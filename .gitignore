@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+build/
+dist/
+*.egg-info/
+
+# Private research and device material must never enter the public repository.
+analysis/
+vendor/
+external/
+captures/
+firmware/
+operator_kit/
+private/
+*.pcap
+*.pcapng
+*.dll
+*.exe
+*.sys
+*.cat
+*.cab
+*.msi
+Goodix_Cache.bin
