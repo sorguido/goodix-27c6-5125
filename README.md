@@ -1,6 +1,6 @@
 # Goodix 27c6:5125 on Linux
 
-**Goodix 27c6:5125 — Technical Manual, Revision 2**
+**Goodix 27c6:5125 — Technical Manual**
 
 This document is the engineering handoff for research toward factory-preserving
 Linux support for the Goodix USB fingerprint reader `27c6:5125`. It describes
@@ -784,8 +784,9 @@ PUBLICATION_LICENSE_STATUS=NOT_SELECTED
 Before publishing, the maintainer must choose an appropriate license or keep
 the default copyright status. Do not infer a license from referenced projects.
 
-**Create a fresh Git repository from this sanitized tree. Do not publish the
-historical private research repository.**
+**This repository contains the sanitized public tree with a new root history.
+The former private research history must not be published, restored, or
+reintroduced into this repository.**
 
 ## Non-redistributed source material
 
