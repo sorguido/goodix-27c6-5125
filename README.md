@@ -6,7 +6,14 @@ This document is the engineering handoff for research toward factory-preserving
 Linux support for the Goodix USB fingerprint reader `27c6:5125`. It describes
 the current technical model, the evidence behind it, the implementation work
 that is safe to reuse, and the exact boundary at which development is paused.
-It is not a chronological research log.
+It is the sole canonical technical manual for this repository, not a
+chronological research log.
+
+> **Status: PAUSED at a documented evidence boundary.**
+>
+> No working Linux driver exists.
+>
+> This repository is a technical engineering handoff, not an operator kit.
 
 ## Table of contents
 
@@ -29,11 +36,13 @@ It is not a chronological research log.
 - [Current critical blocker](#current-critical-blocker)
 - [The Hard Wall — Why Development Is Paused](#the-hard-wall--why-development-is-paused)
 - [Required next primary evidence](#required-next-primary-evidence)
+- [How to contribute](#how-to-contribute)
 - [Suggested engineering continuation](#suggested-engineering-continuation)
 - [Reproducible synthetic tests](#reproducible-synthetic-tests)
 - [Public repository contents](#public-repository-contents)
 - [Non-redistributed source material](#non-redistributed-source-material)
 - [References](#references)
+- [License](#license)
 - [Glossary](#glossary)
 
 ## Project status
@@ -723,6 +732,54 @@ are comparative evidence only. Do not send secrets, biometric material or
 proprietary blobs without a lawful sharing basis. Metadata and a reproducible
 provenance description are valuable first.
 
+## How to contribute
+
+### Contributions useful now
+
+Contributions that can help immediately include:
+
+- technical review of the documented model;
+- review, testing and extension of the public clean-room image codec;
+- additional deterministic synthetic tests;
+- documentation corrections that preserve evidence and status distinctions;
+- clean-room architectural discussion relevant to a future libfprint driver.
+
+There is no working Linux driver in this repository.
+
+### Evidence that could unblock the project
+
+See [Required next primary evidence](#required-next-primary-evidence). The main
+discriminator is target-specific, provenance-valid, hash-pinned ST411/12509
+resident evidence covering at least `0x080272e0..0x0802b8f4`. The value is not
+in having arbitrary Goodix firmware, but in being able to attribute the
+resident code verifiably to the relevant target and version. Do not upload
+proprietary material publicly unless you have the lawful right to redistribute
+it.
+
+### Material not to send or publish
+
+Do not send or publish the following through issues, pull requests or this
+repository:
+
+- transport secrets or PSKs;
+- DPAPI or Goodix cache containers;
+- biometric images, templates, features or payloads;
+- private USB or decrypted captures containing sensitive material;
+- proprietary OEM binaries or firmware without a lawful right to redistribute;
+- credentials or machine-specific secret material.
+
+Metadata, hashes, provenance descriptions, addresses or ranges, and
+independently reproducible observations may be useful without redistributing
+proprietary blobs.
+
+### Safety boundary for contributions
+
+Factory-preserving remains mandatory. No flash, IAP, erase, OTP or persistent
+provisioning shortcut is in scope. A live command sequence is not authorized
+merely because it is documented. Any future live experiment requires separate
+design, review and operator authorization; contributions must not turn this
+handoff into an operator kit.
+
 ## Suggested engineering continuation
 
 If that source becomes available:
@@ -767,22 +824,13 @@ or biometric matching.
 
 ```text
 README.md
-Goodix 27c6 5125 manuale tecnico.md
+LICENSE
 .gitignore
 docs/EVIDENCE.md
 docs/REFERENCES.md
 src/goodix5125_cleanroom.py
 tests/test_cleanroom.py
 ```
-
-No project license has been selected:
-
-```text
-PUBLICATION_LICENSE_STATUS=NOT_SELECTED
-```
-
-Before publishing, the maintainer must choose an appropriate license or keep
-the default copyright status. Do not infer a license from referenced projects.
 
 **This repository contains the sanitized public tree with a new root history.
 The former private research history must not be published, restored, or
@@ -805,11 +853,25 @@ Identifiers and hashes are retained in the evidence and references indexes so
 claims can be audited by the original researcher without redistributing the
 sources.
 
+Product names, file names, trademarks and other OEM identifiers are used
+solely for technical identification and interoperability research. No OEM
+source code, firmware, binaries or other proprietary material is included or
+redistributed by this repository.
+
 ## References
 
 See [docs/REFERENCES.md](docs/REFERENCES.md) for upstream/community projects,
 non-redistributed OEM sources, private captures and standards. Community code
 is referenced, not vendored.
+
+## License
+
+Original project-authored content in this repository is licensed under the
+BSD-2-Clause license. See [LICENSE](LICENSE).
+
+Referenced third-party projects and non-redistributed OEM or proprietary
+materials retain their own rights and licenses and are not relicensed by this
+repository.
 
 ## Glossary
 
