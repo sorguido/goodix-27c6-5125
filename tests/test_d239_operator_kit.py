@@ -18,6 +18,10 @@ OPERATOR_KIT = REPOSITORY / "operator_kit/d239-live-pre-d1-tls-once.sh"
 BACKEND = REPOSITORY / "src/goodix5125_d233_backend.py"
 ENTRYPOINT = REPOSITORY / "src/goodix5125_d235_entrypoint.py"
 LIVE_STDOUT = REPOSITORY / "analysis/D239/D239_operator_live_stdout.json"
+D239_SEALED_SOURCE_HASHES = (
+    "7727128ee27337b70ba48eac31b8640c888b76560387363e4eff0c167d993f5b",
+    "38e857a14bd416808b9ae2df7c4101809879e4732b6e001ce29d11bd731dd555",
+)
 
 
 def digest(path: Path) -> str:
@@ -71,6 +75,15 @@ class D239OperatorKitExecutabilityTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
+        if source_hashes != D239_SEALED_SOURCE_HASHES:
+            # D241 intentionally supersedes the reviewed D239 source baseline.
+            # The historical kit must now reject it rather than silently using
+            # stale D239 hashes or an obsolete unseal patch.
+            self.assertEqual(result.returncode, 68)
+            self.assertIn("sealed backend source differs", result.stderr)
+            self.assertEqual((digest(BACKEND), digest(ENTRYPOINT)), source_hashes)
+            self.assertEqual(os.path.lexists(LIVE_STDOUT), live_stdout_before)
+            return
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("OPERATOR_KIT_DRY_RUN_PRE_USB=PASS", result.stdout)
         report = json.loads(DRY_RUN_REPORT.read_text(encoding="utf-8"))

@@ -48,6 +48,7 @@ from .goodix5125_d232_offline import (
     build_b0,
     parse_a0,
     parse_b0,
+    validate_tls_client_hello_record,
 )
 
 
@@ -393,6 +394,73 @@ def _split_tls_records(stream: bytes) -> tuple[bytes, ...]:
     return tuple(records)
 
 
+_TLS_CONTENT_TYPE_NAMES = {
+    0x14: "change_cipher_spec",
+    0x15: "alert",
+    0x16: "handshake",
+    0x17: "application_data",
+}
+_TLS_HANDSHAKE_TYPE_NAMES = {
+    0x01: "client_hello",
+    0x02: "server_hello",
+    0x0C: "server_key_exchange",
+    0x0E: "server_hello_done",
+    0x10: "client_key_exchange",
+    0x14: "finished",
+}
+
+
+def _redacted_tls_record(
+    record: bytes,
+    *,
+    record_index: int,
+    direction: str,
+    state_before: str,
+    state_after: str,
+    handshake_type_verified: bool,
+) -> dict[str, object]:
+    """Return header-only TLS observability; never retain record payload bytes."""
+    record = bytes(record)
+    if len(record) < 5:
+        raise ContractError("partial TLS record in trace")
+    declared = int.from_bytes(record[3:5], "big")
+    if len(record) != 5 + declared:
+        raise ContractError("TLS record length mismatch in trace")
+    content_type = record[0]
+    result: dict[str, object] = {
+        "record_index": record_index,
+        "direction": direction,
+        "tls_content_type": _TLS_CONTENT_TYPE_NAMES.get(
+            content_type, f"unknown_0x{content_type:02x}"
+        ),
+        "tls_version": f"0x{record[1]:02x}{record[2]:02x}",
+        "record_length": declared,
+        "handshake_type_if_verified": "not_verified",
+        "handshake_state_before": state_before,
+        "handshake_state_after": state_after,
+        "observation_basis": "tls_record_header_observed",
+    }
+    handshake_length = (
+        int.from_bytes(record[6:9], "big")
+        if content_type == 0x16 and declared >= 4
+        else -1
+    )
+    if (
+        handshake_type_verified
+        and content_type == 0x16
+        and handshake_length >= 0
+        and 4 + handshake_length <= declared
+    ):
+        handshake_type = record[5]
+        result["handshake_type_if_verified"] = _TLS_HANDSHAKE_TYPE_NAMES.get(
+            handshake_type, f"unknown_0x{handshake_type:02x}"
+        )
+    if content_type == 0x15 and declared == 2:
+        result["alert_level"] = record[5]
+        result["alert_description"] = record[6]
+    return result
+
+
 class Tls12PskServer:
     """One-shot OpenSSL TLS 1.2 PSK server over MemoryBIO."""
 
@@ -476,16 +544,96 @@ class B0TlsBridge:
         self.engine = engine
         self.transport = transport
         self.pump_count = 0
+        self.first_tls_record_handoff_count = 0
+        self.input_record_count = 0
+        self.output_record_count = 0
+        self.trace: list[dict[str, object]] = []
+        self._record_index = 0
+        self._input_trace_buffer = bytearray()
+        self._input_encrypted = False
+        self._output_encrypted = False
 
-    def accept_b0(self, frame: bytes, timeout_ms: int) -> None:
+    @staticmethod
+    def _remaining(deadline: float) -> int:
+        remaining = int((deadline - time.monotonic()) * 1000)
+        if remaining <= 0:
+            raise ReplayAbort(AbortClass.TLS_TIMEOUT)
+        return remaining
+
+    def _state(self) -> str:
+        if getattr(self.engine, "complete", False):
+            return "cryptographic_handshake_complete"
+        if getattr(self.engine, "handshake_count", 0):
+            return "handshake_in_progress"
+        return "awaiting_first_tls_record"
+
+    def _trace_input(self, payload: bytes, before: str, after: str, *, first_record: bool) -> None:
+        self._input_trace_buffer.extend(payload)
+        while len(self._input_trace_buffer) >= 5:
+            total = 5 + int.from_bytes(self._input_trace_buffer[3:5], "big")
+            if len(self._input_trace_buffer) < total:
+                break
+            record = bytes(self._input_trace_buffer[:total])
+            del self._input_trace_buffer[:total]
+            self._record_index += 1
+            verified = first_record and self.input_record_count == 0
+            self.trace.append(
+                _redacted_tls_record(
+                    record,
+                    record_index=self._record_index,
+                    direction="device_to_host",
+                    state_before=before,
+                    state_after=after,
+                    handshake_type_verified=verified or not self._input_encrypted,
+                )
+            )
+            self.input_record_count += 1
+            if record[0] == 0x14:
+                self._input_encrypted = True
+
+    def accept_b0(
+        self,
+        frame: bytes,
+        timeout_ms: int,
+        *,
+        first_record: bool = False,
+        deadline: float | None = None,
+    ) -> None:
+        if timeout_ms <= 0:
+            raise ReplayAbort(AbortClass.TLS_TIMEOUT)
+        deadline = time.monotonic() + timeout_ms / 1000 if deadline is None else deadline
+        if first_record:
+            if self.first_tls_record_handoff_count:
+                raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
+            self.first_tls_record_handoff_count = 1
+
         try:
             payload = parse_b0(frame)
         except ContractError as exc:
             raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+        if first_record:
+            validate_tls_client_hello_record(payload)
+        before = self._state()
         self.engine.feed(payload)
         self.engine.advance()
+        after = self._state()
+        self._trace_input(payload, before, after, first_record=first_record)
         for record in self.engine.drain():
-            self.transport.write_frame(build_b0(record), timeout_ms)
+            self._record_index += 1
+            self.trace.append(
+                _redacted_tls_record(
+                    record,
+                    record_index=self._record_index,
+                    direction="host_to_device",
+                    state_before=after,
+                    state_after=after,
+                    handshake_type_verified=not self._output_encrypted,
+                )
+            )
+            self.transport.write_frame(build_b0(record), self._remaining(deadline))
+            self.output_record_count += 1
+            if record[0] == 0x14:
+                self._output_encrypted = True
         self.pump_count += 1
 
 
@@ -649,6 +797,12 @@ class ProductionReplayBackend:
         self.last_attempted_phase = "not_reached"
         self.last_failure_domain = "none"
         self.protocol_observations: list[dict[str, object]] = []
+        self.first_tls_record_handoff_count = 0
+        self.tls_secret_object_identity_verified = False
+        self.tls_failure_class = "none"
+        self.tls_trace_redacted: list[dict[str, object]] = []
+        self._pending_first_b0: bytes | None = None
+        self._pending_first_b0_consumed = False
 
     @property
     def usb_open_count(self) -> int:
@@ -675,6 +829,18 @@ class ProductionReplayBackend:
                 responses.append(self.transport.read_frame(timeout_ms))
                 completion_ids.append(self.transport.last_frame_completion_ids)
             self.transport.revalidate_identity()
+            if phase_id == "D1":
+                if self._pending_first_b0 is not None or len(responses) != 1:
+                    raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
+                try:
+                    parse_b0(responses[0])
+                except ContractError:
+                    # The shared response validator owns the D1 protocol
+                    # classification; transport framing errors remain visible
+                    # there as unexpected D1 data, not as a USB I/O failure.
+                    pass
+                else:
+                    self._pending_first_b0 = bytes(responses[0])
             if phase_id == "E4":
                 try:
                     self.binder.validate(self.secret, tuple(responses))
@@ -706,19 +872,40 @@ class ProductionReplayBackend:
             raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
         if self.tls_handshake_count:
             raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
+        if self._pending_first_b0 is None or self._pending_first_b0_consumed:
+            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
+        pending_payload = parse_b0(self._pending_first_b0)
+        if pending_payload != bytes(client_hello):
+            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
         self.tls_handshake_count = 1
         engine = self.tls_factory(secret)
+        self.tls_secret_object_identity_verified = secret is self.secret
         bridge = B0TlsBridge(engine, self.transport)
         deadline = time.monotonic() + timeout_ms / 1000
         try:
-            bridge.accept_b0(build_b0(client_hello), timeout_ms)
+            first_b0 = self._pending_first_b0
+            self._pending_first_b0 = None
+            self._pending_first_b0_consumed = True
+            self.first_tls_record_handoff_count += 1
+            bridge.accept_b0(
+                first_b0,
+                timeout_ms,
+                first_record=True,
+                deadline=deadline,
+            )
             while not engine.complete:
                 remaining = int((deadline - time.monotonic()) * 1000)
                 if remaining <= 0:
                     raise ReplayAbort(AbortClass.TLS_TIMEOUT)
-                bridge.accept_b0(self.transport.read_frame(remaining), remaining)
+                bridge.accept_b0(
+                    self.transport.read_frame(remaining),
+                    remaining,
+                    deadline=deadline,
+                )
+            self.tls_failure_class = "none"
         except UsbTimeout as exc:
             self.last_failure_domain = "usb_transport"
+            self.tls_failure_class = self._timeout_failure_class(bridge)
             raise ReplayAbort(AbortClass.TLS_TIMEOUT) from exc
         except UsbAmbiguousCompletion as exc:
             self.last_failure_domain = "usb_transport"
@@ -726,8 +913,23 @@ class ProductionReplayBackend:
         except UsbFailure as exc:
             self.last_failure_domain = "usb_transport"
             raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+        except ReplayAbort as exc:
+            self.last_failure_domain = "tls_engine"
+            if exc.abort_class == AbortClass.TLS_TIMEOUT:
+                self.tls_failure_class = self._timeout_failure_class(bridge)
+            raise
         finally:
+            self.tls_trace_redacted = list(bridge.trace)
             engine.close()
+
+    def _timeout_failure_class(self, bridge: B0TlsBridge) -> str:
+        if not self.first_tls_record_handoff_count:
+            return "TLS_HANDSHAKE_TIMEOUT_BEFORE_FIRST_TLS_RECORD"
+        if bridge.output_record_count:
+            return "TLS_HANDSHAKE_TIMEOUT_AFTER_SERVER_FLIGHT"
+        if bridge.input_record_count:
+            return "TLS_HANDSHAKE_TIMEOUT_AFTER_CLIENTHELLO"
+        return "TLS_HANDSHAKE_TIMEOUT_STATE_UNRESOLVED"
 
     def cleanup(self) -> None:
         self.cleanup_count += 1
@@ -967,6 +1169,9 @@ def _candidate_report(
         "terminal_state": values.get("terminal_state", "STOP"),
         "reached_phase": values.get("reached_phase", reached_phase),
         "abort_class": values.get("abort_class", abort_class),
+        "unexpected_data": (
+            values.get("abort_class", abort_class) == AbortClass.UNEXPECTED_DATA.value
+        ),
         "command_count": values.get("command_count", 0),
         "usb_open_count": values.get("usb_open_count", 0),
         "tls_handshake_count": values.get("tls_handshake_count", 0),
@@ -984,6 +1189,17 @@ def _candidate_report(
             backend is not None
             and backend.binder.compare_count == 1
             and backend.tls_handshake_count == 1
+            and backend.tls_secret_object_identity_verified
+        ),
+        "first_tls_record_handoff_count": (
+            backend.first_tls_record_handoff_count if backend is not None else 0
+        ),
+        "tls_failure_class": (
+            backend.tls_failure_class if backend is not None else "none"
+        ),
+        "tls_handshake_timeout_ms": PHASE_TIMEOUT_MS["TLS"],
+        "tls_trace_redacted": (
+            list(backend.tls_trace_redacted) if backend is not None else []
         ),
         "attempted_phase": (
             backend.last_attempted_phase if backend is not None else "not_reached"

@@ -75,16 +75,16 @@ class ProductionRuntimePaths:
     def system_default(cls) -> "ProductionRuntimePaths":
         repository = Path(__file__).resolve().parents[1]
         store = Path("/var/lib/goodix-5125-poc")
-        reports = store / "d238-results"
+        reports = store / "d241-results"
         return cls(
             psk_store=store / "transport-material.bin",
             target_material_manifest=store / "target-material-manifest.json",
             config90_store=store / "target-config-90.bin",
             canonical_gfusb=repository / "analysis/D230/work/GoodixExport/gfusb.dll",
             report_directory=reports,
-            checkpoint_report=reports / "d238-live-pre-restore.json",
-            final_report=reports / "d238-live-result.json",
-            single_use_marker=store / "d238-live-single-use.marker",
+            checkpoint_report=reports / "d241-live-pre-restore.json",
+            final_report=reports / "d241-live-result.json",
+            single_use_marker=store / "d241-operator-invocation.marker",
         )
 
     def validate(self) -> None:
@@ -283,6 +283,30 @@ def map_production_report(
         contains_secret=False,
         contains_raw_config90=False,
         contains_biometric_data=False,
+        d241_result=(
+            "TLS_CRYPTOGRAPHIC_HANDSHAKE_COMPLETED_D4_NOT_EXECUTED"
+            if report.get("result") == "pass"
+            else "D241_ABORTED_FAIL_CLOSED"
+        ),
+        d241_failure_class=(
+            report.get("tls_failure_class")
+            if report.get("tls_failure_class") not in (None, "none")
+            else report.get("abort_class", AbortClass.INTERNAL.value)
+            if report.get("result") != "pass"
+            else "none"
+        ),
+        d241_d1_direct_b0_handoff=(
+            "exactly_once"
+            if report.get("first_tls_record_handoff_count") == 1
+            else "not_completed"
+        ),
+        d241_psk_binding=(
+            "same_e4_validated_secret_object_used_by_tls"
+            if report.get("same_validated_psk_used_by_tls") is True
+            else "not_proven"
+        ),
+        d241_tls_handshake_timeout_policy="bounded_3000ms_no_retry",
+        d241_tls_trace_redacted=True,
     )
     return mapped
 

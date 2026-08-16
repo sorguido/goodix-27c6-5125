@@ -32,6 +32,9 @@ TARGET_PID = 0x5125
 PSK_LENGTH = 32
 TLS_SUITE = 0x00A8
 TLS_IDENTITY = "Client_identity"
+TLS12_CLIENT_HELLO_RECORD_VERSIONS = frozenset(
+    (b"\x03\x01", b"\x03\x02", b"\x03\x03")
+)
 
 EXACT_PHASE_ORDER = (
     "E4",
@@ -173,7 +176,22 @@ def parse_b0(frame: bytes) -> bytes:
 
 
 def validate_tls_client_hello_record(record: bytes) -> None:
-    if len(record) < 9 or record[0] != 0x16 or record[1:3] != b"\x03\x03":
+    """Validate one complete TLS 1.2 ClientHello record without consuming it.
+
+    A TLS 1.2 ClientHello can legitimately use a legacy record-layer version
+    from TLS 1.0 through TLS 1.2 while advertising TLS 1.2 in the handshake
+    body. Clients may also offer the required ``0x00a8`` together with the
+    signaling cipher-suite value or other suites. The previous exact-``0303``
+    record and exact-one-suite checks rejected interoperable forms before the
+    already-read B0 could reach OpenSSL; the server context remains restricted
+    to ``0x00a8``.
+    """
+    record = bytes(record)
+    if (
+        len(record) < 9
+        or record[0] != 0x16
+        or record[1:3] not in TLS12_CLIENT_HELLO_RECORD_VERSIONS
+    ):
         raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
     if int.from_bytes(record[3:5], "big") != len(record) - 5:
         raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
@@ -191,7 +209,17 @@ def validate_tls_client_hello_record(record: bytes) -> None:
         raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
     suites_length = int.from_bytes(body[cursor:cursor + 2], "big")
     cursor += 2
-    if suites_length != 2 or body[cursor:cursor + suites_length] != TLS_SUITE.to_bytes(2, "big"):
+    if (
+        suites_length < 2
+        or suites_length % 2
+        or cursor + suites_length > len(body)
+    ):
+        raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
+    suites = tuple(
+        int.from_bytes(body[index:index + 2], "big")
+        for index in range(cursor, cursor + suites_length, 2)
+    )
+    if TLS_SUITE not in suites:
         raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
     cursor += suites_length
     if cursor >= len(body):

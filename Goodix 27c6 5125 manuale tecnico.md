@@ -6,18 +6,20 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-Non esiste ancora un driver Linux funzionante. D238 ha consolidato offline il
-solo cold-start OEM fino al primo handshake TLS, ma il relativo tentativo
-operatore si è arrestato prima dell'USB per un contesto d'import Python errato.
-D239 corregge in modo permanente il launcher e introduce un gate di dry-run
-reale fino alla barriera pre-USB. Il repository non autorizza da solo operazioni
-live: l'esecuzione privilegiata resta subordinata a review e nuova
-autorizzazione umana.
+Non esiste ancora un driver Linux funzionante. Il successivo tentativo live
+D239 ha però eseguito sul firmware 12509 l'intero cold-start OEM fino a D1 e ha
+ricevuto direttamente un frame B0/TLS. Il run si è fermato nel software host
+prima del TLS bridge: il command path aveva già consumato il B0 e il validatore
+ClientHello pre-bridge lo ha classificato `unexpected_data`. D241 corregge
+offline questa transizione con ownership exactly-once, timeout handshake
+bounded e trace redatta. Il repository non autorizza da solo operazioni live:
+l'esecuzione privilegiata resta subordinata a review e nuova autorizzazione
+umana.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
-| TLS 1.2 PSK | motore reale verificato offline in D233 | profilo/dataflow noti; nessun handshake con il dispositivo |
+| TLS 1.2 PSK | motore reale verificato offline in D233 | profilo/dataflow noti; D239 ha ricevuto il primo B0 ma non ha avviato il bridge |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
 | A2 e `0x70` | convergenza host-side D231 | reset solo sensore e set-mode idle; corpi resident ancora assenti |
 | Readback resident arbitrario | esaurito nel corpus locale | nessun path host-side safe trovato da D230 |
@@ -27,7 +29,8 @@ autorizzazione umana.
 | Entrypoint production D235 | composto e verificato offline, hard-disabled | path reali deterministici, mapping terminale e restore collegati; D236 non autorizzato |
 | Evidenza live D236 | parziale, non è un cold-start riuscito | E4 binding reale `match`; primo A2 trasmesso; ACK reale `B0/A2/07`; zero TLS/retry/persistent-write |
 | Consolidamento D238 | verificato offline, source-sealed | policy ACK unica, replay pre-D1 completo con `0x01` e `0x07`, osservabilità redatta e unico kit operatore |
-| Executability gate D239 | PASS offline, nessun live USB | launcher import-safe, composizione production-shaped fino al fence pre-USB e tutti i contatori live a zero |
+| Evidenza live D239 | pre-D1 integralmente superato su 12509 | 12 comandi, E4 `match`, D1 seguito da B0/TLS diretto di 52 byte; stop host-side `unexpected_data` |
+| Transizione TLS D241 | PASS offline, source-sealed | primo B0 già letto trasferito al bridge una volta, PSK E4-bound, timeout/trace e closure gate verificati; nessun live D241 |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -133,7 +136,7 @@ direttamente B0 con ClientHello TLS.
 | `0x70` | `70` | `01`, `07` | nessuna | capture `01`; `07` ereditato dalla semantica ACK di sessione |
 | `0x80` ×4 | `80` | `01`, `07` | nessuna | capture `01`; `07` ereditato dalla semantica ACK di sessione |
 | `0x90` | `90` | `01`, `07` | A0/90 body esatto `0100` | capture `01`; `07` ereditato dalla semantica ACK di sessione |
-| D1 | `d1` | nessuno | B0/TLS ClientHello | capture primaria |
+| D1 | `d1` | nessuno | B0/TLS diretto | capture primaria: ClientHello verificato; live D239: B0 osservato, body non disponibile localmente per verifica byte-per-byte |
 
 `0x07` non è stato promosso come risposta applicativa specifica di E4 o A2. La
 capture mostra `0x01` invariato attraverso control diversi; i run reali D236
@@ -198,8 +201,10 @@ D237 -> evidenza D236 normalizzata e boundary di sicurezza riconfermato
 D238 -> policy pre-D1 consolidata e kit operatore source-sealed
      -> tentativo operatore fallito sull'import Python, prima di unseal/USB
 D239 -> launcher corretto + dry-run operatore production-shaped fino al pre-USB
-     -> OPERATOR_KIT_DRY_RUN_PRE_USB=PASS; nessun live eseguito
-next -> review D239, poi eventuali autorizzazione e step live separati
+     -> gate offline PASS; successiva run autorizzata: pre-D1 completo e B0/TLS
+D240 -> SUPERSEDED / DO_NOT_EXECUTE / NOT_EXECUTED
+D241 -> correzione offline command-to-TLS, kit source-sealed e closure PASS
+     -> prossimo confine autorizzabile: solo handshake TLS crittografico, senza D4
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -540,9 +545,9 @@ unseal, claim del marker, entrypoint production, init libusb, open USB o comando
 Goodix è stato raggiunto. Il vecchio report D236 già presente non fu rigenerato
 da quel tentativo e non ne costituisce evidenza.
 
-## D239: executability gate dell'operator kit
+## D239 e D241: dal primo B0 live alla transizione TLS
 
-D239 sostituisce il launcher operativo con
+D239 ha sostituito il launcher operativo con
 `operator_kit/d239-live-pre-d1-tls-once.sh`. Ogni entrypoint Python del launcher
 riceve esplicitamente
 `PYTHONPATH="$EXPECTED_REPOSITORY${PYTHONPATH:+:$PYTHONPATH}"`; il preflight
@@ -585,13 +590,65 @@ La Definition of Done permanente dell'operator kit è:
 5. sorgenti ancora sealed e patch live applicabile soltanto in dry-run;
 6. suite completa senza regressioni.
 
-D239 soddisfa questi punti con 74 test passati. La decisione è
-`D239_OPERATOR_KIT_EXECUTABILITY_GATE_PASSED_READY_FOR_REVIEW`, ma non è
-un'autorizzazione hardware: il ramo live richiede prima un report D239 PASS
-fresco, poi root, review e autorizzazione umana separate. Codex non ha eseguito
-né richiesto di eseguire quel ramo. D4, application data, FDT, capture, enroll,
-reset/power-cycle e recovery invasiva automatica restano irraggiungibili o
-vietati.
+D239 soddisfece questi punti con 74 test passati. Dopo la correzione manuale
+della directory report root, l'operatore eseguì il singolo ramo live autorizzato.
+Sul dispositivo reale `27c6:5125`, firmware `GF_ST411SEC_APP_12509`, la sequenza
+fu `E4/A2/82/A6/A2/70/80x4/90/D1`, con `command_count=12`, binding E4 `match` e
+risposta D1 `direct_b0_tls`. Il B0 aveva body length redatta 52; non vi furono
+ACK D1, D4, application data, persistent write o retry. Cleanup, zeroizzazione,
+restore e reseal risultarono completati.
+
+La mappa causale chiusa da D241 è:
+
+```text
+D1 send
+→ ProductionReplayBackend.exchange legge e riassembla il primo B0
+→ _validate_responses verifica wrapper e ClientHello
+→ i vecchi vincoli record-version 0x0303 e lista suite esattamente {0x00a8}
+  possono produrre unexpected_data prima del bridge
+→ il B0 resta già consumato dal command reader
+→ D241 conserva il frame come pending ownership
+→ tls_handshake verifica l'identità dell'oggetto SecretBuffer E4-validato
+→ B0TlsBridge riceve lo stesso frame pending esattamente una volta
+```
+
+D241 ammette per il record layer ClientHello TLS 1.2 le legacy version
+`0x0301`, `0x0302` e `0x0303` e una lista offerta che contenga `0x00a8`
+anche insieme a SCSV o altre suite. Il server OpenSSL resta ristretto a
+`0x00a8`; handshake version TLS 1.2, wrapper/lunghezze e struttura ClientHello
+restano obbligatori.
+Non rende permissivo `unexpected_data` e non ammette B0 in altre fasi. Il frame
+pending viene rimosso prima del feed e non può essere riletto o reiniettato.
+
+I byte redatti del B0 live D239 non sono presenti negli artefatti locali:
+
+```text
+D239_FIRST_B0_TLS_BYTES_NOT_LOCALLY_AVAILABLE
+```
+
+È quindi soltanto un'inferenza che quel body fosse un ClientHello. Un
+ClientHello TLS 1.2 minimale può essere molto piccolo, ma i 52 byte non possono
+essere confrontati numericamente finché non è noto se la misura includa o
+escluda wrapper B0, header TLS, checksum o altri campi. La conferma resta la
+verifica byte-per-byte del record header e del handshake type in una futura
+trace redatta.
+
+Il kit D241 usa il solo marker
+`/var/lib/goodix-5125-poc/d241-operator-invocation.marker`; marker storici
+D236/D238/D239 sono innocui e non vengono cancellati. Il launcher prepara
+idempotentemente `/var/lib/goodix-5125-poc/d241-results` come root `0700`, poi
+lo rivalida. L'handshake ha budget complessivo di 3000 ms, zero retry e classi
+timeout basate sull'ultimo record verificato. Il report espone solo header TLS,
+direzione, lunghezza, stato e handshake type quando verificabile; non conserva
+record completi o key material.
+
+Il closure gate D241 attraversa launcher, import, preflight sandbox, marker
+storici, directory report, patch apply/reseal, entrypoint, B0 diretto
+frammentato su completion USB, handoff, fixture successo, fixture timeout,
+pubblicazione redatta e cleanup. D241 non ha effettuato accesso al sensore.
+D4, application data, FDT, capture, enroll, reset/power-cycle e recovery
+invasiva automatica restano irraggiungibili o vietati. D240 è obsoleto e non è
+stato eseguito.
 
 Il riferimento Rocky indipendente è
 <https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1>. È corroborazione
@@ -647,15 +704,15 @@ interfaccia senza nuova evidenza primaria target-specific.
 
 La semantica host-side A2/0x70, il backend USB/TLS, il binding runtime PSK↔E4,
 l'orchestratore e il vero entrypoint production non sono più blocker offline.
-Il confine immediato resta operativo e umano: i run manuali D236 hanno provato
-E4 e il primo ACK A2, D238 ha chiuso offline la policy completa e D239 ha
-provato l'eseguibilità dell'operator kit soltanto fino alla barriera pre-USB.
-Il repository resta source-sealed; il solo script D239 può applicare
-temporaneamente l'unseal revisionato, ma il suo gate PASS abilita esclusivamente
-la review. Qualunque tentativo hardware richiede un nuovo step e una nuova
-autorizzazione esplicita dell'operatore. Nessun esito D236–D239 autorizza retry
-o seconda invocazione. L'assenza di prova device-side assoluta dei receiver
-resident resta esplicita.
+Il confine immediato non è più pre-D1: D239 ha provato live su 12509 l'intera
+sequenza fino a D1 e il successivo B0/TLS diretto. D241 ha chiuso offline il
+confine software command→TLS, ma non costituisce avanzamento device-side e non
+ha eseguito un handshake con il sensore. Il repository resta source-sealed; il
+solo script D241 può applicare temporaneamente l'unseal revisionato, e il suo
+gate PASS abilita esclusivamente review e un singolo tentativo umano separato.
+Quel tentativo deve fermarsi subito dopo il successo crittografico TLS, prima
+di D4. Nessun esito storico autorizza retry o seconda invocazione. L'assenza di
+prova device-side assoluta dei receiver resident resta esplicita.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,
@@ -702,9 +759,9 @@ replay senza tale estrazione.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
-production-candidate D235, il consolidamento D238 e l'executability gate D239.
-Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
-source-sealed e non
+production-candidate D235, il consolidamento D238, l'evidenza D239 e la
+transizione command→TLS D241. Questi includono ABI libusb esatta e TLS OpenSSL,
+ma il live resta doppiamente source-sealed e non
 costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
 transpose.
@@ -722,4 +779,4 @@ transpose.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D239 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D241 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
