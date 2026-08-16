@@ -6,20 +6,19 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-Non esiste ancora un driver Linux funzionante. Il successivo tentativo live
-D239 ha però eseguito sul firmware 12509 l'intero cold-start OEM fino a D1 e ha
-ricevuto direttamente un frame B0/TLS. Il run si è fermato nel software host
-prima del TLS bridge: il command path aveva già consumato il B0 e il validatore
-ClientHello pre-bridge lo ha classificato `unexpected_data`. D241 corregge
-offline questa transizione con ownership exactly-once, timeout handshake
-bounded e trace redatta. Il repository non autorizza da solo operazioni live:
-l'esecuzione privilegiata resta subordinata a review e nuova autorizzazione
-umana.
+Non esiste ancora un driver Linux funzionante. D239 ha eseguito sul firmware
+12509 l'intero cold-start OEM fino a D1 e ricevuto il B0/TLS diretto; D241 ha
+poi verificato live l'ownership exactly-once e un ClientHello TLS 1.2 valido.
+Il server OpenSSL ha emesso ServerHello e ServerHelloDone, ma il dispositivo
+non ha inviato ClientKeyExchange entro il timeout bounded. D242 ha isolato e
+corretto offline due divergenze primarie dal send path Windows: ultimi OUT corti
+anziché blocchi fissi da 64 byte e assenza del pacing TLS `Sleep(10)`. Il nuovo
+kit è `READY_NOT_EXECUTED`: il repository non autorizza da solo operazioni live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
-| TLS 1.2 PSK | motore reale verificato offline in D233 | profilo/dataflow noti; D239 ha ricevuto il primo B0 ma non ha avviato il bridge |
+| TLS 1.2 PSK | server flight verificato live in D241 | ClientHello 47, ServerHello 81, ServerHelloDone 4; nessun ClientKeyExchange |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
 | A2 e `0x70` | convergenza host-side D231 | reset solo sensore e set-mode idle; corpi resident ancora assenti |
 | Readback resident arbitrario | esaurito nel corpus locale | nessun path host-side safe trovato da D230 |
@@ -30,7 +29,8 @@ umana.
 | Evidenza live D236 | parziale, non è un cold-start riuscito | E4 binding reale `match`; primo A2 trasmesso; ACK reale `B0/A2/07`; zero TLS/retry/persistent-write |
 | Consolidamento D238 | verificato offline, source-sealed | policy ACK unica, replay pre-D1 completo con `0x01` e `0x07`, osservabilità redatta e unico kit operatore |
 | Evidenza live D239 | pre-D1 integralmente superato su 12509 | 12 comandi, E4 `match`, D1 seguito da B0/TLS diretto di 52 byte; stop host-side `unexpected_data` |
-| Transizione TLS D241 | PASS offline, source-sealed | primo B0 già letto trasferito al bridge una volta, PSK E4-bound, timeout/trace e closure gate verificati; nessun live D241 |
+| Transizione TLS D241 | live single-shot consumato, fail-closed | handoff e PSK object binding verificati; timeout dopo server flight; zero D4/app-data/retry |
+| Correzione D242 | PASS offline, source-sealed | OUT OEM fissi da 64 byte + pacing TLS 10 ms; 100 test e closure gate PASS; kit non eseguito |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -83,12 +83,27 @@ separatamente. Non è corretto dedurre sempre il logico con `wire & 0xfe`.
 B0 avvolge direttamente un record TLS completo con header Goodix di quattro
 byte; non aggiunge cifratura o compressione.
 
+La lunghezza dichiarata dal wrapper B0 descrive soltanto il record TLS. Il
+trasporto OEM Windows invia però ogni segmento bulk OUT come staging buffer
+fisso da 64 byte; la tail dell'ultimo blocco è fuori dal B0 dichiarato e nella
+capture non è tutta zero. I byte TLS **emessi** dal motore, il frame B0
+costruito, i byte USB richiesti e quelli completati sono quindi misure distinte.
+D242 inizializza deterministicamente a zero la tail non semantica. Un flag
+`server_hello_sent` prova al massimo emissione e wrapping; la trasmissione
+completa richiede completion USB full-length per ogni blocco.
+
 ## Sicurezza e TLS
 
 Il profilo noto è TLS 1.2 pure PSK, suite `0x00a8`, identity
 `Client_identity`, dispositivo client e host server. Il materiale autentico del
 laptop originale ha prodotto una singola E4 read-only `MATCH`, ma questo non
 costituisce una procedura generale di provisioning.
+
+D241 ha inoltre verificato il binding di ownership: il medesimo oggetto
+`SecretBuffer` validato da E4 è stato consegnato al server TLS, senza copia o
+sostituzione intermedia. Questo prova l'identità dell'oggetto e il percorso
+runtime, non prova da solo che il dispositivo abbia completato la derivazione
+crittografica o accettato il server flight.
 
 D231 conferma nella DLL che il plaintext DPAPI viene copiato nell'area PSK
 runtime e passato direttamente al setup TLS senza un secondo KDF OEM. Il
@@ -136,7 +151,7 @@ direttamente B0 con ClientHello TLS.
 | `0x70` | `70` | `01`, `07` | nessuna | capture `01`; `07` ereditato dalla semantica ACK di sessione |
 | `0x80` ×4 | `80` | `01`, `07` | nessuna | capture `01`; `07` ereditato dalla semantica ACK di sessione |
 | `0x90` | `90` | `01`, `07` | A0/90 body esatto `0100` | capture `01`; `07` ereditato dalla semantica ACK di sessione |
-| D1 | `d1` | nessuno | B0/TLS diretto | capture primaria: ClientHello verificato; live D239: B0 osservato, body non disponibile localmente per verifica byte-per-byte |
+| D1 | `d1` | nessuno | B0/TLS diretto | capture primaria D175 e live D241: ClientHello TLS 1.2 verificato; D241 ownership exactly-once |
 
 `0x07` non è stato promosso come risposta applicativa specifica di E4 o A2. La
 capture mostra `0x01` invariato attraverso control diversi; i run reali D236
@@ -203,8 +218,10 @@ D238 -> policy pre-D1 consolidata e kit operatore source-sealed
 D239 -> launcher corretto + dry-run operatore production-shaped fino al pre-USB
      -> gate offline PASS; successiva run autorizzata: pre-D1 completo e B0/TLS
 D240 -> SUPERSEDED / DO_NOT_EXECUTE / NOT_EXECUTED
-D241 -> correzione offline command-to-TLS, kit source-sealed e closure PASS
-     -> prossimo confine autorizzabile: solo handshake TLS crittografico, senza D4
+D241 -> run live single-shot consumata: ClientHello verificato e server flight
+     -> trasmesso, poi timeout senza ClientKeyExchange; zero retry/D4/app-data
+D242 -> contratto OEM corretto offline: OUT fissi 64 byte + pacing 10 ms/record
+     -> closure PASS e nuovo kit source-sealed READY_NOT_EXECUTED, senza D4
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -604,48 +621,108 @@ La mappa causale chiusa da D241 è:
 D1 send
 → ProductionReplayBackend.exchange legge e riassembla il primo B0
 → _validate_responses verifica wrapper e ClientHello
-→ i vecchi vincoli record-version 0x0303 e lista suite esattamente {0x00a8}
-  possono produrre unexpected_data prima del bridge
-→ il B0 resta già consumato dal command reader
-→ D241 conserva il frame come pending ownership
-→ tls_handshake verifica l'identità dell'oggetto SecretBuffer E4-validato
-→ B0TlsBridge riceve lo stesso frame pending esattamente una volta
+→ il frame resta pending dopo la validazione
+→ tls_handshake verifica l'identità del SecretBuffer E4-validato
+→ B0TlsBridge riceve quel frame esattamente una volta
+→ OpenSSL emette ServerHello e ServerHelloDone
+→ due B0 distinti sono sottoposti a bulk OUT
+→ una successiva bulk IN non riceve dati e scade il budget bounded
 ```
 
 D241 ammette per il record layer ClientHello TLS 1.2 le legacy version
 `0x0301`, `0x0302` e `0x0303` e una lista offerta che contenga `0x00a8`
 anche insieme a SCSV o altre suite. Il server OpenSSL resta ristretto a
 `0x00a8`; handshake version TLS 1.2, wrapper/lunghezze e struttura ClientHello
-restano obbligatori.
-Non rende permissivo `unexpected_data` e non ammette B0 in altre fasi. Il frame
-pending viene rimosso prima del feed e non può essere riletto o reiniettato.
+restano obbligatori. Non rende permissivo `unexpected_data` e non ammette B0
+in altre fasi. Il pending frame viene rimosso prima del feed, quindi non può
+essere riletto o reiniettato.
 
-I byte redatti del B0 live D239 non sono presenti negli artefatti locali:
+La singola run live D241 è evidenza reale, non un dry-run:
 
 ```text
-D239_FIRST_B0_TLS_BYTES_NOT_LOCALLY_AVAILABLE
+D241_LIVE_SINGLE_SHOT_COMPLETED=true
+D241_CLIENT_HELLO_VERIFIED=true
+D241_CLIENT_HELLO_RECORD_LENGTH=47
+D241_SERVER_HELLO_SENT=true
+D241_SERVER_HELLO_RECORD_LENGTH=81
+D241_SERVER_HELLO_DONE_SENT=true
+D241_SERVER_HELLO_DONE_RECORD_LENGTH=4
+D241_CLIENT_KEY_EXCHANGE_OBSERVED=false
+D241_TLS_CRYPTOGRAPHIC_HANDSHAKE_COMPLETED=false
+D241_ERROR_CLASS=TLS_HANDSHAKE_TIMEOUT_AFTER_SERVER_FLIGHT
+D241_D4_COUNT=0
+D241_APPLICATION_DATA_COUNT=0
+D241_PERSISTENT_WRITE_FAMILY_COUNT=0
+D241_RETRY_COUNT=0
+D241_SECRET_ZEROIZED=true
+D241_FPRINTD_RESTORED=true
+D241_SOURCE_RESEALED=true
+D241_DO_NOT_RETRY=true
 ```
 
-È quindi soltanto un'inferenza che quel body fosse un ClientHello. Un
-ClientHello TLS 1.2 minimale può essere molto piccolo, ma i 52 byte non possono
-essere confrontati numericamente finché non è noto se la misura includa o
-escluda wrapper B0, header TLS, checksum o altri campi. La conferma resta la
-verifica byte-per-byte del record header e del handshake type in una futura
-trace redatta.
+Nel JSON ereditato, `decision=D236_ABORTED_USB_TRANSPORT` e
+`backend_failure_domain=usb_transport` sono label nominali legacy. Non hanno
+precedenza sulla classe causale specifica: l'esito canonico D241 è
+`TLS_HANDSHAKE_TIMEOUT_AFTER_SERVER_FLIGHT`. Il server flight fu emesso da
+OpenSSL, avvolto in due B0 validi, sottoposto e completato integralmente secondo
+le lunghezze richieste dal codice D241; una bulk IN post-flight fu realmente
+tentata e non restituì dati. Questo sposta la vecchia analisi oltre un semplice
+errore locale di submit, ma non rende equivalente il contratto USB all'OEM.
 
-Il kit D241 usa il solo marker
-`/var/lib/goodix-5125-poc/d241-operator-invocation.marker`; marker storici
-D236/D238/D239 sono innocui e non vengono cancellati. Il launcher prepara
-idempotentemente `/var/lib/goodix-5125-poc/d241-results` come root `0700`, poi
-lo rivalida. L'handshake ha budget complessivo di 3000 ms, zero retry e classi
-timeout basate sull'ultimo record verificato. Il report espone solo header TLS,
-direzione, lunghezza, stato e handshake type quando verificabile; non conserva
-record completi o key material.
+La semantica delle lunghezze è ora chiusa tracciando i produttori dei campi:
+`response_body_length=52` in D239 è `len(parse_b0(frame))`, cioè record TLS
+completo; `record_length=47` nella trace D241 è il payload dichiarato
+dall'header TLS. Quindi `52 = 5 byte di header TLS + 47 byte di payload` e la
+classificazione è
+`D239_52_EQUALS_TLS_HEADER_PLUS_D241_47_CONFIRMED`. Non riguarda i quattro byte
+del wrapper B0.
 
-Il closure gate D241 attraversa launcher, import, preflight sandbox, marker
-storici, directory report, patch apply/reseal, entrypoint, B0 diretto
-frammentato su completion USB, handoff, fixture successo, fixture timeout,
-pubblicazione redatta e cleanup. D241 non ha effettuato accesso al sensore.
+## D242: differenziale causale del server flight
+
+La sola capture primaria locale disponibile è quella storicamente classificata
+D175; la capture D43 è assente e resta `NOT_ASSESSABLE`. D175 mostra la stessa
+struttura TLS osservata in D241: ClientHello payload 47 con suite offerte
+`00a8,00ff`, ServerHello payload 81 che seleziona `00a8`, e
+ServerHelloDone payload 4. ServerHello e ServerHelloDone sono in due B0
+distinti, un record TLS per B0; wrapper type, declared/actual length e checksum
+sono coerenti. Non è una equivalenza byte-per-byte dei valori casuali o del
+session ID, che restano intenzionalmente non pubblicati.
+
+Il differenziale primario ha invece provato due violazioni del contratto OEM:
+
+1. il send callback Windows spezza ogni B0 in segmenti logici `<=64`, ma
+   sottopone sempre 64 byte al bulk OUT, con zero padding finale; D241
+   sottoponeva finali corti (ServerHello `64+26`, ServerHelloDone `13`), mentre
+   D175 osserva completion da `64+64` e `64`;
+2. la DLL chiama `Sleep(10)` dopo ciascun record TLS. D175 osserva circa
+   21,933 ms fra completion ServerHello e primo OUT ServerHelloDone, mentre
+   D241 drenava e inviava i due record back-to-back senza pacing.
+
+Il timeout di 3000 ms non è la causa: nella sessione OEM il ClientKeyExchange
+inizia circa 13,338 ms dopo ServerHelloDone, molto dentro quel budget. D242 ha
+quindi implementato il fix minimale di classe: zero padding dell'ultimo OUT a
+64 byte, requisito di completion esattamente 64, e pacing di 10 ms dopo ogni
+record TLS. First-record ownership, binding PSK, zero retry e stop prima di D4
+restano invariati. Fixture offline verificano tre OUT da 64 byte, due B0
+distinti, due pause da 10 ms, ricezione post-flight, short completion
+fail-closed, cleanup/zeroizzazione e redazione.
+
+Questo prova la causa della divergenza del path D241 e la sua correzione
+contrattuale; non prova ancora che il firmware risponderà con ClientKeyExchange
+al path corretto. Il nuovo confine è dunque la validazione device-side futura
+del server flight corretto, in un solo tentativo umano separatamente
+autorizzato. D242 non ha eseguito USB reale né handshake TLS reale.
+
+Il kit D242 usa esclusivamente
+`/var/lib/goodix-5125-poc/d242-operator-invocation.marker`; i marker storici
+D236/D238/D239/D241 sono benigni e non vengono cancellati. Prepara
+idempotentemente `/var/lib/goodix-5125-poc/d242-results` root `0700`, verifica
+hash e sealed baseline, applica l'unseal soltanto per la singola invocazione,
+e reseala nel cleanup. Il closure gate esegue con peer USB/TLS sintetici
+preflight, lifecycle directory/marker, patch apply/reverse, handoff exactly-once,
+successo, timeout post-flight, osservabilità redatta e cleanup. Il suo stato è
+`D242_EXECUTABLE_CLOSURE_GATE_PASS`; il kit resta `READY_NOT_EXECUTED`.
+
 D4, application data, FDT, capture, enroll, reset/power-cycle e recovery
 invasiva automatica restano irraggiungibili o vietati. D240 è obsoleto e non è
 stato eseguito.
@@ -705,14 +782,16 @@ interfaccia senza nuova evidenza primaria target-specific.
 La semantica host-side A2/0x70, il backend USB/TLS, il binding runtime PSK↔E4,
 l'orchestratore e il vero entrypoint production non sono più blocker offline.
 Il confine immediato non è più pre-D1: D239 ha provato live su 12509 l'intera
-sequenza fino a D1 e il successivo B0/TLS diretto. D241 ha chiuso offline il
-confine software command→TLS, ma non costituisce avanzamento device-side e non
-ha eseguito un handshake con il sensore. Il repository resta source-sealed; il
-solo script D241 può applicare temporaneamente l'unseal revisionato, e il suo
-gate PASS abilita esclusivamente review e un singolo tentativo umano separato.
-Quel tentativo deve fermarsi subito dopo il successo crittografico TLS, prima
-di D4. Nessun esito storico autorizza retry o seconda invocazione. L'assenza di
-prova device-side assoluta dei receiver resident resta esplicita.
+sequenza fino a D1 e il successivo B0/TLS diretto. D241 ha poi verificato live
+ClientHello, ownership e binding, ha trasmesso il server flight ed è terminato
+senza ClientKeyExchange. D242 ha provato e corretto offline le differenze di
+segmentazione e pacing rispetto a D175/Windows. Il confine corrente è la sola
+risposta device-side al server flight corretto: non è stata ancora osservata.
+Il repository resta source-sealed; soltanto il kit D242 con closure PASS può
+applicare temporaneamente l'unseal per un singolo tentativo umano separatamente
+autorizzato. Quel tentativo deve fermarsi subito dopo il successo crittografico
+TLS, prima di D4. Nessun esito storico autorizza retry o seconda invocazione.
+L'assenza di prova device-side assoluta dei receiver resident resta esplicita.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,
@@ -760,8 +839,9 @@ replay senza tale estrazione.
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
 production-candidate D235, il consolidamento D238, l'evidenza D239 e la
-transizione command→TLS D241. Questi includono ABI libusb esatta e TLS OpenSSL,
-ma il live resta doppiamente source-sealed e non
+transizione command→TLS D241, più la correzione di trasporto/pacing D242.
+Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
+source-sealed e non
 costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
 transpose.
@@ -779,4 +859,4 @@ transpose.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D241 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D242 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.

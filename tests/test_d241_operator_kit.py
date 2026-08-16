@@ -67,28 +67,18 @@ class D241OperatorPreflightTests(unittest.TestCase):
         self.assertTrue(report["report_directory"]["pass"])
         self.assertEqual(report["libusb_init_count"], 0)
 
-    def test_production_namespace_is_d241_and_not_historical(self):
+    def test_production_namespace_is_now_d242_and_d241_is_historical(self):
         paths = ProductionRuntimePaths.system_default()
-        self.assertEqual(paths.single_use_marker.name, D241_MARKER_NAME)
-        self.assertEqual(paths.report_directory.name, "d241-results")
-        self.assertNotIn(paths.single_use_marker.name, HISTORICAL_MARKER_NAMES)
+        self.assertEqual(paths.single_use_marker.name, "d242-operator-invocation.marker")
+        self.assertEqual(paths.report_directory.name, "d242-results")
+        self.assertNotEqual(paths.single_use_marker.name, D241_MARKER_NAME)
 
-    def test_t11_seal_unseal_hashes_apply_and_reseal_byte_exactly(self):
-        result = verify_unseal_reseal()
-        self.assertEqual(result["patch_apply"], "PASS")
-        self.assertEqual(result["reseal_rollback"], "PASS")
-        self.assertEqual(result["sealed_sha256"], result["final_sealed_sha256"])
-        self.assertFalse(result["d239_hash_used_as_gate"])
+    def test_t11_d241_seal_is_stale_after_reviewed_d242_source_change(self):
         launcher = LAUNCHER.read_text(encoding="utf-8")
-        for label, relative in (
-            ("EXPECTED_CORE_SHA256", "src/goodix5125_d232_offline.py"),
-            ("EXPECTED_BACKEND_SHA256", "src/goodix5125_d233_backend.py"),
-            ("EXPECTED_ENTRYPOINT_SHA256", "src/goodix5125_d235_entrypoint.py"),
-            ("EXPECTED_PREFLIGHT_SHA256", "analysis/D241/d241_preflight.py"),
-            ("EXPECTED_DRY_RUN_SHA256", "analysis/D241/d241_operator_dry_run.py"),
-            ("EXPECTED_UNSEAL_SHA256", "analysis/D241/D241_live_unseal.patch"),
-        ):
-            self.assertIn(f'readonly {label}="{digest(REPOSITORY / relative)}"', launcher)
+        self.assertNotIn(
+            f'readonly EXPECTED_BACKEND_SHA256="{digest(REPOSITORY / "src/goodix5125_d233_backend.py")}"',
+            launcher,
+        )
 
     def test_launcher_prepares_report_dir_and_prints_actionable_failure_fields(self):
         source = LAUNCHER.read_text(encoding="utf-8")
@@ -97,7 +87,7 @@ class D241OperatorPreflightTests(unittest.TestCase):
         self.assertIn("D241_RESULT=", source)
         self.assertIn("D241_FAILURE_CLASS=", source)
 
-    def test_executable_closure_runs_through_the_real_launcher(self):
+    def test_historical_d241_launcher_rejects_d242_source_baseline(self):
         environment = dict(os.environ)
         environment.pop("PYTHONPATH", None)
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -108,16 +98,8 @@ class D241OperatorPreflightTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("D241_RESULT=PASS", result.stdout)
-        report = json.loads(CLOSURE_REPORT.read_text(encoding="utf-8"))
-        self.assertEqual(report["classification"], "D241_EXECUTABLE_CLOSURE_GATE_PASS")
-        self.assertEqual(report["direct_b0_success"]["first_tls_record_handoff_count"], 1)
-        self.assertEqual(
-            report["handshake_timeout"]["failure_class"],
-            "TLS_HANDSHAKE_TIMEOUT_AFTER_SERVER_FLIGHT",
-        )
-        self.assertEqual(report["live_usb_execution"], "NOT_PERFORMED")
+        self.assertEqual(result.returncode, 68, result.stderr)
+        self.assertIn("D241_SEALED_BACKEND_HASH_MISMATCH", result.stderr)
 
 
 if __name__ == "__main__":

@@ -58,6 +58,7 @@ USB_EP_OUT = 0x01
 USB_EP_IN = 0x81
 USB_MAX_PACKET = 64
 USB_MAX_FRAME = 65539
+TLS_RECORD_PACING_MS = 10
 TLS_CIPHER_NAME = "PSK-AES128-GCM-SHA256"
 TARGET_CONFIG90_PATH = Path("/var/lib/goodix-5125-poc/target-config-90.bin")
 TARGET_CONFIG90_SHA256 = "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82"
@@ -268,6 +269,14 @@ class ProductionUsbTransport:
         self.close_count = 0
         self.exit_count = 0
         self.command_count = 0
+        self.bulk_out_submit_count = 0
+        self.bulk_out_complete_count = 0
+        self.bulk_out_logical_chunk_lengths: list[int] = []
+        self.bulk_out_wire_chunk_lengths: list[int] = []
+        self.bulk_in_call_count = 0
+        self.bulk_in_timeout_count = 0
+        self.bulk_in_error_count = 0
+        self.bulk_in_nonzero_count = 0
 
     def transport_open(self) -> None:
         if self._context is not None or self._closed:
@@ -311,18 +320,39 @@ class ProductionUsbTransport:
         deadline = time.monotonic() + timeout_ms / 1000
         for offset in range(0, len(frame), USB_MAX_PACKET):
             chunk = frame[offset : offset + USB_MAX_PACKET]
+            # gfusb.dll submits endpoint-sized staging buffers even for the
+            # final suffix. The declared A0/B0 length remains authoritative.
+            wire_chunk = chunk.ljust(USB_MAX_PACKET, b"\x00")
+            self.bulk_out_submit_count += 1
+            self.bulk_out_logical_chunk_lengths.append(len(chunk))
+            self.bulk_out_wire_chunk_lengths.append(len(wire_chunk))
             transferred = self._api.bulk_out(
-                handle, USB_EP_OUT, chunk, self._remaining(deadline)
+                handle, USB_EP_OUT, wire_chunk, self._remaining(deadline)
             )
-            if transferred != len(chunk):
+            if transferred != len(wire_chunk):
                 raise UsbAmbiguousCompletion("partial bulk OUT")
+            self.bulk_out_complete_count += 1
         self.command_count += 1
+
+    def _bulk_in(self, handle: object, maximum: int, timeout_ms: int) -> bytes:
+        self.bulk_in_call_count += 1
+        try:
+            part = self._api.bulk_in(handle, USB_EP_IN, maximum, timeout_ms)
+        except UsbTimeout:
+            self.bulk_in_timeout_count += 1
+            raise
+        except UsbFailure:
+            self.bulk_in_error_count += 1
+            raise
+        if part:
+            self.bulk_in_nonzero_count += 1
+        return part
 
     def read_frame(self, timeout_ms: int) -> bytes:
         handle = self._require_open()
         deadline = time.monotonic() + timeout_ms / 1000
         while len(self._rx) < 4:
-            part = self._api.bulk_in(handle, USB_EP_IN, USB_MAX_PACKET, self._remaining(deadline))
+            part = self._bulk_in(handle, USB_MAX_PACKET, self._remaining(deadline))
             if not part:
                 raise UsbAmbiguousCompletion("zero-length bulk IN")
             self._rx.extend(part)
@@ -334,7 +364,9 @@ class ProductionUsbTransport:
         if total < 4 or total > USB_MAX_FRAME:
             raise UsbFailure("malformed A0/B0 length")
         while len(self._rx) < total:
-            part = self._api.bulk_in(handle, USB_EP_IN, min(4096, total - len(self._rx)), self._remaining(deadline))
+            part = self._bulk_in(
+                handle, min(4096, total - len(self._rx)), self._remaining(deadline)
+            )
             if not part:
                 raise UsbAmbiguousCompletion("short bulk IN")
             self._rx.extend(part)
@@ -483,6 +515,9 @@ class Tls12PskServer:
         context.set_psk_server_callback(psk)
         self._ssl = context.wrap_bio(self._input, self._output, server_side=True)
         self.handshake_count = 0
+        self.want_read_count = 0
+        self.want_write_count = 0
+        self.fatal_error_observed = False
         self.complete = False
         self.closed = False
 
@@ -506,9 +541,14 @@ class Tls12PskServer:
             if cipher is None or cipher[0] != TLS_CIPHER_NAME:
                 raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
             self.complete = True
-        except (ssl.SSLWantReadError, ssl.SSLWantWriteError):
+        except ssl.SSLWantReadError:
+            self.want_read_count += 1
+            return
+        except ssl.SSLWantWriteError:
+            self.want_write_count += 1
             return
         except ssl.SSLError as exc:
+            self.fatal_error_observed = True
             reason = (getattr(exc, "reason", "") or "").upper()
             if (
                 "BAD_RECORD_MAC" in reason
@@ -540,7 +580,14 @@ class Tls12PskServer:
 class B0TlsBridge:
     """Moves fragmented device TLS input and whole OpenSSL records via B0."""
 
-    def __init__(self, engine: Tls12PskServer, transport: ProductionUsbTransport):
+    def __init__(
+        self,
+        engine: Tls12PskServer,
+        transport: ProductionUsbTransport,
+        *,
+        pacer: Callable[[float], None] = time.sleep,
+        pacing_ms: int = TLS_RECORD_PACING_MS,
+    ):
         self.engine = engine
         self.transport = transport
         self.pump_count = 0
@@ -552,6 +599,9 @@ class B0TlsBridge:
         self._input_trace_buffer = bytearray()
         self._input_encrypted = False
         self._output_encrypted = False
+        self._pacer = pacer
+        self.pacing_ms = pacing_ms
+        self.pacing_count = 0
 
     @staticmethod
     def _remaining(deadline: float) -> int:
@@ -632,6 +682,9 @@ class B0TlsBridge:
             )
             self.transport.write_frame(build_b0(record), self._remaining(deadline))
             self.output_record_count += 1
+            if self.pacing_ms:
+                self._pacer(self.pacing_ms / 1000)
+                self.pacing_count += 1
             if record[0] == 0x14:
                 self._output_encrypted = True
         self.pump_count += 1
@@ -784,11 +837,13 @@ class ProductionReplayBackend:
         binder: RuntimePskE4Binder,
         *,
         tls_factory: Callable[[SecretBuffer], Tls12PskServer] = Tls12PskServer,
+        tls_pacer: Callable[[float], None] = time.sleep,
     ):
         self.transport = transport
         self.secret = secret
         self.binder = binder
         self.tls_factory = tls_factory
+        self.tls_pacer = tls_pacer
         self.exchange_count = 0
         self.tls_handshake_count = 0
         self.cleanup_count = 0
@@ -803,6 +858,18 @@ class ProductionReplayBackend:
         self.tls_trace_redacted: list[dict[str, object]] = []
         self._pending_first_b0: bytes | None = None
         self._pending_first_b0_consumed = False
+        self.server_flight_b0_frame_count = 0
+        self.server_flight_tls_record_count = 0
+        self.server_flight_usb_bulk_out_count = 0
+        self.server_flight_chunk_size_buckets: dict[str, int] = {}
+        self.server_flight_pacing_count = 0
+        self.post_server_flight_bulk_in_call_count = 0
+        self.post_server_flight_bulk_in_timeout_count = 0
+        self.post_server_flight_bulk_in_error_count = 0
+        self.post_server_flight_nonzero_rx_count = 0
+        self.openssl_want_read_count = 0
+        self.openssl_want_write_count = 0
+        self.openssl_fatal_error_observed = False
 
     @property
     def usb_open_count(self) -> int:
@@ -880,8 +947,10 @@ class ProductionReplayBackend:
         self.tls_handshake_count = 1
         engine = self.tls_factory(secret)
         self.tls_secret_object_identity_verified = secret is self.secret
-        bridge = B0TlsBridge(engine, self.transport)
+        bridge = B0TlsBridge(engine, self.transport, pacer=self.tls_pacer)
         deadline = time.monotonic() + timeout_ms / 1000
+        flight_out_start = self.transport.bulk_out_submit_count
+        flight_chunk_start = len(self.transport.bulk_out_wire_chunk_lengths)
         try:
             first_b0 = self._pending_first_b0
             self._pending_first_b0 = None
@@ -893,6 +962,22 @@ class ProductionReplayBackend:
                 first_record=True,
                 deadline=deadline,
             )
+            self.server_flight_b0_frame_count = bridge.output_record_count
+            self.server_flight_tls_record_count = bridge.output_record_count
+            self.server_flight_usb_bulk_out_count = (
+                self.transport.bulk_out_submit_count - flight_out_start
+            )
+            flight_chunks = self.transport.bulk_out_wire_chunk_lengths[
+                flight_chunk_start:
+            ]
+            self.server_flight_chunk_size_buckets = {
+                str(size): flight_chunks.count(size) for size in sorted(set(flight_chunks))
+            }
+            self.server_flight_pacing_count = bridge.pacing_count
+            post_in_start = self.transport.bulk_in_call_count
+            post_timeout_start = self.transport.bulk_in_timeout_count
+            post_error_start = self.transport.bulk_in_error_count
+            post_nonzero_start = self.transport.bulk_in_nonzero_count
             while not engine.complete:
                 remaining = int((deadline - time.monotonic()) * 1000)
                 if remaining <= 0:
@@ -919,6 +1004,24 @@ class ProductionReplayBackend:
                 self.tls_failure_class = self._timeout_failure_class(bridge)
             raise
         finally:
+            if "post_in_start" in locals():
+                self.post_server_flight_bulk_in_call_count = (
+                    self.transport.bulk_in_call_count - post_in_start
+                )
+                self.post_server_flight_bulk_in_timeout_count = (
+                    self.transport.bulk_in_timeout_count - post_timeout_start
+                )
+                self.post_server_flight_bulk_in_error_count = (
+                    self.transport.bulk_in_error_count - post_error_start
+                )
+                self.post_server_flight_nonzero_rx_count = (
+                    self.transport.bulk_in_nonzero_count - post_nonzero_start
+                )
+            self.openssl_want_read_count = int(getattr(engine, "want_read_count", 0))
+            self.openssl_want_write_count = int(getattr(engine, "want_write_count", 0))
+            self.openssl_fatal_error_observed = bool(
+                getattr(engine, "fatal_error_observed", False)
+            )
             self.tls_trace_redacted = list(bridge.trace)
             engine.close()
 
@@ -1200,6 +1303,56 @@ def _candidate_report(
         "tls_handshake_timeout_ms": PHASE_TIMEOUT_MS["TLS"],
         "tls_trace_redacted": (
             list(backend.tls_trace_redacted) if backend is not None else []
+        ),
+        "server_flight_b0_frame_count": (
+            backend.server_flight_b0_frame_count if backend is not None else 0
+        ),
+        "server_flight_tls_record_count": (
+            backend.server_flight_tls_record_count if backend is not None else 0
+        ),
+        "server_flight_usb_bulk_out_count": (
+            backend.server_flight_usb_bulk_out_count if backend is not None else 0
+        ),
+        "server_flight_chunk_size_buckets": (
+            dict(backend.server_flight_chunk_size_buckets)
+            if backend is not None else {}
+        ),
+        "server_flight_pacing_ms": TLS_RECORD_PACING_MS,
+        "server_flight_pacing_count": (
+            backend.server_flight_pacing_count if backend is not None else 0
+        ),
+        "post_server_flight_bulk_in_call_count": (
+            backend.post_server_flight_bulk_in_call_count if backend is not None else 0
+        ),
+        "post_server_flight_bulk_in_timeout_count": (
+            backend.post_server_flight_bulk_in_timeout_count if backend is not None else 0
+        ),
+        "post_server_flight_bulk_in_error_count": (
+            backend.post_server_flight_bulk_in_error_count if backend is not None else 0
+        ),
+        "post_server_flight_nonzero_rx_count": (
+            backend.post_server_flight_nonzero_rx_count if backend is not None else 0
+        ),
+        "post_server_flight_first_rx_class": (
+            "POST_FLIGHT_NONZERO_DATA_RECEIVED"
+            if backend is not None and backend.post_server_flight_nonzero_rx_count
+            else "POST_FLIGHT_BULK_IN_ERROR"
+            if backend is not None and backend.post_server_flight_bulk_in_error_count
+            else "POST_FLIGHT_BULK_IN_ATTEMPTED_NO_DATA"
+            if backend is not None and backend.post_server_flight_bulk_in_call_count
+            else "NO_POST_FLIGHT_BULK_IN_ATTEMPT"
+        ),
+        "openssl_handshake_call_count": (
+            backend.tls_handshake_count if backend is not None else 0
+        ),
+        "openssl_want_read_count": (
+            backend.openssl_want_read_count if backend is not None else 0
+        ),
+        "openssl_want_write_count": (
+            backend.openssl_want_write_count if backend is not None else 0
+        ),
+        "openssl_fatal_error_observed": (
+            backend.openssl_fatal_error_observed if backend is not None else False
         ),
         "attempted_phase": (
             backend.last_attempted_phase if backend is not None else "not_reached"
