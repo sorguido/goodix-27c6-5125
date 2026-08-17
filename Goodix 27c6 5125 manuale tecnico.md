@@ -14,6 +14,9 @@ non ha inviato ClientKeyExchange entro il timeout bounded. D242 ha isolato e
 corretto offline due divergenze primarie dal send path Windows: ultimi OUT corti
 anziché blocchi fissi da 64 byte e assenza del pacing TLS `Sleep(10)`. Il nuovo
 kit è `READY_NOT_EXECUTED`: il repository non autorizza da solo operazioni live.
+D242 ha provato e corretto offline due divergenze rispetto al contratto OEM
+osservato in D175/Windows; la loro sufficienza causale sul firmware 12509 non è
+ancora verificata live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
@@ -30,7 +33,7 @@ kit è `READY_NOT_EXECUTED`: il repository non autorizza da solo operazioni live
 | Consolidamento D238 | verificato offline, source-sealed | policy ACK unica, replay pre-D1 completo con `0x01` e `0x07`, osservabilità redatta e unico kit operatore |
 | Evidenza live D239 | pre-D1 integralmente superato su 12509 | 12 comandi, E4 `match`, D1 seguito da B0/TLS diretto di 52 byte; stop host-side `unexpected_data` |
 | Transizione TLS D241 | live single-shot consumato, fail-closed | handoff e PSK object binding verificati; timeout dopo server flight; zero D4/app-data/retry |
-| Correzione D242 | PASS offline, source-sealed | OUT OEM fissi da 64 byte + pacing TLS 10 ms; 100 test e closure gate PASS; kit non eseguito |
+| Correzione D242 | PASS offline, source-sealed | contratto A0/B0 OUT fissi da 64 byte + pacing TLS 10 ms; closure gate PASS; kit non eseguito, sufficienza causale live non verificata |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -52,6 +55,22 @@ e una capture recuperata SHA-256
 La prima capture indicata dall'operatore è definitivamente perduta. Nessun
 riepilogo storico la sostituisce come evidenza packet-level; D230 censisce una
 sola capture. Questo limite è parte della coverage proof.
+
+Una testimonianza indipendente nel commento di `mkl-corbachoh` alla
+[issue GitHub #1](https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1)
+è registrata come `EXTERNAL_THIRD_PARTY_LIVE_CORROBORATION`, non come evidenza
+primaria del target. Il contributor dichiara successo TLS-PSK, enrollment,
+same/different-finger verify e autenticazione PAM su `27c6:5125`, chip
+`0x2504`, firmware nativo 12509 preservato e senza flash, usando una build
+localmente auditata e isolata sotto `/opt/goodixgf`. La stessa testimonianza
+riporta però `MCU read 0xBB010003 status 0x01`, cioè assenza di dati PSK, e una
+nuova provisioning PSK once: dimostra al più
+`EXTERNALLY_REPORTED_12509_NATIVE_FW_FULL_STACK_SUCCESS` e
+`EXTERNALLY_REPORTED_12509_NO_FIRMWARE_FLASH`, non preservazione di una PSK
+Windows/factory preesistente. La coesistenza riportata di eventi FDT plaintext
+con frame immagine protetti TLS è una corroborazione esterna utile per fasi
+post-handshake future; non riapre lo scope D242 e non autorizza D4, FDT,
+capture, enroll o matching in questo step.
 
 ## Architettura
 
@@ -83,12 +102,15 @@ separatamente. Non è corretto dedurre sempre il logico con `wire & 0xfe`.
 B0 avvolge direttamente un record TLS completo con header Goodix di quattro
 byte; non aggiunge cifratura o compressione.
 
-La lunghezza dichiarata dal wrapper B0 descrive soltanto il record TLS. Il
-trasporto OEM Windows invia però ogni segmento bulk OUT come staging buffer
-fisso da 64 byte; la tail dell'ultimo blocco è fuori dal B0 dichiarato e nella
-capture non è tutta zero. I byte TLS **emessi** dal motore, il frame B0
-costruito, i byte USB richiesti e quelli completati sono quindi misure distinte.
-D242 inizializza deterministicamente a zero la tail non semantica. Un flag
+Le lunghezze dichiarate A0/B0 descrivono soltanto il frame logico. Nella capture
+D175 tutte le 56 submission bulk OUT A0/B0 osservate sono staging buffer fissi
+da 64 byte; la tail dell'ultimo blocco è fuori dalla lunghezza dichiarata e,
+nei B0 del server flight esaminati, è nonzero. I byte del frame costruito, i
+byte USB richiesti e quelli completati sono quindi misure distinte. D242 copia
+prima i byte significativi e inizializza deterministicamente a zero la tail
+non semantica per non propagare contenuto di staging irrilevante. L'equivalenza
+rivendicata riguarda dimensione di submit e semantica della lunghezza
+dichiarata, non identità byte-per-byte della tail Windows. Un flag
 `server_hello_sent` prova al massimo emissione e wrapping; la trasmissione
 completa richiede completion USB full-length per ogni blocco.
 
@@ -222,6 +244,7 @@ D241 -> run live single-shot consumata: ClientHello verificato e server flight
      -> trasmesso, poi timeout senza ClientKeyExchange; zero retry/D4/app-data
 D242 -> contratto OEM corretto offline: OUT fissi 64 byte + pacing 10 ms/record
      -> closure PASS e nuovo kit source-sealed READY_NOT_EXECUTED, senza D4
+     -> bundle precedente a112fe2b...56df20 SUPERSEDED / DO_NOT_USE_FOR_LIVE_AUTHORIZATION
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -677,7 +700,7 @@ classificazione è
 `D239_52_EQUALS_TLS_HEADER_PLUS_D241_47_CONFIRMED`. Non riguarda i quattro byte
 del wrapper B0.
 
-## D242: differenziale causale del server flight
+## D242: correzione delle divergenze del contratto OEM
 
 La sola capture primaria locale disponibile è quella storicamente classificata
 D175; la capture D43 è assente e resta `NOT_ASSESSABLE`. D175 mostra la stessa
@@ -688,28 +711,37 @@ distinti, un record TLS per B0; wrapper type, declared/actual length e checksum
 sono coerenti. Non è una equivalenza byte-per-byte dei valori casuali o del
 session ID, che restano intenzionalmente non pubblicati.
 
-Il differenziale primario ha invece provato due violazioni del contratto OEM:
+Il differenziale primario ha invece provato due divergenze dal contratto OEM:
 
 1. il send callback Windows spezza ogni B0 in segmenti logici `<=64`, ma
-   sottopone sempre 64 byte al bulk OUT, con zero padding finale; D241
+   sottopone sempre 64 byte al bulk OUT, con tail nonzero catturata fuori dalla
+   lunghezza B0 dichiarata; D241
    sottoponeva finali corti (ServerHello `64+26`, ServerHelloDone `13`), mentre
    D175 osserva completion da `64+64` e `64`;
 2. la DLL chiama `Sleep(10)` dopo ciascun record TLS. D175 osserva circa
    21,933 ms fra completion ServerHello e primo OUT ServerHelloDone, mentre
    D241 drenava e inviava i due record back-to-back senza pacing.
 
-Il timeout di 3000 ms non è la causa: nella sessione OEM il ClientKeyExchange
-inizia circa 13,338 ms dopo ServerHelloDone, molto dentro quel budget. D242 ha
-quindi implementato il fix minimale di classe: zero padding dell'ultimo OUT a
-64 byte, requisito di completion esattamente 64, e pacing di 10 ms dopo ogni
-record TLS. First-record ownership, binding PSK, zero retry e stop prima di D4
-restano invariati. Fixture offline verificano tre OUT da 64 byte, due B0
-distinti, due pause da 10 ms, ricezione post-flight, short completion
-fail-closed, cleanup/zeroizzazione e redazione.
+Il timeout di 3000 ms non spiega la divergenza temporale osservata: nella
+sessione OEM il ClientKeyExchange inizia circa 13,338 ms dopo ServerHelloDone,
+molto dentro quel budget. D242 ha quindi implementato il fix di contratto:
+staging di ogni OUT A0/B0 a 64 byte con tail D242 zero-initialized, requisito di
+completion esattamente 64, e pacing di 10 ms dopo ogni record TLS. La portata
+comune A0/B0 è classificata `OEM_COMMON_A0_B0_TRANSPORT_CONTRACT_VERIFIED`:
+tutte le 56 submission OUT D175 sono da 64 byte e le call-site command-send
+note passano `r8b=0x40` al helper che usa la lunghezza del caller. Declared
+length, checksum/header, ACK/response e parsing A0 restano invariati; un test
+sintetico verifica che la tail resti fuori dal frame dichiarato. Ciò preserva
+il pre-D1 già superato live in D239/D241 senza riaprirne la semantica.
+First-record ownership, binding PSK, zero retry e stop prima di D4 restano
+invariati. Fixture offline verificano tre OUT da 64 byte, due B0 distinti, due
+pause da 10 ms, ricezione post-flight, short completion fail-closed,
+cleanup/zeroizzazione e redazione.
 
-Questo prova la causa della divergenza del path D241 e la sua correzione
-contrattuale; non prova ancora che il firmware risponderà con ClientKeyExchange
-al path corretto. Il nuovo confine è dunque la validazione device-side futura
+`PROVEN_DIVERGENCE != PROVEN_DEVICE_ROOT_CAUSE`. H4 e H5 sono `PROVEN` come
+divergenze e il runtime corretto ne riproduce offline le proprietà; non è ancora
+provato che una o entrambe siano causalmente sufficienti a far rispondere il
+firmware con ClientKeyExchange. Il nuovo confine è la validazione device-side futura
 del server flight corretto, in un solo tentativo umano separatamente
 autorizzato. D242 non ha eseguito USB reale né handshake TLS reale.
 
@@ -722,6 +754,19 @@ e reseala nel cleanup. Il closure gate esegue con peer USB/TLS sintetici
 preflight, lifecycle directory/marker, patch apply/reverse, handoff exactly-once,
 successo, timeout post-flight, osservabilità redatta e cleanup. Il suo stato è
 `D242_EXECUTABLE_CLOSURE_GATE_PASS`; il kit resta `READY_NOT_EXECUTED`.
+
+La provenance D241 è nuovamente byte-exact e read-only:
+`d241_operator_dry_run.py` ha SHA-256
+`0bf0921435624ef64b57328af8c2a669be1b1da51dc8b4caeece2f5d35e2944f` e
+`d241_preflight.py` ha SHA-256
+`6cc7ddd62fe1dffedd71abfb05ba0a4ef5788d155ddd288782b2b222d25c5cf7`.
+Sono le sole dipendenze D241 behavior-relevant della closure/preflight D242,
+entrambe pin-nate e verificate prima dell'import dal launcher; l'adattamento
+alla tail fixed-64 vive esclusivamente in D242. Il bundle D242 precedente
+SHA-256 `a112fe2be21a48ff84072194e38cf07bfdb0817b42c44de43bc01e858a56df20`
+è `SUPERSEDED_DO_NOT_USE_FOR_LIVE_AUTHORIZATION`: il differenziale tecnico e il
+runtime fix restano utili, ma quella revisione fallì i gate di
+provenance/closure/manuale e non è più il riferimento operativo.
 
 D4, application data, FDT, capture, enroll, reset/power-cycle e recovery
 invasiva automatica restano irraggiungibili o vietati. D240 è obsoleto e non è
@@ -784,8 +829,9 @@ l'orchestratore e il vero entrypoint production non sono più blocker offline.
 Il confine immediato non è più pre-D1: D239 ha provato live su 12509 l'intera
 sequenza fino a D1 e il successivo B0/TLS diretto. D241 ha poi verificato live
 ClientHello, ownership e binding, ha trasmesso il server flight ed è terminato
-senza ClientKeyExchange. D242 ha provato e corretto offline le differenze di
-segmentazione e pacing rispetto a D175/Windows. Il confine corrente è la sola
+senza ClientKeyExchange. D242 ha provato e corretto offline le divergenze di
+segmentazione e pacing rispetto a D175/Windows; non ha provato una root cause
+device-side. Il confine corrente è la sola
 risposta device-side al server flight corretto: non è stata ancora osservata.
 Il repository resta source-sealed; soltanto il kit D242 con closure PASS può
 applicare temporaneamente l'unseal per un singolo tentativo umano separatamente

@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from analysis.D241.d241_preflight import report_directory_status
+from analysis.D242.d242_dependency_gate import verify_d241_dependencies
 from analysis.D242.d242_operator_dry_run import run, verify_unseal_reseal
 from analysis.D242.d242_preflight import (
     D242_MARKER_NAME,
@@ -23,6 +24,19 @@ LAUNCHER = REPOSITORY / "operator_kit/d242-live-tls-once.sh"
 
 
 class D242OperatorKitTests(unittest.TestCase):
+    def test_historical_d241_dependencies_are_byte_exact_and_fully_pinned(self):
+        result = verify_d241_dependencies()
+        self.assertEqual(result["behavior_relevant_dependency_count"], 2)
+        self.assertEqual(result["pinned_dependency_count"], 2)
+        self.assertEqual(result["unpinned_closure_dependency_count"], 0)
+        self.assertEqual(
+            {item["module_path"]: item["actual_sha256"] for item in result["modules"]},
+            {
+                "analysis/D241/d241_operator_dry_run.py": "0bf0921435624ef64b57328af8c2a669be1b1da51dc8b4caeece2f5d35e2944f",
+                "analysis/D241/d241_preflight.py": "6cc7ddd62fe1dffedd71abfb05ba0a4ef5788d155ddd288782b2b222d25c5cf7",
+            },
+        )
+
     def test_marker_namespace_is_new_and_historical_markers_are_benign(self):
         paths = ProductionRuntimePaths.system_default()
         self.assertEqual(paths.single_use_marker.name, D242_MARKER_NAME)

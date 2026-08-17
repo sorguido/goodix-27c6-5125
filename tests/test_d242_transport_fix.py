@@ -5,7 +5,13 @@ import unittest
 from pathlib import Path
 
 from analysis.D242.d242_capture_forensics import derive
-from src.goodix5125_d232_offline import SecretBuffer, build_b0, parse_b0
+from src.goodix5125_d232_offline import (
+    SecretBuffer,
+    build_a0,
+    build_b0,
+    parse_a0,
+    parse_b0,
+)
 from src.goodix5125_d233_backend import (
     B0TlsBridge,
     ProductionUsbTransport,
@@ -68,7 +74,30 @@ class D242TransportCorrectionTests(unittest.TestCase):
             report["server_flight_grouping"]["server_hello_final_tail_class"],
             "NONZERO_REDACTED_OUTSIDE_DECLARED_B0",
         )
+        scope = report["fixed64_transport_scope"]
+        self.assertEqual(scope["classification"], "OEM_COMMON_A0_B0_TRANSPORT_CONTRACT_VERIFIED")
+        self.assertEqual(scope["a0_frame_count"], 48)
+        self.assertEqual(scope["a0_usb_out_payload_lengths"], [64])
+        self.assertEqual(scope["b0_usb_out_payload_lengths"], [64])
+        self.assertTrue(scope["all_a0_b0_usb_out_submissions_fixed_64"])
         self.assertFalse(any(report["redaction"].values()))
+
+    def test_a0_declared_frame_checksum_and_response_semantics_survive_fixed64(self):
+        request = build_a0(0x82, b"abcd")
+        response = build_a0(0x82, b"wxyz")
+        api = FakeUsbApi((response,))
+        transport = ProductionUsbTransport(api)
+        transport.transport_open()
+        transport.write_frame(request, 1000)
+        self.assertEqual(len(api.outgoing), 1)
+        self.assertEqual(len(api.outgoing[0]), 64)
+        self.assertEqual(api.outgoing[0][: len(request)], request)
+        self.assertEqual(api.outgoing[0][len(request) :], bytes(64 - len(request)))
+        parsed = parse_a0(api.outgoing[0][: len(request)])
+        self.assertEqual((parsed.control, parsed.body), (0x82, b"abcd"))
+        self.assertEqual(transport.read_frame(1000), response)
+        parsed_response = parse_a0(response)
+        self.assertEqual((parsed_response.control, parsed_response.body), (0x82, b"wxyz"))
 
     def test_transport_zero_pads_every_final_out_to_oem_packet_size(self):
         api = FakeUsbApi()
