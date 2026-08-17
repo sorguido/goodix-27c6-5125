@@ -20,9 +20,14 @@ fixed-64 e pacing 10 ms soltanto per B0/TLS, ed è stato poi eseguito live: anch
 D243 si è fermato al primo E4 con lo stesso timeout, `command_count=1`, binding
 non raggiunto e zero TLS/retry. Quindi fixed-64 A0 è falsificato soltanto come
 spiegazione sufficiente del timeout D242; la sua equivalenza device-side resta
-irrisolta. D244 chiude offline il differenziale e prepara, senza cambiare il
-wire D243, un controllo causale su stato iniziale dopo shutdown completo e
-riaccensione manuale dell'operatore. Il repository non autorizza da solo
+irrisolta. D244 ha poi eseguito il controllo fresh-host dopo shutdown completo
+e nuova accensione: il controllo host è valido, l'OUT E4 è completato, ma il
+bulk IN va ancora in timeout. Questo falsifica il fresh boot host come
+condizione sufficiente di recupero; non prova però un power-cycle elettrico del
+sensore, perché il laptop ha batteria interna. D245 prepara offline il solo
+prossimo tentativo informativo: query A8 read-only una volta, E4 una volta e,
+solo dopo firmware 12509 e binding E4 `match`, continuazione del pre-D1 e TLS
+già revisionati, con stop prima di D4. Il repository non autorizza da solo
 operazioni live.
 
 | Area | Stato | Risultato |
@@ -42,7 +47,8 @@ operazioni live.
 | Transizione TLS D241 | live single-shot consumato, fail-closed | handoff e PSK object binding verificati; timeout dopo server flight; zero D4/app-data/retry |
 | Run live D242 | fail-closed al primo E4 | OUT E4 completato, bulk IN in timeout senza frame completo; binding/TLS/pacing non raggiunti; cleanup/restore/reseal riusciti |
 | Run live D243 | fail-closed al primo E4 | A0 corto ripristinato; OUT E4 completato e stesso timeout bulk IN; zero binding/TLS/retry; cleanup/restore/reseal riusciti |
-| Controllo D244 | PASS offline, source-sealed | nessuna regressione software pre-E4 irrisolta; wire D243 invariato; fresh-state causal control pronto e non eseguito |
+| Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
+| Kit D245 A8→E4→TLS | PASS offline, source-sealed | A8 read-only byte-pinned e firmware 12509 obbligatori prima di E4; continuazione pre-D1/TLS invariata; stop prima di D4; non eseguito live |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -272,8 +278,11 @@ D242 -> run live single-shot: timeout al primo E4 dopo generic fixed-64 A0
 D243 -> split A0/B0 chiuso offline, poi run live single-shot consumata
      -> A0 corto D241 ma stesso timeout E4; binding/TLS non raggiunti; zero retry/D4
 D244 -> evidenze D242/D243 verificate, timeout localizzato su bulk IN dopo OUT
-     -> logical E4 byte-exact; differenziale D241↔D243 senza candidati irrisolti
-     -> wire D243 invariato; fresh-state causal control READY_NOT_EXECUTED
+     -> successiva run fresh-host valida: E4 OUT completato, bulk IN timeout
+     -> fresh host boot falsificato come condizione sufficiente; power loss sensore non provata
+D245 -> record storico canonico D179 A8→E4 + corroborazione locale D230
+     -> A8 read-only una volta, poi E4 e continuazione pre-D1/TLS solo su gate completi
+     -> closure offline PASS; READY_NOT_EXECUTED; zero retry e stop prima di D4
      -> bundle precedente a112fe2b...56df20 SUPERSEDED / DO_NOT_USE_FOR_LIVE_AUTHORIZATION
 ```
 
@@ -730,7 +739,7 @@ classificazione è
 `D239_52_EQUALS_TLS_HEADER_PLUS_D241_47_CONFIRMED`. Non riguarda i quattro byte
 del wrapper B0.
 
-## D242/D243 live e controllo causale D244
+## D242/D243/D244 live e precondizione D245
 
 La sola capture primaria locale disponibile è quella storicamente classificata
 D175; la capture D43 è assente e resta `NOT_ASSESSABLE`. D175 mostra la stessa
@@ -840,7 +849,8 @@ mancante, invalido o renderer fallito hanno classi distinte e fail-closed. Il
 path è verificato senza sudo con una fixture sintetica che termina prima di
 unseal, USB, secret, fprintd e marker. Questa proprietà storica resta valida;
 la run D242 successiva ha consumato il kit ed è terminata al primo E4. Anche il
-kit D243 è ora consumato; il riferimento operativo corrente è D244.
+kit D243 è ora consumato; anche la singola autorizzazione D244 descritta sotto
+è consumata. Il riferimento operativo non eseguito corrente è D245.
 
 La provenance D241 è nuovamente byte-exact e read-only:
 `d241_operator_dry_run.py` ha SHA-256
@@ -902,8 +912,82 @@ metadati insufficienti o stesso boot producono
 `D244_FRESH_STATE_CONTROL_VALID=false` senza fingere una prova elettrica. La
 closure sintetica verifica i casi boot-id presente/assente, uptime-only e
 metadati insufficienti, insieme a E4, A0, B0, pacing, durability e safety.
-L'esito corrente è
-`D244_FRESH_STATE_CAUSAL_CONTROL_READY_NOT_EXECUTED`.
+La successiva singola run live è stata eseguita con fresh host boot documentato
+e controllo fresh-state valido. E4 OUT ha completato, E4 IN è andato in
+timeout, il binding non è stato raggiunto, TLS non è stato raggiunto, retry è
+rimasto zero e cleanup, restore e reseal sono terminati. La classificazione
+corretta è:
+
+```text
+D244_FRESH_STATE_HOST_CONTROL_RESULT=E4_TIMEOUT_PERSISTS
+D244_FRESH_HOST_BOOT_SUFFICIENCY=FALSIFIED_AS_SUFFICIENT_RECOVERY_CONDITION
+D244_SENSOR_ELECTRICAL_POWER_CYCLE_STATUS=NOT_PROVEN
+```
+
+Lo shutdown e la rimozione dell'alimentatore esterno non provano che il sensore
+abbia perso alimentazione dal laptop con batteria interna. Quindi il carryover
+della sola sessione host non basta a spiegare il fallimento, mentre lo stato
+elettrico/protocollare del device resta irrisolto; non si dichiara falsificato
+in assoluto il carryover di stato device post-D241.
+
+Lo stato iniziale di `fprintd` non è una spiegazione sufficiente:
+
+```text
+D241: active   -> E4 superato
+D242: active   -> E4 timeout
+D243: active   -> E4 timeout
+D244: inactive -> E4 timeout
+D245_FPRINTD_INITIAL_STATE_CAUSAL_STATUS=NOT_SUFFICIENT_EXPLANATION
+```
+
+Il comportamento production resta invariato: se `fprintd` è inizialmente
+active viene fermato e ripristinato; se è inactive non viene avviato.
+
+Il corpus storico canonico conserva una run live D179 sul firmware 12509 con
+questo boundary:
+
+```text
+A8 OUT      a00600a6a803000000ff
+A8 ACK      a00600a6b00300a8014e        status 01
+A8 response GF_ST411SEC_APP_12509
+A8_COMPLETE
+E4 OUT      a00c00ace40900030002bb00000000fd
+E4 ACK      a00600a6b00300e40112        status 01
+E4 response status 0, selector bb020003, validator 32 byte corretto
+```
+
+Gli artifact runtime primari D179 sono stati bonificati e non sono più nel
+repository corrente: il record è
+`CANONICAL_HISTORICAL_LIVE_RECORD_PRIMARY_RUNTIME_ARTIFACTS_PURGED`, non
+`PRIMARY_LOCAL_EVIDENCE_VERIFIED`. D230 lo corrobora indipendentemente: la
+capture corrente contiene due A8 request byte-exact, ACK `B0/A8/01` e response
+tipizzata `GF_ST411SEC_APP_12509\0`; il census DLL identifica `GetEvkVersion` e
+l'audit read-boundary classifica A8 come query-only di metadato fisso senza
+side effect, distinta da flash/IAP, provisioning, OTP/config write e biometria.
+
+La semantica ammessa resta limitata:
+
+```text
+D245_A8_SEMANTIC_CLASS=TARGET_LIVE_PROVEN_READ_ONLY_PRECONDITION_DISCRIMINATOR
+D245_A8_INITIALIZER_STATUS=NOT_PROVEN
+D245_A8_CAUSAL_ROLE=PRECONDITION_OBSERVED_BEFORE_SUCCESSFUL_E4_NOT_DEVICE_INITIALIZATION_PROVEN
+```
+
+A8 non è quindi chiamata initializer, reset o wake. D245 richiede wrapper e
+checksum validi, ACK echo A8 status `01`, response esatta 12509 e nessun frame
+stale/unowned prima di E4. ACK A8 `07`, timeout, status diverso, mismatch
+12508/12510, frame malformed o ordine diverso fermano la run con E4 count zero.
+
+Solo dopo A8 completo, E4 canonico e binding `match`, lo stesso backend continua
+`A2→82→A6→A2→70→80x4→90→D1→TLS`. A0 conserva gli OUT corti D241; il server
+flight B0 conserva submission fisiche fixed-64 con tail deterministica a zero,
+pacing 10 ms per record e timeout 3000 ms. D4, application data, reset e retry
+restano irraggiungibili. Il launcher usa il marker
+`/var/lib/goodix-5125-poc/d245-operator-invocation.marker`, i risultati
+`/var/lib/goodix-5125-poc/d245-results`, risolve la root dal proprio path/git e
+verifica gli hash sealed dopo il rename. Gli hash correnti backend/entrypoint
+coincidono con D243/D244; la closure applica e inverte la patch senza offset e
+prova il dry-run production-shaped senza USB reale.
 
 D4, application data, FDT, capture, enroll, reset/power-cycle e recovery
 invasiva automatica restano irraggiungibili o vietati. D240 è obsoleto e non è
@@ -970,16 +1054,18 @@ senza ClientKeyExchange. D242 si è poi fermato live al primo E4 dopo
 l'estensione generica fixed-64 A0; D243 ha ripristinato A0 corto ma si è fermato
 live nello stesso punto. D244 prova che i due timeout sono bulk IN dopo
 completion OUT, che E4 è byte-exact e che non resta una regressione software
-pre-E4 concreta nel differenziale D241↔D243. Il blocker immediato è quindi `E4
-responsiveness depends on an unresolved runtime/initial-state condition`; il
-server flight B0 fixed-64 con pacing 10 ms resta oltre il boundary e non è stato
-raggiunto live da D242 o D243. Il repository resta source-sealed; soltanto il
-kit D244 con closure PASS può applicare temporaneamente l'unseal per un singolo
-tentativo umano separatamente autorizzato, dopo shutdown completo e
-riaccensione manuale. Quel tentativo deve fermarsi subito dopo il successo
-crittografico TLS, prima di D4. Nessun esito storico autorizza retry o seconda
-invocazione. L'assenza di prova elettrica del sensore e di prova device-side
-assoluta dei receiver resident resta esplicita.
+pre-E4 concreta nel differenziale D241↔D243; la sua run live aggiunge che un
+fresh host boot non recupera da solo E4 e non prova la perdita elettrica del
+sensore. Il nuovo critical boundary è la precondizione live-proven ma non
+causalmente interpretata `A8_COMPLETE → E4_OUT`: una futura run D245 può
+eseguire A8 read-only una sola volta e continuare solo con ACK01 e firmware
+12509 esatto. Se anche E4 produce binding `match`, la stessa run prosegue lungo
+il pre-D1 già provato e il server flight B0 fixed-64 con pacing 10 ms, quindi si
+ferma subito al completamento TLS e sempre prima di D4. Il repository resta
+source-sealed; solo il kit D245 con closure PASS può applicare temporaneamente
+l'unseal, dopo review e nuova autorizzazione umana distinta. Nessun esito
+storico autorizza retry o seconda invocazione. L'assenza di prova elettrica del
+sensore e di prova device-side assoluta dei receiver resident resta esplicita.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,
@@ -1027,8 +1113,8 @@ replay senza tale estrazione.
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
 production-candidate D235, il consolidamento D238, l'evidenza D239 e la
-transizione command→TLS D241, le due evidenze E4 D242/D243 e il controllo
-causale fresh-state D244.
+transizione command→TLS D241, le evidenze E4 D242/D243/D244 e il kit D245 per
+la precondizione read-only A8→E4 con continuazione TLS.
 Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
 source-sealed e non
 costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
@@ -1048,4 +1134,4 @@ transpose.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D244 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D245 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
