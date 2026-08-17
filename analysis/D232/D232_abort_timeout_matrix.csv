@@ -1,0 +1,15 @@
+phase_id,timeout_ms,source_of_timeout,on_timeout,on_unexpected_response,on_ambiguous_completion,retry_count,automatic_reset,future_operator_action
+E4,1000,target capture timing plus conservative D232 ceiling,STOP,STOP,STOP,0,forbidden,review report; no same-run traffic
+A2_1,1000,D231 A2 builder/capture matrix,STOP,STOP,STOP,0,forbidden,review report; no same-run traffic
+CHIP_82,500,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report; verify target identity offline
+OTP_A6,750,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report; no same-run traffic
+A2_2,1000,D231 A2 builder/capture matrix,STOP,STOP,STOP,0,forbidden,review report; no same-run traffic
+MODE_70,500,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report; no same-run traffic
+DAC_220,250,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report and protected material
+DAC_236,250,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report and protected material
+DAC_238,250,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report and protected material
+DAC_23A,250,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report and protected material
+CONFIG_90,1000,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report; validate length hash finalizer and DAC correlation
+D1,1000,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report; do not re-enter TLS
+TLS,3000,D231 abort/timeout matrix,STOP,STOP,STOP,0,forbidden,review report; Bad Record MAC or alert ends run
+

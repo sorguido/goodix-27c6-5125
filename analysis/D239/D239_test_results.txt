@@ -1,0 +1,40 @@
+D239 test results — 2026-08-16
+
+STATIC_CHECK
+  bash -n operator_kit/d239-live-pre-d1-tls-once.sh: PASS
+  D239_live_unseal.patch patch --dry-run: PASS
+  sealed backend SHA-256: PASS
+  sealed entrypoint SHA-256: PASS
+  forbidden D4/application-data reachability: PASS (zero/forbidden)
+  retry policy: PASS (zero)
+
+UNIT_TEST
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+  Result: Ran 74 tests in 1.513s — OK
+  Failures: 0
+  Errors: 0
+  Skips: 0
+
+IMPORT/PATH REGRESSION
+  Direct script with PYTHONPATH absent: expected ModuleNotFoundError reproduced
+  Same launcher import context with explicit repository PYTHONPATH: PASS
+  Wrong cwd fail-closed check: PASS (exit 65 before Python/live path)
+  Missing/stale dry-run report rejection: PASS
+
+REAL_OFFLINE_OPERATOR_DRY_RUN
+  env -u PYTHONPATH operator_kit/d239-live-pre-d1-tls-once.sh --offline-dry-run-pre-usb
+  OPERATOR_KIT_DRY_RUN_PRE_USB=PASS
+  pre_usb_fence_count=1
+  libusb_init_count=0
+  usb_open_count=0
+  goodix_command_count=0
+  real_secret_read_count=0
+  live_marker_create_count=0
+  source_unseal_count=0
+  fprintd_stop_count=0
+  secret_present_in_report=false
+
+LIVE_USB_EXECUTION
+  NOT_PERFORMED
+
+NO_LIVE_USB_EXECUTION_PERFORMED

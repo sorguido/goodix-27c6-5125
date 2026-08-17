@@ -1,0 +1,131 @@
+--- a/Goodix 27c6 5125 manuale tecnico.md
++++ b/Goodix 27c6 5125 manuale tecnico.md
+@@ -18,7 +18,8 @@
+ | A2 e `0x70` | convergenza host-side D231 | reset solo sensore e set-mode idle; corpi resident ancora assenti |
+ | Readback resident arbitrario | esaurito nel corpus locale | nessun path host-side safe trovato da D230 |
+ | Exact OEM replay | implementato e revisionato offline in D232 | state machine single-shot e oracle sintetico; live compilato fuori e D233 non autorizzato |
+-| Backend USB/TLS D233 | implementato e testato offline, hard-disabled | blocker: KDF runtime PSK→validator E4 non recuperata dal corpus |
++| Binding D190 PSK→E4 | reference recuperata e verificata | cinque KAT OEM-attributed non circolari e PE canonico hash-gated |
++| Backend/orchestratore D233 | verificato offline, hard-disabled | schema candidate distinto; D234 e rischio operatore non autorizzati |
+ | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
+ 
+ ## Fonti e confini di pubblicazione
+@@ -141,6 +142,7 @@
+ D232 -> implementazione/review OFFLINE chiusa dell'exact OEM replay
+      -> live hard-disabled, allowlist byte-pinned, test sintetici pass
+ D233 -> backend USB/TLS reale + review soltanto OFFLINE, hard-disabled
++D233 closure -> reference D190 + binding runtime + orchestratore candidate offline
+ D234 -> eventuale LIVE single-shot dopo review D233 del blast radius
+      -> accettazione umana esplicita del blast radius
+      -> autorizzazione separata
+@@ -232,12 +234,40 @@
+ Il boundary secret D232 viene riusato senza fallback. D233 aggiunge
+ `RuntimePskE4Binder`: deriva un expected validator dal buffer PSK effettivamente
+ caricato, confronta in constant time i 32 byte E4 e azzera il temporaneo; un
+-mismatch ferma dopo E4 e prima del primo A2. Il seam e i test sintetici esistono,
+-ma il corpus corrente conserva soltanto la relazione
+-`validator = KDF_OEM(out A)`, non l'algoritmo KDF provenance-valid. Pertanto
+-`RUNTIME_PSK_E4_BINDING_PROVEN=no` e D233 termina con
+-`D233_BLOCKED_BY_RUNTIME_PSK_E4_BINDING`: il precedente MATCH storico non viene
+-usato come sostituto.
++mismatch ferma dopo E4 e prima del primo A2. D189/D190 avevano già chiuso la
++teoria, l'oracle OEM e la reference locale byte-exact; la sanitizzazione
++successiva della repository pubblica aveva rimosso il source, non quella prova.
++Il D233 originario non riuscì a recuperarlo e dichiarò correttamente il blocker.
++La closure D233 ha poi recuperato source e KAT dal transcript locale D190,
++reintegrato la reference minima e ripetuto i cinque vettori sul PE canonico con
++zero mismatch. Non usa un MATCH storico come gate: ogni run deriva nuovamente il
++validator dalla PSK caricata e dal PE hash-gated.
++
++## Derivazione OEM e reference D190
++
++La catena target è `secret[32] → producer key[32] → SP800-108 HMAC-SHA-256
++out48 → envelope AES-256-GCM/HMAC[102] → SHA-256 → validator[32]`. Il FixedData
++SP800-108 contiene le label canoniche e `BE32(384)`; `T1` e `T2` usano counter
++BE32 1 e 2. D190 ha corretto due dettagli statici tramite le istruzioni OEM:
++il buffer AES è azzerato a ogni iterazione e i quattro blocchi non sono
++concatenati; `inner16` è il nonce GCM e la costante target è l'AAD.
++
++La reference sotto `poc/goodix5125/tools/binding_reference/` non esegue la DLL.
++Accetta soltanto SHA-256
++`904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`,
++controlla PE, range e pattern univoco, legge i due seed strettamente necessari e
++li azzera insieme ai material intermedi mutabili. Nel source e nei bundle non
++sono presenti seed raw, producer key o out48. La policy resta
++`LOCAL_VOLATILE_DERIVATION_HASH_ONLY`; il limite onesto è che Python non può
++garantire la cancellazione di ogni copia immutabile interna alla libreria.
++
++I validator attesi V0–V4 furono prodotti dall'oracle di istruzioni OEM sotto
++QEMU prima di entrare nel self-test della reference. Nella closure sono input
++storici indipendenti, non output rigenerati dalla funzione sotto test. Il PE
++canonico locale riproduce tutti e cinque; hash errato, pattern ambiguo, KAT
++alterato, PSK mutata o E4 errato falliscono chiusi. Ne seguono
++`D190_REFERENCE_PROVENANCE_VALID=yes`, `D190_KAT_NONCIRCULAR=yes` e
++`RUNTIME_PSK_E4_BINDING_PROVEN=yes`.
+ 
+ Il raw `0x90` non è copiato nel source o nel bundle. La capture locale
+ provenance-valid, SHA-256 `50071c0f...19c184b`, contiene a packet index 103
+@@ -253,11 +283,27 @@
+ la mask segnali. In D233 sono eseguite soltanto facade mock; nessun servizio o
+ sistema è mutato.
+ 
++L'orchestratore candidate unisce preflight, loader protetti, verifica PE,
++caricamento PSK, binder D190, backend USB/TLS e core OEM monotono attraverso sole
++facade iniettate in D233. Il core D232 conserva lo schema sintetico, ma quel
++report è catturato soltanto in memoria: il percorso candidate pubblica
++`d233-production-candidate-run-report-v1`, con mode, seal, autorizzazione,
++conteggi, restore, zeroizzazione, identità target e stato binding espliciti.
++Non esiste alcun valore runtime che possa dichiarare `live_single_shot`.
++
++L'ordine di recovery è causale e testato: stop del nuovo traffico, cleanup e
++zeroizzazione exactly-once, checkpoint durable pre-restore, ripristino esatto di
++fprintd e signal mask, poi report finale. Il checkpoint rende il risultato
++recuperabile anche se il restore fallisce; il finale registra fedelmente
++l'esito del restore. Nessun failure autorizza un secondo comando o recovery
++invasiva automatica.
++
+ Il live è hard-disabled due volte: l'unico entrypoint spedito risponde soltanto
+ con capability zero e respinge flag, ambiente, config e backend alternativo;
+ ogni metodo della facade libusb reale chiama un sigillo source che solleva prima
+ di qualsiasi API USB. D234 richiederebbe una patch esplicita a quel sigillo,
+-review umana e autorizzazione separata. I 33 test offline complessivi coprono
++review umana e autorizzazione separata. La suite riproducibile corrente comprende
++46 metodi unittest, oltre ai check statici censiti separatamente, e copre
+ happy/failure path D232, boundary, USB mock, TLS loopback reale, B0, restore,
+ report, KAT D190 e tentativi di enablement. Nessun test enumera o apre il sensore.
+ 
+@@ -308,13 +354,12 @@
+ 
+ ## Current critical boundary
+ 
+-La semantica host-side A2/0x70 e il backend USB/TLS non sono più blocker del
+-replay OEM esatto. Il confine immediato è il binding runtime PSK↔E4: manca nel
+-corpus l'algoritmo concreto `KDF_OEM(out A)`, quindi il validator non può ancora
+-essere ricalcolato in modo provenance-valid dalla PSK caricata nello stesso run.
+-Solo dopo la chiusura di questo gate un eventuale D234 potrebbe passare alla
+-review umana del blast radius, alla patch source e a un'autorizzazione separata.
+-L'assenza di prova device-side assoluta dei receiver resident resta esplicita.
++La semantica host-side A2/0x70, il backend USB/TLS, il binding runtime PSK↔E4 e
++l'orchestratore candidate non sono più blocker offline. Il confine immediato è
++ora umano e operativo: D234 richiede review del blast radius, accettazione
++esplicita del rischio, patch source che rimuova il sigillo e autorizzazione live
++separata. Nessuna di queste condizioni è concessa da D233. L'assenza di prova
++device-side assoluta dei receiver resident resta esplicita.
+ 
+ Separatamente, la riproducibilità generale resta limitata dal materiale di
+ trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,
+@@ -359,10 +404,10 @@
+ 
+ ## Stato implementazione Linux
+ 
+-Il repository implementa il codec immagine clean-room, il seam D232 e il
+-backend D233 production-shaped. Quest'ultimo include ABI libusb esatta e TLS
+-OpenSSL, ma il live D233 non è attivabile e non costituisce un driver libfprint
+-pronto. Il record immagine noto è di 7684 byte:
++Il repository implementa il codec immagine clean-room, il seam D232, la
++reference D190 recuperata e il backend/orchestratore D233 production-shaped.
++Questi includono ABI libusb esatta e TLS OpenSSL, ma il live D233 non è
++attivabile e non costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
+ 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
+ transpose.
+ 

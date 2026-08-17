@@ -1,0 +1,22 @@
+{
+  "runner": "python3 -m unittest -v tests.test_d233_closure",
+  "tests_run": 13,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "canonical_pe_hash_match": true,
+  "kat_vectors": 5,
+  "kat_matches": 5,
+  "kat_mismatches": 0,
+  "negative_cases": [
+    "wrong_pe_hash",
+    "ambiguous_instruction_pattern",
+    "one_bit_secret_mutation",
+    "wrong_kat",
+    "wrong_e4",
+    "checkpoint_publication_failure",
+    "final_publication_failure",
+    "restore_failure"
+  ],
+  "result": "pass"
+}

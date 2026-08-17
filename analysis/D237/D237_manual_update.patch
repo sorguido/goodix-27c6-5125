@@ -1,0 +1,48 @@
+diff --git a/Goodix 27c6 5125 manuale tecnico.md b/Goodix 27c6 5125 manuale tecnico.md
+--- a/Goodix 27c6 5125 manuale tecnico.md
++++ b/Goodix 27c6 5125 manuale tecnico.md
+@@ -414,6 +414,26 @@ Dopo il blocker sono stati ripristinati entrambi i source seal e le dichiarazioni
+ autorizzazione e una sessione root già autenticata secondo governance. Non è
+ consentito rilanciare D236.
+ 
++## Esito D237: autenticazione sudo non predisposta
++
++D237 ha ricevuto `D237_OPERATOR_RISK_ACCEPTANCE=granted`, ma il gate operativo
++iniziale obbligatorio `sudo -n true` ha restituito `a password is required`.
++La decisione terminale è quindi
++`D237_BLOCKED_BY_SUDO_AUTH_NOT_PRIMED`, distinta da un blocker Goodix e dal
++preflight D236: nessun altro comando root è stato eseguito.
++
++Il source unseal e la relativa review non sono stati raggiunti. Non sono stati
++avviati il preflight root, la selezione sysfs, libusb, l'apertura o il claim USB,
++E4, alcun comando OEM o TLS. Tutti i contatori live e di recovery sono zero;
++`fprintd` e la signal mask non sono stati toccati e nessun cleanup era necessario.
++La regola udev persistente resta assente. Poiché il live non è iniziato,
++l'autorizzazione D237 non è stata consumata; l'esito terminale chiude comunque
++lo step e non autorizza un secondo tentativo.
++
++Un eventuale nuovo step live richiede una nuova review e autorizzazione umana e,
++prima che Codex inizi, una sessione sudo già autenticata dall'operatore fuori dal
++workflow. Codex non deve richiedere, ricevere o gestire credenziali.
++
+ ## Operazioni read note e limiti
+ 
+ | Operazione | Dominio | Limite |
+@@ -463,11 +483,12 @@ Non creare o raccomandare D231/D232 per altre ricerche statiche della stessa
+ 
+ La semantica host-side A2/0x70, il backend USB/TLS, il binding runtime PSK↔E4,
+ l'orchestratore e il vero entrypoint production non sono più blocker offline.
+-Il confine immediato torna a essere operativo e umano dopo il blocker D236: un
+-nuovo step deve predisporre una sessione root autenticata, ripetere review e
+-autorizzazione e rieseguire da zero l'unseal/preflight. Il repository è nuovamente
+-source-sealed e D236 non autorizza un retry. L'assenza di prova device-side
+-assoluta dei receiver resident resta esplicita.
++Il confine immediato resta operativo e umano dopo i blocker D236 e D237. D237 si
++è fermato ancora prima dell'unseal perché `sudo -n true` non era autenticato. Un
++nuovo step deve predisporre fuori dal workflow una sessione root già autenticata,
++ripetere review e autorizzazione e ripartire da zero. Il repository resta
++source-sealed e né D236 né D237 autorizzano un retry. L'assenza di prova
++device-side assoluta dei receiver resident resta esplicita.
+ 
+ Separatamente, la riproducibilità generale resta limitata dal materiale di
+ trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,

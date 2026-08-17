@@ -1,0 +1,17 @@
+Goodix 27c6 5125 manuale tecnico.md
+src/goodix5125_d232_offline.py
+src/goodix5125_d233_backend.py
+src/goodix5125_d235_entrypoint.py
+operator_kit/d241-live-tls-once.sh
+tests/test_d239_operator_kit.py
+tests/test_d241_operator_kit.py
+tests/test_d241_transition.py
+analysis/D241/d241_preflight.py
+analysis/D241/d241_operator_dry_run.py
+analysis/D241/D241_live_unseal.patch
+analysis/D241/D241_executable_closure_report.json
+analysis/D241/D241_technical_report.md
+analysis/D241/D241_decision.json
+analysis/D241/D241_test_results.txt
+analysis/D241/D241_source_inventory.json
+analysis/D241/D241_bundle_file_list.txt

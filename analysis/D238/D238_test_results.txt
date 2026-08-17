@@ -1,0 +1,16 @@
+D238 OFFLINE TEST RESULT
+command: python3 -m unittest discover -s tests -v
+date: 2026-08-15 Europe/Rome
+scope: test_cleanroom, test_d232_offline, test_d233_backend, test_d233_closure, test_d235_entrypoint, test_d236_unseal, test_d238_consolidation
+tests_run: 68
+failures: 0
+errors: 0
+skipped: 0
+result: PASS
+
+Additional operator-kit checks:
+- bash -n operator_kit/d238-live-pre-d1-tls-once.sh: PASS
+- patch --dry-run --batch --forward --strip=1 --input=analysis/D238/D238_live_unseal.patch: PASS
+- live operator script execution: NOT RUN (mandatory D238 boundary)
+- sudo use: NONE
+- live USB/libusb/TLS access: NONE

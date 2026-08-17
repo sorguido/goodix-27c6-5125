@@ -1,0 +1,9 @@
+operation,host_controls,address_namespace,address_fixed_or_arbitrary,length_fixed_or_arbitrary,maximum_read,memory_domain,side_effects,can_reach_0x080272e0,can_reach_0x0802b8f4,reason
+E4,production selector/request blob through constrained API,production MCU service selectors,"selector, not proven address",selector-defined bounded output,not a caller-selected MCU span,fixed production data,selector-dependent; studied read path,no,no,no 32-bit address+length serializer or matching handler
+0x82 ChipRegRead,LE16 register + LE16 count,chip/sensor registers,arbitrary only inside 16-bit register namespace,LE16 typed count,operation bounded; not MCU flash span,registers,read-like,no,no,cannot encode either 32-bit MCU address
+A6 / OTP,fixed selector/shape,OTP/factory data,fixed/selective,fixed,fixed response,OTP/factory,none proven for read,no,no,different namespace and no raw address
+A8,query only,firmware version metadata,fixed,fixed string,firmware name,metadata,none,no,no,fixed metadata handler
+AE / wire AF,query only,MCU state structure,fixed,fixed,fixed state,runtime state,none proven,no,no,fixed state response
+ProductionOperateKey,operation enum,PMK hash / MCU state / Pkey selectors,fixed enum,fixed per enum,operation-specific,secure/factory typed data,operation-dependent,no,no,no pointer/address input
+0x90 DEVICE_CONFIG,224-byte configuration body,configuration destination selected by handler,not an address read,fixed 224-byte download in capture,none,volatile configuration write,volatile write,no,no,download/write path; candidate address byte windows are coincidences
+F0/F4 update/check,firmware input slices/update control,firmware update state,not exposed as read address,input slice lengths,status only,IAP/APP flash maintenance,erase/program/reset possible,no safe read,no safe read,no returned raw flash; path is mutating

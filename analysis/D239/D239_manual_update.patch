@@ -1,0 +1,156 @@
+--- "a/Goodix 27c6 5125 manuale tecnico.md"
++++ "b/Goodix 27c6 5125 manuale tecnico.md"
+@@ -7,9 +7,12 @@
+ configurazione factory, stato persistente/secure e compatibilità con Windows.
+ 
+ Non esiste ancora un driver Linux funzionante. D238 ha consolidato offline il
+-solo cold-start OEM fino al primo handshake TLS e ha prodotto un unico script
+-operatore source-sealed. Il repository non autorizza da solo operazioni live:
+-l'esecuzione privilegiata resta subordinata a nuova autorizzazione umana.
++solo cold-start OEM fino al primo handshake TLS, ma il relativo tentativo
++operatore si è arrestato prima dell'USB per un contesto d'import Python errato.
++D239 corregge in modo permanente il launcher e introduce un gate di dry-run
++reale fino alla barriera pre-USB. Il repository non autorizza da solo operazioni
++live: l'esecuzione privilegiata resta subordinata a review e nuova
++autorizzazione umana.
+ 
+ | Area | Stato | Risultato |
+ | --- | --- | --- |
+@@ -24,6 +27,7 @@
+ | Entrypoint production D235 | composto e verificato offline, hard-disabled | path reali deterministici, mapping terminale e restore collegati; D236 non autorizzato |
+ | Evidenza live D236 | parziale, non è un cold-start riuscito | E4 binding reale `match`; primo A2 trasmesso; ACK reale `B0/A2/07`; zero TLS/retry/persistent-write |
+ | Consolidamento D238 | verificato offline, source-sealed | policy ACK unica, replay pre-D1 completo con `0x01` e `0x07`, osservabilità redatta e unico kit operatore |
++| Executability gate D239 | PASS offline, nessun live USB | launcher import-safe, composizione production-shaped fino al fence pre-USB e tutti i contatori live a zero |
+ | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
+ 
+ ## Fonti e confini di pubblicazione
+@@ -190,7 +194,12 @@
+      -> doppio source seal D235/D233, nessun runtime enablement
+ D236 -> autorizzato, unseal revisionato, ma bloccato prima del preflight root
+      -> zero enumerazione/open/comandi; source resealed
+-next -> nuovo step, review e autorizzazione separate
++D237 -> evidenza D236 normalizzata e boundary di sicurezza riconfermato
++D238 -> policy pre-D1 consolidata e kit operatore source-sealed
++     -> tentativo operatore fallito sull'import Python, prima di unseal/USB
++D239 -> launcher corretto + dry-run operatore production-shaped fino al pre-USB
++     -> OPERATOR_KIT_DRY_RUN_PRE_USB=PASS; nessun live eseguito
++next -> review D239, poi eventuali autorizzazione e step live separati
+ ```
+ 
+ L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
+@@ -521,12 +530,68 @@
+ `1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15`
+ e `gfusb.dll` a
+ `904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`.
+-L'unico launcher futuro è
+-`operator_kit/d238-live-pre-d1-tls-once.sh`: preflight prima dell'unseal,
+-un'unica invocazione, checkpoint prima del restore, report finale, marker di
+-consumo autorizzazione e reseal in trap. Codex non lo ha eseguito. D4,
+-application data, FDT, capture, enroll, reset/power-cycle e recovery invasiva
+-automatica restano irraggiungibili o vietati.
++Il tentativo operatore D238 ha invocato direttamente
++`python3 analysis/D236/d236_preflight.py` senza rendere esplicita la root del
++repository nel path di import. È quindi terminato con
++`ModuleNotFoundError: No module named 'src'` prima di entrare nel `main` del
++preflight. L'incidente è classificato
++`OPERATOR_KIT_PREFLIGHT_INVOCATION_FAILURE` e `NO_LIVE_USB_EXECUTION`: nessun
++unseal, claim del marker, entrypoint production, init libusb, open USB o comando
++Goodix è stato raggiunto. Il vecchio report D236 già presente non fu rigenerato
++da quel tentativo e non ne costituisce evidenza.
++
++## D239: executability gate dell'operator kit
++
++D239 sostituisce il launcher operativo con
++`operator_kit/d239-live-pre-d1-tls-once.sh`. Ogni entrypoint Python del launcher
++riceve esplicitamente
++`PYTHONPATH="$EXPECTED_REPOSITORY${PYTHONPATH:+:$PYTHONPATH}"`; il preflight
++espone inoltre un probe d'import offline che costruisce gli stessi componenti
++production senza toccare sistema, USB o secret reali. La patch di unseal resta
++byte-identica a D238: non sono cambiati protocollo, allowlist, policy ACK,
++retry, recovery, command family o percorso del materiale protetto.
++
++Il percorso `--offline-dry-run-pre-usb` è eseguibile senza root. Usa facade,
++materiale protetto e secret sintetici, verifica il PE canonico e compone il
++vero entrypoint/backend fino all'esatto seam `libusb.init`. In quel punto un
++fence offline termina intenzionalmente il percorso prima di inizializzare
++libusb. Il report permanente attesta:
++
++```text
++OPERATOR_KIT_DRY_RUN_PRE_USB=PASS
++pre_usb_fence_count=1
++libusb_init_count=0
++usb_open_count=0
++goodix_command_count=0
++real_secret_read_count=0
++live_marker_create_count=0
++source_unseal_count=0
++fprintd_stop_count=0
++live_usb_execution=NOT_PERFORMED
++```
++
++Il dry-run non crea marker persistenti; il claim single-use e il caricamento del
++secret sono sostituiti soltanto in memoria. La directory marker live D238 è
++protetta e non ispezionabile da utente non privilegiato; ciò non altera la
++diagnosi, perché il fallimento d'import avvenne testualmente prima del relativo
++check. Nessun marker live è stato creato da D239.
++
++La Definition of Done permanente dell'operator kit è:
++
++1. `bash -n` del launcher;
++2. probe d'import con contesto esplicito;
++3. dry-run reale fino al fence pre-USB;
++4. validazione di schema, hash e tutti i contatori negativi del report;
++5. sorgenti ancora sealed e patch live applicabile soltanto in dry-run;
++6. suite completa senza regressioni.
++
++D239 soddisfa questi punti con 74 test passati. La decisione è
++`D239_OPERATOR_KIT_EXECUTABILITY_GATE_PASSED_READY_FOR_REVIEW`, ma non è
++un'autorizzazione hardware: il ramo live richiede prima un report D239 PASS
++fresco, poi root, review e autorizzazione umana separate. Codex non ha eseguito
++né richiesto di eseguire quel ramo. D4, application data, FDT, capture, enroll,
++reset/power-cycle e recovery invasiva automatica restano irraggiungibili o
++vietati.
+ 
+ Il riferimento Rocky indipendente è
+ <https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1>. È corroborazione
+@@ -582,13 +647,15 @@
+ 
+ La semantica host-side A2/0x70, il backend USB/TLS, il binding runtime PSK↔E4,
+ l'orchestratore e il vero entrypoint production non sono più blocker offline.
+-Il confine immediato resta operativo e umano, ma non è più il vecchio blocker
+-sudo: i run manuali D236 hanno provato E4 e il primo ACK A2, mentre D238 ha
+-chiuso offline la policy completa. Il repository resta source-sealed; il solo
+-script D238 può applicare temporaneamente l'unseal revisionato e richiede una
+-nuova autorizzazione esplicita dell'operatore. Nessun esito D236/D237 autorizza
+-retry o seconda invocazione. L'assenza di prova device-side assoluta dei
+-receiver resident resta esplicita.
++Il confine immediato resta operativo e umano: i run manuali D236 hanno provato
++E4 e il primo ACK A2, D238 ha chiuso offline la policy completa e D239 ha
++provato l'eseguibilità dell'operator kit soltanto fino alla barriera pre-USB.
++Il repository resta source-sealed; il solo script D239 può applicare
++temporaneamente l'unseal revisionato, ma il suo gate PASS abilita esclusivamente
++la review. Qualunque tentativo hardware richiede un nuovo step e una nuova
++autorizzazione esplicita dell'operatore. Nessun esito D236–D239 autorizza retry
++o seconda invocazione. L'assenza di prova device-side assoluta dei receiver
++resident resta esplicita.
+ 
+ Separatamente, la riproducibilità generale resta limitata dal materiale di
+ trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,
+@@ -635,8 +702,9 @@
+ 
+ Il repository implementa il codec immagine clean-room, il seam D232, la
+ reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
+-production-candidate D235 e il consolidamento D238. Questi includono ABI libusb
+-esatta e TLS OpenSSL, ma il live resta doppiamente source-sealed e non
++production-candidate D235, il consolidamento D238 e l'executability gate D239.
++Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
++source-sealed e non
+ costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
+ 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
+ transpose.
+@@ -654,4 +722,4 @@
+ 
+ L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
+ riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
+-D230–D238 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
++D230–D239 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.

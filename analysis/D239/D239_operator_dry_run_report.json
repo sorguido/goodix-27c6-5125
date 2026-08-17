@@ -1,0 +1,60 @@
+{
+  "artifact_sha256": {
+    "analysis/D236/d236_preflight.py": "de7aacd4213cd6e5ddf9b39917f7f28aa657af34bb62de6d6fbd3b7c529d9603",
+    "analysis/D239/D239_live_unseal.patch": "4b243cacf7f0af00d358f1c72c05f0a83f36e22ee3c06d6af8136a8fec742003",
+    "analysis/D239/d239_operator_dry_run.py": "970b7c540e1276f5e129fba0987702e60862a6e064fbf3a7cdb6324d4cef188e",
+    "operator_kit/d239-live-pre-d1-tls-once.sh": "74bfd0a556d947eaa1bca600e832521c4018fb9dfd923a502ea000e2bb3aad15",
+    "src/goodix5125_d233_backend.py": "7727128ee27337b70ba48eac31b8640c888b76560387363e4eff0c167d993f5b",
+    "src/goodix5125_d235_entrypoint.py": "38e857a14bd416808b9ae2df7c4101809879e4732b6e001ce29d11bd731dd555"
+  },
+  "classification": "REAL_OFFLINE_OPERATOR_DRY_RUN",
+  "composed_abort_class": "internal_fail_closed",
+  "composed_command_count": 0,
+  "composed_usb_open_count": 0,
+  "cwd": "/home/guido/Repository/goodix-27c6-5125",
+  "fprintd_stop_count": 0,
+  "gate": "OPERATOR_KIT_DRY_RUN_PRE_USB",
+  "goodix_command_count": 0,
+  "libusb_init_count": 0,
+  "live_marker_create_count": 0,
+  "live_usb_execution": "NOT_PERFORMED",
+  "modules_loaded": [
+    "src.goodix5125_d232_offline",
+    "src.goodix5125_d233_backend",
+    "src.goodix5125_d235_entrypoint"
+  ],
+  "offline_marker_created": false,
+  "operator_path_stages": [
+    "repository_and_artifact_gate",
+    "real_python_import",
+    "production_path_validation",
+    "synthetic_preflight_prepare",
+    "synthetic_protected_input_load",
+    "canonical_pe_reference_gate",
+    "production_backend_composition",
+    "pre_usb_fence",
+    "stop",
+    "synthetic_restore_and_offline_report"
+  ],
+  "pre_usb_fence_count": 1,
+  "production_runtime_paths": {
+    "canonical_gfusb": "/home/guido/Repository/goodix-27c6-5125/analysis/D230/work/GoodixExport/gfusb.dll",
+    "checkpoint_report": "/var/lib/goodix-5125-poc/d238-results/d238-live-pre-restore.json",
+    "config90_store": "/var/lib/goodix-5125-poc/target-config-90.bin",
+    "final_report": "/var/lib/goodix-5125-poc/d238-results/d238-live-result.json",
+    "psk_store": "/var/lib/goodix-5125-poc/transport-material.bin",
+    "report_directory": "/var/lib/goodix-5125-poc/d238-results",
+    "single_use_marker": "/var/lib/goodix-5125-poc/d238-live-single-use.marker",
+    "target_material_manifest": "/var/lib/goodix-5125-poc/target-material-manifest.json"
+  },
+  "real_secret_read_count": 0,
+  "repository": "/home/guido/Repository/goodix-27c6-5125",
+  "schema": "d239-operator-dry-run-pre-usb-v1",
+  "secret_present_in_report": false,
+  "source_unseal_count": 0,
+  "status": "PASS",
+  "synthetic_marker_claim_count": 1,
+  "synthetic_material_load_count": 1,
+  "synthetic_secret_load_count": 1,
+  "usb_open_count": 0
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "d245-decision-v1",
+  "decision": "D245_A8_E4_PRECONDITION_TLS_CONTINUATION_READY_NOT_EXECUTED",
+  "a8_current_local_corpus_corroboration": "PASS",
+  "sealed_baseline_after_rename": "MATCH",
+  "executable_closure_gate": "PASS",
+  "manual_updated": true,
+  "operator_kit_created": true,
+  "live_executed": false,
+  "real_usb_access": 0,
+  "real_tls_handshake": 0,
+  "retry_count": 0,
+  "d4_reachable": false,
+  "application_data_reachable": false
+}

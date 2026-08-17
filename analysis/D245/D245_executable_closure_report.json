@@ -1,0 +1,95 @@
+{
+  "D244_FRESH_HOST_BOOT_SUFFICIENCY": "FALSIFIED_AS_SUFFICIENT_RECOVERY_CONDITION",
+  "D244_FRESH_STATE_HOST_CONTROL_RESULT": "E4_TIMEOUT_PERSISTS",
+  "D244_SENSOR_ELECTRICAL_POWER_CYCLE_STATUS": "NOT_PROVEN",
+  "D245_A8_CURRENT_LOCAL_CORPUS_CORROBORATION": "PASS",
+  "D245_A8_READ_ONLY_CLASSIFICATION": "CURRENT_LOCAL_CORPUS_CONFIRMED",
+  "D245_A8_WIRE_CONTRACT_CURRENT_CORPUS": "CONFIRMED",
+  "D245_D244_E4_IN_TIMEOUT": true,
+  "D245_D244_E4_OUT_COMPLETED": true,
+  "D245_D244_LIVE_RESULT_INGESTED": true,
+  "D245_EXECUTABLE_CLOSURE_GATE": "PASS",
+  "D245_FPRINTD_INITIAL_STATE_CAUSAL_STATUS": "NOT_SUFFICIENT_EXPLANATION",
+  "application_data_count": 0,
+  "artifact_sha256": {
+    "analysis/D245/D245_A8_E4_contract.json": "99d77ca3fbb7d0bf80cd1a081111e7eddee491c13405054ae14f6bf6ecd1be86",
+    "analysis/D245/D245_A8_E4_primary_evidence_audit.md": "e70bd8bb4b020c38228aab139de751614c280aa78f4faa8f4e01360ac8913690",
+    "analysis/D245/D245_live_unseal.patch": "66b6a7416479190ef56b67623222346a1452f2fdfba03f47764a59b09a78f5b0",
+    "analysis/D245/d245_runtime_matrix.py": "32a24adae47e711b015016163805f6c6a36f78191021d222f37652924fd774c8"
+  },
+  "d4_count": 0,
+  "live_usb_execution": "NOT_PERFORMED",
+  "persistent_write_family_count": 0,
+  "real_tls_handshake": 0,
+  "real_usb_access": 0,
+  "repository_root": "/home/guido/Repository/goodix-27c6-5125_private",
+  "retry_count": 0,
+  "schema": "d245-executable-closure-v1",
+  "sealed_baseline": {
+    "D245_SEALED_BASELINE_AFTER_RENAME_STATUS": "MATCH",
+    "files": [
+      {
+        "actual_sha256": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+        "behavior_relevant": true,
+        "expected_sha256": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+        "path": "src/goodix5125_d233_backend.py",
+        "status": "MATCH"
+      },
+      {
+        "actual_sha256": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69",
+        "behavior_relevant": true,
+        "expected_sha256": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69",
+        "path": "src/goodix5125_d235_entrypoint.py",
+        "status": "MATCH"
+      }
+    ]
+  },
+  "status": "PASS",
+  "unseal_runtime_reseal": {
+    "final_sealed_sha256": {
+      "src/goodix5125_d233_backend.py": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+      "src/goodix5125_d235_entrypoint.py": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69"
+    },
+    "patch_apply": "PASS_WITHOUT_OFFSET",
+    "runtime_matrix": {
+      "a8_ack07_e4_count": 0,
+      "a8_in_timeout_e4_count": 0,
+      "a8_out_timeout_e4_count": 0,
+      "a8_request_hex": "a00600a6a803000000ff",
+      "application_data_count": 0,
+      "d4_count": 0,
+      "e4_timeout_direction": "IN_AFTER_COMPLETED_OUT",
+      "firmware_mismatch_cases": [
+        "GF_ST411SEC_APP_12508",
+        "GF_ST411SEC_APP_12510"
+      ],
+      "full_command_count": 13,
+      "happy_cases": [
+        "E4_ACK_01_PASS",
+        "E4_ACK_07_PASS"
+      ],
+      "persistent_write_family_count": 0,
+      "real_usb_access": 0,
+      "retry_count": 0,
+      "schema": "d245-runtime-matrix-v1",
+      "server_flight_pacing_count": 2,
+      "server_flight_usb_chunk_lengths": [
+        64,
+        64,
+        64
+      ],
+      "status": "PASS",
+      "tls_success_stop_before_d4": true,
+      "tls_timeout_durable": true
+    },
+    "sealed_sha256": {
+      "src/goodix5125_d233_backend.py": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+      "src/goodix5125_d235_entrypoint.py": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69"
+    },
+    "source_reseal": "PASS_WITHOUT_OFFSET",
+    "unsealed_sha256": {
+      "src/goodix5125_d233_backend.py": "57aaee6d7a616e305a64066c1fb8baf9c4c6ce1186dc1440390099af29b0be51",
+      "src/goodix5125_d235_entrypoint.py": "0956653d1aa01ecab048d898c81fccbe3d0123ab10c26ae0f249271d6c099b8e"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "d244-live-evidence-verification-v1",
+  "D244_D242_LIVE_RESULT_INGESTED": true,
+  "D244_D242_LIVE_REPORT_PATH": "analysis/D242/D242_operator_live_stdout.json",
+  "D244_D242_LIVE_REPORT_SHA256": "1d9c2c736a2b8939855a184e350ea2ecaa914921536ae2a2d616130a166eb7e7",
+  "D244_D242_LIVE_REPORT_STATUS": "PRIMARY_LOCAL_EVIDENCE_VERIFIED",
+  "D244_D243_LIVE_RESULT_INGESTED": true,
+  "D244_D243_LIVE_REPORT_PATH": "analysis/D243/D243_operator_live_stdout.json",
+  "D244_D243_LIVE_REPORT_SHA256": "a82c43f4aba5c6f9dcfe072eee7b8b6ab0edc7f621961ea6a322dfe6ac45aa23",
+  "D244_D243_LIVE_REPORT_STATUS": "PRIMARY_LOCAL_EVIDENCE_VERIFIED",
+  "D244_D243_LIVE_FAILURE_CLASS": "timeout",
+  "D244_D243_LIVE_ATTEMPTED_PHASE": "E4",
+  "D244_D243_LIVE_COMMAND_COUNT": 1,
+  "D244_D243_LIVE_USB_OPEN_COUNT": 1,
+  "validation": {
+    "regular_file": true,
+    "json_valid": true,
+    "required_fields_match": true,
+    "root_only_result_directories_read": false,
+    "historical_files_modified": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "d237-postlive-report-v1",
+  "status": "not_applicable_no_live_run",
+  "decision": "D237_BLOCKED_BY_SUDO_AUTH_NOT_PRIMED",
+  "live_run_count": 0,
+  "target_enumeration_count": 0,
+  "libusb_init_count": 0,
+  "usb_open_count": 0,
+  "protocol_traffic_count": 0,
+  "external_holders_postrun": "not_checked_no_run",
+  "fprintd_restore_status": "not_needed",
+  "signal_restore_status": "not_needed",
+  "device_enumerated_postrun": "unknown",
+  "udev_rule_status": "absent",
+  "system_persistent_changes": 0,
+  "automatic_recovery_count": 0,
+  "second_command_probe_count": 0,
+  "source_unsealed": "no"
+}

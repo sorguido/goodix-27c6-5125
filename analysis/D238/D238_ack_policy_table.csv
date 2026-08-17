@@ -1,0 +1,13 @@
+phase,request_control,historical_D43_ack_status,historical_D175_ack_status,D236_live_status_if_observed,response_after_ack_required?,same-completion_ACK+response_allowed?,confidence,source_artifacts
+E4,0xe4,not_available_in_current_repository,0x01,0x07,yes_typed_E4,yes_exact_two_A0_frames_only,high,"analysis/D230/work/GoodixExport/rilevamento.pcapng packets 53/55/57; analysis/D236 run1 artifacts"
+A2_1,0xa2,not_available_in_current_repository,0x01,0x07,yes_typed_A2,yes_exact_two_A0_frames_only,high,"rilevamento.pcapng packets 58/61/63; analysis/D236 run2/run3 artifacts"
+CHIP_82,0x82,not_available_in_current_repository,0x01,not_observed_live,yes_typed_82,yes_exact_two_A0_frames_only,medium_high,"rilevamento.pcapng packets 65/67/69; 0x07 transport/session inference"
+OTP_A6,0xa6,not_available_in_current_repository,0x01,not_observed_live,yes_typed_A6,yes_exact_two_A0_frames_only,medium_high,"rilevamento.pcapng packets 70/73/75; 0x07 transport/session inference"
+A2_2,0xa2,not_available_in_current_repository,0x01,not_observed_live,yes_typed_A2,yes_exact_two_A0_frames_only,high,"rilevamento.pcapng packets 77/79/81; same control as live A2_1"
+MODE_70,0x70,not_available_in_current_repository,0x01,not_observed_live,no_ACK_only,no,medium_high,"rilevamento.pcapng packets 82/85; 0x07 transport/session inference"
+DAC_220,0x80,not_available_in_current_repository,0x01,not_observed_live,no_ACK_only,no,medium_high,"rilevamento.pcapng packets 87/89; 0x07 transport/session inference"
+DAC_236,0x80,not_available_in_current_repository,0x01,not_observed_live,no_ACK_only,no,medium_high,"rilevamento.pcapng packets 90/93; 0x07 transport/session inference"
+DAC_238,0x80,not_available_in_current_repository,0x01,not_observed_live,no_ACK_only,no,medium_high,"rilevamento.pcapng packets 94/97; 0x07 transport/session inference"
+DAC_23A,0x80,not_available_in_current_repository,0x01,not_observed_live,no_ACK_only,no,medium_high,"rilevamento.pcapng packets 99/101; 0x07 transport/session inference"
+CONFIG_90,0x90,not_available_in_current_repository,0x01,not_observed_live,yes_typed_90,yes_exact_two_A0_frames_only,medium_high,"rilevamento.pcapng packets 103/111/113; 0x07 transport/session inference"
+D1,0xd1,not_applicable,no_A0_ACK,not_observed_live,direct_B0_TLS,no,high,"rilevamento.pcapng packets 114/117"

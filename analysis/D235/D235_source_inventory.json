@@ -1,0 +1,24 @@
+{
+  "schema": "d235-source-inventory-v1",
+  "head": "ebaeda016bd3c66d78aa16b351fd0bd13d1daf8b",
+  "files": {
+    "src/goodix5125_d232_offline.py": {
+      "role": "unchanged_exact_oem_core_and_protected_loaders",
+      "sha256": "f2ace73461cb9f7d4499ed21cc724cd2331c933ff49a25f22b14b8d91faf8ef1"
+    },
+    "src/goodix5125_d233_backend.py": {
+      "role": "existing_components_plus_report_observability_and_path_hardening",
+      "sha256": "64c2d1b45f015075fa58f771de1abe8882a791e6e99e9f235ad1eebb41b188dc"
+    },
+    "src/goodix5125_d235_entrypoint.py": {
+      "role": "new_thin_production_composition_layer_source_sealed",
+      "sha256": "1db1119c27cb13fb73918cc42e35e5d514bb7b4466e02a3af32d9d639eceafcb"
+    },
+    "tests/test_d235_entrypoint.py": {
+      "role": "offline_entrypoint_and_hard_disable_tests",
+      "sha256": "47a61ab334a11d1f96e2aee6b541bb7d6a2424db843fb51da172beba0e2c2076"
+    }
+  },
+  "integrated_test_count": 53,
+  "integrated_test_result": "pass"
+}

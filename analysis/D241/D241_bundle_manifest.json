@@ -1,0 +1,13 @@
+{
+  "schema": "d241-bundle-manifest-v1",
+  "bundle_path": "analysis/D241/D241_d1_direct_b0_tls_transition_bundle.zip",
+  "bundle_sha256": "78e37198ff02c0e33cdf48b9e5de04fc1e32c5c0ec7b9c56ce910b99cddf4506",
+  "member_count": 17,
+  "step_local": true,
+  "archive_test": "PASS",
+  "contains_secret": false,
+  "contains_tls_key_material": false,
+  "contains_biometric_payload": false,
+  "contains_cache": false,
+  "contains_historical_bundle": false
+}

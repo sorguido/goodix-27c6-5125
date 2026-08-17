@@ -1,0 +1,40 @@
+opcode_or_wire_control,name_or_role,observed_request_count,static_builder_callsite_count,source,read_boundary_class,arbitrary_32bit_address,notes
+0x01,NOP/state request (wire bit set),10,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x20,sensor/mode family,2,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x22,sensor/mode family subtype,1,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x32,sensor/mode family,3,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x34,sensor/mode family subtype,1,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x36,sensor/mode family subtype,3,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x40,mode family,0,4,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x50,sensor/mode family,2,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x60,mode family,0,4,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x70,mode command; resident target unresolved,1,4,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x80,ChipRegWrite,4,1,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x82,ChipRegRead,2,1,recovered capture,bounded_or_selector_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x90,DEVICE_CONFIG download,1,1,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x92,powerdown FDT scan frequency,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x96,SetDriverState,0,2,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x97,SetDriverState wire coordinate,1,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x98,set DAC,0,2,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0x9a,SPI communication test,0,2,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xa0,set/get SPI clock,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xa2,MCU/reset-family command,2,3,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xa4,erase APP / ClearApp,0,2,gfusb static builder census,maintenance_mutating,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xa6,OTP/fixed production read,1,1,recovered capture,bounded_or_selector_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xa8,GetEvkVersion,2,1,recovered capture,bounded_or_selector_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xac,mode family,0,4,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xae,GetMcuState,0,1,gfusb static builder census,bounded_or_selector_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xaf,GetMcuState wire coordinate,5,0,recovered capture,bounded_or_selector_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xd0,TLS server init,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xd1,TLS server initialization / transition,1,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xd2,D-family state command,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xd4,D-family state command,1,1,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xd5,D4-family wire coordinate,4,0,recovered capture,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xd8,D-family state command,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xe0,production_write_mcu selector protocol,0,2,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xe4,production_read_mcu selector protocol,1,2,recovered capture,bounded_or_selector_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xe6,E-family state command,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xee,E-family command,0,1,gfusb static builder census,not_read,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xf0,firmware update frame,0,1,gfusb static builder census,maintenance_mutating,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+0xf4,firmware check/finalize/reset,0,1,gfusb static builder census,maintenance_mutating,no,Wire value retained; pre-OR coordinate is not inferred by clearing bit 0.
+dynamic,runtime-computed subtype / generic no-ack / B0 TLS,4,18,gfusb static builder census and recovered capture,bounded_by_callers_or_tls_transport,no,Dynamic builders were classified by enclosing functions and callers.

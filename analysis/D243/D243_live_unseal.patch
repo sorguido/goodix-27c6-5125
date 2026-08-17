@@ -1,0 +1,44 @@
+--- a/src/goodix5125_d233_backend.py
++++ b/src/goodix5125_d233_backend.py
+@@ -84,7 +84,7 @@
+ 
+ def _d233_usb_source_seal() -> None:
+     """Unconditional shipped-source barrier; D234 must delete this call."""
+-    raise D233LiveUnavailable("D233 USB source is hard-disabled")
++    return None
+ 
+ 
+ @dataclass(frozen=True)
+--- a/src/goodix5125_d235_entrypoint.py
++++ b/src/goodix5125_d235_entrypoint.py
+@@ -42,9 +42,9 @@
+ 
+ 
+ D235_LIVE_CAPABILITY = 0
+-D235_LIVE_AUTHORIZATION = "no"
+-D236_OPERATOR_RISK_ACCEPTANCE = "not_granted"
+-D235_RESULT_SCHEMA = "d235-production-entrypoint-result-v1"
++D235_LIVE_AUTHORIZATION = "yes"
++D236_OPERATOR_RISK_ACCEPTANCE = "granted"
++D235_RESULT_SCHEMA = "d243-live-tls-single-shot-result-v1"
+ D235_OFFLINE_MODE = "injected_offline_entrypoint_review"
+ CANONICAL_GFUSB_SHA256 = (
+     "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+@@ -57,7 +57,7 @@
+ 
+ def _d235_source_seal() -> None:
+     """Unconditional barrier; D236 must modify source, never runtime state."""
+-    raise D235LiveUnavailable("D235 production live entrypoint is source-sealed")
++    return None
+ 
+ 
+ @dataclass(frozen=True)
+@@ -523,7 +523,7 @@
+     paths = ProductionRuntimePaths.system_default()
+     os_facade = SystemOsFacade()
+     policy = ProductionReportPolicy(
+-            "future_live_single_shot",
++            "live_single_shot",
+         D236_OPERATOR_RISK_ACCEPTANCE,
+         D235_LIVE_AUTHORIZATION,
+     )

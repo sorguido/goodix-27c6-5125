@@ -1,0 +1,10 @@
+claim_id,claim,evidence_source,location_or_packet,value,independent_cross_check,confidence,residual_limit,falsifier
+A2-001,First boolean selects MCU reset,gfusb.dll 1.1.125.14,0x1800698a9..0x180069956,flag OR 0x02,log string soft reset MCU,high,resident receiver absent,proven alternate flag meaning on target
+A2-002,Second boolean selects sensor reset,gfusb.dll 1.1.125.14,0x18006995a..0x1800699aa,flag OR 0x01,log string reset sensor,high,resident receiver absent,proven alternate flag meaning on target
+A2-003,A2 body serializer,gfusb.dll 1.1.125.14,0x1800699c4..0x180069a7a,"{flag,0x14}; len=2; builder (0x0a,0x01)",capture body 0114,high,builder ABI names inferred from dataflow,different serializer reaching same capture
+A2-004,Sensor-only caller,gfusb.dll 1.1.125.14,0x1800644a1..0x1800644c2,"first=0; second=1; optional one retry",branch and string mapping,high,caller purpose not required for flag proof,different callee or argument convention
+A2-005,First captured A2,recovered capture,packet 58,wire A2 body 0114 checksum f0,typed response packet 63,high,one available capture only,raw capture hash mismatch
+A2-006,Second captured A2,recovered capture,packet 77,wire A2 body 0114 checksum f0,typed response packet 81,high,one available capture only,raw capture hash mismatch
+A2-007,Cross-version A2 convergence,operator-supplied Rockytkg issue claim,gfusb.dll 1.1.125.13,"ResetMCUAndFingerprint(0,1); {1,20}",local 1.1.125.14 reconstruction and capture,medium-high,external binary and issue text not locally archived,primary 1.1.125.13 artifact contradicts claim
+A2-008,Operational lifetime classification,host semantics plus OEM cold-start,pre-D1 sequence,volatile sensor reset transition,no persistent write primitive in host dataflow,medium-high,resident body unavailable,device-side proof of NVM mutation
+A2-009,Coverage limit,operator declaration,first capture,definitively lost,D230 census counts only recovered capture,high,no packet-level comparison possible,recovery of authentic first capture

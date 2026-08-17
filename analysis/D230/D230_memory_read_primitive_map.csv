@@ -1,0 +1,10 @@
+primitive_or_function,address,source_address_domain,length_constraints,side_effects,caller_set,host_reachable,normal_mode,iap_only,class
+ordinary CPU loads/copy loops,multiple APP functions,APP literals/SRAM/caller-internal pointers,call-site fixed/bounded,none inherent,internal APP,not as host-controlled source pointer,yes internally,no,PRIMITIVE_EXISTS_BUT_NOT_EXPOSED
+ChipRegRead handler,gfusb 0x180059488; APP family 8 at 0x0803356c,16-bit chip/sensor register namespace,LE16 count and typed response,read-like register access,normal Windows stack,"yes, bounded namespace",yes,no,BOUNDED_REGISTER_READ_NOT_MCU_MEMORY
+production_read_mcu,gfusb 0x18003c7f4; APP E family 0x08033b3c,production selector namespace,selector-defined response,selector dependent,production wrappers,yes through constrained callers,yes,no,FIXED_SELECTOR_READ_NOT_ARBITRARY
+A6 production/OTP read,gfusb 0x1800655f8; APP A family 0x08033188,OTP/factory selector,fixed protocol result,none proven for read,firmware/version initialization,yes,yes,no,FIXED_OTP_READ_NOT_FLASH
+A8 firmware version,gfusb 0x180059b38; APP A family 0x08033188,fixed firmware identity,fixed string response,none,initial query,yes,yes,no,FIXED_METADATA_READ
+AE/AF MCU state,gfusb 0x180059f98; APP A family 0x08033188,fixed state structure,fixed state response,none proven,normal Windows stack,yes,yes,no,FIXED_STATE_READ
+F0/F4 firmware programming/check,gfusb 0x18006bb3c; APP F family 0x08033c4c,"update image/status, not raw flash return",sliced firmware input; status response,erase/program/reset possible,firmware update,maintenance only,requires transition/update flow,yes/maintenance,MUTATING_NO_READBACK_FOUND
+flash controller program control,APP 0x0802d874 / peripheral 0x40023c00,flash program/erase control,program path,persistent mutation,firmware maintenance,only through mutating maintenance flow,no safe use,maintenance,WRITE_PRIMITIVE_NOT_READ_PATH
+A2 / 0x70 resident handlers,0x080272e1 / 0x0802b8f5,body absent,unknown,unknown,normal cold-start,yes for the exact fixed captured requests,yes,unknown,RESIDENT_UNKNOWN_NO_ARBITRARY_HOST_DATAFLOW

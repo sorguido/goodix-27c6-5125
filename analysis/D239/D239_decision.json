@@ -1,0 +1,29 @@
+{
+  "schema": "d239-decision-v1",
+  "decision": "D239_OPERATOR_KIT_EXECUTABILITY_GATE_PASSED_READY_FOR_REVIEW",
+  "operator_kit_dry_run_pre_usb": "PASS",
+  "incident_classification": [
+    "OPERATOR_KIT_PREFLIGHT_INVOCATION_FAILURE",
+    "NO_LIVE_USB_EXECUTION"
+  ],
+  "evidence_classes": {
+    "STATIC_CHECK": "PASS",
+    "UNIT_TEST": "PASS_74_OF_74",
+    "REAL_OFFLINE_OPERATOR_DRY_RUN": "PASS",
+    "LIVE_USB_EXECUTION": "NOT_PERFORMED"
+  },
+  "pre_usb_fence_count": 1,
+  "libusb_init_count": 0,
+  "usb_open_count": 0,
+  "goodix_command_count": 0,
+  "real_secret_read_count": 0,
+  "live_marker_create_count": 0,
+  "source_unseal_count": 0,
+  "fprintd_stop_count": 0,
+  "sources_sealed": true,
+  "no_live_usb_execution_performed": true,
+  "protocol_or_safety_change": false,
+  "authorization_effect": "READY_FOR_REVIEW_ONLY_NOT_LIVE_AUTHORIZATION",
+  "residual_blocker": "Any hardware attempt remains a separate human review and authorization step; D239 performed no device-side validation.",
+  "marker_audit_limit": "The privileged D238 marker directory was not inspectable without privilege; code order proves the failed import preceded marker handling."
+}

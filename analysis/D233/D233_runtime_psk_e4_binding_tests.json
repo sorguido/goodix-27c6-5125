@@ -1,0 +1,23 @@
+{
+  "canonical_pe_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+  "derivation": "recovered D190 reference, canonical PE data-only",
+  "historical_kat_vectors": 5,
+  "historical_kat_matches": 5,
+  "historical_kat_mismatches": 0,
+  "kat_expected_source": "pre-existing D190 OEM instruction oracle outputs recovered from local session transcript",
+  "tests": [
+    {"case": "D190 V0-V4", "result": "MATCH 5/5", "noncircular": true},
+    {"case": "correct D190 V2 and E4", "result": "MATCH then A2/TLS"},
+    {"case": "one-bit PSK mutation", "result": "STOP after E4 before A2", "command_count": 1},
+    {"case": "wrong E4", "result": "STOP after E4 before A2", "command_count": 1},
+    {"case": "wrong PE hash", "result": "STOP before backend/command"},
+    {"case": "ambiguous PE pattern", "result": "STOP"},
+    {"case": "wrong derived/KAT value", "result": "STOP"},
+    {"case": "same SecretBuffer object", "result": "binder MATCH and one TLS handshake"},
+    {"case": "owned secret cleanup", "result": "zeroized"}
+  ],
+  "constant_time_compare": "hmac.compare_digest",
+  "contains_secret": false,
+  "contains_raw_oem_material": false,
+  "runtime_psk_e4_binding_proven": true
+}

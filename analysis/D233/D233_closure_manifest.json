@@ -1,0 +1,45 @@
+{
+  "schema": "d233-closure-bundle-manifest-v1",
+  "step": "D233_runtime_binding_and_orchestrator_closure",
+  "decision": "D233_REAL_BACKEND_OFFLINE_VERIFIED_READY_FOR_D234_HUMAN_RISK_REVIEW",
+  "payload_roots": [
+    "analysis/D233",
+    "poc/goodix5125/tools/binding_reference"
+  ],
+  "source_files": [
+    "src/goodix5125_d232_offline.py",
+    "src/goodix5125_d233_backend.py"
+  ],
+  "test_files": [
+    "tests/test_d232_offline.py",
+    "tests/test_d233_backend.py",
+    "tests/test_d233_closure.py",
+    "tests/fixtures/d232_synthetic_oracle.json"
+  ],
+  "manual_delivery": "analysis/D233/D233_manual_update.patch",
+  "full_manual_included": false,
+  "canonical_pe_included": false,
+  "firmware_included": false,
+  "capture_included": false,
+  "psk_or_secret_included": false,
+  "raw_oem_static_material_included": false,
+  "raw_config90_included": false,
+  "biometric_data_included": false,
+  "previous_bundle_included": false,
+  "nested_zip_included": false,
+  "repository_bundle_included": false,
+  "expected_repository_unittest": {
+    "run": 46,
+    "passed": 46,
+    "failed": 0,
+    "skipped": 0
+  },
+  "expected_bundle_unittest_without_canonical_pe": {
+    "run": 40,
+    "passed": 29,
+    "failed": 0,
+    "skipped": 11,
+    "skip_reason": "canonical proprietary PE intentionally excluded"
+  },
+  "live_authorization": "no"
+}

@@ -1,0 +1,21 @@
+{
+  "d233_live_capability": 0,
+  "d233_live_hard_disabled": true,
+  "shipped_entrypoint": "src.goodix5125_d233_backend:d233_offline_entrypoint",
+  "usb_open_reachable_from_shipped_entrypoint": false,
+  "real_libusb_init_reached_in_tests": false,
+  "real_usb_open_reached_in_tests": false,
+  "source_seal": "_d233_usb_source_seal unconditionally raises before every LibusbSystemApi ABI call",
+  "d234_requires_source_patch": true,
+  "attempts": {
+    "--live": "blocked; USB_OPEN_COUNT=0",
+    "environment_LIVE": "blocked; USB_OPEN_COUNT=0",
+    "config_live": "blocked; USB_OPEN_COUNT=0",
+    "alternate_backend_name": "blocked; USB_OPEN_COUNT=0",
+    "direct_real_libusb_init": "blocked before libusb_init; USB_OPEN_COUNT=0",
+    "normal_entrypoint": "capability query only; USB_OPEN_COUNT=0"
+  },
+  "runtime_override": false,
+  "operator_risk_acceptance": "not_granted",
+  "live_authorization": "no"
+}

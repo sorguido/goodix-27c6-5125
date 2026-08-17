@@ -1,0 +1,20 @@
+{
+  "decision": "D230_NO_SAFE_MEMORY_READ_PATH_EXISTS_IN_CORPUS",
+  "safe_arbitrary_memory_read_path": "no",
+  "arbitrary_read_exists_in_any_mode": "no",
+  "requires_iap": "no",
+  "requires_boot_mode_change": "no",
+  "requires_persistent_mutation": "no",
+  "normal_mode_host_reachable": "no",
+  "target_resident_range_readable": "no",
+  "windows_capture_observed": "no",
+  "gfusb_builder_found": "no",
+  "app12509_dispatch_found": "no",
+  "coverage_sufficient_for_negative_proof": "yes",
+  "safe_resident_readback_route_status": "EXHAUSTED_IN_LOCAL_CORPUS",
+  "strategic_answer": "NO_NOT_WITH_CURRENT_LOCAL_CORPUS_AND_CONSTRAINTS",
+  "live_authorization": "no",
+  "scope_note": "No safe arbitrary resident-memory read path exists in the inventoried local target-specific corpus; this is not a claim about every possible undocumented resident implementation.",
+  "lost_capture_limit": "The operator-designated first capture is definitively lost and was not included in packet-level coverage.",
+  "real_execution_completed": "no"
+}

@@ -1,0 +1,8 @@
+sequence,phase,event,outcome,target_enumeration_count,usb_open_count,command_count
+1,AUTHORIZATION,D236 operator risk acceptance,granted,0,0,0
+2,UNSEAL_REVIEW,minimal source patch reviewed,pass,0,0,0
+3,OFFLINE_TEST,unseal composition and exit contract,pass_14_tests,0,0,0
+4,ROOT_GATE,sudo preflight invocation,sudo_password_required_script_not_started,0,0,0
+5,TERMINAL,D236 decision,D236_BLOCKED_BY_PREFLIGHT,0,0,0
+6,RESEAL,D233 and D235 source seals restored,pass,0,0,0
+7,REPORT,durable D236 blocker artifacts,published,0,0,0

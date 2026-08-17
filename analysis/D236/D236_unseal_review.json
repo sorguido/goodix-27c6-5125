@@ -1,0 +1,24 @@
+{
+  "schema": "d236-unseal-review-v1",
+  "unseal_patch_scope": "minimal",
+  "source_files_changed": [
+    "src/goodix5125_d233_backend.py",
+    "src/goodix5125_d235_entrypoint.py"
+  ],
+  "source_seals_changed": 2,
+  "compile_time_authorization_declarations_changed": 2,
+  "production_report_schema_normalized": "d236-live-single-shot-result-v1",
+  "production_execution_mode_normalized": "live_single_shot",
+  "new_protocol_logic": "no",
+  "new_command_builder": "no",
+  "new_backend_logic": "no",
+  "state_machine_changed": "no",
+  "runtime_live_enablement_added": "no",
+  "exit_code_normalization_only_beyond_unseal": "yes",
+  "offline_exit_contract_tests": "pass",
+  "offline_composition_tests": "pass",
+  "preflight_root_gate": "failed_before_script_start",
+  "postblock_source_resealed": "yes",
+  "exit_code_normalization_retained_after_reseal": "yes",
+  "review": "pass"
+}

@@ -1,0 +1,8 @@
+source,tls_message,logical_wrapper_length,bulk_out_requested_lengths,bulk_out_completed_lengths,padding_policy,short_transfer,error,retry,classification,evidence_class
+D43,server_flight,NOT_ASSESSABLE,NOT_ASSESSABLE,NOT_ASSESSABLE,NOT_ASSESSABLE,NOT_ASSESSABLE,NOT_ASSESSABLE,NOT_ASSESSABLE,TRANSPORT_NOT_ASSESSABLE,UNKNOWN
+D175,ServerHello,90,64|64,64|64,fixed_64_nonzero_tail_redacted_and_ignored_by_B0_length,false,false,0,TRANSPORT_MATCH_REFERENCE,VERIFIED_PRIMARY_CAPTURE
+D175,ServerHelloDone,13,64,64,fixed_64_nonzero_tail_redacted_and_ignored_by_B0_length,false,false,0,TRANSPORT_MATCH_REFERENCE,VERIFIED_PRIMARY_CAPTURE
+D241_before_fix,ServerHello,90,64|26,64|26,no_padding,false,false,0,USB_SEGMENTATION_DIVERGENCE_PROVEN,OBSERVED_LIVE_D241 + VERIFIED_STATIC_CODE
+D241_before_fix,ServerHelloDone,13,13,13,no_padding,false,false,0,USB_SEGMENTATION_DIVERGENCE_PROVEN,OBSERVED_LIVE_D241 + VERIFIED_STATIC_CODE
+D242_corrected,ServerHello,90,64|64,64|64,deterministic_zero_padding,false,false,0,TRANSPORT_MATCH_VERIFIED,VERIFIED_OFFLINE
+D242_corrected,ServerHelloDone,13,64,64,deterministic_zero_padding,false,false,0,TRANSPORT_MATCH_VERIFIED,VERIFIED_OFFLINE
