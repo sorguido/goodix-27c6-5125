@@ -200,10 +200,10 @@ class D233UsbBackendTests(unittest.TestCase):
         api = FakeUsbApi((frame[:2], frame[2:5], frame[5:]))
         transport = ProductionUsbTransport(api, expected_identity=api.current_identity)
         transport.transport_open()
-        transport.write_frame(b"x" * 130, 1000)
-        self.assertEqual([len(item) for item in api.outgoing], [64, 64, 64])
-        self.assertEqual(api.outgoing[-1][:2], b"xx")
-        self.assertEqual(api.outgoing[-1][2:], bytes(62))
+        request = build_a0(0x90, b"x" * 122)
+        transport.write_frame(request, 1000)
+        self.assertEqual([len(item) for item in api.outgoing], [64, 64, 2])
+        self.assertEqual(b"".join(api.outgoing), request)
         self.assertEqual(transport.read_frame(1000), frame)
         transport.cleanup()
         transport.cleanup()
@@ -232,12 +232,12 @@ class D233UsbBackendTests(unittest.TestCase):
         api = FakeUsbApi(); transport = ProductionUsbTransport(api); transport.transport_open()
         api.partial_out = True
         with self.assertRaises(UsbAmbiguousCompletion):
-            transport.write_frame(b"abc", 1000)
+            transport.write_frame(build_a0(0x82, b"abc"), 1000)
         transport.cleanup()
 
         api = FakeUsbApi(); transport = ProductionUsbTransport(api); transport.transport_open(); api.timeout_out = True
         with self.assertRaises(UsbTimeout):
-            transport.write_frame(b"abc", 1000)
+            transport.write_frame(build_a0(0x82, b"abc"), 1000)
         transport.cleanup()
 
         api = FakeUsbApi((b"\xa0\x01\x00\x00x",)); transport = ProductionUsbTransport(api); transport.transport_open()

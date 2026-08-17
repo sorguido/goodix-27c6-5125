@@ -67,10 +67,10 @@ class D241OperatorPreflightTests(unittest.TestCase):
         self.assertTrue(report["report_directory"]["pass"])
         self.assertEqual(report["libusb_init_count"], 0)
 
-    def test_production_namespace_is_now_d242_and_d241_is_historical(self):
+    def test_production_namespace_is_now_d243_and_d241_is_historical(self):
         paths = ProductionRuntimePaths.system_default()
-        self.assertEqual(paths.single_use_marker.name, "d242-operator-invocation.marker")
-        self.assertEqual(paths.report_directory.name, "d242-results")
+        self.assertEqual(paths.single_use_marker.name, "d243-operator-invocation.marker")
+        self.assertEqual(paths.report_directory.name, "d243-results")
         self.assertNotEqual(paths.single_use_marker.name, D241_MARKER_NAME)
 
     def test_t11_d241_seal_is_stale_after_reviewed_d242_source_change(self):

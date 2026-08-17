@@ -82,7 +82,7 @@ class D242TransportCorrectionTests(unittest.TestCase):
         self.assertTrue(scope["all_a0_b0_usb_out_submissions_fixed_64"])
         self.assertFalse(any(report["redaction"].values()))
 
-    def test_a0_declared_frame_checksum_and_response_semantics_survive_fixed64(self):
+    def test_a0_declared_frame_checksum_and_response_semantics_survive_d243_split(self):
         request = build_a0(0x82, b"abcd")
         response = build_a0(0x82, b"wxyz")
         api = FakeUsbApi((response,))
@@ -90,36 +90,35 @@ class D242TransportCorrectionTests(unittest.TestCase):
         transport.transport_open()
         transport.write_frame(request, 1000)
         self.assertEqual(len(api.outgoing), 1)
-        self.assertEqual(len(api.outgoing[0]), 64)
-        self.assertEqual(api.outgoing[0][: len(request)], request)
-        self.assertEqual(api.outgoing[0][len(request) :], bytes(64 - len(request)))
-        parsed = parse_a0(api.outgoing[0][: len(request)])
+        self.assertEqual(api.outgoing, [request])
+        parsed = parse_a0(api.outgoing[0])
         self.assertEqual((parsed.control, parsed.body), (0x82, b"abcd"))
         self.assertEqual(transport.read_frame(1000), response)
         parsed_response = parse_a0(response)
         self.assertEqual((parsed_response.control, parsed_response.body), (0x82, b"wxyz"))
 
-    def test_transport_zero_pads_every_final_out_to_oem_packet_size(self):
+    def test_transport_splits_a0_short_and_b0_fixed64(self):
         api = FakeUsbApi()
         transport = ProductionUsbTransport(api)
         transport.transport_open()
-        transport.write_frame(b"a" * 90, 1000)
-        transport.write_frame(b"b" * 13, 1000)
-        self.assertEqual([len(item) for item in api.outgoing], [64, 64, 64])
-        self.assertEqual(api.outgoing[1][:26], b"a" * 26)
-        self.assertEqual(api.outgoing[1][26:], bytes(38))
-        self.assertEqual(api.outgoing[2][:13], b"b" * 13)
-        self.assertEqual(api.outgoing[2][13:], bytes(51))
+        a0 = build_a0(0x82, b"a" * 78)
+        b0 = build_b0(b"b" * 9)
+        transport.write_frame(a0, 1000)
+        transport.write_frame(b0, 1000)
+        self.assertEqual([len(item) for item in api.outgoing], [64, 22, 64])
+        self.assertEqual(b"".join(api.outgoing[:2]), a0)
+        self.assertEqual(api.outgoing[2][: len(b0)], b0)
+        self.assertEqual(api.outgoing[2][len(b0):], bytes(64 - len(b0)))
         self.assertEqual(transport.bulk_out_submit_count, 3)
         self.assertEqual(transport.bulk_out_complete_count, 3)
 
-    def test_partial_padded_out_is_ambiguous_and_fails_closed(self):
+    def test_partial_b0_padded_out_is_ambiguous_and_fails_closed(self):
         api = FakeUsbApi()
         transport = ProductionUsbTransport(api)
         transport.transport_open()
         api.partial_out = True
         with self.assertRaises(UsbAmbiguousCompletion):
-            transport.write_frame(b"short", 1000)
+            transport.write_frame(build_b0(b"short"), 1000)
         self.assertEqual(transport.bulk_out_submit_count, 1)
         self.assertEqual(transport.bulk_out_complete_count, 0)
 

@@ -317,25 +317,12 @@ class ProductionUsbTransport:
         frame = bytes(frame)
         if not frame or len(frame) > USB_MAX_FRAME:
             raise UsbFailure("frame length outside contract")
-        if len(frame) < 4 or frame[0] not in (0xA0, 0xB0):
-            raise UsbFailure("unclassified A0/B0 wrapper")
-        declared_total = 4 + int.from_bytes(frame[1:3], "little")
-        if declared_total != len(frame):
-            raise UsbFailure("A0/B0 declared length mismatch")
-        if frame[3] != (frame[0] + frame[1] + frame[2]) & 0xFF:
-            raise UsbFailure("malformed A0/B0 tag")
         deadline = time.monotonic() + timeout_ms / 1000
         for offset in range(0, len(frame), USB_MAX_PACKET):
             chunk = frame[offset : offset + USB_MAX_PACKET]
-            # D239/D241 live evidence proves short final submissions for this
-            # A0 path.  Preserve D242's fixed endpoint-sized staging only for
-            # B0/TLS, whose physical transport contract remains an offline
-            # result awaiting live confirmation.
-            wire_chunk = (
-                chunk.ljust(USB_MAX_PACKET, b"\x00")
-                if frame[0] == 0xB0
-                else chunk
-            )
+            # gfusb.dll submits endpoint-sized staging buffers even for the
+            # final suffix. The declared A0/B0 length remains authoritative.
+            wire_chunk = chunk.ljust(USB_MAX_PACKET, b"\x00")
             self.bulk_out_submit_count += 1
             self.bulk_out_logical_chunk_lengths.append(len(chunk))
             self.bulk_out_wire_chunk_lengths.append(len(wire_chunk))

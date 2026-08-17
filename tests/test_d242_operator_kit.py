@@ -21,9 +21,88 @@ from src.goodix5125_d235_entrypoint import ProductionRuntimePaths
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 LAUNCHER = REPOSITORY / "operator_kit/d242-live-tls-once.sh"
+OBSERVABILITY = REPOSITORY / "analysis/D242/d242_preflight_observability.py"
 
 
 class D242OperatorKitTests(unittest.TestCase):
+    def test_historical_renderer_preserves_specific_redacted_preflight_failure(self):
+        backend = REPOSITORY / "src/goodix5125_d233_backend.py"
+        entrypoint = REPOSITORY / "src/goodix5125_d235_entrypoint.py"
+        before = (backend.read_bytes(), entrypoint.read_bytes())
+        with tempfile.TemporaryDirectory(prefix="d242-observability-") as directory:
+            root = Path(directory)
+            marker = root / "d242-operator-invocation.marker"
+            report_path = root / "synthetic-preflight-failure.json"
+            report_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "d242-preflight-report-v1",
+                        "status": "fail",
+                        "phase": "PREFLIGHT",
+                        "failure_class": "operator_identity",
+                        "failures": ["operator_identity", "durable_report_path"],
+                        "marker_namespace_status": {
+                            "namespace": str(marker),
+                            "d242_marker_absent": True,
+                        },
+                        "usb_open_count": 0,
+                        "contains_secret": False,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            rendered = subprocess.run(
+                [
+                    "python3",
+                    str(OBSERVABILITY),
+                    "--report",
+                    str(report_path),
+                ],
+                cwd=REPOSITORY,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(rendered.returncode, 0)
+            self.assertIn("D242_PHASE=PREFLIGHT", rendered.stdout)
+            self.assertIn("D242_FAILURE_CLASS=OPERATOR_IDENTITY", rendered.stdout)
+            self.assertIn(
+                "D242_PREFLIGHT_FAILURES=operator_identity,durable_report_path",
+                rendered.stdout,
+            )
+            self.assertIn(f"D242_MARKER_PATH={marker}", rendered.stdout)
+            self.assertIn("D242_USB_OPEN_COUNT=0", rendered.stdout)
+            self.assertIn("D242_GOODIX_COMMAND_COUNT=0", rendered.stdout)
+            self.assertIn("D242_REAL_SECRET_READ_COUNT=0", rendered.stdout)
+            self.assertIn("D242_FPRINTD_MUTATION_COUNT=0", rendered.stdout)
+            self.assertIn("D242_LIVE_MARKER_CREATE_COUNT=0", rendered.stdout)
+            self.assertIn("D242_LIVE_USB_EXECUTION=NOT_STARTED", rendered.stdout)
+            self.assertNotIn("D242_FAILURE_CLASS=PREFLIGHT_FAILED", rendered.stdout)
+            self.assertFalse(marker.exists())
+        self.assertEqual(before, (backend.read_bytes(), entrypoint.read_bytes()))
+
+    def test_historical_renderer_classifies_missing_and_invalid_reports(self):
+        with tempfile.TemporaryDirectory(prefix="d242-observability-errors-") as directory:
+            root = Path(directory)
+            missing = subprocess.run(
+                ["python3", str(OBSERVABILITY), "--report", str(root / "missing.json")],
+                cwd=REPOSITORY,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(missing.returncode, 0)
+            self.assertIn("D242_FAILURE_CLASS=PREFLIGHT_REPORT_MISSING", missing.stdout)
+            invalid_path = root / "invalid.json"
+            invalid_path.write_text("not-json\n", encoding="ascii")
+            invalid = subprocess.run(
+                ["python3", str(OBSERVABILITY), "--report", str(invalid_path)],
+                cwd=REPOSITORY,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(invalid.returncode, 0)
+            self.assertIn("D242_FAILURE_CLASS=PREFLIGHT_REPORT_INVALID", invalid.stdout)
+
     def test_historical_d241_dependencies_are_byte_exact_and_fully_pinned(self):
         result = verify_d241_dependencies()
         self.assertEqual(result["behavior_relevant_dependency_count"], 2)
@@ -37,10 +116,10 @@ class D242OperatorKitTests(unittest.TestCase):
             },
         )
 
-    def test_marker_namespace_is_new_and_historical_markers_are_benign(self):
+    def test_d242_marker_is_historical_after_d243_namespace_advance(self):
         paths = ProductionRuntimePaths.system_default()
-        self.assertEqual(paths.single_use_marker.name, D242_MARKER_NAME)
-        self.assertEqual(paths.report_directory.name, "d242-results")
+        self.assertEqual(paths.single_use_marker.name, "d243-operator-invocation.marker")
+        self.assertEqual(paths.report_directory.name, "d243-results")
         with tempfile.TemporaryDirectory(prefix="d242-markers-") as directory:
             store = Path(directory)
             for name in HISTORICAL_MARKER_NAMES:
