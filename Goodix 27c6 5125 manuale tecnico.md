@@ -14,11 +14,16 @@ non ha inviato ClientKeyExchange entro il timeout bounded. D242 ha poi eseguito
 una run live reale: ha trasmesso soltanto E4 e non ha ricevuto alcun frame
 completo prima del timeout. Binding E4, TLS e pacing non sono stati raggiunti;
 retry è rimasto zero e cleanup, zeroizzazione, restore e reseal sono riusciti.
-Questa run ha falsificato l'estensione generica A0/B0 del fixed-64 D242. D243
-ripristina offline A0 alla submission D241 live-proven e conserva fixed-64 più
-pacing 10 ms soltanto per B0/TLS. Il kit D243 è
-`READY_FOR_SINGLE_LIVE_VALIDATION_NOT_EXECUTED`: il repository non autorizza da
-solo operazioni live.
+Questa run aveva reso il generic fixed-64 A0 un candidato, non una causa
+provata. D243 ha ripristinato A0 alla submission D241 live-proven, conservando
+fixed-64 e pacing 10 ms soltanto per B0/TLS, ed è stato poi eseguito live: anche
+D243 si è fermato al primo E4 con lo stesso timeout, `command_count=1`, binding
+non raggiunto e zero TLS/retry. Quindi fixed-64 A0 è falsificato soltanto come
+spiegazione sufficiente del timeout D242; la sua equivalenza device-side resta
+irrisolta. D244 chiude offline il differenziale e prepara, senza cambiare il
+wire D243, un controllo causale su stato iniziale dopo shutdown completo e
+riaccensione manuale dell'operatore. Il repository non autorizza da solo
+operazioni live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
@@ -35,8 +40,9 @@ solo operazioni live.
 | Consolidamento D238 | verificato offline, source-sealed | policy ACK unica, replay pre-D1 completo con `0x01` e `0x07`, osservabilità redatta e unico kit operatore |
 | Evidenza live D239 | pre-D1 integralmente superato su 12509 | 12 comandi, E4 `match`, D1 seguito da B0/TLS diretto di 52 byte; stop host-side `unexpected_data` |
 | Transizione TLS D241 | live single-shot consumato, fail-closed | handoff e PSK object binding verificati; timeout dopo server flight; zero D4/app-data/retry |
-| Run live D242 | fail-closed al primo E4 | un OUT A0, nessun frame completo IN, timeout; binding/TLS/pacing non raggiunti; cleanup/restore/reseal riusciti |
-| Split D243 | PASS offline, source-sealed | A0 corto come D241; B0 fixed-64 + pacing TLS 10 ms; closure e durability gate PASS; live non eseguito |
+| Run live D242 | fail-closed al primo E4 | OUT E4 completato, bulk IN in timeout senza frame completo; binding/TLS/pacing non raggiunti; cleanup/restore/reseal riusciti |
+| Run live D243 | fail-closed al primo E4 | A0 corto ripristinato; OUT E4 completato e stesso timeout bulk IN; zero binding/TLS/retry; cleanup/restore/reseal riusciti |
+| Controllo D244 | PASS offline, source-sealed | nessuna regressione software pre-E4 irrisolta; wire D243 invariato; fresh-state causal control pronto e non eseguito |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -112,16 +118,24 @@ nei B0 del server flight esaminati, è nonzero. I byte del frame costruito, i
 byte USB richiesti e quelli completati sono quindi misure distinte. Questa
 osservazione host-side **non** prova che una tail A0 artificialmente zero-filled
 sia device-side equivalente: il contenuto semanticamente rilevante della tail
-Windows resta non noto. La run D242 ha anzi mostrato che il padding zero
-generico non conserva il path E4 già superato live in D239/D241.
+Windows resta non noto. La run D242 ha mostrato che il padding zero generico
+coincide temporalmente con la perdita di responsività E4 già superata live in
+D239/D241; la run D243 ha poi mostrato che rimuoverlo non è sufficiente a
+recuperare quel path.
 
-Lo stato canonico è perciò
-`D242_FIXED64_SCOPE_A0=FALSIFIED_BY_LIVE_E4_REGRESSION` e
-`D242_FIXED64_SCOPE_B0=OFFLINE_VERIFIED_NOT_YET_LIVE_CONFIRMED`; la claim
-`OEM_COMMON_A0_B0_TRANSPORT_CONTRACT_VERIFIED` è ritirata come stato corrente.
-D243 invia gli A0 in chunk logici `<=64`, con ultimo OUT corto e completion
-richiesta pari alla lunghezza del chunk. Solo B0/TLS usa staging fisico da 64
-byte, tail zero-initialized e completion esattamente 64. Un flag
+Lo stato canonico è perciò:
+
+```text
+D243_A0_FIXED64_CAUSAL_STATUS=FALSIFIED_AS_SUFFICIENT_EXPLANATION_BY_D243_LIVE
+D244_A0_FIXED64_DEVICE_EQUIVALENCE_STATUS=UNRESOLVED
+D244_B0_FIXED64_DEVICE_EQUIVALENCE_STATUS=NOT_YET_LIVE_REACHED
+```
+
+La claim `OEM_COMMON_A0_B0_TRANSPORT_CONTRACT_VERIFIED` resta ritirata come
+claim device-side. D243/D244 invia gli A0 in chunk logici `<=64`, con ultimo OUT
+corto e completion richiesta pari alla lunghezza del chunk. Solo B0/TLS usa
+staging fisico da 64 byte, tail zero-initialized e completion esattamente 64.
+Un flag
 `server_hello_sent` prova al massimo emissione e wrapping; la trasmissione
 completa richiede completion USB full-length per ogni blocco richiesto.
 
@@ -255,8 +269,11 @@ D241 -> run live single-shot consumata: ClientHello verificato e server flight
      -> trasmesso, poi timeout senza ClientKeyExchange; zero retry/D4/app-data
 D242 -> run live single-shot: timeout al primo E4 dopo generic fixed-64 A0
      -> binding/TLS/pacing non raggiunti; cleanup/restore/reseal riusciti
-D243 -> split offline: A0 submission D241, B0 fixed-64 + pacing 10 ms/record
-     -> closure/durability PASS, source-sealed, live NOT_EXECUTED, senza D4
+D243 -> split A0/B0 chiuso offline, poi run live single-shot consumata
+     -> A0 corto D241 ma stesso timeout E4; binding/TLS non raggiunti; zero retry/D4
+D244 -> evidenze D242/D243 verificate, timeout localizzato su bulk IN dopo OUT
+     -> logical E4 byte-exact; differenziale D241↔D243 senza candidati irrisolti
+     -> wire D243 invariato; fresh-state causal control READY_NOT_EXECUTED
      -> bundle precedente a112fe2b...56df20 SUPERSEDED / DO_NOT_USE_FOR_LIVE_AUTHORIZATION
 ```
 
@@ -713,7 +730,7 @@ classificazione è
 `D239_52_EQUALS_TLS_HEADER_PLUS_D241_47_CONFIRMED`. Non riguarda i quattro byte
 del wrapper B0.
 
-## D242 live e split correttivo D243
+## D242/D243 live e controllo causale D244
 
 La sola capture primaria locale disponibile è quella storicamente classificata
 D175; la capture D43 è assente e resta `NOT_ASSESSABLE`. D175 mostra la stessa
@@ -750,21 +767,30 @@ once, secret zeroization, restore fprintd/segnali e source reseal sono riusciti.
 La copia primaria locale accessibile è
 `analysis/D242/D242_operator_live_stdout.json`, SHA-256
 `1d9c2c736a2b8939855a184e350ea2ecaa914921536ae2a2d616130a166eb7e7`,
-classificata `PRIMARY_LOCAL_EVIDENCE_VERIFIED`. La directory canonica
-`/var/lib/goodix-5125-poc/d242-results` non è accessibile all'utente corrente e
-non sono stati usati privilegi. La classificazione corrente è quindi:
+classificata `PRIMARY_LOCAL_EVIDENCE_VERIFIED`.
+
+D243 ha poi eseguito live lo split A0/B0: A0 era tornato alla submission corta
+D241, ma il singolo E4 ha prodotto di nuovo `command_count=1`, nessun frame
+completo e timeout. Binding E4, server flight, pacing e TLS non sono stati
+raggiunti; retry, D4, application data e write persistenti sono rimasti zero;
+cleanup, zeroizzazione, restore e reseal sono riusciti. La copia locale
+`analysis/D243/D243_operator_live_stdout.json`, SHA-256
+`a82c43f4aba5c6f9dcfe072eee7b8b6ab0edc7f621961ea6a322dfe6ac45aa23`,
+è anch'essa `PRIMARY_LOCAL_EVIDENCE_VERIFIED`. Non sono state lette directory
+root-only né usati privilegi per acquisire queste evidenze.
+
+La classificazione corrente è quindi:
 
 ```text
-D242_FIXED64_SCOPE_A0=FALSIFIED_BY_LIVE_E4_REGRESSION
-D242_FIXED64_SCOPE_B0=OFFLINE_VERIFIED_NOT_YET_LIVE_CONFIRMED
-D243_A0_FIXED64_CAUSAL_STATUS=STRONG_CAUSAL_REGRESSION_CANDIDATE_SINGLE_LIVE_OBSERVATION
+D243_A0_FIXED64_CAUSAL_STATUS=FALSIFIED_AS_SUFFICIENT_EXPLANATION_BY_D243_LIVE
+D244_A0_FIXED64_DEVICE_EQUIVALENCE_STATUS=UNRESOLVED
+D244_B0_FIXED64_DEVICE_EQUIVALENCE_STATUS=NOT_YET_LIVE_REACHED
 ```
 
-Non è `ROOT_CAUSE_PROVEN`: la tail Windows A0 resta non nota. L'audit completo
-D241→D242 censisce sei gruppi di delta raggiunti prima o al timeout E4; un solo
-candidato cambia i byte/lunghezze sottoposti al device, il padding fixed-64 A0.
-Namespace/schema, contatori transport, wrapper `_bulk_in` e telemetria backend
-non cambiano endpoint, timeout, parser o sequenza. H5 non è stato raggiunto.
+La tail Windows A0 resta non nota e non è né provata né falsificata come
+contratto device-side. È falsificata soltanto la sua sufficienza causale per il
+timeout D242. Il server flight B0 fixed-64 con pacing 10 ms non è stato
+raggiunto live né da D242 né da D243.
 
 D243 applica lo split minimo nello stesso backend: A0/E4/pre-D1 torna alla
 submission D241 live-proven (ultimo chunk corto, nessuna tail aggiunta,
@@ -775,12 +801,24 @@ verificano l'E4 logico esatto con `len(submitted_E4_chunk) != 64`, l'intera
 sequenza A0 pre-D1, ServerHello `64|64`, ServerHelloDone `64`, tail zero,
 short completion fail-closed e due pause da 10 ms senza pacing A0.
 
-`PROVEN_DIVERGENCE != PROVEN_DEVICE_ROOT_CAUSE`. Il server flight B0 fixed-64
-più 10 ms è verificato offline ma non ancora confermato live, perché D242 non lo
-ha raggiunto. Il nuovo confine è prima la futura validazione device-side del
-path A0 ripristinato e, soltanto se pre-D1 torna a completarsi, del server flight
-corretto, in un solo tentativo umano separatamente autorizzato. Codex non ha
-eseguito USB reale né handshake TLS reale in D243.
+`PROVEN_DIVERGENCE != PROVEN_DEVICE_ROOT_CAUSE`. D244 ha rieseguito il
+differenziale sulle fonti reali archiviate D241/D242/D243. I path E4 D241 e D243
+non sono byte-identici come sorgente, perché D243 aggiunge validazione wrapper e
+telemetria, ma sono semanticamente equivalenti sul frame E4 canonico valido.
+Il generic fixed-64 A0 D242 è completamente rimosso dal path D243. Le otto
+differenze D241↔D243 raggiunte prima del timeout comprendono cinque differenze
+host-side behavior-relevant intenzionali (namespace, gate e preflight), nessuna
+wire/timing regression sul frame valido e zero candidati causali irrisolti.
+
+Il logical E4 D241/D242/D243/D244 è in tutti i casi
+`a00c00ace40900030002bb00000000fd`, lunghezza 16, SHA-256
+`b6ada1adde00249e4e55f41bbf7c00443409c3752050520bc1a1874b0b63cf1a`.
+`ProductionUsbTransport.command_count` aumenta soltanto dopo completion
+full-length di tutti i chunk bulk OUT. Poiché E4 era l'unico comando e i due
+report live hanno `command_count=1`, entrambi provano OUT completato; il timeout
+è `IN_CONFIRMED_AFTER_OUT_COMPLETION`. Un timeout OUT sintetico lascia invece
+`command_count=0` e non tenta bulk IN. Non è stata necessaria nuova
+strumentazione runtime.
 
 Il kit storico D242 usava esclusivamente
 `/var/lib/goodix-5125-poc/d242-operator-invocation.marker`; i marker storici
@@ -801,8 +839,8 @@ failure, marker path e contatori zero per USB/comandi/secret/marker live. Report
 mancante, invalido o renderer fallito hanno classi distinte e fail-closed. Il
 path è verificato senza sudo con una fixture sintetica che termina prima di
 unseal, USB, secret, fprintd e marker. Questa proprietà storica resta valida;
-la run D242 successiva ha consumato il kit ed è terminata al primo E4. Il
-riferimento operativo corrente è D243, ancora non eseguito.
+la run D242 successiva ha consumato il kit ed è terminata al primo E4. Anche il
+kit D243 è ora consumato; il riferimento operativo corrente è D244.
 
 La provenance D241 è nuovamente byte-exact e read-only:
 `d241_operator_dry_run.py` ha SHA-256
@@ -834,12 +872,38 @@ si inverte senza offset.
 Il launcher D243 usa il marker
 `/var/lib/goodix-5125-poc/d243-operator-invocation.marker` e la directory
 `/var/lib/goodix-5125-poc/d243-results`. Riusa il modello durevole già
-revisionato: runtime abort, checkpoint atomico pre-restore, cleanup e
-zeroizzazione, restore, report finale sono distinti. Una fixture timeout al
+revisionato: runtime abort, cleanup e zeroizzazione, checkpoint atomico
+pre-restore, restore e report finale sono distinti. Una fixture timeout al
 primo E4 verifica checkpoint con `report_publish_count=1` e segnali ancora
 `pending`, quindi report finale con restore registrato e
-`report_publish_count=2`. La closure è
-`D243_EXECUTABLE_CLOSURE_GATE_PASS`; il ramo live resta `NOT_EXECUTED`.
+`report_publish_count=2`. La closure offline era
+`D243_EXECUTABLE_CLOSURE_GATE_PASS`; la successiva run live è quella terminata
+al timeout E4 descritta sopra.
+
+Il cleanup D241 non eseguì device reset, USB reset, A2 reset, re-enumeration
+forzata, power-cycle, protocol close o Goodix state reset: eseguì soltanto stop
+del nuovo traffico, release/close/exit USB, zeroizzazione, restore fprintd e
+signal mask, publication e source reseal. Quindi
+`D244_POST_D241_DEVICE_STATE_RESET_OBSERVED=false`. La cronologia journal
+accessibile senza privilegi colloca D241 nel boot host
+`704a277d1ed647ec877c90a83b2043d4` e D242/D243 nel boot successivo
+`bc1ec5816f8044528be0e1feeafcc4c7`: l'ipotesi carryover è
+`WEAKENED_BY_INTERVENING_BOOT`, non falsificata, perché un reboot host non prova
+il power-cycle elettrico del sensore.
+
+Il launcher D244 usa il marker
+`/var/lib/goodix-5125-poc/d244-operator-invocation.marker` e la directory
+`/var/lib/goodix-5125-poc/d244-results`. Conserva il wire D243 e richiede
+all'operatore di confermare nell'argomento di autorizzazione un normale shutdown
+completo seguito da accensione e avvio Fedora. Confronta read-only boot-id,
+uptime e, se accessibile, `journalctl --list-boots` con la baseline D243. La run
+è un fresh-state control valido solo con conferma operatore e boot-id diverso;
+metadati insufficienti o stesso boot producono
+`D244_FRESH_STATE_CONTROL_VALID=false` senza fingere una prova elettrica. La
+closure sintetica verifica i casi boot-id presente/assente, uptime-only e
+metadati insufficienti, insieme a E4, A0, B0, pacing, durability e safety.
+L'esito corrente è
+`D244_FRESH_STATE_CAUSAL_CONTROL_READY_NOT_EXECUTED`.
 
 D4, application data, FDT, capture, enroll, reset/power-cycle e recovery
 invasiva automatica restano irraggiungibili o vietati. D240 è obsoleto e non è
@@ -902,17 +966,20 @@ l'orchestratore e il vero entrypoint production non sono più blocker offline.
 Il confine immediato non è più pre-D1: D239 ha provato live su 12509 l'intera
 sequenza fino a D1 e il successivo B0/TLS diretto. D241 ha poi verificato live
 ClientHello, ownership e binding, ha trasmesso il server flight ed è terminato
-senza ClientKeyExchange. D242 ha poi introdotto e osservato live una regressione
-al primo E4 estendendo genericamente ad A0 il padding fixed-64. D243 ha corretto
-offline quel delta, senza provarne ancora device-side la sufficienza causale.
-Il confine TLS resta la risposta device-side al server flight B0 fixed-64 con
-pacing 10 ms, ancora non osservata; prima occorre riconfermare live una sola
-volta il path A0 ripristinato. Il repository resta source-sealed; soltanto il
-kit D243 con closure PASS può
-applicare temporaneamente l'unseal per un singolo tentativo umano separatamente
-autorizzato. Quel tentativo deve fermarsi subito dopo il successo crittografico
-TLS, prima di D4. Nessun esito storico autorizza retry o seconda invocazione.
-L'assenza di prova device-side assoluta dei receiver resident resta esplicita.
+senza ClientKeyExchange. D242 si è poi fermato live al primo E4 dopo
+l'estensione generica fixed-64 A0; D243 ha ripristinato A0 corto ma si è fermato
+live nello stesso punto. D244 prova che i due timeout sono bulk IN dopo
+completion OUT, che E4 è byte-exact e che non resta una regressione software
+pre-E4 concreta nel differenziale D241↔D243. Il blocker immediato è quindi `E4
+responsiveness depends on an unresolved runtime/initial-state condition`; il
+server flight B0 fixed-64 con pacing 10 ms resta oltre il boundary e non è stato
+raggiunto live da D242 o D243. Il repository resta source-sealed; soltanto il
+kit D244 con closure PASS può applicare temporaneamente l'unseal per un singolo
+tentativo umano separatamente autorizzato, dopo shutdown completo e
+riaccensione manuale. Quel tentativo deve fermarsi subito dopo il successo
+crittografico TLS, prima di D4. Nessun esito storico autorizza retry o seconda
+invocazione. L'assenza di prova elettrica del sensore e di prova device-side
+assoluta dei receiver resident resta esplicita.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound; il motore TLS Linux è verificato soltanto in loopback,
@@ -960,8 +1027,8 @@ replay senza tale estrazione.
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
 production-candidate D235, il consolidamento D238, l'evidenza D239 e la
-transizione command→TLS D241, più l'evidenza regressiva D242 e lo split di
-trasporto D243.
+transizione command→TLS D241, le due evidenze E4 D242/D243 e il controllo
+causale fresh-state D244.
 Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
 source-sealed e non
 costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
@@ -981,4 +1048,4 @@ transpose.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D243 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D244 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
