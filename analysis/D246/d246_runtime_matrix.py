@@ -148,8 +148,8 @@ def run_matrix() -> dict[str, object]:
     tls_stop = run_case([], api=tls_api, tls_factory=StalledAfterServerFlightTlsEngine)
     tls_report = tls_stop["report"]
     require(tls_report["abort_class"] == AbortClass.TLS_TIMEOUT.value, "T1 TLS timeout")
+    require(tls_report["d4_attempt_count"] == 0, "T1 attempted D4")
     require(tls_report["d4_send_count"] == 0, "T1 reached D4")
-    require(tls_report["d4_send_count"] == 0, "T1 retry-equivalent D4 count")
     assert_cleanup(tls_stop)
     tests["T1_D245_TLS_REGRESSION"] = "PASS_STOP_BEFORE_D4"
 
@@ -160,6 +160,7 @@ def run_matrix() -> dict[str, object]:
     outgoing = happy["api"].outgoing
     require(report["result"] == "pass", "T2 result")
     require(report["tls_handshake_completed"] is True, "T2 TLS")
+    require(report["d4_attempt_count"] == 1, "T2 D4 attempt")
     require(report["d4_send_count"] == 1 and report["d4_completed"] is True, "T2 D4")
     require(report["d4_ack_status"] == 1 and report["d4_response_count"] == 0, "T2 ACK")
     require(report["command_count"] == 14, "T2 command count")
@@ -186,6 +187,7 @@ def run_matrix() -> dict[str, object]:
     timeout = run_case([], api=timeout_api)
     timeout_report = timeout["report"]
     require(timeout_report["tls_handshake_completed"] is True, "T3 TLS")
+    require(timeout_report["d4_attempt_count"] == 1, "T3 D4 attempt")
     require(timeout_report["d4_send_count"] == 1, "T3 D4 count")
     require(timeout_report["d4_failure_class"] == "ack_timeout", "T3 class")
     require(d4_out_count(timeout) == 1, "T3 retry")
@@ -195,6 +197,7 @@ def run_matrix() -> dict[str, object]:
     # T4: any ACK other than the capture-proven d4/01 pair fails closed.
     wrong = run_case([*normal_frames(), build_a0(0xB0, b"\xd4\x07")])
     require(wrong["report"]["d4_send_count"] == 1, "T4 D4 count")
+    require(wrong["report"]["d4_attempt_count"] == 1, "T4 D4 attempt")
     require(wrong["report"]["d4_failure_class"] == "unexpected_ack", "T4 class")
     require(d4_out_count(wrong) == 1, "T4 retry")
     assert_cleanup(wrong)
@@ -203,6 +206,7 @@ def run_matrix() -> dict[str, object]:
     # T5: coalesced trailing protocol data cannot authorize a next action.
     trailing = run_case([*normal_frames(), D4_ACK + build_a0(0xAF, b"\x00\x00")])
     trailing_report = trailing["report"]
+    require(trailing_report["d4_attempt_count"] == 1, "T5 D4 attempt")
     require(trailing_report["d4_send_count"] == 1, "T5 D4 count")
     require(trailing_report["d4_failure_class"] == "unexpected_trailing_frame", "T5 class")
     require(d4_out_count(trailing) == 1, "T5 host action after D4")

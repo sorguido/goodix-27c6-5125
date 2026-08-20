@@ -58,11 +58,12 @@
          self.cleanup_count = 0
          self._phase_index = 0
          self._opened = False
-@@ -908,6 +919,12 @@
+@@ -908,6 +919,13 @@
          self.e4_usb_out_result = "not_attempted"
          self.e4_usb_in_attempted = False
          self.e4_usb_in_result = "not_attempted"
 +        self._d4_complete = False
++        self.d4_attempt_count = 0
 +        self.d4_send_count = 0
 +        self.d4_ack_status: int | None = None
 +        self.d4_failure_class = "not_reached"
@@ -71,7 +72,7 @@
  
      @property
      def usb_open_count(self) -> int:
-@@ -1124,6 +1141,83 @@
+@@ -1124,6 +1142,84 @@
          self._phase_index += 1
          return tuple(responses)
  
@@ -79,7 +80,7 @@
 +        """Send the one capture-proven volatile D4 session transition."""
 +        if (
 +            self._d4_complete
-+            or self.d4_send_count
++            or self.d4_attempt_count != 0
 +            or self.tls_handshake_count != 1
 +            or self._phase_index != len(EXACT_PHASE_ORDER) - 1
 +            or self.transport.buffered_rx_bytes
@@ -95,6 +96,7 @@
 +            self.d4_pacer(D4_POST_TLS_PACING_MS / 1000)
 +            self.d4_pacing_count = 1
 +            self.transport.revalidate_identity()
++            self.d4_attempt_count = 1
 +            self.transport.write_frame(
 +                D4_CANONICAL_REQUEST,
 +                D4_TIMEOUT_MS,
@@ -155,7 +157,7 @@
      def tls_handshake(self, client_hello: bytes, secret: SecretBuffer, timeout_ms: int) -> None:
          self.last_attempted_phase = "TLS"
          self.last_failure_domain = "none"
-@@ -1179,6 +1273,8 @@
+@@ -1179,6 +1275,8 @@
                      remaining,
                      deadline=deadline,
                  )
@@ -164,7 +166,7 @@
              self.tls_failure_class = "none"
          except UsbTimeout as exc:
              self.last_failure_domain = "usb_transport"
-@@ -1191,7 +1287,8 @@
+@@ -1191,7 +1289,8 @@
              self.last_failure_domain = "usb_transport"
              raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
          except ReplayAbort as exc:
@@ -174,7 +176,7 @@
              if exc.abort_class == AbortClass.TLS_TIMEOUT:
                  self.tls_failure_class = self._timeout_failure_class(bridge)
              raise
-@@ -1508,9 +1605,9 @@
+@@ -1508,9 +1607,9 @@
              )
          ),
          "tls_handshake_completed": bool(
@@ -186,12 +188,15 @@
          ),
          "server_flight_b0_frame_count": (
              backend.server_flight_b0_frame_count if backend is not None else 0
-@@ -1619,6 +1716,22 @@
+@@ -1619,6 +1718,25 @@
          "e4_usb_in_result": (
              backend.e4_usb_in_result if backend is not None else "not_attempted"
          ),
 +        "d4_send_count": (
 +            backend.d4_send_count if backend is not None else 0
++        ),
++        "d4_attempt_count": (
++            backend.d4_attempt_count if backend is not None else 0
 +        ),
 +        "d4_ack_status": (
 +            backend.d4_ack_status if backend is not None else None

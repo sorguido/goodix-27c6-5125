@@ -8,7 +8,7 @@ readonly AUTHORIZATION_ARGUMENT="--i-authorize-one-d246-d4-live-attempt"
 readonly DRY_RUN_ARGUMENT="--offline-dry-run"
 readonly D246_REPORT_DIR="/var/lib/goodix-5125-poc/d246-results"
 readonly AUTHORIZATION_MARKER="/var/lib/goodix-5125-poc/d246-operator-invocation.marker"
-readonly PREFLIGHT_REPORT="analysis/D245/D245_preflight_report.json"
+readonly PREFLIGHT_REPORT="analysis/D246/D246_preflight_report.json"
 readonly OPERATOR_STDOUT="analysis/D246/D246_operator_live_stdout.json"
 readonly BACKEND_SOURCE="src/goodix5125_d233_backend.py"
 readonly ENTRYPOINT_SOURCE="src/goodix5125_d235_entrypoint.py"
@@ -16,20 +16,9 @@ readonly D245_UNSEAL_PATCH="analysis/D245/D245_live_unseal.patch"
 readonly D246_CONTINUATION_PATCH="analysis/D246/D246_d4_continuation.patch"
 readonly D246_DRY_RUN_SOURCE="analysis/D246/d246_operator_dry_run.py"
 readonly D246_LIVE_TEST_SOURCE="analysis/D246/d246_live_enablement_offline.py"
-readonly PREFLIGHT_SOURCE="analysis/D245/d245_preflight.py"
-readonly PREFLIGHT_OBSERVABILITY_SOURCE="analysis/D245/d245_preflight_observability.py"
-
-readonly -a LIVE_CRITICAL_FILES=(
-    "operator_kit/d246-live-d4-once.sh"
-    "analysis/D245/D245_live_unseal.patch"
-    "analysis/D246/D246_d4_continuation.patch"
-    "src/goodix5125_d232_offline.py"
-    "src/goodix5125_d233_backend.py"
-    "src/goodix5125_d235_entrypoint.py"
-    "analysis/D241/d241_preflight.py"
-    "analysis/D245/d245_preflight.py"
-    "analysis/D245/d245_preflight_observability.py"
-)
+readonly PREFLIGHT_SOURCE="analysis/D246/d246_preflight.py"
+readonly PREFLIGHT_OBSERVABILITY_SOURCE="analysis/D246/d246_preflight_observability.py"
+readonly LIVE_CRITICAL_SOURCE="analysis/D246/d246_live_critical.py"
 
 die() {
     local code="$1"
@@ -47,7 +36,8 @@ verify_source_seal() {
 
 baseline_state() {
     local baseline_sha="$1"
-    local path
+    local helper_copy
+    local state
     if [[ ! "$baseline_sha" =~ ^[0-9a-f]{40}$ ]]; then
         printf 'UNAPPROVED\n'
         return
@@ -56,17 +46,27 @@ baseline_state() {
         printf 'UNAPPROVED\n'
         return
     fi
-    for path in "${LIVE_CRITICAL_FILES[@]}"; do
-        if ! git cat-file -e "${baseline_sha}:${path}" 2>/dev/null; then
-            printf 'STALE\n'
-            return
-        fi
-    done
-    if ! git diff --quiet "$baseline_sha" -- "${LIVE_CRITICAL_FILES[@]}"; then
+    helper_copy="$(mktemp /tmp/d246-live-critical-bootstrap.XXXXXX)" || {
+        printf 'STALE\n'
+        return
+    }
+    if ! git show "${baseline_sha}:${LIVE_CRITICAL_SOURCE}" > "$helper_copy" 2>/dev/null || \
+        ! cmp -s -- "$helper_copy" "$LIVE_CRITICAL_SOURCE"; then
+        rm -f -- "$helper_copy"
         printf 'STALE\n'
         return
     fi
-    printf 'APPROVED\n'
+    rm -f -- "$helper_copy"
+    state="$(PYTHONPATH="$REPOSITORY${PYTHONPATH:+:$PYTHONPATH}" \
+        PYTHONDONTWRITEBYTECODE=1 python3 "$LIVE_CRITICAL_SOURCE" \
+        --repository "$REPOSITORY" --baseline-state "$baseline_sha" 2>/dev/null)" || {
+        printf 'STALE\n'
+        return
+    }
+    case "$state" in
+        APPROVED|STALE|UNAPPROVED) printf '%s\n' "$state" ;;
+        *) printf 'STALE\n' ;;
+    esac
 }
 
 live_guard_failure() {
@@ -147,10 +147,17 @@ if [[ "${1-}" == "$DRY_RUN_ARGUMENT" && "$#" -eq 1 ]]; then
         'D246_RESULT=PASS' \
         'D246_FAILURE_CLASS=none' \
         'D246_GUARDRAIL_MATRIX=PASS' \
+        'D246_PREFLIGHT_NAMESPACE=D246_ONLY' \
+        'D246_LIVE_CRITICAL_STALE_DETECTION=PASS' \
+        'D246_D4_ATTEMPT_LATCH=PASS_PRE_SUBMIT' \
+        'D246_AMBIGUOUS_REENTRY=PASS_SECOND_WRITE_ZERO' \
         'D246_RUNTIME_DISCONNECT_REENUMERATION=PASS_TERMINAL_NO_RETRY' \
         'D246_SECOND_D4=UNREACHABLE' \
         'D246_AF=UNREACHABLE' \
         'D246_LIVE_USB_EXECUTION=NOT_PERFORMED' \
+        'D246_REAL_USB_ACCESS=0' \
+        'D246_REAL_TLS_HANDSHAKE=0' \
+        'D246_REAL_D4_ATTEMPT=0' \
         'D246_SOURCE_SEAL=ACTIVE' \
         'D246_LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW'
     exit 0
@@ -247,7 +254,7 @@ verify_source_seal
 
 if [[ -s "$live_stdout" ]]; then
     PYTHONPATH="$REPOSITORY${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 \
-        python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); fields=(("TLS_HANDSHAKE_COMPLETED",r.get("tls_handshake_completed",False)),("D4_SEND_COUNT",r.get("d4_send_count",0)),("D4_ACK_STATUS",r.get("d4_ack_status","none")),("D4_COMPLETED",r.get("d4_completed",False)),("D4_FAILURE_CLASS",r.get("d4_failure_class","not_reached")),("STOP_AFTER_D4",r.get("D246_STOP_BOUNDARY","STOP_AFTER_D4") == "STOP_AFTER_D4"),("cleanup_count",r.get("cleanup_count",0)),("retry_count",r.get("retry_count",0)),("persistent_write_family_count",r.get("persistent_write_family_count",0))); [print("D246_"+k+"="+str(v).lower() if isinstance(v,bool) else "D246_"+k+"="+str(v)) for k,v in fields]' "$live_stdout" || true
+        python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); fields=(("TLS_HANDSHAKE_COMPLETED",r.get("tls_handshake_completed",False)),("D4_ATTEMPT_COUNT",r.get("d4_attempt_count",0)),("D4_SEND_COUNT",r.get("d4_send_count",0)),("D4_ACK_STATUS",r.get("d4_ack_status","none")),("D4_COMPLETED",r.get("d4_completed",False)),("D4_FAILURE_CLASS",r.get("d4_failure_class","not_reached")),("STOP_AFTER_D4",r.get("D246_STOP_BOUNDARY","STOP_AFTER_D4") == "STOP_AFTER_D4"),("cleanup_count",r.get("cleanup_count",0)),("retry_count",r.get("retry_count",0)),("persistent_write_family_count",r.get("persistent_write_family_count",0))); [print("D246_"+k+"="+str(v).lower() if isinstance(v,bool) else "D246_"+k+"="+str(v)) for k,v in fields]' "$live_stdout" || true
 fi
 [[ "$live_status" -eq 0 ]] || \
     printf 'D246 live attempt stopped; durable report published; source resealed; no retry authorized\n' >&2

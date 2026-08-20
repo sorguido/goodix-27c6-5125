@@ -30,11 +30,15 @@ binding E4 `match` e handshake TLS completo, con stop prima di D4, zero retry,
 zero application data e zero famiglie di scrittura persistente. D246 chiude
 offline il confine immediatamente successivo: il D4 esatto osservato nella
 capture è classificato `VOLATILE_SESSION_INITIALIZATION`, viene modellato una
-sola volta con ACK esatto `d4/01` e `STOP_AFTER_D4`. Il launcher live-capable
-hard-gated è ora implementato e verificato soltanto offline; le sorgenti
-canoniche restano hard-disabled e il commit candidato attende review AI PM.
-D246 non è stato eseguito live e il repository non auto-approva né autorizza da
-solo operazioni live.
+sola volta con ACK esatto `d4/01` e `STOP_AFTER_D4`. Un primo tentativo
+operatore non ha iniziato D246 live: il launcher richiamava ancora il namespace
+preflight D245 e si è fermato sul marker storico con zero USB, comandi, secret
+read e D4 attempt. La correzione post-review usa ora preflight/report D246,
+closure transitiva delle dipendenze live-critical e latch D4 pre-submit. Il
+launcher hard-gated passa la closure soltanto offline; le sorgenti canoniche
+restano hard-disabled e il nuovo commit candidato attende review AI PM. D246
+non è stato eseguito live e il repository non auto-approva né autorizza da solo
+operazioni live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
@@ -55,7 +59,7 @@ solo operazioni live.
 | Run live D243 | fail-closed al primo E4 | A0 corto ripristinato; OUT E4 completato e stesso timeout bulk IN; zero binding/TLS/retry; cleanup/restore/reseal riusciti |
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
-| D246 TLS→D4 | live-enablement candidate implementato offline, `READY_NOT_EXECUTED` | D4 esatto una volta, fixed-64 zero-tail, ACK solo `d4/01`, nessuna response e `STOP_AFTER_D4`; commit candidato in attesa di review AI PM |
+| D246 TLS→D4 | post-review closure offline `READY_NOT_EXECUTED` | tentativo live non iniziato per namespace D245 ereditato, zero hardware; ora preflight D246, latch attempt pre-submit e closure Git transitiva PASS; nuovo commit candidato in attesa di review AI PM |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1071,14 +1075,18 @@ esterna, distinta dalla capture/DLL primaria locale; nessuna implementazione GPL
 
 ### D246: dal TLS Finished al solo D4
 
-Il riesame metodologico pre-live cambia realmente il confine: non ripete A8,
-E4 o TLS per investigare ancora il vecchio timeout, ma usa il successo D245
-come precondizione verificata e isola il primo comando OEM post-handshake. La
-nuova ipotesi è che il D4 osservato subito dopo TLS sia una transizione volatile
-di sessione, ricostruibile byte-per-byte e priva di effetti persistenti. Se
-questa ipotesi non fosse chiusa su fonti primarie host, wire e device, la patch
-non sarebbe promossa e nessun launcher live verrebbe aperto; l'azione diversa
-sarebbe identificare l'evidenza primaria mancante, non ripetere il live.
+Il riesame metodologico pre-live corrente è:
+
+1. il prossimo live non ripete un esperimento precedente: D245 ha già chiuso
+   TLS e D246 aggiunge esattamente un D4 e stop;
+2. testa l'ipotesi che il D4 staticamente/capture-correlato come
+   `VOLATILE_SESSION_INITIALIZATION` sia accettato live dal target con ACK
+   esatto `d4/01`, senza richiedere alcuna azione successiva;
+3. se fallisce, non sono autorizzati retry o patch cosmetiche: il failure viene
+   classificato come pre-D4/TLS regression, D4 OUT ambiguous/timeout, ACK
+   mismatch o disconnect/re-enumeration. Se D4 è tentato ma non chiude, AF
+   resta irraggiungibile e vengono riesaminate ipotesi causale e precondizioni
+   device.
 
 La catena causale stretta nella capture D230 è:
 
@@ -1124,6 +1132,15 @@ completion ambigua, ACK diverso o frame trailing terminano senza retry,
 rilasciano le risorse e resealano. AF e ogni azione ulteriore sono non
 raggiungibili.
 
+Il contratto exactly-once distingue ora `d4_attempt_count`, latched a uno
+immediatamente prima della chiamata che può consegnare il frame al transport,
+da `d4_send_count`, che indica soltanto il ritorno full-length confermato. La
+guardia d'ingresso vieta D4 quando attempt è già diverso da zero. Una
+completion ambigua conserva quindi `attempt=1`, `send=0`, failure
+`ambiguous_usb_completion`, zero retry; una re-entry intenzionale termina prima
+del transport con secondo write zero, senza inferire se il device abbia
+ricevuto il frame.
+
 Il delta vive in `analysis/D246/D246_d4_continuation.patch` ed è applicato
 soltanto dopo la patch D245. Nella closure offline le patch vivono in una copia
 temporanea; in una futura run approvata il launcher crea prima backup byte-exact,
@@ -1133,9 +1150,13 @@ Le sorgenti D233/D235 a riposo restano source-sealed. La matrice sintetica prova
 regressione D245 fino a TLS, happy path D4 exactly-once, timeout D4 senza retry,
 ACK inatteso e assenza di qualunque OUT dopo D4. L'estensione di safety prova
 anche disconnect e re-enumeration terminali senza reopen/reclaim, secondo D4
-irraggiungibile e nessun reset/recovery automatico. Closure, hash pre/post e
-contatori reali provano zero open USB reale, zero handshake TLS reale, zero D4
-reale e zero famiglie di scrittura persistente.
+irraggiungibile, completion ambigua con re-entry vietata e nessun reset/recovery
+automatico. I fixture preflight provano che il marker D245 è benigno, il marker
+D246 blocca e path/renderer sono soltanto D246. Un repository Git temporaneo
+prova che la modifica di `binding_reference/runtime.py` rende la baseline
+`STALE`. Closure, hash pre/post, 135 regressioni e contatori reali provano zero
+open USB reale, zero handshake TLS reale, zero D4 reale e zero famiglie di
+scrittura persistente.
 
 `operator_kit/d246-live-d4-once.sh` accetta `--offline-dry-run` oppure il solo
 argomento live esatto `--i-authorize-one-d246-d4-live-attempt`. Il ramo live
@@ -1143,12 +1164,26 @@ fallisce chiuso se non coesistono EUID root, `SUDO_UID` numerico non-root,
 marker D246 assente, preflight PASS, source seal attivo e una baseline approvata.
 La governance v2.1 usa come baseline primaria il commit SHA completo designato
 esternamente in `D246_APPROVED_LIVE_BASELINE_SHA` dopo review AI PM e confronta
-con Git soltanto il live-critical set; SHA assente/non valido o contenuto stale
-bloccano la run. Manuale, report, status e test non sono oggetto di pinning
-generalizzato. Marker e namespace dei risultati sono esclusivamente D246.
+direttamente con i blob Git l'intero set live-critical transitivo: launcher,
+patch D245/D246, preflight/renderer/helper D246, D232/D233/D235, il PE canonico
+hash-gated e i quattro moduli package/runtime/crypto/parser del binding PSK↔E4.
+SHA assente/non valido o
+contenuto stale bloccano la run. Manuale, report, status e test non sono oggetto
+di pinning generalizzato. Marker, directory risultati e report preflight sono
+esclusivamente D246.
+
+Prima della correzione, un tentativo operatore si è fermato nel preflight D245
+ereditato sul marker storico consumato. Questo prova soltanto un difetto
+host-side: `D246 live attempt=NOT_STARTED`, USB/comandi/secret read/mutazioni
+fprintd/D4 attempt tutti zero e stato device invariato. Il marker D245 resta
+storico, benigno e intatto. La precedente baseline candidata
+`ff4cc3b748dafbce681e6fa38a44936eca794d12` è
+`SUPERSEDED_NOT_APPROVED_FOR_LIVE`.
 
 Lo stato è
-`D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED`. La baseline del
+`D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED`. Lo step D246
+complessivo conserva `ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED`; la sola
+patch post-review non aggiunge avanzamento scientifico. La baseline del
 live-critical set non è auto-approvata: il live-enablement candidate è
 implementato offline e il commit candidato è
 `LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW`. D246 non è stato eseguito live e

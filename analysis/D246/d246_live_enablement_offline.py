@@ -42,6 +42,7 @@ def run_patched_runtime_tests() -> dict[str, object]:
     )
     from src.goodix5125_d232_offline import AbortClass, ReplayAbort
     from src.goodix5125_d233_backend import D4_CANONICAL_REQUEST, UsbFailure, UsbIdentity
+    from src.goodix5125_d235_entrypoint import ProductionReportPolicy, map_production_report
     from tests.test_d233_backend import FakeUsbApi
 
     alternate_identity = UsbIdentity(0x27C6, 0x5125, 1, 5, (2, 4))
@@ -64,10 +65,19 @@ def run_patched_runtime_tests() -> dict[str, object]:
                 return alternate_identity
             return super().identity(handle)
 
+    class AmbiguousD4CompletionApi(FakeUsbApi):
+        def bulk_out(self, handle, endpoint, data, timeout_ms):
+            if bytes(data)[:10] == D4_CANONICAL_REQUEST:
+                self.calls.append(("out_ambiguous", endpoint, timeout_ms))
+                self.outgoing.append(bytes(data))
+                return len(data) - 1
+            return super().bulk_out(handle, endpoint, data, timeout_ms)
+
     disconnect_api = DisconnectAfterD4Api(normal_frames())
     disconnected = run_case([], api=disconnect_api)
     disconnected_report = disconnected["report"]
     require(disconnected_report["result"] == "abort", "disconnect must abort")
+    require(disconnected_report["d4_attempt_count"] == 1, "disconnect D4 attempt")
     require(disconnected_report["d4_send_count"] == 1, "disconnect D4 count")
     require(
         disconnected_report["d4_failure_class"] == "usb_or_frame_error",
@@ -83,6 +93,7 @@ def run_patched_runtime_tests() -> dict[str, object]:
     )
     reenumerated_report = reenumerated["report"]
     require(reenumerated_report["result"] == "abort", "re-enumeration must abort")
+    require(reenumerated_report["d4_attempt_count"] == 1, "re-enumeration D4 attempt")
     require(reenumerated_report["d4_send_count"] == 1, "re-enumeration D4 count")
     require(reenumerated_report["d4_completed"] is False, "re-enumeration completed D4")
     require(
@@ -102,7 +113,39 @@ def run_patched_runtime_tests() -> dict[str, object]:
     else:
         raise AssertionError("second D4 unexpectedly reachable")
     require(tuple(happy["api"].outgoing) == outgoing_before, "second D4 emitted OUT")
+    require(backend.d4_attempt_count == 1, "happy re-entry changed attempt latch")
     assert_cleanup(happy)
+
+    ambiguous = run_case([], api=AmbiguousD4CompletionApi(normal_frames()))
+    ambiguous_report = ambiguous["report"]
+    ambiguous_backend = ambiguous["backend"]
+    require(ambiguous_report["result"] == "abort", "ambiguous completion must abort")
+    require(ambiguous_report["d4_attempt_count"] == 1, "attempt latch not set pre-submit")
+    require(ambiguous_report["d4_send_count"] == 0, "ambiguous submit marked confirmed")
+    require(
+        ambiguous_report["d4_failure_class"] == "ambiguous_usb_completion",
+        "ambiguous completion class",
+    )
+    ambiguous_mapped = map_production_report(
+        ambiguous_report,
+        ProductionReportPolicy("offline_dry_run", "not_applicable", "no"),
+    )
+    require(ambiguous_mapped["retry_count"] == 0, "ambiguous completion retried")
+    require(d4_out_count(ambiguous) == 1, "ambiguous D4 physical attempt count")
+    ambiguous_outgoing = tuple(ambiguous["api"].outgoing)
+    try:
+        ambiguous_backend._exchange_d4_after_tls()
+    except ReplayAbort as exc:
+        require(exc.abort_class == AbortClass.EXTRA_OR_REORDERED, "ambiguous re-entry class")
+    else:
+        raise AssertionError("ambiguous D4 re-entry unexpectedly reachable")
+    require(
+        tuple(ambiguous["api"].outgoing) == ambiguous_outgoing,
+        "ambiguous re-entry emitted a second transport write",
+    )
+    require(ambiguous_backend.d4_attempt_count == 1, "ambiguous re-entry changed latch")
+    require(ambiguous_backend.d4_failure_class == "ambiguous_usb_completion", "failure class lost")
+    assert_cleanup(ambiguous)
 
     return {
         "schema": "d246-live-enablement-offline-v1",
@@ -110,6 +153,7 @@ def run_patched_runtime_tests() -> dict[str, object]:
         "unexpected_disconnect": "TERMINAL_NO_RETRY_NO_REOPEN",
         "unexpected_reenumeration": "TERMINAL_NO_RETRY_NO_RECLAIM",
         "second_d4": "UNREACHABLE",
+        "ambiguous_completion_reentry": "PASS_ATTEMPT_LATCHED_SECOND_WRITE_ZERO",
         "automatic_reset_recovery": "FORBIDDEN_NOT_INVOKED",
         "real_usb_open_count": 0,
         "real_tls_handshake_count": 0,
@@ -119,7 +163,30 @@ def run_patched_runtime_tests() -> dict[str, object]:
 
 
 def run_parent() -> dict[str, object]:
+    from analysis.D246.d246_live_critical import offline_stale_detection_test
+    from analysis.D246.d246_preflight import offline_sandbox_preflight
+    from analysis.D246.d246_preflight_observability import render
+
     before = {str(path): digest(REPOSITORY / path) for path in SOURCE_FILES}
+    with tempfile.TemporaryDirectory(prefix="d246-preflight-fixture-") as preflight_root:
+        preflight = offline_sandbox_preflight(Path(preflight_root))
+    require(preflight["status"] == "PASS", "D246 preflight namespace fixtures failed")
+    require(preflight["d245_marker_touched"] is False, "historical D245 marker changed")
+    require(
+        "/analysis/D246/D246_preflight_report.json"
+        in preflight["durable_preflight_report"],
+        "D246 durable preflight report namespace",
+    )
+    failure_render = render(
+        {
+            "failure_class": "d246_single_use_marker_consumed",
+            "failures": ["d246_single_use_marker_consumed"],
+            "marker_namespace_status": preflight["consumed_d246_marker_case"],
+        }
+    )
+    require("D246_PHASE=PREFLIGHT" in failure_render, "D246 renderer phase")
+    require("D245_PHASE=" not in failure_render, "D245 renderer namespace leaked")
+    stale_detection = offline_stale_detection_test()
     with tempfile.TemporaryDirectory(prefix="d246-live-enablement-") as directory:
         work = Path(directory)
         for name in ("src", "poc", "tests"):
@@ -150,15 +217,22 @@ def run_parent() -> dict[str, object]:
             [sys.executable, "analysis/D246/d246_live_enablement_offline.py", "--patched-runtime"],
             cwd=work,
             env=environment,
-            check=True,
+            check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
+        if result.returncode:
+            raise RuntimeError(
+                f"patched runtime failed ({result.returncode})\n{result.stdout}\n{result.stderr}"
+            )
         report = json.loads(result.stdout)
     after = {str(path): digest(REPOSITORY / path) for path in SOURCE_FILES}
     require(before == after, "canonical source changed during offline tests")
     require(report.get("status") == "PASS", "patched runtime tests failed")
+    report["preflight_namespace"] = preflight
+    report["preflight_failure_renderer_namespace"] = "PASS_D246_ONLY"
+    report["live_critical_stale_detection"] = stale_detection
     return report
 
 

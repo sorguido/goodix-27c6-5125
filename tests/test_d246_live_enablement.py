@@ -51,7 +51,13 @@ class D246LiveEnablementTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("D246_RESULT=PASS", result.stdout)
             self.assertIn("D246_GUARDRAIL_MATRIX=PASS", result.stdout)
+            self.assertIn("D246_PREFLIGHT_NAMESPACE=D246_ONLY", result.stdout)
+            self.assertIn("D246_D4_ATTEMPT_LATCH=PASS_PRE_SUBMIT", result.stdout)
+            self.assertIn("D246_AMBIGUOUS_REENTRY=PASS_SECOND_WRITE_ZERO", result.stdout)
             self.assertIn("D246_LIVE_USB_EXECUTION=NOT_PERFORMED", result.stdout)
+            self.assertIn("D246_REAL_USB_ACCESS=0", result.stdout)
+            self.assertIn("D246_REAL_TLS_HANDSHAKE=0", result.stdout)
+            self.assertIn("D246_REAL_D4_ATTEMPT=0", result.stdout)
 
     def test_disconnect_reenumeration_and_second_d4_are_terminal(self):
         result = subprocess.run(
@@ -69,6 +75,19 @@ class D246LiveEnablementTests(unittest.TestCase):
             report["unexpected_reenumeration"], "TERMINAL_NO_RETRY_NO_RECLAIM"
         )
         self.assertEqual(report["second_d4"], "UNREACHABLE")
+        self.assertEqual(
+            report["ambiguous_completion_reentry"],
+            "PASS_ATTEMPT_LATCHED_SECOND_WRITE_ZERO",
+        )
+        self.assertEqual(report["preflight_namespace"]["status"], "PASS")
+        self.assertFalse(report["preflight_namespace"]["d245_marker_touched"])
+        self.assertEqual(
+            report["preflight_failure_renderer_namespace"], "PASS_D246_ONLY"
+        )
+        self.assertEqual(
+            report["live_critical_stale_detection"]["modified_binding_runtime_state"],
+            "STALE",
+        )
         self.assertEqual(report["real_usb_open_count"], 0)
 
 
