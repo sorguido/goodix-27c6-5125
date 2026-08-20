@@ -30,9 +30,11 @@ binding E4 `match` e handshake TLS completo, con stop prima di D4, zero retry,
 zero application data e zero famiglie di scrittura persistente. D246 chiude
 offline il confine immediatamente successivo: il D4 esatto osservato nella
 capture è classificato `VOLATILE_SESSION_INITIALIZATION`, viene modellato una
-sola volta con ACK esatto `d4/01` e `STOP_AFTER_D4`. Il delta resta una patch
-temporanea; le sorgenti canoniche sono hard-disabled e la baseline live D246 è
-`PENDING_USER_REVIEW`. Il repository non autorizza da solo operazioni live.
+sola volta con ACK esatto `d4/01` e `STOP_AFTER_D4`. Il launcher live-capable
+hard-gated è ora implementato e verificato soltanto offline; le sorgenti
+canoniche restano hard-disabled e il commit candidato attende review AI PM.
+D246 non è stato eseguito live e il repository non auto-approva né autorizza da
+solo operazioni live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
@@ -53,7 +55,7 @@ temporanea; le sorgenti canoniche sono hard-disabled e la baseline live D246 è
 | Run live D243 | fail-closed al primo E4 | A0 corto ripristinato; OUT E4 completato e stesso timeout bulk IN; zero binding/TLS/retry; cleanup/restore/reseal riusciti |
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
-| D246 TLS→D4 | `READY_NOT_EXECUTED`, source-sealed | D4 esatto una volta, fixed-64 zero-tail, ACK solo `d4/01`, nessuna response e `STOP_AFTER_D4`; baseline live in attesa di review |
+| D246 TLS→D4 | live-enablement candidate implementato offline, `READY_NOT_EXECUTED` | D4 esatto una volta, fixed-64 zero-tail, ACK solo `d4/01`, nessuna response e `STOP_AFTER_D4`; commit candidato in attesa di review AI PM |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -297,7 +299,8 @@ D245 -> record storico canonico D179 A8→E4 + corroborazione locale D230
 D246 -> evidenza D245 validata; audit primario TLS Finished→D4→ACK→AF
      -> D4 classificato volatile sul receiver APP12509 esatto; host e device persistence escluse per quel path
      -> patch offline D4 exactly-once, ACK d4/01 only, STOP_AFTER_D4; closure PASS
-     -> READY_NOT_EXECUTED; sorgenti sealed e baseline live PENDING_USER_REVIEW
+     -> launcher live-capable hard-gated e testato offline; READY_NOT_EXECUTED
+     -> sorgenti sealed; commit candidato e baseline live PENDING_AI_PM_REVIEW
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1055,9 +1058,11 @@ D245_HISTORICAL_LAUNCHER_MUTATION_COUNT=0
 ```
 
 Nel kit D245 D4, application data, FDT, capture, enroll, reset/power-cycle e
-recovery invasiva automatica restano irraggiungibili o vietati. D246 rende
-raggiungibile soltanto D4 in una patch temporanea offline; tutte le azioni
-successive restano irraggiungibili. D240 è obsoleto e non è stato eseguito.
+recovery invasiva automatica restano irraggiungibili o vietati. Il candidato
+D246 rende raggiungibile soltanto D4 durante una futura run separatamente
+approvata, tramite due patch temporanee applicate in ordine D245→D246; tutte le
+azioni successive restano irraggiungibili. D246 non è stato eseguito live. D240
+è obsoleto e non è stato eseguito.
 
 Il riferimento Rocky indipendente è
 <https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1>. È corroborazione
@@ -1120,18 +1125,34 @@ rilasciano le risorse e resealano. AF e ogni azione ulteriore sono non
 raggiungibili.
 
 Il delta vive in `analysis/D246/D246_d4_continuation.patch` ed è applicato
-soltanto dopo la patch D245 dentro una directory temporanea. Le sorgenti
-canoniche D233/D235 restano source-sealed. La matrice sintetica prova regressione
-D245 fino a TLS, happy path D4 exactly-once, timeout D4 senza retry, ACK inatteso,
-assenza di qualunque OUT dopo D4 e launcher dalla cwd reale. Closure, hash
-pre/post e contatori reali provano zero open USB reale, zero handshake TLS reale,
-zero D4 reale e zero famiglie di scrittura persistente.
+soltanto dopo la patch D245. Nella closure offline le patch vivono in una copia
+temporanea; in una futura run approvata il launcher crea prima backup byte-exact,
+applica D245→D246 alle due sorgenti canoniche per una sola invocazione
+dell'entrypoint e garantisce restore/reseal tramite trap anche su uscita anomala.
+Le sorgenti D233/D235 a riposo restano source-sealed. La matrice sintetica prova
+regressione D245 fino a TLS, happy path D4 exactly-once, timeout D4 senza retry,
+ACK inatteso e assenza di qualunque OUT dopo D4. L'estensione di safety prova
+anche disconnect e re-enumeration terminali senza reopen/reclaim, secondo D4
+irraggiungibile e nessun reset/recovery automatico. Closure, hash pre/post e
+contatori reali provano zero open USB reale, zero handshake TLS reale, zero D4
+reale e zero famiglie di scrittura persistente.
+
+`operator_kit/d246-live-d4-once.sh` accetta `--offline-dry-run` oppure il solo
+argomento live esatto `--i-authorize-one-d246-d4-live-attempt`. Il ramo live
+fallisce chiuso se non coesistono EUID root, `SUDO_UID` numerico non-root,
+marker D246 assente, preflight PASS, source seal attivo e una baseline approvata.
+La governance v2.1 usa come baseline primaria il commit SHA completo designato
+esternamente in `D246_APPROVED_LIVE_BASELINE_SHA` dopo review AI PM e confronta
+con Git soltanto il live-critical set; SHA assente/non valido o contenuto stale
+bloccano la run. Manuale, report, status e test non sono oggetto di pinning
+generalizzato. Marker e namespace dei risultati sono esclusivamente D246.
 
 Lo stato è
 `D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED`. La baseline del
-live-critical set non è auto-approvata:
-`LIVE_BASELINE_APPROVAL=PENDING_USER_REVIEW`. D246 non autorizza una run live,
-un secondo D4 o il comando AF.
+live-critical set non è auto-approvata: il live-enablement candidate è
+implementato offline e il commit candidato è
+`LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW`. D246 non è stato eseguito live e
+non autorizza un secondo D4 o il comando AF.
 
 ## Operazioni read note e limiti
 
@@ -1193,10 +1214,12 @@ Il critical boundary tecnico si sposta quindi al comando successivo A0/AF,
 osservato nella capture ma non ancora classificato né raggiungibile. Il confine
 operativo resta più conservativo: nessuna run D246 è autorizzata finché il
 live-critical set non riceve una baseline SHA completa approvata dall'Utente/AI
-PM. Le sorgenti correnti restano hard-disabled; `d246-live-d4-once.sh` accetta
-soltanto `--offline-dry-run`. Nessun esito storico autorizza retry, secondo D4,
-AF o seconda invocazione. L'assenza di prova elettrica del sensore e di prova
-device-side assoluta oltre il receiver D4 esatto resta esplicita.
+PM. Le sorgenti correnti restano hard-disabled; il launcher supporta il dry-run
+offline e contiene un ramo live hard-gated, ma senza SHA esplicitamente
+designato dopo review fallisce chiuso. Il commit candidato non è una baseline
+approvata. Nessun esito storico autorizza retry, secondo D4, AF o seconda
+invocazione. L'assenza di prova elettrica del sensore e di prova device-side
+assoluta oltre il receiver D4 esatto resta esplicita.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1248,8 +1271,9 @@ reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
 production-candidate D235, il consolidamento D238, l'evidenza D239 e la
 transizione command→TLS D241, le evidenze E4 D242/D243/D244 e il kit D245 per
 la precondizione read-only A8→E4 con continuazione TLS. D245 è ora anche una
-run live TLS riuscita; D246 aggiunge come patch offline il solo D4 volatile con
-stop immediato.
+run live TLS riuscita; D246 aggiunge il solo D4 volatile con stop immediato e un
+launcher live-capable hard-gated, implementato e verificato offline ma non
+ancora approvato come baseline né eseguito live.
 Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
 source-sealed e non
 costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
@@ -1269,4 +1293,4 @@ transpose.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D245 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D246 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.

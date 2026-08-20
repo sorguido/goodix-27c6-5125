@@ -1,9 +1,9 @@
 {
   "schema": "d246-status-v1",
   "outcome": "D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED",
-  "advancement": "NEW_TECHNICAL_EVIDENCE_PRODUCED",
+  "advancement": "NONE",
   "executable_closure": "PASS",
-  "residual_blocker_or_risk": "LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW; D4_NOT_LIVE_EXECUTED; AF_UNASSESSED",
+  "residual_blocker_or_risk": "LIVE_BASELINE_CANDIDATE_PENDING_AI_PM_APPROVAL; D4_NOT_LIVE_EXECUTED; AF_UNASSESSED",
   "canonical_documentation": "Goodix 27c6 5125 manuale tecnico.md",
   "bundle": "analysis/D246/D246_bundle.zip",
   "d245_evidence": {
@@ -28,8 +28,11 @@
     "response_count": 0,
     "terminal": "STOP_AFTER_D4"
   },
+  "live_enablement_candidate": "IMPLEMENTED_OFFLINE",
   "live_execution": false,
-  "live_baseline_approval": "PENDING_USER_REVIEW",
+  "live_baseline_approval": "PENDING_AI_PM_REVIEW",
+  "baseline_designation_variable": "D246_APPROVED_LIVE_BASELINE_SHA",
+  "baseline_governance": "GIT_LIVE_CRITICAL_SET_ONLY",
   "source_seal": "ACTIVE_UNCHANGED",
   "real_counters": {
     "usb_open_count": 0,
@@ -43,7 +46,12 @@
     "T3_D4_TIMEOUT": "PASS_NO_RETRY_CLEANUP_RESEAL",
     "T4_UNEXPECTED_ACK": "PASS_FAIL_CLOSED",
     "T5_NOTHING_AFTER_D4": "PASS_NEXT_ACTION_UNREACHABLE",
-    "T6_LAUNCHER_ACTUAL_CWD": "PASS"
+    "T6_LAUNCHER_REPOSITORY_CWD": "PASS",
+    "T7_LAUNCHER_EXTERNAL_CWD": "PASS",
+    "T8_LIVE_GUARDRAIL_MATRIX": "PASS",
+    "T9_DISCONNECT_REENUMERATION": "PASS_TERMINAL_NO_RETRY_NO_REOPEN_NO_RECLAIM",
+    "T10_SECOND_D4": "PASS_UNREACHABLE",
+    "T11_FULL_REGRESSION_135_TESTS": "PASS"
   },
   "contains_secret": false,
   "contains_proprietary_raw": false,
