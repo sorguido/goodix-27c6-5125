@@ -6,39 +6,20 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-Non esiste ancora un driver Linux funzionante. D239 ha eseguito sul firmware
-12509 l'intero cold-start OEM fino a D1 e ricevuto il B0/TLS diretto; D241 ha
-poi verificato live l'ownership exactly-once e un ClientHello TLS 1.2 valido.
-Il server OpenSSL ha emesso ServerHello e ServerHelloDone, ma il dispositivo
-non ha inviato ClientKeyExchange entro il timeout bounded. D242 ha poi eseguito
-una run live reale: ha trasmesso soltanto E4 e non ha ricevuto alcun frame
-completo prima del timeout. Binding E4, TLS e pacing non sono stati raggiunti;
-retry è rimasto zero e cleanup, zeroizzazione, restore e reseal sono riusciti.
-Questa run aveva reso il generic fixed-64 A0 un candidato, non una causa
-provata. D243 ha ripristinato A0 alla submission D241 live-proven, conservando
-fixed-64 e pacing 10 ms soltanto per B0/TLS, ed è stato poi eseguito live: anche
-D243 si è fermato al primo E4 con lo stesso timeout, `command_count=1`, binding
-non raggiunto e zero TLS/retry. Quindi fixed-64 A0 è falsificato soltanto come
-spiegazione sufficiente del timeout D242; la sua equivalenza device-side resta
-irrisolta. D244 ha poi eseguito il controllo fresh-host dopo shutdown completo
-e nuova accensione: il controllo host è valido, l'OUT E4 è completato, ma il
-bulk IN va ancora in timeout. Questo falsifica il fresh boot host come
-condizione sufficiente di recupero; non prova però un power-cycle elettrico del
-sensore, perché il laptop ha batteria interna. D245 ha poi eseguito con successo
-il singolo percorso A8→E4→pre-D1→D1→TLS: ACK A8 `0x07`, firmware 12509 esatto,
-binding E4 `match` e handshake TLS completo, con stop prima di D4, zero retry,
-zero application data e zero famiglie di scrittura persistente. D246 chiude
-offline il confine immediatamente successivo: il D4 esatto osservato nella
-capture è classificato `VOLATILE_SESSION_INITIALIZATION`, viene modellato una
-sola volta con ACK esatto `d4/01` e `STOP_AFTER_D4`. Un primo tentativo
-operatore non ha iniziato D246 live: il launcher richiamava ancora il namespace
-preflight D245 e si è fermato sul marker storico con zero USB, comandi, secret
-read e D4 attempt. La correzione post-review usa ora preflight/report D246,
-closure transitiva delle dipendenze live-critical e latch D4 pre-submit. Il
-launcher hard-gated passa la closure soltanto offline; le sorgenti canoniche
-restano hard-disabled e il nuovo commit candidato attende review AI PM. D246
-non è stato eseguito live e il repository non auto-approva né autorizza da solo
-operazioni live.
+Non esiste ancora un driver Linux funzionante. La progressione live ha però
+chiuso i confini A8, E4 e TLS sul firmware 12509: D239 ha eseguito il cold-start
+OEM fino al B0/TLS, D241 ha verificato l'ownership exactly-once e il
+ClientHello TLS 1.2, D242–D244 hanno localizzato e controllato i timeout E4 e
+D245 ha completato l'intero percorso A8→E4→pre-D1→D1→TLS senza retry. D246 ha
+ora completato live anche il solo exchange D4 autorizzato: un tentativo e un
+invio, ACK esatto `d4/01`, nessuna response tipizzata, nessun application data
+e stop terminale `STOP_AFTER_D4`. Cleanup, zeroizzazione del secret, restore di
+fprintd e reseal sono riusciti; le famiglie di scrittura persistente sono
+rimaste a zero. La semantica D4 resta quella già provata staticamente,
+`VOLATILE_SESSION_INITIALIZATION`, limitata al receiver APP12509 esatto. A8,
+E4, TLS e D4 non sono più blocker aperti: il nuovo current critical boundary è
+AF, non ancora valutato e non autorizzato. Il repository non auto-approva né
+autorizza da solo ulteriori operazioni live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
@@ -59,7 +40,7 @@ operazioni live.
 | Run live D243 | fail-closed al primo E4 | A0 corto ripristinato; OUT E4 completato e stesso timeout bulk IN; zero binding/TLS/retry; cleanup/restore/reseal riusciti |
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
-| D246 TLS→D4 | post-review closure offline `READY_NOT_EXECUTED` | tentativo live non iniziato per namespace D245 ereditato, zero hardware; ora preflight D246, latch attempt pre-submit e closure Git transitiva PASS; nuovo commit candidato in attesa di review AI PM |
+| Run live D246 TLS→D4 | successo, consumata | handshake TLS completo; D4 attempt/send `1/1`, ACK `01`, nessuna response/app-data/retry/write persistente; `STOP_AFTER_D4`, cleanup/restore/reseal riusciti |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -303,8 +284,9 @@ D245 -> record storico canonico D179 A8→E4 + corroborazione locale D230
 D246 -> evidenza D245 validata; audit primario TLS Finished→D4→ACK→AF
      -> D4 classificato volatile sul receiver APP12509 esatto; host e device persistence escluse per quel path
      -> patch offline D4 exactly-once, ACK d4/01 only, STOP_AFTER_D4; closure PASS
-     -> launcher live-capable hard-gated e testato offline; READY_NOT_EXECUTED
-     -> sorgenti sealed; commit candidato e baseline live PENDING_AI_PM_REVIEW
+     -> launcher live-capable hard-gated e testato offline; successiva run live single-shot PASS
+     -> TLS completo, D4 attempt/send 1/1, ACK d4/01, STOP_AFTER_D4; zero retry/app-data/persistent-write
+     -> cleanup/restore/reseal riusciti; AF diventa il prossimo confine non valutato
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1062,11 +1044,11 @@ D245_HISTORICAL_LAUNCHER_MUTATION_COUNT=0
 ```
 
 Nel kit D245 D4, application data, FDT, capture, enroll, reset/power-cycle e
-recovery invasiva automatica restano irraggiungibili o vietati. Il candidato
-D246 rende raggiungibile soltanto D4 durante una futura run separatamente
-approvata, tramite due patch temporanee applicate in ordine D245→D246; tutte le
-azioni successive restano irraggiungibili. D246 non è stato eseguito live. D240
-è obsoleto e non è stato eseguito.
+recovery invasiva automatica erano irraggiungibili o vietati. D246 ha reso
+raggiungibile soltanto D4 nella run separatamente approvata, tramite due patch
+temporanee applicate in ordine D245→D246; tutte le azioni successive sono
+rimaste irraggiungibili. D246 è stato eseguito live una sola volta e si è
+fermato dopo l'ACK D4. D240 è obsoleto e non è stato eseguito.
 
 Il riferimento Rocky indipendente è
 <https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1>. È corroborazione
@@ -1075,18 +1057,15 @@ esterna, distinta dalla capture/DLL primaria locale; nessuna implementazione GPL
 
 ### D246: dal TLS Finished al solo D4
 
-Il riesame metodologico pre-live corrente è:
+Il riesame metodologico che ha governato la run live completata era:
 
-1. il prossimo live non ripete un esperimento precedente: D245 ha già chiuso
-   TLS e D246 aggiunge esattamente un D4 e stop;
-2. testa l'ipotesi che il D4 staticamente/capture-correlato come
+1. la run non ripeteva un esperimento precedente: D245 aveva già chiuso TLS e
+   D246 aggiungeva esattamente un D4 e stop;
+2. testava l'ipotesi che il D4 staticamente/capture-correlato come
    `VOLATILE_SESSION_INITIALIZATION` sia accettato live dal target con ACK
    esatto `d4/01`, senza richiedere alcuna azione successiva;
-3. se fallisce, non sono autorizzati retry o patch cosmetiche: il failure viene
-   classificato come pre-D4/TLS regression, D4 OUT ambiguous/timeout, ACK
-   mismatch o disconnect/re-enumeration. Se D4 è tentato ma non chiude, AF
-   resta irraggiungibile e vengono riesaminate ipotesi causale e precondizioni
-   device.
+3. in caso di failure non erano autorizzati retry o patch cosmetiche; la run ha
+   invece chiuso D4 al primo tentativo, quindi tale ramo non è stato percorso.
 
 La catena causale stretta nella capture D230 è:
 
@@ -1132,6 +1111,40 @@ completion ambigua, ACK diverso o frame trailing terminano senza retry,
 rilasciano le risorse e resealano. AF e ogni azione ulteriore sono non
 raggiungibili.
 
+La successiva run live D246 è evidenza primaria locale in
+`analysis/D246/D246_operator_live_stdout.json`, SHA-256
+`055ace08832e2297d1b3687523fd41a410ed80b215207d63c352ea1cee2493e0`.
+Il risultato autoritativo è determinato dai contatori e dai campi D246
+specifici della run:
+
+```text
+D246 live execution                 COMPLETED
+execution_mode                      live_single_shot
+usb_open_count                      1
+TLS cryptographic handshake         COMPLETED (count 1)
+D4 attempt/send count               1/1
+D4 ACK                              status 0x01
+D4 completed                        true
+D4 request logical/physical length  10/64
+D4 response body length             0
+D4 completion                       single_frame_usb_completion
+retry/application data count        0/0
+persistent write family count       0
+terminal boundary                   STOP_AFTER_D4
+cleanup                             completed (count 1)
+secret/source/fprintd               zeroized/sealed/restored
+```
+
+Il raw evidence resta byte-identico. I campi
+`LIVE_BASELINE_APPROVAL=PENDING_USER_REVIEW`,
+`decision=D236_LIVE_TLS_HANDSHAKE_SUCCESS` e
+`reached_phase=TLS_HANDSHAKE_OK` sono metadata legacy del renderer: sono
+incoerenti con la closure finale D246 ma non invalidano la run. `result=pass`,
+`execution_mode=live_single_shot`, i contatori D4 e l'osservazione protocollo
+D4 sono i campi autoritativi. La run produce nuova evidenza tecnica live che il
+target accetta l'exchange previsto; non estende la prova semantica oltre
+`EXACT_APP12509_D4_RECEIVER_PATH_ONLY`.
+
 Il contratto exactly-once distingue ora `d4_attempt_count`, latched a uno
 immediatamente prima della chiamata che può consegnare il frame al transport,
 da `d4_send_count`, che indica soltanto il ritorno full-length confermato. La
@@ -1143,9 +1156,9 @@ ricevuto il frame.
 
 Il delta vive in `analysis/D246/D246_d4_continuation.patch` ed è applicato
 soltanto dopo la patch D245. Nella closure offline le patch vivono in una copia
-temporanea; in una futura run approvata il launcher crea prima backup byte-exact,
-applica D245→D246 alle due sorgenti canoniche per una sola invocazione
-dell'entrypoint e garantisce restore/reseal tramite trap anche su uscita anomala.
+temporanea; nella run approvata il launcher ha creato prima backup byte-exact,
+applicato D245→D246 alle due sorgenti canoniche per una sola invocazione
+dell'entrypoint e garantito restore/reseal tramite trap anche su uscita anomala.
 Le sorgenti D233/D235 a riposo restano source-sealed. La matrice sintetica prova
 regressione D245 fino a TLS, happy path D4 exactly-once, timeout D4 senza retry,
 ACK inatteso e assenza di qualunque OUT dopo D4. L'estensione di safety prova
@@ -1180,14 +1193,12 @@ storico, benigno e intatto. La precedente baseline candidata
 `ff4cc3b748dafbce681e6fa38a44936eca794d12` è
 `SUPERSEDED_NOT_APPROVED_FOR_LIVE`.
 
-Lo stato è
-`D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED`. Lo step D246
-complessivo conserva `ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED`; la sola
-patch post-review non aggiunge avanzamento scientifico. La baseline del
-live-critical set non è auto-approvata: il live-enablement candidate è
-implementato offline e il commit candidato è
-`LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW`. D246 non è stato eseguito live e
-non autorizza un secondo D4 o il comando AF.
+Lo stato finale è
+`D246_D4_LIVE_EXECUTION_COMPLETED_STOP_AFTER_D4`, con
+`ADVANCEMENT=REAL_EXECUTION_COMPLETED` ed `EXECUTABLE_CLOSURE=PASS`. La run ha
+prodotto anche nuova evidenza tecnica live sul D4, mentre la categoria primaria
+di avanzamento resta l'esecuzione reale completata. L'autorizzazione single-shot
+è consumata: D246 non autorizza un secondo D4, retry o il comando AF.
 
 ## Operazioni read note e limiti
 
@@ -1239,22 +1250,17 @@ interfaccia senza nuova evidenza primaria target-specific.
 La semantica host-side A2/0x70, il backend USB/TLS, il binding runtime PSK↔E4,
 l'orchestratore e l'entrypoint production non sono più blocker offline. D245 ha
 provato live su 12509 l'intera catena A8→E4→pre-D1→D1→TLS e ha completato
-l'handshake senza retry, fermandosi prima di D4. D246 chiude staticamente il
-primo confine post-handshake: D4 è una inizializzazione volatile di sessione
-per il receiver APP12509 esatto, con wire, ACK e side effect RAM ricostruiti da
-fonti primarie. La continuazione factory-preserving è implementata in patch e
-verificata offline fino a `STOP_AFTER_D4`, ma non è stata eseguita live.
+l'handshake senza retry. D246 ha poi chiuso live il primo confine
+post-handshake: il target ha accettato una sola inizializzazione volatile D4
+per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
+`STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
-Il critical boundary tecnico si sposta quindi al comando successivo A0/AF,
-osservato nella capture ma non ancora classificato né raggiungibile. Il confine
-operativo resta più conservativo: nessuna run D246 è autorizzata finché il
-live-critical set non riceve una baseline SHA completa approvata dall'Utente/AI
-PM. Le sorgenti correnti restano hard-disabled; il launcher supporta il dry-run
-offline e contiene un ramo live hard-gated, ma senza SHA esplicitamente
-designato dopo review fallisce chiuso. Il commit candidato non è una baseline
-approvata. Nessun esito storico autorizza retry, secondo D4, AF o seconda
-invocazione. L'assenza di prova elettrica del sensore e di prova device-side
-assoluta oltre il receiver D4 esatto resta esplicita.
+Il current critical boundary tecnico è quindi il comando successivo A0/AF,
+osservato nella capture ma non ancora classificato, implementato, eseguito o
+autorizzato. L'autorizzazione D246 è consumata. Nessun esito storico autorizza
+retry, secondo D4, AF o seconda invocazione. L'assenza di prova elettrica del
+sensore e di prova device-side assoluta oltre il receiver D4 esatto resta
+esplicita.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1306,12 +1312,11 @@ reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
 production-candidate D235, il consolidamento D238, l'evidenza D239 e la
 transizione command→TLS D241, le evidenze E4 D242/D243/D244 e il kit D245 per
 la precondizione read-only A8→E4 con continuazione TLS. D245 è ora anche una
-run live TLS riuscita; D246 aggiunge il solo D4 volatile con stop immediato e un
-launcher live-capable hard-gated, implementato e verificato offline ma non
-ancora approvato come baseline né eseguito live.
-Questi includono ABI libusb esatta e TLS OpenSSL, ma il live resta doppiamente
-source-sealed e non
-costituisce un driver libfprint pronto. Il record immagine noto è di 7684 byte:
+run live TLS riuscita; D246 ha aggiunto ed eseguito live il solo D4 volatile con
+stop immediato, completando il percorso implementato fino a quel boundary. Le
+sorgenti sono state ripristinate e sealed dopo la run. L'implementazione include
+ABI libusb esatta e TLS OpenSSL, ma non costituisce ancora un driver libfprint
+pronto e AF resta non valutato. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
 transpose.
 

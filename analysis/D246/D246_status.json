@@ -1,76 +1,95 @@
 {
-  "schema": "d246-status-v2",
-  "outcome": "D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED",
-  "advancement": "NEW_TECHNICAL_EVIDENCE_PRODUCED",
+  "schema": "d246-status-v3",
+  "outcome": "D246_D4_LIVE_EXECUTION_COMPLETED_STOP_AFTER_D4",
+  "advancement": "REAL_EXECUTION_COMPLETED",
+  "additional_advancement_evidence": "NEW_TECHNICAL_EVIDENCE_PRODUCED_BY_LIVE_D4_ACCEPTANCE",
   "executable_closure": "PASS",
-  "residual_blocker_or_risk": "LIVE_BASELINE_CANDIDATE_PENDING_AI_PM_APPROVAL; D4_NOT_LIVE_EXECUTED; AF_UNASSESSED",
-  "canonical_documentation": "Goodix 27c6 5125 manuale tecnico.md",
-  "bundle": "analysis/D246/D246_bundle.zip",
-  "previous_baseline": {
-    "sha": "ff4cc3b748dafbce681e6fa38a44936eca794d12",
-    "status": "SUPERSEDED_NOT_APPROVED_FOR_LIVE"
+  "residual_blocker_or_risk": "AF_UNASSESSED",
+  "canonical_documentation": {
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "manual_updated": true,
+    "sections": [
+      "Stato del progetto",
+      "D246",
+      "Current critical boundary",
+      "Stato implementazione Linux"
+    ]
   },
-  "preflight_stopped_attempt": {
-    "d246_live_attempt": "NOT_STARTED",
-    "failure": "INHERITED_D245_PREFLIGHT_NAMESPACE",
-    "usb_open_count": 0,
-    "goodix_command_count": 0,
-    "real_secret_read_count": 0,
-    "fprintd_mutation_count": 0,
-    "d4_attempt_count": 0,
-    "device_state": "UNCHANGED_BY_D246_ATTEMPT"
+  "bundle": {
+    "path": "analysis/D246/D246_bundle.zip",
+    "sha256": "RECORDED_IN_EXTERNAL_SIDECAR",
+    "sidecar": "analysis/D246/D246_bundle.zip.sha256"
   },
-  "d4_gate": {
-    "decision": "PASS",
+  "live_evidence": {
+    "path": "analysis/D246/D246_operator_live_stdout.json",
+    "sha256": "055ace08832e2297d1b3687523fd41a410ed80b215207d63c352ea1cee2493e0",
+    "raw_evidence_modified": false,
+    "authoritative_basis": "RESULT_EXECUTION_MODE_D246_SPECIFIC_FIELDS_COUNTERS_AND_D4_PROTOCOL_OBSERVATION",
+    "legacy_stale_fields": {
+      "LIVE_BASELINE_APPROVAL": "PENDING_USER_REVIEW",
+      "decision": "D236_LIVE_TLS_HANDSHAKE_SUCCESS",
+      "reached_phase": "TLS_HANDSHAKE_OK"
+    },
+    "legacy_fields_invalidate_run": false
+  },
+  "live_execution": {
+    "status": "COMPLETED",
+    "result": "pass",
+    "execution_mode": "live_single_shot",
+    "authorization": "CONSUMED_SINGLE_SHOT",
+    "usb_open_count": 1,
+    "tls_cryptographic_handshake": "COMPLETED",
+    "tls_handshake_count": 1,
+    "d4_attempt_count": 1,
+    "d4_send_count": 1,
+    "d4_ack_status": "0x01",
+    "d4_completed": true,
+    "d4_failure_class": "none",
+    "retry_count": 0,
+    "application_data_count": 0,
+    "persistent_write_family_count": 0,
+    "next_application_action_reachable": false,
+    "unexpected_data": false,
+    "terminal_boundary": "STOP_AFTER_D4",
+    "cleanup": "completed",
+    "cleanup_count": 1,
+    "secret_zeroized": true,
+    "source_seal_state": "sealed",
+    "fprintd_restore_status": "restored",
+    "runtime_psk_e4_binding_status": "match",
+    "same_validated_psk_used_by_tls": true
+  },
+  "d4_observation": {
+    "request_control": "0xd4",
+    "request_logical_length": 10,
+    "request_physical_length": 64,
+    "ack_status": "0x01",
+    "response_body_length": 0,
+    "completion_classification": "single_frame_usb_completion",
+    "terminal_action": "STOP_AFTER_D4"
+  },
+  "d4_semantics": {
     "semantic_class": "VOLATILE_SESSION_INITIALIZATION",
-    "evidence_status": "PROVEN_HOST_WIRE_EXACT_APP12509_RECEIVER; LIVE_RESULT_UNVERIFIED",
     "scope": "EXACT_APP12509_D4_RECEIVER_PATH_ONLY",
-    "request_hex": "a00600a6d403000000d3",
-    "physical_out": "FIXED64_ZERO_TAIL",
-    "post_tls_pacing_ms": 20,
-    "timeout_ms": 200,
-    "ack_policy": "EXACT_D4_STATUS_01_ONLY",
-    "response_count": 0,
-    "terminal": "STOP_AFTER_D4"
+    "live_claim": "TARGET_ACCEPTED_EXPECTED_D4_EXCHANGE",
+    "scope_extension": false
   },
-  "exactly_once_contract": {
-    "attempt_latch": "D4_ATTEMPT_COUNT_SET_IMMEDIATELY_BEFORE_TRANSPORT_WRITE",
-    "entry_guard": "D4_ATTEMPT_COUNT_MUST_EQUAL_ZERO",
-    "ambiguous_completion": "ATTEMPT_1_SEND_0_FAILURE_AMBIGUOUS_USB_COMPLETION",
-    "ambiguous_reentry": "TERMINAL_ABORT_SECOND_TRANSPORT_WRITE_ZERO_RETRY_ZERO"
+  "current_critical_boundary": {
+    "command": "AF",
+    "status": "NEXT_UNASSESSED_PROTOCOL_BOUNDARY",
+    "implemented": false,
+    "executed": false,
+    "authorized": false
   },
-  "preflight_namespace": {
-    "marker": "/var/lib/goodix-5125-poc/d246-operator-invocation.marker",
-    "result_directory": "/var/lib/goodix-5125-poc/d246-results",
-    "durable_report": "analysis/D246/D246_preflight_report.json",
-    "d245_marker": "HISTORICAL_BENIGN_NOT_TOUCHED"
+  "preflight_evidence": {
+    "path": "analysis/D246/D246_preflight_report.json",
+    "sha256": "0843096d32a8f3dea0a202c8bd7bb04d0c0c88e2289116782aa0f6cb5bd744b8",
+    "status": "pass"
   },
-  "live_enablement_candidate": "IMPLEMENTED_OFFLINE",
-  "live_execution": false,
-  "live_baseline_approval": "PENDING_AI_PM_REVIEW",
-  "baseline_designation_variable": "D246_APPROVED_LIVE_BASELINE_SHA",
-  "baseline_governance": "GIT_TRANSITIVE_LIVE_CRITICAL_SET_DIRECT_BLOB_COMPARISON",
-  "live_critical_file_count": 14,
-  "source_seal": "ACTIVE_UNCHANGED",
-  "real_counters": {
-    "usb_open_count": 0,
-    "tls_handshake_count": 0,
-    "d4_attempt_count": 0,
-    "d4_send_count": 0,
-    "persistent_write_family_count": 0
-  },
-  "tests": {
-    "T1_D245_HISTORICAL_MARKER": "PASS_BENIGN_NOT_TOUCHED",
-    "T2_D246_MARKER_CONSUMED": "PASS_HARD_STOP_PRE_USB",
-    "T3_D246_DURABLE_REPORT_NAMESPACE": "PASS_D246_ONLY",
-    "T4_D4_AMBIGUOUS_REENTRY": "PASS_ATTEMPT_LATCHED_SECOND_WRITE_ZERO",
-    "T5_LIVE_CRITICAL_STALE_DETECTION": "PASS_BINDING_RUNTIME_MODIFICATION_STALE",
-    "T6_D245_TLS_REGRESSION": "PASS_STOP_BEFORE_D4",
-    "T7_D4_SYNTHETIC_HAPPY_NEGATIVE": "PASS_STOP_AFTER_D4_FAIL_CLOSED_NEGATIVES",
-    "T8_LAUNCHER_TWO_CWDS": "PASS_REAL_USB_TLS_D4_ZERO",
-    "T9_FULL_REGRESSION_135_TESTS": "PASS",
-    "BASH_SYNTAX": "PASS",
-    "PATCH_ROUND_TRIP_AND_SOURCE_RESEAL": "PASS_BYTE_EXACT"
+  "closure_task_real_counters": {
+    "D246_REAL_USB_ACCESS": 0,
+    "D246_REAL_TLS_HANDSHAKE": 0,
+    "D246_REAL_D4_ATTEMPT": 0
   },
   "contains_secret": false,
   "contains_proprietary_raw": false,
