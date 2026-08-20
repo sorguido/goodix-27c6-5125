@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
+HISTORICAL_REPOSITORY = Path("/home/guido/Repository/goodix-27c6-5125")
 PREFLIGHT = REPOSITORY / "analysis/D236/d236_preflight.py"
 DRY_RUN = REPOSITORY / "analysis/D239/d239_operator_dry_run.py"
 DRY_RUN_REPORT = REPOSITORY / "analysis/D239/D239_operator_dry_run_report.json"
@@ -75,6 +76,12 @@ class D239OperatorKitExecutabilityTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
+        if REPOSITORY != HISTORICAL_REPOSITORY:
+            self.assertEqual(result.returncode, 65)
+            self.assertIn(f"launch from {HISTORICAL_REPOSITORY}", result.stderr)
+            self.assertEqual((digest(BACKEND), digest(ENTRYPOINT)), source_hashes)
+            self.assertEqual(os.path.lexists(LIVE_STDOUT), live_stdout_before)
+            return
         if source_hashes != D239_SEALED_SOURCE_HASHES:
             # D241 intentionally supersedes the reviewed D239 source baseline.
             # The historical kit must now reject it rather than silently using

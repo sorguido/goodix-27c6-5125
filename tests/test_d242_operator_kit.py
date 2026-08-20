@@ -20,6 +20,7 @@ from src.goodix5125_d235_entrypoint import ProductionRuntimePaths
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
+HISTORICAL_REPOSITORY = Path("/home/guido/Repository/goodix-27c6-5125")
 LAUNCHER = REPOSITORY / "operator_kit/d242-live-tls-once.sh"
 OBSERVABILITY = REPOSITORY / "analysis/D242/d242_preflight_observability.py"
 
@@ -157,6 +158,12 @@ class D242OperatorKitTests(unittest.TestCase):
         denied = subprocess.run(
             [str(LAUNCHER)], cwd=REPOSITORY, text=True, capture_output=True
         )
+        if REPOSITORY != HISTORICAL_REPOSITORY:
+            self.assertEqual(denied.returncode, 65)
+            self.assertIn("WRONG_REPOSITORY_CWD", denied.stderr)
+            source = LAUNCHER.read_text(encoding="utf-8")
+            self.assertIn("EXPLICIT_D242_AUTHORIZATION_ARGUMENT_REQUIRED", source)
+            return
         self.assertEqual(denied.returncode, 64)
         self.assertIn("EXPLICIT_D242_AUTHORIZATION_ARGUMENT_REQUIRED", denied.stderr)
 

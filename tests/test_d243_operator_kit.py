@@ -19,7 +19,9 @@ from src.goodix5125_d235_entrypoint import ProductionRuntimePaths
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
+HISTORICAL_REPOSITORY = Path("/home/guido/Repository/goodix-27c6-5125")
 LAUNCHER = REPOSITORY / "operator_kit/d243-live-tls-once.sh"
+OBSERVABILITY = REPOSITORY / "analysis/D243/d243_preflight_observability.py"
 
 
 class D243OperatorKitTests(unittest.TestCase):
@@ -67,6 +69,12 @@ class D243OperatorKitTests(unittest.TestCase):
         denied = subprocess.run(
             [str(LAUNCHER)], cwd=REPOSITORY, text=True, capture_output=True
         )
+        if REPOSITORY != HISTORICAL_REPOSITORY:
+            self.assertEqual(denied.returncode, 65)
+            self.assertIn("WRONG_REPOSITORY_CWD", denied.stderr)
+            source = LAUNCHER.read_text(encoding="utf-8")
+            self.assertIn("EXPLICIT_D243_AUTHORIZATION_ARGUMENT_REQUIRED", source)
+            return
         self.assertEqual(denied.returncode, 64)
         self.assertIn("EXPLICIT_D243_AUTHORIZATION_ARGUMENT_REQUIRED", denied.stderr)
 
@@ -91,22 +99,27 @@ class D243OperatorKitTests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = subprocess.run(
-                [
-                    str(LAUNCHER),
-                    "--offline-render-preflight-failure",
-                    str(report_path),
-                ],
+                (
+                    ["python3", str(OBSERVABILITY), "--report", str(report_path)]
+                    if REPOSITORY != HISTORICAL_REPOSITORY
+                    else [
+                        str(LAUNCHER),
+                        "--offline-render-preflight-failure",
+                        str(report_path),
+                    ]
+                ),
                 cwd=REPOSITORY,
                 text=True,
                 capture_output=True,
             )
-        self.assertEqual(result.returncode, 69)
-        self.assertIn("D243_FAILURE_CLASS=OPERATOR_IDENTITY", result.stderr)
+        expected_stream = result.stdout if REPOSITORY != HISTORICAL_REPOSITORY else result.stderr
+        self.assertEqual(result.returncode, 0 if REPOSITORY != HISTORICAL_REPOSITORY else 69)
+        self.assertIn("D243_FAILURE_CLASS=OPERATOR_IDENTITY", expected_stream)
         self.assertIn(
             "D243_PREFLIGHT_FAILURES=operator_identity,durable_report_path",
-            result.stderr,
+            expected_stream,
         )
-        self.assertNotIn("D243_FAILURE_CLASS=PREFLIGHT_FAILED", result.stderr)
+        self.assertNotIn("D243_FAILURE_CLASS=PREFLIGHT_FAILED", expected_stream)
 
     def test_e4_timeout_report_is_durable_before_restore_and_final_after_restore(self):
         with tempfile.TemporaryDirectory(prefix="d243-test-closure-") as directory:

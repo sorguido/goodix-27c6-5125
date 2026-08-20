@@ -83,14 +83,19 @@ def _require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def _normal_frames(*, ack_status: int = 0x01) -> tuple[object, list[bytes]]:
+def _normal_frames(
+    *, a8_ack_status: int = 0x01, e4_ack_status: int = 0x01
+) -> tuple[object, list[bytes]]:
     material, responses = _canonical_objects(SECRET)
     frames = [
         frame
-        for step in happy_synthetic_script(material, responses, ack_status=ack_status)
+        for step in happy_synthetic_script(
+            material, responses, ack_status=e4_ack_status
+        )
         for frame in step.responses
     ]
-    return material, [A8_ACK01, A8_RESPONSE, *frames]
+    a8_ack = build_a0(0xB0, bytes((0xA8, a8_ack_status)))
+    return material, [a8_ack, A8_RESPONSE, *frames]
 
 
 def _run_candidate(
@@ -168,15 +173,22 @@ def run_matrix() -> dict[str, object]:
     parsed = parse_a0(A8_CANONICAL_REQUEST)
     _require((parsed.control, parsed.body) == (0xA8, b"\x00\x00"), "A8 parse")
 
-    # T2: both currently admitted E4 ACK statuses continue after the stricter A8 ACK01.
+    # T2: both empirically observed A8 statuses authorize one response and the
+    # full synthetic path. Pair them with both preserved E4 ACK classes.
     happy_cases = []
-    for e4_ack in (0x01, 0x07):
-        material, incoming = _normal_frames(ack_status=e4_ack)
+    happy_e4_counts = {}
+    for a8_ack, e4_ack in ((0x01, 0x01), (0x07, 0x07)):
+        material, incoming = _normal_frames(
+            a8_ack_status=a8_ack, e4_ack_status=e4_ack
+        )
         case = _run_candidate(incoming)
         report = case["report"]
         backend = case["backend"]
         api = case["api"]
-        _require(report["result"] == "pass", f"happy E4 ACK {e4_ack:02x}")
+        _require(report["result"] == "pass", f"happy A8 ACK {a8_ack:02x}")
+        _require(report["a8_ack_status"] == a8_ack, "wrong A8 ACK status")
+        _require(report["a8_response_observed"] is True, "A8 response not read")
+        _require(report["a8_firmware_version_match"] is True, "A8 firmware gate")
         _require(report["runtime_psk_e4_binding_status"] == "match", "E4 binding")
         _require(report["client_hello_observed"] is True, "ClientHello observability")
         _require(report["client_key_exchange_observed"] is False, "unexpected ClientKeyExchange")
@@ -190,14 +202,40 @@ def run_matrix() -> dict[str, object]:
         _require(phases.count(A8_FIRMWARE_QUERY_PHASE) == 1, "A8 repeated")
         _require(not any(phase == "D4" for phase in phases), "D4 reached")
         _assert_durable(case)
-        happy_cases.append(f"E4_ACK_{e4_ack:02X}_PASS")
+        happy_cases.append(f"A8_ACK_{a8_ack:02X}_VALID_RESPONSE_PASS")
+        happy_e4_counts[a8_ack] = int(report["e4_usb_out_attempted"])
 
-    # T3/T4/T5: every A8 terminal stops before E4 with granular direction.
-    ack07 = _run_candidate([A8_ACK07])
-    _require(ack07["report"]["a8_ack_status"] == 7, "ACK07 not observed")
-    _require(ack07["report"]["a8_response_observed"] is False, "ACK07 read response")
-    _require(ack07["report"]["e4_usb_out_attempted"] is False, "ACK07 sent E4")
-    _assert_durable(ack07)
+    # T3/T4/T5: an authorized ACK without an exact response stops before E4.
+    ack07_timeout_api = TimeoutAfterIncomingUsbApi([A8_ACK07])
+    ack07_timeout = _run_candidate([], api=ack07_timeout_api)
+    _require(ack07_timeout["report"]["a8_ack_status"] == 7, "ACK07 not observed")
+    _require(
+        ack07_timeout["report"]["a8_failure_class"] == "in_timeout",
+        "ACK07 response timeout class",
+    )
+    _require(
+        ack07_timeout["report"]["e4_usb_out_attempted"] is False,
+        "E4 after ACK07 response timeout",
+    )
+    _assert_durable(ack07_timeout)
+
+    malformed_response = bytearray(A8_RESPONSE)
+    malformed_response[-1] ^= 1
+    ack07_malformed = _run_candidate([A8_ACK07, bytes(malformed_response)])
+    _require(
+        ack07_malformed["report"]["e4_usb_out_attempted"] is False,
+        "E4 after malformed ACK07 response",
+    )
+    _assert_durable(ack07_malformed)
+
+    ack07_wrong_control = _run_candidate(
+        [A8_ACK07, build_a0(0xA6, A8_TARGET_RESPONSE_BODY)]
+    )
+    _require(
+        ack07_wrong_control["report"]["e4_usb_out_attempted"] is False,
+        "E4 after wrong-control ACK07 response",
+    )
+    _assert_durable(ack07_wrong_control)
 
     out_api = FakeUsbApi()
     out_api.timeout_out = True
@@ -216,18 +254,59 @@ def run_matrix() -> dict[str, object]:
     _assert_durable(in_timeout)
 
     mismatch_results = []
-    for version in (b"GF_ST411SEC_APP_12508\x00", b"GF_ST411SEC_APP_12510\x00"):
-        mismatch = _run_candidate([A8_ACK01, build_a0(0xA8, version)])
+    mismatch_cases = {}
+    for ack_status, version in (
+        (0x07, b"GF_ST411SEC_APP_12508\x00"),
+        (0x07, b"GF_ST411SEC_APP_12510\x00"),
+        (0x01, b"GF_ST411SEC_APP_12508\x00"),
+    ):
+        ack = build_a0(0xB0, bytes((0xA8, ack_status)))
+        mismatch = _run_candidate([ack, build_a0(0xA8, version)])
         report = mismatch["report"]
         _require(report["a8_response_observed"] is True, "valid mismatch not parsed")
         _require(report["a8_firmware_version_match"] is False, "mismatch accepted")
         _require(report["a8_failure_class"] == "firmware_mismatch", "mismatch class")
         _require(report["e4_usb_out_attempted"] is False, "E4 after mismatch")
         _assert_durable(mismatch)
-        mismatch_results.append(version[:-1].decode("ascii"))
+        label = f"ACK{ack_status:02X}_{version[:-1].decode('ascii')}"
+        mismatch_results.append(label)
+        mismatch_cases[(ack_status, version[-6:-1].decode("ascii"))] = int(
+            report["e4_usb_out_attempted"]
+        )
+
+    other_ack = _run_candidate([build_a0(0xB0, b"\xa8\x02")])
+    other_in_count = sum(
+        1
+        for call in other_ack["api"].calls
+        if isinstance(call, tuple) and call[0] == "in"
+    )
+    _require(other_in_count == 1, "other ACK triggered a second response IN")
+    _require(
+        other_ack["report"]["e4_usb_out_attempted"] is False,
+        "E4 after other ACK status",
+    )
+    _assert_durable(other_ack)
+
+    ack07_extra = _run_candidate(
+        [A8_ACK07 + A8_RESPONSE + build_a0(0x82, b"extra")]
+    )
+    _require(
+        ack07_extra["report"]["a8_failure_class"] == "stale_or_unowned_frame",
+        "extra frame after ACK07 response accepted",
+    )
+    _require(
+        ack07_extra["report"]["e4_usb_out_attempted"] is False,
+        "E4 after extra ACK07 frame",
+    )
+    _assert_durable(ack07_extra)
 
     # T6: historical fragmentation/coalescing accepted, stale/malformed/order rejected.
-    coalesced = _run_candidate([A8_ACK01 + A8_RESPONSE, *_normal_frames()[1][2:]])
+    coalesced = _run_candidate(
+        [
+            A8_ACK07 + A8_RESPONSE,
+            *_normal_frames(a8_ack_status=0x07, e4_ack_status=0x01)[1][2:],
+        ]
+    )
     _require(coalesced["report"]["result"] == "pass", "coalesced ACK/response")
     _require(
         coalesced["backend"].protocol_observations[0]["completion_classification"]
@@ -243,9 +322,9 @@ def run_matrix() -> dict[str, object]:
     _require(stale["report"]["e4_usb_out_attempted"] is False, "E4 after stale")
     wrong_order = _run_candidate([A8_RESPONSE, A8_ACK01])
     _require(wrong_order["report"]["e4_usb_out_attempted"] is False, "E4 after wrong order")
-    malformed = bytearray(A8_ACK01)
-    malformed[-1] ^= 1
-    malformed_case = _run_candidate([bytes(malformed)])
+    malformed_ack = bytearray(A8_ACK01)
+    malformed_ack[-1] ^= 1
+    malformed_case = _run_candidate([bytes(malformed_ack)])
     _require(malformed_case["report"]["e4_usb_out_attempted"] is False, "E4 after malformed")
 
     # T7: A8 succeeds, E4 OUT completes, and the IN timeout direction is explicit.
@@ -299,12 +378,32 @@ def run_matrix() -> dict[str, object]:
     _require(paths.single_use_marker.name == "d245-operator-invocation.marker", "marker namespace")
 
     return {
-        "schema": "d245-runtime-matrix-v1",
+        "schema": "d245-runtime-matrix-v2",
         "status": "PASS",
         "a8_request_hex": A8_CANONICAL_REQUEST.hex(),
         "happy_cases": happy_cases,
         "firmware_mismatch_cases": mismatch_results,
-        "a8_ack07_e4_count": int(ack07["report"]["e4_usb_out_attempted"]),
+        "a8_ack01_valid_response_e4_count": happy_e4_counts[0x01],
+        "a8_ack07_valid_response_e4_count": happy_e4_counts[0x07],
+        "a8_ack07_response_timeout_e4_count": int(
+            ack07_timeout["report"]["e4_usb_out_attempted"]
+        ),
+        "a8_ack07_response_malformed_e4_count": int(
+            ack07_malformed["report"]["e4_usb_out_attempted"]
+        ),
+        "a8_ack07_wrong_control_e4_count": int(
+            ack07_wrong_control["report"]["e4_usb_out_attempted"]
+        ),
+        "a8_ack07_fw12508_e4_count": mismatch_cases[(0x07, "12508")],
+        "a8_ack07_fw12510_e4_count": mismatch_cases[(0x07, "12510")],
+        "a8_ack01_fw_mismatch_e4_count": mismatch_cases[(0x01, "12508")],
+        "other_ack_status_second_in_count": other_in_count - 1,
+        "other_ack_status_e4_count": int(
+            other_ack["report"]["e4_usb_out_attempted"]
+        ),
+        "a8_ack07_valid_response_extra_frame_e4_count": int(
+            ack07_extra["report"]["e4_usb_out_attempted"]
+        ),
         "a8_out_timeout_e4_count": int(out_timeout["report"]["e4_usb_out_attempted"]),
         "a8_in_timeout_e4_count": int(in_timeout["report"]["e4_usb_out_attempted"]),
         "e4_timeout_direction": "IN_AFTER_COMPLETED_OUT",

@@ -31,7 +31,7 @@
      def revalidate_identity(self) -> None:
          handle = self._require_open()
          if self._api.identity(handle) != self._baseline:
-@@ -883,14 +891,162 @@
+@@ -883,14 +891,160 @@
          self.openssl_want_read_count = 0
          self.openssl_want_write_count = 0
          self.openssl_fatal_error_observed = False
@@ -97,16 +97,14 @@
 +                self.a8_failure_class = "unexpected_ack"
 +                raise ReplayAbort(AbortClass.UNEXPECTED_ACK)
 +            self.a8_ack_status = typed_ack.body[1]
-+            if self.a8_ack_status == 0x07:
-+                self.a8_usb_in_result = "ack07_terminal"
-+                self.a8_failure_class = "ack07_response_not_authorized"
-+                if self.transport.buffered_rx_bytes:
-+                    self.a8_failure_class = "stale_or_unowned_frame"
-+                    raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
-+                raise ReplayAbort(AbortClass.UNEXPECTED_ACK)
-+            if self.a8_ack_status != 0x01:
++            if self.a8_ack_status not in (0x01, 0x07):
 +                self.a8_failure_class = "unsupported_ack_status"
 +                raise ReplayAbort(AbortClass.UNEXPECTED_ACK)
++            if self.a8_ack_status == 0x07:
++                self.a8_usb_in_result = "ack07_response_authorized"
++            # Status 0x01 and 0x07 are empirically distinct but both authorize
++            # exactly one bounded A8 response read. Their nominal meaning is
++            # unknown; neither status authorizes retry or continuation alone.
 +
 +            response = self.transport.read_frame(timeout_ms)
 +            responses.append(bytes(response))
@@ -194,7 +192,7 @@
          self.last_attempted_phase = phase_id
          self.last_failure_domain = "none"
          responses: list[bytes] = []
-@@ -903,11 +1059,21 @@
+@@ -903,11 +1057,21 @@
                  self.transport.transport_open()
                  self._opened = True
              self.transport.revalidate_identity()
@@ -216,7 +214,7 @@
              self.transport.revalidate_identity()
              if phase_id == "D1":
                  if self._pending_first_b0 is not None or len(responses) != 1:
-@@ -929,12 +1095,27 @@
+@@ -929,12 +1093,27 @@
                      raise
          except UsbTimeout as exc:
              self.last_failure_domain = "usb_transport"
@@ -244,7 +242,7 @@
              raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
          finally:
              self.protocol_observations.append(
-@@ -1317,6 +1498,22 @@
+@@ -1317,6 +1496,22 @@
          "tls_trace_redacted": (
              list(backend.tls_trace_redacted) if backend is not None else []
          ),
@@ -267,7 +265,7 @@
          "server_flight_b0_frame_count": (
              backend.server_flight_b0_frame_count if backend is not None else 0
          ),
-@@ -1376,6 +1573,54 @@
+@@ -1376,6 +1571,54 @@
          "protocol_observations": (
              list(backend.protocol_observations) if backend is not None else []
          ),
@@ -386,7 +384,7 @@
 +        D245_A8_INITIALIZER_STATUS="NOT_PROVEN",
 +        D245_A8_CAUSAL_ROLE="PRECONDITION_OBSERVED_BEFORE_SUCCESSFUL_E4_NOT_DEVICE_INITIALIZATION_PROVEN",
 +        D245_A8_REQUIRED_FOR_E4_IN_THIS_KIT=True,
-+        D245_A8_ACK01_REQUIRED_TO_CONTINUE=True,
++        D245_A8_ACK_RESPONSE_AUTHORIZING_STATUSES="01,07",
 +        D245_A8_FW12509_REQUIRED_TO_CONTINUE=True,
 +        D245_A0_TRANSPORT="D241_SHORT_OUT",
 +        D245_B0_TRANSPORT="D242_FIXED64",

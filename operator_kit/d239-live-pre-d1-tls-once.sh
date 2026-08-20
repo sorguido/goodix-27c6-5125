@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly EXPECTED_REPOSITORY="$(git -C "$(dirname -- "${BASH_SOURCE[0]}")/.." rev-parse --show-toplevel)"
+readonly EXPECTED_REPOSITORY="/home/guido/Repository/goodix-27c6-5125"
 readonly AUTHORIZATION_ARGUMENT="--i-authorize-one-d239-live-attempt"
 readonly DRY_RUN_ARGUMENT="--offline-dry-run-pre-usb"
 readonly AUTHORIZATION_MARKER="/var/lib/goodix-5125-poc/d238-operator-invocation.marker"

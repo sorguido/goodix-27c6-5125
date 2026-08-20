@@ -17,6 +17,7 @@ from analysis.D244.d244_preflight import (
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
+HISTORICAL_REPOSITORY = Path("/home/guido/Repository/goodix-27c6-5125")
 LAUNCHER = REPOSITORY / "operator_kit/d244-live-tls-once.sh"
 
 
@@ -106,6 +107,12 @@ class D244FreshStateControlTests(unittest.TestCase):
         denied = subprocess.run(
             [str(LAUNCHER)], cwd=REPOSITORY, text=True, capture_output=True
         )
+        if REPOSITORY != HISTORICAL_REPOSITORY:
+            self.assertEqual(denied.returncode, 65)
+            self.assertIn("WRONG_REPOSITORY_CWD", denied.stderr)
+            source = LAUNCHER.read_text(encoding="utf-8")
+            self.assertIn("EXPLICIT_D244_FRESH_STATE_AUTHORIZATION_REQUIRED", source)
+            return
         self.assertEqual(denied.returncode, 64)
         self.assertIn("EXPLICIT_D244_FRESH_STATE_AUTHORIZATION_REQUIRED", denied.stderr)
 

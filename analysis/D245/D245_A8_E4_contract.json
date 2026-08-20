@@ -1,5 +1,5 @@
 {
-  "schema": "d245-a8-e4-contract-v1",
+  "schema": "d245-a8-e4-contract-v2",
   "repository_root": "/home/guido/Repository/goodix-27c6-5125_private",
   "provenance": {
     "D245_D179_PRIMARY_RUNTIME_ARTIFACTS_STATUS": "PURGED_UNAVAILABLE_IN_CURRENT_REPOSITORY",
@@ -21,13 +21,24 @@
     "transport": "A0_D241_SHORT_OUT",
     "ack_control": 176,
     "ack_echo": 168,
-    "continue_status": 1,
-    "terminal_status_without_response": 7,
+    "response_authorizing_statuses": [1, 7],
+    "response_reads_after_authorized_ack": 1,
+    "other_status_policy": "FAIL_CLOSED_WITHOUT_SECOND_RESPONSE_READ",
+    "status_classification": {
+      "1": "UNKNOWN_STATUS_CLASS_01_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE",
+      "7": "UNKNOWN_STATUS_CLASS_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE"
+    },
     "response_control": 168,
     "response_body_hex": "47465f53543431315345435f4150505f313235303900",
     "response_text": "GF_ST411SEC_APP_12509",
     "trailing_frame_policy": "FORBIDDEN",
     "retry_count": 0
+  },
+  "final_state": {
+    "D245_A8_ACK_RESPONSE_AUTHORIZING_STATUSES": "01,07",
+    "D245_A8_RESPONSE_REQUIRED_TO_CONTINUE": true,
+    "D245_A8_FW12509_REQUIRED_TO_CONTINUE": true,
+    "D245_A8_INITIALIZER_STATUS": "NOT_PROVEN"
   },
   "e4": {
     "request_hex": "a00c00ace40900030002bb00000000fd",

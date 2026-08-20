@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
 
 
@@ -25,6 +26,38 @@ INPUT_ARTIFACTS = (
     "analysis/D245/D245_A8_E4_contract.json",
     "analysis/D245/D245_live_unseal.patch",
     "analysis/D245/d245_runtime_matrix.py",
+)
+HISTORICAL_LAUNCHERS = (
+    (
+        "operator_kit/d239-live-pre-d1-tls-once.sh",
+        "D239_operator_kit_executability_gate_bundle.zip",
+        "operator_kit/d239-live-pre-d1-tls-once.sh",
+        "74bfd0a556d947eaa1bca600e832521c4018fb9dfd923a502ea000e2bb3aad15",
+    ),
+    (
+        "operator_kit/d241-live-tls-once.sh",
+        "analysis/D241/D241_d1_direct_b0_tls_transition_bundle.zip",
+        "operator_kit/d241-live-tls-once.sh",
+        "e30bcfa9e2962c5947a93013d6312c2c01bf1f2d5a20a4f20d110ac1610611f9",
+    ),
+    (
+        "operator_kit/d242-live-tls-once.sh",
+        "analysis/D242/D242_post_server_flight_causal_differential_bundle.zip",
+        "operator_kit/d242-live-tls-once.sh",
+        "0e52c549725d02663d06a24f90c55a1f6dbd7e1accf4f5cf251558c94fa8906e",
+    ),
+    (
+        "operator_kit/d243-live-tls-once.sh",
+        "analysis/D243/D243_a0_b0_transport_split_regression_bundle.zip",
+        "operator_kit/d243-live-tls-once.sh",
+        "cc5a077bb2cb001618d5acb3312305107ffb2fd82c4de874e2f4b8f17bc13713",
+    ),
+    (
+        "operator_kit/d244-live-tls-once.sh",
+        "analysis/D244/D244_e4_timeout_forensic_fresh_state_control_bundle.zip",
+        "operator_kit/d244-live-tls-once.sh",
+        "bd2701c27c5f2ed61a450bcd964d9ccd6d993c466759ed4da1e6e52b3a41bc10",
+    ),
 )
 
 
@@ -117,6 +150,36 @@ def artifact_sha256() -> dict[str, str]:
     return {relative: sha256(REPOSITORY / relative) for relative in INPUT_ARTIFACTS}
 
 
+def verify_historical_launcher_integrity() -> dict[str, object]:
+    rows = []
+    for root_path, bundle_path, member, expected in HISTORICAL_LAUNCHERS:
+        with zipfile.ZipFile(REPOSITORY / bundle_path) as archive:
+            canonical = archive.read(member)
+        canonical_sha256 = hashlib.sha256(canonical).hexdigest()
+        root_bytes = (REPOSITORY / root_path).read_bytes()
+        rows.append(
+            {
+                "path": root_path,
+                "canonical_bundle": bundle_path,
+                "canonical_sha256": canonical_sha256,
+                "root_sha256": hashlib.sha256(root_bytes).hexdigest(),
+                "status": (
+                    "MATCH"
+                    if canonical_sha256 == expected and root_bytes == canonical
+                    else "MISMATCH"
+                ),
+            }
+        )
+    mutation_count = sum(row["status"] != "MATCH" for row in rows)
+    if mutation_count:
+        raise AssertionError("D245_BLOCKED_BY_HISTORICAL_LAUNCHER_INTEGRITY")
+    return {
+        "D245_HISTORICAL_LAUNCHER_INTEGRITY": "RESTORED",
+        "D245_HISTORICAL_LAUNCHER_MUTATION_COUNT": mutation_count,
+        "files": rows,
+    }
+
+
 def run(report_path: Path | None = None) -> dict[str, object]:
     baseline = verify_sealed_baseline()
     if baseline["D245_SEALED_BASELINE_AFTER_RENAME_STATUS"] != "MATCH":
@@ -125,6 +188,7 @@ def run(report_path: Path | None = None) -> dict[str, object]:
     if contract["provenance"]["D245_A8_CURRENT_LOCAL_CORPUS_CORROBORATION"] != "PASS":
         raise AssertionError("D245_BLOCKED_BY_A8_CURRENT_CORPUS_CORROBORATION")
     closure = verify_unseal_runtime_reseal()
+    historical_launchers = verify_historical_launcher_integrity()
     d244 = json.loads(
         (REPOSITORY / "analysis/D244/D244_operator_live_stdout.json").read_text(encoding="utf-8")
     )
@@ -137,12 +201,20 @@ def run(report_path: Path | None = None) -> dict[str, object]:
     ):
         raise AssertionError("D245 D244 live ingest mismatch")
     report = {
-        "schema": "d245-executable-closure-v1",
+        "schema": "d245-executable-closure-v2",
         "status": "PASS",
         "repository_root": str(REPOSITORY),
         "artifact_sha256": artifact_sha256(),
         "sealed_baseline": baseline,
         "unseal_runtime_reseal": closure,
+        "historical_launcher_integrity": historical_launchers,
+        "D245_HISTORICAL_LAUNCHER_INTEGRITY": historical_launchers[
+            "D245_HISTORICAL_LAUNCHER_INTEGRITY"
+        ],
+        "D245_HISTORICAL_LAUNCHER_MUTATION_COUNT": historical_launchers[
+            "D245_HISTORICAL_LAUNCHER_MUTATION_COUNT"
+        ],
+        "D245_LIVE_BASELINE_APPROVAL_STATUS": "LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW",
         "D245_D244_LIVE_RESULT_INGESTED": True,
         "D245_D244_E4_OUT_COMPLETED": True,
         "D245_D244_E4_IN_TIMEOUT": True,

@@ -17,6 +17,13 @@ Il record storico canonico D179 conserva la sequenza target-live
 E4_RESPONSE_IN → E4_COMPLETE`, con 2 OUT, 4 IN, zero retry e cleanup unico.
 Non viene riclassificato come evidenza primaria locale verificata.
 
+La policy ACK non si deduce dal solo D179. I record storici canonici D43 e D175
+mostrano rispettivamente `B0/A8/01 → A8/17 → GF_ST411SEC_APP_12509\0` e
+`B0/A8/07 → A8/17 → GF_ST411SEC_APP_12509\0`. D175 falsifica quindi la
+precedente reintroduzione D245 di ACK07 come stato terminale senza response.
+Questa provenance resta storica: gli artifact primari D43/D175 non vengono
+presentati come nuovamente verificati nel corpus locale corrente.
+
 ## Corroborazione locale corrente D230
 
 Le fonti correnti forniscono una corroborazione indipendente sufficiente:
@@ -46,10 +53,16 @@ D245_A8_E4_PRECONDITION_EVIDENCE=HISTORICAL_LIVE_RECORD_CANONICALLY_PRESERVED_AN
 
 Il contratto è ristretto:
 
-- `B0/A8/01`: autorizza una sola response tipizzata A8;
-- `B0/A8/07`: ACK strutturalmente valido ma non autorizza la response né E4;
-- altro status, echo, wrapper, checksum, frame count o ordine: stop fail-closed;
+- `B0/A8/01` e `B0/A8/07`: classi ACK empiricamente distinte che autorizzano
+  entrambe esattamente una bounded response read tipizzata A8;
+- la semantica nominale interna di `0x01` e `0x07` resta ignota; `0x07` è
+  `UNKNOWN_STATUS_CLASS_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE`, non failure,
+  busy, not-ready, terminal o response-not-authorized;
+- altro status: stop fail-closed senza seconda response read;
+- echo, wrapper, checksum, frame count o ordine invalido: stop fail-closed;
 - `A8_COMPLETE` è obbligatorio prima di `E4_OUT`;
+- per entrambi gli status, `A8_COMPLETE` richiede A0/A8 con body esatto
+  `GF_ST411SEC_APP_12509\0`;
 - qualunque byte residuo dopo ACK+response è un frame stale/unowned e blocca E4.
 
 Il transport restituisce oggetti `bytes` separati e conserva il buffer di

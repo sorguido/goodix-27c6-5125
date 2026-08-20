@@ -25,10 +25,11 @@ e nuova accensione: il controllo host è valido, l'OUT E4 è completato, ma il
 bulk IN va ancora in timeout. Questo falsifica il fresh boot host come
 condizione sufficiente di recupero; non prova però un power-cycle elettrico del
 sensore, perché il laptop ha batteria interna. D245 prepara offline il solo
-prossimo tentativo informativo: query A8 read-only una volta, E4 una volta e,
-solo dopo firmware 12509 e binding E4 `match`, continuazione del pre-D1 e TLS
-già revisionati, con stop prima di D4. Il repository non autorizza da solo
-operazioni live.
+prossimo tentativo informativo: query A8 read-only una volta, una bounded A8
+response read dopo ACK echo A8 status `0x01` oppure `0x07`, E4 una volta e,
+solo dopo response esatta firmware 12509 e binding E4 `match`, continuazione
+del pre-D1 e TLS già revisionati, con stop prima di D4. Il repository non
+autorizza da solo operazioni live.
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
@@ -48,7 +49,7 @@ operazioni live.
 | Run live D242 | fail-closed al primo E4 | OUT E4 completato, bulk IN in timeout senza frame completo; binding/TLS/pacing non raggiunti; cleanup/restore/reseal riusciti |
 | Run live D243 | fail-closed al primo E4 | A0 corto ripristinato; OUT E4 completato e stesso timeout bulk IN; zero binding/TLS/retry; cleanup/restore/reseal riusciti |
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
-| Kit D245 A8→E4→TLS | PASS offline, source-sealed | A8 read-only byte-pinned e firmware 12509 obbligatori prima di E4; continuazione pre-D1/TLS invariata; stop prima di D4; non eseguito live |
+| Kit D245 A8→E4→TLS | PASS offline, source-sealed | ACK A8 `01`/`07` autorizzano una bounded response; A0/A8 firmware 12509 esatto obbligatorio prima di E4; continuazione invariata; non eseguito live |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -281,9 +282,10 @@ D244 -> evidenze D242/D243 verificate, timeout localizzato su bulk IN dopo OUT
      -> successiva run fresh-host valida: E4 OUT completato, bulk IN timeout
      -> fresh host boot falsificato come condizione sufficiente; power loss sensore non provata
 D245 -> record storico canonico D179 A8→E4 + corroborazione locale D230
-     -> A8 read-only una volta, poi E4 e continuazione pre-D1/TLS solo su gate completi
+     -> D43 ACK01 e D175 ACK07 seguiti dalla stessa response 12509: vecchia policy ACK07 terminale falsificata
+     -> A8 read-only una volta; ACK01/07 autorizzano una response bounded; poi E4 solo su FW12509 esatto
      -> closure offline PASS; READY_NOT_EXECUTED; zero retry e stop prima di D4
-     -> bundle precedente a112fe2b...56df20 SUPERSEDED / DO_NOT_USE_FOR_LIVE_AUTHORIZATION
+     -> bundle 9813878a...569f precedente alla correzione ACK07 SUPERSEDED / DO_NOT_USE_FOR_LIVE_AUTHORIZATION
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -956,6 +958,21 @@ E4 ACK      a00600a6b00300e40112        status 01
 E4 response status 0, selector bb020003, validator 32 byte corretto
 ```
 
+La policy di response A8 è determinata anche dai record storici D43 e D175:
+
+```text
+D43:  A8 -> B0/A8/01 -> A8/17 -> GF_ST411SEC_APP_12509\0
+D175: A8 -> B0/A8/07 -> A8/17 -> GF_ST411SEC_APP_12509\0
+```
+
+D175 falsifica la policy erroneamente reintrodotta nella prima closure D245,
+secondo cui ACK07 sarebbe stato terminale senza response. `0x01` e `0x07` sono
+classi ACK empiricamente distinte; entrambe autorizzano esattamente una bounded
+A8 response read. La semantica nominale interna di entrambe resta ignota. In
+particolare, `0x07` è classificato
+`UNKNOWN_STATUS_CLASS_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE`, non failure,
+busy, not-ready, terminal o response-not-authorized.
+
 Gli artifact runtime primari D179 sono stati bonificati e non sono più nel
 repository corrente: il record è
 `CANONICAL_HISTORICAL_LIVE_RECORD_PRIMARY_RUNTIME_ARTIFACTS_PURGED`, non
@@ -974,9 +991,12 @@ D245_A8_CAUSAL_ROLE=PRECONDITION_OBSERVED_BEFORE_SUCCESSFUL_E4_NOT_DEVICE_INITIA
 ```
 
 A8 non è quindi chiamata initializer, reset o wake. D245 richiede wrapper e
-checksum validi, ACK echo A8 status `01`, response esatta 12509 e nessun frame
-stale/unowned prima di E4. ACK A8 `07`, timeout, status diverso, mismatch
-12508/12510, frame malformed o ordine diverso fermano la run con E4 count zero.
+checksum validi; ACK echo A8 status `01` oppure `07` autorizza esattamente una
+response read. Per entrambi gli status, `A8_COMPLETE` richiede A0 control A8 e
+body esatto `GF_ST411SEC_APP_12509\0`, senza frame trailing/unowned. Timeout,
+response malformed, control errato, mismatch 12508/12510 o frame extra fermano
+la run con E4 count zero e zero retry. Uno status diverso da `01|07` ferma la
+run senza una seconda IN e sempre con E4 count zero.
 
 Solo dopo A8 completo, E4 canonico e binding `match`, lo stesso backend continua
 `A2→82→A6→A2→70→80x4→90→D1→TLS`. A0 conserva gli OUT corti D241; il server
@@ -988,6 +1008,26 @@ restano irraggiungibili. Il launcher usa il marker
 verifica gli hash sealed dopo il rename. Gli hash correnti backend/entrypoint
 coincidono con D243/D244; la closure applica e inverte la patch senza offset e
 prova il dry-run production-shaped senza USB reale.
+
+La correzione governance v2.1 non auto-approva una baseline live. L'eventuale
+commit SHA del live-critical set D245 deve essere designato dopo review
+dall'Utente/AI PM; lo stato corrente è
+`LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW`, che non blocca la closure offline.
+I pin correnti di backend, entrypoint, core, patch unseal e preflight proteggono
+ancora il percorso live/source-sealing; i pin di audit, contratto, runtime
+matrix, closure runner, report storico e test sono governance/closure. D245 non
+estende il pinning e non lo ridisegna opportunisticamente.
+
+I launcher D239–D244 sono stati confrontati con i rispettivi bundle storici e
+ripristinati byte-per-byte alla versione canonica, incluse le loro assunzioni
+di location storiche. Solo `d245-live-tls-once.sh` resta robusto al rename della
+root. I test correnti trattano l'eventuale stop per vecchia location come
+comportamento storico atteso, senza mutare i launcher:
+
+```text
+D245_HISTORICAL_LAUNCHER_INTEGRITY=RESTORED
+D245_HISTORICAL_LAUNCHER_MUTATION_COUNT=0
+```
 
 D4, application data, FDT, capture, enroll, reset/power-cycle e recovery
 invasiva automatica restano irraggiungibili o vietati. D240 è obsoleto e non è
@@ -1058,8 +1098,9 @@ pre-E4 concreta nel differenziale D241↔D243; la sua run live aggiunge che un
 fresh host boot non recupera da solo E4 e non prova la perdita elettrica del
 sensore. Il nuovo critical boundary è la precondizione live-proven ma non
 causalmente interpretata `A8_COMPLETE → E4_OUT`: una futura run D245 può
-eseguire A8 read-only una sola volta e continuare solo con ACK01 e firmware
-12509 esatto. Se anche E4 produce binding `match`, la stessa run prosegue lungo
+eseguire A8 read-only una sola volta; ACK01 e ACK07 autorizzano entrambi una
+sola bounded response read, ma la continuazione richiede A0/A8 con firmware
+12509 esatto e nessun frame residuo. Se anche E4 produce binding `match`, la stessa run prosegue lungo
 il pre-D1 già provato e il server flight B0 fixed-64 con pacing 10 ms, quindi si
 ferma subito al completamento TLS e sempre prima di D4. Il repository resta
 source-sealed; solo il kit D245 con closure PASS può applicare temporaneamente

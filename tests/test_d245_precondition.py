@@ -8,6 +8,7 @@ from pathlib import Path
 
 from analysis.D245.d245_operator_dry_run import (
     run,
+    verify_historical_launcher_integrity,
     verify_sealed_baseline,
     verify_unseal_runtime_reseal,
 )
@@ -39,6 +40,13 @@ class D245PreconditionClosureTests(unittest.TestCase):
             contract["epistemic_classification"]["D245_A8_INITIALIZER_STATUS"],
             "NOT_PROVEN",
         )
+        self.assertEqual(contract["a8"]["response_authorizing_statuses"], [1, 7])
+        self.assertEqual(contract["a8"]["response_reads_after_authorized_ack"], 1)
+        self.assertEqual(
+            contract["a8"]["other_status_policy"],
+            "FAIL_CLOSED_WITHOUT_SECOND_RESPONSE_READ",
+        )
+        self.assertNotIn("terminal_status_without_response", contract["a8"])
         frame = bytes.fromhex(contract["a8"]["request_hex"])
         self.assertEqual(frame.hex(), "a00600a6a803000000ff")
         self.assertEqual(len(frame), 10)
@@ -55,8 +63,24 @@ class D245PreconditionClosureTests(unittest.TestCase):
         self.assertEqual(closure["sealed_sha256"], closure["final_sealed_sha256"])
         matrix = closure["runtime_matrix"]
         self.assertEqual(matrix["status"], "PASS")
-        self.assertEqual(matrix["happy_cases"], ["E4_ACK_01_PASS", "E4_ACK_07_PASS"])
-        self.assertEqual(matrix["a8_ack07_e4_count"], 0)
+        self.assertEqual(
+            matrix["happy_cases"],
+            [
+                "A8_ACK_01_VALID_RESPONSE_PASS",
+                "A8_ACK_07_VALID_RESPONSE_PASS",
+            ],
+        )
+        self.assertEqual(matrix["a8_ack01_valid_response_e4_count"], 1)
+        self.assertEqual(matrix["a8_ack07_valid_response_e4_count"], 1)
+        self.assertEqual(matrix["a8_ack07_response_timeout_e4_count"], 0)
+        self.assertEqual(matrix["a8_ack07_response_malformed_e4_count"], 0)
+        self.assertEqual(matrix["a8_ack07_wrong_control_e4_count"], 0)
+        self.assertEqual(matrix["a8_ack07_fw12508_e4_count"], 0)
+        self.assertEqual(matrix["a8_ack07_fw12510_e4_count"], 0)
+        self.assertEqual(matrix["a8_ack01_fw_mismatch_e4_count"], 0)
+        self.assertEqual(matrix["other_ack_status_second_in_count"], 0)
+        self.assertEqual(matrix["other_ack_status_e4_count"], 0)
+        self.assertEqual(matrix["a8_ack07_valid_response_extra_frame_e4_count"], 0)
         self.assertEqual(matrix["a8_out_timeout_e4_count"], 0)
         self.assertEqual(matrix["a8_in_timeout_e4_count"], 0)
         self.assertEqual(matrix["server_flight_usb_chunk_lengths"], [64, 64, 64])
@@ -76,6 +100,19 @@ class D245PreconditionClosureTests(unittest.TestCase):
         self.assertEqual(report["D245_EXECUTABLE_CLOSURE_GATE"], "PASS")
         self.assertEqual(report["live_usb_execution"], "NOT_PERFORMED")
         self.assertEqual(report["real_tls_handshake"], 0)
+        self.assertEqual(report["D245_HISTORICAL_LAUNCHER_INTEGRITY"], "RESTORED")
+        self.assertEqual(report["D245_HISTORICAL_LAUNCHER_MUTATION_COUNT"], 0)
+        self.assertEqual(
+            report["D245_LIVE_BASELINE_APPROVAL_STATUS"],
+            "LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW",
+        )
+
+    def test_historical_launchers_match_their_canonical_bundles_byte_exactly(self):
+        integrity = verify_historical_launcher_integrity()
+        self.assertEqual(integrity["D245_HISTORICAL_LAUNCHER_INTEGRITY"], "RESTORED")
+        self.assertEqual(integrity["D245_HISTORICAL_LAUNCHER_MUTATION_COUNT"], 0)
+        self.assertEqual(len(integrity["files"]), 5)
+        self.assertTrue(all(row["status"] == "MATCH" for row in integrity["files"]))
 
     def test_fprintd_initial_state_is_not_a_sufficient_explanation(self):
         expected = {

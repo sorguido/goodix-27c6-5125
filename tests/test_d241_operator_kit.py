@@ -20,6 +20,7 @@ from src.goodix5125_d235_entrypoint import ProductionRuntimePaths
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
+HISTORICAL_REPOSITORY = Path("/home/guido/Repository/goodix-27c6-5125")
 LAUNCHER = REPOSITORY / "operator_kit/d241-live-tls-once.sh"
 CLOSURE_REPORT = REPOSITORY / "analysis/D241/D241_executable_closure_report.json"
 
@@ -98,6 +99,10 @@ class D241OperatorPreflightTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
+        if REPOSITORY != HISTORICAL_REPOSITORY:
+            self.assertEqual(result.returncode, 65, result.stderr)
+            self.assertIn("WRONG_REPOSITORY_CWD", result.stderr)
+            return
         self.assertEqual(result.returncode, 68, result.stderr)
         self.assertIn("D241_SEALED_BACKEND_HASH_MISMATCH", result.stderr)
 

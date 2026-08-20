@@ -30,7 +30,8 @@ D245_A8_FRAME_MATCH=true
 D245_E4_FRAME_MATCH=true
 
 D245_A8_REQUIRED_FOR_E4_IN_THIS_KIT=true
-D245_A8_ACK01_REQUIRED_TO_CONTINUE=true
+D245_A8_ACK_RESPONSE_AUTHORIZING_STATUSES=01,07
+D245_A8_RESPONSE_REQUIRED_TO_CONTINUE=true
 D245_A8_FW12509_REQUIRED_TO_CONTINUE=true
 
 D245_A0_TRANSPORT=D241_SHORT_OUT
@@ -45,23 +46,34 @@ D245_OPERATOR_KIT_CREATED=true
 D245_EXECUTABLE_CLOSURE_GATE=PASS
 D245_MANUAL_UPDATED=true
 
+D245_HISTORICAL_LAUNCHER_INTEGRITY=RESTORED
+D245_HISTORICAL_LAUNCHER_MUTATION_COUNT=0
+
+D245_LIVE_BASELINE_APPROVAL_STATUS=LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW
+
 D245_REAL_USB_ACCESS_DURING_CODEX=0
 D245_REAL_TLS_HANDSHAKE_DURING_CODEX=0
 
 D245_BUNDLE_PATH=analysis/D245/D245_a8_e4_precondition_tls_continuation_bundle.zip
-D245_BUNDLE_SHA256=9813878a256a9b5afa9631c064fd8cc21486376a8bba327881b1d7dae0ce569f
+D245_BUNDLE_SHA256=SEE_EXTERNAL_SIDECAR
 
 D245_DECISION=D245_A8_E4_PRECONDITION_TLS_CONTINUATION_READY_NOT_EXECUTED
 ```
 
 La root reale usata è
-`/home/guido/Repository/goodix-27c6-5125_private`; il launcher la risolve dal
-proprio path/Git e non dipende dal basename. La suite completa passa con 130
-test e il dry-run del launcher passa senza sudo, USB o TLS reali. La patch D245
-si applica/inverte senza offset e le sorgenti finali restano sealed con gli hash
-D243/D244 canonici.
+`/home/guido/Repository/goodix-27c6-5125_private`; il launcher D245 la risolve
+dal proprio path/Git e non dipende dal basename. La suite completa passa con
+131 test e il dry-run del launcher passa senza sudo, USB o TLS reali. La patch
+D245 si applica/inverte senza offset e le sorgenti finali restano sealed con gli
+hash D243/D244 canonici. I launcher D239–D244 coincidono byte-per-byte con i
+rispettivi bundle storici; soltanto il test harness gestisce le loro location
+assumption non più correnti.
 
-Lo ZIP contiene 18 file step-local, supera `unzip -t` e non include report live
-storici, D230 raw/proprietario, secret, config90 raw, payload USB/TLS raw o dati
-biometrici. Il final report e questo sidecar restano esterni allo ZIP per evitare
-auto-riferimenti del digest.
+ACK echo A8 `0x01` e `0x07` autorizzano entrambi esattamente una bounded A8
+response read. Solo A0/A8 con body esatto `GF_ST411SEC_APP_12509\0` produce
+`A8_COMPLETE` e consente E4. La semantica nominale dei due status resta ignota;
+ACK07 è `UNKNOWN_STATUS_CLASS_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE`.
+
+Lo ZIP corretto è step-local e non include report live storici, D230
+raw/proprietario, secret, config90 raw, payload USB/TLS raw o dati biometrici.
+Il digest definitivo resta nel sidecar esterno per evitare auto-riferimenti.
