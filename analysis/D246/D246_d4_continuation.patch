@@ -1,0 +1,280 @@
+--- a/src/goodix5125_d233_backend.py
++++ b/src/goodix5125_d233_backend.py
+@@ -63,6 +63,10 @@
+ A8_FIRMWARE_QUERY_PHASE = "A8_FIRMWARE_QUERY"
+ A8_CANONICAL_REQUEST = bytes.fromhex("a00600a6a803000000ff")
+ A8_TARGET_RESPONSE_BODY = b"GF_ST411SEC_APP_12509\x00"
++D4_PHASE = "D4"
++D4_CANONICAL_REQUEST = bytes.fromhex("a00600a6d403000000d3")
++D4_POST_TLS_PACING_MS = 20
++D4_TIMEOUT_MS = 200
+ TARGET_CONFIG90_PATH = Path("/var/lib/goodix-5125-poc/target-config-90.bin")
+ TARGET_CONFIG90_SHA256 = "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82"
+ PRODUCTION_CANDIDATE_SCHEMA = "d233-production-candidate-run-report-v1"
+@@ -320,7 +324,9 @@
+             raise UsbTimeout("transport deadline")
+         return remaining
+ 
+-    def write_frame(self, frame: bytes, timeout_ms: int) -> None:
++    def write_frame(
++        self, frame: bytes, timeout_ms: int, *, fixed64_a0_d4: bool = False
++    ) -> None:
+         handle = self._require_open()
+         frame = bytes(frame)
+         if not frame or len(frame) > USB_MAX_FRAME:
+@@ -332,6 +338,8 @@
+             raise UsbFailure("A0/B0 declared length mismatch")
+         if frame[3] != (frame[0] + frame[1] + frame[2]) & 0xFF:
+             raise UsbFailure("malformed A0/B0 tag")
++        if fixed64_a0_d4 and frame != D4_CANONICAL_REQUEST:
++            raise UsbFailure("fixed-64 A0 is restricted to canonical D4")
+         deadline = time.monotonic() + timeout_ms / 1000
+         for offset in range(0, len(frame), USB_MAX_PACKET):
+             chunk = frame[offset : offset + USB_MAX_PACKET]
+@@ -341,7 +349,7 @@
+             # result awaiting live confirmation.
+             wire_chunk = (
+                 chunk.ljust(USB_MAX_PACKET, b"\x00")
+-                if frame[0] == 0xB0
++                if frame[0] == 0xB0 or fixed64_a0_d4
+                 else chunk
+             )
+             self.bulk_out_submit_count += 1
+@@ -859,14 +867,17 @@
+         *,
+         tls_factory: Callable[[SecretBuffer], Tls12PskServer] = Tls12PskServer,
+         tls_pacer: Callable[[float], None] = time.sleep,
++        d4_pacer: Callable[[float], None] = time.sleep,
+     ):
+         self.transport = transport
+         self.secret = secret
+         self.binder = binder
+         self.tls_factory = tls_factory
+         self.tls_pacer = tls_pacer
++        self.d4_pacer = d4_pacer
+         self.exchange_count = 0
+         self.tls_handshake_count = 0
++        self.tls_cryptographic_handshake_completed = False
+         self.cleanup_count = 0
+         self._phase_index = 0
+         self._opened = False
+@@ -908,6 +919,12 @@
+         self.e4_usb_out_result = "not_attempted"
+         self.e4_usb_in_attempted = False
+         self.e4_usb_in_result = "not_attempted"
++        self._d4_complete = False
++        self.d4_send_count = 0
++        self.d4_ack_status: int | None = None
++        self.d4_failure_class = "not_reached"
++        self.d4_pacing_count = 0
++        self.d4_response_count = 0
+ 
+     @property
+     def usb_open_count(self) -> int:
+@@ -1124,6 +1141,83 @@
+         self._phase_index += 1
+         return tuple(responses)
+ 
++    def _exchange_d4_after_tls(self) -> None:
++        """Send the one capture-proven volatile D4 session transition."""
++        if (
++            self._d4_complete
++            or self.d4_send_count
++            or self.tls_handshake_count != 1
++            or self._phase_index != len(EXACT_PHASE_ORDER) - 1
++            or self.transport.buffered_rx_bytes
++        ):
++            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
++        parsed_request = parse_a0(D4_CANONICAL_REQUEST)
++        if parsed_request.control != 0xD4 or parsed_request.body != b"\x00\x00":
++            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
++        self.last_attempted_phase = D4_PHASE
++        self.last_failure_domain = "none"
++        completion_ids: tuple[int, ...] = ()
++        try:
++            self.d4_pacer(D4_POST_TLS_PACING_MS / 1000)
++            self.d4_pacing_count = 1
++            self.transport.revalidate_identity()
++            self.transport.write_frame(
++                D4_CANONICAL_REQUEST,
++                D4_TIMEOUT_MS,
++                fixed64_a0_d4=True,
++            )
++            self.d4_send_count = 1
++            self.exchange_count += 1
++            ack = self.transport.read_frame(D4_TIMEOUT_MS)
++            completion_ids = self.transport.last_frame_completion_ids
++            typed_ack = parse_a0(ack)
++            if (
++                typed_ack.control != 0xB0
++                or typed_ack.body != b"\xd4\x01"
++            ):
++                self.d4_failure_class = "unexpected_ack"
++                raise ReplayAbort(AbortClass.UNEXPECTED_ACK)
++            self.d4_ack_status = 0x01
++            if self.transport.buffered_rx_bytes:
++                self.d4_failure_class = "unexpected_trailing_frame"
++                raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
++            self.transport.revalidate_identity()
++            self._d4_complete = True
++            self.d4_failure_class = "none"
++        except UsbTimeout as exc:
++            self.last_failure_domain = "usb_transport"
++            self.d4_failure_class = (
++                "ack_timeout" if self.d4_send_count else "out_timeout"
++            )
++            raise ReplayAbort(AbortClass.TIMEOUT) from exc
++        except UsbAmbiguousCompletion as exc:
++            self.last_failure_domain = "usb_transport"
++            self.d4_failure_class = "ambiguous_usb_completion"
++            raise ReplayAbort(AbortClass.AMBIGUOUS) from exc
++        except (UsbFailure, ContractError) as exc:
++            self.last_failure_domain = "usb_transport"
++            self.d4_failure_class = "usb_or_frame_error"
++            raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
++        finally:
++            self.protocol_observations.append(
++                {
++                    "phase": D4_PHASE,
++                    "request_control": "0xd4",
++                    "request_logical_length": len(D4_CANONICAL_REQUEST),
++                    "request_physical_length": USB_MAX_PACKET,
++                    "ack_status": (
++                        f"0x{self.d4_ack_status:02x}"
++                        if self.d4_ack_status is not None else "none"
++                    ),
++                    "response_body_length": 0,
++                    "completion_classification": (
++                        "single_frame_usb_completion"
++                        if completion_ids else "none"
++                    ),
++                    "terminal_action": "STOP_AFTER_D4",
++                }
++            )
++
+     def tls_handshake(self, client_hello: bytes, secret: SecretBuffer, timeout_ms: int) -> None:
+         self.last_attempted_phase = "TLS"
+         self.last_failure_domain = "none"
+@@ -1179,6 +1273,8 @@
+                     remaining,
+                     deadline=deadline,
+                 )
++            self.tls_cryptographic_handshake_completed = True
++            self._exchange_d4_after_tls()
+             self.tls_failure_class = "none"
+         except UsbTimeout as exc:
+             self.last_failure_domain = "usb_transport"
+@@ -1191,7 +1287,8 @@
+             self.last_failure_domain = "usb_transport"
+             raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+         except ReplayAbort as exc:
+-            self.last_failure_domain = "tls_engine"
++            if self.last_attempted_phase != D4_PHASE:
++                self.last_failure_domain = "tls_engine"
+             if exc.abort_class == AbortClass.TLS_TIMEOUT:
+                 self.tls_failure_class = self._timeout_failure_class(bridge)
+             raise
+@@ -1508,9 +1605,9 @@
+             )
+         ),
+         "tls_handshake_completed": bool(
+-            values.get("result") == "pass"
+-            and backend is not None
++            backend is not None
+             and backend.tls_handshake_count == 1
++            and backend.tls_cryptographic_handshake_completed
+         ),
+         "server_flight_b0_frame_count": (
+             backend.server_flight_b0_frame_count if backend is not None else 0
+@@ -1619,6 +1716,22 @@
+         "e4_usb_in_result": (
+             backend.e4_usb_in_result if backend is not None else "not_attempted"
+         ),
++        "d4_send_count": (
++            backend.d4_send_count if backend is not None else 0
++        ),
++        "d4_ack_status": (
++            backend.d4_ack_status if backend is not None else None
++        ),
++        "d4_failure_class": (
++            backend.d4_failure_class if backend is not None else "not_reached"
++        ),
++        "d4_pacing_count": (
++            backend.d4_pacing_count if backend is not None else 0
++        ),
++        "d4_response_count": (
++            backend.d4_response_count if backend is not None else 0
++        ),
++        "d4_completed": bool(backend is not None and backend._d4_complete),
+         "automatic_invasive_recovery": "forbidden",
+     }
+ 
+--- a/src/goodix5125_d235_entrypoint.py
++++ b/src/goodix5125_d235_entrypoint.py
+@@ -44,7 +44,7 @@
+ D235_LIVE_CAPABILITY = 0
+ D235_LIVE_AUTHORIZATION = "yes"
+ D236_OPERATOR_RISK_ACCEPTANCE = "granted"
+-D235_RESULT_SCHEMA = "d245-live-tls-single-shot-result-v1"
++D235_RESULT_SCHEMA = "d246-live-d4-single-shot-result-v1"
+ D235_OFFLINE_MODE = "injected_offline_entrypoint_review"
+ CANONICAL_GFUSB_SHA256 = (
+     "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+@@ -75,16 +75,16 @@
+     def system_default(cls) -> "ProductionRuntimePaths":
+         repository = Path(__file__).resolve().parents[1]
+         store = Path("/var/lib/goodix-5125-poc")
+-        reports = store / "d245-results"
++        reports = store / "d246-results"
+         return cls(
+             psk_store=store / "transport-material.bin",
+             target_material_manifest=store / "target-material-manifest.json",
+             config90_store=store / "target-config-90.bin",
+             canonical_gfusb=repository / "analysis/D230/work/GoodixExport/gfusb.dll",
+             report_directory=reports,
+-            checkpoint_report=reports / "d245-live-pre-restore.json",
+-            final_report=reports / "d245-live-result.json",
+-            single_use_marker=store / "d245-operator-invocation.marker",
++            checkpoint_report=reports / "d246-live-pre-restore.json",
++            final_report=reports / "d246-live-result.json",
++            single_use_marker=store / "d246-operator-invocation.marker",
+         )
+ 
+     def validate(self) -> None:
+@@ -225,6 +225,7 @@
+     "CONFIG_90": "D236_ABORTED_CONFIG90",
+     "D1": "D236_ABORTED_D1",
+     "TLS": "D236_ABORTED_TLS",
++    "D4": "D246_ABORTED_D4",
+ }
+ 
+ 
+@@ -275,7 +276,7 @@
+         operator_risk_acceptance=policy.operator_risk_acceptance,
+         live_authorization=policy.live_authorization,
+         decision=map_future_live_decision(report),
+-        d4_count=0,
++        d4_count=int(report.get("d4_send_count", 0)),
+         application_data_count=0,
+         persistent_write_family_count=0,
+         retry_count=0,
+@@ -356,6 +357,19 @@
+         D245_RETRY_COUNT=0,
+         D245_D4_REACHABLE=False,
+         D245_APPLICATION_DATA_REACHABLE=False,
++        d246_result=(
++            "D4_EXACTLY_ONCE_STOP_AFTER_D4"
++            if report.get("result") == "pass"
++            and report.get("d4_completed") is True
++            else "D246_ABORTED_FAIL_CLOSED"
++        ),
++        D246_D4_SEMANTIC_CLASS="VOLATILE_SESSION_INITIALIZATION",
++        D246_D4_FACTORY_PRESERVING=True,
++        D246_D4_PHYSICAL_OUT="FIXED64_ZERO_TAIL",
++        D246_D4_ACK_POLICY="EXACT_D4_STATUS_01_ONLY",
++        D246_STOP_BOUNDARY="STOP_AFTER_D4",
++        D246_NEXT_APPLICATION_ACTION_REACHABLE=False,
++        LIVE_BASELINE_APPROVAL="PENDING_USER_REVIEW",
+     )
+     return mapped
+ 

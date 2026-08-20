@@ -1,0 +1,51 @@
+{
+  "schema": "d246-status-v1",
+  "outcome": "D246_D4_FACTORY_PRESERVING_CONTINUATION_READY_NOT_EXECUTED",
+  "advancement": "NEW_TECHNICAL_EVIDENCE_PRODUCED",
+  "executable_closure": "PASS",
+  "residual_blocker_or_risk": "LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW; D4_NOT_LIVE_EXECUTED; AF_UNASSESSED",
+  "canonical_documentation": "Goodix 27c6 5125 manuale tecnico.md",
+  "bundle": "analysis/D246/D246_bundle.zip",
+  "d245_evidence": {
+    "validation": "PASS",
+    "sha256": "2992457855197b90dad3f7048bef85a6703079b95452dc07fa8e201a5c294e09",
+    "tls_handshake_completed": true,
+    "d4_count": 0,
+    "retry_count": 0,
+    "persistent_write_family_count": 0
+  },
+  "d4_gate": {
+    "decision": "PASS",
+    "semantic_class": "VOLATILE_SESSION_INITIALIZATION",
+    "host_callsite_proven": true,
+    "primary_wire_capture_proven": true,
+    "host_side_no_persistent_write_observed": true,
+    "device_side_persistence_excluded_with_sufficient_evidence": true,
+    "scope": "EXACT_APP12509_D4_RECEIVER_PATH_ONLY",
+    "request_hex": "a00600a6d403000000d3",
+    "physical_out": "FIXED64_ZERO_TAIL",
+    "ack_policy": "EXACT_D4_STATUS_01_ONLY",
+    "response_count": 0,
+    "terminal": "STOP_AFTER_D4"
+  },
+  "live_execution": false,
+  "live_baseline_approval": "PENDING_USER_REVIEW",
+  "source_seal": "ACTIVE_UNCHANGED",
+  "real_counters": {
+    "usb_open_count": 0,
+    "tls_handshake_count": 0,
+    "d4_send_count": 0,
+    "persistent_write_family_count": 0
+  },
+  "tests": {
+    "T1_D245_TLS_REGRESSION": "PASS_STOP_BEFORE_D4",
+    "T2_D4_ONCE_HAPPY": "PASS_STOP_AFTER_D4",
+    "T3_D4_TIMEOUT": "PASS_NO_RETRY_CLEANUP_RESEAL",
+    "T4_UNEXPECTED_ACK": "PASS_FAIL_CLOSED",
+    "T5_NOTHING_AFTER_D4": "PASS_NEXT_ACTION_UNREACHABLE",
+    "T6_LAUNCHER_ACTUAL_CWD": "PASS"
+  },
+  "contains_secret": false,
+  "contains_proprietary_raw": false,
+  "contains_biometric_data": false
+}
