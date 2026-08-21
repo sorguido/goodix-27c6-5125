@@ -169,13 +169,9 @@ GPL userspace core
 LGPL libfprint driver/glue
 ```
 
-Il confine esiste per impedire che espressione GPL, inclusi adattamenti Rocky,
-entri involontariamente nel driver upstream-facing LGPL. Il passaggio richiede
-dual licensing/licenza alternativa valida da tutti i titolari pertinenti; in
-assenza, il driver deve essere indipendente e basato su specifiche, fatti di
-protocollo, test ed evidenza, non sull'espressione GPL. Ogni import GPL registra
-repository, commit, source path, SPDX/licenza, copyright noto, step/data,
-destinazione e modifiche nel ledger operativo.
+L'architettura post-D247 è stata adottata precisamente per consentire il riuso diretto, l'adattamento e l'integrazione nel core/ e nei tools/ GPL del codice Rockytkg compatibile GPL, preservandone licenza, attribuzione e provenienza. Analogamente, codice Rockytkg specificamente disponibile sotto licenza LGPL compatibile può essere valutato per libfprint-driver/.
+
+Il licensing boundary non vieta quindi il riuso di Rockytkg: impedisce soltanto che espressione GPL-only venga trasferita dal dominio GPL al driver upstream-facing LGPL. Tale passaggio è possibile solo in presenza di dual licensing o di una licenza alternativa compatibile concessa da tutti i titolari pertinenti; in assenza, l'implementazione LGPL deve essere indipendente e basata su specifiche, fatti di protocollo, test ed evidenza, non sull'espressione GPL-only.
 
 
 ## Trasporto USB
