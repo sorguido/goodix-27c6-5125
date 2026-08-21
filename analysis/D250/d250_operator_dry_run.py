@@ -13,6 +13,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from analysis.D250.d250_live_critical import offline_stale_detection_test
+from analysis.D250.d250_preflight import offline_sandbox_preflight
+from analysis.D250.d250_preflight_observability import render
+
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 SOURCE_FILES = (
@@ -62,6 +66,28 @@ def run() -> dict[str, object]:
     before = {str(path): digest(REPOSITORY / path) for path in SOURCE_FILES}
     if not sealed(REPOSITORY):
         raise RuntimeError("repository live source is not sealed")
+
+    stale_detection = offline_stale_detection_test()
+    with tempfile.TemporaryDirectory(prefix="d250-preflight-fixture-") as directory:
+        preflight = offline_sandbox_preflight(Path(directory))
+    if preflight.get("status") != "PASS":
+        raise RuntimeError("D250 preflight namespace fixture failed")
+    rendered_failure = render(
+        {
+            "failure_class": "d250_single_use_marker_consumed",
+            "failures": ["d250_single_use_marker_consumed"],
+            "marker_namespace_status": preflight["marker_present_case"],
+            "live_critical_set_status": "APPROVED",
+        }
+    )
+    required_lines = (
+        "D250_FAILURE_CLASS=D250_SINGLE_USE_MARKER_CONSUMED",
+        "D250_USB_OPEN_COUNT=0",
+        "D250_AF_ATTEMPT_COUNT=0",
+        "D250_AF_SEND_COUNT=0",
+    )
+    if not all(line in rendered_failure for line in required_lines):
+        raise RuntimeError("D250 preflight failure observability incomplete")
 
     with tempfile.TemporaryDirectory(prefix="d250-executable-closure-") as directory:
         work = Path(directory)
@@ -117,7 +143,13 @@ def run() -> dict[str, object]:
         "source_sealed_after": True,
         "source_hashes_unchanged": True,
         "temporary_patch_round_trip": "PASS_BYTE_EXACT",
-        "live_capability": "HARD_DISABLED_PENDING_SEPARATE_USER_AUTHORIZATION",
+        "source_restore_count": 1,
+        "preflight_namespace": preflight,
+        "preflight_failure_observability": "PASS_ZERO_PRE_USB_COUNTERS_VISIBLE",
+        "live_critical_stale_detection": stale_detection,
+        "live_capability": "HARD_GATED",
+        "live_execution": "NOT_PERFORMED",
+        "live_baseline_approval": "PENDING_AI_PM_REVIEW",
         "real_usb_open_count": 0,
         "real_tls_handshake_count": 0,
         "real_d4_send_count": 0,

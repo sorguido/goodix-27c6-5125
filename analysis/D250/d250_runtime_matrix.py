@@ -69,8 +69,8 @@ def outer(body: bytes) -> bytes:
     return bytes((PLAIN, len(body) & 0xFF, len(body) >> 8, (PLAIN + len(body)) & 0xFF)) + body
 
 
-def ae_response(flags: int = 0x02, *, size: int = 16) -> bytes:
-    data = (bytes((1, flags)) + bytes(14))[:size].ljust(size, b"\x00")
+def ae_response(flags: int = 0x02, *, version: int = 1, size: int = 16) -> bytes:
+    data = (bytes((version, flags)) + bytes(14))[:size].ljust(size, b"\x00")
     return outer(payload(0xAE, data))
 
 
@@ -223,6 +223,7 @@ def run_matrix() -> dict[str, object]:
     require(report["result"] == "pass", "happy result")
     require(report["d4_completed"] is True and report["af_completed"] is True, "happy completion")
     require(report["af_send_count"] == 1 and report["af_response_count"] == 1, "happy AF")
+    require(report["af_state_version"] == 1, "state version not recorded")
     require(report["af_state_flags"] == 0x32, "state flags not preserved")
     require(report["af_unknown_flag_bits"] == 0x30, "unknown flags not preserved")
     require(happy["d4_pacing"] == [0.02] and happy["af_pacing"] == [0.02], "pacing")
@@ -276,11 +277,21 @@ def run_matrix() -> dict[str, object]:
         assert_terminal_counts(case, af_response_count=0)
     tests["T6_MALFORMED_AE_MATRIX"] = "PASS_LENGTH_CONTROL_CHECKSUM"
 
+    version_mismatch = run_case([*normal_frames(), D4_ACK, ae_response(version=2)])
+    require(
+        version_mismatch["report"]["af_failure_class"]
+        == "semantic_state_version_mismatch",
+        "AF state version mismatch classification",
+    )
+    require(version_mismatch["report"]["af_state_version"] is None, "unexpected version accepted")
+    assert_terminal_counts(version_mismatch, af_response_count=0)
+    tests["T7_STATE_VERSION_MISMATCH"] = "PASS_FAIL_CLOSED_STOP_AFTER_AF"
+
     duplicate = run_case([*normal_frames(), D4_ACK, ae_response() + ae_response()])
     require(duplicate["report"]["af_failure_class"] == "unexpected_trailing_frame", "duplicate AE")
     require(duplicate["report"]["af_response_count"] == 1, "first AE not recorded")
     assert_terminal_counts(duplicate, af_response_count=1)
-    tests["T7_DUPLICATE_COALESCED_RESPONSE"] = "PASS_FAIL_CLOSED"
+    tests["T8_DUPLICATE_COALESCED_RESPONSE"] = "PASS_FAIL_CLOSED"
 
     trailing_api = FakeUsbApi([*normal_frames(), D4_ACK, ae_response(), build_a0(0xB0, b"\x32\x01")])
     trailing = run_case([], api=trailing_api)
@@ -297,7 +308,7 @@ def run_matrix() -> dict[str, object]:
             raise AssertionError("post-AF sensor command unexpectedly reachable")
     require(tuple(trailing_api.outgoing) == before, "post-AF command emitted")
     assert_terminal_counts(trailing, af_response_count=1)
-    tests["T8_TRAILING_UNOWNED_AND_POST_AF_FENCE"] = "PASS_UNCONSUMED_NO_SENSOR_ACTION"
+    tests["T9_TRAILING_UNOWNED_AND_POST_AF_FENCE"] = "PASS_UNCONSUMED_NO_SENSOR_ACTION"
 
     try:
         happy["backend"]._exchange_af_after_d4()
@@ -306,7 +317,7 @@ def run_matrix() -> dict[str, object]:
     else:
         raise AssertionError("second AF unexpectedly reachable")
     require(boundary_out_counts(happy) == (1, 1), "second AF wrote")
-    tests["T9_SECOND_AF"] = "PASS_UNREACHABLE"
+    tests["T10_SECOND_AF"] = "PASS_UNREACHABLE"
 
     require(D235_RESULT_SCHEMA == "d250-live-af-single-shot-result-v1", "D250 schema")
     paths = ProductionRuntimePaths.system_default()

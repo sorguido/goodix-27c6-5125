@@ -36,8 +36,16 @@ validare live. Il continuation sintetico impone un solo attempt/send, una sola
 IN bounded, validator AE fail-closed e terminale `STOP_AFTER_AF`; FDT, finger e
 image sono strutturalmente irraggiungibili. La decisione è
 `D250_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_USER_AUTHORIZATION`, non
-un'autorizzazione: il launcher consegnato resta hard-disabled salvo dry-run e
-nessun accesso USB è avvenuto in D250.
+un'autorizzazione. Il primo bundle D250 consegnava un launcher deliberatamente
+dry-run-only; la successiva correzione same-step lo rende live-capable ma
+hard-gated. Il percorso operatore richiede argomento esatto, root tramite un
+operatore `SUDO_UID` non-root, marker D250 assente, preflight D250 PASS, sorgenti
+sealed e un commit SHA completo fornito esternamente in
+`D250_APPROVED_LIVE_BASELINE_SHA`, con confronto byte-per-byte del live-critical
+set direttamente contro i blob Git. Nessun SHA è auto-approvato: lo stato è
+`READY_FOR_AI_PM_BASELINE_REVIEW`, l'approvazione resta
+`PENDING_AI_PM_REVIEW`, l'autorizzazione esplicita dell'Utente resta richiesta
+e nessun accesso USB è avvenuto in D250.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
@@ -83,7 +91,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
 | Run live D246 TLS→D4 | successo, consumata | handshake TLS completo; D4 attempt/send `1/1`, ACK `01`, nessuna response/app-data/retry/write persistente; `STOP_AFTER_D4`, cleanup/restore/reseal riusciti |
-| Boundary D250 D4→AF | READY per autorizzazione separata, solo offline | AF logical 13 / physical 64, tail candidate zero, AE diretta 24 con state body 16, ACK AF vietato, one-IN/zero-retry/`STOP_AFTER_AF`; USB reale zero |
+| Boundary D250 D4→AF | protocollo chiuso offline; operator path live-capable hard-gated, baseline review pendente | AF logical 13 / physical 64, tail candidate zero, AE diretta 24 con state body 16/versione 1, ACK AF vietato, one-IN/zero-retry/`STOP_AFTER_AF`; hardware non eseguito |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -974,8 +982,9 @@ kit D243 è ora consumato; anche la singola autorizzazione D244 descritta sotto
 è consumata. Anche la singola invocazione D245 è ora consumata. La frase
 storica che indicava D246 come riferimento soltanto offline descriveva lo stato
 prima della run D246: D246 è poi stato eseguito live con successo ed è chiuso a
-`STOP_AFTER_D4`. Il candidate corrente D250 è invece soltanto offline e non ha
-una baseline live approvata.
+`STOP_AFTER_D4`. Il candidate corrente D250 ha protocol boundary chiuso offline
+e percorso operatore live-capable con executable closure offline PASS, ma non
+ha una baseline live approvata e non è stato eseguito su hardware.
 
 La provenance D241 è nuovamente byte-exact e read-only:
 `d241_operator_dry_run.py` ha SHA-256
@@ -1375,7 +1384,7 @@ primo e massimo candidato restano exactly-one AF con telemetria e stop prima di
 FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi restano
 non noti target-side; un live first-image non è giustificato né autorizzato.
 
-## D250: canonicalizzazione Rocky e closure offline exactly-one AF
+## D250: canonicalizzazione Rocky, closure exactly-one AF e operator path
 
 Lo snapshot operativo canonico è `Rockytkg/`, con provenance in
 `Rockytkg/PROVENANCE.md`; struttura e licenze sono quelle descritte nella
@@ -1394,7 +1403,10 @@ opaca di 51 byte, con sei byte nonzero agli offset tail 27–32. Non è trattata
 come payload protocollo né replayata. Il candidate invia 13 byte logici in un
 buffer fisico 64 zero-initialized; l'equivalenza device-side specifica AF resta
 **non live-proven**, ma è bounded e non aggiunge un comando o un campo
-persistente.
+persistente. Presenza dell'ACK AF, lunghezza tail, conteggio e offset dei byte
+nonzero e identità delle cinque tail sono ora derivati programmaticamente dalla
+capture anziché descritti da costanti; il JSON resta redatto e l'audit fallisce
+se questo profilo canonico cambia.
 
 La DLL locale classifica `GetMcuState` come read tipizzata: control wire AF
 (`AE` logico con `more=1`), body `55,ts16le,00,00`, ACK timeout zero, data
@@ -1402,9 +1414,12 @@ timeout 500 ms ed evento/risposta AE. Il call path OEM mostra anche `Sleep(20)`
 prima della query; la capture osserva 58,365 ms da ACK D4 ad AF OUT. Il
 candidate usa 20 ms host-side, timeout complessivo AF 500 ms e massimo una sola
 lettura di frame. La AE accettata deve essere A0, control `0xAE`, checksum
-valido e body esattamente 16 byte. Byte 1: bit0 POV-valid, bit1 TLS-connected e
-bit3 locked sono noti; ogni altro bit è preservato come ignoto e non governa
-azioni ulteriori.
+valido e body esattamente 16 byte. Il byte 0 deve essere la versione `1`
+osservata; una versione diversa viene classificata
+`semantic_state_version_mismatch` e fallisce chiusa. Byte 1: bit0 POV-valid,
+bit1 TLS-connected e bit3 locked sono noti; ogni altro bit è preservato come
+ignoto e non governa azioni ulteriori. La telemetria espone separatamente
+`af_state_version`, `af_state_flags` e `af_unknown_flag_bits`.
 
 `ExactlyOneAfMachine` e la patch continuation mettono il latch attempt prima
 della submission. Completion corta/ambigua conserva `attempt=1`, non marca
@@ -1415,6 +1430,8 @@ il budget autorizza una sola IN. Dopo AE valida il terminale è sempre
 `STOP_AFTER_AF`; non esiste transizione verso FDT `32`, SetMode `20`, cached
 `D2`, finger o image. Cleanup/release/secret zeroization/restore/reseal restano
 quelli della catena D246 e sono verificati nel tree temporaneo.
+Il modello core intercetta `Exception`, non `KeyboardInterrupt`, `SystemExit`
+o le altre eccezioni di controllo processo.
 
 La classificazione safety è corpus-bounded: AF è una query di stato fissa,
 osservata nel workflow OEM e distinta dalle famiglie di write/provisioning/
@@ -1422,6 +1439,14 @@ firmware; non serializza address, blob o selector persistenti. Il receiver
 resident APP12509 resta non disponibile, quindi non si afferma una proprietà
 universale di ogni AF possibile. Rocky e Issue #1 corroborano serializer e
 semantica, ma non sono la prova target-specific.
+
+Riesame metodologico pre-live: rispetto all'ultima run D246 non viene ripetuto
+lo stesso confine, ma si testa il comando successivo AF exactly-once dopo D4
+già provato; l'ipotesi nuova è che la submission fisica AF con tail zero rispetti
+la lunghezza logica dichiarata e produca una AE versione 1 semanticamente valida.
+Se un futuro tentativo autorizzato fallisse allo stesso punto, non è previsto
+alcun retry: si arresta il percorso e si analizza la nuova evidenza prima di
+proporre un metodo diverso.
 
 ```text
 D250_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_USER_AUTHORIZATION
@@ -1431,12 +1456,25 @@ D250_AF_ACK_POLICY=FORBIDDEN
 D250_RETRY_COUNT=0
 D250_PERSISTENT_WRITE_FAMILY_COUNT=0
 D250_USB_OPEN_COUNT=0
+D250_LIVE_OPERATOR_PATH=READY_FOR_AI_PM_BASELINE_REVIEW
+D250_LIVE_CAPABILITY=HARD_GATED
+D250_LIVE_EXECUTION=NOT_PERFORMED
+D250_LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW
 ```
 
 Questa decisione non autorizza hardware. Una futura run richiede review AI PM,
 un commit SHA completo approvato per il live-critical set e autorizzazione
-esplicita separata dell'Utente. Il launcher D250 consegnato accetta soltanto
-`--offline-dry-run` e chiude prima di USB per ogni altro argomento.
+esplicita separata dell'Utente. Il primo launcher D250 accettava soltanto
+`--offline-dry-run`. La correzione same-step supporta ora esattamente il dry-run
+e `--i-authorize-one-d250-af-live-attempt`; il secondo ramo non è stato
+eseguito su hardware ed è hard-gated da identità operatore, marker D250,
+preflight, source seal e `D250_APPROVED_LIVE_BASELINE_SHA` esterno. Il helper
+confronta direttamente i byte del working tree con i blob del commit, senza
+consultare lo staging index. La fixture Git passa pulita come `APPROVED` e
+classifica `STALE` la mutazione di ciascuno dei 17 file live-critical. Le patch
+D245→D246→D250 applicano e reversano byte-exact in un tree temporaneo; il
+dry-run operatore passa sia dalla root sia da cwd esterno. Nessun commit SHA è
+approvato da questo step.
 
 ## Operazioni read note e limiti
 
@@ -1497,11 +1535,14 @@ Il current critical boundary live resta il comando successivo A0/AF. D249
 lo ha classificato e implementato nel core; D250 ne ha chiuso il candidate
 exactly-one offline: request AF (logical AE con `more=1`)
 `55,ts16le,00,00`, risposta diretta A0/AE senza ACK e stato esatto da 16 byte,
-con byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked; gli altri bit sono
-preservati come ignoti. Serializer, pacing, submission 64 e validator sono ora
-bounded; resta non provata live l'equivalenza della tail AF zero rispetto alla
-tail OEM opaca e resta assente il receiver resident APP12509. Questi sono rischi
-del test, non un'autorizzazione. AF non è stato eseguito né autorizzato.
+versione `1`, con byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked; gli
+altri bit sono preservati come ignoti. Serializer, pacing, submission 64 e
+validator sono ora bounded; resta non provata live l'equivalenza della tail AF
+zero rispetto alla tail OEM opaca e resta assente il receiver resident APP12509.
+Questi sono rischi del test, non un'autorizzazione. Il percorso operatore è
+live-capable e hard-gated, con executable closure offline PASS, ma attende
+review/approvazione AI PM del commit live-critical e autorizzazione separata
+dell'Utente. AF non è stato eseguito né autorizzato.
 L'autorizzazione D246 è consumata. Nessun esito storico autorizza
 retry, secondo D4, AF o seconda invocazione. L'assenza di prova elettrica del
 sensore e di prova device-side assoluta oltre il receiver D4 esatto resta
@@ -1524,6 +1565,8 @@ DEVICE_RESIDENT_NO_NVM_SIDE_EFFECT_PROVEN false
 D246_EXACT_APP12509_D4_NO_NVM_SIDE_EFFECT_PROVEN true
 D250_AF_LIVE_BOUNDARY READY_FOR_SEPARATE_USER_AUTHORIZATION
 D250_AF_ZERO_TAIL_DEVICE_EQUIVALENCE NOT_LIVE_PROVEN
+D250_LIVE_OPERATOR_PATH READY_FOR_AI_PM_BASELINE_REVIEW
+D250_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -1573,10 +1616,18 @@ costruzione. Il record immagine noto è di 7684 byte:
 transpose.
 
 D250 aggiunge il terminale AF-only, la patch continuation sopra la catena
-D245→D246, la matrice avversaria e un launcher realmente invocabile soltanto in
-dry-run. Il codice sorgente USB storico resta sealed nel repository; patch
-apply/reverse e hash dimostrano ripristino byte-identico. Questa è executable
-closure offline e nuova evidenza derivata dalla capture, non avanzamento live.
+D245→D246 e la matrice avversaria. Il primo bundle aveva un launcher invocabile
+soltanto in dry-run; la correzione same-step aggiunge il ramo live hard-gated,
+il namespace/marker D250, il preflight specifico e il verifier Git del
+live-critical set. Il set include launcher, patch chain, preflight/helper, core
+AF, sorgenti backend/entrypoint, PE canonico e dipendenze transitive che possono
+influire sul path sensor-reaching; manuale, report, bundle e test offline non
+sono pin-nati. Una fixture Git prova `APPROVED` pulito e `STALE` mutando ciascun
+file del set senza consultare lo staging index. Il codice sorgente USB storico
+resta sealed nel repository; patch apply/reverse e hash dimostrano ripristino
+byte-identico. Il dry-run reale passa dalla root e da cwd esterno. Questa è
+executable closure offline del percorso operatore live-capable, non esecuzione
+hardware né approvazione del commit live.
 
 ## Regole operative
 
@@ -1591,4 +1642,4 @@ closure offline e nuova evidenza derivata dalla capture, non avanzamento live.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D246 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D250 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.

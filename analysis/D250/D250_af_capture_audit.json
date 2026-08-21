@@ -11,6 +11,7 @@
     "ae_state_body_length": 16,
     "ae_usb_completion_payload_length": 24,
     "af_ack_observed": false,
+    "af_ack_occurrence_count": 0,
     "af_completion_event_payload_length": 0,
     "af_completion_length_interpretation": "successful completion paired with the 64-byte submission; completion event carries no duplicate OUT payload",
     "af_completion_status": "SUCCESS",
@@ -20,8 +21,24 @@
     "af_out_packet_index_zero_based": 139,
     "af_out_to_completion_ms": 14.521,
     "af_physical_submission_length": 64,
-    "af_submission_tail": "OPAQUE_51_BYTES_WITH_6_NONZERO_BYTES_AT_TAIL_OFFSETS_27_TO_32",
     "af_submission_tail_identical_across_all_five_occurrences": true,
+    "af_submission_tail_redacted": {
+      "length": 51,
+      "lengths_identical": true,
+      "nonzero_byte_count": 6,
+      "nonzero_counts_identical": true,
+      "nonzero_offsets_identical": true,
+      "nonzero_offsets_zero_based": [
+        27,
+        28,
+        29,
+        30,
+        31,
+        32
+      ],
+      "raw_tail_in_output": false,
+      "tails_identical": true
+    },
     "candidate_tail_equivalence_status": "NOT_LIVE_PROVEN_FOR_AF;SAFETY_BOUNDED_BY_DECLARED_A0_LENGTH_AND_D4_ZERO_TAIL_PRECEDENT",
     "candidate_tail_policy": "DETERMINISTIC_ZERO_51_BYTES_DO_NOT_REPLAY_OPAQUE_HOST_STAGING",
     "d4_ack_packet_index_zero_based": 137,

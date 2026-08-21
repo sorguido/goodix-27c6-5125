@@ -39,6 +39,99 @@ def next_matching(items, start: int, predicate):
     return next(item for item in items if int(item["index"]) > start and predicate(item))
 
 
+def redacted_tail_facts(af_outs: list[dict[str, object]]) -> dict[str, object]:
+    tails = [
+        bytes(item["payload"])[frame_total(bytes(item["payload"])) :]
+        for item in af_outs
+    ]
+    lengths = [len(tail) for tail in tails]
+    nonzero_offsets = [
+        [offset for offset, value in enumerate(tail) if value]
+        for tail in tails
+    ]
+    nonzero_counts = [len(offsets) for offsets in nonzero_offsets]
+    return {
+        "length": lengths[0] if len(set(lengths)) == 1 else None,
+        "lengths_identical": len(set(lengths)) == 1,
+        "nonzero_byte_count": (
+            nonzero_counts[0] if len(set(nonzero_counts)) == 1 else None
+        ),
+        "nonzero_counts_identical": len(set(nonzero_counts)) == 1,
+        "nonzero_offsets_zero_based": (
+            nonzero_offsets[0]
+            if all(offsets == nonzero_offsets[0] for offsets in nonzero_offsets)
+            else None
+        ),
+        "nonzero_offsets_identical": all(
+            offsets == nonzero_offsets[0] for offsets in nonzero_offsets
+        ),
+        "tails_identical": len(set(tails)) == 1,
+        "raw_tail_in_output": False,
+    }
+
+
+def af_response_facts(
+    items: list[dict[str, object]], af_outs: list[dict[str, object]]
+) -> dict[str, object]:
+    ack_indices = []
+    direct_ae_indices = []
+    for af in af_outs:
+        following_in = [
+            item
+            for item in items
+            if int(item["index"]) > int(af["index"])
+            and item["endpoint"] == 0x81
+            and item["info"] == 1
+            and bytes(item["payload"])
+        ]
+        first = following_in[0]
+        wire = bytes(first["payload"])
+        if inner_control(wire) == 0xAE:
+            direct_ae_indices.append(int(first["index"]))
+        for item in following_in:
+            candidate = bytes(item["payload"])
+            control = inner_control(candidate)
+            if control == 0xAE:
+                break
+            if control == 0xB0 and candidate[7:8] == b"\xaf":
+                ack_indices.append(int(item["index"]))
+    return {
+        "af_ack_observed": bool(ack_indices),
+        "af_ack_occurrence_count": len(ack_indices),
+        "direct_ae_occurrence_count": len(direct_ae_indices),
+    }
+
+
+def require_expected_capture_facts(report: dict[str, object]) -> None:
+    boundary = report["post_d4_boundary"]
+    tail = boundary["af_submission_tail_redacted"]
+    expected = {
+        "all_capture_af_occurrences": 5,
+        "all_capture_direct_ae_occurrences": 5,
+        "all_af_submissions_fixed_64": True,
+        "all_af_tails_zero": False,
+    }
+    for key, value in expected.items():
+        if report.get(key) != value:
+            raise RuntimeError(f"canonical capture fact changed:{key}")
+    tail_expected = {
+        "length": 51,
+        "lengths_identical": True,
+        "nonzero_byte_count": 6,
+        "nonzero_counts_identical": True,
+        "nonzero_offsets_zero_based": list(range(27, 33)),
+        "nonzero_offsets_identical": True,
+        "tails_identical": True,
+    }
+    for key, value in tail_expected.items():
+        if tail.get(key) != value:
+            raise RuntimeError(f"canonical capture tail fact changed:{key}")
+    if boundary.get("af_ack_observed") is not False:
+        raise RuntimeError("canonical capture fact changed:af_ack_observed")
+    if boundary.get("af_ack_occurrence_count") != 0:
+        raise RuntimeError("canonical capture fact changed:af_ack_occurrence_count")
+
+
 def derive() -> dict[str, object]:
     items = packets(CAPTURE)
     af_outs = [
@@ -90,12 +183,16 @@ def derive() -> dict[str, object]:
         and bytes(item["payload"])
     ]
 
-    return {
+    response_facts = af_response_facts(items, af_outs)
+    tail_facts = redacted_tail_facts(af_outs)
+    report = {
         "schema": "d250-af-capture-audit-v1",
         "capture_sha256": hashlib.sha256(CAPTURE.read_bytes()).hexdigest(),
         "capture_historical_classification": "D175_PRIMARY_LOCAL_TARGET_EVIDENCE",
         "all_capture_af_occurrences": len(af_outs),
-        "all_capture_direct_ae_occurrences": len(ae_ins),
+        "all_capture_direct_ae_occurrences": response_facts[
+            "direct_ae_occurrence_count"
+        ],
         "all_af_submissions_fixed_64": all(len(bytes(item["payload"])) == 64 for item in af_outs),
         "all_af_tails_zero": all(
             bytes(item["payload"])[frame_total(bytes(item["payload"])) :] == bytes(64 - frame_total(bytes(item["payload"])))
@@ -111,13 +208,10 @@ def derive() -> dict[str, object]:
             "endpoint_in": "0x81",
             "af_logical_frame_length": logical_af_length,
             "af_physical_submission_length": len(af_wire),
-            "af_submission_tail": "OPAQUE_51_BYTES_WITH_6_NONZERO_BYTES_AT_TAIL_OFFSETS_27_TO_32",
-            "af_submission_tail_identical_across_all_five_occurrences": len(
-                {
-                    bytes(item["payload"])[frame_total(bytes(item["payload"])) :]
-                    for item in af_outs
-                }
-            ) == 1,
+            "af_submission_tail_redacted": tail_facts,
+            "af_submission_tail_identical_across_all_five_occurrences": tail_facts[
+                "tails_identical"
+            ],
             "candidate_tail_policy": "DETERMINISTIC_ZERO_51_BYTES_DO_NOT_REPLAY_OPAQUE_HOST_STAGING",
             "candidate_tail_equivalence_status": "NOT_LIVE_PROVEN_FOR_AF;SAFETY_BOUNDED_BY_DECLARED_A0_LENGTH_AND_D4_ZERO_TAIL_PRECEDENT",
             "af_completion_status": "SUCCESS",
@@ -127,7 +221,8 @@ def derive() -> dict[str, object]:
             "ae_usb_completion_payload_length": len(ae_wire),
             "ae_state_body_length": len(state.raw),
             "intervening_nonempty_in_frame_count": len(between),
-            "af_ack_observed": False,
+            "af_ack_observed": response_facts["af_ack_observed"],
+            "af_ack_occurrence_count": response_facts["af_ack_occurrence_count"],
             "d4_ack_to_af_out_ms": milliseconds(af, d4_ack),
             "af_out_to_completion_ms": milliseconds(af_completion, af),
             "af_completion_to_ae_in_ms": milliseconds(ae, af_completion),
@@ -145,6 +240,8 @@ def derive() -> dict[str, object]:
             "biometric_payload_in_output": False,
         },
     }
+    require_expected_capture_facts(report)
+    return report
 
 
 def main() -> int:

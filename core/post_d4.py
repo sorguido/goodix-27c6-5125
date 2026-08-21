@@ -60,6 +60,10 @@ class UnexpectedEvent(ProtocolError):
     pass
 
 
+class UnexpectedStateVersion(ProtocolError):
+    pass
+
+
 class InvalidTransition(ProtocolError):
     pass
 
@@ -130,6 +134,8 @@ def build_af(ts16: int) -> bytes:
 @dataclass(frozen=True)
 class McuState:
     raw: bytes
+    version: int
+    flags: int
     pov_valid: bool
     tls_connected: bool
     locked: bool
@@ -147,9 +153,18 @@ def parse_af_response(frame: bytes) -> McuState:
         raise UnexpectedControl(f"af_response:0x{control:02x}")
     if len(data) != 16:
         raise LengthMismatch(f"af_state_length:{len(data)}")
+    version = data[0]
+    if version != 1:
+        raise UnexpectedStateVersion(f"af_state_version:{version}")
     flags = data[1]
     return McuState(
-        data, bool(flags & 1), bool(flags & 2), bool(flags & 8), flags & ~0x0B
+        data,
+        version,
+        flags,
+        bool(flags & 1),
+        bool(flags & 2),
+        bool(flags & 8),
+        flags & ~0x0B,
     )
 
 
@@ -312,7 +327,7 @@ class ExactlyOneAfMachine:
             self.af_response_count = 1
             self.phase = STOP_AFTER_AF
             return self.state
-        except BaseException:
+        except Exception:
             self.phase = "STOP_AFTER_AF_FAILURE"
             raise
 
