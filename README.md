@@ -170,8 +170,10 @@ The Linux target replaces the Windows framework and proprietary algorithm
 layers with a GPL-2.0-or-later userspace core and tools, plus a separately
 implemented LGPL-2.1-or-later libfprint-facing driver boundary. Historical
 through-D246 work remains reproducible under its prior BSD grant. GPL Rocky
-code may be reused in the GPL domain with provenance, but is not target proof. The current
-blocker occurs before the real TLS transition, not in the offline codec.
+code may be reused in the GPL domain with provenance, but is not target proof.
+
+The current live technical boundary is tracked in the canonical technical
+manual; after D246 it is AF.
 
 ## Windows stack
 

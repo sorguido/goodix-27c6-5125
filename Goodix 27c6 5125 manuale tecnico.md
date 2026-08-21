@@ -87,6 +87,17 @@ e una capture recuperata SHA-256
 `50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`.
 La prima capture resta definitivamente perduta e non è sostituita da riepiloghi.
 
+La testimonianza indipendente di `mkl-corbachoh` nella issue GitHub #1 resta
+classificata `EXTERNAL_THIRD_PARTY_LIVE_CORROBORATION`. Sul proprio target
+riferisce `27c6:5125`, chip `0x2504`, firmware nativo 12509 preservato,
+TLS-PSK, enrollment, verifica same/different-finger, autenticazione PAM e
+nessun firmware flash. Riferisce però anche `MCU read 0xBB010003 status 0x01`,
+quindi assenza di dati PSK preesistenti, e provisioning una tantum di una nuova
+PSK; riporta inoltre la coesistenza di eventi FDT plaintext e frame immagine
+protetti TLS. È corroborazione esterna utile, ma non prova primaria del nostro
+target, non prova la preservazione della PSK Windows/factory preesistente e non
+autorizza automaticamente alcuna futura operazione live.
+
 La baseline Rocky è verificata esternamente al commit
 `227eba219fa9e3fbac5bd59aca79f624f67cd11b`: il `LICENSE` assegna
 GPL-2.0-or-later al codice originale, LGPL-2.1-or-later a `src/goodixgf.c`,
