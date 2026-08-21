@@ -20,32 +20,44 @@ rimaste a zero. La semantica D4 resta quella già provata staticamente,
 E4, TLS e D4 non sono più blocker aperti. D249 ha ora chiuso offline il
 framing e parsing AF e, dopo la correzione di review, ha chiuso realmente nel
 nuovo core GPL due replay sintetici bounded fino a `FIRST_IMAGE_RECEIVED`:
-FDT fresh e cached POV, sopra un transport astratto e senza USB reale. Il boundary
-live resta AF: non è stato eseguito né autorizzato, e FDT arming/disarm non è
-ancora chiuso sul target. Il repository non auto-approva né
+FDT fresh e cached POV, sopra un transport astratto e senza USB reale. D250 ha
+poi eseguito una volta il boundary AF sul target: TLS e D4 sono riusciti, AF è
+stato inviato una volta come 13 byte logici in una submission fisica da 64 byte
+con tail zero, e il device ha restituito una A0/AE strutturalmente valida con
+checksum valido e body da 16 byte. FDT arming/disarm non è ancora chiuso sul
+target. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
-D250 ha ora chiuso offline il boundary minimo exactly-one AF. L'audit
+D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
 request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
 byte con 16 byte di stato, nessun ACK AF e 58,365 ms osservati tra ACK D4 e AF
 OUT. La tail OEM AF contiene 51 byte fuori dalla lunghezza dichiarata, con sei
 byte opachi nonzero identici nelle cinque occorrenze; il candidate non li
-replaya e usa una tail deterministica zero, ipotesi di equivalenza che resta da
-validare live. Il continuation sintetico impone un solo attempt/send, una sola
-IN bounded, validator AE fail-closed e terminale `STOP_AFTER_AF`; FDT, finger e
-image sono strutturalmente irraggiungibili. La decisione è
-`D250_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_USER_AUTHORIZATION`, non
-un'autorizzazione. Il primo bundle D250 consegnava un launcher deliberatamente
-dry-run-only; la successiva correzione same-step lo rende live-capable ma
-hard-gated. Il percorso operatore richiede argomento esatto, root tramite un
-operatore `SUDO_UID` non-root, marker D250 assente, preflight D250 PASS, sorgenti
-sealed e un commit SHA completo fornito esternamente in
-`D250_APPROVED_LIVE_BASELINE_SHA`, con confronto byte-per-byte del live-critical
-set direttamente contro i blob Git. Nessun SHA è auto-approvato: lo stato è
-`READY_FOR_AI_PM_BASELINE_REVIEW`, l'approvazione resta
-`PENDING_AI_PM_REVIEW`, l'autorizzazione esplicita dell'Utente resta richiesta
-e nessun accesso USB è avvenuto in D250.
+replayava e usava una tail deterministica zero. La run D250 ha ora provato sul
+target APP12509 che questa zero-tail viene accettata fino a OUT completion e a
+una risposta AE strutturalmente valida: `D250_AF_ZERO_TAIL_DEVICE_ACCEPTANCE`
+e `D250_AF_ZERO_TAIL_STRUCTURAL_AE_RESPONSE` sono `LIVE_PROVEN`. Non è invece
+provata l'equivalenza byte-per-byte o semantica universale con i sei byte opachi
+nonzero della tail OEM. La run si è fermata fail-closed perché il validator
+promuoveva il byte 0, osservato a `1` nelle cinque capture OEM, a una presunta
+versione obbligatoria. Il contatore `af_response_count` veniva incrementato
+solo dopo quel controllo: il valore live `0` è quindi un difetto di
+osservabilità, non assenza di risposta. Il byte 0 live non è stato persistito ed
+è `LOST_BY_OBSERVABILITY_GAP`. Cleanup, reseal, zeroizzazione del secret e
+restore fprintd/segnali sono riusciti; retry, write persistenti e application
+data sono rimasti a zero. Il marker D250 è consumato.
+
+D251 corregge solo modello semantico e osservabilità. L'audit dei tre call site
+locali di `GetMcuState` in `gfusb.dll` non mostra confronti né branch sul byte
+0: le decisioni osservate leggono il byte 1 e i suoi bit 0, 1 e 3. Rocky
+corrobora lo stesso uso senza essere prova target-specific. Il byte 0 è quindi
+canonizzato come opaco (`af_state_byte0`), non come versione; una A0/AE con
+checksum valido e body da 16 byte è strutturalmente valida qualunque sia quel
+valore. Il candidate D251 conserva il valore e i flag prima di qualunque uso
+semantico, conta la AE valida come risposta, non intraprende azioni da POV/TLS/
+locked e termina sempre a `STOP_AFTER_AF`. È
+`READY_FOR_SEPARATE_AI_PM_REVIEW`, non autorizzato live.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
@@ -91,7 +103,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
 | Run live D246 TLS→D4 | successo, consumata | handshake TLS completo; D4 attempt/send `1/1`, ACK `01`, nessuna response/app-data/retry/write persistente; `STOP_AFTER_D4`, cleanup/restore/reseal riusciti |
-| Boundary D250 D4→AF | protocollo chiuso offline; operator path live-capable hard-gated, baseline review pendente | AF logical 13 / physical 64, tail candidate zero, AE diretta 24 con state body 16/versione 1, ACK AF vietato, one-IN/zero-retry/`STOP_AFTER_AF`; hardware non eseguito |
+| Run live D250 D4→AF | eseguita una volta, marker consumato, fail-closed nel validator | TLS e D4 riusciti; AF logical 13 / physical 64 zero-tail inviato una volta; A0/AE strutturalmente valida con body 16; byte0 perduto dalla telemetria; zero retry/write/app-data; cleanup/restore/reseal riusciti |
+| Candidate D251 D4→AF | corretto offline, hard-gated, review AI PM separata richiesta | wire invariato rispetto a D250; byte0 opaco preservato, contatore su AE strutturalmente valida, FDT/20/D2/secondo AF irraggiungibili, `STOP_AFTER_AF` |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -413,6 +426,13 @@ D246 -> evidenza D245 validata; audit primario TLS Finished→D4→ACK→AF
      -> launcher live-capable hard-gated e testato offline; successiva run live single-shot PASS
      -> TLS completo, D4 attempt/send 1/1, ACK d4/01, STOP_AFTER_D4; zero retry/app-data/persistent-write
      -> cleanup/restore/reseal riusciti; AF diventa il prossimo confine non valutato
+D250 -> candidate AF exactly-once chiuso offline, poi run live singola consumata
+     -> TLS e D4 riusciti; AF zero-tail attempt/send 1/1; A0/AE strutturalmente valida body 16
+     -> abort fail-closed sul gate byte0==1; response_count incrementato troppo tardi; byte0 perso
+     -> cleanup/restore/reseal riusciti; zero retry/app-data/persistent-write
+D251 -> audit byte0: gfusb usa byte1 bit0/1/3 e non confronta byte0; Rocky corrobora
+     -> byte0 riclassificato opaco; validator/telemetria corretti, wire D250 invariato
+     -> closure offline PASS; live D251 non eseguito né autorizzato
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -982,9 +1002,10 @@ kit D243 è ora consumato; anche la singola autorizzazione D244 descritta sotto
 è consumata. Anche la singola invocazione D245 è ora consumata. La frase
 storica che indicava D246 come riferimento soltanto offline descriveva lo stato
 prima della run D246: D246 è poi stato eseguito live con successo ed è chiuso a
-`STOP_AFTER_D4`. Il candidate corrente D250 ha protocol boundary chiuso offline
-e percorso operatore live-capable con executable closure offline PASS, ma non
-ha una baseline live approvata e non è stato eseguito su hardware.
+`STOP_AFTER_D4`. D250 è stato poi eseguito una volta fino alla AE strutturale ed
+è consumato. Il candidate corrente D251 corregge offline il solo validator e
+l'osservabilità, ha executable closure PASS, ma non ha una baseline live
+approvata e non è stato eseguito su hardware.
 
 La provenance D241 è nuovamente byte-exact e read-only:
 `d241_operator_dry_run.py` ha SHA-256
@@ -1379,10 +1400,11 @@ accettano un checksum genuino che vale 0x88.
 La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
 immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
 CRC e transizioni duplicate/regressive. Non esistono backend USB/TLS concreti,
-secret, persistenza, retry o loop non bounded. Il boundary live non avanza: il
-primo e massimo candidato restano exactly-one AF con telemetria e stop prima di
-FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi restano
-non noti target-side; un live first-image non è giustificato né autorizzato.
+secret, persistenza, retry o loop non bounded. D250 ha raggiunto live AF/AE; il
+massimo candidate corrente D251 resta exactly-one AF con telemetria e stop
+prima di FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi
+restano non noti target-side; un live first-image non è giustificato né
+autorizzato.
 
 ## D250: canonicalizzazione Rocky, closure exactly-one AF e operator path
 
@@ -1401,9 +1423,10 @@ le cinque occorrenze AF della capture hanno risposta AE diretta e submission
 64; la tail AF fuori dalla lunghezza A0 dichiarata è sempre la stessa sequenza
 opaca di 51 byte, con sei byte nonzero agli offset tail 27–32. Non è trattata
 come payload protocollo né replayata. Il candidate invia 13 byte logici in un
-buffer fisico 64 zero-initialized; l'equivalenza device-side specifica AF resta
-**non live-proven**, ma è bounded e non aggiunge un comando o un campo
-persistente. Presenza dell'ACK AF, lunghezza tail, conteggio e offset dei byte
+buffer fisico 64 zero-initialized. D250 ha provato live l'accettazione
+device-side di questa zero-tail fino a una AE strutturalmente valida; resta
+`NOT_PROVEN` soltanto l'equivalenza byte-per-byte/universale con la tail OEM.
+Presenza dell'ACK AF, lunghezza tail, conteggio e offset dei byte
 nonzero e identità delle cinque tail sono ora derivati programmaticamente dalla
 capture anziché descritti da costanti; il JSON resta redatto e l'audit fallisce
 se questo profilo canonico cambia.
@@ -1413,13 +1436,15 @@ La DLL locale classifica `GetMcuState` come read tipizzata: control wire AF
 timeout 500 ms ed evento/risposta AE. Il call path OEM mostra anche `Sleep(20)`
 prima della query; la capture osserva 58,365 ms da ACK D4 ad AF OUT. Il
 candidate usa 20 ms host-side, timeout complessivo AF 500 ms e massimo una sola
-lettura di frame. La AE accettata deve essere A0, control `0xAE`, checksum
-valido e body esattamente 16 byte. Il byte 0 deve essere la versione `1`
-osservata; una versione diversa viene classificata
-`semantic_state_version_mismatch` e fallisce chiusa. Byte 1: bit0 POV-valid,
-bit1 TLS-connected e bit3 locked sono noti; ogni altro bit è preservato come
-ignoto e non governa azioni ulteriori. La telemetria espone separatamente
-`af_state_version`, `af_state_flags` e `af_unknown_flag_bits`.
+lettura di frame. La AE strutturalmente valida deve essere A0, control `0xAE`,
+checksum valido e body esattamente 16 byte. Le cinque capture OEM osservavano
+byte 0 uguale a `1`, ma l'audit D251 non trova una semantica positiva né un
+confronto OEM: chiamarlo “versione” e imporre `== 1` era una promozione di
+un'osservazione a invariante. Byte 0 è quindi opaco. Byte 1: bit0 POV-valid,
+bit1 TLS-connected e bit3 locked sono gli usi semantici verificati; ogni altro
+bit è preservato come ignoto e non governa azioni ulteriori. La telemetria
+D251 espone `af_state_byte0`, `af_state_flags`, `af_unknown_flag_bits`,
+`af_pov_valid`, `af_tls_connected` e `af_locked`.
 
 `ExactlyOneAfMachine` e la patch continuation mettono il latch attempt prima
 della submission. Completion corta/ambigua conserva `attempt=1`, non marca
@@ -1440,41 +1465,71 @@ resident APP12509 resta non disponibile, quindi non si afferma una proprietà
 universale di ogni AF possibile. Rocky e Issue #1 corroborano serializer e
 semantica, ma non sono la prova target-specific.
 
-Riesame metodologico pre-live: rispetto all'ultima run D246 non viene ripetuto
-lo stesso confine, ma si testa il comando successivo AF exactly-once dopo D4
-già provato; l'ipotesi nuova è che la submission fisica AF con tail zero rispetti
-la lunghezza logica dichiarata e produca una AE versione 1 semanticamente valida.
-Se un futuro tentativo autorizzato fallisse allo stesso punto, non è previsto
-alcun retry: si arresta il percorso e si analizza la nuova evidenza prima di
-proporre un metodo diverso.
+La run D250, eseguita una volta sulla baseline approvata
+`44b22f21178c0083d4628ca9bbdb4ee895df40bd`, ha completato TLS e D4, inviato
+AF una volta e ricevuto una A0/AE strutturalmente valida. È terminata
+fail-closed nel controllo `byte0 == 1`; questo safety behavior era corretto
+rispetto al contratto allora approvato, mentre il modello semantico era
+sovravincolato e l'osservabilità insufficiente perché byte 0 e response count
+non venivano persistiti prima del controllo. Il valore live non è recuperabile
+dagli artefatti leggibili; i due report `/var/lib/.../d250-results/` non sono
+leggibili senza privilegi e non è stato usato `sudo`.
 
 ```text
-D250_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_USER_AUTHORIZATION
-D250_CANDIDATE=TLS->D4_ONCE->ACK_D4_01->AF_ATTEMPT_ONCE->AE_VALIDATED->STOP_AFTER_AF
+D250_AF_LIVE_BOUNDARY=CONSUMED
+D250_CANDIDATE=EXECUTED_ONCE_TLS->D4_ONCE->ACK_D4_01->AF_ONCE->STRUCTURAL_AE->VALIDATOR_ABORT
 D250_MAX_AF_IN_FRAME_COUNT=1
 D250_AF_ACK_POLICY=FORBIDDEN
 D250_RETRY_COUNT=0
 D250_PERSISTENT_WRITE_FAMILY_COUNT=0
-D250_USB_OPEN_COUNT=0
-D250_LIVE_OPERATOR_PATH=READY_FOR_AI_PM_BASELINE_REVIEW
-D250_LIVE_CAPABILITY=HARD_GATED
-D250_LIVE_EXECUTION=NOT_PERFORMED
-D250_LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW
+D250_USB_OPEN_COUNT=1
+D250_AF_ZERO_TAIL_DEVICE_ACCEPTANCE=LIVE_PROVEN
+D250_AF_ZERO_TAIL_STRUCTURAL_AE_RESPONSE=LIVE_PROVEN
+D250_AF_ZERO_TAIL_OEM_BYTEWISE_EQUIVALENCE=NOT_PROVEN
+D250_AF_LIVE_STATE_BYTE0_VALUE=LOST_BY_OBSERVABILITY_GAP
+D250_AF_RESPONSE_COUNTER_DIAGNOSIS=INCREMENTED_TOO_LATE_AFTER_SEMANTIC_CHECK
+D250_LIVE_EXECUTION=PERFORMED_ONCE_MARKER_CONSUMED
 ```
 
-Questa decisione non autorizza hardware. Una futura run richiede review AI PM,
-un commit SHA completo approvato per il live-critical set e autorizzazione
-esplicita separata dell'Utente. Il primo launcher D250 accettava soltanto
-`--offline-dry-run`. La correzione same-step supporta ora esattamente il dry-run
-e `--i-authorize-one-d250-af-live-attempt`; il secondo ramo non è stato
-eseguito su hardware ed è hard-gated da identità operatore, marker D250,
-preflight, source seal e `D250_APPROVED_LIVE_BASELINE_SHA` esterno. Il helper
-confronta direttamente i byte del working tree con i blob del commit, senza
-consultare lo staging index. La fixture Git passa pulita come `APPROVED` e
-classifica `STALE` la mutazione di ciascuno dei 17 file live-critical. Le patch
-D245→D246→D250 applicano e reversano byte-exact in un tree temporaneo; il
-dry-run operatore passa sia dalla root sia da cwd esterno. Nessun commit SHA è
-approvato da questo step.
+Il marker D250 non deve essere cancellato o riutilizzato. D251 usa namespace e
+marker propri. Nessuna preparazione o evidenza D251 autorizza hardware.
+
+## D251: post-mortem semantica AF e candidate one-shot corretto
+
+L'audit primario di `gfusb.dll` copre `GetMcuState` e i tre call site diretti
+nel disassembly locale. La funzione acquisisce 16 byte; il codice OEM usa
+byte 1 bit0 nel percorso POV, byte 1 bit1 per conferma TLS e byte 1 bit3 per lo
+stato locked. Un call site usa solo l'esito della query. Nessun call site
+confronta byte 0 con `1` né lo usa per una decisione. Le cinque capture OEM
+restano una semplice osservazione `byte0=1`. Rocky legge/logga byte 0 ma governa
+POV/TLS/locked con byte 1; è solo corroborazione.
+
+Il parser canonico restituisce ora ogni A0/AE strutturalmente valida con body
+da 16 byte e conserva byte 0 come `McuState.byte0`. Il continuation D251
+incrementa `af_response_count` subito dopo questa validazione strutturale,
+prima di classificare campi inusuali, e persiste byte0/flags/bit semantici. Il
+report distingue `no_response`, `malformed_response`, `unexpected_ack`,
+`valid_ae_with_unusual_state_fields` e `valid_ae_accepted`. Un byte0 diverso da
+1 è osservabile ma non causa failure; ogni esito resta terminale. Serializer,
+tail zero, pacing 20 ms, timeout 500 ms, endpoint e massimo una IN restano
+invariati rispetto a D250.
+
+Riesame metodologico pre-live D251:
+
+1. cambia il solo validator/observability, eliminando l'invariante non provata;
+2. testa l'ipotesi nuova che la AE D250 fosse protocollo valido con byte0 opaco;
+3. se un eventuale D251 autorizzato fallisse ancora allo stesso punto, non si
+   ripeterebbe il probe: si analizzerebbe la telemetria completa e si tornerebbe
+   all'audit del receiver/protocollo prima di qualsiasi nuovo live.
+
+```text
+D251_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_AI_PM_REVIEW
+D251_CANDIDATE=TLS->D4_ONCE->ACK_D4_01->AF_ONCE->ONE_STRUCTURAL_AE->TELEMETRY->STOP_AFTER_AF
+D251_LIVE_EXECUTION=NOT_PERFORMED
+D251_LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW
+D251_RETRY_COUNT=0
+D251_PERSISTENT_WRITE_FAMILY_COUNT=0
+```
 
 ## Operazioni read note e limiti
 
@@ -1531,22 +1586,20 @@ post-handshake: il target ha accettato una sola inizializzazione volatile D4
 per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
 `STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
-Il current critical boundary live resta il comando successivo A0/AF. D249
-lo ha classificato e implementato nel core; D250 ne ha chiuso il candidate
-exactly-one offline: request AF (logical AE con `more=1`)
-`55,ts16le,00,00`, risposta diretta A0/AE senza ACK e stato esatto da 16 byte,
-versione `1`, con byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked; gli
-altri bit sono preservati come ignoti. Serializer, pacing, submission 64 e
-validator sono ora bounded; resta non provata live l'equivalenza della tail AF
-zero rispetto alla tail OEM opaca e resta assente il receiver resident APP12509.
-Questi sono rischi del test, non un'autorizzazione. Il percorso operatore è
-live-capable e hard-gated, con executable closure offline PASS, ma attende
-review/approvazione AI PM del commit live-critical e autorizzazione separata
-dell'Utente. AF non è stato eseguito né autorizzato.
-L'autorizzazione D246 è consumata. Nessun esito storico autorizza
-retry, secondo D4, AF o seconda invocazione. L'assenza di prova elettrica del
-sensore e di prova device-side assoluta oltre il receiver D4 esatto resta
-esplicita.
+Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
+la submission AF zero-tail e restituito direttamente una A0/AE con checksum
+valido e body da 16 byte. La run è terminata nel validator host-side, non per
+assenza o malformazione della risposta. Byte 0 non ha semantica positiva
+provata; byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked sono gli usi
+OEM verificati, e gli altri bit restano ignoti. Il valore byte0 della run D250
+è perduto per gap di osservabilità.
+
+Il current critical boundary è ora la review/autorizzazione separata del
+candidate D251, wire-identico a D250 e corretto soltanto nel modello/telemetria.
+Il percorso è live-capable e hard-gated con executable closure offline PASS,
+ma nessun commit D251 è auto-approvato e nessun live D251 è autorizzato. Il
+marker D250 e tutte le autorizzazioni precedenti sono consumati. Nessun esito
+storico autorizza retry, secondo D4, secondo AF, FDT o una nuova invocazione.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1563,10 +1616,14 @@ minimum missing interval  0x080272e0..0x0802b8f4
 PRE_D1_PATH_CLEARED_FOR_EXACT_OEM_REPLAY  true
 DEVICE_RESIDENT_NO_NVM_SIDE_EFFECT_PROVEN false
 D246_EXACT_APP12509_D4_NO_NVM_SIDE_EFFECT_PROVEN true
-D250_AF_LIVE_BOUNDARY READY_FOR_SEPARATE_USER_AUTHORIZATION
-D250_AF_ZERO_TAIL_DEVICE_EQUIVALENCE NOT_LIVE_PROVEN
-D250_LIVE_OPERATOR_PATH READY_FOR_AI_PM_BASELINE_REVIEW
-D250_LIVE_EXECUTION NOT_PERFORMED
+D250_AF_LIVE_BOUNDARY CONSUMED
+D250_AF_ZERO_TAIL_DEVICE_ACCEPTANCE LIVE_PROVEN
+D250_AF_ZERO_TAIL_STRUCTURAL_AE_RESPONSE LIVE_PROVEN
+D250_AF_ZERO_TAIL_OEM_BYTEWISE_EQUIVALENCE NOT_PROVEN
+D250_AF_LIVE_STATE_BYTE0_VALUE LOST_BY_OBSERVABILITY_GAP
+D250_LIVE_EXECUTION PERFORMED_ONCE
+D251_AF_LIVE_BOUNDARY READY_FOR_SEPARATE_AI_PM_REVIEW
+D251_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -1629,6 +1686,15 @@ byte-identico. Il dry-run reale passa dalla root e da cwd esterno. Questa è
 executable closure offline del percorso operatore live-capable, non esecuzione
 hardware né approvazione del commit live.
 
+D251 mantiene invariato quel wire path e aggiunge una patch continuation
+successiva che rimuove esclusivamente il gate `byte0 == 1`, rinomina il campo
+opaco e corregge response count/classificazione/telemetria. Il launcher usa il
+nuovo marker `d251-operator-invocation.marker` e la directory `d251-results`,
+tratta il marker D250 come storico benigno ma consumato, applica
+D245→D246→D250→D251 e ripristina le sorgenti sealed byte-exact. La matrice
+offline copre byte0 `1`, `0` e `2`, failure strutturali, timeout, ACK inatteso,
+completion ambigua, duplicati e fence post-AF. Nessun USB reale è stato aperto.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -1642,4 +1708,4 @@ hardware né approvazione del commit live.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D250 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D251 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.

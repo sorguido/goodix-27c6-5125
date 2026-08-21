@@ -16,17 +16,17 @@ from core.post_d4 import (
     UnexpectedAck,
     _checksum,
 )
-from analysis.D250.d250_live_critical import (
+from analysis.D251.d251_live_critical import (
     LIVE_CRITICAL_FILES,
     offline_stale_detection_test,
 )
-from analysis.D250.d250_preflight import offline_sandbox_preflight
-from analysis.D250.d250_preflight_observability import render
+from analysis.D251.d251_preflight import offline_sandbox_preflight
+from analysis.D251.d251_preflight_observability import render
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-LAUNCHER = REPOSITORY / "operator_kit/d250-live-af-once.sh"
-AUTHORIZATION = "--i-authorize-one-d250-af-live-attempt"
+LAUNCHER = REPOSITORY / "operator_kit/d251-live-af-once.sh"
+AUTHORIZATION = "--i-authorize-one-d251-af-live-attempt"
 
 
 def payload(control: int, data: bytes) -> bytes:
@@ -55,7 +55,7 @@ class ScriptedTransport:
         return self.frames
 
 
-class D250CoreBoundaryTests(unittest.TestCase):
+class D251CoreBoundaryTests(unittest.TestCase):
     def test_happy_is_terminal_and_preserves_unknown_bits(self):
         transport = ScriptedTransport([ae(0x32)])
         machine = ExactlyOneAfMachine(transport)
@@ -109,7 +109,7 @@ class D250CoreBoundaryTests(unittest.TestCase):
         self.assertEqual(machine.phase, "AF_ATTEMPTED")
 
 
-class D250OperatorClosureTests(unittest.TestCase):
+class D251OperatorClosureTests(unittest.TestCase):
     def test_capture_audit_is_reproducible_and_redacted(self):
         result = subprocess.run(
             ["python3", "analysis/D250/d250_af_capture_audit.py"],
@@ -140,23 +140,23 @@ class D250OperatorClosureTests(unittest.TestCase):
         for arguments in ((), ("--wrong",), (AUTHORIZATION, "extra")):
             result = subprocess.run([str(LAUNCHER), *arguments], cwd=REPOSITORY, text=True, capture_output=True)
             self.assertEqual(result.returncode, 64)
-            self.assertIn("EXPLICIT_D250_SINGLE_RUN_AUTHORIZATION_REQUIRED", result.stderr)
-            self.assertIn("D250_USB_OPEN_COUNT=0", result.stderr)
-            self.assertIn("D250_AF_ATTEMPT_COUNT=0", result.stderr)
-            self.assertIn("D250_AF_SEND_COUNT=0", result.stderr)
+            self.assertIn("EXPLICIT_D251_SINGLE_RUN_AUTHORIZATION_REQUIRED", result.stderr)
+            self.assertIn("D251_USB_OPEN_COUNT=0", result.stderr)
+            self.assertIn("D251_AF_ATTEMPT_COUNT=0", result.stderr)
+            self.assertIn("D251_AF_SEND_COUNT=0", result.stderr)
 
     @unittest.skipIf(os.geteuid() == 0, "non-root invocation requires a non-root test process")
     def test_exact_live_argument_is_blocked_for_non_root(self):
         result = subprocess.run(
             [str(LAUNCHER), AUTHORIZATION],
             cwd=REPOSITORY,
-            env={**os.environ, "D250_APPROVED_LIVE_BASELINE_SHA": "0" * 40},
+            env={**os.environ, "D251_APPROVED_LIVE_BASELINE_SHA": "0" * 40},
             text=True,
             capture_output=True,
         )
         self.assertEqual(result.returncode, 64)
         self.assertIn("ROOT_CONTEXT_REQUIRED", result.stderr)
-        self.assertIn("D250_USB_OPEN_COUNT=0", result.stderr)
+        self.assertIn("D251_USB_OPEN_COUNT=0", result.stderr)
 
     def test_live_critical_baseline_matrix_is_index_independent(self):
         report = offline_stale_detection_test()
@@ -167,12 +167,16 @@ class D250OperatorClosureTests(unittest.TestCase):
         self.assertEqual(report["stale_paths_checked"], list(LIVE_CRITICAL_FILES))
 
     def test_preflight_marker_namespace_and_failure_observability(self):
-        with tempfile.TemporaryDirectory(prefix="d250-test-preflight-") as directory:
+        with tempfile.TemporaryDirectory(prefix="d251-test-preflight-") as directory:
             report = offline_sandbox_preflight(Path(directory))
         self.assertEqual(report["status"], "PASS")
-        self.assertTrue(report["marker_absent_case"]["d250_marker_absent"])
-        self.assertFalse(report["marker_present_case"]["d250_marker_absent"])
+        self.assertTrue(report["marker_absent_case"]["d251_marker_absent"])
+        self.assertFalse(report["marker_present_case"]["d251_marker_absent"])
         self.assertFalse(report["historical_markers_touched"])
+        self.assertIn(
+            "d250-operator-invocation.marker",
+            report["marker_absent_case"]["historical_markers_present_benign"],
+        )
         output = render(
             {
                 "failure_class": "live_critical_baseline_stale",
@@ -181,17 +185,23 @@ class D250OperatorClosureTests(unittest.TestCase):
                 "live_critical_set_status": "STALE",
             }
         )
-        self.assertIn("D250_FAILURE_CLASS=LIVE_CRITICAL_BASELINE_STALE", output)
-        self.assertIn("D250_USB_OPEN_COUNT=0", output)
-        self.assertIn("D250_AF_ATTEMPT_COUNT=0", output)
-        self.assertIn("D250_AF_SEND_COUNT=0", output)
+        self.assertIn("D251_FAILURE_CLASS=LIVE_CRITICAL_BASELINE_STALE", output)
+        self.assertIn("D251_USB_OPEN_COUNT=0", output)
+        self.assertIn("D251_AF_ATTEMPT_COUNT=0", output)
+        self.assertIn("D251_AF_SEND_COUNT=0", output)
 
-    def test_historical_d250_namespace_remains_distinct_from_d251(self):
-        source = LAUNCHER.read_text(encoding="utf-8")
-        self.assertIn("d250-operator-invocation.marker", source)
-        self.assertIn("--i-authorize-one-d250-af-live-attempt", source)
-        self.assertNotIn("d251-operator-invocation.marker", source)
-        self.assertNotIn("--i-authorize-one-d251-af-live-attempt", source)
+    def test_real_offline_invocation_from_repository_and_external_cwd(self):
+        environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+        for cwd in (REPOSITORY, Path(tempfile.gettempdir())):
+            result = subprocess.run([str(LAUNCHER), "--offline-dry-run"], cwd=cwd, env=environment, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("D251_RESULT=PASS", result.stdout)
+            self.assertIn("D251_TERMINAL_BOUNDARY=STOP_AFTER_AF", result.stdout)
+            self.assertIn("D251_USB_OPEN_COUNT=0", result.stdout)
+            self.assertIn("D251_AF_SEND_COUNT=0", result.stdout)
+            self.assertIn("D251_LIVE_CAPABILITY=HARD_GATED", result.stdout)
+            self.assertIn("D251_LIVE_EXECUTION=NOT_PERFORMED", result.stdout)
+            self.assertIn("D251_LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW", result.stdout)
 
 
 if __name__ == "__main__":
