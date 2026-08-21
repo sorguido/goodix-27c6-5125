@@ -90,5 +90,9 @@ quando necessario, senza sincronizzazione automatica.
 Il manuale tecnico in root è la fonte narrativa canonica, aggiornata
 organicamente e non come log append-only. I bundle sono step-local e non
 includono secret, PSK, firmware/DLL proprietarie, capture o dati biometrici.
+Ogni output Dxxx, bundle e checksum compresi, risiede in `analysis/Dxxx/`; la
+root è riservata alle fonti canoniche e alle directory di progetto. Eventuali
+bundle binari storici ancora in root sono trasferiti insieme ai sidecar con una
+relocation byte-preserving, non rigenerati.
 La chiusura usa `OUTCOME`, `ADVANCEMENT`, `EXECUTABLE_CLOSURE`,
 `RESIDUAL_BLOCKER_OR_RISK`, `CANONICAL_DOCUMENTATION`, `BUNDLE`.
