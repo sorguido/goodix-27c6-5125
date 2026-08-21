@@ -12,10 +12,11 @@ Prima di modificare codice, stato tecnico o documentazione:
 
 1. identifica la root reale del repository;
 2. leggi questo `AGENTS.md`;
-3. leggi le sezioni pertinenti del manuale tecnico;
-4. leggi il prompt specifico dello step;
-5. controlla `git status --short` e branch corrente;
-6. esamina solo gli artefatti storici realmente pertinenti.
+3. leggo le linee guida `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
+4. leggi le sezioni pertinenti del manuale tecnico;
+5. leggi il prompt specifico dello step;
+6. controlla `git status --short` e branch corrente;
+7. esamina solo gli artefatti storici realmente pertinenti.
 
 Il manuale tecnico è la fonte narrativa canonica dello stato del progetto. La conoscenza nuova non deve restare soltanto in chat, report o bundle.
 
