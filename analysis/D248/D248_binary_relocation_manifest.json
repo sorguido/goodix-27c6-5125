@@ -353,14 +353,14 @@
       "size": 24693,
       "step": "D239",
       "collision_status": "DESTINATION_ABSENT",
-      "reference_scan_status": "REFERENCES_RECORDED_NO_BLOCKING_RUNTIME_REFERENCE",
+      "reference_scan_status": "BLOCKING_D245_EXECUTABLE_CLOSURE_REPRODUCIBILITY_REFERENCE",
       "references": [
         "D239_operator_kit_executability_gate_bundle.zip.sha256",
         "analysis/D236/D236_preflight_report.json",
         "analysis/D245/D245_executable_closure_report.json",
         "analysis/D245/d245_operator_dry_run.py"
       ],
-      "recommended_action": "GIT_MV_SAME_BLOB_WITH_PAIRED_ZIP_AND_SIDECAR"
+      "recommended_action": "KEEP_IN_ROOT_D245_EXECUTABLE_CLOSURE_COMPATIBILITY_EXCEPTION"
     },
     {
       "source_path": "D239_operator_kit_executability_gate_bundle.zip.sha256",
@@ -371,11 +371,18 @@
       "size": 114,
       "step": "D239",
       "collision_status": "DESTINATION_ABSENT",
-      "reference_scan_status": "REFERENCES_RECORDED_NO_BLOCKING_RUNTIME_REFERENCE",
+      "reference_scan_status": "BLOCKING_D245_EXECUTABLE_CLOSURE_REPRODUCIBILITY_REFERENCE",
       "references": [
-        "analysis/D236/D236_preflight_report.json"
+        "analysis/D236/D236_preflight_report.json",
+        "analysis/D245/d245_operator_dry_run.py",
+        "analysis/D245/D245_executable_closure_report.json"
       ],
-      "recommended_action": "GIT_MV_SAME_BLOB_WITH_PAIRED_ZIP_AND_SIDECAR"
+      "recommended_action": "KEEP_IN_ROOT_D245_EXECUTABLE_CLOSURE_COMPATIBILITY_EXCEPTION"
     }
-  ]
+  ],
+  "artifact_counts": {
+    "total_historical_root_artifacts": 24,
+    "mechanically_relocatable_now": 22,
+    "retained_compatibility_exception": 2
+  }
 }

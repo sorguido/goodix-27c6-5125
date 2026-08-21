@@ -31,7 +31,8 @@ found.
 | tracked `**/__pycache__/*.pyc` (25) | removed | reproducible interpreter cache, never a fixture | path/type and tracked-file audit; no runtime dependency | low |
 | `src/goodix5125_d233_backend.py.orig` | removed; `SAFE_TO_REMOVE_GENERATED_BACKUP` | generated backup introduced by D243 and reconstructible from Git | no textual references; history commit recorded | low |
 | `src/goodix5125_d235_entrypoint.py.orig` | removed; `SAFE_TO_REMOVE_GENERATED_BACKUP` | generated backup introduced by D243 and reconstructible from Git | no textual references; history commit recorded | low |
-| root D230–D239 ZIP/sidecars | classified, not moved | Codex Web binary-transfer constraint; preserve paired artifacts | every name scanned; references recorded in manifest | low pending mechanical move |
+| root D230–D238 ZIP/sidecars | classified, not moved | preserve paired artifacts for byte-exact mechanical relocation | every name scanned; references recorded in manifest | low pending mechanical move |
+| root D239 ZIP/sidecar | retained compatibility exception | D245 executable closure opens the root ZIP path | blocking executable reference confirmed | none while retained |
 | `analysis/README.md` | created | concise canonical step index | paths checked | low |
 | `operator_kit/README.md` | created | distinguishes consumed/superseded launchers; grants no authorization | manual and Dxxx reports reviewed | low |
 | `src/`, `tests/`, `poc/` | README only; no move | freeze reproducible legacy D232–D246 chain | tree/path audit | low |
@@ -47,10 +48,13 @@ sources are historical runtime evolution, not unique evidence in the backups.
 ## Binary relocation inventory
 
 Every declared ZIP checksum equals the bytes currently tracked. Destinations
-were absent, so there are no collisions. Historical status/report references
-and sidecar self-references are non-blocking: a mechanical `git mv` must update
-live path consumers where the manifest's `references` list identifies them,
-while historical captured reports should not be retro-edited.
+were absent, so there are no collisions. Eleven ZIPs and eleven sidecars from
+D230–D238 are mechanically relocatable byte-for-byte. The D239 ZIP and sidecar
+are not authorized for relocation: `analysis/D245/d245_operator_dry_run.py`
+opens the root ZIP while verifying historical launchers, and the D245 closure
+report records that path. Those two artifacts remain a deliberate compatibility
+exception until a future step migrates the dependency and re-verifies executable
+closure. Historical captured reports are not retro-edited.
 
 | Source | Destination | Git blob | SHA-256 of file | Bytes | Collision |
 | --- | --- | --- | --- | ---: | --- |
@@ -76,13 +80,13 @@ while historical captured reports should not be retro-edited.
 | `D237_live_exact_oem_replay_tls_single_shot_bundle.zip.sha256` | `analysis/D237/D237_live_exact_oem_replay_tls_single_shot_bundle.zip.sha256` | `445d2eea7e309aa7d1cc6cdb91f0557a8ae9cf65` | `24c977db6df45b13a689b541b055f0fd9ca6794937414981b7ec449ec9119905` | 120 | DESTINATION_ABSENT |
 | `D238_pre_d1_live_path_consolidation_bundle.zip` | `analysis/D238/D238_pre_d1_live_path_consolidation_bundle.zip` | `05053594b4bc8b7cec2b4de305edecccd35b2bfc` | `39c1254ca54de250bb4ee29cdaa033e729ed972de5fea683687343a50c53076a` | 18611 | DESTINATION_ABSENT |
 | `D238_pre_d1_live_path_consolidation_bundle.zip.sha256` | `analysis/D238/D238_pre_d1_live_path_consolidation_bundle.zip.sha256` | `1134a187eb6a992c9f60fed9dc380c60400d69d7` | `e3f310289439e08142759ad6fef7d7da92b474b1ae78e78bc64aaeda15f71bad` | 113 | DESTINATION_ABSENT |
-| `D239_operator_kit_executability_gate_bundle.zip` | `analysis/D239/D239_operator_kit_executability_gate_bundle.zip` | `72a2c129709e69e79775ace5d40a2a609faf0208` | `0afb408a09c4306622ad2396ee7fa8246d43557557786bc6bf10b7d7505f12bc` | 24693 | DESTINATION_ABSENT |
-| `D239_operator_kit_executability_gate_bundle.zip.sha256` | `analysis/D239/D239_operator_kit_executability_gate_bundle.zip.sha256` | `23e220d9944b141229d1b3a2dbac6ac812793df2` | `4bc02b352648e19a414a93b1a8847aeb6a6995ccb96d1cf22a4c73cafa36a349` | 114 | DESTINATION_ABSENT |
+| `D239_operator_kit_executability_gate_bundle.zip` | **KEEP IN ROOT (D245 closure)** | `72a2c129709e69e79775ace5d40a2a609faf0208` | `0afb408a09c4306622ad2396ee7fa8246d43557557786bc6bf10b7d7505f12bc` | 24693 | COMPATIBILITY EXCEPTION |
+| `D239_operator_kit_executability_gate_bundle.zip.sha256` | **KEEP IN ROOT WITH ZIP** | `23e220d9944b141229d1b3a2dbac6ac812793df2` | `4bc02b352648e19a414a93b1a8847aeb6a6995ccb96d1cf22a4c73cafa36a349` | 114 | COMPATIBILITY EXCEPTION |
 
 The machine-readable manifest is
-`analysis/D248/D248_binary_relocation_manifest.json`. The required action is a
-paired, byte-preserving Git relocation of each ZIP and sidecar; D248 does not
-perform it.
+`analysis/D248/D248_binary_relocation_manifest.json`. For the 22 D230–D238 artifacts, the required action is paired, byte-preserving
+Git relocation; D248 does not perform it. The two D239 artifacts remain in root.
+No executable or runtime Python is modified.
 
 ## Structural and licensing result
 
@@ -112,6 +116,11 @@ ZIP integrity match the sidecar. The binary ZIP is absent from the PR tree and
 must be restored from Base64, verified, and replace the temporary transport
 file before the final baseline is merged.
 
+The AI Supervisor subsequently verified Draft PR `#2` as open, draft,
+mergeable, and not merged, with base
+`9e19370d068a71ad0794fdb570aaf9693011ed78`. This is external repository-state
+evidence; it does not alter the D248 technical result.
+
 ## Closure
 
 ```text
@@ -128,7 +137,10 @@ ORIG_AUDIT_COMPLETE=YES
 ANALYSIS_INDEX_CREATED=YES
 BINARY_RELOCATION_MANIFEST_READY=YES
 READY_FOR_BINARY_RELOCATION=YES
-DRAFT_PR_CREATED=NO
-READY_FOR_DRAFT_PR=YES
+D239_ROOT_COMPATIBILITY_EXCEPTION=YES
+MECHANICALLY_RELOCATABLE_ARTIFACTS=22
+RETAINED_ROOT_ARTIFACTS=2
+DRAFT_PR_CREATED=YES
+DRAFT_PR=2
 PR_MERGED=NO
 ```

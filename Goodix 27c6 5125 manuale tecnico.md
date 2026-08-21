@@ -79,13 +79,16 @@ storia richiedono clean export, nuova storia o filtro dedicato.
 La root contiene soltanto fonti canoniche, licenze, linee guida e directory di
 progetto. Gli output Dxxx sono step-local e non cumulativi in
 `analysis/Dxxx/`, inclusi bundle e checksum; `analysis/README.md` è il solo
-indice sintetico e non sostituisce questo manuale. I bundle D230–D239 ancora
-presenti in root alla chiusura D248 sono un'eccezione storica temporanea: il
-manifest `analysis/D248/D248_binary_relocation_manifest.json` ne fissa blob
-Git, SHA-256, dimensione, destinazione e riferimenti. A causa del limite di
-trasferimento binario Codex Web, ZIP e sidecar saranno spostati insieme in una
-fase meccanica successiva, usando gli stessi blob e senza re-encoding; questa
-relocation di layout non cambia stato tecnico né autorizzazioni live.
+indice sintetico e non sostituisce questo manuale. Il manifest
+`analysis/D248/D248_binary_relocation_manifest.json` fissa blob Git, SHA-256,
+dimensione, destinazione e riferimenti dei bundle storici in root. Le undici
+coppie D230–D238 possono essere spostate insieme in una fase meccanica
+byte-preserving. La coppia D239 resta invece intenzionalmente in root perché il
+controllo offline D245 apre quel path per verificare i launcher storici: la
+riproducibilità prevale su una root solo esteticamente perfetta. Rimuovere
+l'eccezione richiede uno step futuro che migri esplicitamente la dipendenza
+D245 e ne verifichi nuovamente l'executable closure. La relocation di layout
+non cambia stato tecnico né autorizzazioni live.
 
 Le categorie restano distinte:
 

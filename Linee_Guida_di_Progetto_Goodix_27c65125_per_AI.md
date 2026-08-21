@@ -93,6 +93,7 @@ includono secret, PSK, firmware/DLL proprietarie, capture o dati biometrici.
 Ogni output Dxxx, bundle e checksum compresi, risiede in `analysis/Dxxx/`; la
 root è riservata alle fonti canoniche e alle directory di progetto. Eventuali
 bundle binari storici ancora in root sono trasferiti insieme ai sidecar con una
-relocation byte-preserving, non rigenerati.
+relocation byte-preserving, non rigenerati, soltanto quando il move non rompe
+consumatori eseguibili o riproducibilità; le eccezioni sono documentate.
 La chiusura usa `OUTCOME`, `ADVANCEMENT`, `EXECUTABLE_CLOSURE`,
 `RESIDUAL_BLOCKER_OR_RISK`, `CANONICAL_DOCUMENTATION`, `BUNDLE`.
