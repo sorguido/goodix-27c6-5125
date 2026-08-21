@@ -1,0 +1,60 @@
+{
+  "schema": "d252-fdt-precondition-restore-decision-v1",
+  "execution_mode": "offline_only",
+  "initial_head": "f07352ce085651568a9aedbf04b097df91d7c0bb",
+  "d251": {
+    "live_result": "PASS",
+    "af_boundary": "LIVE_PROVEN",
+    "af_zero_tail_device_acceptance": "LIVE_PROVEN",
+    "af_structural_ae": "LIVE_PROVEN",
+    "af_state_byte0": 0,
+    "af_state_byte0_semantic_class": "OPAQUE",
+    "af_state_flags": "0x02",
+    "af_pov_valid": false,
+    "af_tls_connected": true,
+    "af_locked": false,
+    "af_unknown_flag_bits": 0,
+    "retry_count": 0,
+    "persistent_write_family_count": 0,
+    "application_data_count": 0,
+    "cleanup_reseal_restore": "PASS",
+    "marker": "CONSUMED"
+  },
+  "fresh_fdt": {
+    "path_selected": true,
+    "cached_d2_selected": false,
+    "fdt_down_table_source": "DYNAMIC_IRQ_0x100_TRANSFORM_AFTER_0x36; FIRST_0x36_SEED_PROVENANCE_UNRESOLVED",
+    "fdt_down_table_lifetime": "OBSERVED_REUSED_WITHIN_ONE_CAPTURE_SESSION; CROSS_SESSION_AND_ENVIRONMENTAL_VALIDITY_NOT_PROVEN",
+    "fdt_down_table_target_validity": "TARGET_CAPTURE_SESSION_ONLY; NOT_VALIDATED_FOR_CURRENT_D251_COLD_START",
+    "fdt_down_table_live_ready": false,
+    "fdt36_required_before_fdt32": "YES_FOR_CURRENT_PATH_TO_OBTAIN_FRESH_TARGET_BASELINE; SAFE_LIVE_0x36_PRECONDITIONS_NOT_CLOSED",
+    "fdt32_semantic_class": "FINGER_DOWN_DETECTION_ARMING_SENSOR_MODE",
+    "fdt32_persistence_class": "NO_PERSISTENT_WRITE_PATH_OBSERVED; DEVICE_NVM_NONMUTATION_NOT_ABSOLUTELY_PROVEN",
+    "fdt36_semantic_class": "MANUAL_NO_FINGER_FDT_BASELINE_SAMPLING_WITH_IRQ_0x100",
+    "fdt36_persistence_class": "DYNAMIC_SENSOR_BASELINE_AND_HOST_LEARNED_TABLE; NO_DEVICE_PERSISTENT_WRITE_PATH_OBSERVED; DEVICE_NVM_NONMUTATION_NOT_ABSOLUTELY_PROVEN",
+    "fdt_cancel_command": "NOT_FOUND_OR_PROVEN",
+    "fdt_cancel_primary_evidence": "NONE; OEM_gfOnCancel_IS_HOST_REQUEST_CANCELLATION; 0x34_ARMS_FINGER_UP",
+    "fdt_restore_state": "NOT_PROVEN",
+    "fdt_restore_live_proven_predecessor": "NONE",
+    "fdt_arm_and_stop_safe": false,
+    "post_irq2_target_command": "0x22_DATA_0100",
+    "d249_rocky_based_0x20_model_matches_target_occurrence": false
+  },
+  "decision": {
+    "next_minimum_live_boundary": "NONE",
+    "next_useful_work": "OFFLINE_AUDIT_OF_INITIAL_0x36_SEED_PROVENANCE_AND_PRIMARY_POST_FDT_RESTORE_PLUS_0x22_SEMANTICS",
+    "d252_live_boundary": "BLOCKED",
+    "d252_live_execution": "NOT_PERFORMED",
+    "operator_kit_created": false
+  },
+  "safety_counts": {
+    "usb_open_count": 0,
+    "tls_handshake_count": 0,
+    "d4_send_count": 0,
+    "af_send_count": 0,
+    "fdt_send_count": 0,
+    "finger_interaction_count": 0,
+    "retry_count": 0,
+    "persistent_write_family_count": 0
+  }
+}

@@ -48,16 +48,27 @@ osservabilità, non assenza di risposta. Il byte 0 live non è stato persistito 
 restore fprintd/segnali sono riusciti; retry, write persistenti e application
 data sono rimasti a zero. Il marker D250 è consumato.
 
-D251 corregge solo modello semantico e osservabilità. L'audit dei tre call site
-locali di `GetMcuState` in `gfusb.dll` non mostra confronti né branch sul byte
-0: le decisioni osservate leggono il byte 1 e i suoi bit 0, 1 e 3. Rocky
-corrobora lo stesso uso senza essere prova target-specific. Il byte 0 è quindi
-canonizzato come opaco (`af_state_byte0`), non come versione; una A0/AE con
-checksum valido e body da 16 byte è strutturalmente valida qualunque sia quel
-valore. Il candidate D251 conserva il valore e i flag prima di qualunque uso
-semantico, conta la AE valida come risposta, non intraprende azioni da POV/TLS/
-locked e termina sempre a `STOP_AFTER_AF`. È
-`READY_FOR_SEPARATE_AI_PM_REVIEW`, non autorizzato live.
+D251 ha poi eseguito una volta il candidate corretto sulla baseline approvata
+`f07352ce085651568a9aedbf04b097df91d7c0bb`. TLS e D4 sono riusciti; AF è stato
+inviato una volta con la zero-tail già accettata dal target e ha ricevuto una
+sola A0/AE strutturalmente valida. Lo stato live è `byte0=0`, ancora opaco e
+non una “versione 0”, con `flags=0x02`: TLS connected vero, POV-valid e locked
+falsi, bit ignoti zero. D251 ha terminato a `STOP_AFTER_AF`; retry, famiglie di
+scrittura persistente e application data sono rimasti a zero, mentre cleanup,
+zeroizzazione secret, restore fprintd/segnali e reseal sono riusciti. Il marker
+D251 è consumato. `POV_VALID=false` seleziona il percorso fresh-FDT; D2 non è
+selezionato da questo stato.
+
+D252 ha riesaminato offline quel percorso senza hardware. La capture target
+prova che la tabella FDT-down è appresa dinamicamente dagli IRQ `0x0100` prodotti
+da tre `0x36`, ma non chiude la provenienza/freschezza della tabella seed del
+primo `0x36` per il cold-start corrente. Tutti i tre `0x32` usano la tabella
+finale nella stessa sessione; dopo l'unico IRQ finger-down catturato il comando
+target successivo è wire `0x22 [01 00]`, non il `0x20` del modello Rocky/D249.
+Soprattutto, nessun cancel/disarm/restore post-FDT è provato: `0x34` arma
+finger-up e `gfOnCancel` cancella una richiesta host, mentre A2/`0x70` non sono
+osservati come restore FDT. Perciò `D252_LIVE_BOUNDARY=BLOCKED` e non esiste un
+operator kit D252.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
@@ -104,7 +115,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
 | Run live D246 TLS→D4 | successo, consumata | handshake TLS completo; D4 attempt/send `1/1`, ACK `01`, nessuna response/app-data/retry/write persistente; `STOP_AFTER_D4`, cleanup/restore/reseal riusciti |
 | Run live D250 D4→AF | eseguita una volta, marker consumato, fail-closed nel validator | TLS e D4 riusciti; AF logical 13 / physical 64 zero-tail inviato una volta; A0/AE strutturalmente valida con body 16; byte0 perduto dalla telemetria; zero retry/write/app-data; cleanup/restore/reseal riusciti |
-| Candidate D251 D4→AF | corretto offline, hard-gated, review AI PM separata richiesta | wire invariato rispetto a D250; byte0 opaco preservato, contatore su AE strutturalmente valida, FDT/20/D2/secondo AF irraggiungibili, `STOP_AFTER_AF` |
+| Run live D251 D4→AF | successo, consumata | exactly-one AF/AE; byte0 opaco `0`, flags `0x02`, POV false/TLS true/locked false, zero retry/write/app-data, cleanup/restore/reseal riusciti, `STOP_AFTER_AF` |
+| Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -432,7 +444,11 @@ D250 -> candidate AF exactly-once chiuso offline, poi run live singola consumata
      -> cleanup/restore/reseal riusciti; zero retry/app-data/persistent-write
 D251 -> audit byte0: gfusb usa byte1 bit0/1/3 e non confronta byte0; Rocky corrobora
      -> byte0 riclassificato opaco; validator/telemetria corretti, wire D250 invariato
-     -> closure offline PASS; live D251 non eseguito né autorizzato
+     -> closure offline PASS; successiva run live single-shot PASS e marker consumato
+     -> AE unica valida: byte0=0 opaco, flags=0x02, POV false/TLS true/locked false; STOP_AFTER_AF
+D252 -> audit offline fresh-FDT: tabella appresa da 0x36/IRQ0100, ma seed/freschezza current-path aperti
+     -> target IRQ2 seguito da wire 0x22, non 0x20; nessun cancel/restore post-FDT provato
+     -> D252_LIVE_BOUNDARY=BLOCKED; nessun kit live e zero hardware
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1003,9 +1019,9 @@ kit D243 è ora consumato; anche la singola autorizzazione D244 descritta sotto
 storica che indicava D246 come riferimento soltanto offline descriveva lo stato
 prima della run D246: D246 è poi stato eseguito live con successo ed è chiuso a
 `STOP_AFTER_D4`. D250 è stato poi eseguito una volta fino alla AE strutturale ed
-è consumato. Il candidate corrente D251 corregge offline il solo validator e
-l'osservabilità, ha executable closure PASS, ma non ha una baseline live
-approvata e non è stato eseguito su hardware.
+è consumato. D251 ha poi corretto validator/osservabilità ed è stato eseguito
+una volta sulla baseline live approvata, chiudendo AF a `STOP_AFTER_AF`; anche
+il suo marker è consumato. D252 non ha prodotto un nuovo kit live.
 
 La provenance D241 è nuovamente byte-exact e read-only:
 `d241_operator_dry_run.py` ha SHA-256
@@ -1373,9 +1389,14 @@ un encoder duplicato D249.
 
 La capture locale osserva AF e comandi FDT plaintext nella sessione post-TLS;
 la DLL conferma serializer AF, timestamp, risposta AE da 16 byte e bit di stato.
-Il modello offline sceglie separatamente due percorsi: AF senza POV → invio
+Il modello offline D249 sceglie separatamente due percorsi: AF senza POV → invio
 asincrono FDT down 32 → IRQ 2 → invio asincrono SetMode Image 20 → immagine;
-AF con POV valido → invio asincrono D2 → immagine cached. Gli ACK osservati
+AF con POV valido → invio asincrono D2 → immagine cached. D252 ha poi stabilito
+che questo tratto, mutuato da Rocky, non è wire-exact per l'unica occorrenza
+target con IRQ 2: il successivo OUT è `0x22 [01 00]`, mentre `0x20` compare
+separatamente nei path di immagine base/no-finger. D249 resta una closure
+sintetica storica e non prova il sequencing target verso la prima immagine.
+Gli ACK osservati
 localmente dopo 32 e 20 vengono validati se presenti, ma non sono una
 precondizione causale obbligatoria; per D2 la presenza target resta non nota. Entrambi validano framing, checksum, record, CRC,
 unpack/transpose e terminano esplicitamente in `FIRST_IMAGE_RECEIVED`. Questa è
@@ -1400,11 +1421,11 @@ accettano un checksum genuino che vale 0x88.
 La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
 immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
 CRC e transizioni duplicate/regressive. Non esistono backend USB/TLS concreti,
-secret, persistenza, retry o loop non bounded. D250 ha raggiunto live AF/AE; il
-massimo candidate corrente D251 resta exactly-one AF con telemetria e stop
-prima di FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi
-restano non noti target-side; un live first-image non è giustificato né
-autorizzato.
+secret, persistenza, retry o loop non bounded. D251 ha raggiunto live AF/AE e
+si è fermato prima di FDT o dito. D252 ha provato la derivazione dinamica della
+tabella FDT ma non la sua freschezza current-path né un restore post-arming;
+FDT arming/disarm/restore e ordering mixed-channel completi restano quindi non
+chiusi target-side. Un live FDT o first-image non è giustificato né autorizzato.
 
 ## D250: canonicalizzazione Rocky, closure exactly-one AF e operator path
 
@@ -1491,8 +1512,8 @@ D250_AF_RESPONSE_COUNTER_DIAGNOSIS=INCREMENTED_TOO_LATE_AFTER_SEMANTIC_CHECK
 D250_LIVE_EXECUTION=PERFORMED_ONCE_MARKER_CONSUMED
 ```
 
-Il marker D250 non deve essere cancellato o riutilizzato. D251 usa namespace e
-marker propri. Nessuna preparazione o evidenza D251 autorizza hardware.
+Il marker D250 non deve essere cancellato o riutilizzato. D251 ha usato
+namespace e marker propri; anche il marker D251 è ora storico e consumato.
 
 ## D251: post-mortem semantica AF e candidate one-shot corretto
 
@@ -1518,18 +1539,89 @@ Riesame metodologico pre-live D251:
 
 1. cambia il solo validator/observability, eliminando l'invariante non provata;
 2. testa l'ipotesi nuova che la AE D250 fosse protocollo valido con byte0 opaco;
-3. se un eventuale D251 autorizzato fallisse ancora allo stesso punto, non si
-   ripeterebbe il probe: si analizzerebbe la telemetria completa e si tornerebbe
-   all'audit del receiver/protocollo prima di qualsiasi nuovo live.
+3. se il D251 autorizzato fosse fallito ancora allo stesso punto, non si sarebbe
+   ripetuto il probe: la telemetria completa avrebbe riportato all'audit del
+   receiver/protocollo prima di qualsiasi nuovo live.
+
+La run autorizzata sulla baseline
+`f07352ce085651568a9aedbf04b097df91d7c0bb` ha validato esattamente l'ipotesi:
+una sola AE strutturale con `byte0=0` è stata accettata e classificata senza
+promuoverla a versione. `flags=0x02` significa TLS connected vero, POV-valid e
+locked falsi, con bit ignoti zero. La run ha chiuso AF e si è arrestata prima
+di qualsiasi FDT, D2, dito o immagine.
 
 ```text
-D251_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_AI_PM_REVIEW
-D251_CANDIDATE=TLS->D4_ONCE->ACK_D4_01->AF_ONCE->ONE_STRUCTURAL_AE->TELEMETRY->STOP_AFTER_AF
-D251_LIVE_EXECUTION=NOT_PERFORMED
-D251_LIVE_BASELINE_APPROVAL=PENDING_AI_PM_REVIEW
+D251_LIVE_RESULT=PASS
+D251_AF_BOUNDARY=LIVE_PROVEN
+D251_AF_ZERO_TAIL_DEVICE_ACCEPTANCE=LIVE_PROVEN
+D251_AF_STRUCTURAL_AE=LIVE_PROVEN
+D251_AF_STATE_BYTE0=0
+D251_AF_STATE_BYTE0_SEMANTIC_CLASS=OPAQUE
+D251_AF_STATE_FLAGS=0x02
+D251_AF_POV_VALID=false
+D251_AF_TLS_CONNECTED=true
+D251_AF_LOCKED=false
+D251_AF_UNKNOWN_FLAG_BITS=0
 D251_RETRY_COUNT=0
 D251_PERSISTENT_WRITE_FAMILY_COUNT=0
+D251_APPLICATION_DATA_COUNT=0
+D251_CLEANUP_RESEAL_RESTORE=PASS
+D251_MARKER=CONSUMED
 ```
+
+## D252: audit fresh-FDT, tabella dinamica e restore mancante
+
+L'audit riproducibile `analysis/D252/d252_fdt_capture_audit.py` verifica la
+capture target hash-gated. Le tre richieste `0x36` hanno data
+`09 01 || table12`, frame logico 22 e submission fisica 64; la tail esterna al
+frame conserva sei byte OEM opachi nonzero agli offset 40–45. Ognuna riceve
+ACK echo `36`/status `01` e un evento IRQ `0x0100`, touch flag zero. La routine
+DLL `0x180029210` valida i sei raw word e calcola ciascun word di tabella come
+`((v >> 1) << 8) | 0x80`: nella capture le prime due tabelle apprese diventano
+esattamente l'input del `0x36` successivo, e la terza diventa
+`80ac80bd80a380b180a680b2`.
+
+Le tre richieste `0x32` hanno data
+`08 01 || 80ac80bd80a380b180a680b2 || ts16le`, frame logico 24, submission 64
+con tail zero e ACK echo `32`/status `01`. Il timestamp DLL è
+`wSecond*1000+wMilliseconds` troncato a 16 bit. La tabella è riusata per circa
+117,45 secondi nella stessa sessione; la validità cross-session, termica o per
+il cold-start D251 non è provata. Il primo seed `0x36` non è un literal in DLL,
+APP o config90 e la sua provenienza/freschezza resta aperta, sebbene il DLL
+abbia un possibile percorso cache host `goodix.dat` legato alla OTP.
+
+Dopo l'unico IRQ 2 target, il successivo OUT è wire `0x22 [01 00]`, non il
+`0x20` modellato in D249/Rocky. `0x34` arma invece finger-up. La routine OEM
+`gfOnCancel` cancella la richiesta WDF host senza inviare direttamente un
+comando A0; A2 reset-sensor e `0x70` idle non sono osservati come cleanup dopo
+FDT. La capture termina dopo il terzo `0x32` senza un restore esplicito. Il
+receiver APP family-3 risiede inoltre nel tratto mancante: non si osservano
+write persistenti, ma non è possibile promuovere l'inferenza di modalità
+volatile a prova assoluta di nonmutazione NVM.
+
+```text
+FDT_DOWN_TABLE_SOURCE=DYNAMIC_IRQ_0x100_TRANSFORM_AFTER_0x36; FIRST_0x36_SEED_PROVENANCE_UNRESOLVED
+FDT_DOWN_TABLE_LIFETIME=OBSERVED_REUSED_WITHIN_ONE_CAPTURE_SESSION; CROSS_SESSION_AND_ENVIRONMENTAL_VALIDITY_NOT_PROVEN
+FDT_DOWN_TABLE_TARGET_VALIDITY=TARGET_CAPTURE_SESSION_ONLY; NOT_VALIDATED_FOR_CURRENT_D251_COLD_START
+FDT_DOWN_TABLE_LIVE_READY=false
+FDT32_SEMANTIC_CLASS=FINGER_DOWN_DETECTION_ARMING_SENSOR_MODE
+FDT32_PERSISTENCE_CLASS=NO_PERSISTENT_WRITE_PATH_OBSERVED; DEVICE_NVM_NONMUTATION_NOT_ABSOLUTELY_PROVEN
+FDT36_REQUIRED_BEFORE_FDT32=YES_FOR_CURRENT_PATH_TO_OBTAIN_FRESH_TARGET_BASELINE; SAFE_LIVE_0x36_PRECONDITIONS_NOT_CLOSED
+FDT36_SEMANTIC_CLASS=MANUAL_NO_FINGER_FDT_BASELINE_SAMPLING_WITH_IRQ_0x100
+FDT36_PERSISTENCE_CLASS=DYNAMIC_SENSOR_BASELINE_AND_HOST_LEARNED_TABLE; NO_DEVICE_PERSISTENT_WRITE_PATH_OBSERVED; DEVICE_NVM_NONMUTATION_NOT_ABSOLUTELY_PROVEN
+FDT_CANCEL_COMMAND=NOT_FOUND_OR_PROVEN
+FDT_CANCEL_PRIMARY_EVIDENCE=NONE; gfOnCancel_IS_HOST_ONLY; 0x34_ARMS_FINGER_UP
+FDT_RESTORE_STATE=NOT_PROVEN
+FDT_RESTORE_LIVE_PROVEN_PREDECESSOR=NONE
+FDT_ARM_AND_STOP_SAFE=false
+NEXT_MINIMUM_LIVE_BOUNDARY=NONE
+D252_LIVE_BOUNDARY=BLOCKED
+D252_LIVE_EXECUTION=NOT_PERFORMED
+```
+
+Il prossimo avanzamento utile richiede nuova evidenza primaria sul seed del
+primo `0x36`, sul restore device-side post-FDT e sulla distinzione `0x22/0x20`;
+non una ripetizione live del percorso già noto.
 
 ## Operazioni read note e limiti
 
@@ -1594,12 +1686,18 @@ provata; byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked sono gli usi
 OEM verificati, e gli altri bit restano ignoti. Il valore byte0 della run D250
 è perduto per gap di osservabilità.
 
-Il current critical boundary è ora la review/autorizzazione separata del
-candidate D251, wire-identico a D250 e corretto soltanto nel modello/telemetria.
-Il percorso è live-capable e hard-gated con executable closure offline PASS,
-ma nessun commit D251 è auto-approvato e nessun live D251 è autorizzato. Il
-marker D250 e tutte le autorizzazioni precedenti sono consumati. Nessun esito
-storico autorizza retry, secondo D4, secondo AF, FDT o una nuova invocazione.
+D251 ha chiuso live AF sulla baseline approvata: la singola AE valida con
+`byte0=0` ha confermato che il byte è opaco, e `flags=0x02` ha selezionato
+fresh-FDT, non D2. Anche il marker D251 è consumato; l'esito non autorizza
+retry, secondo D4, secondo AF, FDT o una nuova invocazione.
+
+Il current critical boundary è ora offline: chiudere la precondizione target
+fresh per `0x36`/tabella FDT, il cancel/restore device-side dopo arming e la
+semantica target del successivo wire `0x22`. La tabella finale della capture è
+dinamicamente appresa da IRQ `0x0100`, ma vale soltanto come prova della
+sessione catturata; il cold-start D251 non possiede una baseline validata. Non
+esiste un restore OEM post-FDT provato. D252 è quindi `BLOCKED` e non ha creato
+un path live-capable.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1622,8 +1720,17 @@ D250_AF_ZERO_TAIL_STRUCTURAL_AE_RESPONSE LIVE_PROVEN
 D250_AF_ZERO_TAIL_OEM_BYTEWISE_EQUIVALENCE NOT_PROVEN
 D250_AF_LIVE_STATE_BYTE0_VALUE LOST_BY_OBSERVABILITY_GAP
 D250_LIVE_EXECUTION PERFORMED_ONCE
-D251_AF_LIVE_BOUNDARY READY_FOR_SEPARATE_AI_PM_REVIEW
-D251_LIVE_EXECUTION NOT_PERFORMED
+D251_LIVE_RESULT PASS
+D251_AF_BOUNDARY LIVE_PROVEN
+D251_AF_STATE_BYTE0 0_OPAQUE
+D251_AF_STATE_FLAGS 0x02
+D251_AF_POV_VALID false
+D251_MARKER CONSUMED
+FDT_DOWN_TABLE_LIVE_READY false
+FDT_RESTORE_STATE NOT_PROVEN
+FDT_ARM_AND_STOP_SAFE false
+D252_LIVE_BOUNDARY BLOCKED
+D252_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -1693,7 +1800,15 @@ nuovo marker `d251-operator-invocation.marker` e la directory `d251-results`,
 tratta il marker D250 come storico benigno ma consumato, applica
 D245→D246→D250→D251 e ripristina le sorgenti sealed byte-exact. La matrice
 offline copre byte0 `1`, `0` e `2`, failure strutturali, timeout, ACK inatteso,
-completion ambigua, duplicati e fence post-AF. Nessun USB reale è stato aperto.
+completion ambigua, duplicati e fence post-AF. Quel launcher è stato poi
+eseguito una volta sulla baseline approvata e ha chiuso AF con `byte0=0`,
+`flags=0x02`, stop terminale e restore completo; il marker è consumato.
+
+D252 non aggiunge runtime USB né operator kit. Aggiunge soltanto un audit
+offline GPL hash-gated della capture, la decisione strutturata e il report
+step-local. Il modello D249 `IRQ2→0x20` resta storico e viene esplicitamente
+marcato non wire-exact rispetto al target `IRQ2→0x22`; non è stato promosso un
+nuovo percorso perché tabella fresh e restore non sono entrambi chiusi.
 
 ## Regole operative
 
@@ -1708,4 +1823,4 @@ completion ambigua, duplicati e fence post-AF. Nessun USB reale è stato aperto.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D251 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D252 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
