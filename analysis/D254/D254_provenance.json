@@ -1,0 +1,64 @@
+{
+  "schema": "D254_EXTERNAL_SOURCE_PROVENANCE_V1",
+  "fetch_date": "2026-08-22",
+  "reuse_policy": "EVIDENCE_ONLY_NO_CODE_REUSE",
+  "sources": [
+    {
+      "name": "yanxinwu946/goodix-5125-linux",
+      "url": "https://github.com/yanxinwu946/goodix-5125-linux",
+      "commit": "d39e34f240270bb13c3977a7fa99973c346fa81f",
+      "tree": "165cc7ffc3380b8fdd106e069e5a874c48b11077",
+      "license_repo": "README claims inherited LGPL-2.1; no root LICENSE at pinned tree; per-file notices control",
+      "copyright": "goodix5125.c/h: Copyright (C) 2026 libfprint contributors; goodix.c/goodix5xx.c/goodix_proto.c: Copyright (C) 2021 Alexander Meiler, Matthieu CHARETTE, Natasha England-Elbro; scripts/log: no per-file copyright notice found",
+      "evidence_class": "THIRD_PARTY_CODE_AND_CROSS_FAMILY_OEM_LOG",
+      "reuse_status": "EVIDENCE_ONLY_NO_CODE_REUSE",
+      "files": [
+        {"path":"README.md","sha256":"205e8e146039088e8bc8da27a6a163fcdff4dda56d9b1dc197db202f8e6218cf","license":"README LGPL-2.1 claim; no per-file header"},
+        {"path":"fp/fork-goodixtls/libfprint/drivers/goodixtls/goodix5125.c","sha256":"cf8fabf07e14206b072b6f0e9d8fdc6d99fcc62c2e6c4665495a6f9af071a9cd","license":"LGPL-2.1-or-later (SPDX)"},
+        {"path":"fp/fork-goodixtls/libfprint/drivers/goodixtls/goodix5125.h","sha256":"1990503099ba3a2c4a0c19f94da32b7602ea1664f175c94d503904dea99f0bf3","license":"LGPL-2.1-or-later (SPDX)"},
+        {"path":"fp/fork-goodixtls/libfprint/drivers/goodixtls/goodix.c","sha256":"ac43886529409bb0f39ba7402bfef4f7574a22d6fc8d1a5169e3d1849299dc62","license":"LGPL-2.1-or-later (file header)"},
+        {"path":"fp/fork-goodixtls/libfprint/drivers/goodixtls/goodix5xx.c","sha256":"def0babfe01450aadd00b248822023d53ceb590481657829d5a6509bd9a5dd9d","license":"LGPL-2.1-or-later (file header)"},
+        {"path":"fp/fork-goodixtls/libfprint/drivers/goodixtls/goodix_proto.c","sha256":"dd4aad34da3249899dcd595dc6702d1a907cd990f7f987d033b8bb5b031fe72a","license":"LGPL-2.1-or-later (file header)"},
+        {"path":"fp/goodix-fp-dump/exp5125_realpsk.py","sha256":"4a071f7c2c95416e048be6688d78b281d8951809a0cfba478c6cbfb981f3a9ad","license":"MIT directory LICENSE only; no per-file header"},
+        {"path":"fp/goodix-fp-dump/exp5125_v2.py","sha256":"a7afe687e0d1bd67bc0001e3df363fa8bc8c6afb340afe46af818d79e2384b11","license":"MIT directory LICENSE only; no per-file header"},
+        {"path":"fp/goodix-fp-dump/exp5125_v3.py","sha256":"723927eab2c0a90f6ac9e24cbfca574bf8dc1ff0102c1326a3c0b8843e264a3d","license":"MIT directory LICENSE only; no per-file header"},
+        {"path":"fp/goodix-fp-dump/fdt_seed_probe.py","sha256":"206dcb71cf540416610abc6c8704f4e39340e7fe9b48aa6e82a429fa77267c6b","license":"MIT directory LICENSE only; no per-file header"},
+        {"path":"wbdi_utf8.log","sha256":"050d6cbb8e676bf085b77e6376a2b8db972e614683e32cea8834cdd60f8c6ba1","license":"NO_EXPLICIT_FILE_LICENSE"}
+      ]
+    },
+    {
+      "name": "goodix-fp-dump Issue 63 attachment",
+      "url": "https://github.com/goodix-fp-linux-dev/goodix-fp-dump/issues/63",
+      "attachment_url": "https://github.com/user-attachments/files/27089978/fingerprint.zip",
+      "commit": null,
+      "paths": ["fingerprint.zip", "fingerprint.pcap"],
+      "sha256": {"attachment":"61e1d5354cb9617cd602b8ee465aa6693381d00899a7f50af3d10ee89b86bc3c","pcap":"5b2e9649b8acdbf93bbb19275feb32203dacc50d727ef2222d58162fbd1b63d0","issue_api_json":"a427be8fa6089cecb6564aa59a8e10c613e2c156618ee3614c49ee2a3784e714"},
+      "license": "NO_EXPLICIT_ATTACHMENT_LICENSE",
+      "copyright": "Issue/attachment submitted by GitHub user MrHiXl; ownership and redistribution grant not asserted",
+      "evidence_class": "THIRD_PARTY_CAPTURE",
+      "reuse_status": "EVIDENCE_ONLY_NO_CODE_REUSE; RAW_NOT_STORED_IN_PROJECT"
+    },
+    {
+      "name": "Rockytkg preserved snapshot",
+      "url": "https://github.com/Rockytkg/goodix-linux-27c6-5125",
+      "commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b",
+      "tree": "6dda93a960ceddb085c59b5382df47ecc5d56a39",
+      "paths": ["src/goodix_capture.c", "src/goodix_base.c", "README.en.md", "PROVENANCE.md"],
+      "license": "src/goodix_capture.c and src/goodix_base.c GPL-2.0-or-later; other scope per Rockytkg/PROVENANCE.md",
+      "copyright": "Rockytkg/upstream contributors; exact per-file notices control",
+      "evidence_class": "THIRD_PARTY_CODE; APP12508 IMPLEMENTATION AXIS",
+      "reuse_status": "EVIDENCE_ONLY_NO_CODE_REUSE_IN_D254"
+    },
+    {
+      "name": "Rockytkg Issue 1",
+      "url": "https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1",
+      "commit": null,
+      "paths": ["issue body", "public comments through 2026-08-17"],
+      "sha256": {"issue_api_json":"24f130eb4e546c1d9c1f530b3264364b88e49ef4498daa02651407c3b06462d2","comments_api_json":"23055c88414e68f00cf4c498c3e72661d0637744a3f79b83c1ac31ff2d4a87ad"},
+      "license": "NO_EXPLICIT_DISCUSSION_LICENSE",
+      "copyright": "Individual GitHub commenters",
+      "evidence_class": "THIRD_PARTY_LIVE_REPORT_AND_DISCUSSION",
+      "reuse_status": "EVIDENCE_ONLY_NO_CODE_REUSE"
+    }
+  ]
+}

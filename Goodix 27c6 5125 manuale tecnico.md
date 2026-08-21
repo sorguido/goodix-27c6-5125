@@ -83,6 +83,21 @@ osservato confronta soltanto il prefisso OTP e non prova una table FDT. Inoltre
 non esiste ancora cancel/restore device-side deterministico. D253 resta quindi
 `BLOCKED`, richiede evidenza primaria esterna mirata e non crea un kit live.
 
+D254 ha acquisito e parsato offline le fonti pubbliche richieste senza hardware
+locale. Il WBDI di `yanxinwu946/goodix-5125-linux` è in realtà `27c6:5110`,
+firmware `GF_ST411SEC_APP_12117`: mostra un cache OTP-bound da 13520 byte e tre
+stage FDT riusciti con NAV e immagine base intercalati, ma non è prova diretta
+APP12509. Lo stesso repository espone una costante claimed-12509
+`b3b3...b7b7`, diversa dal seed target `adad...b2b2`, senza capture wire che ne
+provi la derivazione. La capture pubblica Issue #63 è `27c6:5125`, firmware
+ignoto: in 21 eventi IRQ2 usa sempre `0x22 [01 00]`, corroborando il modello
+corrente, e mostra su 22 comandi `0x36` residui fisici agli stessi offset
+40–45 del target, con valori diversi. Non contiene cold-start, cancel senza
+dito o restore. Il bootstrap blocker è ridotto ma non chiuso; il restore
+blocker non è ridotto. D254 resta `BLOCKED`, non autorizza live e richiede come
+prossima evidenza primaria una singola traccia Windows APP12509 sanitizzata da
+cold-start/cache/first-seed fino ad arm, cancel senza dito e re-entry.
+
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
 rispetto a Rockytkg; dalla baseline post-D247 il futuro core userspace e i tool
@@ -131,6 +146,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D251 D4→AF | successo, consumata | exactly-one AF/AE; byte0 opaco `0`, flags `0x02`, POV false/TLS true/locked false, zero retry/write/app-data, cleanup/restore/reseal riusciti, `STOP_AFTER_AF` |
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
+| Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -463,6 +479,10 @@ D251 -> audit byte0: gfusb usa byte1 bit0/1/3 e non confronta byte0; Rocky corro
 D252 -> audit offline fresh-FDT: tabella appresa da 0x36/IRQ0100, ma seed/freschezza current-path aperti
      -> target IRQ2 seguito da wire 0x22, non 0x20; nessun cancel/restore post-FDT provato
      -> D252_LIVE_BOUNDARY=BLOCKED; nessun kit live e zero hardware
+D253 -> dataflow seed delimitato; core corretto a IRQ2->0x22; restore ancora ignoto
+D254 -> audit pubblico hash-gated: WBDI=5110/12117, Issue63=5125/FW ignoto
+     -> Issue63 corrobora 21/21 IRQ2->0x22 e residuo tail 0x36 agli stessi offset
+     -> bootstrap ridotto ma non chiuso; restore non ridotto; nessun live
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1718,6 +1738,80 @@ arm con verifica deterministica dello stato successivo. Un receiver/lifecycle
 APP12509 provenance-valid può sostituire le parti che prova. Ripetere il live
 esistente non produce questa evidenza.
 
+## D254: audit esterno FDT, cache OEM e lifecycle
+
+L'audit riproducibile `analysis/D254/d254_external_audit.py` pinna la fonte A
+al commit `d39e34f240270bb13c3977a7fa99973c346fa81f`, verifica gli hash prima
+del parsing e genera soltanto metadati sanitizzati. Il WBDI associato al
+repository non appartiene a un 5125/12509: dichiara `27c6:5110`, chipid
+`0x2504`, sensor type 12 e firmware `GF_ST411SEC_APP_12117`. È quindi evidenza
+OEM cross-family.
+
+Nel suo init riuscito, il file da 13520 byte viene letto, verificato CRC,
+legato alla OTP e usato per NAV/image; segue la sequenza osservata
+`FDT0 -> NAV -> FDT1 -> read-reg/delta -> 0x20 base image -> FDT2 -> save ->
+FDT-down`. I tre seed sono `afaf...b7b7`, il learned table del passo 0 e quello
+del passo 1; il learned table finale alimenta FDT-down. Il layout
+`OTP64+FDT12+NAV3200+IMAGE10240+CRC4` spiega esattamente 13520 byte e rende
+forte l'inferenza che il primo seed provenga dal campo FDT12 del cache, ma il
+log non mostra la copia. Non è osservato un retry loop o un criterio di
+convergenza: l'orchestratore completa esplicitamente gli stage 0/1/2. Il
+singolo init non prova che il file sia sempre rigenerato né che il seed vari
+fra sessioni. Nello stesso log, un controllo runtime `base_is_valid=0`
+aggiorna image/NAV e salva di nuovo, mentre un successivo `base_is_valid=1`
+termina senza altro save: il modello osservato è validate-and-refresh, non
+rigenerazione incondizionata ad ogni controllo.
+
+Il codice claimed-12509 della stessa fonte usa invece la costante
+`b3b3c3c3a8a8b5b5a8a8b7b7`, fa due manual step separati da NAV, quindi
+read-reg/DAC e `0x20`. Non implementa `0x32`, `0x34`, il current-target `0x22`
+o un cancel device-side. Il commento “empirically verified” è una assertion
+terza, non una capture. La costante non coincide col target; ciò è compatibile
+con dipendenza device/config/session, ma non ne distingue la causa. README e
+codice dipendono inoltre dalla plaintext PSK specifica del device, quindi le
+claim di funzionamento non chiudono un percorso factory-PSK-preserving.
+
+La capture Issue #63, hash
+`5b2e9649b8acdbf93bbb19275feb32203dacc50d727ef2222d58162fbd1b63d0`,
+include un descrittore `27c6:5125` ma nessun A8: firmware `UNKNOWN`. Comincia a
+sessione già armata e contiene 22 `0x36`, 21 IRQ2, 22 IRQ100 e 13 IRQ200.
+Tutti i 21 IRQ2 sono seguiti da `0x22 [01 00]`. I `0x36` sono A0 logici da 22
+byte in OUT fisici da 64, con nonzero fuori frame solo agli offset 40–45:
+`cb f2 ca 66 f8 7f`, diverso dal target `cb f2 e2 be fb 7f`. Questo corrobora
+la natura di staging residue, non l'equivalenza zero-tail. La capture mostra
+solo cicli positivi; termina su IRQ200 dopo `0x34` e non prova cancel, timeout,
+close o restore.
+
+Rocky rimane l'asse APP12508: il suo campionatore accetta il primo IRQ100
+valido entro al massimo tre tentativi, usa seed zero/cache, `0x20` post-IRQ2 e
+un flag di cancel host-side. Non equivale ai tre stage OEM WBDI né al target.
+La matrice D254 completa classifica ogni cella come target capture, OEM cross-
+family, third-party code/capture o unknown.
+
+```text
+EXTERNAL_A_WBDI_EVIDENCE_CLASS=CROSS_FAMILY_OEM_LIFECYCLE_EVIDENCE_5110_APP12117
+EXTERNAL_12509_FDT_SEED=b3b3c3c3a8a8b5b5a8a8b7b7
+EXTERNAL_12509_SEED_MATCH_LOCAL_TARGET=false
+ISSUE63_FIRMWARE=UNKNOWN
+ISSUE63_FDT36_COUNT=22
+ISSUE63_POST_IRQ2_IMAGE_COMMAND=0x22_DATA_0100_FOR_ALL_21_OBSERVED_IRQ2_EVENTS
+EXTERNAL_OEM_FDT_PASS_MODEL=FIXED_THREE_SUCCESSFUL_NAMED_STAGES_IN_OBSERVED_INIT
+EXTERNAL_OEM_INITIAL_SEED_SOURCE=BASEFILE_FDT12_STRONGLY_INFERRED; DIRECT_COPY_NOT_LOGGED
+BOOTSTRAP_BLOCKER_REDUCED=true
+BOOTSTRAP_CLOSED=false
+RESTORE_BLOCKER_REDUCED=false
+RESTORE_CLOSED=false
+D254_OUTCOME=BLOCKED
+NEXT_MINIMUM_LIVE_BOUNDARY=NONE
+D254_LIVE_BOUNDARY=BLOCKED
+D254_LIVE_EXECUTION=NOT_PERFORMED
+```
+
+La singola acquisizione con massimo valore è una capture Windows APP12509
+sanitizzata che inizi dal cold-start e mostri validazione cache e sorgente del
+primo seed, poi prosegua fino a `0x32`, cancel operatore senza dito e re-entry
+deterministica. Non è una sequenza Linux live proposta.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -1789,11 +1883,14 @@ retry, secondo D4, secondo AF, FDT o una nuova invocazione.
 Il current critical boundary è offline: chiudere la precondizione target
 fresh per `0x36`/tabella FDT e il cancel/restore device-side dopo arming. D253
 ha chiuso la distinzione wire corrente `0x22`/`0x20` e corretto il core, ma non
-ha reso il path live-safe. La tabella finale della capture è
+ha reso il path live-safe. D254 ha corroborato dall'esterno il cache OTP-bound
+cross-family e `IRQ2→0x22` su una capture 5125 a firmware ignoto, senza però
+ottenere la derivazione del seed APP12509 o un no-finger restore. La tabella
+finale della capture locale è
 dinamicamente appresa da IRQ `0x0100`, ma vale soltanto come prova della
 sessione catturata; il cold-start D251 non possiede una baseline validata. Non
-esiste un restore OEM post-FDT provato. D253 è quindi `BLOCKED`, richiede
-evidenza esterna specifica e non ha creato un path live-capable.
+esiste un restore OEM post-FDT provato. D254 è quindi `BLOCKED`, richiede una
+capture Windows APP12509 mirata e non ha creato un path live-capable.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1834,6 +1931,13 @@ D253_SAFE_STOP_AFTER_FDT_ARM false
 D253_LIVE_BOUNDARY BLOCKED
 D253_LIVE_EXECUTION NOT_PERFORMED
 D253_REQUIRES_EXTERNAL_EVIDENCE true
+D254_BOOTSTRAP_BLOCKER_REDUCED true
+D254_BOOTSTRAP_CLOSED false
+D254_RESTORE_BLOCKER_REDUCED false
+D254_RESTORE_CLOSED false
+D254_LIVE_BOUNDARY BLOCKED
+D254_LIVE_EXECUTION NOT_PERFORMED
+D254_REQUIRES_MORE_PRIMARY_EVIDENCE true
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -1920,6 +2024,12 @@ step-local; non esistono backend USB aggiunti, persistenza host, live kit o
 autorizzazione hardware. Bootstrap seed, contratto fisico `0x36` e restore
 restano bloccanti.
 
+D254 aggiunge soltanto parser e derivati sanitizzati hash-gated. Clone, WBDI,
+ZIP e PCAP esterni restano fuori dal repository; non sono stati importati
+codice runtime, secret, OTP, immagini o payload biometrici. La corroborazione
+esterna non modifica guardrail, non crea un backend/launcher e non autorizza
+hardware. Seed APP12509 iniziale e restore no-finger restano bloccanti.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -1933,4 +2043,5 @@ restano bloccanti.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D253 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D254 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+o capture Issue #63 raw è redistribuita.
