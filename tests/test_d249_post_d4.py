@@ -87,7 +87,7 @@ class D249CodecEquivalenceTests(unittest.TestCase):
 class D249FirstImageClosureTests(unittest.TestCase):
     def test_fresh_fdt_path_reaches_first_image(self):
         transport = ScriptedTransport((
-            [af_response(False)], [ack(0x32)], [ack(0x20)],
+            [af_response(False)], [], [],
         ))
         machine = FirstImageMachine(transport)
         state = machine.query_state(0x1234)
@@ -102,7 +102,7 @@ class D249FirstImageClosureTests(unittest.TestCase):
         self.assertEqual(len(transport.requests), 3)
 
     def test_cached_pov_path_reaches_first_image(self):
-        transport = ScriptedTransport(([af_response(True)], [ack(0xD2)]))
+        transport = ScriptedTransport(([af_response(True)], []))
         machine = FirstImageMachine(transport)
         self.assertTrue(machine.query_state(7).pov_valid)
         machine.begin_capture(bytes(12), 9)
@@ -140,6 +140,33 @@ class D249FirstImageClosureTests(unittest.TestCase):
         machine.begin_capture(bytes(12), 2)
         with self.assertRaises(UnexpectedAck):
             machine.receive_payload(fdt_event())
+
+    def test_every_async_command_accepts_zero_or_one_valid_ack_only(self):
+        table = bytes(range(12))
+        commands = (
+            (0x32, build_fdt_down(table, 1)),
+            (0x20, build_set_image()),
+            (0xD2, build_cached_image()),
+            (0x36, build_fdt_manual(table)),
+            (0x34, build_fdt_up(table)),
+        )
+        for echo, request in commands:
+            with self.subTest(control=hex(echo), case="absent"):
+                FirstImageMachine(ScriptedTransport(([],)))._send_async(request, echo)
+            with self.subTest(control=hex(echo), case="valid"):
+                FirstImageMachine(ScriptedTransport(([ack(echo)],)))._send_async(
+                    request, echo
+                )
+            with self.subTest(control=hex(echo), case="wrong"):
+                with self.assertRaises(UnexpectedAck):
+                    FirstImageMachine(
+                        ScriptedTransport(([ack(echo ^ 2)],))
+                    )._send_async(request, echo)
+            with self.subTest(control=hex(echo), case="duplicate"):
+                with self.assertRaises(UnexpectedAck):
+                    FirstImageMachine(
+                        ScriptedTransport(([ack(echo), ack(echo)],))
+                    )._send_async(request, echo)
 
 
 class D249ParserPolicyTests(unittest.TestCase):

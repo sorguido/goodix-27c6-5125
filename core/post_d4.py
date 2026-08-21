@@ -19,6 +19,16 @@ from src.goodix5125_cleanroom import decode_record as _decode_local_record
 PLAIN, TLS = 0xA0, 0xB0
 ALLOWED_COMMANDS = frozenset({0xAF, 0x36, 0x32, 0x34, 0x20, 0xD2})
 FIRST_IMAGE_RECEIVED = "FIRST_IMAGE_RECEIVED"
+ACK_FORBIDDEN = "FORBIDDEN"
+ACK_OPTIONAL = "OPTIONAL_IF_PRESENT"
+ACK_POLICIES = {
+    0xAF: ACK_FORBIDDEN,
+    0x32: ACK_OPTIONAL,
+    0x20: ACK_OPTIONAL,
+    0xD2: ACK_OPTIONAL,
+    0x36: ACK_OPTIONAL,
+    0x34: ACK_OPTIONAL,
+}
 
 
 class ProtocolError(ValueError):
@@ -281,11 +291,21 @@ class FirstImageMachine:
         if self.phase != phase:
             raise InvalidTransition(f"phase:{self.phase}:expected:{phase}")
 
-    def _one_ack(self, request: bytes, echo: int) -> None:
+    def _send_async(self, request: bytes, echo: int) -> None:
+        """Send once; validate zero/one immediate ACK without requiring one.
+
+        Local capture observes ACKs after 0x20/0x32/0x34/0x36, but does not
+        establish them as a causal prerequisite for the pushed event/image.
+        D2 is not observed locally; Rocky likewise sends these commands
+        asynchronously and its receive loop consumes ACKs while waiting.
+        """
+        if ACK_POLICIES.get(echo) != ACK_OPTIONAL:
+            raise UnexpectedAck(f"async_ack_policy:0x{echo:02x}")
         frames = list(self.transport.exchange(request))
-        if len(frames) != 1:
+        if len(frames) > 1:
             raise UnexpectedAck(f"ack_frame_count:{len(frames)}")
-        parse_ack(frames[0], echo)
+        if frames:
+            parse_ack(frames[0], echo)
 
     def query_state(self, ts16: int) -> McuState:
         self._require("POST_D4")
@@ -300,12 +320,12 @@ class FirstImageMachine:
     def begin_capture(self, table12: bytes, ts16: int) -> None:
         self._require("AF_OK")
         if self.path == "POV":
-            self._one_ack(build_cached_image(), 0xD2)
+            self._send_async(build_cached_image(), 0xD2)
             self.phase = "WAIT_IMAGE"
             return
         if self.path != "FRESH_FDT":
             raise InvalidTransition("capture_path_unset")
-        self._one_ack(build_fdt_down(table12, ts16), 0x32)
+        self._send_async(build_fdt_down(table12, ts16), 0x32)
         self.phase = "WAIT_FDT_DOWN"
 
     def receive_payload(self, payload: bytes) -> tuple[int, ...] | None:
@@ -313,7 +333,7 @@ class FirstImageMachine:
             event = parse_fdt_event(payload)
             if event.irq != 2:
                 raise UnexpectedEvent(f"fdt_order:0x{event.irq:x}")
-            self._one_ack(build_set_image(), 0x20)
+            self._send_async(build_set_image(), 0x20)
             self.phase = "WAIT_IMAGE"
             return None
         if self.phase == "WAIT_IMAGE":

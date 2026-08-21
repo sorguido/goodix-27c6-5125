@@ -3,7 +3,13 @@
 
 ## Correction baseline and scope
 
-The requested PR head was
+The final ACK correction requested remote head
+`02b4333fb6092b29b8588fc2631c17f456f5d144`; this object is not present in the
+local clone. The observed starting HEAD was
+`64c9a666aaf1eb8f9d2f575e61cd73d57869a51d` on the same local `work` branch.
+The correction adds a normal commit without rewriting history or opening a PR.
+
+The earlier correction requested head was
 `a49321c028d3bc288c7e6a3226b079c8ee667bfe`. The object is not present in this
 clone. The observed initial workspace head was
 `25724f9cac638bf3c744156b22961e847d0e1910` on branch `work`, containing the
@@ -48,6 +54,24 @@ corroboration, not target-specific evidence for APP12509.
 | Complete mixed ordering on 12509 | **non noto** | offline demux proves parser behavior, not every target ordering |
 | FDT disarm/restore | **non noto** | 34 is finger-up detection, not proven deterministic cleanup |
 
+## ACK policy audit
+
+| Command | Semantic | Local target observation | Host/Rocky behavior | D249 policy |
+| --- | --- | --- | --- | --- |
+| AF | GetMcuState | direct AE in five occurrences; no intervening ACK | synchronous response query | `FORBIDDEN` |
+| 32 | FDT down | ACK follows all three requests; causal necessity not established | asynchronous send; receive loop consumes ACK while waiting | `OPTIONAL_IF_PRESENT` |
+| 20 | SetMode Image | ACK follows both requests; causal necessity not established | asynchronous send followed by pushed image | `OPTIONAL_IF_PRESENT` |
+| D2 | cached POV | no local target occurrence | asynchronous send; ACK skipped if received | `OPTIONAL_IF_PRESENT`, acceptance policy only; target presence `NOT_ESTABLISHED` |
+| 36 | FDT manual | ACK follows all three requests; event remains asynchronous | asynchronous send followed by IRQ 0x100 | `OPTIONAL_IF_PRESENT` |
+| 34 | FDT up | ACK follows the one request; event remains asynchronous | asynchronous send followed by finger-up event | `OPTIONAL_IF_PRESENT`; documented, not current live boundary |
+
+“Observed ACK” is not promoted to “causally required.” `parse_ack()` validates
+any consumed ACK. `_send_async()` accepts zero or one exact ACK for optional
+commands, rejects wrong/duplicate frames, and never retries. AF retains the
+separate direct-response path where an ACK is forbidden.
+
+`ACK_POLICY_MATRIX=AF_FORBIDDEN;20_32_34_36_D2_OPTIONAL_IF_PRESENT`
+
 ## Codec blocker correction
 
 The rejected D249 decoder was removed. `decode_image_record()` now delegates
@@ -74,17 +98,18 @@ self-consistent.
 `FIRST_IMAGE_RECEIVED`:
 
 ```text
-fresh:  POST_D4 → AF_OK/FRESH_FDT → 32 ACK → WAIT_FDT_DOWN
-        → IRQ 2 → 20 ACK → WAIT_IMAGE → strict type-2 image payload
+fresh:  POST_D4 → AF_OK/FRESH_FDT → async 32 → WAIT_FDT_DOWN
+        → IRQ 2 → async 20 → WAIT_IMAGE → strict type-2 image payload
         → canonical record decode → FIRST_IMAGE_RECEIVED
 
-cached: POST_D4 → AF_OK/POV → D2 ACK → WAIT_IMAGE
+cached: POST_D4 → AF_OK/POV → async D2 → WAIT_IMAGE
         → strict type-2 image payload → canonical record decode
         → FIRST_IMAGE_RECEIVED
 ```
 
 This is executable closure of the offline model, not proof that either full
-sequence is safe or causally complete on the target. The harness rejects ACK
+sequence is safe or causally complete on the target. For each asynchronous
+command, both absent ACK and one valid ACK pass; the harness rejects ACK
 duplicates/wrong echo/status, FDT events out of order, early image payloads,
 unexpected controls, corrupt framing/checksums, EOF before terminal, short/long
 records, image CRC failures, repeated/regressive transitions and non-allowlisted
@@ -110,14 +135,14 @@ payload whose genuine computed checksum equals 0x88. There is no global bypass.
 
 ## Executable closure and results
 
-- `timeout 30s python3 -m unittest -v tests.test_d249_post_d4`: 12/12 passed;
+- `timeout 30s python3 -m unittest -v tests.test_d249_post_d4`: 13/13 passed;
   this includes three codec-equivalence tests, both first-image paths and the
   adversarial matrix.
 - `python3 -m py_compile core/post_d4.py tests/test_d249_post_d4.py`: passed.
-- `timeout 120s python3 -m unittest discover -s tests -v`: 53 run; 36 passed,
+- `timeout 120s python3 -m unittest discover -s tests -v`: 54 run; 37 passed,
   1 skipped, 3 failed and 13 import errors. Every non-pass is a legacy path
   blocked by the pre-existing missing `cryptography` dependency. The command is
-  environment-limited and is not declared PASS; all 12 D249 tests passed inside it.
+  environment-limited and is not declared PASS; all 13 D249 tests passed inside it.
 - `git diff --check`: passed after final changes.
 
 ## Next-live decision
@@ -150,4 +175,4 @@ baseline, guardrails and explicit authorization; neither is authorized here.
 
 `ROCKY_PINNED_COMMIT=227eba219fa9e3fbac5bd59aca79f624f67cd11b`
 
-`RECONSTRUCTED_ZIP_SHA256=27e85910998a5873571aec44500f42ecdb2b11c063b6e5bcbc10871f198f70cc`
+`RECONSTRUCTED_ZIP_SHA256=6a08165b1feac4e9e18d09c79641290ca4ab8cfc3dd24c617795537884223d0e`

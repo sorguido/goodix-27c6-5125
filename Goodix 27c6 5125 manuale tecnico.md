@@ -1310,12 +1310,23 @@ un encoder duplicato D249.
 
 La capture locale osserva AF e comandi FDT plaintext nella sessione post-TLS;
 la DLL conferma serializer AF, timestamp, risposta AE da 16 byte e bit di stato.
-Il modello offline sceglie separatamente due percorsi: AF senza POV → FDT down
-32/ACK → IRQ 2 → SetMode Image 20/ACK → immagine; AF con POV valido → D2/ACK →
-immagine cached. Entrambi validano framing, checksum, record, CRC,
+Il modello offline sceglie separatamente due percorsi: AF senza POV → invio
+asincrono FDT down 32 → IRQ 2 → invio asincrono SetMode Image 20 → immagine;
+AF con POV valido → invio asincrono D2 → immagine cached. Gli ACK osservati
+localmente dopo 32 e 20 vengono validati se presenti, ma non sono una
+precondizione causale obbligatoria; per D2 la presenza target resta non nota. Entrambi validano framing, checksum, record, CRC,
 unpack/transpose e terminano esplicitamente in `FIRST_IMAGE_RECEIVED`. Questa è
 closure eseguibile delle fixture sintetiche, non prova che il sequencing sia il
 minimo causale o live-safe sul 12509.
+
+La matrice ACK D249 classifica AF come `FORBIDDEN`: le occorrenze locali hanno
+risposta AE diretta senza ACK. Per 32, 20, 36 e 34 la capture osserva un ACK
+successivo, ma non prova che sia necessario prima dell'evento/payload push;
+questi comandi sono quindi `OPTIONAL_IF_PRESENT`. D2 non è osservato nella
+capture target; Rocky lo invia asincrono e consuma eventuali ACK nel receive
+loop, perciò il parser D249 usa ancora `OPTIONAL_IF_PRESENT` come policy di
+accettazione senza trasformarla in evidenza target. Zero o un ACK esatto sono
+accettati; ACK errato o duplicato fallisce chiuso.
 
 La policy checksum è strict: `parse_payload()` calcola sempre il checksum. Il
 valore 0x88 è accettato soltanto quando coincide matematicamente con il checksum
