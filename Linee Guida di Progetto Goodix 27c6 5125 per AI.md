@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.3 — Revisione 21 agosto 2026
-**Stato**: Attivo; sostituisce la v2.1 e la v2.2 transitoria del 21 agosto 2026
-**Motivazione**: La v2.3 conserva l'ossatura metodologica post-mortem D239 della v2.1, integra le decisioni D247 su licenze/provenance e D248 su repository hygiene, corregge l'eccessiva compressione della v2.2 e rimuove gli snapshot tecnici ormai obsoleti. Le regole permanenti restano distinte dallo stato tecnico corrente, che appartiene al manuale canonico.
+> **Versione**: 2.4 — Revisione 21 agosto 2026
+**Stato**: Attivo; sostituisce la v2.3 del 21 agosto 2026
+**Motivazione**: La v2.4 conserva l'ossatura metodologica post-mortem D239 e le decisioni D247/D248, e introduce come riferimento operativo unico lo snapshot locale versionato di Rockytkg nella Git root, con scheda di provenance dedicata. La disponibilità locale serve sia alla conservazione della fonte sia all'uso offline da parte delle AI; il riuso dei singoli materiali resta subordinato alla loro licenza e provenance. Le regole permanenti restano distinte dallo stato tecnico corrente, che appartiene al manuale canonico.
 > 
 
 ---
@@ -458,7 +458,7 @@ Deve contenere almeno:
 - licensing boundary e regole minime di provenance post-D247;
 - repository hygiene minima post-D248.
 
-`AGENTS.md` è un'istruzione operativa derivata, non una fonte normativa alternativa e non può contraddire il PDF canonico.
+`AGENTS.md` è un'istruzione operativa derivata, non una fonte normativa alternativa e non può contraddire il MD canonico.
 
 ### 16.2 Prompt Dxxx: solo delta dello step
 
@@ -521,15 +521,21 @@ Codice con una licenza LGPL compatibile può essere valutato per `libfprint-driv
 
 ## 19. Rockytkg: fonte implementativa, non autorità probatoria
 
-Repository di riferimento:
+Snapshot locale canonico di riferimento:
 
-[Rockytkg/goodix-linux-27c6-5125](https://github.com/Rockytkg/goodix-linux-27c6-5125)
+`<git-root>/Rockytkg/`
+
+La scheda di provenance dello snapshot è:
+
+`<git-root>/Rockytkg/PROVENANCE.md`
+
+Per audit, confronto, adattamento o riuso del materiale Rockytkg, Codex e le altre AI devono usare **come riferimento operativo unico** lo snapshot presente nella Git root e leggere prima `Rockytkg/PROVENANCE.md`. Il repository online non è una dipendenza del normale workflow: lo snapshot locale è preservato e versionato proprio per mantenere disponibile la conoscenza anche in assenza della fonte remota e per consentire analisi offline.
 
 Conversazione tecnica principale:
 
 [Issue #1 — goodix-linux-27c6-5125](https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1)
 
-Codice Rockytkg verificato come compatibile GPL può essere letto, copiato, adattato e incorporato nel dominio GPL `core/`/`tools/`, con licenza, attribution e provenance. Eventuale codice specificamente disponibile sotto licenza LGPL compatibile può essere valutato per il dominio LGPL dopo audit per-file.
+Codice Rockytkg verificato come compatibile GPL può essere letto, copiato, adattato e incorporato nel dominio GPL `core/`/`tools/`, con licenza, attribution e provenance. Eventuale codice specificamente disponibile sotto licenza LGPL compatibile può essere valutato per il dominio LGPL dopo audit per-file. La presenza di un file nello snapshot non implica automaticamente che esso sia coperto dalla licenza GPL/LGPL del codice: valgono le eccezioni e i diritti descritti nella scheda di provenance e nei file di licenza originali, in particolare per firmware/vendor material e componenti terzi.
 
 Questo permesso non promuove Rockytkg a prova primaria per APP12509 e non dimostra da solo safety, assenza di persistenza, compatibilità con PSK/factory state o correttezza sul target locale. Ogni comportamento sensor-reaching richiede validazione differenziale locale e, quando necessario, autorizzazione live separata.
 
