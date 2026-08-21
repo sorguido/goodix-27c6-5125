@@ -1,2 +1,11 @@
-# Private repository: all project content is intended to be versioned.
-# Do not add ignore rules inherited from the public repository.
+# The private repository versions project evidence, but not ephemeral editor,
+# interpreter, test, or coverage output.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+*.orig
+*.bak
+*.tmp
+*~

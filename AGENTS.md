@@ -198,6 +198,13 @@ Output finale di Codex:
 bundle ZIP step-local, non cumulativo
 ```
 
+Ogni output Dxxx futuro, inclusi bundle e checksum, vive in
+`analysis/Dxxx/`. La root non è una destinazione per output di step, salvo
+eccezione esplicita e documentata. I bundle storici ancora in root sono
+relocati soltanto con un'operazione meccanica che ne preservi i blob e non
+rompa consumatori eseguibili o riproducibilità; ogni eccezione resta in sede ed
+è documentata.
+
 Il bundle deve essere autonomamente auditabile **per riferimento**, non autosufficiente per duplicazione.
 
 Deve contenere solo quanto necessario alla review dello step e non deve includere:

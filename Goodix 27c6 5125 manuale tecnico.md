@@ -36,6 +36,15 @@ blocker di provenance sulla baseline Rocky
 Resta obbligatoria la verifica puntuale di diritti, SPDX e componenti terzi per
 ogni file che un futuro step deciderà effettivamente di importare.
 
+D248 ha consolidato esclusivamente l'organizzazione del repository, senza
+modificare runtime o confine hardware. Cache Python versionate e due backup
+`.orig` generati sono stati rimossi dopo audit; i contenuti dei backup restano
+ricostruibili dal commit storico `1c66b43c63e21e2dc4547a903154167233731fdd`
+e non avevano riferimenti. `src/`, `tests/` e `poc/` rimangono congelati nelle
+posizioni storiche per preservare riproducibilità e import della catena
+D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
+`tools/` e `libfprint-driver/` definiti dalla mappa licenze.
+
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
@@ -66,6 +75,20 @@ da D247 e potrà ricevere soltanto un export futuro, separato, sanitizzato e
 auditato. Un working tree pulito/equivalente non rende pubblicabile la history
 privata; capture, DLL, firmware, secret o dati biometrici transitati nella
 storia richiedono clean export, nuova storia o filtro dedicato.
+
+La root contiene soltanto fonti canoniche, licenze, linee guida e directory di
+progetto. Gli output Dxxx sono step-local e non cumulativi in
+`analysis/Dxxx/`, inclusi bundle e checksum; `analysis/README.md` è il solo
+indice sintetico e non sostituisce questo manuale. Il manifest
+`analysis/D248/D248_binary_relocation_manifest.json` fissa blob Git, SHA-256,
+dimensione, destinazione e riferimenti dei bundle storici in root. Le undici
+coppie D230–D238 possono essere spostate insieme in una fase meccanica
+byte-preserving. La coppia D239 resta invece intenzionalmente in root perché il
+controllo offline D245 apre quel path per verificare i launcher storici: la
+riproducibilità prevale su una root solo esteticamente perfetta. Rimuovere
+l'eccezione richiede uno step futuro che migri esplicitamente la dipendenza
+D245 e ne verifichi nuovamente l'executable closure. La relocation di layout
+non cambia stato tecnico né autorizzazioni live.
 
 Le categorie restano distinte:
 
