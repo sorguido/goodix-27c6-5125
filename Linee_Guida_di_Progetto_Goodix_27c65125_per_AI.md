@@ -40,6 +40,7 @@ biometrico, factory data e asset non redistribuibili non ricevono alcuna
 blanket open-source license.
 
 ## 4. Rockytkg: fonte implementativa, non autorità probatoria
+Repository di riferimento: [Rockytkg/goodix-linux-27c6-5125](https://github.com/Rockytkg/goodix-linux-27c6-5125)
 
 Codice originale Rockytkg verificato come compatibile GPL-2.0-or-later può,
 dopo D247, essere letto, copiato, adattato e incorporato esclusivamente nel
