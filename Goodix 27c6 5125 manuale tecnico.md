@@ -110,7 +110,7 @@ e una capture recuperata SHA-256
 `50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`.
 La prima capture resta definitivamente perduta e non è sostituita da riepiloghi.
 
-La testimonianza indipendente di `mkl-corbachoh` nella issue GitHub #1 resta
+La testimonianza indipendente di `mkl-corbachoh` nella issue GitHub #1 (https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1) resta
 classificata `EXTERNAL_THIRD_PARTY_LIVE_CORROBORATION`. Sul proprio target
 riferisce `27c6:5125`, chip `0x2504`, firmware nativo 12509 preservato,
 TLS-PSK, enrollment, verifica same/different-finger, autenticazione PAM e
@@ -120,6 +120,10 @@ PSK; riporta inoltre la coesistenza di eventi FDT plaintext e frame immagine
 protetti TLS. È corroborazione esterna utile, ma non prova primaria del nostro
 target, non prova la preservazione della PSK Windows/factory preesistente e non
 autorizza automaticamente alcuna futura operazione live.
+
+### Rockytkg — fonte implementativa esterna
+Repository di riferimento:
+[Rockytkg/goodix-linux-27c6-5125](https://github.com/Rockytkg/goodix-linux-27c6-5125)
 
 La baseline Rocky è verificata esternamente al commit
 `227eba219fa9e3fbac5bd59aca79f624f67cd11b`: il `LICENSE` assegna
