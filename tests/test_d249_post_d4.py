@@ -100,6 +100,9 @@ class D249FirstImageClosureTests(unittest.TestCase):
         self.assertEqual(image, synthetic_raster())
         machine.eof()
         self.assertEqual(len(transport.requests), 3)
+        control, data = parse_payload(parse_outer(transport.requests[2])[1])
+        self.assertEqual((control, data), (0x22, b"\x01\x00"))
+        self.assertEqual(machine.image_command_attempt_count, 1)
 
     def test_cached_pov_path_reaches_first_image(self):
         transport = ScriptedTransport(([af_response(True)], []))
@@ -140,12 +143,19 @@ class D249FirstImageClosureTests(unittest.TestCase):
         machine.begin_capture(bytes(12), 2)
         with self.assertRaises(UnexpectedAck):
             machine.receive_payload(fdt_event())
+        self.assertEqual(machine.phase, "IMAGE_COMMAND_FAILED")
+        self.assertEqual(machine.image_command_attempt_count, 1)
+        request_count = len(machine.transport.requests)
+        with self.assertRaises(InvalidTransition):
+            machine.receive_payload(fdt_event())
+        self.assertEqual(len(machine.transport.requests), request_count)
 
     def test_every_async_command_accepts_zero_or_one_valid_ack_only(self):
         table = bytes(range(12))
         commands = (
             (0x32, build_fdt_down(table, 1)),
             (0x20, build_set_image()),
+            (0x22, build_finger_image()),
             (0xD2, build_cached_image()),
             (0x36, build_fdt_manual(table)),
             (0x34, build_fdt_up(table)),
@@ -183,10 +193,36 @@ class D249ParserPolicyTests(unittest.TestCase):
                          b"\x09\x01" + table)
         self.assertEqual(parse_payload(parse_outer(build_fdt_down(table, 0x1234))[1])[1][-2:],
                          b"\x34\x12")
-        for frame in (build_fdt_up(table), build_set_image(), build_cached_image()):
+        for frame in (build_fdt_up(table), build_set_image(), build_finger_image(),
+                      build_cached_image()):
             parse_payload(parse_outer(frame)[1])
         for forbidden in (0xE0, 0xA4, 0xF0, 0xF4):
             self.assertRaises(UnexpectedControl, build_command, forbidden, b"")
+
+    def test_target_image_command_variants_are_wire_exact_and_distinct(self):
+        self.assertEqual(build_set_image().hex(), "a00600a6200300010086")
+        self.assertEqual(build_finger_image().hex(), "a00600a6220300010084")
+        baseline = parse_payload(parse_outer(build_set_image())[1])
+        finger = parse_payload(parse_outer(build_finger_image())[1])
+        self.assertEqual(baseline, (0x20, b"\x01\x00"))
+        self.assertEqual(finger, (0x22, b"\x01\x00"))
+        self.assertRaises(UnexpectedControl, build_command, 0x21, b"\x01\x00")
+
+    def test_post_irq2_rejects_out_of_order_and_duplicate_second_command(self):
+        machine = FirstImageMachine(ScriptedTransport((
+            [af_response(False)], [ack(0x32)], [ack(0x22)],
+        )))
+        machine.query_state(1)
+        machine.begin_capture(bytes(12), 2)
+        with self.assertRaises(UnexpectedEvent):
+            machine.receive_payload(fdt_event(0x200))
+        self.assertEqual(machine.image_command_attempt_count, 0)
+        self.assertIsNone(machine.receive_payload(fdt_event(2)))
+        request_count = len(machine.transport.requests)
+        with self.assertRaises(UnexpectedControl):
+            machine.receive_payload(fdt_event(2))
+        self.assertEqual(len(machine.transport.requests), request_count)
+        self.assertEqual(machine.image_command_attempt_count, 1)
 
     def test_mixed_fragment_coalesce_interleave_and_eof(self):
         first = fdt_event(2)

@@ -17,7 +17,7 @@ from src.goodix5125_cleanroom import decode_record as _decode_local_record
 
 
 PLAIN, TLS = 0xA0, 0xB0
-ALLOWED_COMMANDS = frozenset({0xAF, 0x36, 0x32, 0x34, 0x20, 0xD2})
+ALLOWED_COMMANDS = frozenset({0xAF, 0x36, 0x32, 0x34, 0x20, 0x22, 0xD2})
 FIRST_IMAGE_RECEIVED = "FIRST_IMAGE_RECEIVED"
 STOP_AFTER_AF = "STOP_AFTER_AF"
 ACK_FORBIDDEN = "FORBIDDEN"
@@ -26,6 +26,7 @@ ACK_POLICIES = {
     0xAF: ACK_FORBIDDEN,
     0x32: ACK_OPTIONAL,
     0x20: ACK_OPTIONAL,
+    0x22: ACK_OPTIONAL,
     0xD2: ACK_OPTIONAL,
     0x36: ACK_OPTIONAL,
     0x34: ACK_OPTIONAL,
@@ -183,7 +184,13 @@ def build_fdt_up(table12: bytes) -> bytes:
 
 
 def build_set_image() -> bytes:
+    """Build the target-observed baseline/no-finger image-mode variant."""
     return build_command(0x20, b"\x01\x00")
+
+
+def build_finger_image() -> bytes:
+    """Build the target post-IRQ2 image-mode variant (cmd0=2, cmd1=1)."""
+    return build_command(0x22, b"\x01\x00")
 
 
 def build_cached_image() -> bytes:
@@ -334,6 +341,7 @@ class FirstImageMachine:
         self.phase = "POST_D4"
         self.path: str | None = None
         self.image: tuple[int, ...] | None = None
+        self.image_command_attempt_count = 0
 
     def _require(self, phase: str) -> None:
         if self.phase != phase:
@@ -381,8 +389,18 @@ class FirstImageMachine:
             event = parse_fdt_event(payload)
             if event.irq != 2:
                 raise UnexpectedEvent(f"fdt_order:0x{event.irq:x}")
-            self._send_async(build_set_image(), 0x20)
-            self.phase = "WAIT_IMAGE"
+            if self.image_command_attempt_count:
+                raise InvalidTransition("post_irq2_image_command_already_attempted")
+            self.image_command_attempt_count = 1
+            self.phase = "IMAGE_COMMAND_ATTEMPTED"
+            try:
+                # Target packet 227 proves cmd0=2/cmd1=1 (wire 0x22) after
+                # finger-down. Wire 0x20 remains a separate baseline builder.
+                self._send_async(build_finger_image(), 0x22)
+                self.phase = "WAIT_IMAGE"
+            except Exception:
+                self.phase = "IMAGE_COMMAND_FAILED"
+                raise
             return None
         if self.phase == "WAIT_IMAGE":
             self.image = parse_image_payload(payload)

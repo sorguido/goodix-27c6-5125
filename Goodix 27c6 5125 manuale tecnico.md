@@ -70,6 +70,19 @@ finger-up e `gfOnCancel` cancella una richiesta host, mentre A2/`0x70` non sono
 osservati come restore FDT. Perciò `D252_LIVE_BOUNDARY=BLOCKED` e non esiste un
 operator kit D252.
 
+D253 ha chiuso offline la distinzione immagine target e ha corretto il modello
+corrente: `0x20` e `0x22` sono entrambi SetMode Image con `more=0`, ma usano
+rispettivamente `cmd1=0` nei due contesti baseline/no-finger catturati e
+`cmd1=1` subito dopo IRQ finger-down `0x0002`. Il core invia ora exact wire
+`0x22 [01 00]` dopo IRQ2, valida ACK echo `22` e impedisce un secondo tentativo
+post-IRQ in caso di failure. L'audit dataflow ha però delimitato, non chiuso,
+il bootstrap: `gfusb.dll` riceve il primo seed tramite un callback host che
+copia 12 byte nella globale FDT, ma il chiamante e la sorgente ultima sono
+esterni al DLL disponibile. Nessun `goodix.dat` OEM è presente; il path OEM
+osservato confronta soltanto il prefisso OTP e non prova una table FDT. Inoltre
+non esiste ancora cancel/restore device-side deterministico. D253 resta quindi
+`BLOCKED`, richiede evidenza primaria esterna mirata e non crea un kit live.
+
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
 rispetto a Rockytkg; dalla baseline post-D247 il futuro core userspace e i tool
@@ -117,6 +130,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D250 D4→AF | eseguita una volta, marker consumato, fail-closed nel validator | TLS e D4 riusciti; AF logical 13 / physical 64 zero-tail inviato una volta; A0/AE strutturalmente valida con body 16; byte0 perduto dalla telemetria; zero retry/write/app-data; cleanup/restore/reseal riusciti |
 | Run live D251 D4→AF | successo, consumata | exactly-one AF/AE; byte0 opaco `0`, flags `0x02`, POV false/TLS true/locked false, zero retry/write/app-data, cleanup/restore/reseal riusciti, `STOP_AFTER_AF` |
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
+| Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1389,15 +1403,20 @@ un encoder duplicato D249.
 
 La capture locale osserva AF e comandi FDT plaintext nella sessione post-TLS;
 la DLL conferma serializer AF, timestamp, risposta AE da 16 byte e bit di stato.
-Il modello offline D249 sceglie separatamente due percorsi: AF senza POV → invio
-asincrono FDT down 32 → IRQ 2 → invio asincrono SetMode Image 20 → immagine;
+Il modello offline D249 storico sceglieva separatamente due percorsi: AF senza
+POV → invio asincrono FDT down 32 → IRQ 2 → invio asincrono SetMode Image 20 → immagine;
 AF con POV valido → invio asincrono D2 → immagine cached. D252 ha poi stabilito
 che questo tratto, mutuato da Rocky, non è wire-exact per l'unica occorrenza
 target con IRQ 2: il successivo OUT è `0x22 [01 00]`, mentre `0x20` compare
-separatamente nei path di immagine base/no-finger. D249 resta una closure
-sintetica storica e non prova il sequencing target verso la prima immagine.
+separatamente nei path di immagine base/no-finger. D253 ha quindi corretto
+organicamente il core corrente: `build_finger_image()` serializza `0x22`, la
+allowlist e la policy ACK includono echo `22`, e la state machine usa quel
+comando dopo IRQ2 con latch di tentativo pre-submit. `build_set_image()` resta
+il builder `0x20` separato. D249 resta la provenance storica della closure
+sintetica; la correzione current-path D253 non prova che il percorso sia
+live-safe.
 Gli ACK osservati
-localmente dopo 32 e 20 vengono validati se presenti, ma non sono una
+localmente dopo 32, 20 e 22 vengono validati se presenti, ma non sono una
 precondizione causale obbligatoria; per D2 la presenza target resta non nota. Entrambi validano framing, checksum, record, CRC,
 unpack/transpose e terminano esplicitamente in `FIRST_IMAGE_RECEIVED`. Questa è
 closure eseguibile delle fixture sintetiche, non prova che il sequencing sia il
@@ -1424,6 +1443,8 @@ CRC e transizioni duplicate/regressive. Non esistono backend USB/TLS concreti,
 secret, persistenza, retry o loop non bounded. D251 ha raggiunto live AF/AE e
 si è fermato prima di FDT o dito. D252 ha provato la derivazione dinamica della
 tabella FDT ma non la sua freschezza current-path né un restore post-arming;
+D253 ha delimitato il setter host del seed senza trovarne la sorgente ultima e
+ha confermato l'assenza di restore deterministico;
 FDT arming/disarm/restore e ordering mixed-channel completi restano quindi non
 chiusi target-side. Un live FDT o first-image non è giustificato né autorizzato.
 
@@ -1623,6 +1644,80 @@ Il prossimo avanzamento utile richiede nuova evidenza primaria sul seed del
 primo `0x36`, sul restore device-side post-FDT e sulla distinzione `0x22/0x20`;
 non una ripetizione live del percorso già noto.
 
+## D253: dataflow seed, lifecycle post-FDT e correzione `0x22`
+
+L'audit riproducibile `analysis/D253/d253_offline_audit.py` censisce tutte le
+occorrenze prima di applicare gli invarianti attesi. Conferma esattamente tre
+`0x36`, tutti logici 22 / fisici 64, con un'unica tail profile e nessuna
+zero-tail target. I soli byte nonzero fuori frame sono sempre
+`cb f2 e2 be fb 7f` agli offset fisici 40–45. Lo stesso residuo compare nei
+tre comandi immagine `0x20`/`0x22`, mentre il buffer locale SetMode è azzerato
+esplicitamente: la classificazione più forte è staging/transport residue fuori
+dalla lunghezza A0, non payload. Rocky offre solo corroborazione zero-init;
+l'equivalenza zero-tail `0x36` sul target non è provata e il contratto fisico
+non è live-ready.
+
+Il dataflow della globale FDT-down `0x180580818` separa due fasi. Il callback
+registrato in `context+0x13d68` punta a `0x180028480` e copia 12 byte forniti
+dal chiamante; è l'unico initializer pre-manual delimitato. Dopo ogni IRQ100,
+`0x180029210` valida i raw word e sostituisce la globale con la trasformazione
+già provata. Il chiamante del callback, la costruzione dei suoi 12 byte e il
+criterio esterno che produce esattamente tre sample non sono presenti in
+`gfusb.dll`. Non sono provati un default type-12, una derivazione da sei
+scalari, una validazione pre-copy o la necessità fisica di un seed nonzero.
+
+Nel corpus non è presente un file OEM `goodix.dat`. Il path DLL osservato
+legge una quantità pari alla OTP, confronta quel prefisso con la OTP live e
+sceglie i calibration bytes; non raggiunge direttamente la globale FDT.
+Il layout Rocky con OTP/FDT/image/CRC resta fonte implementativa
+corroborativa, non prova target del formato o della freschezza. Host persistence
+Linux non è quindi autorizzata né classificabile come riuso sicuro.
+
+L'audit differenziale target trova `0x20` ai pacchetti zero-based 167 e 238,
+in contesti baseline/no-finger, e `0x22` al 227 immediatamente dopo IRQ2.
+Tutti hanno data `01 00`, lunghezza logica 10/fisica 64, ACK con echo uguale al
+control e un frame immagine B0/TLS da 7726 byte successivo. Il builder DLL
+prova la decomposizione: `0x20 = cmd0 2, cmd1 0, more 0`; `0x22 = cmd0 2,
+cmd1 1, more 0`. Il core corrente usa perciò `0x22` post-IRQ2; la semantica
+non viene estesa oltre “variante immagine post-finger-down”.
+
+Il lifecycle positivo catturato è
+`0x32→IRQ2→0x22→image→0x34→IRQ0x0200→0x20→image→0x32`, ma non è un cancel.
+Un `0x32` successivo è accettato senza restore osservato, mentre l'ultimo
+`0x32` termina con la capture. Timeout, errori, close USB/TLS, deinit e service
+stop non sono esposti. `gfOnCancel` resta host-only, `0x34` arma finger-up e
+A2/`0x70` non compaiono come restore. La durata dell'arm, la sopravvivenza ai
+close e il safe stop senza dito restano ignoti/non provati.
+
+```text
+INITIAL_FDT36_SEED_SOURCE=HOST_SUPPLIED_VIA_GFUSB_CALLBACK; ULTIMATE_SOURCE_UNRESOLVED
+FRESH_BASELINE_BOOTSTRAP_CLOSED=false
+GOODIX_DAT_AVAILABLE_FOR_AUDIT=false
+FDT36_TARGET_OCCURRENCE_COUNT=3
+FDT36_ZERO_TAIL_OBSERVED_ON_TARGET=false
+FDT36_ZERO_TAIL_TARGET_EQUIVALENCE=NOT_PROVEN
+FDT36_PHYSICAL_CONTRACT_LIVE_READY=false
+POST_FDT_RESTORE_MODEL=NO_EXPLICIT_RESTORE; SUCCESS_CYCLE_EVENT_CONSUMPTION; STOP_FAILURE_MODEL_UNKNOWN
+DEVICE_SIDE_CANCEL_COMMAND=NOT_FOUND_OR_PROVEN
+FDT_ARM_SURVIVES_USB_CLOSE=UNKNOWN
+SAFE_STOP_AFTER_FDT_ARM=false
+CMD20_22_RELATION=CMD1_SELECTOR_0_VERSUS_1; MORE_0_FOR_BOTH
+POST_IRQ2_IMAGE_COMMAND=0x22_DATA_0100
+D249_FIRST_IMAGE_MODEL_STATUS=HISTORICAL_0x20_MODEL_CORRECTED_IN_CURRENT_CORE; OFFLINE_ONLY
+NEXT_MINIMUM_LIVE_BOUNDARY=NONE
+D253_OUTCOME=BLOCKED
+D253_LIVE_BOUNDARY=BLOCKED
+D253_LIVE_EXECUTION=NOT_PERFORMED
+REQUIRES_EXTERNAL_EVIDENCE=true
+```
+
+Per riaprire il confine servono insieme: una traccia OEM sanitizzata da
+cold-start che mostri input/chiamante del callback seed, cache e criterio del
+loop; e una traccia OEM di cancel/timeout/service-stop/close subito dopo FDT
+arm con verifica deterministica dello stato successivo. Un receiver/lifecycle
+APP12509 provenance-valid può sostituire le parti che prova. Ripetere il live
+esistente non produce questa evidenza.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -1691,13 +1786,14 @@ D251 ha chiuso live AF sulla baseline approvata: la singola AE valida con
 fresh-FDT, non D2. Anche il marker D251 è consumato; l'esito non autorizza
 retry, secondo D4, secondo AF, FDT o una nuova invocazione.
 
-Il current critical boundary è ora offline: chiudere la precondizione target
-fresh per `0x36`/tabella FDT, il cancel/restore device-side dopo arming e la
-semantica target del successivo wire `0x22`. La tabella finale della capture è
+Il current critical boundary è offline: chiudere la precondizione target
+fresh per `0x36`/tabella FDT e il cancel/restore device-side dopo arming. D253
+ha chiuso la distinzione wire corrente `0x22`/`0x20` e corretto il core, ma non
+ha reso il path live-safe. La tabella finale della capture è
 dinamicamente appresa da IRQ `0x0100`, ma vale soltanto come prova della
 sessione catturata; il cold-start D251 non possiede una baseline validata. Non
-esiste un restore OEM post-FDT provato. D252 è quindi `BLOCKED` e non ha creato
-un path live-capable.
+esiste un restore OEM post-FDT provato. D253 è quindi `BLOCKED`, richiede
+evidenza esterna specifica e non ha creato un path live-capable.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1731,6 +1827,13 @@ FDT_RESTORE_STATE NOT_PROVEN
 FDT_ARM_AND_STOP_SAFE false
 D252_LIVE_BOUNDARY BLOCKED
 D252_LIVE_EXECUTION NOT_PERFORMED
+D253_POST_IRQ2_IMAGE_COMMAND 0x22_DATA_0100
+D253_FRESH_BASELINE_BOOTSTRAP_CLOSED false
+D253_FDT36_PHYSICAL_CONTRACT_LIVE_READY false
+D253_SAFE_STOP_AFTER_FDT_ARM false
+D253_LIVE_BOUNDARY BLOCKED
+D253_LIVE_EXECUTION NOT_PERFORMED
+D253_REQUIRES_EXTERNAL_EVIDENCE true
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -1810,6 +1913,13 @@ step-local. Il modello D249 `IRQ2→0x20` resta storico e viene esplicitamente
 marcato non wire-exact rispetto al target `IRQ2→0x22`; non è stato promosso un
 nuovo percorso perché tabella fresh e restore non sono entrambi chiusi.
 
+D253 corregge soltanto il core GPL offline corrente e i test: la state machine
+usa `IRQ2→0x22`, conserva `0x20` come builder baseline distinto e applica un
+fence single-shot prima del secondo comando. L'audit/report/decisione sono
+step-local; non esistono backend USB aggiunti, persistenza host, live kit o
+autorizzazione hardware. Bootstrap seed, contratto fisico `0x36` e restore
+restano bloccanti.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -1823,4 +1933,4 @@ nuovo percorso perché tabella fresh e restore non sono entrambi chiusi.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D252 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
+D230–D253 sono sotto `analysis/`; nessuna fonte proprietaria raw è redistribuita.
