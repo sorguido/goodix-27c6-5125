@@ -18,8 +18,9 @@ fprintd e reseal sono riusciti; le famiglie di scrittura persistente sono
 rimaste a zero. La semantica D4 resta quella già provata staticamente,
 `VOLATILE_SESSION_INITIALIZATION`, limitata al receiver APP12509 esatto. A8,
 E4, TLS e D4 non sono più blocker aperti. D249 ha ora chiuso offline il
-framing e parsing AF e ha implementato nel nuovo core GPL il tratto
-AF→FDT→first-image sopra un transport astratto, senza USB reale. Il boundary
+framing e parsing AF e, dopo la correzione di review, ha chiuso realmente nel
+nuovo core GPL due replay sintetici bounded fino a `FIRST_IMAGE_RECEIVED`:
+FDT fresh e cached POV, sopra un transport astratto e senza USB reale. Il boundary
 live resta AF: non è stato eseguito né autorizzato, e FDT arming/disarm non è
 ancora chiuso sul target. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
@@ -1289,35 +1290,46 @@ di avanzamento resta l'esecuzione reale completata. L'autorizzazione single-shot
 
 ## D249: core GPL offline AF → FDT → first image
 
-D249 ha verificato online la raggiungibilità del repository Rocky e ha fissato
-la baseline immutabile `227eba219fa9e3fbac5bd59aca79f624f67cd11b`. Dopo
-verifica di LICENSE, SPDX e copyright ha adattato soltanto parti GPL di
-`src/goodix_cmd.c`, `src/goodix_frame.c` e `src/goodix_capture.c` nel dominio
-`core/`; il ledger per-file è in `docs/LICENSING_AND_PROVENANCE.md`. Il codec
-7684-byte/CRC-32-MPEG-2/packed-12/transpose resta quello locale già validato.
-Rocky è fonte implementativa, non prova target-specific.
+D249 usa la baseline Rocky immutabile
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`. Le sole parti adattate nel dominio
+GPL provengono da `src/goodix_cmd.c`, `src/goodix_frame.c` e
+`src/goodix_capture.c`, con SPDX GPL-2.0-or-later e attribution registrati nel
+ledger. Rocky resta fonte implementativa e corroborativa, non prova
+APP12509. Lifecycle USB, retry/reconnect, PSK/MCU write, persistenza baseline,
+firmware/IAP/ClearApp e le famiglie E0/A4/F0/F4 non sono importati né
+raggiungibili.
 
-La capture locale 12509 osserva dopo D4 un AF plaintext e successivi comandi
-FDT plaintext in una sessione che contiene anche B0/TLS. La DLL 1.1.125.14
-conferma serializer, timestamp, risposta AE da 16 byte e bit di stato. La
-coesistenza di canali è quindi osservata, mentre ogni possibile ordering o
-interleaving applicativo non visibile nella capture resta non noto. Il demux
-D249 accumula soltanto byte TLS già decifrati forniti dall'esterno e fallisce
-chiuso su framing, lunghezze, checksum, EOF e limiti; non importa lifecycle USB
-o TLS reconnect Rocky.
+La prima revisione D249 conteneva un decoder immagine non equivalente alla
+closure locale. La correzione lo ha rimosso: `core/post_d4.py` delega ora
+esattamente a `src/goodix5125_cleanroom.py`. Restano quindi canonici record da
+7684 byte, 7680 packed, gruppi 6-byte/4-sample, 5120 sample, trailer CRC nel
+reale ordine `crc>>8, crc, crc>>24, crc>>16` e transpose wire-index → raster
+80×64. I test costruiscono il record con il codec locale, confrontano tutti i
+pixel dei due output, verificano un KAT non banale e corruzione CRC; non usano
+un encoder duplicato D249.
 
-La mappa implementata offline è AF, FDT manual `36`, FDT down `32`, FDT up
-`34`, SetMode Image `20` e POV cached-image `D2`. Il core non automatizza
-arming, retry, re-arm o cleanup. In particolare `34` è provato come modalità
-di rilevamento finger-up, non come disarm/restore deterministico. Perciò il
-primo live candidato resta exactly-one AF e stop; anche il massimo boundary
-giustificato si ferma dopo telemetria AF, prima di FDT o richiesta dito. Un live
-first-image non è ancora giustificato.
+La capture locale osserva AF e comandi FDT plaintext nella sessione post-TLS;
+la DLL conferma serializer AF, timestamp, risposta AE da 16 byte e bit di stato.
+Il modello offline sceglie separatamente due percorsi: AF senza POV → FDT down
+32/ACK → IRQ 2 → SetMode Image 20/ACK → immagine; AF con POV valido → D2/ACK →
+immagine cached. Entrambi validano framing, checksum, record, CRC,
+unpack/transpose e terminano esplicitamente in `FIRST_IMAGE_RECEIVED`. Questa è
+closure eseguibile delle fixture sintetiche, non prova che il sequencing sia il
+minimo causale o live-safe sul 12509.
 
-La closure offline esplicita esegue sette test bounded con fixture sintetiche e
-non biometriche: AF, bit ignoti, FDT, mixed channel frammentato/coalesciato,
-codec/CRC, duplicati/ordine, EOF e matrice malformed. Non enumera o apre USB,
-non legge secret e non offre alcun concrete transport.
+La policy checksum è strict: `parse_payload()` calcola sempre il checksum. Il
+valore 0x88 è accettato soltanto quando coincide matematicamente con il checksum
+del payload specifico; non è un bypass. Il NOP locale osservato con marker
+no-check è fuori dall'allowlist D249. Test distinti rifiutano un 0x88 errato e
+accettano un checksum genuino che vale 0x88.
+
+La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
+immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
+CRC e transizioni duplicate/regressive. Non esistono backend USB/TLS concreti,
+secret, persistenza, retry o loop non bounded. Il boundary live non avanza: il
+primo e massimo candidato restano exactly-one AF con telemetria e stop prima di
+FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi restano
+non noti target-side; un live first-image non è giustificato né autorizzato.
 
 ## Operazioni read note e limiti
 
@@ -1439,8 +1451,9 @@ stop immediato, completando il percorso implementato fino a quel boundary. Le
 sorgenti sono state ripristinate e sealed dopo la run. L'implementazione storica include ABI libusb esatta e TLS OpenSSL, ma non
 costituisce ancora un driver libfprint pronto. D249 aggiunge
 `core/post_d4.py`, GPL-2.0-or-later e privo di backend USB: framing/parsing
-fail-closed, AF, demux A0 + byte-stream applicativo B0 già decifrato,
-builder/eventi FDT, request first-image/D2 e codec immagine locale. L'allowlist
+fail-closed, AF, demux A0 + byte-stream applicativo B0 già decifrato, builder/eventi
+FDT, due state path bounded fino a `FIRST_IMAGE_RECEIVED` e delega diretta al
+codec immagine locale canonico. L'allowlist
 rende E0/A4/F0/F4 e le famiglie provisioning/firmware irraggiungibili per
 costruzione. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
