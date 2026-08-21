@@ -17,8 +17,11 @@ e stop terminale `STOP_AFTER_D4`. Cleanup, zeroizzazione del secret, restore di
 fprintd e reseal sono riusciti; le famiglie di scrittura persistente sono
 rimaste a zero. La semantica D4 resta quella già provata staticamente,
 `VOLATILE_SESSION_INITIALIZATION`, limitata al receiver APP12509 esatto. A8,
-E4, TLS e D4 non sono più blocker aperti: il nuovo current critical boundary è
-AF, non ancora valutato e non autorizzato. Il repository non auto-approva né
+E4, TLS e D4 non sono più blocker aperti. D249 ha ora chiuso offline il
+framing e parsing AF e ha implementato nel nuovo core GPL il tratto
+AF→FDT→first-image sopra un transport astratto, senza USB reale. Il boundary
+live resta AF: non è stato eseguito né autorizzato, e FDT arming/disarm non è
+ancora chiuso sul target. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
@@ -1284,6 +1287,38 @@ prodotto anche nuova evidenza tecnica live sul D4, mentre la categoria primaria
 di avanzamento resta l'esecuzione reale completata. L'autorizzazione single-shot
 è consumata: D246 non autorizza un secondo D4, retry o il comando AF.
 
+## D249: core GPL offline AF → FDT → first image
+
+D249 ha verificato online la raggiungibilità del repository Rocky e ha fissato
+la baseline immutabile `227eba219fa9e3fbac5bd59aca79f624f67cd11b`. Dopo
+verifica di LICENSE, SPDX e copyright ha adattato soltanto parti GPL di
+`src/goodix_cmd.c`, `src/goodix_frame.c` e `src/goodix_capture.c` nel dominio
+`core/`; il ledger per-file è in `docs/LICENSING_AND_PROVENANCE.md`. Il codec
+7684-byte/CRC-32-MPEG-2/packed-12/transpose resta quello locale già validato.
+Rocky è fonte implementativa, non prova target-specific.
+
+La capture locale 12509 osserva dopo D4 un AF plaintext e successivi comandi
+FDT plaintext in una sessione che contiene anche B0/TLS. La DLL 1.1.125.14
+conferma serializer, timestamp, risposta AE da 16 byte e bit di stato. La
+coesistenza di canali è quindi osservata, mentre ogni possibile ordering o
+interleaving applicativo non visibile nella capture resta non noto. Il demux
+D249 accumula soltanto byte TLS già decifrati forniti dall'esterno e fallisce
+chiuso su framing, lunghezze, checksum, EOF e limiti; non importa lifecycle USB
+o TLS reconnect Rocky.
+
+La mappa implementata offline è AF, FDT manual `36`, FDT down `32`, FDT up
+`34`, SetMode Image `20` e POV cached-image `D2`. Il core non automatizza
+arming, retry, re-arm o cleanup. In particolare `34` è provato come modalità
+di rilevamento finger-up, non come disarm/restore deterministico. Perciò il
+primo live candidato resta exactly-one AF e stop; anche il massimo boundary
+giustificato si ferma dopo telemetria AF, prima di FDT o richiesta dito. Un live
+first-image non è ancora giustificato.
+
+La closure offline esplicita esegue sette test bounded con fixture sintetiche e
+non biometriche: AF, bit ignoti, FDT, mixed channel frammentato/coalesciato,
+codec/CRC, duplicati/ordine, EOF e matrice malformed. Non enumera o apre USB,
+non legge secret e non offre alcun concrete transport.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -1339,9 +1374,12 @@ post-handshake: il target ha accettato una sola inizializzazione volatile D4
 per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
 `STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
-Il current critical boundary tecnico è quindi il comando successivo A0/AF,
-osservato nella capture ma non ancora classificato, implementato, eseguito o
-autorizzato. L'autorizzazione D246 è consumata. Nessun esito storico autorizza
+Il current critical boundary live è quindi il comando successivo A0/AF. D249
+lo ha classificato e implementato offline: request AF (logical AE con `more=1`)
+`55,ts16le,00,00`, risposta diretta A0/AE senza ACK e stato esatto da 16 byte,
+con byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked; gli altri bit sono
+preservati come ignoti. Restano non chiusi il contratto fisico/pacing live e il
+receiver resident APP12509. AF non è stato eseguito né autorizzato. L'autorizzazione D246 è consumata. Nessun esito storico autorizza
 retry, secondo D4, AF o seconda invocazione. L'assenza di prova elettrica del
 sensore e di prova device-side assoluta oltre il receiver D4 esatto resta
 esplicita.
@@ -1398,9 +1436,13 @@ transizione command→TLS D241, le evidenze E4 D242/D243/D244 e il kit D245 per
 la precondizione read-only A8→E4 con continuazione TLS. D245 è ora anche una
 run live TLS riuscita; D246 ha aggiunto ed eseguito live il solo D4 volatile con
 stop immediato, completando il percorso implementato fino a quel boundary. Le
-sorgenti sono state ripristinate e sealed dopo la run. L'implementazione include
-ABI libusb esatta e TLS OpenSSL, ma non costituisce ancora un driver libfprint
-pronto e AF resta non valutato. Il record immagine noto è di 7684 byte:
+sorgenti sono state ripristinate e sealed dopo la run. L'implementazione storica include ABI libusb esatta e TLS OpenSSL, ma non
+costituisce ancora un driver libfprint pronto. D249 aggiunge
+`core/post_d4.py`, GPL-2.0-or-later e privo di backend USB: framing/parsing
+fail-closed, AF, demux A0 + byte-stream applicativo B0 già decifrato,
+builder/eventi FDT, request first-image/D2 e codec immagine locale. L'allowlist
+rende E0/A4/F0/F4 e le famiglie provisioning/firmware irraggiungibili per
+costruzione. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
 transpose.
 
