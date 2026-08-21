@@ -25,6 +25,20 @@ live resta AF: non è stato eseguito né autorizzato, e FDT arming/disarm non è
 ancora chiuso sul target. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
+D250 ha ora chiuso offline il boundary minimo exactly-one AF. L'audit
+riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
+request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
+byte con 16 byte di stato, nessun ACK AF e 58,365 ms osservati tra ACK D4 e AF
+OUT. La tail OEM AF contiene 51 byte fuori dalla lunghezza dichiarata, con sei
+byte opachi nonzero identici nelle cinque occorrenze; il candidate non li
+replaya e usa una tail deterministica zero, ipotesi di equivalenza che resta da
+validare live. Il continuation sintetico impone un solo attempt/send, una sola
+IN bounded, validator AE fail-closed e terminale `STOP_AFTER_AF`; FDT, finger e
+image sono strutturalmente irraggiungibili. La decisione è
+`D250_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_USER_AUTHORIZATION`, non
+un'autorizzazione: il launcher consegnato resta hard-disabled salvo dry-run e
+nessun accesso USB è avvenuto in D250.
+
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
 rispetto a Rockytkg; dalla baseline post-D247 il futuro core userspace e i tool
@@ -69,6 +83,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D244 | fail-closed al primo E4 | fresh host boot documentato e controllo valido; OUT E4 completato, bulk IN timeout; nessuna prova di perdita elettrica sensore; zero retry e cleanup/reseal riusciti |
 | Run live D245 A8→E4→TLS | successo, consumata | ACK A8 `07`, FW12509 esatto, E4 `match`, pre-D1/D1 e handshake TLS completi; stop prima di D4, zero retry/app-data/persistent-write |
 | Run live D246 TLS→D4 | successo, consumata | handshake TLS completo; D4 attempt/send `1/1`, ACK `01`, nessuna response/app-data/retry/write persistente; `STOP_AFTER_D4`, cleanup/restore/reseal riusciti |
+| Boundary D250 D4→AF | READY per autorizzazione separata, solo offline | AF logical 13 / physical 64, tail candidate zero, AE diretta 24 con state body 16, ACK AF vietato, one-IN/zero-retry/`STOP_AFTER_AF`; USB reale zero |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -125,18 +140,34 @@ protetti TLS. È corroborazione esterna utile, ma non prova primaria del nostro
 target, non prova la preservazione della PSK Windows/factory preesistente e non
 autorizza automaticamente alcuna futura operazione live.
 
-### Rockytkg — fonte implementativa esterna
-Repository di riferimento:
-[Rockytkg/goodix-linux-27c6-5125](https://github.com/Rockytkg/goodix-linux-27c6-5125)
+### Rockytkg — snapshot locale implementativo canonico
 
-La baseline Rocky è verificata esternamente al commit
+Il riferimento operativo unico è lo snapshot versionato
+`<git-root>/Rockytkg/`; la sua scheda canonica è
+`Rockytkg/PROVENANCE.md`. Il repository online
+`Rockytkg/goodix-linux-27c6-5125` registra l'origine ma non è una dipendenza del
+workflow ordinario. La Issue #1 resta una fonte esterna distinta e non è
+incorporata da un normale snapshot Git.
+
+La baseline preservata è il commit
 `227eba219fa9e3fbac5bd59aca79f624f67cd11b`: il `LICENSE` assegna
 GPL-2.0-or-later al codice originale, LGPL-2.1-or-later a `src/goodixgf.c`,
 lascia `libfprint/` ai termini upstream ed esclude dalla blanket license il
 firmware vendor. Gli header campionati confermano GPL per
 `goodix_capture.c`, `goodix_init.c`, `goodix_tls.c` e LGPL per `goodixgf.c`;
 il copyright repository-level indica `liushicong (Rockytkg)` senza implicare
-titolarità su ogni riga o contributo terzo.
+titolarità su ogni riga o contributo terzo. Il tree upstream preservato è
+`6dda93a960ceddb085c59b5382df47ecc5d56a39`; il gitlink upstream originario di
+`libfprint` è `7ebe0c809b4d1df3400e84299a4ec4acdea84590`, mentre nello snapshot locale
+`Rockytkg/libfprint/` è materializzato come file normali, senza submodule attivo
+o `.git` annidata.
+
+Preservazione non equivale a diritto di riuso: ogni import richiede audit
+file-specifico e registrazione nel ledger. Il codice originale Rocky è GPL,
+`src/goodixgf.c` è LGPL, `libfprint/` conserva i termini third-party e
+`firmware/st411sec_app.bin` più i byte firmware in `include/goodix_fw.h` sono
+materiale vendor fuori dalla blanket GPL/LGPL. Lo snapshot e il materiale
+vendor non confluiscono automaticamente nel repository pubblico.
 
 La issue Rocky #1 verificata chiarisce inoltre che la validazione hardware
 diretta dell'autore riguarda un'unità 12508, non un 12509 non modificato. Il
@@ -940,9 +971,11 @@ path è verificato senza sudo con una fixture sintetica che termina prima di
 unseal, USB, secret, fprintd e marker. Questa proprietà storica resta valida;
 la run D242 successiva ha consumato il kit ed è terminata al primo E4. Anche il
 kit D243 è ora consumato; anche la singola autorizzazione D244 descritta sotto
-è consumata. Anche la singola invocazione D245 è ora consumata; il riferimento
-operativo non eseguito corrente è D246, limitato a una closure offline e senza
-baseline live approvata.
+è consumata. Anche la singola invocazione D245 è ora consumata. La frase
+storica che indicava D246 come riferimento soltanto offline descriveva lo stato
+prima della run D246: D246 è poi stato eseguito live con successo ed è chiuso a
+`STOP_AFTER_D4`. Il candidate corrente D250 è invece soltanto offline e non ha
+una baseline live approvata.
 
 La provenance D241 è nuovamente byte-exact e read-only:
 `d241_operator_dry_run.py` ha SHA-256
@@ -1342,6 +1375,69 @@ primo e massimo candidato restano exactly-one AF con telemetria e stop prima di
 FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi restano
 non noti target-side; un live first-image non è giustificato né autorizzato.
 
+## D250: canonicalizzazione Rocky e closure offline exactly-one AF
+
+Lo snapshot operativo canonico è `Rockytkg/`, con provenance in
+`Rockytkg/PROVENANCE.md`; struttura e licenze sono quelle descritte nella
+sezione fonti. D250 non importa nuovo codice Rocky: riusa il serializer e il
+validator GPL già registrati da D249 in `core/post_d4.py`.
+
+L'audit primario riproducibile è
+`analysis/D250/D250_af_capture_audit.json`. Nella sola sequenza locale
+post-D4 esatta, il frame 136 è D4 logico 10 / OUT 64 zero-tail, il frame 138 è
+l'ACK `d4/01`, il frame 140 è AF logico 13 / submission 64 e il frame 142 è AE
+logico e fisico 24. La numerazione è umana 1-based; il JSON conserva gli indici
+zero-based 135/137/139/141. Non esiste un frame IN non vuoto tra AF e AE. Tutte
+le cinque occorrenze AF della capture hanno risposta AE diretta e submission
+64; la tail AF fuori dalla lunghezza A0 dichiarata è sempre la stessa sequenza
+opaca di 51 byte, con sei byte nonzero agli offset tail 27–32. Non è trattata
+come payload protocollo né replayata. Il candidate invia 13 byte logici in un
+buffer fisico 64 zero-initialized; l'equivalenza device-side specifica AF resta
+**non live-proven**, ma è bounded e non aggiunge un comando o un campo
+persistente.
+
+La DLL locale classifica `GetMcuState` come read tipizzata: control wire AF
+(`AE` logico con `more=1`), body `55,ts16le,00,00`, ACK timeout zero, data
+timeout 500 ms ed evento/risposta AE. Il call path OEM mostra anche `Sleep(20)`
+prima della query; la capture osserva 58,365 ms da ACK D4 ad AF OUT. Il
+candidate usa 20 ms host-side, timeout complessivo AF 500 ms e massimo una sola
+lettura di frame. La AE accettata deve essere A0, control `0xAE`, checksum
+valido e body esattamente 16 byte. Byte 1: bit0 POV-valid, bit1 TLS-connected e
+bit3 locked sono noti; ogni altro bit è preservato come ignoto e non governa
+azioni ulteriori.
+
+`ExactlyOneAfMachine` e la patch continuation mettono il latch attempt prima
+della submission. Completion corta/ambigua conserva `attempt=1`, non marca
+`send=1` e impedisce re-entry. Timeout, ACK AF, AE corta/lunga, control o
+checksum errato, risposta duplicata coalesced e frame trailing falliscono
+chiusi; un frame separato successivo resta unowned e non viene consumato perché
+il budget autorizza una sola IN. Dopo AE valida il terminale è sempre
+`STOP_AFTER_AF`; non esiste transizione verso FDT `32`, SetMode `20`, cached
+`D2`, finger o image. Cleanup/release/secret zeroization/restore/reseal restano
+quelli della catena D246 e sono verificati nel tree temporaneo.
+
+La classificazione safety è corpus-bounded: AF è una query di stato fissa,
+osservata nel workflow OEM e distinta dalle famiglie di write/provisioning/
+firmware; non serializza address, blob o selector persistenti. Il receiver
+resident APP12509 resta non disponibile, quindi non si afferma una proprietà
+universale di ogni AF possibile. Rocky e Issue #1 corroborano serializer e
+semantica, ma non sono la prova target-specific.
+
+```text
+D250_AF_LIVE_BOUNDARY=READY_FOR_SEPARATE_USER_AUTHORIZATION
+D250_CANDIDATE=TLS->D4_ONCE->ACK_D4_01->AF_ATTEMPT_ONCE->AE_VALIDATED->STOP_AFTER_AF
+D250_MAX_AF_IN_FRAME_COUNT=1
+D250_AF_ACK_POLICY=FORBIDDEN
+D250_RETRY_COUNT=0
+D250_PERSISTENT_WRITE_FAMILY_COUNT=0
+D250_USB_OPEN_COUNT=0
+```
+
+Questa decisione non autorizza hardware. Una futura run richiede review AI PM,
+un commit SHA completo approvato per il live-critical set e autorizzazione
+esplicita separata dell'Utente. Il launcher D250 consegnato accetta soltanto
+`--offline-dry-run` e chiude prima di USB per ogni altro argomento.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -1397,12 +1493,16 @@ post-handshake: il target ha accettato una sola inizializzazione volatile D4
 per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
 `STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
-Il current critical boundary live è quindi il comando successivo A0/AF. D249
-lo ha classificato e implementato offline: request AF (logical AE con `more=1`)
+Il current critical boundary live resta il comando successivo A0/AF. D249
+lo ha classificato e implementato nel core; D250 ne ha chiuso il candidate
+exactly-one offline: request AF (logical AE con `more=1`)
 `55,ts16le,00,00`, risposta diretta A0/AE senza ACK e stato esatto da 16 byte,
 con byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked; gli altri bit sono
-preservati come ignoti. Restano non chiusi il contratto fisico/pacing live e il
-receiver resident APP12509. AF non è stato eseguito né autorizzato. L'autorizzazione D246 è consumata. Nessun esito storico autorizza
+preservati come ignoti. Serializer, pacing, submission 64 e validator sono ora
+bounded; resta non provata live l'equivalenza della tail AF zero rispetto alla
+tail OEM opaca e resta assente il receiver resident APP12509. Questi sono rischi
+del test, non un'autorizzazione. AF non è stato eseguito né autorizzato.
+L'autorizzazione D246 è consumata. Nessun esito storico autorizza
 retry, secondo D4, AF o seconda invocazione. L'assenza di prova elettrica del
 sensore e di prova device-side assoluta oltre il receiver D4 esatto resta
 esplicita.
@@ -1422,6 +1522,8 @@ minimum missing interval  0x080272e0..0x0802b8f4
 PRE_D1_PATH_CLEARED_FOR_EXACT_OEM_REPLAY  true
 DEVICE_RESIDENT_NO_NVM_SIDE_EFFECT_PROVEN false
 D246_EXACT_APP12509_D4_NO_NVM_SIDE_EFFECT_PROVEN true
+D250_AF_LIVE_BOUNDARY READY_FOR_SEPARATE_USER_AUTHORIZATION
+D250_AF_ZERO_TAIL_DEVICE_EQUIVALENCE NOT_LIVE_PROVEN
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -1469,6 +1571,12 @@ rende E0/A4/F0/F4 e le famiglie provisioning/firmware irraggiungibili per
 costruzione. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
 transpose.
+
+D250 aggiunge il terminale AF-only, la patch continuation sopra la catena
+D245→D246, la matrice avversaria e un launcher realmente invocabile soltanto in
+dry-run. Il codice sorgente USB storico resta sealed nel repository; patch
+apply/reverse e hash dimostrano ripristino byte-identico. Questa è executable
+closure offline e nuova evidenza derivata dalla capture, non avanzamento live.
 
 ## Regole operative
 

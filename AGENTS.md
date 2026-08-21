@@ -87,6 +87,11 @@ Correzioni locali che non cambiano il confine tecnico restano nello stesso Dxxx.
 
 Dettagli operativi e ledger: `docs/LICENSING_AND_PROVENANCE.md`.
 
+Snapshot Rockytkg operativo canonico: `<git-root>/Rockytkg/`. Prima di audit,
+adattamento o riuso leggere `Rockytkg/PROVENANCE.md`. Il repository online
+Rockytkg non è una dipendenza del workflow ordinario; la Issue #1 resta una
+fonte esterna distinta e non è incorporata nello snapshot.
+
 ---
 
 ## 5. Riesame metodologico pre-live

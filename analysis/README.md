@@ -26,6 +26,8 @@ costituisce autorizzazione live.
 | D246 | TLS→D4 | READY / consumato | `analysis/D246/D246_report.md` | `analysis/D246/D246_bundle.zip` |
 | D247 | Architettura licenze | READY | `analysis/D247/D247_license_architecture_migration.md` | `analysis/D247/D247_license_architecture_migration_bundle.zip` |
 | D248 | Hygiene e indice strutturale | READY | `analysis/D248/D248_repository_hygiene_report.md` | `analysis/D248/D248_repository_hygiene_bundle.zip` |
+| D249 | Core GPL offline AF→FDT→prima immagine | READY offline | `analysis/D249/D249_rocky_assisted_af_fdt_first_image.md` | `analysis/D249/D249_rocky_assisted_af_fdt_first_image_bundle.zip` |
+| D250 | Rocky canonico + boundary exactly-one AF | READY offline / autorizzazione live separata richiesta | `analysis/D250/D250_report.md` | `analysis/D250/D250_bundle.zip` |
 
 I bundle D230–D238 in root attendono la relocation meccanica byte-preserving
 descritta dal manifest D248; ZIP e sidecar devono muoversi insieme. La coppia

@@ -19,6 +19,7 @@ from src.goodix5125_cleanroom import decode_record as _decode_local_record
 PLAIN, TLS = 0xA0, 0xB0
 ALLOWED_COMMANDS = frozenset({0xAF, 0x36, 0x32, 0x34, 0x20, 0xD2})
 FIRST_IMAGE_RECEIVED = "FIRST_IMAGE_RECEIVED"
+STOP_AFTER_AF = "STOP_AFTER_AF"
 ACK_FORBIDDEN = "FORBIDDEN"
 ACK_OPTIONAL = "OPTIONAL_IF_PRESENT"
 ACK_POLICIES = {
@@ -276,6 +277,44 @@ def parse_image_payload(payload: bytes) -> tuple[int, ...]:
 class Transport(Protocol):
     def exchange(self, request: bytes) -> Iterable[bytes]:
         ...
+
+
+class ExactlyOneAfMachine:
+    """Terminal AF-only boundary with a pre-submit attempt latch.
+
+    This machine deliberately has no FDT/capture transition.  ``exchange`` is
+    invoked at most once and every success terminates at ``STOP_AFTER_AF``.
+    """
+
+    def __init__(self, transport: Transport):
+        self.transport = transport
+        self.phase = "POST_D4"
+        self.af_attempt_count = 0
+        self.af_send_count = 0
+        self.af_response_count = 0
+        self.retry_count = 0
+        self.persistent_write_family_count = 0
+        self.state: McuState | None = None
+
+    def run(self, ts16: int) -> McuState:
+        if self.phase != "POST_D4" or self.af_attempt_count:
+            raise InvalidTransition(
+                f"af_phase:{self.phase}:attempts:{self.af_attempt_count}"
+            )
+        self.af_attempt_count = 1
+        self.phase = "AF_ATTEMPTED"
+        try:
+            frames = list(self.transport.exchange(build_af(ts16)))
+            self.af_send_count = 1
+            if len(frames) != 1:
+                raise UnexpectedAck(f"af_frame_count:{len(frames)}")
+            self.state = parse_af_response(frames[0])
+            self.af_response_count = 1
+            self.phase = STOP_AFTER_AF
+            return self.state
+        except BaseException:
+            self.phase = "STOP_AFTER_AF_FAILURE"
+            raise
 
 
 class FirstImageMachine:

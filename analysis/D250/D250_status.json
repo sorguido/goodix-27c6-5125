@@ -1,0 +1,27 @@
+{
+  "schema": "d250-project-status-v1",
+  "outcome": "READY_OFFLINE",
+  "advancement": "NEW_TECHNICAL_EVIDENCE_PRODUCED_AND_NEW_OFFLINE_PROTOCOL_BOUNDARY_REACHED",
+  "executable_closure": "PASS",
+  "canonical_documentation": "UPDATED",
+  "decision": "READY_FOR_SEPARATE_USER_AUTHORIZATION",
+  "terminal_boundary": "STOP_AFTER_AF",
+  "live_capability": "HARD_DISABLED_PENDING_SEPARATE_USER_AUTHORIZATION",
+  "initial_head": "e40761b344bc44e492111aab8ff39769e99e6006",
+  "rocky_snapshot_status": "VERIFIED_CANONICAL_LOCAL_MATERIALIZED_NO_NESTED_GIT_OR_GITLINK",
+  "rocky_provenance_status": "VERIFIED_PREEXISTING_CANONICAL_NO_CHANGE",
+  "guidelines_version_status": "VERIFIED_V2.4_2026-08-21_UNCHANGED",
+  "af_audit_result": "PASS_BOUNDED_QUERY_ONLY_DIRECT_AE_STOP_BEFORE_FDT",
+  "real_usb_open_count": 0,
+  "real_af_attempt_count": 0,
+  "real_af_send_count": 0,
+  "retry_count": 0,
+  "persistent_write_family_count": 0,
+  "tests": {
+    "full_unittest_suite": "PASS_154_OF_154",
+    "d250_targeted": "PASS_6_OF_6",
+    "operator_offline_dry_run": "PASS",
+    "shell_syntax": "PASS",
+    "diff_check": "PASS"
+  }
+}
