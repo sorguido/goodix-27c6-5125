@@ -2,17 +2,11 @@
 
 ## 1. Repository e fonti canoniche
 
-Repository operativo canonico:
+Repository operativo canonico: la root reale del clone Git privato corrente,
+individuata con `git rev-parse --show-toplevel`. Non assumere path della
+workstation dell’Utente.
 
-```text
-/home/guido/Repository/goodix-27c6-5125_private
-```
-
-Manuale tecnico canonico:
-
-```text
-/home/guido/Repository/goodix-27c6-5125_private/Goodix 27c6 5125 manuale tecnico.md
-```
+Manuale tecnico canonico: `Goodix 27c6 5125 manuale tecnico.md` nella root.
 
 Prima di modificare codice, stato tecnico o documentazione:
 
@@ -77,7 +71,24 @@ Correzioni locali che non cambiano il confine tecnico restano nello stesso Dxxx.
 
 ---
 
-## 4. Riesame metodologico pre-live
+## 4. Licenze, provenance e pubblicazione
+
+- nuovo core userspace e tool collegati: `core/`, `tools/` = `GPL-2.0-or-later`;
+- driver/glue upstream: `libfprint-driver/` = `LGPL-2.1-or-later`;
+- riuso diretto di codice Rockytkg GPL è autorizzato solo nel dominio GPL, con
+  commit/path/licenza/copyright/destinazione/modifiche registrati;
+- Rocky è fonte implementativa, non prova target-specific per APP12509; safety
+  e comportamento sensor-reaching richiedono sempre evidenza locale;
+- nessuna espressione GPL entra nel dominio LGPL senza dual/alternative license
+  valida o implementazione indipendente;
+- il repository privato è il workspace canonico; il pubblico resta congelato
+  fino a un export separato, sanitizzato e con audit della history privata.
+
+Dettagli operativi e ledger: `docs/LICENSING_AND_PROVENANCE.md`.
+
+---
+
+## 5. Riesame metodologico pre-live
 
 Prima di preparare o autorizzare una nuova run live dopo un fallimento, pubblica un blocco breve con queste tre risposte:
 
@@ -93,7 +104,7 @@ La conclusione metodologica rilevante va integrata nel manuale tecnico. Non crea
 
 ---
 
-## 5. Prompt specifici
+## 6. Prompt specifici
 
 Il prompt Dxxx deve descrivere il **delta dello step**, non ricopiare questa costituzione operativa.
 
@@ -111,7 +122,7 @@ Se prompt e regole permanenti sembrano contraddirsi, segnala il conflitto invece
 
 ---
 
-## 6. Git e integrità
+## 7. Git e integrità
 
 Per default:
 
@@ -143,7 +154,7 @@ Evitare pin SHA-256 manuali generalizzati per artefatti non live-critical. Mante
 
 ---
 
-## 7. Guardrail live da non semplificare
+## 8. Guardrail live da non semplificare
 
 Quando applicabili, preservare:
 
@@ -159,7 +170,7 @@ Questi sono guardrail hardware. Non sostituirli con sola prosa.
 
 ---
 
-## 8. Manuale tecnico
+## 9. Manuale tecnico
 
 Ogni step che cambia conoscenza, decisioni o stato tecnico deve aggiornare ricorsivamente:
 
@@ -179,7 +190,7 @@ Quando una decisione cambia stato:
 
 ---
 
-## 9. Bundle
+## 10. Bundle
 
 Output finale di Codex:
 
@@ -203,7 +214,7 @@ Indicare il commit SHA di riferimento quando rilevante.
 
 ---
 
-## 10. Safety telemetry e project reporting
+## 11. Safety telemetry e project reporting
 
 Non confondere telemetria di sicurezza con sintesi di progetto.
 
@@ -238,7 +249,7 @@ Campi aggiuntivi solo se contengono informazione tecnica realmente utile e non d
 
 ---
 
-## 11. Executable Closure
+## 12. Executable Closure
 
 Un task non è `READY` solo perché i test unitari passano.
 
@@ -255,7 +266,7 @@ Non eseguire USB reale o hardware se il prompt non lo autorizza esplicitamente.
 
 ---
 
-## 12. Principio finale
+## 13. Principio finale
 
 ```text
 sicurezza hardware forte
