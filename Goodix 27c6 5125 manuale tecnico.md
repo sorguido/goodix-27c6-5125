@@ -17,8 +17,12 @@ e stop terminale `STOP_AFTER_D4`. Cleanup, zeroizzazione del secret, restore di
 fprintd e reseal sono riusciti; le famiglie di scrittura persistente sono
 rimaste a zero. La semantica D4 resta quella già provata staticamente,
 `VOLATILE_SESSION_INITIALIZATION`, limitata al receiver APP12509 esatto. A8,
-E4, TLS e D4 non sono più blocker aperti: il nuovo current critical boundary è
-AF, non ancora valutato e non autorizzato. Il repository non auto-approva né
+E4, TLS e D4 non sono più blocker aperti. D249 ha ora chiuso offline il
+framing e parsing AF e, dopo la correzione di review, ha chiuso realmente nel
+nuovo core GPL due replay sintetici bounded fino a `FIRST_IMAGE_RECEIVED`:
+FDT fresh e cached POV, sopra un transport astratto e senza USB reale. Il boundary
+live resta AF: non è stato eseguito né autorizzato, e FDT arming/disarm non è
+ancora chiuso sul target. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
@@ -1284,6 +1288,60 @@ prodotto anche nuova evidenza tecnica live sul D4, mentre la categoria primaria
 di avanzamento resta l'esecuzione reale completata. L'autorizzazione single-shot
 è consumata: D246 non autorizza un secondo D4, retry o il comando AF.
 
+## D249: core GPL offline AF → FDT → first image
+
+D249 usa la baseline Rocky immutabile
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`. Le sole parti adattate nel dominio
+GPL provengono da `src/goodix_cmd.c`, `src/goodix_frame.c` e
+`src/goodix_capture.c`, con SPDX GPL-2.0-or-later e attribution registrati nel
+ledger. Rocky resta fonte implementativa e corroborativa, non prova
+APP12509. Lifecycle USB, retry/reconnect, PSK/MCU write, persistenza baseline,
+firmware/IAP/ClearApp e le famiglie E0/A4/F0/F4 non sono importati né
+raggiungibili.
+
+La prima revisione D249 conteneva un decoder immagine non equivalente alla
+closure locale. La correzione lo ha rimosso: `core/post_d4.py` delega ora
+esattamente a `src/goodix5125_cleanroom.py`. Restano quindi canonici record da
+7684 byte, 7680 packed, gruppi 6-byte/4-sample, 5120 sample, trailer CRC nel
+reale ordine `crc>>8, crc, crc>>24, crc>>16` e transpose wire-index → raster
+80×64. I test costruiscono il record con il codec locale, confrontano tutti i
+pixel dei due output, verificano un KAT non banale e corruzione CRC; non usano
+un encoder duplicato D249.
+
+La capture locale osserva AF e comandi FDT plaintext nella sessione post-TLS;
+la DLL conferma serializer AF, timestamp, risposta AE da 16 byte e bit di stato.
+Il modello offline sceglie separatamente due percorsi: AF senza POV → invio
+asincrono FDT down 32 → IRQ 2 → invio asincrono SetMode Image 20 → immagine;
+AF con POV valido → invio asincrono D2 → immagine cached. Gli ACK osservati
+localmente dopo 32 e 20 vengono validati se presenti, ma non sono una
+precondizione causale obbligatoria; per D2 la presenza target resta non nota. Entrambi validano framing, checksum, record, CRC,
+unpack/transpose e terminano esplicitamente in `FIRST_IMAGE_RECEIVED`. Questa è
+closure eseguibile delle fixture sintetiche, non prova che il sequencing sia il
+minimo causale o live-safe sul 12509.
+
+La matrice ACK D249 classifica AF come `FORBIDDEN`: le occorrenze locali hanno
+risposta AE diretta senza ACK. Per 32, 20, 36 e 34 la capture osserva un ACK
+successivo, ma non prova che sia necessario prima dell'evento/payload push;
+questi comandi sono quindi `OPTIONAL_IF_PRESENT`. D2 non è osservato nella
+capture target; Rocky lo invia asincrono e consuma eventuali ACK nel receive
+loop, perciò il parser D249 usa ancora `OPTIONAL_IF_PRESENT` come policy di
+accettazione senza trasformarla in evidenza target. Zero o un ACK esatto sono
+accettati; ACK errato o duplicato fallisce chiuso.
+
+La policy checksum è strict: `parse_payload()` calcola sempre il checksum. Il
+valore 0x88 è accettato soltanto quando coincide matematicamente con il checksum
+del payload specifico; non è un bypass. Il NOP locale osservato con marker
+no-check è fuori dall'allowlist D249. Test distinti rifiutano un 0x88 errato e
+accettano un checksum genuino che vale 0x88.
+
+La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
+immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
+CRC e transizioni duplicate/regressive. Non esistono backend USB/TLS concreti,
+secret, persistenza, retry o loop non bounded. Il boundary live non avanza: il
+primo e massimo candidato restano exactly-one AF con telemetria e stop prima di
+FDT o dito. FDT arming/disarm/restore e ordering mixed-channel completi restano
+non noti target-side; un live first-image non è giustificato né autorizzato.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -1339,9 +1397,12 @@ post-handshake: il target ha accettato una sola inizializzazione volatile D4
 per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
 `STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
-Il current critical boundary tecnico è quindi il comando successivo A0/AF,
-osservato nella capture ma non ancora classificato, implementato, eseguito o
-autorizzato. L'autorizzazione D246 è consumata. Nessun esito storico autorizza
+Il current critical boundary live è quindi il comando successivo A0/AF. D249
+lo ha classificato e implementato offline: request AF (logical AE con `more=1`)
+`55,ts16le,00,00`, risposta diretta A0/AE senza ACK e stato esatto da 16 byte,
+con byte 1 bit0 POV valido, bit1 TLS connesso e bit3 locked; gli altri bit sono
+preservati come ignoti. Restano non chiusi il contratto fisico/pacing live e il
+receiver resident APP12509. AF non è stato eseguito né autorizzato. L'autorizzazione D246 è consumata. Nessun esito storico autorizza
 retry, secondo D4, AF o seconda invocazione. L'assenza di prova elettrica del
 sensore e di prova device-side assoluta oltre il receiver D4 esatto resta
 esplicita.
@@ -1398,9 +1459,14 @@ transizione command→TLS D241, le evidenze E4 D242/D243/D244 e il kit D245 per
 la precondizione read-only A8→E4 con continuazione TLS. D245 è ora anche una
 run live TLS riuscita; D246 ha aggiunto ed eseguito live il solo D4 volatile con
 stop immediato, completando il percorso implementato fino a quel boundary. Le
-sorgenti sono state ripristinate e sealed dopo la run. L'implementazione include
-ABI libusb esatta e TLS OpenSSL, ma non costituisce ancora un driver libfprint
-pronto e AF resta non valutato. Il record immagine noto è di 7684 byte:
+sorgenti sono state ripristinate e sealed dopo la run. L'implementazione storica include ABI libusb esatta e TLS OpenSSL, ma non
+costituisce ancora un driver libfprint pronto. D249 aggiunge
+`core/post_d4.py`, GPL-2.0-or-later e privo di backend USB: framing/parsing
+fail-closed, AF, demux A0 + byte-stream applicativo B0 già decifrato, builder/eventi
+FDT, due state path bounded fino a `FIRST_IMAGE_RECEIVED` e delega diretta al
+codec immagine locale canonico. L'allowlist
+rende E0/A4/F0/F4 e le famiglie provisioning/firmware irraggiungibili per
+costruzione. Il record immagine noto è di 7684 byte:
 7680 byte packed-12 più CRC-32/MPEG-2, convertito in raster u16 `80x64` con
 transpose.
 
