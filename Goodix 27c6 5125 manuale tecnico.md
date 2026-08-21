@@ -21,6 +21,21 @@ E4, TLS e D4 non sono più blocker aperti: il nuovo current critical boundary è
 AF, non ancora valutato e non autorizzato. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
+D247 cambia inoltre la strategia implementativa, senza modificare il confine
+hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
+rispetto a Rockytkg; dalla baseline post-D247 il futuro core userspace e i tool
+collegati sono `GPL-2.0-or-later`, con riuso diretto Rocky consentito nel solo
+dominio GPL quando licenza e provenance sono verificate. La validazione
+factory-preserving sul target 12509 resta indipendente e obbligatoria. Il futuro
+driver/glue libfprint è un dominio separato `LGPL-2.1-or-later`. D247 non ha
+importato codice funzionale esterno e non ha eseguito AF/FDT/capture o hardware.
+La verifica GitHub autenticata fornita dall'AI Supervisor ha poi chiuso il
+blocker di provenance sulla baseline Rocky
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b` del 2026-08-17; D247 è quindi
+`READY`. La verifica è esterna al workspace Codex ed è registrata come tale.
+Resta obbligatoria la verifica puntuale di diritti, SPDX e componenti terzi per
+ogni file che un futuro step deciderà effettivamente di importare.
+
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
@@ -45,11 +60,23 @@ autorizza da solo ulteriori operazioni live.
 
 ## Fonti e confini di pubblicazione
 
-Lo stato pubblico è composto dal repository, da `README.md`, dall'indice
-`docs/EVIDENCE.md`, dai riferimenti e dal codice clean-room. Le fonti primarie
-private/locali comprendono DLL OEM, capture e APP embedded, identificati per hash
-ma non redistribuiti. Materiale proprietario, payload TLS privati, secret,
-immagini e template biometrici non devono entrare nel repository o nei bundle.
+Il repository privato è il workspace canonico di sviluppo. Il repository
+pubblico è una superficie di pubblicazione congelata: non viene sincronizzato
+da D247 e potrà ricevere soltanto un export futuro, separato, sanitizzato e
+auditato. Un working tree pulito/equivalente non rende pubblicabile la history
+privata; capture, DLL, firmware, secret o dati biometrici transitati nella
+storia richiedono clean export, nuova storia o filtro dedicato.
+
+Le categorie restano distinte:
+
+- capture Windows, `gfusb.dll`, APP12509 ed evidenza live locale sono evidenza
+  privata target-specific e autorità primaria per il comportamento sul target;
+- codice esterno Rockytkg verificato GPL può essere una fonte implementativa
+  riusabile in `core/`/`tools/`, con attribution e ledger, ma non prova safety;
+- materiale OEM/proprietario, secret, capture e dati biometrici non sono
+  redistribuibili e non ricevono una licenza open source per collocazione;
+- documentazione e codice pubblicabile seguono la mappa file/directory in
+  `docs/LICENSING_AND_PROVENANCE.md`.
 
 Il corpus D230 è `GoodixExport.zip`, indicato dall'operatore come corpus privato
 recuperato e già provenance-validato, SHA-256
@@ -58,26 +85,34 @@ Contiene `gfusb.dll` SHA-256
 `904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`
 e una capture recuperata SHA-256
 `50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`.
+La prima capture resta definitivamente perduta e non è sostituita da riepiloghi.
 
-La prima capture indicata dall'operatore è definitivamente perduta. Nessun
-riepilogo storico la sostituisce come evidenza packet-level; D230 censisce una
-sola capture. Questo limite è parte della coverage proof.
+La testimonianza indipendente di `mkl-corbachoh` nella issue GitHub #1 resta
+classificata `EXTERNAL_THIRD_PARTY_LIVE_CORROBORATION`. Sul proprio target
+riferisce `27c6:5125`, chip `0x2504`, firmware nativo 12509 preservato,
+TLS-PSK, enrollment, verifica same/different-finger, autenticazione PAM e
+nessun firmware flash. Riferisce però anche `MCU read 0xBB010003 status 0x01`,
+quindi assenza di dati PSK preesistenti, e provisioning una tantum di una nuova
+PSK; riporta inoltre la coesistenza di eventi FDT plaintext e frame immagine
+protetti TLS. È corroborazione esterna utile, ma non prova primaria del nostro
+target, non prova la preservazione della PSK Windows/factory preesistente e non
+autorizza automaticamente alcuna futura operazione live.
 
-Una testimonianza indipendente nel commento di `mkl-corbachoh` alla
-[issue GitHub #1](https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1)
-è registrata come `EXTERNAL_THIRD_PARTY_LIVE_CORROBORATION`, non come evidenza
-primaria del target. Il contributor dichiara successo TLS-PSK, enrollment,
-same/different-finger verify e autenticazione PAM su `27c6:5125`, chip
-`0x2504`, firmware nativo 12509 preservato e senza flash, usando una build
-localmente auditata e isolata sotto `/opt/goodixgf`. La stessa testimonianza
-riporta però `MCU read 0xBB010003 status 0x01`, cioè assenza di dati PSK, e una
-nuova provisioning PSK once: dimostra al più
-`EXTERNALLY_REPORTED_12509_NATIVE_FW_FULL_STACK_SUCCESS` e
-`EXTERNALLY_REPORTED_12509_NO_FIRMWARE_FLASH`, non preservazione di una PSK
-Windows/factory preesistente. La coesistenza riportata di eventi FDT plaintext
-con frame immagine protetti TLS è una corroborazione esterna utile per fasi
-post-handshake future; non riapre lo scope D242 e non autorizza di per sé D4, FDT,
-capture, enroll o matching in questo step.
+La baseline Rocky è verificata esternamente al commit
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`: il `LICENSE` assegna
+GPL-2.0-or-later al codice originale, LGPL-2.1-or-later a `src/goodixgf.c`,
+lascia `libfprint/` ai termini upstream ed esclude dalla blanket license il
+firmware vendor. Gli header campionati confermano GPL per
+`goodix_capture.c`, `goodix_init.c`, `goodix_tls.c` e LGPL per `goodixgf.c`;
+il copyright repository-level indica `liushicong (Rockytkg)` senza implicare
+titolarità su ogni riga o contributo terzo.
+
+La issue Rocky #1 verificata chiarisce inoltre che la validazione hardware
+diretta dell'autore riguarda un'unità 12508, non un 12509 non modificato. Il
+codice Rocky è quindi una fonte implementativa autorizzata, ma resta
+corroborazione esterna e non prova primaria della preservazione factory/PSK o
+del comportamento APP12509. Questi due ruoli non vanno confusi; ogni futuro
+import richiede comunque verifica file-specifica di diritti e SPDX.
 
 ## Architettura
 
@@ -94,6 +129,31 @@ Goodix MCU: APP ST411/12509 + resident code non disponibile
 Il target dichiara `GF_ST411SEC_APP_12509`. L'APP mappata disponibile inizia a
 `0x0802c000`; il codice resident necessario per interpretare A2 e `0x70` è sotto
 questo indirizzo.
+
+### Architettura software e licensing boundary post-D247
+
+```text
+GPL userspace core
+  transport
+  protocol
+  tls
+  fdt
+  capture
+  image
+      |
+      | licensing boundary
+      v
+LGPL libfprint driver/glue
+```
+
+Il confine esiste per impedire che espressione GPL, inclusi adattamenti Rocky,
+entri involontariamente nel driver upstream-facing LGPL. Il passaggio richiede
+dual licensing/licenza alternativa valida da tutti i titolari pertinenti; in
+assenza, il driver deve essere indipendente e basato su specifiche, fatti di
+protocollo, test ed evidenza, non sull'espressione GPL. Ogni import GPL registra
+repository, commit, source path, SPDX/licenza, copyright noto, step/data,
+destinazione e modifiche nel ledger operativo.
+
 
 ## Trasporto USB
 
@@ -1050,10 +1110,11 @@ temporanee applicate in ordine D245→D246; tutte le azioni successive sono
 rimaste irraggiungibili. D246 è stato eseguito live una sola volta e si è
 fermato dopo l'ACK D4. D240 è obsoleto e non è stato eseguito.
 
-Il riferimento Rocky indipendente è
-<https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1>. È corroborazione
-esterna, distinta dalla capture/DLL primaria locale; nessuna implementazione GPL
-è stata copiata nel repository BSD-2-Clause.
+Storicamente, fino a D246, il riferimento Rocky era soltanto corroborazione
+esterna e nessuna implementazione GPL era stata copiata nel repository allora
+BSD-2-Clause. Questa frase descrive le revisioni storiche, non la policy futura:
+dopo D247 il riuso GPL è consentito in `core/`/`tools/` con provenance; resta
+vietato usarlo come prova primaria target-specific o copiarlo nel dominio LGPL.
 
 ### D246: dal TLS Finished al solo D4
 

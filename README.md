@@ -167,9 +167,13 @@ Fingerprint sensing hardware
 ```
 
 The Linux target replaces the Windows framework and proprietary algorithm
-layers with a clean-room transport, protocol state machine, TLS server,
-validated image decoder and eventually a libfprint-facing device. The current
-blocker occurs before the real TLS transition, not in the offline codec.
+layers with a GPL-2.0-or-later userspace core and tools, plus a separately
+implemented LGPL-2.1-or-later libfprint-facing driver boundary. Historical
+through-D246 work remains reproducible under its prior BSD grant. GPL Rocky
+code may be reused in the GPL domain with provenance, but is not target proof.
+
+The current live technical boundary is tracked in the canonical technical
+manual; after D246 it is AF.
 
 ## Windows stack
 
@@ -866,12 +870,15 @@ is referenced, not vendored.
 
 ## License
 
-Original project-authored content in this repository is licensed under the
-BSD-2-Clause license. See [LICENSE](LICENSE).
+This repository uses a multi-license architecture: new `core/` and `tools/`
+work is `GPL-2.0-or-later`, while future `libfprint-driver/` work is
+`LGPL-2.1-or-later`. Historical revisions already released under
+BSD-2-Clause retain that grant. See [LICENSE](LICENSE), canonical texts in
+[LICENSES](LICENSES), and the operational
+[licensing/provenance map](docs/LICENSING_AND_PROVENANCE.md).
 
-Referenced third-party projects and non-redistributed OEM or proprietary
-materials retain their own rights and licenses and are not relicensed by this
-repository.
+Third-party and non-redistributed OEM/private materials retain their own rights
+and are not relicensed by this repository.
 
 ## Glossary
 
