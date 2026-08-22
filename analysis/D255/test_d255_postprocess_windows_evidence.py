@@ -97,6 +97,17 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertFalse(result["seed_correlation"]["CAUSALITY_PROVEN"])
         self.assertEqual(result["restore_cancel"]["REENTRY_PROOF_CLASS"],
                          "REENTRY_WITHOUT_FINGER")
+        self.assertEqual(result["vm_boundary"]["D255_BOOTSTRAP_EVIDENCE_VALIDITY"],
+                         "VALID_COLD_ATTACH")
+        self.assertEqual(result["vm_boundary"]["VM_USB_ATTACH_COUNT"], 1)
+        self.assertTrue(result["vm_boundary"]["CAPTURE_STARTED_BEFORE_VM_USB_ATTACH"])
+        self.assertTrue(result["vm_boundary"]["A8_APP12509_PROVEN"])
+        self.assertEqual(result["zero_finger"], {
+            "FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS": 0,
+            "POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS": 0,
+            "FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS": 0,
+            "FINGER_INTERACTION_DETECTED": False,
+        })
         self.assertEqual(result["oem_log_time"]["OEM_LOG_TIMESTAMP_FORMATS"],
                          ["GOODIX_MMDD_LOCAL"])
         self.assertEqual(result["oem_log_time"]["OEM_LOG_UNTIMED_EVENT_COUNT"], 0)
@@ -134,8 +145,55 @@ class D255PostprocessorTests(unittest.TestCase):
 
     def test_missing_firmware_a8_fails_target_gate(self):
         root, run, manifest, digest = self.fixture(firmware=False)
-        with self.assertRaisesRegex(D255.EvidenceError, "target-specific evidence gate"):
+        with self.assertRaisesRegex(D255.EvidenceError, "A8 APP12509 proof is absent"):
             D255.analyze(run, manifest, digest, root / "out")
+
+    def test_capture_without_target_enumeration_is_invalid(self):
+        root, run, manifest, digest = self.fixture(enumeration=False)
+        with self.assertRaisesRegex(D255.EvidenceError, "enumeration/attach is absent"):
+            D255.analyze(run, manifest, digest, root / "out")
+
+    def test_guest_target_must_be_absent_before_attach(self):
+        root, run, manifest, digest = self.fixture(guest_before_count=1)
+        with self.assertRaisesRegex(D255.EvidenceError,
+                                    "guest_topology_before target presence count is not 0"):
+            D255.analyze(run, manifest, digest, root / "out")
+
+    def test_guest_target_presence_is_required_after_attach(self):
+        root, run, manifest, digest = self.fixture(guest_after_count=0)
+        with self.assertRaisesRegex(D255.EvidenceError,
+                                    "guest_topology_after_attach target presence count is not 1"):
+            D255.analyze(run, manifest, digest, root / "out")
+
+    def test_attach_before_capture_is_invalid_bootstrap(self):
+        root, run, manifest, digest = self.fixture(attach_before_capture=True)
+        with self.assertRaisesRegex(D255.EvidenceError, "INVALID_DEVICE_ALREADY_ATTACHED"):
+            D255.analyze(run, manifest, digest, root / "out")
+
+    def test_second_attach_or_device_address_is_invalid_topology(self):
+        root, run, manifest, digest = self.fixture(second_attach=True)
+        with self.assertRaisesRegex(D255.EvidenceError, "INVALID_VM_USB_TOPOLOGY_CHANGE"):
+            D255.analyze(run, manifest, digest, root / "out")
+
+    def test_single_finger_irq_invalidates_zero_finger_evidence(self):
+        result, _ = self.analyze_fixture(finger_irq=True)
+        self.assertEqual(result["zero_finger"]["FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS"], 1)
+        self.assertTrue(result["zero_finger"]["FINGER_INTERACTION_DETECTED"])
+        self.assertEqual(result["vm_boundary"]["D255_EVIDENCE_VALIDITY"],
+                         "INVALID_FINGER_INTERACTION")
+        self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
+
+    def test_cmd22_invalidates_zero_finger_evidence(self):
+        result, _ = self.analyze_fixture(cmd22=True)
+        self.assertEqual(result["zero_finger"]["POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS"], 1)
+        self.assertTrue(result["zero_finger"]["FINGER_INTERACTION_DETECTED"])
+        self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
+
+    def test_image_path_invalidates_zero_finger_evidence(self):
+        result, _ = self.analyze_fixture(image_path=True)
+        self.assertEqual(result["zero_finger"]["FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS"], 1)
+        self.assertTrue(result["zero_finger"]["FINGER_INTERACTION_DETECTED"])
+        self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
 
     def test_cancel_marker_missing(self):
         root, run, manifest, digest = self.fixture(cancel_marker=False)
@@ -200,7 +258,19 @@ class D255PostprocessorTests(unittest.TestCase):
             "if (-not (Test-D255PathAvailable -Path $script:RunDirectory))",
             "D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true",
             "CANCEL_NO_FINGER_BEGIN",
-            "REENTRY_READY_NO_FINGER",
+            "REENTRY_WAITING_NO_FINGER",
+            "REENTRY_CANCEL_BEGIN",
+            "REENTRY_CANCEL_END",
+            "VM_GUEST_READY",
+            "GUEST_TOPOLOGY_BEFORE",
+            "VM_USB_ATTACH_BEGIN",
+            "VM_USB_ATTACH_END",
+            "GUEST_27C6_5125_PRESENT",
+            "OEM_SESSION_BEGIN",
+            "OEM_WAITING_NO_FINGER",
+            "WINDOWS_HELLO_SETUP_NO_FINGER",
+            "SETUP_NO_FINGER_PATH_VERIFIED_NO_NEW_PIN",
+            "USBPCAP_INTERFACE_SELECTION=AMBIGUOUS",
             "duration:$CaptureDurationSeconds",
             "D255_POWERSHELL_SELFTEST=PASS",
             "D255_AUTHORIZATION_CONSUMED=false",
@@ -210,7 +280,7 @@ class D255PostprocessorTests(unittest.TestCase):
             "function Test-D255PathAvailable",
             "function New-D255ClockAnchor",
             'Write-OperatorMarker -Event "CLOCK_ANCHOR"',
-            'schema = "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V2"',
+            'schema = "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V3"',
         )
         for token in required:
             self.assertIn(token, source)
@@ -222,6 +292,9 @@ class D255PostprocessorTests(unittest.TestCase):
             "[System.IO.Path]::GetRelativePath",
         ):
             self.assertNotIn(unsupported, source)
+        self.assertNotIn("AllowReentryFinger", source)
+        self.assertNotIn("recognition prompt", source.lower())
+        self.assertNotRegex(source, r"(?i)\b(?:virsh|virt-manager|qemu|spice|hostdev)\b")
 
     def test_powershell_authorization_gate_follows_all_pre_hardware_setup(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")
@@ -244,6 +317,18 @@ class D255PostprocessorTests(unittest.TestCase):
                         source.rindex('$preflight["runtime"] = Get-D255RuntimeInfo'))
         self.assertLess(gate, consumed)
         self.assertLess(consumed, start_capture)
+
+    def test_usbpcap_single_interface_is_unambiguous(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        self.assertIn('if ($usbPcapCandidates.Count -eq 1) { "UNAMBIGUOUS" }', source)
+        self.assertIn('$usbPcapCandidates = @($interfaceLines | Where-Object', source)
+
+    def test_usbpcap_multi_interface_requires_capture_all(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        self.assertIn('[string[]]$CaptureInterface = @()', source)
+        self.assertIn('$interfaceMatches.Count -ne $usbPcapCandidates.Count', source)
+        self.assertIn('"CAPTURE_ALL"', source)
+        self.assertIn('$captureSelectors = @($CaptureInterface | ForEach-Object', source)
 
     def test_iso_timestamp_regression(self):
         result, _ = self.analyze_fixture(oem_timestamp_format="iso")

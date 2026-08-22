@@ -25,6 +25,9 @@ IDB = 0x00000001
 EPB = 0x00000006
 USBPCAP_LINKTYPE = 249
 EXPECTED_FIRMWARE = "GF_ST411SEC_APP_12509"
+TARGET_DEVICE_DESCRIPTOR_PREFIX = b"\x12\x01"
+TARGET_VID_LE = bytes.fromhex("c627")
+TARGET_PID_LE = bytes.fromhex("2551")
 KNOWN_CONTROLS = {
     0x20, 0x22, 0x32, 0x34, 0x36, 0x70, 0x80, 0x82, 0x90,
     0xA2, 0xA6, 0xA8, 0xAE, 0xAF, 0xB0, 0xD1, 0xD2, 0xD4, 0xD5, 0xE4,
@@ -76,7 +79,7 @@ def load_manifest(run_dir: Path, manifest_path: Path, expected_hash: str) -> lis
             "manifest SHA-256 must be 64 hexadecimal characters")
     require(sha256_file(manifest_path) == expected_hash.lower(), "input manifest hash mismatch")
     document = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
-    require(document.get("schema") == "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V2",
+    require(document.get("schema") == "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V3",
             "unexpected input manifest schema")
     root = run_dir.resolve()
     result: list[InputFile] = []
@@ -183,6 +186,15 @@ def iter_usbpcap(path: Path) -> Iterable[UsbPacket]:
             packet_index += 1
         offset += block_length
     require(offset == len(data), "trailing bytes after final pcapng block")
+
+
+def target_descriptor_packets(packets: list[UsbPacket]) -> list[UsbPacket]:
+    """Return exact 27c6:5125 USB device descriptors observed during enumeration."""
+    return [packet for packet in packets
+            if len(packet.payload) >= 12
+            and packet.payload[:2] == TARGET_DEVICE_DESCRIPTOR_PREFIX
+            and packet.payload[8:10] == TARGET_VID_LE
+            and packet.payload[10:12] == TARGET_PID_LE]
 
 
 @dataclass
@@ -298,6 +310,18 @@ def one_marker(markers: list[dict], name: str, required: bool = True) -> dict | 
     elif len(matches) > 1:
         raise EvidenceError(f"marker {name} duplicated")
     return matches[0] if matches else None
+
+
+def require_guest_topology(inputs: list[InputFile], role: str, expected_count: int) -> None:
+    matches = [row for row in inputs if row.role == role]
+    require(len(matches) == 1, f"manifest must identify one {role} snapshot")
+    document = json.loads(matches[0].path.read_text(encoding="utf-8-sig"))
+    require(document.get("schema") == "D255_GUEST_PNP_TOPOLOGY_V1",
+            f"unexpected {role} schema")
+    require(document.get("target_vid_pid") == "27c6:5125",
+            f"unexpected {role} target")
+    require(document.get("target_present_count") == expected_count,
+            f"{role} target presence count is not {expected_count}")
 
 
 OEM_EVENT_PATTERNS = (
@@ -573,20 +597,71 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     marker_files = [row for row in inputs if row.role == "markers"]
     require(len(wire) == 1 and len(marker_files) == 1, "manifest must identify one wire and one marker input")
     packets = list(iter_usbpcap(wire[0].path))
-    frames = split_frames(packets)
-    selected, firmware, target_specific = select_device(frames, usb_device)
-    target_frames = [row for row in frames if (row.bus, row.device) == selected]
     markers = load_markers(marker_files[0].path)
     clock = load_clock_context(inputs, markers)
+    require_guest_topology(inputs, "guest_topology_before", 0)
+    require_guest_topology(inputs, "guest_topology_after_attach", 1)
+    require_guest_topology(inputs, "guest_topology_after_capture", 1)
+
+    vm_guest_ready = one_marker(markers, "VM_GUEST_READY")
+    topology_before = one_marker(markers, "GUEST_TOPOLOGY_BEFORE")
+    capture_started = one_marker(markers, "CAPTURE_STARTED")
+    attach_begin = one_marker(markers, "VM_USB_ATTACH_BEGIN")
+    attach_end = one_marker(markers, "VM_USB_ATTACH_END")
+    guest_present = one_marker(markers, "GUEST_27C6_5125_PRESENT")
+    oem_session_begin = one_marker(markers, "OEM_SESSION_BEGIN")
+    require(vm_guest_ready["timestamp"] <= topology_before["timestamp"] < capture_started["timestamp"],
+            "VM guest/topology/capture marker order invalid")
+    require(capture_started["timestamp"] < attach_begin["timestamp"] < attach_end["timestamp"]
+            <= guest_present["timestamp"] < oem_session_begin["timestamp"],
+            "CAPTURE_STARTED -> VM_USB_ATTACH -> OEM_SESSION marker order invalid")
+    require(not any("DETACH" in row["event"] for row in markers),
+            "D255_EVIDENCE_VALIDITY=INVALID_VM_USB_TOPOLOGY_CHANGE")
+
+    descriptors = target_descriptor_packets(packets)
+    require(descriptors, "target 27c6:5125 enumeration/attach is absent from the capture")
+    descriptor_devices = {(packet.bus, packet.device) for packet in descriptors}
+    require(len(descriptor_devices) == 1,
+            "D255_EVIDENCE_VALIDITY=INVALID_VM_USB_TOPOLOGY_CHANGE")
+    descriptor_episodes = 1
+    for previous, current in zip(descriptors, descriptors[1:]):
+        if current.timestamp - previous.timestamp > 2.0:
+            descriptor_episodes += 1
+    require(descriptor_episodes == 1,
+            "D255_EVIDENCE_VALIDITY=INVALID_VM_USB_TOPOLOGY_CHANGE")
+    descriptor = descriptors[0]
+    require(descriptor.timestamp >= capture_started["timestamp"],
+            "D255_BOOTSTRAP_EVIDENCE_VALIDITY=INVALID_DEVICE_ALREADY_ATTACHED")
+    require(attach_begin["timestamp"] <= descriptor.timestamp <= attach_end["timestamp"],
+            "target enumeration is not bounded by the single VM USB attach markers")
+
+    frames = split_frames(packets)
+    selected, firmware, target_specific = select_device(frames, usb_device)
+    require(selected in descriptor_devices,
+            "A8 device identity does not match the enumerated 27c6:5125 device")
+    target_frames = [row for row in frames if (row.bus, row.device) == selected]
+    a8_proofs = [frame for frame in target_frames
+                 if frame.direction == "IN" and (parsed := parse_a0(frame))
+                 and parsed[0] == 0xA8 and EXPECTED_FIRMWARE.encode() in parsed[1]]
+    require(a8_proofs, "A8 APP12509 proof is absent")
+    require(attach_end["timestamp"] <= a8_proofs[0].timestamp < oem_session_begin["timestamp"],
+            "VM_USB_ATTACH -> A8_APP12509_PROVEN -> OEM_SESSION ordering invalid")
 
     cancel_begin = one_marker(markers, "CANCEL_NO_FINGER_BEGIN")
     cancel_end = one_marker(markers, "CANCEL_NO_FINGER_END")
     reentry_begin = one_marker(markers, "REENTRY_BEGIN")
+    reentry_waiting = one_marker(markers, "REENTRY_WAITING_NO_FINGER")
+    reentry_cancel_begin = one_marker(markers, "REENTRY_CANCEL_BEGIN")
+    reentry_cancel_end = one_marker(markers, "REENTRY_CANCEL_END")
     reentry_end = one_marker(markers, "REENTRY_END")
-    arm_marker = one_marker(markers, "ARM_OBSERVED_NO_FINGER")
+    arm_marker = one_marker(markers, "OEM_WAITING_NO_FINGER")
+    require(oem_session_begin["timestamp"] < arm_marker["timestamp"],
+            "OEM session/waiting marker order invalid")
     require(arm_marker["timestamp"] < cancel_begin["timestamp"] < cancel_end["timestamp"],
             "cancel marker order invalid")
-    require(cancel_end["timestamp"] <= reentry_begin["timestamp"] < reentry_end["timestamp"],
+    require(cancel_end["timestamp"] <= reentry_begin["timestamp"] < reentry_waiting["timestamp"]
+            < reentry_cancel_begin["timestamp"] < reentry_cancel_end["timestamp"]
+            <= reentry_end["timestamp"],
             "re-entry marker order invalid")
 
     decoded = [(frame, parse_a0(frame)) for frame in target_frames]
@@ -702,8 +777,26 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     cancel_is_host_only = ("unknown" if critical_time_unresolved
                            else bool(host_cancel and not cancel_controls))
     arm_state = "REARMED" if rearm else "POSSIBLY_ARMED_UNRESOLVED"
-    no_finger_ready = one_marker(markers, "REENTRY_READY_NO_FINGER", required=False) is not None
-    finger_used = one_marker(markers, "REENTRY_FINGER_BEGIN", required=False) is not None
+    operator_start = arm_marker["timestamp"]
+    operator_end = reentry_cancel_end["timestamp"]
+    finger_irq_count = sum(
+        packet.bus == selected[0] and packet.device == selected[1]
+        and packet.endpoint == 0x82 and packet.payload[:2] == b"\x02\x00"
+        and operator_start <= packet.timestamp <= operator_end
+        for packet in packets)
+    post_irq_cmd22_frames = [
+        frame for frame, parsed in decoded
+        if frame.direction == "OUT" and parsed and parsed[0] == 0x22
+        and parsed[1] == b"\x01\x00" and operator_start <= frame.timestamp <= operator_end]
+    post_irq_cmd22_count = len(post_irq_cmd22_frames)
+    finger_image_path_count = sum(
+        frame.direction == "IN" and frame.outer == 0xB0 and len(frame.raw) >= 1024
+        and operator_start <= frame.timestamp <= operator_end
+        and any(0 <= frame.timestamp - command.timestamp <= 2.0
+                for command in post_irq_cmd22_frames)
+        for frame in target_frames)
+    finger_interaction_detected = bool(
+        finger_irq_count or post_irq_cmd22_count or finger_image_path_count)
     reentry_window = [(frame, parsed) for frame, parsed in decoded if parsed
                       and reentry_begin["timestamp"] <= frame.timestamp <= reentry_end["timestamp"]]
     reentry_proven = False
@@ -725,10 +818,11 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         ):
             reentry_proven = True
             break
-    reentry_class = ("REENTRY_WITHOUT_FINGER" if reentry_proven and no_finger_ready and not finger_used
-                     else "REENTRY_PROVEN_ONLY_AFTER_FINGER" if reentry_proven and finger_used
+    reentry_class = ("REENTRY_WITHOUT_FINGER" if reentry_proven and not finger_interaction_detected
+                     else "REENTRY_INVALID_FINGER_INTERACTION" if finger_interaction_detected
                      else "REENTRY_NOT_PROVEN")
-    restore_closed = bool(reentry_proven and not critical_time_unresolved)
+    restore_closed = bool(reentry_proven and not critical_time_unresolved
+                          and not finger_interaction_detected)
 
     sanitized_oem_events = [{key: value for key, value in row.items() if key != "_timestamp"}
                             for row in oem_events]
@@ -737,13 +831,36 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         for row in oem_log_states)
 
     result = {
-        "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V2",
+        "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V3",
         "execution_mode": "OFFLINE_POSTPROCESS_ONLY",
         "input_hashes": {"manifest_sha256": manifest_hash.lower(), "wire_sha256": wire[0].sha256},
         "target": {
             "usb_bus": selected[0], "usb_device": selected[1],
             "CAPTURE_FIRMWARE": firmware,
             "D255_EVIDENCE_TARGET_SPECIFIC": target_specific,
+        },
+        "vm_boundary": {
+            "WINDOWS_EXECUTION_ENVIRONMENT": "VIRTUAL_MACHINE",
+            "GOODIX_PRESENT_IN_GUEST_BEFORE_CAPTURE": False,
+            "CAPTURE_STARTED_BEFORE_VM_USB_ATTACH": True,
+            "VM_USB_ATTACH_COUNT": 1,
+            "AUTOMATIC_DETACH_REATTACH_ALLOWED": False,
+            "GUEST_GOODIX_27C6_5125_PRESENCE_PROOF": True,
+            "TARGET_ENUMERATION_IN_CAPTURE": True,
+            "A8_APP12509_PROVEN": target_specific,
+            "derived_marker_order": [
+                "CAPTURE_STARTED", "VM_USB_ATTACH_BEGIN", "VM_USB_ATTACH_END",
+                "GUEST_27C6_5125_PRESENT", "A8_APP12509_PROVEN", "OEM_SESSION_BEGIN",
+            ],
+            "D255_BOOTSTRAP_EVIDENCE_VALIDITY": "VALID_COLD_ATTACH",
+            "D255_EVIDENCE_VALIDITY": (
+                "INVALID_FINGER_INTERACTION" if finger_interaction_detected else "VALID_ZERO_FINGER"),
+        },
+        "zero_finger": {
+            "FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS": finger_irq_count,
+            "POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS": post_irq_cmd22_count,
+            "FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS": finger_image_path_count,
+            "FINGER_INTERACTION_DETECTED": finger_interaction_detected,
         },
         "seed_correlation": {
             "FIRST_FDT36_SEED": first_seed.hex() if first_seed else None,
@@ -816,6 +933,12 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     summary = [
         f"CAPTURE_FIRMWARE={firmware}",
         f"D255_EVIDENCE_TARGET_SPECIFIC={str(target_specific).lower()}",
+        "D255_BOOTSTRAP_EVIDENCE_VALIDITY=VALID_COLD_ATTACH",
+        f"D255_EVIDENCE_VALIDITY={'INVALID_FINGER_INTERACTION' if finger_interaction_detected else 'VALID_ZERO_FINGER'}",
+        f"FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS={finger_irq_count}",
+        f"POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS={post_irq_cmd22_count}",
+        f"FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS={finger_image_path_count}",
+        f"FINGER_INTERACTION_DETECTED={str(finger_interaction_detected).lower()}",
         f"FIRST_FDT36_SEED={result['seed_correlation']['FIRST_FDT36_SEED']}",
         f"CACHE_FDT12_MATCH={str(cache_match).lower()}",
         f"OEM_LOG_FDT12_MATCH={str(log_match).lower()}",
@@ -851,14 +974,20 @@ def _a0(control: int, body: bytes) -> bytes:
     return b"\xa0" + len(payload).to_bytes(2, "little") + bytes((outer_tag,)) + payload
 
 
+def _b0(payload: bytes) -> bytes:
+    tag = (0x100 - ((0xB0 + len(payload) + sum(payload)) & 0xFF)) & 0xFF
+    return b"\xb0" + len(payload).to_bytes(2, "little") + bytes((tag,)) + payload
+
+
 def _usbpcap_packet(timestamp: float, packet_index: int, payload: bytes, direction: str,
-                    bus: int = 1, device: int = 5, physical: int | None = None) -> bytes:
-    endpoint = 0x81 if direction == "IN" else 0x01
+                    bus: int = 1, device: int = 5, physical: int | None = None,
+                    endpoint: int | None = None, transfer: int = 3) -> bytes:
+    endpoint = endpoint if endpoint is not None else (0x81 if direction == "IN" else 0x01)
     info = 1 if direction == "IN" else 0
     if physical and len(payload) < physical:
         payload = payload + bytes(physical - len(payload))
     header = struct.pack("<HQIH BHHBBI", 27, packet_index + 1, 0, 9, info,
-                         bus, device, endpoint, 3, len(payload))
+                         bus, device, endpoint, transfer, len(payload))
     raw = header + payload
     ticks = int(timestamp * 1_000_000)
     body = struct.pack("<IIIII", 0, ticks >> 32, ticks & 0xFFFFFFFF, len(raw), len(raw)) + raw
@@ -876,7 +1005,15 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
                              base_timestamp: float | None = None,
                              clock_offset_minutes: int = 120,
                              end_clock_offset_minutes: int | None = None,
-                             goodix_month_day: tuple[int, int] | None = None) -> tuple[Path, str]:
+                             goodix_month_day: tuple[int, int] | None = None,
+                             attach_before_capture: bool = False,
+                             second_attach: bool = False,
+                             enumeration: bool = True,
+                             finger_irq: bool = False,
+                             cmd22: bool = False,
+                             image_path: bool = False,
+                             guest_before_count: int = 0,
+                             guest_after_count: int = 1) -> tuple[Path, str]:
     require(not directory.exists(), "synthetic fixture output collision")
     raw = directory / "raw"
     (raw / "cache_before").mkdir(parents=True)
@@ -971,6 +1108,24 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         json.dumps(clock_document(base + 8.0, end_offset, "AFTER_CAPTURE"), indent=2) + "\n",
         encoding="utf-8")
 
+    def topology_document(stage: str, count: int) -> dict:
+        return {
+            "schema": "D255_GUEST_PNP_TOPOLOGY_V1",
+            "stage": stage,
+            "timestamp_utc": dt.datetime.fromtimestamp(base, dt.timezone.utc).isoformat(),
+            "target_vid_pid": "27c6:5125",
+            "target_present_count": count,
+            "devices": [],
+        }
+
+    for filename, stage, count in (
+        ("guest_topology_before_attach.json", "before_attach", guest_before_count),
+        ("guest_topology_after_attach.json", "after_attach", guest_after_count),
+        ("guest_topology_after_capture.json", "after_capture", guest_after_count),
+    ):
+        (directory / filename).write_text(
+            json.dumps(topology_document(stage, count), indent=2) + "\n", encoding="utf-8")
+
     packets: list[tuple[float, bytes, str, int | None]] = []
     packets.append((base + 1, _a0(0xA8, b""), "OUT", 64))
     fw_body = (EXPECTED_FIRMWARE.encode() + b"\0") if firmware else b"OTHER_APP_00000\0"
@@ -981,6 +1136,10 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         packets.append((base + 3, _a0(0x32, b"\x08\x01" + seed + b"\x00\x00"), "OUT", 64))
     if unknown_control:
         packets.append((base + 4.3, _a0(0x66, b"\x00"), "OUT", 64))
+    if cmd22 or image_path:
+        packets.append((base + 3.9, _a0(0x22, b"\x01\x00"), "OUT", 64))
+    if image_path:
+        packets.append((base + 3.95, _b0(bytes(1500)), "IN", None))
     if reentry:
         packets.append((base + 4.9, _a0(0xA8, b""), "OUT", 64))
         packets.append((base + 5.0, _a0(0xA8, fw_body), "IN", None))
@@ -988,19 +1147,42 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         packets.append((base + 5.2, _a0(0xB0, b"\x32\x01"), "IN", None))
     pcap = _block(SHB, b"\x4d\x3c\x2b\x1a" + struct.pack("<HHq", 1, 0, -1))
     pcap += _block(IDB, struct.pack("<HHI", USBPCAP_LINKTYPE, 0, 65535))
-    for index, (timestamp, payload, direction, physical) in enumerate(packets):
-        pcap += _usbpcap_packet(timestamp, index, payload, direction, physical=physical)
+    packet_rows: list[tuple[float, bytes, str, int | None, int, int, int | None, int]] = []
+    if enumeration:
+        descriptor = (b"\x12\x01\x00\x02\x00\x00\x00\x40" + TARGET_VID_LE + TARGET_PID_LE
+                      + b"\x00\x01\x01\x02\x03\x01")
+        descriptor_time = base + (0.2 if attach_before_capture else 0.75)
+        packet_rows.append((descriptor_time, descriptor, "IN", None, 1, 5, 0x80, 2))
+        if second_attach:
+            packet_rows.append((base + 3.0, descriptor, "IN", None, 1, 5, 0x80, 2))
+    if finger_irq:
+        packet_rows.append((base + 3.8, b"\x02\x00", "IN", None, 1, 5, 0x82, 1))
+    packet_rows.extend((timestamp, payload, direction, physical, 1, 5, None, 3)
+                       for timestamp, payload, direction, physical in packets)
+    for index, row in enumerate(sorted(packet_rows, key=lambda item: item[0])):
+        timestamp, payload, direction, physical, bus, device, endpoint, transfer = row
+        pcap += _usbpcap_packet(timestamp, index, payload, direction, bus=bus, device=device,
+                               physical=physical, endpoint=endpoint, transfer=transfer)
     wire_path = raw / "wire.pcapng"
     wire_path.write_bytes(pcap)
 
     marker_rows = [
         (start_clock_timestamp, "CLOCK_ANCHOR"),
+        (base + 0.2, "VM_GUEST_READY"),
+        (base + 0.3, "GUEST_TOPOLOGY_BEFORE"),
         (base + 0.5, "CAPTURE_STARTED"),
-        (base + 2.8 if cancel_before_arm else base + 3.5, "ARM_OBSERVED_NO_FINGER"),
+        (base + 0.6, "VM_USB_ATTACH_BEGIN"),
+        (base + 0.9, "VM_USB_ATTACH_END"),
+        (base + 0.95, "GUEST_27C6_5125_PRESENT"),
+        (base + 2.5, "OEM_SESSION_BEGIN"),
+        (base + 2.8 if cancel_before_arm else base + 3.5, "OEM_WAITING_NO_FINGER"),
     ]
     if cancel_marker:
         marker_rows.extend([(base + 4, "CANCEL_NO_FINGER_BEGIN"), (base + 4.5, "CANCEL_NO_FINGER_END")])
-    marker_rows.extend([(base + 4.8, "REENTRY_BEGIN"), (base + 5.3, "REENTRY_READY_NO_FINGER"),
+    marker_rows.extend([(base + 4.8, "REENTRY_BEGIN"),
+                        (base + 5.3, "REENTRY_WAITING_NO_FINGER"),
+                        (base + 5.35, "REENTRY_CANCEL_BEGIN"),
+                        (base + 5.4, "REENTRY_CANCEL_END"),
                         (base + 5.5, "REENTRY_END")])
     marker_text = "timestamp_utc\tevent\tdetail\n" + "".join(
         f"{dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat()}\t{name}\tsynthetic\n"
@@ -1012,6 +1194,9 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     roles = {
         "raw/wire.pcapng": "wire", "operator_markers.tsv": "markers",
         "run_clock.json": "clock_anchor", "run_clock_end.json": "clock_end",
+        "guest_topology_before_attach.json": "guest_topology_before",
+        "guest_topology_after_attach.json": "guest_topology_after_attach",
+        "guest_topology_after_capture.json": "guest_topology_after_capture",
         "raw/oem_logs_before/oem_000.log": "oem_log_before",
         "raw/oem_logs_after/oem_000.log": "oem_log_after",
         "raw/cache_before/candidate.bin": "cache_before",
@@ -1023,7 +1208,7 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         path = directory / relative
         files.append({"path": relative, "role": role, "size": path.stat().st_size,
                       "sha256": sha256_file(path)})
-    manifest = {"schema": "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V2", "files": files}
+    manifest = {"schema": "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V3", "files": files}
     manifest_path = directory / "input_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest_path, sha256_file(manifest_path)

@@ -1,6 +1,6 @@
-D255 CORRECTIVE OFFLINE VERIFICATION RESULTS
+D255 CORRECTIVE VM-BOUNDARY OFFLINE VERIFICATION RESULTS
 Date: 2026-08-22 Europe/Rome
-Initial HEAD: 08edf292fde7404bb86422b43dd2075cc29d359d
+Initial HEAD: 922134e21ec40ef4346df555eb8a4c096f56b2a9
 Execution mode: OFFLINE_PREPARATION_ONLY
 
 1. Python compilation
@@ -16,42 +16,46 @@ Execution mode: OFFLINE_PREPARATION_ONLY
 
 3. Dedicated D254 suite
    Command:
-     python3 -m unittest -v analysis/D254/test_d254_external_audit.py
+     python3 -m unittest -q analysis/D254/test_d254_external_audit.py
    Result: PASS
    Tests run: 5
-   Failures: 0
-   Errors: 0
 
 4. Dedicated expanded D255 suite
    Command:
-     python3 -m unittest -v analysis/D255/test_d255_postprocess_windows_evidence.py
+     python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
    Result: PASS
-   Tests run: 27
+   Tests run: 37
    Failures: 0
    Errors: 0
 
-   Corrective coverage includes forbidden modern .NET API absence, PS5.1 hash
-   and relative-path helper contracts, sibling-prefix rejection, self-test
-   contract, authorization ordering after every pre-hardware snapshot/gate,
-   ISO regression, realistic Goodix MMDD same-day correlation, midnight and
-   year rollover, malformed and ambiguous mapping, offset/DST fail-closed, and
-   OEM-log unchanged/growth/truncate/replace handling.
+   VM boundary coverage:
+   - guest-before target absence and guest-after presence snapshots;
+   - capture-before-attach and one attach episode;
+   - pre-attached target, missing enumeration, and second attach invalidation;
+   - captured 27c6:5125 descriptor distinct from exact A8 APP12509 proof;
+   - single USBPcap interface and capture-all multi-interface contracts;
+   - marker ordering through OEM setup/cancel/re-entry;
+   - no hypervisor automation assumed by the launcher.
 
-   Synthetic Goodix critical sequence:
-     [0822-08:14:10:100] gfOnCancel -> CANCEL
-     [0822-08:14:10:130] DeviceD0Exit -> CANCEL
-     [0822-08:14:10:900] DeviceD0Entry -> REENTRY
-   Recognized timestamped OEM events: 8
-   Recognized untimed OEM events: 0
-   OEM_LOG_TIME_CORRELATION: EXACT_ANCHORED
+   Zero-finger coverage:
+   - valid 0x32 arm with no IRQ2, 0x22, or image path;
+   - one IRQ2 invalidates evidence;
+   - exact 0x22 [01 00] invalidates evidence;
+   - correlated image-sized B0 path invalidates evidence;
+   - AllowReentryFinger and recognition-prompt path absent.
+
+   Existing corrective coverage retained:
+   - forbidden modern .NET API absence and PS5.1 helper contracts;
+   - authorization after all pre-device gates;
+   - ISO and Goodix MMDD correlation, midnight/year rollover;
+   - malformed/ambiguous time and offset change fail closed;
+   - OEM-log unchanged/growth/truncate/replace handling.
 
 5. Full supported repository suite
    Command:
-     python3 -m unittest discover -s tests -v
+     python3 -m unittest discover -s tests -q
    Result: PASS
    Tests run: 172
-   Failures: 0
-   Errors: 0
 
 6. Surviving target primary capture read-only parser smoke
    Input:
@@ -68,7 +72,7 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    pwsh/powershell available on D255 Linux host: no
    Native PowerShell parser/self-test: NOT_AVAILABLE
    Fallback static lexer/delimiter/API/ordering contract: PASS
-   Unsupported required API count after correction: 0
+   Unsupported required API count: 0
    Forbidden occurrences:
      [Convert]::ToHexString: 0
      [Security.Cryptography.SHA256]::HashData: 0

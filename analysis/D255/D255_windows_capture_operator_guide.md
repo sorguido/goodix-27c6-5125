@@ -1,92 +1,162 @@
-# D255 Windows APP12509 evidence capture operator guide
+# D255 Windows VM APP12509 evidence capture operator guide
 
-## Status and authority
+## Status, boundary, and authority
 
-This guide describes a future, single Windows OEM evidence capture.  D255 only
-prepared and tested the kit offline.  AI-PM review is not authorization, and no
-earlier authorization applies.
+D255 prepared this kit offline. It did not start Windows, a VM, USBPcap,
+TShark, or the Goodix device. AI-PM review is not authorization and the future
+run is not yet authorized.
 
 ```text
+WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
+VM_PLATFORM=NOT_CANONICALLY_PRESERVED
+VM_USB_PASSTHROUGH_METHOD=OPERATOR_GUI_MANUAL_ATTACH
+VM_USB_PASSTHROUGH_METHOD_PROVENANCE=HISTORICAL_METHOD_NOT_CANONICALLY_PRESERVED
+GUEST_USB_CAPTURE_METHOD=TSHARK_WITH_USBPCAP
+GUEST_USB_CAPTURE_INTERFACE_MODEL=ONE_UNAMBIGUOUS_INTERFACE_OR_SIMULTANEOUS_ALL_RELEVANT_INTERFACES
+
 D255_OPERATOR_AUTHORIZATION_REQUIRED=true
 D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
 D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
+D255_FINGER_INTERACTION_ALLOWED=false
+D255_EXPECTED_FINGER_INTERACTION_COUNT=0
 ```
 
-The future run must use the factory Windows path.  It must not perform
-enrollment, provisioning, firmware update, IAP, PSK replacement, reset, or any
-other maintenance action.  Raw USB, OEM logs, and cache copies remain in an
-operator-selected local directory outside the repository.
+The repository does not preserve a canonical hypervisor product or attach
+command. Do not substitute an assumed hypervisor CLI, USB redirection, or
+hostdev workflow. Keep the VM already running and use the reviewed manual GUI
+attach available to the operator. The launcher never starts/stops the VM and
+never attaches/detaches USB.
 
-## Historical reconstruction
+The factory Windows path must not perform completed enrollment, provisioning,
+firmware update, IAP, PSK replacement, reset, device disable/enable, service
+restart, or maintenance. Raw USB, OEM logs, and cache copies remain in an
+operator-selected private directory outside Git.
 
-Observed local evidence:
-
-- `analysis/D230/work/GoodixExport/rilevamento.pcapng` is a USBPcap-linktype
-  pcapng, SHA-256
-  `50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`;
-- the manual and evidence index classify it as a Windows OEM cold-attach
-  capture and identify a second independent cold-attach capture, now absent;
-- `GoodixExport.zip`, supplied by the operator and recovered in D230, contained
-  the surviving capture, `gfusb.dll`, the OEM INF/catalog, and related DLLs;
-- the repository does not retain the exact USBPcap/Wireshark command, tool
-  version, hypervisor, VM attach command, or WBDI log path used for that run.
-
-Therefore the artifact proves USBPcap format and the cold-attach boundary, but
-does not prove whether the capture process was launched in the Windows guest or
-by another layer of the old VM setup.  D255 reuses the proved format and
-boundary, and makes all missing selectors and timestamps explicit.
+## Canonical Windows-state distinction
 
 ```text
-PREVIOUS_CAPTURE_METHOD=WINDOWS_OEM_COLD_ATTACH_CAPTURE; EXACT_LAUNCH_PROCEDURE_NOT_RETAINED
-PREVIOUS_CAPTURE_TOOL=USBPCAP_PCAPNG_FORMAT; WIRESHARK_TSHARK_VERSION_UNKNOWN
-PREVIOUS_CAPTURE_BOUNDARY=BEFORE_USB_ENUMERATION_THROUGH_OEM_INIT_AND_IMAGE_CYCLES; NO_EXPLICIT_CANCEL_WINDOW
-RECOMMENDED_D255_CAPTURE_METHOD=TSHARK_WITH_USBPCAP_IN_WINDOWS_VM_STARTED_BEFORE_REVIEWED_GUI_USB_ATTACH
-WHY=REUSES_THE_PRIMARY_CAPTURE_FORMAT_AND_COLD_ATTACH_BOUNDARY_WHILE_ADDING_CORRELATED_MARKERS_LOGS_AND_CACHE_SNAPSHOTS
+HISTORICAL_NATIVE_WINDOWS_STATE=PRIOR_OPERATIONAL_CAPTURE_HISTORY_EXISTS; NOT_PROOF_OF_CURRENT_VM_UI_STATE
+CURRENT_WINDOWS_VM_STATE=FINGERPRINT_ENROLLMENT_NOT_COMPLETED
+CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT=NOT_COMPLETED
+NORMAL_RECOGNITION_UI_AVAILABLE=NOT_PROVEN
+D175_UI_PATH=NONE; PASSIVE_COLD_ATTACH_WITHOUT_WINDOWS_HELLO_OR_FINGER
+RILEVAMENTO_UI_PATH=NOT_CANONICALLY_PRESERVED
 ```
 
-No host wrapper is supplied.  The repository does not preserve a canonical
-hypervisor command, and automating an unverified detach/attach path would make
-the operational boundary less auditable.  Use the same reviewed VM GUI
-passthrough path that produced the prior Windows OEM capture.
+The surviving `analysis/D230/work/GoodixExport/rilevamento.pcapng` is a
+USBPcap pcapng with SHA-256
+`50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`.
+The corpus historically classifies it in the D175 cold-attach line and cites a
+second independent capture now absent. The original capture command, tool
+version, hypervisor, passthrough action, WBDI path, and UI path are not
+preserved. D175's useful boundary is passive cold attach plus automatic OEM
+initialization; it does not prove recognition or enrollment availability in
+the current VM.
 
-## Cold-init trigger decision
+## Selected UI path and zero-enrollment contract
 
-| Candidate | Device-side effect class | Factory-preserving evidence | Windows compatibility risk | Selected |
-| --- | --- | --- | --- | --- |
-| Start USBPcap capture in the running Windows VM, then attach the existing target through the normal VM GUI | normal USB enumeration and OEM D0/init lifecycle; volatile session activity expected | two historical target captures are classified as cold attach; normal OEM path contains no requested maintenance action | low, bounded to normal Windows attach; absolute absence of internal NVM effects is not claimed | yes |
-| Restart Windows Biometric Service with capture active | normal WBF service close/open, expected volatile | D241-D251 prove Linux-side `fprintd` restoration, but the repository does not prove that `WbioSrvc` restart produces the complete target cold-init lifecycle | low but completeness is unproven | no; fallback requires separate review |
-| Disable/enable the Windows device | PnP power/re-enumeration transition | ordinary Windows mechanism, but no retained target procedure proves necessity or exact outcome | higher than service/attach because it changes PnP state | no |
+The selected path is the normal Windows Settings setup wizard:
 
 ```text
-COLD_INIT_TRIGGER=WINDOWS_VM_NORMAL_USB_COLD_ATTACH_WITH_USBPCAP_ALREADY_ACTIVE
-DEVICE_SIDE_EFFECT_CLASS=NORMAL_OEM_ENUMERATION_AND_VOLATILE_SESSION_INITIALIZATION
-FACTORY_PRESERVING_EVIDENCE=HISTORICAL_TARGET_COLD_ATTACH_CAPTURES_PLUS_NO_MAINTENANCE_COMMAND_REQUESTED; NOT_ABSOLUTE_DEVICE_NVM_PROOF
-WINDOWS_COMPATIBILITY_RISK=LOW_BUT_NONZERO_NORMAL_ATTACH_RISK; NO_PERSISTENT_CHANGE_INTENDED
-SELECTED=true
+Windows Settings
+-> Accounts
+-> Sign-in options
+-> Fingerprint recognition (Windows Hello)
+-> Set up / Add a fingerprint
 ```
 
-## Required tools and inputs
+It is used only to arm acquisition, reach the waiting state, and cancel twice
+without touching the sensor. A template cannot be completed from zero samples;
+that is the bounded offline justification for using this path. The exact VM
+account prerequisite still requires guest preflight.
 
-- Windows PowerShell 5.1 or PowerShell 7;
-- Wireshark/TShark with USBPcap installed in the Windows VM;
-- one exact USBPcap interface name copied from `tshark -D`;
-- at least 1 GiB free in an operator-selected output directory outside Git;
-- the existing Windows installation and normal Windows Hello recognition UI;
-- known OEM/WBDI log paths when available.  Static OEM strings name
-  `WBDI.log` and `_wbdi_.log`, but the target path is not established;
-- optional targeted cache roots.  Defaults cover Goodix-specific ProgramData
-  and system-profile Goodix directories only.
+```text
+SELECTED_WINDOWS_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER
+REQUIRES_PREEXISTING_FINGERPRINT=false
+REQUIRES_PREEXISTING_PIN=POSSIBLE; IF_REQUIRED_IT_MUST_ALREADY_EXIST
+NO_EXISTING_FINGERPRINT_REQUIRED=true
+NO_NEW_PIN_CREATION_ALLOWED=true
+CREATES_FINGERPRINT_TEMPLATE_IF_ZERO_FINGER=false
+ZERO_FINGER_CANCEL_EXPECTED_SIDE_EFFECT_CLASS=VOLATILE_OEM_WBF_SESSION_AND_UI_CANCEL_ONLY
+D255_OPERATOR_UI_PATH_READY=true; CONDITIONAL_ON_PREFLIGHT_CONFIRMATIONS
+```
 
-The cache search is deliberately targeted.  It selects 13520-byte files and
-filenames containing Goodix/base/cache/WBDI/finger/NAV/image only within those
-roots.  The 13520-byte layout remains a hypothesis until CRC, OTP binding, and
-field correlations pass.
+If Windows asks to create or modify a PIN, presents only recognition requiring
+an enrolled print, begins enrollment before capture, or exposes another
+unexpected prerequisite, stop with:
 
-## Phase 0: offline preflight
+```text
+WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING
+```
 
-First validate the PowerShell/runtime-only helpers. This mode needs neither
-TShark selectors, the USB target, nor authorization and is distinct from
-`-PreflightOnly`:
+Do not retry automatically and do not improvise a different UI.
+
+## Methodological review before any future run
+
+1. **What actually changes?** The run is now explicitly guest-Windows in a VM,
+   starts USBPcap before one manual attach, and uses setup/add-fingerprint with
+   two zero-finger cancellations instead of assuming recognition.
+2. **What new hypothesis is tested?** The normal setup path can arm, cancel,
+   and re-enter without an enrolled print or finger while the same capture
+   proves guest enumeration and APP12509 A8 identity.
+3. **If it fails at the same point?** The consumed run is not repeated. The
+   failure is reviewed offline; any alternative normal OEM/WBF path requires a
+   new corrected kit, AI-PM review, baseline approval, and authorization.
+
+## Required initial state
+
+The future run starts exactly here:
+
+```text
+VM_WINDOWS_RUNNING=true
+GOODIX_PRESENT_ON_LINUX_HOST=true
+GOODIX_PRESENT_IN_WINDOWS_GUEST=false
+GUEST_USB_CAPTURE_RUNNING=false
+D255_AUTHORIZATION_CONSUMED=false
+```
+
+The cold-attach invariants are:
+
+```text
+GOODIX_PRESENT_IN_GUEST_BEFORE_CAPTURE=false
+CAPTURE_STARTED_BEFORE_VM_USB_ATTACH=true
+VM_USB_ATTACH_COUNT=1
+AUTOMATIC_DETACH_REATTACH_ALLOWED=false
+```
+
+### Linux-host read-only preflight
+
+With the VM already running and before authorization, locate the device without
+changing ownership:
+
+```bash
+lsusb -d 27c6:5125
+```
+
+Record its bus/device numbers from `lsusb`, then inspect active users without
+`sudo` or service changes:
+
+```bash
+fuser /dev/bus/usb/BBB/DDD
+```
+
+An empty `fuser` result is evidence that no visible process owns that device
+node at that instant; lack of permission is inconclusive. Do not kill a process
+or stop Linux fingerprint services as part of D255. Confirm independently in
+the guest that `Get-PnpDevice -PresentOnly` has no `VID_27C6&PID_5125`. Together
+these checks establish:
+
+```text
+GOODIX_VISIBLE_ON_HOST=true
+GOODIX_NOT_ASSIGNED_TO_GUEST=true
+```
+
+The only ownership transition is `OPERATOR_ACTION_VM_USB_ATTACH` after the
+capture-start proof.
+
+## Guest preflight and USBPcap interface gate
+
+First run the hardware-free runtime self-test:
 
 ```powershell
 & "C:\path\d255-windows-evidence-capture.ps1" `
@@ -94,19 +164,20 @@ TShark selectors, the USB target, nor authorization and is distinct from
   -OutputRoot "D:\Goodix-D255-SelfTest"
 ```
 
-Expected output is `D255_POWERSHELL_SELFTEST=PASS`,
-`D255_HARDWARE_ACTION_COUNT=0`, and
-`D255_AUTHORIZATION_CONSUMED=false`. It checks the running PowerShell
-edition/version, SHA-256 known answer, canonical relative paths and sibling
-rejection, clock-anchor JSON, serialization, and collision semantics. It does
-not validate TShark; that belongs to `-PreflightOnly` below.
+Expected: `D255_POWERSHELL_SELFTEST=PASS`, hardware action count zero, and
+authorization not consumed.
 
-Keep `27c6:5125` detached from the Windows guest.  On the Linux host, confirm
-that no fingerprint operation is active and that the reviewed VM owns the
-future passthrough path.  Do not stop services or attach the device during this
-preflight.
+In the VM, verify the setup/add-fingerprint path with the target still absent.
+Do not create a PIN and do not start enrollment. Then enumerate capture
+interfaces with `tshark -D`.
 
-From an ordinary PowerShell prompt in the Windows VM:
+If exactly one USBPcap interface exists, pass it once. If several relevant
+USBPcap interfaces exist and the virtual controller cannot be determined
+before attach, pass every USBPcap selector so TShark captures them
+simultaneously into one pcapng. Selecting only one of several candidates fails
+closed as `USBPCAP_INTERFACE_SELECTION=AMBIGUOUS`; never guess an index.
+
+Single-interface example:
 
 ```powershell
 & "C:\path\d255-windows-evidence-capture.ps1" `
@@ -114,20 +185,19 @@ From an ordinary PowerShell prompt in the Windows VM:
   -OutputRoot "D:\Goodix-D255-Raw" `
   -TsharkPath "C:\Program Files\Wireshark\tshark.exe" `
   -CaptureInterface "USBPcap1" `
-  -OemLogPath "C:\verified\path\WBDI.log"
+  -OemLogPath "C:\verified\path\WBDI.log" `
+  -VmGuestReadyConfirmation "VM_WINDOWS_RUNNING_GOODIX_ABSENT_FROM_GUEST" `
+  -UiPrerequisiteConfirmation "SETUP_NO_FINGER_PATH_VERIFIED_NO_NEW_PIN"
 ```
 
-Expected output is `D255_PREFLIGHT_ONLY=PASS`,
-`D255_HARDWARE_ACTION_COUNT=0`, and
-`D255_AUTHORIZATION_CONSUMED=false`. The script fails on ambiguous interfaces,
-target already present, unreadable configured log/cache paths, output
-collision, tool failure, or insufficient disk space.  Select the USBPcap root
-hub interface that will receive the VM passthrough; do not guess.
+For multiple interfaces, use `-CaptureInterface "USBPcap1","USBPcap2"`.
+Expected preflight output is `D255_PREFLIGHT_ONLY=PASS`, hardware action count
+zero, and authorization not consumed.
 
-## Authorized single run
+## Authorized single run — not currently authorized
 
-Run this only after AI-PM review, baseline approval, and a new explicit user
-authorization for one capture:
+Only after a new positive AI-PM review, live-critical baseline approval, and a
+new explicit one-run authorization:
 
 ```powershell
 & "C:\path\d255-windows-evidence-capture.ps1" `
@@ -136,57 +206,65 @@ authorization for one capture:
   -CaptureInterface "USBPcap1" `
   -CaptureDurationSeconds 300 `
   -OemLogPath "C:\verified\path\WBDI.log" `
+  -VmGuestReadyConfirmation "VM_WINDOWS_RUNNING_GOODIX_ABSENT_FROM_GUEST" `
+  -UiPrerequisiteConfirmation "SETUP_NO_FINGER_PATH_VERIFIED_NO_NEW_PIN" `
   -Authorization "--i-authorize-one-d255-windows-oem-evidence-capture"
 ```
 
-The script completes tool/interface/path/disk/log gates, proves target absence,
-creates the unique run directory, records `run_clock.json`, takes before-log
-and before-cache snapshots, and reruns the runtime check before testing the
-exact authorization. Only then does it record authorization consumption and
-start TShark before prompting for VM GUI attach. A failure before that record
-prints `D255_AUTHORIZATION_CONSUMED=false`. If TShark fails immediately after
-consumption, the attempt is consumed and must not be retried automatically.
-It never invokes a VM, service, PnP, firmware, provisioning, or USB command
-itself.  GUI prompts divide automatic collection from operator actions.
+Before consuming authorization, the launcher completes tool/interface/path/
+disk gates, guest target absence, clock anchor, OEM log/cache before snapshots,
+PowerShell runtime check, UI-prerequisite confirmation, and a read-only guest
+PnP topology snapshot. It then consumes the authorization, starts TShark,
+proves the process and output file exist, and prompts for exactly one manual
+attach. If capture start fails after consumption, the run is consumed.
 
 Follow the prompts exactly:
 
-1. Attach the target to Windows using the normal reviewed VM GUI path.
-2. Open the normal Windows Hello recognition prompt and do not touch the sensor.
-3. Confirm the UI is waiting; the script records the arm marker.
-4. Cancel through the normal Windows UI without a finger.
-5. Reopen the normal recognition prompt without a finger and confirm readiness.
-6. Wait for the bounded capture duration to expire.
+1. Perform the single manual GUI attach; never detach/re-attach.
+2. Wait for guest PnP proof of one `27c6:5125`.
+3. Keep the sensor untouched and let passive OEM initialization settle before
+   opening any Hello UI.
+4. Open setup/add-fingerprint and reach waiting without touching the sensor.
+5. Cancel without touching the sensor.
+6. Reopen the same setup path, reach waiting, and cancel again without touching
+   the sensor.
+7. Let the bounded capture finish; do not terminate TShark manually.
 
-The default proof target is `REENTRY_WITHOUT_FINGER`.  Do not pass
-`-AllowReentryFinger` unless the separately reviewed run plan explicitly
-allows one normal recognition event because no-finger re-entry is insufficient.
-That switch never authorizes enrollment.
+The marker/proof timeline is:
 
-TShark stops on the fixed duration, not by process termination, so the pcapng
-is closed normally.  If the duration expires before all operator phases, the
-script fails closed.  Do not retry without a new authorization.
+```text
+VM_GUEST_READY
+GUEST_TOPOLOGY_BEFORE
+CAPTURE_STARTED
+VM_USB_ATTACH_BEGIN
+VM_USB_ATTACH_END
+GUEST_27C6_5125_PRESENT
+A8_APP12509_PROVEN              # derived from wire by the postprocessor
+OEM_SESSION_BEGIN
+OEM_WAITING_NO_FINGER
+CANCEL_NO_FINGER_BEGIN
+CANCEL_NO_FINGER_END
+REENTRY_BEGIN
+REENTRY_WAITING_NO_FINGER
+REENTRY_CANCEL_BEGIN
+REENTRY_CANCEL_END
+REENTRY_END
+```
 
-## Phase 5 outputs
+The postprocessor requires the target device descriptor inside the capture,
+the descriptor after `CAPTURE_STARTED` and within the single attach window, and
+exact A8 `GF_ST411SEC_APP_12509` before `OEM_SESSION_BEGIN`. VID/PID or guest
+PnP alone is not target-specific proof.
 
-The run directory contains:
+## Private outputs and offline sanitization
 
-- `raw/wire.pcapng`;
-- `run_clock.json` plus the post-capture `run_clock_end.json` consistency anchor;
-- before and after raw OEM-log snapshots plus size/hash/mtime metadata;
-- before/after raw cache candidates and metadata;
-- `operator_markers.tsv` with UTC timestamps;
-- preflight and authorization-consumption records;
-- `input_manifest.json` and its SHA-256 sidecar.
+The run directory contains `raw/wire.pcapng`, clock anchors, before/after raw
+OEM logs and targeted cache snapshots, guest topology snapshots, markers,
+preflight/authorization records, and a hash-gated input manifest. These may
+contain OTP, TLS, images, biometric material, and machine identifiers. Keep
+them outside Git, cloud storage, and support tickets.
 
-These are private raw evidence.  Do not place the run directory in Git, the
-D255 bundle, cloud storage, or a support ticket.  It can contain OTP material,
-biometric baselines, images, TLS traffic, or machine-specific data.
-
-## Linux offline sanitization
-
-Copy or mount the raw run directory outside this repository.  Read the exact
-manifest hash from `input_manifest.json.sha256`, then run:
+Process only from Linux, outside the repository:
 
 ```bash
 python3 analysis/D255/d255_postprocess_windows_evidence.py \
@@ -196,39 +274,21 @@ python3 analysis/D255/d255_postprocess_windows_evidence.py \
   --output-dir /tmp/D255_sanitized
 ```
 
-The postprocessor refuses changed inputs and output collisions.  It never
-opens USB, invokes the network, or copies raw evidence.  Only the two files in
-the sanitized output directory are candidates for later review.  Inspect them
-before adding them to any future step.
-
-If A8 does not prove `GF_ST411SEC_APP_12509`, processing terminates with:
+The operator window is `OEM_WAITING_NO_FINGER` through
+`REENTRY_CANCEL_END`. The postprocessor counts IRQ finger-down `0x0002`, exact
+outbound `0x22 [01 00]`, and correlated image-sized B0 transfers. Valid
+evidence requires all three counts to be zero:
 
 ```text
-CAPTURE_FIRMWARE=UNKNOWN
-D255_EVIDENCE_TARGET_SPECIFIC=false
+FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS=0
+POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS=0
+FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS=0
+FINGER_INTERACTION_DETECTED=false
 ```
 
-and the run cannot close the target blocker.  A seed equality is reported as a
-correlation only; it does not prove causal dataflow without matching timing and
-OEM lifecycle evidence. ISO-8601 log timestamps are retained as sanitized UTC
-metadata. Goodix `[MMDD-HH:MM:SS:mmm]` timestamps are mapped only when the
-start/end clock anchors, Windows timezone/offset, run year, and marker window
-select one UTC instant. Offset changes, ambiguous year/date mapping, or an
-unreconstructible log rotation force `OEM_LOG_TIME_CORRELATION=AMBIGUOUS` and
-`RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION`.
-
-## Failure policy
-
-There is no automatic retry. Missing capture, ambiguous selectors, output
-collision, missing markers, cancel before arm, firmware mismatch, unexpected
-cache layout, CRC failure, log truncation/replacement, time ambiguity, or
-absent re-entry remain explicit failure or inconclusive results. If the UI
-cancel does not occur between its markers,
-classify the evidence as:
-
-```text
-RESULT=INCONCLUSIVE_NO_CANCEL_MARKER
-```
-
-Do not repair an inconclusive run by replaying commands, tails, firmware, or
-cache data to the sensor.
+Any positive count yields `D255_EVIDENCE_VALIDITY=INVALID_FINGER_INTERACTION`
+and `RESTORE_CLOSED=false`. A pre-capture descriptor yields
+`INVALID_DEVICE_ALREADY_ATTACHED`; multiple target device addresses or detach
+markers yield `INVALID_VM_USB_TOPOLOGY_CHANGE`; missing target enumeration,
+guest PnP proof, A8 identity, markers, or ordering also fails closed. No result
+authorizes an automatic retry.

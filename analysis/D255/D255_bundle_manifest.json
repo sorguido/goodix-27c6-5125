@@ -1,49 +1,49 @@
 {
-  "schema": "d255-step-local-bundle-manifest-v2",
+  "schema": "d255-step-local-bundle-manifest-v3",
   "step": "D255",
-  "initial_head": "08edf292fde7404bb86422b43dd2075cc29d359d",
-  "decision": "CORRECTIVE_READY_FOR_AI_PM_REVIEW; HARDWARE_NOT_AUTHORIZED",
+  "initial_head": "922134e21ec40ef4346df555eb8a4c096f56b2a9",
+  "decision": "VM_AWARE_ZERO_FINGER_CORRECTIVE_READY_FOR_AI_PM_REVIEW; HARDWARE_NOT_AUTHORIZED",
   "operator_kit_included": true,
   "members": [
     {
       "path": "analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md",
-      "size": 6402,
-      "sha256": "1bdbda95f587dffe8abe63a68c4f9fa93cac1c300686722ce42c92d714b96619"
+      "size": 6479,
+      "sha256": "53dbf4643e23c0f29fd536d5df31643c9f87427823c9e3047b77000db258ff3b"
     },
     {
       "path": "analysis/D255/D255_decision.json",
-      "size": 3019,
-      "sha256": "4447e21196fa8ccb3854de3e2bc842ca6b0e53b7bc2aa8461a40e8c22fa9d76c"
+      "size": 3739,
+      "sha256": "d87512219613c886ecaa199ca7d770279b7eba24ef53218055d9eae8b0b2962d"
     },
     {
       "path": "analysis/D255/D255_windows_capture_operator_guide.md",
-      "size": 11323,
-      "sha256": "d2601d36d1cf5a3da730eb0a3f318b2a47377dba4b6a1ae1b187ab46c7e41d12"
+      "size": 11146,
+      "sha256": "e9b783003975c8e871b55d6bd740472da9c055114d3dba82777623d12f4f6695"
     },
     {
       "path": "operator_kit/d255-windows-evidence-capture.ps1",
-      "size": 25293,
-      "sha256": "2708f14b4e5ab29a7e2b54b52329c1be91475d401357de0b91ee39976608f537"
+      "size": 29568,
+      "sha256": "42a9e41d8631334474814291d3d77e7edc08f7e7e8b2d0d4e9828255e847ea52"
     },
     {
       "path": "analysis/D255/d255_postprocess_windows_evidence.py",
-      "size": 49901,
-      "sha256": "977c23e67499fe4c3952088402bf8856951fc7b0e1f7be233321a03d1a3d7848"
+      "size": 60371,
+      "sha256": "b20c4b987857d995edca125ecf6d0b60d139a29217ebfe697f6894313224056c"
     },
     {
       "path": "analysis/D255/test_d255_postprocess_windows_evidence.py",
-      "size": 16651,
-      "sha256": "7fc6c66545e6f9375026c131067b509192f5ff7745d68e9b6e2e6d9abe60fedb"
+      "size": 21503,
+      "sha256": "538a557e1cb3a204e67b9e9c6ed340f12aaeda09f1a98f2f02bb67713a2c381a"
     },
     {
       "path": "analysis/D255/D255_test_results.txt",
-      "size": 3355,
-      "sha256": "9824587a420d1a39c5916f953d44d8fd7267329ca9a150cfebe2196d5fae9596"
+      "size": 3651,
+      "sha256": "487b86e613bcdaa87c5d2ecd7896894ad01c5fcb17cc60b0f9b548966b50187f"
     }
   ],
   "canonical_documentation_reference": {
     "path": "Goodix 27c6 5125 manuale tecnico.md",
-    "sha256_at_bundle_creation": "e7889bc42d1fc75fe237ea55543c14640ccd3f90d683c66dcbafaaef988d9e51",
+    "sha256_at_bundle_creation": "894293dd807900e4d41cfe024f74c42c3d6d9942d29057c4e4dbc155d8ed1a0f",
     "included": false,
     "reason": "canonical repository document referenced rather than duplicated"
   },
@@ -70,6 +70,7 @@
     "raw USB capture",
     "raw WBDI/OEM log before or after",
     "raw cache/base file",
+    "guest PnP topology from a real run",
     "firmware or DLL",
     "OTP or PSK/secrets",
     "TLS payload",

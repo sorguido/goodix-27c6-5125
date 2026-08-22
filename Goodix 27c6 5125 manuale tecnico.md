@@ -116,10 +116,27 @@ correla A8, primo `0x36`, FDT12 host, cancel e re-entry senza esportare OTP,
 immagini, PSK, TLS o payload biometrici. I test sintetici e le regressioni
 offline passano; il runtime PowerShell nativo resta da verificare tramite il
 nuovo `-SelfTestOnly` e poi `-PreflightOnly` in Windows perché non è disponibile
-sull'host D255. La correzione è pronta soltanto per una nuova review AI-PM, non
-per una run operatore. Bootstrap e restore restano aperti, nessuna
-autorizzazione live è implicita e ogni run richiede una nuova autorizzazione
-single-shot dopo review positiva.
+sull'host D255. Una seconda review AI-PM ha respinto anche questa revisione:
+assumeva un normale prompt di recognition, ma nella VM Windows corrente
+l'enrollment fingerprint non è completato e quel path non è provato
+disponibile. La seconda correzione dello stesso D255 rende perciò canonico il
+boundary host Linux → guest Windows: VM già avviata, Goodix assente dal guest,
+snapshot PnP read-only, USBPcap attivo prima di un solo attach GUI manuale e
+prova in capture sia del descriptor `27c6:5125` sia, separatamente, dell'A8
+`GF_ST411SEC_APP_12509`. Hypervisor e metodo storico esatto non sono preservati,
+quindi non viene inventata automazione host-side; se esistono più interfacce
+USBPcap, vanno catturate tutte o il preflight fallisce ambiguo.
+
+Il path UI selezionato è ora Settings → Sign-in options → Fingerprint
+recognition → Set up/Add a fingerprint, usato soltanto per raggiungere due volte
+lo stato waiting e cancellarlo due volte senza dito. Non richiede un fingerprint
+preesistente; un eventuale PIN deve esistere già e D255 non può crearlo o
+modificarlo. Ogni IRQ finger-down `0x0002`, `0x22 [01 00]` o image path nella
+finestra operatore invalida la run e forza `RESTORE_CLOSED=false`.
+`-AllowReentryFinger` è stato rimosso. La correzione VM-aware/zero-finger è
+pronta soltanto per una nuova review AI-PM, non per una run operatore. Bootstrap
+e restore restano aperti, nessuna autorizzazione live è implicita e ogni run
+richiede una nuova autorizzazione single-shot dopo review positiva.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
@@ -170,7 +187,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | prima review fallita; corrective pronto per nuova review AI-PM, non eseguito | compatibilità PS5.1/7 statica, self-test, clock anchor e WBDI MMDD/log rotation fail-closed; hardware non autorizzato |
+| Kit acquisizione Windows D255 | due review correttive fallite; revisione VM-aware/zero-finger pronta per nuova review AI-PM, non eseguita | PS5.1/MMDD preservati; capture-before-attach, singolo attach GUI, setup no-finger e invalidazione IRQ2/`0x22`/image; hardware non autorizzato |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -512,7 +529,10 @@ D255 -> kit offline per una sola capture Windows APP12509 correlata
      -> sanitizer hash-gated, redazione OTP/PSK/biometria; zero hardware in D255
      -> prima review FAIL: API PowerShell 5.1 e timestamp WBDI MMDD non chiusi
      -> corrective: helper PS5.1, self-test, clock start/end, log delta/rotation
-     -> READY_FOR_AI_PM_REVIEW; nuova autorizzazione richiesta per ogni run
+     -> seconda review FAIL: recognition non provata e enrollment VM non completato
+     -> corrective VM: capture-before-attach, singolo attach GUI, PnP+descriptor+A8
+     -> setup/add-fingerprint zero-finger; IRQ2/0x22/image invalidano la run
+     -> READY_FOR_AI_PM_REVIEW; non READY_FOR_OPERATOR_RUN
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1877,22 +1897,46 @@ La revisione correttiva di
 target, autorizzazione o TShark e controlla runtime, SHA-256 KAT, path relativo,
 sibling rejection, clock/JSON e collisioni con hardware action count zero.
 
-Nel ramo futuro one-shot, tool/interface/path/disk/log gate e target absence
-precedono la creazione del run. `run_clock.json`, marker `CLOCK_ANCHOR`, copie e
-metadati before di log/cache, runtime self-check e setup non hardware vengono
-completati prima del confronto dell'autorizzazione esatta. Solo allora si
-scrive `authorization_consumed.json` e si tenta TShark. Un failure precedente
-riporta `D255_AUTHORIZATION_CONSUMED=false`; un failure di start TShark dopo il
-record consuma il run. Attach VM, Windows Hello, cancel e re-entry restano
-azioni GUI separate da marker UTC. Lo script non invoca service restart, PnP,
-VM, provisioning, flash o comandi Goodix. Il cache discovery resta ristretto a
-root Goodix e a size/naming pertinenti.
+La seconda review AI-PM ha individuato un difetto ulteriore nello stesso
+boundary: il launcher assumeva recognition, mentre
+`CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT=NOT_COMPLETED` e la disponibilità di
+quel prompt non è provata. La storia nativa/operativa precedente non viene
+promossa a stato della VM corrente. D175 viene usato soltanto come evidenza di
+cold attach passivo e init OEM automatico senza Hello o dito; l'UI esatta della
+capture sopravvissuta `rilevamento.pcapng` non è canonicamente preservata.
+
+Nel ramo futuro one-shot, la VM Windows è già avviata e il Goodix resta visibile
+sull'host Linux ma assente dal guest. Tool/interface/path/disk/log gate, conferma
+del path setup senza nuovo PIN, target absence, `run_clock.json`, copie e
+metadati before di log/cache, runtime self-check e snapshot PnP read-only
+precedono l'autorizzazione. Se TShark vede una sola interfaccia USBPcap la
+selezione è univoca; se ne vede più di una, il launcher richiede la capture
+simultanea di tutte o fallisce `USBPCAP_INTERFACE_SELECTION=AMBIGUOUS`.
+
+Solo dopo questi gate si scrive `authorization_consumed.json` e si tenta
+TShark. Il launcher prova processo e output attivi, poi presenta una sola azione
+`OPERATOR_ACTION_VM_USB_ATTACH`; non contiene attach/detach automatico. Un
+failure di start dopo il record consuma il run. Il postprocessor richiede che
+il descriptor `27c6:5125` compaia dopo `CAPTURE_STARTED`, entro i marker
+`VM_USB_ATTACH_BEGIN/END`, su un solo bus/device, e che l'A8 byte-exact
+`GF_ST411SEC_APP_12509` preceda `OEM_SESSION_BEGIN`. Descriptor pre-capture,
+assenza di enumerazione, secondo device/attach o topology change invalidano la
+provenance bootstrap. Lo script non invoca service restart, PnP mutation, VM,
+provisioning, flash o comandi Goodix. Il cache discovery resta ristretto a root
+Goodix e a size/naming pertinenti.
 
 `analysis/D255/d255_postprocess_windows_evidence.py` opera solo su path esterni
 hash-gated. Seleziona il device tramite A8 esatto, ricostruisce A0/B0 senza
 esportare payload, misura il contratto fisico `0x36`, valida l'ipotesi
 `OTP64+FDT12+NAV3200+IMAGE10240+CRC4`, confronta solo FDT12 e hash di regioni,
-e censisce la finestra ultimo `0x32` → cancel → re-entry. Il launcher conserva
+e censisce la finestra ultimo `0x32` → cancel → re-entry. La UI selezionata è il
+normale setup/add-fingerprint, non recognition: due attese e due cancellazioni,
+sempre senza dito, nessun enrollment completato e nessuna creazione/modifica
+PIN. Il parametro `-AllowReentryFinger` non esiste più. Nella finestra
+`OEM_WAITING_NO_FINGER` → `REENTRY_CANCEL_END`, il sanitizer censisce IRQ
+finger-down `0x0002`, exact `0x22 [01 00]` e image-sized B0; qualunque occorrenza
+produce `INVALID_FINGER_INTERACTION` e forza `RESTORE_CLOSED=false`.
+Il launcher conserva
 local-only snapshot OEM before/after con path, size, hash e mtime; il parser usa
 come nuova finestra soltanto un append byte-prefix verificato e distingue
 `UNCHANGED`, `GREW`, `TRUNCATED` e `REPLACED_OR_ROTATED`.
@@ -1911,17 +1955,25 @@ automaticamente come causalità. Un A8 assente/diverso rende l'evidenza non
 target-specific e terminale; marker mancanti, cancel prima di arm, formato
 inatteso e collisioni falliscono chiusi senza retry.
 
-I 27 test D255 passano, inclusi ISO, MMDD realistico, mezzanotte, fine anno,
-ambiguità/cambio offset e quattro stati del log, insieme alle regressioni
-D252–D254 e ai 172 test della suite supportata. `pwsh` non è installato
+I 37 test D255 passano, inclusi boundary VM/enumerazione/single attach,
+invalidation pre-attached/topology-change, zero-finger e invalidazione separata
+IRQ2/`0x22`/image, oltre a ISO, MMDD realistico, mezzanotte, fine anno,
+ambiguità/cambio offset e quattro stati del log. Passano inoltre le regressioni
+D252–D254 e i 172 test della suite supportata. `pwsh` non è installato
 sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
 staticamente, mentre il vero `-SelfTestOnly` e poi `-PreflightOnly` Windows
 restano una verifica futura. Nessun dato raw D255 è stato acquisito.
 
 ```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
+D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
-D255_OUTCOME=CORRECTIVE_WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED
+D255_OUTCOME=VM_AWARE_ZERO_FINGER_CORRECTIVE_KIT_PREPARED
+D255_WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
+D255_VM_USB_ATTACH_METHOD=OPERATOR_GUI_MANUAL_ATTACH
+D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT=NOT_COMPLETED
+D255_SELECTED_WINDOWS_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER
+D255_FINGER_INTERACTION_ALLOWED=false
 D255_LIVE_EXECUTION=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 D255_OPERATOR_AUTHORIZATION_REQUIRED=true
@@ -2062,7 +2114,13 @@ D254_LIVE_EXECUTION NOT_PERFORMED
 D254_REQUIRES_MORE_PRIMARY_EVIDENCE true
 D255_KIT_PREPARED true
 D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
+D255_SECOND_AI_PM_REVIEW FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
+D255_WINDOWS_EXECUTION_ENVIRONMENT VIRTUAL_MACHINE
+D255_VM_USB_ATTACH_METHOD OPERATOR_GUI_MANUAL_ATTACH
+D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT NOT_COMPLETED
+D255_SELECTED_WINDOWS_UI_PATH WINDOWS_HELLO_SETUP_NO_FINGER
+D255_FINGER_INTERACTION_ALLOWED false
 D255_READY_FOR_AI_PM_REVIEW true
 D255_READY_FOR_OPERATOR_RUN false
 D255_LIVE_EXECUTION NOT_PERFORMED
@@ -2163,11 +2221,14 @@ hardware. Seed APP12509 iniziale e restore no-finger restano bloccanti.
 
 D255 aggiunge un kit PowerShell GPL per la futura raccolta OEM e un
 postprocessor GPL offline con fixture. La prima versione è stata respinta in
-review; la correzione chiude staticamente API PS5.1 e correlazione MMDD, ma non
-ha avviato Windows, VM, TShark, USB, TLS o comandi Goodix reali. Ha usato solo
-fixture sintetiche e audit offline. Il bundle non contiene raw USB, WBDI,
-cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del kit non
-consuma né sostituisce la futura autorizzazione operatore.
+review; la prima correzione chiude staticamente API PS5.1 e correlazione MMDD.
+La seconda review ha respinto l'assunzione recognition sulla VM non enrolled;
+la correzione corrente aggiunge boundary VM/cold-attach single-shot, setup UI
+zero-finger e invalidazione wire di ogni interazione. Non ha avviato Windows,
+VM, TShark, USB, TLS o comandi Goodix reali. Ha usato solo fixture sintetiche e
+audit offline. Il bundle non contiene raw USB, WBDI, cache, OTP, PSK, firmware,
+DLL o biometria. Una review positiva del kit non consuma né sostituisce la
+futura autorizzazione operatore e non equivale a `READY_FOR_OPERATOR_RUN`.
 
 ## Regole operative
 

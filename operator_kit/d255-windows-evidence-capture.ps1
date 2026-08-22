@@ -6,18 +6,20 @@ param(
     [switch]$PreflightOnly,
     [Parameter(Mandatory = $true)][string]$OutputRoot,
     [string]$TsharkPath = "",
-    [string]$CaptureInterface = "",
+    [string[]]$CaptureInterface = @(),
     [string]$Authorization = "",
     [ValidateRange(90, 1800)][int]$CaptureDurationSeconds = 300,
     [string[]]$OemLogPath = @(),
     [string[]]$CacheRoot = @(),
-    [switch]$AllowReentryFinger,
-    [switch]$TargetMustInitiallyBeAbsent = $true
+    [string]$VmGuestReadyConfirmation = "",
+    [string]$UiPrerequisiteConfirmation = ""
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $ExpectedAuthorization = "--i-authorize-one-d255-windows-oem-evidence-capture"
+$ExpectedVmGuestReadyConfirmation = "VM_WINDOWS_RUNNING_GOODIX_ABSENT_FROM_GUEST"
+$ExpectedUiPrerequisiteConfirmation = "SETUP_NO_FINGER_PATH_VERIFIED_NO_NEW_PIN"
 $TargetVidPidPattern = "VID_27C6&PID_5125"
 $script:AuthorizationConsumed = $false
 $script:RunDirectory = $null
@@ -145,6 +147,42 @@ function Get-TargetDevices {
     return @(Get-PnpDevice -PresentOnly -ErrorAction Stop | Where-Object {
         $_.InstanceId -match $TargetVidPidPattern
     })
+}
+
+function Assert-SingleGuestTarget {
+    $targets = @(Get-TargetDevices)
+    if ($targets.Count -ne 1) {
+        Fail-D255 "D255_EVIDENCE_VALIDITY=INVALID_VM_USB_TOPOLOGY_CHANGE"
+    }
+    return $targets[0]
+}
+
+function Get-GuestPnpTopology {
+    if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) {
+        Fail-D255 "Get-PnpDevice is unavailable"
+    }
+    return @(Get-PnpDevice -PresentOnly -ErrorAction Stop | Sort-Object -Property InstanceId |
+        ForEach-Object {
+            [ordered]@{
+                class = [string]$_.Class
+                friendly_name = [string]$_.FriendlyName
+                instance_id = [string]$_.InstanceId
+                status = [string]$_.Status
+            }
+        })
+}
+
+function Write-GuestTopologySnapshot {
+    param([Parameter(Mandatory = $true)][string]$Stage)
+    $rows = @(Get-GuestPnpTopology)
+    [ordered]@{
+        schema = "D255_GUEST_PNP_TOPOLOGY_V1"
+        stage = $Stage
+        timestamp_utc = Get-UtcStamp
+        target_vid_pid = "27c6:5125"
+        target_present_count = @($rows | Where-Object { $_.instance_id -match $TargetVidPidPattern }).Count
+        devices = $rows
+    } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory "guest_topology_${Stage}.json") -Encoding UTF8
 }
 
 function Resolve-CacheRoots {
@@ -282,6 +320,9 @@ function Write-Manifest {
             elseif ($relative -eq "operator_markers.tsv") { $role = "markers" }
             elseif ($relative -eq "run_clock.json") { $role = "clock_anchor" }
             elseif ($relative -eq "run_clock_end.json") { $role = "clock_end" }
+            elseif ($relative -eq "guest_topology_before_attach.json") { $role = "guest_topology_before" }
+            elseif ($relative -eq "guest_topology_after_attach.json") { $role = "guest_topology_after_attach" }
+            elseif ($relative -eq "guest_topology_after_capture.json") { $role = "guest_topology_after_capture" }
             elseif ($relative -like "raw/oem_logs_before/*") { $role = "oem_log_before" }
             elseif ($relative -like "raw/oem_logs_after/*") { $role = "oem_log_after" }
             elseif ($relative -like "raw/cache_before/*") { $role = "cache_before" }
@@ -294,7 +335,7 @@ function Write-Manifest {
             })
         }
     $manifest = [ordered]@{
-        schema = "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V2"
+        schema = "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V3"
         created_utc = Get-UtcStamp
         target = "27c6:5125"
         expected_firmware = "GF_ST411SEC_APP_12509"
@@ -371,11 +412,21 @@ if ($SelfTestOnly) {
 }
 
 if ([string]::IsNullOrWhiteSpace($TsharkPath)) { Fail-D255 "TsharkPath is required outside SelfTestOnly" }
-if ([string]::IsNullOrWhiteSpace($CaptureInterface)) { Fail-D255 "CaptureInterface is required outside SelfTestOnly" }
+if ($CaptureInterface.Count -eq 0) { Fail-D255 "at least one CaptureInterface is required outside SelfTestOnly" }
 if (-not (Test-Path -LiteralPath $TsharkPath -PathType Leaf)) {
     Fail-D255 "TShark executable not found"
 }
-if ($CaptureInterface -match '["\r\n]') { Fail-D255 "invalid capture interface characters" }
+foreach ($selector in $CaptureInterface) {
+    if ([string]::IsNullOrWhiteSpace($selector) -or $selector -match '["\r\n]') {
+        Fail-D255 "invalid capture interface selector"
+    }
+}
+if ($VmGuestReadyConfirmation -cne $ExpectedVmGuestReadyConfirmation) {
+    Fail-D255 "VM guest-ready/target-absence confirmation missing"
+}
+if ($UiPrerequisiteConfirmation -cne $ExpectedUiPrerequisiteConfirmation) {
+    Fail-D255 "WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING"
+}
 foreach ($path in $OemLogPath) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         Fail-D255 "configured OEM log is unreadable: $path"
@@ -395,11 +446,18 @@ if (Test-Path -LiteralPath $OutputRoot -PathType Leaf) {
 }
 $interfaceLines = @(& $TsharkPath -D 2>&1)
 if ($LASTEXITCODE -ne 0) { Fail-D255 "tshark interface enumeration failed" }
-$escapedInterface = [regex]::Escape($CaptureInterface)
-$interfacePattern = "(?i)(?<![A-Za-z0-9_.-])$escapedInterface(?![A-Za-z0-9_.-])"
-$interfaceMatches = @($interfaceLines | Where-Object { $_ -match $interfacePattern })
-if ($interfaceMatches.Count -ne 1) {
-    Fail-D255 "capture interface selector is absent or ambiguous"
+$usbPcapCandidates = @($interfaceLines | Where-Object { $_ -match "(?i)USBPcap" })
+if ($usbPcapCandidates.Count -eq 0) { Fail-D255 "no USBPcap interface was detected" }
+$interfaceMatches = [System.Collections.Generic.List[string]]::new()
+foreach ($selector in $CaptureInterface) {
+    $escapedInterface = [regex]::Escape($selector)
+    $interfacePattern = "(?i)(?<![A-Za-z0-9_.-])$escapedInterface(?![A-Za-z0-9_.-])"
+    $matches = @($usbPcapCandidates | Where-Object { $_ -match $interfacePattern })
+    if ($matches.Count -ne 1) { Fail-D255 "capture interface selector is absent or ambiguous: $selector" }
+    if (-not $interfaceMatches.Contains([string]$matches[0])) { $interfaceMatches.Add([string]$matches[0]) }
+}
+if ($usbPcapCandidates.Count -gt 1 -and $interfaceMatches.Count -ne $usbPcapCandidates.Count) {
+    Fail-D255 "USBPCAP_INTERFACE_SELECTION=AMBIGUOUS; select every relevant USBPcap interface or stop"
 }
 $tsharkVersion = [string](@(& $TsharkPath --version 2>&1)[0])
 if ($LASTEXITCODE -ne 0) { Fail-D255 "tshark version query failed" }
@@ -409,21 +467,25 @@ $freeBytes = $outputDrive.AvailableFreeSpace
 if ($freeBytes -lt 1073741824) { Fail-D255 "less than 1 GiB free at OutputRoot" }
 
 $initialTargets = @(Get-TargetDevices)
-if ($TargetMustInitiallyBeAbsent -and $initialTargets.Count -ne 0) {
+if ($initialTargets.Count -ne 0) {
     Fail-D255 "target must be detached from the Windows guest before cold-attach capture"
-}
-if (-not $TargetMustInitiallyBeAbsent -and $initialTargets.Count -ne 1) {
-    Fail-D255 "target selector is absent or ambiguous"
 }
 
 $preflight = [ordered]@{
-    schema = "D255_WINDOWS_PREFLIGHT_V2"
+    schema = "D255_WINDOWS_PREFLIGHT_V3"
     result = "PASS"
     timestamp_utc = Get-UtcStamp
     target_present_count = $initialTargets.Count
-    target_must_initially_be_absent = [bool]$TargetMustInitiallyBeAbsent
-    capture_interface = $CaptureInterface
-    capture_interface_match = [string]$interfaceMatches[0]
+    target_must_initially_be_absent = $true
+    vm_windows_running = $true
+    guest_goodix_present_before_attach = $false
+    no_existing_fingerprint_required = $true
+    no_new_pin_creation_allowed = $true
+    selected_windows_ui_path = "WINDOWS_HELLO_SETUP_NO_FINGER"
+    capture_interfaces = @($CaptureInterface)
+    capture_interface_matches = @($interfaceMatches)
+    usbpcap_candidate_count = $usbPcapCandidates.Count
+    usbpcap_interface_selection = $(if ($usbPcapCandidates.Count -eq 1) { "UNAMBIGUOUS" } else { "CAPTURE_ALL" })
     tshark_path = (Resolve-Path -LiteralPath $TsharkPath).Path
     tshark_version = $tsharkVersion
     capture_duration_seconds = $CaptureDurationSeconds
@@ -461,20 +523,24 @@ $clockPath = Join-Path $script:RunDirectory "run_clock.json"
 $clockAnchor = New-D255ClockAnchor -Phase "BEFORE_CAPTURE"
 $clockAnchor | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockPath -Encoding UTF8
 Write-OperatorMarker -Event "CLOCK_ANCHOR" -Detail "local offset and Windows timezone recorded"
+Write-OperatorMarker -Event "VM_GUEST_READY" -Detail "VM already running; target absent; setup/no-finger prerequisites confirmed"
+Write-GuestTopologySnapshot -Stage "before_attach"
+Write-OperatorMarker -Event "GUEST_TOPOLOGY_BEFORE" -Detail "read-only PnP snapshot; 27c6:5125 absent"
 $cacheRoots = Resolve-CacheRoots
 Write-OemLogSnapshot -Stage "before" -Candidates $oemLogCandidates -RawDirectory $rawDirectory | Out-Null
 Write-FileSnapshot -Stage "before" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
 $preflight["runtime"] = Get-D255RuntimeInfo
 $preflight | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory "preflight.json") -Encoding UTF8
 $capturePath = Join-Path $rawDirectory "wire.pcapng"
-$captureArguments = "-i `"$CaptureInterface`" -a duration:$CaptureDurationSeconds -q -w `"$capturePath`""
+$captureSelectors = @($CaptureInterface | ForEach-Object { "-i `"$_`"" }) -join " "
+$captureArguments = "$captureSelectors -a duration:$CaptureDurationSeconds -q -w `"$capturePath`""
 
 if ($Authorization -cne $ExpectedAuthorization) {
     Fail-D255 "exact one-run authorization string missing or wrong"
 }
 $script:AuthorizationConsumed = $true
 @{
-    schema = "D255_AUTHORIZATION_CONSUMED_V2"
+    schema = "D255_AUTHORIZATION_CONSUMED_V3"
     consumed_utc = Get-UtcStamp
     authorization_sha256 = Get-D255Sha256HexForString -Value $Authorization
     pre_hardware_setup_complete = $true
@@ -486,12 +552,15 @@ try {
     $script:CaptureProcess = Start-Process -FilePath $TsharkPath -ArgumentList $captureArguments -PassThru -NoNewWindow
     Start-Sleep -Seconds 2
     Assert-CaptureActive
-    Write-OperatorMarker -Event "CAPTURE_STARTED" -Detail "capture already active before cold attach"
+    if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) {
+        Fail-D255 "capture process is alive but output file was not created"
+    }
+    Write-OperatorMarker -Event "CAPTURE_STARTED" -Detail "USBPcap active and output created before VM USB attach"
 
-    Write-OperatorMarker -Event "COLD_ATTACH_BEGIN" -Detail "operator GUI action follows"
-    Read-Host "Attach the existing 27c6:5125 USB device to the Windows VM using the reviewed VM GUI, then press Enter"
+    Write-OperatorMarker -Event "VM_USB_ATTACH_BEGIN" -Detail "single operator GUI action follows"
+    Read-Host "Perform the single manual Goodix host-to-VM GUI attach now. Do not detach or re-attach. Press Enter after the GUI action completes"
     Assert-CaptureActive
-    Write-OperatorMarker -Event "COLD_ATTACH_END"
+    Write-OperatorMarker -Event "VM_USB_ATTACH_END"
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
         $targets = @(Get-TargetDevices)
@@ -500,26 +569,33 @@ try {
         Start-Sleep -Milliseconds 500
     } while ([DateTime]::UtcNow -lt $deadline)
     if ($targets.Count -ne 1) { Fail-D255 "target did not appear after cold attach" }
-    Write-OperatorMarker -Event "TARGET_PRESENT" -Detail $targets[0].InstanceId
+    Write-GuestTopologySnapshot -Stage "after_attach"
+    Write-OperatorMarker -Event "GUEST_27C6_5125_PRESENT" -Detail $targets[0].InstanceId
 
-    Read-Host "Open the normal Windows Hello recognition prompt. Do not touch the sensor. Press Enter only when it is visibly waiting for a fingerprint"
+    Read-Host "Keep hands away from the sensor and wait for passive OEM initialization to settle. Press Enter before opening any Windows Hello UI"
     Assert-CaptureActive
-    Write-OperatorMarker -Event "ARM_OBSERVED_NO_FINGER" -Detail "operator UI observation"
+    Assert-SingleGuestTarget | Out-Null
+    Write-OperatorMarker -Event "OEM_SESSION_BEGIN" -Detail "OEM_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER"
+    Read-Host "Open Settings > Accounts > Sign-in options > Fingerprint recognition (Windows Hello) > Set up/Add a fingerprint. Do not create a PIN and never touch the sensor. Press Enter only when waiting for a fingerprint"
+    Assert-CaptureActive
+    Assert-SingleGuestTarget | Out-Null
+    Write-OperatorMarker -Event "OEM_WAITING_NO_FINGER" -Detail "operator UI observation; zero finger"
     Write-OperatorMarker -Event "CANCEL_NO_FINGER_BEGIN"
-    Read-Host "Cancel the normal Windows Hello prompt without touching the sensor, then press Enter"
+    Read-Host "Cancel the setup/add-fingerprint wizard without touching the sensor, then press Enter"
     Assert-CaptureActive
+    Assert-SingleGuestTarget | Out-Null
     Write-OperatorMarker -Event "CANCEL_NO_FINGER_END"
 
     Write-OperatorMarker -Event "REENTRY_BEGIN"
-    Read-Host "Reopen the normal Windows Hello recognition prompt without touching the sensor, then press Enter when it is ready"
+    Read-Host "Reopen the same setup/add-fingerprint path without touching the sensor. Press Enter when it is waiting for a fingerprint"
     Assert-CaptureActive
-    Write-OperatorMarker -Event "REENTRY_READY_NO_FINGER" -Detail "operator UI observation"
-    if ($AllowReentryFinger) {
-        Write-OperatorMarker -Event "REENTRY_FINGER_BEGIN" -Detail "normal OEM recognition only"
-        Read-Host "Only if no-finger re-entry was insufficient, complete one normal recognition event, then press Enter"
-        Assert-CaptureActive
-        Write-OperatorMarker -Event "REENTRY_FINGER_END"
-    }
+    Assert-SingleGuestTarget | Out-Null
+    Write-OperatorMarker -Event "REENTRY_WAITING_NO_FINGER" -Detail "operator UI observation; zero finger"
+    Write-OperatorMarker -Event "REENTRY_CANCEL_BEGIN"
+    Read-Host "Cancel the setup/add-fingerprint wizard again without touching the sensor, then press Enter"
+    Assert-CaptureActive
+    Assert-SingleGuestTarget | Out-Null
+    Write-OperatorMarker -Event "REENTRY_CANCEL_END"
     Write-OperatorMarker -Event "REENTRY_END"
     Write-OperatorMarker -Event "OPERATOR_PHASES_COMPLETE"
     Wait-Process -Id $script:CaptureProcess.Id
@@ -530,6 +606,9 @@ try {
     if ((Get-Item -LiteralPath $capturePath).Length -le 0) { Fail-D255 "capture output empty" }
     $clockEndPath = Join-Path $script:RunDirectory "run_clock_end.json"
     New-D255ClockAnchor -Phase "AFTER_CAPTURE" | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockEndPath -Encoding UTF8
+    $finalTargets = @(Get-TargetDevices)
+    if ($finalTargets.Count -ne 1) { Fail-D255 "D255_EVIDENCE_VALIDITY=INVALID_VM_USB_TOPOLOGY_CHANGE" }
+    Write-GuestTopologySnapshot -Stage "after_capture"
     Write-OemLogSnapshot -Stage "after" -Candidates $oemLogCandidates -RawDirectory $rawDirectory | Out-Null
     Write-FileSnapshot -Stage "after" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
     Write-Manifest
