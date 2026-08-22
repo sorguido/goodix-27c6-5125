@@ -8,7 +8,7 @@ earlier authorization applies.
 
 ```text
 D255_OPERATOR_AUTHORIZATION_REQUIRED=true
-D255_AUTHORIZATION_CONSUMED_ON_START=true
+D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
 D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
 ```
 
@@ -84,6 +84,23 @@ field correlations pass.
 
 ## Phase 0: offline preflight
 
+First validate the PowerShell/runtime-only helpers. This mode needs neither
+TShark selectors, the USB target, nor authorization and is distinct from
+`-PreflightOnly`:
+
+```powershell
+& "C:\path\d255-windows-evidence-capture.ps1" `
+  -SelfTestOnly `
+  -OutputRoot "D:\Goodix-D255-SelfTest"
+```
+
+Expected output is `D255_POWERSHELL_SELFTEST=PASS`,
+`D255_HARDWARE_ACTION_COUNT=0`, and
+`D255_AUTHORIZATION_CONSUMED=false`. It checks the running PowerShell
+edition/version, SHA-256 known answer, canonical relative paths and sibling
+rejection, clock-anchor JSON, serialization, and collision semantics. It does
+not validate TShark; that belongs to `-PreflightOnly` below.
+
 Keep `27c6:5125` detached from the Windows guest.  On the Linux host, confirm
 that no fingerprint operation is active and that the reviewed VM owns the
 future passthrough path.  Do not stop services or attach the device during this
@@ -100,8 +117,9 @@ From an ordinary PowerShell prompt in the Windows VM:
   -OemLogPath "C:\verified\path\WBDI.log"
 ```
 
-Expected output is `D255_PREFLIGHT_ONLY=PASS` and
-`D255_HARDWARE_ACTION_COUNT=0`.  The script fails on ambiguous interfaces,
+Expected output is `D255_PREFLIGHT_ONLY=PASS`,
+`D255_HARDWARE_ACTION_COUNT=0`, and
+`D255_AUTHORIZATION_CONSUMED=false`. The script fails on ambiguous interfaces,
 target already present, unreadable configured log/cache paths, output
 collision, tool failure, or insufficient disk space.  Select the USBPcap root
 hub interface that will receive the VM passthrough; do not guess.
@@ -121,8 +139,13 @@ authorization for one capture:
   -Authorization "--i-authorize-one-d255-windows-oem-evidence-capture"
 ```
 
-The script creates a unique run directory, consumes the authorization, takes a
-before-cache snapshot, and starts TShark before prompting for VM GUI attach.
+The script completes tool/interface/path/disk/log gates, proves target absence,
+creates the unique run directory, records `run_clock.json`, takes before-log
+and before-cache snapshots, and reruns the runtime check before testing the
+exact authorization. Only then does it record authorization consumption and
+start TShark before prompting for VM GUI attach. A failure before that record
+prints `D255_AUTHORIZATION_CONSUMED=false`. If TShark fails immediately after
+consumption, the attempt is consumed and must not be retried automatically.
 It never invokes a VM, service, PnP, firmware, provisioning, or USB command
 itself.  GUI prompts divide automatic collection from operator actions.
 
@@ -149,7 +172,8 @@ script fails closed.  Do not retry without a new authorization.
 The run directory contains:
 
 - `raw/wire.pcapng`;
-- copied raw OEM logs, if configured or found in targeted roots;
+- `run_clock.json` plus the post-capture `run_clock_end.json` consistency anchor;
+- before and after raw OEM-log snapshots plus size/hash/mtime metadata;
 - before/after raw cache candidates and metadata;
 - `operator_markers.tsv` with UTC timestamps;
 - preflight and authorization-consumption records;
@@ -186,14 +210,20 @@ D255_EVIDENCE_TARGET_SPECIFIC=false
 
 and the run cannot close the target blocker.  A seed equality is reported as a
 correlation only; it does not prove causal dataflow without matching timing and
-OEM lifecycle evidence.
+OEM lifecycle evidence. ISO-8601 log timestamps are retained as sanitized UTC
+metadata. Goodix `[MMDD-HH:MM:SS:mmm]` timestamps are mapped only when the
+start/end clock anchors, Windows timezone/offset, run year, and marker window
+select one UTC instant. Offset changes, ambiguous year/date mapping, or an
+unreconstructible log rotation force `OEM_LOG_TIME_CORRELATION=AMBIGUOUS` and
+`RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION`.
 
 ## Failure policy
 
-There is no automatic retry.  Missing capture, ambiguous selectors, output
+There is no automatic retry. Missing capture, ambiguous selectors, output
 collision, missing markers, cancel before arm, firmware mismatch, unexpected
-cache layout, CRC failure, or absent re-entry remain explicit failure or
-inconclusive results.  If the UI cancel does not occur between its markers,
+cache layout, CRC failure, log truncation/replacement, time ambiguity, or
+absent re-entry remain explicit failure or inconclusive results. If the UI
+cancel does not occur between its markers,
 classify the evidence as:
 
 ```text

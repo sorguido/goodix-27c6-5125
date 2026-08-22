@@ -99,7 +99,13 @@ prossima evidenza primaria una singola traccia Windows APP12509 sanitizzata da
 cold-start/cache/first-seed fino ad arm, cancel senza dito e re-entry.
 
 D255 ha preparato offline il kit per quella singola acquisizione, senza
-eseguirla. La procedura recuperabile dalla storia è delimitata ma incompleta:
+eseguirla. La prima versione non è stata approvata dalla review AI-PM: il
+launcher dichiarava PowerShell 5.1 ma usava tre API .NET moderne, mentre il
+postprocessor ISO-only non ancorava il formato WBDI Goodix
+`[MMDD-HH:MM:SS:mmm]`. La revisione correttiva dello stesso D255 sostituisce
+quelle API, aggiunge self-test PowerShell, clock anchor start/end, snapshot
+before/after del log e correlazione MMDD fail-closed. La procedura recuperabile
+dalla storia resta delimitata ma incompleta:
 la capture sopravvissuta è un pcapng USBPcap e il corpus la classifica come
 cold attach Windows OEM, mentre comando, versione dello strumento, hypervisor,
 passthrough e path WBDI originari non sono conservati. Il kit riusa quindi il
@@ -108,10 +114,12 @@ attivo prima del normale attach GUI della VM. Acquisisce nello stesso run wire,
 log OEM, snapshot mirato del cache e marker UTC; il postprocessor hash-gated
 correla A8, primo `0x36`, FDT12 host, cancel e re-entry senza esportare OTP,
 immagini, PSK, TLS o payload biometrici. I test sintetici e le regressioni
-offline passano; il runtime PowerShell nativo resta da verificare nel futuro
-preflight Windows perché non è disponibile sull'host D255. Bootstrap e restore
-restano aperti, nessuna autorizzazione live è implicita e ogni run richiede una
-nuova autorizzazione single-shot dopo review AI-PM.
+offline passano; il runtime PowerShell nativo resta da verificare tramite il
+nuovo `-SelfTestOnly` e poi `-PreflightOnly` in Windows perché non è disponibile
+sull'host D255. La correzione è pronta soltanto per una nuova review AI-PM, non
+per una run operatore. Bootstrap e restore restano aperti, nessuna
+autorizzazione live è implicita e ogni run richiede una nuova autorizzazione
+single-shot dopo review positiva.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
@@ -162,7 +170,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | pronto per review AI-PM, non eseguito | PowerShell one-shot + postprocessor sanitizzante e fixture; cold attach OEM selezionato, hardware non autorizzato |
+| Kit acquisizione Windows D255 | prima review fallita; corrective pronto per nuova review AI-PM, non eseguito | compatibilità PS5.1/7 statica, self-test, clock anchor e WBDI MMDD/log rotation fail-closed; hardware non autorizzato |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -502,6 +510,8 @@ D254 -> audit pubblico hash-gated: WBDI=5110/12117, Issue63=5125/FW ignoto
 D255 -> kit offline per una sola capture Windows APP12509 correlata
      -> USBPcap attivo prima del cold attach VM; wire+WBDI+cache+marker UTC
      -> sanitizer hash-gated, redazione OTP/PSK/biometria; zero hardware in D255
+     -> prima review FAIL: API PowerShell 5.1 e timestamp WBDI MMDD non chiusi
+     -> corrective: helper PS5.1, self-test, clock start/end, log delta/rotation
      -> READY_FOR_AI_PM_REVIEW; nuova autorizzazione richiesta per ogni run
 ```
 
@@ -1852,40 +1862,73 @@ attach è un normale lifecycle OEM con rischio Windows basso ma non nullo; le
 capture storiche e l'assenza di azioni maintenance sostengono il confine
 factory-preserving, senza costituire prova assoluta di nonmutazione NVM interna.
 
-`operator_kit/d255-windows-evidence-capture.ps1` ha un ramo
-`-PreflightOnly`, autorizzazione esatta one-shot, directory run univoca,
-collision/selector/log gate e capture a durata fissa. Lo script automatizza
-soltanto raccolta read-only, hash e snapshot mirati; attach VM, Windows Hello,
-cancel e re-entry restano azioni GUI separate da marker UTC. Non invoca
-service restart, PnP, VM, provisioning, flash o comandi Goodix. Richiede un log
-OEM leggibile, con `WBDI.log`/`_wbdi_.log` come nomi derivati dalle stringhe OEM.
-Il cache discovery resta ristretto a root Goodix e a size/naming pertinenti.
+La prima review AI-PM ha respinto il kit iniziale come non eseguibile/correlabile:
+`SHA256.HashData`, `Convert.ToHexString` e `Path.GetRelativePath` non possono
+essere assunte su Windows PowerShell 5.1/.NET Framework, e `_oem_timestamp()`
+accettava solo ISO-8601 nonostante il corpus D254 esponga timestamp Goodix
+`[MMDD-HH:MM:SS:mmm]`. Quella baseline non è autorizzabile per hardware.
+
+La revisione correttiva di
+`operator_kit/d255-windows-evidence-capture.ps1` usa ora
+`SHA256.Create()`/`ComputeHash()`/`BitConverter` e un helper relativo basato su
+`Path.GetFullPath`, separatore normalizzato e confronto
+`OrdinalIgnoreCase`; `C:\run2` non può essere accettato come figlio di
+`C:\run`. Il nuovo `-SelfTestOnly`, distinto da `-PreflightOnly`, non richiede
+target, autorizzazione o TShark e controlla runtime, SHA-256 KAT, path relativo,
+sibling rejection, clock/JSON e collisioni con hardware action count zero.
+
+Nel ramo futuro one-shot, tool/interface/path/disk/log gate e target absence
+precedono la creazione del run. `run_clock.json`, marker `CLOCK_ANCHOR`, copie e
+metadati before di log/cache, runtime self-check e setup non hardware vengono
+completati prima del confronto dell'autorizzazione esatta. Solo allora si
+scrive `authorization_consumed.json` e si tenta TShark. Un failure precedente
+riporta `D255_AUTHORIZATION_CONSUMED=false`; un failure di start TShark dopo il
+record consuma il run. Attach VM, Windows Hello, cancel e re-entry restano
+azioni GUI separate da marker UTC. Lo script non invoca service restart, PnP,
+VM, provisioning, flash o comandi Goodix. Il cache discovery resta ristretto a
+root Goodix e a size/naming pertinenti.
 
 `analysis/D255/d255_postprocess_windows_evidence.py` opera solo su path esterni
 hash-gated. Seleziona il device tramite A8 esatto, ricostruisce A0/B0 senza
 esportare payload, misura il contratto fisico `0x36`, valida l'ipotesi
 `OTP64+FDT12+NAV3200+IMAGE10240+CRC4`, confronta solo FDT12 e hash di regioni,
-e censisce la finestra ultimo `0x32` → cancel → re-entry. L'uguaglianza
-wire/cache/log viene classificata come correlazione, mai automaticamente come
-causalità. Un A8 assente/diverso rende l'evidenza non target-specific e
-terminale; marker mancanti, cancel prima di arm, formato inatteso e collisioni
-falliscono chiusi senza retry.
+e censisce la finestra ultimo `0x32` → cancel → re-entry. Il launcher conserva
+local-only snapshot OEM before/after con path, size, hash e mtime; il parser usa
+come nuova finestra soltanto un append byte-prefix verificato e distingue
+`UNCHANGED`, `GREW`, `TRUNCATED` e `REPLACED_OR_ROTATED`.
 
-La fixture completa e i casi negativi passano insieme alle regressioni D249–
-D254. Il parser ha inoltre riconosciuto in sola lettura sulla capture primaria
-255 pacchetti, 107 frame e l'A8 APP12509. `pwsh` non è installato sull'host
-Linux D255: sintassi/contratto PowerShell sono coperti dal fallback statico
-richiesto, mentre il vero `-PreflightOnly` Windows appartiene al futuro run
-autorizzato. Nessun dato raw D255 è stato acquisito.
+Ogni evento OEM sanitizzato espone sorgente timestamp, UTC e qualità, mai la
+linea raw. ISO-8601 con offset/Z è diretto; Goodix MMDD viene convertito solo se
+anno del run, offset locale, Windows timezone, anchor start/end e marker UTC
+selezionano un istante unico. Stesso giorno, mezzanotte e fine anno non ambigua
+sono supportati; cambio offset/DST, data malformata o fuori finestra e rotazione
+non ricostruibile restano `AMBIGUOUS`. Eventi critici cancel/restore non
+correlabili impongono `RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION` e non
+promuovono `CANCEL_IS_HOST_ONLY` o `USB_CLOSE_AFTER_CANCEL`.
+
+L'uguaglianza wire/cache/log viene classificata come correlazione, mai
+automaticamente come causalità. Un A8 assente/diverso rende l'evidenza non
+target-specific e terminale; marker mancanti, cancel prima di arm, formato
+inatteso e collisioni falliscono chiusi senza retry.
+
+I 27 test D255 passano, inclusi ISO, MMDD realistico, mezzanotte, fine anno,
+ambiguità/cambio offset e quattro stati del log, insieme alle regressioni
+D252–D254 e ai 172 test della suite supportata. `pwsh` non è installato
+sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
+staticamente, mentre il vero `-SelfTestOnly` e poi `-PreflightOnly` Windows
+restano una verifica futura. Nessun dato raw D255 è stato acquisito.
 
 ```text
-D255_OUTCOME=WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED
+D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
+D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
+D255_OUTCOME=CORRECTIVE_WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED
 D255_LIVE_EXECUTION=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 D255_OPERATOR_AUTHORIZATION_REQUIRED=true
-D255_AUTHORIZATION_CONSUMED_ON_START=true
+D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
 D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
 READY_FOR_AI_PM_REVIEW=true
+READY_FOR_OPERATOR_RUN=false
 BOOTSTRAP_CLOSED=false
 RESTORE_CLOSED=false
 ```
@@ -2018,7 +2061,10 @@ D254_LIVE_BOUNDARY BLOCKED
 D254_LIVE_EXECUTION NOT_PERFORMED
 D254_REQUIRES_MORE_PRIMARY_EVIDENCE true
 D255_KIT_PREPARED true
+D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
+D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
 D255_READY_FOR_AI_PM_REVIEW true
+D255_READY_FOR_OPERATOR_RUN false
 D255_LIVE_EXECUTION NOT_PERFORMED
 D255_HARDWARE_BOUNDARY NOT_AUTHORIZED
 D255_BOOTSTRAP_CLOSED false
@@ -2116,11 +2162,12 @@ esterna non modifica guardrail, non crea un backend/launcher e non autorizza
 hardware. Seed APP12509 iniziale e restore no-finger restano bloccanti.
 
 D255 aggiunge un kit PowerShell GPL per la futura raccolta OEM e un
-postprocessor GPL offline con fixture. Il test D255 non ha avviato Windows,
-VM, TShark, USB, TLS o comandi Goodix reali; ha usato fixture sintetiche e una
-lettura redatta della capture primaria esistente. Il bundle non contiene raw
-USB, WBDI, cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del
-kit non consuma né sostituisce la futura autorizzazione operatore.
+postprocessor GPL offline con fixture. La prima versione è stata respinta in
+review; la correzione chiude staticamente API PS5.1 e correlazione MMDD, ma non
+ha avviato Windows, VM, TShark, USB, TLS o comandi Goodix reali. Ha usato solo
+fixture sintetiche e audit offline. Il bundle non contiene raw USB, WBDI,
+cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del kit non
+consuma né sostituisce la futura autorizzazione operatore.
 
 ## Regole operative
 

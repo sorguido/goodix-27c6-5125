@@ -30,6 +30,7 @@ KNOWN_CONTROLS = {
     0xA2, 0xA6, 0xA8, 0xAE, 0xAF, 0xB0, 0xD1, 0xD2, 0xD4, 0xD5, 0xE4,
 }
 CACHE_SIZE = 64 + 12 + 3200 + 10240 + 4
+OEM_TIME_WINDOW_MARGIN_SECONDS = 300.0
 
 
 class EvidenceError(RuntimeError):
@@ -75,7 +76,7 @@ def load_manifest(run_dir: Path, manifest_path: Path, expected_hash: str) -> lis
             "manifest SHA-256 must be 64 hexadecimal characters")
     require(sha256_file(manifest_path) == expected_hash.lower(), "input manifest hash mismatch")
     document = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
-    require(document.get("schema") == "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V1",
+    require(document.get("schema") == "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V2",
             "unexpected input manifest schema")
     root = run_dir.resolve()
     result: list[InputFile] = []
@@ -314,32 +315,159 @@ OEM_EVENT_PATTERNS = (
 )
 
 
-def _oem_timestamp(line: str) -> float | None:
-    match = re.search(r"\b(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))\b", line)
-    if not match:
+@dataclass(frozen=True)
+class ClockContext:
+    year: int
+    offset_minutes: int
+    timezone_id: str
+    start_utc: float
+    end_utc: float
+    stable_offset: bool
+
+
+def _load_clock_document(path: Path, expected_phase: str) -> tuple[dict, float, dt.datetime]:
+    document = json.loads(path.read_text(encoding="utf-8-sig"))
+    require(document.get("schema") == "D255_WINDOWS_RUN_CLOCK_V1",
+            "unexpected run clock schema")
+    require(document.get("phase") == expected_phase, "unexpected run clock phase")
+    utc_value = dt.datetime.fromisoformat(str(document["utc_iso"]).replace("Z", "+00:00"))
+    local_value = dt.datetime.fromisoformat(str(document["local_iso_with_offset"]))
+    require(utc_value.tzinfo is not None and utc_value.utcoffset() == dt.timedelta(0),
+            "run clock utc_iso must carry UTC offset")
+    require(local_value.tzinfo is not None, "run clock local_iso_with_offset lacks offset")
+    offset_minutes = int(document["utc_offset_minutes"])
+    require(local_value.utcoffset() == dt.timedelta(minutes=offset_minutes),
+            "run clock offset fields disagree")
+    require(abs(local_value.timestamp() - utc_value.timestamp()) < 0.002,
+            "run clock UTC and local values disagree")
+    require((local_value.year, local_value.month, local_value.day) ==
+            (int(document["year"]), int(document["month"]), int(document["day"])),
+            "run clock local date fields disagree")
+    require(bool(str(document.get("windows_timezone_id", "")).strip()),
+            "run clock Windows timezone ID missing")
+    return document, utc_value.timestamp(), local_value
+
+
+def load_clock_context(inputs: list[InputFile], markers: list[dict]) -> ClockContext:
+    starts = [row for row in inputs if row.role == "clock_anchor"]
+    ends = [row for row in inputs if row.role == "clock_end"]
+    require(len(starts) == 1 and len(ends) == 1,
+            "manifest must identify one start and one end clock anchor")
+    start_doc, start_utc, start_local = _load_clock_document(starts[0].path, "BEFORE_CAPTURE")
+    end_doc, end_utc, _ = _load_clock_document(ends[0].path, "AFTER_CAPTURE")
+    require(start_utc <= end_utc, "run clock anchors are reversed")
+    clock_marker = one_marker(markers, "CLOCK_ANCHOR")
+    require(abs(clock_marker["timestamp"] - start_utc) <= 5.0,
+            "CLOCK_ANCHOR marker does not match run_clock.json")
+    same_zone = str(start_doc["windows_timezone_id"]) == str(end_doc["windows_timezone_id"])
+    same_offset = int(start_doc["utc_offset_minutes"]) == int(end_doc["utc_offset_minutes"])
+    return ClockContext(
+        year=start_local.year,
+        offset_minutes=int(start_doc["utc_offset_minutes"]),
+        timezone_id=str(start_doc["windows_timezone_id"]),
+        start_utc=start_utc,
+        end_utc=end_utc,
+        stable_offset=same_zone and same_offset,
+    )
+
+
+def _utc_iso(timestamp: float | None) -> str | None:
+    if timestamp is None:
         return None
+    return dt.datetime.fromtimestamp(timestamp, dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _oem_timestamp(line: str, clock: ClockContext) -> tuple[float | None, str, str]:
+    iso_match = re.search(
+        r"\b(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))\b",
+        line,
+    )
+    if iso_match:
+        try:
+            return parse_utc(iso_match.group(1)), "ISO8601", "EXACT_ANCHORED"
+        except ValueError:
+            return None, "NONE", "UNAVAILABLE"
+    goodix = re.search(r"\[(\d{2})(\d{2})-(\d{2}):(\d{2}):(\d{2}):(\d{3})\]", line)
+    if not goodix:
+        return None, "NONE", "UNAVAILABLE"
+    if not clock.stable_offset:
+        return None, "GOODIX_MMDD_LOCAL", "AMBIGUOUS"
+    month, day, hour, minute, second, millisecond = map(int, goodix.groups())
+    timezone = dt.timezone(dt.timedelta(minutes=clock.offset_minutes))
+    candidates: list[float] = []
+    for year in (clock.year - 1, clock.year, clock.year + 1):
+        try:
+            local = dt.datetime(year, month, day, hour, minute, second,
+                                millisecond * 1000, tzinfo=timezone)
+        except ValueError:
+            continue
+        timestamp = local.timestamp()
+        if (clock.start_utc - OEM_TIME_WINDOW_MARGIN_SECONDS <= timestamp <=
+                clock.end_utc + OEM_TIME_WINDOW_MARGIN_SECONDS):
+            candidates.append(timestamp)
+    if len(candidates) != 1:
+        return None, "GOODIX_MMDD_LOCAL", "AMBIGUOUS"
+    return candidates[0], "GOODIX_MMDD_LOCAL", "EXACT_ANCHORED"
+
+
+def _decode_oem_log(raw: bytes) -> str:
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="replace")
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw.decode("utf-8-sig", errors="replace")
+    if raw[:4096].count(0) > max(4, len(raw[:4096]) // 8):
+        return raw.decode("utf-16le", errors="replace")
     try:
-        return parse_utc(match.group(1))
-    except ValueError:
-        return None
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252", errors="replace")
 
 
-def parse_oem_logs(paths: list[Path]) -> tuple[list[dict], bytes | None]:
+def oem_log_deltas(inputs: list[InputFile]) -> tuple[list[bytes], list[dict], bool]:
+    before = {row.path.name: row for row in inputs if row.role == "oem_log_before"}
+    after = {row.path.name: row for row in inputs if row.role == "oem_log_after"}
+    require(before, "manifest contains no OEM log before snapshot")
+    deltas: list[bytes] = []
+    states: list[dict] = []
+    safe = True
+    for source_index, name in enumerate(sorted(set(before) | set(after))):
+        old = before.get(name)
+        new = after.get(name)
+        old_raw = old.path.read_bytes() if old else None
+        new_raw = new.path.read_bytes() if new else None
+        if old_raw is None:
+            status, delta = "MISSING_BEFORE", new_raw or b""
+        elif new_raw is None:
+            status, delta = "MISSING_AFTER", b""
+        elif old_raw == new_raw:
+            status, delta = "UNCHANGED", b""
+        elif len(new_raw) >= len(old_raw) and new_raw.startswith(old_raw):
+            status, delta = "GREW", new_raw[len(old_raw):]
+        elif len(new_raw) < len(old_raw):
+            status, delta = "TRUNCATED", new_raw
+        else:
+            status, delta = "REPLACED_OR_ROTATED", new_raw
+        if status in {"MISSING_BEFORE", "MISSING_AFTER", "TRUNCATED", "REPLACED_OR_ROTATED"}:
+            safe = False
+        deltas.append(delta)
+        states.append({
+            "source_index": source_index,
+            "change": status,
+            "size_before": len(old_raw) if old_raw is not None else None,
+            "sha256_before": old.sha256 if old else None,
+            "size_after": len(new_raw) if new_raw is not None else None,
+            "sha256_after": new.sha256 if new else None,
+        })
+    return deltas, states, safe
+
+
+def parse_oem_logs(raw_logs: list[bytes], clock: ClockContext,
+                   cancel_begin: float, reentry_begin: float,
+                   reentry_end: float) -> tuple[list[dict], bytes | None]:
     events: list[dict] = []
     first_fdt: bytes | None = None
-    for file_index, path in enumerate(paths):
-        raw = path.read_bytes()
-        if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
-            text = raw.decode("utf-16", errors="replace")
-        elif raw.startswith(b"\xef\xbb\xbf"):
-            text = raw.decode("utf-8-sig", errors="replace")
-        elif raw[:4096].count(0) > max(4, len(raw[:4096]) // 8):
-            text = raw.decode("utf-16le", errors="replace")
-        else:
-            try:
-                text = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                text = raw.decode("cp1252", errors="replace")
+    for file_index, raw in enumerate(raw_logs):
+        text = _decode_oem_log(raw)
         for line_number, line in enumerate(text.splitlines(), 1):
             if first_fdt is None:
                 match = re.search(r"base\s+data\s+sent::0x([0-9a-fA-F]{24})(?![0-9a-fA-F])", line)
@@ -347,8 +475,16 @@ def parse_oem_logs(paths: list[Path]) -> tuple[list[dict], bytes | None]:
                     first_fdt = bytes.fromhex(match.group(1))
             for label, pattern in OEM_EVENT_PATTERNS:
                 if pattern.search(line):
+                    timestamp, source, quality = _oem_timestamp(line, clock)
+                    window = ("CANCEL" if timestamp is not None and cancel_begin <= timestamp < reentry_begin
+                              else "REENTRY" if timestamp is not None and reentry_begin <= timestamp <= reentry_end
+                              else "OUTSIDE" if timestamp is not None else "UNCORRELATED")
                     events.append({"source_index": file_index, "line": line_number,
-                                   "event": label, "timestamp": _oem_timestamp(line)})
+                                   "event": label, "timestamp_source": source,
+                                   "timestamp_utc": _utc_iso(timestamp),
+                                   "time_correlation_quality": quality,
+                                   "time_window": window,
+                                   "_timestamp": timestamp})
     return events, first_fdt
 
 
@@ -441,6 +577,7 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     selected, firmware, target_specific = select_device(frames, usb_device)
     target_frames = [row for row in frames if (row.bus, row.device) == selected]
     markers = load_markers(marker_files[0].path)
+    clock = load_clock_context(inputs, markers)
 
     cancel_begin = one_marker(markers, "CANCEL_NO_FINGER_BEGIN")
     cancel_end = one_marker(markers, "CANCEL_NO_FINGER_END")
@@ -470,8 +607,10 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
                    if parsed and frame.direction == "OUT"
                    and reentry_begin["timestamp"] <= frame.timestamp <= reentry_end["timestamp"]]
 
-    oem_paths = [row.path for row in inputs if row.role == "oem_log"]
-    oem_events, oem_fdt = parse_oem_logs(oem_paths)
+    oem_deltas, oem_log_states, oem_log_window_reconstructible = oem_log_deltas(inputs)
+    oem_events, oem_fdt = parse_oem_logs(
+        oem_deltas, clock, cancel_begin["timestamp"], reentry_begin["timestamp"],
+        reentry_end["timestamp"])
     otp = device_otp(target_frames, selected)
     path_mapping = cache_source_paths(inputs)
     cache_rows = [sanitize_cache(row, otp, path_mapping.get(row.relative))
@@ -520,15 +659,38 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     tls_alert = any(frame.outer == 0xB0 and len(frame.raw) >= 9 and frame.raw[4] == 21
                     for frame in target_frames
                     if cancel_begin["timestamp"] <= frame.timestamp < reentry_begin["timestamp"])
-    window_log_events = [row for row in oem_events if row["timestamp"] is not None
-                         and cancel_begin["timestamp"] <= row["timestamp"] < reentry_begin["timestamp"]]
+    critical_labels = {"HOST_CANCEL", "D0_EXIT", "D0_ENTRY", "DEVICE_CLOSE",
+                       "DEVICE_RESET", "SET_MODE"}
+    critical_events = [row for row in oem_events if row["event"] in critical_labels]
+    timestamped_count = sum(row["timestamp_utc"] is not None for row in oem_events)
+    untimed_count = len(oem_events) - timestamped_count
+    formats = sorted({row["timestamp_source"] for row in oem_events
+                      if row["timestamp_source"] != "NONE"})
+    if not oem_log_window_reconstructible or not clock.stable_offset:
+        oem_time_correlation = "AMBIGUOUS"
+    elif any(row["time_correlation_quality"] == "AMBIGUOUS" for row in critical_events):
+        oem_time_correlation = "AMBIGUOUS"
+    elif any(row["time_correlation_quality"] == "UNAVAILABLE" for row in critical_events):
+        oem_time_correlation = "UNAVAILABLE"
+    elif critical_events:
+        oem_time_correlation = "EXACT_ANCHORED"
+    else:
+        oem_time_correlation = "UNAVAILABLE"
+    critical_time_unresolved = bool(
+        (critical_events and oem_time_correlation != "EXACT_ANCHORED") or
+        not oem_log_window_reconstructible or not clock.stable_offset)
+    window_log_events = [row for row in oem_events if row["time_window"] == "CANCEL"]
     labels = {row["event"] for row in window_log_events}
     usb_close = True if labels & {"D0_EXIT", "DEVICE_CLOSE"} else "unknown"
     device_reset = True if "DEVICE_RESET" in labels else "unknown"
     idle = "0x70" in cancel_controls
     rearm = "0x32" in cancel_controls or "0x32" in reentry_controls
     host_cancel = "HOST_CANCEL" in labels
-    if not cancel_controls and usb_close is True:
+    if critical_time_unresolved:
+        usb_close = "unknown"
+        device_reset = "unknown"
+        restore_model = "INCONCLUSIVE_OEM_TIME_CORRELATION"
+    elif not cancel_controls and usb_close is True:
         restore_model = "HOST_CANCEL_THEN_DEVICE_CLOSE"
     elif not cancel_controls:
         restore_model = "HOST_ONLY_CANCEL_OBSERVED_ARM_LIFETIME_UNRESOLVED"
@@ -537,7 +699,8 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     else:
         restore_model = "DEVICE_COMMAND_SEQUENCE_UNCLASSIFIED"
     device_cancel = False if not cancel_controls else "unknown"
-    cancel_is_host_only = bool(host_cancel and not cancel_controls)
+    cancel_is_host_only = ("unknown" if critical_time_unresolved
+                           else bool(host_cancel and not cancel_controls))
     arm_state = "REARMED" if rearm else "POSSIBLY_ARMED_UNRESOLVED"
     no_finger_ready = one_marker(markers, "REENTRY_READY_NO_FINGER", required=False) is not None
     finger_used = one_marker(markers, "REENTRY_FINGER_BEGIN", required=False) is not None
@@ -565,9 +728,16 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     reentry_class = ("REENTRY_WITHOUT_FINGER" if reentry_proven and no_finger_ready and not finger_used
                      else "REENTRY_PROVEN_ONLY_AFTER_FINGER" if reentry_proven and finger_used
                      else "REENTRY_NOT_PROVEN")
+    restore_closed = bool(reentry_proven and not critical_time_unresolved)
+
+    sanitized_oem_events = [{key: value for key, value in row.items() if key != "_timestamp"}
+                            for row in oem_events]
+    log_rotated_or_truncated = any(
+        row["change"] in {"MISSING_BEFORE", "MISSING_AFTER", "TRUNCATED", "REPLACED_OR_ROTATED"}
+        for row in oem_log_states)
 
     result = {
-        "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V1",
+        "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V2",
         "execution_mode": "OFFLINE_POSTPROCESS_ONLY",
         "input_hashes": {"manifest_sha256": manifest_hash.lower(), "wire_sha256": wire[0].sha256},
         "target": {
@@ -584,7 +754,24 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             "CAUSALITY_LIMIT": "Equality alone does not prove timing or dataflow causality.",
         },
         "cache_candidates": cache_rows,
-        "oem_log_events": oem_events,
+        "oem_log_events": sanitized_oem_events,
+        "oem_log_state": {
+            "sources": oem_log_states,
+            "LOG_ROTATED_OR_TRUNCATED": log_rotated_or_truncated,
+            "LOG_UNCHANGED": bool(oem_log_states and all(
+                row["change"] == "UNCHANGED" for row in oem_log_states)),
+            "LOG_GREW": any(row["change"] == "GREW" for row in oem_log_states),
+            "WINDOW_RECONSTRUCTIBLE": oem_log_window_reconstructible,
+        },
+        "oem_log_time": {
+            "OEM_LOG_TIMESTAMP_FORMATS": formats,
+            "OEM_LOG_TIMESTAMPED_EVENT_COUNT": timestamped_count,
+            "OEM_LOG_UNTIMED_EVENT_COUNT": untimed_count,
+            "OEM_LOG_TIME_CORRELATION": oem_time_correlation,
+            "CLOCK_ANCHOR_TIMEZONE_ID": clock.timezone_id,
+            "CLOCK_ANCHOR_OFFSET_MINUTES": clock.offset_minutes,
+            "CLOCK_OFFSET_STABLE": clock.stable_offset,
+        },
         "restore_cancel": {
             "CANCEL_NO_FINGER_DEVICE_COMMANDS": cancel_controls,
             "CANCEL_NO_FINGER_LAST_FDT_STATE": f"0x{last_arm[1][0]:02x}_ARMED",
@@ -595,6 +782,7 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             "FDT_REARM_AFTER_CANCEL": rearm,
             "REENTRY_COMMAND_SEQUENCE": reentry_controls,
             "RESTORE_MODEL": restore_model,
+            "RESTORE_CLOSED": restore_closed,
             "DEVICE_SIDE_CANCEL_COMMAND": device_cancel,
             "CANCEL_IS_HOST_ONLY": cancel_is_host_only,
             "ARM_STATE_AFTER_CANCEL": arm_state,
@@ -632,7 +820,15 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         f"CACHE_FDT12_MATCH={str(cache_match).lower()}",
         f"OEM_LOG_FDT12_MATCH={str(log_match).lower()}",
         f"SEED_SOURCE_CLASS={seed_class}",
+        f"OEM_LOG_TIMESTAMP_FORMATS={','.join(formats) if formats else 'NONE'}",
+        f"OEM_LOG_TIMESTAMPED_EVENT_COUNT={timestamped_count}",
+        f"OEM_LOG_UNTIMED_EVENT_COUNT={untimed_count}",
+        f"OEM_LOG_TIME_CORRELATION={oem_time_correlation}",
+        f"LOG_ROTATED_OR_TRUNCATED={str(log_rotated_or_truncated).lower()}",
+        f"LOG_UNCHANGED={str(result['oem_log_state']['LOG_UNCHANGED']).lower()}",
+        f"LOG_GREW={str(result['oem_log_state']['LOG_GREW']).lower()}",
         f"RESTORE_MODEL={restore_model}",
+        f"RESTORE_CLOSED={str(restore_closed).lower()}",
         f"DETERMINISTIC_REENTRY_PROVEN={str(reentry_proven).lower()}",
         f"REENTRY_PROOF_CLASS={reentry_class}",
         f"FDT36_COUNT={len(fdt36)}",
@@ -673,13 +869,25 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
                              crc_valid: bool = True, seed_match: bool = True,
                              firmware: bool = True, cancel_marker: bool = True,
                              cancel_before_arm: bool = False, reentry: bool = True,
-                             unknown_control: bool = False, secret_marker: str = "SYNTHETIC_SECRET_NEVER_EXPORT") -> tuple[Path, str]:
+                             unknown_control: bool = False,
+                             secret_marker: str = "SYNTHETIC_SECRET_NEVER_EXPORT",
+                             oem_timestamp_format: str = "goodix",
+                             log_change: str = "growth",
+                             base_timestamp: float | None = None,
+                             clock_offset_minutes: int = 120,
+                             end_clock_offset_minutes: int | None = None,
+                             goodix_month_day: tuple[int, int] | None = None) -> tuple[Path, str]:
     require(not directory.exists(), "synthetic fixture output collision")
     raw = directory / "raw"
     (raw / "cache_before").mkdir(parents=True)
     (raw / "cache_after").mkdir(parents=True)
-    (raw / "oem_logs").mkdir(parents=True)
-    base = 1_800_000_000.0
+    (raw / "oem_logs_before").mkdir(parents=True)
+    (raw / "oem_logs_after").mkdir(parents=True)
+    require(oem_timestamp_format in {"goodix", "iso"}, "unsupported synthetic OEM timestamp format")
+    require(log_change in {"growth", "unchanged", "truncate", "replace"},
+            "unsupported synthetic log change")
+    base = (base_timestamp if base_timestamp is not None else
+            dt.datetime(2026, 8, 22, 6, 14, 6, tzinfo=dt.timezone.utc).timestamp())
     otp = bytes(range(64))
     seed = bytes.fromhex("adadbdbda3a3b1b1a6a6b2b2")
     cache_seed = seed if seed_match else bytes.fromhex("b3b3c3c3a8a8b5b5a8a8b7b7")
@@ -698,7 +906,17 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     metadata = [{"full_path": r"C:\ProgramData\Goodix\goodix.dat", "raw_copy": "raw/cache_after/candidate.bin"}]
     (directory / "cache_after_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
 
-    stamp = lambda seconds: dt.datetime.fromtimestamp(base + seconds, dt.timezone.utc).isoformat()
+    local_zone = dt.timezone(dt.timedelta(minutes=clock_offset_minutes))
+
+    def stamp(seconds: float) -> str:
+        value = dt.datetime.fromtimestamp(base + seconds, dt.timezone.utc)
+        if oem_timestamp_format == "iso":
+            return value.isoformat()
+        local = value.astimezone(local_zone)
+        month, day = goodix_month_day or (local.month, local.day)
+        return (f"[{month:02d}{day:02d}-{local.hour:02d}:{local.minute:02d}:"
+                f"{local.second:02d}:{local.microsecond // 1000:03d}]")
+
     log_lines = [
         f"{stamp(1.3)} read 13520-13520 bytes from base file",
         f"{stamp(1.4)} check crc :Crchost:",
@@ -706,12 +924,52 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         f"{stamp(1.6)} base data sent::0x" + cache_seed.hex(),
         f"{stamp(2.0)} gf_update_all_base",
         f"{stamp(3.0)} base_is_valid:1",
-        f"{stamp(4.2)} gfOnCancel " + secret_marker,
-        f"{stamp(4.4)} DeviceD0Exit",
-        f"{stamp(6.1)} DeviceD0Entry",
+        f"{stamp(4.1)} gfOnCancel " + secret_marker,
+        f"{stamp(4.13)} DeviceD0Exit",
+        f"{stamp(4.9)} DeviceD0Entry",
     ]
-    log_path = raw / "oem_logs" / "oem_000.log"
-    log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+    before_log = b"D255 synthetic pre-existing log prefix\n"
+    appended_log = ("\n".join(log_lines) + "\n").encode()
+    if log_change == "growth":
+        after_log = before_log + appended_log
+    elif log_change == "unchanged":
+        after_log = before_log
+    elif log_change == "truncate":
+        after_log = b"short\n"
+    else:
+        after_log = b"D255 replacement log header\n" + appended_log
+    before_log_path = raw / "oem_logs_before" / "oem_000.log"
+    after_log_path = raw / "oem_logs_after" / "oem_000.log"
+    before_log_path.write_bytes(before_log)
+    after_log_path.write_bytes(after_log)
+
+    def clock_document(timestamp: float, offset_minutes: int, phase: str) -> dict:
+        utc_value = dt.datetime.fromtimestamp(timestamp, dt.timezone.utc)
+        zone = dt.timezone(dt.timedelta(minutes=offset_minutes))
+        local_value = utc_value.astimezone(zone)
+        return {
+            "schema": "D255_WINDOWS_RUN_CLOCK_V1",
+            "phase": phase,
+            "utc_iso": utc_value.isoformat(),
+            "local_iso_with_offset": local_value.isoformat(),
+            "utc_offset_minutes": offset_minutes,
+            "windows_timezone_id": "W. Europe Standard Time",
+            "year": local_value.year,
+            "month": local_value.month,
+            "day": local_value.day,
+            "tick_source": "SYNTHETIC",
+            "environment_tick_count": 123456,
+        }
+
+    start_clock_timestamp = base + 0.1
+    end_offset = (clock_offset_minutes if end_clock_offset_minutes is None
+                  else end_clock_offset_minutes)
+    (directory / "run_clock.json").write_text(
+        json.dumps(clock_document(start_clock_timestamp, clock_offset_minutes,
+                                  "BEFORE_CAPTURE"), indent=2) + "\n", encoding="utf-8")
+    (directory / "run_clock_end.json").write_text(
+        json.dumps(clock_document(base + 8.0, end_offset, "AFTER_CAPTURE"), indent=2) + "\n",
+        encoding="utf-8")
 
     packets: list[tuple[float, bytes, str, int | None]] = []
     packets.append((base + 1, _a0(0xA8, b""), "OUT", 64))
@@ -724,10 +982,10 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     if unknown_control:
         packets.append((base + 4.3, _a0(0x66, b"\x00"), "OUT", 64))
     if reentry:
-        packets.append((base + 6.2, _a0(0xA8, b""), "OUT", 64))
-        packets.append((base + 6.3, _a0(0xA8, fw_body), "IN", None))
-        packets.append((base + 6.4, _a0(0x32, b"\x08\x01" + seed + b"\x01\x00"), "OUT", 64))
-        packets.append((base + 6.5, _a0(0xB0, b"\x32\x01"), "IN", None))
+        packets.append((base + 4.9, _a0(0xA8, b""), "OUT", 64))
+        packets.append((base + 5.0, _a0(0xA8, fw_body), "IN", None))
+        packets.append((base + 5.1, _a0(0x32, b"\x08\x01" + seed + b"\x01\x00"), "OUT", 64))
+        packets.append((base + 5.2, _a0(0xB0, b"\x32\x01"), "IN", None))
     pcap = _block(SHB, b"\x4d\x3c\x2b\x1a" + struct.pack("<HHq", 1, 0, -1))
     pcap += _block(IDB, struct.pack("<HHI", USBPCAP_LINKTYPE, 0, 65535))
     for index, (timestamp, payload, direction, physical) in enumerate(packets):
@@ -736,13 +994,14 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     wire_path.write_bytes(pcap)
 
     marker_rows = [
+        (start_clock_timestamp, "CLOCK_ANCHOR"),
         (base + 0.5, "CAPTURE_STARTED"),
         (base + 2.8 if cancel_before_arm else base + 3.5, "ARM_OBSERVED_NO_FINGER"),
     ]
     if cancel_marker:
-        marker_rows.extend([(base + 4, "CANCEL_NO_FINGER_BEGIN"), (base + 5, "CANCEL_NO_FINGER_END")])
-    marker_rows.extend([(base + 6, "REENTRY_BEGIN"), (base + 6.6, "REENTRY_READY_NO_FINGER"),
-                        (base + 7, "REENTRY_END")])
+        marker_rows.extend([(base + 4, "CANCEL_NO_FINGER_BEGIN"), (base + 4.5, "CANCEL_NO_FINGER_END")])
+    marker_rows.extend([(base + 4.8, "REENTRY_BEGIN"), (base + 5.3, "REENTRY_READY_NO_FINGER"),
+                        (base + 5.5, "REENTRY_END")])
     marker_text = "timestamp_utc\tevent\tdetail\n" + "".join(
         f"{dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat()}\t{name}\tsynthetic\n"
         for ts, name in sorted(marker_rows)
@@ -752,7 +1011,9 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
 
     roles = {
         "raw/wire.pcapng": "wire", "operator_markers.tsv": "markers",
-        "raw/oem_logs/oem_000.log": "oem_log",
+        "run_clock.json": "clock_anchor", "run_clock_end.json": "clock_end",
+        "raw/oem_logs_before/oem_000.log": "oem_log_before",
+        "raw/oem_logs_after/oem_000.log": "oem_log_after",
         "raw/cache_before/candidate.bin": "cache_before",
         "raw/cache_after/candidate.bin": "cache_after",
         "cache_after_metadata.json": "metadata",
@@ -762,7 +1023,7 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         path = directory / relative
         files.append({"path": relative, "role": role, "size": path.stat().st_size,
                       "sha256": sha256_file(path)})
-    manifest = {"schema": "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V1", "files": files}
+    manifest = {"schema": "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V2", "files": files}
     manifest_path = directory / "input_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest_path, sha256_file(manifest_path)

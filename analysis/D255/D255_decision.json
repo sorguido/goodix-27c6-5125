@@ -1,45 +1,62 @@
 {
-  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V1",
-  "initial_head": "7322f405735986d78b1ac3d14fd355695b0e0019",
+  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V2",
+  "initial_head": "08edf292fde7404bb86422b43dd2075cc29d359d",
   "execution_mode": "OFFLINE_PREPARATION_ONLY",
-  "outcome": "WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED",
-  "advancement": "NON_HARDWARE_EXECUTABLE_EVIDENCE_ACQUISITION_PREPARATION",
+  "initial_ai_pm_review": "FAIL_EXECUTABILITY_AND_TIME_CORRELATION",
+  "corrective_status": "READY_FOR_AI_PM_REVIEW",
+  "outcome": "CORRECTIVE_WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED",
+  "advancement": "NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE",
   "executable_closure": {
-    "status": "PASS_OFFLINE_SYNTHETIC_AND_STATIC",
-    "windows_runtime": "PENDING_FUTURE_AUTHORIZED_RUN",
+    "status": "PASS_OFFLINE_STATIC_AND_SYNTHETIC",
+    "windows_runtime": "NATIVE_SELFTEST_PENDING_AI_PM_REVIEW",
     "powershell_native_parser": "UNAVAILABLE_ON_D255_LINUX_HOST",
     "fallback_static_parser": "PASS",
-    "postprocessor_synthetic_fixture": "PASS",
-    "primary_capture_read_only_smoke": "PASS"
+    "postprocessor_synthetic_fixture": "PASS"
   },
-  "historical_capture": {
-    "method": "WINDOWS_OEM_COLD_ATTACH_CAPTURE; EXACT_LAUNCH_PROCEDURE_NOT_RETAINED",
-    "tool": "USBPCAP_PCAPNG_FORMAT; WIRESHARK_TSHARK_VERSION_UNKNOWN",
-    "boundary": "BEFORE_USB_ENUMERATION_THROUGH_OEM_INIT_AND_IMAGE_CYCLES; NO_EXPLICIT_CANCEL_WINDOW",
-    "surviving_sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+  "powershell_compatibility": {
+    "api_audit": "PASS",
+    "unsupported_api_count": 0,
+    "windows_powershell_5_1": "PASS_STATIC_CONTRACT; NATIVE_SELFTEST_PENDING_WINDOWS",
+    "powershell_7_plus": "PASS_STATIC_CONTRACT; NATIVE_SELFTEST_PENDING_WINDOWS",
+    "selftest_mode": "IMPLEMENTED_NOT_EXECUTED; POWERSHELL_RUNTIME_UNAVAILABLE_ON_HOST",
+    "selftest_hardware_action_count": 0
   },
-  "selected_future_method": {
-    "capture": "TSHARK_WITH_USBPCAP_IN_WINDOWS_VM_STARTED_BEFORE_REVIEWED_GUI_USB_ATTACH",
-    "cold_init_trigger": "WINDOWS_VM_NORMAL_USB_COLD_ATTACH_WITH_USBPCAP_ALREADY_ACTIVE",
-    "device_side_effect_class": "NORMAL_OEM_ENUMERATION_AND_VOLATILE_SESSION_INITIALIZATION",
-    "factory_preserving_evidence": "HISTORICAL_TARGET_COLD_ATTACH_CAPTURES_PLUS_NO_MAINTENANCE_COMMAND_REQUESTED; NOT_ABSOLUTE_DEVICE_NVM_PROOF",
-    "windows_compatibility_risk": "LOW_BUT_NONZERO_NORMAL_ATTACH_RISK; NO_PERSISTENT_CHANGE_INTENDED",
-    "target_firmware_gate": "EXACT_A8_GF_ST411SEC_APP_12509_REQUIRED",
-    "retry_policy": "NONE"
+  "authorization": {
+    "required": true,
+    "gate_order": "TOOL_INTERFACE_PATH_DISK_LOG->TARGET_ABSENCE->CLOCK_AND_LOG_CACHE_BEFORE_SNAPSHOTS->RUNTIME_SELF_CHECK->ALL_SETUP_COMPLETE->EXACT_AUTHORIZATION->CONSUMPTION_RECORD->TSHARK_START->FUTURE_ATTACH",
+    "consumed_after_pre_hardware_setup": true,
+    "consumed_before_hardware": true,
+    "pre_consumption_failure_reports_false": true,
+    "tshark_start_failure_consumes_run": true,
+    "repeat_forbidden_without_new_authorization": true,
+    "ai_pm_review_is_authorization": false
+  },
+  "oem_time_correlation": {
+    "formats": [
+      "ISO8601",
+      "GOODIX_MMDD_LOCAL"
+    ],
+    "clock_anchor": "START_AND_END_WITH_UTC_LOCAL_OFFSET_WINDOWS_TIMEZONE_AND_DATE",
+    "same_day": "PASS_SYNTHETIC",
+    "midnight_rollover": "PASS_SYNTHETIC",
+    "year_rollover": "PASS_SYNTHETIC",
+    "ambiguity_and_offset_change": "FAIL_CLOSED_PASS_SYNTHETIC",
+    "critical_unresolved_result": "INCONCLUSIVE_OEM_TIME_CORRELATION"
+  },
+  "oem_log_change_detection": {
+    "unchanged": "PASS_SYNTHETIC",
+    "growth": "PASS_SYNTHETIC",
+    "truncate": "FAIL_CLOSED_PASS_SYNTHETIC",
+    "replace_or_rotation": "FAIL_CLOSED_PASS_SYNTHETIC"
   },
   "blockers": {
     "bootstrap_closed": false,
     "restore_closed": false,
-    "reason": "D255 acquires no new hardware evidence; both claims depend on the separately authorized Windows capture."
-  },
-  "authorization": {
-    "required": true,
-    "consumed_on_start": true,
-    "repeat_forbidden_without_new_authorization": true,
-    "ai_pm_review_is_authorization": false
+    "reason": "No real Windows capture was performed; both claims still require separately authorized target evidence."
   },
   "review": {
     "ready_for_ai_pm_review": true,
+    "ready_for_operator_run": false,
     "live_execution": "NOT_PERFORMED",
     "hardware_boundary": "NOT_AUTHORIZED"
   },

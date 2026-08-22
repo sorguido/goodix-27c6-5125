@@ -1,139 +1,131 @@
-# D255 Windows targeted evidence acquisition kit report
+# D255 corrective Windows targeted evidence acquisition kit report
 
 ## Outcome
 
 ```text
-OUTCOME=READY
-ADVANCEMENT=NON_HARDWARE_EXECUTABLE_EVIDENCE_ACQUISITION_PREPARATION
-EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_AND_STATIC; WINDOWS_RUNTIME_PENDING_FUTURE_AUTHORIZED_RUN
-CANONICAL_DOCUMENTATION=UPDATED
-BUNDLE=analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip; SHA256=RECORDED_IN_STEP_LOCAL_SIDECAR
-D255_OUTCOME=WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED
-D255_LIVE_EXECUTION=NOT_PERFORMED
-D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
+OUTCOME=READY; CORRECTIVE_KIT_PREPARED_FOR_NEW_AI_PM_REVIEW
+ADVANCEMENT=NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE
+EXECUTABLE_CLOSURE=PASS_OFFLINE_STATIC_AND_SYNTHETIC; NATIVE_WINDOWS_SELFTEST_PENDING_AI_PM_REVIEW
+RESIDUAL_BLOCKER_OR_RISK=NO_REAL_WINDOWS_CAPTURE; POWERSHELL_NATIVE_RUNTIME_NOT_AVAILABLE_ON_LINUX_HOST
+CANONICAL_DOCUMENTATION=UPDATED; D255_CURRENT_STATE_AND_CORRECTIVE_HISTORY
+BUNDLE=analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip; SHA256=STEP_LOCAL_SIDECAR
+
+INITIAL_HEAD=08edf292fde7404bb86422b43dd2075cc29d359d
+D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
+D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
 READY_FOR_AI_PM_REVIEW=true
 ```
 
-D255 prepared a fail-closed Windows collection script and an independent Linux
-offline sanitizer.  It performed no Windows capture or local hardware action.
-The bootstrap and restore blockers remain open until a future operator run
-produces target-specific primary evidence.
+The first D255 bundle was not approved for hardware. Its advertised Windows
+PowerShell 5.1 support depended on modern .NET APIs, and its ISO-only OEM-log
+parser could not correlate the observed Goodix `[MMDD-HH:MM:SS:mmm]` format.
+This corrective revision closes both implementation gaps without Windows,
+USB, VM, TShark, network, or device execution. A new AI-PM review is still
+required; this status is not `READY_FOR_OPERATOR_RUN`.
 
-## Initial state and historical evidence
+## Corrective implementation
 
-```text
-INITIAL_HEAD=7322f405735986d78b1ac3d14fd355695b0e0019
-INITIAL_BRANCH=main
-INITIAL_WORKTREE=CLEAN
-PREVIOUS_CAPTURE_METHOD=WINDOWS_OEM_COLD_ATTACH_CAPTURE; EXACT_LAUNCH_PROCEDURE_NOT_RETAINED
-PREVIOUS_CAPTURE_TOOL=USBPCAP_PCAPNG_FORMAT; WIRESHARK_TSHARK_VERSION_UNKNOWN
-PREVIOUS_CAPTURE_BOUNDARY=BEFORE_USB_ENUMERATION_THROUGH_OEM_INIT_AND_IMAGE_CYCLES; NO_EXPLICIT_CANCEL_WINDOW
-RECOMMENDED_D255_CAPTURE_METHOD=TSHARK_WITH_USBPCAP_IN_WINDOWS_VM_STARTED_BEFORE_REVIEWED_GUI_USB_ATTACH
-```
+The launcher now supports Windows PowerShell 5.1 and PowerShell 7+ using
+`SHA256.Create()`/`ComputeHash()`, `BitConverter`, and a canonical relative-path
+helper based on `Path.GetFullPath`. The helper requires the child path to start
+with the normalized base plus a directory separator, so sibling prefixes such
+as `C:\run2` are rejected for `C:\run`. It never calls `Path.GetRelativePath`.
 
-The surviving primary capture is a USBPcap pcapng recovered from the
-operator-provided `GoodixExport.zip`.  The manual classifies it and one now
-missing independent capture as cold attach.  The current repository does not
-retain the old launch command, tool version, VM product, passthrough command,
-or log path.  D255 therefore reuses only the proved capture format and boundary
-and records every previously missing selector explicitly.
-
-The D255 parser read the surviving primary capture in a read-only smoke test:
-255 USBPcap packets, 107 reconstructed A0/B0 frames, one unambiguous bus/device
-pair, and exact A8 identity `GF_ST411SEC_APP_12509`.  No raw payload was emitted.
-
-## Methodological pre-live review
-
-1. **What changes relative to the last attempt?**  The next action observes the
-   normal Windows OEM producer, host cache, OEM log, and USB wire together; it
-   does not replay another Linux FDT sequence.
-2. **What new hypothesis is tested?**  The first APP12509 `0x36` seed is equal
-   to and temporally sourced from the FDT12 field of an OTP-bound host cache;
-   normal UI cancel is either host-only plus close or has an observable bounded
-   device command sequence followed by deterministic re-entry.
-3. **What happens if it fails at the same point?**  No retry.  Missing seed or
-   restore evidence leads to targeted cache/log/trigger analysis; it does not
-   authorize another Linux FDT live attempt.
-
-## Capture design
+`-SelfTestOnly` is independent from `-PreflightOnly` and needs no target,
+authorization, or TShark selector. It checks runtime edition/version, the
+SHA-256 `abc` known answer, relative path success, sibling-prefix rejection,
+clock-anchor creation/parsing, JSON serialization, and collision semantics.
+The self-test is implemented but could not be natively executed because this
+Linux host has neither `powershell` nor `pwsh`.
 
 ```text
-COLD_INIT_TRIGGER=WINDOWS_VM_NORMAL_USB_COLD_ATTACH_WITH_USBPCAP_ALREADY_ACTIVE
-DEVICE_SIDE_EFFECT_CLASS=NORMAL_OEM_ENUMERATION_AND_VOLATILE_SESSION_INITIALIZATION
-FACTORY_PRESERVING_EVIDENCE=HISTORICAL_TARGET_COLD_ATTACH_CAPTURES_PLUS_NO_MAINTENANCE_COMMAND_REQUESTED; NOT_ABSOLUTE_DEVICE_NVM_PROOF
-WINDOWS_COMPATIBILITY_RISK=LOW_BUT_NONZERO_NORMAL_ATTACH_RISK; NO_PERSISTENT_CHANGE_INTENDED
-WINDOWS_CAPTURE_TOOL=TSHARK_WITH_USBPCAP_EXTCAP
-WINDOWS_OEM_LOG_SOURCE=EXPLICIT_OR_TARGETED_DISCOVERY_OF_WBDI.LOG/_WBDI_.LOG; EXACT_TARGET_PATH_UNKNOWN_UNTIL_PREFLIGHT
-BASEFILE_DISCOVERY_METHOD=READ_ONLY_TARGETED_GOODIX_ROOT_SCAN_PLUS_13520_BYTE_LAYOUT_VALIDATION
-TARGET_FIRMWARE_PROOF_METHOD=A8_QUERY_REPLY_IN_CAPTURE_MUST_EQUAL_GF_ST411SEC_APP_12509
-OPERATOR_MARKER_METHOD=UTC_TSV_MARKERS_WRITTEN_AROUND_EACH_GUI_BOUNDARY
-CANCEL_NO_FINGER_METHOD=NORMAL_WINDOWS_HELLO_UI_CANCEL_BETWEEN_EXACT_MARKERS
-REENTRY_PROOF_METHOD=REOPEN_NORMAL_WINDOWS_HELLO_UI; PREFER_WIRE_REARM_WITHOUT_FINGER
+POWERSHELL51_API_AUDIT=PASS; ALL_USED_RUNTIME_APIS_AVAILABLE_TO_WINDOWS_POWERSHELL_5_1_OR_REPLACED
+POWERSHELL51_UNSUPPORTED_API_COUNT=0
+POWERSHELL51_COMPATIBILITY_STATUS=PASS_STATIC_CONTRACT; NATIVE_SELFTEST_PENDING_WINDOWS
+POWERSHELL7_COMPATIBILITY_STATUS=PASS_STATIC_CONTRACT; NATIVE_SELFTEST_PENDING_WINDOWS
+POWERSHELL_SELFTEST_MODE=IMPLEMENTED_NOT_EXECUTED; POWERSHELL_RUNTIME_UNAVAILABLE_ON_HOST
+POWERSHELL_SELFTEST_HARDWARE_ACTION_COUNT=0
 ```
 
-Cold attach is selected because the historical target evidence is already
-classified at that boundary and the capture can begin before enumeration.
-Windows Biometric Service restart and PnP disable/enable are documented but not
-selected: the repository does not prove that either reproduces the complete
-target init, and PnP mutation is less conservative.  No host wrapper is added
-because no canonical hypervisor command is preserved.
+The future live branch now performs, in order, tool/interface/path/disk/log
+gates, target-absence gate, run directory and clock anchor, OEM-log before
+snapshot, cache before snapshot, runtime self-check, and remaining non-hardware
+setup. Only then does it test the exact authorization, record consumption, and
+attempt to start TShark. Every pre-consumption failure emits
+`D255_AUTHORIZATION_CONSUMED=false`; a TShark start failure after consumption
+consumes the one run and cannot auto-retry.
 
-The PowerShell script requires one exact authorization, creates a unique
-directory, refuses collisions and ambiguous selectors, requires a readable OEM
-log source, snapshots only targeted Goodix roots, starts bounded-duration
-TShark before VM attach, and separates every GUI action with UTC markers.  It
-does not automate service restart, PnP, VM control, Windows Hello, firmware, or
-device commands.  `-PreflightOnly` performs tool/path/interface/disk/log/target
-checks with the target required absent from the guest.
+```text
+AUTHORIZATION_GATE_ORDER=TOOL_INTERFACE_PATH_DISK_LOG->TARGET_ABSENCE->CLOCK_AND_LOG_CACHE_BEFORE_SNAPSHOTS->RUNTIME_SELF_CHECK->ALL_SETUP_COMPLETE->EXACT_AUTHORIZATION->CONSUMPTION_RECORD->TSHARK_START->FUTURE_ATTACH
+AUTHORIZATION_CONSUMED_BEFORE_HARDWARE=true; CONSUMED_IMMEDIATELY_BEFORE_TSHARK_START
+```
 
-## Offline sanitizer
+The launcher writes a pre-capture `run_clock.json` and `CLOCK_ANCHOR` marker,
+then a post-capture `run_clock_end.json` consistency anchor. It captures
+before/after OEM-log size, SHA-256 and mtime metadata and retains both raw
+snapshots local-only. The postprocessor compares exact bytes and reports
+unchanged, append/growth, truncation, or replacement/rotation. Only a verified
+append delta is correlated as a new log window.
 
-`d255_postprocess_windows_evidence.py` has no USB, TLS, network, subprocess, or
-firmware path.  It:
+The sanitizer now recognizes ISO-8601 with an explicit offset/Z and Goodix
+`[MMDD-HH:MM:SS:mmm]`. Goodix local timestamps gain a UTC instant only when
+the explicit run year, UTC offset, Windows timezone ID, start/end clock
+anchors, and marker window select exactly one candidate. Same-day, midnight,
+and unambiguous year rollover are covered. Offset changes, malformed/out-of-
+window dates, or non-reconstructible log rotation fail closed without timezone
+or year invention.
 
-- verifies the manifest and every raw input SHA-256 before parsing;
-- parses USBPcap pcapng without external packages and selects the target by A8;
-- reconstructs logical A0 frames and physical `0x36` submissions/tails;
-- validates the hypothesized `64+12+3200+10240+4` cache layout and
-  CRC-32/MPEG-2 in either stored byte order;
-- compares the first wire FDT12 with cache and already printed OEM log values;
-- correlates arm, no-finger cancel, close/reset/idle/rearm, and re-entry;
-- emits allowlisted OEM event labels and hashes, never log lines, OTP, image,
-  TLS, PSK, secret, or biometric payloads.
-
-Equality is explicitly reported as correlation, not causal proof.  Missing or
-wrong A8 identity is terminal and produces no sanitized evidence directory.
+Each sanitized OEM event contains only event label, source/line index,
+`timestamp_source`, `timestamp_utc`, `time_correlation_quality`, and bounded
+window classification; the raw line is never exported. If a critical
+restore/cancel event cannot be anchored, the result forces
+`RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION`, `RESTORE_CLOSED=false`, and
+does not promote host-only cancel or USB-close claims.
 
 ## Verification
-
-`pwsh` and Windows PowerShell are unavailable on this Linux host, so the prompt-
-approved fallback static PowerShell lexer/contract checks were used.  A real
-Windows `-PreflightOnly` invocation remains part of the future operator phase,
-not evidence acquired during D255.
 
 ```text
 PYTHON_COMPILE=PASS
 D252_REPRODUCIBLE_AUDIT=PASS
 D253_REPRODUCIBLE_AUDIT=PASS
-FULL_REPOSITORY_UNIT_SUITE=PASS; TESTS=172
 D254_DEDICATED_TESTS=PASS; TESTS=5
-D255_DEDICATED_TESTS=PASS; TESTS=15
-D255_REAL_PRIMARY_CAPTURE_READ_ONLY_SMOKE=PASS; PACKETS=255; FRAMES=107; FIRMWARE=GF_ST411SEC_APP_12509
-POWERSHELL_NATIVE_SYNTAX_CHECK=NOT_AVAILABLE
+D255_DEDICATED_EXPANDED_TESTS=PASS; TESTS=27
+FULL_SUPPORTED_UNIT_SUITE=PASS; TESTS=172
+GIT_DIFF_CHECK=PASS
+POWERSHELL_NATIVE_SYNTAX_AND_SELFTEST=NOT_AVAILABLE_ON_LINUX_HOST
 POWERSHELL_FALLBACK_STATIC_SYNTAX_AND_CONTRACT=PASS
 ```
 
-Covered negative cases include wrong cache size, CRC failure, mismatched seed,
-missing A8, missing cancel marker, cancel before arm, absent re-entry, unknown
-control, manifest mutation, output collision, missing/wrong authorization, and
-raw biometric/OTP/secret redaction.
-
-## Authorization and safety
+The synthetic Goodix fixture uses the requested realistic sequence:
+`[0822-08:14:10:100] gfOnCancel`,
+`[0822-08:14:10:130] D0Exit`, and
+`[0822-08:14:10:900] D0Entry`. All three map to UTC, with cancel/D0Exit in the
+cancel window and D0Entry in re-entry. The same fixture produces eight
+timestamped recognized events and zero untimed events.
 
 ```text
-D255_OPERATOR_AUTHORIZATION_REQUIRED=true
-D255_AUTHORIZATION_CONSUMED_ON_START=true
-D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
+OEM_LOG_TIMESTAMP_FORMATS=ISO8601|GOODIX_MMDD_LOCAL
+OEM_LOG_TIMESTAMPED_EVENT_COUNT_SYNTHETIC=8
+OEM_LOG_UNTIMED_EVENT_COUNT_SYNTHETIC=0
+OEM_LOG_TIME_CORRELATION_SYNTHETIC=EXACT_ANCHORED
+WBDI_MMDD_CANCEL_CORRELATION_TEST=PASS
+WBDI_MIDNIGHT_ROLLOVER_TEST=PASS
+WBDI_YEAR_ROLLOVER_TEST=PASS
+WBDI_AMBIGUITY_FAIL_CLOSED_TEST=PASS
+OEM_LOG_ROTATION_TESTS=PASS; UNCHANGED|GREW|TRUNCATED|REPLACED_OR_ROTATED
+```
+
+## Safety and unresolved boundary
+
+No corrective command opened USB or ran Windows/OEM software. Bootstrap and
+restore remain open until a separately reviewed and explicitly authorized
+single Windows OEM capture supplies primary target evidence.
+
+```text
+BOOTSTRAP_CLOSED=false
+RESTORE_CLOSED=false
+D255_LIVE_EXECUTION=NOT_PERFORMED
+D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 
 REAL_WINDOWS_CAPTURE_COUNT=0
 REAL_USB_OPEN_COUNT=0
@@ -145,6 +137,3 @@ REAL_IMAGE_COMMAND_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0
 REAL_PERSISTENT_WRITE_FAMILY_COUNT=0
 ```
-
-AI-PM review of this kit is not authorization.  A future run requires baseline
-approval and a new explicit user authorization for one Windows OEM capture.

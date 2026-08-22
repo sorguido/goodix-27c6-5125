@@ -32,7 +32,7 @@ costituisce autorizzazione live.
 | D252 | Audit precondizione fresh-FDT e restore | BLOCKED offline; nessun kit live | `analysis/D252/D252_fdt_precondition_restore_audit.md` | `analysis/D252/D252_fdt_precondition_restore_audit_bundle.zip` |
 | D253 | Dataflow seed, restore post-FDT e semantica `0x22` | BLOCKED offline; core corretto a IRQ2→`0x22`, richiesta evidenza esterna | `analysis/D253/D253_fdt_seed_restore_cmd22_audit.md` | `analysis/D253/D253_fdt_seed_restore_cmd22_audit_bundle.zip` |
 | D254 | Audit esterno FDT/cache/lifecycle | BLOCKED offline; bootstrap ridotto, restore non ridotto | `analysis/D254/D254_external_fdt_evidence_audit.md` | `analysis/D254/D254_external_fdt_evidence_audit_bundle.zip` |
-| D255 | Kit acquisizione Windows APP12509 | READY per review AI-PM; preparazione offline, hardware non autorizzato | `analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md` | `analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip` |
+| D255 | Kit acquisizione Windows APP12509 | prima review FAIL; corrective PS5.1/WBDI time READY per nuova review AI-PM, hardware non autorizzato | `analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md` | `analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip` |
 
 I bundle D230–D238 in root attendono la relocation meccanica byte-preserving
 descritta dal manifest D248; ZIP e sidecar devono muoversi insieme. La coppia

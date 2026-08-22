@@ -1,6 +1,7 @@
-D255 OFFLINE VERIFICATION RESULTS
+D255 CORRECTIVE OFFLINE VERIFICATION RESULTS
 Date: 2026-08-22 Europe/Rome
-Initial HEAD: 7322f405735986d78b1ac3d14fd355695b0e0019
+Initial HEAD: 08edf292fde7404bb86422b43dd2075cc29d359d
+Execution mode: OFFLINE_PREPARATION_ONLY
 
 1. Python compilation
    Command:
@@ -13,7 +14,38 @@ Initial HEAD: 7322f405735986d78b1ac3d14fd355695b0e0019
      python3 analysis/D253/d253_offline_audit.py --repo .
    Result: PASS / PASS
 
-3. Full supported repository suite, including D249-D254 regressions
+3. Dedicated D254 suite
+   Command:
+     python3 -m unittest -v analysis/D254/test_d254_external_audit.py
+   Result: PASS
+   Tests run: 5
+   Failures: 0
+   Errors: 0
+
+4. Dedicated expanded D255 suite
+   Command:
+     python3 -m unittest -v analysis/D255/test_d255_postprocess_windows_evidence.py
+   Result: PASS
+   Tests run: 27
+   Failures: 0
+   Errors: 0
+
+   Corrective coverage includes forbidden modern .NET API absence, PS5.1 hash
+   and relative-path helper contracts, sibling-prefix rejection, self-test
+   contract, authorization ordering after every pre-hardware snapshot/gate,
+   ISO regression, realistic Goodix MMDD same-day correlation, midnight and
+   year rollover, malformed and ambiguous mapping, offset/DST fail-closed, and
+   OEM-log unchanged/growth/truncate/replace handling.
+
+   Synthetic Goodix critical sequence:
+     [0822-08:14:10:100] gfOnCancel -> CANCEL
+     [0822-08:14:10:130] DeviceD0Exit -> CANCEL
+     [0822-08:14:10:900] DeviceD0Entry -> REENTRY
+   Recognized timestamped OEM events: 8
+   Recognized untimed OEM events: 0
+   OEM_LOG_TIME_CORRELATION: EXACT_ANCHORED
+
+5. Full supported repository suite
    Command:
      python3 -m unittest discover -s tests -v
    Result: PASS
@@ -21,21 +53,7 @@ Initial HEAD: 7322f405735986d78b1ac3d14fd355695b0e0019
    Failures: 0
    Errors: 0
 
-4. Dedicated D254 and D255 unit suites
-   Command:
-     python3 -m unittest -v analysis/D254/test_d254_external_audit.py analysis/D255/test_d255_postprocess_windows_evidence.py
-   Result: PASS
-   Tests run: 20 (D254: 5; D255: 15)
-   Failures: 0
-   Errors: 0
-
-   D255 cases include complete synthetic USBPcap/cache/log/marker correlation,
-   wrong-size cache, CRC failure, mismatched seed, missing firmware A8, missing
-   cancel marker, cancel before arm, missing re-entry, unknown control, input
-   hash mismatch, output/fixture collision, raw biometric/OTP/secret redaction,
-   and missing/wrong PowerShell authorization.
-
-5. Surviving target primary capture read-only parser smoke
+6. Surviving target primary capture read-only parser smoke
    Input:
      analysis/D230/work/GoodixExport/rilevamento.pcapng
      SHA-256 50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b
@@ -46,20 +64,24 @@ Initial HEAD: 7322f405735986d78b1ac3d14fd355695b0e0019
    Firmware identity: GF_ST411SEC_APP_12509
    Raw output produced: no
 
-6. PowerShell validation
+7. PowerShell 5.1 / 7 compatibility audit
    pwsh/powershell available on D255 Linux host: no
-   Native PowerShell parser: NOT_AVAILABLE
-   Prompt-authorized fallback static lexer/delimiter check: PASS
-   Static fail-closed/auth/collision/marker/duration contract checks: PASS
-   Future Windows -PreflightOnly execution: NOT_PERFORMED; requires the future
-   reviewed Windows environment and does not belong to D255 hardware evidence.
+   Native PowerShell parser/self-test: NOT_AVAILABLE
+   Fallback static lexer/delimiter/API/ordering contract: PASS
+   Unsupported required API count after correction: 0
+   Forbidden occurrences:
+     [Convert]::ToHexString: 0
+     [Security.Cryptography.SHA256]::HashData: 0
+     [System.IO.Path]::GetRelativePath: 0
+   -SelfTestOnly: IMPLEMENTED_NOT_EXECUTED
+   -SelfTestOnly hardware action count by construction: 0
 
-7. Structured output and patch hygiene
+8. Structured output and patch hygiene
    D255_decision.json: valid JSON
-   D255 bundle manifest: valid JSON after creation
-   git diff --check: PASS at final verification
+   git diff --check: PASS
+   Bundle manifest/ZIP/checksum: verified after final regeneration
 
-Safety counters for every D255 command:
+Safety counters for every D255 corrective command:
 REAL_WINDOWS_CAPTURE_COUNT=0
 REAL_USB_OPEN_COUNT=0
 REAL_TLS_HANDSHAKE_COUNT=0
@@ -70,6 +92,6 @@ REAL_IMAGE_COMMAND_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0
 REAL_PERSISTENT_WRITE_FAMILY_COUNT=0
 
-No sudo, VM start, Windows OEM execution, local USB/libusb, TLS, D4, AF, FDT,
-image command, finger interaction, provisioning, firmware operation, network
-access, retry, or persistent write occurred.
+No sudo, VM start, Windows OEM execution, TShark live capture, local USB/libusb,
+TLS, D4, AF, FDT, image command, finger interaction, provisioning, firmware
+operation, network access, retry, or persistent write occurred.
