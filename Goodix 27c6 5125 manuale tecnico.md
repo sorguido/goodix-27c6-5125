@@ -98,6 +98,21 @@ blocker non è ridotto. D254 resta `BLOCKED`, non autorizza live e richiede come
 prossima evidenza primaria una singola traccia Windows APP12509 sanitizzata da
 cold-start/cache/first-seed fino ad arm, cancel senza dito e re-entry.
 
+D255 ha preparato offline il kit per quella singola acquisizione, senza
+eseguirla. La procedura recuperabile dalla storia è delimitata ma incompleta:
+la capture sopravvissuta è un pcapng USBPcap e il corpus la classifica come
+cold attach Windows OEM, mentre comando, versione dello strumento, hypervisor,
+passthrough e path WBDI originari non sono conservati. Il kit riusa quindi il
+formato e il boundary provati: TShark/USBPcap nel guest Windows deve essere già
+attivo prima del normale attach GUI della VM. Acquisisce nello stesso run wire,
+log OEM, snapshot mirato del cache e marker UTC; il postprocessor hash-gated
+correla A8, primo `0x36`, FDT12 host, cancel e re-entry senza esportare OTP,
+immagini, PSK, TLS o payload biometrici. I test sintetici e le regressioni
+offline passano; il runtime PowerShell nativo resta da verificare nel futuro
+preflight Windows perché non è disponibile sull'host D255. Bootstrap e restore
+restano aperti, nessuna autorizzazione live è implicita e ogni run richiede una
+nuova autorizzazione single-shot dopo review AI-PM.
+
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
 rispetto a Rockytkg; dalla baseline post-D247 il futuro core userspace e i tool
@@ -147,6 +162,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
+| Kit acquisizione Windows D255 | pronto per review AI-PM, non eseguito | PowerShell one-shot + postprocessor sanitizzante e fixture; cold attach OEM selezionato, hardware non autorizzato |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -483,6 +499,10 @@ D253 -> dataflow seed delimitato; core corretto a IRQ2->0x22; restore ancora ign
 D254 -> audit pubblico hash-gated: WBDI=5110/12117, Issue63=5125/FW ignoto
      -> Issue63 corrobora 21/21 IRQ2->0x22 e residuo tail 0x36 agli stessi offset
      -> bootstrap ridotto ma non chiuso; restore non ridotto; nessun live
+D255 -> kit offline per una sola capture Windows APP12509 correlata
+     -> USBPcap attivo prima del cold attach VM; wire+WBDI+cache+marker UTC
+     -> sanitizer hash-gated, redazione OTP/PSK/biometria; zero hardware in D255
+     -> READY_FOR_AI_PM_REVIEW; nuova autorizzazione richiesta per ogni run
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1812,6 +1832,64 @@ sanitizzata che inizi dal cold-start e mostri validazione cache e sorgente del
 primo seed, poi prosegua fino a `0x32`, cancel operatore senza dito e re-entry
 deterministica. Non è una sequenza Linux live proposta.
 
+## D255: kit di acquisizione Windows APP12509
+
+La ricostruzione storica distingue fatti e lacune. Il file
+`rilevamento.pcapng`, hash `50071c0f...19c184b`, usa linktype USBPcap; manuale
+ed evidence index lo classificano come cold attach e citano una seconda
+capture indipendente ora perduta. `GoodixExport.zip` ne ha preservato il file
+insieme a `gfusb.dll` e componenti OEM. Non sono invece preservati comando di
+capture, versione Wireshark/USBPcap, prodotto VM, comando di passthrough o path
+del log. Non è quindi provato il locus esatto del vecchio collector.
+
+Il metodo futuro selezionato avvia TShark sull'interfaccia USBPcap esplicita nel
+guest Windows mentre il target è ancora assente; solo dopo il marker
+`CAPTURE_STARTED` l'operatore usa il normale attach GUI già revisionato. È
+preferito al restart di Windows Biometric Service, che non è dimostrato come
+trigger dell'intero init, e al disable/enable PnP, meno conservativo. Nessun
+wrapper host è stato inventato in assenza di un hypervisor canonico. Il cold
+attach è un normale lifecycle OEM con rischio Windows basso ma non nullo; le
+capture storiche e l'assenza di azioni maintenance sostengono il confine
+factory-preserving, senza costituire prova assoluta di nonmutazione NVM interna.
+
+`operator_kit/d255-windows-evidence-capture.ps1` ha un ramo
+`-PreflightOnly`, autorizzazione esatta one-shot, directory run univoca,
+collision/selector/log gate e capture a durata fissa. Lo script automatizza
+soltanto raccolta read-only, hash e snapshot mirati; attach VM, Windows Hello,
+cancel e re-entry restano azioni GUI separate da marker UTC. Non invoca
+service restart, PnP, VM, provisioning, flash o comandi Goodix. Richiede un log
+OEM leggibile, con `WBDI.log`/`_wbdi_.log` come nomi derivati dalle stringhe OEM.
+Il cache discovery resta ristretto a root Goodix e a size/naming pertinenti.
+
+`analysis/D255/d255_postprocess_windows_evidence.py` opera solo su path esterni
+hash-gated. Seleziona il device tramite A8 esatto, ricostruisce A0/B0 senza
+esportare payload, misura il contratto fisico `0x36`, valida l'ipotesi
+`OTP64+FDT12+NAV3200+IMAGE10240+CRC4`, confronta solo FDT12 e hash di regioni,
+e censisce la finestra ultimo `0x32` → cancel → re-entry. L'uguaglianza
+wire/cache/log viene classificata come correlazione, mai automaticamente come
+causalità. Un A8 assente/diverso rende l'evidenza non target-specific e
+terminale; marker mancanti, cancel prima di arm, formato inatteso e collisioni
+falliscono chiusi senza retry.
+
+La fixture completa e i casi negativi passano insieme alle regressioni D249–
+D254. Il parser ha inoltre riconosciuto in sola lettura sulla capture primaria
+255 pacchetti, 107 frame e l'A8 APP12509. `pwsh` non è installato sull'host
+Linux D255: sintassi/contratto PowerShell sono coperti dal fallback statico
+richiesto, mentre il vero `-PreflightOnly` Windows appartiene al futuro run
+autorizzato. Nessun dato raw D255 è stato acquisito.
+
+```text
+D255_OUTCOME=WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED
+D255_LIVE_EXECUTION=NOT_PERFORMED
+D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
+D255_OPERATOR_AUTHORIZATION_REQUIRED=true
+D255_AUTHORIZATION_CONSUMED_ON_START=true
+D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
+READY_FOR_AI_PM_REVIEW=true
+BOOTSTRAP_CLOSED=false
+RESTORE_CLOSED=false
+```
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -1889,8 +1967,9 @@ ottenere la derivazione del seed APP12509 o un no-finger restore. La tabella
 finale della capture locale è
 dinamicamente appresa da IRQ `0x0100`, ma vale soltanto come prova della
 sessione catturata; il cold-start D251 non possiede una baseline validata. Non
-esiste un restore OEM post-FDT provato. D254 è quindi `BLOCKED`, richiede una
-capture Windows APP12509 mirata e non ha creato un path live-capable.
+esiste un restore OEM post-FDT provato. D255 ha preparato e verificato offline
+il kit per la capture Windows APP12509 mirata, ma non l'ha eseguita: il confine
+resta bloccato e nessun path FDT Linux è diventato live-capable.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -1938,6 +2017,12 @@ D254_RESTORE_CLOSED false
 D254_LIVE_BOUNDARY BLOCKED
 D254_LIVE_EXECUTION NOT_PERFORMED
 D254_REQUIRES_MORE_PRIMARY_EVIDENCE true
+D255_KIT_PREPARED true
+D255_READY_FOR_AI_PM_REVIEW true
+D255_LIVE_EXECUTION NOT_PERFORMED
+D255_HARDWARE_BOUNDARY NOT_AUTHORIZED
+D255_BOOTSTRAP_CLOSED false
+D255_RESTORE_CLOSED false
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -2030,6 +2115,13 @@ codice runtime, secret, OTP, immagini o payload biometrici. La corroborazione
 esterna non modifica guardrail, non crea un backend/launcher e non autorizza
 hardware. Seed APP12509 iniziale e restore no-finger restano bloccanti.
 
+D255 aggiunge un kit PowerShell GPL per la futura raccolta OEM e un
+postprocessor GPL offline con fixture. Il test D255 non ha avviato Windows,
+VM, TShark, USB, TLS o comandi Goodix reali; ha usato fixture sintetiche e una
+lettura redatta della capture primaria esistente. Il bundle non contiene raw
+USB, WBDI, cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del
+kit non consuma né sostituisce la futura autorizzazione operatore.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -2043,5 +2135,5 @@ hardware. Seed APP12509 iniziale e restore no-finger restano bloccanti.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D254 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D255 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.

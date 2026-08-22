@@ -1,0 +1,80 @@
+{
+  "schema": "d255-step-local-bundle-manifest-v1",
+  "step": "D255",
+  "initial_head": "7322f405735986d78b1ac3d14fd355695b0e0019",
+  "decision": "WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED; HARDWARE_NOT_AUTHORIZED",
+  "operator_kit_included": true,
+  "members": [
+    {
+      "path": "analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md",
+      "size": 7201,
+      "sha256": "1b9eb6c31c7007990c44756052201ab5971376908378374f62ca6346d2688c67"
+    },
+    {
+      "path": "analysis/D255/D255_decision.json",
+      "size": 2531,
+      "sha256": "4ce34f77e8a58a6d91db4169fec29ca147a75ac773f40e49fa97de0d85c0c32e"
+    },
+    {
+      "path": "analysis/D255/D255_windows_capture_operator_guide.md",
+      "size": 9676,
+      "sha256": "f550ee1580a9b511039c31f8793e62b19627167966469e9aaf41544e1816a893"
+    },
+    {
+      "path": "operator_kit/d255-windows-evidence-capture.ps1",
+      "size": 15857,
+      "sha256": "4d7af49ee3dcfe533faf544e8779a3aa5272198f176d2f8d528cf3353c25235e"
+    },
+    {
+      "path": "analysis/D255/d255_postprocess_windows_evidence.py",
+      "size": 36493,
+      "sha256": "c903940c626a90e702944f60af98afca49296b78e47cffd23588083f20e411aa"
+    },
+    {
+      "path": "analysis/D255/test_d255_postprocess_windows_evidence.py",
+      "size": 9136,
+      "sha256": "5dc032480c974a07de7d9962b088977cc4768d3f6122a6f01f24de15ef08beb1"
+    },
+    {
+      "path": "analysis/D255/D255_test_results.txt",
+      "size": 2737,
+      "sha256": "14c29581547a849f656db1dcd3153306228fa75e234c19839524e1a6a4b414df"
+    }
+  ],
+  "canonical_documentation_reference": {
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "sha256_at_bundle_creation": "2811d3bbcc53b43d2ea3d559fb243da393a6c81cf804256448c0e066480952da",
+    "included": false,
+    "reason": "canonical repository document referenced rather than duplicated"
+  },
+  "analysis_index_reference": {
+    "path": "analysis/README.md",
+    "sha256_at_bundle_creation": "1553bad19dbfd931c59a798a7c11561ca95e5fa511fc37c3b4e02e7c6868ff1c",
+    "included": false
+  },
+  "primary_sources_referenced_not_included": [
+    {
+      "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+      "sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+    },
+    {
+      "path": "analysis/D230/work/GoodixExport/gfusb.dll",
+      "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+    },
+    {
+      "path": "analysis/D254/D254_external_fdt_evidence_audit.md",
+      "classification": "prior sanitized external audit; referenced, not duplicated"
+    }
+  ],
+  "excluded": [
+    "raw USB capture",
+    "raw WBDI/OEM log",
+    "raw cache/base file",
+    "firmware or DLL",
+    "OTP or PSK/secrets",
+    "TLS payload",
+    "biometric image or template",
+    "synthetic temporary fixture output",
+    "historical bundles"
+  ]
+}

@@ -1,0 +1,75 @@
+D255 OFFLINE VERIFICATION RESULTS
+Date: 2026-08-22 Europe/Rome
+Initial HEAD: 7322f405735986d78b1ac3d14fd355695b0e0019
+
+1. Python compilation
+   Command:
+     python3 -m compileall -q core tests analysis/D252 analysis/D253 analysis/D254 analysis/D255
+   Result: PASS
+
+2. Reproducible D252 and D253 audit regressions
+   Commands:
+     python3 analysis/D252/d252_fdt_capture_audit.py
+     python3 analysis/D253/d253_offline_audit.py --repo .
+   Result: PASS / PASS
+
+3. Full supported repository suite, including D249-D254 regressions
+   Command:
+     python3 -m unittest discover -s tests -v
+   Result: PASS
+   Tests run: 172
+   Failures: 0
+   Errors: 0
+
+4. Dedicated D254 and D255 unit suites
+   Command:
+     python3 -m unittest -v analysis/D254/test_d254_external_audit.py analysis/D255/test_d255_postprocess_windows_evidence.py
+   Result: PASS
+   Tests run: 20 (D254: 5; D255: 15)
+   Failures: 0
+   Errors: 0
+
+   D255 cases include complete synthetic USBPcap/cache/log/marker correlation,
+   wrong-size cache, CRC failure, mismatched seed, missing firmware A8, missing
+   cancel marker, cancel before arm, missing re-entry, unknown control, input
+   hash mismatch, output/fixture collision, raw biometric/OTP/secret redaction,
+   and missing/wrong PowerShell authorization.
+
+5. Surviving target primary capture read-only parser smoke
+   Input:
+     analysis/D230/work/GoodixExport/rilevamento.pcapng
+     SHA-256 50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b
+   Result: PASS
+   USBPcap packets: 255
+   Reconstructed A0/B0 frames: 107
+   Selected USB device: bus 1, device 2
+   Firmware identity: GF_ST411SEC_APP_12509
+   Raw output produced: no
+
+6. PowerShell validation
+   pwsh/powershell available on D255 Linux host: no
+   Native PowerShell parser: NOT_AVAILABLE
+   Prompt-authorized fallback static lexer/delimiter check: PASS
+   Static fail-closed/auth/collision/marker/duration contract checks: PASS
+   Future Windows -PreflightOnly execution: NOT_PERFORMED; requires the future
+   reviewed Windows environment and does not belong to D255 hardware evidence.
+
+7. Structured output and patch hygiene
+   D255_decision.json: valid JSON
+   D255 bundle manifest: valid JSON after creation
+   git diff --check: PASS at final verification
+
+Safety counters for every D255 command:
+REAL_WINDOWS_CAPTURE_COUNT=0
+REAL_USB_OPEN_COUNT=0
+REAL_TLS_HANDSHAKE_COUNT=0
+REAL_D4_SEND_COUNT=0
+REAL_AF_SEND_COUNT=0
+REAL_FDT_SEND_COUNT=0
+REAL_IMAGE_COMMAND_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_PERSISTENT_WRITE_FAMILY_COUNT=0
+
+No sudo, VM start, Windows OEM execution, local USB/libusb, TLS, D4, AF, FDT,
+image command, finger interaction, provisioning, firmware operation, network
+access, retry, or persistent write occurred.

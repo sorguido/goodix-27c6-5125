@@ -1,0 +1,57 @@
+{
+  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V1",
+  "initial_head": "7322f405735986d78b1ac3d14fd355695b0e0019",
+  "execution_mode": "OFFLINE_PREPARATION_ONLY",
+  "outcome": "WINDOWS_EVIDENCE_ACQUISITION_KIT_PREPARED",
+  "advancement": "NON_HARDWARE_EXECUTABLE_EVIDENCE_ACQUISITION_PREPARATION",
+  "executable_closure": {
+    "status": "PASS_OFFLINE_SYNTHETIC_AND_STATIC",
+    "windows_runtime": "PENDING_FUTURE_AUTHORIZED_RUN",
+    "powershell_native_parser": "UNAVAILABLE_ON_D255_LINUX_HOST",
+    "fallback_static_parser": "PASS",
+    "postprocessor_synthetic_fixture": "PASS",
+    "primary_capture_read_only_smoke": "PASS"
+  },
+  "historical_capture": {
+    "method": "WINDOWS_OEM_COLD_ATTACH_CAPTURE; EXACT_LAUNCH_PROCEDURE_NOT_RETAINED",
+    "tool": "USBPCAP_PCAPNG_FORMAT; WIRESHARK_TSHARK_VERSION_UNKNOWN",
+    "boundary": "BEFORE_USB_ENUMERATION_THROUGH_OEM_INIT_AND_IMAGE_CYCLES; NO_EXPLICIT_CANCEL_WINDOW",
+    "surviving_sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+  },
+  "selected_future_method": {
+    "capture": "TSHARK_WITH_USBPCAP_IN_WINDOWS_VM_STARTED_BEFORE_REVIEWED_GUI_USB_ATTACH",
+    "cold_init_trigger": "WINDOWS_VM_NORMAL_USB_COLD_ATTACH_WITH_USBPCAP_ALREADY_ACTIVE",
+    "device_side_effect_class": "NORMAL_OEM_ENUMERATION_AND_VOLATILE_SESSION_INITIALIZATION",
+    "factory_preserving_evidence": "HISTORICAL_TARGET_COLD_ATTACH_CAPTURES_PLUS_NO_MAINTENANCE_COMMAND_REQUESTED; NOT_ABSOLUTE_DEVICE_NVM_PROOF",
+    "windows_compatibility_risk": "LOW_BUT_NONZERO_NORMAL_ATTACH_RISK; NO_PERSISTENT_CHANGE_INTENDED",
+    "target_firmware_gate": "EXACT_A8_GF_ST411SEC_APP_12509_REQUIRED",
+    "retry_policy": "NONE"
+  },
+  "blockers": {
+    "bootstrap_closed": false,
+    "restore_closed": false,
+    "reason": "D255 acquires no new hardware evidence; both claims depend on the separately authorized Windows capture."
+  },
+  "authorization": {
+    "required": true,
+    "consumed_on_start": true,
+    "repeat_forbidden_without_new_authorization": true,
+    "ai_pm_review_is_authorization": false
+  },
+  "review": {
+    "ready_for_ai_pm_review": true,
+    "live_execution": "NOT_PERFORMED",
+    "hardware_boundary": "NOT_AUTHORIZED"
+  },
+  "safety": {
+    "real_windows_capture_count": 0,
+    "real_usb_open_count": 0,
+    "real_tls_handshake_count": 0,
+    "real_d4_send_count": 0,
+    "real_af_send_count": 0,
+    "real_fdt_send_count": 0,
+    "real_image_command_count": 0,
+    "real_finger_interaction_count": 0,
+    "real_persistent_write_family_count": 0
+  }
+}
