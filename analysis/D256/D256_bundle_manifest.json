@@ -1,12 +1,14 @@
 {
-  "schema": "D256_STEP_LOCAL_BUNDLE_MANIFEST_V1",
+  "schema": "D256_STEP_LOCAL_BUNDLE_MANIFEST_V2",
   "step": "D256",
-  "baseline_head": "7751e26806f5aa0e57750ae20febc96325f99c7a",
+  "corrective": "TERMINAL_CANCEL_POST_ARM_QUIESCENCE_CLOSURE",
+  "corrective_initial_head": "44f7af8cd98be3072c32f53f814b4851cf20911f",
+  "previous_bundle_status": "SUPERSEDED_BY_D256_TERMINAL_CANCEL_CORRECTIVE",
   "bundle_policy": "STEP_LOCAL_NON_CUMULATIVE_REFERENCE_AUDITABLE",
   "included_files": [
     {
       "path": "analysis/D256/d256_usb_lifecycle_contract_audit.py",
-      "sha256": "bb99bd05004e880714f04da5b42289cc4aa58740941ad2036b36982c32520c2d"
+      "sha256": "3d1aaa50516dbc49ad04992e73e621a22e40a59f48324f87a99d78ce48df35b4"
     },
     {
       "path": "analysis/D256/D256_usb_timeline.csv",
@@ -14,30 +16,30 @@
     },
     {
       "path": "analysis/D256/D256_usb_timeline.md",
-      "sha256": "a265964aeb25dcb545fcec2700e9191172a96647d8b38e9876af352b01110a58"
+      "sha256": "63c536805648b20357d26ca77487ed7f2516d4af975488d3044c23a98a5bceb9"
     },
     {
       "path": "analysis/D256/D256_decision.json",
-      "sha256": "8c62dbb227994f1d65f6487784b4d64ad73e9b59334094d1fce8ef48c7ba581d"
+      "sha256": "4634de5efaaf0e849179b1b8c53b46c23c5369cc0d981154fce4735de868d498"
     },
     {
       "path": "analysis/D256/D256_offline_usb_lifecycle_contract_audit.md",
-      "sha256": "f1e7436c3872051359fa083397ffbb382a27beb45e500dd93b7b96ad44bdcf67"
+      "sha256": "c49245e5f727ff39de07468c85eb4313a38c529746807a502c6a7c91acf6b337"
     },
     {
       "path": "analysis/D256/test_d256_usb_lifecycle_contract_audit.py",
-      "sha256": "0f9249eb14d286857a5a839faa3f3ddc140d2557be1d8d4d2d3a0e40b6ffefae"
+      "sha256": "920ebe79638d07faf4112839a70602fd83c992078efa28b10521e278024ef656"
     },
     {
       "path": "analysis/D256/D256_test_results.txt",
-      "sha256": "830c0573378e8b0b870edf5b2b257dcb13c13578b1ce0460286ac0896de8da28"
+      "sha256": "cd6a693447e379fb9e530d65c0aab0d7529ed12026a0fea288cede1334b999de"
     }
   ],
   "referenced_not_bundled": [
     {
       "path": "Goodix 27c6 5125 manuale tecnico.md",
       "reason": "canonical documentation updated in place; bundle is audit-by-reference",
-      "sha256": "98def7d285e8ddf0f33d5c8aa488c298350a69e17d83a6dd1c41805ca9d650b7"
+      "sha256": "2e5e61c2b5c52b95a74ca10d9f2eed1cdf755036d3881fbbf18813d117e88241"
     },
     {
       "path": "captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng",
@@ -46,17 +48,34 @@
       "sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c"
     },
     {
+      "path": "captures/D255_20260822T205631772Z_85c8c41f/operator_markers.tsv",
+      "reason": "original private host markers referenced for timing and excluded",
+      "sha256": "bc0c1472c2f5bdfdc78d1435d41070fa86e2bc3d4b71207951336cd897b9c9bb"
+    },
+    {
+      "path": "captures/D255_20260822T205631772Z_85c8c41f/preflight.json",
+      "reason": "original private preflight referenced for configured duration and excluded",
+      "sha256": "7cad12c2c44627146159241e5ae40d0e33d7f81355ecafdc57c00843acee7e90"
+    },
+    {
+      "path": "captures/D255_20260822T205631772Z_85c8c41f/tshark_stderr.txt",
+      "reason": "original private process evidence referenced for final packet count and excluded",
+      "sha256": "58f7be0f1745f6b83a3eb6f0fb359bfba601891792c00b1dcc00d9b471ed0665"
+    },
+    {
       "path": "analysis/D255/d255_postprocess_windows_evidence.py",
       "reason": "historical parser reused by reference and not modified"
     },
     {
       "path": "analysis/D230/work/GoodixExport/gfusb.dll",
-      "reason": "proprietary DLL excluded; bounded audit uses existing local static references"
+      "reason": "proprietary DLL excluded; bounded historical corroboration remains by reference"
     }
   ],
   "excluded_classes": [
     "raw_pcapng",
     "raw_goodix_cache",
+    "operator_marker_raw",
+    "host_preflight_raw",
     "gfusb.dll",
     "firmware",
     "otp_raw",

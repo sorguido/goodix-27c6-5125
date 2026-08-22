@@ -1,139 +1,156 @@
-# D256 — Offline USB lifecycle contract audit
+# D256 corrective — terminal-cancel / post-arm quiescence closure
 
 ## Outcome
 
-`READY`: the complete 218-packet D255 pcapng was parsed offline and the 206
-USBPcap packets belonging to the target `bus 1 / device 2` were rendered as a
-sanitized metadata timeline.  The raw pin is verified at 27,684 bytes and
-SHA-256 `802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c`;
-hash, size and mtime remained unchanged.
+`READY`: the existing D255 raw was re-audited offline without modification.
+The corrective closes the observed OEM host/bus terminal-stop contract as
+path-bounded USB quiescence. It does not claim that the sensor internally
+disarmed or expired its FDT mode.
 
-The minimum observed contract is:
+The raw remains 27,684 bytes, 218 readable frames and SHA-256
+`802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c`.
+All 206 target USBPcap packets are retained as sanitized metadata; raw payload,
+cache, OTP, PSK and biometric material remain excluded.
+
+## Two distinct cancel contracts
+
+The first D256 result remains valid and is explicitly path-bounded:
 
 ```text
-accepted 0x32 arm (frame 198)
-→ operator cancel interval with zero target USBPcap packets
-→ one canceled pending bulk-IN completion (frame 202)
-→ same bus/device and bulk endpoints
-→ re-entry traffic
-→ accepted new 0x32 (request frame 214, ACK frame 216)
+accepted 0x32 frame 198
+→ first operator cancel with zero target packets
+→ pending bulk-IN completion canceled at frame 202
+→ same device/endpoints through re-entry
+→ accepted new 0x32 request/ACK at frames 214/216
 ```
 
-The canceled bulk-IN completion is positive evidence of host-request
-cancellation.  It is not an abort-pipe URB, reset, reconfiguration,
-re-enumeration, descriptor replay or proven device-side disarm.
-
-## Primary USBPcap audit
-
-All function codes observed in the capture are retained numerically.  The
-semantic names in the timeline are limited to the corresponding Windows WDK
-`URB_FUNCTION` ABI values carried by USBPcap; the audit returns
-`SEMANTICS_UNRESOLVED` for any value outside its bounded table.  In the
-critical frame-198→216 window all 19 target packets have function `0x0009`
-(`BULK_OR_INTERRUPT_TRANSFER`).  There are no functions for select
-configuration/interface, control transfer, descriptor fetch, abort pipe,
-reset pipe or clear stall.
-
-The target remains `1:2` and uses only bulk OUT `0x01` and bulk IN `0x81`.
-There is no device descriptor replay and no second enumeration episode.
-Consequently D256 proves transport continuity and the acceptance of re-arm
-without an explicit USB restore; it does not prove that the prior internal arm
-was cleared, expired or overwritten.
+Therefore:
 
 ```text
-USBPCAP_LIFECYCLE_AUDIT=PASS_COMPLETE_TARGET_PACKET_TIMELINE
-CANCEL_TO_REENTRY_DEVICE_CONTINUITY=SAME_BUS_DEVICE_AND_BULK_ENDPOINTS
-HOST_SIDE_PENDING_BULK_IN_CANCELLATION_OBSERVED=true
-EXPLICIT_USB_RESTORE_OBSERVED=false
-ABORT_OR_RESET_OBSERVED=false
-REENUMERATION_OBSERVED=false
 REENTRY_WITHOUT_EXPLICIT_USB_RESTORE_PROVEN=true
-NEW_FDT_ARM_ACCEPTED_ON_REENTRY=true
 RESTORE_REQUIRED_FOR_REENTRY=false
-PRIOR_ARM_DISARM_PROVEN=false
-PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNOBSERVED
-SAFE_STOP_AFTER_FDT_ARM=UNRESOLVED
 ```
 
-`RESTORE_REQUIRED_FOR_REENTRY=false` is bounded to the observed OEM path: the
-new arm was accepted without an explicit USB restore.  It is not a universal
-claim that restoration is useless or that stopping after an arm is safe.
-
-## Controls `0x50` and `0x97`
-
-Neither control is a new D255 discovery.  Both were already in the D230 census
-and were only absent from the local `KNOWN_CONTROLS` allowlist used by the
-D255 sanitizer.
-
-| control | D255 occurrence | wire contract | correlation | bounded class |
-| --- | --- | --- | --- | --- |
-| `0x50` | frame 150, one OUT | A0, payload 2, logical 10, physical 64 | ACK frame 152 `B0/50/01`; A0/50 logical/physical 2417 follows at frame 154 | D230-known sensor/mode family; exact semantics unresolved; bootstrap-local and not lifecycle restore |
-| `0x97` | frame 40, one OUT | A0, payload 2, logical 10, physical 64 | no ACK or response before the next OUT | builder-proven wire coordinate of logical `SetDriverState` `0x96`; initial-query-local and not lifecycle restore |
-
-The bounded D230 static anchor for `0x97` is `SetDriverState` at
-`0x18005c724`, with immediate A0 builder callsites `0x18005c83e` and
-`0x18005c8d0`.  D230 has no dedicated fixed `0x50` builder; its exact dynamic
-mode semantics remain unresolved.  No open-ended DLL reverse engineering was
-performed.
-
-## Bounded static corroboration
-
-The already identified `gfOnCancel` slice
-`0x18001fa90..0x18001fd31` was checked again.  It contains no direct call to
-the known A0 builders.  Already indexed D0 lifecycle strings exist in the DLL,
-but strings do not prove that D0Entry/D0Exit occurred in D255 and no direct
-USB restore dataflow emerged.
+The corrective adds the terminal window:
 
 ```text
-gfOnCancel=HOST_REQUEST_CANCELLATION_NO_DIRECT_A0_SEND_PROVEN
-STATIC_LIFECYCLE_CORROBORATION=EXHAUSTED_NO_NEW_DATAFLOW
+new 0x32 frame 214
+→ accepted ACK frame 216
+→ pending bulk-IN submission frame 217
+→ REENTRY_WAITING_NO_FINGER / REENTRY_CANCEL_BEGIN
+→ REENTRY_CANCEL_END / REENTRY_END / OPERATOR_PHASES_COMPLETE
+→ canceled bulk-IN completion frame 218
+→ end of raw capture, with no further packet
 ```
 
-The pcapng remains the primary source for the bus behavior actually observed.
+Frame 218 is the last frame of the 218-frame pcapng. The TShark stderr records
+`218 packets captured`; preflight records a 600-second duration and the final
+host marker occurs 602.543790 seconds after `CAPTURE_PROCESS_STARTED`. The raw
+therefore remained at frame 218 through final capture closure at the configured
+duration boundary.
 
-## Bootstrap claim
+The marker-derived interval from frame 218 to the `RUN_FAILED` host
+finalization marker is 491.125998 seconds. This is the reported
+`POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS`; the exact process-exit timestamp
+was not recorded, so the value is explicitly a last-frame-to-finalization-marker
+interval rather than a fabricated device timestamp. `RUN_FAILED` is used only
+as host-side boundary/finalization evidence.
 
-The D255 target cache result is preserved without promoting correlation to
-causality.  The 13,520-byte `goodix.dat` layout and CRC are valid, its OTP
-prefix matches the target, and its sanitized FDT12 value equals the first D255
-wire seed.  This establishes
-target binding, layout validity and equality for the first `0x36` of this cold
-attach.  The callback/dataflow causality and any general freshness or lifetime
-remain unproved.
+## Derived terminal-window evidence
+
+| Observation | Result |
+| --- | ---: |
+| ACK new arm → terminal cancel begin | 7.007266 s |
+| terminal cancel begin → end | 7.170485 s |
+| terminal cancel end → canceled completion | 7.559943 s |
+| canceled completion → host finalization marker | 491.125998 s |
+| all/target packets during terminal operator cancel | 0 / 0 |
+| packets after cancel end, before completion | 0 |
+| packets from cancel end through completion | 1, frame 218 |
+| all/target packets after frame 218 | 0 / 0 |
+| non-bulk URBs in frame-214→218 target window | 0 |
+| abort/reset/reconfiguration/descriptor events | 0 |
+| target continuity | bus/device `1:2`, endpoints `0x01/0x81` |
+
+The only terminal completion is function `0x0009`, endpoint `0x81`,
+`USBD_STATUS_CANCELED`. It is positive evidence that the host canceled the
+pending bulk-IN request. No device-side restore command, pipe abort/reset,
+clear-stall, control/descriptor/configuration/interface transition or
+re-enumeration is observed.
 
 ```text
-BOOTSTRAP_CACHE_LAYOUT_TARGET_VALID=true
-BOOTSTRAP_CACHE_OTP_BOUND=true
-BOOTSTRAP_CACHE_FDT12_EQUALS_FIRST_WIRE_SEED=true
-BOOTSTRAP_SEED_SOURCE_CORRELATED=true
-BOOTSTRAP_SEED_DATAFLOW_CAUSALITY_PROVEN=false
-BOOTSTRAP_SEED_FRESHNESS_SCOPE=FIRST_0x36_IN_THIS_D255_COLD_ATTACH_ONLY; GENERAL_LIFETIME_UNPROVEN
-BOOTSTRAP_SEED_SOURCE_STATUS=TARGET_CACHE_WIRE_CORRELATION_PROVEN_CAUSALITY_UNPROVEN_FRESHNESS_NOT_GENERALIZED
+TERMINAL_CANCEL_PENDING_BULK_IN_CANCELED=true
+EXPLICIT_USB_TERMINAL_RESTORE_OBSERVED=false
+TERMINAL_CANCEL_ABORT_OR_RESET_OBSERVED=false
+TERMINAL_CANCEL_REENUMERATION_OBSERVED=false
+POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS=491.125998
+POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT=0
+POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT=0
+OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN=true
 ```
 
-## Residual boundary
+This proves the OEM host/bus behavior for the observed zero-finger path: the
+pending read is canceled and the bus remains quiescent for the rest of the
+capture. USB silence does not expose the sensor's volatile internal FDT state.
 
-The former search for a required restore before OEM re-entry is exhausted by
-the current corpus.  The narrowed blocker is terminal-stop behavior and the
-lifetime of a prior FDT arm when no subsequent re-arm occurs.  D256 neither
-requests an equivalent new capture nor creates a D257/operator kit.
+## Decomposed stop decision
+
+The former opaque `SAFE_STOP_AFTER_FDT_ARM=UNRESOLVED` is superseded by four
+separate decisions:
+
+1. Host/bus terminal-stop contract:
+   `CLOSED_OBSERVED_PATH_BOUNDED_USB_QUIESCENCE`.
+2. USB quiescence:
+   `OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN=true`.
+3. Internal state:
+   `PRIOR_ARM_DISARM_PROVEN=false`,
+   `PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNOBSERVED`,
+   `DEVICE_INTERNAL_FDT_STATE_AFTER_CANCEL=UNOBSERVED`.
+4. Factory persistence:
+   no new device-side factory-persistence claim follows from USB silence; the
+   existing factory-preserving requirements remain unchanged.
+
+This is Task E `Caso A`: no observable host/bus terminal-stop component is
+missing in the current corpus. The residual unknown is internal volatile state.
+A future AI-PM review may therefore assess separately factory-preserving and
+Windows-compatibility requirements, internal-disarm requirements and FDT
+live-readiness. D256 does not authorize an FDT live run or an operator kit.
+
+## URB classification corrective
+
+The semantic table now includes:
 
 ```text
-CURRENT_CORPUS_EXHAUSTED_FOR_THIS_RESTORE_QUESTION=true
-STRATEGIC_BLOCKER=DETERMINE_TERMINAL_STOP_BEHAVIOR_AND_PRIOR_ARM_LIFETIME_WHEN_NO_SUBSEQUENT_REARM_OCCURS
+0x0002  URB_FUNCTION_ABORT_PIPE
+0x001e  URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL
+0x0030  URB_FUNCTION_SYNC_RESET_PIPE
+0x0031  URB_FUNCTION_SYNC_CLEAR_STALL
 ```
 
-## Verification and safety
+No local WDK header, Wireshark source tree or TShark binary is installed on the
+offline Linux host, so the requested local independent provenance check is
+recorded as `UNAVAILABLE_ON_OFFLINE_LINUX_HOST`; no network source was used.
+None of these numeric codes occurs in the terminal window, which contains only
+`0x0009`, so this parser robustness correction does not change the empirical
+D256 result.
 
-The audit was executed from the repository root against the real hash-gated
-raw.  Eight D256 tests cover the known packet decode, direction/endpoint/
-transfer, unresolved function handling, marker boundaries, continuity versus
-re-enumeration, `0x50`/`0x97`, sanitizer and raw immutability.  Three narrowly
-relevant D255 regressions also pass.  `git diff --check` is part of final
-closure.
+## Verification and supersession
+
+The real hash-gated audit passes, as do 13 focused D256 tests and the three
+narrow D255 regressions. Tests cover both cancel contracts, marker order,
+frames 214/216/217/218, final-frame status, zero packets during and after the
+terminal cancel, derived durations, reset/abort classification, sanitizer and
+raw hash/size/mtime immutability. `git diff --check` is part of final closure.
+
+The previous `D256_offline_usb_lifecycle_contract_audit_bundle.zip` is
+`SUPERSEDED_BY_D256_TERMINAL_CANCEL_CORRECTIVE` and remains preserved. The
+current step-local review artifact is
+`D256_terminal_cancel_corrective_bundle.zip`.
 
 ```text
 EXECUTABLE_CLOSURE=PASS_OFFLINE
+CURRENT_CORPUS_EXHAUSTED_FOR_REENTRY_RESTORE_QUESTION=true
+CURRENT_CORPUS_EXHAUSTED_FOR_INTERNAL_ARM_LIFETIME_QUESTION=true
 REAL_USB_OPEN_COUNT=0
 REAL_CAPTURE_COUNT=0
 REAL_HARDWARE_ACTION_COUNT=0

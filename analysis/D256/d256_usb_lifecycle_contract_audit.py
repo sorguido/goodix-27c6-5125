@@ -27,18 +27,28 @@ EXPECTED_FIRST_FRAME = 1
 RUN_RELATIVE_RAW = Path("captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng")
 RUN_RELATIVE_MARKERS = Path("captures/D255_20260822T205631772Z_85c8c41f/operator_markers.tsv")
 RUN_RELATIVE_D255 = Path("analysis/D255/D255_recovered_postprocess/D255_sanitized_evidence.json")
+RUN_RELATIVE_PREFLIGHT = Path("captures/D255_20260822T205631772Z_85c8c41f/preflight.json")
+RUN_RELATIVE_TSHARK_STDERR = Path("captures/D255_20260822T205631772Z_85c8c41f/tshark_stderr.txt")
 
 # Numeric values are the Windows WDK URB_FUNCTION ABI carried verbatim by the
 # USBPcap pseudo-header.  Any value outside this bounded table stays unresolved.
 URB_FUNCTIONS = {
     0x0000: "SELECT_CONFIGURATION",
     0x0001: "SELECT_INTERFACE",
+    0x0002: "ABORT_PIPE",
     0x0008: "CONTROL_TRANSFER",
     0x0009: "BULK_OR_INTERRUPT_TRANSFER",
     0x000B: "GET_DESCRIPTOR_FROM_DEVICE",
     0x0013: "GET_STATUS_FROM_DEVICE",
     0x001B: "CLASS_INTERFACE",
+    0x001E: "SYNC_RESET_PIPE_AND_CLEAR_STALL",
+    0x0030: "SYNC_RESET_PIPE",
+    0x0031: "SYNC_CLEAR_STALL",
 }
+ABORT_PIPE_FUNCTIONS = {0x0002}
+RESET_PIPE_FUNCTIONS = {0x001E, 0x0030, 0x0031}
+ABORT_OR_RESET_FUNCTIONS = ABORT_PIPE_FUNCTIONS | RESET_PIPE_FUNCTIONS
+ENUMERATION_OR_RECONFIGURATION_FUNCTIONS = {0x0000, 0x0001, 0x0008, 0x000B, 0x0013}
 TRANSFER_TYPES = {0: "ISOCHRONOUS", 1: "INTERRUPT", 2: "CONTROL", 3: "BULK"}
 USBD_STATUSES = {0x00000000: "USBD_STATUS_SUCCESS", 0xC0010000: "USBD_STATUS_CANCELED"}
 
@@ -118,6 +128,35 @@ def transfer_semantic(code: int) -> str:
 def iso_utc(timestamp: float) -> str:
     return dt.datetime.fromtimestamp(timestamp, dt.timezone.utc).isoformat(timespec="microseconds").replace(
         "+00:00", "Z")
+
+
+def elapsed_seconds(start: float, end: float) -> float:
+    return round(end - start, 6)
+
+
+def parse_marker_utc_precise(value: str) -> float:
+    require(value.endswith("Z") and "." in value, "marker timestamp is not fractional UTC")
+    whole, fraction = value[:-1].split(".", 1)
+    require(fraction.isdigit(), "marker timestamp fractional part is invalid")
+    base = dt.datetime.strptime(whole, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=dt.timezone.utc)
+    return base.timestamp() + int(fraction) / (10 ** len(fraction))
+
+
+def load_markers_precise(path: Path) -> list[dict]:
+    rows = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        if line_number == 1 and line.startswith("timestamp_utc\tevent\t"):
+            continue
+        parts = line.split("\t", 2)
+        require(len(parts) >= 2, f"bad marker line {line_number}")
+        rows.append({
+            "timestamp": parse_marker_utc_precise(parts[0]),
+            "event": parts[1],
+            "line": line_number,
+        })
+    require(rows == sorted(rows, key=lambda row: row["timestamp"]),
+            "operator markers are not ordered")
+    return rows
 
 
 def wrapper_and_control(payload: bytes) -> tuple[str, str]:
@@ -300,9 +339,9 @@ def critical_contract(d255, packets: list, frames: list, markers: list[dict], se
                             for packet in descriptors)
     continuity_devices = sorted({(packet.bus, packet.device) for packet in window_packets})
     endpoints = sorted({packet.endpoint for packet in window_packets})
-    transition_functions = {0x0000, 0x0001, 0x0002, 0x0008, 0x000B, 0x0013, 0x0030, 0x0031}
+    transition_functions = ENUMERATION_OR_RECONFIGURATION_FUNCTIONS | ABORT_OR_RESET_FUNCTIONS
     explicit_transition = any(packet.function in transition_functions for packet in window_packets)
-    abort_or_reset = any(packet.function in {0x0002, 0x0030, 0x0031} for packet in window_packets)
+    abort_or_reset = any(packet.function in ABORT_OR_RESET_FUNCTIONS for packet in window_packets)
     reenumeration = bool(descriptor_replay or any(packet.function in {0x0000, 0x0001, 0x000B}
                                                   for packet in window_packets))
     require(continuity_devices == [selected], "critical window changes bus/device identity")
@@ -327,9 +366,10 @@ def critical_contract(d255, packets: list, frames: list, markers: list[dict], se
             "endpoint_set": [f"0x{endpoint:02x}" for endpoint in endpoints],
             "canceled_bulk_in_completion_count": len(canceled),
             "canceled_bulk_in_completion_frames": [packet.index + 1 for packet in canceled],
-            "abort_pipe_observed": any(packet.function == 0x0002 for packet in window_packets),
+            "abort_pipe_observed": any(
+                packet.function in ABORT_PIPE_FUNCTIONS for packet in window_packets),
             "reset_pipe_or_clear_stall_observed": any(
-                packet.function in {0x0030, 0x0031} for packet in window_packets),
+                packet.function in RESET_PIPE_FUNCTIONS for packet in window_packets),
             "control_transfer_observed": any(packet.function == 0x0008 for packet in window_packets),
             "select_configuration_or_interface_observed": any(
                 packet.function in {0x0000, 0x0001} for packet in window_packets),
@@ -355,7 +395,184 @@ def critical_contract(d255, packets: list, frames: list, markers: list[dict], se
             "RESTORE_REQUIRED_FOR_REENTRY": False,
             "PRIOR_ARM_DISARM_PROVEN": False,
             "PRIOR_ARM_LIFETIME_AFTER_CANCEL": "UNOBSERVED",
-            "SAFE_STOP_AFTER_FDT_ARM": "UNRESOLVED",
+        },
+    }
+
+
+def terminal_cancel_contract(d255, packets: list, frames: list, markers: list[dict],
+                             selected: tuple[int, int], preflight: dict,
+                             tshark_stderr: str) -> dict:
+    records = a0_records(d255, frames, selected)
+    marker = {name: d255.one_marker(markers, name)["timestamp"] for name in (
+        "CAPTURE_PROCESS_STARTED",
+        "REENTRY_WAITING_NO_FINGER",
+        "REENTRY_CANCEL_BEGIN",
+        "REENTRY_CANCEL_END",
+        "REENTRY_END",
+        "OPERATOR_PHASES_COMPLETE",
+        "RUN_FAILED",
+    )}
+    require(
+        marker["REENTRY_WAITING_NO_FINGER"] <= marker["REENTRY_CANCEL_BEGIN"]
+        < marker["REENTRY_CANCEL_END"] < marker["REENTRY_END"]
+        < marker["OPERATOR_PHASES_COMPLETE"] < marker["RUN_FAILED"],
+        "terminal cancel marker order invalid",
+    )
+
+    new_arms = [row for row in records if row["direction"] == "OUT" and row["control"] == 0x32
+                and row["timestamp"] < marker["REENTRY_CANCEL_BEGIN"]]
+    require(new_arms, "no FDT arm before terminal cancel")
+    new_arm = new_arms[-1]
+    new_position = records.index(new_arm)
+    new_ack = find_ack(records, new_position, 0x32)
+    require(new_arm["frame"] == 214, "terminal cancel new arm frame regression")
+    require(new_ack is not None and new_ack["frame"] == 216
+            and new_ack["strict_body"][1] in (0x01, 0x07),
+            "terminal cancel new arm ACK regression")
+
+    target_packets = [packet for packet in packets if (packet.bus, packet.device) == selected]
+    pending_in = [packet for packet in target_packets
+                  if packet.index + 1 > new_ack["frame"]
+                  and packet.timestamp < marker["REENTRY_CANCEL_BEGIN"]
+                  and packet.function == 0x0009 and packet.endpoint == 0x81
+                  and packet.info == 0 and packet.data_len == 0]
+    require(len(pending_in) == 1 and pending_in[0].index + 1 == 217,
+            "terminal cancel pending bulk-IN submission regression")
+    canceled = [packet for packet in target_packets
+                if packet.timestamp >= marker["REENTRY_CANCEL_END"]
+                and packet.function == 0x0009 and packet.endpoint == 0x81
+                and packet.info == 1 and packet.status == 0xC0010000
+                and packet.data_len == 0]
+    require(len(canceled) == 1 and canceled[0].index + 1 == 218,
+            "terminal cancel canceled bulk-IN completion regression")
+    completion = canceled[0]
+    require(completion.index == len(packets) - 1,
+            "terminal cancel completion is not the last raw frame")
+    require(marker["OPERATOR_PHASES_COMPLETE"] < completion.timestamp < marker["RUN_FAILED"],
+            "terminal cancel completion falls outside host finalization bounds")
+
+    operator_interval_all = [packet for packet in packets
+                             if marker["REENTRY_CANCEL_BEGIN"] <= packet.timestamp
+                             < marker["REENTRY_CANCEL_END"]]
+    operator_interval_target = [packet for packet in operator_interval_all
+                                if (packet.bus, packet.device) == selected]
+    after_cancel_before_completion = [packet for packet in packets
+                                      if marker["REENTRY_CANCEL_END"] <= packet.timestamp
+                                      < completion.timestamp]
+    after_cancel_through_completion = [packet for packet in packets
+                                       if marker["REENTRY_CANCEL_END"] <= packet.timestamp
+                                       <= completion.timestamp]
+    after_completion_all = [packet for packet in packets if packet.index > completion.index]
+    after_completion_target = [packet for packet in after_completion_all
+                               if (packet.bus, packet.device) == selected]
+    terminal_target_window = [packet for packet in target_packets
+                              if new_arm["timestamp"] <= packet.timestamp <= completion.timestamp]
+    terminal_functions = Counter(packet.function for packet in terminal_target_window)
+    descriptors = d255.target_descriptor_packets(packets)
+    terminal_descriptor_replay = any(
+        new_arm["timestamp"] <= packet.timestamp <= completion.timestamp
+        for packet in descriptors)
+    terminal_endpoints = sorted({packet.endpoint for packet in terminal_target_window})
+    terminal_devices = sorted({(packet.bus, packet.device) for packet in terminal_target_window})
+    non_bulk = [packet for packet in terminal_target_window if packet.function != 0x0009]
+    abort_or_reset = [packet for packet in terminal_target_window
+                      if packet.function in ABORT_OR_RESET_FUNCTIONS]
+    reconfiguration = [packet for packet in terminal_target_window
+                       if packet.function in ENUMERATION_OR_RECONFIGURATION_FUNCTIONS]
+
+    capture_duration = preflight.get("capture_duration_seconds")
+    require(capture_duration == 600, "D255 configured capture duration regression")
+    require(tshark_stderr.strip() == f"Capturing on 'USBPcap1'\n{len(packets)} packets captured",
+            "D255 TShark final packet count regression")
+    started_to_finalization = elapsed_seconds(
+        marker["CAPTURE_PROCESS_STARTED"], marker["RUN_FAILED"])
+    require(started_to_finalization >= capture_duration,
+            "D255 host markers do not reach the configured duration boundary")
+
+    quiescence = (
+        len(operator_interval_target) == 0
+        and len(canceled) == 1
+        and completion.index == len(packets) - 1
+        and len(after_completion_all) == 0
+        and len(non_bulk) == 0
+        and len(abort_or_reset) == 0
+        and len(reconfiguration) == 0
+        and not terminal_descriptor_replay
+        and terminal_devices == [selected]
+        and set(terminal_endpoints).issubset({0x01, 0x81})
+        and started_to_finalization >= capture_duration
+    )
+    return {
+        "window": {
+            "new_arm_frame": new_arm["frame"],
+            "new_arm_utc": iso_utc(new_arm["timestamp"]),
+            "new_arm_ack_frame": new_ack["frame"],
+            "new_arm_ack_utc": iso_utc(new_ack["timestamp"]),
+            "pending_bulk_in_frame": pending_in[0].index + 1,
+            "pending_bulk_in_utc": iso_utc(pending_in[0].timestamp),
+            "reentry_waiting_no_finger_utc": iso_utc(marker["REENTRY_WAITING_NO_FINGER"]),
+            "terminal_cancel_begin_utc": iso_utc(marker["REENTRY_CANCEL_BEGIN"]),
+            "terminal_cancel_end_utc": iso_utc(marker["REENTRY_CANCEL_END"]),
+            "reentry_end_utc": iso_utc(marker["REENTRY_END"]),
+            "operator_phases_complete_utc": iso_utc(marker["OPERATOR_PHASES_COMPLETE"]),
+            "canceled_completion_frame": completion.index + 1,
+            "canceled_completion_utc": iso_utc(completion.timestamp),
+            "run_failed_host_finalization_utc": iso_utc(marker["RUN_FAILED"]),
+            "ack_to_terminal_cancel_begin_seconds": elapsed_seconds(
+                new_ack["timestamp"], marker["REENTRY_CANCEL_BEGIN"]),
+            "terminal_cancel_begin_to_end_seconds": elapsed_seconds(
+                marker["REENTRY_CANCEL_BEGIN"], marker["REENTRY_CANCEL_END"]),
+            "terminal_cancel_end_to_canceled_completion_seconds": elapsed_seconds(
+                marker["REENTRY_CANCEL_END"], completion.timestamp),
+            "canceled_completion_to_host_finalization_marker_seconds": elapsed_seconds(
+                completion.timestamp, marker["RUN_FAILED"]),
+            "POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS": elapsed_seconds(
+                completion.timestamp, marker["RUN_FAILED"]),
+            "post_terminal_cancel_capture_window_definition": (
+                "LAST_RAW_FRAME_TO_RUN_FAILED_HOST_FINALIZATION_MARKER_AFTER_DURATION_BOUNDARY; "
+                "EXACT_PROCESS_EXIT_TIMESTAMP_UNOBSERVED"),
+            "configured_capture_duration_seconds": capture_duration,
+            "capture_process_started_to_host_finalization_marker_seconds": started_to_finalization,
+        },
+        "observations": {
+            "terminal_cancel_marker_order_valid": True,
+            "terminal_cancel_total_packet_count_during_operator_interval": len(operator_interval_all),
+            "TERMINAL_CANCEL_TARGET_PACKET_COUNT_DURING_OPERATOR_INTERVAL": len(
+                operator_interval_target),
+            "packet_count_after_cancel_end_before_completion": len(after_cancel_before_completion),
+            "packet_count_after_cancel_end_through_completion": len(after_cancel_through_completion),
+            "pending_bulk_in_canceled": True,
+            "terminal_target_usbpcap_function_counts": {
+                f"0x{code:04x}": count for code, count in sorted(terminal_functions.items())},
+            "terminal_non_bulk_urb_count": len(non_bulk),
+            "terminal_abort_or_reset_count": len(abort_or_reset),
+            "terminal_reconfiguration_control_or_descriptor_count": len(reconfiguration),
+            "terminal_descriptor_replay_observed": terminal_descriptor_replay,
+            "terminal_bus_device": f"{selected[0]}:{selected[1]}",
+            "terminal_same_bus_device": terminal_devices == [selected],
+            "terminal_endpoint_set": [f"0x{endpoint:02x}" for endpoint in terminal_endpoints],
+            "terminal_same_bulk_endpoints": set(terminal_endpoints).issubset({0x01, 0x81}),
+            "completion_is_last_raw_frame": completion.index == len(packets) - 1,
+            "POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT": len(after_completion_target),
+            "POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT": len(after_completion_all),
+            "tshark_final_packet_count": len(packets),
+            "tshark_duration_boundary_evidence": True,
+            "exact_capture_process_exit_timestamp": "UNOBSERVED",
+        },
+        "decision": {
+            "TERMINAL_CANCEL_PENDING_BULK_IN_CANCELED": True,
+            "EXPLICIT_USB_TERMINAL_RESTORE_OBSERVED": False,
+            "TERMINAL_CANCEL_ABORT_OR_RESET_OBSERVED": bool(abort_or_reset),
+            "TERMINAL_CANCEL_REENUMERATION_OBSERVED": bool(
+                terminal_descriptor_replay or reconfiguration),
+            "OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN": quiescence,
+            "HOST_BUS_TERMINAL_STOP_CONTRACT": (
+                "CLOSED_OBSERVED_PATH_BOUNDED_USB_QUIESCENCE" if quiescence else "OPEN"),
+            "PRIOR_ARM_DISARM_PROVEN": False,
+            "PRIOR_ARM_LIFETIME_AFTER_CANCEL": "UNOBSERVED",
+            "DEVICE_INTERNAL_FDT_STATE_AFTER_CANCEL": "UNOBSERVED",
+            "FACTORY_PERSISTENCE_IMPLICATION": (
+                "NO_NEW_DEVICE_SIDE_FACTORY_PERSISTENCE_CLAIM_FROM_USB_SILENCE"),
         },
     }
 
@@ -413,6 +630,7 @@ def bootstrap_decision(d255_evidence: dict) -> dict:
 
 def render_timeline_markdown(rows: list[dict], decision: dict) -> str:
     critical = decision["lifecycle_contract"]["window"]
+    terminal = decision["terminal_cancel_contract"]
     lines = [
         "# D256 USBPcap target timeline",
         "",
@@ -425,6 +643,20 @@ def render_timeline_markdown(rows: list[dict], decision: dict) -> str:
         f"- Target packets during `CANCEL_NO_FINGER_BEGIN..END`: {critical['cancel_interval_target_packet_count']}.",
         f"- New accepted `0x32`: request frame {critical['new_arm_frame']}, ACK frame {critical['new_arm_ack_frame']}.",
         "- The sole intervening exceptional packet is a canceled pending bulk-IN completion; it is host-request cancellation evidence, not a device restore.",
+        "",
+        "## Terminal cancel window",
+        "",
+        f"- Re-entry arm/ACK/pending bulk-IN: frames {terminal['window']['new_arm_frame']}/"
+        f"{terminal['window']['new_arm_ack_frame']}/{terminal['window']['pending_bulk_in_frame']}.",
+        f"- Target packets during `REENTRY_CANCEL_BEGIN..END`: "
+        f"{terminal['observations']['TERMINAL_CANCEL_TARGET_PACKET_COUNT_DURING_OPERATOR_INTERVAL']}.",
+        f"- Canceled completion: frame {terminal['window']['canceled_completion_frame']}, which is the final raw frame.",
+        f"- Packets after the final frame: target "
+        f"{terminal['observations']['POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT']}, total "
+        f"{terminal['observations']['POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT']}.",
+        f"- Frame-to-host-finalization marker window: "
+        f"{terminal['window']['POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS']:.6f} seconds; "
+        "the exact process-exit timestamp is not available.",
         "",
         "## Complete target packet timeline",
         "",
@@ -464,6 +696,8 @@ def audit(repo: Path, output_dir: Path) -> dict:
     raw = repo / RUN_RELATIVE_RAW
     markers_path = repo / RUN_RELATIVE_MARKERS
     d255_path = repo / RUN_RELATIVE_D255
+    preflight_path = repo / RUN_RELATIVE_PREFLIGHT
+    tshark_stderr_path = repo / RUN_RELATIVE_TSHARK_STDERR
     before = {"sha256": sha256_file(raw), "size": raw.stat().st_size, "mtime_ns": raw.stat().st_mtime_ns}
     require(before["sha256"] == EXPECTED_RAW_SHA256, "D255 raw SHA-256 mismatch")
     require(before["size"] == EXPECTED_RAW_SIZE, "D255 raw size mismatch")
@@ -474,20 +708,25 @@ def audit(repo: Path, output_dir: Path) -> dict:
     selected, firmware, target_specific = d255.select_device(frames, None)
     require(selected == (1, 2) and target_specific and firmware == d255.EXPECTED_FIRMWARE,
             "D255 target selection/firmware regression")
-    markers = d255.load_markers(markers_path)
+    markers = load_markers_precise(markers_path)
     rows = timeline_rows(packets, markers, selected)
     records = a0_records(d255, frames, selected)
     d255_evidence = json.loads(d255_path.read_text(encoding="utf-8"))
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8-sig"))
     lifecycle = critical_contract(d255, packets, frames, markers, selected)
+    terminal = terminal_cancel_contract(
+        d255, packets, frames, markers, selected, preflight,
+        tshark_stderr_path.read_text(encoding="utf-8-sig"))
     controls = {"0x50": control_audit(records, 0x50), "0x97": control_audit(records, 0x97)}
     require(controls["0x50"]["occurrence_count"] == 1 and controls["0x97"]["occurrence_count"] == 1,
             "D255 0x50/0x97 occurrence regression")
     after = {"sha256": sha256_file(raw), "size": raw.stat().st_size, "mtime_ns": raw.stat().st_mtime_ns}
     require(before == after, "D255 raw capture changed during audit")
     decision = {
-        "schema": "D256_OFFLINE_USB_LIFECYCLE_CONTRACT_DECISION_V1",
+        "schema": "D256_OFFLINE_USB_LIFECYCLE_CONTRACT_DECISION_V2",
         "execution_mode": "OFFLINE_ONLY",
-        "baseline_head": os.environ.get("D256_BASELINE_HEAD", "7751e26806f5aa0e57750ae20febc96325f99c7a"),
+        "baseline_head": os.environ.get(
+            "D256_BASELINE_HEAD", "44f7af8cd98be3072c32f53f814b4851cf20911f"),
         "primary_evidence": {
             "path": RUN_RELATIVE_RAW.as_posix(),
             "sha256": before["sha256"], "bytes": before["size"],
@@ -496,13 +735,36 @@ def audit(repo: Path, output_dir: Path) -> dict:
             "target_packet_count": len(rows), "target": "27c6:5125 / GF_ST411SEC_APP_12509",
         },
         "lifecycle_contract": lifecycle,
+        "terminal_cancel_contract": terminal,
+        "urb_function_classification": {
+            "mapping_scope": "Windows WDK URB_FUNCTION numeric ABI used by USBPcap",
+            "local_wdk_or_wireshark_source_status": "UNAVAILABLE_ON_OFFLINE_LINUX_HOST",
+            "corrective_required_mapping_implemented": {
+                "0x0002": "URB_FUNCTION_ABORT_PIPE",
+                "0x001e": "URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL",
+                "0x0030": "URB_FUNCTION_SYNC_RESET_PIPE",
+                "0x0031": "URB_FUNCTION_SYNC_CLEAR_STALL",
+            },
+            "mapped_codes_observed_in_terminal_window": [],
+            "empirical_result_changed_by_mapping_correction": False,
+        },
         "controls": controls,
         "static_corroboration": bounded_static_corroboration(repo),
         "bootstrap": bootstrap_decision(d255_evidence),
         "corpus_decision": {
-            "CURRENT_CORPUS_EXHAUSTED_FOR_THIS_RESTORE_QUESTION": True,
-            "strategic_blocker": "DETERMINE_TERMINAL_STOP_BEHAVIOR_AND_PRIOR_ARM_LIFETIME_WHEN_NO_SUBSEQUENT_REARM_OCCURS",
+            "CURRENT_CORPUS_EXHAUSTED_FOR_REENTRY_RESTORE_QUESTION": True,
+            "CURRENT_CORPUS_EXHAUSTED_FOR_INTERNAL_ARM_LIFETIME_QUESTION": True,
+            "terminal_stop_case": "CASE_A_HOST_BUS_CONTRACT_CLOSED_INTERNAL_STATE_UNOBSERVED",
+            "strategic_blocker": (
+                "DEVICE_INTERNAL_FDT_STATE_AND_PRIOR_ARM_LIFETIME_REMAIN_UNOBSERVED; "
+                "NO_OBSERVABLE_HOST_BUS_TERMINAL_STOP_COMPONENT_IS_MISSING"),
             "new_equivalent_capture_requested": False,
+            "future_ai_pm_review_separation": [
+                "factory-preserving_and_Windows_compatibility_requirement",
+                "device_internal_disarm_requirement",
+                "FDT_live_readiness_requirement",
+            ],
+            "fdt_live_authorized": False,
         },
         "safety": {
             "REAL_USB_OPEN_COUNT": 0, "REAL_CAPTURE_COUNT": 0,
@@ -525,9 +787,14 @@ def main() -> int:
     output_dir = args.output_dir.resolve() if args.output_dir else Path(__file__).resolve().parent
     decision = audit(repo, output_dir)
     summary = decision["lifecycle_contract"]["decision"]
+    terminal = decision["terminal_cancel_contract"]
     print("D256_USB_LIFECYCLE_CONTRACT_AUDIT=PASS")
     print(f"EXPLICIT_USB_RESTORE_OBSERVED={str(summary['EXPLICIT_USB_RESTORE_OBSERVED']).lower()}")
     print(f"NEW_FDT_ARM_ACCEPTED_ON_REENTRY={str(summary['NEW_FDT_ARM_ACCEPTED_ON_REENTRY']).lower()}")
+    print(f"OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN="
+          f"{str(terminal['decision']['OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN']).lower()}")
+    print(f"POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS="
+          f"{terminal['window']['POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS']:.6f}")
     print("REAL_USB_OPEN_COUNT=0")
     print("REAL_CAPTURE_COUNT=0")
     print("REAL_HARDWARE_ACTION_COUNT=0")

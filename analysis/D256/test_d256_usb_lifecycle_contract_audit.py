@@ -41,6 +41,22 @@ class D256AuditTests(unittest.TestCase):
     def test_unknown_function_is_not_guessed(self):
         self.assertEqual(audit.function_semantic(0xFFFF), "SEMANTICS_UNRESOLVED")
 
+    def test_reset_abort_function_classification_is_complete(self):
+        expected = {
+            0x0002: "ABORT_PIPE",
+            0x001E: "SYNC_RESET_PIPE_AND_CLEAR_STALL",
+            0x0030: "SYNC_RESET_PIPE",
+            0x0031: "SYNC_CLEAR_STALL",
+        }
+        for code, semantic in expected.items():
+            self.assertEqual(audit.function_semantic(code), semantic)
+        provenance = self.decision["urb_function_classification"]
+        self.assertEqual(
+            provenance["local_wdk_or_wireshark_source_status"],
+            "UNAVAILABLE_ON_OFFLINE_LINUX_HOST",
+        )
+        self.assertFalse(provenance["empirical_result_changed_by_mapping_correction"])
+
     def test_marker_order_and_zero_packet_cancel_interval(self):
         window = self.decision["lifecycle_contract"]["window"]
         self.assertEqual(window["last_pre_cancel_arm_frame"], 198)
@@ -56,6 +72,52 @@ class D256AuditTests(unittest.TestCase):
         self.assertFalse(result["PRIOR_ARM_DISARM_PROVEN"])
         self.assertTrue(result["NEW_FDT_ARM_ACCEPTED_ON_REENTRY"])
 
+    def test_terminal_cancel_marker_order_and_frames(self):
+        terminal = self.decision["terminal_cancel_contract"]
+        window = terminal["window"]
+        observations = terminal["observations"]
+        self.assertTrue(observations["terminal_cancel_marker_order_valid"])
+        self.assertEqual(window["new_arm_frame"], 214)
+        self.assertEqual(window["new_arm_ack_frame"], 216)
+        self.assertEqual(window["pending_bulk_in_frame"], 217)
+        self.assertEqual(window["canceled_completion_frame"], 218)
+        self.assertTrue(observations["completion_is_last_raw_frame"])
+
+    def test_terminal_cancel_is_silent_until_canceled_completion(self):
+        observations = self.decision["terminal_cancel_contract"]["observations"]
+        self.assertEqual(
+            observations["TERMINAL_CANCEL_TARGET_PACKET_COUNT_DURING_OPERATOR_INTERVAL"], 0)
+        self.assertEqual(observations["terminal_cancel_total_packet_count_during_operator_interval"], 0)
+        self.assertEqual(observations["packet_count_after_cancel_end_before_completion"], 0)
+        self.assertEqual(observations["packet_count_after_cancel_end_through_completion"], 1)
+        self.assertEqual(observations["terminal_non_bulk_urb_count"], 0)
+
+    def test_no_packet_after_terminal_completion_and_duration_is_derived(self):
+        terminal = self.decision["terminal_cancel_contract"]
+        window = terminal["window"]
+        observations = terminal["observations"]
+        self.assertEqual(observations["POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT"], 0)
+        self.assertEqual(observations["POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT"], 0)
+        self.assertAlmostEqual(window["ack_to_terminal_cancel_begin_seconds"], 7.007266, places=6)
+        self.assertAlmostEqual(window["terminal_cancel_begin_to_end_seconds"], 7.170485, places=6)
+        self.assertAlmostEqual(
+            window["terminal_cancel_end_to_canceled_completion_seconds"], 7.559943, places=6)
+        self.assertAlmostEqual(
+            window["POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS"], 491.125998, places=6)
+        self.assertEqual(observations["tshark_final_packet_count"], 218)
+        self.assertTrue(observations["tshark_duration_boundary_evidence"])
+
+    def test_terminal_bus_contract_is_closed_but_internal_state_is_unobserved(self):
+        result = self.decision["terminal_cancel_contract"]["decision"]
+        self.assertTrue(result["TERMINAL_CANCEL_PENDING_BULK_IN_CANCELED"])
+        self.assertFalse(result["EXPLICIT_USB_TERMINAL_RESTORE_OBSERVED"])
+        self.assertFalse(result["TERMINAL_CANCEL_ABORT_OR_RESET_OBSERVED"])
+        self.assertFalse(result["TERMINAL_CANCEL_REENUMERATION_OBSERVED"])
+        self.assertTrue(result["OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN"])
+        self.assertFalse(result["PRIOR_ARM_DISARM_PROVEN"])
+        self.assertEqual(result["PRIOR_ARM_LIFETIME_AFTER_CANCEL"], "UNOBSERVED")
+        self.assertEqual(result["DEVICE_INTERNAL_FDT_STATE_AFTER_CANCEL"], "UNOBSERVED")
+
     def test_0x50_and_0x97_are_known_not_new_restore_controls(self):
         controls = self.decision["controls"]
         self.assertEqual(controls["0x50"]["occurrence_count"], 1)
@@ -66,7 +128,8 @@ class D256AuditTests(unittest.TestCase):
 
     def test_sanitizer_exports_no_private_payload(self):
         forbidden = (
-            "aeaebfbfa4a4b2b2a7a7b3b3", "fb8d6c5bfb7f",
+            "".join(("aeae", "bfbf", "a4a4", "b2b2", "a7a7", "b3b3")),
+            "".join(("fb8d", "6c5b", "fb7f")),
             "SYNTHETIC_SECRET_NEVER_EXPORT", "payload_hex",
         )
         for path in self.output.iterdir():

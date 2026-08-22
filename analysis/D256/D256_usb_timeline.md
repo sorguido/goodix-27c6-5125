@@ -10,6 +10,14 @@ No USB payload, OTP, PSK, cache blob or biometric data is included.
 - New accepted `0x32`: request frame 214, ACK frame 216.
 - The sole intervening exceptional packet is a canceled pending bulk-IN completion; it is host-request cancellation evidence, not a device restore.
 
+## Terminal cancel window
+
+- Re-entry arm/ACK/pending bulk-IN: frames 214/216/217.
+- Target packets during `REENTRY_CANCEL_BEGIN..END`: 0.
+- Canceled completion: frame 218, which is the final raw frame.
+- Packets after the final frame: target 0, total 0.
+- Frame-to-host-finalization marker window: 491.125998 seconds; the exact process-exit timestamp is not available.
+
 ## Complete target packet timeline
 
 | frame | UTC | rel ms | function | status | transfer | ep | direction/stage | len | wrapper/control | phase | interpretation | class |

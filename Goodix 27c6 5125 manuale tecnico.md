@@ -98,9 +98,12 @@ indicato come prossima evidenza una traccia Windows APP12509 da cold-start fino
 ad arm, cancel senza dito e re-entry. D255 ha ora acquisito e recuperato quella
 traccia. D256 ne ha poi esaurito offline i metadati USBPcap: il bootstrap/seed
 è corroborato sul target e il nuovo arm viene accettato senza reset,
-re-enumerazione o restore USB esplicito osservato. Restano aperti il disarm e
-la lifetime interna del prior arm e, soprattutto, il comportamento di stop
-terminale quando non segue un re-arm.
+re-enumerazione o restore USB esplicito osservato. Il corrective D256 ha inoltre
+esaurito la seconda cancellazione della stessa capture: il pending bulk-IN del
+nuovo arm termina cancellato al frame finale `218`, seguito da 491,125998
+secondi fino al marker host di finalizzazione senza altri packet. Il contratto
+terminal-stop host/bus è quindi chiuso, path-bounded, come quiescenza USB; il
+disarm, la lifetime e lo stato FDT interno restano non osservati.
 
 D255 ha completato la singola acquisizione richiesta sulla baseline approvata
 `f01b81d629ffe8af5eecb92ca93968045d5345ce`. La run canonica
@@ -130,8 +133,12 @@ richiesta pendente, quindi il medesimo device `1:2` continua sugli endpoint
 `01/81` e accetta il nuovo `0x32`. Non compaiono abort/reset, control transfer,
 descriptor replay, reconfiguration o re-enumeration. Questo prova re-entry e
 re-arm senza restore USB esplicito come prerequisito osservato, ma non prova
-`DEVICE_FDT_DISARM_PROVEN`, la lifetime del prior arm o la sicurezza dello stop
-terminale. Non è richiesta una nuova capture live equivalente.
+`DEVICE_FDT_DISARM_PROVEN` o la lifetime del prior arm. Il secondo cancel chiude
+separatamente il comportamento bus: zero packet nell'intervallo operatore, una
+sola completion bulk-IN cancellata host-side al frame finale `218`, quindi zero
+packet target e totali per il resto della capture fino al duration boundary.
+Questo prova la quiescenza USB osservata, non lo stato volatile interno del
+sensore. Non è richiesta una nuova capture live equivalente.
 
 Le note successive sulle revisioni del kit e sui precedenti failure sono
 provenance storica, superata per lo stato corrente dalla run acquisita e dal
@@ -277,7 +284,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
 | Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
-| Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255 | zero packet target durante cancel; una completion bulk-IN cancellata host-side; continuità `1:2`/endpoint `01,81`; nessun abort/reset/re-enumeration/restore USB esplicito; nuovo `0x32` accettato; terminal stop e prior-arm lifetime irrisolti |
+| Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255, incluso corrective terminal-cancel | primo cancel: re-entry e nuovo `0x32` accettato senza restore USB esplicito; secondo cancel: zero packet nell'intervallo, pending bulk-IN cancellato al frame finale `218`, zero packet residui e quiescenza USB host/bus provata; disarm/lifetime/stato FDT interno non osservati |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -635,7 +642,8 @@ D256 -> timeline completa dei 206 packet target nel raw D255 hash-gated
      -> cancel interval senza traffico target; una completion bulk-IN cancellata dopo re-entry begin
      -> stesso bus/device ed endpoint; nessun abort/reset/descriptor replay/re-enumeration
      -> nuovo 0x32 accettato senza restore USB esplicito osservato
-     -> blocker ristretto a terminal stop e lifetime del prior arm senza successivo re-arm
+     -> secondo cancel: pending IN cancellato al frame finale; zero packet residui
+     -> terminal-stop host/bus chiuso come quiescenza; stato interno/lifetime non osservati
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -2282,6 +2290,19 @@ abort/reset pipe, clear-stall, control transfer, select configuration/interface,
 descriptor replay o re-enumeration. Il target resta `1:2` sugli endpoint bulk
 `0x01/0x81`.
 
+Il corrective dello stesso D256 separa la seconda cancellazione terminale.
+Il nuovo arm/ACK e la bulk-IN pendente sono rispettivamente ai frame
+`214/216/217`. Fra `REENTRY_CANCEL_BEGIN` e `REENTRY_CANCEL_END` non compare
+alcun packet, target o totale. Dopo `REENTRY_CANCEL_END` non passa traffico
+prima del frame `218`, unica completion bulk-IN `0x81` con
+`USBD_STATUS_CANCELED`; il frame `218` è anche l'ultimo del raw. Non esistono
+quindi packet target o totali successivi. TShark dichiara `218 packets
+captured`, la durata configurata è 600 secondi e il marker host finale cade
+602,543790 secondi dopo `CAPTURE_PROCESS_STARTED`: la capture è rimasta bounded
+fino al duration boundary senza ricevere altro traffico. La distanza
+frame-218→marker `RUN_FAILED` è 491,125998 secondi; l'exact process-exit
+timestamp non è disponibile e `RUN_FAILED` non è trattato come evento USB.
+
 ```text
 USBPCAP_LIFECYCLE_AUDIT=PASS_COMPLETE_TARGET_PACKET_TIMELINE
 CANCEL_TO_REENTRY_DEVICE_CONTINUITY=SAME_BUS_DEVICE_AND_BULK_ENDPOINTS
@@ -2294,13 +2315,35 @@ NEW_FDT_ARM_ACCEPTED_ON_REENTRY=true
 RESTORE_REQUIRED_FOR_REENTRY=false
 PRIOR_ARM_DISARM_PROVEN=false
 PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNOBSERVED
-SAFE_STOP_AFTER_FDT_ARM=UNRESOLVED
+TERMINAL_CANCEL_PENDING_BULK_IN_CANCELED=true
+EXPLICIT_USB_TERMINAL_RESTORE_OBSERVED=false
+TERMINAL_CANCEL_ABORT_OR_RESET_OBSERVED=false
+TERMINAL_CANCEL_REENUMERATION_OBSERVED=false
+POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS=491.125998
+POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT=0
+POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT=0
+OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN=true
+DEVICE_INTERNAL_FDT_STATE_AFTER_CANCEL=UNOBSERVED
 ```
 
 `RESTORE_REQUIRED_FOR_REENTRY=false` è rigorosamente path-bounded: il nuovo arm
 è stato accettato senza restore USB esplicito osservato. Non implica che il
-prior arm sia stato disarmato, che un terminal stop Linux sia sicuro o che ogni
-restore sia inutile.
+prior arm sia stato disarmato o che ogni restore sia inutile. Separatamente,
+`OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN=true` chiude il contratto host/bus
+del secondo cancel sul path osservato: la richiesta pendente è cancellata e il
+bus resta silente fino alla chiusura della capture. Non prova disarm, expiry o
+clear del mode FDT interno.
+
+Il vecchio `SAFE_STOP_AFTER_FDT_ARM=UNRESOLVED` è superato dalla scomposizione:
+contratto host/bus terminal-stop chiuso, quiescenza USB provata, stato interno
+e lifetime non osservati, nessuna nuova implicazione factory-persistence
+device-side derivata dal silenzio USB. Le classi URB di audit comprendono ora
+anche `0x0002` abort pipe, `0x001e` sync reset-and-clear-stall, `0x0030` sync
+reset pipe e `0x0031` sync clear-stall. Nessuna compare nella finestra reale,
+quindi la robustezza del parser non cambia l'esito empirico. Sul corrente host
+offline non sono installati header WDK, sorgenti Wireshark o TShark: il check
+locale indipendente della nomenclatura resta dichiarato indisponibile e non è
+stata usata la rete.
 
 I control D255 `0x50` e `0x97` non sono nuovi: il census D230 classificava già
 `0x50` come famiglia sensor/mode a semantica esatta irrisolta e mappava wire
@@ -2331,13 +2374,18 @@ BOOTSTRAP_CACHE_FDT12_EQUALS_FIRST_WIRE_SEED=true
 BOOTSTRAP_SEED_SOURCE_CORRELATED=true
 BOOTSTRAP_SEED_DATAFLOW_CAUSALITY_PROVEN=false
 BOOTSTRAP_SEED_FRESHNESS_SCOPE=FIRST_0x36_IN_THIS_D255_COLD_ATTACH_ONLY; GENERAL_LIFETIME_UNPROVEN
-CURRENT_CORPUS_EXHAUSTED_FOR_THIS_RESTORE_QUESTION=true
+CURRENT_CORPUS_EXHAUSTED_FOR_REENTRY_RESTORE_QUESTION=true
+CURRENT_CORPUS_EXHAUSTED_FOR_INTERNAL_ARM_LIFETIME_QUESTION=true
 ```
 
-Il blocker strategico corrente non è più trovare un restore prima della
-re-entry, ma determinare comportamento di terminal stop e lifetime del prior
-arm quando non segue un nuovo arm. D256 è interamente offline, non richiede una
-capture equivalente e non crea un operator kit.
+Il risultato strategico è il Caso A: non manca più una componente osservabile
+del terminal stop host/bus nel corpus corrente; restano non osservabili lo stato
+volatile FDT e la lifetime del prior arm. Una review futura può separare i
+requisiti factory-preserving/compatibilità Windows, internal disarm e
+live-readiness FDT. D256 è interamente offline, non autorizza FDT live, non
+richiede una capture equivalente e non crea un operator kit. Il bundle D256
+precedente è `SUPERSEDED_BY_D256_TERMINAL_CANCEL_CORRECTIVE`; il blob storico
+resta preservato dalla history Git.
 
 ## Operazioni read note e limiti
 
@@ -2417,12 +2465,19 @@ abort/reset, descriptor replay, reconfiguration, re-enumeration o restore USB
 esplicito. Un restore USB esplicito non è quindi un prerequisito osservato per
 la re-entry/re-arm OEM.
 
+Il secondo cancel della stessa capture chiude inoltre il terminal stop
+osservabile sul bus. Il nuovo arm frame `214`, ACK `216` e pending IN `217` sono
+seguiti da zero packet durante il cancel, poi dalla sola completion cancellata
+frame `218`, ultimo frame; per i successivi 491,125998 secondi fino al marker
+host finale non viene registrato alcun altro packet. Nessun restore, abort,
+reset, reconfiguration o re-enumeration è osservato: il contratto terminal-stop
+host/bus è chiuso come quiescenza USB path-bounded.
+
 Restano non provati la causalità callback/cache→seed, la freschezza generale
-del seed, il disarm del prior arm e la sua lifetime interna. Il blocker
-strategico è ora specificamente il comportamento di terminal stop dopo FDT arm
-quando non segue un nuovo arm; continuità del transport e re-arm accettato non
-dimostrano che lo stato precedente sia scomparso. Nessun path FDT Linux è
-diventato live-capable e D256 non autorizza hardware o una nuova capture.
+del seed, il disarm del prior arm, la sua lifetime e lo stato interno FDT dopo
+cancel. Questi ignoti interni non sono osservabili nel corpus corrente e non
+vanno ricavati dal silenzio USB. Nessun path FDT Linux è diventato live-capable
+e D256 non autorizza hardware o una nuova capture.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -2473,8 +2528,19 @@ D256_NEW_FDT_ARM_ACCEPTED_ON_REENTRY true
 D256_RESTORE_REQUIRED_FOR_REENTRY false
 D256_PRIOR_ARM_DISARM_PROVEN false
 D256_PRIOR_ARM_LIFETIME_AFTER_CANCEL UNOBSERVED
-D256_SAFE_STOP_AFTER_FDT_ARM UNRESOLVED
-D256_CURRENT_CORPUS_EXHAUSTED_FOR_THIS_RESTORE_QUESTION true
+D256_DEVICE_INTERNAL_FDT_STATE_AFTER_CANCEL UNOBSERVED
+D256_TERMINAL_CANCEL_PENDING_BULK_IN_CANCELED true
+D256_EXPLICIT_USB_TERMINAL_RESTORE_OBSERVED false
+D256_TERMINAL_CANCEL_ABORT_OR_RESET_OBSERVED false
+D256_TERMINAL_CANCEL_REENUMERATION_OBSERVED false
+D256_POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS 491.125998
+D256_POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT 0
+D256_POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT 0
+D256_OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN true
+D256_HOST_BUS_TERMINAL_STOP_CONTRACT CLOSED_OBSERVED_PATH_BOUNDED_USB_QUIESCENCE
+D256_FACTORY_PERSISTENCE_IMPLICATION NO_NEW_DEVICE_SIDE_CLAIM_FROM_USB_SILENCE
+D256_CURRENT_CORPUS_EXHAUSTED_FOR_REENTRY_RESTORE_QUESTION true
+D256_CURRENT_CORPUS_EXHAUSTED_FOR_INTERNAL_ARM_LIFETIME_QUESTION true
 D256_LIVE_EXECUTION NOT_PERFORMED
 ```
 
@@ -2569,7 +2635,8 @@ esterna non modifica guardrail, non crea un backend/launcher e non autorizza
 hardware. D254 lasciava seed APP12509 iniziale e restore no-finger bloccanti;
 D255/D256 hanno poi provato la correlazione target cache→seed e la re-entry
 senza restore USB esplicito, restringendo ma non chiudendo causalità/freschezza,
-disarm e terminal stop.
+disarm e lifetime interna. Il corrective D256 chiude invece il distinto
+terminal-stop host/bus come quiescenza USB path-bounded.
 
 D255 ha aggiunto il kit PowerShell GPL e il postprocessor GPL offline, poi ha
 acquisito la capture APP12509 definitiva e ne ha recuperato offline la
@@ -2582,9 +2649,12 @@ D256 aggiunge soltanto l'audit GPL offline e derivati sanitizzati: timeline
 CSV/MD completa dei packet target, decisione lifecycle, test minimi e report.
 Non modifica il runtime live-critical, il core FDT, fprintd o un operator kit.
 Il nuovo modello corrente ammette re-entry e re-arm senza restore USB esplicito
-osservato, ma conserva fail-closed il path Linux perché terminal stop, prior-arm
-lifetime, causalità e freschezza generale del seed restano irrisolti. Il bundle
-D256 esclude raw USB, cache, DLL, firmware, OTP, PSK e biometria.
+osservato e chiude separatamente il terminal-stop host/bus come cancellazione
+della bulk-IN pendente più quiescenza USB fino alla fine della capture. Il path
+Linux resta fail-closed perché disarm/lifetime/stato FDT interno, causalità e
+freschezza generale del seed non sono provati; la closure bus non è
+autorizzazione live. Il bundle D256 corrective sostituisce il precedente
+artefatto D256 ed esclude raw USB, cache, DLL, firmware, OTP, PSK e biometria.
 
 ## Regole operative
 
