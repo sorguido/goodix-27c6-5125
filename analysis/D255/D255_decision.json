@@ -1,11 +1,12 @@
 {
-  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V3",
-  "initial_head": "922134e21ec40ef4346df555eb8a4c096f56b2a9",
+  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V4",
+  "initial_head": "feff1de25132d4e47dc9fe11a5f12509269c1696",
   "execution_mode": "OFFLINE_PREPARATION_ONLY",
   "initial_ai_pm_review": "FAIL_EXECUTABILITY_AND_TIME_CORRELATION",
   "second_ai_pm_review": "FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION",
+  "third_ai_pm_review": "FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM",
   "corrective_status": "READY_FOR_AI_PM_REVIEW",
-  "outcome": "VM_AWARE_ZERO_FINGER_CORRECTIVE_KIT_PREPARED",
+  "outcome": "POSTATTACH_UI_AND_CONSERVATIVE_RESTORE_CORRECTIVE_PREPARED",
   "advancement": "NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE",
   "executable_closure": {
     "status": "PASS_OFFLINE_STATIC_AND_SYNTHETIC",
@@ -14,61 +15,64 @@
     "fallback_static_parser": "PASS",
     "postprocessor_synthetic_fixture": "PASS"
   },
-  "vm_boundary": {
-    "windows_execution_environment": "VIRTUAL_MACHINE",
-    "vm_platform": "NOT_CANONICALLY_PRESERVED",
-    "usb_passthrough_method": "OPERATOR_GUI_MANUAL_ATTACH",
-    "usb_passthrough_provenance": "HISTORICAL_METHOD_NOT_CANONICALLY_PRESERVED",
-    "guest_capture_method": "TSHARK_WITH_USBPCAP",
-    "interface_selection": "ONE_UNAMBIGUOUS_OR_CAPTURE_ALL_RELEVANT",
-    "goodix_present_in_guest_before_capture": false,
-    "capture_started_before_attach": true,
-    "expected_attach_count": 1,
-    "automatic_detach_reattach_allowed": false,
-    "guest_vid_pid_presence_proof": "READ_ONLY_PNP_AND_CAPTURED_DEVICE_DESCRIPTOR",
-    "app12509_proof": "EXACT_WIRE_A8_REQUIRED_SEPARATELY_FROM_VID_PID",
-    "synthetic_tests": "PASS"
-  },
-  "windows_ui": {
-    "current_vm_fingerprint_enrollment": "NOT_COMPLETED",
-    "normal_recognition_ui_available": "NOT_PROVEN",
-    "d175_ui_path": "NONE_PASSIVE_COLD_ATTACH_NO_HELLO_NO_FINGER",
-    "selected_path": "WINDOWS_HELLO_SETUP_NO_FINGER",
-    "requires_preexisting_fingerprint": false,
-    "requires_preexisting_pin": "POSSIBLE_MUST_ALREADY_EXIST_IF_REQUIRED",
+  "account_prerequisites": {
+    "ready_model": true,
+    "confirmation": "SIGNIN_OPTIONS_CHECKED_NO_NEW_PIN_CHANGE",
+    "windows_hello_pin_state_model": [
+      "ALREADY_CONFIGURED",
+      "NOT_CONFIGURED",
+      "UNKNOWN",
+      "NOT_REQUIRED_BY_CURRENT_ACCOUNT_POLICY"
+    ],
+    "sensor_dependent_ui_availability_before_attach": "UNKNOWN_BEFORE_ATTACH",
+    "preattach_fingerprint_ui_required": false,
     "new_pin_creation_allowed": false,
-    "operator_ui_path_ready": "TRUE_CONDITIONAL_ON_GUEST_PREFLIGHT",
-    "missing_prerequisite_result": "WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING"
+    "not_configured_and_required_policy": "FAIL_BEFORE_AUTHORIZATION"
+  },
+  "postattach_ui_gate": {
+    "ordering": "CAPTURE_STARTED_THEN_SINGLE_ATTACH_THEN_GUEST_PNP_THEN_WIRE_A8_THEN_PASSIVE_BOOTSTRAP_THEN_HELLO_UI",
+    "structured_results": [
+      "READY_WAITING_FOR_FINGER",
+      "UI_UNAVAILABLE",
+      "NEW_PIN_REQUIRED",
+      "UNEXPECTED_PREREQUISITE"
+    ],
+    "full_result": "FULL_ZERO_FINGER_CANCEL_REENTRY",
+    "partial_result": "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE",
+    "retry_allowed": false,
+    "alternate_ui_allowed": false
+  },
+  "partial_bootstrap": {
+    "supported": true,
+    "bootstrap_evidence_preserved": true,
+    "restore_evidence_acquired": false,
+    "restore_closed": false,
+    "capture_stop_method": "BOUNDED_CAPTURE_TIMER_EXHAUSTED",
+    "capture_file_validation": "TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG"
+  },
+  "restore_semantics": {
+    "oem_cancel_reentry_proven_model": "EXACT_REENTRY_WIRE_SEQUENCE",
+    "new_fdt_arm_accepted_on_reentry_reported_separately": true,
+    "device_fdt_disarm_proven_default": false,
+    "prior_arm_lifetime_default": "UNKNOWN_OR_NOT_DIRECTLY_OBSERVED",
+    "reentry_alone_can_close_restore": false,
+    "restore_closed_default": false,
+    "restore_closure_decision": "AI_PM_REVIEW_REQUIRED"
   },
   "zero_finger": {
     "finger_interaction_allowed": false,
     "expected_finger_interaction_count": 0,
-    "invariant_enforced": true,
-    "wire_counters": [
-      "FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS",
-      "POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS",
-      "FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS"
-    ],
-    "synthetic_no_finger": "PASS",
-    "irq_invalidation": "PASS",
-    "cmd22_invalidation": "PASS",
-    "image_path_invalidation": "PASS",
-    "invalid_result": "INVALID_FINGER_INTERACTION; RESTORE_CLOSED=false"
+    "irq2_cmd22_image_invalidation": true,
+    "synthetic_tests": "PASS"
   },
-  "authorization": {
-    "required": true,
-    "consumed_after_all_non_device_setup": true,
-    "consumed_before_tshark_start": true,
-    "single_manual_attach_after_capture_start": true,
-    "repeat_forbidden_without_new_authorization": true,
-    "ai_pm_review_is_authorization": false
-  },
-  "powershell_compatibility": {
-    "api_audit": "PASS",
-    "unsupported_api_count": 0,
-    "windows_powershell_5_1": "PASS_STATIC_CONTRACT; NATIVE_SELFTEST_PENDING_WINDOWS",
-    "selftest_mode": "IMPLEMENTED_NOT_EXECUTED; POWERSHELL_RUNTIME_UNAVAILABLE_ON_HOST",
-    "selftest_hardware_action_count": 0
+  "verification": {
+    "d255_test_count": 44,
+    "d255_tests": "PASS",
+    "d252_d253_regressions": "PASS",
+    "d254_tests": "PASS",
+    "full_supported_suite": "PASS",
+    "git_diff_check": "PASS",
+    "native_windows_selftest": "NOT_EXECUTED"
   },
   "review": {
     "ready_for_ai_pm_review": true,
@@ -79,7 +83,7 @@
   "blockers": {
     "bootstrap_closed": false,
     "restore_closed": false,
-    "reason": "No real Windows VM capture was performed."
+    "reason": "No real Windows VM capture was performed; restore closure requires target-specific semantic review."
   },
   "safety": {
     "real_windows_capture_count": 0,

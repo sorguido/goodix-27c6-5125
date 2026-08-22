@@ -1,130 +1,133 @@
-# D255 corrective Windows VM targeted evidence capture kit report
+# D255 corrective post-attach UI and restore-semantics report
 
 ## Closure
 
 ```text
-OUTCOME=READY; CORRECTIVE_VM_AWARE_ZERO_FINGER_KIT_PREPARED_FOR_NEW_AI_PM_REVIEW
+OUTCOME=READY; POSTATTACH_UI_AND_CONSERVATIVE_RESTORE_CORRECTIVE_PREPARED_FOR_AI_PM_REVIEW
 ADVANCEMENT=NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE
 EXECUTABLE_CLOSURE=PASS_OFFLINE_STATIC_AND_SYNTHETIC; NATIVE_WINDOWS_SELFTEST_PENDING_AI_PM_REVIEW
-RESIDUAL_BLOCKER_OR_RISK=NO_REAL_WINDOWS_CAPTURE; UI_PREREQUISITE_AND_POWERSHELL_NATIVE_RUNTIME_REQUIRE_GUEST_PREFLIGHT
-CANONICAL_DOCUMENTATION=UPDATED; D255 VM BOUNDARY, WINDOWS STATE, SETUP PATH, ZERO-FINGER INVARIANT
+CANONICAL_DOCUMENTATION=UPDATED
 BUNDLE=analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip; SHA256=STEP_LOCAL_SIDECAR
+INITIAL_HEAD=feff1de25132d4e47dc9fe11a5f12509269c1696
 
-INITIAL_HEAD=922134e21ec40ef4346df555eb8a4c096f56b2a9
-```
-
-This is the second correction of D255, not D256. The first AI-PM review found
-PowerShell 5.1 and WBDI time-correlation defects. The next review found that
-the corrected kit still assumed a normal recognition prompt although the
-current project VM has no completed fingerprint enrollment. This revision
-closes that same operator boundary offline. It did not start a VM, open USB,
-run Windows/OEM software, use a finger, or execute TShark.
-
-```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
+D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
 READY_FOR_AI_PM_REVIEW=true
 READY_FOR_OPERATOR_RUN=false
 ```
 
-## VM and cold-attach boundary
+This is a third correction of D255, not D256. It was performed entirely
+offline. No VM, Windows OEM component, TShark live capture, USB device, finger,
+enrollment, account mutation, PIN mutation, provisioning, firmware operation,
+PSK operation or persistent command was used.
 
-The local corpus preserves USBPcap format and historical cold-attach behavior,
-but not the hypervisor product or passthrough command. The kit therefore uses
-one explicit manual GUI attach and adds no host-side attach automation.
+## Account prerequisites and post-attach UI gate
+
+The launcher no longer treats the sensor-dependent Fingerprint Setup wizard as
+available while Goodix is absent. Pre-authorization state covers guest absence,
+the accessible Sign-in options page, incomplete enrollment, the no-new-PIN
+rule, an explicit PIN-state model and the current policy requirement.
 
 ```text
-WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
-VM_PLATFORM=NOT_CANONICALLY_PRESERVED
-VM_USB_PASSTHROUGH_METHOD=OPERATOR_GUI_MANUAL_ATTACH
-VM_USB_PASSTHROUGH_METHOD_PROVENANCE=HISTORICAL_METHOD_NOT_CANONICALLY_PRESERVED
-GUEST_USB_CAPTURE_METHOD=TSHARK_WITH_USBPCAP
-USBPCAP_INTERFACE_SELECTION=ONE_UNAMBIGUOUS_OR_CAPTURE_ALL_RELEVANT
-GOODIX_PRESENT_IN_GUEST_BEFORE_CAPTURE=false
-CAPTURE_STARTED_BEFORE_VM_USB_ATTACH=true
-VM_USB_ATTACH_COUNT_EXPECTED=1
-AUTOMATIC_DETACH_REATTACH_ALLOWED=false
-GUEST_GOODIX_27C6_5125_PRESENCE_PROOF=READ_ONLY_PNP_SNAPSHOT_AND_CAPTURED_USB_DEVICE_DESCRIPTOR
-A8_APP12509_PROOF_REQUIRED=true
-VM_BOUNDARY_SYNTHETIC_TESTS=PASS
+ACCOUNT_PREREQUISITES_READY=true
+WINDOWS_HELLO_PIN_STATE_MODEL=ALREADY_CONFIGURED|NOT_CONFIGURED|UNKNOWN|NOT_REQUIRED_BY_CURRENT_ACCOUNT_POLICY
+SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH=UNKNOWN_BEFORE_ATTACH
+PREATTACH_FINGERPRINT_UI_REQUIRED=false
+OLD_UI_CONFIRMATION_REMOVED=true
+NEW_ACCOUNT_CONFIRMATION=SIGNIN_OPTIONS_CHECKED_NO_NEW_PIN_CHANGE
 ```
 
-The PowerShell launcher requires the VM already running, the target absent
-from guest PnP, guest/UI prerequisite confirmations, a read-only topology
-snapshot, USBPcap interface closure, and all existing clock/log/cache/path/
-runtime gates before authorization. When multiple USBPcap interfaces are
-reported, the operator must select all candidates for simultaneous capture or
-preflight fails as ambiguous. After authorization the launcher proves TShark
-and its output exist, emits a single attach prompt, verifies one guest PnP
-target, and never offers detach/re-attach.
+`NOT_CONFIGURED` plus a `REQUIRED` setup-PIN policy fails before authorization;
+the launcher has no registry/account mutation path. The confirmation is checked
+after USBPcap interface closure, and all remaining path/disk/log/cache/runtime
+gates still precede exact authorization and TShark start.
 
-The postprocessor requires an exact `27c6:5125` USB device descriptor after
-`CAPTURE_STARTED` and within the single attach markers. It rejects a descriptor
-before capture, no enumeration, more than one target bus/device, a detach
-marker, or mismatched A8 device identity. Exact wire A8
-`GF_ST411SEC_APP_12509` must occur after attach and before the OEM session;
-VID/PID alone is insufficient.
-
-## Windows UI and zero-finger boundary
+After capture start, one manual attach and guest PnP proof, the postprocessor
+requires exact target A8 APP12509 before the passive-bootstrap marker. Only
+then does the launcher open a structured four-choice UI gate:
 
 ```text
-CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT=NOT_COMPLETED
-NORMAL_RECOGNITION_UI_AVAILABLE=NOT_PROVEN
-D175_UI_PATH=NONE; PASSIVE_COLD_ATTACH_NO_HELLO_NO_FINGER
-SELECTED_WINDOWS_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER
-REQUIRES_PREEXISTING_FINGERPRINT=false
-REQUIRES_PREEXISTING_PIN=POSSIBLE; MUST_ALREADY_EXIST_IF_REQUIRED
-NO_NEW_PIN_CREATION_ALLOWED=true
-D255_OPERATOR_UI_PATH_READY=true; CONDITIONAL_ON_GUEST_PREFLIGHT
+POSTATTACH_HELLO_UI_GATE=READY_WAITING_FOR_FINGER|UI_UNAVAILABLE|NEW_PIN_REQUIRED|UNEXPECTED_PREREQUISITE
+AUTHORIZATION_GATE_ORDER=GUEST_ABSENCE->USBPCAP_INTERFACE_CLOSURE->ACCOUNT_PREREQUISITES->PATH_DISK_LOG_CACHE_RUNTIME->EXACT_AUTHORIZATION->CONSUMPTION->CAPTURE_START->SINGLE_ATTACH->PNP->WIRE_A8->PASSIVE_BOOTSTRAP->HELLO_UI_GATE
 ```
 
-The launcher now names only Settings → Accounts → Sign-in options → Fingerprint
-recognition → Set up/Add a fingerprint. It opens the wizard, waits, cancels,
-reopens, waits, and cancels again without a finger. `-AllowReentryFinger` and
-every recognition-prompt instruction were removed. A new or modified PIN,
-unexpected enrollment prerequisite, or unavailable setup path is terminal
-`WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING` with no automatic retry.
+The ready choice enters the existing zero-finger cancel/re-entry sequence. Any
+other choice is terminal without retry, alternate UI, PIN/account change,
+recognition, finger or detach/re-attach.
+
+## Partial-bootstrap preservation
+
+The non-ready UI branch is a consumed but valid partial result rather than a
+capture failure. It lets the bounded TShark timer expire, requires exit zero,
+nonempty capture and a read-only one-frame TShark validation, then snapshots
+after-state and writes the hash-gated manifest.
 
 ```text
-D255_FINGER_INTERACTION_ALLOWED=false
-D255_EXPECTED_FINGER_INTERACTION_COUNT=0
-D255_ZERO_FINGER_INVARIANT_ENFORCED=true
+FULL_RUN_RESULT_CLASS=FULL_ZERO_FINGER_CANCEL_REENTRY
+PARTIAL_RUN_RESULT_CLASS=PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE
+PARTIAL_BOOTSTRAP_RESULT_SUPPORTED=true
+BOOTSTRAP_EVIDENCE_PRESERVED_ON_UI_UNAVAILABLE=true
+RESTORE_EVIDENCE_ACQUIRED_ON_UI_UNAVAILABLE=false
+PARTIAL_CAPTURE_STOP_METHOD=BOUNDED_CAPTURE_TIMER_EXHAUSTED
+PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG
+```
+
+The postprocessor accepts the partial marker without cancel/re-entry markers,
+while retaining strict capture-before-attach, single topology, descriptor,
+guest PnP and APP12509 A8 gates. It still extracts first `0x36`, physical tail,
+cache/log correlation and sanitized bootstrap metadata.
+
+## Conservative cancel/restore model
+
+The sanitizer now reports independent observations for host cancel, cancel
+wire sequence, device close, D0Exit, D0Entry, OEM re-entry, new `0x32`
+acceptance, device-side cancel proof and prior-arm lifetime. Evidence classes
+are bounded to:
+
+```text
+NO_RESTORE_EVIDENCE
+HOST_CANCEL_ONLY
+HOST_CANCEL_WITH_DEVICE_CLOSE
+HOST_CANCEL_WITH_D0EXIT_REENTRY
+EXPLICIT_DEVICE_CANCEL_COMMAND_OBSERVED
+REENTRY_ACCEPTS_NEW_ARM_PRIOR_ARM_STATUS_UNKNOWN
+INCONCLUSIVE_OEM_TIME_CORRELATION
+```
+
+Re-entry is not disarm. Even exact A8 re-entry or an ACKed new `0x32` cannot
+auto-promote prior-arm lifetime or close restore:
+
+```text
+OEM_CANCEL_REENTRY_PROVEN_MODEL=EXACT_REENTRY_WIRE_SEQUENCE
+DEVICE_FDT_DISARM_PROVEN_MODEL=EXPLICIT_TARGET_SPECIFIC_DISARM_REQUIRED
+REENTRY_ALONE_CAN_CLOSE_RESTORE=false
+RESTORE_CLOSURE_DECISION=AI_PM_REVIEW_REQUIRED
+RESTORE_CLOSED_DEFAULT=false
+```
+
+Zero-finger invalidation remains active for IRQ2, exact `0x22 [01 00]` and the
+correlated image path. A partial UI branch reports restore not acquired rather
+than failing for absent cancel markers.
+
+## Offline verification
+
+```text
 ZERO_FINGER_SYNTHETIC_TEST=PASS
-FINGER_IRQ_INVALIDATION_TEST=PASS
-CMD22_INVALIDATION_TEST=PASS
-IMAGE_PATH_INVALIDATION_TEST=PASS
-```
-
-The postprocessor evaluates the complete operator window from
-`OEM_WAITING_NO_FINGER` through `REENTRY_CANCEL_END`. It counts target IRQ
-`0x0002`, exact `0x22 [01 00]`, and image-sized inbound B0 records. Any positive
-count produces `INVALID_FINGER_INTERACTION`, forces `RESTORE_CLOSED=false`, and
-prevents the run from closing D255.
-
-The dedicated D255 suite passes 37 tests, including guest-before absence,
-guest-after presence, target enumeration in capture, pre-capture attach
-invalidation, same-address second-attach episode invalidation, interface
-selection contracts, UI marker order, and the four zero-finger fixtures.
-
-## Existing corrective contracts retained
-
-The PowerShell 5.1 implementation still uses `SHA256.Create()`/
-`ComputeHash()`, `BitConverter`, and the canonical relative-path helper. Its
-`-SelfTestOnly` remains hardware-free. Authorization follows every pre-device
-gate and is consumed before TShark start; a post-consumption start failure is
-terminal. Clock anchors, MMDD correlation, midnight/year rollover, log
-rotation detection, hash-gated inputs, and secret/biometric redaction remain.
-
-```text
+VM_BOUNDARY_SYNTHETIC_TESTS=PASS
+PARTIAL_BOOTSTRAP_SYNTHETIC_TEST=PASS
+REENTRY_DOES_NOT_CLOSE_RESTORE_TEST=PASS
 POWERSHELL51_COMPATIBILITY_STATUS=PASS_STATIC_CONTRACT; NATIVE_SELFTEST_PENDING_WINDOWS
-POWERSHELL_SELFTEST_MODE=IMPLEMENTED_NOT_EXECUTED; POWERSHELL_RUNTIME_UNAVAILABLE_ON_HOST
 WBDI_MMDD_CANCEL_CORRELATION_TEST=PASS
 OEM_LOG_ROTATION_TESTS=PASS
-AUTHORIZATION_GATE_ORDER=ALL_GUEST_INTERFACE_PATH_CLOCK_LOG_CACHE_TOPOLOGY_UI_RUNTIME_GATES->EXACT_AUTHORIZATION->CONSUMPTION_RECORD->TSHARK_START->SINGLE_MANUAL_ATTACH
 ```
 
-## Safety and unresolved device boundary
+The dedicated D255 suite passes 44 tests. D252/D253 audits, the five-test D254
+suite, the full supported repository suite and `git diff --check` pass. Native
+PowerShell is unavailable on this Linux host; `-SelfTestOnly` and
+`-PreflightOnly` therefore remain future guest checks after review. No real
+capture exists.
 
 ```text
 BOOTSTRAP_CLOSED=false
@@ -137,6 +140,3 @@ REAL_USB_OPEN_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0
 REAL_PERSISTENT_WRITE_FAMILY_COUNT=0
 ```
-
-The offline correction is ready for AI-PM review only. A positive review would
-not itself approve a baseline or authorize the future one-shot capture.

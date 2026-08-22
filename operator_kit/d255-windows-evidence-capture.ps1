@@ -12,14 +12,23 @@ param(
     [string[]]$OemLogPath = @(),
     [string[]]$CacheRoot = @(),
     [string]$VmGuestReadyConfirmation = "",
-    [string]$UiPrerequisiteConfirmation = ""
+    [string]$AccountPrerequisiteConfirmation = "",
+    [string]$WindowsHelloPinState = "",
+    [string]$FingerprintSetupPinRequirement = ""
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $ExpectedAuthorization = "--i-authorize-one-d255-windows-oem-evidence-capture"
 $ExpectedVmGuestReadyConfirmation = "VM_WINDOWS_RUNNING_GOODIX_ABSENT_FROM_GUEST"
-$ExpectedUiPrerequisiteConfirmation = "SETUP_NO_FINGER_PATH_VERIFIED_NO_NEW_PIN"
+$ExpectedAccountPrerequisiteConfirmation = "SIGNIN_OPTIONS_CHECKED_NO_NEW_PIN_CHANGE"
+$AllowedWindowsHelloPinStates = @(
+    "ALREADY_CONFIGURED",
+    "NOT_CONFIGURED",
+    "UNKNOWN",
+    "NOT_REQUIRED_BY_CURRENT_ACCOUNT_POLICY"
+)
+$AllowedFingerprintSetupPinRequirements = @("REQUIRED", "NOT_REQUIRED", "UNKNOWN")
 $TargetVidPidPattern = "VID_27C6&PID_5125"
 $script:AuthorizationConsumed = $false
 $script:RunDirectory = $null
@@ -138,6 +147,30 @@ function Write-OperatorMarker {
     )
     $safeDetail = $Detail -replace "[\r\n\t]", " "
     Add-Content -LiteralPath $script:MarkerPath -Encoding UTF8 -Value "$(Get-UtcStamp)`t$Event`t$safeDetail"
+}
+
+function Read-HelloSetupUiResult {
+    $choices = [System.Collections.ObjectModel.Collection[System.Management.Automation.Host.ChoiceDescription]]::new()
+    $choices.Add([System.Management.Automation.Host.ChoiceDescription]::new(
+        "&Ready waiting for finger", "READY_WAITING_FOR_FINGER"))
+    $choices.Add([System.Management.Automation.Host.ChoiceDescription]::new(
+        "UI &unavailable", "UI_UNAVAILABLE"))
+    $choices.Add([System.Management.Automation.Host.ChoiceDescription]::new(
+        "&New PIN required", "NEW_PIN_REQUIRED"))
+    $choices.Add([System.Management.Automation.Host.ChoiceDescription]::new(
+        "Une&xpected prerequisite", "UNEXPECTED_PREREQUISITE"))
+    $selected = $Host.UI.PromptForChoice(
+        "D255 post-attach Windows Hello gate",
+        "Classify the setup UI exactly. Do not touch the sensor, create/change a PIN, retry, or use another UI path.",
+        $choices,
+        -1
+    )
+    return @(
+        "READY_WAITING_FOR_FINGER",
+        "UI_UNAVAILABLE",
+        "NEW_PIN_REQUIRED",
+        "UNEXPECTED_PREREQUISITE"
+    )[$selected]
 }
 
 function Get-TargetDevices {
@@ -424,8 +457,37 @@ foreach ($selector in $CaptureInterface) {
 if ($VmGuestReadyConfirmation -cne $ExpectedVmGuestReadyConfirmation) {
     Fail-D255 "VM guest-ready/target-absence confirmation missing"
 }
-if ($UiPrerequisiteConfirmation -cne $ExpectedUiPrerequisiteConfirmation) {
-    Fail-D255 "WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING"
+$initialTargets = @(Get-TargetDevices)
+if ($initialTargets.Count -ne 0) {
+    Fail-D255 "target must be detached from the Windows guest before cold-attach capture"
+}
+$interfaceLines = @(& $TsharkPath -D 2>&1)
+if ($LASTEXITCODE -ne 0) { Fail-D255 "tshark interface enumeration failed" }
+$usbPcapCandidates = @($interfaceLines | Where-Object { $_ -match "(?i)USBPcap" })
+if ($usbPcapCandidates.Count -eq 0) { Fail-D255 "no USBPcap interface was detected" }
+$interfaceMatches = [System.Collections.Generic.List[string]]::new()
+foreach ($selector in $CaptureInterface) {
+    $escapedInterface = [regex]::Escape($selector)
+    $interfacePattern = "(?i)(?<![A-Za-z0-9_.-])$escapedInterface(?![A-Za-z0-9_.-])"
+    $matches = @($usbPcapCandidates | Where-Object { $_ -match $interfacePattern })
+    if ($matches.Count -ne 1) { Fail-D255 "capture interface selector is absent or ambiguous: $selector" }
+    if (-not $interfaceMatches.Contains([string]$matches[0])) { $interfaceMatches.Add([string]$matches[0]) }
+}
+if ($usbPcapCandidates.Count -gt 1 -and $interfaceMatches.Count -ne $usbPcapCandidates.Count) {
+    Fail-D255 "USBPCAP_INTERFACE_SELECTION=AMBIGUOUS; select every relevant USBPcap interface or stop"
+}
+if ($AccountPrerequisiteConfirmation -cne $ExpectedAccountPrerequisiteConfirmation) {
+    Fail-D255 "account-level Sign-in options confirmation missing"
+}
+if ($AllowedWindowsHelloPinStates -cnotcontains $WindowsHelloPinState) {
+    Fail-D255 "WINDOWS_HELLO_PIN_STATE must be classified explicitly"
+}
+if ($AllowedFingerprintSetupPinRequirements -cnotcontains $FingerprintSetupPinRequirement) {
+    Fail-D255 "fingerprint setup PIN requirement must be classified explicitly"
+}
+if ($WindowsHelloPinState -ceq "NOT_CONFIGURED" -and
+    $FingerprintSetupPinRequirement -ceq "REQUIRED") {
+    Fail-D255 "WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING_BEFORE_AUTHORIZATION; PIN creation/change is forbidden"
 }
 foreach ($path in $OemLogPath) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -444,32 +506,12 @@ if ($oemLogCandidates.Count -eq 0) {
 if (Test-Path -LiteralPath $OutputRoot -PathType Leaf) {
     Fail-D255 "OutputRoot names a file"
 }
-$interfaceLines = @(& $TsharkPath -D 2>&1)
-if ($LASTEXITCODE -ne 0) { Fail-D255 "tshark interface enumeration failed" }
-$usbPcapCandidates = @($interfaceLines | Where-Object { $_ -match "(?i)USBPcap" })
-if ($usbPcapCandidates.Count -eq 0) { Fail-D255 "no USBPcap interface was detected" }
-$interfaceMatches = [System.Collections.Generic.List[string]]::new()
-foreach ($selector in $CaptureInterface) {
-    $escapedInterface = [regex]::Escape($selector)
-    $interfacePattern = "(?i)(?<![A-Za-z0-9_.-])$escapedInterface(?![A-Za-z0-9_.-])"
-    $matches = @($usbPcapCandidates | Where-Object { $_ -match $interfacePattern })
-    if ($matches.Count -ne 1) { Fail-D255 "capture interface selector is absent or ambiguous: $selector" }
-    if (-not $interfaceMatches.Contains([string]$matches[0])) { $interfaceMatches.Add([string]$matches[0]) }
-}
-if ($usbPcapCandidates.Count -gt 1 -and $interfaceMatches.Count -ne $usbPcapCandidates.Count) {
-    Fail-D255 "USBPCAP_INTERFACE_SELECTION=AMBIGUOUS; select every relevant USBPcap interface or stop"
-}
 $tsharkVersion = [string](@(& $TsharkPath --version 2>&1)[0])
 if ($LASTEXITCODE -ne 0) { Fail-D255 "tshark version query failed" }
 $outputFullPath = [System.IO.Path]::GetFullPath($OutputRoot)
 $outputDrive = [System.IO.DriveInfo]::new([System.IO.Path]::GetPathRoot($outputFullPath))
 $freeBytes = $outputDrive.AvailableFreeSpace
 if ($freeBytes -lt 1073741824) { Fail-D255 "less than 1 GiB free at OutputRoot" }
-
-$initialTargets = @(Get-TargetDevices)
-if ($initialTargets.Count -ne 0) {
-    Fail-D255 "target must be detached from the Windows guest before cold-attach capture"
-}
 
 $preflight = [ordered]@{
     schema = "D255_WINDOWS_PREFLIGHT_V3"
@@ -481,7 +523,14 @@ $preflight = [ordered]@{
     guest_goodix_present_before_attach = $false
     no_existing_fingerprint_required = $true
     no_new_pin_creation_allowed = $true
-    selected_windows_ui_path = "WINDOWS_HELLO_SETUP_NO_FINGER"
+    settings_signin_options_page_accessible = $true
+    current_vm_fingerprint_enrollment = "NOT_COMPLETED"
+    windows_hello_pin_state = $WindowsHelloPinState
+    fingerprint_setup_pin_requirement = $FingerprintSetupPinRequirement
+    account_prerequisites_ready = $true
+    sensor_dependent_ui_availability = "UNKNOWN_BEFORE_ATTACH"
+    preattach_fingerprint_ui_required = $false
+    postattach_windows_ui_path = "WINDOWS_HELLO_SETUP_NO_FINGER"
     capture_interfaces = @($CaptureInterface)
     capture_interface_matches = @($interfaceMatches)
     usbpcap_candidate_count = $usbPcapCandidates.Count
@@ -503,6 +552,9 @@ if ($PreflightOnly) {
     if (-not (Test-D255PathAvailable -Path $preflightPath)) { Fail-D255 "preflight output collision" }
     $preflight | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $preflightPath -Encoding UTF8
     Write-Output "D255_PREFLIGHT_ONLY=PASS"
+    Write-Output "ACCOUNT_PREREQUISITES_READY=true"
+    Write-Output "WINDOWS_HELLO_PIN_STATE=$WindowsHelloPinState"
+    Write-Output "SENSOR_DEPENDENT_UI_AVAILABILITY=UNKNOWN_BEFORE_ATTACH"
     Write-Output "D255_HARDWARE_ACTION_COUNT=0"
     Write-Output "D255_AUTHORIZATION_CONSUMED=false"
     exit 0
@@ -523,7 +575,7 @@ $clockPath = Join-Path $script:RunDirectory "run_clock.json"
 $clockAnchor = New-D255ClockAnchor -Phase "BEFORE_CAPTURE"
 $clockAnchor | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockPath -Encoding UTF8
 Write-OperatorMarker -Event "CLOCK_ANCHOR" -Detail "local offset and Windows timezone recorded"
-Write-OperatorMarker -Event "VM_GUEST_READY" -Detail "VM already running; target absent; setup/no-finger prerequisites confirmed"
+Write-OperatorMarker -Event "VM_GUEST_READY" -Detail "VM already running; target absent from guest"
 Write-GuestTopologySnapshot -Stage "before_attach"
 Write-OperatorMarker -Event "GUEST_TOPOLOGY_BEFORE" -Detail "read-only PnP snapshot; 27c6:5125 absent"
 $cacheRoots = Resolve-CacheRoots
@@ -531,6 +583,7 @@ Write-OemLogSnapshot -Stage "before" -Candidates $oemLogCandidates -RawDirectory
 Write-FileSnapshot -Stage "before" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
 $preflight["runtime"] = Get-D255RuntimeInfo
 $preflight | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory "preflight.json") -Encoding UTF8
+Write-OperatorMarker -Event "ACCOUNT_PREREQUISITES_CHECKED" -Detail "Sign-in options accessible; PIN state=$WindowsHelloPinState; no PIN change"
 $capturePath = Join-Path $rawDirectory "wire.pcapng"
 $captureSelectors = @($CaptureInterface | ForEach-Object { "-i `"$_`"" }) -join " "
 $captureArguments = "$captureSelectors -a duration:$CaptureDurationSeconds -q -w `"$capturePath`""
@@ -572,31 +625,55 @@ try {
     Write-GuestTopologySnapshot -Stage "after_attach"
     Write-OperatorMarker -Event "GUEST_27C6_5125_PRESENT" -Detail $targets[0].InstanceId
 
-    Read-Host "Keep hands away from the sensor and wait for passive OEM initialization to settle. Press Enter before opening any Windows Hello UI"
+    Read-Host "Keep hands away from the sensor and wait for passive OEM initialization to settle. Press Enter only after the passive bootstrap has settled"
     Assert-CaptureActive
     Assert-SingleGuestTarget | Out-Null
-    Write-OperatorMarker -Event "OEM_SESSION_BEGIN" -Detail "OEM_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER"
-    Read-Host "Open Settings > Accounts > Sign-in options > Fingerprint recognition (Windows Hello) > Set up/Add a fingerprint. Do not create a PIN and never touch the sensor. Press Enter only when waiting for a fingerprint"
-    Assert-CaptureActive
+    Write-OperatorMarker -Event "PASSIVE_BOOTSTRAP_SETTLED" -Detail "operator-observed passive settle; A8 proof remains wire-derived"
+    Write-OperatorMarker -Event "HELLO_SETUP_UI_CHECK_BEGIN" -Detail "post-attach sensor-dependent UI check"
+    Write-Output "Open Settings > Accounts > Sign-in options > Fingerprint recognition (Windows Hello) > Set up/Add a fingerprint. Never touch the sensor or create/change a PIN."
+    $helloUiResult = Read-HelloSetupUiResult
+    if ($helloUiResult -ceq "READY_WAITING_FOR_FINGER") {
+        Assert-CaptureActive
+    } elseif ($script:CaptureProcess.HasExited -and $script:CaptureProcess.ExitCode -ne 0) {
+        Fail-D255 "partial bootstrap capture process failed before UI classification"
+    }
     Assert-SingleGuestTarget | Out-Null
-    Write-OperatorMarker -Event "OEM_WAITING_NO_FINGER" -Detail "operator UI observation; zero finger"
-    Write-OperatorMarker -Event "CANCEL_NO_FINGER_BEGIN"
-    Read-Host "Cancel the setup/add-fingerprint wizard without touching the sensor, then press Enter"
-    Assert-CaptureActive
-    Assert-SingleGuestTarget | Out-Null
-    Write-OperatorMarker -Event "CANCEL_NO_FINGER_END"
+    $runResult = "FULL_ZERO_FINGER_CANCEL_REENTRY"
+    if ($helloUiResult -ceq "READY_WAITING_FOR_FINGER") {
+        Write-OperatorMarker -Event "HELLO_SETUP_UI_READY" -Detail $helloUiResult
+        Write-OperatorMarker -Event "OEM_SESSION_BEGIN" -Detail "OEM_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER"
+        Write-OperatorMarker -Event "OEM_WAITING_NO_FINGER" -Detail "operator UI observation; zero finger"
+        Write-OperatorMarker -Event "CANCEL_NO_FINGER_BEGIN"
+        Read-Host "Cancel the setup/add-fingerprint wizard without touching the sensor, then press Enter"
+        Assert-CaptureActive
+        Assert-SingleGuestTarget | Out-Null
+        Write-OperatorMarker -Event "CANCEL_NO_FINGER_END"
 
-    Write-OperatorMarker -Event "REENTRY_BEGIN"
-    Read-Host "Reopen the same setup/add-fingerprint path without touching the sensor. Press Enter when it is waiting for a fingerprint"
-    Assert-CaptureActive
-    Assert-SingleGuestTarget | Out-Null
-    Write-OperatorMarker -Event "REENTRY_WAITING_NO_FINGER" -Detail "operator UI observation; zero finger"
-    Write-OperatorMarker -Event "REENTRY_CANCEL_BEGIN"
-    Read-Host "Cancel the setup/add-fingerprint wizard again without touching the sensor, then press Enter"
-    Assert-CaptureActive
-    Assert-SingleGuestTarget | Out-Null
-    Write-OperatorMarker -Event "REENTRY_CANCEL_END"
-    Write-OperatorMarker -Event "REENTRY_END"
+        Write-OperatorMarker -Event "REENTRY_BEGIN"
+        Read-Host "Reopen the same setup/add-fingerprint path without touching the sensor. Press Enter when it is waiting for a fingerprint"
+        Assert-CaptureActive
+        Assert-SingleGuestTarget | Out-Null
+        Write-OperatorMarker -Event "REENTRY_WAITING_NO_FINGER" -Detail "operator UI observation; zero finger"
+        Write-OperatorMarker -Event "REENTRY_CANCEL_BEGIN"
+        Read-Host "Cancel the setup/add-fingerprint wizard again without touching the sensor, then press Enter"
+        Assert-CaptureActive
+        Assert-SingleGuestTarget | Out-Null
+        Write-OperatorMarker -Event "REENTRY_CANCEL_END"
+        Write-OperatorMarker -Event "REENTRY_END"
+    } else {
+        $partialMarker = @{
+            "UI_UNAVAILABLE" = "HELLO_SETUP_UI_UNAVAILABLE"
+            "NEW_PIN_REQUIRED" = "HELLO_SETUP_NEW_PIN_REQUIRED"
+            "UNEXPECTED_PREREQUISITE" = "HELLO_SETUP_UNEXPECTED_PREREQUISITE"
+        }[$helloUiResult]
+        Write-OperatorMarker -Event $partialMarker -Detail $helloUiResult
+        $runResult = "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE"
+        Write-Output "D255_RESTORE_PHASE_RESULT=WINDOWS_HELLO_SETUP_PREREQUISITE_MISSING_AFTER_ATTACH"
+        Write-Output "BOOTSTRAP_EVIDENCE_PRESERVED=true"
+        Write-Output "RESTORE_EVIDENCE_ACQUIRED=false"
+        Write-Output "RESTORE_CLOSED=false"
+        Write-Output "PARTIAL_CAPTURE_STOP_METHOD=BOUNDED_CAPTURE_TIMER_EXHAUSTED"
+    }
     Write-OperatorMarker -Event "OPERATOR_PHASES_COMPLETE"
     Wait-Process -Id $script:CaptureProcess.Id
     if ($script:CaptureProcess.ExitCode -ne 0) { Fail-D255 "capture process failed" }
@@ -604,6 +681,10 @@ try {
 
     if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) { Fail-D255 "capture output missing" }
     if ((Get-Item -LiteralPath $capturePath).Length -le 0) { Fail-D255 "capture output empty" }
+    $captureValidation = @(& $TsharkPath -r $capturePath -c 1 -T fields -e frame.number 2>&1)
+    if ($LASTEXITCODE -ne 0 -or -not ($captureValidation -contains "1")) {
+        Fail-D255 "capture output is not a readable nonempty pcapng"
+    }
     $clockEndPath = Join-Path $script:RunDirectory "run_clock_end.json"
     New-D255ClockAnchor -Phase "AFTER_CAPTURE" | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockEndPath -Encoding UTF8
     $finalTargets = @(Get-TargetDevices)
@@ -612,6 +693,10 @@ try {
     Write-OemLogSnapshot -Stage "after" -Candidates $oemLogCandidates -RawDirectory $rawDirectory | Out-Null
     Write-FileSnapshot -Stage "after" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
     Write-Manifest
+    Write-Output "D255_RUN_RESULT=$runResult"
+    if ($runResult -ceq "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE") {
+        Write-Output "PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG"
+    }
     Write-Output "D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION"
     Write-Output "D255_RUN_DIRECTORY=$script:RunDirectory"
     Write-Output "D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true"

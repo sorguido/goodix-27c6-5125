@@ -605,16 +605,36 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
 
     vm_guest_ready = one_marker(markers, "VM_GUEST_READY")
     topology_before = one_marker(markers, "GUEST_TOPOLOGY_BEFORE")
+    account_checked = one_marker(markers, "ACCOUNT_PREREQUISITES_CHECKED")
     capture_started = one_marker(markers, "CAPTURE_STARTED")
     attach_begin = one_marker(markers, "VM_USB_ATTACH_BEGIN")
     attach_end = one_marker(markers, "VM_USB_ATTACH_END")
     guest_present = one_marker(markers, "GUEST_27C6_5125_PRESENT")
-    oem_session_begin = one_marker(markers, "OEM_SESSION_BEGIN")
-    require(vm_guest_ready["timestamp"] <= topology_before["timestamp"] < capture_started["timestamp"],
-            "VM guest/topology/capture marker order invalid")
+    passive_settled = one_marker(markers, "PASSIVE_BOOTSTRAP_SETTLED")
+    ui_check_begin = one_marker(markers, "HELLO_SETUP_UI_CHECK_BEGIN")
+    terminal_names = {
+        "HELLO_SETUP_UI_READY": "READY_WAITING_FOR_FINGER",
+        "HELLO_SETUP_UI_UNAVAILABLE": "UI_UNAVAILABLE",
+        "HELLO_SETUP_NEW_PIN_REQUIRED": "NEW_PIN_REQUIRED",
+        "HELLO_SETUP_UNEXPECTED_PREREQUISITE": "UNEXPECTED_PREREQUISITE",
+    }
+    terminal_markers = [(name, one_marker(markers, name, required=False))
+                        for name in terminal_names]
+    terminal_markers = [(name, marker) for name, marker in terminal_markers if marker]
+    require(len(terminal_markers) == 1,
+            "exactly one structured post-attach Hello UI result marker is required")
+    ui_terminal_name, ui_terminal = terminal_markers[0]
+    ui_result = terminal_names[ui_terminal_name]
+    full_run = ui_terminal_name == "HELLO_SETUP_UI_READY"
+    run_result = ("FULL_ZERO_FINGER_CANCEL_REENTRY" if full_run
+                  else "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE")
+    require(vm_guest_ready["timestamp"] <= topology_before["timestamp"]
+            <= account_checked["timestamp"] < capture_started["timestamp"],
+            "VM guest/topology/account/capture marker order invalid")
     require(capture_started["timestamp"] < attach_begin["timestamp"] < attach_end["timestamp"]
-            <= guest_present["timestamp"] < oem_session_begin["timestamp"],
-            "CAPTURE_STARTED -> VM_USB_ATTACH -> OEM_SESSION marker order invalid")
+            <= guest_present["timestamp"] < passive_settled["timestamp"]
+            < ui_check_begin["timestamp"] <= ui_terminal["timestamp"],
+            "CAPTURE_STARTED -> VM_USB_ATTACH -> bootstrap -> Hello UI marker order invalid")
     require(not any("DETACH" in row["event"] for row in markers),
             "D255_EVIDENCE_VALIDITY=INVALID_VM_USB_TOPOLOGY_CHANGE")
 
@@ -644,48 +664,72 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
                  if frame.direction == "IN" and (parsed := parse_a0(frame))
                  and parsed[0] == 0xA8 and EXPECTED_FIRMWARE.encode() in parsed[1]]
     require(a8_proofs, "A8 APP12509 proof is absent")
-    require(attach_end["timestamp"] <= a8_proofs[0].timestamp < oem_session_begin["timestamp"],
-            "VM_USB_ATTACH -> A8_APP12509_PROVEN -> OEM_SESSION ordering invalid")
+    require(attach_end["timestamp"] <= a8_proofs[0].timestamp < passive_settled["timestamp"],
+            "VM_USB_ATTACH -> A8_APP12509_PROVEN -> PASSIVE_BOOTSTRAP ordering invalid")
 
-    cancel_begin = one_marker(markers, "CANCEL_NO_FINGER_BEGIN")
-    cancel_end = one_marker(markers, "CANCEL_NO_FINGER_END")
-    reentry_begin = one_marker(markers, "REENTRY_BEGIN")
-    reentry_waiting = one_marker(markers, "REENTRY_WAITING_NO_FINGER")
-    reentry_cancel_begin = one_marker(markers, "REENTRY_CANCEL_BEGIN")
-    reentry_cancel_end = one_marker(markers, "REENTRY_CANCEL_END")
-    reentry_end = one_marker(markers, "REENTRY_END")
-    arm_marker = one_marker(markers, "OEM_WAITING_NO_FINGER")
-    require(oem_session_begin["timestamp"] < arm_marker["timestamp"],
-            "OEM session/waiting marker order invalid")
-    require(arm_marker["timestamp"] < cancel_begin["timestamp"] < cancel_end["timestamp"],
-            "cancel marker order invalid")
-    require(cancel_end["timestamp"] <= reentry_begin["timestamp"] < reentry_waiting["timestamp"]
-            < reentry_cancel_begin["timestamp"] < reentry_cancel_end["timestamp"]
-            <= reentry_end["timestamp"],
-            "re-entry marker order invalid")
+    full_phase_names = (
+        "OEM_SESSION_BEGIN", "OEM_WAITING_NO_FINGER", "CANCEL_NO_FINGER_BEGIN",
+        "CANCEL_NO_FINGER_END", "REENTRY_BEGIN", "REENTRY_WAITING_NO_FINGER",
+        "REENTRY_CANCEL_BEGIN", "REENTRY_CANCEL_END", "REENTRY_END",
+    )
+    if full_run:
+        oem_session_begin = one_marker(markers, "OEM_SESSION_BEGIN")
+        arm_marker = one_marker(markers, "OEM_WAITING_NO_FINGER")
+        cancel_begin = one_marker(markers, "CANCEL_NO_FINGER_BEGIN")
+        cancel_end = one_marker(markers, "CANCEL_NO_FINGER_END")
+        reentry_begin = one_marker(markers, "REENTRY_BEGIN")
+        reentry_waiting = one_marker(markers, "REENTRY_WAITING_NO_FINGER")
+        reentry_cancel_begin = one_marker(markers, "REENTRY_CANCEL_BEGIN")
+        reentry_cancel_end = one_marker(markers, "REENTRY_CANCEL_END")
+        reentry_end = one_marker(markers, "REENTRY_END")
+        require(ui_terminal["timestamp"] <= oem_session_begin["timestamp"]
+                < arm_marker["timestamp"], "Hello UI/OEM waiting marker order invalid")
+        require(arm_marker["timestamp"] < cancel_begin["timestamp"] < cancel_end["timestamp"],
+                "cancel marker order invalid")
+        require(cancel_end["timestamp"] <= reentry_begin["timestamp"]
+                < reentry_waiting["timestamp"] < reentry_cancel_begin["timestamp"]
+                < reentry_cancel_end["timestamp"] <= reentry_end["timestamp"],
+                "re-entry marker order invalid")
+    else:
+        require(not any(one_marker(markers, name, required=False) for name in full_phase_names),
+                "partial-bootstrap run contains forbidden cancel/re-entry markers")
+        oem_session_begin = arm_marker = cancel_begin = cancel_end = None
+        reentry_begin = reentry_waiting = reentry_cancel_begin = None
+        reentry_cancel_end = reentry_end = None
 
     decoded = [(frame, parse_a0(frame)) for frame in target_frames]
-    arms_before_cancel = [(frame, parsed) for frame, parsed in decoded
-                          if parsed and frame.direction == "OUT" and parsed[0] == 0x32
-                          and frame.timestamp < cancel_begin["timestamp"]]
-    require(arms_before_cancel, "cancel occurred before any observed 0x32 arm")
-    last_arm = arms_before_cancel[-1]
-    require(last_arm[0].timestamp <= arm_marker["timestamp"] < cancel_begin["timestamp"],
-            "operator arm marker is not correlated after the last wire 0x32")
-    cancel_events = [frame_metadata(frame, cancel_begin["timestamp"])
-                     for frame in target_frames
-                     if last_arm[0].timestamp <= frame.timestamp < reentry_begin["timestamp"]]
-    cancel_out = [(frame, parsed) for frame, parsed in decoded
-                  if parsed and frame.direction == "OUT"
-                  and cancel_begin["timestamp"] <= frame.timestamp < reentry_begin["timestamp"]]
-    reentry_out = [(frame, parsed) for frame, parsed in decoded
-                   if parsed and frame.direction == "OUT"
-                   and reentry_begin["timestamp"] <= frame.timestamp <= reentry_end["timestamp"]]
+    if full_run:
+        arms_before_cancel = [(frame, parsed) for frame, parsed in decoded
+                              if parsed and frame.direction == "OUT" and parsed[0] == 0x32
+                              and frame.timestamp < cancel_begin["timestamp"]]
+        require(arms_before_cancel, "cancel occurred before any observed 0x32 arm")
+        last_arm = arms_before_cancel[-1]
+        require(last_arm[0].timestamp <= arm_marker["timestamp"] < cancel_begin["timestamp"],
+                "operator arm marker is not correlated after the last wire 0x32")
+        cancel_events = [frame_metadata(frame, cancel_begin["timestamp"])
+                         for frame in target_frames
+                         if last_arm[0].timestamp <= frame.timestamp < reentry_begin["timestamp"]]
+        cancel_out = [(frame, parsed) for frame, parsed in decoded
+                      if parsed and frame.direction == "OUT"
+                      and cancel_begin["timestamp"] <= frame.timestamp < reentry_begin["timestamp"]]
+        reentry_out = [(frame, parsed) for frame, parsed in decoded
+                       if parsed and frame.direction == "OUT"
+                       and reentry_begin["timestamp"] <= frame.timestamp <= reentry_end["timestamp"]]
+    else:
+        last_arm = None
+        cancel_events = []
+        cancel_out = []
+        reentry_out = []
 
     oem_deltas, oem_log_states, oem_log_window_reconstructible = oem_log_deltas(inputs)
-    oem_events, oem_fdt = parse_oem_logs(
-        oem_deltas, clock, cancel_begin["timestamp"], reentry_begin["timestamp"],
-        reentry_end["timestamp"])
+    if full_run:
+        oem_events, oem_fdt = parse_oem_logs(
+            oem_deltas, clock, cancel_begin["timestamp"], reentry_begin["timestamp"],
+            reentry_end["timestamp"])
+    else:
+        terminal_time = ui_terminal["timestamp"]
+        oem_events, oem_fdt = parse_oem_logs(
+            oem_deltas, clock, terminal_time, terminal_time, terminal_time)
     otp = device_otp(target_frames, selected)
     path_mapping = cache_source_paths(inputs)
     cache_rows = [sanitize_cache(row, otp, path_mapping.get(row.relative))
@@ -731,9 +775,10 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     reentry_controls = [f"0x{parsed[0]:02x}" for _, parsed in reentry_out]
     unknown_controls = sorted({f"0x{parsed[0]:02x}" for _, parsed in decoded
                                if parsed and parsed[0] not in KNOWN_CONTROLS})
-    tls_alert = any(frame.outer == 0xB0 and len(frame.raw) >= 9 and frame.raw[4] == 21
-                    for frame in target_frames
-                    if cancel_begin["timestamp"] <= frame.timestamp < reentry_begin["timestamp"])
+    tls_alert = bool(full_run and any(
+        frame.outer == 0xB0 and len(frame.raw) >= 9 and frame.raw[4] == 21
+        for frame in target_frames
+        if cancel_begin["timestamp"] <= frame.timestamp < reentry_begin["timestamp"]))
     critical_labels = {"HOST_CANCEL", "D0_EXIT", "D0_ENTRY", "DEVICE_CLOSE",
                        "DEVICE_RESET", "SET_MODE"}
     critical_events = [row for row in oem_events if row["event"] in critical_labels]
@@ -755,30 +800,30 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         (critical_events and oem_time_correlation != "EXACT_ANCHORED") or
         not oem_log_window_reconstructible or not clock.stable_offset)
     window_log_events = [row for row in oem_events if row["time_window"] == "CANCEL"]
+    reentry_log_events = [row for row in oem_events if row["time_window"] == "REENTRY"]
     labels = {row["event"] for row in window_log_events}
-    usb_close = True if labels & {"D0_EXIT", "DEVICE_CLOSE"} else "unknown"
-    device_reset = True if "DEVICE_RESET" in labels else "unknown"
+    reentry_labels = {row["event"] for row in reentry_log_events}
+    if critical_time_unresolved:
+        oem_device_close = "unknown"
+        oem_d0exit = "unknown"
+        oem_d0entry = "unknown"
+        device_reset = "unknown"
+    else:
+        oem_device_close = "DEVICE_CLOSE" in labels
+        oem_d0exit = "D0_EXIT" in labels
+        oem_d0entry = "D0_ENTRY" in reentry_labels
+        device_reset = "DEVICE_RESET" in labels
+    usb_close = ("unknown" if critical_time_unresolved
+                 else bool(oem_device_close or oem_d0exit))
     idle = "0x70" in cancel_controls
     rearm = "0x32" in cancel_controls or "0x32" in reentry_controls
-    host_cancel = "HOST_CANCEL" in labels
-    if critical_time_unresolved:
-        usb_close = "unknown"
-        device_reset = "unknown"
-        restore_model = "INCONCLUSIVE_OEM_TIME_CORRELATION"
-    elif not cancel_controls and usb_close is True:
-        restore_model = "HOST_CANCEL_THEN_DEVICE_CLOSE"
-    elif not cancel_controls:
-        restore_model = "HOST_ONLY_CANCEL_OBSERVED_ARM_LIFETIME_UNRESOLVED"
-    elif idle:
-        restore_model = "EXPLICIT_IDLE_MODE_OBSERVED_SEMANTICS_BOUNDED"
-    else:
-        restore_model = "DEVICE_COMMAND_SEQUENCE_UNCLASSIFIED"
-    device_cancel = False if not cancel_controls else "unknown"
+    host_cancel = bool(full_run and not critical_time_unresolved and "HOST_CANCEL" in labels)
+    device_cancel = False
     cancel_is_host_only = ("unknown" if critical_time_unresolved
                            else bool(host_cancel and not cancel_controls))
-    arm_state = "REARMED" if rearm else "POSSIBLY_ARMED_UNRESOLVED"
-    operator_start = arm_marker["timestamp"]
-    operator_end = reentry_cancel_end["timestamp"]
+    arm_state = "PRIOR_ARM_STATUS_UNKNOWN" if full_run else "NOT_EVALUATED_PARTIAL_RUN"
+    operator_start = (arm_marker["timestamp"] if full_run else ui_check_begin["timestamp"])
+    operator_end = (reentry_cancel_end["timestamp"] if full_run else ui_terminal["timestamp"])
     finger_irq_count = sum(
         packet.bus == selected[0] and packet.device == selected[1]
         and packet.endpoint == 0x82 and packet.payload[:2] == b"\x02\x00"
@@ -797,9 +842,11 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         for frame in target_frames)
     finger_interaction_detected = bool(
         finger_irq_count or post_irq_cmd22_count or finger_image_path_count)
-    reentry_window = [(frame, parsed) for frame, parsed in decoded if parsed
-                      and reentry_begin["timestamp"] <= frame.timestamp <= reentry_end["timestamp"]]
+    reentry_window = ([(frame, parsed) for frame, parsed in decoded if parsed
+                       and reentry_begin["timestamp"] <= frame.timestamp <= reentry_end["timestamp"]]
+                      if full_run else [])
     reentry_proven = False
+    new_fdt_arm_accepted = False
     for position, (request, request_parsed) in enumerate(reentry_window):
         if request.direction != "OUT":
             continue
@@ -810,19 +857,36 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             for response, response_parsed in later
         ):
             reentry_proven = True
-            break
         if request_parsed[0] == 0x32 and any(
             response.direction == "IN" and response_parsed[0] == 0xB0
             and response_parsed[1] in (b"\x32\x01", b"\x32\x07")
             for response, response_parsed in later
         ):
+            new_fdt_arm_accepted = True
             reentry_proven = True
-            break
+    if not full_run:
+        restore_evidence_class = "NO_RESTORE_EVIDENCE"
+    elif critical_time_unresolved:
+        restore_evidence_class = "INCONCLUSIVE_OEM_TIME_CORRELATION"
+    elif device_cancel:
+        restore_evidence_class = "EXPLICIT_DEVICE_CANCEL_COMMAND_OBSERVED"
+    elif new_fdt_arm_accepted:
+        restore_evidence_class = "REENTRY_ACCEPTS_NEW_ARM_PRIOR_ARM_STATUS_UNKNOWN"
+    elif host_cancel and oem_d0exit and oem_d0entry:
+        restore_evidence_class = "HOST_CANCEL_WITH_D0EXIT_REENTRY"
+    elif host_cancel and oem_device_close:
+        restore_evidence_class = "HOST_CANCEL_WITH_DEVICE_CLOSE"
+    elif host_cancel:
+        restore_evidence_class = "HOST_CANCEL_ONLY"
+    else:
+        restore_evidence_class = "NO_RESTORE_EVIDENCE"
     reentry_class = ("REENTRY_WITHOUT_FINGER" if reentry_proven and not finger_interaction_detected
                      else "REENTRY_INVALID_FINGER_INTERACTION" if finger_interaction_detected
                      else "REENTRY_NOT_PROVEN")
-    restore_closed = bool(reentry_proven and not critical_time_unresolved
-                          and not finger_interaction_detected)
+    device_fdt_disarm_proven = False
+    prior_arm_lifetime = ("UNKNOWN_OR_NOT_DIRECTLY_OBSERVED" if full_run
+                          else "NOT_EVALUATED_PARTIAL_RUN")
+    restore_closed = False
 
     sanitized_oem_events = [{key: value for key, value in row.items() if key != "_timestamp"}
                             for row in oem_events]
@@ -831,9 +895,16 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         for row in oem_log_states)
 
     result = {
-        "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V3",
+        "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V4",
         "execution_mode": "OFFLINE_POSTPROCESS_ONLY",
         "input_hashes": {"manifest_sha256": manifest_hash.lower(), "wire_sha256": wire[0].sha256},
+        "run_classification": {
+            "D255_RUN_RESULT": run_result,
+            "POSTATTACH_HELLO_UI_RESULT": ui_result,
+            "BOOTSTRAP_EVIDENCE_PRESERVED": True,
+            "RESTORE_EVIDENCE_ACQUIRED": full_run,
+            "RESTORE_CLOSED": False,
+        },
         "target": {
             "usb_bus": selected[0], "usb_device": selected[1],
             "CAPTURE_FIRMWARE": firmware,
@@ -850,11 +921,21 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             "A8_APP12509_PROVEN": target_specific,
             "derived_marker_order": [
                 "CAPTURE_STARTED", "VM_USB_ATTACH_BEGIN", "VM_USB_ATTACH_END",
-                "GUEST_27C6_5125_PRESENT", "A8_APP12509_PROVEN", "OEM_SESSION_BEGIN",
+                "GUEST_27C6_5125_PRESENT", "A8_APP12509_PROVEN",
+                "PASSIVE_BOOTSTRAP_SETTLED", "HELLO_SETUP_UI_CHECK_BEGIN",
+                ui_terminal_name,
             ],
             "D255_BOOTSTRAP_EVIDENCE_VALIDITY": "VALID_COLD_ATTACH",
             "D255_EVIDENCE_VALIDITY": (
-                "INVALID_FINGER_INTERACTION" if finger_interaction_detected else "VALID_ZERO_FINGER"),
+                "INVALID_FINGER_INTERACTION" if finger_interaction_detected
+                else run_result if not full_run else "VALID_ZERO_FINGER"),
+        },
+        "ui_gate": {
+            "ACCOUNT_PREREQUISITES_CHECKED": True,
+            "SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH": "UNKNOWN_BEFORE_ATTACH",
+            "PREATTACH_FINGERPRINT_UI_REQUIRED": False,
+            "HELLO_SETUP_UI_RESULT": ui_result,
+            "TERMINAL_MARKER": ui_terminal_name,
         },
         "zero_finger": {
             "FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS": finger_irq_count,
@@ -891,20 +972,34 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         },
         "restore_cancel": {
             "CANCEL_NO_FINGER_DEVICE_COMMANDS": cancel_controls,
-            "CANCEL_NO_FINGER_LAST_FDT_STATE": f"0x{last_arm[1][0]:02x}_ARMED",
+            "CANCEL_NO_FINGER_LAST_FDT_STATE": (
+                f"0x{last_arm[1][0]:02x}_ARMED" if last_arm else "NOT_EVALUATED_PARTIAL_RUN"),
             "USB_CLOSE_AFTER_CANCEL": usb_close,
             "TLS_CLOSE_AFTER_CANCEL": tls_alert,
             "DEVICE_RESET_AFTER_CANCEL": device_reset,
             "IDLE_COMMAND_AFTER_CANCEL": idle,
             "FDT_REARM_AFTER_CANCEL": rearm,
             "REENTRY_COMMAND_SEQUENCE": reentry_controls,
-            "RESTORE_MODEL": restore_model,
+            "RESTORE_MODEL": restore_evidence_class,
             "RESTORE_CLOSED": restore_closed,
             "DEVICE_SIDE_CANCEL_COMMAND": device_cancel,
             "CANCEL_IS_HOST_ONLY": cancel_is_host_only,
             "ARM_STATE_AFTER_CANCEL": arm_state,
             "DETERMINISTIC_REENTRY_PROVEN": reentry_proven,
             "REENTRY_PROOF_CLASS": reentry_class,
+            "HOST_CANCEL_EVENT_PROVEN": host_cancel,
+            "CANCEL_WIRE_COMMAND_SEQUENCE": cancel_controls,
+            "OEM_DEVICE_CLOSE_AFTER_CANCEL": oem_device_close,
+            "OEM_D0EXIT_AFTER_CANCEL": oem_d0exit,
+            "OEM_D0ENTRY_ON_REENTRY": oem_d0entry,
+            "OEM_CANCEL_REENTRY_PROVEN": reentry_proven,
+            "NEW_FDT_ARM_ACCEPTED_ON_REENTRY": new_fdt_arm_accepted,
+            "DEVICE_SIDE_CANCEL_COMMAND_PROVEN": device_cancel,
+            "DEVICE_FDT_DISARM_PROVEN": device_fdt_disarm_proven,
+            "PRIOR_ARM_LIFETIME_AFTER_CANCEL": prior_arm_lifetime,
+            "RESTORE_EVIDENCE_CLASS": restore_evidence_class,
+            "RESTORE_EVIDENCE_ACQUIRED": full_run,
+            "RESTORE_CLOSURE_DECISION": "AI_PM_REVIEW_REQUIRED",
             "window_events": cancel_events,
         },
         "physical_fdt36_contract": {
@@ -934,7 +1029,10 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         f"CAPTURE_FIRMWARE={firmware}",
         f"D255_EVIDENCE_TARGET_SPECIFIC={str(target_specific).lower()}",
         "D255_BOOTSTRAP_EVIDENCE_VALIDITY=VALID_COLD_ATTACH",
-        f"D255_EVIDENCE_VALIDITY={'INVALID_FINGER_INTERACTION' if finger_interaction_detected else 'VALID_ZERO_FINGER'}",
+        f"D255_RUN_RESULT={run_result}",
+        "BOOTSTRAP_EVIDENCE_PRESERVED=true",
+        f"RESTORE_EVIDENCE_ACQUIRED={str(full_run).lower()}",
+        f"D255_EVIDENCE_VALIDITY={'INVALID_FINGER_INTERACTION' if finger_interaction_detected else run_result if not full_run else 'VALID_ZERO_FINGER'}",
         f"FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS={finger_irq_count}",
         f"POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS={post_irq_cmd22_count}",
         f"FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS={finger_image_path_count}",
@@ -950,8 +1048,14 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         f"LOG_ROTATED_OR_TRUNCATED={str(log_rotated_or_truncated).lower()}",
         f"LOG_UNCHANGED={str(result['oem_log_state']['LOG_UNCHANGED']).lower()}",
         f"LOG_GREW={str(result['oem_log_state']['LOG_GREW']).lower()}",
-        f"RESTORE_MODEL={restore_model}",
+        f"RESTORE_MODEL={restore_evidence_class}",
+        f"RESTORE_EVIDENCE_CLASS={restore_evidence_class}",
         f"RESTORE_CLOSED={str(restore_closed).lower()}",
+        "RESTORE_CLOSURE_DECISION=AI_PM_REVIEW_REQUIRED",
+        f"OEM_CANCEL_REENTRY_PROVEN={str(reentry_proven).lower()}",
+        f"NEW_FDT_ARM_ACCEPTED_ON_REENTRY={str(new_fdt_arm_accepted).lower()}",
+        f"DEVICE_FDT_DISARM_PROVEN={str(device_fdt_disarm_proven).lower()}",
+        f"PRIOR_ARM_LIFETIME_AFTER_CANCEL={prior_arm_lifetime}",
         f"DETERMINISTIC_REENTRY_PROVEN={str(reentry_proven).lower()}",
         f"REENTRY_PROOF_CLASS={reentry_class}",
         f"FDT36_COUNT={len(fdt36)}",
@@ -1012,6 +1116,7 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
                              finger_irq: bool = False,
                              cmd22: bool = False,
                              image_path: bool = False,
+                             ui_result: str = "READY_WAITING_FOR_FINGER",
                              guest_before_count: int = 0,
                              guest_after_count: int = 1) -> tuple[Path, str]:
     require(not directory.exists(), "synthetic fixture output collision")
@@ -1023,6 +1128,10 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     require(oem_timestamp_format in {"goodix", "iso"}, "unsupported synthetic OEM timestamp format")
     require(log_change in {"growth", "unchanged", "truncate", "replace"},
             "unsupported synthetic log change")
+    require(ui_result in {"READY_WAITING_FOR_FINGER", "UI_UNAVAILABLE",
+                          "NEW_PIN_REQUIRED", "UNEXPECTED_PREREQUISITE"},
+            "unsupported synthetic Hello UI result")
+    full_run = ui_result == "READY_WAITING_FOR_FINGER"
     base = (base_timestamp if base_timestamp is not None else
             dt.datetime(2026, 8, 22, 6, 14, 6, tzinfo=dt.timezone.utc).timestamp())
     otp = bytes(range(64))
@@ -1061,10 +1170,13 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         f"{stamp(1.6)} base data sent::0x" + cache_seed.hex(),
         f"{stamp(2.0)} gf_update_all_base",
         f"{stamp(3.0)} base_is_valid:1",
-        f"{stamp(4.1)} gfOnCancel " + secret_marker,
-        f"{stamp(4.13)} DeviceD0Exit",
-        f"{stamp(4.9)} DeviceD0Entry",
     ]
+    if full_run:
+        log_lines.extend([
+            f"{stamp(4.1)} gfOnCancel " + secret_marker,
+            f"{stamp(4.13)} DeviceD0Exit",
+            f"{stamp(4.9)} DeviceD0Entry",
+        ])
     before_log = b"D255 synthetic pre-existing log prefix\n"
     appended_log = ("\n".join(log_lines) + "\n").encode()
     if log_change == "growth":
@@ -1132,7 +1244,7 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     packets.append((base + 1.1, _a0(0xA8, fw_body), "IN", None))
     packets.append((base + 1.2, _a0(0xA6, otp), "IN", None))
     packets.append((base + 2, _a0(0x36, b"\x09\x01" + seed), "OUT", 64))
-    if not cancel_before_arm:
+    if full_run and not cancel_before_arm:
         packets.append((base + 3, _a0(0x32, b"\x08\x01" + seed + b"\x00\x00"), "OUT", 64))
     if unknown_control:
         packets.append((base + 4.3, _a0(0x66, b"\x00"), "OUT", 64))
@@ -1140,7 +1252,7 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         packets.append((base + 3.9, _a0(0x22, b"\x01\x00"), "OUT", 64))
     if image_path:
         packets.append((base + 3.95, _b0(bytes(1500)), "IN", None))
-    if reentry:
+    if full_run and reentry:
         packets.append((base + 4.9, _a0(0xA8, b""), "OUT", 64))
         packets.append((base + 5.0, _a0(0xA8, fw_body), "IN", None))
         packets.append((base + 5.1, _a0(0x32, b"\x08\x01" + seed + b"\x01\x00"), "OUT", 64))
@@ -1170,20 +1282,33 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         (start_clock_timestamp, "CLOCK_ANCHOR"),
         (base + 0.2, "VM_GUEST_READY"),
         (base + 0.3, "GUEST_TOPOLOGY_BEFORE"),
+        (base + 0.4, "ACCOUNT_PREREQUISITES_CHECKED"),
         (base + 0.5, "CAPTURE_STARTED"),
         (base + 0.6, "VM_USB_ATTACH_BEGIN"),
         (base + 0.9, "VM_USB_ATTACH_END"),
         (base + 0.95, "GUEST_27C6_5125_PRESENT"),
-        (base + 2.5, "OEM_SESSION_BEGIN"),
-        (base + 2.8 if cancel_before_arm else base + 3.5, "OEM_WAITING_NO_FINGER"),
+        (base + 2.4, "PASSIVE_BOOTSTRAP_SETTLED"),
+        (base + 2.5, "HELLO_SETUP_UI_CHECK_BEGIN"),
     ]
-    if cancel_marker:
-        marker_rows.extend([(base + 4, "CANCEL_NO_FINGER_BEGIN"), (base + 4.5, "CANCEL_NO_FINGER_END")])
-    marker_rows.extend([(base + 4.8, "REENTRY_BEGIN"),
-                        (base + 5.3, "REENTRY_WAITING_NO_FINGER"),
-                        (base + 5.35, "REENTRY_CANCEL_BEGIN"),
-                        (base + 5.4, "REENTRY_CANCEL_END"),
-                        (base + 5.5, "REENTRY_END")])
+    terminal_marker = {
+        "READY_WAITING_FOR_FINGER": "HELLO_SETUP_UI_READY",
+        "UI_UNAVAILABLE": "HELLO_SETUP_UI_UNAVAILABLE",
+        "NEW_PIN_REQUIRED": "HELLO_SETUP_NEW_PIN_REQUIRED",
+        "UNEXPECTED_PREREQUISITE": "HELLO_SETUP_UNEXPECTED_PREREQUISITE",
+    }[ui_result]
+    marker_rows.append((base + 2.6, terminal_marker))
+    if full_run:
+        marker_rows.extend([(base + 2.7, "OEM_SESSION_BEGIN"),
+                            (base + 2.8 if cancel_before_arm else base + 3.5,
+                             "OEM_WAITING_NO_FINGER")])
+        if cancel_marker:
+            marker_rows.extend([(base + 4, "CANCEL_NO_FINGER_BEGIN"),
+                                (base + 4.5, "CANCEL_NO_FINGER_END")])
+        marker_rows.extend([(base + 4.8, "REENTRY_BEGIN"),
+                            (base + 5.3, "REENTRY_WAITING_NO_FINGER"),
+                            (base + 5.35, "REENTRY_CANCEL_BEGIN"),
+                            (base + 5.4, "REENTRY_CANCEL_END"),
+                            (base + 5.5, "REENTRY_END")])
     marker_text = "timestamp_utc\tevent\tdetail\n" + "".join(
         f"{dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat()}\t{name}\tsynthetic\n"
         for ts, name in sorted(marker_rows)

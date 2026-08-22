@@ -97,6 +97,14 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertFalse(result["seed_correlation"]["CAUSALITY_PROVEN"])
         self.assertEqual(result["restore_cancel"]["REENTRY_PROOF_CLASS"],
                          "REENTRY_WITHOUT_FINGER")
+        self.assertTrue(result["restore_cancel"]["OEM_CANCEL_REENTRY_PROVEN"])
+        self.assertTrue(result["restore_cancel"]["NEW_FDT_ARM_ACCEPTED_ON_REENTRY"])
+        self.assertFalse(result["restore_cancel"]["DEVICE_FDT_DISARM_PROVEN"])
+        self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
+        self.assertEqual(result["restore_cancel"]["RESTORE_CLOSURE_DECISION"],
+                         "AI_PM_REVIEW_REQUIRED")
+        self.assertEqual(result["restore_cancel"]["PRIOR_ARM_LIFETIME_AFTER_CANCEL"],
+                         "UNKNOWN_OR_NOT_DIRECTLY_OBSERVED")
         self.assertEqual(result["vm_boundary"]["D255_BOOTSTRAP_EVIDENCE_VALIDITY"],
                          "VALID_COLD_ATTACH")
         self.assertEqual(result["vm_boundary"]["VM_USB_ATTACH_COUNT"], 1)
@@ -200,6 +208,42 @@ class D255PostprocessorTests(unittest.TestCase):
         with self.assertRaisesRegex(D255.EvidenceError, "CANCEL_NO_FINGER_BEGIN"):
             D255.analyze(run, manifest, digest, root / "out")
 
+    def test_partial_bootstrap_ui_unavailable_preserves_seed_without_restore(self):
+        result, output = self.analyze_fixture(ui_result="UI_UNAVAILABLE")
+        self.assertEqual(result["run_classification"]["D255_RUN_RESULT"],
+                         "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE")
+        self.assertTrue(result["run_classification"]["BOOTSTRAP_EVIDENCE_PRESERVED"])
+        self.assertFalse(result["run_classification"]["RESTORE_EVIDENCE_ACQUIRED"])
+        self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
+        self.assertEqual(result["restore_cancel"]["RESTORE_EVIDENCE_CLASS"],
+                         "NO_RESTORE_EVIDENCE")
+        self.assertEqual(result["seed_correlation"]["FIRST_FDT36_SEED"],
+                         "adadbdbda3a3b1b1a6a6b2b2")
+        summary = (output / "D255_sanitized_summary.txt").read_text(encoding="ascii")
+        self.assertIn("BOOTSTRAP_EVIDENCE_PRESERVED=true", summary)
+        self.assertIn("RESTORE_EVIDENCE_ACQUIRED=false", summary)
+
+    def test_partial_bootstrap_new_pin_required_is_terminal(self):
+        result, _ = self.analyze_fixture(ui_result="NEW_PIN_REQUIRED")
+        self.assertEqual(result["ui_gate"]["HELLO_SETUP_UI_RESULT"], "NEW_PIN_REQUIRED")
+        self.assertFalse(result["restore_cancel"]["RESTORE_EVIDENCE_ACQUIRED"])
+
+    def test_partial_bootstrap_unexpected_prerequisite_is_terminal(self):
+        result, _ = self.analyze_fixture(ui_result="UNEXPECTED_PREREQUISITE")
+        self.assertEqual(result["ui_gate"]["HELLO_SETUP_UI_RESULT"],
+                         "UNEXPECTED_PREREQUISITE")
+        self.assertFalse(result["restore_cancel"]["OEM_CANCEL_REENTRY_PROVEN"])
+
+    def test_reentry_and_new_arm_never_close_restore(self):
+        result, _ = self.analyze_fixture()
+        restore = result["restore_cancel"]
+        self.assertTrue(restore["OEM_CANCEL_REENTRY_PROVEN"])
+        self.assertTrue(restore["NEW_FDT_ARM_ACCEPTED_ON_REENTRY"])
+        self.assertFalse(restore["DEVICE_FDT_DISARM_PROVEN"])
+        self.assertFalse(restore["RESTORE_CLOSED"])
+        self.assertEqual(restore["RESTORE_EVIDENCE_CLASS"],
+                         "REENTRY_ACCEPTS_NEW_ARM_PRIOR_ARM_STATUS_UNKNOWN")
+
     def test_cancel_before_arm(self):
         root, run, manifest, digest = self.fixture(cancel_before_arm=True)
         with self.assertRaisesRegex(D255.EvidenceError, "before any observed 0x32"):
@@ -266,10 +310,25 @@ class D255PostprocessorTests(unittest.TestCase):
             "VM_USB_ATTACH_BEGIN",
             "VM_USB_ATTACH_END",
             "GUEST_27C6_5125_PRESENT",
+            "ACCOUNT_PREREQUISITES_CHECKED",
+            "PASSIVE_BOOTSTRAP_SETTLED",
+            "HELLO_SETUP_UI_CHECK_BEGIN",
+            "HELLO_SETUP_UI_READY",
+            "HELLO_SETUP_UI_UNAVAILABLE",
+            "HELLO_SETUP_NEW_PIN_REQUIRED",
+            "HELLO_SETUP_UNEXPECTED_PREREQUISITE",
             "OEM_SESSION_BEGIN",
             "OEM_WAITING_NO_FINGER",
             "WINDOWS_HELLO_SETUP_NO_FINGER",
-            "SETUP_NO_FINGER_PATH_VERIFIED_NO_NEW_PIN",
+            "AccountPrerequisiteConfirmation",
+            "SIGNIN_OPTIONS_CHECKED_NO_NEW_PIN_CHANGE",
+            "WindowsHelloPinState",
+            "NOT_REQUIRED_BY_CURRENT_ACCOUNT_POLICY",
+            "FingerprintSetupPinRequirement",
+            "SENSOR_DEPENDENT_UI_AVAILABILITY",
+            "UNKNOWN_BEFORE_ATTACH",
+            "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE",
+            "PromptForChoice",
             "USBPCAP_INTERFACE_SELECTION=AMBIGUOUS",
             "duration:$CaptureDurationSeconds",
             "D255_POWERSHELL_SELFTEST=PASS",
@@ -293,8 +352,45 @@ class D255PostprocessorTests(unittest.TestCase):
         ):
             self.assertNotIn(unsupported, source)
         self.assertNotIn("AllowReentryFinger", source)
+        self.assertNotIn("SETUP_NO_FINGER_PATH_" + "VERIFIED_NO_NEW_PIN", source)
+        self.assertNotIn("UiPrerequisite" + "Confirmation", source)
         self.assertNotIn("recognition prompt", source.lower())
         self.assertNotRegex(source, r"(?i)\b(?:virsh|virt-manager|qemu|spice|hostdev)\b")
+
+    def test_powershell_preattach_gate_is_account_only(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        self.assertIn('account_prerequisites_ready = $true', source)
+        self.assertIn('sensor_dependent_ui_availability = "UNKNOWN_BEFORE_ATTACH"', source)
+        self.assertIn('preattach_fingerprint_ui_required = $false', source)
+        self.assertNotIn("SETUP_NO_FINGER_PATH_" + "VERIFIED_NO_NEW_PIN", source)
+        confirmation = re.search(
+            r'\$ExpectedAccountPrerequisiteConfirmation\s*=\s*"([^"]+)"', source)
+        self.assertIsNotNone(confirmation)
+        self.assertNotRegex(confirmation.group(1), r"(?i)finger|sensor|wizard|setup.*path")
+
+    def test_powershell_pin_required_without_pin_fails_before_authorization(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        pin_gate = source.index('$WindowsHelloPinState -ceq "NOT_CONFIGURED"')
+        authorization_gate = source.index('if ($Authorization -cne $ExpectedAuthorization)')
+        self.assertLess(pin_gate, authorization_gate)
+        self.assertIn('$FingerprintSetupPinRequirement -ceq "REQUIRED"', source)
+        self.assertIn("PIN creation/change is forbidden", source)
+        self.assertNotRegex(source, r"(?i)Set-ItemProperty|New-ItemProperty|reg\.exe|net user")
+
+    def test_powershell_postattach_ui_gate_is_structured_and_single_shot(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        gate_function = source[source.index("function Read-HelloSetupUiResult"):
+                               source.index("function Get-TargetDevices")]
+        self.assertIn("PromptForChoice", gate_function)
+        self.assertNotIn("Read-Host", gate_function)
+        for result in ("READY_WAITING_FOR_FINGER", "UI_UNAVAILABLE",
+                       "NEW_PIN_REQUIRED", "UNEXPECTED_PREREQUISITE"):
+            self.assertIn(result, gate_function)
+        self.assertEqual(source.count("$helloUiResult = Read-HelloSetupUiResult"), 1)
+        ui_gate = source.index('$helloUiResult = Read-HelloSetupUiResult')
+        self.assertLess(source.index('Write-OperatorMarker -Event "PASSIVE_BOOTSTRAP_SETTLED"'),
+                        ui_gate)
+        self.assertLess(ui_gate, source.index('Write-OperatorMarker -Event "OEM_SESSION_BEGIN"'))
 
     def test_powershell_authorization_gate_follows_all_pre_hardware_setup(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")
@@ -315,6 +411,13 @@ class D255PostprocessorTests(unittest.TestCase):
             self.assertLess(position, gate, token)
         self.assertLess(source.index('Write-FileSnapshot -Stage "before"'),
                         source.rindex('$preflight["runtime"] = Get-D255RuntimeInfo'))
+        interface_closed = source.index(
+            '$usbPcapCandidates.Count -gt 1 -and $interfaceMatches.Count -ne')
+        account_gate = source.index(
+            'if ($AccountPrerequisiteConfirmation -cne $ExpectedAccountPrerequisiteConfirmation)')
+        remaining_path_gates = source.index('foreach ($path in $OemLogPath)', account_gate)
+        self.assertLess(interface_closed, account_gate)
+        self.assertLess(account_gate, remaining_path_gates)
         self.assertLess(gate, consumed)
         self.assertLess(consumed, start_capture)
 

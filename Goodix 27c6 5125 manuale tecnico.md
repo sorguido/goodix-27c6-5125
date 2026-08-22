@@ -127,16 +127,35 @@ prova in capture sia del descriptor `27c6:5125` sia, separatamente, dell'A8
 quindi non viene inventata automazione host-side; se esistono più interfacce
 USBPcap, vanno catturate tutte o il preflight fallisce ambiguo.
 
-Il path UI selezionato è ora Settings → Sign-in options → Fingerprint
-recognition → Set up/Add a fingerprint, usato soltanto per raggiungere due volte
-lo stato waiting e cancellarlo due volte senza dito. Non richiede un fingerprint
-preesistente; un eventuale PIN deve esistere già e D255 non può crearlo o
-modificarlo. Ogni IRQ finger-down `0x0002`, `0x22 [01 00]` o image path nella
-finestra operatore invalida la run e forza `RESTORE_CLOSED=false`.
-`-AllowReentryFinger` è stato rimosso. La correzione VM-aware/zero-finger è
-pronta soltanto per una nuova review AI-PM, non per una run operatore. Bootstrap
-e restore restano aperti, nessuna autorizzazione live è implicita e ogni run
-richiede una nuova autorizzazione single-shot dopo review positiva.
+La terza review AI-PM ha corretto due overclaim residui. Con Goodix assente dal
+guest, la UI fingerprint può legittimamente essere nascosta o indisponibile:
+pre-attach si verificano perciò soltanto pagina Sign-in options, stato account,
+enrollment incompleto, divieto di nuovo PIN e stato PIN esplicito. La
+disponibilità sensor-dependent resta `UNKNOWN_BEFORE_ATTACH`; non è un gate di
+autorizzazione. Il vero path Settings → Sign-in options → Fingerprint
+recognition → Set up/Add a fingerprint viene verificato solo dopo capture
+attiva, singolo attach, PnP guest, A8 APP12509 wire-derived e bootstrap passivo.
+
+Il gate post-attach accetta solo `READY_WAITING_FOR_FINGER`, `UI_UNAVAILABLE`,
+`NEW_PIN_REQUIRED` o `UNEXPECTED_PREREQUISITE`. Solo il primo entra nelle due
+cancellazioni senza dito; gli altri chiudono la restore phase senza retry,
+mutazione account/PIN, UI alternativa, recognition, dito o detach. Il timer
+bounded completa comunque la capture: descriptor/A8, cache, primo `0x36` e
+bootstrap restano sanitizzabili come
+`PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE`, con
+`BOOTSTRAP_EVIDENCE_PRESERVED=true` e
+`RESTORE_EVIDENCE_ACQUIRED=false`.
+
+La re-entry OEM e perfino un nuovo `0x32` accettato provano soltanto che una
+nuova sessione/arm è accettata; non osservano necessariamente la vita del prior
+arm né un disarm FDT. Il sanitizer separa quindi cancel host, comandi wire,
+close/D0Exit/D0Entry, re-entry, nuovo arm, cancel device-side e lifetime del
+prior arm. Senza comando/transizione target-specific semanticamente chiusa,
+`DEVICE_FDT_DISARM_PROVEN=false`, `RESTORE_CLOSED=false` e
+`RESTORE_CLOSURE_DECISION=AI_PM_REVIEW_REQUIRED`. Ogni IRQ finger-down
+`0x0002`, `0x22 [01 00]` o image path nella finestra operatore invalida la
+restore evidence. La correzione resta pronta soltanto per review AI-PM, non per
+una run operatore; nessuna autorizzazione live è implicita.
 
 D247 cambia inoltre la strategia implementativa, senza modificare il confine
 hardware: fino a D246 il codice di progetto è rimasto BSD-2-Clause e clean-room
@@ -187,7 +206,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | due review correttive fallite; revisione VM-aware/zero-finger pronta per nuova review AI-PM, non eseguita | PS5.1/MMDD preservati; capture-before-attach, singolo attach GUI, setup no-finger e invalidazione IRQ2/`0x22`/image; hardware non autorizzato |
+| Kit acquisizione Windows D255 | tre review correttive fallite; correttivo post-attach/conservative-restore pronto per nuova review AI-PM, non eseguito | pre-attach solo account/PIN, UI sensor-dependent dopo attach/A8/bootstrap, partial bootstrap preservato; re-entry non chiude disarm; hardware non autorizzato |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1905,13 +1924,24 @@ promossa a stato della VM corrente. D175 viene usato soltanto come evidenza di
 cold attach passivo e init OEM automatico senza Hello o dito; l'UI esatta della
 capture sopravvissuta `rilevamento.pcapng` non è canonicamente preservata.
 
+La terza review AI-PM ha respinto anche il requisito del vero wizard fingerprint
+pre-attach e l'equivalenza implicita re-entry→restore. Windows Hello Fingerprint
+è sensor-dependent: con Goodix assente dal guest il relativo controllo può
+essere nascosto, indisponibile o non configurabile anche se funzionerebbe dopo
+l'attach. Inoltre A8 o nuovo `0x32` accettato nella seconda sessione non
+osservano necessariamente il disarm del prior arm. Questa è la decisione
+canonica corrente, non un limite cosmetico del launcher.
+
 Nel ramo futuro one-shot, la VM Windows è già avviata e il Goodix resta visibile
-sull'host Linux ma assente dal guest. Tool/interface/path/disk/log gate, conferma
-del path setup senza nuovo PIN, target absence, `run_clock.json`, copie e
-metadati before di log/cache, runtime self-check e snapshot PnP read-only
-precedono l'autorizzazione. Se TShark vede una sola interfaccia USBPcap la
-selezione è univoca; se ne vede più di una, il launcher richiede la capture
-simultanea di tutte o fallisce `USBPCAP_INTERFACE_SELECTION=AMBIGUOUS`.
+sull'host Linux ma assente dal guest. Il preflight verifica soltanto
+Sign-in-options/account-level: enrollment `NOT_COMPLETED`, nessuna creazione o
+modifica PIN, e `WINDOWS_HELLO_PIN_STATE` in
+`ALREADY_CONFIGURED|NOT_CONFIGURED|UNKNOWN|NOT_REQUIRED_BY_CURRENT_ACCOUNT_POLICY`.
+Se policy setup=`REQUIRED` e PIN=`NOT_CONFIGURED`, il run fallisce prima
+dell'autorizzazione. La disponibilità UI fingerprint resta
+`UNKNOWN_BEFORE_ATTACH`. Se TShark vede una sola interfaccia USBPcap la selezione
+è univoca; se ne vede più di una, il launcher richiede la capture simultanea di
+tutte o fallisce `USBPCAP_INTERFACE_SELECTION=AMBIGUOUS`.
 
 Solo dopo questi gate si scrive `authorization_consumed.json` e si tenta
 TShark. Il launcher prova processo e output attivi, poi presenta una sola azione
@@ -1919,7 +1949,8 @@ TShark. Il launcher prova processo e output attivi, poi presenta una sola azione
 failure di start dopo il record consuma il run. Il postprocessor richiede che
 il descriptor `27c6:5125` compaia dopo `CAPTURE_STARTED`, entro i marker
 `VM_USB_ATTACH_BEGIN/END`, su un solo bus/device, e che l'A8 byte-exact
-`GF_ST411SEC_APP_12509` preceda `OEM_SESSION_BEGIN`. Descriptor pre-capture,
+`GF_ST411SEC_APP_12509` preceda `PASSIVE_BOOTSTRAP_SETTLED` e il successivo gate
+UI. Descriptor pre-capture,
 assenza di enumerazione, secondo device/attach o topology change invalidano la
 provenance bootstrap. Lo script non invoca service restart, PnP mutation, VM,
 provisioning, flash o comandi Goodix. Il cache discovery resta ristretto a root
@@ -1929,10 +1960,11 @@ Goodix e a size/naming pertinenti.
 hash-gated. Seleziona il device tramite A8 esatto, ricostruisce A0/B0 senza
 esportare payload, misura il contratto fisico `0x36`, valida l'ipotesi
 `OTP64+FDT12+NAV3200+IMAGE10240+CRC4`, confronta solo FDT12 e hash di regioni,
-e censisce la finestra ultimo `0x32` → cancel → re-entry. La UI selezionata è il
-normale setup/add-fingerprint, non recognition: due attese e due cancellazioni,
-sempre senza dito, nessun enrollment completato e nessuna creazione/modifica
-PIN. Il parametro `-AllowReentryFinger` non esiste più. Nella finestra
+e censisce la finestra ultimo `0x32` → cancel → re-entry. La UI sensor-dependent
+è verificata soltanto post-attach/A8/bootstrap con una scelta strutturata:
+`READY_WAITING_FOR_FINGER`, `UI_UNAVAILABLE`, `NEW_PIN_REQUIRED` o
+`UNEXPECTED_PREREQUISITE`. Solo READY prosegue con due attese e due
+cancellazioni, sempre senza dito, enrollment o modifica PIN. Nella finestra
 `OEM_WAITING_NO_FINGER` → `REENTRY_CANCEL_END`, il sanitizer censisce IRQ
 finger-down `0x0002`, exact `0x22 [01 00]` e image-sized B0; qualunque occorrenza
 produce `INVALID_FINGER_INTERACTION` e forza `RESTORE_CLOSED=false`.
@@ -1950,15 +1982,29 @@ non ricostruibile restano `AMBIGUOUS`. Eventi critici cancel/restore non
 correlabili impongono `RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION` e non
 promuovono `CANCEL_IS_HOST_ONLY` o `USB_CLOSE_AFTER_CANCEL`.
 
-L'uguaglianza wire/cache/log viene classificata come correlazione, mai
-automaticamente come causalità. Un A8 assente/diverso rende l'evidenza non
-target-specific e terminale; marker mancanti, cancel prima di arm, formato
-inatteso e collisioni falliscono chiusi senza retry.
+Se la UI non è ready, il run consumato termina senza cancel/re-entry e lascia
+scadere il timer bounded; TShark exit zero, file non vuoto e readback di un frame
+validano il pcapng prima degli snapshot after e del manifest. Il postprocessor
+accetta `PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE` senza marker cancel ma conserva
+descriptor/A8, cache, primo `0x36` e profilo fisico. Produce
+`BOOTSTRAP_EVIDENCE_PRESERVED=true`, `RESTORE_EVIDENCE_ACQUIRED=false` e
+`RESTORE_CLOSED=false`.
 
-I 37 test D255 passano, inclusi boundary VM/enumerazione/single attach,
+Nel ramo full, `OEM_CANCEL_REENTRY_PROVEN` e
+`NEW_FDT_ARM_ACCEPTED_ON_REENTRY` sono osservazioni distinte da
+`DEVICE_FDT_DISARM_PROVEN`, che resta falso senza una semantica target-specific
+esplicita. `PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNKNOWN_OR_NOT_DIRECTLY_OBSERVED` e
+la sola re-entry non può mai promuovere `RESTORE_CLOSED`; la chiusura resta
+`AI_PM_REVIEW_REQUIRED` sul futuro bundle reale. L'uguaglianza wire/cache/log
+resta correlazione, mai automaticamente causalità. Un A8 assente/diverso rende
+l'evidenza non target-specific e terminale; marker/formati inattesi e collisioni
+falliscono chiusi senza retry.
+
+I 44 test D255 passano, inclusi boundary VM/enumerazione/single attach,
 invalidation pre-attached/topology-change, zero-finger e invalidazione separata
 IRQ2/`0x22`/image, oltre a ISO, MMDD realistico, mezzanotte, fine anno,
-ambiguità/cambio offset e quattro stati del log. Passano inoltre le regressioni
+ambiguità/cambio offset, quattro stati del log, quattro esiti UI, partial
+bootstrap e regressione re-entry≠disarm. Passano inoltre le regressioni
 D252–D254 e i 172 test della suite supportata. `pwsh` non è installato
 sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
 staticamente, mentre il vero `-SelfTestOnly` e poi `-PreflightOnly` Windows
@@ -1967,12 +2013,16 @@ restano una verifica futura. Nessun dato raw D255 è stato acquisito.
 ```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
+D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
-D255_OUTCOME=VM_AWARE_ZERO_FINGER_CORRECTIVE_KIT_PREPARED
+D255_OUTCOME=POSTATTACH_UI_AND_CONSERVATIVE_RESTORE_CORRECTIVE_PREPARED
 D255_WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
 D255_VM_USB_ATTACH_METHOD=OPERATOR_GUI_MANUAL_ATTACH
 D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT=NOT_COMPLETED
 D255_SELECTED_WINDOWS_UI_PATH=WINDOWS_HELLO_SETUP_NO_FINGER
+D255_SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH=UNKNOWN_BEFORE_ATTACH
+D255_PARTIAL_BOOTSTRAP_RESULT_SUPPORTED=true
+D255_REENTRY_ALONE_CAN_CLOSE_RESTORE=false
 D255_FINGER_INTERACTION_ALLOWED=false
 D255_LIVE_EXECUTION=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
@@ -2115,11 +2165,17 @@ D254_REQUIRES_MORE_PRIMARY_EVIDENCE true
 D255_KIT_PREPARED true
 D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
+D255_THIRD_AI_PM_REVIEW FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
 D255_WINDOWS_EXECUTION_ENVIRONMENT VIRTUAL_MACHINE
 D255_VM_USB_ATTACH_METHOD OPERATOR_GUI_MANUAL_ATTACH
 D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT NOT_COMPLETED
 D255_SELECTED_WINDOWS_UI_PATH WINDOWS_HELLO_SETUP_NO_FINGER
+D255_SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH UNKNOWN_BEFORE_ATTACH
+D255_PREATTACH_FINGERPRINT_UI_REQUIRED false
+D255_PARTIAL_BOOTSTRAP_RESULT_SUPPORTED true
+D255_REENTRY_ALONE_CAN_CLOSE_RESTORE false
+D255_RESTORE_CLOSURE_DECISION AI_PM_REVIEW_REQUIRED
 D255_FINGER_INTERACTION_ALLOWED false
 D255_READY_FOR_AI_PM_REVIEW true
 D255_READY_FOR_OPERATOR_RUN false
