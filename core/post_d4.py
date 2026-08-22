@@ -7,7 +7,8 @@ Command/framing and capture sequencing are adapted from Rockytkg commit
 227eba219fa9e3fbac5bd59aca79f624f67cd11b after comparison with local 12509
 evidence.  The image codec is reused directly from the independently validated
 local implementation; this module provides no USB, TLS, secret, retry,
-reconnect, lifecycle, firmware, provisioning, or persistence implementation.
+reconnect, firmware, provisioning, or persistence implementation.  A caller
+may attach the offline lifecycle observer introduced in D257.
 """
 
 from dataclasses import dataclass
@@ -295,6 +296,23 @@ class Transport(Protocol):
         ...
 
 
+class FdtLifecycleObserver(Protocol):
+    def observe_af_state(self, pov_valid: bool) -> object:
+        ...
+
+    def arm_fdt(self) -> object:
+        ...
+
+    def post_irq2_image_command(self) -> object:
+        ...
+
+    def first_image_received(self) -> object:
+        ...
+
+    def fail_closed(self, reason: str) -> None:
+        ...
+
+
 class ExactlyOneAfMachine:
     """Terminal AF-only boundary with a pre-submit attempt latch.
 
@@ -336,8 +354,9 @@ class ExactlyOneAfMachine:
 class FirstImageMachine:
     """Monotonic, single-pass offline AF→FDT/POV→first-image machine."""
 
-    def __init__(self, transport: Transport):
+    def __init__(self, transport: Transport, lifecycle: FdtLifecycleObserver | None = None):
         self.transport = transport
+        self.lifecycle = lifecycle
         self.phase = "POST_D4"
         self.path: str | None = None
         self.image: tuple[int, ...] | None = None
@@ -370,6 +389,8 @@ class FirstImageMachine:
             raise UnexpectedAck(f"af_frame_count:{len(frames)}")
         state = parse_af_response(frames[0])
         self.path = "POV" if state.pov_valid else "FRESH_FDT"
+        if self.lifecycle is not None:
+            self.lifecycle.observe_af_state(state.pov_valid)
         self.phase = "AF_OK"
         return state
 
@@ -381,14 +402,28 @@ class FirstImageMachine:
             return
         if self.path != "FRESH_FDT":
             raise InvalidTransition("capture_path_unset")
-        self._send_async(build_fdt_down(table12, ts16), 0x32)
-        self.phase = "WAIT_FDT_DOWN"
+        try:
+            if self.lifecycle is not None:
+                self.lifecycle.arm_fdt()
+            self._send_async(build_fdt_down(table12, ts16), 0x32)
+            self.phase = "WAIT_FDT_DOWN"
+        except Exception:
+            if self.lifecycle is not None:
+                self.lifecycle.fail_closed("initial_fdt_arm_failed")
+                self.phase = "FDT_ARM_FAILED"
+            raise
 
     def receive_payload(self, payload: bytes) -> tuple[int, ...] | None:
         if self.phase == "WAIT_FDT_DOWN":
-            event = parse_fdt_event(payload)
-            if event.irq != 2:
-                raise UnexpectedEvent(f"fdt_order:0x{event.irq:x}")
+            try:
+                event = parse_fdt_event(payload)
+                if event.irq != 2:
+                    raise UnexpectedEvent(f"fdt_order:0x{event.irq:x}")
+            except Exception:
+                if self.lifecycle is not None:
+                    self.lifecycle.fail_closed("fdt_event_validation_failed")
+                    self.phase = "FDT_EVENT_FAILED"
+                raise
             if self.image_command_attempt_count:
                 raise InvalidTransition("post_irq2_image_command_already_attempted")
             self.image_command_attempt_count = 1
@@ -396,14 +431,26 @@ class FirstImageMachine:
             try:
                 # Target packet 227 proves cmd0=2/cmd1=1 (wire 0x22) after
                 # finger-down. Wire 0x20 remains a separate baseline builder.
+                if self.lifecycle is not None:
+                    self.lifecycle.post_irq2_image_command()
                 self._send_async(build_finger_image(), 0x22)
                 self.phase = "WAIT_IMAGE"
             except Exception:
+                if self.lifecycle is not None:
+                    self.lifecycle.fail_closed("post_irq2_image_command_failed")
                 self.phase = "IMAGE_COMMAND_FAILED"
                 raise
             return None
         if self.phase == "WAIT_IMAGE":
-            self.image = parse_image_payload(payload)
+            try:
+                self.image = parse_image_payload(payload)
+                if self.lifecycle is not None and self.path == "FRESH_FDT":
+                    self.lifecycle.first_image_received()
+            except Exception:
+                if self.lifecycle is not None:
+                    self.lifecycle.fail_closed("first_image_validation_failed")
+                    self.phase = "IMAGE_VALIDATION_FAILED"
+                raise
             self.phase = FIRST_IMAGE_RECEIVED
             return self.image
         raise InvalidTransition(f"payload_in_phase:{self.phase}")

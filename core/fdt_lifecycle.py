@@ -1,0 +1,352 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2026 Goodix 27c6:5125 project contributors
+"""Offline-only fresh-FDT lifecycle and bootstrap composition.
+
+This module models the target-observed OEM host/bus contract.  Canceling a
+wait is a host receive cancellation, session re-entry injects no recovery
+command, and terminal stop emits no device command.  Full cold-start is an
+explicit external boundary and is never simulated as session re-entry.
+
+There is no USB backend, retry loop, cache writeback, provisioning, firmware,
+or persistent-command implementation here.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Iterable, Protocol
+
+from core.fdt_seed import SeedProviderResult
+from core.post_d4 import (
+    InvalidTransition,
+    LengthMismatch,
+    UnexpectedAck,
+    UnexpectedEvent,
+    build_fdt_down,
+    build_fdt_manual,
+    parse_ack,
+    parse_fdt_event,
+)
+
+
+class FdtLifecycleState(str, Enum):
+    INITIALIZED_POST_D4 = "INITIALIZED_POST_D4"
+    AF_STATE_KNOWN = "AF_STATE_KNOWN"
+    FDT_BOOTSTRAP_SAMPLING = "FDT_BOOTSTRAP_SAMPLING"
+    FDT_BOOTSTRAP_READY = "FDT_BOOTSTRAP_READY"
+    FDT_ARMED_WAIT = "FDT_ARMED_WAIT"
+    HOST_WAIT_CANCELED = "HOST_WAIT_CANCELED"
+    SESSION_REENTRY = "SESSION_REENTRY"
+    TERMINAL_STOPPED = "TERMINAL_STOPPED"
+    FIRST_IMAGE_RECEIVED = "FIRST_IMAGE_RECEIVED"
+    FULL_COLD_START_REQUIRED = "FULL_COLD_START_REQUIRED"
+    FAILED_CLOSED = "FAILED_CLOSED"
+
+
+SAFE_DEVICE_COMMANDS = frozenset({0x36, 0x32, 0x22})
+PERSISTENT_COMMAND_FAMILIES = frozenset({0xE0, 0xA4, 0xF0, 0xF4})
+SPECIAL_RECOVERY_COMMANDS = frozenset({0xA2, 0x70})
+
+
+@dataclass(frozen=True)
+class LifecycleTransition:
+    sequence: int
+    session_generation: int
+    source: str
+    event: str
+    target: str
+    host_actions: tuple[str, ...]
+    device_commands: tuple[int, ...]
+
+    def redacted(self) -> dict[str, object]:
+        return {
+            "sequence": self.sequence,
+            "session_generation": self.session_generation,
+            "source": self.source,
+            "event": self.event,
+            "target": self.target,
+            "host_actions": list(self.host_actions),
+            "device_commands": [f"0x{value:02x}" for value in self.device_commands],
+        }
+
+
+class FdtLifecycle:
+    """Fail-closed lifecycle with a monotonically numbered audit trail."""
+
+    def __init__(self) -> None:
+        self.state = FdtLifecycleState.INITIALIZED_POST_D4
+        self.session_generation = 0
+        self.retry_count = 0
+        self.persistent_write_family_count = 0
+        self.fresh_path: bool | None = None
+        self.arm_attempts_by_generation: dict[int, int] = {}
+        self.transitions: list[LifecycleTransition] = []
+
+    def _record(
+        self,
+        event: str,
+        target: FdtLifecycleState,
+        *,
+        host_actions: tuple[str, ...] = (),
+        device_commands: tuple[int, ...] = (),
+    ) -> LifecycleTransition:
+        if any(command not in SAFE_DEVICE_COMMANDS for command in device_commands):
+            self.fail_closed(f"non_allowlisted_device_command:{device_commands!r}")
+            raise InvalidTransition("lifecycle_device_command_not_allowlisted")
+        if set(device_commands) & (PERSISTENT_COMMAND_FAMILIES | SPECIAL_RECOVERY_COMMANDS):
+            self.fail_closed("persistent_or_recovery_command_reachable")
+            raise InvalidTransition("persistent_or_recovery_command_reachable")
+        transition = LifecycleTransition(
+            sequence=len(self.transitions) + 1,
+            session_generation=self.session_generation,
+            source=self.state.value,
+            event=event,
+            target=target.value,
+            host_actions=host_actions,
+            device_commands=device_commands,
+        )
+        self.transitions.append(transition)
+        self.state = target
+        return transition
+
+    def _require(self, *states: FdtLifecycleState) -> None:
+        if self.state in states:
+            return
+        current = self.state.value
+        expected = ",".join(state.value for state in states)
+        self.fail_closed(f"invalid_transition:{current}:expected:{expected}")
+        raise InvalidTransition(f"lifecycle_state:{current}:expected:{expected}")
+
+    def fail_closed(self, reason: str) -> None:
+        if self.state == FdtLifecycleState.FAILED_CLOSED:
+            return
+        self._record(
+            f"FAIL_CLOSED:{reason}",
+            FdtLifecycleState.FAILED_CLOSED,
+            host_actions=("STOP_NEW_TRAFFIC",),
+        )
+
+    def observe_af_state(self, pov_valid: bool) -> LifecycleTransition:
+        self._require(FdtLifecycleState.INITIALIZED_POST_D4)
+        self.fresh_path = not pov_valid
+        return self._record("AF_STATE_OBSERVED", FdtLifecycleState.AF_STATE_KNOWN)
+
+    def begin_bootstrap(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.AF_STATE_KNOWN)
+        if self.fresh_path is not True:
+            self.fail_closed("fresh_bootstrap_without_fresh_af_path")
+            raise InvalidTransition("fresh_bootstrap_without_fresh_af_path")
+        return self._record("BEGIN_FRESH_FDT_BOOTSTRAP", FdtLifecycleState.FDT_BOOTSTRAP_SAMPLING)
+
+    def manual_sample_attempt(self, stage: int) -> LifecycleTransition:
+        self._require(FdtLifecycleState.FDT_BOOTSTRAP_SAMPLING)
+        return self._record(
+            f"FDT_MANUAL_SAMPLE_{stage}_ATTEMPT",
+            FdtLifecycleState.FDT_BOOTSTRAP_SAMPLING,
+            device_commands=(0x36,),
+        )
+
+    def manual_sample_completed(self, stage: int) -> LifecycleTransition:
+        self._require(FdtLifecycleState.FDT_BOOTSTRAP_SAMPLING)
+        return self._record(
+            f"FDT_MANUAL_SAMPLE_{stage}_IRQ100_ACCEPTED",
+            FdtLifecycleState.FDT_BOOTSTRAP_SAMPLING,
+        )
+
+    def bootstrap_completed(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.FDT_BOOTSTRAP_SAMPLING)
+        return self._record("FDT_BOOTSTRAP_COMPLETED", FdtLifecycleState.FDT_BOOTSTRAP_READY)
+
+    def arm_fdt(self) -> LifecycleTransition:
+        self._require(
+            FdtLifecycleState.AF_STATE_KNOWN,
+            FdtLifecycleState.FDT_BOOTSTRAP_READY,
+            FdtLifecycleState.SESSION_REENTRY,
+        )
+        if self.fresh_path is not True:
+            self.fail_closed("fdt_arm_without_fresh_af_path")
+            raise InvalidTransition("fdt_arm_without_fresh_af_path")
+        attempts = self.arm_attempts_by_generation.get(self.session_generation, 0)
+        if attempts:
+            self.fail_closed("implicit_fdt_arm_retry_forbidden")
+            raise InvalidTransition("implicit_fdt_arm_retry_forbidden")
+        self.arm_attempts_by_generation[self.session_generation] = attempts + 1
+        return self._record(
+            "FDT_ARM_ATTEMPT",
+            FdtLifecycleState.FDT_ARMED_WAIT,
+            device_commands=(0x32,),
+        )
+
+    def post_irq2_image_command(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.FDT_ARMED_WAIT)
+        return self._record(
+            "POST_IRQ2_IMAGE_COMMAND_ATTEMPT",
+            FdtLifecycleState.FDT_ARMED_WAIT,
+            device_commands=(0x22,),
+        )
+
+    def first_image_received(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.FDT_ARMED_WAIT)
+        return self._record("FIRST_IMAGE_VALIDATED", FdtLifecycleState.FIRST_IMAGE_RECEIVED)
+
+    def cancel_pending_receive(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.FDT_ARMED_WAIT)
+        return self._record(
+            "HOST_CANCEL_PENDING_RECEIVE",
+            FdtLifecycleState.HOST_WAIT_CANCELED,
+            host_actions=("CANCEL_PENDING_BULK_IN",),
+        )
+
+    def begin_session_reentry(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.HOST_WAIT_CANCELED)
+        self.session_generation += 1
+        return self._record(
+            "BEGIN_SESSION_REENTRY",
+            FdtLifecycleState.SESSION_REENTRY,
+            host_actions=("OEM_STYLE_REENTRY_STATE_PATH",),
+        )
+
+    def terminal_stop(self) -> LifecycleTransition:
+        self._require(FdtLifecycleState.HOST_WAIT_CANCELED)
+        return self._record(
+            "TERMINAL_STOP",
+            FdtLifecycleState.TERMINAL_STOPPED,
+            host_actions=("STOP_SESSION",),
+        )
+
+    def request_full_cold_start(self) -> LifecycleTransition:
+        """Expose a distinct boundary without implementing its wire sequence."""
+        self._require(FdtLifecycleState.TERMINAL_STOPPED)
+        self.session_generation += 1
+        return self._record(
+            "REQUEST_FULL_COLD_START",
+            FdtLifecycleState.FULL_COLD_START_REQUIRED,
+            host_actions=("DELEGATE_TO_EXISTING_FULL_COLD_START",),
+        )
+
+    @property
+    def device_command_trace(self) -> tuple[int, ...]:
+        return tuple(command for row in self.transitions for command in row.device_commands)
+
+    def audit(self) -> dict[str, object]:
+        trace = self.device_command_trace
+        return {
+            "state": self.state.value,
+            "session_generation": self.session_generation,
+            "transition_count": len(self.transitions),
+            "transitions": [row.redacted() for row in self.transitions],
+            "device_command_trace": [f"0x{value:02x}" for value in trace],
+            "retry_count": self.retry_count,
+            "persistent_write_family_count": self.persistent_write_family_count,
+            "a2_injection_count": trace.count(0xA2),
+            "0x70_injection_count": trace.count(0x70),
+        }
+
+
+class OfflineTransport(Protocol):
+    def exchange(self, request: bytes) -> Iterable[bytes]:
+        ...
+
+
+def table_from_irq100_payload(payload: bytes) -> bytes:
+    """Derive the six-word FDT table using the D252 target-observed transform."""
+    event = parse_fdt_event(payload)
+    if event.irq != 0x100 or event.touch_flags != 0 or event.raw_base is None:
+        raise UnexpectedEvent("manual_sample_requires_irq100_touch_zero_raw12")
+    if len(event.raw_base) != 12:
+        raise LengthMismatch("manual_sample_raw_base_length")
+    learned = bytearray()
+    for offset in range(0, 12, 2):
+        word = int.from_bytes(event.raw_base[offset:offset + 2], "little")
+        component = (word >> 1) & 0xFF
+        if component in (0, 0xFF):
+            raise UnexpectedEvent("manual_sample_baseline_validator_rejected_word")
+        learned += bytes((0x80, component))
+    return bytes(learned)
+
+
+class FreshFdtBootstrapMachine:
+    """Exactly-three-stage FDT bootstrap plus cancel/re-entry/stop projection.
+
+    The three stages are named successful OEM stages, not retries.  Inter-stage
+    NAV/base-image work remains outside this FDT-only composition and is not
+    claimed to be causally optional.
+    """
+
+    MANUAL_STAGE_COUNT = 3
+
+    def __init__(self, transport: OfflineTransport, lifecycle: FdtLifecycle) -> None:
+        self.transport = transport
+        self.lifecycle = lifecycle
+        self.table12: bytes | None = None
+        self.manual_stage = 0
+        self.manual_attempt_count = 0
+        self.arm_attempt_count = 0
+
+    @staticmethod
+    def _exchange_optional_ack(transport: OfflineTransport, request: bytes, echo: int) -> None:
+        frames = list(transport.exchange(request))
+        if len(frames) > 1:
+            raise UnexpectedAck(f"ack_frame_count:{len(frames)}")
+        if frames:
+            parse_ack(frames[0], echo)
+
+    def begin(self, seed_result: SeedProviderResult) -> None:
+        if not seed_result.ok:
+            self.lifecycle.fail_closed(seed_result.failure_reason or "seed_provider_fail_closed")
+            raise InvalidTransition("seed_provider_fail_closed")
+        self.lifecycle.begin_bootstrap()
+        self.table12 = seed_result.require_seed()
+
+    def manual_sample(self, event_payload: bytes) -> bytes:
+        if self.table12 is None or self.manual_stage >= self.MANUAL_STAGE_COUNT:
+            self.lifecycle.fail_closed("manual_sample_invalid_stage")
+            raise InvalidTransition("manual_sample_invalid_stage")
+        stage = self.manual_stage
+        self.lifecycle.manual_sample_attempt(stage)
+        self.manual_attempt_count += 1
+        try:
+            self._exchange_optional_ack(self.transport, build_fdt_manual(self.table12), 0x36)
+            learned = table_from_irq100_payload(event_payload)
+        except Exception:
+            self.lifecycle.fail_closed(f"manual_sample_{stage}_failed")
+            raise
+        self.table12 = learned
+        self.manual_stage += 1
+        self.lifecycle.manual_sample_completed(stage)
+        if self.manual_stage == self.MANUAL_STAGE_COUNT:
+            self.lifecycle.bootstrap_completed()
+        return learned
+
+    def arm(self, ts16: int) -> None:
+        if self.table12 is None or self.manual_stage != self.MANUAL_STAGE_COUNT:
+            self.lifecycle.fail_closed("arm_before_bootstrap_complete")
+            raise InvalidTransition("arm_before_bootstrap_complete")
+        self.lifecycle.arm_fdt()
+        self.arm_attempt_count += 1
+        try:
+            self._exchange_optional_ack(self.transport, build_fdt_down(self.table12, ts16), 0x32)
+        except Exception:
+            self.lifecycle.fail_closed("fdt_arm_exchange_failed")
+            raise
+
+    def cancel_pending_receive(self) -> None:
+        self.lifecycle.cancel_pending_receive()
+
+    def reenter_and_arm(self, ts16: int) -> None:
+        self.lifecycle.begin_session_reentry()
+        if self.table12 is None:
+            self.lifecycle.fail_closed("reentry_table_missing")
+            raise InvalidTransition("reentry_table_missing")
+        self.lifecycle.arm_fdt()
+        self.arm_attempt_count += 1
+        try:
+            self._exchange_optional_ack(self.transport, build_fdt_down(self.table12, ts16), 0x32)
+        except Exception:
+            self.lifecycle.fail_closed("reentry_arm_exchange_failed")
+            raise
+
+    def terminal_cancel_and_stop(self) -> None:
+        self.lifecycle.cancel_pending_receive()
+        self.lifecycle.terminal_stop()

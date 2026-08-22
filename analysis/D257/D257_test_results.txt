@@ -1,0 +1,57 @@
+D257 TEST RESULTS
+=================
+
+Execution mode: OFFLINE_ONLY
+Baseline HEAD: 00940b8aebf938488e16f754db8cf102da1a3118
+
+1. Full repository tests
+   Command: python3 -m unittest discover -s tests -v
+   Result: PASS — 184 tests
+
+2. D255 regression
+   Command: python3 analysis/D255/test_d255_postprocess_windows_evidence.py
+   Result: PASS — 56 tests
+
+3. D256 regression
+   Command: (cwd analysis/D256) python3 test_d256_usb_lifecycle_contract_audit.py
+   Result: PASS — 13 tests
+
+4. D253 reproducible audit
+   Command: python3 analysis/D253/d253_offline_audit.py --repo .
+   Result: PASS
+   Key retained facts: three 0x36 stages, chained IRQ100 transform,
+   post-IRQ2 exact 0x22, no post-arm A2/0x70 restore.
+
+5. D257 real offline replay
+   Command: python3 analysis/D257/d257_offline_replay.py --repo-root .
+   Result: PASS
+   - D255 cache layout/CRC/OTP/FDT12 provider: PASS
+   - D255 three manual requests and cancel/re-entry arms: byte-exact PASS
+   - invalid CRC/OTP/size/absent-seed matrix: FAIL_CLOSED PASS
+   - IRQ2 -> 0x22 exactly once -> FIRST_IMAGE_RECEIVED: PASS
+   - provenance separation and raw seed/OTP redaction: PASS
+
+6. D257 executable closure from external cwd
+   Command: absolute d257_offline_replay.py path with explicit absolute
+            --repo-root while cwd is /tmp
+   Result: PASS
+
+7. Python syntax/import closure
+   Command: python3 -m py_compile core/fdt_seed.py core/fdt_lifecycle.py
+            core/post_d4.py tests/test_d257_fdt_candidate.py
+            analysis/D257/d257_offline_replay.py
+   Result: PASS
+
+8. Diff hygiene
+   Command: git diff --check
+   Result: PASS
+
+Safety counters
+---------------
+REAL_USB_OPEN_COUNT=0
+REAL_CAPTURE_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+REAL_COMMAND_SEND_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+PERSISTENT_WRITE_FAMILY_COUNT=0
+RETRY_COUNT=0

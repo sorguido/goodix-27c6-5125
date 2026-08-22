@@ -24,8 +24,10 @@ FDT fresh e cached POV, sopra un transport astratto e senza USB reale. D250 ha
 poi eseguito una volta il boundary AF sul target: TLS e D4 sono riusciti, AF è
 stato inviato una volta come 13 byte logici in una submission fisica da 64 byte
 con tail zero, e il device ha restituito una A0/AE strutturalmente valida con
-checksum valido e body da 16 byte. FDT arming/disarm non è ancora chiuso sul
-target. Il repository non auto-approva né
+checksum valido e body da 16 byte. Il percorso fresh-FDT non è ancora
+autorizzato live: D256 ne ha chiuso il lifecycle osservabile host/bus e D257 ha
+chiuso il candidate offline, ma la freschezza/provenance del seed per un futuro
+cold attach resta il solo blocker live. Il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
@@ -285,6 +287,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
 | Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
 | Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255, incluso corrective terminal-cancel | primo cancel: re-entry e nuovo `0x32` accettato senza restore USB esplicito; secondo cancel: zero packet nell'intervallo, pending bulk-IN cancellato al frame finale `218`, zero packet residui e quiescenza USB host/bus provata; disarm/lifetime/stato FDT interno non osservati |
+| Candidate fresh-FDT D257 | implementato e verificato offline; nessun backend/kit live | lifecycle OEM fail-closed, cancel/re-entry senza A2/`0x70`, provider cache esplicito 13.520 byte con CRC/OTP binding, replay D255 byte-exact e IRQ2→`0x22`→prima immagine; Classe A, sola freschezza/provenance current-attempt del seed ancora bloccante |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -644,6 +647,10 @@ D256 -> timeline completa dei 206 packet target nel raw D255 hash-gated
      -> nuovo 0x32 accettato senza restore USB esplicito osservato
      -> secondo cancel: pending IN cancellato al frame finale; zero packet residui
      -> terminal-stop host/bus chiuso come quiescenza; stato interno/lifetime non osservati
+D257 -> lifecycle FDT e provider seed esplicito implementati offline, senza backend USB
+     -> replay D255 hash-gated: tre 0x36 e due arm 0x32 byte-exact, cancel/re-entry/stop
+     -> IRQ2->0x22 exactly-once e primo record immagine chiusi su fixture sintetica
+     -> Caso A: stato interno ignoto non bloccante; freschezza/provenance seed unico blocker live
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -1625,9 +1632,11 @@ secret, persistenza, retry o loop non bounded. D251 ha raggiunto live AF/AE e
 si è fermato prima di FDT o dito. D252 ha provato la derivazione dinamica della
 tabella FDT ma non la sua freschezza current-path né un restore post-arming;
 D253 ha delimitato il setter host del seed senza trovarne la sorgente ultima e
-ha confermato l'assenza di restore deterministico;
-FDT arming/disarm/restore e ordering mixed-channel completi restano quindi non
-chiusi target-side. Un live FDT o first-image non è giustificato né autorizzato.
+ha confermato l'assenza di restore deterministico. D255/D256 hanno poi provato
+la re-entry/re-arm e il terminal-stop host/bus senza restore USB esplicito;
+D257 integra tali fatti nel lifecycle offline e riclassifica disarm/lifetime
+interni come unknown epistemici non bloccanti. Il live resta non autorizzato
+per la distinta freschezza/provenance current-attempt del seed.
 
 ## D250: canonicalizzazione Rocky, closure exactly-one AF e operator path
 
@@ -2387,6 +2396,69 @@ richiede una capture equivalente e non crea un operator kit. Il bundle D256
 precedente è `SUPERSEDED_BY_D256_TERMINAL_CANCEL_CORRECTIVE`; il blob storico
 resta preservato dalla history Git.
 
+## D257: consolidamento candidate fresh-FDT e gate di live-readiness
+
+D257 implementa esclusivamente offline due moduli GPL-2.0-or-later
+project-authored, senza importare codice Rockytkg e senza aggiungere un backend
+USB. `core/fdt_seed.py` rende esplicito il solo input cache ammesso: path
+fornito dal chiamante, file regolare non symlink, lettura stabile e read-only,
+layout esatto OTP64 + FDT12 + NAV3200 + IMAGE10240 + CRC4 = 13.520 byte,
+CRC-32/MPEG-2 little-endian nella forma osservata sul target e binding
+constant-time all'identità OTP64 fornita dal chiamante. Restituisce soltanto
+FDT12 e provenance redatta; assenza, dimensione/layout errati, CRC errato,
+binding errato o FDT12 nullo falliscono chiusi. Non esistono ricerca del path
+Windows, fallback storico/D255/Rocky, derivazione da PSK, seed zero o casuale,
+né scrittura della cache.
+
+`core/fdt_lifecycle.py` modella il contratto host osservato: inizializzazione
+post-D4, stato AF noto, tre stage manuali `0x36`, arm `0x32`, cancellazione
+host-only, re-entry di sessione, nuovo arm, cancellazione terminale e stop.
+Re-entry e full cold-start sono boundary distinti. Sequenza, generazione di
+sessione e latch pre-submission rendono ogni tentativo auditabile e senza
+retry implicito. L'allowlist device contiene soltanto `0x36`, `0x32` e `0x22`;
+A2, `0x70`, E0, A4, F0 e F4 restano irraggiungibili. Cancel, re-entry e stop
+terminale emettono zero comandi device. `core/post_d4.py` accetta il lifecycle
+come observer opzionale, registra l'arm e il solo tentativo IRQ2→`0x22` prima
+della submission, e raggiunge `FIRST_IMAGE_RECEIVED` soltanto dopo la validazione
+del record immagine canonico.
+
+Il replay reale hash-gated usa per riferimento, senza esportarli, cache e PCAP
+privati D255. Prova layout/CRC/binding della cache, uguaglianza FDT12↔primo seed
+wire senza rendere i byte, tre request manuali `0x36` e i due arm `0x32` attorno
+al cancel/re-entry byte-exact rispetto alla capture. Uno scenario separato usa
+i fatti target D230/D253 e la fixture sintetica non biometrica D249 per chiudere
+IRQ2→`0x22` exactly-once→primo record immagine. La matrice negativa copre CRC,
+OTP, dimensione/layout e FDT12 nullo con fallback count zero. Questa è una
+proiezione della sottosequenza FDT e non prova che il lavoro NAV/base-image
+intermedio del trace OEM sia causalmente opzionale.
+
+L'audit di freschezza delimitato D230–D256 trova un solo cache target da 13.520
+byte, un solo snapshot `before`, nessun `after` recuperabile, un solo pair
+cache-FDT12↔primo seed wire APP12509 e nessun log OEM target della run. Il
+refresh/save 5110/APP12117 D254 e il writeback Rockytkg sono corroborazione
+cross-family, non prova di lifetime o writeback APP12509. Il corpus corrente è
+esaurito per generalizzare la freschezza. La precondizione minima futura resta
+quindi un cache snapshot esplicito valido e OTP-bound con provenance primaria
+che lo renda corrente per quella specifica cold attach.
+
+```text
+FDT_OFFLINE_CANDIDATE_CLOSED=true
+HOST_BUS_LIFECYCLE_READY=true
+INTERNAL_PRIOR_ARM_STATE=NON_BLOCKING_EPISTEMIC_UNKNOWN
+SEED_PROVIDER_IMPLEMENTED=true
+SEED_FRESHNESS_GENERALIZATION=UNPROVEN
+CURRENT_CORPUS_EXHAUSTED_FOR_SEED_FRESHNESS_GENERALIZATION=true
+SEED_FRESHNESS_IS_SOLE_LIVE_BLOCKER=true
+READY_FOR_FDT_LIVE_REVIEW=false
+READY_FOR_FDT_LIVE=false
+```
+
+Questo è il Caso A. L'ignoto su disarm/lifetime/stato interno rimane tale ma,
+nel contratto host/bus OEM già osservato, non introduce da solo un rischio
+factory-state o compatibilità Windows concreto aggiuntivo. D257 non apre USB,
+non usa hardware o dati biometrici, non crea launcher/operator kit, non approva
+una baseline e non autorizza una run live.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -2473,11 +2545,16 @@ host finale non viene registrato alcun altro packet. Nessun restore, abort,
 reset, reconfiguration o re-enumeration è osservato: il contratto terminal-stop
 host/bus è chiuso come quiescenza USB path-bounded.
 
-Restano non provati la causalità callback/cache→seed, la freschezza generale
-del seed, il disarm del prior arm, la sua lifetime e lo stato interno FDT dopo
-cancel. Questi ignoti interni non sono osservabili nel corpus corrente e non
-vanno ricavati dal silenzio USB. Nessun path FDT Linux è diventato live-capable
-e D256 non autorizza hardware o una nuova capture.
+D257 chiude offline il lifecycle host come stato implementato, rende esplicito
+e fail-closed il provider cache e riproduce byte-exact la sottosequenza D255.
+Restano non provati la causalità OEM callback/cache→seed e la freschezza
+generale/corrente del seed. Il disarm del prior arm, la sua lifetime e lo stato
+interno FDT dopo cancel rimangono ignoti epistemici, ma non sono più classificati
+come blocker implementativi: il contratto host OEM osservato cancella la
+receive, non invia restore, ri-arma con successo e termina in quiescenza USB.
+Il solo blocker live corrente è quindi la freschezza e provenance del seed per
+la specifica futura cold attach. Nessun path FDT Linux è diventato live-capable
+e D257 non autorizza hardware, capture o nuova invocazione.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -2542,6 +2619,23 @@ D256_FACTORY_PERSISTENCE_IMPLICATION NO_NEW_DEVICE_SIDE_CLAIM_FROM_USB_SILENCE
 D256_CURRENT_CORPUS_EXHAUSTED_FOR_REENTRY_RESTORE_QUESTION true
 D256_CURRENT_CORPUS_EXHAUSTED_FOR_INTERNAL_ARM_LIFETIME_QUESTION true
 D256_LIVE_EXECUTION NOT_PERFORMED
+D257_SEED_PROVIDER_IMPLEMENTED true
+D257_SEED_CACHE_LAYOUT_VALIDATION PASS
+D257_SEED_OTP_BINDING_VALIDATION PASS
+D257_SEED_CRC_VALIDATION PASS
+D257_FRESH_FDT_OFFLINE_REPLAY PASS
+D257_IRQ2_0x22_PATH PASS_EXACTLY_ONCE
+D257_FIRST_IMAGE_OFFLINE_CLOSURE PASS_SYNTHETIC_NON_BIOMETRIC_CODEC_FIXTURE
+D257_INTERNAL_PRIOR_ARM_STATE NON_BLOCKING_EPISTEMIC_UNKNOWN
+D257_NO_SPECIAL_FDT_RECOVERY_COMMAND_POLICY DEFAULT
+D257_SEED_FRESHNESS_GENERALIZATION UNPROVEN
+D257_CURRENT_CORPUS_EXHAUSTED_FOR_SEED_FRESHNESS_GENERALIZATION true
+D257_FDT_OFFLINE_CANDIDATE_CLOSED true
+D257_HOST_BUS_LIFECYCLE_READY true
+D257_SEED_FRESHNESS_IS_SOLE_LIVE_BLOCKER true
+D257_READY_FOR_FDT_LIVE_REVIEW false
+D257_READY_FOR_FDT_LIVE false
+D257_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -2650,11 +2744,21 @@ CSV/MD completa dei packet target, decisione lifecycle, test minimi e report.
 Non modifica il runtime live-critical, il core FDT, fprintd o un operator kit.
 Il nuovo modello corrente ammette re-entry e re-arm senza restore USB esplicito
 osservato e chiude separatamente il terminal-stop host/bus come cancellazione
-della bulk-IN pendente più quiescenza USB fino alla fine della capture. Il path
-Linux resta fail-closed perché disarm/lifetime/stato FDT interno, causalità e
-freschezza generale del seed non sono provati; la closure bus non è
-autorizzazione live. Il bundle D256 corrective sostituisce il precedente
-artefatto D256 ed esclude raw USB, cache, DLL, firmware, OTP, PSK e biometria.
+della bulk-IN pendente più quiescenza USB fino alla fine della capture. Il
+bundle D256 corrective sostituisce il precedente artefatto D256 ed esclude raw
+USB, cache, DLL, firmware, OTP, PSK e biometria.
+
+D257 aggiunge `core/fdt_lifecycle.py`, `core/fdt_seed.py`, l'integrazione
+observer opzionale in `core/post_d4.py`, test e replay offline. Il provider
+accetta solo cache esplicita valida, OTP-bound e read-only; il lifecycle rende
+cancel/re-entry/terminal-stop host-only, separa il full cold-start e vieta per
+costruzione recovery speciali e famiglie persistenti. La replay D255 reale è
+byte-exact sulle request dichiarate; la chiusura IRQ2→`0x22`→prima immagine usa
+separatamente una fixture sintetica non biometrica. Disarm/lifetime/stato FDT
+interno restano ignoti non bloccanti; la freschezza/provenance del seed per la
+specifica futura cold attach è l'unico blocker live. Non sono stati aggiunti
+backend USB, launcher, baseline approvata o operator kit, e il live resta non
+autorizzato.
 
 ## Regole operative
 
@@ -2669,5 +2773,5 @@ artefatto D256 ed esclude raw USB, cache, DLL, firmware, OTP, PSK e biometria.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D256 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D257 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.
