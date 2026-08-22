@@ -36,6 +36,7 @@ $script:AuthorizationConsumed = $false
 $script:RunDirectory = $null
 $script:MarkerPath = $null
 $script:CaptureProcess = $null
+$script:CaptureProcessHandle = $null
 $script:CapturePath = $null
 $script:CaptureArgumentsRedacted = $null
 $script:CaptureStdoutPath = $null
@@ -169,13 +170,39 @@ function Test-D255PreAttachReadinessState {
 
 function Test-D255FinalCaptureValidationState {
     param(
-        [Parameter(Mandatory = $true)][int]$TsharkExitCode,
+        [Parameter(Mandatory = $true)][bool]$ProcessExited,
+        [Parameter(Mandatory = $true)][AllowNull()][object]$TsharkExitCode,
         [Parameter(Mandatory = $true)][bool]$PcapngExists,
         [Parameter(Mandatory = $true)][long]$PcapngLength,
         [Parameter(Mandatory = $true)][int]$ReadableFrameCount
     )
-    return ($TsharkExitCode -eq 0 -and $PcapngExists -and
-        $PcapngLength -gt 0 -and $ReadableFrameCount -ge 1)
+    if (-not $ProcessExited) { return "FAIL_CLOSED" }
+    $captureValid = ($PcapngExists -and $PcapngLength -gt 0 -and
+        $ReadableFrameCount -ge 1)
+    if ($null -eq $TsharkExitCode) {
+        if ($captureValid) { return "PASS_WITH_EXIT_CODE_UNAVAILABLE" }
+        return "FAIL_CLOSED"
+    }
+    if ($TsharkExitCode -isnot [int] -and $TsharkExitCode -isnot [long]) {
+        return "FAIL_CLOSED"
+    }
+    if ([long]$TsharkExitCode -ne 0 -or -not $captureValid) {
+        return "FAIL_CLOSED"
+    }
+    return "PASS"
+}
+
+function Get-D255CaptureExitCode {
+    if ($null -eq $script:CaptureProcess -or -not $script:CaptureProcess.HasExited) {
+        return $null
+    }
+    try {
+        $value = $script:CaptureProcess.ExitCode
+        if ($null -eq $value) { return $null }
+        return [int]$value
+    } catch {
+        return $null
+    }
 }
 
 function ConvertTo-D255RedactedDiagnosticText {
@@ -232,7 +259,8 @@ function Get-D255CaptureFailureDetail {
         try { $script:CaptureProcess.Refresh() } catch { }
         if ($script:CaptureProcess.HasExited) {
             $processState = "EXITED"
-            try { $exitCode = [string]$script:CaptureProcess.ExitCode } catch { }
+            $observedExitCode = Get-D255CaptureExitCode
+            if ($null -ne $observedExitCode) { $exitCode = [string]$observedExitCode }
         } else {
             $processState = "RUNNING"
         }
@@ -672,10 +700,13 @@ function Invoke-D255SelfTest {
     if (Test-D255PreAttachReadinessState -ProcessAlive $true -GuestTargetCount 1) {
         Fail-D255 "pre-attach readiness accepted a target already present in the guest"
     }
-    if ((Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $false -PcapngLength 0 -ReadableFrameCount 0) -or
-        (Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $true -PcapngLength 0 -ReadableFrameCount 0) -or
-        (Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 0) -or
-        -not (Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1)) {
+    if ((Test-D255FinalCaptureValidationState -ProcessExited $true -TsharkExitCode 0 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "PASS" -or
+        (Test-D255FinalCaptureValidationState -ProcessExited $true -TsharkExitCode $null -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "PASS_WITH_EXIT_CODE_UNAVAILABLE" -or
+        (Test-D255FinalCaptureValidationState -ProcessExited $true -TsharkExitCode $null -PcapngExists $false -PcapngLength 0 -ReadableFrameCount 0) -cne "FAIL_CLOSED" -or
+        (Test-D255FinalCaptureValidationState -ProcessExited $true -TsharkExitCode $null -PcapngExists $true -PcapngLength 0 -ReadableFrameCount 0) -cne "FAIL_CLOSED" -or
+        (Test-D255FinalCaptureValidationState -ProcessExited $true -TsharkExitCode $null -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 0) -cne "FAIL_CLOSED" -or
+        (Test-D255FinalCaptureValidationState -ProcessExited $true -TsharkExitCode 7 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "FAIL_CLOSED" -or
+        (Test-D255FinalCaptureValidationState -ProcessExited $false -TsharkExitCode $null -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "FAIL_CLOSED") {
         Fail-D255 "final capture validation state contract failed"
     }
     $clockPath = Join-Path $selfTestDirectory "run_clock.json"
@@ -703,6 +734,9 @@ function Invoke-D255SelfTest {
         capture_zero_byte_file_before_attach_allowed = $true
         capture_exited_process_before_attach_rejected = $true
         final_capture_validation_contract = "PASS"
+        final_capture_exit_zero_result = "PASS"
+        final_capture_exit_unavailable_result = "PASS_WITH_EXIT_CODE_UNAVAILABLE"
+        final_capture_invalid_or_nonzero_result = "FAIL_CLOSED"
         hardware_action_count = 0
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $selfTestDirectory "selftest_result.json") -Encoding UTF8
     Write-Output "D255_POWERSHELL_SELFTEST=PASS"
@@ -901,6 +935,10 @@ try {
         $script:CaptureProcess = Start-Process -FilePath $TsharkPath -ArgumentList $captureArguments `
             -PassThru -NoNewWindow -RedirectStandardOutput $script:CaptureStdoutPath `
             -RedirectStandardError $script:CaptureStderrPath
+        # Windows PowerShell 5.1 can lose ExitCode after Wait-Process when
+        # -NoNewWindow or redirected streams are used.  Accessing Handle while
+        # the process is alive preserves it when the runtime supports that path.
+        $script:CaptureProcessHandle = $script:CaptureProcess.Handle
     } catch {
         Fail-D255Capture "capture process failed to start: $($_.Exception.Message)"
     }
@@ -945,8 +983,11 @@ try {
     $helloUiResult = Read-HelloSetupUiResult
     if ($helloUiResult -ceq "READY_WAITING_FOR_FINGER") {
         Assert-CaptureActive
-    } elseif ($script:CaptureProcess.HasExited -and $script:CaptureProcess.ExitCode -ne 0) {
-        Fail-D255Capture "partial bootstrap capture process failed before UI classification"
+    } elseif ($script:CaptureProcess.HasExited) {
+        $earlyExitCode = Get-D255CaptureExitCode
+        if ($null -ne $earlyExitCode -and $earlyExitCode -ne 0) {
+            Fail-D255Capture "partial bootstrap capture process failed before UI classification"
+        }
     }
     Assert-SingleGuestTarget | Out-Null
     $runResult = "FULL_ZERO_FINGER_CANCEL_REENTRY"
@@ -988,20 +1029,31 @@ try {
     Write-OperatorMarker -Event "OPERATOR_PHASES_COMPLETE"
     Wait-Process -Id $script:CaptureProcess.Id
     $script:CaptureProcess.Refresh()
-    if ($script:CaptureProcess.ExitCode -ne 0) { Fail-D255Capture "capture process failed at the duration boundary" }
-    Write-OperatorMarker -Event "CAPTURE_STOPPED" -Detail "duration boundary reached"
+    if (-not $script:CaptureProcess.HasExited) {
+        Fail-D255Capture "capture process did not exit at the duration boundary"
+    }
+    $tsharkExitCode = Get-D255CaptureExitCode
+    if ($null -ne $tsharkExitCode -and $tsharkExitCode -ne 0) {
+        Fail-D255Capture "capture process returned a non-zero exit code at the duration boundary"
+    }
 
     if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) { Fail-D255Capture "capture output missing at final validation" }
     $captureLength = (Get-Item -LiteralPath $capturePath).Length
     if ($captureLength -le 0) { Fail-D255Capture "capture output empty at final validation" }
     $captureValidation = @(& $TsharkPath -r $capturePath -c 1 -T fields -e frame.number 2>&1)
-    $readableFrameCount = if ($captureValidation -contains "1") { 1 } else { 0 }
-    if (-not (Test-D255FinalCaptureValidationState `
-        -TsharkExitCode $script:CaptureProcess.ExitCode `
+    $captureReadExitCode = $LASTEXITCODE
+    $readableFrameCount = if ($captureReadExitCode -eq 0 -and $captureValidation -contains "1") { 1 } else { 0 }
+    $finalCaptureResult = Test-D255FinalCaptureValidationState `
+        -ProcessExited $script:CaptureProcess.HasExited -TsharkExitCode $tsharkExitCode `
         -PcapngExists $true -PcapngLength $captureLength `
-        -ReadableFrameCount $readableFrameCount) -or $LASTEXITCODE -ne 0) {
+        -ReadableFrameCount $readableFrameCount
+    if ($finalCaptureResult -ceq "FAIL_CLOSED") {
         Fail-D255Capture "capture output is not a readable nonempty pcapng with at least one frame"
     }
+    $tsharkExitCodeText = if ($null -eq $tsharkExitCode) { "UNAVAILABLE" } else { [string]$tsharkExitCode }
+    Write-OperatorMarker -Event "CAPTURE_STOPPED" -Detail "duration boundary reached; TSHARK_EXIT_CODE=$tsharkExitCodeText; RESULT=$finalCaptureResult"
+    Write-Output "TSHARK_EXIT_CODE=$tsharkExitCodeText"
+    Write-Output "D255_FINAL_CAPTURE_VALIDATION=$finalCaptureResult"
     $clockEndPath = Join-Path $script:RunDirectory "run_clock_end.json"
     New-D255ClockAnchor -Phase "AFTER_CAPTURE" | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockEndPath -Encoding UTF8
     $finalTargets = @(Get-TargetDevices)
@@ -1016,7 +1068,7 @@ try {
     Write-Output "GOODIX_CACHE_SOURCE_COUNT=$($cacheCandidates.Count)"
     Write-Output "D255_RUN_RESULT=$runResult"
     if ($runResult -ceq "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE") {
-        Write-Output "PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG"
+        Write-Output "PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_OR_UNAVAILABLE_NONEMPTY_READABLE_PCAPNG"
     }
     Write-Output "D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION"
     Write-Output "D255_RUN_DIRECTORY=$script:RunDirectory"

@@ -18,6 +18,7 @@ richiede review, baseline e autorizzazione esplicite.
 | `d246-live-d4-once.sh` | ultimo launcher eseguito, single-shot consumato; non autorizza AF |
 | `d250-live-af-once.sh` | storico, single-shot eseguito e marker consumato; non riutilizzabile |
 | `d251-live-af-once.sh` | candidate corretto live-capable hard-gated; executable closure solo offline, review baseline AI PM e autorizzazione Utente pendenti |
+| `d255-windows-evidence-capture.ps1` | storico, single-shot consumato; capture completata e recuperata offline, nessuna nuova run richiesta o autorizzata |
 
 Non esiste un kit operativo corrente autorizzato. D251 espone il futuro ramo
 live nel source revisionabile, ma non incorpora né auto-approva il commit SHA

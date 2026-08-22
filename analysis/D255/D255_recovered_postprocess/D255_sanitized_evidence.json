@@ -1,0 +1,257 @@
+{
+  "artifact_provenance": {
+    "CACHE_AFTER": "NOT_RECOVERABLE",
+    "GUEST_TOPOLOGY_AFTER_CAPTURE": "NOT_RECOVERABLE",
+    "MANIFEST": "RECOVERED_ARTIFACT",
+    "OEM_LOG_AFTER": "NOT_RECOVERABLE",
+    "OPERATOR_MARKERS": "ORIGINAL_ARTIFACT",
+    "POST_CAPTURE_STATE_SNAPSHOT": "NOT_RECOVERABLE_RETROACTIVELY",
+    "RUN_CLOCK_END": "NOT_RECOVERABLE",
+    "WIRE_PCAP": "ORIGINAL_ARTIFACT"
+  },
+  "cache_candidates": [
+    {
+      "CRC_BYTE_ORDER": "unknown",
+      "CRC_VALID": "unknown",
+      "FDT12_HEX": null,
+      "FILE_SHA256": "0f67f5dff4613e33bf234102984211441c8b02c1d5d367774a4ae75c091c977a",
+      "FILE_SIZE": 332,
+      "IMAGE_REGION_SHA256": null,
+      "LAYOUT_13520_COMPATIBLE": false,
+      "NAV_REGION_SHA256": null,
+      "OTP_PREFIX_MATCH_WITH_DEVICE": "unknown",
+      "SOURCE_PATH": "C:\\ProgramData\\Goodix\\Goodix_Cache.bin"
+    },
+    {
+      "CRC_BYTE_ORDER": "little",
+      "CRC_VALID": true,
+      "FDT12_HEX": "aeaebfbfa4a4b2b2a7a7b3b3",
+      "FILE_SHA256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+      "FILE_SIZE": 13520,
+      "IMAGE_REGION_SHA256": "adf29bd40ae4313df3f888d266957d4e42fb14eb0964db6cef452a50bacc0c42",
+      "LAYOUT_13520_COMPATIBLE": true,
+      "NAV_REGION_SHA256": "d393a2670e03d468ed1e34890d3706ee22d6cc7df2dc09b1b0ed9adc3c8aa9ac",
+      "OTP_PREFIX_MATCH_WITH_DEVICE": true,
+      "SOURCE_PATH": "C:\\ProgramData\\Goodix\\goodix.dat"
+    },
+    {
+      "CRC_BYTE_ORDER": "unknown",
+      "CRC_VALID": "unknown",
+      "FDT12_HEX": null,
+      "FILE_SHA256": "df5fb5ef1382d47e35e878d90c93bcd8a0bd2b0885c428ee7b6cab3ff9707116",
+      "FILE_SIZE": 140480,
+      "IMAGE_REGION_SHA256": null,
+      "LAYOUT_13520_COMPATIBLE": false,
+      "NAV_REGION_SHA256": null,
+      "OTP_PREFIX_MATCH_WITH_DEVICE": "unknown",
+      "SOURCE_PATH": "C:\\ProgramData\\Goodix\\goodix_calib.dat"
+    }
+  ],
+  "evidence_sources": {
+    "GOODIX_CACHE_SOURCE_COUNT": 3,
+    "GOODIX_CACHE_STATUS": "PRESENT",
+    "OEM_LOG_SOURCE_COUNT": 0,
+    "OEM_LOG_STATUS": "ABSENT"
+  },
+  "execution_mode": "OFFLINE_POSTPROCESS_ONLY",
+  "input_hashes": {
+    "manifest_sha256": "deb08f42b3fe4d3991f1e9bf9283e77fcf4f4c6f42383aa3c0efc82750dcedaa",
+    "wire_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c"
+  },
+  "oem_log_events": [],
+  "oem_log_state": {
+    "LOG_GREW": false,
+    "LOG_ROTATED_OR_TRUNCATED": false,
+    "LOG_UNCHANGED": false,
+    "WINDOW_RECONSTRUCTIBLE": false,
+    "sources": []
+  },
+  "oem_log_time": {
+    "CLOCK_ANCHOR_OFFSET_MINUTES": 120,
+    "CLOCK_ANCHOR_TIMEZONE_ID": "W. Europe Standard Time",
+    "CLOCK_OFFSET_STABLE": false,
+    "OEM_LOG_TIMESTAMPED_EVENT_COUNT": 0,
+    "OEM_LOG_TIMESTAMP_FORMATS": [],
+    "OEM_LOG_TIME_CORRELATION": "UNAVAILABLE_NO_OEM_LOG",
+    "OEM_LOG_UNTIMED_EVENT_COUNT": 0
+  },
+  "physical_fdt36_contract": {
+    "FDT36_COUNT": 3,
+    "FDT36_LOGICAL_LENGTHS": [
+      22
+    ],
+    "FDT36_PHYSICAL_LENGTHS": [
+      64
+    ],
+    "FDT36_TAIL_PROFILES": [
+      {
+        "logical_length": 22,
+        "physical_length": 64,
+        "tail_nonzero_offsets": [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45
+        ],
+        "tail_nonzero_values_hex": "fb8d6c5bfb7f",
+        "zero_tail": false
+      },
+      {
+        "logical_length": 22,
+        "physical_length": 64,
+        "tail_nonzero_offsets": [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45
+        ],
+        "tail_nonzero_values_hex": "fb8d6c5bfb7f",
+        "zero_tail": false
+      },
+      {
+        "logical_length": 22,
+        "physical_length": 64,
+        "tail_nonzero_offsets": [
+          40,
+          41,
+          42,
+          43,
+          44,
+          45
+        ],
+        "tail_nonzero_values_hex": "fb8d6c5bfb7f",
+        "zero_tail": false
+      }
+    ],
+    "FDT36_ZERO_TAIL_OBSERVED": false
+  },
+  "restore_cancel": {
+    "ARM_STATE_AFTER_CANCEL": "PRIOR_ARM_STATUS_UNKNOWN",
+    "CANCEL_IS_HOST_ONLY": "unknown",
+    "CANCEL_NO_FINGER_DEVICE_COMMANDS": [],
+    "CANCEL_NO_FINGER_LAST_FDT_STATE": "0x32_ARMED",
+    "CANCEL_WIRE_COMMAND_SEQUENCE": [],
+    "DETERMINISTIC_REENTRY_PROVEN": true,
+    "DEVICE_FDT_DISARM_PROVEN": false,
+    "DEVICE_RESET_AFTER_CANCEL": "unknown",
+    "DEVICE_SIDE_CANCEL_COMMAND": false,
+    "DEVICE_SIDE_CANCEL_COMMAND_PROVEN": false,
+    "FDT_REARM_AFTER_CANCEL": true,
+    "HOST_CANCEL_EVENT_PROVEN": false,
+    "IDLE_COMMAND_AFTER_CANCEL": false,
+    "NEW_FDT_ARM_ACCEPTED_ON_REENTRY": true,
+    "OEM_CANCEL_REENTRY_PROVEN": true,
+    "OEM_D0ENTRY_ON_REENTRY": "unknown",
+    "OEM_D0EXIT_AFTER_CANCEL": "unknown",
+    "OEM_DEVICE_CLOSE_AFTER_CANCEL": "unknown",
+    "PRIOR_ARM_LIFETIME_AFTER_CANCEL": "UNKNOWN_OR_NOT_DIRECTLY_OBSERVED",
+    "REENTRY_COMMAND_SEQUENCE": [
+      "0xd5",
+      "0xaf",
+      "0x32"
+    ],
+    "REENTRY_PROOF_CLASS": "REENTRY_WITHOUT_FINGER",
+    "RESTORE_CLOSED": false,
+    "RESTORE_CLOSURE_DECISION": "AI_PM_REVIEW_REQUIRED",
+    "RESTORE_EVIDENCE_ACQUIRED": true,
+    "RESTORE_EVIDENCE_CLASS": "INCONCLUSIVE_OEM_TIME_CORRELATION",
+    "RESTORE_MODEL": "INCONCLUSIVE_OEM_TIME_CORRELATION",
+    "TLS_CLOSE_AFTER_CANCEL": false,
+    "USB_CLOSE_AFTER_CANCEL": "unknown",
+    "window_events": [
+      {
+        "control": "0x32",
+        "direction": "OUT",
+        "logical_length": 24,
+        "outer": "0xa0",
+        "physical_length": 64,
+        "relative_ms": -10318.822
+      },
+      {
+        "control": "0xb0",
+        "direction": "IN",
+        "logical_length": 10,
+        "outer": "0xa0",
+        "physical_length": 10,
+        "relative_ms": -10298.044
+      }
+    ]
+  },
+  "run_classification": {
+    "BOOTSTRAP_EVIDENCE_PRESERVED": true,
+    "D255_RUN_RESULT": "FULL_ZERO_FINGER_CANCEL_REENTRY",
+    "POSTATTACH_HELLO_UI_RESULT": "READY_WAITING_FOR_FINGER",
+    "RESTORE_CLOSED": false,
+    "RESTORE_EVIDENCE_ACQUIRED": true
+  },
+  "safety": {
+    "command_send_count": 0,
+    "otp_raw_exported": false,
+    "psk_or_secret_exported": false,
+    "raw_biometric_exported": false,
+    "raw_payload_exported": false,
+    "raw_pcap_modified": false,
+    "real_capture_count": 0,
+    "real_hardware_action_count": 0,
+    "usb_open_count": 0
+  },
+  "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V4",
+  "seed_correlation": {
+    "CACHE_FDT12_MATCH": true,
+    "CAUSALITY_LIMIT": "Equality alone does not prove timing or dataflow causality.",
+    "CAUSALITY_PROVEN": false,
+    "FIRST_FDT36_SEED": "aeaebfbfa4a4b2b2a7a7b3b3",
+    "OEM_LOG_FDT12_MATCH": "unknown",
+    "SEED_SOURCE_CLASS": "HOST_CACHE_WIRE_MATCH"
+  },
+  "target": {
+    "CAPTURE_FIRMWARE": "GF_ST411SEC_APP_12509",
+    "D255_EVIDENCE_TARGET_SPECIFIC": true,
+    "usb_bus": 1,
+    "usb_device": 2
+  },
+  "ui_gate": {
+    "ACCOUNT_PREREQUISITES_CHECKED": true,
+    "HELLO_SETUP_UI_RESULT": "READY_WAITING_FOR_FINGER",
+    "PREATTACH_FINGERPRINT_UI_REQUIRED": false,
+    "SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH": "UNKNOWN_BEFORE_ATTACH",
+    "TERMINAL_MARKER": "HELLO_SETUP_UI_READY"
+  },
+  "unknown_controls": [
+    "0x50",
+    "0x97"
+  ],
+  "vm_boundary": {
+    "A8_APP12509_PROVEN": true,
+    "AUTOMATIC_DETACH_REATTACH_ALLOWED": false,
+    "CAPTURE_STARTED_BEFORE_VM_USB_ATTACH": true,
+    "D255_BOOTSTRAP_EVIDENCE_VALIDITY": "VALID_COLD_ATTACH",
+    "D255_EVIDENCE_VALIDITY": "VALID_ZERO_FINGER",
+    "GOODIX_PRESENT_IN_GUEST_BEFORE_CAPTURE": false,
+    "GUEST_GOODIX_27C6_5125_PRESENCE_PROOF": true,
+    "TARGET_ENUMERATION_IN_CAPTURE": true,
+    "VM_USB_ATTACH_COUNT": 1,
+    "WINDOWS_EXECUTION_ENVIRONMENT": "VIRTUAL_MACHINE",
+    "derived_marker_order": [
+      "CAPTURE_STARTED",
+      "VM_USB_ATTACH_BEGIN",
+      "TARGET_DESCRIPTOR_27C6_5125",
+      "A8_APP12509_PROVEN",
+      "VM_USB_ATTACH_END",
+      "GUEST_27C6_5125_PRESENT",
+      "PASSIVE_BOOTSTRAP_SETTLED",
+      "HELLO_SETUP_UI_CHECK_BEGIN",
+      "HELLO_SETUP_UI_READY"
+    ]
+  },
+  "zero_finger": {
+    "FINGER_DOWN_IRQ_COUNT_IN_OPERATOR_WINDOWS": 0,
+    "FINGER_IMAGE_PATH_COUNT_IN_OPERATOR_WINDOWS": 0,
+    "FINGER_INTERACTION_DETECTED": false,
+    "POST_IRQ2_0x22_COUNT_IN_OPERATOR_WINDOWS": 0
+  }
+}

@@ -223,6 +223,11 @@ Deve contenere solo quanto necessario alla review dello step e non deve includer
 - cache o temporanei;
 - artefatti storici non modificati.
 
+Le evidenze raw private autentiche vivono canonicamente in `<git-root>/captures/`
+e possono essere versionate nel repository privato. Bundle e futuri export
+pubblici devono escluderle; non esiste sincronizzazione automatica dal privato
+al pubblico e la pubblicazione richiede uno step esplicito di sanitizzazione.
+
 Indicare il commit SHA di riferimento quando rilevante.
 
 ---

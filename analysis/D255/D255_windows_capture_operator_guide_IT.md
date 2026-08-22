@@ -2,13 +2,12 @@
 
 ## Stato e limiti di autorità
 
-D255 ha preparato e testato offline la correzione corrente. L'ultima invocazione
-autorizzata ha consumato l'autorizzazione e avviato TShark, poi si è fermata
-prima dell'attach perché il pcapng non era stato creato entro due secondi.
-TShark era ancora vivo e il file è comparso diversi secondi dopo. Goodix non è
-mai stato collegato al guest e non è avvenuta alcuna azione sensor-reaching. La
-review AI-PM non equivale all'autorizzazione dell'operatore, l'autorizzazione
-precedente è consumata e al momento nessuna esecuzione è autorizzata.
+D255 ha acquisito la capture richiesta. La run autorizzata ha completato cold
+attach e tutte le fasi operatore cancel/re-entry senza dito; TShark ha scritto
+un pcapng leggibile da 27.684 byte e 218 frame. È fallita soltanto la
+finalizzazione host-side perché Windows PowerShell 5.1 ha esposto un ExitCode
+nullo/non disponibile. La run esistente è stata recuperata offline e non è
+richiesta né autorizzata una nuova cattura live.
 
 ```text
 WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -18,12 +17,15 @@ D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
 D255_FINGER_INTERACTION_ALLOWED=false
 D255_EXPECTED_FINGER_INTERACTION_COUNT=0
 READY_FOR_OPERATOR_RUN=false
+NEW_LIVE_CAPTURE_REQUIRED=false
 ```
 
 Il launcher non avvia né arresta mai la VM e non collega/scollega mai automaticamente il dispositivo USB.
 Non eseguire enrollment, provisioning, operazioni firmware/IAP, sostituzione della PSK, disabilitazione/
 riabilitazione del dispositivo, riavvio di servizi, manutenzione o modifiche all'account/PIN.
-Conservare USB raw, log OEM, cache e topologia del guest in una directory privata esterna a Git.
+Conservare USB raw, log OEM, cache e topologia del guest nella sede canonica
+`captures/` del repository privato. I bundle pubblici devono escludere le
+evidenze raw.
 
 > **Importante:** tutti i nomi di parametri, marker e valori nei blocchi di codice devono essere usati
 > esattamente in inglese come riportati. Sono stringhe operative, non testo da tradurre.
@@ -358,22 +360,26 @@ BOOTSTRAP_EVIDENCE_PRESERVED=true
 RESTORE_EVIDENCE_ACQUIRED=false
 RESTORE_CLOSED=false
 PARTIAL_CAPTURE_STOP_METHOD=BOUNDED_CAPTURE_TIMER_EXHAUSTED
-PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG
+PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_OR_UNAVAILABLE_NONEMPTY_READABLE_PCAPNG
 ```
 
 In altre parole: anche se Windows Hello non fosse utilizzabile, **la parte bootstrap già catturata viene conservata**.
 
 ## Post-processing offline e semantica del restore
 
-La run privata deve essere elaborata soltanto da Linux e fuori dal repository:
+La run privata deve essere elaborata soltanto da Linux, direttamente dalla
+sede canonica `captures/` del repository privato:
 
 ```bash
 python3 analysis/D255/d255_postprocess_windows_evidence.py \
-  --run-dir /external/private/D255_RUN \
-  --manifest /external/private/D255_RUN/input_manifest.json \
-  --manifest-sha256 MANIFEST_SHA256_FROM_SIDECAR \
+  --run-dir captures/D255_20260822T205631772Z_85c8c41f \
+  --manifest captures/D255_20260822T205631772Z_85c8c41f/recovery_manifest.json \
+  --manifest-sha256 deb08f42b3fe4d3991f1e9bf9283e77fcf4f4c6f42383aa3c0efc82750dcedaa \
   --output-dir /tmp/D255_sanitized
 ```
+
+Il manifest di recovery distingue i file originali, i metadati recuperati ora
+e gli snapshot post-capture non ricostruibili retroattivamente.
 
 Il postprocessor accetta sia risultati completi sia risultati parziali.
 

@@ -1,0 +1,28 @@
+{
+  "schema": "D255_RECOVERY_BUNDLE_MANIFEST_V1",
+  "baseline_commit": "f01b81d629ffe8af5eecb92ca93968045d5345ce",
+  "bundle_class": "STEP_LOCAL_NON_CUMULATIVE",
+  "raw_evidence_included": false,
+  "files": [
+    {"path": "AGENTS.md", "sha256": "71cfda3eb507eb3dfa4f3de71c1a83e30914b6ca36cda6de897728cb6606051f"},
+    {"path": "Goodix 27c6 5125 manuale tecnico.md", "sha256": "aa6c3793ba956b216d19f374755d04836296e887c3ce745f7a9fdff957aaf724"},
+    {"path": "operator_kit/README.md", "sha256": "47876baa1d2eb9b5526cf392c8e5a491d61d5600b9b9a2246f6cbdd52dc2efef"},
+    {"path": "operator_kit/d255-windows-evidence-capture.ps1", "sha256": "3e5ff33a274a546df19a26b8033d2cf120da802aa74c9ec0a4ba51d2e003f551"},
+    {"path": "analysis/D255/d255_recover_existing_run.py", "sha256": "50d3e6f388754378b8d214436511044cf1b5e62e441de0fe6164d06eab4d5094"},
+    {"path": "analysis/D255/d255_postprocess_windows_evidence.py", "sha256": "fe9db98ae3b5fe63d0b97f7e9618b4733219e852fcb71895dfa87bbb030f6def"},
+    {"path": "analysis/D255/test_d255_postprocess_windows_evidence.py", "sha256": "b0e110141039aa88d5b5e01a639b9899d93c2fbfb3c2aca43b6d4ce53576d469"},
+    {"path": "analysis/D255/D255_windows_capture_operator_guide.md", "sha256": "6652d969c0d20b2f5b2dcf15fd4895510a8b71e104fd0372e42728da714e0531"},
+    {"path": "analysis/D255/D255_windows_capture_operator_guide_IT.md", "sha256": "ad150a8382ed3a69d7cf1d29d975d51824d9270fdafbdbf45719d6129ae61d96"},
+    {"path": "analysis/D255/D255_recovery_decision.json", "sha256": "421a91aa71655f544b0fbc0ce743b024ab0bde8803c3d6dc071b6a6cd47e069e"},
+    {"path": "analysis/D255/D255_recovery_exitcode_report.md", "sha256": "727f42dc1c8b3e1a1dde9c7840f0b5224fd2fc37bef3615a9b2418af5208be65"},
+    {"path": "analysis/D255/D255_recovery_test_results.txt", "sha256": "59065e950f098ec3242495a51d5bcb10e808f3057641ce080ce2913481baab21"},
+    {"path": "analysis/D255/D255_private_capture_inventory.json", "sha256": "a5ff86d71196ffac9879ce5a580206fc757528fb4ca70df9d3c92ae63767b7ae"},
+    {"path": "analysis/D255/D255_recovered_postprocess/D255_sanitized_evidence.json", "sha256": "cc469e95ef34eeff8868785d201260707363b1b9183e084923bac9111d61e52b"},
+    {"path": "analysis/D255/D255_recovered_postprocess/D255_sanitized_summary.txt", "sha256": "8b8e5c387a32c22151fafeb0e6b15bed1a48cafaa57ec7b83788d3e0f6db24f9"}
+  ],
+  "excluded_private_evidence": [
+    "captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng",
+    "captures/D255_20260822T205631772Z_85c8c41f/raw/cache_before/",
+    "captures/D255_20260822T205631772Z_85c8c41f/guest_topology_*.json"
+  ]
+}

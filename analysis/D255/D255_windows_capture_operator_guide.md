@@ -2,13 +2,11 @@
 
 ## Status and non-authority
 
-D255 prepared and tested the current correction offline. The latest authorized
-operator invocation consumed its authorization and started TShark, then failed
-before attach because the pcapng had not been created within two seconds.
-TShark was still alive; the file appeared several seconds later. Goodix was
-never attached and no sensor-reaching action occurred. AI-PM review is not
-operator authorization, the prior authorization is consumed, and no run is
-currently authorized.
+D255 has acquired the required capture. The authorized run completed cold
+attach and all zero-finger cancel/re-entry operator phases; TShark wrote a
+readable 27,684-byte pcapng with 218 frames. Only host-side finalization failed
+because Windows PowerShell 5.1 exposed a null/unavailable ExitCode. The existing
+run has been recovered offline and no new live capture is required or authorized.
 
 ```text
 WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -18,12 +16,14 @@ D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
 D255_FINGER_INTERACTION_ALLOWED=false
 D255_EXPECTED_FINGER_INTERACTION_COUNT=0
 READY_FOR_OPERATOR_RUN=false
+NEW_LIVE_CAPTURE_REQUIRED=false
 ```
 
 The launcher never starts/stops the VM and never attaches/detaches USB. Do not
 perform enrollment, provisioning, firmware/IAP, PSK replacement, device
 disable/enable, service restart, maintenance, or account/PIN changes. Keep raw
-USB, OEM logs, cache and guest topology in a private directory outside Git.
+USB, OEM logs, cache and guest topology under the private repository's
+canonical `captures/` directory. Public bundles must exclude raw evidence.
 
 ## Pre-attach account boundary
 
@@ -233,20 +233,23 @@ BOOTSTRAP_EVIDENCE_PRESERVED=true
 RESTORE_EVIDENCE_ACQUIRED=false
 RESTORE_CLOSED=false
 PARTIAL_CAPTURE_STOP_METHOD=BOUNDED_CAPTURE_TIMER_EXHAUSTED
-PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG
+PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_OR_UNAVAILABLE_NONEMPTY_READABLE_PCAPNG
 ```
 
 ## Offline postprocessing and restore semantics
 
-Process the private run only from Linux and outside the repository:
+Process the private run only from Linux, directly from the private repository:
 
 ```bash
 python3 analysis/D255/d255_postprocess_windows_evidence.py \
-  --run-dir /external/private/D255_RUN \
-  --manifest /external/private/D255_RUN/input_manifest.json \
-  --manifest-sha256 MANIFEST_SHA256_FROM_SIDECAR \
+  --run-dir captures/D255_20260822T205631772Z_85c8c41f \
+  --manifest captures/D255_20260822T205631772Z_85c8c41f/recovery_manifest.json \
+  --manifest-sha256 deb08f42b3fe4d3991f1e9bf9283e77fcf4f4c6f42383aa3c0efc82750dcedaa \
   --output-dir /tmp/D255_sanitized
 ```
+
+The recovery manifest distinguishes original files, newly recovered metadata
+and post-capture snapshots that cannot be reconstructed retroactively.
 
 The postprocessor accepts full and partial result classes. A partial UI result
 does not require cancel/re-entry markers, but still requires capture-before-

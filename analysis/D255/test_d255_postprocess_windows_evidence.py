@@ -20,6 +20,12 @@ assert SPEC and SPEC.loader
 D255 = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = D255
 SPEC.loader.exec_module(D255)
+sys.modules["d255_postprocess_windows_evidence"] = D255
+RECOVERY_PATH = Path(__file__).with_name("d255_recover_existing_run.py")
+RECOVERY_SPEC = importlib.util.spec_from_file_location("d255_recovery", RECOVERY_PATH)
+assert RECOVERY_SPEC and RECOVERY_SPEC.loader
+RECOVERY = importlib.util.module_from_spec(RECOVERY_SPEC)
+RECOVERY_SPEC.loader.exec_module(RECOVERY)
 
 
 def powershell_without_literals(source: str) -> str:
@@ -107,6 +113,7 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertTrue(result["restore_cancel"]["NEW_FDT_ARM_ACCEPTED_ON_REENTRY"])
         self.assertFalse(result["restore_cancel"]["DEVICE_FDT_DISARM_PROVEN"])
         self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
+
         self.assertEqual(result["restore_cancel"]["RESTORE_CLOSURE_DECISION"],
                          "AI_PM_REVIEW_REQUIRED")
         self.assertEqual(result["restore_cancel"]["PRIOR_ARM_LIFETIME_AFTER_CANCEL"],
@@ -440,12 +447,15 @@ class D255PostprocessorTests(unittest.TestCase):
 
         final_state = source[source.index("function Test-D255FinalCaptureValidationState"):
                              source.index("function ConvertTo-D255RedactedDiagnosticText")]
-        for token in ("$TsharkExitCode -eq 0", "$PcapngExists",
-                      "$PcapngLength -gt 0", "$ReadableFrameCount -ge 1"):
+        for token in ("$null -eq $TsharkExitCode", "PASS_WITH_EXIT_CODE_UNAVAILABLE",
+                      "$PcapngExists", "$PcapngLength -gt 0",
+                      "$ReadableFrameCount -ge 1", "FAIL_CLOSED"):
             self.assertIn(token, final_state)
         final_path = source[source.index("Wait-Process -Id $script:CaptureProcess.Id"):]
         self.assertIn("Test-D255FinalCaptureValidationState", final_path)
         self.assertIn("$captureValidation -contains \"1\"", final_path)
+        self.assertIn('Write-Output "TSHARK_EXIT_CODE=$tsharkExitCodeText"', final_path)
+        self.assertIn("$script:CaptureProcess.HasExited", final_path)
         self.assertIn("D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION", final_path)
         self.assertLess(final_path.index("Test-D255FinalCaptureValidationState"),
                         final_path.index("D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION"))
@@ -462,7 +472,78 @@ class D255PostprocessorTests(unittest.TestCase):
                        source.index("Start-Sleep -Seconds 2")]
         self.assertIn("-RedirectStandardOutput", start)
         self.assertIn("-RedirectStandardError", start)
+        self.assertIn("$script:CaptureProcessHandle = $script:CaptureProcess.Handle", start)
         self.assertIn('Fail-D255Capture "capture process failed to start:', start)
+
+    def test_powershell_finalization_matrix_covers_exitcode_cases(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        selftest = source[source.index("function Invoke-D255SelfTest"):
+                          source.index("$selectedModeCount = 0")]
+        cases = (
+            '-TsharkExitCode 0 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "PASS"',
+            '-TsharkExitCode $null -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "PASS_WITH_EXIT_CODE_UNAVAILABLE"',
+            '-TsharkExitCode $null -PcapngExists $false -PcapngLength 0 -ReadableFrameCount 0) -cne "FAIL_CLOSED"',
+            '-TsharkExitCode $null -PcapngExists $true -PcapngLength 0 -ReadableFrameCount 0) -cne "FAIL_CLOSED"',
+            '-TsharkExitCode $null -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 0) -cne "FAIL_CLOSED"',
+            '-TsharkExitCode 7 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1) -cne "FAIL_CLOSED"',
+        )
+        for case in cases:
+            self.assertIn(case, selftest)
+
+    def test_offline_recovery_preserves_raw_and_supports_postprocessing(self):
+        temporary = tempfile.TemporaryDirectory(prefix="d255-recovery-test-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        run = root / RECOVERY.RUN_NAME
+        D255.create_synthetic_fixture(run)
+        (run / "input_manifest.json").unlink()
+        for path in (
+                run / "run_clock_end.json",
+                run / "guest_topology_after_capture.json",
+                run / "cache_after_metadata.json",
+                run / "raw/cache_after/candidate.bin",
+                run / "raw/oem_logs_after/oem_000.log"):
+            path.unlink()
+        for directory in (run / "raw/cache_after", run / "raw/oem_logs_after"):
+            directory.rmdir()
+        wire = run / "raw/wire.pcapng"
+        before_hash = D255.sha256_file(wire)
+        before_stat = wire.stat()
+
+        report = RECOVERY.recover(run)
+        self.assertEqual(report["result"],
+                         "PASS_RECOVERED_READY_FOR_OFFLINE_POSTPROCESSING")
+        self.assertFalse(report["pcap"]["modified"])
+        self.assertEqual(report["safety"]["real_usb_open_count"], 0)
+        self.assertEqual(report["safety"]["real_capture_count"], 0)
+        self.assertEqual(report["safety"]["real_hardware_action_count"], 0)
+        self.assertEqual(D255.sha256_file(wire), before_hash)
+        self.assertEqual(wire.stat().st_mtime_ns, before_stat.st_mtime_ns)
+        self.assertEqual(report["artifact_status"]["run_clock_end.json"],
+                         "NOT_RECOVERABLE")
+
+        output = root / "sanitized-recovery"
+        result = D255.analyze(
+            run, run / "recovery_manifest.json",
+            report["postprocess"]["manifest_sha256"], output)
+        provenance = result["artifact_provenance"]
+        self.assertEqual(provenance["MANIFEST"], "RECOVERED_ARTIFACT")
+        self.assertEqual(provenance["RUN_CLOCK_END"], "NOT_RECOVERABLE")
+        self.assertEqual(provenance["GUEST_TOPOLOGY_AFTER_CAPTURE"],
+                         "NOT_RECOVERABLE")
+        self.assertEqual(provenance["POST_CAPTURE_STATE_SNAPSHOT"],
+                         "NOT_RECOVERABLE_RETROACTIVELY")
+        self.assertFalse(result["restore_cancel"]["DEVICE_FDT_DISARM_PROVEN"])
+        self.assertFalse(result["restore_cancel"]["RESTORE_CLOSED"])
+
+        recovery_manifest = run / "recovery_manifest.json"
+        tampered = json.loads(recovery_manifest.read_text(encoding="utf-8"))
+        tampered["created_by"] = "UNTRUSTED_RECOVERY"
+        recovery_manifest.write_text(json.dumps(tampered), encoding="utf-8")
+        with self.assertRaisesRegex(D255.EvidenceError,
+                                    "invalid recovery manifest provenance"):
+            D255.analyze(run, recovery_manifest, D255.sha256_file(recovery_manifest),
+                         root / "tampered-recovery-output")
 
     def test_powershell_pin_required_without_pin_fails_before_authorization(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")

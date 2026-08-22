@@ -1,0 +1,121 @@
+{
+  "created_by": "D255_OFFLINE_RECOVERY_V1",
+  "expected_firmware": "GF_ST411SEC_APP_12509",
+  "files": [
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "authorization_consumed.json",
+      "role": "metadata",
+      "sha256": "72adcb0309ddd4321d9c9eceaf387638a57a211e7971be8c852537219d228f06",
+      "size": 311
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "cache_before_metadata.json",
+      "role": "metadata",
+      "sha256": "a8158e2e52be2a1d92065305a810adabffea45a1445701608f256e3dbbe64627",
+      "size": 1627
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "guest_topology_after_attach.json",
+      "role": "guest_topology_after_attach",
+      "sha256": "69df551ec691637ae0211cc8da0e8e23227ba90d81e109c2cccb65923a30e51c",
+      "size": 27393
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "guest_topology_before_attach.json",
+      "role": "guest_topology_before",
+      "sha256": "8d52167685ac910894170766961e7188b5a9bae5f9a937b369036ec35b57e1db",
+      "size": 27096
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "oem_logs_before_metadata.json",
+      "role": "metadata",
+      "sha256": "50056c08ce479cc2f54c4d6595a4264bdf32bf84f2995d59ff3bd513897ab414",
+      "size": 7
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "operator_markers.tsv",
+      "role": "markers",
+      "sha256": "bc0c1472c2f5bdfdc78d1435d41070fa86e2bc3d4b71207951336cd897b9c9bb",
+      "size": 2458
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "preflight.json",
+      "role": "metadata",
+      "sha256": "7cad12c2c44627146159241e5ae40d0e33d7f81355ecafdc57c00843acee7e90",
+      "size": 2010
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "raw/cache_before/0f67f5dff4613e33bf234102984211441c8b02c1d5d367774a4ae75c091c977a.bin",
+      "role": "cache_before",
+      "sha256": "0f67f5dff4613e33bf234102984211441c8b02c1d5d367774a4ae75c091c977a",
+      "size": 332
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "raw/cache_before/9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2.bin",
+      "role": "cache_before",
+      "sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+      "size": 13520
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "raw/cache_before/df5fb5ef1382d47e35e878d90c93bcd8a0bd2b0885c428ee7b6cab3ff9707116.bin",
+      "role": "cache_before",
+      "sha256": "df5fb5ef1382d47e35e878d90c93bcd8a0bd2b0885c428ee7b6cab3ff9707116",
+      "size": 140480
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "raw/wire.pcapng",
+      "role": "wire",
+      "sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+      "size": 27684
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "run_clock.json",
+      "role": "clock_anchor",
+      "sha256": "0c530962690ba7d9ce6099d031609404d04298b6ae95ebaa357fc943321d3e8d",
+      "size": 439
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "tshark_stderr.txt",
+      "role": "metadata",
+      "sha256": "58f7be0f1745f6b83a3eb6f0fb359bfba601891792c00b1dcc00d9b471ed0665",
+      "size": 47
+    },
+    {
+      "artifact_origin": "ORIGINAL_ARTIFACT",
+      "path": "tshark_stdout.txt",
+      "role": "metadata",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    }
+  ],
+  "recovery": {
+    "artifact_status": {
+      "cache_after_metadata.json": "NOT_RECOVERABLE",
+      "guest_topology_after_capture.json": "NOT_RECOVERABLE",
+      "input_manifest.json": "NOT_RECOVERABLE",
+      "input_manifest.json.sha256": "NOT_RECOVERABLE",
+      "oem_logs_after_metadata.json": "NOT_RECOVERABLE",
+      "run_clock_end.json": "NOT_RECOVERABLE"
+    },
+    "offline_recovery": true,
+    "original_artifact_default": "ORIGINAL_ARTIFACT",
+    "original_run_finalization": "FAILED_HOST_SIDE_EXITCODE_UNAVAILABLE",
+    "post_capture_state_snapshot": "NOT_RECOVERABLE_RETROACTIVELY",
+    "recovered_artifact": "recovery_manifest.json"
+  },
+  "schema": "D255_WINDOWS_EVIDENCE_INPUT_MANIFEST_V3",
+  "target": "27c6:5125"
+}

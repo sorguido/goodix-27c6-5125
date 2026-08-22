@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Offline-only D255 USBPcap/cache/log sanitizer and correlator.
 
-Raw evidence remains outside the repository.  This tool hash-gates every input
+Raw evidence remains in the private repository capture area.  This tool hash-gates every input
 and emits only protocol metadata, FDT12 values, cache-region hashes, redacted
 OEM event labels, and bounded cancel/re-entry classifications.
 """
@@ -25,6 +25,7 @@ IDB = 0x00000001
 EPB = 0x00000006
 USBPCAP_LINKTYPE = 249
 EXPECTED_FIRMWARE = "GF_ST411SEC_APP_12509"
+RECOVERY_RUN_NAME = "D255_20260822T205631772Z_85c8c41f"
 TARGET_DEVICE_DESCRIPTOR_PREFIX = b"\x12\x01"
 TARGET_VID_LE = bytes.fromhex("c627")
 TARGET_PID_LE = bytes.fromhex("2551")
@@ -372,19 +373,25 @@ def _load_clock_document(path: Path, expected_phase: str) -> tuple[dict, float, 
     return document, utc_value.timestamp(), local_value
 
 
-def load_clock_context(inputs: list[InputFile], markers: list[dict]) -> ClockContext:
+def load_clock_context(inputs: list[InputFile], markers: list[dict],
+                       recovery_mode: bool = False) -> ClockContext:
     starts = [row for row in inputs if row.role == "clock_anchor"]
     ends = [row for row in inputs if row.role == "clock_end"]
-    require(len(starts) == 1 and len(ends) == 1,
-            "manifest must identify one start and one end clock anchor")
+    require(len(starts) == 1, "manifest must identify one start clock anchor")
+    require(len(ends) == 1 or (recovery_mode and not ends),
+            "manifest must identify one end clock anchor outside offline recovery")
     start_doc, start_utc, start_local = _load_clock_document(starts[0].path, "BEFORE_CAPTURE")
-    end_doc, end_utc, _ = _load_clock_document(ends[0].path, "AFTER_CAPTURE")
+    if ends:
+        end_doc, end_utc, _ = _load_clock_document(ends[0].path, "AFTER_CAPTURE")
+        same_zone = str(start_doc["windows_timezone_id"]) == str(end_doc["windows_timezone_id"])
+        same_offset = int(start_doc["utc_offset_minutes"]) == int(end_doc["utc_offset_minutes"])
+    else:
+        end_utc = max(row["timestamp"] for row in markers)
+        same_zone = same_offset = False
     require(start_utc <= end_utc, "run clock anchors are reversed")
     clock_marker = one_marker(markers, "CLOCK_ANCHOR")
     require(abs(clock_marker["timestamp"] - start_utc) <= 5.0,
             "CLOCK_ANCHOR marker does not match run_clock.json")
-    same_zone = str(start_doc["windows_timezone_id"]) == str(end_doc["windows_timezone_id"])
-    same_offset = int(start_doc["utc_offset_minutes"]) == int(end_doc["utc_offset_minutes"])
     return ClockContext(
         year=start_local.year,
         offset_minutes=int(start_doc["utc_offset_minutes"]),
@@ -595,15 +602,35 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             usb_device: str | None = None) -> dict:
     require(not output_dir.exists(), "output collision: sanitized output directory already exists")
     inputs = load_manifest(run_dir, manifest_path, manifest_hash)
+    manifest_document = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    recovery = manifest_document.get("recovery", {})
+    recovery_mode = recovery.get("offline_recovery") is True
+    if recovery_mode:
+        require(run_dir.name == RECOVERY_RUN_NAME,
+                "offline recovery exception is restricted to the known D255 run")
+        require(manifest_path.name == "recovery_manifest.json"
+                and manifest_document.get("created_by") == "D255_OFFLINE_RECOVERY_V1",
+                "invalid recovery manifest provenance")
+        artifact_status = recovery.get("artifact_status", {})
+        for missing in ("run_clock_end.json", "guest_topology_after_capture.json",
+                        "cache_after_metadata.json", "oem_logs_after_metadata.json",
+                        "input_manifest.json", "input_manifest.json.sha256"):
+            require(artifact_status.get(missing) == "NOT_RECOVERABLE",
+                    f"recovery manifest does not classify {missing} as NOT_RECOVERABLE")
     wire = [row for row in inputs if row.role == "wire"]
     marker_files = [row for row in inputs if row.role == "markers"]
     require(len(wire) == 1 and len(marker_files) == 1, "manifest must identify one wire and one marker input")
     packets = list(iter_usbpcap(wire[0].path))
     markers = load_markers(marker_files[0].path)
-    clock = load_clock_context(inputs, markers)
+    clock = load_clock_context(inputs, markers, recovery_mode)
     require_guest_topology(inputs, "guest_topology_before", 0)
     require_guest_topology(inputs, "guest_topology_after_attach", 1)
-    require_guest_topology(inputs, "guest_topology_after_capture", 1)
+    after_capture_topology = [row for row in inputs if row.role == "guest_topology_after_capture"]
+    if after_capture_topology:
+        require_guest_topology(inputs, "guest_topology_after_capture", 1)
+    else:
+        require(recovery_mode,
+                "manifest must identify one guest_topology_after_capture snapshot")
 
     vm_guest_ready = one_marker(markers, "VM_GUEST_READY")
     topology_before = one_marker(markers, "GUEST_TOPOLOGY_BEFORE")
@@ -614,6 +641,7 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     guest_present = one_marker(markers, "GUEST_27C6_5125_PRESENT")
     passive_settled = one_marker(markers, "PASSIVE_BOOTSTRAP_SETTLED")
     ui_check_begin = one_marker(markers, "HELLO_SETUP_UI_CHECK_BEGIN")
+    operator_phases_complete = one_marker(markers, "OPERATOR_PHASES_COMPLETE")
     terminal_names = {
         "HELLO_SETUP_UI_READY": "READY_WAITING_FOR_FINGER",
         "HELLO_SETUP_UI_UNAVAILABLE": "UI_UNAVAILABLE",
@@ -666,8 +694,9 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
                  if frame.direction == "IN" and (parsed := parse_a0(frame))
                  and parsed[0] == 0xA8 and EXPECTED_FIRMWARE.encode() in parsed[1]]
     require(a8_proofs, "A8 APP12509 proof is absent")
-    require(attach_end["timestamp"] <= a8_proofs[0].timestamp < passive_settled["timestamp"],
-            "VM_USB_ATTACH -> A8_APP12509_PROVEN -> PASSIVE_BOOTSTRAP ordering invalid")
+    require(descriptor.timestamp <= a8_proofs[0].timestamp <= attach_end["timestamp"]
+            < passive_settled["timestamp"],
+            "descriptor -> A8_APP12509_PROVEN within VM_USB_ATTACH -> PASSIVE_BOOTSTRAP ordering invalid")
 
     full_phase_names = (
         "OEM_SESSION_BEGIN", "OEM_WAITING_NO_FINGER", "CANCEL_NO_FINGER_BEGIN",
@@ -688,10 +717,13 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
                 < arm_marker["timestamp"], "Hello UI/OEM waiting marker order invalid")
         require(arm_marker["timestamp"] < cancel_begin["timestamp"] < cancel_end["timestamp"],
                 "cancel marker order invalid")
-        require(cancel_end["timestamp"] <= reentry_begin["timestamp"]
-                < reentry_waiting["timestamp"] < reentry_cancel_begin["timestamp"]
-                < reentry_cancel_end["timestamp"] <= reentry_end["timestamp"],
+        marker_key = lambda row: (row["timestamp"], row["line"])
+        require(marker_key(cancel_end) < marker_key(reentry_begin)
+                < marker_key(reentry_waiting) < marker_key(reentry_cancel_begin)
+                < marker_key(reentry_cancel_end) < marker_key(reentry_end),
                 "re-entry marker order invalid")
+        require(marker_key(reentry_end) < marker_key(operator_phases_complete),
+                "operator completion marker precedes re-entry end")
     else:
         require(not any(one_marker(markers, name, required=False) for name in full_phase_names),
                 "partial-bootstrap run contains forbidden cancel/re-entry markers")
@@ -905,6 +937,25 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     result = {
         "schema": "D255_SANITIZED_WINDOWS_EVIDENCE_V4",
         "execution_mode": "OFFLINE_POSTPROCESS_ONLY",
+        "artifact_provenance": {
+            "MANIFEST": "RECOVERED_ARTIFACT" if recovery_mode else "ORIGINAL_ARTIFACT",
+            "WIRE_PCAP": "ORIGINAL_ARTIFACT",
+            "OPERATOR_MARKERS": "ORIGINAL_ARTIFACT",
+            "RUN_CLOCK_END": (
+                "ORIGINAL_ARTIFACT" if any(row.role == "clock_end" for row in inputs)
+                else "NOT_RECOVERABLE"),
+            "GUEST_TOPOLOGY_AFTER_CAPTURE": (
+                "ORIGINAL_ARTIFACT" if after_capture_topology else "NOT_RECOVERABLE"),
+            "CACHE_AFTER": (
+                "ORIGINAL_ARTIFACT" if any(row.role == "cache_after" for row in inputs)
+                else "NOT_RECOVERABLE"),
+            "OEM_LOG_AFTER": (
+                "ORIGINAL_ARTIFACT" if any(row.role == "oem_log_after" for row in inputs)
+                else "NOT_RECOVERABLE"),
+            "POST_CAPTURE_STATE_SNAPSHOT": (
+                "ORIGINAL_ARTIFACT" if not recovery_mode
+                else "NOT_RECOVERABLE_RETROACTIVELY"),
+        },
         "input_hashes": {"manifest_sha256": manifest_hash.lower(), "wire_sha256": wire[0].sha256},
         "run_classification": {
             "D255_RUN_RESULT": run_result,
@@ -928,8 +979,9 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             "TARGET_ENUMERATION_IN_CAPTURE": True,
             "A8_APP12509_PROVEN": target_specific,
             "derived_marker_order": [
-                "CAPTURE_STARTED", "VM_USB_ATTACH_BEGIN", "VM_USB_ATTACH_END",
-                "GUEST_27C6_5125_PRESENT", "A8_APP12509_PROVEN",
+                "CAPTURE_STARTED", "VM_USB_ATTACH_BEGIN", "TARGET_DESCRIPTOR_27C6_5125",
+                "A8_APP12509_PROVEN", "VM_USB_ATTACH_END",
+                "GUEST_27C6_5125_PRESENT",
                 "PASSIVE_BOOTSTRAP_SETTLED", "HELLO_SETUP_UI_CHECK_BEGIN",
                 ui_terminal_name,
             ],
@@ -1031,6 +1083,9 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             "psk_or_secret_exported": False,
             "usb_open_count": 0,
             "command_send_count": 0,
+            "real_capture_count": 0,
+            "real_hardware_action_count": 0,
+            "raw_pcap_modified": False,
         },
     }
     require(target_specific,
@@ -1042,6 +1097,8 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     summary = [
         f"CAPTURE_FIRMWARE={firmware}",
         f"D255_EVIDENCE_TARGET_SPECIFIC={str(target_specific).lower()}",
+        f"MANIFEST_ARTIFACT_CLASS={result['artifact_provenance']['MANIFEST']}",
+        f"POST_CAPTURE_STATE_SNAPSHOT={result['artifact_provenance']['POST_CAPTURE_STATE_SNAPSHOT']}",
         "D255_BOOTSTRAP_EVIDENCE_VALIDITY=VALID_COLD_ATTACH",
         f"D255_RUN_RESULT={run_result}",
         "BOOTSTRAP_EVIDENCE_PRESERVED=true",
@@ -1306,10 +1363,12 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         (base + 0.2, "VM_GUEST_READY"),
         (base + 0.3, "GUEST_TOPOLOGY_BEFORE"),
         (base + 0.4, "ACCOUNT_PREREQUISITES_CHECKED"),
+        (base + 0.45, "CAPTURE_PROCESS_STARTED"),
         (base + 0.5, "CAPTURE_STARTED"),
         (base + 0.6, "VM_USB_ATTACH_BEGIN"),
-        (base + 0.9, "VM_USB_ATTACH_END"),
-        (base + 0.95, "GUEST_27C6_5125_PRESENT"),
+        (base + 1.3, "VM_USB_ATTACH_END"),
+        (base + 1.4, "GUEST_27C6_5125_PRESENT"),
+        (base + 2.3, "CAPTURE_OUTPUT_MATERIALIZED"),
         (base + 2.4, "PASSIVE_BOOTSTRAP_SETTLED"),
         (base + 2.5, "HELLO_SETUP_UI_CHECK_BEGIN"),
     ]
@@ -1332,6 +1391,8 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
                             (base + 5.35, "REENTRY_CANCEL_BEGIN"),
                             (base + 5.4, "REENTRY_CANCEL_END"),
                             (base + 5.5, "REENTRY_END")])
+    marker_rows.append((base + 5.6 if full_run else base + 2.7,
+                        "OPERATOR_PHASES_COMPLETE"))
     marker_text = "timestamp_utc\tevent\tdetail\n" + "".join(
         f"{dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat()}\t{name}\tsynthetic\n"
         for ts, name in sorted(marker_rows)

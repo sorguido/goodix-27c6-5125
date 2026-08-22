@@ -1,0 +1,71 @@
+D255 RECOVERY / EXITCODE OFFLINE VERIFICATION RESULTS
+Date: 2026-08-22 Europe/Rome
+Execution mode: OFFLINE=true
+
+1. Python compilation
+   Command: python3 -m compileall -q core tests analysis/D252 analysis/D253 analysis/D254 analysis/D255
+   Result: PASS
+
+2. Historical capture regressions
+   Commands:
+     python3 analysis/D252/d252_fdt_capture_audit.py
+     python3 analysis/D253/d253_offline_audit.py --repo .
+   Result: PASS / PASS
+   Safety: usb/command/persistent-write counts zero.
+
+3. D254 external-evidence suite
+   Command: python3 -m unittest -q analysis/D254/test_d254_external_audit.py
+   Result: PASS; 5 tests
+
+4. D255 recovery and postprocessor suite
+   Command: python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
+   Result: PASS; 56 tests
+   New coverage:
+   - ExitCode 0 + valid pcap => PASS;
+   - ExitCode unavailable + exited process + valid pcap => PASS_WITH_EXIT_CODE_UNAVAILABLE;
+   - ExitCode unavailable + missing/empty/unreadable pcap => FAIL_CLOSED;
+   - numeric non-zero ExitCode => FAIL_CLOSED;
+   - offline recovery preserves pcap hash and mtime;
+   - missing after snapshots remain NOT_RECOVERABLE;
+   - recovered manifest is accepted by the postprocessor;
+   - restore/disarm are not promoted.
+
+5. Full supported repository suite
+   Command: python3 -m unittest discover -s tests -q
+   Result: PASS; 172 tests
+
+6. Existing real-run recovery
+   Command: python3 analysis/D255/d255_recover_existing_run.py --run-dir captures/D255_20260822T205631772Z_85c8c41f
+   Result: PASS_RECOVERED_READY_FOR_OFFLINE_POSTPROCESSING
+   PCAP_BYTES=27684
+   FRAME_COUNT=218
+   FIRST_FRAME=1
+   PCAP_SHA256=802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c
+   RAW_PCAP_MODIFIED=false
+   Note: the one-shot recovery output already exists; later verification used its hash-gated manifest without rerunning/replacing it.
+
+7. Real recovered-run postprocessor
+   Result: PASS
+   CAPTURE_FIRMWARE=GF_ST411SEC_APP_12509
+   D255_EVIDENCE_VALIDITY=VALID_ZERO_FINGER
+   SEED_SOURCE_CLASS=HOST_CACHE_WIRE_MATCH
+   DEVICE_FDT_DISARM_PROVEN=false
+   RESTORE_CLOSED=false
+   RESTORE_CLOSURE_DECISION=AI_PM_REVIEW_REQUIRED
+
+8. Structured data and hygiene
+   JSON parse: PASS for recovery decision, inventory, recovery manifest/report and sanitized evidence
+   captures/ gitignore check: NOT_IGNORED
+   git diff --check: PASS
+
+9. Native PowerShell limitation
+   pwsh/powershell available on Linux host: no
+   PowerShell 5.1 handle-caching retest after patch: NOT_AVAILABLE
+   Static syntax/safety/finalization matrix: PASS
+
+Safety counters for every Codex command in this step:
+REAL_USB_OPEN_COUNT=0
+REAL_CAPTURE_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+RAW_PCAP_MODIFIED=false
+NEW_LIVE_CAPTURE_REQUIRED=false

@@ -93,41 +93,41 @@ provi la derivazione. La capture pubblica Issue #63 è `27c6:5125`, firmware
 ignoto: in 21 eventi IRQ2 usa sempre `0x22 [01 00]`, corroborando il modello
 corrente, e mostra su 22 comandi `0x36` residui fisici agli stessi offset
 40–45 del target, con valori diversi. Non contiene cold-start, cancel senza
-dito o restore. Il bootstrap blocker è ridotto ma non chiuso; il restore
-blocker non è ridotto. D254 resta `BLOCKED`, non autorizza live e richiede come
-prossima evidenza primaria una singola traccia Windows APP12509 sanitizzata da
-cold-start/cache/first-seed fino ad arm, cancel senza dito e re-entry.
+dito o restore. D254 aveva quindi lasciato bootstrap e restore aperti e aveva
+indicato come prossima evidenza una traccia Windows APP12509 da cold-start fino
+ad arm, cancel senza dito e re-entry. D255 ha ora acquisito e recuperato quella
+traccia: il bootstrap/seed è corroborato sul target, mentre il restore resta
+aperto perché gli snapshot e log `after` non sono recuperabili.
 
-D255 ha inizialmente preparato offline il kit per quella singola acquisizione;
-la capture target non è stata completata nei successivi tentativi launcher. La
-prima versione non è stata approvata dalla review AI-PM: il
-launcher dichiarava PowerShell 5.1 ma usava tre API .NET moderne, mentre il
-postprocessor ISO-only non ancorava il formato WBDI Goodix
-`[MMDD-HH:MM:SS:mmm]`. La revisione correttiva dello stesso D255 sostituisce
-quelle API, aggiunge self-test PowerShell, clock anchor start/end, snapshot
-before/after del log e correlazione MMDD fail-closed. La procedura recuperabile
-dalla storia resta delimitata ma incompleta:
-la capture sopravvissuta è un pcapng USBPcap e il corpus la classifica come
-cold attach Windows OEM, mentre comando, versione dello strumento, hypervisor,
-passthrough e path WBDI originari non sono conservati. Il kit riusa quindi il
-formato e il boundary provati: TShark/USBPcap nel guest Windows deve essere già
-attivo prima del normale attach GUI della VM. Acquisisce nello stesso run wire,
-log OEM, snapshot mirato del cache e marker UTC; il postprocessor hash-gated
-correla A8, primo `0x36`, FDT12 host, cancel e re-entry senza esportare OTP,
-immagini, PSK, TLS o payload biometrici. I test sintetici e le regressioni
-offline passano; il self-test della baseline è stato poi osservato `PASS` nella
-VM, mentre `pwsh` resta indisponibile sull'host Linux e il file corretto richiede
-ancora `-SelfTestOnly` e `-PreflightOnly` nativi. Una seconda review AI-PM ha
-respinto anche questa revisione:
-assumeva un normale prompt di recognition, ma nella VM Windows corrente
-l'enrollment fingerprint non è completato e quel path non è provato
-disponibile. La seconda correzione dello stesso D255 rende perciò canonico il
-boundary host Linux → guest Windows: VM già avviata, Goodix assente dal guest,
-snapshot PnP read-only, USBPcap attivo prima di un solo attach GUI manuale e
-prova in capture sia del descriptor `27c6:5125` sia, separatamente, dell'A8
-`GF_ST411SEC_APP_12509`. Hypervisor e metodo storico esatto non sono preservati,
-quindi non viene inventata automazione host-side; se esistono più interfacce
-USBPcap, vanno catturate tutte o il preflight fallisce ambiguo.
+D255 ha completato la singola acquisizione richiesta sulla baseline approvata
+`f01b81d629ffe8af5eecb92ca93968045d5345ce`. La run canonica
+`captures/D255_20260822T205631772Z_85c8c41f/` contiene un pcapng USBPcap da
+27.684 byte, SHA-256 `802370d6...cc63337c`, con 218 frame leggibili e primo
+frame `1`. Cold attach, UI ready, cancel e re-entry sono stati completati senza
+dito. Il launcher ha fallito soltanto dopo `OPERATOR_PHASES_COMPLETE`: Windows
+PowerShell 5.1 ha esposto `$null` per `ExitCode` sul `Process` creato con
+`Start-Process -PassThru -NoNewWindow` e redirect, pur con processo terminato e
+stderr TShark `218 packets captured`. È un failure di finalizzazione host-side,
+non un failure di acquisizione.
+
+Il recovery offline ha verificato hash, dimensione, leggibilità, 218 frame e
+ordine univoco dei marker senza cambiare hash, size o mtime del raw. Gli
+snapshot `run_clock_end`, `guest_topology_after_capture`, cache/log after e il
+manifest originale non erano stati prodotti prima del falso failure e sono
+`NOT_RECOVERABLE_RETROACTIVELY`; non sono stati ricreati dallo stato corrente.
+Il manifest nuovo è esplicitamente `RECOVERED_ARTIFACT`. Il postprocessor reale
+accetta questa provenance mantenendo i gate wire: descriptor e primo A8
+APP12509 cadono, in quest'ordine, dentro i marker dell'attach manuale. La
+capture prova cold attach target-specific, tre `0x36`, match primo seed/cache,
+zero IRQ dito/`0x22`/image path nella finestra operatore, re-entry OEM e nuovo
+`0x32` accettato. L'assenza di log/snapshot after lascia
+`RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION`,
+`DEVICE_FDT_DISARM_PROVEN=false`, `RESTORE_CLOSED=false` e decisione AI-PM.
+Non è richiesta una nuova capture live.
+
+Le note successive sulle revisioni del kit e sui precedenti failure sono
+provenance storica, superata per lo stato corrente dalla run acquisita e dal
+recovery appena descritto.
 
 La terza review AI-PM ha corretto due overclaim residui. Con Goodix assente dal
 guest, la UI fingerprint può legittimamente essere nascosta o indisponibile:
@@ -268,7 +268,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | ultima run consumata, TShark avviato ma stop pre-attach sulla race di creazione pcapng; Goodix mai collegato | readiness corretta offline a processo vivo + target assente, file richiesto dopo attach e validazione finale forte preservata; review AI-PM, prova nativa Windows, nuova baseline e nuova autorizzazione pendenti |
+| Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -279,6 +279,12 @@ da D247 e potrà ricevere soltanto un export futuro, separato, sanitizzato e
 auditato. Un working tree pulito/equivalente non rende pubblicabile la history
 privata; capture, DLL, firmware, secret o dati biometrici transitati nella
 storia richiedono clean export, nuova storia o filtro dedicato.
+
+Le evidenze autentiche private hanno sede canonica in `<git-root>/captures/` e
+possono essere versionate nel repository privato per renderle disponibili agli
+strumenti autorizzati sul remoto privato. Bundle ed export pubblici escludono il
+raw; la futura pubblicazione richiede sanitizzazione esplicita di contenuto e
+history. Non esiste sincronizzazione automatica privato→pubblico.
 
 La root contiene soltanto fonti canoniche, licenze, linee guida e directory di
 progetto. Gli output Dxxx sono step-local e non cumulativi in
@@ -1945,7 +1951,7 @@ sanitizzata che inizi dal cold-start e mostri validazione cache e sorgente del
 primo seed, poi prosegua fino a `0x32`, cancel operatore senza dito e re-entry
 deterministica. Non è una sequenza Linux live proposta.
 
-## D255: kit di acquisizione Windows APP12509
+## D255: acquisizione Windows APP12509 e recovery offline
 
 La ricostruzione storica distingue fatti e lacune. Il file
 `rilevamento.pcapng`, hash `50071c0f...19c184b`, usa linktype USBPcap; manuale
@@ -1955,7 +1961,7 @@ insieme a `gfusb.dll` e componenti OEM. Non sono invece preservati comando di
 capture, versione Wireshark/USBPcap, prodotto VM, comando di passthrough o path
 del log. Non è quindi provato il locus esatto del vecchio collector.
 
-Il metodo futuro selezionato avvia TShark sull'interfaccia USBPcap esplicita nel
+Il metodo poi eseguito avvia TShark sull'interfaccia USBPcap esplicita nel
 guest Windows mentre il target è ancora assente; solo dopo i marker
 `CAPTURE_PROCESS_STARTED` e `CAPTURE_STARTED` l'operatore usa il normale attach
 GUI già revisionato. Entrambi significano processo TShark attivo e target
@@ -1998,7 +2004,7 @@ l'attach. Inoltre A8 o nuovo `0x32` accettato nella seconda sessione non
 osservano necessariamente il disarm del prior arm. Questa è la decisione
 canonica corrente, non un limite cosmetico del launcher.
 
-Nel ramo futuro one-shot, la VM Windows è già avviata e il Goodix resta visibile
+Nel ramo one-shot eseguito, la VM Windows era già avviata e il Goodix restava visibile
 sull'host Linux ma assente dal guest. Il preflight verifica soltanto
 Sign-in-options/account-level: enrollment `NOT_COMPLETED`, nessuna creazione o
 modifica PIN, e `WINDOWS_HELLO_PIN_STATE` in
@@ -2024,8 +2030,8 @@ provenance bootstrap. Lo script non invoca service restart, PnP mutation, VM,
 provisioning, flash o comandi Goodix. Il cache discovery resta ristretto a root
 Goodix e a size/naming pertinenti.
 
-`analysis/D255/d255_postprocess_windows_evidence.py` opera solo su path esterni
-hash-gated. Seleziona il device tramite A8 esatto, ricostruisce A0/B0 senza
+`analysis/D255/d255_postprocess_windows_evidence.py` opera solo su path privati
+hash-gated, canonicamente sotto `captures/`. Seleziona il device tramite A8 esatto, ricostruisce A0/B0 senza
 esportare payload, misura il contratto fisico `0x36`, valida l'ipotesi
 `OTP64+FDT12+NAV3200+IMAGE10240+CRC4`, confronta solo FDT12 e hash di regioni,
 e censisce la finestra ultimo `0x32` → cancel → re-entry. La UI sensor-dependent
@@ -2075,7 +2081,38 @@ timestamp di diversi secondi posteriore prova la race host-side del gate. La
 futura run richiede review AI-PM, approvazione di un nuovo SHA live-critical e
 una nuova autorizzazione esplicita; quella consumata non è riutilizzabile.
 
-Il riesame metodologico pre-live corrente è:
+La run successiva sulla baseline approvata
+`f01b81d629ffe8af5eecb92ca93968045d5345ce` ha invece completato l'intero
+percorso operatore senza dito. La capture canonica è
+`captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng`: 27.684 byte,
+218 frame leggibili, `FIRST_FRAME=1`, SHA-256
+`802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c`.
+Tutti i marker da `CAPTURE_PROCESS_STARTED` a `OPERATOR_PHASES_COMPLETE` sono
+presenti una volta e ordinati. Il failure finale
+`HOST_SIDE_TSHARK_EXITCODE_NULL_OR_UNAVAILABLE` è il bug noto di Windows
+PowerShell 5.1 per processi `Start-Process -PassThru` con `-NoNewWindow` e
+stream rediretti: dopo `Wait-Process`, il wrapper può non esporre l'ExitCode
+anche se `HasExited=true`. Il launcher conserva ora anticipatamente l'handle e
+tratta l'ExitCode come nullable. Zero numerico più pcap valido produce `PASS`;
+null più processo terminato, file presente/non vuoto e almeno un frame
+leggibile produce `PASS_WITH_EXIT_CODE_UNAVAILABLE`; non-zero, processo ancora
+attivo o pcap invalido restano `FAIL_CLOSED`. Stdout/stderr rimangono soltanto
+diagnostica e non sostituiscono la prova di leggibilità.
+
+`analysis/D255/d255_recover_existing_run.py` ha finalizzato la run interamente
+offline con `REAL_USB_OPEN_COUNT=0`, `REAL_CAPTURE_COUNT=0`,
+`REAL_HARDWARE_ACTION_COUNT=0` e `RAW_PCAP_MODIFIED=false`. Il recovery
+manifest SHA-256 è `deb08f42...dcedaa`. Gli snapshot after e il manifest
+originale mai creati restano `NOT_RECOVERABLE`; il postprocessor distingue
+`ORIGINAL_ARTIFACT`, `RECOVERED_ARTIFACT` e `NOT_RECOVERABLE`. L'esecuzione
+reale del postprocessor passa: target APP12509, cold attach valido,
+`VALID_ZERO_FINGER`, tre `0x36`, primo seed
+`aeaebfbfa4a4b2b2a7a7b3b3` uguale all'FDT12 del cache before, re-entry e nuovo
+arm accettato. Non prova causalità del seed né disarm del prior arm; senza log
+OEM e snapshot after la closure restore resta inconclusiva e soggetta a review
+AI-PM. `NEW_LIVE_CAPTURE_REQUIRED=false`.
+
+Il riesame metodologico che precedette quella run era:
 
 1. cambia la semantica della readiness, da file creato entro due secondi a
    processo TShark vivo più target ancora assente, con materializzazione
@@ -2130,8 +2167,10 @@ correlabili impongono `RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION` e non
 promuovono `CANCEL_IS_HOST_ONLY` o `USB_CLOSE_AFTER_CANCEL`.
 
 Se la UI non è ready, il run consumato termina senza cancel/re-entry e lascia
-scadere il timer bounded; TShark exit zero, file non vuoto e readback di un frame
-validano il pcapng prima degli snapshot after e del manifest. Il postprocessor
+scadere il timer bounded; processo terminato, ExitCode zero oppure non
+disponibile, file non vuoto e readback di un frame validano il pcapng prima
+degli snapshot after e del manifest. Un ExitCode numerico non-zero resta
+terminale. Il postprocessor
 accetta `PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE` senza marker cancel ma conserva
 descriptor/A8, cache, primo `0x36` e profilo fisico. Produce
 `BOOTSTRAP_EVIDENCE_PRESERVED=true`, `RESTORE_EVIDENCE_ACQUIRED=false` e
@@ -2142,28 +2181,20 @@ Nel ramo full, `OEM_CANCEL_REENTRY_PROVEN` e
 `DEVICE_FDT_DISARM_PROVEN`, che resta falso senza una semantica target-specific
 esplicita. `PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNKNOWN_OR_NOT_DIRECTLY_OBSERVED` e
 la sola re-entry non può mai promuovere `RESTORE_CLOSED`; la chiusura resta
-`AI_PM_REVIEW_REQUIRED` sul futuro bundle reale. L'uguaglianza wire/cache/log
+`AI_PM_REVIEW_REQUIRED` sull'evidenza recuperata. L'uguaglianza wire/cache/log
 resta correlazione, mai automaticamente causalità. Un A8 assente/diverso rende
 l'evidenza non target-specific e terminale; marker/formati inattesi e collisioni
 falliscono chiusi senza retry.
 
-I 54 test D255 passano, inclusi zero-log con cache presente, log presente con
-cache assente, reporting indipendente delle fonti, boundary
-VM/enumerazione/single attach, invalidation pre-attached/topology-change,
-zero-finger e invalidazione separata
-IRQ2/`0x22`/image, oltre a ISO, MMDD realistico, mezzanotte, fine anno,
-ambiguità/cambio offset, quattro stati del log, quattro esiti UI, partial
-bootstrap, regressione re-entry≠disarm e i contratti readiness per file
-mancante/zero-byte, processo terminato, materializzazione post-attach e
-validazione finale forte. Passano inoltre le regressioni
-D252–D254 e i 172 test della suite supportata. `pwsh` non è installato
-sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
-staticamente. Il self-test della baseline precedente è stato osservato `PASS`
-nella VM, con hardware action count zero e autorizzazione non consumata; il
-vero `-SelfTestOnly` e poi `-PreflightOnly` sul file corretto restano una
-verifica futura, insieme alle simulazioni pre-autorizzazione ABSENT/PRESENT e
-al comportamento nativo TShark della readiness corretta. Nessun dato raw D255
-è stato acquisito in questa correzione offline.
+I 56 test D255 passano. Oltre alle coperture storiche includono i quattro casi
+di finalizzazione TShark — ExitCode 0, ExitCode nullo con pcap valido, ExitCode
+nullo con pcap assente/vuoto/illeggibile e ExitCode non-zero — e il recovery
+end-to-end su fixture incompleta con hash e mtime raw invariati. La run reale è
+stata recuperata e postprocessata offline con successo. `pwsh` non è installato
+sull'host Linux: il nuovo handle-caching non è stato rieseguito su Windows
+PowerShell 5.1 dopo la patch, ma l'osservazione nativa della run e il bug runtime
+documentato chiudono la causa; la semantica nullable è coperta offline e non
+richiede una nuova capture.
 
 ```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
@@ -2171,13 +2202,13 @@ D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION=FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
 D255_PRIOR_LIVE_PATH_OBSERVATION=FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
-D255_LATEST_LIVE_PATH_OBSERVATION=FAIL_PREATTACH_PCAP_FILE_CREATION_RACE_AFTER_AUTHORIZATION
-D255_LATEST_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED=true
-D255_LATEST_FAILED_ATTEMPT_TSHARK_STARTED=true
-D255_LATEST_FAILED_ATTEMPT_GOODIX_ATTACHED_TO_VM=false
-D255_LATEST_FAILED_ATTEMPT_SENSOR_REACHING_ACTION=false
-D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
-D255_OUTCOME=TSHARK_PREATTACH_FILE_RACE_CORRECTED_OFFLINE
+D255_LATEST_LIVE_PATH_OBSERVATION=CAPTURE_ACQUIRED_FINALIZATION_FAILED_EXITCODE_UNAVAILABLE
+D255_LATEST_RUN_AUTHORIZATION_CONSUMED=true
+D255_LATEST_RUN_TSHARK_STARTED=true
+D255_LATEST_RUN_GOODIX_ATTACHED_TO_VM=true
+D255_LATEST_RUN_OPERATOR_PHASES=COMPLETED_ZERO_FINGER
+D255_CORRECTIVE_STATUS=RECOVERED_READY_FOR_AI_PM_REVIEW
+D255_OUTCOME=CAPTURE_ACQUIRED_RECOVERED_AND_POSTPROCESSED_OFFLINE
 D255_OEM_LOG_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_GOODIX_CACHE_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -2188,17 +2219,25 @@ D255_SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH=UNKNOWN_BEFORE_ATTACH
 D255_PARTIAL_BOOTSTRAP_RESULT_SUPPORTED=true
 D255_REENTRY_ALONE_CAN_CLOSE_RESTORE=false
 D255_FINGER_INTERACTION_ALLOWED=false
-D255_LIVE_PATH_ATTEMPT=FAILED_PREATTACH_AFTER_TSHARK_START
-D255_LIVE_CAPTURE=NOT_PERFORMED
-D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
-D255_OPERATOR_AUTHORIZATION_REQUIRED=true
+D255_LIVE_PATH_ATTEMPT=COMPLETED_OPERATOR_PHASES_FINALIZATION_FALSE_FAILURE
+D255_LIVE_CAPTURE=SUCCEEDED
+D255_CAPTURE_BYTES=27684
+D255_CAPTURE_FRAME_COUNT=218
+D255_FIRST_FRAME=1
+D255_CAPTURE_SHA256=802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c
+D255_OPERATOR_AUTHORIZATION_REQUIRED=false
 D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
 D255_TSHARK_PREATTACH_READINESS=PROCESS_STARTED_AND_ALIVE_TARGET_ABSENT
 D255_PREATTACH_PCAP_FILE_REQUIRED=false
-D255_FINAL_PCAP_VALIDATION=EXIT_ZERO_EXISTS_NONEMPTY_READABLE_FRAME
+D255_FINAL_PCAP_VALIDATION=PROCESS_EXITED_AND_EXIT_ZERO_OR_UNAVAILABLE_AND_EXISTS_NONEMPTY_READABLE_FRAME
+D255_RECOVERY_RESULT=PASS_RECOVERED_READY_FOR_OFFLINE_POSTPROCESSING
+D255_POSTPROCESS_RESULT=PASS
+D255_POST_CAPTURE_STATE_SNAPSHOT=NOT_RECOVERABLE_RETROACTIVELY
+D255_PRIVATE_EVIDENCE_CANONICAL_LOCATION=captures/
+D255_NEW_LIVE_CAPTURE_REQUIRED=false
 D255_EMPTY_OEM_LOG_CANDIDATES_SUPPORTED=true
 D255_EMPTY_ARRAY_CLASS_AUDIT=PASS
-D255_SHARED_PREAUTHORIZATION_SIMULATION=NATIVE_WINDOWS_PENDING
+D255_SHARED_PREAUTHORIZATION_SIMULATION=HISTORICAL_NOT_REQUIRED_FOR_RECOVERY
 D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
 READY_FOR_AI_PM_REVIEW=true
 READY_FOR_OPERATOR_RUN=false
