@@ -114,9 +114,10 @@ attivo prima del normale attach GUI della VM. Acquisisce nello stesso run wire,
 log OEM, snapshot mirato del cache e marker UTC; il postprocessor hash-gated
 correla A8, primo `0x36`, FDT12 host, cancel e re-entry senza esportare OTP,
 immagini, PSK, TLS o payload biometrici. I test sintetici e le regressioni
-offline passano; il runtime PowerShell nativo resta da verificare tramite il
-nuovo `-SelfTestOnly` e poi `-PreflightOnly` in Windows perché non è disponibile
-sull'host D255. Una seconda review AI-PM ha respinto anche questa revisione:
+offline passano; il self-test della baseline è stato poi osservato `PASS` nella
+VM, mentre `pwsh` resta indisponibile sull'host Linux e il file corretto richiede
+ancora `-SelfTestOnly` e `-PreflightOnly` nativi. Una seconda review AI-PM ha
+respinto anche questa revisione:
 assumeva un normale prompt di recognition, ma nella VM Windows corrente
 l'enrollment fingerprint non è completato e quel path non è provato
 disponibile. La seconda correzione dello stesso D255 rende perciò canonico il
@@ -135,6 +136,15 @@ disponibilità sensor-dependent resta `UNKNOWN_BEFORE_ATTACH`; non è un gate di
 autorizzazione. Il vero path Settings → Sign-in options → Fingerprint
 recognition → Set up/Add a fingerprint viene verificato solo dopo capture
 attiva, singolo attach, PnP guest, A8 APP12509 wire-derived e bootstrap passivo.
+
+Il primo preflight nella VM reale ha poi osservato un ulteriore difetto locale
+dello stesso D255: self-test `PASS`, zero azioni hardware, autorizzazione non
+consumata, una sola `USBPcap1` e cache leggibile in
+`C:\ProgramData\Goodix`, ma nessun `goodix*.log`/`wbdi*.log`. L'esistenza di un
+log OEM non era mai stata provata come prerequisito e non protegge alcun gate
+live-critical. La correzione rende quindi log OEM e cache Goodix fonti
+opzionali e indipendenti, classificate `PRESENT|ABSENT`; restano terminali prima
+dell'autorizzazione soltanto i path esplicitamente forniti ma illeggibili.
 
 Il gate post-attach accetta solo `READY_WAITING_FOR_FINGER`, `UI_UNAVAILABLE`,
 `NEW_PIN_REQUIRED` o `UNEXPECTED_PREREQUISITE`. Solo il primo entra nelle due
@@ -206,7 +216,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | tre review correttive fallite; correttivo post-attach/conservative-restore pronto per nuova review AI-PM, non eseguito | pre-attach solo account/PIN, UI sensor-dependent dopo attach/A8/bootstrap, partial bootstrap preservato; re-entry non chiude disarm; hardware non autorizzato |
+| Kit acquisizione Windows D255 | correttivo OEM-log gate pronto per nuova review AI-PM, non eseguito nativamente dopo la patch | zero log accettato e riportato separatamente dalla cache; path espliciti illeggibili restano fail-closed; UI post-attach/partial bootstrap e re-entry≠disarm invariati; hardware non autorizzato |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1973,6 +1983,19 @@ local-only snapshot OEM before/after con path, size, hash e mtime; il parser usa
 come nuova finestra soltanto un append byte-prefix verificato e distingue
 `UNCHANGED`, `GREW`, `TRUNCATED` e `REPLACED_OR_ROTATED`.
 
+Il preflight reale della VM ha dimostrato che questa raccolta non può assumere
+l'esistenza del log: `C:\ProgramData\Goodix` contiene cache Goodix leggibili,
+ma nessun `goodix*.log` o `wbdi*.log` nelle directory candidate. Il vecchio
+`no readable OEM/WBDI log source was identified` bloccava quindi un caso reale
+senza ridurre rischio device-side. `D255_WINDOWS_PREFLIGHT_V4` accetta zero
+candidate log e riporta separatamente `OEM_LOG_STATUS`,
+`OEM_LOG_SOURCE_COUNT`, `GOODIX_CACHE_STATUS` e
+`GOODIX_CACHE_SOURCE_COUNT`. Quando presenti, log e cache continuano a essere
+snapshot before/after; un path esplicito illeggibile resta fail-closed. Gli
+snapshot vuoti sono array JSON validi. Il postprocessor accetta l'assenza di
+log, conserva l'analisi wire/cache e marca la correlazione temporale
+`UNAVAILABLE_NO_OEM_LOG`, senza promuovere restore o causalità.
+
 Ogni evento OEM sanitizzato espone sorgente timestamp, UTC e qualità, mai la
 linea raw. ISO-8601 con offset/Z è diretto; Goodix MMDD viene convertito solo se
 anno del run, offset locale, Windows timezone, anchor start/end e marker UTC
@@ -2000,22 +2023,29 @@ resta correlazione, mai automaticamente causalità. Un A8 assente/diverso rende
 l'evidenza non target-specific e terminale; marker/formati inattesi e collisioni
 falliscono chiusi senza retry.
 
-I 44 test D255 passano, inclusi boundary VM/enumerazione/single attach,
-invalidation pre-attached/topology-change, zero-finger e invalidazione separata
+I 47 test D255 passano, inclusi zero-log con cache presente, log presente con
+cache assente, reporting indipendente delle fonti, boundary
+VM/enumerazione/single attach, invalidation pre-attached/topology-change,
+zero-finger e invalidazione separata
 IRQ2/`0x22`/image, oltre a ISO, MMDD realistico, mezzanotte, fine anno,
 ambiguità/cambio offset, quattro stati del log, quattro esiti UI, partial
 bootstrap e regressione re-entry≠disarm. Passano inoltre le regressioni
 D252–D254 e i 172 test della suite supportata. `pwsh` non è installato
 sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
-staticamente, mentre il vero `-SelfTestOnly` e poi `-PreflightOnly` Windows
-restano una verifica futura. Nessun dato raw D255 è stato acquisito.
+staticamente. Il self-test della baseline precedente è stato osservato `PASS`
+nella VM, con hardware action count zero e autorizzazione non consumata; il
+vero `-SelfTestOnly` e poi `-PreflightOnly` sul file corretto restano una
+verifica futura. Nessun dato raw D255 è stato acquisito.
 
 ```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
+D255_REAL_PREFLIGHT_OBSERVATION=FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
 D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
-D255_OUTCOME=POSTATTACH_UI_AND_CONSERVATIVE_RESTORE_CORRECTIVE_PREPARED
+D255_OUTCOME=OEM_LOG_OPTIONALITY_CORRECTIVE_PREPARED
+D255_OEM_LOG_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
+D255_GOODIX_CACHE_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
 D255_VM_USB_ATTACH_METHOD=OPERATOR_GUI_MANUAL_ATTACH
 D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT=NOT_COMPLETED
@@ -2166,7 +2196,10 @@ D255_KIT_PREPARED true
 D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
+D255_REAL_PREFLIGHT_OBSERVATION FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
 D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
+D255_OEM_LOG_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
+D255_GOODIX_CACHE_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_WINDOWS_EXECUTION_ENVIRONMENT VIRTUAL_MACHINE
 D255_VM_USB_ATTACH_METHOD OPERATOR_GUI_MANUAL_ATTACH
 D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT NOT_COMPLETED

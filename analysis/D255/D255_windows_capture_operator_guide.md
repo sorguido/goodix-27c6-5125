@@ -108,7 +108,6 @@ Example with an already configured PIN:
   -OutputRoot "D:\Goodix-D255-Raw" `
   -TsharkPath "C:\Program Files\Wireshark\tshark.exe" `
   -CaptureInterface "USBPcap1" `
-  -OemLogPath "C:\verified\path\WBDI.log" `
   -VmGuestReadyConfirmation "VM_WINDOWS_RUNNING_GOODIX_ABSENT_FROM_GUEST" `
   -AccountPrerequisiteConfirmation "SIGNIN_OPTIONS_CHECKED_NO_NEW_PIN_CHANGE" `
   -WindowsHelloPinState "ALREADY_CONFIGURED" `
@@ -117,7 +116,13 @@ Example with an already configured PIN:
 
 Expected: `D255_PREFLIGHT_ONLY=PASS`, account prerequisites ready, sensor UI
 availability unknown before attach, hardware action count zero and
-authorization not consumed.
+authorization not consumed. OEM/WBDI logs are optional evidence sources: when
+none is discoverable, the report must say `OEM_LOG_STATUS=ABSENT` and continue.
+If logs exist, automatic discovery or an explicit `-OemLogPath` preserves their
+before/after snapshots and reports `OEM_LOG_STATUS=PRESENT`. Goodix cache is
+reported independently as `GOODIX_CACHE_STATUS=PRESENT|ABSENT`; its absence is
+not disguised as log absence. An explicitly supplied unreadable log or cache
+path remains a pre-authorization failure.
 
 ## Authorized single run — not currently authorized
 
@@ -130,8 +135,10 @@ SHA, and explicit one-run authorization may the same command be run without
   -Authorization "--i-authorize-one-d255-windows-oem-evidence-capture"
 ```
 
-All guest absence, interface, account, path, disk, log/cache, clock/topology
-and runtime gates precede authorization consumption. After capture-start
+All guest absence, interface, account, explicitly configured path, disk,
+clock/topology and runtime gates precede authorization consumption. Optional
+log/cache availability is recorded before authorization but is not itself a
+live-critical gate. After capture-start
 proof, perform exactly one manual host→VM GUI attach. Do not detach/re-attach.
 
 The evidence ordering later enforced from markers and wire is:

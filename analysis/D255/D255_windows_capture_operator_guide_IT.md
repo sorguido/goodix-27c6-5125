@@ -163,7 +163,6 @@ Non indovinare mai arbitrariamente una singola interfaccia tra più candidate.
   -OutputRoot "D:\Goodix-D255-Raw" `
   -TsharkPath "C:\Program Files\Wireshark\tshark.exe" `
   -CaptureInterface "USBPcap1" `
-  -OemLogPath "C:\verified\path\WBDI.log" `
   -VmGuestReadyConfirmation "VM_WINDOWS_RUNNING_GOODIX_ABSENT_FROM_GUEST" `
   -AccountPrerequisiteConfirmation "SIGNIN_OPTIONS_CHECKED_NO_NEW_PIN_CHANGE" `
   -WindowsHelloPinState "ALREADY_CONFIGURED" `
@@ -182,6 +181,15 @@ con:
 - disponibilità della UI del sensore ancora classificata come sconosciuta prima dell'attach;
 - hardware action count uguale a zero;
 - autorizzazione non consumata.
+
+I log OEM/WBDI sono fonti di evidenza opzionali. Se non ne viene individuato
+alcuno, il report deve mostrare `OEM_LOG_STATUS=ABSENT` e il preflight deve
+proseguire. Se esistono, la discovery automatica o un `-OemLogPath` esplicito
+mantengono gli snapshot before/after e riportano `OEM_LOG_STATUS=PRESENT`. La
+cache Goodix è classificata separatamente come
+`GOODIX_CACHE_STATUS=PRESENT|ABSENT`. Un path log o cache fornito esplicitamente
+ma illeggibile continua invece a far fallire il preflight prima
+dell'autorizzazione.
 
 ## Singola esecuzione autorizzata — NON attualmente autorizzata
 
@@ -208,12 +216,15 @@ Tutti i gate relativi a:
 - account;
 - path;
 - spazio disco;
-- log/cache;
+- path log/cache esplicitamente configurati;
 - clock;
 - topologia;
 - runtime;
 
 devono essere superati **prima** che l'autorizzazione venga consumata.
+
+La sola assenza di log OEM o cache viene registrata, ma non è un gate
+live-critical.
 
 Dopo la prova che la capture è realmente partita, eseguire **esattamente un singolo attach manuale
 host → VM tramite GUI**.

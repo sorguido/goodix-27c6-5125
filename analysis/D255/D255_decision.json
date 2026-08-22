@@ -1,19 +1,29 @@
 {
-  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V4",
-  "initial_head": "feff1de25132d4e47dc9fe11a5f12509269c1696",
+  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V5",
+  "corrective_initial_head": "dce2bbbfc8de00b5f218fa0d6d087a179beac86d",
   "execution_mode": "OFFLINE_PREPARATION_ONLY",
   "initial_ai_pm_review": "FAIL_EXECUTABILITY_AND_TIME_CORRELATION",
   "second_ai_pm_review": "FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION",
   "third_ai_pm_review": "FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM",
+  "real_preflight_observation": "FAIL_UNPROVEN_OEM_LOG_REQUIREMENT",
   "corrective_status": "READY_FOR_AI_PM_REVIEW",
-  "outcome": "POSTATTACH_UI_AND_CONSERVATIVE_RESTORE_CORRECTIVE_PREPARED",
+  "outcome": "OEM_LOG_OPTIONALITY_CORRECTIVE_PREPARED",
   "advancement": "NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE",
   "executable_closure": {
     "status": "PASS_OFFLINE_STATIC_AND_SYNTHETIC",
-    "windows_runtime": "NATIVE_SELFTEST_PENDING_AI_PM_REVIEW",
+    "windows_runtime": "CORRECTED_NATIVE_SELFTEST_AND_PREFLIGHT_PENDING_AI_PM_REVIEW",
     "powershell_native_parser": "UNAVAILABLE_ON_D255_LINUX_HOST",
     "fallback_static_parser": "PASS",
     "postprocessor_synthetic_fixture": "PASS"
+  },
+  "evidence_source_availability": {
+    "oem_log_requirement": "OPTIONAL",
+    "goodix_cache_requirement": "OPTIONAL",
+    "explicit_unreadable_path": "FAIL_BEFORE_AUTHORIZATION",
+    "oem_log_states": ["PRESENT", "ABSENT"],
+    "goodix_cache_states": ["PRESENT", "ABSENT"],
+    "zero_oem_log_with_cache": "PASS_OFFLINE_STATIC_AND_SYNTHETIC",
+    "present_oem_log": "PASS_OFFLINE_STATIC_AND_SYNTHETIC"
   },
   "account_prerequisites": {
     "ready_model": true,
@@ -66,13 +76,14 @@
     "synthetic_tests": "PASS"
   },
   "verification": {
-    "d255_test_count": 44,
+    "d255_test_count": 47,
     "d255_tests": "PASS",
     "d252_d253_regressions": "PASS",
     "d254_tests": "PASS",
     "full_supported_suite": "PASS",
     "git_diff_check": "PASS",
-    "native_windows_selftest": "NOT_EXECUTED"
+    "pre_correction_native_windows_selftest": "PASS_REPORTED_BY_OPERATOR",
+    "corrected_native_windows_selftest_and_preflight": "NOT_EXECUTED"
   },
   "review": {
     "ready_for_ai_pm_review": true,

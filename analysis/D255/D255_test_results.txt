@@ -1,6 +1,6 @@
-D255 POST-ATTACH UI / CONSERVATIVE RESTORE OFFLINE VERIFICATION RESULTS
+D255 OEM LOG GATE CORRECTIVE OFFLINE VERIFICATION RESULTS
 Date: 2026-08-22 Europe/Rome
-Initial HEAD: feff1de25132d4e47dc9fe11a5f12509269c1696
+Corrective initial HEAD: dce2bbbfc8de00b5f218fa0d6d087a179beac86d
 Execution mode: OFFLINE_PREPARATION_ONLY
 
 1. Python compilation
@@ -25,11 +25,17 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    Command:
      python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
    Result: PASS
-   Tests run: 44
+   Tests run: 47
    Failures: 0
    Errors: 0
 
    New corrective coverage:
+   - zero OEM-log candidates plus present Goodix cache is accepted and
+     reported without inventing log evidence;
+   - present OEM log plus absent Goodix cache is classified independently;
+   - empty log/cache snapshots serialize as valid JSON arrays;
+   - the zero-log failure is absent while explicitly configured unreadable
+     paths remain fail-closed before authorization;
    - fingerprint setup UI is not required with the target absent;
    - account-only confirmation and explicit four-state PIN model;
    - NOT_CONFIGURED + REQUIRED policy fails before authorization;
@@ -77,6 +83,8 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    Fallback static lexer/delimiter/API/ordering contract: PASS
    Forbidden modern API occurrences: 0
    -SelfTestOnly: IMPLEMENTED_NOT_EXECUTED
+   pre-correction VM self-test reported by operator: PASS
+   corrected -SelfTestOnly/-PreflightOnly: NOT_EXECUTED_ON_NATIVE_WINDOWS
    -SelfTestOnly hardware action count by construction: 0
 
 8. Structured output and patch hygiene

@@ -450,7 +450,9 @@ def _decode_oem_log(raw: bytes) -> str:
 def oem_log_deltas(inputs: list[InputFile]) -> tuple[list[bytes], list[dict], bool]:
     before = {row.path.name: row for row in inputs if row.role == "oem_log_before"}
     after = {row.path.name: row for row in inputs if row.role == "oem_log_after"}
-    require(before, "manifest contains no OEM log before snapshot")
+    if not before and not after:
+        return [], [], False
+    require(before, "manifest contains OEM log after snapshot without before snapshot")
     deltas: list[bytes] = []
     states: list[dict] = []
     safe = True
@@ -786,7 +788,12 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     untimed_count = len(oem_events) - timestamped_count
     formats = sorted({row["timestamp_source"] for row in oem_events
                       if row["timestamp_source"] != "NONE"})
-    if not oem_log_window_reconstructible or not clock.stable_offset:
+    oem_log_present = bool(oem_log_states)
+    cache_source_count = sum(row.role == "cache_before" for row in inputs)
+    cache_present = cache_source_count > 0
+    if not oem_log_present:
+        oem_time_correlation = "UNAVAILABLE_NO_OEM_LOG"
+    elif not oem_log_window_reconstructible or not clock.stable_offset:
         oem_time_correlation = "AMBIGUOUS"
     elif any(row["time_correlation_quality"] == "AMBIGUOUS" for row in critical_events):
         oem_time_correlation = "AMBIGUOUS"
@@ -797,6 +804,7 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
     else:
         oem_time_correlation = "UNAVAILABLE"
     critical_time_unresolved = bool(
+        not oem_log_present or
         (critical_events and oem_time_correlation != "EXACT_ANCHORED") or
         not oem_log_window_reconstructible or not clock.stable_offset)
     window_log_events = [row for row in oem_events if row["time_window"] == "CANCEL"]
@@ -951,6 +959,12 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
             "CAUSALITY_PROVEN": False,
             "CAUSALITY_LIMIT": "Equality alone does not prove timing or dataflow causality.",
         },
+        "evidence_sources": {
+            "OEM_LOG_STATUS": "PRESENT" if oem_log_present else "ABSENT",
+            "OEM_LOG_SOURCE_COUNT": len(oem_log_states),
+            "GOODIX_CACHE_STATUS": "PRESENT" if cache_present else "ABSENT",
+            "GOODIX_CACHE_SOURCE_COUNT": cache_source_count,
+        },
         "cache_candidates": cache_rows,
         "oem_log_events": sanitized_oem_events,
         "oem_log_state": {
@@ -1041,6 +1055,10 @@ def analyze(run_dir: Path, manifest_path: Path, manifest_hash: str, output_dir: 
         f"CACHE_FDT12_MATCH={str(cache_match).lower()}",
         f"OEM_LOG_FDT12_MATCH={str(log_match).lower()}",
         f"SEED_SOURCE_CLASS={seed_class}",
+        f"OEM_LOG_STATUS={'PRESENT' if oem_log_present else 'ABSENT'}",
+        f"OEM_LOG_SOURCE_COUNT={len(oem_log_states)}",
+        f"GOODIX_CACHE_STATUS={'PRESENT' if cache_present else 'ABSENT'}",
+        f"GOODIX_CACHE_SOURCE_COUNT={cache_source_count}",
         f"OEM_LOG_TIMESTAMP_FORMATS={','.join(formats) if formats else 'NONE'}",
         f"OEM_LOG_TIMESTAMPED_EVENT_COUNT={timestamped_count}",
         f"OEM_LOG_UNTIMED_EVENT_COUNT={untimed_count}",
@@ -1118,7 +1136,9 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
                              image_path: bool = False,
                              ui_result: str = "READY_WAITING_FOR_FINGER",
                              guest_before_count: int = 0,
-                             guest_after_count: int = 1) -> tuple[Path, str]:
+                             guest_after_count: int = 1,
+                             include_oem_log: bool = True,
+                             include_cache: bool = True) -> tuple[Path, str]:
     require(not directory.exists(), "synthetic fixture output collision")
     raw = directory / "raw"
     (raw / "cache_before").mkdir(parents=True)
@@ -1146,10 +1166,12 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
     cache = (cache_body + crc)[:cache_size]
     if len(cache) < cache_size:
         cache += bytes(cache_size - len(cache))
-    cache_path = raw / "cache_after" / "candidate.bin"
-    cache_path.write_bytes(cache)
-    (raw / "cache_before" / "candidate.bin").write_bytes(cache)
-    metadata = [{"full_path": r"C:\ProgramData\Goodix\goodix.dat", "raw_copy": "raw/cache_after/candidate.bin"}]
+    if include_cache:
+        cache_path = raw / "cache_after" / "candidate.bin"
+        cache_path.write_bytes(cache)
+        (raw / "cache_before" / "candidate.bin").write_bytes(cache)
+    metadata = ([{"full_path": r"C:\ProgramData\Goodix\goodix.dat",
+                  "raw_copy": "raw/cache_after/candidate.bin"}] if include_cache else [])
     (directory / "cache_after_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
 
     local_zone = dt.timezone(dt.timedelta(minutes=clock_offset_minutes))
@@ -1187,10 +1209,11 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         after_log = b"short\n"
     else:
         after_log = b"D255 replacement log header\n" + appended_log
-    before_log_path = raw / "oem_logs_before" / "oem_000.log"
-    after_log_path = raw / "oem_logs_after" / "oem_000.log"
-    before_log_path.write_bytes(before_log)
-    after_log_path.write_bytes(after_log)
+    if include_oem_log:
+        before_log_path = raw / "oem_logs_before" / "oem_000.log"
+        after_log_path = raw / "oem_logs_after" / "oem_000.log"
+        before_log_path.write_bytes(before_log)
+        after_log_path.write_bytes(after_log)
 
     def clock_document(timestamp: float, offset_minutes: int, phase: str) -> dict:
         utc_value = dt.datetime.fromtimestamp(timestamp, dt.timezone.utc)
@@ -1322,12 +1345,18 @@ def create_synthetic_fixture(directory: Path, *, cache_size: int = CACHE_SIZE,
         "guest_topology_before_attach.json": "guest_topology_before",
         "guest_topology_after_attach.json": "guest_topology_after_attach",
         "guest_topology_after_capture.json": "guest_topology_after_capture",
-        "raw/oem_logs_before/oem_000.log": "oem_log_before",
-        "raw/oem_logs_after/oem_000.log": "oem_log_after",
-        "raw/cache_before/candidate.bin": "cache_before",
-        "raw/cache_after/candidate.bin": "cache_after",
         "cache_after_metadata.json": "metadata",
     }
+    if include_oem_log:
+        roles.update({
+            "raw/oem_logs_before/oem_000.log": "oem_log_before",
+            "raw/oem_logs_after/oem_000.log": "oem_log_after",
+        })
+    if include_cache:
+        roles.update({
+            "raw/cache_before/candidate.bin": "cache_before",
+            "raw/cache_after/candidate.bin": "cache_after",
+        })
     files = []
     for relative, role in roles.items():
         path = directory / relative

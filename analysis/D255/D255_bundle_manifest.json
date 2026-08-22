@@ -1,49 +1,54 @@
 {
-  "schema": "d255-step-local-bundle-manifest-v4",
+  "schema": "d255-step-local-bundle-manifest-v5",
   "step": "D255",
-  "initial_head": "feff1de25132d4e47dc9fe11a5f12509269c1696",
-  "decision": "POSTATTACH_UI_AND_CONSERVATIVE_RESTORE_CORRECTIVE_READY_FOR_AI_PM_REVIEW; HARDWARE_NOT_AUTHORIZED",
+  "corrective_initial_head": "dce2bbbfc8de00b5f218fa0d6d087a179beac86d",
+  "decision": "OEM_LOG_OPTIONALITY_CORRECTIVE_READY_FOR_AI_PM_REVIEW; HARDWARE_NOT_AUTHORIZED",
   "operator_kit_included": true,
   "members": [
     {
       "path": "analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md",
-      "size": 5914,
-      "sha256": "d7b1b1a57562c9488348141042da457357578dc522e8dae4e270211382105862"
+      "size": 7506,
+      "sha256": "b6210055f608ffa044e10a77af43303ec60d9742e67aa711229f3763fac70438"
     },
     {
       "path": "analysis/D255/D255_decision.json",
-      "size": 3585,
-      "sha256": "adf6885dc55740193be0ba8c4e39d3714ef510d5c1f031f210f0d17d06fbb36b"
+      "size": 4176,
+      "sha256": "2787540cd3f83e1e90e809e7e7370d8d78aeeef776049688e23a381afe47c002"
     },
     {
       "path": "analysis/D255/D255_windows_capture_operator_guide.md",
-      "size": 8178,
-      "sha256": "b52a476f2e44b09c914843c1af204e7e2d4ea38f37b61b96dfb2729a71ccf67a"
+      "size": 8735,
+      "sha256": "3b202ce5c951779db0f95d35147663860c4fc2b7be471964924e7fcd54f9174e"
+    },
+    {
+      "path": "analysis/D255/D255_windows_capture_operator_guide_IT.md",
+      "size": 11502,
+      "sha256": "6ecd15d8b9e00ac0195c9ea5441c4f83435edbab28aef2d4486ea206b3d1753b"
     },
     {
       "path": "operator_kit/d255-windows-evidence-capture.ps1",
-      "size": 34200,
-      "sha256": "74808386af8a0e20b150730e24413f7d2301cd1ae42ff9f5b2d0c44334988c19"
+      "size": 35464,
+      "sha256": "0e8f271610b58bddbd9573979ae5bd39aeb9ca795d8b90baea3d3ce32a88350c"
     },
     {
       "path": "analysis/D255/d255_postprocess_windows_evidence.py",
-      "size": 67039,
-      "sha256": "844cb09a314bc285d65d424436788694e3a021a536fd7b284df5ec422666df8a"
+      "size": 68335,
+      "sha256": "8dfbd0665ba9ac67946f1c35e42672d9f77e11cc8ad615adc1086d63541e96e1"
     },
     {
       "path": "analysis/D255/test_d255_postprocess_windows_evidence.py",
-      "size": 27850,
-      "sha256": "e09211a81b69eba8fdbd63c07eb831f758305dc30da3d038cbfce19f3a80807a"
+      "size": 31421,
+      "sha256": "e226d13d3e1febf72c932767626146faf278e27b83ae88bbe3e81f179ffde2f7"
     },
     {
       "path": "analysis/D255/D255_test_results.txt",
-      "size": 3920,
-      "sha256": "e8c7d583e8b9e347f53c2bc05c53e98d48f967c8c482563a97f206c160a9ff5e"
+      "size": 4431,
+      "sha256": "bb84baf7c8f1414bba1717e7b5977b64589a007c55b26b9e14291f0b54c2d8ad"
     }
   ],
   "canonical_documentation_reference": {
     "path": "Goodix 27c6 5125 manuale tecnico.md",
-    "sha256_at_bundle_creation": "5091cdf13d59b5e6529c1361c1cd69e184b795ec98b0c954709bcee0ec0aeb12",
+    "sha256_at_bundle_creation": "888db6ca16d78496fb15e972bbce608d21bd55e41a1cc5ccf21fc5184479dbbd",
     "included": false,
     "reason": "canonical repository document referenced rather than duplicated"
   },

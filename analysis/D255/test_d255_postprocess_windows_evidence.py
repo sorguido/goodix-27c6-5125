@@ -92,6 +92,12 @@ class D255PostprocessorTests(unittest.TestCase):
         result, _ = self.analyze_fixture()
         self.assertEqual(result["target"]["CAPTURE_FIRMWARE"], D255.EXPECTED_FIRMWARE)
         self.assertTrue(result["target"]["D255_EVIDENCE_TARGET_SPECIFIC"])
+        self.assertEqual(result["evidence_sources"], {
+            "OEM_LOG_STATUS": "PRESENT",
+            "OEM_LOG_SOURCE_COUNT": 1,
+            "GOODIX_CACHE_STATUS": "PRESENT",
+            "GOODIX_CACHE_SOURCE_COUNT": 1,
+        })
         self.assertEqual(result["seed_correlation"]["SEED_SOURCE_CLASS"],
                          "CACHE_AND_LOG_WIRE_MATCH")
         self.assertFalse(result["seed_correlation"]["CAUSALITY_PROVEN"])
@@ -131,6 +137,28 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertEqual(contract["FDT36_COUNT"], 1)
         self.assertEqual(contract["FDT36_LOGICAL_LENGTHS"], [22])
         self.assertEqual(contract["FDT36_PHYSICAL_LENGTHS"], [64])
+
+    def test_zero_oem_logs_with_goodix_cache_is_accepted_and_reported(self):
+        result, output = self.analyze_fixture(include_oem_log=False)
+        self.assertEqual(result["evidence_sources"]["OEM_LOG_STATUS"], "ABSENT")
+        self.assertEqual(result["evidence_sources"]["OEM_LOG_SOURCE_COUNT"], 0)
+        self.assertEqual(result["evidence_sources"]["GOODIX_CACHE_STATUS"], "PRESENT")
+        self.assertEqual(result["seed_correlation"]["CACHE_FDT12_MATCH"], True)
+        self.assertEqual(result["seed_correlation"]["OEM_LOG_FDT12_MATCH"], "unknown")
+        self.assertEqual(result["oem_log_time"]["OEM_LOG_TIME_CORRELATION"],
+                         "UNAVAILABLE_NO_OEM_LOG")
+        summary = (output / "D255_sanitized_summary.txt").read_text(encoding="ascii")
+        self.assertIn("OEM_LOG_STATUS=ABSENT\n", summary)
+        self.assertIn("GOODIX_CACHE_STATUS=PRESENT\n", summary)
+
+    def test_absent_goodix_cache_is_distinguished_from_present_oem_log(self):
+        result, output = self.analyze_fixture(include_cache=False)
+        self.assertEqual(result["evidence_sources"]["OEM_LOG_STATUS"], "PRESENT")
+        self.assertEqual(result["evidence_sources"]["GOODIX_CACHE_STATUS"], "ABSENT")
+        self.assertEqual(result["evidence_sources"]["GOODIX_CACHE_SOURCE_COUNT"], 0)
+        summary = (output / "D255_sanitized_summary.txt").read_text(encoding="ascii")
+        self.assertIn("OEM_LOG_STATUS=PRESENT\n", summary)
+        self.assertIn("GOODIX_CACHE_STATUS=ABSENT\n", summary)
 
     def test_wrong_size_cache_is_not_promoted(self):
         result, _ = self.analyze_fixture(cache_size=127)
@@ -420,6 +448,34 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertLess(account_gate, remaining_path_gates)
         self.assertLess(gate, consumed)
         self.assertLess(consumed, start_capture)
+
+    def test_powershell_preflight_accepts_zero_oem_logs_and_reports_sources(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        oem_resolution = source.index("$oemLogCandidates = @(Resolve-OemLogCandidates)")
+        preflight = source.index("$preflight = [ordered]@{")
+        segment = source[oem_resolution:preflight]
+        self.assertNotIn("$oemLogCandidates.Count -eq 0", segment)
+        self.assertNotIn("no readable OEM/WBDI log source was identified", source)
+        authorization_gate = source.index('if ($Authorization -cne $ExpectedAuthorization)')
+        for failure in ("configured OEM log is unreadable",
+                        "configured cache root is unreadable"):
+            self.assertIn(failure, source)
+            self.assertLess(source.index(failure), authorization_gate)
+        self.assertIn("$cacheCandidates = @(Get-TargetedFiles -Roots $cacheRoots)", segment)
+        cache_discovery = source[source.index("function Get-TargetedFiles"):
+                                 source.index("function Resolve-OemLogCandidates")]
+        self.assertIn('$_.Extension -notmatch "(?i)^\\.log$"', cache_discovery)
+        for token in (
+                "oem_log_status = $oemLogStatus",
+                "goodix_cache_status = $cacheStatus",
+                'Write-Output "OEM_LOG_STATUS=$oemLogStatus"',
+                'Write-Output "GOODIX_CACHE_STATUS=$cacheStatus"',
+                'Write-Output "D255_HARDWARE_ACTION_COUNT=0"',
+                'Write-Output "D255_AUTHORIZATION_CONSUMED=false"'):
+            self.assertIn(token, source)
+        self.assertIn('Get-D255AvailabilityStatus -SourceCount 0', source)
+        self.assertIn('Get-D255AvailabilityStatus -SourceCount 1', source)
+        self.assertGreaterEqual(source.count("ConvertTo-Json -InputObject @($rows)"), 2)
 
     def test_usbpcap_single_interface_is_unambiguous(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")

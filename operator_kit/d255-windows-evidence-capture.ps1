@@ -93,6 +93,12 @@ function Test-D255PathAvailable {
     return -not (Test-Path -LiteralPath $Path)
 }
 
+function Get-D255AvailabilityStatus {
+    param([Parameter(Mandatory = $true)][int]$SourceCount)
+    if ($SourceCount -gt 0) { return "PRESENT" }
+    return "ABSENT"
+}
+
 function Get-D255RuntimeInfo {
     $version = $PSVersionTable.PSVersion
     $clrVersion = "not-reported"
@@ -241,8 +247,9 @@ function Get-TargetedFiles {
         if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
         Get-ChildItem -LiteralPath $root -File -Recurse -Force -ErrorAction SilentlyContinue |
             Where-Object {
-                $_.Length -eq 13520 -or
-                $_.Name -match "(?i)(goodix|base|cache|wbdi|finger|nav|image)"
+                $_.Extension -notmatch "(?i)^\.log$" -and
+                ($_.Length -eq 13520 -or
+                 $_.Name -match "(?i)(goodix|base|cache|wbdi|finger|nav|image)")
             } |
             ForEach-Object { $files.Add($_) }
     }
@@ -296,7 +303,8 @@ function Write-FileSnapshot {
         })
     }
     $snapshotPath = Join-Path $script:RunDirectory "cache_${Stage}_metadata.json"
-    @($rows) | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $snapshotPath -Encoding UTF8
+    ConvertTo-Json -InputObject @($rows) -Depth 5 |
+        Set-Content -LiteralPath $snapshotPath -Encoding UTF8
     return $snapshotPath
 }
 
@@ -337,7 +345,8 @@ function Write-OemLogSnapshot {
         $rows.Add($row)
     }
     $metadataPath = Join-Path $script:RunDirectory "oem_logs_${Stage}_metadata.json"
-    @($rows) | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $metadataPath -Encoding UTF8
+    ConvertTo-Json -InputObject @($rows) -Depth 5 |
+        Set-Content -LiteralPath $metadataPath -Encoding UTF8
     return $metadataPath
 }
 
@@ -410,6 +419,10 @@ function Invoke-D255SelfTest {
     if (Test-D255PathAvailable -Path $child) {
         Fail-D255 "output collision probe did not reject an existing path"
     }
+    if ((Get-D255AvailabilityStatus -SourceCount 0) -cne "ABSENT" -or
+        (Get-D255AvailabilityStatus -SourceCount 1) -cne "PRESENT") {
+        Fail-D255 "evidence source availability classification failed"
+    }
     $clockPath = Join-Path $selfTestDirectory "run_clock.json"
     $clock = New-D255ClockAnchor -Phase "SELFTEST"
     $clock | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockPath -Encoding UTF8
@@ -429,6 +442,7 @@ function Invoke-D255SelfTest {
         clock_anchor_parsed = $true
         json_serialization = "PASS"
         output_collision_semantics = "PASS"
+        evidence_source_availability_semantics = "PASS"
         hardware_action_count = 0
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $selfTestDirectory "selftest_result.json") -Encoding UTF8
     Write-Output "D255_POWERSHELL_SELFTEST=PASS"
@@ -500,9 +514,10 @@ foreach ($root in $CacheRoot) {
     }
 }
 $oemLogCandidates = @(Resolve-OemLogCandidates)
-if ($oemLogCandidates.Count -eq 0) {
-    Fail-D255 "no readable OEM/WBDI log source was identified"
-}
+$cacheRoots = @(Resolve-CacheRoots)
+$cacheCandidates = @(Get-TargetedFiles -Roots $cacheRoots)
+$oemLogStatus = Get-D255AvailabilityStatus -SourceCount $oemLogCandidates.Count
+$cacheStatus = Get-D255AvailabilityStatus -SourceCount $cacheCandidates.Count
 if (Test-Path -LiteralPath $OutputRoot -PathType Leaf) {
     Fail-D255 "OutputRoot names a file"
 }
@@ -514,7 +529,7 @@ $freeBytes = $outputDrive.AvailableFreeSpace
 if ($freeBytes -lt 1073741824) { Fail-D255 "less than 1 GiB free at OutputRoot" }
 
 $preflight = [ordered]@{
-    schema = "D255_WINDOWS_PREFLIGHT_V3"
+    schema = "D255_WINDOWS_PREFLIGHT_V4"
     result = "PASS"
     timestamp_utc = Get-UtcStamp
     target_present_count = $initialTargets.Count
@@ -539,6 +554,9 @@ $preflight = [ordered]@{
     tshark_version = $tsharkVersion
     capture_duration_seconds = $CaptureDurationSeconds
     oem_log_source_count = $oemLogCandidates.Count
+    oem_log_status = $oemLogStatus
+    goodix_cache_source_count = $cacheCandidates.Count
+    goodix_cache_status = $cacheStatus
     runtime = $null
     authorization_required_for_live_capture = $true
     authorization_consumed = $false
@@ -555,6 +573,10 @@ if ($PreflightOnly) {
     Write-Output "ACCOUNT_PREREQUISITES_READY=true"
     Write-Output "WINDOWS_HELLO_PIN_STATE=$WindowsHelloPinState"
     Write-Output "SENSOR_DEPENDENT_UI_AVAILABILITY=UNKNOWN_BEFORE_ATTACH"
+    Write-Output "OEM_LOG_STATUS=$oemLogStatus"
+    Write-Output "OEM_LOG_SOURCE_COUNT=$($oemLogCandidates.Count)"
+    Write-Output "GOODIX_CACHE_STATUS=$cacheStatus"
+    Write-Output "GOODIX_CACHE_SOURCE_COUNT=$($cacheCandidates.Count)"
     Write-Output "D255_HARDWARE_ACTION_COUNT=0"
     Write-Output "D255_AUTHORIZATION_CONSUMED=false"
     exit 0
@@ -578,7 +600,6 @@ Write-OperatorMarker -Event "CLOCK_ANCHOR" -Detail "local offset and Windows tim
 Write-OperatorMarker -Event "VM_GUEST_READY" -Detail "VM already running; target absent from guest"
 Write-GuestTopologySnapshot -Stage "before_attach"
 Write-OperatorMarker -Event "GUEST_TOPOLOGY_BEFORE" -Detail "read-only PnP snapshot; 27c6:5125 absent"
-$cacheRoots = Resolve-CacheRoots
 Write-OemLogSnapshot -Stage "before" -Candidates $oemLogCandidates -RawDirectory $rawDirectory | Out-Null
 Write-FileSnapshot -Stage "before" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
 $preflight["runtime"] = Get-D255RuntimeInfo
@@ -693,6 +714,10 @@ try {
     Write-OemLogSnapshot -Stage "after" -Candidates $oemLogCandidates -RawDirectory $rawDirectory | Out-Null
     Write-FileSnapshot -Stage "after" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
     Write-Manifest
+    Write-Output "OEM_LOG_STATUS=$oemLogStatus"
+    Write-Output "OEM_LOG_SOURCE_COUNT=$($oemLogCandidates.Count)"
+    Write-Output "GOODIX_CACHE_STATUS=$cacheStatus"
+    Write-Output "GOODIX_CACHE_SOURCE_COUNT=$($cacheCandidates.Count)"
     Write-Output "D255_RUN_RESULT=$runResult"
     if ($runResult -ceq "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE") {
         Write-Output "PARTIAL_CAPTURE_FILE_VALIDATION=TSHARK_EXIT_ZERO_NONEMPTY_PCAPNG"
