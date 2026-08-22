@@ -1,0 +1,73 @@
+{
+  "schema": "D256_STEP_LOCAL_BUNDLE_MANIFEST_V1",
+  "step": "D256",
+  "baseline_head": "7751e26806f5aa0e57750ae20febc96325f99c7a",
+  "bundle_policy": "STEP_LOCAL_NON_CUMULATIVE_REFERENCE_AUDITABLE",
+  "included_files": [
+    {
+      "path": "analysis/D256/d256_usb_lifecycle_contract_audit.py",
+      "sha256": "bb99bd05004e880714f04da5b42289cc4aa58740941ad2036b36982c32520c2d"
+    },
+    {
+      "path": "analysis/D256/D256_usb_timeline.csv",
+      "sha256": "df66aac1d5ec49f3b8edac23af34bc23a52b1793058ef3afacb252e2b0d3042d"
+    },
+    {
+      "path": "analysis/D256/D256_usb_timeline.md",
+      "sha256": "a265964aeb25dcb545fcec2700e9191172a96647d8b38e9876af352b01110a58"
+    },
+    {
+      "path": "analysis/D256/D256_decision.json",
+      "sha256": "8c62dbb227994f1d65f6487784b4d64ad73e9b59334094d1fce8ef48c7ba581d"
+    },
+    {
+      "path": "analysis/D256/D256_offline_usb_lifecycle_contract_audit.md",
+      "sha256": "f1e7436c3872051359fa083397ffbb382a27beb45e500dd93b7b96ad44bdcf67"
+    },
+    {
+      "path": "analysis/D256/test_d256_usb_lifecycle_contract_audit.py",
+      "sha256": "0f9249eb14d286857a5a839faa3f3ddc140d2557be1d8d4d2d3a0e40b6ffefae"
+    },
+    {
+      "path": "analysis/D256/D256_test_results.txt",
+      "sha256": "830c0573378e8b0b870edf5b2b257dcb13c13578b1ce0460286ac0896de8da28"
+    }
+  ],
+  "referenced_not_bundled": [
+    {
+      "path": "Goodix 27c6 5125 manuale tecnico.md",
+      "reason": "canonical documentation updated in place; bundle is audit-by-reference",
+      "sha256": "98def7d285e8ddf0f33d5c8aa488c298350a69e17d83a6dd1c41805ca9d650b7"
+    },
+    {
+      "path": "captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng",
+      "reason": "private primary raw evidence excluded from bundle",
+      "bytes": 27684,
+      "sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c"
+    },
+    {
+      "path": "analysis/D255/d255_postprocess_windows_evidence.py",
+      "reason": "historical parser reused by reference and not modified"
+    },
+    {
+      "path": "analysis/D230/work/GoodixExport/gfusb.dll",
+      "reason": "proprietary DLL excluded; bounded audit uses existing local static references"
+    }
+  ],
+  "excluded_classes": [
+    "raw_pcapng",
+    "raw_goodix_cache",
+    "gfusb.dll",
+    "firmware",
+    "otp_raw",
+    "psk_or_secret",
+    "biometric_data",
+    "historical_unmodified_artifacts",
+    "cache_or_temporary_files"
+  ],
+  "safety": {
+    "REAL_USB_OPEN_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0
+  }
+}

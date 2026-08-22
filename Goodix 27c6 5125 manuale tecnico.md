@@ -96,8 +96,11 @@ corrente, e mostra su 22 comandi `0x36` residui fisici agli stessi offset
 dito o restore. D254 aveva quindi lasciato bootstrap e restore aperti e aveva
 indicato come prossima evidenza una traccia Windows APP12509 da cold-start fino
 ad arm, cancel senza dito e re-entry. D255 ha ora acquisito e recuperato quella
-traccia: il bootstrap/seed è corroborato sul target, mentre il restore resta
-aperto perché gli snapshot e log `after` non sono recuperabili.
+traccia. D256 ne ha poi esaurito offline i metadati USBPcap: il bootstrap/seed
+è corroborato sul target e il nuovo arm viene accettato senza reset,
+re-enumerazione o restore USB esplicito osservato. Restano aperti il disarm e
+la lifetime interna del prior arm e, soprattutto, il comportamento di stop
+terminale quando non segue un re-arm.
 
 D255 ha completato la singola acquisizione richiesta sulla baseline approvata
 `f01b81d629ffe8af5eecb92ca93968045d5345ce`. La run canonica
@@ -120,10 +123,15 @@ accetta questa provenance mantenendo i gate wire: descriptor e primo A8
 APP12509 cadono, in quest'ordine, dentro i marker dell'attach manuale. La
 capture prova cold attach target-specific, tre `0x36`, match primo seed/cache,
 zero IRQ dito/`0x22`/image path nella finestra operatore, re-entry OEM e nuovo
-`0x32` accettato. L'assenza di log/snapshot after lascia
-`RESTORE_MODEL=INCONCLUSIVE_OEM_TIME_CORRELATION`,
-`DEVICE_FDT_DISARM_PROVEN=false`, `RESTORE_CLOSED=false` e decisione AI-PM.
-Non è richiesta una nuova capture live.
+`0x32` accettato. D256 ha chiarito il limite dell'assenza di log/snapshot
+`after`: sul bus non compare alcun packet target durante l'intervallo cancel;
+dopo l'inizio della re-entry compare una completion bulk-IN cancellata della
+richiesta pendente, quindi il medesimo device `1:2` continua sugli endpoint
+`01/81` e accetta il nuovo `0x32`. Non compaiono abort/reset, control transfer,
+descriptor replay, reconfiguration o re-enumeration. Questo prova re-entry e
+re-arm senza restore USB esplicito come prerequisito osservato, ma non prova
+`DEVICE_FDT_DISARM_PROVEN`, la lifetime del prior arm o la sicurezza dello stop
+terminale. Non è richiesta una nuova capture live equivalente.
 
 Le note successive sulle revisioni del kit e sui precedenti failure sono
 provenance storica, superata per lo stato corrente dalla run acquisita e dal
@@ -269,6 +277,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
 | Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
+| Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255 | zero packet target durante cancel; una completion bulk-IN cancellata host-side; continuità `1:2`/endpoint `01,81`; nessun abort/reset/re-enumeration/restore USB esplicito; nuovo `0x32` accettato; terminal stop e prior-arm lifetime irrisolti |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -619,9 +628,14 @@ D255 -> kit offline per una sola capture Windows APP12509 correlata
      -> seconda review FAIL: recognition non provata e enrollment VM non completato
      -> corrective VM: capture-before-attach, singolo attach GUI, PnP+descriptor+A8
      -> setup/add-fingerprint zero-finger; IRQ2/0x22/image invalidano la run
-     -> preflight reale PASS, ma primo ramo live FAIL su Candidates=@() prima di auth/attach
-     -> fix di classe AllowEmptyCollection + setup condiviso; simulazione Windows pendente
-     -> READY_FOR_AI_PM_REVIEW; non READY_FOR_OPERATOR_RUN
+     -> preflight reale PASS; i failure locali pre-attach sono stati corretti nello stesso step
+     -> run finale acquisita: 27.684 byte/218 frame; cold attach, zero finger, cancel e re-entry
+     -> recovery/postprocess offline PASS; seed/cache match; nessuna nuova capture richiesta
+D256 -> timeline completa dei 206 packet target nel raw D255 hash-gated
+     -> cancel interval senza traffico target; una completion bulk-IN cancellata dopo re-entry begin
+     -> stesso bus/device ed endpoint; nessun abort/reset/descriptor replay/re-enumeration
+     -> nuovo 0x32 accettato senza restore USB esplicito osservato
+     -> blocker ristretto a terminal stop e lifetime del prior arm senza successivo re-arm
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -2176,12 +2190,14 @@ descriptor/A8, cache, primo `0x36` e profilo fisico. Produce
 `BOOTSTRAP_EVIDENCE_PRESERVED=true`, `RESTORE_EVIDENCE_ACQUIRED=false` e
 `RESTORE_CLOSED=false`.
 
-Nel ramo full, `OEM_CANCEL_REENTRY_PROVEN` e
-`NEW_FDT_ARM_ACCEPTED_ON_REENTRY` sono osservazioni distinte da
-`DEVICE_FDT_DISARM_PROVEN`, che resta falso senza una semantica target-specific
-esplicita. `PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNKNOWN_OR_NOT_DIRECTLY_OBSERVED` e
-la sola re-entry non può mai promuovere `RESTORE_CLOSED`; la chiusura resta
-`AI_PM_REVIEW_REQUIRED` sull'evidenza recuperata. L'uguaglianza wire/cache/log
+Nel ramo full occorre distinguere quattro fatti: la fase cancel operatore è
+completata; la cancellazione della richiesta host è osservata in D256 tramite
+una completion bulk-IN cancellata; il disarm device-side non è provato; la
+re-entry e il nuovo `0x32` accettato sono provati. La vecchia scorciatoia
+`OEM_CANCEL_REENTRY_PROVEN` non va usata come sinonimo di questi quattro
+concetti. `PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNOBSERVED` e la sola re-entry non
+promuove `RESTORE_CLOSED`; prova invece che un restore USB esplicito non è un
+prerequisito osservato per la continuazione/re-arm. L'uguaglianza wire/cache/log
 resta correlazione, mai automaticamente causalità. Un A8 assente/diverso rende
 l'evidenza non target-specific e terminale; marker/formati inattesi e collisioni
 falliscono chiusi senza retry.
@@ -2225,7 +2241,8 @@ D255_CAPTURE_BYTES=27684
 D255_CAPTURE_FRAME_COUNT=218
 D255_FIRST_FRAME=1
 D255_CAPTURE_SHA256=802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c
-D255_OPERATOR_AUTHORIZATION_REQUIRED=false
+D255_NEW_RUN_REQUIRED=false
+FUTURE_LIVE_OPERATOR_AUTHORIZATION_REQUIRED=true
 D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
 D255_TSHARK_PREATTACH_READINESS=PROCESS_STARTED_AND_ALIVE_TARGET_ABSENT
 D255_PREATTACH_PCAP_FILE_REQUIRED=false
@@ -2244,6 +2261,83 @@ READY_FOR_OPERATOR_RUN=false
 BOOTSTRAP_CLOSED=false
 RESTORE_CLOSED=false
 ```
+
+## D256: contratto USB lifecycle osservato nella capture D255
+
+L'audit riproducibile
+`analysis/D256/d256_usb_lifecycle_contract_audit.py` riusa il parser pcapng
+D255, verifica prima del parsing path, SHA-256, 27.684 byte, 218 frame e primo
+frame `1`, quindi produce una timeline sanitizzata di tutti i 206 packet
+USBPcap del target `bus 1 / device 2`. Hash, size e mtime del raw restano
+invariati; nessun payload USB, OTP, PSK, cache raw o materiale biometrico entra
+nei derivati.
+
+La finestra critica inizia dal `0x32` frame 198, ACKato prima del marker cancel.
+Tra `CANCEL_NO_FINGER_BEGIN` e `CANCEL_NO_FINGER_END` non compare alcun packet
+target. Dopo `REENTRY_BEGIN` il frame 202 completa con
+`USBD_STATUS_CANCELED` una bulk-IN pendente: è prova di cancellazione della
+richiesta host, non un comando device-side. Fino al nuovo `0x32` frame 214 e al
+suo ACK frame 216 compaiono soltanto URB function `0x0009`; non si osservano
+abort/reset pipe, clear-stall, control transfer, select configuration/interface,
+descriptor replay o re-enumeration. Il target resta `1:2` sugli endpoint bulk
+`0x01/0x81`.
+
+```text
+USBPCAP_LIFECYCLE_AUDIT=PASS_COMPLETE_TARGET_PACKET_TIMELINE
+CANCEL_TO_REENTRY_DEVICE_CONTINUITY=SAME_BUS_DEVICE_AND_BULK_ENDPOINTS
+HOST_SIDE_PENDING_BULK_IN_CANCELLATION_OBSERVED=true
+EXPLICIT_USB_RESTORE_OBSERVED=false
+ABORT_OR_RESET_OBSERVED=false
+REENUMERATION_OBSERVED=false
+REENTRY_WITHOUT_EXPLICIT_USB_RESTORE_PROVEN=true
+NEW_FDT_ARM_ACCEPTED_ON_REENTRY=true
+RESTORE_REQUIRED_FOR_REENTRY=false
+PRIOR_ARM_DISARM_PROVEN=false
+PRIOR_ARM_LIFETIME_AFTER_CANCEL=UNOBSERVED
+SAFE_STOP_AFTER_FDT_ARM=UNRESOLVED
+```
+
+`RESTORE_REQUIRED_FOR_REENTRY=false` è rigorosamente path-bounded: il nuovo arm
+è stato accettato senza restore USB esplicito osservato. Non implica che il
+prior arm sia stato disarmato, che un terminal stop Linux sia sicuro o che ogni
+restore sia inutile.
+
+I control D255 `0x50` e `0x97` non sono nuovi: il census D230 classificava già
+`0x50` come famiglia sensor/mode a semantica esatta irrisolta e mappava wire
+`0x97` al builder `SetDriverState` logico `0x96`. D255 contiene un solo `0x50`,
+frame 150, A0 logico 10/fisico 64, ACK `B0/50/01` e una A0/50 lunga seguente;
+è nel bootstrap fra primo e secondo `0x36`. Contiene un solo `0x97`, frame 40,
+A0 logico 10/fisico 64 senza ACK/response prima del successivo OUT, nella
+sequenza iniziale pre-TLS. Nessuno compare nella finestra cancel/re-entry o
+fornisce evidenza di restore. La lista `unknown_controls` D255 rifletteva
+quindi una allowlist locale incompleta, non una nuova semantica protocollo.
+
+La verifica statica severamente bounded conferma nel solo slice già noto che
+`gfOnCancel` non chiama direttamente i builder A0. Le stringhe D0 già censite
+non provano che D0Exit/D0Entry siano avvenuti nella run; non emerge un nuovo
+dataflow USB e
+`STATIC_LIFECYCLE_CORROBORATION=EXHAUSTED_NO_NEW_DATAFLOW`.
+
+Il claim bootstrap massimo resta separato: il cache `goodix.dat` da 13.520
+byte ha layout/CRC validi, è OTP-bound al target e il suo FDT12 uguaglia il
+primo seed wire nella cold attach D255. La correlazione host/cache/wire è
+provata, ma non il dataflow causale della callback né freschezza/lifetime
+generali.
+
+```text
+BOOTSTRAP_CACHE_LAYOUT_TARGET_VALID=true
+BOOTSTRAP_CACHE_OTP_BOUND=true
+BOOTSTRAP_CACHE_FDT12_EQUALS_FIRST_WIRE_SEED=true
+BOOTSTRAP_SEED_SOURCE_CORRELATED=true
+BOOTSTRAP_SEED_DATAFLOW_CAUSALITY_PROVEN=false
+BOOTSTRAP_SEED_FRESHNESS_SCOPE=FIRST_0x36_IN_THIS_D255_COLD_ATTACH_ONLY; GENERAL_LIFETIME_UNPROVEN
+CURRENT_CORPUS_EXHAUSTED_FOR_THIS_RESTORE_QUESTION=true
+```
+
+Il blocker strategico corrente non è più trovare un restore prima della
+re-entry, ma determinare comportamento di terminal stop e lifetime del prior
+arm quando non segue un nuovo arm. D256 è interamente offline, non richiede una
+capture equivalente e non crea un operator kit.
 
 ## Operazioni read note e limiti
 
@@ -2313,19 +2407,22 @@ D251 ha chiuso live AF sulla baseline approvata: la singola AE valida con
 fresh-FDT, non D2. Anche il marker D251 è consumato; l'esito non autorizza
 retry, secondo D4, secondo AF, FDT o una nuova invocazione.
 
-Il current critical boundary è offline: chiudere la precondizione target
-fresh per `0x36`/tabella FDT e il cancel/restore device-side dopo arming. D253
-ha chiuso la distinzione wire corrente `0x22`/`0x20` e corretto il core, ma non
-ha reso il path live-safe. D254 ha corroborato dall'esterno il cache OTP-bound
-cross-family e `IRQ2→0x22` su una capture 5125 a firmware ignoto, senza però
-ottenere la derivazione del seed APP12509 o un no-finger restore. La tabella
-finale della capture locale è
-dinamicamente appresa da IRQ `0x0100`, ma vale soltanto come prova della
-sessione catturata; il cold-start D251 non possiede una baseline validata. Non
-esiste un restore OEM post-FDT provato. D255 ha preparato il kit per la capture
-Windows APP12509 mirata; i tentativi launcher non hanno raggiunto l'attach e
-non hanno prodotto una capture valida: il confine resta bloccato e nessun path
-FDT Linux è diventato live-capable.
+Il current critical boundary resta offline, ma D255/D256 lo hanno ristretto.
+La capture APP12509 prova nella stessa cold attach il cache OTP-bound da 13.520
+byte, l'uguaglianza FDT12→primo seed wire, tre `0x36`, cancel senza dito,
+re-entry e nuovo `0x32` accettato. D256 prova inoltre che nell'intervallo cancel
+non passa traffico target e che, dopo una completion bulk-IN cancellata
+host-side, il medesimo device `1:2` continua sugli stessi endpoint senza
+abort/reset, descriptor replay, reconfiguration, re-enumeration o restore USB
+esplicito. Un restore USB esplicito non è quindi un prerequisito osservato per
+la re-entry/re-arm OEM.
+
+Restano non provati la causalità callback/cache→seed, la freschezza generale
+del seed, il disarm del prior arm e la sua lifetime interna. Il blocker
+strategico è ora specificamente il comportamento di terminal stop dopo FDT arm
+quando non segue un nuovo arm; continuità del transport e re-arm accettato non
+dimostrano che lo stato precedente sia scomparso. Nessun path FDT Linux è
+diventato live-capable e D256 non autorizza hardware o una nuova capture.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -2355,61 +2452,30 @@ D251_AF_STATE_FLAGS 0x02
 D251_AF_POV_VALID false
 D251_MARKER CONSUMED
 FDT_DOWN_TABLE_LIVE_READY false
-FDT_RESTORE_STATE NOT_PROVEN
-FDT_ARM_AND_STOP_SAFE false
-D252_LIVE_BOUNDARY BLOCKED
-D252_LIVE_EXECUTION NOT_PERFORMED
 D253_POST_IRQ2_IMAGE_COMMAND 0x22_DATA_0100
-D253_FRESH_BASELINE_BOOTSTRAP_CLOSED false
-D253_FDT36_PHYSICAL_CONTRACT_LIVE_READY false
-D253_SAFE_STOP_AFTER_FDT_ARM false
-D253_LIVE_BOUNDARY BLOCKED
-D253_LIVE_EXECUTION NOT_PERFORMED
-D253_REQUIRES_EXTERNAL_EVIDENCE true
-D254_BOOTSTRAP_BLOCKER_REDUCED true
-D254_BOOTSTRAP_CLOSED false
-D254_RESTORE_BLOCKER_REDUCED false
-D254_RESTORE_CLOSED false
-D254_LIVE_BOUNDARY BLOCKED
-D254_LIVE_EXECUTION NOT_PERFORMED
-D254_REQUIRES_MORE_PRIMARY_EVIDENCE true
-D255_KIT_PREPARED true
-D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
-D255_SECOND_AI_PM_REVIEW FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
-D255_THIRD_AI_PM_REVIEW FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
-D255_REAL_PREFLIGHT_OBSERVATION FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
-D255_PRIOR_LIVE_PATH_OBSERVATION FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
-D255_LATEST_LIVE_PATH_OBSERVATION FAIL_PREATTACH_PCAP_FILE_CREATION_RACE_AFTER_AUTHORIZATION
-D255_LATEST_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED true
-D255_LATEST_FAILED_ATTEMPT_TSHARK_STARTED true
-D255_LATEST_FAILED_ATTEMPT_GOODIX_ATTACHED_TO_VM false
-D255_LATEST_FAILED_ATTEMPT_SENSOR_REACHING_ACTION false
-D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
-D255_OEM_LOG_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
-D255_GOODIX_CACHE_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
-D255_WINDOWS_EXECUTION_ENVIRONMENT VIRTUAL_MACHINE
-D255_VM_USB_ATTACH_METHOD OPERATOR_GUI_MANUAL_ATTACH
-D255_CURRENT_WINDOWS_VM_FINGERPRINT_ENROLLMENT NOT_COMPLETED
-D255_SELECTED_WINDOWS_UI_PATH WINDOWS_HELLO_SETUP_NO_FINGER
-D255_SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH UNKNOWN_BEFORE_ATTACH
-D255_PREATTACH_FINGERPRINT_UI_REQUIRED false
-D255_PARTIAL_BOOTSTRAP_RESULT_SUPPORTED true
-D255_REENTRY_ALONE_CAN_CLOSE_RESTORE false
-D255_RESTORE_CLOSURE_DECISION AI_PM_REVIEW_REQUIRED
-D255_FINGER_INTERACTION_ALLOWED false
-D255_READY_FOR_AI_PM_REVIEW true
-D255_READY_FOR_OPERATOR_RUN false
-D255_LIVE_PATH_ATTEMPT FAILED_PREATTACH_AFTER_TSHARK_START
-D255_LIVE_CAPTURE NOT_PERFORMED
-D255_HARDWARE_BOUNDARY NOT_AUTHORIZED
-D255_TSHARK_PREATTACH_READINESS PROCESS_STARTED_AND_ALIVE_TARGET_ABSENT
-D255_PREATTACH_PCAP_FILE_REQUIRED false
-D255_FINAL_PCAP_VALIDATION EXIT_ZERO_EXISTS_NONEMPTY_READABLE_FRAME
-D255_EMPTY_OEM_LOG_CANDIDATES_SUPPORTED true
-D255_EMPTY_ARRAY_CLASS_AUDIT PASS
-D255_SHARED_PREAUTHORIZATION_SIMULATION NATIVE_WINDOWS_PENDING
-D255_BOOTSTRAP_CLOSED false
-D255_RESTORE_CLOSED false
+D255_LIVE_CAPTURE SUCCEEDED
+D255_CAPTURE_BYTES 27684
+D255_CAPTURE_FRAME_COUNT 218
+D255_CAPTURE_SHA256 802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c
+D255_RECOVERY_RESULT PASS
+D255_POSTPROCESS_RESULT PASS
+D255_NEW_LIVE_CAPTURE_REQUIRED false
+D255_NEW_RUN_REQUIRED false
+FUTURE_LIVE_OPERATOR_AUTHORIZATION_REQUIRED true
+D256_USBPCAP_LIFECYCLE_AUDIT PASS_COMPLETE_TARGET_PACKET_TIMELINE
+D256_CANCEL_TO_REENTRY_DEVICE_CONTINUITY SAME_BUS_DEVICE_AND_BULK_ENDPOINTS
+D256_HOST_SIDE_PENDING_BULK_IN_CANCELLATION_OBSERVED true
+D256_EXPLICIT_USB_RESTORE_OBSERVED false
+D256_ABORT_OR_RESET_OBSERVED false
+D256_REENUMERATION_OBSERVED false
+D256_REENTRY_WITHOUT_EXPLICIT_USB_RESTORE_PROVEN true
+D256_NEW_FDT_ARM_ACCEPTED_ON_REENTRY true
+D256_RESTORE_REQUIRED_FOR_REENTRY false
+D256_PRIOR_ARM_DISARM_PROVEN false
+D256_PRIOR_ARM_LIFETIME_AFTER_CANCEL UNOBSERVED
+D256_SAFE_STOP_AFTER_FDT_ARM UNRESOLVED
+D256_CURRENT_CORPUS_EXHAUSTED_FOR_THIS_RESTORE_QUESTION true
+D256_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -2500,24 +2566,25 @@ D254 aggiunge soltanto parser e derivati sanitizzati hash-gated. Clone, WBDI,
 ZIP e PCAP esterni restano fuori dal repository; non sono stati importati
 codice runtime, secret, OTP, immagini o payload biometrici. La corroborazione
 esterna non modifica guardrail, non crea un backend/launcher e non autorizza
-hardware. Seed APP12509 iniziale e restore no-finger restano bloccanti.
+hardware. D254 lasciava seed APP12509 iniziale e restore no-finger bloccanti;
+D255/D256 hanno poi provato la correlazione target cache→seed e la re-entry
+senza restore USB esplicito, restringendo ma non chiudendo causalità/freschezza,
+disarm e terminal stop.
 
-D255 aggiunge un kit PowerShell GPL per la futura raccolta OEM e un
-postprocessor GPL offline con fixture. La prima versione è stata respinta in
-review; la prima correzione chiude staticamente API PS5.1 e correlazione MMDD.
-La seconda review ha respinto l'assunzione recognition sulla VM non enrolled;
-la correzione corrente aggiunge boundary VM/cold-attach single-shot, setup UI
-zero-finger e invalidazione wire di ogni interazione. Un primo tentativo
-operatore nel guest Windows si è fermato sul binding dell'array OEM vuoto prima
-di autorizzazione, TShark e attach. Il tentativo successivo ha consumato
-l'autorizzazione e avviato TShark, ma si è fermato prima dell'attach sulla race
-di creazione del pcapng; Goodix è rimasto assente dal guest e non vi sono state
-azioni sensor-reaching. La correzione attuale è stata sviluppata solo offline
-e non ha usato VM, TShark, USB, TLS o comandi Goodix reali; ha
-usato solo fixture sintetiche e audit offline. Il bundle non contiene raw USB,
-WBDI, cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del kit
-non consuma né sostituisce la futura autorizzazione operatore e non equivale a
-`READY_FOR_OPERATOR_RUN`.
+D255 ha aggiunto il kit PowerShell GPL e il postprocessor GPL offline, poi ha
+acquisito la capture APP12509 definitiva e ne ha recuperato offline la
+finalizzazione. Il raw canonico da 27.684 byte/218 frame prova cold attach,
+bootstrap, zero finger, cancel e re-entry; non è richiesta una nuova run D255.
+Le revisioni e i failure pre-attach precedenti restano provenance storica nella
+sezione D255, non stato corrente dell'implementazione.
+
+D256 aggiunge soltanto l'audit GPL offline e derivati sanitizzati: timeline
+CSV/MD completa dei packet target, decisione lifecycle, test minimi e report.
+Non modifica il runtime live-critical, il core FDT, fprintd o un operator kit.
+Il nuovo modello corrente ammette re-entry e re-arm senza restore USB esplicito
+osservato, ma conserva fail-closed il path Linux perché terminal stop, prior-arm
+lifetime, causalità e freschezza generale del seed restano irrisolti. Il bundle
+D256 esclude raw USB, cache, DLL, firmware, OTP, PSK e biometria.
 
 ## Regole operative
 
@@ -2532,5 +2599,5 @@ non consuma né sostituisce la futura autorizzazione operatore e non equivale a
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D255 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D256 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.
