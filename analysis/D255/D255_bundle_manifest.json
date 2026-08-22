@@ -1,82 +1,74 @@
 {
-  "schema": "d255-step-local-bundle-manifest-v5",
+  "schema": "d255-step-local-bundle-manifest-v6",
   "step": "D255",
-  "corrective_initial_head": "dce2bbbfc8de00b5f218fa0d6d087a179beac86d",
-  "decision": "OEM_LOG_OPTIONALITY_CORRECTIVE_READY_FOR_AI_PM_REVIEW; HARDWARE_NOT_AUTHORIZED",
+  "corrective_initial_head": "74a1ebda24166ac026ef7ed55c15f0d21e4593e3",
+  "decision": "EMPTY_ARRAY_LIVE_PATH_CORRECTIVE_READY_FOR_AI_PM_REVIEW; NATIVE_WINDOWS_SIMULATION_PENDING; HARDWARE_NOT_AUTHORIZED",
   "operator_kit_included": true,
   "members": [
     {
       "path": "analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md",
-      "size": 7506,
-      "sha256": "b6210055f608ffa044e10a77af43303ec60d9742e67aa711229f3763fac70438"
+      "size": 12727,
+      "sha256": "2391d071c6768e18e93a32307497ffa7babfca80b3f98abe53ef61b2e61a2b05"
     },
     {
       "path": "analysis/D255/D255_decision.json",
-      "size": 4176,
-      "sha256": "2787540cd3f83e1e90e809e7e7370d8d78aeeef776049688e23a381afe47c002"
+      "size": 5093,
+      "sha256": "b985cdf1c01d3792ce9bd49cfa5677f49a94880b8a0956bb75b06a506e2f6c2a"
     },
     {
       "path": "analysis/D255/D255_windows_capture_operator_guide.md",
-      "size": 8735,
-      "sha256": "3b202ce5c951779db0f95d35147663860c4fc2b7be471964924e7fcd54f9174e"
+      "size": 9625,
+      "sha256": "8af1b9b48a288f45fe9e517cce7cf8c1ac1883081e5561c440b8c65e70871552"
     },
     {
       "path": "analysis/D255/D255_windows_capture_operator_guide_IT.md",
-      "size": 11502,
-      "sha256": "6ecd15d8b9e00ac0195c9ea5441c4f83435edbab28aef2d4486ea206b3d1753b"
+      "size": 12418,
+      "sha256": "3bc4da4af420e51f9ade87ed26ac5ef74b5fc14c933aaadf8a913cffac7ac0cf"
     },
     {
       "path": "operator_kit/d255-windows-evidence-capture.ps1",
-      "size": 35464,
-      "sha256": "0e8f271610b58bddbd9573979ae5bd39aeb9ca795d8b90baea3d3ce32a88350c"
-    },
-    {
-      "path": "analysis/D255/d255_postprocess_windows_evidence.py",
-      "size": 68335,
-      "sha256": "8dfbd0665ba9ac67946f1c35e42672d9f77e11cc8ad615adc1086d63541e96e1"
+      "size": 42823,
+      "sha256": "a4d565aa43e9c9cf1a9fdaf385992137764d482c556a33d90d9a533d755eaf17"
     },
     {
       "path": "analysis/D255/test_d255_postprocess_windows_evidence.py",
-      "size": 31421,
-      "sha256": "e226d13d3e1febf72c932767626146faf278e27b83ae88bbe3e81f179ffde2f7"
+      "size": 36461,
+      "sha256": "c5f1b8fd62a667195e8dbc65618ce62c75f6cc6c04c6dab530cd17dae77a09ea"
     },
     {
       "path": "analysis/D255/D255_test_results.txt",
-      "size": 4431,
-      "sha256": "bb84baf7c8f1414bba1717e7b5977b64589a007c55b26b9e14291f0b54c2d8ad"
+      "size": 5262,
+      "sha256": "f7cb6ad7b8ab28abbc86298ab704a8e07f1706bbf0e6c151950e25b0bfb24c35"
     }
   ],
   "canonical_documentation_reference": {
     "path": "Goodix 27c6 5125 manuale tecnico.md",
-    "sha256_at_bundle_creation": "888db6ca16d78496fb15e972bbce608d21bd55e41a1cc5ccf21fc5184479dbbd",
+    "sha256_at_bundle_creation": "8b2690119381efe425edab0ded7e120f92ff8343d6da4d933f36d741c1469f70",
     "included": false,
     "reason": "canonical repository document referenced rather than duplicated"
   },
   "analysis_index_reference": {
     "path": "analysis/README.md",
-    "sha256_at_bundle_creation": "e69b4af7f187d9bca7ef07241989c83cf0a7420da5a6a719122c2d60041e2a1c",
+    "sha256_at_bundle_creation": "1e377a75ea82388aa020fc021f49246f23688ae59d01647603e54573f1e02cf9",
     "included": false
   },
-  "primary_sources_referenced_not_included": [
-    {
-      "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
-      "sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
-    },
-    {
-      "path": "analysis/D254/D254_external_fdt_evidence_audit.md",
-      "classification": "prior sanitized external audit; referenced, not duplicated"
-    }
-  ],
+  "unchanged_runtime_reference": {
+    "path": "analysis/D255/d255_postprocess_windows_evidence.py",
+    "sha256": "8dfbd0665ba9ac67946f1c35e42672d9f77e11cc8ad615adc1086d63541e96e1",
+    "included": false,
+    "reason": "unchanged by this corrective revision; referenced without cumulative duplication"
+  },
   "excluded": [
     "raw USB capture",
     "raw WBDI/OEM log before or after",
     "raw cache/base file",
+    "synthetic simulation output",
     "guest PnP topology from a real run",
     "firmware or DLL",
     "OTP or PSK/secrets",
     "TLS payload",
     "biometric image or template",
-    "synthetic temporary fixture output",
-    "historical bundles"
+    "historical bundles",
+    "unchanged postprocessor implementation"
   ]
 }

@@ -2,8 +2,9 @@
 
 ## Status and non-authority
 
-D255 prepared and tested this kit offline. It did not start a VM, open USB,
-run Windows/OEM software, start TShark, or use a finger. AI-PM review is not
+D255 prepared and tested the current correction offline. A prior operator
+invocation stopped on an empty-array PowerShell binding before authorization,
+TShark, USB attach or any hardware action. AI-PM review is not
 operator authorization, and no run is currently authorized.
 
 ```text
@@ -81,7 +82,7 @@ The human operator may locate the host device read-only with `lsusb -d
 kill a holder, stop fprintd, or change ownership. Independently confirm in the
 guest that `Get-PnpDevice -PresentOnly` has no `VID_27C6&PID_5125`.
 
-## Guest self-test and preflight
+## Guest self-test, shared-path simulation and preflight
 
 Run the hardware-free self-test first:
 
@@ -93,6 +94,25 @@ Run the hardware-free self-test first:
 
 Expected: `D255_POWERSHELL_SELFTEST=PASS`, hardware action count zero and
 authorization not consumed.
+
+Before any real preflight or authorization, exercise the shared live-path
+setup with synthetic files only:
+
+```powershell
+& "C:\path\d255-windows-evidence-capture.ps1" `
+  -PreAuthorizationSimulationOnly `
+  -OutputRoot "D:\Goodix-D255-Preauth-Simulation" `
+  -SimulationOemLogState "ABSENT"
+```
+
+Expected: `EMPTY_OEM_LOG_CANDIDATES_BINDING=PASS`,
+`EMPTY_CACHE_ROOTS_BINDING=PASS`, `AUTHORIZATION_CONSUMED=false`,
+`REAL_CAPTURE_STARTED=false`, `REAL_USB_OPEN_COUNT=0` and
+`REAL_HARDWARE_ACTION_COUNT=0`. Repeat with `-SimulationOemLogState "PRESENT"`;
+the expected source-specific result is `PRESENT_OEM_LOG_SNAPSHOT=PASS`. This
+mode rejects an authorization string, TShark path, capture interface and real
+log/cache path, and it calls the same evidence-snapshot setup function used by
+the live branch.
 
 Then open Settings → Accounts → Sign-in options only far enough to classify
 the account/PIN state. Do not require or try to open Fingerprint recognition.

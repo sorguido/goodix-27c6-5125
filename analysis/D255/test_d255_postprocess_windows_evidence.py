@@ -325,6 +325,7 @@ class D255PostprocessorTests(unittest.TestCase):
         required = (
             "[switch]$SelfTestOnly",
             "[switch]$PreflightOnly",
+            "[switch]$PreAuthorizationSimulationOnly",
             "$ExpectedAuthorization = \"--i-authorize-one-d255-windows-oem-evidence-capture\"",
             "if ($Authorization -cne $ExpectedAuthorization)",
             "if (-not (Test-D255PathAvailable -Path $script:RunDirectory))",
@@ -358,7 +359,7 @@ class D255PostprocessorTests(unittest.TestCase):
             "PARTIAL_BOOTSTRAP_ONLY_UI_UNAVAILABLE",
             "PromptForChoice",
             "USBPCAP_INTERFACE_SELECTION=AMBIGUOUS",
-            "duration:$CaptureDurationSeconds",
+            "duration:$DurationSeconds",
             "D255_POWERSHELL_SELFTEST=PASS",
             "D255_AUTHORIZATION_CONSUMED=false",
             "function Get-D255Sha256HexForString",
@@ -449,10 +450,84 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertLess(gate, consumed)
         self.assertLess(consumed, start_capture)
 
+    def test_powershell_empty_collection_contract_horizontal_audit(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        targeted = source[source.index("function Get-TargetedFiles"):
+                          source.index("function Resolve-OemLogCandidates")]
+        file_snapshot = source[source.index("function Write-FileSnapshot"):
+                               source.index("function Write-OemLogSnapshot")]
+        log_snapshot = source[source.index("function Write-OemLogSnapshot"):
+                              source.index("function Invoke-D255PreAuthorizationEvidenceSetup")]
+        shared_setup = source[source.index("function Invoke-D255PreAuthorizationEvidenceSetup"):
+                              source.index("function Invoke-D255PreAuthorizationSimulation")]
+        self.assertIn("[AllowEmptyCollection()][string[]]$Roots = @()", targeted)
+        self.assertIn(
+            "[Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Roots",
+            file_snapshot)
+        self.assertIn(
+            "[Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Candidates",
+            log_snapshot)
+        for parameter in ("$OemLogCandidates", "$CacheRoots", "$CaptureInterfaces"):
+            self.assertRegex(
+                shared_setup,
+                re.escape("[Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]")
+                + re.escape(parameter))
+        self.assertIn('if ($CaptureInterfaces.Count -eq 0)', shared_setup)
+        self.assertIn("pre-authorization setup requires at least one capture interface",
+                      shared_setup)
+        self.assertIn('if ($CaptureInterface.Count -eq 0)', source)
+        self.assertIn('if ($usbPcapCandidates.Count -eq 0)', source)
+
+    def test_powershell_preauthorization_simulation_reuses_live_setup(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        shared_setup = source[source.index("function Invoke-D255PreAuthorizationEvidenceSetup"):
+                              source.index("function Invoke-D255PreAuthorizationSimulation")]
+        simulation = source[source.index("function Invoke-D255PreAuthorizationSimulation"):
+                            source.index("function Write-Manifest")]
+        authorization_gate = source.index('if ($Authorization -cne $ExpectedAuthorization)')
+        live_setup = source[source.index("# Pre-hardware setup:"):authorization_gate]
+        for token in (
+                'Write-OemLogSnapshot -Stage "before"',
+                'Write-FileSnapshot -Stage "before"',
+                '$Preflight["runtime"] = Get-D255RuntimeInfo',
+                'capture_arguments ='):
+            self.assertIn(token, shared_setup)
+        self.assertNotIn("Start-Process", shared_setup)
+        self.assertIn("$setup = Invoke-D255PreAuthorizationEvidenceSetup", simulation)
+        self.assertIn("$preAuthorizationSetup = Invoke-D255PreAuthorizationEvidenceSetup",
+                      live_setup)
+        self.assertIn("-OemLogCandidates $oemLogCandidates", simulation)
+        self.assertIn("-OemLogCandidates $oemLogCandidates", live_setup)
+        for token in (
+                "EMPTY_OEM_LOG_CANDIDATES_BINDING=PASS",
+                "AUTHORIZATION_CONSUMED=false",
+                "REAL_CAPTURE_STARTED=false",
+                "REAL_USB_OPEN_COUNT=0",
+                "REAL_HARDWARE_ACTION_COUNT=0",
+                "EMPTY_CACHE_ROOTS_BINDING=PASS"):
+            self.assertIn(token, simulation)
+        self.assertNotIn("Start-Process", simulation)
+        self.assertNotIn("Get-PnpDevice", simulation)
+        self.assertLess(source.index("$preAuthorizationSetup = ",
+                                     source.index("# Pre-hardware setup:")),
+                        authorization_gate)
+
+    def test_powershell_preauthorization_simulation_has_present_log_case(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        simulation = source[source.index("function Invoke-D255PreAuthorizationSimulation"):
+                            source.index("function Write-Manifest")]
+        self.assertIn('[ValidateSet("ABSENT", "PRESENT")]', source)
+        self.assertIn('$SimulationOemLogState -ceq "PRESENT"', simulation)
+        self.assertIn("goodix-synthetic.log", simulation)
+        self.assertIn("PRESENT_OEM_LOG_SNAPSHOT=PASS", simulation)
+        self.assertIn('oem_logs_before\\oem_000.log', simulation)
+        self.assertIn("authorization must not be supplied", simulation)
+        self.assertIn("TsharkPath must not be supplied", simulation)
+
     def test_powershell_preflight_accepts_zero_oem_logs_and_reports_sources(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")
         oem_resolution = source.index("$oemLogCandidates = @(Resolve-OemLogCandidates)")
-        preflight = source.index("$preflight = [ordered]@{")
+        preflight = source.index("$preflight = [ordered]@{", oem_resolution)
         segment = source[oem_resolution:preflight]
         self.assertNotIn("$oemLogCandidates.Count -eq 0", segment)
         self.assertNotIn("no readable OEM/WBDI log source was identified", source)
@@ -475,7 +550,13 @@ class D255PostprocessorTests(unittest.TestCase):
             self.assertIn(token, source)
         self.assertIn('Get-D255AvailabilityStatus -SourceCount 0', source)
         self.assertIn('Get-D255AvailabilityStatus -SourceCount 1', source)
-        self.assertGreaterEqual(source.count("ConvertTo-Json -InputObject @($rows)"), 2)
+        self.assertGreaterEqual(source.count("Write-D255JsonArray -Rows @($rows)"), 2)
+        json_array = source[source.index("function Write-D255JsonArray"):
+                            source.index("function Get-D255RuntimeInfo")]
+        self.assertIn("[AllowEmptyCollection()][object[]]$Rows", json_array)
+        self.assertIn('if ($Rows.Count -eq 0)', json_array)
+        self.assertIn('Set-Content -LiteralPath $Path -Encoding UTF8 -Value "[]"',
+                      json_array)
 
     def test_usbpcap_single_interface_is_unambiguous(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")
@@ -487,7 +568,7 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertIn('[string[]]$CaptureInterface = @()', source)
         self.assertIn('$interfaceMatches.Count -ne $usbPcapCandidates.Count', source)
         self.assertIn('"CAPTURE_ALL"', source)
-        self.assertIn('$captureSelectors = @($CaptureInterface | ForEach-Object', source)
+        self.assertIn('$captureSelectors = @($CaptureInterfaces | ForEach-Object', source)
 
     def test_iso_timestamp_regression(self):
         result, _ = self.analyze_fixture(oem_timestamp_format="iso")

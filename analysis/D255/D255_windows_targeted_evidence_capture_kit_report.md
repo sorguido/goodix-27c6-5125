@@ -1,21 +1,29 @@
-# D255 OEM-log preflight gate corrective report
+# D255 empty-array live-path corrective report
 
 ## Closure
 
 ```text
-OUTCOME=READY; OEM_LOG_OPTIONALITY_CORRECTIVE_PREPARED_FOR_AI_PM_REVIEW
+OUTCOME=READY; EMPTY_ARRAY_LIVE_PATH_CORRECTIVE_PREPARED_FOR_AI_PM_REVIEW
 ADVANCEMENT=NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE
-EXECUTABLE_CLOSURE=PASS_OFFLINE_STATIC_AND_SYNTHETIC; CORRECTED_NATIVE_WINDOWS_SELFTEST_AND_PREFLIGHT_PENDING
-RESIDUAL_BLOCKER_OR_RISK=CORRECTED_POWERSHELL_NOT_RERUN_IN_NATIVE_WINDOWS; NO_LIVE_CAPTURE_AUTHORIZED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_STATIC_AND_SYNTHETIC; SHARED_PREAUTHORIZATION_SIMULATION_IMPLEMENTED; NATIVE_WINDOWS_EXECUTION_PENDING
+RESIDUAL_BLOCKER_OR_RISK=CORRECTED_POWERSHELL_AND_SHARED-PATH_SIMULATION_NOT_RERUN_IN_NATIVE_WINDOWS; NO_LIVE_CAPTURE_AUTHORIZED
 CANONICAL_DOCUMENTATION=UPDATED
 BUNDLE=analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip; SHA256=STEP_LOCAL_SIDECAR
-CORRECTIVE_INITIAL_HEAD=dce2bbbfc8de00b5f218fa0d6d087a179beac86d
+CORRECTIVE_INITIAL_HEAD=74a1ebda24166ac026ef7ed55c15f0d21e4593e3
+
+OBSERVED_WINDOWS_FAILURE=ParameterArgumentValidationErrorEmptyArrayNotAllowed
+FAILURE_BEFORE_AUTHORIZATION_CONSUMPTION=true
+EMPTY_OEM_LOG_CANDIDATES_SUPPORTED=true
+EMPTY_ARRAY_CLASS_AUDIT=PASS
+REAL_USB_OPEN_COUNT=0
+REAL_CAPTURE_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
 
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION=FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
-D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
+D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW; NATIVE_SHARED_PATH_SIMULATION_PENDING
 READY_FOR_AI_PM_REVIEW=true
 READY_FOR_OPERATOR_RUN=false
 ```
@@ -25,6 +33,81 @@ offline. No VM, Windows OEM component, TShark live capture, USB device, finger,
 enrollment, account mutation, PIN mutation, provisioning, firmware operation,
 PSK operation or persistent command was used.
 
+The prior operator invocation likewise stopped before attach, capture start
+and authorization consumption.
+
+## Observed Windows failure and control-flow proof
+
+The operator-authorized invocation on baseline
+`74a1ebda24166ac026ef7ed55c15f0d21e4593e3` reached the live-only
+pre-authorization setup after the passing self-test and preflight. With
+`OEM_LOG_SOURCE_COUNT=0`, PowerShell rejected the mandatory `Candidates`
+argument before entering `Write-OemLogSnapshot`:
+
+```text
+ParameterBindingValidationException
+ParameterArgumentValidationErrorEmptyArrayNotAllowed
+```
+
+The source order proves that this happened before authorization consumption:
+the before-log/cache snapshots and shared setup call precede the exact
+authorization comparison; `$script:AuthorizationConsumed = $true`,
+`authorization_consumed.json` and `Start-Process` follow it. Consequently the
+failed invocation performed no attach, opened no USB device, started no real
+capture and did not consume the one-run authorization. A future real run still
+requires a new explicit user authorization after AI-PM review.
+
+## Empty-array class correction and audit
+
+`Write-OemLogSnapshot`, `Write-FileSnapshot`, `Get-TargetedFiles` and the new
+shared `Invoke-D255PreAuthorizationEvidenceSetup` now state their empty-array
+contracts explicitly. `Write-D255JsonArray` serializes a zero-row snapshot as
+literal `[]`, avoiding a second empty-input binding ambiguity. Capture
+interfaces remain semantically non-empty: binding is accepted so the function
+can issue the explicit D255 failure instead of a generic PowerShell binder
+error.
+
+| FUNCTION_OR_PARAMETER | CAN_BE_EMPTY_IN_REAL_RUN | CURRENT_BEHAVIOR | FIX_OR_JUSTIFICATION | TEST |
+| --- | --- | --- | --- | --- |
+| top-level `OemLogPath` | yes | optional `@()` | unchanged; discovery may still yield zero | zero-log preflight/static contract |
+| resolved OEM candidate list / `Write-OemLogSnapshot.Candidates` | yes | empty snapshot allowed | `AllowEmptyCollection`; writes `[]`, no fictitious log | shared-path ABSENT simulation contract |
+| top-level `CacheRoot` | yes | optional user list; built-in roots still resolved | unchanged; unreadable explicit roots remain fail-closed | static contract |
+| `Get-TargetedFiles.Roots` / `Write-FileSnapshot.Roots` | yes at function boundary | zero files is valid | explicit empty support and `[]` metadata | empty-root simulation contract |
+| shared setup `OemLogCandidates` / `CacheRoots` | yes | empty evidence sources allowed | `AllowEmptyCollection` on both | horizontal contract test |
+| top-level/shared capture interface lists | no in live/preflight | terminal if zero | generic binding replaced by explicit `at least one capture interface` failure; simulator supplies synthetic selector | capture-interface and shared-setup tests |
+| USBPcap candidates / selector matches | no | terminal if zero/ambiguous | unchanged safety/provenance gate | single/capture-all tests |
+| UI choice, marker and manifest event collections | no external empty binding; internally constructed | fixed enumerations or naturally empty output lists | no change required | static syntax/safety and postprocessor tests |
+
+No additional pre-authorization gate was removed. Guest absence/topology,
+USBPcap closure, account/PIN policy, explicit-path readability, runtime,
+output collision/free space, exact authorization and capture activation each
+protect device safety, evidence provenance or executable closure. The prior
+mandatory OEM-log existence requirement was the ceremonial gate and remains
+removed; this correction does not reintroduce it.
+
+## Shared live-path pre-authorization simulation
+
+`-PreAuthorizationSimulationOnly` creates only synthetic cache/log fixtures,
+rejects authorization, TShark, real interface selectors and real evidence
+paths, and invokes the same `Invoke-D255PreAuthorizationEvidenceSetup` function
+used by the live branch. It stops before the authorization comparison and
+before `Start-Process`. ABSENT and PRESENT modes respectively require:
+
+```text
+EMPTY_OEM_LOG_CANDIDATES_BINDING=PASS
+PRESENT_OEM_LOG_SNAPSHOT=PASS
+EMPTY_CACHE_ROOTS_BINDING=PASS
+AUTHORIZATION_CONSUMED=false
+REAL_CAPTURE_STARTED=false
+REAL_USB_OPEN_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+```
+
+The Linux host has no `pwsh`/`powershell`, so this revision verifies the shared
+control flow, empty-collection attributes, explicit JSON-array handling and
+safety boundary with the fallback parser/static suite. Native Windows runs of
+both simulation states remain required before `READY_FOR_OPERATOR_RUN=true`.
+
 ## OEM log and Goodix cache availability
 
 The real Windows preflight had already established a passing D255 self-test,
@@ -33,7 +116,8 @@ readable `C:\ProgramData\Goodix` cache root, but no `goodix*.log` or
 `wbdi*.log`. The launcher incorrectly converted that optional evidence absence
 into a terminal preflight gate.
 
-The correction removes only the zero-candidate OEM-log failure. Explicitly
+The earlier optionality correction removed only the zero-source gate; this
+class correction also makes the live snapshot binding itself empty-safe. Explicitly
 supplied unreadable `-OemLogPath` and `-CacheRoot` values still fail before
 authorization. Automatic discovery and before/after snapshots remain active
 when logs exist. Preflight V4 and sanitized output now classify the sources
@@ -149,21 +233,25 @@ VM_BOUNDARY_SYNTHETIC_TESTS=PASS
 PARTIAL_BOOTSTRAP_SYNTHETIC_TEST=PASS
 REENTRY_DOES_NOT_CLOSE_RESTORE_TEST=PASS
 POWERSHELL51_COMPATIBILITY_STATUS=PASS_STATIC_CONTRACT; CORRECTED_NATIVE_SELFTEST_AND_PREFLIGHT_PENDING_WINDOWS
+EMPTY_ARRAY_CLASS_AUDIT=PASS_STATIC_AND_SYNTHETIC_CONTRACT
+SHARED_PREAUTHORIZATION_SIMULATION=IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS
 WBDI_MMDD_CANCEL_CORRELATION_TEST=PASS
 OEM_LOG_ROTATION_TESTS=PASS
 ```
 
-The dedicated D255 suite passes 47 tests. D252/D253 audits, the five-test D254
+The dedicated D255 suite passes 50 tests. D252/D253 audits, the five-test D254
 suite, the full supported repository suite and `git diff --check` pass. Native
 PowerShell is unavailable on this Linux host; `-SelfTestOnly` and
-the corrected `-PreflightOnly` therefore remain future guest checks after
-review. The pre-correction native self-test was observed PASS in the VM, but it
-does not substitute for rerunning the corrected file. No real capture exists.
+the corrected `-PreflightOnly` plus both `-PreAuthorizationSimulationOnly`
+states therefore remain future guest checks after review. The pre-correction
+native self-test was observed PASS in the VM, but it does not substitute for
+rerunning the corrected file. No real capture exists.
 
 ```text
 BOOTSTRAP_CLOSED=false
 RESTORE_CLOSED=false
-D255_LIVE_EXECUTION=NOT_PERFORMED
+D255_LIVE_PATH_ATTEMPT=FAILED_PREAUTHORIZATION
+D255_LIVE_CAPTURE=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 
 REAL_WINDOWS_CAPTURE_COUNT=0

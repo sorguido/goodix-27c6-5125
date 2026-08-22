@@ -1,20 +1,33 @@
 {
-  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V5",
-  "corrective_initial_head": "dce2bbbfc8de00b5f218fa0d6d087a179beac86d",
+  "schema": "D255_WINDOWS_EVIDENCE_ACQUISITION_KIT_DECISION_V6",
+  "corrective_initial_head": "74a1ebda24166ac026ef7ed55c15f0d21e4593e3",
   "execution_mode": "OFFLINE_PREPARATION_ONLY",
   "initial_ai_pm_review": "FAIL_EXECUTABILITY_AND_TIME_CORRELATION",
   "second_ai_pm_review": "FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION",
   "third_ai_pm_review": "FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM",
   "real_preflight_observation": "FAIL_UNPROVEN_OEM_LOG_REQUIREMENT",
+  "real_live_path_observation": "FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION",
   "corrective_status": "READY_FOR_AI_PM_REVIEW",
-  "outcome": "OEM_LOG_OPTIONALITY_CORRECTIVE_PREPARED",
+  "outcome": "EMPTY_ARRAY_LIVE_PATH_CORRECTIVE_PREPARED",
   "advancement": "NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE",
   "executable_closure": {
-    "status": "PASS_OFFLINE_STATIC_AND_SYNTHETIC",
-    "windows_runtime": "CORRECTED_NATIVE_SELFTEST_AND_PREFLIGHT_PENDING_AI_PM_REVIEW",
+    "status": "PASS_OFFLINE_STATIC_AND_SYNTHETIC_CONTRACT",
+    "windows_runtime": "CORRECTED_NATIVE_SELFTEST_PREFLIGHT_AND_SHARED_PREAUTH_SIMULATION_PENDING_AI_PM_REVIEW",
     "powershell_native_parser": "UNAVAILABLE_ON_D255_LINUX_HOST",
     "fallback_static_parser": "PASS",
-    "postprocessor_synthetic_fixture": "PASS"
+    "postprocessor_synthetic_fixture": "PASS",
+    "shared_live_path_simulation": "IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS"
+  },
+  "empty_array_audit": {
+    "status": "PASS",
+    "observed_failure": "ParameterArgumentValidationErrorEmptyArrayNotAllowed",
+    "failure_before_authorization_consumption": true,
+    "oem_log_candidates_empty_supported": true,
+    "cache_roots_empty_supported_at_function_boundary": true,
+    "capture_interfaces_empty_supported": false,
+    "capture_interfaces_empty_behavior": "EXPLICIT_D255_FAILURE",
+    "empty_json_snapshot": "LITERAL_ARRAY",
+    "present_oem_log_snapshot_regression": "PASS_STATIC_CONTRACT"
   },
   "evidence_source_availability": {
     "oem_log_requirement": "OPTIONAL",
@@ -76,19 +89,20 @@
     "synthetic_tests": "PASS"
   },
   "verification": {
-    "d255_test_count": 47,
+    "d255_test_count": 50,
     "d255_tests": "PASS",
     "d252_d253_regressions": "PASS",
     "d254_tests": "PASS",
     "full_supported_suite": "PASS",
     "git_diff_check": "PASS",
     "pre_correction_native_windows_selftest": "PASS_REPORTED_BY_OPERATOR",
-    "corrected_native_windows_selftest_and_preflight": "NOT_EXECUTED"
+    "corrected_native_windows_selftest_preflight_and_shared_path_simulation": "NOT_EXECUTED"
   },
   "review": {
     "ready_for_ai_pm_review": true,
     "ready_for_operator_run": false,
-    "live_execution": "NOT_PERFORMED",
+    "live_path_attempt": "FAILED_PREAUTHORIZATION",
+    "live_capture": "NOT_PERFORMED",
     "hardware_boundary": "NOT_AUTHORIZED"
   },
   "blockers": {
@@ -99,6 +113,8 @@
   "safety": {
     "real_windows_capture_count": 0,
     "real_usb_open_count": 0,
+    "real_hardware_action_count": 0,
+    "authorization_consumed_by_failed_live_path_attempt": false,
     "real_finger_interaction_count": 0,
     "real_persistent_write_family_count": 0
   }

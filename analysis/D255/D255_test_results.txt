@@ -1,6 +1,6 @@
-D255 OEM LOG GATE CORRECTIVE OFFLINE VERIFICATION RESULTS
+D255 EMPTY ARRAY LIVE PATH CORRECTIVE OFFLINE VERIFICATION RESULTS
 Date: 2026-08-22 Europe/Rome
-Corrective initial HEAD: dce2bbbfc8de00b5f218fa0d6d087a179beac86d
+Corrective initial HEAD: 74a1ebda24166ac026ef7ed55c15f0d21e4593e3
 Execution mode: OFFLINE_PREPARATION_ONLY
 
 1. Python compilation
@@ -25,11 +25,19 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    Command:
      python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
    Result: PASS
-   Tests run: 47
+   Tests run: 50
    Failures: 0
    Errors: 0
 
    New corrective coverage:
+   - horizontal audit of every array/list contract used before authorization;
+   - empty OEM candidates accepted by mandatory snapshot/shared-setup bindings;
+   - empty cache roots accepted and serialized as a JSON array;
+   - capture interfaces remain semantically non-empty with explicit D255 failure;
+   - live and synthetic pre-authorization branches invoke the same setup function;
+   - ABSENT and PRESENT synthetic OEM-log simulation contracts;
+   - simulation rejects authorization, TShark, real interfaces and real paths,
+     and cannot call Start-Process/Get-PnpDevice;
    - zero OEM-log candidates plus present Goodix cache is accepted and
      reported without inventing log evidence;
    - present OEM log plus absent Goodix cache is classified independently;
@@ -85,6 +93,9 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    -SelfTestOnly: IMPLEMENTED_NOT_EXECUTED
    pre-correction VM self-test reported by operator: PASS
    corrected -SelfTestOnly/-PreflightOnly: NOT_EXECUTED_ON_NATIVE_WINDOWS
+   -PreAuthorizationSimulationOnly ABSENT/PRESENT: IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS
+   shared live-path setup and authorization ordering: PASS_STATIC_CONTRACT
+   empty-array binding/JSON contract: PASS_STATIC_AND_SYNTHETIC_CONTRACT
    -SelfTestOnly hardware action count by construction: 0
 
 8. Structured output and patch hygiene

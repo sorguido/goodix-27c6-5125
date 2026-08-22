@@ -146,6 +146,32 @@ live-critical. La correzione rende quindi log OEM e cache Goodix fonti
 opzionali e indipendenti, classificate `PRESENT|ABSENT`; restano terminali prima
 dell'autorizzazione soltanto i path esplicitamente forniti ma illeggibili.
 
+La successiva prima invocazione del ramo live sulla baseline approvata
+`74a1ebda24166ac026ef7ed55c15f0d21e4593e3` non ha però superato il setup
+pre-autorizzazione: PowerShell ha rifiutato `-Candidates @()` sulla funzione
+`Write-OemLogSnapshot` con
+`ParameterArgumentValidationErrorEmptyArrayNotAllowed`. Il binding è fallito
+prima di entrare nella funzione e prima del confronto con la stringa di
+autorizzazione; `$script:AuthorizationConsumed = $true`, il record
+`authorization_consumed.json` e `Start-Process` sono tutti successivi nel
+control flow. Il tentativo non ha quindi consumato l'autorizzazione, aperto USB,
+avviato TShark né raggiunto l'attach host→VM.
+
+La correzione di classe dello stesso D255 marca esplicitamente con
+`AllowEmptyCollection` le collezioni di log, cache e setup che possono essere
+vuote, e serializza gli snapshot senza righe come JSON letterale `[]`. Le liste
+di interfacce restano semanticamente non vuote nel live, ma il binding permette
+ora alla funzione di produrre un failure D255 esplicito invece dell'errore
+generico del binder. Il nuovo `-PreAuthorizationSimulationOnly` rifiuta
+autorizzazione, TShark, selettori e path reali, crea solo fixture sintetiche e
+chiama la stessa `Invoke-D255PreAuthorizationEvidenceSetup` del ramo live fino
+al boundary immediatamente precedente all'autorizzazione/capture. Copre sia
+zero log sia log presente e un audit separato con zero cache root; non usa PnP,
+USB o hardware. La suite offline verifica struttura e condivisione del ramo,
+ma `pwsh` non è disponibile sull'host Linux: le due modalità sintetiche devono
+ancora essere eseguite nativamente in Windows prima di dichiarare il kit pronto
+per l'operatore.
+
 Il gate post-attach accetta solo `READY_WAITING_FOR_FINGER`, `UI_UNAVAILABLE`,
 `NEW_PIN_REQUIRED` o `UNEXPECTED_PREREQUISITE`. Solo il primo entra nelle due
 cancellazioni senza dito; gli altri chiudono la restore phase senza retry,
@@ -216,7 +242,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | correttivo OEM-log gate pronto per nuova review AI-PM, non eseguito nativamente dopo la patch | zero log accettato e riportato separatamente dalla cache; path espliciti illeggibili restano fail-closed; UI post-attach/partial bootstrap e re-entry≠disarm invariati; hardware non autorizzato |
+| Kit acquisizione Windows D255 | tentativo live fermato dal binding array vuoto prima di autorizzazione/attach; correzione di classe pronta per review AI-PM | zero log/cache supportati dove validi, interfacce vuote falliscono esplicitamente; simulazione condivisa nativa Windows pendente; hardware non autorizzato |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -561,6 +587,8 @@ D255 -> kit offline per una sola capture Windows APP12509 correlata
      -> seconda review FAIL: recognition non provata e enrollment VM non completato
      -> corrective VM: capture-before-attach, singolo attach GUI, PnP+descriptor+A8
      -> setup/add-fingerprint zero-finger; IRQ2/0x22/image invalidano la run
+     -> preflight reale PASS, ma primo ramo live FAIL su Candidates=@() prima di auth/attach
+     -> fix di classe AllowEmptyCollection + setup condiviso; simulazione Windows pendente
      -> READY_FOR_AI_PM_REVIEW; non READY_FOR_OPERATOR_RUN
 ```
 
@@ -1996,6 +2024,49 @@ snapshot vuoti sono array JSON validi. Il postprocessor accetta l'assenza di
 log, conserva l'analisi wire/cache e marca la correlazione temporale
 `UNAVAILABLE_NO_OEM_LOG`, senza promuovere restore o causalità.
 
+La prima invocazione live successiva, pur autorizzata dall'operatore sulla
+baseline `74a1ebda24166ac026ef7ed55c15f0d21e4593e3`, ha esposto una distinzione
+PowerShell non coperta dal solo preflight: il parametro mandatory
+`Write-OemLogSnapshot.Candidates` non accettava l'array vuoto e il binder ha
+generato `ParameterArgumentValidationErrorEmptyArrayNotAllowed` prima di
+entrare nella funzione. Il ramo aveva già creato directory e marker locali, ma
+non aveva ancora raggiunto il confronto di autorizzazione, l'assegnazione
+`$script:AuthorizationConsumed = $true`, `authorization_consumed.json` o
+`Start-Process`; risultano quindi autorizzazione non consumata, capture non
+avviata, zero attach, zero USB open e zero azioni hardware.
+
+L'audit orizzontale delle collezioni separa i casi semanticamente vuoti da
+quelli non vuoti. `OemLogPath`, candidate OEM, `CacheRoot`, roots/file cache e
+le corrispondenti collezioni del setup condiviso possono legittimamente essere
+vuoti e ora espongono un contratto `AllowEmptyCollection`; un helper dedicato
+scrive `[]` senza affidarsi a un secondo binding vuoto di `ConvertTo-Json`.
+`CaptureInterface`, candidate USBPcap e match dei selettori non possono invece
+essere vuoti nel percorso live: mantengono failure espliciti, univocità o
+capture-all. Le collezioni UI/marker sono enumerazioni interne fisse o output
+naturalmente vuoti e non espongono un parametro mandatory problematico.
+
+Il setup log/cache/runtime/preflight/argomenti di cattura è ora una funzione
+unica chiamata sia dal live sia da `-PreAuthorizationSimulationOnly`. La
+simulazione vieta autorizzazione, TShark, interfacce e path reali, usa fixture
+sintetiche ABSENT/PRESENT e si arresta prima del consumo/autorizzazione e di
+`Start-Process`, con contratto atteso:
+
+```text
+EMPTY_OEM_LOG_CANDIDATES_BINDING=PASS
+EMPTY_CACHE_ROOTS_BINDING=PASS
+AUTHORIZATION_CONSUMED=false
+REAL_CAPTURE_STARTED=false
+REAL_USB_OPEN_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+```
+
+Non sono stati rimossi altri gate pre-autorizzazione: assenza/topologia guest,
+chiusura selezione USBPcap, prerequisiti account/PIN, leggibilità dei path
+espliciti, runtime, collisione/spazio output, autorizzazione esatta e prova di
+capture attiva riducono rischio device-side, perdita di provenance o failure
+operativi reali. Il requisito obbligatorio del log OEM era il gate cerimoniale
+e resta eliminato.
+
 Ogni evento OEM sanitizzato espone sorgente timestamp, UTC e qualità, mai la
 linea raw. ISO-8601 con offset/Z è diretto; Goodix MMDD viene convertito solo se
 anno del run, offset locale, Windows timezone, anchor start/end e marker UTC
@@ -2023,7 +2094,7 @@ resta correlazione, mai automaticamente causalità. Un A8 assente/diverso rende
 l'evidenza non target-specific e terminale; marker/formati inattesi e collisioni
 falliscono chiusi senza retry.
 
-I 47 test D255 passano, inclusi zero-log con cache presente, log presente con
+I 50 test D255 passano, inclusi zero-log con cache presente, log presente con
 cache assente, reporting indipendente delle fonti, boundary
 VM/enumerazione/single attach, invalidation pre-attached/topology-change,
 zero-finger e invalidazione separata
@@ -2035,15 +2106,18 @@ sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
 staticamente. Il self-test della baseline precedente è stato osservato `PASS`
 nella VM, con hardware action count zero e autorizzazione non consumata; il
 vero `-SelfTestOnly` e poi `-PreflightOnly` sul file corretto restano una
-verifica futura. Nessun dato raw D255 è stato acquisito.
+verifica futura, insieme alle simulazioni pre-autorizzazione ABSENT/PRESENT.
+Nessun dato raw D255 è stato acquisito.
 
 ```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION=FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
+D255_REAL_LIVE_PATH_OBSERVATION=FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
+D255_FAILURE_BEFORE_AUTHORIZATION_CONSUMPTION=true
 D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
-D255_OUTCOME=OEM_LOG_OPTIONALITY_CORRECTIVE_PREPARED
+D255_OUTCOME=EMPTY_ARRAY_LIVE_PATH_CORRECTIVE_PREPARED
 D255_OEM_LOG_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_GOODIX_CACHE_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -2054,10 +2128,15 @@ D255_SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH=UNKNOWN_BEFORE_ATTACH
 D255_PARTIAL_BOOTSTRAP_RESULT_SUPPORTED=true
 D255_REENTRY_ALONE_CAN_CLOSE_RESTORE=false
 D255_FINGER_INTERACTION_ALLOWED=false
-D255_LIVE_EXECUTION=NOT_PERFORMED
+D255_LIVE_PATH_ATTEMPT=FAILED_PREAUTHORIZATION
+D255_LIVE_CAPTURE=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 D255_OPERATOR_AUTHORIZATION_REQUIRED=true
 D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
+D255_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED=false
+D255_EMPTY_OEM_LOG_CANDIDATES_SUPPORTED=true
+D255_EMPTY_ARRAY_CLASS_AUDIT=PASS
+D255_SHARED_PREAUTHORIZATION_SIMULATION=NATIVE_WINDOWS_PENDING
 D255_REPEAT_FORBIDDEN_WITHOUT_NEW_AUTHORIZATION=true
 READY_FOR_AI_PM_REVIEW=true
 READY_FOR_OPERATOR_RUN=false
@@ -2197,6 +2276,8 @@ D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
+D255_REAL_LIVE_PATH_OBSERVATION FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
+D255_FAILURE_BEFORE_AUTHORIZATION_CONSUMPTION true
 D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
 D255_OEM_LOG_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_GOODIX_CACHE_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
@@ -2212,8 +2293,13 @@ D255_RESTORE_CLOSURE_DECISION AI_PM_REVIEW_REQUIRED
 D255_FINGER_INTERACTION_ALLOWED false
 D255_READY_FOR_AI_PM_REVIEW true
 D255_READY_FOR_OPERATOR_RUN false
-D255_LIVE_EXECUTION NOT_PERFORMED
+D255_LIVE_PATH_ATTEMPT FAILED_PREAUTHORIZATION
+D255_LIVE_CAPTURE NOT_PERFORMED
 D255_HARDWARE_BOUNDARY NOT_AUTHORIZED
+D255_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED false
+D255_EMPTY_OEM_LOG_CANDIDATES_SUPPORTED true
+D255_EMPTY_ARRAY_CLASS_AUDIT PASS
+D255_SHARED_PREAUTHORIZATION_SIMULATION NATIVE_WINDOWS_PENDING
 D255_BOOTSTRAP_CLOSED false
 D255_RESTORE_CLOSED false
 ```
@@ -2313,11 +2399,14 @@ postprocessor GPL offline con fixture. La prima versione è stata respinta in
 review; la prima correzione chiude staticamente API PS5.1 e correlazione MMDD.
 La seconda review ha respinto l'assunzione recognition sulla VM non enrolled;
 la correzione corrente aggiunge boundary VM/cold-attach single-shot, setup UI
-zero-finger e invalidazione wire di ogni interazione. Non ha avviato Windows,
-VM, TShark, USB, TLS o comandi Goodix reali. Ha usato solo fixture sintetiche e
-audit offline. Il bundle non contiene raw USB, WBDI, cache, OTP, PSK, firmware,
-DLL o biometria. Una review positiva del kit non consuma né sostituisce la
-futura autorizzazione operatore e non equivale a `READY_FOR_OPERATOR_RUN`.
+zero-finger e invalidazione wire di ogni interazione. Il successivo tentativo
+operatore nel guest Windows si è fermato sul binding dell'array OEM vuoto prima
+di autorizzazione, TShark e attach. La correzione attuale è stata sviluppata
+solo offline e non ha usato VM, TShark, USB, TLS o comandi Goodix reali; ha
+usato solo fixture sintetiche e audit offline. Il bundle non contiene raw USB,
+WBDI, cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del kit
+non consuma né sostituisce la futura autorizzazione operatore e non equivale a
+`READY_FOR_OPERATOR_RUN`.
 
 ## Regole operative
 

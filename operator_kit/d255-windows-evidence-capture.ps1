@@ -4,6 +4,7 @@
 param(
     [switch]$SelfTestOnly,
     [switch]$PreflightOnly,
+    [switch]$PreAuthorizationSimulationOnly,
     [Parameter(Mandatory = $true)][string]$OutputRoot,
     [string]$TsharkPath = "",
     [string[]]$CaptureInterface = @(),
@@ -14,7 +15,8 @@ param(
     [string]$VmGuestReadyConfirmation = "",
     [string]$AccountPrerequisiteConfirmation = "",
     [string]$WindowsHelloPinState = "",
-    [string]$FingerprintSetupPinRequirement = ""
+    [string]$FingerprintSetupPinRequirement = "",
+    [ValidateSet("ABSENT", "PRESENT")][string]$SimulationOemLogState = "ABSENT"
 )
 
 Set-StrictMode -Version Latest
@@ -97,6 +99,19 @@ function Get-D255AvailabilityStatus {
     param([Parameter(Mandatory = $true)][int]$SourceCount)
     if ($SourceCount -gt 0) { return "PRESENT" }
     return "ABSENT"
+}
+
+function Write-D255JsonArray {
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Rows,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+    if ($Rows.Count -eq 0) {
+        Set-Content -LiteralPath $Path -Encoding UTF8 -Value "[]"
+        return
+    }
+    ConvertTo-Json -InputObject $Rows -Depth 5 |
+        Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
 function Get-D255RuntimeInfo {
@@ -241,7 +256,7 @@ function Resolve-CacheRoots {
 }
 
 function Get-TargetedFiles {
-    param([string[]]$Roots)
+    param([AllowEmptyCollection()][string[]]$Roots = @())
     $files = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
     foreach ($root in $Roots) {
         if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
@@ -273,7 +288,7 @@ function Resolve-OemLogCandidates {
 function Write-FileSnapshot {
     param(
         [Parameter(Mandatory = $true)][string]$Stage,
-        [Parameter(Mandatory = $true)][string[]]$Roots,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Roots,
         [Parameter(Mandatory = $true)][string]$RawDirectory
     )
     $copyDirectory = Join-Path $RawDirectory "cache_$Stage"
@@ -303,15 +318,14 @@ function Write-FileSnapshot {
         })
     }
     $snapshotPath = Join-Path $script:RunDirectory "cache_${Stage}_metadata.json"
-    ConvertTo-Json -InputObject @($rows) -Depth 5 |
-        Set-Content -LiteralPath $snapshotPath -Encoding UTF8
+    Write-D255JsonArray -Rows @($rows) -Path $snapshotPath
     return $snapshotPath
 }
 
 function Write-OemLogSnapshot {
     param(
         [Parameter(Mandatory = $true)][string]$Stage,
-        [Parameter(Mandatory = $true)][string[]]$Candidates,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Candidates,
         [Parameter(Mandatory = $true)][string]$RawDirectory
     )
     $logDirectory = Join-Path $RawDirectory "oem_logs_$Stage"
@@ -345,9 +359,131 @@ function Write-OemLogSnapshot {
         $rows.Add($row)
     }
     $metadataPath = Join-Path $script:RunDirectory "oem_logs_${Stage}_metadata.json"
-    ConvertTo-Json -InputObject @($rows) -Depth 5 |
-        Set-Content -LiteralPath $metadataPath -Encoding UTF8
+    Write-D255JsonArray -Rows @($rows) -Path $metadataPath
     return $metadataPath
+}
+
+function Invoke-D255PreAuthorizationEvidenceSetup {
+    param(
+        [Parameter(Mandatory = $true)][System.Collections.IDictionary]$Preflight,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$OemLogCandidates,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$CacheRoots,
+        [Parameter(Mandatory = $true)][string]$RawDirectory,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$CaptureInterfaces,
+        [Parameter(Mandatory = $true)][int]$DurationSeconds
+    )
+    if ($CaptureInterfaces.Count -eq 0) {
+        Fail-D255 "pre-authorization setup requires at least one capture interface"
+    }
+    Write-OemLogSnapshot -Stage "before" -Candidates $OemLogCandidates -RawDirectory $RawDirectory | Out-Null
+    Write-FileSnapshot -Stage "before" -Roots $CacheRoots -RawDirectory $RawDirectory | Out-Null
+    $Preflight["runtime"] = Get-D255RuntimeInfo
+    $Preflight | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory "preflight.json") -Encoding UTF8
+    Write-OperatorMarker -Event "ACCOUNT_PREREQUISITES_CHECKED" -Detail "Sign-in options accessible; PIN state=$WindowsHelloPinState; no PIN change"
+    $capturePath = Join-Path $RawDirectory "wire.pcapng"
+    $captureSelectors = @($CaptureInterfaces | ForEach-Object { "-i `"$_`"" }) -join " "
+    return [ordered]@{
+        capture_path = $capturePath
+        capture_arguments = "$captureSelectors -a duration:$DurationSeconds -q -w `"$capturePath`""
+    }
+}
+
+function Invoke-D255PreAuthorizationSimulation {
+    if (-not [string]::IsNullOrWhiteSpace($Authorization)) {
+        Fail-D255 "authorization must not be supplied to the offline pre-authorization simulation"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TsharkPath)) {
+        Fail-D255 "TsharkPath must not be supplied to the offline pre-authorization simulation"
+    }
+    if ($CaptureInterface.Count -ne 0 -or $OemLogPath.Count -ne 0 -or $CacheRoot.Count -ne 0) {
+        Fail-D255 "real capture interfaces and evidence paths are forbidden in the offline pre-authorization simulation"
+    }
+    New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
+    $simulationId = "D255_PREAUTH_SIM_{0}" -f ([Guid]::NewGuid().ToString("N"))
+    $script:RunDirectory = Join-Path $OutputRoot $simulationId
+    if (-not (Test-D255PathAvailable -Path $script:RunDirectory)) {
+        Fail-D255 "pre-authorization simulation output collision"
+    }
+    New-Item -ItemType Directory -Path $script:RunDirectory -ErrorAction Stop | Out-Null
+    $rawDirectory = Join-Path $script:RunDirectory "raw"
+    New-Item -ItemType Directory -Path $rawDirectory -ErrorAction Stop | Out-Null
+    $script:MarkerPath = Join-Path $script:RunDirectory "operator_markers.tsv"
+    Set-Content -LiteralPath $script:MarkerPath -Encoding UTF8 -Value "timestamp_utc`tevent`tdetail"
+
+    $fixtureRoot = Join-Path $script:RunDirectory "synthetic_input"
+    New-Item -ItemType Directory -Path $fixtureRoot -ErrorAction Stop | Out-Null
+    Set-Content -LiteralPath (Join-Path $fixtureRoot "Goodix_Cache.bin") -Encoding ASCII -Value "D255 synthetic cache fixture; no device data"
+    $oemLogCandidates = @()
+    if ($SimulationOemLogState -ceq "PRESENT") {
+        $fixtureLog = Join-Path $fixtureRoot "goodix-synthetic.log"
+        Set-Content -LiteralPath $fixtureLog -Encoding ASCII -Value "D255 synthetic OEM log fixture; no device data"
+        $oemLogCandidates = @($fixtureLog)
+    }
+    $cacheRoots = @($fixtureRoot)
+    $cacheCandidates = @(Get-TargetedFiles -Roots $cacheRoots)
+    $preflight = [ordered]@{
+        schema = "D255_WINDOWS_PREAUTH_SIMULATION_V1"
+        result = "PASS"
+        oem_log_source_count = $oemLogCandidates.Count
+        oem_log_status = Get-D255AvailabilityStatus -SourceCount $oemLogCandidates.Count
+        goodix_cache_source_count = $cacheCandidates.Count
+        goodix_cache_status = Get-D255AvailabilityStatus -SourceCount $cacheCandidates.Count
+        runtime = $null
+        authorization_required_for_live_capture = $true
+        authorization_consumed = $false
+        real_capture_started = $false
+        real_usb_open_count = 0
+        real_hardware_action_count = 0
+    }
+    $setup = Invoke-D255PreAuthorizationEvidenceSetup `
+        -Preflight $preflight `
+        -OemLogCandidates $oemLogCandidates `
+        -CacheRoots $cacheRoots `
+        -RawDirectory $rawDirectory `
+        -CaptureInterfaces @("USBPcap_SIMULATED") `
+        -DurationSeconds $CaptureDurationSeconds
+    Write-FileSnapshot -Stage "empty_roots_audit" -Roots @() -RawDirectory $rawDirectory | Out-Null
+
+    $oemMetadata = Get-Content -LiteralPath (Join-Path $script:RunDirectory "oem_logs_before_metadata.json") -Raw
+    if ($SimulationOemLogState -ceq "ABSENT" -and $oemMetadata.Trim() -cne "[]") {
+        Fail-D255 "empty OEM-log simulation did not serialize an empty JSON array"
+    }
+    if ($SimulationOemLogState -ceq "PRESENT" -and
+        -not (Test-Path -LiteralPath (Join-Path $rawDirectory "oem_logs_before\oem_000.log") -PathType Leaf)) {
+        Fail-D255 "present OEM-log simulation did not snapshot the synthetic log"
+    }
+    if ($cacheCandidates.Count -ne 1 -or
+        -not (Test-Path -LiteralPath (Join-Path $script:RunDirectory "cache_before_metadata.json") -PathType Leaf)) {
+        Fail-D255 "pre-authorization simulation did not snapshot the synthetic cache"
+    }
+    $emptyCacheMetadata = Get-Content -LiteralPath (Join-Path $script:RunDirectory "cache_empty_roots_audit_metadata.json") -Raw
+    if ($emptyCacheMetadata.Trim() -cne "[]" -or @(Get-TargetedFiles -Roots @()).Count -ne 0) {
+        Fail-D255 "empty cache-root collection did not produce an empty snapshot"
+    }
+    if ($script:AuthorizationConsumed -or $null -ne $script:CaptureProcess -or
+        (Test-Path -LiteralPath $setup.capture_path -PathType Leaf)) {
+        Fail-D255 "pre-authorization simulation crossed the authorization/capture boundary"
+    }
+    [ordered]@{
+        schema = "D255_WINDOWS_PREAUTH_SIMULATION_RESULT_V1"
+        result = "PASS"
+        oem_log_state = $SimulationOemLogState
+        shared_setup_function = "Invoke-D255PreAuthorizationEvidenceSetup"
+        authorization_consumed = $false
+        real_capture_started = $false
+        real_usb_open_count = 0
+        real_hardware_action_count = 0
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $script:RunDirectory "preauthorization_simulation_result.json") -Encoding UTF8
+    if ($SimulationOemLogState -ceq "ABSENT") {
+        Write-Output "EMPTY_OEM_LOG_CANDIDATES_BINDING=PASS"
+    } else {
+        Write-Output "PRESENT_OEM_LOG_SNAPSHOT=PASS"
+    }
+    Write-Output "AUTHORIZATION_CONSUMED=false"
+    Write-Output "REAL_CAPTURE_STARTED=false"
+    Write-Output "REAL_USB_OPEN_COUNT=0"
+    Write-Output "REAL_HARDWARE_ACTION_COUNT=0"
+    Write-Output "EMPTY_CACHE_ROOTS_BINDING=PASS"
 }
 
 function Write-Manifest {
@@ -450,11 +586,19 @@ function Invoke-D255SelfTest {
     Write-Output "D255_AUTHORIZATION_CONSUMED=false"
 }
 
-if ($SelfTestOnly -and $PreflightOnly) {
-    Fail-D255 "SelfTestOnly and PreflightOnly are mutually exclusive"
+$selectedModeCount = 0
+if ($SelfTestOnly) { $selectedModeCount += 1 }
+if ($PreflightOnly) { $selectedModeCount += 1 }
+if ($PreAuthorizationSimulationOnly) { $selectedModeCount += 1 }
+if ($selectedModeCount -gt 1) {
+    Fail-D255 "SelfTestOnly, PreflightOnly and PreAuthorizationSimulationOnly are mutually exclusive"
 }
 if ($SelfTestOnly) {
     Invoke-D255SelfTest
+    exit 0
+}
+if ($PreAuthorizationSimulationOnly) {
+    Invoke-D255PreAuthorizationSimulation
     exit 0
 }
 
@@ -600,14 +744,15 @@ Write-OperatorMarker -Event "CLOCK_ANCHOR" -Detail "local offset and Windows tim
 Write-OperatorMarker -Event "VM_GUEST_READY" -Detail "VM already running; target absent from guest"
 Write-GuestTopologySnapshot -Stage "before_attach"
 Write-OperatorMarker -Event "GUEST_TOPOLOGY_BEFORE" -Detail "read-only PnP snapshot; 27c6:5125 absent"
-Write-OemLogSnapshot -Stage "before" -Candidates $oemLogCandidates -RawDirectory $rawDirectory | Out-Null
-Write-FileSnapshot -Stage "before" -Roots $cacheRoots -RawDirectory $rawDirectory | Out-Null
-$preflight["runtime"] = Get-D255RuntimeInfo
-$preflight | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory "preflight.json") -Encoding UTF8
-Write-OperatorMarker -Event "ACCOUNT_PREREQUISITES_CHECKED" -Detail "Sign-in options accessible; PIN state=$WindowsHelloPinState; no PIN change"
-$capturePath = Join-Path $rawDirectory "wire.pcapng"
-$captureSelectors = @($CaptureInterface | ForEach-Object { "-i `"$_`"" }) -join " "
-$captureArguments = "$captureSelectors -a duration:$CaptureDurationSeconds -q -w `"$capturePath`""
+$preAuthorizationSetup = Invoke-D255PreAuthorizationEvidenceSetup `
+    -Preflight $preflight `
+    -OemLogCandidates $oemLogCandidates `
+    -CacheRoots $cacheRoots `
+    -RawDirectory $rawDirectory `
+    -CaptureInterfaces $CaptureInterface `
+    -DurationSeconds $CaptureDurationSeconds
+$capturePath = $preAuthorizationSetup.capture_path
+$captureArguments = $preAuthorizationSetup.capture_arguments
 
 if ($Authorization -cne $ExpectedAuthorization) {
     Fail-D255 "exact one-run authorization string missing or wrong"

@@ -2,8 +2,9 @@
 
 ## Stato e limiti di autorità
 
-D255 ha preparato e testato questo kit esclusivamente offline. Non ha avviato una VM, aperto USB,
-eseguito software Windows/OEM, avviato TShark o usato un dito. La review AI-PM non equivale
+D255 ha preparato e testato offline la correzione corrente. Una precedente
+invocazione dell'operatore si è fermata sul binding PowerShell di un array vuoto
+prima di autorizzazione, TShark, attach USB o qualunque azione hardware. La review AI-PM non equivale
 all'autorizzazione dell'operatore e, al momento, nessuna esecuzione è autorizzata.
 
 ```text
@@ -112,7 +113,7 @@ non mostri alcun dispositivo con:
 VID_27C6&PID_5125
 ```
 
-## Self-test e preflight nel guest
+## Self-test, simulazione del ramo condiviso e preflight nel guest
 
 Per prima cosa eseguire il self-test, che non usa hardware:
 
@@ -132,6 +133,32 @@ con:
 
 - hardware action count uguale a zero;
 - autorizzazione non consumata.
+
+Prima di qualunque preflight reale o autorizzazione, percorrere il setup
+condiviso del ramo live usando soltanto file sintetici:
+
+```powershell
+& "C:\path\d255-windows-evidence-capture.ps1" `
+  -PreAuthorizationSimulationOnly `
+  -OutputRoot "D:\Goodix-D255-Preauth-Simulation" `
+  -SimulationOemLogState "ABSENT"
+```
+
+Risultato atteso:
+
+```text
+EMPTY_OEM_LOG_CANDIDATES_BINDING=PASS
+EMPTY_CACHE_ROOTS_BINDING=PASS
+AUTHORIZATION_CONSUMED=false
+REAL_CAPTURE_STARTED=false
+REAL_USB_OPEN_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+```
+
+Ripetere con `-SimulationOemLogState "PRESENT"`; il risultato specifico atteso
+è `PRESENT_OEM_LOG_SNAPSHOT=PASS`. Questa modalità rifiuta stringa di
+autorizzazione, path TShark, interfacce di cattura e path log/cache reali, e
+chiama la stessa funzione di snapshot usata dal ramo live.
 
 Successivamente aprire:
 
