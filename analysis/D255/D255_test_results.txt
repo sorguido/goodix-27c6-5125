@@ -1,6 +1,6 @@
-D255 EMPTY ARRAY LIVE PATH CORRECTIVE OFFLINE VERIFICATION RESULTS
+D255 TSHARK PRE-ATTACH READINESS CORRECTIVE OFFLINE VERIFICATION RESULTS
 Date: 2026-08-22 Europe/Rome
-Corrective initial HEAD: 74a1ebda24166ac026ef7ed55c15f0d21e4593e3
+Corrective initial HEAD: 999483362af23f67790eb6e54f4c02bb48bd6cd5
 Execution mode: OFFLINE_PREPARATION_ONLY
 
 1. Python compilation
@@ -25,7 +25,7 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    Command:
      python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
    Result: PASS
-   Tests run: 50
+   Tests run: 54
    Failures: 0
    Errors: 0
 
@@ -54,6 +54,17 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    - full re-entry plus ACKed new arm proves re-entry but never FDT disarm or
      RESTORE_CLOSED;
    - authorization ordering retains interface/account/path/runtime gates.
+   - live TShark plus missing pre-attach pcapng is accepted by the readiness
+     state contract;
+   - live TShark plus zero-byte pre-attach pcapng is accepted by the readiness
+     state contract;
+   - an exited TShark process remains fail-closed;
+   - Goodix presence before the authorized attach remains fail-closed;
+   - pcapng materialization is required after attach/passive bootstrap;
+   - final capture validation still requires exit zero, file present/nonempty
+     and at least one readable frame;
+   - TShark failures include redacted command/output state and captured
+     stdout/stderr diagnostics.
 
    Existing coverage retained:
    - guest-before absence, guest-after presence, capture-before-attach and one
@@ -93,9 +104,12 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    -SelfTestOnly: IMPLEMENTED_NOT_EXECUTED
    pre-correction VM self-test reported by operator: PASS
    corrected -SelfTestOnly/-PreflightOnly: NOT_EXECUTED_ON_NATIVE_WINDOWS
+   D255_CAPTURE_READINESS_SELFTEST: IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS
    -PreAuthorizationSimulationOnly ABSENT/PRESENT: IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS
    shared live-path setup and authorization ordering: PASS_STATIC_CONTRACT
    empty-array binding/JSON contract: PASS_STATIC_AND_SYNTHETIC_CONTRACT
+   TShark pre-attach process-only readiness: PASS_STATIC_AND_SYNTHETIC_CONTRACT
+   real Windows TShark delayed-file behavior after correction: NOT_EXECUTED
    -SelfTestOnly hardware action count by construction: 0
 
 8. Structured output and patch hygiene
@@ -105,6 +119,7 @@ Execution mode: OFFLINE_PREPARATION_ONLY
    bundle manifest/ZIP/checksum: verified after final regeneration
 
 Safety counters for every D255 corrective command:
+REAL_CAPTURE_COUNT=0
 REAL_WINDOWS_CAPTURE_COUNT=0
 REAL_USB_OPEN_COUNT=0
 REAL_TLS_HANDSHAKE_COUNT=0
@@ -113,6 +128,7 @@ REAL_AF_SEND_COUNT=0
 REAL_FDT_SEND_COUNT=0
 REAL_IMAGE_COMMAND_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
 REAL_PERSISTENT_WRITE_FAMILY_COUNT=0
 
 No sudo, VM start, Windows OEM execution, TShark live capture, local USB/libusb,

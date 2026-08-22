@@ -36,6 +36,10 @@ $script:AuthorizationConsumed = $false
 $script:RunDirectory = $null
 $script:MarkerPath = $null
 $script:CaptureProcess = $null
+$script:CapturePath = $null
+$script:CaptureArgumentsRedacted = $null
+$script:CaptureStdoutPath = $null
+$script:CaptureStderrPath = $null
 
 function Fail-D255 {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -155,9 +159,100 @@ function New-D255ClockAnchor {
     }
 }
 
+function Test-D255PreAttachReadinessState {
+    param(
+        [Parameter(Mandatory = $true)][bool]$ProcessAlive,
+        [Parameter(Mandatory = $true)][int]$GuestTargetCount
+    )
+    return ($ProcessAlive -and $GuestTargetCount -eq 0)
+}
+
+function Test-D255FinalCaptureValidationState {
+    param(
+        [Parameter(Mandatory = $true)][int]$TsharkExitCode,
+        [Parameter(Mandatory = $true)][bool]$PcapngExists,
+        [Parameter(Mandatory = $true)][long]$PcapngLength,
+        [Parameter(Mandatory = $true)][int]$ReadableFrameCount
+    )
+    return ($TsharkExitCode -eq 0 -and $PcapngExists -and
+        $PcapngLength -gt 0 -and $ReadableFrameCount -ge 1)
+}
+
+function ConvertTo-D255RedactedDiagnosticText {
+    param([AllowEmptyString()][string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return "UNAVAILABLE" }
+    $redacted = $Value
+    $redactions = @(
+        [pscustomobject]@{ value = $script:RunDirectory; replacement = "<run-directory>" }
+        [pscustomobject]@{ value = $script:CapturePath; replacement = "<capture-output>" }
+        [pscustomobject]@{ value = $TsharkPath; replacement = "<tshark-executable>" }
+    )
+    foreach ($item in $redactions) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$item.value)) {
+            $redacted = $redacted.Replace([string]$item.value, [string]$item.replacement)
+        }
+    }
+    $redacted = ($redacted -replace "[\r\n\t]+", " ").Trim()
+    if ($redacted.Length -gt 1024) {
+        $redacted = $redacted.Substring($redacted.Length - 1024)
+    }
+    return $redacted
+}
+
+function Get-D255CaptureDiagnosticStream {
+    param([AllowEmptyString()][string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path) -or
+        -not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return "UNAVAILABLE"
+    }
+    try {
+        return ConvertTo-D255RedactedDiagnosticText -Value (Get-Content -LiteralPath $Path -Raw -ErrorAction Stop)
+    } catch {
+        return "UNREADABLE"
+    }
+}
+
+function Get-D255CaptureOutputPathState {
+    if ([string]::IsNullOrWhiteSpace($script:CapturePath) -or
+        -not (Test-Path -LiteralPath $script:CapturePath -PathType Leaf)) {
+        return "exists=false,length=UNAVAILABLE"
+    }
+    try {
+        return "exists=true,length=$((Get-Item -LiteralPath $script:CapturePath -ErrorAction Stop).Length)"
+    } catch {
+        return "exists=true,length=UNREADABLE"
+    }
+}
+
+function Get-D255CaptureFailureDetail {
+    param([Parameter(Mandatory = $true)][string]$Reason)
+    $exitCode = "UNAVAILABLE"
+    $processState = "NOT_STARTED"
+    if ($null -ne $script:CaptureProcess) {
+        try { $script:CaptureProcess.Refresh() } catch { }
+        if ($script:CaptureProcess.HasExited) {
+            $processState = "EXITED"
+            try { $exitCode = [string]$script:CaptureProcess.ExitCode } catch { }
+        } else {
+            $processState = "RUNNING"
+        }
+    }
+    $reasonRedacted = ConvertTo-D255RedactedDiagnosticText -Value $Reason
+    $stdout = Get-D255CaptureDiagnosticStream -Path $script:CaptureStdoutPath
+    $stderr = Get-D255CaptureDiagnosticStream -Path $script:CaptureStderrPath
+    return ($reasonRedacted + "; process_state=$processState; exit_code=$exitCode; " +
+        "command_arguments=$script:CaptureArgumentsRedacted; output_path_state=$(Get-D255CaptureOutputPathState); " +
+        "stdout=$stdout; stderr=$stderr")
+}
+
+function Fail-D255Capture {
+    param([Parameter(Mandatory = $true)][string]$Reason)
+    Fail-D255 (Get-D255CaptureFailureDetail -Reason $Reason)
+}
+
 function Assert-CaptureActive {
     if ($null -eq $script:CaptureProcess -or $script:CaptureProcess.HasExited) {
-        Fail-D255 "capture duration elapsed or capture process failed before operator phases completed"
+        Fail-D255Capture "capture duration elapsed or capture process failed before operator phases completed"
     }
 }
 
@@ -559,6 +654,30 @@ function Invoke-D255SelfTest {
         (Get-D255AvailabilityStatus -SourceCount 1) -cne "PRESENT") {
         Fail-D255 "evidence source availability classification failed"
     }
+    $missingCapturePath = Join-Path $selfTestDirectory "missing.pcapng"
+    $zeroCapturePath = Join-Path $selfTestDirectory "zero.pcapng"
+    [System.IO.File]::WriteAllBytes($zeroCapturePath, [byte[]]@())
+    if ((Test-Path -LiteralPath $missingCapturePath) -or
+        -not (Test-D255PreAttachReadinessState -ProcessAlive $true -GuestTargetCount 0)) {
+        Fail-D255 "pre-attach readiness rejected a live process with a not-yet-created pcapng"
+    }
+    if (-not (Test-D255PreAttachReadinessState -ProcessAlive $true -GuestTargetCount 0) -or
+        -not (Test-Path -LiteralPath $zeroCapturePath -PathType Leaf) -or
+        (Get-Item -LiteralPath $zeroCapturePath).Length -ne 0) {
+        Fail-D255 "pre-attach readiness rejected a live process with a zero-byte pcapng"
+    }
+    if (Test-D255PreAttachReadinessState -ProcessAlive $false -GuestTargetCount 0) {
+        Fail-D255 "pre-attach readiness accepted an exited capture process"
+    }
+    if (Test-D255PreAttachReadinessState -ProcessAlive $true -GuestTargetCount 1) {
+        Fail-D255 "pre-attach readiness accepted a target already present in the guest"
+    }
+    if ((Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $false -PcapngLength 0 -ReadableFrameCount 0) -or
+        (Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $true -PcapngLength 0 -ReadableFrameCount 0) -or
+        (Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 0) -or
+        -not (Test-D255FinalCaptureValidationState -TsharkExitCode 0 -PcapngExists $true -PcapngLength 1 -ReadableFrameCount 1)) {
+        Fail-D255 "final capture validation state contract failed"
+    }
     $clockPath = Join-Path $selfTestDirectory "run_clock.json"
     $clock = New-D255ClockAnchor -Phase "SELFTEST"
     $clock | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockPath -Encoding UTF8
@@ -579,9 +698,15 @@ function Invoke-D255SelfTest {
         json_serialization = "PASS"
         output_collision_semantics = "PASS"
         evidence_source_availability_semantics = "PASS"
+        capture_preattach_process_only_readiness = "PASS"
+        capture_missing_file_before_attach_allowed = -not (Test-Path -LiteralPath $missingCapturePath)
+        capture_zero_byte_file_before_attach_allowed = $true
+        capture_exited_process_before_attach_rejected = $true
+        final_capture_validation_contract = "PASS"
         hardware_action_count = 0
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $selfTestDirectory "selftest_result.json") -Encoding UTF8
     Write-Output "D255_POWERSHELL_SELFTEST=PASS"
+    Write-Output "D255_CAPTURE_READINESS_SELFTEST=PASS"
     Write-Output "D255_HARDWARE_ACTION_COUNT=0"
     Write-Output "D255_AUTHORIZATION_CONSUMED=false"
 }
@@ -753,6 +878,10 @@ $preAuthorizationSetup = Invoke-D255PreAuthorizationEvidenceSetup `
     -DurationSeconds $CaptureDurationSeconds
 $capturePath = $preAuthorizationSetup.capture_path
 $captureArguments = $preAuthorizationSetup.capture_arguments
+$script:CapturePath = $capturePath
+$script:CaptureArgumentsRedacted = "tshark <configured-executable> -i <configured-interface>x$($CaptureInterface.Count) -a duration:$CaptureDurationSeconds -q -w <capture-output>"
+$script:CaptureStdoutPath = Join-Path $script:RunDirectory "tshark_stdout.txt"
+$script:CaptureStderrPath = Join-Path $script:RunDirectory "tshark_stderr.txt"
 
 if ($Authorization -cne $ExpectedAuthorization) {
     Fail-D255 "exact one-run authorization string missing or wrong"
@@ -768,13 +897,25 @@ $script:AuthorizationConsumed = $true
 Write-OperatorMarker -Event "AUTHORIZATION_CONSUMED" -Detail "one run only; pre-hardware setup complete"
 
 try {
-    $script:CaptureProcess = Start-Process -FilePath $TsharkPath -ArgumentList $captureArguments -PassThru -NoNewWindow
-    Start-Sleep -Seconds 2
-    Assert-CaptureActive
-    if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) {
-        Fail-D255 "capture process is alive but output file was not created"
+    try {
+        $script:CaptureProcess = Start-Process -FilePath $TsharkPath -ArgumentList $captureArguments `
+            -PassThru -NoNewWindow -RedirectStandardOutput $script:CaptureStdoutPath `
+            -RedirectStandardError $script:CaptureStderrPath
+    } catch {
+        Fail-D255Capture "capture process failed to start: $($_.Exception.Message)"
     }
-    Write-OperatorMarker -Event "CAPTURE_STARTED" -Detail "USBPcap active and output created before VM USB attach"
+    Start-Sleep -Seconds 2
+    $captureAlive = ($null -ne $script:CaptureProcess -and -not $script:CaptureProcess.HasExited)
+    $preAttachTargets = @(Get-TargetDevices)
+    if (-not (Test-D255PreAttachReadinessState `
+        -ProcessAlive $captureAlive -GuestTargetCount $preAttachTargets.Count)) {
+        if (-not $captureAlive) {
+            Fail-D255Capture "capture process exited during the pre-attach grace period"
+        }
+        Fail-D255Capture "target appeared in the guest before the authorized manual attach"
+    }
+    Write-OperatorMarker -Event "CAPTURE_PROCESS_STARTED" -Detail "TShark process active; target absent; pcapng materialization and frames not asserted"
+    Write-OperatorMarker -Event "CAPTURE_STARTED" -Detail "compatibility marker: TShark process active before attach; pcapng existence/nonempty state not asserted"
 
     Write-OperatorMarker -Event "VM_USB_ATTACH_BEGIN" -Detail "single operator GUI action follows"
     Read-Host "Perform the single manual Goodix host-to-VM GUI attach now. Do not detach or re-attach. Press Enter after the GUI action completes"
@@ -794,6 +935,10 @@ try {
     Read-Host "Keep hands away from the sensor and wait for passive OEM initialization to settle. Press Enter only after the passive bootstrap has settled"
     Assert-CaptureActive
     Assert-SingleGuestTarget | Out-Null
+    if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) {
+        Fail-D255Capture "capture output was not materialized after attach and passive bootstrap"
+    }
+    Write-OperatorMarker -Event "CAPTURE_OUTPUT_MATERIALIZED" -Detail "pcapng exists after attach; nonempty/readable validation remains final"
     Write-OperatorMarker -Event "PASSIVE_BOOTSTRAP_SETTLED" -Detail "operator-observed passive settle; A8 proof remains wire-derived"
     Write-OperatorMarker -Event "HELLO_SETUP_UI_CHECK_BEGIN" -Detail "post-attach sensor-dependent UI check"
     Write-Output "Open Settings > Accounts > Sign-in options > Fingerprint recognition (Windows Hello) > Set up/Add a fingerprint. Never touch the sensor or create/change a PIN."
@@ -801,7 +946,7 @@ try {
     if ($helloUiResult -ceq "READY_WAITING_FOR_FINGER") {
         Assert-CaptureActive
     } elseif ($script:CaptureProcess.HasExited -and $script:CaptureProcess.ExitCode -ne 0) {
-        Fail-D255 "partial bootstrap capture process failed before UI classification"
+        Fail-D255Capture "partial bootstrap capture process failed before UI classification"
     }
     Assert-SingleGuestTarget | Out-Null
     $runResult = "FULL_ZERO_FINGER_CANCEL_REENTRY"
@@ -842,14 +987,20 @@ try {
     }
     Write-OperatorMarker -Event "OPERATOR_PHASES_COMPLETE"
     Wait-Process -Id $script:CaptureProcess.Id
-    if ($script:CaptureProcess.ExitCode -ne 0) { Fail-D255 "capture process failed" }
+    $script:CaptureProcess.Refresh()
+    if ($script:CaptureProcess.ExitCode -ne 0) { Fail-D255Capture "capture process failed at the duration boundary" }
     Write-OperatorMarker -Event "CAPTURE_STOPPED" -Detail "duration boundary reached"
 
-    if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) { Fail-D255 "capture output missing" }
-    if ((Get-Item -LiteralPath $capturePath).Length -le 0) { Fail-D255 "capture output empty" }
+    if (-not (Test-Path -LiteralPath $capturePath -PathType Leaf)) { Fail-D255Capture "capture output missing at final validation" }
+    $captureLength = (Get-Item -LiteralPath $capturePath).Length
+    if ($captureLength -le 0) { Fail-D255Capture "capture output empty at final validation" }
     $captureValidation = @(& $TsharkPath -r $capturePath -c 1 -T fields -e frame.number 2>&1)
-    if ($LASTEXITCODE -ne 0 -or -not ($captureValidation -contains "1")) {
-        Fail-D255 "capture output is not a readable nonempty pcapng"
+    $readableFrameCount = if ($captureValidation -contains "1") { 1 } else { 0 }
+    if (-not (Test-D255FinalCaptureValidationState `
+        -TsharkExitCode $script:CaptureProcess.ExitCode `
+        -PcapngExists $true -PcapngLength $captureLength `
+        -ReadableFrameCount $readableFrameCount) -or $LASTEXITCODE -ne 0) {
+        Fail-D255Capture "capture output is not a readable nonempty pcapng with at least one frame"
     }
     $clockEndPath = Join-Path $script:RunDirectory "run_clock_end.json"
     New-D255ClockAnchor -Phase "AFTER_CAPTURE" | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $clockEndPath -Encoding UTF8

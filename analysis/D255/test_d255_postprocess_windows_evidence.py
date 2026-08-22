@@ -397,6 +397,73 @@ class D255PostprocessorTests(unittest.TestCase):
         self.assertIsNotNone(confirmation)
         self.assertNotRegex(confirmation.group(1), r"(?i)finger|sensor|wizard|setup.*path")
 
+    def test_powershell_preattach_capture_readiness_allows_missing_or_empty_file(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        readiness = source[source.index("function Test-D255PreAttachReadinessState"):
+                           source.index("function Test-D255FinalCaptureValidationState")]
+        self.assertIn("$ProcessAlive -and $GuestTargetCount -eq 0", readiness)
+        self.assertNotRegex(readiness, r"(?i)Test-Path|Get-Item|Length|pcap")
+
+        live_gate = source[source.index("Start-Sleep -Seconds 2"):
+                           source.index('Write-OperatorMarker -Event "VM_USB_ATTACH_BEGIN"')]
+        self.assertIn("$preAttachTargets = @(Get-TargetDevices)", live_gate)
+        self.assertIn("Test-D255PreAttachReadinessState", live_gate)
+        self.assertIn('Fail-D255Capture "capture process exited during the pre-attach grace period"',
+                      live_gate)
+        self.assertNotRegex(live_gate, r"(?i)Test-Path|Get-Item|\.Length")
+        self.assertIn('Write-OperatorMarker -Event "CAPTURE_PROCESS_STARTED"', live_gate)
+        self.assertIn("pcapng existence/nonempty state not asserted", live_gate)
+
+    def test_powershell_selftest_covers_preattach_readiness_states_offline(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        selftest = source[source.index("function Invoke-D255SelfTest"):
+                          source.index("$selectedModeCount = 0")]
+        for token in (
+                "missing.pcapng",
+                "zero.pcapng",
+                "-ProcessAlive $true -GuestTargetCount 0",
+                "-ProcessAlive $false -GuestTargetCount 0",
+                "-ProcessAlive $true -GuestTargetCount 1",
+                "D255_CAPTURE_READINESS_SELFTEST=PASS"):
+            self.assertIn(token, selftest)
+        self.assertIn("hardware_action_count = 0", selftest)
+
+    def test_powershell_postattach_materialization_and_final_validation_remain_strong(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        materialization = source.index(
+            'Fail-D255Capture "capture output was not materialized after attach and passive bootstrap"')
+        attach_end = source.index('Write-OperatorMarker -Event "VM_USB_ATTACH_END"')
+        passive_settle = source.index('Write-OperatorMarker -Event "PASSIVE_BOOTSTRAP_SETTLED"')
+        self.assertLess(attach_end, materialization)
+        self.assertLess(materialization, passive_settle)
+        self.assertIn('Write-OperatorMarker -Event "CAPTURE_OUTPUT_MATERIALIZED"', source)
+
+        final_state = source[source.index("function Test-D255FinalCaptureValidationState"):
+                             source.index("function ConvertTo-D255RedactedDiagnosticText")]
+        for token in ("$TsharkExitCode -eq 0", "$PcapngExists",
+                      "$PcapngLength -gt 0", "$ReadableFrameCount -ge 1"):
+            self.assertIn(token, final_state)
+        final_path = source[source.index("Wait-Process -Id $script:CaptureProcess.Id"):]
+        self.assertIn("Test-D255FinalCaptureValidationState", final_path)
+        self.assertIn("$captureValidation -contains \"1\"", final_path)
+        self.assertIn("D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION", final_path)
+        self.assertLess(final_path.index("Test-D255FinalCaptureValidationState"),
+                        final_path.index("D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION"))
+
+    def test_powershell_capture_failure_diagnostics_are_redacted_and_useful(self):
+        source = POWERSHELL_PATH.read_text(encoding="utf-8")
+        diagnostics = source[source.index("function ConvertTo-D255RedactedDiagnosticText"):
+                             source.index("function Assert-CaptureActive")]
+        for token in ("<run-directory>", "<capture-output>", "<tshark-executable>",
+                      "process_state=", "exit_code=", "command_arguments=",
+                      "output_path_state=", "stdout=", "stderr="):
+            self.assertIn(token, diagnostics)
+        start = source[source.index("$script:CaptureProcess = Start-Process"):
+                       source.index("Start-Sleep -Seconds 2")]
+        self.assertIn("-RedirectStandardOutput", start)
+        self.assertIn("-RedirectStandardError", start)
+        self.assertIn('Fail-D255Capture "capture process failed to start:', start)
+
     def test_powershell_pin_required_without_pin_fails_before_authorization(self):
         source = POWERSHELL_PATH.read_text(encoding="utf-8")
         pin_gate = source.index('$WindowsHelloPinState -ceq "NOT_CONFIGURED"')

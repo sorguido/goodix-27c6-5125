@@ -1,18 +1,22 @@
-# D255 empty-array live-path corrective report
+# D255 TShark pre-attach readiness corrective report
 
 ## Closure
 
 ```text
-OUTCOME=READY; EMPTY_ARRAY_LIVE_PATH_CORRECTIVE_PREPARED_FOR_AI_PM_REVIEW
+OUTCOME=READY_FOR_AI_PM_REVIEW; TSHARK_PREATTACH_FILE_RACE_CORRECTED_OFFLINE
 ADVANCEMENT=NON_HARDWARE_EXECUTABLE_CORRECTION; NO_NEW_DEVICE_EVIDENCE
-EXECUTABLE_CLOSURE=PASS_OFFLINE_STATIC_AND_SYNTHETIC; SHARED_PREAUTHORIZATION_SIMULATION_IMPLEMENTED; NATIVE_WINDOWS_EXECUTION_PENDING
-RESIDUAL_BLOCKER_OR_RISK=CORRECTED_POWERSHELL_AND_SHARED-PATH_SIMULATION_NOT_RERUN_IN_NATIVE_WINDOWS; NO_LIVE_CAPTURE_AUTHORIZED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_STATIC_AND_SYNTHETIC_CONTROL_FLOW; NATIVE_WINDOWS_SELFTEST_AND_TSHARK_BEHAVIOR_PENDING
+RESIDUAL_BLOCKER_OR_RISK=CORRECTED_LAUNCHER_NOT_RERUN_IN_NATIVE_WINDOWS; AI_PM_REVIEW_NEW_EXACT_BASELINE_AND_NEW_USER_AUTHORIZATION_REQUIRED_BEFORE_LIVE
 CANONICAL_DOCUMENTATION=UPDATED
 BUNDLE=analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip; SHA256=STEP_LOCAL_SIDECAR
-CORRECTIVE_INITIAL_HEAD=74a1ebda24166ac026ef7ed55c15f0d21e4593e3
+CORRECTIVE_INITIAL_HEAD=999483362af23f67790eb6e54f4c02bb48bd6cd5
 
-OBSERVED_WINDOWS_FAILURE=ParameterArgumentValidationErrorEmptyArrayNotAllowed
-FAILURE_BEFORE_AUTHORIZATION_CONSUMPTION=true
+OBSERVED_WINDOWS_FAILURE=D255_FAIL_CLOSED_CAPTURE_PROCESS_ALIVE_BUT_OUTPUT_FILE_NOT_CREATED
+AUTHORIZATION_CONSUMED=true
+GOODIX_ATTACHED_TO_VM=false
+TSHARK_PREATTACH_READINESS_SEMANTICS=PROCESS_STARTED_AND_ALIVE_TARGET_ABSENT; NO_FRAME_OR_VALID_PCAP_CLAIM
+PREATTACH_PCAP_FILE_REQUIRED=false
+FINAL_PCAP_VALIDATION_PRESERVED=true
 EMPTY_OEM_LOG_CANDIDATES_SUPPORTED=true
 EMPTY_ARRAY_CLASS_AUDIT=PASS
 REAL_USB_OPEN_COUNT=0
@@ -23,7 +27,9 @@ D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION=FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
-D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW; NATIVE_SHARED_PATH_SIMULATION_PENDING
+D255_PRIOR_LIVE_PATH_OBSERVATION=FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
+D255_LATEST_LIVE_PATH_OBSERVATION=FAIL_PREATTACH_PCAP_FILE_CREATION_RACE_AFTER_AUTHORIZATION
+D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW; NATIVE_WINDOWS_READINESS_SELFTEST_PENDING
 READY_FOR_AI_PM_REVIEW=true
 READY_FOR_OPERATOR_RUN=false
 ```
@@ -33,12 +39,47 @@ offline. No VM, Windows OEM component, TShark live capture, USB device, finger,
 enrollment, account mutation, PIN mutation, provisioning, firmware operation,
 PSK operation or persistent command was used.
 
-The prior operator invocation likewise stopped before attach, capture start
-and authorization consumption.
+The latest operator invocation stopped before attach and before any
+sensor-reaching action, but it did consume the one-run authorization and did
+start TShark. It therefore cannot be repeated under the consumed authorization.
+
+## Latest observed Windows failure: pre-attach pcapng race
+
+The single authorized run on baseline
+`999483362af23f67790eb6e54f4c02bb48bd6cd5` completed pre-hardware setup,
+recorded authorization consumption and started TShark on `USBPcap1`. After the
+fixed two-second grace period the TShark process was alive, but the launcher
+failed solely because `raw/wire.pcapng` did not yet exist:
+
+```text
+D255_FAIL_CLOSED: capture process is alive but output file was not created
+```
+
+Goodix was never attached to the Windows guest and no sensor-reaching action
+occurred. A later read-only check observed the zero-byte pcapng in the run
+directory with a last-write time several seconds after the premature gate.
+This is direct evidence of delayed host-side file materialization, not device
+or capture-process failure.
+
+The corrected pre-attach contract is now exactly: TShark was started, remains
+alive after the short grace period, and `27c6:5125` is still absent from the
+guest. `CAPTURE_PROCESS_STARTED` records that meaning; the retained
+`CAPTURE_STARTED` compatibility marker explicitly makes the same process-only
+claim. Neither marker claims that a file, frame or valid pcapng already exists.
+The launcher checks that the file has materialized after attach and passive
+bootstrap, then preserves the terminal requirements: capture process exit code
+zero, file present, file nonempty and TShark readback of at least one frame.
+Only after those terminal checks can it emit
+`D255_CAPTURE_RESULT=CAPTURED_PENDING_OFFLINE_VALIDATION`.
+
+TShark stdout and stderr are redirected to run-local diagnostic files. Capture
+failures now report process state, exit code when available, a redacted
+command/argument summary, output-path state and redacted bounded stdout/stderr.
+No dependency was added.
 
 ## Observed Windows failure and control-flow proof
 
-The operator-authorized invocation on baseline
+The earlier operator invocation on baseline
 `74a1ebda24166ac026ef7ed55c15f0d21e4593e3` reached the live-only
 pre-authorization setup after the passing self-test and preflight. With
 `OEM_LOG_SOURCE_COUNT=0`, PowerShell rejected the mandatory `Candidates`
@@ -49,13 +90,14 @@ ParameterBindingValidationException
 ParameterArgumentValidationErrorEmptyArrayNotAllowed
 ```
 
-The source order proves that this happened before authorization consumption:
+The source order proves that the earlier failure happened before authorization consumption:
 the before-log/cache snapshots and shared setup call precede the exact
 authorization comparison; `$script:AuthorizationConsumed = $true`,
 `authorization_consumed.json` and `Start-Process` follow it. Consequently the
-failed invocation performed no attach, opened no USB device, started no real
-capture and did not consume the one-run authorization. A future real run still
-requires a new explicit user authorization after AI-PM review.
+earlier failed invocation performed no attach, opened no USB device, started no
+real capture and did not consume that one-run authorization. This historical
+state is distinct from the latest, consumed TShark race failure described
+above.
 
 ## Empty-array class correction and audit
 
@@ -80,10 +122,14 @@ error.
 
 No additional pre-authorization gate was removed. Guest absence/topology,
 USBPcap closure, account/PIN policy, explicit-path readability, runtime,
-output collision/free space, exact authorization and capture activation each
+output collision/free space, exact authorization and capture-process liveness each
 protect device safety, evidence provenance or executable closure. The prior
 mandatory OEM-log existence requirement was the ceremonial gate and remains
-removed; this correction does not reintroduce it.
+removed. The only post-start gate removed is the requirement that the capture
+file be created within two seconds; it protected no device-side condition.
+The other local timing gates are retained: the bounded duration constrains the
+capture and the 30-second post-attach PnP deadline checks actual target
+enumeration rather than host file buffering.
 
 ## Shared live-path pre-authorization simulation
 
@@ -158,7 +204,7 @@ after USBPcap interface closure, and all explicitly configured path, disk and
 runtime gates still precede exact authorization and TShark start. Optional
 log/cache availability is reported rather than used as a gate.
 
-After capture start, one manual attach and guest PnP proof, the postprocessor
+After capture-process readiness, one manual attach and guest PnP proof, the postprocessor
 requires exact target A8 APP12509 before the passive-bootstrap marker. Only
 then does the launcher open a structured four-choice UI gate:
 
@@ -239,21 +285,30 @@ WBDI_MMDD_CANCEL_CORRELATION_TEST=PASS
 OEM_LOG_ROTATION_TESTS=PASS
 ```
 
-The dedicated D255 suite passes 50 tests. D252/D253 audits, the five-test D254
+The dedicated D255 suite passes 54 tests, including the missing-file,
+zero-byte-file, exited-process, post-attach materialization and strong final
+validation contracts. D252/D253 audits, the five-test D254
 suite, the full supported repository suite and `git diff --check` pass. Native
 PowerShell is unavailable on this Linux host; `-SelfTestOnly` and
 the corrected `-PreflightOnly` plus both `-PreAuthorizationSimulationOnly`
 states therefore remain future guest checks after review. The pre-correction
 native self-test was observed PASS in the VM, but it does not substitute for
-rerunning the corrected file. No real capture exists.
+rerunning the corrected file. The next native evidence must first exercise
+`-SelfTestOnly` and confirm `D255_CAPTURE_READINESS_SELFTEST=PASS`; after
+AI-PM review and approval of an exact new live-critical commit, any live run
+requires a new explicit one-run authorization. No successful real capture
+exists.
 
 ```text
 BOOTSTRAP_CLOSED=false
 RESTORE_CLOSED=false
-D255_LIVE_PATH_ATTEMPT=FAILED_PREAUTHORIZATION
+D255_LIVE_PATH_ATTEMPT=FAILED_PREATTACH_AFTER_TSHARK_START
 D255_LIVE_CAPTURE=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 
+AUTHORIZATION_CONSUMED=true
+GOODIX_ATTACHED_TO_VM=false
+SENSOR_REACHING_ACTION=false
 REAL_WINDOWS_CAPTURE_COUNT=0
 REAL_USB_OPEN_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0

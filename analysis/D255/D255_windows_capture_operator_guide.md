@@ -2,10 +2,13 @@
 
 ## Status and non-authority
 
-D255 prepared and tested the current correction offline. A prior operator
-invocation stopped on an empty-array PowerShell binding before authorization,
-TShark, USB attach or any hardware action. AI-PM review is not
-operator authorization, and no run is currently authorized.
+D255 prepared and tested the current correction offline. The latest authorized
+operator invocation consumed its authorization and started TShark, then failed
+before attach because the pcapng had not been created within two seconds.
+TShark was still alive; the file appeared several seconds later. Goodix was
+never attached and no sensor-reaching action occurred. AI-PM review is not
+operator authorization, the prior authorization is consumed, and no run is
+currently authorized.
 
 ```text
 WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -55,17 +58,19 @@ registry/account workarounds.
 
 ## Methodological review before any future run
 
-1. **What changes?** The sensor-dependent setup UI is checked only after the
-   single attach, wire-derived APP12509 A8 proof and passive bootstrap; a
-   non-ready UI produces a preserved partial-bootstrap run.
-2. **What hypothesis is tested?** Cold attach can yield APP12509 bootstrap
-   evidence even if the current account cannot enter the Hello fingerprint
-   wizard; if the wizard is ready, two zero-finger cancel sessions can add
-   bounded lifecycle evidence.
-3. **If it fails at the same point?** Preserve and sanitize the consumed
-   bootstrap capture, do not retry, and return the evidence to AI-PM. Any new
-   UI/account strategy needs a corrected kit, review, baseline approval and a
-   new explicit authorization.
+1. **What changes?** Pre-attach readiness now requires only a started/live
+   TShark process and Goodix still absent from the guest. It does not require
+   an already-created or nonempty pcapng. File materialization is checked after
+   attach/bootstrap and final validation remains exit-zero, present, nonempty
+   and readable with at least one frame.
+2. **What hypothesis is tested?** The prior failure was caused solely by
+   delayed host-side pcapng creation while TShark was healthy; removing that
+   premature file gate should allow the operator attach prompt without
+   weakening capture evidence validation.
+3. **If it fails at the same point?** Do not authorize another repetition.
+   Preserve the redacted TShark exit/path/stdout/stderr diagnostics and return
+   them to AI-PM; investigate native TShark/USBPcap process behavior with a
+   hardware-free Windows reproducer before proposing a different live method.
 
 ## Required initial state and host check
 
@@ -92,8 +97,11 @@ Run the hardware-free self-test first:
   -OutputRoot "D:\Goodix-D255-SelfTest"
 ```
 
-Expected: `D255_POWERSHELL_SELFTEST=PASS`, hardware action count zero and
-authorization not consumed.
+Expected: `D255_POWERSHELL_SELFTEST=PASS`,
+`D255_CAPTURE_READINESS_SELFTEST=PASS`, hardware action count zero and
+authorization not consumed. The readiness cases cover a live process with a
+missing file, a live process with a zero-byte file, an exited process and the
+strong terminal pcap contract.
 
 Before any real preflight or authorization, exercise the shared live-path
 setup with synthetic files only:
@@ -158,8 +166,10 @@ SHA, and explicit one-run authorization may the same command be run without
 All guest absence, interface, account, explicitly configured path, disk,
 clock/topology and runtime gates precede authorization consumption. Optional
 log/cache availability is recorded before authorization but is not itself a
-live-critical gate. After capture-start
-proof, perform exactly one manual host→VM GUI attach. Do not detach/re-attach.
+live-critical gate. After the short grace period, readiness means only that
+TShark is still alive and Goodix is still absent from the guest. The pcapng may
+still be missing or zero bytes. Perform exactly one manual host→VM GUI attach
+only after that process-readiness marker. Do not detach/re-attach.
 
 The evidence ordering later enforced from markers and wire is:
 
@@ -167,6 +177,7 @@ The evidence ordering later enforced from markers and wire is:
 VM_GUEST_READY
 GUEST_TOPOLOGY_BEFORE
 ACCOUNT_PREREQUISITES_CHECKED
+CAPTURE_PROCESS_STARTED
 CAPTURE_STARTED
 VM_USB_ATTACH_BEGIN
 VM_USB_ATTACH_END
@@ -175,6 +186,13 @@ A8_APP12509_PROVEN              # derived from exact target wire response
 PASSIVE_BOOTSTRAP_SETTLED
 HELLO_SETUP_UI_CHECK_BEGIN
 ```
+
+`CAPTURE_STARTED` is retained for postprocessor compatibility and means
+"TShark process active before attach"; it does not assert file creation,
+nonempty content or any captured frame. After attach and passive bootstrap the
+launcher requires the pcapng to have materialized. At the bounded end it still
+requires TShark exit code zero, a present nonempty pcapng and successful
+one-frame readback before reporting captured evidence.
 
 Only then open Settings → Accounts → Sign-in options → Fingerprint recognition
 (Windows Hello) → Set up/Add a fingerprint, without touching the sensor. The

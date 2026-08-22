@@ -98,8 +98,9 @@ blocker non è ridotto. D254 resta `BLOCKED`, non autorizza live e richiede come
 prossima evidenza primaria una singola traccia Windows APP12509 sanitizzata da
 cold-start/cache/first-seed fino ad arm, cancel senza dito e re-entry.
 
-D255 ha preparato offline il kit per quella singola acquisizione, senza
-eseguirla. La prima versione non è stata approvata dalla review AI-PM: il
+D255 ha inizialmente preparato offline il kit per quella singola acquisizione;
+la capture target non è stata completata nei successivi tentativi launcher. La
+prima versione non è stata approvata dalla review AI-PM: il
 launcher dichiarava PowerShell 5.1 ma usava tre API .NET moderne, mentre il
 postprocessor ISO-only non ancorava il formato WBDI Goodix
 `[MMDD-HH:MM:SS:mmm]`. La revisione correttiva dello stesso D255 sostituisce
@@ -172,6 +173,31 @@ ma `pwsh` non è disponibile sull'host Linux: le due modalità sintetiche devono
 ancora essere eseguite nativamente in Windows prima di dichiarare il kit pronto
 per l'operatore.
 
+La successiva singola run autorizzata sulla baseline
+`999483362af23f67790eb6e54f4c02bb48bd6cd5` ha superato quel setup, consumato
+l'autorizzazione e avviato TShark su `USBPcap1`, ma si è fermata prima del
+prompt di attach perché il launcher pretendeva `wire.pcapng` già creato dopo
+un grace period fisso di due secondi. Il processo TShark era ancora vivo;
+Goodix non è mai stato collegato al guest e non è avvenuta alcuna azione
+sensor-reaching. Una verifica successiva in sola lettura ha osservato il file,
+ancora a zero byte, comparso diversi secondi dopo il controllo. È quindi
+osservata una race di materializzazione/buffering host-side, non un failure
+device-side o una prova di processo TShark non sano.
+
+La correzione corrente elimina soltanto quel requisito pre-attach. Dopo il
+breve grace period la readiness significa
+`TSHARK_PROCESS_STARTED=true`, `TSHARK_PROCESS_ALIVE=true` e
+`GOODIX_PRESENT_IN_GUEST=false`; il nuovo marker
+`CAPTURE_PROCESS_STARTED` e il marker compatibile `CAPTURE_STARTED` non
+dichiarano file, frame o pcapng valido. Dopo attach e bootstrap passivo il file
+deve essere materializzato. Al termine restano obbligatori exit code TShark
+zero, pcapng presente e non vuoto e readback TShark di almeno un frame prima di
+`CAPTURED_PENDING_OFFLINE_VALIDATION`. I failure TShark includono exit code se
+disponibile, command/arguments redatti, stato del path e stdout/stderr redatti.
+L'audit locale conserva il timer bounded e il deadline PnP post-attach perché
+proteggono rispettivamente durata della capture e vera enumerazione del target;
+non esistono altri gate file/processo host-side equivalenti da rimuovere.
+
 Il gate post-attach accetta solo `READY_WAITING_FOR_FINGER`, `UI_UNAVAILABLE`,
 `NEW_PIN_REQUIRED` o `UNEXPECTED_PREREQUISITE`. Solo il primo entra nelle due
 cancellazioni senza dito; gli altri chiudono la restore phase senza retry,
@@ -242,7 +268,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
 | Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
-| Kit acquisizione Windows D255 | tentativo live fermato dal binding array vuoto prima di autorizzazione/attach; correzione di classe pronta per review AI-PM | zero log/cache supportati dove validi, interfacce vuote falliscono esplicitamente; simulazione condivisa nativa Windows pendente; hardware non autorizzato |
+| Kit acquisizione Windows D255 | ultima run consumata, TShark avviato ma stop pre-attach sulla race di creazione pcapng; Goodix mai collegato | readiness corretta offline a processo vivo + target assente, file richiesto dopo attach e validazione finale forte preservata; review AI-PM, prova nativa Windows, nuova baseline e nuova autorizzazione pendenti |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1930,8 +1956,10 @@ capture, versione Wireshark/USBPcap, prodotto VM, comando di passthrough o path
 del log. Non è quindi provato il locus esatto del vecchio collector.
 
 Il metodo futuro selezionato avvia TShark sull'interfaccia USBPcap esplicita nel
-guest Windows mentre il target è ancora assente; solo dopo il marker
-`CAPTURE_STARTED` l'operatore usa il normale attach GUI già revisionato. È
+guest Windows mentre il target è ancora assente; solo dopo i marker
+`CAPTURE_PROCESS_STARTED` e `CAPTURE_STARTED` l'operatore usa il normale attach
+GUI già revisionato. Entrambi significano processo TShark attivo e target
+ancora assente, non file già creato/non vuoto o frame acquisiti. È
 preferito al restart di Windows Biometric Service, che non è dimostrato come
 trigger dell'intero init, e al disable/enable PnP, meno conservativo. Nessun
 wrapper host è stato inventato in assenza di un hypervisor canonico. Il cold
@@ -1982,7 +2010,9 @@ dell'autorizzazione. La disponibilità UI fingerprint resta
 tutte o fallisce `USBPCAP_INTERFACE_SELECTION=AMBIGUOUS`.
 
 Solo dopo questi gate si scrive `authorization_consumed.json` e si tenta
-TShark. Il launcher prova processo e output attivi, poi presenta una sola azione
+TShark. Il launcher prova il processo attivo e di nuovo l'assenza del target,
+senza usare la materializzazione del pcapng come gate pre-attach, poi presenta
+una sola azione
 `OPERATOR_ACTION_VM_USB_ATTACH`; non contiene attach/detach automatico. Un
 failure di start dopo il record consuma il run. Il postprocessor richiede che
 il descriptor `27c6:5125` compaia dopo `CAPTURE_STARTED`, entro i marker
@@ -2035,6 +2065,27 @@ non aveva ancora raggiunto il confronto di autorizzazione, l'assegnazione
 `Start-Process`; risultano quindi autorizzazione non consumata, capture non
 avviata, zero attach, zero USB open e zero azioni hardware.
 
+Una run seguente sulla baseline approvata
+`999483362af23f67790eb6e54f4c02bb48bd6cd5` ha invece consumato
+l'autorizzazione e avviato TShark, poi ha prodotto
+`D255_FAIL_CLOSED: capture process is alive but output file was not created`
+al controllo fisso dei due secondi. Il Goodix non è stato collegato alla VM e
+non è avvenuta alcuna azione sul sensore. Il successivo pcapng zero-byte con
+timestamp di diversi secondi posteriore prova la race host-side del gate. La
+futura run richiede review AI-PM, approvazione di un nuovo SHA live-critical e
+una nuova autorizzazione esplicita; quella consumata non è riutilizzabile.
+
+Il riesame metodologico pre-live corrente è:
+
+1. cambia la semantica della readiness, da file creato entro due secondi a
+   processo TShark vivo più target ancora assente, con materializzazione
+   post-attach e validazione finale forte;
+2. testa l'ipotesi nuova che il failure osservato fosse soltanto ritardo
+   host-side di creazione/buffering del pcapng con processo sano;
+3. se il failure ricorre nello stesso punto, non si ripete il live: si conserva
+   la diagnostica redatta e si studia TShark/USBPcap nativo con un riproduttore
+   Windows senza hardware prima di proporre un metodo diverso.
+
 L'audit orizzontale delle collezioni separa i casi semanticamente vuoti da
 quelli non vuoti. `OemLogPath`, candidate OEM, `CacheRoot`, roots/file cache e
 le corrispondenti collezioni del setup condiviso possono legittimamente essere
@@ -2063,9 +2114,11 @@ REAL_HARDWARE_ACTION_COUNT=0
 Non sono stati rimossi altri gate pre-autorizzazione: assenza/topologia guest,
 chiusura selezione USBPcap, prerequisiti account/PIN, leggibilità dei path
 espliciti, runtime, collisione/spazio output, autorizzazione esatta e prova di
-capture attiva riducono rischio device-side, perdita di provenance o failure
-operativi reali. Il requisito obbligatorio del log OEM era il gate cerimoniale
-e resta eliminato.
+processo TShark attivo riducono rischio device-side, perdita di provenance o
+failure operativi reali. Il requisito obbligatorio del log OEM e quello del
+pcapng già creato entro due secondi erano gate host-side non probanti e restano
+eliminati. Il deadline PnP post-attach e la durata bounded restano perché
+proteggono rispettivamente enumerazione reale e contenimento della capture.
 
 Ogni evento OEM sanitizzato espone sorgente timestamp, UTC e qualità, mai la
 linea raw. ISO-8601 con offset/Z è diretto; Goodix MMDD viene convertito solo se
@@ -2094,30 +2147,37 @@ resta correlazione, mai automaticamente causalità. Un A8 assente/diverso rende
 l'evidenza non target-specific e terminale; marker/formati inattesi e collisioni
 falliscono chiusi senza retry.
 
-I 50 test D255 passano, inclusi zero-log con cache presente, log presente con
+I 54 test D255 passano, inclusi zero-log con cache presente, log presente con
 cache assente, reporting indipendente delle fonti, boundary
 VM/enumerazione/single attach, invalidation pre-attached/topology-change,
 zero-finger e invalidazione separata
 IRQ2/`0x22`/image, oltre a ISO, MMDD realistico, mezzanotte, fine anno,
 ambiguità/cambio offset, quattro stati del log, quattro esiti UI, partial
-bootstrap e regressione re-entry≠disarm. Passano inoltre le regressioni
+bootstrap, regressione re-entry≠disarm e i contratti readiness per file
+mancante/zero-byte, processo terminato, materializzazione post-attach e
+validazione finale forte. Passano inoltre le regressioni
 D252–D254 e i 172 test della suite supportata. `pwsh` non è installato
 sull'host Linux D255: sintassi, API vietate e contratti PowerShell sono coperti
 staticamente. Il self-test della baseline precedente è stato osservato `PASS`
 nella VM, con hardware action count zero e autorizzazione non consumata; il
 vero `-SelfTestOnly` e poi `-PreflightOnly` sul file corretto restano una
-verifica futura, insieme alle simulazioni pre-autorizzazione ABSENT/PRESENT.
-Nessun dato raw D255 è stato acquisito.
+verifica futura, insieme alle simulazioni pre-autorizzazione ABSENT/PRESENT e
+al comportamento nativo TShark della readiness corretta. Nessun dato raw D255
+è stato acquisito in questa correzione offline.
 
 ```text
 D255_INITIAL_AI_PM_REVIEW=FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW=FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW=FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION=FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
-D255_REAL_LIVE_PATH_OBSERVATION=FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
-D255_FAILURE_BEFORE_AUTHORIZATION_CONSUMPTION=true
+D255_PRIOR_LIVE_PATH_OBSERVATION=FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
+D255_LATEST_LIVE_PATH_OBSERVATION=FAIL_PREATTACH_PCAP_FILE_CREATION_RACE_AFTER_AUTHORIZATION
+D255_LATEST_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED=true
+D255_LATEST_FAILED_ATTEMPT_TSHARK_STARTED=true
+D255_LATEST_FAILED_ATTEMPT_GOODIX_ATTACHED_TO_VM=false
+D255_LATEST_FAILED_ATTEMPT_SENSOR_REACHING_ACTION=false
 D255_CORRECTIVE_STATUS=READY_FOR_AI_PM_REVIEW
-D255_OUTCOME=EMPTY_ARRAY_LIVE_PATH_CORRECTIVE_PREPARED
+D255_OUTCOME=TSHARK_PREATTACH_FILE_RACE_CORRECTED_OFFLINE
 D255_OEM_LOG_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_GOODIX_CACHE_REQUIREMENT=OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -2128,12 +2188,14 @@ D255_SENSOR_DEPENDENT_UI_AVAILABILITY_BEFORE_ATTACH=UNKNOWN_BEFORE_ATTACH
 D255_PARTIAL_BOOTSTRAP_RESULT_SUPPORTED=true
 D255_REENTRY_ALONE_CAN_CLOSE_RESTORE=false
 D255_FINGER_INTERACTION_ALLOWED=false
-D255_LIVE_PATH_ATTEMPT=FAILED_PREAUTHORIZATION
+D255_LIVE_PATH_ATTEMPT=FAILED_PREATTACH_AFTER_TSHARK_START
 D255_LIVE_CAPTURE=NOT_PERFORMED
 D255_HARDWARE_BOUNDARY=NOT_AUTHORIZED
 D255_OPERATOR_AUTHORIZATION_REQUIRED=true
 D255_AUTHORIZATION_CONSUMED_AFTER_PRE_HARDWARE_SETUP=true
-D255_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED=false
+D255_TSHARK_PREATTACH_READINESS=PROCESS_STARTED_AND_ALIVE_TARGET_ABSENT
+D255_PREATTACH_PCAP_FILE_REQUIRED=false
+D255_FINAL_PCAP_VALIDATION=EXIT_ZERO_EXISTS_NONEMPTY_READABLE_FRAME
 D255_EMPTY_OEM_LOG_CANDIDATES_SUPPORTED=true
 D255_EMPTY_ARRAY_CLASS_AUDIT=PASS
 D255_SHARED_PREAUTHORIZATION_SIMULATION=NATIVE_WINDOWS_PENDING
@@ -2221,9 +2283,10 @@ ottenere la derivazione del seed APP12509 o un no-finger restore. La tabella
 finale della capture locale è
 dinamicamente appresa da IRQ `0x0100`, ma vale soltanto come prova della
 sessione catturata; il cold-start D251 non possiede una baseline validata. Non
-esiste un restore OEM post-FDT provato. D255 ha preparato e verificato offline
-il kit per la capture Windows APP12509 mirata, ma non l'ha eseguita: il confine
-resta bloccato e nessun path FDT Linux è diventato live-capable.
+esiste un restore OEM post-FDT provato. D255 ha preparato il kit per la capture
+Windows APP12509 mirata; i tentativi launcher non hanno raggiunto l'attach e
+non hanno prodotto una capture valida: il confine resta bloccato e nessun path
+FDT Linux è diventato live-capable.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -2276,8 +2339,12 @@ D255_INITIAL_AI_PM_REVIEW FAIL_EXECUTABILITY_AND_TIME_CORRELATION
 D255_SECOND_AI_PM_REVIEW FAIL_CURRENT_VM_RECOGNITION_PATH_ASSUMPTION
 D255_THIRD_AI_PM_REVIEW FAIL_PREATTACH_SENSOR_UI_GATE_AND_RESTORE_OVERCLAIM
 D255_REAL_PREFLIGHT_OBSERVATION FAIL_UNPROVEN_OEM_LOG_REQUIREMENT
-D255_REAL_LIVE_PATH_OBSERVATION FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
-D255_FAILURE_BEFORE_AUTHORIZATION_CONSUMPTION true
+D255_PRIOR_LIVE_PATH_OBSERVATION FAIL_PARAMETER_ARGUMENT_VALIDATION_EMPTY_ARRAY_BEFORE_AUTHORIZATION
+D255_LATEST_LIVE_PATH_OBSERVATION FAIL_PREATTACH_PCAP_FILE_CREATION_RACE_AFTER_AUTHORIZATION
+D255_LATEST_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED true
+D255_LATEST_FAILED_ATTEMPT_TSHARK_STARTED true
+D255_LATEST_FAILED_ATTEMPT_GOODIX_ATTACHED_TO_VM false
+D255_LATEST_FAILED_ATTEMPT_SENSOR_REACHING_ACTION false
 D255_CORRECTIVE_STATUS READY_FOR_AI_PM_REVIEW
 D255_OEM_LOG_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
 D255_GOODIX_CACHE_REQUIREMENT OPTIONAL_REPORTED_PRESENT_OR_ABSENT
@@ -2293,10 +2360,12 @@ D255_RESTORE_CLOSURE_DECISION AI_PM_REVIEW_REQUIRED
 D255_FINGER_INTERACTION_ALLOWED false
 D255_READY_FOR_AI_PM_REVIEW true
 D255_READY_FOR_OPERATOR_RUN false
-D255_LIVE_PATH_ATTEMPT FAILED_PREAUTHORIZATION
+D255_LIVE_PATH_ATTEMPT FAILED_PREATTACH_AFTER_TSHARK_START
 D255_LIVE_CAPTURE NOT_PERFORMED
 D255_HARDWARE_BOUNDARY NOT_AUTHORIZED
-D255_FAILED_ATTEMPT_AUTHORIZATION_CONSUMED false
+D255_TSHARK_PREATTACH_READINESS PROCESS_STARTED_AND_ALIVE_TARGET_ABSENT
+D255_PREATTACH_PCAP_FILE_REQUIRED false
+D255_FINAL_PCAP_VALIDATION EXIT_ZERO_EXISTS_NONEMPTY_READABLE_FRAME
 D255_EMPTY_OEM_LOG_CANDIDATES_SUPPORTED true
 D255_EMPTY_ARRAY_CLASS_AUDIT PASS
 D255_SHARED_PREAUTHORIZATION_SIMULATION NATIVE_WINDOWS_PENDING
@@ -2399,10 +2468,13 @@ postprocessor GPL offline con fixture. La prima versione è stata respinta in
 review; la prima correzione chiude staticamente API PS5.1 e correlazione MMDD.
 La seconda review ha respinto l'assunzione recognition sulla VM non enrolled;
 la correzione corrente aggiunge boundary VM/cold-attach single-shot, setup UI
-zero-finger e invalidazione wire di ogni interazione. Il successivo tentativo
+zero-finger e invalidazione wire di ogni interazione. Un primo tentativo
 operatore nel guest Windows si è fermato sul binding dell'array OEM vuoto prima
-di autorizzazione, TShark e attach. La correzione attuale è stata sviluppata
-solo offline e non ha usato VM, TShark, USB, TLS o comandi Goodix reali; ha
+di autorizzazione, TShark e attach. Il tentativo successivo ha consumato
+l'autorizzazione e avviato TShark, ma si è fermato prima dell'attach sulla race
+di creazione del pcapng; Goodix è rimasto assente dal guest e non vi sono state
+azioni sensor-reaching. La correzione attuale è stata sviluppata solo offline
+e non ha usato VM, TShark, USB, TLS o comandi Goodix reali; ha
 usato solo fixture sintetiche e audit offline. Il bundle non contiene raw USB,
 WBDI, cache, OTP, PSK, firmware, DLL o biometria. Una review positiva del kit
 non consuma né sostituisce la futura autorizzazione operatore e non equivale a

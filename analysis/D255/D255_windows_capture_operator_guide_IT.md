@@ -2,10 +2,13 @@
 
 ## Stato e limiti di autorità
 
-D255 ha preparato e testato offline la correzione corrente. Una precedente
-invocazione dell'operatore si è fermata sul binding PowerShell di un array vuoto
-prima di autorizzazione, TShark, attach USB o qualunque azione hardware. La review AI-PM non equivale
-all'autorizzazione dell'operatore e, al momento, nessuna esecuzione è autorizzata.
+D255 ha preparato e testato offline la correzione corrente. L'ultima invocazione
+autorizzata ha consumato l'autorizzazione e avviato TShark, poi si è fermata
+prima dell'attach perché il pcapng non era stato creato entro due secondi.
+TShark era ancora vivo e il file è comparso diversi secondi dopo. Goodix non è
+mai stato collegato al guest e non è avvenuta alcuna azione sensor-reaching. La
+review AI-PM non equivale all'autorizzazione dell'operatore, l'autorizzazione
+precedente è consumata e al momento nessuna esecuzione è autorizzata.
 
 ```text
 WINDOWS_EXECUTION_ENVIRONMENT=VIRTUAL_MACHINE
@@ -62,19 +65,22 @@ Non creare o modificare mai un PIN e non usare workaround tramite registro o acc
 ## Revisione metodologica prima di qualsiasi futura esecuzione
 
 1. **Che cosa cambia?**  
-   L'interfaccia di setup dipendente dal sensore viene verificata soltanto dopo il singolo attach,
-   dopo la prova A8 APP12509 ottenuta dal wire e dopo il bootstrap passivo. Se la UI non è pronta,
-   la run viene comunque conservata come evidenza bootstrap parziale.
+   La readiness pre-attach richiede soltanto processo TShark avviato/vivo e
+   Goodix ancora assente dal guest. Non richiede un pcapng già creato o non
+   vuoto. La materializzazione viene controllata dopo attach/bootstrap e la
+   validazione finale resta exit-zero, file presente/non vuoto e almeno un
+   frame leggibile.
 
 2. **Quale ipotesi viene testata?**  
-   Il cold attach può produrre evidenza bootstrap APP12509 anche se l'account Windows corrente
-   non può entrare nel wizard fingerprint di Windows Hello. Se invece il wizard è disponibile,
-   due sessioni di cancel senza dito possono aggiungere evidenza circoscritta sul lifecycle.
+   Il failure precedente dipendeva soltanto dalla creazione ritardata del
+   pcapng lato host con TShark sano; eliminare quel gate prematuro deve
+   consentire il prompt di attach senza indebolire la validazione probatoria.
 
 3. **Cosa fare se fallisce nello stesso punto?**  
-   Conservare e sanitizzare la capture bootstrap già consumata, non riprovare e restituire
-   l'evidenza ad AI-PM. Qualunque nuova strategia relativa a UI/account richiede un kit corretto,
-   review, approvazione della baseline e una nuova autorizzazione esplicita.
+   Non autorizzare un'altra ripetizione. Conservare la diagnostica redatta di
+   exit/path/stdout/stderr TShark e restituirla ad AI-PM; studiare il processo
+   TShark/USBPcap nativo con un riproduttore Windows senza hardware prima di
+   proporre un metodo live diverso.
 
 ## Stato iniziale richiesto e controllo sull'host
 
@@ -127,6 +133,7 @@ Risultato atteso:
 
 ```text
 D255_POWERSHELL_SELFTEST=PASS
+D255_CAPTURE_READINESS_SELFTEST=PASS
 ```
 
 con:
@@ -253,8 +260,10 @@ devono essere superati **prima** che l'autorizzazione venga consumata.
 La sola assenza di log OEM o cache viene registrata, ma non è un gate
 live-critical.
 
-Dopo la prova che la capture è realmente partita, eseguire **esattamente un singolo attach manuale
-host → VM tramite GUI**.
+Dopo il breve grace period, la readiness significa soltanto che TShark è vivo
+e Goodix è ancora assente dal guest: il pcapng può ancora mancare o avere zero
+byte. Solo dopo questo marker di processo eseguire **esattamente un singolo
+attach manuale host → VM tramite GUI**.
 
 Non fare detach/re-attach.
 
@@ -264,6 +273,7 @@ L'ordine delle evidenze successivamente imposto da marker e wire è:
 VM_GUEST_READY
 GUEST_TOPOLOGY_BEFORE
 ACCOUNT_PREREQUISITES_CHECKED
+CAPTURE_PROCESS_STARTED
 CAPTURE_STARTED
 VM_USB_ATTACH_BEGIN
 VM_USB_ATTACH_END
@@ -272,6 +282,13 @@ A8_APP12509_PROVEN              # derived from exact target wire response
 PASSIVE_BOOTSTRAP_SETTLED
 HELLO_SETUP_UI_CHECK_BEGIN
 ```
+
+`CAPTURE_STARTED` resta per compatibilità col postprocessor e significa
+"processo TShark attivo prima dell'attach"; non dichiara file creato, contenuto
+non vuoto o frame catturati. Dopo attach e bootstrap passivo il launcher esige
+che il pcapng sia stato materializzato. Al termine bounded richiede ancora exit
+code TShark zero, pcapng presente/non vuoto e readback di almeno un frame prima
+di dichiarare evidenza catturata.
 
 Solo a questo punto aprire:
 
