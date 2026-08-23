@@ -45,6 +45,20 @@ continuità handshake→B0→secondo record sono provati offline sulla stessa
 `0x36`; il plumbing nel runtime live resta `UNIMPLEMENTED`. D259 è pertanto
 bloccato prima della live-readiness review e non autorizzato live.
 
+D260 chiude ora quel gap **sul solo piano architetturale offline** nel dominio
+GPL `core/`, senza modificare il runtime sealed. Un coordinator production-shaped
+possiede una sola sessione transport simulata, un solo handoff di secret
+sintetico, un solo server TLS e un solo handshake; il lifecycle TLS resta vivo
+attraverso D4 plaintext A0, AF/AE e gli A0 FDT, poi consuma il B0 baseline sulla
+stessa sessione prima del terzo `0x36`. ACK e IRQ `0x0100` passano da contratti
+distinti. Il rehearsal unico `D1/B0 TLS → D4 → AF/AE → 36,50,36,82,20,36,32`
+e i 15 failure richiesti passano offline con zero retry, recovery speciale,
+cache write e famiglie persistenti. Le policy fisiche D4 e B0 sono chiuse; la
+tail fisica dei futuri A0 FDT Linux resta esplicitamente astratta. Ne segue
+`READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true`, mentre review operativa,
+backend USB reale, secret reale, baseline approvata, kit e autorizzazione live
+restano separati e tutti i flag live non qualificati restano false.
+
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
 request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
@@ -305,6 +319,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Candidate fresh-FDT D257 | BLOCKED exact offline; nessun backend/kit live | replay proiettato storico PASS; sequenza esatta D255 `36,50,36,82,20,36,32`, ma gate host dinamici NAV/delta/baseline non derivabili; first-`0x36` single-shot fail-closed; freshness non è il solo blocker |
 | Chiusura gate host D258 | avanzamento offline, candidate ancora BLOCKED | orchestratore target in `gfusb.dll`; gate `0x82` chiuso e implementato; `0x50`/`0x20` corretti come input a classificatori post-stage2 ancora non riproducibili; timeout per comando; zero hardware |
 | Corrective contratto minimo D259 | BLOCKED sul plumbing TLS runtime; live non autorizzato | Classe A confermata meccanicamente dal CFG; replay B0 ordinato subito dopo `0x20`, same-`SSLObject` e continuità TLS PASS offline; il runtime sealed D245 chiude e non espone l'engine, quindi `READY_FOR_FDT_LIVE_REVIEW=false` |
+| Runtime persistente D260 | architecture readiness PASS offline; operational/live false | nuovo coordinator GPL con un server/sessione/handshake TLS, D4 A0 plaintext, EventSource separato e minimal FDT continuo; 15 failure contenuti, `src/`/launcher storici invariati; physical FDT A0 ancora astratto |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -2782,6 +2797,102 @@ Il precedente bundle D259 è preservato per provenance ma marcato
 e i launcher D245/D246/D251 byte-identici, non aggiunge backend USB, launcher o
 operator kit, non auto-approva una baseline e non autorizza hardware.
 
+## D260: runtime GPL persistente e architecture readiness offline
+
+D260 implementa in `core/` la convergenza architetturale che D259 aveva
+lasciato aperta. `core/persistent_runtime.py` possiede per l'intera esecuzione
+una sessione transport logica, un `ValidatedSecretBoundary`, un server TLS 1.2
+PSK, un bridge B0, il demux misto A0/B0, un `EventSource` separato e la state
+machine FDT D259. `core/tls_b0.py` espone ora il lifecycle esplicito:
+
+```text
+CREATED -> HANDSHAKING -> ESTABLISHED -> APPLICATION_ACTIVE -> CLOSED
+```
+
+Il rehearsal usa esclusivamente un client OpenSSL e un secret sintetici. Il
+medesimo boundary object effettua un solo handoff; il server crea un solo
+`SSLObject`, registra un solo handshake e non esegue secondo provisioning,
+fallback, PSK random o PSK null. La sessione rimane stabilita mentre D4 passa
+come A0 plaintext canonico `a00600a6d403000000d3`, una sola volta, con policy
+fixed-64 zero-tail, pacing post-TLS 20 ms e timeout 200 ms. D4 non incrementa
+il contatore TLS application data. AF/AE e gli A0 FDT restano plaintext; solo
+la risposta B0 a `0x20` viene autenticata/decrittata dal medesimo engine e il
+buffer mutabile del plaintext sintetico viene scartato e zeroizzato
+best-effort. Copie interne OpenSSL e temporanei Python immutabili restano
+`NOT_PROVEN` rispetto alla zeroizzazione.
+
+Il bridge handshake prova offline il passaggio `D1 → B0 ClientHello → server
+flight B0 → client Finished B0 → ESTABLISHED`. I record B0 host→device
+conservano staging fisico fixed-64 e pacing 10 ms D242/D245. D4 conserva il
+contratto fisico D246 e AF quello D251. Per `0x36/0x50/0x82/0x20/0x32`, D260
+modella framing e timeout logici esatti ma non inventa la tail fisica futura
+del backend Linux:
+
+```text
+PHYSICAL_SUBMISSION_CONTRACT_STATUS=
+  ABSTRACT_OFFLINE_FOR_FDT_A0_WITH_EXACT_D4_AND_B0_TLS_POLICIES
+```
+
+Questa incompletezza è compatibile con architecture readiness ma impedisce
+operational readiness. ACK sincrono ed evento asincrono non sono collassati:
+`RuntimeTransport.receive()` consegna l'ACK e solo dopo
+`EventSource.wait_event()` consegna ciascuno dei tre IRQ `0x0100`, touch zero e
+raw-base da 12 byte, exactly once.
+
+Il percorso production-shaped continuo passa come singolo runtime object:
+
+```text
+D1/B0 TLS handshake
+-> retained TLS engine
+-> D4 A0 plaintext exactly once
+-> AF/AE A0
+-> 0x36 ACK -> separate IRQ100 stage0
+-> 0x50 NAV
+-> 0x36 ACK -> separate IRQ100 stage1
+-> 0x82 first native delta PASS
+-> 0x20 -> B0 consumed by same TLS engine
+-> 0x36 ACK -> separate IRQ100 stage2
+-> second native delta PASS
+-> classifier/raster/cache zero
+-> final 0x32 exactly once
+-> one TLS close and one transport cleanup
+```
+
+La traccia FDT è esattamente `36,50,36,82,20,36,32`; B0 viene consumato prima
+dello stage2. La matrice copre malformed B0 handshake, bad MAC handshake,
+timeout TLS, ACK D4 errato, AE malformed, seed invalido, timeout primo `0x36`,
+IRQ100 mancante/errato, NAV malformed, primo delta reject, B0 auth failure, B0
+ritardato oltre il boundary stage2, secondo delta reject e ACK finale `0x32`
+errato. Ogni scenario termina con retry/cache/device-write/A2/`0x70` a zero,
+una chiusura TLS e un cleanup transport.
+
+Il runtime D245/D246/D251 e i launcher storici restano byte-identici e
+continuano a essere l'autorità dell'evidenza live pregressa. Il nuovo runtime
+non è collegato a USB reale, non usa il secret E4 reale, non implementa
+privilege/fprintd/marker/baseline/operator kit e non è live-proven. Lo stato
+canonico D260 è:
+
+```text
+PERSISTENT_TLS_RUNTIME_IMPLEMENTED=true
+LEGACY_TLS_ONE_SHOT_LIMITATION_ARCHITECTURALLY_BYPASSED_IN_CORE=true
+END_TO_END_OFFLINE_RUNTIME_REHEARSAL=PASS
+FAILURE_CONTAINMENT_MATRIX=PASS
+MINIMAL_DEVICE_LIVE_CONTRACT_CLOSED=true
+FACTORY_PRESERVING_MINIMAL_CANDIDATE_CLOSED=true
+FDT_OFFLINE_CANDIDATE_CLOSED=true
+READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true
+READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false
+READY_FOR_FDT_LIVE_REVIEW=false
+READY_FOR_FDT_LIVE=false
+NEW_RUNTIME_LIVE_PROVEN=false
+```
+
+La successiva review operativa, se autorizzata come step distinto, dovrà
+ancora chiudere backend USB del nuovo runtime, physical policy A0 FDT,
+privilege model, loading/binding del secret reale, stop/restore fprintd,
+single-use marker, baseline live approvata e operator kit. D260 non autorizza
+hardware e non prepara quel percorso.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -2877,19 +2988,27 @@ nessun riflesso sul contratto device-visible del primo arm; il loro modello
 esatto e il plaintext B0 storico D255 non sono blocker del classifier. Il B0
 resta obbligatoriamente TLS-consumed subito dopo `0x20`. Questa proprietà e la
 continuità del record successivo sono provate offline sulla stessa `SSLObject`,
-ma il runtime sealed D245 chiude l'engine a fine handshake e non lo espone: il
-plumbing live TLS→B0 è quindi ancora `UNIMPLEMENTED`. Il disarm del prior
-arm, la sua lifetime e lo stato interno FDT dopo cancel rimangono ignoti
+ma il runtime sealed D245 chiude l'engine a fine handshake e non lo espone.
+D260 lascia quel runtime storico invariato e implementa invece nel nuovo core
+GPL un coordinator persistente: lo stesso server TLS attraversa D4/AF/FDT A0 e
+consuma il B0 baseline prima di stage2. Il rehearsal end-to-end e la matrice
+failure passano offline, quindi il gap one-shot è architetturalmente superato,
+non live-proven. Il disarm del prior arm, la sua lifetime e lo stato interno
+FDT dopo cancel rimangono ignoti
 epistemici non bloccanti rispetto al contratto host/bus D256. La TTL generale
 del cache resta un'incertezza di successo funzionale, non il solo blocker né
 un requisito di factory-preservation.
 
-Il current critical boundary non è più il classifier ma l'integrazione del
-consumer nella stessa sessione TLS reale. Finché il runtime non conserva ed
-espone in modo sicuro l'engine handshaked, `READY_FOR_FDT_LIVE_REVIEW=false` e
-`READY_FOR_FDT_LIVE=false`. Una futura correzione dovrà inoltre preservare
-baseline live-critical esplicitamente approvata, single-shot e cleanup/reseal.
-D259 non autorizza hardware, capture o nuova invocazione.
+Il current critical boundary è ora la review **operativa** del nuovo runtime,
+non più la sua architettura persistente né il classifier. Restano da
+implementare e revisionare il backend USB reale, la physical submission policy
+degli A0 FDT, privilege model, binding del secret E4 reale, stop/restore
+fprintd, marker single-shot, baseline live-critical approvata, operator kit e
+autorizzazione esplicita. Perciò
+`READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true`, ma
+`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false`, il legacy
+`READY_FOR_FDT_LIVE_REVIEW=false` e `READY_FOR_FDT_LIVE=false`. D260 non
+autorizza hardware, capture o invocazioni live.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -3070,6 +3189,39 @@ D259_REAL_HARDWARE_ACTION_COUNT 0
 D259_REAL_COMMAND_SEND_COUNT 0
 D259_PERSISTENT_WRITE_FAMILY_COUNT 0
 D259_LIVE_EXECUTION NOT_PERFORMED
+D260_PERSISTENT_TLS_RUNTIME_IMPLEMENTED true
+D260_TLS_SERVER_SESSION_OBJECT_COUNT 1
+D260_TLS_SERVER_HANDSHAKE_COUNT 1
+D260_SECOND_SERVER_SESSION_CREATED false
+D260_SECOND_PSK_PROVISIONING false
+D260_D4_POST_TLS_A0_PLAINTEXT_EXACTLY_ONCE true
+D260_D4_TLS_APPLICATION_RECORD_COUNT 0
+D260_POST_D4_TLS_ENGINE_RETAINED true
+D260_EVENT_SOURCE_CONTRACT_REQUIRED true
+D260_IRQ100_EVENT_SEPARATE_FROM_ACK_REQUIRED true
+D260_EXACT_FDT_COMMAND_TRACE 36,50,36,82,20,36,32
+D260_BASELINE_B0_CONSUMED_BEFORE_STAGE2 true
+D260_SAME_TLS_SESSION_B0_CONSUMPTION PASS_OFFLINE_ARCHITECTURAL
+D260_SECOND_NATIVE_DELTA_REQUIRED true
+D260_CLASSIFIER_CALL_COUNT 0
+D260_RASTER_DECODE_COUNT 0
+D260_HOST_CACHE_WRITE_COUNT 0
+D260_RETRY_COUNT 0
+D260_PERSISTENT_WRITE_FAMILY_COUNT 0
+D260_PHYSICAL_SUBMISSION_CONTRACT_STATUS ABSTRACT_OFFLINE_FOR_FDT_A0_WITH_EXACT_D4_AND_B0_TLS_POLICIES
+D260_END_TO_END_OFFLINE_RUNTIME_REHEARSAL PASS
+D260_FAILURE_CONTAINMENT_MATRIX PASS
+D260_MINIMAL_DEVICE_LIVE_CONTRACT_CLOSED true
+D260_FACTORY_PRESERVING_MINIMAL_CANDIDATE_CLOSED true
+D260_FDT_OFFLINE_CANDIDATE_CLOSED true
+D260_READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW true
+D260_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW false
+D260_READY_FOR_FDT_LIVE_REVIEW false
+D260_READY_FOR_FDT_LIVE false
+D260_NEW_RUNTIME_LIVE_PROVEN false
+D260_REAL_USB_OPEN_COUNT 0
+D260_REAL_TLS_TARGET_HANDSHAKE_COUNT 0
+D260_REAL_HARDWARE_ACTION_COUNT 0
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -3213,6 +3365,16 @@ native ma ha contatori classifier, raster e cache a zero. Nessun dato storico
 B0 è decrittato o esportato. Non sono stati aggiunti backend USB, launcher,
 operator kit, baseline live approvata o autorizzazione hardware.
 
+D260 aggiunge `core/runtime_transport.py` e `core/persistent_runtime.py` ed
+estende il TLS e lifecycle FDT esistenti senza toccare `src/`. Il nuovo core
+separa framing logico, policy fisica ed eventi asincroni; conserva un solo
+server TLS oltre l'handshake, lascia D4/AF/FDT come A0 plaintext e inoltra il
+solo B0 baseline allo stesso engine. Il rehearsal sintetico production-shaped
+copre l'intera sessione e 15 failure terminali. D4 e B0 hanno policy fisiche
+evidence-backed; gli A0 FDT restano `ABSTRACT_LOGICAL_ONLY`. Questa è
+executable closure del runtime offline e architecture readiness, non un
+backend USB, un path operatore o una readiness live.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -3226,5 +3388,5 @@ operator kit, baseline live approvata o autorizzazione hardware.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D259 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D260 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.

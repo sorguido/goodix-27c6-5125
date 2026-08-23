@@ -22,6 +22,7 @@ from core.tls_b0 import B0ApplicationConsumer, B0ConsumptionResult
 from core.post_d4 import (
     InvalidTransition,
     LengthMismatch,
+    PLAIN,
     UnexpectedAck,
     UnexpectedEvent,
     build_nav_baseline,
@@ -35,6 +36,7 @@ from core.post_d4 import (
     parse_fdt_event,
     parse_image_payload,
     parse_nav_baseline_response,
+    parse_outer,
 )
 
 
@@ -288,6 +290,11 @@ class OfflineTransport(Protocol):
         ...
 
 
+class OfflineEventSource(Protocol):
+    def wait_event(self, timeout_ms: int) -> bytes:
+        ...
+
+
 def table_from_irq100_payload(payload: bytes) -> bytes:
     """Derive the six-word FDT table using the D252 target-observed transform."""
     event = parse_fdt_event(payload)
@@ -448,12 +455,14 @@ class ExactFreshFdtBootstrapMachine:
         nav_semantic_gate: Callable[[bytes], bool] | None = None,
         decrypt_baseline_b0: Callable[[bytes], bytes] | None = None,
         baseline_semantic_gate: Callable[[tuple[int, ...]], bool] | None = None,
+        event_source: OfflineEventSource | None = None,
     ) -> None:
         self.transport = transport
         self.lifecycle = lifecycle
         self.nav_semantic_gate = nav_semantic_gate
         self.decrypt_baseline_b0 = decrypt_baseline_b0
         self.baseline_semantic_gate = baseline_semantic_gate
+        self.event_source = event_source
         self.table12: bytes | None = None
         self.manual_stage = 0
         self.manual_attempt_count = 0
@@ -497,7 +506,7 @@ class ExactFreshFdtBootstrapMachine:
         self.lifecycle.begin_bootstrap()
         self.table12 = seed_result.require_seed()
 
-    def manual_sample(self, event_payload: bytes) -> bytes:
+    def manual_sample(self, event_payload: bytes | None = None) -> bytes:
         if self.table12 is None or self.manual_stage >= self.MANUAL_STAGE_COUNT:
             self._fail("manual_sample_invalid_stage")
             raise InvalidTransition("manual_sample_invalid_stage")
@@ -517,6 +526,13 @@ class ExactFreshFdtBootstrapMachine:
             self.first_0x36_attempt_count += 1
         try:
             self._required_exchange(build_fdt_manual(self.table12), 0x36, 0)
+            if event_payload is None:
+                if self.event_source is None:
+                    raise InvalidTransition("manual_sample_event_source_unavailable")
+                event_frame = self.event_source.wait_event(COMMAND_TIMEOUT_MS[0x36])
+                kind, event_payload = parse_outer(event_frame)
+                if kind != PLAIN:
+                    raise UnexpectedEvent("manual_sample_event_not_a0")
             raw_words = raw_words_from_irq100_payload(event_payload)
             learned = table_from_irq100_payload(event_payload)
         except Exception:

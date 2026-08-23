@@ -29,3 +29,14 @@ unimplemented and live-readiness review is fail-closed. `fdt_seed.py` validates 
 target-observed 13,520-byte OTP-bound cache and returns only FDT12. Neither
 module opens USB, searches Windows paths, writes cache state, or exposes
 persistent/provisioning command families.
+
+D260 adds the production-shaped offline architecture in
+`persistent_runtime.py` and `runtime_transport.py`. One coordinator now owns a
+single logical transport session, a single synthetic validated-secret handoff,
+one retained TLS 1.2 PSK server, the B0 handshake bridge, post-handshake D4 and
+AF plaintext A0, a separate asynchronous `EventSource`, and the exact minimal
+FDT path. D4 is represented byte-exact as a fixed-64 zero-tail submission after
+20 ms with a 200 ms timeout; server-flight B0 records retain the D242/D245
+fixed-64 staging and 10 ms pacing contract. The future Linux physical tail for
+FDT A0 commands remains explicitly abstract, so D260 closes architecture
+readiness only and does not provide a USB backend or operational live path.
