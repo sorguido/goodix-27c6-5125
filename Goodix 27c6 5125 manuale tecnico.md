@@ -93,10 +93,12 @@ ora validati prima di costruire o materializzare il secret reale; i rehearsal
 offline iniettano esclusivamente una boundary sintetica via Protocol e non
 tentano alcun fallback real→synthetic. La suite completa passa offline; i
 contatori reali USB/secret/comandi/marker/fprintd restano zero. Lo stato massimo
-è `READY_FOR_BASELINE_APPROVAL_REVIEW=true` e
-`OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=true`; finché Utente e AI-PM non
-approvano un full commit SHA, `READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false`,
-`READY_FOR_FDT_LIVE_REVIEW=false` e `READY_FOR_FDT_LIVE=false`.
+è `READY_FOR_BASELINE_APPROVAL_REVIEW=false` e
+`OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=false`; Utente e AI-PM hanno ora
+approvato il full commit SHA `e9073a171697bd68dd2debabb851f23d007bf718` come
+baseline live-critical immutabile, promuovendo la readiness a review operativa
+(`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true`, `READY_FOR_FDT_LIVE_REVIEW=true`),
+ma `READY_FOR_FDT_LIVE=false`: approvazione baseline ≠ autorizzazione hardware.
 
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
@@ -359,7 +361,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Chiusura gate host D258 | avanzamento offline, candidate ancora BLOCKED | orchestratore target in `gfusb.dll`; gate `0x82` chiuso e implementato; `0x50`/`0x20` corretti come input a classificatori post-stage2 ancora non riproducibili; timeout per comando; zero hardware |
 | Corrective contratto minimo D259 | BLOCKED sul plumbing TLS runtime; live non autorizzato | Classe A confermata meccanicamente dal CFG; replay B0 ordinato subito dopo `0x20`, same-`SSLObject` e continuità TLS PASS offline; il runtime sealed D245 chiude e non espone l'engine, quindi `READY_FOR_FDT_LIVE_REVIEW=false` |
 | Runtime persistente D260 | architecture readiness PASS offline; operational/live false | nuovo coordinator GPL con un server/sessione/handshake TLS, D4 A0 plaintext, EventSource separato e minimal FDT continuo; 15 failure contenuti, `src/`/launcher storici invariati; physical FDT A0 ancora astratto |
-| Corrective readiness D261 | PASS offline per baseline-approval review; operational/live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full SHA approvato ancora assente e zero-tail per comando resta rischio live |
+| Corrective readiness D261 | PASS offline per baseline-approval; operational review promosso, live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full commit SHA `e9073a171697bd68dd2debabb851f23d007bf718` approvato da Utente e AI-PM, zero-tail per comando resta rischio live |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -3056,7 +3058,7 @@ Riesame metodologico pre-live:
 Lo stato canonico D261 è:
 
 ```text
-D261_OUTCOME=READY_FOR_BASELINE_APPROVAL_REVIEW
+D261_OUTCOME=READY
 D261_OPERATIONAL_EVIDENCE_HARDENING=PASS
 D261_END_TO_END_OFFLINE_OPERATIONAL_REHEARSAL=PASS
 D261_FAILURE_CONTAINMENT_MATRIX=PASS_EXECUTION_DERIVED
@@ -3078,12 +3080,13 @@ D261_SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ=true
 D261_OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT=0
 D261_OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT=0
 D261_OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC=false
-D261_OPERATIONAL_LIVE_CRITICAL_FILESET=PENDING_USER_AI_PM_FULL_SHA_APPROVAL
-D261_EXACT_APPROVED_LIVE_BASELINE_PRESENT=false
-D261_READY_FOR_BASELINE_APPROVAL_REVIEW=true
-D261_OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=true
-D261_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false
-D261_READY_FOR_FDT_LIVE_REVIEW=false
+D261_APPROVED_LIVE_BASELINE_SHA=e9073a171697bd68dd2debabb851f23d007bf718
+D261_OPERATIONAL_LIVE_CRITICAL_FILESET=APPROVED_USER_AI_PM_FULL_SHA
+D261_EXACT_APPROVED_LIVE_BASELINE_PRESENT=true
+D261_READY_FOR_BASELINE_APPROVAL_REVIEW=false
+D261_OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=false
+D261_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true
+D261_READY_FOR_FDT_LIVE_REVIEW=true
 D261_READY_FOR_FDT_LIVE=false
 D261_LIVE_EXECUTION=NOT_PERFORMED
 ```
@@ -3204,19 +3207,21 @@ matrice failure execution-derived, deadline reader assoluta e report durable.
 La review successiva è chiusa dallo stesso D261: la tuple baseline copre ora
 l'intera bounded import closure inclusi i due initializer, l'import è provato
 side-effect-free in subprocess pulito e il materiale non-secret viene validato
-prima della materializzazione secret. Il candidate è quindi pronto soltanto
-per la review di approvazione della
-baseline. Il boundary immediato è un full commit SHA esplicitamente approvato
-da Utente e AI-PM; solo uno step successivo potrà promuovere la review
-operativa, senza ancora autorizzare hardware. L'accettazione target della
-zero-tail per `0x36/0x50/0x82/0x20` resta il rischio live primario dichiarato,
-non un fatto già provato. Perciò
+prima della materializzazione secret. Il full commit SHA
+`e9073a171697bd68dd2debabb851f23d007bf718` è ora approvato da Utente e AI-PM
+come baseline live-critical immutabile: la governance di readiness è promossa
+a review operativa/live. Il boundary immediato è una **AI-PM final risk review**
+del bounded fresh-FDT arm sulla baseline approvata; solo dopo tale review, su
+nuova autorizzazione hardware esplicita dell'Utente, potrà proseguire un nuovo
+step live. L'accettazione target della zero-tail per `0x36/0x50/0x82/0x20`
+resta il rischio live primario dichiarato, non un fatto già provato; `0x32`
+resta provato sul target. Perciò
 `READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true`,
-`READY_FOR_BASELINE_APPROVAL_REVIEW=true`,
-`OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=true`,
-`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false`,
-`READY_FOR_FDT_LIVE_REVIEW=false` e `READY_FOR_FDT_LIVE=false`. D261 non ha
-aperto hardware e non auto-approva una baseline o una run.
+`READY_FOR_BASELINE_APPROVAL_REVIEW=false`,
+`OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=false`,
+`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true`,
+`READY_FOR_FDT_LIVE_REVIEW=true` e `READY_FOR_FDT_LIVE=false`. D261 non ha
+aperto hardware e non auto-approva una run.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -3430,7 +3435,7 @@ D260_NEW_RUNTIME_LIVE_PROVEN false
 D260_REAL_USB_OPEN_COUNT 0
 D260_REAL_TLS_TARGET_HANDSHAKE_COUNT 0
 D260_REAL_HARDWARE_ACTION_COUNT 0
-D261_OUTCOME READY_FOR_BASELINE_APPROVAL_REVIEW
+D261_OUTCOME READY
 D261_OPERATIONAL_EVIDENCE_HARDENING PASS
 D261_FDT_A0_PHYSICAL_LENGTH 64
 D261_FDT_A0_TAIL_POLICY ZERO_FILL_OUTSIDE_DECLARED_LOGICAL_FRAME
@@ -3482,12 +3487,13 @@ D261_OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC false
 D261_FULL_TEST_SUITE 238_PASS
 D261_LIVE_CRITICAL_PATH_SOURCE HARDCODED_REVIEWED_TUPLE_IN_VERIFIER
 D261_LIVE_CRITICAL_FILESET_JSON_ROLE DERIVED_REPORT_NOT_AUTHORITY
-D261_OPERATIONAL_LIVE_CRITICAL_FILESET PENDING_USER_AI_PM_FULL_SHA_APPROVAL
-D261_EXACT_APPROVED_LIVE_BASELINE_PRESENT false
-D261_READY_FOR_BASELINE_APPROVAL_REVIEW true
-D261_OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE true
-D261_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW false
-D261_READY_FOR_FDT_LIVE_REVIEW false
+D261_APPROVED_LIVE_BASELINE_SHA e9073a171697bd68dd2debabb851f23d007bf718
+D261_OPERATIONAL_LIVE_CRITICAL_FILESET APPROVED_USER_AI_PM_FULL_SHA
+D261_EXACT_APPROVED_LIVE_BASELINE_PRESENT true
+D261_READY_FOR_BASELINE_APPROVAL_REVIEW false
+D261_OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE false
+D261_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW true
+D261_READY_FOR_FDT_LIVE_REVIEW true
 D261_READY_FOR_FDT_LIVE false
 D261_REAL_USB_OPEN_COUNT 0
 D261_REAL_SECRET_READ_COUNT 0
@@ -3664,9 +3670,11 @@ corrective finale completa inoltre la tuple con i due package initializer,
 prova import purity in un subprocess nuovo e impone manifest/config/cache
 non-secret prima del secret. Il dry-run reale è cwd-independent, non legge il
 secret e non apre USB; il rehearsal usa soltanto fixture sintetiche iniettate e
-non istanzia il real loader. Questa è executable closure offline
-e readiness per approvare una baseline immutabile, non readiness operativa,
-approvazione SHA o run live. Il precedente bundle D261 resta preservato ma è
+non istanzia il real loader. La baseline live-critical
+`e9073a171697bd68dd2debabb851f23d007bf718` è ora approvata da Utente e AI-PM
+(EXACT_APPROVED_LIVE_BASELINE_PRESENT=true), promuovendo la readiness a review
+operativa/live senza autorizzare hardware (READY_FOR_FDT_LIVE=false). Il
+precedente bundle D261 resta preservato ma è
 `SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE`.
 
 ## Regole operative
