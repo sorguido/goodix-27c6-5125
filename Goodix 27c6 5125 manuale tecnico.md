@@ -112,9 +112,23 @@ A2/`0x70` di recovery, `0x22`/post-finger/enrollment/matching irraggiungibili. R
 live invariato: l'accettazione della zero-tail per `0x32` è provata
 (`PRIMARY_TARGET_PROVEN_AND_ACK_ACCEPTED`), mentre per `0x36/0x50/0x82/0x20`
 resta `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE` /
-`UNPROVEN_LIVE_HYPOTHESIS`. Lo stato è
+`UNPROVEN_LIVE_HYPOTHESIS`. Lo stato era
 `READY_FOR_D262_OPERATOR_EXECUTION_REVIEW=true`, `READY_FOR_D262_OPERATOR_EXECUTION=false`,
 `READY_FOR_FDT_LIVE=false`: nessuna esecuzione hardware né autorizzazione implicita.
+
+La singola run live autorizzata è poi stata eseguita una sola volta e completata con
+successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
+nessun retry (`RETRY_COUNT=0`), zero famiglie persistenti (`PERSISTENT_DEVICE_WRITE_COUNT=0`),
+zero cache write (`CACHE_WRITE_COUNT=0`) e zero recovery A2/`0x70`, un'unica sessione USB
+(`USB_TRANSPORT_SESSION_COUNT=1`) e un solo handshake/server TLS, B0 consumato sulla stessa
+sessione TLS prima di stage2, secret zeroizzato e non loggato, fprintd e segnale ripristinati,
+runtime chiuso. La traccia FDT esatta
+`0x36,0x50,0x36,0x82,0x20,0x36,0x32` è ora accettata dal target primario con ACK: il rischio
+zero-tail per `0x36/0x50/0x82/0x20` è ritirato per `27c6:5125`/`GF_ST411SEC_APP_12509` sul
+bounded FDT arm path (`PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED`). Il marker single-use è
+consumato; `SECOND_LIVE_ATTEMPT_ALLOWED=false`: la stessa run non deve essere ripetuta e nessun
+nuovo step live è autorizzato in questo step. `0x22` e il post-finger image non sono stati
+raggiunti.
 
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
@@ -3226,18 +3240,43 @@ side-effect-free in subprocess pulito e il materiale non-secret viene validato
 prima della materializzazione secret. Il full commit SHA
 `e9073a171697bd68dd2debabb851f23d007bf718` è ora approvato da Utente e AI-PM
 come baseline live-critical immutabile: la governance di readiness è promossa
-a review operativa/live. Il boundary immediato è una **AI-PM final risk review**
+a review operativa/live. Il boundary immediato era una **AI-PM final risk review**
 del bounded fresh-FDT arm sulla baseline approvata; solo dopo tale review, su
 nuova autorizzazione hardware esplicita dell'Utente, potrà proseguire un nuovo
 step live. L'accettazione target della zero-tail per `0x36/0x50/0x82/0x20`
-resta il rischio live primario dichiarato, non un fatto già provato; `0x32`
-resta provato sul target. Perciò
+era il rischio live primario dichiarato, non un fatto già provato; `0x32`
+restava provato sul target.
+
+Questa AI-PM final risk review è stata completata e la singola run live
+autorizzata è stata eseguita con successo (`PASS_STOP_AFTER_FDT_ARM_ACK`). Sul
+target primario `27c6:5125` / firmware `GF_ST411SEC_APP_12509`, lungo il
+bounded FDT arm path `0x36,0x50,0x36,0x82,0x20,0x36,0x32`, l'accettazione
+zero-tail è ora **live-proven con ACK**, con la seguente tassonomia esplicita
+per comando:
+
+```text
+0x32 = PRIMARY_TARGET_PROVEN_AND_ACK_ACCEPTED
+
+0x36 / 0x50 / 0x82 / 0x20 = PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED
+```
+
+Lo scope resta `27c6:5125` / `GF_ST411SEC_APP_12509` sul bounded FDT arm path.
+Il rischio primario D262
+`FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND` è pertanto ritirato
+per questo target/firmware/path. Non si generalizza ad altri device, firmware,
+comandi di controllo, flusso post-finger, `0x22`, enrollment/matching o
+operazioni di scrittura persistente; `0x22` e il post-finger image non sono
+stati raggiunti. Il marker single-use è consumato (`SECOND_LIVE_ATTEMPT_ALLOWED=false`)
+e la stessa run non deve essere ripetuta: il prossimo confine live richiede una
+nuova AI-PM review e autorizzazione hardware esplicita dell'Utente. Perciò
 `READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true`,
 `READY_FOR_BASELINE_APPROVAL_REVIEW=false`,
 `OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=false`,
-`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true`,
-`READY_FOR_FDT_LIVE_REVIEW=true` e `READY_FOR_FDT_LIVE=false`. D261 non ha
-aperto hardware e non auto-approva una run.
+`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false`,
+`READY_FOR_FDT_LIVE_REVIEW=false` e `READY_FOR_FDT_LIVE=false`: D262 ha aperto
+hardware una sola volta in single-shot e si è chiuso, non autorizzando alcun
+passo successivo; tutti i gate READY_FOR_* a qualificazione non avvenuta restano
+false. D261 non aveva aperto hardware e non auto-approva una run.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -3518,24 +3557,78 @@ D261_FPRINTD_MUTATION_COUNT 0
 D261_REAL_SINGLE_USE_MARKER_CREATE_COUNT 0
 D261_REAL_HARDWARE_ACTION_COUNT 0
 D261_LIVE_EXECUTION NOT_PERFORMED
-D262_OUTCOME READY
-D262_ADVANCEMENT LIVE_EXECUTION_READINESS_REVIEW
-D262_EXECUTION_TARGET STOP_AFTER_FDT_ARM_ACK
-D262_LIVE_CRITICAL_MODIFICATION_COUNT 0
-D262_LIVE_CRITICAL_WORKTREE_MATCH PASS
-D262_D261_OPERATOR_KIT_REUSED true
-D262_DRY_RUN PASS
-D262_DRY_RUN_REAL_USB_OPEN_COUNT 0
-D262_DRY_RUN_REAL_SECRET_READ_COUNT 0
-D262_DRY_RUN_REAL_COMMAND_SEND_COUNT 0
-D262_DRY_RUN_REAL_MARKER_CREATE_COUNT 0
-D262_DRY_RUN_FPRINTD_MUTATION_COUNT 0
-D262_FULL_TEST_SUITE 238_PASS
-D262_READY_FOR_D262_OPERATOR_EXECUTION_REVIEW true
+D262_PRELIVE_OUTCOME READY
+D262_PRELIVE_ADVANCEMENT LIVE_EXECUTION_READINESS_REVIEW
+D262_PRELIVE_EXECUTION_TARGET STOP_AFTER_FDT_ARM_ACK
+D262_PRELIVE_LIVE_CRITICAL_MODIFICATION_COUNT 0
+D262_PRELIVE_LIVE_CRITICAL_WORKTREE_MATCH PASS
+D262_PRELIVE_D261_OPERATOR_KIT_REUSED true
+D262_PRELIVE_DRY_RUN PASS
+D262_PRELIVE_DRY_RUN_REAL_USB_OPEN_COUNT 0
+D262_PRELIVE_DRY_RUN_REAL_SECRET_READ_COUNT 0
+D262_PRELIVE_DRY_RUN_REAL_COMMAND_SEND_COUNT 0
+D262_PRELIVE_DRY_RUN_REAL_MARKER_CREATE_COUNT 0
+D262_PRELIVE_DRY_RUN_FPRINTD_MUTATION_COUNT 0
+D262_PRELIVE_FULL_TEST_SUITE 238_PASS
+D262_PRELIVE_READY_FOR_D262_OPERATOR_EXECUTION_REVIEW true
+D262_PRELIVE_READY_FOR_D262_OPERATOR_EXECUTION false
+D262_PRELIVE_READY_FOR_FDT_LIVE_REVIEW true
+D262_PRELIVE_READY_FOR_FDT_LIVE false
+D262_PRELIVE_LIVE_EXECUTION NOT_PERFORMED
+D262_LIVE_EXECUTION_PERFORMED_ONCE true
+D262_LIVE_OUTCOME PASS
+D262_LIVE_RESULT PASS_STOP_AFTER_FDT_ARM_ACK
+D262_LIVE_PHASE_REACHED STOP_AFTER_FDT_ARM_ACK
+D262_LIVE_TARGET_IDENTITY 27c6:5125
+D262_LIVE_TARGET_FIRMWARE GF_ST411SEC_APP_12509
+D262_APPROVED_BASELINE_SHA e9073a171697bd68dd2debabb851f23d007bf718
+D262_LIVE_CRITICAL_FILESET_DIGEST 39d162077156b2af5fdb4b43d4382923006aa44f75e1e44c0fff741709761418
+D262_EXACT_FDT_COMMAND_TRACE 0x36,0x50,0x36,0x82,0x20,0x36,0x32
+D262_FDT_ARM_BOUNDARY_LIVE_PROVEN true
+D262_FDT_ZERO_TAIL_0x32 PRIMARY_TARGET_PROVEN_AND_ACK_ACCEPTED
+D262_FDT_ZERO_TAIL_0x36 PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED
+D262_FDT_ZERO_TAIL_0x50 PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED
+D262_FDT_ZERO_TAIL_0x82 PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED
+D262_FDT_ZERO_TAIL_0x20 PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED
+D262_PRIMARY_ZERO_TAIL_RISK_RETIRED true
+D262_ZERO_TAIL_PROOF_SCOPE PRIMARY_TARGET_27C6_5125_APP_12509_BOUNDED_FDT_ARM_PATH
+D262_FINGER_INTERACTION_COUNT 0
+D262_RASTER_DECODE_COUNT 0
+D262_RETRY_COUNT 0
+D262_PERSISTENT_DEVICE_WRITE_COUNT 0
+D262_CACHE_WRITE_COUNT 0
+D262_HOST_CACHE_WRITE_COUNT 0
+D262_A2_SPECIAL_RECOVERY_COUNT 0
+D262_0X70_SPECIAL_RECOVERY_COUNT 0
+D262_USB_TRANSPORT_SESSION_COUNT 1
+D262_TLS_SERVER_SESSION_OBJECT_COUNT 1
+D262_TLS_SERVER_HANDSHAKE_COUNT 1
+D262_TRANSPORT_REOPEN_AFTER_TLS false
+D262_TRANSPORT_CLEANUP_COUNT 1
+D262_TLS_CLOSE_COUNT 1
+D262_SECOND_SERVER_SESSION_CREATED false
+D262_SECOND_PSK_PROVISIONING false
+D262_SECRET_BOUNDARY_HANDOFF_COUNT 1
+D262_SECRET_BOUNDARY_ZEROIZED true
+D262_SECRET_ZEROIZED true
+D262_SECRET_LOG_COUNT 0
+D262_BASELINE_B0_TLS_CONSUMED true
+D262_BASELINE_B0_CONSUMED_BEFORE_STAGE2 true
+D262_SECOND_NATIVE_DELTA_PASSED true
+D262_FPRINTD_RESTORE_STATUS restored_to_initial_state
+D262_SIGNAL_RESTORE_STATUS restored
+D262_RUNTIME_STATE CLOSED
+D262_SINGLE_USE_MARKER_STATUS claimed_single_use
+D262_SECOND_LIVE_ATTEMPT_ALLOWED false
+D262_NEXT_LIVE_BOUNDARY_REQUIRES_NEW_AI_PM_REVIEW_AND_EXPLICIT_USER_AUTHORIZATION true
+D262_OUTCOME PASS
+D262_ADVANCEMENT LIVE_FDT_ARM_BOUNDARY_PROVEN
+D262_EXECUTABLE_CLOSURE PASS
+D262_READY_FOR_D262_OPERATOR_EXECUTION_REVIEW false
 D262_READY_FOR_D262_OPERATOR_EXECUTION false
-D262_READY_FOR_FDT_LIVE_REVIEW true
+D262_READY_FOR_FDT_LIVE_REVIEW false
 D262_READY_FOR_FDT_LIVE false
-D262_LIVE_EXECUTION NOT_PERFORMED
+D262_CANONICAL_MANUAL_UPDATED true
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -3778,7 +3871,14 @@ FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND = 0x36/0x50/0x82/0x20
 PRIMARY_FUTURE_LIVE_RISK = FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND
 ```
 
-Il rehearsal end-to-end offline (238 test suite PASS) confermata che il runtime
+Questo blocco descrive lo stato offline pre-live della readiness review. Dopo
+l'esecuzione live una tantum, il rischio `FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND`
+è **ritirato** per `27c6:5125` / `GF_ST411SEC_APP_12509` sul bounded FDT arm path:
+`0x36/0x50/0x82/0x20` sono ora `PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED`;
+`0x32` resta `PRIMARY_TARGET_PROVEN_AND_ACK_ACCEPTED`
+(v. sezione "D262: esecuzione live una tantum e closure" e Hard Wall).
+
+Il rehearsal end-to-end offline (238 test suite PASS) conferma che il runtime
 giunge solo a `STOP_AFTER_FDT_ARM_ACK` dopo il terzo `0x36`/IRQ `0x0100` e l'ACK finale
 `0x32`, con una sola sessione TLS, un solo server, un solo handshake, zero retry,
 zero famiglie persistenti, zero A2/`0x70` di recovery, secret zeroizzato e fprintd
@@ -3787,12 +3887,84 @@ l'import safety dimostra zero side-effect a import-time in un subprocess non
 privilegiato (16 moduli Python, closure 16/16). Il live-critical set è verificato
 blob-per-blob contro la baseline approvata.
 
-La decisione corrente resta invariata: `READY_FOR_D262_OPERATOR_EXECUTION_REVIEW=true`,
-`READY_FOR_D262_OPERATOR_EXECUTION=false`, `READY_FOR_FDT_LIVE=false`. D262 non ha
-aperto hardware, non ha letto secret reale, non ha aperto USB reale, non ha creato
-marker reale e non ha tolto fprintd. La prossima azione è esclusivamente la review
-AI-PM del bundle D262 e la decisione/autorizzazione live esplicita dell'Utente, con
-esecuzione terminale da eseguire manualmente dall'operatore su base single-shot.
+La decisione corrente restava invariata: `READY_FOR_D262_OPERATOR_EXECUTION_REVIEW=true`,
+`READY_FOR_D262_OPERATOR_EXECUTION=false`, `READY_FOR_FDT_LIVE=false`. D262 non aveva
+ancora aperto hardware, non aveva letto secret reale, non aveva aperto USB reale, non
+aveva creato marker reale e non aveva tolto fprintd. La prossima azione era esclusivamente
+la review AI-PM del bundle D262 e la decisione/autorizzazione live esplicita dell'Utente,
+con esecuzione terminale da eseguire manualmente dall'operatore su base single-shot.
+
+### D262: esecuzione live una tantum e closure del confine fresh-FDT arm
+
+La review AI-PM è stata completata e la run è stata eseguita una sola volta (single-shot)
+e si è chiusa con `PASS_STOP_AFTER_FDT_ARM_ACK`. La prova primaria del rapporto operatore
+(recuperato read-only da `/var/lib/goodix-5125-poc/d261-results/d261-final.json`) è
+riprodotta fedelmente negli artefatti `analysis/D262/D262_live_fdt_arm_result.json`,
+`D262_post_live_closure_report.md` e `D262_post_live_decision.json`.
+
+Risultato live (target `27c6:5125`, firmware `GF_ST411SEC_APP_12509`, baseline immutabile
+`e9073a171697bd68dd2debabb851f23d007bf718`, live-critical fileset digest
+`39d162077156b2af5fdb4b43d4382923006aa44f75e1e44c0fff741709761418`):
+
+```text
+D262_LIVE_ATTEMPT = PASS
+D262_LIVE_RESULT = PASS_STOP_AFTER_FDT_ARM_ACK
+PHASE_REACHED = STOP_AFTER_FDT_ARM_ACK
+EXACT_FDT_COMMAND_TRACE = 0x36,0x50,0x36,0x82,0x20,0x36,0x32
+FDT_ARM_BOUNDARY_LIVE_PROVEN = true
+
+FINGER_INTERACTION_COUNT = 0
+RASTER_DECODE_COUNT = 0
+RETRY_COUNT = 0
+PERSISTENT_DEVICE_WRITE_COUNT = 0
+CACHE_WRITE_COUNT = 0
+HOST_CACHE_WRITE_COUNT = 0
+A2_SPECIAL_RECOVERY_COUNT = 0
+0X70_SPECIAL_RECOVERY_COUNT = 0
+
+USB_TRANSPORT_SESSION_COUNT = 1
+TLS_SERVER_SESSION_OBJECT_COUNT = 1
+TLS_SERVER_HANDSHAKE_COUNT = 1
+TRANSPORT_REOPEN_AFTER_TLS = false
+TRANSPORT_CLEANUP_COUNT = 1
+TLS_CLOSE_COUNT = 1
+
+SECOND_SERVER_SESSION_CREATED = false
+SECOND_PSK_PROVISIONING = false
+SECRET_BOUNDARY_HANDOFF_COUNT = 1
+SECRET_BOUNDARY_ZEROIZED = true
+SECRET_ZEROIZED = true
+SECRET_LOG_COUNT = 0
+
+BASELINE_B0_TLS_CONSUMED = true
+BASELINE_B0_CONSUMED_BEFORE_STAGE2 = true
+SECOND_NATIVE_DELTA_PASSED = true
+
+FPRINTD_RESTORE_STATUS = restored_to_initial_state
+SIGNAL_RESTORE_STATUS = restored
+RUNTIME_STATE = CLOSED
+
+SINGLE_USE_MARKER_STATUS = claimed_single_use
+SECOND_LIVE_ATTEMPT_ALLOWED = false
+```
+
+La traccia FDT esatta è stata accettata dal target primario con ACK. Il rischio zero-tail
+per `0x36/0x50/0x82/0x20` passa da `UNPROVEN_LIVE_HYPOTHESIS` a
+`PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED`; `0x32` resta `PRIMARY_TARGET_PROVEN_AND_ACK_ACCEPTED`.
+Lo scope della prova è limitato a `27c6:5125` / `GF_ST411SEC_APP_12509` sul bounded FDT arm
+path. Non si generalizza ad altri device, firmware, comandi di controllo, flusso post-finger,
+`0x22`, enrollment/matching o scritture persistenti. Nessuna interazione dito, nessun retry,
+nessuna scrittura persistente/cache, nessun recovery A2/`0x70`, un'unica sessione USB e un
+solo handshake/server TLS, B0 consumato sulla stessa sessione TLS prima di stage2, secret
+zeroizzato e non loggato, fprintd e segnale ripristinati, runtime chiuso.
+
+`D262_PRIMARY_ZERO_TAIL_RISK_RETIRED=true`; `D262_ZERO_TAIL_PROOF_SCOPE=
+PRIMARY_TARGET_27C6_5125_APP_12509_BOUNDED_FDT_ARM_PATH`. Il marker single-use è consumato e
+la stessa run non deve essere ripetuta: il prossimo confine live richiede nuova AI-PM review
+e autorizzazione hardware esplicita dell'Utente. I vincoli factory-preserving e di
+compatibilità Windows restano integrali. Lo stato massimo è `OUTCOME=PASS`,
+`ADVANCEMENT=LIVE_FDT_ARM_BOUNDARY_PROVEN`, `EXECUTABLE_CLOSURE=PASS`; i flag `READY_FOR_*`
+restano false perché D262 è già eseguito e chiuso, non perché D262 sia fallito.
 
 ## Regole operative
 
