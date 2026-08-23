@@ -27,8 +27,12 @@ con tail zero, e il device ha restituito una A0/AE strutturalmente valida con
 checksum valido e body da 16 byte. Il percorso fresh-FDT non è ancora
 autorizzato live: D256 ne ha chiuso il lifecycle osservabile host/bus, mentre il
 corrective D257 ha dimostrato che il replay precedente copriva soltanto una
-sottosequenza proiettata. Il bootstrap target esatto contiene anche `0x50`,
-`0x82` e `0x20`; i relativi gate host dinamici non sono derivabili dal raw D255.
+sottosequenza proiettata. D258 ha ora trovato nel `gfusb.dll` target
+l'orchestratore completo `gf_update_all_base`: `0x50` e `0x20` sono acquisiti
+prima del terzo sample ma classificati soltanto dopo, mentre `0x82` fornisce
+nel secondo byte la soglia unsigned del confronto assoluto fra i word FDT
+grezzi. Tale predicate è chiusa e implementata; restano irrisolti il modello
+esatto del classificatore NAV/image e, per D255, il plaintext B0 baseline.
 Il candidate esatto resta quindi aperto e il repository non auto-approva né
 autorizza da solo ulteriori operazioni live.
 
@@ -290,6 +294,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
 | Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255, incluso corrective terminal-cancel | primo cancel: re-entry e nuovo `0x32` accettato senza restore USB esplicito; secondo cancel: zero packet nell'intervallo, pending bulk-IN cancellato al frame finale `218`, zero packet residui e quiescenza USB host/bus provata; disarm/lifetime/stato FDT interno non osservati |
 | Candidate fresh-FDT D257 | BLOCKED exact offline; nessun backend/kit live | replay proiettato storico PASS; sequenza esatta D255 `36,50,36,82,20,36,32`, ma gate host dinamici NAV/delta/baseline non derivabili; first-`0x36` single-shot fail-closed; freshness non è il solo blocker |
+| Chiusura gate host D258 | avanzamento offline, candidate ancora BLOCKED | orchestratore target in `gfusb.dll`; gate `0x82` chiuso e implementato; `0x50`/`0x20` corretti come input a classificatori post-stage2 ancora non riproducibili; timeout per comando; zero hardware |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -656,6 +661,12 @@ D257 -> lifecycle FDT e provider seed esplicito implementati offline, senza back
      -> first 0x36 exactly-once, ACK/IRQ/validator obbligatori, zero retry e cleanup fail-closed
      -> IRQ2->0x22 exactly-once e primo record immagine chiusi su fixture sintetica
      -> cache riusata con successo oltre 27 minuti dopo mtime; TTL generale ignota ma non safety blocker
+D258 -> orchestratore target gf_update_all_base recuperato nel gfusb.dll hash-gated
+     -> 0x50 NAV e 0x20 baseline acquisiti prima di stage2, classificati soltanto dopo stage2
+     -> 0x82 chiuso: byte1 unsigned, abs-delta sui word FDT grezzi; predicate implementata
+     -> timeout per comando 36/50/82=500, 20=2000, 32=100 ms; zero retry
+     -> replay esatto avanza wire-exact fino al terzo 0x36, poi fail-closed sui classificatori NAV/image
+     -> B0 D255 non decifrato: input PSK non disponibile nel confine user-readable; nessun privilegio richiesto
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -2491,6 +2502,102 @@ e classificato `SUPERSEDED_BY_D257_EXACT_BOOTSTRAP_CORRECTIVE`. D257 non
 apre USB, non usa hardware o dati biometrici, non crea launcher/operator kit,
 non approva una baseline e non autorizza una run live.
 
+## D258: proprietario e semantica dei gate host FDT
+
+D258 è esclusivamente offline. L'audit statico mirato sul `gfusb.dll` target
+SHA-256 `904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`
+ha recuperato l'orchestratore `gf_update_all_base` a
+`0x180068adc..0x18006987d` e il caller che, su successo, invoca il final FDT
+down a `0x180068abe`. Questo corregge l'inferenza D257 che collocava tutti i
+gate dinamici prima del terzo sample.
+
+Il percorso target statico è:
+
+```text
+stage0 0x36 -> acquisizione/store NAV 0x50 -> stage1 0x36
+-> ChipRegRead 0x0082 -> confronto base0/base1
+-> acquisizione baseline 0x20 -> stage2 0x36 -> confronto base1/base2
+-> classificatore NAV mode1 -> classificatore immagine mode0 -> final 0x32
+```
+
+L'helper NAV `0x180067874` copia la risposta dinamica nel buffer di lavoro e
+ritorna successo senza valutarne semanticamente il contenuto; stage1 segue
+dunque la sola acquisizione strutturalmente valida. Il NAV viene consumato
+dopo stage2 dal wrapper `0x180023fdc`, che imposta mode 1 e chiama il
+classificatore comune `0x180022654`. La baseline acquisita da `0x180067914`
+viene analogamente consumata dopo stage2 da `0x180023fa8`, mode 0, verso lo
+stesso classificatore. Gli enum `0..3` selezionano riuso o aggiornamento delle
+basi; non autorizzano il terzo sample, già completato.
+
+La read `ChipRegRead(register=0x0082, quantity=2)` è invece chiusa: il byte 0
+della risposta non viene usato su questo path, il byte 1 è zero-extended come
+soglia unsigned e ogni elemento delle due basi FDT grezze è confrontato come
+word unsigned:
+
+```text
+forall i: abs(uint16(base0[i]) - uint16(base1[i])) <= uint8(response[1])
+```
+
+Una violazione sceglie il fallback alla base file quando disponibile o il loop
+di rebuild; il pass prosegue verso la baseline. Lo stesso confronto è ripetuto
+fra base1 e base2. Nel raw D255 la massima differenza base0/base1 è `1` e la
+soglia osservata è `29`, quindi il pass deriva dalla formula e non dal blob
+hardcoded `80 1d`.
+
+Il core GPL conserva ora NAV e B0 baseline come stato runtime, applica il gate
+`0x82` nativo nel punto corretto, completa stage2 e sposta i classificatori
+NAV/image nel boundary post-stage2. La decryption e i classificatori mancanti
+restano obbligatori prima del final `0x32`: in loro assenza il candidate fallisce
+chiuso. Il replay D255 esatto è wire-exact attraverso
+`36,50,36,82,20,36`, poi si arresta prima di `0x32` sul primo classificatore
+post-stage2 non riproducibile. Il replay proiettato D256/D257 resta distinto e
+`PASS_HISTORICAL`.
+
+Il classifier comune è presente nel corpus, ma la sua configurazione/stato
+runtime target e un modello ABI esatto validabile non sono materializzati.
+Per la baseline manca inoltre il plaintext application del B0 D255: la PSK
+factory approvata vive fuori dal confine user-readable del repository, quindi
+`D255_B0_DECRYPTION_STATUS=INPUT_UNAVAILABLE_WITHOUT_PRIVILEGE`. D258 non ha
+letto path root-only, chiesto privilegi o copiato secret. Il corpus statico
+locale è esaurito per queste domande: un ulteriore census dello stesso DLL
+senza runtime state o plaintext non testerebbe una nuova ipotesi.
+
+La policy temporale non riusa più accidentalmente un unico valore:
+
+```text
+COMMAND_TIMEOUT_POLICY=PER_COMMAND_EVIDENCE_BOUNDED
+TIMEOUT_0x36_MS=500
+TIMEOUT_0x50_MS=500
+TIMEOUT_0x82_MS=500
+TIMEOUT_0x20_MS=2000
+TIMEOUT_0x32_MS=100
+```
+
+I valori derivano dai callsite OEM e sono compatibili con le latenze D255
+osservate (`11.025`, `17.934`, `2.198`, `81.293`, `0.957` ms rispettivamente).
+Timeout significa stop fail-closed e non retry.
+
+```text
+TARGET_BOOTSTRAP_SEQUENCE_HASH_GATED=true
+GATE_0x50_STATUS=PARTIAL_STORE_ROLE_CLOSED_POST_SAMPLE_CLASSIFIER_UNRESOLVED
+GATE_0x82_STATUS=CLOSED_NATIVE_PREDICATE_IMPLEMENTED
+GATE_0x20_STATUS=PARTIAL_ACQUISITION_ROLE_CLOSED_POST_SAMPLE_CLASSIFIER_UNRESOLVED
+CURRENT_LOCAL_CORPUS_EXHAUSTED_FOR_0x50_GATE=true
+CURRENT_LOCAL_CORPUS_EXHAUSTED_FOR_0x82_GATE=true
+CURRENT_LOCAL_CORPUS_EXHAUSTED_FOR_0x20_GATE=true
+PROJECTED_FDT_SUBSEQUENCE_REPLAY=PASS_HISTORICAL
+EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY=BLOCKED
+DYNAMIC_HOST_GATES_CLOSED=false
+FDT_OFFLINE_CANDIDATE_CLOSED=false
+HOST_BUS_LIFECYCLE_READY=true
+SEED_FRESHNESS_FACTORY_PRESERVATION_BLOCKER=false
+READY_FOR_FDT_LIVE_REVIEW=false
+READY_FOR_FDT_LIVE=false
+```
+
+D258 non modifica il backend USB reale, non crea launcher o operator kit, non
+accede all'hardware e non autorizza una run live.
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -2577,15 +2684,16 @@ host finale non viene registrato alcun altro packet. Nessun restore, abort,
 reset, reconfiguration o re-enumeration è osservato: il contratto terminal-stop
 host/bus è chiuso come quiescenza USB path-bounded.
 
-D257 mantiene chiusi il lifecycle host e il provider cache fail-closed, ma il
-corrective riclassifica il vecchio replay come sottosequenza proiettata. Il
-bootstrap esatto D255 include `0x50`, `0x82` e `0x20` fra i tre `0x36`; i gate
-host sui rispettivi dati dinamici NAV/delta/baseline non sono derivabili dal
-raw. Questo è il blocker esatto corrente. Il disarm del prior arm, la sua
+D257 mantiene chiusi il lifecycle host e il provider cache fail-closed e
+riclassifica il vecchio replay come sottosequenza proiettata. D258 chiude la
+semantica `0x82` e corregge `0x50`/`0x20` come acquisizioni prima di stage2 con
+classificazione soltanto dopo stage2. Il blocker esatto corrente è ora il
+modello non riproducibile del classificatore NAV/image comune, cui si aggiunge
+per la baseline l'indisponibilità del plaintext B0 D255. Il disarm del prior arm, la sua
 lifetime e lo stato interno FDT dopo cancel rimangono ignoti epistemici non
 bloccanti rispetto al contratto host/bus D256. La TTL generale del cache resta
 un'incertezza di successo funzionale, non il solo blocker né un requisito di
-factory-preservation. Nessun path FDT Linux è diventato live-capable e D257 non
+factory-preservation. Nessun path FDT Linux è diventato live-capable e D258 non
 autorizza hardware, capture o nuova invocazione.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
@@ -2683,6 +2791,29 @@ D257_SEED_FRESHNESS_IS_SOLE_LIVE_BLOCKER false
 D257_READY_FOR_FDT_LIVE_REVIEW false
 D257_READY_FOR_FDT_LIVE false
 D257_LIVE_EXECUTION NOT_PERFORMED
+D258_TARGET_BOOTSTRAP_SEQUENCE_HASH_GATED true
+D258_GATE_0x50_STATUS PARTIAL_STORE_ROLE_CLOSED_POST_SAMPLE_CLASSIFIER_UNRESOLVED
+D258_GATE_0x82_STATUS CLOSED_NATIVE_PREDICATE_IMPLEMENTED
+D258_GATE_0x20_STATUS PARTIAL_ACQUISITION_ROLE_CLOSED_POST_SAMPLE_CLASSIFIER_UNRESOLVED
+D258_D255_B0_DECRYPTION_STATUS INPUT_UNAVAILABLE_WITHOUT_PRIVILEGE
+D258_COMMAND_TIMEOUT_POLICY PER_COMMAND_EVIDENCE_BOUNDED
+D258_TIMEOUT_0x36_MS 500
+D258_TIMEOUT_0x50_MS 500
+D258_TIMEOUT_0x82_MS 500
+D258_TIMEOUT_0x20_MS 2000
+D258_TIMEOUT_0x32_MS 100
+D258_CURRENT_LOCAL_CORPUS_EXHAUSTED_FOR_0x50_GATE true
+D258_CURRENT_LOCAL_CORPUS_EXHAUSTED_FOR_0x82_GATE true
+D258_CURRENT_LOCAL_CORPUS_EXHAUSTED_FOR_0x20_GATE true
+D258_PROJECTED_FDT_SUBSEQUENCE_REPLAY PASS_HISTORICAL
+D258_EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY BLOCKED
+D258_DYNAMIC_HOST_GATES_CLOSED false
+D258_FDT_OFFLINE_CANDIDATE_CLOSED false
+D258_HOST_BUS_LIFECYCLE_READY true
+D258_SEED_FRESHNESS_FACTORY_PRESERVATION_BLOCKER false
+D258_READY_FOR_FDT_LIVE_REVIEW false
+D258_READY_FOR_FDT_LIVE false
+D258_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -2808,6 +2939,14 @@ IRQ2→`0x22`→prima immagine usa una fixture sintetica non biometrica. Non son
 stati aggiunti backend USB, launcher, baseline approvata o operator kit, e il
 live resta non autorizzato.
 
+D258 estende soltanto il core e gli audit offline: preserva NAV/B0 come input
+runtime, implementa il predicate target `0x82`, sposta correttamente i
+classificatori dopo stage2 e introduce timeout per comando. L'audit statico e
+il replay sono hash-gated e non esportano raw, OTP, cache, DLL, secret o raster.
+Il final `0x32` del candidate esatto resta irraggiungibile finché entrambi i
+classificatori post-stage2 non sono riproducibili; nessun backend, launcher,
+operator kit o autorizzazione live è stato aggiunto.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -2821,5 +2960,5 @@ live resta non autorizzato.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D257 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D258 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.

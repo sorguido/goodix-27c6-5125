@@ -55,7 +55,17 @@ SAFE_DEVICE_COMMANDS = frozenset({0x20, 0x22, 0x32, 0x36, 0x50, 0x82})
 PERSISTENT_COMMAND_FAMILIES = frozenset({0xE0, 0xA4, 0xF0, 0xF4})
 SPECIAL_RECOVERY_COMMANDS = frozenset({0xA2, 0x70})
 EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE = (0x36, 0x50, 0x36, 0x82, 0x20, 0x36, 0x32)
-FIRST_FDT36_COMMAND_TIMEOUT_MS = 100
+COMMAND_TIMEOUT_POLICY = "PER_COMMAND_EVIDENCE_BOUNDED"
+COMMAND_TIMEOUT_MS = {
+    0x36: 500,
+    0x50: 500,
+    0x82: 500,
+    0x20: 2000,
+    0x32: 100,
+}
+# Compatibility name: end-to-end OEM FDT-base acquisition budget, not the
+# 100 ms ACK-only constant inside ChicagoHUSetMode.
+FIRST_FDT36_COMMAND_TIMEOUT_MS = COMMAND_TIMEOUT_MS[0x36]
 
 
 @dataclass(frozen=True)
@@ -294,6 +304,41 @@ def table_from_irq100_payload(payload: bytes) -> bytes:
     return bytes(learned)
 
 
+def raw_words_from_irq100_payload(payload: bytes) -> tuple[int, ...]:
+    """Return the six unsigned OEM FDT-base words from an IRQ 0x0100."""
+    event = parse_fdt_event(payload)
+    if event.irq != 0x100 or event.touch_flags != 0 or event.raw_base is None:
+        raise UnexpectedEvent("manual_sample_requires_irq100_touch_zero_raw12")
+    if len(event.raw_base) != 12:
+        raise LengthMismatch("manual_sample_raw_base_length")
+    return tuple(
+        int.from_bytes(event.raw_base[offset:offset + 2], "little")
+        for offset in range(0, 12, 2)
+    )
+
+
+def fdt_delta_threshold(response_data: bytes) -> int:
+    """Decode the OEM threshold from a two-byte register-0x0082 read."""
+    if len(response_data) != 2:
+        raise LengthMismatch(f"fdt_delta_response_length:{len(response_data)}")
+    return response_data[1]
+
+
+def fdt_raw_delta_within_threshold(
+    first: tuple[int, ...],
+    second: tuple[int, ...],
+    threshold: int,
+) -> bool:
+    """Apply the OEM unsigned absolute-delta test to two raw FDT bases."""
+    if len(first) != len(second) or not first:
+        raise LengthMismatch("fdt_delta_word_count")
+    if not 0 <= threshold <= 0xFF:
+        raise ValueError("fdt_delta_threshold_range")
+    if any(not 0 <= value <= 0xFFFF for value in (*first, *second)):
+        raise ValueError("fdt_delta_word_range")
+    return all(abs(left - right) <= threshold for left, right in zip(first, second))
+
+
 class FreshFdtBootstrapMachine:
     """Exactly-three-stage FDT bootstrap plus cancel/re-entry/stop projection.
 
@@ -385,9 +430,11 @@ class ExactFreshFdtBootstrapMachine:
 
     Unlike ``FreshFdtBootstrapMachine`` (the historical projected
     subsequence), this machine enforces the target-observed 0x50, 0x82 and
-    0x20 inter-stage work.  Dynamic NAV, FDT-delta and decrypted baseline-image
-    data must pass caller-supplied semantic gates.  Missing gates fail closed;
-    the target capture is never used as a runtime blob or truth predicate.
+    0x20 inter-stage work.  NAV and baseline data are acquired before the third
+    manual sample but consumed by the OEM classifier only after it.  The native
+    0x82 predicate is enforced immediately; unresolved post-sample classifiers
+    remain injected fail-closed boundaries.  Capture bytes are never truth
+    predicates.
     """
 
     MANUAL_STAGE_COUNT = 3
@@ -398,14 +445,12 @@ class ExactFreshFdtBootstrapMachine:
         lifecycle: FdtLifecycle,
         *,
         nav_semantic_gate: Callable[[bytes], bool] | None = None,
-        delta_semantic_gate: Callable[[bytes], bool] | None = None,
         decrypt_baseline_b0: Callable[[bytes], bytes] | None = None,
         baseline_semantic_gate: Callable[[tuple[int, ...]], bool] | None = None,
     ) -> None:
         self.transport = transport
         self.lifecycle = lifecycle
         self.nav_semantic_gate = nav_semantic_gate
-        self.delta_semantic_gate = delta_semantic_gate
         self.decrypt_baseline_b0 = decrypt_baseline_b0
         self.baseline_semantic_gate = baseline_semantic_gate
         self.table12: bytes | None = None
@@ -416,13 +461,22 @@ class ExactFreshFdtBootstrapMachine:
         self.arm_attempt_count = 0
         self.nav_gate_passed = False
         self.delta_gate_passed = False
+        self.second_delta_gate_passed = False
         self.baseline_gate_passed = False
+        self.nav_dynamic_state: bytes | None = None
+        self.baseline_b0: bytes | None = None
+        self.raw_fdt_samples: list[tuple[int, ...]] = []
+        self.delta_threshold: int | None = None
+        self.host_decisions_finalized = False
 
     def _fail(self, reason: str) -> None:
         self.lifecycle.fail_closed(reason)
 
     def _required_exchange(self, request: bytes, echo: int, response_count: int) -> list[bytes]:
-        frames = list(self.transport.exchange(request, timeout_ms=FIRST_FDT36_COMMAND_TIMEOUT_MS))
+        timeout_ms = COMMAND_TIMEOUT_MS.get(echo)
+        if timeout_ms is None:
+            raise InvalidTransition(f"missing_command_timeout:0x{echo:02x}")
+        frames = list(self.transport.exchange(request, timeout_ms=timeout_ms))
         if len(frames) != response_count + 1:
             raise UnexpectedAck(
                 f"required_ack_response_count:0x{echo:02x}:{len(frames)}"
@@ -441,12 +495,12 @@ class ExactFreshFdtBootstrapMachine:
         if self.table12 is None or self.manual_stage >= self.MANUAL_STAGE_COUNT:
             self._fail("manual_sample_invalid_stage")
             raise InvalidTransition("manual_sample_invalid_stage")
-        if self.manual_stage == 1 and not self.nav_gate_passed:
-            self._fail("second_manual_stage_before_nav_gate")
-            raise InvalidTransition("second_manual_stage_before_nav_gate")
-        if self.manual_stage == 2 and not (self.delta_gate_passed and self.baseline_gate_passed):
-            self._fail("third_manual_stage_before_delta_baseline_gates")
-            raise InvalidTransition("third_manual_stage_before_delta_baseline_gates")
+        if self.manual_stage == 1 and self.nav_dynamic_state is None:
+            self._fail("second_manual_stage_before_nav_acquisition")
+            raise InvalidTransition("second_manual_stage_before_nav_acquisition")
+        if self.manual_stage == 2 and not (self.delta_gate_passed and self.baseline_b0 is not None):
+            self._fail("third_manual_stage_before_delta_and_baseline_acquisition")
+            raise InvalidTransition("third_manual_stage_before_delta_and_baseline_acquisition")
         stage = self.manual_stage
         self.lifecycle.manual_sample_attempt(stage)
         self.manual_attempt_count += 1
@@ -454,11 +508,13 @@ class ExactFreshFdtBootstrapMachine:
             self.first_0x36_attempt_count += 1
         try:
             self._required_exchange(build_fdt_manual(self.table12), 0x36, 0)
+            raw_words = raw_words_from_irq100_payload(event_payload)
             learned = table_from_irq100_payload(event_payload)
         except Exception:
             self._fail(f"manual_sample_{stage}_failed")
             raise
         self.table12 = learned
+        self.raw_fdt_samples.append(raw_words)
         self.manual_stage += 1
         self.lifecycle.manual_sample_completed(stage)
         if self.manual_stage == self.MANUAL_STAGE_COUNT:
@@ -466,22 +522,18 @@ class ExactFreshFdtBootstrapMachine:
         return learned
 
     def nav_interstage(self) -> None:
-        if self.manual_stage != 1 or self.nav_gate_passed:
+        if self.manual_stage != 1 or self.nav_dynamic_state is not None:
             self._fail("nav_interstage_wrong_order")
             raise InvalidTransition("nav_interstage_wrong_order")
         self.lifecycle.interstage_attempt("0x50_NAV", 0x50)
         try:
             response = self._required_exchange(build_nav_baseline(), 0x50, 1)[0]
             nav = parse_nav_baseline_response(response)
-            if self.nav_semantic_gate is None:
-                raise InvalidTransition("nav_semantic_gate_unavailable")
-            if not self.nav_semantic_gate(nav):
-                raise UnexpectedEvent("nav_semantic_gate_rejected")
+            self.nav_dynamic_state = bytes(nav)
         except Exception:
             self._fail("nav_interstage_failed")
             raise
-        self.nav_gate_passed = True
-        self.lifecycle.interstage_completed("0x50_NAV")
+        self.lifecycle.interstage_completed("0x50_NAV_STORED")
 
     def delta_and_baseline_interstage(self) -> None:
         if self.manual_stage != 2 or self.delta_gate_passed or self.baseline_gate_passed:
@@ -491,10 +543,14 @@ class ExactFreshFdtBootstrapMachine:
         try:
             response = self._required_exchange(build_read_fdt_delta(), 0x82, 1)[0]
             delta = parse_fdt_delta_response(response)
-            if self.delta_semantic_gate is None:
-                raise InvalidTransition("delta_semantic_gate_unavailable")
-            if not self.delta_semantic_gate(delta):
-                raise UnexpectedEvent("delta_semantic_gate_rejected")
+            if len(self.raw_fdt_samples) != 2:
+                raise InvalidTransition("delta_requires_two_raw_fdt_samples")
+            threshold = fdt_delta_threshold(delta)
+            if not fdt_raw_delta_within_threshold(
+                self.raw_fdt_samples[0], self.raw_fdt_samples[1], threshold
+            ):
+                raise UnexpectedEvent("fdt_delta_threshold_rejected")
+            self.delta_threshold = threshold
         except Exception:
             self._fail("delta_interstage_failed")
             raise
@@ -505,21 +561,52 @@ class ExactFreshFdtBootstrapMachine:
         try:
             response = self._required_exchange(build_set_image(), 0x20, 1)[0]
             parse_baseline_image_b0_shape(response)
-            if self.decrypt_baseline_b0 is None:
-                raise InvalidTransition("baseline_b0_decryptor_unavailable")
-            pixels = parse_image_payload(self.decrypt_baseline_b0(response))
-            if self.baseline_semantic_gate is None:
-                raise InvalidTransition("baseline_semantic_gate_unavailable")
-            if not self.baseline_semantic_gate(pixels):
-                raise UnexpectedEvent("baseline_semantic_gate_rejected")
+            self.baseline_b0 = bytes(response)
         except Exception:
             self._fail("baseline_interstage_failed")
             raise
+        self.lifecycle.interstage_completed("0x20_BASELINE_IMAGE_ACQUIRED")
+
+    def finalize_host_base_decisions(self) -> None:
+        """Run post-stage2 NAV/image decisions, failing closed while unknown."""
+        if self.manual_stage != self.MANUAL_STAGE_COUNT or self.host_decisions_finalized:
+            self._fail("host_base_decisions_wrong_order")
+            raise InvalidTransition("host_base_decisions_wrong_order")
+        if self.nav_dynamic_state is None or self.baseline_b0 is None:
+            self._fail("host_base_decision_inputs_missing")
+            raise InvalidTransition("host_base_decision_inputs_missing")
+        try:
+            if len(self.raw_fdt_samples) != 3 or self.delta_threshold is None:
+                raise InvalidTransition("second_delta_requires_three_raw_fdt_samples")
+            if not fdt_raw_delta_within_threshold(
+                self.raw_fdt_samples[1], self.raw_fdt_samples[2], self.delta_threshold
+            ):
+                raise UnexpectedEvent("second_fdt_delta_threshold_rejected")
+            self.second_delta_gate_passed = True
+            if self.nav_semantic_gate is None:
+                raise InvalidTransition("nav_post_sample_classifier_unavailable")
+            if not self.nav_semantic_gate(self.nav_dynamic_state):
+                raise UnexpectedEvent("nav_post_sample_classifier_rejected")
+            if self.decrypt_baseline_b0 is None:
+                raise InvalidTransition("baseline_b0_decryptor_unavailable")
+            pixels = parse_image_payload(self.decrypt_baseline_b0(self.baseline_b0))
+            if self.baseline_semantic_gate is None:
+                raise InvalidTransition("baseline_post_sample_classifier_unavailable")
+            if not self.baseline_semantic_gate(pixels):
+                raise UnexpectedEvent("baseline_post_sample_classifier_rejected")
+        except Exception:
+            self._fail("post_sample_host_base_decisions_failed")
+            raise
+        self.nav_gate_passed = True
         self.baseline_gate_passed = True
-        self.lifecycle.interstage_completed("0x20_BASELINE_IMAGE")
+        self.host_decisions_finalized = True
 
     def arm(self, ts16: int) -> None:
-        if self.table12 is None or self.manual_stage != self.MANUAL_STAGE_COUNT:
+        if (
+            self.table12 is None
+            or self.manual_stage != self.MANUAL_STAGE_COUNT
+            or not self.host_decisions_finalized
+        ):
             self._fail("arm_before_exact_bootstrap_complete")
             raise InvalidTransition("arm_before_exact_bootstrap_complete")
         self.lifecycle.arm_fdt()

@@ -299,12 +299,11 @@ def scenario_exact_target_blocked(
     candidate = ExactFreshFdtBootstrapMachine(transport, lifecycle)
     candidate.begin(provider)
     candidate.manual_sample(first_event.raw[4:])
-    try:
-        candidate.nav_interstage()
-    except InvalidTransition as error:
-        require(str(error) == "nav_semantic_gate_unavailable", "unexpected exact-candidate blocker")
-    else:
-        raise RuntimeError("D255 exact candidate incorrectly bypassed the NAV semantic gate")
+    candidate.nav_interstage()
+    # D258 proved that 0x50 acquisition is store-only at this point.  Keep the
+    # historical D257 bounded scenario at two requests, but stop explicitly
+    # before pretending that the then-unavailable later host decisions close.
+    lifecycle.fail_closed("later_dynamic_host_gates_unavailable_in_d257_scope")
     require(transport.requests == [first_request.raw, nav_request.raw],
             "exact candidate pre-blocker requests differ from D255")
     require(candidate.first_0x36_attempt_count == 1, "first 0x36 was not exactly once")
@@ -313,14 +312,14 @@ def scenario_exact_target_blocked(
     require(lifecycle.retry_count == 0, "exact candidate retried")
     return {
         "name": "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY",
-        "status": "BLOCKED_FAIL_CLOSED_AT_FIRST_UNAVAILABLE_DYNAMIC_HOST_GATE",
+        "status": "BLOCKED_FAIL_CLOSED_BEFORE_LATER_UNAVAILABLE_DYNAMIC_HOST_GATES",
         "full_target_out_control_trace": audit["timeline"]["out_control_trace"][1:],
         "core_exact_trace_contract": [f"0x{value:02x}" for value in EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE],
         "trace_contract_matches_target": tuple(EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE) == tuple(
             int(value, 16) for value in audit["timeline"]["out_control_trace"][1:]
         ),
         "requests_executed_before_fail_closed": ["0x36", "0x50"],
-        "blocker": "0x50_DYNAMIC_NAV_HOST_SEMANTIC_GATE_UNAVAILABLE; LATER_0x82_AND_0x20_GATES_ALSO_UNRESOLVED",
+        "blocker": "D257_SCOPE_ENDED_AFTER_0x50_STORE; LATER_0x82_AND_0x20_HOST_DECISIONS_UNRESOLVED_AT_THAT_STEP",
         "first_0x36_attempt_count": candidate.first_0x36_attempt_count,
         "first_0x36_timeout_ms": FIRST_FDT36_COMMAND_TIMEOUT_MS,
         "first_0x36_ack_required": True,

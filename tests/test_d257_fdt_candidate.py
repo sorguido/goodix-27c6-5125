@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 from core.fdt_lifecycle import (
+    COMMAND_TIMEOUT_MS,
     EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE,
     FIRST_FDT36_COMMAND_TIMEOUT_MS,
     ExactFreshFdtBootstrapMachine,
@@ -295,7 +296,6 @@ class D257LifecycleTests(unittest.TestCase):
             transport,
             lifecycle,
             nav_semantic_gate=lambda data: len(data) == 2409,
-            delta_semantic_gate=lambda data: data == b"\x80\x1d",
             decrypt_baseline_b0=lambda _frame: image_payload(),
             baseline_semantic_gate=lambda pixels: pixels == synthetic_raster(),
         )
@@ -310,12 +310,24 @@ class D257LifecycleTests(unittest.TestCase):
         candidate.manual_sample(irq100(raw_sets[1]))
         candidate.delta_and_baseline_interstage()
         candidate.manual_sample(irq100(raw_sets[2]))
+        candidate.finalize_host_base_decisions()
         candidate.arm(0x1234)
 
         self.assertEqual(lifecycle.device_command_trace, EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE)
         self.assertEqual(candidate.first_0x36_attempt_count, 1)
         self.assertEqual(candidate.first_0x36_timeout_ms, FIRST_FDT36_COMMAND_TIMEOUT_MS)
-        self.assertEqual(transport.timeouts, [FIRST_FDT36_COMMAND_TIMEOUT_MS] * 7)
+        self.assertEqual(
+            transport.timeouts,
+            [
+                COMMAND_TIMEOUT_MS[0x36],
+                COMMAND_TIMEOUT_MS[0x50],
+                COMMAND_TIMEOUT_MS[0x36],
+                COMMAND_TIMEOUT_MS[0x82],
+                COMMAND_TIMEOUT_MS[0x20],
+                COMMAND_TIMEOUT_MS[0x36],
+                COMMAND_TIMEOUT_MS[0x32],
+            ],
+        )
         self.assertTrue(candidate.nav_gate_passed)
         self.assertTrue(candidate.delta_gate_passed)
         self.assertTrue(candidate.baseline_gate_passed)

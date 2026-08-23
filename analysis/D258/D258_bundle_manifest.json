@@ -1,0 +1,42 @@
+{
+  "schema": "D258_STEP_LOCAL_BUNDLE_MANIFEST_V1",
+  "step": "D258",
+  "baseline_head": "3e157d63830cb5469ba9e8e99ef02337b9eee913",
+  "bundle": "analysis/D258/D258_host_semantic_gate_closure_bundle.zip",
+  "scope": "STEP_LOCAL_NON_CUMULATIVE_REVIEW_BY_REFERENCE",
+  "files": {
+    "Goodix 27c6 5125 manuale tecnico.md": "622771f54fa85fd712bd22d7b831aa39086930d20b32d4468f02906f131d84b7",
+    "core/README.md": "48fe542170592de2a0746f64913ee69bcbd9cb8ada26dd2d060367803d12259d",
+    "core/fdt_lifecycle.py": "850d6baab0d6748ddf6130859074e2bc426906560a4d5c84873d9eb6ca92f06c",
+    "analysis/D257/d257_offline_replay.py": "ae246c471953137f12a34fa85d5402992d78979d916f765312f7bb8a269a9bfc",
+    "tests/test_d257_fdt_candidate.py": "b8143b9e2032a516d267d37a3cd4473cefd99a9f589bbb021a491f96dbdc2fa5",
+    "tests/test_d258_host_gates.py": "ea665bea72e6dbc55d2332d03711f73dc6c9f60e517b5d6ce3807558d2d08bbb",
+    "analysis/D258/d258_host_gate_audit.py": "371c0843d07954bfa63aff695ee55a1eb59e0443bb033c81b9b6e77d71d6f8be",
+    "analysis/D258/d258_offline_replay.py": "ee0dae84bdf91f9fd4244eee8b2970765cfea19105e98a3d6e1f4f6f1870d2e0",
+    "analysis/D258/D258_host_gate_audit.json": "e7f6e23870a014c8acd759e7c11c1b5b0e1e45b48bbd70883ae534947ab4652b",
+    "analysis/D258/D258_host_gate_callgraph.json": "eb2bc8b17496c8fcbf393cce5468a082878403664fda700b4ac5e517c87955e2",
+    "analysis/D258/D258_host_gate_callgraph.md": "4318101025076d1069f43e6a4c4edee8270b00adc434c694eb7075439ac792bb",
+    "analysis/D258/D258_exact_bootstrap_decision.json": "97c9d88c89ac82d940e724584c462c0e7a19e0dee13ee281e95496b671fb9b08",
+    "analysis/D258/D258_replay_integration.json": "4df3a834db35830ca1de4db142c65918a24bad7eb99e02583c9dbbc680bae58e",
+    "analysis/D258/D258_timeout_policy.md": "3b84b78c9a2a9649461f4e7522747d1243d1bd7630e5550891f6723850464792",
+    "analysis/D258/D258_test_results.txt": "a0e9db8e70c12fbca9b402f3bb5fbb2e6a175cd46c354620d0756d9e47020d0f",
+    "analysis/D258/D258_host_semantic_gate_closure_report.md": "aa5849e5344753a2ad9ffb0e6d9900d494072f175041a3c1421f3ed90dfd512b"
+  },
+  "excluded": [
+    "raw pcapng and captures",
+    "raw cache and OTP",
+    "OEM DLLs, executables and firmware",
+    "PSK, TLS keys and other secrets",
+    "dynamic NAV payloads",
+    "baseline image records and biometric or zero-finger rasters",
+    "historical bundles and unmodified historical artifacts",
+    "cache and temporary files"
+  ],
+  "safety": {
+    "REAL_USB_OPEN_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0
+  }
+}

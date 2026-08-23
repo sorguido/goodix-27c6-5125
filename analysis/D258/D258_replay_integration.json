@@ -1,0 +1,453 @@
+{
+  "closure": {
+    "DYNAMIC_HOST_GATES_CLOSED": false,
+    "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY": "BLOCKED",
+    "FDT_OFFLINE_CANDIDATE_CLOSED": false,
+    "HOST_BUS_LIFECYCLE_READY": true,
+    "PROJECTED_FDT_SUBSEQUENCE_REPLAY": "PASS_HISTORICAL",
+    "READY_FOR_FDT_LIVE": false,
+    "READY_FOR_FDT_LIVE_REVIEW": false,
+    "SEED_FRESHNESS_FACTORY_PRESERVATION_BLOCKER": false,
+    "SEED_FRESHNESS_FUNCTIONAL_SUCCESS_RISK": "GENERAL_TTL_UNPROVEN_BOUNDED_RISK",
+    "TARGET_BOOTSTRAP_SEQUENCE_HASH_GATED": true
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "primary_blockers": [
+    "POST_STAGE2_NAV_CLASSIFIER_0x180022654_NOT_EXACTLY_REPRODUCIBLE_FROM_TARGET_RUNTIME_STATE",
+    "D255_BASELINE_B0_PLAINTEXT_AND_POST_STAGE2_IMAGE_CLASSIFIER_RUNTIME_STATE_UNAVAILABLE"
+  ],
+  "safety": {
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_USB_OPEN_COUNT": 0
+  },
+  "scenarios": [
+    {
+      "cache_fdt12_equals_first_wire_seed": true,
+      "cache_modified": false,
+      "cancel_host_only": true,
+      "lifecycle": {
+        "0x70_injection_count": 0,
+        "a2_injection_count": 0,
+        "device_command_trace": [
+          "0x36",
+          "0x36",
+          "0x36",
+          "0x32",
+          "0x32"
+        ],
+        "persistent_write_family_count": 0,
+        "retry_count": 0,
+        "session_generation": 1,
+        "state": "TERMINAL_STOPPED",
+        "transition_count": 15,
+        "transitions": [
+          {
+            "device_commands": [],
+            "event": "AF_STATE_OBSERVED",
+            "host_actions": [],
+            "sequence": 1,
+            "session_generation": 0,
+            "source": "INITIALIZED_POST_D4",
+            "target": "AF_STATE_KNOWN"
+          },
+          {
+            "device_commands": [],
+            "event": "BEGIN_FRESH_FDT_BOOTSTRAP",
+            "host_actions": [],
+            "sequence": 2,
+            "session_generation": 0,
+            "source": "AF_STATE_KNOWN",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x36"
+            ],
+            "event": "FDT_MANUAL_SAMPLE_0_ATTEMPT",
+            "host_actions": [],
+            "sequence": 3,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_MANUAL_SAMPLE_0_IRQ100_ACCEPTED",
+            "host_actions": [],
+            "sequence": 4,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x36"
+            ],
+            "event": "FDT_MANUAL_SAMPLE_1_ATTEMPT",
+            "host_actions": [],
+            "sequence": 5,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_MANUAL_SAMPLE_1_IRQ100_ACCEPTED",
+            "host_actions": [],
+            "sequence": 6,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x36"
+            ],
+            "event": "FDT_MANUAL_SAMPLE_2_ATTEMPT",
+            "host_actions": [],
+            "sequence": 7,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_MANUAL_SAMPLE_2_IRQ100_ACCEPTED",
+            "host_actions": [],
+            "sequence": 8,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_BOOTSTRAP_COMPLETED",
+            "host_actions": [],
+            "sequence": 9,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_READY"
+          },
+          {
+            "device_commands": [
+              "0x32"
+            ],
+            "event": "FDT_ARM_ATTEMPT",
+            "host_actions": [],
+            "sequence": 10,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_READY",
+            "target": "FDT_ARMED_WAIT"
+          },
+          {
+            "device_commands": [],
+            "event": "HOST_CANCEL_PENDING_RECEIVE",
+            "host_actions": [
+              "CANCEL_PENDING_BULK_IN"
+            ],
+            "sequence": 11,
+            "session_generation": 0,
+            "source": "FDT_ARMED_WAIT",
+            "target": "HOST_WAIT_CANCELED"
+          },
+          {
+            "device_commands": [],
+            "event": "BEGIN_SESSION_REENTRY",
+            "host_actions": [
+              "OEM_STYLE_REENTRY_STATE_PATH"
+            ],
+            "sequence": 12,
+            "session_generation": 1,
+            "source": "HOST_WAIT_CANCELED",
+            "target": "SESSION_REENTRY"
+          },
+          {
+            "device_commands": [
+              "0x32"
+            ],
+            "event": "FDT_ARM_ATTEMPT",
+            "host_actions": [],
+            "sequence": 13,
+            "session_generation": 1,
+            "source": "SESSION_REENTRY",
+            "target": "FDT_ARMED_WAIT"
+          },
+          {
+            "device_commands": [],
+            "event": "HOST_CANCEL_PENDING_RECEIVE",
+            "host_actions": [
+              "CANCEL_PENDING_BULK_IN"
+            ],
+            "sequence": 14,
+            "session_generation": 1,
+            "source": "FDT_ARMED_WAIT",
+            "target": "HOST_WAIT_CANCELED"
+          },
+          {
+            "device_commands": [],
+            "event": "TERMINAL_STOP",
+            "host_actions": [
+              "STOP_SESSION"
+            ],
+            "sequence": 15,
+            "session_generation": 1,
+            "source": "HOST_WAIT_CANCELED",
+            "target": "TERMINAL_STOPPED"
+          }
+        ]
+      },
+      "manual_requests_wire_exact": true,
+      "manual_stage_count": 3,
+      "name": "D255_FRESH_BOOTSTRAP_CANCEL_REENTRY_TERMINAL_STOP",
+      "provenance_class": "PRIVATE_D255_APP12509_CAPTURE_AND_CACHE_PROJECTED_FDT_SUBSEQUENCE",
+      "raw_otp_exported": false,
+      "raw_payload_exported": false,
+      "raw_seed_exported": false,
+      "reentry_requests_wire_exact": true,
+      "seed_provider_provenance": {
+        "crc_algorithm": "CRC-32/MPEG-2",
+        "crc_byte_order": "little",
+        "crc_valid": true,
+        "fdt12_sha256": "02a8b3e1391160cf3e072018d5eb645bfb2eb2b6b10db3d9b063f5f139884577",
+        "file_sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+        "file_size": 13520,
+        "layout": "OTP64+FDT12+NAV3200+IMAGE10240+CRC32_MPEG2_LE4",
+        "otp_binding": "MATCH",
+        "otp_identity_reference": "EXPLICIT_CALLER_INPUT_REDACTED",
+        "read_only": true,
+        "source_path": "EXPLICIT_INPUT_PATH_REDACTED"
+      },
+      "seed_provider_result": "PASS",
+      "source_cache_bytes": 13520,
+      "source_cache_sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+      "source_capture_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+      "terminal_stop": "TERMINAL_STOPPED"
+    },
+    {
+      "0x70_reentry_injection": 0,
+      "a2_reentry_injection": 0,
+      "automatic_retry_count": 0,
+      "baseline_b0_envelope_stored": true,
+      "delta_native_predicate_passed": true,
+      "delta_threshold_unsigned": 29,
+      "final_0x32_sent": false,
+      "first_0x36_attempt_count": 1,
+      "host_decisions_finalized": false,
+      "lifecycle": {
+        "0x70_injection_count": 0,
+        "a2_injection_count": 0,
+        "device_command_trace": [
+          "0x36",
+          "0x50",
+          "0x36",
+          "0x82",
+          "0x20",
+          "0x36"
+        ],
+        "persistent_write_family_count": 0,
+        "retry_count": 0,
+        "session_generation": 0,
+        "state": "FAILED_CLOSED",
+        "transition_count": 16,
+        "transitions": [
+          {
+            "device_commands": [],
+            "event": "AF_STATE_OBSERVED",
+            "host_actions": [],
+            "sequence": 1,
+            "session_generation": 0,
+            "source": "INITIALIZED_POST_D4",
+            "target": "AF_STATE_KNOWN"
+          },
+          {
+            "device_commands": [],
+            "event": "BEGIN_FRESH_FDT_BOOTSTRAP",
+            "host_actions": [],
+            "sequence": 2,
+            "session_generation": 0,
+            "source": "AF_STATE_KNOWN",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x36"
+            ],
+            "event": "FDT_MANUAL_SAMPLE_0_ATTEMPT",
+            "host_actions": [],
+            "sequence": 3,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_MANUAL_SAMPLE_0_IRQ100_ACCEPTED",
+            "host_actions": [],
+            "sequence": 4,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x50"
+            ],
+            "event": "INTERSTAGE_0x50_NAV_ATTEMPT",
+            "host_actions": [],
+            "sequence": 5,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "INTERSTAGE_0x50_NAV_STORED_GATE_ACCEPTED",
+            "host_actions": [],
+            "sequence": 6,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x36"
+            ],
+            "event": "FDT_MANUAL_SAMPLE_1_ATTEMPT",
+            "host_actions": [],
+            "sequence": 7,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_MANUAL_SAMPLE_1_IRQ100_ACCEPTED",
+            "host_actions": [],
+            "sequence": 8,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x82"
+            ],
+            "event": "INTERSTAGE_0x82_FDT_DELTA_ATTEMPT",
+            "host_actions": [],
+            "sequence": 9,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "INTERSTAGE_0x82_FDT_DELTA_GATE_ACCEPTED",
+            "host_actions": [],
+            "sequence": 10,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x20"
+            ],
+            "event": "INTERSTAGE_0x20_BASELINE_IMAGE_ATTEMPT",
+            "host_actions": [],
+            "sequence": 11,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "INTERSTAGE_0x20_BASELINE_IMAGE_ACQUIRED_GATE_ACCEPTED",
+            "host_actions": [],
+            "sequence": 12,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [
+              "0x36"
+            ],
+            "event": "FDT_MANUAL_SAMPLE_2_ATTEMPT",
+            "host_actions": [],
+            "sequence": 13,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_MANUAL_SAMPLE_2_IRQ100_ACCEPTED",
+            "host_actions": [],
+            "sequence": 14,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_SAMPLING"
+          },
+          {
+            "device_commands": [],
+            "event": "FDT_BOOTSTRAP_COMPLETED",
+            "host_actions": [],
+            "sequence": 15,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_SAMPLING",
+            "target": "FDT_BOOTSTRAP_READY"
+          },
+          {
+            "device_commands": [],
+            "event": "FAIL_CLOSED:post_sample_host_base_decisions_failed",
+            "host_actions": [
+              "STOP_NEW_TRAFFIC",
+              "CANCEL_PENDING_RECEIVE_IF_ANY",
+              "TERMINAL_HOST_CLEANUP"
+            ],
+            "sequence": 16,
+            "session_generation": 0,
+            "source": "FDT_BOOTSTRAP_READY",
+            "target": "FAILED_CLOSED"
+          }
+        ]
+      },
+      "manual_stage_count": 3,
+      "name": "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY",
+      "nav_dynamic_state_stored": true,
+      "persistent_write_family_count": 0,
+      "raw_dynamic_payload_exported": false,
+      "second_delta_native_predicate_passed": true,
+      "status": "BLOCKED_AFTER_STAGE2_AT_UNREPRODUCED_POST_SAMPLE_HOST_CLASSIFIERS",
+      "target_trace": [
+        "0x36",
+        "0x50",
+        "0x36",
+        "0x82",
+        "0x20",
+        "0x36",
+        "0x32"
+      ],
+      "timeouts_ms": [
+        500,
+        500,
+        500,
+        500,
+        2000,
+        500
+      ],
+      "wire_exact_requests_before_blocker": [
+        "0x36",
+        "0x50",
+        "0x36",
+        "0x82",
+        "0x20",
+        "0x36"
+      ]
+    }
+  ],
+  "schema": "D258_OFFLINE_REPLAY_V1"
+}
