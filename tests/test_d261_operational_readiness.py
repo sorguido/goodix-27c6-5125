@@ -198,6 +198,52 @@ class D261OperationalReadinessTests(unittest.TestCase):
         with self.assertRaises(OperationalFailure):
             verify_approved_git_baseline(REPO, "0" * 40, fileset)
 
+    def test_bounded_import_closure_includes_executed_initializers(self) -> None:
+        closure = _json("analysis/D261/D261_live_import_closure.json")
+        self.assertEqual(closure["LIVE_IMPORT_CLOSURE_STATUS"], "PASS")
+        self.assertEqual(closure["LIVE_IMPORT_CLOSURE_PATH_COUNT"], 16)
+        self.assertEqual(closure["LIVE_IMPORT_CLOSURE_MISSING_PATH_COUNT"], 0)
+        self.assertTrue(closure["PACKAGE_INITIALIZERS_EXECUTED_AND_BASELINE_GATED"])
+        paths = {row["path"] for row in closure["files"]}
+        self.assertIn("core/__init__.py", paths)
+        self.assertIn("poc/goodix5125/tools/binding_reference/__init__.py", paths)
+        self.assertTrue(closure["CORE_INIT_DRIFT_DETECTED"])
+        self.assertTrue(closure["BINDING_REFERENCE_INIT_DRIFT_DETECTED"])
+
+    def test_fresh_process_import_safety_has_zero_side_effect_counters(self) -> None:
+        evidence = _json("analysis/D261/D261_import_safety_evidence.json")
+        self.assertEqual(evidence["IMPORT_SAFETY_TEST"], "PASS")
+        self.assertEqual(evidence["IMPORT_SAFETY_EXIT_CODE"], 0)
+        self.assertTrue(evidence["NO_IMPORT_TIME_SIDE_EFFECTS"])
+        for key in (
+            "IMPORT_TIME_USB_ATTEMPT_COUNT",
+            "IMPORT_TIME_PROTECTED_FS_ACCESS_COUNT",
+            "IMPORT_TIME_SECRET_INSTANTIATION_COUNT",
+            "IMPORT_TIME_SECRET_MATERIALIZATION_COUNT",
+            "IMPORT_TIME_FPRINTD_MUTATION_COUNT",
+            "IMPORT_TIME_MARKER_CREATE_COUNT",
+            "IMPORT_TIME_SIGNAL_MUTATION_COUNT",
+        ):
+            self.assertEqual(evidence[key], 0)
+
+    def test_nonsecret_failures_precede_synthetic_secret_materialization(self) -> None:
+        evidence = _json("analysis/D261/D261_presecret_ordering_evidence.json")
+        self.assertEqual(evidence["status"], "PASS")
+        self.assertTrue(evidence["NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION"])
+        self.assertTrue(evidence["SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ"])
+        self.assertEqual(evidence["OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT"], 0)
+        self.assertEqual(evidence["OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT"], 0)
+        self.assertFalse(evidence["OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC"])
+        rows = {row["scenario"]: row for row in evidence["rows"]}
+        for scenario in (
+            "config90_hash_mismatch", "material_manifest_invalid",
+            "cache_hash_failure", "cache_layout_failure", "cache_crc_failure",
+        ):
+            self.assertEqual(rows[scenario]["secret_read_or_materialize_count"], 0)
+            self.assertEqual(rows[scenario]["marker_create_count"], 0)
+            self.assertEqual(rows[scenario]["usb_open_count"], 0)
+        self.assertEqual(rows["secret_metadata_invalid"]["secret_materialize_count"], 0)
+
     def test_hard_disable_scenarios_are_executable(self) -> None:
         evidence = _json("analysis/D261/D261_hard_disable_execution_evidence.json")
         self.assertEqual(evidence["status"], "PASS")

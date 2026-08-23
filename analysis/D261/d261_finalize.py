@@ -13,19 +13,24 @@ import zipfile
 
 REPO = Path(__file__).resolve().parents[2]
 OUTPUT = REPO / "analysis/D261"
-REFERENCE_HEAD = "75dbb50475786295a816e6cbd0e726af46132091"
-BUNDLE_NAME = "D261_operational_evidence_hardening_corrective_bundle.zip"
+REFERENCE_HEAD = "c2e032076ca0bb97b840bbc0352a4fe7bec0e5cd"
+BUNDLE_NAME = "D261_import_purity_presecret_corrective_bundle.zip"
 
 REVIEW_FILES = (
-    "core/protected_runtime.py",
-    "core/usb_runtime.py",
+    "core/__init__.py",
+    "poc/goodix5125/tools/binding_reference/__init__.py",
     "tools/d261_live_fdt_arm_once.py",
     "operator_kit/d261-live-fdt-arm-once.sh",
     "tests/test_d261_operational_readiness.py",
+    "analysis/D261/d261_import_safety.py",
     "analysis/D261/d261_offline_rehearsal.py",
     "analysis/D261/d261_corrective_harness.py",
     "analysis/D261/d261_finalize.py",
     "analysis/D261/D261_hard_disable_execution_evidence.json",
+    "analysis/D261/D261_import_safety_evidence.json",
+    "analysis/D261/D261_live_import_closure.json",
+    "analysis/D261/D261_live_import_closure.md",
+    "analysis/D261/D261_presecret_ordering_evidence.json",
     "analysis/D261/D261_real_usb_adapter_offline_evidence.json",
     "analysis/D261/D261_failure_containment_matrix.json",
     "analysis/D261/D261_single_reader_demux_evidence.json",
@@ -39,6 +44,7 @@ REVIEW_FILES = (
     "analysis/D261/D261_readiness_decision.json",
     "analysis/D261/D261_corrective_report.md",
     "analysis/D261/D261_previous_bundle_status.txt",
+    "Goodix 27c6 5125 manuale tecnico.md",
 )
 
 
@@ -66,6 +72,9 @@ def main() -> int:
     hard_disable = load_json("D261_hard_disable_execution_evidence.json")
     report_safety = load_json("D261_durable_report_safety_evidence.json")
     transaction = load_json("D261_pre_usb_transaction_evidence.json")
+    import_safety = load_json("D261_import_safety_evidence.json")
+    closure = load_json("D261_live_import_closure.json")
+    presecret = load_json("D261_presecret_ordering_evidence.json")
     if not all((
         preflight["status"] == "PASS",
         rehearsal["status"] == "PASS",
@@ -74,33 +83,39 @@ def main() -> int:
         hard_disable["status"] == "PASS",
         report_safety["status"] == "PASS",
         transaction["status"] == "PASS",
+        import_safety["IMPORT_SAFETY_TEST"] == "PASS",
+        closure["LIVE_IMPORT_CLOSURE_STATUS"] == "PASS",
+        presecret["status"] == "PASS",
     )):
         raise RuntimeError("D261 corrective prerequisite artifact is not PASS")
 
     test_results = {
-        "schema": "D261_CORRECTIVE_TEST_RESULTS_V2",
+        "schema": "D261_IMPORT_PURITY_PRESECRET_TEST_RESULTS_V3",
         "execution_mode": "OFFLINE_ONLY",
         "commands": [
             {"command": "python3 -m py_compile <D261 corrective Python files>", "status": "PASS"},
             {"command": "python3 analysis/D261/d261_tail_audit.py", "status": "PASS"},
             {"command": "python3 analysis/D261/d261_offline_rehearsal.py", "status": "PASS"},
+            {"command": "python3 -B analysis/D261/d261_import_safety.py", "status": "PASS"},
             {"command": "operator_kit/d261-live-fdt-arm-once.sh --dry-run (external cwd)", "status": "PASS"},
             {
                 "command": "python3 -m unittest discover -s tests -p 'test_*.py'",
-                "status": "PASS", "tests_run": 235, "failures": 0, "errors": 0,
+                "status": "PASS", "tests_run": 238, "failures": 0, "errors": 0,
             },
+            {"command": "pytest --collect-only", "status": "NOT_REQUIRED_NOT_CANONICAL_DEPENDENCY"},
         ],
         "REAL_USB_OPEN_COUNT": 0,
         "REAL_SECRET_READ_COUNT": 0,
         "REAL_COMMAND_SEND_COUNT": 0,
         "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
         "FPRINTD_MUTATION_COUNT": 0,
+        "REAL_HARDWARE_ACTION_COUNT": 0,
         "status": "PASS",
     }
     write_json(OUTPUT / "D261_test_results.json", test_results)
 
     readiness = {
-        "schema": "D261_OPERATIONAL_EVIDENCE_HARDENING_DECISION_V2",
+        "schema": "D261_IMPORT_PURITY_PRESECRET_DECISION_V3",
         "step": "D261_CORRECTIVE_SAME_STEP",
         "execution_mode": "OFFLINE_ONLY",
         "OUTCOME": "READY_FOR_BASELINE_APPROVAL_REVIEW",
@@ -114,6 +129,37 @@ def main() -> int:
         "BUNDLE": f"analysis/D261/{BUNDLE_NAME}",
         "BUNDLE_SHA256": f"analysis/D261/{BUNDLE_NAME}.sha256",
         "D261_OPERATIONAL_EVIDENCE_HARDENING": "PASS",
+        "LIVE_IMPORT_CLOSURE_STATUS": closure["LIVE_IMPORT_CLOSURE_STATUS"],
+        "LIVE_IMPORT_CLOSURE_PATH_COUNT": closure["LIVE_IMPORT_CLOSURE_PATH_COUNT"],
+        "LIVE_IMPORT_CLOSURE_MISSING_PATH_COUNT": closure["LIVE_IMPORT_CLOSURE_MISSING_PATH_COUNT"],
+        "PACKAGE_INITIALIZERS_EXECUTED_AND_BASELINE_GATED": closure["PACKAGE_INITIALIZERS_EXECUTED_AND_BASELINE_GATED"],
+        "CORE_INIT_DRIFT_DETECTED": closure["CORE_INIT_DRIFT_DETECTED"],
+        "BINDING_REFERENCE_INIT_DRIFT_DETECTED": closure["BINDING_REFERENCE_INIT_DRIFT_DETECTED"],
+        "NO_IMPORT_TIME_SIDE_EFFECTS": import_safety["NO_IMPORT_TIME_SIDE_EFFECTS"],
+        "IMPORT_SAFETY_TEST": import_safety["IMPORT_SAFETY_TEST"],
+        "IMPORT_SAFETY_EXIT_CODE": import_safety["IMPORT_SAFETY_EXIT_CODE"],
+        "IMPORT_TIME_USB_ATTEMPT_COUNT": import_safety["IMPORT_TIME_USB_ATTEMPT_COUNT"],
+        "IMPORT_TIME_PROTECTED_FS_ACCESS_COUNT": import_safety["IMPORT_TIME_PROTECTED_FS_ACCESS_COUNT"],
+        "IMPORT_TIME_SECRET_INSTANTIATION_COUNT": import_safety["IMPORT_TIME_SECRET_INSTANTIATION_COUNT"],
+        "IMPORT_TIME_SECRET_MATERIALIZATION_COUNT": import_safety["IMPORT_TIME_SECRET_MATERIALIZATION_COUNT"],
+        "IMPORT_TIME_FPRINTD_MUTATION_COUNT": import_safety["IMPORT_TIME_FPRINTD_MUTATION_COUNT"],
+        "IMPORT_TIME_MARKER_CREATE_COUNT": import_safety["IMPORT_TIME_MARKER_CREATE_COUNT"],
+        "IMPORT_TIME_SIGNAL_MUTATION_COUNT": import_safety["IMPORT_TIME_SIGNAL_MUTATION_COUNT"],
+        "PYTEST_COLLECT_ONLY_STATUS": "NOT_REQUIRED_NOT_CANONICAL_DEPENDENCY",
+        "NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION": presecret["NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION"],
+        "SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ": presecret["SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ"],
+        "SECRET_LOADER_INSTANTIATION_GATED_BY_EXPLICIT_LIVE_INTENT_AND_APPROVED_BASELINE": presecret["SECRET_LOADER_INSTANTIATION_GATED_BY_EXPLICIT_LIVE_INTENT_AND_APPROVED_BASELINE"],
+        "SECRET_MATERIALIZATION_PRE_MARKER": presecret["SECRET_MATERIALIZATION_PRE_MARKER"],
+        "SECRET_MATERIALIZATION_POST_NONSECRET_VALIDATION": presecret["SECRET_MATERIALIZATION_POST_NONSECRET_VALIDATION"],
+        "OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT": presecret["OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT"],
+        "OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT": presecret["OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT"],
+        "OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC": presecret["OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC"],
+        "CONFIG90_FAILURE_SECRET_MATERIALIZE_COUNT": presecret["CONFIG90_FAILURE_SECRET_MATERIALIZE_COUNT"],
+        "MANIFEST_FAILURE_SECRET_MATERIALIZE_COUNT": presecret["MANIFEST_FAILURE_SECRET_MATERIALIZE_COUNT"],
+        "CACHE_FAILURE_SECRET_MATERIALIZE_COUNT": presecret["CACHE_FAILURE_SECRET_MATERIALIZE_COUNT"],
+        "CANONICAL_MANUAL_UPDATED": True,
+        "CANONICAL_MANUAL_INCLUDED_IN_REVIEW_BUNDLE": True,
+        "CANONICAL_MANUAL_LIVE_CRITICAL": False,
         "SRC_SEALED_UNCHANGED": True,
         "HISTORICAL_LIVE_EVIDENCE_UNCHANGED": True,
         "SUPPORTED_LIVE_ENTRYPOINT_COUNT": 1,
@@ -162,12 +208,15 @@ def main() -> int:
         "REAL_COMMAND_SEND_COUNT": 0,
         "FPRINTD_MUTATION_COUNT": 0,
         "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
+        "REAL_HARDWARE_ACTION_COUNT": 0,
     }
     write_json(OUTPUT / "D261_readiness_decision.json", readiness)
 
-    report_text = """# D261 corrective v2 — operational evidence hardening
+    report_text = """# D261 corrective v4 — import purity and pre-secret ordering
 
-The same-step corrective passes offline. The supported live path now requires distinct CLI-intent and post-marker Live-I/O capabilities; protected content is validated before marker consumption. All 24 negative rows and all 13 shared-reader/demux cases are execution-derived. Report publication is preflighted before side effects and durably uses a `0600` temporary file, file and directory fsync, and same-directory replacement.
+The same-step corrective passes offline. The bounded supported import path contains 16 repository-local Python files; both executed package initializers are now baseline-gated and synthetic drift is detected. A fresh unprivileged subprocess imports the closure with zero USB, protected-filesystem, real-secret, fprintd and marker side effects.
+
+Manifest/config90 and cache hash/layout/CRC validation now precede real-secret loader construction and materialization. Offline rehearsal injects only a synthetic boundary through the protocol seam: the concrete real loader is never instantiated, no real-to-synthetic fallback exists, and all required non-secret failures stop with secret, marker and USB counts at zero.
 
 The physical-tail decision is unchanged: `0x32` zero-tail is primary-target observed and accepted; `0x36/0x50/0x82/0x20` remain an unproven live hypothesis. No baseline was approved and no live action occurred.
 
@@ -175,6 +224,9 @@ The physical-tail decision is unchanged: `0x32` zero-tail is primary-target obse
 OUTCOME=READY_FOR_BASELINE_APPROVAL_REVIEW
 ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
 EXECUTABLE_CLOSURE=PASS_OFFLINE
+LIVE_IMPORT_CLOSURE_STATUS=PASS
+NO_IMPORT_TIME_SIDE_EFFECTS=true
+NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION=true
 READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false
 READY_FOR_FDT_LIVE_REVIEW=false
 READY_FOR_FDT_LIVE=false
@@ -184,19 +236,22 @@ REAL_SECRET_READ_COUNT=0
 REAL_COMMAND_SEND_COUNT=0
 FPRINTD_MUTATION_COUNT=0
 REAL_SINGLE_USE_MARKER_CREATE_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
 ```
 """
     (OUTPUT / "D261_corrective_report.md").write_text(report_text, encoding="utf-8")
     (OUTPUT / "D261_previous_bundle_status.txt").write_text(
         "D261_operational_live_readiness_bundle.zip\n"
         "STATUS=SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE\n"
-        "NOTE=Preserved byte-for-byte for provenance; do not use for baseline-approval review.\n",
+        "D261_operational_evidence_hardening_corrective_bundle.zip\n"
+        "STATUS=SUPERSEDED_BY_D261_IMPORT_PURITY_PRESECRET_CORRECTIVE\n"
+        "NOTE=Both prior bundles are preserved byte-for-byte for provenance; use the import-purity bundle for baseline-approval review.\n",
         encoding="utf-8",
     )
 
     manifest_path = OUTPUT / "D261_bundle_manifest.json"
     manifest = {
-        "schema": "D261_CORRECTIVE_BUNDLE_MANIFEST_V2",
+        "schema": "D261_IMPORT_PURITY_PRESECRET_BUNDLE_MANIFEST_V3",
         "step": "D261_CORRECTIVE_SAME_STEP",
         "reference_head_before_corrective": REFERENCE_HEAD,
         "baseline_approval": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
@@ -205,8 +260,8 @@ REAL_SINGLE_USE_MARKER_CREATE_COUNT=0
         "canonical_manual": {
             "path": "Goodix 27c6 5125 manuale tecnico.md",
             "sha256": sha256_file(REPO / "Goodix 27c6 5125 manuale tecnico.md"),
-            "included": False,
-            "reason": "CANONICAL_REPOSITORY_REFERENCE_NOT_DUPLICATED",
+            "included": True,
+            "reason": "MODIFIED_CANONICAL_DOCUMENT_INCLUDED_FOR_REVIEW",
         },
         "files": [
             {"path": relative, "sha256": sha256_file(REPO / relative), "size": (REPO / relative).stat().st_size}

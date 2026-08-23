@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any
+from typing import Any, Protocol
 
 
 def find_repo_root(start: Path) -> Path:
@@ -75,6 +75,7 @@ D260_FILESET_PATH = REPO / "analysis/D260/D260_architecture_critical_fileset.jso
 D260_REFERENCE_COMMIT = "ef2aa95c0b7261638a70cdf26a91ea00dd60eb41"
 LIVE_CAPABILITY_DEFAULT = 0
 CANONICAL_LIVE_CRITICAL_PATHS = (
+    "core/__init__.py",
     "core/cold_start.py",
     "core/fdt_lifecycle.py",
     "core/fdt_seed.py",
@@ -85,6 +86,7 @@ CANONICAL_LIVE_CRITICAL_PATHS = (
     "core/tls_b0.py",
     "core/usb_runtime.py",
     "src/goodix5125_cleanroom.py",
+    "poc/goodix5125/tools/binding_reference/__init__.py",
     "poc/goodix5125/tools/binding_reference/runtime.py",
     "poc/goodix5125/tools/binding_reference/crypto_reference.py",
     "poc/goodix5125/tools/binding_reference/pe_parser.py",
@@ -98,6 +100,13 @@ LIVE_CRITICAL_PATHS = CANONICAL_LIVE_CRITICAL_PATHS
 
 class OperationalFailure(RuntimeError):
     pass
+
+
+class PreMarkerSecretBoundary(Protocol):
+    """Minimal injectable secret interface used by live and offline paths."""
+
+    def materialize(self, cli_intent: CliIntentCapability) -> None:
+        ...
 
 
 def _write_all(descriptor: int, payload: bytes) -> None:
@@ -192,10 +201,17 @@ def verify_d260_architecture_reference(repo: Path) -> dict[str, Any]:
     }
 
 
-def cache_preflight() -> dict[str, Any]:
+def cache_preflight(
+    cache_path: Path = CACHE_PATH,
+    expected_sha256: str = CACHE_SHA256,
+) -> dict[str, Any]:
     result = {
-        "path": str(CACHE_PATH.relative_to(REPO)),
-        "expected_sha256": CACHE_SHA256,
+        "path": (
+            str(cache_path.relative_to(REPO))
+            if cache_path.is_relative_to(REPO)
+            else str(cache_path)
+        ),
+        "expected_sha256": expected_sha256,
         "size": None,
         "sha256": None,
         "layout_crc_status": "NOT_CHECKED",
@@ -204,9 +220,9 @@ def cache_preflight() -> dict[str, Any]:
         "status": "FAIL",
     }
     try:
-        before = CACHE_PATH.stat()
-        data = CACHE_PATH.read_bytes()
-        after = CACHE_PATH.stat()
+        before = cache_path.stat()
+        data = cache_path.read_bytes()
+        after = cache_path.stat()
     except OSError:
         return result
     result["size"] = len(data)
@@ -214,8 +230,32 @@ def cache_preflight() -> dict[str, Any]:
     stable = (before.st_ino, before.st_size, before.st_mtime_ns) == (after.st_ino, after.st_size, after.st_mtime_ns)
     crc_ok = len(data) == 13_520 and int.from_bytes(data[CRC_OFFSET:], "little") == crc32_mpeg2(data[:CRC_OFFSET])
     result["layout_crc_status"] = "PASS" if crc_ok else "FAIL"
-    result["status"] = "PASS" if stable and crc_ok and result["sha256"] == CACHE_SHA256 else "FAIL"
+    result["status"] = "PASS" if stable and crc_ok and result["sha256"] == expected_sha256 else "FAIL"
     return result
+
+
+def prepare_pre_marker_material(
+    cli_intent: CliIntentCapability | None,
+    *,
+    material_loader: Any = load_cold_start_material,
+    cache_validator: Any = cache_preflight,
+    secret_boundary_factory: Any = RealSecretBoundary,
+) -> tuple[Any, dict[str, Any], PreMarkerSecretBoundary]:
+    """Validate all available non-secret content before touching the secret.
+
+    The injectable callables are the bounded offline-test seam.  Production
+    uses the concrete protected loaders; rehearsals inject synthetic fixtures
+    and never instantiate or materialize ``RealSecretBoundary``.
+    """
+
+    require_cli_intent(cli_intent)
+    material = material_loader(MATERIAL_MANIFEST_PATH, CONFIG90_PATH, cli_intent)
+    cache = cache_validator()
+    if cache.get("status") != "PASS":
+        raise OperationalFailure("canonical_seed_cache_preflight_failed")
+    boundary = secret_boundary_factory(SECRET_PATH, REPO / CANONICAL_GFUSB_PATH)
+    boundary.materialize(cli_intent)
+    return material, cache, boundary
 
 
 def dependency_preflight() -> dict[str, Any]:
@@ -564,15 +604,12 @@ def live_preflight(
     gfusb = repo / CANONICAL_GFUSB_PATH
     if sha256_file(gfusb) != CANONICAL_GFUSB_SHA256:
         raise OperationalFailure("canonical_gfusb_hash_mismatch")
-    cache = cache_preflight()
-    if cache["status"] != "PASS":
-        raise OperationalFailure("canonical_seed_cache_preflight_failed")
     sysfs, devnode = exact_target_sysfs()
     return fileset, {
         "sysfs": str(sysfs),
         "devnode": str(devnode),
         "target": "27c6:5125",
-        "cache": cache,
+        "cache": {"status": "DEFERRED_UNTIL_AFTER_HOLDER_CHECK"},
         "approved_baseline_sha": baseline_sha,
         "fileset_digest": fileset_digest(fileset),
         "protected_root_status": "PASS_METADATA",
@@ -615,9 +652,8 @@ def _run_live(
             external_holders(Path(preflight["devnode"])),
             own_pid=os.getpid(),
         )
-        boundary = RealSecretBoundary(SECRET_PATH, repo / CANONICAL_GFUSB_PATH)
-        boundary.materialize(cli_intent)
-        material = load_cold_start_material(MATERIAL_MANIFEST_PATH, CONFIG90_PATH, cli_intent)
+        material, cache, boundary = prepare_pre_marker_material(cli_intent)
+        preflight["cache"] = cache
         marker_claim = claim_marker(MARKER_PATH, baseline_sha, cli_intent)
         live_io_capability = issue_live_io_capability_after_marker(
             cli_intent,

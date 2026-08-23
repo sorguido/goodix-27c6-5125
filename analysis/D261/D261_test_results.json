@@ -1,6 +1,7 @@
 {
   "FPRINTD_MUTATION_COUNT": 0,
   "REAL_COMMAND_SEND_COUNT": 0,
+  "REAL_HARDWARE_ACTION_COUNT": 0,
   "REAL_SECRET_READ_COUNT": 0,
   "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
   "REAL_USB_OPEN_COUNT": 0,
@@ -18,6 +19,10 @@
       "status": "PASS"
     },
     {
+      "command": "python3 -B analysis/D261/d261_import_safety.py",
+      "status": "PASS"
+    },
+    {
       "command": "operator_kit/d261-live-fdt-arm-once.sh --dry-run (external cwd)",
       "status": "PASS"
     },
@@ -26,10 +31,14 @@
       "errors": 0,
       "failures": 0,
       "status": "PASS",
-      "tests_run": 235
+      "tests_run": 238
+    },
+    {
+      "command": "pytest --collect-only",
+      "status": "NOT_REQUIRED_NOT_CANONICAL_DEPENDENCY"
     }
   ],
   "execution_mode": "OFFLINE_ONLY",
-  "schema": "D261_CORRECTIVE_TEST_RESULTS_V2",
+  "schema": "D261_IMPORT_PURITY_PRESECRET_TEST_RESULTS_V3",
   "status": "PASS"
 }

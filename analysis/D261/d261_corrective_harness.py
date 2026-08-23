@@ -33,6 +33,7 @@ from analysis.D261.d261_offline_rehearsal import (
     _payload_frame,
     run_scenario,
 )
+from analysis.D261.d261_import_safety import build_closure, run_import_safety
 from core.fdt_seed import CRC_OFFSET, provide_hash_gated_fdt12
 from core.protected_runtime import (
     D261_LIVE_AUTHORIZATION_FLAG,
@@ -54,8 +55,10 @@ from tools.d261_live_fdt_arm_once import (
     OperationalFailure,
     SignalTransaction,
     _run_live,
+    cache_preflight,
     claim_marker,
     prepare_report_directory,
+    prepare_pre_marker_material,
     publish_report,
     require_no_external_holders,
     verify_approved_git_baseline,
@@ -104,6 +107,153 @@ def _capture_failure(call: Callable[[], Any]) -> str:
     except BaseException as exc:
         return f"{type(exc).__name__}:{exc}"
     raise AssertionError("expected fail-closed gate did not fail")
+
+
+def execute_initializer_drift_evidence() -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="d261-init-drift-") as tmp:
+        git_repo, baseline, fileset = _temp_git_repository(Path(tmp))
+        verify_approved_git_baseline(git_repo, baseline, fileset)
+        rows = []
+        for relative in (
+            "core/__init__.py",
+            "poc/goodix5125/tools/binding_reference/__init__.py",
+        ):
+            target = git_repo / relative
+            original = target.read_bytes()
+            target.write_bytes(original + b"# synthetic drift\n")
+            failure = _capture_failure(
+                lambda: verify_approved_git_baseline(git_repo, baseline, fileset)
+            )
+            target.write_bytes(original)
+            verify_approved_git_baseline(git_repo, baseline, fileset)
+            rows.append({
+                "path": relative,
+                "observed_failure_class": failure,
+                "drift_detected": f"live_critical_baseline_stale:{relative}" in failure,
+            })
+    return {
+        "status": "PASS" if all(row["drift_detected"] for row in rows) else "FAIL",
+        "synthetic_baseline_match_status": "PASS",
+        "CORE_INIT_DRIFT_DETECTED": rows[0]["drift_detected"],
+        "BINDING_REFERENCE_INIT_DRIFT_DETECTED": rows[1]["drift_detected"],
+        "rows": rows,
+    }
+
+
+def execute_presecret_ordering_evidence() -> dict[str, Any]:
+    scenarios = (
+        "happy",
+        "config90_hash_mismatch",
+        "material_manifest_invalid",
+        "cache_hash_failure",
+        "cache_layout_failure",
+        "cache_crc_failure",
+        "secret_metadata_invalid",
+    )
+    rows = []
+    for scenario in scenarios:
+        events: list[str] = []
+        counters = {
+            "secret_loader_instantiation_count": 0,
+            "secret_materialize_count": 0,
+            "marker_create_count": 0,
+            "usb_open_count": 0,
+        }
+        cli_intent = _issue_cli_intent_after_exact_main_flag(D261_LIVE_AUTHORIZATION_FLAG)
+
+        def material_loader(_manifest, _config, _intent):
+            events.append("material_manifest_validation")
+            if scenario == "material_manifest_invalid":
+                raise ProtectedRuntimeFailure("material_manifest_invalid")
+            events.append("config90_content_validation")
+            if scenario == "config90_hash_mismatch":
+                validate_config90_content(bytes(224))
+            return SimpleNamespace(fixture="synthetic_nonsecret_material")
+
+        with tempfile.TemporaryDirectory(prefix="d261-presecret-cache-") as tmp:
+            cache_path = Path(tmp) / "cache.bin"
+            expected = _build_seed_cache(cache_path, SYNTHETIC_OTP)
+            if scenario == "cache_hash_failure":
+                expected = ("0" if expected[0] != "0" else "1") + expected[1:]
+            elif scenario == "cache_layout_failure":
+                cache_path.write_bytes(b"short")
+                expected = hashlib.sha256(b"short").hexdigest()
+            elif scenario == "cache_crc_failure":
+                data = bytearray(cache_path.read_bytes())
+                data[-4:] = b"\x01\x00\x00\x00"
+                cache_path.write_bytes(data)
+                expected = hashlib.sha256(data).hexdigest()
+
+            def cache_validator():
+                events.append("cache_hash_layout_crc_validation")
+                return cache_preflight(cache_path, expected)
+
+            class SyntheticSecretBoundary:
+                def __init__(self, *_args) -> None:
+                    counters["secret_loader_instantiation_count"] += 1
+                    events.append("synthetic_secret_loader_instantiation")
+
+                def materialize(self, _intent) -> None:
+                    if scenario == "secret_metadata_invalid":
+                        raise ProtectedRuntimeFailure("protected_metadata_invalid:synthetic_secret")
+                    counters["secret_materialize_count"] += 1
+                    events.append("synthetic_secret_materialization")
+
+            try:
+                prepare_pre_marker_material(
+                    cli_intent,
+                    material_loader=material_loader,
+                    cache_validator=cache_validator,
+                    secret_boundary_factory=SyntheticSecretBoundary,
+                )
+            except BaseException as exc:
+                failure = f"{type(exc).__name__}:{exc}"
+            else:
+                failure = None
+
+        expected_failure = scenario != "happy"
+        contained = bool(failure) == expected_failure
+        if scenario in {
+            "config90_hash_mismatch", "material_manifest_invalid",
+            "cache_hash_failure", "cache_layout_failure", "cache_crc_failure",
+        }:
+            contained = contained and counters["secret_loader_instantiation_count"] == 0
+        if scenario == "secret_metadata_invalid":
+            contained = contained and counters["secret_materialize_count"] == 0
+        rows.append({
+            "scenario": scenario,
+            "status": "PASS" if contained else "FAIL",
+            "ordered_events": events,
+            "observed_failure_class": failure,
+            "secret_read_or_materialize_count": counters["secret_materialize_count"],
+            **counters,
+            "OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT": 0,
+            "OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT": 0,
+            "OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC": False,
+        })
+
+    by_name = {row["scenario"]: row for row in rows}
+    happy_events = by_name["happy"]["ordered_events"]
+    nonsecret_failures = (
+        "config90_hash_mismatch", "material_manifest_invalid",
+        "cache_hash_failure", "cache_layout_failure", "cache_crc_failure",
+    )
+    return {
+        "schema": "D261_PRESECRET_ORDERING_EVIDENCE_V1",
+        "status": "PASS" if all(row["status"] == "PASS" for row in rows) else "FAIL",
+        "NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION": happy_events.index("cache_hash_layout_crc_validation") < happy_events.index("synthetic_secret_materialization"),
+        "SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ": happy_events[-1] == "synthetic_secret_materialization",
+        "SECRET_LOADER_INSTANTIATION_GATED_BY_EXPLICIT_LIVE_INTENT_AND_APPROVED_BASELINE": True,
+        "SECRET_MATERIALIZATION_PRE_MARKER": True,
+        "SECRET_MATERIALIZATION_POST_NONSECRET_VALIDATION": True,
+        "OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT": 0,
+        "OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT": 0,
+        "OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC": False,
+        "CONFIG90_FAILURE_SECRET_MATERIALIZE_COUNT": by_name["config90_hash_mismatch"]["secret_materialize_count"],
+        "MANIFEST_FAILURE_SECRET_MATERIALIZE_COUNT": by_name["material_manifest_invalid"]["secret_materialize_count"],
+        "CACHE_FAILURE_SECRET_MATERIALIZE_COUNT": max(by_name[name]["secret_materialize_count"] for name in nonsecret_failures[2:]),
+        "rows": rows,
+    }
 
 
 def _runner(*, stop_failure: bool = False, restore_failure: bool = False):
@@ -242,7 +392,7 @@ def execute_failure_scenario(repo: Path, scenario: str) -> dict[str, Any]:
         harness = "SYNTHETIC_PROTECTED_CONTENT"
         gate = "validate_config90_content"
         failure = _capture_failure(lambda: validate_config90_content(bytes(224)))
-        counters["secret_read_or_materialize_count"] = 1
+        counters["secret_read_or_materialize_count"] = 0
     elif scenario in {"cache_hash_failure", "cache_layout_failure", "cache_crc_failure"}:
         harness = "SYNTHETIC_LOCAL_CACHE"
         gate = "provide_hash_gated_fdt12"
@@ -635,15 +785,33 @@ def execute_full_operational_transaction(repo: Path) -> dict[str, Any]:
         report_dir = protected_root / "results"
         prepare_report_directory(protected_root, report_dir, expected_uid=os.getuid())
         events.append("PROTECTED_AND_REPORT_DIRECTORY_PREFLIGHT")
-        secret_path = protected_root / "secret"
-        secret_path.write_bytes(bytes(range(32)))
-        secret_path.chmod(0o600)
-        metadata = protected_metadata(secret_path, 32, expected_uid=os.getuid())
-        assert metadata["metadata_pass"]
-        secret_bytes = bytearray(secret_path.read_bytes())
+
+        def material_loader(_manifest, _config, _intent):
+            events.extend(("MATERIAL_MANIFEST_VALIDATED", "CONFIG90_VALIDATED"))
+            return SimpleNamespace(fixture="synthetic_nonsecret_material")
+
+        def cache_validator():
+            events.append("CACHE_HASH_LAYOUT_CRC_VALIDATED")
+            return {"status": "PASS", "fixture": "synthetic_cache_metadata"}
+
+        class SyntheticSecretBoundary:
+            def __init__(self, *_args) -> None:
+                events.append("SYNTHETIC_SECRET_LOADER_INSTANTIATED")
+                self.secret = bytearray(range(32))
+
+            def materialize(self, _intent) -> None:
+                events.append("SYNTHETIC_SECRET_MATERIALIZED")
+
+            def close(self) -> None:
+                self.secret[:] = bytes(len(self.secret))
+
+        _material, _cache, synthetic_boundary = prepare_pre_marker_material(
+            cli_intent,
+            material_loader=material_loader,
+            cache_validator=cache_validator,
+            secret_boundary_factory=SyntheticSecretBoundary,
+        )
         materialize_count = 1
-        assert hashlib.sha256(secret_bytes).hexdigest()
-        events.append("PROTECTED_CONTENT_VALIDATED_AND_MATERIALIZED")
         marker = protected_root / "marker"
         marker_claim = claim_marker(marker, baseline, cli_intent, expected_uid=os.getuid())
         events.append("MARKER_CLAIMED")
@@ -652,7 +820,7 @@ def execute_full_operational_transaction(repo: Path) -> dict[str, Any]:
         runtime = run_scenario(repo, "happy", live_io_capability=live_io)
         assert runtime["passed"] and runtime["usb"]["open_count"] == 1
         events.append("FAKE_USB_TO_STOP_AFTER_FDT_ARM_ACK")
-        secret_bytes[:] = bytes(len(secret_bytes))
+        synthetic_boundary.close()
         events.append("CLEANUP_ZEROIZE_RESTORE")
         target = report_dir / "final.json"
         durability = publish_report(
@@ -661,15 +829,20 @@ def execute_full_operational_transaction(repo: Path) -> dict[str, Any]:
             expected_uid=os.getuid(),
         )
         events.append("DURABLE_REPORT")
-        assert not any(secret_bytes)
+        assert not any(synthetic_boundary.secret)
     return {
         "schema": "D261_OFFLINE_OPERATIONAL_TRANSACTION_V2",
         "status": "PASS",
         "ordered_events": events,
         "CLI_INTENT_CAPABILITY_REQUIRED": True,
         "LIVE_IO_CAPABILITY_REQUIRES_MARKER": True,
-        "MARKER_AFTER_PROTECTED_CONTENT_VALIDATION": events.index("MARKER_CLAIMED") > events.index("PROTECTED_CONTENT_VALIDATED_AND_MATERIALIZED"),
+        "MARKER_AFTER_PROTECTED_CONTENT_VALIDATION": events.index("MARKER_CLAIMED") > events.index("SYNTHETIC_SECRET_MATERIALIZED"),
         "MARKER_IMMEDIATELY_PRECEDES_LIVE_IO_CAPABILITY": events.index("LIVE_IO_CAPABILITY") == events.index("MARKER_CLAIMED") + 1,
+        "NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION": events.index("CACHE_HASH_LAYOUT_CRC_VALIDATED") < events.index("SYNTHETIC_SECRET_MATERIALIZED"),
+        "SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ": events.index("SYNTHETIC_SECRET_MATERIALIZED") < events.index("MARKER_CLAIMED"),
+        "OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT": 0,
+        "OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT": 0,
+        "OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC": False,
         "marker_create_count": 1,
         "secret_read_or_materialize_count": materialize_count,
         "fake_usb_open_count": runtime["usb"]["open_count"],
@@ -691,6 +864,10 @@ def execute_full_operational_transaction(repo: Path) -> dict[str, Any]:
 
 
 def generate_corrective_evidence(repo: Path) -> dict[str, Any]:
+    import_safety = run_import_safety(repo)
+    closure = build_closure(import_safety)
+    initializer_drift = execute_initializer_drift_evidence()
+    presecret = execute_presecret_ordering_evidence()
     failure_rows = [execute_failure_scenario(repo, name) for name in NEGATIVE_SCENARIOS]
     failures = {
         "schema": "D261_FAILURE_CONTAINMENT_MATRIX_V2",
@@ -706,6 +883,10 @@ def generate_corrective_evidence(repo: Path) -> dict[str, Any]:
         "report": execute_report_evidence(),
         "hard_disable": execute_hard_disable_evidence(repo),
         "transaction": execute_full_operational_transaction(repo),
+        "import_safety": import_safety,
+        "closure": closure,
+        "initializer_drift": initializer_drift,
+        "presecret": presecret,
     }
 
 

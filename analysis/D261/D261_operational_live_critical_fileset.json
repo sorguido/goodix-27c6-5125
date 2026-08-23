@@ -7,6 +7,12 @@
   "approval_status": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
   "files": [
     {
+      "path": "core/__init__.py",
+      "provenance": "CANONICAL_REPOSITORY_FILE",
+      "rationale": "executed package initializer for every core submodule import",
+      "sha256": "a2890ff0a08391c5465c7b7f054a627f60d15e93e86ae961aad49082cbad3255"
+    },
+    {
       "path": "core/cold_start.py",
       "provenance": "CANONICAL_REPOSITORY_FILE",
       "rationale": "cold-start state machine and exact request/response gates",
@@ -67,6 +73,12 @@
       "sha256": "ef63eb3852e6526722ee12cc5e61e753783007f082819f20218a19fbbe41e3e9"
     },
     {
+      "path": "poc/goodix5125/tools/binding_reference/__init__.py",
+      "provenance": "CANONICAL_REPOSITORY_FILE",
+      "rationale": "executed package initializer exporting the runtime validator",
+      "sha256": "281ed6a9d5fce2d2213de24136525b894111efc71a11caa750c0ab961c7a3b00"
+    },
+    {
       "path": "poc/goodix5125/tools/binding_reference/runtime.py",
       "provenance": "CANONICAL_REPOSITORY_FILE",
       "rationale": "runtime E4 validator derivation API",
@@ -88,7 +100,7 @@
       "path": "tools/d261_live_fdt_arm_once.py",
       "provenance": "CANONICAL_REPOSITORY_FILE",
       "rationale": "entrypoint, baseline, preflight, marker and transaction",
-      "sha256": "81b070902bba4a80e023be309172744d76e118b0a67dc3ee27902ffa5d7131e4"
+      "sha256": "f2957e3a01db05f8f9c27585eca93086e1b53c4043e8c7f602c3f3ccaafbadac"
     },
     {
       "path": "operator_kit/d261-live-fdt-arm-once.sh",

@@ -78,9 +78,22 @@ corrispondente e la safety della report directory veniva chiusa soltanto in
 pubblicazione. Il corrective dello stesso D261 separa ora capability
 CLI-intent e Live-I/O, valida il contenuto protetto prima del marker, applica
 una deadline monotonic assoluta e anticipa i gate directory pre-side-effect.
-Tutti i 24 failure, i 13 casi demux/deadline, il rehearsal transazionale e 235
-test passano offline; i contatori reali USB/secret/comandi/marker/fprintd
-restano zero. Lo stato massimo è `READY_FOR_BASELINE_APPROVAL_REVIEW=true` e
+Tutti i 24 failure, i 13 casi demux/deadline e il rehearsal transazionale
+passano offline. La review successiva ha individuato una bounded import closure
+incompleta e una lettura secret anticipata rispetto al failure config90, senza
+osservare side effect a import-time. Il corrective finale dello stesso D261
+include ora nel set baseline anche `core/__init__.py` e
+`poc/goodix5125/tools/binding_reference/__init__.py`: la closure dinamica
+bounded comprende 16 file Python, non omette file e rileva drift sintetico di
+entrambi gli initializer. Un subprocess nuovo, non privilegiato e senza flag
+live importa l'intera closure con zero tentativi USB, accessi al filesystem
+protetto, istanziazioni/materializzazioni del real secret loader, mutazioni
+fprintd e creazioni marker. Manifest, config90 e cache hash/layout/CRC vengono
+ora validati prima di costruire o materializzare il secret reale; i rehearsal
+offline iniettano esclusivamente una boundary sintetica via Protocol e non
+tentano alcun fallback real→synthetic. La suite completa passa offline; i
+contatori reali USB/secret/comandi/marker/fprintd restano zero. Lo stato massimo
+è `READY_FOR_BASELINE_APPROVAL_REVIEW=true` e
 `OPERATIONAL_REVIEW_PENDING_APPROVED_BASELINE=true`; finché Utente e AI-PM non
 approvano un full commit SHA, `READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false`,
 `READY_FOR_FDT_LIVE_REVIEW=false` e `READY_FOR_FDT_LIVE=false`.
@@ -346,7 +359,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Chiusura gate host D258 | avanzamento offline, candidate ancora BLOCKED | orchestratore target in `gfusb.dll`; gate `0x82` chiuso e implementato; `0x50`/`0x20` corretti come input a classificatori post-stage2 ancora non riproducibili; timeout per comando; zero hardware |
 | Corrective contratto minimo D259 | BLOCKED sul plumbing TLS runtime; live non autorizzato | Classe A confermata meccanicamente dal CFG; replay B0 ordinato subito dopo `0x20`, same-`SSLObject` e continuità TLS PASS offline; il runtime sealed D245 chiude e non espone l'engine, quindi `READY_FOR_FDT_LIVE_REVIEW=false` |
 | Runtime persistente D260 | architecture readiness PASS offline; operational/live false | nuovo coordinator GPL con un server/sessione/handshake TLS, D4 A0 plaintext, EventSource separato e minimal FDT continuo; 15 failure contenuti, `src/`/launcher storici invariati; physical FDT A0 ancora astratto |
-| Corrective readiness D261 | PASS offline per baseline-approval review; operational/live false | capability CLI-intent/Live-I/O distinte, marker post-validazione, gate directory pre-side-effect, deadline reader assoluta, 24 failure e 13 casi demux execution-derived; 235 test PASS, full SHA approvato ancora assente e zero-tail per comando resta rischio live |
+| Corrective readiness D261 | PASS offline per baseline-approval review; operational/live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full SHA approvato ancora assente e zero-tail per comando resta rischio live |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -2952,8 +2965,12 @@ prima del primo `0x36`, senza fallback, randomizzazione o write cache.
 Il dry-run effettua soltanto `lstat`, distingue `ABSENT` da
 `INACCESSIBLE_UNPRIVILEGED`/errore errno e non legge il secret. Il supported
 path crea una capability CLI-intent soltanto dopo il parsing dell'esatto flag;
-questa abilita preflight e validazione/materializzazione del contenuto protetto
-ma non USB. Solo dopo tali controlli viene acquisito e fsyncato il marker, che
+questa abilita preflight e validazione del contenuto protetto ma non USB. Dopo
+i gate holder, il manifest e config90 sono letti e validati, quindi la fonte
+cache è verificata per hash, layout e CRC; soltanto dopo il PASS di tutto il
+materiale non-secret viene costruita e materializzata la boundary secret
+reale. Il secret è così l'ultimo contenuto protetto materializzato prima del
+marker. Solo dopo tali controlli viene acquisito e fsyncato il marker, che
 restituisce una prova opaca usata immediatamente per emettere la distinta
 capability Live-I/O accettata dal backend libusb. Lo stesso buffer valida E4
 mediante la reference D190 canonica e, solo dopo il match, passa al server TLS;
@@ -2961,6 +2978,20 @@ il cleanup lo azzera best-effort. Funzione Python interna senza capability,
 ambiente da solo e backend da solo falliscono prima di marker, secret e libusb.
 È un fence contro uso accidentale/path non supportati, non un confine di
 sicurezza contro codice arbitrario nel medesimo interprete Python.
+
+La bounded import closure del supported path è derivata in un processo nuovo
+dal delta dei moduli repository-local effettivamente caricati e comprende 16
+source Python. Oltre a entrypoint e moduli transitivi include i due package
+initializer realmente eseguiti, `core/__init__.py` e
+`poc/goodix5125/tools/binding_reference/__init__.py`; entrambi appartengono ora
+alla tuple hardcoded e il verifier ne rileva il drift rispetto a una baseline
+sintetica. Le directory namespace prive di `__init__.py` non sono incluse. Un
+harness separato, senza mock che intercettino gli import, usa audit/profile
+solo per osservare il subprocess e prova zero accessi USB/protected filesystem,
+zero istanziazione o materializzazione secret reale, zero mutazioni fprintd e
+zero marker a import-time. Definire e importare il concrete loader è consentito;
+il rehearsal offline lo sostituisce esplicitamente tramite Protocol con una
+fixture sintetica e non implementa fallback dopo un tentativo reale.
 
 `core/usb_runtime.py` è un adapter libusb lazy e production-shaped per un solo
 target `27c6:5125`, interfaccia `0`, OUT `0x01`, IN `0x81`. Richiede cardinalità
@@ -2983,9 +3014,10 @@ La tuple immutabile nel verifier è l'autorità; il JSON fileset è un report
 derivato e il verifier include se stesso nel set. Protected root e report
 directory reali, non symlink, root-owned e `0700`, più destinazione report
 sicura, sono verificati o creati secondo policy prima di fprintd, marker,
-secret e USB. Seguono metadata/cache/target, stop fprintd, signal mask, holder
-check e validazione del contenuto protetto; soltanto allora il marker `O_EXCL`
-`0600` viene consumato e abilita la capability Live-I/O. La pubblicazione usa
+secret e USB. Seguono metadata/target, stop fprintd, signal mask e holder
+check; manifest, config90 e cache non-secret vengono quindi validati prima del
+secret reale. Soltanto dopo la sua materializzazione il marker `O_EXCL` `0600`
+viene consumato e abilita la capability Live-I/O. La pubblicazione usa
 temporary `0600`, fsync file, replace nella stessa directory e fsync directory;
 collisioni/symlink falliscono chiuso e un failure del report finale non può
 essere rappresentato come run PASS.
@@ -3001,8 +3033,11 @@ holder esterno, metadati protetti invalidi, failure fprintd/report/cleanup/
 restore e mismatch della policy fisica. Tutti i 24 scenari invocano realmente
 il gate o il runtime, inclusi due repository Git temporanei reali;
 `ASSERTION_ONLY_FAILURE_ROWS=0`. Tutti i failure sono fail-closed con retry,
-famiglie persistenti e cache write a zero. La suite repository completa passa
-`235/235`; nessun raw, OTP, secret o dato biometrico entra nel bundle.
+famiglie persistenti e cache write a zero. I failure config90, manifest e cache
+hash/layout/CRC hanno inoltre secret materialization, marker e USB a zero; il
+failure di metadata secret ha materializzazione, marker e USB a zero. La suite
+repository completa passa `238/238`; nessun raw, OTP, secret o dato biometrico entra nel
+bundle.
 
 Riesame metodologico pre-live:
 
@@ -3032,6 +3067,17 @@ D261_LIVE_CAPABILITY_DEFAULT=0
 D261_LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG=false
 D261_DIRECT_PYTHON_LIVE_CALL_WITHOUT_CAPABILITY_FAILS_CLOSED=true
 D261_SHARED_READER_PHASE_DEADLINE_ENFORCED=true
+D261_LIVE_IMPORT_CLOSURE_STATUS=PASS
+D261_LIVE_IMPORT_CLOSURE_PATH_COUNT=16
+D261_LIVE_IMPORT_CLOSURE_MISSING_PATH_COUNT=0
+D261_PACKAGE_INITIALIZERS_EXECUTED_AND_BASELINE_GATED=true
+D261_NO_IMPORT_TIME_SIDE_EFFECTS=true
+D261_IMPORT_SAFETY_TEST=PASS
+D261_NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION=true
+D261_SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ=true
+D261_OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT=0
+D261_OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT=0
+D261_OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC=false
 D261_OPERATIONAL_LIVE_CRITICAL_FILESET=PENDING_USER_AI_PM_FULL_SHA_APPROVAL
 D261_EXACT_APPROVED_LIVE_BASELINE_PRESENT=false
 D261_READY_FOR_BASELINE_APPROVAL_REVIEW=true
@@ -3155,7 +3201,11 @@ Git, operator kit e autorizzazione esplicita. Il corrective chiude offline le
 prove operative che la prima versione aveva overclaimed: supported entrypoint
 unico, capability distinte, gate pre-side-effect, marker post-validazione,
 matrice failure execution-derived, deadline reader assoluta e report durable.
-Il candidate è quindi pronto soltanto per la review di approvazione della
+La review successiva è chiusa dallo stesso D261: la tuple baseline copre ora
+l'intera bounded import closure inclusi i due initializer, l'import è provato
+side-effect-free in subprocess pulito e il materiale non-secret viene validato
+prima della materializzazione secret. Il candidate è quindi pronto soltanto
+per la review di approvazione della
 baseline. Il boundary immediato è un full commit SHA esplicitamente approvato
 da Utente e AI-PM; solo uno step successivo potrà promuovere la review
 operativa, senza ancora autorizzare hardware. L'accettazione target della
@@ -3410,7 +3460,26 @@ D261_ASSERTION_ONLY_FAILURE_ROWS 0
 D261_SHARED_READER_PHASE_DEADLINE_ENFORCED true
 D261_TIMEOUT_RENEWAL_PER_UNMATCHED_FRAME false
 D261_SINGLE_READER_DEMUX_EXECUTABLE_EVIDENCE PASS
-D261_FULL_TEST_SUITE 235_PASS
+D261_LIVE_IMPORT_CLOSURE_STATUS PASS
+D261_LIVE_IMPORT_CLOSURE_PATH_COUNT 16
+D261_LIVE_IMPORT_CLOSURE_MISSING_PATH_COUNT 0
+D261_PACKAGE_INITIALIZERS_EXECUTED_AND_BASELINE_GATED true
+D261_CORE_INIT_DRIFT_DETECTED true
+D261_BINDING_REFERENCE_INIT_DRIFT_DETECTED true
+D261_NO_IMPORT_TIME_SIDE_EFFECTS true
+D261_IMPORT_SAFETY_TEST PASS
+D261_IMPORT_TIME_USB_ATTEMPT_COUNT 0
+D261_IMPORT_TIME_PROTECTED_FS_ACCESS_COUNT 0
+D261_IMPORT_TIME_SECRET_INSTANTIATION_COUNT 0
+D261_IMPORT_TIME_SECRET_MATERIALIZATION_COUNT 0
+D261_IMPORT_TIME_FPRINTD_MUTATION_COUNT 0
+D261_IMPORT_TIME_MARKER_CREATE_COUNT 0
+D261_NON_SECRET_CONTENT_VALIDATED_BEFORE_SECRET_MATERIALIZATION true
+D261_SECRET_MATERIALIZATION_LAST_PRE_MARKER_PROTECTED_READ true
+D261_OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT 0
+D261_OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT 0
+D261_OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC false
+D261_FULL_TEST_SUITE 238_PASS
 D261_LIVE_CRITICAL_PATH_SOURCE HARDCODED_REVIEWED_TUPLE_IN_VERIFIER
 D261_LIVE_CRITICAL_FILESET_JSON_ROLE DERIVED_REPORT_NOT_AUTHORITY
 D261_OPERATIONAL_LIVE_CRITICAL_FILESET PENDING_USER_AI_PM_FULL_SHA_APPROVAL
@@ -3425,6 +3494,7 @@ D261_REAL_SECRET_READ_COUNT 0
 D261_REAL_COMMAND_SEND_COUNT 0
 D261_FPRINTD_MUTATION_COUNT 0
 D261_REAL_SINGLE_USE_MARKER_CREATE_COUNT 0
+D261_REAL_HARDWARE_ACTION_COUNT 0
 D261_LIVE_EXECUTION NOT_PERFORMED
 ```
 
@@ -3590,8 +3660,11 @@ fileset come report derivato; il verifier include se stesso. Separa capability
 CLI-intent e Live-I/O, sposta materiale protetto prima del marker, anticipa i
 gate delle directory, rende assoluta la deadline del shared reader e rende
 execution-derived matrici failure/demux e safety del report durable. Il
-dry-run reale è cwd-independent, non legge il secret e non apre USB; il
-rehearsal usa soltanto fixture sintetiche. Questa è executable closure offline
+corrective finale completa inoltre la tuple con i due package initializer,
+prova import purity in un subprocess nuovo e impone manifest/config/cache
+non-secret prima del secret. Il dry-run reale è cwd-independent, non legge il
+secret e non apre USB; il rehearsal usa soltanto fixture sintetiche iniettate e
+non istanzia il real loader. Questa è executable closure offline
 e readiness per approvare una baseline immutabile, non readiness operativa,
 approvazione SHA o run live. Il precedente bundle D261 resta preservato ma è
 `SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE`.

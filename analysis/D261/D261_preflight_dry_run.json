@@ -4,7 +4,7 @@
     "reference_commit": "ef2aa95c0b7261638a70cdf26a91ea00dd60eb41",
     "status": "PASS_HISTORICAL_REFERENCE"
   },
-  "D261_operational_fileset_digest": "b28c08bb228d3740a81f5ee0b7f2eebd5b0a97a84aeeacb2041cda8e08291d53",
+  "D261_operational_fileset_digest": "39d162077156b2af5fdb4b43d4382923006aa44f75e1e44c0fff741709761418",
   "D261_operational_worktree_mismatches": [],
   "FPRINTD_MUTATION_COUNT": 0,
   "LIVE_CAPABILITY_DEFAULT": 0,

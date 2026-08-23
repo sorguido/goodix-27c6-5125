@@ -405,6 +405,7 @@ def _write_json(path: Path, value: Any) -> None:
 
 def generate_fileset(repo: Path) -> dict[str, Any]:
     rationale = {
+        "core/__init__.py": "executed package initializer for every core submodule import",
         "core/cold_start.py": "cold-start state machine and exact request/response gates",
         "core/fdt_lifecycle.py": "fresh-FDT sequence, gates and no-retry lifecycle",
         "core/fdt_seed.py": "read-only cache layout, CRC, hash and live OTP binding",
@@ -415,6 +416,7 @@ def generate_fileset(repo: Path) -> dict[str, Any]:
         "core/tls_b0.py": "persistent TLS engine and B0 consumption",
         "core/usb_runtime.py": "real libusb adapter and shared physical-IN router",
         "src/goodix5125_cleanroom.py": "CRC implementation used by cache validation",
+        "poc/goodix5125/tools/binding_reference/__init__.py": "executed package initializer exporting the runtime validator",
         "poc/goodix5125/tools/binding_reference/runtime.py": "runtime E4 validator derivation API",
         "poc/goodix5125/tools/binding_reference/crypto_reference.py": "E4 binding cryptographic reference",
         "poc/goodix5125/tools/binding_reference/pe_parser.py": "canonical gfusb hash-gated seed parser",
@@ -519,6 +521,9 @@ def generate(repo: Path) -> dict[str, Any]:
         "REAL_SECRET_BOUNDARY_RUNTIME_PATH_IMPLEMENTED": True, "REAL_SECRET_READ_COUNT": 0,
         "E4_VALIDATION_REQUIRED": True, "SAME_SECRET_BOUNDARY_OBJECT_E4_TO_TLS": True,
         "PSK_RANDOM_COUNT": 0, "PSK_NULL_COUNT": 0, "PSK_FALLBACK_COUNT": 0, "SECRET_LOG_COUNT": 0,
+        "OFFLINE_REAL_SECRET_LOADER_INSTANTIATION_COUNT": 0,
+        "OFFLINE_REAL_SECRET_MATERIALIZATION_COUNT": 0,
+        "OFFLINE_SECRET_FALLBACK_FROM_REAL_TO_SYNTHETIC": False,
     })
     _write_json(output / "D261_seed_otp_runtime_path_evidence.json", {
         "schema": "D261_SEED_OTP_PATH_EVIDENCE_V1", "status": "PASS_SYNTHETIC_OTP_BOUND_FIXTURE",
@@ -544,6 +549,19 @@ def generate(repo: Path) -> dict[str, Any]:
     })
     from analysis.D261.d261_corrective_harness import generate_corrective_evidence
     corrective = generate_corrective_evidence(repo)
+    closure = dict(corrective["closure"])
+    closure.update({
+        "CORE_INIT_DRIFT_DETECTED": corrective["initializer_drift"]["CORE_INIT_DRIFT_DETECTED"],
+        "BINDING_REFERENCE_INIT_DRIFT_DETECTED": corrective["initializer_drift"]["BINDING_REFERENCE_INIT_DRIFT_DETECTED"],
+        "synthetic_drift_evidence": corrective["initializer_drift"],
+    })
+    from analysis.D261.d261_import_safety import closure_markdown
+    _write_json(output / "D261_live_import_closure.json", closure)
+    (output / "D261_live_import_closure.md").write_text(
+        closure_markdown(closure), encoding="utf-8"
+    )
+    _write_json(output / "D261_import_safety_evidence.json", corrective["import_safety"])
+    _write_json(output / "D261_presecret_ordering_evidence.json", corrective["presecret"])
     _write_json(output / "D261_failure_containment_matrix.json", corrective["failures"])
     _write_json(output / "D261_single_reader_demux_evidence.json", corrective["demux"])
     _write_json(output / "D261_hard_disable_execution_evidence.json", corrective["hard_disable"])
@@ -558,6 +576,10 @@ def generate(repo: Path) -> dict[str, Any]:
         corrective["hard_disable"]["status"] == "PASS",
         corrective["report"]["status"] == "PASS",
         transaction["status"] == "PASS",
+        corrective["import_safety"]["IMPORT_SAFETY_TEST"] == "PASS",
+        closure["LIVE_IMPORT_CLOSURE_STATUS"] == "PASS",
+        corrective["initializer_drift"]["status"] == "PASS",
+        corrective["presecret"]["status"] == "PASS",
     )) else "FAIL"
     rehearsal["OFFLINE_OPERATIONAL_REHEARSAL"] = rehearsal["status"]
     _write_json(output / "D261_full_offline_operational_rehearsal.json", rehearsal)
