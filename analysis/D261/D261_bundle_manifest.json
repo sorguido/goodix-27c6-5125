@@ -1,0 +1,159 @@
+{
+  "bundle_path": "analysis/D261/D261_operational_live_readiness_bundle.zip",
+  "bundle_sha256": "RECORDED_IN_EXTERNAL_SIDECAR",
+  "canonical_manual": {
+    "included": false,
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "reason": "CANONICAL_REPOSITORY_REFERENCE_NOT_DUPLICATED",
+    "sha256": "8c68492f8a7fa62ebdaf0e5da28f1802025b41750abb83651bd8984a03dac0f1"
+  },
+  "exclusions": [
+    "raw captures and packet payloads",
+    "OTP and cache source bytes",
+    "real secret/PSK and protected material",
+    "biometric plaintext/raster",
+    "OEM DLL, firmware and disassembly",
+    "historical unchanged artifacts"
+  ],
+  "files": [
+    {
+      "path": "core/cold_start.py",
+      "sha256": "5ce4e0eb9e3328dd36f69631ea16cd152a24f90f36418c3ddbfb7c3deb6ef025",
+      "size": 9335
+    },
+    {
+      "path": "core/fdt_seed.py",
+      "sha256": "5df64876dd977623def8bccab512410b1ecb18f11b3b06d589faa935c8c44e2a",
+      "size": 7354
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "sha256": "8e448caaa2527b13e66679cad55afa103b9ac30cab505299c848c5250a0df12c",
+      "size": 14703
+    },
+    {
+      "path": "core/protected_runtime.py",
+      "sha256": "81e4a789f0162dbbe2168cee4468f384527878a305f6f75609f00b70ed23493a",
+      "size": 9547
+    },
+    {
+      "path": "core/runtime_transport.py",
+      "sha256": "cbbb0b68a570da0d7ae07b386883144b9ce31ad22e864a2436e5dadb1dbe91ea",
+      "size": 4474
+    },
+    {
+      "path": "core/usb_runtime.py",
+      "sha256": "2678e84d5358db7fe6c0d3166c82a2551c101cfbdbdcfec9572738bcb70cc362",
+      "size": 16095
+    },
+    {
+      "path": "tools/d261_live_fdt_arm_once.py",
+      "sha256": "542368780d9e3a223af3c08eddf33e9584547ad5dd3e130513a96d22c6fb7238",
+      "size": 21322
+    },
+    {
+      "path": "operator_kit/d261-live-fdt-arm-once.sh",
+      "sha256": "8a055bd173e30bdf033ded8c3a09508874c7cf3f6bc74ab1d375ba0751a5e9ae",
+      "size": 1439
+    },
+    {
+      "path": "tests/test_d261_operational_readiness.py",
+      "sha256": "31997a1257123e1ab82702bac2b2c82955f382e0e0258906eee47dcb214784dd",
+      "size": 9405
+    },
+    {
+      "path": "analysis/D261/d261_tail_audit.py",
+      "sha256": "8426bcab74c4404420e4ffcacfd455617dcfd9175a5aafe4d7faf3919b57dadc",
+      "size": 7349
+    },
+    {
+      "path": "analysis/D261/d261_offline_rehearsal.py",
+      "sha256": "de54d39e4be4b47cd4ba574030c38479daf0dfe880be052aa6925f1de26479bc",
+      "size": 25393
+    },
+    {
+      "path": "analysis/D261/d261_finalize.py",
+      "sha256": "605e3bdce574d4610f59a4b16b4c60c81fcdf4000804708f39fab5daa47d760d",
+      "size": 7822
+    },
+    {
+      "path": "analysis/D261/D261_fdt_physical_tail_audit.json",
+      "sha256": "3bcfff01f6ec151e310e67418c60d503485d714f960818c969cd379547ced09a",
+      "size": 8379
+    },
+    {
+      "path": "analysis/D261/D261_sanitized_tail_matrix.json",
+      "sha256": "834d97ca3da76c0e086b659f646c65197c43df3b6cc770e5fcb68c3320347a96",
+      "size": 3647
+    },
+    {
+      "path": "analysis/D261/D261_physical_policy_decision.json",
+      "sha256": "ed47f0f17a750e65e83d69bfe575c2f49d06f20a7aecc06d52b4ccf9d5642377",
+      "size": 5385
+    },
+    {
+      "path": "analysis/D261/D261_cold_start_migration_evidence.json",
+      "sha256": "7412d96d5f8781ae3dfdecdb6c9a8feeb34fd4fdb3d1c230ab1599d471313564",
+      "size": 728
+    },
+    {
+      "path": "analysis/D261/D261_real_usb_adapter_offline_evidence.json",
+      "sha256": "2202aaececee4d362004ad4cce9359e185e340f85ec3535df976460c8d25a1db",
+      "size": 598
+    },
+    {
+      "path": "analysis/D261/D261_single_reader_demux_evidence.json",
+      "sha256": "de29e1b62ea2ca173f47dccfffb4a6fe2e3a171733c7672fdb0903ee5456b653",
+      "size": 577
+    },
+    {
+      "path": "analysis/D261/D261_secret_boundary_operational_evidence.json",
+      "sha256": "aa7e705b36527f2f53628c507fc96850431949da49496ce23602b907c9d664e4",
+      "size": 377
+    },
+    {
+      "path": "analysis/D261/D261_seed_otp_runtime_path_evidence.json",
+      "sha256": "a48e218b5596f970b5377e0240b066815a8639dbd9cff3f6c4132c2d9afac673",
+      "size": 364
+    },
+    {
+      "path": "analysis/D261/D261_preflight_dry_run.json",
+      "sha256": "2052e6280af2577f516ad4971df299ceb609a54b9ea1e5946707167dcec2a040",
+      "size": 2899
+    },
+    {
+      "path": "analysis/D261/D261_operator_kit_dry_run_result.json",
+      "sha256": "dbb2419bf5a4bab89485940146d69ce8e4330d6d706f2d73ce51e4b8689eac3e",
+      "size": 443
+    },
+    {
+      "path": "analysis/D261/D261_failure_containment_matrix.json",
+      "sha256": "5b6b9bfc4b4ef58b62b2b9e9622adb53ce399ee8ff1521eec7b6468c08e9f88c",
+      "size": 6480
+    },
+    {
+      "path": "analysis/D261/D261_operational_live_critical_fileset.json",
+      "sha256": "ed0e76a5dbbfff840b9688c6bf7262abe1c4cdfef872d490bdcb61244d6dd476",
+      "size": 4282
+    },
+    {
+      "path": "analysis/D261/D261_full_offline_operational_rehearsal.json",
+      "sha256": "a8455ae7cbe753f20c1e4f2fa3cc7d5ab3296c48769563070391d961e12322d3",
+      "size": 4220
+    },
+    {
+      "path": "analysis/D261/D261_test_results.json",
+      "sha256": "f4770aae1bc66199f3c5db609bcfacaa01b733ec70acec2ede160e8fd435a87d",
+      "size": 888
+    },
+    {
+      "path": "analysis/D261/D261_readiness_decision.json",
+      "sha256": "135650810023f0ffb451821288a0dd76ea190be9181b7d750118dfbc6d63386a",
+      "size": 1673
+    }
+  ],
+  "generated_utc": "2026-08-23T11:06:08.979809+02:00",
+  "reference_head": "ef2aa95c0b7261638a70cdf26a91ea00dd60eb41",
+  "schema": "D261_BUNDLE_MANIFEST_V1",
+  "step": "D261"
+}

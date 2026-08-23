@@ -210,3 +210,28 @@ def provide_fdt12(cache_path: str | os.PathLike[str], expected_otp64: bytes) -> 
         ),
         failure_reason=None,
     )
+
+
+def provide_hash_gated_fdt12(
+    cache_path: str | os.PathLike[str],
+    expected_otp64: bytes,
+    expected_cache_sha256: str,
+) -> SeedProviderResult:
+    """Add the D261 canonical-source hash gate without ever writing the cache."""
+
+    source = Path(cache_path)
+    result = provide_fdt12(source, expected_otp64)
+    if not result.ok:
+        return result
+    if result.provenance.file_sha256 != expected_cache_sha256:
+        return _failure(
+            source,
+            "CACHE_SOURCE_HASH_MISMATCH",
+            size=result.provenance.file_size,
+            file_sha256=result.provenance.file_sha256,
+            crc_valid=result.provenance.crc_valid,
+            otp_binding=result.provenance.otp_binding,
+            otp_sha256=result.provenance.otp_sha256,
+            fdt12_sha256=result.provenance.fdt12_sha256,
+        )
+    return result

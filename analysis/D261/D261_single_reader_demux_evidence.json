@@ -1,0 +1,22 @@
+{
+  "ONE_PHYSICAL_IN_READER": true,
+  "ack_and_irq_same_completion": true,
+  "buffered_event_before_wait_preserved": true,
+  "happy_counts": {
+    "claim_count": 1,
+    "close_count": 1,
+    "max_queue_depth": 2,
+    "nonzero_fdt_tail_count": 0,
+    "one_physical_in_reader": true,
+    "open_count": 1,
+    "physical_in_read_count": 37,
+    "queued_frame_count_at_end": 0,
+    "release_count": 1
+  },
+  "large_baseline_b0": true,
+  "large_nav": true,
+  "no_frame_stealing": true,
+  "schema": "D261_SINGLE_READER_DEMUX_EVIDENCE_V1",
+  "split_frames": true,
+  "status": "PASS"
+}

@@ -1,0 +1,222 @@
+{
+  "rows": [
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "wrong_git_baseline",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "modified_live_critical_file",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "stale_marker",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "wrong_vid_pid",
+      "test_class": "FULL_FAKE_RUNTIME"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 1,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "identity_changes_after_open",
+      "test_class": "FULL_FAKE_RUNTIME"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "interface_claim_failure",
+      "test_class": "FULL_FAKE_RUNTIME"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "external_holder",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "config90_hash_mismatch",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "cache_hash_failure",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "cache_layout_failure",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "cache_crc_failure",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 1,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "live_otp_cache_mismatch",
+      "test_class": "FULL_FAKE_RUNTIME"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "secret_metadata_invalid",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 1,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "e4_mismatch",
+      "test_class": "FULL_FAKE_RUNTIME"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "secret_tls_object_identity_mismatch",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "fprintd_stop_failure",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 0,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "report_path_unsafe",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "cleanup_exception",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "signal_restore_failure",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "fprintd_restore_failure",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "physical_policy_mismatch",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "tail_policy_mismatch",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": "NOT_APPLICABLE_AFTER_OPEN_OR_CLEANUP_FIXTURE",
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "wrong_physical_length",
+      "test_class": "INJECTED_OPERATIONAL_GATE"
+    },
+    {
+      "NO_AUTOMATIC_RETRY": true,
+      "USB_OPEN_COUNT": 1,
+      "cache_write_count": 0,
+      "contained": true,
+      "persistent_write_count": 0,
+      "scenario": "unexpected_extra_frame_after_final_0x32",
+      "test_class": "FULL_FAKE_RUNTIME"
+    }
+  ],
+  "schema": "D261_FAILURE_CONTAINMENT_MATRIX_V1",
+  "status": "PASS"
+}

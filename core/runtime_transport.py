@@ -83,6 +83,26 @@ def fdt_a0_policy(control: int, timeout_ms: int) -> PhysicalSubmissionPolicy:
     )
 
 
+def operational_fdt_a0_policy(control: int, timeout_ms: int) -> PhysicalSubmissionPolicy:
+    """Return the D261 deterministic physical candidate for one FDT A0.
+
+    D255 proves physical length 64 for every command in the exact fresh-FDT
+    trace.  Its only bytes outside the declared frame that are nonzero occupy
+    the same absolute staging offsets across unrelated commands; D254 observes
+    different values at those offsets.  D261 therefore never replays that
+    residue and zero-fills the complete tail.  Device acceptance remains a
+    future per-command live hypothesis.
+    """
+
+    if control not in {0x20, 0x32, 0x36, 0x50, 0x82}:
+        raise ValueError(f"unsupported_fdt_control:0x{control:02x}")
+    return PhysicalSubmissionPolicy(
+        f"FDT_A0_0x{control:02X}_FIXED64_ZERO_TAIL_D261_CANDIDATE",
+        SubmissionMode.FIXED64_ZERO_TAIL,
+        timeout_ms=timeout_ms,
+    )
+
+
 class RuntimeTransport(Protocol):
     """One logical transport session; a future adapter may own real USB."""
 

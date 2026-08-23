@@ -59,6 +59,25 @@ tail fisica dei futuri A0 FDT Linux resta esplicitamente astratta. Ne segue
 backend USB reale, secret reale, baseline approvata, kit e autorizzazione live
 restano separati e tutti i flag live non qualificati restano false.
 
+D261 chiude offline il successivo gap operativo senza eseguire USB reale. Il
+raw D255 è stato ricensito per comando: tutti gli A0 FDT hanno submission da
+64 byte; i sei byte nonzero fuori frame ricorrono agli stessi offset assoluti
+`40..45` su comandi non correlati e cambiano nella capture D254, mentre il
+finale `0x32` OEM usa tail interamente zero e riceve ACK. Il candidate Linux
+usa quindi fixed-64 e zero-fill deterministico per
+`36,50,36,82,20,36,32`, senza replay di residui. L'accettazione target è prova
+primaria per `0x32`, ma resta una nuova ipotesi live per gli altri comandi e il
+rischio principale della futura singola run. Il nuovo path GPL integra
+cold-start APP12509, secret reale protetto con validazione E4 prima del medesimo
+handoff TLS, cache hash/CRC/OTP-bound, adapter libusb esatto con un solo reader
+EP81, preflight, marker single-use, restore e reporting. Il rehearsal completo
+e 231 test passano offline; default/import restano hard-disabled e i contatori
+reali USB/secret/comandi/marker/fprintd sono zero. Ne segue
+`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true` e
+`READY_FOR_FDT_LIVE_REVIEW=true`, ma `READY_FOR_FDT_LIVE=false`: manca ancora
+un commit SHA completo esplicitamente approvato per il live-critical set e
+nessuna autorizzazione hardware è implicita.
+
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
 request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
@@ -320,6 +339,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Chiusura gate host D258 | avanzamento offline, candidate ancora BLOCKED | orchestratore target in `gfusb.dll`; gate `0x82` chiuso e implementato; `0x50`/`0x20` corretti come input a classificatori post-stage2 ancora non riproducibili; timeout per comando; zero hardware |
 | Corrective contratto minimo D259 | BLOCKED sul plumbing TLS runtime; live non autorizzato | Classe A confermata meccanicamente dal CFG; replay B0 ordinato subito dopo `0x20`, same-`SSLObject` e continuità TLS PASS offline; il runtime sealed D245 chiude e non espone l'engine, quindi `READY_FOR_FDT_LIVE_REVIEW=false` |
 | Runtime persistente D260 | architecture readiness PASS offline; operational/live false | nuovo coordinator GPL con un server/sessione/handshake TLS, D4 A0 plaintext, EventSource separato e minimal FDT continuo; 15 failure contenuti, `src/`/launcher storici invariati; physical FDT A0 ancora astratto |
+| Readiness operativa D261 | PASS offline per review; live non approvato/non eseguito | tail FDT fixed-64 zero-fill chiusa come candidate, cold-start GPL e backend libusb single-reader integrati, secret/cache/preflight/marker/restore/reporting collegati; 231 test PASS, baseline live approvata ancora assente e accettazione zero-tail per comando resta rischio live |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -2893,6 +2913,100 @@ privilege model, loading/binding del secret reale, stop/restore fprintd,
 single-use marker, baseline live approvata e operator kit. D260 non autorizza
 hardware e non prepara quel percorso.
 
+## D261: operational live-readiness candidate offline
+
+D261 implementa il percorso operativo che D260 lasciava intenzionalmente
+astratto, ma lo valida soltanto con backend, OS, secret e target sintetici. Il
+censimento riproducibile della capture canonica D255 separa per ciascun
+controllo lunghezza logica, lunghezza fisica, tail e provenienza. Le submission
+OEM FDT sono tutte da 64 byte. Nei comandi `0x36`, `0x50`, `0x82` e `0x20` i
+soli byte extra nonzero occupano sempre gli offset fisici `40..45`; la capture
+D254 mostra gli stessi offset con valori diversi. Il finale `0x32` D255 ha
+invece tail zero e ACK valido. La decisione bounded è:
+
+```text
+FDT_A0_PHYSICAL_LENGTH=64
+FDT_A0_TAIL_POLICY=ZERO_FILL_OUTSIDE_DECLARED_LOGICAL_FRAME
+FDT_A0_RESIDUE_REPLAY=false
+0x32_ZERO_TAIL_EVIDENCE=PRIMARY_TARGET_OEM_ACCEPTED
+0x36/0x50/0x82/0x20_ZERO_TAIL_EVIDENCE=DETERMINISTIC_CANDIDATE_NOT_LIVE_PROVEN
+PRIMARY_FUTURE_LIVE_RISK=FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND
+```
+
+`core/cold_start.py` reimplementa nel dominio GPL i fatti comportamentali già
+provati da D245/D246 senza importare o modificare il runtime sealed: firmware
+A8 esatto, E4 tipizzato e validato, due A2 soltanto nelle posizioni canoniche,
+chip `0x82`, OTP A6, `0x70`, quattro DAC `0x80` correlati alla config e config
+`0x90` hash-gated. L'OTP ottenuto nella stessa sessione è l'unica identità
+accettata da `provide_hash_gated_fdt12()`; mismatch, layout, CRC o hash fermano
+prima del primo `0x36`, senza fallback, randomizzazione o write cache.
+
+`core/protected_runtime.py` definisce path root-owned `0600` deterministici.
+Il dry-run effettua soltanto `lstat` e non legge il secret. La
+materializzazione è exactly-once e richiede una capability opaca emessa solo
+dopo flag live esatto e marker single-use già acquisito. Lo stesso buffer
+valida E4 mediante la reference D190 canonica e, solo dopo il match, passa al
+server TLS; il cleanup lo azzera best-effort. Nessun import o costruttore del
+backend libusb può aprire USB senza la capability esplicita.
+
+`core/usb_runtime.py` è un adapter libusb lazy e production-shaped per un solo
+target `27c6:5125`, interfaccia `0`, OUT `0x01`, IN `0x81`. Richiede cardinalità
+esatta e rivalida bus/address/port path prima e dopo ogni OUT. Non espone
+detach, reset, clear-halt, reopen, retry o recovery. Un solo
+`SharedFrameRouter` possiede fisicamente EP81 e conserva in code separate ACK,
+risposte, IRQ `0x0100` e B0 anche quando sono frammentati o coalesciuti; applica
+inoltre pacing pre/post della policy fisica e rifiuta frame buffered inattesi
+dopo l'ACK terminale `0x32`.
+
+Il launcher `operator_kit/d261-live-fdt-arm-once.sh` accetta soltanto
+`--dry-run` oppure l'esatta autorizzazione live. Il default è hard-disabled.
+Il ramo live, non eseguito in D261, richiede root derivato da un operatore non
+root, full SHA approvato, confronto Git blob-per-blob dell'insieme hardcoded,
+materiale protetto valido, target/cardinalità esatti, cache canonica read-only,
+assenza di holder e marker D261 fresco creato `O_EXCL` `0600`. Stop/restore di
+fprintd, signal mask, cleanup, zeroizzazione e report atomico sono racchiusi
+nella stessa transazione; un'autorizzazione permette zero retry e al massimo
+un passaggio fino a `STOP_AFTER_FDT_ARM_ACK`.
+
+Il rehearsal offline completo attraversa, in una sola sessione fake,
+`cold-start → D1/TLS → D4 → AF/AE → 36,50,36,82,20/B0,36,32` e termina solo
+dopo l'ACK arm. Copre split/coalescing, payload grandi, identità USB mutata,
+claim failure, mismatch OTP/cache, mismatch E4 e frame extra terminale. La
+matrice operativa comprende inoltre baseline errata o modificata, marker stale,
+holder esterno, metadati protetti invalidi, failure fprintd/report/cleanup/
+restore e mismatch della policy fisica. Tutti i failure sono fail-closed con
+retry, famiglie persistenti e cache write a zero. La suite repository completa
+passa `231/231`; nessun raw, OTP, secret o dato biometrico entra nel bundle.
+
+Riesame metodologico pre-live:
+
+1. rispetto all'ultimo percorso live, cambia il metodo: il nuovo runtime GPL
+   conserva cold-start, TLS e FDT nella stessa sessione reale, usa un solo
+   reader fisico e sostituisce la tail astratta con una policy per comando
+   derivata dal raw;
+2. la nuova ipotesi tecnica è che APP12509 accetti la tail zero fixed-64 anche
+   per `0x36`, `0x50`, `0x82` e `0x20`, come già osservato direttamente per
+   `0x32` e per altri boundary A0;
+3. se una futura singola run fallisce nello stesso punto, non si ripete: si
+   analizza il comando/tail preciso e si acquisisce nuova evidenza o si cambia
+   metodo tecnico, senza creare una replica basata soltanto su pacing,
+   packaging o preflight.
+
+Lo stato canonico D261 è:
+
+```text
+D261_OUTCOME=READY_FOR_OPERATIONAL_LIVE_REVIEW
+D261_END_TO_END_OFFLINE_OPERATIONAL_REHEARSAL=PASS
+D261_FAILURE_CONTAINMENT_MATRIX=PASS
+D261_LIVE_CAPABILITY_DEFAULT=0
+D261_LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG=false
+D261_OPERATIONAL_LIVE_CRITICAL_FILESET=PENDING_FULL_SHA_APPROVAL
+D261_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true
+D261_READY_FOR_FDT_LIVE_REVIEW=true
+D261_READY_FOR_FDT_LIVE=false
+D261_LIVE_EXECUTION=NOT_PERFORMED
+```
+
 ## Operazioni read note e limiti
 
 | Operazione | Dominio | Limite |
@@ -2999,16 +3113,19 @@ epistemici non bloccanti rispetto al contratto host/bus D256. La TTL generale
 del cache resta un'incertezza di successo funzionale, non il solo blocker né
 un requisito di factory-preservation.
 
-Il current critical boundary è ora la review **operativa** del nuovo runtime,
-non più la sua architettura persistente né il classifier. Restano da
-implementare e revisionare il backend USB reale, la physical submission policy
-degli A0 FDT, privilege model, binding del secret E4 reale, stop/restore
-fprintd, marker single-shot, baseline live-critical approvata, operator kit e
-autorizzazione esplicita. Perciò
-`READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true`, ma
-`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=false`, il legacy
-`READY_FOR_FDT_LIVE_REVIEW=false` e `READY_FOR_FDT_LIVE=false`. D260 non
-autorizza hardware, capture o invocazioni live.
+Il current critical boundary non è più l'implementazione operativa: D261
+collega ora adapter USB reale, physical policy FDT zero-tail, privilege model,
+binding del secret E4, stop/restore fprintd, marker, verifier della baseline
+Git, operator kit e autorizzazione esplicita, tutti provati offline. Il
+candidate è quindi pronto per la review operativa live. Il boundary residuo è
+l'approvazione di un full commit SHA per il live-critical set D261 e
+l'autorizzazione consapevole di una sola run. L'accettazione target della
+zero-tail per `0x36/0x50/0x82/0x20` è il rischio live primario dichiarato, non
+un fatto già provato. Perciò
+`READY_FOR_FDT_LIVE_ARCHITECTURE_REVIEW=true`,
+`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true` e
+`READY_FOR_FDT_LIVE_REVIEW=true`, mentre `READY_FOR_FDT_LIVE=false`. D261 non
+ha aperto hardware e non auto-approva una baseline o una run.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -3222,6 +3339,32 @@ D260_NEW_RUNTIME_LIVE_PROVEN false
 D260_REAL_USB_OPEN_COUNT 0
 D260_REAL_TLS_TARGET_HANDSHAKE_COUNT 0
 D260_REAL_HARDWARE_ACTION_COUNT 0
+D261_OUTCOME READY_FOR_OPERATIONAL_LIVE_REVIEW
+D261_FDT_A0_PHYSICAL_LENGTH 64
+D261_FDT_A0_TAIL_POLICY ZERO_FILL_OUTSIDE_DECLARED_LOGICAL_FRAME
+D261_FDT_A0_RESIDUE_REPLAY false
+D261_FDT_ZERO_TAIL_0x32 PRIMARY_TARGET_OEM_ACCEPTED
+D261_FDT_ZERO_TAIL_0x36_0x50_0x82_0x20 UNPROVEN_LIVE_HYPOTHESIS
+D261_COLD_START_GPL_RUNTIME_IMPLEMENTED true
+D261_REAL_USB_ADAPTER_IMPLEMENTED true
+D261_ONE_PHYSICAL_EP81_READER true
+D261_REAL_SECRET_BOUNDARY_IMPLEMENTED true
+D261_SEED_LIVE_OTP_BINDING_REQUIRED true
+D261_LIVE_CAPABILITY_DEFAULT 0
+D261_LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG false
+D261_END_TO_END_OFFLINE_OPERATIONAL_REHEARSAL PASS
+D261_FAILURE_CONTAINMENT_MATRIX PASS
+D261_FULL_TEST_SUITE 231_PASS
+D261_OPERATIONAL_LIVE_CRITICAL_FILESET PENDING_FULL_SHA_APPROVAL
+D261_READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW true
+D261_READY_FOR_FDT_LIVE_REVIEW true
+D261_READY_FOR_FDT_LIVE false
+D261_REAL_USB_OPEN_COUNT 0
+D261_REAL_SECRET_READ_COUNT 0
+D261_REAL_COMMAND_SEND_COUNT 0
+D261_FPRINTD_MUTATION_COUNT 0
+D261_REAL_SINGLE_USE_MARKER_CREATE_COUNT 0
+D261_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -3375,6 +3518,16 @@ evidence-backed; gli A0 FDT restano `ABSTRACT_LOGICAL_ONLY`. Questa è
 executable closure del runtime offline e architecture readiness, non un
 backend USB, un path operatore o una readiness live.
 
+D261 aggiunge `core/cold_start.py`, `core/protected_runtime.py` e
+`core/usb_runtime.py`, rende operativa la policy FDT fixed-64 zero-tail nel
+coordinator e aggiunge entrypoint e launcher D261. Il live-critical set è
+hardcoded e verificato sia contro la working tree sia contro ogni blob di un
+full commit SHA esternamente approvato; il riferimento architetturale D260 è
+letto dal commit storico, non da report rigenerabili nella working tree. Il
+dry-run reale è cwd-independent, non legge il secret e non apre USB; il
+rehearsal usa soltanto fixture sintetiche. Questa è executable closure offline
+e readiness per review operativa, non un'approvazione SHA né una run live.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -3388,5 +3541,5 @@ backend USB, un path operatore o una readiness live.
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D260 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D261 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.

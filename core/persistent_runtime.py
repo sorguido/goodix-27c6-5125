@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
+from typing import Callable, Iterable
+
+from core.cold_start import ColdStartMachine, ColdStartMaterial, ColdStartResult
 
 from core.fdt_lifecycle import (
     COMMAND_TIMEOUT_MS,
@@ -38,6 +40,7 @@ from core.runtime_transport import (
     RuntimeTransport,
     ValidatedSecretBoundary,
     fdt_a0_policy,
+    operational_fdt_a0_policy,
 )
 from core.tls_b0 import (
     B0ApplicationConsumer,
@@ -72,6 +75,8 @@ class RuntimeResult:
     tls_state_before_cleanup: str
     baseline_b0_consumed_before_stage2: bool
     second_native_delta_passed: bool
+    cold_start_completed: bool = False
+    target_firmware: str | None = None
 
 
 class _FdtTransportAdapter:
@@ -79,8 +84,9 @@ class _FdtTransportAdapter:
 
     _RESPONSE_COUNTS = {0x36: 1, 0x50: 2, 0x82: 2, 0x20: 2, 0x32: 1}
 
-    def __init__(self, transport: RuntimeTransport) -> None:
+    def __init__(self, transport: RuntimeTransport, *, operational_physical_policy: bool = False) -> None:
         self.transport = transport
+        self.operational_physical_policy = operational_physical_policy
 
     def exchange(
         self, request: bytes, *, timeout_ms: int | None = None
@@ -95,7 +101,8 @@ class _FdtTransportAdapter:
         count = self._RESPONSE_COUNTS.get(control)
         if count is None:
             raise RuntimeFailure(f"fdt_response_policy_missing:0x{control:02x}")
-        self.transport.submit(request, fdt_a0_policy(control, timeout_ms))
+        policy_factory = operational_fdt_a0_policy if self.operational_physical_policy else fdt_a0_policy
+        self.transport.submit(request, policy_factory(control, timeout_ms))
         return tuple(self.transport.receive(timeout_ms) for _ in range(count))
 
 
@@ -107,10 +114,19 @@ class PersistentRuntimeCoordinator:
         transport: RuntimeTransport,
         event_source: EventSource,
         secret_boundary: ValidatedSecretBoundary,
+        *,
+        cold_start_machine: ColdStartMachine | None = None,
+        cold_start_material: ColdStartMaterial | None = None,
+        seed_provider_from_live_otp: Callable[[bytes], SeedProviderResult] | None = None,
+        operational_physical_policy: bool = False,
     ) -> None:
         self.transport = transport
         self.event_source = event_source
         self.secret_boundary = secret_boundary
+        self.cold_start_machine = cold_start_machine
+        self.cold_start_material = cold_start_material
+        self.seed_provider_from_live_otp = seed_provider_from_live_otp
+        self.operational_physical_policy = operational_physical_policy
         self.state = RuntimeState.CREATED
         self.tls_session: Tls12PskServerSession | None = None
         self.tls_close_count = 0
@@ -125,6 +141,7 @@ class PersistentRuntimeCoordinator:
         self.failure_reason: str | None = None
         self.lifecycle = FdtLifecycle()
         self.machine: ExactFreshFdtBootstrapMachine | None = None
+        self.cold_start_result: ColdStartResult | None = None
 
     def _handshake(self) -> None:
         if self.tls_session is None:
@@ -172,19 +189,31 @@ class PersistentRuntimeCoordinator:
             raise RuntimeFailure("d260_requires_fresh_fdt_path")
         self.lifecycle.observe_af_state(state.pov_valid)
 
-    def run(self, seed_result: SeedProviderResult, *, ts16: int) -> RuntimeResult:
+    def run(self, seed_result: SeedProviderResult | None = None, *, ts16: int) -> RuntimeResult:
         if self.state != RuntimeState.CREATED:
             raise RuntimeFailure("runtime_single_use")
         self.state = RuntimeState.RUNNING
         try:
             self.transport.open()
+            if self.cold_start_machine is not None:
+                if self.cold_start_material is None or self.seed_provider_from_live_otp is None:
+                    raise RuntimeFailure("cold_start_operational_inputs_missing")
+                self.cold_start_result = self.cold_start_machine.run(self.cold_start_material)
+                seed_result = self.seed_provider_from_live_otp(self.cold_start_result.otp64)
+                if not seed_result.ok:
+                    raise RuntimeFailure("live_otp_seed_binding_failed_before_first_0x36")
+            elif seed_result is None:
+                raise RuntimeFailure("seed_result_missing")
             self.tls_session = Tls12PskServerSession.from_boundary(self.secret_boundary)
             if not self.tls_session.uses_secret_boundary(self.secret_boundary):
                 raise RuntimeFailure("tls_secret_boundary_identity_mismatch")
             self._handshake()
             self._d4()
             self._af(ts16)
-            adapter = _FdtTransportAdapter(self.transport)
+            adapter = _FdtTransportAdapter(
+                self.transport,
+                operational_physical_policy=self.operational_physical_policy,
+            )
             self.machine = ExactFreshFdtBootstrapMachine(
                 adapter,
                 self.lifecycle,
@@ -201,6 +230,9 @@ class PersistentRuntimeCoordinator:
             self.machine.manual_sample()
             self.machine.finalize_minimal_device_contract()
             self.machine.arm(ts16)
+            terminal_queue_gate = getattr(self.transport, "assert_no_buffered_frames", None)
+            if callable(terminal_queue_gate):
+                terminal_queue_gate()
             if tuple(self.lifecycle.device_command_trace) != EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE:
                 raise RuntimeFailure("exact_fdt_command_trace_mismatch")
             result = RuntimeResult(
@@ -210,6 +242,10 @@ class PersistentRuntimeCoordinator:
                     self.machine.baseline_b0_consumed_at_manual_stage == 2
                 ),
                 second_native_delta_passed=self.machine.second_delta_gate_passed,
+                cold_start_completed=self.cold_start_result is not None,
+                target_firmware=(
+                    self.cold_start_result.firmware if self.cold_start_result is not None else None
+                ),
             )
             self.state = RuntimeState.COMPLETED
             return result
@@ -265,6 +301,19 @@ class PersistentRuntimeCoordinator:
                 machine and machine.baseline_b0_consumed_at_manual_stage == 2
             ),
             "second_native_delta_passed": bool(machine and machine.second_delta_gate_passed),
+            "cold_start_gpl_runtime_completed": self.cold_start_result is not None,
+            "cold_start_phase_trace": (
+                list(self.cold_start_result.phase_trace) if self.cold_start_result else []
+            ),
+            "cold_start_command_trace": (
+                [f"0x{value:02x}" for value in self.cold_start_result.command_trace]
+                if self.cold_start_result else []
+            ),
+            "target_firmware": self.cold_start_result.firmware if self.cold_start_result else None,
+            "e4_validation_count": (
+                self.cold_start_machine.e4_validation_count if self.cold_start_machine else 0
+            ),
+            "operational_fdt_physical_policy": self.operational_physical_policy,
             "classifier_call_count": machine.semantic_classifier_call_count if machine else 0,
             "raster_decode_count": machine.raster_decode_count if machine else 0,
             "host_cache_write_count": machine.host_cache_write_count if machine else 0,

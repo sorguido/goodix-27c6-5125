@@ -1,0 +1,36 @@
+{
+  "FPRINTD_MUTATION_COUNT": 0,
+  "REAL_COMMAND_SEND_COUNT": 0,
+  "REAL_SECRET_READ_COUNT": 0,
+  "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
+  "REAL_USB_OPEN_COUNT": 0,
+  "commands": [
+    {
+      "command": "python3 -m py_compile <D261 Python files>",
+      "status": "PASS"
+    },
+    {
+      "command": "python3 analysis/D261/d261_tail_audit.py",
+      "status": "PASS"
+    },
+    {
+      "command": "python3 analysis/D261/d261_offline_rehearsal.py",
+      "status": "PASS"
+    },
+    {
+      "command": "operator_kit/d261-live-fdt-arm-once.sh --dry-run",
+      "status": "PASS"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p 'test_*.py'",
+      "errors": 0,
+      "failures": 0,
+      "status": "PASS",
+      "tests_run": 231,
+      "wall_seconds": 15.387
+    }
+  ],
+  "execution_mode": "OFFLINE_ONLY",
+  "schema": "D261_TEST_RESULTS_V1",
+  "status": "PASS"
+}

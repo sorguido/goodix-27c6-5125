@@ -1,0 +1,23 @@
+{
+  "detach_reset_reopen_retry_api": false,
+  "ep_in": "0x81",
+  "ep_out": "0x01",
+  "exact_target": "27c6:5125",
+  "happy_fake_counts": {
+    "claim_count": 1,
+    "close_count": 1,
+    "max_queue_depth": 2,
+    "nonzero_fdt_tail_count": 0,
+    "one_physical_in_reader": true,
+    "open_count": 1,
+    "physical_in_read_count": 37,
+    "queued_frame_count_at_end": 0,
+    "release_count": 1
+  },
+  "identity_revalidation": true,
+  "interface": 0,
+  "real_libusb_initialized": false,
+  "schema": "D261_REAL_USB_ADAPTER_OFFLINE_EVIDENCE_V1",
+  "single_open": true,
+  "status": "PASS_FAKE_BACKEND"
+}
