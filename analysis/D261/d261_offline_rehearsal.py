@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import nullcontext
 from pathlib import Path
 import tempfile
 import sys
 from typing import Any
+from unittest import mock
 
 
 def find_repo_root(start: Path) -> Path:
@@ -29,9 +31,9 @@ from core.cold_start import ColdStartMachine, ColdStartMaterial, DacEntry, E4_RE
 from core.fdt_seed import CRC_OFFSET, provide_hash_gated_fdt12
 from core.persistent_runtime import PersistentRuntimeCoordinator
 from core.post_d4 import PLAIN, TLS, parse_outer, parse_payload
-from core.protected_runtime import CANONICAL_GFUSB_PATH
+from core.protected_runtime import CANONICAL_GFUSB_PATH, LiveIoCapability, require_live_io_capability
 from core.runtime_transport import operational_fdt_a0_policy
-from core.tls_b0 import wrap_tls_record_b0
+from core.tls_b0 import Tls12PskServerSession, wrap_tls_record_b0
 from core.usb_runtime import LibusbRuntimeTransport, UsbIdentity, UsbRuntimeFailure
 from poc.goodix5125.tools.binding_reference.runtime import derive_validator_from_canonical_pe
 from src.goodix5125_cleanroom import crc32_mpeg2
@@ -163,7 +165,14 @@ class SyntheticOperationalSecret:
 
 
 class FakeLibusbBackend:
-    def __init__(self, repo: Path, secret: SyntheticOperationalSecret, scenario: str) -> None:
+    def __init__(
+        self,
+        repo: Path,
+        secret: SyntheticOperationalSecret,
+        scenario: str,
+        *,
+        live_io_capability: LiveIoCapability | None = None,
+    ) -> None:
         self.repo = repo
         self.secret = secret
         self.scenario = scenario
@@ -179,8 +188,12 @@ class FakeLibusbBackend:
         self.logical_out: list[bytes] = []
         self.physical_chunks: list[bytes] = []
         self.nonzero_fdt_tail_count = 0
+        self.command_send_count = 0
+        self.live_io_capability = live_io_capability
 
     def open_exact(self, vid: int, pid: int, interface: int) -> UsbIdentity:
+        if self.live_io_capability is not None:
+            require_live_io_capability(self.live_io_capability)
         if self.scenario == "wrong_vid_pid":
             return UsbIdentity(vid, pid ^ 1, 1, 2, (3,))
         if self.scenario == "interface_claim_failure":
@@ -266,6 +279,7 @@ class FakeLibusbBackend:
             raise RuntimeError(f"unexpected synthetic control:0x{control:02x}")
 
     def bulk_out(self, endpoint: int, data: bytes, timeout_ms: int) -> int:
+        self.command_send_count += 1
         self.physical_chunks.append(bytes(data))
         self.out_accumulator.extend(data)
         if len(self.out_accumulator) >= 4:
@@ -286,6 +300,8 @@ class FakeLibusbBackend:
         if not self.close_count:
             self.release_count = int(bool(self.claim_count))
             self.close_count = 1
+            if self.scenario == "cleanup_exception":
+                raise UsbRuntimeFailure("synthetic_cleanup_exception")
 
 
 def _build_seed_cache(path: Path, otp: bytes, *, mismatch: bool = False) -> str:
@@ -297,13 +313,24 @@ def _build_seed_cache(path: Path, otp: bytes, *, mismatch: bool = False) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def run_scenario(repo: Path, scenario: str = "happy") -> dict[str, Any]:
+def run_scenario(
+    repo: Path,
+    scenario: str = "happy",
+    *,
+    live_io_capability: LiveIoCapability | None = None,
+) -> dict[str, Any]:
     secret = SyntheticOperationalSecret(repo, e4_mismatch=scenario == "e4_mismatch")
-    backend = FakeLibusbBackend(repo, secret, scenario)
+    backend = FakeLibusbBackend(
+        repo,
+        secret,
+        scenario,
+        live_io_capability=live_io_capability,
+    )
     transport = LibusbRuntimeTransport(backend, sleeper=lambda _seconds: None)
     cold = ColdStartMachine(transport, secret)
     passed = False
     result = None
+    failure_class = None
     with tempfile.TemporaryDirectory(prefix="d261-seed-fixture-") as directory:
         cache = Path(directory) / "goodix.dat"
         cache_hash = _build_seed_cache(cache, SYNTHETIC_OTP, mismatch=scenario == "live_otp_cache_mismatch")
@@ -316,12 +343,23 @@ def run_scenario(repo: Path, scenario: str = "happy") -> dict[str, Any]:
             seed_provider_from_live_otp=lambda otp: provide_hash_gated_fdt12(cache, otp, cache_hash),
             operational_physical_policy=True,
         )
-        try:
-            result = coordinator.run(ts16=0x4242)
-            passed = True
-        except Exception:
-            if scenario == "happy":
-                raise
+        identity_context = (
+            mock.patch.object(
+                Tls12PskServerSession,
+                "from_boundary",
+                return_value=Tls12PskServerSession(SYNTHETIC_SECRET),
+            )
+            if scenario == "secret_tls_object_identity_mismatch"
+            else nullcontext()
+        )
+        with identity_context:
+            try:
+                result = coordinator.run(ts16=0x4242)
+                passed = True
+            except Exception as exc:
+                failure_class = f"{type(exc).__name__}:{exc}"
+                if scenario == "happy":
+                    raise
         audit = coordinator.audit()
     fdt_frames = []
     for frame in backend.logical_out:
@@ -333,6 +371,7 @@ def run_scenario(repo: Path, scenario: str = "happy") -> dict[str, Any]:
     return {
         "scenario": scenario,
         "passed": passed,
+        "observed_failure_class": failure_class,
         "result": ({
             "cold_start_completed": result.cold_start_completed,
             "target_firmware": result.target_firmware,
@@ -350,6 +389,7 @@ def run_scenario(repo: Path, scenario: str = "happy") -> dict[str, Any]:
             "max_queue_depth": transport.router.max_queue_depth,
             "queued_frame_count_at_end": transport.router.queued_frame_count,
             "nonzero_fdt_tail_count": backend.nonzero_fdt_tail_count,
+            "command_send_count": backend.command_send_count,
         },
         "synthetic_fixtures": {
             "A8": True, "E4": True, "A6_OTP": True,
@@ -384,7 +424,12 @@ def generate_fileset(repo: Path) -> dict[str, Any]:
     return {
         "schema": "D261_OPERATIONAL_LIVE_CRITICAL_FILESET_V1",
         "step": "D261",
-        "approval_status": "PENDING_USER_AI_PM_REVIEW",
+        "role": "DERIVED_REPORT_NOT_AUTHORITY",
+        "LIVE_CRITICAL_PATH_SOURCE": "HARDCODED_REVIEWED_TUPLE_IN_VERIFIER",
+        "LIVE_CRITICAL_FILESET_JSON_ROLE": "DERIVED_REPORT_NOT_AUTHORITY",
+        "LIVE_CRITICAL_VERIFIER_SELF_INCLUDED": "tools/d261_live_fdt_arm_once.py" in LIVE_CRITICAL_PATHS,
+        "FILESET_SELF_INTEGRITY_AGAINST_APPROVED_COMMIT": True,
+        "approval_status": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
         "preferred_approval": "D261_APPROVED_LIVE_BASELINE_SHA=<full git commit sha>",
         "files": [
             {"path": path, "sha256": sha256_file(repo / path), "rationale": rationale[path], "provenance": "CANONICAL_REPOSITORY_FILE"}
@@ -469,13 +514,6 @@ def generate(repo: Path) -> dict[str, Any]:
         "single_open": True, "identity_revalidation": True, "detach_reset_reopen_retry_api": False,
         "real_libusb_initialized": False, "happy_fake_counts": happy["usb"],
     })
-    _write_json(output / "D261_single_reader_demux_evidence.json", {
-        "schema": "D261_SINGLE_READER_DEMUX_EVIDENCE_V1", "status": "PASS",
-        "ONE_PHYSICAL_IN_READER": True, "ack_and_irq_same_completion": True,
-        "split_frames": True, "large_nav": True, "large_baseline_b0": True,
-        "buffered_event_before_wait_preserved": True, "no_frame_stealing": True,
-        "happy_counts": happy["usb"],
-    })
     _write_json(output / "D261_secret_boundary_operational_evidence.json", {
         "schema": "D261_SECRET_BOUNDARY_EVIDENCE_V1", "status": "PASS_SYNTHETIC_FIXTURE_REAL_PATH_UNREAD",
         "REAL_SECRET_BOUNDARY_RUNTIME_PATH_IMPLEMENTED": True, "REAL_SECRET_READ_COUNT": 0,
@@ -504,9 +542,29 @@ def generate(repo: Path) -> dict[str, Any]:
         "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
         "FPRINTD_MUTATION_COUNT": 0,
     })
+    from analysis.D261.d261_corrective_harness import generate_corrective_evidence
+    corrective = generate_corrective_evidence(repo)
+    _write_json(output / "D261_failure_containment_matrix.json", corrective["failures"])
+    _write_json(output / "D261_single_reader_demux_evidence.json", corrective["demux"])
+    _write_json(output / "D261_hard_disable_execution_evidence.json", corrective["hard_disable"])
+    _write_json(output / "D261_durable_report_safety_evidence.json", corrective["report"])
+    transaction = corrective["transaction"]
+    _write_json(output / "D261_pre_usb_transaction_evidence.json", transaction)
+    rehearsal["operational_transaction_fixture"] = transaction
+    rehearsal["status"] = "PASS" if all((
+        happy["passed"],
+        corrective["failures"]["status"] == "PASS_EXECUTION_DERIVED",
+        corrective["demux"]["status"] == "PASS",
+        corrective["hard_disable"]["status"] == "PASS",
+        corrective["report"]["status"] == "PASS",
+        transaction["status"] == "PASS",
+    )) else "FAIL"
+    rehearsal["OFFLINE_OPERATIONAL_REHEARSAL"] = rehearsal["status"]
+    _write_json(output / "D261_full_offline_operational_rehearsal.json", rehearsal)
     return {
-        "happy": happy, "failure_matrix": failure_matrix, "sealed_matches": sealed_matches,
+        "happy": happy, "failure_matrix": corrective["failures"], "sealed_matches": sealed_matches,
         "fileset": fileset, "rehearsal": rehearsal, "preflight": preflight,
+        "corrective": corrective,
     }
 
 

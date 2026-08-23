@@ -6,6 +6,7 @@
   "happy_fake_counts": {
     "claim_count": 1,
     "close_count": 1,
+    "command_send_count": 30,
     "max_queue_depth": 2,
     "nonzero_fdt_tail_count": 0,
     "one_physical_in_reader": true,

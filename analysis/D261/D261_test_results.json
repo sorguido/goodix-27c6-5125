@@ -6,7 +6,7 @@
   "REAL_USB_OPEN_COUNT": 0,
   "commands": [
     {
-      "command": "python3 -m py_compile <D261 Python files>",
+      "command": "python3 -m py_compile <D261 corrective Python files>",
       "status": "PASS"
     },
     {
@@ -18,7 +18,7 @@
       "status": "PASS"
     },
     {
-      "command": "operator_kit/d261-live-fdt-arm-once.sh --dry-run",
+      "command": "operator_kit/d261-live-fdt-arm-once.sh --dry-run (external cwd)",
       "status": "PASS"
     },
     {
@@ -26,11 +26,10 @@
       "errors": 0,
       "failures": 0,
       "status": "PASS",
-      "tests_run": 231,
-      "wall_seconds": 15.387
+      "tests_run": 235
     }
   ],
   "execution_mode": "OFFLINE_ONLY",
-  "schema": "D261_TEST_RESULTS_V1",
+  "schema": "D261_CORRECTIVE_TEST_RESULTS_V2",
   "status": "PASS"
 }

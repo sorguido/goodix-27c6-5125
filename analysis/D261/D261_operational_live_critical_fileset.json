@@ -1,6 +1,10 @@
 {
   "D260_ARCHITECTURE_CRITICAL_FILESET": "analysis/D260/D260_architecture_critical_fileset.json",
-  "approval_status": "PENDING_USER_AI_PM_REVIEW",
+  "FILESET_SELF_INTEGRITY_AGAINST_APPROVED_COMMIT": true,
+  "LIVE_CRITICAL_FILESET_JSON_ROLE": "DERIVED_REPORT_NOT_AUTHORITY",
+  "LIVE_CRITICAL_PATH_SOURCE": "HARDCODED_REVIEWED_TUPLE_IN_VERIFIER",
+  "LIVE_CRITICAL_VERIFIER_SELF_INCLUDED": true,
+  "approval_status": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
   "files": [
     {
       "path": "core/cold_start.py",
@@ -36,7 +40,7 @@
       "path": "core/protected_runtime.py",
       "provenance": "CANONICAL_REPOSITORY_FILE",
       "rationale": "protected material loader and E4-to-TLS secret lineage",
-      "sha256": "81e4a789f0162dbbe2168cee4468f384527878a305f6f75609f00b70ed23493a"
+      "sha256": "d8bde02ec9cf70d20d845270e03d5f8a9ccd5ce336cc9358271c3cb11ce6ce3b"
     },
     {
       "path": "core/runtime_transport.py",
@@ -54,7 +58,7 @@
       "path": "core/usb_runtime.py",
       "provenance": "CANONICAL_REPOSITORY_FILE",
       "rationale": "real libusb adapter and shared physical-IN router",
-      "sha256": "2678e84d5358db7fe6c0d3166c82a2551c101cfbdbdcfec9572738bcb70cc362"
+      "sha256": "4891171f7c1a153aee5c7b8ea2c52d9dd78b2d40a91419cd97475e5e6c7e4727"
     },
     {
       "path": "src/goodix5125_cleanroom.py",
@@ -84,7 +88,7 @@
       "path": "tools/d261_live_fdt_arm_once.py",
       "provenance": "CANONICAL_REPOSITORY_FILE",
       "rationale": "entrypoint, baseline, preflight, marker and transaction",
-      "sha256": "542368780d9e3a223af3c08eddf33e9584547ad5dd3e130513a96d22c6fb7238"
+      "sha256": "81b070902bba4a80e023be309172744d76e118b0a67dc3ee27902ffa5d7131e4"
     },
     {
       "path": "operator_kit/d261-live-fdt-arm-once.sh",
@@ -94,6 +98,7 @@
     }
   ],
   "preferred_approval": "D261_APPROVED_LIVE_BASELINE_SHA=<full git commit sha>",
+  "role": "DERIVED_REPORT_NOT_AUTHORITY",
   "schema": "D261_OPERATIONAL_LIVE_CRITICAL_FILESET_V1",
   "self_protection": "ENTRYPOINT_REQUIRES_EXACT_HARDCODED_PATH_SET_AND_GIT_BLOB_MATCH",
   "step": "D261"

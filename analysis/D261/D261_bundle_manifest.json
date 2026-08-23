@@ -1,11 +1,12 @@
 {
-  "bundle_path": "analysis/D261/D261_operational_live_readiness_bundle.zip",
+  "baseline_approval": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
+  "bundle_path": "analysis/D261/D261_operational_evidence_hardening_corrective_bundle.zip",
   "bundle_sha256": "RECORDED_IN_EXTERNAL_SIDECAR",
   "canonical_manual": {
     "included": false,
     "path": "Goodix 27c6 5125 manuale tecnico.md",
     "reason": "CANONICAL_REPOSITORY_REFERENCE_NOT_DUPLICATED",
-    "sha256": "8c68492f8a7fa62ebdaf0e5da28f1802025b41750abb83651bd8984a03dac0f1"
+    "sha256": "cdc9974cc04cc20d272d04edd728eb5c25f0d120df84102df6dc27914e49d87e"
   },
   "exclusions": [
     "raw captures and packet payloads",
@@ -13,43 +14,23 @@
     "real secret/PSK and protected material",
     "biometric plaintext/raster",
     "OEM DLL, firmware and disassembly",
-    "historical unchanged artifacts"
+    "unchanged historical artifacts and prior bundle contents"
   ],
   "files": [
     {
-      "path": "core/cold_start.py",
-      "sha256": "5ce4e0eb9e3328dd36f69631ea16cd152a24f90f36418c3ddbfb7c3deb6ef025",
-      "size": 9335
-    },
-    {
-      "path": "core/fdt_seed.py",
-      "sha256": "5df64876dd977623def8bccab512410b1ecb18f11b3b06d589faa935c8c44e2a",
-      "size": 7354
-    },
-    {
-      "path": "core/persistent_runtime.py",
-      "sha256": "8e448caaa2527b13e66679cad55afa103b9ac30cab505299c848c5250a0df12c",
-      "size": 14703
-    },
-    {
       "path": "core/protected_runtime.py",
-      "sha256": "81e4a789f0162dbbe2168cee4468f384527878a305f6f75609f00b70ed23493a",
-      "size": 9547
-    },
-    {
-      "path": "core/runtime_transport.py",
-      "sha256": "cbbb0b68a570da0d7ae07b386883144b9ce31ad22e864a2436e5dadb1dbe91ea",
-      "size": 4474
+      "sha256": "d8bde02ec9cf70d20d845270e03d5f8a9ccd5ce336cc9358271c3cb11ce6ce3b",
+      "size": 13349
     },
     {
       "path": "core/usb_runtime.py",
-      "sha256": "2678e84d5358db7fe6c0d3166c82a2551c101cfbdbdcfec9572738bcb70cc362",
-      "size": 16095
+      "sha256": "4891171f7c1a153aee5c7b8ea2c52d9dd78b2d40a91419cd97475e5e6c7e4727",
+      "size": 16654
     },
     {
       "path": "tools/d261_live_fdt_arm_once.py",
-      "sha256": "542368780d9e3a223af3c08eddf33e9584547ad5dd3e130513a96d22c6fb7238",
-      "size": 21322
+      "sha256": "81b070902bba4a80e023be309172744d76e118b0a67dc3ee27902ffa5d7131e4",
+      "size": 27772
     },
     {
       "path": "operator_kit/d261-live-fdt-arm-once.sh",
@@ -58,68 +39,58 @@
     },
     {
       "path": "tests/test_d261_operational_readiness.py",
-      "sha256": "31997a1257123e1ab82702bac2b2c82955f382e0e0258906eee47dcb214784dd",
-      "size": 9405
-    },
-    {
-      "path": "analysis/D261/d261_tail_audit.py",
-      "sha256": "8426bcab74c4404420e4ffcacfd455617dcfd9175a5aafe4d7faf3919b57dadc",
-      "size": 7349
+      "sha256": "9db94a69cf24a00bdf59d6f2ed72a30951db8529eb1d0e4713566afdae276a81",
+      "size": 12228
     },
     {
       "path": "analysis/D261/d261_offline_rehearsal.py",
-      "sha256": "de54d39e4be4b47cd4ba574030c38479daf0dfe880be052aa6925f1de26479bc",
-      "size": 25393
+      "sha256": "b7dc8c1a0155ebcd1cec45b1ca11e10ad972b44541bc3902e8ab567da8ffb1e3",
+      "size": 27921
+    },
+    {
+      "path": "analysis/D261/d261_corrective_harness.py",
+      "sha256": "f9c72f2223ae7c350f62488ca37cdefff0ec420c4a23e1980a4cb0b51f9dbe9a",
+      "size": 31065
     },
     {
       "path": "analysis/D261/d261_finalize.py",
-      "sha256": "605e3bdce574d4610f59a4b16b4c60c81fcdf4000804708f39fab5daa47d760d",
-      "size": 7822
+      "sha256": "6c79ea96fe8d5799081832231fbb47472802a4a013a62958a8e21f5c2f5209bb",
+      "size": 11711
     },
     {
-      "path": "analysis/D261/D261_fdt_physical_tail_audit.json",
-      "sha256": "3bcfff01f6ec151e310e67418c60d503485d714f960818c969cd379547ced09a",
-      "size": 8379
-    },
-    {
-      "path": "analysis/D261/D261_sanitized_tail_matrix.json",
-      "sha256": "834d97ca3da76c0e086b659f646c65197c43df3b6cc770e5fcb68c3320347a96",
-      "size": 3647
-    },
-    {
-      "path": "analysis/D261/D261_physical_policy_decision.json",
-      "sha256": "ed47f0f17a750e65e83d69bfe575c2f49d06f20a7aecc06d52b4ccf9d5642377",
-      "size": 5385
-    },
-    {
-      "path": "analysis/D261/D261_cold_start_migration_evidence.json",
-      "sha256": "7412d96d5f8781ae3dfdecdb6c9a8feeb34fd4fdb3d1c230ab1599d471313564",
-      "size": 728
+      "path": "analysis/D261/D261_hard_disable_execution_evidence.json",
+      "sha256": "ff4caeb70b0c0e16e83df1101913002a4556e10e158640b0c7699bbe534d627b",
+      "size": 2212
     },
     {
       "path": "analysis/D261/D261_real_usb_adapter_offline_evidence.json",
-      "sha256": "2202aaececee4d362004ad4cce9359e185e340f85ec3535df976460c8d25a1db",
-      "size": 598
+      "sha256": "3a889d20de2dead9e52e0e7101eca0b094cbfe789d59eb0b2f88035b3715c00f",
+      "size": 628
+    },
+    {
+      "path": "analysis/D261/D261_failure_containment_matrix.json",
+      "sha256": "5d86b57bcb160b7ad3b54bde38b46c7826544517b7c0af7e11a36b9a8fc34239",
+      "size": 15438
     },
     {
       "path": "analysis/D261/D261_single_reader_demux_evidence.json",
-      "sha256": "de29e1b62ea2ca173f47dccfffb4a6fe2e3a171733c7672fdb0903ee5456b653",
-      "size": 577
+      "sha256": "a2e645618363054a45bdf31efebf8dd95b3442b8dea5beb48bf73d9b9f160a58",
+      "size": 4782
     },
     {
-      "path": "analysis/D261/D261_secret_boundary_operational_evidence.json",
-      "sha256": "aa7e705b36527f2f53628c507fc96850431949da49496ce23602b907c9d664e4",
-      "size": 377
+      "path": "analysis/D261/D261_pre_usb_transaction_evidence.json",
+      "sha256": "b84b8443b8c4eac9eb8bc8e9a0854ed23de136114fb4d34e907c195b79ed733b",
+      "size": 1372
     },
     {
-      "path": "analysis/D261/D261_seed_otp_runtime_path_evidence.json",
-      "sha256": "a48e218b5596f970b5377e0240b066815a8639dbd9cff3f6c4132c2d9afac673",
-      "size": 364
+      "path": "analysis/D261/D261_durable_report_safety_evidence.json",
+      "sha256": "766ebb4a5ae5d19d0027fda63b9cf0cf15ac724e3f28211a8a66e6c1956a51f7",
+      "size": 850
     },
     {
       "path": "analysis/D261/D261_preflight_dry_run.json",
-      "sha256": "2052e6280af2577f516ad4971df299ceb609a54b9ea1e5946707167dcec2a040",
-      "size": 2899
+      "sha256": "de54eb96a67ce8f884dd35e9af64f2438b6c686bef028ea7dd7bcc84293238e2",
+      "size": 4096
     },
     {
       "path": "analysis/D261/D261_operator_kit_dry_run_result.json",
@@ -127,33 +98,38 @@
       "size": 443
     },
     {
-      "path": "analysis/D261/D261_failure_containment_matrix.json",
-      "sha256": "5b6b9bfc4b4ef58b62b2b9e9622adb53ce399ee8ff1521eec7b6468c08e9f88c",
-      "size": 6480
+      "path": "analysis/D261/D261_full_offline_operational_rehearsal.json",
+      "sha256": "8ca2c75732e7bbf5f3edbc3425729a54d1ab85e66a7a484fa3a31af7a50f40ec",
+      "size": 5447
     },
     {
       "path": "analysis/D261/D261_operational_live_critical_fileset.json",
-      "sha256": "ed0e76a5dbbfff840b9688c6bf7262abe1c4cdfef872d490bdcb61244d6dd476",
-      "size": 4282
-    },
-    {
-      "path": "analysis/D261/D261_full_offline_operational_rehearsal.json",
-      "sha256": "a8455ae7cbe753f20c1e4f2fa3cc7d5ab3296c48769563070391d961e12322d3",
-      "size": 4220
+      "sha256": "be5ee312d31c105b1ec2045d0f1da215a39bcfed027daa01854d4f655aa9010b",
+      "size": 4581
     },
     {
       "path": "analysis/D261/D261_test_results.json",
-      "sha256": "f4770aae1bc66199f3c5db609bcfacaa01b733ec70acec2ede160e8fd435a87d",
-      "size": 888
+      "sha256": "e2a6b87a09fd0cfc0d367e8efbcfaeb779f280ee6ae390cfbb1db5c95fdc21a5",
+      "size": 895
     },
     {
       "path": "analysis/D261/D261_readiness_decision.json",
-      "sha256": "135650810023f0ffb451821288a0dd76ea190be9181b7d750118dfbc6d63386a",
-      "size": 1673
+      "sha256": "8c3fd7f794440c7faf375fe790fb4647c0e68058b30cc6f628dfa4f7df55492e",
+      "size": 3409
+    },
+    {
+      "path": "analysis/D261/D261_corrective_report.md",
+      "sha256": "b75329917a9ea8c47503032177e3a942ec9b19dc3d9ce5860e130c46a496c473",
+      "size": 1111
+    },
+    {
+      "path": "analysis/D261/D261_previous_bundle_status.txt",
+      "sha256": "d8b7f3c7602cefa6490eb48ea0833cb10149c0700b7411467f5d0a21392e6a2c",
+      "size": 197
     }
   ],
-  "generated_utc": "2026-08-23T11:06:08.979809+02:00",
-  "reference_head": "ef2aa95c0b7261638a70cdf26a91ea00dd60eb41",
-  "schema": "D261_BUNDLE_MANIFEST_V1",
-  "step": "D261"
+  "generated_utc": "2026-08-23T11:51:28.652752+02:00",
+  "reference_head_before_corrective": "75dbb50475786295a816e6cbd0e726af46132091",
+  "schema": "D261_CORRECTIVE_BUNDLE_MANIFEST_V2",
+  "step": "D261_CORRECTIVE_SAME_STEP"
 }

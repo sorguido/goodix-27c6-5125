@@ -20,12 +20,15 @@ from analysis.D261.d261_offline_rehearsal import (
 from core.protected_runtime import (
     D261_LIVE_AUTHORIZATION_FLAG,
     ProtectedRuntimeFailure,
-    issue_live_authorization_after_marker,
+    _issue_cli_intent_after_exact_main_flag,
+    issue_live_io_capability_after_marker,
 )
 from core.runtime_transport import PhysicalSubmissionPolicy, SubmissionMode, operational_fdt_a0_policy
 from core.usb_runtime import CtypesLibusbBackend, LibusbRuntimeTransport, UsbIdentity
 from tools.d261_live_fdt_arm_once import (
+    CANONICAL_LIVE_CRITICAL_PATHS,
     LIVE_CRITICAL_PATHS,
+    _run_live,
     dry_run,
     load_fileset,
     verify_approved_git_baseline,
@@ -127,27 +130,38 @@ class D261OperationalReadinessTests(unittest.TestCase):
 
     def test_declared_negative_matrix_is_complete_and_contained(self) -> None:
         matrix = _json("analysis/D261/D261_failure_containment_matrix.json")
-        self.assertEqual(matrix["status"], "PASS")
+        self.assertEqual(matrix["status"], "PASS_EXECUTION_DERIVED")
         rows = {row["scenario"]: row for row in matrix["rows"]}
         self.assertEqual(set(rows), set(NEGATIVE_SCENARIOS))
+        self.assertEqual(matrix["FAILURE_SCENARIO_COUNT"], len(NEGATIVE_SCENARIOS))
+        self.assertEqual(matrix["FAILURE_SCENARIO_EXECUTED_COUNT"], len(NEGATIVE_SCENARIOS))
+        self.assertEqual(matrix["ASSERTION_ONLY_FAILURE_ROWS"], 0)
         for row in rows.values():
             self.assertTrue(row["contained"])
             self.assertTrue(row["NO_AUTOMATIC_RETRY"])
+            self.assertTrue(row["gate_invoked"])
+            self.assertTrue(row["observed_failure_class"])
+            self.assertFalse(row["LIVE_EVIDENCE"])
             self.assertEqual(row["persistent_write_count"], 0)
             self.assertEqual(row["cache_write_count"], 0)
 
     def test_concrete_usb_backend_is_sealed_without_capability(self) -> None:
         backend = CtypesLibusbBackend()
-        with self.assertRaisesRegex(ProtectedRuntimeFailure, "live_resource_open_not_authorized"):
+        with self.assertRaisesRegex(ProtectedRuntimeFailure, "live_io_capability_required"):
             backend.open_exact(0x27C6, 0x5125, 0)
         self.assertIsNone(backend._lib)
         self.assertEqual(backend.open_count, 0)
 
-    def test_live_authorization_requires_flag_and_marker(self) -> None:
+    def test_live_capabilities_require_exact_flag_and_marker(self) -> None:
         with self.assertRaisesRegex(ProtectedRuntimeFailure, "explicit_live_authorization_required"):
-            issue_live_authorization_after_marker("wrong", marker_claimed=True)
-        with self.assertRaisesRegex(ProtectedRuntimeFailure, "single_use_marker_required"):
-            issue_live_authorization_after_marker(D261_LIVE_AUTHORIZATION_FLAG, marker_claimed=False)
+            _issue_cli_intent_after_exact_main_flag("wrong")
+        cli_intent = _issue_cli_intent_after_exact_main_flag(D261_LIVE_AUTHORIZATION_FLAG)
+        with self.assertRaisesRegex(ProtectedRuntimeFailure, "single_use_marker_required_before_live_io"):
+            issue_live_io_capability_after_marker(cli_intent, marker_claim=None)
+
+    def test_direct_python_live_call_without_cli_capability_fails_before_gates(self) -> None:
+        with self.assertRaisesRegex(ProtectedRuntimeFailure, "valid_cli_intent_capability_required"):
+            _run_live(REPO, "0" * 40, None)
 
     def test_default_entrypoint_is_hard_disabled_and_cwd_independent(self) -> None:
         tool = REPO / "tools/d261_live_fdt_arm_once.py"
@@ -171,13 +185,44 @@ class D261OperationalReadinessTests(unittest.TestCase):
             "REAL_SINGLE_USE_MARKER_CREATE_COUNT", "FPRINTD_MUTATION_COUNT",
         ):
             self.assertEqual(report[key], 0)
+        self.assertIn(report["PROTECTED_ROOT_STATUS"], {
+            "PASS_METADATA", "ABSENT", "INACCESSIBLE_UNPRIVILEGED", "ERROR_METADATA_UNSAFE"
+        })
 
     def test_fileset_cannot_omit_hardcoded_live_critical_paths(self) -> None:
         fileset = load_fileset()
-        self.assertEqual(tuple(row["path"] for row in fileset["files"]), LIVE_CRITICAL_PATHS)
-        self.assertEqual(fileset["approval_status"], "PENDING_USER_AI_PM_REVIEW")
+        self.assertEqual(tuple(row["path"] for row in fileset["files"]), CANONICAL_LIVE_CRITICAL_PATHS)
+        self.assertEqual(LIVE_CRITICAL_PATHS, CANONICAL_LIVE_CRITICAL_PATHS)
+        self.assertEqual(fileset["role"], "DERIVED_REPORT_NOT_AUTHORITY")
+        self.assertEqual(fileset["approval_status"], "PENDING_USER_AI_PM_FULL_SHA_APPROVAL")
         with self.assertRaises(OperationalFailure):
             verify_approved_git_baseline(REPO, "0" * 40, fileset)
+
+    def test_hard_disable_scenarios_are_executable(self) -> None:
+        evidence = _json("analysis/D261/D261_hard_disable_execution_evidence.json")
+        self.assertEqual(evidence["status"], "PASS")
+        self.assertEqual(evidence["SUPPORTED_LIVE_ENTRYPOINT_COUNT"], 1)
+        self.assertTrue(evidence["DIRECT_PYTHON_LIVE_CALL_WITHOUT_CAPABILITY_FAILS_CLOSED"])
+        self.assertFalse(evidence["ENVIRONMENT_ONLY_LIVE_ENABLEMENT"])
+        self.assertFalse(evidence["BACKEND_ONLY_LIVE_ENABLEMENT"])
+
+    def test_shared_reader_demux_and_deadline_evidence_is_executed(self) -> None:
+        evidence = _json("analysis/D261/D261_single_reader_demux_evidence.json")
+        self.assertEqual(evidence["status"], "PASS")
+        self.assertTrue(evidence["SHARED_READER_PHASE_DEADLINE_ENFORCED"])
+        self.assertFalse(evidence["TIMEOUT_RENEWAL_PER_UNMATCHED_FRAME"])
+        self.assertEqual(len(evidence["rows"]), 13)
+        self.assertTrue(all(row["status"] == "PASS" for row in evidence["rows"]))
+
+    def test_marker_capability_and_durable_report_ordering(self) -> None:
+        transaction = _json("analysis/D261/D261_pre_usb_transaction_evidence.json")
+        report = _json("analysis/D261/D261_durable_report_safety_evidence.json")
+        self.assertEqual(transaction["status"], "PASS")
+        self.assertTrue(transaction["MARKER_AFTER_PROTECTED_CONTENT_VALIDATION"])
+        self.assertTrue(transaction["MARKER_IMMEDIATELY_PRECEDES_LIVE_IO_CAPABILITY"])
+        self.assertEqual(transaction["fake_usb_open_count"], 1)
+        self.assertEqual(report["status"], "PASS")
+        self.assertTrue(report["FINAL_REPORT_FAILURE_CANNOT_REPRESENT_RUN_PASS"])
 
     def test_sealed_historical_artifacts_are_byte_identical(self) -> None:
         for relative, expected in SEALED_HASHES.items():

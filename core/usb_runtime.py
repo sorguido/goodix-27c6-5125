@@ -13,12 +13,13 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 from dataclasses import dataclass
+import math
 import threading
 import time
 from typing import Callable, Protocol
 
 from core.post_d4 import PLAIN, parse_outer, parse_payload
-from core.protected_runtime import LiveAuthorization, require_live_authorization
+from core.protected_runtime import LiveIoCapability, require_live_io_capability
 from core.runtime_transport import EventSource, PhysicalSubmissionPolicy
 
 
@@ -79,8 +80,14 @@ def _is_irq100(frame: bytes) -> bool:
 class SharedFrameRouter:
     """Own the only physical EP81 read path and expose two queue views."""
 
-    def __init__(self, backend: UsbBackend) -> None:
+    def __init__(
+        self,
+        backend: UsbBackend,
+        *,
+        monotonic: Callable[[], float] = time.monotonic,
+    ) -> None:
         self.backend = backend
+        self._monotonic = monotonic
         self._partial = bytearray()
         self._frames: list[bytes] = []
         self._read_lock = threading.Lock()
@@ -125,6 +132,9 @@ class SharedFrameRouter:
             self._read_lock.release()
 
     def _pop(self, *, event: bool, timeout_ms: int) -> bytes:
+        if timeout_ms <= 0:
+            raise TimeoutError("shared_reader_phase_deadline_expired")
+        deadline = self._monotonic() + timeout_ms / 1000.0
         while True:
             for index, frame in enumerate(self._frames):
                 if _is_irq100(frame) is event:
@@ -134,7 +144,10 @@ class SharedFrameRouter:
                     else:
                         self.command_delivery_count += 1
                     return selected
-            self._read_once(timeout_ms)
+            remaining = deadline - self._monotonic()
+            if remaining <= 0:
+                raise TimeoutError("shared_reader_phase_deadline_expired")
+            self._read_once(max(1, math.ceil(remaining * 1000.0)))
 
     def receive_command(self, timeout_ms: int) -> bytes:
         return self._pop(event=False, timeout_ms=timeout_ms)
@@ -167,10 +180,11 @@ class LibusbRuntimeTransport:
         backend: UsbBackend,
         *,
         sleeper: Callable[[float], None] = time.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self.backend = backend
         self._sleeper = sleeper
-        self.router = SharedFrameRouter(backend)
+        self.router = SharedFrameRouter(backend, monotonic=monotonic)
         self.event_source = _RouterEventSource(self.router)
         self.session_count = 0
         self.cleanup_count = 0
@@ -251,10 +265,10 @@ class CtypesLibusbBackend:
 
     def __init__(
         self,
-        live_authorization: LiveAuthorization | None = None,
+        live_io_capability: LiveIoCapability | None = None,
         library_name: str | None = None,
     ) -> None:
-        self.live_authorization = live_authorization
+        self.live_io_capability = live_io_capability
         self.library_name = library_name
         self.open_count = 0
         self.claim_count = 0
@@ -322,7 +336,7 @@ class CtypesLibusbBackend:
         )
 
     def open_exact(self, vid: int, pid: int, interface: int) -> UsbIdentity:
-        require_live_authorization(self.live_authorization)
+        require_live_io_capability(self.live_io_capability)
         if self.open_count or self._lib is not None:
             raise UsbRuntimeFailure("libusb_open_exactly_once")
         lib = self._load()

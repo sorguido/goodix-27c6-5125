@@ -2,9 +2,10 @@
 # Copyright (C) 2026 Goodix 27c6:5125 project contributors
 """Protected material and secret boundaries for the D261 operational path.
 
-Construction and metadata preflight never read the secret.  Materialization
-requires an unforgeable in-process authorization token issued only after the
-single-use marker has been claimed by the operator transaction.
+Construction and metadata preflight never read the secret.  Protected-content
+materialization requires an opaque CLI-intent capability.  A distinct live-I/O
+capability is minted only after that content has been validated and the
+single-use marker has been claimed.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import hmac
+import errno
 import json
 import os
 from pathlib import Path
@@ -44,8 +46,8 @@ class ProtectedRuntimeFailure(RuntimeError):
     pass
 
 
-class LiveAuthorization:
-    """Opaque token minted by the marker-owning operational transaction."""
+class CliIntentCapability:
+    """Opaque proof that the supported main path parsed the exact live flag."""
 
     __slots__ = ("_nonce",)
 
@@ -53,32 +55,73 @@ class LiveAuthorization:
         self._nonce = nonce
 
 
-_AUTHORITY_NONCE = object()
+class LiveIoCapability:
+    """Opaque post-marker capability accepted by real live-resource openers."""
+
+    __slots__ = ("_nonce",)
+
+    def __init__(self, nonce: object) -> None:
+        self._nonce = nonce
 
 
-def issue_live_authorization_after_marker(
-    explicit_authorization: str,
-    *,
-    marker_claimed: bool,
-) -> LiveAuthorization:
-    """Mint the opaque capability only from the explicit post-marker path."""
+class MarkerClaimCapability:
+    """Opaque proof returned only after the marker file is durably claimed."""
+
+    __slots__ = ("_nonce",)
+
+    def __init__(self, nonce: object) -> None:
+        self._nonce = nonce
+
+
+_CLI_INTENT_NONCE = object()
+_MARKER_CLAIM_NONCE = object()
+_LIVE_IO_NONCE = object()
+
+
+def _issue_cli_intent_after_exact_main_flag(explicit_authorization: str) -> CliIntentCapability:
+    """Private factory used only by the supported ``main()`` live branch."""
 
     if explicit_authorization != D261_LIVE_AUTHORIZATION_FLAG:
         raise ProtectedRuntimeFailure("explicit_live_authorization_required")
-    if marker_claimed is not True:
-        raise ProtectedRuntimeFailure("single_use_marker_required_before_authorization")
-    return LiveAuthorization(_AUTHORITY_NONCE)
+    return CliIntentCapability(_CLI_INTENT_NONCE)
 
 
-def _authorized(token: LiveAuthorization) -> bool:
-    return isinstance(token, LiveAuthorization) and token._nonce is _AUTHORITY_NONCE
+def require_cli_intent(token: CliIntentCapability | None) -> None:
+    if not isinstance(token, CliIntentCapability) or token._nonce is not _CLI_INTENT_NONCE:
+        raise ProtectedRuntimeFailure("valid_cli_intent_capability_required")
 
 
-def require_live_authorization(token: LiveAuthorization | None) -> None:
+def _issue_marker_claim_capability(
+    cli_intent: CliIntentCapability | None,
+) -> MarkerClaimCapability:
+    """Private factory called by the marker writer after fsync succeeds."""
+
+    require_cli_intent(cli_intent)
+    return MarkerClaimCapability(_MARKER_CLAIM_NONCE)
+
+
+def issue_live_io_capability_after_marker(
+    cli_intent: CliIntentCapability | None,
+    *,
+    marker_claim: MarkerClaimCapability | None,
+) -> LiveIoCapability:
+    """Mint the live-I/O capability immediately after a successful marker claim."""
+
+    require_cli_intent(cli_intent)
+    if not isinstance(marker_claim, MarkerClaimCapability) or marker_claim._nonce is not _MARKER_CLAIM_NONCE:
+        raise ProtectedRuntimeFailure("single_use_marker_required_before_live_io")
+    return LiveIoCapability(_LIVE_IO_NONCE)
+
+
+def _cli_intent_authorized(token: CliIntentCapability) -> bool:
+    return isinstance(token, CliIntentCapability) and token._nonce is _CLI_INTENT_NONCE
+
+
+def require_live_io_capability(token: LiveIoCapability | None) -> None:
     """Fail before any live resource is opened when the capability is absent."""
 
-    if token is None or not _authorized(token):
-        raise ProtectedRuntimeFailure("live_resource_open_not_authorized")
+    if not isinstance(token, LiveIoCapability) or token._nonce is not _LIVE_IO_NONCE:
+        raise ProtectedRuntimeFailure("live_io_capability_required")
 
 
 def sha256_file(path: Path) -> str:
@@ -89,7 +132,12 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def protected_metadata(path: Path, expected_size: int | None) -> dict[str, object]:
+def protected_metadata(
+    path: Path,
+    expected_size: int | None,
+    *,
+    expected_uid: int = 0,
+) -> dict[str, object]:
     """Inspect ownership/mode/shape without opening or hashing file content."""
 
     result: dict[str, object] = {
@@ -103,10 +151,19 @@ def protected_metadata(path: Path, expected_size: int | None) -> dict[str, objec
         "expected_size": expected_size,
         "metadata_pass": False,
         "content_read": False,
+        "status": "ABSENT",
+        "errno": None,
     }
     try:
         value = path.lstat()
-    except OSError:
+    except OSError as exc:
+        result["errno"] = exc.errno
+        if exc.errno in (errno.EACCES, errno.EPERM):
+            result["status"] = "INACCESSIBLE_UNPRIVILEGED"
+        elif exc.errno == errno.ENOENT:
+            result["status"] = "ABSENT"
+        else:
+            result["status"] = f"ERROR_{exc.errno if exc.errno is not None else 'UNKNOWN'}"
         return result
     result.update(
         exists=True,
@@ -119,10 +176,59 @@ def protected_metadata(path: Path, expected_size: int | None) -> dict[str, objec
     result["metadata_pass"] = bool(
         result["regular"]
         and not result["symlink"]
-        and value.st_uid == 0
+        and value.st_uid == expected_uid
         and stat.S_IMODE(value.st_mode) == 0o600
         and (expected_size is None or value.st_size == expected_size)
     )
+    result["status"] = "PASS_METADATA" if result["metadata_pass"] else "ERROR_METADATA_UNSAFE"
+    return result
+
+
+def protected_directory_metadata(
+    path: Path,
+    expected_mode: int = 0o700,
+    *,
+    expected_uid: int = 0,
+) -> dict[str, object]:
+    """Classify a protected directory without following symlinks or mutating it."""
+
+    result: dict[str, object] = {
+        "path": os.fspath(path),
+        "exists": False,
+        "directory": False,
+        "symlink": False,
+        "uid": None,
+        "mode": None,
+        "metadata_pass": False,
+        "content_read": False,
+        "status": "ABSENT",
+        "errno": None,
+    }
+    try:
+        value = path.lstat()
+    except OSError as exc:
+        result["errno"] = exc.errno
+        if exc.errno in (errno.EACCES, errno.EPERM):
+            result["status"] = "INACCESSIBLE_UNPRIVILEGED"
+        elif exc.errno == errno.ENOENT:
+            result["status"] = "ABSENT"
+        else:
+            result["status"] = f"ERROR_{exc.errno if exc.errno is not None else 'UNKNOWN'}"
+        return result
+    result.update(
+        exists=True,
+        directory=stat.S_ISDIR(value.st_mode),
+        symlink=stat.S_ISLNK(value.st_mode),
+        uid=value.st_uid,
+        mode=oct(stat.S_IMODE(value.st_mode)),
+    )
+    result["metadata_pass"] = bool(
+        result["directory"]
+        and not result["symlink"]
+        and value.st_uid == expected_uid
+        and stat.S_IMODE(value.st_mode) == expected_mode
+    )
+    result["status"] = "PASS_METADATA" if result["metadata_pass"] else "ERROR_METADATA_UNSAFE"
     return result
 
 
@@ -152,8 +258,8 @@ class RealSecretBoundary:
     def metadata(self) -> dict[str, object]:
         return protected_metadata(self.secret_path, SECRET_RECORD_LENGTH)
 
-    def materialize(self, authorization: LiveAuthorization) -> None:
-        if not _authorized(authorization):
+    def materialize(self, cli_intent: CliIntentCapability) -> None:
+        if not _cli_intent_authorized(cli_intent):
             raise ProtectedRuntimeFailure("secret_materialization_not_authorized")
         if self.materialize_count or self._secret is not None:
             raise ProtectedRuntimeFailure("secret_materialization_exactly_once")
@@ -208,12 +314,21 @@ class RealSecretBoundary:
         return self.close_count == 1 and (self._secret is None or not any(self._secret))
 
 
+def validate_config90_content(config: bytes) -> None:
+    """Shared content gate used by the live loader and synthetic fixtures."""
+
+    if len(config) != TARGET_CONFIG90_LENGTH:
+        raise ProtectedRuntimeFailure("config90_size_mismatch")
+    if hashlib.sha256(config).hexdigest() != TARGET_CONFIG90_SHA256:
+        raise ProtectedRuntimeFailure("config90_hash_mismatch")
+
+
 def load_cold_start_material(
     manifest_path: Path,
     config90_path: Path,
-    authorization: LiveAuthorization,
+    cli_intent: CliIntentCapability,
 ) -> ColdStartMaterial:
-    if not _authorized(authorization):
+    if not _cli_intent_authorized(cli_intent):
         raise ProtectedRuntimeFailure("material_load_not_authorized")
     manifest_raw = _read_protected(Path(manifest_path))
     if hashlib.sha256(manifest_raw).hexdigest() != MATERIAL_MANIFEST_SHA256:
@@ -223,8 +338,7 @@ def load_cold_start_material(
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ProtectedRuntimeFailure("material_manifest_invalid") from exc
     config = _read_protected(Path(config90_path), TARGET_CONFIG90_LENGTH)
-    if hashlib.sha256(config).hexdigest() != TARGET_CONFIG90_SHA256:
-        raise ProtectedRuntimeFailure("config90_hash_mismatch")
+    validate_config90_content(config)
     config_meta = manifest.get("config90", {})
     if config_meta.get("body_length") != TARGET_CONFIG90_LENGTH or config_meta.get("body_sha256") != TARGET_CONFIG90_SHA256:
         raise ProtectedRuntimeFailure("config90_manifest_mismatch")

@@ -1,0 +1,3 @@
+D261_operational_live_readiness_bundle.zip
+STATUS=SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE
+NOTE=Preserved byte-for-byte for provenance; do not use for baseline-approval review.

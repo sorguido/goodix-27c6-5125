@@ -45,15 +45,20 @@ from core.persistent_runtime import PersistentRuntimeCoordinator
 from core.protected_runtime import (
     CANONICAL_GFUSB_PATH,
     CANONICAL_GFUSB_SHA256,
+    CliIntentCapability,
     CONFIG90_PATH,
     D261_LIVE_AUTHORIZATION_FLAG,
     MATERIAL_MANIFEST_PATH,
     PROTECTED_ROOT,
     SECRET_PATH,
     RealSecretBoundary,
-    issue_live_authorization_after_marker,
+    _issue_cli_intent_after_exact_main_flag,
+    _issue_marker_claim_capability,
+    issue_live_io_capability_after_marker,
     load_cold_start_material,
+    protected_directory_metadata,
     protected_metadata,
+    require_cli_intent,
 )
 from core.usb_runtime import CtypesLibusbBackend, LibusbRuntimeTransport, TARGET_PID, TARGET_VID
 from src.goodix5125_cleanroom import crc32_mpeg2
@@ -69,7 +74,7 @@ FILESET_PATH = REPO / "analysis/D261/D261_operational_live_critical_fileset.json
 D260_FILESET_PATH = REPO / "analysis/D260/D260_architecture_critical_fileset.json"
 D260_REFERENCE_COMMIT = "ef2aa95c0b7261638a70cdf26a91ea00dd60eb41"
 LIVE_CAPABILITY_DEFAULT = 0
-LIVE_CRITICAL_PATHS = (
+CANONICAL_LIVE_CRITICAL_PATHS = (
     "core/cold_start.py",
     "core/fdt_lifecycle.py",
     "core/fdt_seed.py",
@@ -86,10 +91,22 @@ LIVE_CRITICAL_PATHS = (
     "tools/d261_live_fdt_arm_once.py",
     "operator_kit/d261-live-fdt-arm-once.sh",
 )
+# Compatibility name for existing offline reviewers.  The tuple above is the
+# sole runtime authority; the JSON is a derived report only.
+LIVE_CRITICAL_PATHS = CANONICAL_LIVE_CRITICAL_PATHS
 
 
 class OperationalFailure(RuntimeError):
     pass
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.write(descriptor, view)
+        if written <= 0:
+            raise OperationalFailure("durable_write_made_no_progress")
+        view = view[written:]
 
 
 def sha256_file(path: Path) -> str:
@@ -117,8 +134,10 @@ def load_fileset() -> dict[str, Any]:
         raise OperationalFailure("D261_live_critical_fileset_unavailable") from exc
     if value.get("schema") != "D261_OPERATIONAL_LIVE_CRITICAL_FILESET_V1":
         raise OperationalFailure("D261_live_critical_fileset_schema")
-    if tuple(row.get("path") for row in value.get("files", [])) != LIVE_CRITICAL_PATHS:
+    if tuple(row.get("path") for row in value.get("files", [])) != CANONICAL_LIVE_CRITICAL_PATHS:
         raise OperationalFailure("D261_live_critical_fileset_path_set_mismatch")
+    if value.get("role") != "DERIVED_REPORT_NOT_AUTHORITY":
+        raise OperationalFailure("D261_live_critical_fileset_role_mismatch")
     return value
 
 
@@ -143,11 +162,12 @@ def verify_approved_git_baseline(repo: Path, sha: str, fileset: dict[str, Any]) 
     resolved = _git(repo, "rev-parse", f"{sha}^{{commit}}").decode("ascii").strip()
     if resolved != sha:
         raise OperationalFailure("approved_live_baseline_resolution_mismatch")
-    for row in fileset["files"]:
-        relative = str(row["path"])
+    if tuple(row.get("path") for row in fileset.get("files", [])) != CANONICAL_LIVE_CRITICAL_PATHS:
+        raise OperationalFailure("D261_live_critical_fileset_path_set_mismatch")
+    for relative in CANONICAL_LIVE_CRITICAL_PATHS:
         blob = _git(repo, "show", f"{sha}:{relative}")
         worktree = (repo / relative).read_bytes()
-        if hashlib.sha256(blob).hexdigest() != row["sha256"] or blob != worktree:
+        if blob != worktree:
             raise OperationalFailure(f"live_critical_baseline_stale:{relative}")
 
 
@@ -210,11 +230,15 @@ def dependency_preflight() -> dict[str, Any]:
 
 
 def protected_preflight_metadata(repo: Path) -> dict[str, Any]:
+    protected_root = protected_directory_metadata(PROTECTED_ROOT)
+    report_directory = protected_directory_metadata(REPORT_DIRECTORY)
     secret = protected_metadata(SECRET_PATH, 88)
     config = protected_metadata(CONFIG90_PATH, 224)
     manifest = protected_metadata(MATERIAL_MANIFEST_PATH, None)
     gfusb = repo / CANONICAL_GFUSB_PATH
     return {
+        "protected_root": protected_root,
+        "report_directory": report_directory,
         "secret_store": secret,
         "config90_store": config,
         "material_manifest": manifest,
@@ -259,11 +283,18 @@ def dry_run(repo: Path) -> dict[str, Any]:
         "D261_operational_fileset_digest": fileset_digest(fileset),
         "D261_operational_worktree_mismatches": worktree_failures,
         "protected_material_metadata": protected,
+        "PROTECTED_ROOT_STATUS": protected["protected_root"]["status"],
+        "REPORT_DIRECTORY_STATUS": protected["report_directory"]["status"],
+        "PROTECTED_METADATA_DRYRUN_STATUS_MODEL": [
+            "PASS_METADATA", "ABSENT", "INACCESSIBLE_UNPRIVILEGED", "ERROR_<errno>"
+        ],
+        "PROTECTED_ROOT_SAFETY_CHECKED_PRE_SIDE_EFFECT": True,
+        "REPORT_DIRECTORY_SAFETY_CHECKED_PRE_SIDE_EFFECT": True,
         "cache_seed_source": cache,
         "dependencies": dependencies,
         "operator_launcher_syntax": "PASS" if syntax else "FAIL",
         "fake_marker_fixture_absent": marker_fixture_absent,
-        "live_baseline_approval": "PENDING_USER_AI_PM_REVIEW",
+        "live_baseline_approval": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
         "report_destination_model": str(REPORT_DIRECTORY / "d261-final.json"),
         "LIVE_CAPABILITY_DEFAULT": LIVE_CAPABILITY_DEFAULT,
         "LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG": False,
@@ -309,23 +340,30 @@ def external_holders(devnode: Path) -> list[int]:
     return sorted(set(holders))
 
 
+def require_no_external_holders(holders: list[int], *, own_pid: int) -> None:
+    external = sorted({pid for pid in holders if pid != own_pid})
+    if external:
+        raise OperationalFailure(f"external_usb_holder:{external}")
+
+
 class FprintdTransaction:
-    def __init__(self) -> None:
+    def __init__(self, *, runner: Any = subprocess.run) -> None:
+        self._runner = runner
         self.initial_state = "unknown"
         self.stop_count = 0
         self.restore_count = 0
         self.restore_status = "not_attempted"
 
     def prepare(self) -> None:
-        probe = subprocess.run(("systemctl", "is-active", "fprintd.service"), check=False, capture_output=True, text=True)
+        probe = self._runner(("systemctl", "is-active", "fprintd.service"), check=False, capture_output=True, text=True)
         self.initial_state = "active" if probe.returncode == 0 and probe.stdout.strip() == "active" else "inactive"
         if self.initial_state == "active":
-            subprocess.run(("systemctl", "stop", "fprintd.service"), check=True)
+            self._runner(("systemctl", "stop", "fprintd.service"), check=True)
             self.stop_count = 1
 
     def restore(self) -> None:
         if self.initial_state == "active":
-            subprocess.run(("systemctl", "start", "fprintd.service"), check=True)
+            self._runner(("systemctl", "start", "fprintd.service"), check=True)
         self.restore_count = 1
         self.restore_status = "restored_to_initial_state"
 
@@ -333,67 +371,192 @@ class FprintdTransaction:
 class SignalTransaction:
     SIGNALS = {signal.SIGINT, signal.SIGTERM, signal.SIGHUP}
 
-    def __init__(self) -> None:
+    def __init__(self, *, mask_fn: Any = signal.pthread_sigmask) -> None:
+        self._mask_fn = mask_fn
         self.previous = None
         self.restore_status = "not_attempted"
 
     def block(self) -> None:
-        self.previous = signal.pthread_sigmask(signal.SIG_BLOCK, self.SIGNALS)
+        self.previous = self._mask_fn(signal.SIG_BLOCK, self.SIGNALS)
 
     def restore(self) -> None:
         if self.previous is not None:
-            signal.pthread_sigmask(signal.SIG_SETMASK, self.previous)
+            self._mask_fn(signal.SIG_SETMASK, self.previous)
         self.restore_status = "restored"
 
 
-def claim_marker(path: Path, baseline_sha: str) -> bool:
+def claim_marker(
+    path: Path,
+    baseline_sha: str,
+    cli_intent: CliIntentCapability | None,
+    *,
+    expected_uid: int = 0,
+):
+    require_cli_intent(cli_intent)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags, 0o600)
     try:
         status = os.fstat(descriptor)
-        if status.st_uid != 0 or stat.S_IMODE(status.st_mode) != 0o600:
+        if status.st_uid != expected_uid or stat.S_IMODE(status.st_mode) != 0o600:
             raise OperationalFailure("marker_owner_mode_invalid")
         payload = json.dumps({
             "schema": "D261_SINGLE_USE_MARKER_V1",
             "approved_baseline_sha": baseline_sha,
             "claimed_utc": datetime.now().astimezone().isoformat(),
         }, sort_keys=True).encode("utf-8") + b"\n"
-        os.write(descriptor, payload)
+        _write_all(descriptor, payload)
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-    return True
+    return _issue_marker_claim_capability(cli_intent)
 
 
-def publish_report(path: Path, report: dict[str, Any]) -> None:
-    directory = path.parent
-    status = directory.stat()
-    if status.st_uid != 0 or stat.S_IMODE(status.st_mode) != 0o700 or not stat.S_ISDIR(status.st_mode):
-        raise OperationalFailure("report_directory_safety_failed")
-    temporary = directory / f".{path.name}.{os.getpid()}.tmp"
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+def _require_safe_directory(path: Path, *, expected_uid: int, expected_mode: int = 0o700) -> None:
     try:
-        os.write(descriptor, json.dumps(report, indent=2, sort_keys=True).encode("utf-8") + b"\n")
+        status = path.lstat()
+    except OSError as exc:
+        raise OperationalFailure(f"safe_directory_lstat_failed:{path}:{exc.errno}") from exc
+    if (
+        stat.S_ISLNK(status.st_mode)
+        or not stat.S_ISDIR(status.st_mode)
+        or status.st_uid != expected_uid
+        or stat.S_IMODE(status.st_mode) != expected_mode
+    ):
+        raise OperationalFailure(f"safe_directory_metadata_failed:{path}")
+
+
+def prepare_report_directory(
+    protected_root: Path,
+    report_directory: Path,
+    *,
+    expected_uid: int = 0,
+) -> str:
+    """Validate the root and safely create/validate the report directory."""
+
+    _require_safe_directory(protected_root, expected_uid=expected_uid)
+    try:
+        report_directory.lstat()
+    except FileNotFoundError:
+        os.mkdir(report_directory, 0o700)
+        disposition = "CREATED_SAFE"
+    except OSError as exc:
+        raise OperationalFailure(f"report_directory_lstat_failed:{exc.errno}") from exc
+    else:
+        disposition = "EXISTING_SAFE"
+    _require_safe_directory(report_directory, expected_uid=expected_uid)
+    return disposition
+
+
+def require_safe_report_destination(path: Path) -> None:
+    """A D261 single-shot report must not replace any pre-existing object."""
+
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise OperationalFailure(f"report_destination_lstat_failed:{exc.errno}") from exc
+    raise OperationalFailure("report_destination_already_exists_or_unsafe")
+
+
+def publish_report(
+    path: Path,
+    report: dict[str, Any],
+    *,
+    expected_uid: int = 0,
+) -> dict[str, Any]:
+    """Durably publish once within a prevalidated real directory."""
+
+    directory = path.parent
+    _require_safe_directory(directory, expected_uid=expected_uid)
+    require_safe_report_destination(path)
+    temporary = directory / f".{path.name}.{os.getpid()}.tmp"
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        directory_flags |= os.O_NOFOLLOW
+    directory_descriptor = os.open(directory, directory_flags)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = -1
+    created_temporary = False
+    try:
+        descriptor = os.open(temporary.name, flags, 0o600, dir_fd=directory_descriptor)
+        created_temporary = True
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != expected_uid
+            or stat.S_IMODE(opened.st_mode) != 0o600
+        ):
+            raise OperationalFailure("report_temporary_metadata_failed")
+        _write_all(descriptor, json.dumps(report, indent=2, sort_keys=True).encode("utf-8") + b"\n")
         os.fsync(descriptor)
-    finally:
         os.close(descriptor)
-    os.replace(temporary, path)
+        descriptor = -1
+        _require_safe_directory(directory, expected_uid=expected_uid)
+        require_safe_report_destination(path)
+        os.replace(
+            temporary.name,
+            path.name,
+            src_dir_fd=directory_descriptor,
+            dst_dir_fd=directory_descriptor,
+        )
+        created_temporary = False
+        os.fsync(directory_descriptor)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if created_temporary:
+            try:
+                os.unlink(temporary.name, dir_fd=directory_descriptor)
+            except OSError:
+                pass
+        os.close(directory_descriptor)
+    final = path.lstat()
+    if (
+        not stat.S_ISREG(final.st_mode)
+        or stat.S_ISLNK(final.st_mode)
+        or final.st_uid != expected_uid
+        or stat.S_IMODE(final.st_mode) != 0o600
+    ):
+        raise OperationalFailure("final_report_metadata_failed")
+    return {
+        "temporary_mode": "0600",
+        "file_fsync": True,
+        "same_directory_replace": True,
+        "directory_fsync": True,
+        "final_mode": "0600",
+    }
 
 
-def live_preflight(repo: Path, baseline_sha: str) -> tuple[dict[str, Any], dict[str, Any]]:
+def live_preflight(
+    repo: Path,
+    baseline_sha: str,
+    cli_intent: CliIntentCapability | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    require_cli_intent(cli_intent)
+    fileset = load_fileset()
+    # Baseline approval is deliberately the first external-state gate.  An
+    # unapproved SHA cannot reach privilege, service, protected or USB work.
+    verify_approved_git_baseline(repo, baseline_sha, fileset)
     if os.geteuid() != 0:
         raise OperationalFailure("live_euid_root_required")
     sudo_uid = os.environ.get("SUDO_UID", "")
     if not sudo_uid.isdigit() or int(sudo_uid) == 0:
         raise OperationalFailure("non_root_operator_context_required")
-    fileset = load_fileset()
-    verify_approved_git_baseline(repo, baseline_sha, fileset)
-    if MARKER_PATH.exists():
+    try:
+        MARKER_PATH.lstat()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise OperationalFailure(f"marker_status_probe_failed:{exc.errno}") from exc
+    else:
         raise OperationalFailure("D261_single_use_marker_already_consumed")
-    if not REPORT_DIRECTORY.exists():
-        raise OperationalFailure("report_directory_missing")
+    report_directory_disposition = prepare_report_directory(PROTECTED_ROOT, REPORT_DIRECTORY)
+    require_safe_report_destination(REPORT_DIRECTORY / "d261-final.json")
     if not all(protected_metadata(path, size)["metadata_pass"] for path, size in (
         (SECRET_PATH, 88), (MATERIAL_MANIFEST_PATH, None), (CONFIG90_PATH, 224)
     )):
@@ -412,11 +575,21 @@ def live_preflight(repo: Path, baseline_sha: str) -> tuple[dict[str, Any], dict[
         "cache": cache,
         "approved_baseline_sha": baseline_sha,
         "fileset_digest": fileset_digest(fileset),
+        "protected_root_status": "PASS_METADATA",
+        "report_directory_status": "PASS_METADATA",
+        "report_directory_disposition": report_directory_disposition,
     }
 
 
-def run_live(repo: Path, baseline_sha: str) -> dict[str, Any]:
-    fileset, preflight = live_preflight(repo, baseline_sha)
+def _run_live(
+    repo: Path,
+    baseline_sha: str,
+    cli_intent: CliIntentCapability | None,
+) -> dict[str, Any]:
+    """Internal live implementation; unsupported direct calls fail closed."""
+
+    require_cli_intent(cli_intent)
+    fileset, preflight = live_preflight(repo, baseline_sha, cli_intent)
     fprintd = FprintdTransaction()
     signals = SignalTransaction()
     boundary: RealSecretBoundary | None = None
@@ -438,19 +611,20 @@ def run_live(repo: Path, baseline_sha: str) -> dict[str, Any]:
         fprintd.prepare()
         report["fprintd_initial_state"] = fprintd.initial_state
         signals.block()
-        holders = [pid for pid in external_holders(Path(preflight["devnode"])) if pid != os.getpid()]
-        if holders:
-            raise OperationalFailure(f"external_usb_holder:{holders}")
-        marker_claimed = claim_marker(MARKER_PATH, baseline_sha)
-        report["marker_status"] = "claimed_single_use"
-        authorization = issue_live_authorization_after_marker(
-            LIVE_FLAG,
-            marker_claimed=marker_claimed,
+        require_no_external_holders(
+            external_holders(Path(preflight["devnode"])),
+            own_pid=os.getpid(),
         )
         boundary = RealSecretBoundary(SECRET_PATH, repo / CANONICAL_GFUSB_PATH)
-        boundary.materialize(authorization)
-        material = load_cold_start_material(MATERIAL_MANIFEST_PATH, CONFIG90_PATH, authorization)
-        backend = CtypesLibusbBackend(authorization)
+        boundary.materialize(cli_intent)
+        material = load_cold_start_material(MATERIAL_MANIFEST_PATH, CONFIG90_PATH, cli_intent)
+        marker_claim = claim_marker(MARKER_PATH, baseline_sha, cli_intent)
+        live_io_capability = issue_live_io_capability_after_marker(
+            cli_intent,
+            marker_claim=marker_claim,
+        )
+        report["marker_status"] = "claimed_single_use"
+        backend = CtypesLibusbBackend(live_io_capability)
         transport = LibusbRuntimeTransport(backend)
         cold_start = ColdStartMachine(transport, boundary)
         coordinator = PersistentRuntimeCoordinator(
@@ -492,6 +666,8 @@ def run_live(repo: Path, baseline_sha: str) -> dict[str, Any]:
         report["secret_zeroized"] = boundary is None or boundary.zeroized
         report["secret_log_count"] = 0
         report["finalized_utc"] = datetime.now().astimezone().isoformat()
+        if "signal_restore_failure" in report or "fprintd_restore_failure" in report:
+            report["result"] = "FAIL_CLOSED_RESTORE_INCOMPLETE"
         publish_report(REPORT_DIRECTORY / "d261-final.json", report)
     return report
 
@@ -509,13 +685,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.live:
         baseline = os.environ.get(APPROVED_BASELINE_ENV, "")
         try:
-            report = run_live(REPO, baseline)
+            cli_intent = _issue_cli_intent_after_exact_main_flag(LIVE_FLAG)
+            report = _run_live(REPO, baseline, cli_intent)
         except BaseException as exc:
             print(json.dumps({
-                "result": "PRELIVE_FAIL_CLOSED",
+                "result": "FAIL_CLOSED",
                 "failure_class": f"{type(exc).__name__}:{exc}",
-                "LIVE_COMMAND_SEND_COUNT": 0,
-                "report": "NOT_CREATED_BEFORE_LIVE_PREFLIGHT_PASS",
+                "report": "NOT_DURABLY_PUBLISHED",
             }, sort_keys=True))
             return 1
         print(json.dumps({
