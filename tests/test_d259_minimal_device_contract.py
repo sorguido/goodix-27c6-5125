@@ -112,6 +112,9 @@ class D259MinimalDeviceContractTests(unittest.TestCase):
         )
         self.assertTrue(result.accepted)
         self.assertEqual(result.plaintext_length, 32)
+        self.assertTrue(result.plaintext_mutable_buffer_best_effort_zeroized)
+        self.assertEqual(result.openssl_internal_copy_zeroization, "NOT_PROVEN")
+        self.assertEqual(result.python_immutable_temp_copy_zeroization, "NOT_PROVEN")
         self.assertEqual(consumer.consumption_count, 1)
         server.close()
         self.assertTrue(server.secret_zeroized)
@@ -160,9 +163,13 @@ class D259MinimalDeviceContractTests(unittest.TestCase):
             machine.manual_sample(irq100(samples[0]))
             machine.nav_interstage()
             machine.manual_sample(irq100(samples[1]))
-            machine.delta_and_baseline_interstage()
+            consumer = B0ApplicationConsumer(server.application_session)
+            machine.delta_and_baseline_interstage(consumer)
+            self.assertEqual(machine.manual_stage, 2)
+            self.assertEqual(machine.baseline_b0_consumed_at_manual_stage, 2)
+            self.assertEqual(consumer.consumption_count, 1)
             machine.manual_sample(irq100(samples[2]))
-            machine.finalize_minimal_device_contract(B0ApplicationConsumer(server))
+            machine.finalize_minimal_device_contract()
             machine.arm(0x1234)
         self.assertTrue(machine.second_delta_gate_passed)
         self.assertTrue(machine.baseline_b0_tls_consumed)
@@ -191,11 +198,29 @@ class D259MinimalDeviceContractTests(unittest.TestCase):
             machine.manual_sample(sample)
             machine.nav_interstage()
             machine.manual_sample(sample)
-            machine.delta_and_baseline_interstage()
-            machine.manual_sample(sample)
             with self.assertRaises(AttributeError):
-                machine.finalize_minimal_device_contract(lambda _frame: None)  # type: ignore[arg-type]
+                machine.delta_and_baseline_interstage(lambda _frame: None)  # type: ignore[arg-type]
         self.assertEqual(lifecycle.state.value, "FAILED_CLOSED")
+
+    def test_same_ssl_object_survives_b0_and_second_application_record(self):
+        server, client, client_out = self._active_tls()
+        adapter = server.application_session
+        self.assertTrue(adapter.uses_ssl_object(server._ssl))
+        consumer = B0ApplicationConsumer(adapter)
+        consumer.consume(self._encrypted_application_b0(client, client_out, b"baseline-b0"))
+        second = self._encrypted_application_b0(client, client_out, b"continuity")
+        _kind, record = (second[0], second[4:])
+        plaintext = adapter.consume_application_record(record)
+        self.assertEqual(bytes(plaintext), b"continuity")
+        for index in range(len(plaintext)):
+            plaintext[index] = 0
+        self.assertFalse(any(plaintext))
+        self.assertEqual(server.server_session_object_count, 1)
+        self.assertEqual(server.handshake_count, 1)
+        self.assertEqual(server.psk_context_provisioning_count, 1)
+        self.assertEqual(consumer.consumption_count, 1)
+        self.assertEqual(adapter.application_record_count, 2)
+        server.close()
 
 
 if __name__ == "__main__":

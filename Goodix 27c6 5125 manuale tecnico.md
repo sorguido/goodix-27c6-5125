@@ -31,15 +31,19 @@ sottosequenza proiettata. D258 ha trovato nel `gfusb.dll` target
 l'orchestratore completo `gf_update_all_base`: `0x50` e `0x20` sono acquisiti
 prima del terzo sample ma classificati soltanto dopo, mentre `0x82` fornisce
 nel secondo byte la soglia unsigned del confronto assoluto fra i word FDT
-grezzi. D259 ha poi chiuso il riflesso causale dei classificatori: tutti i
-return osservabili convergono a successo, possono cambiare soltanto le basi RAM
-e la cache host OEM, ma non la tabella FDT, il payload o la raggiungibilità del
-primo `0x32`, né aggiungono comandi/retry/recovery device-side. Il candidate
-minimo factory-preserving è quindi chiuso offline in Classe A: conserva le due
-predicate delta native e consuma obbligatoriamente il B0 tramite la sessione
-TLS attiva, senza classifier, raster decode o cache write. È pronto per una
-separata review live, non è autorizzato live; il modello classifier esatto
-resta futuro lavoro di fedeltà host OEM, non un blocker del primo arm.
+grezzi. Il corrective D259 ha ora confermato meccanicamente il riflesso causale
+dei classificatori: la matrice è derivata dai compare/jump/call del disassembly
+hash-gated e tutti i return osservabili convergono a successo, possono cambiare
+soltanto basi RAM e dirty/cache host OEM, ma non tabella FDT, payload o
+raggiungibilità del primo `0x32`, né aggiungono comandi/retry/recovery
+device-side. La Classe A del classifier è quindi confermata. Il corrective ha
+però falsificato la precedente readiness complessiva: il runtime sealed D245
+crea il TLS server come locale e lo chiude nel `finally` di `tls_handshake()`,
+senza esporre la stessa sessione al futuro consumer B0. L'adapter GPL e la
+continuità handshake→B0→secondo record sono provati offline sulla stessa
+`SSLObject`, e il replay consuma ora B0 subito dopo `0x20` e prima del terzo
+`0x36`; il plumbing nel runtime live resta `UNIMPLEMENTED`. D259 è pertanto
+bloccato prima della live-readiness review e non autorizzato live.
 
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
@@ -300,7 +304,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255, incluso corrective terminal-cancel | primo cancel: re-entry e nuovo `0x32` accettato senza restore USB esplicito; secondo cancel: zero packet nell'intervallo, pending bulk-IN cancellato al frame finale `218`, zero packet residui e quiescenza USB host/bus provata; disarm/lifetime/stato FDT interno non osservati |
 | Candidate fresh-FDT D257 | BLOCKED exact offline; nessun backend/kit live | replay proiettato storico PASS; sequenza esatta D255 `36,50,36,82,20,36,32`, ma gate host dinamici NAV/delta/baseline non derivabili; first-`0x36` single-shot fail-closed; freshness non è il solo blocker |
 | Chiusura gate host D258 | avanzamento offline, candidate ancora BLOCKED | orchestratore target in `gfusb.dll`; gate `0x82` chiuso e implementato; `0x50`/`0x20` corretti come input a classificatori post-stage2 ancora non riproducibili; timeout per comando; zero hardware |
-| Contratto minimo device D259 | READY Classe A offline; live non autorizzato | branch audit hash-gated: classifier host/cache-only per il primo arm; replay completo con B0 TLS-consumed, due delta PASS, `36,50,36,82,20,36,32` wire-exact, zero classifier/raster/cache/retry/recovery/persistenza; pronto per review live separata |
+| Corrective contratto minimo D259 | BLOCKED sul plumbing TLS runtime; live non autorizzato | Classe A confermata meccanicamente dal CFG; replay B0 ordinato subito dopo `0x20`, same-`SSLObject` e continuità TLS PASS offline; il runtime sealed D245 chiude e non espone l'engine, quindi `READY_FOR_FDT_LIVE_REVIEW=false` |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -2622,6 +2626,16 @@ Nel caller `0x180068940`, `gf_update_all_base` è chiamato a `0x18006898a` e
 il final `ChicagoHUSetMode(3,1,1)` segue a `0x180068abe` per ogni return nonzero
 dell'orchestratore.
 
+La conclusione Class A preliminare era sostenuta da anchor corretti ma da una
+matrice semantica codificata nel Python. Il corrective la sostituisce con
+`D259_post_classifier_disasm_excerpt.txt` e
+`D259_post_classifier_cfg.json`: un parser bounded estrae programmaticamente
+le sole istruzioni pertinenti, deriva target condizionali/incondizionati,
+case/default, merge, call, copy e dirty flag e genera da quel CFG la matrice
+finale. Un campo non derivabile farebbe fallire l'audit invece di essere
+promosso. La Classe A seguente è pertanto `PASS_MECHANICALLY_DERIVED`, non più
+una riaffermazione dell'assertion harness preliminare.
+
 I wrapper classifier NAV `0x180023fdc` e image `0x180023fa8` alimentano il
 classificatore comune `0x180022654`. I rispettivi return sono salvati a
 `[rsp+0x54]` e `[rsp+0x58]`; gli switch `0x1800693d8..0x1800694fa` e
@@ -2673,15 +2687,27 @@ HOST_CACHE_WRITE_COUNT=0
 Il B0 baseline `0x20` segue una regola diversa: può essere ignorato
 semanticamente solo dopo il consumo da parte dello stack TLS che possiede la
 sessione. Rimuovere il ciphertext dal transport senza TLS consumption è
-fail-closed perché desincronizzerebbe sequence/state. Il core GPL aggiunge una
-sessione TLS 1.2 PSK OpenSSL MemoryBIO riutilizzabile dopo l'handshake e un
-consumer applicativo che autentica/decripta il record, zeroizza prontamente il
-plaintext e lo scarta senza raster decode, classifier o persistenza. D245 è
-l'evidenza live target-specific che il runtime Linux completa una sessione TLS
-con lo stesso secret già validato da E4; D259 prova offline il nuovo wiring
-post-handshake con una fixture TLS sintetica non biometrica. Il plaintext B0
-storico D255 non è disponibile, non è stato decrittato e non è necessario per
-dimostrare la capacità futura:
+fail-closed perché desincronizzerebbe sequence/state. Il corrective sposta il
+consumo nel punto corretto: risposta B0 a `0x20` → autenticazione/decryption
+tramite la sessione attiva → discard e zeroizzazione best-effort del solo
+buffer mutabile → terzo `0x36`. Il finalizer post-stage2 non riceve più il B0 e
+non può ritardarne il consumo.
+
+Il core GPL espone un adapter che usa l'esatta `SSLObject` e la stessa input
+MemoryBIO già handshaked, senza creare un secondo contesto/server, handshake,
+transport o provisioning PSK. La fixture sintetica non biometrica prova una
+sessione server, un client, un handshake, il consumo B0 e un secondo record
+applicativo sulla medesima sessione, quindi anche la continuità di sequence
+numbers/cipher state. La prova resta esclusivamente offline/architectural.
+
+D245 resta evidenza live target-specific che Linux completa il TLS nel ruolo
+server con lo stesso secret validato da E4. L'audit del runtime sealed mostra
+però che `ProductionReplayBackend.tls_handshake()` conserva l'engine soltanto
+in una variabile locale e lo chiude incondizionatamente nel `finally`; non
+esiste un oggetto post-handshake esposto al consumer B0. Poiché D259 non può
+modificare `src/` o i launcher live, il plumbing reale non è chiuso. Il
+plaintext B0 storico D255 resta indisponibile e non è stato richiesto o
+decrittato:
 
 ```text
 BASELINE_B0_TLS_CONSUMPTION_REQUIRED=true
@@ -2689,7 +2715,19 @@ BASELINE_B0_IMAGE_CLASSIFICATION_REQUIRED=false
 BASELINE_B0_RASTER_DECODE_REQUIRED=false
 HISTORICAL_D255_B0_PLAINTEXT_AVAILABLE=false
 FUTURE_LINUX_RUNTIME_TLS_SESSION_PROVEN=true
-FUTURE_LINUX_RUNTIME_B0_CONSUMPTION_CAPABILITY=true
+LIVE_TLS_ROLE=SERVER
+LIVE_TLS_TO_B0_ADAPTER_STATUS=UNIMPLEMENTED
+SAME_TLS_SESSION_B0_CONSUMPTION=PASS_OFFLINE_ARCHITECTURAL
+POST_B0_TLS_SESSION_CONTINUITY=PASS_OFFLINE_ARCHITECTURAL
+FUTURE_LINUX_RUNTIME_B0_CONSUMPTION_CAPABILITY=false
+```
+
+La zeroizzazione non è promossa oltre quanto Python/OpenSSL consentono:
+
+```text
+PLAINTEXT_MUTABLE_BUFFER_BEST_EFFORT_ZEROIZED=true
+OPENSSL_INTERNAL_COPY_ZEROIZATION=NOT_PROVEN
+PYTHON_IMMUTABLE_TEMP_COPY_ZEROIZATION=NOT_PROVEN
 ```
 
 Il replay D259 usa per riferimento seed/cache, request e risposte non-B0 D255;
@@ -2701,7 +2739,7 @@ completo è wire-exact nelle request target:
 validated OTP-bound seed
 -> 0x36 -> IRQ100 -> 0x50 structurally valid
 -> 0x36 -> IRQ100 -> 0x82 native delta PASS
--> 0x20 -> B0 TLS authenticate/decrypt/zeroize/discard
+-> 0x20 -> B0 TLS authenticate/decrypt/best-effort mutable-buffer zeroize/discard
 -> 0x36 -> IRQ100 -> second native delta PASS
 -> no classifier, raster decode or cache write
 -> final 0x32 exactly once
@@ -2712,14 +2750,19 @@ famiglie device persistenti e cache write sono zero. Un failure resta
 `no retry → no recovery speciale → cleanup terminale host-side`; D256 rimane
 l'autorità sul terminal stop osservato.
 
-La knowledge boundary distingue ora permanentemente due domande. Il corpus
+La knowledge boundary distingue ora permanentemente tre domande. Il corpus
 locale è esaurito per la fedeltà host OEM esatta, perché mancano ABI/stato
 runtime completo del classifier; non è esaurito/bloccante per il contratto
-minimo device-visible, che è chiuso. Analogamente, cache fidelity non equivale
-a factory-preservation, e readiness review non equivale ad autorizzazione.
+minimo device-visible del classifier, ora confermato meccanicamente. Resta però
+un gap software concreto fra il TLS live-proven D245 e il consumer B0: la prova
+same-session sintetica non sostituisce il plumbing runtime. Analogamente, cache
+fidelity non equivale a factory-preservation, e readiness review non equivale
+ad autorizzazione.
 
 ```text
-OUTCOME=READY_CLASS_A_OFFLINE
+OUTCOME=BLOCKED_LIVE_TLS_RUNTIME_ADAPTER_GAP
+POST_CLASSIFIER_BRANCH_PROOF=PASS_MECHANICALLY_DERIVED
+BRANCH_MATRIX_DERIVATION_MODE=PARSED_DISASSEMBLY_CFG
 POST_STAGE2_CLASSIFIER_DEVICE_PROGRESS_REQUIRED=false
 POST_STAGE2_CLASSIFIER_FACTORY_PRESERVATION_REQUIRED=false
 POST_STAGE2_CLASSIFIER_FIRST_ARM_REQUIRED=false
@@ -2727,17 +2770,17 @@ POST_STAGE2_CLASSIFIER_OEM_HOST_FIDELITY_REQUIRED=true
 POST_STAGE2_CLASSIFIER_HOST_PERSISTENCE_REQUIRED=false
 CORPUS_EXHAUSTED_FOR_EXACT_OEM_HOST_FIDELITY=true
 CORPUS_EXHAUSTED_FOR_MINIMAL_DEVICE_LIVE_CONTRACT=false
-MINIMAL_DEVICE_LIVE_CONTRACT_CLOSED=true
-FACTORY_PRESERVING_MINIMAL_CANDIDATE_CLOSED=true
-FDT_OFFLINE_CANDIDATE_CLOSED=true
-READY_FOR_FDT_LIVE_REVIEW=true
+MINIMAL_DEVICE_LIVE_CONTRACT_CLOSED=false
+FACTORY_PRESERVING_MINIMAL_CANDIDATE_CLOSED=false
+FDT_OFFLINE_CANDIDATE_CLOSED=false
+READY_FOR_FDT_LIVE_REVIEW=false
 READY_FOR_FDT_LIVE=false
 ```
 
-La review futura dovrà comunque riesaminare baseline Git live-critical,
-integrazione del consumer nella sessione TLS reale, guardrail single-shot e
-cleanup/reseal. D259 non aggiunge backend USB, launcher o operator kit, non
-auto-approva una baseline e non autorizza hardware.
+Il precedente bundle D259 è preservato per provenance ma marcato
+`SUPERSEDED_BY_D259_MECHANICAL_PROOF_CORRECTIVE`. Il corrective lascia `src/`
+e i launcher D245/D246/D251 byte-identici, non aggiunge backend USB, launcher o
+operator kit, non auto-approva una baseline e non autorizza hardware.
 
 ## Operazioni read note e limiti
 
@@ -2828,23 +2871,25 @@ host/bus è chiuso come quiescenza USB path-bounded.
 D257 mantiene chiusi il lifecycle host e il provider cache fail-closed e
 riclassifica il vecchio replay come sottosequenza proiettata. D258 chiude la
 semantica `0x82` e corregge `0x50`/`0x20` come acquisizioni prima di stage2 con
-classificazione soltanto dopo stage2. D259 dimostra poi che i return dei due
-classifier hanno effetto solo su basi/cache host OEM e nessun riflesso sul
-contratto device-visible del primo arm; il loro modello esatto e il plaintext
-B0 storico D255 non bloccano più il candidate minimo. Il B0 resta però
-obbligatoriamente TLS-consumed, requisito ora coperto da plumbing core offline
-e dalla separata prova live D245 della sessione TLS Linux. Il disarm del prior
+classificazione soltanto dopo stage2. Il corrective D259 prova meccanicamente
+che i return dei due classifier hanno effetto solo su basi/cache host OEM e
+nessun riflesso sul contratto device-visible del primo arm; il loro modello
+esatto e il plaintext B0 storico D255 non sono blocker del classifier. Il B0
+resta obbligatoriamente TLS-consumed subito dopo `0x20`. Questa proprietà e la
+continuità del record successivo sono provate offline sulla stessa `SSLObject`,
+ma il runtime sealed D245 chiude l'engine a fine handshake e non lo espone: il
+plumbing live TLS→B0 è quindi ancora `UNIMPLEMENTED`. Il disarm del prior
 arm, la sua lifetime e lo stato interno FDT dopo cancel rimangono ignoti
 epistemici non bloccanti rispetto al contratto host/bus D256. La TTL generale
 del cache resta un'incertezza di successo funzionale, non il solo blocker né
 un requisito di factory-preservation.
 
-Il current critical boundary è quindi la review live separata del candidate
-minimo chiuso offline, non un blocker classifier: integrazione nel runtime
-TLS reale, baseline live-critical esplicitamente approvata, single-shot e
-cleanup/reseal devono essere revisionati prima di qualsiasi autorizzazione.
-`READY_FOR_FDT_LIVE_REVIEW=true` non significa `READY_FOR_FDT_LIVE`; D259 non
-autorizza hardware, capture o nuova invocazione.
+Il current critical boundary non è più il classifier ma l'integrazione del
+consumer nella stessa sessione TLS reale. Finché il runtime non conserva ed
+espone in modo sicuro l'engine handshaked, `READY_FOR_FDT_LIVE_REVIEW=false` e
+`READY_FOR_FDT_LIVE=false`. Una futura correzione dovrà inoltre preservare
+baseline live-critical esplicitamente approvata, single-shot e cleanup/reseal.
+D259 non autorizza hardware, capture o nuova invocazione.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -2964,7 +3009,12 @@ D258_SEED_FRESHNESS_FACTORY_PRESERVATION_BLOCKER false
 D258_READY_FOR_FDT_LIVE_REVIEW false
 D258_READY_FOR_FDT_LIVE false
 D258_LIVE_EXECUTION NOT_PERFORMED
-D259_OUTCOME READY_CLASS_A_OFFLINE
+D259_OUTCOME BLOCKED_LIVE_TLS_RUNTIME_ADAPTER_GAP
+D259_POST_CLASSIFIER_BRANCH_PROOF PASS_MECHANICALLY_DERIVED
+D259_BRANCH_MATRIX_DERIVATION_MODE PARSED_DISASSEMBLY_CFG
+D259_NAV_RETURN_CFG_PROVEN true
+D259_IMAGE_RETURN_CFG_PROVEN true
+D259_CLASS_A_CLASSIFIER_HOST_ONLY_FOR_FIRST_ARM true
 D259_POST_STAGE2_CLASSIFIER_DEVICE_PROGRESS_REQUIRED false
 D259_POST_STAGE2_CLASSIFIER_FACTORY_PRESERVATION_REQUIRED false
 D259_POST_STAGE2_CLASSIFIER_FIRST_ARM_REQUIRED false
@@ -2982,17 +3032,33 @@ D259_BASELINE_B0_IMAGE_CLASSIFICATION_REQUIRED false
 D259_BASELINE_B0_RASTER_DECODE_REQUIRED false
 D259_HISTORICAL_D255_B0_PLAINTEXT_AVAILABLE false
 D259_FUTURE_LINUX_RUNTIME_TLS_SESSION_PROVEN true
-D259_FUTURE_LINUX_RUNTIME_B0_CONSUMPTION_CAPABILITY true
+D259_LIVE_TLS_ROLE SERVER
+D259_LIVE_TLS_TO_B0_ADAPTER_STATUS UNIMPLEMENTED
+D259_B0_CONSUMED_BEFORE_STAGE2 true
+D259_TLS_SERVER_SESSION_OBJECT_COUNT 1
+D259_TLS_CLIENT_SESSION_OBJECT_COUNT 1
+D259_TLS_SERVER_HANDSHAKE_COUNT 1
+D259_TLS_APPLICATION_RECORD_CONSUMPTION_COUNT 1
+D259_SECOND_SERVER_SESSION_CREATED false
+D259_SECOND_PSK_PROVISIONING false
+D259_SAME_TLS_SESSION_B0_CONSUMPTION PASS_OFFLINE_ARCHITECTURAL
+D259_POST_B0_TLS_SESSION_CONTINUITY PASS_OFFLINE_ARCHITECTURAL
+D259_FUTURE_LINUX_RUNTIME_B0_CONSUMPTION_CAPABILITY false
+D259_PLAINTEXT_MUTABLE_BUFFER_BEST_EFFORT_ZEROIZED true
+D259_OPENSSL_INTERNAL_COPY_ZEROIZATION NOT_PROVEN
+D259_PYTHON_IMMUTABLE_TEMP_COPY_ZEROIZATION NOT_PROVEN
+D259_SRC_SEALED_UNCHANGED true
+D259_LIVE_LAUNCHERS_UNCHANGED true
 D259_OEM_CACHE_WRITE_BEFORE_FINAL_0x32 CONDITIONAL
 D259_OEM_CACHE_WRITE_AFTER_FINAL_0x32 false
 D259_OEM_CACHE_WRITE_REQUIRED_FOR_FINAL_0x32 false
 D259_LINUX_FIRST_LIVE_CACHE_WRITE_POLICY DISABLED
 D259_CORPUS_EXHAUSTED_FOR_EXACT_OEM_HOST_FIDELITY true
 D259_CORPUS_EXHAUSTED_FOR_MINIMAL_DEVICE_LIVE_CONTRACT false
-D259_MINIMAL_DEVICE_LIVE_CONTRACT_CLOSED true
-D259_FACTORY_PRESERVING_MINIMAL_CANDIDATE_CLOSED true
-D259_FDT_OFFLINE_CANDIDATE_CLOSED true
-D259_READY_FOR_FDT_LIVE_REVIEW true
+D259_MINIMAL_DEVICE_LIVE_CONTRACT_CLOSED false
+D259_FACTORY_PRESERVING_MINIMAL_CANDIDATE_CLOSED false
+D259_FDT_OFFLINE_CANDIDATE_CLOSED false
+D259_READY_FOR_FDT_LIVE_REVIEW false
 D259_READY_FOR_FDT_LIVE false
 D259_NO_SPECIAL_FDT_RECOVERY_COMMAND_POLICY DEFAULT
 D259_A2_REENTRY_INJECTION 0

@@ -470,6 +470,7 @@ class ExactFreshFdtBootstrapMachine:
         self.delta_threshold: int | None = None
         self.host_decisions_finalized = False
         self.baseline_b0_tls_consumed = False
+        self.baseline_b0_consumed_at_manual_stage: int | None = None
         self.semantic_classifier_call_count = 0
         self.raster_decode_count = 0
         self.host_cache_write_count = 0
@@ -503,7 +504,10 @@ class ExactFreshFdtBootstrapMachine:
         if self.manual_stage == 1 and self.nav_dynamic_state is None:
             self._fail("second_manual_stage_before_nav_acquisition")
             raise InvalidTransition("second_manual_stage_before_nav_acquisition")
-        if self.manual_stage == 2 and not (self.delta_gate_passed and self.baseline_b0 is not None):
+        if self.manual_stage == 2 and not (
+            self.delta_gate_passed
+            and (self.baseline_b0 is not None or self.baseline_b0_tls_consumed)
+        ):
             self._fail("third_manual_stage_before_delta_and_baseline_acquisition")
             raise InvalidTransition("third_manual_stage_before_delta_and_baseline_acquisition")
         stage = self.manual_stage
@@ -540,7 +544,9 @@ class ExactFreshFdtBootstrapMachine:
             raise
         self.lifecycle.interstage_completed("0x50_NAV_STORED")
 
-    def delta_and_baseline_interstage(self) -> None:
+    def delta_and_baseline_interstage(
+        self, consumer: B0ApplicationConsumer | None = None
+    ) -> None:
         if self.manual_stage != 2 or self.delta_gate_passed or self.baseline_gate_passed:
             self._fail("delta_baseline_interstage_wrong_order")
             raise InvalidTransition("delta_baseline_interstage_wrong_order")
@@ -567,10 +573,21 @@ class ExactFreshFdtBootstrapMachine:
             response = self._required_exchange(build_set_image(), 0x20, 1)[0]
             parse_baseline_image_b0_shape(response)
             self.baseline_b0 = bytes(response)
+            if consumer is not None:
+                result = consumer.consume(self.baseline_b0)
+                if not isinstance(result, B0ConsumptionResult) or not result.accepted:
+                    raise InvalidTransition("baseline_b0_tls_consumption_unproven")
+                self.baseline_b0_tls_consumed = True
+                self.baseline_b0_consumed_at_manual_stage = self.manual_stage
+                self.baseline_b0 = None
         except Exception:
             self._fail("baseline_interstage_failed")
             raise
-        self.lifecycle.interstage_completed("0x20_BASELINE_IMAGE_ACQUIRED")
+        self.lifecycle.interstage_completed(
+            "0x20_BASELINE_B0_TLS_CONSUMED"
+            if self.baseline_b0_tls_consumed
+            else "0x20_BASELINE_IMAGE_ACQUIRED"
+        )
 
     def finalize_host_base_decisions(self) -> None:
         """Run post-stage2 NAV/image decisions, failing closed while unknown."""
@@ -606,19 +623,20 @@ class ExactFreshFdtBootstrapMachine:
         self.baseline_gate_passed = True
         self.host_decisions_finalized = True
 
-    def finalize_minimal_device_contract(self, consumer: B0ApplicationConsumer) -> None:
+    def finalize_minimal_device_contract(self) -> None:
         """Close only device-visible post-stage2 work.
 
         D259 proves that OEM classifier returns affect host base/cache fidelity,
         not the final FDT table, payload, command sequence, or reachability.
         The second native delta predicate remains mandatory.  The encrypted
-        baseline B0 must still be consumed by active TLS; its plaintext is not
-        semantically decoded, classified, persisted, or retained here.
+        baseline B0 must already have been consumed by the active TLS session
+        immediately after ``0x20`` and before stage2.  No plaintext is decoded,
+        classified, persisted, or retained here.
         """
         if self.manual_stage != self.MANUAL_STAGE_COUNT or self.host_decisions_finalized:
             self._fail("minimal_device_contract_wrong_order")
             raise InvalidTransition("minimal_device_contract_wrong_order")
-        if self.nav_dynamic_state is None or self.baseline_b0 is None:
+        if self.nav_dynamic_state is None or not self.baseline_b0_tls_consumed:
             self._fail("minimal_device_contract_inputs_missing")
             raise InvalidTransition("minimal_device_contract_inputs_missing")
         try:
@@ -629,13 +647,11 @@ class ExactFreshFdtBootstrapMachine:
             ):
                 raise UnexpectedEvent("second_fdt_delta_threshold_rejected")
             self.second_delta_gate_passed = True
-            result = consumer.consume(self.baseline_b0)
-            if not isinstance(result, B0ConsumptionResult) or not result.accepted:
-                raise InvalidTransition("baseline_b0_tls_consumption_unproven")
+            if self.baseline_b0_consumed_at_manual_stage != 2:
+                raise InvalidTransition("baseline_b0_not_consumed_before_stage2")
         except Exception:
             self._fail("minimal_device_contract_finalization_failed")
             raise
-        self.baseline_b0_tls_consumed = True
         self.host_decisions_finalized = True
 
     def arm(self, ts16: int) -> None:

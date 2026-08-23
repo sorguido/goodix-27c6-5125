@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+import json
 from pathlib import Path
 import unittest
 
@@ -25,16 +26,26 @@ class D259PostClassifierClosureTests(unittest.TestCase):
                 {row["return"] for row in rows if row["classifier"] == classifier},
                 {"0", "1", "2", "3", "negative_or_other"},
             )
+        cfg_rows = {
+            (switch["classifier"], case["return"], case["case_target"])
+            for switch in result["cfg"]["switches"].values()
+            for case in switch["cases"]
+        }
+        self.assertEqual(
+            {(row["classifier"], row["return"], row["case_target"]) for row in rows},
+            cfg_rows,
+        )
 
     def test_every_classifier_return_has_no_wire_or_recovery_effect(self):
         result = AUDIT.audit(REPO)
         for row in result["wire_rows"]:
-            self.assertEqual(row["gf_update_all_base_result"], "1_SUCCESS")
+            self.assertEqual(row["gf_update_all_base_result"], "1_SUCCESS_UNCHANGED")
             self.assertEqual(row["fdt_table_effect"], "NONE")
             self.assertEqual(row["final_0x32_payload_effect"], "NONE")
             self.assertEqual(row["additional_usb_commands"], "NONE")
             self.assertEqual(row["recovery_command"], "NONE")
-            self.assertEqual(row["final_0x32_reachable"], "YES")
+            self.assertEqual(row["final_0x32_reachable"], "YES_VIA_CALLER_NONZERO_BRANCH")
+            self.assertEqual(row["derivation_mode"], "PARSED_DISASSEMBLY_CFG")
         classifier_recovery = result["recovery_rows"][0]
         self.assertEqual(classifier_recovery["a2_reentry"], 0)
         self.assertEqual(classifier_recovery["0x70_reentry"], 0)
@@ -58,6 +69,7 @@ class D259PostClassifierClosureTests(unittest.TestCase):
         self.assertTrue(scenario["delta_native_predicate_passed"])
         self.assertTrue(scenario["second_delta_native_predicate_passed"])
         self.assertTrue(scenario["baseline_b0_tls_consumed"])
+        self.assertTrue(scenario["b0_consumed_before_stage2"])
         self.assertTrue(scenario["first_0x32_sent_once"])
         self.assertEqual(scenario["semantic_classifier_call_count"], 0)
         self.assertEqual(scenario["raster_decode_count"], 0)
@@ -68,8 +80,36 @@ class D259PostClassifierClosureTests(unittest.TestCase):
         self.assertEqual(scenario["0x70_reentry_injection"], 0)
         self.assertEqual(scenario["timeouts_ms"], scenario["expected_timeouts_ms"])
         self.assertFalse(result["closure"]["READY_FOR_FDT_LIVE"])
-        self.assertTrue(result["closure"]["READY_FOR_FDT_LIVE_REVIEW"])
+        self.assertFalse(result["closure"]["READY_FOR_FDT_LIVE_REVIEW"])
+        tls = result["tls_closure"]
+        self.assertEqual(tls["LIVE_TLS_TO_B0_ADAPTER_STATUS"], "UNIMPLEMENTED")
+        self.assertEqual(tls["TLS_SERVER_SESSION_OBJECT_COUNT"], 1)
+        self.assertEqual(tls["TLS_CLIENT_SESSION_OBJECT_COUNT"], 1)
+        self.assertEqual(tls["TLS_SERVER_HANDSHAKE_COUNT"], 1)
+        self.assertEqual(tls["TLS_APPLICATION_RECORD_CONSUMPTION_COUNT"], 1)
+        self.assertFalse(tls["SECOND_SERVER_SESSION_CREATED"])
+        self.assertFalse(tls["SECOND_PSK_PROVISIONING"])
+        self.assertEqual(tls["SAME_TLS_SESSION_B0_CONSUMPTION"], "PASS_OFFLINE_ARCHITECTURAL")
+        self.assertEqual(tls["POST_B0_TLS_SESSION_CONTINUITY"], "PASS_OFFLINE_ARCHITECTURAL")
         self.assertTrue(all(value == 0 for value in result["safety"].values()))
+
+    def test_corrective_decision_matches_fail_closed_runtime_evidence(self):
+        decision = json.loads(
+            (REPO / "analysis/D259/D259_readiness_decision.json").read_text(encoding="utf-8")
+        )
+        replay = REPLAY.run(REPO)
+        self.assertEqual(decision["POST_CLASSIFIER_BRANCH_PROOF"], "PASS_MECHANICALLY_DERIVED")
+        self.assertEqual(decision["LIVE_TLS_TO_B0_ADAPTER_STATUS"], "UNIMPLEMENTED")
+        self.assertFalse(decision["READY_FOR_FDT_LIVE_REVIEW"])
+        self.assertFalse(decision["READY_FOR_FDT_LIVE"])
+        self.assertEqual(
+            decision["LIVE_TLS_TO_B0_ADAPTER_STATUS"],
+            replay["tls_closure"]["LIVE_TLS_TO_B0_ADAPTER_STATUS"],
+        )
+        self.assertEqual(
+            decision["B0_CONSUMED_BEFORE_STAGE2"],
+            replay["closure"]["B0_CONSUMED_BEFORE_STAGE2"],
+        )
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hmac
 import ssl
-from typing import Protocol
+from typing import Callable, Protocol
 
 from core.post_d4 import TLS, parse_outer
 
@@ -32,7 +32,7 @@ class ActiveTlsApplicationSession(Protocol):
         ...
 
     def consume_application_record(self, tls_record: bytes) -> bytearray:
-        """Authenticate/decrypt one or more TLS records and return plaintext."""
+        """Authenticate/decrypt records into a caller-owned mutable buffer."""
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,9 @@ class B0ConsumptionResult:
     authenticated: bool
     decrypted: bool
     plaintext_length: int
-    plaintext_zeroized: bool
+    plaintext_mutable_buffer_best_effort_zeroized: bool
+    openssl_internal_copy_zeroization: str = "NOT_PROVEN"
+    python_immutable_temp_copy_zeroization: str = "NOT_PROVEN"
 
     @property
     def accepted(self) -> bool:
@@ -49,8 +51,66 @@ class B0ConsumptionResult:
             self.tls_record_consumed
             and self.authenticated
             and self.decrypted
-            and self.plaintext_zeroized
+            and self.plaintext_mutable_buffer_best_effort_zeroized
         )
+
+
+class MemoryBioApplicationSessionAdapter:
+    """Adapt an already-handshaked MemoryBIO SSL object for application data.
+
+    The adapter creates no SSL context, SSL object, handshake, PSK callback, or
+    transport.  Its caller must keep the exact input BIO and SSLObject from the
+    established server session alive.  Python/OpenSSL may retain internal or
+    immutable plaintext copies; only the returned mutable buffer can be wiped
+    best-effort by the caller.
+    """
+
+    def __init__(
+        self,
+        ssl_object: ssl.SSLObject,
+        input_bio: ssl.MemoryBIO,
+        *,
+        handshake_complete: Callable[[], bool],
+        closed: Callable[[], bool],
+    ) -> None:
+        self._ssl = ssl_object
+        self._input = input_bio
+        self._is_handshake_complete = handshake_complete
+        self._is_closed = closed
+        self.application_record_count = 0
+
+    @property
+    def handshake_complete(self) -> bool:
+        return self._is_handshake_complete() and not self._is_closed()
+
+    def uses_ssl_object(self, ssl_object: ssl.SSLObject) -> bool:
+        return self._ssl is ssl_object
+
+    def consume_application_record(self, tls_record: bytes) -> bytearray:
+        if not self.handshake_complete:
+            raise TlsB0ConsumptionError("active_tls_session_required")
+        plaintext = bytearray()
+        try:
+            self._input.write(tls_record)
+            while True:
+                try:
+                    # SSLObject.read() returns an immutable Python bytes object.
+                    # Copying it into bytearray permits only best-effort wiping
+                    # of the mutable copy, not OpenSSL or immutable temporaries.
+                    chunk = self._ssl.read(65536)
+                except ssl.SSLWantReadError:
+                    break
+                if not chunk:
+                    break
+                plaintext.extend(chunk)
+        except ssl.SSLError as error:
+            for index in range(len(plaintext)):
+                plaintext[index] = 0
+            raise TlsB0ConsumptionError("tls_record_authentication_failed") from error
+        if not plaintext:
+            raise TlsB0ConsumptionError("tls_application_plaintext_missing")
+        self.application_record_count += 1
+        return plaintext
 
 
 def _split_tls_records(data: bytes) -> tuple[bytes, ...]:
@@ -97,7 +157,15 @@ class Tls12PskServerSession:
         self._ssl = context.wrap_bio(self._input, self._output, server_side=True)
         self._handshake_complete = False
         self.closed = False
-        self.application_record_count = 0
+        self.server_session_object_count = 1
+        self.psk_context_provisioning_count = 1
+        self.handshake_count = 0
+        self._application = MemoryBioApplicationSessionAdapter(
+            self._ssl,
+            self._input,
+            handshake_complete=lambda: self._handshake_complete,
+            closed=lambda: self.closed,
+        )
 
     @property
     def handshake_complete(self) -> bool:
@@ -111,6 +179,8 @@ class Tls12PskServerSession:
     def advance_handshake(self) -> None:
         if self.closed or self._handshake_complete:
             raise TlsB0ConsumptionError("handshake_advance_wrong_state")
+        if self.handshake_count == 0:
+            self.handshake_count = 1
         try:
             self._ssl.do_handshake()
         except (ssl.SSLWantReadError, ssl.SSLWantWriteError):
@@ -131,27 +201,16 @@ class Tls12PskServerSession:
         return _split_tls_records(bytes(output)) if output else ()
 
     def consume_application_record(self, tls_record: bytes) -> bytearray:
-        if not self.handshake_complete:
-            raise TlsB0ConsumptionError("active_tls_session_required")
-        plaintext = bytearray()
-        try:
-            self._input.write(tls_record)
-            while True:
-                try:
-                    chunk = self._ssl.read(65536)
-                except ssl.SSLWantReadError:
-                    break
-                if not chunk:
-                    break
-                plaintext.extend(chunk)
-        except ssl.SSLError as error:
-            for index in range(len(plaintext)):
-                plaintext[index] = 0
-            raise TlsB0ConsumptionError("tls_record_authentication_failed") from error
-        if not plaintext:
-            raise TlsB0ConsumptionError("tls_application_plaintext_missing")
-        self.application_record_count += 1
-        return plaintext
+        return self._application.consume_application_record(tls_record)
+
+    @property
+    def application_session(self) -> MemoryBioApplicationSessionAdapter:
+        """Return an adapter over this exact SSLObject and input BIO."""
+        return self._application
+
+    @property
+    def application_record_count(self) -> int:
+        return self._application.application_record_count
 
     def close(self) -> None:
         if self.closed:
@@ -166,7 +225,7 @@ class Tls12PskServerSession:
 
 
 class B0ApplicationConsumer:
-    """Consume, authenticate, decrypt, promptly zeroize, and discard one B0."""
+    """Consume/decrypt a B0 and best-effort wipe its mutable plaintext copy."""
 
     def __init__(self, session: ActiveTlsApplicationSession):
         self.session = session
@@ -191,5 +250,5 @@ class B0ApplicationConsumer:
             authenticated=True,
             decrypted=True,
             plaintext_length=length,
-            plaintext_zeroized=zeroized,
+            plaintext_mutable_buffer_best_effort_zeroized=zeroized,
         )
