@@ -1,0 +1,252 @@
+{
+  "cache_fields": [
+    "phase",
+    "condition",
+    "oem_effect",
+    "linux_first_live_policy",
+    "required_for_final_0x32",
+    "required_for_device_progress",
+    "host_cache_write_count_in_minimal_candidate",
+    "evidence"
+  ],
+  "cache_rows": [
+    {
+      "condition": "either_classifier_return_not_equal_1_or_classifier_disabled_copy_path",
+      "evidence": "dirty byte 0x18006952c/0x180069722/0x1800697d3; call 0x1800697e1; caller arm later at 0x180068abe",
+      "host_cache_write_count_in_minimal_candidate": 0,
+      "linux_first_live_policy": "DISABLED",
+      "oem_effect": "gf_savebaseTofile/goodix.dat called conditionally",
+      "phase": "before_final_0x32",
+      "required_for_device_progress": false,
+      "required_for_final_0x32": false
+    },
+    {
+      "condition": "gf_update_all_base caller path",
+      "evidence": "cache call is inside gf_update_all_base before return; caller issues final 0x32 afterwards",
+      "host_cache_write_count_in_minimal_candidate": 0,
+      "linux_first_live_policy": "DISABLED",
+      "oem_effect": "NONE_OBSERVED",
+      "phase": "after_final_0x32",
+      "required_for_device_progress": false,
+      "required_for_final_0x32": false
+    }
+  ],
+  "decisions": {
+    "CAUSAL_OBSERVABILITY_FROM_MCU": "NONE_FOR_MINIMAL_DEVICE_CONTRACT",
+    "CLASSIFIER_ADDITIONAL_DEVICE_COMMANDS": "NONE",
+    "CLASSIFIER_ERROR_RECOVERY_COMMANDS": "NONE",
+    "CLASSIFIER_FDT_TABLE_EFFECT": "NONE",
+    "CLASSIFIER_FINAL_0x32_PAYLOAD_EFFECT": "NONE",
+    "CLASSIFIER_REQUIRED_FOR_FACTORY_PRESERVATION": false,
+    "CLASSIFIER_REQUIRED_FOR_FIRST_FDT_ARM": false,
+    "CLASSIFIER_REQUIRED_FOR_OEM_HOST_FIDELITY": true,
+    "CLASSIFIER_RETRY_OR_REBUILD_EFFECT": "NONE",
+    "LINUX_FIRST_LIVE_CACHE_WRITE_POLICY": "DISABLED",
+    "OEM_CACHE_WRITE_AFTER_FINAL_0x32": false,
+    "OEM_CACHE_WRITE_BEFORE_FINAL_0x32": "CONDITIONAL",
+    "OEM_CACHE_WRITE_REQUIRED_FOR_DEVICE_PROGRESS": false,
+    "OEM_CACHE_WRITE_REQUIRED_FOR_FINAL_0x32": false
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "hash_gates": {
+    "d255_capture_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+    "gfusb_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+    "static_anchor_count": 30
+  },
+  "recovery_fields": [
+    "condition",
+    "gf_update_all_base_result",
+    "final_0x32",
+    "retry_or_rebuild",
+    "a2_reentry",
+    "0x70_reentry",
+    "other_recovery_command",
+    "evidence"
+  ],
+  "recovery_rows": [
+    {
+      "0x70_reentry": 0,
+      "a2_reentry": 0,
+      "condition": "classifier_return_0_1_2_3_negative_or_other",
+      "evidence": "all switch arms converge at 0x1800694fa/0x1800696b4; return remains [rsp+0x44]=1",
+      "final_0x32": "REACHABLE",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "other_recovery_command": "NONE",
+      "retry_or_rebuild": "NONE"
+    },
+    {
+      "0x70_reentry": 0,
+      "a2_reentry": 0,
+      "condition": "earlier_acquisition_or_protocol_failure",
+      "evidence": "failure writes [rsp+0x44]=0; caller 0x18006898f branches away from 0x180068abe",
+      "final_0x32": "NOT_REACHED_BY_CALLER",
+      "gf_update_all_base_result": "0_FAILURE",
+      "other_recovery_command": "NONE_IN_CALLER_BRANCH",
+      "retry_or_rebuild": "ONLY_EARLIER_DELTA_FALLBACK_OR_LOOP; NOT_CLASSIFIER_CAUSED"
+    }
+  ],
+  "safety": {
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_USB_OPEN_COUNT": 0
+  },
+  "schema": "D259_POST_CLASSIFIER_AUDIT_V1",
+  "wire_fields": [
+    "classifier",
+    "return",
+    "gf_update_all_base_result",
+    "host_ram_effect",
+    "fdt_table_effect",
+    "final_0x32_payload_effect",
+    "additional_usb_commands",
+    "retry_or_rebuild",
+    "recovery_command",
+    "cache_write_effect",
+    "final_0x32_reachable",
+    "evidence"
+  ],
+  "wire_rows": [
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "NAV",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "0"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "NO_UPDATE_FROM_THIS_CLASSIFIER",
+      "classifier": "NAV",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "KEEP_EXISTING_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "1"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "NAV",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "2"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "NAV",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "3"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "NAV",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "negative_or_other"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "IMAGE",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "0"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "NO_UPDATE_FROM_THIS_CLASSIFIER",
+      "classifier": "IMAGE",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "KEEP_EXISTING_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "1"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "IMAGE",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "2"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "IMAGE",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "3"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "classifier": "IMAGE",
+      "evidence": "gf_update_all_base init/result 0x180068b21,0x18006981c,0x180069860; caller success branch 0x18006898a..0x180068abe; classifiers/copies 0x180069377..0x18006952c and 0x180069531..0x180069722; host state 0x180069727..0x180069737; conditional cache call 0x1800697d8..0x1800697e6; independent FDT table global 0x180580818 at 0x180025046/0x1800253e2",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES",
+      "gf_update_all_base_result": "1_SUCCESS",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_CLASSIFIER_RETURN",
+      "return": "negative_or_other"
+    }
+  ]
+}

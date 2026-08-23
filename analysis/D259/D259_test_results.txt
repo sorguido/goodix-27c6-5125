@@ -1,0 +1,36 @@
+D259 OFFLINE TEST RESULTS
+
+PASS  python3 -m unittest discover -s tests -v
+      206 tests; includes D253/D255/D256/D257/D258 regressions and 8 D259 tests
+
+PASS  python3 -m py_compile core/tls_b0.py core/fdt_lifecycle.py
+      analysis/D259/d259_post_classifier_audit.py
+      analysis/D259/d259_minimal_replay.py
+      tests/test_d259_minimal_device_contract.py
+      tests/test_d259_post_classifier_closure.py
+
+PASS  python3 analysis/D259/d259_post_classifier_audit.py
+      gfusb.dll and D255 raw hash gates; 10-row NAV/image return matrix;
+      error/recovery and cache-effect matrices generated
+
+PASS  python3 analysis/D259/d259_minimal_replay.py
+      complete 36,50,36,82,20,36,32 request trace byte-exact to D255;
+      two native delta predicates PASS; synthetic target-shaped B0 consumed
+      through active TLS; final 0x32 exactly once
+
+PASS  TLS B0 consumption, authenticate/decrypt/zeroize/discard plumbing
+PASS  raw ciphertext discard without active TLS rejected fail-closed
+PASS  no semantic classifier and no raster decode in minimal path
+PASS  no cache write, retry, A2/0x70 injection, or persistent device family
+PASS  per-command timeout policy 500,500,500,500,2000,500,100 ms
+PASS  source D255 cache content and mtime unchanged
+PASS  git diff --check
+
+SAFETY
+REAL_USB_OPEN_COUNT=0
+REAL_CAPTURE_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+REAL_COMMAND_SEND_COUNT=0
+FINGER_INTERACTION_COUNT=0
+PERSISTENT_WRITE_FAMILY_COUNT=0
+HOST_CACHE_WRITE_COUNT=0

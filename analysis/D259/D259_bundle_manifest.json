@@ -1,0 +1,54 @@
+{
+  "schema": "D259_STEP_LOCAL_BUNDLE_MANIFEST_V1",
+  "step": "D259",
+  "baseline_head": "b3f51a2d75c9ced20acc0b324139d9898988b229",
+  "bundle": "analysis/D259/D259_minimal_device_contract_closure_bundle.zip",
+  "scope": "STEP_LOCAL_NON_CUMULATIVE_REVIEW_BY_REFERENCE",
+  "readiness_class": "CLASS_A_CLASSIFIER_HOST_ONLY_FOR_FIRST_ARM",
+  "files": {
+    "Goodix 27c6 5125 manuale tecnico.md": "316358adc830db693dcefe193387de2cbf8b7cb533166d1795f139e33469392f",
+    "core/README.md": "604ac24a49b0a8cedd8ad0cae61fc65003ccbd51226e6dfa8f9fa9fcf15348cc",
+    "core/fdt_lifecycle.py": "9c3d5486da9164f5c7993cd92168a6d24927b181071b9d4d760225745f9c7854",
+    "core/tls_b0.py": "37132108f001cccde2040872dd0bd0a383e36fe5b5a33cbe4af71812fc4754af",
+    "tests/test_d259_minimal_device_contract.py": "4cb14d49c7807e23474b1c520ccc9ab7576ce8cd83887e751dc4da09d8284903",
+    "tests/test_d259_post_classifier_closure.py": "c6da223baceb06afaec4043429fcac4be3e726b7bdc8dfd6c9879f50a806045e",
+    "analysis/D259/d259_post_classifier_audit.py": "6301907e6dc6b655a4f89a2b2a0333ede2ded7fe21aca8aab5f5c68883cf6e44",
+    "analysis/D259/d259_minimal_replay.py": "bed3a046be3de9dfc1c516dbae0a55a5faf9adf1e1604d9ac45a33b8e988b278",
+    "analysis/D259/D259_post_classifier_audit.json": "80a4a728151a09bbf61dff93ca44751c78d1ff002acad54c249b40ad2d497061",
+    "analysis/D259/D259_post_classifier_wire_effect_matrix.csv": "b208c82b17a706abd01ae70c995966c14bae74690f2fd05636e69d8bfad023cc",
+    "analysis/D259/D259_post_classifier_wire_effect_matrix.md": "3e9b50657a9b67cf6696e7d7b7c4d1595c14f2b659ed5880700cd79baef21199",
+    "analysis/D259/D259_error_recovery_matrix.csv": "0c17b08e9749f78821a2600a0e6f7d9e14af3c655a1b5b12f5e6df9c006ee070",
+    "analysis/D259/D259_error_recovery_matrix.md": "79f0f59ee290133df38d3b12a74a8f9468d04c4b3ec1dc83eff10d2d2b51c77a",
+    "analysis/D259/D259_cache_effect_matrix.csv": "c50d40f7dcc8131e4519727a2df8212e66cca62e607b166be0bc7a61d6944fd2",
+    "analysis/D259/D259_cache_effect_matrix.md": "c28c23fb1b1d048af40ae29e3e3618c18e6ce0bc7ad9f9f8022e6b03feaf7813",
+    "analysis/D259/D259_minimal_replay.json": "d87c96d902c283e78aca19572cab0d8a310db229750dd8967b4a785dc8d5462d",
+    "analysis/D259/D259_readiness_decision.json": "fa5ba47287229ad32f8d86709105f6a8c368894f5ca49517d2488c171121a9b9",
+    "analysis/D259/D259_minimal_device_contract_closure_report.md": "e6f7788e4445ea03d34941861eaa3598e8a404f66fdcb6e688a898949650bed7",
+    "analysis/D259/D259_test_results.txt": "28dc16fdce9571845484b98d9f7b4fbb6e2fc9a298a635d336c8ec6ece912b72"
+  },
+  "external_evidence_by_reference": {
+    "gfusb.dll_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+    "d255_capture_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+    "d245_live_tls_result": "analysis/D245/D245_operator_live_stdout.json"
+  },
+  "excluded": [
+    "raw pcapng and captures",
+    "raw cache and OTP",
+    "OEM DLL, disassembly, executables and firmware",
+    "PSK, TLS keys and other secrets",
+    "dynamic NAV payloads",
+    "historical D255 B0 ciphertext or plaintext",
+    "decrypted B0 plaintext, raster and biometric material",
+    "historical bundles and unmodified historical artifacts",
+    "cache and temporary files"
+  ],
+  "safety": {
+    "REAL_USB_OPEN_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "FINGER_INTERACTION_COUNT": 0,
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0,
+    "HOST_CACHE_WRITE_COUNT": 0
+  }
+}

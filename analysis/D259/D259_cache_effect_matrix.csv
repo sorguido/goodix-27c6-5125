@@ -1,0 +1,3 @@
+phase,condition,oem_effect,linux_first_live_policy,required_for_final_0x32,required_for_device_progress,host_cache_write_count_in_minimal_candidate,evidence
+before_final_0x32,either_classifier_return_not_equal_1_or_classifier_disabled_copy_path,gf_savebaseTofile/goodix.dat called conditionally,DISABLED,False,False,0,dirty byte 0x18006952c/0x180069722/0x1800697d3; call 0x1800697e1; caller arm later at 0x180068abe
+after_final_0x32,gf_update_all_base caller path,NONE_OBSERVED,DISABLED,False,False,0,cache call is inside gf_update_all_base before return; caller issues final 0x32 afterwards

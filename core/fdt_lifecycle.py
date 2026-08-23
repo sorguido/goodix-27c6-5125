@@ -18,6 +18,7 @@ from enum import Enum
 from typing import Callable, Iterable, Protocol
 
 from core.fdt_seed import SeedProviderResult
+from core.tls_b0 import B0ApplicationConsumer, B0ConsumptionResult
 from core.post_d4 import (
     InvalidTransition,
     LengthMismatch,
@@ -468,6 +469,10 @@ class ExactFreshFdtBootstrapMachine:
         self.raw_fdt_samples: list[tuple[int, ...]] = []
         self.delta_threshold: int | None = None
         self.host_decisions_finalized = False
+        self.baseline_b0_tls_consumed = False
+        self.semantic_classifier_call_count = 0
+        self.raster_decode_count = 0
+        self.host_cache_write_count = 0
 
     def _fail(self, reason: str) -> None:
         self.lifecycle.fail_closed(reason)
@@ -599,6 +604,38 @@ class ExactFreshFdtBootstrapMachine:
             raise
         self.nav_gate_passed = True
         self.baseline_gate_passed = True
+        self.host_decisions_finalized = True
+
+    def finalize_minimal_device_contract(self, consumer: B0ApplicationConsumer) -> None:
+        """Close only device-visible post-stage2 work.
+
+        D259 proves that OEM classifier returns affect host base/cache fidelity,
+        not the final FDT table, payload, command sequence, or reachability.
+        The second native delta predicate remains mandatory.  The encrypted
+        baseline B0 must still be consumed by active TLS; its plaintext is not
+        semantically decoded, classified, persisted, or retained here.
+        """
+        if self.manual_stage != self.MANUAL_STAGE_COUNT or self.host_decisions_finalized:
+            self._fail("minimal_device_contract_wrong_order")
+            raise InvalidTransition("minimal_device_contract_wrong_order")
+        if self.nav_dynamic_state is None or self.baseline_b0 is None:
+            self._fail("minimal_device_contract_inputs_missing")
+            raise InvalidTransition("minimal_device_contract_inputs_missing")
+        try:
+            if len(self.raw_fdt_samples) != 3 or self.delta_threshold is None:
+                raise InvalidTransition("second_delta_requires_three_raw_fdt_samples")
+            if not fdt_raw_delta_within_threshold(
+                self.raw_fdt_samples[1], self.raw_fdt_samples[2], self.delta_threshold
+            ):
+                raise UnexpectedEvent("second_fdt_delta_threshold_rejected")
+            self.second_delta_gate_passed = True
+            result = consumer.consume(self.baseline_b0)
+            if not isinstance(result, B0ConsumptionResult) or not result.accepted:
+                raise InvalidTransition("baseline_b0_tls_consumption_unproven")
+        except Exception:
+            self._fail("minimal_device_contract_finalization_failed")
+            raise
+        self.baseline_b0_tls_consumed = True
         self.host_decisions_finalized = True
 
     def arm(self, ts16: int) -> None:
