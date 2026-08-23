@@ -18,7 +18,7 @@ from src.goodix5125_cleanroom import decode_record as _decode_local_record
 
 
 PLAIN, TLS = 0xA0, 0xB0
-ALLOWED_COMMANDS = frozenset({0xAF, 0x36, 0x32, 0x34, 0x20, 0x22, 0xD2})
+ALLOWED_COMMANDS = frozenset({0xAF, 0x20, 0x22, 0x32, 0x34, 0x36, 0x50, 0x82, 0xD2})
 FIRST_IMAGE_RECEIVED = "FIRST_IMAGE_RECEIVED"
 STOP_AFTER_AF = "STOP_AFTER_AF"
 ACK_FORBIDDEN = "FORBIDDEN"
@@ -184,9 +184,74 @@ def build_fdt_up(table12: bytes) -> bytes:
     return build_command(0x34, b"\x0a\x01" + table12)
 
 
+def build_nav_baseline() -> bytes:
+    """Build the target-observed inter-stage NAV baseline request."""
+    return build_command(0x50, b"\x01\x00")
+
+
+def build_read_fdt_delta() -> bytes:
+    """Read two bytes from target-observed sensor register 0x0082."""
+    return build_command(0x82, b"\x00\x82\x00\x02\x00")
+
+
 def build_set_image() -> bytes:
     """Build the target-observed baseline/no-finger image-mode variant."""
     return build_command(0x20, b"\x01\x00")
+
+
+def parse_nav_baseline_response(frame: bytes) -> bytes:
+    """Validate the bounded target 0x50 response envelope.
+
+    The D255 response uses the OEM no-check marker ``0x88`` rather than the
+    additive checksum used by ordinary A0 payloads.  This parser is deliberately
+    limited to the one observed 0x50 shape; it is not a general checksum bypass.
+    The returned 2409 bytes remain dynamic input to a separate host semantic
+    gate.
+    """
+    kind, payload = parse_outer(frame)
+    if kind != PLAIN:
+        raise UnexpectedControl("nav_response_not_plaintext")
+    if len(payload) < 4:
+        raise TruncatedFrame("nav_response_header_truncated")
+    control, lo, hi = payload[:3]
+    declared = lo | hi << 8
+    if control != 0x50:
+        raise UnexpectedControl(f"nav_response:0x{control:02x}")
+    if declared != 2410 or len(payload) != declared + 3:
+        raise LengthMismatch(f"nav_response_length:{declared}:{len(payload) - 3}")
+    if payload[-1] != 0x88:
+        raise ChecksumMismatch("nav_response_no_check_marker")
+    data = payload[3:-1]
+    if len(data) != 2409 or data[:2] != b"\x50\x01":
+        raise LengthMismatch("nav_response_target_shape")
+    return data
+
+
+def parse_fdt_delta_response(frame: bytes) -> bytes:
+    """Validate the two-byte response to the inter-stage 0x82 read."""
+    kind, payload = parse_outer(frame)
+    if kind != PLAIN:
+        raise UnexpectedControl("fdt_delta_response_not_plaintext")
+    control, data = parse_payload(payload)
+    if control != 0x82:
+        raise UnexpectedControl(f"fdt_delta_response:0x{control:02x}")
+    if len(data) != 2:
+        raise LengthMismatch(f"fdt_delta_response_length:{len(data)}")
+    return data
+
+
+def parse_baseline_image_b0_shape(frame: bytes) -> None:
+    """Validate only the target-observed encrypted baseline-image B0 shape.
+
+    Semantic image/no-finger validation requires the decrypted application
+    payload and is intentionally a separate gate.  Accepting this envelope
+    alone must never authorize the next manual FDT stage.
+    """
+    kind, body = parse_outer(frame)
+    if kind != TLS:
+        raise UnexpectedControl("baseline_image_response_not_b0")
+    if len(frame) != 7726 or len(body) != 7722:
+        raise LengthMismatch(f"baseline_image_b0_length:{len(frame)}")
 
 
 def build_finger_image() -> bytes:

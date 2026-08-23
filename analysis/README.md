@@ -34,7 +34,7 @@ costituisce autorizzazione live.
 | D254 | Audit esterno FDT/cache/lifecycle | BLOCKED offline; bootstrap ridotto, restore non ridotto | `analysis/D254/D254_external_fdt_evidence_audit.md` | `analysis/D254/D254_external_fdt_evidence_audit_bundle.zip` |
 | D255 | Evidenza Windows APP12509 correlata | run finale consumata e recuperata offline: capture 27.684 byte/218 frame, cache↔primo seed, zero-finger cancel e re-entry; nessuna nuova capture richiesta | `analysis/D255/D255_windows_targeted_evidence_capture_kit_report.md` | `analysis/D255/D255_windows_targeted_evidence_capture_kit_bundle.zip` |
 | D256 | Contratto lifecycle USB D255 | READY offline; re-entry/re-arm senza restore USB esplicito e terminal-stop host/bus chiuso come quiescenza path-bounded | `analysis/D256/D256_usb_lifecycle_contract_audit.md` | `analysis/D256/D256_usb_lifecycle_contract_audit_bundle.zip` |
-| D257 | Candidate fresh-FDT e gate live-readiness | READY offline, Classe A; lifecycle/provider/replay chiusi, freschezza/provenance seed unico blocker live; nessuna autorizzazione live | `analysis/D257/D257_fresh_fdt_candidate_live_readiness.md` | `analysis/D257/D257_fresh_fdt_candidate_live_readiness_bundle.zip` |
+| D257 | Corrective exact fresh-bootstrap | BLOCKED exact offline: sottosequenza proiettata PASS storico, gate dinamici `0x50`/`0x82`/`0x20` non derivabili; first-`0x36` single-shot fail-closed; nessuna autorizzazione live | `analysis/D257/D257_fresh_fdt_candidate_live_readiness.md` | `analysis/D257/D257_exact_fresh_bootstrap_corrective_bundle.zip` (sostituisce il bundle D257 precedente, preservato) |
 
 I bundle D230–D238 in root attendono la relocation meccanica byte-preserving
 descritta dal manifest D248; ZIP e sidecar devono muoversi insieme. La coppia

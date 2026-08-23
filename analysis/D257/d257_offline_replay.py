@@ -32,10 +32,18 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from analysis.D255 import d255_postprocess_windows_evidence as d255
-from core.fdt_lifecycle import FdtLifecycle, FreshFdtBootstrapMachine
+from analysis.D257 import d257_exact_bootstrap_audit as exact_audit
+from core.fdt_lifecycle import (
+    EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE,
+    FIRST_FDT36_COMMAND_TIMEOUT_MS,
+    ExactFreshFdtBootstrapMachine,
+    FdtLifecycle,
+    FreshFdtBootstrapMachine,
+)
 from core.fdt_seed import CRC_OFFSET, FDT12_OFFSET, NAV_OFFSET, provide_fdt12
 from core.post_d4 import (
     FIRST_IMAGE_RECEIVED,
+    InvalidTransition,
     PLAIN,
     FirstImageMachine,
     _checksum,
@@ -70,9 +78,11 @@ class ScriptedTransport:
     def __init__(self, responses):
         self.responses = list(responses)
         self.requests: list[bytes] = []
+        self.timeouts: list[int | None] = []
 
-    def exchange(self, request: bytes):
+    def exchange(self, request: bytes, *, timeout_ms: int | None = None):
         self.requests.append(request)
+        self.timeouts.append(timeout_ms)
         require(bool(self.responses), "unexpected offline transport exchange")
         return self.responses.pop(0)
 
@@ -260,6 +270,71 @@ def scenario_first_image(repo: Path) -> dict[str, object]:
     }
 
 
+def scenario_exact_target_blocked(
+    repo: Path,
+    context: dict[str, object],
+    audit: dict[str, object],
+) -> dict[str, object]:
+    """Exercise the exact candidate until the first unavailable host gate."""
+    _run, _wire, target_frames, otp, _cache = _load_d255(repo)
+    by_frame = {frame.packet_index + 1: frame for frame in target_frames}
+    rows = audit["timeline"]["rows"]
+
+    def frame_for(event_class: str):
+        row = next(row for row in rows if row["event_class"] == event_class)
+        return by_frame[int(row["frame"])]
+
+    first_request = frame_for("FDT36_STAGE_0_REQUEST")
+    first_ack = frame_for("ACK_0x36_STATUS_01")
+    first_event = frame_for("IRQ_0x0100_TOUCH_0")
+    nav_request = frame_for("INTERSTAGE_NAV_0x50_REQUEST")
+    nav_ack = frame_for("ACK_0x50_STATUS_01")
+    nav_response = frame_for("INTERSTAGE_NAV_0x50_RESPONSE")
+
+    provider = provide_fdt12(context["cache"].path, otp)
+    require(provider.ok, "D255 exact candidate seed provider failed")
+    transport = ScriptedTransport(([first_ack.raw], [nav_ack.raw, nav_response.raw]))
+    lifecycle = FdtLifecycle()
+    lifecycle.observe_af_state(False)
+    candidate = ExactFreshFdtBootstrapMachine(transport, lifecycle)
+    candidate.begin(provider)
+    candidate.manual_sample(first_event.raw[4:])
+    try:
+        candidate.nav_interstage()
+    except InvalidTransition as error:
+        require(str(error) == "nav_semantic_gate_unavailable", "unexpected exact-candidate blocker")
+    else:
+        raise RuntimeError("D255 exact candidate incorrectly bypassed the NAV semantic gate")
+    require(transport.requests == [first_request.raw, nav_request.raw],
+            "exact candidate pre-blocker requests differ from D255")
+    require(candidate.first_0x36_attempt_count == 1, "first 0x36 was not exactly once")
+    require(transport.timeouts == [FIRST_FDT36_COMMAND_TIMEOUT_MS] * 2,
+            "exact candidate did not enforce the bounded exchange timeout")
+    require(lifecycle.retry_count == 0, "exact candidate retried")
+    return {
+        "name": "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY",
+        "status": "BLOCKED_FAIL_CLOSED_AT_FIRST_UNAVAILABLE_DYNAMIC_HOST_GATE",
+        "full_target_out_control_trace": audit["timeline"]["out_control_trace"][1:],
+        "core_exact_trace_contract": [f"0x{value:02x}" for value in EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE],
+        "trace_contract_matches_target": tuple(EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE) == tuple(
+            int(value, 16) for value in audit["timeline"]["out_control_trace"][1:]
+        ),
+        "requests_executed_before_fail_closed": ["0x36", "0x50"],
+        "blocker": "0x50_DYNAMIC_NAV_HOST_SEMANTIC_GATE_UNAVAILABLE; LATER_0x82_AND_0x20_GATES_ALSO_UNRESOLVED",
+        "first_0x36_attempt_count": candidate.first_0x36_attempt_count,
+        "first_0x36_timeout_ms": FIRST_FDT36_COMMAND_TIMEOUT_MS,
+        "first_0x36_ack_required": True,
+        "first_0x36_irq100_touch0_required": True,
+        "first_0x36_validator_transform_required": True,
+        "automatic_retry_count": lifecycle.retry_count,
+        "failed_before_later_stage": True,
+        "terminal_host_cleanup": "STOP_NEW_TRAFFIC+CANCEL_PENDING_RECEIVE_IF_ANY+TERMINAL_HOST_CLEANUP",
+        "special_recovery_command_count": 0,
+        "persistent_write_family_count": lifecycle.persistent_write_family_count,
+        "lifecycle": lifecycle.audit(),
+    }
+
+
 def scenario_invalid_cache(context: dict[str, object], otp: bytes) -> dict[str, object]:
     cache = context["cache"]
     source = cache.path.read_bytes()
@@ -308,7 +383,7 @@ def scenario_invalid_cache(context: dict[str, object], otp: bytes) -> dict[str, 
     }
 
 
-def freshness_audit(repo: Path, context: dict[str, object]) -> dict[str, object]:
+def freshness_audit(repo: Path, context: dict[str, object], audit: dict[str, object]) -> dict[str, object]:
     run = context["run"]
     metadata = json.loads((run / "cache_before_metadata.json").read_text(encoding="utf-8-sig"))
     compatible = [row for row in metadata if row.get("size") == 13_520]
@@ -319,26 +394,18 @@ def freshness_audit(repo: Path, context: dict[str, object]) -> dict[str, object]
             "target cache snapshot census changed")
     require(evidence["seed_correlation"]["CACHE_FDT12_MATCH"] is True,
             "D255 cache/wire pair is no longer correlated")
+    temporal = audit["temporal_provenance"]
     return {
-        "scope": "D230_D256_BOUNDED_EXISTING_LOCAL_CORPUS",
+        "scope": "D230_D257_CORRECTIVE_BOUNDED_EXISTING_LOCAL_CORPUS",
         "target_13520_cache_snapshot_count": 1,
         "target_cache_first_wire_seed_pair_count": 1,
         "target_cache_snapshot_stage": compatible[0].get("stage"),
-        "target_cache_modification_time_utc": compatible[0].get("modification_time_utc"),
         "target_cache_after_snapshot": "NOT_RECOVERABLE",
         "target_oem_log_status": evidence["evidence_sources"]["OEM_LOG_STATUS"],
-        "additional_target_session_pairs": 0,
-        "d254_cross_family_refresh_evidence": "OBSERVED_VALIDATE_REFRESH_SAVE_5110_APP12117_ONLY",
-        "rockytkg_writeback_evidence": "THIRD_PARTY_IMPLEMENTATION_ONLY_NOT_TARGET_BEHAVIOR",
-        "gfusb_bounded_lookup": "NO_NEW_TARGET_WRITEBACK_OR_FRESHNESS_DATAFLOW_BEYOND_D253_D256",
+        **temporal,
         "seed_freshness_generalization": "UNPROVEN",
         "current_corpus_exhausted_for_seed_freshness_generalization": True,
-        "minimum_future_live_seed_precondition": (
-            "EXPLICIT_13520_CACHE_SNAPSHOT_WITH_TARGET_LITTLE_ENDIAN_CRC_VALID_AND_OTP64_"
-            "IDENTITY_MATCH_PLUS_PRIMARY_CURRENT_COLD_ATTACH_PROVENANCE_ESTABLISHING_"
-            "THAT_ITS_FDT12_IS_THE_SEED_FOR_THAT_ATTEMPT"
-        ),
-        "sole_live_blocker": "SEED_FRESHNESS_AND_CURRENT_ATTEMPT_PROVENANCE",
+        "seed_freshness_is_sole_live_blocker": False,
     }
 
 
@@ -347,7 +414,9 @@ def run(repo: Path) -> dict[str, object]:
     _run, _wire, _frames, otp, _cache = _load_d255(repo)
     scenario2 = scenario_first_image(repo)
     scenario3 = scenario_invalid_cache(context, otp)
-    freshness = freshness_audit(repo, context)
+    exact = exact_audit.audit(repo)
+    scenario_exact = scenario_exact_target_blocked(repo, context, exact)
+    freshness = freshness_audit(repo, context, exact)
     scenario4 = {
         "name": "LIFECYCLE_CANCEL_REENTRY",
         "provenance_class": "D256_OBSERVED_HOST_BUS_CONTRACT_PLUS_D257_OFFLINE_MODEL",
@@ -359,10 +428,11 @@ def run(repo: Path) -> dict[str, object]:
         "persistent_command_families_reachable": False,
     }
     return {
-        "schema": "D257_OFFLINE_REPLAY_INTEGRATION_V1",
+        "schema": "D257_OFFLINE_REPLAY_INTEGRATION_V2_CORRECTIVE",
         "execution_mode": "OFFLINE_ONLY",
-        "baseline_head": "00940b8aebf938488e16f754db8cf102da1a3118",
-        "scenarios": [scenario1, scenario2, scenario3, scenario4],
+        "baseline_head": "417a1c543ed1a1d9217c462b6c0c33023d89b857",
+        "scenarios": [scenario1, scenario_exact, scenario2, scenario3, scenario4],
+        "exact_bootstrap_audit": exact,
         "freshness_audit": freshness,
         "provenance_separation": {
             "scenario_1": scenario1["provenance_class"],
@@ -370,11 +440,16 @@ def run(repo: Path) -> dict[str, object]:
             "same_single_run_claimed": False,
         },
         "closure": {
-            "FRESH_FDT_OFFLINE_REPLAY": "PASS",
+            "PROJECTED_FDT_SUBSEQUENCE_REPLAY": "PASS_HISTORICAL",
+            "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY": "BLOCKED_DYNAMIC_HOST_GATES_NOT_DERIVABLE_FROM_D255_RAW",
+            "FDT_OFFLINE_CANDIDATE_CLOSED": False,
             "IRQ2_0x22_PATH": "PASS_EXACTLY_ONCE",
             "FIRST_IMAGE_OFFLINE_CLOSURE": "PASS_SYNTHETIC_CODEC_FIXTURE",
             "PERSISTENT_COMMAND_FAMILIES_REACHABLE": False,
             "SEED_PROVIDER_RESULT": "PASS_D255_AND_FAIL_CLOSED_INVALID_MATRIX",
+            "SEED_FRESHNESS_IS_SOLE_LIVE_BLOCKER": False,
+            "READY_FOR_FDT_LIVE_REVIEW": False,
+            "READY_FOR_FDT_LIVE": False,
         },
         "safety": {
             "REAL_USB_OPEN_COUNT": 0,

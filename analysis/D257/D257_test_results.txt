@@ -1,48 +1,54 @@
-D257 TEST RESULTS
-=================
+D257 EXACT FRESH-BOOTSTRAP CORRECTIVE — OFFLINE TEST RESULTS
+===========================================================
 
 Execution mode: OFFLINE_ONLY
-Baseline HEAD: 00940b8aebf938488e16f754db8cf102da1a3118
+Baseline HEAD: 417a1c543ed1a1d9217c462b6c0c33023d89b857
 
 1. Full repository tests
    Command: python3 -m unittest discover -s tests -v
-   Result: PASS — 184 tests
+   Result: PASS — 187 tests
 
 2. D255 regression
-   Command: python3 analysis/D255/test_d255_postprocess_windows_evidence.py
+   Command: python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
    Result: PASS — 56 tests
 
 3. D256 regression
-   Command: (cwd analysis/D256) python3 test_d256_usb_lifecycle_contract_audit.py
+   Command: (cwd analysis/D256) python3 -m unittest -q test_d256_usb_lifecycle_contract_audit.py
    Result: PASS — 13 tests
 
 4. D253 reproducible audit
    Command: python3 analysis/D253/d253_offline_audit.py --repo .
    Result: PASS
-   Key retained facts: three 0x36 stages, chained IRQ100 transform,
+   Retained facts: three 0x36 stages, chained IRQ100 transform,
    post-IRQ2 exact 0x22, no post-arm A2/0x70 restore.
 
-5. D257 real offline replay
-   Command: python3 analysis/D257/d257_offline_replay.py --repo-root .
-   Result: PASS
-   - D255 cache layout/CRC/OTP/FDT12 provider: PASS
-   - D255 three manual requests and cancel/re-entry arms: byte-exact PASS
-   - invalid CRC/OTP/size/absent-seed matrix: FAIL_CLOSED PASS
-   - IRQ2 -> 0x22 exactly once -> FIRST_IMAGE_RECEIVED: PASS
-   - provenance separation and raw seed/OTP redaction: PASS
+5. D257 focused tests
+   Command: python3 -m unittest -q tests.test_d257_fdt_candidate
+   Result: PASS — 15 tests
+   Covered: raw hash/census/correlation, exact-order candidate, projected-vs-
+   exact separation, dynamic-gate blocker, temporal deltas, invalid-cache
+   matrix, first-0x36 single-shot failure containment, bounded timeout,
+   zero retry, special-recovery exclusion and persistent-family exclusion.
 
-6. D257 executable closure from external cwd
-   Command: absolute d257_offline_replay.py path with explicit absolute
-            --repo-root while cwd is /tmp
+6. Corrective audit and replay generation
+   Commands:
+     python3 analysis/D257/d257_exact_bootstrap_audit.py --repo-root .
+     python3 analysis/D257/d257_offline_replay.py --repo-root .
+   Result: PASS
+   PROJECTED_FDT_SUBSEQUENCE_REPLAY=PASS_HISTORICAL
+   EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY=BLOCKED_DYNAMIC_HOST_GATES_NOT_DERIVABLE_FROM_D255_RAW
+
+7. Executable closure from external cwd
+   Commands: both D257 scripts invoked by absolute path from /tmp with an
+             explicit absolute --repo-root
    Result: PASS
 
-7. Python syntax/import closure
-   Command: python3 -m py_compile core/fdt_seed.py core/fdt_lifecycle.py
-            core/post_d4.py tests/test_d257_fdt_candidate.py
-            analysis/D257/d257_offline_replay.py
+8. Python syntax/import closure and JSON validation
+   Command: python3 -m py_compile on D257/core touched Python files;
+            python3 -m json.tool on decision and replay results
    Result: PASS
 
-8. Diff hygiene
+9. Diff hygiene
    Command: git diff --check
    Result: PASS
 

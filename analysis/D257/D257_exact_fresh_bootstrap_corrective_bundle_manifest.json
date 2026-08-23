@@ -1,0 +1,55 @@
+{
+  "schema": "D257_EXACT_FRESH_BOOTSTRAP_CORRECTIVE_BUNDLE_MANIFEST_V1",
+  "step": "D257",
+  "bundle": "analysis/D257/D257_exact_fresh_bootstrap_corrective_bundle.zip",
+  "baseline_head": "417a1c543ed1a1d9217c462b6c0c33023d89b857",
+  "execution_mode": "OFFLINE_ONLY",
+  "license": "GPL-2.0-or-later for core, tools and tests",
+  "prior_bundle_status": "SUPERSEDED_BY_D257_EXACT_BOOTSTRAP_CORRECTIVE",
+  "included_files": [
+    {"path": "core/fdt_lifecycle.py", "sha256": "0ffe1c884ecb9d3cebcf1f1c969fcdb42ed3aaf7d712d5c9a7a63d07678fd9da"},
+    {"path": "core/post_d4.py", "sha256": "f4f52031319b21f4ae4b5841e91f91966d9b11df8a626fcef339b080fee1daf2"},
+    {"path": "tests/test_d257_fdt_candidate.py", "sha256": "9f3c75e410803c09235c0ab22156e20bf520c7074380391d7287169e5bf49b2b"},
+    {"path": "analysis/D257/d257_exact_bootstrap_audit.py", "sha256": "7e3df5b5bed001840f0680d5c21fcf2b6bd0b902c8983e93dc52aa1405488d87"},
+    {"path": "analysis/D257/d257_offline_replay.py", "sha256": "18382777030e05240876ae8d8a7b118f2fcad4fc50a18e3e175034a0e1c91545"},
+    {"path": "analysis/D257/D257_exact_fresh_bootstrap_audit.json", "sha256": "7a3c02983fb0817f2f40bbdc24dcc6b5238c3558c6d468573d7924d8e9d8ca2b"},
+    {"path": "analysis/D257/D257_exact_fresh_bootstrap_timeline.csv", "sha256": "da3e04e70c28722afea32de519e6546b1119d6c6d33c00b1c8febbe9b7a3fab9"},
+    {"path": "analysis/D257/D257_exact_fresh_bootstrap_timeline.md", "sha256": "f55204fa192588f638150e8bf695d8bf191a29efffbeac79d5fd1590b6293400"},
+    {"path": "analysis/D257/D257_replay_integration.json", "sha256": "9bf10222c969c307b0d5346bf183d137dd3a9351ce930e2ba918d611b1ae47e3"},
+    {"path": "analysis/D257/D257_live_readiness_decision.json", "sha256": "0ca27afe7a141384f8a2f9b0b23fa45d902086a188d553e1813a6c43c2aae0c5"},
+    {"path": "analysis/D257/D257_fresh_fdt_candidate_live_readiness.md", "sha256": "b3678f026e95e27651572631366599d3d3440166561ef61372d7a2304159dcdb"},
+    {"path": "analysis/D257/D257_test_results.txt", "sha256": "e8c29b745bb0424479fe9c5abf913e87995e4927459d7698ec714fb3f2f85892"}
+  ],
+  "canonical_references_not_duplicated": [
+    {"path": "Goodix 27c6 5125 manuale tecnico.md", "sha256": "d06c543eef94ba387a81337b947e23489611b3687d962c946a4fdd6c9813a325"},
+    {"path": "core/fdt_seed.py", "sha256": "6b6ba63bab6332186d215f52df3eed8b8e2c91f6de4c36951e4a819f51087c14"},
+    {"path": "analysis/D256/D256_decision.json", "sha256": "4634de5efaaf0e849179b1b8c53b46c23c5369cc0d981154fce4735de868d498"},
+    {"path": "analysis/D253/D253_decision.json", "sha256": "6988fb75d24125fec4540096330f1a7bf9aade5f59a96a3bdcd662e1a5364d4b"}
+  ],
+  "private_evidence_referenced_by_hash_only": [
+    {"role": "D255_USBPCAP", "sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c"},
+    {"role": "D255_CACHE_BEFORE", "sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2"}
+  ],
+  "excluded": [
+    "raw pcapng",
+    "raw cache",
+    "raw OTP",
+    "gfusb.dll",
+    "firmware",
+    "PSK or other secrets",
+    "biometric material",
+    "unchanged historical artifacts"
+  ],
+  "closure": {
+    "PROJECTED_FDT_SUBSEQUENCE_REPLAY": "PASS_HISTORICAL",
+    "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY": "BLOCKED_DYNAMIC_HOST_GATES_NOT_DERIVABLE_FROM_D255_RAW",
+    "FDT_OFFLINE_CANDIDATE_CLOSED": false,
+    "READY_FOR_FDT_LIVE_REVIEW": false,
+    "READY_FOR_FDT_LIVE": false,
+    "REAL_USB_OPEN_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0
+  }
+}

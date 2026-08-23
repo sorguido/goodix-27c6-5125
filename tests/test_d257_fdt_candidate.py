@@ -6,6 +6,9 @@ import tempfile
 import unittest
 
 from core.fdt_lifecycle import (
+    EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE,
+    FIRST_FDT36_COMMAND_TIMEOUT_MS,
+    ExactFreshFdtBootstrapMachine,
     FdtLifecycle,
     FdtLifecycleState,
     FreshFdtBootstrapMachine,
@@ -22,6 +25,7 @@ from core.fdt_seed import (
 from core.post_d4 import (
     FIRST_IMAGE_RECEIVED,
     PLAIN,
+    TLS,
     FirstImageMachine,
     InvalidTransition,
     UnexpectedAck,
@@ -42,11 +46,27 @@ def payload(control: int, data: bytes) -> bytes:
 
 
 def outer(body: bytes) -> bytes:
-    return bytes((PLAIN, len(body) & 0xFF, len(body) >> 8, (PLAIN + len(body)) & 0xFF)) + body
+    lo, hi = len(body) & 0xFF, len(body) >> 8
+    return bytes((PLAIN, lo, hi, (PLAIN + lo + hi) & 0xFF)) + body
 
 
 def ack(echo: int) -> bytes:
     return outer(payload(0xB0, bytes((echo, 1))))
+
+
+def nav_response() -> bytes:
+    data = b"\x50\x01" + bytes(2407)
+    body = bytes((0x50, 0x6A, 0x09)) + data + b"\x88"
+    return outer(body)
+
+
+def fdt_delta_response() -> bytes:
+    return outer(payload(0x82, b"\x80\x1d"))
+
+
+def baseline_b0_shape() -> bytes:
+    body = bytes(7722)
+    return bytes((TLS, 0x2A, 0x1E, (TLS + 0x2A + 0x1E) & 0xFF)) + body
 
 
 def af_response(*, pov: bool = False) -> bytes:
@@ -83,9 +103,11 @@ class ScriptedTransport:
     def __init__(self, responses):
         self.responses = list(responses)
         self.requests = []
+        self.timeouts = []
 
-    def exchange(self, request):
+    def exchange(self, request, *, timeout_ms=None):
         self.requests.append(request)
+        self.timeouts.append(timeout_ms)
         if not self.responses:
             raise AssertionError("unexpected transport exchange")
         return self.responses.pop(0)
@@ -257,6 +279,69 @@ class D257LifecycleTests(unittest.TestCase):
         self.assertEqual(controls.count(0x22), 1)
         self.assertEqual(lifecycle.device_command_trace, (0x32, 0x22))
 
+    def test_exact_bootstrap_happy_path_requires_all_observed_interstages(self):
+        transport = ScriptedTransport((
+            [ack(0x36)],
+            [ack(0x50), nav_response()],
+            [ack(0x36)],
+            [ack(0x82), fdt_delta_response()],
+            [ack(0x20), baseline_b0_shape()],
+            [ack(0x36)],
+            [ack(0x32)],
+        ))
+        lifecycle = FdtLifecycle()
+        lifecycle.observe_af_state(False)
+        candidate = ExactFreshFdtBootstrapMachine(
+            transport,
+            lifecycle,
+            nav_semantic_gate=lambda data: len(data) == 2409,
+            delta_semantic_gate=lambda data: data == b"\x80\x1d",
+            decrypt_baseline_b0=lambda _frame: image_payload(),
+            baseline_semantic_gate=lambda pixels: pixels == synthetic_raster(),
+        )
+        candidate.begin(self.make_seed_result())
+        raw_sets = (
+            (0x015E, 0x017E, 0x0146, 0x016E, 0x014E, 0x016C),
+            (0x015C, 0x017C, 0x0148, 0x0170, 0x0150, 0x016E),
+            (0x015A, 0x017A, 0x014A, 0x0172, 0x0152, 0x0170),
+        )
+        candidate.manual_sample(irq100(raw_sets[0]))
+        candidate.nav_interstage()
+        candidate.manual_sample(irq100(raw_sets[1]))
+        candidate.delta_and_baseline_interstage()
+        candidate.manual_sample(irq100(raw_sets[2]))
+        candidate.arm(0x1234)
+
+        self.assertEqual(lifecycle.device_command_trace, EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE)
+        self.assertEqual(candidate.first_0x36_attempt_count, 1)
+        self.assertEqual(candidate.first_0x36_timeout_ms, FIRST_FDT36_COMMAND_TIMEOUT_MS)
+        self.assertEqual(transport.timeouts, [FIRST_FDT36_COMMAND_TIMEOUT_MS] * 7)
+        self.assertTrue(candidate.nav_gate_passed)
+        self.assertTrue(candidate.delta_gate_passed)
+        self.assertTrue(candidate.baseline_gate_passed)
+        self.assertEqual(lifecycle.retry_count, 0)
+        self.assertEqual(lifecycle.persistent_write_family_count, 0)
+
+    def test_exact_first_0x36_failure_is_single_shot_and_fail_closed(self):
+        transport = ScriptedTransport(([ack(0x32)],))
+        lifecycle = FdtLifecycle()
+        lifecycle.observe_af_state(False)
+        candidate = ExactFreshFdtBootstrapMachine(transport, lifecycle)
+        candidate.begin(self.make_seed_result())
+        event = irq100((0x015E, 0x017E, 0x0146, 0x016E, 0x014E, 0x016C))
+
+        with self.assertRaises(UnexpectedAck):
+            candidate.manual_sample(event)
+        self.assertEqual(candidate.first_0x36_attempt_count, 1)
+        self.assertEqual(lifecycle.retry_count, 0)
+        self.assertEqual(lifecycle.state, FdtLifecycleState.FAILED_CLOSED)
+        self.assertEqual(len(transport.requests), 1)
+        self.assertEqual(transport.timeouts, [FIRST_FDT36_COMMAND_TIMEOUT_MS])
+        with self.assertRaises(InvalidTransition):
+            candidate.manual_sample(event)
+        self.assertEqual(candidate.first_0x36_attempt_count, 1)
+        self.assertEqual(len(transport.requests), 1)
+
     def test_lifecycle_allowlist_excludes_recovery_and_persistence(self):
         self.assertFalse(SAFE_DEVICE_COMMANDS & SPECIAL_RECOVERY_COMMANDS)
         self.assertFalse(SAFE_DEVICE_COMMANDS & PERSISTENT_COMMAND_FAMILIES)
@@ -265,7 +350,13 @@ class D257LifecycleTests(unittest.TestCase):
 class D257IntegrationReplayTests(unittest.TestCase):
     def test_real_private_replay_is_redacted_and_provenance_separated(self):
         result = D257_REPLAY.run(REPO)
-        self.assertEqual(result["closure"]["FRESH_FDT_OFFLINE_REPLAY"], "PASS")
+        self.assertEqual(result["closure"]["PROJECTED_FDT_SUBSEQUENCE_REPLAY"], "PASS_HISTORICAL")
+        self.assertEqual(
+            result["closure"]["EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY"],
+            "BLOCKED_DYNAMIC_HOST_GATES_NOT_DERIVABLE_FROM_D255_RAW",
+        )
+        self.assertFalse(result["closure"]["FDT_OFFLINE_CANDIDATE_CLOSED"])
+        self.assertFalse(result["closure"]["SEED_FRESHNESS_IS_SOLE_LIVE_BLOCKER"])
         self.assertEqual(result["closure"]["IRQ2_0x22_PATH"], "PASS_EXACTLY_ONCE")
         self.assertTrue(result["freshness_audit"][
             "current_corpus_exhausted_for_seed_freshness_generalization"])
@@ -279,6 +370,26 @@ class D257IntegrationReplayTests(unittest.TestCase):
         self.assertNotIn(otp.hex(), rendered)
         self.assertEqual(result["safety"]["REAL_USB_OPEN_COUNT"], 0)
         self.assertEqual(result["safety"]["REAL_HARDWARE_ACTION_COUNT"], 0)
+
+    def test_exact_raw_timeline_and_temporal_provenance_are_programmatic(self):
+        result = D257_REPLAY.run(REPO)
+        exact = result["exact_bootstrap_audit"]
+        self.assertEqual(
+            exact["timeline"]["out_control_trace"][1:],
+            ["0x36", "0x50", "0x36", "0x82", "0x20", "0x36", "0x32"],
+        )
+        temporal = exact["temporal_provenance"]
+        self.assertFalse(temporal["SAME_ATTACH_SEED_GENERATION_REQUIRED"])
+        self.assertTrue(temporal["PERSISTED_PRE_ATTACH_CACHE_REUSE_PROVEN"])
+        self.assertFalse(temporal["GENERAL_CACHE_TTL_PROVEN"])
+        self.assertAlmostEqual(temporal["CACHE_MTIME_TO_ATTACH_BEGIN_SECONDS"], 1626.1975757, places=6)
+        self.assertAlmostEqual(temporal["CACHE_MTIME_TO_FIRST_0x36_SECONDS"], 1635.6222, places=6)
+
+        blocked = next(row for row in result["scenarios"]
+                       if row["name"] == "EXACT_TARGET_FRESH_BOOTSTRAP_REPLAY")
+        self.assertEqual(blocked["first_0x36_attempt_count"], 1)
+        self.assertEqual(blocked["requests_executed_before_fail_closed"], ["0x36", "0x50"])
+        self.assertEqual(blocked["automatic_retry_count"], 0)
 
 
 if __name__ == "__main__":
