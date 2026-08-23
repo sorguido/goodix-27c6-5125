@@ -100,6 +100,22 @@ baseline live-critical immutabile, promuovendo la readiness a review operativa
 (`READY_FOR_FDT_LIVE_OPERATIONAL_REVIEW=true`, `READY_FOR_FDT_LIVE_REVIEW=true`),
 ma `READY_FOR_FDT_LIVE=false`: approvazione baseline ≠ autorizzazione hardware.
 
+D262 esegue la final execution-readiness review offline del bounded fresh-FDT arm
+sulla baseline approvata `e9073a171697bd68dd2debabb851f23d007bf718`, senza modificare
+nessun file live-critical (`D262_LIVE_CRITICAL_MODIFICATION_COUNT=0`). Il kit operatore
+D261 è riusato in `--dry-run` da cwd realistico (PASS, zero USB/secret/marker/command/
+fprintd reali); il verifier conferma che tutti i 17 blob del live-critical set sono
+byte-identici alla baseline. La full suite offline (238 test) PASSa; il rehearsal
+conferma che il runtime giunge solo a `STOP_AFTER_FDT_ARM_ACK` con traccia FDT
+`0x36,0x50,0x36,0x82,0x20,0x36,0x32`, zero retry, zero famiglie persistenti, zero
+A2/`0x70` di recovery, `0x22`/post-finger/enrollment/matching irraggiungibili. Rischio
+live invariato: l'accettazione della zero-tail per `0x32` è provata
+(`PRIMARY_TARGET_PROVEN_AND_ACK_ACCEPTED`), mentre per `0x36/0x50/0x82/0x20`
+resta `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE` /
+`UNPROVEN_LIVE_HYPOTHESIS`. Lo stato è
+`READY_FOR_D262_OPERATOR_EXECUTION_REVIEW=true`, `READY_FOR_D262_OPERATOR_EXECUTION=false`,
+`READY_FOR_FDT_LIVE=false`: nessuna esecuzione hardware né autorizzazione implicita.
+
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
 request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
@@ -3502,6 +3518,24 @@ D261_FPRINTD_MUTATION_COUNT 0
 D261_REAL_SINGLE_USE_MARKER_CREATE_COUNT 0
 D261_REAL_HARDWARE_ACTION_COUNT 0
 D261_LIVE_EXECUTION NOT_PERFORMED
+D262_OUTCOME READY
+D262_ADVANCEMENT LIVE_EXECUTION_READINESS_REVIEW
+D262_EXECUTION_TARGET STOP_AFTER_FDT_ARM_ACK
+D262_LIVE_CRITICAL_MODIFICATION_COUNT 0
+D262_LIVE_CRITICAL_WORKTREE_MATCH PASS
+D262_D261_OPERATOR_KIT_REUSED true
+D262_DRY_RUN PASS
+D262_DRY_RUN_REAL_USB_OPEN_COUNT 0
+D262_DRY_RUN_REAL_SECRET_READ_COUNT 0
+D262_DRY_RUN_REAL_COMMAND_SEND_COUNT 0
+D262_DRY_RUN_REAL_MARKER_CREATE_COUNT 0
+D262_DRY_RUN_FPRINTD_MUTATION_COUNT 0
+D262_FULL_TEST_SUITE 238_PASS
+D262_READY_FOR_D262_OPERATOR_EXECUTION_REVIEW true
+D262_READY_FOR_D262_OPERATOR_EXECUTION false
+D262_READY_FOR_FDT_LIVE_REVIEW true
+D262_READY_FOR_FDT_LIVE false
+D262_LIVE_EXECUTION NOT_PERFORMED
 ```
 
 Il corpus sa dove si trovano i receiver ma non contiene i loro corpi. La safety
@@ -3677,6 +3711,89 @@ operativa/live senza autorizzare hardware (READY_FOR_FDT_LIVE=false). Il
 precedente bundle D261 resta preservato ma è
 `SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE`.
 
+## D262: fresh-FDT arm execution-readiness review offline
+
+D262 esegue una **final execution-readiness review offline** del bounded fresh-FDT arm
+usando il candidate D261 già approvato, senza modificare alcun file live-critical e
+senza hardware. La baseline live-critical immutabile rimane
+`e9073a171697bd68dd2debabb851f23d007bf718` (sha completo approvato da Utente e AI-PM).
+
+Il live path futuro validato è:
+
+```text
+A8
+→ E4
+→ exact cold-start pre-D1
+→ D1
+→ TLS 1.2 PSK handshake
+→ D4 plaintext A0
+→ AF / AE
+→ fresh FDT:
+   0x36 stage0 → ACK → IRQ 0x0100 → 0x50 → ACK + response
+   → 0x36 stage1 → ACK → IRQ 0x0100 → 0x82 → ACK + response
+   → 0x20 → ACK → B0 baseline on SAME retained TLS session
+   → authenticate/decrypt/consume B0
+   → 0x36 stage2 → ACK → IRQ 0x0100 → 0x32 → ACK
+→ STOP_AFTER_FDT_ARM_ACK
+```
+
+Il candidate riutilizza il kit operatore D261
+(`operator_kit/d261-live-fdt-arm-once.sh` + `tools/d261_live_fdt_arm_once.py`) con il
+ramo `--dry-run` e con cwd realistico (repo root). `D262_LIVE_CRITICAL_MODIFICATION_COUNT=0`:
+nessun file del live-critical set D261 è stato toccato. Il verifier D261 conferma che
+TUTTI i 17 blob del set sono byte-identici ai blob del commit di baseline. Nessun nuovo
+runtime/launcher D262 è stato creato.
+
+Verifiche eseguite in D262 (tutte offline, zero hardware):
+
+```text
+D261_APPROVED_LIVE_BASELINE_SHA = e9073a171697bd68dd2debabb851f23d007bf718
+D261_APPROVED_BASELINE_RESOLVES = true
+D261_LIVE_CRITICAL_WORKTREE_MATCH = PASS
+D261_LIVE_CRITICAL_MISMATCH_COUNT = 0
+D262_LIVE_CRITICAL_MODIFICATION_COUNT = 0
+D262_D261_OPERATOR_KIT_REUSED = true
+D262_DRY_RUN = PASS
+D262_DRY_RUN_REAL_USB_OPEN_COUNT = 0
+D262_DRY_RUN_REAL_SECRET_READ_COUNT = 0
+D262_DRY_RUN_REAL_COMMAND_SEND_COUNT = 0
+D262_DRY_RUN_REAL_MARKER_CREATE_COUNT = 0
+D262_DRY_RUN_FPRINTD_MUTATION_COUNT = 0
+D262_EXECUTION_TARGET = STOP_AFTER_FDT_ARM_ACK
+D262_EXACT_FDT_COMMAND_TRACE = 0x36,0x50,0x36,0x82,0x20,0x36,0x32
+D262_RETRY_COUNT = 0
+D262_AUTOMATIC_RETRY_COUNT = 0
+D262_AUTOMATIC_RECOVERY_COMMAND_COUNT = 0
+D262_PERSISTENT_WRITE_FAMILY_COUNT = 0
+COMMAND_0X22_REACHABLE = false
+POST_FINGER_IMAGE_REACHABLE = false
+ENROLLMENT_REACHABLE = false
+MATCHING_REACHABLE = false
+FINGER_INTERACTION_REQUIRED = false
+FINGER_INTERACTION_ALLOWED = false
+IRQ_FINGER_DOWN_REQUIRED = false
+A2_0X70_RECOVERY_AFTER_FDT_FAILURE = forbidden
+PHYSICAL_USB_OUT_LENGTH = 64
+FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND = 0x36/0x50/0x82/0x20
+PRIMARY_FUTURE_LIVE_RISK = FDT_A0_ZERO_TAIL_DEVICE_ACCEPTANCE_UNPROVEN_PER_COMMAND
+```
+
+Il rehearsal end-to-end offline (238 test suite PASS) confermata che il runtime
+giunge solo a `STOP_AFTER_FDT_ARM_ACK` dopo il terzo `0x36`/IRQ `0x0100` e l'ACK finale
+`0x32`, con una sola sessione TLS, un solo server, un solo handshake, zero retry,
+zero famiglie persistenti, zero A2/`0x70` di recovery, secret zeroizzato e fprintd
+ripristinato. Il dry-run è cwd-independent, non legge il secret e non apre USB;
+l'import safety dimostra zero side-effect a import-time in un subprocess non
+privilegiato (16 moduli Python, closure 16/16). Il live-critical set è verificato
+blob-per-blob contro la baseline approvata.
+
+La decisione corrente resta invariata: `READY_FOR_D262_OPERATOR_EXECUTION_REVIEW=true`,
+`READY_FOR_D262_OPERATOR_EXECUTION=false`, `READY_FOR_FDT_LIVE=false`. D262 non ha
+aperto hardware, non ha letto secret reale, non ha aperto USB reale, non ha creato
+marker reale e non ha tolto fprintd. La prossima azione è esclusivamente la review
+AI-PM del bundle D262 e la decisione/autorizzazione live esplicita dell'Utente, con
+esecuzione terminale da eseguire manualmente dall'operatore su base single-shot.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
@@ -3690,5 +3807,5 @@ precedente bundle D261 resta preservato ma è
 
 L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
-D230–D261 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
+D230–D262 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.
