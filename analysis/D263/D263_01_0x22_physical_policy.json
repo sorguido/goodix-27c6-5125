@@ -1,0 +1,35 @@
+{
+  "schema": "D263_01_0x22_PHYSICAL_POLICY_V1",
+  "command": "0x22",
+  "command_meaning": "SetMode Image, cmd0=2 cmd1=1 more=0 (post finger-down variant)",
+  "primary_evidence": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+  "primary_capture_sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b",
+  "logical_a0_length": 10,
+  "physical_out_length": 64,
+  "body": "01 00",
+  "bytes_outside_declared_length": 54,
+  "nonzero_outside_declared_length_count": 6,
+  "nonzero_outside_declared_length_offsets": [
+    40,
+    41,
+    42,
+    43,
+    44,
+    45
+  ],
+  "nonzero_outside_declared_length_values_hex": [
+    "0xcb",
+    "0xf2",
+    "0xe2",
+    "0xbe",
+    "0xfb",
+    "0x7f"
+  ],
+  "candidate_phase2_model": "logical exact A0 -> physical fixed64 -> deterministic zero-fill outside declared length",
+  "phase2_model_confirmed": true,
+  "residue_class": "staging/transport residue identical to 0x36/0x20 at offsets 40-45, not payload",
+  "taxonomy": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
+  "taxonomy_rationale": "The 0x22 post-arm order, ACK/echo/status and physical fixed-64 policy are directly observed in the primary APP12509 capture (target-specific). The D262 live proof covers only the FDT arm 0x36/0x50/0x36/0x82/0x20/0x36/0x32; it does NOT reach the post-arm finger-down/0x22/image subtree. Therefore 0x22 is PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY, not live-proven/accepted.",
+  "live_proof_status": "NOT_LIVE_PROVEN",
+  "rockytkg_corroboration": "Issue #63 capture (hash 5b2e9649...b63d0) shows 21/21 IRQ2 followed by 0x22[01 00]; corroborative only, not APP12509 primary authority."
+}

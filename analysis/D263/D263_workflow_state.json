@@ -1,0 +1,78 @@
+{
+  "schema": "D263_WORKFLOW_STATE_V1",
+  "milestone": "D263",
+  "substep": "01",
+  "reasoning": "HIGH",
+  "generated_utc": "2026-08-24T06:46:00Z",
+  "repo_root": "/workspace/2c6bcb5e-92be-491d-ac15-4d05a688d17e/sessions/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
+  "git": {
+    "branch": "session/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
+    "head": "d1cea0ed5109274d5249ff8b8492d7d131ec6a54",
+    "status_short": "",
+    "remote_head_referenced_by_prompt_matches_head": true
+  },
+  "completed_substeps": ["01"],
+  "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
+  "source_identities": {
+    "primary_capture": {
+      "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+      "sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b",
+      "hash_gate": "PASS",
+      "firmware_target": "GF_ST411SEC_APP_12509"
+    },
+    "d255_capture": {
+      "role": "zero-finger, NOT containing post-arm subtree",
+      "post_irq2_0x22_count": 0,
+      "used_as_primary_for_this_trace": false
+    },
+    "rockytkg_issue63": {
+      "role": "CORROBORATION_ONLY",
+      "sha256": "5b2e9649b8acdbf93bbb19275feb32203dacc50d727ef2222d58162fbd1b63d0",
+      "post_irq2_0x22_events": 21,
+      "primary_authority": false
+    }
+  },
+  "observed_order": [
+    "0x32 arm OUT@220 / ACK@223 echo 0x32 status 0x01",
+    "IRQ finger-down IN@225 value 0x0002 wrapper 3f00d500ee00c800ba00c500d200",
+    "0x22 OUT@227 body 01 00 logical10 physical64",
+    "0x22 ACK IN@229 echo 0x22 status 0x01",
+    "first image IN@231 outer 0xb0 TLS record 170303 size 7726",
+    "subtree: 0x34@233 -> IRQ0x0200@237 -> 0x20[01 00]@238 -> 2nd image@243 -> final 0x32@251 -> ACK@253"
+  ],
+  "causal_requirement": "Observed order only; IRQ2->0x22 necessity NOT proven by this trace.",
+  "command_0x22_derivations": {
+    "body": "01 00",
+    "logical_a0_length": 10,
+    "physical_out_length": 64,
+    "bytes_outside_declared_length": 54,
+    "nonzero_offsets_absolute": [40, 41, 42, 43, 44, 45],
+    "nonzero_values_hex": ["0xcb", "0xf2", "0xe2", "0xbe", "0xfb", "0x7f"],
+    "ack_echo": "0x22",
+    "ack_status": "0x01",
+    "first_image_outer": "0xb0",
+    "first_image_transport": "TLS",
+    "first_image_size": 7726,
+    "out_0x22_count_in_primary_corpus": 1
+  },
+  "phase2_model": {
+    "statement": "logical exact A0 -> physical fixed64 -> deterministic zero-fill outside declared length",
+    "confirmed_on_primary": true
+  },
+  "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
+  "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
+  "residual_blockers": [
+    "Causality IRQ2=>0x22 necessity not proven by this trace alone",
+    "0x22 not live-proven (D262 STOP_AFTER_FDT_ARM_ACK)",
+    "device-side restore/cancel and arm lifetime remain open (D252/D253/D255 scope)"
+  ],
+  "manual_updated": true,
+  "next_substep_expected": "D263/02 (per prompt successivo; nessun ZIP in 01)",
+  "safety": {
+    "usb_open_count": 0,
+    "command_count": 0,
+    "persistent_write_family_count": 0,
+    "network_access": 0,
+    "raw_payload_emitted": false
+  }
+}

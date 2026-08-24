@@ -1,0 +1,182 @@
+{
+  "schema": "D263_01_POST_ARM_ORDER_V1",
+  "execution_mode": "OFFLINE_ONLY",
+  "primary_capture": {
+    "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+    "sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b",
+    "hash_gate": "PASS",
+    "firmware_target": "GF_ST411SEC_APP_12509",
+    "packet_indices": "zero_based"
+  },
+  "trace": "final 0x32 -> IRQ 0x0002 -> 0x22 [01 00] -> first image",
+  "observed_order": [
+    {
+      "step": "FDT arm request (final 0x32 before finger-down)",
+      "packet_index_zero_based": 220,
+      "wire_control": "0x32",
+      "body_hex_prefix": "080180ac80bd80a380b180a680b2b73d",
+      "logical_a0_frame_length": 24,
+      "physical_out_length": 64
+    },
+    {
+      "step": "FDT arm ACK (device -> host)",
+      "packet_index_zero_based": 223,
+      "outer_type": "0xa0",
+      "wire_control": "0xb0",
+      "ack_echo": "0x32",
+      "ack_status": "0x01"
+    },
+    {
+      "step": "IRQ finger-down (device -> host)",
+      "packet_index_zero_based": 225,
+      "wire_control": "0x32",
+      "irq_value": "0x0002",
+      "irq_wrapper_hex": "3f00d500ee00c800ba00c500d200",
+      "body_hex_prefix": "02003f00d500ee00"
+    },
+    {
+      "step": "post-IRQ host command 0x22",
+      "packet_index_zero_based": 227,
+      "wire_control": "0x22",
+      "body_hex": "0100",
+      "logical_a0_frame_length": 10,
+      "physical_out_length": 64,
+      "nonzero_outside_declared_length": [
+        {
+          "absolute_physical_offset": 40,
+          "value": "0xcb"
+        },
+        {
+          "absolute_physical_offset": 41,
+          "value": "0xf2"
+        },
+        {
+          "absolute_physical_offset": 42,
+          "value": "0xe2"
+        },
+        {
+          "absolute_physical_offset": 43,
+          "value": "0xbe"
+        },
+        {
+          "absolute_physical_offset": 44,
+          "value": "0xfb"
+        },
+        {
+          "absolute_physical_offset": 45,
+          "value": "0x7f"
+        }
+      ]
+    },
+    {
+      "step": "0x22 ACK (device -> host)",
+      "packet_index_zero_based": 229,
+      "outer_type": "0xa0",
+      "wire_control": "0xb0",
+      "ack_echo": "0x22",
+      "ack_status": "0x01"
+    },
+    {
+      "step": "first image (device -> host)",
+      "packet_index_zero_based": 231,
+      "outer_type": "0xb0",
+      "wire_control": "0xb0",
+      "logical_frame_length": 7726,
+      "physical_in_length": 7726,
+      "transport": "TLS",
+      "tls_record_prefix_hex": "1703031e"
+    }
+  ],
+  "intermediate_frames_after_first_image": [
+    {
+      "dir": "IN",
+      "packet": 231,
+      "ctl": "0xb0",
+      "body": "1703031e25000000"
+    },
+    {
+      "dir": "OUT",
+      "packet": 233,
+      "ctl": "0x34",
+      "body": "0a01808780948081"
+    },
+    {
+      "dir": "IN",
+      "packet": 235,
+      "ctl": "0xb0",
+      "body": "3401"
+    },
+    {
+      "dir": "IN",
+      "packet": 237,
+      "ctl": "0x34",
+      "body": "0002000058017b01"
+    },
+    {
+      "dir": "OUT",
+      "packet": 238,
+      "ctl": "0x20",
+      "body": "0100"
+    },
+    {
+      "dir": "IN",
+      "packet": 241,
+      "ctl": "0xb0",
+      "body": "2001"
+    },
+    {
+      "dir": "IN",
+      "packet": 243,
+      "ctl": "0xb0",
+      "body": "1703031e25000000"
+    },
+    {
+      "dir": "OUT",
+      "packet": 244,
+      "ctl": "0x50",
+      "body": "0100"
+    },
+    {
+      "dir": "IN",
+      "packet": 247,
+      "ctl": "0xb0",
+      "body": "5001"
+    },
+    {
+      "dir": "IN",
+      "packet": 249,
+      "ctl": "unknown",
+      "body": ""
+    },
+    {
+      "dir": "OUT",
+      "packet": 251,
+      "ctl": "0x32",
+      "body": "080180ac80bd80a3"
+    },
+    {
+      "dir": "IN",
+      "packet": 253,
+      "ctl": "0xb0",
+      "body": "3201"
+    }
+  ],
+  "minimum_causal_requirement": "Observed order only. The capture proves the SEQUENCE 0x32(arm,ACK) -> IRQ0x0002 -> 0x22[01 00](ACK) -> first image. It does NOT prove that 0x22 is the unique necessary command, nor that the finger-down IRQ causally requires 0x22; only that in the single captured APP12509 lifecycle this is the exact order emitted by the OEM stack. Causality is not established by this trace alone.",
+  "occurrence_counts": {
+    "out_0x22_in_primary_corpus": 1,
+    "in_0x22_in_primary_corpus": 0,
+    "all_0x22_in_primary_corpus": 1,
+    "out_0x22_packet_indices_zero_based": [
+      227
+    ],
+    "finger_down_irq_count_in_capture": 1
+  },
+  "safety": {
+    "usb_open_count": 0,
+    "command_count": 0,
+    "persistent_write_family_count": 0,
+    "network_access": 0,
+    "raw_payload_emitted": false
+  },
+  "result": "PASS_PRIMARY_EVIDENCE_CLOSED"
+}

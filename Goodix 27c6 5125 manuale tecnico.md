@@ -3966,6 +3966,58 @@ compatibilità Windows restano integrali. Lo stato massimo è `OUTCOME=PASS`,
 `ADVANCEMENT=LIVE_FDT_ARM_BOUNDARY_PROVEN`, `EXECUTABLE_CLOSURE=PASS`; i flag `READY_FOR_*`
 restano false perché D262 è già eseguito e chiuso, non perché D262 sia fallito.
 
+## D263: post-arm order e policy fisica `0x22` (sottostep 01)
+
+D263/01 ricostruisce e chiude, con evidenza primaria target-specific, il tratto
+`final 0x32 → IRQ 0x0002 → 0x22 [01 00] → first image` e ne classifica la
+policy fisica USB di `0x22`. Esecuzione OFFLINE, strictly no-USB/no-sudo/no-secret.
+
+La capture primaria è `analysis/D230/work/GoodixExport/rilevamento.pcapng`
+(`GF_ST411SEC_APP_12509`, SHA-256
+`50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`), hash-gated.
+La capture D255 (`VALID_ZERO_FINGER`) **non** contiene il sottoalbero
+post-arm (`FINGER_DOWN_IRQ_COUNT=0`, `POST_IRQ2_0x22_COUNT=0`); pertanto il
+tratto è derivato da `rilevamento.pcapng`, non da D255. Issue #63 (21/21 IRQ2→
+`0x22`) resta solo corroborazione esterna, non autorità primaria APP12509.
+
+Ordine osservato (indici pacchetto zero-based):
+
+```text
+0x32 arm  OUT@220 / ACK@223 echo 0x32 status 0x01
+IRQ finger-down  IN@225  value 0x0002  wrapper 3f00d500ee00c800ba00c500d200
+0x22  OUT@227  body 01 00  logical A0=10  physical OUT=64
+0x22  ACK@229  echo 0x22 status 0x01
+first image  IN@231  outer 0xB0  TLS(17 03 03)  size 7726
+subtree: 0x34@233 → IRQ 0x0200@237 → 0x20[01 00]@238 → 2a immagine B0/TLS@243
+         → 0x50@244 → … → final 0x32@251 / ACK@253
+```
+
+Derivazioni meccaniche `0x22`: body `01 00`; lunghezza logica A0 = **10**;
+lunghezza fisica OUT = **64**; 54 byte fuori frame; unici 6 non-zero a offset
+fisici **40–45** = `cb f2 e2 be fb 7f` (staging residue, identica a `0x36`/`0x20`,
+non payload). ACK echo `0x22`/status `0x01`, subito dopo l'OUT e prima della
+prima immagine. Prima immagine: outer `0xB0`, **TLS** (`17 03 03`), 7726 byte;
+nessun frame A0 "immagine" la precede. Occorrenze `0x22` nel primary corpus:
+**1** OUT (`rilevamento.pcapng`@227), 0 IN; D255 = 0; Issue#63 = 21 (esterno).
+
+`MINIMUM_CAUSAL_REQUIREMENT`: la capture prova l'**ordine**
+`0x32(arm,ACK) → IRQ0x0002 → 0x22[01 00](ACK) → first image`; **non** prova
+che `0x22` sia l'unico comando necessario né che l'IRQ finger-down lo richieda
+causalmente (osservato ≠ causale).
+
+**Taxonomy `0x22` = `PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY`.** Il post-arm order,
+ACK/echo/status e la policy fisica fixed-64 sono direttamente osservati nella
+capture primaria APP12509. Il live proof D262 copre **solo** il bounded FDT arm
+(`0x36,0x50,0x36,0x82,0x20,0x36,0x32`, `STOP_AFTER_FDT_ARM_ACK`) e **non**
+raggiunge il sottoalbero finger-down/`0x22`/immagine; dunque `0x22` NON è
+live-proven/accepted. Il modello Phase 2
+`logical exact A0 → physical fixed64 → deterministic zero-fill outside declared length`
+è **confermato** sul primary (`rilevamento.pcapng`, già hash-gated).
+
+Artefatti `analysis/D263/`: `d263_01_0x22_evidence_audit.py`,
+`D263_01_post_arm_order.json`, `D263_01_0x22_physical_policy.json`,
+`D263_01_report.md`, `D263_workflow_state.json`. Nessun ZIP in 01.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
