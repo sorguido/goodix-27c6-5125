@@ -1,39 +1,36 @@
-# D264/02 — First-image OFFLINE operationalization
+# D264/02 — First-image OFFLINE operationalization (AI-PM corrective)
 
-## Baseline, scope e patch plan
+## Provenance canonica e scope
 
-Starting HEAD `fbb39daf80e1ec611b496f300ad480ba60e49b02` discende dalla baseline richiesta `a6d0fbea12a841c7071681b50ee7a82c04a0a33b`; branch osservato `work`, non cambiato. Il commit candidate del live-critical set è `c0463b024f71ed3bb90d228b27f0866660988401`. Non è una baseline live approvata.
+La baseline iniziale locale discende da `a6d0fbea12a841c7071681b50ee7a82c04a0a33b`. Per la tree eseguibile D264/02 sottoposta a review, il riferimento canonico remoto è `REMOTE_REVIEW_HEAD=a4b2eec79071b3b2682962be63c583bad0fae03b`, head osservato dall'AI-PM sulla PR #7 prima del corrective. È un review anchor, non una baseline approvata. Gli SHA `c0463b024f71ed3bb90d228b27f0866660988401` e `7dfa7f85b8630811c82383864217f8cadce2f15e` sono registrati esclusivamente come `EXECUTOR_LOCAL_IMPLEMENTATION_SHA` e `EXECUTOR_LOCAL_DELIVERABLE_SHA`: `LOCAL_EXECUTOR_PROVENANCE_ONLY_NOT_REMOTE_BASELINE_AUTHORITY`.
 
-Il patch plan minimo è stato: riusare `PersistentRuntimeCoordinator.run()` e le fixture D263; aggiungere un launcher/entrypoint esclusivamente sintetico; irrobustire il cleanup indipendente; aggiungere test e aggiornare il manuale. File implementativi modificati: `core/persistent_runtime.py`, `tools/d264_first_image_offline.py`, `operator_kit/d264-first-image-offline.sh`, `tests/test_d264_02_offline_operator.py`, `tests/test_d263_phase2_public_run.py`; aggiornati anche i due README e il manuale canonico.
+Il corrective cambia soltanto manuale, report/manifest D264/02 e trasporto bundle. Nessun file sotto `core/`, `tools/`, `operator_kit/` o `tests/` cambia rispetto al remote review anchor: `NO_EXECUTABLE_FILE_CHANGED=true`.
 
-## Percorso operatore e comportamento
+## Closure offline e distinzione di reachability
 
-Senza argomenti il launcher preserva `STOP_AFTER_FDT_ARM_ACK`. Solo `--stop-after-first-image` seleziona esplicitamente `STOP_AFTER_FIRST_IMAGE`; unknown o più argomenti falliscono prima di Python e quindi prima di qualunque backend. L'entrypoint non possiede modalità live e guida il public coordinator su transport/event/TLS sintetici D263.
+`PASS_OFFLINE_OPERATIONALIZATION` resta valido. Il launcher D264/02 e il relativo entrypoint costituiscono una rehearsal/operator path **synthetic-only**, non un launcher reale: selezione esplicita → public coordinator → `STOP_AFTER_FIRST_IMAGE` → deadline IRQ2 assoluta/non rinnovabile 15000 ms → candidate fixed64 `0x22` → primo B0 sulla TLS trattenuta → decode in memoria → cleanup host indipendente. Il default resta `STOP_AFTER_FDT_ARM_ACK`; unknown o selezioni multiple falliscono prima dell'entrypoint. I contatori reali USB/TLS/comandi/secret restano zero e nessun payload biometrico viene persistito.
 
-Il percorso opt-in raggiunge: final ACK `0x32` → una wait IRQ2 con deadline host assoluto/non rinnovabile 15000 ms → un `0x22` con policy operational candidate `FIXED64_ZERO_TAIL` → una validazione ACK → un primo B0 sulla TLS trattenuta → CRC/parser/decode canonico in memoria → cleanup host → stop. Il default non raggiunge IRQ2, `0x22` o immagine.
+Il percorso reale esistente è distinto. `tools/d261_live_fdt_arm_once.py` continua a invocare `coordinator.run(ts16=ts16)` senza selezionare `STOP_AFTER_FIRST_IMAGE`: sotto i guard esistenti può raggiungere USB reale, ma termina ancora a `STOP_AFTER_FDT_ARM_ACK`. Pertanto `FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED`. Prima di chiedere una baseline live serve un successivo step OFFLINE, separato, che cabli il boundary first-image nel percorso reale protetto e ne riesegua review, hash e closure. Questo corrective non implementa tale wiring.
 
-## Invarianti, failure e assenza hardware
+Il manifest v2 separa per-file `reachable_from_d264_offline_operator_path` da `included_for_future_live_review`. Le dipendenze D261 USB/protected/secret sono correttamente non raggiungibili dal launcher D264 synthetic; restano elencate soltanto perché un futuro wiring live le renderebbe pertinenti, con `future_first_image_live_reachability=ARM_ONLY_CURRENTLY`. I file condivisi sono raggiunti dalla rehearsal, ma nel real entrypoint corrente partecipano soltanto al boundary arm-only. Qualunque futura modifica al set richiederà nuovi hash e una nuova approvazione esplicita.
 
-Una rehearsal mantiene una sessione transport, una TLS, un handshake e un handoff secret sintetico; zero retry/reopen/fallback. Nel segmento post-arm non compaiono `0x34`, `0x20` post-image, secondo `0x22`, re-arm, A2, `0x70`, recovery o write persistenti. Nessun payload biometrico è serializzato: il report espone soltanto esito e dimensioni.
+## Verifiche e rischio residuo
 
-I test coprono timeout IRQ2, evento inatteso, ACK `0x22` errato, B0 malformato, CRC/decode failure, seconda esecuzione proibita e cleanup parziale. TLS, secret e transport vengono chiusi in blocchi indipendenti: una cleanup exception porta a `FAILED_CLOSED` senza saltare le fasi residue. I dry-run attestano `REAL_USB_OPEN_COUNT=0`, `REAL_TLS_HANDSHAKE_COUNT=0`, `REAL_SENSOR_COMMAND_COUNT=0` e `REAL_SECRET_MATERIALIZATION_COUNT=0`.
-
-## Test ed executable closure
-
-I 34 test D263/D264 mirati passano. Le regressioni environment-independent D260 passano. L'import di `tests.test_d261_operational_readiness` non è disponibile nel container perché manca il pacchetto Python `cryptography`; il failure avviene durante import nella dipendenza storica `binding_reference`, prima del path D264, ed è classificato ambientale, non mascherato. Launcher default/opt-in da cwd `/tmp`, `bash -n`, JSON validation e diff check passano. Bundle e round-trip sono verificati separatamente.
-
-`D264_02_EXECUTABLE_CLOSURE=PASS_OFFLINE`. Il manifest live-critical deriva dalla reachability combinata del nuovo operatore offline e dell'esistente futuro percorso reale; include launcher, backend USB, TLS/secret/authorization, coordinator, framing/lifecycle/image e dipendenze importate. Ogni file ha SHA-256, ruolo e motivazione.
-
-## Rischi residui e review gate
-
-`0x22` fixed64 e first image non sono live-proven. Lo stato interno device post-image e la lifetime interna dell'arm restano ignoti. Il cleanup host è implementato offline, non dimostra uno stato device sicuro. Servono ancora review AI-PM, commit candidate, verifica manifest, approvazione esplicita baseline, autorizzazione live separata e un eventuale nuovo milestone D265.
+JSON validation, diff check, audit dello scope, ZIP test e round-trip Base64 byte-exact passano. Il corrective non riesegue hardware. La closure offline non è promossa a closure live. `0x22` fixed64 e first image restano non live-proven; lo stato interno device post-image e la lifetime interna dell'arm restano ignoti; host cleanup offline non dimostra uno stato device safe.
 
 ```text
 OUTCOME=PASS_OFFLINE_OPERATIONALIZATION
-ADVANCEMENT=NEW_EXECUTABLE_OFFLINE_CANDIDATE
+ADVANCEMENT=DOCUMENTATION_AND_PROVENANCE_CORRECTIVE
 EXECUTABLE_CLOSURE=PASS_OFFLINE
-RESIDUAL_BLOCKER_OR_RISK=0x22_AND_FIRST_IMAGE_NOT_LIVE_PROVEN;POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE_UNKNOWN
+AI_PM_CORRECTIVE=PASS
+REMOTE_REVIEW_HEAD=a4b2eec79071b3b2682962be63c583bad0fae03b
+EXECUTOR_LOCAL_IMPLEMENTATION_SHA=c0463b024f71ed3bb90d228b27f0866660988401
+EXECUTOR_LOCAL_DELIVERABLE_SHA=7dfa7f85b8630811c82383864217f8cadce2f15e
+FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED
+D264_02_READY_FOR_BASELINE_APPROVAL=false
+RESIDUAL_BLOCKER_OR_RISK=PRELIVE_FIRST_IMAGE_WIRING_NOT_IMPLEMENTED;0x22_AND_FIRST_IMAGE_NOT_LIVE_PROVEN;POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE_UNKNOWN
 CANONICAL_DOCUMENTATION=UPDATED
+NO_EXECUTABLE_FILE_CHANGED=true
 D264_02_READY_FOR_AI_PM_REVIEW=true
 READY_FOR_LIVE=false
 LIVE_AUTHORIZED=false

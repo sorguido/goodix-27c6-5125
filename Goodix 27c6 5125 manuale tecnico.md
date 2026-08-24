@@ -132,6 +132,18 @@ approvata. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
 corretto minimamente a una deadline host assoluta di 15000 ms, senza asserire
 una lifetime interna del device.
 
+D264/02 chiude ora l'executable closure del candidate first-image **soltanto
+offline**. Una rehearsal operatore synthetic-only preserva come default
+`STOP_AFTER_FDT_ARM_ACK` e raggiunge `STOP_AFTER_FIRST_IMAGE` esclusivamente
+con opt-in esplicito, attraversando il coordinatore pubblico, la deadline IRQ2
+assoluta di 15000 ms, il candidate fixed64 `0x22`, il primo B0, il decode in
+memoria e il cleanup host indipendente/fail-closed. Nessun live è stato
+eseguito. Il launcher reale D261 resta distinto e arm-only: invoca ancora il
+default del coordinatore e non può raggiungere il boundary first-image.
+Pertanto `FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED` e la baseline
+approval non è ancora raggiungibile; prima servirà un successivo step offline
+di wiring e review del percorso reale protetto.
+
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
 nessun retry (`RETRY_COUNT=0`), zero famiglie persistenti (`PERSISTENT_DEVICE_WRITE_COUNT=0`),
@@ -4510,13 +4522,23 @@ provato offline; `POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN`; `0x22`
 fixed64 e first image restano `NOT_LIVE_PROVEN`.
 `FIRST_IMAGE_TERMINAL_RISK=ACCEPTABLY_BOUNDED`, non sicurezza assoluta.
 
-Hash, ruoli e reachability del live-critical set sono registrati in
-`analysis/D264/D264_02_live_critical_manifest.json`; il commit candidate non
-equivale ad approvazione baseline. Stato corrente:
+Questa reachability è esclusivamente sintetica. Il real launcher D261 continua
+a chiamare il coordinatore senza selezionare `STOP_AFTER_FIRST_IMAGE`, quindi
+resta `STOP_AFTER_FDT_ARM_ACK`: USB reale è raggiungibile soltanto sotto i suoi
+guard storici, ma il boundary first-image non lo è. Il manifest distingue ora
+esplicitamente i file raggiunti dal launcher D264 offline da quelli inclusi
+soltanto per una futura review live. Il riferimento remoto canonico della tree
+eseguibile già reviewata è
+`REMOTE_REVIEW_HEAD=a4b2eec79071b3b2682962be63c583bad0fae03b`; gli SHA locali
+Codex `c0463b0…` e `7dfa7f8…` sono sola provenance dell'esecutore, non autorità
+di baseline remota. Il corrective non modifica file eseguibili/live-critical.
+Stato corrente:
 
 ```text
 D264_02_EXECUTABLE_CLOSURE=PASS_OFFLINE
 D264_02_READY_FOR_AI_PM_REVIEW=true
+D264_02_READY_FOR_BASELINE_APPROVAL=false
+FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED
 READY_FOR_LIVE=false
 LIVE_AUTHORIZED=false
 BASELINE_APPROVED=false

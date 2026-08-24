@@ -2,8 +2,9 @@
   "bundle_manifest_packaging_note": "This manifest is the external transport manifest and is intentionally not self-embedded, avoiding an impossible self-referential ZIP hash.",
   "bundle_scope": "D264/02 only; step-local and non-cumulative",
   "canonical_bundle_filename": "analysis/D264/D264_02_first_image_offline_operationalization_bundle.zip",
-  "canonical_zip_sha256": "d2a0014baa17a651fa84d3f55d1af4057faaf6681ce0e8761eba089afa25574e",
+  "canonical_zip_sha256": "e08e7d2a640d4593535a164020a726c1960f1853fc41b6c76a138d71b88c1b83",
   "cloud_transport_statement": ".zip.b64 is a temporary Cloud transport representation; canonical format remains ZIP.",
+  "d264_02_ready_for_baseline_approval": false,
   "exclusions": [
     "raw captures",
     "secrets/PSK",
@@ -12,18 +13,23 @@
     "Rockytkg tree",
     ".git"
   ],
+  "executor_local_deliverable_sha": "7dfa7f85b8630811c82383864217f8cadce2f15e",
+  "executor_local_implementation_sha": "c0463b024f71ed3bb90d228b27f0866660988401",
+  "first_image_live_operator_wiring": "NOT_IMPLEMENTED",
+  "local_executor_provenance": "LOCAL_EXECUTOR_PROVENANCE_ONLY_NOT_REMOTE_BASELINE_AUTHORITY",
+  "no_executable_file_changed_by_corrective": true,
   "payload": [
     {
       "path": "analysis/D264/D264_02_report.md",
-      "sha256": "699e1b92a5e5bf253296e7ed4cfc777225f9fb3e80313db0effa1c216f8d060e"
+      "sha256": "a79226119f604f4ede31983dd1936d3363f6dae74cbb919d8f329296ccb1f596"
     },
     {
       "path": "analysis/D264/D264_02_executable_closure.json",
-      "sha256": "bd7d5dbdaab72aa7721c1782b2186cda4ab822684b070f6be08a334ddc338b15"
+      "sha256": "dfac12639839cececfd20fccb2167ec3bc36470ce66d97f8c204084be7e556e8"
     },
     {
       "path": "analysis/D264/D264_02_live_critical_manifest.json",
-      "sha256": "fde50673e5cbced0e2c9b3358e856dddce6affb93a7d8cd54bcf83d42e03972d"
+      "sha256": "ab3c78ebc223b1c3405c64999886789b975931052de94a6e4894bbb96b936b5e"
     },
     {
       "path": "core/persistent_runtime.py",
@@ -47,10 +53,12 @@
     },
     {
       "path": "Goodix 27c6 5125 manuale tecnico.md",
-      "sha256": "f87d55649490614b155583f8c8e5280d996043d6bd7422a718bbffd8a3d8d427"
+      "sha256": "454b921a305253168747c43612b67ebb587c304caa0fb103ae693a350b4203ec"
     }
   ],
+  "remote_review_head": "a4b2eec79071b3b2682962be63c583bad0fae03b",
+  "remote_review_head_role": "CANONICAL_REMOTE_PR7_EXECUTABLE_TREE_REVIEW_ANCHOR_NOT_BASELINE_APPROVAL",
   "round_trip_byte_exact": true,
-  "schema": "D264_02_BUNDLE_MANIFEST_V1",
+  "schema": "D264_02_BUNDLE_MANIFEST_V2",
   "transport_representation": "analysis/D264/D264_02_first_image_offline_operationalization_bundle.zip.b64"
 }
