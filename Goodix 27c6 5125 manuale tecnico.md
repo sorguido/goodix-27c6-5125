@@ -226,9 +226,28 @@ storico conserva l'hash pre-fix di `core/usb_runtime.py`, mentre il worktree usa
 correttamente il blob D266/01 accettato. I test router 8/8 e la suite mirata
 37/37 restano verdi, ma l'executable closure operatore è `FAIL`. Non è stata
 retro-modificata l'autorità storica né applicato un corrective live-critical
-nello step di ratifica. Servono quindi un corrective separato, nuova review e
-solo dopo un'eventuale approvazione full-SHA e autorizzazione live;
-`READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false` e `READY_FOR_LIVE=false`.
+nello step di ratifica. La review AI-PM classifica quindi D266/02 come
+`PASS_AS_FAIL_CLOSED_AUDIT`: il failure è l'atteso rifiuto di una authority
+D265 storica e stale dopo la patch router accettata, non un difetto del gate.
+
+D266/03 chiude ora **offline** quel corrective senza cambiare il router e senza
+riaprire D265. Il nuovo candidate `operator_kit/d267-first-image-once.sh` →
+`tools/d267_live_first_image_once.py` ha flag, environment, capability/nonce,
+marker e report D267 distinti. La sua authority deriva dalla call graph reale
+ed è composta da 20 file; include `core/usb_runtime.py` al blob post-D266
+`c4e62b07…`, ma ha `baseline_approved=false`. Il verifier live richiede un full
+SHA lowercase, `HEAD` uguale allo SHA approvato, worktree pulito, path-set
+esatto e identità commit/worktree di ogni file, senza affidarsi ai soli hash
+del manifest. Il dry-run da `/tmp` passa senza costruire dipendenze production
+e con USB, secret, comandi, marker, fprintd, TLS live e write persistenti tutti
+a zero. I 21 nuovi unittest, i test router 8/8 e la suite mirata 37/37 passano;
+la regressione 303 = 299 PASS, 1 FAIL, 3 ERROR riproduce soltanto i quattro
+esiti D261/pytest già noti. Ne segue
+`D267_OPERATOR_CANDIDATE_READY_OFFLINE=true` e
+`READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=true`, non un'approvazione o
+autorizzazione: `BASELINE_APPROVED_FOR_NEW_ATTEMPT=false`,
+`LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false` e
+`D265_02_RETRY_AUTHORIZED=false`.
 
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
@@ -515,6 +534,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D265/02 first-image | fail-closed pre-`0x22`, autorizzazione consumata | una USB/sessione/TLS/handshake e un arm finale; timeout EP81, zero IRQ2 consegnati/`0x22`/B0/retry/recovery/reopen/write; difetto router IRQ2 provato sulla baseline, emissione fisica IRQ2 non determinabile |
 | Corrective D266/01 router eventi | PASS offline; review AI-PM PASS, fix accettato, live false | classifier FDT strutturale condiviso con il parser canonico; IRQ100/IRQ2, command routing, interleaving, deadline, single-reader e seam sintetico IRQ2→un `0x22` PASS sul router concreto; nessuna nuova evidenza device-side |
 | Closure D266/02 post-review | CORRECTIVE REQUIRED; baseline-readiness false | test router 8/8 e mirati 37/37 PASS; regressione 282 = 278 PASS, 1 FAIL, 3 ERROR invariata; dry-run D265 fail-closed sul solo hash pre-D266 di `core/usb_runtime.py` nel manifest storico, con tutti i contatori reali a zero |
+| Corrective D266/03 authority D267 | PASS offline; pronto per review di una nuova baseline, live false | D265 immutabile e retry vietato; nuova authority D267 di 20 file con capability/marker/report/flag distinti, router post-fix incluso, verifier Git full-SHA/HEAD/clean/path/byte identity, dry-run esterno zero-side-effect e 21 unittest PASS |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -3187,7 +3207,25 @@ mentre il blob accettato D266/01 è
 Il gate si comporta quindi correttamente fail-closed, ma l'operator kit non è
 execution-ready sulla nuova base. D266/02 non modifica il manifest storico né
 il codice live-critical: la nuova autorità candidate e il relativo wiring
-richiedono uno step corrective separato.
+richiedono uno step corrective separato. D266/03 materializza tale separazione
+nel namespace D267 e lascia D265 byte-immutato. La nuova tuple
+`D267_FIRST_IMAGE_LIVE_CRITICAL_PATHS` contiene tutti e soli i 20 file
+raggiungibili dal launcher D267: i due entrypoint e 18 dipendenze runtime/guard,
+con `core/d267_first_image_operator.py` al posto dell'orchestrator storico
+D265. Il path production costruisce `CtypesLibusbBackend` →
+`LibusbRuntimeTransport`, usa l'unico `SharedFrameRouter` e il suo
+`_RouterEventSource`, quindi invoca `PersistentRuntimeCoordinator` soltanto con
+`STOP_AFTER_FIRST_IMAGE`; non esiste un event-source bypass nel candidate.
+
+`core/live_capability.py` conserva le authority D261 e D265 e aggiunge classi e
+nonce D267 separati. Un intent D265 non può creare marker/live-I/O D267 e un
+intent D267 non può creare capability D265; il marker D267 viene scritto
+`O_EXCL`/`0600`, completato e fsyncato prima del minting, e la sua capability è
+consumabile una volta. Il namespace durable è
+`/var/lib/goodix-5125-poc/d267-first-image-single-use.marker`; il report è
+`/var/lib/goodix-5125-poc/d261-results/d267-first-image-final.json`. Il path
+live richiede `D267_APPROVED_LIVE_BASELINE_SHA`, ma D266/03 non assegna alcun
+valore approvato e non crea il marker reale.
 
 Il launcher `operator_kit/d261-live-fdt-arm-once.sh` accetta soltanto
 `--dry-run` oppure l'esatta autorizzazione live. Il default è hard-disabled.
@@ -3442,12 +3480,27 @@ D266/02 non ha eseguito live e non risolve l'indeterminatezza fisica della run
 precedente. Ha invece verificato che il dry-run D265 non accetta ancora la
 nuova base perché la sua autorità byte storica contiene l'hash pre-fix del
 router. L'autorizzazione D265/02 è consumata, il retry è vietato e prima di una
-futura run occorrono un corrective separato del gate/manifest candidate, review
-AI-PM, eventuale merge, approvazione esplicita di un nuovo full SHA e nuova
-autorizzazione separata. `READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false`,
+futura run D266/03 fornisce ora un candidate D267 offline con authority
+post-router e namespace one-shot nuovo; D265 resta storico e immutabile.
+Occorrono ancora review AI-PM, eventuale merge, approvazione esplicita del nuovo
+full SHA e una nuova autorizzazione separata.
+`READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=true`,
 `BASELINE_APPROVED_FOR_NEW_ATTEMPT=false`, `0x22_FIXED64_LIVE_PROVEN=false`,
 `FIRST_IMAGE_LIVE_PROVEN=false`, `POST_D265_02_DEVICE_INTERNAL_STATE=UNKNOWN`,
 `READY_FOR_LIVE=false` e `LIVE_AUTHORIZED=false`.
+
+Riesame metodologico pre-live D267:
+
+1. rispetto a D265 cambia realmente il delivery software: il router D266
+   accettato consegna IRQ2 attraverso la stessa authority/call graph D267, con
+   una nuova autorizzazione one-shot che non riusa marker o baseline D265;
+2. la nuova ipotesi tecnica futura è che un IRQ2 fisicamente emesso raggiunga
+   `_RouterEventSource` e abiliti l'unico `0x22` fixed64; il live resta
+   necessario per distinguere emissione fisica e accettazione target;
+3. se un futuro tentativo autorizzato fallisse ancora nella wait IRQ2, non si
+   ripeterà lo stesso esperimento: si fermerà il live e si analizzerà evidenza
+   capace di discriminare assenza fisica e delivery host prima di proporre un
+   metodo diverso.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -5064,4 +5117,58 @@ READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false
 BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
+```
+
+### D266/03: nuova authority post-router e namespace D267, OFFLINE ONLY
+
+D266/03 parte dal branch `codex` al commit
+`65b8ec198603c347b89107fe5b7b28cf84fbd318`, con parent
+`7a2ceff54f2fc27332a9f2a531ce4af5d90cf9a2`, `origin/codex` coincidente,
+`origin/main` invariato a `c68398db24c7a1689e3056b771df83b479a1c7ef` e
+worktree iniziale pulito. Il bundle D266/02 è verificato al digest
+`207dea0f24ee163fb9f7a7f3be1ec1aecfbc6f1b6bc442dbcdd353b077c1dfd1`.
+D266/02 è accettato come audit fail-closed e il corrective non modifica
+`analysis/D265/D265_01_live_critical_manifest.json`,
+`operator_kit/d265-first-image-once.sh` o
+`tools/d265_live_first_image_once.py`.
+
+Il nuovo surface D267 espone soltanto `--dry-run` e
+`--i-authorize-one-d267-first-image-live-attempt`. Il live, non eseguito,
+richiederebbe `D267_APPROVED_LIVE_BASELINE_SHA`; marker e report canonici sono
+rispettivamente
+`/var/lib/goodix-5125-poc/d267-first-image-single-use.marker` e
+`/var/lib/goodix-5125-poc/d261-results/d267-first-image-final.json`. Le
+capability D267 usano tipi e nonce propri, incompatibili con D261/D265, e il
+live-I/O non può nascere prima del durable claim fsyncato. La nuova authority
+di 20 file è esatta e include il router accettato D266 al digest
+`c4e62b0786d7710eb0625b033258636597b9aa8f40259ce5a1f669b0e160385b`;
+il manifest dichiara correttamente `baseline_approved=false`.
+
+Il dry-run eseguito dalla cwd esterna `/tmp` passa con tutti i contatori reali
+a zero. I nuovi test D266/03 passano 21/21; router 8/8 e suite mirata 37/37
+passano. La discovery completa esegue 303 test: 299 PASS, un FAIL D261 per il
+drift storico del dry-run e tre ERROR (classe eccezione D261 più due moduli
+pytest-only con pytest assente), esattamente le classi già documentate; zero
+nuovi failure sono attribuibili a D266/03. Nessun pytest è installato. Nessun
+USB reale, secret reale, TLS live, marker reale, fprintd o comando device è
+stato raggiunto.
+
+```text
+OUTCOME=D266_03_READY_FOR_AI_PM_BASELINE_REVIEW
+ADVANCEMENT=POST_ROUTER_NEW_ONE_SHOT_AUTHORITY_CLOSED_OFFLINE
+EXECUTABLE_CLOSURE=PASS
+D266_01_ROUTER_FIX_ACCEPTED=true
+D266_02_AI_PM_REVIEW=PASS_AS_FAIL_CLOSED_AUDIT
+D266_02_CORRECTIVE_REQUIRED=true
+D266_02_FAILURE_IS_EXPECTED_STALE_D265_AUTHORITY=true
+D265_HISTORICAL_AUTHORITY_IMMUTABLE=true
+D265_02_RETRY_AUTHORIZED=false
+D267_OPERATOR_CANDIDATE_READY_OFFLINE=true
+READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=true
+BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
 ```
