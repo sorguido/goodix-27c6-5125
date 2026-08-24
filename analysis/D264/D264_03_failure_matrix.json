@@ -1,17 +1,363 @@
 {
-  "schema": "D264_03_FAILURE_MATRIX_V1",
-  "execution_mode": "INJECTED_DOUBLES_ONLY",
-  "retry_count": 0,
-  "classes": [
-    {"class":"reachability","cases":["protected guards through explicit STOP_AFTER_FIRST_IMAGE","exactly one 0x22","first image","cleanup and restore"],"status":"PASS"},
-    {"class":"D261 regression","cases":["D261 coordinator call retains default STOP_AFTER_FDT_ARM_ACK","0x22 absent"],"status":"PASS"},
-    {"class":"baseline","cases":["missing SHA","short SHA","branch","HEAD","wrong/unresolved SHA","stale blob","path-set mismatch"],"status":"PASS_FAIL_CLOSED_PRE_SIDE_EFFECT"},
-    {"class":"authorization","cases":["missing intent","wrong intent","direct call","capability reuse"],"status":"PASS_FAIL_CLOSED"},
-    {"class":"marker","cases":["already exists","owner/mode contract","symlink","second claim","D261 namespace"],"status":"PASS_FAIL_CLOSED_TEMP_FIXTURE_ONLY"},
-    {"class":"target/backend","cases":["absent","duplicate","holder conflict","open","submit","receive"],"status":"PASS_INJECTED_NO_RETRY"},
-    {"class":"first image","cases":["IRQ2 timeout","unexpected IRQ","invalid 0x22 ACK","malformed B0","TLS consume","CRC","decode","buffered frame","second 0x22"],"status":"PASS_INJECTED_NO_RETRY"},
-    {"class":"cleanup/restore","cases":["coordinator/TLS/transport close","secret close","signal restore","fprintd restore","report publication"],"status":"PASS_ALL_POSSIBLE_PHASES_ATTEMPTED"},
-    {"class":"forbidden trace","cases":["0x34","post-image 0x20","A2","0x70","second 0x22","re-arm"],"status":"PASS_ABSENT"},
-    {"class":"absolute timeout","cases":["unexpected/nonmatching completions cannot renew 15000 ms"],"status":"PASS_BY_D263_D264_RUNTIME_REGRESSION"}
+  "schema": "D264_03_FAILURE_MATRIX_V2_CORRECTIVE1",
+  "all_required_cases_proven": true,
+  "cases": [
+    {
+      "case": "missing SHA",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_format_fails_before_side_effects",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "short SHA",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_format_fails_before_side_effects",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "HEAD",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_format_fails_before_side_effects",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "branch",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_format_fails_before_side_effects",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "unresolved full SHA",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_unresolved_stale_duplicate_omitted_extra",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "stale live-critical blob",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_unresolved_stale_duplicate_omitted_extra",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "duplicate authoritative path",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_unresolved_stale_duplicate_omitted_extra",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "omitted authoritative path",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_unresolved_stale_duplicate_omitted_extra",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "extra authoritative path",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_unresolved_stale_duplicate_omitted_extra",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "operator context",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "safe directories/report",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "protected metadata without secret",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "gfusb hash",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "fprintd stop",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "signal block",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "non-secret material/cache",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
+      "side_effect_boundary_reached": "synthetic_guard_only"
+    },
+    {
+      "case": "explicit protected guard order",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_explicit_guard_order_and_ownership_success",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "target absent",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_exact_target_absent_and_duplicate_fail_before_secret",
+      "side_effect_boundary_reached": "synthetic_target_guard"
+    },
+    {
+      "case": "target duplicate",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_exact_target_absent_and_duplicate_fail_before_secret",
+      "side_effect_boundary_reached": "synthetic_target_guard"
+    },
+    {
+      "case": "external holder conflict",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_target_holder_backend_failures_are_distinct_and_zero_retry",
+      "side_effect_boundary_reached": "synthetic_holder_guard"
+    },
+    {
+      "case": "backend construction failure",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_target_holder_backend_failures_are_distinct_and_zero_retry",
+      "side_effect_boundary_reached": "synthetic_backend"
+    },
+    {
+      "case": "USB open failure",
+      "status": "PASS_FAIL_CLOSED_ZERO_RETRY",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_runtime_backend_failures_no_retry_one_secret_close",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "submit failure",
+      "status": "PASS_FAIL_CLOSED_ZERO_RETRY",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_runtime_backend_failures_no_retry_one_secret_close",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "receive failure",
+      "status": "PASS_FAIL_CLOSED_ZERO_RETRY",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_runtime_backend_failures_no_retry_one_secret_close",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "existing marker",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_marker_existing_symlink_owner_mode_second_claim_and_d261",
+      "side_effect_boundary_reached": "temporary_fixture_only"
+    },
+    {
+      "case": "symlink marker",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_marker_existing_symlink_owner_mode_second_claim_and_d261",
+      "side_effect_boundary_reached": "temporary_fixture_only"
+    },
+    {
+      "case": "owner mismatch",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_marker_existing_symlink_owner_mode_second_claim_and_d261",
+      "side_effect_boundary_reached": "temporary_fixture_only"
+    },
+    {
+      "case": "mode mismatch",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_marker_existing_symlink_owner_mode_second_claim_and_d261",
+      "side_effect_boundary_reached": "temporary_fixture_only"
+    },
+    {
+      "case": "second marker claim",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_marker_existing_symlink_owner_mode_second_claim_and_d261",
+      "side_effect_boundary_reached": "temporary_fixture_only"
+    },
+    {
+      "case": "D261 marker namespace",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_marker_existing_symlink_owner_mode_second_claim_and_d261",
+      "side_effect_boundary_reached": "temporary_fixture_only"
+    },
+    {
+      "case": "marker claim wrong type/nonce",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_capability_chain_wrong_type_nonce_and_reuse",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "marker claim capability reuse",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_capability_chain_wrong_type_nonce_and_reuse",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "intent reuse",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_capability_chain_wrong_type_nonce_and_reuse",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "manual live-I/O capability",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_capability_chain_wrong_type_nonce_and_reuse",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "IRQ2 timeout",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_RUNTIME_D263",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_event_timeout_fails_closed",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "unexpected IRQ",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_RUNTIME_D263",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_wrong_irq_fails_closed",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "invalid 0x22 ACK",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_RUNTIME_D263",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_wrong_ack_fails_closed",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "malformed first B0",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_RUNTIME_D263",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_malformed_b0_fails_closed",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "CRC/decode failure",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_RUNTIME_D263",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_crc_image_failure_wipes_and_fails_closed",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "second 0x22 blocked",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_RUNTIME_D263",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_second_command_prevention",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "real coordinator first-image success and forbidden-command trace",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_real_persistent_coordinator_integration",
+      "side_effect_boundary_reached": "synthetic_real_coordinator"
+    },
+    {
+      "case": "TLS close failure still secret/transport cleanup",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "INHERITED_REGRESSION_D264_02",
+      "test_name_or_artifact": "tests/test_d263_phase2_public_run.py::PartialCleanupTests::test_tls_close_exception_still_zeroizes_and_closes_transport",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "success secret close exactly once",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_explicit_guard_order_and_ownership_success / test_runtime_backend_failures_no_retry_one_secret_close",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "runtime failure secret close exactly once",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_explicit_guard_order_and_ownership_success / test_runtime_backend_failures_no_retry_one_secret_close",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "marker failure outer secret close exactly once",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_secret_owned_by_outer_before_transfer",
+      "side_effect_boundary_reached": "synthetic_outer_transaction"
+    },
+    {
+      "case": "coordinator construction failure outer secret close exactly once",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_secret_owned_by_outer_before_transfer",
+      "side_effect_boundary_reached": "synthetic_outer_transaction"
+    },
+    {
+      "case": "absolute non-renewable 15000ms deadline",
+      "status": "PASS",
+      "proof_source": "INHERITED_BYTE_IDENTICAL_RUNTIME_REGRESSION",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_irq2_deadline_covers_primary_trace_delta + core/persistent_runtime.py hash in closure",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "D261 remains arm-only",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_cli_hard_disabled_and_d261_arm_only",
+      "side_effect_boundary_reached": "static_call_seam"
+    },
+    {
+      "case": "CLI live hard-disabled and all real counters zero",
+      "status": "PASS",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_cli_hard_disabled_and_d261_arm_only",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "TLS application consume failure",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_real_runtime_tls_consume_failure_is_specific",
+      "side_effect_boundary_reached": "synthetic_runtime"
+    },
+    {
+      "case": "buffered unexpected frame",
+      "status": "PASS_FAIL_CLOSED_ZERO_RETRY",
+      "proof_source": "D264_03_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_real_public_runtime_rejects_buffered_unexpected_frame",
+      "side_effect_boundary_reached": "synthetic_real_coordinator"
+    }
   ]
 }

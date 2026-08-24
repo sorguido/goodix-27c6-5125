@@ -142,13 +142,17 @@ eseguito. Il launcher reale D261 resta distinto e arm-only: invoca ancora il
 default del coordinatore e non può raggiungere il boundary first-image.
 Pertanto `FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED` e la baseline
 approval non è ancora raggiungibile; prima servirà un successivo step offline
-di wiring e review del percorso reale protetto. D264/03 chiude ora quel wiring
-pre-live sul solo piano offline: il nuovo launcher production-shaped è
+di wiring e review del percorso reale protetto. Il primo candidate D264/03 era
+soltanto uno skeleton parzialmente production-shaped: un callback `preflight`
+opaco, una capability live-I/O non derivata formalmente dal marker, ownership
+secret ambigua e una failure matrix più ampia dei test. Il corrective della
+review AI-PM chiude questi difetti e quindi chiude il wiring pre-live sul solo
+piano offline: il nuovo launcher production-shaped è
 raggiungibile dalla shell esclusivamente con `--dry-run`, mentre ogni altra
 invocazione termina `HARD_DISABLED_D264_03` prima di secret, marker, fprintd,
 USB o comandi. La control flow futura usa capability e marker namespace
 dedicati D265-future, guard baseline full-SHA e byte identity, dipendenze
-pericolose iniettate, coordinator reale con opt-in esplicito
+pericolose iniettate e adapter futuro concreto, coordinator reale con opt-in esplicito
 `STOP_AFTER_FIRST_IMAGE`, cleanup e restore indipendenti. Il path D261 e il suo
 marker consumato restano invariati e arm-only. Ne segue
 `FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE`; non segue alcuna
@@ -4565,20 +4569,40 @@ Il dry-run valida schema e hash del live-critical set v3, sintassi launcher,
 modello baseline full-SHA e soli metadata del marker futuro; ignora
 intenzionalmente qualunque valore dell'environment di approvazione.
 
-La control flow che una futura milestone potrà collegare alle implementazioni
-reali vive in `core/future_first_image_operator.py`. Essa richiede l'intento
+La prima versione reviewata dall'AI-PM al remote HEAD
+`830c95c407ecbe0f9b185a8adbc968ae5c9cef0d` era uno skeleton parzialmente
+production-shaped: non chiamava il baseline verifier dal candidate, celava i
+guard in un unico callback, emetteva convenzionalmente la capability live-I/O
+e poteva chiudere due volte il secret. Il corrective rende invece esplicita in
+`core/future_first_image_operator.py` la sequenza: baseline full-SHA/path-set/
+blob identity → contesto operatore → directory/report sicuri → metadata
+protetti → hash gfusb → target/cardinalità → stop fprintd → signal block →
+holder check → materiale/cache non-secret → singola materializzazione secret →
+marker → capability live-I/O → backend/coordinator → run/restore/report.
+
+La control flow richiede l'intento
 esatto `--i-authorize-one-future-d265-first-image-live-attempt`, consumabile una
 sola volta, e usa il marker distinto
 `/var/lib/goodix-5125-poc/d265-first-image-single-use.marker`, schema
 `D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1`. D264/03 non crea quel marker:
 claim, capability live-I/O e backend sono esercitati soltanto con fixture e
-doubles. Dopo preflight, singolo secret handoff e singolo claim sintetico, la
-orchestration costruisce il coordinator attraverso l'interfaccia backend e
-invoca esplicitamente `STOP_AFTER_FIRST_IMAGE`; cleanup coordinator/secret,
-restore segnali/fprintd e pubblicazione report sono tentati indipendentemente.
+doubles. Non è più un legame convenzionale: la catena tipata/nonce è
+`FutureIntentCapability → FutureMarkerClaimCapability → FutureLiveIoCapability`,
+con consumo one-shot e rigetto di tipo/nonce/namespace D261 errati.
+`FutureProductionDependencies` collega concretamente i guard D261-reviewed,
+`RealSecretBoundary`, `CtypesLibusbBackend`, `ColdStartMachine`, seed FDT e
+`PersistentRuntimeCoordinator`, ma non è raggiungibile dal CLI D264/03.
+
+L'outer possiede il secret fino alla costruzione riuscita del coordinator: un
+failure marker/capability/costruzione causa un solo close outer. Dopo la
+costruzione l'ownership passa al coordinator, il cui `run()` possiede cleanup
+TLS/secret/transport; l'outer non richiama il secret close e conserva soltanto
+restore segnali/fprintd/report. Successo, failure runtime e failure prima del
+transfer provano `SECRET_DOUBLE_CLOSE_COUNT=0`.
 
 Il manifest `analysis/D264/D264_03_live_critical_manifest.json` ricalcola 18
-file raggiungibili dal futuro path: launcher, entrypoint/gate, helper protetti,
+file dal call graph concreto dell'adapter futuro e del gate offline: launcher,
+entrypoint/gate, helper protetti,
 backend USB, cold-start/FDT, coordinator, transport/framing, retained TLS/B0,
 codec immagine/CRC e dipendenze di validazione secret. Test, rehearsal D264/02
 e manuale sono classificati rispettivamente `test_only`, `synthetic_only` e
@@ -4587,14 +4611,26 @@ il modello rifiuta SHA corto, branch, `HEAD`, commit errato e blob worktree non
 identico. Review AI-PM e successiva approvazione byte-level restano gate
 separati.
 
-La closure offline verifica il successo production-shaped con un solo `0x22`,
-zero retry/reopen, terminal cleanup/restore e failure injection. La suite D263,
+La closure offline attraversa dall'orchestrator il vero
+`PersistentRuntimeCoordinator.run()` con fixture D263: prefisso FDT storico,
+un solo `0x22` `FIXED64_ZERO_TAIL`, TLS trattenuta, primo B0, raster 80×64,
+zero persistenza/retry/comandi vietati e cleanup host. La failure matrix v2
+associa ogni PASS a test/artifact e distingue prova D264/03 diretta, regressione
+D264/02/D263 ereditata e deadline su runtime byte-identico. La suite D263,
 D264/02 e D260 pertinente resta verde; la suite D261 non è eseguibile in questo
 ambiente perché la dipendenza preesistente `cryptography` manca, senza essere
 installata. Nessun test hardware è stato eseguito. Stato canonico:
 
 ```text
 D264_03_EXECUTABLE_CLOSURE=PASS_OFFLINE
+PROTECTED_GUARD_ORDER_PROVEN=true
+BASELINE_BYTE_IDENTITY_GATE_PROVEN=true
+MARKER_TO_LIVE_IO_CAPABILITY_CHAIN_PROVEN=true
+SECRET_CLEANUP_OWNERSHIP=TRANSFER_TO_COORDINATOR_AFTER_CONSTRUCTION
+SECRET_DOUBLE_CLOSE_COUNT=0
+REAL_COORDINATOR_FIRST_IMAGE_INTEGRATION_PROVEN=true
+LIVE_CRITICAL_REACHABILITY_PROVEN=true
+FAILURE_MATRIX_ALL_REQUIRED_CASES_PROVEN=true
 FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE
 CURRENT_D261_REAL_BOUNDARY=STOP_AFTER_FDT_ARM_ACK
 FUTURE_FIRST_IMAGE_REAL_BOUNDARY=STOP_AFTER_FIRST_IMAGE

@@ -258,8 +258,8 @@ class RealSecretBoundary:
     def metadata(self) -> dict[str, object]:
         return protected_metadata(self.secret_path, SECRET_RECORD_LENGTH)
 
-    def materialize(self, cli_intent: CliIntentCapability) -> None:
-        if not _cli_intent_authorized(cli_intent):
+    def materialize(self, cli_intent: CliIntentCapability, *, authorization_validator=_cli_intent_authorized) -> None:
+        if not authorization_validator(cli_intent):
             raise ProtectedRuntimeFailure("secret_materialization_not_authorized")
         if self.materialize_count or self._secret is not None:
             raise ProtectedRuntimeFailure("secret_materialization_exactly_once")
@@ -327,8 +327,10 @@ def load_cold_start_material(
     manifest_path: Path,
     config90_path: Path,
     cli_intent: CliIntentCapability,
+    *,
+    authorization_validator=_cli_intent_authorized,
 ) -> ColdStartMaterial:
-    if not _cli_intent_authorized(cli_intent):
+    if not authorization_validator(cli_intent):
         raise ProtectedRuntimeFailure("material_load_not_authorized")
     manifest_raw = _read_protected(Path(manifest_path))
     if hashlib.sha256(manifest_raw).hexdigest() != MATERIAL_MANIFEST_SHA256:

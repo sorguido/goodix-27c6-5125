@@ -50,7 +50,7 @@ def dry_run() -> dict[str, object]:
     failures: list[str] = []
     try:
         manifest = json.loads(MANIFEST.read_text())
-        if manifest.get("schema") != "D264_03_LIVE_CRITICAL_MANIFEST_V3":
+        if manifest.get("schema") != "D264_03_LIVE_CRITICAL_MANIFEST_V3_CORRECTIVE1":
             failures.append("manifest_schema")
         rows = manifest.get("live_critical_files", [])
         paths = [row.get("path") for row in rows]

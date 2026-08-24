@@ -1,33 +1,41 @@
 {
-  "schema": "D264_03_BUNDLE_MANIFEST_V1",
+  "schema": "D264_03_BUNDLE_MANIFEST_V2_CORRECTIVE1",
   "canonical_bundle_filename": "analysis/D264/D264_03_first_image_prelive_wiring_bundle.zip",
-  "canonical_zip_sha256": "7f4a437fd30e98e87bc50fd0994659ae2c350d070bb93c919692ba27a7a24157",
+  "canonical_zip_sha256": "d19280597780c15e52ce6fedf5cdcb39f290a9752b1eabf9b1a7b7d4d863f290",
   "transport_representation": "analysis/D264/D264_03_first_image_prelive_wiring_bundle.zip.b64",
-  "bundle_scope": "D264/03 only",
+  "bundle_scope": "D264/03 corrective only",
   "payload_paths": [
     {
       "path": "analysis/D264/D264_03_report.md",
-      "sha256": "b44839767c97daa2f443baec40f849ccd949170099beb85a1bef3cd3fae56a14"
+      "sha256": "9fdef4b29d54914676fbf4c9cf37e201a43aacc5ef3f864abb29560bf5d22377"
     },
     {
       "path": "analysis/D264/D264_03_executable_closure.json",
-      "sha256": "63d8e91653789145e35aed8c7cf01035f5392021a6799e5ccd2fe31e1cca5bf3"
+      "sha256": "6acf46b3dd69a97bbc4589f1d96c54b5b80e52296ed2e8097c25cf41cd38dd18"
     },
     {
       "path": "analysis/D264/D264_03_failure_matrix.json",
-      "sha256": "b4f8d39c5c44787ef465974cfe0f6d5841e356cdae345a8196d53bfaa8096f0d"
+      "sha256": "0d204637f3b198379bd6f29833655dd1781c3b62b68d5ffa33b241de3b0cf266"
     },
     {
       "path": "analysis/D264/D264_03_live_critical_manifest.json",
-      "sha256": "c5fc392d38c0b7474407a5fff7bdd4af93079edf2c4220371939d65488298344"
+      "sha256": "2d0a40196659ba1c27ec2f2bbdf840d9e0a0737e9960ed6eac0331ad4ebfd1ca"
     },
     {
       "path": "core/future_first_image_operator.py",
-      "sha256": "115ed43304ba28c98d113c8812c29f398b675b52997096532e85d1ed4c58cad0"
+      "sha256": "3e219fcf6e045e5eb15fd4707db30cc119bd25213df81b999c89b158b8ad4dc4"
+    },
+    {
+      "path": "core/protected_runtime.py",
+      "sha256": "c423943d45b68c333ace981945a617506aea3bb0979bfb56a1bb68c6e5595303"
+    },
+    {
+      "path": "core/usb_runtime.py",
+      "sha256": "800fb173665a30e230bea4802f83c5687ac5be78cd7a069aa6f923fd16977a23"
     },
     {
       "path": "tools/d264_first_image_prelive.py",
-      "sha256": "b2470c846a5ad8b40b730347748e09ddf4de6b52c201c36c09243eed2a98e2e7"
+      "sha256": "9440ff0cb68dc3c97747ae50ebea0e9f7ec7dd247daac890e0fe86cba8908135"
     },
     {
       "path": "operator_kit/d264-first-image-prelive.sh",
@@ -35,11 +43,11 @@
     },
     {
       "path": "tests/test_d264_03_prelive_operator.py",
-      "sha256": "8138e3802804661f9568308a4bb6fc7d40b4a25a3f96334dd42b00838d8d9d55"
+      "sha256": "9b243e1e59053a18672dad676445e06819d12f7098edd810a8bed7f81095332b"
     },
     {
       "path": "Goodix 27c6 5125 manuale tecnico.md",
-      "sha256": "09d121d8e52a798165945dc680606f9866c4840a74b7b0449c1e943e8715f56e"
+      "sha256": "36406f7428b35b73d61725d432faec40385651d65e4bce85a686197611855ebb"
     }
   ],
   "exclusions": [
@@ -49,9 +57,9 @@
     "private cache",
     ".git",
     "historical bundles",
-    "Rockytkg full tree",
+    "Rockytkg tree",
     "analysis/D264/D264_03_bundle_manifest.json (external self-reference record)"
   ],
   "round_trip_byte_exact": true,
-  "cloud_transport_statement": "The Base64 file is transport-only; the canonical conceptual artifact is the byte-exact ZIP named above."
+  "cloud_transport_statement": "Base64 is transport-only; canonical conceptual artifact is the byte-exact ZIP."
 }
