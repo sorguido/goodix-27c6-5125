@@ -403,5 +403,30 @@ class SyntheticSecretHandoffExactlyOnceTests(unittest.TestCase):
         self.assertTrue(boundary.zeroized)
 
 
+class PartialCleanupTests(unittest.TestCase):
+    """A cleanup exception must not prevent the remaining host cleanup."""
+
+    def test_tls_close_exception_still_zeroizes_and_closes_transport(self):
+        coord, transport, event_source = _make_coordinator(operational_physical_policy=True)
+        coord.transport._receive = _build_receive_frames(first_image=True)
+        coord.event_source._frames = _build_event_frames(first_image=True)
+
+        def factory(boundary):
+            session = _fake_tls_factory(boundary)
+            session.close = mock.Mock(side_effect=RuntimeError("synthetic_tls_close_failure"))
+            return session
+
+        with mock.patch.object(Tls12PskServerSession, "from_boundary", factory):
+            with self.assertRaisesRegex(RuntimeFailure, "host_cleanup_incomplete"):
+                coord.run(
+                    seed_result=synthetic_seed(), ts16=0x4242,
+                    terminal_mode=TerminalBoundary.STOP_AFTER_FIRST_IMAGE,
+                )
+        self.assertEqual(transport.cleanup_count, 1)
+        self.assertTrue(coord.secret_boundary.zeroized)
+        self.assertEqual(len(coord.audit()["cleanup_failures"]), 1)
+        self.assertEqual(coord.state.value, "FAILED_CLOSED")
+
+
 if __name__ == "__main__":
     unittest.main()

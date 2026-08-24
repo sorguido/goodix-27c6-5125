@@ -1,0 +1,54 @@
+{
+  "absolute_nonrenewable_irq2_wait": true,
+  "baseline_approved": false,
+  "candidate_git_head": "c0463b024f71ed3bb90d228b27f0866660988401",
+  "default_boundary": "STOP_AFTER_FDT_ARM_ACK",
+  "failure_coverage": [
+    "IRQ2 timeout",
+    "unexpected IRQ/event",
+    "0x22 ACK mismatch",
+    "malformed first B0",
+    "CRC failure",
+    "image parse/decode failure",
+    "TLS cleanup exception with continued secret/transport cleanup"
+  ],
+  "first_image_opt_in": "--stop-after-first-image",
+  "forbidden_post_image_command_counts": {
+    "0x34": 0,
+    "0x70": 0,
+    "A2": 0,
+    "persistent_write": 0,
+    "post_image_0x20": 0,
+    "rearm_0x32": 0,
+    "reopen": 0,
+    "retry": 0,
+    "second_0x22": 0
+  },
+  "hardware_action_count": 0,
+  "live_authorized": false,
+  "no_real_device_proof": {
+    "REAL_SECRET_MATERIALIZATION_COUNT": 0,
+    "REAL_SENSOR_COMMAND_COUNT": 0,
+    "REAL_TLS_HANDSHAKE_COUNT": 0,
+    "REAL_USB_OPEN_COUNT": 0
+  },
+  "operator_commands": [
+    "./operator_kit/d264-first-image-offline.sh",
+    "./operator_kit/d264-first-image-offline.sh --stop-after-first-image"
+  ],
+  "reachability": [
+    "operator flag",
+    "tools/d264_first_image_offline.py",
+    "PersistentRuntimeCoordinator.run",
+    "TerminalBoundary.STOP_AFTER_FIRST_IMAGE",
+    "FIRST_IMAGE_IRQ2_TIMEOUT_MS=15000",
+    "operational_fdt_a0_policy(0x22)=FIXED64_ZERO_TAIL",
+    "retained TLS B0 consumer",
+    "canonical CRC/image decode",
+    "independent host cleanup"
+  ],
+  "ready_for_ai_pm_review": true,
+  "ready_for_live": false,
+  "result": "PASS_OFFLINE",
+  "schema": "D264_02_EXECUTABLE_CLOSURE_V1"
+}

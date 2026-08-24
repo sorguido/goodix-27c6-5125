@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import sys
 from typing import Callable, Iterable
 
 from core.cold_start import ColdStartMachine, ColdStartMaterial, ColdStartResult
@@ -164,6 +165,7 @@ class PersistentRuntimeCoordinator:
         self.state = RuntimeState.CREATED
         self.tls_session: Tls12PskServerSession | None = None
         self.tls_close_count = 0
+        self.cleanup_failures: list[str] = []
         self.retry_count = 0
         self.d4_attempt_count = 0
         self.d4_send_count = 0
@@ -283,12 +285,26 @@ class PersistentRuntimeCoordinator:
                 pass
             raise
         finally:
+            active_failure = sys.exc_info()[0] is not None
             if self.tls_session is not None:
-                self.tls_session.close()
-                self.tls_close_count = 1
-            self.secret_boundary.close()
-            self.transport.close()
-            if self.state == RuntimeState.COMPLETED:
+                try:
+                    self.tls_session.close()
+                    self.tls_close_count = 1
+                except Exception as error:
+                    self.cleanup_failures.append(f"tls:{type(error).__name__}:{error}")
+            try:
+                self.secret_boundary.close()
+            except Exception as error:
+                self.cleanup_failures.append(f"secret:{type(error).__name__}:{error}")
+            try:
+                self.transport.close()
+            except Exception as error:
+                self.cleanup_failures.append(f"transport:{type(error).__name__}:{error}")
+            if self.cleanup_failures:
+                self.state = RuntimeState.FAILED_CLOSED
+                if not active_failure:
+                    raise RuntimeFailure("host_cleanup_incomplete:" + ";".join(self.cleanup_failures))
+            elif self.state == RuntimeState.COMPLETED:
                 self.state = RuntimeState.CLOSED
 
     def _run_arm_only_boundary(self) -> RuntimeResult:
@@ -442,6 +458,7 @@ class PersistentRuntimeCoordinator:
             ),
             "tls_server_handshake_count": session.handshake_count if session is not None else 0,
             "tls_close_count": self.tls_close_count,
+            "cleanup_failures": list(self.cleanup_failures),
             "second_server_session_created": False,
             "second_psk_provisioning": (
                 session.psk_context_provisioning_count != 1 if session is not None else False

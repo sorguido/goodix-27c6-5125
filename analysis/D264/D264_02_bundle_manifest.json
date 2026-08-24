@@ -1,0 +1,56 @@
+{
+  "bundle_manifest_packaging_note": "This manifest is the external transport manifest and is intentionally not self-embedded, avoiding an impossible self-referential ZIP hash.",
+  "bundle_scope": "D264/02 only; step-local and non-cumulative",
+  "canonical_bundle_filename": "analysis/D264/D264_02_first_image_offline_operationalization_bundle.zip",
+  "canonical_zip_sha256": "d2a0014baa17a651fa84d3f55d1af4057faaf6681ce0e8761eba089afa25574e",
+  "cloud_transport_statement": ".zip.b64 is a temporary Cloud transport representation; canonical format remains ZIP.",
+  "exclusions": [
+    "raw captures",
+    "secrets/PSK",
+    "biometric payloads",
+    "historical bundles",
+    "Rockytkg tree",
+    ".git"
+  ],
+  "payload": [
+    {
+      "path": "analysis/D264/D264_02_report.md",
+      "sha256": "699e1b92a5e5bf253296e7ed4cfc777225f9fb3e80313db0effa1c216f8d060e"
+    },
+    {
+      "path": "analysis/D264/D264_02_executable_closure.json",
+      "sha256": "bd7d5dbdaab72aa7721c1782b2186cda4ab822684b070f6be08a334ddc338b15"
+    },
+    {
+      "path": "analysis/D264/D264_02_live_critical_manifest.json",
+      "sha256": "fde50673e5cbced0e2c9b3358e856dddce6affb93a7d8cd54bcf83d42e03972d"
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "sha256": "dd84cda8c43df12c9caa057af0c16e8b5b9b198a26a3a38636bd1ee41dc885e3"
+    },
+    {
+      "path": "tools/d264_first_image_offline.py",
+      "sha256": "8efc0b5ce811927e02d3d13f1aadb2b7f92b640738e8598afa70ed4f7414f4ba"
+    },
+    {
+      "path": "operator_kit/d264-first-image-offline.sh",
+      "sha256": "6846022320508747d8142344ab4ac22d01bdb2096d5087ffc3dec27c56a19a48"
+    },
+    {
+      "path": "tests/test_d264_02_offline_operator.py",
+      "sha256": "9efe7b607fdab48cfc8a6ab30c60b8576c8e089c69f473ae8267be3b8cbbaa9a"
+    },
+    {
+      "path": "tests/test_d263_phase2_public_run.py",
+      "sha256": "66e1ed6993a3910ad1a16e1daf910efd4c24b4716634fc73feb8964b92ffc23a"
+    },
+    {
+      "path": "Goodix 27c6 5125 manuale tecnico.md",
+      "sha256": "f87d55649490614b155583f8c8e5280d996043d6bd7422a718bbffd8a3d8d427"
+    }
+  ],
+  "round_trip_byte_exact": true,
+  "schema": "D264_02_BUNDLE_MANIFEST_V1",
+  "transport_representation": "analysis/D264/D264_02_first_image_offline_operationalization_bundle.zip.b64"
+}

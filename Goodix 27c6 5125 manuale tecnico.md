@@ -4481,3 +4481,43 @@ FIRST_IMAGE_LIVE_PROVEN=false
 ```
 
 Gli artefatti machine-readable e il report di review sono in `analysis/D264/`.
+
+### D264/02: candidate operatore first-image, executable closure OFFLINE
+
+D264/02 rende il boundary D263 operativamente invocabile senza abilitare il
+live. Il launcher `operator_kit/d264-first-image-offline.sh` non ha modalità
+hardware: senza argomenti seleziona `STOP_AFTER_FDT_ARM_ACK`, mentre
+`--stop-after-first-image` è l'unico opt-in per `STOP_AFTER_FIRST_IMAGE`.
+Valori ignoti o selezioni multiple falliscono prima dell'entrypoint.
+L'entrypoint riusa il coordinatore pubblico e le fixture sintetiche D263; non
+duplica protocollo, transport o lifecycle.
+
+La rehearsal first-image attraversa realmente il coordinatore persistente con
+policy fisica candidate `FIXED64_ZERO_TAIL`, un solo deadline IRQ2 host-side
+assoluto/non rinnovabile da 15000 ms, esattamente un `0x22`, una validazione
+ACK, un primo B0 sulla TLS trattenuta, decode canonico in memoria e cleanup
+host. Il JSON conserva soltanto dimensioni e telemetria non biometrica. I test
+coprono default e opt-in, selezione fail-closed, timeout/evento inatteso, ACK
+errato, B0 malformato, CRC/decode failure, one-shot e cleanup parziale. Il
+cleanup runtime è indipendente per TLS, secret e transport: un'eccezione non
+impedisce le fasi successive e chiude il runtime come `FAILED_CLOSED`.
+
+Il path non invia `0x34`, `0x20` post-image, un secondo `0x22`, re-arm, A2,
+`0x70`, recovery, retry o write persistenti. La rehearsal attesta
+`REAL_USB_OPEN_COUNT=0`, `REAL_TLS_HANDSHAKE_COUNT=0` e
+`REAL_SENSOR_COMMAND_COUNT=0`. `POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED` è
+provato offline; `POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN`; `0x22`
+fixed64 e first image restano `NOT_LIVE_PROVEN`.
+`FIRST_IMAGE_TERMINAL_RISK=ACCEPTABLY_BOUNDED`, non sicurezza assoluta.
+
+Hash, ruoli e reachability del live-critical set sono registrati in
+`analysis/D264/D264_02_live_critical_manifest.json`; il commit candidate non
+equivale ad approvazione baseline. Stato corrente:
+
+```text
+D264_02_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D264_02_READY_FOR_AI_PM_REVIEW=true
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED=false
+```
