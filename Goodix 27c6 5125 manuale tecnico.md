@@ -4052,6 +4052,41 @@ Test esistenti: `test_cleanroom.py`, `test_d249_post_d4.py`,
 Artefatti `analysis/D263/`: `D263_02_retained_tls_map.json`,
 `D263_02_first_image_pipeline.json`, `D263_02_runtime_gap_report.md`. Nessun ZIP.
 
+### D263/03: terminal stop dopo la first image e gate Phase 1 (sottostep 03)
+
+OFFLINE, no live, no patch runtime. Confronto con il ciclo positivo primario
+(`rilevamento.pcapng`, in `D263_workflow_state.observed_order`): lo stack
+Windows dopo la prima immagine invia `0x34` (arm finger-up, manuale 170-171) →
+`IRQ 0x0200` → `0x20` (seconda immagine) → `0x32` re-arm. Questo è
+multi-enrollment e **non** prova che `0x34`/`0x20`/re-arm siano richiesti per
+uno stop host dopo la prima immagine.
+
+Candidato terminale D263/03:
+`0x32 → IRQ 0x0002 → 0x22 → first image → HOST/TLS/USB CLEANUP → STOP`,
+senza `0x34`, `0x20`, re-arm, A2, `0x70`, reset, retry, comandi persistenti.
+
+Host cleanup (VERIFICATO fattibile/implementato): cancel pending receive
+(D255/D256 quiescenza bus: pending IN cancellato a frame 218, zero packet
+residui), TLS close (`core/persistent_runtime.py` finally), USB release/close,
+restore `fprintd` exactly-once (manuale 912-928, 1377-1387), nessun comando
+Goodix extra (D255/D256: intervallo cancel senza packet target).
+
+Device internal state (UNKNOWN per taxonomy): FDT/finger post-image non noto
+(D252 BLOCKED); `0x34` osservato solo come arm finger-up, necessità non provata;
+tolleranza disconnect device-side non osservata; recovery cold start INFERITO OK
+(D256: nuovo `0x32` accettato senza restore USB); restore device-side non
+osservato, A2/`0x70` NON sono restore FDT.
+
+Classificazione: `FIRST_IMAGE_TERMINAL_STOP=EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN`.
+`D263_PHASE1_READY_FOR_PHASE2_OFFLINE_RUNTIME_INTEGRATION=true`: autorizza solo
+design/implementazione **OFFLINE** del candidato bounded (cablare path post-arm
+first-image su TLS retainita + cleanup host esattamente-once + STOP), NON live
+review né live execution. Baseline D262 `e9073a17...` rispettata, non regredita.
+
+Artefatti `analysis/D263/`: `D263_03_terminal_boundary_evidence.json`,
+`D263_03_terminal_boundary_decision.json`, `D263_03_phase1_decision.json`,
+`D263_03_report.md`. Nessun ZIP.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;

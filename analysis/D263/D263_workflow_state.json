@@ -11,9 +11,10 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02"],
+  "completed_substeps": ["01", "02", "03"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
+  "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -60,6 +61,14 @@
     "statement": "logical exact A0 -> physical fixed64 -> deterministic zero-fill outside declared length",
     "confirmed_on_primary": true
   },
+  "phase2_gate": {
+    "substep_03_classification": "FIRST_IMAGE_TERMINAL_STOP=EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN",
+    "D263_PHASE1_READY_FOR_PHASE2_OFFLINE_RUNTIME_INTEGRATION": true,
+    "phase2_scope": "OFFLINE design/implementation ONLY; NO live review; NO live execution",
+    "host_side_stop": "VERIFIED feasible/implemented (cancel pending, TLS close, USB release, restore fprintd, zero extra Goodix cmd; D255/D256 quiescence + retained-TLS audit)",
+    "device_internal_state": "UNKNOWN (D252 BLOCKED; 0x34 = arm finger-up only; A2/0x70 not restore FDT)",
+    "d262_baseline_respected": "e9073a171697bd68dd2debabb851f23d007bf718"
+  },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
   "residual_blockers": [
@@ -68,7 +77,7 @@
     "device-side restore/cancel and arm lifetime remain open (D252/D253/D255 scope)"
   ],
   "manual_updated": true,
-  "next_substep_expected": "D263/02 (per prompt successivo; nessun ZIP in 01)",
+  "next_substep_expected": "D263/04+ (Phase 2 OFFLINE runtime integration per gate=true; nessun ZIP finche' non e' l'ultimo prompt D263)",
   "safety": {
     "usb_open_count": 0,
     "command_count": 0,
