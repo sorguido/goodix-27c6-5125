@@ -11,7 +11,7 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02", "03", "04", "05", "06", "07"],
+  "completed_substeps": ["01", "02", "03", "04", "05", "06", "07", "08"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
@@ -19,6 +19,7 @@
   "outcome_05": "PASS_SUPPORT_PRIMITIVES_IMPLEMENTED",
   "outcome_06": "PASS_RUNTIME_INTEGRATION",
   "outcome_07": "PASS_EXECUTABLE_CLOSURE_REGRESSION_AUDIT_MICRO_CORRECTIVE",
+  "outcome_08": "PASS_FINAL_CONSOLIDATION_CANONICAL_CLOSURE_BUNDLE",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -127,6 +128,18 @@
     "live_critical_diff": "exactly the 3 Phase-2-patched files changed vs D263_04 baseline; all other live-critical unchanged",
     "invariants_preserved": "no new command/retry/persistent; first-image not persisted; fail-closed; one-shot 0x22"
   },
+  "phase2_step08_summary": {
+    "status": "FINAL_CONSOLIDATION_CANONICAL_CLOSURE_BUNDLE",
+    "outcome": "OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW",
+    "coherence_check": "no contradictions across 01-07; taxonomy/phase1-gate/contract/hashes coherent",
+    "final_decision": "analysis/D263/D263_final_decision.json",
+    "final_report": "analysis/D263/D263_final_report.md",
+    "bundle": "analysis/D263/D263_post_arm_first_image_offline_bundle.zip",
+    "bundle_sha256": "239bfaeaa82cd505e9bdc294508202504c404a903f622f762ea5b300dbffa4f6",
+    "bundle_entries": 34,
+    "bundle_verified": "CRC_OK; no path traversal/symlink; no forbidden-material; sidecar SHA-256 present",
+    "manual_updated": true
+  },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
   "residual_blockers": [
@@ -135,7 +148,7 @@
     "device-side restore/cancel and arm lifetime remain open (D252/D253/D255 scope)"
   ],
   "manual_updated": true,
-  "next_substep_expected": "D263/08 (likely ULTIMO prompt: bundle ZIP finale unico step-local non cumulativo; nessun ZIP finora)",
+  "next_substep_expected": "NONE (ultimo prompt D263; bundle unico creato; in attesa di review AI PM / baseline live)",
   "safety": {
     "usb_open_count": 0,
     "command_count": 0,

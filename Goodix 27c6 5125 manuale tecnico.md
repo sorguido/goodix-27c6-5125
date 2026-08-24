@@ -4223,6 +4223,59 @@ Artefatti `analysis/D263/`: `D263_07_executable_closure.json`,
 `D263_07_regression_results.json`, `D263_07_live_critical_diff_manifest.json`,
 `D263_07_report.md`. Nessun ZIP.
 
+### D263/08: consolidamento finale, closure canonica, UNICO bundle (sottostep 08, ultimo)
+
+Consolidamento OFFLINE di D263 (Phase 1 + Phase 2). Nessuna feature nuova.
+Verifica di coerenza tra sottostep 01–07: nessuna contraddizione (taxonomy
+`0x22`=`PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY` costante; gate Phase1 READY
+coerente; step05/06/07 implementano esattamente il contratto `D263_04`; hash
+live-critical coerenti con `D263_07`).
+
+Esito finale: **`OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW`** (non live-ready).
+D263 ha provato offline: (a) ordine post-arm target-specific
+`0x32(arm,ACK)→IRQ0x0002→0x22[01 00](ACK)→first image(TLS B0)→host/TLS/USB
+cleanup→STOP`; (b) policy fisica `0x22` (`ABSTRACT_LOGICAL_ONLY`, nessun padding
+inventato); (c) pipeline first-image canonica unica (TLS retained → codec
+`decode_image_record` 7684-byte → 80×64, CRC fail-closed); (d) retained TLS
+single-session/single-handshake; (e) terminal-stop su coordinator di produzione
+cablatо ed esercitato end-to-end con double offline; (f) micro-correttiva shape
+raster derivata dal decode.
+
+Stato canonico D263 (coerente con i marker globali del manuale):
+
+```text
+CURRENT BOUNDARY            = post-arm first-image OFFLINE candidate (D263), non live
+READY_FOR_FDT              = architecture-review true; operational/live false
+SECOND_LIVE_ATTEMPT_ALLOWED= false (single-use coordinator; D262 marker consumato)
+FDT_DOWN_TABLE_LIVE_READY  = false (tabella dynamic IRQ0x100, sessione-capture only)
+0x22                       = PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY; non live-proven
+FIRST_IMAGE                = pipeline canonica OFFLINE chiusa; non persistita
+D262_OUTCOME               = PASS_STOP_AFTER_FDT_ARM_ACK (baseline e9073a17… non regredita)
+D263                       = OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW
+D263_PHASE1_READY_FOR_PHASE2_OFFLINE_RUNTIME_INTEGRATION = true
+D263_PHASE2_EXECUTED       = true
+D263_PHASE2_RESULT         = OFFLINE_PASS (no live)
+D263_EXECUTABLE_CLOSURE    = PASS_OFFLINE
+D263_LIVE_CRITICAL_MODIFICATION_COUNT = 3 (persistent_runtime, runtime_transport, fdt_lifecycle)
+D263_HARDWARE_ACTION_COUNT = 0
+D263_READY_FOR_LIVE_REVIEW = false
+D263_READY_FOR_LIVE        = false
+D263_LIVE_EXECUTION        = NOT_PERFORMED
+```
+
+File live-critical cambiati (vs `D263_04`): `core/persistent_runtime.py`,
+`core/runtime_transport.py`, `core/fdt_lifecycle.py`. Tutti gli altri
+backend/guardrail/launcher live-critical sono byte-identici. Nessun live
+test/autorizzazione; nessun comando USB/PSK/OTP/flash. Bundle unico:
+`D263_post_arm_first_image_offline_bundle.zip` (+ `.sha256`), step-local,
+non cumulativo, con manifest path+SHA-256, senza raw capture/secret/biometric.
+
+Review necessaria prima di qualunque futuro live: baseline live approvata
+esplicitamente dall'AI PM; autorizzazione live separata; verifica del
+live-critical set contro questo bundle; riapertura dei blocchi D252/D253/D255
+(device-side restore/cancel, arm lifetime, current-path seed) con evidenza OEM
+mirata. `0x22` resta `OBSERVED_ONLY` finché un live dedicato non lo accetta.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;

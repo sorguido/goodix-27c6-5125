@@ -1,0 +1,71 @@
+{
+  "schema": "D263_FINAL_DECISION_V1",
+  "step": "D263",
+  "milestone": "D263",
+  "reasoning": "HIGH",
+  "generated_utc": "2026-08-24T07:54:28Z",
+  "git": {
+    "branch": "session/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
+    "start_head": "d1cea0ed5109274d5249ff8b8492d7d131ec6a54",
+    "current_head": "adf582fe31c41effcd9d7a0f9d4ed94d6376700f",
+    "status": "clean (harness-managed change-set; D263 edits present on disk)"
+  },
+  "target": {
+    "identity": "Goodix USB 27c6:5125",
+    "firmware": "GF_ST411SEC_APP_12509",
+    "primary_capture": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+    "primary_capture_sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+  },
+  "target_observed_post_arm_order": "0x32(arm,ACK) -> IRQ0x0002 -> 0x22[01 00](ACK) -> first image(outer 0xB0, TLS 17 03 03, 7726) -> [D263 terminal-stop candidate: host/TLS/USB cleanup -> STOP]; note: primary capture continues with 0x34->IRQ0x0200->0x20->2nd image->0x32 re-arm, but that is Windows multi-enroll, NOT part of the D263 terminal-stop candidate",
+  "minimum_causal_requirement": "Order 0x32(arm,ACK)->IRQ0x0002->0x22[01 00](ACK)->first image is OBSERVED in primary capture; causality 'IRQ2 causes 0x22' is NOT proven (observed != causal). 0x22 NOT live-proven (D262 stops at FDT arm).",
+  "OUTCOME": "OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW",
+  "ADVANCEMENT": "Phase 1 (evidence/architecture) + Phase 2 (offline runtime integration of first-image terminal-stop) completed and audited offline; no live execution; no new hardware boundary reached beyond D262's STOP_AFTER_FDT_ARM_ACK",
+  "EXECUTABLE_CLOSURE": "PASS_OFFLINE (coordinator imports/runs offline; fail-closed; single-use; cleanup guaranteed; 20/20 D263 tests PASS)",
+  "RESIDUAL_BLOCKER_OR_RISK": [
+    "Causality IRQ2=>0x22 necessity not proven by primary trace alone",
+    "0x22 not live-proven (D262 STOP_AFTER_FDT_ARM_ACK)",
+    "device-side restore/cancel and arm lifetime remain open (D252/D253/D255)",
+    "0x22 physical policy is ABSTRACT_LOGICAL_ONLY (no Linux-safe padding invented; only observed as abstract logical)",
+    "D263 0x22 zero-tail candidate unproven for live Linux submission"
+  ],
+  "CANONICAL_DOCUMENTATION": {
+    "manual_updated": true,
+    "manual_section": "## D263 ... ### D263/08 (final consolidation)",
+    "markers_verified": ["CURRENT_BOUNDARY", "READY_FOR_FDT", "SECOND_LIVE_ATTEMPT_ALLOWED", "FDT_DOWN_TABLE_LIVE_READY", "0x22", "FIRST_IMAGE", "D262_OUTCOME", "D263"],
+    "d262_outcome_preserved": "PASS_STOP_AFTER_FDT_ARM_ACK (baseline e9073a171697bd68dd2debabb851f23d007bf718 not regressed)"
+  },
+  "BUNDLE": {
+    "path": "analysis/D263/D263_post_arm_first_image_offline_bundle.zip",
+    "sha256_sidecar": "analysis/D263/D263_post_arm_first_image_offline_bundle.zip.sha256",
+    "semantics": "step-local D263, non-cumulative vs D262/prior; includes all D263-produced/modified artifacts (Phase1+Phase2), updated canonical manual, and D263-modified source/test files; excludes raw captures/secret/biometric/temp/unrelated; manifest with path+SHA-256"
+  },
+  "D263_0X22_ZERO_TAIL_CANDIDATE_STATUS": "ABSTRACT_LOGICAL_ONLY (no zero-tail padding invented for unproven post-arm command; fixed64 zero-tail remains a future per-command live hypothesis, D261-style, for 0x22 only if explicitly authorized)",
+  "D263_RETAINED_TLS_PATH_STATUS": "IMPLEMENTED_OFFLINE_VERIFIED (one Tls12PskServerSession, handshake_count==1, same secret-boundary; first-image B0 consumed on the retained application session; no second handshake/session/reopen)",
+  "D263_FIRST_IMAGE_PIPELINE_STATUS": "IMPLEMENTED_OFFLINE_VERIFIED (canonical codec decode_image_record 7684B->80x64, CRC fail-closed; plaintext zeroed after decode; not persisted)",
+  "FIRST_IMAGE_TERMINAL_STOP": "EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN; host-side stop implemented and exercised offline end-to-end; device internal post-image state remains UNKNOWN (D252 BLOCKED)",
+  "D263_PHASE1_READY_FOR_PHASE2_OFFLINE_RUNTIME_INTEGRATION": true,
+  "D263_PHASE2_EXECUTED": true,
+  "D263_PHASE2_RESULT": "OFFLINE_PASS",
+  "D263_EXECUTABLE_CLOSURE": "PASS_OFFLINE",
+  "D263_LIVE_CRITICAL_MODIFICATION_COUNT": 3,
+  "D263_HARDWARE_ACTION_COUNT": 0,
+  "D263_READY_FOR_LIVE_REVIEW": false,
+  "D263_READY_FOR_LIVE": false,
+  "D263_LIVE_EXECUTION": "NOT_PERFORMED",
+  "live_critical_files_changed": [
+    "core/persistent_runtime.py",
+    "core/runtime_transport.py",
+    "core/fdt_lifecycle.py"
+  ],
+  "live_critical_files_unchanged": [
+    "core/post_d4.py", "core/tls_b0.py", "src/goodix5125_cleanroom.py",
+    "core/usb_runtime.py", "core/protected_runtime.py",
+    "tools/d261_live_fdt_arm_once.py", "src/goodix5125_d235_entrypoint.py"
+  ],
+  "next_required_review_before_any_live": [
+    "explicit AI-PM-approved live baseline SHA",
+    "separate live authorization",
+    "live-critical set verification against this bundle",
+    "targeted OEM evidence to close D252/D253/D255 (device-side restore/cancel, arm lifetime, current-path seed)"
+  ]
+}
