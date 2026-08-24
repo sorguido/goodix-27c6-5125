@@ -4225,8 +4225,11 @@ test PASS.
 
 Test: D263-targeted 20/20 PASS; full discovery 248 (5 fail + 33 err + 3 skip)
 tutti ambientali (no OpenSSL PSK / `patch` / libusb / synthetic-TLS client nel
-Cloud), pre-esistenti a D263, nessuno importa/esercita i tre moduli patch-ati.
-Nessuna regressione D263. Integrity: vs `D263_04`, cambiano esattamente i tre
+Cloud), pre-esistenti a D263: i guasti ambientali osservati nel Cloud avvengono
+prima di raggiungere il path D263 modificato — il rehearsal D260 importa in via
+transitiva `core/persistent_runtime.py`, ma il failure Cloud avviene prima del
+path D263; nessuna regressione è attribuibile al change-set D263. Nessuna
+regressione D263. Integrity: vs `D263_04`, cambiano esattamente i tre
 file patch-ati (persistent_runtime, runtime_transport, fdt_lifecycle); tutti gli
 altri live-critical (backend/guardrail/launcher) byte-identici.
 

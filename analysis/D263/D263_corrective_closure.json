@@ -92,7 +92,7 @@
     "public_run_secret_handoff_test": "PASS"
   },
   "test_counts": {
-    "d263_total_pass": 27,
+    "d263_total_pass": 28,
     "d260_failure_environmental": true,
     "d263_attributable_regressions": 0
   },

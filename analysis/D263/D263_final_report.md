@@ -86,9 +86,10 @@ cleanup on every path.
   `ABSTRACT_LOGICAL_ONLY` (logical) vs `FIXED64_ZERO_TAIL`
   (`EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`, not live-accepted); ACK `0x22`
   `= EXACTLY_ONE_REQUIRED_AND_VALIDATED`.
-- **Tests:** 7 environment-independent public-`run()` tests added (arm-only x3,
-  first-image success x1, first-image failure x1, `0x22` policy x2). Total D263
-  tests = 27 PASS.
+- **Tests:** 8 environment-independent public-`run()` tests added (arm-only x3,
+  first-image success x1, first-image failure x1, `0x22` policy x2), plus 1
+  secret-handoff exactly-once test in the canonical-polish pass. Total D263
+  tests = 28 PASS.
 
 ## File live-critical changed (vs `D263_04`)
 

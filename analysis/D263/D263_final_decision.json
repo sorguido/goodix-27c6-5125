@@ -65,7 +65,7 @@
     "POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN": false
   },
   "D260_BACKWARD_COMPATIBILITY": "PRESERVED_BY_EXPLICIT_DEFAULT_BOUNDARY (default run() stops after final FDT arm; D260 rehearsal/happy path unaffected; new env-independent public-run arm-only tests prove it without OpenSSL-PSK)",
-  "D263_PUBLIC_RUN_FIRST_IMAGE_TEST": "PASS_OFFLINE_ENV_INDEPENDENT (public run() exercised end-to-end for both boundaries incl. finally-cleanup; 27 D263 tests PASS)",
+  "D263_PUBLIC_RUN_FIRST_IMAGE_TEST": "PASS_OFFLINE_ENV_INDEPENDENT (public run() exercised end-to-end for both boundaries incl. finally-cleanup; 28 D263 tests PASS)",
   "D263_0X22_POLICY_SELECTION_TEST": "PASS",
   "D263_RETAINED_TLS_PATH_STATUS": "IMPLEMENTED_OFFLINE_VERIFIED (one Tls12PskServerSession, handshake_count==1, same secret-boundary; first-image B0 consumed on the retained application session; no second handshake/session/reopen)",
   "D263_FIRST_IMAGE_PIPELINE_STATUS": "IMPLEMENTED_OFFLINE_VERIFIED (canonical codec decode_image_record 7684B->80x64, CRC fail-closed; plaintext zeroed after decode; not persisted)",

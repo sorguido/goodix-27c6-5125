@@ -28,7 +28,7 @@
       "no libusb / real USB backend",
       "synthetic TLS client API absent"
     ],
-    "note": "All 38 non-passing tests are environmental and pre-existed D263; none import or exercise the three D263-patched modules. No NEW regression attributable to D263."
+    "note": "All 38 non-passing tests are environmental and pre-existed D263; the Cloud environmental failures occur before reaching the D263-modified path — the D260 rehearsal transitively imports core/persistent_runtime.py, but the Cloud failure occurs before the D263 path; none of these failures exercise the D263-modified code paths. No NEW regression attributable to D263."
   },
   "micro_corrective_retest": {
     "file": "core/persistent_runtime.py",

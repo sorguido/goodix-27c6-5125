@@ -32,7 +32,10 @@
 
 ## Test execution
 - **D263-targeted:** 20 executed, 20 pass, 0 fail/skip/unavailable.
-- **Full discovery:** 248 executed; 5 fail + 33 error + 3 skip. All 38 non-passing are **environmental** (no OpenSSL PSK / `patch` / libusb / synthetic-TLS client in Cloud) and pre-existed D263; none import or exercise the three patched modules. **No D263 regression.**
+- **Full discovery:** 248 executed; 5 fail + 33 error + 3 skip. All 38 non-passing are **environmental** (no OpenSSL PSK / `patch` / libusb / synthetic-TLS client in Cloud) and pre-existed D263; the Cloud environmental failures occur before reaching the
+D263-modified path — the D260 rehearsal transitively imports `core/persistent_runtime.py`,
+but the Cloud failure occurs before the D263 path, and none of these failures exercise
+the D263-modified code paths. **No D263 regression.**
 
 ## Integrity (live-critical diff)
 Exactly the three Phase-2-patched files changed vs `D263_04` baseline; all reused + backend/guardrail/launcher live-critical files byte-identical. See `D263_07_live_critical_diff_manifest.json`.
