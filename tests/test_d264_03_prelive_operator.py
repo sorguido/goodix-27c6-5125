@@ -114,7 +114,7 @@ def test_baseline_format_fails_before_side_effects(git_authority, sha):
     repo, _, paths=git_authority; events=[]
     report=run_future_first_image_candidate(issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG), deps(events),
         repo=repo, approved_baseline_sha=sha, authoritative_paths=paths, ts16=1)
-    assert events == ["signals_restore","fprintd_restore","report_publish"]
+    assert events == []
     assert "full_sha_required" in report["failure_class"]
 
 
@@ -137,7 +137,14 @@ def test_each_guard_fails_closed_before_later_phases(git_authority, guard):
     events=[]; report=run(git_authority, deps(events, fail_at=guard), events)
     assert report["result"] == "FAIL_CLOSED"
     assert "secret_materialize" not in events and "marker_claim" not in events and "backend_construct" not in events
-    assert events[-3:] == ["signals_restore","fprintd_restore","report_publish"]
+    if guard in {"operator_context", "safe_directories"}:
+        assert "report_publish" not in events
+    elif guard in {"protected_metadata", "gfusb_hash", "target_identity", "fprintd_stop"}:
+        assert events[-1:] == ["report_publish"] and "fprintd_restore" not in events
+    elif guard == "signals_block":
+        assert events[-2:] == ["fprintd_restore", "report_publish"] and "signals_restore" not in events
+    else:
+        assert events[-3:] == ["signals_restore","fprintd_restore","report_publish"]
 
 
 @pytest.mark.parametrize("guard", ["safe_directories", "marker_preflight"])
@@ -145,6 +152,16 @@ def test_future_report_collision_and_marker_presence_fail_before_secret(git_auth
     events=[]; report=run(git_authority,deps(events,fail_at=guard),events)
     assert report["result"] == "FAIL_CLOSED"
     assert "secret_materialize" not in events and "marker_claim" not in events and "backend_construct" not in events
+    if guard == "safe_directories": assert "report_publish" not in events
+
+
+def test_report_and_restore_are_transaction_state_gated(git_authority):
+    events=[]; run(git_authority,deps(events,fail_at="protected_metadata"),events)
+    assert events[-1:] == ["report_publish"]
+    events=[]; run(git_authority,deps(events,fail_at="signals_block"),events)
+    assert events.count("fprintd_restore")==1 and "signals_restore" not in events
+    events=[]; run(git_authority,deps(events,fail_at="holder_check"),events)
+    assert events.count("fprintd_restore")==events.count("signals_restore")==1
 
 
 def test_concrete_future_report_and_marker_preflights_use_fixed_safe_boundaries(tmp_path):
@@ -327,16 +344,45 @@ def test_fixed_capability_authority_has_no_public_validator_bypass(monkeypatch, 
 
 
 def test_d261_and_future_fixed_authorities_are_distinct():
-    from core.live_capability import (issue_d261_intent,issue_d261_live_io,issue_d261_marker,
+    import core.live_capability as authority
+    from core.live_capability import (_issue_d261_intent_after_exact_flag,
+        _issue_d261_live_io_after_marker,_issue_d261_marker_after_durable_claim,
         issue_future_intent,issue_future_live_io,_issue_future_marker_after_durable_claim,
         require_known_live_io_capability,require_known_material_intent)
-    d261=issue_d261_intent("--i-authorize-one-d261-fdt-arm-live-attempt")
-    d261_live=issue_d261_live_io(d261,issue_d261_marker(d261))
+    assert not hasattr(authority,"issue_d261_intent") and not hasattr(authority,"issue_d261_marker")
+    assert not hasattr(authority,"issue_future_marker_after_durable_claim")
+    d261=_issue_d261_intent_after_exact_flag("--i-authorize-one-d261-fdt-arm-live-attempt")
+    with pytest.raises(Exception): _issue_d261_live_io_after_marker(d261,object())
+    d261_marker=_issue_d261_marker_after_durable_claim(d261)
+    d261_live=_issue_d261_live_io_after_marker(d261,d261_marker)
     require_known_material_intent(d261); require_known_live_io_capability(d261_live)
     future=issue_future_intent(D265_FUTURE_LIVE_AUTHORIZATION_FLAG); future._used=True
     future_marker=_issue_future_marker_after_durable_claim(future); future_live=issue_future_live_io(future_marker)
     require_known_material_intent(future); require_known_live_io_capability(future_live)
-    with pytest.raises(Exception): issue_d261_live_io(d261,future_marker)
-    with pytest.raises(Exception): issue_future_live_io(issue_d261_marker(d261))
+    with pytest.raises(Exception): _issue_d261_live_io_after_marker(d261,future_marker)
+    with pytest.raises(Exception): issue_future_live_io(d261_marker)
     with pytest.raises(Exception): require_known_material_intent(object())
     with pytest.raises(Exception): require_known_live_io_capability(object())
+
+
+@pytest.mark.parametrize("euid,sudo_uid,passes", [(1000,"1000",False),(0,"",False),(0,"abc",False),(0,"0",False),(0,"1000",True)])
+def test_future_operator_context_matches_d261(euid,sudo_uid,passes):
+    from core.live_capability import require_root_with_nonroot_operator
+    if passes: require_root_with_nonroot_operator(euid,sudo_uid)
+    else:
+        with pytest.raises(Exception): require_root_with_nonroot_operator(euid,sudo_uid)
+
+
+def test_future_marker_short_write_and_zero_progress(tmp_path,monkeypatch):
+    original_write=os.write; calls=[]
+    def short_write(fd,data):
+        calls.append(len(data)); return original_write(fd,bytes(data[:3]))
+    monkeypatch.setattr(os,"write",short_write)
+    intent=issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG); intent._used=True
+    marker=tmp_path/"short.marker"; capability=claim_future_marker_fixture(marker,"a"*40,intent)
+    assert len(calls)>1 and json.loads(marker.read_text())["schema"]=="D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1"
+    assert issue_live_io_after_marker_claim(capability)
+    monkeypatch.setattr(os,"write",lambda fd,data: 0)
+    intent2=issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG); intent2._used=True
+    with pytest.raises(FutureOperatorFailure,match="no_progress"):
+        claim_future_marker_fixture(tmp_path/"zero.marker","a"*40,intent2)

@@ -61,6 +61,7 @@ from core.protected_runtime import (
     require_cli_intent,
 )
 from core.usb_runtime import CtypesLibusbBackend, LibusbRuntimeTransport, TARGET_PID, TARGET_VID
+from core.live_capability import CapabilityFailure, require_root_with_nonroot_operator
 from src.goodix5125_cleanroom import crc32_mpeg2
 
 
@@ -582,11 +583,11 @@ def live_preflight(
     # Baseline approval is deliberately the first external-state gate.  An
     # unapproved SHA cannot reach privilege, service, protected or USB work.
     verify_approved_git_baseline(repo, baseline_sha, fileset)
-    if os.geteuid() != 0:
-        raise OperationalFailure("live_euid_root_required")
     sudo_uid = os.environ.get("SUDO_UID", "")
-    if not sudo_uid.isdigit() or int(sudo_uid) == 0:
-        raise OperationalFailure("non_root_operator_context_required")
+    try:
+        require_root_with_nonroot_operator(os.geteuid(), sudo_uid)
+    except CapabilityFailure as exc:
+        raise OperationalFailure(str(exc)) from exc
     try:
         MARKER_PATH.lstat()
     except FileNotFoundError:

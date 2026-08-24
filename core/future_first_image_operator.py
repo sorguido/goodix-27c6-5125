@@ -33,6 +33,7 @@ from core.live_capability import (
     issue_future_live_io,
     _issue_future_marker_after_durable_claim,
     require_known_live_io_capability,
+    require_root_with_nonroot_operator,
 )
 
 
@@ -152,7 +153,12 @@ def claim_future_marker_fixture(path: Path, baseline_sha: str, intent: FutureInt
             "schema": "D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1",
             "approved_baseline_sha": baseline_sha,
         }, sort_keys=True).encode() + b"\n"
-        os.write(descriptor, payload)
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise FutureOperatorFailure("future_marker_write_made_no_progress")
+            view = view[written:]
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
@@ -242,8 +248,10 @@ class FutureProductionDependencies:
         state: dict[str, Any] = {}
         fprintd, signals = FprintdTransaction(), SignalTransaction()
         def operator_context():
-            if os.geteuid() != 0 or not os.environ.get("SUDO_UID", "").isdigit():
-                raise FutureOperatorFailure("future_operator_context_required")
+            try:
+                require_root_with_nonroot_operator(os.geteuid(), os.environ.get("SUDO_UID", ""))
+            except CapabilityFailure as exc:
+                raise FutureOperatorFailure(str(exc)) from exc
         def safe_directories():
             prepare_report_directory(PROTECTED_ROOT, REPORT_DIRECTORY)
             require_bound_future_report_destination(require_safe_report_destination)
@@ -294,16 +302,22 @@ def run_future_first_image_candidate(
     secret = None
     secret_owned_by_outer = False
     ownership_transferred = False
+    report_destination_preflight_passed = False
+    fprintd_transaction_started = False
+    signals_transaction_started = False
     try:
         verify_authoritative_baseline(repo, approved_baseline_sha, authoritative_paths)
         dependencies.observe_baseline_verified()
         dependencies.require_operator_context()
         dependencies.require_safe_directories()
+        report_destination_preflight_passed = True
         dependencies.verify_protected_metadata()
         dependencies.verify_gfusb_hash()
         target = dependencies.resolve_exact_target()
         dependencies.stop_fprintd()
+        fprintd_transaction_started = True
         dependencies.block_signals()
+        signals_transaction_started = True
         dependencies.require_no_holders(target)
         dependencies.validate_non_secret_material()
         dependencies.require_future_marker_absent()
@@ -334,21 +348,25 @@ def run_future_first_image_candidate(
             except BaseException as exc:
                 report["secret_cleanup_failure"] = f"{type(exc).__name__}:{exc}"
         report["secret_ownership_transferred_to_coordinator"] = ownership_transferred
-        try:
-            dependencies.restore_signals()
-        except BaseException as exc:
-            report["signal_restore_failure"] = f"{type(exc).__name__}:{exc}"
-        try:
-            dependencies.restore_fprintd()
-        except BaseException as exc:
-            report["fprintd_restore_failure"] = f"{type(exc).__name__}:{exc}"
+        if signals_transaction_started:
+            try:
+                dependencies.restore_signals()
+            except BaseException as exc:
+                report["signal_restore_failure"] = f"{type(exc).__name__}:{exc}"
+        if fprintd_transaction_started:
+            try:
+                dependencies.restore_fprintd()
+            except BaseException as exc:
+                report["fprintd_restore_failure"] = f"{type(exc).__name__}:{exc}"
         if any(key.endswith("_failure") for key in report):
             report["result"] = "FAIL_CLOSED_CLEANUP_INCOMPLETE"
-        try:
-            dependencies.publish_report(report)
-        except BaseException as exc:
-            report["report_publication_failure"] = f"{type(exc).__name__}:{exc}"
-            report["result"] = "FAIL_CLOSED_REPORT_UNPUBLISHED"
+        report["report_destination_preflight_passed"] = report_destination_preflight_passed
+        if report_destination_preflight_passed:
+            try:
+                dependencies.publish_report(report)
+            except BaseException as exc:
+                report["report_publication_failure"] = f"{type(exc).__name__}:{exc}"
+                report["result"] = "FAIL_CLOSED_REPORT_UNPUBLISHED"
     return report
 
 

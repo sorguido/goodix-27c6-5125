@@ -161,6 +161,10 @@ centralizza poi capability D261/future in un'authority fissa non sostituibile
 da callback, rende interna la tuple future-live canonica (18 file, incluso il
 modulo operatore D261 importato), separa i due file del gate offline e lega
 transaction, report futuro e marker preflight concreti nell'adapter.
+Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
+private post-durable-claim, impedisce report/restore prima dei rispettivi
+preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
+nonzero) e rende il writer marker future robusto agli short-write.
 
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
@@ -4604,6 +4608,15 @@ con consumo one-shot e rigetto di tipo/nonce/namespace D261 errati.
 future note: le API pubbliche non accettano più funzioni validator. La factory
 marker future è una seam privata chiamata dal durable claim; non esiste un path
 production supportato intent-consumato → marker-capability senza claim.
+La terza review AI-PM al remote HEAD
+`415c7357e6cdc7457ccd2f70d55805b6471818dd` ha precisato che anche gli helper
+D261 intent/marker/live-I/O non potevano restare API pubbliche: avrebbero
+permesso di saltare il durable marker pur conservando tipi e nonce validi. Il
+micro-corrective 3 li rende privati e mantiene come unica superficie supportata
+D261 quella storica in `core.protected_runtime`: exact main flag → intent →
+writer marker `O_EXCL`/write-all/fsync → marker capability → live-I/O. Lo
+stesso vincolo vale per il marker future, la cui capability nasce soltanto
+dalla seam privata chiamata dopo fsync.
 `FutureProductionDependencies` collega concretamente i guard D261-reviewed,
 `RealSecretBoundary`, `CtypesLibusbBackend`, `ColdStartMachine`, seed FDT e
 `PersistentRuntimeCoordinator`, ma non è raggiungibile dal CLI D264/03. La
@@ -4613,6 +4626,16 @@ a `/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json`, la cui
 assenza/sicurezza viene verificata prima degli effetti. Anche l'assenza del
 marker D265-future viene verificata senza lettura o mutazione prima del secret;
 il claim successivo conserva `O_EXCL`, `O_NOFOLLOW`, mode 0600 e fsync.
+Il writer future gestisce ora anche short-write con un ciclo write-all e
+fallisce senza capability quando `write()` non progredisce.
+
+La transaction outer traccia separatamente report-destination preflight,
+fprintd avviato e segnali bloccati. Un failure baseline, contesto operatore o
+report preflight non pubblica e non consuma il report protetto; restore viene
+tentato solo per transaction effettivamente iniziate. Dopo report preflight un
+failure successivo può invece pubblicare il report fail-closed. La policy
+operatore è condivisa con D261: `EUID=0`, `SUDO_UID` presente e numerico, e
+`int(SUDO_UID) != 0`; quindi `SUDO_UID=0` è respinto.
 
 L'outer possiede il secret fino alla costruzione riuscita del coordinator: un
 failure marker/capability/costruzione causa un solo close outer. Dopo la
@@ -4630,7 +4653,9 @@ backend USB, cold-start/FDT, coordinator, transport/framing, retained TLS/B0,
 codec immagine/CRC e dipendenze di validazione secret. Launcher/tool D264/03
 formano invece un set offline-gate separato di due file e non sono marcati
 future-live; shell D261, test e manuale sono esclusi con classificazione
-esplicita. Nessuno SHA è approvato:
+esplicita. I due record offline hanno ora ruolo coerente di hard-disable
+launcher/dry-run inspector e classificazione
+`OFFLINE_GATE_ONLY_NOT_FUTURE_LIVE`. Nessuno SHA è approvato:
 il modello rifiuta SHA corto, branch, `HEAD`, commit errato e blob worktree non
 identico. Review AI-PM e successiva approvazione byte-level restano gate
 separati.
@@ -4638,7 +4663,7 @@ separati.
 La closure offline attraversa dall'orchestrator il vero
 `PersistentRuntimeCoordinator.run()` con fixture D263: prefisso FDT storico,
 un solo `0x22` `FIXED64_ZERO_TAIL`, TLS trattenuta, primo B0, raster 80×64,
-zero persistenza/retry/comandi vietati e cleanup host. La failure matrix v3
+zero persistenza/retry/comandi vietati e cleanup host. La failure matrix v4
 associa ogni PASS a test/artifact e distingue prova D264/03 diretta, regressione
 D264/02/D263 ereditata e deadline su runtime byte-identico. La suite D263,
 D264/02 e D260 pertinente resta verde; la suite D261 non è eseguibile in questo
@@ -4647,6 +4672,15 @@ installata. Nessun test hardware è stato eseguito. Stato canonico:
 
 ```text
 D264_03_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D261_SUPPORTED_CAPABILITY_CHAIN_PRESERVED=true
+D261_PUBLIC_INTENT_MINT_BYPASS_ABSENT=true
+D261_PUBLIC_MARKER_MINT_BYPASS_ABSENT=true
+FUTURE_PUBLIC_MARKER_MINT_BYPASS_ABSENT=true
+DURABLE_MARKER_REQUIRED_BEFORE_CAPABILITY=true
+BASELINE_FAILURE_REPORT_WRITE_COUNT=0
+REPORT_PUBLICATION_REQUIRES_PREFLIGHT=true
+FUTURE_OPERATOR_CONTEXT_MATCHES_D261=true
+FUTURE_MARKER_SHORT_WRITE_SAFE=true
 PUBLIC_AUTHORIZATION_VALIDATOR_BYPASS_ABSENT=true
 PUBLIC_LIVE_IO_VALIDATOR_BYPASS_ABSENT=true
 CANONICAL_FUTURE_LIVE_CRITICAL_PATHS_INTERNAL=true

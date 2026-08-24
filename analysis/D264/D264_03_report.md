@@ -1,19 +1,17 @@
-# D264/03 corrective 2 — fixed authority and canonical closure
+# D264/03 micro-corrective 3 — final pre-baseline hardening
 
-## Second AI-PM finding
+## Third AI-PM finding
 
-At remote review HEAD `495cc2c6cd2467241cf67ec4e0e8e748726e9f8c`, AI-PM confirmed guard order, ownership transfer, real-coordinator synthetic integration, D261 arm-only preservation and CLI hard-disable, but rejected closure because public validator callbacks allowed `lambda _: True`, the live-critical manifest omitted the directly imported D261 operator module, both sides of the path-set comparison were caller-controlled, offline gate files were mislabeled future-live, and production report/signal/service transactions were not fully bound.
+At remote HEAD `415c7357e6cdc7457ccd2f70d55805b6471818dd`, AI-PM accepted corrective2’s fixed validator authority, canonical future set, dependency inclusion, offline-gate separation, internal path-set comparison, report binding and marker preflight. Three blockers remained: D261 capability mint helpers were publicly supported, pre-baseline failures could still publish/consume the protected report destination, and future operator context accepted `SUDO_UID=0`. The offline manifest roles also required correction.
 
-## Corrective 2
+## Corrective 3
 
-`core/live_capability.py` is now the sole fixed authority for known D261 and future intent/marker/live-I/O types and private nonces. Public secret/material/backend APIs no longer accept validator functions: they accept only capabilities recognized by that authority. D261 wrappers retain their exact flag → intent → durable marker → live-I/O semantics; the future namespace is distinct and a future marker capability is emitted through a private seam only after the durable claim function succeeds.
+D261 intent, marker and live-I/O mint helpers in `core/live_capability.py` are private. The supported D261 surface remains `core.protected_runtime`: exact main flag issues intent, the D261 durable marker writer performs `O_EXCL`/write-all/fsync, only then its private marker factory runs, and the historical reviewed live-I/O API consumes that marker capability. Future marker minting likewise remains a private post-durable-claim seam; D261/future marker and live-I/O types are not interchangeable.
 
-`FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS` is the internal baseline authority. `verify_authoritative_baseline()` compares the approval record directly against it; there is no caller-supplied `expected_paths`. The derived manifest contains 18 future-live files, including `core/live_capability.py` and the directly imported `tools/d261_live_fdt_arm_once.py`. The D264/03 shell/tool are a separate two-file offline-gate set and are false for future-live reachability.
+The future orchestration now records report-preflight, fprintd-started and signals-started state. It publishes only after report destination preflight, restores only transactions that actually started, and leaves baseline/operator/report-preflight failures in memory without protected report writes. The shared pure operator-context helper enforces exactly `EUID=0`, numeric present `SUDO_UID`, and `SUDO_UID != 0` for D261 and future paths.
 
-`FutureProductionDependencies.build(repo, intent)` now instantiates the reviewed `FprintdTransaction` and `SignalTransaction`, binds durable publication to `/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json`, validates that destination before effects, and performs a non-mutating future-marker absence check before secret materialization. Tests still inject doubles; the D264/03 CLI never constructs the production adapter.
+The future durable marker writer now loops over short writes, requires forward progress, fsyncs, and mints capability only afterward. Synthetic tests prove multi-write completion and zero-progress failure before capability issuance. Offline manifest roles now explicitly classify the launcher and inspector as `OFFLINE_GATE_ONLY_NOT_FUTURE_LIVE`.
 
-## Proof and residual risk
+## Proof and residual state
 
-Thirty-nine focused corrective tests cover callback-bypass impossibility, D261/future authority separation, canonical tuple/manifest equality, subset rejection, D261 dependency inclusion, offline-gate separation, fixed report destination collision, marker presence, existing guard/ownership/failure cases, and the real public persistent coordinator with synthetic transport/TLS/secret. All six real counters remain zero.
-
-Target acceptance of fixed64 `0x22`, Linux first B0 behavior and post-image internal state remain unproven/unknown. No baseline or live run is approved.
+Focused corrective3 tests cover private mint surfaces, namespace separation, report/restore transaction gating, operator-context matrix, short/zero-progress marker writes, prior canonical closure and the real persistent coordinator synthetic integration. All six real side-effect counters remain zero. Fixed64 `0x22`, Linux first B0 and post-image internal device state remain live-unproven/unknown; baseline approval and live authorization remain false.

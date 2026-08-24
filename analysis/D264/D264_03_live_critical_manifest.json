@@ -34,14 +34,14 @@
     },
     {
       "path": "core/future_first_image_operator.py",
-      "sha256": "d72bc5860c1458a4e3f37ada2af5bb18130456b86633dcff09253b86494e5c3c",
+      "sha256": "230b0b401bba3e04863ef5e3c6c54c697eaecd74074b65996f061f97166f5a7c",
       "role": "future guard/capability/transaction adapter",
       "reachable_from_future_first_image_real_operator_path": true,
       "why_live_critical": "future guard/capability/transaction adapter"
     },
     {
       "path": "core/live_capability.py",
-      "sha256": "c685243488237157f70ee72df6d4d268f86cf0a42f3f8495d15f3daacc3d2402",
+      "sha256": "2bd4ad37f9ec2e6feaac0ea2e6bc47bff668408086a899f4864a6cfc2ea47440",
       "role": "fixed known D261/future capability authority",
       "reachable_from_future_first_image_real_operator_path": true,
       "why_live_critical": "fixed known D261/future capability authority"
@@ -62,7 +62,7 @@
     },
     {
       "path": "core/protected_runtime.py",
-      "sha256": "9a0315863f22c4c3d6883bdd0fda7b840586525836de4e190efbabdb1dcf8b5d",
+      "sha256": "896d1543240107b474408b608cdacd346b2a08c9be73298ae048b980fe396da6",
       "role": "protected material and secret boundary",
       "reachable_from_future_first_image_real_operator_path": true,
       "why_live_critical": "protected material and secret boundary"
@@ -125,7 +125,7 @@
     },
     {
       "path": "tools/d261_live_fdt_arm_once.py",
-      "sha256": "f2957e3a01db05f8f9c27585eca93086e1b53c4043e8c7f602c3f3ccaafbadac",
+      "sha256": "6d5402b4fd7ac1ccd69cbd067783bbcf219a5aace2abd1bfc82895ef128840e6",
       "role": "D261-reviewed guards and transactions imported by future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
       "why_live_critical": "D261-reviewed guards and transactions imported by future adapter"
@@ -136,16 +136,18 @@
     {
       "path": "operator_kit/d264-first-image-prelive.sh",
       "sha256": "bd63fe8c6fcba68524dda307410d4bf56f533ba10b11c50428d2e0e591a08d2c",
-      "role": "transitive repository dependency reached by concrete future adapter",
+      "role": "D264/03 offline hard-disable launcher",
       "reachable_from_future_first_image_real_operator_path": false,
-      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
+      "why_live_critical": "Offline review gate only; excluded from future-live baseline authority",
+      "classification": "OFFLINE_GATE_ONLY_NOT_FUTURE_LIVE"
     },
     {
       "path": "tools/d264_first_image_prelive.py",
       "sha256": "ca13c9b63fc2d870bef75e4cdac0b700e598fe299feede713b79ab9f7585e9fc",
-      "role": "transitive repository dependency reached by concrete future adapter",
+      "role": "D264/03 offline dry-run inspector",
       "reachable_from_future_first_image_real_operator_path": false,
-      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
+      "why_live_critical": "Offline review gate only; excluded from future-live baseline authority",
+      "classification": "OFFLINE_GATE_ONLY_NOT_FUTURE_LIVE"
     }
   ],
   "excluded_classifications": [

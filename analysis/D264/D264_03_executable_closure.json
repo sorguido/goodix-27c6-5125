@@ -1,7 +1,7 @@
 {
-  "schema": "D264_03_EXECUTABLE_CLOSURE_V3_CORRECTIVE2",
+  "schema": "D264_03_EXECUTABLE_CLOSURE_V4_CORRECTIVE3",
   "outcome": "PASS_OFFLINE_PRELIVE_WIRING",
-  "advancement": "HARDENED_CANONICAL_FIRST_IMAGE_PRELIVE_CANDIDATE",
+  "advancement": "FINAL_HARDENED_FIRST_IMAGE_PRELIVE_CANDIDATE",
   "executable_closure": "PASS_OFFLINE",
   "ai_pm_corrective": "DEFECTS_A_B_C_D_CLOSED_OFFLINE",
   "remote_review_head_pre_corrective": "830c95c407ecbe0f9b185a8adbc968ae5c9cef0d",
@@ -53,5 +53,16 @@
   "future_report_destination_bound": true,
   "future_marker_preflight_before_secret": true,
   "future_live_critical_file_count": 18,
-  "d264_03_offline_gate_file_count": 2
+  "d264_03_offline_gate_file_count": 2,
+  "ai_pm_corrective3": "CLOSED_OFFLINE",
+  "remote_review_head_pre_corrective3": "415c7357e6cdc7457ccd2f70d55805b6471818dd",
+  "d261_supported_capability_chain_preserved": true,
+  "d261_public_intent_mint_bypass_absent": true,
+  "d261_public_marker_mint_bypass_absent": true,
+  "future_public_marker_mint_bypass_absent": true,
+  "durable_marker_required_before_capability": true,
+  "baseline_failure_report_write_count": 0,
+  "report_publication_requires_preflight": true,
+  "future_operator_context_matches_d261": true,
+  "future_marker_short_write_safe": true
 }

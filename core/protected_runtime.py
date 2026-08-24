@@ -31,8 +31,9 @@ from poc.goodix5125.tools.binding_reference.runtime import derive_validator_from
 from core.live_capability import (
     CapabilityFailure, CliIntentCapability, D261_LIVE_AUTHORIZATION_FLAG,
     FutureIntentCapability, FutureLiveIoCapability, FutureMarkerClaimCapability,
-    LiveIoCapability, MarkerClaimCapability, issue_d261_intent, issue_d261_live_io,
-    issue_d261_marker, require_d261_intent, require_known_live_io_capability,
+    LiveIoCapability, MarkerClaimCapability, _issue_d261_intent_after_exact_flag,
+    _issue_d261_live_io_after_marker, _issue_d261_marker_after_durable_claim,
+    require_d261_intent, require_known_live_io_capability,
     require_known_material_intent,
 )
 
@@ -56,7 +57,7 @@ def _issue_cli_intent_after_exact_main_flag(explicit_authorization: str) -> CliI
     """Private factory used only by the supported ``main()`` live branch."""
 
     try:
-        return issue_d261_intent(explicit_authorization)
+        return _issue_d261_intent_after_exact_flag(explicit_authorization)
     except CapabilityFailure as exc:
         raise ProtectedRuntimeFailure(str(exc)) from exc
 
@@ -74,7 +75,7 @@ def _issue_marker_claim_capability(
     """Private factory called by the marker writer after fsync succeeds."""
 
     require_cli_intent(cli_intent)
-    return issue_d261_marker(cli_intent)
+    return _issue_d261_marker_after_durable_claim(cli_intent)
 
 
 def issue_live_io_capability_after_marker(
@@ -85,7 +86,7 @@ def issue_live_io_capability_after_marker(
     """Mint the live-I/O capability immediately after a successful marker claim."""
 
     try:
-        return issue_d261_live_io(cli_intent, marker_claim)
+        return _issue_d261_live_io_after_marker(cli_intent, marker_claim)
     except CapabilityFailure as exc:
         raise ProtectedRuntimeFailure(str(exc)) from exc
 

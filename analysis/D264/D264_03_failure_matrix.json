@@ -1,5 +1,5 @@
 {
-  "schema": "D264_03_FAILURE_MATRIX_V3_CORRECTIVE2",
+  "schema": "D264_03_FAILURE_MATRIX_V4_CORRECTIVE3",
   "all_required_cases_proven": true,
   "cases": [
     {
@@ -421,6 +421,76 @@
       "proof_source": "D264_03_CORRECTIVE2_DIRECT",
       "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_concrete_future_report_and_marker_preflights_use_fixed_safe_boundaries",
       "side_effect_boundary_reached": "pre_secret_pre_marker_pre_backend"
+    },
+    {
+      "case": "D261 public intent mint bypass absent",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_d261_and_future_fixed_authorities_are_distinct",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "D261 public marker mint bypass absent",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_d261_and_future_fixed_authorities_are_distinct",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "D261 marker capability requires private durable-claim seam",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_d261_and_future_fixed_authorities_are_distinct",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "future marker capability requires private durable-claim seam",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_d261_and_future_fixed_authorities_are_distinct",
+      "side_effect_boundary_reached": "capability_only"
+    },
+    {
+      "case": "baseline failure produces no protected report write",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_baseline_format_fails_before_side_effects",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "report preflight failure produces no report write",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_report_collision_and_marker_presence_fail_before_secret",
+      "side_effect_boundary_reached": "report_preflight_only"
+    },
+    {
+      "case": "post-report-preflight failure may publish fail report",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_report_and_restore_are_transaction_state_gated",
+      "side_effect_boundary_reached": "synthetic_report"
+    },
+    {
+      "case": "SUDO_UID=0 rejected",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_operator_context_matches_d261",
+      "side_effect_boundary_reached": "operator_context_only"
+    },
+    {
+      "case": "short marker write completes before capability issuance",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_marker_short_write_and_zero_progress",
+      "side_effect_boundary_reached": "temporary_marker_fixture"
+    },
+    {
+      "case": "zero-progress marker write fails before capability issuance",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE3_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_marker_short_write_and_zero_progress",
+      "side_effect_boundary_reached": "temporary_marker_fixture"
     }
   ]
 }

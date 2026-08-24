@@ -46,7 +46,7 @@ _D261_INTENT = object(); _D261_MARKER = object(); _D261_LIVE_IO = object()
 _FUTURE_INTENT = object(); _FUTURE_MARKER = object(); _FUTURE_LIVE_IO = object()
 
 
-def issue_d261_intent(exact_flag: str) -> CliIntentCapability:
+def _issue_d261_intent_after_exact_flag(exact_flag: str) -> CliIntentCapability:
     if exact_flag != D261_LIVE_AUTHORIZATION_FLAG: raise CapabilityFailure("explicit_live_authorization_required")
     return CliIntentCapability(_D261_INTENT)
 
@@ -56,11 +56,11 @@ def require_d261_intent(token: object) -> None:
         raise CapabilityFailure("valid_cli_intent_capability_required")
 
 
-def issue_d261_marker(token: object) -> MarkerClaimCapability:
+def _issue_d261_marker_after_durable_claim(token: object) -> MarkerClaimCapability:
     require_d261_intent(token); return MarkerClaimCapability(_D261_MARKER)
 
 
-def issue_d261_live_io(token: object, marker: object) -> LiveIoCapability:
+def _issue_d261_live_io_after_marker(token: object, marker: object) -> LiveIoCapability:
     require_d261_intent(token)
     if not isinstance(marker, MarkerClaimCapability) or marker._nonce is not _D261_MARKER:
         raise CapabilityFailure("single_use_marker_required_before_live_io")
@@ -102,3 +102,11 @@ def require_known_live_io_capability(token: object) -> None:
     if isinstance(token, LiveIoCapability) and token._nonce is _D261_LIVE_IO: return
     if isinstance(token, FutureLiveIoCapability) and token._nonce is _FUTURE_LIVE_IO: return
     raise CapabilityFailure("known_live_io_capability_required")
+
+
+def require_root_with_nonroot_operator(euid: int, sudo_uid: str) -> None:
+    """Shared D261/future operator-context policy; pure and offline-testable."""
+    if euid != 0:
+        raise CapabilityFailure("live_euid_root_required")
+    if not sudo_uid.isdigit() or int(sudo_uid) == 0:
+        raise CapabilityFailure("non_root_operator_context_required")
