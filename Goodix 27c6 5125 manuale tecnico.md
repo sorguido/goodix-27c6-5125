@@ -4247,7 +4247,11 @@ Stato canonico D263 (coerente con i marker globali del manuale):
 CURRENT BOUNDARY            = post-arm first-image OFFLINE candidate (D263), non live
 READY_FOR_FDT              = architecture-review true; operational/live false
 SECOND_LIVE_ATTEMPT_ALLOWED= false (single-use coordinator; D262 marker consumato)
-FDT_DOWN_TABLE_LIVE_READY  = false (tabella dynamic IRQ0x100, sessione-capture only)
+FRESH_FDT_BOOTSTRAP_LIVE_PROVEN = true
+FINAL_FDT_ARM_LIVE_PROVEN       = true
+POST_ARM_0x22_LIVE_PROVEN        = false
+FIRST_IMAGE_LIVE_PROVEN          = false
+FDT_DOWN_TABLE_LIVE_READY (storico D252, solo stato storico) = false
 0x22                       = PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY; non live-proven
 FIRST_IMAGE                = pipeline canonica OFFLINE chiusa; non persistita
 D262_OUTCOME               = PASS_STOP_AFTER_FDT_ARM_ACK (baseline e9073a17… non regredita)
@@ -4257,6 +4261,7 @@ D263_PHASE2_EXECUTED       = true
 D263_PHASE2_RESULT         = OFFLINE_PASS (no live)
 D263_EXECUTABLE_CLOSURE    = PASS_OFFLINE
 D263_LIVE_CRITICAL_MODIFICATION_COUNT = 3 (persistent_runtime, runtime_transport, fdt_lifecycle)
+D263_CORRECTIVE_MODIFICATION_COUNT  = 1 (solo core/persistent_runtime.py: defect A + B)
 D263_HARDWARE_ACTION_COUNT = 0
 D263_READY_FOR_LIVE_REVIEW = false
 D263_READY_FOR_LIVE        = false
@@ -4275,6 +4280,81 @@ esplicitamente dall'AI PM; autorizzazione live separata; verifica del
 live-critical set contro questo bundle; riapertura dei blocchi D252/D253/D255
 (device-side restore/cancel, arm lifetime, current-path seed) con evidenza OEM
 mirata. `0x22` resta `OBSERVED_ONLY` finché un live dedicato non lo accetta.
+
+### D263/09: correttivo post-review AI-PM (defect A/B + normalizzazione)
+
+Correttivo OFFLINE dello stesso milestone D263, senza rifare D263 da zero né
+ampliare il boundary, né preparare/eseguire live. Branch
+`session/agent_16ceb075-09cc-4bef-9575-02c7f6528892`, HEAD
+`320dbf3c…`, stato clean. Esecuzione strictly OFFLINE; live hardware vietato.
+
+**Defect A — regressione semantica D260/D262 in `run()` (CHIUSO).** `run()`
+invocava incondizionatamente `_run_first_image_terminal()` dopo l'arm,
+promuovendo implicitamente ogni consumer (incl. il rehearsal D260) al boundary
+D263. Correzione: enum esplicito `TerminalBoundary`;
+`STOP_AFTER_FDT_ARM_ACK` è il **default** (preserva D260/D262: termina dopo
+il final `0x32` ACK, nessun IRQ2/`0x22`/first-image); `STOP_AFTER_FIRST_IMAGE`
+è **opt-in**. Il check della command trace dipende dal boundary scelto
+(arm-only: trace storica esatta; first-image: prefisso esatto + unico suffix
+`(0x22,)`). I test pubblici `run()` arm-only lo provano end-to-end in modo
+environment-independent (senza OpenSSL-PSK).
+
+**Defect B — `operational_physical_policy` ignorata sul nuovo `0x22` (CHIUSO).**
+`_run_first_image_terminal()` usava sempre `fdt_a0_policy(0x22,…)`. Correzione:
+`0x22` seleziona `operational_fdt_a0_policy` (`FIXED64_ZERO_TAIL`) quando
+`operational_physical_policy=true`, altrimenti `fdt_a0_policy`
+(`ABSTRACT_LOGICAL_ONLY`). Nessun nuovo submission mode inventato; nessuna
+claim di acceptance live. `Zero22PolicySelectionTests` verifica il mode
+realmente passato a `transport.submit()`.
+
+**Normalizzazione taxonomy/policy `0x22` (coerente con `D263_01` v2).**
+
+```text
+0x22                       = PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY
+0x22_LOGICAL_OFFLINE_POLICY= ABSTRACT_LOGICAL_ONLY
+0x22_OPERATIONAL_LINUX_CANDIDATE        = FIXED64_ZERO_TAIL
+0x22_OPERATIONAL_ZERO_TAIL_CANDIDATE    = EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE
+0x22_LIVE_ACCEPTANCE       = NOT_LIVE_PROVEN
+0x22_ACK_POLICY            = EXACTLY_ONE_REQUIRED_AND_VALIDATED
+FIRST_IMAGE_TERMINAL_STOP  = EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN
+HOST_CLEANUP_MECHANISM_SUPPORTED             = true
+POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED_OFFLINE = true
+POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE       = UNKNOWN
+POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN     = false
+```
+
+La capture primaria conferma la **submission** OEM fixed64 e supporta la scelta
+candidate zero-tail; **non** conferma live il padding zero Linux su `0x22`. Il
+`phase2_model_confirmed` di D263/01 è stato riportato a `false` per non essere
+interpretato come acceptance device.
+
+**Closure pubblica `run()` (Sezione 5).** Aggiunti test OFFLINE, sintetici,
+environment-independent che esercitano il metodo pubblico `run()` (non il
+privato): (A) backward-compat arm-only (stop dopo arm, nessun `0x22`, trace
+esatta, cleanup exactly-once, nessun retry/persistenza); (B) first-image opt-in
+end-to-end success (un solo session/handshake/secret-handoff, prefisso storico
++ unico `0x22`, ACK valido, first B0 su TLS retained, codec canonico, immagine
+valida, non persistita, `TERMINAL_STOPPED`, cleanup exactly-once) e failure
+path (fail-closed, cleanup once, nessun secondo `0x22`/recovery/persistenza).
+
+**Audit regression.** 27 test D263 PASS (12 support-primitives + 8
+first-image + 7 public-run nuovi). I test D260 pertinenti falliscono solo per
+limite ambientale Cloud (`SSLContext` senza `set_psk_client_callback`):
+il fallimento avviene alla costruzione di `SyntheticTlsClient` in
+`d260_offline_rehearsal`, **prima** che qualunque modulo D263 esegua — non è
+una regressione D263. Nessuna regressione attribuibile ai tre moduli D263.
+
+**Bundle.** Rigenerato `D263_post_arm_first_image_offline_bundle.zip` (+`.sha256`)
+dopo il correttivo; step-local, non cumulativo. File live-critical cambiati dal
+solo correttivo: `core/persistent_runtime.py` (`1a731cda…`→`36963ce7…`);
+`core/runtime_transport.py` e `core/fdt_lifecycle.py` invariati
+(`2930aa57…`, `2aac7422…`). Nessun launcher/operator-kit modificato.
+
+**Esito correttivo: `D263_CORRECTIVE = PASS`.** Stato finale:
+`OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW`; `D263_HARDWARE_ACTION_COUNT=0`;
+`D263_READY_FOR_LIVE_REVIEW=false`; `D263_READY_FOR_LIVE=false`;
+`D263_LIVE_EXECUTION=NOT_PERFORMED`. Nessuna autorizzazione live concessa né
+consumata.
 
 ## Regole operative
 

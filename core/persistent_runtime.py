@@ -73,6 +73,20 @@ class RuntimeState(str, Enum):
     CLOSED = "CLOSED"
 
 
+class TerminalBoundary(str, Enum):
+    """Explicit terminal boundary of one coordinator run.
+
+    ``STOP_AFTER_FDT_ARM_ACK`` preserves the historical D260/D262 default:
+    terminate after the final FDT arm ACK.  ``STOP_AFTER_FIRST_IMAGE`` is the
+    opt-in D263 candidate (bounded IRQ2 -> one 0x22 -> retained-TLS first image
+    -> host-only cleanup -> stop).  No consumer is promoted to the D263 boundary
+    implicitly; the default keeps D260/D262 semantics intact.
+    """
+
+    STOP_AFTER_FDT_ARM_ACK = "STOP_AFTER_FDT_ARM_ACK"
+    STOP_AFTER_FIRST_IMAGE = "STOP_AFTER_FIRST_IMAGE"
+
+
 class RuntimeFailure(RuntimeError):
     """A bounded runtime phase failed and no retry was attempted."""
 
@@ -205,7 +219,13 @@ class PersistentRuntimeCoordinator:
             raise RuntimeFailure("d260_requires_fresh_fdt_path")
         self.lifecycle.observe_af_state(state.pov_valid)
 
-    def run(self, seed_result: SeedProviderResult | None = None, *, ts16: int) -> RuntimeResult:
+    def run(
+        self,
+        seed_result: SeedProviderResult | None = None,
+        *,
+        ts16: int,
+        terminal_mode: TerminalBoundary = TerminalBoundary.STOP_AFTER_FDT_ARM_ACK,
+    ) -> RuntimeResult:
         if self.state != RuntimeState.CREATED:
             raise RuntimeFailure("runtime_single_use")
         self.state = RuntimeState.RUNNING
@@ -246,40 +266,10 @@ class PersistentRuntimeCoordinator:
             self.machine.manual_sample()
             self.machine.finalize_minimal_device_contract()
             self.machine.arm(ts16)
-            first_image = self._run_first_image_terminal()
-            terminal_queue_gate = getattr(self.transport, "assert_no_buffered_frames", None)
-            if callable(terminal_queue_gate):
-                terminal_queue_gate()
-            trace = tuple(self.lifecycle.device_command_trace)
-            if trace[: len(EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE)] != EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE:
-                raise RuntimeFailure("exact_fdt_command_trace_prefix_mismatch")
-            extra = trace[len(EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE):]
-            if any(command in {0x34, 0xA2, 0x70, 0x20} for command in extra):
-                raise RuntimeFailure("forbidden_post_arm_command_in_trace")
-            if extra != (0x22,):
-                raise RuntimeFailure(f"unexpected_post_arm_commands:{extra!r}")
-            result = RuntimeResult(
-                command_trace=self.lifecycle.device_command_trace,
-                tls_state_before_cleanup=self.tls_session.state.value,
-                baseline_b0_consumed_before_stage2=(
-                    self.machine.baseline_b0_consumed_at_manual_stage == 2
-                ),
-                second_native_delta_passed=self.machine.second_delta_gate_passed,
-                cold_start_completed=self.cold_start_result is not None,
-                target_firmware=(
-                    self.cold_start_result.firmware if self.cold_start_result is not None else None
-                ),
-                irq2_observed=bool(first_image["irq2_observed"]),
-                image_command_attempt_count=int(first_image["image_command_attempt_count"]),
-                image_ack=str(first_image["image_ack"]),
-                first_image_received=first_image["first_image_validation"] == "SUCCESS",
-                first_image_validation=str(first_image["first_image_validation"]),
-                first_image_raster_shape=first_image["first_image_raster_shape"],
-                first_image_bytes_persisted=bool(first_image["first_image_bytes_persisted"]),
-                terminal_cleanup_completed=bool(first_image["terminal_cleanup_completed"]),
-            )
-            self.state = RuntimeState.COMPLETED
-            return result
+            if terminal_mode == TerminalBoundary.STOP_AFTER_FIRST_IMAGE:
+                return self._run_first_image_terminal_boundary(ts16)
+            # Default historical boundary (D260/D262): stop after the final arm.
+            return self._run_arm_only_boundary()
         except Exception as error:
             self.failure_reason = f"{type(error).__name__}:{error}"
             self.state = RuntimeState.FAILED_CLOSED
@@ -296,6 +286,70 @@ class PersistentRuntimeCoordinator:
             self.transport.close()
             if self.state == RuntimeState.COMPLETED:
                 self.state = RuntimeState.CLOSED
+
+    def _run_arm_only_boundary(self) -> RuntimeResult:
+        """Historical terminal boundary: terminate after the final FDT arm ACK.
+
+        No IRQ2 wait, no 0x22, no first image.  The command trace must equal
+        the exact historical fresh-FDT bootstrap trace.
+        """
+        terminal_queue_gate = getattr(self.transport, "assert_no_buffered_frames", None)
+        if callable(terminal_queue_gate):
+            terminal_queue_gate()
+        trace = tuple(self.lifecycle.device_command_trace)
+        if trace != EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE:
+            raise RuntimeFailure("exact_fdt_command_trace_mismatch")
+        result = RuntimeResult(
+            command_trace=self.lifecycle.device_command_trace,
+            tls_state_before_cleanup=self.tls_session.state.value,
+            baseline_b0_consumed_before_stage2=(
+                self.machine.baseline_b0_consumed_at_manual_stage == 2
+            ),
+            second_native_delta_passed=self.machine.second_delta_gate_passed,
+            cold_start_completed=self.cold_start_result is not None,
+            target_firmware=(
+                self.cold_start_result.firmware if self.cold_start_result is not None else None
+            ),
+        )
+        self.state = RuntimeState.COMPLETED
+        return result
+
+    def _run_first_image_terminal_boundary(self, ts16: int) -> RuntimeResult:
+        """Opt-in D263 boundary: arm -> one 0x22 -> first image -> host cleanup."""
+        first_image = self._run_first_image_terminal()
+        terminal_queue_gate = getattr(self.transport, "assert_no_buffered_frames", None)
+        if callable(terminal_queue_gate):
+            terminal_queue_gate()
+        trace = tuple(self.lifecycle.device_command_trace)
+        if trace[: len(EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE)] != EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE:
+            raise RuntimeFailure("exact_fdt_command_trace_prefix_mismatch")
+        extra = trace[len(EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE):]
+        if any(command in {0x34, 0xA2, 0x70, 0x20} for command in extra):
+            raise RuntimeFailure("forbidden_post_arm_command_in_trace")
+        if extra != (0x22,):
+            raise RuntimeFailure(f"unexpected_post_arm_commands:{extra!r}")
+        result = RuntimeResult(
+            command_trace=self.lifecycle.device_command_trace,
+            tls_state_before_cleanup=self.tls_session.state.value,
+            baseline_b0_consumed_before_stage2=(
+                self.machine.baseline_b0_consumed_at_manual_stage == 2
+            ),
+            second_native_delta_passed=self.machine.second_delta_gate_passed,
+            cold_start_completed=self.cold_start_result is not None,
+            target_firmware=(
+                self.cold_start_result.firmware if self.cold_start_result is not None else None
+            ),
+            irq2_observed=bool(first_image["irq2_observed"]),
+            image_command_attempt_count=int(first_image["image_command_attempt_count"]),
+            image_ack=str(first_image["image_ack"]),
+            first_image_received=first_image["first_image_validation"] == "SUCCESS",
+            first_image_validation=str(first_image["first_image_validation"]),
+            first_image_raster_shape=first_image["first_image_raster_shape"],
+            first_image_bytes_persisted=bool(first_image["first_image_bytes_persisted"]),
+            terminal_cleanup_completed=bool(first_image["terminal_cleanup_completed"]),
+        )
+        self.state = RuntimeState.COMPLETED
+        return result
 
     def _run_first_image_terminal(self) -> dict[str, object]:
         """Bounded offline candidate after FDT arm: one first image then stop.
@@ -328,8 +382,15 @@ class PersistentRuntimeCoordinator:
         # 2) exactly one 0x22 image command on the same retained TLS session
         self.lifecycle.post_irq2_image_command()
         outcome["image_command_attempt_count"] = self.lifecycle.image_command_attempt_count
+        # The 0x22 submission follows the same explicit physical-policy axis as
+        # the rest of the runtime: abstract-logical when operational policy is
+        # off, operational candidate (FIXED64 zero-tail) when it is on.  No new
+        # submission mode is invented and D263 remains offline/non-live.
+        policy_factory = (
+            operational_fdt_a0_policy if self.operational_physical_policy else fdt_a0_policy
+        )
         self.transport.submit(
-            build_finger_image(), fdt_a0_policy(0x22, COMMAND_TIMEOUT_MS[0x22])
+            build_finger_image(), policy_factory(0x22, COMMAND_TIMEOUT_MS[0x22])
         )
         ack_frame = self.transport.receive(COMMAND_TIMEOUT_MS[0x22])
         try:

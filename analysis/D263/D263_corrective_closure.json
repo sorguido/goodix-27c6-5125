@@ -1,0 +1,95 @@
+{
+  "schema": "D263_CORRECTIVE_CLOSURE_V1",
+  "step": "D263",
+  "corrective_of": "D263_08_final_bundle",
+  "generated_utc": "2026-08-24T08:48:52Z",
+  "git": {
+    "branch": "session/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
+    "current_head": "320dbf3cc77b91a11cf8a19bafbe91d39cddffde",
+    "status": "clean"
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "live_hardware": "FORBIDDEN",
+  "defects": {
+    "A": {
+      "title": "Semantic regression D260/D262 in run()",
+      "root_cause": "run() unconditionally invoked _run_first_image_terminal() after arm, promoting every consumer (incl. D260 rehearsal) to the D263 boundary",
+      "fix": "Explicit TerminalBoundary enum; default STOP_AFTER_FDT_ARM_ACK restores D260/D262; STOP_AFTER_FIRST_IMAGE is opt-in. Boundary-dependent command-trace check.",
+      "status": "CLOSED",
+      "tests": "BackwardCompatArmOnlyTests (3) + DefaultArmOnlyEvenWhenOperationalTrue"
+    },
+    "B": {
+      "title": "operational_physical_policy ignored on new 0x22",
+      "root_cause": "_run_first_image_terminal() always used fdt_a0_policy(0x22)",
+      "fix": "0x22 selects operational_fdt_a0_policy (FIXED64_ZERO_TAIL) when operational_physical_policy true, else fdt_a0_policy (ABSTRACT_LOGICAL_ONLY)",
+      "status": "CLOSED",
+      "tests": "Zero22PolicySelectionTests (2) verify mode passed to transport.submit()"
+    }
+  },
+  "taxonomy_normalization": {
+    "0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
+    "0x22_LOGICAL_OFFLINE_POLICY": "ABSTRACT_LOGICAL_ONLY",
+    "0x22_OPERATIONAL_LINUX_CANDIDATE": "FIXED64_ZERO_TAIL",
+    "0x22_OPERATIONAL_ZERO_TAIL_CANDIDATE": "EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE",
+    "0x22_LIVE_ACCEPTANCE": "NOT_LIVE_PROVEN",
+    "0x22_ACK_POLICY": "EXACTLY_ONE_REQUIRED_AND_VALIDATED",
+    "FIRST_IMAGE_TERMINAL_STOP": "EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN",
+    "HOST_CLEANUP_MECHANISM_SUPPORTED": true,
+    "POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED_OFFLINE": true,
+    "POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE": "UNKNOWN",
+    "POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN": false
+  },
+  "live_critical_diff_manifest": {
+    "schema": "D263_CORRECTIVE_LIVE_CRITICAL_DIFF_V1",
+    "files": [
+      {
+        "path": "core/persistent_runtime.py",
+        "pre_corrective_sha256": "1a731cda1240df06b2a90d849aacee062020a95f477d51c910b5a436f72504d6",
+        "post_corrective_sha256": "36963ce78346fcea24b8f772e5cf0389846084b8ba4796a5b5a550916b5afa12",
+        "changed_by_corrective": true,
+        "reason": "Defect A (TerminalBoundary enum + run() default arm-only + boundary-dependent trace check) and Defect B (0x22 policy selection via operational_physical_policy)"
+      },
+      {
+        "path": "core/runtime_transport.py",
+        "pre_corrective_sha256": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d",
+        "post_corrective_sha256": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d",
+        "changed_by_corrective": false,
+        "reason": "Unchanged by corrective (operational_fdt_a0_policy already existed and is now reused for 0x22)"
+      },
+      {
+        "path": "core/fdt_lifecycle.py",
+        "pre_corrective_sha256": "2aac74224f427c618fa21d4bf0d146284b9c7e42e3d8717bfce11be9f393a33a",
+        "post_corrective_sha256": "2aac74224f427c618fa21d4bf0d146284b9c7e42e3d8717bfce11be9f393a33a",
+        "changed_by_corrective": false,
+        "reason": "Unchanged by corrective"
+      }
+    ],
+    "other_backend_guardrail_launcher_files": "Byte-identical to D263_04 baseline; not part of this change-set",
+    "launcher_modifications": "NONE (live launcher/operator kit untouched; D263 remains non-live and non-executable as live)"
+  },
+  "regression_audit": {
+    "d263_support_primitives": "PASS (12 tests)",
+    "d263_first_image_terminal": "PASS (8 tests)",
+    "d263_public_run_new": "PASS (7 tests, env-independent: arm-only x3, first-image success x1, first-image failure x1, 0x22 policy x2)",
+    "d260_pertinent": "ENVIRONMENTAL_FAILURE (Cloud lacks OpenSSL-PSK: 'SSLContext' object has no attribute 'set_psk_client_callback'); failure occurs at SyntheticTlsClient construction in d260_offline_rehearsal BEFORE any D263 module executes; NOT a D263 regression. Arm-only default preserved and proven by D263 public-run arm-only tests.",
+    "broader_suite": "No D263-module-attributable regression. Remaining failures are pre-existing environmental (OpenSSL-PSK / patch / libusb absent in Cloud)."
+  },
+  "test_counts": {
+    "d263_total_pass": 27,
+    "d260_failure_environmental": true,
+    "d263_attributable_regressions": 0
+  },
+  "closure_fields": {
+    "OUTCOME": "OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW",
+    "D263_CORRECTIVE_RESULT": "PASS",
+    "D260_BACKWARD_COMPATIBILITY": "PRESERVED_BY_EXPLICIT_DEFAULT_BOUNDARY",
+    "D263_PUBLIC_RUN_FIRST_IMAGE_TEST": "PASS_OFFLINE_ENV_INDEPENDENT",
+    "D263_0X22_POLICY_SELECTION_TEST": "PASS",
+    "D263_HARDWARE_ACTION_COUNT": 0,
+    "D263_READY_FOR_LIVE_REVIEW": false,
+    "D263_READY_FOR_LIVE": false,
+    "D263_LIVE_EXECUTION": "NOT_PERFORMED",
+    "CURRENT_HEAD": "320dbf3cc77b91a11cf8a19bafbe91d39cddffde",
+    "LIVE_AUTHORIZATION_GRANTED_OR_CONSUMED": false
+  }
+}

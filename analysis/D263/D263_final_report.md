@@ -63,3 +63,42 @@ Baseline live esplicitamente approvata dall'AI PM; autorizzazione live separata;
 verifica del live-critical set contro questo bundle; evidenza OEM mirata per
 chiudere D252/D253/D255. `0x22` resta `OBSERVED_ONLY` finché un live dedicato non
 lo accetta.
+
+---
+
+## Correttivo post-review AI-PM (D263/09)
+
+Esecuzione OFFLINE, strictly no-USB/no-sudo/no-secret. Branch
+`session/agent_16ceb075-09cc-4bef-9575-02c7f6528892`, HEAD `320dbf3c…`, stato
+clean. Nessun live test/autorizzazione; nessun comando USB/PSK/OTP/flash.
+
+**Defect A (CHIUSO):** `run()` promuoveva implicitamente ogni consumer al
+boundary D263 (first-image dopo arm). Aggiunto `TerminalBoundary`
+(`STOP_AFTER_FDT_ARM_ACK` default = preserva D260/D262; `STOP_AFTER_FIRST_IMAGE`
+opt-in); trace check dipendente dal boundary.
+
+**Defect B (CHIUSO):** `0x22` ora seleziona `operational_fdt_a0_policy`
+(`FIXED64_ZERO_TAIL`) se `operational_physical_policy=true`, altrimenti
+`fdt_a0_policy` (`ABSTRACT_LOGICAL_ONLY`).
+
+**Normalizzazione:** `0x22` = `PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY`;
+`ABSTRACT_LOGICAL_ONLY` (logical) vs `FIXED64_ZERO_TAIL`
+(`EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`, non live-accepted); ACK `0x22` =
+`EXACTLY_ONE_REQUIRED_AND_VALIDATED`; `FIRST_IMAGE_TERMINAL_STOP` =
+`EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN` (host cleanup
+supported/implemented offline; device internal UNKNOWN; device stop NOT
+live-proven).
+
+**Test:** aggiunti 7 test environment-independent su `run()` pubblico (arm-only x3,
+first-image success x1, first-image failure x1, `0x22` policy x2). Totale D263
+27 PASS. D260 pertinenti falliscono solo per limite ambientale Cloud
+(OpenSSL-PSK assente), non per regressione D263.
+
+**File live-critical modificati dal correttivo:** solo `core/persistent_runtime.py`
+(`1a731cda…`→`36963ce7…`); `core/runtime_transport.py` e `core/fdt_lifecycle.py`
+invariati. Nessun launcher/operator-kit modificato.
+
+**Esito:** `D263_CORRECTIVE = PASS`; `D263_HARDWARE_ACTION_COUNT = 0`;
+`D263_READY_FOR_LIVE_REVIEW = false`; `D263_READY_FOR_LIVE = false`;
+`D263_LIVE_EXECUTION = NOT_PERFORMED`. Nessuna autorizzazione live concessa né
+consumata.

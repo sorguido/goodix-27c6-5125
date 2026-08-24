@@ -11,7 +11,7 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02", "03", "04", "05", "06", "07", "08"],
+  "completed_substeps": ["01", "02", "03", "04", "05", "06", "07", "08", "09"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
@@ -20,6 +20,7 @@
   "outcome_06": "PASS_RUNTIME_INTEGRATION",
   "outcome_07": "PASS_EXECUTABLE_CLOSURE_REGRESSION_AUDIT_MICRO_CORRECTIVE",
   "outcome_08": "PASS_FINAL_CONSOLIDATION_CANONICAL_CLOSURE_BUNDLE",
+  "outcome_09": "PASS_POST_REVIEW_CORRECTIVE_DEFECTS_A_B_NORMALIZED_TAXONOMY",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -63,8 +64,12 @@
     "out_0x22_count_in_primary_corpus": 1
   },
   "phase2_model": {
-    "statement": "logical exact A0 -> physical fixed64 -> deterministic zero-fill outside declared length",
-    "confirmed_on_primary": true
+    "observed_submission": "logical exact A0 -> physical fixed64 (64-byte OEM submission observed in primary capture)",
+    "logical_offline_policy": "ABSTRACT_LOGICAL_ONLY",
+    "operational_linux_candidate": "FIXED64_ZERO_TAIL",
+    "operational_linux_candidate_status": "EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE",
+    "confirmed_on_primary_as_device_acceptance": false,
+    "note": "capture confirms OEM fixed64 SUBMISSION and supports the zero-tail CANDIDATE; it does NOT confirm live device acceptance of Linux zero-tail on 0x22"
   },
   "phase2_gate": {
     "substep_03_classification": "FIRST_IMAGE_TERMINAL_STOP=EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN",
@@ -140,12 +145,41 @@
     "bundle_verified": "CRC_OK; no path traversal/symlink; no forbidden-material; sidecar SHA-256 present",
     "manual_updated": true
   },
+  "phase2_step09_summary": {
+    "status": "POST_REVIEW_CORRECTIVE_PASSED",
+    "outcome": "OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW (corrected)",
+    "defect_A": "CLOSED - TerminalBoundary enum; default STOP_AFTER_FDT_ARM_ACK preserves D260/D262; first-image opt-in; boundary-dependent trace check",
+    "defect_B": "CLOSED - 0x22 selects operational_fdt_a0_policy (FIXED64_ZERO_TAIL) when operational_physical_policy true, else fdt_a0_policy (ABSTRACT_LOGICAL_ONLY)",
+    "taxonomy_normalized": true,
+    "ack_policy_0x22": "EXACTLY_ONE_REQUIRED_AND_VALIDATED",
+    "first_image_terminal_stop": "EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN (host cleanup supported/implemented offline; device internal UNKNOWN; device stop NOT live-proven)",
+    "tests_added": "tests/test_d263_phase2_public_run.py (7 env-independent: arm-only x3, first-image success x1, first-image failure x1, 0x22 policy x2)",
+    "test_counts": "D263 27 PASS (12 support + 8 first-image + 7 public-run); D260 environmental failure pre-existing (OpenSSL-PSK absent), not D263-attributable",
+    "files_modified_by_corrective": {
+      "core/persistent_runtime.py": {
+        "pre_corrective": "1a731cda1240df06b2a90d849aacee062020a95f477d51c910b5a436f72504d6",
+        "post_corrective": "36963ce78346fcea24b8f772e5cf0389846084b8ba4796a5b5a550916b5afa12"
+      }
+    },
+    "files_unchanged_by_corrective": {
+      "core/runtime_transport.py": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d",
+      "core/fdt_lifecycle.py": "2aac74224f427c618fa21d4bf0d146284b9c7e42e3d8717bfce11be9f393a33a"
+    },
+    "artifacts_updated": ["D263_final_decision.json (v2)", "D263_corrective_closure.json (new)", "D263_01_0x22_physical_policy.json (v2)", "D263_workflow_state.json", "Goodix 27c6 5125 manuale tecnico.md (D263/09)"],
+    "bundle_regenerated": true,
+    "manual_updated": true,
+    "hardware_action_count": 0
+  },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
+  "taxonomy_0x22_logical_offline_policy": "ABSTRACT_LOGICAL_ONLY",
+  "taxonomy_0x22_operational_candidate": "FIXED64_ZERO_TAIL (EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE, NOT_LIVE_PROVEN)",
+  "taxonomy_0x22_ack_policy": "EXACTLY_ONE_REQUIRED_AND_VALIDATED",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
   "residual_blockers": [
     "Causality IRQ2=>0x22 necessity not proven by this trace alone",
     "0x22 not live-proven (D262 STOP_AFTER_FDT_ARM_ACK)",
-    "device-side restore/cancel and arm lifetime remain open (D252/D253/D255 scope)"
+    "device-side restore/cancel and arm lifetime remain open (D252/D253/D255 scope)",
+    "0x22 operational zero-tail candidate EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE, not live-accepted"
   ],
   "manual_updated": true,
   "next_substep_expected": "NONE (ultimo prompt D263; bundle unico creato; in attesa di review AI PM / baseline live)",
