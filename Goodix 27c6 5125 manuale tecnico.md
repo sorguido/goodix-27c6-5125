@@ -132,6 +132,18 @@ approvata. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
 corretto minimamente a una deadline host assoluta di 15000 ms, senza asserire
 una lifetime interna del device.
 
+D264/02 chiude ora l'executable closure del candidate first-image **soltanto
+offline**. Una rehearsal operatore synthetic-only preserva come default
+`STOP_AFTER_FDT_ARM_ACK` e raggiunge `STOP_AFTER_FIRST_IMAGE` esclusivamente
+con opt-in esplicito, attraversando il coordinatore pubblico, la deadline IRQ2
+assoluta di 15000 ms, il candidate fixed64 `0x22`, il primo B0, il decode in
+memoria e il cleanup host indipendente/fail-closed. Nessun live è stato
+eseguito. Il launcher reale D261 resta distinto e arm-only: invoca ancora il
+default del coordinatore e non può raggiungere il boundary first-image.
+Pertanto `FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED` e la baseline
+approval non è ancora raggiungibile; prima servirà un successivo step offline
+di wiring e review del percorso reale protetto.
+
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
 nessun retry (`RETRY_COUNT=0`), zero famiglie persistenti (`PERSISTENT_DEVICE_WRITE_COUNT=0`),
@@ -4481,3 +4493,53 @@ FIRST_IMAGE_LIVE_PROVEN=false
 ```
 
 Gli artefatti machine-readable e il report di review sono in `analysis/D264/`.
+
+### D264/02: candidate operatore first-image, executable closure OFFLINE
+
+D264/02 rende il boundary D263 operativamente invocabile senza abilitare il
+live. Il launcher `operator_kit/d264-first-image-offline.sh` non ha modalità
+hardware: senza argomenti seleziona `STOP_AFTER_FDT_ARM_ACK`, mentre
+`--stop-after-first-image` è l'unico opt-in per `STOP_AFTER_FIRST_IMAGE`.
+Valori ignoti o selezioni multiple falliscono prima dell'entrypoint.
+L'entrypoint riusa il coordinatore pubblico e le fixture sintetiche D263; non
+duplica protocollo, transport o lifecycle.
+
+La rehearsal first-image attraversa realmente il coordinatore persistente con
+policy fisica candidate `FIXED64_ZERO_TAIL`, un solo deadline IRQ2 host-side
+assoluto/non rinnovabile da 15000 ms, esattamente un `0x22`, una validazione
+ACK, un primo B0 sulla TLS trattenuta, decode canonico in memoria e cleanup
+host. Il JSON conserva soltanto dimensioni e telemetria non biometrica. I test
+coprono default e opt-in, selezione fail-closed, timeout/evento inatteso, ACK
+errato, B0 malformato, CRC/decode failure, one-shot e cleanup parziale. Il
+cleanup runtime è indipendente per TLS, secret e transport: un'eccezione non
+impedisce le fasi successive e chiude il runtime come `FAILED_CLOSED`.
+
+Il path non invia `0x34`, `0x20` post-image, un secondo `0x22`, re-arm, A2,
+`0x70`, recovery, retry o write persistenti. La rehearsal attesta
+`REAL_USB_OPEN_COUNT=0`, `REAL_TLS_HANDSHAKE_COUNT=0` e
+`REAL_SENSOR_COMMAND_COUNT=0`. `POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED` è
+provato offline; `POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN`; `0x22`
+fixed64 e first image restano `NOT_LIVE_PROVEN`.
+`FIRST_IMAGE_TERMINAL_RISK=ACCEPTABLY_BOUNDED`, non sicurezza assoluta.
+
+Questa reachability è esclusivamente sintetica. Il real launcher D261 continua
+a chiamare il coordinatore senza selezionare `STOP_AFTER_FIRST_IMAGE`, quindi
+resta `STOP_AFTER_FDT_ARM_ACK`: USB reale è raggiungibile soltanto sotto i suoi
+guard storici, ma il boundary first-image non lo è. Il manifest distingue ora
+esplicitamente i file raggiunti dal launcher D264 offline da quelli inclusi
+soltanto per una futura review live. Il riferimento remoto canonico della tree
+eseguibile già reviewata è
+`REMOTE_REVIEW_HEAD=a4b2eec79071b3b2682962be63c583bad0fae03b`; gli SHA locali
+Codex `c0463b0…` e `7dfa7f8…` sono sola provenance dell'esecutore, non autorità
+di baseline remota. Il corrective non modifica file eseguibili/live-critical.
+Stato corrente:
+
+```text
+D264_02_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D264_02_READY_FOR_AI_PM_REVIEW=true
+D264_02_READY_FOR_BASELINE_APPROVAL=false
+FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED=false
+```

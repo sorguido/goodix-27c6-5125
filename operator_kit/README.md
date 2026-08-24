@@ -1,6 +1,13 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D264/02 first-image rehearsal (offline only)
+
+`./operator_kit/d264-first-image-offline.sh` is a synthetic-only operator
+rehearsal. With no argument it preserves `STOP_AFTER_FDT_ARM_ACK`; the
+first-image candidate requires `--stop-after-first-image`. The launcher has no
+live mode and rejects unknown or multiple selections before Python starts.
+
 Questa directory conserva launcher storici per riproducibilità. **Nessun
 launcher qui presente autorizza automaticamente una nuova run live**: le
 single-shot già eseguite o consumate non sono riutilizzabili e ogni nuovo live
