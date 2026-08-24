@@ -3966,6 +3966,415 @@ compatibilità Windows restano integrali. Lo stato massimo è `OUTCOME=PASS`,
 `ADVANCEMENT=LIVE_FDT_ARM_BOUNDARY_PROVEN`, `EXECUTABLE_CLOSURE=PASS`; i flag `READY_FOR_*`
 restano false perché D262 è già eseguito e chiuso, non perché D262 sia fallito.
 
+## D263: post-arm order e policy fisica `0x22` (sottostep 01)
+
+D263/01 ricostruisce e chiude, con evidenza primaria target-specific, il tratto
+`final 0x32 → IRQ 0x0002 → 0x22 [01 00] → first image` e ne classifica la
+policy fisica USB di `0x22`. Esecuzione OFFLINE, strictly no-USB/no-sudo/no-secret.
+
+La capture primaria è `analysis/D230/work/GoodixExport/rilevamento.pcapng`
+(`GF_ST411SEC_APP_12509`, SHA-256
+`50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`), hash-gated.
+La capture D255 (`VALID_ZERO_FINGER`) **non** contiene il sottoalbero
+post-arm (`FINGER_DOWN_IRQ_COUNT=0`, `POST_IRQ2_0x22_COUNT=0`); pertanto il
+tratto è derivato da `rilevamento.pcapng`, non da D255. Issue #63 (21/21 IRQ2→
+`0x22`) resta solo corroborazione esterna, non autorità primaria APP12509.
+
+Ordine osservato (indici pacchetto zero-based):
+
+```text
+0x32 arm  OUT@220 / ACK@223 echo 0x32 status 0x01
+IRQ finger-down  IN@225  value 0x0002  wrapper 3f00d500ee00c800ba00c500d200
+0x22  OUT@227  body 01 00  logical A0=10  physical OUT=64
+0x22  ACK@229  echo 0x22 status 0x01
+first image  IN@231  outer 0xB0  TLS(17 03 03)  size 7726
+subtree: 0x34@233 → IRQ 0x0200@237 → 0x20[01 00]@238 → 2a immagine B0/TLS@243
+         → 0x50@244 → … → final 0x32@251 / ACK@253
+```
+
+Derivazioni meccaniche `0x22`: body `01 00`; lunghezza logica A0 = **10**;
+lunghezza fisica OUT = **64**; 54 byte fuori frame; unici 6 non-zero a offset
+fisici **40–45** = `cb f2 e2 be fb 7f` (staging residue, identica a `0x36`/`0x20`,
+non payload). ACK echo `0x22`/status `0x01`, subito dopo l'OUT e prima della
+prima immagine. Prima immagine: outer `0xB0`, **TLS** (`17 03 03`), 7726 byte;
+nessun frame A0 "immagine" la precede. Occorrenze `0x22` nel primary corpus:
+**1** OUT (`rilevamento.pcapng`@227), 0 IN; D255 = 0; Issue#63 = 21 (esterno).
+
+`MINIMUM_CAUSAL_REQUIREMENT`: la capture prova l'**ordine**
+`0x32(arm,ACK) → IRQ0x0002 → 0x22[01 00](ACK) → first image`; **non** prova
+che `0x22` sia l'unico comando necessario né che l'IRQ finger-down lo richieda
+causalmente (osservato ≠ causale).
+
+**Taxonomy `0x22` = `PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY`.** Il post-arm order,
+ACK/echo/status e la policy fisica fixed-64 sono direttamente osservati nella
+capture primaria APP12509. Il live proof D262 copre **solo** il bounded FDT arm
+(`0x36,0x50,0x36,0x82,0x20,0x36,0x32`, `STOP_AFTER_FDT_ARM_ACK`) e **non**
+raggiunge il sottoalbero finger-down/`0x22`/immagine; dunque `0x22` NON è
+live-proven/accepted.
+
+**Modello `0x22` (coerente con `D263_01` v2).**
+- *Observed on primary target:* logical A0 length 10; physical OEM OUT length 64;
+  out-of-frame residue/staging observed (offset 40–45 = `cb f2 e2 be fb 7f`).
+- *Linux deterministic operational candidate:* `FIXED64_ZERO_TAIL`.
+- *Candidate status:* `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`.
+- *Device acceptance of Linux zero-tail on `0x22`:* `NOT_LIVE_PROVEN`.
+
+La capture primaria prova la **submission** OEM fixed64 e supporta la scelta
+candidate zero-tail; **non** conferma live l'acceptance device del zero-fill
+Linux su `0x22` (`phase2_model_confirmed` di `D263_01` = `false`).
+
+Artefatti `analysis/D263/`: `d263_01_0x22_evidence_audit.py`,
+`D263_01_post_arm_order.json`, `D263_01_0x22_physical_policy.json`,
+`D263_01_report.md`, `D263_workflow_state.json`. Nessun ZIP in 01.
+
+### D263/02: retained TLS e pipeline first-image (sottostep 02)
+
+Audit OFFLINE dell'architettura esistente per
+`encrypted first-image B0 -> retained TLS -> Goodix payload -> image record -> CRC -> packed12 -> 80x64`,
+senza modifiche runtime. Esito `PASS_AUDIT_NOT_BLOCKED`.
+
+Retained TLS: `PersistentRuntimeCoordinator` crea **una** sola
+`Tls12PskServerSession` (`server_session_object_count=1`,
+`psk_context_provisioning_count=1`, `handshake_count=1`); l'adapter
+`MemoryBioApplicationSessionAdapter` può consumare più application
+record sulla stessa sessione retainita (baseline B0 = record #1). La stessa
+sessione può quindi teoricamente trasportare anche il primo B0 immagine
+(IRQ2 → 0x22 → first-image). Tuttavia `run()` si ferma a `machine.arm(ts16)` e
+il `finally` chiude TLS prima di qualsiasi post-arm: la fase post-arm non è
+cablata. Chi decripta B0: `B0ApplicationConsumer.consume`
+(`core/tls_b0.py:287`); chi parse l'immagine:
+`parse_image_payload`→`decode_image_record`→`src/goodix5125_cleanroom.decode_record`
+(servono i byte decriptati). `FdtLifecycle` ha già gli stati/metodi
+`FDT_ARMED_WAIT`, `FIRST_IMAGE_RECEIVED`, `post_irq2_image_command`,
+`first_image_received`, ma il coordinator/macchina di produzione non li
+invoca: la transizione terminale `FDT_ARMED_WAIT → FIRST_IMAGE_RECEIVED` è assente.
+Nessun redesign TLS/transport richiesto (target: ONE USB/TLS session, ONE
+handshake, ONE secret boundary, ZERO second PSK/reopen è già soddisfatto).
+
+Pipeline immagine: codec canonico **unico** in `src/goodix5125_cleanroom.py`
+(packed12, `RECORD_BYTES=7684`, `SAMPLE_COUNT=5120`, raster 80×64, CRC-32/MPEG-2
+fail-closed). `decode_image_record` è solo wrapper. Nessun decoder duplicato.
+Test esistenti: `test_cleanroom.py`, `test_d249_post_d4.py`,
+`test_d257_fdt_candidate.py` (tutti fixture sintetiche). `FIRST_IMAGE_RECEIVED`
+è raggiunto solo da `FirstImageMachine` (offline/test), non dal coordinator.
+
+Artefatti `analysis/D263/`: `D263_02_retained_tls_map.json`,
+`D263_02_first_image_pipeline.json`, `D263_02_runtime_gap_report.md`. Nessun ZIP.
+
+### D263/03: terminal stop dopo la first image e gate Phase 1 (sottostep 03)
+
+OFFLINE, no live, no patch runtime. Confronto con il ciclo positivo primario
+(`rilevamento.pcapng`, in `D263_workflow_state.observed_order`): lo stack
+Windows dopo la prima immagine invia `0x34` (arm finger-up, manuale 170-171) →
+`IRQ 0x0200` → `0x20` (seconda immagine) → `0x32` re-arm. Questo è
+multi-enrollment e **non** prova che `0x34`/`0x20`/re-arm siano richiesti per
+uno stop host dopo la prima immagine.
+
+Candidato terminale D263/03:
+`0x32 → IRQ 0x0002 → 0x22 → first image → HOST/TLS/USB CLEANUP → STOP`,
+senza `0x34`, `0x20`, re-arm, A2, `0x70`, reset, retry, comandi persistenti.
+
+Host cleanup (VERIFICATO fattibile/implementato): cancel pending receive
+(D255/D256 quiescenza bus: pending IN cancellato a frame 218, zero packet
+residui), TLS close (`core/persistent_runtime.py` finally), USB release/close,
+restore `fprintd` exactly-once (manuale 912-928, 1377-1387), nessun comando
+Goodix extra (D255/D256: intervallo cancel senza packet target).
+
+Device internal state (UNKNOWN per taxonomy): FDT/finger post-image non noto
+(D252 BLOCKED); `0x34` osservato solo come arm finger-up, necessità non provata;
+tolleranza disconnect device-side non osservata; recovery cold start INFERITO OK
+(D256: nuovo `0x32` accettato senza restore USB); restore device-side non
+osservato, A2/`0x70` NON sono restore FDT.
+
+Classificazione: `FIRST_IMAGE_TERMINAL_STOP=EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN`.
+`D263_PHASE1_READY_FOR_PHASE2_OFFLINE_RUNTIME_INTEGRATION=true`: autorizza solo
+design/implementazione **OFFLINE** del candidato bounded (cablare path post-arm
+first-image su TLS retainita + cleanup host esattamente-once + STOP), NON live
+review né live execution. Baseline D262 `e9073a17...` rispettata, non regredita.
+
+Artefatti `analysis/D263/`: `D263_03_terminal_boundary_evidence.json`,
+`D263_03_terminal_boundary_decision.json`, `D263_03_phase1_decision.json`,
+`D263_03_report.md`. Nessun ZIP.
+
+### D263/04: Phase 2 design contract e patch plan (sottostep 04, design-only)
+
+Gate Phase 2 `READY` (`D263_PHASE1_READY…=true`). Nessuna patch runtime in
+04. Contratto minimo: `D262 path → arm 0x32 ACK → bounded wait IRQ 0x0002 →
+exactly one 0x22 [01 00] → retained TLS receives first B0 → parser/codec
+canonico valida+decodifica → FIRST_IMAGE_RECEIVED → bounded host-only terminal
+cleanup → STOP`. Invarianti: one USB/TLS session+handshake, zero second
+secret/USB reopen/retry/A2/`0x70`/`0x34`/`0x20`-post/re-arm/persistent-write,
+first-image bytes non persistiti (plaintext azzerato, raster solo in memoria),
+fail-closed su mismatch.
+
+Primitive riusate (nessun duplicato): `build_finger_image` (post_d4.py:257),
+`parse_fdt_event` (irq==2, post_d4.py:273),
+`application_session.consume_application_record` (tls_b0.py:252),
+`parse_image_payload`/`decode_image_record` (post_d4.py:336/347 → codec
+canonico), `lifecycle.post_irq2_image_command`/`first_image_received`/
+`cancel_pending_receive`/`terminal_stop` (fdt_lifecycle.py:222/230/234/251).
+Il gap era solo in `PersistentRuntimeCoordinator.run()` che si ferma a
+`machine.arm(ts16)` (persistent_runtime.py:232).
+
+Patch plan (step 05/06, ciascuno <15 min):
+- **Step 05**: `core/runtime_transport.py` (aggiungere `0x22` agli allowlist
+  `fdt_a0_policy`/`operational_fdt_a0_policy`); `core/fdt_lifecycle.py`
+  (aggiungere `0x22` a `COMMAND_TIMEOUT_MS`; `cancel_pending_receive` accetta
+  anche `FIRST_IMAGE_RECEIVED`). Rischio basso.
+- **Step 06**: `core/persistent_runtime.py` (orchestrazione post-arm: wait
+  IRQ2 → un `0x22` → receive B0 TLS → decode → `first_image_received` →
+  `cancel_pending_receive`+`terminal_stop`; rilassare il check
+  `EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE` a prefisso + audit comandi proibiti;
+  arricchire `RuntimeResult`); nuovo `tests/test_d263_phase2_first_image_terminal.py`.
+  Rischio medio, mitigato da riuso primitive auditate, single-use, fail-closed,
+  cleanup exactly-once.
+
+Hash pre-change dei file live-critical in
+`D263_04_live_critical_prechange_hashes.json` (baseline per step 05/06).
+
+Artefatti `analysis/D263/`: `D263_04_phase2_contract.json`,
+`D263_04_patch_plan.md`, `D263_04_live_critical_prechange_hashes.json`. Nessun ZIP.
+
+### D263/05: Phase 2 support primitives lifecycle + transport (sottostep 05)
+
+Gate READY + contract step 04 valido. Implementati SOLO i support primitives;
+il coordinator NON è stato esteso (rimandato a step 06).
+
+`core/fdt_lifecycle.py` (`2aac7422…93a33a`): `COMMAND_TIMEOUT_MS` +`0x22:2000`;
+`post_irq2_image_command` con guard one-shot (secondo tentativo →
+`fail_closed`+`InvalidTransition`, niente re-arm retry); `cancel_pending_receive`
+ora accetta anche `FIRST_IMAGE_RECEIVED` (cleanup host terminale post-first-image
+per la decisione step 03). `core/runtime_transport.py` (`2930aa57…3e38d`):
+`0x22` aggiunto a `fdt_a0_policy` (ABSTRACT_LOGICAL_ONLY, **non** live-proven,
+nessun tail inventato) e a `operational_fdt_a0_policy`
+(FIXED64_ZERO_TAIL_D261_CANDIDATE, deterministico zero-fill). `0x34`/`0xA2`/`0x70`
+restano rifiutati da entrambe. Nuovo `tests/test_d263_phase2_support_primitives.py`
+(12 test sintetici, tutti OK): valid transition (trace termina `0x32,0x22`, nessun
+`0x34`/`0x20`), one-shot `0x22`, second attempt rejected, wrong-order rejected,
+terminal transition, prohibited unreachable, physical frame construction,
+deterministic tail. Coordinator invariato (`8e448caa…0df12c`).
+
+Artefatti `analysis/D263/`: `D263_05_change_summary.json`,
+`D263_05_test_results.json`, `D263_05_report.md`. Nessun ZIP.
+
+### D263/06: Phase 2 PersistentRuntime first-image integration (sottostep 06)
+
+Gate READY + step05 PASS. Esteso il production-shaped
+`PersistentRuntimeCoordinator` (`persistent_runtime.py`
+`c266ef8a…3963af`) con il minimo percorso offline candidato:
+`D262 arm complete -> bounded IRQ2 wait -> exactly-one 0x22 -> retained TLS
+first-image B0 -> canonical parser/codec -> FIRST_IMAGE_RECEIVED -> bounded
+host/TLS/USB cleanup -> stop`. Nuovo metodo `_run_first_image_terminal()`
+riusa `build_finger_image`, `parse_image_payload`/`decode_image_record` (codec
+canonico) e la retained TLS B0 application session; nessun parser/codec
+duplicato. `run()` chiama il metodo dopo `arm(ts16)` e rilassa il check del
+trace esatto a prefisso `EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE` + extra esattamente
+`(0x22)` + audit comandi proibiti; `RuntimeResult`/`audit()` arricchiti. Il
+`finally` esistente (TLS close + secret zeroize + USB release) resta
+exactly-once su ogni failure. `tests/test_d263_phase2_first_image_terminal.py`
+(8 test sintetici TLS, tutti OK) copre happy-path completo, wrong IRQ, timeout,
+wrong ACK, malformed B0, CRC/image failure (plaintext azzerato), prevenzione
+second 0x22 (one-shot), nessun pixel persistito, one-session/one-handshake/no-
+reopen. Invarianti: one USB/TLS session+handshake, zero second secret/USB
+reopen/retry, same retained session, esattamente un `0x22`, no
+`0x34`/`0x20`-post/re-arm/`A2`/`0x70`/persistent-write, first-image bytes non
+persistiti, fail-closed su mismatch, cleanup su failure. Nota: l'env Cloud non
+ha OpenSSL PSK; i test usano TLS sintetico, il path `Tls12PskServerSession` di
+produzione è validato da `test_d259` in env con OpenSSL-PSK.
+
+Artefatti `analysis/D263/`: `D263_06_runtime_integration_summary.json`,
+`D263_06_test_results.json`, `D263_06_report.md`. Nessun ZIP.
+
+### D263/07: executable closure, regression audit, micro-corrective (sottostep 07)
+
+Sottostep conclusivo di review offline end-to-end del change-set D263 (Phase 2
+attiva: gate Phase1 READY + step05/06 completati). Closure eseguibile
+verificata: coordinator importato da cwd repo-root, path resolution ok,
+invocazione offline via double iniettati (nessun USB/live), failure reporting
+fail-closed (`run()` -> `FAILED_CLOSED` + `lifecycle.fail_closed()` + re-raise;
+`audit()` espone `failure_reason`), single-use (`runtime_single_use`),
+cleanup garantito nel `finally` (TLS zeroize + secret boundary + transport).
+
+Regression audit (checklist prompt): sequence state machine esatta (trace
+prefisso `EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE` + solo `(0x22)`); one-shot
+(`post_irq2_image_command` incrementa `image_command_attempt_count` e fail-closed
+al secondo tentativo; coordinator single-use); no forbidden reachability
+(`run()` rifiuta `{0x34,0xA2,0x70,0x20}` post-arm e impone `extra==(0x22,)`;
+lifecycle `_record` rifiuta non-allowlist/persistent/recovery); physical `0x22`
+policy coerente con evidence e con il contratto `D263_04`: il runtime seleziona
+`fdt_a0_policy(0x22,…)` = `ABSTRACT_LOGICAL_ONLY` quando `operational_physical_policy`
+è false, e `operational_fdt_a0_policy(0x22,…)` = `FIXED64_ZERO_TAIL` (candidato
+deterministico Linux, `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`, **NON**
+live-accepted) quando è true; nessun nuovo submission mode inventato; nessuna
+claim di acceptance device; retained TLS single-session (`handshake_count==1`,
+`second_server_session_created=False`, stesso secret-boundary); no second
+handshake/provision/reopen (`session_count==1`, `psk_context_provisioning_count==1`);
+first-image non persistita (plaintext azzerato dopo decode, azzerato anche su
+fallimento decode; solo shape `(…,64)` in report, mai pixel; `host_cache_write_count=0`);
+cleanup in success/failure; lifecycle terminale
+(`FIRST_IMAGE_RECEIVED`->`HOST_WAIT_CANCELED`->`TERMINAL_STOPPED`); exception
+fail-closed; no log di payload sensibile; nessun path operator/live preparato.
+
+Micro-corrective (unico step con correzione permessa): difetto locale —
+`_run_first_image_terminal` hardcodava `first_image_raster_shape=(80,64)`
+invece di derivarlo dal decode canonico. Corretto:
+`raster = parse_image_payload(bytes(plaintext)); outcome["first_image_raster_shape"] = (len(raster)//64, 64)`
+(`core/persistent_runtime.py` `c266ef8a…` -> `1a731cda…`); decode canonico
+inalterato, nessun pixel persistito, scope/invarianti invariati. Retest: 8+12 D263
+test PASS.
+
+Test: D263-targeted 20/20 PASS; full discovery 248 (5 fail + 33 err + 3 skip)
+tutti ambientali (no OpenSSL PSK / `patch` / libusb / synthetic-TLS client nel
+Cloud), pre-esistenti a D263: i guasti ambientali osservati nel Cloud avvengono
+prima di raggiungere il path D263 modificato — il rehearsal D260 importa in via
+transitiva `core/persistent_runtime.py`, ma il failure Cloud avviene prima del
+path D263; nessuna regressione è attribuibile al change-set D263. Nessuna
+regressione D263. Integrity: vs `D263_04`, cambiano esattamente i tre
+file patch-ati (persistent_runtime, runtime_transport, fdt_lifecycle); tutti gli
+altri live-critical (backend/guardrail/launcher) byte-identici.
+
+Artefatti `analysis/D263/`: `D263_07_executable_closure.json`,
+`D263_07_regression_results.json`, `D263_07_live_critical_diff_manifest.json`,
+`D263_07_report.md`. Nessun ZIP.
+
+### D263/08: consolidamento finale, closure canonica, UNICO bundle (sottostep 08, ultimo)
+
+Consolidamento OFFLINE di D263 (Phase 1 + Phase 2). Nessuna feature nuova.
+Verifica di coerenza tra sottostep 01–07: nessuna contraddizione (taxonomy
+`0x22`=`PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY` costante; gate Phase1 READY
+coerente; step05/06/07 implementano esattamente il contratto `D263_04`; hash
+live-critical coerenti con `D263_07`).
+
+Esito finale: **`OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW`** (non live-ready).
+D263 ha provato offline: (a) ordine post-arm target-specific
+`0x32(arm,ACK)→IRQ0x0002→0x22[01 00](ACK)→first image(TLS B0)→host/TLS/USB
+cleanup→STOP`; (b) policy `0x22`: logical offline = `ABSTRACT_LOGICAL_ONLY`;
+operational Linux candidate = `FIXED64_ZERO_TAIL`
+(`EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`, `NOT_LIVE_PROVEN`); nessun padding
+inventato per la policy logica, mentre il candidato operativo è deterministico e
+non live-accepted; (c) pipeline first-image canonica unica (TLS retained → codec
+`decode_image_record` 7684-byte → 80×64, CRC fail-closed); (d) retained TLS
+single-session/single-handshake; (e) terminal-stop su coordinator di produzione
+cablatо ed esercitato end-to-end con double offline; (f) micro-correttiva shape
+raster derivata dal decode.
+
+Stato canonico D263 (coerente con i marker globali del manuale):
+
+```text
+CURRENT BOUNDARY            = D263 implements an opt-in OFFLINE first-image terminal candidate; default coordinator run() boundary remains STOP_AFTER_FDT_ARM_ACK (D260/D262); D263 non live
+READY_FOR_FDT              = architecture-review true; operational/live false
+SECOND_LIVE_ATTEMPT_ALLOWED= false (single-use coordinator; D262 marker consumato)
+FRESH_FDT_BOOTSTRAP_LIVE_PROVEN = true
+FINAL_FDT_ARM_LIVE_PROVEN       = true
+POST_ARM_0x22_LIVE_PROVEN        = false
+FIRST_IMAGE_LIVE_PROVEN          = false
+FDT_DOWN_TABLE_LIVE_READY (storico D252, solo stato storico) = false
+0x22                       = PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY; non live-proven
+0x22_LOGICAL_OFFLINE_POLICY= ABSTRACT_LOGICAL_ONLY
+0x22_OPERATIONAL_LINUX_CANDIDATE = FIXED64_ZERO_TAIL (EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE, NOT_LIVE_PROVEN)
+FIRST_IMAGE                = pipeline canonica OFFLINE chiusa; non persistita
+D262_OUTCOME               = PASS_STOP_AFTER_FDT_ARM_ACK (baseline e9073a17… non regredita)
+D263                       = OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW
+D263_PHASE1_READY_FOR_PHASE2_OFFLINE_RUNTIME_INTEGRATION = true
+D263_PHASE2_EXECUTED       = true
+D263_PHASE2_RESULT         = OFFLINE_PASS (no live)
+D263_EXECUTABLE_CLOSURE    = PASS_OFFLINE
+D263_LIVE_CRITICAL_MODIFICATION_COUNT = 3 (persistent_runtime, runtime_transport, fdt_lifecycle)
+D263_CORRECTIVE_MODIFICATION_COUNT  = 1 (solo core/persistent_runtime.py: defect A + B)
+D263_HARDWARE_ACTION_COUNT = 0
+D263_READY_FOR_LIVE_REVIEW = false
+D263_READY_FOR_LIVE        = false
+D263_LIVE_EXECUTION        = NOT_PERFORMED
+```
+
+File live-critical cambiati (vs `D263_04`): `core/persistent_runtime.py`,
+`core/runtime_transport.py`, `core/fdt_lifecycle.py`. Tutti gli altri
+backend/guardrail/launcher live-critical sono byte-identici. Nessun live
+test/autorizzazione; nessun comando USB/PSK/OTP/flash. Bundle unico:
+`D263_post_arm_first_image_offline_bundle.zip` (+ `.sha256`), step-local,
+non cumulativo, con manifest path+SHA-256, senza raw capture/secret/biometric.
+
+Review necessaria prima di qualunque futuro live: baseline live approvata
+esplicitamente dall'AI PM; autorizzazione live separata; verifica del
+live-critical set contro questo bundle; riapertura dei blocchi D252/D253/D255
+(device-side restore/cancel, arm lifetime, current-path seed) con evidenza OEM
+mirata. `0x22` resta `OBSERVED_ONLY` finché un live dedicato non lo accetta.
+
+### D263/09: correttivo post-review AI-PM (defect A/B + normalizzazione)
+
+Correttivo OFFLINE dello stesso milestone D263, senza rifare D263 da zero né
+ampliare il boundary, né preparare/eseguire live. Branch
+`session/agent_16ceb075-09cc-4bef-9575-02c7f6528892`, HEAD
+`320dbf3c…`, stato clean. Esecuzione strictly OFFLINE; live hardware vietato.
+
+**Defect A — regressione semantica D260/D262 in `run()` (CHIUSO).** `run()`
+invocava incondizionatamente `_run_first_image_terminal()` dopo l'arm,
+promuovendo implicitamente ogni consumer (incl. il rehearsal D260) al boundary
+D263. Correzione: enum esplicito `TerminalBoundary`;
+`STOP_AFTER_FDT_ARM_ACK` è il **default** (preserva D260/D262: termina dopo
+il final `0x32` ACK, nessun IRQ2/`0x22`/first-image); `STOP_AFTER_FIRST_IMAGE`
+è **opt-in**. Il check della command trace dipende dal boundary scelto
+(arm-only: trace storica esatta; first-image: prefisso esatto + unico suffix
+`(0x22,)`). I test pubblici `run()` arm-only lo provano end-to-end in modo
+environment-independent (senza OpenSSL-PSK).
+
+**Defect B — `operational_physical_policy` ignorata sul nuovo `0x22` (CHIUSO).**
+`_run_first_image_terminal()` usava sempre `fdt_a0_policy(0x22,…)`. Correzione:
+`0x22` seleziona `operational_fdt_a0_policy` (`FIXED64_ZERO_TAIL`) quando
+`operational_physical_policy=true`, altrimenti `fdt_a0_policy`
+(`ABSTRACT_LOGICAL_ONLY`). Nessun nuovo submission mode inventato; nessuna
+claim di acceptance live. `Zero22PolicySelectionTests` verifica il mode
+realmente passato a `transport.submit()`.
+
+**Normalizzazione taxonomy/policy `0x22` (coerente con `D263_01` v2).**
+
+```text
+0x22                       = PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY
+0x22_LOGICAL_OFFLINE_POLICY= ABSTRACT_LOGICAL_ONLY
+0x22_OPERATIONAL_LINUX_CANDIDATE        = FIXED64_ZERO_TAIL
+0x22_OPERATIONAL_ZERO_TAIL_CANDIDATE    = EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE
+0x22_LIVE_ACCEPTANCE       = NOT_LIVE_PROVEN
+0x22_ACK_POLICY            = EXACTLY_ONE_REQUIRED_AND_VALIDATED
+FIRST_IMAGE_TERMINAL_STOP  = EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN
+HOST_CLEANUP_MECHANISM_SUPPORTED             = true
+POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED_OFFLINE = true
+POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE       = UNKNOWN
+POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN     = false
+```
+
+La capture primaria conferma la **submission** OEM fixed64 e supporta la scelta
+candidate zero-tail; **non** conferma live il padding zero Linux su `0x22`. Il
+`phase2_model_confirmed` di D263/01 è stato riportato a `false` per non essere
+interpretato come acceptance device.
+
+**Closure pubblica `run()` (Sezione 5).** Aggiunti test OFFLINE, sintetici,
+environment-independent che esercitano il metodo pubblico `run()` (non il
+privato): (A) backward-compat arm-only (stop dopo arm, nessun `0x22`, trace
+esatta, cleanup exactly-once, nessun retry/persistenza); (B) first-image opt-in
+end-to-end success (un solo session/handshake/secret-handoff, prefisso storico
++ unico `0x22`, ACK valido, first B0 su TLS retained, codec canonico, immagine
+valida, non persistita, `TERMINAL_STOPPED`, cleanup exactly-once) e failure
+path (fail-closed, cleanup once, nessun secondo `0x22`/recovery/persistenza).
+
+**Audit regression.** 27 test D263 PASS (12 support-primitives + 8
+first-image + 7 public-run nuovi). I test D260 pertinenti falliscono solo per
+limite ambientale Cloud (`SSLContext` senza `set_psk_client_callback`):
+il fallimento avviene alla costruzione di `SyntheticTlsClient` in
+`d260_offline_rehearsal`, **prima** che qualunque modulo D263 esegua — non è
+una regressione D263. Nessuna regressione attribuibile ai tre moduli D263.
+
+**Bundle.** Rigenerato `D263_post_arm_first_image_offline_bundle.zip` (+`.sha256`)
+dopo il correttivo; step-local, non cumulativo. File live-critical cambiati dal
+solo correttivo: `core/persistent_runtime.py` (`1a731cda…`→`36963ce7…`);
+`core/runtime_transport.py` e `core/fdt_lifecycle.py` invariati
+(`2930aa57…`, `2aac7422…`). Nessun launcher/operator-kit modificato.
+
+**Esito correttivo: `D263_CORRECTIVE = PASS`.** Stato finale:
+`OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW`; `D263_HARDWARE_ACTION_COUNT=0`;
+`D263_READY_FOR_LIVE_REVIEW=false`; `D263_READY_FOR_LIVE=false`;
+`D263_LIVE_EXECUTION=NOT_PERFORMED`. Nessuna autorizzazione live concessa né
+consumata.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;

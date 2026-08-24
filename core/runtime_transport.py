@@ -74,7 +74,7 @@ def fdt_a0_policy(control: int, timeout_ms: int) -> PhysicalSubmissionPolicy:
     therefore keeps this axis abstract instead of inventing padding.
     """
 
-    if control not in {0x20, 0x32, 0x36, 0x50, 0x82}:
+    if control not in {0x20, 0x22, 0x32, 0x36, 0x50, 0x82}:
         raise ValueError(f"unsupported_fdt_control:0x{control:02x}")
     return PhysicalSubmissionPolicy(
         f"FDT_A0_0x{control:02X}_ABSTRACT_OFFLINE",
@@ -94,7 +94,7 @@ def operational_fdt_a0_policy(control: int, timeout_ms: int) -> PhysicalSubmissi
     future per-command live hypothesis.
     """
 
-    if control not in {0x20, 0x32, 0x36, 0x50, 0x82}:
+    if control not in {0x20, 0x22, 0x32, 0x36, 0x50, 0x82}:
         raise ValueError(f"unsupported_fdt_control:0x{control:02x}")
     return PhysicalSubmissionPolicy(
         f"FDT_A0_0x{control:02X}_FIXED64_ZERO_TAIL_D261_CANDIDATE",

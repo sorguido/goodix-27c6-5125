@@ -1,0 +1,51 @@
+{
+  "schema": "D263_06_RUNTIME_INTEGRATION_SUMMARY_V1",
+  "generated_utc": "2026-08-24T07:38:00Z",
+  "reasoning": "HIGH",
+  "scope": "Phase 2 coordinator first-image integration (OFFLINE; synthetic TLS in tests)",
+  "gate": "Phase1 READY + step05 PASS -> applied",
+  "files_modified": {
+    "core/persistent_runtime.py": {
+      "before_sha256": "8e448caaa2527b13e66679cad55afa103b9ac30cab505299c848c5250a0df12c",
+      "after_sha256": "c266ef8a83ac11da6d9be49ed8edc89d16fe16d4b626325d7ef68a3db93963af",
+      "changes": [
+        "imports: build_finger_image, parse_ack, parse_fdt_event, parse_image_payload, UnexpectedAck, TLS",
+        "constants: FIRST_IMAGE_IRQ2_TIMEOUT_MS=5000, FIRST_IMAGE_B0_TIMEOUT_MS=5000",
+        "RuntimeResult: +irq2_observed, image_command_attempt_count, image_ack, first_image_received, first_image_validation, first_image_raster_shape, first_image_bytes_persisted, terminal_cleanup_completed",
+        "new method _run_first_image_terminal(): IRQ2 wait -> exactly-one 0x22 -> retained TLS first B0 -> canonical codec decode -> FIRST_IMAGE_RECEIVED -> host-only cleanup -> stop",
+        "run(): calls _run_first_image_terminal() after arm; relaxes exact-trace check to prefix == EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE + extra == (0x22) + forbidden-post-arm audit; RuntimeResult carries first-image fields",
+        "audit(): +first_image_received, image_command_attempt_count, first_image_validation, first_image_bytes_persisted, terminal_cleanup_completed"
+      ]
+    },
+    "tests/test_d263_phase2_first_image_terminal.py": {
+      "before_sha256": null,
+      "after_sha256": "NEW_FILE",
+      "changes": ["8 synthetic-TLS integration tests covering happy path + all failure categories"]
+    }
+  },
+  "reused_no_duplication": [
+    "build_finger_image (post_d4)",
+    "parse_image_payload / decode_image_record (canonical codec)",
+    "retained TLS B0 consumer (tls_b0.application_session.consume_application_record)",
+    "lifecycle.post_irq2_image_command / first_image_received / cancel_pending_receive / terminal_stop"
+  ],
+  "invariants_verified_by_tests": {
+    "one_usb_session": true,
+    "one_tls_server_session_one_handshake": true,
+    "zero_second_secret_provisioning": true,
+    "zero_transport_reopen": true,
+    "same_retained_tls_application_session": true,
+    "exactly_one_0x22": true,
+    "no_0x34": true,
+    "no_post_image_0x20": true,
+    "no_re_arm": true,
+    "no_a2_0x70": true,
+    "no_retry": true,
+    "no_persistent_write": true,
+    "first_image_not_persisted": true,
+    "decoded_raster_not_in_report": true,
+    "cleanup_on_failure": true,
+    "fail_closed_on_irq_ack_b0_image_mismatch": true
+  },
+  "env_note": "Cloud runner lacks OpenSSL PSK (set_psk_server_callback); tests use a synthetic TLS adapter. Production Tls12PskServerSession path validated by test_d259 in an OpenSSL-PSK environment."
+}

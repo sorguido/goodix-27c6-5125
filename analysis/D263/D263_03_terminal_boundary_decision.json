@@ -1,0 +1,23 @@
+{
+  "schema": "D263_03_TERMINAL_BOUNDARY_DECISION_V1",
+  "generated_utc": "2026-08-24T07:10:00Z",
+  "classification": "FIRST_IMAGE_TERMINAL_STOP=EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN",
+  "decision_one_of_four": "EVIDENCE_SUPPORTED_BUT_DEVICE_INTERNAL_STATE_UNKNOWN",
+  "not_chosen": [
+    "PRIMARY_TARGET_SUPPORTED_HOST_ONLY_STOP",
+    "UNPROVEN_AND_BLOCKING",
+    "CONTRADICTED_BY_PRIMARY_EVIDENCE"
+  ],
+  "rationale": {
+    "host_side": "Lo stop host-only (cancel pending receive, TLS close, USB release/close, restore fprintd, ZERO comandi Goodix extra) e' VERIFICATO fattibile ed implementato: D255/D256 provano la quiescenza bus (pending IN cancellato, zero packet residui) e il runtime production implementa cleanup/zeroizzazione/restore/reseal exactly-once in D232-D262.",
+    "device_side": "Lo stato interno device post-prima-immagine (FDT/finger, necessita' di 0x34, tolleranza disconnect, restore device-side) resta UNKNOWN: nessun live post-first-image eseguito; D252 BLOCKED; 0x34 osservato solo come 'arm finger-up' nello stack Windows, non come cleanup obbligatorio. Non contraddetto da evidenza primaria, ma non provato.",
+    "positive_cycle": "Il ciclo positivo documentato (0x34->IRQ0x0200->0x20->re-arm) e' cio' che lo stack Windows fa per multi-enrollment; NON dimostra che 0x34/0x20/re-arm siano richiesti per uno stop host dopo la prima immagine."
+  },
+  "host_cleanup_mechanism_supported": true,
+  "post_first_image_host_cleanup_implemented_offline": true,
+  "post_first_image_device_internal_state": "UNKNOWN",
+  "post_first_image_device_stop_live_proven": false,
+  "device_internal_state_known": false,
+  "contradicted_by_primary": false,
+  "blocking_missing_evidence": "NESSUNA che blocchi l'integrazione OFFLINE; l'unico residuo e' lo stato interno device (validabile solo live, fuori scope D263/03)."
+}

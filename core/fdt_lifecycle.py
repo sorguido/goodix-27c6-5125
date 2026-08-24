@@ -64,6 +64,7 @@ COMMAND_TIMEOUT_MS = {
     0x50: 500,
     0x82: 500,
     0x20: 2000,
+    0x22: 2000,
     0x32: 100,
 }
 # Compatibility name: end-to-end OEM FDT-base acquisition budget, not the
@@ -100,6 +101,7 @@ class FdtLifecycle:
         self.state = FdtLifecycleState.INITIALIZED_POST_D4
         self.session_generation = 0
         self.retry_count = 0
+        self.image_command_attempt_count = 0
         self.persistent_write_family_count = 0
         self.fresh_path: bool | None = None
         self.arm_attempts_by_generation: dict[int, int] = {}
@@ -221,6 +223,10 @@ class FdtLifecycle:
 
     def post_irq2_image_command(self) -> LifecycleTransition:
         self._require(FdtLifecycleState.FDT_ARMED_WAIT)
+        if self.image_command_attempt_count:
+            self.fail_closed("post_irq2_image_command_already_attempted")
+            raise InvalidTransition("post_irq2_image_command_already_attempted")
+        self.image_command_attempt_count += 1
         return self._record(
             "POST_IRQ2_IMAGE_COMMAND_ATTEMPT",
             FdtLifecycleState.FDT_ARMED_WAIT,
@@ -232,7 +238,10 @@ class FdtLifecycle:
         return self._record("FIRST_IMAGE_VALIDATED", FdtLifecycleState.FIRST_IMAGE_RECEIVED)
 
     def cancel_pending_receive(self) -> LifecycleTransition:
-        self._require(FdtLifecycleState.FDT_ARMED_WAIT)
+        self._require(
+            FdtLifecycleState.FDT_ARMED_WAIT,
+            FdtLifecycleState.FIRST_IMAGE_RECEIVED,
+        )
         return self._record(
             "HOST_CANCEL_PENDING_RECEIVE",
             FdtLifecycleState.HOST_WAIT_CANCELED,
