@@ -205,7 +205,8 @@ smentito l'accettazione target di `0x22` fixed64 o la first image. Lo stato
 interno device post-run resta `UNKNOWN`; `READY_FOR_LIVE=false`,
 `LIVE_AUTHORIZED=false` e nessuna nuova baseline è approvata.
 
-D266/01 corregge offline la classe di delivery nel router concreto. Il
+D266/01 corregge offline la classe di delivery nel router concreto. La review
+AI-PM è conclusa con `PASS` e il fix è accettato. Il
 predicato ad hoc `_is_irq100()` è sostituito da un classificatore FDT
 strutturale che riusa `parse_fdt_event()`: sono eventi soltanto frame A0 con
 una delle coppie control/IRQ target-specific osservate
@@ -219,8 +220,15 @@ esattamente un tentativo `0x22`, mentre il timeout senza IRQ2 ne abilita zero.
 Nessun hardware, secret reale, marker, fprintd o write persistente è stato
 toccato. La correzione rimuove il blocker software noto ma non dimostra che
 IRQ2 sia stato fisicamente emesso in D265/02, né prova live `0x22` o la prima
-immagine. Review AI-PM, eventuale merge, nuova baseline full-SHA approvata e
-nuova autorizzazione restano obbligatori; `READY_FOR_LIVE=false`.
+immagine. D266/02 ha però falsificato la readiness del percorso operatore sulla
+nuova base: il dry-run ufficiale D265 termina fail-closed perché il suo manifest
+storico conserva l'hash pre-fix di `core/usb_runtime.py`, mentre il worktree usa
+correttamente il blob D266/01 accettato. I test router 8/8 e la suite mirata
+37/37 restano verdi, ma l'executable closure operatore è `FAIL`. Non è stata
+retro-modificata l'autorità storica né applicato un corrective live-critical
+nello step di ratifica. Servono quindi un corrective separato, nuova review e
+solo dopo un'eventuale approvazione full-SHA e autorizzazione live;
+`READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false` e `READY_FOR_LIVE=false`.
 
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
@@ -505,7 +513,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Corrective readiness D261 | PASS offline per baseline-approval; operational review promosso, live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full commit SHA `e9073a171697bd68dd2debabb851f23d007bf718` approvato da Utente e AI-PM, zero-tail per comando resta rischio live |
 | Kit D265/01 first-image | PASS offline; live successivamente eseguito in D265/02 | operator path one-shot, prompt immediatamente prima della wait IRQ2 e telemetria truth-preserving; baseline eseguita poi fissata a `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d` |
 | Run live D265/02 first-image | fail-closed pre-`0x22`, autorizzazione consumata | una USB/sessione/TLS/handshake e un arm finale; timeout EP81, zero IRQ2 consegnati/`0x22`/B0/retry/recovery/reopen/write; difetto router IRQ2 provato sulla baseline, emissione fisica IRQ2 non determinabile |
-| Corrective D266/01 router eventi | PASS offline; review AI-PM pendente, live false | classifier FDT strutturale condiviso con il parser canonico; IRQ100/IRQ2, command routing, interleaving, deadline, single-reader e seam sintetico IRQ2→un `0x22` PASS sul router concreto; nessuna nuova evidenza device-side |
+| Corrective D266/01 router eventi | PASS offline; review AI-PM PASS, fix accettato, live false | classifier FDT strutturale condiviso con il parser canonico; IRQ100/IRQ2, command routing, interleaving, deadline, single-reader e seam sintetico IRQ2→un `0x22` PASS sul router concreto; nessuna nuova evidenza device-side |
+| Closure D266/02 post-review | CORRECTIVE REQUIRED; baseline-readiness false | test router 8/8 e mirati 37/37 PASS; regressione 282 = 278 PASS, 1 FAIL, 3 ERROR invariata; dry-run D265 fail-closed sul solo hash pre-D266 di `core/usb_runtime.py` nel manifest storico, con tutti i contatori reali a zero |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -3164,6 +3173,22 @@ deadline assoluta, il lock del reader e il seam first-image fino a un solo
 tentativo sintetico `0x22`. Questo è evidence software/offline e non rivela se
 IRQ2 sia stato fisicamente emesso durante D265/02.
 
+La review AI-PM di D266/01 ha accettato il fix al commit
+`7a2ceff54f2fc27332a9f2a531ce4af5d90cf9a2`. L'audit D266/02 conferma che il
+call graph operatore continua a costruire `LibusbRuntimeTransport`, usa il suo
+unico `SharedFrameRouter` e passa al coordinator proprio
+`transport.event_source`; non emerge un event source alternativo nel percorso
+production. Il dry-run del launcher D265 dalla cwd esterna realistica `/tmp`
+fallisce tuttavia la byte identity: `analysis/D265/D265_01_live_critical_manifest.json`
+attende per `core/usb_runtime.py` l'hash D265
+`a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278`,
+mentre il blob accettato D266/01 è
+`c4e62b0786d7710eb0625b033258636597b9aa8f40259ce5a1f669b0e160385b`.
+Il gate si comporta quindi correttamente fail-closed, ma l'operator kit non è
+execution-ready sulla nuova base. D266/02 non modifica il manifest storico né
+il codice live-critical: la nuova autorità candidate e il relativo wiring
+richiedono uno step corrective separato.
+
 Il launcher `operator_kit/d261-live-fdt-arm-once.sh` accetta soltanto
 `--dry-run` oppure l'esatta autorizzazione live. Il default è hard-disabled.
 Il ramo live, non eseguito in D261, richiede root derivato da un operatore non
@@ -3411,12 +3436,16 @@ discrimina tra IRQ2 assente sul device e IRQ2 fisicamente arrivato ma trattenuto
 dal router: la baseline consegna alla event queue solo IRQ `0x0100`, mentre il
 runtime attende IRQ `0x0002`. Questo difetto software deterministico rende
 invalida qualsiasi inferenza device-side dall'assenza di IRQ2 osservata dal
-runtime. D266/01 ha ora applicato e verificato offline la patch sul router
-concreto, incluso il seam sintetico IRQ2→un solo `0x22`; non ha eseguito live e
-non risolve l'indeterminatezza fisica della run precedente. L'autorizzazione
-D265/02 è consumata, il retry è vietato e una futura run richiede ancora review
+runtime. D266/01 ha applicato e verificato offline la patch sul router concreto,
+incluso il seam sintetico IRQ2→un solo `0x22`; la review AI-PM del fix è `PASS`.
+D266/02 non ha eseguito live e non risolve l'indeterminatezza fisica della run
+precedente. Ha invece verificato che il dry-run D265 non accetta ancora la
+nuova base perché la sua autorità byte storica contiene l'hash pre-fix del
+router. L'autorizzazione D265/02 è consumata, il retry è vietato e prima di una
+futura run occorrono un corrective separato del gate/manifest candidate, review
 AI-PM, eventuale merge, approvazione esplicita di un nuovo full SHA e nuova
-autorizzazione separata. `0x22_FIXED64_LIVE_PROVEN=false`,
+autorizzazione separata. `READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false`,
+`BASELINE_APPROVED_FOR_NEW_ATTEMPT=false`, `0x22_FIXED64_LIVE_PROVEN=false`,
 `FIRST_IMAGE_LIVE_PROVEN=false`, `POST_D265_02_DEVICE_INTERNAL_STATE=UNKNOWN`,
 `READY_FOR_LIVE=false` e `LIVE_AUTHORIZED=false`.
 
@@ -4989,4 +5018,50 @@ FIRST_IMAGE_LIVE_PROVEN=false
 READY_FOR_LIVE=false
 LIVE_AUTHORIZED=false
 BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+```
+
+La review AI-PM successiva è conclusa con:
+
+```text
+D266_01_AI_PM_REVIEW=PASS
+D266_01_ROUTER_FIX_ACCEPTED=true
+D266_01_CORRECTIVE_REQUIRED=false
+```
+
+### D266/02: execution-readiness post-review fail-closed
+
+D266/02 parte e resta sul branch `codex` al commit
+`7a2ceff54f2fc27332a9f2a531ce4af5d90cf9a2`, con `origin/main` invariato a
+`c68398db24c7a1689e3056b771df83b479a1c7ef`. L'integrità del bundle D266/01 è
+PASS: vero ZIP, sidecar coerente, archive test e hash membri validi, path-set
+esatto e contenuto sanitizzato. I test del router passano 8/8 e la suite mirata
+passa 37/37. La regressione generale riproduce senza differenze D266/01: 282
+test, 278 PASS, un FAIL e tre ERROR preesistenti/ambientali; `pytest` non è
+installato e i due moduli pytest-only D264/D265 risultano invariati dal delta
+D266.
+
+Il dry-run ufficiale `operator_kit/d265-first-image-once.sh --dry-run`, eseguito
+da `/tmp`, restituisce invece `FAIL_CLOSED` con
+`byte_identity:core/usb_runtime.py`. Il manifest D265/01 è correttamente uno
+snapshot storico del candidate pre-fix e conserva SHA-256 `a19c0ffb…`; il
+router accettato D266/01 ha SHA-256 `c4e62b07…`. Tutti i contatori reali del
+dry-run restano zero, ma il gate impedisce la executable closure sulla nuova
+base. D266/02 non retro-modifica il manifest storico e non cambia alcun file
+live-critical.
+
+```text
+OUTCOME=D266_02_CORRECTIVE_REQUIRED
+ADVANCEMENT=POST_ROUTER_FIX_OPERATOR_GATE_DEFECT_LOCALIZED_OFFLINE
+EXECUTABLE_CLOSURE=FAIL
+D266_01_AI_PM_REVIEW=PASS
+D266_01_ROUTER_FIX_ACCEPTED=true
+D266_02_LIVE_CRITICAL_CODE_CHANGE_COUNT=0
+D265_OPERATOR_DRY_RUN=FAIL_CLOSED_BYTE_IDENTITY_CORE_USB_RUNTIME
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false
+BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
 ```
