@@ -347,9 +347,9 @@ class PersistentRuntimeCoordinator:
         except Exception:
             raise RuntimeFailure("first_image_b0_consumption_failed")
         try:
-            parse_image_payload(bytes(plaintext))
+            raster = parse_image_payload(bytes(plaintext))
             outcome["first_image_validation"] = "SUCCESS"
-            outcome["first_image_raster_shape"] = (80, 64)
+            outcome["first_image_raster_shape"] = (len(raster) // 64, 64)
         except Exception:
             for index in range(len(plaintext)):
                 plaintext[index] = 0

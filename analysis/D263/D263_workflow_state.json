@@ -11,13 +11,14 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02", "03", "04", "05", "06"],
+  "completed_substeps": ["01", "02", "03", "04", "05", "06", "07"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
-  "outcome_04": "PASS_PHASE2_CONTRACT_AND_PATCH_PLAN_DEFINED",
+  "outcome_04": "PASS_PHASE2_CONTRACT_AND_PATCH_PLANNED",
   "outcome_05": "PASS_SUPPORT_PRIMITIVES_IMPLEMENTED",
   "outcome_06": "PASS_RUNTIME_INTEGRATION",
+  "outcome_07": "PASS_EXECUTABLE_CLOSURE_REGRESSION_AUDIT_MICRO_CORRECTIVE",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -111,6 +112,21 @@
     "tests": "tests/test_d263_phase2_first_image_terminal.py (8 tests, all PASS, synthetic TLS)",
     "invariants_preserved": "one session/handshake; zero 2nd secret/reopen/retry/re-arm; exactly one 0x22; no 0x34/0x20-post/A2/0x70/persistent; first-image not persisted; fail-closed; cleanup on failure"
   },
+  "phase2_step07_summary": {
+    "status": "EXECUTABLE_CLOSURE_REGRESSION_AUDIT_PASSED",
+    "defects_found": 1,
+    "defects_corrected": 1,
+    "correction": "first_image_raster_shape derived from canonical decode instead of hardcoded (80,64)",
+    "files_modified": {
+      "core/persistent_runtime.py": {
+        "post_step06": "c266ef8a83ac11da6d9be49ed8edc89d16fe16d4b626325d7ef68a3db93963af",
+        "post_step07": "1a731cda1240df06b2a90d849aacee062020a95f477d51c910b5a436f72504d6"
+      }
+    },
+    "regression": "D263-targeted 20/20 PASS; full discovery 248 (5 fail+33 err+3 skip) all environmental, no D263 regression",
+    "live_critical_diff": "exactly the 3 Phase-2-patched files changed vs D263_04 baseline; all other live-critical unchanged",
+    "invariants_preserved": "no new command/retry/persistent; first-image not persisted; fail-closed; one-shot 0x22"
+  },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
   "residual_blockers": [
@@ -119,7 +135,7 @@
     "device-side restore/cancel and arm lifetime remain open (D252/D253/D255 scope)"
   ],
   "manual_updated": true,
-  "next_substep_expected": "D263/04+ (Phase 2 OFFLINE runtime integration per gate=true; nessun ZIP finche' non e' l'ultimo prompt D263)",
+  "next_substep_expected": "D263/08 (likely ULTIMO prompt: bundle ZIP finale unico step-local non cumulativo; nessun ZIP finora)",
   "safety": {
     "usb_open_count": 0,
     "command_count": 0,

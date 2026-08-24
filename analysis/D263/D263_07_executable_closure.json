@@ -1,0 +1,30 @@
+{
+  "schema": "D263_07_EXECUTABLE_CLOSURE_V1",
+  "generated_utc": "2026-08-24T07:46:25Z",
+  "milestone": "D263",
+  "substep": "07",
+  "reasoning": "HIGH",
+  "offline": true,
+  "live_execution": false,
+  "closure_checks": {
+    "cwd_real": "workspace root (coordinator imported from repo-root cwd; tests run with cwd=<repo-root>)",
+    "import_path": "from core.persistent_runtime import PersistentRuntimeCoordinator (no PYTHONPATH required when cwd=repo-root)",
+    "path_resolution": "OK (relative package imports resolve from repo-root)",
+    "invocation_mode": "offline synthetic (ScriptedTransport + ScriptedEventSource + FakeTlsSession); no USB, no live",
+    "dry_run_offline_path": "run() exercises D1->TLS handshake->D4->AF->exact bootstrap->arm->first-image terminal using injected offline doubles; no real device",
+    "failure_reporting": "fail-closed: run() catches Exception -> FAILED_CLOSED + lifecycle.fail_closed() + re-raise; RuntimeFailure carries cause; audit() exposes failure_reason",
+    "single_use": "runtime_single_use guard: second run() raises RuntimeFailure('runtime_single_use')",
+    "cleanup_path": "finally closes tls_session (close, zeroize), secret_boundary.close(), transport.close(); on COMPLETED also transitions to CLOSED"
+  },
+  "defects_found": 1,
+  "defects_corrected": 1,
+  "defect_detail": {
+    "location": "core/persistent_runtime.py:PersistentRuntimeCoordinator._run_first_image_terminal",
+    "issue": "first_image_raster_shape was hardcoded (80,64) instead of derived from the canonical decode",
+    "correction": "derive shape from len(parse_image_payload(...))//64 ; decode still canonical, no pixel persisted",
+    "before_hash": "c266ef8a83ac11da6d9be49ed8edc89d16fe16d4b626325d7ef68a3db93963af",
+    "after_hash": "1a731cda1240df06b2a90d849aacee062020a95f477d51c910b5a436f72504d6",
+    "retest": "tests/test_d263_phase2_first_image_terminal.py (8) + tests/test_d263_phase2_support_primitives.py (12) all PASS"
+  },
+  "verdict": "EXECUTABLE_CLOSURE_PASS_OFFLINE"
+}

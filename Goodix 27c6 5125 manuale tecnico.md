@@ -4176,6 +4176,53 @@ produzione è validato da `test_d259` in env con OpenSSL-PSK.
 Artefatti `analysis/D263/`: `D263_06_runtime_integration_summary.json`,
 `D263_06_test_results.json`, `D263_06_report.md`. Nessun ZIP.
 
+### D263/07: executable closure, regression audit, micro-corrective (sottostep 07)
+
+Sottostep conclusivo di review offline end-to-end del change-set D263 (Phase 2
+attiva: gate Phase1 READY + step05/06 completati). Closure eseguibile
+verificata: coordinator importato da cwd repo-root, path resolution ok,
+invocazione offline via double iniettati (nessun USB/live), failure reporting
+fail-closed (`run()` -> `FAILED_CLOSED` + `lifecycle.fail_closed()` + re-raise;
+`audit()` espone `failure_reason`), single-use (`runtime_single_use`),
+cleanup garantito nel `finally` (TLS zeroize + secret boundary + transport).
+
+Regression audit (checklist prompt): sequence state machine esatta (trace
+prefisso `EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE` + solo `(0x22)`); one-shot
+(`post_irq2_image_command` incrementa `image_command_attempt_count` e fail-closed
+al secondo tentativo; coordinator single-use); no forbidden reachability
+(`run()` rifiuta `{0x34,0xA2,0x70,0x20}` post-arm e impone `extra==(0x22,)`;
+lifecycle `_record` rifiuta non-allowlist/persistent/recovery); physical `0x22`
+policy coerente con evidence (`fdt_a0_policy(0x22,…)` = `ABSTRACT_LOGICAL_ONLY`;
+arm `0x32` (trace provata D255/D261) può usare FIXED64, ma `0x22` post-arm NON è
+nella trace provata, quindi astrazione è la scelta fedele all'evidence, nessun
+padding inventato); retained TLS single-session (`handshake_count==1`,
+`second_server_session_created=False`, stesso secret-boundary); no second
+handshake/provision/reopen (`session_count==1`, `psk_context_provisioning_count==1`);
+first-image non persistita (plaintext azzerato dopo decode, azzerato anche su
+fallimento decode; solo shape `(…,64)` in report, mai pixel; `host_cache_write_count=0`);
+cleanup in success/failure; lifecycle terminale
+(`FIRST_IMAGE_RECEIVED`->`HOST_WAIT_CANCELED`->`TERMINAL_STOPPED`); exception
+fail-closed; no log di payload sensibile; nessun path operator/live preparato.
+
+Micro-corrective (unico step con correzione permessa): difetto locale —
+`_run_first_image_terminal` hardcodava `first_image_raster_shape=(80,64)`
+invece di derivarlo dal decode canonico. Corretto:
+`raster = parse_image_payload(bytes(plaintext)); outcome["first_image_raster_shape"] = (len(raster)//64, 64)`
+(`core/persistent_runtime.py` `c266ef8a…` -> `1a731cda…`); decode canonico
+inalterato, nessun pixel persistito, scope/invarianti invariati. Retest: 8+12 D263
+test PASS.
+
+Test: D263-targeted 20/20 PASS; full discovery 248 (5 fail + 33 err + 3 skip)
+tutti ambientali (no OpenSSL PSK / `patch` / libusb / synthetic-TLS client nel
+Cloud), pre-esistenti a D263, nessuno importa/esercita i tre moduli patch-ati.
+Nessuna regressione D263. Integrity: vs `D263_04`, cambiano esattamente i tre
+file patch-ati (persistent_runtime, runtime_transport, fdt_lifecycle); tutti gli
+altri live-critical (backend/guardrail/launcher) byte-identici.
+
+Artefatti `analysis/D263/`: `D263_07_executable_closure.json`,
+`D263_07_regression_results.json`, `D263_07_live_critical_diff_manifest.json`,
+`D263_07_report.md`. Nessun ZIP.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
