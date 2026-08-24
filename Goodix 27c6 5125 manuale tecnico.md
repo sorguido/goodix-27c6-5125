@@ -161,6 +161,17 @@ centralizza poi capability D261/future in un'authority fissa non sostituibile
 da callback, rende interna la tuple future-live canonica (18 file, incluso il
 modulo operatore D261 importato), separa i due file del gate offline e lega
 transaction, report futuro e marker preflight concreti nell'adapter.
+D265/01 materializza ora, ancora **OFFLINE ONLY**, il kit operatore manuale
+`operator_kit/d265-first-image-once.sh` → `tools/d265_live_first_image_once.py`.
+Il surface ha esattamente dry-run e flag live futuro; il path futuro è vincolato
+a un nuovo full SHA in `D265_APPROVED_LIVE_BASELINE_SHA`, HEAD/worktree/path-set
+e byte identity esatti. L’autorità D265 contiene 20 file: i 18 transitivi già
+rivalutati in D264/03 più launcher e tool realmente raggiungibili. La precedente
+autorizzazione non consumata non è trasferita: review AI-PM, merge, approvazione
+del nuovo SHA e nuova autorizzazione restano quattro gate distinti.
+`READY_FOR_LIVE=false`, `BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`;
+`0x22` fixed64 e prima immagine restano non live-proven.
+
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
 preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
@@ -4726,3 +4737,44 @@ uno step successivo e separatamente autorizzato potrà approvare una baseline e
 valutare se abilitare il collegamento reale; fino ad allora il rischio residuo
 rimane l'accettazione target non provata di `0x22` fixed64 e del primo B0,
 insieme allo stato interno device post-image ignoto.
+
+### D265/01: kit operatore one-shot first-image, OFFLINE ONLY
+
+Il kit cwd-independent `operator_kit/d265-first-image-once.sh` accetta soltanto
+`--dry-run` oppure il futuro flag esatto
+`--i-authorize-one-d265-first-image-live-attempt`; default, flag errati e
+combinazioni multiple terminano `HARD_DISABLED_DEFAULT`. Il dry-run non consuma
+l'environment di approvazione e verifica wiring/schema, sintassi, autorità dei
+path, hash del worktree e soli modelli metadata di marker/report, con tutti i
+contatori reali a zero.
+
+La futura control flow richiede `D265_APPROVED_LIVE_BASELINE_SHA` come SHA-1
+completo lowercase: commit risolto esattamente, HEAD uguale, worktree pulito,
+autorità interna D265 esatta e tutti i blob live-critical byte-identici al
+commit. Il set è derivato dalla call graph: launcher e tool D265 più i 18 file
+production transitivi rivalutati da D264/03. Dopo questi gate il tool riusa
+direttamente `FutureProductionDependencies`, `run_future_first_image_candidate`,
+`PersistentRuntimeCoordinator` e `TerminalBoundary.STOP_AFTER_FIRST_IMAGE`; non
+duplica il runtime first-image.
+
+Restano dedicati marker
+`/var/lib/goodix-5125-poc/d265-first-image-single-use.marker` (schema
+`D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1`) e report
+`/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json`. Il claim
+preesistente reviewato conserva `O_EXCL`, `O_NOFOLLOW`, 0600, owner, write-all e
+fsync prima della capability live-I/O. L'interazione futura stampa istruzioni
+prima dell'attesa e apre/chiude esplicitamente una sola finestra operatore; non
+implementa password handling, retry, recovery o secondo tentativo.
+
+La rehearsal e le failure proof sono esclusivamente double/fixture/synthetic:
+zero USB, secret reale, marker reale, sensor command, mutazione fprintd e TLS
+live. D261 resta arm-only a `STOP_AFTER_FDT_ARM_ACK` e il suo marker non è
+riusato. Nessuna conoscenza live nuova è prodotta: `0x22_FIXED64_LIVE_PROVEN=false`,
+`FIRST_IMAGE_LIVE_PROVEN=false`, stato device post-image `UNKNOWN` e stop
+post-image non live-proven. La precedente autorizzazione live non fu consumata
+ma non è trasferita a D265/02. Stato: `D265_01_READY_FOR_AI_PM_REVIEW=true`,
+`D265_01_READY_FOR_BASELINE_APPROVAL=false`, `READY_FOR_LIVE=false`,
+`LIVE_AUTHORIZED=false`, `BASELINE_APPROVED=false`. Il rischio residuo è la
+reale accettazione target di `0x22`/primo B0 e lo stato interno post-image; prima
+di ogni live servono PASS AI-PM, merge, approvazione esplicita del nuovo full
+SHA e nuova autorizzazione separata.

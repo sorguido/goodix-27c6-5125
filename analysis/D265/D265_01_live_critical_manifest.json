@@ -1,0 +1,128 @@
+{
+  "schema": "D265_01_LIVE_CRITICAL_MANIFEST_V1",
+  "authority": "D265_FIRST_IMAGE_LIVE_CRITICAL_PATHS",
+  "baseline_approved": false,
+  "future_live_critical_file_count": 20,
+  "future_live_critical_files": [
+    {
+      "path": "operator_kit/d265-first-image-once.sh",
+      "sha256": "1b0d10d47e4762aeb2cd2a177a9a07352c6c10b811eb6318d2f9d2c9c3e4d805",
+      "role": "cwd-independent exact-mode operator launcher",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "tools/d265_live_first_image_once.py",
+      "sha256": "618784d6d5c7788d33e5ef7f9bf2592f75f9d54509d4a2b32c91cf81743472ee",
+      "role": "D265 baseline-bound one-shot operator entrypoint",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/__init__.py",
+      "sha256": "a2890ff0a08391c5465c7b7f054a627f60d15e93e86ae961aad49082cbad3255",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/cold_start.py",
+      "sha256": "5ce4e0eb9e3328dd36f69631ea16cd152a24f90f36418c3ddbfb7c3deb6ef025",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/fdt_lifecycle.py",
+      "sha256": "2aac74224f427c618fa21d4bf0d146284b9c7e42e3d8717bfce11be9f393a33a",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/fdt_seed.py",
+      "sha256": "5df64876dd977623def8bccab512410b1ecb18f11b3b06d589faa935c8c44e2a",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/future_first_image_operator.py",
+      "sha256": "230b0b401bba3e04863ef5e3c6c54c697eaecd74074b65996f061f97166f5a7c",
+      "role": "guard, transaction, marker and production dependency orchestration",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/live_capability.py",
+      "sha256": "2bd4ad37f9ec2e6feaac0ea2e6bc47bff668408086a899f4864a6cfc2ea47440",
+      "role": "fixed intent/marker/live-I/O capability authority",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "sha256": "dd84cda8c43df12c9caa057af0c16e8b5b9b198a26a3a38636bd1ee41dc885e3",
+      "role": "persistent coordinator and STOP_AFTER_FIRST_IMAGE runtime",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/post_d4.py",
+      "sha256": "f4f52031319b21f4ae4b5841e91f91966d9b11df8a626fcef339b080fee1daf2",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/protected_runtime.py",
+      "sha256": "896d1543240107b474408b608cdacd346b2a08c9be73298ae048b980fe396da6",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/runtime_transport.py",
+      "sha256": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/tls_b0.py",
+      "sha256": "135dc8a4a9d5c753fec38fc638d530d86f53dadbde004d9d5248200ecd1b7f56",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "core/usb_runtime.py",
+      "sha256": "a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278",
+      "role": "real ctypes libusb backend and runtime transport",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "src/goodix5125_cleanroom.py",
+      "sha256": "ef63eb3852e6526722ee12cc5e61e753783007f082819f20218a19fbbe41e3e9",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "poc/goodix5125/tools/binding_reference/__init__.py",
+      "sha256": "281ed6a9d5fce2d2213de24136525b894111efc71a11caa750c0ab961c7a3b00",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "poc/goodix5125/tools/binding_reference/runtime.py",
+      "sha256": "0530efe5b7e7834ad287c8ba28892cdf979af494a4c3c6f73b2dfe9a00dcd4b4",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "poc/goodix5125/tools/binding_reference/crypto_reference.py",
+      "sha256": "c238c4f5b187e7ffea7ac0566aa220bcf1e1903a7fa40f46fa8aa82794e737aa",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "poc/goodix5125/tools/binding_reference/pe_parser.py",
+      "sha256": "24b3931b3ac1a1268d763aa47b16bd313ba529d0ac002335eca7174434dd6617",
+      "role": "transitive production-path dependency derived from real call graph",
+      "reachable_from_d265_real_operator_path": true
+    },
+    {
+      "path": "tools/d261_live_fdt_arm_once.py",
+      "sha256": "6d5402b4fd7ac1ccd69cbd067783bbcf219a5aace2abd1bfc82895ef128840e6",
+      "role": "reviewed host guards, transactions and report primitives",
+      "reachable_from_d265_real_operator_path": true
+    }
+  ]
+}
