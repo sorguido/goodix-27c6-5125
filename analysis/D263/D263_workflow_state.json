@@ -11,12 +11,13 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02", "03", "04", "05"],
+  "completed_substeps": ["01", "02", "03", "04", "05", "06"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
   "outcome_04": "PASS_PHASE2_CONTRACT_AND_PATCH_PLAN_DEFINED",
   "outcome_05": "PASS_SUPPORT_PRIMITIVES_IMPLEMENTED",
+  "outcome_06": "PASS_RUNTIME_INTEGRATION",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -97,6 +98,18 @@
     },
     "tests": "tests/test_d263_phase2_support_primitives.py (12 tests, all PASS, synthetic only)",
     "invariants_preserved": "no 0x34/0x20-post/re-arm/A2/0x70/retry/persistent; coordinator unchanged"
+  },
+  "phase2_step06_summary": {
+    "status": "RUNTIME_INTEGRATION_PASSED",
+    "coordinator_extended": true,
+    "files_modified": {
+      "core/persistent_runtime.py": {
+        "before": "8e448caaa2527b13e66679cad55afa103b9ac30cab505299c848c5250a0df12c",
+        "after": "c266ef8a83ac11da6d9be49ed8edc89d16fe16d4b626325d7ef68a3db93963af"
+      }
+    },
+    "tests": "tests/test_d263_phase2_first_image_terminal.py (8 tests, all PASS, synthetic TLS)",
+    "invariants_preserved": "one session/handshake; zero 2nd secret/reopen/retry/re-arm; exactly one 0x22; no 0x34/0x20-post/A2/0x70/persistent; first-image not persisted; fail-closed; cleanup on failure"
   },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
