@@ -116,6 +116,22 @@ resta `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE` /
 `READY_FOR_D262_OPERATOR_EXECUTION_REVIEW=true`, `READY_FOR_D262_OPERATOR_EXECUTION=false`,
 `READY_FOR_FDT_LIVE=false`: nessuna esecuzione hardware né autorizzazione implicita.
 
+D264/01 riesamina quindi offline il rischio terminale dopo la prima immagine. La
+continuazione Windows osservata (`0x34 → IRQ 0x0200 → 0x20 → seconda immagine →
+re-arm`) è un workflow positivo, non prova un requisito device-side per lo stop.
+`0x34` resta verificato come arm finger-up/continuation primitive e non è provato
+come cancel/disarm/restore. D256 prova quiescenza host/bus e successiva re-entry
+con nuovo `0x32` senza restore USB esplicito; D262 prova inoltre il successivo
+cold-start bounded con A2 reset sensore volatile. Lo stato interno post-image
+resta `UNKNOWN`, ma non esiste evidenza di write NVM o di stato persistente/non
+recuperabile: il rischio è classificato `ACCEPTABLY_BOUNDED`, soltanto per una
+successiva review di operationalization **offline**. `0x22` zero-tail e first
+image restano non live-proven; nessuna readiness/autorizzazione/baseline live è
+approvata. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
+7108,212 ms: il timeout D263 di 5000 ms contraddiceva il path osservato ed è
+corretto minimamente a una deadline host assoluta di 15000 ms, senza asserire
+una lifetime interna del device.
+
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
 nessun retry (`RETRY_COUNT=0`), zero famiglie persistenti (`PERSISTENT_DEVICE_WRITE_COUNT=0`),
@@ -382,8 +398,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D246 TLS→D4 | successo, consumata | handshake TLS completo; D4 attempt/send `1/1`, ACK `01`, nessuna response/app-data/retry/write persistente; `STOP_AFTER_D4`, cleanup/restore/reseal riusciti |
 | Run live D250 D4→AF | eseguita una volta, marker consumato, fail-closed nel validator | TLS e D4 riusciti; AF logical 13 / physical 64 zero-tail inviato una volta; A0/AE strutturalmente valida con body 16; byte0 perduto dalla telemetria; zero retry/write/app-data; cleanup/restore/reseal riusciti |
 | Run live D251 D4→AF | successo, consumata | exactly-one AF/AE; byte0 opaco `0`, flags `0x02`, POV false/TLS true/locked false, zero retry/write/app-data, cleanup/restore/reseal riusciti, `STOP_AFTER_AF` |
-| Boundary D252 fresh-FDT | bloccato offline, nessun kit live | tabella appresa via `0x36`/IRQ `0x0100` ma seed/freschezza current-path e restore non provati; target post-IRQ usa `0x22`, non `0x20` |
-| Boundary D253 seed/restore/`0x22` | bloccato offline, nessun kit live | current core corretto a IRQ2→`0x22`; seed ultimo, zero-tail `0x36` e restore deterministico non chiusi; richiesta evidenza OEM esterna mirata |
+| Boundary storica D252 fresh-FDT | blocker originario, parzialmente superseded da D262 | seed/freschezza e restore erano aperti; D262 ha poi provato live l'intero bounded fresh-FDT arm path che consuma il seed, quindi la provenienza ultima non è più blocker operativo per quel path; restore/lifetime restano gap di conoscenza |
+| Boundary storica D253 seed/restore/`0x22` | bootstrap superseded; first-image ancora non live-proven | D262 chiude live `36,50,36,82,20,36,32`, non raggiunge IRQ2/`0x22`; zero-tail `0x22` e prima immagine restano blocker della sola boundary first-image |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
 | Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
 | Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255, incluso corrective terminal-cancel | primo cancel: re-entry e nuovo `0x32` accettato senza restore USB esplicito; secondo cancel: zero packet nell'intervallo, pending bulk-IN cancellato al frame finale `218`, zero packet residui e quiescenza USB host/bus provata; disarm/lifetime/stato FDT interno non osservati |
@@ -4390,3 +4406,78 @@ L'indice pubblico delle claim è `docs/EVIDENCE.md`; le fonti OEM/private e i
 riferimenti community sono elencati in `docs/REFERENCES.md`. Gli artefatti
 D230–D262 sono sotto `analysis/`; nessuna fonte proprietaria raw, WBDI esterna
 o capture Issue #63 raw è redistribuita.
+
+## D264/01: audit terminal-state first-image e finestra di arm
+
+D264/01 è un audit target-oriented OFFLINE; non ha eseguito D261/D262, USB,
+dito, secret reale o comandi. La baseline contenuto iniziale coincide con
+`4db9058a3235b82c8777f306a89bab10eb863337`; il branch osservato era `work`
+anziché l'atteso `codex-cloud` ed è stato lasciato invariato. Questo SHA non è
+una baseline live approvata.
+
+La capture primaria APP12509 hash-gated osserva, dopo la prima immagine,
+`0x34 → IRQ 0x0200 → 0x20 → seconda immagine → 0x50 → successivo 0x32`.
+Questa è **HOST WORKFLOW CONTINUATION**, non evidenza di un **DEVICE-SIDE
+REQUIREMENT FOR SAFE STOP**. Capture e analisi locale `gfusb.dll` verificano
+`0x34` come arm finger-up/continuation primitive; non esiste evidenza primaria
+che sia cancel, disarm, restore o requisito pre-disconnect. `gfOnCancel` cancella
+la richiesta host senza inviare direttamente A0; A2 e `0x70` non sono osservati
+come restore post-image. Rockytkg corrobora il ruolo finger-up, senza diventare
+prova APP12509. La Issue #1 esterna non era accessibile (HTTP 401) e nessun suo
+contenuto è stato ricostruito a memoria.
+
+Recoverability: D256 prova una cancellazione host con quiescenza USB terminale
+(491,125998 s, zero packet) e una re-entry sullo stesso device/endpoints in cui
+un nuovo `0x32` è accettato senza reset, re-enumerazione o restore USB esplicito.
+D262 prova poi live l'exact bounded fresh-FDT path, incluso il cold-start OEM
+che contiene A2 come reset sensore volatile. Ne segue l'inferenza delimitata che
+un eventuale stato FDT post-image è recuperabile al cold-start successivo. Lo
+stato interno resta però `POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN` e non
+viene dichiarato SAFE. Non sono osservati write NVM post-image, il candidato non
+contiene famiglie di scrittura persistente e non emerge un path plausibile di
+stato persistente/non recuperabile; l'assenza assoluta di mutazione NVM resta
+non direttamente osservabile.
+
+La finestra primaria è: `0x32` OUT@220, ACK@223, IRQ2@225, `0x22`@227,
+ACK@229, primo B0@231. Dai timestamp pcap: ACK32→IRQ2 **7108,212 ms**,
+IRQ2→`0x22` 2,404 ms, IRQ2→ACK22 2,952 ms e IRQ2→B0 50,217 ms. Esiste una sola
+osservazione positiva: non prova TTL o lifetime device, comportamento con dito
+immediato/tardivo o no-finger. Il modello bounded futuro è una singola deadline
+host monotonic assoluta dopo ACK32, non rinnovata da frame inattesi, attesa
+exactly-once di IRQ2 e cleanup host-only fail-closed alla scadenza. La deadline
+raccomandata è **15000 ms**: copre l'unico delta target con margine, ma non è una
+claim sulla lifetime interna. Il valore D263 5000 ms avrebbe scartato la traccia
+primaria a 7,108 s; D264 applica quindi il corrective minimo a 15000 ms e un test
+di regressione, senza altra modifica runtime.
+
+Riesame blocker:
+
+| Blocker storico | Classificazione D264/01 | Motivo corrente |
+| --- | --- | --- |
+| provenienza/freschezza first-`0x36` | `SUPERSEDED_BY_D262_LIVE_EVIDENCE` | D262 ha accettato live una volta l'intero bounded path che consuma quel seed; la sorgente ultima resta conoscenza, non blocker operativo dello stesso path |
+| cancel/disarm/restore | `RESIDUAL_KNOWLEDGE_GAP_ONLY` | nessun restore device provato, ma D256 prova cancel host, quiescenza e re-entry senza restore esplicito |
+| arm lifetime | `RESIDUAL_KNOWLEDGE_GAP_ONLY` | lifetime interna ignota; deadline host bounded separata dalla TTL device |
+| IRQ2→`0x22` | `BOUNDARY_SPECIFIC_UNPROVEN_HYPOTHESIS` | ordine primario osservato, causalità e acceptance live non provate |
+| zero-tail fisica `0x22` | `STILL_RELEVANT_LIVE_BLOCKER` | candidate deterministico supportato; D262 non ha inviato `0x22` |
+| first image | `STILL_RELEVANT_LIVE_BLOCKER` | capture OEM e codec offline non equivalgono a esecuzione Linux live |
+| stato device post-image | `RESIDUAL_KNOWLEDGE_GAP_ONLY` | unknown conservato; persistenza/danno irrecoverabile non supportati dall'evidenza |
+
+L'audit del codice conferma default
+`TerminalBoundary.STOP_AFTER_FDT_ARM_ACK` e opt-in esplicito
+`STOP_AFTER_FIRST_IMAGE`; one IRQ2 wait, one `0x22`, one ACK, primo B0 sulla TLS
+retained, zero secondo secret/reopen/retry/`0x34`/post-image `0x20`/re-arm/A2/
+`0x70`/write persistenti/persistenza biometrica e cleanup exactly-once. Il gate è:
+
+```text
+FIRST_IMAGE_TERMINAL_RISK=ACCEPTABLY_BOUNDED
+D264_01_READY_FOR_OFFLINE_OPERATIONALIZATION_REVIEW=true
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED=false
+POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN
+POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN=false
+0x22_TARGET_LIVE_ACCEPTANCE=NOT_LIVE_PROVEN
+FIRST_IMAGE_LIVE_PROVEN=false
+```
+
+Gli artefatti machine-readable e il report di review sono in `analysis/D264/`.
