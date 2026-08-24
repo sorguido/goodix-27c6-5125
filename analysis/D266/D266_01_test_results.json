@@ -1,0 +1,65 @@
+{
+  "schema": "D266_01_TEST_RESULTS_V1",
+  "execution_mode": "OFFLINE_ONLY",
+  "new_d266_tests": {
+    "command": "python3 -m unittest -v tests.test_d266_irq_event_router",
+    "tests_run": 8,
+    "passed": 8,
+    "failed": 0,
+    "errors": 0,
+    "status": "PASS"
+  },
+  "targeted_router_runtime_first_image": {
+    "command": "python3 -m unittest -v tests.test_d266_irq_event_router tests.test_d260_persistent_runtime tests.test_d263_phase2_first_image_terminal tests.test_d263_phase2_public_run tests.test_d261_operational_readiness.D261OperationalReadinessTests.test_shared_reader_demux_and_deadline_evidence_is_executed",
+    "tests_run": 37,
+    "passed": 37,
+    "failed": 0,
+    "errors": 0,
+    "status": "PASS"
+  },
+  "broader_unittest_regression": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests_run": 282,
+    "passed": 278,
+    "failed": 1,
+    "errors": 3,
+    "status": "PARTIAL_PREEXISTING_ENVIRONMENT_AND_DRIFT_ONLY",
+    "router_patch_attributable_failure_count": 0,
+    "known_failures": [
+      {
+        "test": "D261OperationalReadinessTests.test_preflight_dry_run_is_side_effect_free",
+        "classification": "PREEXISTING_BASELINE_DRIFT"
+      },
+      {
+        "test": "D261OperationalReadinessTests.test_concrete_usb_backend_is_sealed_without_capability",
+        "classification": "PREEXISTING_CAPABILITY_EXCEPTION_CLASS_DRIFT"
+      },
+      {
+        "test": "test_d264_03_prelive_operator import",
+        "classification": "PYTEST_NOT_INSTALLED"
+      },
+      {
+        "test": "test_d265_live_first_image_once import",
+        "classification": "PYTEST_NOT_INSTALLED"
+      }
+    ]
+  },
+  "verification": {
+    "IRQ100_CONCRETE_ROUTER_EVENT_DELIVERY": "PASS",
+    "IRQ2_CONCRETE_ROUTER_EVENT_DELIVERY": "PASS",
+    "NORMAL_COMMAND_ROUTING": "PASS",
+    "INTERLEAVED_ROUTING_NO_LOSS": "PASS",
+    "ABSOLUTE_DEADLINE_PRESERVED": "PASS",
+    "SINGLE_PHYSICAL_IN_OWNER_PRESERVED": "PASS",
+    "SYNTHETIC_IRQ2_TO_0x22_END_TO_END": "PASS",
+    "NO_IRQ2_ZERO_0x22_ATTEMPTS": "PASS"
+  },
+  "real_side_effects": {
+    "REAL_USB_ACCESS_COUNT": 0,
+    "REAL_SECRET_READ_COUNT": 0,
+    "MARKER_MUTATION_COUNT": 0,
+    "FPRINTD_MUTATION_COUNT": 0,
+    "PERSISTENT_DEVICE_WRITE_COUNT": 0,
+    "RETRY_COUNT": 0
+  }
+}

@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Callable, Protocol
 
-from core.post_d4 import PLAIN, parse_outer, parse_payload
+from core.post_d4 import PLAIN, parse_fdt_event, parse_outer, parse_payload
 from core.protected_runtime import LiveIoCapability, require_known_live_io_capability
 from core.runtime_transport import EventSource, PhysicalSubmissionPolicy
 
@@ -68,13 +68,24 @@ class UsbBackend(Protocol):
         ...
 
 
-def _is_irq100(frame: bytes) -> bool:
+_KNOWN_TARGET_FDT_EVENTS = frozenset({
+    (0x32, 0x0002),
+    (0x34, 0x0200),
+    (0x36, 0x0100),
+})
+
+
+def _is_fdt_event(frame: bytes) -> bool:
+    """Return whether *frame* is one of the structurally known FDT events."""
     try:
         kind, payload = parse_outer(frame)
-        control, data = parse_payload(payload)
+        if kind != PLAIN:
+            return False
+        control, _ = parse_payload(payload)
+        event = parse_fdt_event(payload)
     except Exception:
         return False
-    return kind == PLAIN and control == 0x36 and len(data) >= 2 and data[:2] == b"\x00\x01"
+    return (control, event.irq) in _KNOWN_TARGET_FDT_EVENTS
 
 
 class SharedFrameRouter:
@@ -137,7 +148,7 @@ class SharedFrameRouter:
         deadline = self._monotonic() + timeout_ms / 1000.0
         while True:
             for index, frame in enumerate(self._frames):
-                if _is_irq100(frame) is event:
+                if _is_fdt_event(frame) is event:
                     selected = self._frames.pop(index)
                     if event:
                         self.event_delivery_count += 1

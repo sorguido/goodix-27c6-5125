@@ -205,6 +205,78 @@ smentito l'accettazione target di `0x22` fixed64 o la first image. Lo stato
 interno device post-run resta `UNKNOWN`; `READY_FOR_LIVE=false`,
 `LIVE_AUTHORIZED=false` e nessuna nuova baseline è approvata.
 
+D266/01 corregge offline la classe di delivery nel router concreto. La review
+AI-PM è conclusa con `PASS` e il fix è accettato. Il
+predicato ad hoc `_is_irq100()` è sostituito da un classificatore FDT
+strutturale che riusa `parse_fdt_event()`: sono eventi soltanto frame A0 con
+una delle coppie control/IRQ target-specific osservate
+`{0x32/0x0002, 0x34/0x0200, 0x36/0x0100}`. ACK `0xB0`, B0/TLS, risposte
+normali e altre combinazioni FDT restano nella vista command. Test offline sul
+`SharedFrameRouter` concreto provano IRQ100 e IRQ2 exactly-once, interleaving
+nelle due viste senza perdita/duplicazione, deadline assoluta e divieto di un
+secondo reader fisico. Una rehearsal sintetica attraversa
+`SharedFrameRouter → _RouterEventSource → first-image runtime`: IRQ2 abilita
+esattamente un tentativo `0x22`, mentre il timeout senza IRQ2 ne abilita zero.
+Nessun hardware, secret reale, marker, fprintd o write persistente è stato
+toccato. La correzione rimuove il blocker software noto ma non dimostra che
+IRQ2 sia stato fisicamente emesso in D265/02, né prova live `0x22` o la prima
+immagine. D266/02 ha però falsificato la readiness del percorso operatore sulla
+nuova base: il dry-run ufficiale D265 termina fail-closed perché il suo manifest
+storico conserva l'hash pre-fix di `core/usb_runtime.py`, mentre il worktree usa
+correttamente il blob D266/01 accettato. I test router 8/8 e la suite mirata
+37/37 restano verdi, ma l'executable closure operatore è `FAIL`. Non è stata
+retro-modificata l'autorità storica né applicato un corrective live-critical
+nello step di ratifica. La review AI-PM classifica quindi D266/02 come
+`PASS_AS_FAIL_CLOSED_AUDIT`: il failure è l'atteso rifiuto di una authority
+D265 storica e stale dopo la patch router accettata, non un difetto del gate.
+
+D266/03 chiude ora **offline** quel corrective senza cambiare il router e senza
+riaprire D265. Il nuovo candidate `operator_kit/d267-first-image-once.sh` →
+`tools/d267_live_first_image_once.py` ha flag, environment, capability/nonce,
+marker e report D267 distinti. La sua authority deriva dalla call graph reale
+ed è composta da 20 file; include `core/usb_runtime.py` al blob post-D266
+`c4e62b07…`, ma ha `baseline_approved=false`. Il verifier live richiede un full
+SHA lowercase, `HEAD` uguale allo SHA approvato, worktree pulito, path-set
+esatto e identità commit/worktree di ogni file, senza affidarsi ai soli hash
+del manifest. Il dry-run da `/tmp` passa senza costruire dipendenze production
+e con USB, secret, comandi, marker, fprintd, TLS live e write persistenti tutti
+a zero. I 21 nuovi unittest, i test router 8/8 e la suite mirata 37/37 passano;
+la regressione 303 = 299 PASS, 1 FAIL, 3 ERROR riproduce soltanto i quattro
+esiti D261/pytest già noti. Ne segue
+`D267_OPERATOR_CANDIDATE_READY_OFFLINE=true` e
+`READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=true`, non un'approvazione o
+autorizzazione: `BASELINE_APPROVED_FOR_NEW_ATTEMPT=false`,
+`LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false` e
+`D265_02_RETRY_AUTHORIZED=false`.
+
+D267/01 è stato poi eseguito manualmente una sola volta sulla baseline
+approvata `219c038600deb87da1cd93340b9bd07c14e1f5fe`. Il router corretto ha
+consegnato live IRQ2; il runtime ha inviato esattamente un `0x22` fixed64
+zero-tail, ne ha validato l'ACK target e ha ricevuto il primo B0. La run si è
+quindi fermata fail-closed in
+`RuntimeFailure:first_image_decode_failed`, senza retry, recovery, reopen,
+write persistenti o comandi post-image vietati. Cleanup host e zeroizzazione
+del secret sono completati. Sono pertanto live-proven delivery IRQ2, invio e
+accettazione target di `0x22`, e arrivo del primo B0; non sono provati decode
+né first image. L'autorizzazione D267/01 è consumata e un secondo tentativo non
+è autorizzato.
+
+D267/02 localizza offline l'emettitore in
+`PersistentRuntimeCoordinator._run_first_image_terminal()`: il B0 supera outer
+framing e il distinto catch TLS, poi ogni eccezione di
+`parse_image_payload(bytes(plaintext))` viene appiattita in
+`first_image_decode_failed`. Il parser richiede plaintext da 7693 byte,
+payload image cmd0=2 con data da 7689 byte, prefix da 5 byte, record da 7684
+byte e CRC-32/MPEG-2 valido. L'eccezione interna e i metadata sanitizzati non
+sono stati conservati dalla baseline eseguita, quindi non è possibile
+distinguere a posteriori header/lunghezza/checksum/control/POV/CRC. Il mismatch
+più concreto da riesaminare è la policy image-specific `0x88`: Python è strict,
+mentre DLL locale e Rocky ammettono il marker no-check; senza il trailer live
+questa resta un'ipotesi `MEDIUM`, non un fatto. Stato:
+`OUTCOME=D267_02_DECODE_FAILURE_BOUNDED_BUT_NOT_LOCALIZED`,
+`READY_FOR_DECODE_CORRECTIVE_REVIEW=false`, `LIVE_AUTHORIZED=false` e
+`READY_FOR_LIVE=false`.
+
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
 preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
@@ -488,6 +560,11 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Corrective readiness D261 | PASS offline per baseline-approval; operational review promosso, live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full commit SHA `e9073a171697bd68dd2debabb851f23d007bf718` approvato da Utente e AI-PM, zero-tail per comando resta rischio live |
 | Kit D265/01 first-image | PASS offline; live successivamente eseguito in D265/02 | operator path one-shot, prompt immediatamente prima della wait IRQ2 e telemetria truth-preserving; baseline eseguita poi fissata a `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d` |
 | Run live D265/02 first-image | fail-closed pre-`0x22`, autorizzazione consumata | una USB/sessione/TLS/handshake e un arm finale; timeout EP81, zero IRQ2 consegnati/`0x22`/B0/retry/recovery/reopen/write; difetto router IRQ2 provato sulla baseline, emissione fisica IRQ2 non determinabile |
+| Corrective D266/01 router eventi | PASS offline; review AI-PM PASS, fix accettato, live false | classifier FDT strutturale condiviso con il parser canonico; IRQ100/IRQ2, command routing, interleaving, deadline, single-reader e seam sintetico IRQ2→un `0x22` PASS sul router concreto; nessuna nuova evidenza device-side |
+| Closure D266/02 post-review | CORRECTIVE REQUIRED; baseline-readiness false | test router 8/8 e mirati 37/37 PASS; regressione 282 = 278 PASS, 1 FAIL, 3 ERROR invariata; dry-run D265 fail-closed sul solo hash pre-D266 di `core/usb_runtime.py` nel manifest storico, con tutti i contatori reali a zero |
+| Corrective D266/03 authority D267 | PASS offline; pronto per review di una nuova baseline, live false | D265 immutabile e retry vietato; nuova authority D267 di 20 file con capability/marker/report/flag distinti, router post-fix incluso, verifier Git full-SHA/HEAD/clean/path/byte identity, dry-run esterno zero-side-effect e 21 unittest PASS |
+| Run live D267/01 first B0 | fail-closed nel decoder, autorizzazione consumata | IRQ2 consegnato, un `0x22` fixed64 inviato e ACK-validato, primo B0 ricevuto; zero retry/recovery/reopen/write/comandi post-image; decode e first image non provati |
+| Analisi D267/02 decoder | failure bounded offline, subpredicato live non recuperabile | emettitore esatto `persistent_runtime.py:444`; TLS consumption superato per call-flow, poi catch opaco su `parse_image_payload`; fixture 7693→7684→80x64 PASS, mismatch `0x88` candidato MEDIUM; manca diagnostica sanitizzata length/header/checksum/CRC |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1834,11 +1911,16 @@ loop, perciò il parser D249 usa ancora `OPTIONAL_IF_PRESENT` come policy di
 accettazione senza trasformarla in evidenza target. Zero o un ACK esatto sono
 accettati; ACK errato o duplicato fallisce chiuso.
 
-La policy checksum è strict: `parse_payload()` calcola sempre il checksum. Il
-valore 0x88 è accettato soltanto quando coincide matematicamente con il checksum
-del payload specifico; non è un bypass. Il NOP locale osservato con marker
-no-check è fuori dall'allowlist D249. Test distinti rifiutano un 0x88 errato e
-accettano un checksum genuino che vale 0x88.
+La policy checksum D249 implementata è strict: `parse_payload()` calcola sempre
+il checksum. Il valore 0x88 è accettato soltanto quando coincide matematicamente
+con il checksum del payload specifico; non è un bypass. Il NOP locale osservato
+con marker no-check era fuori dall'allowlist D249. Test distinti rifiutano un
+0x88 errato e accettano un checksum genuino che vale 0x88. D267/02 non cambia
+questa policy, ma dopo il live D267/01 la riclassifica come ipotesi concreta da
+riesaminare per il solo payload immagine: DLL locale e Rocky applicano un bypass
+`0x88`, mentre la baseline live ha fallito dentro l'envelope parser/codec. Il
+trailer plaintext live non è stato registrato, quindi il mismatch non è ancora
+provato e non autorizza una patch implicita.
 
 La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
 immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
@@ -3126,7 +3208,7 @@ target `27c6:5125`, interfaccia `0`, OUT `0x01`, IN `0x81`. Richiede cardinalit�
 esatta e rivalida bus/address/port path prima e dopo ogni OUT. Non espone
 detach, reset, clear-halt, reopen, retry o recovery. Un solo
 `SharedFrameRouter` possiede fisicamente EP81 e conserva in code separate ACK,
-risposte, IRQ `0x0100` e B0 anche quando sono frammentati o coalesciuti. Ogni
+risposte, eventi FDT noti e B0 anche quando sono frammentati o coalesciuti. Ogni
 phase read usa una sola deadline monotonic assoluta: le completion valide ma
 non corrispondenti ricevono solo il tempo residuo e non rinnovano il timeout.
 Tredici harness eseguono split/coalescing, buffering incrociato, NAV/B0 grandi,
@@ -3134,14 +3216,51 @@ interleaving, ordine, starvation, deadline e tentativo di secondo reader. Il
 transport applica inoltre pacing pre/post della policy fisica e rifiuta frame
 buffered inattesi dopo l'ACK terminale `0x32`.
 
-L'audit post-live D265/02 restringe questa descrizione: sulla baseline eseguita
-il router separa come eventi **soltanto** gli IRQ `0x0100` riconosciuti da
-`_is_irq100()`. Un logical A0/FDT IRQ `0x0002` non attraversa
-`SharedFrameRouter.receive_event()` ed è classificato nella vista non-event.
-La coverage D261 esercitava il router concreto solo con IRQ `0x0100`; i test
-first-image D263–D265 iniettavano event source sintetici/decorator e non
-attraversavano il demux USB reale. `PromptingEventSource` ha timing corretto,
-ma la classificazione eventi del router reale è incompleta per IRQ2.
+L'audit post-live D265/02 resta la prova storica che la baseline eseguita
+separava come eventi soltanto gli IRQ `0x0100` riconosciuti da `_is_irq100()` e
+lasciava IRQ `0x0002` nella vista command. D266/01 corregge offline quel difetto
+nel codice corrente: `_is_fdt_event()` accetta solo A0 che superano il parser
+canonico `parse_fdt_event()` e corrispondono alle coppie target osservate
+`0x32/IRQ2`, `0x34/IRQ200` o `0x36/IRQ100`; distingue quindi tali eventi da
+ACK, response, B0/TLS e altre combinazioni FDT. La nuova coverage attraversa il router
+concreto con IRQ100 e IRQ2, le quattro sequenze di interleaving richieste, la
+deadline assoluta, il lock del reader e il seam first-image fino a un solo
+tentativo sintetico `0x22`. Questo è evidence software/offline e non rivela se
+IRQ2 sia stato fisicamente emesso durante D265/02.
+
+La review AI-PM di D266/01 ha accettato il fix al commit
+`7a2ceff54f2fc27332a9f2a531ce4af5d90cf9a2`. L'audit D266/02 conferma che il
+call graph operatore continua a costruire `LibusbRuntimeTransport`, usa il suo
+unico `SharedFrameRouter` e passa al coordinator proprio
+`transport.event_source`; non emerge un event source alternativo nel percorso
+production. Il dry-run del launcher D265 dalla cwd esterna realistica `/tmp`
+fallisce tuttavia la byte identity: `analysis/D265/D265_01_live_critical_manifest.json`
+attende per `core/usb_runtime.py` l'hash D265
+`a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278`,
+mentre il blob accettato D266/01 è
+`c4e62b0786d7710eb0625b033258636597b9aa8f40259ce5a1f669b0e160385b`.
+Il gate si comporta quindi correttamente fail-closed, ma l'operator kit non è
+execution-ready sulla nuova base. D266/02 non modifica il manifest storico né
+il codice live-critical: la nuova autorità candidate e il relativo wiring
+richiedono uno step corrective separato. D266/03 materializza tale separazione
+nel namespace D267 e lascia D265 byte-immutato. La nuova tuple
+`D267_FIRST_IMAGE_LIVE_CRITICAL_PATHS` contiene tutti e soli i 20 file
+raggiungibili dal launcher D267: i due entrypoint e 18 dipendenze runtime/guard,
+con `core/d267_first_image_operator.py` al posto dell'orchestrator storico
+D265. Il path production costruisce `CtypesLibusbBackend` →
+`LibusbRuntimeTransport`, usa l'unico `SharedFrameRouter` e il suo
+`_RouterEventSource`, quindi invoca `PersistentRuntimeCoordinator` soltanto con
+`STOP_AFTER_FIRST_IMAGE`; non esiste un event-source bypass nel candidate.
+
+`core/live_capability.py` conserva le authority D261 e D265 e aggiunge classi e
+nonce D267 separati. Un intent D265 non può creare marker/live-I/O D267 e un
+intent D267 non può creare capability D265; il marker D267 viene scritto
+`O_EXCL`/`0600`, completato e fsyncato prima del minting, e la sua capability è
+consumabile una volta. Il namespace durable è
+`/var/lib/goodix-5125-poc/d267-first-image-single-use.marker`; il report è
+`/var/lib/goodix-5125-poc/d261-results/d267-first-image-final.json`. Il path
+live richiede `D267_APPROVED_LIVE_BASELINE_SHA`, ma D266/03 non assegna alcun
+valore approvato e non crea il marker reale.
 
 Il launcher `operator_kit/d261-live-fdt-arm-once.sh` accetta soltanto
 `--dry-run` oppure l'esatta autorizzazione live. Il default è hard-disabled.
@@ -3383,18 +3502,33 @@ hardware una sola volta in single-shot e si è chiuso, non autorizzando alcun
 passo successivo; tutti i gate READY_FOR_* a qualificazione non avvenuta restano
 false. D261 non aveva aperto hardware e non auto-approva una run.
 
-Il successivo confine first-image è stato aperto una sola volta in D265/02
-sulla baseline approvata `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d` e si è
-chiuso fail-closed durante la wait IRQ2, prima di qualsiasi `0x22`. Il live non
-discrimina tra IRQ2 assente sul device e IRQ2 fisicamente arrivato ma trattenuto
-dal router: la baseline consegna alla event queue solo IRQ `0x0100`, mentre il
-runtime attende IRQ `0x0002`. Questo difetto software deterministico rende
-invalida qualsiasi inferenza device-side dall'assenza di IRQ2 osservata dal
-runtime. L'autorizzazione D265/02 è consumata, il retry è vietato e una futura
-run richiede prima patch offline, test del router concreto, review AI-PM, merge,
-approvazione esplicita di un nuovo full SHA e nuova autorizzazione separata.
-Fino ad allora `0x22_FIXED64_LIVE_PROVEN=false`,
-`FIRST_IMAGE_LIVE_PROVEN=false`, `POST_D265_02_DEVICE_INTERNAL_STATE=UNKNOWN`,
+Il successivo confine first-image è stato aperto prima in D265/02, che si era
+chiuso fail-closed nella wait IRQ2 per il difetto deterministico del router, e
+poi una sola volta in D267/01 sulla nuova baseline approvata
+`219c038600deb87da1cd93340b9bd07c14e1f5fe`. D267/01 chiude definitivamente i
+dubbi live sul tratto `finger-down IRQ2 -> router D266 -> un 0x22 fixed64 -> ACK
+target -> primo B0`: tutti questi passaggi sono provati. Il current critical
+boundary è ora il parser/codec del plaintext del primo B0.
+
+La call-chain prova che `consume_application_record()` ha restituito plaintext
+non vuoto: altrimenti la failure sarebbe stata
+`first_image_b0_consumption_failed`. Subito dopo, però, il runtime cattura ogni
+eccezione di `parse_image_payload()` e scarta il dettaglio. Il failure resta
+quindi bounded a header/lunghezza/checksum, control image/POV o CRC del record,
+ma non è localizzato a un singolo predicato. Il parser atteso è
+`7693 byte plaintext -> data 7689 -> prefix 5 + record 7684 -> packed 7680 +
+CRC 4 -> raster 80x64`. La policy strict del checksum payload, in particolare,
+differisce dal bypass `0x88` presente nella DLL locale e in Rocky; senza
+metadata del trailer live è una pista `MEDIUM`, non una conclusione.
+
+L'autorizzazione D267/01 è consumata e non esiste un secondo tentativo
+autorizzato. Il prossimo passo tecnico è soltanto una review AI-PM del bounded
+corrective offline: diagnostica tipizzata e sanitizzata per stage più fixture
+image-specific per checksum `0x88`, lunghezze/header, POV e CRC. Nessuna patch
+decoder è applicata in D267/02 e nessun nuovo live va preparato automaticamente.
+`IRQ2_HOST_DELIVERY_LIVE_PROVEN=true`, `0x22_FIXED64_ACK_LIVE_PROVEN=true`,
+`FIRST_B0_LIVE_RECEIVED=true`, `FIRST_IMAGE_DECODE_LIVE_PROVEN=false`,
+`FIRST_IMAGE_LIVE_PROVEN=false`, `READY_FOR_DECODE_CORRECTIVE_REVIEW=false`,
 `READY_FOR_LIVE=false` e `LIVE_AUTHORIZED=false`.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
@@ -4931,3 +5065,223 @@ correggere offline la classe di routing, aggiungere test concreti end-to-end e
 attraversare review, merge, nuova approvazione full-SHA e autorizzazione live
 separata. Gli artefatti sanitizzati sono in `analysis/D265/`; nessun raw USB,
 secret, plaintext TLS, marker, cache protetta o dato biometrico è incluso.
+
+### D266/01: correzione offline del router eventi FDT
+
+D266/01 parte dal branch `codex` a
+`c68398db24c7a1689e3056b771df83b479a1c7ef` e non esegue hardware. Il fix
+rinomina il predicato in `_is_fdt_event()` e delega la validazione semantica al
+parser FDT già canonico. Il contratto risultante è evidence-bounded: outer A0,
+payload strutturalmente valido, control nella famiglia `0x3x` e IRQ nella
+allowlist target osservata delle coppie `0x32/IRQ2`, `0x34/IRQ200` e
+`0x36/IRQ100`; non equivale a «ogni A0 è evento». ACK/response e frame non
+riconosciuti restano command-side.
+
+Otto test D266 sul router concreto verificano IRQ100 e IRQ2 exactly-once,
+non-stealing di ACK/response, quattro interleaving, code finali vuote, deadline
+monotonic assoluta e `concurrent_physical_in_reader_forbidden`. Il seam
+first-image usa una fixture bulk-IN sintetica e passa da
+`SharedFrameRouter` a `_RouterEventSource` e al runtime: con IRQ2 produce un
+solo submit logico `0x22 [01 00]` e completa una immagine sintetica `80x64`;
+senza IRQ2 termina in timeout con zero submit. La suite mirata router/runtime/
+first-image passa 37/37. La suite generale `unittest` esegue 282 test e
+mantiene un failure e tre errori non attribuibili al router: i due esiti D261
+storici (capability exception class e dry-run drift) e due import di test
+pytest-only con `pytest` non installato. Nessuna dipendenza è stata aggiunta.
+
+```text
+OUTCOME=D266_01_READY_FOR_AI_PM_REVIEW
+ADVANCEMENT=CONCRETE_ROUTER_EVENT_CLASSIFICATION_FIXED_OFFLINE
+EXECUTABLE_CLOSURE=PASS
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+D265_02_RETRY_AUTHORIZED=false
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+```
+
+La review AI-PM successiva è conclusa con:
+
+```text
+D266_01_AI_PM_REVIEW=PASS
+D266_01_ROUTER_FIX_ACCEPTED=true
+D266_01_CORRECTIVE_REQUIRED=false
+```
+
+### D266/02: execution-readiness post-review fail-closed
+
+D266/02 parte e resta sul branch `codex` al commit
+`7a2ceff54f2fc27332a9f2a531ce4af5d90cf9a2`, con `origin/main` invariato a
+`c68398db24c7a1689e3056b771df83b479a1c7ef`. L'integrità del bundle D266/01 è
+PASS: vero ZIP, sidecar coerente, archive test e hash membri validi, path-set
+esatto e contenuto sanitizzato. I test del router passano 8/8 e la suite mirata
+passa 37/37. La regressione generale riproduce senza differenze D266/01: 282
+test, 278 PASS, un FAIL e tre ERROR preesistenti/ambientali; `pytest` non è
+installato e i due moduli pytest-only D264/D265 risultano invariati dal delta
+D266.
+
+Il dry-run ufficiale `operator_kit/d265-first-image-once.sh --dry-run`, eseguito
+da `/tmp`, restituisce invece `FAIL_CLOSED` con
+`byte_identity:core/usb_runtime.py`. Il manifest D265/01 è correttamente uno
+snapshot storico del candidate pre-fix e conserva SHA-256 `a19c0ffb…`; il
+router accettato D266/01 ha SHA-256 `c4e62b07…`. Tutti i contatori reali del
+dry-run restano zero, ma il gate impedisce la executable closure sulla nuova
+base. D266/02 non retro-modifica il manifest storico e non cambia alcun file
+live-critical.
+
+```text
+OUTCOME=D266_02_CORRECTIVE_REQUIRED
+ADVANCEMENT=POST_ROUTER_FIX_OPERATOR_GATE_DEFECT_LOCALIZED_OFFLINE
+EXECUTABLE_CLOSURE=FAIL
+D266_01_AI_PM_REVIEW=PASS
+D266_01_ROUTER_FIX_ACCEPTED=true
+D266_02_LIVE_CRITICAL_CODE_CHANGE_COUNT=0
+D265_OPERATOR_DRY_RUN=FAIL_CLOSED_BYTE_IDENTITY_CORE_USB_RUNTIME
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=false
+BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+### D266/03: nuova authority post-router e namespace D267, OFFLINE ONLY
+
+D266/03 parte dal branch `codex` al commit
+`65b8ec198603c347b89107fe5b7b28cf84fbd318`, con parent
+`7a2ceff54f2fc27332a9f2a531ce4af5d90cf9a2`, `origin/codex` coincidente,
+`origin/main` invariato a `c68398db24c7a1689e3056b771df83b479a1c7ef` e
+worktree iniziale pulito. Il bundle D266/02 è verificato al digest
+`207dea0f24ee163fb9f7a7f3be1ec1aecfbc6f1b6bc442dbcdd353b077c1dfd1`.
+D266/02 è accettato come audit fail-closed e il corrective non modifica
+`analysis/D265/D265_01_live_critical_manifest.json`,
+`operator_kit/d265-first-image-once.sh` o
+`tools/d265_live_first_image_once.py`.
+
+Il nuovo surface D267 espone soltanto `--dry-run` e
+`--i-authorize-one-d267-first-image-live-attempt`. Il live, non eseguito,
+richiederebbe `D267_APPROVED_LIVE_BASELINE_SHA`; marker e report canonici sono
+rispettivamente
+`/var/lib/goodix-5125-poc/d267-first-image-single-use.marker` e
+`/var/lib/goodix-5125-poc/d261-results/d267-first-image-final.json`. Le
+capability D267 usano tipi e nonce propri, incompatibili con D261/D265, e il
+live-I/O non può nascere prima del durable claim fsyncato. La nuova authority
+di 20 file è esatta e include il router accettato D266 al digest
+`c4e62b0786d7710eb0625b033258636597b9aa8f40259ce5a1f669b0e160385b`;
+il manifest dichiara correttamente `baseline_approved=false`.
+
+Il dry-run eseguito dalla cwd esterna `/tmp` passa con tutti i contatori reali
+a zero. I nuovi test D266/03 passano 21/21; router 8/8 e suite mirata 37/37
+passano. La discovery completa esegue 303 test: 299 PASS, un FAIL D261 per il
+drift storico del dry-run e tre ERROR (classe eccezione D261 più due moduli
+pytest-only con pytest assente), esattamente le classi già documentate; zero
+nuovi failure sono attribuibili a D266/03. Nessun pytest è installato. Nessun
+USB reale, secret reale, TLS live, marker reale, fprintd o comando device è
+stato raggiunto.
+
+```text
+OUTCOME=D266_03_READY_FOR_AI_PM_BASELINE_REVIEW
+ADVANCEMENT=POST_ROUTER_NEW_ONE_SHOT_AUTHORITY_CLOSED_OFFLINE
+EXECUTABLE_CLOSURE=PASS
+D266_01_ROUTER_FIX_ACCEPTED=true
+D266_02_AI_PM_REVIEW=PASS_AS_FAIL_CLOSED_AUDIT
+D266_02_CORRECTIVE_REQUIRED=true
+D266_02_FAILURE_IS_EXPECTED_STALE_D265_AUTHORITY=true
+D265_HISTORICAL_AUTHORITY_IMMUTABLE=true
+D265_02_RETRY_AUTHORIZED=false
+D267_OPERATOR_CANDIDATE_READY_OFFLINE=true
+READY_FOR_NEW_BASELINE_APPROVAL_REVIEW=true
+BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+```
+
+### D267/01–02: first B0 live e localizzazione bounded del decoder
+
+D267/01 è stato eseguito manualmente una sola volta sulla baseline approvata
+`219c038600deb87da1cd93340b9bd07c14e1f5fe`. L'output sanitizzato fornito
+dall'operatore registra una sessione USB/transport, un oggetto e handshake TLS,
+un solo secret materializzato e un arm finale. Dopo il prompt dito, IRQ2 è
+stato consegnato al runtime; un solo `0x22` fixed64 è stato inviato, il relativo
+ACK è stato validato e il primo B0 è stato ricevuto. Il boundary precedente è
+quindi avanzato realmente fino al decoder:
+
+```text
+D267_BASELINE_APPROVED=true
+D267_APPROVED_BASELINE_SHA=219c038600deb87da1cd93340b9bd07c14e1f5fe
+D267_01_LIVE_AUTHORIZATION_CONSUMED=true
+D267_01_LIVE_ATTEMPT_COUNT=1
+D267_01_SECOND_LIVE_ATTEMPT_AUTHORIZED=false
+D267_01_LIVE_RESULT=FAIL_CLOSED
+D267_01_FAILURE_CLASS=RuntimeFailure:first_image_decode_failed
+IRQ2_HOST_DELIVERY_LIVE_PROVEN=true
+0x22_FIXED64_LIVE_SENT=true
+0x22_FIXED64_ACK_LIVE_PROVEN=true
+FIRST_B0_LIVE_RECEIVED=true
+FIRST_IMAGE_DECODE_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+RETRY_COUNT=0
+RECOVERY_COUNT=0
+REOPEN_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+FORBIDDEN_POST_IMAGE_COMMAND_COUNT=0
+HOST_CLEANUP_STATUS=COMPLETED
+SECRET_ZEROIZED=true
+FPRINTD_RESTORE_STATUS=UNVERIFIED_FROM_AVAILABLE_SANITIZED_EVIDENCE
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+Il report protetto
+`/var/lib/goodix-5125-poc/d261-results/d267-first-image-final.json` non è
+leggibile dall'utente corrente (`PROTECTED_D267_REPORT_READ_STATUS=
+UNAVAILABLE_WITH_CURRENT_PERMISSIONS`); D267/02 non usa privilegi, non cambia
+permessi e non copia il raw.
+
+La call-chain production termina in
+`PersistentRuntimeCoordinator._run_first_image_terminal()`. Dopo outer B0 e
+consumo TLS, il plaintext viene passato a `parse_image_payload()`. Una failure
+nel consumo/auth TLS avrebbe la classe distinta
+`first_image_b0_consumption_failed`; l'esito osservato prova per call-flow che
+il TLS consumer ha invece restituito plaintext non vuoto. Il successivo
+`except Exception` azzera il buffer e sostituisce qualunque dettaglio con
+`first_image_decode_failed`.
+
+Il formato accettato offline è esatto: plaintext 7693 byte, `v19=7690`, data
+7689 byte, cmd0=2, prefix immagine 5 byte non-POV, record 7684 byte composto da
+7680 packed12 più trailer CRC-32/MPEG-2, output 5120 sample `80x64`. I test
+router passano 8/8 e decoder/first-image/cleanroom 30/30; il dry-run operatore
+da `/tmp` passa con tutti i side effect reali a zero. Un probe sintetico
+conferma che la fixture 7693 passa, mentre trailer forzato `0x88`, record raw,
+B0 intero e payload troncato falliscono nei gate attesi. `pytest` non è
+installato e non è stato aggiunto.
+
+La causa interna della run consumata non è ricostruibile perché non furono
+registrati exception class, stage, lunghezze, control, categoria trailer,
+checksum o CRC sanitizzati. Le ipotesi restano ordinate: mismatch strict
+checksum/no-check `0x88` (`MEDIUM`), framing/header/lunghezza (`MEDIUM-LOW`),
+CRC record (`MEDIUM-LOW`), control/POV (`LOW`) e concatenazione di più payload
+TLS (`LOW`). DLL locale e Rocky ammettono `0x88`; il parser Python no. Questa
+divergenza giustifica test e osservabilità offline, non prova che il trailer
+live fosse `0x88`.
+
+```text
+OUTCOME=D267_02_DECODE_FAILURE_BOUNDED_BUT_NOT_LOCALIZED
+ADVANCEMENT=LIVE_IRQ2_0x22_B0_BOUNDARY_PROVEN_DECODE_FAILURE_BOUNDED_OFFLINE
+EXECUTABLE_CLOSURE=PASS_FOR_POST_LIVE_ANALYSIS
+RESIDUAL_BLOCKER_OR_RISK=MISSING_SANITIZED_INNER_DECODER_STAGE_AND_LENGTH_CHECKSUM_CRC_METADATA_FROM_CONSUMED_RUN
+READY_FOR_DECODE_CORRECTIVE_REVIEW=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+Il solo passo successivo proposto è un corrective **offline** separato:
+conservare diagnostica tipizzata e sanitizzata per stage e aggiungere fixture
+image-specific per `0x88`, lunghezze/header, POV e CRC. D267/02 non modifica
+`core/`, `tools/`, `operator_kit/`, `src/` o `poc/` e non autorizza un live.
