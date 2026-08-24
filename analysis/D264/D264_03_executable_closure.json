@@ -1,0 +1,40 @@
+{
+  "schema": "D264_03_EXECUTABLE_CLOSURE_V1",
+  "outcome": "PASS_OFFLINE_PRELIVE_WIRING",
+  "executable_closure": "PASS_OFFLINE",
+  "baseline_start": "eca1598801ce57241934d679b3b94784cad5693f",
+  "execution_mode": "OFFLINE_ONLY",
+  "first_image_prelive_operator_wiring": "IMPLEMENTED_OFFLINE",
+  "current_d261_real_boundary": "STOP_AFTER_FDT_ARM_ACK",
+  "future_first_image_real_boundary": "STOP_AFTER_FIRST_IMAGE",
+  "dedicated_future_marker_namespace": "D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1",
+  "d261_marker_reused": false,
+  "real_side_effect_counts": {
+    "usb_open": 0,
+    "secret_read": 0,
+    "sensor_command": 0,
+    "single_use_marker_create": 0,
+    "fprintd_mutation": 0,
+    "live_tls_handshake": 0
+  },
+  "candidate_injected_invariants": {
+    "usb_open_count": 1,
+    "usb_transport_session_count": 1,
+    "tls_server_session_object_count": 1,
+    "tls_handshake_count": 1,
+    "secret_handoff_count": 1,
+    "command_22_attempt_count": 1,
+    "command_22_ack_validation_count": 1,
+    "first_image_b0_receive_count": 1,
+    "retry_count": 0,
+    "reopen_count": 0
+  },
+  "post_first_image_host_cleanup_implemented_offline": true,
+  "post_first_image_device_internal_state": "UNKNOWN",
+  "post_first_image_device_stop_live_proven": false,
+  "ready_for_ai_pm_review": true,
+  "ready_for_baseline_approval": false,
+  "ready_for_live": false,
+  "live_authorized": false,
+  "baseline_approved": false
+}

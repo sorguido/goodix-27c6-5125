@@ -132,7 +132,7 @@ approvata. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
 corretto minimamente a una deadline host assoluta di 15000 ms, senza asserire
 una lifetime interna del device.
 
-D264/02 chiude ora l'executable closure del candidate first-image **soltanto
+D264/02 ha chiuso l'executable closure del candidate first-image **soltanto
 offline**. Una rehearsal operatore synthetic-only preserva come default
 `STOP_AFTER_FDT_ARM_ACK` e raggiunge `STOP_AFTER_FIRST_IMAGE` esclusivamente
 con opt-in esplicito, attraversando il coordinatore pubblico, la deadline IRQ2
@@ -142,7 +142,17 @@ eseguito. Il launcher reale D261 resta distinto e arm-only: invoca ancora il
 default del coordinatore e non può raggiungere il boundary first-image.
 Pertanto `FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED` e la baseline
 approval non è ancora raggiungibile; prima servirà un successivo step offline
-di wiring e review del percorso reale protetto.
+di wiring e review del percorso reale protetto. D264/03 chiude ora quel wiring
+pre-live sul solo piano offline: il nuovo launcher production-shaped è
+raggiungibile dalla shell esclusivamente con `--dry-run`, mentre ogni altra
+invocazione termina `HARD_DISABLED_D264_03` prima di secret, marker, fprintd,
+USB o comandi. La control flow futura usa capability e marker namespace
+dedicati D265-future, guard baseline full-SHA e byte identity, dipendenze
+pericolose iniettate, coordinator reale con opt-in esplicito
+`STOP_AFTER_FIRST_IMAGE`, cleanup e restore indipendenti. Il path D261 e il suo
+marker consumato restano invariati e arm-only. Ne segue
+`FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE`; non segue alcuna
+approvazione baseline, autorizzazione o prova live.
 
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
@@ -4543,3 +4553,74 @@ READY_FOR_LIVE=false
 LIVE_AUTHORIZED=false
 BASELINE_APPROVED=false
 ```
+
+### D264/03: wiring pre-live protetto first-image, OFFLINE ONLY
+
+Il nuovo surface `operator_kit/d264-first-image-prelive.sh` →
+`tools/d264_first_image_prelive.py` è cwd-independent e offre soltanto
+`--dry-run`. Non espone una modalità live: qualsiasi altra combinazione viene
+respinta dal launcher come `HARD_DISABLED_D264_03`, prima di controllo root
+mutante, stop/start fprintd, lettura secret, marker, backend USB o comando.
+Il dry-run valida schema e hash del live-critical set v3, sintassi launcher,
+modello baseline full-SHA e soli metadata del marker futuro; ignora
+intenzionalmente qualunque valore dell'environment di approvazione.
+
+La control flow che una futura milestone potrà collegare alle implementazioni
+reali vive in `core/future_first_image_operator.py`. Essa richiede l'intento
+esatto `--i-authorize-one-future-d265-first-image-live-attempt`, consumabile una
+sola volta, e usa il marker distinto
+`/var/lib/goodix-5125-poc/d265-first-image-single-use.marker`, schema
+`D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1`. D264/03 non crea quel marker:
+claim, capability live-I/O e backend sono esercitati soltanto con fixture e
+doubles. Dopo preflight, singolo secret handoff e singolo claim sintetico, la
+orchestration costruisce il coordinator attraverso l'interfaccia backend e
+invoca esplicitamente `STOP_AFTER_FIRST_IMAGE`; cleanup coordinator/secret,
+restore segnali/fprintd e pubblicazione report sono tentati indipendentemente.
+
+Il manifest `analysis/D264/D264_03_live_critical_manifest.json` ricalcola 18
+file raggiungibili dal futuro path: launcher, entrypoint/gate, helper protetti,
+backend USB, cold-start/FDT, coordinator, transport/framing, retained TLS/B0,
+codec immagine/CRC e dipendenze di validazione secret. Test, rehearsal D264/02
+e manuale sono classificati rispettivamente `test_only`, `synthetic_only` e
+`documentation_only`, non autorità live-critical. Nessuno SHA è approvato:
+il modello rifiuta SHA corto, branch, `HEAD`, commit errato e blob worktree non
+identico. Review AI-PM e successiva approvazione byte-level restano gate
+separati.
+
+La closure offline verifica il successo production-shaped con un solo `0x22`,
+zero retry/reopen, terminal cleanup/restore e failure injection. La suite D263,
+D264/02 e D260 pertinente resta verde; la suite D261 non è eseguibile in questo
+ambiente perché la dipendenza preesistente `cryptography` manca, senza essere
+installata. Nessun test hardware è stato eseguito. Stato canonico:
+
+```text
+D264_03_EXECUTABLE_CLOSURE=PASS_OFFLINE
+FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE
+CURRENT_D261_REAL_BOUNDARY=STOP_AFTER_FDT_ARM_ACK
+FUTURE_FIRST_IMAGE_REAL_BOUNDARY=STOP_AFTER_FIRST_IMAGE
+DEDICATED_FUTURE_MARKER_NAMESPACE=D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1
+D261_MARKER_REUSED=false
+D264_03_REAL_USB_OPEN_COUNT=0
+D264_03_REAL_SECRET_READ_COUNT=0
+D264_03_REAL_SENSOR_COMMAND_COUNT=0
+D264_03_REAL_SINGLE_USE_MARKER_CREATE_COUNT=0
+D264_03_FPRINTD_MUTATION_COUNT=0
+D264_03_LIVE_TLS_HANDSHAKE_COUNT=0
+POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED_OFFLINE=true
+POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN
+POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN=false
+0x22_TARGET_EVIDENCE=PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY
+0x22_OPERATIONAL_CANDIDATE=EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE
+0x22_TARGET_LIVE_ACCEPTANCE=NOT_LIVE_PROVEN
+D264_03_READY_FOR_AI_PM_REVIEW=true
+D264_03_READY_FOR_BASELINE_APPROVAL=false
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED=false
+```
+
+Il prossimo gate è la review AI-PM del remote branch e del set byte-level. Solo
+uno step successivo e separatamente autorizzato potrà approvare una baseline e
+valutare se abilitare il collegamento reale; fino ad allora il rischio residuo
+rimane l'accettazione target non provata di `0x22` fixed64 e del primo B0,
+insieme allo stato interno device post-image ignoto.

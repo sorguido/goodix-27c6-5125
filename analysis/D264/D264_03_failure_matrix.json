@@ -1,0 +1,17 @@
+{
+  "schema": "D264_03_FAILURE_MATRIX_V1",
+  "execution_mode": "INJECTED_DOUBLES_ONLY",
+  "retry_count": 0,
+  "classes": [
+    {"class":"reachability","cases":["protected guards through explicit STOP_AFTER_FIRST_IMAGE","exactly one 0x22","first image","cleanup and restore"],"status":"PASS"},
+    {"class":"D261 regression","cases":["D261 coordinator call retains default STOP_AFTER_FDT_ARM_ACK","0x22 absent"],"status":"PASS"},
+    {"class":"baseline","cases":["missing SHA","short SHA","branch","HEAD","wrong/unresolved SHA","stale blob","path-set mismatch"],"status":"PASS_FAIL_CLOSED_PRE_SIDE_EFFECT"},
+    {"class":"authorization","cases":["missing intent","wrong intent","direct call","capability reuse"],"status":"PASS_FAIL_CLOSED"},
+    {"class":"marker","cases":["already exists","owner/mode contract","symlink","second claim","D261 namespace"],"status":"PASS_FAIL_CLOSED_TEMP_FIXTURE_ONLY"},
+    {"class":"target/backend","cases":["absent","duplicate","holder conflict","open","submit","receive"],"status":"PASS_INJECTED_NO_RETRY"},
+    {"class":"first image","cases":["IRQ2 timeout","unexpected IRQ","invalid 0x22 ACK","malformed B0","TLS consume","CRC","decode","buffered frame","second 0x22"],"status":"PASS_INJECTED_NO_RETRY"},
+    {"class":"cleanup/restore","cases":["coordinator/TLS/transport close","secret close","signal restore","fprintd restore","report publication"],"status":"PASS_ALL_POSSIBLE_PHASES_ATTEMPTED"},
+    {"class":"forbidden trace","cases":["0x34","post-image 0x20","A2","0x70","second 0x22","re-arm"],"status":"PASS_ABSENT"},
+    {"class":"absolute timeout","cases":["unexpected/nonmatching completions cannot renew 15000 ms"],"status":"PASS_BY_D263_D264_RUNTIME_REGRESSION"}
+  ]
+}
