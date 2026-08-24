@@ -205,6 +205,23 @@ smentito l'accettazione target di `0x22` fixed64 o la first image. Lo stato
 interno device post-run resta `UNKNOWN`; `READY_FOR_LIVE=false`,
 `LIVE_AUTHORIZED=false` e nessuna nuova baseline è approvata.
 
+D266/01 corregge offline la classe di delivery nel router concreto. Il
+predicato ad hoc `_is_irq100()` è sostituito da un classificatore FDT
+strutturale che riusa `parse_fdt_event()`: sono eventi soltanto frame A0 con
+una delle coppie control/IRQ target-specific osservate
+`{0x32/0x0002, 0x34/0x0200, 0x36/0x0100}`. ACK `0xB0`, B0/TLS, risposte
+normali e altre combinazioni FDT restano nella vista command. Test offline sul
+`SharedFrameRouter` concreto provano IRQ100 e IRQ2 exactly-once, interleaving
+nelle due viste senza perdita/duplicazione, deadline assoluta e divieto di un
+secondo reader fisico. Una rehearsal sintetica attraversa
+`SharedFrameRouter → _RouterEventSource → first-image runtime`: IRQ2 abilita
+esattamente un tentativo `0x22`, mentre il timeout senza IRQ2 ne abilita zero.
+Nessun hardware, secret reale, marker, fprintd o write persistente è stato
+toccato. La correzione rimuove il blocker software noto ma non dimostra che
+IRQ2 sia stato fisicamente emesso in D265/02, né prova live `0x22` o la prima
+immagine. Review AI-PM, eventuale merge, nuova baseline full-SHA approvata e
+nuova autorizzazione restano obbligatori; `READY_FOR_LIVE=false`.
+
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
 preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
@@ -488,6 +505,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Corrective readiness D261 | PASS offline per baseline-approval; operational review promosso, live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full commit SHA `e9073a171697bd68dd2debabb851f23d007bf718` approvato da Utente e AI-PM, zero-tail per comando resta rischio live |
 | Kit D265/01 first-image | PASS offline; live successivamente eseguito in D265/02 | operator path one-shot, prompt immediatamente prima della wait IRQ2 e telemetria truth-preserving; baseline eseguita poi fissata a `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d` |
 | Run live D265/02 first-image | fail-closed pre-`0x22`, autorizzazione consumata | una USB/sessione/TLS/handshake e un arm finale; timeout EP81, zero IRQ2 consegnati/`0x22`/B0/retry/recovery/reopen/write; difetto router IRQ2 provato sulla baseline, emissione fisica IRQ2 non determinabile |
+| Corrective D266/01 router eventi | PASS offline; review AI-PM pendente, live false | classifier FDT strutturale condiviso con il parser canonico; IRQ100/IRQ2, command routing, interleaving, deadline, single-reader e seam sintetico IRQ2→un `0x22` PASS sul router concreto; nessuna nuova evidenza device-side |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -3126,7 +3144,7 @@ target `27c6:5125`, interfaccia `0`, OUT `0x01`, IN `0x81`. Richiede cardinalit�
 esatta e rivalida bus/address/port path prima e dopo ogni OUT. Non espone
 detach, reset, clear-halt, reopen, retry o recovery. Un solo
 `SharedFrameRouter` possiede fisicamente EP81 e conserva in code separate ACK,
-risposte, IRQ `0x0100` e B0 anche quando sono frammentati o coalesciuti. Ogni
+risposte, eventi FDT noti e B0 anche quando sono frammentati o coalesciuti. Ogni
 phase read usa una sola deadline monotonic assoluta: le completion valide ma
 non corrispondenti ricevono solo il tempo residuo e non rinnovano il timeout.
 Tredici harness eseguono split/coalescing, buffering incrociato, NAV/B0 grandi,
@@ -3134,14 +3152,17 @@ interleaving, ordine, starvation, deadline e tentativo di secondo reader. Il
 transport applica inoltre pacing pre/post della policy fisica e rifiuta frame
 buffered inattesi dopo l'ACK terminale `0x32`.
 
-L'audit post-live D265/02 restringe questa descrizione: sulla baseline eseguita
-il router separa come eventi **soltanto** gli IRQ `0x0100` riconosciuti da
-`_is_irq100()`. Un logical A0/FDT IRQ `0x0002` non attraversa
-`SharedFrameRouter.receive_event()` ed è classificato nella vista non-event.
-La coverage D261 esercitava il router concreto solo con IRQ `0x0100`; i test
-first-image D263–D265 iniettavano event source sintetici/decorator e non
-attraversavano il demux USB reale. `PromptingEventSource` ha timing corretto,
-ma la classificazione eventi del router reale è incompleta per IRQ2.
+L'audit post-live D265/02 resta la prova storica che la baseline eseguita
+separava come eventi soltanto gli IRQ `0x0100` riconosciuti da `_is_irq100()` e
+lasciava IRQ `0x0002` nella vista command. D266/01 corregge offline quel difetto
+nel codice corrente: `_is_fdt_event()` accetta solo A0 che superano il parser
+canonico `parse_fdt_event()` e corrispondono alle coppie target osservate
+`0x32/IRQ2`, `0x34/IRQ200` o `0x36/IRQ100`; distingue quindi tali eventi da
+ACK, response, B0/TLS e altre combinazioni FDT. La nuova coverage attraversa il router
+concreto con IRQ100 e IRQ2, le quattro sequenze di interleaving richieste, la
+deadline assoluta, il lock del reader e il seam first-image fino a un solo
+tentativo sintetico `0x22`. Questo è evidence software/offline e non rivela se
+IRQ2 sia stato fisicamente emesso durante D265/02.
 
 Il launcher `operator_kit/d261-live-fdt-arm-once.sh` accetta soltanto
 `--dry-run` oppure l'esatta autorizzazione live. Il default è hard-disabled.
@@ -3390,10 +3411,12 @@ discrimina tra IRQ2 assente sul device e IRQ2 fisicamente arrivato ma trattenuto
 dal router: la baseline consegna alla event queue solo IRQ `0x0100`, mentre il
 runtime attende IRQ `0x0002`. Questo difetto software deterministico rende
 invalida qualsiasi inferenza device-side dall'assenza di IRQ2 osservata dal
-runtime. L'autorizzazione D265/02 è consumata, il retry è vietato e una futura
-run richiede prima patch offline, test del router concreto, review AI-PM, merge,
-approvazione esplicita di un nuovo full SHA e nuova autorizzazione separata.
-Fino ad allora `0x22_FIXED64_LIVE_PROVEN=false`,
+runtime. D266/01 ha ora applicato e verificato offline la patch sul router
+concreto, incluso il seam sintetico IRQ2→un solo `0x22`; non ha eseguito live e
+non risolve l'indeterminatezza fisica della run precedente. L'autorizzazione
+D265/02 è consumata, il retry è vietato e una futura run richiede ancora review
+AI-PM, eventuale merge, approvazione esplicita di un nuovo full SHA e nuova
+autorizzazione separata. `0x22_FIXED64_LIVE_PROVEN=false`,
 `FIRST_IMAGE_LIVE_PROVEN=false`, `POST_D265_02_DEVICE_INTERNAL_STATE=UNKNOWN`,
 `READY_FOR_LIVE=false` e `LIVE_AUTHORIZED=false`.
 
@@ -4931,3 +4954,39 @@ correggere offline la classe di routing, aggiungere test concreti end-to-end e
 attraversare review, merge, nuova approvazione full-SHA e autorizzazione live
 separata. Gli artefatti sanitizzati sono in `analysis/D265/`; nessun raw USB,
 secret, plaintext TLS, marker, cache protetta o dato biometrico è incluso.
+
+### D266/01: correzione offline del router eventi FDT
+
+D266/01 parte dal branch `codex` a
+`c68398db24c7a1689e3056b771df83b479a1c7ef` e non esegue hardware. Il fix
+rinomina il predicato in `_is_fdt_event()` e delega la validazione semantica al
+parser FDT già canonico. Il contratto risultante è evidence-bounded: outer A0,
+payload strutturalmente valido, control nella famiglia `0x3x` e IRQ nella
+allowlist target osservata delle coppie `0x32/IRQ2`, `0x34/IRQ200` e
+`0x36/IRQ100`; non equivale a «ogni A0 è evento». ACK/response e frame non
+riconosciuti restano command-side.
+
+Otto test D266 sul router concreto verificano IRQ100 e IRQ2 exactly-once,
+non-stealing di ACK/response, quattro interleaving, code finali vuote, deadline
+monotonic assoluta e `concurrent_physical_in_reader_forbidden`. Il seam
+first-image usa una fixture bulk-IN sintetica e passa da
+`SharedFrameRouter` a `_RouterEventSource` e al runtime: con IRQ2 produce un
+solo submit logico `0x22 [01 00]` e completa una immagine sintetica `80x64`;
+senza IRQ2 termina in timeout con zero submit. La suite mirata router/runtime/
+first-image passa 37/37. La suite generale `unittest` esegue 282 test e
+mantiene un failure e tre errori non attribuibili al router: i due esiti D261
+storici (capability exception class e dry-run drift) e due import di test
+pytest-only con `pytest` non installato. Nessuna dipendenza è stata aggiunta.
+
+```text
+OUTCOME=D266_01_READY_FOR_AI_PM_REVIEW
+ADVANCEMENT=CONCRETE_ROUTER_EVENT_CLASSIFICATION_FIXED_OFFLINE
+EXECUTABLE_CLOSURE=PASS
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+D265_02_RETRY_AUTHORIZED=false
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED_FOR_NEW_ATTEMPT=false
+```
