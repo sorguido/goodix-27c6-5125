@@ -1,0 +1,25 @@
+{
+  "schema": "D263_05_TEST_RESULTS_V1",
+  "generated_utc": "2026-08-24T07:40:00Z",
+  "runner": "python3 -m unittest tests.test_d263_phase2_support_primitives",
+  "framework": "unittest (pytest not installed)",
+  "tests_run": 12,
+  "failures": 0,
+  "errors": 0,
+  "data": "SYNTHETIC_ONLY",
+  "cases": [
+    "FdtLifecycleSupportPrimitives.test_valid_terminal_transition",
+    "FdtLifecycleSupportPrimitives.test_0x22_one_shot_second_rejected",
+    "FdtLifecycleSupportPrimitives.test_first_image_received_twice_rejected",
+    "FdtLifecycleSupportPrimitives.test_post_irq2_requires_armed_wait",
+    "FdtLifecycleSupportPrimitives.test_cancel_accepts_first_image_received",
+    "FdtLifecycleSupportPrimitives.test_prohibited_commands_unreachable",
+    "FdtLifecycleSupportPrimitives.test_command_timeout_ms_has_0x22",
+    "Transport0x22Policy.test_abstract_policy_not_live_proven",
+    "Transport0x22Policy.test_abstract_materialize_no_invented_tail",
+    "Transport0x22Policy.test_operational_policy_deterministic_zero_tail",
+    "Transport0x22Policy.test_prohibited_0x34_0xA2_rejected",
+    "Transport0x22Policy.test_0x22_allowed_in_both_policies"
+  ],
+  "coverage_summary": "valid terminal transition (arm->post_irq2->first_image->cancel->terminal, trace ends 0x32,0x22, no 0x34/0x20); one-shot 0x22; second attempt rejected; first_image twice rejected; post_irq2 requires armed wait; cancel accepts FIRST_IMAGE_RECEIVED; prohibited commands unreachable (0x34/0xA2/0x70 not in SAFE_DEVICE_COMMANDS); 0x22 timeout present; 0x22 abstract policy not live-proven; abstract materialize no invented tail; operational deterministic zero tail; 0x34/0xA2/0x70 rejected by both policies."
+}

@@ -4126,6 +4126,28 @@ Hash pre-change dei file live-critical in
 Artefatti `analysis/D263/`: `D263_04_phase2_contract.json`,
 `D263_04_patch_plan.md`, `D263_04_live_critical_prechange_hashes.json`. Nessun ZIP.
 
+### D263/05: Phase 2 support primitives lifecycle + transport (sottostep 05)
+
+Gate READY + contract step 04 valido. Implementati SOLO i support primitives;
+il coordinator NON è stato esteso (rimandato a step 06).
+
+`core/fdt_lifecycle.py` (`2aac7422…93a33a`): `COMMAND_TIMEOUT_MS` +`0x22:2000`;
+`post_irq2_image_command` con guard one-shot (secondo tentativo →
+`fail_closed`+`InvalidTransition`, niente re-arm retry); `cancel_pending_receive`
+ora accetta anche `FIRST_IMAGE_RECEIVED` (cleanup host terminale post-first-image
+per la decisione step 03). `core/runtime_transport.py` (`2930aa57…3e38d`):
+`0x22` aggiunto a `fdt_a0_policy` (ABSTRACT_LOGICAL_ONLY, **non** live-proven,
+nessun tail inventato) e a `operational_fdt_a0_policy`
+(FIXED64_ZERO_TAIL_D261_CANDIDATE, deterministico zero-fill). `0x34`/`0xA2`/`0x70`
+restano rifiutati da entrambe. Nuovo `tests/test_d263_phase2_support_primitives.py`
+(12 test sintetici, tutti OK): valid transition (trace termina `0x32,0x22`, nessun
+`0x34`/`0x20`), one-shot `0x22`, second attempt rejected, wrong-order rejected,
+terminal transition, prohibited unreachable, physical frame construction,
+deterministic tail. Coordinator invariato (`8e448caa…0df12c`).
+
+Artefatti `analysis/D263/`: `D263_05_change_summary.json`,
+`D263_05_test_results.json`, `D263_05_report.md`. Nessun ZIP.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;

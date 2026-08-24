@@ -11,11 +11,12 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02", "03", "04"],
+  "completed_substeps": ["01", "02", "03", "04", "05"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
   "outcome_04": "PASS_PHASE2_CONTRACT_AND_PATCH_PLAN_DEFINED",
+  "outcome_05": "PASS_SUPPORT_PRIMITIVES_IMPLEMENTED",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -80,6 +81,22 @@
     },
     "invariants": "one USB/TLS session+handshake; zero 2nd secret/USB reopen/retry/A2/0x70/0x34/0x20-post/re-arm/persistent-write; first-image bytes not persisted; fail-closed",
     "prechange_hashes_file": "D263_04_live_critical_prechange_hashes.json"
+  },
+  "phase2_step05_summary": {
+    "status": "SUPPORT_PRIMITIVES_IMPLEMENTED",
+    "coordinator_extended": false,
+    "files_modified": {
+      "core/fdt_lifecycle.py": {
+        "before": "2edbec9e6651c63f23830985ac7e6bd80160780b6186bb00446480019575e1c8",
+        "after": "2aac74224f427c618fa21d4bf0d146284b9c7e42e3d8717bfce11be9f393a33a"
+      },
+      "core/runtime_transport.py": {
+        "before": "cbbb0b68a570da0d7ae07b386883144b9ce31ad22e864a2436e5dadb1dbe91ea",
+        "after": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d"
+      }
+    },
+    "tests": "tests/test_d263_phase2_support_primitives.py (12 tests, all PASS, synthetic only)",
+    "invariants_preserved": "no 0x34/0x20-post/re-arm/A2/0x70/retry/persistent; coordinator unchanged"
   },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",
