@@ -1,0 +1,89 @@
+{
+  "schema": "D263_02_FIRST_IMAGE_PIPELINE_V1",
+  "substep": "02",
+  "scope": "audit only, synthetic fixtures only, no runtime patch",
+  "canonical_parser": {
+    "entry": "core/post_d4.py:336 decode_image_record(record)",
+    "implementation": "src/goodix5125_cleanroom.py:72 decode_record(record)",
+    "note": "single canonical codec; no duplicated decoder in production plan"
+  },
+  "canonical_codec": {
+    "module": "src/goodix5125_cleanroom.py",
+    "constants": {
+      "RECORD_BYTES": 7684,
+      "PACKED_BYTES": 7680,
+      "SAMPLE_COUNT": 5120,
+      "WIDTH": 80,
+      "HEIGHT": 64
+    },
+    "sample_format": "12-bit packed (packed12), 4 samples per 6-byte group",
+    "group_decode": "src/goodix5125_cleanroom.py:40 decode_group(block) unpacks 6 bytes -> 4 x u12",
+    "raster_layout": "raster_index(wire_index) = (wire_index % HEIGHT) * WIDTH + wire_index // HEIGHT (column-major wiring)"
+  },
+  "record_7684": {
+    "confirmed": true,
+    "source": [
+      "src/goodix5125_cleanroom.py:11 RECORD_BYTES = 7684",
+      "core/post_d4.py:352 parse_image_payload requires len(data) == 5 + 7684 (image payload data; control prefix 5 bytes + 7684-byte record)",
+      "core/post_d4.py:356 decode_image_record(data[5:]) consumes the 7684-byte record"
+    ],
+    "structure": "7680 packed bytes (1280 groups of 6 bytes = 5120 samples) + 4-byte CRC-32/MPEG-2 trailer"
+  },
+  "sample_count": {
+    "value": 5120,
+    "source": "src/goodix5125_cleanroom.py:12 SAMPLE_COUNT = 5120 (= WIDTH*HEIGHT = 80*64)"
+  },
+  "raster_80x64": {
+    "confirmed": true,
+    "width": 80,
+    "height": 64,
+    "source": "src/goodix5125_cleanroom.py:13-14 WIDTH/HEIGHT; test_d249_post_d4.py and test_d257_fdt_candidate.py assert decode returns 5120-element 80x64 raster"
+  },
+  "crc": {
+    "algorithm": "CRC-32/MPEG-2 (poly 0x04C11DB7, non-reflected, init 0xFFFFFFFF)",
+    "implementation": "src/goodix5125_cleanroom.py:17 crc32_mpeg2; trailer codec src/goodix5125_cleanroom.py:27-37",
+    "check": "decode_record computes crc32_mpeg2(packed) and compares to decode_crc_trailer(record[7680:])",
+    "failure_behavior": "raise ValueError('CRC mismatch') -> normalized to ImageCrcError (core/post_d4.py:342-343) -> fail-closed (no silent accept, no retry)"
+  },
+  "failure_behavior": {
+    "length_mismatch": "LengthMismatch (core/post_d4.py:353 / cleanroom :74-75)",
+    "crc_mismatch": "ImageCrcError (fail-closed; no accept, no retry, no cache write)",
+    "pov_guard": "data[0]==0xAA rejected as non-image notification (core/post_d4.py:354-355)",
+    "classifier": "baseline_semantic_gate / nav_semantic_gate gate pixels but never persist or retain plaintext"
+  },
+  "existing_tests": [
+    {
+      "file": "tests/test_cleanroom.py",
+      "covers": "round-trip encode_synthetic_record/decode_record, raster_index correctness, CRC mismatch raises",
+      "fixture": "synthetic only (no biometric)"
+    },
+    {
+      "file": "tests/test_d249_post_d4.py",
+      "covers": "decode_image_record equals local decode; fresh_fdt_path_reaches_first_image; cached_pov_path_reaches_first_image; FIRST_IMAGE_RECEIVED reached via FirstImageMachine",
+      "fixture": "synthetic raster (test_d249_post_d4.py:37 synthetic_raster)"
+    },
+    {
+      "file": "tests/test_d257_fdt_candidate.py",
+      "covers": "synthetic_raster; test_target_irq2_0x22_exactly_once_and_first_image asserts phase==FIRST_IMAGE_RECEIVED and image==synthetic_raster",
+      "fixture": "synthetic"
+    }
+  ],
+  "duplicate_decoder_check": {
+    "decoders_found": [
+      "src/goodix5125_cleanroom.py:72 decode_record (canonical, packed12 + CRC)",
+      "src/goodix5125_cleanroom.py:40 decode_group (packed12 group primitive)",
+      "core/post_d4.py:336 decode_image_record (thin wrapper, normalizes errors)"
+    ],
+    "duplicate_implementation": false,
+    "note": "Only one packed12+CRC codec exists. core/post_d4.decode_image_record delegates to it; tests reference it via alias local_decode_record but do not reimplement. No second/parallel decoder in the production plan."
+  },
+  "pipeline_end_to_end_status": {
+    "baseline_image": "WIRED via coordinator: B0 consumed by retained TLS then parsed by parse_image_payload inside ExactFreshFdtBootstrapMachine.finalize_host_base_decisions (core/fdt_lifecycle.py:608-640)",
+    "first_image": "NOT WIRED in coordinator: first-image B0 is never decrypted/parsed on the retained TLS session in PersistentRuntimeCoordinator path (see D263_02_retained_tls_map.json question_4/question_5)",
+    "standalone_offline_closure": "FirstImageMachine (core/post_d4.py:419) reaches FIRST_IMAGE_RECEIVED on synthetic fixtures only; not connected to coordinator/TLS"
+  },
+  "safety": {
+    "biometric_fixture": false,
+    "runtime_modified": false
+  }
+}

@@ -4018,6 +4018,40 @@ Artefatti `analysis/D263/`: `d263_01_0x22_evidence_audit.py`,
 `D263_01_post_arm_order.json`, `D263_01_0x22_physical_policy.json`,
 `D263_01_report.md`, `D263_workflow_state.json`. Nessun ZIP in 01.
 
+### D263/02: retained TLS e pipeline first-image (sottostep 02)
+
+Audit OFFLINE dell'architettura esistente per
+`encrypted first-image B0 -> retained TLS -> Goodix payload -> image record -> CRC -> packed12 -> 80x64`,
+senza modifiche runtime. Esito `PASS_AUDIT_NOT_BLOCKED`.
+
+Retained TLS: `PersistentRuntimeCoordinator` crea **una** sola
+`Tls12PskServerSession` (`server_session_object_count=1`,
+`psk_context_provisioning_count=1`, `handshake_count=1`); l'adapter
+`MemoryBioApplicationSessionAdapter` può consumare più application
+record sulla stessa sessione retainita (baseline B0 = record #1). La stessa
+sessione può quindi teoricamente trasportare anche il primo B0 immagine
+(IRQ2 → 0x22 → first-image). Tuttavia `run()` si ferma a `machine.arm(ts16)` e
+il `finally` chiude TLS prima di qualsiasi post-arm: la fase post-arm non è
+cablata. Chi decripta B0: `B0ApplicationConsumer.consume`
+(`core/tls_b0.py:287`); chi parse l'immagine:
+`parse_image_payload`→`decode_image_record`→`src/goodix5125_cleanroom.decode_record`
+(servono i byte decriptati). `FdtLifecycle` ha già gli stati/metodi
+`FDT_ARMED_WAIT`, `FIRST_IMAGE_RECEIVED`, `post_irq2_image_command`,
+`first_image_received`, ma il coordinator/macchina di produzione non li
+invoca: la transizione terminale `FDT_ARMED_WAIT → FIRST_IMAGE_RECEIVED` è assente.
+Nessun redesign TLS/transport richiesto (target: ONE USB/TLS session, ONE
+handshake, ONE secret boundary, ZERO second PSK/reopen è già soddisfatto).
+
+Pipeline immagine: codec canonico **unico** in `src/goodix5125_cleanroom.py`
+(packed12, `RECORD_BYTES=7684`, `SAMPLE_COUNT=5120`, raster 80×64, CRC-32/MPEG-2
+fail-closed). `decode_image_record` è solo wrapper. Nessun decoder duplicato.
+Test esistenti: `test_cleanroom.py`, `test_d249_post_d4.py`,
+`test_d257_fdt_candidate.py` (tutti fixture sintetiche). `FIRST_IMAGE_RECEIVED`
+è raggiunto solo da `FirstImageMachine` (offline/test), non dal coordinator.
+
+Artefatti `analysis/D263/`: `D263_02_retained_tls_map.json`,
+`D263_02_first_image_pipeline.json`, `D263_02_runtime_gap_report.md`. Nessun ZIP.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;

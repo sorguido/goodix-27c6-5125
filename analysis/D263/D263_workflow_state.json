@@ -11,8 +11,9 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01"],
+  "completed_substeps": ["01", "02"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
+  "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
