@@ -1,0 +1,39 @@
+name: D264 materialize canonical bundle
+
+on:
+  push:
+    branches:
+      - codex/esegui-audit-evidenza-stato-terminale-prima-immagine
+    paths:
+      - .github/workflows/d264-materialize-zip.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/esegui-audit-evidenza-stato-terminale-prima-immagine
+          fetch-depth: 0
+
+      - name: Decode, verify, and canonicalize D264 bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd analysis/D264
+          base64 --decode D264_01_first_image_terminal_state_audit_bundle.zip.b64 > D264_01_first_image_terminal_state_audit_bundle.zip
+          sha256sum --check D264_01_first_image_terminal_state_audit_bundle.zip.sha256
+          unzip -t D264_01_first_image_terminal_state_audit_bundle.zip
+          rm D264_01_first_image_terminal_state_audit_bundle.zip.b64
+          cd ../..
+          rm .github/workflows/d264-materialize-zip.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(D264): materialize canonical audit bundle"
+          git push origin HEAD:codex/esegui-audit-evidenza-stato-terminale-prima-immagine
