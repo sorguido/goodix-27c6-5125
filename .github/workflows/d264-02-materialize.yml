@@ -1,0 +1,46 @@
+name: D264-02 materialize canonical bundle
+
+on:
+  push:
+    branches:
+      - 'codex/implementare-operazionali-offline-d264/02'
+    paths:
+      - '.github/workflows/d264-02-materialize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: 'codex/implementare-operazionali-offline-d264/02'
+          fetch-depth: 0
+
+      - name: Decode and verify canonical ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd analysis/D264
+          base64 -d D264_02_first_image_offline_operationalization_bundle.zip.b64 > D264_02_first_image_offline_operationalization_bundle.zip
+          sha256sum -c D264_02_first_image_offline_operationalization_bundle.zip.sha256
+          unzip -t D264_02_first_image_offline_operationalization_bundle.zip
+          actual="$(sha256sum D264_02_first_image_offline_operationalization_bundle.zip | awk '{print $1}')"
+          test "$actual" = "e08e7d2a640d4593535a164020a726c1960f1853fc41b6c76a138d71b88c1b83"
+
+      - name: Replace temporary transport with canonical ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f analysis/D264/D264_02_first_image_offline_operationalization_bundle.zip.b64
+          rm -f .github/workflows/d264-02-materialize.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'chore(D264): materialize canonical D264/02 bundle'
+          git push origin HEAD:'codex/implementare-operazionali-offline-d264/02'
