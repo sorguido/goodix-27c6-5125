@@ -1,18 +1,29 @@
 {
-  "schema": "D265_02_BUNDLE_MANIFEST_V1",
+  "schema": "D265_02_BUNDLE_MANIFEST_V2",
   "step_local": true,
   "non_cumulative": true,
+  "packaging_only_migration": true,
+  "technical_state_changed": false,
   "executed_baseline_sha": "2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d",
+  "source_transport": {
+    "path": "analysis/D265/D265_02_live_fail_closed_bundle.zip.b64",
+    "git_blob": "706553a767b0f57ef4148bb1870695cadc7d2027",
+    "decoded_zip_sha256": "f59b7205a73665ff52c61618a79674d2f190209f1550a9b2efb485098578ca12",
+    "decoded_zip_size": 113660,
+    "verification": "BYTE_EXACT_RECONSTRUCTION_AND_SHA256_MATCH"
+  },
+  "canonical_manual": {
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "sha256": "c25290f256b797c4e60561e0b449cea9664594ab14d8d78a97f89e9aff4dfd59",
+    "bundle_inclusion": false,
+    "reason": "Canonical root document; referenced by hash to keep the transport bundle strictly step-local."
+  },
   "contains_secret": false,
   "contains_tls_plaintext": false,
   "contains_biometric_or_image_data": false,
   "contains_raw_usb_capture": false,
   "contains_protected_cache_or_marker_content": false,
   "bundle_members": [
-    {
-      "path": "Goodix 27c6 5125 manuale tecnico.md",
-      "sha256": "c25290f256b797c4e60561e0b449cea9664594ab14d8d78a97f89e9aff4dfd59"
-    },
     {
       "path": "analysis/D265/D265_02_live_fail_closed_report.md",
       "sha256": "386f94e504d86a0cffe523966f657793f404aa8f9f9229cf62e11a6c3ac67a5b"
