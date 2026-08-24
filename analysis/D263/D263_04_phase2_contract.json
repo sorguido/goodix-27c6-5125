@@ -7,7 +7,7 @@
   "target_sequence": [
     "existing D262 path (D1->TLS->D4->AF->fresh-FDT bootstrap->final FDT arm 0x32 ACK)",
     "bounded wait IRQ 0x0002 (event_source.wait_event, parse_fdt_event irq==2)",
-    "exactly one 0x22 [01 00] (build_finger_image, ACK-optional validated)",
+    "exactly one 0x22 [01 00] (build_finger_image, 0x22 ACK = EXACTLY_ONE_REQUIRED_AND_VALIDATED)",
     "existing retained TLS receives first B0 (application_session.consume_application_record)",
     "existing first-image parser/codec validates+decodes (parse_image_payload -> canonical 80x64)",
     "transition FIRST_IMAGE_RECEIVED",

@@ -85,14 +85,22 @@ il sottoalbero finger-down / `0x22` / immagine. Dunque `0x22` è
 
 ## Modello Phase 2 `0x22`
 
-**`logical exact A0 -> physical fixed64 -> deterministic zero-fill outside declared length`** — **CONFERMATO** sul primary:
+Observed on primary target:
+- logical A0 length 10
+- physical OEM OUT length 64
+- out-of-frame residue/staging observed
 
-- logical A0 = 10; physical OUT = 64; 54 byte fuori frame;
-- determinismo: gli unici 6 byte non-zero (offset 40–45 = `cb f2 e2 be fb 7f`)
-  sono staging residue costante, identica a `0x36`/`0x20`, non payload.
+Linux deterministic operational candidate:
+- FIXED64_ZERO_TAIL
 
-La conferma del modello Phase 2 è lecita perché derivata dalla stessa capture
-primaria `rilevamento.pcapng` già hash-gated, non da inferenza esterna.
+Candidate status:
+- EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE
+
+Device acceptance of Linux zero-tail on 0x22:
+- NOT_LIVE_PROVEN
+
+The primary capture proves OEM fixed64 submission and supports the Linux
+candidate; it does NOT prove live device acceptance of Linux zero-fill for `0x22`.
 
 ## Residui / blocker
 

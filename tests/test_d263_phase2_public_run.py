@@ -51,13 +51,23 @@ def outer(kind: int, body: bytes) -> bytes:
 
 
 class FakeBoundary:
-    handoff_count = 1
+    """Synthetic validated-secret boundary.
+
+    The handoff must occur exactly once. ``handoff()`` therefore starts at
+    ``handoff_count = 0`` and performs one real transfer of the secret; a second
+    call is detectable and fails the exactly-once invariant, mirroring the
+    production boundary used by ``Tls12PskServerSession.from_boundary``.
+    """
 
     def __init__(self, secret: bytes) -> None:
         self._secret = bytearray(secret)
+        self.handoff_count = 0
         self.closed = False
 
     def handoff(self) -> memoryview:
+        if self.handoff_count != 0:
+            raise RuntimeError("synthetic secret boundary handoff must be exactly-once")
+        self.handoff_count += 1
         return memoryview(self._secret)
 
     def close(self) -> None:
@@ -94,6 +104,7 @@ class FakeTlsSession:
         self.psk_context_provisioning_count = 1
         self.application_record_count = 0
         self.closed = False
+        self.handoff_secret = b""
 
     @property
     def handshake_complete(self) -> bool:
@@ -107,7 +118,10 @@ class FakeTlsSession:
 
 
 def _fake_tls_factory(boundary):
-    return FakeTlsSession(FakeApplicationSession())
+    secret = boundary.handoff()  # exactly one synthetic secret boundary handoff
+    session = FakeTlsSession(FakeApplicationSession())
+    session.handoff_secret = bytes(secret)
+    return session
 
 
 def irq2(irq: int = 2) -> bytes:
@@ -372,6 +386,21 @@ class Zero22PolicySelectionTests(unittest.TestCase):
     def test_fixed64_when_operational_true(self):
         mode = self._policy_mode_for_22(operational=True)
         self.assertEqual(mode, SubmissionMode.FIXED64_ZERO_TAIL.value)
+
+
+class SyntheticSecretHandoffExactlyOnceTests(unittest.TestCase):
+    """The synthetic secret-boundary handoff must be performed exactly once."""
+
+    def test_factory_performs_exactly_one_real_handoff(self):
+        boundary = FakeBoundary(b"secret-32-bytes-xxxxxxxxxxxxxx")
+        session = _fake_tls_factory(boundary)
+        self.assertEqual(boundary.handoff_count, 1)
+        self.assertEqual(session.handoff_secret, b"secret-32-bytes-xxxxxxxxxxxxxx")
+        # A second handoff is detectable and must fail the exactly-once invariant.
+        with self.assertRaises(RuntimeError):
+            boundary.handoff()
+        boundary.close()
+        self.assertTrue(boundary.zeroized)
 
 
 if __name__ == "__main__":

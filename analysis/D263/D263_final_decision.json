@@ -3,12 +3,12 @@
   "step": "D263",
   "milestone": "D263",
   "reasoning": "HIGH",
-  "generated_utc": "2026-08-24T08:48:52Z",
+  "generated_utc": "2026-08-24T09:40:00Z",
   "corrective_of": "D263_08_final_bundle",
   "git": {
     "branch": "session/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
-    "current_head": "320dbf3cc77b91a11cf8a19bafbe91d39cddffde",
-    "status": "clean (D263 edits present on disk; no unexpected change-set)"
+    "current_head": "7653d5bdb09bc0b55171a65a4a9900181db7d996",
+    "status": "clean (D263 final canonical-polish edits present on disk; no production boundary change)"
   },
   "target": {
     "identity": "Goodix USB 27c6:5125",
@@ -79,7 +79,7 @@
   "D263_READY_FOR_LIVE_REVIEW": false,
   "D263_READY_FOR_LIVE": false,
   "D263_LIVE_EXECUTION": "NOT_PERFORMED",
-  "CURRENT_HEAD": "320dbf3cc77b91a11cf8a19bafbe91d39cddffde",
+  "CURRENT_HEAD": "7653d5bdb09bc0b55171a65a4a9900181db7d996",
   "live_critical_files_changed_overall": [
     "core/persistent_runtime.py",
     "core/runtime_transport.py",
@@ -103,5 +103,10 @@
     "live-critical set verification against this bundle",
     "targeted OEM evidence to close D252/D253/D255 (device-side restore/cancel, arm lifetime, current-path seed)"
   ],
-  "LIVE_AUTHORIZATION": "NONE_GRANTED_NOR_CONSUMED"
+  "LIVE_AUTHORIZATION": "NONE_GRANTED_NOR_CONSUMED",
+  "CANONICAL_CONSISTENCY": "PASS",
+  "STALE_D263_ARTIFACTS_RECONCILED": true,
+  "PUBLIC_RUN_SECRET_HANDOFF_TEST": "PASS",
+  "D263_CANONICAL_POLISH_PASS": true,
+  "PRODUCTION_BOUNDARY_UNCHANGED_BY_POLISH": true
 }

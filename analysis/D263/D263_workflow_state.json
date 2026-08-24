@@ -7,7 +7,7 @@
   "repo_root": "/workspace/2c6bcb5e-92be-491d-ac15-4d05a688d17e/sessions/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
   "git": {
     "branch": "session/agent_16ceb075-09cc-4bef-9575-02c7f6528892",
-    "head": "d1cea0ed5109274d5249ff8b8492d7d131ec6a54",
+    "head": "7653d5bdb09bc0b55171a65a4a9900181db7d996",
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
@@ -169,6 +169,22 @@
     "bundle_regenerated": true,
     "manual_updated": true,
     "hardware_action_count": 0
+  },
+  "canonical_polish_pass": {
+    "status": "CANONICAL_CONSISTENCY_PASS_STALE_RECONCILED",
+    "scope": "final canonical polish + closure hardening; no production boundary change",
+    "artifacts_reconciled": [
+      "D263_03_terminal_boundary_decision.json",
+      "D263_04_phase2_contract.json",
+      "D263_01_report.md",
+      "D263_final_report.md",
+      "Goodix 27c6 5125 manuale tecnico.md"
+    ],
+    "test_hardening": "tests/test_d263_phase2_public_run.py FakeBoundary performs exactly-one real synthetic secret handoff; new SyntheticSecretHandoffExactlyOnceTests; 28 D263 tests PASS",
+    "production_boundary_unchanged": true,
+    "stale_artifacts_reconciled": true,
+    "canonical_consistency": "PASS",
+    "public_run_secret_handoff_test": "PASS"
   },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_0x22_logical_offline_policy": "ABSTRACT_LOGICAL_ONLY",

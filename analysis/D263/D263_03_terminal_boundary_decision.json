@@ -13,7 +13,10 @@
     "device_side": "Lo stato interno device post-prima-immagine (FDT/finger, necessita' di 0x34, tolleranza disconnect, restore device-side) resta UNKNOWN: nessun live post-first-image eseguito; D252 BLOCKED; 0x34 osservato solo come 'arm finger-up' nello stack Windows, non come cleanup obbligatorio. Non contraddetto da evidenza primaria, ma non provato.",
     "positive_cycle": "Il ciclo positivo documentato (0x34->IRQ0x0200->0x20->re-arm) e' cio' che lo stack Windows fa per multi-enrollment; NON dimostra che 0x34/0x20/re-arm siano richiesti per uno stop host dopo la prima immagine."
   },
-  "primary_target_supported_host_only_stop": true,
+  "host_cleanup_mechanism_supported": true,
+  "post_first_image_host_cleanup_implemented_offline": true,
+  "post_first_image_device_internal_state": "UNKNOWN",
+  "post_first_image_device_stop_live_proven": false,
   "device_internal_state_known": false,
   "contradicted_by_primary": false,
   "blocking_missing_evidence": "NESSUNA che blocchi l'integrazione OFFLINE; l'unico residuo e' lo stato interno device (validabile solo live, fuori scope D263/03)."

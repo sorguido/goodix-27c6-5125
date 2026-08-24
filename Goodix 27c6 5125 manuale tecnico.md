@@ -4010,9 +4010,18 @@ ACK/echo/status e la policy fisica fixed-64 sono direttamente osservati nella
 capture primaria APP12509. Il live proof D262 copre **solo** il bounded FDT arm
 (`0x36,0x50,0x36,0x82,0x20,0x36,0x32`, `STOP_AFTER_FDT_ARM_ACK`) e **non**
 raggiunge il sottoalbero finger-down/`0x22`/immagine; dunque `0x22` NON è
-live-proven/accepted. Il modello Phase 2
-`logical exact A0 → physical fixed64 → deterministic zero-fill outside declared length`
-è **confermato** sul primary (`rilevamento.pcapng`, già hash-gated).
+live-proven/accepted.
+
+**Modello `0x22` (coerente con `D263_01` v2).**
+- *Observed on primary target:* logical A0 length 10; physical OEM OUT length 64;
+  out-of-frame residue/staging observed (offset 40–45 = `cb f2 e2 be fb 7f`).
+- *Linux deterministic operational candidate:* `FIXED64_ZERO_TAIL`.
+- *Candidate status:* `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`.
+- *Device acceptance of Linux zero-tail on `0x22`:* `NOT_LIVE_PROVEN`.
+
+La capture primaria prova la **submission** OEM fixed64 e supporta la scelta
+candidate zero-tail; **non** conferma live l'acceptance device del zero-fill
+Linux su `0x22` (`phase2_model_confirmed` di `D263_01` = `false`).
 
 Artefatti `analysis/D263/`: `d263_01_0x22_evidence_audit.py`,
 `D263_01_post_arm_order.json`, `D263_01_0x22_physical_policy.json`,
@@ -4192,10 +4201,12 @@ prefisso `EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE` + solo `(0x22)`); one-shot
 al secondo tentativo; coordinator single-use); no forbidden reachability
 (`run()` rifiuta `{0x34,0xA2,0x70,0x20}` post-arm e impone `extra==(0x22,)`;
 lifecycle `_record` rifiuta non-allowlist/persistent/recovery); physical `0x22`
-policy coerente con evidence (`fdt_a0_policy(0x22,…)` = `ABSTRACT_LOGICAL_ONLY`;
-arm `0x32` (trace provata D255/D261) può usare FIXED64, ma `0x22` post-arm NON è
-nella trace provata, quindi astrazione è la scelta fedele all'evidence, nessun
-padding inventato); retained TLS single-session (`handshake_count==1`,
+policy coerente con evidence e con il contratto `D263_04`: il runtime seleziona
+`fdt_a0_policy(0x22,…)` = `ABSTRACT_LOGICAL_ONLY` quando `operational_physical_policy`
+è false, e `operational_fdt_a0_policy(0x22,…)` = `FIXED64_ZERO_TAIL` (candidato
+deterministico Linux, `EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`, **NON**
+live-accepted) quando è true; nessun nuovo submission mode inventato; nessuna
+claim di acceptance device; retained TLS single-session (`handshake_count==1`,
 `second_server_session_created=False`, stesso secret-boundary); no second
 handshake/provision/reopen (`session_count==1`, `psk_context_provisioning_count==1`);
 first-image non persistita (plaintext azzerato dopo decode, azzerato anche su
@@ -4234,8 +4245,11 @@ live-critical coerenti con `D263_07`).
 Esito finale: **`OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW`** (non live-ready).
 D263 ha provato offline: (a) ordine post-arm target-specific
 `0x32(arm,ACK)→IRQ0x0002→0x22[01 00](ACK)→first image(TLS B0)→host/TLS/USB
-cleanup→STOP`; (b) policy fisica `0x22` (`ABSTRACT_LOGICAL_ONLY`, nessun padding
-inventato); (c) pipeline first-image canonica unica (TLS retained → codec
+cleanup→STOP`; (b) policy `0x22`: logical offline = `ABSTRACT_LOGICAL_ONLY`;
+operational Linux candidate = `FIXED64_ZERO_TAIL`
+(`EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE`, `NOT_LIVE_PROVEN`); nessun padding
+inventato per la policy logica, mentre il candidato operativo è deterministico e
+non live-accepted; (c) pipeline first-image canonica unica (TLS retained → codec
 `decode_image_record` 7684-byte → 80×64, CRC fail-closed); (d) retained TLS
 single-session/single-handshake; (e) terminal-stop su coordinator di produzione
 cablatо ed esercitato end-to-end con double offline; (f) micro-correttiva shape
@@ -4244,7 +4258,7 @@ raster derivata dal decode.
 Stato canonico D263 (coerente con i marker globali del manuale):
 
 ```text
-CURRENT BOUNDARY            = post-arm first-image OFFLINE candidate (D263), non live
+CURRENT BOUNDARY            = D263 implements an opt-in OFFLINE first-image terminal candidate; default coordinator run() boundary remains STOP_AFTER_FDT_ARM_ACK (D260/D262); D263 non live
 READY_FOR_FDT              = architecture-review true; operational/live false
 SECOND_LIVE_ATTEMPT_ALLOWED= false (single-use coordinator; D262 marker consumato)
 FRESH_FDT_BOOTSTRAP_LIVE_PROVEN = true
@@ -4253,6 +4267,8 @@ POST_ARM_0x22_LIVE_PROVEN        = false
 FIRST_IMAGE_LIVE_PROVEN          = false
 FDT_DOWN_TABLE_LIVE_READY (storico D252, solo stato storico) = false
 0x22                       = PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY; non live-proven
+0x22_LOGICAL_OFFLINE_POLICY= ABSTRACT_LOGICAL_ONLY
+0x22_OPERATIONAL_LINUX_CANDIDATE = FIXED64_ZERO_TAIL (EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE, NOT_LIVE_PROVEN)
 FIRST_IMAGE                = pipeline canonica OFFLINE chiusa; non persistita
 D262_OUTCOME               = PASS_STOP_AFTER_FDT_ARM_ACK (baseline e9073a17… non regredita)
 D263                       = OFFLINE_IMPLEMENTATION_READY_FOR_AI_PM_REVIEW
