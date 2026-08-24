@@ -1,0 +1,83 @@
+{
+  "schema": "D265_02_EXECUTION_MANIFEST_V1",
+  "step": "D265/02",
+  "nature": "OFFLINE_ONLY_POSTMORTEM_DOCUMENTATION_EVIDENCE",
+  "execution_date": "2026-08-24",
+  "repository_branch": "main",
+  "initial_head": "2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d",
+  "executed_baseline_sha": "2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d",
+  "initial_worktree_clean": true,
+  "baseline_equals_initial_head": true,
+  "new_live_performed": false,
+  "real_usb_access_count_during_postmortem": 0,
+  "real_secret_read_count_during_postmortem": 0,
+  "real_device_command_count_during_postmortem": 0,
+  "marker_mutation_count_during_postmortem": 0,
+  "fprintd_mutation_count_during_postmortem": 0,
+  "live_critical_code_modified": false,
+  "baseline_files": [
+    {
+      "path": "core/usb_runtime.py",
+      "git_blob": "50a71487ebf45ae7a8c49cbe04013c042d910c65",
+      "sha256": "a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278",
+      "byte_exact_to_executed_baseline": true
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "git_blob": "9a1ae5a8b06106f7620d8ca3395aedb088209728",
+      "sha256": "42efbc29d2cebc06d3a83fd37cb410d9412dd6d20f0ffc7e3348338a70d79641",
+      "byte_exact_to_executed_baseline": true
+    },
+    {
+      "path": "tools/d265_live_first_image_once.py",
+      "git_blob": "dba083b094d166b2d3be650372541862fc137247",
+      "sha256": "f5501cf1d90bb5b2b873c7a22f8d41b4db23c6b96bffd2ce1243b71665dab1e4",
+      "byte_exact_to_executed_baseline": true
+    }
+  ],
+  "verification": [
+    {
+      "name": "executed_baseline_three_file_byte_identity",
+      "status": "PASS"
+    },
+    {
+      "name": "concrete_shared_frame_router_irq2_offline_fixture",
+      "status": "PASS",
+      "observed": "IRQ2_NOT_EVENT_DELIVERED__TIMEOUT__THEN_COMMAND_DELIVERED"
+    },
+    {
+      "name": "d263_first_image_and_public_runtime_unittest",
+      "status": "PASS",
+      "passed": 18,
+      "failed": 0
+    },
+    {
+      "name": "d265_operator_dry_run_external_cwd",
+      "status": "PASS_OFFLINE_OPERATOR_KIT",
+      "real_side_effect_counts_zero": true
+    },
+    {
+      "name": "pytest_suites_d264_d265",
+      "status": "NOT_AVAILABLE",
+      "reason": "No module named pytest"
+    },
+    {
+      "name": "historical_d261_unittest",
+      "status": "PARTIAL_PREEXISTING_BASELINE_OR_HOST_DRIFT_OUT_OF_SCOPE",
+      "passed": 18,
+      "failed": 1,
+      "errors": 1,
+      "relevant_shared_router_demux_test": "PASS",
+      "known_gap": "demux event fixtures cover IRQ 0x0100 only"
+    }
+  ],
+  "OUTCOME": "D265_02_LIVE_FAIL_CLOSED",
+  "EXECUTABLE_CLOSURE": "PASS_POSTMORTEM",
+  "D265_02_ROUTER_IRQ2_DELIVERY_DEFECT": "PROVEN_FROM_EXECUTED_BASELINE",
+  "DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02": "UNDETERMINED",
+  "D265_02_FIRST_IMAGE_PATH_WAS_SOFTWARE_BLOCKED_BEFORE_0x22": true,
+  "D265_02_RETRY_AUTHORIZED": false,
+  "READY_FOR_LIVE": false,
+  "LIVE_AUTHORIZED": false,
+  "BASELINE_APPROVED_FOR_NEW_ATTEMPT": false
+}

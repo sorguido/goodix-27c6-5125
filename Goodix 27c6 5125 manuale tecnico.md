@@ -179,6 +179,32 @@ approvazione del nuovo SHA e nuova autorizzazione restano quattro gate distinti.
 `READY_FOR_LIVE=false`, `BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`;
 `0x22` fixed64 e prima immagine restano non live-proven.
 
+D265/02 chiude il successivo live one-shot, eseguito sulla baseline approvata
+`2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d`, come `FAIL_CLOSED` prima di
+`0x22`. L'unica autorizzazione è consumata e D265/02 non deve essere ripetuto.
+La run ha aperto una sola sessione USB/transport e una sola TLS, ha completato
+un handshake, materializzato il secret una volta e armato FDT una volta; dopo
+la richiesta dito il runtime ha terminato con
+`TimeoutError:libusb_bulk_timeout:0x81`. Nessun IRQ2 è stato consegnato al
+runtime, nessun `0x22` è stato tentato o validato, nessun primo B0 è stato
+ricevuto e non vi sono stati retry, recovery, reopen, write persistenti o
+comandi post-image vietati. Cleanup host completato e secret zeroizzato sono
+osservati; il report protetto conferma fail-closed, timeout, zero retry,
+preflight della destinazione superato e trasferimento dell'ownership del
+secret al coordinator, ma non prova direttamente il restore di fprintd.
+
+L'audit byte-level della baseline prova un difetto software deterministico:
+`SharedFrameRouter.receive_event()` seleziona soltanto i frame riconosciuti da
+`_is_irq100()`, cioè A0 `control=0x36` con dati iniziali `00 01`, mentre il
+first-image runtime attende un evento FDT IRQ `0x0002`. Un IRQ2 fisicamente
+ricevuto verrebbe quindi lasciato nella vista non-event e la wait continuerebbe
+fino al timeout; anche l'assenza fisica di IRQ2 produce timeout. Di conseguenza
+l'emissione IRQ2 device-side durante D265/02 resta **UNDETERMINED**: il live ha
+localizzato la failure nel delivery software pre-`0x22`, ma non ha provato né
+smentito l'accettazione target di `0x22` fixed64 o la first image. Lo stato
+interno device post-run resta `UNKNOWN`; `READY_FOR_LIVE=false`,
+`LIVE_AUTHORIZED=false` e nessuna nuova baseline è approvata.
+
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
 preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
@@ -460,6 +486,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Corrective contratto minimo D259 | BLOCKED sul plumbing TLS runtime; live non autorizzato | Classe A confermata meccanicamente dal CFG; replay B0 ordinato subito dopo `0x20`, same-`SSLObject` e continuità TLS PASS offline; il runtime sealed D245 chiude e non espone l'engine, quindi `READY_FOR_FDT_LIVE_REVIEW=false` |
 | Runtime persistente D260 | architecture readiness PASS offline; operational/live false | nuovo coordinator GPL con un server/sessione/handshake TLS, D4 A0 plaintext, EventSource separato e minimal FDT continuo; 15 failure contenuti, `src/`/launcher storici invariati; physical FDT A0 ancora astratto |
 | Corrective readiness D261 | PASS offline per baseline-approval; operational review promosso, live false | closure import 16/16 e import purity PASS; non-secret prima del secret; capability CLI-intent/Live-I/O distinte, 24 failure e 13 casi demux execution-derived; 238 test PASS, full commit SHA `e9073a171697bd68dd2debabb851f23d007bf718` approvato da Utente e AI-PM, zero-tail per comando resta rischio live |
+| Kit D265/01 first-image | PASS offline; live successivamente eseguito in D265/02 | operator path one-shot, prompt immediatamente prima della wait IRQ2 e telemetria truth-preserving; baseline eseguita poi fissata a `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d` |
+| Run live D265/02 first-image | fail-closed pre-`0x22`, autorizzazione consumata | una USB/sessione/TLS/handshake e un arm finale; timeout EP81, zero IRQ2 consegnati/`0x22`/B0/retry/recovery/reopen/write; difetto router IRQ2 provato sulla baseline, emissione fisica IRQ2 non determinabile |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -3106,6 +3134,15 @@ interleaving, ordine, starvation, deadline e tentativo di secondo reader. Il
 transport applica inoltre pacing pre/post della policy fisica e rifiuta frame
 buffered inattesi dopo l'ACK terminale `0x32`.
 
+L'audit post-live D265/02 restringe questa descrizione: sulla baseline eseguita
+il router separa come eventi **soltanto** gli IRQ `0x0100` riconosciuti da
+`_is_irq100()`. Un logical A0/FDT IRQ `0x0002` non attraversa
+`SharedFrameRouter.receive_event()` ed è classificato nella vista non-event.
+La coverage D261 esercitava il router concreto solo con IRQ `0x0100`; i test
+first-image D263–D265 iniettavano event source sintetici/decorator e non
+attraversavano il demux USB reale. `PromptingEventSource` ha timing corretto,
+ma la classificazione eventi del router reale è incompleta per IRQ2.
+
 Il launcher `operator_kit/d261-live-fdt-arm-once.sh` accetta soltanto
 `--dry-run` oppure l'esatta autorizzazione live. Il default è hard-disabled.
 Il ramo live, non eseguito in D261, richiede root derivato da un operatore non
@@ -3345,6 +3382,20 @@ nuova AI-PM review e autorizzazione hardware esplicita dell'Utente. Perciò
 hardware una sola volta in single-shot e si è chiuso, non autorizzando alcun
 passo successivo; tutti i gate READY_FOR_* a qualificazione non avvenuta restano
 false. D261 non aveva aperto hardware e non auto-approva una run.
+
+Il successivo confine first-image è stato aperto una sola volta in D265/02
+sulla baseline approvata `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d` e si è
+chiuso fail-closed durante la wait IRQ2, prima di qualsiasi `0x22`. Il live non
+discrimina tra IRQ2 assente sul device e IRQ2 fisicamente arrivato ma trattenuto
+dal router: la baseline consegna alla event queue solo IRQ `0x0100`, mentre il
+runtime attende IRQ `0x0002`. Questo difetto software deterministico rende
+invalida qualsiasi inferenza device-side dall'assenza di IRQ2 osservata dal
+runtime. L'autorizzazione D265/02 è consumata, il retry è vietato e una futura
+run richiede prima patch offline, test del router concreto, review AI-PM, merge,
+approvazione esplicita di un nuovo full SHA e nuova autorizzazione separata.
+Fino ad allora `0x22_FIXED64_LIVE_PROVEN=false`,
+`FIRST_IMAGE_LIVE_PROVEN=false`, `POST_D265_02_DEVICE_INTERNAL_STATE=UNKNOWN`,
+`READY_FOR_LIVE=false` e `LIVE_AUTHORIZED=false`.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -4797,3 +4848,86 @@ trasferita. Servono ancora PASS AI-PM, merge, approvazione esplicita del nuovo
 full SHA e nuova autorizzazione separata. Stato: `READY_FOR_LIVE=false`,
 `LIVE_AUTHORIZED=false`, `BASELINE_APPROVED=false` e
 `D265_01_READY_FOR_BASELINE_APPROVAL=false`.
+
+### D265/02: live fail-closed e difetto deterministico del router IRQ2
+
+Il live one-shot D265/02 è stato eseguito una sola volta sulla baseline full-SHA
+approvata `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d`. Dopo il prompt
+`D265_OPERATOR_ACTION = APPOGGIA_UN_DITO_ORA`, l'operatore riferisce di aver
+appoggiato il dito; nessun output immediato è stato osservato e dopo alcuni
+secondi la run ha chiuso fail-closed. Questa è un'osservazione soggettiva e non
+viene trasformata in una misura temporale.
+
+La telemetria terminale sanitizzata registra:
+
+```text
+OUTCOME=FAIL_CLOSED
+LIVE_ATTEMPT_INVOCATION_COUNT=1
+USB_OPEN_COUNT=1
+TRANSPORT_SESSION_COUNT=1
+TLS_OBJECT_COUNT=1
+TLS_HANDSHAKE_COUNT=1
+SECRET_MATERIALIZATION_COUNT=1
+FINAL_FDT_ARM_COUNT=1
+IRQ2_FINGER_DOWN_COUNT=0
+COMMAND_22_ATTEMPT_COUNT=0
+COMMAND_22_ACK_VALIDATION_COUNT=0
+FIRST_B0_COUNT=0
+RETRY_COUNT=0
+RECOVERY_COUNT=0
+REOPEN_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+FORBIDDEN_POST_IMAGE_COMMAND_COUNT=0
+FAILURE_CLASS=TimeoutError:libusb_bulk_timeout:0x81
+HOST_CLEANUP_STATUS=COMPLETED
+SECRET_ZEROIZED=true
+```
+
+Il report protetto già prodotto dalla run, letto dall'operatore senza nuovo
+traffico USB, conferma `result=FAIL_CLOSED`, la stessa failure class,
+`retry_count=0`, `report_destination_preflight_passed=true` e
+`secret_ownership_transferred_to_coordinator=true`. Poiché non espone lo stato
+fprintd, `FPRINTD_RESTORE_STATUS` resta non direttamente provato da tale JSON e
+va consultato nel rapporto operatore; non viene promosso a PASS.
+
+L'audit dei blob eseguiti dimostra che `core/usb_runtime.py` ha SHA-256
+`a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278` e
+che `_is_irq100()` restituisce true soltanto per A0 `0x36` il cui data prefix è
+`00 01`. `_pop(event=True)` consegna esclusivamente quei frame. Il coordinator
+in `core/persistent_runtime.py`, SHA-256
+`42efbc29d2cebc06d3a83fd37cb410d9412dd6d20f0ffc7e3348338a70d79641`,
+chiama invece `wait_event(15000)` e procede a `0x22` soltanto dopo aver parsato
+`event.irq == 2`. Il decorator D265, nel tool con SHA-256
+`f5501cf1d90bb5b2b873c7a22f8d41b4db23c6b96bffd2ce1243b71665dab1e4`,
+stampa correttamente il prompt e delega senza alterare la classificazione.
+
+Una riproduzione sintetica offline sul `SharedFrameRouter` concreto conferma:
+`_is_irq100(IRQ2)=false`; `receive_event()` continua fino a
+`TimeoutError:libusb_bulk_timeout:0x81`; il frame IRQ2 resta accodato e viene
+poi consegnato da `receive_command()`. Questa prova è code-level e non dimostra
+che il device abbia realmente emesso IRQ2 durante il live. La classificazione
+corretta è pertanto:
+
+```text
+D265_02_ROUTER_IRQ2_DELIVERY_DEFECT=PROVEN_FROM_EXECUTED_BASELINE
+DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
+D265_02_FIRST_IMAGE_PATH_WAS_SOFTWARE_BLOCKED_BEFORE_0x22=true
+0x22_FIXED64_LIVE_PROVEN=false
+FIRST_IMAGE_LIVE_PROVEN=false
+POST_D265_02_DEVICE_INTERNAL_STATE=UNKNOWN
+```
+
+Il gap di test è una mancata integrazione fra first-image e router concreto:
+gli event source sintetici D263/D264 e il decorator D265 bypassano il demux;
+gli harness D261 del router coprono IRQ `0x0100`, non un logical A0/FDT IRQ2
+attraverso `receive_event()`. La prompt timing logic resta corretta; la real
+router event classification è incompleta per IRQ2.
+
+D265/02 non modifica codice live-critical e non applica il fix. L'unica
+autorizzazione è consumata, `D265_02_RETRY_AUTHORIZED=false`,
+`READY_FOR_LIVE=false`, `LIVE_AUTHORIZED=false` e
+`BASELINE_APPROVED_FOR_NEW_ATTEMPT=false`. Un eventuale passo futuro deve prima
+correggere offline la classe di routing, aggiungere test concreti end-to-end e
+attraversare review, merge, nuova approvazione full-SHA e autorizzazione live
+separata. Gli artefatti sanitizzati sono in `analysis/D265/`; nessun raw USB,
+secret, plaintext TLS, marker, cache protetta o dato biometrico è incluso.
