@@ -161,6 +161,24 @@ centralizza poi capability D261/future in un'authority fissa non sostituibile
 da callback, rende interna la tuple future-live canonica (18 file, incluso il
 modulo operatore D261 importato), separa i due file del gate offline e lega
 transaction, report futuro e marker preflight concreti nell'adapter.
+D265/01 materializza ora, ancora **OFFLINE ONLY**, il kit operatore manuale
+`operator_kit/d265-first-image-once.sh` → `tools/d265_live_first_image_once.py`.
+Il surface ha esattamente dry-run e flag live futuro; il comando canonico è
+`sudo env D265_APPROVED_LIVE_BASELINE_SHA=<FULL_APPROVED_SHA> ./operator_kit/d265-first-image-once.sh --i-authorize-one-d265-first-image-live-attempt`,
+così sudo mantiene il proprio prompt password e `/usr/bin/env` trasporta la
+baseline al processo root senza password handling. HEAD/worktree/path-set e
+byte identity sono esatti. L’autorità D265 contiene 20 file: i 18 transitivi già
+rivalutati in D264/03 più launcher e tool realmente raggiungibili. L'interazione
+umana è interamente italiana e la richiesta dito nasce una volta sola, tramite
+decorator host-side, immediatamente prima del vero `wait_event(15000)` dopo ACK
+`0x32`, non durante cold-start/TLS/D4/AF/FDT. La telemetria non usa default
+inventati: tracker di fase, audit del coordinator preservato anche su failure e
+contatori monotoni IRQ2/ACK/B0 distinguono osservato, non raggiunto e ignoto. La
+precedente autorizzazione non consumata non è trasferita: review AI-PM, merge,
+approvazione del nuovo SHA e nuova autorizzazione restano quattro gate distinti.
+`READY_FOR_LIVE=false`, `BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`;
+`0x22` fixed64 e prima immagine restano non live-proven.
+
 Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
 private post-durable-claim, impedisce report/restore prima dei rispettivi
 preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
@@ -4726,3 +4744,56 @@ uno step successivo e separatamente autorizzato potrà approvare una baseline e
 valutare se abilitare il collegamento reale; fino ad allora il rischio residuo
 rimane l'accettazione target non provata di `0x22` fixed64 e del primo B0,
 insieme allo stato interno device post-image ignoto.
+
+### D265/01: kit operatore one-shot first-image, OFFLINE ONLY
+
+Il corrective AI-PM mantiene lo stesso milestone e chiude offline quattro
+classi di difetto. Il launcher cwd-independent accetta solo `--dry-run` e
+`--i-authorize-one-d265-first-image-live-attempt`; ogni messaggio human-facing,
+inclusi gli errori, è italiano. La forma futura canonica è:
+
+```text
+sudo env D265_APPROVED_LIVE_BASELINE_SHA=<FULL_APPROVED_SHA> \
+  ./operator_kit/d265-first-image-once.sh \
+  --i-authorize-one-d265-first-image-live-attempt
+```
+
+`sudo` conserva la gestione interattiva della password e genera `SUDO_UID`;
+`env` passa al processo root soltanto la baseline esplicita. Il kit non legge
+password, non usa `sudo -S` e non inventa alcuno SHA approvato. Il dry-run mostra
+questo template e continua a non consumare l'environment né raggiungere secret,
+marker, servizi o USB.
+
+Il prompt dito non precede più il runtime. Un decorator D265 dell'event source
+lascia invariati gli eventi preliminari e, una sola volta quando riceve la
+richiesta esatta `FIRST_IMAGE_IRQ2_TIMEOUT_MS=15000`, stampa le istruzioni
+italiane e `D265_OPERATOR_ACTION = APPOGGIA_UN_DITO_ORA`, quindi delega al vero
+`wait_event(15000)`. Ciò avviene dopo il final `0x32`/ACK. Il `finally` chiude la
+finestra con `D265_OPERATOR_ACTION_WINDOW = CHIUSA`; sessione, transport,
+coordinator, timeout e command path restano identici.
+
+La telemetria è truth-preserving. Un tracker incrementa materializzazione
+secret, claim marker, capability live-I/O e costruzione coordinator soltanto
+dopo il successo della fase. Il riferimento al coordinator permette di leggere
+`audit()` anche dopo failure senza nuovo I/O. `USB_OPEN_COUNT` viene dal backend
+concreto; sessioni/TLS/retry/persistenza/zeroization/cleanup derivano dalle
+chiavi audit reali. Tre contatori monotoni host-only nel runtime registrano IRQ2
+valido, ACK `0x22` valido e primo B0 riconosciuto nei punti già esistenti, senza
+nuovi branch, comandi, timeout, retry o cleanup. Valori non osservabili sono
+`UNKNOWN`/`NOT_REACHED`, mai zero/uno/true inventati. `LIVE_RESULT` conserva
+l'esatto risultato runtime.
+
+L'autorità live-critical D265/01 resta di 20 file e include il runtime telemetry-only;
+`baseline_approved=false`. Il manifest D264/03 è invece uno snapshot storico
+congelato, byte-identico alla baseline D264/03: non riceve hash D265 e non entra
+nel bundle step-local D265/01. Test synthetic provano ordine arm→prompt→IRQ2,
+progressi parziali timeout/ACK/B0/successo, audit su failure, command trace
+immutata e zero retry/persistenza/comandi post-image vietati. Nessun live è
+stato eseguito. D261 resta `STOP_AFTER_FDT_ARM_ACK`; D265 resta futuro
+`STOP_AFTER_FIRST_IMAGE`; `0x22_FIXED64_LIVE_PROVEN=false`,
+`FIRST_IMAGE_LIVE_PROVEN=false`, stato interno post-image `UNKNOWN` e stop
+post-image non live-proven. La precedente autorizzazione non è consumata né
+trasferita. Servono ancora PASS AI-PM, merge, approvazione esplicita del nuovo
+full SHA e nuova autorizzazione separata. Stato: `READY_FOR_LIVE=false`,
+`LIVE_AUTHORIZED=false`, `BASELINE_APPROVED=false` e
+`D265_01_READY_FOR_BASELINE_APPROVAL=false`.

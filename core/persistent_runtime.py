@@ -175,6 +175,10 @@ class PersistentRuntimeCoordinator:
         self.af_retry_count = 0
         self.handshake_device_record_count = 0
         self.failure_reason: str | None = None
+        # Monotonic host-side observations only; these do not alter I/O flow.
+        self.first_image_irq2_observed_count = 0
+        self.first_image_ack_validation_count = 0
+        self.first_image_b0_count = 0
         self.lifecycle = FdtLifecycle()
         self.machine: ExactFreshFdtBootstrapMachine | None = None
         self.cold_start_result: ColdStartResult | None = None
@@ -398,6 +402,7 @@ class PersistentRuntimeCoordinator:
         event = parse_fdt_event(payload)
         if event.irq != 2:
             raise RuntimeFailure(f"expected_irq2_finger_down:0x{event.irq:x}")
+        self.first_image_irq2_observed_count += 1
         outcome["irq2_observed"] = True
         # 2) exactly one 0x22 image command on the same retained TLS session
         self.lifecycle.post_irq2_image_command()
@@ -415,6 +420,7 @@ class PersistentRuntimeCoordinator:
         ack_frame = self.transport.receive(COMMAND_TIMEOUT_MS[0x22])
         try:
             parse_ack(ack_frame, 0x22)
+            self.first_image_ack_validation_count += 1
             outcome["image_ack"] = "ACK01_OR_07"
         except UnexpectedAck:
             raise RuntimeFailure("0x22_ack_invalid")
@@ -423,6 +429,7 @@ class PersistentRuntimeCoordinator:
         b0_kind, b0_body = parse_outer(image_frame)
         if b0_kind != TLS:
             raise RuntimeFailure("first_image_not_b0")
+        self.first_image_b0_count += 1
         try:
             plaintext = self.tls_session.application_session.consume_application_record(b0_body)
         except Exception:
@@ -507,6 +514,9 @@ class PersistentRuntimeCoordinator:
             "image_command_attempt_count": getattr(
                 self.lifecycle, "image_command_attempt_count", 0
             ),
+            "first_image_irq2_observed_count": self.first_image_irq2_observed_count,
+            "first_image_ack_validation_count": self.first_image_ack_validation_count,
+            "first_image_b0_count": self.first_image_b0_count,
             "first_image_validation": "INTEGRATED_IN_RUNTIME_RESULT",
             "first_image_bytes_persisted": False,
             "terminal_cleanup_completed": self.lifecycle.state.value == "TERMINAL_STOPPED",
