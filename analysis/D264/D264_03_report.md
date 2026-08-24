@@ -1,32 +1,19 @@
-# D264/03 corrective — protected pre-live first-image wiring
+# D264/03 corrective 2 — fixed authority and canonical closure
 
-## AI-PM pre-corrective finding
+## Second AI-PM finding
 
-The AI-PM reviewed the first D264/03 candidate at remote HEAD `830c95c407ecbe0f9b185a8adbc968ae5c9cef0d` and classified it as `PARTIAL_PRODUCTION_SHAPED_SKELETON`: one opaque preflight callback hid guard order; baseline verification was not in the candidate; marker claim did not formally mint live-I/O authority; secret ownership permitted double-close; and the failure matrix overclaimed tests. Executor-local pre-corrective SHA `7e80561882247da4d8dfcd6d34f0b40ef6f11d18` is provenance only, never remote baseline authority.
+At remote review HEAD `495cc2c6cd2467241cf67ec4e0e8e748726e9f8c`, AI-PM confirmed guard order, ownership transfer, real-coordinator synthetic integration, D261 arm-only preservation and CLI hard-disable, but rejected closure because public validator callbacks allowed `lambda _: True`, the live-critical manifest omitted the directly imported D261 operator module, both sides of the path-set comparison were caller-controlled, offline gate files were mislabeled future-live, and production report/signal/service transactions were not fully bound.
 
-## Corrective patch
+## Corrective 2
 
-The candidate now directly verifies the approved full SHA, exact authoritative path set, commit resolution and every baseline/worktree blob before any side effect. Its control flow explicitly orders operator context, directory/report safety, protected metadata, gfusb hash, exact target, fprintd/signal transactions, holder check, non-secret material/cache, secret, marker, capability, backend/coordinator and restore/report. `FutureProductionDependencies` is a concrete future adapter to the reviewed guard, protected-runtime, real USB, cold-start/FDT and persistent-coordinator graph, while the D264/03 CLI cannot construct or reach it.
+`core/live_capability.py` is now the sole fixed authority for known D261 and future intent/marker/live-I/O types and private nonces. Public secret/material/backend APIs no longer accept validator functions: they accept only capabilities recognized by that authority. D261 wrappers retain their exact flag → intent → durable marker → live-I/O semantics; the future namespace is distinct and a future marker capability is emitted through a private seam only after the durable claim function succeeds.
 
-The enforced capability chain is `FutureIntentCapability → FutureMarkerClaimCapability → FutureLiveIoCapability`; nonce/type checks and one-shot consumption prevent construction, wrong-type use and reuse. Secret ownership remains outer until coordinator construction succeeds, then transfers exactly once. Before transfer the outer closes once; after transfer `PersistentRuntimeCoordinator.run()` alone owns TLS/secret/transport cleanup.
+`FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS` is the internal baseline authority. `verify_authoritative_baseline()` compares the approval record directly against it; there is no caller-supplied `expected_paths`. The derived manifest contains 18 future-live files, including `core/live_capability.py` and the directly imported `tools/d261_live_fdt_arm_once.py`. The D264/03 shell/tool are a separate two-file offline-gate set and are false for future-live reachability.
 
-## Proof obtained
+`FutureProductionDependencies.build(repo, intent)` now instantiates the reviewed `FprintdTransaction` and `SignalTransaction`, binds durable publication to `/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json`, validates that destination before effects, and performs a non-mutating future-marker absence check before secret materialization. Tests still inject doubles; the D264/03 CLI never constructs the production adapter.
 
-Thirty-three focused tests cover real temporary-Git baseline gates, explicit guard order and early stop, target cardinalities, holder/backend classes, marker metadata and namespace, capability reuse, ownership success/failures, CLI hard-disable/import safety and D261 arm-only semantics. An integrated test enters the real public `PersistentRuntimeCoordinator.run()` through the candidate using reviewed D263 transport/event/TLS/secret doubles and proves the historical FDT prefix, exactly one fixed64-zero-tail `0x22`, retained TLS, first B0, 80×64 decode, zero persistence/retry/forbidden continuation and host cleanup. Specific runtime tests prove TLS consume and buffered-frame failure; inherited D263/D264/02 tests are identified rather than relabeled as direct proof. The unchanged `core/persistent_runtime.py` hash records the inherited absolute 15000 ms deadline proof.
+## Proof and residual risk
 
-The D264/03 shell remains `--dry-run` only and reports all six real side-effect counters zero. No USB, secret, marker, fprintd, TLS sensor session or sensor command was executed.
+Thirty-nine focused corrective tests cover callback-bypass impossibility, D261/future authority separation, canonical tuple/manifest equality, subset rejection, D261 dependency inclusion, offline-gate separation, fixed report destination collision, marker presence, existing guard/ownership/failure cases, and the real public persistent coordinator with synthetic transport/TLS/secret. All six real counters remain zero.
 
-## Remaining unknowns and gate
-
-Fixed64 `0x22` target acceptance, Linux first B0 behavior and post-image device-internal state remain not live-proven/unknown. No baseline is approved and no live run is authorized. The next gate is AI-PM review of the corrected remote branch and byte-level live-critical set.
-
-```text
-OUTCOME=PASS_OFFLINE_PRELIVE_WIRING
-ADVANCEMENT=CORRECTED_PRODUCTION_SHAPED_FIRST_IMAGE_PRELIVE_CANDIDATE
-EXECUTABLE_CLOSURE=PASS_OFFLINE
-D264_03_READY_FOR_AI_PM_REVIEW=true
-D264_03_READY_FOR_BASELINE_APPROVAL=false
-READY_FOR_LIVE=false
-LIVE_AUTHORIZED=false
-BASELINE_APPROVED=false
-```
+Target acceptance of fixed64 `0x22`, Linux first B0 behavior and post-image internal state remain unproven/unknown. No baseline or live run is approved.

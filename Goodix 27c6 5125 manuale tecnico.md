@@ -156,7 +156,11 @@ pericolose iniettate e adapter futuro concreto, coordinator reale con opt-in esp
 `STOP_AFTER_FIRST_IMAGE`, cleanup e restore indipendenti. Il path D261 e il suo
 marker consumato restano invariati e arm-only. Ne segue
 `FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE`; non segue alcuna
-approvazione baseline, autorizzazione o prova live.
+approvazione baseline, autorizzazione o prova live. Il secondo corrective
+centralizza poi capability D261/future in un'authority fissa non sostituibile
+da callback, rende interna la tuple future-live canonica (18 file, incluso il
+modulo operatore D261 importato), separa i due file del gate offline e lega
+transaction, report futuro e marker preflight concreti nell'adapter.
 
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
@@ -4578,7 +4582,14 @@ e poteva chiudere due volte il secret. Il corrective rende invece esplicita in
 blob identity → contesto operatore → directory/report sicuri → metadata
 protetti → hash gfusb → target/cardinalità → stop fprintd → signal block →
 holder check → materiale/cache non-secret → singola materializzazione secret →
-marker → capability live-I/O → backend/coordinator → run/restore/report.
+marker → capability live-I/O → backend/coordinator → run/restore/report. La
+seconda review AI-PM al remote HEAD
+`495cc2c6cd2467241cf67ec4e0e8e748726e9f8c` ha tuttavia individuato un
+indebolimento strutturale: i validator pubblici iniettabili di secret,
+materiale e backend avrebbero accettato anche una callback arbitraria sempre
+vera; inoltre path-set atteso e osservato erano entrambi caller-controlled e il
+manifest ometteva il modulo D261 direttamente importato. Il corrective 2
+rimuove queste superfici prima di confermare la closure.
 
 La control flow richiede l'intento
 esatto `--i-authorize-one-future-d265-first-image-live-attempt`, consumabile una
@@ -4589,9 +4600,19 @@ claim, capability live-I/O e backend sono esercitati soltanto con fixture e
 doubles. Non è più un legame convenzionale: la catena tipata/nonce è
 `FutureIntentCapability → FutureMarkerClaimCapability → FutureLiveIoCapability`,
 con consumo one-shot e rigetto di tipo/nonce/namespace D261 errati.
+`core/live_capability.py` è ora l'unica authority fissa per capability D261 e
+future note: le API pubbliche non accettano più funzioni validator. La factory
+marker future è una seam privata chiamata dal durable claim; non esiste un path
+production supportato intent-consumato → marker-capability senza claim.
 `FutureProductionDependencies` collega concretamente i guard D261-reviewed,
 `RealSecretBoundary`, `CtypesLibusbBackend`, `ColdStartMachine`, seed FDT e
-`PersistentRuntimeCoordinator`, ma non è raggiungibile dal CLI D264/03.
+`PersistentRuntimeCoordinator`, ma non è raggiungibile dal CLI D264/03. La
+factory concreta non riceve più transaction o publisher arbitrari: costruisce
+`FprintdTransaction` e `SignalTransaction` e vincola il report futuro distinto
+a `/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json`, la cui
+assenza/sicurezza viene verificata prima degli effetti. Anche l'assenza del
+marker D265-future viene verificata senza lettura o mutazione prima del secret;
+il claim successivo conserva `O_EXCL`, `O_NOFOLLOW`, mode 0600 e fsync.
 
 L'outer possiede il secret fino alla costruzione riuscita del coordinator: un
 failure marker/capability/costruzione causa un solo close outer. Dopo la
@@ -4600,13 +4621,16 @@ TLS/secret/transport; l'outer non richiama il secret close e conserva soltanto
 restore segnali/fprintd/report. Successo, failure runtime e failure prima del
 transfer provano `SECRET_DOUBLE_CLOSE_COUNT=0`.
 
-Il manifest `analysis/D264/D264_03_live_critical_manifest.json` ricalcola 18
-file dal call graph concreto dell'adapter futuro e del gate offline: launcher,
-entrypoint/gate, helper protetti,
+La tuple interna `FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS` è l'autorità della
+baseline futura e non è fornita dal caller. Il manifest
+`analysis/D264/D264_03_live_critical_manifest.json` deriva esattamente 18 file
+future-live dal call graph concreto, inclusi `core/live_capability.py` e
+`tools/d261_live_fdt_arm_once.py`: helper protetti,
 backend USB, cold-start/FDT, coordinator, transport/framing, retained TLS/B0,
-codec immagine/CRC e dipendenze di validazione secret. Test, rehearsal D264/02
-e manuale sono classificati rispettivamente `test_only`, `synthetic_only` e
-`documentation_only`, non autorità live-critical. Nessuno SHA è approvato:
+codec immagine/CRC e dipendenze di validazione secret. Launcher/tool D264/03
+formano invece un set offline-gate separato di due file e non sono marcati
+future-live; shell D261, test e manuale sono esclusi con classificazione
+esplicita. Nessuno SHA è approvato:
 il modello rifiuta SHA corto, branch, `HEAD`, commit errato e blob worktree non
 identico. Review AI-PM e successiva approvazione byte-level restano gate
 separati.
@@ -4614,7 +4638,7 @@ separati.
 La closure offline attraversa dall'orchestrator il vero
 `PersistentRuntimeCoordinator.run()` con fixture D263: prefisso FDT storico,
 un solo `0x22` `FIXED64_ZERO_TAIL`, TLS trattenuta, primo B0, raster 80×64,
-zero persistenza/retry/comandi vietati e cleanup host. La failure matrix v2
+zero persistenza/retry/comandi vietati e cleanup host. La failure matrix v3
 associa ogni PASS a test/artifact e distingue prova D264/03 diretta, regressione
 D264/02/D263 ereditata e deadline su runtime byte-identico. La suite D263,
 D264/02 e D260 pertinente resta verde; la suite D261 non è eseguibile in questo
@@ -4623,6 +4647,14 @@ installata. Nessun test hardware è stato eseguito. Stato canonico:
 
 ```text
 D264_03_EXECUTABLE_CLOSURE=PASS_OFFLINE
+PUBLIC_AUTHORIZATION_VALIDATOR_BYPASS_ABSENT=true
+PUBLIC_LIVE_IO_VALIDATOR_BYPASS_ABSENT=true
+CANONICAL_FUTURE_LIVE_CRITICAL_PATHS_INTERNAL=true
+CALLER_CONTROLLED_EXPECTED_PATH_SET_REMOVED=true
+FUTURE_LIVE_CRITICAL_MANIFEST_EXACT_MATCH=true
+D261_OPERATOR_DEPENDENCY_INCLUDED=true
+FUTURE_REPORT_DESTINATION_BOUND=true
+FUTURE_MARKER_PREFLIGHT_BEFORE_SECRET=true
 PROTECTED_GUARD_ORDER_PROVEN=true
 BASELINE_BYTE_IDENTITY_GATE_PROVEN=true
 MARKER_TO_LIVE_IO_CAPABILITY_CHAIN_PROVEN=true

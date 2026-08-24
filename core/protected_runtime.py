@@ -28,6 +28,13 @@ from core.cold_start import (
     TARGET_CONFIG90_SHA256,
 )
 from poc.goodix5125.tools.binding_reference.runtime import derive_validator_from_canonical_pe
+from core.live_capability import (
+    CapabilityFailure, CliIntentCapability, D261_LIVE_AUTHORIZATION_FLAG,
+    FutureIntentCapability, FutureLiveIoCapability, FutureMarkerClaimCapability,
+    LiveIoCapability, MarkerClaimCapability, issue_d261_intent, issue_d261_live_io,
+    issue_d261_marker, require_d261_intent, require_known_live_io_capability,
+    require_known_material_intent,
+)
 
 
 PROTECTED_ROOT: Final = Path("/var/lib/goodix-5125-poc")
@@ -39,56 +46,26 @@ SECRET_RECORD_LENGTH: Final = 88
 SECRET_RECORD_SHA256: Final = "eb47bbed40e079ca780cd9cd4b2324520a67584ad3d576674914152fd6080a75"
 MATERIAL_MANIFEST_SHA256: Final = "1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15"
 CANONICAL_GFUSB_SHA256: Final = "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
-D261_LIVE_AUTHORIZATION_FLAG: Final = "--i-authorize-one-d261-fdt-arm-live-attempt"
 
 
 class ProtectedRuntimeFailure(RuntimeError):
     pass
 
 
-class CliIntentCapability:
-    """Opaque proof that the supported main path parsed the exact live flag."""
-
-    __slots__ = ("_nonce",)
-
-    def __init__(self, nonce: object) -> None:
-        self._nonce = nonce
-
-
-class LiveIoCapability:
-    """Opaque post-marker capability accepted by real live-resource openers."""
-
-    __slots__ = ("_nonce",)
-
-    def __init__(self, nonce: object) -> None:
-        self._nonce = nonce
-
-
-class MarkerClaimCapability:
-    """Opaque proof returned only after the marker file is durably claimed."""
-
-    __slots__ = ("_nonce",)
-
-    def __init__(self, nonce: object) -> None:
-        self._nonce = nonce
-
-
-_CLI_INTENT_NONCE = object()
-_MARKER_CLAIM_NONCE = object()
-_LIVE_IO_NONCE = object()
-
-
 def _issue_cli_intent_after_exact_main_flag(explicit_authorization: str) -> CliIntentCapability:
     """Private factory used only by the supported ``main()`` live branch."""
 
-    if explicit_authorization != D261_LIVE_AUTHORIZATION_FLAG:
-        raise ProtectedRuntimeFailure("explicit_live_authorization_required")
-    return CliIntentCapability(_CLI_INTENT_NONCE)
+    try:
+        return issue_d261_intent(explicit_authorization)
+    except CapabilityFailure as exc:
+        raise ProtectedRuntimeFailure(str(exc)) from exc
 
 
 def require_cli_intent(token: CliIntentCapability | None) -> None:
-    if not isinstance(token, CliIntentCapability) or token._nonce is not _CLI_INTENT_NONCE:
-        raise ProtectedRuntimeFailure("valid_cli_intent_capability_required")
+    try:
+        require_d261_intent(token)
+    except CapabilityFailure as exc:
+        raise ProtectedRuntimeFailure(str(exc)) from exc
 
 
 def _issue_marker_claim_capability(
@@ -97,7 +74,7 @@ def _issue_marker_claim_capability(
     """Private factory called by the marker writer after fsync succeeds."""
 
     require_cli_intent(cli_intent)
-    return MarkerClaimCapability(_MARKER_CLAIM_NONCE)
+    return issue_d261_marker(cli_intent)
 
 
 def issue_live_io_capability_after_marker(
@@ -107,21 +84,27 @@ def issue_live_io_capability_after_marker(
 ) -> LiveIoCapability:
     """Mint the live-I/O capability immediately after a successful marker claim."""
 
-    require_cli_intent(cli_intent)
-    if not isinstance(marker_claim, MarkerClaimCapability) or marker_claim._nonce is not _MARKER_CLAIM_NONCE:
-        raise ProtectedRuntimeFailure("single_use_marker_required_before_live_io")
-    return LiveIoCapability(_LIVE_IO_NONCE)
+    try:
+        return issue_d261_live_io(cli_intent, marker_claim)
+    except CapabilityFailure as exc:
+        raise ProtectedRuntimeFailure(str(exc)) from exc
 
 
 def _cli_intent_authorized(token: CliIntentCapability) -> bool:
-    return isinstance(token, CliIntentCapability) and token._nonce is _CLI_INTENT_NONCE
+    try:
+        require_d261_intent(token)
+        return True
+    except CapabilityFailure:
+        return False
 
 
 def require_live_io_capability(token: LiveIoCapability | None) -> None:
     """Fail before any live resource is opened when the capability is absent."""
 
-    if not isinstance(token, LiveIoCapability) or token._nonce is not _LIVE_IO_NONCE:
-        raise ProtectedRuntimeFailure("live_io_capability_required")
+    try:
+        require_known_live_io_capability(token)
+    except CapabilityFailure as exc:
+        raise ProtectedRuntimeFailure(str(exc)) from exc
 
 
 def sha256_file(path: Path) -> str:
@@ -258,8 +241,10 @@ class RealSecretBoundary:
     def metadata(self) -> dict[str, object]:
         return protected_metadata(self.secret_path, SECRET_RECORD_LENGTH)
 
-    def materialize(self, cli_intent: CliIntentCapability, *, authorization_validator=_cli_intent_authorized) -> None:
-        if not authorization_validator(cli_intent):
+    def materialize(self, cli_intent: object) -> None:
+        try:
+            require_known_material_intent(cli_intent)
+        except CapabilityFailure:
             raise ProtectedRuntimeFailure("secret_materialization_not_authorized")
         if self.materialize_count or self._secret is not None:
             raise ProtectedRuntimeFailure("secret_materialization_exactly_once")
@@ -326,11 +311,11 @@ def validate_config90_content(config: bytes) -> None:
 def load_cold_start_material(
     manifest_path: Path,
     config90_path: Path,
-    cli_intent: CliIntentCapability,
-    *,
-    authorization_validator=_cli_intent_authorized,
+    cli_intent: object,
 ) -> ColdStartMaterial:
-    if not authorization_validator(cli_intent):
+    try:
+        require_known_material_intent(cli_intent)
+    except CapabilityFailure:
         raise ProtectedRuntimeFailure("material_load_not_authorized")
     manifest_raw = _read_protected(Path(manifest_path))
     if hashlib.sha256(manifest_raw).hexdigest() != MATERIAL_MANIFEST_SHA256:

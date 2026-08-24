@@ -1,7 +1,7 @@
 {
-  "schema": "D264_03_EXECUTABLE_CLOSURE_V2_CORRECTIVE1",
+  "schema": "D264_03_EXECUTABLE_CLOSURE_V3_CORRECTIVE2",
   "outcome": "PASS_OFFLINE_PRELIVE_WIRING",
-  "advancement": "CORRECTED_PRODUCTION_SHAPED_FIRST_IMAGE_PRELIVE_CANDIDATE",
+  "advancement": "HARDENED_CANONICAL_FIRST_IMAGE_PRELIVE_CANDIDATE",
   "executable_closure": "PASS_OFFLINE",
   "ai_pm_corrective": "DEFECTS_A_B_C_D_CLOSED_OFFLINE",
   "remote_review_head_pre_corrective": "830c95c407ecbe0f9b185a8adbc968ae5c9cef0d",
@@ -40,5 +40,18 @@
   "ready_for_baseline_approval": false,
   "ready_for_live": false,
   "live_authorized": false,
-  "baseline_approved": false
+  "baseline_approved": false,
+  "ai_pm_corrective2": "CLOSED_OFFLINE",
+  "remote_review_head_pre_corrective2": "495cc2c6cd2467241cf67ec4e0e8e748726e9f8c",
+  "public_authorization_validator_bypass_absent": true,
+  "public_live_io_validator_bypass_absent": true,
+  "canonical_future_live_critical_paths_internal": true,
+  "future_live_critical_manifest_exact_match": true,
+  "d261_operator_dependency_included": true,
+  "caller_controlled_expected_path_set_removed": true,
+  "future_report_destination": "/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json",
+  "future_report_destination_bound": true,
+  "future_marker_preflight_before_secret": true,
+  "future_live_critical_file_count": 18,
+  "d264_03_offline_gate_file_count": 2
 }

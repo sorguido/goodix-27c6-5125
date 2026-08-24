@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import json
+import inspect
 import os
 from pathlib import Path
 import subprocess
+import sys
+import types
 from types import SimpleNamespace
 from unittest import mock
 
@@ -14,12 +17,14 @@ from core.future_first_image_operator import (
     D261_MARKER_PATH, D265_FUTURE_LIVE_AUTHORIZATION_FLAG,
     FutureIntentCapability, FutureLiveIoCapability, FutureMarkerClaimCapability,
     FutureOperatorDependencies, FutureOperatorFailure,
-    claim_future_marker_fixture, issue_future_intent_for_injected_rehearsal,
-    issue_live_io_after_marker_claim, issue_marker_claim_after_durable_claim,
-    require_future_live_io, run_future_first_image_candidate,
+    FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS, claim_future_marker_fixture,
+    issue_future_intent_for_injected_rehearsal, issue_live_io_after_marker_claim,
+    require_bound_future_report_destination, require_future_live_io,
+    require_future_marker_absent_at, run_future_first_image_candidate,
     verify_authoritative_baseline,
 )
 from core.persistent_runtime import TerminalBoundary
+from core.live_capability import _issue_future_marker_after_durable_claim
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -31,12 +36,12 @@ def git_authority(tmp_path):
     subprocess.run(("git", "init", "-q"), cwd=repo, check=True)
     subprocess.run(("git", "config", "user.email", "offline@example.invalid"), cwd=repo, check=True)
     subprocess.run(("git", "config", "user.name", "Offline Test"), cwd=repo, check=True)
-    (repo / "critical.py").write_text("safe = True\n")
-    (repo / "guard.py").write_text("guard = True\n")
+    for relative in FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS:
+        path=repo/relative; path.parent.mkdir(parents=True,exist_ok=True); path.write_text(f"fixture = {relative!r}\n")
     subprocess.run(("git", "add", "."), cwd=repo, check=True)
     subprocess.run(("git", "commit", "-qm", "fixture"), cwd=repo, check=True)
     sha = subprocess.check_output(("git", "rev-parse", "HEAD"), cwd=repo, text=True).strip()
-    return repo, sha, ("critical.py", "guard.py")
+    return repo, sha, FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS
 
 
 class Secret:
@@ -67,7 +72,7 @@ def deps(events, *, fail_at=None, runtime_failure=None, construction_failure=Fal
     def marker(baseline, intent):
         events.append("marker_claim")
         if fail_at == "marker_claim": raise FutureOperatorFailure("marker")
-        return issue_marker_claim_after_durable_claim(intent)
+        return _issue_future_marker_after_durable_claim(intent)
     def construct(capability, secret, target):
         events.append("backend_construct"); require_future_live_io(capability)
         if construction_failure or fail_at == "backend_construct": raise FutureOperatorFailure("backend")
@@ -78,7 +83,7 @@ def deps(events, *, fail_at=None, runtime_failure=None, construction_failure=Fal
         verify_protected_metadata=guard("protected_metadata"),
         verify_gfusb_hash=guard("gfusb_hash"), resolve_exact_target=guard("target_identity", {"target":"synthetic"}),
         stop_fprintd=guard("fprintd_stop"), block_signals=guard("signals_block"),
-        require_no_holders=guard("holder_check"), validate_non_secret_material=guard("non_secret_material"),
+        require_no_holders=guard("holder_check"), validate_non_secret_material=guard("non_secret_material"), require_future_marker_absent=guard("marker_preflight"),
         materialize_secret_once=lambda: (events.append("secret_materialize") or Secret(events)),
         claim_marker_once=marker, observe_live_io_issue=guard("live_io_capability_issue"),
         construct_coordinator=construct, restore_signals=guard("signals_restore"),
@@ -90,7 +95,7 @@ def run(git_authority, dependencies, events, **kwargs):
     repo, sha, paths = git_authority
     return run_future_first_image_candidate(
         issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG), dependencies,
-        repo=repo, approved_baseline_sha=sha, authoritative_paths=paths, expected_paths=paths, ts16=0x4242, **kwargs,
+        repo=repo, approved_baseline_sha=sha, authoritative_paths=paths, ts16=0x4242, **kwargs,
     )
 
 
@@ -98,7 +103,7 @@ def test_explicit_guard_order_and_ownership_success(git_authority):
     events=[]; report=run(git_authority, deps(events), events)
     assert report["result"] == "PASS_STOP_AFTER_FIRST_IMAGE"
     assert events == ["baseline_verify","operator_context","safe_directories","protected_metadata","gfusb_hash","target_identity",
-        "fprintd_stop","signals_block","holder_check","non_secret_material","secret_materialize","marker_claim",
+        "fprintd_stop","signals_block","holder_check","non_secret_material","marker_preflight","secret_materialize","marker_claim",
         "live_io_capability_issue","backend_construct","coordinator_run","secret_close","signals_restore","fprintd_restore","report_publish"]
     assert events.count("secret_close") == 1
     assert report["secret_ownership_transferred_to_coordinator"] is True
@@ -108,7 +113,7 @@ def test_explicit_guard_order_and_ownership_success(git_authority):
 def test_baseline_format_fails_before_side_effects(git_authority, sha):
     repo, _, paths=git_authority; events=[]
     report=run_future_first_image_candidate(issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG), deps(events),
-        repo=repo, approved_baseline_sha=sha, authoritative_paths=paths, expected_paths=paths, ts16=1)
+        repo=repo, approved_baseline_sha=sha, authoritative_paths=paths, ts16=1)
     assert events == ["signals_restore","fprintd_restore","report_publish"]
     assert "full_sha_required" in report["failure_class"]
 
@@ -116,14 +121,14 @@ def test_baseline_format_fails_before_side_effects(git_authority, sha):
 def test_baseline_unresolved_stale_duplicate_omitted_extra(git_authority):
     repo, sha, paths=git_authority
     with pytest.raises(FutureOperatorFailure, match="resolution"):
-        verify_authoritative_baseline(repo, "f"*40, paths, paths)
+        verify_authoritative_baseline(repo, "f"*40, paths)
     (repo/paths[0]).write_text("dirty = True\n")
     with pytest.raises(FutureOperatorFailure, match="stale"):
-        verify_authoritative_baseline(repo, sha, paths, paths)
+        verify_authoritative_baseline(repo, sha, paths)
     (repo/paths[0]).write_text("safe = True\n")
     for authority in ((paths[0],paths[0]), (paths[0],), paths+("extra.py",)):
         with pytest.raises(FutureOperatorFailure, match="duplicate|path_set"):
-            verify_authoritative_baseline(repo, sha, authority, paths)
+            verify_authoritative_baseline(repo, sha, authority)
 
 
 @pytest.mark.parametrize("guard", ["operator_context","safe_directories","protected_metadata","gfusb_hash",
@@ -135,12 +140,32 @@ def test_each_guard_fails_closed_before_later_phases(git_authority, guard):
     assert events[-3:] == ["signals_restore","fprintd_restore","report_publish"]
 
 
+@pytest.mark.parametrize("guard", ["safe_directories", "marker_preflight"])
+def test_future_report_collision_and_marker_presence_fail_before_secret(git_authority, guard):
+    events=[]; report=run(git_authority,deps(events,fail_at=guard),events)
+    assert report["result"] == "FAIL_CLOSED"
+    assert "secret_materialize" not in events and "marker_claim" not in events and "backend_construct" not in events
+
+
+def test_concrete_future_report_and_marker_preflights_use_fixed_safe_boundaries(tmp_path):
+    marker=tmp_path/"future.marker"
+    require_future_marker_absent_at(marker)
+    marker.write_text("consumed")
+    with pytest.raises(FutureOperatorFailure,match="already_exists"):
+        require_future_marker_absent_at(marker)
+    observed=[]
+    require_bound_future_report_destination(lambda path: observed.append(path))
+    assert observed == [Path("/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json")]
+    with pytest.raises(RuntimeError,match="collision"):
+        require_bound_future_report_destination(lambda path: (_ for _ in ()).throw(RuntimeError("collision")))
+
+
 def test_capability_chain_wrong_type_nonce_and_reuse():
     with pytest.raises(FutureOperatorFailure):
         issue_future_intent_for_injected_rehearsal("wrong")
     intent=issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG)
-    with pytest.raises(FutureOperatorFailure): issue_marker_claim_after_durable_claim(intent)
-    intent._used=True; marker=issue_marker_claim_after_durable_claim(intent)
+    with pytest.raises(Exception): _issue_future_marker_after_durable_claim(intent)
+    intent._used=True; marker=_issue_future_marker_after_durable_claim(intent)
     live=issue_live_io_after_marker_claim(marker); require_future_live_io(live)
     with pytest.raises(FutureOperatorFailure, match="already_used"): issue_live_io_after_marker_claim(marker)
     with pytest.raises(FutureOperatorFailure): issue_live_io_after_marker_claim(None)
@@ -152,10 +177,10 @@ def test_intent_reuse_fails_before_baseline(git_authority):
     repo,sha,paths=git_authority; events=[]
     intent=issue_future_intent_for_injected_rehearsal(D265_FUTURE_LIVE_AUTHORIZATION_FLAG)
     run_future_first_image_candidate(intent,deps(events),repo=repo,approved_baseline_sha=sha,
-        authoritative_paths=paths,expected_paths=paths,ts16=1)
+        authoritative_paths=paths,ts16=1)
     with pytest.raises(FutureOperatorFailure,match="already_used"):
         run_future_first_image_candidate(intent,deps([]),repo=repo,approved_baseline_sha=sha,
-            authoritative_paths=paths,expected_paths=paths,ts16=1)
+            authoritative_paths=paths,ts16=1)
 
 
 def test_marker_existing_symlink_owner_mode_second_claim_and_d261(tmp_path, monkeypatch):
@@ -263,3 +288,55 @@ def test_import_has_no_real_side_effects():
     code="import core.future_first_image_operator; print('IMPORT_OFFLINE_OK')"
     completed=subprocess.run((os.sys.executable,"-c",code),cwd=REPO,text=True,capture_output=True)
     assert completed.returncode==0 and completed.stdout.strip()=="IMPORT_OFFLINE_OK"
+
+
+def test_canonical_manifest_exact_and_offline_gate_separate():
+    manifest=json.loads((REPO/"analysis/D264/D264_03_live_critical_manifest.json").read_text())
+    future=tuple(row["path"] for row in manifest["future_live_critical_files"])
+    offline=tuple(row["path"] for row in manifest["d264_03_offline_gate_files"])
+    assert future == FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS
+    assert len(future)==len(set(future)) and "tools/d261_live_fdt_arm_once.py" in future
+    assert offline == ("operator_kit/d264-first-image-prelive.sh","tools/d264_first_image_prelive.py")
+    assert not set(future)&set(offline)
+
+
+def test_fixed_capability_authority_has_no_public_validator_bypass(monkeypatch, tmp_path):
+    fake=types.ModuleType("poc.goodix5125.tools.binding_reference.runtime")
+    fake.derive_validator_from_canonical_pe=lambda *args: bytearray(32)
+    monkeypatch.setitem(sys.modules,"poc.goodix5125.tools.binding_reference.runtime",fake)
+    import core.protected_runtime as protected
+    import core.usb_runtime as usb
+    assert "authorization_validator" not in inspect.signature(protected.RealSecretBoundary.materialize).parameters
+    assert "authorization_validator" not in inspect.signature(protected.load_cold_start_material).parameters
+    assert "capability_validator" not in inspect.signature(usb.CtypesLibusbBackend).parameters
+    boundary=protected.RealSecretBoundary(tmp_path/"secret",tmp_path/"gfusb")
+    with pytest.raises(TypeError): boundary.materialize(None,authorization_validator=lambda _: True)
+    with pytest.raises(TypeError): protected.load_cold_start_material(tmp_path/"m",tmp_path/"c",None,authorization_validator=lambda _: True)
+    with pytest.raises(TypeError): usb.CtypesLibusbBackend(None,capability_validator=lambda _: True)
+    with pytest.raises(Exception,match="secret_materialization_not_authorized"): boundary.materialize(object())
+    with pytest.raises(Exception,match="material_load_not_authorized"):
+        protected.load_cold_start_material(tmp_path/"m",tmp_path/"c",object())
+    with pytest.raises(Exception,match="known_live_io_capability_required"):
+        usb.CtypesLibusbBackend(None).open_exact(0x27C6,0x5125,0)
+    d261_intent=protected._issue_cli_intent_after_exact_main_flag(protected.D261_LIVE_AUTHORIZATION_FLAG)
+    with pytest.raises(Exception) as secret_error: boundary.materialize(d261_intent)
+    assert "not_authorized" not in str(secret_error.value)
+    with pytest.raises(Exception) as material_error:
+        protected.load_cold_start_material(tmp_path/"m",tmp_path/"c",d261_intent)
+    assert "not_authorized" not in str(material_error.value)
+
+
+def test_d261_and_future_fixed_authorities_are_distinct():
+    from core.live_capability import (issue_d261_intent,issue_d261_live_io,issue_d261_marker,
+        issue_future_intent,issue_future_live_io,_issue_future_marker_after_durable_claim,
+        require_known_live_io_capability,require_known_material_intent)
+    d261=issue_d261_intent("--i-authorize-one-d261-fdt-arm-live-attempt")
+    d261_live=issue_d261_live_io(d261,issue_d261_marker(d261))
+    require_known_material_intent(d261); require_known_live_io_capability(d261_live)
+    future=issue_future_intent(D265_FUTURE_LIVE_AUTHORIZATION_FLAG); future._used=True
+    future_marker=_issue_future_marker_after_durable_claim(future); future_live=issue_future_live_io(future_marker)
+    require_known_material_intent(future); require_known_live_io_capability(future_live)
+    with pytest.raises(Exception): issue_d261_live_io(d261,future_marker)
+    with pytest.raises(Exception): issue_future_live_io(issue_d261_marker(d261))
+    with pytest.raises(Exception): require_known_material_intent(object())
+    with pytest.raises(Exception): require_known_live_io_capability(object())

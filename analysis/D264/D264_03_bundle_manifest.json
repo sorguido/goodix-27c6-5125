@@ -1,41 +1,45 @@
 {
-  "schema": "D264_03_BUNDLE_MANIFEST_V2_CORRECTIVE1",
+  "schema": "D264_03_BUNDLE_MANIFEST_V3_CORRECTIVE2",
   "canonical_bundle_filename": "analysis/D264/D264_03_first_image_prelive_wiring_bundle.zip",
-  "canonical_zip_sha256": "d19280597780c15e52ce6fedf5cdcb39f290a9752b1eabf9b1a7b7d4d863f290",
+  "canonical_zip_sha256": "c290ae5e6771104546a02b8c8aee0fd5909d20c6171ce5eced49e45b79257ad4",
   "transport_representation": "analysis/D264/D264_03_first_image_prelive_wiring_bundle.zip.b64",
-  "bundle_scope": "D264/03 corrective only",
+  "bundle_scope": "D264/03 corrective2 only",
   "payload_paths": [
     {
       "path": "analysis/D264/D264_03_report.md",
-      "sha256": "9fdef4b29d54914676fbf4c9cf37e201a43aacc5ef3f864abb29560bf5d22377"
+      "sha256": "69112e4700bcf0b5953007e4f98535d872f1c6785e6ee636326d1aed09041d14"
     },
     {
       "path": "analysis/D264/D264_03_executable_closure.json",
-      "sha256": "6acf46b3dd69a97bbc4589f1d96c54b5b80e52296ed2e8097c25cf41cd38dd18"
+      "sha256": "ef899f9ffca3410ec254988625859f4ef1ed0f726c5191159076b9bf7ac555e6"
     },
     {
       "path": "analysis/D264/D264_03_failure_matrix.json",
-      "sha256": "0d204637f3b198379bd6f29833655dd1781c3b62b68d5ffa33b241de3b0cf266"
+      "sha256": "8e927d5c825ae94fc5869957959bd4dc6dd6bc4af81e633c17df1295e15d9e4b"
     },
     {
       "path": "analysis/D264/D264_03_live_critical_manifest.json",
-      "sha256": "2d0a40196659ba1c27ec2f2bbdf840d9e0a0737e9960ed6eac0331ad4ebfd1ca"
+      "sha256": "4f28dc3e05240797fed8eb85f276144f7c41badd44f5bda5d513a7e8c119f7a1"
     },
     {
       "path": "core/future_first_image_operator.py",
-      "sha256": "3e219fcf6e045e5eb15fd4707db30cc119bd25213df81b999c89b158b8ad4dc4"
+      "sha256": "d72bc5860c1458a4e3f37ada2af5bb18130456b86633dcff09253b86494e5c3c"
+    },
+    {
+      "path": "core/live_capability.py",
+      "sha256": "c685243488237157f70ee72df6d4d268f86cf0a42f3f8495d15f3daacc3d2402"
     },
     {
       "path": "core/protected_runtime.py",
-      "sha256": "c423943d45b68c333ace981945a617506aea3bb0979bfb56a1bb68c6e5595303"
+      "sha256": "9a0315863f22c4c3d6883bdd0fda7b840586525836de4e190efbabdb1dcf8b5d"
     },
     {
       "path": "core/usb_runtime.py",
-      "sha256": "800fb173665a30e230bea4802f83c5687ac5be78cd7a069aa6f923fd16977a23"
+      "sha256": "a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278"
     },
     {
       "path": "tools/d264_first_image_prelive.py",
-      "sha256": "9440ff0cb68dc3c97747ae50ebea0e9f7ec7dd247daac890e0fe86cba8908135"
+      "sha256": "ca13c9b63fc2d870bef75e4cdac0b700e598fe299feede713b79ab9f7585e9fc"
     },
     {
       "path": "operator_kit/d264-first-image-prelive.sh",
@@ -43,11 +47,11 @@
     },
     {
       "path": "tests/test_d264_03_prelive_operator.py",
-      "sha256": "9b243e1e59053a18672dad676445e06819d12f7098edd810a8bed7f81095332b"
+      "sha256": "c0911caf9b61a986967cc539ad033345f69843d351ab96a72337bb99c4062b0c"
     },
     {
       "path": "Goodix 27c6 5125 manuale tecnico.md",
-      "sha256": "36406f7428b35b73d61725d432faec40385651d65e4bce85a686197611855ebb"
+      "sha256": "1000a89260eb11d4f3b934e67701334b568d6f0a092ee2568e913c818a0338d4"
     }
   ],
   "exclusions": [

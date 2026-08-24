@@ -1,167 +1,165 @@
 {
-  "schema": "D264_03_LIVE_CRITICAL_MANIFEST_V3_CORRECTIVE1",
-  "authority": "FUTURE_BASELINE_MODEL_NOT_APPROVED",
+  "schema": "D264_03_LIVE_CRITICAL_MANIFEST_V4_CORRECTIVE2",
+  "authority": "FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS_IN_CODE_NOT_APPROVED",
   "baseline_approved": false,
-  "live_critical_file_count": 18,
-  "live_critical_files": [
-    {
-      "path": "operator_kit/d264-first-image-prelive.sh",
-      "sha256": "bd63fe8c6fcba68524dda307410d4bf56f533ba10b11c50428d2e0e591a08d2c",
-      "role": "operator launcher and hard-disable gate",
-      "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "operator launcher and hard-disable gate",
-      "reachability": "D264_03_OFFLINE_GATE"
-    },
-    {
-      "path": "tools/d264_first_image_prelive.py",
-      "sha256": "9440ff0cb68dc3c97747ae50ebea0e9f7ec7dd247daac890e0fe86cba8908135",
-      "role": "future protected entrypoint and offline-only gate",
-      "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "future protected entrypoint and offline-only gate",
-      "reachability": "D264_03_OFFLINE_GATE"
-    },
-    {
-      "path": "core/future_first_image_operator.py",
-      "sha256": "3e219fcf6e045e5eb15fd4707db30cc119bd25213df81b999c89b158b8ad4dc4",
-      "role": "dedicated intent, marker, baseline, orchestration and restore guards",
-      "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "dedicated intent, marker, baseline, orchestration and restore guards",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
-    },
+  "future_live_critical_file_count": 18,
+  "future_live_critical_files": [
     {
       "path": "core/__init__.py",
       "sha256": "a2890ff0a08391c5465c7b7f054a627f60d15e93e86ae961aad49082cbad3255",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "core/cold_start.py",
       "sha256": "5ce4e0eb9e3328dd36f69631ea16cd152a24f90f36418c3ddbfb7c3deb6ef025",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "core/fdt_lifecycle.py",
       "sha256": "2aac74224f427c618fa21d4bf0d146284b9c7e42e3d8717bfce11be9f393a33a",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "core/fdt_seed.py",
       "sha256": "5df64876dd977623def8bccab512410b1ecb18f11b3b06d589faa935c8c44e2a",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
+    },
+    {
+      "path": "core/future_first_image_operator.py",
+      "sha256": "d72bc5860c1458a4e3f37ada2af5bb18130456b86633dcff09253b86494e5c3c",
+      "role": "future guard/capability/transaction adapter",
+      "reachable_from_future_first_image_real_operator_path": true,
+      "why_live_critical": "future guard/capability/transaction adapter"
+    },
+    {
+      "path": "core/live_capability.py",
+      "sha256": "c685243488237157f70ee72df6d4d268f86cf0a42f3f8495d15f3daacc3d2402",
+      "role": "fixed known D261/future capability authority",
+      "reachable_from_future_first_image_real_operator_path": true,
+      "why_live_critical": "fixed known D261/future capability authority"
     },
     {
       "path": "core/persistent_runtime.py",
       "sha256": "dd84cda8c43df12c9caa057af0c16e8b5b9b198a26a3a38636bd1ee41dc885e3",
-      "role": "cold-start coordinator and explicit first-image terminal boundary",
+      "role": "persistent coordinator and first-image boundary",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "cold-start coordinator and explicit first-image terminal boundary",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "persistent coordinator and first-image boundary"
     },
     {
       "path": "core/post_d4.py",
       "sha256": "f4f52031319b21f4ae4b5841e91f91966d9b11df8a626fcef339b080fee1daf2",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "core/protected_runtime.py",
-      "sha256": "c423943d45b68c333ace981945a617506aea3bb0979bfb56a1bb68c6e5595303",
-      "role": "protected material and secret validation dependency",
+      "sha256": "9a0315863f22c4c3d6883bdd0fda7b840586525836de4e190efbabdb1dcf8b5d",
+      "role": "protected material and secret boundary",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "protected material and secret validation dependency",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "protected material and secret boundary"
     },
     {
       "path": "core/runtime_transport.py",
       "sha256": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "core/tls_b0.py",
       "sha256": "135dc8a4a9d5c753fec38fc638d530d86f53dadbde004d9d5248200ecd1b7f56",
-      "role": "retained TLS/B0 consumer",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "retained TLS/B0 consumer",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "core/usb_runtime.py",
-      "sha256": "800fb173665a30e230bea4802f83c5687ac5be78cd7a069aa6f923fd16977a23",
-      "role": "real USB backend interface and absolute-deadline event reader",
+      "sha256": "a19c0ffb93a7e1dc7d4b08a0fed9ed738a9d51bb72e4327d16a41b4cb15dc278",
+      "role": "real USB backend",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "real USB backend interface and absolute-deadline event reader",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "real USB backend"
     },
     {
       "path": "src/goodix5125_cleanroom.py",
       "sha256": "ef63eb3852e6526722ee12cc5e61e753783007f082819f20218a19fbbe41e3e9",
-      "role": "canonical framing, CRC and image decode",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "canonical framing, CRC and image decode",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "poc/goodix5125/tools/binding_reference/__init__.py",
       "sha256": "281ed6a9d5fce2d2213de24136525b894111efc71a11caa750c0ab961c7a3b00",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "poc/goodix5125/tools/binding_reference/runtime.py",
       "sha256": "0530efe5b7e7834ad287c8ba28892cdf979af494a4c3c6f73b2dfe9a00dcd4b4",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "poc/goodix5125/tools/binding_reference/crypto_reference.py",
       "sha256": "c238c4f5b187e7ffea7ac0566aa220bcf1e1903a7fa40f46fa8aa82794e737aa",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     },
     {
       "path": "poc/goodix5125/tools/binding_reference/pe_parser.py",
       "sha256": "24b3931b3ac1a1268d763aa47b16bd313ba529d0ac002335eca7174434dd6617",
-      "role": "transitive runtime dependency reachable from future operator orchestration",
+      "role": "transitive repository dependency reached by concrete future adapter",
       "reachable_from_future_first_image_real_operator_path": true,
-      "why_live_critical": "transitive runtime dependency reachable from future operator orchestration",
-      "reachability": "CONCRETE_FUTURE_PRODUCTION_ADAPTER"
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
+    },
+    {
+      "path": "tools/d261_live_fdt_arm_once.py",
+      "sha256": "f2957e3a01db05f8f9c27585eca93086e1b53c4043e8c7f602c3f3ccaafbadac",
+      "role": "D261-reviewed guards and transactions imported by future adapter",
+      "reachable_from_future_first_image_real_operator_path": true,
+      "why_live_critical": "D261-reviewed guards and transactions imported by future adapter"
+    }
+  ],
+  "d264_03_offline_gate_file_count": 2,
+  "d264_03_offline_gate_files": [
+    {
+      "path": "operator_kit/d264-first-image-prelive.sh",
+      "sha256": "bd63fe8c6fcba68524dda307410d4bf56f533ba10b11c50428d2e0e591a08d2c",
+      "role": "transitive repository dependency reached by concrete future adapter",
+      "reachable_from_future_first_image_real_operator_path": false,
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
+    },
+    {
+      "path": "tools/d264_first_image_prelive.py",
+      "sha256": "ca13c9b63fc2d870bef75e4cdac0b700e598fe299feede713b79ab9f7585e9fc",
+      "role": "transitive repository dependency reached by concrete future adapter",
+      "reachable_from_future_first_image_real_operator_path": false,
+      "why_live_critical": "transitive repository dependency reached by concrete future adapter"
     }
   ],
   "excluded_classifications": [
+    {
+      "path": "operator_kit/d261-live-fdt-arm-once.sh",
+      "classification": "D261_operator_only_not_imported_by_future_adapter"
+    },
     {
       "path": "tests/test_d264_03_prelive_operator.py",
       "classification": "test_only"
     },
     {
-      "path": "tools/d264_first_image_offline.py",
-      "classification": "synthetic_only"
-    },
-    {
       "path": "Goodix 27c6 5125 manuale tecnico.md",
       "classification": "documentation_only"
     }
-  ],
-  "derivation": "Concrete FutureProductionDependencies adapter plus D264/03 offline gate"
+  ]
 }

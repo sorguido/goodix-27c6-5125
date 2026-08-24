@@ -1,5 +1,5 @@
 {
-  "schema": "D264_03_FAILURE_MATRIX_V2_CORRECTIVE1",
+  "schema": "D264_03_FAILURE_MATRIX_V3_CORRECTIVE2",
   "all_required_cases_proven": true,
   "cases": [
     {
@@ -358,6 +358,69 @@
       "proof_source": "D264_03_DIRECT",
       "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_real_public_runtime_rejects_buffered_unexpected_frame",
       "side_effect_boundary_reached": "synthetic_real_coordinator"
+    },
+    {
+      "case": "arbitrary secret authorization validator bypass impossible",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_fixed_capability_authority_has_no_public_validator_bypass",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "arbitrary material authorization validator bypass impossible",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_fixed_capability_authority_has_no_public_validator_bypass",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "arbitrary USB capability validator bypass impossible",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_fixed_capability_authority_has_no_public_validator_bypass",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "future live-critical manifest omission detected",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_canonical_manifest_exact_and_offline_gate_separate",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "caller subset/same-subset bypass impossible",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_canonical_manifest_exact_and_offline_gate_separate",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "D261 operator module included",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_canonical_manifest_exact_and_offline_gate_separate",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "offline gate files separate from future live",
+      "status": "PASS",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_canonical_manifest_exact_and_offline_gate_separate",
+      "side_effect_boundary_reached": "none"
+    },
+    {
+      "case": "future report destination collision",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_concrete_future_report_and_marker_preflights_use_fixed_safe_boundaries",
+      "side_effect_boundary_reached": "pre_secret_pre_marker_pre_backend"
+    },
+    {
+      "case": "future marker already present",
+      "status": "PASS_FAIL_CLOSED",
+      "proof_source": "D264_03_CORRECTIVE2_DIRECT",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_concrete_future_report_and_marker_preflights_use_fixed_safe_boundaries",
+      "side_effect_boundary_reached": "pre_secret_pre_marker_pre_backend"
     }
   ]
 }

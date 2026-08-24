@@ -22,75 +22,83 @@ import subprocess
 from typing import Any, Callable, Sequence
 
 from core.persistent_runtime import PersistentRuntimeCoordinator, TerminalBoundary
+from core.live_capability import (
+    CapabilityFailure,
+    D265_FUTURE_LIVE_AUTHORIZATION_FLAG,
+    FutureIntentCapability,
+    FutureLiveIoCapability,
+    FutureMarkerClaimCapability,
+    consume_future_intent,
+    issue_future_intent,
+    issue_future_live_io,
+    _issue_future_marker_after_durable_claim,
+    require_known_live_io_capability,
+)
 
 
-D265_FUTURE_LIVE_AUTHORIZATION_FLAG = "--i-authorize-one-future-d265-first-image-live-attempt"
 D265_FUTURE_APPROVED_BASELINE_ENV = "D265_FUTURE_APPROVED_BASELINE_SHA"
 D265_FUTURE_SINGLE_USE_MARKER_PATH = Path("/var/lib/goodix-5125-poc/d265-first-image-single-use.marker")
 D261_MARKER_PATH = Path("/var/lib/goodix-5125-poc/d261-live-single-use.marker")
+D265_FUTURE_REPORT_PATH = Path("/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json")
 LIVE_CAPABILITY_DEFAULT = 0
+
+FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS = (
+    "core/__init__.py",
+    "core/cold_start.py",
+    "core/fdt_lifecycle.py",
+    "core/fdt_seed.py",
+    "core/future_first_image_operator.py",
+    "core/live_capability.py",
+    "core/persistent_runtime.py",
+    "core/post_d4.py",
+    "core/protected_runtime.py",
+    "core/runtime_transport.py",
+    "core/tls_b0.py",
+    "core/usb_runtime.py",
+    "src/goodix5125_cleanroom.py",
+    "poc/goodix5125/tools/binding_reference/__init__.py",
+    "poc/goodix5125/tools/binding_reference/runtime.py",
+    "poc/goodix5125/tools/binding_reference/crypto_reference.py",
+    "poc/goodix5125/tools/binding_reference/pe_parser.py",
+    "tools/d261_live_fdt_arm_once.py",
+)
+D264_03_OFFLINE_GATE_PATHS = (
+    "operator_kit/d264-first-image-prelive.sh",
+    "tools/d264_first_image_prelive.py",
+)
 
 
 class FutureOperatorFailure(RuntimeError):
     pass
 
 
-class FutureIntentCapability:
-    __slots__ = ("_nonce", "_used")
-    def __init__(self, nonce: object) -> None:
-        self._nonce, self._used = nonce, False
-
-
-class FutureMarkerClaimCapability:
-    __slots__ = ("_nonce", "_used")
-    def __init__(self, nonce: object) -> None:
-        self._nonce, self._used = nonce, False
-
-
-class FutureLiveIoCapability:
-    __slots__ = ("_nonce",)
-    def __init__(self, nonce: object) -> None:
-        self._nonce = nonce
-
-
-_INTENT_NONCE = object()
-_MARKER_NONCE = object()
-_LIVE_IO_NONCE = object()
-
-
 def issue_future_intent_for_injected_rehearsal(exact_intent: str) -> FutureIntentCapability:
     """Test/future-main seam; the D264/03 CLI never calls this issuer."""
-    if exact_intent != D265_FUTURE_LIVE_AUTHORIZATION_FLAG:
-        raise FutureOperatorFailure("exact_future_operator_intent_required")
-    return FutureIntentCapability(_INTENT_NONCE)
+    try:
+        return issue_future_intent(exact_intent)
+    except CapabilityFailure as exc:
+        raise FutureOperatorFailure(str(exc)) from exc
 
 
 def _consume_intent(intent: FutureIntentCapability | None) -> None:
-    if not isinstance(intent, FutureIntentCapability) or intent._nonce is not _INTENT_NONCE:
-        raise FutureOperatorFailure("future_intent_capability_required")
-    if intent._used:
-        raise FutureOperatorFailure("future_intent_capability_already_used")
-    intent._used = True
-
-
-def issue_marker_claim_after_durable_claim(intent: FutureIntentCapability | None) -> FutureMarkerClaimCapability:
-    if not isinstance(intent, FutureIntentCapability) or intent._nonce is not _INTENT_NONCE or not intent._used:
-        raise FutureOperatorFailure("consumed_future_intent_required_for_marker_claim")
-    return FutureMarkerClaimCapability(_MARKER_NONCE)
+    try:
+        consume_future_intent(intent)
+    except CapabilityFailure as exc:
+        raise FutureOperatorFailure(str(exc)) from exc
 
 
 def issue_live_io_after_marker_claim(marker: FutureMarkerClaimCapability | None) -> FutureLiveIoCapability:
-    if not isinstance(marker, FutureMarkerClaimCapability) or marker._nonce is not _MARKER_NONCE:
-        raise FutureOperatorFailure("valid_future_marker_claim_required")
-    if marker._used:
-        raise FutureOperatorFailure("future_marker_claim_capability_already_used")
-    marker._used = True
-    return FutureLiveIoCapability(_LIVE_IO_NONCE)
+    try:
+        return issue_future_live_io(marker)
+    except CapabilityFailure as exc:
+        raise FutureOperatorFailure(str(exc)) from exc
 
 
 def require_future_live_io(capability: FutureLiveIoCapability | None) -> None:
-    if not isinstance(capability, FutureLiveIoCapability) or capability._nonce is not _LIVE_IO_NONCE:
-        raise FutureOperatorFailure("valid_future_live_io_capability_required")
+    try:
+        require_known_live_io_capability(capability)
+    except CapabilityFailure as exc:
+        raise FutureOperatorFailure(str(exc)) from exc
 
 
 def validate_full_sha(value: str) -> None:
@@ -102,15 +110,13 @@ def verify_authoritative_baseline(
     repo: Path,
     sha: str,
     authoritative_paths: Sequence[str],
-    expected_paths: Sequence[str],
 ) -> None:
     """Verify exact path authority and commit/worktree byte identity."""
     validate_full_sha(sha)
     authority = tuple(authoritative_paths)
-    expected = tuple(expected_paths)
     if len(authority) != len(set(authority)):
         raise FutureOperatorFailure("future_live_critical_duplicate_path")
-    if authority != expected:
+    if authority != FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS:
         raise FutureOperatorFailure("future_live_critical_authoritative_path_set_mismatch")
     resolved = subprocess.run(
         ("git", "rev-parse", f"{sha}^{{commit}}"), cwd=repo, check=False,
@@ -150,7 +156,23 @@ def claim_future_marker_fixture(path: Path, baseline_sha: str, intent: FutureInt
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-    return issue_marker_claim_after_durable_claim(intent)
+    return _issue_future_marker_after_durable_claim(intent)
+
+
+def require_future_marker_absent_at(path: Path) -> None:
+    """Non-mutating absence check; production always passes the fixed future path."""
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise FutureOperatorFailure(f"future_marker_preflight_failed:{exc.errno}") from exc
+    raise FutureOperatorFailure("future_single_use_marker_already_exists")
+
+
+def require_bound_future_report_destination(checker: Callable[[Path], None]) -> None:
+    """Apply the reviewed destination checker to the fixed future report path."""
+    checker(D265_FUTURE_REPORT_PATH)
 
 
 @dataclass
@@ -165,6 +187,7 @@ class FutureOperatorDependencies:
     block_signals: Callable[[], None]
     require_no_holders: Callable[[Any], None]
     validate_non_secret_material: Callable[[], None]
+    require_future_marker_absent: Callable[[], None]
     materialize_secret_once: Callable[[], Any]
     claim_marker_once: Callable[[str, FutureIntentCapability], FutureMarkerClaimCapability]
     observe_live_io_issue: Callable[[], None]
@@ -180,16 +203,17 @@ class FutureProductionDependencies:
     Imports are lazy so importing the offline gate performs no protected reads.
     This adapter names the real D261-reviewed guards, real backend, cold start,
     FDT seed provider, and coordinator instead of hiding them behind a nominal
-    callback.  A future authorized main must still supply transactions/reporting.
+    callback.  Transactions and the dedicated report destination are bound by
+    ``build()`` rather than supplied by a future caller.
     """
     @staticmethod
     def construct_runtime(live_io: FutureLiveIoCapability, secret: Any, target: Any) -> PersistentRuntimeCoordinator:
-        require_future_live_io(live_io)
+        require_known_live_io_capability(live_io)
         from core.cold_start import ColdStartMachine
         from core.fdt_seed import provide_hash_gated_fdt12
         from core.usb_runtime import CtypesLibusbBackend, LibusbRuntimeTransport
         from tools.d261_live_fdt_arm_once import CACHE_PATH, CACHE_SHA256
-        backend = CtypesLibusbBackend(live_io, capability_validator=require_future_live_io)
+        backend = CtypesLibusbBackend(live_io)
         transport = LibusbRuntimeTransport(backend)
         cold_start = ColdStartMachine(transport, secret)
         return PersistentRuntimeCoordinator(
@@ -201,7 +225,7 @@ class FutureProductionDependencies:
         )
 
     @staticmethod
-    def build(repo: Path, intent: FutureIntentCapability, fprintd: Any, signals: Any, publish: Callable[[dict[str, Any]], None]) -> FutureOperatorDependencies:
+    def build(repo: Path, intent: FutureIntentCapability) -> FutureOperatorDependencies:
         """Bind the future candidate to the reviewed real guard/runtime graph.
 
         This function is intentionally never referenced by the D264/03 CLI.
@@ -212,15 +236,17 @@ class FutureProductionDependencies:
             CONFIG90_PATH, MATERIAL_MANIFEST_PATH, PROTECTED_ROOT, SECRET_PATH,
             RealSecretBoundary, load_cold_start_material, protected_metadata)
         from tools.d261_live_fdt_arm_once import (CACHE_PATH, CACHE_SHA256, REPORT_DIRECTORY,
-            cache_preflight, exact_target_sysfs, external_holders, prepare_report_directory,
-            require_no_external_holders, sha256_file)
+            FprintdTransaction, SignalTransaction, cache_preflight, exact_target_sysfs,
+            external_holders, prepare_report_directory, publish_report,
+            require_no_external_holders, require_safe_report_destination, sha256_file)
         state: dict[str, Any] = {}
-        authorized = lambda token: token is intent and intent._nonce is _INTENT_NONCE and intent._used
+        fprintd, signals = FprintdTransaction(), SignalTransaction()
         def operator_context():
             if os.geteuid() != 0 or not os.environ.get("SUDO_UID", "").isdigit():
                 raise FutureOperatorFailure("future_operator_context_required")
         def safe_directories():
             prepare_report_directory(PROTECTED_ROOT, REPORT_DIRECTORY)
+            require_bound_future_report_destination(require_safe_report_destination)
         def metadata():
             if not all(protected_metadata(path, size)["metadata_pass"] for path, size in (
                 (SECRET_PATH, 88), (MATERIAL_MANIFEST_PATH, None), (CONFIG90_PATH, 224))):
@@ -236,19 +262,22 @@ class FutureProductionDependencies:
             cache = cache_preflight(CACHE_PATH, CACHE_SHA256)
             if cache["status"] != "PASS": raise FutureOperatorFailure("future_cache_failed")
             state["target"]["material"] = load_cold_start_material(
-                MATERIAL_MANIFEST_PATH, CONFIG90_PATH, intent, authorization_validator=authorized)
+                MATERIAL_MANIFEST_PATH, CONFIG90_PATH, intent)
+        def marker_absent():
+            require_future_marker_absent_at(D265_FUTURE_SINGLE_USE_MARKER_PATH)
         def secret():
             boundary = RealSecretBoundary(SECRET_PATH, repo / CANONICAL_GFUSB_PATH)
-            boundary.materialize(intent, authorization_validator=authorized); return boundary
+            boundary.materialize(intent); return boundary
         return FutureOperatorDependencies(
             observe_baseline_verified=lambda: None, require_operator_context=operator_context,
             require_safe_directories=safe_directories, verify_protected_metadata=metadata,
             verify_gfusb_hash=gfusb, resolve_exact_target=target, stop_fprintd=fprintd.prepare,
             block_signals=signals.block, require_no_holders=holders, validate_non_secret_material=non_secret,
-            materialize_secret_once=secret,
+            require_future_marker_absent=marker_absent, materialize_secret_once=secret,
             claim_marker_once=lambda sha, token: claim_future_marker_fixture(D265_FUTURE_SINGLE_USE_MARKER_PATH, sha, token),
             observe_live_io_issue=lambda: None, construct_coordinator=FutureProductionDependencies.construct_runtime,
-            restore_signals=signals.restore, restore_fprintd=fprintd.restore, publish_report=publish,
+            restore_signals=signals.restore, restore_fprintd=fprintd.restore,
+            publish_report=lambda report: publish_report(D265_FUTURE_REPORT_PATH, report),
         )
 
 
@@ -256,7 +285,7 @@ def run_future_first_image_candidate(
     intent: FutureIntentCapability | None,
     dependencies: FutureOperatorDependencies,
     *, repo: Path, approved_baseline_sha: str,
-    authoritative_paths: Sequence[str], expected_paths: Sequence[str],
+    authoritative_paths: Sequence[str],
     ts16: int, seed_result_for_offline_rehearsal: Any = None,
 ) -> dict[str, Any]:
     """Execute the explicit guard→capability→ownership→coordinator chain."""
@@ -266,7 +295,7 @@ def run_future_first_image_candidate(
     secret_owned_by_outer = False
     ownership_transferred = False
     try:
-        verify_authoritative_baseline(repo, approved_baseline_sha, authoritative_paths, expected_paths)
+        verify_authoritative_baseline(repo, approved_baseline_sha, authoritative_paths)
         dependencies.observe_baseline_verified()
         dependencies.require_operator_context()
         dependencies.require_safe_directories()
@@ -277,6 +306,7 @@ def run_future_first_image_candidate(
         dependencies.block_signals()
         dependencies.require_no_holders(target)
         dependencies.validate_non_secret_material()
+        dependencies.require_future_marker_absent()
         secret = dependencies.materialize_secret_once()
         secret_owned_by_outer = True
         marker_claim = dependencies.claim_marker_once(approved_baseline_sha, intent)
