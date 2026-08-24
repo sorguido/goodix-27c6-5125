@@ -1,0 +1,81 @@
+name: D265-01 materialize reviewed bundle
+
+on:
+  push:
+    branches:
+      - codex/costruire-kit-operatore-d265/01
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/costruire-kit-operatore-d265/01
+          fetch-depth: 0
+
+      - name: Verify live-critical authority and bundle, then materialize
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, json, zipfile
+
+          repo = Path('.')
+          live_manifest = json.loads((repo/'analysis/D265/D265_01_live_critical_manifest.json').read_text())
+          assert live_manifest['future_live_critical_file_count'] == 20
+          assert live_manifest['baseline_approved'] is False
+          for row in live_manifest['future_live_critical_files']:
+              p = repo / row['path']
+              assert p.is_file(), row['path']
+              got = hashlib.sha256(p.read_bytes()).hexdigest()
+              assert got == row['sha256'], (row['path'], got, row['sha256'])
+
+          bundle_manifest = json.loads((repo/'analysis/D265/D265_01_bundle_manifest.json').read_text())
+          assert bundle_manifest['step_local'] is True
+          assert bundle_manifest['contains_secret_or_biometric_data'] is False
+          assert bundle_manifest['historical_d264_manifest_included'] is False
+          assert all(not row['path'].startswith('analysis/D264/') for row in bundle_manifest['files'])
+          for row in bundle_manifest['files']:
+              p = repo / row['path']
+              assert p.is_file(), row['path']
+              got = hashlib.sha256(p.read_bytes()).hexdigest()
+              assert got == row['sha256'], (row['path'], got, row['sha256'])
+
+          b64p = repo/'analysis/D265/D265_01_operator_kit_bundle.zip.b64'
+          zipp = repo/'analysis/D265/D265_01_operator_kit_bundle.zip'
+          side = repo/'analysis/D265/D265_01_operator_kit_bundle.zip.sha256'
+          data = base64.b64decode(b64p.read_bytes(), validate=False)
+          zipp.write_bytes(data)
+          expected = side.read_text().strip().split()[0]
+          got = hashlib.sha256(data).hexdigest()
+          assert got == expected == '663daebd8a427856ab0097a37f72ea71356a6e7ff93f80d25be793dd9d6ae4bb'
+
+          expected_paths = [row['path'] for row in bundle_manifest['files']]
+          with zipfile.ZipFile(zipp) as zf:
+              bad = zf.testzip()
+              assert bad is None, bad
+              names = [n for n in zf.namelist() if not n.endswith('/')]
+              assert sorted(names) == sorted(expected_paths), (names, expected_paths)
+              for row in bundle_manifest['files']:
+                  member = zf.read(row['path'])
+                  assert hashlib.sha256(member).hexdigest() == row['sha256'], row['path']
+          PY
+          unzip -t analysis/D265/D265_01_operator_kit_bundle.zip
+
+      - name: Commit canonical ZIP and remove transport/workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm analysis/D265/D265_01_operator_kit_bundle.zip.b64
+          rm .github/workflows/d265-01-materialize.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(D265): materialize reviewed operator-kit bundle"
+          git push origin HEAD:codex/costruire-kit-operatore-d265/01
