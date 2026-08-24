@@ -14,7 +14,11 @@ from __future__ import annotations
 import unittest
 
 from core.fdt_lifecycle import FdtLifecycle, FdtLifecycleState, InvalidTransition
-from core.persistent_runtime import PersistentRuntimeCoordinator, RuntimeFailure
+from core.persistent_runtime import (
+    FIRST_IMAGE_IRQ2_TIMEOUT_MS,
+    PersistentRuntimeCoordinator,
+    RuntimeFailure,
+)
 from core.post_d4 import PLAIN, TLS, _checksum
 from src.goodix5125_cleanroom import encode_synthetic_record
 
@@ -139,6 +143,11 @@ def _build_coordinator(lc, transport, event_source) -> PersistentRuntimeCoordina
 
 
 class FirstImageTerminalTests(unittest.TestCase):
+    def test_irq2_deadline_covers_primary_trace_delta(self) -> None:
+        # D264: APP12509 primary trace ACK32 -> IRQ2 = 7.108212 s.
+        self.assertEqual(FIRST_IMAGE_IRQ2_TIMEOUT_MS, 15_000)
+        self.assertGreater(FIRST_IMAGE_IRQ2_TIMEOUT_MS, 7_108.212)
+
     def _image_b0(self, image_a0: bytes) -> bytes:
         return outer(TLS, image_a0)
 

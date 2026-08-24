@@ -61,7 +61,11 @@ D4_CANONICAL_REQUEST = bytes.fromhex("a00600a6d403000000d3")
 D4_TIMEOUT_MS = 200
 AF_TIMEOUT_MS = 500
 TLS_HANDSHAKE_MAX_DEVICE_RECORDS = 8
-FIRST_IMAGE_IRQ2_TIMEOUT_MS = 5000
+# The only timestamped APP12509 positive trace reaches IRQ2 7.108212 s after
+# the final 0x32 ACK.  Five seconds therefore rejected the primary-evidence
+# path before it could occur.  Fifteen seconds is a bounded host deadline with
+# evidence margin; it is not a claim about the device's internal arm lifetime.
+FIRST_IMAGE_IRQ2_TIMEOUT_MS = 15000
 FIRST_IMAGE_B0_TIMEOUT_MS = 5000
 
 
