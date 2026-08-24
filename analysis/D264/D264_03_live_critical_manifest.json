@@ -48,7 +48,7 @@
     },
     {
       "path": "core/persistent_runtime.py",
-      "sha256": "42efbc29d2cebc06d3a83fd37cb410d9412dd6d20f0ffc7e3348338a70d79641",
+      "sha256": "dd84cda8c43df12c9caa057af0c16e8b5b9b198a26a3a38636bd1ee41dc885e3",
       "role": "persistent coordinator and first-image boundary",
       "reachable_from_future_first_image_real_operator_path": true,
       "why_live_critical": "persistent coordinator and first-image boundary"

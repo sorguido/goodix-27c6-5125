@@ -13,3 +13,7 @@ Tracker host-side e audit reale sostituiscono i default inventati. USB open vien
 ## Stato
 
 Il set live-critical resta 20 file e nessuna baseline è approvata. `READY_FOR_LIVE=false`, `LIVE_AUTHORIZED=false`, `0x22_FIXED64_LIVE_PROVEN=false`, `FIRST_IMAGE_LIVE_PROVEN=false`; stato interno post-image `UNKNOWN`. La precedente autorizzazione non è consumata né trasferita.
+
+## Provenance e purezza del bundle
+
+Il manifest D264/03 resta uno snapshot storico congelato e byte-identico a `bc082c48579111a8e9a4a1317b40c5f84f189659`; non viene aggiornato con gli hash D265 e non è payload del bundle D265/01. Il manifest D265/01 resta l'autorità byte corrente del candidate a 20 file.

@@ -1,7 +1,8 @@
 {
-  "schema": "D265_01_BUNDLE_MANIFEST_V2_CORRECTIVE",
+  "schema": "D265_01_BUNDLE_MANIFEST_V3_MICRO_CORRECTIVE",
   "step_local": true,
   "contains_secret_or_biometric_data": false,
+  "historical_d264_manifest_included": false,
   "files": [
     {
       "path": "operator_kit/d265-first-image-once.sh",
@@ -20,12 +21,8 @@
       "sha256": "f4fcc2d684d659222d723036482ee040e0e5079f99e3e1f0ace7ec753e322d36"
     },
     {
-      "path": "analysis/D264/D264_03_live_critical_manifest.json",
-      "sha256": "5c6471b4e9f81dea3d38863d701f379314a4e47e082b54d2b390e91a9698b66f"
-    },
-    {
       "path": "analysis/D265/D265_01_operator_kit_report.md",
-      "sha256": "8ed425592e794d35f9f7e193babe251cbe09b3348f0d94036b57a69dcca1c49b"
+      "sha256": "2fec3066149ec8b15e1ee98dc7f523c1a7fc8417973e84b6646278448a7dae6a"
     },
     {
       "path": "analysis/D265/D265_01_executable_closure.json",
@@ -41,7 +38,7 @@
     },
     {
       "path": "Goodix 27c6 5125 manuale tecnico.md",
-      "sha256": "2332f129def3800751bb7f247c114053dc25aecccf838a66605e1b6e32ea3087"
+      "sha256": "44b83816c2c79e6b3608f957505bfc4e16a271d1b0f5b7b1ab78b421322b88e4"
     }
   ]
 }

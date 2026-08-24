@@ -4783,8 +4783,10 @@ nuovi branch, comandi, timeout, retry o cleanup. Valori non osservabili sono
 `UNKNOWN`/`NOT_REACHED`, mai zero/uno/true inventati. `LIVE_RESULT` conserva
 l'esatto risultato runtime.
 
-L'autorità live-critical resta di 20 file e include il runtime telemetry-only;
-`baseline_approved=false`. Test synthetic provano ordine arm→prompt→IRQ2,
+L'autorità live-critical D265/01 resta di 20 file e include il runtime telemetry-only;
+`baseline_approved=false`. Il manifest D264/03 è invece uno snapshot storico
+congelato, byte-identico alla baseline D264/03: non riceve hash D265 e non entra
+nel bundle step-local D265/01. Test synthetic provano ordine arm→prompt→IRQ2,
 progressi parziali timeout/ACK/B0/successo, audit su failure, command trace
 immutata e zero retry/persistenza/comandi post-image vietati. Nessun live è
 stato eseguito. D261 resta `STOP_AFTER_FDT_ARM_ACK`; D265 resta futuro
