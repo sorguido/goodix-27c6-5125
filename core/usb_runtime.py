@@ -19,7 +19,7 @@ import time
 from typing import Callable, Protocol
 
 from core.post_d4 import PLAIN, parse_outer, parse_payload
-from core.protected_runtime import LiveIoCapability, require_live_io_capability
+from core.protected_runtime import LiveIoCapability, require_known_live_io_capability
 from core.runtime_transport import EventSource, PhysicalSubmissionPolicy
 
 
@@ -336,7 +336,7 @@ class CtypesLibusbBackend:
         )
 
     def open_exact(self, vid: int, pid: int, interface: int) -> UsbIdentity:
-        require_live_io_capability(self.live_io_capability)
+        require_known_live_io_capability(self.live_io_capability)
         if self.open_count or self._lib is not None:
             raise UsbRuntimeFailure("libusb_open_exactly_once")
         lib = self._load()

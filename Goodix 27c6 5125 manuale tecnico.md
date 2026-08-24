@@ -132,7 +132,7 @@ approvata. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
 corretto minimamente a una deadline host assoluta di 15000 ms, senza asserire
 una lifetime interna del device.
 
-D264/02 chiude ora l'executable closure del candidate first-image **soltanto
+D264/02 ha chiuso l'executable closure del candidate first-image **soltanto
 offline**. Una rehearsal operatore synthetic-only preserva come default
 `STOP_AFTER_FDT_ARM_ACK` e raggiunge `STOP_AFTER_FIRST_IMAGE` esclusivamente
 con opt-in esplicito, attraversando il coordinatore pubblico, la deadline IRQ2
@@ -142,7 +142,29 @@ eseguito. Il launcher reale D261 resta distinto e arm-only: invoca ancora il
 default del coordinatore e non può raggiungere il boundary first-image.
 Pertanto `FIRST_IMAGE_LIVE_OPERATOR_WIRING=NOT_IMPLEMENTED` e la baseline
 approval non è ancora raggiungibile; prima servirà un successivo step offline
-di wiring e review del percorso reale protetto.
+di wiring e review del percorso reale protetto. Il primo candidate D264/03 era
+soltanto uno skeleton parzialmente production-shaped: un callback `preflight`
+opaco, una capability live-I/O non derivata formalmente dal marker, ownership
+secret ambigua e una failure matrix più ampia dei test. Il corrective della
+review AI-PM chiude questi difetti e quindi chiude il wiring pre-live sul solo
+piano offline: il nuovo launcher production-shaped è
+raggiungibile dalla shell esclusivamente con `--dry-run`, mentre ogni altra
+invocazione termina `HARD_DISABLED_D264_03` prima di secret, marker, fprintd,
+USB o comandi. La control flow futura usa capability e marker namespace
+dedicati D265-future, guard baseline full-SHA e byte identity, dipendenze
+pericolose iniettate e adapter futuro concreto, coordinator reale con opt-in esplicito
+`STOP_AFTER_FIRST_IMAGE`, cleanup e restore indipendenti. Il path D261 e il suo
+marker consumato restano invariati e arm-only. Ne segue
+`FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE`; non segue alcuna
+approvazione baseline, autorizzazione o prova live. Il secondo corrective
+centralizza poi capability D261/future in un'authority fissa non sostituibile
+da callback, rende interna la tuple future-live canonica (18 file, incluso il
+modulo operatore D261 importato), separa i due file del gate offline e lega
+transaction, report futuro e marker preflight concreti nell'adapter.
+Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
+private post-durable-claim, impedisce report/restore prima dei rispettivi
+preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
+nonzero) e rende il writer marker future robusto agli short-write.
 
 La singola run live autorizzata è poi stata eseguita una sola volta e completata con
 successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
@@ -4543,3 +4565,164 @@ READY_FOR_LIVE=false
 LIVE_AUTHORIZED=false
 BASELINE_APPROVED=false
 ```
+
+### D264/03: wiring pre-live protetto first-image, OFFLINE ONLY
+
+Il nuovo surface `operator_kit/d264-first-image-prelive.sh` →
+`tools/d264_first_image_prelive.py` è cwd-independent e offre soltanto
+`--dry-run`. Non espone una modalità live: qualsiasi altra combinazione viene
+respinta dal launcher come `HARD_DISABLED_D264_03`, prima di controllo root
+mutante, stop/start fprintd, lettura secret, marker, backend USB o comando.
+Il dry-run valida schema e hash del live-critical set v3, sintassi launcher,
+modello baseline full-SHA e soli metadata del marker futuro; ignora
+intenzionalmente qualunque valore dell'environment di approvazione.
+
+La prima versione reviewata dall'AI-PM al remote HEAD
+`830c95c407ecbe0f9b185a8adbc968ae5c9cef0d` era uno skeleton parzialmente
+production-shaped: non chiamava il baseline verifier dal candidate, celava i
+guard in un unico callback, emetteva convenzionalmente la capability live-I/O
+e poteva chiudere due volte il secret. Il corrective rende invece esplicita in
+`core/future_first_image_operator.py` la sequenza: baseline full-SHA/path-set/
+blob identity → contesto operatore → directory/report sicuri → metadata
+protetti → hash gfusb → target/cardinalità → stop fprintd → signal block →
+holder check → materiale/cache non-secret → singola materializzazione secret →
+marker → capability live-I/O → backend/coordinator → run/restore/report. La
+seconda review AI-PM al remote HEAD
+`495cc2c6cd2467241cf67ec4e0e8e748726e9f8c` ha tuttavia individuato un
+indebolimento strutturale: i validator pubblici iniettabili di secret,
+materiale e backend avrebbero accettato anche una callback arbitraria sempre
+vera; inoltre path-set atteso e osservato erano entrambi caller-controlled e il
+manifest ometteva il modulo D261 direttamente importato. Il corrective 2
+rimuove queste superfici prima di confermare la closure.
+
+La control flow richiede l'intento
+esatto `--i-authorize-one-future-d265-first-image-live-attempt`, consumabile una
+sola volta, e usa il marker distinto
+`/var/lib/goodix-5125-poc/d265-first-image-single-use.marker`, schema
+`D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1`. D264/03 non crea quel marker:
+claim, capability live-I/O e backend sono esercitati soltanto con fixture e
+doubles. Non è più un legame convenzionale: la catena tipata/nonce è
+`FutureIntentCapability → FutureMarkerClaimCapability → FutureLiveIoCapability`,
+con consumo one-shot e rigetto di tipo/nonce/namespace D261 errati.
+`core/live_capability.py` è ora l'unica authority fissa per capability D261 e
+future note: le API pubbliche non accettano più funzioni validator. La factory
+marker future è una seam privata chiamata dal durable claim; non esiste un path
+production supportato intent-consumato → marker-capability senza claim.
+La terza review AI-PM al remote HEAD
+`415c7357e6cdc7457ccd2f70d55805b6471818dd` ha precisato che anche gli helper
+D261 intent/marker/live-I/O non potevano restare API pubbliche: avrebbero
+permesso di saltare il durable marker pur conservando tipi e nonce validi. Il
+micro-corrective 3 li rende privati e mantiene come unica superficie supportata
+D261 quella storica in `core.protected_runtime`: exact main flag → intent →
+writer marker `O_EXCL`/write-all/fsync → marker capability → live-I/O. Lo
+stesso vincolo vale per il marker future, la cui capability nasce soltanto
+dalla seam privata chiamata dopo fsync.
+`FutureProductionDependencies` collega concretamente i guard D261-reviewed,
+`RealSecretBoundary`, `CtypesLibusbBackend`, `ColdStartMachine`, seed FDT e
+`PersistentRuntimeCoordinator`, ma non è raggiungibile dal CLI D264/03. La
+factory concreta non riceve più transaction o publisher arbitrari: costruisce
+`FprintdTransaction` e `SignalTransaction` e vincola il report futuro distinto
+a `/var/lib/goodix-5125-poc/d261-results/d265-first-image-final.json`, la cui
+assenza/sicurezza viene verificata prima degli effetti. Anche l'assenza del
+marker D265-future viene verificata senza lettura o mutazione prima del secret;
+il claim successivo conserva `O_EXCL`, `O_NOFOLLOW`, mode 0600 e fsync.
+Il writer future gestisce ora anche short-write con un ciclo write-all e
+fallisce senza capability quando `write()` non progredisce.
+
+La transaction outer traccia separatamente report-destination preflight,
+fprintd avviato e segnali bloccati. Un failure baseline, contesto operatore o
+report preflight non pubblica e non consuma il report protetto; restore viene
+tentato solo per transaction effettivamente iniziate. Dopo report preflight un
+failure successivo può invece pubblicare il report fail-closed. La policy
+operatore è condivisa con D261: `EUID=0`, `SUDO_UID` presente e numerico, e
+`int(SUDO_UID) != 0`; quindi `SUDO_UID=0` è respinto.
+
+L'outer possiede il secret fino alla costruzione riuscita del coordinator: un
+failure marker/capability/costruzione causa un solo close outer. Dopo la
+costruzione l'ownership passa al coordinator, il cui `run()` possiede cleanup
+TLS/secret/transport; l'outer non richiama il secret close e conserva soltanto
+restore segnali/fprintd/report. Successo, failure runtime e failure prima del
+transfer provano `SECRET_DOUBLE_CLOSE_COUNT=0`.
+
+La tuple interna `FUTURE_FIRST_IMAGE_LIVE_CRITICAL_PATHS` è l'autorità della
+baseline futura e non è fornita dal caller. Il manifest
+`analysis/D264/D264_03_live_critical_manifest.json` deriva esattamente 18 file
+future-live dal call graph concreto, inclusi `core/live_capability.py` e
+`tools/d261_live_fdt_arm_once.py`: helper protetti,
+backend USB, cold-start/FDT, coordinator, transport/framing, retained TLS/B0,
+codec immagine/CRC e dipendenze di validazione secret. Launcher/tool D264/03
+formano invece un set offline-gate separato di due file e non sono marcati
+future-live; shell D261, test e manuale sono esclusi con classificazione
+esplicita. I due record offline hanno ora ruolo coerente di hard-disable
+launcher/dry-run inspector e classificazione
+`OFFLINE_GATE_ONLY_NOT_FUTURE_LIVE`. Nessuno SHA è approvato:
+il modello rifiuta SHA corto, branch, `HEAD`, commit errato e blob worktree non
+identico. Review AI-PM e successiva approvazione byte-level restano gate
+separati.
+
+La closure offline attraversa dall'orchestrator il vero
+`PersistentRuntimeCoordinator.run()` con fixture D263: prefisso FDT storico,
+un solo `0x22` `FIXED64_ZERO_TAIL`, TLS trattenuta, primo B0, raster 80×64,
+zero persistenza/retry/comandi vietati e cleanup host. La failure matrix v4
+associa ogni PASS a test/artifact e distingue prova D264/03 diretta, regressione
+D264/02/D263 ereditata e deadline su runtime byte-identico. La suite D263,
+D264/02 e D260 pertinente resta verde; la suite D261 non è eseguibile in questo
+ambiente perché la dipendenza preesistente `cryptography` manca, senza essere
+installata. Nessun test hardware è stato eseguito. Stato canonico:
+
+```text
+D264_03_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D261_SUPPORTED_CAPABILITY_CHAIN_PRESERVED=true
+D261_PUBLIC_INTENT_MINT_BYPASS_ABSENT=true
+D261_PUBLIC_MARKER_MINT_BYPASS_ABSENT=true
+FUTURE_PUBLIC_MARKER_MINT_BYPASS_ABSENT=true
+DURABLE_MARKER_REQUIRED_BEFORE_CAPABILITY=true
+BASELINE_FAILURE_REPORT_WRITE_COUNT=0
+REPORT_PUBLICATION_REQUIRES_PREFLIGHT=true
+FUTURE_OPERATOR_CONTEXT_MATCHES_D261=true
+FUTURE_MARKER_SHORT_WRITE_SAFE=true
+PUBLIC_AUTHORIZATION_VALIDATOR_BYPASS_ABSENT=true
+PUBLIC_LIVE_IO_VALIDATOR_BYPASS_ABSENT=true
+CANONICAL_FUTURE_LIVE_CRITICAL_PATHS_INTERNAL=true
+CALLER_CONTROLLED_EXPECTED_PATH_SET_REMOVED=true
+FUTURE_LIVE_CRITICAL_MANIFEST_EXACT_MATCH=true
+D261_OPERATOR_DEPENDENCY_INCLUDED=true
+FUTURE_REPORT_DESTINATION_BOUND=true
+FUTURE_MARKER_PREFLIGHT_BEFORE_SECRET=true
+PROTECTED_GUARD_ORDER_PROVEN=true
+BASELINE_BYTE_IDENTITY_GATE_PROVEN=true
+MARKER_TO_LIVE_IO_CAPABILITY_CHAIN_PROVEN=true
+SECRET_CLEANUP_OWNERSHIP=TRANSFER_TO_COORDINATOR_AFTER_CONSTRUCTION
+SECRET_DOUBLE_CLOSE_COUNT=0
+REAL_COORDINATOR_FIRST_IMAGE_INTEGRATION_PROVEN=true
+LIVE_CRITICAL_REACHABILITY_PROVEN=true
+FAILURE_MATRIX_ALL_REQUIRED_CASES_PROVEN=true
+FIRST_IMAGE_PRELIVE_OPERATOR_WIRING=IMPLEMENTED_OFFLINE
+CURRENT_D261_REAL_BOUNDARY=STOP_AFTER_FDT_ARM_ACK
+FUTURE_FIRST_IMAGE_REAL_BOUNDARY=STOP_AFTER_FIRST_IMAGE
+DEDICATED_FUTURE_MARKER_NAMESPACE=D265_FUTURE_FIRST_IMAGE_SINGLE_USE_MARKER_V1
+D261_MARKER_REUSED=false
+D264_03_REAL_USB_OPEN_COUNT=0
+D264_03_REAL_SECRET_READ_COUNT=0
+D264_03_REAL_SENSOR_COMMAND_COUNT=0
+D264_03_REAL_SINGLE_USE_MARKER_CREATE_COUNT=0
+D264_03_FPRINTD_MUTATION_COUNT=0
+D264_03_LIVE_TLS_HANDSHAKE_COUNT=0
+POST_FIRST_IMAGE_HOST_CLEANUP_IMPLEMENTED_OFFLINE=true
+POST_FIRST_IMAGE_DEVICE_INTERNAL_STATE=UNKNOWN
+POST_FIRST_IMAGE_DEVICE_STOP_LIVE_PROVEN=false
+0x22_TARGET_EVIDENCE=PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY
+0x22_OPERATIONAL_CANDIDATE=EVIDENCE_SUPPORTED_DETERMINISTIC_CANDIDATE
+0x22_TARGET_LIVE_ACCEPTANCE=NOT_LIVE_PROVEN
+D264_03_READY_FOR_AI_PM_REVIEW=true
+D264_03_READY_FOR_BASELINE_APPROVAL=false
+READY_FOR_LIVE=false
+LIVE_AUTHORIZED=false
+BASELINE_APPROVED=false
+```
+
+Il prossimo gate è la review AI-PM del remote branch e del set byte-level. Solo
+uno step successivo e separatamente autorizzato potrà approvare una baseline e
+valutare se abilitare il collegamento reale; fino ad allora il rischio residuo
+rimane l'accettazione target non provata di `0x22` fixed64 e del primo B0,
+insieme allo stato interno device post-image ignoto.
