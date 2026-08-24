@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -46,6 +47,7 @@ def test_default_and_wrong_combinations_are_hard_disabled(args):
     result = run_launcher(*args)
     assert result.returncode == 2
     assert "HARD_DISABLED_DEFAULT" in result.stderr
+    assert "modalità D265 esatta richiesta" in result.stderr
 
 
 def test_exact_live_flag_is_wired_but_test_cannot_build_production(monkeypatch):
@@ -113,9 +115,71 @@ def test_marker_write_all_and_zero_progress(tmp_path, monkeypatch):
 
 
 def test_summary_contains_no_biometric_content():
+    audit = {"usb_transport_session_count": 1, "transport_cleanup_count": 1,
+        "tls_server_session_object_count": 1, "tls_server_handshake_count": 1,
+        "retry_count": 0, "persistent_device_write_count": 0,
+        "secret_boundary_zeroized": True, "a2_special_recovery_count": 0,
+        "0x70_special_recovery_count": 0, "exact_fdt_command_trace":
+        ["0x36","0x50","0x36","0x82","0x20","0x36","0x32","0x22"],
+        "first_image_irq2_observed_count": 1, "image_command_attempt_count": 1,
+        "first_image_ack_validation_count": 1, "first_image_b0_count": 1,
+        "first_image_received": True, "cleanup_failures": []}
+    coordinator = SimpleNamespace(audit=lambda: audit,
+        transport=SimpleNamespace(backend=SimpleNamespace(open_count=1)))
+    tracker = tool.PhaseTracker(1, 1, 1, 1, 1, coordinator)
     summary = tool._summary("a" * 40, {"result": "PASS_STOP_AFTER_FIRST_IMAGE",
-        "first_image_raster_shape": [80, 64], "runtime_audit": {"secret_zeroized": True}})
+        "first_image_raster_shape": [80, 64]}, tracker)
     assert summary["FIRST_IMAGE_RASTER_SHAPE"] == [80, 64]
     forbidden = {"secret", "psk", "raster_bytes", "image_hash", "pixel_samples", "biometric_payload"}
     assert forbidden.isdisjoint({key.lower() for key in summary})
     assert summary["RETRY_COUNT"] == summary["RECOVERY_COUNT"] == 0
+    assert summary["USB_OPEN_COUNT"] == summary["TRANSPORT_SESSION_COUNT"] == 1
+    assert summary["TLS_OBJECT_COUNT"] == summary["TLS_HANDSHAKE_COUNT"] == 1
+    assert summary["COMMAND_22_ATTEMPT_COUNT"] == summary["COMMAND_22_ACK_VALIDATION_COUNT"] == 1
+    assert summary["FIRST_B0_COUNT"] == 1 and summary["SECRET_ZEROIZED"] is True
+    assert summary["LIVE_RESULT"] == "PASS_STOP_AFTER_FIRST_IMAGE"
+
+
+def test_italian_operator_text_and_sudo_env_contract():
+    source = Path(tool.__file__).read_text()
+    assert "APPOGGIA_UN_DITO_ORA" in source
+    for english in ("first-image live is starting", "Keep your finger off",
+                    "When prompted, place ONE finger", "Do not retry"):
+        assert english not in source
+    assert tool.CANONICAL_LIVE_COMMAND_TEMPLATE.startswith(
+        "sudo env D265_APPROVED_LIVE_BASELINE_SHA=<FULL_APPROVED_SHA>")
+    assert "sudo -S" not in source and "getpass" not in source and "stdin.write" not in source
+
+
+def test_prompt_occurs_only_at_irq2_wait_and_once(capsys):
+    events = []
+    class Delegate:
+        def wait_event(self, timeout): events.append(("wait", timeout)); return b"frame"
+    tracker = tool.PhaseTracker(); wrapped = tool.PromptingEventSource(Delegate(), tracker)
+    wrapped.wait_event(500); assert "APPOGGIA" not in capsys.readouterr().out
+    events.append(("final_arm_completed", None))
+    wrapped.wait_event(15000); output = capsys.readouterr().out
+    wrapped.wait_event(15000); second = capsys.readouterr().out
+    assert output.count("D265_OPERATOR_ACTION = APPOGGIA_UN_DITO_ORA") == 1
+    assert "APPOGGIA" not in second and tracker.operator_prompt_count == 1
+    assert events == [("wait",500),("final_arm_completed",None),("wait",15000),("wait",15000)]
+
+
+def test_truthful_summary_before_secret_and_after_marker_before_usb():
+    before = tool._summary("a"*40, {"result":"FAIL_CLOSED"}, tool.PhaseTracker())
+    assert before["SECRET_MATERIALIZATION_COUNT"] == 0
+    assert before["D265_MARKER_CLAIMED"] is False and before["USB_OPEN_COUNT"] == "NOT_REACHED"
+    after = tool._summary("a"*40, {"result":"FAIL_CLOSED"}, tool.PhaseTracker(1,1))
+    assert after["SECRET_MATERIALIZATION_COUNT"] == 1
+    assert after["D265_MARKER_CLAIMED"] is True and after["USB_OPEN_COUNT"] == "NOT_REACHED"
+
+
+@pytest.mark.parametrize("irq,ack,b0", [(0,0,0),(1,0,0),(1,1,0),(1,1,1)])
+def test_partial_first_image_progress_is_preserved(irq, ack, b0):
+    audit={"usb_transport_session_count":1,"first_image_irq2_observed_count":irq,
+        "image_command_attempt_count":irq,"first_image_ack_validation_count":ack,
+        "first_image_b0_count":b0,"exact_fdt_command_trace":[],"retry_count":0,
+        "persistent_device_write_count":0,"a2_special_recovery_count":0,"0x70_special_recovery_count":0}
+    coordinator=SimpleNamespace(audit=lambda:audit,transport=SimpleNamespace(backend=SimpleNamespace(open_count=1)))
+    summary=tool._summary("a"*40,{"result":"FAIL_CLOSED"},tool.PhaseTracker(coordinator=coordinator))
+    assert (summary["IRQ2_FINGER_DOWN_COUNT"],summary["COMMAND_22_ACK_VALIDATION_COUNT"],summary["FIRST_B0_COUNT"]) == (irq,ack,b0)

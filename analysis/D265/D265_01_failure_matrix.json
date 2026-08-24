@@ -1,5 +1,5 @@
 {
-  "schema": "D265_01_FAILURE_MATRIX_V1",
+  "schema": "D265_01_FAILURE_MATRIX_V2_CORRECTIVE",
   "all_required_cases_proven": true,
   "no_retry": true,
   "no_recovery": true,
@@ -8,204 +8,204 @@
     {
       "case": "missing baseline SHA",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_live_requires_full_lowercase_sha_before_production",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_live_requires_full_lowercase_sha_before_production_adapter",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "short baseline SHA",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_live_requires_full_lowercase_sha_before_production",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_live_requires_full_lowercase_sha_before_production_adapter",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "non-hex baseline SHA",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_live_requires_full_lowercase_sha_before_production",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_live_requires_full_lowercase_sha_before_production_adapter",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "HEAD mismatch",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_head_mismatch_and_dirty_fail_closed",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_head_mismatch_and_dirty_fail_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "dirty worktree",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_head_mismatch_and_dirty_fail_closed",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_head_mismatch_and_dirty_fail_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "live-critical path-set mismatch",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_authority_manifest_exact_and_namespace_distinct",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_authority_manifest_exact_and_namespace_distinct",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "live-critical byte mismatch",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_head_mismatch_and_dirty_fail_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "invalid operator context",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_operator_context_matches_d261",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "report collision",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_report_collision_and_marker_presence_fail_before_secret",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "marker already exists",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_future_report_collision_and_marker_presence_fail_before_secret",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "protected metadata failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "gfusb hash mismatch",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "target absent",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_exact_target_absent_and_duplicate_fail_before_secret",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "target duplicate",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_exact_target_absent_and_duplicate_fail_before_secret",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "holder conflict",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_target_holder_backend_failures_are_distinct_and_zero_retry",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "cache/material failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_each_guard_fails_closed_before_later_phases",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "secret materialization failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_secret_owned_by_outer_before_transfer",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "marker durable claim failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "D265_01_DIRECT_OFFLINE",
-      "test_name_or_artifact": "test_marker_write_all_and_zero_progress",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d265_live_first_image_once.py::test_marker_write_all_and_zero_progress",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "USB open failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_runtime_backend_failures_no_retry_one_secret_close",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "TLS failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_real_runtime_tls_consume_failure_is_specific",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "IRQ2 timeout",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_event_timeout_fails_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "unexpected IRQ",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_wrong_irq_fails_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "0x22 submit failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_runtime_backend_failures_no_retry_one_secret_close",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "invalid 0x22 ACK",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_wrong_ack_fails_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "first B0 failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_malformed_b0_fails_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "CRC/decode failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d263_phase2_first_image_terminal.py::FirstImageTerminalTests::test_crc_image_failure_wipes_and_fails_closed",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "cleanup failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d263_phase2_public_run.py::PublicRunTests::test_tls_close_exception_still_zeroizes_and_closes_transport",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "restore failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_report_and_restore_are_transaction_state_gated",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     },
     {
       "case": "report publication failure",
       "status": "PASS_FAIL_CLOSED_OFFLINE",
-      "proof_source": "INHERITED_OFFLINE_REGRESSION",
-      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py + D263/D260 regression suite",
+      "proof_source": "EXACT_OFFLINE_TEST",
+      "test_name_or_artifact": "tests/test_d264_03_prelive_operator.py::test_report_and_restore_are_transaction_state_gated",
       "side_effect_boundary_reached": "fixture_or_synthetic_only; no real device"
     }
   ]

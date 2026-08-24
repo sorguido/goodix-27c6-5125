@@ -6,13 +6,13 @@
   "future_live_critical_files": [
     {
       "path": "operator_kit/d265-first-image-once.sh",
-      "sha256": "1b0d10d47e4762aeb2cd2a177a9a07352c6c10b811eb6318d2f9d2c9c3e4d805",
+      "sha256": "d4f49fc2699790984175e5feea505f712194ebce2a4baac30715e57e9dd70bf6",
       "role": "cwd-independent exact-mode operator launcher",
       "reachable_from_d265_real_operator_path": true
     },
     {
       "path": "tools/d265_live_first_image_once.py",
-      "sha256": "618784d6d5c7788d33e5ef7f9bf2592f75f9d54509d4a2b32c91cf81743472ee",
+      "sha256": "f5501cf1d90bb5b2b873c7a22f8d41b4db23c6b96bffd2ce1243b71665dab1e4",
       "role": "D265 baseline-bound one-shot operator entrypoint",
       "reachable_from_d265_real_operator_path": true
     },
@@ -54,7 +54,7 @@
     },
     {
       "path": "core/persistent_runtime.py",
-      "sha256": "dd84cda8c43df12c9caa057af0c16e8b5b9b198a26a3a38636bd1ee41dc885e3",
+      "sha256": "42efbc29d2cebc06d3a83fd37cb410d9412dd6d20f0ffc7e3348338a70d79641",
       "role": "persistent coordinator and STOP_AFTER_FIRST_IMAGE runtime",
       "reachable_from_d265_real_operator_path": true
     },
