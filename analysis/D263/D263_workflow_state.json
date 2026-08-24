@@ -11,10 +11,11 @@
     "status_short": "",
     "remote_head_referenced_by_prompt_matches_head": true
   },
-  "completed_substeps": ["01", "02", "03"],
+  "completed_substeps": ["01", "02", "03", "04"],
   "outcome_01": "PASS_PRIMARY_EVIDENCE_CLOSED",
   "outcome_02": "PASS_AUDIT_NOT_BLOCKED",
   "outcome_03": "PASS_EVIDENCE_SUPPORTED_DEVICE_INTERNAL_UNKNOWN",
+  "outcome_04": "PASS_PHASE2_CONTRACT_AND_PATCH_PLAN_DEFINED",
   "source_identities": {
     "primary_capture": {
       "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
@@ -68,6 +69,17 @@
     "host_side_stop": "VERIFIED feasible/implemented (cancel pending, TLS close, USB release, restore fprintd, zero extra Goodix cmd; D255/D256 quiescence + retained-TLS audit)",
     "device_internal_state": "UNKNOWN (D252 BLOCKED; 0x34 = arm finger-up only; A2/0x70 not restore FDT)",
     "d262_baseline_respected": "e9073a171697bd68dd2debabb851f23d007bf718"
+  },
+  "phase2_contract_04": {
+    "status": "DEFINED_DESIGN_ONLY_NO_RUNTIME_PATCH",
+    "target": "D262 path -> arm 0x32 ACK -> wait IRQ2 -> one 0x22 -> retained TLS first B0 -> canonico decode -> FIRST_IMAGE_RECEIVED -> host-only cleanup -> STOP",
+    "reused_primitives": ["build_finger_image", "parse_fdt_event", "application_session.consume_application_record", "parse_image_payload", "lifecycle.post_irq2_image_command/first_image_received/cancel_pending_receive/terminal_stop"],
+    "patch_files": {
+      "step05": ["core/runtime_transport.py (0x22 allowlist)", "core/fdt_lifecycle.py (0x22 timeout; cancel_pending_receive accept FIRST_IMAGE_RECEIVED)"],
+      "step06": ["core/persistent_runtime.py (post-arm orchestration + relax trace check + RuntimeResult fields)", "tests/test_d263_phase2_first_image_terminal.py (new)"]
+    },
+    "invariants": "one USB/TLS session+handshake; zero 2nd secret/USB reopen/retry/A2/0x70/0x34/0x20-post/re-arm/persistent-write; first-image bytes not persisted; fail-closed",
+    "prechange_hashes_file": "D263_04_live_critical_prechange_hashes.json"
   },
   "taxonomy_0x22": "PRIMARY_TARGET_CAPTURE_OBSERVED_ONLY",
   "taxonomy_live_proof": "NOT_LIVE_PROVEN (D262 stops at FDT arm 0x32)",

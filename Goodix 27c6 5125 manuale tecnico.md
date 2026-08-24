@@ -4087,6 +4087,45 @@ Artefatti `analysis/D263/`: `D263_03_terminal_boundary_evidence.json`,
 `D263_03_terminal_boundary_decision.json`, `D263_03_phase1_decision.json`,
 `D263_03_report.md`. Nessun ZIP.
 
+### D263/04: Phase 2 design contract e patch plan (sottostep 04, design-only)
+
+Gate Phase 2 `READY` (`D263_PHASE1_READY…=true`). Nessuna patch runtime in
+04. Contratto minimo: `D262 path → arm 0x32 ACK → bounded wait IRQ 0x0002 →
+exactly one 0x22 [01 00] → retained TLS receives first B0 → parser/codec
+canonico valida+decodifica → FIRST_IMAGE_RECEIVED → bounded host-only terminal
+cleanup → STOP`. Invarianti: one USB/TLS session+handshake, zero second
+secret/USB reopen/retry/A2/`0x70`/`0x34`/`0x20`-post/re-arm/persistent-write,
+first-image bytes non persistiti (plaintext azzerato, raster solo in memoria),
+fail-closed su mismatch.
+
+Primitive riusate (nessun duplicato): `build_finger_image` (post_d4.py:257),
+`parse_fdt_event` (irq==2, post_d4.py:273),
+`application_session.consume_application_record` (tls_b0.py:252),
+`parse_image_payload`/`decode_image_record` (post_d4.py:336/347 → codec
+canonico), `lifecycle.post_irq2_image_command`/`first_image_received`/
+`cancel_pending_receive`/`terminal_stop` (fdt_lifecycle.py:222/230/234/251).
+Il gap era solo in `PersistentRuntimeCoordinator.run()` che si ferma a
+`machine.arm(ts16)` (persistent_runtime.py:232).
+
+Patch plan (step 05/06, ciascuno <15 min):
+- **Step 05**: `core/runtime_transport.py` (aggiungere `0x22` agli allowlist
+  `fdt_a0_policy`/`operational_fdt_a0_policy`); `core/fdt_lifecycle.py`
+  (aggiungere `0x22` a `COMMAND_TIMEOUT_MS`; `cancel_pending_receive` accetta
+  anche `FIRST_IMAGE_RECEIVED`). Rischio basso.
+- **Step 06**: `core/persistent_runtime.py` (orchestrazione post-arm: wait
+  IRQ2 → un `0x22` → receive B0 TLS → decode → `first_image_received` →
+  `cancel_pending_receive`+`terminal_stop`; rilassare il check
+  `EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE` a prefisso + audit comandi proibiti;
+  arricchire `RuntimeResult`); nuovo `tests/test_d263_phase2_first_image_terminal.py`.
+  Rischio medio, mitigato da riuso primitive auditate, single-use, fail-closed,
+  cleanup exactly-once.
+
+Hash pre-change dei file live-critical in
+`D263_04_live_critical_prechange_hashes.json` (baseline per step 05/06).
+
+Artefatti `analysis/D263/`: `D263_04_phase2_contract.json`,
+`D263_04_patch_plan.md`, `D263_04_live_critical_prechange_hashes.json`. Nessun ZIP.
+
 ## Regole operative
 
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
