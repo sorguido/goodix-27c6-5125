@@ -24,6 +24,14 @@ class MultiFrameError(RuntimeError):
     """Fail-closed lifecycle error; callers must not retry or recover."""
 
 
+#: Every ACK observed in the target post-arm multi-frame cycle carries status
+#: 0x01 (D263 primary evidence: 0x32, 0x22, 0x34, 0x20, 0x50, 0x32).  The
+#: permissive cold-start set (0x01, 0x07) is target-observed only for the
+#: pre-TLS bring-up phases and must not leak into this seam.  Exactly one
+#: status is accepted here; anything else fails closed.
+EXPECTED_ACK_STATUS = 0x01
+
+
 class InputKind(Enum):
     ACK = "ACK"
     IRQ = "IRQ"
@@ -92,7 +100,8 @@ class BoundedMultiFrameRunner:
 
     There are no loops other than the explicit sample bound, and no retry,
     reopen, reconnect, or recovery branch.  The last image is terminal: no
-    further sensor-reaching command is emitted.
+    further sensor-reaching command is emitted.  Every command ACK must echo
+    the exact expected control and carry exactly ``EXPECTED_ACK_STATUS``.
     """
 
     def __init__(self, channel: SingleReaderChannel, metric_sink: MetricSink):
@@ -110,7 +119,7 @@ class BoundedMultiFrameRunner:
     def _command_ack(self, frame: bytes, control: int, timeout_ms: int) -> None:
         self._channel.write(frame, timeout_ms)
         ack = self._read(InputKind.ACK, timeout_ms)
-        if ack.control != control or ack.status not in (0x01, 0x07):
+        if ack.control != control or ack.status != EXPECTED_ACK_STATUS:
             raise MultiFrameError(f"unexpected_ack:0x{control:02x}")
 
     def _consume(self, role: str, raster: tuple[int, ...]) -> dict[str, object]:

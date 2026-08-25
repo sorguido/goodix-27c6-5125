@@ -102,6 +102,14 @@ derivazione, freshness e validità per una sessione futura. Per questi motivi il
 modello non è collegato al transport USB reale e il kit D272 mantiene il flag
 future-live hard-disabled.
 
+Una review AI-PM successiva ha inoltre corretto la policy ACK di quel modello:
+`_command_ack()` accettava `0x01|0x07`, più permissivo dell'evidenza D263 in cui
+ogni ACK del ciclo ha `status=0x01`. Il seam ora richiede echo esatto e
+`status` esattamente `0x01` (`D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01`).
+Il set permissivo resta valido e invariato solo nelle fasi cold-start/pre-TLS,
+dove `0x07` è realmente osservato live. Questa closure non riapre né attenua i
+blocker D272 primari.
+
 Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
 D269, chiama il SIGFM locale, mantiene il gate `<25`, distingue score zero da
 errore negativo e contiene le eccezioni C++/OpenCV al confine C. Raster, buffer
@@ -134,6 +142,7 @@ ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
 MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_PASS_LIVE_INTEGRATION_BLOCKED
+D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
 POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_PAYLOAD_UP_TABLE_PROVENANCE_AND_FRESHNESS_UNKNOWN
 FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
 POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_B0_SEMANTICS_NOT_QUALITY_PROVEN
@@ -825,7 +834,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D269/01 adapter Linux/libfprint | READY offline; pixel+intensity CLOSED; full pipeline NOT_YET_CLOSED; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; `FpImage::ppmm` auditato: NBIS lo consuma, SIGFM no, valore fisico APP12509 UNKNOWN (500 DPI Rockytkg = terza parte); orientation/polarity non inventate; prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` con prerequisito ppmm |
 | D270/01 costruzione FpImage reale | READY offline; object/ownership/dimensions CLOSED; full pipeline PARTIALLY_CLOSED; live false | helper LGPL opaco costruisce `FpImage(80,64)` reale e object-owned dal raster sintetico via adapter D269; weak-finalization, strict build, ASan/UBSan, root/external-cwd e symbol audit PASS; ppmm fisico separato `UNKNOWN`, NBIS fail-closed, SIGFM ppmm-independent ma non selezionato; orientation/polarity ancora unresolved |
 | D271/01 policy feature extractor | READY offline; policy CLOSED; full pipeline PARTIALLY_CLOSED; live false | call-flow extractor/template/matcher/enrollment locale ricostruito; SIGFM unico `CANDIDATE_FOR_VALIDATION` con input 80×64 strutturalmente supportato ma gate ≥25 keypoint e qualità target ignota; NBIS strutturalmente accetta 80×64 ma resta `BLOCKED` per ppmm ignoto e requisito ≥10 minutiae non provato; orientation/polarity unresolved, nessun claim da fixture sintetiche o Rocky |
-| D272/01 pre-live multi-frame + metriche SIGFM | BLOCKED per live/executable closure; avanzamento offline reale; live false | ordine OEM corretto con `0x50` obbligatorio; modello bounded 2–8 sample, single-reader e fail-closed PASS sintetico; seam SIGFM LGPL con mapping D269, gate 25, score/error ed exception containment PASS su double; origine/freshness tabella `0x34`, seconda iterazione target e build SIGFM reale bloccata da OpenCV4-dev assente |
+| D272/01 pre-live multi-frame + metriche SIGFM | BLOCKED per live/executable closure; avanzamento offline reale; live false | ordine OEM corretto con `0x50` obbligatorio; modello bounded 2–8 sample, single-reader e fail-closed PASS sintetico; seam SIGFM LGPL con mapping D269, gate 25, score/error ed exception containment PASS su double; origine/freshness tabella `0x34`, seconda iterazione target e build SIGFM reale bloccata da OpenCV4-dev assente; policy ACK del ciclo corretta post-review AI-PM da `0x01|0x07` a `status` esatto `0x01` (`D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01`), blocker primari invariati |
 
 ## Fonti e confini di pubblicazione
 
@@ -3838,7 +3847,7 @@ L'evidenza primaria già hash-gated in
 | --- | --- | --- | --- |
 | 1 | first B0, packet 231 | `OBSERVED`, decode `VERIFIED` live da D268 | terminale nel runtime corrente |
 | 2 | `0x34 {0a01 || 808780948081807a807f8086}`, packet 233 | `OBSERVED` | origine/freshness/validità futura tabella up `UNKNOWN` |
-| 3 | ACK `B0/34/01`, packet 235 | `OBSERVED` | il modello offline lo rende obbligatorio e fail-closed |
+| 3 | ACK `B0/34/01`, packet 235 | `OBSERVED` | il modello offline lo rende obbligatorio, `status` esatto `0x01` e fail-closed |
 | 4 | IRQ `0x0200`, packet 237 | `OBSERVED`; finger-up fortemente supportato; Rocky `THIRD_PARTY_CORROBORATION` | timeout target `UNKNOWN` |
 | 5 | `0x20 {0100}`, packet 238; ACK packet 241 | `OBSERVED` | nessuna semantica di qualità inventata |
 | 6 | B0 post-up, packet 243 | `OBSERVED` | contenuto no-finger/qualità non promosso |
@@ -3852,6 +3861,51 @@ channel iniettato con un solo `read_next`. Accetta solo un opt-in esplicito da
 ha retry/reopen/recovery e non emette comandi dopo l'ultimo sample. È un modello
 sintetico: non modifica `PersistentRuntimeCoordinator`, il default D268 resta
 first-image terminale e nessuna policy fisica autorizza `0x34`.
+
+#### Policy ACK esatta del ciclo multi-frame (corrective post-review AI-PM)
+
+La prima implementazione D272/01 di `_command_ack()` accettava
+`ack.status in (0x01, 0x07)`. Questa policy era **più permissiva
+dell'evidenza target-specifica** e contraddiceva il contratto già dichiarato in
+`analysis/D272/D272_01_multiframe_contract.json`
+(`mandatory exact ACK; no optional/permissive fallback`). Dopo review AI-PM è
+stata corretta in un confronto esatto con `EXPECTED_ACK_STATUS = 0x01`.
+
+La fonte è `analysis/D263/D263_01_post_arm_order.json`, classificata
+**target-specific primary evidence** (capture hash-gated, firmware
+`GF_ST411SEC_APP_12509`): tutti gli ACK del ciclo pertinente hanno `status=0x01`.
+
+| Control | ACK target osservato | Packet zero-based | Policy corretta |
+| --- | --- | --- | --- |
+| `0x34` | `0x01` | 235 | esatto `0x01` |
+| `0x20` | `0x01` | 241 | esatto `0x01` |
+| `0x50` | `0x01` | 247 | esatto `0x01` |
+| `0x32` | `0x01` | 253 (e 223 pre-first-image) | esatto `0x01` |
+| `0x22` | `0x01` | 229 | esatto `0x01` |
+
+Il seam D272 richiede quindi che `ACK_ECHO` sia uguale al control atteso e che
+`ACK_STATUS` sia esattamente `0x01`; qualsiasi altro valore, incluso `0x07`, è
+fail-closed e non emette alcun comando successivo. Non esistono tabelle di
+status multiple, fallback, retry o recovery in questo percorso.
+
+La distinzione rispetto al resto del codice è **intenzionale e non un difetto**:
+`core/cold_start.py` (`ALLOWED_ACK_STATUSES`) e `core/post_d4.parse_ack()`
+restano `0x01|0x07` perché `0x07` è realmente target-osservato live nelle fasi
+di bring-up pre-TLS (D241: `E4`, `A2`, `0x82`, `0xA6`, `0x70`, `0x80`, `0x90`).
+Quel set permissivo è corretto per quelle fasi e non deve propagarsi al ciclo
+post-arm, dove non è mai stato osservato. I due parser globali non sono stati
+modificati da questo corrective.
+
+```text
+D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
+ACK_0X07_ACCEPTED=false
+```
+
+Il corrective è locale e deterministico: non cambia l'ordine
+`0x34 → IRQ0200 → 0x20 → image → 0x50 → response → 0x32`, il mapping D269, il
+seam metrico SIGFM, il privacy contract, i timeout candidate, la semantica delle
+tabelle up/down, la dipendenza OpenCV o lo stato live-disabled del kit operatore.
+**Non modifica i blocker primari D272**, che restano aperti.
 
 #### Seam SIGFM e privacy
 
@@ -3894,11 +3948,16 @@ Stato canonico:
 OUTCOME=BLOCKED_POST_FIRST_IMAGE_UP_TABLE_SECOND_CYCLE_AND_OPENCV4_DEV
 ADVANCEMENT=NEW_OFFLINE_MULTIFRAME_MODEL_AND_SIGFM_EXCEPTION_PRIVACY_SEAM
 EXECUTABLE_CLOSURE=FAIL
+ACK_POLICY_CORRECTIVE=PASS
+D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
+ACK_0X07_ACCEPTED=false
+CORRECTIVE_EXECUTABLE_CLOSURE=PASS
 FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE_SIGFM_VALIDATION_CANDIDATE
 SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV
 SIGFM_EXCEPTION_CONTAINMENT=CLOSED_OFFLINE_AT_C_ABI
 SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
 MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_PASS_LIVE_INTEGRATION_BLOCKED
+D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
 POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_PAYLOAD_UP_TABLE_PROVENANCE_AND_FRESHNESS_UNKNOWN
 FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
 POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_B0_SEMANTICS_NOT_QUALITY_PROVEN

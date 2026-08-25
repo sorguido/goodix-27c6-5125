@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
+import inspect
 import unittest
 
 from core.multiframe_validation import (
+    EXPECTED_ACK_STATUS,
     BoundedMultiFrameRunner,
     Input,
     InputKind,
@@ -14,6 +16,10 @@ from core.post_d4 import parse_outer, parse_payload
 RASTER = tuple(index % 4096 for index in range(5120))
 UP = bytes.fromhex("808780948081807a807f8086")
 DOWN = bytes.fromhex("80ac80bd80a380b180a680b2")
+
+# Exact target-observed ACK order of one post-first-image cycle (D263 primary
+# evidence, packets 235, 241, 247, 253 and the pre-first-image 229).
+CYCLE_ACK_CONTROLS = (0x34, 0x20, 0x50, 0x32, 0x22)
 
 
 def cycle_inputs():
@@ -29,6 +35,27 @@ def cycle_inputs():
         Input(InputKind.ACK, control=0x22, status=1),
         Input(InputKind.IMAGE, raster=RASTER),
     ]
+
+
+def cycle_prefix_with_ack_status(ack_ordinal, status):
+    """Inputs up to the Nth ACK of the cycle, with that ACK's status replaced.
+
+    The prefix stops at the ACK under test so that any command emitted after a
+    rejected ACK is directly observable in ``controls()``.
+    """
+    inputs = cycle_inputs()
+    positions = [
+        index
+        for index, item in enumerate(inputs)
+        if item.kind is InputKind.ACK
+    ]
+    target = positions[ack_ordinal]
+    replaced = Input(
+        InputKind.ACK,
+        control=inputs[target].control,
+        status=status,
+    )
+    return inputs[:target] + [replaced]
 
 
 class FakeSingleReader:
@@ -140,6 +167,67 @@ class D272MultiFrameTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(MultiFrameError, "biometric_material"):
             runner.run(self.contract(("A1", "A2")), RASTER)
+
+    # --- D272/01 corrective: exact ACK status, fail-closed -----------------
+
+    def test_expected_ack_status_is_exactly_0x01(self):
+        self.assertEqual(EXPECTED_ACK_STATUS, 0x01)
+
+    def test_every_cycle_ack_accepts_only_status_0x01(self):
+        """0x07 and any other status are fail-closed at every ACK stage.
+
+        0x07 is target-observed only in the cold-start/pre-TLS phases; the
+        post-arm cycle observed in D263 is exclusively status 0x01.
+        """
+        rejected = (0x00, 0x02, 0x03, 0x07, 0x10, 0x81, 0xFF)
+        for ordinal, control in enumerate(CYCLE_ACK_CONTROLS):
+            for status in rejected:
+                with self.subTest(control=hex(control), status=hex(status)):
+                    channel = FakeSingleReader(
+                        cycle_prefix_with_ack_status(ordinal, status)
+                    )
+                    runner = BoundedMultiFrameRunner(
+                        channel, lambda role, raster: {}
+                    )
+                    with self.assertRaisesRegex(
+                        MultiFrameError, f"unexpected_ack:0x{control:02x}"
+                    ):
+                        runner.run(self.contract(("A1", "A2")), RASTER)
+                    # No command is emitted after the rejected ACK.
+                    self.assertEqual(
+                        controls(channel),
+                        list(CYCLE_ACK_CONTROLS[: ordinal + 1]),
+                    )
+
+    def test_every_cycle_ack_passes_on_status_0x01(self):
+        """The same stages still accept the exact target-observed status."""
+        for ordinal, control in enumerate(CYCLE_ACK_CONTROLS):
+            with self.subTest(control=hex(control)):
+                channel = FakeSingleReader(
+                    cycle_prefix_with_ack_status(ordinal, EXPECTED_ACK_STATUS)
+                )
+                runner = BoundedMultiFrameRunner(channel, lambda role, raster: {})
+                # The prefix ends at this ACK, so the run stops on the missing
+                # next input, never on the ACK itself.
+                with self.assertRaisesRegex(MultiFrameError, "synthetic_timeout"):
+                    runner.run(self.contract(("A1", "A2")), RASTER)
+
+    def test_wrong_echo_is_rejected_even_with_status_0x01(self):
+        channel = FakeSingleReader(
+            [Input(InputKind.ACK, control=0x20, status=EXPECTED_ACK_STATUS)]
+        )
+        with self.assertRaisesRegex(MultiFrameError, "unexpected_ack:0x34"):
+            BoundedMultiFrameRunner(channel, lambda role, raster: {}).run(
+                self.contract(("A1", "A2")), RASTER
+            )
+        self.assertEqual(controls(channel), [0x34])
+
+    def test_ack_policy_has_no_permissive_membership_test(self):
+        """Structural guard against reintroducing a multi-status ACK table."""
+        source = inspect.getsource(BoundedMultiFrameRunner._command_ack)
+        self.assertIn("EXPECTED_ACK_STATUS", source)
+        self.assertNotIn("0x07", source)
+        self.assertNotIn(" in (", source)
 
 
 if __name__ == "__main__":
