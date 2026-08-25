@@ -1,0 +1,88 @@
+{
+  "artifact": "D270_01_fpimage_pipeline_evidence",
+  "step": "D270/01",
+  "execution_mode": "OFFLINE_ONLY",
+  "generated_at": "2026-08-25T12:31:21+02:00",
+  "libfprint_source": {
+    "path": "Rockytkg/libfprint",
+    "declared_version": "1.94.5",
+    "upstream_gitlink": "7ebe0c809b4d1df3400e84299a4ec4acdea84590",
+    "provenance": "Rockytkg/PROVENANCE.md"
+  },
+  "findings": [
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:51-78",
+      "finding": "fp_image_new uses g_object_new; constructed allocates width*height zeroed bytes"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:60-70,440-456",
+      "finding": "FpImage owns data; finalize frees it; getter returns a transfer-none view of width*height bytes"
+    },
+    {
+      "classification": "OBSERVED",
+      "source": "Rockytkg/libfprint/libfprint/fpi-image.h:37-74",
+      "finding": "width, height, ppmm, flags, guint8 data and derived fields exist; no stride field exists"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:126-160",
+      "finding": "width and height are construct-only; fp_image_init is empty and does not set ppmm or flags"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:350-370,549-569",
+      "finding": "NBIS receives copied image flags, dimensions and ppmm; ppmm is passed to get_minutiae"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/nbis/mindtct/quality.c:195-251",
+      "finding": "NBIS quality computes radius_pix = sround(RADIUS_MM * ppmm)"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:307-328,520-538",
+      "finding": "SIGFM receives only copied image bytes, width and height; ppmm is not consumed"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fpi-image-device.c:496-528",
+      "finding": "image-device selects NBIS or SIGFM downstream according to algorithm; D270 does not select either"
+    },
+    {
+      "classification": "THIRD_PARTY_CORROBORATION",
+      "source": "Rockytkg/src/goodixgf.c:279-281",
+      "finding": "Rockytkg assigns 500/25.4 based on a ridge-scale comment; it is not APP12509 target-specific proof"
+    },
+    {
+      "classification": "UNKNOWN",
+      "source": "repository corpus audit",
+      "finding": "no OEM, capture-derived physical measurement or target-specific source establishes APP12509 DPI/ppmm"
+    },
+    {
+      "classification": "VERIFIED_BY_EXECUTION",
+      "source": "libfprint-driver/tests/test_goodix_fpimage_pipeline.c",
+      "finding": "real local FpImage construction, object-owned data, dimensions, mapping, defaults, weak-finalization and ppmm gate pass with synthetic data"
+    }
+  ],
+  "contract": {
+    "fpimage_object_construction": "CLOSED_OFFLINE",
+    "fpimage_buffer_ownership": "CLOSED_OFFLINE",
+    "fpimage_dimension_contract": "CLOSED_OFFLINE",
+    "width": 80,
+    "height": 64,
+    "packed_bytes": 5120,
+    "stride": "IMPLICIT_WIDTH_80",
+    "pixel_owner": "FPIMAGE_GOBJECT",
+    "pixel_getter_transfer": "NONE",
+    "physical_ppmm_state": "UNKNOWN_SEPARATE_AUTHORITATIVE_METADATA",
+    "fpimage_ppmm_storage_default": 0.0,
+    "fpimage_ppmm_storage_default_semantically_valid": false,
+    "nbis_with_unknown_ppmm": "BLOCKED",
+    "sigfm_ppmm_consumption": "NO_VERIFIED",
+    "orientation_contract": "UNRESOLVED",
+    "polarity_contract": "UNRESOLVED",
+    "full_fpimage_pipeline_contract": "PARTIALLY_CLOSED"
+  }
+}

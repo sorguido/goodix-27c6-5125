@@ -27,3 +27,20 @@ resolved. The adapter has no USB, TLS, secret, fprintd, filesystem, or image
 persistence API. A future libfprint glue layer can allocate `FpImage(80, 64)`,
 copy the returned 5120 bytes into its object-owned `data`, and apply only a
 separately evidenced orientation/polarity decision.
+
+## D270/01 real FpImage construction seam
+
+`goodix_fpimage_pipeline.c` now performs that bounded construction against the
+repository-local libfprint API. It allocates a real `FpImage(80, 64)`, lets the
+D269 adapter write the fixed 5120-byte mapping directly into the object-owned
+pixel buffer, verifies the adapter metadata, and owns the initial GObject
+reference until `goodix_fpimage_pipeline_free()`.
+
+The physical scan resolution remains target-specifically unknown. The opaque
+owner records `GOODIX_FPIMAGE_PHYSICAL_PPMM_UNKNOWN` separately; the numerical
+zero left by GObject initialization is not treated as a measurement or usable
+NBIS input. `goodix_fpimage_pipeline_check_ppmm_requirement()` therefore blocks
+NBIS explicitly. Its OK result for SIGFM means only that the locally audited
+SIGFM extractor does not consume `ppmm`; it does not select an extractor or
+authorize preprocessing, matching, enrollment, or live use. Image flags remain
+zero solely because no orientation or polarity transformation is yet justified.

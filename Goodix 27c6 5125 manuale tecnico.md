@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D269/01 (sintesi)
+### Stato corrente post-D270/01 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -57,22 +57,39 @@ Il decoder GPL continua a produrre il raster canonico `80x64 u16` con valori
 frame-local, I/O o persistenza. `ORIENTATION_CONTRACT=UNRESOLVED`: D269/01 non
 applica flag, flip, rotate, transpose ulteriore o inversione di polarità.
 
-Il **full FpImage pipeline contract** non è ancora chiuso. L'audit correttivo
-D269/01 ha localizzato `FpImage::ppmm` (gdouble, pixels-per-mm) come campo reale
-consumato da NBIS (`get_minutiae` → `combined_minutia_quality`,
-`radius_pix = RADIUS_MM × ppmm`) ma **non** da SIGFM (`sigfm_extract` prende
-solo image/w/h). Il valore fisico target-specific APP12509 è `UNKNOWN`: l'unica
-assegnazione trovata è `fimg->ppmm = 500.0/25.4` in `Rockytkg/src/goodixgf.c`,
-che è terza parte (corroborazione) e la cui stessa commento dichiara ppmm
-"solo per display" e SIGFM insensibile alla risoluzione. Nessuna evidenza
-locale target-specific (OEM, capture, misura diretta) fissa ppmm/DPI per
-APP12509. Pertanto:
+Il primo tratto production-shaped del **full FpImage pipeline contract** è ora
+chiuso offline da D270/01. Il glue LGPL alloca un vero `FpImage(80,64)` usando
+il `fp_image_new()` della copia libfprint 1.94.5 locale, fa scrivere l'adapter
+D269 direttamente nei 5120 byte posseduti dal GObject, preserva flags zero e
+rilascia l'unico riferimento iniziale con finalizzazione verificata. Nessun
+buffer pixel esterno deve sopravvivere al caller e lo stride resta implicito
+pari alla width.
+
+Il valore fisico `ppmm` target-specific resta `UNKNOWN` e viene rappresentato
+da stato separato nel wrapper opaco: lo zero tecnico lasciato dalla
+zero-initialization GObject non è una misura. Il gate D270 blocca NBIS con
+`PHYSICAL_PPMM_REQUIRED`; SIGFM non consuma `ppmm`, ma questo solo fatto non lo
+seleziona né rende semanticamente validi feature extraction, matching o
+enrollment. Nessuna nuova fonte target-specific fissa DPI, orientation o
+polarity. Pertanto:
 
 ```text
-PHYSICAL_PPMM/DPI=UNRESOLVED
-FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
-NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
-NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FPIMAGE_OBJECT_CONSTRUCTION=CLOSED_OFFLINE
+FPIMAGE_BUFFER_OWNERSHIP=CLOSED_OFFLINE
+FPIMAGE_DIMENSION_CONTRACT=CLOSED_OFFLINE
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+UNKNOWN_PPMM_SEMANTICS=EXPLICITLY_BOUNDED
+NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
+NBIS_WITH_UNKNOWN_PPMM=BLOCKED
+SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=TARGET_EVIDENCE_OR_EXPLICIT_BOUNDS_FOR_ORIENTATION_POLARITY_PPMM_AND_BIOMETRIC_QUALITY
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -755,6 +772,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D268 first-image (Kit D268/01) | successo, marker D268 consumato | IRQ2 consegnato, `0x22` ACK-validato, primo B0 e decode raster `80x64` PASS; trailer `0x88` no-check target-proven, checksum additivo mismatch, CRC record valido; zero retry/recovery/reopen/write/comandi post-image; cleanup e zeroizzazione riusciti; restore callback completata senza eccezione; stato esterno finale fprintd non osservato indipendentemente |
 | Codec immagine | confermato offline + CRC record validato live + decode eseguito live | record 7684 byte → raster u16 `80x64` (CRC-32/MPEG-2 record valido e raster `80x64` live-proven in D268) |
 | D269/01 adapter Linux/libfprint | READY offline; pixel+intensity CLOSED; full pipeline NOT_YET_CLOSED; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; `FpImage::ppmm` auditato: NBIS lo consuma, SIGFM no, valore fisico APP12509 UNKNOWN (500 DPI Rockytkg = terza parte); orientation/polarity non inventate; prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` con prerequisito ppmm |
+| D270/01 costruzione FpImage reale | READY offline; object/ownership/dimensions CLOSED; full pipeline PARTIALLY_CLOSED; live false | helper LGPL opaco costruisce `FpImage(80,64)` reale e object-owned dal raster sintetico via adapter D269; weak-finalization, strict build, ASan/UBSan, root/external-cwd e symbol audit PASS; ppmm fisico separato `UNKNOWN`, NBIS fail-closed, SIGFM ppmm-independent ma non selezionato; orientation/polarity ancora unresolved |
 
 ## Fonti e confini di pubblicazione
 
@@ -3806,6 +3824,28 @@ da SIGFM; il valore fisico target-specific APP12509 è `UNKNOWN` (l'unica assegn
 trovata, `fimg->ppmm = 500.0/25.4` in `Rockytkg/src/goodixgf.c`, è terza parte e la sua
 stessa commento la dichiara "solo per display"). Orientation e polarity restano `UNRESOLVED`.
 
+D270/01 ha successivamente superato il boundary di sola integrazione oggetto:
+il helper LGPL `goodix_fpimage_pipeline` costruisce realmente il GObject locale
+e trasferisce i pixel sintetici tramite l'unico adapter D269. Lo stato corrente
+del current critical boundary diventa:
+
+```text
+FPIMAGE_OBJECT_CONSTRUCTION=CLOSED_OFFLINE
+FPIMAGE_BUFFER_OWNERSHIP=CLOSED_OFFLINE
+FPIMAGE_DIMENSION_CONTRACT=CLOSED_OFFLINE
+UNKNOWN_PPMM_SEMANTICS=EXPLICITLY_BOUNDED
+NBIS_WITH_UNKNOWN_PPMM=BLOCKED
+SIGFM_PPMM_CONSUMPTION=NO_VERIFIED
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
+```
+
+Il prossimo step non deve ripetere la costruzione né promuovere SIGFM per sola
+comodità: deve fondare la policy di feature extraction su evidenza o limiti
+espliciti per orientation, polarity, risoluzione e qualità biometrica.
+
 
 ## Hard Wall
 
@@ -4356,19 +4396,33 @@ mapping fixed full-range `round(v*255/4095)`. L'orientamento fisico/naturale e l
 polarità restano `UNRESOLVED`; zero flag significa conservare l'ordine canonico
 del decoder, non dichiararlo fisicamente orientato.
 
-Lo stato di implementazione Linux per il dominio libfprint è pertanto:
+Lo stato di implementazione Linux per il dominio libfprint, aggiornato da
+D270/01, è pertanto:
 
 ```text
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FPIMAGE_OBJECT_CONSTRUCTION=CLOSED_OFFLINE
+FPIMAGE_BUFFER_OWNERSHIP=CLOSED_OFFLINE
+FPIMAGE_DIMENSION_CONTRACT=CLOSED_OFFLINE
 TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
-FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
-NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
-NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+UNKNOWN_PPMM_SEMANTICS=EXPLICITLY_BOUNDED
+NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
+NBIS_WITH_UNKNOWN_PPMM=BLOCKED
+SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
 ```
 
-Il contratto pixel e di quantizzazione intensità sono `CLOSED_OFFLINE`; il full
-`FpImage` pipeline contract resta `NOT_YET_CLOSED` finché `FpImage::ppmm` non è
-risolto con evidenza target-specific APP12509 o esplicitamente bound come non
-risolto dal glue. Orientation e polarity restano `UNRESOLVED`.
+Il contratto pixel, la quantizzazione, la costruzione del GObject, le dimensioni
+e l'ownership sono `CLOSED_OFFLINE`. Il full `FpImage` pipeline contract è
+soltanto `PARTIALLY_CLOSED`: lo stato separato D270 rende l'ignoto `ppmm`
+truth-preserving senza trasformare lo zero storage in una misura; NBIS resta
+bloccato, mentre l'indipendenza SIGFM dal solo `ppmm` non sostituisce una
+decisione su extractor, qualità, orientation o polarity.
 
 
 ## D262: fresh-FDT arm execution-readiness review offline
@@ -6094,3 +6148,77 @@ Il D268 operator-kit `test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_
 fallisce in questo ambiente (guard worktree-dirty non solleva); è pre-esistente,
 estraneo al corrective ppmm e all'adapter (byte-identico) e non viene corretto
 qui per disciplina anti-deragliamento.
+
+### D270/01: integrazione offline del vero FpImage e ppmm bounded
+
+D270/01 è **OFFLINE ONLY** e synthetic-only. Non apre USB, non usa capture
+biometriche reali, non contatta fprintd e non materializza secret. La fonte API
+è la copia libfprint 1.94.5 materializzata in `Rockytkg/libfprint/`, commit
+gitlink di provenance `7ebe0c809b4d1df3400e84299a4ec4acdea84590`.
+
+L'audit verifica nel codice locale che `fp_image_new(width,height)` usa
+`g_object_new()` con width/height construct-only e che `constructed()` alloca
+`width*height` byte tramite `g_malloc0`. `FpImage` possiede `data`; il getter
+restituisce una vista `transfer none`; `finalize()` libera data, binarized e
+minutiae. Non esiste stride esplicito. `flags`, `ppmm`, binarized, minutiae,
+SIGFM info e il campo interno `ref_count` partono da zero/null per
+zero-initialization; `fp_image_init()` è vuoto e non assegna 500 DPI.
+
+Il nuovo owner opaco LGPL `libfprint-driver/goodix_fpimage_pipeline.c` alloca
+`FpImage(80,64)`, passa direttamente il buffer object-owned all'adapter D269 e
+verifica metadata `80×64`, stride implicito 80, 5120 byte e flags zero. Non
+introduce flip, rotate, transpose, inversione, normalizzazione frame-local o
+I/O. L'owner mantiene l'unico riferimento iniziale fino alla free; un weak
+pointer GObject prova la finalizzazione nel test.
+
+Il campo numerico `image->ppmm` resta tecnicamente `0.0` perché il core locale
+lo zero-inizializza, ma questo valore non è semanticamente esposto come misura.
+Lo stato autorevole del wrapper è
+`GOODIX_FPIMAGE_PHYSICAL_PPMM_UNKNOWN`. Il gate consumer-specific blocca NBIS
+con `GOODIX_FPIMAGE_PIPELINE_PHYSICAL_PPMM_REQUIRED`; per SIGFM restituisce
+soltanto che il requisito ppmm non si applica. Non autorizza feature extraction,
+matching o enrollment e non sceglie l'algoritmo.
+
+Matrice downstream canonica:
+
+| Livello | Usa ppmm | Eseguibile con ppmm unknown | Validità semantica D270 | Gate |
+| --- | --- | --- | --- | --- |
+| costruzione FpImage | no | sì, testata | valida per rappresentazione/ownership | PASS |
+| preprocessing bounded D269 | no | sì, testato | valida solo la quantizzazione fixed | PASS |
+| SIGFM extraction | no, verificato | tecnicamente sì | non validata/né selezionata | STOP prima dell'uso feature |
+| NBIS minutiae/quality | sì, verificato | codice tecnicamente invocabile con zero, ma non autorizzato | invalida senza ppmm fisico | BLOCKED |
+| feature extraction | dipende dall'algoritmo | non chiusa | non dimostrata | BLOCKED oltre i soli gate extractor |
+| matching | non direttamente dopo feature valide | non autorizzato | non dimostrata | BLOCKED |
+| enrollment | dipende da extraction e matching validi | non autorizzato | non dimostrata | BLOCKED |
+
+Il runner compila il vero `fp-image.c` locale insieme al nuovo helper e a stub
+link-only che abortirebbero se D270 attraversasse accidentalmente NBIS/SIGFM.
+Build GCC strict, KAT, determinismo, frame-independence, failure behavior,
+weak-finalization, audit simboli vietati, ASan/UBSan e invocazione da Git root e
+da `/tmp` passano. La fault injection di OOM interna a `fp_image_new()` è
+`NOT_AVAILABLE`: GLib usa allocazione abort-on-OOM; il wrapper usa `g_try_new0`,
+gestisce NULL e non introduce un allocator globale solo per il test.
+
+```text
+OUTCOME=READY — D270_01_FPIMAGE_OBJECT_PIPELINE_PARTIALLY_CLOSED
+ADVANCEMENT=REAL_LOCAL_FPIMAGE_CONSTRUCTION_AND_LIFETIME_VERIFIED_WITH_UNKNOWN_PPMM_FAIL_CLOSED
+EXECUTABLE_CLOSURE=PASS
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FPIMAGE_OBJECT_CONSTRUCTION=CLOSED_OFFLINE
+FPIMAGE_BUFFER_OWNERSHIP=CLOSED_OFFLINE
+FPIMAGE_DIMENSION_CONTRACT=CLOSED_OFFLINE
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+UNKNOWN_PPMM_SEMANTICS=EXPLICITLY_BOUNDED
+NBIS_WITH_UNKNOWN_PPMM=BLOCKED
+SIGFM_PPMM_CONSUMPTION=NO_VERIFIED
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+RESIDUAL_BLOCKER_OR_RISK=PPMM_ORIENTATION_POLARITY_AND_BIOMETRIC_QUALITY_UNRESOLVED;EXTRACTOR_NOT_SELECTED
+CANONICAL_DOCUMENTATION=UPDATED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
