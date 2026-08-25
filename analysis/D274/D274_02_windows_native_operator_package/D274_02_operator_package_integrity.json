@@ -1,0 +1,17 @@
+{
+  "artifact": "D274_02_operator_package_integrity",
+  "schema": "D274_02_PACKAGE_INTEGRITY_V1",
+  "scope": "STATIC_PACKAGE_FILES_ONLY_NOT_RUNTIME_RESULTS",
+  "verification": "READ_ONLY_AT_RUNTIME_BY_run-d274-02-native-qualification.ps1",
+  "approved_d274_01_baseline_sha256": {
+    "operator_kit/d274-windows-multiframe-evidence.ps1": "4b0b3b1c3f81a7a5874aa2d3a4b281c79ec03b0b1ab1c92cc11284bbee5bd9bd",
+    "analysis/D274/d274_postprocess_multiframe_evidence.py": "2867ff23cb76297d9089b0840afa59e7a8222e5657e3fc1dc5d7774d6ca68f37"
+  },
+  "files": [
+    { "path": "operator_kit/d274-windows-multiframe-evidence.ps1", "sha256": "4b0b3b1c3f81a7a5874aa2d3a4b281c79ec03b0b1ab1c92cc11284bbee5bd9bd" },
+    { "path": "analysis/D274/d274_postprocess_multiframe_evidence.py", "sha256": "2867ff23cb76297d9089b0840afa59e7a8222e5657e3fc1dc5d7774d6ca68f37" },
+    { "path": "run-d274-02-native-qualification.ps1", "sha256": "ff9d06916cb3cb18a305f96892f87141db2bd5d1b593aa46b3f95b06b9cdb6b3" },
+    { "path": "collect-d274-02-results.ps1", "sha256": "e2ce99a6418b93ade6309aa76dbcb136fc34e2b5de91ccfd5e5f9ed1afdf24ed" },
+    { "path": "D274_02_OPERATOR_README_IT.md", "sha256": "1c5c10805d12289b17f41f3f33398ea223fc00e58c189d46e763d11afb88e359" }
+  ]
+}

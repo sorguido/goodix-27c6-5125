@@ -1,0 +1,56 @@
+{
+  "artifact": "D274_02_bundle_manifest",
+  "bundle": "analysis/D274/D274_02_windows_native_qualification_operator_bundle.zip",
+  "this_bundle_is": "OPERATOR_PACKAGE_PREPARATION_CORRECTIVE_IN_PLACE",
+  "is_windows_native_execution_evidence": false,
+  "review_set": [
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "analysis/D274/D274_02_windows_native_qualification_prep_report.md",
+    "analysis/D274/D274_02_windows_native_qualification_prep_test_results.json",
+    "analysis/D274/D274_02_windows_native_qualification_execution_manifest.json",
+    "analysis/D274/D274_02_windows_native_qualification_bundle_manifest.json",
+    "analysis/D274/D274_02_windows_native_operator_package/"
+  ],
+  "operator_package_contents": [
+    "operator_kit/d274-windows-multiframe-evidence.ps1",
+    "analysis/D274/d274_postprocess_multiframe_evidence.py",
+    "captures/",
+    "results/",
+    "run-d274-02-native-qualification.ps1",
+    "collect-d274-02-results.ps1",
+    "D274_02_operator_package_integrity.json",
+    "D274_02_OPERATOR_README_IT.md"
+  ],
+  "operator_result_allowlist": [
+    "D274_02_selftest.json",
+    "D274_02_preflight.json",
+    "D274_02_preauthorization_simulation.json",
+    "D274_02_native_qualification_summary.json",
+    "D274_02_environment.json",
+    "D274_02_hard_disable_adversarial.json"
+  ],
+  "excluded_from_result_zip": [
+    "pcap", "pcapng", "captures/", "raw ACL", "registry", "event log",
+    "screenshot", "fingerprint data", "B0", "TLS", "secret", "PSK",
+    "cache", "DLL", "firmware"
+  ],
+  "byte_identical_baseline_copies": true,
+  "d274_02_capture_root_authority": "PACKAGE_ROOT_CAPTURES",
+  "d274_02_wrapper_kit_capture_root_alignment": "PASS",
+  "d274_02_goodix_presence_evidence_truthful": "PASS",
+  "d274_02_first_failure_detail_preserved": "PASS_SANITIZED",
+  "d274_02_subprocess_failure_diagnostics": "PASS_SANITIZED_BOUNDED",
+  "d274_02_imported_kit_evidence_path_sanitization": "PASS",
+  "d274_02_user_profile_package_path_collectable": true,
+  "d274_02_operator_package_integrity": "PASS_STATIC_AND_RUNTIME_VERIFIABLE",
+  "d274_02_operator_package_hash_overclaim_removed": true,
+  "d274_02_collector_results_path_authority": "EXACT_PACKAGE_RESULTS",
+  "d274_02_operator_package": "READY_FOR_AI_PM_REVIEW",
+  "d274_02_windows_native_execution": "NOT_YET_PERFORMED",
+  "d274_02_windows_native_qualification": "NOT_YET_DETERMINED",
+  "d274_real_capture_capability": 0,
+  "d274_hard_disabled": true,
+  "live_authorized": false,
+  "ready_for_live": false,
+  "live_execution": "NOT_PERFORMED"
+}

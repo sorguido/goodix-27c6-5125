@@ -245,9 +245,16 @@ D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
 D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
 D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_CORRECTIVE
-NEXT_BOUNDARY_PREREQUISITE=CORRECTIVE_REVIEW_THEN_WINDOWS_NATIVE_OFFLINE_QUALIFICATION
-BASELINE_APPROVED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_OPERATOR_PACKAGE
+NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_DETAILED_OPERATOR_INSTRUCTIONS_AND_WINDOWS_NATIVE_OFFLINE_EXECUTION
+D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
+D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED
+D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
+D274_REAL_CAPTURE_CAPABILITY=0
+D274_HARD_DISABLED=true
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
@@ -4482,6 +4489,138 @@ READY_FOR_LIVE=false
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
 NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_CORRECTIVE
 NEXT_BOUNDARY_PREREQUISITE=CORRECTIVE_REVIEW_THEN_WINDOWS_NATIVE_OFFLINE_QUALIFICATION
+```
+
+### D274/02: Pacchetto operatore per qualificazione nativa Windows (preparazione OFFLINE)
+
+D274/02 prepara esclusivamente offline un **pacchetto operator-run** per
+qualificare nativamente su Windows le sole modalità innocue del Kit D274/01:
+`-SelfTestOnly`, `-PreflightOnly`, `-PreAuthorizationSimulationOnly`. L'AI
+esecutrice non dispone della VM Windows target e non esegue né simula la
+qualificazione nativa. Questo è un corrective in-place del pacchetto già
+preparato: la review AI-PM ha trovato e corretto cinque difetti (A–E) più un
+hardening (F) e una lacuna di privacy. Lo step chiude ora
+`D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW` e
+`D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED`. La qualificazione nativa
+reale avverrà quando l'operatore eseguirà il pacchetto nella VM e rispedirà il
+result bundle; fino ad allora
+`D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED`,
+`WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED` e
+`D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED`.
+
+Il Kit D274/01 (`operator_kit/d274-windows-multiframe-evidence.ps1`) resta
+**baseline non modificata**: le copie nel pacchetto sono byte-identiche (SHA-256
+verificato `4b0b3b1c…bd` per il kit e `2867ff23…f37` per il postprocessor). Non è
+emerso alcun nuovo difetto D274/01, quindi il pacchetto non è bloccato da
+`BLOCKED_BY_NEW_D274_01_DEFECT`.
+
+La review AI-PM del pacchetto preparato ha trovato e corretto in-place (senza
+aprire D274/03) cinque difetti e un hardening: (A) l'autority della radice
+`captures/` era incoerente tra wrapper (`package\..`) e kit (`package/captures`),
+ora unificata in `package/captures`; (B) `Write-D274JsonResult` era tipizzato
+`[hashtable]` pur ricevendo un `PSCustomObject` da `ConvertFrom-Json` in Windows
+PowerShell 5.1, ora `[object]` e senza dipendenza da `-AsHashtable`; (C) un FAIL
+pre-gate non produceva tutti e sei i core JSON, ora ogni esito scrive i sei file
+(le modalità non eseguite come `SKIPPED` con `skipped_because`); (D) il runtime
+summary dichiarava ancora "pending operator run", ora dichiara
+`WINDOWS_NATIVE_OFFLINE_QUALIFICATION_EXECUTED_BY_OPERATOR` e
+`NO_LIVE_CAPTURE_PERFORMED`; (E) `operator_package_sha256` etichettava come hash
+dell'intero pacchetto lo SHA-256 del solo kit, ora esiste
+`D274_02_operator_package_integrity.json` (verificato read-only a runtime) e
+l'environment esporta `operator_package_integrity`,
+`operator_package_manifest_sha256`, `approved_d274_01_kit_sha256`. Hardening (F):
+il collector ora richiede uguaglianza canonica esatta del path `results/`
+(rimosso il controllo prefix). La privacy del FAIL è centralizzata in
+`Sanitize-String` e rafforzata da una seconda barriera FAIL_CLOSED nel collector.
+
+Revisione AI-PM ulteriore (sempre in-place, senza D274/03) ha corretto la
+probatorietà del FAIL: (A) la presenza del sensore è ora osservata da
+`Get-D274GoodixPresence` (booleano) separatamente dal gate; se il target
+`VID_27C6&PID_5125` è presente il gate fallisce chiuso
+(`FAIL_CLOSED_GOODIX_PRESENT_BEFORE_OFFLINE_QUALIFICATION`) e
+`goodix_present_before_run=true`; se `Get-PnpDevice` non è disponibile la presenza
+è `null` (mai un falso negativo); (B) il primo failure preserva
+`failure_detail_sanitized` (messaggio eccezione passato per `Sanitize-String`,
+senza stack trace) nel summary, distinguendo PowerShell/integrity/kit-contract/
+Goodix/marker; (C) i FAIL dei subprocess preservano `exit_code` e un
+`error_sanitized` bounded (<=2048 char) derivato da stderr/stdout, così un
+preflight fallito per TShark/USBPcap/output-root è diagnosticabile; (D) l'evidence
+importata dal Kit (`D274_WINDOWS_PREFLIGHT_V1`) è sanitizzata prima del result
+bundle: `output_root` diventa `<PACKAGE_ROOT>\captures` e `tshark_path` passa per
+`Sanitize-String`, preservando i fatti semantici. Ne consegue che un package
+copiato sotto un user profile Windows (`C:\Users\<utente>\...`) resta
+collezionabile dal collector purché il relativo ACL privacy gate passi: il
+collector non rifiuta il path per il solo nome, ed è sempre la seconda barriera
+(SID/MAC/IP/`C:\Users\`/HKEY_/credential) a rifiutare eventuali dati sensibili
+residui.
+
+Il pacchetto `analysis/D274/D274_02_windows_native_operator_package/` contiene
+copia byte-identica del kit e del postprocessor, una `captures/` vuota (radice
+privata di destinazione), `results/` (prodotto dall'operatore), il launcher
+`run-d274-02-native-qualification.ps1`, il collector
+`collect-d274-02-results.ps1` e il manifest di integrità statico
+`D274_02_operator_package_integrity.json` (entrambi gli script GPL-2.0-or-later,
+Windows PowerShell 5.1). Il launcher verifica read-only il manifest prima di
+eseguire.
+
+Il launcher nativo, in ordine e senza retry:
+
+1. verifica read-only il manifest di integrità `D274_02_operator_package_integrity.json`
+   (SHA-256 dei file statici e baseline D274/01), poi verifica Windows PowerShell
+   5.1 (edizione Desktop);
+2. verifica assenza del sensore `VID_27C6&PID_5125` dal guest
+   (`Get-PnpDevice -PresentOnly` → fail-closed
+   `FAIL_CLOSED_GOODIX_PRESENT_BEFORE_OFFLINE_QUALIFICATION`);
+3. verifica assenza di un marker D274 attivo;
+4. esegue `-SelfTestOnly`, `-PreflightOnly`, `-PreAuthorizationSimulationOnly`,
+   fermandosi al primo FAIL (le modalità non eseguite emettono placeholder
+   `SKIPPED` per mantenere completo il deliverable);
+5. esegue il test read-only nativo sul comportamento ACL della `captures/`
+   (metadati sanitizzati: `canonical_capture_root_match`, `reparse_point`,
+   `acl_readable`, `broad_*_read_or_stronger`, `write_probe_pass`); il preflight
+   nativo deve attestare `output_root_privacy == PASS_PRIVATE_CONTRACT`, altrimenti
+   `WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=FAIL` e qualification chiusa — nessuna mutazione
+   ACL; la radice `captures/` usata è l'unica authority `package/captures`,
+   allineata con quella del kit copiato (corretto il difetto A);
+6. esegue il test avversario hard-disable, ma solo se il safety pre-gate è
+   passato (altrimenti è registrato `SKIPPED`): il flag nominale
+   `-IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture` è lanciato in un
+   subprocess separato e deve fallire (`exit != 0`, messaggio
+   `HARD_DISABLED_D274_01`, nessuna capture, nessuna azione hardware) →
+   `D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS|FAIL`;
+7. raccoglie evidenza d'ambiente non sensibile e produce i JSON in `results/`.
+
+TShark/USBPcap sono usati solo in discovery (`--version`, `-D`);
+`REAL_CAPTURE_START_COUNT=0`. Il collector accetta solo `results/`, verifica
+l'allowlist, rifiuta file inattesi, esegue uno privacy scan testuale e produce
+`D274_02_windows_native_qualification_results.zip` + `.sha256` contenente
+soltanto i sei artefatti risultato (più eventuali stderr sanitizzati solo in
+caso di FAIL e solo se privi di dati sensibili). Non include pcap, ACL raw,
+registry, event log, screenshot, dati di impronta, B0, TLS, segreti, PSK, cache,
+DLL o firmware.
+
+```text
+D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
+D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED
+D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
+D274_02_CAPTURE_ROOT_AUTHORITY=PACKAGE_ROOT_CAPTURES
+D274_02_WRAPPER_KIT_CAPTURE_ROOT_ALIGNMENT=PASS
+D274_02_OPERATOR_PACKAGE_INTEGRITY=PASS_STATIC_AND_RUNTIME_VERIFIABLE
+D274_02_OPERATOR_PACKAGE_HASH_OVERCLAIM_REMOVED=true
+D274_02_COLLECTOR_RESULTS_PATH_AUTHORITY=EXACT_PACKAGE_RESULTS
+D274_02_FAIL_RESULT_COLLECTABILITY=PASS
+D274_02_FIRST_FAILURE_AUTHORITY=PASS
+D274_02_AUTOMATIC_RETRY_COUNT=0
+D274_REAL_CAPTURE_CAPABILITY=0
+D274_HARD_DISABLED=true
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_OPERATOR_PACKAGE
+NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_DETAILED_OPERATOR_INSTRUCTIONS_AND_WINDOWS_NATIVE_OFFLINE_EXECUTION
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.

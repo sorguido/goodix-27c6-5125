@@ -1,0 +1,225 @@
+{
+  "artifact": "D274_02_prep_test_results",
+  "execution_mode": "OFFLINE_ONLY_NO_USB_NO_CAPTURE_NO_WINDOWS_POWERSHELL",
+  "status": "PASS_PREP_STATIC_ONLY_WINDOWS_NATIVE_NOT_AVAILABLE",
+  "this_bundle_is": "OPERATOR_PACKAGE_PREPARATION_CORRECTIVE_IN_PLACE",
+  "is_windows_native_execution_evidence": false,
+  "checks": [
+    {
+      "name": "package_manifest_byte_identity",
+      "status": "PASS",
+      "detail": "operator_kit and postprocessor copies are byte-identical to the D274/01 approved baseline (SHA-256 verified)."
+    },
+    {
+      "name": "python_compile_postprocessor",
+      "status": "PASS",
+      "detail": "py_compile of d274_postprocess_multiframe_evidence.py succeeds."
+    },
+    {
+      "name": "python_compile_postprocessor_external_cwd",
+      "status": "PASS",
+      "detail": "py_compile from external cwd succeeds; no repo-relative import dependency beyond __file__-based schema."
+    },
+    {
+      "name": "evidence_schema_json_parse",
+      "status": "PASS",
+      "detail": "D274_01_evidence_schema.json parses as valid JSON."
+    },
+    {
+      "name": "powershell_source_guards",
+      "status": "PASS",
+      "detail": "no real Start-Process call; no tshark capture-arg invocation (-i/-w/-f/-Y); no Set-Acl/icacls; source hard-disable guard present; SPDX header on both wrappers; kit source-scan guards present."
+    },
+    {
+      "name": "trailing_whitespace_check",
+      "status": "PASS",
+      "detail": "no trailing whitespace in the PowerShell wrappers."
+    },
+    {
+      "name": "bracket_balance_check",
+      "status": "PASS",
+      "detail": "naive best-effort bracket balance OK for both wrappers (no PS runtime available for full parse)."
+    },
+    {
+      "name": "package_privacy_scan",
+      "status": "PASS",
+      "detail": "no developer username, home path, or real registry key in package sources; HKEY_/C:\\Users\\ tokens present are defensive detection patterns, not data."
+    },
+    {
+      "name": "windows_native_powershell_test",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Windows PowerShell 5.1 and pwsh are unavailable on the Fedora executor; not promoted to PASS."
+    },
+    {
+      "name": "git_diff_check",
+      "status": "PASS",
+      "detail": "git diff --check on the modified canonical manual passes; new untracked package files are exempt from tracked-diff whitespace checks."
+    },
+    {
+      "name": "package_capture_root_authority",
+      "status": "PASS",
+      "detail": "single authority: $ExpectedCapturesRoot = GetFullPath(Join-Path $PackageRoot \"captures\")."
+    },
+    {
+      "name": "wrapper_kit_capture_root_alignment",
+      "status": "PASS",
+      "detail": "kit canonical captures root = package/captures; wrapper canonical captures root = package/captures; aligned."
+    },
+    {
+      "name": "write_json_result_pscustomobject_compatible_source_contract",
+      "status": "PASS",
+      "detail": "Write-D274JsonResult param is [object]$Object; accepts PSCustomObject, [ordered], hashtable."
+    },
+    {
+      "name": "no_convertfrom_json_as_hashtable_ps51_dependency",
+      "status": "PASS",
+      "detail": "no -AsHashtable usage; compatible with Windows PowerShell 5.1."
+    },
+    {
+      "name": "fail_result_six_core_files_model",
+      "status": "PASS",
+      "detail": "every outcome produces the six core JSON files; unexecuted stages written as SKIPPED with skipped_because."
+    },
+    {
+      "name": "first_failure_stop_model",
+      "status": "PASS",
+      "detail": "$failedStage/$failureDetail set only once (first failure authority); no retry loop."
+    },
+    {
+      "name": "runtime_summary_not_pending_operator_run",
+      "status": "PASS",
+      "detail": "runtime summary declares WINDOWS_NATIVE_OFFLINE_QUALIFICATION_EXECUTED_BY_OPERATOR and NO_LIVE_CAPTURE_PERFORMED; no 'pending operator run'."
+    },
+    {
+      "name": "operator_package_hash_semantics",
+      "status": "PASS",
+      "detail": "wrapper exports operator_package_integrity, operator_package_manifest_sha256, approved_d274_01_kit_sha256; no overclaiming operator_package_sha256."
+    },
+    {
+      "name": "collector_exact_results_path",
+      "status": "PASS",
+      "detail": "collector requires resolvedResults == GetFullPath(Join-Path $PackageRoot \"results\"); no prefix-based authority."
+    },
+    {
+      "name": "privacy_fail_result_source_contract",
+      "status": "PASS",
+      "detail": "centralized Sanitize-String; no raw stderr in core JSON; collector privacy scan is a second FAIL_CLOSED barrier."
+    },
+    {
+      "name": "goodix_presence_truthful_absent",
+      "status": "PASS",
+      "detail": "Get-D274GoodixPresence returns false when target absent; gate passes; goodix_present_before_run=false."
+    },
+    {
+      "name": "goodix_presence_truthful_present",
+      "status": "PASS",
+      "detail": "Get-D274GoodixPresence returns true when target present; FAIL_CLOSED_GOODIX_PRESENT_BEFORE_OFFLINE_QUALIFICATION thrown; goodix_present_before_run=true."
+    },
+    {
+      "name": "goodix_presence_unknown_on_pnp_unavailable",
+      "status": "PASS",
+      "detail": "Get-PnpDevice unavailable -> throw -> goodix_present_before_run stays null (never a false negative); FAIL_CLOSED."
+    },
+    {
+      "name": "pre_gate_failure_detail_preserved_sanitized",
+      "status": "PASS",
+      "detail": "Register-FirstFailure preserves sanitized $_.Exception.Message into $failureDetail; summary emits failure_detail_sanitized; no raw stack trace."
+    },
+    {
+      "name": "selftest_failure_detail_preserved_sanitized",
+      "status": "PASS",
+      "detail": "selftest FAIL JSON includes exit_code + error_sanitized bounded from stderr/stdout via Sanitize-String."
+    },
+    {
+      "name": "preflight_failure_detail_preserved_sanitized",
+      "status": "PASS",
+      "detail": "preflight FAIL JSON includes exit_code + error_sanitized bounded from stderr/stdout via Sanitize-String."
+    },
+    {
+      "name": "preauth_failure_detail_preserved_sanitized",
+      "status": "PASS",
+      "detail": "preauth FAIL JSON includes exit_code + error_sanitized bounded from stderr/stdout via Sanitize-String."
+    },
+    {
+      "name": "imported_preflight_output_root_sanitized",
+      "status": "PASS",
+      "detail": "preflight output_root forced to <PACKAGE_ROOT>\\captures; tshark_path passed through Sanitize-String; semantic fields preserved."
+    },
+    {
+      "name": "user_profile_package_path_collector_fixture_pass",
+      "status": "PASS",
+      "detail": "synthetic preflight with C:\\Users\\Alice package path: after wrapper sanitization the collector privacy scan accepts (no C:\\Users\\, SID, MAC, IP, HKEY_, credential)."
+    },
+    {
+      "name": "all_six_core_json_privacy_clean",
+      "status": "PASS",
+      "detail": "synthetic six-core result set with package under user profile is privacy-clean after Sanitize-String; collector model accepts."
+    },
+    {
+      "name": "package_integrity_manifest_valid",
+      "status": "PASS",
+      "detail": "D274_02_operator_package_integrity.json valid; lists 5 static files and 2 approved D274/01 baseline hashes; wrapper verifies read-only at runtime."
+    },
+    {
+      "name": "integrity_manifest_self_consistent",
+      "status": "PASS",
+      "detail": "recorded SHA-256 of the five static files match the actual files on disk."
+    },
+    {
+      "name": "D274_01_copy_byte_identity",
+      "status": "PASS",
+      "detail": "kit SHA-256 4b0b3b1c…bd and postprocessor SHA-256 2867ff23…f37 match approved baseline."
+    },
+    {
+      "name": "forbidden_capture_args_absent",
+      "status": "PASS",
+      "detail": "wrapper/kit source scan forbids -i/-w/-f/-Y; kit contains no Start-Process."
+    },
+    {
+      "name": "hard_disable_preserved",
+      "status": "PASS",
+      "detail": "Test-D274HardDisableAdversarial retained and invoked with -IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture."
+    },
+    {
+      "name": "no_pycache_in_package",
+      "status": "PASS",
+      "detail": "no __pycache__ inside the operator package."
+    }
+  ],
+  "d274_02_capture_root_authority": "PACKAGE_ROOT_CAPTURES",
+  "d274_02_wrapper_kit_capture_root_alignment": "PASS",
+  "d274_02_write_json_result_object_contract": "PSOBJECT_PSCUSTOMOBJECT_HASHTABLE_ORDERED",
+  "d274_02_pscustomobject_serialization": "PASS_PS51",
+  "d274_02_powershell51_ashashtable_dependency": false,
+  "d274_02_fail_result_collectability": "PASS_STRUCTURE",
+  "d274_02_first_failure_authority": "PASS",
+  "d274_02_automatic_retry_count": 0,
+  "d274_02_runtime_summary_state": "WINDOWS_NATIVE_OFFLINE_QUALIFICATION_EXECUTED_BY_OPERATOR_NO_LIVE_CAPTURE",
+  "d274_02_goodix_presence_evidence_truthful": "PASS",
+  "d274_02_first_failure_detail_preserved": "PASS_SANITIZED",
+  "d274_02_subprocess_failure_diagnostics": "PASS_SANITIZED_BOUNDED",
+  "d274_02_imported_kit_evidence_path_sanitization": "PASS",
+  "d274_02_user_profile_package_path_collectable": true,
+  "d274_02_operator_package_integrity": "PASS_STATIC_AND_RUNTIME_VERIFIABLE",
+  "d274_02_operator_package_hash_overclaim_removed": true,
+  "d274_02_collector_results_path_authority": "EXACT_PACKAGE_RESULTS",
+  "d274_02_fail_result_privacy": "PASS_CENTRALIZED_SANITIZE_PLUS_COLLECTOR_SCAN",
+  "d274_01_operator_kit_byte_identity": "PASS_4b0b3b1c3f81a7a5874aa2d3a4b281c79ec03b0b1ab1c92cc11284bbee5bd9bd",
+  "d274_01_postprocessor_byte_identity": "PASS_2867ff23cb76297d9089b0840afa59e7a8222e5657e3fc1dc5d7774d6ca68f37",
+  "d274_real_capture_capability": 0,
+  "d274_hard_disabled": true,
+  "d274_operator_package": "READY_FOR_AI_PM_REVIEW",
+  "d274_windows_native_execution": "NOT_YET_PERFORMED",
+  "d274_windows_native_qualification": "NOT_YET_DETERMINED",
+  "real_usb_open_count": 0,
+  "real_command_send_count": 0,
+  "real_capture_count": 0,
+  "real_finger_interaction_count": 0,
+  "real_secret_materialization_count": 0,
+  "real_fprintd_mutation_count": 0,
+  "real_windows_account_mutation_count": 0,
+  "real_windows_enrollment_commit_count": 0,
+  "persistent_device_write_count": 0,
+  "live_execution": "NOT_PERFORMED",
+  "windows_native_powershell_test": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT"
+}
