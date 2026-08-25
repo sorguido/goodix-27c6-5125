@@ -329,6 +329,23 @@ approvato e contatori sensor-reaching a zero. Stato corrente:
 `IMAGE_RECORD_CRC_POLICY_CHANGE=NO`, `WIRE_CHANGE=NO`,
 `LIVE_AUTHORIZED=false` e `READY_FOR_LIVE=false`.
 
+D268/01 sostituisce ora il surface operativo corrente senza eseguire hardware.
+Il manifest D267/03, retro-modificato in D267/04 con l'hash del decoder nuovo,
+è stato ripristinato byte-identico al commit
+`42af60107cf21eb610de867a6de05b774ec1e37f` e torna a essere uno snapshot
+storico immutabile; il decoder D267/04 corrente appartiene esclusivamente alla
+nuova authority D268. Launcher, tool, flag, capability/nonce, marker e report
+D268 sono distinti da D267. Il Kit espone in italiano lo stage e la classe
+della failure, classe trailer, policy/esito checksum, CRC record e shape di
+successo, senza B0, plaintext, immagine, raster, pixel o secret. Il dry-run
+reale passa dalla root e da `/tmp` con zero USB, secret, comandi, marker,
+fprintd, TLS live e write persistenti. Lo stato massimo resta
+`BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false`:
+la diagnostica è live-ready ma non è stata eseguita, e la prima immagine non è
+ancora live-proven. Ogni test hardware futuro del progetto deve passare
+esclusivamente da un Kit Operatore dedicato, con interazione e messaggi in
+italiano; niente invocazione Python, comando USB manuale o bypass del launcher.
+
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
 request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
@@ -600,6 +617,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Analisi D267/02 decoder | failure bounded offline, subpredicato live non recuperabile | emettitore esatto `persistent_runtime.py:444`; TLS consumption superato per call-flow, poi catch opaco su `parse_image_payload`; fixture 7693→7684→80x64 PASS, mismatch `0x88` candidato MEDIUM; manca diagnostica sanitizzata length/header/checksum/CRC |
 | Corrective D267/03 decode observability | READY offline, live false | diagnostica sanitizzata per nove classi; report/audit preservano lo stage interno; `0x88` visibile ma strict e senza bypass; acceptance e wire invariati; D209/D210 non presenti e non re-queryable |
 | Audit/corrective D267/04 `0x88` image no-check | READY offline, live false | gate PASS su call-flow OEM TLS-plaintext→parser→major 2→record 7684; bypass additivo solo image dopo gate strutturali/POV; parser generico e CRC record strict; trailer D267/01 ancora unknown |
+| Kit D268/01 first-image con decoder D267/04 | READY offline, baseline/live false | nuovo namespace one-shot e authority corrente di 20 file; manifest D267/03 ripristinato storico; diagnostica typed/sanitized esposta in italiano; dry-run root e `/tmp` zero-side-effect; first-image non ancora live-proven |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -4670,6 +4688,8 @@ consumata.
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
 - niente payload privati, secret o materiale biometrico nei log/bundle;
 - nessun comando live senza autorizzazione esplicita e step separato;
+- qualunque test hardware/live esclusivamente tramite Kit Operatore dedicato,
+  senza Python o comandi USB manuali, con interazione e messaggi in italiano;
 - fonti di modelli Goodix correlati sono atlanti strutturali, non prova target;
 - ogni promozione di safety richiede sorgente, control flow, dataflow, lifetime
   ed effetto persistente chiusi sul target.
@@ -5460,4 +5480,75 @@ RETRY_RECOVERY_CHANGE=NO
 PERSISTENT_WRITE_REACHABILITY_CHANGE=NO
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
+```
+
+### D268/01: Kit Operatore first-image con decoder D267/04
+
+D268/01 è interamente **OFFLINE ONLY**. Parte da `development` al commit
+`999976978b5fb2da21cbf16ef79d942a90c4581b`, con worktree iniziale pulito.
+Non ha eseguito USB, secret reale, TLS live, comandi device, marker o mutazioni
+fprintd e non ha autorizzato una nuova run.
+
+La repository hygiene è stata corretta ripristinando soltanto
+`analysis/D267/D267_03_live_critical_manifest.json` ai byte del commit
+`42af60107cf21eb610de867a6de05b774ec1e37f`. In D267/04 quel file storico era
+stato aggiornato retroattivamente con l'hash corrente di `core/post_d4.py`;
+ora l'identità dello snapshot D267/03 è nuovamente verificabile e il current
+live-critical set vive soltanto in
+`analysis/D268/D268_01_live_critical_manifest.json`.
+
+Il nuovo path
+`operator_kit/d268-first-image-once.sh` →
+`tools/d268_live_first_image_once.py` →
+`core/d268_first_image_operator.py` conserva la call graph produttiva
+`cold start → TLS → D4 → AF → fresh FDT → IRQ2 → un 0x22 → ACK → primo B0 →
+TLS retained → parse_image_payload() → stop/cleanup`. Flag, baseline
+environment, capability/nonce, marker single-use e report sono D268 e
+incompatibili con D267. Il verifier richiede full SHA lowercase a 40 caratteri,
+HEAD uguale, worktree pulito, path-set esatto e identità byte commit/worktree;
+nessuna SHA è auto-approvata.
+
+Il summary operatore espone separatamente status/stage/classe eccezione,
+classe trailer, policy ed esito checksum, CRC record e shape raster. Le classi
+`ADDITIVE_VERIFIED`, `NO_CHECK_0X88_ACCEPTED`, mismatch checksum,
+control/major, POV, lunghezza record, CRC immagine e decode riuscito restano
+distinguibili senza persistere payload sensibili. La semantica decoder resta
+quella accettata in D267/04: `0x88` evita soltanto il controllo additivo nel
+parser image-specific dopo i gate strutturali; il parser generico e il CRC del
+record restano strict/fail-closed.
+
+Il launcher `--dry-run`, eseguito sia dalla Git root sia da `/tmp`, passa con
+`REAL_USB_ACCESS_COUNT`, `REAL_SECRET_READ_COUNT`,
+`REAL_DEVICE_COMMAND_COUNT`, `MARKER_MUTATION_COUNT`,
+`FPRINTD_MUTATION_COUNT`, `PERSISTENT_DEVICE_WRITE_COUNT` e
+`LIVE_TLS_HANDSHAKE_COUNT` tutti a zero. Il flag live senza SHA approvata si
+ferma prima di costruire dipendenze produttive e riporta in italiano il gate
+mancante. Le regressioni mirate D263/D266/D267 e D268 passano 94/94; non è
+stata prodotta nuova evidenza device-side.
+
+#### Riesame metodologico pre-live
+
+1. **Cosa cambia realmente rispetto a D267/01?** Il decoder applica la
+   semantica OEM locale verificata del marker image-specific `0x88`; il
+   runtime conserva diagnostica tipizzata/sanitizzata del predicato interno;
+   il futuro tentativo usa nuova authority e Kit D268.
+2. **Quale nuova ipotesi viene testata?** Una futura run dovrà distinguere se
+   D267/01 fallì per la policy additiva `0x88` oppure per framing/lunghezza,
+   control/POV, CRC o un'altra failure tipizzata, senza assumere che il trailer
+   storico fosse `0x88`.
+3. **Se fallisce di nuovo allo stesso boundary?** La classe diagnostica
+   guiderà il corrective successivo. Se il record fosse assente od opaco, si
+   correggerà offline il reporting e non si ripeterà immediatamente il live.
+
+```text
+OUTCOME=READY — D268_01_FIRST_IMAGE_OPERATOR_KIT_READY_OFFLINE
+ADVANCEMENT=NEW_LIVE_CRITICAL_OPERATOR_PATH_WITH_CORRECTED_DECODER_AND_TYPED_DIAGNOSTICS
+EXECUTABLE_CLOSURE=PASS
+RESIDUAL_BLOCKER_OR_RISK=NEW_D268_BASELINE_NOT_YET_APPROVED_AND_LIVE_NOT_AUTHORIZED
+CANONICAL_DOCUMENTATION=UPDATED
+D267_03_MANIFEST_HISTORY_RESTORED=true
+BASELINE_APPROVED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+FIRST_IMAGE_LIVE_PROVEN=false
 ```

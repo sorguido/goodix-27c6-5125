@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Fixed capability authority shared by D261 and the future first-image path."""
+"""Fixed capability authority shared by the reviewed one-shot operator paths."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from __future__ import annotations
 D261_LIVE_AUTHORIZATION_FLAG = "--i-authorize-one-d261-fdt-arm-live-attempt"
 D265_FUTURE_LIVE_AUTHORIZATION_FLAG = "--i-authorize-one-future-d265-first-image-live-attempt"
 D267_LIVE_AUTHORIZATION_FLAG = "--i-authorize-one-d267-first-image-live-attempt"
+D268_LIVE_AUTHORIZATION_FLAG = "--i-authorize-one-d268-first-image-live-attempt"
 
 
 class CapabilityFailure(RuntimeError):
@@ -58,9 +59,25 @@ class D267LiveIoCapability:
     def __init__(self, nonce: object) -> None: self._nonce = nonce
 
 
+class D268IntentCapability:
+    __slots__ = ("_nonce", "_used")
+    def __init__(self, nonce: object) -> None: self._nonce, self._used = nonce, False
+
+
+class D268MarkerClaimCapability:
+    __slots__ = ("_nonce", "_used")
+    def __init__(self, nonce: object) -> None: self._nonce, self._used = nonce, False
+
+
+class D268LiveIoCapability:
+    __slots__ = ("_nonce",)
+    def __init__(self, nonce: object) -> None: self._nonce = nonce
+
+
 _D261_INTENT = object(); _D261_MARKER = object(); _D261_LIVE_IO = object()
 _FUTURE_INTENT = object(); _FUTURE_MARKER = object(); _FUTURE_LIVE_IO = object()
 _D267_INTENT = object(); _D267_MARKER = object(); _D267_LIVE_IO = object()
+_D268_INTENT = object(); _D268_MARKER = object(); _D268_LIVE_IO = object()
 
 
 def _issue_d261_intent_after_exact_flag(exact_flag: str) -> CliIntentCapability:
@@ -142,10 +159,44 @@ def issue_d267_live_io(marker: object) -> D267LiveIoCapability:
     return D267LiveIoCapability(_D267_LIVE_IO)
 
 
+def issue_d268_intent(exact_flag: str) -> D268IntentCapability:
+    if exact_flag != D268_LIVE_AUTHORIZATION_FLAG:
+        raise CapabilityFailure("exact_d268_operator_intent_required")
+    return D268IntentCapability(_D268_INTENT)
+
+
+def consume_d268_intent(token: object) -> None:
+    if not isinstance(token, D268IntentCapability) or token._nonce is not _D268_INTENT:
+        raise CapabilityFailure("d268_intent_capability_required")
+    if token._used:
+        raise CapabilityFailure("d268_intent_capability_already_used")
+    token._used = True
+
+
+def _issue_d268_marker_after_durable_claim(token: object) -> D268MarkerClaimCapability:
+    if (
+        not isinstance(token, D268IntentCapability)
+        or token._nonce is not _D268_INTENT
+        or not token._used
+    ):
+        raise CapabilityFailure("consumed_d268_intent_required_after_durable_marker")
+    return D268MarkerClaimCapability(_D268_MARKER)
+
+
+def issue_d268_live_io(marker: object) -> D268LiveIoCapability:
+    if not isinstance(marker, D268MarkerClaimCapability) or marker._nonce is not _D268_MARKER:
+        raise CapabilityFailure("valid_d268_marker_claim_required")
+    if marker._used:
+        raise CapabilityFailure("d268_marker_claim_capability_already_used")
+    marker._used = True
+    return D268LiveIoCapability(_D268_LIVE_IO)
+
+
 def require_known_material_intent(token: object) -> None:
     if isinstance(token, CliIntentCapability) and token._nonce is _D261_INTENT: return
     if isinstance(token, FutureIntentCapability) and token._nonce is _FUTURE_INTENT: return
     if isinstance(token, D267IntentCapability) and token._nonce is _D267_INTENT: return
+    if isinstance(token, D268IntentCapability) and token._nonce is _D268_INTENT: return
     raise CapabilityFailure("known_material_intent_capability_required")
 
 
@@ -153,6 +204,7 @@ def require_known_live_io_capability(token: object) -> None:
     if isinstance(token, LiveIoCapability) and token._nonce is _D261_LIVE_IO: return
     if isinstance(token, FutureLiveIoCapability) and token._nonce is _FUTURE_LIVE_IO: return
     if isinstance(token, D267LiveIoCapability) and token._nonce is _D267_LIVE_IO: return
+    if isinstance(token, D268LiveIoCapability) and token._nonce is _D268_LIVE_IO: return
     raise CapabilityFailure("known_live_io_capability_required")
 
 

@@ -1,6 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D268/01 first-image one-shot (offline-ready, live non autorizzato)
+
+`./operator_kit/d268-first-image-once.sh --dry-run` è il Kit Operatore
+corrente per il confine first-image. Il launcher e tutti i messaggi operatore
+sono in italiano; flag, capability, marker, report e authority appartengono al
+namespace D268 e non riusano D267. Il percorso live resta bloccato senza flag
+D268 esatto e full commit SHA approvato. In D268/01 la baseline non è
+approvata, il live non è autorizzato e l'hardware non è stato eseguito.
+
 ## D264/02 first-image rehearsal (offline only)
 
 `./operator_kit/d264-first-image-offline.sh` is a synthetic-only operator
@@ -27,7 +36,7 @@ richiede review, baseline e autorizzazione esplicite.
 | `d251-live-af-once.sh` | candidate corretto live-capable hard-gated; executable closure solo offline, review baseline AI PM e autorizzazione Utente pendenti |
 | `d255-windows-evidence-capture.ps1` | storico, single-shot consumato; capture completata e recuperata offline, nessuna nuova run richiesta o autorizzata |
 
-Non esiste un kit operativo corrente autorizzato. D251 espone il futuro ramo
-live nel source revisionabile, ma non incorpora né auto-approva il commit SHA
-richiesto e non autorizza una run. Il marker D250 non deve essere cancellato o
-riutilizzato.
+Non esiste un kit operativo corrente **autorizzato live**. D268 è il current
+path revisionabile ma non incorpora né auto-approva il commit SHA richiesto e
+non autorizza una run. I marker storici non devono essere cancellati o
+riutilizzati.

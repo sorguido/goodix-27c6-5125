@@ -79,13 +79,13 @@ def _git_fixture(root: Path) -> tuple[Path, str]:
 
 
 class D267LauncherTests(unittest.TestCase):
-    def test_dry_run_from_external_cwd_has_zero_side_effects(self) -> None:
+    def test_consumed_historical_dry_run_fails_closed_with_zero_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             result = _run("--dry-run", cwd=Path(temporary))
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)
         report = json.loads(result.stdout)
-        self.assertEqual(report["D267_OPERATOR_DRY_RUN"], "PASS")
-        self.assertEqual(report["OUTCOME"], "PASS_OFFLINE_OPERATOR_KIT")
+        self.assertEqual(report["D267_OPERATOR_DRY_RUN"], "FAIL_CLOSED")
+        self.assertEqual(report["OUTCOME"], "FAIL_CLOSED")
         for key in (
             "REAL_USB_ACCESS_COUNT",
             "REAL_SECRET_READ_COUNT",
@@ -225,17 +225,25 @@ class D267BaselineAuthorityTests(unittest.TestCase):
         # current manifest instead of rewriting this historical artifact.
         self.assertEqual(document["schema"], "D266_03_D267_LIVE_CRITICAL_MANIFEST_V1")
 
-    def test_d267_03_current_manifest_is_exact_and_unapproved(self) -> None:
-        document = json.loads(
-            (REPO / "analysis/D267/D267_03_live_critical_manifest.json").read_text()
-        )
+    def test_d267_03_manifest_is_required_immutable_historical_snapshot(self) -> None:
+        path = REPO / "analysis/D267/D267_03_live_critical_manifest.json"
+        expected = subprocess.run(
+            (
+                "git",
+                "show",
+                "42af60107cf21eb610de867a6de05b774ec1e37f:"
+                "analysis/D267/D267_03_live_critical_manifest.json",
+            ),
+            cwd=REPO,
+            check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        self.assertEqual(path.read_bytes(), expected)
+        document = json.loads(path.read_text())
         self.assertEqual(document["schema"], "D267_03_LIVE_CRITICAL_MANIFEST_V1")
         self.assertFalse(document["baseline_approved"])
         paths = tuple(row["path"] for row in document["live_critical_files"])
         self.assertEqual(paths, d267.D267_FIRST_IMAGE_LIVE_CRITICAL_PATHS)
-        for row in document["live_critical_files"]:
-            actual = hashlib.sha256((REPO / row["path"]).read_bytes()).hexdigest()
-            self.assertEqual(actual, row["sha256"], row["path"])
 
 
 class D267CapabilityNamespaceTests(unittest.TestCase):
