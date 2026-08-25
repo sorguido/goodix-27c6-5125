@@ -6,6 +6,48 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
+### Stato corrente post-D268 (sintesi)
+
+Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
+live** i seguenti confini:
+
+```text
+A8
+E4
+TLS 1.2 PSK
+D4
+AF
+bounded fresh-FDT arm path
+IRQ2
+0x22
+ACK 0x22
+first B0
+first image decode
+raster 80x64
+```
+
+Evidenza target-specific live già consolidata:
+
+```text
+IMAGE_0X88_NO_CHECK_TARGET_PROVEN=true
+IMAGE_RECORD_CRC_LIVE_PROVEN=true
+FIRST_IMAGE_DECODE_LIVE_PROVEN=true
+FIRST_IMAGE_RECEIVED=true
+D267_01_CAUSE=STRONG_CAUSAL_INFERENCE
+D268_RETRY_AUTHORIZED=false
+LIVE_AUTHORIZED=false
+```
+
+Il prossimo boundary è:
+
+```text
+LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+```
+
+con `ORIENTATION_CONTRACT=UNRESOLVED`. La storia tecnica dettagliata prosegue
+nelle sezioni seguenti; le frasi riferite a step passati (es. D257/D259/D264) sono
+da intendersi come stato di quel momento, oggi superato.
+
 Non esiste ancora un driver Linux funzionante. La progressione live ha però
 chiuso i confini A8, E4 e TLS sul firmware 12509: D239 ha eseguito il cold-start
 OEM fino al B0/TLS, D241 ha verificato l'ownership exactly-once e il
@@ -24,10 +66,11 @@ FDT fresh e cached POV, sopra un transport astratto e senza USB reale. D250 ha
 poi eseguito una volta il boundary AF sul target: TLS e D4 sono riusciti, AF è
 stato inviato una volta come 13 byte logici in una submission fisica da 64 byte
 con tail zero, e il device ha restituito una A0/AE strutturalmente valida con
-checksum valido e body da 16 byte. Il percorso fresh-FDT non è ancora
-autorizzato live: D256 ne ha chiuso il lifecycle osservabile host/bus, mentre il
-corrective D257 ha dimostrato che il replay precedente copriva soltanto una
-sottosequenza proiettata. D258 ha trovato nel `gfusb.dll` target
+checksum valido e body da 16 byte. Il percorso fresh-FDT non era ancora
+autorizzato live a quel punto (stato storico D256/D257, oggi superato dal bounded
+fresh-FDT arm path provato live in D262): D256 ne ha chiuso il lifecycle
+osservabile host/bus, mentre il corrective D257 ha dimostrato che il replay
+precedente copriva soltanto una sottosequenza proiettata. D258 ha trovato nel `gfusb.dll` target
 l'orchestratore completo `gf_update_all_base`: `0x50` e `0x20` sono acquisiti
 prima del terzo sample ma classificati soltanto dopo, mentre `0x82` fornisce
 nel secondo byte la soglia unsigned del confronto assoluto fra i word FDT
@@ -42,8 +85,10 @@ crea il TLS server come locale e lo chiude nel `finally` di `tls_handshake()`,
 senza esporre la stessa sessione al futuro consumer B0. L'adapter GPL e la
 continuità handshake→B0→secondo record sono provati offline sulla stessa
 `SSLObject`, e il replay consuma ora B0 subito dopo `0x20` e prima del terzo
-`0x36`; il plumbing nel runtime live resta `UNIMPLEMENTED`. D259 è pertanto
-bloccato prima della live-readiness review e non autorizzato live.
+`0x36`; il plumbing nel runtime live restava `UNIMPLEMENTED` (stato storico D259,
+oggi superato: D260 ha chiuso il gap architetturalmente e D261/D262/D266/D267/D268
+hanno poi eseguito il percorso live). D259 era pertanto bloccato prima della
+live-readiness review e non autorizzato live.
 
 D260 chiude ora quel gap **sul solo piano architetturale offline** nel dominio
 GPL `core/`, senza modificare il runtime sealed. Un coordinator production-shaped
@@ -126,8 +171,9 @@ cold-start bounded con A2 reset sensore volatile. Lo stato interno post-image
 resta `UNKNOWN`, ma non esiste evidenza di write NVM o di stato persistente/non
 recuperabile: il rischio è classificato `ACCEPTABLY_BOUNDED`, soltanto per una
 successiva review di operationalization **offline**. `0x22` zero-tail e first
-image restano non live-proven; nessuna readiness/autorizzazione/baseline live è
-approvata. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
+image restavano non live-proven a quel punto (stato storico D264, oggi superseded
+da D267 + D268: IRQ2→`0x22`→ACK e primo B0 + decode raster `80x64` sono ora
+chiusi live); nessuna readiness/autorizzazione/baseline live era approvata allora. L'audit timestamp della capture primaria misura ACK `0x32`→IRQ2 in
 7108,212 ms: il timeout D263 di 5000 ms contraddiceva il path osservato ed è
 corretto minimamente a una deadline host assoluta di 15000 ms, senza asserire
 una lifetime interna del device.
@@ -177,7 +223,8 @@ contatori monotoni IRQ2/ACK/B0 distinguono osservato, non raggiunto e ignoto. La
 precedente autorizzazione non consumata non è trasferita: review AI-PM, merge,
 approvazione del nuovo SHA e nuova autorizzazione restano quattro gate distinti.
 `READY_FOR_LIVE=false`, `BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`;
-`0x22` fixed64 e prima immagine restano non live-proven.
+`0x22` fixed64 e prima immagine restavano non live-proven a quel punto (stato storico D265/01, oggi superseded da D267 + D268: IRQ2→`0x22`→ACK e primo B0 +
+decode raster `80x64` sono ora chiusi live).
 
 D265/02 chiude il successivo live one-shot, eseguito sulla baseline approvata
 `2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d`, come `FAIL_CLOSED` prima di
@@ -345,6 +392,63 @@ la diagnostica è live-ready ma non è stata eseguita, e la prima immagine non �
 ancora live-proven. Ogni test hardware futuro del progetto deve passare
 esclusivamente da un Kit Operatore dedicato, con interazione e messaggi in
 italiano; niente invocazione Python, comando USB manuale o bypass del launcher.
+
+D268 (run live one-shot) è stata eseguita una sola volta, esclusivamente tramite
+il Kit Operatore D268, sulla baseline approvata
+`c03d32e8647444495e6615e41c2839cbddd62143`, con un solo tentativo autorizzato e
+consumato. L'esito terminale è `PASS_STOP_AFTER_FIRST_IMAGE`: la run ha aperto
+una sola sessione USB/transport e una sola TLS, ha completato handshake,
+materializzato il secret una volta, armato FDT, consegnato IRQ2, inviato e
+ACK-validato un `0x22` fixed64, ricevuto il primo B0 e decodificato con successo
+il primo payload immagine. Il boundary first-image è quindi ora **chiuso live**
+sul target APP12509.
+
+L'evidenza target-specific appena acquisita è:
+
+```text
+FIRST_B0_COUNT=1
+FIRST_IMAGE_DECODE_STATUS=SUCCESSFUL_RASTER_DECODE
+FIRST_IMAGE_DECODE_STAGE=successful_raster_decode
+FIRST_IMAGE_PAYLOAD_TRAILER_CLASS=0X88
+FIRST_IMAGE_PAYLOAD_CHECKSUM_POLICY=NO_CHECK_0X88_ACCEPTED
+FIRST_IMAGE_PAYLOAD_CHECKSUM_MATCH=False
+FIRST_IMAGE_RECORD_CRC_MATCH=True
+FIRST_IMAGE_RASTER_SHAPE=[80, 64]
+```
+
+La semantica image `0x88` è ora **target-proven** (non più soltanto
+corroborazione statica/OEM/third-party): il trailer `0x88` salta il verifier
+additivo, il checksum additivo risulta non coincidente, ma il CRC-32/MPEG-2 del
+record è valido e il raster `80x64` è decodificato con successo. La run ha
+mantenuto retry, recovery, reopen, write persistenti e comandi post-image vietati
+tutti a zero; cleanup host e zeroizzazione secret sono osservati. Il ripristino
+fprintd è classificato
+`FPRINTD_RESTORE_CALLBACK_COMPLETED_WITHOUT_EXCEPTION=VERIFIED_BY_CONTROL_FLOW`
+(il `finally` lo richiama e, se sollevasse eccezione, la run non restituirebbe
+`PASS_STOP_AFTER_FIRST_IMAGE`); resta invece
+`EXTERNAL_FPRINTD_FINAL_STATE=NOT_INDEPENDENTLY_OBSERVED`, poiché il control-flow
+esclude un cleanup incompleto ma non osserva lo stato esterno finale del servizio.
+Il marker D268 è consumato e la run non deve essere ripetuta: ogni futuro live
+resta un gate separato, esclusivamente tramite Kit Operatore dedicato in italiano,
+nuova baseline e nuova autorizzazione esplicita.
+
+Aggiornando lo stato canonico, risultano ora **chiusi live** sul target APP12509:
+A8, E4, TLS 1.2 PSK, D4, AF, il bounded fresh-FDT arm path, IRQ2, `0x22`, l'ACK
+`0x22`, il primo B0, il decode della prima immagine e il raster `80x64`. I vecchi
+blocker D252/D253/D259/D264 (seed/freschezza/restore/router) restano storia,
+superati da D262/D266/D267/D268 e marcati come tali dove pertinenti.
+
+La causalità storica D267/01 resta distinta e va classificata con la giusta
+precisione epistemica. In D267/01 sono **osservati** la ricezione del primo B0 e
+il fallimento `first_image_decode_failed`; il trailer effettivo di quella run non
+fu conservato e resta `UNKNOWN`. In D268 sono **osservati target-specific live**
+il trailer `0x88`, il mismatch del checksum additivo e il CRC record valido; è in
+oltre **verificato** (da D267/04 sul call-flow OEM locale) che il vecchio parser
+strict additivo è incompatibile con `0x88`. Ne segue che la causa di D267/01 è
+una **inferenza causale forte** (`D267_01_CAUSE=STRONG_CAUSAL_INFERENCE`), non un'
+osservazione retroattiva del trailer `0x88`: D267/01 non viene perciò riscritto
+come se avesse registrato `0x88` allora — si registra soltanto la causalità
+corroborata dalla nuova evidenza D268.
 
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
@@ -599,7 +703,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D250 D4→AF | eseguita una volta, marker consumato, fail-closed nel validator | TLS e D4 riusciti; AF logical 13 / physical 64 zero-tail inviato una volta; A0/AE strutturalmente valida con body 16; byte0 perduto dalla telemetria; zero retry/write/app-data; cleanup/restore/reseal riusciti |
 | Run live D251 D4→AF | successo, consumata | exactly-one AF/AE; byte0 opaco `0`, flags `0x02`, POV false/TLS true/locked false, zero retry/write/app-data, cleanup/restore/reseal riusciti, `STOP_AFTER_AF` |
 | Boundary storica D252 fresh-FDT | blocker originario, parzialmente superseded da D262 | seed/freschezza e restore erano aperti; D262 ha poi provato live l'intero bounded fresh-FDT arm path che consuma il seed, quindi la provenienza ultima non è più blocker operativo per quel path; restore/lifetime restano gap di conoscenza |
-| Boundary storica D253 seed/restore/`0x22` | bootstrap superseded; first-image ancora non live-proven | D262 chiude live `36,50,36,82,20,36,32`, non raggiunge IRQ2/`0x22`; zero-tail `0x22` e prima immagine restano blocker della sola boundary first-image |
+| Boundary storica D253 seed/restore/`0x22` | HISTORICAL / SUPERSEDED BY D267+D268 | a D253 `0x22` e first-image non erano ancora live-proven e restavano blocker della sola boundary first-image; tali confini sono oggi chiusi live da D267 (IRQ2→`0x22`→ACK) e D268 (primo B0 + decode raster `80x64`) |
 | Audit esterno D254 | bloccato offline, nessun kit live | cache/layout OEM 5110/12117 e capture Issue63 riducono bootstrap e corroborano IRQ2→`0x22`/tail; seed APP12509 e no-finger restore restano non chiusi |
 | Acquisizione Windows D255 | capture riuscita e run consumata; finalizzazione host-side recuperata offline | 27.684 byte/218 frame, cold attach APP12509, fasi zero-finger complete, seed/cache match; snapshot after non recuperabili e restore non chiuso; nessuna nuova capture richiesta |
 | Contratto lifecycle D256 | audit offline completo dei packet USBPcap D255, incluso corrective terminal-cancel | primo cancel: re-entry e nuovo `0x32` accettato senza restore USB esplicito; secondo cancel: zero packet nell'intervallo, pending bulk-IN cancellato al frame finale `218`, zero packet residui e quiescenza USB host/bus provata; disarm/lifetime/stato FDT interno non osservati |
@@ -617,8 +721,9 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Analisi D267/02 decoder | failure bounded offline, subpredicato live non recuperabile | emettitore esatto `persistent_runtime.py:444`; TLS consumption superato per call-flow, poi catch opaco su `parse_image_payload`; fixture 7693→7684→80x64 PASS, mismatch `0x88` candidato MEDIUM; manca diagnostica sanitizzata length/header/checksum/CRC |
 | Corrective D267/03 decode observability | READY offline, live false | diagnostica sanitizzata per nove classi; report/audit preservano lo stage interno; `0x88` visibile ma strict e senza bypass; acceptance e wire invariati; D209/D210 non presenti e non re-queryable |
 | Audit/corrective D267/04 `0x88` image no-check | READY offline, live false | gate PASS su call-flow OEM TLS-plaintext→parser→major 2→record 7684; bypass additivo solo image dopo gate strutturali/POV; parser generico e CRC record strict; trailer D267/01 ancora unknown |
-| Kit D268/01 first-image con decoder D267/04 | READY offline, baseline/live false | nuovo namespace one-shot e authority corrente di 20 file; manifest D267/03 ripristinato storico; diagnostica typed/sanitized esposta in italiano; dry-run root e `/tmp` zero-side-effect; first-image non ancora live-proven |
-| Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
+| Kit D268/01 first-image con decoder D267/04 | READY offline, poi run live eseguita una sola volta | nuovo namespace one-shot e authority corrente di 20 file; manifest D267/03 ripristinato storico; diagnostica typed/sanitized esposta in italiano; dry-run root e `/tmp` zero-side-effect; run D268 conclusa `PASS_STOP_AFTER_FIRST_IMAGE` sulla baseline `c03d32e...` |
+| Run live D268 first-image (Kit D268/01) | successo, marker D268 consumato | IRQ2 consegnato, `0x22` ACK-validato, primo B0 e decode raster `80x64` PASS; trailer `0x88` no-check target-proven, checksum additivo mismatch, CRC record valido; zero retry/recovery/reopen/write/comandi post-image; cleanup e zeroizzazione riusciti; restore callback completata senza eccezione; stato esterno finale fprintd non osservato indipendentemente |
+| Codec immagine | confermato offline + CRC record validato live + decode eseguito live | record 7684 byte → raster u16 `80x64` (CRC-32/MPEG-2 record valido e raster `80x64` live-proven in D268) |
 
 ## Fonti e confini di pubblicazione
 
@@ -995,7 +1100,12 @@ D259 -> branch audit dei return NAV/image 0,1,2,3 e altri/negativi sul gfusb.dll
      -> nessun effetto su tabella/payload/reachability 0x32, comandi USB, retry o recovery A2/0x70
      -> B0 resta obbligatoriamente consumato/autenticato/decrittato dalla sessione TLS attiva
      -> replay minimo completo PASS: due delta, zero classifier/raster/cache/retry/persistenza, final 0x32 una volta
-     -> Classe A: minimal contract chiuso offline e pronto per review live separata; READY_FOR_FDT_LIVE=false
+      -> Classe A: minimal contract chiuso offline e pronto per review live separata; READY_FOR_FDT_LIVE=false
+D268 -> run live one-shot eseguita una sola volta sulla baseline `c03d32e...` tramite Kit Operatore D268
+      -> PASS_STOP_AFTER_FIRST_IMAGE; primo B0, trailer 0x88 no-check, CRC record valido, raster 80x64 decodificato
+      -> boundary first-image CHIUSO LIVE; D267/01 riclassificato STRONG_CAUSAL_INFERENCE (trailer ignoto)
+      -> closure D218-D220 preservata: Windows consuma u16 direttamente, nessun adapter u8, orientation UNRESOLVED
+      -> prossimo boundary: LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
 ```
 
 L'accettazione D234 è stata consumata dal suo esito terminale senza alcun live
@@ -3562,29 +3672,79 @@ chiuso fail-closed nella wait IRQ2 per il difetto deterministico del router, e
 poi una sola volta in D267/01 sulla nuova baseline approvata
 `219c038600deb87da1cd93340b9bd07c14e1f5fe`. D267/01 chiude definitivamente i
 dubbi live sul tratto `finger-down IRQ2 -> router D266 -> un 0x22 fixed64 -> ACK
-target -> primo B0`: tutti questi passaggi sono provati. Il current critical
-boundary è ora il parser/codec del plaintext del primo B0.
+target -> primo B0`: tutti questi passaggi sono provati. D267/01 si era però
+fermata fail-closed nel decoder `first_image_decode_failed`; il trailer della
+run non fu conservato e resta `UNKNOWN`, quindi la causa fu allora soltanto
+un'ipotesi `MEDIUM`.
 
-La call-chain prova che `consume_application_record()` ha restituito plaintext
-non vuoto: altrimenti la failure sarebbe stata
-`first_image_b0_consumption_failed`. Subito dopo, però, il runtime cattura ogni
-eccezione di `parse_image_payload()` e scarta il dettaglio. Il failure resta
-quindi bounded a header/lunghezza/checksum, control image/POV o CRC del record,
-ma non è localizzato a un singolo predicato. Il parser atteso è
-`7693 byte plaintext -> data 7689 -> prefix 5 + record 7684 -> packed 7680 +
-CRC 4 -> raster 80x64`. La policy strict del checksum payload, in particolare,
-differisce dal bypass `0x88` presente nella DLL locale e in Rocky; senza
-metadata del trailer live è una pista `MEDIUM`, non una conclusione.
+D268 ha poi eseguito, una sola volta e sempre tramite il Kit Operatore D268 sulla
+baseline approvata `c03d32e8647444495e6615e41c2839cbddd62143`, il confine
+first-image fino al decode. L'esito è `PASS_STOP_AFTER_FIRST_IMAGE`: il primo
+payload immagine usa trailer `0x88`, non coincide con il checksum additivo
+(`FIRST_IMAGE_PAYLOAD_CHECKSUM_MATCH=False`), la policy image-specific
+`NO_CHECK_0X88_ACCEPTED` lo accetta, il CRC-32/MPEG-2 del record risulta valido
+(`FIRST_IMAGE_RECORD_CRC_MATCH=True`) e il raster `80x64` è decodificato con
+successo (`FIRST_IMAGE_DECODE_STAGE=successful_raster_decode`). Il boundary
+first-image è pertanto ora **chiuso live** sul target APP12509: la semantica
+`0x88` non è più soltanto corroborata staticamente ma **target-proven**, il
+mismatch additivo è osservato e il CRC record è osservato valido.
 
-L'autorizzazione D267/01 è consumata e non esiste un secondo tentativo
-autorizzato. Il prossimo passo tecnico è soltanto una review AI-PM del bounded
-corrective offline: diagnostica tipizzata e sanitizzata per stage più fixture
-image-specific per checksum `0x88`, lunghezze/header, POV e CRC. Nessuna patch
-decoder è applicata in D267/02 e nessun nuovo live va preparato automaticamente.
-`IRQ2_HOST_DELIVERY_LIVE_PROVEN=true`, `0x22_FIXED64_ACK_LIVE_PROVEN=true`,
-`FIRST_B0_LIVE_RECEIVED=true`, `FIRST_IMAGE_DECODE_LIVE_PROVEN=false`,
-`FIRST_IMAGE_LIVE_PROVEN=false`, `READY_FOR_DECODE_CORRECTIVE_REVIEW=false`,
-`READY_FOR_LIVE=false` e `LIVE_AUTHORIZED=false`.
+La classificazione epistemica di D267/01 è ora: ricezione del primo B0 e
+`first_image_decode_failed` sono **osservati**; il trailer effettivo di quella
+run è **UNKNOWN**. In D268 il trailer `0x88` e il mismatch del checksum additivo
+sono **osservati target-specific live**; il mismatch del vecchio parser strict
+additivo con `0x88` è **verificato** (D267/04 sul call-flow OEM locale). La causa
+di D267/01 è pertanto una **inferenza causale forte**
+(`D267_01_CAUSE=STRONG_CAUSAL_INFERENCE`), non un'osservazione retroattiva del
+trailer `0x88`: D267/01 non viene riscritto come se avesse registrato `0x88`
+allora.
+
+La run D268 mantiene retry, recovery, reopen, write persistenti e comandi
+post-image vietati tutti a zero; cleanup host, zeroizzazione secret e restore
+fprintd (callback `finally` completata senza eccezione, per control-flow
+verificabile) sono osservati. Il marker D268 è consumato e la run non deve essere
+ripetuta. Ne segue:
+
+```text
+IRQ2_HOST_DELIVERY_LIVE_PROVEN=true
+0x22_FIXED64_ACK_LIVE_PROVEN=true
+FIRST_B0_LIVE_RECEIVED=true
+FIRST_IMAGE_DECODE_LIVE_PROVEN=true
+FIRST_IMAGE_LIVE_PROVEN=true
+FIRST_IMAGE_RECEIVED=true
+IMAGE_0X88_NO_CHECK_TARGET_PROVEN=true
+IMAGE_ADDITIVE_CHECKSUM_MISMATCH_LIVE_OBSERVED=true
+IMAGE_RECORD_CRC_LIVE_PROVEN=true
+FIRST_IMAGE_RASTER_SHAPE=80x64
+D268_MARKER_CLAIMED=true
+D268_RETRY_AUTHORIZED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+Il current critical boundary si sposta ora a valle del primo raster decodificato.
+La closure canonica D218–D220 (contract immagine Windows) va preservata e non
+reinventata: il preprocessing Windows/AlgoChicago consuma direttamente il raster
+`u16`/12-bit (`INTENSITY_CONTRACT=DIRECT_U16_CONSUMED_PROVEN`, WIN-001 in
+`docs/EVIDENCE.md`); non è giustificato alcun adapter `u16→u8` ricostruito dal
+contratto Windows; l'orientamento resta `UNRESOLVED`. Il nuovo fatto D268
+(`target live image → valid image record → decoded raster 80x64 u16`) e la
+conoscenza D220 (Windows consuma u16 direttamente, nessun adapter u8) portano al
+prossimo boundary principale, che è una **decisione di engineering Linux-specifica**
+e non una nuova campagna statica Windows:
+
+```text
+NEXT_PRIMARY_BOUNDARY=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+```
+
+Il task successivo dovrà affrontare, senza assumere la soluzione: i requisiti di
+rappresentazione immagine libfprint, il mapping `u16`/12-bit → Linux/libfprint,
+la policy di scaling/clipping/normalizzazione, orientation/transpose/flag, la
+proprietà di quality/preprocessing e se la conversione appartenga al core GPL o
+alla glue LGPL libfprint. Resta aperto anche il lifecycle di capture per frame
+ripetuti e il confine verso la pipeline biometrica (quality/enrollment/matching).
+Tale boundary è definito in D268/02 e da sottoporre a review AI-PM prima di ogni
+nuovo live.
 
 Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
@@ -4111,6 +4271,32 @@ non istanzia il real loader. La baseline live-critical
 operativa/live senza autorizzare hardware (READY_FOR_FDT_LIVE=false). Il
 precedente bundle D261 resta preservato ma è
 `SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE`.
+
+### D218–D220: closure del contratto immagine Windows e boundary Linux/libfprint
+
+La closure canonica D218–D220 (recuperata da `docs/EVIDENCE.md`, WIN-001, e da
+`README.md`) definisce il contract di intensità dell'immagine e non va reinventata
+da D268/02. I fatti supportati sono:
+
+- il record immagine è `7684` byte (7680 packed-12 + CRC-32/MPEG-2) e produce un
+  raster `u16`/`80x64` trasposto — `CONFIRMED` (codec clean-room + decoder OEM);
+- il preprocessing Windows/`AlgoChicago.dll` (selezionato da `EngineAdapter.dll`
+  con sensor index 12) consuma **direttamente** il raster `u16`/12-bit
+  (`INTENSITY_CONTRACT=DIRECT_U16_CONSUMED_PROVEN`, WIN-001);
+- non è giustificato alcun adapter `u16 → u8` ricostruito dal contratto Windows
+  (`D220_WINDOWS_PREPROCESSOR_CONSUMES_U16_NO_U8_ADAPTER_JUSTIFIED`);
+- l'orientamento fisico del raster resta `UNRESOLVED`;
+- la successiva decisione è **Linux-specifica**
+  (`NEXT_BLOCKER=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT`):
+  Linux deve definire il proprio contract `FpImage`/`libfprint` dopo che
+  l'acquisizione live è sicura (residual uncertainty di WIN-001).
+
+D268/02 preserva questa closure: il nuovo fatto D268 (`target live image →
+valid image record → decoded raster 80x64 u16`) eredita lo stesso contract `u16`;
+il prossimo boundary non è una nuova campagna statica Windows ma la decisione di
+engineering Linux su come rappresentare/adattare il raster Goodix `80x64 u16`/12-bit
+verso libfprint, mantenendo distinte semantica del sensore, contratto Windows già
+ricostruito e orientamento `UNRESOLVED`.
 
 ## D262: fresh-FDT arm execution-readiness review offline
 
@@ -5551,4 +5737,161 @@ BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 FIRST_IMAGE_LIVE_PROVEN=false
+```
+
+### D268/02: post-live first-image evidence closure e prossimo boundary
+
+D268/02 è **OFFLINE ONLY**. Non esegue hardware, non usa `sudo`, non apre USB
+reale, non materializza secret reali, non esegue una seconda run D268 e non
+modifica la semantica live-critical. La run D268 one-shot appartiene alla baseline
+approvata `c03d32e8647444495e6615e41c2839cbddd62143` ed è conclusa; il marker è
+consumato e nessuna nuova autorizzazione live è implicita.
+
+La closure probatoria della run live D268 è **buona e non viene rifatta né
+reinterpretata** (`LIVE_EVIDENCE_CLOSURE=PASS`).
+
+#### Evidenza live classificata
+
+Registrata come **osservata target-specific live** (non più sola corroborazione
+statica/OEM/third-party):
+
+```text
+FIRST_IMAGE_B0_LIVE_PROVEN=true
+IMAGE_0X88_NO_CHECK_TARGET_PROVEN=true
+IMAGE_ADDITIVE_CHECKSUM_MISMATCH_LIVE_OBSERVED=true
+IMAGE_RECORD_CRC_LIVE_PROVEN=true
+FIRST_IMAGE_DECODE_LIVE_PROVEN=true
+FIRST_IMAGE_RASTER_SHAPE=80x64
+FIRST_IMAGE_RECEIVED=true
+```
+
+Il punto essenziale: `trailer=0x88`, `payload additive checksum match=false`,
+`policy=NO_CHECK_0X88_ACCEPTED`, `record CRC=true`, `decode=successful_raster_decode`,
+`shape=80x64`. Questa è ora evidenza primaria sul target APP12509.
+
+#### Causalità storica D267/01 (inferenza causale forte, non osservazione retroattiva)
+
+Classificazione epistemica esatta:
+
+```text
+D267_01_FIRST_B0_RECEIVED=OBSERVED
+D267_01_FIRST_IMAGE_DECODE_FAILED=OBSERVED
+D267_01_ACTUAL_TRAILER=UNKNOWN
+D268_FIRST_IMAGE_TRAILER_0X88=OBSERVED_TARGET_LIVE
+D268_ADDITIVE_CHECKSUM_MATCH_FALSE=OBSERVED_TARGET_LIVE
+OLD_STRICT_ADDITIVE_PARSER_MISMATCH_WITH_0X88=VERIFIED
+D267_01_CAUSE=STRONG_CAUSAL_INFERENCE
+```
+
+- In D267/01 sono **osservati** la ricezione del primo B0 e il fallimento
+  `first_image_decode_failed`; il trailer effettivo di quella run non fu conservato
+  e resta `UNKNOWN`.
+- In D268 sono **osservati target-specific live** il trailer `0x88` e il mismatch
+  del checksum additivo; è inoltre **verificato** (da D267/04 sul call-flow OEM) che
+  il vecchio parser strict additivo è incompatibile con `0x88`.
+- La causa di D267/01 è pertanto una **inferenza causale forte**, non un'
+  osservazione retroattiva del trailer `0x88`: D267/01 non viene riscritto come se
+  avesse registrato `0x88` allora.
+
+#### Safety closure
+
+```text
+USB_OPEN_COUNT=1
+TRANSPORT_SESSION_COUNT=1
+TLS_OBJECT_COUNT=1
+TLS_HANDSHAKE_COUNT=1
+SECRET_MATERIALIZATION_COUNT=1
+FINAL_FDT_ARM_COUNT=1
+IRQ2_FINGER_DOWN_COUNT=1
+COMMAND_22_ATTEMPT_COUNT=1
+COMMAND_22_ACK_VALIDATION_COUNT=1
+FIRST_B0_COUNT=1
+RETRY_COUNT=0
+RECOVERY_COUNT=0
+REOPEN_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+FORBIDDEN_POST_IMAGE_COMMAND_COUNT=0
+HOST_CLEANUP_STATUS=COMPLETATO
+SECRET_ZEROIZED=true
+FPRINTD_RESTORE_CALLBACK_COMPLETED_WITHOUT_EXCEPTION=VERIFIED_BY_CONTROL_FLOW
+```
+
+Il report protetto canonico
+`/var/lib/goodix-5125-poc/d261-results/d268-first-image-final.json` non è
+leggibile dall'utente corrente (permessi negati) e D268/02 non usa `sudo`, non
+cambia permessi e non blocca lo step: il summary live e il control-flow verificabile
+del codice sono sufficienti. La run ha restituito `PASS_STOP_AFTER_FIRST_IMAGE`,
+quindi `restore_fprintd()` nel `finally` non ha sollevato eccezione. La classe
+dell'evidenza è:
+
+```text
+FPRINTD_RESTORE_EVIDENCE_CLASS=VERIFIED_BY_CONTROL_FLOW_NOT_EXTERNAL_STATE_OBSERVATION
+EXTERNAL_FPRINTD_FINAL_STATE=NOT_INDEPENDENTLY_OBSERVED
+```
+
+#### Closure canonica D218–D220 preservata
+
+D268/02 **preserva integralmente** la closure D218–D220 (recuperata da
+`docs/EVIDENCE.md` WIN-001 e da `README.md`):
+
+```text
+D220_WINDOWS_PREPROCESSOR_CONSUMES_U16_NO_U8_ADAPTER_JUSTIFIED=true
+INTENSITY_CONTRACT=DIRECT_U16_CONSUMED_PROVEN
+ORIENTATION_CONTRACT=UNRESOLVED
+NEXT_BLOCKER=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+D220_CLOSURE_PRESERVED=true
+```
+
+Significato: Windows/`AlgoChicago.dll` consuma direttamente il raster `u16`/12-bit;
+non è giustificato alcun adapter `u16 → u8` ricostruito dal contratto Windows;
+l'orientamento resta non risolto; la decisione successiva è Linux-specifica, non
+una nuova campagna statica Windows.
+
+#### Prossimo boundary tecnico
+
+Il prossimo boundary principale è la **decisione di engineering Linux-specifica**
+su come rappresentare/adattare il raster Goodix `80x64 u16`/12-bit verso il
+contratto Linux/libfprint, mantenendo distinte semantica del sensore, contratto
+Windows già ricostruito e orientamento `UNRESOLVED`:
+
+```text
+NEXT_PRIMARY_BOUNDARY=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+```
+
+Parte dal nuovo fatto D268 (`target live image → valid image record → decoded
+raster 80x64 u16`) e dalla conoscenza D220 (Windows consuma u16 direttamente, nessun
+adapter u8). I sottoproblemi che il prossimo step dovrà affrontare, senza assumere
+la soluzione:
+
+```text
+libfprint image representation requirements
+u16/12-bit -> Linux/libfprint mapping
+scaling / clipping / normalization policy
+orientation / transpose / flags
+quality/preprocessing ownership
+whether conversion belongs in GPL core or LGPL libfprint glue
+```
+
+Non si implementa codice in D268/02: il task successivo è definito per review
+AI-PM.
+
+```text
+OUTCOME=READY — D268_02_FIRST_IMAGE_LIVE_EVIDENCE_CLOSED
+ADVANCEMENT=LIVE_FIRST_IMAGE_BOUNDARY_CLOSED_AND_LINUX_LIBFPRINT_BOUNDARY_DEFINED
+EXECUTABLE_CLOSURE=NOT_APPLICABLE
+RESIDUAL_BLOCKER_OR_RISK=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT; ORIENTATION_UNRESOLVED
+CANONICAL_DOCUMENTATION=UPDATED
+LIVE_EVIDENCE_CLOSURE=PASS
+D267_01_CAUSAL_CLASSIFICATION=STRONG_CAUSAL_INFERENCE
+FPRINTD_RESTORE_EVIDENCE_CLASS=VERIFIED_BY_CONTROL_FLOW_NOT_EXTERNAL_STATE_OBSERVATION
+D220_CLOSURE_PRESERVED=true
+NEXT_PRIMARY_BOUNDARY=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+FIRST_IMAGE_RECEIVED=true
+IMAGE_0X88_NO_CHECK_TARGET_PROVEN=true
+IMAGE_RECORD_CRC_LIVE_PROVEN=true
+FIRST_IMAGE_DECODE_LIVE_PROVEN=true
+FIRST_IMAGE_RASTER_SHAPE=80x64
+D267_01_CAUSE=STRONG_CAUSAL_INFERENCE
+D268_RETRY_AUTHORIZED=false
+LIVE_AUTHORIZED=false
 ```
