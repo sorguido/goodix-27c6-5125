@@ -7,7 +7,7 @@
     "zero_finger_target_capture": "captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng",
     "zero_finger_target_capture_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
     "oem_static_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
-    "rocky_snapshot_commit": "227eba177a44b2eea645be81c995246ceb8119e5"
+    "rocky_snapshot_commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b"
   },
   "boundaries": [
     {"boundary":"0x34 builder","target_capture":"OBSERVED packet 233","oem_static":"VERIFIED 0x1800250d0-0x1800251b5","rocky_external":"THIRD_PARTY_CORROBORATION","d273_status":"CLOSED_OFFLINE"},

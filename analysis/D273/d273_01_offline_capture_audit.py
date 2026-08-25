@@ -65,19 +65,26 @@ def _frame_metadata(frame: dict, direction: str) -> dict:
         return result
     wire_control = raw[4]
     inner_length = int.from_bytes(raw[5:7], "little")
+    # The exact wire control is always preserved. The project has no general
+    # contract "logical = wire & 0xfe"; the canonical manual states the two must
+    # be kept distinct. A semantic logical_control is therefore only emitted when
+    # a command-specific, verified rule applies (the ACK echo); otherwise it is
+    # explicitly marked NOT_DERIVED instead of being fabricated by masking.
     result.update(
         {
             "wire_control": f"0x{wire_control:02x}",
-            "logical_control": f"0x{wire_control & 0xfe:02x}",
             "declared_inner_length": inner_length,
         }
     )
     if wire_control == 0xB0 and inner_length == 3:
+        ack_echo = f"0x{raw[7]:02x}"
+        ack_status = f"0x{raw[8]:02x}"
         result.update(
             {
                 "classification": "A0_COMMAND_ACK",
-                "ack_echo": f"0x{raw[7]:02x}",
-                "ack_status": f"0x{raw[8]:02x}",
+                "ack_echo": ack_echo,
+                "ack_status": ack_status,
+                "logical_control": ack_echo,
             }
         )
     elif direction == "device_to_host" and inner_length == 17:
@@ -85,12 +92,23 @@ def _frame_metadata(frame: dict, direction: str) -> dict:
             {
                 "classification": "A0_FDT_IRQ",
                 "irq": f"0x{int.from_bytes(raw[7:9], 'little'):04x}",
+                "logical_control": "NOT_DERIVED",
             }
         )
     elif direction == "device_to_host" and (wire_control & 0xFE) == 0x50:
-        result["classification"] = "A0_0X50_NAV_RESPONSE"
+        result.update(
+            {
+                "classification": "A0_0X50_NAV_RESPONSE",
+                "logical_control": "NOT_DERIVED",
+            }
+        )
     else:
-        result["classification"] = "A0_COMMAND_OR_RESPONSE"
+        result.update(
+            {
+                "classification": "A0_COMMAND_OR_RESPONSE",
+                "logical_control": "NOT_DERIVED",
+            }
+        )
     return result
 
 
@@ -157,7 +175,7 @@ def main() -> None:
         item = by_index[index]
         if item["classification"] != classification:
             raise RuntimeError(f"classification_mismatch:{index}")
-        observed_control = item.get("ack_echo", item.get("logical_control"))
+        observed_control = item.get("ack_echo", item.get("wire_control"))
         if control is not None and observed_control != control:
             raise RuntimeError(f"control_mismatch:{index}")
     result = {

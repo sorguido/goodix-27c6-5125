@@ -20,9 +20,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 27,
@@ -31,9 +31,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 29,
@@ -42,9 +42,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 31,
@@ -53,9 +53,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 33,
@@ -64,11 +64,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa8",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa8"
         },
         {
           "packet_index": 35,
@@ -77,9 +77,9 @@
           "physical_length": 30,
           "declared_outer_length": 30,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 23,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 36,
@@ -88,9 +88,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 39,
@@ -99,9 +99,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x97",
-          "logical_control": "0x96",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 41,
@@ -110,9 +110,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 43,
@@ -121,10 +121,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0201"
+          "irq": "0x0201",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 44,
@@ -133,9 +133,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 47,
@@ -144,9 +144,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 49,
@@ -155,11 +155,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa8",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa8"
         },
         {
           "packet_index": 51,
@@ -168,9 +168,9 @@
           "physical_length": 30,
           "declared_outer_length": 30,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 23,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 53,
@@ -179,9 +179,9 @@
           "physical_length": 16,
           "declared_outer_length": 16,
           "wire_control": "0xe4",
-          "logical_control": "0xe4",
           "declared_inner_length": 9,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 55,
@@ -190,11 +190,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xe4",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xe4"
         },
         {
           "packet_index": 57,
@@ -203,9 +203,9 @@
           "physical_length": 49,
           "declared_outer_length": 49,
           "wire_control": "0xe4",
-          "logical_control": "0xe4",
           "declared_inner_length": 42,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 58,
@@ -214,9 +214,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 61,
@@ -225,11 +225,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa2",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa2"
         },
         {
           "packet_index": 63,
@@ -238,9 +238,9 @@
           "physical_length": 11,
           "declared_outer_length": 11,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 4,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 65,
@@ -249,9 +249,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 67,
@@ -260,11 +260,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x82",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x82"
         },
         {
           "packet_index": 69,
@@ -273,9 +273,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 70,
@@ -284,9 +284,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa6",
-          "logical_control": "0xa6",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 73,
@@ -295,11 +295,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa6",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa6"
         },
         {
           "packet_index": 75,
@@ -308,9 +308,9 @@
           "physical_length": 72,
           "declared_outer_length": 72,
           "wire_control": "0xa6",
-          "logical_control": "0xa6",
           "declared_inner_length": 65,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 77,
@@ -319,9 +319,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 79,
@@ -330,11 +330,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa2",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa2"
         },
         {
           "packet_index": 81,
@@ -343,9 +343,9 @@
           "physical_length": 11,
           "declared_outer_length": 11,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 4,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 82,
@@ -354,9 +354,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x70",
-          "logical_control": "0x70",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 85,
@@ -365,11 +365,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x70",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x70"
         },
         {
           "packet_index": 87,
@@ -378,9 +378,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 89,
@@ -389,11 +389,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 90,
@@ -402,9 +402,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 93,
@@ -413,11 +413,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 94,
@@ -426,9 +426,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 97,
@@ -437,11 +437,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 99,
@@ -450,9 +450,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 101,
@@ -461,11 +461,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 103,
@@ -474,9 +474,9 @@
           "physical_length": 232,
           "declared_outer_length": 232,
           "wire_control": "0x90",
-          "logical_control": "0x90",
           "declared_inner_length": 225,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 111,
@@ -485,11 +485,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x90",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x90"
         },
         {
           "packet_index": 113,
@@ -498,9 +498,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x90",
-          "logical_control": "0x90",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 114,
@@ -509,9 +509,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd1",
-          "logical_control": "0xd0",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 117,
@@ -584,9 +584,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd4",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 137,
@@ -595,11 +595,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xd4",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xd4"
         },
         {
           "packet_index": 139,
@@ -608,9 +608,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 141,
@@ -619,10 +619,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0201"
+          "irq": "0x0201",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 142,
@@ -631,9 +631,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 145,
@@ -642,11 +642,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x36",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x36"
         },
         {
           "packet_index": 147,
@@ -655,10 +655,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0100"
+          "irq": "0x0100",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 148,
@@ -667,9 +667,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x50",
-          "logical_control": "0x50",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 151,
@@ -678,11 +678,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x50",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x50"
         },
         {
           "packet_index": 153,
@@ -691,9 +691,9 @@
           "physical_length": 2417,
           "declared_outer_length": 2417,
           "wire_control": "0x50",
-          "logical_control": "0x50",
           "declared_inner_length": 2410,
-          "classification": "A0_0X50_NAV_RESPONSE"
+          "classification": "A0_0X50_NAV_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 154,
@@ -702,9 +702,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 157,
@@ -713,11 +713,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x36",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x36"
         },
         {
           "packet_index": 159,
@@ -726,10 +726,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0100"
+          "irq": "0x0100",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 160,
@@ -738,9 +738,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 163,
@@ -749,11 +749,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x82",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x82"
         },
         {
           "packet_index": 165,
@@ -762,9 +762,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 167,
@@ -773,9 +773,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x20",
-          "logical_control": "0x20",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 169,
@@ -784,11 +784,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x20",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x20"
         },
         {
           "packet_index": 171,
@@ -805,9 +805,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 175,
@@ -816,11 +816,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x36",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x36"
         },
         {
           "packet_index": 177,
@@ -829,10 +829,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0100"
+          "irq": "0x0100",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 178,
@@ -841,9 +841,9 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 181,
@@ -852,11 +852,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x32",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x32"
         },
         {
           "packet_index": 187,
@@ -865,9 +865,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 189,
@@ -876,9 +876,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 191,
@@ -887,9 +887,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 193,
@@ -898,9 +898,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 195,
@@ -909,10 +909,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0201"
+          "irq": "0x0201",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 199,
@@ -921,9 +921,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 201,
@@ -932,9 +932,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 203,
@@ -943,9 +943,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 205,
@@ -954,9 +954,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 207,
@@ -965,10 +965,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0201"
+          "irq": "0x0201",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 211,
@@ -977,9 +977,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 213,
@@ -988,9 +988,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 215,
@@ -999,9 +999,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 217,
@@ -1010,9 +1010,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 219,
@@ -1021,10 +1021,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0201"
+          "irq": "0x0201",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 220,
@@ -1033,9 +1033,9 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 223,
@@ -1044,11 +1044,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x32",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x32"
         },
         {
           "packet_index": 225,
@@ -1057,10 +1057,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0002"
+          "irq": "0x0002",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 227,
@@ -1069,9 +1069,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x22",
-          "logical_control": "0x22",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 229,
@@ -1080,11 +1080,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x22",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x22"
         },
         {
           "packet_index": 231,
@@ -1101,9 +1101,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x34",
-          "logical_control": "0x34",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 235,
@@ -1112,11 +1112,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x34",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x34"
         },
         {
           "packet_index": 237,
@@ -1125,10 +1125,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x34",
-          "logical_control": "0x34",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0200"
+          "irq": "0x0200",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 238,
@@ -1137,9 +1137,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x20",
-          "logical_control": "0x20",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 241,
@@ -1148,11 +1148,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x20",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x20"
         },
         {
           "packet_index": 243,
@@ -1169,9 +1169,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x50",
-          "logical_control": "0x50",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 247,
@@ -1180,11 +1180,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x50",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x50"
         },
         {
           "packet_index": 249,
@@ -1193,9 +1193,9 @@
           "physical_length": 2417,
           "declared_outer_length": 2417,
           "wire_control": "0x50",
-          "logical_control": "0x50",
           "declared_inner_length": 2410,
-          "classification": "A0_0X50_NAV_RESPONSE"
+          "classification": "A0_0X50_NAV_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 251,
@@ -1204,9 +1204,9 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 253,
@@ -1215,11 +1215,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x32",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x32"
         }
       ]
     },
@@ -1240,9 +1240,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 27,
@@ -1251,9 +1251,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 29,
@@ -1262,9 +1262,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 31,
@@ -1273,9 +1273,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 33,
@@ -1284,11 +1284,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa8",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa8"
         },
         {
           "packet_index": 35,
@@ -1297,9 +1297,9 @@
           "physical_length": 30,
           "declared_outer_length": 30,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 23,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 37,
@@ -1308,9 +1308,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 39,
@@ -1319,9 +1319,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x97",
-          "logical_control": "0x96",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 41,
@@ -1330,9 +1330,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 43,
@@ -1341,10 +1341,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0200"
+          "irq": "0x0200",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 45,
@@ -1353,9 +1353,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 47,
@@ -1364,9 +1364,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 49,
@@ -1375,11 +1375,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa8",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa8"
         },
         {
           "packet_index": 51,
@@ -1388,9 +1388,9 @@
           "physical_length": 30,
           "declared_outer_length": 30,
           "wire_control": "0xa8",
-          "logical_control": "0xa8",
           "declared_inner_length": 23,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 53,
@@ -1399,9 +1399,9 @@
           "physical_length": 16,
           "declared_outer_length": 16,
           "wire_control": "0xe4",
-          "logical_control": "0xe4",
           "declared_inner_length": 9,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 55,
@@ -1410,11 +1410,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xe4",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xe4"
         },
         {
           "packet_index": 57,
@@ -1423,9 +1423,9 @@
           "physical_length": 49,
           "declared_outer_length": 49,
           "wire_control": "0xe4",
-          "logical_control": "0xe4",
           "declared_inner_length": 42,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 59,
@@ -1434,9 +1434,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 61,
@@ -1445,11 +1445,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa2",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa2"
         },
         {
           "packet_index": 63,
@@ -1458,9 +1458,9 @@
           "physical_length": 11,
           "declared_outer_length": 11,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 4,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 65,
@@ -1469,9 +1469,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 67,
@@ -1480,11 +1480,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x82",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x82"
         },
         {
           "packet_index": 69,
@@ -1493,9 +1493,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 70,
@@ -1504,9 +1504,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa6",
-          "logical_control": "0xa6",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 73,
@@ -1515,11 +1515,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa6",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa6"
         },
         {
           "packet_index": 75,
@@ -1528,9 +1528,9 @@
           "physical_length": 72,
           "declared_outer_length": 72,
           "wire_control": "0xa6",
-          "logical_control": "0xa6",
           "declared_inner_length": 65,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 77,
@@ -1539,9 +1539,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 79,
@@ -1550,11 +1550,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xa2",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xa2"
         },
         {
           "packet_index": 81,
@@ -1563,9 +1563,9 @@
           "physical_length": 11,
           "declared_outer_length": 11,
           "wire_control": "0xa2",
-          "logical_control": "0xa2",
           "declared_inner_length": 4,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 82,
@@ -1574,9 +1574,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x70",
-          "logical_control": "0x70",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 85,
@@ -1585,11 +1585,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x70",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x70"
         },
         {
           "packet_index": 87,
@@ -1598,9 +1598,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 89,
@@ -1609,11 +1609,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 90,
@@ -1622,9 +1622,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 93,
@@ -1633,11 +1633,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 95,
@@ -1646,9 +1646,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 97,
@@ -1657,11 +1657,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 98,
@@ -1670,9 +1670,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x80",
-          "logical_control": "0x80",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 101,
@@ -1681,11 +1681,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x80",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x80"
         },
         {
           "packet_index": 103,
@@ -1694,9 +1694,9 @@
           "physical_length": 232,
           "declared_outer_length": 232,
           "wire_control": "0x90",
-          "logical_control": "0x90",
           "declared_inner_length": 225,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 111,
@@ -1705,11 +1705,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x90",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x90"
         },
         {
           "packet_index": 113,
@@ -1718,9 +1718,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x90",
-          "logical_control": "0x90",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 114,
@@ -1729,9 +1729,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd1",
-          "logical_control": "0xd0",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 117,
@@ -1804,9 +1804,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd4",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 137,
@@ -1815,11 +1815,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0xd4",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0xd4"
         },
         {
           "packet_index": 139,
@@ -1828,9 +1828,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 141,
@@ -1839,10 +1839,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0200"
+          "irq": "0x0200",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 142,
@@ -1851,9 +1851,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 145,
@@ -1862,11 +1862,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x36",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x36"
         },
         {
           "packet_index": 147,
@@ -1875,10 +1875,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0100"
+          "irq": "0x0100",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 149,
@@ -1887,9 +1887,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x50",
-          "logical_control": "0x50",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 151,
@@ -1898,11 +1898,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x50",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x50"
         },
         {
           "packet_index": 153,
@@ -1911,9 +1911,9 @@
           "physical_length": 2417,
           "declared_outer_length": 2417,
           "wire_control": "0x50",
-          "logical_control": "0x50",
           "declared_inner_length": 2410,
-          "classification": "A0_0X50_NAV_RESPONSE"
+          "classification": "A0_0X50_NAV_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 154,
@@ -1922,9 +1922,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 157,
@@ -1933,11 +1933,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x36",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x36"
         },
         {
           "packet_index": 159,
@@ -1946,10 +1946,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0100"
+          "irq": "0x0100",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 161,
@@ -1958,9 +1958,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 163,
@@ -1969,11 +1969,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x82",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x82"
         },
         {
           "packet_index": 165,
@@ -1982,9 +1982,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x82",
-          "logical_control": "0x82",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 167,
@@ -1993,9 +1993,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0x20",
-          "logical_control": "0x20",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 169,
@@ -2004,11 +2004,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x20",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x20"
         },
         {
           "packet_index": 171,
@@ -2025,9 +2025,9 @@
           "physical_length": 22,
           "declared_outer_length": 22,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 15,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 175,
@@ -2036,11 +2036,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x36",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x36"
         },
         {
           "packet_index": 177,
@@ -2049,10 +2049,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x36",
-          "logical_control": "0x36",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0100"
+          "irq": "0x0100",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 178,
@@ -2061,9 +2061,9 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 181,
@@ -2072,11 +2072,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x32",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x32"
         },
         {
           "packet_index": 187,
@@ -2085,9 +2085,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 189,
@@ -2096,9 +2096,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 191,
@@ -2107,9 +2107,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 193,
@@ -2118,9 +2118,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 195,
@@ -2129,10 +2129,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0200"
+          "irq": "0x0200",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 197,
@@ -2141,9 +2141,9 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 199,
@@ -2152,11 +2152,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x32",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x32"
         },
         {
           "packet_index": 203,
@@ -2165,9 +2165,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 205,
@@ -2176,9 +2176,9 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xd5",
-          "logical_control": "0xd4",
           "declared_inner_length": 3,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 207,
@@ -2187,9 +2187,9 @@
           "physical_length": 12,
           "declared_outer_length": 12,
           "wire_control": "0x01",
-          "logical_control": "0x00",
           "declared_inner_length": 5,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 209,
@@ -2198,9 +2198,9 @@
           "physical_length": 13,
           "declared_outer_length": 13,
           "wire_control": "0xaf",
-          "logical_control": "0xae",
           "declared_inner_length": 6,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 211,
@@ -2209,10 +2209,10 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0xae",
-          "logical_control": "0xae",
           "declared_inner_length": 17,
           "classification": "A0_FDT_IRQ",
-          "irq": "0x0200"
+          "irq": "0x0200",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 213,
@@ -2221,9 +2221,9 @@
           "physical_length": 24,
           "declared_outer_length": 24,
           "wire_control": "0x32",
-          "logical_control": "0x32",
           "declared_inner_length": 17,
-          "classification": "A0_COMMAND_OR_RESPONSE"
+          "classification": "A0_COMMAND_OR_RESPONSE",
+          "logical_control": "NOT_DERIVED"
         },
         {
           "packet_index": 215,
@@ -2232,11 +2232,11 @@
           "physical_length": 10,
           "declared_outer_length": 10,
           "wire_control": "0xb0",
-          "logical_control": "0xb0",
           "declared_inner_length": 3,
           "classification": "A0_COMMAND_ACK",
           "ack_echo": "0x32",
-          "ack_status": "0x01"
+          "ack_status": "0x01",
+          "logical_control": "0x32"
         }
       ]
     }
@@ -2249,9 +2249,9 @@
     "physical_length": 2417,
     "declared_outer_length": 2417,
     "wire_control": "0x50",
-    "logical_control": "0x50",
     "declared_inner_length": 2410,
-    "classification": "A0_0X50_NAV_RESPONSE"
+    "classification": "A0_0X50_NAV_RESPONSE",
+    "logical_control": "NOT_DERIVED"
   },
   "second_cycle_after_packet_251_observed": false
 }

@@ -4099,10 +4099,47 @@ POLARITY_CONTRACT=UNRESOLVED
 D273_TARGET_EVIDENCE_GAP=EXACT_MINIMUM_NEW_OBSERVATION_REQUIRED
 NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
 NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
-BASELINE_APPROVED=false
-LIVE_AUTHORIZED=false
-READY_FOR_LIVE=false
-LIVE_EXECUTION=NOT_PERFORMED
+ BASELINE_APPROVED=false
+ LIVE_AUTHORIZED=false
+ READY_FOR_LIVE=false
+ LIVE_EXECUTION=NOT_PERFORMED
+ ```
+
+### D273/01 corrective: verità probatoria metadata e provenance Rocky
+
+Corrective locale deterministico (D273/01, post-baseline
+`5ef14c5051726fe6bc6624de86d3885f3306776e`) che ripristina solo metadati
+probatori e provenance, senza cambiare il boundary tecnico D273.
+
+- `analysis/D273/d273_01_offline_capture_audit.py` non deduce più un
+  `logical_control` universale con `wire & 0xfe`. Il `wire_control` esatto è
+  sempre preservato; un `logical_control` semantico è emesso solo per gli ACK
+  (echo realmente osservato) e marcato `NOT_DERIVED` negli altri frame A0. Un
+  control dispari non appartenente alla regola (es. D1 wire `0xd1`) non è più
+  pubblicato falsamente come `0xd0`. Coerente con il contratto di
+  trasporto §Trasporto USB («Non è corretto dedurre sempre il logico con
+  `wire & 0xfe`»).
+- `analysis/D273/D273_01_capture_census.json` rigenerato in modo deterministico:
+  packet 249 resta `A0_0X50_NAV_RESPONSE` con control `0x50`, length
+  2417/2410; gli ACK conservano echo/status osservati; nessun payload
+  B0/plaintext/raster serializzato.
+- `analysis/D273/D273_01_multiframe_evidence_matrix.json` riallineata alla
+  provenance canonica: `rocky_snapshot_commit` corretto da
+  `227eba177a44b2eea645be81c995246ceb8119e5` (errato) a
+  `227eba219fa9e3fbac5bd59aca79f624f67cd11b` (canonico in
+  `Rockytkg/PROVENANCE.md`). Aggiunto check programmatico che confronta il
+  valore registrato nella matrix con il commit canonico letto da
+  `Rockytkg/PROVENANCE.md`.
+- Nessuna classificazione tecnica Rocky cambia: resta
+  `THIRD_PARTY_CORROBORATION`. Nessuna conclusione D273 (dataflow up-table, NAV
+  packet 249, blocker seconda iterazione, blocker OpenCV4-dev) cambia per
+  effetto del corrective.
+
+```text
+D273_EVIDENCE_METADATA_CORRECTIVE=PASS
+GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
+ROCKY_PROVENANCE_REALIGNED_TO=227eba219fa9e3fbac5bd59aca79f624f67cd11b
+D273_TECHNICAL_CONCLUSIONS_UNCHANGED=true
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
