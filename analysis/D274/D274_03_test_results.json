@@ -1,27 +1,27 @@
 {
-  "schema": "D274_03_TEST_RESULTS_V1",
+  "schema": "D274_03_TEST_RESULTS_V2",
   "executed_at": "2026-08-25",
   "environment": {
     "host_os": "Linux",
     "python": "3.14.7",
-    "powershell_5_1_runtime": "NOT_AVAILABLE_CURRENT_LINUX_HOST",
+    "windows_powershell_5_1_runtime": "NOT_AVAILABLE_CURRENT_LINUX_HOST",
     "hardware_access": false
   },
   "commands": [
     {
       "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v analysis/D274/test_d274_03_second_cycle_operator_kit.py",
       "result": "PASS",
-      "tests_passed": 22,
+      "tests_passed": 34,
       "tests_failed": 0
     },
     {
-      "command": "python3 -m unittest -v analysis/D274/test_d274_postprocess_multiframe_evidence.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v analysis/D274/test_d274_postprocess_multiframe_evidence.py",
       "result": "PASS",
       "tests_passed": 30,
       "tests_failed": 0
     },
     {
-      "command": "python3 -m py_compile <D274_03 postprocessor and test>",
+      "command": "python3 -m py_compile <D274_03 observer, postprocessor and tests>",
       "result": "PASS"
     },
     {
@@ -29,44 +29,54 @@
       "result": "PASS"
     },
     {
-      "command": "from /tmp: PYTHONDONTWRITEBYTECODE=1 python3 <absolute test path> -q; python3 <absolute postprocessor path> --help",
+      "command": "python3 <D274_03 postprocessor> --help; python3 <D274_03 observer> --help",
+      "result": "PASS"
+    },
+    {
+      "command": "from /tmp: PYTHONDONTWRITEBYTECODE=1 python3 <absolute D274_03 test path> -q; both Python CLI --help",
       "result": "PASS",
-      "tests_passed": 22,
+      "tests_passed": 34,
       "tests_failed": 0
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
     }
   ],
-  "d274_03_cases": {
-    "success_rearm_ack_irq2_0x22_ack01_second_b0_stop": "PASS",
-    "missing_second_irq2": "PASS",
-    "wrong_second_irq": "PASS",
-    "missing_second_0x22": "PASS",
-    "duplicate_second_0x22": "PASS",
-    "wrong_ack_echo": "PASS",
-    "ack_status_0x07": "PASS",
-    "malformed_fingerprint_b0": "PASS",
-    "wrong_b0_class": "PASS",
-    "third_cycle_evidence": "PASS",
-    "ambiguous_target": "PASS",
-    "target_reenumeration": "PASS",
-    "wrong_firmware": "PASS",
-    "capture_deadline": "PASS",
-    "privacy_leak_attempt": "PASS",
-    "schema_violation": "PASS",
-    "unauthorized_live": "PASS_STATIC_AND_TEMPLATE",
-    "stale_or_wrong_baseline": "PASS_STATIC",
-    "reused_marker": "PASS_STATIC_CREATENEW",
-    "passive_tshark_and_acl_source_contract": "PASS_STATIC",
+  "corrective_cases": {
+    "authority_false_blocks_live": "PASS_STATIC_TEMPLATE_AND_NATIVE_PACKAGE_CONTRACT",
+    "wrong_sha_branch_dirty_or_stale_live_critical_set": "PASS_STATIC",
+    "same_run_goodix_absence_causal_order": "PASS_STATIC_AND_NATIVE_QUALIFICATION_PATH_PREPARED",
+    "same_run_goodix_present_fail_before_marker": "PENDING_NATIVE_BEHAVIORAL_EXECUTION_SOURCE_FAIL_CLOSED",
+    "same_run_goodix_absent_reaches_next_gate": "PENDING_NATIVE_BEHAVIORAL_EXECUTION_PATH_PREPARED",
+    "marker_reused_and_no_retry": "PASS_STATIC_CREATENEW",
+    "existing_pin_authentication_non_mutating": "PASS_SOURCE_AND_OPERATOR_POLICY",
+    "pin_value_never_read_or_serialized": "PASS_SOURCE_SCHEMA_COLLECTOR",
+    "pin_account_credential_commit_unexpected_terminal_categories": "PASS_SOURCE_POLICY",
+    "growing_capture_exact_second_b0_trigger": "PASS_SYNTHETIC",
+    "growing_capture_trailing_incomplete_block": "PASS_SYNTHETIC",
+    "missing_or_wrong_irq_0x22_ack_b0": "PASS_SYNTHETIC",
+    "observer_deadline": "PASS_SYNTHETIC_FAIL_CLOSED_ZERO_RETRY",
+    "third_cycle_evidence": "PASS_SYNTHETIC_FAIL_CLOSED",
+    "capture_stop_bounded_source_contract": "PASS_STATIC",
+    "final_raw_readable_terminal_frame_recovered": "PASS_SYNTHETIC",
+    "capture_finalization_lost_terminal_evidence": "PASS_SYNTHETIC_DISTINCT_FAILURE",
+    "empty_missing_truncated_final_raw": "PASS_SYNTHETIC_FAIL_CLOSED",
+    "metadata_only_privacy_and_strict_schema": "PASS",
     "operator_surface_italian": "PASS_SOURCE_SCAN",
+    "native_qualification_package": "PASS_OFFLINE_PREPARED_NOT_EXECUTED",
     "historical_d263_capture": "PASS_MISSING_SECOND_IRQ2_NOT_PROMOTED"
   },
   "closure": {
-    "d274_03_offline_executable_closure": "PASS",
-    "windows_native_d274_03_execution": "NOT_PERFORMED_CURRENT_LINUX_HOST",
+    "d274_03_offline_executable_closure": "PASS_PYTHON_AND_STATIC_PACKAGE",
+    "d274_03_windows_native_qualification": "REQUIRED_NOT_YET_EXECUTED",
+    "baseline_approval_blocked_pending_native_qualification": true,
     "d274_01_regression_tests": "PASS_30_OF_30",
     "real_capture_count": 0,
     "real_usb_open_count": 0,
     "real_finger_interaction_count": 0,
     "real_goodix_command_count": 0,
-    "automatic_retry_count": 0
+    "automatic_retry_count": 0,
+    "persistent_device_write_count": 0
   }
 }

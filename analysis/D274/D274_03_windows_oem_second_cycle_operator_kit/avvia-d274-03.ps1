@@ -33,6 +33,12 @@ function Get-D274UsbPcapInterfaces([string]$Tshark) {
     return @(& $Tshark -D 2>&1 | Where-Object { $_ -match "USBPcap" })
 }
 
+function Get-D274UsbPcapInterfaceSelector([string]$DiscoveryLine) {
+    $match = [regex]::Match($DiscoveryLine, '^\s*(\d+)\.')
+    if (-not $match.Success) { return $null }
+    return $match.Groups[1].Value
+}
+
 function Test-D274PrivateOutputRoot([string]$Root, [string]$RepositoryRoot) {
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
         New-Item -ItemType Directory -Path $Root -Force | Out-Null
@@ -68,7 +74,10 @@ function Invoke-D274SelfTest {
     }
     $required = @(
         "invoke-d274-03-live-once.ps1", "collect-d274-03-results.ps1",
-        "d274_03_postprocess_second_cycle.py", "D274_03_evidence_schema.json",
+        "d274_03_postprocess_second_cycle.py", "d274_03_observe_second_b0.py",
+        "run-d274-03-native-qualification.ps1",
+        "collect-d274-03-native-qualification-results.ps1",
+        "D274_03_evidence_schema.json",
         "D274_03_live_authority.json", "D274_03_OPERATOR_README_IT.md"
     )
     $missing = @($required | Where-Object { -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $_) -PathType Leaf) })
@@ -103,6 +112,8 @@ function Invoke-D274Preflight {
     $version = & $tshark --version 2>&1 | Select-Object -First 1
     $interfaces = @(Get-D274UsbPcapInterfaces -Tshark $tshark)
     if ($interfaces.Count -ne 1) { Fail-D274 "interfaccia USBPcap assente o ambigua" }
+    $interfaceSelector = Get-D274UsbPcapInterfaceSelector -DiscoveryLine ([string]$interfaces[0])
+    if ($null -eq $interfaceSelector) { Fail-D274 "selector numerico USBPcap non ricavabile" }
     if (-not (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) { Fail-D274 "Get-PnpDevice non disponibile" }
     $targets = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match $script:ExpectedTarget })
     if ($targets.Count -ne 0) { Fail-D274 "il target deve essere assente dal guest durante il preflight offline" }
@@ -118,6 +129,7 @@ function Invoke-D274Preflight {
         tshark_path = $tshark
         tshark_version = [string]$version
         usbpcap_interface_count = $interfaces.Count
+        usbpcap_interface_selector_valid = $true
         goodix_absent_from_guest = $true
         output_root_private = $true
         repository_root_resolved = $true
@@ -176,7 +188,8 @@ $tshark = Get-D274TsharkPath
 if ($null -eq $tshark) { Fail-D274 "TShark non disponibile" }
 $interfaces = @(Get-D274UsbPcapInterfaces -Tshark $tshark)
 if ($interfaces.Count -ne 1) { Fail-D274 "interfaccia USBPcap assente o ambigua" }
-$interfaceName = ([string]$interfaces[0]).Split(" ")[0].Trim()
+$interfaceName = Get-D274UsbPcapInterfaceSelector -DiscoveryLine ([string]$interfaces[0])
+if ($null -eq $interfaceName) { Fail-D274 "selector numerico USBPcap non ricavabile" }
 & (Join-Path $PSScriptRoot "invoke-d274-03-live-once.ps1") `
     -RepositoryRoot $root `
     -AuthorityPath (Join-Path $PSScriptRoot "D274_03_live_authority.json") `

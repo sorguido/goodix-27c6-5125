@@ -77,13 +77,22 @@ class UsbPacket:
     data_len: int
 
 
-def iter_usbpcap(path: Path) -> Iterable[UsbPacket]:
-    data = path.read_bytes()
-    require(len(data) >= 28, "TRUNCATED_PCAP_METADATA")
+def parse_usbpcap_bytes(data: bytes, *, allow_trailing_incomplete: bool = False) -> list[UsbPacket]:
+    """Parse complete pcapng blocks, optionally ignoring one growing tail.
+
+    The relaxed mode is only for the passive live observer.  The final
+    postprocessor always uses the strict mode and therefore remains the
+    authority on raw readability and evidence closure.
+    """
+    if len(data) < 28:
+        if allow_trailing_incomplete:
+            return []
+        raise EvidenceError("TRUNCATED_PCAP_METADATA")
     endian = "<"
     interfaces: list[tuple[int, float]] = []
     offset = 0
     packet_index = 0
+    packets: list[UsbPacket] = []
     while offset + 12 <= len(data):
         block_type = struct.unpack_from(endian + "I", data, offset)[0]
         if block_type == SHB:
@@ -96,8 +105,11 @@ def iter_usbpcap(path: Path) -> Iterable[UsbPacket]:
                 raise EvidenceError("MALFORMED_PCAPNG_BYTE_ORDER")
             block_type = SHB
         block_length = struct.unpack_from(endian + "I", data, offset + 4)[0]
-        require(block_length >= 12 and offset + block_length <= len(data),
-                "TRUNCATED_PCAP_METADATA")
+        require(block_length >= 12, "TRUNCATED_PCAP_METADATA")
+        if offset + block_length > len(data):
+            if allow_trailing_incomplete:
+                break
+            raise EvidenceError("TRUNCATED_PCAP_METADATA")
         require(struct.unpack_from(endian + "I", data, offset + block_length - 4)[0]
                 == block_length, "MALFORMED_PCAPNG_TRAILER")
         body = data[offset + 8:offset + block_length - 4]
@@ -120,18 +132,24 @@ def iter_usbpcap(path: Path) -> Iterable[UsbPacket]:
             require(27 <= header_len <= len(raw), "MALFORMED_USBCAP_HEADER")
             data_len = struct.unpack_from("<I", raw, 23)[0]
             require(header_len + data_len <= len(raw), "TRUNCATED_USBCAP_PAYLOAD")
-            yield UsbPacket(
+            packets.append(UsbPacket(
                 packet_index,
                 ((ts_hi << 32) | ts_lo) * resolution,
                 struct.unpack_from("<H", raw, 17)[0],
                 struct.unpack_from("<H", raw, 19)[0],
                 raw[21], raw[22], raw[16], raw[header_len:header_len + data_len],
                 data_len,
-            )
+            ))
             packet_index += 1
         offset += block_length
-    require(offset == len(data), "TRUNCATED_PCAP_METADATA")
-    require(bool(interfaces), "PCAP_INTERFACE_MISSING")
+    if not allow_trailing_incomplete:
+        require(offset == len(data), "TRUNCATED_PCAP_METADATA")
+        require(bool(interfaces), "PCAP_INTERFACE_MISSING")
+    return packets
+
+
+def iter_usbpcap(path: Path) -> Iterable[UsbPacket]:
+    yield from parse_usbpcap_bytes(path.read_bytes())
 
 
 @dataclass
@@ -148,7 +166,7 @@ class Frame:
     truncated: bool = False
 
 
-def split_frames(packets: list[UsbPacket]) -> list[Frame]:
+def split_frames(packets: list[UsbPacket], *, include_incomplete: bool = True) -> list[Frame]:
     frames: list[Frame] = []
     pending: dict[tuple[int, int, int, int], Frame] = {}
     for packet in packets:
@@ -179,9 +197,10 @@ def split_frames(packets: list[UsbPacket]) -> list[Frame]:
             frames.append(frame)
         else:
             pending[key] = frame
-    for frame in pending.values():
-        frame.truncated = True
-        frames.append(frame)
+    if include_incomplete:
+        for frame in pending.values():
+            frame.truncated = True
+            frames.append(frame)
     return sorted(frames, key=lambda item: (item.timestamp, item.packet_index))
 
 
@@ -414,6 +433,7 @@ def analyze_frames(frames: list[Frame], base: float, synthetic: bool) -> dict:
         "biometric_plaintext_exported": False,
         "biometric_hash_exported": False,
         "secret_material_exported": False,
+        "pin_value_exported": False,
     }
 
 
@@ -477,7 +497,7 @@ def validate_document(document: dict) -> None:
 
     walk(document)
     forbidden = {"raw", "body", "payload", "plaintext", "image", "raster",
-                 "pixel", "template", "descriptor", "psk", "secret"}
+                 "pixel", "template", "descriptor", "psk", "secret", "pin"}
     require(not (serialized_keys & forbidden), "PRIVACY_FORBIDDEN_FIELD")
 
 
@@ -488,15 +508,7 @@ def target_descriptors(packets: list[UsbPacket]) -> list[UsbPacket]:
             and packet.payload[10:12] == TARGET_PID_LE]
 
 
-def process_capture(path: Path, expected_sha256: str, *, synthetic: bool = False) -> dict:
-    require(re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is not None,
-            "EXPECTED_SHA256_INVALID")
-    actual = sha256_file(path)
-    require(actual == expected_sha256, "CAPTURE_HASH_MISMATCH")
-    packets = list(iter_usbpcap(path))
-    require(bool(packets), "CAPTURE_EMPTY")
-    require(packets[-1].timestamp - packets[0].timestamp <= HOST_CAPTURE_DEADLINE_SECONDS,
-            "CAPTURE_DEADLINE_EXCEEDED")
+def _target_frames(packets: list[UsbPacket], *, include_incomplete: bool) -> tuple[list[Frame], bool]:
     descriptors = target_descriptors(packets)
     require(bool(descriptors), "TARGET_27C6_5125_NOT_IDENTIFIED")
     devices = {(packet.bus, packet.device) for packet in descriptors}
@@ -505,7 +517,7 @@ def process_capture(path: Path, expected_sha256: str, *, synthetic: bool = False
                        for previous, current in zip(descriptors, descriptors[1:]))
     require(episodes == 1, "TARGET_REENUMERATION_OBSERVED")
     selected = next(iter(devices))
-    frames = [frame for frame in split_frames(packets)
+    frames = [frame for frame in split_frames(packets, include_incomplete=include_incomplete)
               if (frame.bus, frame.device) == selected]
     firmware_ok = False
     for frame in frames:
@@ -518,6 +530,54 @@ def process_capture(path: Path, expected_sha256: str, *, synthetic: bool = False
         if control == 0xA8 and EXPECTED_FIRMWARE.encode() in body:
             firmware_ok = True
             break
+    return frames, firmware_ok
+
+
+def inspect_growing_capture(path: Path) -> dict:
+    """Return metadata-only observer state for a pcapng still being written."""
+    if not path.exists() or path.stat().st_size == 0:
+        return {"status": "PENDING", "failure_class": "CAPTURE_NOT_MATERIALIZED"}
+    packets = parse_usbpcap_bytes(path.read_bytes(), allow_trailing_incomplete=True)
+    if not packets:
+        return {"status": "PENDING", "failure_class": "CAPTURE_HEADER_PENDING"}
+    try:
+        frames, firmware_ok = _target_frames(packets, include_incomplete=False)
+    except EvidenceError as exc:
+        if str(exc) == "TARGET_27C6_5125_NOT_IDENTIFIED":
+            return {"status": "PENDING", "failure_class": str(exc)}
+        return {"status": "FAIL_CLOSED", "failure_class": str(exc)}
+    if not firmware_ok:
+        return {"status": "PENDING", "failure_class": "FIRMWARE_IDENTITY_PENDING"}
+    document = analyze_frames(frames, packets[0].timestamp, synthetic=False)
+    if document["boundary_status"] == "OBSERVED_COMPLETE":
+        terminal = document["second_b0_frame"]
+        return {
+            "status": "SECOND_FINGERPRINT_B0_OBSERVED",
+            "failure_class": None,
+            "terminal_frame": terminal["frame"],
+            "terminal_event_class": terminal["event_class"],
+            "privacy_payload_exported": False,
+            "biometric_plaintext_exported": False,
+            "biometric_hash_exported": False,
+            "secret_material_exported": False,
+            "pin_value_exported": False,
+        }
+    failure = document["failure_class"]
+    if failure and not failure.startswith("MISSING_"):
+        return {"status": "FAIL_CLOSED", "failure_class": failure}
+    return {"status": "PENDING", "failure_class": failure}
+
+
+def process_capture(path: Path, expected_sha256: str, *, synthetic: bool = False) -> dict:
+    require(re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is not None,
+            "EXPECTED_SHA256_INVALID")
+    actual = sha256_file(path)
+    require(actual == expected_sha256, "CAPTURE_HASH_MISMATCH")
+    packets = list(iter_usbpcap(path))
+    require(bool(packets), "CAPTURE_EMPTY")
+    require(packets[-1].timestamp - packets[0].timestamp <= HOST_CAPTURE_DEADLINE_SECONDS,
+            "CAPTURE_DEADLINE_EXCEEDED")
+    frames, firmware_ok = _target_frames(packets, include_incomplete=True)
     require(firmware_ok, "WRONG_OR_MISSING_FIRMWARE_APP12509")
     document = analyze_frames(frames, packets[0].timestamp, synthetic)
     document["capture_sha256"] = actual
@@ -527,15 +587,43 @@ def process_capture(path: Path, expected_sha256: str, *, synthetic: bool = False
     return document
 
 
+def verify_finalized_capture(path: Path, expected_sha256: str,
+                             observer_signal: dict, *, synthetic: bool = False) -> dict:
+    """Verify that the finalized raw preserved the observer's terminal event."""
+    require(observer_signal.get("status") == "SECOND_FINGERPRINT_B0_OBSERVED",
+            "OBSERVER_TERMINAL_SIGNAL_MISSING")
+    try:
+        document = process_capture(path, expected_sha256, synthetic=synthetic)
+    except EvidenceError as exc:
+        if str(exc) in {
+            "TRUNCATED_PCAP_METADATA", "TRUNCATED_USBCAP_METADATA",
+            "TRUNCATED_USBCAP_PAYLOAD", "CAPTURE_EMPTY",
+        }:
+            raise EvidenceError("CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE") from exc
+        raise
+    terminal = document.get("second_b0_frame")
+    if (document.get("boundary_status") != "OBSERVED_COMPLETE"
+            or terminal is None
+            or terminal.get("frame") != observer_signal.get("terminal_frame")):
+        raise EvidenceError("CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE")
+    return document
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pcap", type=Path, required=True)
     parser.add_argument("--expected-sha256", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--observer-signal", type=Path)
     args = parser.parse_args()
     try:
         require(not args.output.exists(), "SANITIZED_OUTPUT_COLLISION")
-        result = process_capture(args.pcap, args.expected_sha256.lower())
+        if args.observer_signal is not None:
+            signal = json.loads(args.observer_signal.read_text(encoding="utf-8"))
+            result = verify_finalized_capture(
+                args.pcap, args.expected_sha256.lower(), signal)
+        else:
+            result = process_capture(args.pcap, args.expected_sha256.lower())
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"boundary_status": result["boundary_status"],

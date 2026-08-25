@@ -24,6 +24,12 @@ assert SPEC is not None and SPEC.loader is not None
 D274 = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = D274
 SPEC.loader.exec_module(D274)
+OBSERVER_MODULE = KIT / "d274_03_observe_second_b0.py"
+sys.path.insert(0, str(KIT))
+OBSERVER_SPEC = importlib.util.spec_from_file_location("d274_03_observer", OBSERVER_MODULE)
+assert OBSERVER_SPEC is not None and OBSERVER_SPEC.loader is not None
+OBSERVER = importlib.util.module_from_spec(OBSERVER_SPEC)
+OBSERVER_SPEC.loader.exec_module(OBSERVER)
 
 
 def a0(control: int, body: bytes = b"") -> bytes:
@@ -268,11 +274,17 @@ class D27403Tests(unittest.TestCase):
         self.assertIn('"-a", "duration:180"', runner)
         self.assertIn('"-w"', runner)
         self.assertIn("Stop-D274Capture", runner)
+        self.assertIn("d274_03_observe_second_b0.py", runner)
+        self.assertIn("WaitForExit(10000)", runner)
+        self.assertIn("CAPTURE_PROCESS_STOP_TIMEOUT", runner)
+        self.assertIn("--observer-signal", runner)
         self.assertNotIn("libusb", lower)
         self.assertNotIn("pyusb", lower)
         self.assertNotIn("clearapp", lower)
         self.assertNotIn("provision", lower)
         self.assertNotIn("iap", lower)
+        self.assertIn("Get-D274UsbPcapInterfaceSelector", launcher)
+        self.assertIn(r"'^\s*(\d+)\.'", launcher)
         for source in (runner, launcher):
             source_lower = source.lower()
             self.assertIn("get-acl", source_lower)
@@ -286,7 +298,7 @@ class D27403Tests(unittest.TestCase):
         sources = "\n".join((KIT / name).read_text(encoding="utf-8") for name in (
             "avvia-d274-03.ps1", "invoke-d274-03-live-once.ps1",
             "collect-d274-03-results.ps1", "D274_03_OPERATOR_README_IT.md"))
-        for phrase in ("NON toccare", "Appoggia il dito", "Cattura arrestata",
+        for phrase in ("NON toccare", "Appoggia il dito", "Secondo B0 osservato",
                        "Non completare", "nessun retry", "fallire chiuso"):
             self.assertIn(phrase.lower(), sources.lower())
         for english_instruction in ("touch the sensor", "select exactly one mode",
@@ -303,6 +315,9 @@ class D27403Tests(unittest.TestCase):
         self.assertEqual(manifest["operator_language"], "ITALIAN")
         self.assertFalse(manifest["automatic_retry_authorized"])
         self.assertFalse(manifest["third_cycle_authorized"])
+        self.assertFalse(manifest["pin_value_handled_by_kit"])
+        self.assertEqual(manifest["second_b0_stop_trigger"], "WIRE_DRIVEN")
+        self.assertTrue(manifest["baseline_approval_blocked_pending_native_qualification"])
         self.assertFalse(schema["additionalProperties"])
         self.assertFalse(schema["$defs"]["frameMetadata"]["additionalProperties"])
 
@@ -314,6 +329,175 @@ class D27403Tests(unittest.TestCase):
         self.assertEqual(result["failure_class"], "MISSING_SECOND_IRQ2")
         self.assertIsNotNone(result["rearm_0x32_ack_frame"])
         self.assertIsNone(result["second_b0_frame"])
+
+    def test_23_same_run_absence_gate_causal_order(self):
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text()
+        gate = runner.index("Assert-D274GoodixAbsentSameRun | Out-Null",
+                            runner.index("# Gate causale"))
+        marker = runner.index("[System.IO.FileMode]::CreateNew")
+        capture = runner.index("Start-Process -FilePath $TsharkPath")
+        attach = runner.index("Collega ora il solo sensore")
+        finger = runner.index("Appoggia il dito per il PRIMO ciclo")
+        self.assertLess(gate, marker)
+        self.assertLess(marker, capture)
+        self.assertLess(capture, attach)
+        self.assertLess(attach, finger)
+        self.assertIn("Get-PnpDevice -PresentOnly -ErrorAction Stop", runner)
+        self.assertIn("GOODIX_PRESENT_IN_GUEST=true", runner)
+        self.assertNotRegex(runner, r"(?i)Disable-PnpDevice|Enable-PnpDevice|pnputil")
+
+    def test_24_native_qualification_same_run_gate_is_harmless(self):
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text()
+        branch = runner[runner.index("if ($NativeQualificationOnly)"):
+                        runner.index("if ($authority.baseline_approved -ne $true)")]
+        self.assertIn("Assert-D274GoodixAbsentSameRun", branch)
+        self.assertIn("marker_created = $false", branch)
+        self.assertIn("capture_started = $false", branch)
+        self.assertIn("finger_prompt_presented = $false", branch)
+        self.assertNotIn("Start-Process", branch)
+        self.assertNotIn("FileMode]::CreateNew", branch)
+
+    def test_25_pin_authentication_policy_and_terminal_categories(self):
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text()
+        readme = (KIT / "D274_03_OPERATOR_README_IT.md").read_text()
+        for token in (
+            "EXISTING_PIN_AUTHENTICATION", "NEW_PIN_REQUIRED", "PIN_CREATION_UI",
+            "PIN_MUTATION_UI", "ACCOUNT_MUTATION_UI", "CREDENTIAL_MUTATION_UI",
+            "UNEXPECTED_PREREQUISITE", "ENROLLMENT_COMMIT_UI",
+        ):
+            self.assertIn(token, runner)
+            self.assertIn(token, readme)
+        self.assertIn("inseriscilo direttamente nella finestra di Windows", runner)
+        self.assertIn("Il Kit non deve conoscerlo né registrarlo", runner)
+        self.assertNotRegex(runner, r"(?i)Read-Host[^\n]*(pin|password|secret)")
+        self.assertNotRegex(runner, r"(?i)ConvertTo-SecureString|Get-Credential")
+        self.assertIn("pin_value_handled_by_kit = $false", runner)
+        self.assertNotIn('"PIN"', runner)
+
+    def test_26_growing_observer_triggers_exactly_on_second_b0(self):
+        before = make_capture(lambda rows: remove(rows, "second_b0"))
+        complete = make_capture()
+        with tempfile.TemporaryDirectory(prefix="d274-03-growing-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(before)
+            state = D274.inspect_growing_capture(path)
+            self.assertEqual(state["status"], "PENDING")
+            self.assertEqual(state["failure_class"], "MISSING_SECOND_B0")
+            path.write_bytes(complete)
+            state = D274.inspect_growing_capture(path)
+            self.assertEqual(state["status"], "SECOND_FINGERPRINT_B0_OBSERVED")
+            self.assertEqual(state["terminal_event_class"], "FINGERPRINT_B0")
+            self.assertFalse(state["privacy_payload_exported"])
+            self.assertFalse(state["pin_value_exported"])
+
+    def test_27_growing_observer_tolerates_trailing_incomplete_block(self):
+        data = make_capture()
+        with tempfile.TemporaryDirectory(prefix="d274-03-growing-tail-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data[:-5])
+            state = D274.inspect_growing_capture(path)
+            self.assertEqual(state["status"], "PENDING")
+            self.assertEqual(state["failure_class"], "MISSING_SECOND_B0")
+            path.write_bytes(data)
+            self.assertEqual(D274.inspect_growing_capture(path)["status"],
+                             "SECOND_FINGERPRINT_B0_OBSERVED")
+
+    def test_28_observer_wrong_ack_fails_closed_without_retry(self):
+        data = make_capture(lambda rows: replace(
+            rows, "second_0x22_ack", a0(0xB0, b"\x22\x07"), 0x81))
+        with tempfile.TemporaryDirectory(prefix="d274-03-observer-fail-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            state = D274.inspect_growing_capture(path)
+            self.assertEqual(state, {"status": "FAIL_CLOSED",
+                                     "failure_class": "ACK_STATUS_NOT_EXACT_0X01"})
+            with self.assertRaisesRegex(OBSERVER.EvidenceError,
+                                        "ACK_STATUS_NOT_EXACT_0X01"):
+                OBSERVER.observe(path, Path(directory) / "signal.json", 0.01, 1)
+
+    def test_29_observer_deadline_no_retry(self):
+        data = make_capture(lambda rows: remove(rows, "second_b0"))
+        with tempfile.TemporaryDirectory(prefix="d274-03-observer-deadline-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            with self.assertRaisesRegex(OBSERVER.EvidenceError,
+                                        "SECOND_B0_OBSERVER_DEADLINE"):
+                OBSERVER.observe(path, Path(directory) / "signal.json", 0.0, 1)
+
+    def test_30_finalized_raw_recovers_same_terminal_frame(self):
+        data = make_capture()
+        with tempfile.TemporaryDirectory(prefix="d274-03-final-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            signal = D274.inspect_growing_capture(path)
+            result = D274.verify_finalized_capture(
+                path, hashlib.sha256(data).hexdigest(), signal, synthetic=True)
+            self.assertEqual(result["second_b0_frame"]["frame"],
+                             signal["terminal_frame"])
+            self.assertFalse(result["pin_value_exported"])
+
+    def test_31_finalization_loss_is_distinct_failure(self):
+        data = make_capture()
+        with tempfile.TemporaryDirectory(prefix="d274-03-final-loss-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            signal = D274.inspect_growing_capture(path)
+            truncated = data[:-5]
+            path.write_bytes(truncated)
+            with self.assertRaisesRegex(
+                    D274.EvidenceError,
+                    "CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE"):
+                D274.verify_finalized_capture(
+                    path, hashlib.sha256(truncated).hexdigest(), signal,
+                    synthetic=True)
+
+    def test_32_empty_missing_and_truncated_final_raw_fail(self):
+        with tempfile.TemporaryDirectory(prefix="d274-03-final-invalid-") as directory:
+            empty = Path(directory) / "empty.pcapng"
+            empty.write_bytes(b"")
+            with self.assertRaisesRegex(D274.EvidenceError,
+                                        "TRUNCATED_PCAP_METADATA"):
+                D274.process_capture(empty, hashlib.sha256(b"").hexdigest(),
+                                     synthetic=True)
+            with self.assertRaises(OSError):
+                D274.process_capture(Path(directory) / "missing.pcapng",
+                                     "0" * 64, synthetic=True)
+
+    def test_33_native_qualification_package_contract(self):
+        native = (KIT / "run-d274-03-native-qualification.ps1").read_text()
+        collector = (KIT / "collect-d274-03-native-qualification-results.ps1").read_text()
+        for mode in ("-SelfTestOnly", "-PreflightOnly",
+                     "-PreAuthorizationSimulationOnly",
+                     "-AutorizzoUnaSolaCatturaD27403",
+                     "-NativeQualificationOnly"):
+            self.assertIn(mode, native)
+        for stage in ("powershell_51_selector", "same_run_goodix_absence_gate",
+                      "causal_source_order", "authority_false_adversarial",
+                      "source_privacy_language_and_runtime_contract",
+                      "no_real_capture_or_marker"):
+            self.assertIn(stage, native)
+        self.assertIn("failed_stage", native)
+        self.assertIn("failure_detail_sanitized", native)
+        self.assertIn("real_capture_count = 0", native)
+        self.assertIn("real_usb_open_count = 0", native)
+        self.assertIn("pin_value_handled_by_kit = $false", native)
+        self.assertIn("D274_03_windows_native_qualification_results.zip", collector)
+        self.assertIn("privacy scan", collector.lower())
+
+    def test_34_no_sensitive_output_contract_observer_postprocessor_collectors(self):
+        observer = (KIT / "d274_03_observe_second_b0.py").read_text().lower()
+        postprocessor = MODULE.read_text().lower()
+        collectors = ((KIT / "collect-d274-03-results.ps1").read_text().lower()
+                      + (KIT / "collect-d274-03-native-qualification-results.ps1").read_text().lower())
+        for source in (observer, postprocessor):
+            self.assertNotIn("libusb", source)
+            self.assertNotIn("pyusb", source)
+        for forbidden_key in ('"body"', '"payload"', '"plaintext"', '"image"',
+                              '"raster"', '"pixel"', '"biometric_hash"',
+                              '"psk"', '"secret"', '"pin_value"'):
+            self.assertIn(forbidden_key, collectors)
+        signal_keys = D274.inspect_growing_capture.__doc__
+        self.assertIn("metadata-only", signal_keys)
 
 
 if __name__ == "__main__":

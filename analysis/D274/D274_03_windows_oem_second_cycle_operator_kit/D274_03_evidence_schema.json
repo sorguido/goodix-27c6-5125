@@ -12,7 +12,8 @@
     "host_capture_deadline_seconds", "host_deadline_policy",
     "device_timeout_claim", "timing_observations_ms", "counts",
     "privacy_payload_exported", "biometric_plaintext_exported",
-    "biometric_hash_exported", "secret_material_exported"
+    "biometric_hash_exported", "secret_material_exported",
+    "pin_value_exported"
   ],
   "properties": {
     "schema": {"const": "D274_03_SECOND_CYCLE_EVIDENCE_V1"},
@@ -55,7 +56,8 @@
     "privacy_payload_exported": {"const": false},
     "biometric_plaintext_exported": {"const": false},
     "biometric_hash_exported": {"const": false},
-    "secret_material_exported": {"const": false}
+    "secret_material_exported": {"const": false},
+    "pin_value_exported": {"const": false}
   },
   "$defs": {
     "frameMetadata": {

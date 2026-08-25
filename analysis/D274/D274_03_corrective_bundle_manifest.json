@@ -1,0 +1,64 @@
+{
+  "schema": "D274_03_CORRECTIVE_BUNDLE_MANIFEST_V1",
+  "artifact": "D274_03_corrective_bundle",
+  "step": "D274/03 corrective",
+  "bundle": "analysis/D274/D274_03_corrective_bundle.zip",
+  "sidecar": "analysis/D274/D274_03_corrective_bundle.zip.sha256",
+  "sidecar_is_external_to_zip": true,
+  "nature": "STEP_LOCAL_NON_CUMULATIVE_SANITIZED_AUDITABLE_BY_REFERENCE",
+  "reference_full_head": "86c9b8d0cf16e7ec9d4fbdd20a51735c3cadd8de",
+  "review_set": [
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/",
+    "analysis/D274/test_d274_03_second_cycle_operator_kit.py",
+    "analysis/D274/D274_03_test_results.json",
+    "analysis/D274/D274_03_corrective_execution_manifest.json",
+    "analysis/D274/D274_03_corrective_report.md",
+    "analysis/D274/D274_03_corrective_bundle_manifest.json"
+  ],
+  "excluded": [
+    "raw pcap/pcapng",
+    "native qualification runtime results not yet produced",
+    "B0 content and TLS plaintext",
+    "image/raster/pixel and biometric hashes",
+    "PSK/secret and PIN/account material",
+    "DLL/firmware",
+    "historical bundles and reports",
+    "__pycache__",
+    "bundle sidecar"
+  ],
+  "privacy_contract": "METADATA_ONLY_NO_B0_CONTENT_NO_SECRET_NO_BIOMETRIC_NO_PIN_VALUE",
+  "bundle_checks": {
+    "zip_crc": "PASS",
+    "duplicates": 0,
+    "path_traversal": 0,
+    "unexpected_symlink": 0,
+    "sidecar_external": true,
+    "raw_or_sensitive_material": "PASS_EXPLICIT_REVIEW_SET_AND_CONTENT_SCAN"
+  },
+  "safety": {
+    "source_contains_future_live_path": true,
+    "live_path_executed": false,
+    "live_path_authorized": false,
+    "real_capture_count": 0,
+    "real_usb_open_count": 0,
+    "real_finger_interaction_count": 0,
+    "real_goodix_command_count": 0,
+    "automatic_retry_count": 0,
+    "persistent_device_write_count": 0,
+    "live_execution": "NOT_PERFORMED"
+  },
+  "final_state": {
+    "D274_02_STATUS": "CLOSED_PASS_UNCHANGED",
+    "D274_03_CORRECTIVE_IMPLEMENTED_OFFLINE": true,
+    "D274_03_WINDOWS_NATIVE_QUALIFICATION": "REQUIRED_NOT_YET_EXECUTED",
+    "BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION": true,
+    "D274_03_BASELINE_APPROVAL_REVIEW_PENDING": false,
+    "D274_03_BASELINE_APPROVED": false,
+    "APPROVED_FOR_CAPTURE": false,
+    "LIVE_AUTHORIZED": false,
+    "READY_FOR_LIVE": false,
+    "LIVE_EXECUTION": "NOT_PERFORMED",
+    "D274_SECOND_CYCLE_TARGET_OBSERVATION": "NOT_EXECUTED"
+  }
+}

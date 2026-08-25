@@ -21,8 +21,9 @@ if ($files.Count -ne 1 -or $files[0].Name -ne "D274_03_second_cycle_evidence.jso
     Fail-D274Collect "la directory deve contenere solo l'evidenza sanitizzata prevista"
 }
 $text = [System.IO.File]::ReadAllText($files[0].FullName)
-$forbidden = @('"raw"\s*:', '"payload"\s*:', '"plaintext"\s*:', '"image"\s*:',
-               '"raster"\s*:', '"pixel"\s*:', '"psk"\s*:', '"secret"\s*:')
+$forbidden = @('"raw"\s*:', '"body"\s*:', '"payload"\s*:', '"plaintext"\s*:', '"image"\s*:',
+               '"raster"\s*:', '"pixel"\s*:', '"psk"\s*:', '"secret"\s*:',
+               '"biometric_hash"\s*:', '"pin"\s*:', '"pin_value"\s*:')
 foreach ($pattern in $forbidden) {
     if ($text -match $pattern) { Fail-D274Collect "privacy scan fallito" }
 }
@@ -30,7 +31,8 @@ $document = $text | ConvertFrom-Json
 if ($document.privacy_payload_exported -ne $false -or
     $document.biometric_plaintext_exported -ne $false -or
     $document.biometric_hash_exported -ne $false -or
-    $document.secret_material_exported -ne $false) {
+    $document.secret_material_exported -ne $false -or
+    $document.pin_value_exported -ne $false) {
     Fail-D274Collect "flag privacy non validi"
 }
 $zipPath = Join-Path $resolved "D274_03_sanitized_results.zip"
