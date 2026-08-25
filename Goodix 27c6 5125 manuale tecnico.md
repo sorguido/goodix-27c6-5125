@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D273/01 (sintesi)
+### Stato corrente post-D274/01 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -178,6 +178,59 @@ SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERI
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
 NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
 NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
+```
+
+D274/01 prepara esclusivamente offline una superficie Windows/OEM distinta da
+D268 per acquisire, in un eventuale step futuro e separatamente autorizzato, il
+minimo bordo mancante `second IRQ2 → exact 0x22 → exact ACK 0x01 → second B0`.
+Il kit non contiene un ramo capace di avviare una capture: la modalità reale è
+hard-disabled nel sorgente prima di TShark, attach, prompt o altra azione
+hardware. Self-test, preflight e simulazione pre-autorizzazione sono le sole
+modalità eseguibili.
+
+La provenienza della UI positiva storica resta ignota. La capture D263 deriva
+dal corpus recuperato D230, che non conserva comando di acquisizione, marker o
+workflow UI; D255 prova invece soltanto un percorso distinto Windows Hello
+setup zero-finger. Il workflow futuro è quindi
+`WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT`, non un'attribuzione retroattiva. Ogni
+commit enrollment, mutazione account/PIN, terzo ciclo o retry è terminale e non
+autorizzato.
+
+Il sanitizer hash-gated riusa il framing USBPcap osservato, seleziona un unico
+`27c6:5125`, richiede A8 APP12509 nella stessa capture e pubblica soltanto
+indici, direzioni, wrapper, lunghezze, classe TLS esterna e timing. Non esporta
+contenuti B0, plaintext, raster, hash biometrici o secret. La fixture pcapng
+sintetica chiude l'intera sequenza e i failure richiesti; sulla capture storica
+positiva il tool restituisce correttamente `MISSING_SECOND_IRQ2`, senza
+promozione probatoria.
+
+La deadline unica di 180 s è host-side: la capture positiva osserva 8,383 s
+fra ACK del primo arm e ACK del re-arm, mentre D255 osserva circa 62,9 s da
+attach-begin a UI-ready. Il margine non definisce una semantica timeout del
+device, che resta `UNKNOWN`.
+
+```text
+D274_PRELIVE_WINDOWS_MULTIFRAME_EVIDENCE_KIT=READY_FOR_AI_PM_REVIEW
+D274_REAL_CAPTURE_CAPABILITY=0
+D274_HARD_DISABLED=true
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+D263_CAPTURE_WORKFLOW_CLASS=UNKNOWN
+WINDOWS_OEM_WORKFLOW_SELECTED=WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT
+WINDOWS_ENROLLMENT_COMMIT_AUTHORIZED=false
+WINDOWS_ACCOUNT_MUTATION_AUTHORIZED=false
+WINDOWS_PIN_MUTATION_AUTHORIZED=false
+D274_POSTPROCESSOR_STATUS=PASS_OFFLINE_HASH_GATED_SANITIZED
+D274_EVIDENCE_SCHEMA_STATUS=PASS
+D274_SYNTHETIC_SECOND_CYCLE_FIXTURE=PASS
+D274_PRIVACY_CONTRACT=PASS_METADATA_ONLY_NO_B0_CONTENT
+D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
+SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_PRELIVE_KIT
+NEXT_BOUNDARY_PREREQUISITE=REVIEW_AND_SEPARATE_EXPLICIT_LIVE_BASELINE_APPROVAL_AND_ONE_RUN_AUTHORIZATION
+BASELINE_APPROVED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -4154,6 +4207,123 @@ D273_NAV_CLASSIFICATION_WIRE_CONTROL=EXACT_0X50
 D273_0X51_NAV_ALIAS_ACCEPTED=false
 ROCKY_PROVENANCE_REALIGNED_TO=227eba219fa9e3fbac5bd59aca79f624f67cd11b
 D273_TECHNICAL_CONCLUSIONS_UNCHANGED=true
+```
+
+### D274/01: Kit Windows/OEM multi-frame, solo pre-live offline
+
+D274/01 non esegue una capture e non modifica il runtime Linux. Crea il kit
+dedicato `operator_kit/d274-windows-multiframe-evidence.ps1`, il postprocessor
+offline e lo schema evidence sotto `analysis/D274/`. La superficie PowerShell
+espone soltanto self-test, preflight, simulazione pre-autorizzazione e il flag
+nominale della futura autorizzazione; quest'ultimo termina sempre
+`HARD_DISABLED_D274_01` perché `D274_REAL_CAPTURE_CAPABILITY=0` è costante nel
+sorgente e non esiste alcun bypass via flag, ambiente o configurazione. Nel
+sorgente D274/01 non esistono `Start-Process` né argomenti di capture TShark.
+
+Il preflight futuro verifica Windows PowerShell 5.1, disponibilità/versione
+TShark, discovery USBPcap, target assente dal guest prima della capture,
+destinazione privata `captures/` scrivibile, assenza di marker concorrente,
+clock UTC, deadline 180 s e presenza del postprocessor. L'unicità del target
+dopo attach è un gate definito ma non eseguito nel preflight pre-attach. La UI
+fingerprint resta `UNKNOWN_BEFORE_ATTACH`, secondo la lezione D255.
+
+#### Audit del workflow storico
+
+Gli artefatti D230/D263 identificano la capture positiva recuperata e il suo
+hash, ma non conservano marker, UI, comando TShark o workflow OEM. La
+classificazione è quindi:
+
+```text
+D263_CAPTURE_WORKFLOW_CLASS=UNKNOWN
+```
+
+D255 prova separatamente che `WINDOWS_HELLO_SETUP_NO_FINGER` è disponibile
+dopo attach sul guest usato allora, ma la sua capture è zero-finger e non è la
+fonte positiva D263. Per una futura run il setup Windows Hello è soltanto il
+candidato locale meglio supportato:
+
+```text
+WINDOWS_OEM_WORKFLOW_SELECTED=WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT
+WINDOWS_ENROLLMENT_COMMIT_AUTHORIZED=false
+WINDOWS_ACCOUNT_MUTATION_AUTHORIZED=false
+WINDOWS_PIN_MUTATION_AUTHORIZED=false
+```
+
+Il candidato deve essere abbandonato al primo boundary di commit enrollment,
+nuovo PIN, mutazione account/credenziali o terzo dito. Non si cancellano
+enrollment esistenti e non si modificano policy, registry, service o PnP.
+
+#### Evidence boundary, privacy e timing
+
+Il postprocessor richiede SHA-256 esplicito prima del parsing, linktype
+USBPcap 249, un solo descriptor `27c6:5125` e A8
+`GF_ST411SEC_APP_12509` nella stessa capture. Ricostruisce A0/B0 senza
+serializzare payload e applica l'esatta sequenza:
+
+```text
+first IRQ2 → 0x22 → ACK 0x01 → first B0
+→ 0x34 → ACK → IRQ0200 → 0x20 → ACK → post-up B0
+→ exact 0x50 → ACK → exact A0 0x50 NAV 2417/2410
+→ 0x32 → ACK → second IRQ2 → 0x22 → ACK 0x01 → second B0 → STOP
+```
+
+Il NAV richiede wire control esatto `0x50`; `0x51` non è alias. Tutti gli ACK
+del ciclo richiedono echo esatto e status `0x01`. I B0 esportano soltanto
+indice frame, direzione, outer wrapper, lunghezza fisica/dichiarata, classe TLS
+esterna, timestamp relativo e associazione implicita al campo di ciclo. Nessun
+payload hash o derivato biometrico viene prodotto.
+
+La capture target storica hash-gated attraversa il primo ciclo fino all'ACK
+del re-arm e poi termina; il nuovo tool la classifica
+`failure_class=MISSING_SECOND_IRQ2`, coerentemente con D273. Non è nuova
+evidenza e non cambia `SECOND_CYCLE_STATUS`.
+
+Timing osservato nella stessa fonte: ACK `0x32` iniziale → IRQ2 7.108 s e
+finestra re-arm iniziale → ACK finale 8.383 s. D255 misura 62.884 s da
+`VM_USB_ATTACH_BEGIN` a `HELLO_SETUP_UI_READY`. La deadline D274 è una sola,
+180 s, scelta con margine sopra entrambe le osservazioni:
+
+```text
+D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
+D274_HOST_CAPTURE_DEADLINE_SECONDS=180
+D274_DEVICE_SEMANTIC_TIMEOUT=UNKNOWN
+```
+
+#### Chiusura sintetica e stato
+
+La suite genera pcapng/eventi interamente sintetici e copre happy path, assenza
+del secondo IRQ2/`0x22`, comandi `0x20`/`0x50` errati, `0x51`, ACK echo/status,
+B0 anticipato, terzo ciclo, duplicati, re-enumeration, secondo target, metadata
+troncati, A0/B0 malformati, deadline, marker fuori ordine e terminal condition
+UI. Il run da Git root e da `/tmp` passa. `pwsh` non è installato sull'host
+Fedora: la verifica nativa Windows resta correttamente `NOT_AVAILABLE`, mentre
+il source/static contract è verificato offline.
+
+```text
+D274_PRELIVE_WINDOWS_MULTIFRAME_EVIDENCE_KIT=READY_FOR_AI_PM_REVIEW
+D274_REAL_CAPTURE_CAPABILITY=0
+D274_HARD_DISABLED=true
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+D274_POSTPROCESSOR_STATUS=PASS_OFFLINE_HASH_GATED_SANITIZED
+D274_EVIDENCE_SCHEMA_STATUS=PASS
+D274_SYNTHETIC_SECOND_CYCLE_FIXTURE=PASS
+D274_PRIVACY_CONTRACT=PASS_METADATA_ONLY_NO_B0_CONTENT
+WINDOWS_NATIVE_EXECUTION_TEST=NOT_AVAILABLE
+REAL_USB_OPEN_COUNT=0
+REAL_COMMAND_SEND_COUNT=0
+REAL_CAPTURE_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_SECRET_MATERIALIZATION_COUNT=0
+REAL_FPRINTD_MUTATION_COUNT=0
+REAL_WINDOWS_ACCOUNT_MUTATION_COUNT=0
+REAL_WINDOWS_ENROLLMENT_COMMIT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+LIVE_EXECUTION=NOT_PERFORMED
+BASELINE_APPROVED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_PRELIVE_KIT
+NEXT_BOUNDARY_PREREQUISITE=REVIEW_AND_SEPARATE_EXPLICIT_LIVE_BASELINE_APPROVAL_AND_ONE_RUN_AUTHORIZATION
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
