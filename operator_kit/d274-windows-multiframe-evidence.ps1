@@ -209,9 +209,14 @@ function Invoke-D274Preflight {
     } | ConvertTo-Json -Depth 5
 }
 
-$selected = @($SelfTestOnly, $PreflightOnly, $PreAuthorizationSimulationOnly,
-              $IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture) |
-    Where-Object { $_ }
+$selected = @(
+    @(
+        $SelfTestOnly,
+        $PreflightOnly,
+        $PreAuthorizationSimulationOnly,
+        $IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture
+    ) | Where-Object { $_ }
+)
 if ($selected.Count -ne 1) { Fail-D274 "select exactly one mode" }
 
 if ($IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture) {

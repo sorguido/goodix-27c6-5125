@@ -4,11 +4,12 @@
   "status": "PASS_PREP_STATIC_ONLY_WINDOWS_NATIVE_NOT_AVAILABLE",
   "this_bundle_is": "OPERATOR_PACKAGE_PREPARATION_CORRECTIVE_IN_PLACE",
   "is_windows_native_execution_evidence": false,
+  "windows_native_selector_test": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
   "checks": [
     {
       "name": "package_manifest_byte_identity",
       "status": "PASS",
-      "detail": "operator_kit and postprocessor copies are byte-identical to the D274/01 approved baseline (SHA-256 verified)."
+      "detail": "operator_kit and postprocessor copies are byte-identical to the corrected D274/01 baseline (SHA-256 verified)."
     },
     {
       "name": "python_compile_postprocessor",
@@ -53,7 +54,7 @@
     {
       "name": "git_diff_check",
       "status": "PASS",
-      "detail": "git diff --check on the modified canonical manual passes; new untracked package files are exempt from tracked-diff whitespace checks."
+      "detail": "git diff --check on the modified canonical manual and corrected kit/wrapper passes; new untracked package files are exempt from tracked-diff whitespace checks."
     },
     {
       "name": "package_capture_root_authority",
@@ -168,7 +169,7 @@
     {
       "name": "D274_01_copy_byte_identity",
       "status": "PASS",
-      "detail": "kit SHA-256 4b0b3b1c…bd and postprocessor SHA-256 2867ff23…f37 match approved baseline."
+      "detail": "kit SHA-256 2f2e2f1b…6c (corrected D274/01 selector) and postprocessor SHA-256 2867ff23…f37 match approved baseline copy."
     },
     {
       "name": "forbidden_capture_args_absent",
@@ -258,32 +259,32 @@
     {
       "name": "final_integrity_manifest_self_consistent",
       "status": "PASS",
-      "detail": "after freezing static files, every entries.sha256 in D274_02_operator_package_integrity.json equals the SHA-256 of the final file on disk (runner, collector, README, kit, postprocessor, and approved D274/01 baseline)."
+      "detail": "after freezing static files, every entries.sha256 in D274_02_operator_package_integrity.json equals the SHA-256 of the final file on disk (runner, collector, README, kit, postprocessor, and approved D274/01 baseline). Verified by recompute."
     },
     {
       "name": "final_runner_hash_matches_manifest",
       "status": "PASS",
-      "detail": "run-d274-02-native-qualification.ps1 actual a381282ba2507118d69769d9443ba75ce881f923790f68fdeb9af26c6c8c8de1 == manifest recorded."
+      "detail": "run-d274-02-native-qualification.ps1 actual e5405fd4…ca3 == manifest recorded."
     },
     {
       "name": "final_collector_hash_matches_manifest",
       "status": "PASS",
-      "detail": "collect-d274-02-results.ps1 actual e2ce99a6... == manifest recorded."
+      "detail": "collect-d274-02-results.ps1 actual e2ce99a6…ed == manifest recorded."
     },
     {
       "name": "final_readme_hash_matches_manifest",
       "status": "PASS",
-      "detail": "D274_02_OPERATOR_README_IT.md actual 85c55cdb... == manifest recorded."
+      "detail": "D274_02_OPERATOR_README_IT.md actual 85c55cdb…2d == manifest recorded."
     },
     {
       "name": "final_kit_hash_matches_manifest",
       "status": "PASS",
-      "detail": "operator_kit/d274-windows-multiframe-evidence.ps1 actual 4b0b3b1c... == manifest recorded (byte-identical D274/01 baseline)."
+      "detail": "operator_kit/d274-windows-multiframe-evidence.ps1 actual 2f2e2f1b…6c == manifest recorded (corrected D274/01 selector; byte-identical copy in package)."
     },
     {
       "name": "final_postprocessor_hash_matches_manifest",
       "status": "PASS",
-      "detail": "analysis/D274/d274_postprocess_multiframe_evidence.py actual 2867ff23... == manifest recorded (byte-identical D274/01 baseline)."
+      "detail": "analysis/D274/d274_postprocess_multiframe_evidence.py actual 2867ff23…f37 == manifest recorded (byte-identical D274/01 baseline)."
     },
     {
       "name": "tshark_exact_version_fixture",
@@ -304,6 +305,116 @@
       "name": "operator_console_guidance",
       "status": "PASS",
       "detail": "runner prints Italian guidance to run collector both after PASS and FAIL; exit codes preserved (PASS->0, FAIL->!=0)."
+    },
+    {
+      "name": "mode_selector_forced_array",
+      "status": "PASS_STATIC",
+      "detail": "Canonical D274/01 kit wraps the mode-select pipeline in an outer @(...): '$selected = @( @( ... ) | Where-Object { $_ } )'. Under StrictMode 2.0 on Windows PowerShell 5.1 this forces $selected to always be an array, so $selected.Count is reliable for 0/1/2/4 selected switches. Static source verification passed; native behavioral PASS pending third operator run."
+    },
+    {
+      "name": "mode_selector_zero",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Requires Windows PowerShell 5.1; executor is Linux. WINDOWS_NATIVE_SELECTOR_TEST=NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT. Not promoted to PASS."
+    },
+    {
+      "name": "mode_selector_each_single_mode",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Behavioral selector count test (selftest/preflight/preauth/harddisable each alone => Count=1) requires Windows PowerShell 5.1; not available in executor. Not promoted to PASS."
+    },
+    {
+      "name": "mode_selector_multi_mode",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Behavioral selector count test (two/ four switches => Count=2/4) requires Windows PowerShell 5.1; not available in executor. Not promoted to PASS."
+    },
+    {
+      "name": "selector_final_result_forced_array",
+      "status": "PASS_STATIC",
+      "detail": "Static check: the final assigned value to $selected is wrapped by an outer array constructor; the select-exactly-one guard '$selected.Count -ne 1' cannot encounter a non-array scalar."
+    },
+    {
+      "name": "strictmode_preserved",
+      "status": "PASS_STATIC",
+      "detail": "Set-StrictMode -Version 2.0 remains present in the canonical kit; it was NOT removed by the selector corrective."
+    },
+    {
+      "name": "hard_disable_only_selector_reaches_harddisable_contract",
+      "status": "PASS_STATIC",
+      "detail": "Static source verification: with the selector fixed, -IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture passes the 'select exactly one mode' guard and reaches Fail-D274 'HARD_DISABLED_D274_01; D274_REAL_CAPTURE_CAPABILITY=0' BEFORE any TShark capture, USB attach, hardware access or finger prompt. Expected message literal preserved; D274RealCaptureCapability=0 and D274HardDisabled=true preserved. Native behavioral PASS pending third operator run."
+    },
+    {
+      "name": "summary_has_all_stage_keys",
+      "status": "PASS_STATIC",
+      "detail": "run-d274-02-native-qualification.ps1 summary stages object always contains all nine keys: assert_windows_powershell_51, package_integrity, kit_source_contract, goodix_absence_gate, no_active_marker_gate, selftest, preflight, preauthorization_simulation, hard_disable_adversarial. hard_disable_adversarial is now set in both the safety-pre-gate-pass and SKIPPED branches; pre-gate failure also sets the five pre-gate keys to FAIL so none is left undefined."
+    },
+    {
+      "name": "selftest_failure_recorded_as_FAIL",
+      "status": "PASS_STATIC",
+      "detail": "Static model: when the self-test subprocess exits non-zero, Register-FirstFailure 'selftest' is invoked and stages['selftest']='FAIL'; the second operator run evidenced this (failed_stage=selftest)."
+    },
+    {
+      "name": "later_stages_after_selftest_failure_SKIPPED",
+      "status": "PASS_STATIC",
+      "detail": "Static model: preflight, preauthorization_simulation and (when safety pre-gate passed) hard_disable_adversarial are SKIPPED after the first failure; the adversarial branch, however, executes because the safety pre-gate passed, which is how the second run reached the hard-disable subprocess."
+    },
+    {
+      "name": "hard_disable_only_selector_reaches_harddisable_contract_runtime",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Runtime confirmation of the hard-disable reachability requires Windows PowerShell 5.1; not available in executor. D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PENDING_WINDOWS_RETEST."
+    },
+    {
+      "name": "selftest_fail_model",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Runtime self-test failure model requires Windows PowerShell 5.1; not available in executor."
+    },
+    {
+      "name": "post_selftest_stages_skipped_model",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Runtime post-selftest skip model requires Windows PowerShell 5.1; not available in executor."
+    },
+    {
+      "name": "summary_all_stage_keys_runtime",
+      "status": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+      "detail": "Runtime confirmation that all nine stage keys appear in the produced summary requires Windows PowerShell 5.1; not available in executor."
+    },
+    {
+      "name": "context_aware_exact_tshark_allowlist",
+      "status": "PASS",
+      "detail": "D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST preserved; no regressions."
+    },
+    {
+      "name": "capture_root_alignment",
+      "status": "PASS",
+      "detail": "D274_02_CAPTURE_ROOT_AUTHORITY=PACKAGE_ROOT_CAPTURES and wrapper/kit alignment preserved."
+    },
+    {
+      "name": "goodix_presence_truthfulness",
+      "status": "PASS",
+      "detail": "D274_02_GOODIX_PRESENCE_EVIDENCE_TRUTHFUL=PASS preserved."
+    },
+    {
+      "name": "fail_diagnostics",
+      "status": "PASS",
+      "detail": "D274_02_FIRST_FAILURE_DETAIL_PRESERVED=PASS_SANITIZED and D274_02_SUBPROCESS_FAILURE_DIAGNOSTICS=PASS_SANITIZED_BOUNDED preserved."
+    },
+    {
+      "name": "path_sanitization",
+      "status": "PASS",
+      "detail": "D274_02_IMPORTED_KIT_EVIDENCE_PATH_SANITIZATION=PASS and D274_02_USER_PROFILE_PACKAGE_PATH_COLLECTABLE=true preserved."
+    },
+    {
+      "name": "fail_result_collector",
+      "status": "PASS",
+      "detail": "D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS preserved."
+    },
+    {
+      "name": "exact_results_path",
+      "status": "PASS",
+      "detail": "D274_02_COLLECTOR_RESULTS_PATH_AUTHORITY=EXACT_PACKAGE_RESULTS preserved."
+    },
+    {
+      "name": "canonical_corrected_kit_equals_package_copy",
+      "status": "PASS",
+      "detail": "operator_kit/d274-windows-multiframe-evidence.ps1 (canonical, corrected) is byte-identical (cmp) to analysis/D274/D274_02_windows_native_operator_package/operator_kit/d274-windows-multiframe-evidence.ps1."
     }
   ],
   "d274_02_capture_root_authority": "PACKAGE_ROOT_CAPTURES",
@@ -324,12 +435,12 @@
   "d274_02_operator_package_hash_overclaim_removed": true,
   "d274_02_collector_results_path_authority": "EXACT_PACKAGE_RESULTS",
   "d274_02_fail_result_privacy": "PASS_CENTRALIZED_SANITIZE_PLUS_COLLECTOR_SCAN",
-  "d274_01_operator_kit_byte_identity": "PASS_4b0b3b1c3f81a7a5874aa2d3a4b281c79ec03b0b1ab1c92cc11284bbee5bd9bd",
+  "d274_01_operator_kit_byte_identity": "PASS_2f2e2f1be0a61b3abecc3cc4427857650276543849b3f21f6e86a2debb74876c",
   "d274_01_postprocessor_byte_identity": "PASS_2867ff23cb76297d9089b0840afa59e7a8222e5657e3fc1dc5d7774d6ca68f37",
   "d274_real_capture_capability": 0,
   "d274_hard_disabled": true,
   "d274_operator_package": "READY_FOR_AI_PM_REVIEW",
-  "d274_windows_native_execution": "ONE_FAILED_PRE_GATE_RUN_OBSERVED",
+  "d274_windows_native_execution": "TWO_FAILED_TOOLING_RUNS_OBSERVED",
   "d274_windows_native_qualification": "NOT_YET_DETERMINED",
   "real_usb_open_count": 0,
   "real_command_send_count": 0,
@@ -342,8 +453,17 @@
   "persistent_device_write_count": 0,
   "live_execution": "NOT_PERFORMED",
   "windows_native_powershell_test": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
-  "d274_02_first_windows_operator_run": "FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN",
-  "d274_02_first_windows_operator_run_root_cause": "GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR",
+  "windows_native_selector_test": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+  "d274_02_second_windows_operator_run": "FAIL_SELFTEST_NATIVE_POWERSHELL51_SCALAR_COUNT",
+  "d274_02_second_windows_operator_run_root_cause": "MODE_SELECTOR_PIPELINE_SCALAR_COUNT_UNDER_STRICTMODE",
+  "d274_01_native_powershell51_mode_selector_corrective": "APPLIED_PENDING_OPERATOR_RETEST",
+  "d274_01_mode_selector_forced_array": "PASS_STATIC_PENDING_NATIVE_CONFIRMATION",
+  "d274_01_strictmode_preserved": "PASS",
+  "d274_01_native_powershell51_mode_selector": "PENDING_NATIVE_RETEST_NOT_YET_PASS",
+  "d274_native_hard_disable_adversarial_test": "PENDING_WINDOWS_RETEST",
+  "d274_02_summary_all_stage_keys": "PASS_STATIC_ALL_NINE_KEYS_PRESENT",
+  "d274_02_post_selftest_failure_skip_contract": "PRESERVED",
+  "d274_02_vm_absolute_log_timestamps_cross_session_duration_authority": false,
   "d274_02_tshark_source_contract": "CONTEXT_AWARE_EXACT_ALLOWLIST",
   "d274_02_tshark_allowlist_trailing_argument_escape": false,
   "d274_02_integrity_manifest_generated_after_static_files_frozen": true,
@@ -365,11 +485,10 @@
   "first_failure_stop_runtime": "PASS",
   "fail_core_json_production_runtime": "PASS",
   "windows_native_acl_behavior_test": "NOT_YET_EXECUTED",
-  "d274_native_hard_disable_adversarial_test": "NOT_YET_EXECUTED",
   "d274_second_cycle_target_observation": "NOT_EXECUTED",
   "baseline_approved": false,
   "live_authorized": false,
   "ready_for_live": false,
-  "next_primary_boundary": "AI_PM_REVIEW_D274_02_FINAL_INTEGRITY_CORRECTIVE",
-  "next_boundary_prerequisite": "AI_PM_PASS_THEN_SECOND_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN"
+  "next_primary_boundary": "AI_PM_REVIEW_D274_01_NATIVE_SELECTOR_CORRECTIVE_AND_D274_02_REPACK",
+  "next_boundary_prerequisite": "AI_PM_PASS_THEN_THIRD_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN"
 }

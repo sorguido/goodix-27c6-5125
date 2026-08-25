@@ -374,7 +374,11 @@ try {
     $safetyPreGatePassed = $true
 } catch {
     Register-FirstFailure "pre_gate" $_.Exception.Message
-    $stages["pre_gate"] = "FAIL"
+    # Ensure every explicit pre-gate stage key is present in the summary stages
+    # object even on failure (never left undefined).
+    foreach ($k in @("assert_windows_powershell_51", "package_integrity", "kit_source_contract", "goodix_absence_gate", "no_active_marker_gate")) {
+        if (-not $stages.Contains($k)) { $stages[$k] = "FAIL" }
+    }
 }
 
 # SelfTestOnly
@@ -473,6 +477,7 @@ if ($safetyPreGatePassed) {
         $adv = Test-D274HardDisableAdversarial
         Write-D274JsonResult "D274_02_hard_disable_adversarial.json" $adv
         $adversarialTest = $adv.result
+        $stages["hard_disable_adversarial"] = $adv.result
         if ($adv.result -ne "PASS" -and $overallResult -eq "PASS") {
             $overallResult = "FAIL"; if ($null -eq $failedStage) { $failedStage = "hard_disable_adversarial" }
         }

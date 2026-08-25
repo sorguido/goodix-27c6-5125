@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D274/01 (sintesi)
+### Stato corrente post-D274/02 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -240,24 +240,36 @@ D274_OUTPUT_ROOT_PRIVACY_POLICY_SOURCE_CONTRACT=PASS
 D274_BROAD_ACL_READ_ACCEPTED=false
 D274_ACL_ALLOW_DISCRIMINATOR=AccessControlType
 D274_ACL_IDENTITY_NORMALIZATION=SecurityIdentifier
-WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_AVAILABLE
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=PASS
 D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
 D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
 D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_OPERATOR_PACKAGE
-NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_DETAILED_OPERATOR_INSTRUCTIONS_AND_WINDOWS_NATIVE_OFFLINE_EXECUTION
-D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
-D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED
-D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
-WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
-D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
+NEXT_PRIMARY_BOUNDARY=AI_PM_PLANNING_D274_03_ONE_SHOT_WINDOWS_OEM_CAPTURE
+NEXT_BOUNDARY_PREREQUISITE=SEPARATE_AI_PM_LIVE_DESIGN_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_RUN_AUTHORIZATION
+D274_02_OPERATOR_PACKAGE=CLOSED
+D274_02_WINDOWS_NATIVE_EXECUTION=COMPLETED
+D274_02_WINDOWS_NATIVE_QUALIFICATION=PASS
+D274_02_SELFTEST_NATIVE=PASS
+D274_02_PREFLIGHT_NATIVE=PASS
+D274_02_PREAUTHORIZATION_SIMULATION_NATIVE=PASS
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR=PASS_NATIVE
+D274_02_FINAL_REVIEW=PASS
+D274_02_STATUS=CLOSED
+CORRECTIVE_REQUIRED=false
+D274_02_FINAL_INTEGRITY_MANIFEST_SELF_CONSISTENT=PASS
+D274_02_CORRECTED_KIT_CANONICAL_PACKAGE_BYTE_IDENTITY=PASS
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
 D274_REAL_CAPTURE_CAPABILITY=0
 D274_HARD_DISABLED=true
-D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+APPROVED_FOR_CAPTURE=false
+BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
+D274_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -4503,20 +4515,31 @@ regex `-f\s` ha scambiato l'operatore di formattazione PowerShell per il
 capture-filter di TShark); è seguito un corrective in-place dello stesso D274/02
 che rende il source contract context-aware e corregge la verità dell'ACL dopo
 pre-gate fallito. La review AI-PM aveva inoltre trovato e corretto cinque
-difetti (A–E) più un hardening (F) e una lacuna di privacy. Lo step chiude ora
-`D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW` e
-`D274_02_WINDOWS_NATIVE_EXECUTION=ONE_FAILED_PRE_GATE_RUN_OBSERVED`. La qualificazione nativa
-reale avverrà quando l'operatore eseguirà il pacchetto nella VM e rispedirà il
-result bundle; fino ad allora
-`D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED`,
-`WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED` e
-`D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED`.
+difetti (A–E) più un hardening (F) e una lacuna di privacy. La **seconda
+operator-run Windows nativa** (result ZIP verificato AI-PM,
+`ZIP_SHA256=e146c39a…`, `SIDECAR_MATCH=PASS`, `ZIP_CRC=PASS`) ha invece raggiunto
+lo stage `selftest` ed è **fallita nativamente** su Windows PowerShell Desktop
+5.1 per un difetto del **Kit D274/01** (selettore modalità scalare `.Count`
+sotto `StrictMode 2.0`), emerso proprio durante D274/02. Lo step corregge il
+Kit canonico D274/01 e rigenera coerentemente il pacchetto; chiude ora `D274_02_OPERATOR_PACKAGE=CLOSED` (dopo la terza operator-run nativa,
+vedi sotto). La terza operator-run Windows nativa del pacchetto è stata realmente
+eseguita nella VM e revisionata da AI-PM: `result=PASS` con
+`D274_02_WINDOWS_NATIVE_QUALIFICATION=PASS`,
+`WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=PASS` e
+`D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS`. D274/02 è pertanto
+`D274_02_STATUS=CLOSED` e `CORRECTIVE_REQUIRED=false`. Le due run precedenti
+(FAIL pre-gate per falso positivo source scan; FAIL selftest per scalare `.Count`
+sotto StrictMode) restano provenance storica delle run 1 e 2, superate dal
+corrective del Kit D274/01 validato nativamente alla terza run.
 
-Il Kit D274/01 (`operator_kit/d274-windows-multiframe-evidence.ps1`) resta
-**baseline non modificata**: le copie nel pacchetto sono byte-identiche (SHA-256
-verificato `4b0b3b1c…bd` per il kit e `2867ff23…f37` per il postprocessor). Non è
-emerso alcun nuovo difetto D274/01, quindi il pacchetto non è bloccato da
-`BLOCKED_BY_NEW_D274_01_DEFECT`.
+Il Kit D274/01 (`operator_kit/d274-windows-multiframe-evidence.ps1`) è stato
+**corretto in questo step** (non è più baseline non modificata): il selettore
+modalità ora forza il risultato a sempre array via outer `@(...)`, risolvendo il
+`PropertyNotFoundStrict` su `.Count` su Windows PowerShell 5.1. La copia nel
+pacchetto è rigenerata **byte-identica** al Kit canonico corretto (SHA-256
+verificato `2f2e2f1b…6c` per il kit e `2867ff23…f37` per il postprocessor).
+Non è emerso alcun altro nuovo difetto D274/01 oltre al selettore; il pacchetto
+non è bloccato da `BLOCKED_BY_NEW_D274_01_DEFECT`.
 
 La review AI-PM del pacchetto preparato ha trovato e corretto in-place (senza
 aprire D274/03) cinque difetti e un hardening: (A) l'autority della radice
@@ -4606,15 +4629,30 @@ DLL o firmware.
 ```text
 D274_02_FIRST_WINDOWS_OPERATOR_RUN=FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN
 D274_02_FIRST_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR
+D274_02_SECOND_WINDOWS_OPERATOR_RUN=FAIL_SELFTEST_NATIVE_POWERSHELL51_SCALAR_COUNT
+D274_02_SECOND_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=MODE_SELECTOR_PIPELINE_SCALAR_COUNT_UNDER_STRICTMODE
 WINDOWS_POWERSHELL51_RUNTIME=PASS
 OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+KIT_SOURCE_CONTRACT_RUNTIME=PASS
+GOODIX_ABSENCE_GATE_RUNTIME=PASS
+NO_ACTIVE_MARKER_GATE_RUNTIME=PASS
+SELFTEST_RUNTIME=FAIL
+PRELIGHT_RUNTIME=SKIPPED
+PREAUTHORIZATION_SIMULATION_RUNTIME=SKIPPED
+HARD_DISABLE_ADVERSARIAL_RUNTIME=FAIL_BEFORE_EXPECTED_BRANCH_DUE_SELECTOR
 FIRST_FAILURE_STOP_RUNTIME=PASS
 FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
 NO_LIVE_CAPTURE_PERFORMED=true
 REAL_CAPTURE_START_COUNT=0
 REAL_USB_OPEN_COUNT=0
+HARDWARE_ACTION_COUNT=0
 HARD_DISABLE_PRESERVED=true
-D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR_CORRECTIVE=CLOSED
+D274_01_MODE_SELECTOR_FORCED_ARRAY=true
+D274_01_STRICTMODE_PRESERVED=true
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR=PASS_NATIVE
+D274_02_CORRECTED_KIT_CANONICAL_PACKAGE_BYTE_IDENTITY=PASS
+D274_02_OPERATOR_PACKAGE=CLOSED
 D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST
 D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false
 D274_02_POWERSHELL_FORMAT_OPERATOR_FALSE_POSITIVE=false
@@ -4630,10 +4668,13 @@ D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE
 D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS
 D274_02_ENVIRONMENT_TSHARK_DISCOVERY=NON_AUTHORITATIVE_DIAGNOSTIC
 D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE
-D274_02_WINDOWS_NATIVE_EXECUTION=ONE_FAILED_PRE_GATE_RUN_OBSERVED
-D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
-WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
-D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
+D274_02_SUMMARY_ALL_STAGE_KEYS=PASS_STATIC_ALL_NINE_KEYS_PRESENT
+D274_02_POST_SELFTEST_FAILURE_SKIP_CONTRACT=PRESERVED
+D274_02_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false
+D274_02_WINDOWS_NATIVE_EXECUTION=COMPLETED
+D274_02_WINDOWS_NATIVE_QUALIFICATION=PASS
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=PASS
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS
 D274_02_CAPTURE_ROOT_AUTHORITY=PACKAGE_ROOT_CAPTURES
 D274_02_WRAPPER_KIT_CAPTURE_ROOT_ALIGNMENT=PASS
 D274_02_OPERATOR_PACKAGE_INTEGRITY=PASS_STATIC_AND_RUNTIME_VERIFIABLE
@@ -4649,8 +4690,8 @@ BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_INTEGRITY_CORRECTIVE
-NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_SECOND_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_NATIVE_SELECTOR_CORRECTIVE_AND_D274_02_REPACK
+NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_THIRD_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
 ```
 
 #### D274/02 — prima operator-run Windows (FAIL pre-gate, falso positivo source-scan)
@@ -4740,8 +4781,286 @@ questa iterazione finale (sempre D274/02, nessun D274/03):
   `D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST`,
   `D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false`.
 
-D274/01 resta byte-identico (kit `4b0b3b1c…bd`, postprocessor `2867ff23…f37`);
-il corrective non cambia l'esito della prima operator run.
+D274/01 **non** resta byte-identico: il selettore modalità del Kit canonico è
+stato corretto in questo step (kit `2f2e2f1b…6c`, postprocessor `2867ff23…f37`);
+il corrective cambia l'esito della seconda operator run (che era fallita proprio
+sul selettore) e sarà verificato nativamente alla terza operator run.
+
+#### D274/02 — seconda operator-run Windows (FAIL selftest, difetto nativo D274/01)
+
+La seconda vera esecuzione operatore Windows del pacchetto D274/02 (result ZIP
+verificato AI-PM, `ZIP_SHA256=e146c39a…`, `SIDECAR_MATCH=PASS`, `ZIP_CRC=PASS`)
+ha raggiunto lo stage `selftest` ed è **fallita nativamente** su Windows
+PowerShell Desktop 5.1. Non è un failure dell'ambiente Windows: il root cause è
+un difetto del **Kit D274/01**
+
+Evidence nativa osservata:
+
+```text
+runtime_result_state=WINDOWS_NATIVE_OFFLINE_QUALIFICATION_EXECUTED_BY_OPERATOR
+result=FAIL
+failed_stage=selftest
+assert_windows_powershell_51=PASS
+package_integrity=PASS
+kit_source_contract=PASS
+goodix_absence_gate=PASS
+no_active_marker_gate=PASS
+preflight=SKIPPED
+preauthorization_simulation=SKIPPED
+hard_disable_adversarial=FAIL_BEFORE_EXPECTED_BRANCH_DUE_SELECTOR
+windows_native_acl_behavior_test=NOT_EXECUTED_DUE_PRIOR_FAILURE
+real_capture_start_count=0
+real_usb_open_count=0
+hardware_action_count=0
+real_usb_open_count=0
+```
+
+Self-test failure reale:
+
+```text
+PropertyNotFoundException / PropertyNotFoundStrict
+Impossibile trovare la proprietà 'Count' in questo oggetto.
+```
+
+Il failure proviene dal selettore modalità del Kit D274/01:
+
+```powershell
+$selected = @($SelfTestOnly, $PreflightOnly, $PreAuthorizationSimulationOnly,
+              $IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture) |
+    Where-Object { $_ }
+if ($selected.Count -ne 1) { Fail-D274 "select exactly one mode" }
+```
+
+Con `Set-StrictMode -Version 2.0`, la pipeline produce uno **scalare** quando è
+selezionata un'unica modalità, e l'accesso `.Count` su quello scalare non è
+affidabile su Windows PowerShell Desktop 5.1 (osservato `FAIL` reale). Il
+sub-processo hard-disable è morto sullo stesso `.Count` prima di raggiungere il
+ramo `HARD_DISABLED_D274_01`; pertanto
+`HARD_DISABLE_NATIVE_BRANCH_TEST=NOT_YET_PASSED` (l'invariant source
+hard-disable è preservato, non bypassato). Stato di interpretazione corretta:
+
+```text
+HARD_DISABLE_SOURCE_INVARIANT=PRESERVED
+HARD_DISABLE_NATIVE_BRANCH_TEST=NOT_YET_PASSED
+```
+
+Non è interpretato: hard-disable bypassed, capture attempted, hardware action
+occurred.
+
+Root cause: `MODE_SELECTOR_PIPELINE_SCALAR_COUNT_UNDER_STRICTMODE`.
+
+La run ha chiuso solo i confini raggiunti:
+
+```text
+WINDOWS_POWERSHELL51_RUNTIME=PASS
+OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+KIT_SOURCE_CONTRACT_RUNTIME=PASS
+GOODIX_ABSENCE_GATE_RUNTIME=PASS
+NO_ACTIVE_MARKER_GATE_RUNTIME=PASS
+SELFTEST_RUNTIME=FAIL
+PRELIGHT_RUNTIME=SKIPPED
+PREAUTHORIZATION_SIMULATION_RUNTIME=SKIPPED
+HARD_DISABLE_ADVERSARIAL_RUNTIME=FAIL_BEFORE_EXPECTED_BRANCH_DUE_SELECTOR
+REAL_CAPTURE_START_COUNT=0
+REAL_USB_OPEN_COUNT=0
+HARDWARE_ACTION_COUNT=0
+LIVE_EXECUTION=NOT_PERFORMED
+```
+
+Corrective (qui, stesso D274/02 + Kit D274/01, nessun D274/03): il selettore
+modalità del Kit canonico `operator_kit/d274-windows-multiframe-evidence.ps1`
+forza ora il risultato a **sempre array** tramite outer `@(...)`:
+
+```powershell
+$selected = @(
+    @(
+        $SelfTestOnly,
+        $PreflightOnly,
+        $PreAuthorizationSimulationOnly,
+        $IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture
+    ) | Where-Object { $_ }
+)
+if ($selected.Count -ne 1) { Fail-D274 "select exactly one mode" }
+```
+
+`0/1/2/4` switch selezionati → `Count=0/1/2/4` affidabili; lo `StrictMode`
+**non è stato rimosso**. La copia nel pacchetto D274/02 è rigenerata
+**byte-identica** al Kit corretto. Dopo la correzione, il nominale
+`-IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture` supera la selezione e
+raggiunge `Fail-D274 "HARD_DISABLED_D274_01; D274_REAL_CAPTURE_CAPABILITY=0"`
+prima di ogni capture/USB/hardware/finger-prompt. Stato:
+
+```text
+D274_01_NATIVE_SELECTOR_CORRECTIVE=APPLIED_PENDING_OPERATOR_RETEST
+D274_01_MODE_SELECTOR_FORCED_ARRAY=true
+D274_01_STRICTMODE_PRESERVED=true
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR=NOT_YET_PASS_NATIVE_PENDING_THIRD_RUN
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PENDING_WINDOWS_RETEST
+D274_02_CORRECTED_KIT_CANONICAL_PACKAGE_BYTE_IDENTITY=PASS
+```
+
+Non è promossa a `WINDOWS_NATIVE_QUALIFICATION=PASS`, né a
+`WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=FAIL`, né a `TSHARK=ABSENT`/`USBPCAP=ABSENT`:
+la run è fallita prima del preflight nativo realmente eseguito. I timestamp
+assoluti della VM **non** sono authority sulla durata tra sessioni (la VM può
+essere sospesa/riattivata); `D274_02_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false`.
+
+#### D274/02 — terza operator-run Windows (PASS: qualificazione nativa completa)
+
+La terza vera esecuzione operatore Windows del pacchetto D274/02 è stata
+realmente eseguita nella VM Windows e revisionata da AI-PM. Non è un tooling
+run: è l'authority definitiva della qualificazione nativa. Il result bundle è
+verificato:
+
+```text
+D274_02_WINDOWS_NATIVE_RESULT_ZIP_SHA256=4bbca10957dd30b672a76d84368303083a392eb18480a6d0c506045be313eaf0
+SIDECAR_MATCH=PASS
+ZIP_CRC=PASS
+EXPECTED_RESULT_FILES=6/6
+UNEXPECTED_RESULT_FILES=0
+PRIVACY_SCAN=PASS
+```
+
+Le due run precedenti erano failure di tooling (run 1: falso positivo source
+scan `-f`; run 2: scalare `.Count` sotto `StrictMode 2.0`) entrambi superati dal
+corrective del Kit D274/01; la terza run li ha chiusi entrambi nativamente.
+
+Environment nativo osservato (authority della terza run):
+
+```text
+WINDOWS_OS_CAPTION=Microsoft Windows 11 Home
+WINDOWS_OS_BUILD=26200
+WINDOWS_POWERSHELL_EDITION=Desktop
+WINDOWS_POWERSHELL_VERSION=5.1.26100.8655
+TSHARK_AUTHORITATIVE_PREFLIGHT_PATH=<PROGRAMFILES>\Wireshark\tshark.exe
+TSHARK_AUTHORITATIVE_PREFLIGHT_VERSION=TShark (Wireshark) 4.6.7
+USBPCAP_AUTHORITATIVE_PREFLIGHT_INTERFACE_COUNT=1
+GOODIX_PRESENT_BEFORE_RUN=false
+D274_02_ENVIRONMENT_TSHARK_DISCOVERY=NON_AUTHORITATIVE_DIAGNOSTIC
+D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE
+```
+
+Gli orari assoluti dei log VM **non** sono authority sulla durata tra sessioni
+(la VM può essere sospesa/riattivata):
+`D274_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false`.
+
+Tutti gli stage nativi = PASS (authority AI-PM):
+
+```text
+assert_windows_powershell_51=PASS
+package_integrity=PASS
+kit_source_contract=PASS
+goodix_absence_gate=PASS
+no_active_marker_gate=PASS
+selftest=PASS
+preflight=PASS
+preauthorization_simulation=PASS
+hard_disable_adversarial=PASS
+```
+
+Quindi: `D274_02_SELFTEST_NATIVE=PASS`, `D274_02_PREFLIGHT_NATIVE=PASS`,
+`D274_02_PREAUTHORIZATION_SIMULATION_NATIVE=PASS`,
+`D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS`.
+
+Il corrective D274/01 (selettore modalità forzato a array sotto
+`Set-StrictMode -Version 2.0`) ha superato nativamente `-SelfTestOnly`. Lo stage
+pre-authorization simulation ha osservato:
+
+```text
+synthetic_marker_lifecycle=PASS
+authorization_consumed=false
+real_capture_started=false
+real_usb_open_count=0
+real_finger_interaction_count=0
+enrollment_commit_authorized=false
+account_mutation_authorized=false
+pin_mutation_authorized=false
+```
+
+Native ACL privacy = PASS (osservato realmente):
+
+```text
+canonical_capture_root_match=true
+reparse_point=false
+acl_readable=true
+broad_everyone_read_or_stronger=false
+broad_builtin_users_read_or_stronger=false
+broad_authenticated_users_read_or_stronger=false
+broad_guests_read_or_stronger=false
+write_probe_pass=true
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=PASS
+D274_02_OUTPUT_ROOT_PRIVACY_NATIVE=PASS
+```
+
+Nessuna ACL è stata modificata: né `Set-Acl` né `icacls`. Quindi
+`D274_02_OUTPUT_ROOT_PRIVACY_NATIVE=PASS`.
+
+Native hard-disable adversarial test = PASS (fail-closed): il ramo nominale di
+autorizzazione deve fallire con `HARD_DISABLED_D274_01` e
+`D274_REAL_CAPTURE_CAPABILITY=0`; l'exit code 1 è il risultato corretto del test
+avversario.
+
+```text
+subprocess_exit_code=1
+expected_hard_disable_message_observed=true
+no_capture_started=true
+no_hardware_action=true
+D274_REAL_CAPTURE_CAPABILITY=0
+D274_HARD_DISABLED=true
+authorization_consumed=false
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS
+D274_HARD_DISABLE_NATIVE_BRANCH=PASS_FAIL_CLOSED
+```
+
+Safety closure D274/02 (nessun hardware/live eseguito):
+
+```text
+REAL_CAPTURE_START_COUNT=0
+REAL_USB_OPEN_COUNT=0
+REAL_COMMAND_SEND_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_SECRET_MATERIALIZATION_COUNT=0
+REAL_FPRINTD_MUTATION_COUNT=0
+REAL_WINDOWS_ACCOUNT_MUTATION_COUNT=0
+REAL_WINDOWS_ENROLLMENT_COMMIT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+LIVE_EXECUTION=NOT_PERFORMED
+D274_REAL_CAPTURE_CAPABILITY=0
+D274_HARD_DISABLED=true
+```
+
+Non promosso (restano false): `APPROVED_FOR_CAPTURE`, `LIVE_AUTHORIZED`,
+`READY_FOR_LIVE`. D274/02 NON ha osservato il secondo ciclo biometrico:
+`D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED`,
+`SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED`.
+
+Stato finale D274/02:
+
+```text
+D274_02_WINDOWS_NATIVE_EXECUTION=COMPLETED
+D274_02_WINDOWS_NATIVE_QUALIFICATION=PASS
+D274_02_SELFTEST_NATIVE=PASS
+D274_02_PREFLIGHT_NATIVE=PASS
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=PASS
+D274_02_PREAUTHORIZATION_SIMULATION_NATIVE=PASS
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PASS
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR=PASS_NATIVE
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR_CORRECTIVE=CLOSED
+D274_01_STRICTMODE_PRESERVED=true
+D274_02_FINAL_REVIEW=PASS
+D274_02_STATUS=CLOSED
+CORRECTIVE_REQUIRED=false
+```
+
+Il Kit canonico D274/01 `operator_kit/d274-windows-multiframe-evidence.ps1` e la
+sua copia byte-identica nel pacchetto D274/02 restano immutati in questo closure
+step: nessuna modifica comportamentale al Kit. La terza run chiude D274/02 come
+qualificazione nativa Windows offline completa (selftest, preflight, simulazione
+pre-autorizzazione, ACL privacy, hard-disable adversarial), senza alcuna capture
+o azione hardware. Il prossimo boundary (solo pianificazione, non esecuzione) è
+`NEXT_PRIMARY_BOUNDARY=AI_PM_PLANNING_D274_03_ONE_SHOT_WINDOWS_OEM_CAPTURE`, con
+prerequisito `SEPARATE_AI_PM_LIVE_DESIGN_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_RUN_AUTHORIZATION`;
+D274/02 non abilita capture reale, non rimuove hard-disable e non autorizza live.
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
 La closure canonica D218–D220 (contract immagine Windows) va preservata e non

@@ -16,20 +16,64 @@ Windows le sole modalità innocue del Kit D274/01:
 
 L'AI esecutrice non dispone della VM Windows target e non finge alcuna
 esecuzione nativa. Questa iterazione è un **corrective in-place** dello stesso
-D274/02, successiva alla **prima vera esecuzione operatore Windows nativa** del
-pacchetto. Quella run ha chiuso con `result=FAIL` allo `pre_gate`, causato da un
-**falso positivo** del source scan: la regex generica `-f\s` ha scambiato
-l'operatore di formattazione PowerShell (`-f [Guid]`) per il capture-filter di
-TShark. Non è un failure dell'ambiente Windows: la review AI-PM ha identificato
-il falso positivo. La run ha comunque chiuso correttamente i soli confini
-raggiunti:
+D274/02, successiva alla **seconda vera esecuzione operatore Windows nativa**
+del pacchetto, ed emenda un **difetto nativo del Kit D274/01** emerso durante
+quella run.
+
+La **prima** operator run Windows aveva chiuso `result=FAIL` allo `pre_gate`
+per un **falso positivo** del source scan (la regex generica `-f\s` aveva
+scambiato l'operatore di formattazione PowerShell `-f [Guid]` per il
+capture-filter di TShark). La review AI-PM lo aveva già corretto (allowlist
+context-aware esatta) e il pacchetto era stato riportato a
+`READY_FOR_AI_PM_REVIEW`.
+
+La **seconda** operator run Windows (result ZIP verificato AI-PM,
+`ZIP_SHA256=e146c39a…`, `SIDECAR_MATCH=PASS`, `ZIP_CRC=PASS`) ha invece
+raggiunto lo stage `selftest` e qui è **fallita nativamente** su Windows
+PowerShell Desktop 5.1 con:
+
+```text
+PropertyNotFoundException / PropertyNotFoundStrict
+Impossibile trovare la proprietà 'Count' in questo oggetto.
+```
+
+Root cause: la pipeline di selezione modalità del Kit D274/01
+
+```powershell
+$selected = @($SelfTestOnly, $Preflight?, ...) | Where-Object { $_ }
+if ($selected.Count -ne 1) { Fail-D274 "select exactly one mode" }
+```
+
+sotto `Set-StrictMode -Version 2.0` restituisce uno **scalare** quando è
+selezionata un'unica modalità, e l'accesso `.Count` su quello scalare non è
+affidabile su Windows PowerShell 5.1 (osservato `FAIL` reale). Lo stesso
+sub-processo hard-disable è morto sullo stesso `.Count` prima di raggiungere il
+ramo `HARD_DISABLED_D274_01`; pertanto
+`HARD_DISABLE_NATIVE_BRANCH_TEST=NOT_YET_PASSED` (il source-invariant
+hard-disable è preservato, non bypassato). La run ha chiuso correttamente i soli
+confini raggiunti:
 
 ```text
 WINDOWS_POWERSHELL51_RUNTIME=PASS
 OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
-FIRST_FAILURE_STOP_RUNTIME=PASS
-FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
+KIT_SOURCE_CONTRACT_RUNTIME=PASS
+GOODIX_ABSENCE_GATE_RUNTIME=PASS
+NO_ACTIVE_MARKER_GATE_RUNTIME=PASS
+SELFTEST_RUNTIME=FAIL
+PRELIGHT_RUNTIME=SKIPPED
+PREAUTHORIZATION_SIMULATION_RUNTIME=SKIPPED
+HARD_DISABLE_ADVERSARIAL_RUNTIME=FAIL_BEFORE_EXPECTED_BRANCH_DUE_SELECTOR
+REAL_CAPTURE_START_COUNT=0
+REAL_USB_OPEN_COUNT=0
+HARDWARE_ACTION_COUNT=0
+LIVE_EXECUTION=NOT_PERFORMED
 ```
+
+Il difetto **appartiene al Kit D274/01**, non a D274/02: D274/02 è il veicolo di
+qualificazione. Questa iterazione corregge il selettore del Kit canonico
+`operator_kit/d274-windows-multiframe-evidence.ps1` (forzando il risultato a
+sempre array via outer `@(...)`) e rigenera coerentemente il pacchetto D274/02.
+Non si nasconde la provenienza del bug.
 
 La review AI-PM del pacchetto preparato aveva inoltre trovato cinque difetti
 (A–E) più un hardening (F) e una lacuna di privacy, qui corretti e ri-testati.
@@ -57,10 +101,12 @@ nella VM Windows e rispedirà il result bundle ad AI-PM.
 ```text
 GIT_ROOT=/home/guido/Repository/goodix-27c6-5125_private
 BRANCH=development
-STARTING_HEAD=99369cdfcb266a912c4a76863b2935a948ec2fb1
+STARTING_HEAD=a3b32f4bb2ed7d69d7ea192214ff763a8d8887a9
+PROMPT_ASSUMED_HEAD=99369cdfcb266a912c4a76863b2935a948ec2fb1
+HEAD_DISCREPANCY_NOTE=repo advanced 2 commits beyond prompt-assumed 99369cd; 99369cd remains an ancestor (PASS)
 STARTING_BASELINE_APPROVED=99369cdfcb266a912c4a76863b2935a948ec2fb1
 BASELINE_ANCESTOR_CHECK=PASS
-WORKTREE_STATUS=DIRTY_EXPECTED_D274_02_UNCOMMITTED_PREP_ONLY
+WORKTREE_STATUS=DIRTY_EXPECTED_D274_01_SELECTOR_CORRECTIVE_AND_D274_02_REPACK_UNCOMMITTED
 D274_01_CORRECTIVE_FINAL_REVIEW=PASS
 ```
 
@@ -263,20 +309,75 @@ iterazione finale (sempre D274/02, nessun D274/03):
   `D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST`,
   `D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false`.
 
-D274/01 resta **byte-identico** (kit `4b0b3b1c…bd`, postprocessor
-`2867ff23…f37`); non cambia l'esito della prima operator run.
+Al momento di quel corrective (precedente a questo step) D274/01 era
+**byte-identico** (kit `4b0b3b1c…bd`, postprocessor `2867ff23…f37`) e non
+cambiava l'esito della prima operator run. Il presente step ha poi corretto il
+selettore del Kit D274/01 (nuovo hash kit `2f2e2f1b…6c`); cfr. sezione
+"Corrective D274/01 — selettore modalità scalar `.Count` sotto StrictMode".
 
-## Boundary D274/01 preservato
+## Corrective D274/01 — selettore modalità scalar `.Count` sotto StrictMode (RISOLTO)
 
-Il Kit D274/01 `operator_kit/d274-windows-multiframe-evidence.ps1` è baseline e
-**non è stato modificato**. Le copie nel pacchetto sono **byte-identiche**
-(SHA-256 `4b0b3b1c…bd` per il kit, `2867ff23…f37` per il postprocessor). Nessun
-nuovo difetto D274/01 è emerso, quindi non è stato aperto
-`D274_02_OPERATOR_PACKAGE=BLOCKED_BY_NEW_D274_01_DEFECT`.
+Il difetto appartiene al **Kit D274/01** `operator_kit/d274-windows-multiframe-evidence.ps1`
+e si è manifestato durante la seconda operator run D274/02. La selezione
+modalità:
+
+```powershell
+$selected = @($SelfTestOnly, $PreflightOnly, $PreAuthorizationSimulationOnly,
+              $IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture) |
+    Where-Object { $_ }
+if ($selected.Count -ne 1) { Fail-D274 "select exactly one mode" }
+```
+
+sotto `Set-StrictMode -Version 2.0` su Windows PowerShell Desktop 5.1 produce
+uno **scalare** quando è selezionata un'unica modalità, e l'accesso `.Count`
+sullo scalare non è affidabile (osservato `PropertyNotFoundStrict` reale).
+Corretto forzando il risultato della pipeline a **sempre array** tramite un
+outer `@(...)`:
+
+```powershell
+$selected = @(
+    @(
+        $SelfTestOnly,
+        $PreflightOnly,
+        $PreAuthorizationSimulationOnly,
+        $IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture
+    ) | Where-Object { $_ }
+)
+if ($selected.Count -ne 1) { Fail-D274 "select exactly one mode" }
+```
+
+Ora `0/1/2/4` switch selezionati producono `Count=0/1/2/4` affidabili. Lo
+`StrictMode` **non è stato rimosso**. La copia nel pacchetto D274/02 è rigenerata
+**byte-identica** al Kit canonico corretto (SHA-256 `2f2e2f1b…6c` per il kit;
+`2867ff23…f37` per il postprocessor invariato). Stato:
 
 ```text
-D274_01_OPERATOR_KIT_BYTE_IDENTITY=PASS_4b0b3b1c3f81a7a5874aa2d3a4b281c79ec03b0b1ab1c92cc11284bbee5bd9bd
-D274_01_POSTPROCESSOR_BYTE_IDENTITY=PASS_2867ff23cb76297d9089b0840afa59e7a8222e5657e3fc1dc5d7774d6ca68f37
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR_CORRECTIVE=APPLIED_PENDING_OPERATOR_RETEST
+D274_01_MODE_SELECTOR_FORCED_ARRAY=true
+D274_01_STRICTMODE_PRESERVED=true
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR=NOT_YET_PASS_NATIVE_PENDING_THIRD_RUN
+D274_02_CORRECTED_KIT_CANONICAL_PACKAGE_BYTE_IDENTITY=PASS
+```
+
+La correzione è **applicata** ma il `PASS` nativo è rinviato alla terza operator
+run Windows (la seconda è fallita sullo stesso `.Count` prima di raggiungere il
+ramo hard-disable). Non viene dichiarato `PASS_NATIVE` finché non arriva il nuovo
+result Windows.
+
+## Hard-disable adversarial branch dopo la correzione (STATO PREPARATORIO)
+
+Dopo la correzione del selettore, il nominale
+`-IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture` supera la selezione
+modalità e raggiunge il ramo
+`Fail-D274 "HARD_DISABLED_D274_01; D274_REAL_CAPTURE_CAPABILITY=0"` **prima di**
+qualsiasi TShark capture, USB attach, azione hardware o finger prompt. Test
+statici/portable nel `prep_test_results` verificano: il selettore non blocca più
+la modalità hard-disable-only; il check hard-disable avviene prima del dispatch
+SelfTest/Preflight/PreAuth; il literal del messaggio è preservato;
+`D274RealCaptureCapability=0` e `D274HardDisabled=true` preservati. Stato:
+
+```text
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PENDING_WINDOWS_RETEST
 ```
 
 ## Pacchetto operatore
@@ -332,24 +433,49 @@ acl_preflight_pass_yields_pass, acl_preflight_acl_failure_yields_fail,
 fail_result_collector_contract, operator_console_guidance, environment_tshark_discovery_non_authoritative,
 final_integrity_manifest_self_consistent, final_runner_hash_matches_manifest,
 final_collector_hash_matches_manifest, final_readme_hash_matches_manifest,
-final_kit_hash_matches_manifest, final_postprocessor_hash_matches_manifest, più
-i test precedenti (py_compile, JSON parse, source guards, trailing whitespace,
-bracket balance, package privacy scan).
+final_kit_hash_matches_manifest, final_postprocessor_hash_matches_manifest,
+mode_selector_forced_array, mode_selector_zero (NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT),
+mode_selector_each_single_mode (NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT),
+mode_selector_multi_mode (NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT),
+hard_disable_only_selector_reaches_harddisable_contract (static PASS; runtime NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT),
+summary_all_stage_keys, selftest_fail_model (NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT),
+post_selftest_stages_skipped_model (NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT),
+context_aware_exact_tshark_allowlist, powershell_format_operator_fixture,
+capture_root_alignment, goodix_presence_truthfulness, fail_diagnostics,
+path_sanitization, fail_result_collector, exact_results_path,
+final_integrity_manifest_self_consistent, canonical_corrected_kit_equals_package_copy,
+git_diff_check, più i test precedenti (py_compile, JSON parse, source guards,
+trailing whitespace, bracket balance, package privacy scan).
 `WINDOWS_NATIVE_POWERSHELL_TEST=NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT`.
+`WINDOWS_NATIVE_SELECTOR_TEST=NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT`.
 
 ## Stato di preparazione
 
 ```text
 D274_02_FIRST_WINDOWS_OPERATOR_RUN=FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN
 D274_02_FIRST_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR
+D274_02_SECOND_WINDOWS_OPERATOR_RUN=FAIL_SELFTEST_NATIVE_POWERSHELL51_SCALAR_COUNT
+D274_02_SECOND_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=MODE_SELECTOR_PIPELINE_SCALAR_COUNT_UNDER_STRICTMODE
 WINDOWS_POWERSHELL51_RUNTIME=PASS
 OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+KIT_SOURCE_CONTRACT_RUNTIME=PASS
+GOODIX_ABSENCE_GATE_RUNTIME=PASS
+NO_ACTIVE_MARKER_GATE_RUNTIME=PASS
+SELFTEST_RUNTIME=FAIL
+PRELIGHT_RUNTIME=SKIPPED
+PREAUTHORIZATION_SIMULATION_RUNTIME=SKIPPED
+HARD_DISABLE_ADVERSARIAL_RUNTIME=FAIL_BEFORE_EXPECTED_BRANCH_DUE_SELECTOR
 FIRST_FAILURE_STOP_RUNTIME=PASS
 FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
 NO_LIVE_CAPTURE_PERFORMED=true
 REAL_CAPTURE_START_COUNT=0
 REAL_USB_OPEN_COUNT=0
+HARDWARE_ACTION_COUNT=0
 HARD_DISABLE_PRESERVED=true
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR_CORRECTIVE=APPLIED_PENDING_OPERATOR_RETEST
+D274_01_MODE_SELECTOR_FORCED_ARRAY=true
+D274_01_STRICTMODE_PRESERVED=true
+D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR=NOT_YET_PASS_NATIVE_PENDING_THIRD_RUN
 D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST
 D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false
 D274_02_POWERSHELL_FORMAT_OPERATOR_FALSE_POSITIVE=false
@@ -360,16 +486,20 @@ D274_02_FINAL_COLLECTOR_HASH_MATCHES_MANIFEST=PASS
 D274_02_FINAL_README_HASH_MATCHES_MANIFEST=PASS
 D274_02_FINAL_KIT_HASH_MATCHES_MANIFEST=PASS
 D274_02_FINAL_POSTPROCESSOR_HASH_MATCHES_MANIFEST=PASS
+D274_02_CORRECTED_KIT_CANONICAL_PACKAGE_BYTE_IDENTITY=PASS
 D274_02_BUNDLE_MANIFEST_STATIC_RUNTIME_PATHS_ACCURATE=PASS
 D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE
 D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS
 D274_02_ENVIRONMENT_TSHARK_DISCOVERY=NON_AUTHORITATIVE_DIAGNOSTIC
 D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE
+D274_02_SUMMARY_ALL_STAGE_KEYS=PASS_STATIC_ALL_NINE_KEYS_PRESENT
+D274_02_POST_SELFTEST_FAILURE_SKIP_CONTRACT=PRESERVED
+D274_02_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false
 D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
-D274_02_WINDOWS_NATIVE_EXECUTION=ONE_FAILED_PRE_GATE_RUN_OBSERVED
+D274_02_WINDOWS_NATIVE_EXECUTION=TWO_FAILED_TOOLING_RUNS_OBSERVED
 D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
 WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
-D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
+D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=PENDING_WINDOWS_RETEST
 D274_REAL_CAPTURE_CAPABILITY=0
 D274_HARD_DISABLED=true
 D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
@@ -381,8 +511,8 @@ READY_FOR_LIVE=false
 ## Prossimo boundary
 
 ```text
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_INTEGRITY_CORRECTIVE
-NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_SECOND_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_NATIVE_SELECTOR_CORRECTIVE_AND_D274_02_REPACK
+NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_THIRD_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
 ```
 
 ## Safety counters (run AI)
