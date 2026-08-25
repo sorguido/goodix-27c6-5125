@@ -95,7 +95,7 @@ def _frame_metadata(frame: dict, direction: str) -> dict:
                 "logical_control": "NOT_DERIVED",
             }
         )
-    elif direction == "device_to_host" and (wire_control & 0xFE) == 0x50:
+    elif direction == "device_to_host" and wire_control == 0x50:
         result.update(
             {
                 "classification": "A0_0X50_NAV_RESPONSE",

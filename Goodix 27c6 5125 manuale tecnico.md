@@ -170,6 +170,9 @@ FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
 POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_POST_UP_B0_IMAGE_ROLE_STATICALLY_SUPPORTED_NO_QUALITY_CLAIM
 POST_FINGER_UP_0X50_STATUS=OBSERVED_WITH_EXACT_ACK_AND_OEM_NAV_GETTER_VERIFIED
 POST_0X50_RESPONSE_STATUS=OBSERVED_A0_0X50_NAV_RESPONSE_LENGTHS_2417_2410
+D273_NAV_CLASSIFICATION_WIRE_CONTROL=EXACT_0X50
+D273_0X51_NAV_ALIAS_ACCEPTED=false
+GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
@@ -4105,39 +4108,50 @@ NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_N
  LIVE_EXECUTION=NOT_PERFORMED
  ```
 
-### D273/01 corrective: verità probatoria metadata e provenance Rocky
+### D273/01 corrective: verità probatoria, provenance Rocky e exact NAV control
 
-Corrective locale deterministico (D273/01, post-baseline
-`5ef14c5051726fe6bc6624de86d3885f3306776e`) che ripristina solo metadati
-probatori e provenance, senza cambiare il boundary tecnico D273.
+Corrective locali deterministici (D273/01, su baseline
+`5ef14c5051726fe6bc6624de86d3885f3306776e`; corrective 2 su
+`7c991143e3670f6262f23e6159edde9e240c4287`) che ripristinano solo metadati
+probatori, provenance Rocky e il classificatore NAV, senza cambiare il boundary
+tecnico D273.
 
-- `analysis/D273/d273_01_offline_capture_audit.py` non deduce più un
-  `logical_control` universale con `wire & 0xfe`. Il `wire_control` esatto è
-  sempre preservato; un `logical_control` semantico è emesso solo per gli ACK
-  (echo realmente osservato) e marcato `NOT_DERIVED` negli altri frame A0. Un
-  control dispari non appartenente alla regola (es. D1 wire `0xd1`) non è più
-  pubblicato falsamente come `0xd0`. Coerente con il contratto di
-  trasporto §Trasporto USB («Non è corretto dedurre sempre il logico con
-  `wire & 0xfe`»).
-- `analysis/D273/D273_01_capture_census.json` rigenerato in modo deterministico:
-  packet 249 resta `A0_0X50_NAV_RESPONSE` con control `0x50`, length
-  2417/2410; gli ACK conservano echo/status osservati; nessun payload
-  B0/plaintext/raster serializzato.
-- `analysis/D273/D273_01_multiframe_evidence_matrix.json` riallineata alla
-  provenance canonica: `rocky_snapshot_commit` corretto da
-  `227eba177a44b2eea645be81c995246ceb8119e5` (errato) a
-  `227eba219fa9e3fbac5bd59aca79f624f67cd11b` (canonico in
-  `Rockytkg/PROVENANCE.md`). Aggiunto check programmatico che confronta il
-  valore registrato nella matrix con il commit canonico letto da
-  `Rockytkg/PROVENANCE.md`.
-- Nessuna classificazione tecnica Rocky cambia: resta
-  `THIRD_PARTY_CORROBORATION`. Nessuna conclusione D273 (dataflow up-table, NAV
-  packet 249, blocker seconda iterazione, blocker OpenCV4-dev) cambia per
-  effetto del corrective.
+Primo difetto (corrective 1): `analysis/D273/d273_01_offline_capture_audit.py`
+deduceva un `logical_control` universale con `wire & 0xfe`, e
+`analysis/D273/D273_01_multiframe_evidence_matrix.json` riportava una provenance
+Rocky errata. Corrective 1: il `wire_control` esatto è sempre preservato; un
+`logical_control` semantico è emesso solo per gli ACK (echo realmente osservato)
+e marcato `NOT_DERIVED` negli altri frame A0; un control dispari non
+appartenente alla regola (es. D1 wire `0xd1`) non è più pubblicato falsamente
+come `0xd0`; `rocky_snapshot_commit` è riallineato a
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b` (canonico in
+`Rockytkg/PROVENANCE.md`). Coerente con il contratto di trasporto §Trasporto
+USB («Non è corretto dedurre sempre il logico con `wire & 0xfe`»).
+
+Review indipendente (corrective 2): il classificatore della response NAV usava
+ancora `wire_control & 0xFE == 0x50`, semanticamente troppo permissivo (es. un
+ipotetico `0x51` sarebbe stato etichettato `A0_0X50_NAV_RESPONSE`). Corrective
+2: il classificatore NAV usa ora l'exact match `wire_control == 0x50` (senza
+masking, parità, even/odd normalization). Aggiunti test sintetici diretti sul
+classificatore: `0x50` → `A0_0X50_NAV_RESPONSE`; `0x51` → NON NAV, resta
+`A0_COMMAND_OR_RESPONSE`. Aggiunta source-guard bounded sul solo script D273 che
+fallisce chiuso se ricompare `wire_control & 0xfe`/`0xFE`. La claim
+`GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true` è ora letteralmente vera per l'audit
+D273.
+
+`analysis/D273/D273_01_capture_census.json` rigenerato in modo deterministico:
+packet 249 resta `A0_0X50_NAV_RESPONSE` con control `0x50`, length 2417/2410;
+gli ACK conservano echo/status osservati; nessun payload B0/plaintext/raster
+serializzato. Nessuna classificazione tecnica Rocky cambia: resta
+`THIRD_PARTY_CORROBORATION`. Nessuna conclusione D273 (dataflow up-table, NAV
+packet 249, blocker seconda iterazione, blocker OpenCV4-dev) cambia per effetto
+dei corrective.
 
 ```text
 D273_EVIDENCE_METADATA_CORRECTIVE=PASS
 GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
+D273_NAV_CLASSIFICATION_WIRE_CONTROL=EXACT_0X50
+D273_0X51_NAV_ALIAS_ACCEPTED=false
 ROCKY_PROVENANCE_REALIGNED_TO=227eba219fa9e3fbac5bd59aca79f624f67cd11b
 D273_TECHNICAL_CONCLUSIONS_UNCHANGED=true
 ```

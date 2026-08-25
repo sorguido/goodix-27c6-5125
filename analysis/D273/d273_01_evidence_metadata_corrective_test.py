@@ -11,6 +11,10 @@ Verifies the two corrective findings:
    longer fabricates a universal logical_control via wire & 0xfe masking:
      - an odd control such as D1 wire 0xd1 is NOT published as logical 0xd0;
      - packet 249 stays classified A0_0X50_NAV_RESPONSE with exact data;
+     - the NAV classifier matches the exact wire control 0x50 only (no parity
+       mask); a synthetic wire 0x51 is NOT classified as A0_0X50_NAV_RESPONSE;
+     - a source guard fails closed if the residual `wire_control & 0xfe`
+       pattern reappears in the D273 audit script;
      - ACK echo/status are preserved (observed echo used as logical control);
      - the census regeneration is deterministic;
      - no B0 plaintext/raster/payload content is serialized.
@@ -65,6 +69,65 @@ def generate_census() -> str:
         return path.read_text(encoding="utf-8")
     finally:
         path.unlink(missing_ok=True)
+
+
+def _load_audit_module():
+    import importlib.util as _iu
+
+    spec = _iu.spec_from_file_location("d273_audit_corrective", AUDIT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("audit_module_import_failed")
+    module = _iu.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _synthetic_nav_frame(wire_control: int) -> dict:
+    raw = bytearray(10)
+    raw[0] = 0xA0
+    raw[4] = wire_control
+    # inner length 2410 (0x096A) avoids the FDT_IRQ branch (length == 17)
+    raw[5] = 0x6A
+    raw[6] = 0x09
+    return {
+        "raw": bytes(raw),
+        "outer_type": "0xa0",
+        "expected_len": 2417,
+        "first_packet_index": 999,
+    }
+
+
+def test_nav_classifier_synthetic_positive() -> None:
+    name = "nav_classifier_wire_0x50_positive"
+    module = _load_audit_module()
+    meta = module._frame_metadata(_synthetic_nav_frame(0x50), "device_to_host")
+    if meta.get("classification") != "A0_0X50_NAV_RESPONSE":
+        _fail(name, f"classification={meta.get('classification')}")
+        return
+    _pass(name)
+
+
+def test_nav_classifier_synthetic_negative() -> None:
+    name = "nav_classifier_wire_0x51_not_nav"
+    module = _load_audit_module()
+    meta = module._frame_metadata(_synthetic_nav_frame(0x51), "device_to_host")
+    if meta.get("classification") == "A0_0X50_NAV_RESPONSE":
+        _fail(name, "wire 0x51 falsely classified as A0_0X50_NAV_RESPONSE")
+        return
+    if meta.get("classification") != "A0_COMMAND_OR_RESPONSE":
+        _fail(name, f"unexpected non-NAV classification {meta.get('classification')}")
+        return
+    _pass(name)
+
+
+def test_source_guard_no_mask() -> None:
+    name = "audit_source_guard_no_wire_control_mask"
+    text = AUDIT.read_text(encoding="utf-8")
+    for pattern in ("wire_control & 0xfe", "wire_control & 0xFE"):
+        if pattern in text:
+            _fail(name, f"residual mask pattern present: {pattern}")
+            return
+    _pass(name)
 
 
 def test_rocky_provenance() -> None:
@@ -213,6 +276,9 @@ def main() -> int:
     test_packet_249(census)
     test_ack_echo_status_preserved(census)
     test_no_payload_serialized(census)
+    test_nav_classifier_synthetic_positive()
+    test_nav_classifier_synthetic_negative()
+    test_source_guard_no_mask()
     print()
     if FAILED:
         print(f"{len(FAILED)} corrective check(s) FAILED")
@@ -238,6 +304,9 @@ def main() -> int:
                     "packet_249_nav_classification_preserved",
                     "ack_echo_status_preserved",
                     "no_b0_plaintext_raster_payload_serialized",
+                    "nav_classifier_wire_0x50_positive",
+                    "nav_classifier_wire_0x51_not_nav",
+                    "audit_source_guard_no_wire_control_mask",
                 )
             ],
             "real_usb_open_count": 0,
