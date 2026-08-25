@@ -5,6 +5,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define GOODIX_CANONICAL_IMAGE_WIDTH 80u
 #define GOODIX_CANONICAL_IMAGE_HEIGHT 64u
 #define GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT \
@@ -50,5 +54,9 @@ goodix_u16_to_fpimage (const uint16_t                 *samples,
                        uint8_t                        *output,
                        size_t                          output_size,
                        GoodixLibfprintImageMetadata   *metadata);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

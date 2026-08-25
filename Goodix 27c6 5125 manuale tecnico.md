@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D271/01 (sintesi)
+### Stato corrente post-D272/01 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -88,6 +88,29 @@ chiusa con SIGFM unico candidato da validare e NBIS bloccato, senza selezione
 production e senza claim di qualità. Nessuna nuova fonte target-specific fissa
 DPI, orientation o polarity. Pertanto:
 
+D272/01 ha implementato due seam offline senza promuoverli a percorso live.
+Nel dominio GPL, `core/multiframe_validation.py` modella un ciclo bounded da 2
+a 8 sample con un solo reader, zero retry/reopen/recovery e stop immediato a
+ogni mismatch. L'audit della capture primaria ha però corretto la sequenza
+abbreviata: dopo l'immagine post-rilascio sono osservati anche `0x50`, il suo
+ACK e la risposta dinamica, prima del `0x32`. Inoltre la capture termina dopo
+l'ACK al re-arm: il successivo `IRQ2 → 0x22 → seconda immagine` è una
+composizione inferita con la sottosequenza pre-first-image, non una seconda
+iterazione osservata. Soprattutto, del body `0x34` è osservato il valore della
+tabella up nella sola sessione catturata, ma restano ignote origine,
+derivazione, freshness e validità per una sessione futura. Per questi motivi il
+modello non è collegato al transport USB reale e il kit D272 mantiene il flag
+future-live hard-disabled.
+
+Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
+D269, chiama il SIGFM locale, mantiene il gate `<25`, distingue score zero da
+errore negativo e contiene le eccezioni C++/OpenCV al confine C. Raster, buffer
+u8 e `SigfmImgInfo` sono solo in memoria; non esiste API di serializzazione.
+Warning severi, ASan/UBSan e test double sintetico passano. L'ambiente corrente
+non contiene però OpenCV4 development files: la build/link del SIGFM reale non
+è eseguibile e `EXECUTABLE_CLOSURE=FAIL`. La fixture prova soltanto plumbing,
+non qualità biometrica.
+
 ```text
 PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
 INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
@@ -101,16 +124,23 @@ NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
 NBIS_WITH_UNKNOWN_PPMM=BLOCKED
 SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
 FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
-SIGFM_STATUS=CANDIDATE_FOR_VALIDATION
+SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV
+SIGFM_EXCEPTION_CONTAINMENT=CLOSED_OFFLINE_AT_C_ABI
+SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
 NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
 SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
 NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_PASS_LIVE_INTEGRATION_BLOCKED
+POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_PAYLOAD_UP_TABLE_PROVENANCE_AND_FRESHNESS_UNKNOWN
+FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
+POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_B0_SEMANTICS_NOT_QUALITY_PROVEN
+REARM_0X32_STATUS=OBSERVED_WITH_ACK_SECOND_CYCLE_COMPLETION_NOT_OBSERVED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION
-NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING
+NEXT_PRIMARY_BOUNDARY=POST_FIRST_IMAGE_MULTIFRAME_CONTRACT_CLOSURE_AND_REAL_SIGFM_BUILD
+NEXT_BOUNDARY_PREREQUISITE=TARGET_CLOSE_0X34_UP_TABLE_AND_SECOND_CYCLE_PLUS_EXISTING_OPENCV4_DEV_ENVIRONMENT
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -795,6 +825,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D269/01 adapter Linux/libfprint | READY offline; pixel+intensity CLOSED; full pipeline NOT_YET_CLOSED; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; `FpImage::ppmm` auditato: NBIS lo consuma, SIGFM no, valore fisico APP12509 UNKNOWN (500 DPI Rockytkg = terza parte); orientation/polarity non inventate; prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` con prerequisito ppmm |
 | D270/01 costruzione FpImage reale | READY offline; object/ownership/dimensions CLOSED; full pipeline PARTIALLY_CLOSED; live false | helper LGPL opaco costruisce `FpImage(80,64)` reale e object-owned dal raster sintetico via adapter D269; weak-finalization, strict build, ASan/UBSan, root/external-cwd e symbol audit PASS; ppmm fisico separato `UNKNOWN`, NBIS fail-closed, SIGFM ppmm-independent ma non selezionato; orientation/polarity ancora unresolved |
 | D271/01 policy feature extractor | READY offline; policy CLOSED; full pipeline PARTIALLY_CLOSED; live false | call-flow extractor/template/matcher/enrollment locale ricostruito; SIGFM unico `CANDIDATE_FOR_VALIDATION` con input 80×64 strutturalmente supportato ma gate ≥25 keypoint e qualità target ignota; NBIS strutturalmente accetta 80×64 ma resta `BLOCKED` per ppmm ignoto e requisito ≥10 minutiae non provato; orientation/polarity unresolved, nessun claim da fixture sintetiche o Rocky |
+| D272/01 pre-live multi-frame + metriche SIGFM | BLOCKED per live/executable closure; avanzamento offline reale; live false | ordine OEM corretto con `0x50` obbligatorio; modello bounded 2–8 sample, single-reader e fail-closed PASS sintetico; seam SIGFM LGPL con mapping D269, gate 25, score/error ed exception containment PASS su double; origine/freshness tabella `0x34`, seconda iterazione target e build SIGFM reale bloccata da OpenCV4-dev assente |
 
 ## Fonti e confini di pubblicazione
 
@@ -3791,6 +3822,101 @@ LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
 
+### D272/01: validazione target SIGFM pre-live, solo offline
+
+D272/01 parte dal commit D271 completo
+`fdc52d04995d65d1e2a895a373e1fe7e24e6fa9f` sul branch `development`, con
+working tree iniziale pulita e ancestor check PASS. Non ha aperto USB, letto
+secret, contattato fprintd, acquisito biometria o inviato comandi reali.
+
+#### Lifecycle dopo la prima immagine
+
+L'evidenza primaria già hash-gated in
+`analysis/D263/D263_01_post_arm_order.json` mostra, con indici zero-based:
+
+| Ordine | Evento | Classe D272 | Limite |
+| --- | --- | --- | --- |
+| 1 | first B0, packet 231 | `OBSERVED`, decode `VERIFIED` live da D268 | terminale nel runtime corrente |
+| 2 | `0x34 {0a01 || 808780948081807a807f8086}`, packet 233 | `OBSERVED` | origine/freshness/validità futura tabella up `UNKNOWN` |
+| 3 | ACK `B0/34/01`, packet 235 | `OBSERVED` | il modello offline lo rende obbligatorio e fail-closed |
+| 4 | IRQ `0x0200`, packet 237 | `OBSERVED`; finger-up fortemente supportato; Rocky `THIRD_PARTY_CORROBORATION` | timeout target `UNKNOWN` |
+| 5 | `0x20 {0100}`, packet 238; ACK packet 241 | `OBSERVED` | nessuna semantica di qualità inventata |
+| 6 | B0 post-up, packet 243 | `OBSERVED` | contenuto no-finger/qualità non promosso |
+| 7 | `0x50 {0100}`, ACK e risposta, packet 244/247/249 | `OBSERVED` | passaggio omesso nella sequenza abbreviata ma obbligatorio nella capture |
+| 8 | `0x32` re-arm, packet 251; ACK packet 253 | `OBSERVED` | usa tabella down della sessione |
+| 9 | prossimo IRQ2 → `0x22` → seconda fingerprint image | `INFERRED` per composizione con packet 220–231 | non osservato dopo il re-arm packet 251 |
+
+Il nuovo `BoundedMultiFrameRunner` rappresenta esattamente questo ordine su un
+channel iniettato con un solo `read_next`. Accetta solo un opt-in esplicito da
+2 a 8 ruoli, consuma l'immagine post-up senza conservarla, include `0x50`, non
+ha retry/reopen/recovery e non emette comandi dopo l'ultimo sample. È un modello
+sintetico: non modifica `PersistentRuntimeCoordinator`, il default D268 resta
+first-image terminale e nessuna policy fisica autorizza `0x34`.
+
+#### Seam SIGFM e privacy
+
+Il wrapper LGPL C++ usa `goodix_u16_to_fpimage()` e il vero ABI locale
+`sigfm_extract`/`sigfm_keypoints_count`/`sigfm_match_score`/`sigfm_free_info`.
+L'API è opaca ed effimera: non espone `sigfm_serialize_binary`, file, rete,
+USB o TLS. Meno di 25 keypoint è `KEYPOINT_GATE_FAILED`; score zero è successo,
+score negativo è `MATCH_ERROR`; eccezioni di extract, keypoint, match e destroy
+non attraversano il confine C. Il buffer u8 sullo stack viene azzerato; non è
+possibile garantire l'azzeramento di copie o allocazioni interne OpenCV.
+
+Il double sintetico verifica dimensioni, mapping D269, determinismo, gate,
+score/error, eccezioni e lifetime con warning severi e ASan/UBSan. Questo non
+misura feature reali. Né host né Flatpak SDK installato forniscono OpenCV4-dev;
+come imposto dal task non è stato installato nulla. La build/link del SIGFM
+reale resta quindi non eseguita e impedisce executable closure PASS.
+
+Il piano futuro, non eseguito, limita una singola run a sei ruoli anonimi
+`A1,A2,A3,B1,B2,B3`: coppie interne ad A/B sono same-finger, coppie A:B sono
+different-finger. Può produrre soltanto stato extract, keypoint count/gate,
+relazione, stato/score match e failure class. Non assume threshold 20 o 40 e
+serve solo a `FEASIBILITY_AND_THRESHOLD_CANDIDATE_VALIDATION`, non a una
+calibrazione production.
+
+#### Riesame metodologico prima di qualsiasi futuro live
+
+1. Il metodo dovrà cambiare chiudendo con evidenza target origine/freshness
+   della tabella `0x34`, l'intera seconda iterazione e il gate `0x50`, oltre a
+   compilare il SIGFM reale in un ambiente OpenCV4-dev già disponibile.
+2. Solo allora l'ipotesi tecnica sarà che una tabella up valida per la sessione
+   permetta il ciclo release/re-arm completo e che raster target distinti
+   producano keypoint e score SIGFM preliminarmente separabili.
+3. Un fallimento allo stesso confine non autorizzerà una ripetizione: si
+   tornerà ad audit offline della capture/call-flow o del build environment,
+   senza nuova micro-run.
+
+Stato canonico:
+
+```text
+OUTCOME=BLOCKED_POST_FIRST_IMAGE_UP_TABLE_SECOND_CYCLE_AND_OPENCV4_DEV
+ADVANCEMENT=NEW_OFFLINE_MULTIFRAME_MODEL_AND_SIGFM_EXCEPTION_PRIVACY_SEAM
+EXECUTABLE_CLOSURE=FAIL
+FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE_SIGFM_VALIDATION_CANDIDATE
+SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV
+SIGFM_EXCEPTION_CONTAINMENT=CLOSED_OFFLINE_AT_C_ABI
+SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
+MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_PASS_LIVE_INTEGRATION_BLOCKED
+POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_PAYLOAD_UP_TABLE_PROVENANCE_AND_FRESHNESS_UNKNOWN
+FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
+POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_B0_SEMANTICS_NOT_QUALITY_PROVEN
+REARM_0X32_STATUS=OBSERVED_WITH_ACK_SECOND_CYCLE_COMPLETION_NOT_OBSERVED
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+NEXT_PRIMARY_BOUNDARY=POST_FIRST_IMAGE_MULTIFRAME_CONTRACT_CLOSURE_AND_REAL_SIGFM_BUILD
+NEXT_BOUNDARY_PREREQUISITE=TARGET_CLOSE_0X34_UP_TABLE_AND_SECOND_CYCLE_PLUS_EXISTING_OPENCV4_DEV_ENVIRONMENT
+BASELINE_APPROVED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
+```
+
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
 La closure canonica D218–D220 (contract immagine Windows) va preservata e non
 reinventata: il preprocessing Windows/AlgoChicago consuma direttamente il raster
@@ -3888,6 +4014,13 @@ Il prossimo step non deve ripetere la scelta architetturale né assumere il
 threshold Rockytkg: deve produrre metriche target-reali autorizzate e
 privacy-preserving su keypoint, extraction gate e separazione dei punteggi,
 preservando il mapping D269 finché l'evidenza non giustifica una revisione.
+
+D272/01 ha ora superato la sola progettazione di quelle metriche con un seam
+sintetico verificato, ma **non** ha raggiunto la validazione target: il
+lifecycle live resta bloccato sulla tabella up `0x34` e sulla seconda
+iterazione non osservata, mentre la build SIGFM reale è bloccata
+dall'assenza di OpenCV4-dev. Il current next boundary è quindi quello indicato
+nella sintesi alta, non una run target immediata.
 
 
 ## Hard Wall

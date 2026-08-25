@@ -1,0 +1,113 @@
+{
+  "artifact": "D272_01_multiframe_contract",
+  "step": "D272/01",
+  "execution_mode": "OFFLINE_ONLY",
+  "firmware_target": "GF_ST411SEC_APP_12509",
+  "primary_evidence": {
+    "source": "analysis/D263/D263_01_post_arm_order.json",
+    "capture_reference": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+    "capture_sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b",
+    "raw_capture_bundled": false
+  },
+  "exact_order": [
+    {
+      "ordinal": 1,
+      "transition": "FIRST_IMAGE",
+      "classification": ["OBSERVED", "VERIFIED"],
+      "evidence": "primary packet 231; D268 target-live decode closed the 80x64 raster"
+    },
+    {
+      "ordinal": 2,
+      "transition": "0x34 body 0a01 || up_table12",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 233; captured up table 808780948081807a807f8086",
+      "open_contract": "source, derivation, freshness and current-session validity of up_table12 are UNKNOWN"
+    },
+    {
+      "ordinal": 3,
+      "transition": "ACK B0/34/01",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 235",
+      "offline_model_policy": "mandatory exact ACK; no optional/permissive fallback"
+    },
+    {
+      "ordinal": 4,
+      "transition": "IRQ 0x0200",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 237",
+      "semantic_classification": "finger-up indication is strongly supported by target ordering; Rockytkg is THIRD_PARTY_CORROBORATION only",
+      "timeout_contract": "UNKNOWN_TARGET_POLICY"
+    },
+    {
+      "ordinal": 5,
+      "transition": "0x20 body 0100",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 238"
+    },
+    {
+      "ordinal": 6,
+      "transition": "ACK B0/20/01",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 241",
+      "offline_model_policy": "mandatory exact ACK"
+    },
+    {
+      "ordinal": 7,
+      "transition": "post-finger-up B0 image",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 243",
+      "semantic_classification": "UNKNOWN beyond image occurrence; not promoted to proven no-finger quality"
+    },
+    {
+      "ordinal": 8,
+      "transition": "0x50 body 0100 -> ACK -> dynamic response",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packets 244, 247 and 249; bounded 0x50 response shape is established elsewhere in the target corpus",
+      "prompt_summary_correction": "this mandatory observed inter-stage exchange was absent from the abbreviated requested cycle and cannot be omitted"
+    },
+    {
+      "ordinal": 9,
+      "transition": "0x32 body 0801 || down_table12 || timestamp16",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 251; down table begins 80ac80bd80a380b180a680b2"
+    },
+    {
+      "ordinal": 10,
+      "transition": "ACK B0/32/01",
+      "classification": ["OBSERVED"],
+      "evidence": "primary packet 253"
+    },
+    {
+      "ordinal": 11,
+      "transition": "next IRQ 0x0002 -> 0x22/ACK -> next fingerprint image",
+      "classification": ["INFERRED"],
+      "evidence": "the pre-first-image subsequence is observed at packets 220-231, but the capture does not observe its completion after the re-arm at packet 251",
+      "production_status": "NOT_TARGET_CLOSED"
+    }
+  ],
+  "third_party_corroboration": {
+    "source": "Rockytkg/src/goodixgf.c and include/goodix.h",
+    "finding": "0x34 is used as finger-up arm and IRQ 0x0200 as release; 15000 ms appears in that implementation",
+    "authority": "not target proof and not a target timeout contract"
+  },
+  "offline_model": {
+    "path": "core/multiframe_validation.py",
+    "state_model": "IMPLEMENTED_SYNTHETIC_FAIL_CLOSED",
+    "single_reader": true,
+    "sample_min": 2,
+    "sample_max": 8,
+    "retry_count": 0,
+    "reopen_count": 0,
+    "recovery_count": 0,
+    "first_image_default_modified": false,
+    "real_transport_wiring": false,
+    "future_live_enablement": false
+  },
+  "production_blockers": [
+    "0x34 up-table source/freshness/current-session validity is not target-closed",
+    "the second-cycle completion after packet 251 is not observed in the primary capture",
+    "target timeout policy is unknown",
+    "post-up image semantics and dynamic 0x50 response acceptance are not sufficient to authorize live re-arm"
+  ],
+  "status": "BLOCKED_FOR_PRODUCTION_SHAPED_LIVE_INTEGRATION"
+}

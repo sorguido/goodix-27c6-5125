@@ -44,3 +44,19 @@ NBIS explicitly. Its OK result for SIGFM means only that the locally audited
 SIGFM extractor does not consume `ppmm`; it does not select an extractor or
 authorize preprocessing, matching, enrollment, or live use. Image flags remain
 zero solely because no orientation or polarity transformation is yet justified.
+
+## D272/01 ephemeral SIGFM metric seam
+
+`goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
+reimplementing it. It applies only the D269 mapper, contains every C++/OpenCV
+exception at the C ABI, preserves the 25-keypoint gate, and distinguishes a
+valid score zero from matcher failure. The API intentionally exposes neither
+SIGFM serialization nor template storage; raster, u8 pixels and SIGFM objects
+are transient and are released after comparison. Stack u8 pixels are
+explicitly cleared, while complete zeroization of allocations owned internally
+by C++/OpenCV cannot be guaranteed by this seam.
+
+The synthetic test double verifies mapping and error plumbing only. On the
+current D272 environment OpenCV4 development files are absent, so the real
+SIGFM object cannot be compiled/linked and the full executable path remains
+blocked. This is not evidence of target biometric quality.

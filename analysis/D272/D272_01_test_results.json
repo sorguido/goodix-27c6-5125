@@ -1,0 +1,52 @@
+{
+  "artifact": "D272_01_test_results",
+  "step": "D272/01",
+  "execution_mode": "OFFLINE_ONLY",
+  "generated_at": "2026-08-25T13:53:52+02:00",
+  "results": [
+    {
+      "name": "d272_python_lifecycle_operator_privacy",
+      "status": "PASS",
+      "count": 12,
+      "coverage": "exact order including 0x50, bounded completion, wrong/missing IRQ, unexpected/duplicate input, timeout, single-reader API, no retry/reopen/recovery, terminal stop, root/external cwd and hard-disabled future-live"
+    },
+    {
+      "name": "runtime_and_first_image_regression",
+      "status": "PASS",
+      "count": 60,
+      "scope": "D260, D263, D266, D267 and D268 selected runtime/decoder/operator suites"
+    },
+    {
+      "name": "sigfm_metric_seam_strict_build_and_symbol_audit",
+      "status": "PASS",
+      "detail": "C11/C++17 warnings-as-errors from repository and external cwd; no persistence/I-O/USB/TLS/serialization symbol"
+    },
+    {
+      "name": "sigfm_metric_synthetic_normal",
+      "status": "PASS",
+      "detail": "D269 mapping, 80x64, deterministic mapping, keypoint gate, score zero/error, exception containment and balanced lifetime"
+    },
+    {
+      "name": "sigfm_metric_synthetic_asan_ubsan",
+      "status": "PASS",
+      "detail": "ASan/UBSan pass; leak detector disabled because it is unsupported under the Flatpak/ptrace environment, explicit alloc/free balance checked mechanically"
+    },
+    {
+      "name": "d269_d270_fpimage_regression_normal_and_sanitized",
+      "status": "PASS"
+    },
+    {
+      "name": "real_sigfm_opencv4_dependency_and_link_path",
+      "status": "BLOCKED",
+      "failure_class": "OPENCV4_DEV_UNAVAILABLE",
+      "detail": "pkg-config opencv4 unavailable on host and installed org.freedesktop.Sdk//25.08; no dependency installation attempted"
+    }
+  ],
+  "executable_closure": "FAIL",
+  "biometric_quality_proven": false,
+  "real_usb_open_count": 0,
+  "real_secret_materialization_count": 0,
+  "real_fprintd_mutation_count": 0,
+  "real_biometric_capture_count": 0,
+  "persistent_device_write_count": 0
+}

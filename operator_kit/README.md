@@ -1,6 +1,13 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D272/01 validazione SIGFM (solo preflight offline)
+
+`./operator_kit/d272-sigfm-validation.sh --dry-run` verifica il surface
+operatore senza USB, secret, fprintd o acquisizione. Il flag riservato
+`--future-live` è hard-disabled: non esiste un backend live D272 e nessuna
+baseline è approvata.
+
 ## D268/01 first-image one-shot (offline-ready, live non autorizzato)
 
 `./operator_kit/d268-first-image-once.sh --dry-run` è il Kit Operatore
