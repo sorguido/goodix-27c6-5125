@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D268 (sintesi)
+### Stato corrente post-D269/01 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -38,15 +38,26 @@ D268_RETRY_AUTHORIZED=false
 LIVE_AUTHORIZED=false
 ```
 
-Il prossimo boundary è:
+Il boundary Linux `u16/12-bit → libfprint` è ora chiuso offline come contratto
+di rappresentazione e adapter bounded:
 
 ```text
-LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+LIBFPRINT_IMAGE_PIXEL_CONTRACT=PACKED_GRAYSCALE_U8_ONE_BYTE_PER_PIXEL
+INTENSITY_MAPPING_DECISION=FIXED_LINEAR_FULL_RANGE_ROUND_NEAREST_12BIT_TO_8BIT
+WINDOWS_CONTRACT_REUSED=false
+U16_TO_LIBFPRINT_OWNER=LGPL_LIBFPRINT_DRIVER_GLUE
+ADAPTER_IMPLEMENTATION_GATE=PASS
 ```
 
-con `ORIENTATION_CONTRACT=UNRESOLVED`. La storia tecnica dettagliata prosegue
-nelle sezioni seguenti; le frasi riferite a step passati (es. D257/D259/D264) sono
-da intendersi come stato di quel momento, oggi superato.
+Il decoder GPL continua a produrre il raster canonico `80x64 u16` con valori
+12-bit. Il nuovo helper LGPL lo valida e lo quantizza con
+`round(sample × 255 / 4095)` in 5120 byte packed, senza normalizzazione
+frame-local, I/O o persistenza. `ORIENTATION_CONTRACT=UNRESOLVED`: D269/01 non
+applica flag, flip, rotate, transpose ulteriore o inversione di polarità. Il
+prossimo boundary principale è `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE`.
+La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
+a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
+momento, oggi superato.
 
 Non esiste ancora un driver Linux funzionante. La progressione live ha però
 chiuso i confini A8, E4 e TLS sul firmware 12509: D239 ha eseguito il cold-start
@@ -724,6 +735,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Kit D268/01 first-image con decoder D267/04 | READY offline, poi run live eseguita una sola volta | nuovo namespace one-shot e authority corrente di 20 file; manifest D267/03 ripristinato storico; diagnostica typed/sanitized esposta in italiano; dry-run root e `/tmp` zero-side-effect; run D268 conclusa `PASS_STOP_AFTER_FIRST_IMAGE` sulla baseline `c03d32e...` |
 | Run live D268 first-image (Kit D268/01) | successo, marker D268 consumato | IRQ2 consegnato, `0x22` ACK-validato, primo B0 e decode raster `80x64` PASS; trailer `0x88` no-check target-proven, checksum additivo mismatch, CRC record valido; zero retry/recovery/reopen/write/comandi post-image; cleanup e zeroizzazione riusciti; restore callback completata senza eccezione; stato esterno finale fprintd non osservato indipendentemente |
 | Codec immagine | confermato offline + CRC record validato live + decode eseguito live | record 7684 byte → raster u16 `80x64` (CRC-32/MPEG-2 record valido e raster `80x64` live-proven in D268) |
+| D269/01 adapter Linux/libfprint | READY offline; executable closure PASS; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; orientation/polarity non inventate e prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` |
 
 ## Fonti e confini di pubblicazione
 
@@ -4292,11 +4304,13 @@ da D268/02. I fatti supportati sono:
   l'acquisizione live è sicura (residual uncertainty di WIN-001).
 
 D268/02 preserva questa closure: il nuovo fatto D268 (`target live image →
-valid image record → decoded raster 80x64 u16`) eredita lo stesso contract `u16`;
-il prossimo boundary non è una nuova campagna statica Windows ma la decisione di
-engineering Linux su come rappresentare/adattare il raster Goodix `80x64 u16`/12-bit
-verso libfprint, mantenendo distinte semantica del sensore, contratto Windows già
-ricostruito e orientamento `UNRESOLVED`.
+valid image record → decoded raster 80x64 u16`) eredita lo stesso contract
+`u16`. D269/01 chiude poi la decisione Linux-specifica senza reinterpretare il
+contratto Windows: il core GPL mantiene il raster canonico, mentre il glue LGPL
+valida 5120 sample nel range `0..4095` e produce il packed u8 libfprint tramite
+mapping fixed full-range `round(v*255/4095)`. L'orientamento fisico/naturale e la
+polarità restano `UNRESOLVED`; zero flag significa conservare l'ordine canonico
+del decoder, non dichiararlo fisicamente orientato.
 
 ## D262: fresh-FDT arm execution-readiness review offline
 
@@ -5894,4 +5908,92 @@ FIRST_IMAGE_RASTER_SHAPE=80x64
 D267_01_CAUSE=STRONG_CAUSAL_INFERENCE
 D268_RETRY_AUTHORIZED=false
 LIVE_AUTHORIZED=false
+```
+
+### D269/01: contratto Linux u16/12-bit → libfprint e adapter bounded offline
+
+D269/01 è **OFFLINE ONLY**: nessun accesso USB, TLS, secret, fprintd o hardware;
+nessun file live-critical è modificato. L'audit usa la copia libfprint
+materializzata nello snapshot Rockytkg, identificata dalla provenance al gitlink
+upstream `7ebe0c809b4d1df3400e84299a4ec4acdea84590` e dichiarata versione `1.94.5`.
+
+Il contratto osservato/verificato è:
+
+```text
+LIBFPRINT_IMAGE_PIXEL_CONTRACT=PACKED_GRAYSCALE_U8_ONE_BYTE_PER_PIXEL
+LIBFPRINT_IMAGE_BIT_DEPTH=8
+LIBFPRINT_IMAGE_DIMENSION_CONTRACT=WIDTH_HEIGHT_CONSTRUCT_ONLY_DATA_LENGTH_WIDTH_X_HEIGHT_STRIDE_IMPLICIT_WIDTH
+LIBFPRINT_IMAGE_ORIENTATION_MECHANISM=V_FLIPPED_H_FLIPPED_COLORS_INVERTED_FLAGS_NO_ROTATE_OR_TRANSPOSE_FLAG
+LIBFPRINT_IMAGE_OWNERSHIP_CONTRACT=FPIMAGE_GOBJECT_OWNS_ALLOCATED_DATA
+LIBFPRINT_PREPROCESSING_EXPECTATION=DRIVER_SUPPLIES_U8;STANDARD_PATH_ONLY_APPLIES_FLAGS_THEN_NBIS_8BIT;SIGFM_CONSUMES_U8_COPY_DIRECTLY
+```
+
+`fp_image_new(width,height)` alloca `width*height` byte; `FpImage::data` è
+`guint8 *`; `fp_image_get_data()` restituisce esattamente `width*height`; NBIS è
+invocato con depth `8`. I flag standard possono applicare flip verticale,
+orizzontale e inversione colori prima di NBIS, ma non esiste un flag rotate o
+transpose né un helper standard che converta/normalizzi un raster u16. Nel fork
+SIGFM, l'estrazione copia e consuma direttamente i byte senza applicare i flag:
+questo rende ancora più importante non usare flag come sostituto di una futura
+decisione esplicita di orientation/polarity.
+
+Il confronto locale mostra due precedenti distinti: il driver AES3K espande in
+modo fixed il proprio dominio 4-bit a 8-bit (`nibble*17`), mentre ELAN applica
+un min/max frame-local specifico del driver. Rockytkg `src/goodixgf.c` (LGPL)
+chiama `gx_imgproc_to8bit`, ma la trasformazione concreta è in
+`src/goodix_imgproc.c` (GPL) ed è sensor/matcher-specifica: baseline, flat-field,
+percentili e enhancement. È corroborazione che il boundary esiste, non prova
+target-specific né espressione trasferibile nel glue LGPL.
+
+D269/01 adotta quindi il minimo contratto Linux stabile e non adattivo:
+
+```text
+INTENSITY_MAPPING_DECISION=FIXED_LINEAR_FULL_RANGE_ROUND_NEAREST_12BIT_TO_8BIT
+INTENSITY_MAPPING_FORMULA=round(sample*255/4095)
+INTENSITY_MAPPING_EVIDENCE_CLASS=VERIFIED_ENGINEERING_DECISION_FROM_LOCAL_API_AND_FIXED_RANGE_PRECEDENT
+INTENSITY_MAPPING_STABILITY=FRAME_CONTENT_INDEPENDENT_CROSS_FRAME_STABLE_MONOTONIC_NONDECREASING
+WINDOWS_CONTRACT_REUSED=false
+```
+
+Questa quantizzazione usa l'intero dominio dichiarato dal decoder, conserva
+ordine e endpoint ed evita che il significato di uno stesso sample cambi da un
+frame all'altro. Non è una quality policy e non dimostra contrasto sufficiente
+per NBIS/SIGFM; min/max, percentili, baseline subtraction, flat-field ed
+enhancement restano fuori dal contratto bounded finché non esiste evidenza
+biometrica/architetturale specifica.
+
+L'adapter indipendente `libfprint-driver/goodix_u16_to_fpimage.c` è
+`LGPL-2.1-or-later`. Accetta soltanto 5120 `uint16_t`, valida l'intero frame nel
+range `0..4095` prima di scrivere, produce 5120 byte packed e metadata
+`80x64`, stride `80`, flags `0`, orientation canonica preservata e natural
+orientation non risolta. Non modifica il decoder GPL e non contiene I/O.
+
+```text
+WIRE_TO_CANONICAL_RASTER_TRANSPOSE=IMPLEMENTED_IN_CANONICAL_GPL_DECODER
+CANONICAL_RASTER_TO_FINGERPRINT_NATURAL_ORIENTATION=UNRESOLVED
+ORIENTATION_CONTRACT=UNRESOLVED
+U16_TO_LIBFPRINT_OWNER=LGPL_LIBFPRINT_DRIVER_GLUE
+LICENSING_BOUNDARY_STATUS=PASS_INDEPENDENT_LGPL_ADAPTER_NO_GPL_EXPRESSION_TRANSFERRED
+GPL_TO_LGPL_DATA_CONTRACT=OWNED_80X64_U16_12BIT_CANONICAL_RASTER_PLUS_METADATA
+ADAPTER_IMPLEMENTATION_GATE=PASS
+```
+
+I test C sintetici coprono raster valido, count e output size errati, null,
+sample oltre range, rappresentazione castata di un negativo, minimo, massimo,
+KAT non banale, monotonicità su tutti i 4096 valori, determinismo,
+indipendenza dal contenuto globale del frame, input invariato, dimensioni e
+orientation metadata. Build GCC strict, unit test da root e da cwd esterno e
+audit dell'oggetto senza simboli I/O indefiniti passano. ASan/UBSan è saltato
+per runtime linker non installati; non è necessario alla closure.
+
+```text
+OUTCOME=READY — D269_01_LINUX_U16_LIBFPRINT_CONTRACT_CLOSED_OFFLINE
+ADVANCEMENT=LINUX_LIBFPRINT_IMAGE_CONTRACT_DEFINED_AND_BOUNDED_ADAPTER_VERIFIED
+EXECUTABLE_CLOSURE=PASS
+RESIDUAL_BLOCKER_OR_RISK=ORIENTATION_AND_POLARITY_UNRESOLVED;BIOMETRIC_QUALITY_OF_FIXED_MAPPING_NOT_YET_PROVEN
+CANONICAL_DOCUMENTATION=UPDATED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+D268_RETRY_AUTHORIZED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
 ```

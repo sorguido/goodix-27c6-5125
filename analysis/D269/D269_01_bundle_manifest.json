@@ -1,0 +1,48 @@
+{
+  "artifact": "D269_01_bundle_manifest",
+  "step": "D269/01",
+  "execution_mode": "OFFLINE_ONLY",
+  "generated_at": "2026-08-25T10:37:59+02:00",
+  "bundle_type": "STEP_LOCAL_NON_CUMULATIVE",
+  "review_set": [
+    "analysis/D269/D269_01_linux_u16_libfprint_contract_report.md",
+    "analysis/D269/D269_01_libfprint_api_evidence.json",
+    "analysis/D269/D269_01_test_results.json",
+    "analysis/D269/D269_01_execution_manifest.json",
+    "analysis/D269/D269_01_bundle_manifest.json",
+    "libfprint-driver/goodix_u16_to_fpimage.h",
+    "libfprint-driver/goodix_u16_to_fpimage.c",
+    "libfprint-driver/tests/test_goodix_u16_to_fpimage.c",
+    "libfprint-driver/README.md",
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "canonical_files_modified": [
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "implementation_and_boundary_files_modified": [
+    "libfprint-driver/goodix_u16_to_fpimage.h",
+    "libfprint-driver/goodix_u16_to_fpimage.c",
+    "libfprint-driver/tests/test_goodix_u16_to_fpimage.c",
+    "libfprint-driver/README.md"
+  ],
+  "excluded": [
+    "previous bundles",
+    "captures",
+    "raw or real raster/pixel data",
+    "images",
+    "TLS plaintext",
+    "PSK or secrets",
+    "OEM DLL or firmware",
+    "biometric material",
+    "core and live-critical paths"
+  ],
+  "biometric_data_in_bundle": false,
+  "raw_image_in_bundle": false,
+  "pixel_data_in_bundle": false,
+  "secret_in_bundle": false,
+  "sha256_file": "analysis/D269/D269_01_linux_u16_libfprint_contract_bundle.zip.sha256",
+  "outcome": "READY_D269_01_LINUX_U16_LIBFPRINT_CONTRACT_CLOSED_OFFLINE",
+  "adapter_implementation_gate": "PASS",
+  "next_primary_boundary": "LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE",
+  "live_authorized": false
+}
