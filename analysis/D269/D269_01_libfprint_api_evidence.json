@@ -16,63 +16,98 @@
     "LIBFPRINT_IMAGE_OWNERSHIP_CONTRACT": "FPIMAGE_GOBJECT_OWNS_ALLOCATED_DATA",
     "LIBFPRINT_PREPROCESSING_EXPECTATION": "DRIVER_SUPPLIES_U8;STANDARD_PATH_ONLY_APPLIES_FLAGS_THEN_NBIS_8BIT;SIGFM_CONSUMES_U8_COPY_DIRECTLY",
     "HIGHER_BIT_DEPTH_SUPPORTED": false,
-    "STANDARD_U16_NORMALIZATION_HELPER_PRESENT": false
+    "STANDARD_U16_NORMALIZATION_HELPER_PRESENT": false,
+    "LIBFPRINT_IMAGE_PPMM_FIELD": "OBSERVED",
+    "LIBFPRINT_NBIS_CONSUMES_PPMM": "VERIFIED",
+    "NBIS_PPMM_CALLSITE": "fp-image.c:370 -> get_minutiae -> combined_minutia_quality -> radius_pix=RADIUS_MM*ppmm",
+    "NBIS_PPMM_SEMANTIC_ROLE": "resolution-scaled minutia reliability neighborhood radius",
+    "SIGFM_PPMM_CONSUMPTION": "NO"
   },
   "evidence": [
     {
-      "classification": "OSSERVATO",
+      "classification": "OBSERVED",
       "source": "Rockytkg/libfprint/meson.build:1-2",
       "finding": "project version is 1.94.5"
     },
     {
-      "classification": "OSSERVATO",
+      "classification": "OBSERVED",
       "source": "Rockytkg/libfprint/libfprint/fpi-image.h:27-74",
       "finding": "FpImage exposes width, height, flags and guint8 data; flags cover vertical flip, horizontal flip, color inversion and partial"
     },
     {
-      "classification": "VERIFICATO",
+      "classification": "VERIFIED",
       "source": "Rockytkg/libfprint/libfprint/fp-image.c:51-78,136-154,440-456",
       "finding": "construction allocates and reports exactly width*height bytes; object finalization frees data"
     },
     {
-      "classification": "INFERITO",
+      "classification": "INFERRED",
       "source": "Rockytkg/libfprint/libfprint/fp-image.c:77,258-305,453-456",
       "finding": "stride is implicit width because all rows are packed and no stride field/API exists"
     },
     {
-      "classification": "VERIFICATO",
+      "classification": "VERIFIED",
       "source": "Rockytkg/libfprint/libfprint/fp-image.c:330-370",
       "finding": "standard NBIS path applies declared flips/inversion then calls get_minutiae with depth 8"
     },
     {
-      "classification": "VERIFICATO",
+      "classification": "VERIFIED",
       "source": "Rockytkg/libfprint/libfprint/fp-image.c:520-569",
       "finding": "NBIS and SIGFM paths copy width*height u8 bytes; SIGFM does not consume image flags"
     },
     {
-      "classification": "OSSERVATO",
+      "classification": "OBSERVED",
       "source": "Rockytkg/libfprint/libfprint/fpi-image-device.c:483-527",
       "finding": "FpImageDevice routes a captured FpImage to NBIS or SIGFM according to the selected algorithm"
     },
     {
-      "classification": "OSSERVATO",
+      "classification": "OBSERVED",
       "source": "Rockytkg/libfprint/libfprint/drivers/aes3k.c:60-70",
       "finding": "an upstream-style image driver uses a fixed full-range 4-bit to 8-bit expansion"
     },
     {
-      "classification": "OSSERVATO",
+      "classification": "OBSERVED",
       "source": "Rockytkg/libfprint/libfprint/drivers/elan.c:234-263",
       "finding": "ELAN has a driver-specific frame-local min/max mapping; this is a precedent, not a generic libfprint contract"
     },
     {
-      "classification": "OSSERVATO",
+      "classification": "OBSERVED",
       "source": "Rockytkg/src/goodixgf.c:24,259-281; Rockytkg/src/goodix_imgproc.c:1-24,133-175",
       "finding": "LGPL Goodix glue calls a GPL adaptive preprocessing pipeline; no GPL expression was reused in the local LGPL adapter"
     },
     {
-      "classification": "NON_NOTO",
+      "classification": "UNKNOWN",
       "source": "local corpus",
       "finding": "canonical raster to physical/natural fingerprint orientation and target polarity"
+    },
+    {
+      "classification": "OBSERVED",
+      "source": "Rockytkg/libfprint/libfprint/fpi-image.h:63; fp-image.h:39",
+      "finding": "FpImage exposes gdouble ppmm; fp_image_get_ppmm() getter exists, no setter/property"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:157-160,370",
+      "finding": "fp_image_init is empty; ppmm not set by libfprint core; NBIS path passes data->ppmm to get_minutiae"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/nbis/mindtct/quality.c:236; getmin.c:105,148",
+      "finding": "combined_minutia_quality computes radius_pix = sround(RADIUS_MM * ppmm); NBIS consumes ppmm semantically"
+    },
+    {
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:315",
+      "finding": "sigfm_extract(data->image, data->width, data->height) takes only image/w/h; SIGFM does not consume ppmm"
+    },
+    {
+      "classification": "THIRD_PARTY_CORROBORATION",
+      "source": "Rockytkg/src/goodixgf.c:279-281",
+      "finding": "fimg->ppmm = 500.0/25.4; comment states ppmm is display-only and SIGFM resolution-insensitive; not target-specific APP12509 evidence"
+    },
+    {
+      "classification": "UNKNOWN",
+      "source": "private corpus (non-Rockytkg)",
+      "finding": "no OEM/capture/direct measurement fixes ppmm/DPI for target APP12509"
     }
   ],
   "decision": {
@@ -86,7 +121,15 @@
     "LICENSING_BOUNDARY_STATUS": "PASS_INDEPENDENT_LGPL_ADAPTER_NO_GPL_EXPRESSION_TRANSFERRED",
     "GPL_TO_LGPL_DATA_CONTRACT": "OWNED_80X64_U16_12BIT_CANONICAL_RASTER_PLUS_METADATA",
     "ADAPTER_IMPLEMENTATION_GATE": "PASS",
-    "NEXT_PRIMARY_BOUNDARY": "LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE"
+    "PIXEL_REPRESENTATION_CONTRACT": "CLOSED_OFFLINE",
+    "INTENSITY_QUANTIZATION_CONTRACT": "CLOSED_OFFLINE",
+    "FULL_FPIMAGE_PIPELINE_CONTRACT": "NOT_YET_CLOSED",
+    "ROCKYTKG_GOODIX_PPMM_500DPI": "THIRD_PARTY_CORROBORATION",
+    "TARGET_APP12509_PHYSICAL_PPMM": "UNKNOWN",
+    "TARGET_APP12509_PHYSICAL_DPI": "UNKNOWN",
+    "TARGET_PPMM_EVIDENCE_CLASS": "UNKNOWN",
+    "NEXT_PRIMARY_BOUNDARY": "LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE",
+    "NEXT_BOUNDARY_PREREQUISITE": "RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS"
   },
   "live_authorized": false,
   "ready_for_live": false

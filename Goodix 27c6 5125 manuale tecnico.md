@@ -38,10 +38,12 @@ D268_RETRY_AUTHORIZED=false
 LIVE_AUTHORIZED=false
 ```
 
-Il boundary Linux `u16/12-bit → libfprint` è ora chiuso offline come contratto
-di rappresentazione e adapter bounded:
+Il boundary Linux `u16/12-bit → libfprint` ha chiuso offline (post-D269/01
+corrective) il solo contratto di **rappresentazione pixel** e l'adapter bounded:
 
 ```text
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
 LIBFPRINT_IMAGE_PIXEL_CONTRACT=PACKED_GRAYSCALE_U8_ONE_BYTE_PER_PIXEL
 INTENSITY_MAPPING_DECISION=FIXED_LINEAR_FULL_RANGE_ROUND_NEAREST_12BIT_TO_8BIT
 WINDOWS_CONTRACT_REUSED=false
@@ -53,8 +55,25 @@ Il decoder GPL continua a produrre il raster canonico `80x64 u16` con valori
 12-bit. Il nuovo helper LGPL lo valida e lo quantizza con
 `round(sample × 255 / 4095)` in 5120 byte packed, senza normalizzazione
 frame-local, I/O o persistenza. `ORIENTATION_CONTRACT=UNRESOLVED`: D269/01 non
-applica flag, flip, rotate, transpose ulteriore o inversione di polarità. Il
-prossimo boundary principale è `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE`.
+applica flag, flip, rotate, transpose ulteriore o inversione di polarità.
+
+Il **full FpImage pipeline contract** non è ancora chiuso. L'audit correttivo
+D269/01 ha localizzato `FpImage::ppmm` (gdouble, pixels-per-mm) come campo reale
+consumato da NBIS (`get_minutiae` → `combined_minutia_quality`,
+`radius_pix = RADIUS_MM × ppmm`) ma **non** da SIGFM (`sigfm_extract` prende
+solo image/w/h). Il valore fisico target-specific APP12509 è `UNKNOWN`: l'unica
+assegnazione trovata è `fimg->ppmm = 500.0/25.4` in `Rockytkg/src/goodixgf.c`,
+che è terza parte (corroborazione) e la cui stessa commento dichiara ppmm
+"solo per display" e SIGFM insensibile alla risoluzione. Nessuna evidenza
+locale target-specific (OEM, capture, misura diretta) fissa ppmm/DPI per
+APP12509. Pertanto:
+
+```text
+PHYSICAL_PPMM/DPI=UNRESOLVED
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
 momento, oggi superato.
@@ -735,7 +754,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Kit D268/01 first-image con decoder D267/04 | READY offline, poi run live eseguita una sola volta | nuovo namespace one-shot e authority corrente di 20 file; manifest D267/03 ripristinato storico; diagnostica typed/sanitized esposta in italiano; dry-run root e `/tmp` zero-side-effect; run D268 conclusa `PASS_STOP_AFTER_FIRST_IMAGE` sulla baseline `c03d32e...` |
 | Run live D268 first-image (Kit D268/01) | successo, marker D268 consumato | IRQ2 consegnato, `0x22` ACK-validato, primo B0 e decode raster `80x64` PASS; trailer `0x88` no-check target-proven, checksum additivo mismatch, CRC record valido; zero retry/recovery/reopen/write/comandi post-image; cleanup e zeroizzazione riusciti; restore callback completata senza eccezione; stato esterno finale fprintd non osservato indipendentemente |
 | Codec immagine | confermato offline + CRC record validato live + decode eseguito live | record 7684 byte → raster u16 `80x64` (CRC-32/MPEG-2 record valido e raster `80x64` live-proven in D268) |
-| D269/01 adapter Linux/libfprint | READY offline; executable closure PASS; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; orientation/polarity non inventate e prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` |
+| D269/01 adapter Linux/libfprint | READY offline; pixel+intensity CLOSED; full pipeline NOT_YET_CLOSED; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; `FpImage::ppmm` auditato: NBIS lo consuma, SIGFM no, valore fisico APP12509 UNKNOWN (500 DPI Rockytkg = terza parte); orientation/polarity non inventate; prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` con prerequisito ppmm |
 
 ## Fonti e confini di pubblicazione
 
@@ -3712,9 +3731,7 @@ trailer `0x88`: D267/01 non viene riscritto come se avesse registrato `0x88`
 allora.
 
 La run D268 mantiene retry, recovery, reopen, write persistenti e comandi
-post-image vietati tutti a zero; cleanup host, zeroizzazione secret e restore
-fprintd (callback `finally` completata senza eccezione, per control-flow
-verificabile) sono osservati. Il marker D268 è consumato e la run non deve essere
+post-image vietati tutti a zero; cleanup host (`HOST_CLEANUP=OBSERVED`) e zeroizzazione secret (`SECRET_ZEROIZATION=OBSERVED`) sono osservati, e il restore fprintd è `FPRINTD_RESTORE_CALLBACK_COMPLETED_WITHOUT_EXCEPTION=VERIFIED_BY_CONTROL_FLOW` mentre `EXTERNAL_FPRINTD_FINAL_STATE=NOT_INDEPENDENTLY_OBSERVED`. Il marker D268 è consumato e la run non deve essere
 ripetuta. Ne segue:
 
 ```text
@@ -3746,7 +3763,7 @@ prossimo boundary principale, che è una **decisione di engineering Linux-specif
 e non una nuova campagna statica Windows:
 
 ```text
-NEXT_PRIMARY_BOUNDARY=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT
+NEXT_PRIMARY_BOUNDARY=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT  # post-D268; SUPERSEDED by D269/01 (see update below)
 ```
 
 Il task successivo dovrà affrontare, senza assumere la soluzione: i requisiti di
@@ -3762,6 +3779,33 @@ Separatamente, la riproducibilità generale resta limitata dal materiale di
 trasporto machine-bound. Il motore TLS Linux è ora verificato anche sul target
 D245, ma questa evidenza non rende portabile il materiale né autorizza un nuovo
 live.
+
+D269/01 ha successivamente chiuso offline la decisione di engineering Linux-specifica
+post-D268 (il vecchio `NEXT_PRIMARY_BOUNDARY=LINUX_U16_TO_LIBFPRINT_ENGINEERING_DECISION_NON_WINDOWS_CONTRACT`
+è ora superato) auditando l'API locale libfprint 1.94.5 e implementando l'adapter bounded
+`libfprint-driver/goodix_u16_to_fpimage` (LGPL-2.1-or-later, byte-identico e non modificato
+in questo corrective). Lo stato corrente del current critical boundary per il dominio
+Linux/libfprint è:
+
+```text
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+```
+
+Il full `FpImage` pipeline contract resta `NOT_YET_CLOSED` perché `FpImage::ppmm`
+(pixels-per-mm, campo `gdouble` osservato in `fpi-image.h`) è consumato da NBIS
+(`get_minutiae` → `combined_minutia_quality`, `radius_pix = RADIUS_MM × ppmm`) ma non
+da SIGFM; il valore fisico target-specific APP12509 è `UNKNOWN` (l'unica assegnazione
+trovata, `fimg->ppmm = 500.0/25.4` in `Rockytkg/src/goodixgf.c`, è terza parte e la sua
+stessa commento la dichiara "solo per display"). Orientation e polarity restano `UNRESOLVED`.
+
 
 ## Hard Wall
 
@@ -4311,6 +4355,21 @@ valida 5120 sample nel range `0..4095` e produce il packed u8 libfprint tramite
 mapping fixed full-range `round(v*255/4095)`. L'orientamento fisico/naturale e la
 polarità restano `UNRESOLVED`; zero flag significa conservare l'ordine canonico
 del decoder, non dichiararlo fisicamente orientato.
+
+Lo stato di implementazione Linux per il dominio libfprint è pertanto:
+
+```text
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+```
+
+Il contratto pixel e di quantizzazione intensità sono `CLOSED_OFFLINE`; il full
+`FpImage` pipeline contract resta `NOT_YET_CLOSED` finché `FpImage::ppmm` non è
+risolto con evidenza target-specific APP12509 o esplicitamente bound come non
+risolto dal glue. Orientation e polarity restano `UNRESOLVED`.
+
 
 ## D262: fresh-FDT arm execution-readiness review offline
 
@@ -5987,13 +6046,51 @@ audit dell'oggetto senza simboli I/O indefiniti passano. ASan/UBSan è saltato
 per runtime linker non installati; non è necessario alla closure.
 
 ```text
-OUTCOME=READY — D269_01_LINUX_U16_LIBFPRINT_CONTRACT_CLOSED_OFFLINE
-ADVANCEMENT=LINUX_LIBFPRINT_IMAGE_CONTRACT_DEFINED_AND_BOUNDED_ADAPTER_VERIFIED
+OUTCOME=READY — D269_01_PIXEL_REPRESENTATION_CONTRACT_CLOSED_PPMM_LOCALIZED
+ADVANCEMENT=LINUX_LIBFPRINT_IMAGE_CONTRACT_DEFINED_BOUNDED_ADAPTER_VERIFIED_AND_PPMM_PREREQUISITE_LOCALIZED
 EXECUTABLE_CLOSURE=PASS
-RESIDUAL_BLOCKER_OR_RISK=ORIENTATION_AND_POLARITY_UNRESOLVED;BIOMETRIC_QUALITY_OF_FIXED_MAPPING_NOT_YET_PROVEN
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
+RESIDUAL_BLOCKER_OR_RISK=TARGET_APP12509_PHYSICAL_PPMM_UNRESOLVED;ORIENTATION_AND_POLARITY_UNRESOLVED;BIOMETRIC_QUALITY_OF_FIXED_MAPPING_NOT_YET_PROVEN
 CANONICAL_DOCUMENTATION=UPDATED
 NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
 D268_RETRY_AUTHORIZED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
+
+#### D269/01 corrective — audit semantico `FpImage::ppmm`
+
+Il corrective (post-review AI-PM) audità `FpImage::ppmm` senza modificare il
+converter. Gerarchia probatoria:
+
+```text
+LIBFPRINT_IMAGE_PPMM_FIELD=OBSERVED            (fpi-image.h:63; fp-image.h getter)
+FPIMAGE_PPMM_INITIAL_VALUE=0.0                 (GObject instance zero-init; fp_image_init vuoto)
+FPIMAGE_PPMM_INITIALIZATION_PATH=NONE_IN_LIBFPRINT_CORE  (driver scrive fimg->ppmm direttamente)
+LIBFPRINT_NBIS_CONSUMES_PPMM=VERIFIED
+NBIS_PPMM_CALLSITE=fp-image.c:370 → get_minutiae → combined_minutia_quality → radius_pix=RADIUS_MM*ppmm
+NBIS_PPMM_SEMANTIC_ROLE=resolution-scaled minutia reliability neighborhood radius
+SIGFM_PPMM_CONSUMPTION=NO                      (sigfm_extract(image,w,h) only)
+ROCKYTKG_GOODIX_PPMM_500DPI=THIRD_PARTY_CORROBORATION (Rockytkg/src/goodixgf.c:281; commento: "solo per display")
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+TARGET_PPMM_EVIDENCE_CLASS=UNKNOWN
+ADAPTER_BYTES_UNCHANGED=true
+RUNTIME_CODE_CHANGE_REQUIRED=false
+```
+
+NBIS richiede `ppmm` semanticamente (raggio in pixel derivato da `RADIUS_MM ×
+ppmm`); SIGFM non lo passa. Il glue futuro che alloca il vero `FpImage` dovrà
+quindi fissare `ppmm` con evidenza target-specific o dichiararlo esplicitamente
+non risolto, prima che il full pipeline contract possa chiudersi. Non esiste
+alcuna evidenza locale target-specific (OEM, capture, misura diretta, datashed
+APP12509) che fissi ppmm/DPI: il valore 500 DPI in Rockytkg è terza parte e non
+viene promosso a fatto target-specific.
+
+Il D268 operator-kit `test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed`
+fallisce in questo ambiente (guard worktree-dirty non solleva); è pre-esistente,
+estraneo al corrective ppmm e all'adapter (byte-identico) e non viene corretto
+qui per disciplina anti-deragliamento.

@@ -2,7 +2,9 @@
   "artifact": "D269_01_test_results",
   "step": "D269/01",
   "execution_mode": "OFFLINE_ONLY",
-  "generated_at": "2026-08-25T10:37:59+02:00",
+  "original_generated_at": "2026-08-25T10:37:59+02:00",
+  "corrective_generated_at": "2026-08-25T11:38:32+02:00",
+  "generated_at": "2026-08-25T11:38:32+02:00",
   "results": [
     {
       "name": "gcc_c11_strict_compile",
@@ -26,8 +28,8 @@
     },
     {
       "name": "pertinent_python_regressions",
-      "status": "PASS",
-      "detail": "30/30: tests.test_cleanroom, tests.test_d267_04_image_no_check, tests.test_d268_01_operator_kit"
+      "status": "FAIL_NON_HERMETIC_PRE_EXISTING_TEST",
+      "detail": "29_PASS_1_FAIL: tests.test_cleanroom, tests.test_d267_04_image_no_check, tests.test_d268_01_operator_kit; test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed fails in this environment (pre-existing, non-hermetic worktree-state dependency); unrelated to ppmm corrective and to byte-identical adapter"
     },
     {
       "name": "diff_whitespace_check",
@@ -60,6 +62,14 @@
     "no_real_biometric_fixture": true
   },
   "executable_closure": "PASS",
+  "adapter_bytes_unchanged": true,
+  "runtime_code_change_required": false,
+  "PERTINENT_PYTHON_REGRESSIONS": "29_PASS_1_FAIL",
+  "PERTINENT_PYTHON_REGRESSIONS_STATUS": "FAIL_NON_HERMETIC_PRE_EXISTING_TEST",
+  "FAILED_TEST": "test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed",
+  "FAILED_TEST_CLASS": "PRE_EXISTING_NON_HERMETIC_WORKTREE_STATE_DEPENDENCY",
+  "D269_ADAPTER_REGRESSION_INDICATED": false,
+  "residual_observation": "test_d268_01_operator_kit::test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed fails pre-existing in this environment; it appears to be a non-hermetic test that expects a dirty worktree without making it dirty internally, not a verifier bug; out of ppmm corrective scope; adapter KAT still PASS, nm -u clean",
   "usb_real_access": false,
   "secret_real_materialized": false,
   "fprintd_contacted": false,

@@ -2,19 +2,34 @@
 # D269/01 — Linux u16/12-bit → libfprint contract
 
 ```text
-OUTCOME=READY — D269_01_LINUX_U16_LIBFPRINT_CONTRACT_CLOSED_OFFLINE
-ADVANCEMENT=LINUX_LIBFPRINT_IMAGE_CONTRACT_DEFINED_AND_BOUNDED_ADAPTER_VERIFIED
+OUTCOME=READY — D269_01_PIXEL_REPRESENTATION_CONTRACT_CLOSED_PPMM_LOCALIZED
+ADVANCEMENT=FPIMAGE_PPMM_SEMANTICS_AUDITED_AND_FULL_PIPELINE_PREREQUISITE_LOCALIZED
 EXECUTABLE_CLOSURE=PASS
-RESIDUAL_BLOCKER_OR_RISK=ORIENTATION_AND_POLARITY_UNRESOLVED; BIOMETRIC_QUALITY_OF_FIXED_MAPPING_NOT_YET_PROVEN
+RESIDUAL_BLOCKER_OR_RISK=TARGET_APP12509_PHYSICAL_PPMM_UNRESOLVED; ORIENTATION_AND_POLARITY_UNRESOLVED; BIOMETRIC_QUALITY_OF_FIXED_MAPPING_NOT_YET_PROVEN
 CANONICAL_DOCUMENTATION=UPDATED
 BUNDLE=analysis/D269/D269_01_linux_u16_libfprint_contract_bundle.zip
+BUNDLE_SHA256=SEE_EXTERNAL_SIDECAR
+ADAPTER_BYTES_UNCHANGED=true
+RUNTIME_CODE_CHANGE_REQUIRED=false
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_PPMM_EVIDENCE_CLASS=UNKNOWN
+ROCKYTKG_GOODIX_PPMM_500DPI=THIRD_PARTY_CORROBORATION
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
 ```
 
 ## Scope e baseline
 
 - Execution mode: `OFFLINE ONLY`.
 - Branch: `development`.
-- HEAD iniziale: `b3c094e28eb407f937c884423cf265551cc2a32e`.
+- ORIGINAL_D269_01_STARTING_HEAD: `b3c094e28eb407f937c884423cf265551cc2a32e`.
+- D269_01_CORRECTIVE_STARTING_HEAD: `e60b571f6fe2a54be76726582777029d36d202f1`.
+- HEAD iniziale (corrective): `e60b571f6fe2a54be76726582777029d36d202f1`.
 - Worktree iniziale: pulito.
 - Nessun accesso USB/hardware, TLS, secret o fprintd; nessun `sudo`.
 - Nessuna modifica a core, decoder, tool o path live-critical.
@@ -121,13 +136,76 @@ filesystem, USB, TLS, secret, fprintd o persistenza. È il seam puro esatto che
 il futuro glue userà per riempire `FpImage::data`; la costruzione GObject e la
 consegna nella pipeline sono intenzionalmente il prossimo step offline.
 
+## Audit correttivo FpImage::ppmm (post review AI-PM)
+
+Il corrective non modifica il converter (`ADAPTER_BYTES_UNCHANGED=true`,
+`RUNTIME_CODE_CHANGE_REQUIRED=false`). Audit semantico del campo `ppmm`
+secondo la gerarchia probatoria obbligatoria.
+
+A. Significato semantico: `FpImage::ppmm` è un `gdouble` "pixels per millimeter"
+(`fpi-image.h:63`), risoluzione di scansione dichiarata dell'immagine.
+
+B. Inizializzazione: `fp_image_init()` è vuoto (`fp-image.c:157-160`); il campo
+non è una GObject property né viene impostato in `fp_image_new()`. Il valore
+effettivo di default nel clone locale è `0.0` per zero-initialization della
+memoria GObject instance; nessun driver/libfprint core vi scrive un default
+500 DPI (il commento di `fp_image_get_ppmm()` documenta solo che "è assunto
+fisso a 500 ppi per la maggior parte dei driver", ma non è un valore impostato).
+
+C. Consumatori downstream reali: NBIS sì; SIGFM no.
+
+D. NBIS richiede `ppmm` semanticamente: SÌ. `fp_image_detect_minutiae_thread_func`
+passa `data->ppmm` a `get_minutiae(...)` (`fp-image.c:370`); a valle
+`combined_minutia_quality()` calcola `radius_pix = sround(RADIUS_MM * ppmm)`
+(`nbis/mindtct/quality.c:236`). Il raggio di neighborhood per l'affidabilità
+delle minuzie dipende quindi dalla risoluzione.
+
+E. SIGFM usa o ignora `ppmm`: lo ignora. `fp_image_sigfm_extract_thread_func`
+chiama `sigfm_extract(data->image, data->width, data->height)`
+(`fp-image.c:315`): solo immagine, larghezza, altezza.
+
+F. Default effettivo locale: `ppmm == 0.0` se il driver non lo imposta
+(zero-init). Nessun default 500 DPI cablato in libfprint core.
+
+G. Evidenza locale target-specific APP12509 per il valore fisico: **NESSUNA**.
+L'unica assegnazione trovata nel corpus è `Rockytkg/src/goodixgf.c:281`
+`fimg->ppmm = 500.0 / 25.4;`, con commento esplicito (righe 279-280) che il
+ppmm è "solo per display" e che SIGFM è insensibile alla risoluzione. Nessuna
+misura OEM, capture o dato target APP12509 fissa ppmm/DPI.
+
+H. Il contratto pipeline può essere dichiarato chiuso? NO per il full pipeline:
+`ppmm` è un prerequisito esplicito del prossimo boundary.
+
+```text
+LIBFPRINT_IMAGE_PPMM_FIELD=OBSERVED
+FPIMAGE_PPMM_INITIAL_VALUE=0.0
+FPIMAGE_PPMM_INITIALIZATION_PATH=NONE_IN_LIBFPRINT_CORE; DRIVER_WRITES_FIMG_PPMM_DIRECTLY
+LIBFPRINT_NBIS_CONSUMES_PPMM=VERIFIED
+NBIS_PPMM_CALLSITE=fp-image.c:370 -> get_minutiae -> combined_minutia_quality -> radius_pix=RADIUS_MM*ppmm
+NBIS_PPMM_SEMANTIC_ROLE=resolution-scaled minutia reliability neighborhood radius
+SIGFM_PPMM_CONSUMPTION=NO
+ROCKYTKG_GOODIX_PPMM_500DPI=THIRD_PARTY_CORROBORATION
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+TARGET_PPMM_EVIDENCE_CLASS=UNKNOWN
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
+NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+```
+
 ## Verifica
 
 - GCC C11 strict (`-Wall -Wextra -Werror -pedantic`): PASS.
 - Unit/KAT sintetici da Git root: PASS.
 - Stesso binario eseguito da `/tmp`: PASS.
 - Oggetto adapter `nm -u`: nessun simbolo indefinito, quindi nessuna dipendenza I/O/runtime esterna: PASS.
-- Regressioni `test_cleanroom`, `test_d267_04_image_no_check`, `test_d268_01_operator_kit`: 30/30 PASS.
+- Regressioni `test_cleanroom`, `test_d267_04_image_no_check`, `test_d268_01_operator_kit`: 29/30 PASS.
+  Osservazione residua (fuori scope corrective): `test_d268_01_operator_kit ::
+  test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed` fallisce in
+  questo ambiente (guard worktree-dirty non solleva); è pre-esistente, estraneo
+  al corrective ppmm e all'adapter (byte-identico) e non viene corretto qui.
 - `git diff --check`: PASS.
 - ASan/UBSan: SKIP, runtime linker non installati; non necessario per la closure.
 
@@ -138,13 +216,19 @@ reale è stato letto, scritto o incluso nel bundle.
 
 ```text
 NEXT_PRIMARY_BOUNDARY=LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE
+NEXT_BOUNDARY_PREREQUISITE=RESOLVE_OR_EXPLICITLY_BOUND_PPMM_SEMANTICS
+PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
+INTENSITY_QUANTIZATION_CONTRACT=CLOSED_OFFLINE
+FULL_FPIMAGE_PIPELINE_CONTRACT=NOT_YET_CLOSED
 ```
 
 La prossima attività deve integrare il seam in un vero `FpImage` locale e
 provare offline allocation/copy/lifetime e consegna alla pipeline rilevante.
-Orientation/polarity e quality/preprocessing restano rischi espliciti, ma non
-vengono risolti per supposizione in D269/01. Enrollment/matcher e repeated
-capture non sono ancora il confine immediato.
+Il full pipeline contract resta `NOT_YET_CLOSED` finché `FpImage::ppmm` non è
+risolto con evidenza target-specific APP12509 o esplicitamente bound come
+non risolto dal glue. Orientation/polarity e quality/preprocessing restano
+rischi espliciti, ma non vengono risolti per supposizione in D269/01.
+Enrollment/matcher e repeated capture non sono ancora il confine immediato.
 
 ```text
 D268_RETRY_AUTHORIZED=false
