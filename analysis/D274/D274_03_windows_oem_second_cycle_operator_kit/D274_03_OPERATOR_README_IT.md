@@ -7,7 +7,13 @@ offline. Non è approvato per una cattura reale.
 
 ```text
 D274_03_CORRECTIVE_IMPLEMENTED_OFFLINE=true
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_NOT_YET_EXECUTED
+D274_03_POWERSHELL51_ENCODING_CORRECTIVE=IMPLEMENTED_OFFLINE
+D274_03_PS1_ENCODING=UTF8_WITH_BOM
+D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
+D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
+D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
+D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
 D274_03_BASELINE_APPROVED=false
 APPROVED_FOR_CAPTURE=false
@@ -19,8 +25,15 @@ LIVE_EXECUTION=NOT_PERFORMED
 Il sorgente contiene un percorso futuro di cattura passiva, ma il file
 `D274_03_live_authority.json` distribuito ha tutti i gate a `false`. Il flag del
 launcher non sostituisce l'authority. Una futura esecuzione richiederà review,
-commit SHA completo approvato, HEAD esatto, live-critical set pulito e
+commit SHA completo approvato, HEAD esatto, branch `main`, live-critical set pulito e
 autorizzazione one-shot separata.
+
+La prima qualificazione nativa si è arrestata al parsing del runner di
+qualificazione su Windows PowerShell 5.1.26100.8655. Goodix era assente dal
+guest: nessun runtime del Kit, accesso USB o hardware è stato eseguito. La
+causa era l'encoding UTF-8 senza BOM degli script con testo italiano/non-ASCII.
+Tutti gli script PowerShell 5.1 del package sono ora UTF-8 con BOM; la
+qualificazione deve essere ripetuta integralmente e non è ancora PASS.
 
 ## Scopo limitato
 

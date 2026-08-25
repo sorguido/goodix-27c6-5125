@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+﻿# SPDX-License-Identifier: GPL-2.0-or-later
 # Collector metadata-only della qualificazione nativa D274/03.
 [CmdletBinding()]
 param([string]$ResultsDir = (Join-Path $PSScriptRoot "native_qualification_results"))

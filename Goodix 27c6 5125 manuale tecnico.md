@@ -6,6 +6,16 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
+Il branch Git canonico corrente è `main`. Il branch `development` è ritirato
+dalla policy operativa dopo l'allineamento completo del lavoro corrente su
+`main`; i riferimenti storici a esecuzioni e baseline avvenute su
+`development` restano invariati.
+
+```text
+GIT_CANONICAL_BRANCH=main
+DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
+```
+
 ### Stato corrente post-D274/03 corrective pre-live offline (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
@@ -314,8 +324,14 @@ sintetiche e capture storica D263 verificano rispettivamente PASS e
 Goodix assente, self-test, preflight, simulazione pre-authority, selector 5.1,
 gate same-run, contratto TShark/USBPcap, ACL/privacy/lingua e invocazione
 avversaria con authority false. Poiché l'host AI Linux non dispone di Windows
-PowerShell 5.1, questa run non è stata eseguita: la baseline approval resta
-bloccata fino alla qualificazione nativa e alla sua review.
+PowerShell 5.1, non può validare il runtime nativo. La prima invocazione nativa,
+su Windows PowerShell 5.1.26100.8655 e con Goodix assente, è fallita al parsing
+di `run-d274-03-native-qualification.ps1`, prima del runtime. La causa era il
+salvataggio UTF-8 senza BOM degli script con superficie italiana/non-ASCII;
+nessun hardware, accesso USB o runtime del Kit è stato eseguito. Tutti i cinque
+`.ps1` del package sono ora UTF-8 con BOM (`EF BB BF`). La qualificazione deve
+essere ripetuta integralmente e la baseline approval resta bloccata fino al suo
+PASS nativo e alla review AI-PM.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -323,8 +339,15 @@ D274_02_REOPEN_REQUIRED=false
 D274_02_MANUAL_HISTORICAL_STATE_CLEANUP=COMPLETED
 D274_03_CORRECTIVE_IMPLEMENTED_OFFLINE=true
 D274_03_OPERATOR_LANGUAGE=ITALIAN
-D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_NOT_YET_EXECUTED
+D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_ONLY
+D274_03_LIVE_BRANCH_GATE=main
+D274_03_POWERSHELL51_ENCODING_CORRECTIVE=IMPLEMENTED_OFFLINE
+D274_03_PS1_ENCODING=UTF8_WITH_BOM
+D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
+D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
+D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
+D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
 D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
@@ -1033,7 +1056,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D273/01 closure post-first-image + SIGFM reale | PARTIAL CLOSURE offline; live false; executable closure globale FAIL_NOT_AVAILABLE | dataflow up/down OEM chiuso: IRQ2 aggiorna up globale di sessione consumata da `0x34`, IRQ0200 aggiorna down consumata da re-arm `0x32`; packet 249 chiuso come A0 NAV `0x50` 2417/2410; modello corretto con source IRQ/generation e timestamp per transizione; seconda iterazione target e timeout non osservati; host e SDK senza OpenCV4-dev, vero `sigfm.cpp` non compilabile, nessuna installazione |
 | D274/01 Kit Windows/OEM pre-live | READY offline; hard-disabled; live false | sanitizer metadata-only, target/A8/hash/schema/privacy gate e fixture sintetica del secondo ciclo PASS; capture storica termina a ACK re-arm e resta `MISSING_SECOND_IRQ2`; workflow candidato no-commit, nessuna attribution retroattiva |
 | D274/02 qualificazione nativa Windows | CLOSED / PASS; tre run storiche preservate; live false | run 1 FAIL source-scan `-f`, run 2 FAIL `.Count` sotto PowerShell 5.1, run 3 PASS nativo completo dopo corrective; nessuna regressione tecnica e nessuna riapertura |
-| D274/03 Kit one-shot secondo ciclo | CORRECTIVE_IMPLEMENTED_OFFLINE; qualificazione nativa richiesta/non eseguita; baseline/capture/live false | gate assenza Goodix same-run prima di marker/capture, PIN esistente distinto da mutazioni, observer wire-driven sul secondo B0, raw finalizzato hash-gated con frame terminale recuperabile; 34 test offline PASS, package nativo innocuo pronto, D263 resta negativa; nessun hardware eseguito |
+| D274/03 Kit one-shot secondo ciclo | UTF-8 BOM corrective implementato offline; qualification nativa da ripetere; baseline/capture/live false | runner futuro vincolato a `main`; prima qualification su PowerShell 5.1.26100.8655 fallita al parsing pre-runtime con Goodix assente e hardware non toccato; tutti i `.ps1` ora UTF-8 BOM, gate assenza same-run/PIN/observer/finalizzazione invariati, D263 resta negativa |
 
 ## Fonti e confini di pubblicazione
 
@@ -5193,7 +5216,7 @@ Il workflow resta `WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT`: non attribuisce
 retroattivamente D263 a una UI nota. Il runner futuro invoca un solo processo
 TShark con USBPcap e deadline host-side 180 s; non contiene Python/libusb
 sensor-reaching. Prima della capture richiede authority separata con tre flag
-true, full SHA di 40 caratteri, HEAD e branch `development` esatti,
+true, full SHA di 40 caratteri, HEAD esatto e branch `main`,
 live-critical set pulito e uguale alla baseline, root privata non-reparse e
 marker atomico `CreateNew`. Prima del marker verifica inoltre, tramite
 `Get-PnpDevice -PresentOnly`, che il target esatto `VID_27C6&PID_5125` sia
@@ -5231,7 +5254,7 @@ per distinguere il B0 fingerprint strutturale già chiuso da D274/01/D274/02.
 
 #### Closure offline
 
-Il test D274/03 esegue 34 casi sintetici/avversari: success boundary; secondo
+Il test D274/03 esegue 36 casi sintetici/avversari: success boundary; secondo
 IRQ mancante/errato; secondo `0x22` mancante/duplicato; ACK echo/status errati;
 B0 malformato/classe errata; terzo ciclo; target ambiguo/re-enumerato; firmware
 errato; deadline; privacy/schema; authority non autorizzata; baseline stale;
@@ -5239,10 +5262,14 @@ marker riusato; ordine causale same-run; policy PIN; trigger growing esatto;
 trailing block incompleto; deadline observer; stop/finalizzazione bounded;
 perdita terminal evidence; raw vuoto/mancante/troncato; source contract passivo;
 ACL/privacy; lingua italiana; package nativo; manifest strict; regressione sulla
-capture storica D263. Tutti passano su Linux. Il runtime Windows PowerShell 5.1
-D274/03 non è disponibile su questo host: il package nativo innocuo è pronto ma
-non eseguito. Pertanto il PASS offline non qualifica PowerShell 5.1 e non può
-approvare la baseline.
+capture storica D263; BOM UTF-8, decodifica `utf-8-sig`, assenza di mojibake e
+hash del contenuto logico di ciascun `.ps1`. Tutti passano su Linux. La prima
+qualification nativa è fallita al parsing pre-runtime su Windows PowerShell
+5.1.26100.8655 perché gli script erano UTF-8 senza BOM; Goodix era assente e
+nessun hardware è stato toccato. Il corrective byte-level è ora applicato, ma
+il runtime Windows PowerShell 5.1 non è disponibile sull'host AI Linux.
+Pertanto il PASS offline non qualifica PowerShell 5.1: serve una ripetizione
+integrale nativa prima di qualunque approvazione baseline.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -5250,8 +5277,15 @@ D274_02_REOPEN_REQUIRED=false
 D274_02_MANUAL_HISTORICAL_STATE_CLEANUP=COMPLETED
 D274_03_CORRECTIVE_IMPLEMENTED_OFFLINE=true
 D274_03_OPERATOR_LANGUAGE=ITALIAN
-D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_NOT_YET_EXECUTED
+D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_ONLY
+D274_03_LIVE_BRANCH_GATE=main
+D274_03_POWERSHELL51_ENCODING_CORRECTIVE=IMPLEMENTED_OFFLINE
+D274_03_PS1_ENCODING=UTF8_WITH_BOM
+D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
+D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
+D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
+D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
 D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true

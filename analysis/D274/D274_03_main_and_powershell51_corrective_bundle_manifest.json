@@ -1,0 +1,49 @@
+{
+  "schema": "D274_03_MAIN_AND_POWERSHELL51_CORRECTIVE_BUNDLE_MANIFEST_V1",
+  "artifact": "D274_03_main_and_powershell51_corrective_bundle",
+  "step": "D274/03 main and PowerShell 5.1 corrective",
+  "bundle": "analysis/D274/D274_03_main_and_powershell51_corrective_bundle.zip",
+  "sidecar": "analysis/D274/D274_03_main_and_powershell51_corrective_bundle.zip.sha256",
+  "sidecar_is_external_to_zip": true,
+  "reference_full_head": "f0dcaebf240b981183ab826f95af31a30f4463e7",
+  "nature": "STEP_LOCAL_NON_CUMULATIVE_SANITIZED_AUDITABLE_BY_REFERENCE",
+  "review_set": [
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "analysis/D274/D274_03_main_and_powershell51_corrective_bundle_manifest.json",
+    "analysis/D274/D274_03_main_and_powershell51_corrective_execution_manifest.json",
+    "analysis/D274/D274_03_main_and_powershell51_corrective_report.md",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/D274_03_OPERATOR_README_IT.md",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/D274_03_kit_manifest.json",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/avvia-d274-03.ps1",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/collect-d274-03-native-qualification-results.ps1",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/collect-d274-03-results.ps1",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/invoke-d274-03-live-once.ps1",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/run-d274-03-native-qualification.ps1",
+    "analysis/D274/test_d274_03_second_cycle_operator_kit.py"
+  ],
+  "excluded": [
+    "raw capture and native qualification results",
+    "secret, PSK, PIN/account and TLS key material",
+    "image, raster, pixel and biometric material",
+    "firmware, DLL and proprietary binaries",
+    "historical unmodified artifacts",
+    "cache and temporary files",
+    "bundle sidecar"
+  ],
+  "bundle_checks": {
+    "zip_crc": "PASS",
+    "duplicates": 0,
+    "path_traversal": 0,
+    "unexpected_symlink": 0,
+    "sidecar_external": true
+  },
+  "safety": {
+    "live_execution": "NOT_PERFORMED",
+    "real_capture_count": 0,
+    "real_usb_open_count": 0,
+    "real_finger_interaction_count": 0,
+    "real_goodix_command_count": 0,
+    "automatic_retry_count": 0,
+    "persistent_device_write_count": 0
+  }
+}

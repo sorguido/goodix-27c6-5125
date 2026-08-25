@@ -18,6 +18,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit"
+POWERSHELL51_FILES = (
+    "avvia-d274-03.ps1",
+    "collect-d274-03-native-qualification-results.ps1",
+    "collect-d274-03-results.ps1",
+    "invoke-d274-03-live-once.ps1",
+    "run-d274-03-native-qualification.ps1",
+)
+POWERSHELL51_LOGICAL_SHA256 = {
+    "avvia-d274-03.ps1": "e7076090bf75cde7830a7d5184cf68308c58f75404eba03101419c4e6d15e370",
+    "collect-d274-03-native-qualification-results.ps1": "e618a2d76113b697113f1040fa6355ed6bc2b35883750291480a3b426cb8877b",
+    "collect-d274-03-results.ps1": "28df91e65990eeadfd33773ab4bfcabc81187c290fd18cee865b1ca510d17a56",
+    "invoke-d274-03-live-once.ps1": "8b882bfbce352bc9971fcce6ecdf07dd8a09446503d6a6b60c864069cf64aaae",
+    "run-d274-03-native-qualification.ps1": "7ecc625d4ff0723e3f14866076e0cf69294a5475cbc0e136baec013130547d0f",
+}
 MODULE = KIT / "d274_03_postprocess_second_cycle.py"
 SPEC = importlib.util.spec_from_file_location("d274_03_postprocessor", MODULE)
 assert SPEC is not None and SPEC.loader is not None
@@ -258,7 +272,8 @@ class D27403Tests(unittest.TestCase):
         self.assertIn("$head -ne $approvedSha", runner)
         self.assertIn("git -C $RepositoryRoot diff --quiet $approvedSha -- @critical", runner)
         self.assertIn("git -C $RepositoryRoot status --porcelain -- @critical", runner)
-        self.assertIn('$branch -ne "development"', runner)
+        self.assertIn('$branch -ne "main"', runner)
+        self.assertNotIn('$branch -ne "development"', runner)
 
     def test_18_reused_marker_fail_closed_and_no_retry(self):
         runner = (KIT / "invoke-d274-03-live-once.ps1").read_text()
@@ -498,6 +513,27 @@ class D27403Tests(unittest.TestCase):
             self.assertIn(forbidden_key, collectors)
         signal_keys = D274.inspect_growing_capture.__doc__
         self.assertIn("metadata-only", signal_keys)
+
+    def test_35_powershell51_sources_are_utf8_with_bom_and_intact(self):
+        mojibake_markers = ("\ufffd", "\u00c3", "\u00c2", "\u00e2\u20ac", "\u00ef\u00bb\u00bf")
+        for name in POWERSHELL51_FILES:
+            raw = (KIT / name).read_bytes()
+            self.assertTrue(raw.startswith(b"\xef\xbb\xbf"), name)
+            source = raw.decode("utf-8-sig")
+            self.assertTrue(any(ord(char) > 127 for char in source), name)
+            for marker in mojibake_markers:
+                self.assertNotIn(marker, source, name)
+
+    def test_36_powershell51_logical_content_matches_corrective_contract(self):
+        for name, expected in POWERSHELL51_LOGICAL_SHA256.items():
+            source = (KIT / name).read_bytes().decode("utf-8-sig")
+            actual = hashlib.sha256(source.encode("utf-8")).hexdigest()
+            self.assertEqual(actual, expected, name)
+
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text(
+            encoding="utf-8-sig")
+        self.assertIn('$branch -ne "main"', runner)
+        self.assertNotIn('$branch -ne "development"', runner)
 
 
 if __name__ == "__main__":

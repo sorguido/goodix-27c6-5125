@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+﻿# SPDX-License-Identifier: GPL-2.0-or-later
 # Percorso futuro live D274/03: cattura passiva USBPcap/TShark, nessun comando Goodix.
 [CmdletBinding()]
 param(
@@ -140,7 +140,7 @@ if ($authorizationId -notmatch '^[A-Za-z0-9_-]{12,80}$') { Fail-D274Live "identi
 $head = (& git -C $RepositoryRoot rev-parse HEAD 2>&1 | Select-Object -First 1).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -ne $approvedSha) { Fail-D274Live "HEAD diverso dalla baseline approvata" }
 $branch = (& git -C $RepositoryRoot branch --show-current 2>&1 | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0 -or $branch -ne "development") { Fail-D274Live "branch diversa da development" }
+if ($LASTEXITCODE -ne 0 -or $branch -ne "main") { Fail-D274Live "branch diversa da main" }
 
 $critical = @(
     "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/avvia-d274-03.ps1",

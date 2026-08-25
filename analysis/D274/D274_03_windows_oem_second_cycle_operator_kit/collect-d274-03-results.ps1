@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+﻿# SPDX-License-Identifier: GPL-2.0-or-later
 # Collector metadata-only D274/03, compatibile con Windows PowerShell 5.1.
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$SanitizedRunDirectory)

@@ -1,0 +1,92 @@
+# D274/03 corrective — `main` e PowerShell 5.1 UTF-8 BOM
+
+```text
+OUTCOME=READY_FOR_AI_PM_REVIEW — OFFLINE_CORRECTIVE_COMPLETE;NATIVE_RETRY_REQUIRED
+ADVANCEMENT=QUALIFICATION_STATE_CORRECTED_AND_OFFLINE_REGRESSION_EVIDENCE;NO_DEVICE_SIDE_ADVANCEMENT
+EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_CORRECTIVE;WINDOWS_POWERSHELL_5_1_NATIVE_RETRY_REQUIRED
+RESIDUAL_BLOCKER_OR_RISK=BASELINE_APPROVAL_BLOCKED_PENDING_FULL_NATIVE_QUALIFICATION_RETRY
+CANONICAL_DOCUMENTATION=UPDATED — MAIN_BRANCH_POLICY,PARSE_FAILURE,UTF8_BOM,NATIVE_RETRY_STATE
+BUNDLE=analysis/D274/D274_03_main_and_powershell51_corrective_bundle.zip
+
+GIT_CANONICAL_BRANCH=main
+DEVELOPMENT_BRANCH_POLICY=RETIRED
+D274_03_LIVE_BRANCH_GATE=main
+D274_03_POWERSHELL51_ENCODING_CORRECTIVE=PASS_OFFLINE
+D274_03_PS1_ENCODING=UTF8_WITH_BOM
+D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
+D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
+D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
+D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
+```
+
+## Correzione applicata
+
+Il runner futuro rifiuta ogni branch diverso da `main`. Il gate full SHA,
+HEAD, live-critical set, authority, privacy e marker one-shot resta invariato.
+I riferimenti storici a esecuzioni su `development` non sono stati riscritti.
+
+Tutti i cinque `.ps1` del Kit D274/03 iniziano ora con `EF BB BF` e si
+decodificano come `utf-8-sig`. Il confronto con HEAD prova che quattro script
+sono logicamente byte-identici dopo la rimozione del BOM; nel runner le sole
+variazioni logiche sono `development -> main` nel confronto e nel messaggio di
+errore. Test dedicati verificano BOM, decodifica, presenza di testo non-ASCII,
+assenza di mojibake e SHA-256 del contenuto logico.
+
+## Qualification e safety
+
+La prima qualification nativa è fallita al parsing di
+`run-d274-03-native-qualification.ps1` su Windows PowerShell 5.1.26100.8655.
+Goodix era assente; il runtime non è iniziato e nessun hardware è stato
+toccato. Il corrective non costituisce un PASS nativo: la qualification deve
+essere ripetuta integralmente.
+
+```text
+BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
+D274_03_BASELINE_APPROVED=false
+APPROVED_FOR_CAPTURE=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+REAL_CAPTURE_COUNT=0
+REAL_USB_OPEN_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_GOODIX_COMMAND_COUNT=0
+AUTOMATIC_RETRY_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+```
+
+## Verifica offline
+
+```text
+D274_03_TESTS=PASS_36_OF_36
+D274_POSTPROCESS_MULTIFRAME_TESTS=PASS_30_OF_30
+HISTORICAL_PRIVATE_CAPTURE_REGRESSION=PASS_EXPECTED_MISSING_SECOND_IRQ2
+POWERSHELL51_BOM_CHECK=PASS_5_OF_5
+POWERSHELL51_UTF8_SIG_DECODE=PASS_5_OF_5
+POWERSHELL51_LOGICAL_CONTENT_AUDIT=PASS
+PYTHON_COMPILE=PASS
+JSON_VALIDATION=PASS
+OBSERVER_CLI_HELP=PASS
+POSTPROCESSOR_CLI_HELP=PASS
+GIT_DIFF_CHECK=PASS
+WINDOWS_POWERSHELL_5_1_NATIVE_RUNTIME=NOT_AVAILABLE_ON_LINUX_HOST
+```
+
+## Git e bundle
+
+```text
+initial_branch=main
+initial_full_head=f0dcaebf240b981183ab826f95af31a30f4463e7
+final_branch=main
+final_head=f0dcaebf240b981183ab826f95af31a30f4463e7
+commit_created=false
+git_status=DIRTY_EXPECTED_D274_03_MAIN_POWERSHELL51_CORRECTIVE_ONLY
+unexpected_files=NONE
+ZIP_CRC=PASS
+duplicates=0
+path_traversal=0
+unexpected_symlink=0
+sidecar_external=true
+```

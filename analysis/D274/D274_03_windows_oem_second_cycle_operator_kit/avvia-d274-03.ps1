@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+﻿# SPDX-License-Identifier: GPL-2.0-or-later
 # Launcher D274/03 compatibile con Windows PowerShell Desktop 5.1.
 [CmdletBinding()]
 param(

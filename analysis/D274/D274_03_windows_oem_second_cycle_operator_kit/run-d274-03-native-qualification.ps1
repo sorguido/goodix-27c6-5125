@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+﻿# SPDX-License-Identifier: GPL-2.0-or-later
 # Qualificazione OFFLINE innocua D274/03 per Windows PowerShell Desktop 5.1.
 [CmdletBinding()]
 param()
