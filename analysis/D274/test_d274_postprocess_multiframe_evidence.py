@@ -7,11 +7,19 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 import struct
 import sys
 import tempfile
 import unittest
+import copy
 from pathlib import Path
+
+try:
+    import jsonschema  # type: ignore
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    JSONSCHEMA_AVAILABLE = False
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,9 +41,47 @@ def a0(control: int, body: bytes = b"") -> bytes:
     return raw[:1] + declared.to_bytes(2, "little") + raw[3:]
 
 
-def b0() -> bytes:
-    body = b"\x17\x03\x03" + bytes(29)
+def b0(total_outer_length: int = 7726) -> bytes:
+    # Fingerprint-image B0: device-to-host outer 0xB0, total outer 7726 bytes,
+    # carrying a TLS application-data record (17 03 03) whose declared length
+    # (network byte order / big-endian) plus the 5-byte record header equals the
+    # declared B0 length (7722). Goodix B0 outer length stays little-endian.
+    declared_b0 = total_outer_length - 4
+    tls_inner_len = declared_b0 - 5
+    tls = b"\x17\x03\x03" + tls_inner_len.to_bytes(2, "big") + bytes(tls_inner_len)
+    return b"\xB0" + declared_b0.to_bytes(2, "little") + b"\x00" + tls
+
+
+def b0_alert() -> bytes:
+    # Short B0 carrying a TLS alert (15 03 03); structurally NOT a fingerprint.
+    body = b"\x15\x03\x03" + (2).to_bytes(2, "big") + b"\x02\x01"
     return b"\xB0" + len(body).to_bytes(2, "little") + b"\x00" + body
+
+
+def b0_wrong_length(total_outer_length: int = 4000) -> bytes:
+    declared_b0 = total_outer_length - 4
+    tls_inner_len = declared_b0 - 5
+    tls = b"\x17\x03\x03" + tls_inner_len.to_bytes(2, "big") + bytes(tls_inner_len)
+    return b"\xB0" + declared_b0.to_bytes(2, "little") + b"\x00" + tls
+
+
+def b0_incoherent_tls_length() -> bytes:
+    # Total outer 7726 / declared 7722 but TLS declared length off by one.
+    declared_b0 = 7722
+    tls_inner_len = declared_b0 - 5 - 1
+    tls = b"\x17\x03\x03" + tls_inner_len.to_bytes(2, "big") + bytes(tls_inner_len + 1)
+    return b"\xB0" + declared_b0.to_bytes(2, "little") + b"\x00" + tls
+
+
+def b0_little_endian_tls(total_outer_length: int = 7726) -> bytes:
+    # Intentionally WRONG: a synthetic fixture that encodes the TLS record length
+    # in little-endian (17 03 03 25 1e) while the record layer is big-endian.
+    # This must NOT be accepted as a fingerprint B0; it guards against the
+    # synthetic fixture redefining TLS semantics.
+    declared_b0 = total_outer_length - 4
+    tls_inner_len = declared_b0 - 5
+    tls = b"\x17\x03\x03" + tls_inner_len.to_bytes(2, "little") + bytes(tls_inner_len)
+    return b"\xB0" + declared_b0.to_bytes(2, "little") + b"\x00" + tls
 
 
 def nav(control: int = 0x50) -> bytes:
@@ -102,6 +148,114 @@ def canonical_frames() -> list[tuple[str, bytes, int]]:
         ("second_0x22_ack", a0(0xB0, b"\x22\x01"), 0x81),
         ("second_b0", b0(), 0x81),
     ]
+
+
+def _load_schema() -> dict:
+    return json.loads((ROOT / "analysis/D274/D274_01_evidence_schema.json").read_text())
+
+
+def _local_validate(document: dict, schema: dict) -> None:
+    """Strict local JSON-Schema validator for the D274 evidence subset.
+
+    It does not depend on the jsonschema library and fails closed on any
+    additional property or type/constraint violation inside frame metadata.
+    """
+    defs = schema.get("$defs", {})
+
+    def resolve(subschema: dict) -> dict:
+        while "$ref" in subschema:
+            name = subschema["$ref"].rpartition("/")[2]
+            subschema = defs[name]
+        return subschema
+
+    def validate(node, subschema) -> None:
+        subschema = resolve(subschema)
+        if "enum" in subschema:
+            if node not in subschema["enum"]:
+                raise D274.EvidenceError("SCHEMA_ENUM")
+            return
+        if "const" in subschema:
+            if node != subschema["const"]:
+                raise D274.EvidenceError("SCHEMA_CONST")
+            return
+        if "anyOf" in subschema:
+            ok = False
+            for sub in subschema["anyOf"]:
+                try:
+                    validate(node, sub)
+                    ok = True
+                    break
+                except D274.EvidenceError:
+                    continue
+            if not ok:
+                raise D274.EvidenceError("SCHEMA_ANYOF")
+            return
+        t = subschema.get("type")
+        types = t if isinstance(t, list) else ([t] if t is not None else [])
+        if types and not any(_schema_type_matches(node, tt) for tt in types):
+            raise D274.EvidenceError("SCHEMA_TYPE")
+        if isinstance(node, dict):
+            ap = subschema.get("additionalProperties", True)
+            allowed = set(subschema.get("properties", {}))
+            for key in node:
+                if key not in allowed:
+                    if ap is False:
+                        raise D274.EvidenceError("SCHEMA_ADDITIONAL_PROPERTY")
+                    if isinstance(ap, dict):
+                        validate(node[key], ap)
+            for req in subschema.get("required", []):
+                if req not in node:
+                    raise D274.EvidenceError("SCHEMA_REQUIRED")
+            for key, prop in subschema.get("properties", {}).items():
+                if key in node:
+                    validate(node[key], prop)
+            return
+        if isinstance(node, str):
+            if "pattern" in subschema and not re.fullmatch(subschema["pattern"], node):
+                raise D274.EvidenceError("SCHEMA_PATTERN")
+            return
+        if isinstance(node, bool):
+            return
+        if isinstance(node, (int, float)):
+            return
+        if node is None:
+            return
+        if isinstance(node, list):
+            return
+        raise D274.EvidenceError("SCHEMA_UNHANDLED")
+    validate(document, schema)
+
+
+def _schema_type_matches(node, t: str) -> bool:
+    if t == "object":
+        return isinstance(node, dict)
+    if t == "string":
+        return isinstance(node, str)
+    if t == "integer":
+        return isinstance(node, int) and not isinstance(node, bool)
+    if t == "number":
+        return isinstance(node, (int, float)) and not isinstance(node, bool)
+    if t == "boolean":
+        return isinstance(node, bool)
+    if t == "null":
+        return node is None
+    if t == "array":
+        return isinstance(node, list)
+    return False
+
+
+def _validate_instance_ok(document: dict, schema: dict) -> bool:
+    if JSONSCHEMA_AVAILABLE:
+        try:
+            jsonschema.validate(document, schema)
+            return True
+        except jsonschema.ValidationError:
+            return False
+    try:
+        _local_validate(document, schema)
+        return True
+    except D274.EvidenceError:
+        return False
 
 
 def make_capture(mutator=None, duration_scale: float = 1.0,
@@ -229,7 +383,8 @@ class D274Tests(unittest.TestCase):
 
     def test_17_malformed_b0(self):
         def mutate(frames):
-            bad = bytearray(b0()); bad[1:3] = (100).to_bytes(2, "little")
+            bad = bytearray(b0())
+            bad[1:3] = (len(bad) + 50).to_bytes(2, "little")
             return replace_label(frames, "second_b0", bytes(bad), 0x81)
         self.assertEqual(self.failure(make_capture(mutate)), "MALFORMED_B0")
 
@@ -269,16 +424,215 @@ class D274Tests(unittest.TestCase):
     def test_22_schema_and_powershell_static_contract(self):
         schema = json.loads((ROOT / "analysis/D274/D274_01_evidence_schema.json").read_text())
         self.assertIn("second_b0_frame", schema["required"])
+        self.assertIn("frameMetadata", schema.get("$defs", {}))
+        self.assertFalse(schema["$defs"]["frameMetadata"]["additionalProperties"])
         script = (ROOT / "operator_kit/d274-windows-multiframe-evidence.ps1").read_text()
+        script_lower = script.lower()
         self.assertIn("$script:D274RealCaptureCapability = 0", script)
         self.assertIn("$script:D274HardDisabled = $true", script)
         self.assertIn("HARD_DISABLED_D274_01", script)
         self.assertNotIn("Start-Process", script)
         self.assertNotIn(" -w ", script)
+        # Privacy contract: ACL evaluable, no reparse/junction/symlink, no ACL mutation.
+        self.assertIn("get-acl", script_lower)
+        self.assertIn("reparsepoint", script_lower)
+        # D274 Defect B: ACL privacy must not depend on AceType; it must use
+        # AccessControlType, normalize identity to a SID via Translate, reject
+        # Read/ReadAndExecute too, and enumerate the four canonical well-known
+        # SIDs. Nominal principal names are not robust on localized Windows.
+        self.assertNotIn(".acetype", script_lower)
+        self.assertIn("accesscontroltype", script_lower)
+        self.assertIn("[system.security.accesscontrol.filesystemrights]::read", script_lower)
+        self.assertIn("translate(", script_lower)
+        self.assertIn("securityidentifier", script_lower)
+        for sid in ("S-1-1-0", "S-1-5-32-545", "S-1-5-11", "S-1-5-32-546"):
+            self.assertIn(sid, script)
+        self.assertNotIn("set-acl", script_lower)
+        self.assertNotIn("icacls", script_lower)
+        self.assertIn("output_root_privacy", script_lower)
         parameters = script.split("param(", 1)[1].split(")", 1)[0]
         for name in ("SelfTestOnly", "PreflightOnly", "PreAuthorizationSimulationOnly",
                      "IUnderstandAndAuthorizeOneD274WindowsMultiframeCapture"):
             self.assertIn("$" + name, parameters)
+
+    def _historical_sanitized(self) -> dict:
+        p = ROOT / "analysis/D230/work/GoodixExport/rilevamento.pcapng"
+        data = p.read_bytes()
+        return D274.process_capture(p, hashlib.sha256(data).hexdigest(),
+                                    "SYNTHETIC", origin="SYNTHETIC")
+
+    def test_23_generic_b0_is_not_fingerprint(self):
+        # Positive: a correctly shaped fingerprint B0 closes the second cycle.
+        result = self.run_capture(make_capture())
+        self.assertIsNone(result["failure_class"])
+        # Negative 1: short TLS-alert B0 after the second 0x22 ACK must NOT close.
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0_alert(), 0x81))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        # Negative 2: TLS app-data B0 with wrong total length must NOT close.
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0_wrong_length(4000), 0x81))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        # Negative 3: 7726-byte B0 with incoherent TLS declared length fails closed.
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0_incoherent_tls_length(), 0x81))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        # Negative 4: host->device B0 in the second-image position fails closed.
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0(), 0x01))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        # The generic-B0 shape also fails for the first and post-up positions.
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "first_image_b0", b0_alert(), 0x81))),
+            "FIRST_B0_NOT_FINGERPRINT_SHAPE")
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "post_up_b0", b0_alert(), 0x81))),
+            "POST_UP_B0_NOT_FINGERPRINT_SHAPE")
+
+    def test_24_classify_b0_direct(self):
+        fp = D274.Frame(0, 0.0, 1, 2, "device_to_host", 0x81, 0xB0,
+                        b0(), len(b0()))
+        self.assertEqual(D274.classify_b0(fp), "FINGERPRINT_B0")
+        alert = D274.Frame(0, 0.0, 1, 2, "device_to_host", 0x81, 0xB0,
+                           b0_alert(), len(b0_alert()))
+        self.assertEqual(D274.classify_b0(alert), "B0_OTHER")
+        host = D274.Frame(0, 0.0, 1, 2, "host_to_device", 0x01, 0xB0,
+                          b0(), len(b0()))
+        self.assertEqual(D274.classify_b0(host), "B0_OTHER")
+
+    def test_25_credential_mutation_ui_terminal(self):
+        with tempfile.TemporaryDirectory(prefix="d274-markers-") as directory:
+            marker = Path(directory) / "markers.tsv"
+            marker.write_text("timestamp_utc\tevent\n"
+                              "2026-01-01T00:00:00Z\tPREFLIGHT_COMPLETE\n"
+                              "2026-01-01T00:00:01Z\tCREDENTIAL_MUTATION_UI\n", encoding="utf-8")
+            self.assertEqual(self.failure_with_markers(make_capture(), marker),
+                             "UI_TERMINAL_CONDITION")
+
+    def test_26_unknown_marker_fail_closed(self):
+        with tempfile.TemporaryDirectory(prefix="d274-markers-") as directory:
+            marker = Path(directory) / "markers.tsv"
+            marker.write_text("timestamp_utc\tevent\n"
+                              "2026-01-01T00:00:00Z\tPREFLIGHT_COMPLETE\n"
+                              "2026-01-01T00:00:01Z\tSOMETHING_UNKNOWN\n", encoding="utf-8")
+            self.assertEqual(self.failure_with_markers(make_capture(), marker),
+                             "UNKNOWN_MARKER")
+
+    def test_27_schema_instance_validation(self):
+        schema = _load_schema()
+        happy = self.run_capture(make_capture())
+        self.assertTrue(_validate_instance_ok(happy, schema))
+        historical = self._historical_sanitized()
+        self.assertTrue(_validate_instance_ok(historical, schema))
+        # Negative: extra arbitrary property inside a frame metadata object.
+        bad_raw = copy.deepcopy(happy)
+        bad_raw["second_b0_frame"]["raw"] = "deadbeef"
+        self.assertFalse(_validate_instance_ok(bad_raw, schema))
+        # Negative: wrong type on a required scalar.
+        bad_type = copy.deepcopy(happy)
+        bad_type["target_vid"] = 27
+        self.assertFalse(_validate_instance_ok(bad_type, schema))
+        # Negative: missing required field.
+        bad_missing = copy.deepcopy(happy)
+        del bad_missing["second_b0_frame"]
+        self.assertFalse(_validate_instance_ok(bad_missing, schema))
+
+
+    def test_28_tls_record_length_endianness(self):
+        # The TLS record length is network byte order (big-endian), distinct from
+        # the Goodix B0 outer length which is little-endian. The realistic header
+        # 17 03 03 1e 25 (7717 = 0x1e25) must close as FINGERPRINT_B0; the
+        # little-endian-encoded variant 17 03 03 25 1e must NOT, so a synthetic
+        # fixture cannot redefine TLS semantics.
+        declared_b0 = 7722
+        tls_inner = declared_b0 - 5
+        base = b"\xB0" + declared_b0.to_bytes(2, "little") + b"\x00" + b"\x17\x03\x03"
+        big = D274.Frame(0, 0.0, 1, 2, "device_to_host", 0x81, 0xB0,
+                         base + tls_inner.to_bytes(2, "big") + bytes(tls_inner),
+                         declared_b0 + 4)
+        self.assertEqual(big.raw[4:9], b"\x17\x03\x03\x1e\x25")
+        self.assertEqual(D274.classify_b0(big), "FINGERPRINT_B0")
+        little = D274.Frame(0, 0.0, 1, 2, "device_to_host", 0x81, 0xB0,
+                            base + tls_inner.to_bytes(2, "little") + bytes(tls_inner),
+                            declared_b0 + 4)
+        self.assertEqual(D274.classify_b0(little), "B0_OTHER")
+        # Fixture-level: the little-endian TLS fixture must not close either.
+        le = b0_little_endian_tls()
+        le_frame = D274.Frame(0, 0.0, 1, 2, "device_to_host", 0x81, 0xB0, le, len(le))
+        self.assertEqual(D274.classify_b0(le_frame), "B0_OTHER")
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0_little_endian_tls(), 0x81))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        # Negative controls still hold.
+        self.assertEqual(D274.classify_b0(D274.Frame(
+            0, 0.0, 1, 2, "device_to_host", 0x81, 0xB0, b0_alert(), len(b0_alert()))),
+            "B0_OTHER")
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0_wrong_length(4000), 0x81))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0_incoherent_tls_length(), 0x81))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+        self.assertEqual(self.failure(make_capture(
+            lambda f: replace_label(f, "second_b0", b0(), 0x01))),
+            "SECOND_B0_NOT_FINGERPRINT_SHAPE")
+
+    def test_29_local_validator_integer_vs_number(self):
+        # Force the local strict validator (independent of jsonschema presence).
+        schema = _load_schema()
+        happy = self.run_capture(make_capture())
+        try:
+            _local_validate(happy, schema)
+        except D274.EvidenceError:
+            self.fail("local strict validator rejected a valid document")
+        # Positive type cases: integer frame and float relative_timestamp_ms.
+        self.assertIsInstance(happy["second_b0_frame"]["frame"], int)
+        self.assertIsInstance(happy["second_b0_frame"]["relative_timestamp_ms"], float)
+        # Negative: float where schema requires integer must be rejected.
+        neg_float = copy.deepcopy(happy)
+        neg_float["second_b0_frame"]["frame"] = 1.5
+        with self.assertRaises(D274.EvidenceError):
+            _local_validate(neg_float, schema)
+        # Negative: non-integer physical length must be rejected.
+        neg_len = copy.deepcopy(happy)
+        neg_len["second_b0_frame"]["physical_length"] = 7726.5
+        with self.assertRaises(D274.EvidenceError):
+            _local_validate(neg_len, schema)
+        # Negative: string where schema requires integer must be rejected.
+        neg_decl = copy.deepcopy(happy)
+        neg_decl["second_b0_frame"]["declared_outer_length"] = "7726"
+        with self.assertRaises(D274.EvidenceError):
+            _local_validate(neg_decl, schema)
+        # Negative: extra (private) property inside a frame must be rejected.
+        neg_extra = copy.deepcopy(happy)
+        neg_extra["second_b0_frame"]["raw"] = "deadbeef"
+        with self.assertRaises(D274.EvidenceError):
+            _local_validate(neg_extra, schema)
+        # Negative: missing required field inside a frame must be rejected.
+        neg_missing = copy.deepcopy(happy)
+        neg_missing["second_b0_frame"].pop("direction")
+        with self.assertRaises(D274.EvidenceError):
+            _local_validate(neg_missing, schema)
+
+    def test_30_runtime_evidence_contract_validation(self):
+        # The production module enforces a fail-closed structural contract before
+        # serialization (Section 5), with strict integer typing and a privacy
+        # forbid-list.
+        result = self.run_capture(make_capture())
+        try:
+            D274.validate_evidence_document_strict(result)
+        except D274.EvidenceError:
+            self.fail("runtime strict evidence contract rejected a valid document")
+        # Float where schema requires integer must fail closed before serialization.
+        bad_int = copy.deepcopy(result)
+        bad_int["second_b0_frame"]["frame"] = 1.5
+        with self.assertRaises(D274.EvidenceError):
+            D274.validate_evidence_document_strict(bad_int)
+        # A forbidden privacy-sensitive field must fail closed.
+        bad_priv = copy.deepcopy(result)
+        bad_priv["second_b0_frame"]["raw"] = "deadbeef"
+        with self.assertRaises(D274.EvidenceError):
+            D274.validate_evidence_document_strict(bad_priv)
 
 
 if __name__ == "__main__":

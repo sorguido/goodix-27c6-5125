@@ -50,10 +50,55 @@ function Get-D274TsharkPath {
 }
 
 function Test-D274PrivateOutputRoot([string]$Root) {
+    # Fail-closed privacy contract for the future fingerprint-raw destination.
+    # A writable root is NOT sufficient: it must also be private. This check
+    # never mutates ACLs, junctions or symlinks (D274/01 stays pre-live).
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
         New-Item -ItemType Directory -Path $Root -Force | Out-Null
     }
-    $probe = Join-Path $Root (".d274-write-probe-{0}" -f [Guid]::NewGuid().ToString("N"))
+    $item = Get-Item -LiteralPath $Root -ErrorAction Stop
+    $resolved = $item.FullName
+    # Reparse points, junctions and symlinks are not accepted as private roots.
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        return $false
+    }
+    # Canonical location: <repository-root>\captures exactly.
+    $repository = Get-D274RepositoryRoot
+    $expected = Join-Path $repository "captures"
+    if ($resolved.TrimEnd("\").ToLower() -ne $expected.TrimEnd("\").ToLower()) {
+        return $false
+    }
+    # ACL must be evaluable and must not grant read/write/modify/full-control to
+    # generic well-known principals. Host administrative principals (SYSTEM,
+    # Administrators) and the current user remain allowed per host policy. The
+    # Read right is included because ReadAndExecute/ReadData are granted through
+    # it; the band check therefore intercepts them too. Identity is normalized to
+    # a SID so the check is robust on localized Windows builds. A SID
+    # translation failure is fail-closed (the root is not accepted as private).
+    $acl = $null
+    try { $acl = Get-Acl -Path $resolved -ErrorAction Stop } catch { return $false }
+    if ($null -eq $acl) { return $false }
+    $wellKnownSids = @(
+        "S-1-1-0",       # Everyone
+        "S-1-5-32-545",  # BUILTIN\Users
+        "S-1-5-11",      # Authenticated Users
+        "S-1-5-32-546"   # Guests
+    )
+    $badRights = ([System.Security.AccessControl.FileSystemRights]::Read) -bor
+                 ([System.Security.AccessControl.FileSystemRights]::Write) -bor
+                 ([System.Security.AccessControl.FileSystemRights]::Modify) -bor
+                 ([System.Security.AccessControl.FileSystemRights]::FullControl)
+    foreach ($ace in $acl.Access) {
+        if ($ace.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+        if (($ace.FileSystemRights -band $badRights) -eq 0) { continue }
+        try {
+            $sid = $ace.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier])
+        } catch {
+            return $false  # FAIL_CLOSED: SID translation failed
+        }
+        if ($wellKnownSids -contains $sid.Value) { return $false }
+    }
+    $probe = Join-Path $resolved (".d274-write-probe-{0}" -f [Guid]::NewGuid().ToString("N"))
     try {
         [System.IO.File]::WriteAllText($probe, "offline-preflight")
         return (Test-Path -LiteralPath $probe -PathType Leaf)
@@ -131,7 +176,9 @@ function Invoke-D274Preflight {
     }
     $targets = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match $script:ExpectedTarget })
     if ($targets.Count -ne 0) { Fail-D274 "Goodix must be absent from guest before capture" }
-    if (-not (Test-D274PrivateOutputRoot -Root $captureRoot)) { Fail-D274 "private output root not writable" }
+    if (-not (Test-D274PrivateOutputRoot -Root $captureRoot)) {
+        Fail-D274 "private output root privacy/accessibility contract failed"
+    }
     if (Test-Path -LiteralPath $conflictMarker) { Fail-D274 "conflicting D274 marker exists" }
     if (-not (Test-Path -LiteralPath $postprocessor -PathType Leaf)) {
         Fail-D274 "offline postprocessor unavailable"
@@ -149,6 +196,7 @@ function Invoke-D274Preflight {
         single_target_after_attach_gate = "DEFINED_NOT_EXECUTED_PRELIVE"
         output_root = $captureRoot
         output_root_private_writable = $true
+        output_root_privacy = "PASS_PRIVATE_CONTRACT"
         conflicting_marker = $false
         utc_marker = $utc
         host_capture_deadline_seconds = $script:HostCaptureDeadlineSeconds

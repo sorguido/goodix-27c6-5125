@@ -47,6 +47,28 @@
     "failure_class": {"type": ["string", "null"]}
   },
   "$defs": {
-    "frameOrNull": {"anyOf": [{"type": "null"}, {"type": "object"}]}
+    "frameMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame", "direction", "outer_wrapper", "physical_length",
+        "declared_outer_length", "relative_timestamp_ms"
+      ],
+      "properties": {
+        "frame": {"type": "integer"},
+        "direction": {"enum": ["host_to_device", "device_to_host"]},
+        "outer_wrapper": {"type": "string", "pattern": "^0x[0-9a-f]{2}$"},
+        "physical_length": {"type": "integer"},
+        "declared_outer_length": {"type": "integer"},
+        "relative_timestamp_ms": {"type": "number"},
+        "declared_b0_length": {"type": "integer"},
+        "tls_record_type_class": {"enum": ["TLS_APPLICATION_DATA", "UNKNOWN"]},
+        "cycle_association": {
+          "enum": ["FIRST_CYCLE_FINGERPRINT", "FIRST_CYCLE_POST_UP",
+                   "SECOND_CYCLE_FINGERPRINT"]
+        }
+      }
+    },
+    "frameOrNull": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/frameMetadata"}]}
   }
 }

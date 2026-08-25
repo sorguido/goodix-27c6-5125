@@ -223,10 +223,30 @@ D274_POSTPROCESSOR_STATUS=PASS_OFFLINE_HASH_GATED_SANITIZED
 D274_EVIDENCE_SCHEMA_STATUS=PASS
 D274_SYNTHETIC_SECOND_CYCLE_FIXTURE=PASS
 D274_PRIVACY_CONTRACT=PASS_METADATA_ONLY_NO_B0_CONTENT
+D274_FINGERPRINT_B0_CONTRACT=CLOSED_OFFLINE_STRUCTURAL_7726_TLS_APPLICATION_DATA
+D274_GENERIC_B0_AS_FINGERPRINT_ACCEPTED=false
+D274_OUTPUT_ROOT_PRIVACY_CONTRACT=CLOSED_OFFLINE_PREFLIGHT_POLICY
+D274_CREDENTIAL_MUTATION_UI_TERMINAL=true
+D274_UNKNOWN_MARKER_ACCEPTED=false
+D274_FRAME_METADATA_SCHEMA=STRICT_ADDITIONAL_PROPERTIES_FALSE
+D274_SCHEMA_INSTANCE_VALIDATION=PASS
+D274_TLS_RECORD_LENGTH_ENDIAN=BIG_ENDIAN_NETWORK_ORDER
+D274_GOODIX_B0_LENGTH_ENDIAN=LITTLE_ENDIAN
+D274_REALISTIC_TLS_HEADER_1703031E25_ACCEPTED=true
+D274_SYNTHETIC_LITTLE_ENDIAN_TLS_LENGTH_ACCEPTED=false
+D274_TLS_ALERT_B0_AS_FINGERPRINT_ACCEPTED=false
+D274_WRONG_LENGTH_B0_AS_FINGERPRINT_ACCEPTED=false
+D274_OUTPUT_ROOT_PRIVACY_POLICY_SOURCE_CONTRACT=PASS
+D274_BROAD_ACL_READ_ACCEPTED=false
+D274_ACL_ALLOW_DISCRIMINATOR=AccessControlType
+D274_ACL_IDENTITY_NORMALIZATION=SecurityIdentifier
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_AVAILABLE
+D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
+D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
 D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_PRELIVE_KIT
-NEXT_BOUNDARY_PREREQUISITE=REVIEW_AND_SEPARATE_EXPLICIT_LIVE_BASELINE_APPROVAL_AND_ONE_RUN_AUTHORIZATION
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_CORRECTIVE
+NEXT_BOUNDARY_PREREQUISITE=CORRECTIVE_REVIEW_THEN_WINDOWS_NATIVE_OFFLINE_QUALIFICATION
 BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
@@ -4222,10 +4242,15 @@ sorgente D274/01 non esistono `Start-Process` né argomenti di capture TShark.
 
 Il preflight futuro verifica Windows PowerShell 5.1, disponibilità/versione
 TShark, discovery USBPcap, target assente dal guest prima della capture,
-destinazione privata `captures/` scrivibile, assenza di marker concorrente,
-clock UTC, deadline 180 s e presenza del postprocessor. L'unicità del target
-dopo attach è un gate definito ma non eseguito nel preflight pre-attach. La UI
-fingerprint resta `UNKNOWN_BEFORE_ATTACH`, secondo la lezione D255.
+destinazione privata `captures/` verificata privata (path canonico sotto la
+repository root, nessun reparse-point/junction/symlink, `Get-Acl` valutabile e
+nessun ACE Allow a principal generici — Everyone, BUILTIN\Users, Authenticated
+Users, Guests — per read/write/modify/full-control; i principal
+amministrativi host e l'utente corrente restano ammessi per policy), assenza di
+marker concorrente, clock UTC, deadline 180 s e presenza del postprocessor.
+L'unicità del target dopo attach è un gate definito ma non eseguito nel
+preflight pre-attach. La UI fingerprint resta `UNKNOWN_BEFORE_ATTACH`, secondo
+la lezione D255. D274/01 resta pre-live e non muta ACL.
 
 #### Audit del workflow storico
 
@@ -4273,6 +4298,18 @@ indice frame, direzione, outer wrapper, lunghezza fisica/dichiarata, classe TLS
 esterna, timestamp relativo e associazione implicita al campo di ciclo. Nessun
 payload hash o derivato biometrico viene prodotto.
 
+Per essere promosso a `FINGERPRINT_B0` (e quindi a `first_image_b0`,
+`post_up_b0` e `second_b0` della sequenza) un B0 deve essere strutturalmente
+coerente con il boundary target: direzione device-to-host, outer `0xB0` non
+troncato, lunghezza totale outer esatta 7726 byte, lunghezza B0 dichiarata 7722,
+record TLS `17 03 03` con la lunghezza del record in network byte order
+(big-endian), distinta dalla lunghezza outer B0 Goodix in little-endian, e
+`TLS_record_declared_length + 5 == declared_B0_length`.
+Non viene decriptato né ispezionato il payload applicativo. Un B0 generico
+(`B0_OTHER`) — alert TLS, lunghezza diversa, length incoerente o direzione
+host→device — non chiude il secondo ciclo e fallisce chiuso con
+`FIRST/POST_UP/SECOND_B0_NOT_FINGERPRINT_SHAPE`.
+
 La capture target storica hash-gated attraversa il primo ciclo fino all'ACK
 del re-arm e poi termina; il nuovo tool la classifica
 `failure_class=MISSING_SECOND_IRQ2`, coerentemente con D273. Non è nuova
@@ -4299,6 +4336,102 @@ UI. Il run da Git root e da `/tmp` passa. `pwsh` non è installato sull'host
 Fedora: la verifica nativa Windows resta correttamente `NOT_AVAILABLE`, mentre
 il source/static contract è verificato offline.
 
+#### Corrective D274/01 — quattro overclaim chiusi (review AI-PM)
+
+La review AI-PM ha chiuso quattro overclaim del kit pre-live:
+
+1. **B0 generico ≠ fingerprint B0.** Il `_event` accettava ogni B0 come
+   `kind=B0` e lo promuoveva a `SECOND_CYCLE_FINGERPRINT`. Ora esiste un
+   classificatore esplicito `classify_b0` che distingue `FINGERPRINT_B0` (solo
+   device-to-host, outer `0xB0` non troncato, totale outer 7726 byte, B0
+   dichiarato 7722, record TLS `17 03 03` con la lunghezza del record in
+   network byte order / big-endian, e `TLS_record_declared_length + 5 ==
+   declared_B0_length`) da `B0_OTHER`. La sequenza richiede `FINGERPRINT_B0` per
+   `first_image_b0`, `post_up_b0` e `second_b0`; un B0 generico (alert TLS,
+   lunghezza diversa, length incoerente o direzione host→device) fallisce chiuso
+   con `FIRST/POST_UP/SECOND_B0_NOT_FINGERPRINT_SHAPE` e non chiude il secondo
+   ciclo. Non viene decriptato né esportato alcun payload.
+2. **Writable ≠ private.** Il preflight verificava solo creazione/scrittura della
+   destination. Ora `Test-D274PrivateOutputRoot` impone il contract di privacy:
+   path canonico `<repo>\captures`, nessun reparse-point/junction/symlink,
+   `Get-Acl` valutabile e nessun ACE Allow a principal generici (Everyone,
+   BUILTIN\Users, Authenticated Users, Guests) per read/write/modify/full-control;
+   i principal amministrativi host e l'utente corrente restano ammessi. La claim
+   `output_root_private_writable=true` è emessa solo dopo il check reale; in
+   caso contrario il preflight fallisce chiuso. D274/01 non muta ACL.
+3. **`CREDENTIAL_MUTATION_UI` terminale e marker sconosciuti falliscono.** Il set
+   terminale ora include `ENROLLMENT_COMMIT_UI`, `ACCOUNT_MUTATION_UI`,
+   `PIN_MUTATION_UI`, `CREDENTIAL_MUTATION_UI`, `THIRD_FINGER_PROMPT` e
+   `THIRD_FINGERPRINT_B0`. Ogni marker deve appartenere a `MARKER_ORDER` o a
+   `UI_TERMINAL_MARKERS`; un marker sconosciuto (es. `SOMETHING_UNKNOWN`) fallisce
+   chiuso con `UNKNOWN_MARKER`; i marker terminali restano failure terminali
+   (`UI_TERMINAL_CONDITION`); quelli ordinari restano monotonici strict senza
+   duplicati. La distinzione fra marker umano e osservazione wire è preservata.
+4. **JSON parse ≠ istanza evidence validata.** Lo schema ora tipizza i frame
+   metadata con `additionalProperties: false` (solo `frame`, `direction`,
+   `outer_wrapper`, `physical_length`, `declared_outer_length`,
+   `relative_timestamp_ms` e, opzionali, `declared_b0_length`,
+   `tls_record_type_class`, `cycle_association`), vietando implicitamente
+   `raw`/`body`/`payload`/`plaintext`/`image`/`raster`/`pixel`/`hash`/
+   `descriptor`/`template`/`secret`/`psk`. La validazione non si ferma al parse:
+   `D274_01_prelive_corrective_test_results.json` esegue realmente la validazione
+   dello schema su evidenza happy-path sintetica, evidenza storica sanitizzata,
+   e fixture negative (campo `raw` aggiunto, tipo errato, campo richiesto
+   assente). `jsonschema` non è disponibile sull'host, quindi il corrective
+   implementa e dichiara onestamente un validator locale strict equivalente
+   (`STRICT_LOCAL_SCHEMA_VALIDATOR=PASS`), senza fingere una validazione
+   library-backed.
+
+#### Corrective D274/01 — finalizzazione in-place (review AI-PM successiva)
+
+La review successiva ha individuato tre difetti reali ancora presenti nel
+corrective corrente e li ha corretti in-place, senza aprire D274/02 e senza
+creare un "corrective 2". Non è stata eseguita alcuna capture, alcun accesso
+USB, alcuna decriptazione o alcuna mutazione ACL.
+
+- **A — TLS record length interpretata little-endian.** Il classificatore
+  leggeva `frame.raw[7:9]` come little-endian, e le fixture codificavano la
+  lunghezza del record TLS in little-endian (`17 03 03 25 1e`). Il record layer
+  TLS è network byte order (big-endian), quindi l'header realistico è
+  `17 03 03 1e 25` (7717 = `0x1e25`). Corretto: il classificatore usa
+  `int.from_bytes(frame.raw[7:9], "big")` e le fixture codificano la lunghezza
+  TLS in big-endian; la lunghezza outer B0 Goodix (`raw[1:3]`) resta
+  little-endian. È stato aggiunto un test che costruisce esplicitamente
+  l'header `17 03 03 1e 25` (FINGERPRINT_B0) e la variante little-endian
+  `17 03 03 25 1e` (B0_OTHER), impedendo alla fixture sintetica di ridefinire la
+  semantica TLS.
+- **B — il check ACL non chiudeva davvero la privacy.** `Test-D274PrivateOutputRoot`
+  elencava `Write/Modify/FullControl` ma ometteva `Read`, quindi un ACE
+  `Everyone: Read` non veniva respinto; inoltre controllava `AceType` anziché
+  `AccessControlType` (il discriminante allow/deny su `FileSystemAccessRule`), e
+  confrontava principal in forma nominale (non robusto su Windows localizzato).
+  Corretto: il mask dei diritti include ora `Read` (intercettando anche
+  `ReadAndExecute`/`ReadData` via band), il discriminante è
+  `AccessControlType -eq Allow`, e l'`IdentityReference` è normalizzata a
+  `SecurityIdentifier` tramite `Translate(...)`; la traduzione SID fallita è
+  fail-closed. I quattro SID canonici (S-1-1-0, S-1-5-32-545, S-1-5-11,
+  S-1-5-32-546) sono rifiutati se concedono un diritto coperto dal mask. Non
+  viene usato `Set-Acl` né `icacls`; D274 resta pre-live. Il contratto è una
+  closure source/policy offline, non una verifica nativa Windows (vedi
+  `WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_AVAILABLE`).
+- **C — il fallback strict-local trattava float come integer.** Il validator
+  locale accettava `1.5` per uno schema che richiede `"type": "integer"`.
+  Corretto: `integer` richiede `isinstance(node, int)` (bool escluso) e `number`
+  richiede `int` o `float`. Aggiunti test forzati sul validator locale
+  (indipendenti da `jsonschema`) con fixture negative `frame=1.5`,
+  `physical_length=7726.5`, `declared_outer_length="7726"`, proprietà `raw`
+  extra, campo richiesto mancante, e positive `frame=int`,
+  `relative_timestamp_ms=float`.
+- **Contract runtime evidence (rafforzamento).** Il producer ora esegue, prima
+  della serializzazione, una validazione strutturale fail-closed
+  (`validate_evidence_document_strict`): set esatto di proprietà top-level,
+  campi richiesti, privacy booleans false, allowlist strict dei frame metadata,
+  `frame` integer, campi di lunghezza integer, `direction` enum, shape
+  outer-wrapper, `timestamp` number, e forbid-list esatta dei campi
+  privacy-sensitive (`raw`/`body`/`payload`/`plaintext`/`image`/`raster`/`pixel`/
+  `hash`/`descriptor`/`template`/`secret`/`psk`). Nessuna dipendenza runtime da
+  `jsonschema`.
+
 ```text
 D274_PRELIVE_WINDOWS_MULTIFRAME_EVIDENCE_KIT=READY_FOR_AI_PM_REVIEW
 D274_REAL_CAPTURE_CAPABILITY=0
@@ -4308,6 +4441,30 @@ D274_POSTPROCESSOR_STATUS=PASS_OFFLINE_HASH_GATED_SANITIZED
 D274_EVIDENCE_SCHEMA_STATUS=PASS
 D274_SYNTHETIC_SECOND_CYCLE_FIXTURE=PASS
 D274_PRIVACY_CONTRACT=PASS_METADATA_ONLY_NO_B0_CONTENT
+D274_FINGERPRINT_B0_CONTRACT=CLOSED_OFFLINE_STRUCTURAL_7726_TLS_APPLICATION_DATA
+D274_GENERIC_B0_AS_FINGERPRINT_ACCEPTED=false
+D274_TLS_ALERT_B0_AS_FINGERPRINT_ACCEPTED=false
+D274_WRONG_LENGTH_B0_AS_FINGERPRINT_ACCEPTED=false
+D274_TLS_RECORD_LENGTH_ENDIAN=BIG_ENDIAN_NETWORK_ORDER
+D274_GOODIX_B0_LENGTH_ENDIAN=LITTLE_ENDIAN
+D274_REALISTIC_TLS_HEADER_1703031E25_ACCEPTED=true
+D274_SYNTHETIC_LITTLE_ENDIAN_TLS_LENGTH_ACCEPTED=false
+D274_OUTPUT_ROOT_PRIVACY_CONTRACT=CLOSED_OFFLINE_PREFLIGHT_POLICY
+D274_OUTPUT_ROOT_PRIVACY_POLICY_SOURCE_CONTRACT=PASS
+D274_OUTPUT_ROOT_REPARSE_POINT_ACCEPTED=false
+D274_BROAD_ACL_ACCEPTED=false
+D274_BROAD_ACL_READ_ACCEPTED=false
+D274_ACL_ALLOW_DISCRIMINATOR=AccessControlType
+D274_ACL_IDENTITY_NORMALIZATION=SecurityIdentifier
+WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_AVAILABLE
+D274_CREDENTIAL_MUTATION_UI_TERMINAL=true
+D274_UNKNOWN_MARKER_ACCEPTED=false
+D274_FRAME_METADATA_SCHEMA=STRICT_ADDITIONAL_PROPERTIES_FALSE
+D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
+D274_SCHEMA_JSON_PARSE=PASS
+D274_SCHEMA_INSTANCE_VALIDATION=PASS
+D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
+D274_PRIVACY_FRAME_METADATA_SHAPE=PASS
 WINDOWS_NATIVE_EXECUTION_TEST=NOT_AVAILABLE
 REAL_USB_OPEN_COUNT=0
 REAL_COMMAND_SEND_COUNT=0
@@ -4322,8 +4479,9 @@ LIVE_EXECUTION=NOT_PERFORMED
 BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_PRELIVE_KIT
-NEXT_BOUNDARY_PREREQUISITE=REVIEW_AND_SEPARATE_EXPLICIT_LIVE_BASELINE_APPROVAL_AND_ONE_RUN_AUTHORIZATION
+SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_CORRECTIVE
+NEXT_BOUNDARY_PREREQUISITE=CORRECTIVE_REVIEW_THEN_WINDOWS_NATIVE_OFFLINE_QUALIFICATION
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.

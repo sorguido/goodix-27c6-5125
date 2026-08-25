@@ -32,6 +32,10 @@ TARGET_PID_LE = bytes.fromhex("2551")
 HOST_CAPTURE_DEADLINE_SECONDS = 180
 HOST_DEADLINE_POLICY = "EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM"
 DEVICE_TIMEOUT_CLAIM = "UNKNOWN"
+FINGERPRINT_B0_TOTAL_OUTER_LENGTH = 7726
+FINGERPRINT_B0_DECLARED_LENGTH = 7722
+FINGERPRINT_B0_TLS_RECORD_TYPE = 0x17
+FINGERPRINT_B0_TLS_RECORD_VERSION = 0x0303
 EVIDENCE_CLASSES = {
     "TARGET_CAPTURE_OBSERVED", "STATICALLY_VERIFIED_OEM",
     "STRONG_CAUSAL_INFERENCE", "INFERRED", "THIRD_PARTY_CORROBORATION",
@@ -229,10 +233,40 @@ def _frame_meta(frame: Frame, base_timestamp: float) -> dict:
     return row
 
 
+def classify_b0(frame: Frame) -> str:
+    """Structural fingerprint-image B0 contract.
+
+    A FINGERPRINT_B0 is exactly a device-to-host outer 0xB0 whose total outer
+    frame is 7726 bytes carrying a TLS application-data record (17 03 03) whose
+    declared record length plus the 5-byte record header equals the declared B0
+    length.  No payload is decrypted, inspected, or exported.
+    """
+    if frame.direction != "device_to_host":
+        return "B0_OTHER"
+    if frame.truncated:
+        return "B0_OTHER"
+    if frame.outer != 0xB0:
+        return "B0_OTHER"
+    if len(frame.raw) != FINGERPRINT_B0_TOTAL_OUTER_LENGTH:
+        return "B0_OTHER"
+    declared = int.from_bytes(frame.raw[1:3], "little")
+    if declared != FINGERPRINT_B0_DECLARED_LENGTH:
+        return "B0_OTHER"
+    if frame.raw[4:7] != (FINGERPRINT_B0_TLS_RECORD_TYPE.to_bytes(1, "little")
+                          + FINGERPRINT_B0_TLS_RECORD_VERSION.to_bytes(2, "little")):
+        return "B0_OTHER"
+    # The TLS record length is network byte order (big-endian), distinct from the
+    # Goodix B0 outer length which is little-endian at raw[1:3].
+    tls_declared = int.from_bytes(frame.raw[7:9], "big")
+    if tls_declared + 5 != declared:
+        return "B0_OTHER"
+    return "FINGERPRINT_B0"
+
+
 def _event(frame: Frame) -> dict:
     if frame.outer == 0xB0:
         require(not frame.truncated, "MALFORMED_B0")
-        return {"kind": "B0", "frame": frame}
+        return {"kind": "B0", "b0_class": classify_b0(frame), "frame": frame}
     # The target-observed post-0x50 NAV response is an exact command-specific
     # A0 shape (wire control 0x50, physical/outer 2417, inner 2410). Its final
     # byte does not satisfy the ordinary short-command checksum equation, so
@@ -259,13 +293,13 @@ SEQUENCE = (
     ("first_irq2", "IRQ", 0x0002),
     ("first_0x22", "COMMAND", 0x22),
     ("first_0x22_ack", "ACK", 0x22),
-    ("first_image_b0", "B0", None),
+    ("first_image_b0", "FINGERPRINT_B0", None),
     ("first_0x34", "COMMAND", 0x34),
     ("first_0x34_ack", "ACK", 0x34),
     ("first_irq0200", "IRQ", 0x0200),
     ("post_up_0x20", "COMMAND", 0x20),
     ("post_up_0x20_ack", "ACK", 0x20),
-    ("post_up_b0", "B0", None),
+    ("post_up_b0", "FINGERPRINT_B0", None),
     ("post_up_0x50", "COMMAND", 0x50),
     ("post_up_0x50_ack", "ACK", 0x50),
     ("post_0x50_nav", "NAV", 0x50),
@@ -274,11 +308,14 @@ SEQUENCE = (
     ("second_irq2", "IRQ", 0x0002),
     ("second_0x22", "COMMAND", 0x22),
     ("second_0x22_ack", "ACK", 0x22),
-    ("second_b0", "B0", None),
+    ("second_b0", "FINGERPRINT_B0", None),
 )
 
 
 def _matches(event: dict, kind: str, value: int | None) -> bool:
+    if kind == "FINGERPRINT_B0":
+        return (event.get("kind") == "B0"
+                and event.get("b0_class") == "FINGERPRINT_B0")
     if event["kind"] != kind:
         return False
     if kind == "COMMAND":
@@ -301,6 +338,14 @@ def _matches(event: dict, kind: str, value: int | None) -> bool:
 def _failure_for(expected_name: str, event: dict | None) -> str:
     if event is None:
         return "MISSING_" + expected_name.upper()
+    if expected_name.endswith("_b0") and event.get("kind") == "B0":
+        if event.get("b0_class") != "FINGERPRINT_B0":
+            mapping = {
+                "first_image_b0": "FIRST_B0_NOT_FINGERPRINT_SHAPE",
+                "post_up_b0": "POST_UP_B0_NOT_FINGERPRINT_SHAPE",
+                "second_b0": "SECOND_B0_NOT_FINGERPRINT_SHAPE",
+            }
+            return mapping.get(expected_name, "B0_NOT_FINGERPRINT_SHAPE")
     if event["kind"] == "ACK" and expected_name.endswith("_ack"):
         if event["status"] != 0x01:
             return "ACK_STATUS_NOT_EXACT_0X01"
@@ -430,7 +475,7 @@ MARKER_ORDER = (
 )
 UI_TERMINAL_MARKERS = {
     "ENROLLMENT_COMMIT_UI", "ACCOUNT_MUTATION_UI", "PIN_MUTATION_UI",
-    "THIRD_FINGER_PROMPT",
+    "CREDENTIAL_MUTATION_UI", "THIRD_FINGER_PROMPT", "THIRD_FINGERPRINT_B0",
 }
 
 
@@ -445,6 +490,8 @@ def validate_markers(path: Path) -> None:
         rows.append((timestamp, parts[1]))
     require(rows == sorted(rows), "MARKER_OUT_OF_ORDER")
     names = [name for _, name in rows]
+    known_markers = UI_TERMINAL_MARKERS | set(MARKER_ORDER)
+    require(all(name in known_markers for name in names), "UNKNOWN_MARKER")
     require(not UI_TERMINAL_MARKERS.intersection(names), "UI_TERMINAL_CONDITION")
     positions = [MARKER_ORDER.index(name) for name in names if name in MARKER_ORDER]
     require(positions == sorted(positions) and len(positions) == len(set(positions)),
@@ -472,8 +519,93 @@ def validate_evidence_document(document: dict) -> None:
     require(document["secret_material_exported"] is False, "PRIVACY_CONTRACT_VIOLATION")
 
 
+def _load_evidence_schema() -> dict:
+    path = Path(__file__).resolve().with_name("D274_01_evidence_schema.json")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+_SCHEMA_TYPE_MATCHES: dict[str, object] = {
+    "object": lambda n: isinstance(n, dict),
+    "string": lambda n: isinstance(n, str),
+    "boolean": lambda n: isinstance(n, bool),
+    "null": lambda n: n is None,
+    "array": lambda n: isinstance(n, list),
+    "integer": lambda n: isinstance(n, int) and not isinstance(n, bool),
+    "number": lambda n: isinstance(n, (int, float)) and not isinstance(n, bool),
+}
+
+
+def _strict_validate(node, subschema: dict, defs: dict) -> None:
+    while "$ref" in subschema:
+        subschema = defs[subschema["$ref"].rpartition("/")[2]]
+    if "enum" in subschema:
+        if node not in subschema["enum"]:
+            raise EvidenceError("EVIDENCE_STRICT_SCHEMA_ENUM")
+        return
+    if "const" in subschema:
+        if node != subschema["const"]:
+            raise EvidenceError("EVIDENCE_STRICT_SCHEMA_CONST")
+        return
+    if "anyOf" in subschema:
+        for sub in subschema["anyOf"]:
+            try:
+                _strict_validate(node, sub, defs)
+                return
+            except EvidenceError:
+                continue
+        raise EvidenceError("EVIDENCE_STRICT_SCHEMA_ANYOF")
+    t = subschema.get("type")
+    types = t if isinstance(t, list) else ([t] if t is not None else [])
+    if types and not any(_SCHEMA_TYPE_MATCHES.get(tt, lambda n: False)(node) for tt in types):
+        raise EvidenceError("EVIDENCE_STRICT_SCHEMA_TYPE")
+    if isinstance(node, dict):
+        ap = subschema.get("additionalProperties", True)
+        allowed = set(subschema.get("properties", {}))
+        for key in node:
+            if key not in allowed:
+                if ap is False:
+                    raise EvidenceError("EVIDENCE_STRICT_SCHEMA_ADDITIONAL_PROPERTY")
+                if isinstance(ap, dict):
+                    _strict_validate(node[key], ap, defs)
+        for req in subschema.get("required", []):
+            if req not in node:
+                raise EvidenceError("EVIDENCE_STRICT_SCHEMA_REQUIRED")
+        for key, prop in subschema.get("properties", {}).items():
+            if key in node:
+                _strict_validate(node[key], prop, defs)
+        return
+    if isinstance(node, str):
+        if "pattern" in subschema and not re.fullmatch(subschema["pattern"], node):
+            raise EvidenceError("EVIDENCE_STRICT_SCHEMA_PATTERN")
+        return
+
+
+def validate_evidence_document_strict(document: dict) -> None:
+    """Fail-closed structural contract enforced before serialization.
+
+    Bounded, dependency-free, strict integer/number typing, exact top-level
+    property set, strict frame-metadata allowlist, and a hard forbid-list for
+    privacy-sensitive field names. No payload is inspected or exported.
+    """
+    schema = _load_evidence_schema()
+    _strict_validate(document, schema, schema.get("$defs", {}))
+    forbidden = ("raw", "body", "payload", "plaintext", "image", "raster", "pixel",
+                 "hash", "descriptor", "template", "secret", "psk")
+
+    def _walk(node) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in forbidden:
+                    raise EvidenceError("EVIDENCE_STRICT_PRIVACY_FORBIDDEN_FIELD")
+                _walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                _walk(item)
+    _walk(document)
+
+
 def process_capture(pcap: Path, expected_sha256: str, workflow_class: str,
-                    markers: Path | None = None, origin: str = "TARGET_CAPTURE") -> dict:
+                     markers: Path | None = None, origin: str = "TARGET_CAPTURE") -> dict:
     require(re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is not None,
             "EXPECTED_SHA256_INVALID")
     actual_sha256 = sha256_file(pcap)
@@ -531,7 +663,8 @@ def main() -> int:
     try:
         require(not args.output.exists(), "SANITIZED_OUTPUT_COLLISION")
         result = process_capture(args.pcap, args.expected_sha256.lower(),
-                                 args.workflow_class, args.markers)
+                                  args.workflow_class, args.markers)
+        validate_evidence_document_strict(result)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({"result_class": result["result_class"],
