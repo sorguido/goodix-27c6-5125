@@ -58,6 +58,7 @@ class D267DecodeObservabilityTests(unittest.TestCase):
                 "is_pov_notification": False,
                 "payload_trailer_class": "COMPUTED_ADDITIVE_CHECKSUM",
                 "payload_checksum_match": True,
+                "payload_checksum_policy": "ADDITIVE_VERIFIED",
                 "image_record_length": 7684,
                 "image_record_crc_match": True,
                 "exception_class": None,
@@ -86,7 +87,8 @@ class D267DecodeObservabilityTests(unittest.TestCase):
         self.assertIsInstance(error, UnexpectedControl)
         self.assertEqual(diagnostic["decode_stage"], "control_major")
         self.assertEqual(diagnostic["control_or_major_class"], "MAJOR_0X3")
-        self.assertTrue(diagnostic["payload_checksum_match"])
+        self.assertIsNone(diagnostic["payload_checksum_match"])
+        self.assertEqual(diagnostic["payload_checksum_policy"], "NOT_REACHED")
 
     def test_pov_notification_is_distinct(self) -> None:
         _raster, diagnostic, error = _observe(_image_payload(prefix0=0xAA))
@@ -104,14 +106,18 @@ class D267DecodeObservabilityTests(unittest.TestCase):
         self.assertEqual(diagnostic["payload_trailer_class"], "OTHER")
         self.assertFalse(diagnostic["payload_checksum_match"])
 
-    def test_0x88_is_visible_but_remains_rejected(self) -> None:
+    def test_0x88_is_visible_and_image_policy_is_explicit(self) -> None:
         valid = _image_payload()
         self.assertNotEqual(valid[-1], 0x88)
-        _raster, diagnostic, error = _observe(valid[:-1] + b"\x88")
-        self.assertIsInstance(error, ChecksumMismatch)
-        self.assertEqual(diagnostic["decode_stage"], "payload_checksum")
+        raster, diagnostic, error = _observe(valid[:-1] + b"\x88")
+        self.assertIsNone(error)
+        self.assertEqual(len(raster or ()), 5120)
+        self.assertEqual(diagnostic["decode_stage"], "successful_raster_decode")
         self.assertEqual(diagnostic["payload_trailer_class"], "0X88")
         self.assertFalse(diagnostic["payload_checksum_match"])
+        self.assertEqual(
+            diagnostic["payload_checksum_policy"], "NO_CHECK_0X88_ACCEPTED"
+        )
 
     def test_wrong_image_record_length_is_distinct(self) -> None:
         malformed = _payload(0x20, b"\x01\x00\x00\x00\x00" + _record()[:-1])
@@ -119,7 +125,8 @@ class D267DecodeObservabilityTests(unittest.TestCase):
         self.assertIsInstance(error, LengthMismatch)
         self.assertEqual(diagnostic["decode_stage"], "image_record_length")
         self.assertEqual(diagnostic["image_record_length"], 7683)
-        self.assertTrue(diagnostic["payload_checksum_match"])
+        self.assertIsNone(diagnostic["payload_checksum_match"])
+        self.assertEqual(diagnostic["payload_checksum_policy"], "NOT_REACHED")
 
     def test_bad_image_record_crc_is_distinct(self) -> None:
         record = bytearray(_record())

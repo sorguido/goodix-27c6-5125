@@ -276,7 +276,7 @@ class ImageDecodeDiagnostic:
 
     This record deliberately contains no payload bytes, plaintext hashes,
     image bytes, raster samples, or other biometric material.  It observes the
-    existing acceptance path; it does not provide an alternate decode policy.
+    image-specific acceptance path.
     """
 
     decode_stage: str = "plaintext_envelope"
@@ -286,6 +286,7 @@ class ImageDecodeDiagnostic:
     is_pov_notification: bool | None = None
     payload_trailer_class: str | None = None
     payload_checksum_match: bool | None = None
+    payload_checksum_policy: str = "NOT_REACHED"
     image_record_length: int | None = None
     image_record_crc_match: bool | None = None
     exception_class: str | None = None
@@ -300,6 +301,7 @@ class ImageDecodeDiagnostic:
             "is_pov_notification": self.is_pov_notification,
             "payload_trailer_class": self.payload_trailer_class,
             "payload_checksum_match": self.payload_checksum_match,
+            "payload_checksum_policy": self.payload_checksum_policy,
             "image_record_length": self.image_record_length,
             "image_record_crc_match": self.image_record_crc_match,
             "exception_class": self.exception_class,
@@ -387,37 +389,27 @@ def parse_image_payload(
     """Validate one type-12 image payload and return the canonical 80x64 raster.
 
     When supplied, ``diagnostic`` is populated only with bounded metadata.  The
-    parser still executes the same strict checksum, control, length, POV and
-    record-CRC predicates in the same order as the pre-D267/03 implementation.
-    In particular, a trailer byte of ``0x88`` remains subject to the ordinary
-    additive checksum comparison and never enables a bypass.
+    generic :func:`parse_payload` remains strict.  This image-only parser first
+    validates framing, image classification, record length and the POV marker;
+    only then does a trailing ``0x88`` select the OEM no-check policy for the
+    additive payload checksum.  The image-record CRC remains mandatory.
     """
 
     observation = diagnostic or ImageDecodeDiagnostic()
     observation.plaintext_length = len(payload)
     try:
-        if len(payload) >= 1:
-            observation.control_or_major_class = f"MAJOR_0X{payload[0] >> 4:X}"
-        if len(payload) >= 3:
-            declared = int.from_bytes(payload[1:3], "little")
-            observation.declared_payload_length = declared
-            if declared < 1 or len(payload) != declared + 3:
-                observation.decode_stage = "declared_length"
-            else:
-                observation.decode_stage = "payload_checksum"
-                expected_checksum = _checksum(payload[0], payload[3:-1])
-                observation.payload_checksum_match = payload[-1] == expected_checksum
-                observation.payload_trailer_class = (
-                    "0X88"
-                    if payload[-1] == 0x88
-                    else (
-                        "COMPUTED_ADDITIVE_CHECKSUM"
-                        if observation.payload_checksum_match
-                        else "OTHER"
-                    )
-                )
+        if len(payload) < 4:
+            raise TruncatedFrame("payload_header_truncated")
 
-        control, data = parse_payload(payload)
+        control, lo, hi = payload[:3]
+        observation.control_or_major_class = f"MAJOR_0X{control >> 4:X}"
+        declared = lo | hi << 8
+        observation.declared_payload_length = declared
+        if declared < 1 or len(payload) != declared + 3:
+            observation.decode_stage = "declared_length"
+            raise LengthMismatch(f"payload_length:{declared}:{len(payload) - 3}")
+        data, trailer = payload[3:-1], payload[-1]
+
         observation.decode_stage = "control_major"
         if control >> 4 != 2:
             raise UnexpectedControl(f"not_image:0x{control:02x}")
@@ -431,6 +423,25 @@ def parse_image_payload(
         observation.is_pov_notification = data[0] == 0xAA
         if observation.is_pov_notification:
             raise UnexpectedEvent("pov_notification_not_image")
+
+        observation.decode_stage = "payload_checksum"
+        expected_checksum = _checksum(control, data)
+        observation.payload_checksum_match = trailer == expected_checksum
+        observation.payload_trailer_class = (
+            "0X88"
+            if trailer == 0x88
+            else (
+                "COMPUTED_ADDITIVE_CHECKSUM"
+                if observation.payload_checksum_match
+                else "OTHER"
+            )
+        )
+        if trailer == 0x88:
+            observation.payload_checksum_policy = "NO_CHECK_0X88_ACCEPTED"
+        elif observation.payload_checksum_match:
+            observation.payload_checksum_policy = "ADDITIVE_VERIFIED"
+        else:
+            raise ChecksumMismatch("payload_checksum")
 
         observation.decode_stage = "image_record_crc"
         try:

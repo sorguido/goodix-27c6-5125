@@ -16,7 +16,7 @@
     {"path": "core/fdt_seed.py", "sha256": "5df64876dd977623def8bccab512410b1ecb18f11b3b06d589faa935c8c44e2a"},
     {"path": "core/live_capability.py", "sha256": "8a35f878c3b6d3234556d10f1eafd235fe1c13016e4af3cae48f4ddcc61056ab"},
     {"path": "core/persistent_runtime.py", "sha256": "bc34c50559ca5e5d1b6aeaa3bacac7442351d6a7f97c68952136d4ae0cbfd41a"},
-    {"path": "core/post_d4.py", "sha256": "34cb660c8c1f7daa5926837d187bc921b3df3783b3011c70fb700bbb7c5f459f"},
+    {"path": "core/post_d4.py", "sha256": "8f8696a8d8852ec45b421aa5feee7876024726155f049c686e5c8c9b534c00af"},
     {"path": "core/protected_runtime.py", "sha256": "896d1543240107b474408b608cdacd346b2a08c9be73298ae048b980fe396da6"},
     {"path": "core/runtime_transport.py", "sha256": "2930aa57f7acfbc3ad823d8fdd43dc95b75ba6dcade7e30d021564b1f6c3e38d"},
     {"path": "core/tls_b0.py", "sha256": "135dc8a4a9d5c753fec38fc638d530d86f53dadbde004d9d5248200ecd1b7f56"},

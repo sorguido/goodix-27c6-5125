@@ -308,6 +308,27 @@ nessun live è autorizzato. Stato corrente:
 `0X88_DIAGNOSTICALLY_RECOGNIZED=true`, `0X88_BYPASS_ENABLED=false`,
 `LIVE_AUTHORIZED=false` e `READY_FOR_LIVE=false`.
 
+La review AI-PM ha accettato D267/03 come corrective di sola osservabilità.
+D267/04 ha quindi riesaminato staticamente il percorso OEM locale prima di
+modificare l'acceptance. Il B0 viene consegnato al TLS engine e il plaintext
+prodotto viene reinoltrato a `0x18005f098`; qui struttura e lunghezza sono
+validate, il trailer `0x88` salta direttamente la verifica additiva e il ramo
+`major == 2` consegna al consumer `data+5` per `declared_length-6`, cioè il
+record immagine da 7684 byte del contratto corrente. Questo collegamento OEM
+locale diretto supera il gate semantico; Rocky lo corrobora senza costituire la
+base primaria. `parse_payload()` resta globalmente strict, mentre il solo
+`parse_image_payload()` accetta `0x88` dopo framing, classificazione image,
+lunghezza record e rifiuto POV. Il CRC-32/MPEG-2 del record resta obbligatorio
+e fail-closed. Il trailer effettivo di D267/01 non fu conservato e resta
+`UNKNOWN`: il corrective non identifica quindi la causa reale della run.
+Nessun percorso wire/USB/TLS/FDT/IRQ2/`0x22`/ACK/B0, retry o write persistente
+è cambiato; il dry-run del Kit Operatore resta offline, con manifest non
+approvato e contatori sensor-reaching a zero. Stato corrente:
+`SEMANTIC_CORRECTIVE_GATE=PASS`, `DECODER_SEMANTIC_CHANGE=YES`,
+`DECODER_SEMANTIC_CHANGE_SCOPE=IMAGE_ADDITIVE_CHECKSUM_0X88_ONLY`,
+`IMAGE_RECORD_CRC_POLICY_CHANGE=NO`, `WIRE_CHANGE=NO`,
+`LIVE_AUTHORIZED=false` e `READY_FOR_LIVE=false`.
+
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
 request logica 13 byte, submission OEM da 64 byte, risposta AE diretta da 24
@@ -578,6 +599,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Run live D267/01 first B0 | fail-closed nel decoder, autorizzazione consumata | IRQ2 consegnato, un `0x22` fixed64 inviato e ACK-validato, primo B0 ricevuto; zero retry/recovery/reopen/write/comandi post-image; decode e first image non provati |
 | Analisi D267/02 decoder | failure bounded offline, subpredicato live non recuperabile | emettitore esatto `persistent_runtime.py:444`; TLS consumption superato per call-flow, poi catch opaco su `parse_image_payload`; fixture 7693→7684→80x64 PASS, mismatch `0x88` candidato MEDIUM; manca diagnostica sanitizzata length/header/checksum/CRC |
 | Corrective D267/03 decode observability | READY offline, live false | diagnostica sanitizzata per nove classi; report/audit preservano lo stage interno; `0x88` visibile ma strict e senza bypass; acceptance e wire invariati; D209/D210 non presenti e non re-queryable |
+| Audit/corrective D267/04 `0x88` image no-check | READY offline, live false | gate PASS su call-flow OEM TLS-plaintext→parser→major 2→record 7684; bypass additivo solo image dopo gate strutturali/POV; parser generico e CRC record strict; trailer D267/01 ancora unknown |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1924,17 +1946,18 @@ loop, perciò il parser D249 usa ancora `OPTIONAL_IF_PRESENT` come policy di
 accettazione senza trasformarla in evidenza target. Zero o un ACK esatto sono
 accettati; ACK errato o duplicato fallisce chiuso.
 
-La policy checksum D249 implementata è strict: `parse_payload()` calcola sempre
-il checksum. Il valore 0x88 è accettato soltanto quando coincide matematicamente
-con il checksum del payload specifico; non è un bypass. Il NOP locale osservato
-con marker no-check era fuori dall'allowlist D249. Test distinti rifiutano un
-0x88 errato e accettano un checksum genuino che vale 0x88. D267/02 non aveva
-cambiato questa policy e D267/03 aggiunge soltanto la classe diagnostica
-`payload_trailer_class=0X88`: un `0x88` non genuino continua a fallire nello
-stesso `ChecksumMismatch`. DLL locale e Rocky applicano un bypass, ma sono
-corroborazione implementativa e non prova target-specific che il plaintext
-D267/01 avesse quel trailer. Il mismatch resta quindi un'ipotesi `MEDIUM`, non
-un'autorizzazione a cambiare acceptance.
+La policy generica D249 resta strict: `parse_payload()` calcola sempre il
+checksum e un `0x88` non aritmeticamente valido fallisce. D267/03 aveva
+aggiunto soltanto `payload_trailer_class=0X88`. D267/04 stabilisce però nel
+materiale OEM locale che lo stesso parser riceve anche il plaintext post-TLS,
+salta la verifica additiva sul trailer `0x88`, classifica poi `major == 2` e
+passa `data+5`/`declared_length-6` al consumer del record immagine. Il solo
+`parse_image_payload()` replica ora tale semantica dopo i gate di framing,
+major image, lunghezza 7684 e POV; `payload_checksum_policy` distingue
+`ADDITIVE_VERIFIED`, `NO_CHECK_0X88_ACCEPTED` e `NOT_REACHED`. Il CRC record
+resta strict. Rocky è solo corroborazione. Il trailer di D267/01 resta
+`UNKNOWN`, quindi la nuova validità semantica generale/image-specific non
+dimostra che quel marker abbia causato la failure live.
 
 La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
 immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
@@ -5307,8 +5330,9 @@ conservare diagnostica tipizzata e sanitizzata per stage e aggiungere fixture
 image-specific per `0x88`, lunghezze/header, POV e CRC. D267/02 non modifica
 `core/`, `tools/`, `operator_kit/`, `src/` o `poc/` e non autorizza un live.
 
-D267/03 esegue quel corrective senza cambiare i predicati. Il record
-`first_image_decode_diagnostic` contiene esclusivamente:
+D267/03 esegue quel corrective senza cambiare i predicati; D267/04 estende poi
+il medesimo record `first_image_decode_diagnostic`, che nello stato corrente
+contiene esclusivamente:
 
 ```text
 decode_stage
@@ -5318,6 +5342,7 @@ control_or_major_class
 is_pov_notification
 payload_trailer_class
 payload_checksum_match
+payload_checksum_policy
 image_record_length
 image_record_crc_match
 exception_class
@@ -5360,6 +5385,79 @@ WIRE_CHANGE=NO
 0X88_DIAGNOSTICALLY_RECOGNIZED=true
 0X88_BYPASS_ENABLED=false
 RESIDUAL_BLOCKER_OR_RISK=EXACT_D267_01_INNER_FAILURE_PREDICATE_STILL_UNOBSERVED_WITHOUT_NEW_EVIDENCE
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+D267/04 chiude il successivo audit semantico **solo offline**. Nel materiale
+OEM locale il call-flow osservato è:
+
+```text
+USB parser 0x18005ef1a (major B0)
+  -> TLS input 0x18003f0a8
+  -> application-data callback 0x1800211c8
+  -> plaintext buffer/length 0x180058128
+  -> parser 0x18005f098 at call 0x1800213fd
+  -> declared length bytes [1:3], payload copy from byte 3
+  -> trailer compare 0x18005f4f9
+     0x88: success flag at 0x18005f51f
+     other: additive verifier 0x180059390
+  -> major dispatch from control high nibble
+  -> major 2 branch 0x18005f76e
+  -> consumer callback with data+5 and declared_length-6
+```
+
+È quindi `OSSERVATO` che il buffer controllato è plaintext applicativo
+post-TLS e che la lunghezza dichiarata proviene dai byte 1–2; è `VERIFICATO`
+staticamente che `0x88` evita la chiamata al verificatore additivo e porta allo
+stesso success path; è `VERIFICATO` che il medesimo buffer viene classificato
+per major e che `major == 2` passa al consumer il sottointervallo image
+`data+5`, lungo `declared_length-6` (7684 per il contratto 7693 corrente).
+L'identità simbolica del callback OEM rimane `NON_NOTO`, ma data-flow,
+dimensione e dispatch rendono l'applicabilità al payload immagine diretta e
+non dipendente da Rocky. Lo snapshot Rockytkg, commit preservato
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`, corrobora indipendentemente in
+`src/goodix_capture.c:223-268` cmd0 2, prefix 5, `v19-6`, marker no-check
+`0x88` e record 7684; il suo rilassamento CRC non è stato importato.
+
+Il corrective minimo conserva `parse_payload()` strict e applica il no-check
+soltanto in `parse_image_payload()`, dopo struttura/lunghezza dichiarata,
+major image, record length 7684 e rifiuto POV. Trailer ordinari richiedono
+ancora l'additive match; il CRC-32/MPEG-2 viene sempre eseguito. La matrice
+D267/04 copre i dieci casi richiesti e prova anche identità completa del raster
+80×64 fra fixture 7693 ordinaria e variante `0x88`. Le regressioni decoder,
+D263, D266 e runtime passano; il dry-run reale da `/tmp` passa con baseline
+non approvata e zero side effect. D209/D210 restano assenti e non re-queryable.
+
+La causa D267/01 non viene promossa: `TARGET_D267_01_TRAILER=UNKNOWN` e il
+sotto-predicato che fallì resta non osservato. La graduatoria non deve più
+trattare il significato image-specific di `0x88` come incerto; resta invece
+aperta l'ipotesi che D267/01 avesse effettivamente quel marker, insieme agli
+altri predicati non registrati. Qualunque futuro live resta un gate separato e
+potrà essere eseguito soltanto tramite Kit Operatore dedicato con interazione
+in italiano, nuova baseline e autorizzazione esplicita.
+
+```text
+OUTCOME=D267_04_IMAGE_NO_CHECK_SEMANTIC_CORRECTIVE_READY_OFFLINE
+ADVANCEMENT=NEW_LOCAL_OEM_SEMANTIC_EVIDENCE_AND_BOUNDED_DECODER_CORRECTIVE
+EXECUTABLE_CLOSURE=PASS
+SEMANTIC_CORRECTIVE_GATE=PASS
+OEM_0X88_SEMANTICS=VERIFIED_NO_CHECK_ADDITIVE
+OEM_IMAGE_PATH_APPLICABILITY=VERIFIED_REACHABLE_MAJOR_2_DATA_PLUS_5_LENGTH_MINUS_6
+ROCKYTKG_CORROBORATION=YES_NOT_PRIMARY
+TARGET_D267_01_TRAILER=UNKNOWN
+DECODER_SEMANTIC_CHANGE=YES
+DECODER_SEMANTIC_CHANGE_SCOPE=IMAGE_ADDITIVE_CHECKSUM_0X88_ONLY
+IMAGE_RECORD_CRC_POLICY_CHANGE=NO
+WIRE_CHANGE=NO
+USB_PATH_CHANGE=NO
+TLS_PATH_CHANGE=NO
+FDT_IRQ_ROUTING_CHANGE=NO
+COMMAND_22_CHANGE=NO
+ACK_POLICY_CHANGE=NO
+B0_OWNERSHIP_CHANGE=NO
+RETRY_RECOVERY_CHANGE=NO
+PERSISTENT_WRITE_REACHABILITY_CHANGE=NO
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
