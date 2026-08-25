@@ -5,6 +5,7 @@ import unittest
 from core.multiframe_validation import (
     EXPECTED_ACK_STATUS,
     BoundedMultiFrameRunner,
+    DerivedFdtTable,
     Input,
     InputKind,
     MultiFrameContract,
@@ -16,22 +17,39 @@ from core.post_d4 import parse_outer, parse_payload
 RASTER = tuple(index % 4096 for index in range(5120))
 UP = bytes.fromhex("808780948081807a807f8086")
 DOWN = bytes.fromhex("80ac80bd80a380b180a680b2")
+UP_NEXT = bytes.fromhex("809080918092809380948095")
+DOWN_NEXT = bytes.fromhex("80b080b180b280b380b480b5")
 
 # Exact target-observed ACK order of one post-first-image cycle (D263 primary
 # evidence, packets 235, 241, 247, 253 and the pre-first-image 229).
 CYCLE_ACK_CONTROLS = (0x34, 0x20, 0x50, 0x32, 0x22)
 
 
-def cycle_inputs():
+def cycle_inputs(cycle=0):
+    down = DOWN if cycle == 0 else DOWN_NEXT
+    next_up = UP_NEXT if cycle == 0 else UP
     return [
         Input(InputKind.ACK, control=0x34, status=1),
-        Input(InputKind.IRQ, irq=0x0200),
+        Input(
+            InputKind.IRQ,
+            irq=0x0200,
+            derived_fdt_table=DerivedFdtTable(down, 0x0200, cycle),
+        ),
         Input(InputKind.ACK, control=0x20, status=1),
         Input(InputKind.IMAGE, raster=RASTER),
         Input(InputKind.ACK, control=0x50, status=1),
-        Input(InputKind.NAV_RESPONSE, control=0x50),
+        Input(
+            InputKind.NAV_RESPONSE,
+            control=0x50,
+            outer_length=2417,
+            inner_length=2410,
+        ),
         Input(InputKind.ACK, control=0x32, status=1),
-        Input(InputKind.IRQ, irq=0x0002),
+        Input(
+            InputKind.IRQ,
+            irq=0x0002,
+            derived_fdt_table=DerivedFdtTable(next_up, 0x0002, cycle + 1),
+        ),
         Input(InputKind.ACK, control=0x22, status=1),
         Input(InputKind.IMAGE, raster=RASTER),
     ]
@@ -84,9 +102,23 @@ def controls(channel):
     return result
 
 
+def command_data(channel):
+    result = []
+    for frame, _timeout in channel.writes:
+        _kind, payload = parse_outer(frame)
+        control, data = parse_payload(payload)
+        result.append((control, data))
+    return result
+
+
 class D272MultiFrameTests(unittest.TestCase):
     def contract(self, roles=("A1", "A2", "A3")):
-        return MultiFrameContract(roles, UP, DOWN, 0x1234)
+        timestamps = tuple(0x1234 + index for index in range(len(roles) - 1))
+        return MultiFrameContract(
+            roles,
+            DerivedFdtTable(UP, 0x0002, 0),
+            timestamps,
+        )
 
     def test_exact_bounded_order_and_terminal_last_image(self):
         retained = []
@@ -95,7 +127,7 @@ class D272MultiFrameTests(unittest.TestCase):
             retained.append(raster)
             return {"role": role, "keypoints": 31}
 
-        channel = FakeSingleReader(cycle_inputs() + cycle_inputs())
+        channel = FakeSingleReader(cycle_inputs(0) + cycle_inputs(1))
         result = BoundedMultiFrameRunner(channel, sink).run(
             self.contract(), RASTER
         )
@@ -103,6 +135,14 @@ class D272MultiFrameTests(unittest.TestCase):
         self.assertEqual(
             controls(channel),
             [0x34, 0x20, 0x50, 0x32, 0x22] * 2,
+        )
+        commands = command_data(channel)
+        self.assertEqual(commands[0], (0x34, b"\x0a\x01" + UP))
+        self.assertEqual(commands[3], (0x32, b"\x08\x01" + DOWN + b"\x34\x12"))
+        self.assertEqual(commands[5], (0x34, b"\x0a\x01" + UP_NEXT))
+        self.assertEqual(
+            commands[8],
+            (0x32, b"\x08\x01" + DOWN_NEXT + b"\x35\x12"),
         )
         self.assertFalse(channel.inputs)
         self.assertTrue(all(all(value == 0 for value in item) for item in retained))
@@ -113,8 +153,57 @@ class D272MultiFrameTests(unittest.TestCase):
         with self.assertRaisesRegex(MultiFrameError, "sample_count_out_of_bounds"):
             runner.run(self.contract(("A1",)), RASTER)
         with self.assertRaisesRegex(MultiFrameError, "up_table_source_unresolved"):
-            runner.run(MultiFrameContract(("A1", "A2"), b"", DOWN, 0), RASTER)
+            runner.run(
+                MultiFrameContract(
+                    ("A1", "A2"),
+                    DerivedFdtTable(b"", 0x0002, 0),
+                    (0,),
+                ),
+                RASTER,
+            )
         self.assertEqual(channel.writes, [])
+
+    def test_fdt_tables_are_fresh_and_irq_owned(self):
+        stale_down = cycle_inputs(0)
+        stale_down[1] = Input(
+            InputKind.IRQ,
+            irq=0x0200,
+            derived_fdt_table=DerivedFdtTable(DOWN, 0x0200, 9),
+        )
+        channel = FakeSingleReader(stale_down)
+        with self.assertRaisesRegex(MultiFrameError, "fdt_table_stale_cycle"):
+            BoundedMultiFrameRunner(channel, lambda role, raster: {}).run(
+                self.contract(("A1", "A2")), RASTER
+            )
+        self.assertEqual(controls(channel), [0x34])
+
+        wrong_source = cycle_inputs(0)
+        wrong_source[7] = Input(
+            InputKind.IRQ,
+            irq=0x0002,
+            derived_fdt_table=DerivedFdtTable(UP_NEXT, 0x0200, 1),
+        )
+        channel = FakeSingleReader(wrong_source)
+        with self.assertRaisesRegex(MultiFrameError, "fdt_table_source_irq"):
+            BoundedMultiFrameRunner(channel, lambda role, raster: {}).run(
+                self.contract(("A1", "A2")), RASTER
+            )
+        self.assertEqual(controls(channel), [0x34, 0x20, 0x50, 0x32])
+
+    def test_post_0x50_requires_target_a0_shape(self):
+        inputs = cycle_inputs(0)
+        inputs[5] = Input(
+            InputKind.NAV_RESPONSE,
+            control=0x50,
+            outer_length=2416,
+            inner_length=2410,
+        )
+        channel = FakeSingleReader(inputs)
+        with self.assertRaisesRegex(MultiFrameError, "nav_response_invalid"):
+            BoundedMultiFrameRunner(channel, lambda role, raster: {}).run(
+                self.contract(("A1", "A2")), RASTER
+            )
+        self.assertEqual(controls(channel), [0x34, 0x20, 0x50])
 
     def test_wrong_irq_stops_without_retry_or_extra_command(self):
         channel = FakeSingleReader([

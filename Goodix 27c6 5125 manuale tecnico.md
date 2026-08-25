@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D272/01 (sintesi)
+### Stato corrente post-D273/01 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -89,18 +89,30 @@ production e senza claim di qualità. Nessuna nuova fonte target-specific fissa
 DPI, orientation o polarity. Pertanto:
 
 D272/01 ha implementato due seam offline senza promuoverli a percorso live.
-Nel dominio GPL, `core/multiframe_validation.py` modella un ciclo bounded da 2
-a 8 sample con un solo reader, zero retry/reopen/recovery e stop immediato a
-ogni mismatch. L'audit della capture primaria ha però corretto la sequenza
-abbreviata: dopo l'immagine post-rilascio sono osservati anche `0x50`, il suo
-ACK e la risposta dinamica, prima del `0x32`. Inoltre la capture termina dopo
-l'ACK al re-arm: il successivo `IRQ2 → 0x22 → seconda immagine` è una
-composizione inferita con la sottosequenza pre-first-image, non una seconda
-iterazione osservata. Soprattutto, del body `0x34` è osservato il valore della
-tabella up nella sola sessione catturata, ma restano ignote origine,
-derivazione, freshness e validità per una sessione futura. Per questi motivi il
-modello non è collegato al transport USB reale e il kit D272 mantiene il flag
-future-live hard-disabled.
+D273/01 ha ora chiuso staticamente il dataflow delle tabelle FDT e la semantica
+del frame post-`0x50`, senza eseguire hardware. La tabella del `0x34` proviene
+dalla globale volatile di sessione OEM `0x180580838`: il dispatcher IRQ2 la
+aggiorna tramite `0x180029314`, che valida la base raw, deriva sei word con
+offset contestuale e applica touchflag/policy mode-dependent. Il builder
+FDT-up la copia poi direttamente nel body. Simmetricamente, il ramo normale
+dell'IRQ `0x0200` aggiorna la tabella down `0x180580818` usata dal nuovo
+`0x32`. Il valore catturato resta quindi un'istanza di sessione, non una
+costante target; il requisito è usare la generation più recente prodotta
+dall'IRQ dello stesso ciclo.
+
+Packet 249 è una risposta **A0 NAV `0x50`**, non un B0/TLS: 2417 byte fisici e
+outer dichiarati, inner 2410. `chicagoHUget_navdata` (`0x180067874`) usa mode 5
+e copia il NAV buffer di sessione al caller. Il modello GPL ora lega ogni
+tabella a IRQ sorgente e generation, usa la down table appena derivata per il
+re-arm e valida la forma A0 2417/2410 della risposta NAV. Rimangono single
+reader, ACK esatto `0x01`, zero retry/reopen/recovery e stop terminale.
+
+La sola capture positiva termina però dopo l'ACK del re-arm a packet 253: il
+successivo `IRQ2 → 0x22 → fingerprint B0` non è target-osservato. I componenti
+OEM event-driven esistono, ma l'ownership dell'intero edge di seconda
+iterazione non è univocamente chiusa dal call graph. Anche i timeout target
+restano ignoti. Il modello non è collegato al transport USB reale, nessuna
+allowlist live è ampliata e D268 resta terminale alla prima immagine.
 
 Una review AI-PM successiva ha inoltre corretto la policy ACK di quel modello:
 `_command_ack()` accettava `0x01|0x07`, più permissivo dell'evidenza D263 in cui
@@ -114,10 +126,13 @@ Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
 D269, chiama il SIGFM locale, mantiene il gate `<25`, distingue score zero da
 errore negativo e contiene le eccezioni C++/OpenCV al confine C. Raster, buffer
 u8 e `SigfmImgInfo` sono solo in memoria; non esiste API di serializzazione.
-Warning severi, ASan/UBSan e test double sintetico passano. L'ambiente corrente
-non contiene però OpenCV4 development files: la build/link del SIGFM reale non
-è eseguibile e `EXECUTABLE_CLOSURE=FAIL`. La fixture prova soltanto plumbing,
-non qualità biometrica.
+Warning severi, ASan/UBSan e test double sintetico passano. D273 ha aggiunto un
+harness synthetic-only per il vero SIGFM: adapter, wrapper e harness compilano
+nello SDK Flatpak, mentre il vero `sigfm.cpp` si arresta su
+`opencv2/core/mat.hpp` mancante. Né host né SDK installato espongono
+`opencv4.pc`; la build/link reale è quindi `NOT_AVAILABLE` e
+`EXECUTABLE_CLOSURE=FAIL`. Nessun pacchetto è stato installato. La fixture prova
+soltanto plumbing, non qualità biometrica.
 
 ```text
 PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
@@ -135,21 +150,31 @@ FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
 SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV
 SIGFM_EXCEPTION_CONTAINMENT=CLOSED_OFFLINE_AT_C_ABI
 SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
+OPENCV4_DEV_ENVIRONMENT=NOT_AVAILABLE
+REAL_SIGFM_BUILD=BLOCKED_OPENCV4_DEV_NOT_AVAILABLE
+REAL_SIGFM_EXECUTABLE_CLOSURE=FAIL_NOT_AVAILABLE
 NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
 SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
 NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
-MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_PASS_LIVE_INTEGRATION_BLOCKED
+MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_TABLE_DATAFLOW_CLOSED_SECOND_TARGET_CYCLE_AND_TIMEOUTS_BLOCKED
 D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
-POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_PAYLOAD_UP_TABLE_PROVENANCE_AND_FRESHNESS_UNKNOWN
+UP_TABLE12_SOURCE=OEM_SESSION_GLOBAL_GF_FDT_UP_BASE_VA_0X180580838
+UP_TABLE12_DERIVATION=IRQ_0X0002_RAW_BASE_VALIDATION_THEN_PER_WORD_HALF_PLUS_CONTEXT_OFFSET_ENCODING_AND_MODE_DEPENDENT_COMMIT_BY_0X180029314
+UP_TABLE12_LIFETIME=VOLATILE_OEM_PROCESS_SESSION_GLOBAL_INITIALIZABLE_BY_CALLBACK_0X180028480_AND_UPDATED_BY_FDT_IRQ_HANDLING
+UP_TABLE12_FRESHNESS_REQUIREMENT=0X34_MUST_CONSUME_THE_MOST_RECENT_VALID_IRQ_0X0002_DERIVED_TABLE_FROM_THE_SAME_FINGER_DOWN_CYCLE
+POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_BUILDER_AND_SESSION_TABLE_DATAFLOW_VERIFIED_STATICALLY
 FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
-POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_B0_SEMANTICS_NOT_QUALITY_PROVEN
-REARM_0X32_STATUS=OBSERVED_WITH_ACK_SECOND_CYCLE_COMPLETION_NOT_OBSERVED
+POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_POST_UP_B0_IMAGE_ROLE_STATICALLY_SUPPORTED_NO_QUALITY_CLAIM
+POST_FINGER_UP_0X50_STATUS=OBSERVED_WITH_EXACT_ACK_AND_OEM_NAV_GETTER_VERIFIED
+POST_0X50_RESPONSE_STATUS=OBSERVED_A0_0X50_NAV_RESPONSE_LENGTHS_2417_2410
+REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
+SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=POST_FIRST_IMAGE_MULTIFRAME_CONTRACT_CLOSURE_AND_REAL_SIGFM_BUILD
-NEXT_BOUNDARY_PREREQUISITE=TARGET_CLOSE_0X34_UP_TABLE_AND_SECOND_CYCLE_PLUS_EXISTING_OPENCV4_DEV_ENVIRONMENT
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
+NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -835,6 +860,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D270/01 costruzione FpImage reale | READY offline; object/ownership/dimensions CLOSED; full pipeline PARTIALLY_CLOSED; live false | helper LGPL opaco costruisce `FpImage(80,64)` reale e object-owned dal raster sintetico via adapter D269; weak-finalization, strict build, ASan/UBSan, root/external-cwd e symbol audit PASS; ppmm fisico separato `UNKNOWN`, NBIS fail-closed, SIGFM ppmm-independent ma non selezionato; orientation/polarity ancora unresolved |
 | D271/01 policy feature extractor | READY offline; policy CLOSED; full pipeline PARTIALLY_CLOSED; live false | call-flow extractor/template/matcher/enrollment locale ricostruito; SIGFM unico `CANDIDATE_FOR_VALIDATION` con input 80×64 strutturalmente supportato ma gate ≥25 keypoint e qualità target ignota; NBIS strutturalmente accetta 80×64 ma resta `BLOCKED` per ppmm ignoto e requisito ≥10 minutiae non provato; orientation/polarity unresolved, nessun claim da fixture sintetiche o Rocky |
 | D272/01 pre-live multi-frame + metriche SIGFM | BLOCKED per live/executable closure; avanzamento offline reale; live false | ordine OEM corretto con `0x50` obbligatorio; modello bounded 2–8 sample, single-reader e fail-closed PASS sintetico; seam SIGFM LGPL con mapping D269, gate 25, score/error ed exception containment PASS su double; origine/freshness tabella `0x34`, seconda iterazione target e build SIGFM reale bloccata da OpenCV4-dev assente; policy ACK del ciclo corretta post-review AI-PM da `0x01|0x07` a `status` esatto `0x01` (`D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01`), blocker primari invariati |
+| D273/01 closure post-first-image + SIGFM reale | PARTIAL CLOSURE offline; live false; executable closure globale FAIL_NOT_AVAILABLE | dataflow up/down OEM chiuso: IRQ2 aggiorna up globale di sessione consumata da `0x34`, IRQ0200 aggiorna down consumata da re-arm `0x32`; packet 249 chiuso come A0 NAV `0x50` 2417/2410; modello corretto con source IRQ/generation e timestamp per transizione; seconda iterazione target e timeout non osservati; host e SDK senza OpenCV4-dev, vero `sigfm.cpp` non compilabile, nessuna installazione |
 
 ## Fonti e confini di pubblicazione
 
@@ -3970,6 +3996,109 @@ POLARITY_CONTRACT=UNRESOLVED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
 NEXT_PRIMARY_BOUNDARY=POST_FIRST_IMAGE_MULTIFRAME_CONTRACT_CLOSURE_AND_REAL_SIGFM_BUILD
 NEXT_BOUNDARY_PREREQUISITE=TARGET_CLOSE_0X34_UP_TABLE_AND_SECOND_CYCLE_PLUS_EXISTING_OPENCV4_DEV_ENVIRONMENT
+BASELINE_APPROVED=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
+```
+
+### D273/01: dataflow multi-frame e build SIGFM reale, solo offline
+
+D273/01 parte dal corrective D272 completo
+`062c05a1fbe198c858eaeba4b86db1d24eb79f39` sul branch `development`, con
+working tree iniziale pulita e ancestor check PASS. Non ha aperto USB, inviato
+comandi Goodix, materializzato secret, contattato fprintd o acquisito biometria.
+
+Il census programmatico delle capture target-specific locali conferma una sola
+sequenza positiva in `rilevamento.pcapng` hash
+`50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b`.
+La seconda fonte, la capture D255 hash
+`802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c`,
+è zero-finger e non contiene IRQ2 o record positivo. Nella fonte positiva il
+packet 249 è A0, control `0x50`, physical/outer length 2417 e inner length
+2410. È quindi la response command-specific NAV, non un B0/TLS. Il DLL OEM
+conferma la semantica: `chicagoHUget_navdata` a `0x180067874` usa mode 5 e
+copia il NAV buffer volatile di sessione al caller.
+
+L'audit statico del `gfusb.dll` hash
+`904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`
+chiude il dataflow FDT:
+
+- `0x180028480` può inizializzare entrambe le globali up/down o una sola;
+- il ramo IRQ `0x0002` del dispatcher chiama `0x180029314`, che valida la base
+  raw, deriva sei word e aggiorna la globale up `0x180580838`;
+- il builder FDT-up `0x1800250d0–0x1800251b5` copia direttamente tale globale
+  nel body `0a 01 || table12` del `0x34`;
+- nel ramo normale IRQ `0x0200`, `0x180029210` aggiorna la globale down
+  `0x180580818`, poi consumata dal builder `0x32` con timestamp;
+- il valore up osservato a packet 233 è quindi session data, non una costante
+  APP12509.
+
+La freshness è classificata `STRONG_CAUSAL_INFERENCE`: IRQ2 packet 225 precede
+il builder `0x34` packet 233 nello stesso ciclo e il dataflow statico collega
+esattamente quell'evento alla globale consumata. Il modello offline rende ora
+eseguibile tale contratto: `DerivedFdtTable` lega 12 byte a source IRQ e
+generation; IRQ0200 deve fornire la down table corrente per il `0x32`, mentre
+il successivo IRQ2 fornisce la up table della generation seguente. Una tabella
+stale, con source errata o lunghezza errata fallisce chiuso. I timestamp sono
+forniti per transizione e la NAV response richiede control/lunghezze target
+`0x50/2417/2410`.
+
+La capture positiva termina però all'ACK packet 253 del re-arm. Il DLL espone
+dispatcher IRQ2, builder immagine e consumer ripetibili, ma il call graph non
+chiude univocamente l'ownership dell'intero edge nello stesso lifecycle. Rocky
+corrobora apprendimento up/down e ciclo FDT, ma diverge nella coda post-`0x34`
+e resta fonte terza, non prova target. La seconda iterazione e i timeout target
+restano quindi aperti; una eventuale nuova fonte minima dovrebbe osservare un
+solo segmento Windows OEM bounded `0x32 ACK → IRQ2 → 0x22 ACK → fingerprint
+B0`, senza conservare nel bundle raw, plaintext o biometria. D273 non crea un
+Operator Kit e non autorizza tale acquisizione.
+
+Sul boundary SIGFM, host e SDK Flatpak 25.08 installato non espongono
+`opencv4.pc`; l'host non ha inoltre un frontend C++ rilevato. Nello SDK isolato
+dalla rete, GCC/G++ hanno compilato con warning severi adapter D269, wrapper e
+harness synthetic-only reale. La compilazione del vero `sigfm.cpp` fallisce su
+`opencv2/core/mat.hpp` mancante; link e runtime sono `NOT_AVAILABLE`. Nessuna
+installazione o vendorizzazione è stata eseguita. L'harness non serializza e
+non introduce claim di qualità, sufficienza keypoint target, separazione,
+polarity, orientation o threshold.
+
+Stato canonico D273:
+
+```text
+OUTCOME=PARTIAL_CLOSURE_UP_TABLE_AND_POST_0X50_CLOSED_SECOND_TARGET_CYCLE_AND_REAL_SIGFM_BUILD_BLOCKED
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED_AND_OFFLINE_MODEL_CORRECTED
+EXECUTABLE_CLOSURE=FAIL_REAL_SIGFM_NOT_AVAILABLE
+MULTIFRAME_CONTRACT=PARTIALLY_CLOSED_TARGET_SECOND_CYCLE_NOT_OBSERVED_AND_TARGET_TIMEOUTS_UNCLOSED
+MULTIFRAME_MODEL_EXECUTABLE_CLOSURE=PASS_OFFLINE
+UP_TABLE12_SOURCE=OEM_SESSION_GLOBAL_GF_FDT_UP_BASE_VA_0X180580838
+UP_TABLE12_DERIVATION=IRQ_0X0002_RAW_BASE_VALIDATION_THEN_PER_WORD_HALF_PLUS_CONTEXT_OFFSET_ENCODING_AND_MODE_DEPENDENT_COMMIT_BY_0X180029314
+UP_TABLE12_LIFETIME=VOLATILE_OEM_PROCESS_SESSION_GLOBAL_INITIALIZABLE_BY_CALLBACK_0X180028480_AND_UPDATED_BY_FDT_IRQ_HANDLING
+UP_TABLE12_FRESHNESS_REQUIREMENT=0X34_MUST_CONSUME_THE_MOST_RECENT_VALID_IRQ_0X0002_DERIVED_TABLE_FROM_THE_SAME_FINGER_DOWN_CYCLE
+POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_BUILDER_AND_SESSION_TABLE_DATAFLOW_VERIFIED_STATICALLY
+FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
+POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_POST_UP_B0_IMAGE_ROLE_STATICALLY_SUPPORTED_NO_QUALITY_CLAIM
+POST_FINGER_UP_0X50_STATUS=OBSERVED_WITH_EXACT_ACK_AND_OEM_NAV_GETTER_VERIFIED
+POST_0X50_RESPONSE_STATUS=OBSERVED_A0_0X50_NAV_RESPONSE_LENGTHS_2417_2410
+REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
+SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
+D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
+ACK_0X07_ACCEPTED=false
+OPENCV4_DEV_ENVIRONMENT=NOT_AVAILABLE
+REAL_SIGFM_BUILD=BLOCKED_OPENCV4_DEV_NOT_AVAILABLE
+REAL_SIGFM_EXECUTABLE_CLOSURE=FAIL_NOT_AVAILABLE
+SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV
+SIGFM_EXCEPTION_CONTAINMENT=CLOSED_OFFLINE_AT_C_ABI
+SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+D273_TARGET_EVIDENCE_GAP=EXACT_MINIMUM_NEW_OBSERVATION_REQUIRED
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
+NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
 BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false

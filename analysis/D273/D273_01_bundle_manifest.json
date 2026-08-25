@@ -1,0 +1,71 @@
+{
+  "artifact": "D273_01_bundle_manifest",
+  "step": "D273/01",
+  "generated_at": "2026-08-25T15:02:39+02:00",
+  "execution_mode": "OFFLINE_ONLY",
+  "bundle_type": "STEP_LOCAL_NON_CUMULATIVE_SANITIZED",
+  "reference_head": "062c05a1fbe198c858eaeba4b86db1d24eb79f39",
+  "review_set": [
+    "analysis/D273/D273_01_post_first_image_multiframe_sigfm_report.md",
+    "analysis/D273/D273_01_capture_census.json",
+    "analysis/D273/D273_01_multiframe_evidence_matrix.json",
+    "analysis/D273/D273_01_up_table_dataflow.json",
+    "analysis/D273/D273_01_post_0x50_contract.json",
+    "analysis/D273/D273_01_sigfm_build_evidence.json",
+    "analysis/D273/D273_01_target_evidence_gap.json",
+    "analysis/D273/D273_01_test_results.json",
+    "analysis/D273/D273_01_execution_manifest.json",
+    "analysis/D273/D273_01_bundle_manifest.json",
+    "analysis/D273/d273_01_offline_capture_audit.py",
+    "core/multiframe_validation.py",
+    "tests/test_d272_multiframe_validation.py",
+    "libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp",
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "implementation_files_added_or_modified": [
+    "core/multiframe_validation.py",
+    "libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp"
+  ],
+  "test_and_audit_files_added_or_modified": [
+    "tests/test_d272_multiframe_validation.py",
+    "analysis/D273/d273_01_offline_capture_audit.py"
+  ],
+  "canonical_files_modified": [
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "referenced_unchanged_files_not_bundled": [
+    "AGENTS.md",
+    "Linee Guida di Progetto Goodix 27c6 5125 per AI.md",
+    "Rockytkg/PROVENANCE.md",
+    "Rockytkg/src/goodix_capture.c",
+    "Rockytkg/src/goodixgf.c",
+    "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp",
+    "analysis/D230/work/GoodixExport/gfusb.dll",
+    "analysis/D230/work/GoodixExport/gfusb_static_refs/gfusb_disasm.txt",
+    "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+    "captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng"
+  ],
+  "excluded": [
+    "raw pcapng/capture and packet payloads",
+    "B0 content, TLS plaintext and real biometric material",
+    "PSK, secrets and keys",
+    "firmware and proprietary DLLs",
+    "raster, pixel, keypoint coordinates, descriptors, templates and FP3",
+    "OpenCV binaries/vendor packages",
+    "build outputs, cache, temporary files and historical bundles"
+  ],
+  "synthetic_test_source_in_bundle": true,
+  "static_biometric_fixture_in_bundle": false,
+  "biometric_data_in_bundle": false,
+  "raw_image_in_bundle": false,
+  "secret_in_bundle": false,
+  "firmware_in_bundle": false,
+  "dll_in_bundle": false,
+  "capture_raw_in_bundle": false,
+  "sigfm_template_or_descriptor_in_bundle": false,
+  "sha256_sidecar": "analysis/D273/D273_01_post_first_image_multiframe_sigfm_bundle.zip.sha256",
+  "bundle_sha256": "SEE_EXTERNAL_SIDECAR",
+  "outcome": "PARTIAL_CLOSURE_UP_TABLE_AND_POST_0X50_CLOSED_SECOND_TARGET_CYCLE_AND_REAL_SIGFM_BUILD_BLOCKED",
+  "live_authorized": false,
+  "ready_for_live": false
+}

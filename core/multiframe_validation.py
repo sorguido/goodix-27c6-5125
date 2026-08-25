@@ -3,8 +3,9 @@
 
 This module deliberately has no USB or TLS implementation.  Its channel has a
 single ``read_next`` method so that a future integration cannot accidentally
-introduce a second physical reader.  D272 keeps that integration hard-disabled:
-the source/freshness contract for the 0x34 table is not target-closed.
+introduce a second physical reader.  D273 keeps live integration hard-disabled:
+the table dataflow is now modelled, but a complete second target cycle and the
+target timeout policy are not locally observed.
 """
 
 from dataclasses import dataclass
@@ -40,12 +41,32 @@ class InputKind(Enum):
 
 
 @dataclass(frozen=True)
+class DerivedFdtTable:
+    """A 12-byte table tied to the IRQ and cycle that produced it."""
+
+    value: bytes
+    source_irq: int
+    cycle: int
+
+    def validate(self, expected_irq: int, expected_cycle: int) -> None:
+        if len(self.value) != 12:
+            raise MultiFrameError("fdt_table_length")
+        if self.source_irq != expected_irq:
+            raise MultiFrameError("fdt_table_source_irq")
+        if self.cycle != expected_cycle:
+            raise MultiFrameError("fdt_table_stale_cycle")
+
+
+@dataclass(frozen=True)
 class Input:
     kind: InputKind
     control: int | None = None
     status: int | None = None
     irq: int | None = None
     raster: tuple[int, ...] | None = None
+    derived_fdt_table: DerivedFdtTable | None = None
+    outer_length: int | None = None
+    inner_length: int | None = None
 
 
 class SingleReaderChannel(Protocol):
@@ -72,9 +93,8 @@ class TimeoutPolicy:
 @dataclass(frozen=True)
 class MultiFrameContract:
     roles: tuple[str, ...]
-    up_table12: bytes
-    down_table12: bytes
-    rearm_timestamp16: int
+    initial_up_table: DerivedFdtTable
+    rearm_timestamps16: tuple[int, ...]
     timeouts: TimeoutPolicy = TimeoutPolicy()
 
     def validate(self) -> None:
@@ -84,11 +104,13 @@ class MultiFrameContract:
             raise MultiFrameError("sample_roles_not_unique")
         if any(not role or len(role) > 16 for role in self.roles):
             raise MultiFrameError("invalid_sample_role")
-        if len(self.up_table12) != 12:
-            raise MultiFrameError("up_table_source_unresolved")
-        if len(self.down_table12) != 12:
-            raise MultiFrameError("down_table_invalid")
-        if not 0 <= self.rearm_timestamp16 <= 0xFFFF:
+        try:
+            self.initial_up_table.validate(0x0002, 0)
+        except MultiFrameError as error:
+            raise MultiFrameError("up_table_source_unresolved") from error
+        if len(self.rearm_timestamps16) != len(self.roles) - 1:
+            raise MultiFrameError("rearm_timestamp_count")
+        if any(not 0 <= value <= 0xFFFF for value in self.rearm_timestamps16):
             raise MultiFrameError("rearm_timestamp_out_of_range")
         values = vars(self.timeouts).values()
         if any(not 1 <= value <= 30_000 for value in values):
@@ -149,13 +171,18 @@ class BoundedMultiFrameRunner:
         contract.validate()
         metrics = [self._consume(contract.roles[0], first_image)]
         t = contract.timeouts
+        current_up = contract.initial_up_table
 
-        for role in contract.roles[1:]:
+        for cycle, role in enumerate(contract.roles[1:]):
             # Exact target-observed order.  The 0x50 stage is not optional.
-            self._command_ack(build_fdt_up(contract.up_table12), 0x34, t.command_ms)
+            current_up.validate(0x0002, cycle)
+            self._command_ack(build_fdt_up(current_up.value), 0x34, t.command_ms)
             irq_up = self._read(InputKind.IRQ, t.irq_ms)
             if irq_up.irq != 0x0200:
                 raise MultiFrameError("expected_irq_0x0200")
+            if irq_up.derived_fdt_table is None:
+                raise MultiFrameError("down_table_missing_from_irq_0x0200")
+            irq_up.derived_fdt_table.validate(0x0200, cycle)
 
             self._command_ack(build_set_image(), 0x20, t.command_ms)
             post_up = self._read(InputKind.IMAGE, t.image_ms)
@@ -171,22 +198,33 @@ class BoundedMultiFrameRunner:
 
             self._command_ack(build_nav_baseline(), 0x50, t.command_ms)
             nav = self._read(InputKind.NAV_RESPONSE, t.nav_ms)
-            if nav.control != 0x50:
+            if (
+                nav.control != 0x50
+                or nav.outer_length != 2417
+                or nav.inner_length != 2410
+            ):
                 raise MultiFrameError("nav_response_invalid")
 
             self._command_ack(
-                build_fdt_down(contract.down_table12, contract.rearm_timestamp16),
+                build_fdt_down(
+                    irq_up.derived_fdt_table.value,
+                    contract.rearm_timestamps16[cycle],
+                ),
                 0x32,
                 t.command_ms,
             )
             irq_down = self._read(InputKind.IRQ, t.irq_ms)
             if irq_down.irq != 0x0002:
                 raise MultiFrameError("expected_irq_0x0002")
+            if irq_down.derived_fdt_table is None:
+                raise MultiFrameError("up_table_missing_from_irq_0x0002")
+            irq_down.derived_fdt_table.validate(0x0002, cycle + 1)
 
             self._command_ack(build_finger_image(), 0x22, t.command_ms)
             image = self._read(InputKind.IMAGE, t.image_ms)
             if image.raster is None:
                 raise MultiFrameError("finger_image_missing")
             metrics.append(self._consume(role, image.raster))
+            current_up = irq_down.derived_fdt_table
 
         return tuple(metrics)
