@@ -28,7 +28,7 @@
     {
       "name": "powershell_source_guards",
       "status": "PASS",
-      "detail": "no real Start-Process call; no tshark capture-arg invocation (-i/-w/-f/-Y); no Set-Acl/icacls; source hard-disable guard present; SPDX header on both wrappers; kit source-scan guards present."
+      "detail": "no real Start-Process call; no capture-start TShark invocation in kit (context-aware allowlist: only '& $tshark --version' and '& $tshark -D' permitted; PowerShell format operator -f is no longer a false positive); no Set-Acl/icacls; source hard-disable guard present; SPDX header on both wrappers; kit source-scan guards present."
     },
     {
       "name": "trailing_whitespace_check",
@@ -173,7 +173,7 @@
     {
       "name": "forbidden_capture_args_absent",
       "status": "PASS",
-      "detail": "wrapper/kit source scan forbids -i/-w/-f/-Y; kit contains no Start-Process."
+      "detail": "kit source scan is now CONTEXT_AWARE_EXACT_ALLOWLIST: isolates '& $tshark' invocations, strips redirection/pipeline (2>&1,2>,>,|), and allows ONLY the exact argument sets '--version' or '-D'; augmented forms (e.g. --version -i, -D -w) are REJECTED; PowerShell format operator -f is NOT treated as a capture filter; kit contains no Start-Process; HARD_DISABLED_D274_01 present."
     },
     {
       "name": "hard_disable_preserved",
@@ -184,6 +184,126 @@
       "name": "no_pycache_in_package",
       "status": "PASS",
       "detail": "no __pycache__ inside the operator package."
+    },
+    {
+      "name": "baseline_approved_kit_source_contract",
+      "status": "PASS",
+      "detail": "D274/01 approved kit source contract verified context-aware: only discovery TShark invocations allowed."
+    },
+    {
+      "name": "powershell_format_operator_fixture",
+      "status": "PASS",
+      "detail": "'\".d274-write-probe-{0}\" -f [Guid]::NewGuid()' => ACCEPTED (no longer a false positive)."
+    },
+    {
+      "name": "tshark_version_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark --version' => ACCEPTED (allowlisted discovery form)."
+    },
+    {
+      "name": "tshark_discovery_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark -D' => ACCEPTED (allowlisted discovery form)."
+    },
+    {
+      "name": "tshark_capture_interface_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark -i USBPcap1' => REJECTED (non-allowlisted TShark invocation)."
+    },
+    {
+      "name": "tshark_capture_write_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark -w wire.pcapng' => REJECTED (non-allowlisted TShark invocation)."
+    },
+    {
+      "name": "tshark_capture_filter_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark -f \"usb\"' => REJECTED (non-allowlisted TShark invocation; distinct from PowerShell -f)."
+    },
+    {
+      "name": "tshark_display_filter_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark -Y \"usb\"' => REJECTED (non-allowlisted TShark invocation)."
+    },
+    {
+      "name": "start_process_fixture",
+      "status": "PASS",
+      "detail": "Start-Process => REJECTED (hard forbidden in kit source scan)."
+    },
+    {
+      "name": "acl_after_skipped_preflight_not_false_fail",
+      "status": "PASS",
+      "detail": "pre_gate failure or selftest failure before preflight -> windows_native_acl_behavior_test=NOT_EXECUTED_DUE_PRIOR_FAILURE (not FAIL)."
+    },
+    {
+      "name": "acl_preflight_pass_yields_pass",
+      "status": "PASS",
+      "detail": "preflight PASS and ACL metadata pass -> windows_native_acl_behavior_test=PASS."
+    },
+    {
+      "name": "acl_preflight_acl_failure_yields_fail",
+      "status": "PASS",
+      "detail": "preflight PASS but ACL privacy/root fails -> windows_native_acl_behavior_test=FAIL."
+    },
+    {
+      "name": "fail_result_collector_contract",
+      "status": "PASS",
+      "detail": "collect-d274-02-results.ps1 accepts the six core JSON from a FAIL run (failed_stage=pre_gate, others SKIPPED) and produces results.zip + .sha256 without requiring PASS."
+    },
+    {
+      "name": "environment_tshark_discovery_non_authoritative",
+      "status": "PASS",
+      "detail": "environment tshark discovery (PATH-only) is NON_AUTHORITATIVE_DIAGNOSTIC; D274/01 -PreflightOnly tshark discovery is AUTHORITATIVE_GATE."
+    },
+    {
+      "name": "final_integrity_manifest_self_consistent",
+      "status": "PASS",
+      "detail": "after freezing static files, every entries.sha256 in D274_02_operator_package_integrity.json equals the SHA-256 of the final file on disk (runner, collector, README, kit, postprocessor, and approved D274/01 baseline)."
+    },
+    {
+      "name": "final_runner_hash_matches_manifest",
+      "status": "PASS",
+      "detail": "run-d274-02-native-qualification.ps1 actual a381282ba2507118d69769d9443ba75ce881f923790f68fdeb9af26c6c8c8de1 == manifest recorded."
+    },
+    {
+      "name": "final_collector_hash_matches_manifest",
+      "status": "PASS",
+      "detail": "collect-d274-02-results.ps1 actual e2ce99a6... == manifest recorded."
+    },
+    {
+      "name": "final_readme_hash_matches_manifest",
+      "status": "PASS",
+      "detail": "D274_02_OPERATOR_README_IT.md actual 85c55cdb... == manifest recorded."
+    },
+    {
+      "name": "final_kit_hash_matches_manifest",
+      "status": "PASS",
+      "detail": "operator_kit/d274-windows-multiframe-evidence.ps1 actual 4b0b3b1c... == manifest recorded (byte-identical D274/01 baseline)."
+    },
+    {
+      "name": "final_postprocessor_hash_matches_manifest",
+      "status": "PASS",
+      "detail": "analysis/D274/d274_postprocess_multiframe_evidence.py actual 2867ff23... == manifest recorded (byte-identical D274/01 baseline)."
+    },
+    {
+      "name": "tshark_exact_version_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark --version' => ACCEPT; '& $tshark --version -i USBPcap1' => REJECT; '& $tshark --version -f usb' => REJECT."
+    },
+    {
+      "name": "tshark_exact_discovery_fixture",
+      "status": "PASS",
+      "detail": "'& $tshark -D' => ACCEPT; '& $tshark -D -w wire.pcapng' => REJECT; '& $tshark -D -Y usb' => REJECT; '& $tshark -i USBPcap1' => REJECT; '& $tshark -w wire.pcapng' => REJECT."
+    },
+    {
+      "name": "tshark_allowlist_trailing_argument_escape",
+      "status": "PASS",
+      "detail": "CONTEXT_AWARE_EXACT_ALLOWLIST rejects trailing switches appended to allowlisted forms; no trailing-argument escape."
+    },
+    {
+      "name": "operator_console_guidance",
+      "status": "PASS",
+      "detail": "runner prints Italian guidance to run collector both after PASS and FAIL; exit codes preserved (PASS->0, FAIL->!=0)."
     }
   ],
   "d274_02_capture_root_authority": "PACKAGE_ROOT_CAPTURES",
@@ -209,7 +329,7 @@
   "d274_real_capture_capability": 0,
   "d274_hard_disabled": true,
   "d274_operator_package": "READY_FOR_AI_PM_REVIEW",
-  "d274_windows_native_execution": "NOT_YET_PERFORMED",
+  "d274_windows_native_execution": "ONE_FAILED_PRE_GATE_RUN_OBSERVED",
   "d274_windows_native_qualification": "NOT_YET_DETERMINED",
   "real_usb_open_count": 0,
   "real_command_send_count": 0,
@@ -221,5 +341,35 @@
   "real_windows_enrollment_commit_count": 0,
   "persistent_device_write_count": 0,
   "live_execution": "NOT_PERFORMED",
-  "windows_native_powershell_test": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT"
+  "windows_native_powershell_test": "NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT",
+  "d274_02_first_windows_operator_run": "FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN",
+  "d274_02_first_windows_operator_run_root_cause": "GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR",
+  "d274_02_tshark_source_contract": "CONTEXT_AWARE_EXACT_ALLOWLIST",
+  "d274_02_tshark_allowlist_trailing_argument_escape": false,
+  "d274_02_integrity_manifest_generated_after_static_files_frozen": true,
+  "d274_02_final_integrity_manifest_self_consistent": "PASS",
+  "d274_02_final_runner_hash_matches_manifest": "PASS",
+  "d274_02_final_collector_hash_matches_manifest": "PASS",
+  "d274_02_final_readme_hash_matches_manifest": "PASS",
+  "d274_02_final_kit_hash_matches_manifest": "PASS",
+  "d274_02_final_postprocessor_hash_matches_manifest": "PASS",
+  "d274_02_bundle_manifest_static_runtime_paths_accurate": "PASS",
+  "d274_02_powershell_format_operator_false_positive": false,
+  "d274_02_acl_result_after_skipped_preflight": "NOT_EXECUTED_DUE_PRIOR_FAILURE",
+  "d274_02_fail_result_collector_contract": "PASS",
+  "d274_02_operator_console_guidance": "RUNNER_PRINTS_ITALIAN_GUIDANCE_TO_RUN_COLLECTOR_BOTH_PASS_AND_FAIL",
+  "d274_02_environment_tshark_discovery": "NON_AUTHORITATIVE_DIAGNOSTIC",
+  "d274_01_preflight_tshark_discovery": "AUTHORITATIVE_GATE",
+  "windows_powershell51_runtime": "PASS",
+  "operator_package_integrity_runtime": "PASS",
+  "first_failure_stop_runtime": "PASS",
+  "fail_core_json_production_runtime": "PASS",
+  "windows_native_acl_behavior_test": "NOT_YET_EXECUTED",
+  "d274_native_hard_disable_adversarial_test": "NOT_YET_EXECUTED",
+  "d274_second_cycle_target_observation": "NOT_EXECUTED",
+  "baseline_approved": false,
+  "live_authorized": false,
+  "ready_for_live": false,
+  "next_primary_boundary": "AI_PM_REVIEW_D274_02_FINAL_INTEGRITY_CORRECTIVE",
+  "next_boundary_prerequisite": "AI_PM_PASS_THEN_SECOND_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN"
 }

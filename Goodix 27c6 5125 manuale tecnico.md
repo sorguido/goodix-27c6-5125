@@ -4497,11 +4497,15 @@ D274/02 prepara esclusivamente offline un **pacchetto operator-run** per
 qualificare nativamente su Windows le sole modalità innocue del Kit D274/01:
 `-SelfTestOnly`, `-PreflightOnly`, `-PreAuthorizationSimulationOnly`. L'AI
 esecutrice non dispone della VM Windows target e non esegue né simula la
-qualificazione nativa. Questo è un corrective in-place del pacchetto già
-preparato: la review AI-PM ha trovato e corretto cinque difetti (A–E) più un
-hardening (F) e una lacuna di privacy. Lo step chiude ora
+qualificazione nativa. La **prima operator-run Windows nativa** del pacchetto ha
+chiuso `result=FAIL` allo `pre_gate` per un falso positivo del source scan (la
+regex `-f\s` ha scambiato l'operatore di formattazione PowerShell per il
+capture-filter di TShark); è seguito un corrective in-place dello stesso D274/02
+che rende il source contract context-aware e corregge la verità dell'ACL dopo
+pre-gate fallito. La review AI-PM aveva inoltre trovato e corretto cinque
+difetti (A–E) più un hardening (F) e una lacuna di privacy. Lo step chiude ora
 `D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW` e
-`D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED`. La qualificazione nativa
+`D274_02_WINDOWS_NATIVE_EXECUTION=ONE_FAILED_PRE_GATE_RUN_OBSERVED`. La qualificazione nativa
 reale avverrà quando l'operatore eseguirà il pacchetto nella VM e rispedirà il
 result bundle; fino ad allora
 `D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED`,
@@ -4600,8 +4604,33 @@ registry, event log, screenshot, dati di impronta, B0, TLS, segreti, PSK, cache,
 DLL o firmware.
 
 ```text
+D274_02_FIRST_WINDOWS_OPERATOR_RUN=FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN
+D274_02_FIRST_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR
+WINDOWS_POWERSHELL51_RUNTIME=PASS
+OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+FIRST_FAILURE_STOP_RUNTIME=PASS
+FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
+NO_LIVE_CAPTURE_PERFORMED=true
+REAL_CAPTURE_START_COUNT=0
+REAL_USB_OPEN_COUNT=0
+HARD_DISABLE_PRESERVED=true
 D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
-D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED
+D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST
+D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false
+D274_02_POWERSHELL_FORMAT_OPERATOR_FALSE_POSITIVE=false
+D274_02_FINAL_INTEGRITY_MANIFEST_SELF_CONSISTENT=PASS
+D274_02_INTEGRITY_MANIFEST_GENERATED_AFTER_STATIC_FILES_FROZEN=true
+D274_02_FINAL_RUNNER_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_COLLECTOR_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_README_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_KIT_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_POSTPROCESSOR_HASH_MATCHES_MANIFEST=PASS
+D274_02_BUNDLE_MANIFEST_STATIC_RUNTIME_PATHS_ACCURATE=PASS
+D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE
+D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS
+D274_02_ENVIRONMENT_TSHARK_DISCOVERY=NON_AUTHORITATIVE_DIAGNOSTIC
+D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE
+D274_02_WINDOWS_NATIVE_EXECUTION=ONE_FAILED_PRE_GATE_RUN_OBSERVED
 D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
 WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
 D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
@@ -4616,12 +4645,103 @@ D274_02_AUTOMATIC_RETRY_COUNT=0
 D274_REAL_CAPTURE_CAPABILITY=0
 D274_HARD_DISABLED=true
 D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_OPERATOR_PACKAGE
-NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_DETAILED_OPERATOR_INSTRUCTIONS_AND_WINDOWS_NATIVE_OFFLINE_EXECUTION
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_INTEGRITY_CORRECTIVE
+NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_SECOND_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
 ```
+
+#### D274/02 — prima operator-run Windows (FAIL pre-gate, falso positivo source-scan)
+
+La prima vera esecuzione operatore Windows del pacchetto D274/02 ha chiuso
+`result=FAIL` allo `pre_gate`. Non è un failure dell'ambiente Windows: la review
+AI-PM ha identificato un falso positivo nel source scan del package.
+
+Evidence nativa osservata:
+
+```text
+runtime_result_state=WINDOWS_NATIVE_OFFLINE_QUALIFICATION_EXECUTED_BY_OPERATOR
+result=FAIL
+failed_stage=pre_gate
+failure_detail_sanitized=D274_02_FAIL_CLOSED: kit source scan found forbidden capture argument token: -f\s
+assert_windows_powershell_51=PASS
+package_integrity=PASS
+pre_gate=FAIL
+selftest=SKIPPED
+preflight=SKIPPED
+preauthorization_simulation=SKIPPED
+hard_disable_adversarial=SKIPPED
+```
+
+Environment: Windows 11 Home build 26200; Windows PowerShell Desktop
+5.1.26100.8655; `operator_package_integrity=PASS`; `goodix_present_before_run=null`
+(corretto: il source-contract gate è fallito prima dell'osservazione PnP).
+
+Root cause: la regex generica `-f\s` applicata all'intero sorgente del Kit
+D274/01 ha scambiato l'operatore di formattazione PowerShell
+`(".d274-write-probe-{0}" -f [Guid]::NewGuid().ToString("N"))` per il
+capture-filter di TShark.
+
+La run ha chiuso solo i confini raggiunti:
+
+```text
+WINDOWS_POWERSHELL51_RUNTIME=PASS
+OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+FIRST_FAILURE_STOP_RUNTIME=PASS
+FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
+NO_LIVE_CAPTURE_PERFORMED=true
+REAL_CAPTURE_START_COUNT=0
+REAL_USB_OPEN_COUNT=0
+HARD_DISABLE_PRESERVED=true
+```
+
+Non è promossa a `WINDOWS_NATIVE_QUALIFICATION=PASS`, né a
+`WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=FAIL_REAL_ENVIRONMENT`, né a
+`TSHARK=ABSENT`/`USBPCAP=ABSENT`: la run è fallita troppo presto per tali
+conclusioni.
+
+Corrective in-place (stesso D274/02, nessun D274/03): il source contract è ora
+context-aware (`& $tshark` allowlist solo discovery; `-f` PowerShell non più
+falso positivo); l'ACL dopo pre-gate fallito è `NOT_EXECUTED_DUE_PRIOR_FAILURE`;
+il runner stampa in italiano l'invito al collector; il collector accetta il FAIL.
+Lo `environment.json` esporta `tshark_discovery_role=NON_AUTHORITATIVE_DIAGNOSTIC`
+(il vero gate è il `-PreflightOnly` del Kit D274/01,
+`D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE`).
+
+#### D274/02 — corrective finale post-review AI-PM (manifest integrità + allowlist esatta)
+
+La review AI-PM del bundle `64ddee56…` ha rilevato due blocchi, corretti in
+questa iterazione finale (sempre D274/02, nessun D274/03):
+
+- **FINAL_PACKAGE_INTEGRITY_MANIFEST_STALE=true** — root cause:
+  `MANIFEST_GENERATED_BEFORE_FINAL_RUNNER_AND_README_CHANGES`. Il bundle
+  precedente era stato costruito prima della rigenerazione del manifest, quindi
+  conteneva gli hash obsoleti di runner e README; alla seconda run Windows il
+  gate `package_integrity` sarebbe fallito (`pre_gate -> package_integrity ->
+  FAIL`) prima di raggiungere il fix del source-contract. Risolto rispettando
+  l'ordine: freeze dei file statici, calcolo degli SHA-256 reali dai file finali,
+  rigenerazione del manifest, verifica indipendente manifest-vs-files (tutte
+  PASS), e solo per ultimo la creazione dello ZIP. Stato:
+  `D274_02_FINAL_INTEGRITY_MANIFEST_SELF_CONSISTENT=PASS`,
+  `D274_02_INTEGRITY_MANIFEST_GENERATED_AFTER_STATIC_FILES_FROZEN=true`,
+  `D274_02_FINAL_RUNNER_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_COLLECTOR_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_README_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_KIT_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_POSTPROCESSOR_HASH_MATCHES_MANIFEST=PASS`.
+
+- **HARDENING B — allowlist TShark esatta**: `Test-D274KitSourceContract`
+  isola le righe `& $tshark`, rimuove redirection/pipeline (`2>&1`, `2>`, `>`,
+  `|`) e richiede argomenti effettivi **esattamente** `--version` o `-D`. Le due
+  righe baseline restano accettate; forme aumentate (`--version -i`, `-D -w`,
+  ecc.) sono rifiutate. Stato:
+  `D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST`,
+  `D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false`.
+
+D274/01 resta byte-identico (kit `4b0b3b1c…bd`, postprocessor `2867ff23…f37`);
+il corrective non cambia l'esito della prima operator run.
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
 La closure canonica D218–D220 (contract immagine Windows) va preservata e non

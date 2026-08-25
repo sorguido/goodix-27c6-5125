@@ -16,9 +16,25 @@ Windows le sole modalità innocue del Kit D274/01:
 
 L'AI esecutrice non dispone della VM Windows target e non finge alcuna
 esecuzione nativa. Questa iterazione è un **corrective in-place** dello stesso
-D274/02: la review AI-PM del pacchetto preparato ha trovato cinque difetti (A–E)
-più un hardening (F) e una lacuna di privacy, qui corretti e ri-testati. Lo step
-chiude solo:
+D274/02, successiva alla **prima vera esecuzione operatore Windows nativa** del
+pacchetto. Quella run ha chiuso con `result=FAIL` allo `pre_gate`, causato da un
+**falso positivo** del source scan: la regex generica `-f\s` ha scambiato
+l'operatore di formattazione PowerShell (`-f [Guid]`) per il capture-filter di
+TShark. Non è un failure dell'ambiente Windows: la review AI-PM ha identificato
+il falso positivo. La run ha comunque chiuso correttamente i soli confini
+raggiunti:
+
+```text
+WINDOWS_POWERSHELL51_RUNTIME=PASS
+OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+FIRST_FAILURE_STOP_RUNTIME=PASS
+FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
+```
+
+La review AI-PM del pacchetto preparato aveva inoltre trovato cinque difetti
+(A–E) più un hardening (F) e una lacuna di privacy, qui corretti e ri-testati.
+La presente iterazione corregge ulteriormente il source-scan (context-aware
+allowlist) e la verità dell'ACL dopo pre-gate fallito. Lo step chiude solo:
 
 ```text
 D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
@@ -167,6 +183,89 @@ probatorietà del FAIL:
 Il collector resta seconda barriera (SID/MAC/IP/`C:\Users\`/HKEY_/credential);
 non sono stati indeboliti i regex.
 
+## Corrective in-place successivo — source-scan false positive e verità ACL (RISOLTO)
+
+La prima operator-run Windows ha prodotto `result=FAIL` allo `pre_gate` con
+`failure_detail_sanitized = D274_02_FAIL_CLOSED: kit source scan found forbidden
+capture argument token: -f\s`. Root cause: la regex `-f\s` applicata all'intero
+sorgente del Kit D274/01 collide con l'operatore di formattazione PowerShell
+`(".d274-write-probe-{0}" -f [Guid]::NewGuid().ToString("N"))`. Corretto:
+
+- **Source contract context-aware**: `Test-D274KitSourceContract` isola le sole
+  righe che invocano realmente `& $tshark` e ammette solo le due forme
+  discovery approvate (`& $tshark --version`, `& $tshark -D`); ogni altra
+  invocazione `& $tshark` è rifiutata. L'operatore `-f` di PowerShell non è più
+  un falso positivo. Restano rifiutati `Start-Process` e l'assenza di
+  `HARD_DISABLED_D274_01`. Stato:
+  `D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_ALLOWLIST`,
+  `D274_02_POWERSHELL_FORMAT_OPERATOR_FALSE_POSITIVE=false`.
+
+Fixture verificate (offline, nel `prep_test_results`):
+`powershell_format_operator_fixture` ACCEPTED; `tshark_version_fixture` e
+`tshark_discovery_fixture` ACCEPTED; `tshark_capture_interface_fixture`,
+`tshark_capture_write_fixture`, `tshark_capture_filter_fixture`,
+`tshark_display_filter_fixture`, `Start-Process fixture` REJECTED.
+
+- **Verità ACL dopo pre-gate fallito**: la prima run aveva registrato
+  `windows_native_acl_behavior_test=FAIL` pur avendo il preflight `SKIPPED`
+  (bug: `$aclPass` non definito nel ramo else). Ora, se il preflight non è PASS,
+  l'ACL è `NOT_EXECUTED_DUE_PRIOR_FAILURE` (non FAIL). FAIL è usato solo quando il
+  preflight ha realmente eseguito il gate privacy/accessibility o la raccolta ACL
+  stessa è stata tentata come authority e il contract fallisce. Stato:
+  `D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE`.
+
+- **Collector UX**: il runner non crea lo ZIP; alla fine, sia in PASS sia in FAIL,
+  stampa in italiano l'invito a eseguire `.\collect-d274-02-results.ps1`; in FAIL
+  aggiunge che il FAIL sarà incluso nel bundle e di non tentare retry prima della
+  review AI-PM. Gli exit code macchina sono preservati (PASS→0, FAIL→!=0).
+
+- **Collector FAIL path**: il collector accetta il set dei sei core JSON anche da
+  una run FAIL (es. `failed_stage=pre_gate`, resto `SKIPPED`) e produce
+  `results.zip` + `.sha256` senza richiedere PASS. Stato:
+  `D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS`.
+
+- **TShark environment discovery non è authority**: il wrapper environment helper
+  (PATH-only) è `NON_AUTHORITATIVE_DIAGNOSTIC`; il vero gate `-PreflightOnly`
+  del Kit D274/01 (`$env:ProgramFiles\Wireshark\tshark.exe`) è
+  `AUTHORITATIVE_GATE`. Lo `environment.json` ora esporta
+  `tshark_discovery_role = NON_AUTHORITATIVE_DIAGNOSTIC`. La prima run aveva
+  `tshark_path=null`/`usbpcap_interfaces_count=0` ma ciò NON prova assenza di
+  TShark/USBPcap: il source-contract gate è fallito prima del preflight.
+
+## Corrective finale post-review AI-PM — manifest integrità e allowlist esatta (RISOLTO)
+
+La review AI-PM del bundle `64ddee56…` ha rilevato due blocchi risolti in questa
+iterazione finale (sempre D274/02, nessun D274/03):
+
+- **BLOCKER A — manifest di integrità stale**: il bundle precedente era stato
+  costruito *prima* della rigenerazione del manifest, quindi conteneva gli hash
+  obsoleti di runner e README. Alla seconda run Windows il gate
+  `package_integrity` sarebbe fallito (`pre_gate -> package_integrity -> FAIL`)
+  prima di raggiungere il fix del source-contract. Corretto rispettando l'ordine
+  obbligatorio: freeze dei file statici → calcolo degli SHA-256 REALI dai file
+  finali → rigenerazione di `D274_02_operator_package_integrity.json` → verifica
+  indipendente manifest-vs-files → solo alla fine ZIP. La verifica reale sui file
+  finali dal filesystem passa per ogni entry. Stati:
+  `D274_02_FINAL_INTEGRITY_MANIFEST_SELF_CONSISTENT=PASS`,
+  `D274_02_INTEGRITY_MANIFEST_GENERATED_AFTER_STATIC_FILES_FROZEN=true`,
+  `D274_02_FINAL_RUNNER_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_COLLECTOR_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_README_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_KIT_HASH_MATCHES_MANIFEST=PASS`,
+  `D274_02_FINAL_POSTPROCESSOR_HASH_MATCHES_MANIFEST=PASS`.
+
+- **HARDENING B — allowlist TShark esatta**: la regex precedente ancorava solo il
+  prefisso, quindi `& $tshark --version -i USBPcap1` veniva accettata. Ora
+  `Test-D274KitSourceContract` isola le righe `& $tshark`, rimuove
+  redirection/pipeline (`2>&1`, `2>`, `>`, `|`) e richiede che gli argomenti
+  effettivi siano **esattamente** `--version` o `-D`. Le due righe baseline
+  restano accettate; le forme aumentate sono rifiutate. Stato:
+  `D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST`,
+  `D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false`.
+
+D274/01 resta **byte-identico** (kit `4b0b3b1c…bd`, postprocessor
+`2867ff23…f37`); non cambia l'esito della prima operator run.
+
 ## Boundary D274/01 preservato
 
 Il Kit D274/01 `operator_kit/d274-windows-multiframe-evidence.ps1` è baseline e
@@ -223,21 +322,58 @@ no_convertfrom_json_as_hashtable_ps51_dependency, fail_result_six_core_files_mod
 first_failure_stop_model, runtime_summary_not_pending_operator_run,
 operator_package_hash_semantics, collector_exact_results_path,
 privacy_fail_result_source_contract, D274_01_copy_byte_identity,
-forbidden_capture_args_absent, hard_disable_preserved, git_diff_check, più i test
-precedenti (py_compile, JSON parse, source guards, trailing whitespace, bracket
-balance, package privacy scan). `WINDOWS_NATIVE_POWERSHELL_TEST=NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT`.
+forbidden_capture_args_absent (ora CONTEXT_AWARE_EXACT_ALLOWLIST), hard_disable_preserved,
+git_diff_check, baseline_approved_kit_source_contract, powershell_format_operator_fixture,
+tshark_version_fixture, tshark_discovery_fixture, tshark_capture_interface_fixture,
+tshark_capture_write_fixture, tshark_capture_filter_fixture, tshark_display_filter_fixture,
+start_process_fixture, tshark_exact_version_fixture, tshark_exact_discovery_fixture,
+tshark_allowlist_trailing_argument_escape, acl_after_skipped_preflight_not_false_fail,
+acl_preflight_pass_yields_pass, acl_preflight_acl_failure_yields_fail,
+fail_result_collector_contract, operator_console_guidance, environment_tshark_discovery_non_authoritative,
+final_integrity_manifest_self_consistent, final_runner_hash_matches_manifest,
+final_collector_hash_matches_manifest, final_readme_hash_matches_manifest,
+final_kit_hash_matches_manifest, final_postprocessor_hash_matches_manifest, più
+i test precedenti (py_compile, JSON parse, source guards, trailing whitespace,
+bracket balance, package privacy scan).
+`WINDOWS_NATIVE_POWERSHELL_TEST=NOT_AVAILABLE_IN_EXECUTOR_ENVIRONMENT`.
 
 ## Stato di preparazione
 
 ```text
+D274_02_FIRST_WINDOWS_OPERATOR_RUN=FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN
+D274_02_FIRST_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR
+WINDOWS_POWERSHELL51_RUNTIME=PASS
+OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
+FIRST_FAILURE_STOP_RUNTIME=PASS
+FAIL_CORE_JSON_PRODUCTION_RUNTIME=PASS
+NO_LIVE_CAPTURE_PERFORMED=true
+REAL_CAPTURE_START_COUNT=0
+REAL_USB_OPEN_COUNT=0
+HARD_DISABLE_PRESERVED=true
+D274_02_TSHARK_SOURCE_CONTRACT=CONTEXT_AWARE_EXACT_ALLOWLIST
+D274_02_TSHARK_ALLOWLIST_TRAILING_ARGUMENT_ESCAPE=false
+D274_02_POWERSHELL_FORMAT_OPERATOR_FALSE_POSITIVE=false
+D274_02_FINAL_INTEGRITY_MANIFEST_SELF_CONSISTENT=PASS
+D274_02_INTEGRITY_MANIFEST_GENERATED_AFTER_STATIC_FILES_FROZEN=true
+D274_02_FINAL_RUNNER_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_COLLECTOR_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_README_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_KIT_HASH_MATCHES_MANIFEST=PASS
+D274_02_FINAL_POSTPROCESSOR_HASH_MATCHES_MANIFEST=PASS
+D274_02_BUNDLE_MANIFEST_STATIC_RUNTIME_PATHS_ACCURATE=PASS
+D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE
+D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS
+D274_02_ENVIRONMENT_TSHARK_DISCOVERY=NON_AUTHORITATIVE_DIAGNOSTIC
+D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE
 D274_02_OPERATOR_PACKAGE=READY_FOR_AI_PM_REVIEW
-D274_02_WINDOWS_NATIVE_EXECUTION=NOT_YET_PERFORMED
+D274_02_WINDOWS_NATIVE_EXECUTION=ONE_FAILED_PRE_GATE_RUN_OBSERVED
 D274_02_WINDOWS_NATIVE_QUALIFICATION=NOT_YET_DETERMINED
 WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=NOT_YET_EXECUTED
 D274_NATIVE_HARD_DISABLE_ADVERSARIAL_TEST=NOT_YET_EXECUTED
 D274_REAL_CAPTURE_CAPABILITY=0
 D274_HARD_DISABLED=true
 D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
@@ -245,8 +381,8 @@ READY_FOR_LIVE=false
 ## Prossimo boundary
 
 ```text
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_OPERATOR_PACKAGE
-NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_DETAILED_OPERATOR_INSTRUCTIONS_AND_WINDOWS_NATIVE_OFFLINE_EXECUTION
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_02_FINAL_INTEGRITY_CORRECTIVE
+NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_SECOND_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
 ```
 
 ## Safety counters (run AI)

@@ -50,7 +50,24 @@ Lo script, in ordine:
 4. esegue `-SelfTestOnly`, `-PreflightOnly`, `-PreAuthorizationSimulationOnly`;
 5. esegue il test nativo read-only sul comportamento ACL della cartella `captures/`;
 6. esegue il test avversario hard-disable (il flag di autorizzazione deve fallire chiuso);
-7. produce i file JSON in `results/`.
+7. produce i **soli file JSON** in `results/`.
+
+**Il runner NON crea lo ZIP dei risultati.** Alla fine dell'esecuzione, sia in
+caso di PASS sia in caso di FAIL, il runner stampa in italiano:
+
+```text
+D274/02 ha terminato l'esecuzione.
+NON rilanciare il runner.
+Esegui ora:
+  .\collect-d274-02-results.ps1
+```
+
+In caso di FAIL viene inoltre stampato:
+
+```text
+Il FAIL verra' incluso nel bundle risultati.
+Non tentare correzioni o retry prima della review AI-PM.
+```
 
 In caso di FAIL a uno stadio, lo script si ferma senza retry e scrive l'errore
 letterale sanitizzato. **Non** riattaccare il dispositivo e **non** rilanciare
@@ -58,7 +75,8 @@ senza decisione di AI-PM/operatore.
 
 ## Dopo l'esecuzione
 
-Raccogliere i risultati:
+Il runner ha prodotto i sei JSON in `results/`. Lo ZIP dei risultati è creato
+**solo** dal collector, non dal runner. Raccogliere i risultati:
 
 ```powershell
 .\collect-d274-02-results.ps1

@@ -179,23 +179,54 @@ function Get-D274TsharkDiscovery {
 }
 
 function Test-D274KitSourceContract {
-    # Read-only source scan of the approved baseline kit. It must contain no
-    # capture-start TShark arguments and no process spawn that could start a
-    # real capture or attach hardware.
+    # Context-aware, read-only source scan of the approved baseline kit. It must
+    # contain no capture-start TShark invocation. A naive "-f\s" regex collides
+    # with the PowerShell string format operator ("-f [Guid]") that the kit uses
+    # legitimately for probe path formatting. Instead we isolate the lines that
+    # ACTUALLY invoke $tshark and allowlist only the approved discovery forms.
+    $script:tsharkSourceContract = "CONTEXT_AWARE_EXACT_ALLOWLIST"
+    $script:powershellFormatOperatorFalsePositive = $false
+
     $content = [System.IO.File]::ReadAllText($KitPath)
-    $forbiddenCaptureArgs = @('-i\s', '-w\s', '-f\s', '-Y\s')
-    foreach ($token in $forbiddenCaptureArgs) {
-        if ($content -match $token) {
-            Fail-D274 "kit source scan found forbidden capture argument token: $token"
+    $lines = $content -split "`n"
+
+    $tsharkInvokeLines = @()
+    foreach ($line in $lines) {
+        if ($line -match '\&\s*\$tshark') {
+            $tsharkInvokeLines += $line.Trim()
         }
     }
+
+    # Approved TShark invocations in the D274/01 baseline are discovery only,
+    # and the effective arguments passed to TShark must be EXACTLY one of
+    # "--version" or "-D". Any trailing switch (e.g. -i/-w/-f/-Y) appended to an
+    # otherwise allowlisted form is REJECTED. Redirection/pipeline
+    # (2>&1, 2>, >, |) are stripped before evaluating the argument list, so the
+    # two baseline forms remain accepted while augmented forms are not.
+    foreach ($invokeLine in $tsharkInvokeLines) {
+        $argsPart = $invokeLine -replace '.*\$tshark\s*', ''
+        $argsPart = $argsPart -replace '2>&1', ' '
+        $argsPart = $argsPart -replace '2>', ' '
+        $argsPart = $argsPart -replace '>', ' '
+        $argsPart = ($argsPart -split '\|')[0]
+        $argsPart = $argsPart.Trim()
+        $allowed = ($argsPart -eq '--version') -or ($argsPart -eq '-D')
+        if (-not $allowed) {
+            Fail-D274 "kit source scan found non-allowlisted TShark invocation: $invokeLine"
+        }
+    }
+
     if ($content -match "Start-Process") {
         Fail-D274 "kit source scan found Start-Process"
     }
     if ($content -notmatch "HARD_DISABLED_D274_01") {
         Fail-D274 "kit source scan missing source hard-disable invariant"
     }
-    return $true
+    return [ordered]@{
+        source_contract = $script:tsharkSourceContract
+        tshark_invocations_observed = $tsharkInvokeLines.Count
+        powershell_format_operator_false_positive = $script:powershellFormatOperatorFalsePositive
+    }
 }
 
 # Read-only package integrity verification against the static manifest. The
@@ -326,7 +357,7 @@ try {
     $integrity = Test-D274PackageIntegrity
     $stages["package_integrity"] = "PASS"
 
-    Test-D274KitSourceContract | Out-Null
+    $script:kitSourceContract = Test-D274KitSourceContract
     $stages["kit_source_contract"] = "PASS"
 
     # Observation first; gate second. If undeterminable, goodix_present_before_run
@@ -413,19 +444,21 @@ try {
         $preflightJson = Get-Content -LiteralPath (Join-Path $ResultsDir "D274_02_preflight.json") -Raw | ConvertFrom-Json
         $aclMeta.write_probe_pass = ($preflightJson.output_root_private_writable -eq $true)
         $preflightPrivacyOk = ($preflightJson.output_root_privacy -eq "PASS_PRIVATE_CONTRACT")
+        $aclPass = (-not $aclMeta.reparse_point) -and $aclMeta.acl_readable -and
+                   (-not $aclMeta.broad_everyone_read_or_stronger) -and
+                   (-not $aclMeta.broad_builtin_users_read_or_stronger) -and
+                   (-not $aclMeta.broad_authenticated_users_read_or_stronger) -and
+                   (-not $aclMeta.broad_guests_read_or_stronger) -and
+                   $aclMeta.canonical_capture_root_match -and $preflightPrivacyOk
+        $aclBehaviorTest = $(if ($aclPass) { "PASS" } else { "FAIL" })
+        if ($aclPass -eq $false -and $overallResult -eq "PASS") {
+            $overallResult = "FAIL"; if ($null -eq $failedStage) { $failedStage = "acl_behavior" }
+        }
     } else {
+        # preflight did not actually run/pass (skipped or failed earlier). The
+        # ACL qualification was NOT executed; it must not be reported as FAIL.
         $aclMeta.write_probe_pass = $false
-        $preflightPrivacyOk = $false
-    }
-    $aclPass = (-not $aclMeta.reparse_point) -and $aclMeta.acl_readable -and
-               (-not $aclMeta.broad_everyone_read_or_stronger) -and
-               (-not $aclMeta.broad_builtin_users_read_or_stronger) -and
-               (-not $aclMeta.broad_authenticated_users_read_or_stronger) -and
-               (-not $aclMeta.broad_guests_read_or_stronger) -and
-               $aclMeta.canonical_capture_root_match -and $preflightPrivacyOk
-    $aclBehaviorTest = $(if ($aclPass) { "PASS" } else { "FAIL" })
-    if ($aclPass -eq $false -and $overallResult -eq "PASS") {
-        $overallResult = "FAIL"; if ($null -eq $failedStage) { $failedStage = "acl_behavior" }
+        $aclBehaviorTest = "NOT_EXECUTED_DUE_PRIOR_FAILURE"
     }
     $script:aclMetadata = $aclMeta
 } catch {
@@ -481,6 +514,7 @@ $envEvidence = [ordered]@{
     tshark_path = $tshark.tshark_path
     tshark_version = $tshark.tshark_version
     usbpcap_interfaces_count = $tshark.usbpcap_interfaces_count
+    tshark_discovery_role = "NON_AUTHORITATIVE_DIAGNOSTIC"
     python_command_status = $pythonStatus
     operator_package_integrity = $(if ($null -ne $integrity) { $integrity.integrity } else { "NOT_VERIFIED" })
     operator_package_manifest_sha256 = $(if ($null -ne $integrity) { $integrity.manifest_sha256 } else { $null })
@@ -502,6 +536,9 @@ $summary = [ordered]@{
     goodix_present_before_run = $goodixPresentBeforeRun
     windows_native_acl_behavior_test = $aclBehaviorTest
     acl_behavior_metadata = $script:aclMetadata
+    tshark_source_contract = $(if ($null -ne $script:kitSourceContract) { $script:kitSourceContract.source_contract } else { $null })
+    tshark_invocations_observed = $(if ($null -ne $script:kitSourceContract) { $script:kitSourceContract.tshark_invocations_observed } else { $null })
+    powershell_format_operator_false_positive = $(if ($null -ne $script:kitSourceContract) { $script:kitSourceContract.powershell_format_operator_false_positive } else { $null })
     d274_native_hard_disable_adversarial_test = $adversarialTest
     real_capture_start_count = $script:RealCaptureStartCount
     real_usb_open_count = $script:RealUsbOpenCount
@@ -514,7 +551,15 @@ $summary = [ordered]@{
 }
 Write-D274JsonResult "D274_02_native_qualification_summary.json" $summary
 
+Write-Host ""
+Write-Host "D274/02 ha terminato l'esecuzione."
+Write-Host "NON rilanciare il runner."
+Write-Host "Esegui ora:"
+Write-Host "  .\collect-d274-02-results.ps1"
+Write-Host ""
 if ($overallResult -ne "PASS") {
+    Write-Host "Il FAIL verra' incluso nel bundle risultati."
+    Write-Host "Non tentare correzioni o retry prima della review AI-PM."
     Write-Error "D274/02 native qualification FAILED at stage: $failedStage"
     exit 1
 }

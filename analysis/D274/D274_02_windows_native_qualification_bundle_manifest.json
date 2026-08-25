@@ -21,6 +21,18 @@
     "D274_02_operator_package_integrity.json",
     "D274_02_OPERATOR_README_IT.md"
   ],
+  "operator_package_static_contents": [
+    "operator_kit/d274-windows-multiframe-evidence.ps1",
+    "analysis/D274/d274_postprocess_multiframe_evidence.py",
+    "captures/",
+    "run-d274-02-native-qualification.ps1",
+    "collect-d274-02-results.ps1",
+    "D274_02_operator_package_integrity.json",
+    "D274_02_OPERATOR_README_IT.md"
+  ],
+  "runtime_created_paths": [
+    "results/"
+  ],
   "operator_result_allowlist": [
     "D274_02_selftest.json",
     "D274_02_preflight.json",
@@ -46,7 +58,19 @@
   "d274_02_operator_package_hash_overclaim_removed": true,
   "d274_02_collector_results_path_authority": "EXACT_PACKAGE_RESULTS",
   "d274_02_operator_package": "READY_FOR_AI_PM_REVIEW",
-  "d274_02_windows_native_execution": "NOT_YET_PERFORMED",
+  "d274_02_tshark_source_contract": "CONTEXT_AWARE_EXACT_ALLOWLIST",
+  "d274_02_tshark_allowlist_trailing_argument_escape": false,
+  "d274_02_bundle_manifest_static_runtime_paths_accurate": "PASS",
+  "d274_02_powershell_format_operator_false_positive": false,
+  "d274_02_acl_result_after_skipped_preflight": "NOT_EXECUTED_DUE_PRIOR_FAILURE",
+  "d274_02_fail_result_collector_contract": "PASS",
+  "d274_02_environment_tshark_discovery": "NON_AUTHORITATIVE_DIAGNOSTIC",
+  "d274_01_preflight_tshark_discovery": "AUTHORITATIVE_GATE",
+  "windows_powershell51_runtime": "PASS",
+  "operator_package_integrity_runtime": "PASS",
+  "first_failure_stop_runtime": "PASS",
+  "fail_core_json_production_runtime": "PASS",
+  "d274_02_windows_native_execution": "ONE_FAILED_PRE_GATE_RUN_OBSERVED",
   "d274_02_windows_native_qualification": "NOT_YET_DETERMINED",
   "d274_real_capture_capability": 0,
   "d274_hard_disabled": true,
