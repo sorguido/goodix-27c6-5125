@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D274/02 (sintesi)
+### Stato corrente post-D274/03 pre-live offline (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -176,8 +176,8 @@ GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
-NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_PRELIVE_OPERATOR_KIT
+NEXT_BOUNDARY_PREREQUISITE=SEPARATE_AI_PM_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
 
 D274/01 prepara esclusivamente offline una superficie Windows/OEM distinta da
@@ -245,7 +245,7 @@ D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
 D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
 D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=AI_PM_PLANNING_D274_03_ONE_SHOT_WINDOWS_OEM_CAPTURE
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_PRELIVE_OPERATOR_KIT
 NEXT_BOUNDARY_PREREQUISITE=SEPARATE_AI_PM_LIVE_DESIGN_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_RUN_AUTHORIZATION
 D274_02_OPERATOR_PACKAGE=CLOSED
 D274_02_WINDOWS_NATIVE_EXECUTION=COMPLETED
@@ -270,6 +270,52 @@ LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
 D274_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false
+```
+D274/03 introduce una nuova authority separata, senza retro-modificare D274/01
+o riaprire D274/02. Il nuovo Kit contiene launcher, runner, collector,
+postprocessor, schema, authority template, marker e radici output con namespace
+D274/03. La superficie rivolta all'operatore è in italiano. Il percorso futuro
+è capace soltanto di osservazione passiva USBPcap/TShark del traffico prodotto
+dal workflow OEM; non contiene un sender Goodix Python/libusb. È hard-gated da
+authority separata, full commit SHA approvato, HEAD/branch/live-critical set,
+ACL privata e marker `CreateNew` single-use. Il template consegnato ha tutti i
+gate live a `false`, quindi il percorso non è eseguibile in questo step.
+
+Il sanitizer mantiene il prefisso completo necessario a distinguere il re-arm
+dal primo arm, ma il boundary di successo termina al minimo evento nuovo:
+ACK `0x32` → secondo IRQ `0x0002` → secondo wire `0x22` → ACK echo `0x22` e
+status esatto `0x01` → secondo B0 fingerprint strutturale → STOP. Non richiede
+decode immagine e non esporta contenuto B0/TLS, raster, pixel o hash biometrici.
+Fixture sintetiche e capture storica D263 verificano rispettivamente PASS e
+`MISSING_SECOND_IRQ2`; nessuna delle due è promossa a evidenza target del
+secondo ciclo.
+
+```text
+D274_02_TECHNICAL_REGRESSION=false
+D274_02_REOPEN_REQUIRED=false
+D274_02_MANUAL_HISTORICAL_STATE_CLEANUP=COMPLETED
+D274_03_PRELIVE_OPERATOR_KIT=READY_FOR_AI_PM_REVIEW
+D274_03_OPERATOR_LANGUAGE=ITALIAN
+D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS
+D274_03_WINDOWS_NATIVE_EXECUTION=NOT_PERFORMED_CURRENT_LINUX_HOST
+D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
+SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
+LIVE_PATH_EXECUTED=false
+LIVE_PATH_AUTHORIZED=false
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
+D274_03_BASELINE_APPROVED=false
+APPROVED_FOR_CAPTURE=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+REAL_CAPTURE_COUNT=0
+REAL_USB_OPEN_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_GOODIX_COMMAND_COUNT=0
+AUTOMATIC_RETRY_COUNT=0
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_PRELIVE_OPERATOR_KIT
+NEXT_BOUNDARY_PREREQUISITE=SEPARATE_AI_PM_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -956,6 +1002,9 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D271/01 policy feature extractor | READY offline; policy CLOSED; full pipeline PARTIALLY_CLOSED; live false | call-flow extractor/template/matcher/enrollment locale ricostruito; SIGFM unico `CANDIDATE_FOR_VALIDATION` con input 80×64 strutturalmente supportato ma gate ≥25 keypoint e qualità target ignota; NBIS strutturalmente accetta 80×64 ma resta `BLOCKED` per ppmm ignoto e requisito ≥10 minutiae non provato; orientation/polarity unresolved, nessun claim da fixture sintetiche o Rocky |
 | D272/01 pre-live multi-frame + metriche SIGFM | BLOCKED per live/executable closure; avanzamento offline reale; live false | ordine OEM corretto con `0x50` obbligatorio; modello bounded 2–8 sample, single-reader e fail-closed PASS sintetico; seam SIGFM LGPL con mapping D269, gate 25, score/error ed exception containment PASS su double; origine/freshness tabella `0x34`, seconda iterazione target e build SIGFM reale bloccata da OpenCV4-dev assente; policy ACK del ciclo corretta post-review AI-PM da `0x01|0x07` a `status` esatto `0x01` (`D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01`), blocker primari invariati |
 | D273/01 closure post-first-image + SIGFM reale | PARTIAL CLOSURE offline; live false; executable closure globale FAIL_NOT_AVAILABLE | dataflow up/down OEM chiuso: IRQ2 aggiorna up globale di sessione consumata da `0x34`, IRQ0200 aggiorna down consumata da re-arm `0x32`; packet 249 chiuso come A0 NAV `0x50` 2417/2410; modello corretto con source IRQ/generation e timestamp per transizione; seconda iterazione target e timeout non osservati; host e SDK senza OpenCV4-dev, vero `sigfm.cpp` non compilabile, nessuna installazione |
+| D274/01 Kit Windows/OEM pre-live | READY offline; hard-disabled; live false | sanitizer metadata-only, target/A8/hash/schema/privacy gate e fixture sintetica del secondo ciclo PASS; capture storica termina a ACK re-arm e resta `MISSING_SECOND_IRQ2`; workflow candidato no-commit, nessuna attribution retroattiva |
+| D274/02 qualificazione nativa Windows | CLOSED / PASS; tre run storiche preservate; live false | run 1 FAIL source-scan `-f`, run 2 FAIL `.Count` sotto PowerShell 5.1, run 3 PASS nativo completo dopo corrective; nessuna regressione tecnica e nessuna riapertura |
+| D274/03 Kit one-shot secondo ciclo | READY_FOR_AI_PM_REVIEW offline; baseline/capture/live false | nuova authority separata con UI italiana, cattura futura solo passiva USBPcap/TShark, gate Git full-SHA/HEAD/live-critical set/ACL/marker single-use; boundary minimo termina al secondo B0, 22 fixture/test PASS, D263 resta negativa; nessun hardware eseguito |
 
 ## Fonti e confini di pubblicazione
 
@@ -4192,8 +4241,8 @@ TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 D273_TARGET_EVIDENCE_GAP=EXACT_MINIMUM_NEW_OBSERVATION_REQUIRED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
-NEXT_BOUNDARY_PREREQUISITE=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D273=AI_PM_REVIEW_D273_PARTIAL_CLOSURE
+HISTORICAL_NEXT_BOUNDARY_PREREQUISITE_AFTER_D273=NONE_FOR_REVIEW_EXPLICIT_AUTHORITY_REQUIRED_FOR_ANY_NEW_CAPTURE_OR_ENVIRONMENT_CHANGE
  BASELINE_APPROVED=false
  LIVE_AUTHORIZED=false
  READY_FOR_LIVE=false
@@ -4499,8 +4548,8 @@ BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_CORRECTIVE
-NEXT_BOUNDARY_PREREQUISITE=CORRECTIVE_REVIEW_THEN_WINDOWS_NATIVE_OFFLINE_QUALIFICATION
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D274_01=AI_PM_REVIEW_D274_01_CORRECTIVE
+HISTORICAL_NEXT_BOUNDARY_PREREQUISITE_AFTER_D274_01=CORRECTIVE_REVIEW_THEN_WINDOWS_NATIVE_OFFLINE_QUALIFICATION
 ```
 
 ### D274/02: Pacchetto operatore per qualificazione nativa Windows (preparazione OFFLINE)
@@ -4626,11 +4675,22 @@ caso di FAIL e solo se privi di dati sensibili). Non include pcap, ACL raw,
 registry, event log, screenshot, dati di impronta, B0, TLS, segreti, PSK, cache,
 DLL o firmware.
 
+Il blocco seguente è separato in snapshot temporali: i flag FAIL appartengono
+alla **seconda run** e non descrivono lo stato finale; i flag PASS successivi
+appartengono alla **terza run** e sono l'authority finale D274/02. Le prime due
+righe preservano inoltre l'esito distinto della prima run. Questa etichettatura
+è cleanup storico D274/03 e non riapre D274/02.
+
 ```text
 D274_02_FIRST_WINDOWS_OPERATOR_RUN=FAIL_PRE_GATE_FALSE_POSITIVE_SOURCE_SCAN
 D274_02_FIRST_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=GENERIC_REGEX_-f_MATCHED_POWERSHELL_FORMAT_OPERATOR
 D274_02_SECOND_WINDOWS_OPERATOR_RUN=FAIL_SELFTEST_NATIVE_POWERSHELL51_SCALAR_COUNT
 D274_02_SECOND_WINDOWS_OPERATOR_RUN_ROOT_CAUSE=MODE_SELECTOR_PIPELINE_SCALAR_COUNT_UNDER_STRICTMODE
+```
+
+Snapshot storico della seconda run FAIL (non è lo stato finale):
+
+```text
 WINDOWS_POWERSHELL51_RUNTIME=PASS
 OPERATOR_PACKAGE_INTEGRITY_RUNTIME=PASS
 KIT_SOURCE_CONTRACT_RUNTIME=PASS
@@ -4647,6 +4707,12 @@ REAL_CAPTURE_START_COUNT=0
 REAL_USB_OPEN_COUNT=0
 HARDWARE_ACTION_COUNT=0
 HARD_DISABLE_PRESERVED=true
+D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE
+```
+
+Snapshot finale della terza run PASS (authority corrente D274/02):
+
+```text
 D274_01_NATIVE_POWERSHELL51_MODE_SELECTOR_CORRECTIVE=CLOSED
 D274_01_MODE_SELECTOR_FORCED_ARRAY=true
 D274_01_STRICTMODE_PRESERVED=true
@@ -4664,7 +4730,6 @@ D274_02_FINAL_README_HASH_MATCHES_MANIFEST=PASS
 D274_02_FINAL_KIT_HASH_MATCHES_MANIFEST=PASS
 D274_02_FINAL_POSTPROCESSOR_HASH_MATCHES_MANIFEST=PASS
 D274_02_BUNDLE_MANIFEST_STATIC_RUNTIME_PATHS_ACCURATE=PASS
-D274_02_ACL_RESULT_AFTER_SKIPPED_PREFLIGHT=NOT_EXECUTED_DUE_PRIOR_FAILURE
 D274_02_FAIL_RESULT_COLLECTOR_CONTRACT=PASS
 D274_02_ENVIRONMENT_TSHARK_DISCOVERY=NON_AUTHORITATIVE_DIAGNOSTIC
 D274_01_PREFLIGHT_TSHARK_DISCOVERY=AUTHORITATIVE_GATE
@@ -4690,8 +4755,11 @@ BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_01_NATIVE_SELECTOR_CORRECTIVE_AND_D274_02_REPACK
-NEXT_BOUNDARY_PREREQUISITE=AI_PM_PASS_THEN_THIRD_WINDOWS_NATIVE_OFFLINE_OPERATOR_RUN
+D274_02_TECHNICAL_REGRESSION=false
+D274_02_REOPEN_REQUIRED=false
+D274_02_MANUAL_HISTORICAL_STATE_CLEANUP=COMPLETED
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_PRELIVE_OPERATOR_KIT
+NEXT_BOUNDARY_PREREQUISITE=SEPARATE_AI_PM_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
 
 #### D274/02 — prima operator-run Windows (FAIL pre-gate, falso positivo source-scan)
@@ -5057,10 +5125,101 @@ sua copia byte-identica nel pacchetto D274/02 restano immutati in questo closure
 step: nessuna modifica comportamentale al Kit. La terza run chiude D274/02 come
 qualificazione nativa Windows offline completa (selftest, preflight, simulazione
 pre-autorizzazione, ACL privacy, hard-disable adversarial), senza alcuna capture
-o azione hardware. Il prossimo boundary (solo pianificazione, non esecuzione) è
-`NEXT_PRIMARY_BOUNDARY=AI_PM_PLANNING_D274_03_ONE_SHOT_WINDOWS_OEM_CAPTURE`, con
-prerequisito `SEPARATE_AI_PM_LIVE_DESIGN_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_RUN_AUTHORIZATION`;
+o azione hardware. Quel boundary storico di pianificazione è stato consumato
+dalla preparazione offline D274/03; il boundary corrente è ora
+`NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_PRELIVE_OPERATOR_KIT`, con
+prerequisito `SEPARATE_AI_PM_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION`.
 D274/02 non abilita capture reale, non rimuove hard-disable e non autorizza live.
+
+### D274/03: Kit Windows/OEM one-shot per il secondo ciclo (preparazione OFFLINE)
+
+D274/03 non esegue hardware. Crea la nuova authority separata
+`analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/`; D274/01 e
+D274/02 restano storici, salvo il cleanup narrativo sopra. Il package parla in
+italiano all'operatore e contiene launcher, runner live futuro, collector,
+sanitizer pcapng, schema strict, template authority con gate false, README,
+marker e radici D274/03 distinte.
+
+#### Riesame metodologico pre-live
+
+1. **Cosa cambia realmente rispetto a D274/02?** D274/02 qualificava
+   nativamente un package hard-disabled. D274/03 prepara una nuova authority
+   one-shot destinata a una futura capture OEM reale del solo secondo ciclo;
+   nessun hardware viene eseguito ora.
+2. **Quale nuova ipotesi tecnica verrà testata?** Dopo ACK del re-arm `0x32`,
+   un nuovo finger-down nel workflow OEM produce IRQ `0x0002`, wire `0x22`, ACK
+   echo `0x22` con status esatto `0x01` e un secondo B0 fingerprint.
+3. **Se la futura run non chiude il boundary?** Nessun retry automatico e
+   nessuna seconda run equivalente per default. Si revisiona offline il raw e
+   si classifica il failure in workflow/UI, emissione secondo IRQ2, dispatch
+   secondo `0x22`, ACK o secondo B0. Una nuova run richiede modifica
+   metodologica sostanziale, nuova review e nuova autorizzazione.
+
+#### Authority, workflow e safety
+
+Il workflow resta `WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT`: non attribuisce
+retroattivamente D263 a una UI nota. Il runner futuro invoca un solo processo
+TShark con USBPcap e deadline host-side 180 s; non contiene Python/libusb
+sensor-reaching. Prima della capture richiede authority separata con tre flag
+true, full SHA di 40 caratteri, HEAD e branch `development` esatti,
+live-critical set pulito e uguale alla baseline, root privata non-reparse e
+marker atomico `CreateNew`. Il template corrente ha i flag false e nessun SHA,
+quindi fallisce prima di `Start-Process`.
+
+L'operatore deve fermarsi su PIN, account/credenziali, commit enrollment o UI
+inattesa. Il Kit non offre un terzo prompt e vieta retry/recovery. Dopo la
+conferma OEM del secondo campione arresta TShark, poi il sanitizer richiede la
+sequenza completa e rifiuta terzo IRQ2/`0x22`/B0, duplicato secondo `0x22`, ACK
+diverso, B0 mancante/malformato, target ambiguo, re-enumeration, firmware non
+APP12509, deadline, schema o privacy failure.
+
+Il prefisso first-cycle resta nel matcher soltanto per provare che il `0x32` è
+il re-arm e non il primo arm. L'output pubblicabile contiene soltanto metadata:
+frame, direzione, wrapper, control/IRQ/ACK, lunghezze, classe TLS esterna,
+ordine, delta intra-run, stop reason e conteggi. Non serve il decode immagine
+per distinguere il B0 fingerprint strutturale già chiuso da D274/01/D274/02.
+
+#### Closure offline
+
+Il test D274/03 esegue 22 casi sintetici/avversari: success boundary; secondo
+IRQ mancante/errato; secondo `0x22` mancante/duplicato; ACK echo/status errati;
+B0 malformato/classe errata; terzo ciclo; target ambiguo/re-enumerato; firmware
+errato; deadline; privacy/schema; authority non autorizzata; baseline stale;
+marker riusato; source contract passivo; ACL privacy; lingua italiana; manifest
+strict; regressione sulla capture storica D263. Tutti passano su Linux. Il
+runtime PowerShell 5.1 D274/03 non è eseguito su questo host Linux; i costrutti
+condivisi sono quelli già qualificati nativamente in D274/02, mentre una futura
+run Windows resta subordinata alla review AI-PM e non è implicita nel PASS
+offline corrente.
+
+```text
+D274_02_TECHNICAL_REGRESSION=false
+D274_02_REOPEN_REQUIRED=false
+D274_02_MANUAL_HISTORICAL_STATE_CLEANUP=COMPLETED
+D274_03_PRELIVE_OPERATOR_KIT=READY_FOR_AI_PM_REVIEW
+D274_03_OPERATOR_LANGUAGE=ITALIAN
+D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS
+D274_03_WINDOWS_NATIVE_EXECUTION=NOT_PERFORMED_CURRENT_LINUX_HOST
+D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
+SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
+LIVE_PATH_EXECUTED=false
+LIVE_PATH_AUTHORIZED=false
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
+D274_03_BASELINE_APPROVED=false
+APPROVED_FOR_CAPTURE=false
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+LIVE_EXECUTION=NOT_PERFORMED
+D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+REAL_CAPTURE_COUNT=0
+REAL_USB_OPEN_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_GOODIX_COMMAND_COUNT=0
+AUTOMATIC_RETRY_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_PRELIVE_OPERATOR_KIT
+NEXT_BOUNDARY_PREREQUISITE=SEPARATE_AI_PM_REVIEW_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
+```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
 La closure canonica D218–D220 (contract immagine Windows) va preservata e non

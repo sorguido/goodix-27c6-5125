@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "D274_03_SECOND_CYCLE_EVIDENCE_V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "capture_sha256", "target_vid", "target_pid",
+    "firmware_identity_status", "workflow_class", "boundary_status",
+    "rearm_0x32_frame", "rearm_0x32_ack_frame", "second_irq2_frame",
+    "second_0x22_frame", "second_0x22_ack_frame", "second_b0_frame",
+    "third_cycle_observed", "stop_reason", "failure_class",
+    "host_capture_deadline_seconds", "host_deadline_policy",
+    "device_timeout_claim", "timing_observations_ms", "counts",
+    "privacy_payload_exported", "biometric_plaintext_exported",
+    "biometric_hash_exported", "secret_material_exported"
+  ],
+  "properties": {
+    "schema": {"const": "D274_03_SECOND_CYCLE_EVIDENCE_V1"},
+    "capture_sha256": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[0-9a-f]{64}$"}]},
+    "target_vid": {"const": "27c6"},
+    "target_pid": {"const": "5125"},
+    "firmware_identity_status": {
+      "enum": ["TARGET_CAPTURE_OBSERVED_APP12509", "SYNTHETIC_APP12509", "UNKNOWN"]
+    },
+    "workflow_class": {"const": "WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT"},
+    "boundary_status": {"enum": ["OBSERVED_COMPLETE", "NOT_OBSERVED_COMPLETE"]},
+    "rearm_0x32_frame": {"$ref": "#/$defs/frameOrNull"},
+    "rearm_0x32_ack_frame": {"$ref": "#/$defs/frameOrNull"},
+    "second_irq2_frame": {"$ref": "#/$defs/frameOrNull"},
+    "second_0x22_frame": {"$ref": "#/$defs/frameOrNull"},
+    "second_0x22_ack_frame": {"$ref": "#/$defs/frameOrNull"},
+    "second_b0_frame": {"$ref": "#/$defs/frameOrNull"},
+    "third_cycle_observed": {"type": "boolean"},
+    "stop_reason": {
+      "enum": ["SECOND_FINGERPRINT_B0", "FAIL_CLOSED", "CAPTURE_DEADLINE", "NOT_REACHED"]
+    },
+    "failure_class": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[A-Z0-9_]+$"}]},
+    "host_capture_deadline_seconds": {"const": 180},
+    "host_deadline_policy": {"const": "EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM"},
+    "device_timeout_claim": {"const": "UNKNOWN"},
+    "timing_observations_ms": {
+      "type": "object",
+      "additionalProperties": {"type": "number"}
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["irq0002", "wire_0x22", "fingerprint_b0"],
+      "properties": {
+        "irq0002": {"type": "integer"},
+        "wire_0x22": {"type": "integer"},
+        "fingerprint_b0": {"type": "integer"}
+      }
+    },
+    "privacy_payload_exported": {"const": false},
+    "biometric_plaintext_exported": {"const": false},
+    "biometric_hash_exported": {"const": false},
+    "secret_material_exported": {"const": false}
+  },
+  "$defs": {
+    "frameMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame", "direction", "outer_wrapper", "physical_length",
+        "declared_outer_length", "relative_timestamp_ms", "event_class"
+      ],
+      "properties": {
+        "frame": {"type": "integer"},
+        "direction": {"enum": ["host_to_device", "device_to_host"]},
+        "outer_wrapper": {"enum": ["0xa0", "0xb0"]},
+        "physical_length": {"type": "integer"},
+        "declared_outer_length": {"type": "integer"},
+        "relative_timestamp_ms": {"type": "number"},
+        "event_class": {
+          "enum": ["REARM_0X32", "ACK_0X32_STATUS_0X01", "IRQ_0X0002",
+                   "WIRE_0X22", "ACK_0X22_STATUS_0X01", "FINGERPRINT_B0"]
+        },
+        "control": {"type": "integer"},
+        "irq_code": {"type": "integer"},
+        "ack_echo": {"type": "integer"},
+        "ack_status": {"type": "integer"},
+        "declared_b0_length": {"type": "integer"},
+        "tls_record_type_class": {"enum": ["TLS_APPLICATION_DATA"]}
+      }
+    },
+    "frameOrNull": {
+      "anyOf": [{"type": "null"}, {"$ref": "#/$defs/frameMetadata"}]
+    }
+  }
+}

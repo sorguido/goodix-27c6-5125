@@ -1,0 +1,33 @@
+{
+  "schema": "D274_03_KIT_MANIFEST_V1",
+  "authority_namespace": "D274_03",
+  "workflow_class": "WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT",
+  "operator_language": "ITALIAN",
+  "host_capture_deadline_seconds": 180,
+  "source_contains_future_live_path": true,
+  "live_path_executed": false,
+  "live_path_authorized": false,
+  "baseline_approved": false,
+  "approved_for_capture": false,
+  "ready_for_live": false,
+  "automatic_retry_authorized": false,
+  "third_cycle_authorized": false,
+  "enrollment_commit_authorized": false,
+  "account_mutation_authorized": false,
+  "pin_mutation_authorized": false,
+  "goodix_manual_command_path_present": false,
+  "raw_bundle_inclusion_authorized": false,
+  "files": {
+    "launcher": "avvia-d274-03.ps1",
+    "runner": "invoke-d274-03-live-once.ps1",
+    "collector": "collect-d274-03-results.ps1",
+    "postprocessor": "d274_03_postprocess_second_cycle.py",
+    "evidence_schema": "D274_03_evidence_schema.json",
+    "live_authority_template": "D274_03_live_authority.json",
+    "operator_readme": "D274_03_OPERATOR_README_IT.md",
+    "package_raw_placeholder": "raw/",
+    "package_results_placeholder": "results/",
+    "canonical_private_raw_root": "<git-root>/captures/D274_03/<authorization-id>/raw/",
+    "canonical_sanitized_root": "<git-root>/captures/D274_03/<authorization-id>/sanitized/"
+  }
+}
