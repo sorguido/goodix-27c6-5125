@@ -1,0 +1,80 @@
+{
+  "artifact": "D271_01_extractor_policy_matrix",
+  "step": "D271/01",
+  "rows": [
+    {
+      "dimension": "ppmm_required",
+      "sigfm": "NO_VERIFIED",
+      "nbis": "YES_VERIFIED"
+    },
+    {
+      "dimension": "80x64_supportability",
+      "sigfm": "ARCHITECTURALLY_ACCEPTED_WITH_LIBFPRINT_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN",
+      "nbis": "STRUCTURALLY_ACCEPTED_BY_8PX_BLOCK_MINIMUM_BUT_MIN_10_STABLE_MINUTIAE_UNPROVEN"
+    },
+    {
+      "dimension": "orientation_sensitivity",
+      "sigfm": "FLAGS_IGNORED_ROTATION_TOLERANCE_CODE_INTENDED_NOT_TRANSFORM_TESTED",
+      "nbis": "H_AND_V_FLAGS_APPLIED_BUT_TARGET_POLICY_UNRESOLVED"
+    },
+    {
+      "dimension": "polarity_sensitivity",
+      "sigfm": "NO_INVERSION_PATH_OR_INVARIANCE_PROOF",
+      "nbis": "COLOR_INVERSION_FLAG_AVAILABLE_BUT_TARGET_POLICY_UNRESOLVED"
+    },
+    {
+      "dimension": "scale_resolution_sensitivity",
+      "sigfm": "NO_PPMM_SIFT_SCALE_SPACE_BUT_MATCHER_PAIR_LENGTH_TOLERANCE_APPROX_5_PERCENT_NOT_GENERAL_INVARIANCE",
+      "nbis": "PPMM_SCALES_QUALITY_RADIUS_AND_XYT_MATCHING_USES_PIXEL_GEOMETRY"
+    },
+    {
+      "dimension": "preprocessing_expectations",
+      "sigfm": "DIRECT_U8_COPY_NO_INTERNAL_NORMALIZATION_FLAGS_IGNORED",
+      "nbis": "FLAGS_THEN_LFSV2_MAP_BINARIZATION_MINUTIA_QUALITY"
+    },
+    {
+      "dimension": "template_representation",
+      "sigfm": "KEYPOINT_VECTOR_PLUS_DESCRIPTOR_MATRIX_PER_STAGE",
+      "nbis": "XYT_UP_TO_200_MINUTIAE_PER_STAGE"
+    },
+    {
+      "dimension": "matching_path",
+      "sigfm": "BF_KNN_RATIO_0_75_MIN_5_THEN_GEOMETRIC_VOTE_DRIVER_THRESHOLD",
+      "nbis": "BOZORTH3_MIN_10_MINUTIAE_DRIVER_THRESHOLD_DEFAULT_40"
+    },
+    {
+      "dimension": "enrollment_path",
+      "sigfm": "MULTI_STAGE_ARRAY_BASE_5_ROCKY_GOODIX_3_TO_8_THIRD_PARTY",
+      "nbis": "MULTI_STAGE_ARRAY_BASE_5"
+    },
+    {
+      "dimension": "target_local_evidence",
+      "sigfm": "80X64_RASTER_AND_D269_MAPPING_ONLY_NO_KEYPOINT_OR_SCORE_QUALITY",
+      "nbis": "80X64_RASTER_AND_D269_MAPPING_ONLY_NO_PPMM_MINUTIA_OR_SCORE_QUALITY"
+    },
+    {
+      "dimension": "third_party_evidence",
+      "sigfm": "ROCKY_EXACT_80X64_WORKING_PIPELINE_AND_ISSUE_1_COMPLETE_PIPELINE_CORROBORATION",
+      "nbis": "NO_EQUIVALENT_APP12509_PIPELINE_CORROBORATION_FOUND"
+    },
+    {
+      "dimension": "licensing_impact",
+      "sigfm": "LGPL_2_1_OR_LATER_PLUS_OPENCV4_DEPENDENCY",
+      "nbis": "LGPL_INTEGRATION_PLUS_NIST_PUBLIC_DOMAIN_NBIS"
+    },
+    {
+      "dimension": "current_blocker",
+      "sigfm": "TARGET_REAL_KEYPOINT_MATCH_THRESHOLD_POLARITY_ORIENTATION_VALIDATION",
+      "nbis": "TARGET_PHYSICAL_PPMM_PLUS_MIN_10_STABLE_MINUTIAE_AND_SCORE_VALIDATION"
+    }
+  ],
+  "policy": {
+    "feature_extractor_policy": "CLOSED_OFFLINE",
+    "sigfm": "CANDIDATE_FOR_VALIDATION",
+    "nbis": "BLOCKED",
+    "production_selected": "NONE",
+    "sigfm_selected_only_because_ppmm_independent": false,
+    "nbis_500dpi_assumption_authorized": false,
+    "biometric_quality_proven": false
+  }
+}

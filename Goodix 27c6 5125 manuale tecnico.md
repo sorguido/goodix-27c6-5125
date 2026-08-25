@@ -6,7 +6,7 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-### Stato corrente post-D270/01 (sintesi)
+### Stato corrente post-D271/01 (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -68,10 +68,25 @@ pari alla width.
 Il valore fisico `ppmm` target-specific resta `UNKNOWN` e viene rappresentato
 da stato separato nel wrapper opaco: lo zero tecnico lasciato dalla
 zero-initialization GObject non è una misura. Il gate D270 blocca NBIS con
-`PHYSICAL_PPMM_REQUIRED`; SIGFM non consuma `ppmm`, ma questo solo fatto non lo
-seleziona né rende semanticamente validi feature extraction, matching o
-enrollment. Nessuna nuova fonte target-specific fissa DPI, orientation o
-polarity. Pertanto:
+`PHYSICAL_PPMM_REQUIRED`.
+
+D271/01 chiude ora la **policy** extractor offline, non la validazione
+biometrica. Il call-flow locale mostra che SIGFM copia i 5120 byte u8 senza
+applicare `FpImage::flags`, estrae SIFT/OpenCV e richiede almeno 25 keypoint;
+il matcher richiede almeno 5 match descrittore e vota la coerenza geometrica.
+Il codice non prova una invarianza generale: la distanza tra coppie tollera
+soltanto circa il 5%, non esistono test locali di rotazione/scala/polarità e
+l'inversione di intensità non è gestita nel path SIGFM. L'esatta pipeline
+Rockytkg `80x64` con SIGFM è corroborazione terza parte, inclusi threshold 20 e
+enrollment 3--8 stage, non prova target-local né rende riusabile il preprocessing
+GPL nel glue LGPL.
+
+NBIS accetta strutturalmente `80x64` rispetto al suo blocksize minimo di 8 px,
+ma oltre a consumare `ppmm` richiede almeno 10 minutiae per un punteggio Bozorth
+non nullo; densità e qualità target-locali non sono provate. La policy è quindi
+chiusa con SIGFM unico candidato da validare e NBIS bloccato, senza selezione
+production e senza claim di qualità. Nessuna nuova fonte target-specific fissa
+DPI, orientation o polarity. Pertanto:
 
 ```text
 PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
@@ -85,11 +100,17 @@ UNKNOWN_PPMM_SEMANTICS=EXPLICITLY_BOUNDED
 NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
 NBIS_WITH_UNKNOWN_PPMM=BLOCKED
 SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
+FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
+SIGFM_STATUS=CANDIDATE_FOR_VALIDATION
+NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
+SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
+NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
-NEXT_BOUNDARY_PREREQUISITE=TARGET_EVIDENCE_OR_EXPLICIT_BOUNDS_FOR_ORIENTATION_POLARITY_PPMM_AND_BIOMETRIC_QUALITY
+NEXT_PRIMARY_BOUNDARY=SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION
+NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -773,6 +794,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Codec immagine | confermato offline + CRC record validato live + decode eseguito live | record 7684 byte → raster u16 `80x64` (CRC-32/MPEG-2 record valido e raster `80x64` live-proven in D268) |
 | D269/01 adapter Linux/libfprint | READY offline; pixel+intensity CLOSED; full pipeline NOT_YET_CLOSED; live false | API locale libfprint 1.94.5 auditata: `FpImage` è packed grayscale u8, 1 B/pixel, `width*height`; mapping Linux fixed full-range `round(v*255/4095)` nel glue LGPL, test sintetici PASS; `FpImage::ppmm` auditato: NBIS lo consuma, SIGFM no, valore fisico APP12509 UNKNOWN (500 DPI Rockytkg = terza parte); orientation/polarity non inventate; prossimo boundary `LIBFPRINT_IMAGE_PIPELINE_INTEGRATION_OFFLINE` con prerequisito ppmm |
 | D270/01 costruzione FpImage reale | READY offline; object/ownership/dimensions CLOSED; full pipeline PARTIALLY_CLOSED; live false | helper LGPL opaco costruisce `FpImage(80,64)` reale e object-owned dal raster sintetico via adapter D269; weak-finalization, strict build, ASan/UBSan, root/external-cwd e symbol audit PASS; ppmm fisico separato `UNKNOWN`, NBIS fail-closed, SIGFM ppmm-independent ma non selezionato; orientation/polarity ancora unresolved |
+| D271/01 policy feature extractor | READY offline; policy CLOSED; full pipeline PARTIALLY_CLOSED; live false | call-flow extractor/template/matcher/enrollment locale ricostruito; SIGFM unico `CANDIDATE_FOR_VALIDATION` con input 80×64 strutturalmente supportato ma gate ≥25 keypoint e qualità target ignota; NBIS strutturalmente accetta 80×64 ma resta `BLOCKED` per ppmm ignoto e requisito ≥10 minutiae non provato; orientation/polarity unresolved, nessun claim da fixture sintetiche o Rocky |
 
 ## Fonti e confini di pubblicazione
 
@@ -3846,6 +3868,27 @@ Il prossimo step non deve ripetere la costruzione né promuovere SIGFM per sola
 comodità: deve fondare la policy di feature extraction su evidenza o limiti
 espliciti per orientation, polarity, risoluzione e qualità biometrica.
 
+D271/01 ha successivamente auditato extractor, matcher ed enrollment nel fork
+locale. La policy risultante è chiusa senza promuovere una qualità non
+dimostrata:
+
+```text
+FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
+SIGFM_STATUS=CANDIDATE_FOR_VALIDATION
+NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
+SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
+NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+NEXT_PRIMARY_BOUNDARY=SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION
+NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING
+```
+
+Il prossimo step non deve ripetere la scelta architetturale né assumere il
+threshold Rockytkg: deve produrre metriche target-reali autorizzate e
+privacy-preserving su keypoint, extraction gate e separazione dei punteggi,
+preservando il mapping D269 finché l'evidenza non giustifica una revisione.
+
 
 ## Hard Wall
 
@@ -4397,7 +4440,7 @@ polarità restano `UNRESOLVED`; zero flag significa conservare l'ordine canonico
 del decoder, non dichiararlo fisicamente orientato.
 
 Lo stato di implementazione Linux per il dominio libfprint, aggiornato da
-D270/01, è pertanto:
+D271/01, è pertanto:
 
 ```text
 PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
@@ -4411,18 +4454,26 @@ UNKNOWN_PPMM_SEMANTICS=EXPLICITLY_BOUNDED
 NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
 NBIS_WITH_UNKNOWN_PPMM=BLOCKED
 SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
+FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
+SIGFM_STATUS=CANDIDATE_FOR_VALIDATION
+NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
+SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
+NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
+NEXT_PRIMARY_BOUNDARY=SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION
+NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING
 ```
 
 Il contratto pixel, la quantizzazione, la costruzione del GObject, le dimensioni
 e l'ownership sono `CLOSED_OFFLINE`. Il full `FpImage` pipeline contract è
 soltanto `PARTIALLY_CLOSED`: lo stato separato D270 rende l'ignoto `ppmm`
 truth-preserving senza trasformare lo zero storage in una misura; NBIS resta
-bloccato, mentre l'indipendenza SIGFM dal solo `ppmm` non sostituisce una
-decisione su extractor, qualità, orientation o polarity.
+bloccato. D271 sceglie SIGFM soltanto come candidato di validazione, sulla base
+del call-flow, del supporto strutturale 80×64 e della corroborazione terza parte;
+non risolve qualità, orientation o polarity e non seleziona un path production.
 
 
 ## D262: fresh-FDT arm execution-readiness review offline
@@ -6219,6 +6270,132 @@ FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
 RESIDUAL_BLOCKER_OR_RISK=PPMM_ORIENTATION_POLARITY_AND_BIOMETRIC_QUALITY_UNRESOLVED;EXTRACTOR_NOT_SELECTED
 CANONICAL_DOCUMENTATION=UPDATED
 NEXT_PRIMARY_BOUNDARY=LIBFPRINT_FEATURE_EXTRACTION_POLICY_OFFLINE
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+### D271/01: policy feature extraction libfprint offline
+
+D271/01 è **OFFLINE ONLY** e documentale: non apre USB, non usa capture o
+raster biometrici reali, non contatta fprintd, non materializza secret e non
+modifica codice eseguibile. La fonte software primaria è la copia libfprint
+1.94.5 materializzata in `Rockytkg/libfprint/`, gitlink di provenance
+`7ebe0c809b4d1df3400e84299a4ec4acdea84590`.
+
+#### Call-flow locale
+
+`fpi_image_device_image_captured()` sceglie l'extractor dalla proprietà di
+classe `algorithm`. Il default è NBIS; un driver può scegliere SIGFM. Entrambi
+lavorano asincronicamente su una copia di `width*height` byte. NBIS applica
+prima i flag H/V/inversione, invoca `get_minutiae(..., depth=8, ppmm)` e porta
+nel `FpImage` dati normalizzati, binarized e minutiae. SIGFM ignora invece tutti
+i flag, copia direttamente il raster u8 in una `cv::Mat CV_8UC1` e usa
+`cv::SIFT::detectAndCompute`; meno di 25 keypoint produce failure retryable nel
+`FpImageDevice`.
+
+Su successo `fpi_print_add_from_image()` converte NBIS in una struttura XYT
+owned dal `FpPrint`; per SIGFM inserisce nel template il `SigfmImgInfo`
+(keypoint + descrittori). Il trasferimento SIGFM è implicito: l'array del print
+ha `sigfm_free_info` come destructor, mentre `FpImage::finalize()` non libera
+`sigfm_info`; il call-flow principale mantiene una reference all'immagine e
+usa una sola aggiunta, ma il riuso dello stesso info in più print non è un
+contratto sicuro dimostrato. La serializzazione `FP3` salva ogni XYT NBIS o il
+blob SIGFM keypoint+descriptor e la deserializzazione ricostruisce gli oggetti.
+
+Enrollment accumula una feature structure per stage nel template. Il base
+`FpImageDevice` usa 5 stage; Rockytkg configura, come sola corroborazione terza
+parte, un percorso SIGFM Goodix dinamico 3--8 stage. Verify/identify estraggono
+un singolo nuovo print e lo confrontano con ogni stage/template: Bozorth3 per
+NBIS, `sigfm_match_score()` per SIGFM.
+
+#### SIGFM
+
+SIGFM non consuma `ppmm`, non ridimensiona e non normalizza internamente oltre
+alla copia in `CV_8UC1`. L'extractor SIFT non contiene un limite dimensionale
+esplicito, quindi `80x64` è strutturalmente accettato, ma il gate libfprint di
+25 keypoint rende l'effettiva supportability dipendente dal contenuto. La
+pipeline Rockytkg usa esattamente 80×64 ed è riportata funzionante per
+enrollment/verify: è `THIRD_PARTY_CORROBORATION`, non prova la qualità del
+mapping D269 sul target locale.
+
+Il matcher applica ratio test descrittore 0,75, richiede almeno 5 match, accetta
+lunghezze tra coppie entro circa il 5% e conta coppie con trasformazione angolare
+coerente entro circa il 5%; un driver stabilisce poi lo score threshold. Il
+default generico locale è 40, Rockytkg usa 20: nessuno dei due è una soglia
+target-local validata per il nostro mapping. Il codice suggerisce tolleranza a
+rotazione rigida e scala molto limitata, ma i test locali SIGFM coprono
+serializzazione su immagini 256×256, non trasformazioni, 80×64 o polarity.
+Pertanto non è provata invarianza generale a rotazione/scala; inversione di
+polarità e flag non sono gestiti dal path SIGFM. Il matcher contiene le proprie
+eccezioni e restituisce errore, mentre `sigfm_extract()` non contiene eccezioni
+OpenCV; inoltre `fp_print_equal()` non implementa SIGFM. Sono limiti del fork
+da preservare nella futura validazione, non blocker della sola candidatura.
+
+#### NBIS
+
+NBIS usa LFSv2 con blocksize 8 e rifiuta soltanto immagini più piccole di un
+blocco: `80x64` supera quindi il limite strutturale e produce una mappa teorica
+10×8. Questo non prova minutiae utili. `combined_minutia_quality()` converte il
+raggio fisico in pixel con `round(RADIUS_MM*ppmm)`; lo zero storage non è valido.
+Il template conserva fino a 200 minutiae XYT e Bozorth restituisce score zero
+quando probe o gallery hanno meno di 10 minutiae. Anche ottenendo il `ppmm`
+fisico resterebbe dunque da provare che la piccola geometria e il mapping D269
+producano almeno 10 minutiae stabili e score separabili.
+
+#### Evidenza target e licensing
+
+Il riesame di D218--D220, D268--D270, `gfusb.dll`, `AlgoChicago.dll` e del
+corpus testuale non trova una misura fisica APP12509 né un contratto di natural
+orientation o polarity. Le stringhe di rotazione osservate in
+`AlgoChicagoT.dll` non appartengono al consumer target selezionato
+`AlgoChicago.dll` e non vengono promosse. Restano quindi:
+
+```text
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+```
+
+Il fork libfprint e SIGFM dichiarano `LGPL-2.1-or-later`; NBIS incorporato è
+materiale NIST public domain. SIGFM aggiunge una dipendenza build/runtime
+OpenCV4. Rockytkg `goodixgf.c` è LGPL, ma la sua trasformazione concreta
+`goodix_imgproc.c` è GPL-2.0-or-later e non entra nel driver LGPL. D271 non
+importa né adatta alcuna espressione esterna.
+
+#### Decisione e prossimo confine
+
+La policy si chiude come classificazione architetturale: SIGFM è l'unico
+candidato da validare, non un extractor production-selected; NBIS è bloccato
+dal `ppmm` ignoto e da una seconda incertezza sulla densità di minutiae. La
+qualità biometrica richiede evidenza target-reale futura: almeno distribuzione
+dei keypoint per frame rispetto al gate 25, stabilità/serializzazione dei
+template, punteggi same-finger e different-finger sufficienti a calibrare una
+soglia, e confronto controllato della polarity/orientation solo se una
+trasformazione è indipendentemente giustificata. Nessun numero sintetico può
+soddisfare tali metriche.
+
+```text
+OUTCOME=READY — D271_01_FEATURE_EXTRACTION_POLICY_CLOSED_OFFLINE
+ADVANCEMENT=ARCHITECTURAL_NON_HARDWARE_LIBFPRINT_EXTRACTOR_POLICY_CLOSED_WITH_PRECISE_VALIDATION_BOUNDARY
+EXECUTABLE_CLOSURE=NOT_APPLICABLE
+FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
+SIGFM_STATUS=CANDIDATE_FOR_VALIDATION
+NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
+SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
+NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
+SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
+NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
+RESIDUAL_BLOCKER_OR_RISK=SIGFM_TARGET_LOCAL_KEYPOINT_MATCH_THRESHOLD_POLARITY_AND_ORIENTATION_VALIDATION_MISSING;NBIS_PPMM_AND_MINUTIA_DENSITY_MISSING
+CANONICAL_DOCUMENTATION=UPDATED
+NEXT_PRIMARY_BOUNDARY=SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION
+NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
