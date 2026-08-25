@@ -270,6 +270,43 @@ class FdtEvent:
     raw_base: bytes | None
 
 
+@dataclass
+class ImageDecodeDiagnostic:
+    """Sanitized, metadata-only observability for one image decode attempt.
+
+    This record deliberately contains no payload bytes, plaintext hashes,
+    image bytes, raster samples, or other biometric material.  It observes the
+    existing acceptance path; it does not provide an alternate decode policy.
+    """
+
+    decode_stage: str = "plaintext_envelope"
+    plaintext_length: int = 0
+    declared_payload_length: int | None = None
+    control_or_major_class: str | None = None
+    is_pov_notification: bool | None = None
+    payload_trailer_class: str | None = None
+    payload_checksum_match: bool | None = None
+    image_record_length: int | None = None
+    image_record_crc_match: bool | None = None
+    exception_class: str | None = None
+    raster_shape_if_success: tuple[int, int] | None = None
+
+    def sanitized_dict(self) -> dict[str, object]:
+        return {
+            "decode_stage": self.decode_stage,
+            "plaintext_length": self.plaintext_length,
+            "declared_payload_length": self.declared_payload_length,
+            "control_or_major_class": self.control_or_major_class,
+            "is_pov_notification": self.is_pov_notification,
+            "payload_trailer_class": self.payload_trailer_class,
+            "payload_checksum_match": self.payload_checksum_match,
+            "image_record_length": self.image_record_length,
+            "image_record_crc_match": self.image_record_crc_match,
+            "exception_class": self.exception_class,
+            "raster_shape_if_success": self.raster_shape_if_success,
+        }
+
+
 def parse_fdt_event(payload: bytes) -> FdtEvent:
     control, data = parse_payload(payload)
     if control >> 4 != 3:
@@ -344,16 +381,70 @@ def decode_image_record(record: bytes) -> tuple[int, ...]:
         raise LengthMismatch(f"image_record:{message}") from error
 
 
-def parse_image_payload(payload: bytes) -> tuple[int, ...]:
-    """Validate one type-12 image payload and return the canonical 80x64 raster."""
-    control, data = parse_payload(payload)
-    if control >> 4 != 2:
-        raise UnexpectedControl(f"not_image:0x{control:02x}")
-    if len(data) != 5 + 7684:
-        raise LengthMismatch(f"image_payload_data_length:{len(data)}")
-    if data[0] == 0xAA:
-        raise UnexpectedEvent("pov_notification_not_image")
-    return decode_image_record(data[5:])
+def parse_image_payload(
+    payload: bytes, *, diagnostic: ImageDecodeDiagnostic | None = None
+) -> tuple[int, ...]:
+    """Validate one type-12 image payload and return the canonical 80x64 raster.
+
+    When supplied, ``diagnostic`` is populated only with bounded metadata.  The
+    parser still executes the same strict checksum, control, length, POV and
+    record-CRC predicates in the same order as the pre-D267/03 implementation.
+    In particular, a trailer byte of ``0x88`` remains subject to the ordinary
+    additive checksum comparison and never enables a bypass.
+    """
+
+    observation = diagnostic or ImageDecodeDiagnostic()
+    observation.plaintext_length = len(payload)
+    try:
+        if len(payload) >= 1:
+            observation.control_or_major_class = f"MAJOR_0X{payload[0] >> 4:X}"
+        if len(payload) >= 3:
+            declared = int.from_bytes(payload[1:3], "little")
+            observation.declared_payload_length = declared
+            if declared < 1 or len(payload) != declared + 3:
+                observation.decode_stage = "declared_length"
+            else:
+                observation.decode_stage = "payload_checksum"
+                expected_checksum = _checksum(payload[0], payload[3:-1])
+                observation.payload_checksum_match = payload[-1] == expected_checksum
+                observation.payload_trailer_class = (
+                    "0X88"
+                    if payload[-1] == 0x88
+                    else (
+                        "COMPUTED_ADDITIVE_CHECKSUM"
+                        if observation.payload_checksum_match
+                        else "OTHER"
+                    )
+                )
+
+        control, data = parse_payload(payload)
+        observation.decode_stage = "control_major"
+        if control >> 4 != 2:
+            raise UnexpectedControl(f"not_image:0x{control:02x}")
+
+        observation.decode_stage = "image_record_length"
+        observation.image_record_length = max(0, len(data) - 5)
+        if len(data) != 5 + 7684:
+            raise LengthMismatch(f"image_payload_data_length:{len(data)}")
+
+        observation.decode_stage = "pov_notification"
+        observation.is_pov_notification = data[0] == 0xAA
+        if observation.is_pov_notification:
+            raise UnexpectedEvent("pov_notification_not_image")
+
+        observation.decode_stage = "image_record_crc"
+        try:
+            raster = decode_image_record(data[5:])
+        except ImageCrcError:
+            observation.image_record_crc_match = False
+            raise
+        observation.image_record_crc_match = True
+        observation.decode_stage = "successful_raster_decode"
+        observation.raster_shape_if_success = (len(raster) // 64, 64)
+        return raster
+    except Exception as error:
+        observation.exception_class = type(error).__name__
+        raise
 
 
 class Transport(Protocol):

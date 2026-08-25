@@ -21,6 +21,7 @@ import core.future_first_image_operator as d265_operator
 import core.live_capability as capability
 from core.fdt_lifecycle import COMMAND_TIMEOUT_MS
 from core.post_d4 import build_finger_image, parse_outer, parse_payload
+from core.persistent_runtime import RuntimeFailure
 from core.runtime_transport import SubmissionMode, operational_fdt_a0_policy
 from core.usb_runtime import LibusbRuntimeTransport, _RouterEventSource
 import tools.d267_live_first_image_once as tool
@@ -203,7 +204,7 @@ class D267BaselineAuthorityTests(unittest.TestCase):
                 ):
                     d267.verify_d267_authoritative_baseline(repo, sha)
 
-    def test_manifest_is_exact_and_router_hash_is_post_d266(self) -> None:
+    def test_historical_manifest_preserves_post_d266_router_hash(self) -> None:
         document = json.loads(
             (REPO / "analysis/D266/D266_03_live_critical_manifest.json").read_text()
         )
@@ -219,9 +220,22 @@ class D267BaselineAuthorityTests(unittest.TestCase):
             hashlib.sha256((REPO / "core/usb_runtime.py").read_bytes()).hexdigest(),
             expected_router,
         )
-        for relative, row in rows.items():
-            actual = hashlib.sha256((REPO / relative).read_bytes()).hexdigest()
-            self.assertEqual(actual, row["sha256"], relative)
+        # This is the immutable D266/03 snapshot.  D267/03 intentionally
+        # changes decoder observability files and publishes a new, unapproved
+        # current manifest instead of rewriting this historical artifact.
+        self.assertEqual(document["schema"], "D266_03_D267_LIVE_CRITICAL_MANIFEST_V1")
+
+    def test_d267_03_current_manifest_is_exact_and_unapproved(self) -> None:
+        document = json.loads(
+            (REPO / "analysis/D267/D267_03_live_critical_manifest.json").read_text()
+        )
+        self.assertEqual(document["schema"], "D267_03_LIVE_CRITICAL_MANIFEST_V1")
+        self.assertFalse(document["baseline_approved"])
+        paths = tuple(row["path"] for row in document["live_critical_files"])
+        self.assertEqual(paths, d267.D267_FIRST_IMAGE_LIVE_CRITICAL_PATHS)
+        for row in document["live_critical_files"]:
+            actual = hashlib.sha256((REPO / row["path"]).read_bytes()).hexdigest()
+            self.assertEqual(actual, row["sha256"], row["path"])
 
 
 class D267CapabilityNamespaceTests(unittest.TestCase):
@@ -381,6 +395,75 @@ class D267ProductionPathTests(unittest.TestCase):
             d267.TerminalBoundary.STOP_AFTER_FIRST_IMAGE,
         )
 
+    def test_failure_report_preserves_sanitized_runtime_diagnostic(self) -> None:
+        diagnostic = {
+            "decode_stage": "payload_checksum",
+            "plaintext_length": 7693,
+            "declared_payload_length": 7690,
+            "control_or_major_class": "MAJOR_0X2",
+            "is_pov_notification": None,
+            "payload_trailer_class": "0X88",
+            "payload_checksum_match": False,
+            "image_record_length": None,
+            "image_record_crc_match": None,
+            "exception_class": "ChecksumMismatch",
+            "raster_shape_if_success": None,
+        }
+
+        class Secret:
+            def close(self) -> None:
+                pass
+
+        class Coordinator:
+            def run(self, **_kwargs: object) -> None:
+                raise RuntimeFailure("first_image_decode_failed")
+
+            def audit(self) -> dict[str, object]:
+                return {"first_image_decode_diagnostic": diagnostic}
+
+        intent = capability.issue_d267_intent(capability.D267_LIVE_AUTHORIZATION_FLAG)
+        published: list[dict[str, object]] = []
+        with tempfile.TemporaryDirectory() as temporary:
+            marker_path = Path(temporary) / "marker"
+            dependencies = d267.D267OperatorDependencies(
+                observe_baseline_verified=lambda: None,
+                require_operator_context=lambda: None,
+                require_safe_directories=lambda: None,
+                verify_protected_metadata=lambda: None,
+                verify_gfusb_hash=lambda: None,
+                resolve_exact_target=lambda: object(),
+                stop_fprintd=lambda: None,
+                block_signals=lambda: None,
+                require_no_holders=lambda _target: None,
+                validate_non_secret_material=lambda: None,
+                require_marker_absent=lambda: None,
+                materialize_secret_once=Secret,
+                claim_marker_once=lambda sha, token: d267.claim_d267_marker(
+                    marker_path, sha, token
+                ),
+                observe_live_io_issue=lambda: None,
+                construct_coordinator=lambda _live, _secret, _target: Coordinator(),
+                restore_signals=lambda: None,
+                restore_fprintd=lambda: None,
+                publish_report=lambda report: published.append(report.copy()),
+            )
+            with mock.patch.object(d267, "verify_d267_authoritative_baseline"):
+                report = d267.run_d267_first_image_candidate(
+                    intent,
+                    dependencies,
+                    repo=REPO,
+                    approved_baseline_sha="a" * 40,
+                    ts16=1,
+                )
+
+        self.assertEqual(report["failure_class"], "RuntimeFailure:first_image_decode_failed")
+        self.assertEqual(
+            report["runtime_audit"]["first_image_decode_diagnostic"], diagnostic
+        )
+        self.assertEqual(
+            published[0]["runtime_audit"]["first_image_decode_diagnostic"], diagnostic
+        )
+
     def test_prompt_is_exactly_once_immediately_before_15000ms_wait(self) -> None:
         events: list[tuple[str, int]] = []
 
@@ -475,6 +558,19 @@ class D267ProductionPathTests(unittest.TestCase):
             "first_image_ack_validation_count": 1,
             "first_image_b0_count": 1,
             "first_image_received": True,
+            "first_image_decode_diagnostic": {
+                "decode_stage": "successful_raster_decode",
+                "plaintext_length": 7693,
+                "declared_payload_length": 7690,
+                "control_or_major_class": "MAJOR_0X2",
+                "is_pov_notification": False,
+                "payload_trailer_class": "COMPUTED_ADDITIVE_CHECKSUM",
+                "payload_checksum_match": True,
+                "image_record_length": 7684,
+                "image_record_crc_match": True,
+                "exception_class": None,
+                "raster_shape_if_success": [80, 64],
+            },
             "cleanup_failures": [],
         }
         coordinator = SimpleNamespace(
@@ -495,10 +591,17 @@ class D267ProductionPathTests(unittest.TestCase):
             "raster_bytes",
             "pixel_samples",
             "biometric_payload",
-            "plaintext",
         ):
             self.assertNotIn(forbidden, serialized)
+        self.assertEqual(
+            set(key for key in summary["FIRST_IMAGE_DECODE_DIAGNOSTIC"] if "plaintext" in key),
+            {"plaintext_length"},
+        )
         self.assertEqual(summary["FIRST_IMAGE_RASTER_SHAPE"], [80, 64])
+        self.assertEqual(
+            summary["FIRST_IMAGE_DECODE_DIAGNOSTIC"]["decode_stage"],
+            "successful_raster_decode",
+        )
         self.assertEqual(summary["RETRY_COUNT"], 0)
         self.assertEqual(summary["RECOVERY_COUNT"], 0)
         self.assertTrue(summary["SECRET_ZEROIZED"])

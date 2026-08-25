@@ -249,6 +249,20 @@ autorizzazione: `BASELINE_APPROVED_FOR_NEW_ATTEMPT=false`,
 `LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false` e
 `D265_02_RETRY_AUTHORIZED=false`.
 
+**Chiusure storiche D261/D262, entrambe precedenti a D267.** Il
+micro-corrective 3 D261 aveva chiuso il minting D261/future dietro seam private
+post-durable-claim, impedito report/restore prima dei rispettivi preflight/start,
+riallineato il contesto operatore future a D261 (`SUDO_UID` nonzero) e reso il
+writer marker future robusto agli short-write. La successiva run D262 era stata
+eseguita una sola volta con esito `PASS_STOP_AFTER_FDT_ARM_ACK`: nessuna
+interazione dito, retry, write persistente, cache write o recovery A2/`0x70`;
+una sola sessione USB e un solo handshake/server TLS; cleanup, restore e
+zeroizzazione completati. La traccia
+`0x36,0x50,0x36,0x82,0x20,0x36,0x32` aveva ritirato per il target primario il
+rischio zero-tail dei comandi FDT raggiunti. Il marker era consumato e `0x22`
+non era stato raggiunto. Questi sono antecedenti storici, non eventi successivi
+a D267.
+
 D267/01 è stato poi eseguito manualmente una sola volta sulla baseline
 approvata `219c038600deb87da1cd93340b9bd07c14e1f5fe`. Il router corretto ha
 consegnato live IRQ2; il runtime ha inviato esattamente un `0x22` fixed64
@@ -277,24 +291,22 @@ questa resta un'ipotesi `MEDIUM`, non un fatto. Stato:
 `READY_FOR_DECODE_CORRECTIVE_REVIEW=false`, `LIVE_AUTHORIZED=false` e
 `READY_FOR_LIVE=false`.
 
-Il micro-corrective 3 finale chiude anche il minting D261/future dietro seam
-private post-durable-claim, impedisce report/restore prima dei rispettivi
-preflight/start, riallinea il contesto operatore future a D261 (`SUDO_UID`
-nonzero) e rende il writer marker future robusto agli short-write.
-
-La singola run live autorizzata è poi stata eseguita una sola volta e completata con
-successo: `PASS_STOP_AFTER_FDT_ARM_ACK`, nessuna interazione dito (`FINGER_INTERACTION_COUNT=0`),
-nessun retry (`RETRY_COUNT=0`), zero famiglie persistenti (`PERSISTENT_DEVICE_WRITE_COUNT=0`),
-zero cache write (`CACHE_WRITE_COUNT=0`) e zero recovery A2/`0x70`, un'unica sessione USB
-(`USB_TRANSPORT_SESSION_COUNT=1`) e un solo handshake/server TLS, B0 consumato sulla stessa
-sessione TLS prima di stage2, secret zeroizzato e non loggato, fprintd e segnale ripristinati,
-runtime chiuso. La traccia FDT esatta
-`0x36,0x50,0x36,0x82,0x20,0x36,0x32` è ora accettata dal target primario con ACK: il rischio
-zero-tail per `0x36/0x50/0x82/0x20` è ritirato per `27c6:5125`/`GF_ST411SEC_APP_12509` sul
-bounded FDT arm path (`PRIMARY_TARGET_LIVE_PROVEN_AND_ACK_ACCEPTED`). Il marker single-use è
-consumato; `SECOND_LIVE_ATTEMPT_ALLOWED=false`: la stessa run non deve essere ripetuta e nessun
-nuovo step live è autorizzato in questo step. `0x22` e il post-finger image non sono stati
-raggiunti.
+D267/03 implementa ora il corrective **solo offline**. Il parser conserva un
+record metadata-only con stage, lunghezze, classe major/control, POV, classe
+trailer, esito checksum, lunghezza/CRC del record, classe eccezione e shape di
+successo; il runtime lo mantiene anche dopo la zeroizzazione del plaintext e il
+report/riepilogo operatore lo espone senza B0, plaintext, image bytes, raster,
+pixel o hash sensibili. Nove fixture sintetiche distinguono success, envelope
+troncato, declared-length mismatch, control inatteso, POV, checksum ordinario,
+trailer `0x88`, record length e record CRC. `0x88` è soltanto riconosciuto:
+resta soggetto al checksum additivo strict e non abilita alcun bypass. Il
+manifest live-critical D266/03 resta storico; il dry-run usa un nuovo manifest
+D267/03 con `baseline_approved=false`. Nessuna semantica decoder o wire cambia,
+nessun live è autorizzato. Stato corrente:
+`OUTCOME=D267_03_DECODE_DIAGNOSTIC_CORRECTIVE_READY_OFFLINE`,
+`OBSERVABILITY_CHANGE=YES`, `DECODER_SEMANTIC_CHANGE=NO`, `WIRE_CHANGE=NO`,
+`0X88_DIAGNOSTICALLY_RECOGNIZED=true`, `0X88_BYPASS_ENABLED=false`,
+`LIVE_AUTHORIZED=false` e `READY_FOR_LIVE=false`.
 
 D250 aveva chiuso offline il boundary minimo exactly-one AF. L'audit
 riproducibile della capture primaria ha isolato `D4/ACK d4-01 → AF → AE`:
@@ -565,6 +577,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Corrective D266/03 authority D267 | PASS offline; pronto per review di una nuova baseline, live false | D265 immutabile e retry vietato; nuova authority D267 di 20 file con capability/marker/report/flag distinti, router post-fix incluso, verifier Git full-SHA/HEAD/clean/path/byte identity, dry-run esterno zero-side-effect e 21 unittest PASS |
 | Run live D267/01 first B0 | fail-closed nel decoder, autorizzazione consumata | IRQ2 consegnato, un `0x22` fixed64 inviato e ACK-validato, primo B0 ricevuto; zero retry/recovery/reopen/write/comandi post-image; decode e first image non provati |
 | Analisi D267/02 decoder | failure bounded offline, subpredicato live non recuperabile | emettitore esatto `persistent_runtime.py:444`; TLS consumption superato per call-flow, poi catch opaco su `parse_image_payload`; fixture 7693→7684→80x64 PASS, mismatch `0x88` candidato MEDIUM; manca diagnostica sanitizzata length/header/checksum/CRC |
+| Corrective D267/03 decode observability | READY offline, live false | diagnostica sanitizzata per nove classi; report/audit preservano lo stage interno; `0x88` visibile ma strict e senza bypass; acceptance e wire invariati; D209/D210 non presenti e non re-queryable |
 | Codec immagine | confermato offline | record 7684 byte → raster u16 `80x64` |
 
 ## Fonti e confini di pubblicazione
@@ -1915,12 +1928,13 @@ La policy checksum D249 implementata è strict: `parse_payload()` calcola sempre
 il checksum. Il valore 0x88 è accettato soltanto quando coincide matematicamente
 con il checksum del payload specifico; non è un bypass. Il NOP locale osservato
 con marker no-check era fuori dall'allowlist D249. Test distinti rifiutano un
-0x88 errato e accettano un checksum genuino che vale 0x88. D267/02 non cambia
-questa policy, ma dopo il live D267/01 la riclassifica come ipotesi concreta da
-riesaminare per il solo payload immagine: DLL locale e Rocky applicano un bypass
-`0x88`, mentre la baseline live ha fallito dentro l'envelope parser/codec. Il
-trailer plaintext live non è stato registrato, quindi il mismatch non è ancora
-provato e non autorizza una patch implicita.
+0x88 errato e accettano un checksum genuino che vale 0x88. D267/02 non aveva
+cambiato questa policy e D267/03 aggiunge soltanto la classe diagnostica
+`payload_trailer_class=0X88`: un `0x88` non genuino continua a fallire nello
+stesso `ChecksumMismatch`. DLL locale e Rocky applicano un bypass, ma sono
+corroborazione implementativa e non prova target-specific che il plaintext
+D267/01 avesse quel trailer. Il mismatch resta quindi un'ipotesi `MEDIUM`, non
+un'autorizzazione a cambiare acceptance.
 
 La closure avversariale copre ACK inattesi/duplicati, eventi fuori ordine,
 immagine anticipata, control e framing errati, EOF parziale, lunghezze immagine,
@@ -5202,7 +5216,7 @@ DEVICE_IRQ2_PHYSICAL_EMISSION_DURING_D265_02=UNDETERMINED
 FIRST_IMAGE_LIVE_PROVEN=false
 ```
 
-### D267/01–02: first B0 live e localizzazione bounded del decoder
+### D267/01–03: first B0 live, localizzazione bounded e corrective osservabilità
 
 D267/01 è stato eseguito manualmente una sola volta sulla baseline approvata
 `219c038600deb87da1cd93340b9bd07c14e1f5fe`. L'output sanitizzato fornito
@@ -5262,6 +5276,13 @@ conferma che la fixture 7693 passa, mentre trailer forzato `0x88`, record raw,
 B0 intero e payload troncato falliscono nei gate attesi. `pytest` non è
 installato e non è stato aggiunto.
 
+Questo `7693 → 7690 → 7689 → 5+7684 → 7680+4 → 80x64` è verificato dal
+contratto sintetico e dal codec corrente. Gli artefatti storici D209/D210 non
+sono più presenti nel repository e non sono quindi re-queryable come evidenza
+primaria: qualunque richiamo storico a `7693 byte / major image 2` sopravvive
+solo alla forza probatoria del manuale canonico e degli artefatti D267 ancora
+presenti, non come nuova verifica dei raw D209/D210.
+
 La causa interna della run consumata non è ricostruibile perché non furono
 registrati exception class, stage, lunghezze, control, categoria trailer,
 checksum o CRC sanitizzati. Le ipotesi restano ordinate: mismatch strict
@@ -5285,3 +5306,60 @@ Il solo passo successivo proposto è un corrective **offline** separato:
 conservare diagnostica tipizzata e sanitizzata per stage e aggiungere fixture
 image-specific per `0x88`, lunghezze/header, POV e CRC. D267/02 non modifica
 `core/`, `tools/`, `operator_kit/`, `src/` o `poc/` e non autorizza un live.
+
+D267/03 esegue quel corrective senza cambiare i predicati. Il record
+`first_image_decode_diagnostic` contiene esclusivamente:
+
+```text
+decode_stage
+plaintext_length
+declared_payload_length
+control_or_major_class
+is_pov_notification
+payload_trailer_class
+payload_checksum_match
+image_record_length
+image_record_crc_match
+exception_class
+raster_shape_if_success
+```
+
+I campi non raggiunti restano `null`. Il runtime continua a emettere la classe
+esterna canonica `RuntimeFailure:first_image_decode_failed`, azzera il plaintext
+anche sul failure e conserva il solo record sanitizzato nell'audit. Il report
+protetto di una futura esecuzione e il summary operatore potranno pertanto
+distinguere il predicato senza conservare B0, plaintext, bytes immagine, raster,
+pixel, materiale biometrico o hash sensibili.
+
+La matrice sintetica 9/9 prova classi distinte per valid, truncated,
+declared-length, major/control, POV, checksum ordinario, `0x88`, record length e
+record CRC. Il caso `0x88` termina ancora in
+`ChecksumMismatch:payload_checksum`; DLL locale
+`function_18005f098_non_b0_dispatch` e
+`Rockytkg/src/goodix_capture.c` corroborano una diversa policy no-check, ma non
+provano quale trailer abbia prodotto APP12509 in D267/01. La graduatoria delle
+ipotesi resta quindi invariata: `0x88` `MEDIUM`, framing/header/lunghezza e CRC
+`MEDIUM-LOW`, control/POV e concatenazione TLS `LOW`. Il nuovo codice rende
+queste ipotesi discriminabili soltanto da nuova evidenza; non ricostruisce la
+run consumata.
+
+Le invarianti offline confermano stessa allowlist, ACK policy, command trace,
+un solo `0x22`, retained TLS/first-B0 ownership, zero retry/recovery/reopen e
+zero reachability di write persistenti o comandi post-image vietati. Il dry-run
+reale da `/tmp` usa il manifest D267/03 non approvato e ha tutti i contatori
+sensor-reaching a zero. Il manifest D266/03 resta immutato come snapshot
+storico.
+
+```text
+OUTCOME=D267_03_DECODE_DIAGNOSTIC_CORRECTIVE_READY_OFFLINE
+ADVANCEMENT=NEW_OFFLINE_DIAGNOSTIC_CAPABILITY
+EXECUTABLE_CLOSURE=PASS
+OBSERVABILITY_CHANGE=YES
+DECODER_SEMANTIC_CHANGE=NO
+WIRE_CHANGE=NO
+0X88_DIAGNOSTICALLY_RECOGNIZED=true
+0X88_BYPASS_ENABLED=false
+RESIDUAL_BLOCKER_OR_RISK=EXACT_D267_01_INNER_FAILURE_PREDICATE_STILL_UNOBSERVED_WITHOUT_NEW_EVIDENCE
+LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```

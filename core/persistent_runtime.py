@@ -25,6 +25,7 @@ from core.fdt_lifecycle import (
 )
 from core.fdt_seed import SeedProviderResult
 from core.post_d4 import (
+    ImageDecodeDiagnostic,
     PLAIN,
     TLS,
     InvalidTransition,
@@ -179,6 +180,7 @@ class PersistentRuntimeCoordinator:
         self.first_image_irq2_observed_count = 0
         self.first_image_ack_validation_count = 0
         self.first_image_b0_count = 0
+        self.first_image_decode_diagnostic: dict[str, object] | None = None
         self.lifecycle = FdtLifecycle()
         self.machine: ExactFreshFdtBootstrapMachine | None = None
         self.cold_start_result: ColdStartResult | None = None
@@ -434,11 +436,14 @@ class PersistentRuntimeCoordinator:
             plaintext = self.tls_session.application_session.consume_application_record(b0_body)
         except Exception:
             raise RuntimeFailure("first_image_b0_consumption_failed")
+        diagnostic = ImageDecodeDiagnostic()
         try:
-            raster = parse_image_payload(bytes(plaintext))
+            raster = parse_image_payload(bytes(plaintext), diagnostic=diagnostic)
+            self.first_image_decode_diagnostic = diagnostic.sanitized_dict()
             outcome["first_image_validation"] = "SUCCESS"
             outcome["first_image_raster_shape"] = (len(raster) // 64, 64)
         except Exception:
+            self.first_image_decode_diagnostic = diagnostic.sanitized_dict()
             for index in range(len(plaintext)):
                 plaintext[index] = 0
             raise RuntimeFailure("first_image_decode_failed")
@@ -517,6 +522,7 @@ class PersistentRuntimeCoordinator:
             "first_image_irq2_observed_count": self.first_image_irq2_observed_count,
             "first_image_ack_validation_count": self.first_image_ack_validation_count,
             "first_image_b0_count": self.first_image_b0_count,
+            "first_image_decode_diagnostic": self.first_image_decode_diagnostic,
             "first_image_validation": "INTEGRATED_IN_RUNTIME_RESULT",
             "first_image_bytes_persisted": False,
             "terminal_cleanup_completed": self.lifecycle.state.value == "TERMINAL_STOPPED",

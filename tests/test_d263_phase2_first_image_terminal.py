@@ -177,6 +177,10 @@ class FirstImageTerminalTests(unittest.TestCase):
         self.assertEqual(coord.tls_session.handshake_count, 1)
         self.assertEqual(coord.tls_session.psk_context_provisioning_count, 1)
         self.assertFalse(result["first_image_bytes_persisted"])
+        self.assertEqual(
+            coord.first_image_decode_diagnostic["decode_stage"],
+            "successful_raster_decode",
+        )
 
     def test_wrong_irq_fails_closed(self) -> None:
         lc = _armed_lifecycle()
@@ -216,6 +220,10 @@ class FirstImageTerminalTests(unittest.TestCase):
             coord._run_first_image_terminal()
         # plaintext wiped even on decode failure
         self.assertFalse(any(coord._fake_app.last_plaintext or b""))
+        diagnostic = coord.first_image_decode_diagnostic
+        self.assertEqual(diagnostic["decode_stage"], "image_record_crc")
+        self.assertFalse(diagnostic["image_record_crc_match"])
+        self.assertEqual(diagnostic["exception_class"], "ImageCrcError")
 
     def test_second_command_prevention(self) -> None:
         lc = _armed_lifecycle()

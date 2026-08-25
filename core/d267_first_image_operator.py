@@ -371,6 +371,7 @@ def run_d267_first_image_candidate(
     _consume_intent(intent)
     report: dict[str, Any] = {"result": "FAIL_CLOSED", "retry_count": 0}
     secret = None
+    coordinator: PersistentRuntimeCoordinator | None = None
     secret_owned_by_outer = False
     ownership_transferred = False
     report_destination_preflight_passed = False
@@ -424,6 +425,8 @@ def run_d267_first_image_candidate(
         )
     except BaseException as exc:
         report["failure_class"] = f"{type(exc).__name__}:{exc}"
+        if coordinator is not None:
+            report["runtime_audit"] = coordinator.audit()
     finally:
         if secret_owned_by_outer and secret is not None:
             try:

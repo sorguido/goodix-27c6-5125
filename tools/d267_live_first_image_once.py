@@ -47,7 +47,7 @@ CANONICAL_LIVE_COMMAND_TEMPLATE = (
     "sudo env D267_APPROVED_LIVE_BASELINE_SHA=<FULL_APPROVED_SHA> "
     "./operator_kit/d267-first-image-once.sh " + LIVE_FLAG
 )
-MANIFEST = REPO / "analysis/D266/D266_03_live_critical_manifest.json"
+MANIFEST = REPO / "analysis/D267/D267_03_live_critical_manifest.json"
 
 
 @dataclass
@@ -138,7 +138,7 @@ def dry_run() -> dict[str, Any]:
         document = json.loads(MANIFEST.read_text(encoding="utf-8"))
         rows = document["live_critical_files"]
         paths = tuple(row["path"] for row in rows)
-        if document.get("schema") != "D266_03_D267_LIVE_CRITICAL_MANIFEST_V1":
+        if document.get("schema") != "D267_03_LIVE_CRITICAL_MANIFEST_V1":
             failures.append("schema")
         if document.get("authority") != "D267_FIRST_IMAGE_LIVE_CRITICAL_PATHS":
             failures.append("authority_name")
@@ -248,6 +248,9 @@ def _summary(
         ),
         "FIRST_IMAGE_RASTER_SHAPE": report.get(
             "first_image_raster_shape", "NOT_REACHED"
+        ),
+        "FIRST_IMAGE_DECODE_DIAGNOSTIC": audit.get(
+            "first_image_decode_diagnostic", "NOT_REACHED"
         ),
         "RETRY_COUNT": _unknown_or(audit, "retry_count"),
         "RECOVERY_COUNT": recovery,
