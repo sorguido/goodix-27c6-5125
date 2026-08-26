@@ -18,6 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit"
+BASELINE_APPROVAL = ROOT / "analysis/D274/D274_03_baseline_approval.json"
 POWERSHELL51_FILES = (
     "avvia-d274-03.ps1",
     "collect-d274-03-native-qualification-results.ps1",
@@ -401,7 +402,13 @@ class D27403Tests(unittest.TestCase):
         self.assertFalse(manifest["pin_value_handled_by_kit"])
         self.assertEqual(manifest["second_b0_stop_trigger"], "WIRE_DRIVEN")
         self.assertFalse(manifest["baseline_approval_blocked_pending_native_qualification"])
-        self.assertTrue(manifest["baseline_approval_review_pending"])
+        self.assertFalse(manifest["baseline_approval_review_pending"])
+        self.assertTrue(manifest["baseline_approved"])
+        self.assertEqual(manifest["approved_full_commit_sha"],
+                         "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5")
+        self.assertFalse(manifest["approved_for_capture"])
+        self.assertFalse(manifest["live_authorized"])
+        self.assertFalse(manifest["ready_for_live"])
         self.assertEqual(manifest["windows_native_qualification"],
                          "PASS_OPERATOR_SUPPLIED")
         self.assertFalse(schema["additionalProperties"])
@@ -732,8 +739,8 @@ class D27403Tests(unittest.TestCase):
         for key in ("baseline_approved", "approved_for_capture",
                     "live_authorized"):
             self.assertFalse(authority[key], key)
-        for key in ("baseline_approved", "approved_for_capture",
-                    "ready_for_live"):
+        self.assertTrue(manifest["baseline_approved"])
+        for key in ("approved_for_capture", "live_authorized", "ready_for_live"):
             self.assertFalse(manifest[key], key)
         native = (KIT / "run-d274-03-native-qualification.ps1").read_text(
             encoding="utf-8-sig")
@@ -744,6 +751,45 @@ class D27403Tests(unittest.TestCase):
         for field in ("baseline_approved", "approved_for_capture",
                       "live_authorized", "ready_for_live"):
             self.assertIn(field + " = $false", native)
+
+    def test_47_formal_baseline_approval_record_is_exact_and_closed_live(self):
+        record = json.loads(BASELINE_APPROVAL.read_text())
+        expected_sha = "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5"
+        self.assertEqual(record["schema"], "D274_03_BASELINE_APPROVAL_V1")
+        self.assertTrue(record["baseline_approved"])
+        self.assertRegex(record["approved_full_commit_sha"], r"^[0-9a-f]{40}$")
+        self.assertEqual(record["approved_full_commit_sha"], expected_sha)
+        self.assertEqual(record["windows_native_qualification"],
+                         "PASS_OPERATOR_SUPPLIED")
+        self.assertEqual(record["freeze_review"], "PASS_AI_PM")
+        for key in ("approved_for_capture", "live_authorized", "ready_for_live"):
+            self.assertFalse(record[key], key)
+        self.assertIsNone(record["one_shot_authorization_id"])
+
+    def test_48_baseline_record_cannot_open_runtime_or_degrade_qualification(self):
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text(
+            encoding="utf-8-sig")
+        launcher = (KIT / "avvia-d274-03.ps1").read_text(encoding="utf-8-sig")
+        authority = json.loads((KIT / "D274_03_live_authority.json").read_text())
+        self.assertNotIn("D274_03_baseline_approval.json", runner)
+        self.assertNotIn("D274_03_baseline_approval.json", launcher)
+        for key in ("baseline_approved", "approved_for_capture", "live_authorized"):
+            self.assertFalse(authority[key], key)
+        qualification = runner[runner.index("if ($NativeQualificationOnly)"):
+                               runner.index("if ($authority.baseline_approved -ne $true)")]
+        for field in ("baseline_approved", "approved_for_capture", "live_authorized"):
+            self.assertIn("$authority." + field + " -ne $false", qualification)
+        live_gates = runner[runner.index("if ($authority.baseline_approved -ne $true)"):
+                            runner.index("$approvedSha =")]
+        self.assertIn("approved_for_capture -ne $true", live_gates)
+        self.assertIn("live_authorized -ne $true", live_gates)
+
+    def test_49_formal_approval_preserves_zero_real_counters(self):
+        record = json.loads(BASELINE_APPROVAL.read_text())
+        for field in ("real_capture_count", "real_usb_open_count",
+                      "real_finger_interaction_count", "real_goodix_command_count",
+                      "automatic_retry_count", "persistent_device_write_count"):
+            self.assertEqual(record[field], 0, field)
 
 
 if __name__ == "__main__":

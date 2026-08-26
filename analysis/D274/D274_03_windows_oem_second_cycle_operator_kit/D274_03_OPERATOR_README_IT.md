@@ -2,8 +2,9 @@
 
 ## Stato di questo package
 
-Il package è preparato esclusivamente per review AI-PM e qualificazione
-offline. Non è approvato per una cattura reale.
+Il package ha superato review AI-PM e qualificazione nativa offline. La
+baseline Git è formalmente approvata, ma il package non è approvato per una
+cattura reale e non è autorizzato al live.
 
 ```text
 D274_03_CORRECTIVE_IMPLEMENTED_OFFLINE=true
@@ -24,19 +25,28 @@ D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED
 WINDOWS_NATIVE_PACKAGE_SHA256=5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87
 WINDOWS_NATIVE_PACKAGE_BYTES_REHASHED_BY_AGENT=false
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=false
-D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
-D274_03_BASELINE_APPROVED=false
+D274_03_FREEZE_REVIEW=PASS
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=false
+D274_03_BASELINE_APPROVED=true
+D274_03_APPROVED_BASELINE_FULL_SHA=ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5
 APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
 ```
 
-Il sorgente contiene un percorso futuro di cattura passiva, ma il file
-`D274_03_live_authority.json` distribuito ha tutti i gate a `false`. Il flag del
-launcher non sostituisce l'authority. Una futura esecuzione richiederà review,
-commit SHA completo approvato, HEAD esatto, branch `main`, live-critical set pulito e
-autorizzazione one-shot separata.
+Il record canonico separato `../D274_03_baseline_approval.json` approva
+esclusivamente il commit completo
+`ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5`. Il sorgente contiene un percorso
+futuro di cattura passiva, ma il template runtime
+`D274_03_live_authority.json` resta invariato con tutti i gate a `false`, SHA
+`null` e authorization ID `null`. La baseline approval non viene letta dal
+runner come authority live e il flag del launcher non la sostituisce.
+
+Una futura esecuzione richiederà una decisione separata ed esplicita di
+capture/live, un'authority one-shot dedicata, HEAD esatto, branch `main` e
+live-critical set pulito. Fino ad allora `APPROVED_FOR_CAPTURE=false`,
+`LIVE_AUTHORIZED=false` e `READY_FOR_LIVE=false`.
 
 La qualificazione nativa finale è stata eseguita dall'operatore su Windows 11
 Home build 26200 e Windows PowerShell Desktop 5.1.26100.8655, con Goodix
@@ -146,9 +156,10 @@ native_qualification_results/D274_03_windows_native_qualification_results.zip
 native_qualification_results/D274_03_windows_native_qualification_results.zip.sha256
 ```
 
-La qualification è PASS operator-supplied. Restano obbligatorie freeze/review
-AI-PM e approvazione separata della baseline: la baseline è ancora non
-approvata e il live resta vietato.
+La qualification è PASS operator-supplied; la freeze review AI-PM è PASS e la
+baseline è formalmente approvata nel record separato. Il live resta vietato:
+l'eventuale capture richiede una successiva autorizzazione esplicita e
+one-shot, non implicata dall'approvazione della baseline.
 
 Non eseguire ora:
 

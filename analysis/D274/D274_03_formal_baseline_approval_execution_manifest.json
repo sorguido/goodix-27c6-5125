@@ -1,0 +1,47 @@
+{
+  "schema": "D274_03_FORMAL_BASELINE_APPROVAL_EXECUTION_MANIFEST_V1",
+  "step": "D274/03 formal baseline approval",
+  "date": "2026-08-26",
+  "scope": "OFFLINE_AUTHORITY_GOVERNANCE_ONLY",
+  "initial_branch": "main",
+  "final_branch": "main",
+  "initial_head": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+  "origin_main_at_start": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+  "head_equal_origin_main_at_start": true,
+  "head_origin_divergence_at_start": {
+    "left": 0,
+    "right": 0
+  },
+  "initial_worktree_clean": true,
+  "approved_baseline_full_sha": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+  "authority_model": "SEPARATE_CANONICAL_BASELINE_APPROVAL_RECORD",
+  "runtime_changed": false,
+  "live_critical_set_changed": false,
+  "live_authority_template_changed": false,
+  "native_qualification_only_changed": false,
+  "commit_created": false,
+  "push_performed": false,
+  "merge_rebase_reset_amend_branch_switch_performed": false,
+  "hardware_touched_by_agent": false,
+  "usb_access_performed_by_agent": false,
+  "marker_created": false,
+  "capture_created": false,
+  "authority": {
+    "baseline_approved": true,
+    "approved_full_commit_sha": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+    "approved_for_capture": false,
+    "live_authorized": false,
+    "ready_for_live": false,
+    "one_shot_authorization_id": null
+  },
+  "safety_counters": {
+    "real_capture_count": 0,
+    "real_usb_open_count": 0,
+    "real_finger_interaction_count": 0,
+    "real_goodix_command_count": 0,
+    "automatic_retry_count": 0,
+    "persistent_device_write_count": 0
+  },
+  "windows_powershell_5_1_native_runtime": "NOT_AVAILABLE_ON_LINUX_HOST",
+  "live_execution": "NOT_PERFORMED"
+}

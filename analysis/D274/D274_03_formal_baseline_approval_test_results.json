@@ -1,0 +1,31 @@
+{
+  "schema": "D274_03_FORMAL_BASELINE_APPROVAL_TEST_RESULTS_V1",
+  "date": "2026-08-26",
+  "host_class": "LINUX_AI_HOST_OFFLINE_ONLY",
+  "windows_powershell_5_1_native_runtime": "NOT_AVAILABLE_ON_LINUX_HOST",
+  "tests": {
+    "d274_03_second_cycle_operator_kit": "PASS_49_OF_49",
+    "d274_postprocess_multiframe_evidence": "PASS_30_OF_30",
+    "total_pertinent_d274": "PASS_79_OF_79",
+    "json_validation": "PASS",
+    "observer_cli_help": "PASS",
+    "postprocessor_cli_help": "PASS",
+    "live_critical_set_vs_approved_sha": "PASS_BYTE_IDENTICAL",
+    "no_marker_or_capture_file_created": "PASS"
+  },
+  "regression_guards": {
+    "approved_full_commit_sha_exact_40_hex": "PASS",
+    "baseline_approved_true": "PASS",
+    "approved_for_capture_false": "PASS",
+    "live_authorized_false": "PASS",
+    "ready_for_live_false": "PASS",
+    "one_shot_authorization_id_null": "PASS",
+    "live_authority_template_fail_closed": "PASS",
+    "baseline_record_not_runtime_authority": "PASS",
+    "native_qualification_only_contract_preserved": "PASS",
+    "zero_real_counters": "PASS",
+    "no_runtime_or_live_critical_change": "PASS"
+  },
+  "windows_native_qualification": "PASS_OPERATOR_SUPPLIED_NOT_REEXECUTED",
+  "live_execution": "NOT_PERFORMED"
+}

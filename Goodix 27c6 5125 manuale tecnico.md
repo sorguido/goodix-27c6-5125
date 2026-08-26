@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D274/03 Windows native PASS freeze corrective (sintesi)
+### Stato corrente post-D274/03 formal baseline approval (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -365,8 +365,12 @@ collector operator-supplied riporta privacy scan PASS e SHA-256 package
 `5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87`.
 Il package non è materialmente presente sull'host AI: l'agente non ne ha
 ricalcolato i byte. La qualification chiude quindi come
-`PASS_OPERATOR_SUPPLIED`; baseline, capture e live restano false in attesa di
-freeze/review AI-PM e approvazione separata.
+`PASS_OPERATOR_SUPPLIED`. La successiva review AI-PM del freeze correttivo è
+PASS e la baseline D274/03 è formalmente approvata sul commit completo
+`ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5`, registrato nel record separato
+`analysis/D274/D274_03_baseline_approval.json`. Questa decisione non approva
+capture né live: il template runtime resta chiuso e la prossima decisione è
+un'authorization separata, esplicita e one-shot.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -398,8 +402,11 @@ D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
 LIVE_PATH_EXECUTED=false
 LIVE_PATH_AUTHORIZED=false
-D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
-D274_03_BASELINE_APPROVED=false
+D274_03_FREEZE_REVIEW=PASS
+FREEZE_BUNDLE_SHA256=d7e5db36a0efec05ab33c82c221beb42c91aea4772a059764930ead5d8ed1d6b
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=false
+D274_03_BASELINE_APPROVED=true
+D274_03_APPROVED_BASELINE_FULL_SHA=ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5
 APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
@@ -411,8 +418,8 @@ REAL_FINGER_INTERACTION_COUNT=0
 REAL_GOODIX_COMMAND_COUNT=0
 AUTOMATIC_RETRY_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
-NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
+NEXT_PRIMARY_BOUNDARY=SEPARATE_CAPTURE_LIVE_AUTHORIZATION_DECISION
+NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_ONE_SHOT_CAPTURE_LIVE_AUTHORIZATION
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -5418,6 +5425,22 @@ per iterazioni correttive rapide; dopo PASS, freeze e review formale del
 candidato; eventuale live one-shot soltanto dopo approvazione separata della
 baseline. Il PASS di qualification non promuove da solo alcuna authority.
 
+La review AI-PM del freeze correttivo ha poi chiuso PASS e ha autorizzato la
+sola approvazione formale della baseline. Il record canonico separato
+`analysis/D274/D274_03_baseline_approval.json` fissa il full SHA
+`ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5`, la qualification Windows
+`PASS_OPERATOR_SUPPLIED`, il package hash operatore
+`5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87` e il
+freeze bundle hash verificato AI-PM
+`d7e5db36a0efec05ab33c82c221beb42c91aea4772a059764930ead5d8ed1d6b`.
+Il record non è un input del runner live. Il template
+`D274_03_live_authority.json` resta byte-invariato e fail-closed con
+`baseline_approved=false`, `approved_for_capture=false`,
+`live_authorized=false`, SHA `null` e one-shot ID `null`, preservando anche il
+percorso `-NativeQualificationOnly`. Nessun marker o contatore reale è stato
+creato o incrementato. Il prossimo boundary è una decisione separata ed
+esplicita di capture/live one-shot; la baseline approval non la anticipa.
+
 ```text
 D274_02_TECHNICAL_REGRESSION=false
 D274_02_REOPEN_REQUIRED=false
@@ -5453,8 +5476,11 @@ D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
 LIVE_PATH_EXECUTED=false
 LIVE_PATH_AUTHORIZED=false
-D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
-D274_03_BASELINE_APPROVED=false
+D274_03_FREEZE_REVIEW=PASS
+FREEZE_BUNDLE_SHA256=d7e5db36a0efec05ab33c82c221beb42c91aea4772a059764930ead5d8ed1d6b
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=false
+D274_03_BASELINE_APPROVED=true
+D274_03_APPROVED_BASELINE_FULL_SHA=ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5
 APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
@@ -5466,8 +5492,8 @@ REAL_FINGER_INTERACTION_COUNT=0
 REAL_GOODIX_COMMAND_COUNT=0
 AUTOMATIC_RETRY_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
-NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
+NEXT_PRIMARY_BOUNDARY=SEPARATE_CAPTURE_LIVE_AUTHORIZATION_DECISION
+NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_ONE_SHOT_CAPTURE_LIVE_AUTHORIZATION
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
@@ -5660,10 +5686,13 @@ session, one handshake, mixed A0/B0 routing), riusato dai successivi step live;
 `LINUX_TLS_REBUILD_REQUIRED=false` (ruolo server-side rispetto al ClientHello
 del device, nessun nuovo TLS client da costruire).
 
-D274/03 è qualificato nativamente con PASS operator-supplied, ma NON è
-baseline-approved e NON è live-ready: il candidato resta congelato per review
-AI-PM formale (`D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED`,
-`D274_03_BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`).
+D274/03 è qualificato nativamente con PASS operator-supplied e la baseline è
+formalmente approvata sul full SHA
+`ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5`, ma NON è approvato per capture e
+NON è live-ready. La decisione successiva resta separata ed esplicita
+(`D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED`,
+`D274_03_BASELINE_APPROVED=true`, `APPROVED_FOR_CAPTURE=false`,
+`LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false`).
 
 ### D274/03 parallel offline forward — Sessione 3: SIGFM / OpenCV4 real-build closure
 
