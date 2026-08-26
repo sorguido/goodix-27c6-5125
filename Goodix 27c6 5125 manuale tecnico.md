@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D274/03 formal baseline approval (sintesi)
+### Stato corrente post-D274/03 osservazione live e corrective offline (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -110,19 +110,24 @@ dell'IRQ `0x0200` aggiorna la tabella down `0x180580818` usata dal nuovo
 costante target; il requisito è usare la generation più recente prodotta
 dall'IRQ dello stesso ciclo.
 
-Packet 249 è una risposta **A0 NAV `0x50`**, non un B0/TLS: 2417 byte fisici e
+Nella capture storica D263 (analisi pre-D274/03, distinta dalla run D274/03), Packet 249 è una risposta **A0 NAV `0x50`**, non un B0/TLS: 2417 byte fisici e
 outer dichiarati, inner 2410. `chicagoHUget_navdata` (`0x180067874`) usa mode 5
 e copia il NAV buffer di sessione al caller. Il modello GPL ora lega ogni
 tabella a IRQ sorgente e generation, usa la down table appena derivata per il
 re-arm e valida la forma A0 2417/2410 della risposta NAV. Rimangono single
 reader, ACK esatto `0x01`, zero retry/reopen/recovery e stop terminale.
 
-La sola capture positiva termina però dopo l'ACK del re-arm a packet 253: il
-successivo `IRQ2 → 0x22 → fingerprint B0` non è target-osservato. I componenti
-OEM event-driven esistono, ma l'ownership dell'intero edge di seconda
-iterazione non è univocamente chiusa dal call graph. Anche i timeout target
-restano ignoti. Il modello non è collegato al transport USB reale, nessuna
-allowlist live è ampliata e D268 resta terminale alla prima immagine.
+Nella capture storica D263 (analisi pre-D274/03) la sola capture positiva
+terminava dopo l'ACK del re-arm a packet 253 e il successivo
+`IRQ2 → 0x22 → fingerprint B0` non era target-osservato: i componenti OEM
+event-driven esistono, ma l'ownership dell'intero edge di seconda iterazione
+non era univocamente chiusa dal call graph, e i timeout target restavano
+ignoti. Il modello non era collegato al transport USB reale e nessuna allowlist
+live era ampliata. D274/03 ha successivamente osservato il secondo edge di
+acquisizione **live** nella run Windows OEM autorizzata separata (secondo B0 a
+frame 249, stop `WIRE_DRIVEN`): lo stato corrente del secondo target cycle è
+pertanto `OBSERVED_COMPLETE`, non più non-osservato. D268 resta terminale alla
+prima immagine per il percorso legacy.
 
 Una review AI-PM successiva ha inoltre corretto la policy ACK di quel modello:
 `_command_ack()` accettava `0x01|0x07`, più permissivo dell'evidenza D263 in cui
@@ -176,7 +181,7 @@ NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILI
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
-MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_TABLE_DATAFLOW_CLOSED_SECOND_TARGET_CYCLE_AND_TIMEOUTS_BLOCKED
+MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_TABLE_DATAFLOW_CLOSED_SECOND_TARGET_CYCLE_OBSERVED_D274_03_TIMEOUTS_UNKNOWN
 D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
 UP_TABLE12_SOURCE=OEM_SESSION_GLOBAL_GF_FDT_UP_BASE_VA_0X180580838
 UP_TABLE12_DERIVATION=IRQ_0X0002_RAW_BASE_VALIDATION_THEN_PER_WORD_HALF_PLUS_CONTEXT_OFFSET_ENCODING_AND_MODE_DEPENDENT_COMMIT_BY_0X180029314
@@ -191,10 +196,10 @@ D273_NAV_CLASSIFICATION_WIRE_CONTROL=EXACT_0X50
 D273_0X51_NAV_ALIAS_ACCEPTED=false
 GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
-SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
+SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
-NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
+NEXT_PRIMARY_BOUNDARY=D274_03_OFFLINE_FINALIZER_CORRECTIVE_REVIEW
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_POST_OBSERVATION
 ```
 
 D274/01 prepara esclusivamente offline una superficie Windows/OEM distinta da
@@ -228,9 +233,9 @@ device, che resta `UNKNOWN`.
 
 ```text
 D274_PRELIVE_WINDOWS_MULTIFRAME_EVIDENCE_KIT=READY_FOR_AI_PM_REVIEW
-D274_REAL_CAPTURE_CAPABILITY=0
+D274_REAL_CAPTURE_CAPABILITY=1
 D274_HARD_DISABLED=true
-D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
+D274_SECOND_CYCLE_TARGET_OBSERVATION=OBSERVED_COMPLETE
 D263_CAPTURE_WORKFLOW_CLASS=UNKNOWN
 WINDOWS_OEM_WORKFLOW_SELECTED=WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT
 WINDOWS_ENROLLMENT_COMMIT_AUTHORIZED=false
@@ -261,9 +266,9 @@ WINDOWS_NATIVE_ACL_BEHAVIOR_TEST=PASS
 D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
 D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
 D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
-SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
-NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
+SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
+NEXT_PRIMARY_BOUNDARY=D274_03_OFFLINE_FINALIZER_CORRECTIVE_REVIEW
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_POST_OBSERVATION
 D274_02_OPERATOR_PACKAGE=CLOSED
 D274_02_WINDOWS_NATIVE_EXECUTION=COMPLETED
 D274_02_WINDOWS_NATIVE_QUALIFICATION=PASS
@@ -277,14 +282,19 @@ D274_02_STATUS=CLOSED
 CORRECTIVE_REQUIRED=false
 D274_02_FINAL_INTEGRITY_MANIFEST_SELF_CONSISTENT=PASS
 D274_02_CORRECTED_KIT_CANONICAL_PACKAGE_BYTE_IDENTITY=PASS
-D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
-SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-D274_REAL_CAPTURE_CAPABILITY=0
+D274_SECOND_CYCLE_TARGET_OBSERVATION=OBSERVED_COMPLETE
+SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
+D274_REAL_CAPTURE_CAPABILITY=1
 D274_HARD_DISABLED=true
+# I campi generici APPROVED_FOR_CAPTURE/BASELINE_APPROVED/LIVE_AUTHORIZED/READY_FOR_LIVE
+# descrivono lo stato storico del template di autorizzazione baseline D274/01-era
+# (pre-D274/03); la baseline D274/03 e' approvata a parte (D274_03_BASELINE_APPROVED=true).
 APPROVED_FOR_CAPTURE=false
 BASELINE_APPROVED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
+# Lo stato LIVE_* descrive il template di autorizzazione della baseline (non eseguito via questo kit);
+# la capture canonica D274/03 osservata è documentata nel blocco D274/03 corrente e nella sottosezione.
 LIVE_EXECUTION=NOT_PERFORMED
 D274_VM_ABSOLUTE_LOG_TIMESTAMPS_CROSS_SESSION_DURATION_AUTHORITY=false
 ```
@@ -398,8 +408,10 @@ WINDOWS_NATIVE_PACKAGE_SHA256=5a498239c9988445deedd0732009a2766a5ac564756c7c5814
 WINDOWS_NATIVE_PACKAGE_BYTES_REHASHED_BY_AGENT=false
 WINDOWS_NATIVE_ALL_STAGES=PASS_OPERATOR_SUPPLIED
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=false
-D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
+D274_03_REAL_CAPTURE_CAPABILITY=1_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
+# Stato di autorizzazione/esecuzione live di baseline (template non eseguito via questo kit):
+# i contatori REAL_* restano a zero per i tentativi UI non validi; la capture osservata è separata.
 LIVE_PATH_EXECUTED=false
 LIVE_PATH_AUTHORIZED=false
 D274_03_FREEZE_REVIEW=PASS
@@ -411,16 +423,102 @@ APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
-D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
-REAL_CAPTURE_COUNT=0
+# Contatori dell'attivita' diretta di invio/osservazione USB del Kit operatore
+# (observer passivo: nessun sender Python/libusb; i due tentativi UI non validi non
+# hanno aperto USB ne' catturato). La run Windows OEM osservata ha svolto l'attivita'
+# USB/finger/command sul target, ma il Kit non la misura separatamente e tali conteggi
+# non sono enumerati qui come totali della run.
 REAL_USB_OPEN_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0
 REAL_GOODIX_COMMAND_COUNT=0
-AUTOMATIC_RETRY_COUNT=0
+D274_SECOND_CYCLE_TARGET_OBSERVATION=OBSERVED_COMPLETE
+REAL_CAPTURE_COUNT=1
+# Stato canonico della capture osservata (run live autorizzata separata):
+D274_03_OBSERVED_TERMINAL_FRAME=249
+D274_03_OBSERVER_STOP_TRIGGER=WIRE_DRIVEN
+D274_03_AUTOMATIC_RETRY_COUNT=0
+D274_03_CANONICAL_RAW_SHA256=5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998
+D274_03_THIRD_CYCLE_OBSERVED=false
+D274_03_OFFLINE_FINALIZER_CORRECTIVE=IMPLEMENTED_OFFLINE_ON_PRESERVED_RAW
+D274_03_NO_NEW_LIVE_RUN=true
+D274_03_DEVICE_TIMEOUT_CLAIM=UNKNOWN
+# I conteggi low-level USB/finger/command della run Windows OEM osservata non sono
+# enumerati qui (observer passivo): vedere i contatori di attivita' diretta del Kit
+# nello stato di template/autorizzazione. L'unica scrittura persistente e' nulla.
 PERSISTENT_DEVICE_WRITE_COUNT=0
-NEXT_PRIMARY_BOUNDARY=SEPARATE_CAPTURE_LIVE_AUTHORIZATION_DECISION
-NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_ONE_SHOT_CAPTURE_LIVE_AUTHORIZATION
+NEXT_PRIMARY_BOUNDARY=D274_03_OFFLINE_FINALIZER_CORRECTIVE_REVIEW
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_POST_OBSERVATION
 ```
+### D274/03 offline finalizer corrective — chiusura su raw preservato
+
+La seconda-ciclo observation Windows Hello è stata eseguita in una run live
+autorizzata separata e il relativo raw canonico è preservato byte-identico in
+`captures/D274_03/D27403_20260826T201852Z/raw/wire.pcapng`
+(SHA-256 `5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998`).
+
+Lo stato di confine osservato è:
+
+- secondo B0 fingerprint osservato (frame terminale 249);
+- trigger di stop dell'observer `WIRE_DRIVEN`;
+- `automatic_retry_count = 0`.
+
+Il finalizer iniziale (Hy3) aveva prodotto un falso fallimento: il traffico
+post-boundary OEM (0x34 / 0x36 / IRQ 0x0100 / 0x20 e un B0 isolato al frame
+265) veniva promosso a terzo ciclo perché bastava un solo `IRQ 0x0002`,
+`COMMAND 0x22` o `FINGERPRINT_B0` dopo il secondo boundary. Dopo il frame 249
+non ricompare però la coppia ordinata `IRQ 0x0002 → COMMAND 0x22 (body 01 00)
+→ ACK 0x22 status 0x01`, quindi il B0 isolato al frame 265 non costituisce un
+terzo ciclo di acquisizione.
+
+La regola corretta richiede un lifecycle di acquisizione ordinato e non
+ambiguo, almeno:
+
+    IRQ 0x0002
+    → COMMAND 0x22 con body esatto 01 00
+    → ACK echo 0x22 con status esatto 0x01
+    → FINGERPRINT_B0
+
+I quattro eventi non devono essere adiacenti: eventi non-lifecycle irrilevanti
+sono ignorati. Un evento lifecycle contraddittorio (COMMAND 0x22 con body
+diverso, ACK 0x22 con status diverso, o FINGERPRINT_B0 fuori ordine) azzera il
+progresso parziale, così l'ambiguità non diventa mai PASS. Il riarm
+`0x32 → ACK 0x32/0x01` resta solo corroborante, non obbligatorio.
+
+`verify_finalized_capture()` preserva `THIRD_CYCLE_OBSERVED` quando il raw
+finalizzato contiene un terzo lifecycle genuino e non lo rimappa a
+`CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE`, che resta riservato alla perdita
+reale della finalizzazione (raw troncato/illeggibile).
+
+Una correzione successiva (v2) ha poi rafforzato il growing observer: un terzo
+lifecycle genuino presente nello snapshot ispezionato fail-closed con
+`THIRD_CYCLE_OBSERVED` e non viene mai promosso a segnale terminale di
+osservazione riuscita.
+
+La correzione e la chiusura sono state eseguite offline sul raw preservato; non
+è stata richiesta né eseguita alcuna nuova capture live. Il risultato
+sanitizzato è in
+`captures/D274_03/D27403_20260826T201852Z/sanitized/D274_03_second_cycle_evidence.json`:
+`boundary_status=OBSERVED_COMPLETE`, `stop_reason=SECOND_FINGERPRINT_B0`,
+`failure_class=null`, `third_cycle_observed=false`, `second_b0_frame.frame=249`.
+
+```text
+D274_03_OFFLINE_FINALIZER_CORRECTIVE=IMPLEMENTED_OFFLINE_ON_PRESERVED_RAW
+D274_03_SECOND_CYCLE_OBSERVED_WIRE_DRIVEN=true
+D274_03_OBSERVED_TERMINAL_FRAME=249
+D274_03_OBSERVER_STOP_TRIGGER=WIRE_DRIVEN
+D274_03_AUTOMATIC_RETRY_COUNT=0
+D274_03_CANONICAL_RAW_SHA256=5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998
+D274_03_THIRD_CYCLE_FALSE_POSITIVE_FIXED=true
+D274_03_ORDERED_NON_ADJACENT_LIFECYCLE_DETECTOR=true
+D274_03_GROWING_OBSERVER_FAIL_CLOSED=true
+D274_03_AUTHORITATIVE_THIRD_CYCLE_PRESERVED=true
+D274_03_FINALIZATION_LOSS_REMAINS_DISTINCT=true
+D274_03_REAL_CAPTURE_REPROCESSED_OFFLINE=true
+D274_03_NO_USB_ACCESS=true
+D274_03_NO_NEW_LIVE_RUN=true
+D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_ONLY
+```
+
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
 momento, oggi superato.
@@ -5472,8 +5570,10 @@ WINDOWS_NATIVE_PACKAGE_BYTES_REHASHED_BY_AGENT=false
 WINDOWS_NATIVE_ALL_STAGES=PASS_OPERATOR_SUPPLIED
 WINDOWS_POWERSHELL_5_1_NATIVE_RUNTIME=NOT_AVAILABLE_ON_LINUX_HOST
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=false
-D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
+D274_03_REAL_CAPTURE_CAPABILITY=1_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
+# Stato di autorizzazione/esecuzione live di baseline (template non eseguito via questo kit):
+# i contatori REAL_* restano a zero per i tentativi UI non validi; la capture osservata è separata.
 LIVE_PATH_EXECUTED=false
 LIVE_PATH_AUTHORIZED=false
 D274_03_FREEZE_REVIEW=PASS
@@ -5485,15 +5585,31 @@ APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 LIVE_EXECUTION=NOT_PERFORMED
-D274_SECOND_CYCLE_TARGET_OBSERVATION=NOT_EXECUTED
-REAL_CAPTURE_COUNT=0
+# Contatori dell'attivita' diretta di invio/osservazione USB del Kit operatore
+# (observer passivo: nessun sender Python/libusb; i due tentativi UI non validi non
+# hanno aperto USB ne' catturato). La run Windows OEM osservata ha svolto l'attivita'
+# USB/finger/command sul target, ma il Kit non la misura separatamente e tali conteggi
+# non sono enumerati qui come totali della run.
 REAL_USB_OPEN_COUNT=0
 REAL_FINGER_INTERACTION_COUNT=0
 REAL_GOODIX_COMMAND_COUNT=0
-AUTOMATIC_RETRY_COUNT=0
+D274_SECOND_CYCLE_TARGET_OBSERVATION=OBSERVED_COMPLETE
+REAL_CAPTURE_COUNT=1
+# Stato canonico della capture osservata (run live autorizzata separata):
+D274_03_OBSERVED_TERMINAL_FRAME=249
+D274_03_OBSERVER_STOP_TRIGGER=WIRE_DRIVEN
+D274_03_AUTOMATIC_RETRY_COUNT=0
+D274_03_CANONICAL_RAW_SHA256=5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998
+D274_03_THIRD_CYCLE_OBSERVED=false
+D274_03_OFFLINE_FINALIZER_CORRECTIVE=IMPLEMENTED_OFFLINE_ON_PRESERVED_RAW
+D274_03_NO_NEW_LIVE_RUN=true
+D274_03_DEVICE_TIMEOUT_CLAIM=UNKNOWN
+# I conteggi low-level USB/finger/command della run Windows OEM osservata non sono
+# enumerati qui (observer passivo): vedere i contatori di attivita' diretta del Kit
+# nello stato di template/autorizzazione. L'unica scrittura persistente e' nulla.
 PERSISTENT_DEVICE_WRITE_COUNT=0
-NEXT_PRIMARY_BOUNDARY=SEPARATE_CAPTURE_LIVE_AUTHORIZATION_DECISION
-NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_ONE_SHOT_CAPTURE_LIVE_AUTHORIZATION
+NEXT_PRIMARY_BOUNDARY=D274_03_OFFLINE_FINALIZER_CORRECTIVE_REVIEW
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_POST_OBSERVATION
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.

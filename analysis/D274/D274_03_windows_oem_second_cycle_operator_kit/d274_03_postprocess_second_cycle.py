@@ -291,6 +291,48 @@ def _matches(event: dict, kind: str, value: int | None) -> bool:
     return True
 
 
+def _third_cycle_lifecycle(events: list) -> bool:
+    """Detect a genuine ordered third fingerprint acquisition lifecycle.
+
+    A third cycle requires the exact ordered lifecycle:
+
+        IRQ 0x0002
+        -> COMMAND 0x22 with exact body 01 00
+        -> ACK echo 0x22 with exact status 0x01
+        -> FINGERPRINT_B0
+
+    The four lifecycle events need not be adjacent; unrelated, non-lifecycle
+    events are skipped.  A contradictory lifecycle-bearing event (a COMMAND
+    0x22 with a wrong body, an ACK 0x22 with a wrong status, or an
+    out-of-order FINGERPRINT_B0) resets the partial progress so that
+    ambiguity is never promoted to a PASS.
+    """
+    state = 0
+    for event in events:
+        kind = event.get("kind")
+        if kind == "IRQ" and event.get("irq") == 0x0002:
+            state = 1
+            continue
+        if kind == "COMMAND" and event.get("control") == 0x22:
+            if event.get("body") == b"\x01\x00" and state >= 1:
+                state = 2
+            else:
+                state = 0
+            continue
+        if kind == "ACK" and event.get("echo") == 0x22:
+            if event.get("status") == 0x01 and state >= 2:
+                state = 3
+            else:
+                state = 0
+            continue
+        if kind == "B0" and event.get("b0_class") == "FINGERPRINT_B0":
+            if state >= 3:
+                return True
+            state = 0
+            continue
+    return False
+
+
 def _failure(expected: str, event: dict | None) -> str:
     if event is None:
         return "MISSING_" + expected.upper()
@@ -385,16 +427,16 @@ def analyze_frames(frames: list[Frame], base: float, synthetic: bool) -> dict:
         failure = _failure(SEQUENCE[index][0], None)
 
     remaining = events[complete_at + 1:] if complete_at is not None else []
-    third_cycle = any(
-        (event.get("kind") == "IRQ" and event.get("irq") == 0x0002)
-        or (event.get("kind") == "COMMAND" and event.get("control") == 0x22)
-        or (event.get("kind") == "B0" and event.get("b0_class") == "FINGERPRINT_B0")
-        for event in remaining
-    )
-    if third_cycle:
+    third_cycle = _third_cycle_lifecycle(remaining)
+    if third_cycle and failure is None:
         failure = "THIRD_CYCLE_OBSERVED"
 
-    complete = index == len(SEQUENCE) and failure is None
+    # Un ciclo di acquisizione terzo genuino è un failure di protocollo /
+    # post-boundary: non deve mai diventare uno stato di confine/stop riuscito.
+    # `complete` resta vincolato sia alla sequenza osservata sia all'assenza di
+    # un terzo ciclo, così il growing observer fail-closed non promuove un
+    # terzo ciclo a SECOND_FINGERPRINT_B0_OBSERVED.
+    complete = index == len(SEQUENCE) and not third_cycle
     metadata = {}
     for name, event_class in OUTPUT_EVENTS.items():
         pair = observed.get(name)
@@ -602,6 +644,15 @@ def verify_finalized_capture(path: Path, expected_sha256: str,
             raise EvidenceError("CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE") from exc
         raise
     terminal = document.get("second_b0_frame")
+    if document.get("failure_class") == "THIRD_CYCLE_OBSERVED":
+        # Autorità: una terza acquisizione osservata nel raw finalizzato è un
+        # failure_class di protocollo/post-boundary, non una perdita della
+        # finalizzazione. Non viene rimappata a
+        # CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE.
+        if (terminal is None
+                or terminal.get("frame") != observer_signal.get("terminal_frame")):
+            raise EvidenceError("CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE")
+        return document
     if (document.get("boundary_status") != "OBSERVED_COMPLETE"
             or terminal is None
             or terminal.get("frame") != observer_signal.get("terminal_frame")):

@@ -293,8 +293,132 @@ class D27403Tests(unittest.TestCase):
     def test_10_third_cycle_evidence(self):
         def mutate(rows):
             rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("third_0x22", a0(0x22, b"\x01\x00"), 0x01))
+            rows.append(("third_0x22_ack", a0(0xB0, b"\x22\x01"), 0x81))
+            rows.append(("third_b0", fingerprint_b0(), 0x81))
             return rows
-        self.assertEqual(self.failure(make_capture(mutate)), "THIRD_CYCLE_OBSERVED")
+        result = self.run_capture(make_capture(mutate))
+        self.assertEqual(result["failure_class"], "THIRD_CYCLE_OBSERVED")
+        self.assertTrue(result["third_cycle_observed"])
+
+    def test_10b_real_capture_regression(self):
+        raw = ROOT / ("captures/D274_03/D27403_20260826T201852Z/raw/wire.pcapng")
+        self.assertTrue(raw.exists(), "canonical raw capture missing")
+        sha = hashlib.sha256(raw.read_bytes()).hexdigest()
+        self.assertEqual(
+            sha, "5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998")
+        signal = json.loads((ROOT / "captures/D274_03/D27403_20260826T201852Z/raw"
+                             "/observer_second_b0_signal.json").read_text())
+        with tempfile.TemporaryDirectory(prefix="d274-03-real-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(raw.read_bytes())
+            result = D274.verify_finalized_capture(
+                path, sha, signal)
+        self.assertEqual(result["boundary_status"], "OBSERVED_COMPLETE")
+        self.assertEqual(result["stop_reason"], "SECOND_FINGERPRINT_B0")
+        self.assertIsNone(result["failure_class"])
+        self.assertFalse(result["third_cycle_observed"])
+        self.assertIsNotNone(result["second_b0_frame"])
+        self.assertEqual(result["second_b0_frame"]["frame"], 249)
+        self.assertEqual(result["capture_sha256"], sha)
+
+    def test_10c_isolated_post_boundary_b0(self):
+        def mutate(rows):
+            rows.append(("post_b0", fingerprint_b0(), 0x81))
+            return rows
+        result = self.run_capture(make_capture(mutate))
+        self.assertFalse(result["third_cycle_observed"])
+        self.assertIsNone(result["failure_class"])
+        self.assertEqual(result["stop_reason"], "SECOND_FINGERPRINT_B0")
+
+    def test_10d_realistic_oem_post_boundary_traffic(self):
+        def mutate(rows):
+            rows.append(("oem_0x34", a0(0x34, b"\x0a\x01" + bytes(12)), 0x01))
+            rows.append(("oem_0x34_ack", a0(0xB0, b"\x34\x01"), 0x81))
+            rows.append(("oem_0x36", a0(0x36, b"\x00\x00" + bytes(12)), 0x01))
+            rows.append(("oem_0x36_ack", a0(0xB0, b"\x36\x01"), 0x81))
+            rows.append(("oem_irq0100", a0(0x32, b"\x00\x01" + bytes(12)), 0x81))
+            rows.append(("oem_0x20", a0(0x20, b"\x01\x00"), 0x01))
+            rows.append(("oem_0x20_ack", a0(0xB0, b"\x20\x01"), 0x81))
+            rows.append(("oem_isolated_b0", fingerprint_b0(), 0x81))
+            rows.append(("oem_0x34b", a0(0x34, b"\x0a\x01" + bytes(12)), 0x01))
+            rows.append(("oem_0x34b_ack", a0(0xB0, b"\x34\x01"), 0x81))
+            return rows
+        result = self.run_capture(make_capture(mutate))
+        self.assertFalse(result["third_cycle_observed"])
+        self.assertIsNone(result["failure_class"])
+
+    def test_10e_partial_third_cycle_fragments(self):
+        for label, builder in (
+            ("lone_irq", lambda rows: rows.append(
+                ("f", a0(0x32, b"\x02\x00" + bytes(12)), 0x81)) or rows),
+            ("lone_0x22", lambda rows: rows.append(
+                ("f", a0(0x22, b"\x01\x00"), 0x01)) or rows),
+            ("lone_b0", lambda rows: rows.append(
+                ("f", fingerprint_b0(), 0x81)) or rows),
+        ):
+            with self.subTest(label):
+                result = self.run_capture(make_capture(builder))
+                self.assertFalse(result["third_cycle_observed"])
+                self.assertIsNone(result["failure_class"])
+
+    def test_10f_genuine_third_cycle_with_interposed_event(self):
+        def mutate(rows):
+            rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("noise_0x34", a0(0x34, b"\x0a\x01" + bytes(12)), 0x01))
+            rows.append(("noise_0x34_ack", a0(0xB0, b"\x34\x01"), 0x81))
+            rows.append(("third_0x22", a0(0x22, b"\x01\x00"), 0x01))
+            rows.append(("third_0x22_ack", a0(0xB0, b"\x22\x01"), 0x81))
+            rows.append(("noise_0x36", a0(0x36, b"\x00\x00" + bytes(12)), 0x01))
+            rows.append(("noise_0x36_ack", a0(0xB0, b"\x36\x01"), 0x81))
+            rows.append(("third_b0", fingerprint_b0(), 0x81))
+            return rows
+        result = self.run_capture(make_capture(mutate))
+        self.assertEqual(result["failure_class"], "THIRD_CYCLE_OBSERVED")
+        self.assertTrue(result["third_cycle_observed"])
+
+    def test_10g_authoritative_finalizer_preserves_third_cycle(self):
+        # Costruisce prima una capture valida fermandosi al secondo B0
+        # autorizzato, ne ottiene il segnale observer pre-third, poi
+        # finalizza una versione che contiene *inoltre* un terzo lifecycle
+        # genuino. verify_finalized_capture() deve preservare la causa radice
+        # THIRD_CYCLE_OBSERVED, non rimapparla a finalization-loss.
+        pre_third = make_capture()
+        with tempfile.TemporaryDirectory(prefix="d274-03-pre-third-") as directory:
+            pre_path = Path(directory) / "pre.pcapng"
+            pre_path.write_bytes(pre_third)
+            signal = D274.inspect_growing_capture(pre_path)
+            self.assertEqual(signal["status"], "SECOND_FINGERPRINT_B0_OBSERVED")
+
+            def mutate(rows):
+                rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+                rows.append(("third_0x22", a0(0x22, b"\x01\x00"), 0x01))
+                rows.append(("third_0x22_ack", a0(0xB0, b"\x22\x01"), 0x81))
+                rows.append(("third_b0", fingerprint_b0(), 0x81))
+                return rows
+            final = make_capture(mutate)
+            final_path = Path(directory) / "final.pcapng"
+            final_path.write_bytes(final)
+            result = D274.verify_finalized_capture(
+                final_path, hashlib.sha256(final).hexdigest(), signal,
+                synthetic=True)
+        self.assertEqual(result["failure_class"], "THIRD_CYCLE_OBSERVED")
+        self.assertTrue(result["third_cycle_observed"])
+
+    def test_10h_growing_observer_true_third_cycle_fail_closed(self):
+        def mutate(rows):
+            rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("third_0x22", a0(0x22, b"\x01\x00"), 0x01))
+            rows.append(("third_0x22_ack", a0(0xB0, b"\x22\x01"), 0x81))
+            rows.append(("third_b0", fingerprint_b0(), 0x81))
+            return rows
+        data = make_capture(mutate)
+        with tempfile.TemporaryDirectory(prefix="d274-03-grow-third-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            state = D274.inspect_growing_capture(path)
+        self.assertEqual(state["status"], "FAIL_CLOSED")
+        self.assertEqual(state["failure_class"], "THIRD_CYCLE_OBSERVED")
 
     def test_11_ambiguous_target(self):
         self.assertEqual(self.failure(make_capture(extra_descriptors=[(0.01, 1, 3)])),
