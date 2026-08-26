@@ -1,0 +1,76 @@
+{
+  "artifact": "D274_03_sigfm_real_build_environment",
+  "schema_version": "1.1",
+  "generated_utc": "2026-08-26T09:45:00Z",
+  "session": "D274/03 parallel offline forward — Sessione 3: SIGFM / OpenCV4 real-build closure (AI-PM micro-corrective)",
+  "executor_model": "Hy3 Free",
+  "git": {
+    "head": "b88edaa44e124ea7b6cd5b0464fca630f5d2da51",
+    "origin_main": "b88edaa44e124ea7b6cd5b0464fca630f5d2da51",
+    "merge_base": "b88edaa44e124ea7b6cd5b0464fca630f5d2da51",
+    "branch": "session/agent_ac7023f8-58c0-424c-99f4-8b24620c8bb2",
+    "working_tree_clean": true,
+    "precondition": "HEAD == origin/main, no divergence, clean tree -> PASS"
+  },
+  "host": {
+    "distro": "Ubuntu",
+    "release": "22.04 (jammy)",
+    "arch": "x86_64",
+    "kernel": "Linux (cloud sandbox container, unprivileged)",
+    "package_manager": "apt / apt-get",
+    "container_runtime_used": false,
+    "flatpak_sdk_used": false,
+    "network_for_apt": "AVAILABLE_BOUNDED"
+  },
+  "toolchain": {
+    "gcc": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0",
+    "g++": "g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0",
+    "clang++": "NOT_AVAILABLE",
+    "pkg_config": "0.29.2",
+    "cmake": "NOT_AVAILABLE",
+    "meson": "NOT_AVAILABLE",
+    "ninja": "NOT_AVAILABLE"
+  },
+  "opencv4_dev": {
+    "status": "AVAILABLE_HOST_ONLY_INSTALLED_VIA_APT",
+    "pkg_config_module": "opencv4",
+    "modversion": "4.5.4",
+    "cflags": "-I/usr/include/opencv4",
+    "libs": "-lopencv_stitching -lopencv_alphamat -lopencv_aruco -lopencv_barcode -lopencv_bgsegm -lopencv_bioinspired -lopencv_ccalib -lopencv_dnn_objdetect -lopencv_dnn_superres -lopencv_dpm -lopencv_face -lopencv_freetype -lopencv_fuzzy -lopencv_hdf -lopencv_hfs -lopencv_img_hash -lopencv_intensity_transform -lopencv_line_descriptor -lopencv_mcc -lopencv_quality -lopencv_rapid -lopencv_reg -lopencv_rgbd -lopencv_saliency -lopencv_shape -lopencv_stereo -lopencv_structured_light -lopencv_phase_unwrapping -lopencv_superres -lopencv_optflow -lopencv_surface_matching -lopencv_tracking -lopencv_highgui -lopencv_datasets -lopencv_text -lopencv_plot -lopencv_ml -lopencv_videostab -lopencv_videoio -lopencv_viz -lopencv_wechat_qrcode -lopencv_ximgproc -lopencv_video -lopencv_xobjdetect -lopencv_objdetect -lopencv_calib3d -lopencv_imgcodecs -lopencv_features2d -lopencv_dnn -lopencv_flann -lopencv_xphoto -lopencv_photo -lopencv_imgproc -lopencv_core",
+    "dev_package": "libopencv-dev 4.5.4+dfsg-9ubuntu4",
+    "sift_module": "opencv_features2d (SIFT present in main features2d module in 4.5.x)"
+  },
+  "install_command_used": "apt-get install -y build-essential pkg-config libopencv-dev",
+  "install_constraints_satisfied": {
+    "no_user_credentials": true,
+    "no_security_bypass": true,
+    "no_target_goodix_modification": true,
+    "no_firmware_usb_fprintd_modification": true,
+    "no_opencv_vendored_in_repo": true,
+    "no_system_binaries_or_libs_committed": true,
+    "standard_reproducible_distro_package_manager": true
+  },
+  "third_party_reference_used": [
+    {"path": "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp", "license": "LGPL-2.1-or-later", "license_evidence": "explicit LGPL-2.1-or-later license header text (NO literal SPDX-License-Identifier tag)", "role": "reference_real_sigfm_implementation", "modified": false},
+    {"path": "Rockytkg/libfprint/libfprint/sigfm/sigfm.h", "license": "LGPL-2.1-or-later", "license_evidence": "explicit LGPL-2.1-or-later license header text (NO literal SPDX tag)", "role": "reference_header", "modified": false},
+    {"path": "Rockytkg/libfprint/libfprint/sigfm/binary.hpp", "license": "LGPL-2.1-or-later", "license_evidence": "explicit LGPL-2.1-or-later license header text (NO literal SPDX tag)", "role": "reference_serializer", "modified": false},
+    {"path": "Rockytkg/libfprint/libfprint/sigfm/img-info.hpp", "license": "LGPL-2.1-or-later", "license_evidence": "explicit LGPL-2.1-or-later license header text (NO literal SPDX tag)", "role": "reference_struct", "modified": false}
+  ],
+  "sigfm_reference_license_summary": {
+    "license": "LGPL-2.1-or-later",
+    "literal_spdx_tag_claimed": false,
+    "provenance": "upstream libfprint material, verified from local mirror Rockytkg/ and docs/LICENSING_AND_PROVENANCE.md",
+    "mirror_modified": false,
+    "new_ledger_entry_required": false
+  },
+  "project_code_used": [
+    "libfprint-driver/goodix_u16_to_fpimage.c",
+    "libfprint-driver/goodix_u16_to_fpimage.h",
+    "libfprint-driver/goodix_sigfm_metrics.cpp",
+    "libfprint-driver/goodix_sigfm_metrics.h",
+    "libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp",
+    "libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh"
+  ],
+  "reproducible_recipe_summary": "apt-get install build-essential pkg-config libopencv-dev; then compile the 4 sources with differentiated warning policy (project full -Werror, third-party relaxed + -isystem) using pkg-config --cflags/--libs opencv4; link; run synthetic positive + negative tests in /tmp.",
+  "environment_classification": "HOST_ONLY_EPHEMERAL_SANDBOX_OPENV4_DEV_INSTALLED_VIA_DISTRO_PACKAGE_MANAGER"
+}

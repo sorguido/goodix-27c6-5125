@@ -142,7 +142,7 @@ nello SDK Flatpak, mentre il vero `sigfm.cpp` si arresta su
 `opencv2/core/mat.hpp` mancante. Né host né SDK installato espongono
 `opencv4.pc`; la build/link reale è quindi `NOT_AVAILABLE` e
 `EXECUTABLE_CLOSURE=FAIL`. Nessun pacchetto è stato installato. La fixture prova
-soltanto plumbing, non qualità biometrica.
+soltanto plumbing, non qualità biometrica. (Narrazione superata da D274/03 Sessione 3: il real SIGFM build è stato chiuso host-only con OpenCV4-dev 4.5.4 installato via apt nel sandbox esecutore; vedi sotto «D274/03 parallel offline forward — Sessione 3: SIGFM / OpenCV4 real-build closure».)
 
 ```text
 PIXEL_REPRESENTATION_CONTRACT=CLOSED_OFFLINE
@@ -157,12 +157,19 @@ NBIS_PPMM_REQUIREMENT=REQUIRED_VERIFIED
 NBIS_WITH_UNKNOWN_PPMM=BLOCKED
 SIGFM_PPMM_REQUIREMENT=NOT_CONSUMED_VERIFIED
 FEATURE_EXTRACTOR_POLICY=CLOSED_OFFLINE
-SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV
+SIGFM_STATUS=OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_CLOSED_HOST_ONLY_OPENCV4
 SIGFM_EXCEPTION_CONTAINMENT=CLOSED_OFFLINE_AT_C_ABI
 SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
-OPENCV4_DEV_ENVIRONMENT=NOT_AVAILABLE
-REAL_SIGFM_BUILD=BLOCKED_OPENCV4_DEV_NOT_AVAILABLE
-REAL_SIGFM_EXECUTABLE_CLOSURE=FAIL_NOT_AVAILABLE
+OPENCV4_DEV_ENVIRONMENT=AVAILABLE_HOST_ONLY_LIBOPENCV_DEV_4_5_4_VIA_APT
+REAL_SIGFM_BUILD=PASS_HOST_ONLY_WITH_REAL_OPENCV4
+REAL_SIGFM_LINK=PASS
+REAL_SIGFM_POSITIVE_EXTRACT=PASS
+REAL_SIGFM_MATCH_PATH=PASS
+REAL_SIGFM_SYNTHETIC_RUNTIME=PASS
+REAL_SIGFM_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+REAL_SIGFM_SANITIZER_STATUS=PASS
+LEAK_DETECTION=DISABLED
+MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED
 NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
 SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
 NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
@@ -5606,6 +5613,127 @@ del device, nessun nuovo TLS client da costruire).
 D274/03 NON è qualificato, NON è baseline-approved e NON è live-ready: il suo
 candidato resta congelato per la qualification nativa successiva
 (`D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE`).
+
+### D274/03 parallel offline forward — Sessione 3: SIGFM / OpenCV4 real-build closure
+
+Sessione 3 del track parallel offline forward D274/03 (esecutore Hy3 Free,
+host-only, nessun target). Chiude il blocker D273
+`REAL_SIGFM_BUILD=BLOCKED_OPENCV4_DEV_NOT_AVAILABLE` / `EXECUTABLE_CLOSURE=FAIL_NOT_AVAILABLE`
+ottenendo un **real SIGFM executable closure** con OpenCV4-dev reale, senza
+inventare qualità biometrica, threshold, orientamento, polarity o ppmm.
+
+Precondizione Git rispettata: `HEAD == origin/main`
+(`b88edaa44e124ea7b6cd5b0464fca630f5d2da51`), working tree pulito, nessuna
+divergenza. Branch di sessione `session/agent_*`, nessun merge/rebase/force-push.
+
+Ambiente (riproducibile, bounded): Ubuntu 22.04 jammy; GCC/G++ 11.4.0;
+pkg-config 0.29.2. OpenCV4-dev **non** presente di default → installato nel
+sandbox esecutore via `apt-get install -y build-essential pkg-config libopencv-dev`
+(`libopencv-dev 4.5.4+dfsg-9ubuntu4`). Nessuna credenziale utente, nessun
+aggiramento di sicurezza, nessun vendorizzazione nel repository, nessun binario
+committato, nessun target/USB/fprintd. Il mirror `Rockytkg/` **non** è stato
+modificato per far compilare il codice.
+
+Codice usato (tutti LGPL-2.1-or-later, audit per-file OK):
+`libfprint-driver/goodix_u16_to_fpimage.c/.h`,
+`libfprint-driver/goodix_sigfm_metrics.cpp/.h` (progetto),
+`Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp/.h`, `binary.hpp`, `img-info.hpp`
+(riferimento terzo-party libfprint, header di licenza LGPL-2.1-or-later esplicito verificato; NESSUN tag SPDX letterale rivendicato),
+`libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp` (progetto).
+
+Policy warning differenziata (giustificata, non nasconde warning nostri):
+codice progetto compilato con
+`-std=c11 -O2 -g -Wall -Wextra -Werror -Wconversion` (C) e
+`-std=c++17 -O2 -g -Wall -Wextra -Werror -Wconversion -Wshadow -Wold-style-cast`
+(C++); il riferimento SIGFM terzo-party compilato con `-Wall -Wextra` (no
+`-Werror`/`-Wconversion`/`-Wold-style-cast`); gli header terzo-party inclusi via
+`-isystem` così i warning progetto restano visibili. Nessun warning nel nostro
+codice; nessun warning terzo-party mascherato nel nostro oggetto.
+
+Risultato (vedi `analysis/D274/D274_03_sigfm_real_build_*.{md,json}` e bundle):
+
+```text
+OUTCOME=READY_FOR_AI_PM_REVIEW
+ADVANCEMENT=SIGFM_REAL_OPENCV4_HOST_ONLY_BUILD_AND_POSITIVE_RUNTIME_CLOSURE
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+REAL_SIGFM_BUILD=PASS_HOST_ONLY_WITH_REAL_OPENCV4
+REAL_SIGFM_LINK=PASS
+REAL_SIGFM_POSITIVE_EXTRACT=PASS
+REAL_SIGFM_MATCH_PATH=PASS
+REAL_SIGFM_SYNTHETIC_RUNTIME=PASS
+REAL_SIGFM_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+REAL_SIGFM_SANITIZER_STATUS=PASS
+LEAK_DETECTION=DISABLED
+MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED
+OPENCV4_DEV_ENVIRONMENT=AVAILABLE_HOST_ONLY_LIBOPENCV_DEV_4_5_4_VIA_APT
+SIGFM_REFERENCE_LICENSE=LGPL-2.1-or-later_EXPLICIT_LICENSE_HEADER_VERIFIED
+SIGFM_REFERENCE_LITERAL_SPDX_TAG_CLAIM=false
+
+BUILDABILITY=PASS
+LINKABILITY=PASS
+SYNTHETIC_REAL_SIGFM_RUNTIME=PASS
+POSITIVE_EXTRACT_AND_MATCH_PATH=PASS
+MEMORY_SAFETY=SCOPE_ASAN_UBSAN_RUNTIME_CLEAN_LEAKS_NOT_ASSESSED
+TARGET_BIOMETRIC_QUALITY=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+PRODUCTION_INTEGRATION=NOT_INTEGRATED_NO_DEVICE_GLUE
+
+BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
+PRODUCTION_MATCH_THRESHOLD=UNSET
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
+SECOND_TARGET_CYCLE=UNOBSERVED
+
+LINUX_TLS_REBUILD_REQUIRED=false
+LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
+PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
+LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED
+
+REAL_USB_OPEN_COUNT=0
+REAL_COMMAND_SEND_COUNT=0
+REAL_SECRET_MATERIALIZATION_COUNT=0
+REAL_FPRINTD_MUTATION_COUNT=0
+REAL_BIOMETRIC_CAPTURE_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+LIVE_EXECUTION=NOT_PERFORMED
+D274_03_OPERATOR_KIT_MODIFIED=false
+LIVE_CRITICAL_SET_MODIFIED=false
+```
+
+Regressione host-only rieseguita: `goodix_u16_to_fpimage` unit test PASS;
+`goodix_sigfm_metrics` synthetic/double PASS + forbidden-symbol audit PASS
+(nessun simbolo libusb_/SSL_/gnutls_/socket/fopen/open/write/read in `metrics.o`);
+`goodix_fpimage_pipeline` **NON_RUN_ENVIRONMENT_LIMITATION**: il suo harness
+storico Flatpak (`run_goodix_fpimage_pipeline_test.sh`) richiede l'SDK Flatpak e
+l'header di framework libfprint `fpi-image.h`, non disponibili in questo
+esecutore. È una limitazione d'ambiente/toolchain, **indipendente** da
+`LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED` (il pipeline helper è un
+componente D270 autonomo, non il futuro device glue).
+
+Harness riproducibile host-only aggiunto:
+`libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh` (machine-actionable,
+fail-closed: se `opencv4.pc` manca → stampa
+`REAL_SIGFM_EXECUTABLE_CLOSURE=BLOCKED_ENVIRONMENT` e
+`REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE` poi **exit 77** (SKIP
+convenzionale, non finto PASS); dipendenza presente + tutti i PASS → exit 0;
+failure build/link/runtime → exit 1; stampa SKIP/NOT_AVAILABLE vs FAIL vs PASS,
+nessun USB/fprintd/secret/network a runtime, nessun pacchetto auto-installato,
+nessuna scrittura fuori `/tmp`, nessun vendorizzazione OpenCV, nessun cambio
+threshold). Il test real positivo richiede `GOODIX_SIGFM_OK` su due estrazioni
+identiche, `keypoints >= 25`, e che `goodix_sigfm_match_ephemeral` esegua
+effettivamente `sigfm_match_score()` (fixture sintetica strutturata deterministica,
+checkerboard 8x8 + grating, nessun target/biometrica/tuning); un test negativo
+separato copre il `GOODIX_SIGFM_KEYPOINT_GATE_FAILED`. L'harness Flatpak esistente
+(`run_goodix_sigfm_metrics_test.sh`) resta valido per il percorso synthetic/double.
+
+Confine rispettato: un PASS sintetico host-only di build/link/run **non** chiude
+qualità biometrica, sufficienza keypoint target, separazione same/different
+finger, threshold di produzione, orientation, polarity o ppmm/DPI. Restano aperti
+tutti i gap `TARGET_EVIDENCE_REQUIRED`. Prossimo vero gap dopo questa sessione:
+glue device libfprint locale + observazione del secondo ciclo di capture dopo
+re-arm (futuro D274/03 live one-shot esplicitamente autorizzato), non più il
+blocco della build SIGFM OpenCV4.
 
 ## Hard Wall
 
