@@ -26,13 +26,81 @@ POWERSHELL51_FILES = (
     "run-d274-03-native-qualification.ps1",
 )
 POWERSHELL51_LOGICAL_SHA256 = {
-    "avvia-d274-03.ps1": "e7076090bf75cde7830a7d5184cf68308c58f75404eba03101419c4e6d15e370",
+    "avvia-d274-03.ps1": "08092cd3a0c4e2a397ce84e5417e080aaf0607c606d6a5f91aaa9882d9bf6e3e",
     "collect-d274-03-native-qualification-results.ps1": "e618a2d76113b697113f1040fa6355ed6bc2b35883750291480a3b426cb8877b",
-    "collect-d274-03-results.ps1": "28df91e65990eeadfd33773ab4bfcabc81187c290fd18cee865b1ca510d17a56",
-    "invoke-d274-03-live-once.ps1": "8b882bfbce352bc9971fcce6ecdf07dd8a09446503d6a6b60c864069cf64aaae",
-    "run-d274-03-native-qualification.ps1": "7ecc625d4ff0723e3f14866076e0cf69294a5475cbc0e136baec013130547d0f",
+    "collect-d274-03-results.ps1": "3518b98ef55598b02a18291d75815f84e280f4e0fc23c6d44c2286bf26d6b812",
+    "invoke-d274-03-live-once.ps1": "4894a19a542a78e46654f61c9827b5063bfd85bf4a6a8ee9ab733067e7d6bcec",
+    "run-d274-03-native-qualification.ps1": "e7072ee99f21388713a17e4dea08394779d9333912b24969f3bc85453cc051e6",
 }
+# Windows PowerShell 5.1 perde l'exit code del comando nativo quando questo
+# viene inglobato in una pipeline: il gate deve leggere $LASTEXITCODE prima di
+# qualunque trasformazione dell'output.
+NATIVE_PIPELINE = re.compile(
+    r"&\s*(?:git|tshark|python3?|USBPcapCMD)\b[^|\r\n]*\|"
+    r"|&\s*\$\w+[^|\r\n]*\|")
+NATIVE_EXIT_CODE_CAPTURES = {
+    "run-d274-03-native-qualification.ps1": (
+        ("$repositoryOutput = & git -C $PackageRoot rev-parse --show-toplevel 2>&1",
+         "$gitExitCode = $LASTEXITCODE"),
+    ),
+    "avvia-d274-03.ps1": (
+        ("$rootOutput = & git -C $PSScriptRoot rev-parse --show-toplevel 2>&1",
+         "$gitExitCode = $LASTEXITCODE"),
+    ),
+    "collect-d274-03-results.ps1": (
+        ("$repositoryOutput = & git -C $PSScriptRoot rev-parse --show-toplevel 2>&1",
+         "$gitExitCode = $LASTEXITCODE"),
+    ),
+    "invoke-d274-03-live-once.ps1": (
+        ("$headOutput = & git -C $RepositoryRoot rev-parse HEAD 2>&1",
+         "$headExitCode = $LASTEXITCODE"),
+        ("$branchOutput = & git -C $RepositoryRoot branch --show-current 2>&1",
+         "$branchExitCode = $LASTEXITCODE"),
+    ),
+}
+HISTORICAL_FRAGILE_SNIPPET = (
+    "$repository = (& git -C $PackageRoot rev-parse --show-toplevel 2>&1 |\n"
+    "    Select-Object -First 1).Trim()\n"
+    'Assert-D274Pass ($LASTEXITCODE -eq 0) "repository Git non individuabile"\n'
+)
 MODULE = KIT / "d274_03_postprocess_second_cycle.py"
+
+
+def powershell_statements(source: str) -> list[str]:
+    """Righe PowerShell con le continuazioni di pipeline e backtick ricongiunte."""
+    statements: list[str] = []
+    pending = ""
+    for raw in source.splitlines():
+        stripped = raw.strip()
+        pending = (pending + " " + stripped).strip() if pending else stripped
+        if pending.endswith("|") or pending.endswith("`"):
+            continue
+        statements.append(pending)
+        pending = ""
+    if pending:
+        statements.append(pending)
+    return statements
+
+
+def lastexitcode_after_pipeline(source: str) -> list[tuple[int, str]]:
+    """Siti in cui $LASTEXITCODE è letto dopo una pipeline su comando nativo."""
+    findings: list[tuple[int, str]] = []
+    statements = powershell_statements(source)
+    for index, statement in enumerate(statements):
+        if "$LASTEXITCODE" not in statement or statement.startswith("#"):
+            continue
+        suspects = [statement]
+        cursor = index - 1
+        while cursor >= 0:
+            previous = statements[cursor]
+            if previous and not previous.startswith("#"):
+                suspects.append(previous)
+                break
+            cursor -= 1
+        for suspect in suspects:
+            if NATIVE_PIPELINE.search(suspect):
+                findings.append((index + 1, suspect))
+    return findings
 SPEC = importlib.util.spec_from_file_location("d274_03_postprocessor", MODULE)
 assert SPEC is not None and SPEC.loader is not None
 D274 = importlib.util.module_from_spec(SPEC)
@@ -534,6 +602,81 @@ class D27403Tests(unittest.TestCase):
             encoding="utf-8-sig")
         self.assertIn('$branch -ne "main"', runner)
         self.assertNotIn('$branch -ne "development"', runner)
+
+    def test_37_native_qualification_captures_git_exit_code_immediately(self):
+        native = (KIT / "run-d274-03-native-qualification.ps1").read_text(
+            encoding="utf-8-sig")
+        statements = powershell_statements(native)
+        invocation = "$repositoryOutput = & git -C $PackageRoot rev-parse --show-toplevel 2>&1"
+        self.assertIn(invocation, statements)
+        index = statements.index(invocation)
+        # L'invocazione nativa non deve stare in una pipeline...
+        self.assertNotIn("|", statements[index])
+        # ...e l'exit code va catturato nello statement immediatamente dopo.
+        self.assertEqual(statements[index + 1], "$gitExitCode = $LASTEXITCODE")
+        # Il fail-closed usa la variabile catturata, non $LASTEXITCODE tardivo.
+        self.assertIn(
+            'Assert-D274Pass ($gitExitCode -eq 0) "repository Git non individuabile"',
+            native)
+        # Il pattern fragile non esiste più.
+        self.assertNotIn("$repository = (& git", native)
+        self.assertNotIn('Assert-D274Pass ($LASTEXITCODE -eq 0)', native)
+        # L'output repository resta validato come non vuoto.
+        self.assertIn(
+            'Assert-D274Pass (-not [string]::IsNullOrWhiteSpace($repository)) '
+            '"repository Git vuoto"', native)
+        self.assertLess(native.index("$gitExitCode = $LASTEXITCODE"),
+                        native.index("$repository = ("))
+
+    def test_38_kit_never_reads_lastexitcode_after_a_native_pipeline(self):
+        # Guardia anti-vacuità: il detector riconosce il pattern storico.
+        self.assertTrue(lastexitcode_after_pipeline(HISTORICAL_FRAGILE_SNIPPET))
+        for name in POWERSHELL51_FILES:
+            source = (KIT / name).read_text(encoding="utf-8-sig")
+            self.assertEqual(lastexitcode_after_pipeline(source), [], name)
+
+    def test_39_audited_native_exit_codes_are_captured_before_transformation(self):
+        for name, pairs in NATIVE_EXIT_CODE_CAPTURES.items():
+            statements = powershell_statements(
+                (KIT / name).read_text(encoding="utf-8-sig"))
+            for invocation, capture in pairs:
+                self.assertIn(invocation, statements, name)
+                index = statements.index(invocation)
+                self.assertNotIn("|", statements[index], name)
+                self.assertEqual(statements[index + 1], capture, name)
+                self.assertNotIn("Select-Object", statements[index], name)
+
+    def test_40_live_head_and_branch_gates_use_captured_exit_codes(self):
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text(
+            encoding="utf-8-sig")
+        self.assertIn("if ($headExitCode -ne 0)", runner)
+        self.assertIn("if ($branchExitCode -ne 0)", runner)
+        # La semantica dei gate baseline/branch resta invariata.
+        self.assertIn('if ($head -ne $approvedSha) { Fail-D274Live '
+                      '"HEAD diverso dalla baseline approvata" }', runner)
+        self.assertIn('if ($branch -ne "main") { Fail-D274Live '
+                      '"branch diversa da main" }', runner)
+        self.assertNotIn("$LASTEXITCODE -ne 0 -or $head", runner)
+        self.assertNotIn("$LASTEXITCODE -ne 0 -or $branch", runner)
+        self.assertNotIn("$head = (& git", runner)
+        self.assertNotIn("$branch = (& git", runner)
+        # I gate restano prima del marker e della cattura.
+        self.assertLess(runner.index("$headExitCode = $LASTEXITCODE"),
+                        runner.index("[System.IO.FileMode]::CreateNew"))
+        self.assertLess(runner.index("$branchExitCode = $LASTEXITCODE"),
+                        runner.index("Start-Process -FilePath $TsharkPath"))
+
+    def test_41_repository_path_is_still_validated_as_non_empty(self):
+        for name, failure in (
+            ("run-d274-03-native-qualification.ps1", "$repository"),
+            ("collect-d274-03-results.ps1", "$repository"),
+            ("avvia-d274-03.ps1", "$root"),
+        ):
+            source = (KIT / name).read_text(encoding="utf-8-sig")
+            self.assertIn(
+                "[string]::IsNullOrWhiteSpace(%s)" % failure, source, name)
+            self.assertIn('"repository Git vuoto"', source, name)
+            self.assertIn('"repository Git non individuabile"', source, name)
 
 
 if __name__ == "__main__":

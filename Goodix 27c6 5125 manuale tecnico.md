@@ -324,14 +324,32 @@ sintetiche e capture storica D263 verificano rispettivamente PASS e
 Goodix assente, self-test, preflight, simulazione pre-authority, selector 5.1,
 gate same-run, contratto TShark/USBPcap, ACL/privacy/lingua e invocazione
 avversaria con authority false. Poiché l'host AI Linux non dispone di Windows
-PowerShell 5.1, non può validare il runtime nativo. La prima invocazione nativa,
-su Windows PowerShell 5.1.26100.8655 e con Goodix assente, è fallita al parsing
-di `run-d274-03-native-qualification.ps1`, prima del runtime. La causa era il
-salvataggio UTF-8 senza BOM degli script con superficie italiana/non-ASCII;
-nessun hardware, accesso USB o runtime del Kit è stato eseguito. Tutti i cinque
-`.ps1` del package sono ora UTF-8 con BOM (`EF BB BF`). La qualificazione deve
-essere ripetuta integralmente e la baseline approval resta bloccata fino al suo
-PASS nativo e alla review AI-PM.
+PowerShell 5.1, non può validare il runtime nativo. Due qualification native sono
+già state avviate su Windows 11 Home build 26200, Windows PowerShell Desktop
+5.1.26100.8655, sempre con Goodix assente dal guest e senza toccare hardware.
+
+La prima è fallita al parsing di `run-d274-03-native-qualification.ps1`, prima
+del runtime, perché gli script con superficie italiana/non-ASCII erano salvati
+UTF-8 senza BOM. Tutti i cinque `.ps1` sono ora UTF-8 con BOM (`EF BB BF`) e il
+corrective è confermato dal campo: il parsing 5.1 passa e lo stage
+`powershell_51` ha dato PASS.
+
+La seconda, prima run realmente entrata in runtime, è fallita allo stage
+`repository_and_goodix_absence` con `repository Git non individuabile`, benché il
+repository fosse individuabile. La diagnostica manuale nello stesso clone isola
+la causa: `git -C <package> rev-parse --show-toplevel` invocato direttamente
+restituisce il toplevel corretto con `EXIT_DIRECT=0`, mentre lo stesso comando
+inglobato in `| Select-Object -First 1` restituisce lo stesso path ma
+`EXIT_PIPE=-1`. In Windows PowerShell 5.1 `$LASTEXITCODE` non è affidabile dopo
+che un comando nativo è stato inglobato in una pipeline che interrompe
+l'upstream. In quella run nessun controllo Goodix, ACL, TShark/USBPcap, selector
+o gate same-run è stato raggiunto. Il corrective applica l'idioma sicuro in tutti
+i siti realmente vulnerabili del Kit — invocazione nativa senza pipeline, exit
+code catturato nello statement immediatamente successivo, fail-closed sulla
+variabile catturata, trasformazione e validazione non-vuoto solo dopo — e lascia
+invariata la semantica dei gate. La qualificazione deve essere ripetuta
+integralmente e la baseline approval resta bloccata fino al suo PASS nativo e
+alla review AI-PM.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -342,12 +360,19 @@ D274_03_OPERATOR_LANGUAGE=ITALIAN
 D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_ONLY
 D274_03_LIVE_BRANCH_GATE=main
 D274_03_POWERSHELL51_ENCODING_CORRECTIVE=IMPLEMENTED_OFFLINE
+D274_03_POWERSHELL51_BOM_CORRECTIVE=PASS
 D274_03_PS1_ENCODING=UTF8_WITH_BOM
 D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
 D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
 D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
 D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
+D274_03_POST_BOM_NATIVE_QUALIFICATION_RESULT=FAIL_REPOSITORY_STAGE
+D274_03_POST_BOM_NATIVE_QUALIFICATION_POWERSHELL_51=PASS
+D274_03_POST_BOM_GIT_EXIT_DIRECT=0
+D274_03_POST_BOM_GIT_EXIT_PIPE=-1
+D274_03_POST_BOM_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_LASTEXITCODE_CORRECTIVE=PASS_OFFLINE
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
 D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
@@ -1056,7 +1081,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D273/01 closure post-first-image + SIGFM reale | PARTIAL CLOSURE offline; live false; executable closure globale FAIL_NOT_AVAILABLE | dataflow up/down OEM chiuso: IRQ2 aggiorna up globale di sessione consumata da `0x34`, IRQ0200 aggiorna down consumata da re-arm `0x32`; packet 249 chiuso come A0 NAV `0x50` 2417/2410; modello corretto con source IRQ/generation e timestamp per transizione; seconda iterazione target e timeout non osservati; host e SDK senza OpenCV4-dev, vero `sigfm.cpp` non compilabile, nessuna installazione |
 | D274/01 Kit Windows/OEM pre-live | READY offline; hard-disabled; live false | sanitizer metadata-only, target/A8/hash/schema/privacy gate e fixture sintetica del secondo ciclo PASS; capture storica termina a ACK re-arm e resta `MISSING_SECOND_IRQ2`; workflow candidato no-commit, nessuna attribution retroattiva |
 | D274/02 qualificazione nativa Windows | CLOSED / PASS; tre run storiche preservate; live false | run 1 FAIL source-scan `-f`, run 2 FAIL `.Count` sotto PowerShell 5.1, run 3 PASS nativo completo dopo corrective; nessuna regressione tecnica e nessuna riapertura |
-| D274/03 Kit one-shot secondo ciclo | UTF-8 BOM corrective implementato offline; qualification nativa da ripetere; baseline/capture/live false | runner futuro vincolato a `main`; prima qualification su PowerShell 5.1.26100.8655 fallita al parsing pre-runtime con Goodix assente e hardware non toccato; tutti i `.ps1` ora UTF-8 BOM, gate assenza same-run/PIN/observer/finalizzazione invariati, D263 resta negativa |
+| D274/03 Kit one-shot secondo ciclo | UTF-8 BOM corrective confermato nativamente; corrective `$LASTEXITCODE` implementato offline; qualification nativa da ripetere; baseline/capture/live false | runner futuro vincolato a `main`; prima qualification fallita al parsing pre-runtime, seconda entrata in runtime con `powershell_51`=PASS e failure a `repository_and_goodix_absence`; causa provata: `$LASTEXITCODE` non affidabile dopo pipeline PowerShell 5.1 (`EXIT_DIRECT=0` vs `EXIT_PIPE=-1`); exit code nativo ora catturato subito nei cinque siti reali; Goodix sempre assente, hardware mai toccato, gate assenza same-run/PIN/observer/finalizzazione invariati, D263 resta negativa |
 
 ## Fonti e confini di pubblicazione
 
@@ -5254,7 +5279,7 @@ per distinguere il B0 fingerprint strutturale già chiuso da D274/01/D274/02.
 
 #### Closure offline
 
-Il test D274/03 esegue 36 casi sintetici/avversari: success boundary; secondo
+Il test D274/03 esegue 41 casi sintetici/avversari: success boundary; secondo
 IRQ mancante/errato; secondo `0x22` mancante/duplicato; ACK echo/status errati;
 B0 malformato/classe errata; terzo ciclo; target ambiguo/re-enumerato; firmware
 errato; deadline; privacy/schema; authority non autorizzata; baseline stale;
@@ -5263,13 +5288,63 @@ trailing block incompleto; deadline observer; stop/finalizzazione bounded;
 perdita terminal evidence; raw vuoto/mancante/troncato; source contract passivo;
 ACL/privacy; lingua italiana; package nativo; manifest strict; regressione sulla
 capture storica D263; BOM UTF-8, decodifica `utf-8-sig`, assenza di mojibake e
-hash del contenuto logico di ciascun `.ps1`. Tutti passano su Linux. La prima
-qualification nativa è fallita al parsing pre-runtime su Windows PowerShell
-5.1.26100.8655 perché gli script erano UTF-8 senza BOM; Goodix era assente e
-nessun hardware è stato toccato. Il corrective byte-level è ora applicato, ma
-il runtime Windows PowerShell 5.1 non è disponibile sull'host AI Linux.
-Pertanto il PASS offline non qualifica PowerShell 5.1: serve una ripetizione
-integrale nativa prima di qualunque approvazione baseline.
+hash del contenuto logico di ciascun `.ps1`; cattura immediata dell'exit code
+nativo, assenza del pattern `$LASTEXITCODE`-dopo-pipeline in tutti i `.ps1`,
+fail-closed sulla variabile catturata e validazione non-vuoto del repository.
+Tutti passano su Linux.
+
+#### Qualification nativa: due failure reali, nessun hardware toccato
+
+Entrambe le run native sono state eseguite su Windows 11 Home build 26200,
+Windows PowerShell Desktop 5.1.26100.8655, con Goodix `27c6:5125` assente dal
+guest. Nessuna ha toccato hardware, aperto USB o creato capture/marker.
+
+La prima è fallita al parsing di `run-d274-03-native-qualification.ps1` prima
+del runtime, per script UTF-8 senza BOM con superficie italiana/non-ASCII. Il
+corrective BOM è ora confermato dal campo, non solo offline: il parsing 5.1 passa
+e lo stage `powershell_51` ha dato PASS.
+
+La seconda è la prima run realmente entrata in runtime ed è fallita allo stage
+`repository_and_goodix_absence` con `D274_03_NATIVE_FAIL_CLOSED: repository Git
+non individuabile`. Il repository era in realtà individuabile. La diagnostica
+manuale, eseguita nello stesso clone e nella stessa directory Kit, isola la
+causa in modo non ambiguo:
+
+```text
+& git -C $PackageRoot rev-parse --show-toplevel   # toplevel corretto
+EXIT_DIRECT=0
+$repository = (& git -C $PackageRoot rev-parse --show-toplevel 2>&1 |
+    Select-Object -First 1)                       # stesso toplevel corretto
+EXIT_PIPE=-1
+```
+
+In Windows PowerShell 5.1 `Select-Object -First 1` interrompe la pipeline
+upstream; il comando nativo non consegna il proprio exit code e `$LASTEXITCODE`
+osservato diventa `-1` anche quando Git riesce. Il gate leggeva quindi un exit
+code inventato dalla pipeline, non quello di Git, e falliva chiuso su un
+repository valido. Nessun controllo Goodix, ACL, TShark/USBPcap, selector 5.1,
+gate same-run o simulazione pre-authority è stato raggiunto in quella run: la
+qualification nativa va ripetuta integralmente.
+
+Il corrective adotta un unico idioma PowerShell 5.1-safe: il comando nativo è
+invocato senza pipeline, l'exit code è catturato nello statement immediatamente
+successivo in una variabile dedicata, il fail-closed valuta quella variabile e
+solo dopo l'output viene selezionato, normalizzato e validato come non vuoto.
+L'audit del Kit ha trovato cinque siti realmente vulnerabili, tutti su Git, e li
+ha corretti: repository nel runner di qualificazione, repository nel launcher,
+repository nel collector, `rev-parse HEAD` e `branch --show-current` nel runner
+live. Restano audit-safe e non modificati i siti che leggono `$LASTEXITCODE`
+senza pipeline interposta (`git diff --quiet`, `git status --porcelain` e il
+sanitizer Python, tutti in forma `@(& …)` o invocazione diretta) e le
+invocazioni TShark che usano solo l'output senza mai leggere `$LASTEXITCODE`.
+Observer e postprocessor Python continuano a essere avviati con `Start-Process
+-PassThru` e valutati su `ExitCode`, che non è soggetto al problema. La semantica
+dei gate non cambia: HEAD deve ancora coincidere con la baseline approvata e la
+branch deve ancora essere `main`.
+
+Il runtime Windows PowerShell 5.1 non è disponibile sull'host AI Linux, quindi
+il PASS offline non qualifica PowerShell 5.1: serve una ripetizione integrale
+nativa prima di qualunque approvazione baseline.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -5280,12 +5355,23 @@ D274_03_OPERATOR_LANGUAGE=ITALIAN
 D274_03_OFFLINE_EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_ONLY
 D274_03_LIVE_BRANCH_GATE=main
 D274_03_POWERSHELL51_ENCODING_CORRECTIVE=IMPLEMENTED_OFFLINE
+D274_03_POWERSHELL51_BOM_CORRECTIVE=PASS
 D274_03_PS1_ENCODING=UTF8_WITH_BOM
 D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
 D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
 D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
 D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
+D274_03_POST_BOM_NATIVE_QUALIFICATION_RESULT=FAIL_REPOSITORY_STAGE
+D274_03_POST_BOM_NATIVE_QUALIFICATION_POWERSHELL_51=PASS
+D274_03_POST_BOM_NATIVE_QUALIFICATION_OS=WINDOWS_11_HOME_BUILD_26200
+D274_03_POST_BOM_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
+D274_03_POST_BOM_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_POST_BOM_GIT_EXIT_DIRECT=0
+D274_03_POST_BOM_GIT_EXIT_PIPE=-1
+D274_03_POST_BOM_STAGES_AFTER_REPOSITORY=NOT_REACHED
+D274_03_LASTEXITCODE_CORRECTIVE=PASS_OFFLINE
+D274_03_LASTEXITCODE_VULNERABLE_SITES_CORRECTED=5
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
 D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true

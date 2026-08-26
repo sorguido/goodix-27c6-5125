@@ -8,12 +8,19 @@ offline. Non è approvato per una cattura reale.
 ```text
 D274_03_CORRECTIVE_IMPLEMENTED_OFFLINE=true
 D274_03_POWERSHELL51_ENCODING_CORRECTIVE=IMPLEMENTED_OFFLINE
+D274_03_POWERSHELL51_BOM_CORRECTIVE=PASS
 D274_03_PS1_ENCODING=UTF8_WITH_BOM
 D274_03_FIRST_NATIVE_QUALIFICATION_RESULT=FAIL_PARSE_BEFORE_RUNTIME
 D274_03_FIRST_NATIVE_QUALIFICATION_GOODIX_PRESENT=false
 D274_03_FIRST_NATIVE_QUALIFICATION_POWERSHELL=5.1.26100.8655
 D274_03_FIRST_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_ENCODING_CORRECTIVE
+D274_03_POST_BOM_NATIVE_QUALIFICATION_RESULT=FAIL_REPOSITORY_STAGE
+D274_03_POST_BOM_NATIVE_QUALIFICATION_POWERSHELL_51=PASS
+D274_03_POST_BOM_GIT_EXIT_DIRECT=0
+D274_03_POST_BOM_GIT_EXIT_PIPE=-1
+D274_03_POST_BOM_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
+D274_03_LASTEXITCODE_CORRECTIVE=PASS_OFFLINE
+D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE
 BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
 D274_03_BASELINE_APPROVED=false
 APPROVED_FOR_CAPTURE=false
@@ -28,11 +35,21 @@ launcher non sostituisce l'authority. Una futura esecuzione richiederà review,
 commit SHA completo approvato, HEAD esatto, branch `main`, live-critical set pulito e
 autorizzazione one-shot separata.
 
-La prima qualificazione nativa si è arrestata al parsing del runner di
-qualificazione su Windows PowerShell 5.1.26100.8655. Goodix era assente dal
-guest: nessun runtime del Kit, accesso USB o hardware è stato eseguito. La
-causa era l'encoding UTF-8 senza BOM degli script con testo italiano/non-ASCII.
-Tutti gli script PowerShell 5.1 del package sono ora UTF-8 con BOM; la
+Sono già state avviate due qualificazioni native, entrambe con Goodix assente
+dal guest e senza alcun runtime hardware, accesso USB, capture o marker.
+
+La prima si è arrestata al parsing del runner di qualificazione su Windows
+PowerShell 5.1.26100.8655, per encoding UTF-8 senza BOM degli script con testo
+italiano/non-ASCII. Tutti gli script PowerShell 5.1 del package sono ora UTF-8
+con BOM e il parsing 5.1 è confermato superato in nativo.
+
+La seconda è entrata in runtime: lo stage `powershell_51` è PASS, ma la run è
+fallita allo stage `repository_and_goodix_absence` con `repository Git non
+individuabile` pur essendo il repository individuabile. In Windows PowerShell
+5.1 `$LASTEXITCODE` non è affidabile quando il comando nativo viene inglobato in
+una pipeline: la stessa invocazione Git dà `EXIT_DIRECT=0` da sola e
+`EXIT_PIPE=-1` dentro `| Select-Object -First 1`. Gli script ora catturano
+l'exit code nativo immediatamente, prima di trasformare l'output. La
 qualificazione deve essere ripetuta integralmente e non è ancora PASS.
 
 ## Scopo limitato

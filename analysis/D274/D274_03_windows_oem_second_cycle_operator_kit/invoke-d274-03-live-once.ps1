@@ -137,10 +137,21 @@ if ($approvedSha -notmatch '^[0-9a-f]{40}$') { Fail-D274Live "SHA completo appro
 $authorizationId = [string]$authority.one_shot_authorization_id
 if ($authorizationId -notmatch '^[A-Za-z0-9_-]{12,80}$') { Fail-D274Live "identificatore one-shot non valido" }
 
-$head = (& git -C $RepositoryRoot rev-parse HEAD 2>&1 | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0 -or $head -ne $approvedSha) { Fail-D274Live "HEAD diverso dalla baseline approvata" }
-$branch = (& git -C $RepositoryRoot branch --show-current 2>&1 | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0 -or $branch -ne "main") { Fail-D274Live "branch diversa da main" }
+# Windows PowerShell 5.1: l'exit code di ogni comando nativo va letto subito.
+# Inglobare Git in una pipeline (per esempio Select-Object -First 1) rende
+# $LASTEXITCODE non affidabile: la pipeline upstream viene interrotta e il
+# valore osservato diventa -1 anche quando Git riesce. I gate restano identici:
+# HEAD deve coincidere con la baseline approvata e la branch deve essere main.
+$headOutput = & git -C $RepositoryRoot rev-parse HEAD 2>&1
+$headExitCode = $LASTEXITCODE
+if ($headExitCode -ne 0) { Fail-D274Live "HEAD non leggibile nel repository indicato" }
+$head = ([string](@($headOutput) | Select-Object -First 1)).Trim()
+if ($head -ne $approvedSha) { Fail-D274Live "HEAD diverso dalla baseline approvata" }
+$branchOutput = & git -C $RepositoryRoot branch --show-current 2>&1
+$branchExitCode = $LASTEXITCODE
+if ($branchExitCode -ne 0) { Fail-D274Live "branch corrente non leggibile" }
+$branch = ([string](@($branchOutput) | Select-Object -First 1)).Trim()
+if ($branch -ne "main") { Fail-D274Live "branch diversa da main" }
 
 $critical = @(
     "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/avvia-d274-03.ps1",
