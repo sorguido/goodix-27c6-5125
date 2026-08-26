@@ -83,12 +83,18 @@ Result: **PASS (ASan/UBSan clean)**.
 with fail-closed behavior:
 
 - if `pkg-config --exists opencv4` is false -> prints
-  `REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE`, exits 0 (SKIP);
+  `REAL_SIGFM_EXECUTABLE_CLOSURE=BLOCKED_ENVIRONMENT` and
+  `REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE`, then **exits 77**
+  (conventional SKIP, not a fake PASS);
+- dependency present + all PASS -> exit 0; real build/link/runtime failure ->
+  exit 1;
 - prints `SKIP/NOT_AVAILABLE` vs `FAIL` vs `PASS` explicitly;
 - no USB / fprintd / secret / mandatory network at runtime;
 - no package auto-install, no system modification, no OpenCV vendoring, no
   production-threshold change;
-- objects/binaries only under `mktemp -d /tmp/...`, cleaned on exit.
+- objects/binaries only under `mktemp -d /tmp/...`, cleaned on exit;
+- sanitizer pass prints `REAL_SIGFM_ASAN_UBSAN_STATUS`, `LEAK_DETECTION=DISABLED`
+  and `MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED`.
 
 ## Source artifacts & git blob SHAs (reference state)
 
@@ -98,15 +104,16 @@ with fail-closed behavior:
 | libfprint-driver/goodix_u16_to_fpimage.h | e07710e625a367afad20dc8f1cfc5e76389b07e4 |
 | libfprint-driver/goodix_sigfm_metrics.cpp | 16f92888fae8eb6fffc0be07d429a43ec8b1a452 |
 | libfprint-driver/goodix_sigfm_metrics.h | 0a697b1aa8444021c65109fde84e81f7d027ed2c |
-| libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp | 56fd77f80bae320e481a4f51232ce30a631693c5 |
+| libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp | ccf752d56d029a54a2c664852ceb2453e2d74914 |
 | Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp | 1ade7b30b5bb65a2d1e9528aaf0fd5c8716662ff |
 | Rockytkg/libfprint/libfprint/sigfm/sigfm.h | 671a2b6df9140b729cf52651d0c395a9d54fceb6 |
 | Rockytkg/libfprint/libfprint/sigfm/binary.hpp | f76b5dabd9c5c336f2d294f830631f892ba01481 |
 | Rockytkg/libfprint/libfprint/sigfm/img-info.hpp | 42967b69d534784abb7951735aca144bb5b7ec2e |
-| libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh | NEW (uncommitted) |
+| libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh | 44249118d3264f440761c59f6dd1f3fe002037a5 |
 
-Third-party SIGFM files: LGPL-2.1-or-later (SPDX verified), **unmodified** in
-`Rockytkg/`. No new ledger entry required (no new import/adaptation).
+Third-party SIGFM files: explicit LGPL-2.1-or-later license header verified
+(NO literal SPDX tag claimed), **unmodified** in `Rockytkg/`. No new ledger
+entry required (no new import/adaptation).
 
 ## Windows operator kit integrity
 
@@ -118,6 +125,9 @@ git blob SHA = `fca3c40d4a3fcd7c6c21ce6809de794d69908e7a` (preserved).
 
 - `goodix_u16_to_fpimage` unit test: PASS
 - `goodix_sigfm_metrics` synthetic/double (+ forbidden-symbol audit): PASS
-- `goodix_fpimage_pipeline` test: NOT_RUNNABLE_HOST_ONLY (missing libfprint
-  framework header `fpi-image.h`); consistent with
-  `LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED`, out of scope.
+- `goodix_fpimage_pipeline` test: NOT_RUN_ENVIRONMENT_LIMITATION — its historical
+  Flatpak SDK harness (`run_goodix_fpimage_pipeline_test.sh`) requires the
+  Flatpak SDK + libfprint framework headers, unavailable in this executor. This
+  is an environment/toolchain limitation, **not** caused by
+  `LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED` (the pipeline helper is an
+  independent D270 component).

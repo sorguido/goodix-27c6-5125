@@ -2,13 +2,20 @@
 
 ```text
 OUTCOME=READY_FOR_AI_PM_REVIEW
-ADVANCEMENT=SIGFM_REAL_OPENCV4_HOST_ONLY_BUILD_CLOSURE
+ADVANCEMENT=SIGFM_REAL_OPENCV4_HOST_ONLY_BUILD_AND_POSITIVE_RUNTIME_CLOSURE
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 REAL_SIGFM_BUILD=PASS_HOST_ONLY_WITH_REAL_OPENCV4
 REAL_SIGFM_LINK=PASS
+REAL_SIGFM_POSITIVE_EXTRACT=PASS
+REAL_SIGFM_MATCH_PATH=PASS
 REAL_SIGFM_SYNTHETIC_RUNTIME=PASS
+REAL_SIGFM_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 REAL_SIGFM_SANITIZER_STATUS=PASS
+LEAK_DETECTION=DISABLED
+MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED
 OPENCV4_DEV_ENVIRONMENT=AVAILABLE_HOST_ONLY_LIBOPENCV_DEV_4_5_4_VIA_APT
+SIGFM_REFERENCE_LICENSE=LGPL-2.1-or-later_EXPLICIT_LICENSE_HEADER_VERIFIED
+SIGFM_REFERENCE_LITERAL_SPDX_TAG_CLAIM=false
 
 BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
 PRODUCTION_MATCH_THRESHOLD=UNSET
@@ -58,11 +65,14 @@ distro package manager. The `Rockytkg/` mirror was **not** modified.
 ## 3. License / provenance (Phase C)
 
 All four SIGFM reference files
-(`sigfm.cpp`, `sigfm.h`, `binary.hpp`, `img-info.hpp`) carry SPDX
-`LGPL-2.1-or-later` headers and belong to the upstream libfprint material
+(`sigfm.cpp`, `sigfm.h`, `binary.hpp`, `img-info.hpp`) carry an **explicit
+LGPL-2.1-or-later license header** (textual, no literal
+`SPDX-License-Identifier` tag) and belong to the upstream libfprint material
 (per `Rockytkg/PROVENANCE.md` and `docs/LICENSING_AND_PROVENANCE.md`), the
-expected domain for `libfprint-driver/`. No new import/adaptation was made, so
-no new ledger entry is required.
+expected domain for `libfprint-driver/`. The licensing conclusion is unchanged:
+LGPL-2.1-or-later compatibility holds, but **no literal SPDX tag is claimed**
+for these files. No new import/adaptation was made, so no new ledger entry is
+required.
 
 ## 4. Differentiated warning policy (Phase D)
 
@@ -81,17 +91,26 @@ masked inside our object. No `-Werror` patch was applied to the mirror.
 ## 5. Build / link / runtime (Phase D + E)
 
 All four translation units compiled, linked with `pkg-config --libs opencv4`,
-and the real synthetic test ran:
+and the real synthetic test ran. The corrected test now exercises the **positive
+runtime path unambiguously**:
 
 ```text
+REAL_SIGFM_POSITIVE_EXTRACT=PASS
+REAL_SIGFM_KEYPOINTS=220
+REAL_SIGFM_MATCH_PATH=PASS
+REAL_SIGFM_IDENTICAL_FIXTURE_SCORE=160
 goodix real SIGFM synthetic plumbing: PASS
 ```
 
-The test exercises the real `sigfm_extract` (SIFT + BFMatcher) and
-`sigfm_match_score` through our `goodix_sigfm_extract_ephemeral` /
-`goodix_sigfm_match_ephemeral` wrapper on a deterministic LCG fixture
-(`80x64` u16 raster). It is **SYNTHETIC_ONLY**: no target image, no capture, no
-biometric corpus.
+The test uses a deterministic, structured synthetic fixture (8x8 block
+checkerboard with a 1px grating, `80x64` u16 raster) that stably yields ≥25
+SIFT keypoints under OpenCV 4.5.4. It requires `GOODIX_SIGFM_OK` on two
+identical extractions, `keypoints >= 25`, and that `goodix_sigfm_match_ephemeral`
+actually executes through `sigfm_match_score()` returning `GOODIX_SIGFM_OK` with
+`score >= 0`. A **separate negative test** asserts the keypoint gate
+(`GOODIX_SIGFM_KEYPOINT_GATE_FAILED`) on a flat fixture. The test is
+**SYNTHETIC_ONLY**: no target image, no capture, no biometric corpus, no
+threshold tuning, no orientation/polarity assumption.
 
 ## 6. Memory safety (Phase F)
 
@@ -101,18 +120,31 @@ ASan/UBSan build (`-O1 -fno-omit-frame-pointer
 
 ```text
 REAL_SIGFM_SANITIZER_STATUS=PASS
+REAL_SIGFM_ASAN_UBSAN_STATUS=PASS
+LEAK_DETECTION=DISABLED
+MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED
 ```
+
+LeakSanitizer is **disabled** (`detect_leaks=0`), so the result is truth-preserving:
+no address or UB errors were detected at runtime; leaks were **not** assessed.
 
 ## 7. Reproducible harness (Phase G)
 
 Added `libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh` — host-only
 real-SIGFM build/test runner (the prior `run_goodix_sigfm_metrics_test.sh` is
-Flatpak-based and not usable here). It is fail-closed: if `opencv4.pc` is
-absent it prints `REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE` and exits
-0 (SKIP, never a fake PASS); it prints `SKIP/NOT_AVAILABLE` vs `FAIL` vs `PASS`
-explicitly; no USB/fprintd/secret/mandatory network at runtime; no auto package
-install; no system modification; no OpenCV vendoring; no threshold change;
-objects only under `mktemp -d /tmp/...` cleaned on exit.
+Flatpak-based and not usable here). It is machine-actionable and fail-closed:
+
+- dependency available + all PASS -> exit 0;
+- dependency missing / SKIP -> prints
+  `REAL_SIGFM_EXECUTABLE_CLOSURE=BLOCKED_ENVIRONMENT` and
+  `REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE`, then **exit 77**
+  (conventional SKIP, not a fake PASS);
+- real build/link/runtime failure -> exit 1.
+
+It prints `SKIP/NOT_AVAILABLE` vs `FAIL` vs `PASS` explicitly; no USB/fprintd/
+secret/mandatory network at runtime; no auto package install; no system
+modification; no OpenCV vendoring; no threshold change; objects only under
+`mktemp -d /tmp/...` cleaned on exit.
 
 ## 8. Regression (host-only)
 
@@ -120,7 +152,7 @@ objects only under `mktemp -d /tmp/...` cleaned on exit.
 | --- | --- |
 | `goodix_u16_to_fpimage` unit | PASS |
 | `goodix_sigfm_metrics` synthetic/double + forbidden-symbol audit | PASS |
-| `goodix_fpimage_pipeline` | NOT_RUNNABLE_HOST_ONLY (missing libfprint `fpi-image.h`; consistent with `LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED`) |
+| `goodix_fpimage_pipeline` | NOT_RUN_ENVIRONMENT_LIMITATION (its historical Flatpak SDK harness `run_goodix_fpimage_pipeline_test.sh` needs the Flatpak SDK + libfprint framework headers, unavailable in this executor; independent of `LOCAL_LIBFPRINT_DEVICE_GLUE`) |
 
 Forbidden-symbol audit on `metrics.o`: no `libusb_`/`SSL_`/`gnutls_`/`socket`/
 `fopen`/`open`/`write`/`read` symbols -> PASS.
@@ -132,7 +164,7 @@ Forbidden-symbol audit on `metrics.o`: no `libusb_`/`SSL_`/`gnutls_`/`socket`/
 | BUILDABILITY | PASS |
 | LINKABILITY | PASS |
 | SYNTHETIC_REAL_SIGFM_RUNTIME | PASS |
-| MEMORY_SAFETY | PASS (ASan/UBSan clean) |
+| MEMORY_SAFETY | SCOPE: ASan/UBSan runtime clean; leaks NOT assessed (LEAK_DETECTION=DISABLED) |
 | TARGET_BIOMETRIC_QUALITY | UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED |
 | PRODUCTION_INTEGRATION | NOT_INTEGRATED_NO_DEVICE_GLUE |
 

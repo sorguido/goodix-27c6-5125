@@ -163,9 +163,13 @@ SIGFM_METRIC_PRIVACY_CONTRACT=CLOSED_OFFLINE_NO_SERIALIZATION
 OPENCV4_DEV_ENVIRONMENT=AVAILABLE_HOST_ONLY_LIBOPENCV_DEV_4_5_4_VIA_APT
 REAL_SIGFM_BUILD=PASS_HOST_ONLY_WITH_REAL_OPENCV4
 REAL_SIGFM_LINK=PASS
+REAL_SIGFM_POSITIVE_EXTRACT=PASS
+REAL_SIGFM_MATCH_PATH=PASS
 REAL_SIGFM_SYNTHETIC_RUNTIME=PASS
 REAL_SIGFM_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 REAL_SIGFM_SANITIZER_STATUS=PASS
+LEAK_DETECTION=DISABLED
+MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED
 NBIS_STATUS=BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN
 SIGFM_80X64_SUPPORT_STATUS=ARCHITECTURALLY_SUPPORTED_WITH_MIN_25_KEYPOINT_GATE_TARGET_QUALITY_UNPROVEN
 NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILITY_BLOCKED
@@ -5634,7 +5638,7 @@ Codice usato (tutti LGPL-2.1-or-later, audit per-file OK):
 `libfprint-driver/goodix_u16_to_fpimage.c/.h`,
 `libfprint-driver/goodix_sigfm_metrics.cpp/.h` (progetto),
 `Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp/.h`, `binary.hpp`, `img-info.hpp`
-(riferimento terzo-party libfprint, SPDX LGPL-2.1-or-later verificato),
+(riferimento terzo-party libfprint, header di licenza LGPL-2.1-or-later esplicito verificato; NESSUN tag SPDX letterale rivendicato),
 `libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp` (progetto).
 
 Policy warning differenziata (giustificata, non nasconde warning nostri):
@@ -5650,18 +5654,26 @@ Risultato (vedi `analysis/D274/D274_03_sigfm_real_build_*.{md,json}` e bundle):
 
 ```text
 OUTCOME=READY_FOR_AI_PM_REVIEW
-ADVANCEMENT=SIGFM_REAL_OPENCV4_HOST_ONLY_BUILD_CLOSURE
+ADVANCEMENT=SIGFM_REAL_OPENCV4_HOST_ONLY_BUILD_AND_POSITIVE_RUNTIME_CLOSURE
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 REAL_SIGFM_BUILD=PASS_HOST_ONLY_WITH_REAL_OPENCV4
 REAL_SIGFM_LINK=PASS
+REAL_SIGFM_POSITIVE_EXTRACT=PASS
+REAL_SIGFM_MATCH_PATH=PASS
 REAL_SIGFM_SYNTHETIC_RUNTIME=PASS
+REAL_SIGFM_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 REAL_SIGFM_SANITIZER_STATUS=PASS
+LEAK_DETECTION=DISABLED
+MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED
 OPENCV4_DEV_ENVIRONMENT=AVAILABLE_HOST_ONLY_LIBOPENCV_DEV_4_5_4_VIA_APT
+SIGFM_REFERENCE_LICENSE=LGPL-2.1-or-later_EXPLICIT_LICENSE_HEADER_VERIFIED
+SIGFM_REFERENCE_LITERAL_SPDX_TAG_CLAIM=false
 
 BUILDABILITY=PASS
 LINKABILITY=PASS
 SYNTHETIC_REAL_SIGFM_RUNTIME=PASS
-MEMORY_SAFETY=PASS (ASan/UBSan clean)
+POSITIVE_EXTRACT_AND_MATCH_PATH=PASS
+MEMORY_SAFETY=SCOPE_ASAN_UBSAN_RUNTIME_CLEAN_LEAKS_NOT_ASSESSED
 TARGET_BIOMETRIC_QUALITY=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
 PRODUCTION_INTEGRATION=NOT_INTEGRATED_NO_DEVICE_GLUE
 
@@ -5692,16 +5704,27 @@ LIVE_CRITICAL_SET_MODIFIED=false
 Regressione host-only rieseguita: `goodix_u16_to_fpimage` unit test PASS;
 `goodix_sigfm_metrics` synthetic/double PASS + forbidden-symbol audit PASS
 (nessun simbolo libusb_/SSL_/gnutls_/socket/fopen/open/write/read in `metrics.o`);
-`goodix_fpimage_pipeline` **non eseguibile** in questo host-only per via dell'header
-di framework libfprint `fpi-image.h` assente — dipendenza framework preesistente,
-coerente con `LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED`, fuori scope.
+`goodix_fpimage_pipeline` **NON_RUN_ENVIRONMENT_LIMITATION**: il suo harness
+storico Flatpak (`run_goodix_fpimage_pipeline_test.sh`) richiede l'SDK Flatpak e
+l'header di framework libfprint `fpi-image.h`, non disponibili in questo
+esecutore. È una limitazione d'ambiente/toolchain, **indipendente** da
+`LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED` (il pipeline helper è un
+componente D270 autonomo, non il futuro device glue).
 
 Harness riproducibile host-only aggiunto:
-`libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh` (fail-closed se
-`opencv4.pc` assente → `REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE`,
-stampa SKIP/NOT_AVAILABLE vs FAIL vs PASS, nessun USB/fprintd/secret/network a
-runtime, nessun pacchetto auto-installato, nessuna scrittura fuori `/tmp`, nessun
-vendorizzazione OpenCV, nessun cambio threshold). L'harness Flatpak esistente
+`libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh` (machine-actionable,
+fail-closed: se `opencv4.pc` manca → stampa
+`REAL_SIGFM_EXECUTABLE_CLOSURE=BLOCKED_ENVIRONMENT` e
+`REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE` poi **exit 77** (SKIP
+convenzionale, non finto PASS); dipendenza presente + tutti i PASS → exit 0;
+failure build/link/runtime → exit 1; stampa SKIP/NOT_AVAILABLE vs FAIL vs PASS,
+nessun USB/fprintd/secret/network a runtime, nessun pacchetto auto-installato,
+nessuna scrittura fuori `/tmp`, nessun vendorizzazione OpenCV, nessun cambio
+threshold). Il test real positivo richiede `GOODIX_SIGFM_OK` su due estrazioni
+identiche, `keypoints >= 25`, e che `goodix_sigfm_match_ephemeral` esegua
+effettivamente `sigfm_match_score()` (fixture sintetica strutturata deterministica,
+checkerboard 8x8 + grating, nessun target/biometrica/tuning); un test negativo
+separato copre il `GOODIX_SIGFM_KEYPOINT_GATE_FAILED`. L'harness Flatpak esistente
 (`run_goodix_sigfm_metrics_test.sh`) resta valido per il percorso synthetic/double.
 
 Confine rispettato: un PASS sintetico host-only di build/link/run **non** chiude

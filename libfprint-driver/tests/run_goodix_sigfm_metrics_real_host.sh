@@ -34,13 +34,15 @@ cleanup ()
 trap cleanup EXIT HUP INT TERM
 
 if ! command -v pkg-config >/dev/null 2>&1; then
+  echo "REAL_SIGFM_EXECUTABLE_CLOSURE=BLOCKED_ENVIRONMENT"
   echo "REAL_SIGFM_DEPENDENCY=BLOCKED_ENVIRONMENT (pkg-config missing)"
-  exit 0
+  exit 77
 fi
 
 if ! pkg-config --exists opencv4; then
+  echo "REAL_SIGFM_EXECUTABLE_CLOSURE=BLOCKED_ENVIRONMENT"
   echo "REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE"
-  exit 0
+  exit 77
 fi
 
 ocv_cflags=$(pkg-config --cflags opencv4)
@@ -93,16 +95,18 @@ g++ $cxxflags $san $drv_includes $tp_includes $ocv_cflags -c "$drv_dir/goodix_si
 g++ -std=c++17 -O2 -g -Wall -Wextra $san $tp_includes $ocv_cflags -c "$sigfm_dir/sigfm.cpp" -o "$sb/sigfm.o" && \
 g++ $cxxflags $san $drv_includes $tp_includes -I"$test_dir" -c "$test_dir/test_goodix_sigfm_metrics_real.cpp" -o "$sb/test.o" && \
 g++ $san "$sb/adapter.o" "$sb/metrics.o" "$sb/sigfm.o" "$sb/test.o" $ocv_libs -o "$sb/test-san"
-if [ $? -ne 0 ]; then
-  echo "REAL_SIGFM_SANITIZER_STATUS=ENVIRONMENT_INCOMPATIBLE"
-else
-  ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$sb/test-san" >/dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    echo "REAL_SIGFM_SANITIZER_STATUS=PASS"
+san_status="ENVIRONMENT_INCOMPATIBLE"
+if [ $? -eq 0 ]; then
+  if ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$sb/test-san" >/dev/null 2>&1; then
+    san_status="PASS"
   else
-    echo "REAL_SIGFM_SANITIZER_STATUS=RUNTIME_FOUND_ISSUE"
+    san_status="RUNTIME_FOUND_ISSUE"
   fi
 fi
+echo "REAL_SIGFM_SANITIZER_STATUS=$san_status"
+echo "REAL_SIGFM_ASAN_UBSAN_STATUS=$san_status"
+echo "LEAK_DETECTION=DISABLED"
+echo "MEMORY_SAFETY_SCOPE=ASAN_UBSAN_RUNTIME_NO_DETECTED_ADDRESS_OR_UB_ERRORS_LEAKS_NOT_ASSESSED"
 rm -rf "$sb"
 
 exit 0
