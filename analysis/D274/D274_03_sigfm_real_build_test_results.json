@@ -1,0 +1,88 @@
+{
+  "artifact": "D274_03_sigfm_real_build_test_results",
+  "schema_version": "1.0",
+  "generated_utc": "2026-08-26T09:35:00Z",
+  "closure_decision_tree_case": "CASE_1_FULL_HOST_ONLY_PASS",
+  "stages": {
+    "adapter_compile": {"status": "PASS", "flags": "-std=c11 -O2 -g -Wall -Wextra -Werror -Wconversion", "rc": 0},
+    "metrics_wrapper_compile": {"status": "PASS", "flags": "-std=c++17 -O2 -g -Wall -Wextra -Werror -Wconversion -Wshadow -Wold-style-cast", "note": "third-party sigfm headers via -isystem; no project warnings", "rc": 0},
+    "sigfm_reference_compile": {"status": "PASS", "flags": "-std=c++17 -O2 -g -Wall -Wextra (relaxed, third-party)", "rc": 0},
+    "real_test_compile": {"status": "PASS", "flags": "-std=c++17 -O2 -g -Wall -Wextra -Werror -Wconversion -Wshadow -Wold-style-cast", "rc": 0},
+    "link": {"status": "PASS", "flags": "g++ ... $(pkg-config --libs opencv4)", "rc": 0},
+    "synthetic_runtime": {"status": "PASS", "exit_code": 0, "stdout": "goodix real SIGFM synthetic plumbing: PASS"},
+    "sanitizer_build_runtime": {"status": "PASS", "flags": "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined", "exit_code": 0, "note": "ASan/UBSan clean"}
+  },
+  "forbidden_symbol_audit": {
+    "object": "libfprint-driver/goodix_sigfm_metrics.cpp -> metrics.o",
+    "checked": ["libusb_", "SSL_", "gnutls_", "socket", "fopen", "open", "write", "read"],
+    "result": "PASS (no forbidden persistence/USB/TLS symbols)"
+  },
+  "regression": {
+    "goodix_u16_to_fpimage_unit_test": {"status": "PASS", "exit_code": 0, "stdout": "goodix_u16_to_fpimage: PASS"},
+    "goodix_sigfm_metrics_synthetic_double": {"status": "PASS", "exit_code": 0, "stdout": "goodix_sigfm_metrics synthetic: PASS", "forbidden_symbol_audit": "PASS"},
+    "goodix_fpimage_pipeline_test": {"status": "NOT_RUNNABLE_HOST_ONLY", "reason": "requires libfprint framework header fpi-image.h, absent in host-only env", "consistent_with": "LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED"}
+  },
+  "harness": {
+    "path": "libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh",
+    "status": "PASS",
+    "behavior_on_missing_opencv4": "prints REAL_SIGFM_DEPENDENCY=BLOCKED_OPENCV4_DEV_UNAVAILABLE and exits 0 (SKIP, not fake PASS)",
+    "output": [
+      "REAL_SIGFM_DEPENDENCY=AVAILABLE",
+      "OPENCV4_VERSION=4.5.4",
+      "REAL_SIGFM_BUILD=PASS_HOST_ONLY_WITH_REAL_OPENCV4",
+      "forbidden-symbol audit: PASS",
+      "REAL_SIGFM_LINK=PASS",
+      "goodix real SIGFM synthetic plumbing: PASS",
+      "REAL_SIGFM_SYNTHETIC_RUNTIME=PASS",
+      "REAL_SIGFM_EXECUTABLE_CLOSURE=PASS_HOST_ONLY",
+      "REAL_SIGFM_SANITIZER_STATUS=PASS"
+    ]
+  },
+  "classification": {
+    "BUILDABILITY": "PASS",
+    "LINKABILITY": "PASS",
+    "SYNTHETIC_REAL_SIGFM_RUNTIME": "PASS",
+    "MEMORY_SAFETY": "PASS (ASan/UBSan clean)",
+    "TARGET_BIOMETRIC_QUALITY": "UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED",
+    "PRODUCTION_INTEGRATION": "NOT_INTEGRATED_NO_DEVICE_GLUE"
+  },
+  "safety_invariants": {
+    "REAL_USB_OPEN_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "REAL_SECRET_MATERIALIZATION_COUNT": 0,
+    "REAL_FPRINTD_MUTATION_COUNT": 0,
+    "REAL_BIOMETRIC_CAPTURE_COUNT": 0,
+    "PERSISTENT_DEVICE_WRITE_COUNT": 0,
+    "LIVE_EXECUTION": "NOT_PERFORMED"
+  },
+  "git_blobs": {
+    "libfprint-driver/goodix_u16_to_fpimage.c": "84ae49ca23bc0e4496f18e3f2a5c84327ddf269d",
+    "libfprint-driver/goodix_u16_to_fpimage.h": "e07710e625a367afad20dc8f1cfc5e76389b07e4",
+    "libfprint-driver/goodix_sigfm_metrics.cpp": "16f92888fae8eb6fffc0be07d429a43ec8b1a452",
+    "libfprint-driver/goodix_sigfm_metrics.h": "0a697b1aa8444021c65109fde84e81f7d027ed2c",
+    "libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp": "56fd77f80bae320e481a4f51232ce30a631693c5",
+    "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp": "1ade7b30b5bb65a2d1e9528aaf0fd5c8716662ff",
+    "Rockytkg/libfprint/libfprint/sigfm/sigfm.h": "671a2b6df9140b729cf52651d0c395a9d54fceb6",
+    "Rockytkg/libfprint/libfprint/sigfm/binary.hpp": "f76b5dabd9c5c336f2d294f830631f892ba01481",
+    "Rockytkg/libfprint/libfprint/sigfm/img-info.hpp": "42967b69d534784abb7951735aca144bb5b7ec2e",
+    "libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh": "NEW_UNCOMMITTED_FILE"
+  },
+  "invariants_not_closed_by_this_session": {
+    "TARGET_APP12509_PHYSICAL_PPMM": "UNKNOWN",
+    "TARGET_APP12509_PHYSICAL_DPI": "UNKNOWN",
+    "ORIENTATION_CONTRACT": "UNRESOLVED",
+    "POLARITY_CONTRACT": "UNRESOLVED",
+    "BIOMETRIC_QUALITY_STATUS": "UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED",
+    "PRODUCTION_MATCH_THRESHOLD": "UNSET",
+    "SAME_DIFFERENT_FINGER_SCORE_DISTRIBUTIONS": "NOT_COLLECTED",
+    "VERIFY_QUALITY": "UNPROVEN",
+    "SECOND_TARGET_CYCLE": "UNOBSERVED",
+    "TARGET_TIMEOUT_POLICY": "UNCLOSED",
+    "LOCAL_LIBFPRINT_DEVICE_GLUE": "NOT_YET_IMPLEMENTED"
+  },
+  "windows_operator_kit": {
+    "D274_03_OPERATOR_KIT_MODIFIED": false,
+    "invoke_blob_sha256_or_sha1": "fca3c40d4a3fcd7c6c21ce6809de794d69908e7a (git blob SHA preserved)",
+    "LIVE_CRITICAL_SET_MODIFIED": false
+  }
+}
