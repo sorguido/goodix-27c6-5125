@@ -1179,6 +1179,27 @@ corroborazione esterna e non prova primaria della preservazione factory/PSK o
 del comportamento APP12509. Questi due ruoli non vanno confusi; ogni futuro
 import richiede comunque verifica file-specifica di diritti e SPDX.
 
+#### Issue #1 — corroborazione terza parte (THIRD_PARTY_CORROBORATION, non prova locale)
+
+D274/03 forward-analysis registra come corroborazione esterna il report di un
+terzo utente (`mkl-corbachoh`) su Huawei MateBook con Goodix `27c6:5125`, chip ID
+`0x2504`, firmware nativo `GF_ST411SEC_APP_12509` mantenuto, TLS-PSK riuscito,
+enrollment fprintd con 8 capture, verify-match sul dito registrato,
+verify-no-match su dito diverso e autenticazione PAM funzionante. Questo è
+**corroborazione implementativa**, non autorità probatoria per APP12509 sul nostro
+target. In particolare il test terza parte **NON preservava una PSK Windows
+esistente**: il dispositivo riportava PSK assente (status `0x01`) ed è stata
+provisionata una nuova PSK una volta. Pertanto non dimostra la preservazione
+della PSK Windows/factory. Il maintainer Rockytkg ha inoltre chiarito che
+l'upstream considera ancora 12509 come firmware diverso da 12508 e quindi può
+entrare nel percorso ClearApp/firmware-update; non possiede un global
+no-write/read-only init mode; e considera un percorso 12509
+keep-current-firmware + no-write una direzione sensata. Per il nostro progetto
+restano invariati gli invarianti: nessun flash/IAP/ClearApp, nessun provisioning
+o overwrite PSK, nessuna scrittura persistente, preservazione Windows/factory
+state. Nessuna di queste affermazioni terze parti promuove un fatto del target
+locale.
+
 ## Architettura
 
 ```text
@@ -5499,6 +5520,92 @@ iterazione non osservata, mentre la build SIGFM reale è bloccata
 dall'assenza di OpenCV4-dev. Il current next boundary è quindi quello indicato
 nella sintesi alta, non una run target immediata.
 
+### D274/03 parallel offline forward analysis (solo OFFLINE, non live)
+
+Mentre D274/03 resta **in attesa della qualification nativa Windows con Goodix
+assente** (candidato non modificato, nessun live-critical toccato), è stata svolta
+una analisi differenziale OFFLINE end-to-end rispetto allo snapshot Rockytkg
+(`227eba219fa9e3fbac5bd59aca79f624f67cd11b`) per individuare i componenti
+software Linux realmente mancanti, anticipabili oggi senza il target. Artefatti in
+`analysis/D274/D274_03_offline_forward_*.{md,json}`.
+
+Due ruoli distinti di D274/03 (chiariti dopo review AI-PM):
+
+- `D274_03_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT` — qualifica solo la
+  parte host-only eseguibile: Windows PowerShell 5.1 runtime, Git/repository gate,
+  TShark/USBPcap/preflight, ACL/privacy, selector/same-run gates, simulazione
+  pre-authority, hard-disable / host-side executable closure. Il sensore è assente
+  → **non può osservare né chiudere l'evidenza del secondo ciclo**, né qualificare
+  il TLS Linux (che ha evidenza storica propria).
+- `FUTURE_D274_03_EXPLICITLY_AUTHORIZED_LIVE_ONE_SHOT_WITH_GOODIX_ATTACHED` —
+  solo dopo qualification PASS + AI-PM freeze review + baseline approval +
+  autorizzazione esplicita, osserverà `0x32` re-arm ACK → second `IRQ0002` →
+  second `0x22` → ACK `0x01` → second fingerprint `B0` → STOP. Boundary stretto =
+  *second-cycle existence/order after re-arm*; non è una campagna biometrica o di
+  timing e un live riuscito non prova il timeout semantico del device.
+
+Esito della mappa: il progetto ha già chiuso offline (o modella fail-closed) tutto
+il percorso da cold-start a prima immagine, inclusi decode canonico, mapping
+`u16→FpImage` (D269/D270), policy feature-extraction (D271) e lifecycle
+multi-frame (D273). I gap che richiedono il target restano: secondo/successivo
+ciclo di capture dopo re-arm (`TARGET_EVIDENCE_REQUIRED`; boundary del futuro live
+one-shot; re-arm osservato con ACK ma seconda iterazione completa non osservata),
+orientation/polarity/ppmm (`TARGET_EVIDENCE_REQUIRED`, separato dal one-shot),
+qualità biometrica/threshold di match (richiede distribuzioni di score target), e
+glue device libfprint non ancora implementata localmente.
+
+Responsabilità framework (verificata): l'enrollment aggregation multi-stage è di
+proprietà di libfprint — `Rockytkg/libfprint/libfprint/fpi-image-device.c:302-306`
+esegue `fpi_print_add_print(enroll_print, print)` → `priv->enroll_stage += 1` →
+`fpi_device_enroll_progress(...)`. Il driver deve invece: catturare un'immagine →
+costruire `FpImage` → riportare lo stato del dito →
+`fpi_image_device_image_captured()`. Di conseguenza:
+
+```text
+LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
+PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
+LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED
+
+LINUX_TLS_1_2_PSK_TARGET_STATUS=LIVE_PROVEN_D245
+PERSISTENT_TLS_RUNTIME_STATUS=IMPLEMENTED_D260
+LINUX_TLS_REBUILD_REQUIRED=false
+
+A2_0X70_COLD_START_CANONICAL_REACHABILITY=ALLOWED_BOUNDED_EXISTING_PATH
+A2_0X70_FDT_RECOVERY_REENTRY_REACHABILITY=FORBIDDEN_FAIL_CLOSED
+PERSISTENT_COMMAND_FAMILIES_REACHABLE=false
+```
+
+Nessun seam è stato implementato in questo corrective: il collector
+`goodix_capture_aggregation` aggiunto nello step precedente è stato rimosso dopo
+review AI-PM perché non chiaramente mancante (vedi
+`analysis/D274/D274_03_offline_forward_seam_decision.md`). `Rockytkg/src/goodixgf.c`
+è `LGPL-2.1-or-later` e può essere valutato per riuso/adattamento diretto nel
+dominio LGPL dopo audit per-file di SPDX/licenza/copyright/origini/provenance; le
+porzioni firmware-update/ClearApp/PSK e ogni espressione GPL-only restano escluse
+(`GPL_TO_LGPL_EXPRESSION_CROSSING_ALLOWED=false`).
+
+La policy no-write del progetto (`core/fdt_lifecycle.py`,
+`core/persistent_runtime.py`, `core/cold_start.py`) rende le famiglie
+persistenti `0xE0/0xA4/0xF0/0xF4` irraggiungibili per costruzione (nessun
+provisioning/firmware/IAP/ClearApp/persistent write). I comandi `0xA2/0x70`
+**non** sono globalmente irraggiungibili: sono raggiungibili solo nei loro
+bounded canonical cold-start positions già autorizzati/provati via
+`core/cold_start.py` (`A2_0X70_COLD_START_CANONICAL_REACHABILITY=ALLOWED_BOUNDED_EXISTING_PATH`),
+e restano vietati come retry/recovery/FDT re-entry/session repair dentro
+`FdtLifecycle._record()` (`A2_0X70_FDT_RECOVERY_REENTRY_REACHABILITY=FORBIDDEN_FAIL_CLOSED`).
+I corrispondenti path Rockytkg (`goodix_fwupdate.c`, `goodix_psk.c`,
+`goodix_otp.c`) restano classificati `ROCKY_UNSAFE_FOR_PROJECT` e non importati.
+
+Inoltre il TLS 1.2 PSK è già **live-proven** in D245 (A8→E4→pre-D1→D1→TLS
+completo, stop prima di D4, zero retry, zero persistent-write) e il runtime TLS
+persistente è **implementato** in D260 (one TLS server engine, one retained
+session, one handshake, mixed A0/B0 routing), riusato dai successivi step live;
+`LINUX_TLS_REBUILD_REQUIRED=false` (ruolo server-side rispetto al ClientHello
+del device, nessun nuovo TLS client da costruire).
+
+D274/03 NON è qualificato, NON è baseline-approved e NON è live-ready: il suo
+candidato resta congelato per la qualification nativa successiva
+(`D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE`).
 
 ## Hard Wall
 
