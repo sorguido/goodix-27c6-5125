@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D274/03 corrective pre-live offline (sintesi)
+### Stato corrente post-D274/03 Windows native PASS freeze corrective (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -193,8 +193,8 @@ GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=WINDOWS_NATIVE_QUALIFICATION_D274_03_WITH_GOODIX_ABSENT
-NEXT_BOUNDARY_PREREQUISITE=NATIVE_QUALIFICATION_PASS_AND_AI_PM_REVIEW_BEFORE_ANY_BASELINE_APPROVAL
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
 ```
 
 D274/01 prepara esclusivamente offline una superficie Windows/OEM distinta da
@@ -262,8 +262,8 @@ D274_LOCAL_SCHEMA_INTEGER_SEMANTICS=STRICT_INTEGER_ONLY
 D274_RUNTIME_EVIDENCE_CONTRACT_VALIDATION=PASS_LOCAL_STRICT
 D274_HOST_CAPTURE_DEADLINE_POLICY=EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM
 SECOND_CYCLE_STATUS=TARGET_CAPTURE_NOT_OBSERVED_STATIC_COMPONENTS_PARTIALLY_VERIFIED
-NEXT_PRIMARY_BOUNDARY=WINDOWS_NATIVE_QUALIFICATION_D274_03_WITH_GOODIX_ABSENT
-NEXT_BOUNDARY_PREREQUISITE=NATIVE_QUALIFICATION_PASS_AND_AI_PM_REVIEW_BEFORE_ANY_BASELINE_APPROVAL
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
 D274_02_OPERATOR_PACKAGE=CLOSED
 D274_02_WINDOWS_NATIVE_EXECUTION=COMPLETED
 D274_02_WINDOWS_NATIVE_QUALIFICATION=PASS
@@ -330,10 +330,11 @@ sintetiche e capture storica D263 verificano rispettivamente PASS e
 È predisposto un package innocuo per qualificare nativamente su Windows, con
 Goodix assente, self-test, preflight, simulazione pre-authority, selector 5.1,
 gate same-run, contratto TShark/USBPcap, ACL/privacy/lingua e invocazione
-avversaria con authority false. Poiché l'host AI Linux non dispone di Windows
-PowerShell 5.1, non può validare il runtime nativo. Due qualification native sono
-già state avviate su Windows 11 Home build 26200, Windows PowerShell Desktop
-5.1.26100.8655, sempre con Goodix assente dal guest e senza toccare hardware.
+avversaria con authority false. L'host AI Linux non dispone di Windows
+PowerShell 5.1 e non può validare localmente quel runtime. L'operatore ha
+eseguito le qualification su Windows 11 Home build 26200, Windows PowerShell
+Desktop 5.1.26100.8655, sempre con Goodix assente dal guest e senza toccare
+hardware.
 
 La prima è fallita al parsing di `run-d274-03-native-qualification.ps1`, prima
 del runtime, perché gli script con superficie italiana/non-ASCII erano salvati
@@ -354,9 +355,18 @@ o gate same-run è stato raggiunto. Il corrective applica l'idioma sicuro in tut
 i siti realmente vulnerabili del Kit — invocazione nativa senza pipeline, exit
 code catturato nello statement immediatamente successivo, fail-closed sulla
 variabile catturata, trasformazione e validazione non-vuoto solo dopo — e lascia
-invariata la semantica dei gate. La qualificazione deve essere ripetuta
-integralmente e la baseline approval resta bloccata fino al suo PASS nativo e
-alla review AI-PM.
+invariata la semantica dei gate.
+
+La run finale post-corrective ha restituito PASS in tutti gli stage nativi:
+PowerShell 5.1, repository/assenza Goodix, self-test, selector 5.1, preflight,
+simulazione pre-authority, gate assenza same-run, ordine causale, authority
+false, privacy/lingua/runtime contract e assenza di capture/marker reali. Il
+collector operator-supplied riporta privacy scan PASS e SHA-256 package
+`5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87`.
+Il package non è materialmente presente sull'host AI: l'agente non ne ha
+ricalcolato i byte. La qualification chiude quindi come
+`PASS_OPERATOR_SUPPLIED`; baseline, capture e live restano false in attesa di
+freeze/review AI-PM e approvazione separata.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -379,13 +389,16 @@ D274_03_POST_BOM_GIT_EXIT_DIRECT=0
 D274_03_POST_BOM_GIT_EXIT_PIPE=-1
 D274_03_POST_BOM_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
 D274_03_LASTEXITCODE_CORRECTIVE=PASS_OFFLINE
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE
-BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
+D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED
+WINDOWS_NATIVE_PACKAGE_SHA256=5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87
+WINDOWS_NATIVE_PACKAGE_BYTES_REHASHED_BY_AGENT=false
+WINDOWS_NATIVE_ALL_STAGES=PASS_OPERATOR_SUPPLIED
+BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=false
 D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
 LIVE_PATH_EXECUTED=false
 LIVE_PATH_AUTHORIZED=false
-D274_03_BASELINE_APPROVAL_REVIEW_PENDING=false
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
 D274_03_BASELINE_APPROVED=false
 APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
@@ -398,8 +411,8 @@ REAL_FINGER_INTERACTION_COUNT=0
 REAL_GOODIX_COMMAND_COUNT=0
 AUTOMATIC_RETRY_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
-NEXT_PRIMARY_BOUNDARY=WINDOWS_NATIVE_QUALIFICATION_D274_03_WITH_GOODIX_ABSENT
-NEXT_BOUNDARY_PREREQUISITE=NATIVE_QUALIFICATION_PASS_AND_AI_PM_REVIEW_BEFORE_ANY_BASELINE_APPROVAL
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
 ```
 La storia tecnica dettagliata prosegue nelle sezioni seguenti; le frasi riferite
 a step passati (es. D257/D259/D264) sono da intendersi come stato di quel
@@ -1088,7 +1101,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D273/01 closure post-first-image + SIGFM reale | PARTIAL CLOSURE offline; live false; executable closure globale FAIL_NOT_AVAILABLE | dataflow up/down OEM chiuso: IRQ2 aggiorna up globale di sessione consumata da `0x34`, IRQ0200 aggiorna down consumata da re-arm `0x32`; packet 249 chiuso come A0 NAV `0x50` 2417/2410; modello corretto con source IRQ/generation e timestamp per transizione; seconda iterazione target e timeout non osservati; host e SDK senza OpenCV4-dev, vero `sigfm.cpp` non compilabile, nessuna installazione |
 | D274/01 Kit Windows/OEM pre-live | READY offline; hard-disabled; live false | sanitizer metadata-only, target/A8/hash/schema/privacy gate e fixture sintetica del secondo ciclo PASS; capture storica termina a ACK re-arm e resta `MISSING_SECOND_IRQ2`; workflow candidato no-commit, nessuna attribution retroattiva |
 | D274/02 qualificazione nativa Windows | CLOSED / PASS; tre run storiche preservate; live false | run 1 FAIL source-scan `-f`, run 2 FAIL `.Count` sotto PowerShell 5.1, run 3 PASS nativo completo dopo corrective; nessuna regressione tecnica e nessuna riapertura |
-| D274/03 Kit one-shot secondo ciclo | UTF-8 BOM corrective confermato nativamente; corrective `$LASTEXITCODE` implementato offline; qualification nativa da ripetere; baseline/capture/live false | runner futuro vincolato a `main`; prima qualification fallita al parsing pre-runtime, seconda entrata in runtime con `powershell_51`=PASS e failure a `repository_and_goodix_absence`; causa provata: `$LASTEXITCODE` non affidabile dopo pipeline PowerShell 5.1 (`EXIT_DIRECT=0` vs `EXIT_PIPE=-1`); exit code nativo ora catturato subito nei cinque siti reali; Goodix sempre assente, hardware mai toccato, gate assenza same-run/PIN/observer/finalizzazione invariati, D263 resta negativa |
+| D274/03 Kit one-shot secondo ciclo | Windows native qualification PASS operator-supplied; baseline/capture/live false; freeze/review AI-PM pending | runner futuro vincolato a `main`; BOM UTF-8 e `$LASTEXITCODE` corretti; literal `$TsharkPath` non interpolato sotto StrictMode e privacy contract verificato nei reali owner observer/postprocessor; run finale PowerShell Desktop 5.1 tutti-stage PASS con Goodix assente, zero capture/USB/dito/comandi/retry/write; SHA package operator-supplied `5a498239…9eca87`, byte non ricalcolati dall'agente; D263 resta negativa |
 
 ## Fonti e confini di pubblicazione
 
@@ -5307,7 +5320,7 @@ per distinguere il B0 fingerprint strutturale già chiuso da D274/01/D274/02.
 
 #### Closure offline
 
-Il test D274/03 esegue 41 casi sintetici/avversari: success boundary; secondo
+Il test D274/03 esegue 46 casi sintetici/avversari: success boundary; secondo
 IRQ mancante/errato; secondo `0x22` mancante/duplicato; ACK echo/status errati;
 B0 malformato/classe errata; terzo ciclo; target ambiguo/re-enumerato; firmware
 errato; deadline; privacy/schema; authority non autorizzata; baseline stale;
@@ -5318,10 +5331,14 @@ ACL/privacy; lingua italiana; package nativo; manifest strict; regressione sulla
 capture storica D263; BOM UTF-8, decodifica `utf-8-sig`, assenza di mojibake e
 hash del contenuto logico di ciascun `.ps1`; cattura immediata dell'exit code
 nativo, assenza del pattern `$LASTEXITCODE`-dopo-pipeline in tutti i `.ps1`,
-fail-closed sulla variabile catturata e validazione non-vuoto del repository.
+fail-closed sulla variabile catturata e validazione non-vuoto del repository;
+literal TShark non interpolato sotto StrictMode; privacy contract attribuito
+all'import `inspect_growing_capture` dell'observer e al campo
+`biometric_plaintext_exported=False` del postprocessor; assenza di nuove
+letture PIN/credenziali, invocazioni USB/capture attive e promozioni authority.
 Tutti passano su Linux.
 
-#### Qualification nativa: due failure reali, nessun hardware toccato
+#### Qualification nativa: PASS finale operator-supplied, nessun hardware toccato
 
 Entrambe le run native sono state eseguite su Windows 11 Home build 26200,
 Windows PowerShell Desktop 5.1.26100.8655, con Goodix `27c6:5125` assente dal
@@ -5351,8 +5368,7 @@ upstream; il comando nativo non consegna il proprio exit code e `$LASTEXITCODE`
 osservato diventa `-1` anche quando Git riesce. Il gate leggeva quindi un exit
 code inventato dalla pipeline, non quello di Git, e falliva chiuso su un
 repository valido. Nessun controllo Goodix, ACL, TShark/USBPcap, selector 5.1,
-gate same-run o simulazione pre-authority è stato raggiunto in quella run: la
-qualification nativa va ripetuta integralmente.
+gate same-run o simulazione pre-authority è stato raggiunto in quella run.
 
 Il corrective adotta un unico idioma PowerShell 5.1-safe: il comando nativo è
 invocato senza pipeline, l'exit code è catturato nello statement immediatamente
@@ -5370,9 +5386,37 @@ Observer e postprocessor Python continuano a essere avviati con `Start-Process
 dei gate non cambia: HEAD deve ancora coincidere con la baseline approvata e la
 branch deve ancora essere `main`.
 
-Il runtime Windows PowerShell 5.1 non è disponibile sull'host AI Linux, quindi
-il PASS offline non qualifica PowerShell 5.1: serve una ripetizione integrale
-nativa prima di qualunque approvazione baseline.
+La run finale post-corrective, eseguita dall'operatore nello stesso ambiente
+Windows con Goodix assente, ha dato PASS completo. I relativi stage
+`powershell_51`, `repository_and_goodix_absence`, `selftest`,
+`powershell_51_selector`, `preflight`, `preauthorization_simulation`,
+`same_run_goodix_absence_gate`, `causal_source_order`,
+`authority_false_adversarial`, `source_privacy_language_and_runtime_contract`
+e `no_real_capture_or_marker` sono tutti PASS. Il contratto runtime registra
+`same_run_goodix_absence_gate=PASS_NATIVE`, selector 5.1 PASS nativo,
+TShark/USBPcap `PASS_NATIVE_NO_CAPTURE`, ACL privacy PASS nativo e lingua
+operatore italiana.
+
+I due micro-fix finali consolidati sono host-only. Nel controllo dell'ordine
+causale il literal `Start-Process -FilePath $TsharkPath` usa apici singoli:
+con `Set-StrictMode` Windows PowerShell 5.1 non tenta più di espandere nel
+processo di qualification una variabile che appartiene al runner ispezionato.
+Nel privacy contract l'observer deve importare/usare `inspect_growing_capture`,
+mentre il postprocessor — owner dello stato pubblicato — deve dichiarare
+`"biometric_plaintext_exported": False`; l'observer non duplica artificialmente
+la costante.
+
+Il collector operator-supplied riporta result e privacy scan PASS e SHA-256
+`5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87` per
+`D274_03_windows_native_qualification_results.zip`. Il package non è presente
+sull'host AI Linux e i suoi byte non sono stati ricalcolati dall'agente. Il
+runtime PowerShell Desktop 5.1 resta non disponibile localmente, ma non viene
+simulato: il PASS nativo qui registrato ha provenance operatore.
+
+Il processo operativo risultante è: qualification host-only con Goodix assente
+per iterazioni correttive rapide; dopo PASS, freeze e review formale del
+candidato; eventuale live one-shot soltanto dopo approvazione separata della
+baseline. Il PASS di qualification non promuove da solo alcuna authority.
 
 ```text
 D274_02_TECHNICAL_REGRESSION=false
@@ -5399,13 +5443,17 @@ D274_03_POST_BOM_GIT_EXIT_PIPE=-1
 D274_03_POST_BOM_STAGES_AFTER_REPOSITORY=NOT_REACHED
 D274_03_LASTEXITCODE_CORRECTIVE=PASS_OFFLINE
 D274_03_LASTEXITCODE_VULNERABLE_SITES_CORRECTED=5
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE
-BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
+D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED
+WINDOWS_NATIVE_PACKAGE_SHA256=5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87
+WINDOWS_NATIVE_PACKAGE_BYTES_REHASHED_BY_AGENT=false
+WINDOWS_NATIVE_ALL_STAGES=PASS_OPERATOR_SUPPLIED
+WINDOWS_POWERSHELL_5_1_NATIVE_RUNTIME=NOT_AVAILABLE_ON_LINUX_HOST
+BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=false
 D274_03_REAL_CAPTURE_CAPABILITY=0_CURRENT_AUTHORITY_TEMPLATE
 SOURCE_CONTAINS_FUTURE_LIVE_PATH=true
 LIVE_PATH_EXECUTED=false
 LIVE_PATH_AUTHORIZED=false
-D274_03_BASELINE_APPROVAL_REVIEW_PENDING=false
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
 D274_03_BASELINE_APPROVED=false
 APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
@@ -5418,8 +5466,8 @@ REAL_FINGER_INTERACTION_COUNT=0
 REAL_GOODIX_COMMAND_COUNT=0
 AUTOMATIC_RETRY_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
-NEXT_PRIMARY_BOUNDARY=WINDOWS_NATIVE_QUALIFICATION_D274_03_WITH_GOODIX_ABSENT
-NEXT_BOUNDARY_PREREQUISITE=NATIVE_QUALIFICATION_PASS_AND_AI_PM_REVIEW_BEFORE_ANY_BASELINE_APPROVAL
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D274_03_BASELINE_CANDIDATE_FREEZE
+NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_LIVE
 ```
 
 Il current critical boundary si sposta ora a valle del primo raster decodificato.
@@ -5529,9 +5577,11 @@ nella sintesi alta, non una run target immediata.
 
 ### D274/03 parallel offline forward analysis (solo OFFLINE, non live)
 
-Mentre D274/03 resta **in attesa della qualification nativa Windows con Goodix
-assente** (candidato non modificato, nessun live-critical toccato), è stata svolta
-una analisi differenziale OFFLINE end-to-end rispetto allo snapshot Rockytkg
+Questa sessione fu svolta mentre D274/03 era **in attesa della qualification
+nativa Windows con Goodix assente**; tale attesa è ora superata dal PASS
+operator-supplied, mentre restano invariati candidato live-critical e authority
+false. La sessione svolse una analisi differenziale OFFLINE end-to-end rispetto
+allo snapshot Rockytkg
 (`227eba219fa9e3fbac5bd59aca79f624f67cd11b`) per individuare i componenti
 software Linux realmente mancanti, anticipabili oggi senza il target. Artefatti in
 `analysis/D274/D274_03_offline_forward_*.{md,json}`.
@@ -5610,9 +5660,10 @@ session, one handshake, mixed A0/B0 routing), riusato dai successivi step live;
 `LINUX_TLS_REBUILD_REQUIRED=false` (ruolo server-side rispetto al ClientHello
 del device, nessun nuovo TLS client da costruire).
 
-D274/03 NON è qualificato, NON è baseline-approved e NON è live-ready: il suo
-candidato resta congelato per la qualification nativa successiva
-(`D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE`).
+D274/03 è qualificato nativamente con PASS operator-supplied, ma NON è
+baseline-approved e NON è live-ready: il candidato resta congelato per review
+AI-PM formale (`D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED`,
+`D274_03_BASELINE_APPROVED=false`, `LIVE_AUTHORIZED=false`).
 
 ### D274/03 parallel offline forward — Sessione 3: SIGFM / OpenCV4 real-build closure
 

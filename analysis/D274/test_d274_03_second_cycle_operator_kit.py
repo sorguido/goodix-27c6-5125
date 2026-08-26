@@ -30,7 +30,7 @@ POWERSHELL51_LOGICAL_SHA256 = {
     "collect-d274-03-native-qualification-results.ps1": "e618a2d76113b697113f1040fa6355ed6bc2b35883750291480a3b426cb8877b",
     "collect-d274-03-results.ps1": "3518b98ef55598b02a18291d75815f84e280f4e0fc23c6d44c2286bf26d6b812",
     "invoke-d274-03-live-once.ps1": "4894a19a542a78e46654f61c9827b5063bfd85bf4a6a8ee9ab733067e7d6bcec",
-    "run-d274-03-native-qualification.ps1": "e7072ee99f21388713a17e4dea08394779d9333912b24969f3bc85453cc051e6",
+    "run-d274-03-native-qualification.ps1": "3a0fa0bd4a288904386906f592ea9e4268128a26e3f3ea3d3d011587bc1a58af",
 }
 # Windows PowerShell 5.1 perde l'exit code del comando nativo quando questo
 # viene inglobato in una pipeline: il gate deve leggere $LASTEXITCODE prima di
@@ -400,7 +400,10 @@ class D27403Tests(unittest.TestCase):
         self.assertFalse(manifest["third_cycle_authorized"])
         self.assertFalse(manifest["pin_value_handled_by_kit"])
         self.assertEqual(manifest["second_b0_stop_trigger"], "WIRE_DRIVEN")
-        self.assertTrue(manifest["baseline_approval_blocked_pending_native_qualification"])
+        self.assertFalse(manifest["baseline_approval_blocked_pending_native_qualification"])
+        self.assertTrue(manifest["baseline_approval_review_pending"])
+        self.assertEqual(manifest["windows_native_qualification"],
+                         "PASS_OPERATOR_SUPPLIED")
         self.assertFalse(schema["additionalProperties"])
         self.assertFalse(schema["$defs"]["frameMetadata"]["additionalProperties"])
 
@@ -677,6 +680,70 @@ class D27403Tests(unittest.TestCase):
                 "[string]::IsNullOrWhiteSpace(%s)" % failure, source, name)
             self.assertIn('"repository Git vuoto"', source, name)
             self.assertIn('"repository Git non individuabile"', source, name)
+
+    def test_42_native_causal_order_tshark_literal_is_not_interpolated(self):
+        native = (KIT / "run-d274-03-native-qualification.ps1").read_text(
+            encoding="utf-8-sig")
+        self.assertIn(
+            "$captureAt = $runnerSource.IndexOf('Start-Process -FilePath "
+            "$TsharkPath')", native)
+        self.assertNotIn(
+            '$captureAt = $runnerSource.IndexOf("Start-Process -FilePath '
+            '$TsharkPath")', native)
+
+    def test_43_privacy_contract_is_owned_by_observer_and_postprocessor(self):
+        native = (KIT / "run-d274-03-native-qualification.ps1").read_text(
+            encoding="utf-8-sig")
+        observer = OBSERVER_MODULE.read_text()
+        postprocessor = MODULE.read_text()
+        self.assertIn('from d274_03_postprocess_second_cycle import '
+                      'EvidenceError, inspect_growing_capture', observer)
+        self.assertIn("inspect_growing_capture(path)", observer)
+        self.assertNotIn('"biometric_plaintext_exported": False', observer)
+        self.assertIn('"biometric_plaintext_exported": False', postprocessor)
+        self.assertIn('$observerSource.Contains("inspect_growing_capture")', native)
+        self.assertIn(
+            "$postSource.Contains('\"biometric_plaintext_exported\": False')",
+            native)
+        self.assertNotIn(
+            "$observerSource.Contains('\"biometric_plaintext_exported\": False')",
+            native)
+
+    def test_44_no_new_credential_or_pin_reads(self):
+        runner = (KIT / "invoke-d274-03-live-once.ps1").read_text(
+            encoding="utf-8-sig")
+        self.assertNotRegex(runner, r"(?i)Read-Host[^\n]*(pin|password|secret)")
+        self.assertNotRegex(runner, r"(?i)ConvertTo-SecureString|Get-Credential")
+        self.assertIn("pin_value_handled_by_kit = $false", runner)
+
+    def test_45_native_qualification_has_no_active_usb_or_capture_invocation(self):
+        native = (KIT / "run-d274-03-native-qualification.ps1").read_text(
+            encoding="utf-8-sig")
+        self.assertNotRegex(native, r"(?im)^\s*Start-Process\b")
+        self.assertNotRegex(native, r"(?im)^\s*&\s*USBPcapCMD\b")
+        self.assertNotRegex(native, r"(?im)^\s*(?:Import-Module|Add-Type).*usb")
+        self.assertIn("-NativeQualificationOnly", native)
+        self.assertIn("real_usb_open_count = 0", native)
+        self.assertIn("real_capture_count = 0", native)
+
+    def test_46_authority_and_zero_counter_invariants_remain_frozen(self):
+        authority = json.loads((KIT / "D274_03_live_authority.json").read_text())
+        manifest = json.loads((KIT / "D274_03_kit_manifest.json").read_text())
+        for key in ("baseline_approved", "approved_for_capture",
+                    "live_authorized"):
+            self.assertFalse(authority[key], key)
+        for key in ("baseline_approved", "approved_for_capture",
+                    "ready_for_live"):
+            self.assertFalse(manifest[key], key)
+        native = (KIT / "run-d274-03-native-qualification.ps1").read_text(
+            encoding="utf-8-sig")
+        for field in ("real_capture_count", "real_usb_open_count",
+                      "real_finger_interaction_count", "real_goodix_command_count",
+                      "automatic_retry_count", "persistent_device_write_count"):
+            self.assertIn(field + " = 0", native)
+        for field in ("baseline_approved", "approved_for_capture",
+                      "live_authorized", "ready_for_live"):
+            self.assertIn(field + " = $false", native)
 
 
 if __name__ == "__main__":

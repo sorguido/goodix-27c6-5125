@@ -20,8 +20,11 @@ D274_03_POST_BOM_GIT_EXIT_DIRECT=0
 D274_03_POST_BOM_GIT_EXIT_PIPE=-1
 D274_03_POST_BOM_NATIVE_QUALIFICATION_HARDWARE_TOUCHED=false
 D274_03_LASTEXITCODE_CORRECTIVE=PASS_OFFLINE
-D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE
-BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=true
+D274_03_WINDOWS_NATIVE_QUALIFICATION=PASS_OPERATOR_SUPPLIED
+WINDOWS_NATIVE_PACKAGE_SHA256=5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87
+WINDOWS_NATIVE_PACKAGE_BYTES_REHASHED_BY_AGENT=false
+BASELINE_APPROVAL_BLOCKED_PENDING_NATIVE_QUALIFICATION=false
+D274_03_BASELINE_APPROVAL_REVIEW_PENDING=true
 D274_03_BASELINE_APPROVED=false
 APPROVED_FOR_CAPTURE=false
 LIVE_AUTHORIZED=false
@@ -35,22 +38,30 @@ launcher non sostituisce l'authority. Una futura esecuzione richiederà review,
 commit SHA completo approvato, HEAD esatto, branch `main`, live-critical set pulito e
 autorizzazione one-shot separata.
 
-Sono già state avviate due qualificazioni native, entrambe con Goodix assente
-dal guest e senza alcun runtime hardware, accesso USB, capture o marker.
+La qualificazione nativa finale è stata eseguita dall'operatore su Windows 11
+Home build 26200 e Windows PowerShell Desktop 5.1.26100.8655, con Goodix
+assente dal guest e senza runtime hardware, accesso USB, capture o marker.
 
 La prima si è arrestata al parsing del runner di qualificazione su Windows
 PowerShell 5.1.26100.8655, per encoding UTF-8 senza BOM degli script con testo
 italiano/non-ASCII. Tutti gli script PowerShell 5.1 del package sono ora UTF-8
 con BOM e il parsing 5.1 è confermato superato in nativo.
 
-La seconda è entrata in runtime: lo stage `powershell_51` è PASS, ma la run è
+La seconda è entrata in runtime: lo stage `powershell_51` era PASS, ma la run è
 fallita allo stage `repository_and_goodix_absence` con `repository Git non
 individuabile` pur essendo il repository individuabile. In Windows PowerShell
 5.1 `$LASTEXITCODE` non è affidabile quando il comando nativo viene inglobato in
 una pipeline: la stessa invocazione Git dà `EXIT_DIRECT=0` da sola e
 `EXIT_PIPE=-1` dentro `| Select-Object -First 1`. Gli script ora catturano
-l'exit code nativo immediatamente, prima di trasformare l'output. La
-qualificazione deve essere ripetuta integralmente e non è ancora PASS.
+l'exit code nativo immediatamente, prima di trasformare l'output.
+
+La run finale post-corrective ha chiuso tutti gli stage a PASS, inclusi selector
+5.1, preflight, simulazione pre-authority, gate assenza same-run, ordine causale,
+authority false e privacy contract observer/postprocessor. Il collector ha
+riportato SHA-256
+`5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87` e
+privacy scan PASS. Il package Windows non è presente su questo host Linux:
+l'hash è quindi operator-supplied e non è stato ricalcolato dall'agente.
 
 ## Scopo limitato
 
@@ -114,10 +125,10 @@ cd analysis\D274\D274_03_windows_oem_second_cycle_operator_kit
 Queste modalità non avviano TShark in cattura, non aprono USB, non chiedono di
 toccare il sensore e non consumano il marker one-shot.
 
-## Qualificazione nativa obbligatoria con Goodix assente
+## Qualificazione nativa completata con Goodix assente
 
-Prima di qualunque approvazione baseline, l'operatore deve eseguire una volta,
-su Windows PowerShell Desktop 5.1 e con Goodix assente:
+La procedura seguente è stata eseguita una volta dall'operatore su Windows
+PowerShell Desktop 5.1, con Goodix assente:
 
 ```powershell
 .\run-d274-03-native-qualification.ps1
@@ -135,8 +146,9 @@ native_qualification_results/D274_03_windows_native_qualification_results.zip
 native_qualification_results/D274_03_windows_native_qualification_results.zip.sha256
 ```
 
-Fino alla review dei risultati nativi la baseline resta non approvata e il live
-resta vietato.
+La qualification è PASS operator-supplied. Restano obbligatorie freeze/review
+AI-PM e approvazione separata della baseline: la baseline è ancora non
+approvata e il live resta vietato.
 
 Non eseguire ora:
 

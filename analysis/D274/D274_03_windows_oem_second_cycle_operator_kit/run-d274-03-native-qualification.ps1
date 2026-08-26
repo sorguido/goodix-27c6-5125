@@ -139,7 +139,7 @@ try {
     $runnerSource = [System.IO.File]::ReadAllText($Runner)
     $gateAt = $runnerSource.IndexOf("Assert-D274GoodixAbsentSameRun | Out-Null", $runnerSource.IndexOf("# Gate causale"))
     $markerAt = $runnerSource.IndexOf("[System.IO.FileMode]::CreateNew")
-    $captureAt = $runnerSource.IndexOf("Start-Process -FilePath $TsharkPath")
+    $captureAt = $runnerSource.IndexOf('Start-Process -FilePath $TsharkPath')
     $attachAt = $runnerSource.IndexOf("Collega ora il solo sensore")
     $fingerAt = $runnerSource.IndexOf("Appoggia il dito per il PRIMO ciclo")
     Assert-D274Pass ($gateAt -ge 0 -and $gateAt -lt $markerAt -and $markerAt -lt $captureAt -and $captureAt -lt $attachAt -and $attachAt -lt $fingerAt) "ordine causale same-run/marker/capture/attach/dito non valido"
@@ -155,13 +155,17 @@ try {
     $failedStage = "source_privacy_language_and_runtime_contract"
     $launcherSource = [System.IO.File]::ReadAllText($Launcher)
     $observerSource = [System.IO.File]::ReadAllText((Join-Path $PackageRoot "d274_03_observe_second_b0.py"))
+    $postSource = [System.IO.File]::ReadAllText((Join-Path $PackageRoot "d274_03_postprocess_second_cycle.py"))
     foreach ($token in @("EXISTING_PIN_AUTHENTICATION", "NEW_PIN_REQUIRED", "PIN_CREATION_UI", "PIN_MUTATION_UI", "ACCOUNT_MUTATION_UI", "CREDENTIAL_MUTATION_UI", "UNEXPECTED_PREREQUISITE", "ENROLLMENT_COMMIT_UI")) {
         Assert-D274Pass ($runnerSource.Contains($token)) ("categoria UI mancante: " + $token)
     }
     Assert-D274Pass ($runnerSource -notmatch 'Read-Host[^\r\n]*(pin|password|secret)') "il Kit sembra richiedere un valore PIN/secret"
     Assert-D274Pass ($runnerSource -notmatch 'ConvertTo-SecureString|Get-Credential') "API credenziali non ammessa"
     Assert-D274Pass ($observerSource -notmatch 'libusb|pyusb|decode.*image') "observer fuori contratto passivo metadata-only"
-    Assert-D274Pass ($observerSource.Contains('"biometric_plaintext_exported": False')) "observer non dichiara il gate plaintext=false"
+    Assert-D274Pass (
+        $observerSource.Contains("inspect_growing_capture") -and
+        $postSource.Contains('"biometric_plaintext_exported": False')
+    ) "contratto observer/postprocessor plaintext=false non dichiarato"
     Assert-D274Pass ($runnerSource.Contains("Secondo B0 osservato. NON toccare più il sensore")) "avviso wire-driven italiano mancante"
     Assert-D274Pass ($runnerSource -notmatch "SECONDO_OK") "stop ancora dipendente da conferma umana"
     Assert-D274Pass ($launcherSource.Contains('Get-D274UsbPcapInterfaces') -and $launcherSource.Contains('Get-D274UsbPcapInterfaceSelector') -and $preflightJson.tshark_version.Length -gt 0) "contratto TShark/USBPcap non verificato"
