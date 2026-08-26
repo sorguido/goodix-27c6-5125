@@ -1179,6 +1179,27 @@ corroborazione esterna e non prova primaria della preservazione factory/PSK o
 del comportamento APP12509. Questi due ruoli non vanno confusi; ogni futuro
 import richiede comunque verifica file-specifica di diritti e SPDX.
 
+#### Issue #1 — corroborazione terza parte (THIRD_PARTY_CORROBORATION, non prova locale)
+
+D274/03 forward-analysis registra come corroborazione esterna il report di un
+terzo utente (`mkl-corbachoh`) su Huawei MateBook con Goodix `27c6:5125`, chip ID
+`0x2504`, firmware nativo `GF_ST411SEC_APP_12509` mantenuto, TLS-PSK riuscito,
+enrollment fprintd con 8 capture, verify-match sul dito registrato,
+verify-no-match su dito diverso e autenticazione PAM funzionante. Questo è
+**corroborazione implementativa**, non autorità probatoria per APP12509 sul nostro
+target. In particolare il test terza parte **NON preservava una PSK Windows
+esistente**: il dispositivo riportava PSK assente (status `0x01`) ed è stata
+provisionata una nuova PSK una volta. Pertanto non dimostra la preservazione
+della PSK Windows/factory. Il maintainer Rockytkg ha inoltre chiarito che
+l'upstream considera ancora 12509 come firmware diverso da 12508 e quindi può
+entrare nel percorso ClearApp/firmware-update; non possiede un global
+no-write/read-only init mode; e considera un percorso 12509
+keep-current-firmware + no-write una direzione sensata. Per il nostro progetto
+restano invariati gli invarianti: nessun flash/IAP/ClearApp, nessun provisioning
+o overwrite PSK, nessuna scrittura persistente, preservazione Windows/factory
+state. Nessuna di queste affermazioni terze parti promuove un fatto del target
+locale.
+
 ## Architettura
 
 ```text
@@ -5499,6 +5520,46 @@ iterazione non osservata, mentre la build SIGFM reale è bloccata
 dall'assenza di OpenCV4-dev. Il current next boundary è quindi quello indicato
 nella sintesi alta, non una run target immediata.
 
+### D274/03 parallel offline forward analysis (solo OFFLINE, non live)
+
+Mentre D274/03 resta **in attesa della qualification nativa Windows con Goodix
+assente** (candidato non modificato, nessun live-critical toccato), è stata svolta
+una analisi differenziale OFFLINE end-to-end rispetto allo snapshot Rockytkg
+(`227eba219fa9e3fbac5bd59aca79f624f67cd11b`) per individuare i componenti
+software Linux realmente mancanti, anticipabili oggi senza il target. Artefatti in
+`analysis/D274/D274_03_offline_forward_*.{md,json}`.
+
+Esito della mappa: il progetto ha già chiuso offline (o modella fail-closed) tutto
+il percorso da cold-start a prima immagine, inclusi decode canonico, mapping
+`u16→FpImage` (D269/D270), policy feature-extraction (D271) e lifecycle
+multi-frame (D273). I gap che richiedono il target restano: secondo/successivo
+ciclo di capture dopo re-arm (`TARGET_EVIDENCE_REQUIRED`; re-arm osservato con
+ACK ma seconda iterazione completa non osservata), orientation/polarity/ppmm
+(`TARGET_EVIDENCE_REQUIRED`), qualità biometrica/threshold di match, e glue device
+libfprint non ancora implementata localmente (Rockytkg `goodixgf.c` è solo
+reference LGPL da reimplementare clean-room, con le porzioni firmware/PSK marcate
+`ROCKY_UNSAFE_FOR_PROJECT`).
+
+Avanzamento software realizzato (un solo seam host-only): `libfprint-driver/
+goodix_capture_aggregation.{c,h}` — collector bounded di capture già decodificate
+che assembla `FpImage` reali via il pipeline D270, senza alcun comando device,
+USB, TLS, file, retry o scrittura persistente; `flags=0` e `ppmm` UNKNOWN
+(nessuna semantica target non provata assunta). Test C sintetici in
+`tests/test_goodix_capture_aggregation.c` + harness
+`tests/run_goodix_capture_aggregation_test.sh` (identico all'harness D270). La
+verifica di build/run nel sandbox corrente è bloccata dall'assenza di
+`gcc`/`glib`/`flatpak org.freedesktop.Sdk` (stessa condizione del blocco
+OpenCV4-dev in D272/D273); l'audit forbidden-symbol passa per revisione statica.
+Nuova implementazione indipendente LGPL, nessuna riga di ledger richiesta.
+
+La policy no-write globale esistente (`core/fdt_lifecycle.py`,
+`core/persistent_runtime.py`) rende le famiglie `0xE0/0xA4/0xF0/0xF4` e
+`0xA2/0x70` irraggiungibili per costruzione; i corrispondenti path Rockytkg
+(`goodix_fwupdate.c`, `goodix_psk.c`, `goodix_otp.c`) sono classificati
+`ROCKY_UNSAFE_FOR_PROJECT` e non importati.
+
+D274/03 NON è qualificato, NON è baseline-approved e NON è live-ready: il suo
+candidato resta congelato per la qualification nativa successiva.
 
 ## Hard Wall
 
