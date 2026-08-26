@@ -9,8 +9,13 @@ $ErrorActionPreference = "Stop"
 function Fail-D274Collect([string]$Message) { throw "D274_03_COLLECT_FAIL_CLOSED: $Message" }
 
 $resolved = [System.IO.Path]::GetFullPath($SanitizedRunDirectory)
-$repository = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>&1 | Select-Object -First 1).Trim()
-if ($LASTEXITCODE -ne 0) { Fail-D274Collect "repository Git non individuabile" }
+# Windows PowerShell 5.1: exit code nativo catturato prima di trasformare
+# l'output; una pipeline intermedia renderebbe $LASTEXITCODE non affidabile.
+$repositoryOutput = & git -C $PSScriptRoot rev-parse --show-toplevel 2>&1
+$gitExitCode = $LASTEXITCODE
+if ($gitExitCode -ne 0) { Fail-D274Collect "repository Git non individuabile" }
+$repository = ([string](@($repositoryOutput) | Select-Object -First 1)).Trim()
+if ([string]::IsNullOrWhiteSpace($repository)) { Fail-D274Collect "repository Git vuoto" }
 $allowedParent = [System.IO.Path]::GetFullPath((Join-Path $repository "captures\D274_03"))
 if (-not $resolved.StartsWith($allowedParent + [System.IO.Path]::DirectorySeparatorChar)) {
     Fail-D274Collect "la directory risultati non appartiene a captures/D274_03"

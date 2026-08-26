@@ -80,8 +80,16 @@ try {
     $stages[$failedStage] = "PASS"
 
     $failedStage = "repository_and_goodix_absence"
-    $repository = (& git -C $PackageRoot rev-parse --show-toplevel 2>&1 | Select-Object -First 1).Trim()
-    Assert-D274Pass ($LASTEXITCODE -eq 0) "repository Git non individuabile"
+    # Windows PowerShell 5.1: $LASTEXITCODE non è affidabile se il comando
+    # nativo viene inglobato in una pipeline. Con Select-Object -First 1 la
+    # pipeline upstream viene interrotta e l'exit code osservato diventa -1
+    # anche quando Git riesce. L'exit code va quindi catturato subito dopo
+    # l'invocazione nativa e solo dopo si trasforma l'output.
+    $repositoryOutput = & git -C $PackageRoot rev-parse --show-toplevel 2>&1
+    $gitExitCode = $LASTEXITCODE
+    Assert-D274Pass ($gitExitCode -eq 0) "repository Git non individuabile"
+    $repository = ([string](@($repositoryOutput) | Select-Object -First 1)).Trim()
+    Assert-D274Pass (-not [string]::IsNullOrWhiteSpace($repository)) "repository Git vuoto"
     $CaptureRoot = Join-Path $repository "captures\D274_03"
     Assert-D274Pass ($null -ne (Get-Command Get-PnpDevice -ErrorAction SilentlyContinue)) "Get-PnpDevice non disponibile"
     $escapedTarget = [regex]::Escape($ExpectedTarget)

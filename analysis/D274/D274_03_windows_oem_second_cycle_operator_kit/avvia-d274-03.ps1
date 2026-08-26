@@ -16,9 +16,15 @@ $script:ExpectedTarget = "VID_27C6&PID_5125"
 function Fail-D274([string]$Message) { throw "D274_03_FAIL_CLOSED: $Message" }
 
 function Get-D274RepositoryRoot {
-    $root = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>&1 | Select-Object -First 1)
-    if ($LASTEXITCODE -ne 0) { Fail-D274 "repository Git non individuabile" }
-    return [System.IO.Path]::GetFullPath($root.Trim())
+    # Windows PowerShell 5.1: catturare $LASTEXITCODE subito dopo il comando
+    # nativo. Una pipeline successiva (per esempio Select-Object -First 1)
+    # interrompe la pipeline upstream e restituisce -1 anche con Git riuscito.
+    $rootOutput = & git -C $PSScriptRoot rev-parse --show-toplevel 2>&1
+    $gitExitCode = $LASTEXITCODE
+    if ($gitExitCode -ne 0) { Fail-D274 "repository Git non individuabile" }
+    $root = ([string](@($rootOutput) | Select-Object -First 1)).Trim()
+    if ([string]::IsNullOrWhiteSpace($root)) { Fail-D274 "repository Git vuoto" }
+    return [System.IO.Path]::GetFullPath($root)
 }
 
 function Get-D274TsharkPath {
