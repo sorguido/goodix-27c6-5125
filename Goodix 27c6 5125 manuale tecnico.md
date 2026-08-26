@@ -479,13 +479,22 @@ ambiguo, almeno:
     → FINGERPRINT_B0
 
 I quattro eventi non devono essere adiacenti: eventi non-lifecycle irrilevanti
-sono ignorati. Un evento lifecycle contraddittorio (COMMAND 0x22 con body
-diverso, ACK 0x22 con status diverso, o FINGERPRINT_B0 fuori ordine) azzera il
-progresso parziale, così l'ambiguità non diventa mai PASS. Il riarm
+sono ignorati. Il detector usa tre esiti espliciti. `NONE` comprende i frammenti
+isolati prima dell'avvio di un candidato (`IRQ 0x0002` solitario, `COMMAND
+0x22` solitario o `FINGERPRINT_B0` solitario); `COMPLETE` richiede l'intera
+catena esatta sopra; `CONTRADICTION` si applica quando, dopo l'avvio con `IRQ
+0x0002`, compare evidenza lifecycle ripetuta, fuori ordine o malformata. Sono
+quindi terminali fail-closed almeno body `0x22` diverso da `01 00`, ACK `0x22`
+con status diverso da `0x01` e `FINGERPRINT_B0` prematuro. La contraddizione
+non azzera più silenziosamente il progresso: produce
+`THIRD_CYCLE_PROTOCOL_CONTRADICTION`, `boundary_status=NOT_OBSERVED_COMPLETE`,
+`stop_reason=FAIL_CLOSED` e `third_cycle_observed=false`. Il riarm
 `0x32 → ACK 0x32/0x01` resta solo corroborante, non obbligatorio.
 
-`verify_finalized_capture()` preserva `THIRD_CYCLE_OBSERVED` quando il raw
-finalizzato contiene un terzo lifecycle genuino e non lo rimappa a
+`verify_finalized_capture()` preserva sia `THIRD_CYCLE_OBSERVED` sia
+`THIRD_CYCLE_PROTOCOL_CONTRADICTION` quando il raw finalizzato conserva il
+secondo B0 terminale indicato dall'observer e contiene poi il relativo evento
+post-boundary; non li rimappa a
 `CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE`, che resta riservato alla perdita
 reale della finalizzazione (raw troncato/illeggibile).
 
@@ -510,6 +519,9 @@ D274_03_AUTOMATIC_RETRY_COUNT=0
 D274_03_CANONICAL_RAW_SHA256=5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998
 D274_03_THIRD_CYCLE_FALSE_POSITIVE_FIXED=true
 D274_03_ORDERED_NON_ADJACENT_LIFECYCLE_DETECTOR=true
+D274_03_THIRD_CYCLE_DETECTOR_RESULT=TRI_STATE_NONE_COMPLETE_CONTRADICTION
+D274_03_THIRD_CYCLE_CONTRADICTION_FAIL_CLOSED=true
+D274_03_THIRD_CYCLE_CONTRADICTION_FAILURE_CLASS=THIRD_CYCLE_PROTOCOL_CONTRADICTION
 D274_03_GROWING_OBSERVER_FAIL_CLOSED=true
 D274_03_AUTHORITATIVE_THIRD_CYCLE_PRESERVED=true
 D274_03_FINALIZATION_LOSS_REMAINS_DISTINCT=true

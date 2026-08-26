@@ -420,6 +420,80 @@ class D27403Tests(unittest.TestCase):
         self.assertEqual(state["status"], "FAIL_CLOSED")
         self.assertEqual(state["failure_class"], "THIRD_CYCLE_OBSERVED")
 
+    def test_10i_third_cycle_wrong_0x22_body_fails_closed(self):
+        def mutate(rows):
+            rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("third_0x22_wrong", a0(0x22, b"\x02\x00"), 0x01))
+            return rows
+        result = self.run_capture(make_capture(mutate))
+        self.assertEqual(result["boundary_status"], "NOT_OBSERVED_COMPLETE")
+        self.assertEqual(result["stop_reason"], "FAIL_CLOSED")
+        self.assertEqual(result["failure_class"],
+                         "THIRD_CYCLE_PROTOCOL_CONTRADICTION")
+        self.assertFalse(result["third_cycle_observed"])
+
+    def test_10j_third_cycle_wrong_0x22_ack_fails_closed(self):
+        def mutate(rows):
+            rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("third_0x22", a0(0x22, b"\x01\x00"), 0x01))
+            rows.append(("third_0x22_ack_wrong", a0(0xB0, b"\x22\x07"), 0x81))
+            return rows
+        result = self.run_capture(make_capture(mutate))
+        self.assertEqual(result["boundary_status"], "NOT_OBSERVED_COMPLETE")
+        self.assertEqual(result["failure_class"],
+                         "THIRD_CYCLE_PROTOCOL_CONTRADICTION")
+        self.assertFalse(result["third_cycle_observed"])
+
+    def test_10k_third_cycle_premature_b0_fails_closed(self):
+        def mutate(rows):
+            rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("third_b0_premature", fingerprint_b0(), 0x81))
+            return rows
+        result = self.run_capture(make_capture(mutate))
+        self.assertEqual(result["boundary_status"], "NOT_OBSERVED_COMPLETE")
+        self.assertEqual(result["failure_class"],
+                         "THIRD_CYCLE_PROTOCOL_CONTRADICTION")
+        self.assertFalse(result["third_cycle_observed"])
+
+    def test_10l_growing_observer_third_contradiction_fails_closed(self):
+        def mutate(rows):
+            rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)), 0x81))
+            rows.append(("third_0x22_wrong", a0(0x22, b"\x02\x00"), 0x01))
+            return rows
+        data = make_capture(mutate)
+        with tempfile.TemporaryDirectory(prefix="d274-03-grow-contradiction-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            state = D274.inspect_growing_capture(path)
+        self.assertEqual(state, {
+            "status": "FAIL_CLOSED",
+            "failure_class": "THIRD_CYCLE_PROTOCOL_CONTRADICTION",
+        })
+
+    def test_10m_authoritative_finalizer_preserves_third_contradiction(self):
+        pre_third = make_capture()
+        with tempfile.TemporaryDirectory(
+                prefix="d274-03-final-contradiction-") as directory:
+            pre_path = Path(directory) / "pre.pcapng"
+            pre_path.write_bytes(pre_third)
+            signal = D274.inspect_growing_capture(pre_path)
+            self.assertEqual(signal["status"], "SECOND_FINGERPRINT_B0_OBSERVED")
+
+            def mutate(rows):
+                rows.append(("third_irq2", a0(0x32, b"\x02\x00" + bytes(12)),
+                             0x81))
+                rows.append(("third_0x22_wrong", a0(0x22, b"\x02\x00"), 0x01))
+                return rows
+            final = make_capture(mutate)
+            final_path = Path(directory) / "final.pcapng"
+            final_path.write_bytes(final)
+            result = D274.verify_finalized_capture(
+                final_path, hashlib.sha256(final).hexdigest(), signal,
+                synthetic=True)
+        self.assertEqual(result["failure_class"],
+                         "THIRD_CYCLE_PROTOCOL_CONTRADICTION")
+        self.assertFalse(result["third_cycle_observed"])
+
     def test_11_ambiguous_target(self):
         self.assertEqual(self.failure(make_capture(extra_descriptors=[(0.01, 1, 3)])),
                          "AMBIGUOUS_TARGET")

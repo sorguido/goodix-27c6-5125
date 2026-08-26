@@ -5,6 +5,13 @@
   "step_local": true,
   "cumulative": false,
   "git_root_relative": true,
+  "review_context": {
+    "finding": "post-commit AI-PM third-cycle contradiction handling defect",
+    "starting_head": "5d87d027c806ac7182738987620c0005ec9a8429",
+    "correction": "tri-state detector with fail-closed THIRD_CYCLE_PROTOCOL_CONTRADICTION",
+    "new_live_evidence": false,
+    "canonical_real_result_unchanged": true
+  },
   "excludes": [
     "*.pcap", "*.pcapng", "raw capture", "PSK", "PIN", "TLS keys",
     "credentials", "secret material", "biometric plaintext", "biometric hashes",

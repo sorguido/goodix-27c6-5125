@@ -1,12 +1,12 @@
 # D274/03 — Offline Finalizer Corrective Report
 
-- Executor: Tencent Hy3 Free via Kilo
+- Executor: Codex
 - Reasoning: HIGH
 - Mode: OFFLINE ONLY (no USB, no new live run)
-- Date (local): 2026-08-26
+- Date (local): 2026-08-27
 - Git root: `/home/guido/Repository/goodix-27c6-5125_private`
 - Branch: `main`
-- HEAD: `fb8614c979d03d66ba648d4c43fcabff683eff4e`
+- Starting HEAD: `5d87d027c806ac7182738987620c0005ec9a8429`
 - Canonical raw: `captures/D274_03/D27403_20260826T201852Z/raw/wire.pcapng`
 - Canonical raw SHA-256 (before = after): `5f11d06763d34531c72283a189a47d9bcd7c666a5fa3c043ec1371eddf107998`
 
@@ -16,6 +16,13 @@ The Windows Hello live capture for D274/03 was already executed in a separately
 authorized live run. The canonical raw is byte-identical and was never mutated.
 The previously reported failure was a **postprocessor/finalizer semantic bug**,
 not missing live evidence.
+
+A post-commit AI-PM review of
+`5d87d027c806ac7182738987620c0005ec9a8429` found a further adversarial defect:
+after a post-boundary `IRQ 0x0002`, contradictory lifecycle-bearing evidence
+reset the partial matcher and could leave the already completed second boundary
+as PASS. This corrective is offline only, adds no live evidence, and leaves the
+canonical real-capture conclusion unchanged.
 
 The original finalizer promoted *any* single event after the second boundary —
 `IRQ 0x0002`, `COMMAND 0x22`, or `FINGERPRINT_B0` — to `THIRD_CYCLE_OBSERVED`.
@@ -29,17 +36,18 @@ away from `OBSERVED_COMPLETE`, `verify_finalized_capture()` then wrongly raised
 
 File: `analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/d274_03_postprocess_second_cycle.py`
 
-- Added `_third_cycle_lifecycle(events)` — a bounded, auditable ordered matcher
+- `_third_cycle_lifecycle(events)` is now a bounded, auditable tri-state matcher
+  with explicit `NONE`, `COMPLETE` and `CONTRADICTION` results. It continues
   requiring the exact lifecycle `IRQ 0x0002 → COMMAND 0x22 (body 01 00) →
-  ACK 0x22 (status 0x01) → FINGERPRINT_B0`. Non-lifecycle events are skipped;
-  a contradictory lifecycle-bearing event (wrong 0x22 body, wrong 0x22 ACK
-  status, or out-of-order `FINGERPRINT_B0`) resets partial progress so
-  ambiguity can never become PASS. No capture-specific frame number is
+  ACK 0x22 (status 0x01) → FINGERPRINT_B0`. Non-lifecycle events are skipped.
+  Isolated pre-candidate fragments remain `NONE`; once `IRQ 0x0002` starts a
+  candidate, a wrong/repeated/out-of-order lifecycle-bearing event returns
+  `CONTRADICTION` and fails closed as
+  `THIRD_CYCLE_PROTOCOL_CONTRADICTION`. No capture-specific frame number is
   hard-coded.
 - `analyze_frames()` derives `third_cycle_observed` only from
-  `_third_cycle_lifecycle()` (the exact ordered lifecycle above; non-lifecycle
-  events skipped, a contradictory lifecycle-bearing event resetting partial
-  progress so ambiguity can never become PASS).
+  `_third_cycle_lifecycle()`; the boolean `third_cycle_observed` is true only
+  for `COMPLETE`, while `CONTRADICTION` remains a distinct semantic failure.
 
   INTERMEDIATE v1 (REJECTED): v1 set `complete = index == len(SEQUENCE)`,
   decoupling `complete` from `failure_class`, so a genuine third cycle did **not**
@@ -47,18 +55,36 @@ File: `analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/d274_03_postp
   a successful observer terminal signal. This is the rejected intermediate
   behavior and is **not** the current semantics.
 
-  FINAL v2 (AUTHORITATIVE): `complete = index == len(SEQUENCE) and not third_cycle`.
+  INTERMEDIATE v2: `complete = index == len(SEQUENCE) and not third_cycle`.
   A genuine third lifecycle therefore yields
   `third_cycle_observed = true` → `failure_class = THIRD_CYCLE_OBSERVED` →
   `boundary_status = NOT_OBSERVED_COMPLETE`, and the growing observer returns
-  `status = FAIL_CLOSED`.
+  `status = FAIL_CLOSED`. This remains correct for a complete third lifecycle,
+  but v2 still conflated `NONE` with contradictory partial evidence.
+
+  FINAL v3 (AUTHORITATIVE): completion additionally requires the tri-state
+  result to be `NONE`. `CONTRADICTION` yields
+  `failure_class = THIRD_CYCLE_PROTOCOL_CONTRADICTION`,
+  `boundary_status = NOT_OBSERVED_COMPLETE`, `stop_reason = FAIL_CLOSED` and
+  `third_cycle_observed = false`.
 
 - `verify_finalized_capture()` explicitly preserves `THIRD_CYCLE_OBSERVED` when the
   observer signal is taken from the pre-third state and the finalized raw
   additionally contains the later genuine third lifecycle (with a recoverable
   terminal frame), and does **not** remap it to
   `CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE`, which stays reserved for real
-  finalization loss (truncated/unreadable raw).
+  finalization loss (truncated/unreadable raw). The same root-cause preservation
+  now applies to `THIRD_CYCLE_PROTOCOL_CONTRADICTION`.
+
+## 2a. Corrective v3 — post-commit contradiction fail-closed
+
+The post-commit AI-PM finding was reproduced with adversarial synthetic
+captures and corrected without USB access or a new live run. After a candidate
+starts with `IRQ 0x0002`, wrong `0x22` body, wrong `0x22` ACK status, premature
+structural B0, and other repeated/out-of-order lifecycle-bearing evidence are
+terminal contradictions. The growing observer reports `FAIL_CLOSED`, and the
+authoritative finalizer preserves the contradiction when the observer's second
+B0 terminal frame is still present. True finalization loss remains distinct.
 
 The rearm `0x32 → ACK 0x32/0x01` is treated as corroborating context only, not
 mandatory (the code does not require it, and no comment claims it is required).
@@ -116,8 +142,10 @@ high/current canonical state to the now-observed D274/03 result:
 ## 3. Real capture reprocessing result
 
 Reprocessed offline via `verify_finalized_capture()` with the canonical expected
-SHA-256 and observer signal. Wrote
-`captures/D274_03/D27403_20260826T201852Z/sanitized/D274_03_second_cycle_evidence.json`.
+SHA-256 and observer signal. The generated result was compared byte-for-byte
+with `captures/D274_03/D27403_20260826T201852Z/sanitized/D274_03_second_cycle_evidence.json`
+and was identical (SHA-256
+`fb49881a24fba050f22912e65b9162c56781b3d028fd1e2dd22778e5d7b84b5a`).
 
 - `boundary_status = OBSERVED_COMPLETE`
 - `stop_reason = SECOND_FINGERPRINT_B0`
@@ -142,27 +170,40 @@ Updated/extended `analysis/D274/test_d274_03_second_cycle_operator_kit.py`:
 - `test_10f` genuine third cycle with interposed irrelevant event → still detected.
 - `test_10g` authoritative finalizer preserves `THIRD_CYCLE_OBSERVED` (not remapped): builds a valid capture ending at the authorized second B0, takes the observer signal from that pre-third state, then finalizes a version that additionally contains a genuine third lifecycle and requires `THIRD_CYCLE_OBSERVED`.
 - `test_10h` growing observer containing a complete genuine third lifecycle returns `status = FAIL_CLOSED`, `failure_class = THIRD_CYCLE_OBSERVED`.
+- `test_10i` post-IRQ2 wrong `0x22` body → `THIRD_CYCLE_PROTOCOL_CONTRADICTION`.
+- `test_10j` post-IRQ2 exact `0x22` + wrong ACK status → contradiction.
+- `test_10k` post-IRQ2 premature structural B0 → contradiction.
+- `test_10l` growing observer preserves contradiction as `FAIL_CLOSED`.
+- `test_10m` finalizer preserves contradiction rather than remapping it to finalization loss.
 - `test_31` (H) true finalization loss still `CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE`.
 
 Full existing D274/03 suite also executed (see below).
+
+```text
+TEST_COMMAND=python3 -m unittest analysis.D274.test_d274_03_second_cycle_operator_kit
+TEST_RESULT=Ran 61 tests in 0.058s - OK
+```
 
 ## 5. Closure fields
 
 ```text
 OUTCOME=READY
-ADVANCEMENT=NONE_HARDWARE (offline documentation/packaging corrective v3 on preserved raw; Python/logic unchanged; real live boundary already observed in prior authorized run)
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED (offline adversarial contradiction regressions; no new live/device evidence)
 EXECUTABLE_CLOSURE=PASS_LINUX_OFFLINE_ONLY
 RESIDUAL_BLOCKER_OR_RISK=none
-CANONICAL_DOCUMENTATION=v3 surgical: removed stale pre-live statements from top/current state (D263 framed historical; D274/03 second cycle stated observed); scoped operator-kit direct-USB counters away from observed capture; historical D274/01+pre-live+D274/02 preserved; report v1 semantics relabeled rejected/intermediate, final v2 authoritative
-MANUAL_STALE_PRELIVE_STATEMENTS_REMOVED=PASS
-MANUAL_CURRENT_STATE_COHERENT=PASS
+CANONICAL_DOCUMENTATION=manual current D274/03 corrective updated with NONE/COMPLETE/CONTRADICTION semantics; historical D274 sections unchanged
+CONTRADICTION_TRI_STATE_IMPLEMENTED=PASS
+WRONG_0X22_BODY_FAIL_CLOSED=PASS
+WRONG_0X22_ACK_FAIL_CLOSED=PASS
+PREMATURE_B0_FAIL_CLOSED=PASS
+GROWING_OBSERVER_CONTRADICTION_FAIL_CLOSED=PASS
+FINALIZER_CONTRADICTION_ROOT_CAUSE_PRESERVED=PASS
+CANONICAL_REAL_CAPTURE_UNCHANGED=PASS
 MANUAL_HISTORICAL_STATE_NOT_CORRUPTED=PASS
-REPORT_FINAL_V2_SEMANTICS_COHERENT=PASS
-CODE_BYTE_IDENTITY=PASS
-TEST_BYTE_IDENTITY=PASS
+REPORT_FINAL_V3_SEMANTICS_COHERENT=PASS
 SANITIZED_EVIDENCE_BYTE_IDENTITY=PASS
 RAW_BYTE_IDENTITY=PASS
-FULL_D274_TEST_SUITE=PASS (56 tests)
+FULL_D274_TEST_SUITE=PASS (61 tests)
 STEP_LOCAL_ZIP_AND_SIDECAR=PASS
 BUNDLE=analysis/D274/D274_03_offline_finalizer_corrective_bundle.zip
 ```

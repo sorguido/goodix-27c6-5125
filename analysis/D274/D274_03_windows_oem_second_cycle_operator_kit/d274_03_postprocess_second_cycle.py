@@ -15,6 +15,7 @@ import json
 import re
 import struct
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
@@ -291,8 +292,14 @@ def _matches(event: dict, kind: str, value: int | None) -> bool:
     return True
 
 
-def _third_cycle_lifecycle(events: list) -> bool:
-    """Detect a genuine ordered third fingerprint acquisition lifecycle.
+class ThirdCycleLifecycleResult(str, Enum):
+    NONE = "NONE"
+    COMPLETE = "COMPLETE"
+    CONTRADICTION = "CONTRADICTION"
+
+
+def _third_cycle_lifecycle(events: list) -> ThirdCycleLifecycleResult:
+    """Classify post-boundary third-cycle lifecycle evidence.
 
     A third cycle requires the exact ordered lifecycle:
 
@@ -302,35 +309,42 @@ def _third_cycle_lifecycle(events: list) -> bool:
         -> FINGERPRINT_B0
 
     The four lifecycle events need not be adjacent; unrelated, non-lifecycle
-    events are skipped.  A contradictory lifecycle-bearing event (a COMMAND
-    0x22 with a wrong body, an ACK 0x22 with a wrong status, or an
-    out-of-order FINGERPRINT_B0) resets the partial progress so that
-    ambiguity is never promoted to a PASS.
+    events are skipped.  Before an IRQ 0x0002 starts a candidate, isolated
+    fragments remain NONE.  After it starts, a repeated/out-of-order or
+    malformed lifecycle-bearing event is a terminal CONTRADICTION rather than
+    a silent reset.
     """
     state = 0
     for event in events:
-        kind = event.get("kind")
-        if kind == "IRQ" and event.get("irq") == 0x0002:
-            state = 1
+        irq2 = _matches(event, "IRQ", 0x0002)
+        command_0x22 = _matches(event, "COMMAND", 0x22)
+        ack_0x22 = _matches(event, "ACK", 0x22)
+        fingerprint_b0 = _matches(event, "FINGERPRINT_B0", None)
+
+        if state == 0:
+            if irq2:
+                state = 1
             continue
-        if kind == "COMMAND" and event.get("control") == 0x22:
-            if event.get("body") == b"\x01\x00" and state >= 1:
-                state = 2
-            else:
-                state = 0
+
+        if state == 1 and command_0x22:
+            state = 2
             continue
-        if kind == "ACK" and event.get("echo") == 0x22:
-            if event.get("status") == 0x01 and state >= 2:
-                state = 3
-            else:
-                state = 0
+        if state == 2 and ack_0x22:
+            state = 3
             continue
-        if kind == "B0" and event.get("b0_class") == "FINGERPRINT_B0":
-            if state >= 3:
-                return True
-            state = 0
-            continue
-    return False
+        if state == 3 and fingerprint_b0:
+            return ThirdCycleLifecycleResult.COMPLETE
+
+        lifecycle_bearing = (
+            irq2
+            or (event.get("kind") == "COMMAND" and event.get("control") == 0x22)
+            or (event.get("kind") == "ACK" and event.get("echo") == 0x22)
+            or fingerprint_b0
+        )
+        if lifecycle_bearing:
+            return ThirdCycleLifecycleResult.CONTRADICTION
+
+    return ThirdCycleLifecycleResult.NONE
 
 
 def _failure(expected: str, event: dict | None) -> str:
@@ -427,16 +441,20 @@ def analyze_frames(frames: list[Frame], base: float, synthetic: bool) -> dict:
         failure = _failure(SEQUENCE[index][0], None)
 
     remaining = events[complete_at + 1:] if complete_at is not None else []
-    third_cycle = _third_cycle_lifecycle(remaining)
-    if third_cycle and failure is None:
-        failure = "THIRD_CYCLE_OBSERVED"
+    third_cycle_result = _third_cycle_lifecycle(remaining)
+    third_cycle = third_cycle_result is ThirdCycleLifecycleResult.COMPLETE
+    if failure is None:
+        if third_cycle_result is ThirdCycleLifecycleResult.COMPLETE:
+            failure = "THIRD_CYCLE_OBSERVED"
+        elif third_cycle_result is ThirdCycleLifecycleResult.CONTRADICTION:
+            failure = "THIRD_CYCLE_PROTOCOL_CONTRADICTION"
 
-    # Un ciclo di acquisizione terzo genuino è un failure di protocollo /
+    # Un lifecycle terzo completo o contraddittorio è un failure di protocollo
     # post-boundary: non deve mai diventare uno stato di confine/stop riuscito.
-    # `complete` resta vincolato sia alla sequenza osservata sia all'assenza di
-    # un terzo ciclo, così il growing observer fail-closed non promuove un
-    # terzo ciclo a SECOND_FINGERPRINT_B0_OBSERVED.
-    complete = index == len(SEQUENCE) and not third_cycle
+    # `complete` resta vincolato alla sequenza osservata e al risultato NONE,
+    # così il growing observer non promuove l'ambiguità a segnale terminale.
+    complete = (index == len(SEQUENCE)
+                and third_cycle_result is ThirdCycleLifecycleResult.NONE)
     metadata = {}
     for name, event_class in OUTPUT_EVENTS.items():
         pair = observed.get(name)
@@ -644,10 +662,11 @@ def verify_finalized_capture(path: Path, expected_sha256: str,
             raise EvidenceError("CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE") from exc
         raise
     terminal = document.get("second_b0_frame")
-    if document.get("failure_class") == "THIRD_CYCLE_OBSERVED":
-        # Autorità: una terza acquisizione osservata nel raw finalizzato è un
-        # failure_class di protocollo/post-boundary, non una perdita della
-        # finalizzazione. Non viene rimappata a
+    if document.get("failure_class") in {
+            "THIRD_CYCLE_OBSERVED", "THIRD_CYCLE_PROTOCOL_CONTRADICTION"}:
+        # Autorità: un terzo lifecycle completo o contraddittorio nel raw
+        # finalizzato è un failure_class di protocollo/post-boundary, non una
+        # perdita della finalizzazione. Non viene rimappato a
         # CAPTURE_FINALIZATION_LOST_TERMINAL_EVIDENCE.
         if (terminal is None
                 or terminal.get("frame") != observer_signal.get("terminal_frame")):
