@@ -22,6 +22,12 @@
   "rocky_goodixgf_license": "LGPL-2.1-or-later",
   "rocky_goodixgf_direct_reuse_possible_after_per_file_audit": true,
   "gpl_to_lgpl_expression_crossing_allowed": false,
+  "linux_tls_1_2_psk_target_status": "LIVE_PROVEN_D245",
+  "persistent_tls_runtime_status": "IMPLEMENTED_D260",
+  "linux_tls_rebuild_required": false,
+  "a2_0x70_cold_start_canonical_reachability": "ALLOWED_BOUNDED_EXISTING_PATH",
+  "a2_0x70_fdt_recovery_reentry_reachability": "FORBIDDEN_FAIL_CLOSED",
+  "persistent_command_families_reachable": false,
   "depends_on_d274_legend": {
     "NO": "Boundary is not closed by the D274/03 live one-shot; needs separate future target evidence.",
     "YES_SECOND_CYCLE_OBSERVATION": "Boundary is exactly the D274/03 explicitly-authorized live one-shot with Goodix attached (second-cycle existence/order after re-arm). The Windows host-only qualification with Goodix absent does NOT close it."
@@ -42,14 +48,14 @@
     {
       "id": 1,
       "component": "cold-start / TLS (Linux)",
-      "classification": "LOCAL_PARTIAL",
-      "local_paths": ["core/cold_start.py", "core/tls_b0.py", "core/protected_runtime.py"],
+      "classification": "LOCAL_CLOSED",
+      "local_paths": ["core/cold_start.py", "core/tls_b0.py", "core/persistent_runtime.py", "core/protected_runtime.py"],
       "rockytkg_paths": ["src/goodix_tls.c"],
       "rockytkg_reuse": "ROCKY_REUSE_CANDIDATE_GPL",
-      "evidence_status": "Offline policy/transport model present; real TLS-PSK handshake is live-only.",
-      "risk": "Linux TLS layer unbuilt. NOTE: D274/03 Windows host-only qualification does NOT qualify TLS; TLS has its own historical evidence.",
+      "evidence_status": "D245 target-live A8->E4->pre-D1->D1->TLS 1.2 PSK handshake complete (stop before D4, zero retry, zero persistent-write); retained TLS runtime implemented by D260 (one TLS server engine, one retained session, one handshake, mixed A0/B0 routing) and reused by later target-live path. Role is server-side to the device ClientHello; no new TLS client to build.",
+      "risk": "NO_REOPEN_FROM_D274_FORWARD_ANALYSIS",
       "depends_on_d274": "NO",
-      "next_action": "Build Linux TLS-PSK client clean-room from goodix_tls.c (GPL) after per-file audit; independent of D274/03 qualification."
+      "next_action": "None; preserve existing runtime, do not rebuild TLS."
     },
     {
       "id": 2,
@@ -247,11 +253,11 @@
       "id": 18,
       "component": "persistent-write exclusion",
       "classification": "LOCAL_CLOSED",
-      "local_paths": ["core/fdt_lifecycle.py", "core/persistent_runtime.py"],
+      "local_paths": ["core/fdt_lifecycle.py", "core/persistent_runtime.py", "core/cold_start.py"],
       "rockytkg_paths": ["src/goodix_fwupdate.c", "src/goodix_psk.c", "src/goodix_otp.c"],
       "rockytkg_reuse": "ROCKY_UNSAFE_FOR_PROJECT",
-      "evidence_status": "Allowlist + PERSISTENT_COMMAND_FAMILIES/SPECIAL_RECOVERY unreachable by construction.",
-      "risk": "Rockytkg firmware IAP/ClearApp/PSK-write paths classified UNSAFE; never imported.",
+      "evidence_status": "PERSISTENT_COMMAND_FAMILIES {0xE0,0xA4,0xF0,0xF4} unreachable by construction (no provisioning/firmware/IAP/ClearApp/persistent write). SPECIAL_RECOVERY_COMMANDS {0xA2,0x70} are NOT globally unreachable: allowed only in bounded canonical cold-start via core/cold_start.py; forbidden as retry/recovery/FDT re-entry inside FdtLifecycle._record() (fail-closed).",
+      "risk": "Rockytkg firmware IAP/ClearApp/PSK-write paths classified UNSAFE; never imported. Project-side A2/0x70 confined to cold-start canonical path.",
       "depends_on_d274": "NO",
       "next_action": "None; policy already sufficient."
     }

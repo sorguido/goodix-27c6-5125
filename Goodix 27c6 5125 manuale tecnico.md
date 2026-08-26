@@ -5565,6 +5565,14 @@ costruire `FpImage` → riportare lo stato del dito →
 LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
 PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
 LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED
+
+LINUX_TLS_1_2_PSK_TARGET_STATUS=LIVE_PROVEN_D245
+PERSISTENT_TLS_RUNTIME_STATUS=IMPLEMENTED_D260
+LINUX_TLS_REBUILD_REQUIRED=false
+
+A2_0X70_COLD_START_CANONICAL_REACHABILITY=ALLOWED_BOUNDED_EXISTING_PATH
+A2_0X70_FDT_RECOVERY_REENTRY_REACHABILITY=FORBIDDEN_FAIL_CLOSED
+PERSISTENT_COMMAND_FAMILIES_REACHABLE=false
 ```
 
 Nessun seam è stato implementato in questo corrective: il collector
@@ -5576,11 +5584,24 @@ dominio LGPL dopo audit per-file di SPDX/licenza/copyright/origini/provenance; l
 porzioni firmware-update/ClearApp/PSK e ogni espressione GPL-only restano escluse
 (`GPL_TO_LGPL_EXPRESSION_CROSSING_ALLOWED=false`).
 
-La policy no-write globale esistente (`core/fdt_lifecycle.py`,
-`core/persistent_runtime.py`) rende le famiglie `0xE0/0xA4/0xF0/0xF4` e
-`0xA2/0x70` irraggiungibili per costruzione; i corrispondenti path Rockytkg
-(`goodix_fwupdate.c`, `goodix_psk.c`, `goodix_otp.c`) sono classificati
-`ROCKY_UNSAFE_FOR_PROJECT` e non importati.
+La policy no-write del progetto (`core/fdt_lifecycle.py`,
+`core/persistent_runtime.py`, `core/cold_start.py`) rende le famiglie
+persistenti `0xE0/0xA4/0xF0/0xF4` irraggiungibili per costruzione (nessun
+provisioning/firmware/IAP/ClearApp/persistent write). I comandi `0xA2/0x70`
+**non** sono globalmente irraggiungibili: sono raggiungibili solo nei loro
+bounded canonical cold-start positions già autorizzati/provati via
+`core/cold_start.py` (`A2_0X70_COLD_START_CANONICAL_REACHABILITY=ALLOWED_BOUNDED_EXISTING_PATH`),
+e restano vietati come retry/recovery/FDT re-entry/session repair dentro
+`FdtLifecycle._record()` (`A2_0X70_FDT_RECOVERY_REENTRY_REACHABILITY=FORBIDDEN_FAIL_CLOSED`).
+I corrispondenti path Rockytkg (`goodix_fwupdate.c`, `goodix_psk.c`,
+`goodix_otp.c`) restano classificati `ROCKY_UNSAFE_FOR_PROJECT` e non importati.
+
+Inoltre il TLS 1.2 PSK è già **live-proven** in D245 (A8→E4→pre-D1→D1→TLS
+completo, stop prima di D4, zero retry, zero persistent-write) e il runtime TLS
+persistente è **implementato** in D260 (one TLS server engine, one retained
+session, one handshake, mixed A0/B0 routing), riusato dai successivi step live;
+`LINUX_TLS_REBUILD_REQUIRED=false` (ruolo server-side rispetto al ClientHello
+del device, nessun nuovo TLS client da costruire).
 
 D274/03 NON è qualificato, NON è baseline-approved e NON è live-ready: il suo
 candidato resta congelato per la qualification nativa successiva

@@ -24,6 +24,14 @@ ROCKY_GOODIXGF_LICENSE=LGPL-2.1-or-later
 ROCKY_GOODIXGF_DIRECT_REUSE_POSSIBLE_AFTER_PER_FILE_AUDIT=true
 GPL_TO_LGPL_EXPRESSION_CROSSING_ALLOWED=false
 
+LINUX_TLS_1_2_PSK_TARGET_STATUS=LIVE_PROVEN_D245
+PERSISTENT_TLS_RUNTIME_STATUS=IMPLEMENTED_D260
+LINUX_TLS_REBUILD_REQUIRED=false
+
+A2_0X70_COLD_START_CANONICAL_REACHABILITY=ALLOWED_BOUNDED_EXISTING_PATH
+A2_0X70_FDT_RECOVERY_REENTRY_REACHABILITY=FORBIDDEN_FAIL_CLOSED
+PERSISTENT_COMMAND_FAMILIES_REACHABLE=false
+
 IMPLEMENTATION=SKIPPED_NO_INDEPENDENT_SAFE_SEAM
 ```
 
@@ -92,7 +100,7 @@ framework libfprint (vedi sotto).
 
 | # | Componente | Classificazione | Dipende da D274/03 one-shot |
 | --- | --- | --- | --- |
-| 1 | cold-start / TLS (Linux) | `LOCAL_PARTIAL` (+ `ROCKY_REUSE_CANDIDATE_GPL`) | NO (TLS ha evidenza storica propria; D274/03 host-only non lo qualifica) |
+| 1 | cold-start / TLS (Linux) | `LOCAL_CLOSED` (D245 live-proven; D260 runtime) | NO |
 | 2 | FDT arm | `LOCAL_CLOSED` | NO |
 | 3 | IRQ/event routing | `LOCAL_PARTIAL` (timeout target non chiuso) | NO (timeout richiede target evidence separata) |
 | 4 | first image | `LOCAL_CLOSED` | NO |
@@ -144,9 +152,14 @@ target, semantica seconda iterazione, comportamento `0x34` fuori dalla sessione.
 Percorsi nel nostro runtime (`core/fdt_lifecycle.py`, `core/persistent_runtime.py`):
 
 - allowlist `SAFE_DEVICE_COMMANDS = {0x20,0x22,0x32,0x36,0x50,0x82}`;
-- `PERSISTENT_COMMAND_FAMILIES = {0xE0,0xA4,0xF0,0xF4}` e
-  `SPECIAL_RECOVERY_COMMANDS = {0xA2,0x70}` sono **irraggiungibili per
-  costruzione** (`_record` fail-closed);
+- `PERSISTENT_COMMAND_FAMILIES = {0xE0,0xA4,0xF0,0xF4}` sono **irraggiungibili
+  per costruzione** (nessun provisioning/firmware/IAP/ClearApp/persistent write);
+- `SPECIAL_RECOVERY_COMMANDS = {0xA2,0x70}` **non** sono globalmente
+  irraggiungibili: sono raggiungibili solo nei loro bounded canonical cold-start
+  positions già autorizzati/provati via `core/cold_start.py`, e restano vietati
+  come retry/recovery/FDT re-entry/session repair/fallback automatico; dentro
+  `FdtLifecycle._record()` sono esclusi fail-closed
+  (`A2_0X70_FDT_RECOVERY_REENTRY_REACHABILITY=FORBIDDEN_FAIL_CLOSED`);
 - nessun retry automatico, nessun USB-reset/recovery, nessuna scrittura host di
   PSK/cache, nessun firmware/IAP/ClearApp.
 
@@ -159,8 +172,10 @@ Percorsi nello snapshot Rockytkg (solo classificazione, nessun riuso espressivo)
 - `goodix_otp.c`: letture OTP (read-only di per sé, ma superficie di readback
   sensibile) → solo host-side separabile, non riusato per path device.
 
-Verdetto: il nostro codice possiede già una policy globale sufficiente a rendere
-tali famiglie irraggiungibili; nessun seam è stato aggiunto in questo corrective.
+Verdetto: il nostro codice rende le famiglie persistent ancora irraggiungibili e
+confina `0xA2`/`0x70` al solo cold-start canonico (`core/cold_start.py`),
+vietandoli come recovery/retry/re-entry; nessun seam è stato aggiunto in questo
+corrective.
 
 ## D. Gap Linux/libfprint (offline, da raster sintetico a lifecycle)
 
