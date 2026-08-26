@@ -5529,28 +5529,52 @@ una analisi differenziale OFFLINE end-to-end rispetto allo snapshot Rockytkg
 software Linux realmente mancanti, anticipabili oggi senza il target. Artefatti in
 `analysis/D274/D274_03_offline_forward_*.{md,json}`.
 
+Due ruoli distinti di D274/03 (chiariti dopo review AI-PM):
+
+- `D274_03_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT` — qualifica solo la
+  parte host-only eseguibile: Windows PowerShell 5.1 runtime, Git/repository gate,
+  TShark/USBPcap/preflight, ACL/privacy, selector/same-run gates, simulazione
+  pre-authority, hard-disable / host-side executable closure. Il sensore è assente
+  → **non può osservare né chiudere l'evidenza del secondo ciclo**, né qualificare
+  il TLS Linux (che ha evidenza storica propria).
+- `FUTURE_D274_03_EXPLICITLY_AUTHORIZED_LIVE_ONE_SHOT_WITH_GOODIX_ATTACHED` —
+  solo dopo qualification PASS + AI-PM freeze review + baseline approval +
+  autorizzazione esplicita, osserverà `0x32` re-arm ACK → second `IRQ0002` →
+  second `0x22` → ACK `0x01` → second fingerprint `B0` → STOP. Boundary stretto =
+  *second-cycle existence/order after re-arm*; non è una campagna biometrica o di
+  timing e un live riuscito non prova il timeout semantico del device.
+
 Esito della mappa: il progetto ha già chiuso offline (o modella fail-closed) tutto
 il percorso da cold-start a prima immagine, inclusi decode canonico, mapping
 `u16→FpImage` (D269/D270), policy feature-extraction (D271) e lifecycle
 multi-frame (D273). I gap che richiedono il target restano: secondo/successivo
-ciclo di capture dopo re-arm (`TARGET_EVIDENCE_REQUIRED`; re-arm osservato con
-ACK ma seconda iterazione completa non osservata), orientation/polarity/ppmm
-(`TARGET_EVIDENCE_REQUIRED`), qualità biometrica/threshold di match, e glue device
-libfprint non ancora implementata localmente (Rockytkg `goodixgf.c` è solo
-reference LGPL da reimplementare clean-room, con le porzioni firmware/PSK marcate
-`ROCKY_UNSAFE_FOR_PROJECT`).
+ciclo di capture dopo re-arm (`TARGET_EVIDENCE_REQUIRED`; boundary del futuro live
+one-shot; re-arm osservato con ACK ma seconda iterazione completa non osservata),
+orientation/polarity/ppmm (`TARGET_EVIDENCE_REQUIRED`, separato dal one-shot),
+qualità biometrica/threshold di match (richiede distribuzioni di score target), e
+glue device libfprint non ancora implementata localmente.
 
-Avanzamento software realizzato (un solo seam host-only): `libfprint-driver/
-goodix_capture_aggregation.{c,h}` — collector bounded di capture già decodificate
-che assembla `FpImage` reali via il pipeline D270, senza alcun comando device,
-USB, TLS, file, retry o scrittura persistente; `flags=0` e `ppmm` UNKNOWN
-(nessuna semantica target non provata assunta). Test C sintetici in
-`tests/test_goodix_capture_aggregation.c` + harness
-`tests/run_goodix_capture_aggregation_test.sh` (identico all'harness D270). La
-verifica di build/run nel sandbox corrente è bloccata dall'assenza di
-`gcc`/`glib`/`flatpak org.freedesktop.Sdk` (stessa condizione del blocco
-OpenCV4-dev in D272/D273); l'audit forbidden-symbol passa per revisione statica.
-Nuova implementazione indipendente LGPL, nessuna riga di ledger richiesta.
+Responsabilità framework (verificata): l'enrollment aggregation multi-stage è di
+proprietà di libfprint — `Rockytkg/libfprint/libfprint/fpi-image-device.c:302-306`
+esegue `fpi_print_add_print(enroll_print, print)` → `priv->enroll_stage += 1` →
+`fpi_device_enroll_progress(...)`. Il driver deve invece: catturare un'immagine →
+costruire `FpImage` → riportare lo stato del dito →
+`fpi_image_device_image_captured()`. Di conseguenza:
+
+```text
+LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
+PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
+LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED
+```
+
+Nessun seam è stato implementato in questo corrective: il collector
+`goodix_capture_aggregation` aggiunto nello step precedente è stato rimosso dopo
+review AI-PM perché non chiaramente mancante (vedi
+`analysis/D274/D274_03_offline_forward_seam_decision.md`). `Rockytkg/src/goodixgf.c`
+è `LGPL-2.1-or-later` e può essere valutato per riuso/adattamento diretto nel
+dominio LGPL dopo audit per-file di SPDX/licenza/copyright/origini/provenance; le
+porzioni firmware-update/ClearApp/PSK e ogni espressione GPL-only restano escluse
+(`GPL_TO_LGPL_EXPRESSION_CROSSING_ALLOWED=false`).
 
 La policy no-write globale esistente (`core/fdt_lifecycle.py`,
 `core/persistent_runtime.py`) rende le famiglie `0xE0/0xA4/0xF0/0xF4` e
@@ -5559,7 +5583,8 @@ La policy no-write globale esistente (`core/fdt_lifecycle.py`,
 `ROCKY_UNSAFE_FOR_PROJECT` e non importati.
 
 D274/03 NON è qualificato, NON è baseline-approved e NON è live-ready: il suo
-candidato resta congelato per la qualification nativa successiva.
+candidato resta congelato per la qualification nativa successiva
+(`D274_03_WINDOWS_NATIVE_QUALIFICATION=REQUIRED_RETRY_AFTER_LASTEXITCODE_CORRECTIVE`).
 
 ## Hard Wall
 
