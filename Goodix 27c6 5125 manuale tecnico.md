@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D275/04 — secondo B0 Linux live osservato (sintesi)
+### Stato corrente post-D276/01 — architettura device glue chiusa, implementazione non iniziata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -77,6 +77,45 @@ HOST_MACHINE_REPORT_PATH=/var/lib/goodix-5125-poc/d261-results/d275-second-b0-fi
 RAW_D275_POST_CORRECTIVE_REPORT_VERSIONED=false
 CANONICAL_PRIVATE_RAW_EVIDENCE_ROOT=captures/
 ```
+
+D276/01 non riapre né estende il confine live D275. Chiude invece offline il
+boundary architetturale `LOCAL_LIBFPRINT_DEVICE_GLUE`: la topologia production
+scelta è un driver `FpImageDevice` nativo C, in-process e LGPL, implementato in
+modo indipendente/clean-room. Una singola istanza `GoodixDeviceContext`, con
+lifetime `img_open → img_close`, possiede il claim USB, l'unico bulk-IN reader,
+il router A0/B0, un solo server TLS 1.2 PSK, il secret scoped e l'unico lifecycle
+Goodix/FDT. Il runtime Python GPL resta oracle comportamentale black-box per
+test sintetici, non dipendenza runtime e non sorgente da tradurre nel dominio
+LGPL.
+
+```text
+PRODUCTION_LIBFPRINT_TOPOLOGY=NATIVE_IN_PROCESS_C_LGPL_CLEANROOM
+REJECTED_TOPOLOGIES=GPL_OUT_OF_PROCESS_HELPER_WITH_IPC,PYTHON_EMBEDDED_IN_LIBFPRINT
+DECISION_CONFIDENCE=HIGH
+USB_TRANSPORT_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT
+TLS_SESSION_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT
+SECRET_BOUNDARY_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT_SCOPED_SECRET
+FDT_LIFECYCLE_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT
+LIBFPRINT_EVENT_CONTEXT_MODEL=ONE_GLIB_MAIN_CONTEXT_WITH_ASYNC_FPI_USB_TRANSFER_AND_ONE_PHYSICAL_IN_READER
+CANCELLATION_MODEL=ACTIVATION_LOCAL_GCANCELLABLE_CANCEL_HOST_IN_QUIESCE_CALLBACKS_THEN_DEACTIVATE_COMPLETE_NO_DEVICE_COMMAND_RETRY_OR_REOPEN
+LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
+PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
+LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED
+LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE=CLOSED_D276_01
+GPL_TO_LGPL_CODE_COPY_ALLOWED=false
+CLEANROOM_NATIVE_REIMPLEMENTATION_REQUIRED_IF_SELECTED=true
+ENROLLMENT_STAGE_POLICY=NOT_SELECTED
+NEXT_PRIMARY_BOUNDARY=LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1_HOST_ONLY
+LIVE_AUTHORIZED=false
+```
+
+Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
+`2..8` e la corroborazione esterna di otto capture non sono autorità di policy
+per APP12509. Il futuro driver non deve essere registrato/abilitato come device
+production finché la policy stage non è chiusa; l'aggregazione resta comunque
+del framework. Non è stato creato uno skeleton D276: il prossimo slice deve
+prima provare con backend in-memory il lifecycle reale, la cancellazione e il
+terminal fence, senza USB, TLS, secret, fprintd o registrazione VID:PID.
 
 `HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
 macchina finale; la sua esistenza corrente non è verificabile senza privilegi
@@ -1555,6 +1594,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; UX operatore poka-yoke italiana su `stderr` con JSON macchina su `stdout`; fake-live rehearsal visiva hardware-inert; D268 storico frozen `c03d32e...`; nessuna USB reale |
 | D275/03 post-live root-cause `0x34 → IRQ0200` | corrective offline; due run live storiche fail-closed; nuova live false | tentativo 2 elimina timing operatore; prima immagine provata dal call-flow e telemetry monotona corretta; baseline Linux passava raw IRQ2 nel `0x34`, mentre tre cicli OEM APP12509 provano `80 || ((raw>>1)+0x1d)` con touch `0x003f`; down-table IRQ0200 corretta a `80 || (raw>>1)`; timeout 15 s non corto, lost-event race non trovata; causalità mismatch `STRONG_CAUSAL_INFERENCE`; terza run equivalente vietata |
 | D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; closure consolidata nel commit `42819c05...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
+| D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; documentation-only; live false | scelta `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM` con un solo `GoodixDeviceContext` owner di claim USB/reader/router/TLS/secret/FDT; mapping reale libfprint 1.94.5, cancel host-only e terminal fence chiusi; enrollment aggregation framework-owned, stage policy non selezionata; helper IPC e Python embedded respinti; implementazione ancora assente, prossimo slice host-only non registrato |
 
 ## Fonti e confini di pubblicazione
 
@@ -1689,25 +1729,108 @@ Il target dichiara `GF_ST411SEC_APP_12509`. L'APP mappata disponibile inizia a
 `0x0802c000`; il codice resident necessario per interpretare A2 e `0x70` è sotto
 questo indirizzo.
 
-### Architettura software e licensing boundary post-D247
+### Architettura software e licensing boundary post-D276/01
 
 ```text
-GPL userspace core
-  transport
-  protocol
-  tls
-  fdt
-  capture
-  image
+GPL userspace core di ricerca / oracle comportamentale
+  transport + protocol + TLS + FDT + capture + image
       |
-      | licensing boundary
+      | solo fatti/spec neutra + test black-box; nessun link/copia/traduzione
       v
-LGPL libfprint driver/glue
+LGPL native FpImageDevice driver (production topology)
+  GoodixDeviceContext per open epoch
+    ├── unico claim/owner USB e unico bulk-IN reader
+    ├── unico router A0/B0
+    ├── unico TLS 1.2 PSK server + secret scoped
+    ├── unico lifecycle Goodix/FDT
+    └── adapter FpImage 80x64 già LGPL
 ```
 
 L'architettura post-D247 è stata adottata precisamente per consentire il riuso diretto, l'adattamento e l'integrazione nel core/ e nei tools/ GPL del codice Rockytkg compatibile GPL, preservandone licenza, attribuzione e provenienza. Analogamente, codice Rockytkg specificamente disponibile sotto licenza LGPL compatibile può essere valutato per libfprint-driver/.
 
 Il licensing boundary non vieta quindi il riuso di Rockytkg: impedisce soltanto che espressione GPL-only venga trasferita dal dominio GPL al driver upstream-facing LGPL. Tale passaggio è possibile solo in presenza di dual licensing o di una licenza alternativa compatibile concessa da tutti i titolari pertinenti; in assenza, l'implementazione LGPL deve essere indipendente e basata su specifiche, fatti di protocollo, test ed evidenza, non sull'espressione GPL-only.
+
+D276/01 seleziona per production la topologia nativa C/LGPL in-process. Un
+helper GPL out-of-process resta tecnicamente possibile come harness di ricerca,
+ma non come device glue: IPC, propagazione cancel, crash/restart e packaging
+dividerebbero il lifecycle fra due owner e renderebbero possibile un reopen
+implicito. Python embedded è escluso per GIL, teardown, failure containment,
+packaging e confine GPL/LGPL. La scelta ha confidenza `HIGH` e non dipende da
+orientation, polarity, ppmm o qualità biometrica.
+
+Il `GoodixDeviceContext` production vive da `img_open` a `img_close` e usa il
+`GUsbDevice` fornito da `fpi_device_get_usb_device()`: possiede il claim
+dell'interfaccia, ma non crea un secondo handle USB. Solo il router può
+sottomettere un bulk-IN fisico; ACK, eventi/NAV A0 e B0 TLS/immagine sono
+demultiplexati dopo lo stesso parser. Waiter e code logiche non leggono mai
+l'endpoint e il TLS consuma/produce soltanto byte B0 consegnati dal router.
+Tutte le notifiche `fpi_image_device_*` avvengono nel GLib main context
+proprietario mediante transfer asincroni `FpiUsbTransfer`, senza reader thread
+bloccante.
+
+#### Mapping production Goodix ↔ FpImageDevice 1.94.5
+
+| Evento | API libfprint verificata | Regola di ownership/teardown |
+| --- | --- | --- |
+| open | `img_open` → `fpi_image_device_open_complete()` | crea il contesto, reclama l'interfaccia, svolge cold-start e un solo TLS/secret handoff; failure pulisce senza retry |
+| activate | `activate` → `fpi_image_device_activate_complete()` | crea generation e `GCancellable` locali; completa success solo dopo arm valido |
+| framework pronto | `change_state(AWAIT_FINGER_ON)` | insieme a `GOODIX_READY_TO_ARM` è il solo gate di re-arm; nessun contatore stage driver |
+| IRQ finger-down `0x0002` | `fpi_image_device_report_finger_status(dev, TRUE)` | l'API pubblica `PRESENT` e porta il framework in `CAPTURE`; callback stale non produce comandi |
+| B0 immagine | helper LGPL → `fpi_image_device_image_captured()` | consegna una `FpImage(80,64)`, flags zero e ppmm semanticamente ignoto; parse/CRC/shape failure è terminale |
+| IRQ finger-up `0x0200` | `fpi_image_device_report_finger_status(dev, FALSE)` | l'API pubblica `NONE`; non-enroll deattiva, enroll attende un nuovo `AWAIT_FINGER_ON` prima del ciclo seguente |
+| deactivate/cancel | `deactivate` → `fpi_image_device_deactivate_complete()` | cancella solo I/O host, drena l'unico callback, invalida generation; nessun comando device, retry, TLS restart o reopen |
+| errore sessione | `fpi_image_device_session_error()` | marca l'open epoch `POISONED`, cleanup exactly-once; una nuova activation non maschera l'errore |
+| close | `img_close` → `fpi_image_device_close_complete()` | fence, drain, chiusura TLS, zeroizzazione secret, release claim; nessun recovery A2/`0x70` |
+
+`FpImageDevice` e `GoodixLifecycle` sono le sole due state machine legittime e
+non duplicate: la prima possiede azione, stato dito, estrazione, matching e
+aggregazione enrollment; la seconda possiede soltanto sequenza wire e
+freschezza FDT. Il gate `AWAIT_FINGER_ON + GOODIX_READY_TO_ARM` impedisce sia
+capture anticipata durante l'estrazione SIGFM sia perdita di un IRQ2 quando il
+framework non è pronto.
+
+La cancellazione libfprint dell'azione porta al `deactivate`; il cancellable
+dell'azione è concatenato a un cancellable activation-local usato da tutti i
+transfer. `deactivate` chiude prima il terminal fence, cancella il solo pending
+IN, attende il ritorno del callback e tratta `G_IO_ERROR_CANCELLED` come esito
+atteso, poi completa una sola volta. Il close è l'unico distruttore dell'open
+epoch. Timeout, TLS, frame/ACK/CRC o lifecycle inattesi sono fail-closed e non
+invocano `fpi_image_device_retry_scan()`; tale API resta riservata a una futura
+condizione biometrica realmente giustificata e non autorizza resend wire.
+
+La cancellazione prima di `activate_complete(NULL)` termina invece la fase con
+`fpi_image_device_activate_complete(..., G_IO_ERROR_CANCELLED)`: in quel punto
+la base non ha ancora marcato il device attivo e `deactivate_complete()` non è
+valido. Lo stesso principio phase-specific vale per open. Inoltre
+`report_finger_status(FALSE)` può provocare sincronicamente `change_state` o
+`deactivate`; il callback IRQ registra quindi il gate e rinvia ogni avanzamento
+a una source idle che ricontrolla generation e terminal fence, evitando submit
+reentrant dopo una deactivation.
+
+La procedura clean-room richiede: specifica neutra derivata da evidenza
+canonica; SPDX/autore/fonti per ogni file; implementazione indipendente contro
+API libfprint e primitive GLib/TLS; confronto black-box di transcript sintetici
+con il runtime Python; golden vector senza secret/biometrica; review provenance
+per slice. Un eventuale riuso di `Rockytkg/src/goodixgf.c`, LGPL, richiede audit
+e ledger per-file; D276 non importa codice. Il suo `500 DPI`, flag inverted,
+policy dinamica `3..8`, worker blocking e dipendenze dal core Rocky GPL non
+sono adottati.
+
+Roadmap corrente:
+
+```text
+D276/01 -> architettura production e ownership CLOSED_OFFLINE
+D276/02 -> shell FpImageDevice non registrata + backend in-memory
+         -> main-loop/cancel/generation/terminal-fence/FpImage test host-only
+D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici
+D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no VID:PID
+poi      -> review provenance + decisione stage enrollment + baseline live separata
+```
+
+Il provider TLS concreto resta una subdecisione build-time ristretta
+(OpenSSL/GnuTLS): deve offrire un server TLS 1.2 PSK in-process alimentato da
+BIO/memoria e non può introdurre helper, socket o processi esterni. La topologia,
+l'ownership e il modello di cancellazione non dipendono dal provider.
 
 
 ## Trasporto USB
@@ -1863,7 +1986,7 @@ OEM replay; non è una prova assoluta device-side di non-mutazione NVM.
 sequenza byte-identica, i DAC/config del dispositivo originale e il materiale
 PSK autentico già validato. Non è un gate universale e non autorizza hardware.
 
-La roadmap immediata è:
+La roadmap storica da D231, preservata per provenance, è:
 
 ```text
 D231 -> decisione statica chiusa
@@ -6697,6 +6820,17 @@ anche se D231 consente di implementare e revisionare offline in D232 l'exact OEM
 replay senza tale estrazione.
 
 ## Stato implementazione Linux
+
+Stato corrente post-D276/01: il glue device non è ancora implementato
+(`LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED`), ma la sua architettura è
+chiusa (`LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE=CLOSED_D276_01`). La
+production topology è una reimplementazione nativa C/LGPL clean-room e
+in-process, con un solo `GoodixDeviceContext` per open epoch. Il prossimo lavoro
+autorizzato è esclusivamente host-only: shell `FpImageDevice` non registrata,
+backend in-memory, main-loop, cancellation/generation/terminal fence e consegna
+della `FpImage` già LGPL. Non include USB, TLS reale, secret, fprintd, VID:PID,
+stage policy, terzo ciclo o nuovo live. Artefatti di decisione:
+`analysis/D276/D276_01_libfprint_device_architecture.{md,json}`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
