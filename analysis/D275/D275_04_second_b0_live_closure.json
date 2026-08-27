@@ -1,0 +1,130 @@
+{
+  "schema": "D275_04_LIVE_CLOSURE_V1",
+  "step": "D275/04",
+  "reasoning_level": "MEDIUM_HIGH",
+  "nature": "closure_git_native_documentation",
+  "new_live_hardware": false,
+  "baseline_live_post_corrective": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+  "head": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+  "branch": "main",
+  "live_result": {
+    "result": "PASS_STOP_AFTER_SECOND_IMAGE",
+    "phase_reached": "STOP_AFTER_SECOND_IMAGE",
+    "failure_reason": null,
+    "runtime_state": "CLOSED"
+  },
+  "command_trace": [
+    "0x36",
+    "0x50",
+    "0x36",
+    "0x82",
+    "0x20",
+    "0x36",
+    "0x32",
+    "0x22",
+    "0x34",
+    "0x20",
+    "0x50",
+    "0x32",
+    "0x22"
+  ],
+  "first_image_raster_shape": [80, 64],
+  "telemetry": {
+    "first_image_irq2_observed_count": 1,
+    "first_image_ack_validation_count": 1,
+    "first_image_b0_count": 1,
+    "first_image_raster_decode_count": 1,
+    "first_image_received": true,
+    "image_command_attempt_count": 2,
+    "persistent_device_write_count": 0,
+    "host_cache_write_count": 0,
+    "retry_count": 0,
+    "transport_reopen_after_tls": false,
+    "usb_transport_session_count": 1,
+    "transport_cleanup_count": 1,
+    "tls_server_session_object_count": 1,
+    "tls_server_handshake_count": 1,
+    "tls_close_count": 1,
+    "second_server_session_created": false,
+    "second_psk_provisioning": false,
+    "secret_boundary_handoff_count": 1,
+    "secret_boundary_zeroized": true,
+    "tls_uses_same_secret_boundary_object": true,
+    "cleanup_failures": [],
+    "terminal_cleanup_completed": true,
+    "target_firmware": "GF_ST411SEC_APP_12509",
+    "operational_fdt_physical_policy": true
+  },
+  "operator_messages": [
+    "1/3 APPOGGIA",
+    "2/3 SOLLEVA",
+    "3/3 APPOGGIA",
+    "TEST COMPLETATO",
+    "SECONDO B0 RICEVUTO"
+  ],
+  "promoted_boundaries": {
+    "LINUX_FIRST_IMAGE_LIVE_OBSERVED": true,
+    "LINUX_IRQ0200_AFTER_0X34": "OBSERVED",
+    "LINUX_SECOND_IRQ0002": "OBSERVED",
+    "LINUX_SECOND_0X22": "OBSERVED",
+    "LINUX_SECOND_B0_LIVE_OBSERVED": true,
+    "STOP_AFTER_SECOND_IMAGE_LIVE": "PASS"
+  },
+  "fdt_causality": {
+    "previous_classification": "STRONG_CAUSAL_INFERENCE",
+    "current_classification": "LIVE_VALIDATED",
+    "target": "GF_ST411SEC_APP_12509",
+    "scope": "this_boundary_and_this_path",
+    "promotion_rationale": [
+      "two_identical_failures_after_0x34_ack_no_irq0200_pre_corrective",
+      "operator_timing_confound_eliminated",
+      "timeout_widening_excluded_by_oem_evidence",
+      "lost_event_race_not_found",
+      "old_0x34_table_verified_wrong_vs_oem",
+      "post_corrective_same_path_reaches_irq0200_and_second_b0",
+      "telemetry_change_does_not_alter_device_side_traffic_or_sequencing"
+    ]
+  },
+  "safety_invariants": {
+    "persistent_device_write_count": 0,
+    "host_cache_write_count": 0,
+    "retry_count": 0,
+    "transport_reopen_after_tls": false,
+    "no_flash_iap": true,
+    "no_provisioning": true,
+    "no_otp_factory_write": true,
+    "no_enrollment": true,
+    "no_third_cycle": true,
+    "no_timeout_widening": true,
+    "secret_zeroized": true
+  },
+  "unknowns": {
+    "TARGET_DEVICE_TIMEOUT": "UNKNOWN",
+    "third_cycle": "not_authorized",
+    "enrollment": "not_authorized",
+    "matcher": "not_implemented",
+    "biometric_quality_target_specific": "UNPROVEN",
+    "orientation": "UNRESOLVED",
+    "polarity": "UNRESOLVED",
+    "physical_ppmm": "UNKNOWN",
+    "physical_dpi": "UNKNOWN"
+  },
+  "authorization": {
+    "LIVE_AUTHORIZED": false,
+    "NEW_LIVE_AUTHORIZED": false
+  },
+  "review_set": {
+    "baseline": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+    "head": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+    "branch": "main",
+    "modified_paths": [
+      "Goodix 27c6 5125 manuale tecnico.md",
+      "analysis/D275/D275_04_second_b0_live_closure.md",
+      "analysis/D275/D275_04_second_b0_live_closure.json"
+    ],
+    "raw_evidence_root": "captures/",
+    "no_zip_created": true,
+    "no_base64_created": true,
+    "no_bundle_manifest_created": true
+  }
+}

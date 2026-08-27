@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D275/03 root-cause e corrective offline (sintesi)
+### Stato corrente post-D275/04 — secondo B0 Linux live osservato (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -34,6 +34,15 @@ ACK 0x22
 first B0
 first image decode
 raster 80x64
+IRQ 0x0200 dopo 0x34
+post-up 0x20
+post-up B0 / NAV 0x50
+re-arm 0x32 con down-table derivata
+secondo IRQ2
+secondo 0x22
+ACK 0x22 secondo ciclo
+secondo B0
+STOP_AFTER_SECOND_IMAGE
 ```
 
 Evidenza target-specific live già consolidata:
@@ -45,7 +54,22 @@ FIRST_IMAGE_DECODE_LIVE_PROVEN=true
 FIRST_IMAGE_RECEIVED=true
 D267_01_CAUSE=STRONG_CAUSAL_INFERENCE
 D268_RETRY_AUTHORIZED=false
+LINUX_FIRST_IMAGE_LIVE_OBSERVED=true
+LINUX_IRQ0200_AFTER_0X34=OBSERVED
+LINUX_SECOND_IRQ0002=OBSERVED
+LINUX_SECOND_0X22=OBSERVED
+LINUX_SECOND_B0_LIVE_OBSERVED=true
+STOP_AFTER_SECOND_IMAGE_LIVE=PASS
+FDT_TABLE_MISMATCH_CAUSALITY=LIVE_VALIDATED
+TARGET_DEVICE_TIMEOUT=UNKNOWN
 LIVE_AUTHORIZED=false
+PERSISTENT_DEVICE_WRITE_COUNT=0
+HOST_CACHE_WRITE_COUNT=0
+RETRY_COUNT=0
+TRANSPORT_REOPEN_AFTER_TLS=false
+USB_TRANSPORT_SESSION_COUNT=1
+TLS_SERVER_HANDSHAKE_COUNT=1
+SECRET_BOUNDARY_HANDOFF_COUNT=1
 ```
 
 Il boundary Linux `u16/12-bit → libfprint` ha chiuso offline (post-D269/01
@@ -190,8 +214,9 @@ baseline D275 è auto-approvata.
 Lo stato probatorio resta distinto: D268 è il first-image Linux live storico a
 baseline frozen; D275/01 chiude offline il production path fino al secondo B0;
 D275/02 qualifica offline il candidate operator path, senza nuova evidenza
-device. `LINUX_SECOND_B0_LIVE_OBSERVED=false`, `LIVE_AUTHORIZED=false` e
-`TARGET_DEVICE_TIMEOUT=UNKNOWN`.
+device. Al termine di D275/02 `LINUX_SECOND_B0_LIVE_OBSERVED` restava `false`,
+`LIVE_AUTHORIZED=false` e `TARGET_DEVICE_TIMEOUT=UNKNOWN`; la promozione a
+`LINUX_SECOND_B0_LIVE_OBSERVED=true` avviene in D275/04.
 
 ### D275/03 — due live Linux, root-cause `0x34` e corrective offline
 
@@ -247,20 +272,112 @@ senza corrective speculativo di chunking.
 ```text
 FIRST_IMAGE_REACHED_IN_D275_LIVE=VERIFIED_FROM_CALL_FLOW
 LINUX_0X34_ACK_REACHED=true
-LINUX_IRQ0200_AFTER_0X34=NOT_OBSERVED_IN_TWO_BOUNDED_RUNS
+LINUX_IRQ0200_AFTER_0X34=OBSERVED_IN_D275_04
 OPERATOR_TIMING_CONFOUND=ELIMINATED_BY_ATTEMPT_2
 D275_LIVE_BASELINE_0X34_TABLE_EQUALS_OEM_REQUIRED_TABLE=false
 CORRECTED_0X34_TABLE_EQUALS_OEM_CAPTURED_TABLE=true
 RAW_IRQ_BASE_CAN_BE_USED_DIRECTLY_FOR_0X34=DISPROVEN
 HOST_15S_TIMEOUT_PLAUSIBLY_TOO_SHORT=NO
 EVENT_LOSS_RACE_FOUND=false
-FDT_TABLE_MISMATCH_CAUSALITY=STRONG_CAUSAL_INFERENCE
+FDT_TABLE_MISMATCH_CAUSALITY=LIVE_VALIDATED
 PROTOCOL_CORRECTIVE_IMPLEMENTED=true
-LINUX_SECOND_B0_LIVE_OBSERVED=false
+LINUX_FIRST_IMAGE_LIVE_OBSERVED=true
+LINUX_SECOND_IRQ0002=OBSERVED
+LINUX_SECOND_0X22=OBSERVED
+LINUX_SECOND_B0_LIVE_OBSERVED=true
+STOP_AFTER_SECOND_IMAGE_LIVE=PASS
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 THIRD_EQUIVALENT_LIVE_ATTEMPT_NOT_AUTHORIZED=true
 LIVE_AUTHORIZED=false
+PERSISTENT_DEVICE_WRITE_COUNT=0
+HOST_CACHE_WRITE_COUNT=0
+RETRY_COUNT=0
+TRANSPORT_REOPEN_AFTER_TLS=false
+USB_TRANSPORT_SESSION_COUNT=1
+TLS_SERVER_HANDSHAKE_COUNT=1
+SECRET_BOUNDARY_HANDOFF_COUNT=1
 ```
+
+### D275/04 — closure della seconda acquisizione Linux live
+
+D275/04 chiude formalmente il ciclo avviato con D275/03. Sulla baseline live
+post-corrective `6eb60856fee7eed2c1765e5b1a11b492e99e42b0` è stata eseguita una
+sola run live autorizzata e consumata, con esito
+`PASS_STOP_AFTER_SECOND_IMAGE` e terminale `STOP_AFTER_SECOND_IMAGE`.
+
+Trace live osservata:
+
+```text
+0x36
+0x50
+0x36
+0x82
+0x20
+0x36
+0x32
+0x22
+0x34
+0x20
+0x50
+0x32
+0x22
+```
+
+Il percorso ha quindi superato: cold start, TLS 1.2 PSK, D4, AF, fresh FDT,
+primo `IRQ 0x0002`, primo `0x22`, primo B0 / prima immagine, `0x34` con FDT-up
+derivata OEM, `IRQ 0x0200`, post-up `0x20`, post-up B0 / NAV `0x50`, re-arm
+`0x32` con down-table derivata, secondo `IRQ 0x0002`, secondo `0x22`, secondo
+B0, stop `STOP_AFTER_SECOND_IMAGE` e cleanup.
+
+La telemetria first-image corretta registra:
+
+```text
+first_image_irq2_observed_count=1
+first_image_ack_validation_count=1
+first_image_b0_count=1
+first_image_raster_decode_count=1
+first_image_received=true
+image_command_attempt_count=2
+```
+
+Il `raster_decode_count=1` conta il primo B0 decodificato; il secondo B0 è
+provato dal `phase_reached=STOP_AFTER_SECOND_IMAGE` e dal fatto che il runner
+non può raggiungere quel terminale prima del secondo B0.
+
+Gli invarianti factory-preserving sono rispettati:
+
+```text
+persistent_device_write_count=0
+host_cache_write_count=0
+retry_count=0
+transport_reopen_after_tls=false
+usb_transport_session_count=1
+transport_cleanup_count=1
+tls_server_session_object_count=1
+tls_server_handshake_count=1
+tls_close_count=1
+second_server_session_created=false
+second_psk_provisioning=false
+secret_boundary_handoff_count=1
+secret_boundary_zeroized=true
+tls_uses_same_secret_boundary_object=true
+terminal_cleanup_completed=true
+```
+
+La causalità del mismatch FDT è promossa da `STRONG_CAUSAL_INFERENCE` a
+`LIVE_VALIDATED` sul target APP12509 per questo boundary e questo percorso:
+prima del corrective due run fallivano entrambe dopo `0x34/ACK` con timeout su
+`IRQ 0x0200`, il timing operatore era stato controllato nel secondo tentativo,
+il timeout di 15 s non è plausibilmente troppo breve, una lost-event race non è
+stata trovata e la tabella `0x34` della vecchia baseline era verificata
+errata rispetto all'OEM; dopo il solo corrective di derivazione FDT e
+telemetry, la stessa sequenza supera `IRQ 0x0200` e raggiunge il secondo B0.
+La modifica telemetry non altera traffico o sequencing device-side.
+
+`TARGET_DEVICE_TIMEOUT` resta `UNKNOWN`: il PASS non misura né chiude il
+timeout semantico del device. `LIVE_AUTHORIZED=false` per qualsiasi nuova run;
+non è autorizzato alcun terzo ciclo, enrollment, persistenza, timeout widening,
+retry/reopen o marker rearm.
 
 ### D275/02/operator path — UX poka-yoke italiana
 
@@ -340,14 +457,14 @@ NBIS_80X64_SUPPORT_STATUS=STRUCTURALLY_ACCEPTED_MIN_8PX_BLOCK_BUT_TARGET_USABILI
 ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 BIOMETRIC_QUALITY_STATUS=UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED
-MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=OFFLINE_MODEL_TABLE_DATAFLOW_CLOSED_SECOND_TARGET_CYCLE_OBSERVED_D274_03_TIMEOUTS_UNKNOWN
+MULTIFRAME_CAPTURE_LIFECYCLE_STATUS=LINUX_LIVE_SECOND_B0_OBSERVED_D275_04_TIMEOUTS_UNKNOWN
 D272_ACK_STATUS_CONTRACT=CLOSED_OFFLINE_EXACT_0X01
 UP_TABLE12_SOURCE=OEM_SESSION_GLOBAL_GF_FDT_UP_BASE_VA_0X180580838
 UP_TABLE12_DERIVATION=IRQ_0X0002_RAW_BASE_VALIDATION_THEN_PER_WORD_HALF_PLUS_CONTEXT_OFFSET_ENCODING_AND_MODE_DEPENDENT_COMMIT_BY_0X180029314
 UP_TABLE12_LIFETIME=VOLATILE_OEM_PROCESS_SESSION_GLOBAL_INITIALIZABLE_BY_CALLBACK_0X180028480_AND_UPDATED_BY_FDT_IRQ_HANDLING
 UP_TABLE12_FRESHNESS_REQUIREMENT=0X34_MUST_CONSUME_THE_MOST_RECENT_VALID_IRQ_0X0002_DERIVED_TABLE_FROM_THE_SAME_FINGER_DOWN_CYCLE
 POST_FIRST_IMAGE_0X34_STATUS=OBSERVED_BUILDER_AND_SESSION_TABLE_DATAFLOW_VERIFIED_STATICALLY
-FINGER_UP_IRQ_0200_STATUS=OBSERVED_AFTER_0X34_ACK_TARGET_TIMEOUT_UNKNOWN
+FINGER_UP_IRQ_0200_STATUS=OBSERVED_LIVE_AFTER_0X34_ACK_D275_04
 POST_FINGER_UP_0X20_STATUS=OBSERVED_WITH_ACK_AND_POST_UP_B0_IMAGE_ROLE_STATICALLY_SUPPORTED_NO_QUALITY_CLAIM
 POST_FINGER_UP_0X50_STATUS=OBSERVED_WITH_EXACT_ACK_AND_OEM_NAV_GETTER_VERIFIED
 POST_0X50_RESPONSE_STATUS=OBSERVED_A0_0X50_NAV_RESPONSE_LENGTHS_2417_2410
@@ -355,13 +472,26 @@ D273_NAV_CLASSIFICATION_WIRE_CONTROL=EXACT_0X50
 D273_0X51_NAV_ALIAS_ACCEPTED=false
 GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
-SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
+SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_LIVE_D275_04
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-LINUX_MULTIFRAME_RUNTIME=D275_03_FDT_DERIVATION_AND_TELEMETRY_CORRECTED_OFFLINE_PENDING_AI_PM_REVIEW
-LINUX_SECOND_B0_LIVE_OBSERVED=false
+LINUX_MULTIFRAME_RUNTIME=D275_04_LIVE_SECOND_B0_CLOSURE_REVIEW
+LINUX_FIRST_IMAGE_LIVE_OBSERVED=true
+LINUX_IRQ0200_AFTER_0X34=OBSERVED
+LINUX_SECOND_IRQ0002=OBSERVED
+LINUX_SECOND_0X22=OBSERVED
+LINUX_SECOND_B0_LIVE_OBSERVED=true
+STOP_AFTER_SECOND_IMAGE_LIVE=PASS
+FDT_TABLE_MISMATCH_CAUSALITY=LIVE_VALIDATED
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D275_03_OFFLINE_CORRECTIVE
+PERSISTENT_DEVICE_WRITE_COUNT=0
+HOST_CACHE_WRITE_COUNT=0
+RETRY_COUNT=0
+TRANSPORT_REOPEN_AFTER_TLS=false
+USB_TRANSPORT_SESSION_COUNT=1
+TLS_SERVER_HANDSHAKE_COUNT=1
+SECRET_BOUNDARY_HANDOFF_COUNT=1
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D275_04_LIVE_CLOSURE
 NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_SEPARATE_AUTHORITY_FOR_ANY_FUTURE_LIVE_STEP
 ```
 
@@ -1385,6 +1515,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/01 production multiframe Linux | READY offline; live false | `PersistentRuntimeCoordinator` chiude il secondo B0 sullo stesso transport/TLS/PSK; allowlist post-image `0x34,0x20,0x50,0x32,0x22`; zero retry/reopen/write; terzo ciclo irraggiungibile |
 | D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; UX operatore poka-yoke italiana su `stderr` con JSON macchina su `stdout`; fake-live rehearsal visiva hardware-inert; D268 storico frozen `c03d32e...`; nessuna USB reale |
 | D275/03 post-live root-cause `0x34 → IRQ0200` | corrective offline; due run live storiche fail-closed; nuova live false | tentativo 2 elimina timing operatore; prima immagine provata dal call-flow e telemetry monotona corretta; baseline Linux passava raw IRQ2 nel `0x34`, mentre tre cicli OEM APP12509 provano `80 || ((raw>>1)+0x1d)` con touch `0x003f`; down-table IRQ0200 corretta a `80 || (raw>>1)`; timeout 15 s non corto, lost-event race non trovata; causalità mismatch `STRONG_CAUSAL_INFERENCE`; terza run equivalente vietata |
+| D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
 
 ## Fonti e confini di pubblicazione
 
@@ -6148,6 +6279,9 @@ LIVE_AUTHORIZED=false
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 NEXT_PRIMARY_BOUNDARY=AI_PM_PRE_LIVE_REVIEW_D275_02
 ```
+
+Stato al termine di D275/02; promosso a `LINUX_SECOND_B0_LIVE_OBSERVED=true`
+da D275/04.
 
 ## Hard Wall
 
