@@ -1,15 +1,47 @@
-# D275/02 — Linux second-B0 live one-shot readiness (corrective Git-native)
+# D275/02 — Linux second-B0 live one-shot readiness (corrective Git-native, operator UX)
 
 ## Esito
 
 ```text
 OUTCOME=READY
-ADVANCEMENT=NEW_OPERATOR_PATH_QUALIFIED_OFFLINE_NO_NEW_HARDWARE_EVIDENCE
+ADVANCEMENT=OPERATOR_UX_POKA_YOKE_QUALIFIED_OFFLINE_NO_NEW_HARDWARE_EVIDENCE
 EXECUTABLE_CLOSURE=PASS_OFFLINE_FAKE_LIVE_SAME_PRODUCTION_COORDINATOR
 RESIDUAL_BLOCKER_OR_RISK=D275_LIVE_BASELINE_SHA_NOT_YET_APPROVED;AI_PM_PRE_LIVE_REVIEW_REQUIRED
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=GIT_NATIVE_DIFF_AGAINST_CORRECTIVE_START_HEAD
+REVIEW_SET=GIT_NATIVE_DIFF_AGAINST_b0c3397a26bbe0dcd5be3eb5a0ac2e4ecab5c83f
 ```
+
+## Corrective locale D275/02 — operator UX poka-yoke
+
+Il percorso live candidate ora guida esplicitamente l'operatore nei tre momenti
+fisici del ciclo, con blocchi in italiano su `stderr` e report macchina JSON su
+`stdout`:
+
+1. `D275 — PREPARAZIONE` (dito lontano) prima del primo accesso USB reale.
+2. `D275 — AZIONE OPERATORE 1/3` (appoggia) immediatamente prima del primo
+   `wait_event(IRQ 0x0002)` dopo l'arm finale.
+3. `D275 — AZIONE OPERATORE 2/3` (solleva) immediatamente prima della wait
+   `IRQ 0x0200` dopo `0x34/ACK`.
+4. `D275 — AZIONE OPERATORE 3/3` (appoggia di nuovo) immediatamente prima del
+   secondo `wait_event(IRQ 0x0002)` dopo `0x32/ACK`.
+5. `D275 — TEST COMPLETATO` dopo il secondo B0 con risultato
+   `PASS_STOP_AFTER_SECOND_IMAGE`.
+
+Ogni blocco è separato da almeno due righe completamente vuote, non usa colori
+ANSI, non richiede `input()` né sleep artificiali, ed è emesso con `flush=True`
+su `stderr`.  I prompt sono agganciati al contatore monotonico delle vere wait
+`FIRST_IMAGE_IRQ2_TIMEOUT_MS` del production path: non ci sono state machine
+parallele, lettori extra, retry, modifica timeout o ordine.
+
+In caso di qualsiasi failure dopo l'avvio compare una sola volta
+`D275 — TEST INTERROTTO` in italiano, senza nascondere la `failure_class`
+macchina conservata nel JSON su `stdout`.
+
+La fake-live attraversa lo stesso `PersistentRuntimeCoordinator` con fixture
+sintetica e mostra la stessa sequenza di blocchi, ciascuno con la riga
+`SIMULAZIONE — NON TOCCARE IL SENSORE`.  Resta hardware-inert:
+`REAL_USB_ACCESS=false`, `REAL_SENSOR_COMMAND_COUNT=0`,
+`REAL_SECRET_MATERIALIZATION_COUNT=0`, `LIVE_AUTHORIZED=false`.
 
 ## Ownership ricostruita
 
@@ -82,6 +114,15 @@ Il gate live richiede la stringa esatta
 oltre al flag D275, boundary esplicito e SHA completo approvato. Marker
 single-use D275, O_CREAT|O_EXCL, O_NOFOLLOW, mode 0600, fsync prima della
 capability. Le capability D268 e D275 non si mintano a vicenda.
+
+La UX operatore è testata offline con:
+
+- ordine esatto `PREPARAZIONE → 1/3 → 2/3 → 3/3 → COMPLETATO` senza duplicazioni;
+- spaziatura di almeno due righe vuote fra blocchi adiacenti;
+- separazione `stderr` (operator UX) / `stdout` (JSON parseabile);
+- timing: ogni azione precede la wait `FIRST_IMAGE_IRQ2_TIMEOUT_MS` corretta;
+- failure single-shot `TEST INTERROTTO` che blocca azioni successive;
+- fake-live con zero accesso USB/secret reale.
 
 ## Riesame metodologico pre-live
 

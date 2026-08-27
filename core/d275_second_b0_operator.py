@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import sys
 from typing import Any, Iterator, Sequence
 
 from core.d268_first_image_operator import (
@@ -25,7 +26,7 @@ from core.live_capability import (
     issue_d275_intent,
     issue_d275_live_io,
 )
-from core.persistent_runtime import TerminalBoundary
+from core.persistent_runtime import FIRST_IMAGE_IRQ2_TIMEOUT_MS, TerminalBoundary
 
 
 D275_MARKER_PATH = Path("/var/lib/goodix-5125-poc/d275-second-b0-single-use.marker")
@@ -58,6 +59,141 @@ D275_LIVE_CRITICAL_PATHS = (
 
 class D275OperatorFailure(RuntimeError):
     pass
+
+
+class D275OperatorPromptState:
+    """Mutable UX state shared between the wrapper and the tool entrypoint.
+
+    Keeps the failure block single-shot across wait-event failures and
+    post-run failure classification.
+    """
+
+    def __init__(self) -> None:
+        self.failure_shown = False
+
+    def show_failure(self, *, simulation: bool = False) -> None:
+        if self.failure_shown:
+            return
+        self.failure_shown = True
+        _print_d275_operator_block(
+            [
+                "D275 — TEST INTERROTTO",
+                "SI È VERIFICATO UN ERRORE",
+                "TOGLI IL DITO DAL SENSORE",
+                "NON RIPROVARE E NON RILANCIARE IL COMANDO.",
+                "Copia tutto l'output del terminale e sottoponilo alla review AI-PM.",
+            ],
+            simulation=simulation,
+        )
+
+
+class D275OperatorPromptingEventSource:
+    """D275-specific operator prompts attached to real protocol waits.
+
+    The prompts are emitted exactly once, immediately before the matching
+    ``event_source.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)`` call:
+
+    1. first wait  -> ACTION 1/3 (first IRQ 0x0002)
+    2. second wait -> ACTION 2/3 (IRQ 0x0200 after 0x34)
+    3. third wait  -> ACTION 3/3 (second IRQ 0x0002 after 0x32)
+
+    No artificial sleep, no input, no extra reader, no state machine beyond
+    a monotonic counter of IRQ2-timeout waits.
+    """
+
+    def __init__(
+        self,
+        delegate: Any,
+        *,
+        state: D275OperatorPromptState,
+        simulation: bool = False,
+    ) -> None:
+        self._delegate = delegate
+        self._state = state
+        self._simulation = simulation
+        self._irq2_wait_count = 0
+        self._failed = False
+
+    def wait_event(self, timeout_ms: int) -> bytes:
+        if timeout_ms == FIRST_IMAGE_IRQ2_TIMEOUT_MS and not self._failed:
+            self._irq2_wait_count += 1
+            if self._irq2_wait_count == 1:
+                _print_d275_operator_block(
+                    [
+                        "D275 — AZIONE OPERATORE 1/3",
+                        "APPOGGIA ORA UN DITO SUL SENSORE",
+                        'Tienilo fermo finché non compare "AZIONE OPERATORE 2/3".',
+                        "Esegui l'azione con calma: l'attesa host è limitata e non viene rinnovata.",
+                    ],
+                    simulation=self._simulation,
+                )
+            elif self._irq2_wait_count == 2:
+                _print_d275_operator_block(
+                    [
+                        "D275 — AZIONE OPERATORE 2/3",
+                        "SOLLEVA ORA IL DITO DAL SENSORE",
+                        'Tienilo completamente lontano finché non compare "AZIONE OPERATORE 3/3".',
+                    ],
+                    simulation=self._simulation,
+                )
+            elif self._irq2_wait_count == 3:
+                _print_d275_operator_block(
+                    [
+                        "D275 — AZIONE OPERATORE 3/3",
+                        "APPOGGIA ORA UN DITO SUL SENSORE",
+                        "Tienilo fermo fino alla conclusione del test.",
+                    ],
+                    simulation=self._simulation,
+                )
+        try:
+            return self._delegate.wait_event(timeout_ms)
+        except Exception:
+            if not self._failed:
+                self._failed = True
+                self._state.show_failure(simulation=self._simulation)
+            raise
+
+
+def _print_d275_operator_block(lines: list[str], *, simulation: bool = False) -> None:
+    """Single helper for every D275 operator block.
+
+    Two completely empty lines precede the opening separator; output goes to
+    stderr with immediate flush.  In simulation mode the block carries an
+    explicit "do not touch the sensor" line.
+    """
+    print(file=sys.stderr, flush=True)
+    print(file=sys.stderr, flush=True)
+    print("=" * 60, file=sys.stderr, flush=True)
+    for line in lines:
+        print(line, file=sys.stderr, flush=True)
+    if simulation:
+        print("SIMULAZIONE — NON TOCCARE IL SENSORE", file=sys.stderr, flush=True)
+    print("=" * 60, file=sys.stderr, flush=True)
+
+
+def print_d275_preparation(*, simulation: bool = False) -> None:
+    _print_d275_operator_block(
+        [
+            "D275 — PREPARAZIONE",
+            "TIENI IL DITO LONTANO DAL SENSORE",
+            'Non toccare il sensore finché non compare "AZIONE OPERATORE 1/3".',
+            "Non premere tasti durante il test: segui soltanto le istruzioni a schermo.",
+            "Se compare un errore, NON rilanciare il comando.",
+        ],
+        simulation=simulation,
+    )
+
+
+def print_d275_success(*, simulation: bool = False) -> None:
+    _print_d275_operator_block(
+        [
+            "D275 — TEST COMPLETATO",
+            "SECONDO B0 RICEVUTO",
+            "PUOI TOGLIERE IL DITO DAL SENSORE",
+            "Il test è terminato. NON eseguire nuovamente il comando.",
+        ],
+        simulation=simulation,
+    )
 
 
 def validate_full_sha(value: str) -> None:
@@ -207,8 +343,12 @@ def _d268_host_adapters() -> Iterator[None]:
 
 
 def build_dependencies(
-    repo: Path, intent: D275IntentCapability
+    repo: Path,
+    intent: D275IntentCapability,
+    prompt_state: D275OperatorPromptState | None = None,
 ) -> D268OperatorDependencies:
+    if prompt_state is None:
+        prompt_state = D275OperatorPromptState()
     deps = D268ProductionDependencies.build(repo, intent)  # type: ignore[arg-type]
     deps.require_marker_absent = require_d275_marker_absent
     deps.claim_marker_once = (  # type: ignore[assignment]
@@ -220,6 +360,11 @@ def build_dependencies(
 
     def construct(live_io, secret, target):
         coordinator = base_construct(live_io, secret, target)
+        coordinator.event_source = D275OperatorPromptingEventSource(
+            coordinator.event_source,
+            state=prompt_state,
+            simulation=False,
+        )
         original_run = coordinator.run
 
         def second_boundary_run(*args, **kwargs):

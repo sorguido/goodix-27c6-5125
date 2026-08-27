@@ -34,7 +34,11 @@ from core.persistent_runtime import FIRST_IMAGE_IRQ2_TIMEOUT_MS, TerminalBoundar
 BOUNDARY_NAMES = tuple(boundary.value for boundary in TerminalBoundary)
 
 
-def rehearse(boundary: TerminalBoundary) -> dict[str, object]:
+def rehearse(
+    boundary: TerminalBoundary,
+    *,
+    event_source_wrapper: object | None = None,
+) -> dict[str, object]:
     # Reuse the already-reviewed D263 synthetic transport/TLS fixture rather
     # than introducing a parallel protocol or lifecycle implementation.
     from tests.test_d263_phase2_public_run import (
@@ -47,10 +51,14 @@ def rehearse(boundary: TerminalBoundary) -> dict[str, object]:
     )
 
     first_image = boundary is not TerminalBoundary.STOP_AFTER_FDT_ARM_ACK
-    coordinator, transport, event_source = _make_coordinator(
+    coordinator, transport, raw_event_source = _make_coordinator(
         operational_physical_policy=first_image,
         record_submissions=True,
     )
+    event_source = raw_event_source
+    if event_source_wrapper is not None:
+        event_source = event_source_wrapper(raw_event_source)
+        coordinator.event_source = event_source
     if boundary is TerminalBoundary.STOP_AFTER_SECOND_IMAGE:
         from tests.test_d275_01_production_multiframe import event, image_b0
         from analysis.D260.d260_offline_rehearsal import _ack, _nav_response
@@ -58,13 +66,13 @@ def rehearse(boundary: TerminalBoundary) -> dict[str, object]:
             _ack(0x34), _ack(0x20), image_b0(), _ack(0x50), _nav_response(),
             _ack(0x32), _ack(0x22), image_b0(),
         ]
-        event_source._frames = _build_event_frames(first_image=False) + [
+        raw_event_source._frames = _build_event_frames(first_image=False) + [
             event(2, bytes(range(12))), event(0x200, bytes(range(12, 24))),
             event(2, bytes(range(24, 36))),
         ]
     else:
         transport._receive = _build_receive_frames(first_image=first_image)
-        event_source._frames = _build_event_frames(first_image=first_image)
+        raw_event_source._frames = _build_event_frames(first_image=first_image)
     with mock.patch.object(Tls12PskServerSession, "from_boundary", _fake_tls_factory):
         result = coordinator.run(
             seed_result=synthetic_seed(),
