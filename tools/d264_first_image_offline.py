@@ -46,13 +46,25 @@ def rehearse(boundary: TerminalBoundary) -> dict[str, object]:
         synthetic_seed,
     )
 
-    first_image = boundary is TerminalBoundary.STOP_AFTER_FIRST_IMAGE
+    first_image = boundary is not TerminalBoundary.STOP_AFTER_FDT_ARM_ACK
     coordinator, transport, event_source = _make_coordinator(
         operational_physical_policy=first_image,
         record_submissions=True,
     )
-    transport._receive = _build_receive_frames(first_image=first_image)
-    event_source._frames = _build_event_frames(first_image=first_image)
+    if boundary is TerminalBoundary.STOP_AFTER_SECOND_IMAGE:
+        from tests.test_d275_01_production_multiframe import event, image_b0
+        from analysis.D260.d260_offline_rehearsal import _ack, _nav_response
+        transport._receive = _build_receive_frames(first_image=True) + [
+            _ack(0x34), _ack(0x20), image_b0(), _ack(0x50), _nav_response(),
+            _ack(0x32), _ack(0x22), image_b0(),
+        ]
+        event_source._frames = _build_event_frames(first_image=False) + [
+            event(2, bytes(range(12))), event(0x200, bytes(range(12, 24))),
+            event(2, bytes(range(24, 36))),
+        ]
+    else:
+        transport._receive = _build_receive_frames(first_image=first_image)
+        event_source._frames = _build_event_frames(first_image=first_image)
     with mock.patch.object(Tls12PskServerSession, "from_boundary", _fake_tls_factory):
         result = coordinator.run(
             seed_result=synthetic_seed(),
@@ -71,6 +83,7 @@ def rehearse(boundary: TerminalBoundary) -> dict[str, object]:
         "first_image_irq2_deadline": "ABSOLUTE_NON_RENEWABLE_SINGLE_WAIT",
         "physical_0x22_policy": "FIXED64_ZERO_TAIL" if first_image else "NOT_REACHED",
         "first_image_received": result.first_image_received,
+        "second_image_received": result.second_image_received,
         "first_image_validation": result.first_image_validation,
         "image_dimensions": list(result.first_image_raster_shape) if result.first_image_raster_shape else None,
         "command_trace": [f"0x{opcode:02x}" for opcode in result.command_trace],
