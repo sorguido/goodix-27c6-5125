@@ -193,6 +193,40 @@ D275/02 qualifica offline il candidate operator path, senza nuova evidenza
 device. `LINUX_SECOND_B0_LIVE_OBSERVED=false`, `LIVE_AUTHORIZED=false` e
 `TARGET_DEVICE_TIMEOUT=UNKNOWN`.
 
+### D275/02/operator path — UX poka-yoke italiana
+
+Il candidato live D275/02 guida l'operatore con blocchi in italiano su `stderr`,
+mentre il report macchina resta JSON parseabile su `stdout`.  La sequenza è:
+
+1. `D275 — PREPARAZIONE` (dito lontano dal sensore) dopo i gate CLI/baseline
+   iniziali e prima del primo accesso USB reale.
+2. `D275 — AZIONE OPERATORE 1/3` (appoggia il dito) immediatamente prima della
+   prima wait reale di `IRQ 0x0002` dopo il final arm.
+3. `D275 — AZIONE OPERATORE 2/3` (solleva il dito) immediatamente prima della
+   wait di `IRQ 0x0200` dopo `0x34/ACK01`.
+4. `D275 — AZIONE OPERATORE 3/3` (appoggia di nuovo il dito) immediatamente
+   prima della seconda wait di `IRQ 0x0002` dopo `0x32/ACK01`.
+5. `D275 — TEST COMPLETATO` (puoi togliere il dito) solo dopo il vero secondo
+   B0 e risultato `PASS_STOP_AFTER_SECOND_IMAGE`.
+
+I prompt sono agganciati al contatore monotonico delle vere wait
+`FIRST_IMAGE_IRQ2_TIMEOUT_MS` del production path (`core.persistent_runtime`);
+non usano timer, sleep, `input()`, lettori extra o state machine parallele.
+Ogni blocco ha almeno due righe completamente vuote prima del separatore
+iniziale; non usa colori ANSI.
+
+La modalità `--fake-live` attraversa lo stesso
+`PersistentRuntimeCoordinator` con fixture sintetica e mostra la stessa
+sequenza di blocchi, ciascuno con la riga
+`SIMULAZIONE — NON TOCCARE IL SENSORE`; non accede USB, non materializza
+secret reali, non attende input e non introduce sleep artificiali.  Serve da
+rehearsal psicologica/operativa prima della live.
+
+In caso di qualsiasi failure dopo l'avvio compare una sola volta
+`D275 — TEST INTERROTTO` in italiano, con istruzione di togliere il dito, non
+rilanciare il comando e inviare l'output alla review AI-PM.  La `failure_class`
+macchina resta disponibile nel JSON finale.
+
 Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
 D269, chiama il SIGFM locale, mantiene il gate `<25`, distingue score zero da
 errore negativo e contiene le eccezioni C++/OpenCV al confine C. Raster, buffer
@@ -1280,7 +1314,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D274/02 qualificazione nativa Windows | CLOSED / PASS; tre run storiche preservate; live false | run 1 FAIL source-scan `-f`, run 2 FAIL `.Count` sotto PowerShell 5.1, run 3 PASS nativo completo dopo corrective; nessuna regressione tecnica e nessuna riapertura |
 | D274/03 Kit one-shot secondo ciclo | Windows native qualification PASS operator-supplied; baseline/capture/live false; freeze/review AI-PM pending | runner futuro vincolato a `main`; BOM UTF-8 e `$LASTEXITCODE` corretti; literal `$TsharkPath` non interpolato sotto StrictMode e privacy contract verificato nei reali owner observer/postprocessor; run finale PowerShell Desktop 5.1 tutti-stage PASS con Goodix assente, zero capture/USB/dito/comandi/retry/write; SHA package operator-supplied `5a498239…9eca87`, byte non ricalcolati dall'agente; D263 resta negativa |
 | D275/01 production multiframe Linux | READY offline; live false | `PersistentRuntimeCoordinator` chiude il secondo B0 sullo stesso transport/TLS/PSK; allowlist post-image `0x34,0x20,0x50,0x32,0x22`; zero retry/reopen/write; terzo ciclo irraggiungibile |
-| D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; D268 storico frozen `c03d32e...`; fake-live PASS; nessuna USB reale |
+| D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; UX operatore poka-yoke italiana su `stderr` con JSON macchina su `stdout`; fake-live rehearsal visiva hardware-inert; D268 storico frozen `c03d32e...`; nessuna USB reale |
 
 ## Fonti e confini di pubblicazione
 

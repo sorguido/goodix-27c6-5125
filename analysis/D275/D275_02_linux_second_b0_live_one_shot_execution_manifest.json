@@ -2,8 +2,8 @@
   "schema": "D275_02_LINUX_SECOND_B0_LIVE_ONE_SHOT_EXECUTION_V1",
   "step": "D275/02",
   "execution_mode": "OFFLINE_ONLY",
-  "corrective_start_head": "dc2031412dd1c9367e608e572b21ae18de12f6d1",
-  "reviewed_ancestor": "3829c45fe7dacc82ad6f1bd21123c6d97491487d",
+  "corrective_start_head": "b0c3397a26bbe0dcd5be3eb5a0ac2e4ecab5c83f",
+  "reviewed_ancestor": "b0c3397a26bbe0dcd5be3eb5a0ac2e4ecab5c83f",
   "d268_historical_baseline": "c03d32e8647444495e6615e41c2839cbddd62143",
   "live_entrypoint": "operator_kit/d275-second-b0-once.sh",
   "production_coordinator": "core.persistent_runtime.PersistentRuntimeCoordinator",
@@ -13,6 +13,20 @@
   "d275_marker_path": "/var/lib/goodix-5125-poc/d275-second-b0-single-use.marker",
   "d275_marker_schema": "D275_SECOND_B0_SINGLE_USE_MARKER_V1",
   "d275_live_critical_file_count": 21,
+  "operator_ux": {
+    "language": "italian",
+    "output_stream": "stderr",
+    "machine_json_stream": "stdout",
+    "sequence": "PREPARATION;ACTION_1_PLACE;ACTION_2_LIFT;ACTION_3_PLACE;COMPLETE",
+    "visual_separator": "AT_LEAST_TWO_EMPTY_LINES",
+    "action_1_trigger": "FIRST_WAIT_EVENT_IRQ0x0002_AFTER_FINAL_ARM",
+    "action_2_trigger": "WAIT_EVENT_IRQ0x0200_AFTER_0x34_ACK",
+    "action_3_trigger": "SECOND_WAIT_EVENT_IRQ0x0002_AFTER_0x32_ACK",
+    "fake_rehearsal_line": "SIMULAZIONE — NON TOCCARE IL SENSORE",
+    "no_input": true,
+    "no_artificial_sleep": true,
+    "failure_block": "D275 — TEST INTERROTTO"
+  },
   "fake_live_command": "./operator_kit/d275-second-b0-once.sh --fake-live --terminal-boundary STOP_AFTER_SECOND_IMAGE",
   "fake_live_result": "PASS",
   "ownership": {
@@ -26,7 +40,7 @@
     "persistent_writes": 0
   },
   "affected_suites": {
-    "d275_02": "26_PASS",
+    "d275_02": "37_PASS",
     "d275_01": "4_PASS",
     "d272_multiframe_validation": "13_PASS",
     "d268_historical_c03d32e": "REPRODUCIBLE_MANIFEST_AND_SEMANTIC_PASS_DIRTY_TREE_GATE_ENVIRONMENT_DEPENDENT",
@@ -48,9 +62,9 @@
   "live_authorized": false,
   "target_device_timeout": "UNKNOWN",
   "OUTCOME": "READY",
-  "ADVANCEMENT": "NEW_OPERATOR_PATH_QUALIFIED_OFFLINE_NO_NEW_HARDWARE_EVIDENCE",
+  "ADVANCEMENT": "OPERATOR_UX_POKA_YOKE_QUALIFIED_OFFLINE_NO_NEW_HARDWARE_EVIDENCE",
   "EXECUTABLE_CLOSURE": "PASS_OFFLINE_FAKE_LIVE_SAME_PRODUCTION_COORDINATOR",
   "RESIDUAL_BLOCKER_OR_RISK": "D275_LIVE_BASELINE_SHA_NOT_YET_APPROVED;AI_PM_PRE_LIVE_REVIEW_REQUIRED",
   "CANONICAL_DOCUMENTATION": "UPDATED",
-  "REVIEW_SET": "GIT_NATIVE_DIFF_AGAINST_dc2031412dd1c9367e608e572b21ae18de12f6d1"
+  "REVIEW_SET": "GIT_NATIVE_DIFF_AGAINST_b0c3397a26bbe0dcd5be3eb5a0ac2e4ecab5c83f"
 }

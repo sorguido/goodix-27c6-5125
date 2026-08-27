@@ -2,8 +2,10 @@
 """Offline D275/02 corrective gates: authority, report, marker, leakage."""
 from __future__ import annotations
 
+import io
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -11,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from core.persistent_runtime import TerminalBoundary
+from core.persistent_runtime import FIRST_IMAGE_IRQ2_TIMEOUT_MS, TerminalBoundary
 import core.d268_first_image_operator as d268
 import core.d275_second_b0_operator as d275
 import core.live_capability as capability
@@ -418,6 +420,206 @@ class D275AdapterLeakageTests(unittest.TestCase):
             )
         self.assertEqual(report["result"], "FAIL_CLOSED")
         self.assertEqual(self._originals(), originals)
+
+
+class D275OperatorUxTests(unittest.TestCase):
+    def _run_fake_live(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "./operator_kit/d275-second-b0-once.sh",
+                "--fake-live",
+                "--terminal-boundary",
+                "STOP_AFTER_SECOND_IMAGE",
+            ],
+            cwd=REPO,
+            text=True,
+            capture_output=True,
+        )
+
+    def _empty_lines_before(self, text: str, pos: int) -> int:
+        count = 0
+        end = pos
+        while True:
+            start = text.rfind("\n", 0, end)
+            if start == -1:
+                break
+            line = text[start + 1 : end]
+            if line.strip() == "":
+                count += 1
+                end = start
+            else:
+                break
+        return count
+
+    def test_fake_live_stdout_is_json_stderr_is_operator_ux(self):
+        process = self._run_fake_live()
+        self.assertEqual(process.returncode, 0, process.stderr)
+        document = json.loads(process.stdout)
+        self.assertEqual(document["OUTCOME"], "PASS")
+        self.assertIn("D275 — PREPARAZIONE", process.stderr)
+        self.assertNotIn("D275 — PREPARAZIONE", process.stdout)
+
+    def test_fake_live_operator_sequence_order_and_no_duplicates(self):
+        process = self._run_fake_live()
+        err = process.stderr
+        blocks = [
+            "D275 — PREPARAZIONE",
+            "D275 — AZIONE OPERATORE 1/3",
+            "D275 — AZIONE OPERATORE 2/3",
+            "D275 — AZIONE OPERATORE 3/3",
+            "D275 — TEST COMPLETATO",
+        ]
+        positions = [err.find(header) for header in blocks]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(len(set(positions)), len(positions))
+        for header in blocks:
+            self.assertEqual(err.count(header), 1, f"duplicate or missing {header}")
+
+    def test_fake_live_blocks_have_two_empty_lines_between(self):
+        process = self._run_fake_live()
+        err = process.stderr
+        # Each block is: ====, header, body lines, ====.  Verify that the gap
+        # between the closing separator of one block and the opening separator
+        # of the next contains at least two completely empty lines.
+        blocks = list(
+            re.finditer(r"={60}\nD275 — [^\n]+(?:\n[^\n]+)*\n={60}", err)
+        )
+        self.assertEqual(len(blocks), 5)
+        for i in range(len(blocks) - 1):
+            gap = err[blocks[i].end() : blocks[i + 1].start()]
+            self.assertIn(
+                "\n\n\n",
+                gap,
+                f"block {i} -> {i + 1} lacks two empty lines: {gap!r}",
+            )
+
+    def test_fake_live_simulation_line_in_every_block(self):
+        process = self._run_fake_live()
+        err = process.stderr
+        for marker in [
+            "D275 — PREPARAZIONE",
+            "D275 — AZIONE OPERATORE 1/3",
+            "D275 — AZIONE OPERATORE 2/3",
+            "D275 — AZIONE OPERATORE 3/3",
+            "D275 — TEST COMPLETATO",
+        ]:
+            pos = err.find(marker)
+            end = err.find("=", pos)
+            block = err[pos:end]
+            self.assertIn("SIMULAZIONE — NON TOCCARE IL SENSORE", block)
+
+    def test_prompts_attach_exactly_to_irq2_timeout_waits(self):
+        state = d275.D275OperatorPromptState()
+        delegate = mock.Mock()
+        frames = [b"first_irq2", b"irq_0200", b"second_irq2"]
+        delegate.wait_event = mock.Mock(side_effect=frames)
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            es = d275.D275OperatorPromptingEventSource(
+                delegate, state=state, simulation=True
+            )
+            for expected, frame in zip(
+                [
+                    "AZIONE OPERATORE 1/3",
+                    "AZIONE OPERATORE 2/3",
+                    "AZIONE OPERATORE 3/3",
+                ],
+                frames,
+            ):
+                returned = es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+                self.assertEqual(returned, frame)
+                self.assertIn(expected, stderr.getvalue())
+        self.assertEqual(delegate.wait_event.call_count, 3)
+        for call in delegate.wait_event.call_args_list:
+            self.assertEqual(call.args[0], FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+
+    def test_prompts_do_not_consume_or_modify_events(self):
+        state = d275.D275OperatorPromptState()
+        expected = b"event_bytes"
+        delegate = mock.Mock()
+        delegate.wait_event = mock.Mock(return_value=expected)
+        es = d275.D275OperatorPromptingEventSource(
+            delegate, state=state, simulation=True
+        )
+        self.assertEqual(es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS), expected)
+        self.assertEqual(es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS), expected)
+        self.assertEqual(es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS), expected)
+
+    def test_non_irq2_waits_do_not_emit_operator_prompts(self):
+        state = d275.D275OperatorPromptState()
+        delegate = mock.Mock()
+        delegate.wait_event = mock.Mock(return_value=b"event")
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            es = d275.D275OperatorPromptingEventSource(
+                delegate, state=state, simulation=True
+            )
+            es.wait_event(500)
+            es.wait_event(2000)
+            es.wait_event(12345)
+        self.assertNotIn("AZIONE OPERATORE", stderr.getvalue())
+
+    def test_wait_failure_emits_failure_block_and_no_repeat(self):
+        state = d275.D275OperatorPromptState()
+        delegate = mock.Mock()
+        delegate.wait_event = mock.Mock(side_effect=RuntimeError("boom"))
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            es = d275.D275OperatorPromptingEventSource(
+                delegate, state=state, simulation=True
+            )
+            for _ in range(2):
+                with self.assertRaises(RuntimeError):
+                    es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+        err = stderr.getvalue()
+        self.assertIn("D275 — AZIONE OPERATORE 1/3", err)
+        self.assertIn("D275 — TEST INTERROTTO", err)
+        self.assertEqual(err.count("TEST INTERROTTO"), 1)
+
+    def test_failure_reported_after_action_one_hides_later_prompts(self):
+        state = d275.D275OperatorPromptState()
+        delegate = mock.Mock()
+        delegate.wait_event = mock.Mock(return_value=b"frame1")
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            es = d275.D275OperatorPromptingEventSource(
+                delegate, state=state, simulation=True
+            )
+            es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+            state.show_failure(simulation=True)
+        err = stderr.getvalue()
+        self.assertIn("D275 — AZIONE OPERATORE 1/3", err)
+        self.assertIn("D275 — TEST INTERROTTO", err)
+        self.assertNotIn("D275 — AZIONE OPERATORE 2/3", err)
+        self.assertNotIn("D275 — AZIONE OPERATORE 3/3", err)
+        self.assertNotIn("D275 — TEST COMPLETATO", err)
+
+    def test_failure_reported_after_action_two_hides_action_three(self):
+        state = d275.D275OperatorPromptState()
+        delegate = mock.Mock()
+        delegate.wait_event = mock.Mock(return_value=b"frame")
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            es = d275.D275OperatorPromptingEventSource(
+                delegate, state=state, simulation=True
+            )
+            es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+            es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+            state.show_failure(simulation=True)
+        err = stderr.getvalue()
+        self.assertIn("D275 — AZIONE OPERATORE 1/3", err)
+        self.assertIn("D275 — AZIONE OPERATORE 2/3", err)
+        self.assertIn("D275 — TEST INTERROTTO", err)
+        self.assertNotIn("D275 — AZIONE OPERATORE 3/3", err)
+        self.assertNotIn("D275 — TEST COMPLETATO", err)
+
+    def test_failure_block_is_single_shot(self):
+        state = d275.D275OperatorPromptState()
+        delegate = mock.Mock()
+        delegate.wait_event = mock.Mock(side_effect=RuntimeError("boom"))
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            es = d275.D275OperatorPromptingEventSource(
+                delegate, state=state, simulation=True
+            )
+            for _ in range(2):
+                with self.assertRaises(RuntimeError):
+                    es.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+        self.assertEqual(stderr.getvalue().count("TEST INTERROTTO"), 1)
 
 
 if __name__ == "__main__":
