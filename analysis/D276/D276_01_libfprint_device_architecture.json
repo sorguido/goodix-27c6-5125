@@ -1,12 +1,13 @@
 {
-  "schema": "D276_01_LIBFPRINT_DEVICE_ARCHITECTURE_V1",
+  "schema": "D276_01_LIBFPRINT_DEVICE_ARCHITECTURE_V2_CORRECTIVE",
   "step": "D276/01",
   "reasoning_level": "HIGH",
   "nature": "production_architecture_decision_offline",
   "git": {
     "branch": "main",
-    "baseline": "73f9b18de6571193544fc8d4dcb9c5e3b18f06c7",
-    "initial_head": "73f9b18de6571193544fc8d4dcb9c5e3b18f06c7",
+    "baseline": "f370bd2f2775c09f53abf0b1da00581786a456c9",
+    "initial_head": "f370bd2f2775c09f53abf0b1da00581786a456c9",
+    "origin_main": "f370bd2f2775c09f53abf0b1da00581786a456c9",
     "initial_worktree": "CLEAN",
     "commit_created": false
   },
@@ -18,18 +19,28 @@
     ],
     "DECISION_CONFIDENCE": "HIGH",
     "USB_TRANSPORT_OWNER": "GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT",
-    "TLS_SESSION_OWNER": "GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT",
-    "SECRET_BOUNDARY_OWNER": "GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT_SCOPED_SECRET",
+    "TLS_SESSION_OWNER": "GoodixDeviceContext",
+    "SECRET_BOUNDARY_OWNER": "GoodixDeviceContext",
+    "TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS": "UNRESOLVED",
+    "SECRET_HANDOFF_POLICY": "ONE_HANDOFF_PER_TLS_SESSION",
+    "CROSS_ACTIVATION_TLS_REUSE_TARGET_PROVEN": false,
     "FDT_LIFECYCLE_OWNER": "GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT",
     "LIBFPRINT_EVENT_CONTEXT_MODEL": "ONE_GLIB_MAIN_CONTEXT_WITH_ASYNC_FPI_USB_TRANSFER_AND_ONE_PHYSICAL_IN_READER",
-    "CANCELLATION_MODEL": "ACTIVATION_LOCAL_GCANCELLABLE_CANCEL_HOST_IN_QUIESCE_CALLBACKS_THEN_DEACTIVATE_COMPLETE_NO_DEVICE_COMMAND_RETRY_OR_REOPEN",
+    "CANCELLATION_MODEL": "HOST_IO_CANCEL_AND_DRAIN_INVALIDATE_GENERATION_MARK_PROTOCOL_SESSION_POISONED_QUIESCENCE_UNKNOWN_NO_MASKED_RESUME",
+    "HOST_ONLY_TERMINAL_CLEANUP": "PROVEN_IN_EXISTING_BOUNDED_RUNTIME",
+    "LIBFPRINT_CANCEL_DEVICE_SIDE_PROTOCOL": "UNPROVEN",
+    "DEVICE_SIDE_CANCEL_COMMAND": "NONE_PROVEN",
+    "NO_UNPROVEN_CANCEL_COMMAND_ALLOWED": true,
+    "PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL": "UNRESOLVED",
     "LIBFPRINT_ENROLLMENT_AGGREGATION": "FRAMEWORK_OWNED_VERIFIED",
     "PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED": false,
     "LOCAL_LIBFPRINT_DEVICE_GLUE": "NOT_YET_IMPLEMENTED",
     "LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE": "CLOSED_D276_01",
     "ENROLLMENT_STAGE_POLICY": "NOT_SELECTED",
     "GPL_TO_LGPL_CODE_COPY_ALLOWED": false,
-    "CLEANROOM_NATIVE_REIMPLEMENTATION_REQUIRED_IF_SELECTED": true
+    "MECHANICAL_TRANSLATION_ALLOWED": false,
+    "CLEANROOM_NATIVE_REIMPLEMENTATION_REQUIRED_IF_SELECTED": true,
+    "CLEANROOM_LABEL": "PROJECT_ENGINEERING_PROVENANCE_CONTROL_NOT_LEGAL_CONCLUSION"
   },
   "ownership": {
     "lifetime": "FPIMAGE_DEVICE_OPEN_TO_CLOSE_EPOCH",
@@ -40,7 +51,11 @@
     "logical_waiters_may_read_usb": false,
     "tls_reads_usb_directly": false,
     "tls_input_output": "B0_BYTES_ROUTED_BY_SINGLE_USB_ROUTER",
-    "secret_handoff_count_per_open_epoch": 1,
+    "tls_session_owner": "GoodixDeviceContext",
+    "secret_boundary_owner": "GoodixDeviceContext",
+    "tls_session_lifetime_across_libfprint_activations": "UNRESOLVED",
+    "secret_handoff_policy": "ONE_HANDOFF_PER_TLS_SESSION",
+    "cross_activation_tls_reuse_target_proven": false,
     "goodix_state_machine_count": 1,
     "framework_state_machine": "FpImageDevice",
     "driver_enrollment_stage_counter_allowed": false,
@@ -50,7 +65,7 @@
     "cancel_before_activate_complete": "complete_activate_with_cancelled_error_after_cleanup",
     "cancel_after_activate_complete": "quiesce_then_complete_deactivate",
     "finger_status_reentrant_submit_allowed": false,
-    "state_advance_dispatch": "idle_source_rechecks_generation_and_terminal_fence"
+    "state_advance_dispatch": "0x32_only_continuation_rechecks_framework_gate_release_tail_generation_and_terminal_fence"
   },
   "packaging": {
     "integration": "NATIVE_LIBFPRINT_MESON_DRIVER",
@@ -139,9 +154,16 @@
     {
       "event": "finger_up_irq_0200",
       "owner": "GoodixUsbRouter_and_GoodixLifecycle",
-      "libfprint_api": "fpi_image_device_report_finger_status(dev, FALSE)",
+      "libfprint_api": "derive_validate_down_table_then_0x20_exact_ack_then_consume_discard_post_up_b0_then_0x50_exact_ack_then_consume_nav_then_fpi_image_device_report_finger_status(dev, FALSE)",
       "context": "single_reader_callback_on_owning_context",
-      "terminal_rule": "non_enroll_deactivates_enroll_rearm_gated_by_await_finger_on"
+      "terminal_rule": "report_false_only_after_goodix_release_tail_complete_unless_cancellation_already_intervened"
+    },
+    {
+      "event": "enrollment_rearm_0x32",
+      "owner": "GoodixLifecycle",
+      "libfprint_api": "change_state(FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON)_is_framework_gate",
+      "context": "separate_continuation_on_owning_glib_main_context",
+      "terminal_rule": "require_await_finger_on_and_goodix_release_tail_complete_and_fresh_same_cycle_down_table_then_recheck_generation_and_terminal_fence"
     },
     {
       "event": "deactivate",
@@ -152,10 +174,10 @@
     },
     {
       "event": "cancellation",
-      "owner": "libfprint_requests_GoodixDeviceContext_quiesces",
+      "owner": "libfprint_requests_GoodixDeviceContext_performs_host_cleanup",
       "libfprint_api": "base_cancel_path_to_deactivate_and_fpi_image_device_deactivate_complete",
       "context": "owning_glib_main_context",
-      "terminal_rule": "cancelled_io_expected_no_session_error_retry_or_reopen"
+      "terminal_rule": "cancel_drain_host_io_invalidate_generation_no_device_cancel_command_mark_nonquiescent_protocol_session_poisoned_quiescence_unknown_no_masked_resume_retry_recovery_or_reopen"
     },
     {
       "event": "fail_closed_error",
@@ -165,6 +187,57 @@
       "terminal_rule": "poison_generation_cleanup_exactly_once"
     }
   ],
+  "release_tail": {
+    "GOODIX_RELEASE_TAIL_ORDER": [
+      "FINGER_IMAGE_DELIVERED",
+      "0x34_EXACT_ACK",
+      "IRQ_0x0200",
+      "DERIVE_VALIDATE_DOWN_TABLE",
+      "0x20_EXACT_ACK",
+      "POST_UP_B0_CONSUME_DISCARD",
+      "0x50_EXACT_ACK",
+      "NAV_CONSUME",
+      "GOODIX_RELEASE_TAIL_COMPLETE",
+      "FINGER_OFF_REPORT_FALSE"
+    ],
+    "FINGER_OFF_REPORT_POINT": "AFTER_GOODIX_RELEASE_TAIL_COMPLETE",
+    "POST_UP_B0_DELIVERED_TO_LIBFPRINT": false,
+    "AWAIT_FINGER_ON_GATES": [
+      "REARM_0x32_ONLY"
+    ],
+    "AWAIT_FINGER_ON_DOES_NOT_GATE": [
+      "POST_UP_0x20",
+      "POST_UP_B0",
+      "NAV_0x50"
+    ],
+    "CANCELLATION_PRECEDENCE": "IF_CANCELLATION_ALREADY_INTERVENED_TERMINAL_FENCE_STOPS_TAIL_AND_NO_NEW_COMMAND_IS_SUBMITTED"
+  },
+  "reentrancy": {
+    "NO_GOODIX_COMMAND_AFTER_LIBFPRINT_CALLBACK_MAY_DEACTIVATE_IN_SAME_STACK_FRAME": true,
+    "NON_ENROLL_FINGER_OFF_REENTRANCY": "SYNCHRONOUS_DEACTIVATE_ALLOWED_AFTER_RELEASE_TAIL_NO_SUBSEQUENT_GOODIX_COMMAND",
+    "ENROLL_REARM_GATE": [
+      "FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON",
+      "GOODIX_RELEASE_TAIL_COMPLETE",
+      "FRESH_SAME_CYCLE_DOWN_TABLE"
+    ],
+    "REARM_DISPATCH": "SEPARATE_CONTINUATION_RECHECKS_GENERATION_AND_TERMINAL_FENCE",
+    "MINUTIAE_AND_FINGER_OFF_ORDERING": "FRAMEWORK_MAY_ENTER_AWAIT_FINGER_ON_ONLY_AFTER_BOTH_COMPLETE_IN_EITHER_ORDER"
+  },
+  "cancellation": {
+    "HOST_ONLY_TERMINAL_CLEANUP": "PROVEN_IN_EXISTING_BOUNDED_RUNTIME",
+    "LIBFPRINT_CANCEL_DEVICE_SIDE_PROTOCOL": "UNPROVEN",
+    "DEVICE_SIDE_CANCEL_COMMAND": "NONE_PROVEN",
+    "NO_UNPROVEN_CANCEL_COMMAND_ALLOWED": true,
+    "PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL": "UNRESOLVED",
+    "NONQUIESCENT_CANCEL_POLICY": [
+      "CANCEL_AND_DRAIN_HOST_IO",
+      "INVALIDATE_ACTIVATION_GENERATION",
+      "MARK_PROTOCOL_SESSION_POISONED_QUIESCENCE_UNKNOWN",
+      "NO_MASKED_RESUME_IN_SAME_PROTOCOL_SESSION",
+      "NO_RECOVERY_RESET_RETRY_TLS_RESTART_OR_AUTO_REOPEN",
+      "FUTURE_NORMAL_FRAMEWORK_LIFECYCLE_ONLY_ACCORDING_TO_EXPLICIT_POLICY"
+    ]
+  },
   "framework_coordination": {
     "framework_owns": [
       "action_state",
@@ -176,17 +249,30 @@
     "driver_owns": [
       "wire_sequence",
       "single_reader_demux",
-      "tls_session",
-      "secret_lifetime",
+      "tls_and_secret_resources_not_cross_activation_lifetime_policy",
       "fdt_freshness"
     ],
-    "next_capture_gate": [
+    "rearm_0x32_gate": [
       "FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON",
-      "GOODIX_LIFECYCLE_READY_TO_ARM"
+      "GOODIX_RELEASE_TAIL_COMPLETE",
+      "FRESH_SAME_CYCLE_DOWN_TABLE"
     ],
+    "release_tail_gated_by_await_finger_on": false,
+    "post_up_b0_delivery": "CONSUME_DISCARD_NEVER_FPI_IMAGE_DEVICE_IMAGE_CAPTURED",
     "driver_sets_dynamic_3_to_8_stage_policy": false,
     "offline_2_to_8_contract_promoted_to_live": false,
     "target_live_authority": "STOP_AFTER_SECOND_IMAGE"
+  },
+  "tls_secret_lifetime": {
+    "TLS_SESSION_OWNER": "GoodixDeviceContext",
+    "SECRET_BOUNDARY_OWNER": "GoodixDeviceContext",
+    "TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS": "UNRESOLVED",
+    "SECRET_HANDOFF_POLICY": "ONE_HANDOFF_PER_TLS_SESSION",
+    "CROSS_ACTIVATION_TLS_REUSE_TARGET_PROVEN": false,
+    "D275_RUN_SPECIFIC_FACT": "ONE_USB_SESSION_ONE_TLS_OBJECT_ONE_HANDSHAKE_ONE_SECRET_HANDOFF_TO_SECOND_B0_IN_ONE_BOUNDED_RUN",
+    "D275_PROVES_MULTI_ACTIVATION_POLICY": false,
+    "RECREATE_TLS_PER_ACTIVATION_POLICY": "NOT_SELECTED",
+    "TLS_RESTART_OR_RECOVERY_ALLOWED": false
   },
   "fpimage_sigfm": {
     "shape": [80, 64],
@@ -211,6 +297,9 @@
     "project_core_license": "GPL-2.0-or-later",
     "gpl_to_lgpl_code_copy_allowed": false,
     "mechanical_translation_allowed": false,
+    "CLEANROOM_LABEL": "PROJECT_ENGINEERING_PROVENANCE_CONTROL_NOT_LEGAL_CONCLUSION",
+    "implementation_description": "PROVENANCE_CONTROLLED_INDEPENDENT_REIMPLEMENTATION",
+    "legal_conclusion_or_guarantee": false,
     "python_runtime_role": "BLACK_BOX_BEHAVIORAL_ORACLE_ONLY",
     "rockytkg_goodixgf_license": "LGPL-2.1-or-later",
     "rockytkg_goodixgf_imported_in_d276": false,
@@ -219,6 +308,7 @@
       "neutral_protocol_specification_from_canonical_facts_and_evidence",
       "per_file_spdx_author_and_fact_source_record",
       "independent_implementation_against_spec_and_libfprint_api",
+      "no_gpl_core_consultation_copy_or_translation_during_lgpl_slice",
       "black_box_transcript_equivalence_tests",
       "secret_free_and_biometric_free_golden_vectors",
       "provenance_diff_review_before_each_slice",
@@ -248,6 +338,14 @@
     "skeleton_created_in_d276": false,
     "skeleton_skip_reason": "architecture_document_closes_boundary; premature_backend_or_tls_scaffolding_would_not_prove_additional_behavior",
     "slice_1": "unregistered_fpimage_device_shell_with_in_memory_backend_real_lifecycle_mapping_generation_cancellation_and_main_loop_tests",
+    "slice_1_required_tests": [
+      "NON_ENROLL_FINGER_OFF_SYNCHRONOUS_DEACTIVATE",
+      "ENROLL_FINGER_OFF_WAIT_MINUTIAE",
+      "ENROLL_MINUTIAE_DONE_BEFORE_FINGER_OFF",
+      "ENROLL_FINGER_OFF_BEFORE_MINUTIAE_DONE",
+      "NO_REARM_BEFORE_BOTH_GATES",
+      "NO_COMMAND_AFTER_DEACTIVATE_FENCE"
+    ],
     "slice_2": "cleanroom_incremental_a0_b0_router_with_one_receive_and_synthetic_transcript_oracle_tests",
     "slice_3": "native_memory_bio_tls_then_async_fpi_usb_transfer_backend_without_device_registration",
     "must_not_register_vid_pid_before": [
@@ -273,7 +371,8 @@
     "TRANSPORT_REOPEN_AFTER_TLS": false,
     "USB_TRANSPORT_SESSION_COUNT": 1,
     "TLS_SERVER_HANDSHAKE_COUNT": 1,
-    "SECRET_BOUNDARY_HANDOFF_COUNT": 1
+    "SECRET_BOUNDARY_HANDOFF_COUNT": 1,
+    "COUNTER_SCOPE": "ONE_BOUNDED_D275_RUN_TO_SECOND_B0_NOT_MULTI_ACTIVATION_POLICY"
   },
   "safety": {
     "REAL_USB_ACCESS": false,
@@ -292,11 +391,11 @@
   },
   "closure_v2_5": {
     "OUTCOME": "READY",
-    "ADVANCEMENT": "NEW_PRODUCTION_ARCHITECTURE_BOUNDARY_CLOSED_OFFLINE",
-    "EXECUTABLE_CLOSURE": "NOT_APPLICABLE_DOCUMENTATION_ONLY",
-    "RESIDUAL_BLOCKER_OR_RISK": "NATIVE_LGPL_IMPLEMENTATION_ABSENT; ENROLLMENT_STAGE_POLICY_NOT_SELECTED; TARGET_DEVICE_TIMEOUT_UNKNOWN; ORIENTATION_POLARITY_PPMM_AND_TARGET_BIOMETRIC_QUALITY_UNRESOLVED",
+    "ADVANCEMENT": "ARCHITECTURAL_CORRECTIVE_RELEASE_TAIL_REENTRANCY_AND_LIFETIME_BOUNDARIES_CLOSED_OFFLINE",
+    "EXECUTABLE_CLOSURE": "NOT_APPLICABLE",
+    "RESIDUAL_BLOCKER_OR_RISK": "NATIVE_LGPL_IMPLEMENTATION_ABSENT; TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED; PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED; ENROLLMENT_STAGE_POLICY_NOT_SELECTED; TARGET_DEVICE_TIMEOUT_UNKNOWN; ORIENTATION_POLARITY_PPMM_AND_TARGET_BIOMETRIC_QUALITY_UNRESOLVED",
     "CANONICAL_DOCUMENTATION": "UPDATED",
-    "REVIEW_SET": "BASELINE_73f9b18de6571193544fc8d4dcb9c5e3b18f06c7_ON_main_PLUS_WORKTREE_FILES_Goodix_27c6_5125_manuale_tecnico.md_analysis_D276_D276_01_libfprint_device_architecture.md_analysis_D276_D276_01_libfprint_device_architecture.json"
+    "REVIEW_SET": "BASELINE_f370bd2f2775c09f53abf0b1da00581786a456c9_ON_main_PLUS_WORKTREE_FILES_Goodix_27c6_5125_manuale_tecnico.md_analysis_D276_D276_01_libfprint_device_architecture.md_analysis_D276_D276_01_libfprint_device_architecture.json"
   },
   "verification": {
     "json_parse": "PASS",
@@ -305,7 +404,7 @@
     "host_only_code_tests": "NOT_APPLICABLE_NO_CODE_CREATED"
   },
   "review_set": {
-    "baseline": "73f9b18de6571193544fc8d4dcb9c5e3b18f06c7",
+    "baseline": "f370bd2f2775c09f53abf0b1da00581786a456c9",
     "branch": "main",
     "commit_created": false,
     "paths": [

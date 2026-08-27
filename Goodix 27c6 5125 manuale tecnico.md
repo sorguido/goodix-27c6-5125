@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D276/01 — architettura device glue chiusa, implementazione non iniziata
+### Stato corrente post-D276/01 corrective — release tail e confini architetturali chiusi offline
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -70,6 +70,7 @@ TRANSPORT_REOPEN_AFTER_TLS=false
 USB_TRANSPORT_SESSION_COUNT=1
 TLS_SERVER_HANDSHAKE_COUNT=1
 SECRET_BOUNDARY_HANDOFF_COUNT=1
+PRESERVED_D275_COUNTER_SCOPE=ONE_BOUNDED_RUN_TO_SECOND_B0_NOT_CROSS_ACTIVATION_POLICY
 
 LIVE_EVIDENCE_CONSOLIDATED_IN_REPOSITORY=true
 CANONICAL_REPOSITORY_EVIDENCE_RECORD=analysis/D275/D275_04_second_b0_live_closure.json
@@ -81,29 +82,48 @@ CANONICAL_PRIVATE_RAW_EVIDENCE_ROOT=captures/
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
 boundary architetturale `LOCAL_LIBFPRINT_DEVICE_GLUE`: la topologia production
 scelta è un driver `FpImageDevice` nativo C, in-process e LGPL, implementato in
-modo indipendente/clean-room. Una singola istanza `GoodixDeviceContext`, con
-lifetime `img_open → img_close`, possiede il claim USB, l'unico bulk-IN reader,
-il router A0/B0, un solo server TLS 1.2 PSK, il secret scoped e l'unico lifecycle
-Goodix/FDT. Il runtime Python GPL resta oracle comportamentale black-box per
-test sintetici, non dipendenza runtime e non sorgente da tradurre nel dominio
-LGPL.
+modo indipendente con provenance controllata. Una singola istanza
+`GoodixDeviceContext`, con lifetime `img_open → img_close`, possiede il claim
+USB, l'unico bulk-IN reader, il router A0/B0, TLS/secret e l'unico lifecycle
+Goodix/FDT. D275 prova un solo oggetto/handshake TLS e un handoff del secret nel
+solo run bounded fino al secondo B0; non prova il riuso della stessa sessione
+TLS fra più activation libfprint. Il runtime Python GPL resta oracle
+comportamentale black-box per test sintetici, non dipendenza runtime e non
+sorgente da tradurre nel dominio LGPL.
 
 ```text
 PRODUCTION_LIBFPRINT_TOPOLOGY=NATIVE_IN_PROCESS_C_LGPL_CLEANROOM
 REJECTED_TOPOLOGIES=GPL_OUT_OF_PROCESS_HELPER_WITH_IPC,PYTHON_EMBEDDED_IN_LIBFPRINT
 DECISION_CONFIDENCE=HIGH
 USB_TRANSPORT_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT
-TLS_SESSION_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT
-SECRET_BOUNDARY_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT_SCOPED_SECRET
+TLS_SESSION_OWNER=GoodixDeviceContext
+SECRET_BOUNDARY_OWNER=GoodixDeviceContext
+TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS=UNRESOLVED
+SECRET_HANDOFF_POLICY=ONE_HANDOFF_PER_TLS_SESSION
+CROSS_ACTIVATION_TLS_REUSE_TARGET_PROVEN=false
 FDT_LIFECYCLE_OWNER=GOODIX_FPIMAGE_DEVICE_OPEN_EPOCH_CONTEXT
 LIBFPRINT_EVENT_CONTEXT_MODEL=ONE_GLIB_MAIN_CONTEXT_WITH_ASYNC_FPI_USB_TRANSFER_AND_ONE_PHYSICAL_IN_READER
-CANCELLATION_MODEL=ACTIVATION_LOCAL_GCANCELLABLE_CANCEL_HOST_IN_QUIESCE_CALLBACKS_THEN_DEACTIVATE_COMPLETE_NO_DEVICE_COMMAND_RETRY_OR_REOPEN
+CANCELLATION_MODEL=HOST_IO_CANCEL_AND_DRAIN_INVALIDATE_GENERATION_MARK_PROTOCOL_SESSION_POISONED_QUIESCENCE_UNKNOWN_NO_MASKED_RESUME
+HOST_ONLY_TERMINAL_CLEANUP=PROVEN_IN_EXISTING_BOUNDED_RUNTIME
+LIBFPRINT_CANCEL_DEVICE_SIDE_PROTOCOL=UNPROVEN
+DEVICE_SIDE_CANCEL_COMMAND=NONE_PROVEN
+NO_UNPROVEN_CANCEL_COMMAND_ALLOWED=true
+PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL=UNRESOLVED
+GOODIX_RELEASE_TAIL_ORDER=FINGER_IMAGE_0X34_EXACT_ACK_IRQ0200_DERIVE_VALIDATE_DOWN_TABLE_0X20_EXACT_ACK_POST_UP_B0_CONSUME_DISCARD_0X50_EXACT_ACK_NAV_CONSUME_GOODIX_RELEASE_TAIL_COMPLETE_FINGER_OFF_REPORT_FALSE
+FINGER_OFF_REPORT_POINT=AFTER_GOODIX_RELEASE_TAIL_COMPLETE
+POST_UP_B0_DELIVERED_TO_LIBFPRINT=false
+AWAIT_FINGER_ON_GATES=REARM_0X32_ONLY
+AWAIT_FINGER_ON_DOES_NOT_GATE=POST_UP_0X20,POST_UP_B0,NAV_0X50
+NON_ENROLL_FINGER_OFF_REENTRANCY=SYNCHRONOUS_DEACTIVATE_ALLOWED_AFTER_RELEASE_TAIL_NO_SUBSEQUENT_GOODIX_COMMAND
+ENROLL_REARM_GATE=AWAIT_FINGER_ON_AND_GOODIX_RELEASE_TAIL_COMPLETE_AND_FRESH_SAME_CYCLE_DOWN_TABLE
 LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
 PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
 LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED
 LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE=CLOSED_D276_01
 GPL_TO_LGPL_CODE_COPY_ALLOWED=false
+MECHANICAL_TRANSLATION_ALLOWED=false
 CLEANROOM_NATIVE_REIMPLEMENTATION_REQUIRED_IF_SELECTED=true
+CLEANROOM_LABEL=PROJECT_ENGINEERING_PROVENANCE_CONTROL_NOT_LEGAL_CONCLUSION
 ENROLLMENT_STAGE_POLICY=NOT_SELECTED
 NEXT_PRIMARY_BOUNDARY=LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1_HOST_ONLY
 LIVE_AUTHORIZED=false
@@ -1594,7 +1614,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; UX operatore poka-yoke italiana su `stderr` con JSON macchina su `stdout`; fake-live rehearsal visiva hardware-inert; D268 storico frozen `c03d32e...`; nessuna USB reale |
 | D275/03 post-live root-cause `0x34 → IRQ0200` | corrective offline; due run live storiche fail-closed; nuova live false | tentativo 2 elimina timing operatore; prima immagine provata dal call-flow e telemetry monotona corretta; baseline Linux passava raw IRQ2 nel `0x34`, mentre tre cicli OEM APP12509 provano `80 || ((raw>>1)+0x1d)` con touch `0x003f`; down-table IRQ0200 corretta a `80 || (raw>>1)`; timeout 15 s non corto, lost-event race non trovata; causalità mismatch `STRONG_CAUSAL_INFERENCE`; terza run equivalente vietata |
 | D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; closure consolidata nel commit `42819c05...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
-| D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; documentation-only; live false | scelta `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM` con un solo `GoodixDeviceContext` owner di claim USB/reader/router/TLS/secret/FDT; mapping reale libfprint 1.94.5, cancel host-only e terminal fence chiusi; enrollment aggregation framework-owned, stage policy non selezionata; helper IPC e Python embedded respinti; implementazione ancora assente, prossimo slice host-only non registrato |
+| D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; corrective documentation-only; live false | preservata `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM`/confidence `HIGH`; release tail corretto fino a NAV prima del finger-off, post-up B0 mai consegnato a libfprint e solo re-arm `0x32` gated da `AWAIT_FINGER_ON`; reentrancy/deactivate esplicitata; `GoodixDeviceContext` owner TLS/secret ma lifetime TLS cross-activation irrisolto; cancel device-side e quiescenza production arbitraria non provati, policy conservativa `POISONED/QUIESCENCE_UNKNOWN`; reimplementazione indipendente con provenance controllata, non conclusione legale; implementazione ancora assente, prossimo slice host-only non registrato |
 
 ## Fonti e confini di pubblicazione
 
@@ -1741,7 +1761,7 @@ LGPL native FpImageDevice driver (production topology)
   GoodixDeviceContext per open epoch
     ├── unico claim/owner USB e unico bulk-IN reader
     ├── unico router A0/B0
-    ├── unico TLS 1.2 PSK server + secret scoped
+    ├── owner unico TLS 1.2 PSK + secret (lifetime cross-activation UNRESOLVED)
     ├── unico lifecycle Goodix/FDT
     └── adapter FpImage 80x64 già LGPL
 ```
@@ -1772,49 +1792,73 @@ bloccante.
 
 | Evento | API libfprint verificata | Regola di ownership/teardown |
 | --- | --- | --- |
-| open | `img_open` → `fpi_image_device_open_complete()` | crea il contesto, reclama l'interfaccia, svolge cold-start e un solo TLS/secret handoff; failure pulisce senza retry |
+| open | `img_open` → `fpi_image_device_open_complete()` | crea il contesto e reclama l'interfaccia; il context possiede TLS/secret, con un handoff per sessione TLS, ma la policy di lifetime cross-activation resta irrisolta; failure pulisce senza retry |
 | activate | `activate` → `fpi_image_device_activate_complete()` | crea generation e `GCancellable` locali; completa success solo dopo arm valido |
-| framework pronto | `change_state(AWAIT_FINGER_ON)` | insieme a `GOODIX_READY_TO_ARM` è il solo gate di re-arm; nessun contatore stage driver |
+| framework pronto | `change_state(AWAIT_FINGER_ON)` | gatea soltanto il re-arm `0x32`, insieme a `GOODIX_RELEASE_TAIL_COMPLETE` e down-table fresca same-cycle; nessun contatore stage driver |
 | IRQ finger-down `0x0002` | `fpi_image_device_report_finger_status(dev, TRUE)` | l'API pubblica `PRESENT` e porta il framework in `CAPTURE`; callback stale non produce comandi |
 | B0 immagine | helper LGPL → `fpi_image_device_image_captured()` | consegna una `FpImage(80,64)`, flags zero e ppmm semanticamente ignoto; parse/CRC/shape failure è terminale |
-| IRQ finger-up `0x0200` | `fpi_image_device_report_finger_status(dev, FALSE)` | l'API pubblica `NONE`; non-enroll deattiva, enroll attende un nuovo `AWAIT_FINGER_ON` prima del ciclo seguente |
-| deactivate/cancel | `deactivate` → `fpi_image_device_deactivate_complete()` | cancella solo I/O host, drena l'unico callback, invalida generation; nessun comando device, retry, TLS restart o reopen |
+| IRQ finger-up `0x0200` e release tail | down-table → `0x20`/ACK → B0 discard → `0x50`/ACK → NAV → `GOODIX_RELEASE_TAIL_COMPLETE` → `fpi_image_device_report_finger_status(dev, FALSE)` | il B0 post-up non è mai consegnato via `fpi_image_device_image_captured()`; `0x20`/B0/`0x50` non sono gated da `AWAIT_FINGER_ON`; finger-off è notificato solo a tail completo, salvo cancellation già intervenuta |
+| deactivate/cancel | `deactivate` → completion phase-correct | cancella/draina solo I/O host e invalida generation; nessun cancel device-side provato. Se non quiescente: sessione `POISONED/QUIESCENCE_UNKNOWN`, nessun resume/recovery/retry/TLS restart/reopen automatico |
 | errore sessione | `fpi_image_device_session_error()` | marca l'open epoch `POISONED`, cleanup exactly-once; una nuova activation non maschera l'errore |
 | close | `img_close` → `fpi_image_device_close_complete()` | fence, drain, chiusura TLS, zeroizzazione secret, release claim; nessun recovery A2/`0x70` |
 
 `FpImageDevice` e `GoodixLifecycle` sono le sole due state machine legittime e
 non duplicate: la prima possiede azione, stato dito, estrazione, matching e
 aggregazione enrollment; la seconda possiede soltanto sequenza wire e
-freschezza FDT. Il gate `AWAIT_FINGER_ON + GOODIX_READY_TO_ARM` impedisce sia
-capture anticipata durante l'estrazione SIGFM sia perdita di un IRQ2 quando il
-framework non è pronto.
+freschezza FDT. L'ordine target-proven del rilascio è:
+
+```text
+finger image -> 0x34/ACK -> IRQ0200 -> derive/validate down table
+-> 0x20/exact ACK -> consume/discard post-up B0
+-> 0x50/exact ACK -> consume NAV -> GOODIX_RELEASE_TAIL_COMPLETE
+-> report_finger_status(FALSE)
+```
+
+Il gate `AWAIT_FINGER_ON + GOODIX_RELEASE_TAIL_COMPLETE + fresh same-cycle
+down-table` autorizza esclusivamente il successivo `0x32`. Impedisce capture
+anticipata durante l'estrazione SIGFM e perdita di un IRQ2 quando il framework
+non è pronto, senza trattenere il release tail corrente dietro lo stato
+`AWAIT_FINGER_ON`.
 
 La cancellazione libfprint dell'azione porta al `deactivate`; il cancellable
 dell'azione è concatenato a un cancellable activation-local usato da tutti i
-transfer. `deactivate` chiude prima il terminal fence, cancella il solo pending
-IN, attende il ritorno del callback e tratta `G_IO_ERROR_CANCELLED` come esito
-atteso, poi completa una sola volta. Il close è l'unico distruttore dell'open
-epoch. Timeout, TLS, frame/ACK/CRC o lifecycle inattesi sono fail-closed e non
-invocano `fpi_image_device_retry_scan()`; tale API resta riservata a una futura
-condizione biometrica realmente giustificata e non autorizza resend wire.
+transfer. `deactivate` chiude prima il terminal fence, cancella/draina il solo
+I/O host pending, invalida generation e completa phase-correctly. Il risultato
+`G_IO_ERROR_CANCELLED` prova la cancellazione host, non la quiescenza del
+protocollo device-side. Non esiste un comando cancel device-side provato e non
+ne è ammesso uno non compreso. Se il lifecycle non è quiescente, la sessione di
+protocollo diventa `POISONED/QUIESCENCE_UNKNOWN`: nessun resume mascherato nella
+stessa sessione, recovery, reset, retry, TLS restart o reopen automatico. La
+quiescenza production dopo cancel arbitrario resta `UNRESOLVED` e un normale
+lifecycle framework futuro richiede una policy esplicita. Timeout, TLS,
+frame/ACK/CRC o lifecycle inattesi sono fail-closed e non invocano
+`fpi_image_device_retry_scan()`.
 
 La cancellazione prima di `activate_complete(NULL)` termina invece la fase con
 `fpi_image_device_activate_complete(..., G_IO_ERROR_CANCELLED)`: in quel punto
 la base non ha ancora marcato il device attivo e `deactivate_complete()` non è
 valido. Lo stesso principio phase-specific vale per open. Inoltre
 `report_finger_status(FALSE)` può provocare sincronicamente `change_state` o
-`deactivate`; il callback IRQ registra quindi il gate e rinvia ogni avanzamento
-a una source idle che ricontrolla generation e terminal fence, evitando submit
-reentrant dopo una deactivation.
+`deactivate`: nel non-enroll la deactivation è immediata; nell'enroll il nuovo
+`AWAIT_FINGER_ON` compare solo dopo finger-off e minutiae completion, in
+qualunque ordine. Il release tail deve quindi essere completo prima della
+callback e nessun comando Goodix può essere inviato dopo di essa nella stessa
+stack frame. Il solo `0x32` è una continuazione separata che ricontrolla i tre
+gate, generation e terminal fence. Se cancellation è già intervenuta, prevale
+il fence e il tail non viene proseguito.
 
-La procedura clean-room richiede: specifica neutra derivata da evidenza
+La provenance-controlled independent reimplementation richiede: specifica neutra derivata da evidenza
 canonica; SPDX/autore/fonti per ogni file; implementazione indipendente contro
 API libfprint e primitive GLib/TLS; confronto black-box di transcript sintetici
-con il runtime Python; golden vector senza secret/biometrica; review provenance
+con il runtime Python; nessuna consultazione/copia/traduzione del core GPL
+durante il slice LGPL; golden vector senza secret/biometrica; review provenance
 per slice. Un eventuale riuso di `Rockytkg/src/goodixgf.c`, LGPL, richiede audit
 e ledger per-file; D276 non importa codice. Il suo `500 DPI`, flag inverted,
 policy dinamica `3..8`, worker blocking e dipendenze dal core Rocky GPL non
-sono adottati.
+sono adottati. `GPL_TO_LGPL_CODE_COPY_ALLOWED=false` e
+`MECHANICAL_TRANSLATION_ALLOWED=false`; questa etichetta è controllo
+ingegneristico di provenance, non conclusione o garanzia legale
+(`CLEANROOM_LABEL=PROJECT_ENGINEERING_PROVENANCE_CONTROL_NOT_LEGAL_CONCLUSION`).
 
 Roadmap corrente:
 
@@ -1822,6 +1866,12 @@ Roadmap corrente:
 D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice non registrata + backend in-memory
          -> main-loop/cancel/generation/terminal-fence/FpImage test host-only
+         -> NON_ENROLL_FINGER_OFF_SYNCHRONOUS_DEACTIVATE
+         -> ENROLL_FINGER_OFF_WAIT_MINUTIAE
+         -> ENROLL_MINUTIAE_DONE_BEFORE_FINGER_OFF
+         -> ENROLL_FINGER_OFF_BEFORE_MINUTIAE_DONE
+         -> NO_REARM_BEFORE_BOTH_GATES
+         -> NO_COMMAND_AFTER_DEACTIVATE_FENCE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici
 D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no VID:PID
 poi      -> review provenance + decisione stage enrollment + baseline live separata
@@ -6821,15 +6871,20 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D276/01: il glue device non è ancora implementato
+Stato corrente post-D276/01 corrective: il glue device non è ancora implementato
 (`LOCAL_LIBFPRINT_DEVICE_GLUE=NOT_YET_IMPLEMENTED`), ma la sua architettura è
 chiusa (`LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE=CLOSED_D276_01`). La
-production topology è una reimplementazione nativa C/LGPL clean-room e
-in-process, con un solo `GoodixDeviceContext` per open epoch. Il prossimo lavoro
-autorizzato è esclusivamente host-only: shell `FpImageDevice` non registrata,
-backend in-memory, main-loop, cancellation/generation/terminal fence e consegna
-della `FpImage` già LGPL. Non include USB, TLS reale, secret, fprintd, VID:PID,
-stage policy, terzo ciclo o nuovo live. Artefatti di decisione:
+production topology è una reimplementazione nativa C/LGPL indipendente con
+provenance controllata e in-process, con un solo `GoodixDeviceContext` per open
+epoch. Il context è owner di TLS/secret, ma lifetime TLS fra più activation e
+quiescenza device-side dopo cancel arbitrario restano irrisolti. Il release
+tail corrente completa `0x20`/B0-discard/`0x50`/NAV prima del finger-off; solo
+il re-arm `0x32` dipende da `AWAIT_FINGER_ON`, tail completo e down-table fresca.
+Il prossimo lavoro autorizzato è esclusivamente host-only: shell
+`FpImageDevice` non registrata, backend in-memory, main-loop,
+cancellation/generation/terminal fence, test reentrancy/enroll e consegna della
+`FpImage` già LGPL. Non include USB, TLS reale, secret, fprintd, VID:PID, stage
+policy, terzo ciclo o nuovo live. Artefatti di decisione:
 `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
