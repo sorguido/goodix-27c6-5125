@@ -159,6 +159,25 @@ ricostruzione offline, D274/03 per il secondo edge Windows OEM live. Il timeout
 semantico del device resta `UNKNOWN`, `LIVE_AUTHORIZED=false` e il prossimo
 confine è review AI-PM, non esecuzione live automatica.
 
+D275/02 prepara **solo offline** il thin operator path; la qualifica finale resta **BLOCKED** perché la suite D268 rileva drift hash preesistente nel manifest live-critical rispetto al current HEAD. Il thin path
+`operator_kit/d275-second-b0-once.sh` →
+`tools/d275_live_second_b0_once.py` sopra lo stesso
+`PersistentRuntimeCoordinator`. Il default storico D268 resta
+`STOP_AFTER_FIRST_IMAGE`; D275 richiede esplicitamente
+`--terminal-boundary STOP_AFTER_SECOND_IMAGE`. La modalità fake attraversa lo
+stesso coordinator e chiude sinteticamente il secondo B0 con una sessione USB,
+un oggetto/handshake TLS, un handoff PSK, zero retry/reopen/write e un cleanup.
+Il live candidate richiede inoltre SHA completo approvato, worktree pulito,
+marker D275 single-use e la frase gate esatta che dichiara VID:PID, one-shot,
+no retry, factory-preserving, no enrollment e no third cycle. Il secondo B0 è
+lo stop wire/state-driven; il comando candidato non è stato eseguito.
+
+Lo stato probatorio è quindi distinto: D268 osserva live Linux la prima
+immagine; D275/01 chiude offline il production path fino al secondo B0; D275/02
+qualifica offline il relativo operator path, ma non produce evidenza device.
+`LINUX_SECOND_B0_LIVE_OBSERVED=false`, `LIVE_AUTHORIZED=false` e
+`TARGET_DEVICE_TIMEOUT=UNKNOWN`.
+
 Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
 D269, chiama il SIGFM locale, mantiene il gate `<25`, distingue score zero da
 errore negativo e contiene le eccezioni C++/OpenCV al confine C. Raster, buffer
@@ -220,11 +239,11 @@ GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-LINUX_MULTIFRAME_RUNTIME=D275_01_EXECUTABLE_CLOSED_OFFLINE_TO_SECOND_B0
+LINUX_MULTIFRAME_RUNTIME=D275_02_LIVE_ONE_SHOT_PATH_PREPARED_QUALIFIED_OFFLINE_NOT_LIVE_EXECUTED
 LINUX_SECOND_B0_LIVE_OBSERVED=false
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D275_01
+NEXT_PRIMARY_BOUNDARY=AI_PM_PRE_LIVE_REVIEW_D275_02
 NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_SEPARATE_AUTHORITY_FOR_ANY_FUTURE_LIVE_STEP
 ```
 
