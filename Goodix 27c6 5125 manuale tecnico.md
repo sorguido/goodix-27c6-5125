@@ -137,6 +137,28 @@ Il set permissivo resta valido e invariato solo nelle fasi cold-start/pre-TLS,
 dove `0x07` è realmente osservato live. Questa closure non riapre né attenua i
 blocker D272 primari.
 
+D275/01 promuove ora quel lifecycle nel vero owner Linux
+`PersistentRuntimeCoordinator`, mantenendo lo stesso `RuntimeTransport`, la
+stessa `Tls12PskServerSession`/`MemoryBioApplicationSessionAdapter`, un solo
+handoff del boundary PSK e il solo cleanup terminale. Il first-image handoff usa
+il decoder canonico e porta `FDT_ARMED_WAIT → FIRST_IMAGE_RECEIVED`; da lì il
+runner D273 è collegato al transport produttivo, non ricopiato. Le generation
+FDT sono possedute da `DerivedFdtTable`: la up-table arriva dall'IRQ `0x0002`
+del ciclo corrente e la down-table dall'IRQ `0x0200` dello stesso ciclo. Tutti
+gli ACK post-image richiedono echo esatto e status `0x01`; NAV accetta soltanto
+il controllo `0x50` con forma 2417/2410. I B0 sono consumati solo negli stati
+first acquisition, post finger-up e second acquisition; un B0 dove è atteso un
+IRQ/NAV fallisce chiuso. Il percorso offline termina al secondo B0, senza
+terzo ciclo, retry, reopen, persistenza o serializzazione biometrica.
+
+La executable closure sintetica attraversa il vero coordinator tramite
+`tools/d264_first_image_offline.py --terminal-boundary STOP_AFTER_SECOND_IMAGE`.
+Questo prova l'integrazione offline, non una seconda acquisizione Linux live:
+D268 resta l'autorità Linux live per la prima immagine, D273 per la
+ricostruzione offline, D274/03 per il secondo edge Windows OEM live. Il timeout
+semantico del device resta `UNKNOWN`, `LIVE_AUTHORIZED=false` e il prossimo
+confine è review AI-PM, non esecuzione live automatica.
+
 Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
 D269, chiama il SIGFM locale, mantiene il gate `<25`, distingue score zero da
 errore negativo e contiene le eccezioni C++/OpenCV al confine C. Raster, buffer
@@ -198,8 +220,12 @@ GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-NEXT_PRIMARY_BOUNDARY=D274_03_OFFLINE_FINALIZER_CORRECTIVE_REVIEW
-NEXT_BOUNDARY_PREREQUISITE=FORMAL_FREEZE_REVIEW_POST_OBSERVATION
+LINUX_MULTIFRAME_RUNTIME=D275_01_EXECUTABLE_CLOSED_OFFLINE_TO_SECOND_B0
+LINUX_SECOND_B0_LIVE_OBSERVED=false
+TARGET_DEVICE_TIMEOUT=UNKNOWN
+LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D275_01
+NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_SEPARATE_AUTHORITY_FOR_ANY_FUTURE_LIVE_STEP
 ```
 
 D274/01 prepara esclusivamente offline una superficie Windows/OEM distinta da

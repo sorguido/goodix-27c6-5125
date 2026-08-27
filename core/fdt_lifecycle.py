@@ -54,7 +54,7 @@ class FdtLifecycleState(str, Enum):
     FAILED_CLOSED = "FAILED_CLOSED"
 
 
-SAFE_DEVICE_COMMANDS = frozenset({0x20, 0x22, 0x32, 0x36, 0x50, 0x82})
+SAFE_DEVICE_COMMANDS = frozenset({0x20, 0x22, 0x32, 0x34, 0x36, 0x50, 0x82})
 PERSISTENT_COMMAND_FAMILIES = frozenset({0xE0, 0xA4, 0xF0, 0xF4})
 SPECIAL_RECOVERY_COMMANDS = frozenset({0xA2, 0x70})
 EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE = (0x36, 0x50, 0x36, 0x82, 0x20, 0x36, 0x32)
@@ -236,6 +236,18 @@ class FdtLifecycle:
     def first_image_received(self) -> LifecycleTransition:
         self._require(FdtLifecycleState.FDT_ARMED_WAIT)
         return self._record("FIRST_IMAGE_VALIDATED", FdtLifecycleState.FIRST_IMAGE_RECEIVED)
+
+    def multiframe_command_attempt(self, command: int) -> LifecycleTransition:
+        """Audit one D273 post-image command without creating another owner."""
+        self._require(FdtLifecycleState.FIRST_IMAGE_RECEIVED)
+        if command not in {0x20, 0x22, 0x32, 0x34, 0x50}:
+            self.fail_closed(f"multiframe_command_not_allowlisted:0x{command:02x}")
+            raise InvalidTransition("multiframe_command_not_allowlisted")
+        return self._record(
+            f"MULTIFRAME_0x{command:02X}_ATTEMPT",
+            FdtLifecycleState.FIRST_IMAGE_RECEIVED,
+            device_commands=(command,),
+        )
 
     def cancel_pending_receive(self) -> LifecycleTransition:
         self._require(

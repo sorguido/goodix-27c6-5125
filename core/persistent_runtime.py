@@ -23,6 +23,14 @@ from core.fdt_lifecycle import (
     ExactFreshFdtBootstrapMachine,
     FdtLifecycle,
 )
+from core.multiframe_validation import (
+    BoundedMultiFrameRunner,
+    DerivedFdtTable,
+    Input,
+    InputKind,
+    MultiFrameContract,
+    MultiFrameError,
+)
 from core.fdt_seed import SeedProviderResult
 from core.post_d4 import (
     ImageDecodeDiagnostic,
@@ -36,6 +44,7 @@ from core.post_d4 import (
     parse_af_response,
     parse_fdt_event,
     parse_image_payload,
+    parse_nav_baseline_response,
     parse_outer,
     parse_payload,
 )
@@ -91,6 +100,7 @@ class TerminalBoundary(str, Enum):
 
     STOP_AFTER_FDT_ARM_ACK = "STOP_AFTER_FDT_ARM_ACK"
     STOP_AFTER_FIRST_IMAGE = "STOP_AFTER_FIRST_IMAGE"
+    STOP_AFTER_SECOND_IMAGE = "STOP_AFTER_SECOND_IMAGE"
 
 
 class RuntimeFailure(RuntimeError):
@@ -113,6 +123,7 @@ class RuntimeResult:
     first_image_raster_shape: tuple[int, int] | None = None
     first_image_bytes_persisted: bool = False
     terminal_cleanup_completed: bool = False
+    second_image_received: bool = False
 
 
 class _FdtTransportAdapter:
@@ -140,6 +151,95 @@ class _FdtTransportAdapter:
         policy_factory = operational_fdt_a0_policy if self.operational_physical_policy else fdt_a0_policy
         self.transport.submit(request, policy_factory(control, timeout_ms))
         return tuple(self.transport.receive(timeout_ms) for _ in range(count))
+
+
+def _parse_exact_lifecycle_ack(frame: bytes, echo: int) -> None:
+    kind, payload = parse_outer(frame)
+    control, data = parse_payload(payload)
+    if kind != PLAIN or control != 0xB0 or data != bytes((echo, 0x01)):
+        raise RuntimeFailure(f"lifecycle_ack01_required:0x{echo:02x}")
+
+
+def _consume_image_b0(coordinator, frame: bytes, label: str) -> tuple[int, ...]:
+    kind, body = parse_outer(frame)
+    if kind != TLS:
+        raise RuntimeFailure(f"{label}_image_b0_out_of_state")
+    plaintext = coordinator.tls_session.application_session.consume_application_record(body)
+    try:
+        return parse_image_payload(bytes(plaintext))
+    except Exception as error:
+        raise RuntimeFailure(f"{label}_image_decode_failed") from error
+    finally:
+        for index in range(len(plaintext)):
+            plaintext[index] = 0
+
+
+class _ProductionMultiFrameChannel:
+    """Bind the D273 ordering engine to the coordinator's sole I/O owners."""
+
+    def __init__(self, coordinator, *, cycle: int) -> None:
+        self.coordinator = coordinator
+        self.cycle = cycle
+        self.expected: int | None = None
+
+    def write(self, frame: bytes, timeout_ms: int) -> None:
+        kind, payload = parse_outer(frame)
+        control, _ = parse_payload(payload)
+        if kind != PLAIN or control not in {0x34, 0x20, 0x50, 0x32, 0x22}:
+            raise MultiFrameError("persistent_or_unknown_command_reachable")
+        self.expected = control
+        # This is the production lifecycle audit trail, not a D275-only machine.
+        self.coordinator.lifecycle.multiframe_command_attempt(control)
+        policy_factory = (
+            operational_fdt_a0_policy
+            if self.coordinator.operational_physical_policy
+            else fdt_a0_policy
+        )
+        self.coordinator.transport.submit(frame, policy_factory(control, timeout_ms))
+
+    def read_next(self, timeout_ms: int) -> Input:
+        if self.expected is not None:
+            control, self.expected = self.expected, None
+            frame = self.coordinator.transport.receive(timeout_ms)
+            try:
+                _parse_exact_lifecycle_ack(frame, control)
+            except RuntimeFailure as error:
+                raise MultiFrameError(str(error)) from error
+            return Input(InputKind.ACK, control=control, status=1)
+        state = self.coordinator.lifecycle.device_command_trace[-1]
+        if state in {0x34, 0x32}:
+            frame = self.coordinator.event_source.wait_event(timeout_ms)
+            kind, payload = parse_outer(frame)
+            event = parse_fdt_event(payload) if kind == PLAIN else None
+            wanted = 0x0200 if state == 0x34 else 0x0002
+            if event is None or event.irq != wanted:
+                raise MultiFrameError(f"expected_irq_0x{wanted:04x}")
+            table = None if event.raw_base is None else DerivedFdtTable(
+                event.raw_base, wanted, self.cycle if wanted == 0x0200 else self.cycle + 1
+            )
+            return Input(InputKind.IRQ, irq=wanted, derived_fdt_table=table)
+        if state in {0x20, 0x22}:
+            raster = _consume_image_b0(
+                self.coordinator,
+                self.coordinator.transport.receive(timeout_ms),
+                "post_up" if state == 0x20 else "second",
+            )
+            if state == 0x22:
+                self.coordinator.lifecycle.image_command_attempt_count += 1
+            return Input(InputKind.IMAGE, raster=raster)
+        if state == 0x50:
+            frame = self.coordinator.transport.receive(timeout_ms)
+            try:
+                parse_nav_baseline_response(frame)
+            except Exception as error:
+                raise MultiFrameError("nav_response_invalid") from error
+            return Input(
+                InputKind.NAV_RESPONSE,
+                control=0x50,
+                outer_length=len(frame),
+                inner_length=2410,
+            )
+        raise MultiFrameError("unexpected_b0_or_input_out_of_state")
 
 
 class PersistentRuntimeCoordinator:
@@ -280,6 +380,8 @@ class PersistentRuntimeCoordinator:
             self.machine.arm(ts16)
             if terminal_mode == TerminalBoundary.STOP_AFTER_FIRST_IMAGE:
                 return self._run_first_image_terminal_boundary(ts16)
+            if terminal_mode == TerminalBoundary.STOP_AFTER_SECOND_IMAGE:
+                return self._run_second_image_terminal_boundary(ts16)
             # Default historical boundary (D260/D262): stop after the final arm.
             return self._run_arm_only_boundary()
         except Exception as error:
@@ -455,6 +557,64 @@ class PersistentRuntimeCoordinator:
         self.lifecycle.terminal_stop()
         outcome["terminal_cleanup_completed"] = True
         return outcome
+
+    def _run_second_image_terminal_boundary(self, ts16: int) -> RuntimeResult:
+        """Production-owned, retained-session D275 two-image offline path."""
+        first = self._acquire_first_image_for_multiframe()
+        channel = _ProductionMultiFrameChannel(self, cycle=0)
+        runner = BoundedMultiFrameRunner(channel, lambda _role, _pixels: {})
+        try:
+            runner.run(
+                MultiFrameContract(
+                    ("FIRST", "SECOND"),
+                    DerivedFdtTable(first["up_table"], 0x0002, 0),
+                    (ts16,),
+                ),
+                first["raster"],
+            )
+        except MultiFrameError as error:
+            raise RuntimeFailure(f"multiframe_fail_closed:{error}") from error
+        self.lifecycle.cancel_pending_receive()
+        self.lifecycle.terminal_stop()
+        self.state = RuntimeState.COMPLETED
+        return RuntimeResult(
+            command_trace=self.lifecycle.device_command_trace,
+            tls_state_before_cleanup=self.tls_session.state.value,
+            baseline_b0_consumed_before_stage2=True,
+            second_native_delta_passed=self.machine.second_delta_gate_passed,
+            irq2_observed=True,
+            image_command_attempt_count=2,
+            image_ack="ACK01",
+            first_image_received=True,
+            first_image_validation="SUCCESS",
+            first_image_raster_shape=(80, 64),
+            first_image_bytes_persisted=False,
+            terminal_cleanup_completed=True,
+            second_image_received=True,
+        )
+
+    def _acquire_first_image_for_multiframe(self) -> dict[str, object]:
+        """Acquire/decode first image without terminating its lifecycle."""
+        irq_frame = self.event_source.wait_event(FIRST_IMAGE_IRQ2_TIMEOUT_MS)
+        kind, payload = parse_outer(irq_frame)
+        event = parse_fdt_event(payload) if kind == PLAIN else None
+        if event is None or event.irq != 2 or event.raw_base is None:
+            raise RuntimeFailure("expected_first_irq2_with_fresh_up_table")
+        self.lifecycle.post_irq2_image_command()
+        policy_factory = (
+            operational_fdt_a0_policy
+            if self.operational_physical_policy
+            else fdt_a0_policy
+        )
+        self.transport.submit(
+            build_finger_image(), policy_factory(0x22, COMMAND_TIMEOUT_MS[0x22])
+        )
+        _parse_exact_lifecycle_ack(self.transport.receive(COMMAND_TIMEOUT_MS[0x22]), 0x22)
+        raster = _consume_image_b0(
+            self, self.transport.receive(FIRST_IMAGE_B0_TIMEOUT_MS), "first"
+        )
+        self.lifecycle.first_image_received()
+        return {"raster": raster, "up_table": event.raw_base}
 
     def audit(self) -> dict[str, object]:
         session = self.tls_session
