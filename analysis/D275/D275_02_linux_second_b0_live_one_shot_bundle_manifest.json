@@ -1,0 +1,18 @@
+{
+  "schema": "D275_02_BUNDLE_MANIFEST_V1",
+  "step": "D275/02",
+  "step_local": true,
+  "members": [
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "analysis/D275/D275_02_linux_second_b0_live_one_shot_bundle_manifest.json",
+    "analysis/D275/D275_02_linux_second_b0_live_one_shot_execution_manifest.json",
+    "analysis/D275/D275_02_linux_second_b0_live_one_shot_readiness_report.md",
+    "core/d275_second_b0_operator.py",
+    "core/live_capability.py",
+    "operator_kit/d275-second-b0-once.sh",
+    "tests/test_d275_02_live_one_shot.py",
+    "tools/d275_live_second_b0_once.py"
+  ],
+  "privacy": {"raw_capture": false, "b0_or_raster": false, "biometric_hash": false, "psk_or_key": false, "firmware_or_oem_binary": false, "previous_bundle": false},
+  "zip_sha256": "RECORDED_IN_SIDECAR_TO_AVOID_SELF_REFERENCE"
+}
