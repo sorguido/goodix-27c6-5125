@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.4 — Revisione 21 agosto 2026
-**Stato**: Attivo; sostituisce la v2.3 del 21 agosto 2026
-**Motivazione**: La v2.4 conserva l'ossatura metodologica post-mortem D239 e le decisioni D247/D248, e introduce come riferimento operativo unico lo snapshot locale versionato di Rockytkg nella Git root, con scheda di provenance dedicata. La disponibilità locale serve sia alla conservazione della fonte sia all'uso offline da parte delle AI; il riuso dei singoli materiali resta subordinato alla loro licenza e provenance. Le regole permanenti restano distinte dallo stato tecnico corrente, che appartiene al manuale canonico.
+> **Versione**: 2.5 — Revisione 27 agosto 2026
+**Stato**: Attivo; sostituisce la v2.4 del 21 agosto 2026
+**Motivazione**: La v2.5 conserva l'ossatura metodologica e di sicurezza della v2.4, ma abolisce il bundle ZIP step-local come requisito standard. La review diventa Git-native: commit/HEAD, diff, branch/PR e artefatti versionati nel repository costituiscono il review set canonico. ZIP e rappresentazioni Base64 non fanno più parte della closure ordinaria e sono ammessi solo come eccezioni di trasporto o export esplicitamente necessarie. La modifica riduce packaging e incompatibilità tra piattaforme AI senza ridurre auditabilità, provenance o controllo.
 > 
 
 ---
@@ -58,7 +58,7 @@ Quando uno step produce o modifica un percorso eseguibile, il codice deve funzio
 
 ### 3.3 Avanzamento di confine > produzione di artefatti
 
-Bundle, report, review e numerazione Dxxx non sono di per sé avanzamento. Avanzamento tecnico reale significa nuova esecuzione, nuova evidenza, nuovo comportamento/protocollo compreso o nuovo confine hardware raggiunto. Una decisione architetturale, di licensing o di repository che cambia realmente lo stato del progetto può essere uno step legittimo, ma deve essere dichiarata come avanzamento non hardware e non confusa con evidenza device-side.
+Review set, report e numerazione Dxxx non sono di per sé avanzamento. Avanzamento tecnico reale significa nuova esecuzione, nuova evidenza, nuovo comportamento/protocollo compreso o nuovo confine hardware raggiunto. Una decisione architetturale, di licensing o di repository che cambia realmente lo stato del progetto può essere uno step legittimo, ma deve essere dichiarata come avanzamento non hardware e non confusa con evidenza device-side.
 
 ### 3.4 Conservatività operativa, non cerimoniale
 
@@ -74,7 +74,7 @@ Distinguere sempre tra **osservato**, **verificato**, **inferito**, **ipotizzato
 
 ### 3.7 Nessuna conoscenza confinata nella chat
 
-La conoscenza tecnica o metodologica rilevante deve essere integrata nel manuale o negli artefatti canonici; non deve rimanere solo in chat, report isolati o bundle.
+La conoscenza tecnica o metodologica rilevante deve essere integrata nel manuale o negli artefatti canonici; non deve rimanere solo in chat, report isolati o artefatti temporanei.
 
 ### 3.8 Validazione umana finale
 
@@ -129,7 +129,7 @@ Una fonte esterna può essere eccellente per implementazione o corroborazione se
 - definisce criteri di accettazione coerenti con lo scope;
 - individua rischi, dipendenze ed esclusioni;
 - prepara task piccoli ma non artificialmente frammentati, con un path di esecuzione chiaro quando applicabile;
-- riesamina diff, test, report, bundle e stato reale del repository;
+- riesamina diff, test, report, review set e stato reale del repository;
 - verifica aggiornamento organico del manuale;
 - prepara il prompt della milestone successiva solo dopo la review;
 - non approva governance host-side aggiuntiva se non riduce un rischio reale;
@@ -143,7 +143,7 @@ Una fonte esterna può essere eccellente per implementazione o corroborazione se
 - esegue test coerenti con lo scope;
 - quando esiste un percorso eseguibile, verifica executable closure nel contesto appropriato;
 - aggiorna il manuale tecnico;
-- produce bundle ZIP step-local non cumulativo;
+- rende disponibile un review set step-local versionato nel repository, senza creare ZIP o Base64 salvo necessità esplicita;
 - riporta limiti, rischi e verifiche con linguaggio fedele all'evidenza.
 
 ---
@@ -159,7 +159,7 @@ Prima di consegnare il task:
 - indicare il livello di ragionamento **MEDIUM** o **HIGH** più appropriato;
 - creare il prompt come file `.md` scaricabile, non come semplice testo da copiare in chat;
 - richiedere aggiornamento del manuale canonico;
-- richiedere bundle ZIP step-local non cumulativo;
+- richiedere un review set step-local Git-native, identificabile tramite baseline, HEAD/commit e file rilevanti;
 - vietare espansioni di scope non autorizzate.
 
 ### 6.2 Lettura iniziale — AI esecutrice
@@ -219,7 +219,7 @@ Quando applicabile, prima di dichiarare lo step ready l'AI esecutrice deve:
 4. considerare bloccanti errori come `ModuleNotFoundError`, `PermissionError`, path errati o marker incoerenti se impediscono l'esecuzione reale;
 5. dare priorità al fallimento del launcher rispetto a una suite offline verde.
 
-Un bundle perfetto non rende eseguibile un launcher rotto.
+Un review set perfettamente ordinato non rende eseguibile un launcher rotto.
 
 ---
 
@@ -235,7 +235,7 @@ Prima di chiudere lo step, l'AI esecutrice verifica:
 - assenza di file inattesi o assunzioni non dimostrate;
 - test pertinenti realmente probanti;
 - manuale coerente con il nuovo stato;
-- bundle limitato al review set necessario.
+- review set limitato ai file e alle evidenze necessarie allo step.
 
 ### 8.2 Chiusura tecnica
 
@@ -245,7 +245,7 @@ Uno step può essere `READY` solo se:
 - executable closure `PASS` oppure `NOT_APPLICABLE` per ragione documentata;
 - limiti residui espliciti;
 - manuale aggiornato quando cambia stato o conoscenza;
-- bundle creato;
+- review set identificabile e verificabile nel repository;
 - report finale fedele.
 
 ### 8.3 Review esterna — AI PM
@@ -254,14 +254,14 @@ L'AI PM deve:
 
 - confrontare risultato e prompt originale;
 - verificare lo stato reale del repository, non solo il summary dell'AI esecutrice;
-- verificare diff, report, test e bundle;
+- verificare diff, report, test e review set;
 - controllare executable closure quando applicabile;
 - controllare coerenza del manuale;
 - distinguere blocker reali da limiti accettabili;
 - proporre accettazione, correzione o rigetto all'Utente;
 - preparare lo step successivo solo dopo review conclusa.
 
-Se commit/branch/PR e bundle sono già disponibili nel repository remoto accessibile all'AI PM, non è necessario che l'Utente ricarichi manualmente lo ZIP in chat: il bundle resta obbligatorio come artefatto del progetto, non come mezzo di trasporto per la review.
+Se commit/branch/PR e gli artefatti dello step sono disponibili nel repository remoto accessibile all'AI PM, la review avviene direttamente sullo stato Git e sui file versionati. L'Utente non deve creare, scaricare, riconvertire o ricaricare ZIP/Base64 per consentire la review.
 
 ---
 
@@ -271,33 +271,40 @@ Se commit/branch/PR e bundle sono già disponibili nel repository remoto accessi
 
 L'AI esecutrice deve integrare organicamente ogni nuova conoscenza, decisione, correzione o cambiamento di stato. Il manuale:
 
-- non deve diventare un log append-only di bundle;
+- non deve diventare un log append-only di step o review set;
 - deve aggiornare sezioni alte/canoniche quando cambia una decisione;
 - aggiunge una sezione Dxxx solo quando utile a provenance o ricostruzione;
 - mantiene indice, tabelle, spiegazioni e stato tecnico coerenti;
-- non lascia conoscenza nuova solo in chat, report o bundle;
+- non lascia conoscenza nuova solo in chat, report o artefatti di review;
 - non duplica o depreca inutilmente contenuto ancora valido.
 
 Le presenti linee guida regolano **come lavorare**; il manuale descrive **cosa sappiamo tecnicamente e qual è lo stato corrente**. Gli snapshot tecnici volatili non appartengono alle linee guida.
 
 ---
 
-## 10. Bundle e repository hygiene
+## 10. Review set Git-native e repository hygiene
 
-Al termine di ogni step l'AI esecutrice crea un bundle ZIP **step-local e non cumulativo**.
+Al termine di ogni step l'AI esecutrice rende disponibile un **review set step-local Git-native**. Il review set non è un archivio separato: è l'insieme verificabile delle modifiche, evidenze e documentazione versionate nel repository e necessarie alla review dello step.
 
-Il bundle deve essere autonomamente auditabile per riferimento e contenere solo i file necessari alla review dello step. Non deve perseguire autosufficienza totale copiando manuale, policy o storia non modificata.
+La superficie di audit standard è costituita da:
+
+- baseline Git rilevante;
+- HEAD/commit finale, oppure branch/PR quando il commit finale non è ancora stato integrato;
+- diff rispetto alla baseline;
+- artefatti Dxxx in `analysis/Dxxx/`;
+- file di codice, test e documentazione realmente modificati dallo step.
 
 Regole permanenti:
 
-- output Dxxx, report, bundle e checksum risiedono in `analysis/Dxxx/`;
-- niente cache, file temporanei, backup `.orig/.bak`, credenziali, PSK, chiavi TLS, firmware/DLL OEM, capture reali o dati biometrici nei bundle pubblicabili;
-- il bundle riporta baseline/commit rilevante e riferimenti al manuale;
+- output Dxxx e report step-local risiedono in `analysis/Dxxx/`;
+- non duplicare manuale, policy, storia o file non modificati solo per rendere il review set autosufficiente;
+- niente cache, file temporanei, backup `.orig/.bak`, credenziali, PSK, chiavi TLS, firmware/DLL OEM, capture reali o dati biometrici nei review set o artefatti destinati alla pubblicazione;
+- il report dello step indica baseline/commit o ref rilevante e riferimenti al manuale quando necessari alla review;
 - eventuali artefatti storici vengono relocati solo byte-preserving e solo se il move non rompe consumatori eseguibili o riproducibilità;
 - eccezioni di compatibilità sono documentate e possono restare in root se necessarie alla executable closure storica;
-- il bundle non va rigenerato solo per spostarlo se può essere preservato con lo stesso blob/hash.
+- i bundle ZIP storici già versionati restano evidenza storica e non devono essere cancellati, rigenerati o riconvertiti senza una ragione tecnica specifica.
 
-Se Codex Web o un altro trasporto non supporta un nuovo ZIP binario, è ammessa una rappresentazione temporanea `.zip.b64` **solo come workaround di trasporto**, con round-trip e SHA-256 verificati. Prima del merge la rappresentazione Base64 deve essere sostituita dal vero ZIP e rimossa dal tree finale.
+ZIP, `.zip.b64` e altri packaging equivalenti **non sono requisiti di closure né mezzi di trasporto standard**. Possono essere creati solo quando una piattaforma, un destinatario o un'attività di export lo richiede esplicitamente; in tal caso devono restare temporanei quando possibile, non duplicare inutilmente il tree canonico e usare hash/round-trip solo quando servono a proteggere un rischio concreto. Il repository Git resta la fonte canonica per la review.
 
 ---
 
@@ -356,7 +363,7 @@ Salvo task specifico autorizzato dall'Utente, l'AI esecutrice non deve eseguire:
 - nessuna scrittura OTP, factory data o configurazione persistente;
 - nessun cambio permanente di VID:PID o modalità boot;
 - nessuna procedura che renda incerta la compatibilità Windows successiva;
-- nessun asset proprietario OEM nei bundle pubblicabili.
+- nessun asset proprietario OEM nei review set o artefatti destinati alla pubblicazione.
 
 ### 12.3 Gerarchia di sicurezza
 
@@ -452,7 +459,7 @@ Deve contenere almeno:
 - definizione di avanzamento reale;
 - riesame metodologico pre-live;
 - aggiornamento organico del manuale;
-- bundle step-local;
+- review set step-local Git-native;
 - closure minima;
 - distinzione safety telemetry / project reporting;
 - licensing boundary e regole minime di provenance post-D247;
@@ -581,7 +588,7 @@ La sintesi finale di ogni step usa, salvo necessità concreta, sei campi:
 3. `EXECUTABLE_CLOSURE` — `PASS` | `FAIL` | `NOT_APPLICABLE`;
 4. `RESIDUAL_BLOCKER_OR_RISK` — descrizione sintetica;
 5. `CANONICAL_DOCUMENTATION` — manuale aggiornato sì/no + sezioni toccate;
-6. `BUNDLE` — path + SHA-256 del bundle step-local.
+6. `REVIEW_SET` — baseline + HEAD/commit (o branch/PR) e path/file rilevanti che compongono il review set step-local.
 
 Campi aggiuntivi sono ammessi quando rappresentano informazione tecnica non derivabile e realmente utile.
 
@@ -608,7 +615,7 @@ La qualità non si misura in:
 
 - numero di file prodotti;
 - numero di test offline passati;
-- numero di report o bundle;
+- numero di report o artefatti di review;
 - numero di step Dxxx.
 
 La qualità si misura in:
@@ -636,7 +643,7 @@ Regole:
 
 ---
 
-## 25. Principio sintetico della v2.3
+## 25. Principio sintetico della v2.5
 
 **sicurezza hardware forte**
 
@@ -651,6 +658,10 @@ Regole:
 - 
 
 **licensing/provenance espliciti**
+
+- 
+
+**review Git-native senza packaging obbligatorio**
 
 - 
 
