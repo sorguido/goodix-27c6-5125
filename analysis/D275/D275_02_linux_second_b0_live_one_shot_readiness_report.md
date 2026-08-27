@@ -1,14 +1,14 @@
-# D275/02 — Linux second-B0 live one-shot readiness
+# D275/02 — Linux second-B0 live one-shot readiness (corrective Git-native)
 
 ## Esito
 
 ```text
-OUTCOME=BLOCKED
+OUTCOME=READY
 ADVANCEMENT=NEW_OPERATOR_PATH_QUALIFIED_OFFLINE_NO_NEW_HARDWARE_EVIDENCE
-EXECUTABLE_CLOSURE=PASS_OFFLINE_BUT_RELEASE_GATE_BLOCKED
-RESIDUAL_BLOCKER_OR_RISK=D268_AFFECTED_REGRESSION_SUITE_FAILS_ON_PREEXISTING_LIVE_MANIFEST_HASH_DRIFT;AI_PM_REVIEW_REQUIRED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_FAKE_LIVE_SAME_PRODUCTION_COORDINATOR
+RESIDUAL_BLOCKER_OR_RISK=D275_LIVE_BASELINE_SHA_NOT_YET_APPROVED;AI_PM_PRE_LIVE_REVIEW_REQUIRED
 CANONICAL_DOCUMENTATION=UPDATED
-BUNDLE=BASE64_TRANSPORT_VERIFIED
+REVIEW_SET=GIT_NATIVE_DIFF_AGAINST_CORRECTIVE_START_HEAD
 ```
 
 ## Ownership ricostruita
@@ -20,40 +20,74 @@ LIVE_TRANSPORT_OWNER=core.usb_runtime.LibusbRuntimeTransport
 TLS_SESSION_OWNER=core.persistent_runtime.PersistentRuntimeCoordinator
 PSK_BOUNDARY_OWNER=core.protected_runtime.RealSecretBoundary
 FDT_LIFECYCLE_OWNER=core.fdt_lifecycle.FdtLifecycle
-CURRENT_LIVE_TERMINAL_BOUNDARY=STOP_AFTER_FIRST_IMAGE (D268 storico)
+CURRENT_LIVE_TERMINAL_BOUNDARY=STOP_AFTER_FIRST_IMAGE (D268 storico, invariato)
 D275_PRODUCTION_BOUNDARY_OWNER=core.persistent_runtime.PersistentRuntimeCoordinator
 LIVE_CLEANUP_OWNER=PersistentRuntimeCoordinator.run finally + D268 host transaction finally
-LIVE_PREFLIGHT_OWNER=tools.d275_live_second_b0_once + reused D268ProductionDependencies
+LIVE_PREFLIGHT_OWNER=tools.d275_live_second_b0_once + D275-overridden D268ProductionDependencies
 LIVE_COMMAND_ALLOWLIST_OWNER=core.persistent_runtime._ProductionMultiFrameChannel
+D275_REPORT_PATH=/var/lib/goodix-5125-poc/d261-results/d275-second-b0-final.json
+D275_MARKER_PATH=/var/lib/goodix-5125-poc/d275-second-b0-single-use.marker
+D275_MARKER_SCHEMA=D275_SECOND_B0_SINGLE_USE_MARKER_V1
+D275_LIVE_CRITICAL_FILE_COUNT=21
 ```
 
-Il wrapper D268 invoca già il coordinator production, ma fissava esplicitamente
-`STOP_AFTER_FIRST_IMAGE`. D275/02 aggiunge solo wiring e authority operatore:
-non duplica FDT, parser B0, D273 runner, NAV, TLS o PSK ownership. Fake e real
-transport entrano nello stesso `PersistentRuntimeCoordinator.run()`; non
-esistono retry/fallback. Il `finally` del coordinator chiude TLS, secret e
-transport anche fra i due B0; il finally host ripristina segnali/fprintd.
+Il wrapper D268 invoca già il coordinator production, ma fissa
+`STOP_AFTER_FIRST_IMAGE`. D275/02 aggiunge wiring e authority operatore: non
+duplica FDT, parser B0, D273 runner, NAV, TLS o PSK ownership. Fake e real
+transport entrano nello stesso `PersistentRuntimeCoordinator.run()`. Il
+`finally` del coordinator chiude TLS, secret e transport anche fra i due B0; il
+finally host ripristina segnali/fprintd. La publish D268 è differita; D275
+finalizza `PASS_STOP_AFTER_SECOND_IMAGE` e pubblica una sola volta sul proprio
+path.
+
+## Corrective host gates
+
+L'authority live D275 è il commit SHA completo approvato dall'AI-PM/Utente.
+`verify_d275_authoritative_baseline` verifica SHA lowercase da 40 caratteri,
+`HEAD ==` SHA, worktree pulito, path set esatto e byte-identity rispetto al
+blob Git. Nessuno SHA è auto-approvato. Non esiste un manifesto SHA-256
+per-file D275.
+
+Il live-critical set copre launcher, wrapper, operator D275/D268, capability,
+runtime persistente, `multiframe_validation`, lifecycle FDT, transport USB/TLS,
+cold-start/seed/post-D4, protected runtime, cleanroom, helper D261 e i moduli
+`binding_reference` raggiunti da `protected_runtime`. Manuale, report e test
+restano fuori dal pin live.
+
+Il full suite D268 sul current HEAD produce 12 PASS / 1 FAIL / 1 ERROR. FAIL ed
+ERROR confrontano il manifest frozen `analysis/D268/D268_01_live_critical_manifest.json`
+con file condivisi evoluti (`identita_byte_non_valida` su
+`core/fdt_lifecycle.py`, `core/live_capability.py`,
+`core/persistent_runtime.py`, `core/runtime_transport.py`). Classificazione:
+
+```text
+D268_CURRENT_FULL_SUITE_CLASSIFICATION=EXPECTED_HISTORICAL_MANIFEST_GUARD
+D268_CURRENT_SHARED_SEMANTIC_SUBSET=12_PASS
+```
+
+Alla baseline storica `c03d32e8647444495e6615e41c2839cbddd62143` (worktree
+detached) la suite D268 è riproducibile: manifest e dry-run passano; il test
+dirty-tree fallisce solo su tree pulito e passa se il worktree storico è
+deliberatamente sporcato. Gli artefatti D268 storici non sono stati riscritti.
 
 ## Safety e qualifica
 
-L'allowlist post-image è esattamente `0x34,0x20,0x50,0x32,0x22`; ogni altro
-controllo fallisce chiuso. Nessuna famiglia flash/IAP/OTP/provisioning/ClearApp,
-configurazione persistente, enrollment, reset o VID/boot è chiamabile. Il
-secondo B0 completa il runner e porta immediatamente a cancel/terminal stop;
-non esiste transizione di terzo ciclo. Report e fake output contengono solo
-metadata e contatori, mai plaintext/raster/hash biometrico.
+L'allowlist post-image è esattamente `0x34,0x20,0x50,0x32,0x22`. Il secondo B0
+completa il runner e porta immediatamente a cancel/terminal stop; non esiste
+transizione di terzo ciclo. Report e fake output contengono solo metadata e
+contatori.
 
 Il gate live richiede la stringa esatta
 `27c6:5125_ONE_SHOT_STOP_AFTER_SECOND_IMAGE_NO_RETRY_FACTORY_PRESERVING_NO_ENROLLMENT_NO_THIRD_CYCLE`,
-oltre al flag D275, boundary esplicito e SHA completo approvato. Il preflight
-riusa selezione cardinalità-one, accesso transport, protected metadata, PSK
-boundary senza stampa, cache/materiale, holder check, output sicuro, marker
-single-use e byte identity Git. Nessuna baseline è auto-approvata.
+oltre al flag D275, boundary esplicito e SHA completo approvato. Marker
+single-use D275, O_CREAT|O_EXCL, O_NOFOLLOW, mode 0600, fsync prima della
+capability. Le capability D268 e D275 non si mintano a vicenda.
 
 ## Riesame metodologico pre-live
 
 1. Cambia realmente il metodo: D268 si fermava alla prima immagine; il candidate
-   usa ora il lifecycle production-shaped D275/01 fino allo stop al secondo B0.
+   usa ora il lifecycle production-shaped D275/01 fino allo stop al secondo B0,
+   con authority/report/marker D275 realmente distinti.
 2. L'ipotesi futura è che il target Linux accetti l'intero edge APP12509 già
    osservato Windows e chiuso offline, nella stessa sessione TLS/USB.
 3. Se fallisce allo stesso confine, non si ripete: si classifica la failure

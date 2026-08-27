@@ -159,7 +159,21 @@ ricostruzione offline, D274/03 per il secondo edge Windows OEM live. Il timeout
 semantico del device resta `UNKNOWN`, `LIVE_AUTHORIZED=false` e il prossimo
 confine è review AI-PM, non esecuzione live automatica.
 
-D275/02 prepara **solo offline** il thin operator path; la qualifica finale resta **BLOCKED** perché la suite D268 rileva drift hash preesistente nel manifest live-critical rispetto al current HEAD. Il thin path
+D275/02 qualifica **solo offline** il thin operator path live one-shot fino al
+secondo B0. Il corrective pre-live Git-native chiude i gate host: l'authority
+D275 è il commit SHA completo approvato (HEAD identico, worktree pulito,
+live-critical set esatto, byte-identity rispetto al blob Git), non un manifesto
+SHA-256 per-file e non il manifest storico D268. Il report vive solo in
+`/var/lib/goodix-5125-poc/d261-results/d275-second-b0-final.json` e viene
+pubblicato dopo la finalizzazione `STOP_AFTER_SECOND_IMAGE`; il path report
+D268 non è toccato. Il marker è D275-specific
+(`D275_SECOND_B0_SINGLE_USE_MARKER_V1`, fsync prima della capability). Il
+live-critical set include `core/multiframe_validation.py` e i moduli
+`binding_reference` raggiunti da `protected_runtime`. Il full test D268 sul
+current HEAD che confronta il manifest frozen con file evoluti è
+`EXPECTED_HISTORICAL_MANIFEST_GUARD`, non una regressione runtime né
+`NOT_AVAILABLE`. La baseline live D268 resta frozen a
+`c03d32e8647444495e6615e41c2839cbddd62143`. Il thin path
 `operator_kit/d275-second-b0-once.sh` →
 `tools/d275_live_second_b0_once.py` sopra lo stesso
 `PersistentRuntimeCoordinator`. Il default storico D268 resta
@@ -170,12 +184,13 @@ un oggetto/handshake TLS, un handoff PSK, zero retry/reopen/write e un cleanup.
 Il live candidate richiede inoltre SHA completo approvato, worktree pulito,
 marker D275 single-use e la frase gate esatta che dichiara VID:PID, one-shot,
 no retry, factory-preserving, no enrollment e no third cycle. Il secondo B0 è
-lo stop wire/state-driven; il comando candidato non è stato eseguito.
+lo stop wire/state-driven; il comando candidato non è stato eseguito e nessuna
+baseline D275 è auto-approvata.
 
-Lo stato probatorio è quindi distinto: D268 osserva live Linux la prima
-immagine; D275/01 chiude offline il production path fino al secondo B0; D275/02
-qualifica offline il relativo operator path, ma non produce evidenza device.
-`LINUX_SECOND_B0_LIVE_OBSERVED=false`, `LIVE_AUTHORIZED=false` e
+Lo stato probatorio resta distinto: D268 è il first-image Linux live storico a
+baseline frozen; D275/01 chiude offline il production path fino al secondo B0;
+D275/02 qualifica offline il candidate operator path, senza nuova evidenza
+device. `LINUX_SECOND_B0_LIVE_OBSERVED=false`, `LIVE_AUTHORIZED=false` e
 `TARGET_DEVICE_TIMEOUT=UNKNOWN`.
 
 Nel dominio LGPL, `goodix_sigfm_metrics.cpp` applica esclusivamente il mapping
@@ -239,7 +254,7 @@ GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-LINUX_MULTIFRAME_RUNTIME=D275_02_LIVE_ONE_SHOT_PATH_PREPARED_QUALIFIED_OFFLINE_NOT_LIVE_EXECUTED
+LINUX_MULTIFRAME_RUNTIME=D275_02_LIVE_ONE_SHOT_PATH_READY_OFFLINE_NOT_LIVE_EXECUTED
 LINUX_SECOND_B0_LIVE_OBSERVED=false
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 LIVE_AUTHORIZED=false
@@ -1264,6 +1279,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D274/01 Kit Windows/OEM pre-live | READY offline; hard-disabled; live false | sanitizer metadata-only, target/A8/hash/schema/privacy gate e fixture sintetica del secondo ciclo PASS; capture storica termina a ACK re-arm e resta `MISSING_SECOND_IRQ2`; workflow candidato no-commit, nessuna attribution retroattiva |
 | D274/02 qualificazione nativa Windows | CLOSED / PASS; tre run storiche preservate; live false | run 1 FAIL source-scan `-f`, run 2 FAIL `.Count` sotto PowerShell 5.1, run 3 PASS nativo completo dopo corrective; nessuna regressione tecnica e nessuna riapertura |
 | D274/03 Kit one-shot secondo ciclo | Windows native qualification PASS operator-supplied; baseline/capture/live false; freeze/review AI-PM pending | runner futuro vincolato a `main`; BOM UTF-8 e `$LASTEXITCODE` corretti; literal `$TsharkPath` non interpolato sotto StrictMode e privacy contract verificato nei reali owner observer/postprocessor; run finale PowerShell Desktop 5.1 tutti-stage PASS con Goodix assente, zero capture/USB/dito/comandi/retry/write; SHA package operator-supplied `5a498239…9eca87`, byte non ricalcolati dall'agente; D263 resta negativa |
+| D275/01 production multiframe Linux | READY offline; live false | `PersistentRuntimeCoordinator` chiude il secondo B0 sullo stesso transport/TLS/PSK; allowlist post-image `0x34,0x20,0x50,0x32,0x22`; zero retry/reopen/write; terzo ciclo irraggiungibile |
+| D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; D268 storico frozen `c03d32e...`; fake-live PASS; nessuna USB reale |
 
 ## Fonti e confini di pubblicazione
 
@@ -5987,6 +6004,46 @@ tutti i gap `TARGET_EVIDENCE_REQUIRED`. Prossimo vero gap dopo questa sessione:
 glue device libfprint locale + observazione del secondo ciclo di capture dopo
 re-arm (futuro D274/03 live one-shot esplicitamente autorizzato), non più il
 blocco della build SIGFM OpenCV4.
+
+### D275/02: candidate Linux live one-shot fino al secondo B0 (OFFLINE)
+
+D275/02 non è una nuova evidenza hardware. Distingue tre authority già chiuse
+altrove e una sola superficie operatore nuova:
+
+- **D268**: first-image Linux live storico; baseline frozen
+  `c03d32e8647444495e6615e41c2839cbddd62143`. Manifest e kit D268 non vengono
+  riscritti per adattarli al current HEAD.
+- **D275/01**: production path Linux chiuso offline fino a
+  `STOP_AFTER_SECOND_IMAGE` nel vero `PersistentRuntimeCoordinator`.
+- **D275/02**: thin operator path
+  `operator_kit/d275-second-b0-once.sh` → `tools/d275_live_second_b0_once.py` →
+  `core.d275_second_b0_operator` → `PersistentRuntimeCoordinator`, con stop
+  immediato al secondo B0.
+
+Il corrective Git-native (policy v2.5) sostituisce i gate host difettosi della
+prima chiusura D275/02: niente ZIP/Base64, niente manifesto SHA-256 cerimoniale,
+nessuna auto-approvazione di SHA. Il gate live verifica SHA completo lowercase,
+`HEAD ==` SHA approvato, worktree pulito, path set esatto e byte-identity Git
+del live-critical set. Il report D275 è distinto da D268 e viene pubblicato
+solo dopo l'adattamento `PASS_STOP_AFTER_SECOND_IMAGE`. Il marker usa lo schema
+`D275_SECOND_B0_SINGLE_USE_MARKER_V1` con `approved_baseline_sha` e
+`terminal_boundary=STOP_AFTER_SECOND_IMAGE`; fsync precede la capability.
+Le capability D268 e D275 non si mintano a vicenda. Il riuso D268 è limitato
+alla host transaction guarded, con adapter intent/live-io/verifier in
+try/finally e zero leakage globale. Il default storico D268 resta
+`STOP_AFTER_FIRST_IMAGE`.
+
+Il full suite D268 sul current HEAD che fallisce sul manifest frozen è
+`EXPECTED_HISTORICAL_MANIFEST_GUARD`. Alla baseline storica `c03d32e...` la
+suite D268 è riproducibile. Nessuna USB reale, nessun comando sensore, nessuna
+nuova evidenza live.
+
+```text
+LINUX_SECOND_B0_LIVE_OBSERVED=false
+LIVE_AUTHORIZED=false
+TARGET_DEVICE_TIMEOUT=UNKNOWN
+NEXT_PRIMARY_BOUNDARY=AI_PM_PRE_LIVE_REVIEW_D275_02
+```
 
 ## Hard Wall
 
