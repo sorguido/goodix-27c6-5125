@@ -12,13 +12,13 @@ Prima di modificare codice, stato tecnico o documentazione:
 
 1. identifica la root reale del repository;
 2. leggi questo `AGENTS.md`;
-3. leggo le linee guida `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
+3. leggi le linee guida `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
 4. leggi le sezioni pertinenti del manuale tecnico;
 5. leggi il prompt specifico dello step;
 6. controlla `git status --short` e branch corrente;
 7. esamina solo gli artefatti storici realmente pertinenti.
 
-Il manuale tecnico è la fonte narrativa canonica dello stato del progetto. La conoscenza nuova non deve restare soltanto in chat, report o bundle.
+Il manuale tecnico è la fonte narrativa canonica dello stato del progetto. La conoscenza nuova non deve restare soltanto in chat, report isolati o artefatti di review.
 
 ---
 
@@ -56,7 +56,7 @@ Principi:
 
 1. **evidence-first**: distinguere osservato, verificato, inferito, ipotizzato e ignoto;
 2. **scope minimo**: niente refactoring globale o nuove dipendenze senza necessità concreta;
-3. **Design → Implementazione → Esecuzione**: evitare catene di bundle design-only;
+3. **Design → Implementazione → Esecuzione**: evitare catene di artefatti design-only;
 4. una sola patch locale post-implementazione quando possibile;
 5. la numerazione Dxxx non è avanzamento.
 
@@ -196,24 +196,23 @@ Quando una decisione cambia stato:
 
 ---
 
-## 10. Bundle
+## 10. Review set Git-native
 
-Output finale di Codex:
+Output finale standard di Codex: un **review set step-local Git-native**, non un archivio ZIP separato.
 
-```text
-bundle ZIP step-local, non cumulativo
-```
+Il review set è l'insieme verificabile delle modifiche, evidenze e documentazione versionate nel repository e necessarie alla review dello step. La superficie di audit standard comprende:
 
-Ogni output Dxxx futuro, inclusi bundle e checksum, vive in
-`analysis/Dxxx/`. La root non è una destinazione per output di step, salvo
-eccezione esplicita e documentata. I bundle storici ancora in root sono
-relocati soltanto con un'operazione meccanica che ne preservi i blob e non
-rompa consumatori eseguibili o riproducibilità; ogni eccezione resta in sede ed
-è documentata.
+- baseline Git rilevante;
+- HEAD/commit finale, oppure branch/PR quando il commit finale non è ancora integrato;
+- diff rispetto alla baseline;
+- artefatti Dxxx in `analysis/Dxxx/`;
+- file di codice, test e documentazione realmente modificati dallo step.
 
-Il bundle deve essere autonomamente auditabile **per riferimento**, non autosufficiente per duplicazione.
+Ogni output Dxxx futuro vive in `analysis/Dxxx/`. La root non è una destinazione per output di step, salvo eccezione esplicita e documentata. Gli artefatti storici ancora in root sono relocati soltanto con un'operazione meccanica che ne preservi i blob e non rompa consumatori eseguibili o riproducibilità; ogni eccezione resta in sede ed è documentata.
 
-Deve contenere solo quanto necessario alla review dello step e non deve includere:
+Il review set deve essere auditabile tramite Git e riferimenti canonici, senza duplicare manuale, policy, history o file non modificati per renderlo autosufficiente.
+
+Non aggiungere al review set o agli artefatti destinati alla pubblicazione:
 
 - secret;
 - PSK;
@@ -223,12 +222,11 @@ Deve contenere solo quanto necessario alla review dello step e non deve includer
 - cache o temporanei;
 - artefatti storici non modificati.
 
-Le evidenze raw private autentiche vivono canonicamente in `<git-root>/captures/`
-e possono essere versionate nel repository privato. Bundle e futuri export
-pubblici devono escluderle; non esiste sincronizzazione automatica dal privato
-al pubblico e la pubblicazione richiede uno step esplicito di sanitizzazione.
+Le evidenze raw private autentiche vivono canonicamente in `<git-root>/captures/` e possono essere versionate nel repository privato. Il review set può riferirle quando necessario, senza duplicarle in `analysis/Dxxx/`; futuri export pubblici devono escluderle. Non esiste sincronizzazione automatica dal privato al pubblico e la pubblicazione richiede uno step esplicito di sanitizzazione.
 
-Indicare il commit SHA di riferimento quando rilevante.
+ZIP, `.zip.b64` e packaging equivalenti **non sono requisiti di closure né mezzi di trasporto standard**. Possono essere creati solo quando una piattaforma, un destinatario o un'attività di export li richiede esplicitamente. I bundle ZIP storici già versionati restano evidenza storica e non devono essere cancellati o rigenerati senza una ragione tecnica specifica.
+
+Indicare baseline e commit/HEAD di riferimento quando rilevanti.
 
 ---
 
@@ -260,8 +258,10 @@ ADVANCEMENT
 EXECUTABLE_CLOSURE
 RESIDUAL_BLOCKER_OR_RISK
 CANONICAL_DOCUMENTATION
-BUNDLE
+REVIEW_SET
 ```
+
+`REVIEW_SET` indica baseline + HEAD/commit (o branch/PR) e i path/file rilevanti che compongono il review set step-local.
 
 Campi aggiuntivi solo se contengono informazione tecnica realmente utile e non derivabile.
 
