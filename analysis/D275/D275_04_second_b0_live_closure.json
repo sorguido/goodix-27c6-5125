@@ -1,12 +1,24 @@
 {
-  "schema": "D275_04_LIVE_CLOSURE_V1",
+  "schema": "D275_04_LIVE_CLOSURE_V2",
   "step": "D275/04",
-  "reasoning_level": "MEDIUM_HIGH",
-  "nature": "closure_git_native_documentation",
+  "reasoning_level": "MEDIUM",
+  "nature": "corrective_local_documental_evidence_only",
   "new_live_hardware": false,
-  "baseline_live_post_corrective": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
-  "head": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
-  "branch": "main",
+  "git_semantics": {
+    "branch": "main",
+    "live_baseline_post_corrective": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+    "pre_closure_execution_head": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+    "d275_04_closure_commit_under_ai_pm_review": "42819c05e2400591bb58168539aa0f54ca09509f"
+  },
+  "evidence_provenance": {
+    "live_evidence_consolidated_in_repository": true,
+    "canonical_repository_evidence_record": "analysis/D275/D275_04_second_b0_live_closure.json",
+    "host_machine_report_path": "/var/lib/goodix-5125-poc/d261-results/d275-second-b0-final.json",
+    "raw_d275_post_corrective_report_versioned": false,
+    "canonical_private_raw_evidence_root": "captures/",
+    "host_machine_report_existence_verified": false,
+    "host_machine_report_existence_note": "path is runtime-expected; current existence not verifiable without elevated privileges"
+  },
   "live_result": {
     "result": "PASS_STOP_AFTER_SECOND_IMAGE",
     "phase_reached": "STOP_AFTER_SECOND_IMAGE",
@@ -113,9 +125,48 @@
     "LIVE_AUTHORIZED": false,
     "NEW_LIVE_AUTHORIZED": false
   },
+  "closure_v2_5": {
+    "OUTCOME": "READY",
+    "ADVANCEMENT": "NONE",
+    "EXECUTABLE_CLOSURE": "NOT_APPLICABLE",
+    "RESIDUAL_BLOCKER_OR_RISK": "TARGET_DEVICE_TIMEOUT_UNKNOWN; RAW_D275_POST_CORRECTIVE_REPORT_NOT_VERSIONED_IN_REPOSITORY",
+    "CANONICAL_DOCUMENTATION": "UPDATED",
+    "REVIEW_SET": "BASELINE_6eb60856fee7eed2c1765e5b1a11b492e99e42b0_PLUS_D275_04_CLOSURE_COMMIT_42819c05e2400591bb58168539aa0f54ca09509f_ON_main_WITH_FILES_Goodix_27c6_5125_manuale_tecnico.md_analysis_D275_D275_04_second_b0_live_closure.md_analysis_D275_D275_04_second_b0_live_closure.json"
+  },
+  "offline_verifications": {
+    "git_diff_check": "PASS",
+    "d275_01_production_multiframe_tests": {
+      "command": "python3 -m unittest tests.test_d275_01_production_multiframe -v",
+      "outcome": "PASS",
+      "count": "8/8"
+    },
+    "d275_02_operator_one_shot_tests": {
+      "command": "python3 -m unittest tests.test_d275_02_live_one_shot -v",
+      "outcome": "PASS",
+      "count": "36/36"
+    },
+    "d275_03_fdt_derivation_tests": {
+      "note": "covered by fixtures in tests/test_d275_01_production_multiframe.py",
+      "fixtures": [
+        "test_exact_oem_fdt_derivation_fixtures",
+        "test_stale_or_cross_cycle_table_fails_before_rearm"
+      ],
+      "outcome": "PASS"
+    },
+    "fake_live_hardware_inert": {
+      "command": "./operator_kit/d275-second-b0-once.sh --fake-live --terminal-boundary STOP_AFTER_SECOND_IMAGE",
+      "outcome": "PASS",
+      "REAL_USB_ACCESS": false,
+      "REAL_SENSOR_COMMAND_COUNT": 0,
+      "NEW_LIVE_EVIDENCE": false,
+      "THIRD_CYCLE_STARTED": false
+    },
+    "json_validation": "PASS"
+  },
   "review_set": {
     "baseline": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
-    "head": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+    "pre_closure_execution_head": "6eb60856fee7eed2c1765e5b1a11b492e99e42b0",
+    "d275_04_closure_commit_under_ai_pm_review": "42819c05e2400591bb58168539aa0f54ca09509f",
     "branch": "main",
     "modified_paths": [
       "Goodix 27c6 5125 manuale tecnico.md",
@@ -123,6 +174,7 @@
       "analysis/D275/D275_04_second_b0_live_closure.json"
     ],
     "raw_evidence_root": "captures/",
+    "raw_d275_post_corrective_report_versioned": false,
     "no_zip_created": true,
     "no_base64_created": true,
     "no_bundle_manifest_created": true

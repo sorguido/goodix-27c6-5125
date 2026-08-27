@@ -70,7 +70,20 @@ TRANSPORT_REOPEN_AFTER_TLS=false
 USB_TRANSPORT_SESSION_COUNT=1
 TLS_SERVER_HANDSHAKE_COUNT=1
 SECRET_BOUNDARY_HANDOFF_COUNT=1
+
+LIVE_EVIDENCE_CONSOLIDATED_IN_REPOSITORY=true
+CANONICAL_REPOSITORY_EVIDENCE_RECORD=analysis/D275/D275_04_second_b0_live_closure.json
+HOST_MACHINE_REPORT_PATH=/var/lib/goodix-5125-poc/d261-results/d275-second-b0-final.json
+RAW_D275_POST_CORRECTIVE_REPORT_VERSIONED=false
+CANONICAL_PRIVATE_RAW_EVIDENCE_ROOT=captures/
 ```
+
+`HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
+macchina finale; la sua esistenza corrente non è verificabile senza privilegi
+elevati e non viene dichiarata. Il record consolidato nel repository è
+`analysis/D275/D275_04_second_b0_live_closure.json`; le evidenze raw private
+autentiche, quando presenti, vivono canonicamente in `captures/` e non sono
+duplicate negli artefatti di review.
 
 Il boundary Linux `u16/12-bit → libfprint` ha chiuso offline (post-D269/01
 corrective) il solo contratto di **rappresentazione pixel** e l'adapter bounded:
@@ -305,6 +318,21 @@ post-corrective `6eb60856fee7eed2c1765e5b1a11b492e99e42b0` è stata eseguita una
 sola run live autorizzata e consumata, con esito
 `PASS_STOP_AFTER_SECOND_IMAGE` e terminale `STOP_AFTER_SECOND_IMAGE`.
 
+Provenance e record versionato:
+
+```text
+LIVE_EVIDENCE_CONSOLIDATED_IN_REPOSITORY=true
+CANONICAL_REPOSITORY_EVIDENCE_RECORD=analysis/D275/D275_04_second_b0_live_closure.json
+HOST_MACHINE_REPORT_PATH=/var/lib/goodix-5125-poc/d261-results/d275-second-b0-final.json
+RAW_D275_POST_CORRECTIVE_REPORT_VERSIONED=false
+CANONICAL_PRIVATE_RAW_EVIDENCE_ROOT=captures/
+```
+
+La baseline live post-corrective resta `6eb60856...`; il commit di closure
+D275/04 attualmente su `main` e sotto review AI-PM è
+`42819c05e2400591bb58168539aa0f54ca09509f`. L'eventuale commit del presente
+correttivo finale sarà eseguito dall'Utente dopo la review.
+
 Trace live osservata:
 
 ```text
@@ -378,6 +406,17 @@ La modifica telemetry non altera traffico o sequencing device-side.
 timeout semantico del device. `LIVE_AUTHORIZED=false` per qualsiasi nuova run;
 non è autorizzato alcun terzo ciclo, enrollment, persistenza, timeout widening,
 retry/reopen o marker rearm.
+
+Closure v2.5 del presente correttivo documentale:
+
+```text
+OUTCOME=READY
+ADVANCEMENT=NONE (correttivo di provenance/semantica Git/verifiche offline; la milestone live D275/04 resta chiusa invariata)
+EXECUTABLE_CLOSURE=NOT_APPLICABLE
+RESIDUAL_BLOCKER_OR_RISK=TARGET_DEVICE_TIMEOUT_UNKNOWN; evidenza raw D275 post-corrective non versionata in repository
+CANONICAL_DOCUMENTATION=UPDATED
+REVIEW_SET=BASELINE_6eb60856fee7eed2c1765e5b1a11b492e99e42b0_PLUS_D275_04_CLOSURE_COMMIT_42819c05e2400591bb58168539aa0f54ca09509f_ON_main_WITH_FILES_Goodix_27c6_5125_manuale_tecnico.md_analysis_D275_D275_04_second_b0_live_closure.md_analysis_D275_D275_04_second_b0_live_closure.json
+```
 
 ### D275/02/operator path — UX poka-yoke italiana
 
@@ -1515,7 +1554,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/01 production multiframe Linux | READY offline; live false | `PersistentRuntimeCoordinator` chiude il secondo B0 sullo stesso transport/TLS/PSK; allowlist post-image `0x34,0x20,0x50,0x32,0x22`; zero retry/reopen/write; terzo ciclo irraggiungibile |
 | D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; UX operatore poka-yoke italiana su `stderr` con JSON macchina su `stdout`; fake-live rehearsal visiva hardware-inert; D268 storico frozen `c03d32e...`; nessuna USB reale |
 | D275/03 post-live root-cause `0x34 → IRQ0200` | corrective offline; due run live storiche fail-closed; nuova live false | tentativo 2 elimina timing operatore; prima immagine provata dal call-flow e telemetry monotona corretta; baseline Linux passava raw IRQ2 nel `0x34`, mentre tre cicli OEM APP12509 provano `80 || ((raw>>1)+0x1d)` con touch `0x003f`; down-table IRQ0200 corretta a `80 || (raw>>1)`; timeout 15 s non corto, lost-event race non trovata; causalità mismatch `STRONG_CAUSAL_INFERENCE`; terza run equivalente vietata |
-| D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
+| D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; closure consolidata nel commit `42819c05...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
 
 ## Fonti e confini di pubblicazione
 

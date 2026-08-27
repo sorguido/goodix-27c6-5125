@@ -1,9 +1,20 @@
-# D275/04 — Closure della seconda acquisizione Linux live
+# D275/04 — Closure della seconda acquisizione Linux live (correttivo finale)
 
-> **Reasoning**: medio/alto, correttivo/documentale  
-> **Natura**: closure Git-native + consolidamento evidenza + aggiornamento manuale  
-> **Nuovo live hardware**: VIETATO  
+> **Reasoning**: MEDIUM
+> **Natura**: correttivo locale D275/04, documentale/evidence-only
+> **Nuovo live hardware**: VIETATO
 > **Baseline live post-corrective**: `6eb60856fee7eed2c1765e5b1a11b492e99e42b0`
+> **Commit D275/04 sotto review AI-PM**: `42819c05e2400591bb58168539aa0f54ca09509f`
+> **Branch**: `main`
+
+```text
+OUTCOME=READY
+ADVANCEMENT=NONE (correzione locale di provenance, semantica Git e verifiche offline; la milestone tecnica D275/04 resta invariata)
+EXECUTABLE_CLOSURE=NOT_APPLICABLE
+RESIDUAL_BLOCKER_OR_RISK=TARGET_DEVICE_TIMEOUT_UNKNOWN; evidenza raw D275 post-corrective non versionata in repository
+CANONICAL_DOCUMENTATION=UPDATED
+REVIEW_SET=BASELINE_6eb60856fee7eed2c1765e5b1a11b492e99e42b0_PLUS_D275_04_CLOSURE_COMMIT_42819c05e2400591bb58168539aa0f54ca09509f_ON_main_WITH_FILES_Goodix_27c6_5125_manuale_tecnico.md_analysis_D275_D275_04_second_b0_live_closure.md_analysis_D275_D275_04_second_b0_live_closure.json
+```
 
 ## 1. Obiettivo
 
@@ -219,16 +230,62 @@ NEW_LIVE_AUTHORIZED=false
 D275/04 è una closure; non autorizza alcuna nuova run live, enrollment, terzo
 ciclo, persistenza, retry/reopen o marker rearm.
 
-## 9. Review set Git-native
+## 9. Provenance dell'evidenza live
+
+Il record consolidato e versionato nel repository è distinto dal raw machine
+report host-side:
+
+```text
+LIVE_EVIDENCE_CONSOLIDATED_IN_REPOSITORY=true
+CANONICAL_REPOSITORY_EVIDENCE_RECORD=analysis/D275/D275_04_second_b0_live_closure.json
+HOST_MACHINE_REPORT_PATH=/var/lib/goodix-5125-poc/d261-results/d275-second-b0-final.json
+RAW_D275_POST_CORRECTIVE_REPORT_VERSIONED=false
+CANONICAL_PRIVATE_RAW_EVIDENCE_ROOT=captures/
+```
+
+`HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
+macchina finale. La verifica della sua esistenza corrente non è disponibile
+senza privilegi elevati e non viene quindi dichiarata. Nessun payload
+biometrico, PSK, plaintext TLS o altro secret è stato copiato o serializzato
+negli artefatti del repository.
+
+## 10. Review set Git-native
 
 - **Baseline live post-corrective**: `6eb60856fee7eed2c1765e5b1a11b492e99e42b0`
-- **HEAD corrente**: `6eb60856fee7eed2c1765e5b1a11b492e99e42b0` (main)
+- **PRE_CLOSURE_EXECUTION_HEAD**: `6eb60856fee7eed2c1765e5b1a11b492e99e42b0`
+  (HEAD osservato durante l'esecuzione live e l'authoring pre-commit)
+- **D275_04_CLOSURE_COMMIT_UNDER_AI_PM_REVIEW**:
+  `42819c05e2400591bb58168539aa0f54ca09509f`
 - **Branch**: `main`
 - **File modificati / artefatti**:
   - `Goodix 27c6 5125 manuale tecnico.md`
   - `analysis/D275/D275_04_second_b0_live_closure.md`
   - `analysis/D275/D275_04_second_b0_live_closure.json`
-- **Evidenze raw private**: `captures/` (non duplicate; futuri export pubblici
-  le escludono)
+
+Nessun raw report D275 post-corrective è attualmente versionato in
+`captures/`. Le evidenze raw private, quando presenti, vivono canonicamente in
+`captures/`; non sono duplicate qui e i futuri export pubblici le escludono.
 
 Nessun ZIP, `.zip.b64`, bundle manifest o review archive è stato creato.
+
+## 11. Verifiche offline richieste dal prompt D275/04 originale
+
+| Verifica | Comando | Esito |
+|---|---|---|
+| `git diff --check` | `git diff --check` | PASS |
+| D275/01 production multiframe | `python3 -m unittest tests.test_d275_01_production_multiframe -v` | PASS (8/8) |
+| D275/02 operator one-shot | `python3 -m unittest tests.test_d275_02_live_one_shot -v` | PASS (36/36) |
+| D275/03 FDT derivation | Fixture `test_exact_oem_fdt_derivation_fixtures` e `test_stale_or_cross_cycle_table_fails_before_rearm` in `tests/test_d275_01_production_multiframe.py` | PASS |
+| Fake-live hardware-inert | `./operator_kit/d275-second-b0-once.sh --fake-live --terminal-boundary STOP_AFTER_SECOND_IMAGE` | PASS |
+| JSON validation | `python -m json.tool analysis/D275/D275_04_second_b0_live_closure.json >/dev/null` | PASS |
+
+`pytest` non è installato nell'ambiente corrente; i test sono stati eseguiti
+con il runner `unittest` standard senza modificarli. Il fake-live ha
+confermato:
+
+```text
+REAL_USB_ACCESS=false
+REAL_SENSOR_COMMAND_COUNT=0
+NEW_LIVE_EVIDENCE=false
+THIRD_CYCLE_STARTED=false
+```
