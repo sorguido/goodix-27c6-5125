@@ -11,8 +11,8 @@ from core.live_capability import D275_LIVE_AUTHORIZATION_FLAG
 from core.persistent_runtime import TerminalBoundary
 from core.d275_second_b0_operator import (
     D275_LIVE_CRITICAL_PATHS, build_dependencies, issue_intent, run_candidate,
+    verify_d275_authoritative_baseline,
 )
-from core.d275_second_b0_operator import verify_d268_authoritative_baseline
 
 BOUNDARY = TerminalBoundary.STOP_AFTER_SECOND_IMAGE
 FAKE_FLAG = "--fake-live"
@@ -47,7 +47,7 @@ def live_once(gate: str) -> int:
     if gate != GATE or not re.fullmatch(r"[0-9a-f]{40}",sha):
         print(json.dumps({"OUTCOME":"PRECHECK_FAILURE","REAL_USB_ACCESS":False,"REAL_SENSOR_COMMAND_COUNT":0}))
         return 1
-    try: verify_d268_authoritative_baseline(REPO,sha,D275_LIVE_CRITICAL_PATHS)
+    try: verify_d275_authoritative_baseline(REPO,sha,D275_LIVE_CRITICAL_PATHS)
     except Exception as exc:
         print(json.dumps({"OUTCOME":"PRECHECK_FAILURE","failure_class":f"{type(exc).__name__}:{exc}","REAL_USB_ACCESS":False,"REAL_SENSOR_COMMAND_COUNT":0}))
         return 1
