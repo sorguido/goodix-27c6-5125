@@ -67,8 +67,21 @@ def rehearse(
             _ack(0x32), _ack(0x22), image_b0(),
         ]
         raw_event_source._frames = _build_event_frames(first_image=False) + [
-            event(2, bytes(range(12))), event(0x200, bytes(range(12, 24))),
-            event(2, bytes(range(24, 36))),
+            event(
+                2,
+                bytes.fromhex("ef00f000df00c800f400d100"),
+                touch_flags=0x003F,
+            ),
+            event(
+                0x200,
+                bytes.fromhex("5a017c01470162014d016501"),
+                touch_flags=0,
+            ),
+            event(
+                2,
+                bytes.fromhex("bc00f200cb00d500c100e800"),
+                touch_flags=0x003F,
+            ),
         ]
     else:
         transport._receive = _build_receive_frames(first_image=first_image)

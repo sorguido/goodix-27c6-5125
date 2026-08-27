@@ -22,6 +22,8 @@ from core.fdt_lifecycle import (
     EXACT_FRESH_BOOTSTRAP_COMMAND_TRACE,
     ExactFreshFdtBootstrapMachine,
     FdtLifecycle,
+    table_from_irq2_up_payload,
+    table_from_irq200_down_payload,
 )
 from core.multiframe_validation import (
     BoundedMultiFrameRunner,
@@ -214,8 +216,20 @@ class _ProductionMultiFrameChannel:
             wanted = 0x0200 if state == 0x34 else 0x0002
             if event is None or event.irq != wanted:
                 raise MultiFrameError(f"expected_irq_0x{wanted:04x}")
-            table = None if event.raw_base is None else DerivedFdtTable(
-                event.raw_base, wanted, self.cycle if wanted == 0x0200 else self.cycle + 1
+            try:
+                value = (
+                    table_from_irq200_down_payload(payload)
+                    if wanted == 0x0200
+                    else table_from_irq2_up_payload(payload)
+                )
+            except Exception as error:
+                raise MultiFrameError(
+                    f"fdt_table_derivation_failed:0x{wanted:04x}"
+                ) from error
+            table = DerivedFdtTable(
+                value,
+                wanted,
+                self.cycle if wanted == 0x0200 else self.cycle + 1,
             )
             return Input(InputKind.IRQ, irq=wanted, derived_fdt_table=table)
         if state in {0x20, 0x22}:
@@ -280,6 +294,7 @@ class PersistentRuntimeCoordinator:
         self.first_image_irq2_observed_count = 0
         self.first_image_ack_validation_count = 0
         self.first_image_b0_count = 0
+        self.first_image_raster_decode_count = 0
         self.first_image_decode_diagnostic: dict[str, object] | None = None
         self.lifecycle = FdtLifecycle()
         self.machine: ExactFreshFdtBootstrapMachine | None = None
@@ -542,6 +557,7 @@ class PersistentRuntimeCoordinator:
         try:
             raster = parse_image_payload(bytes(plaintext), diagnostic=diagnostic)
             self.first_image_decode_diagnostic = diagnostic.sanitized_dict()
+            self.first_image_raster_decode_count += 1
             outcome["first_image_validation"] = "SUCCESS"
             outcome["first_image_raster_shape"] = (len(raster) // 64, 64)
         except Exception:
@@ -600,6 +616,11 @@ class PersistentRuntimeCoordinator:
         event = parse_fdt_event(payload) if kind == PLAIN else None
         if event is None or event.irq != 2 or event.raw_base is None:
             raise RuntimeFailure("expected_first_irq2_with_fresh_up_table")
+        try:
+            up_table = table_from_irq2_up_payload(payload)
+        except Exception as error:
+            raise RuntimeFailure("first_irq2_up_table_derivation_failed") from error
+        self.first_image_irq2_observed_count += 1
         self.lifecycle.post_irq2_image_command()
         policy_factory = (
             operational_fdt_a0_policy
@@ -610,11 +631,16 @@ class PersistentRuntimeCoordinator:
             build_finger_image(), policy_factory(0x22, COMMAND_TIMEOUT_MS[0x22])
         )
         _parse_exact_lifecycle_ack(self.transport.receive(COMMAND_TIMEOUT_MS[0x22]), 0x22)
-        raster = _consume_image_b0(
-            self, self.transport.receive(FIRST_IMAGE_B0_TIMEOUT_MS), "first"
-        )
+        self.first_image_ack_validation_count += 1
+        image_frame = self.transport.receive(FIRST_IMAGE_B0_TIMEOUT_MS)
+        image_kind, _ = parse_outer(image_frame)
+        if image_kind != TLS:
+            raise RuntimeFailure("first_image_b0_out_of_state")
+        self.first_image_b0_count += 1
+        raster = _consume_image_b0(self, image_frame, "first")
+        self.first_image_raster_decode_count += 1
         self.lifecycle.first_image_received()
-        return {"raster": raster, "up_table": event.raw_base}
+        return {"raster": raster, "up_table": up_table}
 
     def audit(self) -> dict[str, object]:
         session = self.tls_session
@@ -666,7 +692,10 @@ class PersistentRuntimeCoordinator:
             ),
             "operational_fdt_physical_policy": self.operational_physical_policy,
             "classifier_call_count": machine.semantic_classifier_call_count if machine else 0,
-            "raster_decode_count": machine.raster_decode_count if machine else 0,
+            "raster_decode_count": (
+                (machine.raster_decode_count if machine else 0)
+                + self.first_image_raster_decode_count
+            ),
             "host_cache_write_count": machine.host_cache_write_count if machine else 0,
             "persistent_device_write_count": self.lifecycle.persistent_write_family_count,
             "a2_special_recovery_count": self.lifecycle.device_command_trace.count(0xA2),
@@ -674,14 +703,14 @@ class PersistentRuntimeCoordinator:
             "exact_fdt_command_trace": [
                 f"0x{control:02x}" for control in self.lifecycle.device_command_trace
             ],
-            "first_image_received": self.lifecycle.state.value == "FIRST_IMAGE_RECEIVED"
-            or self.lifecycle.state.value == "TERMINAL_STOPPED",
+            "first_image_received": self.first_image_raster_decode_count > 0,
             "image_command_attempt_count": getattr(
                 self.lifecycle, "image_command_attempt_count", 0
             ),
             "first_image_irq2_observed_count": self.first_image_irq2_observed_count,
             "first_image_ack_validation_count": self.first_image_ack_validation_count,
             "first_image_b0_count": self.first_image_b0_count,
+            "first_image_raster_decode_count": self.first_image_raster_decode_count,
             "first_image_decode_diagnostic": self.first_image_decode_diagnostic,
             "first_image_validation": "INTEGRATED_IN_RUNTIME_RESULT",
             "first_image_bytes_persisted": False,

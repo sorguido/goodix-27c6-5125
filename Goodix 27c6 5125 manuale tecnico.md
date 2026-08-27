@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D274/03 osservazione live e corrective offline (sintesi)
+### Stato corrente post-D275/03 root-cause e corrective offline (sintesi)
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -193,6 +193,75 @@ D275/02 qualifica offline il candidate operator path, senza nuova evidenza
 device. `LINUX_SECOND_B0_LIVE_OBSERVED=false`, `LIVE_AUTHORIZED=false` e
 `TARGET_DEVICE_TIMEOUT=UNKNOWN`.
 
+### D275/03 — due live Linux, root-cause `0x34` e corrective offline
+
+Due esecuzioni D275 sulla baseline approvata
+`3443154184e138ba0b104669076132c27ace8255` hanno raggiunto la stessa traccia
+terminale `... 0x32, 0x22, 0x34`, validato l'ACK `0x34/0x01` e poi terminato
+fail-closed con `TimeoutError:libusb_bulk_timeout:0x81` durante la wait
+`IRQ 0x0200`; retry, reopen e scritture persistenti sono rimasti a zero. Nel
+primo tentativo il dito poteva essere stato sollevato prima del prompt 2/3. Nel
+secondo l'operatore ha mantenuto il dito fino al prompt e lo ha sollevato solo
+dopo: lo stesso timeout elimina il timing umano come spiegazione sufficiente.
+Una terza esecuzione equivalente non è autorizzata.
+
+Il call-flow prova anche che `0x34` è irraggiungibile prima di IRQ2, `0x22`,
+ACK01, primo B0, plaintext accettato, decode raster e transizione
+`FIRST_IMAGE_RECEIVED`. I valori finali D275
+`first_image_received=false`, contatori first-image zero e
+`raster_decode_count=0` erano quindi telemetry errata: il ramo multiframe non
+incrementava i contatori monotoni, e il successivo `fail_closed()` sostituiva
+lo stato lifecycle usato come proxy. D275/03 registra ora separatamente IRQ2,
+ACK, B0 e decode; un failure successivo non cancella più le milestone già
+raggiunte.
+
+L'audit byte-level delle fonti APP12509 chiude inoltre un mismatch di protocollo
+nella baseline live. Nei tre cicli positivi disponibili (uno D263 e due nella
+capture D274/03), l'IRQ2 ha `touch_flags=0x003f` e l'OEM costruisce la tabella
+up come sei coppie `80 || ((raw_word >> 1) + 0x1d)`. D274/03, per esempio,
+riceve raw `ef00f000df00c800f400d100` ma invia nel body `0x34`
+`0a01 || 80948095808c808180978085`; la baseline Linux passava invece i 12 byte
+raw direttamente a `build_fdt_up()`. Analogamente l'IRQ0200 con touch zero è
+trasformato in down-table `80 || (raw_word >> 1)` prima del re-arm `0x32`:
+raw `5a017c01470162014d016501` diventa
+`80ad80be80a380b180a680b2`.
+
+Il corrective offline applica solo questi due contesti target-osservati e
+fallisce chiuso per touch/mode diversi; source IRQ e generation restano
+obbligatori. Il mismatch è `VERIFIED`; il suo ruolo causale nel mancato IRQ0200
+è `STRONG_CAUSAL_INFERENCE`, non nuova osservazione device-side: entrambe le
+live errate hanno ricevuto ACK ma nessun IRQ0200, mentre l'OEM usa la tabella
+derivata e osserva IRQ0200. Nessuna live post-corrective è stata eseguita o
+autorizzata.
+
+La capture OEM non mostra altri comandi o transfer tra primo B0 e `0x34`.
+Misura ACK `0x34` → IRQ0200 in 47,201 ms (D263) e 345,859 ms (D274/03), quindi
+non sostiene che il timeout host Linux di 15 s sia troppo breve. Il
+`SharedFrameRouter` conserva in coda un IRQ arrivato mentre il path command
+attende l'ACK, usa un solo reader fisico e non presenta una lost-event window
+nel call-flow o nei test di interleaving. Il solo errore libusb `-7` non prova
+però che `transferred == 0`, perché il backend corrente non espone tale valore
+nel failure: la presenza di byte parziali nella specifica live resta `UNKNOWN`,
+senza corrective speculativo di chunking.
+
+```text
+FIRST_IMAGE_REACHED_IN_D275_LIVE=VERIFIED_FROM_CALL_FLOW
+LINUX_0X34_ACK_REACHED=true
+LINUX_IRQ0200_AFTER_0X34=NOT_OBSERVED_IN_TWO_BOUNDED_RUNS
+OPERATOR_TIMING_CONFOUND=ELIMINATED_BY_ATTEMPT_2
+D275_LIVE_BASELINE_0X34_TABLE_EQUALS_OEM_REQUIRED_TABLE=false
+CORRECTED_0X34_TABLE_EQUALS_OEM_CAPTURED_TABLE=true
+RAW_IRQ_BASE_CAN_BE_USED_DIRECTLY_FOR_0X34=DISPROVEN
+HOST_15S_TIMEOUT_PLAUSIBLY_TOO_SHORT=NO
+EVENT_LOSS_RACE_FOUND=false
+FDT_TABLE_MISMATCH_CAUSALITY=STRONG_CAUSAL_INFERENCE
+PROTOCOL_CORRECTIVE_IMPLEMENTED=true
+LINUX_SECOND_B0_LIVE_OBSERVED=false
+TARGET_DEVICE_TIMEOUT=UNKNOWN
+THIRD_EQUIVALENT_LIVE_ATTEMPT_NOT_AUTHORIZED=true
+LIVE_AUTHORIZED=false
+```
+
 ### D275/02/operator path — UX poka-yoke italiana
 
 Il candidato live D275/02 guida l'operatore con blocchi in italiano su `stderr`,
@@ -288,11 +357,11 @@ GENERIC_WIRE_TO_LOGICAL_MASK_REMOVED=true
 REARM_0X32_STATUS=OBSERVED_WITH_ACK_AND_CURRENT_IRQ0200_DERIVED_DOWN_TABLE_CONTRACT
 SECOND_CYCLE_STATUS=OBSERVED_COMPLETE_WIRE_DRIVEN
 FULL_FPIMAGE_PIPELINE_CONTRACT=PARTIALLY_CLOSED
-LINUX_MULTIFRAME_RUNTIME=D275_02_LIVE_ONE_SHOT_PATH_READY_OFFLINE_NOT_LIVE_EXECUTED
+LINUX_MULTIFRAME_RUNTIME=D275_03_FDT_DERIVATION_AND_TELEMETRY_CORRECTED_OFFLINE_PENDING_AI_PM_REVIEW
 LINUX_SECOND_B0_LIVE_OBSERVED=false
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_PRE_LIVE_REVIEW_D275_02
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_D275_03_OFFLINE_CORRECTIVE
 NEXT_BOUNDARY_PREREQUISITE=EXPLICIT_SEPARATE_AUTHORITY_FOR_ANY_FUTURE_LIVE_STEP
 ```
 
@@ -1315,6 +1384,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D274/03 Kit one-shot secondo ciclo | Windows native qualification PASS operator-supplied; baseline/capture/live false; freeze/review AI-PM pending | runner futuro vincolato a `main`; BOM UTF-8 e `$LASTEXITCODE` corretti; literal `$TsharkPath` non interpolato sotto StrictMode e privacy contract verificato nei reali owner observer/postprocessor; run finale PowerShell Desktop 5.1 tutti-stage PASS con Goodix assente, zero capture/USB/dito/comandi/retry/write; SHA package operator-supplied `5a498239…9eca87`, byte non ricalcolati dall'agente; D263 resta negativa |
 | D275/01 production multiframe Linux | READY offline; live false | `PersistentRuntimeCoordinator` chiude il secondo B0 sullo stesso transport/TLS/PSK; allowlist post-image `0x34,0x20,0x50,0x32,0x22`; zero retry/reopen/write; terzo ciclo irraggiungibile |
 | D275/02 Linux second-B0 live one-shot | READY offline; candidate live pending AI-PM; live false | authority Git SHA sul live-critical set (21 file, incluso `multiframe_validation` e `binding_reference`); report/marker D275 distinti; publish dopo `STOP_AFTER_SECOND_IMAGE`; UX operatore poka-yoke italiana su `stderr` con JSON macchina su `stdout`; fake-live rehearsal visiva hardware-inert; D268 storico frozen `c03d32e...`; nessuna USB reale |
+| D275/03 post-live root-cause `0x34 → IRQ0200` | corrective offline; due run live storiche fail-closed; nuova live false | tentativo 2 elimina timing operatore; prima immagine provata dal call-flow e telemetry monotona corretta; baseline Linux passava raw IRQ2 nel `0x34`, mentre tre cicli OEM APP12509 provano `80 || ((raw>>1)+0x1d)` con touch `0x003f`; down-table IRQ0200 corretta a `80 || (raw>>1)`; timeout 15 s non corto, lost-event race non trovata; causalità mismatch `STRONG_CAUSAL_INFERENCE`; terza run equivalente vietata |
 
 ## Fonti e confini di pubblicazione
 

@@ -333,6 +333,41 @@ def table_from_irq100_payload(payload: bytes) -> bytes:
     return bytes(learned)
 
 
+def _derive_encoded_fdt_table(raw_base: bytes, *, component_offset: int) -> bytes:
+    """Encode six target FDT words using the APP12509 OEM representation."""
+    if len(raw_base) != 12:
+        raise LengthMismatch("fdt_raw_base_length")
+    learned = bytearray()
+    for offset in range(0, 12, 2):
+        word = int.from_bytes(raw_base[offset:offset + 2], "little")
+        component = (word >> 1) + component_offset
+        if not 0 < component < 0xFF:
+            raise UnexpectedEvent("fdt_derived_component_out_of_range")
+        learned += bytes((0x80, component))
+    return bytes(learned)
+
+
+def table_from_irq2_up_payload(payload: bytes) -> bytes:
+    """Derive the FDT-up table for the observed APP12509 finger-down mode.
+
+    D263 and D274/03 show touch flags ``0x003f`` and encode each raw word as
+    ``0x80 || ((raw >> 1) + 0x1d)``. Other touch/mode contexts remain unproven
+    and therefore fail closed.
+    """
+    event = parse_fdt_event(payload)
+    if event.irq != 0x0002 or event.touch_flags != 0x003F or event.raw_base is None:
+        raise UnexpectedEvent("fdt_up_requires_irq2_touch003f_raw12")
+    return _derive_encoded_fdt_table(event.raw_base, component_offset=0x1D)
+
+
+def table_from_irq200_down_payload(payload: bytes) -> bytes:
+    """Derive the FDT-down table for the observed APP12509 finger-up mode."""
+    event = parse_fdt_event(payload)
+    if event.irq != 0x0200 or event.touch_flags != 0 or event.raw_base is None:
+        raise UnexpectedEvent("fdt_down_requires_irq0200_touch_zero_raw12")
+    return _derive_encoded_fdt_table(event.raw_base, component_offset=0)
+
+
 def raw_words_from_irq100_payload(payload: bytes) -> tuple[int, ...]:
     """Return the six unsigned OEM FDT-base words from an IRQ 0x0100."""
     event = parse_fdt_event(payload)
