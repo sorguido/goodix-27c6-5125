@@ -108,3 +108,15 @@ Before release, perform a separate audit of content and history for proprietary
 binaries/firmware, captures, secrets and biometric/private data. Use a clean
 export, new history or a purpose-built filter when needed; never automatically
 push or expose the private history. D247 does not modify the public repository.
+
+## D276/03 — componente router LGPL indipendente
+
+`libfprint-driver/goodix_usb_router.[ch]` e i relativi test/launcher D276/03
+sono nuovo codice di progetto `LGPL-2.1-or-later`. Sono stati implementati
+indipendentemente dai fatti neutrali di framing e ownership canonizzati nel
+manuale e in `analysis/D276/D276_01_libfprint_device_architecture.md`; durante
+il slice non sono stati consultati, copiati, tradotti o adattati `core/`,
+`tools/` o sorgenti Rockytkg GPL. Non è stato importato codice esterno. Le sole
+dipendenze sono le API GLib pubbliche; transcript e payload sono sintetici,
+senza secret, capture o biometria. L'etichetta clean-room descrive il controllo
+ingegneristico di provenance e non costituisce una conclusione legale.

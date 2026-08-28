@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+name: D276 USB router host-only
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'libfprint-driver/goodix_usb_router.[ch]'
+      - 'libfprint-driver/tests/*goodix_usb_router*'
+      - '.github/workflows/d276-usb-router-host-only.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  router:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install host-only build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev
+      - name: Verify clean checked-in tree
+        run: test -z "$(git status --short)"
+      - name: Deterministic normal and sanitizer run 1
+        run: libfprint-driver/tests/run_goodix_usb_router_test.sh
+      - name: Deterministic normal and sanitizer run 2
+        run: libfprint-driver/tests/run_goodix_usb_router_test.sh
+      - name: Verify no second receive completion API
+        run: |
+          test "$(rg -n '^goodix_usb_router_receive_complete \(' libfprint-driver/goodix_usb_router.c | wc -l)" -eq 1
+          ! rg -n 'GUsbDevice|FpiUsbTransfer|/dev/bus/usb|27c6.*5125' libfprint-driver/goodix_usb_router.[ch]

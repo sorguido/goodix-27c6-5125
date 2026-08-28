@@ -26,6 +26,7 @@ typedef enum
 
 typedef struct _GoodixDeviceContext GoodixDeviceContext;
 typedef struct _GoodixInMemoryBackend GoodixInMemoryBackend;
+typedef struct _GoodixUsbRouter GoodixUsbRouter;
 
 typedef struct
 {
@@ -41,6 +42,7 @@ typedef struct
 GoodixFpImageDevice * goodix_fpimage_device_new (void);
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
+GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
 
 /* --- Context read-only accessors (test instrumentation) --- */
 GoodixDeviceContextState goodix_device_context_get_state (GoodixDeviceContext *ctx);
