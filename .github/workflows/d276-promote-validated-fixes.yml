@@ -55,8 +55,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          rm .github/d276_fpimage_device_diagnostic_patch.py
-          rm .github/workflows/d276-promote-validated-fixes.yml
+          git rm -f .github/d276_fpimage_device_diagnostic_patch.py
+          git rm -f .github/workflows/d276-promote-validated-fixes.yml
 
           cat > .github/workflows/d276-fpimage-device-host-only.yml <<'YAML'
           name: D276 FpImageDevice host-only validation
@@ -135,7 +135,7 @@ jobs:
 
           git diff --check
 
-          ACTUAL="$(git diff --name-only | sort)"
+          ACTUAL="$(git diff HEAD --name-only | sort)"
           EXPECTED="$(printf '%s\n' \
             '.github/d276_fpimage_device_diagnostic_patch.py' \
             '.github/workflows/d276-fpimage-device-host-only.yml' \
