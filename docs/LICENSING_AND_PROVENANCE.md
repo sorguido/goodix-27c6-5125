@@ -147,3 +147,9 @@ indipendente: rende esplicito il token generation fornito dal context e aggiunge
 fixture A0 sintetiche multi-activation. Non sono stati consultati, copiati o
 tradotti `core/`, Rockytkg o implementazioni esterne; le fixture non contengono
 secret reali né dati biometrici reali.
+
+Il final corrective D276/04 aggiunge al medesimo backend LGPL API checked di
+drain/begin-generation e una seam asincrona host-only. L'implementazione deriva
+dal contratto pubblico `FpiUsbTransfer` della copia repository-local libfprint
+1.94.5 e da fixture sintetiche; non incorpora espressione GPL, secret o dati
+biometrici.

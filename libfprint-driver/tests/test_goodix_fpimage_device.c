@@ -694,7 +694,8 @@ test_stale_callback_generation_guard (void)
   old_generation = goodix_device_context_get_generation (f->ctx);
   usb_backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
   router = goodix_device_context_get_usb_router (f->ctx);
-  goodix_device_context_set_usb_submit_seam (f->ctx, host_only_usb_submit, NULL);
+  goodix_device_context_set_async_usb_submit_seam (f->ctx,
+                                                    host_only_usb_submit, NULL);
   g_assert_true (goodix_device_context_arm_receive (f->ctx, NULL));
 
   /* Complete the action, invalidating the generation. */
@@ -702,6 +703,22 @@ test_stale_callback_generation_guard (void)
                                           GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
   goodix_device_context_emit_release_tail_complete (f->ctx);
   goodix_device_context_emit_finger_up_ready (f->ctx);
+
+  while (goodix_device_context_get_state (f->ctx) !=
+         GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING)
+    g_main_context_iteration (NULL, TRUE);
+  g_assert_false (f->done);
+  g_assert_false (goodix_fpi_usb_backend_is_drained (usb_backend));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (usb_backend), ==, 1);
+
+  /* Cancellation requests only fence the transfer.  The synthetic callback
+   * owns and releases N's physical-shaped token, which allows deactivation
+   * completion without claiming device-side protocol quiescence. */
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled IN completion");
+  goodix_device_context_complete_receive (f->ctx, old_generation, NULL, 0,
+                                           cancelled);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (usb_backend));
   test_wait (f);
 
   g_assert_true (f->success);

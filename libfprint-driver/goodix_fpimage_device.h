@@ -57,6 +57,9 @@ gboolean goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
                                                  GoodixUsbSubmitSeam seam,
                                                  gpointer user_data);
+void goodix_device_context_set_async_usb_submit_seam (GoodixDeviceContext *ctx,
+                                                       GoodixUsbSubmitSeam seam,
+                                                       gpointer user_data);
 gboolean goodix_device_context_arm_receive (GoodixDeviceContext *ctx, GError **error);
 void goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                               guint64 submit_generation,

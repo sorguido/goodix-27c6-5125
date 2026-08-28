@@ -1934,16 +1934,23 @@ anticipata durante l'estrazione SIGFM e perdita di un IRQ2 quando il framework
 non è pronto, senza trattenere il release tail corrente dietro lo stato
 `AWAIT_FINGER_ON`.
 
-La cancellazione libfprint dell'azione porta al `deactivate`; il cancellable
-dell'azione è concatenato a un cancellable activation-local usato da tutti i
-transfer. `deactivate` chiude prima il terminal fence, cancella/draina il solo
-I/O host pending, invalida generation e completa phase-correctly. Il risultato
-`G_IO_ERROR_CANCELLED` prova la cancellazione host, non la quiescenza del
-protocollo device-side. Non esiste un comando cancel device-side provato e non
+La cancellazione libfprint dell'azione porta al `deactivate`; un cancellable
+USB activation-local, distinto dal cancellable dell'azione, è usato dai
+transfer. `deactivate` chiude prima il terminal fence e richiede la cancellazione
+host, ma i token IN/OUT restano pending finché i rispettivi callback asincroni
+non rientrano. Durante questo intervallo il backend è fenced ma non drained:
+nessun submit o delivery è ammesso, una nuova generation fallisce chiusa e la
+deactivation non completa. Il callback matching, incluso
+`G_IO_ERROR_CANCELLED`, rilascia esattamente il proprio token senza consegnare
+byte; il callback finale notifica il drain una sola volta e solo allora il
+context può completare la deactivation. Un callback stale non può rilasciare il
+token della generation corrente. `HOST_ASYNC_IO_DRAIN=PROVEN_HOST_ONLY`; il
+risultato prova lifetime e drain host, non la quiescenza del protocollo
+device-side. Non esiste un comando cancel device-side provato e non
 ne è ammesso uno non compreso. Se il lifecycle non è quiescente, la sessione di
 protocollo diventa `POISONED/QUIESCENCE_UNKNOWN`: nessun resume mascherato nella
 stessa sessione, recovery, reset, retry, TLS restart o reopen automatico. La
-quiescenza production dopo cancel arbitrario resta `UNRESOLVED` e un normale
+quiescenza production dopo cancel arbitrario resta `UNRESOLVED` (`DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED`) e un normale
 lifecycle framework futuro richiede una policy esplicita. Timeout, TLS,
 frame/ACK/CRC o lifecycle inattesi sono fail-closed e non invocano
 `fpi_image_device_retry_scan()`.

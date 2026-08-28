@@ -75,3 +75,27 @@ normal e ASAN/UBSAN sono host-only; nessun submit USB reale è raggiunto. Le
 GitHub Actions del corrective non sono verificabili dall'executor:
 `GITHUB_ACTIONS_CONFIRMATION=NOT_VERIFIED_BY_EXECUTOR` e
 `EXECUTABLE_CLOSURE=PENDING_AI_PM_GITHUB_VERIFICATION`.
+
+## Final corrective — cancel request, callback drain e lifetime
+
+Il terminal fence e il drain sono ora stati separati. La richiesta di cancel
+non azzera i contatori IN/OUT: ogni token fisico-shaped resta outstanding finché
+il callback matching, incluso `G_IO_ERROR_CANCELLED`, rientra e rilascia
+esattamente il proprio token. Nessun callback dopo il fence consegna byte o
+incrementa le delivery. Una callback stale non corrisponde al token della
+nuova generation e non può consumarlo.
+
+`begin_generation()` è ora checked e rifiuta una generation finché IN o OUT non
+sono drained. Il backend espone una notifica di drain exactly-once; il context
+mantiene la deactivation pending e la completa soltanto dopo l'ultimo callback.
+Il cancellable USB è activation-local e distinto da quello dell'azione
+libfprint. `can_free()` rende verificabile che il backend non è liberabile prima
+del drain. La seam asincrona esplicita mantiene pending sia IN sia OUT fino
+all'iniezione sintetica della completion.
+
+I test normal e ASAN/UBSAN provano cancel/drain IN, cancel/drain OUT, free gate,
+reject/allow di begin-generation e l'intero ordine N → fence → callback drain →
+deactivation → N+1 → stale/current. Il massimo IN fisico-shaped è uno e nessun
+submit USB reale viene eseguito. `HOST_ASYNC_IO_DRAIN=PROVEN_HOST_ONLY` non
+promuove la quiescenza device-side:
+`DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED`.
