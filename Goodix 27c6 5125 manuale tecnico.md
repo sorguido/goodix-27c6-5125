@@ -148,9 +148,19 @@ MAX_OUTSTANDING_RECEIVES=1
 SECOND_READER_API_PATH=ABSENT
 STALE_GENERATION_CALLBACK=IGNORED
 CANCEL_TERMINAL_FENCE=PASS_HOST_ONLY
-D276_03_EXECUTABLE_CLOSURE=PENDING_GITHUB_ACTIONS
+D276_03_OUTCOME=READY
+D276_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 D276_03_CORRECTIVE_RUNTIME_COMMIT=d8ddaa72835662a92db857f55551810649a2b1c5
-D276_03_GITHUB_ACTIONS_RESULT=NOT_VERIFIED_BY_EXECUTOR
+D276_03_CI_VALIDATED_COMMIT=49e7e9d108d14fc7a9910d97022cd4baa829c5e4
+D276_03_MERGED_MAIN_COMMIT=474aa2b931977a2c748098c4e510764ad7ee7f42
+D276_03_GITHUB_ACTIONS_PUSH_RUN=33184060807
+D276_03_GITHUB_ACTIONS_PR_RUN=33184064239
+D276_03_GITHUB_ACTIONS_RESULT=PASS
+D276_03_NORMAL_TEST_RUN=PASS
+D276_03_SANITIZER_TEST_RUN=PASS
+D276_03_DETERMINISM_RUNS=2
+D276_03_ROUTER_TESTS_PER_NORMAL_RUN=8/8_PASS
+D276_03_ROUTER_TESTS_PER_SANITIZER_RUN=8/8_PASS
 D276_02_FPIMAGE_REGRESSION_NORMAL=PASS
 D276_02_FPIMAGE_REGRESSION_SANITIZER=PASS
 NEXT_PRIMARY_BOUNDARY=D276_04_NATIVE_TLS_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY
@@ -185,7 +195,12 @@ sottomettono altro; il cancel è esclusivamente cleanup host-side e non implica
 un comando device-side, retry, recovery, reopen o TLS restart.
 
 Il fake scheduler misura `PHYSICAL_RECEIVE_OWNER_COUNT=1` e
-`MAX_OUTSTANDING_RECEIVES=1`; una seconda submission concorrente fallisce. I test GLib coprono anche un B0 con header — incluso il campo length LE16 — e body spezzati su più receive, senza delivery prima del completamento e con ricostruzione byte-identical. Le esecuzioni locali normal e ASAN/UBSAN restano soggette al gate correttivo; coprono inoltre chunk arbitrari, concatenazione, zero byte loss/duplicate, demux misto,
+`MAX_OUTSTANDING_RECEIVES=1`; una seconda submission concorrente fallisce. I test GLib coprono anche un B0 con header — incluso il campo length LE16 — e body spezzati su più receive, senza delivery prima del completamento e con ricostruzione byte-identical. La CI validata esternamente dall’AI-PM sul commit
+`49e7e9d108d14fc7a9910d97022cd4baa829c5e4` ha eseguito due run deterministiche:
+ciascuna ha chiuso 8/8 test router normal e 8/8 ASAN/UBSAN, oltre alla regressione
+`FpImageDevice` 14/14 normal e 14/14 sanitizer. Le run GitHub Actions push
+33184060807 e PR 33184064239 sono entrambe PASS; il commit validato è stato
+integrato in `main` da `474aa2b931977a2c748098c4e510764ad7ee7f42`. I test coprono inoltre chunk arbitrari, concatenazione, zero byte loss/duplicate, demux misto,
 stale generation, cancellation sincrona durante delivery e transcript
 malformati/troncati. Questo chiude soltanto il router host-only: equivalenza
 hardware, quiescenza device-side, timeout target e lifetime TLS cross-activation
@@ -1672,7 +1687,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; closure consolidata nel commit `42819c05...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
 | D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; corrective documentation-only; live false | preservata `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM`/confidence `HIGH`; release tail corretto fino a NAV prima del finger-off, post-up B0 mai consegnato a libfprint e solo re-arm `0x32` gated da `AWAIT_FINGER_ON`; reentrancy/deactivate esplicitata; `GoodixDeviceContext` owner TLS/secret ma lifetime TLS cross-activation irrisolto; cancel device-side e quiescenza production arbitraria non provati, policy conservativa `POISONED/QUIESCENCE_UNKNOWN`; reimplementazione indipendente con provenance controllata, non conclusione legale |
 | D276/02 shell `FpImageDevice` host-only | READY / PASS_HOST_ONLY; validation clean-tree GitHub Actions run 33165906857 (commit 87d4aace...); 2 run deterministiche (14/14 normal PASS, 14/14 ASAN/UBSAN PASS); live false | shell C/LGPL non registrata con backend in-memory che esercita il vero `FpImageDevice` 1.94.5; correzioni: cancellazione `ACTIVATING` collegata al cancellable dell'azione, `GError` owned ai confini, deactivation trattenibile, generation token per eventi fake, re-arm exactly-once per generation, launcher con timeout e propagazione failure; nessun USB/TLS/secret/fprintd/VID:PID usato; unresolved production/device quiescence e TLS session lifetime invariati; prossimo boundary D276/03 |
-| D276/03 router A0/B0 single-receive | CORRECTIVE locale; GitHub Actions PENDING/NOT VERIFIED; live false | nuovo router C/LGPL transport-agnostic posseduto dall’open epoch, parser incrementale comune A0/B0, demux in-order/exactly-once con `GBytes`, un solo completion point e massimo una receive fake outstanding; malformed/truncated fail-closed, generation stale e callback post-cancel ignorate; nessun USB/TLS/secret/VID:PID; prossimo boundary D276/04 host-only |
+| D276/03 router A0/B0 single-receive | READY / PASS_HOST_ONLY; CI clean-tree PASS; merge main 474aa2b9...; live false | nuovo router C/LGPL transport-agnostic posseduto dall’open epoch, parser incrementale comune A0/B0, demux in-order/exactly-once con `GBytes`, un solo completion point e massimo una receive fake outstanding; malformed/truncated fail-closed, generation stale e callback post-cancel ignorate; nessun USB/TLS/secret/VID:PID; prossimo boundary D276/04 host-only |
 
 ## Fonti e confini di pubblicazione
 
@@ -1924,7 +1939,7 @@ Roadmap corrente:
 D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
-D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CORRECTIVE_LOCAL_CI_PENDING
+D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_PASS_HOST_ONLY
 D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no VID:PID
 poi      -> review provenance + decisione stage enrollment + eventuale baseline live separata
 ```
@@ -6975,7 +6990,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D276/02 corrective: la shell `FpImageDevice` non registrata
+Stato corrente post-D276/03: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa
@@ -6989,12 +7004,16 @@ dipende da `AWAIT_FINGER_ON`, tail completo e down-table fresca. Il rescue D276/
 e la successiva CI su GitHub Actions (run 33165906857, commit `87d4aacec23b5415cca5de73e0dfeb83ffe65bab`)
 hanno chiuso la executable closure host-only con 2 run deterministiche (14/14
 normal PASS, 14/14 ASAN/UBSAN PASS, `CI_DIAGNOSTIC_PATCH=NONE`). La precedente
-indisponibilità di Flatpak/GLib-dev nell'ambiente di rescue è superata. Il prossimo
-boundary autorizzato è `D276_03_A0_B0_CLEANROOM_SINGLE_RECEIVE_SYNTHETIC_TRANSCRIPTS`,
-senza USB, TLS reale, secret, fprintd, VID:PID, stage policy, terzo ciclo o nuovo
-live. Artefatti:
-`analysis/D276/D276_01_libfprint_device_architecture.{md,json}` e
-`analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}`.
+indisponibilità di Flatpak/GLib-dev nell'ambiente di rescue è superata. D276/03
+ha inoltre chiuso `PASS_HOST_ONLY` il router A0/B0 single-receive: commit CI
+`49e7e9d108d14fc7a9910d97022cd4baa829c5e4`, run push 33184060807 e PR
+33184064239 PASS, merge `main` `474aa2b931977a2c748098c4e510764ad7ee7f42`.
+Il prossimo boundary è
+`D276_04_NATIVE_TLS_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY`, senza USB,
+TLS reale, secret, fprintd, VID:PID, stage policy, terzo ciclo o nuovo live.
+Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
+`analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
+`analysis/D276/D276_03_usb_router_host_only.{md,json}`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
