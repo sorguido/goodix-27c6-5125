@@ -75,17 +75,18 @@ goodix_usb_router_free (GoodixUsbRouter *router)
   g_free (router);
 }
 
-guint64
-goodix_usb_router_begin_generation (GoodixUsbRouter *router)
+void
+goodix_usb_router_begin_generation (GoodixUsbRouter *router,
+                                    guint64          generation)
 {
-  g_return_val_if_fail (router != NULL, 0);
-  router->generation++;
+  g_return_if_fail (router != NULL);
+  g_return_if_fail (generation != 0);
+  router->generation = generation;
   router->terminal_fence = FALSE;
   router->outstanding = 0;
   router->outstanding_generation = 0;
   g_byte_array_set_size (router->pending, 0);
   g_clear_error (&router->terminal_error);
-  return router->generation;
 }
 
 gboolean
@@ -204,7 +205,6 @@ goodix_usb_router_cancel (GoodixUsbRouter *router)
 {
   g_return_if_fail (router != NULL);
   router->terminal_fence = TRUE;
-  router->generation++;
   router->outstanding = 0;
   router->outstanding_generation = 0;
   g_byte_array_set_size (router->pending, 0);

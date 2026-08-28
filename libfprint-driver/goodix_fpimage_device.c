@@ -44,6 +44,7 @@ struct _GoodixDeviceContext
   gboolean                 terminal_fence;
   gboolean                 poisoned;
   GCancellable            *activation_cancellable;
+  GCancellable            *usb_cancellable;
   gulong                   cancel_handler_id;
   gboolean                 activation_completed;
 
@@ -77,6 +78,19 @@ struct _GoodixFpImageDevice
 
 G_DEFINE_TYPE (GoodixFpImageDevice, goodix_fpimage_device, FP_TYPE_IMAGE_DEVICE)
 
+static void goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx);
+static void goodix_device_context_set_poisoned (GoodixDeviceContext *ctx,
+                                                const GError        *error);
+static void
+context_usb_drained (GoodixFpiUsbBackend *backend,
+                     gpointer             user_data)
+{
+  GoodixDeviceContext *ctx = user_data;
+  (void) backend;
+  if (ctx->deactivation_pending && !ctx->deactivation_held)
+    goodix_device_context_complete_deactivation (ctx);
+}
+
 GoodixUsbRouter *
 goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
 {
@@ -95,7 +109,7 @@ static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
   if(type!=0xb0||ctx->terminal_fence||!ctx->tls_server)return;
   p=g_bytes_get_data(frame,&n);
   if(n<=4||!goodix_tls_server_push(ctx->tls_server,p+4,n-4,&error))
-    { ctx->terminal_fence=TRUE; ctx->poisoned=TRUE; goodix_usb_router_cancel(ctx->usb_router); goodix_fpi_usb_backend_cancel(ctx->fpi_usb_backend); }
+    { goodix_device_context_set_terminal_fence(ctx); goodix_device_context_set_poisoned(ctx,error); }
 }
 static void context_tls_output (GBytes *record, gpointer user_data)
 {
@@ -103,7 +117,7 @@ static void context_tls_output (GBytes *record, gpointer user_data)
   if(ctx->terminal_fence||n>G_MAXUINT16)return;
   h[0]=0xb0;h[1]=(guint8)n;h[2]=(guint8)(n>>8);h[3]=(guint8)(h[0]+h[1]+h[2]);
   frame=g_byte_array_sized_new((guint)n+4);g_byte_array_append(frame,h,4);g_byte_array_append(frame,p,(guint)n);bytes=g_byte_array_free_to_bytes(g_steal_pointer(&frame));
-  if(!goodix_fpi_usb_backend_submit_out(ctx->fpi_usb_backend,ctx->generation,bytes,&error)){ctx->terminal_fence=TRUE;ctx->poisoned=TRUE;goodix_tls_server_cancel(ctx->tls_server);}
+  if(!goodix_fpi_usb_backend_submit_out(ctx->fpi_usb_backend,ctx->generation,bytes,&error)){goodix_device_context_set_terminal_fence(ctx);goodix_device_context_set_poisoned(ctx,error);}
 }
 static void context_tls_plaintext (GBytes *bytes, gpointer user_data)
 { GoodixDeviceContext *ctx=user_data; if(!ctx->terminal_fence&&ctx->tls_plaintext)ctx->tls_plaintext(bytes,ctx->tls_user_data); }
@@ -164,6 +178,8 @@ goodix_device_context_new (GoodixFpImageDevice *device)
   ctx->backend_user_data = &ctx->backend;
   ctx->usb_router = goodix_usb_router_new (context_a0_consumer, context_b0_consumer, ctx);
   ctx->fpi_usb_backend = goodix_fpi_usb_backend_new (FP_DEVICE (device), ctx->usb_router, 0x81, 0x01, 32768);
+  goodix_fpi_usb_backend_set_drained_callback (ctx->fpi_usb_backend,
+                                               context_usb_drained, ctx);
 
   return ctx;
 }
@@ -175,6 +191,7 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
     return;
 
   g_clear_object (&ctx->activation_cancellable);
+  g_clear_object (&ctx->usb_cancellable);
   g_clear_error (&ctx->terminal_error);
   g_free (ctx->backend.last_command);
   goodix_tls_server_free (ctx->tls_server);
@@ -206,7 +223,6 @@ goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
   ctx->terminal_fence = TRUE;
   goodix_tls_server_cancel (ctx->tls_server);
   goodix_fpi_usb_backend_cancel (ctx->fpi_usb_backend);
-  goodix_usb_router_cancel (ctx->usb_router);
 }
 
 static void
@@ -369,10 +385,11 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   g_assert (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
             ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
 
+  g_autoptr(GError) error = NULL;
+
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;
   ctx->generation = ctx->generation_seq;
-  goodix_usb_router_begin_generation (ctx->usb_router);
   ctx->release_tail_complete = FALSE;
   ctx->fresh_down_table = FALSE;
   ctx->rearm_issued_generation = 0;
@@ -382,8 +399,21 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   g_clear_object (&ctx->activation_cancellable);
   ctx->activation_cancellable = g_object_ref (
     fpi_device_get_cancellable (FP_DEVICE (self)));
-  goodix_fpi_usb_backend_begin_generation (ctx->fpi_usb_backend, ctx->generation,
-                                           ctx->activation_cancellable);
+  g_clear_object (&ctx->usb_cancellable);
+  ctx->usb_cancellable = g_cancellable_new ();
+  if (!goodix_fpi_usb_backend_begin_generation (ctx->fpi_usb_backend,
+                                                ctx->generation,
+                                                ctx->usb_cancellable, &error))
+    {
+      ctx->terminal_fence = TRUE;
+      ctx->poisoned = TRUE;
+      ctx->generation = 0;
+      goodix_device_context_set_state (ctx,
+                                       GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+      fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+      return;
+    }
+  goodix_usb_router_begin_generation (ctx->usb_router, ctx->generation);
   ctx->cancel_handler_id =
     g_cancellable_connect (ctx->activation_cancellable,
                            G_CALLBACK (on_activation_cancellable_cancelled),
@@ -420,20 +450,21 @@ goodix_fpimage_device_deactivate (FpImageDevice *dev)
   if (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING)
     return;
 
-  goodix_device_context_disconnect_cancel_handler (ctx);
-  goodix_device_context_set_terminal_fence (ctx);
   goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+  ctx->deactivation_pending = TRUE;
+  goodix_device_context_disconnect_cancel_handler (ctx);
+  goodix_device_context_set_terminal_fence (ctx);
   ctx->backend_vtable->disarm (ctx, ctx->backend_user_data);
 
   /* Host callbacks are fenced, but arbitrary device-side quiescence remains
    * unproven.  Never advertise this cancellation path as safely inactive. */
   ctx->generation = 0;
-  ctx->deactivation_pending = TRUE;
   ctx->deactivation_nonquiescent =
     fpi_device_action_is_cancelled (FP_DEVICE (ctx->device));
 
-  if (!ctx->deactivation_held)
+  if (ctx->deactivation_pending && !ctx->deactivation_held &&
+      goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
     goodix_device_context_complete_deactivation (ctx);
 }
 
@@ -522,6 +553,16 @@ goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
 {
   g_return_if_fail (ctx != NULL);
   goodix_fpi_usb_backend_set_submit_seam (ctx->fpi_usb_backend, seam, user_data);
+}
+
+void
+goodix_device_context_set_async_usb_submit_seam (GoodixDeviceContext *ctx,
+                                                  GoodixUsbSubmitSeam seam,
+                                                  gpointer user_data)
+{
+  g_return_if_fail (ctx != NULL);
+  goodix_fpi_usb_backend_set_async_submit_seam (ctx->fpi_usb_backend, seam,
+                                                user_data);
 }
 
 gboolean
@@ -641,6 +682,8 @@ goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
   g_return_if_fail (ctx != NULL);
   g_return_if_fail (ctx->deactivation_pending);
   g_return_if_fail (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+  if (!goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
+    return;
 
   ctx->deactivation_pending = FALSE;
   if (ctx->deactivation_nonquiescent)

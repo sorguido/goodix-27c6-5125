@@ -165,8 +165,8 @@ D276_02_FPIMAGE_REGRESSION_NORMAL=PASS
 D276_02_FPIMAGE_REGRESSION_SANITIZER=PASS
 D276_04_OUTCOME=READY
 D276_04_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-D276_04_EXECUTOR_STATUS=READY_FOR_AI_PM_REVIEW
-D276_04_AI_PM_REVIEW=PENDING
+D276_04_EXECUTOR_STATUS=CLOSED
+D276_04_AI_PM_REVIEW=PASS
 GOODIX_DEVICE_CONTEXT_OWNS_ROUTER_TLS_BACKEND=true
 ROUTER_B0_TO_TLS_INTEGRATION=PASS
 TLS_POST_HANDSHAKE_APPLICATION_DATA=PASS
@@ -181,8 +181,23 @@ FPI_USB_BACKEND_COMPILED=true
 REAL_USB_TRANSFER_SUBMIT_COUNT=0
 MAX_OUTSTANDING_BULK_IN=1
 SECOND_READER_API_PATH=ABSENT
-GITHUB_ACTIONS_CONFIRMATION=PENDING_AI_PM_NON_GATING
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AFTER_D276_04
+D276_04_CI_VALIDATED_COMMIT=d10155076b7f46e7897c9df65a910a125b4575b4
+D276_04_GITHUB_ACTIONS_PUSH_NATIVE=33197044447
+D276_04_GITHUB_ACTIONS_PUSH_NATIVE_RESULT=PASS
+D276_04_GITHUB_ACTIONS_PUSH_ROUTER=33197044428
+D276_04_GITHUB_ACTIONS_PUSH_ROUTER_RESULT=PASS
+D276_04_GITHUB_ACTIONS_PR_NATIVE=33197046858
+D276_04_GITHUB_ACTIONS_PR_NATIVE_RESULT=PASS
+D276_04_GITHUB_ACTIONS_PR_ROUTER=33197046876
+D276_04_GITHUB_ACTIONS_PR_ROUTER_RESULT=PASS
+GITHUB_ACTIONS_CONFIRMATION=PASS
+OUTCOME=READY
+ADVANCEMENT=NATIVE_TLS_1_2_PSK_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY_INTEGRATION_VALIDATED_WITH_SINGLE_GENERATION_AUTHORITY_AND_CALLBACK_DRIVEN_CANCEL_DRAIN
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+RESIDUAL_BLOCKER_OR_RISK=HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;DEVICE_SIDE_CANCEL_COMMAND_NONE_PROVEN;TARGET_DEVICE_TIMEOUT_UNKNOWN;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;ENROLLMENT_STAGE_POLICY_NOT_SELECTED;ORIENTATION_CONTRACT_UNRESOLVED;POLARITY_CONTRACT_UNRESOLVED;TARGET_APP12509_PHYSICAL_PPMM_UNKNOWN
+CANONICAL_DOCUMENTATION=UPDATED
+REVIEW_SET=BASELINE_MAIN_a0b849d563a1c3619aed11b3dbefad1bb4bb30ec_PLUS_CI_VALIDATED_COMMIT_d10155076b7f46e7897c9df65a910a125b4575b4_PLUS_GITHUB_ACTIONS_PUSH_NATIVE_33197044447_PUSH_ROUTER_33197044428_PR_NATIVE_33197046858_PR_ROUTER_33197046876_PLUS_PR_31_BRANCH_codex/correggi-la-chiusura-dopo-il-merge-d276/04
+NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D276_04_CLOSURE
 LIVE_AUTHORIZED=false
 ```
 
@@ -239,13 +254,17 @@ al path OUT dello stesso backend owner.
 
 Il callback production `FpiUsbTransfer` usa un pending token con generation
 catturata al submit; N-1 non può essere riattribuita a N. Il backend richiede
-drain prima del free e non possiede un'autorità cancellable distinta. Il compile
+drain prima del free e usa un cancellable USB activation-local distinto da
+quello dell'azione. Il compile
 probe usa header libfprint 1.94.5 e `gusb.h` di sistema; lo stub è solo link-time,
 nessun runtime device è eseguito. La copia secret posseduta dal progetto viene
 pulita subito dopo l'unico handoff (o al teardown); la zeroizzazione di copie
 interne OpenSSL non è asserita. Le suite D276/04 sono passate due volte normal e
-ASAN/UBSAN; D276/02–03 restano PASS. GitHub Actions è
-`PENDING_AI_PM_NON_GATING`; equivalenza hardware, quiescenza device-side,
+ASAN/UBSAN; D276/02–03 restano PASS. La review AI-PM del commit tecnico
+`d10155076b7f46e7897c9df65a910a125b4575b4` è `PASS`; le run Actions push
+native/router `33197044447`/`33197044428` e PR native/router
+`33197046858`/`33197046876` sono tutte `PASS`. La closure è
+`PASS_HOST_ONLY`; equivalenza hardware, quiescenza device-side,
 timeout target e lifetime TLS cross-activation restano non provati.
 
 `HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
@@ -1934,16 +1953,23 @@ anticipata durante l'estrazione SIGFM e perdita di un IRQ2 quando il framework
 non è pronto, senza trattenere il release tail corrente dietro lo stato
 `AWAIT_FINGER_ON`.
 
-La cancellazione libfprint dell'azione porta al `deactivate`; il cancellable
-dell'azione è concatenato a un cancellable activation-local usato da tutti i
-transfer. `deactivate` chiude prima il terminal fence, cancella/draina il solo
-I/O host pending, invalida generation e completa phase-correctly. Il risultato
-`G_IO_ERROR_CANCELLED` prova la cancellazione host, non la quiescenza del
-protocollo device-side. Non esiste un comando cancel device-side provato e non
+La cancellazione libfprint dell'azione porta al `deactivate`; un cancellable
+USB activation-local, distinto dal cancellable dell'azione, è usato dai
+transfer. `deactivate` chiude prima il terminal fence e richiede la cancellazione
+host, ma i token IN/OUT restano pending finché i rispettivi callback asincroni
+non rientrano. Durante questo intervallo il backend è fenced ma non drained:
+nessun submit o delivery è ammesso, una nuova generation fallisce chiusa e la
+deactivation non completa. Il callback matching, incluso
+`G_IO_ERROR_CANCELLED`, rilascia esattamente il proprio token senza consegnare
+byte; il callback finale notifica il drain una sola volta e solo allora il
+context può completare la deactivation. Un callback stale non può rilasciare il
+token della generation corrente. `HOST_ASYNC_IO_DRAIN=PROVEN_HOST_ONLY`; il
+risultato prova lifetime e drain host, non la quiescenza del protocollo
+device-side. Non esiste un comando cancel device-side provato e non
 ne è ammesso uno non compreso. Se il lifecycle non è quiescente, la sessione di
 protocollo diventa `POISONED/QUIESCENCE_UNKNOWN`: nessun resume mascherato nella
 stessa sessione, recovery, reset, retry, TLS restart o reopen automatico. La
-quiescenza production dopo cancel arbitrario resta `UNRESOLVED` e un normale
+quiescenza production dopo cancel arbitrario resta `UNRESOLVED` (`DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED`) e un normale
 lifecycle framework futuro richiede una policy esplicita. Timeout, TLS,
 frame/ACK/CRC o lifecycle inattesi sono fail-closed e non invocano
 `fpi_image_device_retry_scan()`.
@@ -1981,7 +2007,7 @@ D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_PASS_HOST_ONLY
-D276/04 -> context-owned B0→TLS application-data + TLS OUT + generation-captured FpiUsbTransfer CLOSED_PASS_HOST_ONLY
+D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; generation authority context-only e callback drain CLOSED / PASS_HOST_ONLY, AI-PM+CI PASS
 review   -> AI-PM decide integrazione, policy/lifetime, provenance o futura baseline live
 ```
 
@@ -2031,6 +2057,24 @@ Flatpak/GLib-dev nell'ambiente di rescue è una condizione storica superata.
 Un'eventuale conferma Fedora futura è `OPTIONAL_NON_GATING` e non costituisce un
 gate retroattivo. Nessun sensore Goodix reale, USB, TLS reale, PSK, fprintd,
 registrazione VID production o mutazione persistente è stato usato.
+
+Il corrective post-merge D276/04 stabilisce inoltre
+`GENERATION_AUTHORITY=GOODIX_DEVICE_CONTEXT_SINGLE_SOURCE`: a ogni activation il
+context crea un token non-zero e lo fornisce esplicitamente a router e backend.
+Il router non mantiene un contatore concorrente; `cancel()` chiude fence,
+receive e parser pending senza mutare il token. Il terminal fence del context
+cancella TLS e backend, e soltanto il backend cancella il router, eliminando il
+doppio cancel. Una regressione integrata host-only attraversa activation N,
+teardown, activation N+1, callback tardiva N e callback valida N+1: la stale è
+ignorata senza consumare la receive corrente e N+1 viene consegnata, con massimo
+una receive logica outstanding. Il test router copre anche due cancel
+consecutivi senza mutazione generation. I workflow corretti aggiungono
+`ca-certificates` pre-checkout a D276/04 e `libssl-dev`/`libgusb-dev` alla
+regressione D276/03. Le Actions push e PR del corrective sul commit CI-validato
+`d10155076b7f46e7897c9df65a910a125b4575b4` sono tutte `PASS`; la review AI-PM
+è `PASS` e la closure eseguibile finale è `PASS_HOST_ONLY`. Restano
+irrisolte la quiescenza reale dopo cancel arbitrario e la lifetime TLS tra
+activation; il test non prova equivalenza hardware.
 
 D276/04 ha chiuso la subdecisione provider su **OpenSSL 3**: il supporto server
 TLS 1.2 pure-PSK, BIO di memoria, callback PSK e cleanup esplicito soddisfa il
@@ -7032,7 +7076,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D276/03: la shell `FpImageDevice` non registrata
+Stato corrente post-corrective D276/04: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa

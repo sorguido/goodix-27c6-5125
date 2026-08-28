@@ -38,7 +38,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git build-essential pkg-config libglib2.0-dev \
+            ca-certificates git build-essential pkg-config libglib2.0-dev libssl-dev libgusb-dev \
             python3 binutils coreutils ripgrep
       - uses: actions/checkout@v4
       - name: Configure Git safe directory
