@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D276/03 — release tail, shell host-only e router A0/B0 single-receive
+### Stato corrente post-D277/01 — percorso nativo host-only chiuso, A8 reale bloccata all'open USB
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -199,6 +199,40 @@ CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=BASELINE_MAIN_a0b849d563a1c3619aed11b3dbefad1bb4bb30ec_PLUS_CI_VALIDATED_COMMIT_d10155076b7f46e7897c9df65a910a125b4575b4_PLUS_GITHUB_ACTIONS_PUSH_NATIVE_33197044447_PUSH_ROUTER_33197044428_PR_NATIVE_33197046858_PR_ROUTER_33197046876_PLUS_PR_31_BRANCH_codex/correggi-la-chiusura-dopo-il-merge-d276/04
 NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D276_04_CLOSURE
 LIVE_AUTHORIZED=false
+```
+
+D277/01 ha costruito e verificato host-only un harness C test-only con binding
+effimero `FpDevice`/`GUsbDevice`, percorso obbligato
+`FpiUsbTransfer → GoodixFpiUsbBackend → GoodixUsbRouter` e un solo frame A8
+immutabile. Le regressioni D277, D276/03 e D276/04 sono PASS normal e
+ASAN/UBSAN; i file production D276/04 sono rimasti byte-identici alla baseline
+approvata `95f40ca791011d637e2040a87014bbb8e946275e`.
+
+La singola run D277/01 non ha però raggiunto il bus protocollo: il target
+univoco `27c6:5125` (bus 1, address 4, port 7) ha fallito al primo
+`g_usb_device_open()`, prima di claim e di qualsiasi submit IN/OUT. Il nodo
+`/dev/bus/usb/001/004` era osservato `root:root` `0664`, senza ACL aggiuntive;
+l'esecutore uid 1000 non aveva write permission. Il nesso con l'open failure è
+una strong inference perché il `GError` non è stato serializzato. Nessun sudo,
+cambio udev, retry, reopen o reset è stato eseguito. L'autorizzazione è stata
+consumata conservativamente sul tentativo di open e resta falsa.
+
+```text
+D277_01_OUTCOME=BLOCKED_ENVIRONMENT_USB_OPEN_FAILED
+D277_01_EXECUTABLE_CLOSURE=FAIL_TARGET_LIVE_PASS_HOST_ONLY
+LIVE_AUTHORIZATION_CONSUMED=true
+LIVE_AUTHORIZED=false
+USB_OPEN_ATTEMPT_COUNT=1
+USB_OPEN_COUNT=0
+USB_CLAIM_COUNT=0
+A8_COMMAND_SUBMIT_COUNT=0
+NATIVE_FPI_USB_A8_PATH_TARGET_PROVEN=false
+NATIVE_FPI_USB_A0_ROUTER_TARGET_PROVEN=false
+HARDWARE_EQUIVALENCE=UNPROVEN
+PERSISTENT_DEVICE_WRITE_COUNT=0
+RETRY_COUNT=0
+TRANSPORT_REOPEN_COUNT=0
+NEXT_LIVE_REQUIREMENT=HOST_PERMISSION_REVIEW_PLUS_NEW_EXPLICIT_AUTHORIZATION
 ```
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
@@ -1747,6 +1781,8 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; corrective documentation-only; live false | preservata `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM`/confidence `HIGH`; release tail corretto fino a NAV prima del finger-off, post-up B0 mai consegnato a libfprint e solo re-arm `0x32` gated da `AWAIT_FINGER_ON`; reentrancy/deactivate esplicitata; `GoodixDeviceContext` owner TLS/secret ma lifetime TLS cross-activation irrisolto; cancel device-side e quiescenza production arbitraria non provati, policy conservativa `POISONED/QUIESCENCE_UNKNOWN`; reimplementazione indipendente con provenance controllata, non conclusione legale |
 | D276/02 shell `FpImageDevice` host-only | READY / PASS_HOST_ONLY; validation clean-tree GitHub Actions run 33165906857 (commit 87d4aace...); 2 run deterministiche (14/14 normal PASS, 14/14 ASAN/UBSAN PASS); live false | shell C/LGPL non registrata con backend in-memory che esercita il vero `FpImageDevice` 1.94.5; correzioni: cancellazione `ACTIVATING` collegata al cancellable dell'azione, `GError` owned ai confini, deactivation trattenibile, generation token per eventi fake, re-arm exactly-once per generation, launcher con timeout e propagazione failure; nessun USB/TLS/secret/fprintd/VID:PID usato; unresolved production/device quiescence e TLS session lifetime invariati; prossimo boundary D276/03 |
 | D276/03 router A0/B0 single-receive | READY / PASS_HOST_ONLY; CI clean-tree PASS; merge main 474aa2b9...; live false | nuovo router C/LGPL transport-agnostic posseduto dall’open epoch, parser incrementale comune A0/B0, demux in-order/exactly-once con `GBytes`, un solo completion point e massimo una receive fake outstanding; malformed/truncated fail-closed, generation stale e callback post-cancel ignorate; nessun USB/TLS/secret/VID:PID; prossimo boundary D276/04 host-only |
+| D276/04 TLS/backend FpiUsbTransfer | READY / PASS_HOST_ONLY; AI-PM+CI PASS; live false | unico context owner di router/TLS/backend, A0 bypass non-TLS, B0→Memory-BIO, TLS OUT sul medesimo backend, generation unica e cancel/drain callback-driven; nessun submit reale; equivalenza hardware e quiescenza device restano irrisolte |
+| D277/01 native A8 reale | BLOCKED_ENVIRONMENT_USB_OPEN_FAILED; PASS_HOST_ONLY / FAIL_TARGET_LIVE; autorizzazione consumata | harness-only `FpDevice`/`GUsbDevice` con A8 immutabile e backend/router production-shape; target unico 1:4 port 7, ma open fallito prima di claim/submit; nodo `root:root` 0664 senza ACL e user privo di write permission, causa strong inference; A8 count 0, zero retry/reopen/reset/write; nuova run richiede review permessi e nuova autorizzazione |
 
 ## Fonti e confini di pubblicazione
 
@@ -2008,7 +2044,8 @@ D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_PASS_HOST_ONLY
 D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; generation authority context-only e callback drain CLOSED / PASS_HOST_ONLY, AI-PM+CI PASS
-review   -> AI-PM decide integrazione, policy/lifetime, provenance o futura baseline live
+D277/01 -> harness nativo A8 PASS_HOST_ONLY; singola run BLOCKED a USB open prima di claim/submit
+review   -> AI-PM riesamina permessi operatore; ogni nuova run richiede nuova autorizzazione esplicita
 ```
 
 Stato rescue D276/02 (28 agosto 2026): il WIP è classificato **B**. La shell è
@@ -7076,7 +7113,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-corrective D276/04: la shell `FpImageDevice` non registrata
+Stato corrente post-D277/01: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa
@@ -7094,12 +7131,18 @@ indisponibilità di Flatpak/GLib-dev nell'ambiente di rescue è superata. D276/0
 ha inoltre chiuso `PASS_HOST_ONLY` il router A0/B0 single-receive: commit CI
 `49e7e9d108d14fc7a9910d97022cd4baa829c5e4`, run push 33184060807 e PR
 33184064239 PASS, merge `main` `474aa2b931977a2c748098c4e510764ad7ee7f42`.
-Il prossimo boundary è
-`D276_04_NATIVE_TLS_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY`, senza USB,
-TLS reale, secret, fprintd, VID:PID, stage policy, terzo ciclo o nuovo live.
+Il boundary D276/04 è chiuso `PASS_HOST_ONLY`. D277/01 ha aggiunto un harness
+nativo test-only e ha tentato una sola run A8 reale, terminata prima del claim e
+di ogni submit per `USB_OPEN_FAILED` nel contesto operatore corrente. Il nodo
+USB era `root:root` `0664` senza ACL e l'utente non aveva write permission;
+questa causa resta strong inference perché il `GError` non è stato conservato.
+La A8 nativa/A0 non è quindi target-proven, l'autorizzazione è consumata e una
+nuova run richiede sia review dei permessi sia nuova autorizzazione esplicita.
 Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
-`analysis/D276/D276_03_usb_router_host_only.{md,json}`.
+`analysis/D276/D276_03_usb_router_host_only.{md,json}`,
+`analysis/D276/D276_04_native_tls_fpi_usb_host_only.{md,json}` e
+`analysis/D277/D277_01_native_a8_real_usb.{md,json}`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
