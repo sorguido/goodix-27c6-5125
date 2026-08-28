@@ -204,12 +204,43 @@ jobs:
           if s.count(old_deactivating) != 1:
               raise SystemExit('FAIL_CLOSED: deactivating-test block count mismatch')
           s = s.replace(old_deactivating, new_deactivating, 1)
+
+          old_stale_capture = '''  old_generation = goodix_device_context_get_generation (f->ctx);
+            commands_before = goodix_device_context_get_backend_command_count (f->ctx);
+
+            /* Complete the action, invalidating the generation. */
+          '''
+          new_stale_capture = '''  old_generation = goodix_device_context_get_generation (f->ctx);
+
+            /* Complete the action, invalidating the generation. */
+          '''
+          if s.count(old_stale_capture) != 1:
+              raise SystemExit('FAIL_CLOSED: stale baseline capture block count mismatch')
+          s = s.replace(old_stale_capture, new_stale_capture, 1)
+
+          old_stale_assert = '''  /* An N-1 callback is ignored while generation N remains active. */
+            goodix_device_context_emit_finger_down_for_generation (f->ctx,
+                                                                   old_generation);
+            g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
+                              ==, commands_before + 1 /* second arm */);
+          '''
+          new_stale_assert = '''  /* An N-1 callback must cause zero new backend commands. */
+            commands_before = goodix_device_context_get_backend_command_count (f->ctx);
+            goodix_device_context_emit_finger_down_for_generation (f->ctx,
+                                                                   old_generation);
+            g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
+                              ==, commands_before);
+          '''
+          if s.count(old_stale_assert) != 1:
+              raise SystemExit('FAIL_CLOSED: stale callback assertion block count mismatch')
+          s = s.replace(old_stale_assert, new_stale_assert, 1)
+
           t.write_text(s)
           PY
 
           git diff --check
           git diff -- libfprint-driver/goodix_fpimage_device.c libfprint-driver/tests/test_goodix_fpimage_device.c
-          echo "CI_DIAGNOSTIC_PATCH=DEFER_ACTIVATION_CANCEL_PLUS_OWNERSHIP_AND_IDLE_CANCEL_TEST_FIXES"
+          echo "CI_DIAGNOSTIC_PATCH=DEFER_ACTIVATION_CANCEL_PLUS_OWNERSHIP_IDLE_CANCEL_AND_STALE_GUARD_FIXES"
 
       - name: Run D276/02 launcher twice
         shell: bash
