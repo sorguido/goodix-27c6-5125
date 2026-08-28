@@ -2,9 +2,10 @@
 
 ## Stato executor
 
-`OUTCOME=READY`, `EXECUTABLE_CLOSURE=PASS_HOST_ONLY` e
-`D276_04_EXECUTOR_STATUS=READY_FOR_AI_PM_REVIEW`. La review finale AI-PM resta
-`PENDING`; non viene dichiarato merge-ready.
+`OUTCOME=READY`, `EXECUTABLE_CLOSURE=PASS_HOST_ONLY`,
+`D276_04_EXECUTOR_STATUS=CLOSED`, `D276_04_AI_PM_REVIEW=PASS` e
+`GITHUB_ACTIONS_CONFIRMATION=PASS`. Il commit tecnico validato è
+`d10155076b7f46e7897c9df65a910a125b4575b4`; non viene dichiarato merge-ready.
 
 ## Correzione architetturale
 
@@ -22,8 +23,9 @@ il path OUT dello stesso backend owner. Nessun test raggiunge il submit reale.
 
 Il callback production `FpiUsbTransfer` usa un `PendingTransfer` con generation
 catturata al submit. Un callback N-1 non viene attribuito a N e non consuma il
-token corrente. Free richiede drain completo. Il cancellable è una ref a quello
-dell'activation e l'autorità semantica resta il context.
+token corrente. Free richiede drain completo. Il cancellable USB è
+activation-local e distinto da quello dell'azione; l'autorità semantica resta
+il context.
 
 ## Secret e confine API
 
@@ -43,13 +45,13 @@ cancel/drain e TLS OUT seam. Compila contro il vero header libfprint 1.94.5 e
 viene raggiunto. D276/02 e D276/03 restano regressioni normal+sanitizer.
 
 Il workflow installa Git prima di checkout, usa `fetch-depth: 2`, installa
-`libgusb-dev`, esegue due run e gli audit Git/JSON/statici. La conferma Actions
-resta `PENDING_AI_PM_NON_GATING`.
+`libgusb-dev`, esegue due run e gli audit Git/JSON/statici. Le run push e PR sul
+commit tecnico validato sono tutte `PASS`.
 
 Restano invariati tutti i boundary irrisolti: lifetime TLS cross-activation,
 quiescenza device dopo cancel arbitrario, timeout, stage enrollment,
 orientation, polarity, ppmm ed equivalenza hardware. Nessun live è autorizzato.
-`NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AFTER_D276_04`.
+`NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D276_04_CLOSURE`.
 
 ## Corrective closure post-merge — generation authority e CI
 
@@ -71,10 +73,9 @@ stale/current completion dopo riattivazione, usando soltanto A0 sintetico.
 
 I workflow installano ora `ca-certificates` prima di checkout per D276/04 e
 `libssl-dev`/`libgusb-dev` nel regression environment D276/03. Le prove locali
-normal e ASAN/UBSAN sono host-only; nessun submit USB reale è raggiunto. Le
-GitHub Actions del corrective non sono verificabili dall'executor:
-`GITHUB_ACTIONS_CONFIRMATION=NOT_VERIFIED_BY_EXECUTOR` e
-`EXECUTABLE_CLOSURE=PENDING_AI_PM_GITHUB_VERIFICATION`.
+normal e ASAN/UBSAN sono host-only; nessun submit USB reale è raggiunto. La review AI-PM e le GitHub Actions hanno verificato il corrective:
+`GITHUB_ACTIONS_CONFIRMATION=PASS` e
+`EXECUTABLE_CLOSURE=PASS_HOST_ONLY`.
 
 ## Final corrective — cancel request, callback drain e lifetime
 
@@ -99,3 +100,29 @@ deactivation → N+1 → stale/current. Il massimo IN fisico-shaped è uno e nes
 submit USB reale viene eseguito. `HOST_ASYNC_IO_DRAIN=PROVEN_HOST_ONLY` non
 promuove la quiescenza device-side:
 `DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED`.
+
+
+## Closure finale AI-PM e GitHub Actions
+
+```text
+D276_04_OUTCOME=READY
+D276_04_AI_PM_REVIEW=PASS
+D276_04_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D276_04_CI_VALIDATED_COMMIT=d10155076b7f46e7897c9df65a910a125b4575b4
+D276_04_GITHUB_ACTIONS_PUSH_NATIVE=33197044447 PASS
+D276_04_GITHUB_ACTIONS_PUSH_ROUTER=33197044428 PASS
+D276_04_GITHUB_ACTIONS_PR_NATIVE=33197046858 PASS
+D276_04_GITHUB_ACTIONS_PR_ROUTER=33197046876 PASS
+GITHUB_ACTIONS_CONFIRMATION=PASS
+OUTCOME=READY
+ADVANCEMENT=NATIVE_TLS_1_2_PSK_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY_INTEGRATION_VALIDATED_WITH_SINGLE_GENERATION_AUTHORITY_AND_CALLBACK_DRIVEN_CANCEL_DRAIN
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+RESIDUAL_BLOCKER_OR_RISK=HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;DEVICE_SIDE_CANCEL_COMMAND_NONE_PROVEN;TARGET_DEVICE_TIMEOUT_UNKNOWN;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;ENROLLMENT_STAGE_POLICY_NOT_SELECTED;ORIENTATION_CONTRACT_UNRESOLVED;POLARITY_CONTRACT_UNRESOLVED;TARGET_APP12509_PHYSICAL_PPMM_UNKNOWN
+CANONICAL_DOCUMENTATION=UPDATED
+REVIEW_SET=BASELINE_MAIN_a0b849d563a1c3619aed11b3dbefad1bb4bb30ec_PLUS_CI_VALIDATED_COMMIT_d10155076b7f46e7897c9df65a910a125b4575b4_PLUS_GITHUB_ACTIONS_PUSH_NATIVE_33197044447_PUSH_ROUTER_33197044428_PR_NATIVE_33197046858_PR_ROUTER_33197046876_PLUS_PR_31_BRANCH_codex/correggi-la-chiusura-dopo-il-merge-d276/04
+NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D276_04_CLOSURE
+```
+
+La closure resta esclusivamente host-only: equivalenza hardware, quiescenza del
+protocollo device-side, timeout target e lifetime TLS cross-activation non sono
+promossi a fatti verificati. Nessuna attività live è autorizzata.

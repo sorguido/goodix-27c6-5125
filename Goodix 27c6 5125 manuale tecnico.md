@@ -165,8 +165,8 @@ D276_02_FPIMAGE_REGRESSION_NORMAL=PASS
 D276_02_FPIMAGE_REGRESSION_SANITIZER=PASS
 D276_04_OUTCOME=READY
 D276_04_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-D276_04_EXECUTOR_STATUS=READY_FOR_AI_PM_REVIEW
-D276_04_AI_PM_REVIEW=PENDING
+D276_04_EXECUTOR_STATUS=CLOSED
+D276_04_AI_PM_REVIEW=PASS
 GOODIX_DEVICE_CONTEXT_OWNS_ROUTER_TLS_BACKEND=true
 ROUTER_B0_TO_TLS_INTEGRATION=PASS
 TLS_POST_HANDSHAKE_APPLICATION_DATA=PASS
@@ -181,8 +181,23 @@ FPI_USB_BACKEND_COMPILED=true
 REAL_USB_TRANSFER_SUBMIT_COUNT=0
 MAX_OUTSTANDING_BULK_IN=1
 SECOND_READER_API_PATH=ABSENT
-GITHUB_ACTIONS_CONFIRMATION=PENDING_AI_PM_NON_GATING
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AFTER_D276_04
+D276_04_CI_VALIDATED_COMMIT=d10155076b7f46e7897c9df65a910a125b4575b4
+D276_04_GITHUB_ACTIONS_PUSH_NATIVE=33197044447
+D276_04_GITHUB_ACTIONS_PUSH_NATIVE_RESULT=PASS
+D276_04_GITHUB_ACTIONS_PUSH_ROUTER=33197044428
+D276_04_GITHUB_ACTIONS_PUSH_ROUTER_RESULT=PASS
+D276_04_GITHUB_ACTIONS_PR_NATIVE=33197046858
+D276_04_GITHUB_ACTIONS_PR_NATIVE_RESULT=PASS
+D276_04_GITHUB_ACTIONS_PR_ROUTER=33197046876
+D276_04_GITHUB_ACTIONS_PR_ROUTER_RESULT=PASS
+GITHUB_ACTIONS_CONFIRMATION=PASS
+OUTCOME=READY
+ADVANCEMENT=NATIVE_TLS_1_2_PSK_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY_INTEGRATION_VALIDATED_WITH_SINGLE_GENERATION_AUTHORITY_AND_CALLBACK_DRIVEN_CANCEL_DRAIN
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+RESIDUAL_BLOCKER_OR_RISK=HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;DEVICE_SIDE_CANCEL_COMMAND_NONE_PROVEN;TARGET_DEVICE_TIMEOUT_UNKNOWN;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;ENROLLMENT_STAGE_POLICY_NOT_SELECTED;ORIENTATION_CONTRACT_UNRESOLVED;POLARITY_CONTRACT_UNRESOLVED;TARGET_APP12509_PHYSICAL_PPMM_UNKNOWN
+CANONICAL_DOCUMENTATION=UPDATED
+REVIEW_SET=BASELINE_MAIN_a0b849d563a1c3619aed11b3dbefad1bb4bb30ec_PLUS_CI_VALIDATED_COMMIT_d10155076b7f46e7897c9df65a910a125b4575b4_PLUS_GITHUB_ACTIONS_PUSH_NATIVE_33197044447_PUSH_ROUTER_33197044428_PR_NATIVE_33197046858_PR_ROUTER_33197046876_PLUS_PR_31_BRANCH_codex/correggi-la-chiusura-dopo-il-merge-d276/04
+NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D276_04_CLOSURE
 LIVE_AUTHORIZED=false
 ```
 
@@ -239,13 +254,17 @@ al path OUT dello stesso backend owner.
 
 Il callback production `FpiUsbTransfer` usa un pending token con generation
 catturata al submit; N-1 non può essere riattribuita a N. Il backend richiede
-drain prima del free e non possiede un'autorità cancellable distinta. Il compile
+drain prima del free e usa un cancellable USB activation-local distinto da
+quello dell'azione. Il compile
 probe usa header libfprint 1.94.5 e `gusb.h` di sistema; lo stub è solo link-time,
 nessun runtime device è eseguito. La copia secret posseduta dal progetto viene
 pulita subito dopo l'unico handoff (o al teardown); la zeroizzazione di copie
 interne OpenSSL non è asserita. Le suite D276/04 sono passate due volte normal e
-ASAN/UBSAN; D276/02–03 restano PASS. GitHub Actions è
-`PENDING_AI_PM_NON_GATING`; equivalenza hardware, quiescenza device-side,
+ASAN/UBSAN; D276/02–03 restano PASS. La review AI-PM del commit tecnico
+`d10155076b7f46e7897c9df65a910a125b4575b4` è `PASS`; le run Actions push
+native/router `33197044447`/`33197044428` e PR native/router
+`33197046858`/`33197046876` sono tutte `PASS`. La closure è
+`PASS_HOST_ONLY`; equivalenza hardware, quiescenza device-side,
 timeout target e lifetime TLS cross-activation restano non provati.
 
 `HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
@@ -1988,7 +2007,7 @@ D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_PASS_HOST_ONLY
-D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; corrective generation authority context-only CLOSED_HOST_ONLY, CI corrective pending AI-PM
+D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; generation authority context-only e callback drain CLOSED / PASS_HOST_ONLY, AI-PM+CI PASS
 review   -> AI-PM decide integrazione, policy/lifetime, provenance o futura baseline live
 ```
 
@@ -2051,9 +2070,9 @@ ignorata senza consumare la receive corrente e N+1 viene consegnata, con massimo
 una receive logica outstanding. Il test router copre anche due cancel
 consecutivi senza mutazione generation. I workflow corretti aggiungono
 `ca-certificates` pre-checkout a D276/04 e `libssl-dev`/`libgusb-dev` alla
-regressione D276/03. Le Actions del corrective restano
-`NOT_VERIFIED_BY_EXECUTOR`, quindi la closure eseguibile finale è
-`PENDING_AI_PM_GITHUB_VERIFICATION` nonostante i test locali host-only. Restano
+regressione D276/03. Le Actions push e PR del corrective sul commit CI-validato
+`d10155076b7f46e7897c9df65a910a125b4575b4` sono tutte `PASS`; la review AI-PM
+è `PASS` e la closure eseguibile finale è `PASS_HOST_ONLY`. Restano
 irrisolte la quiescenza reale dopo cancel arbitrario e la lifetime TLS tra
 activation; il test non prova equivalenza hardware.
 
