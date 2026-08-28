@@ -8,8 +8,8 @@
   "commit_created": false,
   "pre_live": {
     "host_only_checks": "PASS",
-    "d277_normal_tests": "6/6 PASS",
-    "d277_asan_ubsan_tests": "6/6 PASS; LeakSanitizer unsupported under Flatpak sandbox",
+    "d277_normal_tests": "13/13 PASS",
+    "d277_asan_ubsan_tests": "13/13 PASS; LeakSanitizer unsupported under Flatpak sandbox",
     "d276_03_normal_and_asan_ubsan": "8/8 PASS",
     "d276_04_normal_and_asan_ubsan": "5/5 PASS",
     "production_live_critical_files_match_baseline": true,
@@ -21,7 +21,7 @@
     "target_address": 4,
     "target_port": 7,
     "live_harness_path": "/tmp/goodix-d277-a8-build/d277_native_a8_once",
-    "live_harness_sha256": "e9f3f0043bf55bc3e43934eab24bdf24e73f149d3869503aaaf2ad61021e49ed",
+    "live_harness_sha256": "d89dc45701ab4da2c05a6acb04a5fb9e277d6f7982f508079d1f617740a74032",
     "a8_wire_bytes": "a00600a6a803000000ff"
   },
   "live": {
@@ -77,6 +77,67 @@
     "sudo_used": false,
     "host_mutation_performed": false,
     "second_live_attempt_performed": false
+  },
+  "corrective_host_only": {
+    "live_authorized": false,
+    "real_usb_transfer_submit_count": 0,
+    "usb_open_attempt_count_during_corrective_execution": 0,
+    "usb_claim_count_during_corrective_execution": 0,
+    "a8_command_submit_count_during_corrective_execution": 0,
+    "persistent_device_write_count": 0,
+    "retry_count": 0,
+    "transport_reopen_count": 0,
+    "device_reset_count": 0,
+    "changes": [
+      "tools/d277_native_a8_once.c: failure observability for open/claim/release/close with GError domain/code/message serialization",
+      "tools/d277_native_a8_once.c: host-only permission preflight before g_usb_device_open()",
+      "tools/d277_native_a8_once.c: --permission-preflight-only mode",
+      "tools/d277_native_a8_once.c: host-only unit tests for permission preflight and GError serialization",
+      "analysis/D277/D277_01_native_a8_real_usb.md: documented corrective and preserved historical evidence",
+      "analysis/D277/D277_01_native_a8_real_usb.json: added corrective_host_only section",
+      "Goodix 27c6 5125 manuale tecnico.md: corrected stale NEXT_PRIMARY_BOUNDARY and D277 state",
+      ".github/workflows/d276-native-tls-usb-host-only.yml: added D277 host-only CI step"
+    ],
+    "failure_observability": {
+      "usb_open_error_serializable": true,
+      "usb_claim_error_serializable": true,
+      "usb_release_error_serializable": true,
+      "usb_close_error_serializable": true,
+      "no_secret_or_biometric_data_in_errors": true
+    },
+    "permission_preflight": {
+      "gate_blocks_before_open": true,
+      "uses_access_w_ok": true,
+      "parses_acls": false,
+      "acl_parsing_rationale": "access(W_OK) is sufficient for the live gate; ACL parsing not implemented",
+      "test_coverage": [
+        "format_device_node",
+        "permission_logic_owner_group_other_root",
+        "node_not_exists",
+        "node_regular_file_not_chardev",
+        "readable_not_writable",
+        "writable_owner"
+      ]
+    },
+    "tests": {
+      "d277_normal": "13/13 PASS",
+      "d277_asan_ubsan": "13/13 PASS",
+      "d276_03_normal": "8/8 PASS",
+      "d276_03_asan_ubsan": "8/8 PASS",
+      "d276_04_normal": "5/5 PASS",
+      "d276_04_asan_ubsan": "5/5 PASS (LeakSanitizer disabled in Flatpak sandbox)",
+      "d276_02_fpimage_normal": "15/15 PASS",
+      "d276_02_fpimage_asan_ubsan": "15/15 PASS"
+    }
+  },
+  "current_authorization_state": {
+    "previous_live_attempt_terminated": true,
+    "device_contact_or_real_submit_occurred": false,
+    "usb_open_count": 0,
+    "usb_claim_count": 0,
+    "a8_command_submit_count": 0,
+    "current_live_authorized": false,
+    "new_user_authorization_required_for_any_new_open_claim_or_submit": true
   },
   "claims": {
     "native_fpi_usb_a8_path_target_proven": false,

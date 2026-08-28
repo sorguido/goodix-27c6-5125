@@ -27,6 +27,15 @@ jobs:
         run: |
           libfprint-driver/tests/run_goodix_fpimage_device_test.sh
           libfprint-driver/tests/run_goodix_usb_router_test.sh
+      - name: D277/01 host-only self-test and live harness build
+        run: |
+          host_gusb=/usr/lib/x86_64-linux-gnu/libgusb.so.2
+          test -f "$host_gusb"
+          libfprint-driver/tests/run_goodix_d277_a8_test_inner.sh \
+            "$GITHUB_WORKSPACE" "$(mktemp -d)" "$host_gusb" | tee /tmp/d277-run.log
+          grep -q '^NORMAL_TEST_RUN=PASS$' /tmp/d277-run.log
+          grep -q '^SANITIZER_TEST_RUN=PASS$' /tmp/d277-run.log
+          grep -q '^LIVE_HARNESS_BUILD=PASS$' /tmp/d277-run.log
       - name: Static safety audit
         run: |
           python3 -m json.tool analysis/D276/D276_04_native_tls_fpi_usb_host_only.json >/dev/null

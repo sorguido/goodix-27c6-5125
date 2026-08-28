@@ -197,14 +197,14 @@ EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 RESIDUAL_BLOCKER_OR_RISK=HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;DEVICE_SIDE_CANCEL_COMMAND_NONE_PROVEN;TARGET_DEVICE_TIMEOUT_UNKNOWN;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;ENROLLMENT_STAGE_POLICY_NOT_SELECTED;ORIENTATION_CONTRACT_UNRESOLVED;POLARITY_CONTRACT_UNRESOLVED;TARGET_APP12509_PHYSICAL_PPMM_UNKNOWN
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=BASELINE_MAIN_a0b849d563a1c3619aed11b3dbefad1bb4bb30ec_PLUS_CI_VALIDATED_COMMIT_d10155076b7f46e7897c9df65a910a125b4575b4_PLUS_GITHUB_ACTIONS_PUSH_NATIVE_33197044447_PUSH_ROUTER_33197044428_PR_NATIVE_33197046858_PR_ROUTER_33197046876_PLUS_PR_31_BRANCH_codex/correggi-la-chiusura-dopo-il-merge-d276/04
-NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D276_04_CLOSURE
+NEXT_PRIMARY_BOUNDARY=D277_01_PERMISSION_AND_OBSERVABILITY_CORRECTIVE_THEN_AI_PM_REVIEW
 LIVE_AUTHORIZED=false
 ```
 
 D277/01 ha costruito e verificato host-only un harness C test-only con binding
 effimero `FpDevice`/`GUsbDevice`, percorso obbligato
 `FpiUsbTransfer → GoodixFpiUsbBackend → GoodixUsbRouter` e un solo frame A8
-immutabile. Le regressioni D277, D276/03 e D276/04 sono PASS normal e
+immutabile. Le regressioni D277, D276/02, D276/03 e D276/04 sono PASS normal e
 ASAN/UBSAN; i file production D276/04 sono rimasti byte-identici alla baseline
 approvata `95f40ca791011d637e2040a87014bbb8e946275e`.
 
@@ -217,10 +217,29 @@ una strong inference perché il `GError` non è stato serializzato. Nessun sudo,
 cambio udev, retry, reopen o reset è stato eseguito. L'autorizzazione è stata
 consumata conservativamente sul tentativo di open e resta falsa.
 
+Il correttivo host-only D277/01, senza nuova run live, ha aggiunto a
+`tools/d277_native_a8_once.c` un permission preflight read-only che risolve il
+device node `/dev/bus/usb/BBB/DDD`, ne riporta uid/gid/mode e gruppi
+dell'esecutore, e blocca prima di `g_usb_device_open()` quando il nodo non è
+scrivibile (`BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE`). Il preflight non
+usa chmod/chown/setfacl/udev, sudo, open, claim o transfer. Sono stati inoltre
+aggiunti test host-only per la serializzazione dei `GError` di
+open/claim/release/close e per la classificazione mode/uid/gid del permission
+gate. ACL parsing non è stato implementato; la decisione è documentata nel
+sorgente perché `access(W_OK)` è sufficiente nel contesto reale. I file
+production D276/04 restano byte-identici alla baseline approvata
+`95f40ca791011d637e2040a87014bbb8e946275e`.
+
 ```text
 D277_01_OUTCOME=BLOCKED_ENVIRONMENT_USB_OPEN_FAILED
-D277_01_EXECUTABLE_CLOSURE=FAIL_TARGET_LIVE_PASS_HOST_ONLY
+D277_01_HOST_ONLY_CORRECTIVE=READY_FOR_AI_PM_REVIEW
+D277_01_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+PREVIOUS_LIVE_ATTEMPT_TERMINATED=true
 LIVE_AUTHORIZATION_CONSUMED=true
+AUTHORIZATION_CONSUMPTION_POLICY=CONSERVATIVE_ON_FIRST_TARGET_OPEN_ATTEMPT
+DEVICE_CONTACT_OR_REAL_SUBMIT_OCCURRED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEW_USER_AUTHORIZATION_REQUIRED_FOR_ANY_NEW_OPEN_CLAIM_OR_SUBMIT=true
 LIVE_AUTHORIZED=false
 USB_OPEN_ATTEMPT_COUNT=1
 USB_OPEN_COUNT=0
@@ -232,6 +251,7 @@ HARDWARE_EQUIVALENCE=UNPROVEN
 PERSISTENT_DEVICE_WRITE_COUNT=0
 RETRY_COUNT=0
 TRANSPORT_REOPEN_COUNT=0
+NEXT_PRIMARY_BOUNDARY=D277_01_PERMISSION_AND_OBSERVABILITY_CORRECTIVE_THEN_AI_PM_REVIEW
 NEXT_LIVE_REQUIREMENT=HOST_PERMISSION_REVIEW_PLUS_NEW_EXPLICIT_AUTHORIZATION
 ```
 
