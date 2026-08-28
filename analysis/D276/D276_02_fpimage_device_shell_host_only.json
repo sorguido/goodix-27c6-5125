@@ -1,22 +1,22 @@
 {
-  "schema": "D276_02_FPIMAGE_DEVICE_SHELL_HOST_ONLY_V2_5_CORRECTIVE",
+  "schema": "D276_02_FPIMAGE_DEVICE_SHELL_HOST_ONLY_V2_5_CLOSURE",
   "step": "D276/02",
   "reasoning_level": "MEDIUM",
-  "nature": "rescue_implementation_and_documentation_micro_corrective",
+  "nature": "rescue_implementation_host_only_executable_validation_and_documentation_closure",
   "git": {
-    "canonical_main": "2e3fa20443542b9f06c080393b6c9123dea4436b",
-    "baseline_development": "a57c739ba80fcfca7cbae41ca37520dc5198acfb",
-    "parent_rescue_codex": "f2b7871a5c708b4c692050f90b8a4bc781abab6b",
-    "execution_branch": "jules-9285777101472567709-a726b8f5",
-    "commit_created": true
+    "canonical_main_baseline": "54fa55835ec5192aa794c1302d2e4a7e2fab0fcf",
+    "validated_checked_in_tree": "87d4aacec23b5415cca5de73e0dfeb83ffe65bab",
+    "execution_branch": "d276-02-github-actions-validation",
+    "historical_baseline_development": "a57c739ba80fcfca7cbae41ca37520dc5198acfb",
+    "historical_parent_rescue_codex": "f2b7871a5c708b4c692050f90b8a4bc781abab6b"
   },
   "closure_v2_5": {
-    "OUTCOME": "BLOCKED_ENVIRONMENT_VALIDATION",
-    "ADVANCEMENT": "HOST_ONLY_CORRECTIVE_IMPLEMENTATION_AND_NEW_STATE_MACHINE_TEST_SEAMS",
-    "EXECUTABLE_CLOSURE": "NOT_REACHED_ENVIRONMENT_LACKS_REQUIRED_BUILD_METADATA",
-    "RESIDUAL_BLOCKER_OR_RISK": "REQUIRED_NORMAL_AND_ASAN_UBSAN_RUNS_NOT_EXECUTED;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED",
+    "OUTCOME": "READY",
+    "ADVANCEMENT": "HOST_ONLY_EXECUTABLE_VALIDATION_PASS_CLEAN_TREE",
+    "EXECUTABLE_CLOSURE": "PASS_HOST_ONLY",
+    "RESIDUAL_BLOCKER_OR_RISK": "PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;ENROLLMENT_STAGE_POLICY_NOT_SELECTED",
     "CANONICAL_DOCUMENTATION": "UPDATED",
-    "REVIEW_SET": "CANONICAL_MAIN_2e3fa20443542b9f06c080393b6c9123dea4436b"
+    "REVIEW_SET": "BASELINE_MAIN_54fa55835ec5192aa794c1302d2e4a7e2fab0fcf_PLUS_VALIDATED_CHECKED_IN_TREE_87d4aacec23b5415cca5de73e0dfeb83ffe65bab_PLUS_BRANCH_d276-02-github-actions-validation_DOCUMENTATION_CLOSURE"
   },
   "wip_classification": "B",
   "root_causes": {
@@ -37,27 +37,43 @@
     ]
   },
   "implementation": {
-    "LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1": "IMPLEMENTED_CORRECTIVE_NOT_EXECUTABLY_CLOSED",
+    "LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1": "IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY",
     "FPIMAGE_DEVICE_REAL_FRAMEWORK_USED": true,
     "IN_MEMORY_BACKEND_ONLY": true,
-    "GERROR_OWNERSHIP_AUDIT": "CORRECTED_STATIC_AUDIT",
-    "ACTIVATING_CANCEL_PHASE_CORRECT": "IMPLEMENTED_NOT_RUNTIME_VALIDATED",
+    "GERROR_OWNERSHIP_AUDIT": "CORRECTED_AND_HOST_ONLY_VALIDATED",
+    "ACTIVATING_CANCEL_PHASE_CORRECT": "HOST_ONLY_VALIDATED",
     "DEACTIVATING_TEST_OBSERVABLE_AND_BOUNDED": true,
-    "NONQUIESCENT_CANCEL_POISON_POLICY": "IMPLEMENTED",
+    "NONQUIESCENT_CANCEL_POISON_POLICY": "IMPLEMENTED_HOST_ONLY_VALIDATED",
     "OLD_GENERATION_CALLBACK_TEST": "REAL_N_MINUS_1_TOKEN",
     "REARM_EXACTLY_ONCE": "IMPLEMENTED_PER_GENERATION",
     "ENROLLMENT_STAGE_POLICY": "NOT_SELECTED",
     "LAUNCHER_PROPAGATES_FAILURE": true
   },
-  "environment_inventory": {
+  "host_only_executable_validation": {
+    "provider": "GITHUB_ACTIONS",
+    "workflow": ".github/workflows/d276-fpimage-device-host-only.yml",
+    "run_id": 33165906857,
+    "validated_commit": "87d4aacec23b5415cca5de73e0dfeb83ffe65bab",
+    "execution_environment": "HOST_NATIVE_FALLBACK",
+    "CI_DIAGNOSTIC_PATCH": "NONE",
+    "NORMAL_TEST_RUN": "PASS",
+    "SANITIZER_TEST_RUN": "PASS",
+    "TESTS_PER_NORMAL_RUN": "14/14_PASS",
+    "TESTS_PER_SANITIZER_RUN": "14/14_PASS",
+    "DETERMINISM_RUNS": 2,
+    "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION": "PASS_CLEAN_TREE",
+    "EXECUTABLE_CLOSURE": "PASS_HOST_ONLY"
+  },
+  "previous_rescue_environment": {
+    "status": "SUPERSEDED_BY_GITHUB_ACTIONS_VALIDATION",
     "FLATPAK_AVAILABLE": false,
     "FREEDESKTOP_SDK_25_08_AVAILABLE": false,
     "HOST_GLIB_DEV_METADATA_AVAILABLE": false
   },
-  "test_status": {
-    "NORMAL_TEST_RUN": "NOT_RUN_ENVIRONMENT_BLOCKED",
-    "SANITIZER_TEST_RUN": "NOT_RUN_ENVIRONMENT_BLOCKED",
-    "DETERMINISM_RUNS": 0
+  "fedora_host_confirmation": {
+    "status": "NOT_RUN_OPTIONAL_NON_GATING",
+    "target_pc_available": false,
+    "retroactive_merge_gate": false
   },
   "safety": {
     "REAL_USB_ACCESS": false,
@@ -76,9 +92,14 @@
     "ORIENTATION_CONTRACT": "UNRESOLVED",
     "POLARITY_CONTRACT": "UNRESOLVED"
   },
-  "NEXT_PRIMARY_BOUNDARY": "HOST_ONLY_D276_02_EXECUTABLE_VALIDATION",
+  "NEXT_PRIMARY_BOUNDARY": "D276_03_A0_B0_CLEANROOM_SINGLE_RECEIVE_SYNTHETIC_TRANSCRIPTS",
   "review_set": {
     "paths": [
+      ".github/workflows/d276-fpimage-device-host-only.yml",
+      "libfprint-driver/goodix_fpimage_device.c",
+      "libfprint-driver/tests/run_goodix_fpimage_device_test.sh",
+      "libfprint-driver/tests/run_goodix_fpimage_device_test_inner.sh",
+      "libfprint-driver/tests/test_goodix_fpimage_device.c",
       "Goodix 27c6 5125 manuale tecnico.md",
       "analysis/D276/D276_02_fpimage_device_shell_host_only.md",
       "analysis/D276/D276_02_fpimage_device_shell_host_only.json"
@@ -90,6 +111,6 @@
     "json_parse": "PASS",
     "git_diff_check": "PASS",
     "real_hardware_tests": "NOT_RUN_PROHIBITED",
-    "host_only_code_tests": "NOT_RUN_ENVIRONMENT_BLOCKED"
+    "host_only_code_tests": "PASS_CLEAN_TREE_GITHUB_ACTIONS_RUN_33165906857"
   }
 }

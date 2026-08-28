@@ -1,0 +1,72 @@
+name: D276 FpImageDevice host-only validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - d276-02-github-actions-validation
+    paths:
+      - .github/workflows/d276-fpimage-device-host-only.yml
+      - libfprint-driver/**
+      - Rockytkg/libfprint/**
+
+permissions:
+  contents: read
+
+jobs:
+  host-only-validation:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Install host-only build prerequisites
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git build-essential pkg-config libglib2.0-dev \
+            python3 binutils coreutils
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Git safe directory for container mount
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel
+
+      - name: Inventory execution environment
+        run: |
+          set -eu
+          gcc --version | head -n 1
+          pkg-config --version
+          pkg-config --modversion glib-2.0 gio-2.0 gobject-2.0
+          python3 --version
+          timeout --version | head -n 1
+          nm --version | head -n 1
+          if command -v flatpak >/dev/null 2>&1; then
+            echo "FLATPAK_AVAILABLE=true"
+          else
+            echo "FLATPAK_AVAILABLE=false"
+          fi
+          echo "REAL_USB_ACCESS=false"
+          echo "LIVE_AUTHORIZED=false"
+
+      - name: Verify clean checked-in tree
+        run: |
+          git diff --exit-code
+          git status --short
+          echo "CI_DIAGNOSTIC_PATCH=NONE"
+
+      - name: Run D276/02 launcher twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          ulimit -c 0
+          for run in 1 2; do
+            echo "=== D276/02 deterministic run ${run}/2 ==="
+            timeout --signal=TERM 180 sh libfprint-driver/tests/run_goodix_fpimage_device_test.sh
+          done
+          echo "DETERMINISM_RUNS=2"
+          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_CLEAN_TREE"
