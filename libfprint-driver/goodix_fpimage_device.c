@@ -14,6 +14,8 @@
 #include "goodix_fpimage_pipeline.h"
 #include "goodix_u16_to_fpimage.h"
 #include "goodix_usb_router.h"
+#include "goodix_tls_server.h"
+#include "goodix_fpi_usb_backend.h"
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -56,6 +58,11 @@ struct _GoodixDeviceContext
   gpointer                   backend_user_data;
   GoodixInMemoryBackend      backend;
   GoodixUsbRouter           *usb_router;
+  GoodixTlsServer           *tls_server;
+  GoodixFpiUsbBackend       *fpi_usb_backend;
+  GoodixTlsPlaintextFunc     tls_plaintext;
+  gpointer                   tls_user_data;
+  guint                      a0_delivery_count;
 
   FpiImageDeviceState        last_framework_state;
 
@@ -76,6 +83,30 @@ goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
   g_return_val_if_fail (ctx != NULL, NULL);
   return ctx->usb_router;
 }
+
+GoodixTlsServer *goodix_device_context_get_tls_server (GoodixDeviceContext *ctx) { return ctx ? ctx->tls_server : NULL; }
+GoodixFpiUsbBackend *goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx) { return ctx ? ctx->fpi_usb_backend : NULL; }
+
+static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
+{ GoodixDeviceContext *ctx=user_data; (void)frame; if(type==0xa0&&!ctx->terminal_fence)ctx->a0_delivery_count++; }
+static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
+{
+  GoodixDeviceContext *ctx=user_data; gsize n; const guint8 *p; g_autoptr(GError) error=NULL;
+  if(type!=0xb0||ctx->terminal_fence||!ctx->tls_server)return;
+  p=g_bytes_get_data(frame,&n);
+  if(n<=4||!goodix_tls_server_push(ctx->tls_server,p+4,n-4,&error))
+    { ctx->terminal_fence=TRUE; ctx->poisoned=TRUE; goodix_usb_router_cancel(ctx->usb_router); goodix_fpi_usb_backend_cancel(ctx->fpi_usb_backend); }
+}
+static void context_tls_output (GBytes *record, gpointer user_data)
+{
+  GoodixDeviceContext *ctx=user_data; gsize n; const guint8 *p=g_bytes_get_data(record,&n); g_autoptr(GByteArray) frame=NULL; g_autoptr(GBytes) bytes=NULL; g_autoptr(GError) error=NULL; guint8 h[4];
+  if(ctx->terminal_fence||n>G_MAXUINT16)return;
+  h[0]=0xb0;h[1]=(guint8)n;h[2]=(guint8)(n>>8);h[3]=(guint8)(h[0]+h[1]+h[2]);
+  frame=g_byte_array_sized_new((guint)n+4);g_byte_array_append(frame,h,4);g_byte_array_append(frame,p,(guint)n);bytes=g_byte_array_free_to_bytes(g_steal_pointer(&frame));
+  if(!goodix_fpi_usb_backend_submit_out(ctx->fpi_usb_backend,ctx->generation,bytes,&error)){ctx->terminal_fence=TRUE;ctx->poisoned=TRUE;goodix_tls_server_cancel(ctx->tls_server);}
+}
+static void context_tls_plaintext (GBytes *bytes, gpointer user_data)
+{ GoodixDeviceContext *ctx=user_data; if(!ctx->terminal_fence&&ctx->tls_plaintext)ctx->tls_plaintext(bytes,ctx->tls_user_data); }
 
 /* --- Backend command recording --- */
 
@@ -131,7 +162,8 @@ goodix_device_context_new (GoodixFpImageDevice *device)
   ctx->state = GOODIX_DEVICE_CONTEXT_STATE_CLOSED;
   ctx->backend_vtable = &goodix_in_memory_backend_vtable;
   ctx->backend_user_data = &ctx->backend;
-  ctx->usb_router = goodix_usb_router_new (NULL, NULL, NULL);
+  ctx->usb_router = goodix_usb_router_new (context_a0_consumer, context_b0_consumer, ctx);
+  ctx->fpi_usb_backend = goodix_fpi_usb_backend_new (FP_DEVICE (device), ctx->usb_router, 0x81, 0x01, 32768);
 
   return ctx;
 }
@@ -145,6 +177,9 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
   g_clear_object (&ctx->activation_cancellable);
   g_clear_error (&ctx->terminal_error);
   g_free (ctx->backend.last_command);
+  goodix_tls_server_free (ctx->tls_server);
+  g_return_if_fail (goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend));
+  goodix_fpi_usb_backend_free (ctx->fpi_usb_backend);
   goodix_usb_router_free (ctx->usb_router);
   g_free (ctx);
 }
@@ -169,6 +204,8 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
+  goodix_tls_server_cancel (ctx->tls_server);
+  goodix_fpi_usb_backend_cancel (ctx->fpi_usb_backend);
   goodix_usb_router_cancel (ctx->usb_router);
 }
 
@@ -345,6 +382,8 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   g_clear_object (&ctx->activation_cancellable);
   ctx->activation_cancellable = g_object_ref (
     fpi_device_get_cancellable (FP_DEVICE (self)));
+  goodix_fpi_usb_backend_begin_generation (ctx->fpi_usb_backend, ctx->generation,
+                                           ctx->activation_cancellable);
   ctx->cancel_handler_id =
     g_cancellable_connect (ctx->activation_cancellable,
                            G_CALLBACK (on_activation_cancellable_cancelled),
@@ -456,6 +495,53 @@ goodix_fpimage_device_get_context (GoodixFpImageDevice *dev)
 {
   g_return_val_if_fail (GOODIX_IS_FPIMAGE_DEVICE (dev), NULL);
   return dev->ctx;
+}
+
+gboolean
+goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
+                                               const guint8 *psk,
+                                               gsize psk_length,
+                                               GoodixTlsPlaintextFunc plaintext,
+                                               gpointer user_data,
+                                               GoodixTlsAudit *audit,
+                                               GError **error)
+{
+  g_return_val_if_fail (ctx != NULL && ctx->tls_server == NULL, FALSE);
+  ctx->tls_plaintext = plaintext;
+  ctx->tls_user_data = user_data;
+  ctx->tls_server = goodix_tls_server_new (psk, psk_length, context_tls_output,
+                                           context_tls_plaintext, ctx, audit,
+                                           error);
+  return ctx->tls_server != NULL;
+}
+
+void
+goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
+                                            GoodixUsbSubmitSeam seam,
+                                            gpointer user_data)
+{
+  g_return_if_fail (ctx != NULL);
+  goodix_fpi_usb_backend_set_submit_seam (ctx->fpi_usb_backend, seam, user_data);
+}
+
+gboolean
+goodix_device_context_arm_receive (GoodixDeviceContext *ctx, GError **error)
+{
+  g_return_val_if_fail (ctx != NULL, FALSE);
+  return goodix_fpi_usb_backend_arm_receive (ctx->fpi_usb_backend,
+                                             ctx->generation, error);
+}
+
+void
+goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
+                                         guint64 submit_generation,
+                                         const guint8 *data, gsize length,
+                                         const GError *error)
+{
+  g_return_if_fail (ctx != NULL);
+  goodix_fpi_usb_backend_complete_receive (ctx->fpi_usb_backend,
+                                           submit_generation, data, length,
+                                           error);
 }
 
 /* --- Context accessors --- */

@@ -163,7 +163,26 @@ D276_03_ROUTER_TESTS_PER_NORMAL_RUN=8/8_PASS
 D276_03_ROUTER_TESTS_PER_SANITIZER_RUN=8/8_PASS
 D276_02_FPIMAGE_REGRESSION_NORMAL=PASS
 D276_02_FPIMAGE_REGRESSION_SANITIZER=PASS
-NEXT_PRIMARY_BOUNDARY=D276_04_NATIVE_TLS_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY
+D276_04_OUTCOME=READY
+D276_04_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D276_04_EXECUTOR_STATUS=READY_FOR_AI_PM_REVIEW
+D276_04_AI_PM_REVIEW=PENDING
+GOODIX_DEVICE_CONTEXT_OWNS_ROUTER_TLS_BACKEND=true
+ROUTER_B0_TO_TLS_INTEGRATION=PASS
+TLS_POST_HANDSHAKE_APPLICATION_DATA=PASS
+TLS_OUT_BACKEND_PATH=PASS
+NATIVE_TLS_PROVIDER=OPENSSL
+TLS_1_2_PSK_HANDSHAKE_SYNTHETIC=PASS
+SECRET_HANDOFF_COUNT=1
+PROJECT_OWNED_SECRET_COPY_ZEROIZED=true
+OPENSSL_INTERNAL_SECRET_COPY_ZEROIZATION=NOT_ASSERTED
+SECOND_SECRET_HANDOFF_REJECTED=true
+FPI_USB_BACKEND_COMPILED=true
+REAL_USB_TRANSFER_SUBMIT_COUNT=0
+MAX_OUTSTANDING_BULK_IN=1
+SECOND_READER_API_PATH=ABSENT
+GITHUB_ACTIONS_CONFIRMATION=PENDING_AI_PM_NON_GATING
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AFTER_D276_04
 LIVE_AUTHORIZED=false
 ```
 
@@ -202,11 +221,32 @@ ciascuna ha chiuso 8/8 test router normal e 8/8 ASAN/UBSAN, oltre alla regressio
 33184060807 e PR 33184064239 sono entrambe PASS; il commit validato è stato
 integrato in `main` da `474aa2b931977a2c748098c4e510764ad7ee7f42`. I test coprono inoltre chunk arbitrari, concatenazione, zero byte loss/duplicate, demux misto,
 stale generation, cancellation sincrona durante delivery e transcript
-malformati/troncati. Questo chiude soltanto il router host-only: equivalenza
-hardware, quiescenza device-side, timeout target e lifetime TLS cross-activation
-restano non provati. Il prossimo confine è D276/04, ancora host-only, per TLS
-Memory-BIO nativo e backend asincrono `FpiUsbTransfer` senza registrazione
-VID:PID né apertura del sensore reale.
+malformati/troncati. D276/04 chiude ora il successivo confine host-only con OpenSSL 3 selezionato
+come provider build-time unico. `GoodixTlsServer` è un server TLS 1.2 pure-PSK
+in-process con BIO di memoria, suite `0x00a8`, identity esatta
+`Client_identity`, un solo handoff e zeroizzazione `OPENSSL_cleanse`; non espone
+socket o endpoint-read. Il peer sintetico in memoria completa l'handshake e i
+casi terminali restano fenced senza restart.
+
+Il correttivo D276/04 integra i moduli nell'unico `GoodixDeviceContext`: il
+context possiede router, server TLS e backend FpiUsbTransfer insieme a generation,
+cancellable activation-local e terminal fence. Il consumer A0 resta non-TLS;
+il consumer B0 estrae soltanto il payload dal wrapper neutrale a quattro byte e
+lo consegna al Memory-BIO. La state machine TLS distingue handshake,
+application-data established e terminal, consegnando plaintext opaco
+borrowed/transfer-none. L'output OpenSSL viene avvolto nel B0 canonico e passa
+al path OUT dello stesso backend owner.
+
+Il callback production `FpiUsbTransfer` usa un pending token con generation
+catturata al submit; N-1 non può essere riattribuita a N. Il backend richiede
+drain prima del free e non possiede un'autorità cancellable distinta. Il compile
+probe usa header libfprint 1.94.5 e `gusb.h` di sistema; lo stub è solo link-time,
+nessun runtime device è eseguito. La copia secret posseduta dal progetto viene
+pulita subito dopo l'unico handoff (o al teardown); la zeroizzazione di copie
+interne OpenSSL non è asserita. Le suite D276/04 sono passate due volte normal e
+ASAN/UBSAN; D276/02–03 restano PASS. GitHub Actions è
+`PENDING_AI_PM_NON_GATING`; equivalenza hardware, quiescenza device-side,
+timeout target e lifetime TLS cross-activation restano non provati.
 
 `HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
 macchina finale; la sua esistenza corrente non è verificabile senza privilegi
@@ -1834,7 +1874,8 @@ LGPL native FpImageDevice driver (production topology)
   GoodixDeviceContext per open epoch
     ├── unico claim/owner USB e unico bulk-IN reader
     ├── unico router A0/B0
-    ├── owner unico TLS 1.2 PSK + secret (lifetime cross-activation UNRESOLVED)
+    ├── GoodixTlsServer OpenSSL TLS 1.2 PSK Memory-BIO + ScopedSecret one-handoff
+    ├── GoodixFpiUsbBackend async; completion esclusivo nel router
     ├── unico lifecycle Goodix/FDT
     └── adapter FpImage 80x64 già LGPL
 ```
@@ -1940,8 +1981,8 @@ D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_PASS_HOST_ONLY
-D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no VID:PID
-poi      -> review provenance + decisione stage enrollment + eventuale baseline live separata
+D276/04 -> context-owned B0→TLS application-data + TLS OUT + generation-captured FpiUsbTransfer CLOSED_PASS_HOST_ONLY
+review   -> AI-PM decide integrazione, policy/lifetime, provenance o futura baseline live
 ```
 
 Stato rescue D276/02 (28 agosto 2026): il WIP è classificato **B**. La shell è
@@ -1991,10 +2032,11 @@ Un'eventuale conferma Fedora futura è `OPTIONAL_NON_GATING` e non costituisce u
 gate retroattivo. Nessun sensore Goodix reale, USB, TLS reale, PSK, fprintd,
 registrazione VID production o mutazione persistente è stato usato.
 
-Il provider TLS concreto resta una subdecisione build-time ristretta
-(OpenSSL/GnuTLS): deve offrire un server TLS 1.2 PSK in-process alimentato da
-BIO/memoria e non può introdurre helper, socket o processi esterni. La topologia,
-l'ownership e il modello di cancellazione non dipendono dal provider.
+D276/04 ha chiuso la subdecisione provider su **OpenSSL 3**: il supporto server
+TLS 1.2 pure-PSK, BIO di memoria, callback PSK e cleanup esplicito soddisfa il
+contratto senza helper, socket, thread, processo, `dlopen` o fallback. La
+dipendenza `libssl-dev` è esplicita nel workflow. La scelta non risolve né
+modifica lifetime TLS cross-activation o quiescenza dopo cancel arbitrario.
 
 
 ## Trasporto USB

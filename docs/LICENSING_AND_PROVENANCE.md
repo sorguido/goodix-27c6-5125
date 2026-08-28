@@ -120,3 +120,24 @@ il slice non sono stati consultati, copiati, tradotti o adattati `core/`,
 dipendenze sono le API GLib pubbliche; transcript e payload sono sintetici,
 senza secret, capture o biometria. L'etichetta clean-room descrive il controllo
 ingegneristico di provenance e non costituisce una conclusione legale.
+
+## D276/04 — TLS nativo e adapter FpiUsbTransfer LGPL
+
+`libfprint-driver/goodix_tls_server.[ch]`, `goodix_fpi_usb_backend.[ch]` e i
+relativi test sono nuovo codice indipendente `LGPL-2.1-or-later`. La scelta
+OpenSSL usa esclusivamente le API pubbliche OpenSSL 3 (`SSL_CTX`, `SSL`, BIO di
+memoria, callback PSK e `OPENSSL_cleanse`) e i fatti neutrali canonici TLS 1.2,
+`PSK-AES128-GCM-SHA256`/`0x00a8` e identity `Client_identity`. Il backend usa
+le API pubbliche della copia locale libfprint 1.94.5, anch'essa LGPL. Non sono
+stati copiati o tradotti runtime GPL, Rockytkg driver code, secret o capture.
+OpenSSL è una dipendenza build-time unica e dichiarata; non esistono fallback,
+`dlopen`, subprocess, socket o helper.
+
+### D276/04 corrective integration
+
+Il correttivo estende gli stessi moduli LGPL indipendenti con state machine
+application-data, adapter B0 neutrale, ownership nel `GoodixDeviceContext` e
+pending-token generation per `FpiUsbTransfer`. Le fonti restano esclusivamente
+i fatti canonici D242/D276, le API pubbliche OpenSSL 3 e gli header LGPL
+libfprint 1.94.5. Non è stato consultato o trasferito codice GPL. `libgusb-dev`
+serve soltanto al compile/API-shape probe host-only; nessun device viene aperto.

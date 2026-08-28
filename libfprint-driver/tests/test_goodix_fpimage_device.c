@@ -752,6 +752,28 @@ test_terminal_error_path (void)
   test_fixture_free (f);
 }
 
+static void
+test_d276_04_context_ownership (void)
+{
+  static const guint8 synthetic_secret[] = { 0x44, 0x32, 0x37, 0x36, 0x2d, 0x30, 0x34 };
+  TestFixture *f = test_fixture_new ();
+  GoodixTlsAudit audit = { 0 };
+  g_autoptr(GError) error = NULL;
+
+  fixture_open (f);
+  g_assert_nonnull (goodix_device_context_get_usb_router (f->ctx));
+  g_assert_nonnull (goodix_device_context_get_fpi_usb_backend (f->ctx));
+  g_assert_null (goodix_device_context_get_tls_server (f->ctx));
+  g_assert_true (goodix_device_context_configure_tls (
+    f->ctx, synthetic_secret, sizeof synthetic_secret, NULL, NULL, &audit,
+    &error));
+  g_assert_no_error (error);
+  g_assert_nonnull (goodix_device_context_get_tls_server (f->ctx));
+  fixture_close (f);
+  g_assert_true (audit.project_secret_zeroized);
+  test_fixture_free (f);
+}
+
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
@@ -788,6 +810,8 @@ main (int argc, char **argv)
                    test_stale_callback_generation_guard);
   g_test_add_func ("/goodix-fpimage-device/terminal-error-path",
                    test_terminal_error_path);
+  g_test_add_func ("/goodix-fpimage-device/d276-04-context-ownership",
+                   test_d276_04_context_ownership);
 
   return g_test_run ();
 }

@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+name: D276 native TLS and async USB host-only
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+permissions: { contents: read }
+jobs:
+  host-only:
+    runs-on: ubuntu-24.04
+    container: ubuntu:24.04
+    steps:
+      - name: Install Git and host-only build prerequisites before checkout
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git build-essential pkg-config libglib2.0-dev libssl-dev libgusb-dev python3 binutils coreutils ripgrep
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE" && test -z "$(git status --short)"
+      - name: D276/04 deterministic normal and sanitizer runs
+        run: |
+          libfprint-driver/tests/run_goodix_d276_04_test.sh | tee /tmp/d276-04-run-1.log
+          libfprint-driver/tests/run_goodix_d276_04_test.sh | tee /tmp/d276-04-run-2.log
+          test "$(grep -h '^REAL_USB_TRANSFER_SUBMIT_COUNT=0$' /tmp/d276-04-run-*.log | wc -l)" -eq 2
+      - name: D276/02 and D276/03 regressions
+        run: |
+          libfprint-driver/tests/run_goodix_fpimage_device_test.sh
+          libfprint-driver/tests/run_goodix_usb_router_test.sh
+      - name: Static safety audit
+        run: |
+          python3 -m json.tool analysis/D276/D276_04_native_tls_fpi_usb_host_only.json >/dev/null
+          ! rg -n 'socket\s*\(|connect\s*\(|/dev/bus/usb|27c6.*5125' libfprint-driver/goodix_tls_server.[ch] libfprint-driver/goodix_fpi_usb_backend.[ch]
+          test "$(rg -n 'goodix_usb_router_receive_complete \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 1
+          git diff --check HEAD^
+          test -z "$(git status --short)"

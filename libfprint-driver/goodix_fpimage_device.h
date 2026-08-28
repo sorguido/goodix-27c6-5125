@@ -5,6 +5,8 @@
 #include <fpi-image-device.h>
 #include <glib-object.h>
 #include <stdint.h>
+#include "goodix_tls_server.h"
+#include "goodix_fpi_usb_backend.h"
 
 G_BEGIN_DECLS
 
@@ -43,6 +45,23 @@ GoodixFpImageDevice * goodix_fpimage_device_new (void);
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
+GoodixTlsServer *      goodix_device_context_get_tls_server (GoodixDeviceContext *ctx);
+GoodixFpiUsbBackend *  goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx);
+gboolean goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
+                                                        const guint8 *psk,
+                                                        gsize psk_length,
+                                                        GoodixTlsPlaintextFunc plaintext,
+                                                        gpointer user_data,
+                                                        GoodixTlsAudit *audit,
+                                                        GError **error);
+void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
+                                                 GoodixUsbSubmitSeam seam,
+                                                 gpointer user_data);
+gboolean goodix_device_context_arm_receive (GoodixDeviceContext *ctx, GError **error);
+void goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
+                                              guint64 submit_generation,
+                                              const guint8 *data, gsize length,
+                                              const GError *error);
 
 /* --- Context read-only accessors (test instrumentation) --- */
 GoodixDeviceContextState goodix_device_context_get_state (GoodixDeviceContext *ctx);
