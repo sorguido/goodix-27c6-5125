@@ -199,9 +199,9 @@ old_terminal_assert = '''  /* No further commands accepted after the terminal fe
 '''
 new_terminal_assert = '''  /* fpi_image_device_session_error() deactivates the framework session, so
    * the expected teardown is exactly ARM + DISARM, with no REARM. */
-  g_assert_cmpuint (goodix_device_context_get_backend_arm_count (f->ctx), ==, 1);
-  g_assert_cmpuint (goodix_device_context_get_backend_disarm_count (f->ctx), ==, 1);
-  g_assert_cmpuint (goodix_device_context_get_backend_rearm_count (f->ctx), ==, 0);
+  g_assert_cmpuint (goodix_in_memory_backend_get_arm_count (f->ctx), ==, 1);
+  g_assert_cmpuint (goodix_in_memory_backend_get_disarm_count (f->ctx), ==, 1);
+  g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (f->ctx), ==, 0);
   commands_after_error = goodix_device_context_get_backend_command_count (f->ctx);
 
   /* No further commands accepted after the terminal fence. */
