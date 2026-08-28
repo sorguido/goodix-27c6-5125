@@ -4,8 +4,6 @@
   "baseline": "95f40ca791011d637e2040a87014bbb8e946275e",
   "starting_head": "95f40ca791011d637e2040a87014bbb8e946275e",
   "final_head": "95f40ca791011d637e2040a87014bbb8e946275e",
-  "corrective_baseline": "0472d1f0bade6f47954403ca942829c80243cd4b",
-  "corrective_final_head": "WORKTREE_PENDING_USER_COMMIT",
   "branch": "main",
   "commit_created": false,
   "pre_live": {
@@ -81,8 +79,17 @@
     "second_live_attempt_performed": false
   },
   "corrective_host_only": {
-    "corrective_baseline": "0472d1f0bade6f47954403ca942829c80243cd4b",
-    "corrective_final_head": "WORKTREE_PENDING_USER_COMMIT",
+    "D277_01_ORIGINAL_LIVE_BASELINE": "95f40ca791011d637e2040a87014bbb8e946275e",
+    "D277_01_SECOND_CORRECTIVE_BASELINE": "0472d1f0bade6f47954403ca942829c80243cd4b",
+    "D277_01_CORRECTIVE_VALIDATED_COMMIT": "d9336c6e033d736a794dae3486ae84c33c412b01",
+    "D277_01_CANONICAL_CLOSURE_DOC_COMMIT": "PENDING_USER_COMMIT",
+    "D277_01_HOST_ONLY_CORRECTIVE": "CLOSED",
+    "D277_01_EXECUTABLE_CLOSURE": "PASS_HOST_ONLY",
+    "D277_01_CI_CONFIRMATION": "PASS",
+    "D277_01_AI_PM_TECHNICAL_REVIEW": "PASS",
+    "D277_01_DEVICE_SIDE_ADVANCEMENT": "NONE",
+    "D277_01_GITHUB_ACTIONS_RUN": 33207424835,
+    "D277_01_GITHUB_ACTIONS_RESULT": "PASS",
     "live_authorized": false,
     "real_usb_transfer_submit_count": 0,
     "usb_open_attempt_count_during_corrective_execution": 0,
@@ -97,9 +104,17 @@
       "previous_run_result": "FAIL",
       "previous_run_failure_class": "D277_HOST_ONLY_TEST_ROOT_PERMISSION_ASSUMPTION",
       "d276_regressions_before_failure": "PASS",
-      "static_safety_audit": "SKIPPED_DUE_TO_PRIOR_FAILURE",
-      "current_run_id": null,
-      "current_run_result": "NOT_AVAILABLE"
+      "static_safety_audit_previous": "SKIPPED_DUE_TO_PRIOR_FAILURE",
+      "validated_run_id": 33207424835,
+      "validated_run_result": "PASS",
+      "validated_run_head_sha": "d9336c6e033d736a794dae3486ae84c33c412b01",
+      "d276_04_deterministic_normal_and_sanitizer": "PASS",
+      "d276_02_regression": "PASS",
+      "d276_03_regression": "PASS",
+      "d277_01_normal": "15/15 PASS",
+      "d277_01_asan_ubsan": "15/15 PASS",
+      "d277_01_live_harness_build": "PASS",
+      "static_safety_audit": "PASS"
     },
     "changes": [
       "tools/d277_native_a8_once.c: failure observability for open/claim/release/close with GError domain/code/message serialization",
@@ -109,10 +124,9 @@
       "tools/d277_native_a8_once.c: permission fixture tests now compare d277_check_device_node() output with real access(2) instead of assuming unprivileged semantics",
       "tools/d277_native_a8_once.c: d277_device_contact_or_real_submit_occurred() helper and derived telemetry field",
       "tools/d277_native_a8_once.c: host-only unit tests for permission preflight, decision gate, GError serialization and telemetry truthfulness",
-      "analysis/D277/D277_01_native_a8_real_usb.md: documented second corrective and CI failure 33206366417",
-      "analysis/D277/D277_01_native_a8_real_usb.json: added corrective_baseline, final_head, CI state and updated test counts",
-      "Goodix 27c6 5125 manuale tecnico.md: corrected D277 state to CI_CORRECTIVE_IN_PROGRESS",
-      ".github/workflows/d276-native-tls-usb-host-only.yml: D277 host-only CI step retained, validated portable"
+      "analysis/D277/D277_01_native_a8_real_usb.md: documented post-CI canonical closure",
+      "analysis/D277/D277_01_native_a8_real_usb.json: registered validated CI run 33207424835, corrected metadata and closure state",
+      "Goodix 27c6 5125 manuale tecnico.md: closed D277/01 host-only state and set next boundary to AI-PM selection"
     ],
     "failure_observability": {
       "usb_open_error_serializable": true,
