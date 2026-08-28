@@ -134,6 +134,8 @@ jobs:
           {
             GoodixDeviceContext *ctx = user_data;
 
+            (void) cancellable;
+
             if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
                 ctx->activation_completed)
               return;
