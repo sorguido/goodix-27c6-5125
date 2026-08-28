@@ -37,6 +37,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Configure Git safe directory for container mount
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel
+
       - name: Inventory execution environment
         run: |
           set -eu
