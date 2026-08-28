@@ -2,6 +2,13 @@ name: D276 FpImageDevice host-only validation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - d276-02-github-actions-validation
+    paths:
+      - .github/workflows/d276-fpimage-device-host-only.yml
+      - libfprint-driver/**
+      - Rockytkg/libfprint/**
 
 permissions:
   contents: read
@@ -46,12 +53,11 @@ jobs:
           echo "REAL_USB_ACCESS=false"
           echo "LIVE_AUTHORIZED=false"
 
-      - name: Diagnostic - apply causally validated lifecycle fixes in worktree only
+      - name: Verify clean checked-in tree
         run: |
-          python3 .github/d276_fpimage_device_diagnostic_patch.py
-          git diff --check
-          git diff -- libfprint-driver/goodix_fpimage_device.c libfprint-driver/tests/test_goodix_fpimage_device.c
-          echo "CI_DIAGNOSTIC_PATCH=FULL_D276_02_LIFECYCLE_FIX_SET"
+          git diff --exit-code
+          git status --short
+          echo "CI_DIAGNOSTIC_PATCH=NONE"
 
       - name: Run D276/02 launcher twice
         shell: bash
@@ -63,4 +69,4 @@ jobs:
             timeout --signal=TERM 180 sh libfprint-driver/tests/run_goodix_fpimage_device_test.sh
           done
           echo "DETERMINISM_RUNS=2"
-          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_DIAGNOSTIC_PATCHES"
+          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_CLEAN_TREE"
