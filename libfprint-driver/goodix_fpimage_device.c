@@ -13,6 +13,7 @@
 
 #include "goodix_fpimage_pipeline.h"
 #include "goodix_u16_to_fpimage.h"
+#include "goodix_usb_router.h"
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -54,6 +55,7 @@ struct _GoodixDeviceContext
   const GoodixBackendVTable *backend_vtable;
   gpointer                   backend_user_data;
   GoodixInMemoryBackend      backend;
+  GoodixUsbRouter           *usb_router;
 
   FpiImageDeviceState        last_framework_state;
 
@@ -67,6 +69,13 @@ struct _GoodixFpImageDevice
 };
 
 G_DEFINE_TYPE (GoodixFpImageDevice, goodix_fpimage_device, FP_TYPE_IMAGE_DEVICE)
+
+GoodixUsbRouter *
+goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
+{
+  g_return_val_if_fail (ctx != NULL, NULL);
+  return ctx->usb_router;
+}
 
 /* --- Backend command recording --- */
 
@@ -122,6 +131,7 @@ goodix_device_context_new (GoodixFpImageDevice *device)
   ctx->state = GOODIX_DEVICE_CONTEXT_STATE_CLOSED;
   ctx->backend_vtable = &goodix_in_memory_backend_vtable;
   ctx->backend_user_data = &ctx->backend;
+  ctx->usb_router = goodix_usb_router_new (NULL, NULL, NULL);
 
   return ctx;
 }
@@ -135,6 +145,7 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
   g_clear_object (&ctx->activation_cancellable);
   g_clear_error (&ctx->terminal_error);
   g_free (ctx->backend.last_command);
+  goodix_usb_router_free (ctx->usb_router);
   g_free (ctx);
 }
 
@@ -158,6 +169,7 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
+  goodix_usb_router_cancel (ctx->usb_router);
 }
 
 static void
@@ -323,6 +335,7 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;
   ctx->generation = ctx->generation_seq;
+  goodix_usb_router_begin_generation (ctx->usb_router);
   ctx->release_tail_complete = FALSE;
   ctx->fresh_down_table = FALSE;
   ctx->rearm_issued_generation = 0;

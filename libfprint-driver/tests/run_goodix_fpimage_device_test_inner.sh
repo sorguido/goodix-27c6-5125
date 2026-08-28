@@ -60,6 +60,9 @@ gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_pipeline.c" \
   -o "$build_dir/goodix_fpimage_pipeline.o"
 gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_usb_router.c" \
+  -o "$build_dir/goodix_usb_router.o"
+gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_device.c" \
   -o "$build_dir/goodix_fpimage_device.o"
 gcc $strict_flags $glib_cflags $includes -c \
@@ -95,6 +98,7 @@ gcc -Wl,--gc-sections \
   "$build_dir/fp-enums.o" \
   "$build_dir/goodix_u16_to_fpimage.o" \
   "$build_dir/goodix_fpimage_pipeline.o" \
+  "$build_dir/goodix_usb_router.o" \
   "$build_dir/goodix_fpimage_device.o" \
   "$build_dir/test_goodix_fpimage_device.o" \
   "$build_dir/gusb_stub.o" \
@@ -138,6 +142,9 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_pipeline.c" \
   -o "$build_dir/goodix_fpimage_pipeline_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_usb_router.c" \
+  -o "$build_dir/goodix_usb_router_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_device.c" \
   -o "$build_dir/goodix_fpimage_device_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
@@ -162,6 +169,7 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/fp-enums_san.o" \
   "$build_dir/goodix_u16_to_fpimage_san.o" \
   "$build_dir/goodix_fpimage_pipeline_san.o" \
+  "$build_dir/goodix_usb_router_san.o" \
   "$build_dir/goodix_fpimage_device_san.o" \
   "$build_dir/test_goodix_fpimage_device_san.o" \
   "$build_dir/gusb_stub_san.o" \
