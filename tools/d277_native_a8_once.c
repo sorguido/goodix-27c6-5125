@@ -775,6 +775,32 @@ d277_check_device_node (const gchar *path,
   return TRUE;
 }
 
+/* Pure decision helper used by both runtime and host-only tests.  It returns
+ * NULL if the gate should allow proceeding, otherwise a stable failure class.
+ */
+static const gchar *
+d277_permission_decision (const D277PermissionInfo *info)
+{
+  if (info == NULL || !info->node_exists)
+    return "BLOCKED_ENVIRONMENT_USB_NODE_MISSING";
+  if (!info->node_is_chardev)
+    return "BLOCKED_ENVIRONMENT_USB_NODE_NOT_CHARACTER_DEVICE";
+  if (!info->writable_by_current_user)
+    return "BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE";
+  return NULL;
+}
+
+/* Telemetry helper: device contact or real USB transfer submit occurred in the
+ * current run.  The value is derived from counters, never hard-coded.
+ */
+static gboolean
+d277_device_contact_or_real_submit_occurred (guint open_count,
+                                              guint claim_count,
+                                              guint64 real_submit_count)
+{
+  return open_count > 0 || claim_count > 0 || real_submit_count > 0;
+}
+
 static void
 test_format_device_node (void)
 {
@@ -856,14 +882,19 @@ test_permission_info_regular_file (void)
   g_assert_no_error (error);
   g_assert_true (info.node_exists);
   g_assert_false (info.node_is_chardev);
-  g_assert_true (info.readable_by_current_user);
-  g_assert_true (info.writable_by_current_user);
+  /* The runtime gate relies on access(2); the test must remain true under root
+   * and under an unprivileged owner.  Compare with the actual syscall.
+   */
+  g_assert_cmpint (info.readable_by_current_user, ==, access (path, R_OK) == 0);
+  g_assert_cmpint (info.writable_by_current_user, ==, access (path, W_OK) == 0);
+  g_assert_cmpstr (d277_permission_decision (&info), ==,
+                   "BLOCKED_ENVIRONMENT_USB_NODE_NOT_CHARACTER_DEVICE");
 
   g_assert_cmpint (chmod (path, 0444), ==, 0);
   permission_info_clear (&info);
   g_assert_true (d277_check_device_node (path, &info, &error));
-  g_assert_true (info.readable_by_current_user);
-  g_assert_false (info.writable_by_current_user);
+  g_assert_cmpint (info.readable_by_current_user, ==, access (path, R_OK) == 0);
+  g_assert_cmpint (info.writable_by_current_user, ==, access (path, W_OK) == 0);
 
   g_unlink (path);
 }
@@ -885,8 +916,8 @@ test_permission_info_readable_not_writable (void)
   g_assert_true (d277_check_device_node (path, &info, &error));
   g_assert_no_error (error);
   g_assert_true (info.node_exists);
-  g_assert_true (info.readable_by_current_user);
-  g_assert_false (info.writable_by_current_user);
+  g_assert_cmpint (info.readable_by_current_user, ==, access (path, R_OK) == 0);
+  g_assert_cmpint (info.writable_by_current_user, ==, access (path, W_OK) == 0);
 
   g_unlink (path);
 }
@@ -908,9 +939,45 @@ test_permission_info_writable_owner (void)
   g_assert_true (d277_check_device_node (path, &info, &error));
   g_assert_no_error (error);
   g_assert_true (info.node_exists);
-  g_assert_true (info.writable_by_current_user);
+  g_assert_cmpint (info.writable_by_current_user, ==, access (path, W_OK) == 0);
+  /* Also verify the pure mode/uid/gid classification agrees for the owner case.
+   */
+  g_assert_cmpint (d277_permission_logic_is_writable (info.node_uid,
+                                                       info.node_gid,
+                                                       info.node_mode,
+                                                       info.executor_uid,
+                                                       info.executor_gid,
+                                                       (const gid_t *) info.executor_groups->data,
+                                                       info.executor_groups->len),
+                   ==, info.writable_by_current_user);
 
   g_unlink (path);
+}
+
+static void
+test_permission_decision_blocks_before_open (void)
+{
+  D277PermissionInfo info = { 0 };
+
+  info.node_exists = TRUE;
+  info.node_is_chardev = TRUE;
+  info.writable_by_current_user = FALSE;
+  g_assert_cmpstr (d277_permission_decision (&info), ==,
+                   "BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE");
+
+  info.writable_by_current_user = TRUE;
+  g_assert_null (d277_permission_decision (&info));
+
+  info.node_is_chardev = FALSE;
+  info.writable_by_current_user = TRUE;
+  g_assert_cmpstr (d277_permission_decision (&info), ==,
+                   "BLOCKED_ENVIRONMENT_USB_NODE_NOT_CHARACTER_DEVICE");
+
+  info.node_exists = FALSE;
+  g_assert_cmpstr (d277_permission_decision (&info), ==,
+                   "BLOCKED_ENVIRONMENT_USB_NODE_MISSING");
+
+  permission_info_clear (&info);
 }
 
 static void
@@ -929,6 +996,20 @@ test_host_error_serialization (void)
   g_assert_cmpstr (captured.message, ==, "synthetic permission denied");
 }
 
+static void
+test_device_contact_or_real_submit_telemetry (void)
+{
+  /* No open, no claim, no real submit => false. */
+  g_assert_false (d277_device_contact_or_real_submit_occurred (0, 0, 0));
+  g_assert_false (d277_device_contact_or_real_submit_occurred (0, 0, 0));
+  /* Any of the three evidence sources makes it true. */
+  g_assert_true (d277_device_contact_or_real_submit_occurred (1, 0, 0));
+  g_assert_true (d277_device_contact_or_real_submit_occurred (0, 1, 0));
+  g_assert_true (d277_device_contact_or_real_submit_occurred (0, 0, 1));
+  g_assert_true (d277_device_contact_or_real_submit_occurred (0, 0, 42));
+  g_assert_true (d277_device_contact_or_real_submit_occurred (1, 1, 1));
+}
+
 static int
 run_self_tests (int argc, char **argv)
 {
@@ -945,7 +1026,9 @@ run_self_tests (int argc, char **argv)
   g_test_add_func ("/d277/preflight/node-regular-file", test_permission_info_regular_file);
   g_test_add_func ("/d277/preflight/readable-not-writable", test_permission_info_readable_not_writable);
   g_test_add_func ("/d277/preflight/writable-owner", test_permission_info_writable_owner);
+  g_test_add_func ("/d277/preflight/decision-blocks-before-open", test_permission_decision_blocks_before_open);
   g_test_add_func ("/d277/preflight/host-error-serialization", test_host_error_serialization);
+  g_test_add_func ("/d277/telemetry/device-contact-or-real-submit", test_device_contact_or_real_submit_telemetry);
   return g_test_run ();
 }
 
@@ -1018,10 +1101,13 @@ print_live_json (D277Probe *probe, guint bus, guint address, guint port,
   guint64 out_submits = goodix_fpi_usb_backend_get_out_submit_count (probe->backend);
   guint64 in_submits = real_submits >= out_submits ? real_submits - out_submits : 0;
   guint64 in_callbacks = in_submits - goodix_fpi_usb_backend_get_outstanding (probe->backend);
+  gboolean device_contact = d277_device_contact_or_real_submit_occurred (open_count,
+                                                                          claim_count,
+                                                                          real_submits);
 
   g_print ("{\"result\":\"%s\",\"failure_class\":\"%s\","
             "\"previous_live_attempt_terminated\":true,"
-            "\"device_contact_or_real_submit_occurred\":false,"
+            "\"device_contact_or_real_submit_occurred\":%s,"
             "\"current_live_authorized\":false,"
             "\"new_user_authorization_required_for_any_new_open_claim_or_submit\":true,"
             "\"live_authorization_consumed\":%s,\"live_authorized\":false,"
@@ -1043,6 +1129,7 @@ print_live_json (D277Probe *probe, guint bus, guint address, guint port,
             "\"usb_release_count\":%u,\"usb_close_count\":%u,"
             "\"terminal_cleanup_completed\":%s",
             probe->success ? "pass" : "fail", failure,
+            device_contact ? "true" : "false",
             authorization_consumed ? "true" : "false",
             bus, address, port, open_attempt_count, open_count, claim_count,
             probe->out_command_count, in_submits, in_callbacks,
@@ -1189,11 +1276,14 @@ run_permission_preflight_only (void)
   g_print ("USB_OPEN_ATTEMPT_COUNT=0\n");
   g_print ("LIVE_AUTHORIZED=false\n");
 
-  if (!info.writable_by_current_user)
-    {
-      g_printerr ("BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE\n");
-      return 1;
-    }
+  {
+    const gchar *decision = d277_permission_decision (&info);
+    if (decision != NULL)
+      {
+        g_printerr ("%s\n", decision);
+        return 1;
+      }
+  }
   return 0;
 }
 
@@ -1256,16 +1346,19 @@ run_live_once (void)
         return 2;
       }
     print_permission_lines (&perm);
-    if (!perm.writable_by_current_user)
-      {
-        probe = probe_new (NULL, D277_VID, D277_PID);
-        probe->failure_class = g_strdup ("BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE");
-        probe->drained = TRUE;
-        print_live_json (probe, bus, address, port, 0, 0, 0, 0, 0, FALSE,
-                          &open_err, &claim_err, &release_err, &close_err);
-        probe_free (probe);
-        return 1;
-      }
+    {
+      const gchar *decision = d277_permission_decision (&perm);
+      if (decision != NULL)
+        {
+          probe = probe_new (NULL, D277_VID, D277_PID);
+          probe->failure_class = g_strdup (decision);
+          probe->drained = TRUE;
+          print_live_json (probe, bus, address, port, 0, 0, 0, 0, 0, FALSE,
+                            &open_err, &claim_err, &release_err, &close_err);
+          probe_free (probe);
+          return 1;
+        }
+    }
   }
 
   fp_device = g_object_new (d277_harness_device_get_type (),

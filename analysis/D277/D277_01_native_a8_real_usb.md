@@ -67,11 +67,49 @@ I file production D276/04 sono rimasti byte-identici alla baseline approvata
 
 ## Verifiche post-correttivo
 
-- D277: 13/13 test normali e 13/13 ASAN/UBSAN PASS;
+- D277: 15/15 test normali e 15/15 ASAN/UBSAN PASS;
 - D276/02: 15/15 normali e 15/15 ASAN/UBSAN PASS;
 - D276/03: 8/8 normali e 8/8 ASAN/UBSAN PASS;
 - D276/04: 5/5 normali e 5/5 ASAN/UBSAN PASS (LeakSanitizer disabilitato nella
   sandbox Flatpak locale, come noto).
+
+## Secondo correttivo host-only D277/01
+
+La GitHub Actions run 33206366417 è risultata `FAILURE` nel test
+`/d277/preflight/node-regular-file` a causa di un’assunzione non portable: il
+job CI gira come `root`, e `chmod 0444` non rende `access(path, W_OK)` false per
+`root`. Il runtime reale continua a usare correttamente `access(W_OK)` perché
+riflette i permessi effettivi del processo (inclusi ACL); il difetto era solo
+nei test.
+
+Modifiche apportate nel secondo correttivo:
+
+1. **Test permission portabili** — i test che usano fixture temporanee ora
+   verificano solo la coerenza tra `info.readable_by_current_user` /
+   `info.writable_by_current_user` e il risultato reale di `access(R_OK)` /
+   `access(W_OK)`, senza imporre un valore specifico sotto `root`. La logica
+   mode/uid/gid resta testata deterministicamente tramite l’helper puro
+   `d277_permission_logic_is_writable()`, che include owner/group/other e root
+   bypass.
+2. **Decision helper** — introdotto `d277_permission_decision()` usato sia dal
+   runtime che dai test host-only. Quando il nodo non è scrivibile restituisce
+   `BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE`; quando il gate blocca, il codice
+   non raggiunge `g_usb_device_open()` e `open_attempt_count` resta 0.
+3. **Telemetry truthfulness** — `device_contact_or_real_submit_occurred` non è
+   più hard-coded a `false` in `print_live_json()`, ma derivato da
+   `USB_OPEN_COUNT > 0 OR USB_CLAIM_COUNT > 0 OR REAL_USB_TRANSFER_SUBMIT_COUNT > 0`.
+   È stato aggiunto un test host-only dell’helper puro corrispondente. Per la
+   prima run storica il valore resta correttamente `false`.
+
+```text
+corrective_baseline=0472d1f0bade6f47954403ca942829c80243cd4b
+corrective_final_head=WORKTREE_PENDING_USER_COMMIT
+GITHUB_ACTIONS_RUN_PREVIOUS=33206366417
+GITHUB_ACTIONS_RUN_PREVIOUS_RESULT=FAIL
+GITHUB_ACTIONS_RUN_CURRENT=NOT_AVAILABLE
+D276_REGRESSIONS_BEFORE_FAILURE=PASS
+STATIC_SAFETY_AUDIT_PREVIOUS=SKIPPED_DUE_TO_PRIOR_FAILURE
+```
 
 ## Telemetria della singola run (conservata)
 
@@ -113,11 +151,11 @@ NEW_USER_AUTHORIZATION_REQUIRED_FOR_ANY_NEW_OPEN_CLAIM_OR_SUBMIT=true
 ## Closure
 
 ```text
-D277_01_HOST_ONLY_CORRECTIVE=READY_FOR_AI_PM_REVIEW
-OUTCOME=BLOCKED_ENVIRONMENT_USB_OPEN_FAILED_HOST_ONLY_CORRECTIVE_COMPLETE
-ADVANCEMENT=HOST_SIDE_OBSERVABILITY_AND_PERMISSION_PREFLIGHT_IMPROVEMENT_NO_DEVICE_SIDE_PROGRESS
-EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-RESIDUAL_BLOCKER_OR_RISK=NATIVE_A8_A0_PATH_UNPROVEN;CURRENT_USER_LACKS_USB_NODE_WRITE_PERMISSION;NEW_LIVE_AUTHORIZATION_REQUIRED_AFTER_HOST_PERMISSION_REVIEW;GLOBAL_HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED
+D277_01_HOST_ONLY_CORRECTIVE=READY_FOR_CI_CONFIRMATION
+OUTCOME=BLOCKED_ENVIRONMENT_USB_OPEN_FAILED_HOST_ONLY_CORRECTIVE_COMPLETE_LOCAL_AWAITING_CI
+ADVANCEMENT=HOST_SIDE_OBSERVABILITY_PERMISSION_PREFLIGHT_AND_TELEMETRY_TRUTHFULNESS_IMPROVEMENT_NO_DEVICE_SIDE_PROGRESS
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY_LOCAL_AWAITING_CI
+RESIDUAL_BLOCKER_OR_RISK=NATIVE_A8_A0_PATH_UNPROVEN;CURRENT_USER_LACKS_USB_NODE_WRITE_PERMISSION;NEW_LIVE_AUTHORIZATION_REQUIRED_AFTER_HOST_PERMISSION_REVIEW;GLOBAL_HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;CI_CONFIRMATION_PENDING
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=BASELINE_95f40ca791011d637e2040a87014bbb8e946275e_PLUS_TOOLS_d277_native_a8_once.c_PLUS_analysis/D277/D277_01_native_a8_real_usb.md_PLUS_analysis/D277/D277_01_native_a8_real_usb.json_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_dot_github/workflows/d276-native-tls-usb-host-only.yml
+REVIEW_SET=BASELINE_CORRECTIVE_0472d1f0bade6f47954403ca942829c80243cd4b_PLUS_WORKTREE_PENDING_USER_COMMIT_PLUS_TOOLS_d277_native_a8_once.c_PLUS_analysis/D277/D277_01_native_a8_real_usb.md_PLUS_analysis/D277/D277_01_native_a8_real_usb.json_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_dot_github/workflows/d276-native-tls-usb-host-only.yml
 ```

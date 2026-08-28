@@ -4,12 +4,14 @@
   "baseline": "95f40ca791011d637e2040a87014bbb8e946275e",
   "starting_head": "95f40ca791011d637e2040a87014bbb8e946275e",
   "final_head": "95f40ca791011d637e2040a87014bbb8e946275e",
+  "corrective_baseline": "0472d1f0bade6f47954403ca942829c80243cd4b",
+  "corrective_final_head": "WORKTREE_PENDING_USER_COMMIT",
   "branch": "main",
   "commit_created": false,
   "pre_live": {
     "host_only_checks": "PASS",
-    "d277_normal_tests": "13/13 PASS",
-    "d277_asan_ubsan_tests": "13/13 PASS; LeakSanitizer unsupported under Flatpak sandbox",
+    "d277_normal_tests": "15/15 PASS",
+    "d277_asan_ubsan_tests": "15/15 PASS; LeakSanitizer unsupported under Flatpak sandbox",
     "d276_03_normal_and_asan_ubsan": "8/8 PASS",
     "d276_04_normal_and_asan_ubsan": "5/5 PASS",
     "production_live_critical_files_match_baseline": true,
@@ -21,7 +23,7 @@
     "target_address": 4,
     "target_port": 7,
     "live_harness_path": "/tmp/goodix-d277-a8-build/d277_native_a8_once",
-    "live_harness_sha256": "d89dc45701ab4da2c05a6acb04a5fb9e277d6f7982f508079d1f617740a74032",
+    "live_harness_sha256": "762c52aff8516f5746f7bffb4a77749ea6a9d428e0ce9c1804d5c33e227484b3",
     "a8_wire_bytes": "a00600a6a803000000ff"
   },
   "live": {
@@ -79,6 +81,8 @@
     "second_live_attempt_performed": false
   },
   "corrective_host_only": {
+    "corrective_baseline": "0472d1f0bade6f47954403ca942829c80243cd4b",
+    "corrective_final_head": "WORKTREE_PENDING_USER_COMMIT",
     "live_authorized": false,
     "real_usb_transfer_submit_count": 0,
     "usb_open_attempt_count_during_corrective_execution": 0,
@@ -88,15 +92,27 @@
     "retry_count": 0,
     "transport_reopen_count": 0,
     "device_reset_count": 0,
+    "ci": {
+      "previous_run_id": 33206366417,
+      "previous_run_result": "FAIL",
+      "previous_run_failure_class": "D277_HOST_ONLY_TEST_ROOT_PERMISSION_ASSUMPTION",
+      "d276_regressions_before_failure": "PASS",
+      "static_safety_audit": "SKIPPED_DUE_TO_PRIOR_FAILURE",
+      "current_run_id": null,
+      "current_run_result": "NOT_AVAILABLE"
+    },
     "changes": [
       "tools/d277_native_a8_once.c: failure observability for open/claim/release/close with GError domain/code/message serialization",
       "tools/d277_native_a8_once.c: host-only permission preflight before g_usb_device_open()",
       "tools/d277_native_a8_once.c: --permission-preflight-only mode",
-      "tools/d277_native_a8_once.c: host-only unit tests for permission preflight and GError serialization",
-      "analysis/D277/D277_01_native_a8_real_usb.md: documented corrective and preserved historical evidence",
-      "analysis/D277/D277_01_native_a8_real_usb.json: added corrective_host_only section",
-      "Goodix 27c6 5125 manuale tecnico.md: corrected stale NEXT_PRIMARY_BOUNDARY and D277 state",
-      ".github/workflows/d276-native-tls-usb-host-only.yml: added D277 host-only CI step"
+      "tools/d277_native_a8_once.c: d277_permission_decision() helper shared by runtime and tests",
+      "tools/d277_native_a8_once.c: permission fixture tests now compare d277_check_device_node() output with real access(2) instead of assuming unprivileged semantics",
+      "tools/d277_native_a8_once.c: d277_device_contact_or_real_submit_occurred() helper and derived telemetry field",
+      "tools/d277_native_a8_once.c: host-only unit tests for permission preflight, decision gate, GError serialization and telemetry truthfulness",
+      "analysis/D277/D277_01_native_a8_real_usb.md: documented second corrective and CI failure 33206366417",
+      "analysis/D277/D277_01_native_a8_real_usb.json: added corrective_baseline, final_head, CI state and updated test counts",
+      "Goodix 27c6 5125 manuale tecnico.md: corrected D277 state to CI_CORRECTIVE_IN_PROGRESS",
+      ".github/workflows/d276-native-tls-usb-host-only.yml: D277 host-only CI step retained, validated portable"
     ],
     "failure_observability": {
       "usb_open_error_serializable": true,
@@ -115,13 +131,19 @@
         "permission_logic_owner_group_other_root",
         "node_not_exists",
         "node_regular_file_not_chardev",
-        "readable_not_writable",
-        "writable_owner"
+        "readable_not_writable_coherent_with_access",
+        "writable_owner_coherent_with_access",
+        "decision_blocks_before_open"
       ]
     },
+    "telemetry_truthfulness": {
+      "device_contact_or_real_submit_occurred_is_derived": true,
+      "derivation": "(USB_OPEN_COUNT > 0) OR (USB_CLAIM_COUNT > 0) OR (REAL_USB_TRANSFER_SUBMIT_COUNT > 0)",
+      "host_only_test_coverage": true
+    },
     "tests": {
-      "d277_normal": "13/13 PASS",
-      "d277_asan_ubsan": "13/13 PASS",
+      "d277_normal": "15/15 PASS",
+      "d277_asan_ubsan": "15/15 PASS",
       "d276_03_normal": "8/8 PASS",
       "d276_03_asan_ubsan": "8/8 PASS",
       "d276_04_normal": "5/5 PASS",

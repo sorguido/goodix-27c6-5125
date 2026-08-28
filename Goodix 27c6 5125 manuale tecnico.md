@@ -217,23 +217,32 @@ una strong inference perché il `GError` non è stato serializzato. Nessun sudo,
 cambio udev, retry, reopen o reset è stato eseguito. L'autorizzazione è stata
 consumata conservativamente sul tentativo di open e resta falsa.
 
-Il correttivo host-only D277/01, senza nuova run live, ha aggiunto a
-`tools/d277_native_a8_once.c` un permission preflight read-only che risolve il
-device node `/dev/bus/usb/BBB/DDD`, ne riporta uid/gid/mode e gruppi
-dell'esecutore, e blocca prima di `g_usb_device_open()` quando il nodo non è
-scrivibile (`BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE`). Il preflight non
-usa chmod/chown/setfacl/udev, sudo, open, claim o transfer. Sono stati inoltre
-aggiunti test host-only per la serializzazione dei `GError` di
-open/claim/release/close e per la classificazione mode/uid/gid del permission
-gate. ACL parsing non è stato implementato; la decisione è documentata nel
-sorgente perché `access(W_OK)` è sufficiente nel contesto reale. I file
-production D276/04 restano byte-identici alla baseline approvata
+Il primo correttivo host-only D277/01 ha aggiunto a `tools/d277_native_a8_once.c`
+un permission preflight read-only che risolve il device node
+`/dev/bus/usb/BBB/DDD`, ne riporta uid/gid/mode e gruppi dell'esecutore, e
+consulta `access(W_OK)` per bloccare prima di `g_usb_device_open()` quando il
+nodo non è scrivibile (`BLOCKED_ENVIRONMENT_USB_NODE_NOT_WRITABLE`). Il runtime
+continua a usare `access(W_OK)` perché riflette i permessi effettivi del
+processo, inclusi ACL impliciti; i test mode/uid/gid sono invece eseguiti su
+un helper puro deterministico che non dipende dall’uid della CI. ACL parsing
+non è stato implementato; la decisione è documentata nel sorgente.
+
+Un secondo correttivo host-only è stato necessario perché la CI GitHub Actions
+run 33206366417 falliva sotto `root`: i test con fixture temporanee assumevano
+che `chmod 0444` rendesse `access(W_OK)` false, il che non vale per `root`.
+I test sono stati corretti per confrontare il risultato di `d277_check_device_node()`
+direttamente con `access(2)`, senza imporre semantica non privilegiata. È stato
+inoltre corretto il campo `device_contact_or_real_submit_occurred`, prima
+hard-coded a `false`, perché sia derivato dai contatori della run corrente
+(`open_count > 0 || claim_count > 0 || real_submit_count > 0`) e sia
+accompagnato da un test host-only dell’helper puro. I file production D276/04
+restano byte-identici alla baseline approvata
 `95f40ca791011d637e2040a87014bbb8e946275e`.
 
 ```text
 D277_01_OUTCOME=BLOCKED_ENVIRONMENT_USB_OPEN_FAILED
-D277_01_HOST_ONLY_CORRECTIVE=READY_FOR_AI_PM_REVIEW
-D277_01_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D277_01_HOST_ONLY_CORRECTIVE=CI_CORRECTIVE_IN_PROGRESS
+D277_01_EXECUTABLE_CLOSURE=PASS_HOST_ONLY_LOCAL_AWAITING_CI
 PREVIOUS_LIVE_ATTEMPT_TERMINATED=true
 LIVE_AUTHORIZATION_CONSUMED=true
 AUTHORIZATION_CONSUMPTION_POLICY=CONSERVATIVE_ON_FIRST_TARGET_OPEN_ATTEMPT
@@ -251,7 +260,7 @@ HARDWARE_EQUIVALENCE=UNPROVEN
 PERSISTENT_DEVICE_WRITE_COUNT=0
 RETRY_COUNT=0
 TRANSPORT_REOPEN_COUNT=0
-NEXT_PRIMARY_BOUNDARY=D277_01_PERMISSION_AND_OBSERVABILITY_CORRECTIVE_THEN_AI_PM_REVIEW
+NEXT_PRIMARY_BOUNDARY=D277_01_CI_AND_TELEMETRY_CORRECTIVE_THEN_AI_PM_REVIEW
 NEXT_LIVE_REQUIREMENT=HOST_PERMISSION_REVIEW_PLUS_NEW_EXPLICIT_AUTHORIZATION
 ```
 
