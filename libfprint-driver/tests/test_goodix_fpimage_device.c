@@ -27,6 +27,7 @@ typedef struct
   FpiImageDeviceState   last_state;
 
   gboolean              done;
+  gboolean              timed_out;
   guint                 completion_count;
   gboolean              success;
   GError               *error;
@@ -84,6 +85,7 @@ test_timeout_cb (gpointer user_data)
   TestFixture *f = user_data;
 
   f->done = TRUE;
+  f->timed_out = TRUE;
   f->success = FALSE;
   g_main_loop_quit (f->loop);
   return G_SOURCE_REMOVE;
@@ -94,9 +96,14 @@ test_wait (TestFixture *f)
 {
   guint timeout_id;
 
+  if (f->done)
+    return;
+  f->timed_out = FALSE;
   timeout_id = g_timeout_add (TEST_TIMEOUT_MS, test_timeout_cb, f);
   g_main_loop_run (f->loop);
-  g_source_remove (timeout_id);
+  if (!f->timed_out)
+    g_source_remove (timeout_id);
+  g_assert_false (f->timed_out);
 }
 
 static void
@@ -279,7 +286,7 @@ test_non_enroll_finger_off_synchronous_deactivate (void)
   goodix_device_context_emit_finger_up_ready (f->ctx);
 
   g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
-                   GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+                   GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
   g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
 
   test_wait (f);
@@ -335,6 +342,12 @@ run_enroll_cycle (TestFixture *f,
 
   if (block_minutiae)
     {
+      gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+
+      while (!goodix_test_sigfm_extract_is_blocked () &&
+             g_get_monotonic_time () < deadline)
+        g_main_context_iteration (NULL, FALSE);
+      g_assert_true (goodix_test_sigfm_extract_is_blocked ());
       /* With minutiae still pending, re-arm must not happen yet. */
       g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (f->ctx), ==, 0);
       goodix_test_sigfm_extract_unblock ();
@@ -343,6 +356,11 @@ run_enroll_cycle (TestFixture *f,
         g_main_context_iteration (NULL, TRUE);
     }
 
+  g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (f->ctx), ==, 1);
+
+  /* Duplicate gate notifications in the same generation are idempotent. */
+  goodix_device_context_set_fresh_down_table (f->ctx, TRUE);
+  goodix_device_context_emit_release_tail_complete (f->ctx);
   g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (f->ctx), ==, 1);
 
   /* Cancel before the full five-stage enrollment proceeds further. */
@@ -603,18 +621,19 @@ test_cancellation_deactivating (void)
   goodix_device_context_emit_image_ready (f->ctx, samples,
                                           GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
 
+  goodix_device_context_set_deactivation_held (f->ctx, TRUE);
   g_cancellable_cancel (cancellable);
 
-  /* Wait until deactivation is in progress. */
-  while (goodix_device_context_get_state (f->ctx) !=
-         GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING)
-    g_main_context_iteration (NULL, TRUE);
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
 
   completion_before = f->completion_count;
 
   /* A second cancellation while deactivating must not produce a second
    * completion or any new backend command. */
   g_cancellable_cancel (cancellable);
+
+  goodix_device_context_complete_deactivation (f->ctx);
 
   test_wait (f);
   g_assert_cmpuint (f->completion_count, ==, completion_before + 1);
@@ -633,6 +652,8 @@ test_stale_callback_generation_guard (void)
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   guint commands_before;
+  guint64 old_generation;
+  g_autoptr(GCancellable) second_cancellable = g_cancellable_new ();
 
   fixture_open (f);
   fill_gradient_samples (samples);
@@ -644,7 +665,7 @@ test_stale_callback_generation_guard (void)
   goodix_device_context_emit_arm_complete (f->ctx, NULL);
   goodix_device_context_emit_finger_down (f->ctx);
 
-  guint64 old_generation = goodix_device_context_get_generation (f->ctx);
+  old_generation = goodix_device_context_get_generation (f->ctx);
   commands_before = goodix_device_context_get_backend_command_count (f->ctx);
 
   /* Complete the action, invalidating the generation. */
@@ -657,14 +678,20 @@ test_stale_callback_generation_guard (void)
   g_assert_true (f->success);
   g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
 
-  /* Events carrying the old generation must be silently ignored. */
-  goodix_device_context_emit_finger_down (f->ctx);
-  goodix_device_context_emit_image_ready (f->ctx, samples,
-                                          GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_capture (FP_DEVICE (f->device), TRUE, second_cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), !=,
+                    old_generation);
+
+  /* An N-1 callback is ignored while generation N remains active. */
+  goodix_device_context_emit_finger_down_for_generation (f->ctx,
+                                                         old_generation);
   g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
-                    ==, commands_before);
-  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
-  (void) old_generation;
+                    ==, commands_before + 1 /* second arm */);
+  g_cancellable_cancel (second_cancellable);
+  test_wait (f);
 
   fixture_close (f);
   test_fixture_free (f);

@@ -1,0 +1,19 @@
+{
+  "step": "D276/02",
+  "outcome": "BLOCKED_ENVIRONMENT_VALIDATION",
+  "wip_classification": "B",
+  "fpimage_device_real_framework_used": true,
+  "in_memory_backend_only": true,
+  "enrollment_stage_policy": "NOT_SELECTED",
+  "executable_closure": "NOT_REACHED_FLATPAK_AND_HOST_GLIB_DEVELOPMENT_FILES_UNAVAILABLE",
+  "launcher_propagates_failure": true,
+  "safety": {
+    "real_usb_access": false,
+    "real_sensor_command_count": 0,
+    "real_tls_handshake_count": 0,
+    "real_secret_materialization_count": 0,
+    "real_fprintd_mutation_count": 0,
+    "vid_pid_production_registration": false,
+    "live_authorized": false
+  }
+}

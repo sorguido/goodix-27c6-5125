@@ -1877,6 +1877,24 @@ D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no V
 poi      -> review provenance + decisione stage enrollment + baseline live separata
 ```
 
+Stato rescue D276/02 (28 agosto 2026): il WIP è classificato **B**. La shell è
+salvabile e continua a usare il vero `FpImageDevice` 1.94.5, mentre il seam di
+test ha richiesto correzioni locali: cancellazione `ACTIVATING` collegata al
+cancellable dell'azione, ownership `GError` trasferita esplicitamente,
+deactivation trattenibile dal fake, callback con token di generation, re-arm
+idempotente per generation e propagazione non-zero del launcher. La
+cancellazione dopo activation invalida la generation e lascia il context
+`POISONED`, perché la quiescenza device-side resta ignota; la normale
+deactivation conclusa non viene invece avvelenata. L'assegnazione Goodix dei
+cinque stage è rimossa: resta soltanto il default framework e
+`ENROLLMENT_STAGE_POLICY=NOT_SELECTED`.
+
+La closure eseguibile non è dichiarata: nell'ambiente di rescue mancano sia
+`flatpak` sia i development file GLib host, quindi non è stato possibile
+compilare o svolgere le due run normal/sanitizer richieste. D276/02 resta
+`BLOCKED_ENVIRONMENT_VALIDATION`, non READY, finché il launcher non passa due
+volte nell'SDK host-only previsto. Nessun accesso USB/TLS/sensore è avvenuto.
+
 Il provider TLS concreto resta una subdecisione build-time ristretta
 (OpenSSL/GnuTLS): deve offrire un server TLS 1.2 PSK in-process alimentato da
 BIO/memoria e non può introdurre helper, socket o processi esterni. La topologia,
