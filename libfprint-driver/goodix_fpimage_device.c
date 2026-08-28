@@ -46,6 +46,10 @@ struct _GoodixDeviceContext
 
   gboolean                 release_tail_complete;
   gboolean                 fresh_down_table;
+  guint64                  rearm_issued_generation;
+  gboolean                 deactivation_held;
+  gboolean                 deactivation_pending;
+  gboolean                 deactivation_nonquiescent;
 
   const GoodixBackendVTable *backend_vtable;
   gpointer                   backend_user_data;
@@ -154,7 +158,8 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
-  g_cancellable_cancel (ctx->activation_cancellable);
+  if (ctx->activation_cancellable != NULL)
+    g_cancellable_cancel (ctx->activation_cancellable);
 }
 
 static void
@@ -189,6 +194,10 @@ goodix_device_context_maybe_rearm (GoodixDeviceContext *ctx)
   if (ctx->last_framework_state != FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON)
     return;
 
+  if (ctx->rearm_issued_generation == ctx->generation)
+    return;
+
+  ctx->rearm_issued_generation = ctx->generation;
   ctx->backend_vtable->rearm (ctx, ctx->backend_user_data);
 }
 
@@ -205,7 +214,10 @@ on_activation_cancellable_cancelled (GCancellable *cancellable,
       ctx->activation_completed)
     return;
 
-  goodix_device_context_disconnect_cancel_handler (ctx);
+  /* We are executing this handler; disconnecting it here may wait for the
+   * current invocation.  Mark it consumed and let cancellable teardown own
+   * the connection. */
+  ctx->cancel_handler_id = 0;
   goodix_device_context_set_terminal_fence (ctx);
   ctx->generation = 0;
 
@@ -213,7 +225,9 @@ on_activation_cancellable_cancelled (GCancellable *cancellable,
     {
       goodix_device_context_set_state (ctx,
                                        GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
-      fpi_image_device_activate_complete (FP_IMAGE_DEVICE (ctx->device), error);
+      ctx->activation_completed = TRUE;
+      fpi_image_device_activate_complete (FP_IMAGE_DEVICE (ctx->device),
+                                          g_steal_pointer (&error));
     }
 }
 
@@ -230,7 +244,8 @@ open_complete_idle (gpointer user_data)
     {
       goodix_device_context_set_state (ctx,
                                        GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
-      fpi_image_device_open_complete (FP_IMAGE_DEVICE (self), error);
+      fpi_image_device_open_complete (FP_IMAGE_DEVICE (self),
+                                      g_steal_pointer (&error));
     }
   else
     {
@@ -290,11 +305,13 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   ctx->generation = ctx->generation_seq;
   ctx->release_tail_complete = FALSE;
   ctx->fresh_down_table = FALSE;
+  ctx->rearm_issued_generation = 0;
   ctx->terminal_fence = FALSE;
   ctx->poisoned = FALSE;
   ctx->activation_completed = FALSE;
   g_clear_object (&ctx->activation_cancellable);
-  ctx->activation_cancellable = g_cancellable_new ();
+  ctx->activation_cancellable = g_object_ref (
+    fpi_device_get_cancellable (FP_DEVICE (self)));
   ctx->cancel_handler_id =
     g_cancellable_connect (ctx->activation_cancellable,
                            G_CALLBACK (on_activation_cancellable_cancelled),
@@ -337,14 +354,15 @@ goodix_fpimage_device_deactivate (FpImageDevice *dev)
                                    GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
   ctx->backend_vtable->disarm (ctx, ctx->backend_user_data);
 
-  /* Host-side I/O is drained immediately in the fake backend. */
+  /* Host callbacks are fenced, but arbitrary device-side quiescence remains
+   * unproven.  Never advertise this cancellation path as safely inactive. */
   ctx->generation = 0;
+  ctx->deactivation_pending = TRUE;
+  ctx->deactivation_nonquiescent =
+    fpi_device_action_is_cancelled (FP_DEVICE (ctx->device));
 
-  if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_POISONED)
-    goodix_device_context_set_state (ctx,
-                                     GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
-
-  fpi_image_device_deactivate_complete (dev, NULL);
+  if (!ctx->deactivation_held)
+    goodix_device_context_complete_deactivation (ctx);
 }
 
 static void
@@ -370,7 +388,6 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   device_class->id        = "goodix_27c6_5125_host_only";
   device_class->full_name = "Goodix 27c6:5125 host-only shell";
   device_class->type      = FP_DEVICE_TYPE_VIRTUAL;
-  device_class->nr_enroll_stages = IMG_ENROLL_STAGES;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
 
   img_class->img_open     = goodix_fpimage_device_img_open;
@@ -488,6 +505,35 @@ goodix_device_context_set_fresh_down_table (GoodixDeviceContext *ctx,
 {
   g_return_if_fail (ctx != NULL);
   ctx->fresh_down_table = !!fresh;
+  goodix_device_context_maybe_rearm (ctx);
+}
+
+void
+goodix_device_context_set_deactivation_held (GoodixDeviceContext *ctx,
+                                              gboolean             held)
+{
+  g_return_if_fail (ctx != NULL);
+  ctx->deactivation_held = !!held;
+}
+
+void
+goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
+{
+  g_return_if_fail (ctx != NULL);
+  g_return_if_fail (ctx->deactivation_pending);
+  g_return_if_fail (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+
+  ctx->deactivation_pending = FALSE;
+  if (ctx->deactivation_nonquiescent)
+    {
+      ctx->poisoned = TRUE;
+      goodix_device_context_set_state (ctx,
+                                       GOODIX_DEVICE_CONTEXT_STATE_POISONED);
+    }
+  else
+    goodix_device_context_set_state (ctx,
+                                     GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+  fpi_image_device_deactivate_complete (FP_IMAGE_DEVICE (ctx->device), NULL);
 }
 
 /* --- Fake backend event injection --- */
@@ -528,7 +574,7 @@ goodix_device_context_emit_arm_complete (GoodixDeviceContext *ctx,
 
   if (error != NULL)
     {
-      emit_terminal (ctx, error);
+      emit_terminal (ctx, g_error_copy (error));
       return;
     }
 
@@ -541,9 +587,18 @@ goodix_device_context_emit_arm_complete (GoodixDeviceContext *ctx,
 void
 goodix_device_context_emit_finger_down (GoodixDeviceContext *ctx)
 {
+  goodix_device_context_emit_finger_down_for_generation (
+    ctx, ctx != NULL ? ctx->generation : 0);
+}
+
+void
+goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext *ctx,
+                                                       guint64 generation)
+{
   g_return_if_fail (ctx != NULL);
 
-  if (goodix_device_context_is_stale_or_fenced (ctx))
+  if (goodix_device_context_is_stale_or_fenced (ctx) ||
+      generation != ctx->generation)
     return;
 
   fpi_image_device_report_finger_status (FP_IMAGE_DEVICE (ctx->device), TRUE);
@@ -569,7 +624,7 @@ goodix_device_context_emit_image_ready (GoodixDeviceContext *ctx,
       g_autoptr(GError) error = NULL;
       error = g_error_new (FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
                            "Goodix fake image pipeline failed: %d", result);
-      emit_terminal (ctx, error);
+      emit_terminal (ctx, g_steal_pointer (&error));
       return;
     }
 
@@ -631,5 +686,5 @@ goodix_device_context_emit_terminal_error (GoodixDeviceContext *ctx,
   if (goodix_device_context_is_stale_or_fenced (ctx))
     return;
 
-  emit_terminal (ctx, error);
+  emit_terminal (ctx, g_error_copy (error));
 }

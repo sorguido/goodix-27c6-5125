@@ -118,9 +118,14 @@ gcc -Wl,--gc-sections \
   $glib_libs -lm -o "$build_dir/test_goodix_fpimage_device"
 
 set +e
-"$build_dir/test_goodix_fpimage_device" "$@"
+timeout --signal=TERM 30 "$build_dir/test_goodix_fpimage_device" "$@"
 normal_rc=$?
-echo "Normal build exit code: $normal_rc"
+case $normal_rc in
+  0) echo "Normal test run: PASS" ;;
+  124) echo "Normal test run: TIMEOUT" >&2 ;;
+  134) echo "Normal test run: ABORT/assertion failure" >&2 ;;
+  *) echo "Normal test run: FAIL/crash (exit $normal_rc)" >&2 ;;
+esac
 set -e
 
 echo "Running address/undefined-behavior sanitized build..."
@@ -182,8 +187,17 @@ gcc $san_common -Wl,--gc-sections \
 set +e
 ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
 UBSAN_OPTIONS=halt_on_error=1 \
-  "$build_dir/test_goodix_fpimage_device_sanitized" "$@"
+  timeout --signal=TERM 30 "$build_dir/test_goodix_fpimage_device_sanitized" "$@"
 san_rc=$?
-echo "Sanitized build exit code: $san_rc"
+case $san_rc in
+  0) echo "Sanitizer test run: PASS" ;;
+  124) echo "Sanitizer test run: TIMEOUT" >&2 ;;
+  134) echo "Sanitizer test run: ABORT/assertion failure" >&2 ;;
+  *) echo "Sanitizer test run: FAIL/crash/sanitizer finding (exit $san_rc)" >&2 ;;
+esac
 set -e
+
+if [ "$normal_rc" -ne 0 ] || [ "$san_rc" -ne 0 ]; then
+  exit 1
+fi
 ' d276-fpimage-device "$git_root" "$build_dir" "$@"

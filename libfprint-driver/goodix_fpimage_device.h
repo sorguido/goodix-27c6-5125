@@ -61,6 +61,9 @@ const gchar *goodix_in_memory_backend_get_last_command (GoodixDeviceContext *ctx
 /* --- Test-only gate controls --- */
 void goodix_device_context_set_fresh_down_table (GoodixDeviceContext *ctx,
                                                  gboolean             fresh);
+void goodix_device_context_set_deactivation_held (GoodixDeviceContext *ctx,
+                                                  gboolean             held);
+void goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx);
 
 /* --- Host-only fake backend event injection --- */
 void goodix_device_context_emit_arm_complete         (GoodixDeviceContext *ctx,
@@ -74,6 +77,8 @@ void goodix_device_context_emit_finger_up_ready      (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_cancelled            (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_terminal_error       (GoodixDeviceContext *ctx,
                                                       GError              *error);
+void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext *ctx,
+                                                            guint64 generation);
 
 G_END_DECLS
 
