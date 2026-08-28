@@ -134,7 +134,6 @@ Per default:
 
 - lavora solo sul branch corrente;
 - non fare merge, PR, rebase, cherry-pick o switch di branch;
-- non fare commit o push salvo richiesta esplicita;
 - non fare reset/stash distruttivi;
 - non cancellare modifiche preesistenti dell'Utente;
 - non retro-modificare artefatti storici per adattarli al presente;
