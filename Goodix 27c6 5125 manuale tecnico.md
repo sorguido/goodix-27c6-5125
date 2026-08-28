@@ -139,6 +139,8 @@ ENROLLMENT_STAGE_POLICY=NOT_SELECTED
 GOODIX_USB_ROUTER_IMPLEMENTED=true
 A0_B0_INCREMENTAL_PARSER=PASS_HOST_ONLY
 A0_B0_DEMUX=PASS_HOST_ONLY
+B0_SPLIT_ACROSS_RECEIVES=PASS_HOST_ONLY
+GBytes_CALLBACK_OWNERSHIP=TRANSFER_NONE_BORROWED_DURING_CALLBACK
 DELIVERY_ORDER_PRESERVED=true
 DELIVERY_EXACTLY_ONCE=true
 PHYSICAL_RECEIVE_OWNER_COUNT=1
@@ -146,7 +148,11 @@ MAX_OUTSTANDING_RECEIVES=1
 SECOND_READER_API_PATH=ABSENT
 STALE_GENERATION_CALLBACK=IGNORED
 CANCEL_TERMINAL_FENCE=PASS_HOST_ONLY
-D276_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D276_03_EXECUTABLE_CLOSURE=PENDING_GITHUB_ACTIONS
+D276_03_CORRECTIVE_RUNTIME_COMMIT=d8ddaa72835662a92db857f55551810649a2b1c5
+D276_03_GITHUB_ACTIONS_RESULT=NOT_VERIFIED_BY_EXECUTOR
+D276_02_FPIMAGE_REGRESSION_NORMAL=PASS
+D276_02_FPIMAGE_REGRESSION_SANITIZER=PASS
 NEXT_PRIMARY_BOUNDARY=D276_04_NATIVE_TLS_MEMORY_BIO_AND_ASYNC_FPI_USB_BACKEND_HOST_ONLY
 LIVE_AUTHORIZED=false
 ```
@@ -169,8 +175,7 @@ eseguita.
 D276/03 aggiunge ora `GoodixUsbRouter`, posseduto dal solo
 `GoodixDeviceContext` dell'open epoch. Il modulo LGPL transport-agnostic espone
 un solo completion point fisico, applica un parser incrementale comune
-`type + length LE16 + byte header opaco + payload`, e consegna frame owned
-`GBytes` ai consumer logici A0 o B0 exactly-once e in ordine. Il quarto byte
+`type + length LE16 + byte header opaco + payload`, e consegna ai consumer logici A0 o B0 frame `GBytes` exactly-once e in ordine con contratto borrowed/transfer-none durante la callback; il consumer deve chiamare `g_bytes_ref()` per trattenere il frame. Il quarto byte
 dell'header, i payload A0 e il record B0 restano opachi al router: ACK, IRQ2,
 IRQ0200 e NAV sono soltanto fixture sintetiche dei consumer e non introducono
 nuova semantica target-specific. Length zero, length oltre il bound host di
@@ -180,9 +185,7 @@ sottomettono altro; il cancel è esclusivamente cleanup host-side e non implica
 un comando device-side, retry, recovery, reopen o TLS restart.
 
 Il fake scheduler misura `PHYSICAL_RECEIVE_OWNER_COUNT=1` e
-`MAX_OUTSTANDING_RECEIVES=1`; una seconda submission concorrente fallisce. Gli
-otto test GLib, eseguiti normal e ASAN/UBSAN in due run deterministiche,
-coprono chunk arbitrari, concatenazione, zero byte loss/duplicate, demux misto,
+`MAX_OUTSTANDING_RECEIVES=1`; una seconda submission concorrente fallisce. I test GLib coprono anche un B0 con header — incluso il campo length LE16 — e body spezzati su più receive, senza delivery prima del completamento e con ricostruzione byte-identical. Le esecuzioni locali normal e ASAN/UBSAN restano soggette al gate correttivo; coprono inoltre chunk arbitrari, concatenazione, zero byte loss/duplicate, demux misto,
 stale generation, cancellation sincrona durante delivery e transcript
 malformati/troncati. Questo chiude soltanto il router host-only: equivalenza
 hardware, quiescenza device-side, timeout target e lifetime TLS cross-activation
@@ -1669,7 +1672,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; closure consolidata nel commit `42819c05...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
 | D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; corrective documentation-only; live false | preservata `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM`/confidence `HIGH`; release tail corretto fino a NAV prima del finger-off, post-up B0 mai consegnato a libfprint e solo re-arm `0x32` gated da `AWAIT_FINGER_ON`; reentrancy/deactivate esplicitata; `GoodixDeviceContext` owner TLS/secret ma lifetime TLS cross-activation irrisolto; cancel device-side e quiescenza production arbitraria non provati, policy conservativa `POISONED/QUIESCENCE_UNKNOWN`; reimplementazione indipendente con provenance controllata, non conclusione legale |
 | D276/02 shell `FpImageDevice` host-only | READY / PASS_HOST_ONLY; validation clean-tree GitHub Actions run 33165906857 (commit 87d4aace...); 2 run deterministiche (14/14 normal PASS, 14/14 ASAN/UBSAN PASS); live false | shell C/LGPL non registrata con backend in-memory che esercita il vero `FpImageDevice` 1.94.5; correzioni: cancellazione `ACTIVATING` collegata al cancellable dell'azione, `GError` owned ai confini, deactivation trattenibile, generation token per eventi fake, re-arm exactly-once per generation, launcher con timeout e propagazione failure; nessun USB/TLS/secret/fprintd/VID:PID usato; unresolved production/device quiescence e TLS session lifetime invariati; prossimo boundary D276/03 |
-| D276/03 router A0/B0 single-receive | READY / PASS_HOST_ONLY; 2 run locali deterministiche, 8/8 normal e 8/8 ASAN/UBSAN per run; live false | nuovo router C/LGPL transport-agnostic posseduto dall’open epoch, parser incrementale comune A0/B0, demux in-order/exactly-once con `GBytes`, un solo completion point e massimo una receive fake outstanding; malformed/truncated fail-closed, generation stale e callback post-cancel ignorate; nessun USB/TLS/secret/VID:PID; prossimo boundary D276/04 host-only |
+| D276/03 router A0/B0 single-receive | CORRECTIVE locale; GitHub Actions PENDING/NOT VERIFIED; live false | nuovo router C/LGPL transport-agnostic posseduto dall’open epoch, parser incrementale comune A0/B0, demux in-order/exactly-once con `GBytes`, un solo completion point e massimo una receive fake outstanding; malformed/truncated fail-closed, generation stale e callback post-cancel ignorate; nessun USB/TLS/secret/VID:PID; prossimo boundary D276/04 host-only |
 
 ## Fonti e confini di pubblicazione
 
@@ -1921,7 +1924,7 @@ Roadmap corrente:
 D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
-D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_HOST_ONLY
+D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CORRECTIVE_LOCAL_CI_PENDING
 D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no VID:PID
 poi      -> review provenance + decisione stage enrollment + eventuale baseline live separata
 ```

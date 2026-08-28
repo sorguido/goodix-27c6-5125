@@ -4,27 +4,29 @@
 ## Closure
 
 ```text
-OUTCOME=READY
-ADVANCEMENT=NEW_C_LGPL_SINGLE_RECEIVE_ROUTER_AND_SYNTHETIC_EXECUTION_EVIDENCE
-EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+OUTCOME=BLOCKED_GITHUB_ACTIONS_RESULT_NOT_VERIFIED
+ADVANCEMENT=D276_03_REVIEW_FINDINGS_CORRECTED_LOCALLY
+EXECUTABLE_CLOSURE=PENDING_GITHUB_ACTIONS
 RESIDUAL_BLOCKER_OR_RISK=HARDWARE_EQUIVALENCE_UNPROVEN;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;TARGET_DEVICE_TIMEOUT_UNKNOWN;ENROLLMENT_STAGE_POLICY_NOT_SELECTED
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=BASELINE_b16f5289023354adc5c0c42bed12572ab6249e85_BRANCH_work_PATHS_LISTED_BELOW
+CORRECTIVE_COMMIT=d8ddaa72835662a92db857f55551810649a2b1c5
+GITHUB_ACTIONS_RESULT=NOT_VERIFIED_BY_EXECUTOR
+REVIEW_SET=BASELINE_66f2d4354689e61b57c96bc6b039095cd91d100d_BRANCH_work_PATHS_LISTED_BELOW
 ```
 
 ## Implementazione ed evidenza
 
 Il nuovo `GoodixUsbRouter` è transport-agnostic e posseduto dal
 `GoodixDeviceContext` dell'open epoch. Esiste un solo entry point per completion
-fisica; i consumer A0/B0 ricevono `GBytes` owned in ordine. Il parser conserva i
+fisica; i consumer A0/B0 ricevono in ordine un `GBytes` borrowed/transfer-none valido durante la callback e devono chiamare `g_bytes_ref()` per trattenerlo. Il parser conserva i
 byte fra chunk, emette più frame concatenati e chiude fail-closed outer type,
 length e finalizzazione troncata impossibili. Generation e token outstanding
 separati impediscono a callback N-1 di consumare la receive di N. Cancellation
 chiude il fence, invalida la generation e non invia alcun comando.
 
-Gli otto test sintetici coprono A0 ACK, IRQ `0x0002`, IRQ `0x0200`, NAV e B0
+I test sintetici coprono A0 ACK, IRQ `0x0002`, IRQ `0x0200`, NAV e B0
 opaco solo come marker consumer-side, senza attribuire al router semantiche
-inner non canonizzate. Coprono inoltre split di header/body, concatenazione,
+inner non canonizzate. Coprono inoltre un B0 il cui header (incluso LE16 length) e body attraversano più receive, zero delivery prima del frame completo, concatenazione,
 ordering/exactly-once, cancellation durante delivery, callback stale e
 transcript malformati/troncati.
 
@@ -32,6 +34,8 @@ transcript malformati/troncati.
 GOODIX_USB_ROUTER_IMPLEMENTED=true
 A0_B0_INCREMENTAL_PARSER=PASS
 A0_B0_DEMUX=PASS
+B0_SPLIT_ACROSS_RECEIVES=PASS
+GBytes_CALLBACK_OWNERSHIP=TRANSFER_NONE_BORROWED_DURING_CALLBACK
 DELIVERY_ORDER_PRESERVED=true
 DELIVERY_EXACTLY_ONCE=true
 PHYSICAL_RECEIVE_OWNER_COUNT=1
@@ -43,6 +47,8 @@ MALFORMED_TRANSCRIPTS_FAIL_CLOSED=PASS
 NORMAL_TEST_RUN=PASS
 SANITIZER_TEST_RUN=PASS
 DETERMINISM_RUNS=2
+D276_02_FPIMAGE_REGRESSION_NORMAL=PASS
+D276_02_FPIMAGE_REGRESSION_SANITIZER=PASS
 REAL_USB_ACCESS=false
 REAL_SENSOR_COMMAND_COUNT=0
 REAL_TLS_HANDSHAKE_WITH_DEVICE_COUNT=0
@@ -57,9 +63,7 @@ LIVE_AUTHORIZED=false
 Due invocazioni separate di `libfprint-driver/tests/run_goodix_usb_router_test.sh`:
 ogni invocazione ha compilato con warning severi ed eseguito 8/8 test normali e
 8/8 test ASAN/UBSAN. È stata inoltre rieseguita la suite D276/02 integrata:
-14/14 normal e 14/14 sanitizer PASS. Nell'immagine Codex i metadata GLib-dev
-non erano preinstallati; pacchetti Ubuntu sono stati solo scaricati ed estratti
-sotto `/tmp` (nessun `sudo`, nessuna installazione) per fornire header/pkg-config.
+14/14 normal e 14/14 sanitizer PASS. Nell'immagine Codex i prerequisiti GLib-dev mancanti sono stati installati direttamente come root, senza `sudo`, prima delle esecuzioni host-only.
 
 Altri check: `git diff --check`, audit statico dell'unico simbolo completion,
 assenza di API USB/TLS/device e verifica Git di branch/diff/worktree. Il
@@ -78,7 +82,7 @@ polarity, ppmm o qualità biometrica.
 
 ## Review set
 
-Baseline: `b16f5289023354adc5c0c42bed12572ab6249e85`; branch: `work`.
+Baseline correttiva: `66f2d4354689e61b57c96bc6b039095cd91d100d`; branch effettivo: `work`. Il risultato GitHub Actions del commit correttivo resta da verificare e non è dichiarato verde.
 
 Path D276/03:
 

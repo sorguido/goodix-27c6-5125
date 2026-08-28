@@ -9,6 +9,10 @@ G_BEGIN_DECLS
 #define GOODIX_USB_ROUTER_MAX_PAYLOAD (32768u)
 
 typedef struct _GoodixUsbRouter GoodixUsbRouter;
+/*
+ * @frame is borrowed (transfer-none) for the duration of the callback.
+ * The consumer must call g_bytes_ref() if it needs to retain the frame.
+ */
 typedef void (*GoodixUsbRouterFrameFunc) (guint8       outer_type,
                                           GBytes      *frame,
                                           gpointer     user_data);
