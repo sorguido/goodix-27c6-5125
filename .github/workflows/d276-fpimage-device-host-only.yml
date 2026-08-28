@@ -2,14 +2,6 @@ name: D276 FpImageDevice host-only validation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - d276-02-github-actions-validation
-    paths:
-      - .github/workflows/d276-fpimage-device-host-only.yml
-      - .github/d276_fpimage_device_diagnostic_patch.py
-      - libfprint-driver/**
-      - Rockytkg/libfprint/**
 
 permissions:
   contents: read
