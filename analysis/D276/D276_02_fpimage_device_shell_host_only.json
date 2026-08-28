@@ -108,8 +108,8 @@
     "no_base64_created": true
   },
   "verification": {
-    "json_parse": "PASS",
-    "git_diff_check": "PASS",
+    "json_parse": "TO_BE_RECHECKED_AFTER_DOCUMENTATION_CLOSURE",
+    "git_diff_check": "TO_BE_RECHECKED_AFTER_DOCUMENTATION_CLOSURE",
     "real_hardware_tests": "NOT_RUN_PROHIBITED",
     "host_only_code_tests": "PASS_CLEAN_TREE_GITHUB_ACTIONS_RUN_33165906857"
   }
