@@ -59,25 +59,39 @@ jobs:
           echo "REAL_USB_ACCESS=false"
           echo "LIVE_AUTHORIZED=false"
 
-      - name: Diagnostic - do not self-cancel framework action on normal fence
+      - name: Diagnostic - apply two ownership/cancellation hypotheses in worktree only
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('libfprint-driver/goodix_fpimage_device.c')
           s = p.read_text()
-          old = '''  ctx->terminal_fence = TRUE;
+
+          old_cancel = '''  ctx->terminal_fence = TRUE;
             if (ctx->activation_cancellable != NULL)
               g_cancellable_cancel (ctx->activation_cancellable);
           '''
-          new = '''  ctx->terminal_fence = TRUE;
+          new_cancel = '''  ctx->terminal_fence = TRUE;
           '''
-          if s.count(old) != 1:
+          if s.count(old_cancel) != 1:
               raise SystemExit('FAIL_CLOSED: expected terminal-fence cancellable block not found exactly once')
-          p.write_text(s.replace(old, new, 1))
+          s = s.replace(old_cancel, new_cancel, 1)
+
+          old_image = '''  /* fpi_image_device_image_captured() takes its own reference as needed. */
+            fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device), image);
+          '''
+          new_image = '''  /* Transfer an independent reference to FpImageDevice; the pipeline keeps its own. */
+            fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
+                                             g_object_ref (image));
+          '''
+          if s.count(old_image) != 1:
+              raise SystemExit('FAIL_CLOSED: expected image handoff block not found exactly once')
+          s = s.replace(old_image, new_image, 1)
+
+          p.write_text(s)
           PY
           git diff --check
           git diff -- libfprint-driver/goodix_fpimage_device.c
-          echo "CI_DIAGNOSTIC_PATCH=REMOVE_DRIVER_INITIATED_ACTION_CANCELLATION"
+          echo "CI_DIAGNOSTIC_PATCH=NO_DRIVER_SELF_CANCEL_PLUS_EXPLICIT_FPIMAGE_TRANSFER_REF"
 
       - name: Run D276/02 launcher twice
         shell: bash
@@ -89,4 +103,4 @@ jobs:
             timeout --signal=TERM 180 sh libfprint-driver/tests/run_goodix_fpimage_device_test.sh
           done
           echo "DETERMINISM_RUNS=2"
-          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_DIAGNOSTIC_PATCH"
+          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_DIAGNOSTIC_PATCHES"
