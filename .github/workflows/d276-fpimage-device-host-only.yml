@@ -60,15 +60,104 @@ jobs:
 
           p = Path('libfprint-driver/goodix_fpimage_device.c')
           s = p.read_text()
-          old_cancel = '''  ctx->terminal_fence = TRUE;
+
+          old_fence = '''static void
+          goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
+          {
+            ctx->terminal_fence = TRUE;
             if (ctx->activation_cancellable != NULL)
               g_cancellable_cancel (ctx->activation_cancellable);
+          }
           '''
-          new_cancel = '''  ctx->terminal_fence = TRUE;
+          new_fence = '''static void
+          goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
+          {
+            ctx->terminal_fence = TRUE;
+          }
           '''
-          if s.count(old_cancel) != 1:
-              raise SystemExit('FAIL_CLOSED: terminal-fence cancellable block count mismatch')
-          s = s.replace(old_cancel, new_cancel, 1)
+          if s.count(old_fence) != 1:
+              raise SystemExit('FAIL_CLOSED: terminal-fence block count mismatch')
+          s = s.replace(old_fence, new_fence, 1)
+
+          old_handler = '''static void
+          on_activation_cancellable_cancelled (GCancellable *cancellable,
+                                               gpointer      user_data)
+          {
+            GoodixDeviceContext *ctx = user_data;
+            g_autoptr(GError) error = NULL;
+
+            if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
+                ctx->activation_completed)
+              return;
+
+            /* We are executing this handler; disconnecting it here may wait for the
+             * current invocation.  Mark it consumed and let cancellable teardown own
+             * the connection. */
+            ctx->cancel_handler_id = 0;
+            goodix_device_context_set_terminal_fence (ctx);
+            ctx->generation = 0;
+
+            if (g_cancellable_set_error_if_cancelled (cancellable, &error))
+              {
+                goodix_device_context_set_state (ctx,
+                                                 GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+                ctx->activation_completed = TRUE;
+                fpi_image_device_activate_complete (FP_IMAGE_DEVICE (ctx->device),
+                                                    g_steal_pointer (&error));
+              }
+          }
+          '''
+          new_handler = '''static gboolean
+          complete_activation_cancel_idle (gpointer user_data)
+          {
+            GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (user_data);
+            GoodixDeviceContext *ctx = self->ctx;
+            g_autoptr(GError) error = NULL;
+
+            if (ctx == NULL ||
+                ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
+                !ctx->activation_completed ||
+                ctx->activation_cancellable == NULL)
+              return G_SOURCE_REMOVE;
+
+            if (g_cancellable_set_error_if_cancelled (ctx->activation_cancellable,
+                                                       &error))
+              fpi_image_device_activate_complete (FP_IMAGE_DEVICE (self),
+                                                  g_steal_pointer (&error));
+
+            return G_SOURCE_REMOVE;
+          }
+
+          static void
+          on_activation_cancellable_cancelled (GCancellable *cancellable,
+                                               gpointer      user_data)
+          {
+            GoodixDeviceContext *ctx = user_data;
+
+            if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
+                ctx->activation_completed)
+              return;
+
+            /* Do not complete the libfprint action from inside the cancellable
+             * dispatch.  clear_device_cancel_action() disconnects both the internal
+             * and external cancellables; doing that synchronously here can deadlock
+             * against the still-running external cancellation callback. */
+            ctx->cancel_handler_id = 0;
+            goodix_device_context_set_terminal_fence (ctx);
+            ctx->generation = 0;
+            goodix_device_context_set_state (ctx,
+                                             GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+            ctx->activation_completed = TRUE;
+
+            g_idle_add_full (G_PRIORITY_DEFAULT,
+                             complete_activation_cancel_idle,
+                             g_object_ref (ctx->device),
+                             g_object_unref);
+          }
+          '''
+          if s.count(old_handler) != 1:
+              raise SystemExit('FAIL_CLOSED: activation-cancel handler count mismatch')
+          s = s.replace(old_handler, new_handler, 1)
 
           old_image = '''  /* fpi_image_device_image_captured() takes its own reference as needed. */
             fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device), image);
@@ -79,7 +168,8 @@ jobs:
           '''
           if s.count(old_image) != 1:
               raise SystemExit('FAIL_CLOSED: image handoff block count mismatch')
-          p.write_text(s.replace(old_image, new_image, 1))
+          s = s.replace(old_image, new_image, 1)
+          p.write_text(s)
 
           t = Path('libfprint-driver/tests/test_goodix_fpimage_device.c')
           s = t.read_text()
@@ -91,7 +181,7 @@ jobs:
           PY
           git diff --check
           git diff -- libfprint-driver/goodix_fpimage_device.c libfprint-driver/tests/test_goodix_fpimage_device.c
-          echo "CI_DIAGNOSTIC_PATCH=NO_SELF_CANCEL_PLUS_FPIMAGE_REF_PLUS_FLOATING_FPPRINT_TRANSFER"
+          echo "CI_DIAGNOSTIC_PATCH=DEFER_ACTIVATION_CANCEL_PLUS_OWNERSHIP_FIXES"
 
       - name: Run D276/02 launcher twice
         shell: bash
