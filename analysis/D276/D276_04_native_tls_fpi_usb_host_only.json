@@ -1,0 +1,22 @@
+{
+  "step": "D276/04",
+  "outcome": "READY",
+  "native_tls_provider": "OPENSSL",
+  "tls_1_2_psk_handshake_synthetic": "PASS",
+  "secret_handoff_count": 1,
+  "secret_zeroized_on_tls_teardown": true,
+  "fpi_usb_backend_compiled": true,
+  "real_usb_transfer_submit_count": 0,
+  "max_outstanding_bulk_in": 1,
+  "second_reader_api_path": "ABSENT",
+  "d276_02_fpimage_regression": "PASS",
+  "d276_03_usb_router_regression": "PASS",
+  "normal_test_run": "PASS",
+  "sanitizer_test_run": "PASS",
+  "determinism_runs": 2,
+  "local_executable_closure": "PASS_HOST_ONLY",
+  "github_actions_confirmation": "PENDING_AI_PM_NON_GATING",
+  "real_usb_access": false,
+  "live_authorized": false,
+  "next_primary_boundary": "AI_PM_REVIEW_AFTER_D276_04"
+}
