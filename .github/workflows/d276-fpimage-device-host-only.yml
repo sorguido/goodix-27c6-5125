@@ -25,14 +25,8 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates \
-            git \
-            build-essential \
-            pkg-config \
-            libglib2.0-dev \
-            python3 \
-            binutils \
-            coreutils
+            ca-certificates git build-essential pkg-config libglib2.0-dev \
+            python3 binutils coreutils
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -59,13 +53,13 @@ jobs:
           echo "REAL_USB_ACCESS=false"
           echo "LIVE_AUTHORIZED=false"
 
-      - name: Diagnostic - apply two ownership/cancellation hypotheses in worktree only
+      - name: Diagnostic - apply bounded ownership and cancellation fixes in worktree only
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p = Path('libfprint-driver/goodix_fpimage_device.c')
           s = p.read_text()
-
           old_cancel = '''  ctx->terminal_fence = TRUE;
             if (ctx->activation_cancellable != NULL)
               g_cancellable_cancel (ctx->activation_cancellable);
@@ -73,7 +67,7 @@ jobs:
           new_cancel = '''  ctx->terminal_fence = TRUE;
           '''
           if s.count(old_cancel) != 1:
-              raise SystemExit('FAIL_CLOSED: expected terminal-fence cancellable block not found exactly once')
+              raise SystemExit('FAIL_CLOSED: terminal-fence cancellable block count mismatch')
           s = s.replace(old_cancel, new_cancel, 1)
 
           old_image = '''  /* fpi_image_device_image_captured() takes its own reference as needed. */
@@ -84,14 +78,20 @@ jobs:
                                              g_object_ref (image));
           '''
           if s.count(old_image) != 1:
-              raise SystemExit('FAIL_CLOSED: expected image handoff block not found exactly once')
-          s = s.replace(old_image, new_image, 1)
+              raise SystemExit('FAIL_CLOSED: image handoff block count mismatch')
+          p.write_text(s.replace(old_image, new_image, 1))
 
-          p.write_text(s)
+          t = Path('libfprint-driver/tests/test_goodix_fpimage_device.c')
+          s = t.read_text()
+          old_enroll = 'fp_device_enroll (FP_DEVICE (f->device), template, cancellable,'
+          new_enroll = 'fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), cancellable,'
+          if s.count(old_enroll) != 2:
+              raise SystemExit(f'FAIL_CLOSED: expected 2 floating-template handoffs, found {s.count(old_enroll)}')
+          t.write_text(s.replace(old_enroll, new_enroll))
           PY
           git diff --check
-          git diff -- libfprint-driver/goodix_fpimage_device.c
-          echo "CI_DIAGNOSTIC_PATCH=NO_DRIVER_SELF_CANCEL_PLUS_EXPLICIT_FPIMAGE_TRANSFER_REF"
+          git diff -- libfprint-driver/goodix_fpimage_device.c libfprint-driver/tests/test_goodix_fpimage_device.c
+          echo "CI_DIAGNOSTIC_PATCH=NO_SELF_CANCEL_PLUS_FPIMAGE_REF_PLUS_FLOATING_FPPRINT_TRANSFER"
 
       - name: Run D276/02 launcher twice
         shell: bash
