@@ -59,6 +59,26 @@ jobs:
           echo "REAL_USB_ACCESS=false"
           echo "LIVE_AUTHORIZED=false"
 
+      - name: Diagnostic - do not self-cancel framework action on normal fence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('libfprint-driver/goodix_fpimage_device.c')
+          s = p.read_text()
+          old = '''  ctx->terminal_fence = TRUE;
+            if (ctx->activation_cancellable != NULL)
+              g_cancellable_cancel (ctx->activation_cancellable);
+          '''
+          new = '''  ctx->terminal_fence = TRUE;
+          '''
+          if s.count(old) != 1:
+              raise SystemExit('FAIL_CLOSED: expected terminal-fence cancellable block not found exactly once')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git diff --check
+          git diff -- libfprint-driver/goodix_fpimage_device.c
+          echo "CI_DIAGNOSTIC_PATCH=REMOVE_DRIVER_INITIATED_ACTION_CANCELLATION"
+
       - name: Run D276/02 launcher twice
         shell: bash
         run: |
@@ -69,4 +89,4 @@ jobs:
             timeout --signal=TERM 180 sh libfprint-driver/tests/run_goodix_fpimage_device_test.sh
           done
           echo "DETERMINISM_RUNS=2"
-          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS"
+          echo "D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_DIAGNOSTIC_PATCH"
