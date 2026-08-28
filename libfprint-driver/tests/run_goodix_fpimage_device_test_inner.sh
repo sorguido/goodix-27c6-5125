@@ -13,8 +13,8 @@ shift 2
 local_fp_dir="$git_root/Rockytkg/libfprint/libfprint"
 test_dir="$git_root/libfprint-driver/tests"
 
-glib_cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0)
-glib_libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0)
+glib_cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 openssl)
+glib_libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 openssl)
 includes="-I$test_dir/support -I$git_root/libfprint-driver -I$git_root/Rockytkg/libfprint -I$local_fp_dir -I$local_fp_dir/nbis/include -I$local_fp_dir/nbis/libfprint-include -I$build_dir"
 strict_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
@@ -65,6 +65,9 @@ gcc $strict_flags $glib_cflags $includes -c \
 gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_device.c" \
   -o "$build_dir/goodix_fpimage_device.o"
+gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_tls_server.c" -o "$build_dir/goodix_tls_server.o"
+gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_fpi_usb_backend.c" -o "$build_dir/goodix_fpi_usb_backend.o"
+gcc $local_flags $glib_cflags $includes -c "$test_dir/support/fpi_usb_transfer_compile_stub.c" -o "$build_dir/fpi_usb_transfer_compile_stub.o"
 gcc $strict_flags $glib_cflags $includes -c \
   "$test_dir/test_goodix_fpimage_device.c" \
   -o "$build_dir/test_goodix_fpimage_device.o"
@@ -100,6 +103,9 @@ gcc -Wl,--gc-sections \
   "$build_dir/goodix_fpimage_pipeline.o" \
   "$build_dir/goodix_usb_router.o" \
   "$build_dir/goodix_fpimage_device.o" \
+  "$build_dir/goodix_tls_server.o" \
+  "$build_dir/goodix_fpi_usb_backend.o" \
+  "$build_dir/fpi_usb_transfer_compile_stub.o" \
   "$build_dir/test_goodix_fpimage_device.o" \
   "$build_dir/gusb_stub.o" \
   "$build_dir/fpimage_link_stubs.o" \
@@ -147,6 +153,9 @@ gcc $san_strict_flags $glib_cflags $includes -c \
 gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_device.c" \
   -o "$build_dir/goodix_fpimage_device_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_tls_server.c" -o "$build_dir/goodix_tls_server_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_fpi_usb_backend.c" -o "$build_dir/goodix_fpi_usb_backend_san.o"
+gcc $san_local_flags $glib_cflags $includes -c "$test_dir/support/fpi_usb_transfer_compile_stub.c" -o "$build_dir/fpi_usb_transfer_compile_stub_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
   "$test_dir/test_goodix_fpimage_device.c" \
   -o "$build_dir/test_goodix_fpimage_device_san.o"
@@ -171,6 +180,9 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/goodix_fpimage_pipeline_san.o" \
   "$build_dir/goodix_usb_router_san.o" \
   "$build_dir/goodix_fpimage_device_san.o" \
+  "$build_dir/goodix_tls_server_san.o" \
+  "$build_dir/goodix_fpi_usb_backend_san.o" \
+  "$build_dir/fpi_usb_transfer_compile_stub_san.o" \
   "$build_dir/test_goodix_fpimage_device_san.o" \
   "$build_dir/gusb_stub_san.o" \
   "$build_dir/fpimage_link_stubs_san.o" \
