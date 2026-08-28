@@ -141,3 +141,9 @@ pending-token generation per `FpiUsbTransfer`. Le fonti restano esclusivamente
 i fatti canonici D242/D276, le API pubbliche OpenSSL 3 e gli header LGPL
 libfprint 1.94.5. Non è stato consultato o trasferito codice GPL. `libgusb-dev`
 serve soltanto al compile/API-shape probe host-only; nessun device viene aperto.
+
+Il corrective post-merge D276/04 modifica soltanto questa espressione LGPL
+indipendente: rende esplicito il token generation fornito dal context e aggiunge
+fixture A0 sintetiche multi-activation. Non sono stati consultati, copiati o
+tradotti `core/`, Rockytkg o implementazioni esterne; le fixture non contengono
+secret reali né dati biometrici reali.

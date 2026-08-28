@@ -13,7 +13,7 @@ jobs:
       - name: Install Git and host-only build prerequisites before checkout
         run: |
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git build-essential pkg-config libglib2.0-dev libssl-dev libgusb-dev python3 binutils coreutils ripgrep
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git ca-certificates build-essential pkg-config libglib2.0-dev libssl-dev libgusb-dev python3 binutils coreutils ripgrep
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2

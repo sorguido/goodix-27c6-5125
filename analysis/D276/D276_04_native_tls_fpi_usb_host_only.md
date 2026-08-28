@@ -50,3 +50,28 @@ Restano invariati tutti i boundary irrisolti: lifetime TLS cross-activation,
 quiescenza device dopo cancel arbitrario, timeout, stage enrollment,
 orientation, polarity, ppmm ed equivalenza hardware. Nessun live è autorizzato.
 `NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AFTER_D276_04`.
+
+## Corrective closure post-merge — generation authority e CI
+
+Il correttivo rende `GoodixDeviceContext` l'unica autorità della generation di
+activation. Il context incrementa il proprio token non-zero e lo passa
+esplicitamente sia al router sia al backend: il router non genera più epoch e
+`goodix_usb_router_cancel()` chiude receive/pending/fence senza mutare il token.
+La cancellazione context-side è strutturalmente unica: il terminal fence
+cancella TLS e backend, mentre il backend cancella il router una sola volta e in
+modo idempotente. Anche gli errori B0/TLS OUT usano lo stesso terminal fence.
+
+La regressione host-only integrata `FpImageDevice` copre activation N con receive
+armata, teardown, activation N+1 con una nuova receive, callback tardiva N e
+callback corrente N+1. Prova che le generation differiscono, la callback N è
+ignorata senza consumare il token N+1, la callback N+1 viene consegnata e il
+massimo di receive logiche outstanding resta uno. La regressione router prova
+inoltre cancel ripetuto, assenza di mutazione nascosta della generation e
+stale/current completion dopo riattivazione, usando soltanto A0 sintetico.
+
+I workflow installano ora `ca-certificates` prima di checkout per D276/04 e
+`libssl-dev`/`libgusb-dev` nel regression environment D276/03. Le prove locali
+normal e ASAN/UBSAN sono host-only; nessun submit USB reale è raggiunto. Le
+GitHub Actions del corrective non sono verificabili dall'executor:
+`GITHUB_ACTIONS_CONFIRMATION=NOT_VERIFIED_BY_EXECUTOR` e
+`EXECUTABLE_CLOSURE=PENDING_AI_PM_GITHUB_VERIFICATION`.

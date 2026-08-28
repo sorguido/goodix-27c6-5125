@@ -77,6 +77,10 @@ struct _GoodixFpImageDevice
 
 G_DEFINE_TYPE (GoodixFpImageDevice, goodix_fpimage_device, FP_TYPE_IMAGE_DEVICE)
 
+static void goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx);
+static void goodix_device_context_set_poisoned (GoodixDeviceContext *ctx,
+                                                const GError        *error);
+
 GoodixUsbRouter *
 goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
 {
@@ -95,7 +99,7 @@ static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
   if(type!=0xb0||ctx->terminal_fence||!ctx->tls_server)return;
   p=g_bytes_get_data(frame,&n);
   if(n<=4||!goodix_tls_server_push(ctx->tls_server,p+4,n-4,&error))
-    { ctx->terminal_fence=TRUE; ctx->poisoned=TRUE; goodix_usb_router_cancel(ctx->usb_router); goodix_fpi_usb_backend_cancel(ctx->fpi_usb_backend); }
+    { goodix_device_context_set_terminal_fence(ctx); goodix_device_context_set_poisoned(ctx,error); }
 }
 static void context_tls_output (GBytes *record, gpointer user_data)
 {
@@ -103,7 +107,7 @@ static void context_tls_output (GBytes *record, gpointer user_data)
   if(ctx->terminal_fence||n>G_MAXUINT16)return;
   h[0]=0xb0;h[1]=(guint8)n;h[2]=(guint8)(n>>8);h[3]=(guint8)(h[0]+h[1]+h[2]);
   frame=g_byte_array_sized_new((guint)n+4);g_byte_array_append(frame,h,4);g_byte_array_append(frame,p,(guint)n);bytes=g_byte_array_free_to_bytes(g_steal_pointer(&frame));
-  if(!goodix_fpi_usb_backend_submit_out(ctx->fpi_usb_backend,ctx->generation,bytes,&error)){ctx->terminal_fence=TRUE;ctx->poisoned=TRUE;goodix_tls_server_cancel(ctx->tls_server);}
+  if(!goodix_fpi_usb_backend_submit_out(ctx->fpi_usb_backend,ctx->generation,bytes,&error)){goodix_device_context_set_terminal_fence(ctx);goodix_device_context_set_poisoned(ctx,error);}
 }
 static void context_tls_plaintext (GBytes *bytes, gpointer user_data)
 { GoodixDeviceContext *ctx=user_data; if(!ctx->terminal_fence&&ctx->tls_plaintext)ctx->tls_plaintext(bytes,ctx->tls_user_data); }
@@ -206,7 +210,6 @@ goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
   ctx->terminal_fence = TRUE;
   goodix_tls_server_cancel (ctx->tls_server);
   goodix_fpi_usb_backend_cancel (ctx->fpi_usb_backend);
-  goodix_usb_router_cancel (ctx->usb_router);
 }
 
 static void
@@ -372,7 +375,7 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;
   ctx->generation = ctx->generation_seq;
-  goodix_usb_router_begin_generation (ctx->usb_router);
+  goodix_usb_router_begin_generation (ctx->usb_router, ctx->generation);
   ctx->release_tail_complete = FALSE;
   ctx->fresh_down_table = FALSE;
   ctx->rearm_issued_generation = 0;

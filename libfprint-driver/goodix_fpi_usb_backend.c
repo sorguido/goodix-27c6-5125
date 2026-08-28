@@ -91,7 +91,7 @@ void goodix_fpi_usb_backend_complete_receive (GoodixFpiUsbBackend *b, guint64 su
   goodix_usb_router_receive_complete (b->router, submit_generation, data, length, error);
 }
 void goodix_fpi_usb_backend_cancel (GoodixFpiUsbBackend *b)
-{ if (!b || b->terminal_fence) return; b->terminal_fence=TRUE; if (b->cancellable && (b->in_outstanding || b->out_outstanding)) g_cancellable_cancel (b->cancellable); goodix_usb_router_cancel (b->router); }
+{ if (!b || b->terminal_fence) return; b->terminal_fence=TRUE; if (!b->seam && b->cancellable && (b->in_outstanding || b->out_outstanding)) g_cancellable_cancel (b->cancellable); b->in_outstanding=0; goodix_usb_router_cancel (b->router); }
 gboolean goodix_fpi_usb_backend_is_drained (GoodixFpiUsbBackend *b) { return b && b->in_outstanding == 0 && b->out_outstanding == 0; }
 guint goodix_fpi_usb_backend_get_outstanding (GoodixFpiUsbBackend *b) { return b->in_outstanding; }
 guint goodix_fpi_usb_backend_get_max_outstanding (GoodixFpiUsbBackend *b) { return b->max_outstanding; }

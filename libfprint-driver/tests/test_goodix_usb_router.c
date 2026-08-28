@@ -73,7 +73,8 @@ test_incremental_and_concatenated (void)
   guint64 generation;
 
   recorder_init (&r);
-  generation = goodix_usb_router_begin_generation (r.router);
+  generation = 1;
+  goodix_usb_router_begin_generation (r.router, generation);
   /* Both headers and both bodies cross arbitrary receive boundaries. */
   feed (&r, generation, a, 1);
   feed (&r, generation, a + 1, 2);
@@ -113,7 +114,8 @@ test_synthetic_demux_order (void)
   guint64 generation;
 
   recorder_init (&r);
-  generation = goodix_usb_router_begin_generation (r.router);
+  generation = 1;
+  goodix_usb_router_begin_generation (r.router, generation);
   for (guint i = 0; i < G_N_ELEMENTS (types); i++)
     {
       g_autoptr(GBytes) frame = make_frame (types[i], markers[i], i + 1);
@@ -141,7 +143,7 @@ test_single_reader_contract (void)
   Recorder r = { 0 };
   g_autoptr(GError) error = NULL;
   recorder_init (&r);
-  goodix_usb_router_begin_generation (r.router);
+  goodix_usb_router_begin_generation (r.router, 1);
   g_assert_true (goodix_usb_router_request_receive (r.router, &error));
   g_assert_false (goodix_usb_router_request_receive (r.router, &error));
   g_assert_error (error, g_quark_from_static_string ("goodix-usb-router-error"), 2);
@@ -162,8 +164,15 @@ test_stale_generation (void)
   g_autoptr(GError) error = NULL;
 
   recorder_init (&r);
-  old_generation = goodix_usb_router_begin_generation (r.router);
-  generation = goodix_usb_router_begin_generation (r.router);
+  old_generation = 41;
+  goodix_usb_router_begin_generation (r.router, old_generation);
+  g_assert_true (goodix_usb_router_request_receive (r.router, &error));
+  goodix_usb_router_cancel (r.router);
+  goodix_usb_router_cancel (r.router);
+  g_assert_cmpuint (goodix_usb_router_get_generation (r.router), ==,
+                    old_generation);
+  generation = 42;
+  goodix_usb_router_begin_generation (r.router, generation);
   g_assert_true (goodix_usb_router_request_receive (r.router, &error));
   goodix_usb_router_receive_complete (r.router, old_generation, data, length, NULL);
   g_assert_cmpuint (r.frames->len, ==, 0);
@@ -184,7 +193,8 @@ test_cancel_and_callback_fence (void)
   g_autoptr(GError) error = NULL;
 
   recorder_init (&r);
-  generation = goodix_usb_router_begin_generation (r.router);
+  generation = 1;
+  goodix_usb_router_begin_generation (r.router, generation);
   g_assert_true (goodix_usb_router_request_receive (r.router, &error));
   goodix_usb_router_cancel (r.router);
   goodix_usb_router_receive_complete (r.router, generation, data, length, NULL);
@@ -212,7 +222,8 @@ test_consumer_cancel_stops_coalesced_delivery (void)
   g_byte_array_append (all, data, (guint) length);
   data = g_bytes_get_data (second, &length);
   g_byte_array_append (all, data, (guint) length);
-  feed (&r, goodix_usb_router_begin_generation (r.router), all->data, all->len);
+  goodix_usb_router_begin_generation (r.router, 1);
+  feed (&r, 1, all->data, all->len);
   g_assert_cmpuint (r.frames->len, ==, 1);
   recorder_clear (&r);
 }
@@ -223,7 +234,8 @@ assert_terminal_for (const guint8 *bytes, gsize length)
   Recorder r = { 0 };
   guint64 generation;
   recorder_init (&r);
-  generation = goodix_usb_router_begin_generation (r.router);
+  generation = 1;
+  goodix_usb_router_begin_generation (r.router, generation);
   feed (&r, generation, bytes, length);
   g_assert_true (goodix_usb_router_get_terminal_fence (r.router));
   g_assert_nonnull (goodix_usb_router_get_terminal_error (r.router));
@@ -249,8 +261,8 @@ test_truncated_finalize (void)
   Recorder r = { 0 };
   g_autoptr(GError) error = NULL;
   recorder_init (&r);
-  feed (&r, goodix_usb_router_begin_generation (r.router),
-        partial, sizeof partial);
+  goodix_usb_router_begin_generation (r.router, 1);
+  feed (&r, 1, partial, sizeof partial);
   g_assert_false (goodix_usb_router_finalize (r.router, &error));
   g_assert_nonnull (error);
   g_assert_true (goodix_usb_router_get_terminal_fence (r.router));

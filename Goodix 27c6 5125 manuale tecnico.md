@@ -1981,7 +1981,7 @@ D276/01 -> architettura production e ownership CLOSED_OFFLINE
 D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
          -> executable validation GitHub Actions PASS_CLEAN_TREE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici CLOSED_PASS_HOST_ONLY
-D276/04 -> context-owned B0→TLS application-data + TLS OUT + generation-captured FpiUsbTransfer CLOSED_PASS_HOST_ONLY
+D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; corrective generation authority context-only CLOSED_HOST_ONLY, CI corrective pending AI-PM
 review   -> AI-PM decide integrazione, policy/lifetime, provenance o futura baseline live
 ```
 
@@ -2031,6 +2031,24 @@ Flatpak/GLib-dev nell'ambiente di rescue è una condizione storica superata.
 Un'eventuale conferma Fedora futura è `OPTIONAL_NON_GATING` e non costituisce un
 gate retroattivo. Nessun sensore Goodix reale, USB, TLS reale, PSK, fprintd,
 registrazione VID production o mutazione persistente è stato usato.
+
+Il corrective post-merge D276/04 stabilisce inoltre
+`GENERATION_AUTHORITY=GOODIX_DEVICE_CONTEXT_SINGLE_SOURCE`: a ogni activation il
+context crea un token non-zero e lo fornisce esplicitamente a router e backend.
+Il router non mantiene un contatore concorrente; `cancel()` chiude fence,
+receive e parser pending senza mutare il token. Il terminal fence del context
+cancella TLS e backend, e soltanto il backend cancella il router, eliminando il
+doppio cancel. Una regressione integrata host-only attraversa activation N,
+teardown, activation N+1, callback tardiva N e callback valida N+1: la stale è
+ignorata senza consumare la receive corrente e N+1 viene consegnata, con massimo
+una receive logica outstanding. Il test router copre anche due cancel
+consecutivi senza mutazione generation. I workflow corretti aggiungono
+`ca-certificates` pre-checkout a D276/04 e `libssl-dev`/`libgusb-dev` alla
+regressione D276/03. Le Actions del corrective restano
+`NOT_VERIFIED_BY_EXECUTOR`, quindi la closure eseguibile finale è
+`PENDING_AI_PM_GITHUB_VERIFICATION` nonostante i test locali host-only. Restano
+irrisolte la quiescenza reale dopo cancel arbitrario e la lifetime TLS tra
+activation; il test non prova equivalenza hardware.
 
 D276/04 ha chiuso la subdecisione provider su **OpenSSL 3**: il supporto server
 TLS 1.2 pure-PSK, BIO di memoria, callback PSK e cleanup esplicito soddisfa il
@@ -7032,7 +7050,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D276/03: la shell `FpImageDevice` non registrata
+Stato corrente post-corrective D276/04: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa

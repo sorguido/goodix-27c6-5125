@@ -6,6 +6,8 @@
  * state machine through public async actions, with an in-memory fake backend.
  */
 #include "../goodix_fpimage_device.h"
+#include "../goodix_fpi_usb_backend.h"
+#include "../goodix_usb_router.h"
 #include "../goodix_u16_to_fpimage.h"
 
 #include "test_sigfm_control.h"
@@ -35,6 +37,20 @@ typedef struct
   FpPrint              *enroll_print;
   guint                 enroll_progress_count;
 } TestFixture;
+
+static void
+host_only_usb_submit (GoodixFpiUsbBackend *backend,
+                      GoodixUsbDirection   direction,
+                      guint64              generation,
+                      GBytes              *bytes,
+                      gpointer             user_data)
+{
+  (void) backend;
+  (void) direction;
+  (void) generation;
+  (void) bytes;
+  (void) user_data;
+}
 
 static void
 state_changed_cb (FpImageDevice      *dev,
@@ -661,6 +677,9 @@ test_stale_callback_generation_guard (void)
   guint commands_before;
   guint64 old_generation;
   g_autoptr(GCancellable) second_cancellable = g_cancellable_new ();
+  GoodixFpiUsbBackend *usb_backend;
+  GoodixUsbRouter *router;
+  const guint8 synthetic_a0[] = { 0xa0, 0x01, 0x00, 0xa1, 0x01 };
 
   fixture_open (f);
   fill_gradient_samples (samples);
@@ -673,6 +692,10 @@ test_stale_callback_generation_guard (void)
   goodix_device_context_emit_finger_down (f->ctx);
 
   old_generation = goodix_device_context_get_generation (f->ctx);
+  usb_backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
+  router = goodix_device_context_get_usb_router (f->ctx);
+  goodix_device_context_set_usb_submit_seam (f->ctx, host_only_usb_submit, NULL);
+  g_assert_true (goodix_device_context_arm_receive (f->ctx, NULL));
 
   /* Complete the action, invalidating the generation. */
   goodix_device_context_emit_image_ready (f->ctx, samples,
@@ -688,8 +711,24 @@ test_stale_callback_generation_guard (void)
   f->completion_count = 0;
   fp_device_capture (FP_DEVICE (f->device), TRUE, second_cancellable,
                      (GAsyncReadyCallback) capture_cb, f);
-  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), !=,
-                    old_generation);
+  guint64 current_generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpuint (current_generation, !=, old_generation);
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+  g_assert_true (goodix_device_context_arm_receive (f->ctx, NULL));
+
+  /* The late N callback is routed through the integrated context/backend
+   * seam and cannot consume the N+1 router token. */
+  goodix_device_context_complete_receive (f->ctx, old_generation,
+                                           synthetic_a0,
+                                           sizeof synthetic_a0, NULL);
+  g_assert_cmpuint (goodix_usb_router_get_outstanding (router), ==, 1);
+  g_assert_cmpuint (goodix_usb_router_get_delivery_count (router), ==, 0);
+  goodix_device_context_complete_receive (f->ctx, current_generation,
+                                           synthetic_a0,
+                                           sizeof synthetic_a0, NULL);
+  g_assert_cmpuint (goodix_usb_router_get_delivery_count (router), ==, 1);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (usb_backend),
+                    ==, 1);
 
   /* An N-1 callback must cause zero new backend commands. */
   commands_before = goodix_device_context_get_backend_command_count (f->ctx);

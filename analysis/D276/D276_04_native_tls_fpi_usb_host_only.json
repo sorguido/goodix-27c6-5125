@@ -1,8 +1,8 @@
 {
   "step": "D276/04-corrective",
-  "outcome": "READY",
+  "outcome": "READY_FOR_AI_PM_REVIEW",
   "advancement": "D276_04_ARCHITECTURAL_INTEGRATION_AND_HOST_ONLY_CORRECTIVE_COMPLETE",
-  "executable_closure": "PASS_HOST_ONLY",
+  "executable_closure": "PENDING_AI_PM_GITHUB_VERIFICATION",
   "executor_status": "READY_FOR_AI_PM_REVIEW",
   "ai_pm_review": "PENDING",
   "native_tls_provider": "OPENSSL",
@@ -34,7 +34,7 @@
   "normal_test_run": "PASS",
   "sanitizer_test_run": "PASS",
   "determinism_runs": 2,
-  "github_actions_confirmation": "PENDING_AI_PM_NON_GATING",
+  "github_actions_confirmation": "NOT_VERIFIED_BY_EXECUTOR",
   "cloud_work_only": true,
   "real_usb_access": false,
   "real_sensor_command_count": 0,
@@ -46,5 +46,17 @@
   "transport_reopen_count": 0,
   "tls_automatic_restart_count": 0,
   "live_authorized": false,
-  "next_primary_boundary": "AI_PM_REVIEW_AFTER_D276_04"
+  "next_primary_boundary": "AI_PM_REVIEW_AFTER_D276_04",
+  "generation_authority": "GOODIX_DEVICE_CONTEXT_SINGLE_SOURCE",
+  "router_uses_external_context_generation": true,
+  "router_cancel_mutates_generation": false,
+  "router_cancel_idempotent": true,
+  "double_router_cancel_path": "ABSENT",
+  "multi_activation_receive_regression": "PASS",
+  "activation_n_generation_differs_from_n_plus_1": true,
+  "stale_n_callback_after_reactivation": "IGNORED",
+  "stale_n_callback_does_not_consume_current_token": true,
+  "current_n_plus_1_callback": "DELIVERED",
+  "d276_04_native_workflow_ca_certificates": "FIXED",
+  "d276_03_router_workflow_current_build_deps": "FIXED"
 }

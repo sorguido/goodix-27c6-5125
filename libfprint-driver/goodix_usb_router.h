@@ -22,8 +22,9 @@ GoodixUsbRouter *goodix_usb_router_new (GoodixUsbRouterFrameFunc a0_consumer,
                                         gpointer                 user_data);
 void             goodix_usb_router_free (GoodixUsbRouter *router);
 
-/* Starts one activation-local receive generation. */
-guint64  goodix_usb_router_begin_generation (GoodixUsbRouter *router);
+/* Starts one activation-local receive generation owned by the context. */
+void     goodix_usb_router_begin_generation (GoodixUsbRouter *router,
+                                             guint64          generation);
 gboolean goodix_usb_router_request_receive  (GoodixUsbRouter *router,
                                              GError         **error);
 
