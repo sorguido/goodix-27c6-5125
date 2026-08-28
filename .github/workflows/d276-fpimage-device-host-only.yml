@@ -53,7 +53,7 @@ jobs:
           echo "REAL_USB_ACCESS=false"
           echo "LIVE_AUTHORIZED=false"
 
-      - name: Diagnostic - apply bounded ownership and cancellation fixes in worktree only
+      - name: Diagnostic - apply bounded lifecycle fixes in worktree only
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -175,15 +175,41 @@ jobs:
 
           t = Path('libfprint-driver/tests/test_goodix_fpimage_device.c')
           s = t.read_text()
+
           old_enroll = 'fp_device_enroll (FP_DEVICE (f->device), template, cancellable,'
           new_enroll = 'fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), cancellable,'
           if s.count(old_enroll) != 2:
               raise SystemExit(f'FAIL_CLOSED: expected 2 floating-template handoffs, found {s.count(old_enroll)}')
-          t.write_text(s.replace(old_enroll, new_enroll))
+          s = s.replace(old_enroll, new_enroll)
+
+          old_deactivating = '''  goodix_device_context_set_deactivation_held (f->ctx, TRUE);
+            g_cancellable_cancel (cancellable);
+
+            g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                             GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+          '''
+          new_deactivating = '''  goodix_device_context_set_deactivation_held (f->ctx, TRUE);
+            g_cancellable_cancel (cancellable);
+
+            /* libfprint forwards external cancellation through an idle source.
+             * Give that source a chance to invoke the driver's deactivate vfunc;
+             * deactivation_held keeps the driver in DEACTIVATING until the test
+             * explicitly completes it below. */
+            while (g_main_context_pending (NULL))
+              g_main_context_iteration (NULL, FALSE);
+
+            g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                             GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+          '''
+          if s.count(old_deactivating) != 1:
+              raise SystemExit('FAIL_CLOSED: deactivating-test block count mismatch')
+          s = s.replace(old_deactivating, new_deactivating, 1)
+          t.write_text(s)
           PY
+
           git diff --check
           git diff -- libfprint-driver/goodix_fpimage_device.c libfprint-driver/tests/test_goodix_fpimage_device.c
-          echo "CI_DIAGNOSTIC_PATCH=DEFER_ACTIVATION_CANCEL_PLUS_OWNERSHIP_FIXES"
+          echo "CI_DIAGNOSTIC_PATCH=DEFER_ACTIVATION_CANCEL_PLUS_OWNERSHIP_AND_IDLE_CANCEL_TEST_FIXES"
 
       - name: Run D276/02 launcher twice
         shell: bash
