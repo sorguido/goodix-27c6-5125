@@ -79,8 +79,19 @@ test_incremental_and_concatenated (void)
   feed (&r, generation, a + 1, 2);
   feed (&r, generation, a + 3, 5);
   g_byte_array_append (stream, a + 8, (guint) (a_len - 8));
-  g_byte_array_append (stream, b, (guint) b_len);
   feed (&r, generation, stream->data, stream->len);
+
+  g_assert_cmpuint (r.frames->len, ==, 1);
+  /* Split B0 before and inside LE16 length, then split its opaque body. */
+  feed (&r, generation, b, 1);
+  g_assert_cmpuint (r.frames->len, ==, 1);
+  feed (&r, generation, b + 1, 1);
+  g_assert_cmpuint (r.frames->len, ==, 1);
+  feed (&r, generation, b + 2, 3);
+  g_assert_cmpuint (r.frames->len, ==, 1);
+  feed (&r, generation, b + 5, 2);
+  g_assert_cmpuint (r.frames->len, ==, 1);
+  feed (&r, generation, b + 7, b_len - 7);
 
   g_assert_cmpuint (r.frames->len, ==, 2);
   g_assert_cmpmem (g_bytes_get_data (g_ptr_array_index (r.frames, 0), NULL),
