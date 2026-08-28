@@ -118,19 +118,25 @@ NON_ENROLL_FINGER_OFF_REENTRANCY=SYNCHRONOUS_DEACTIVATE_ALLOWED_AFTER_RELEASE_TA
 ENROLL_REARM_GATE=AWAIT_FINGER_ON_AND_GOODIX_RELEASE_TAIL_COMPLETE_AND_FRESH_SAME_CYCLE_DOWN_TABLE
 LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
 PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
-LOCAL_LIBFPRINT_DEVICE_GLUE=IMPLEMENTED_HOST_ONLY_NOT_EXECUTABLY_CLOSED
-LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_NOT_EXECUTABLY_CLOSED
+LOCAL_LIBFPRINT_DEVICE_GLUE=IMPLEMENTED_HOST_ONLY_EXECUTABLY_CLOSED
+LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY
 LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE=CLOSED_D276_01
-D276_02_OUTCOME=BLOCKED_ENVIRONMENT_VALIDATION
+D276_02_OUTCOME=READY
 FPIMAGE_DEVICE_REAL_FRAMEWORK_USED=true
 IN_MEMORY_BACKEND_ONLY=true
-EXECUTABLE_CLOSURE=NOT_REACHED_ENVIRONMENT_LACKS_REQUIRED_BUILD_METADATA
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_CLEAN_TREE
+D276_02_CI_VALIDATED_COMMIT=87d4aacec23b5415cca5de73e0dfeb83ffe65bab
+D276_02_GITHUB_ACTIONS_RUN=33165906857
+D276_02_NORMAL_TEST_RUN=PASS
+D276_02_SANITIZER_TEST_RUN=PASS
+D276_02_DETERMINISM_RUNS=2
 GPL_TO_LGPL_CODE_COPY_ALLOWED=false
 MECHANICAL_TRANSLATION_ALLOWED=false
 CLEANROOM_NATIVE_REIMPLEMENTATION_REQUIRED_IF_SELECTED=true
 CLEANROOM_LABEL=PROJECT_ENGINEERING_PROVENANCE_CONTROL_NOT_LEGAL_CONCLUSION
 ENROLLMENT_STAGE_POLICY=NOT_SELECTED
-NEXT_PRIMARY_BOUNDARY=HOST_ONLY_D276_02_EXECUTABLE_VALIDATION
+NEXT_PRIMARY_BOUNDARY=D276_03_A0_B0_CLEANROOM_SINGLE_RECEIVE_SYNTHETIC_TRANSCRIPTS
 LIVE_AUTHORIZED=false
 ```
 
@@ -138,12 +144,16 @@ Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
 per APP12509. Il futuro driver non deve essere registrato/abilitato come device
 production finché la policy stage non è chiusa; l'aggregazione resta comunque
-del framework. D276/02 ha ora implementato la shell `FpImageDevice` non
-registrata con backend in-memory, lifecycle reale, cancellazione, terminal
-fence e reentrancy; la executable closure è `NOT_REACHED` perché l'ambiente
-manca di `flatpak` e dei development file GLib/GIO/GObject host. Nessuna USB,
-TLS, secret, fprintd, registrazione VID:PID o mutazione persistente è stata
-usata o eseguita.
+del framework. D276/02 ha implementato la shell `FpImageDevice` non registrata
+con backend in-memory, esercitando il vero `FpImageDevice` libfprint 1.94.5;
+la executable closure host-only è stata completata su clean checked-in tree
+al commit `87d4aacec23b5415cca5de73e0dfeb83ffe65bab` tramite GitHub Actions
+run 33165906857 (2 run deterministiche, 14/14 normal PASS, 14/14 ASAN/UBSAN PASS,
+`CI_DIAGNOSTIC_PATCH=NONE`). La precedente indisponibilità di Flatpak/GLib-dev
+nell'ambiente di rescue è una condizione storica superata. Un'eventuale conferma
+Fedora futura è `OPTIONAL_NON_GATING`. Nessuna USB, sensore reale, TLS reale, PSK,
+fprintd, registrazione VID production o mutazione persistente è stata usata o
+eseguita.
 
 `HOST_MACHINE_REPORT_PATH` è il path previsto dal runtime D275 per il report
 macchina finale; la sua esistenza corrente non è verificabile senza privilegi
@@ -1623,7 +1633,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | D275/03 post-live root-cause `0x34 → IRQ0200` | corrective offline; due run live storiche fail-closed; nuova live false | tentativo 2 elimina timing operatore; prima immagine provata dal call-flow e telemetry monotona corretta; baseline Linux passava raw IRQ2 nel `0x34`, mentre tre cicli OEM APP12509 provano `80 || ((raw>>1)+0x1d)` con touch `0x003f`; down-table IRQ0200 corretta a `80 || (raw>>1)`; timeout 15 s non corto, lost-event race non trovata; causalità mismatch `STRONG_CAUSAL_INFERENCE`; terza run equivalente vietata |
 | D275/04 closure secondo B0 Linux live | CLOSED / PASS; una sola run live autorizzata e consumata; nessuna nuova live autorizzata | `PASS_STOP_AFTER_SECOND_IMAGE` sulla baseline `6eb60856...`; closure consolidata nel commit `42819c05...`; trace `0x36,0x50,0x36,0x82,0x20,0x36,0x32,0x22,0x34,0x20,0x50,0x32,0x22`; FDT-up/down derivate OEM; `IRQ 0x0200`, secondo `IRQ2`, secondo `0x22`, secondo B0 e stop wire-driven osservati; causalità FDT promossa a `LIVE_VALIDATED`; zero retry/reopen/write persistente; `TARGET_DEVICE_TIMEOUT=UNKNOWN`; prossimo boundary review AI-PM D275/04, nessuna autorizzazione live implicita |
 | D276/01 architettura production `FpImageDevice` | READY / CLOSED_OFFLINE; corrective documentation-only; live false | preservata `NATIVE_IN_PROCESS_C_LGPL_CLEANROOM`/confidence `HIGH`; release tail corretto fino a NAV prima del finger-off, post-up B0 mai consegnato a libfprint e solo re-arm `0x32` gated da `AWAIT_FINGER_ON`; reentrancy/deactivate esplicitata; `GoodixDeviceContext` owner TLS/secret ma lifetime TLS cross-activation irrisolto; cancel device-side e quiescenza production arbitraria non provati, policy conservativa `POISONED/QUIESCENCE_UNKNOWN`; reimplementazione indipendente con provenance controllata, non conclusione legale |
-| D276/02 shell `FpImageDevice` host-only | BLOCKED_ENVIRONMENT_VALIDATION; implementation + test seams; live false | shell C/LGPL non registrata con backend in-memory che esercita il vero `FpImageDevice` 1.94.5; correzioni: cancellazione `ACTIVATING` collegata al cancellable dell'azione, `GError` owned ai confini, deactivation trattenibile, generation token per eventi fake, re-arm exactly-once per generation, launcher con timeout e propagazione failure; normal/sanitizer non eseguiti per assenza `flatpak`/GLib-dev; nessun USB/TLS/secret/fprintd/VID:PID usato; prossimo boundary `HOST_ONLY_D276_02_EXECUTABLE_VALIDATION` |
+| D276/02 shell `FpImageDevice` host-only | READY / PASS_HOST_ONLY; validation clean-tree GitHub Actions run 33165906857 (commit 87d4aace...); 2 run deterministiche (14/14 normal PASS, 14/14 ASAN/UBSAN PASS); live false | shell C/LGPL non registrata con backend in-memory che esercita il vero `FpImageDevice` 1.94.5; correzioni: cancellazione `ACTIVATING` collegata al cancellable dell'azione, `GError` owned ai confini, deactivation trattenibile, generation token per eventi fake, re-arm exactly-once per generation, launcher con timeout e propagazione failure; nessun USB/TLS/secret/fprintd/VID:PID usato; unresolved production/device quiescence e TLS session lifetime invariati; prossimo boundary D276/03 |
 
 ## Fonti e confini di pubblicazione
 
@@ -1873,77 +1883,58 @@ Roadmap corrente:
 
 ```text
 D276/01 -> architettura production e ownership CLOSED_OFFLINE
-D276/02 -> shell FpImageDevice non registrata + backend in-memory IMPLEMENTED_HOST_ONLY_NOT_EXECUTABLY_CLOSED
-         -> main-loop/cancel/generation/terminal-fence/FpImage test seams IMPLEMENTED
-         -> NON_ENROLL_FINGER_OFF_SYNCHRONOUS_DEACTIVATE IMPLEMENTED
-         -> ENROLL_FINGER_OFF_WAIT_MINUTIAE IMPLEMENTED
-         -> ENROLL_MINUTIAE_DONE_BEFORE_FINGER_OFF IMPLEMENTED
-         -> ENROLL_FINGER_OFF_BEFORE_MINUTIAE_DONE IMPLEMENTED
-         -> NO_REARM_BEFORE_BOTH_GATES IMPLEMENTED
-         -> NO_COMMAND_AFTER_DEACTIVATE_FENCE IMPLEMENTED
+D276/02 -> shell FpImageDevice + backend in-memory + test seams CLOSED_HOST_ONLY
+         -> executable validation GitHub Actions PASS_CLEAN_TREE
 D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici
 D276/04 -> TLS Memory-BIO nativo e backend FpiUsbTransfer asincrono, ancora no VID:PID
-poi      -> HOST_ONLY_D276_02_EXECUTABLE_VALIDATION
-         -> review provenance + decisione stage enrollment + baseline live separata
+poi      -> review provenance + decisione stage enrollment + eventuale baseline live separata
 ```
 
 Stato rescue D276/02 (28 agosto 2026): il WIP è classificato **B**. La shell è
-salvabile e continua a usare il vero `FpImageDevice` 1.94.5, mentre il seam di
-test ha richiesto correzioni locali: aspettativa impossibile di `DEACTIVATING`
-dopo completion sincrona; cancellazione `ACTIVATING` non collegata al
-cancellable libfprint; ownership `GError` non trasferita; launcher che
-mascherava failure; stato `INACTIVE` improprio dopo cancel non-quiescente;
-stale-generation test non probante; ordering SIGFM non deterministico; policy
-stage promossa indebitamente; cancellable nullable; re-arm non idempotente. Le
-correzioni collegano il cancellable dell'azione durante activation, introducono
-deactivation fake trattenibile, applicano `g_steal_pointer()` o una copia owned
-ai confini `GError`, conservano `POISONED` per cancel successivi all'activation,
-associano generation agli eventi fake e rendono re-arm exactly-once. Il launcher
-usa timeout e restituisce failure se normal o sanitizer fallisce.
+salvabile e continua a usare il vero `FpImageDevice` 1.94.5. Il rescue ha
+corretto fake/test e semantiche asincrone (cancellazione `ACTIVATING` collegata al
+cancellable libfprint, ownership `GError` trasferita ai confini, deactivation
+fake trattenibile, generation token per callback, re-arm exactly-once per
+generation, avvelenamento `POISONED` per cancel non-quiescente, launcher con
+propagazione failure). La successiva validazione GitHub Actions sul clean
+checked-in tree (commit `87d4aacec23b5415cca5de73e0dfeb83ffe65bab`, run 33165906857)
+ha ora chiuso la executable closure host-only.
 
 ```text
-OUTCOME=BLOCKED_ENVIRONMENT_VALIDATION
-ADVANCEMENT=HOST_ONLY_CORRECTIVE_IMPLEMENTATION_AND_NEW_STATE_MACHINE_TEST_SEAMS
-EXECUTABLE_CLOSURE=NOT_REACHED_ENVIRONMENT_LACKS_REQUIRED_BUILD_METADATA
-RESIDUAL_BLOCKER_OR_RISK=REQUIRED_NORMAL_AND_ASAN_UBSAN_RUNS_NOT_EXECUTED;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED
+OUTCOME=READY
+ADVANCEMENT=HOST_ONLY_EXECUTABLE_VALIDATION_PASS_CLEAN_TREE
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+RESIDUAL_BLOCKER_OR_RISK=PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;TLS_SESSION_LIFETIME_ACROSS_LIBFPRINT_ACTIVATIONS_UNRESOLVED;ENROLLMENT_STAGE_POLICY_NOT_SELECTED
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=CANONICAL_MAIN_a4ad7b4ef05dbd166daae8e36874dee4f227153f_PLUS_DEVELOPMENT_MERGE_a57c739ba80fcfca7cbae41ca37520dc5198acfb
 
 WIP_CLASSIFICATION=B
-LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_NOT_EXECUTABLY_CLOSED
+LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY
 FPIMAGE_DEVICE_REAL_FRAMEWORK_USED=true
 IN_MEMORY_BACKEND_ONLY=true
-GERROR_OWNERSHIP_AUDIT=CORRECTED_STATIC_AUDIT
-ACTIVATING_CANCEL_PHASE_CORRECT=IMPLEMENTED_NOT_RUNTIME_VALIDATED
+GERROR_OWNERSHIP_AUDIT=CORRECTED_AND_HOST_ONLY_VALIDATED
+ACTIVATING_CANCEL_PHASE_CORRECT=HOST_ONLY_VALIDATED
 DEACTIVATING_TEST_OBSERVABLE_AND_BOUNDED=true
-NONQUIESCENT_CANCEL_POISON_POLICY=IMPLEMENTED
+NONQUIESCENT_CANCEL_POISON_POLICY=IMPLEMENTED_HOST_ONLY_VALIDATED
 OLD_GENERATION_CALLBACK_TEST=REAL_N_MINUS_1_TOKEN
 REARM_EXACTLY_ONCE=IMPLEMENTED_PER_GENERATION
 ENROLLMENT_STAGE_POLICY=NOT_SELECTED
-NORMAL_TEST_RUN=NOT_RUN_FLATPAK_UNAVAILABLE
-SANITIZER_TEST_RUN=NOT_RUN_FLATPAK_UNAVAILABLE
-DETERMINISM_RUNS=0
-LAUNCHER_PROPAGATES_FAILURE=true
-REAL_USB_ACCESS=false
-REAL_SENSOR_COMMAND_COUNT=0
-REAL_TLS_HANDSHAKE_COUNT=0
-REAL_SECRET_MATERIALIZATION_COUNT=0
-REAL_FPRINTD_MUTATION_COUNT=0
-VID_PID_PRODUCTION_REGISTRATION=false
+NORMAL_TEST_RUN=PASS
+SANITIZER_TEST_RUN=PASS
+DETERMINISM_RUNS=2
+D276_02_HOST_ONLY_EXECUTABLE_VALIDATION=PASS_CLEAN_TREE
 LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HOST_ONLY_D276_02_EXECUTABLE_VALIDATION
+NEXT_PRIMARY_BOUNDARY=D276_03_A0_B0_CLEANROOM_SINGLE_RECEIVE_SYNTHETIC_TRANSCRIPTS
 ```
 
-La cancellazione dopo activation invalida la generation e lascia il context
-`POISONED`, perché la quiescenza device-side resta ignota; la normale
-deactivation conclusa non viene invece avvelenata. L'assegnazione Goodix dei
-cinque stage è rimossa: resta soltanto il default framework e
-`ENROLLMENT_STAGE_POLICY=NOT_SELECTED`. La closure eseguibile non è dichiarata:
-nell'ambiente di rescue mancano sia `flatpak` sia i development file GLib host,
-quindi non è stato possibile compilare o svolgere le due run normal/sanitizer
-richieste. D276/02 resta `BLOCKED_ENVIRONMENT_VALIDATION`, non READY, finché il
-launcher non passa due volte nell'SDK host-only previsto. Nessun accesso
-USB/TLS/sensore è avvenuto.
+La executable closure host-only è stata validata su clean checked-in tree al
+commit `87d4aacec23b5415cca5de73e0dfeb83ffe65bab` tramite la run GitHub Actions
+33165906857. Il workflow ha eseguito due volte il launcher checked-in: in entrambe
+le iterazioni, 14/14 test normal e 14/14 test ASAN/UBSAN sono risultati PASS
+senza diagnostic patch (`CI_DIAGNOSTIC_PATCH=NONE`). La precedente mancanza di
+Flatpak/GLib-dev nell'ambiente di rescue è una condizione storica superata.
+Un'eventuale conferma Fedora futura è `OPTIONAL_NON_GATING` e non costituisce un
+gate retroattivo. Nessun sensore Goodix reale, USB, TLS reale, PSK, fprintd,
+registrazione VID production o mutazione persistente è stato usato.
 
 Il provider TLS concreto resta una subdecisione build-time ristretta
 (OpenSSL/GnuTLS): deve offrire un server TLS 1.2 PSK in-process alimentato da
@@ -6352,9 +6343,9 @@ costruire `FpImage` → riportare lo stato del dito →
 ```text
 LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
 PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
-LOCAL_LIBFPRINT_DEVICE_GLUE=IMPLEMENTED_HOST_ONLY_NOT_EXECUTABLY_CLOSED
-LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_NOT_EXECUTABLY_CLOSED
-D276_02_OUTCOME=BLOCKED_ENVIRONMENT_VALIDATION
+LOCAL_LIBFPRINT_DEVICE_GLUE=IMPLEMENTED_HOST_ONLY_EXECUTABLY_CLOSED
+LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY
+D276_02_OUTCOME=READY
 
 LINUX_TLS_1_2_PSK_TARGET_STATUS=LIVE_PROVEN_D245
 PERSISTENT_TLS_RUNTIME_STATUS=IMPLEMENTED_D260
@@ -6475,9 +6466,9 @@ SECOND_TARGET_CYCLE=UNOBSERVED
 LINUX_TLS_REBUILD_REQUIRED=false
 LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
 PROJECT_EXTRA_FPIMAGE_AGGREGATOR_REQUIRED=false
-LOCAL_LIBFPRINT_DEVICE_GLUE=IMPLEMENTED_HOST_ONLY_NOT_EXECUTABLY_CLOSED
-LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_NOT_EXECUTABLY_CLOSED
-D276_02_OUTCOME=BLOCKED_ENVIRONMENT_VALIDATION
+LOCAL_LIBFPRINT_DEVICE_GLUE=IMPLEMENTED_HOST_ONLY_EXECUTABLY_CLOSED
+LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY
+D276_02_OUTCOME=READY
 
 REAL_USB_OPEN_COUNT=0
 REAL_COMMAND_SEND_COUNT=0
@@ -6497,9 +6488,9 @@ Regressione host-only rieseguita: `goodix_u16_to_fpimage` unit test PASS;
 storico Flatpak (`run_goodix_fpimage_pipeline_test.sh`) richiede l'SDK Flatpak e
 l'header di framework libfprint `fpi-image.h`, non disponibili in questo
 esecutore. È una limitazione d'ambiente/toolchain, **indipendente** dallo stato
-del device glue (D276/02 ha implementato la shell host-only, ma la sua
-executable closure è `BLOCKED_ENVIRONMENT_VALIDATION`; il pipeline helper è un
-componente D270 autonomo, non il futuro device glue).
+del device glue (D276/02 ha implementato la shell host-only con executable closure
+`PASS_HOST_ONLY` su GitHub Actions; il pipeline helper è un componente D270
+autonomo, non il futuro device glue).
 
 Harness riproducibile host-only aggiunto:
 `libfprint-driver/tests/run_goodix_sigfm_metrics_real_host.sh` (machine-actionable,
@@ -6945,8 +6936,8 @@ replay senza tale estrazione.
 ## Stato implementazione Linux
 
 Stato corrente post-D276/02 corrective: la shell `FpImageDevice` non registrata
-è ora implementata in C/LGPL con backend in-memory
-(`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_NOT_EXECUTABLY_CLOSED`).
+è ora implementata in C/LGPL con backend in-memory e validata host-only
+(`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_ARCHITECTURE=CLOSED_D276_01`) ed è una
 reimplementazione nativa C/LGPL indipendente con provenance controllata e
@@ -6955,13 +6946,13 @@ di TLS/secret, ma lifetime TLS fra più activation e quiescenza device-side dopo
 cancel arbitrario restano irrisolti. Il release tail corrente completa
 `0x20`/B0-discard/`0x50`/NAV prima del finger-off; solo il re-arm `0x32`
 dipende da `AWAIT_FINGER_ON`, tail completo e down-table fresca. Il rescue D276/02
-ha corretto il lifecycle, la cancellazione, il terminal fence e la reentrancy
-sulla shell host-only, ma la executable closure è
-`BLOCKED_ENVIRONMENT_VALIDATION` perché l'ambiente corrente manca di `flatpak` e
-dei development file GLib/GIO/GObject host: le run normal e sanitizer non sono
-state eseguite. Il prossimo boundary autorizzato è esclusivamente
-`HOST_ONLY_D276_02_EXECUTABLE_VALIDATION`, senza USB, TLS reale, secret, fprintd,
-VID:PID, stage policy, terzo ciclo o nuovo live. Artefatti:
+e la successiva CI su GitHub Actions (run 33165906857, commit `87d4aacec23b5415cca5de73e0dfeb83ffe65bab`)
+hanno chiuso la executable closure host-only con 2 run deterministiche (14/14
+normal PASS, 14/14 ASAN/UBSAN PASS, `CI_DIAGNOSTIC_PATCH=NONE`). La precedente
+indisponibilità di Flatpak/GLib-dev nell'ambiente di rescue è superata. Il prossimo
+boundary autorizzato è `D276_03_A0_B0_CLEANROOM_SINGLE_RECEIVE_SYNTHETIC_TRANSCRIPTS`,
+senza USB, TLS reale, secret, fprintd, VID:PID, stage policy, terzo ciclo o nuovo
+live. Artefatti:
 `analysis/D276/D276_01_libfprint_device_architecture.{md,json}` e
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}`.
 
