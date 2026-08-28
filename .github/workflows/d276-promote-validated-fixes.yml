@@ -150,12 +150,13 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A -- \
-            .github/d276_fpimage_device_diagnostic_patch.py \
-            .github/workflows/d276-fpimage-device-host-only.yml \
-            .github/workflows/d276-promote-validated-fixes.yml \
-            libfprint-driver/goodix_fpimage_device.c \
-            libfprint-driver/tests/test_goodix_fpimage_device.c
+          git add -A
+          STAGED="$(git diff --cached --name-only | sort)"
+          printf '%s\n' '=== promotion staged files ===' "$STAGED"
+          test "$STAGED" = "$EXPECTED" || {
+            echo 'FAIL_CLOSED: unexpected staged promotion file set' >&2
+            exit 42
+          }
           git commit -m 'fix(d276): promote validated FpImageDevice lifecycle corrections'
           git push origin HEAD:d276-02-github-actions-validation
           echo "PROMOTION_PUSHED_HEAD=$(git rev-parse HEAD)"
