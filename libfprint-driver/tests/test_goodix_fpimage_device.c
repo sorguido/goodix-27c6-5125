@@ -320,7 +320,7 @@ run_enroll_cycle (TestFixture *f,
 
   f->done = FALSE;
   f->completion_count = 0;
-  fp_device_enroll (FP_DEVICE (f->device), template, cancellable,
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), cancellable,
                     progress_cb, f, NULL,
                     (GAsyncReadyCallback) enroll_cb, f);
 
@@ -405,7 +405,7 @@ test_no_rearm_before_both_gates (void)
   f->done = FALSE;
   f->completion_count = 0;
   f->enroll_progress_count = 0;
-  fp_device_enroll (FP_DEVICE (f->device), template, cancellable,
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), cancellable,
                     progress_cb, f, NULL,
                     (GAsyncReadyCallback) enroll_cb, f);
 
@@ -624,6 +624,13 @@ test_cancellation_deactivating (void)
   goodix_device_context_set_deactivation_held (f->ctx, TRUE);
   g_cancellable_cancel (cancellable);
 
+  /* libfprint forwards external cancellation through an idle source.
+   * Give that source a chance to invoke the driver's deactivate vfunc;
+   * deactivation_held keeps the driver in DEACTIVATING until the test
+   * explicitly completes it below. */
+  while (g_main_context_pending (NULL))
+    g_main_context_iteration (NULL, FALSE);
+
   g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
 
@@ -666,7 +673,6 @@ test_stale_callback_generation_guard (void)
   goodix_device_context_emit_finger_down (f->ctx);
 
   old_generation = goodix_device_context_get_generation (f->ctx);
-  commands_before = goodix_device_context_get_backend_command_count (f->ctx);
 
   /* Complete the action, invalidating the generation. */
   goodix_device_context_emit_image_ready (f->ctx, samples,
@@ -685,11 +691,12 @@ test_stale_callback_generation_guard (void)
   g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), !=,
                     old_generation);
 
-  /* An N-1 callback is ignored while generation N remains active. */
+  /* An N-1 callback must cause zero new backend commands. */
+  commands_before = goodix_device_context_get_backend_command_count (f->ctx);
   goodix_device_context_emit_finger_down_for_generation (f->ctx,
                                                          old_generation);
   g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
-                    ==, commands_before + 1 /* second arm */);
+                    ==, commands_before);
   g_cancellable_cancel (second_cancellable);
   test_wait (f);
 
@@ -707,6 +714,7 @@ test_terminal_error_path (void)
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   g_autoptr(GError) terminal = NULL;
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  guint commands_after_error;
 
   fixture_open (f);
   fill_gradient_samples (samples);
@@ -728,10 +736,17 @@ test_terminal_error_path (void)
   g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
   g_assert_cmpuint (f->completion_count, ==, 1);
 
+  /* fpi_image_device_session_error() deactivates the framework session, so
+   * the expected teardown is exactly ARM + DISARM, with no REARM. */
+  g_assert_cmpuint (goodix_in_memory_backend_get_arm_count (f->ctx), ==, 1);
+  g_assert_cmpuint (goodix_in_memory_backend_get_disarm_count (f->ctx), ==, 1);
+  g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (f->ctx), ==, 0);
+  commands_after_error = goodix_device_context_get_backend_command_count (f->ctx);
+
   /* No further commands accepted after the terminal fence. */
   goodix_device_context_emit_finger_up_ready (f->ctx);
   g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
-                    ==, 1 /* arm */);
+                    ==, commands_after_error);
 
   fixture_close (f);
   test_fixture_free (f);

@@ -158,8 +158,6 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
-  if (ctx->activation_cancellable != NULL)
-    g_cancellable_cancel (ctx->activation_cancellable);
 }
 
 static void
@@ -203,32 +201,54 @@ goodix_device_context_maybe_rearm (GoodixDeviceContext *ctx)
 
 /* --- libfprint vfunc implementations --- */
 
+static gboolean
+complete_activation_cancel_idle (gpointer user_data)
+{
+  GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (user_data);
+  GoodixDeviceContext *ctx = self->ctx;
+  g_autoptr(GError) error = NULL;
+
+  if (ctx == NULL ||
+      ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
+      !ctx->activation_completed ||
+      ctx->activation_cancellable == NULL)
+    return G_SOURCE_REMOVE;
+
+  if (g_cancellable_set_error_if_cancelled (ctx->activation_cancellable,
+                                             &error))
+    fpi_image_device_activate_complete (FP_IMAGE_DEVICE (self),
+                                        g_steal_pointer (&error));
+
+  return G_SOURCE_REMOVE;
+}
+
 static void
 on_activation_cancellable_cancelled (GCancellable *cancellable,
                                      gpointer      user_data)
 {
   GoodixDeviceContext *ctx = user_data;
-  g_autoptr(GError) error = NULL;
+
+  (void) cancellable;
 
   if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
       ctx->activation_completed)
     return;
 
-  /* We are executing this handler; disconnecting it here may wait for the
-   * current invocation.  Mark it consumed and let cancellable teardown own
-   * the connection. */
+  /* Do not complete the libfprint action from inside the cancellable
+   * dispatch.  clear_device_cancel_action() disconnects both the internal
+   * and external cancellables; doing that synchronously here can deadlock
+   * against the still-running external cancellation callback. */
   ctx->cancel_handler_id = 0;
   goodix_device_context_set_terminal_fence (ctx);
   ctx->generation = 0;
+  goodix_device_context_set_state (ctx,
+                                   GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+  ctx->activation_completed = TRUE;
 
-  if (g_cancellable_set_error_if_cancelled (cancellable, &error))
-    {
-      goodix_device_context_set_state (ctx,
-                                       GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
-      ctx->activation_completed = TRUE;
-      fpi_image_device_activate_complete (FP_IMAGE_DEVICE (ctx->device),
-                                          g_steal_pointer (&error));
-    }
+  g_idle_add_full (G_PRIORITY_DEFAULT,
+                   complete_activation_cancel_idle,
+                   g_object_ref (ctx->device),
+                   g_object_unref);
 }
 
 static gboolean
@@ -631,8 +651,9 @@ goodix_device_context_emit_image_ready (GoodixDeviceContext *ctx,
   image = goodix_fpimage_pipeline_get_image (pipeline);
   g_assert (image != NULL);
 
-  /* fpi_image_device_image_captured() takes its own reference as needed. */
-  fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device), image);
+  /* Transfer an independent reference to FpImageDevice; the pipeline keeps its own. */
+  fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
+                                   g_object_ref (image));
 
   goodix_fpimage_pipeline_free (pipeline);
 }
