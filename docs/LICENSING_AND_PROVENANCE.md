@@ -63,6 +63,8 @@ An author's permission covers only rights that author actually controls.
 | `core/post_d4.py` (FDT builders/events and mixed receive design portions) | `https://github.com/Rockytkg/goodix-linux-27c6-5125` | `227eba219fa9e3fbac5bd59aca79f624f67cd11b` (2026-08-17) | `src/goodix_capture.c` | `GPL-2.0-or-later` (per-file SPDX verified at import) | `Copyright (C) 2026 liushicong (Rockytkg)` | `D249` | `ADAPTED_FROM_ROCKY`; only framing/parsing above an abstract transport. Retry, TLS reconnect, baseline persistence, direct exposure debug bypass, USB/power lifecycle and automatic re-arming excluded. |
 | `core/post_d4.py` (image codec adapter) | local project | `bc377c820fa661c889d61b17a4c81e42507fc78a` | `src/goodix5125_cleanroom.py` | Historical local implementation reused by the GPL core; `GPL-2.0-or-later` distribution is license-compatible | Goodix 27c6:5125 project contributors | `D249` | `LOCAL_EXISTING_REUSED`: direct delegation to the already validated exact 7684-byte codec, real CRC trailer order, 6-byte/4-sample unpack and target transpose; no Rocky decoder and no reimplementation. |
 | `core/post_d4.py` (`FirstImageMachine`, typed failures and abstract `Transport`) | local project | D249 correction commit | `N/A — project-authored adapter` | `GPL-2.0-or-later` | Goodix 27c6:5125 project contributors | `D249` | `NEW_LOCAL_IMPLEMENTATION`: bounded offline composition of the locally evidenced/adapted facts; no USB/TLS backend, lifecycle, secret, retry, reconnect, persistence or live integration. |
+| `libfprint-driver/goodix_d190_binder.[ch]` | local project history | `b475a6eca72e340816779afae917334a6146c986` | `poc/goodix5125/tools/binding_reference/crypto_reference.py`; `poc/goodix5125/tools/binding_reference/known_answers.py` | `BSD-2-Clause` at source revision; adapted destination distributed as `LGPL-2.1-or-later` with BSD notice/provenance preserved | Copyright (c) 2026 sorguido | `D278/02` | `ADAPTED_FROM_PROJECT_BSD`: bounded native OpenSSL 3 port of the D190 crypto reference. Five independent historical known-answer validators are fixed test evidence; no runtime oracle or second implementation. All project-owned secret intermediates are explicitly cleansed. |
+| `tools/goodix_d190_pe.[ch]` | local project history | `b475a6eca72e340816779afae917334a6146c986` | `poc/goodix5125/tools/binding_reference/pe_parser.py`; `poc/goodix5125/tools/binding_reference/runtime.py` | `BSD-2-Clause` at source revision; adapted destination distributed as `GPL-2.0-or-later` with BSD notice/provenance preserved | Copyright (c) 2026 sorguido | `D278/02` | `ADAPTED_FROM_PROJECT_BSD`: bounded inert-byte PE parsing and producer-seed extraction only. The canonical DLL is hash-pinned and never loaded, executed, mapped executable or passed to Wine. |
 
 ### Externally verified Rockytkg baseline
 
@@ -174,3 +176,21 @@ e secret autentici non sono incorporati. L'estensione del backend e del
 `GoodixDeviceContext` preserva la stessa provenance D276/04 e aggiunge solo
 single-OUT ownership, completion generation-captured e wiring della nuova
 state machine.
+
+## D278/02 — boundary materiali e harness live-capable
+
+`libfprint-driver/goodix_target_material.[ch]` è nuova espressione locale
+`LGPL-2.1-or-later`, costruita dai contratti hash/layout canonici D232/D245 e
+dalle API POSIX/GLib/OpenSSL pubbliche. Il loader non incorpora materiale
+autentico: applica policy produttiva fissa uid 0/mode 0600, `O_NOFOLLOW`,
+controlli `fstat` pre/post lettura, lunghezze e hash esatti, finalizer/DAC,
+binding E4 e ownership/cleanse espliciti. Le fixture sono interamente
+sintetiche.
+
+`tools/goodix_d278_harness.[ch]` e
+`tools/d278_native_secure_session_once.c` sono `GPL-2.0-or-later`. Il binding
+libfprint/GUsb live-capable riusa soltanto la meccanica API-shape GPL del tool
+D277, resta fuori dal dominio LGPL e non è stato eseguito in D278/02. Il
+percorso sintetico usa la stessa orchestrazione, la state machine LGPL reale e
+un peer OpenSSL TLS 1.2 reale; non contiene una seconda implementazione del
+protocollo. Nessun codice Rockytkg è stato importato.

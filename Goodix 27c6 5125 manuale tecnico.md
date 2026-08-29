@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/01 — secure-session nativa chiusa host-only, target proof limitata ad A8/A0
+### Stato corrente post-D278/02 — boundary materiali e harness live-capable chiusi host-only, target proof nativa limitata ad A8/A0
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -91,9 +91,11 @@ D278_01_INITIAL_IMPLEMENTATION_HOST_ONLY=PASS
 D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
 D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
 D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
-D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
-D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
-D278_01_D1_TLS_GATE_CI=PENDING
+D278_01_D1_TLS_GATE_CORRECTIVE_COMMIT=5030c66e67db5a7f6cedfbf3bb0deeec107e79db
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PASS
+D278_01_D1_TLS_GATE_CI=PASS
+D278_01_D1_TLS_GATE_CI_RUN=33239781874
+D278_01_D1_TLS_GATE_MERGED_MAIN=52e190b2ceaee0e8de618accd4da9fadbad54115
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
@@ -101,6 +103,29 @@ NATIVE_D1_B0_TLS_TRANSITION_HOST_ONLY_PROVEN=true
 NATIVE_TLS12_PSK_HANDSHAKE_HOST_ONLY_PROVEN=true
 NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
 NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
+
+D278_02_OUTCOME=READY_PASS_HOST_ONLY_PRELIVE
+D190_EXPRESSION_PROVENANCE_GATE=PASS
+NATIVE_D190_E4_BINDER_KAT_PROVEN=true
+D190_FIVE_INDEPENDENT_KATS=PASS
+PE_CANONICAL_HASH_GATE=PASS
+DLL_LOADED_OR_EXECUTED=false
+NATIVE_PROTECTED_MATERIAL_LOADER_HOST_ONLY_PROVEN=true
+PROTECTED_MATERIAL_NEGATIVE_MATRIX=PASS
+PRODUCTION_MATERIAL_POLICY_UID=0
+PRODUCTION_MATERIAL_POLICY_MODE=0600
+PROJECT_OWNED_ZEROIZATION=PROVEN_TO_IMPLEMENTATION_BOUNDARY
+OPENSSL_INTERNAL_ZEROIZATION_ASSERTED=false
+E4_DERIVED_FROM_SAME_PSK_AS_TLS=true
+D278_02_LIVE_CAPABLE_HARNESS_IMPLEMENTED=true
+D278_02_LIVE_HARNESS_BUILD=PASS
+D278_02_LIVE_HARNESS_EXECUTED=false
+D278_02_PHASE_WATCHDOG_HOST_ONLY_PROVEN=true
+D278_02_NORMAL=PASS
+D278_02_ASAN_UBSAN=PASS
+D278_02_DETERMINISM_RUNS=2
+TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
+LIVE_EXECUTION_PERFORMED=false
 D4_REACHABLE=false
 REAL_USB_ACCESS=0
 REAL_USB_SUBMIT=0
@@ -447,17 +472,21 @@ con avanzamento singolo, e TLS malformato fail-closed. Passano inoltre D276/02 1
 disponibile sotto il boundary Flatpak/bwrap ptrace; ASAN address checks e UBSAN
 restano attivi. Il checkpoint iniziale `0efa30f681e0a3aa284565ce581536ad00606c39` ha
 GitHub Actions PASS nella run `33237274978`; questa evidenza precede la
-correzione del gate. La correzione è PASS locale, mentre review AI-PM e nuova
-CI restano pending.
+correzione del gate. La correzione
+`5030c66e67db5a7f6cedfbf3bb0deeec107e79db` ha review AI-PM PASS, CI PASS
+nella run `33239781874` ed è confluita su main con merge
+`52e190b2ceaee0e8de618accd4da9fadbad54115`.
 
 ```text
 D278_01_INITIAL_IMPLEMENTATION_HOST_ONLY=PASS
 D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
 D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
 D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
-D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
-D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
-D278_01_D1_TLS_GATE_CI=PENDING
+D278_01_D1_TLS_GATE_CORRECTIVE_COMMIT=5030c66e67db5a7f6cedfbf3bb0deeec107e79db
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PASS
+D278_01_D1_TLS_GATE_CI=PASS
+D278_01_D1_TLS_GATE_CI_RUN=33239781874
+D278_01_D1_TLS_GATE_MERGED_MAIN=52e190b2ceaee0e8de618accd4da9fadbad54115
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
@@ -476,12 +505,74 @@ D4_REACHABLE=false
 REAL_USB_ACCESS=0
 REAL_USB_SUBMIT=0
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_FOR_D278_02_SINGLE_SHOT_NATIVE_SECURE_SESSION_TARGET_VALIDATION
+NEXT_PRIMARY_BOUNDARY=D278_02_NATIVE_TARGET_MATERIAL_AND_LIVE_CAPABLE_HARNESS_PREPARATION
 ```
 
-Il prossimo boundary è una review AI-PM, non un'autorizzazione live. Una futura
-D278/02 richiede riesame metodologico pre-live, nuovo preflight permessi host e
-nuova autorizzazione esplicita dell'Utente.
+### D278/02 — boundary nativo dei materiali e harness secure-session live-capable, host-only
+
+D278/02 chiude il boundary preparatorio che D278/01 lasciava aperto, senza
+contattare il sensore e senza leggere lo store protetto reale. Il nuovo loader
+LGPL applica sui tre file target policy produttiva uid 0/mode 0600,
+`O_RDONLY|O_CLOEXEC|O_NOFOLLOW`, `fstat` pre/post, tipo/owner/mode/lunghezza,
+device/inode, hash, magic/layout PSK e contratti CONFIG90
+finalizer/DAC. Il validator E4 è derivato in memoria dalla stessa PSK poi
+consegnata al server TLS; nessun validator persistente viene creato.
+
+La primitive D190 LGPL e il parser PE GPL sono adattamenti bounded della
+reference locale BSD-2-Clause al commit storico
+`b475a6eca72e340816779afae917334a6146c986`. I cinque validator indipendenti
+sono golden evidence fissa. La DLL canonica
+`analysis/D230/work/GoodixExport/gfusb.dll` è accettata solo con size 5771496 e
+SHA-256 `904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`;
+viene letta come byte inerti e non caricata, eseguita o passata a Wine.
+
+Il nuovo harness GPL usa la stessa composizione in modalità sintetica e nella
+futura modalità live: `GoodixSecureSession`, `GoodixUsbRouter`,
+`GoodixTlsServer`, `GoodixFpiUsbBackend`, una generation, un receive owner e al
+massimo un IN/OUT fisico in flight. Il watchdog GLib è phase-aware, reinvalidato
+ad ogni progresso e terminalmente fenced. STOP/cancel precedono il drain;
+sessione, backend e router vengono liberati soltanto dopo drain.
+
+La suite contiene 54 casi: 6 D190, 6 PE, 22 loader e 20
+harness/watchdog/telemetria. Due invocazioni consecutive del runner hanno
+eseguito ciascuna 54/54 normal e 54/54 ASAN/UBSAN PASS, compilato il binding
+libfprint/GUsb completo ed eseguito soltanto `--self-test`, che termina
+intenzionalmente sul watchdog A8 con cleanup completo e contatori USB reali a
+zero. Il protected preflight e il ramo live non sono stati eseguiti.
+
+```text
+OUTCOME=READY_PASS_HOST_ONLY_PRELIVE
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+MATERIAL_INVALID_BLOCKS_BEFORE_USB_OPEN=PASS
+SYNTHETIC_SINGLE_OPEN_CLAIM_EPOCH=PASS
+PHYSICAL_RECEIVE_OWNER_COUNT=1
+MAX_PHYSICAL_IN_OUTSTANDING=1
+MAX_PHYSICAL_OUT_OUTSTANDING=1
+SECOND_READER_API_PATH=ABSENT
+RETRY_COUNT=0
+TRANSPORT_REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+D4_REACHABLE=false
+APPLICATION_DATA_COUNT=0
+PROJECT_SECRET_ZEROIZATION=PASS_TO_IMPLEMENTATION_BOUNDARY
+OPENSSL_INTERNAL_ZEROIZATION_ASSERTED=false
+TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
+LIVE_EXECUTION_PERFORMED=false
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Riesame metodologico preparato, non eseguito come live: (1) rispetto a D277/02
+cambiano materialmente il boundary protetto, il binder PSK→E4 condiviso con
+TLS, la composizione completa e il watchdog; (2) l'ipotesi futura è
+APP12509 `A8→E4 MATCH→A2→82→A6→A2→70→80x4→90→D1→TLS→STOP` senza D4 o
+persistenza; (3) al primo fallimento si ferma, registra fase/classe redatta,
+non ritenta/riapre/resetta, drena, azzera e torna ad AI-PM.
+
+Il prossimo boundary è review AI-PM e approvazione esplicita di uno SHA
+completo live-critical. D278/02 non auto-approva una baseline e non autorizza
+una run.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -2298,7 +2389,8 @@ D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; generation authority context-onl
 D277/01 -> harness nativo A8 PASS_HOST_ONLY; singola run BLOCKED a USB open prima di claim/submit; storico preservato
 D277/02 -> prova nativa A8/A0 su target reale PASS; exact A8 → ACK → risposta tipata APP12509; autorizzazione consumata
 D278/01 -> secure-session A8→E4→pre-D1→D1→TLS→STOP PASS_HOST_ONLY; target proof resta falsa oltre A8/A0
-review   -> AI-PM valuta D278/02; ogni nuova run richiede nuova autorizzazione esplicita
+D278/02 -> binder D190 + PE + protected-material loader + harness/watchdog live-capable PASS_HOST_ONLY; live/preflight non eseguiti
+review   -> AI-PM valuta review set e baseline SHA; ogni nuova run richiede approvazione/autorizzazione esplicite
 ```
 
 Stato rescue D276/02 (28 agosto 2026): il WIP è classificato **B**. La shell è
@@ -5081,13 +5173,18 @@ per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
 `STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
 Sul percorso nativo C/LGPL, distinto dal runtime GPL storico sopra descritto,
-D278/01 ha ora chiuso host-only l'intera catena
+D278/01 ha chiuso host-only l'intera catena
 `A8→E4→A2→82→A6→A2→70→80x4→90→D1→TLS ESTABLISHED→STOP`, inclusi ownership
 single-IN/single-OUT, B0 fixed64 zero-tail e pacing 10 ms generation-owned. È
 nuova evidenza eseguibile host-only, non target-specific: sul sensore reale il
 percorso nativo resta provato soltanto fino ad A8/ACK/typed APP12509 da D277/02.
-Il confine immediato nativo è quindi review AI-PM per una possibile D278/02
-single-shot; `CURRENT_LIVE_AUTHORIZED=false` e
+D278/02 aggiunge ora il loader protetto nativo, il binder D190 PSK→E4, il gate
+PE bounded, la composizione live-capable e il watchdog per fase, tutti provati
+host-only con fixture sintetiche; il binding GUsb/libfprint completo compila e
+il solo `--self-test` passa con zero accessi reali. Il confine immediato è
+review AI-PM e approvazione esplicita di uno SHA live-critical prima di una
+eventuale autorizzazione single-shot separata; `CURRENT_LIVE_AUTHORIZED=false`,
+`TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false` e
 `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
 
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
@@ -7376,7 +7473,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D278/01: la shell `FpImageDevice` non registrata
+Stato corrente post-D278/02: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa
@@ -7426,13 +7523,25 @@ post-handshake. La disponibilità del codice e dei test non promuove equivalenza
 hardware: `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`, il raw CONFIG_90 target
 non è disponibile nell'ambiente corrente e il live non è autorizzato.
 
+D278/02 introduce `GoodixTargetMaterial` come unico owner dello scratch
+protetto, della PSK, di CONFIG90 e del validator E4 fino alla costruzione della
+sessione. La produzione accetta soltanto i path fissi dello store root-owned,
+la DLL canonica hash-pinned e i contratti target D232/D245; il test policy seam
+non modifica i costanti produttivi. `GoodixD278Harness` orchestra la stessa
+state machine per transport sintetico o `FpiUsbTransfer`, deriva telemetria
+redatta dallo stato reale e impedisce teardown prima del drain. Il launcher
+`d278_native_secure_session_once` è live-capable ma, nello step, soltanto il
+ramo sintetico `--self-test` è stato eseguito. Il protected store reale, GUsb
+enumeration/open/claim e ogni transfer reale sono rimasti irraggiungibili.
+
 Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
 `analysis/D276/D276_03_usb_router_host_only.{md,json}`,
 `analysis/D276/D276_04_native_tls_fpi_usb_host_only.{md,json}` e
 `analysis/D277/D277_01_native_a8_real_usb.{md,json}` e
 `analysis/D277/D277_02_native_a8_real_usb.{md,json}` e
-`analysis/D278/D278_01_native_secure_session_host_only.{md,json}`.
+`analysis/D278/D278_01_native_secure_session_host_only.{md,json}` e
+`analysis/D278/D278_02_native_target_material_secure_session_prep.{md,json}`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint

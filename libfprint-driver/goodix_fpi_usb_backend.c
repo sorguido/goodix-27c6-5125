@@ -18,8 +18,9 @@ struct _GoodixFpiUsbBackend
   guint8 in_endpoint, out_endpoint;
   gsize receive_size;
   guint64 generation, in_generation, out_generation;
-  guint in_outstanding, out_outstanding, max_outstanding;
+  guint in_outstanding, out_outstanding, max_outstanding, max_out_outstanding;
   guint64 delivery_count, real_submit_count, out_submit_count;
+  guint64 in_completion_count, out_completion_count;
   gboolean terminal_fence, async_seam, drain_notified;
   GoodixUsbSubmitSeam seam;
   gpointer seam_data;
@@ -27,6 +28,8 @@ struct _GoodixFpiUsbBackend
   gpointer drained_data;
   GoodixFpiUsbBackendOutCompletedFunc out_completed_callback;
   gpointer out_completed_data;
+  GoodixFpiUsbBackendInCompletedFunc in_completed_callback;
+  gpointer in_completed_data;
 };
 
 static GQuark
@@ -186,6 +189,17 @@ goodix_fpi_usb_backend_set_out_completed_callback (
   backend->out_completed_data = data;
 }
 
+void
+goodix_fpi_usb_backend_set_in_completed_callback (
+  GoodixFpiUsbBackend                *backend,
+  GoodixFpiUsbBackendInCompletedFunc  callback,
+  gpointer                            data)
+{
+  g_return_if_fail (backend != NULL);
+  backend->in_completed_callback = callback;
+  backend->in_completed_data = data;
+}
+
 gboolean
 goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                                          guint64               generation,
@@ -253,6 +267,8 @@ goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
   backend->out_outstanding = 1;
   backend->out_generation = generation;
   backend->out_submit_count++;
+  backend->max_out_outstanding = MAX (backend->max_out_outstanding,
+                                      backend->out_outstanding);
   if (backend->seam != NULL)
     {
       backend->seam (backend, GOODIX_USB_TRANSFER_OUT, generation, bytes,
@@ -284,6 +300,10 @@ goodix_fpi_usb_backend_complete_receive (GoodixFpiUsbBackend *backend,
       goodix_usb_router_receive_complete (backend->router, submit_generation,
                                           data, length, error);
     }
+  backend->in_completion_count++;
+  if (backend->in_completed_callback != NULL)
+    backend->in_completed_callback (backend, submit_generation, error,
+                                    backend->in_completed_data);
   maybe_notify_drained (backend);
 }
 
@@ -297,6 +317,7 @@ goodix_fpi_usb_backend_complete_out (GoodixFpiUsbBackend *backend,
     return;
   backend->out_outstanding = 0;
   backend->out_generation = 0;
+  backend->out_completion_count++;
   if (backend->out_completed_callback != NULL)
     backend->out_completed_callback (backend, submit_generation, error,
                                      backend->out_completed_data);
@@ -327,9 +348,15 @@ guint goodix_fpi_usb_backend_get_out_outstanding (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->out_outstanding : 0; }
 guint goodix_fpi_usb_backend_get_max_outstanding (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->max_outstanding : 0; }
+guint goodix_fpi_usb_backend_get_max_out_outstanding (GoodixFpiUsbBackend *backend)
+{ return backend != NULL ? backend->max_out_outstanding : 0; }
 guint64 goodix_fpi_usb_backend_get_delivery_count (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->delivery_count : 0; }
 guint64 goodix_fpi_usb_backend_get_real_submit_count (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->real_submit_count : 0; }
 guint64 goodix_fpi_usb_backend_get_out_submit_count (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->out_submit_count : 0; }
+guint64 goodix_fpi_usb_backend_get_in_completion_count (GoodixFpiUsbBackend *backend)
+{ return backend != NULL ? backend->in_completion_count : 0; }
+guint64 goodix_fpi_usb_backend_get_out_completion_count (GoodixFpiUsbBackend *backend)
+{ return backend != NULL ? backend->out_completion_count : 0; }

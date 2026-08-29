@@ -47,6 +47,8 @@ struct _GoodixSecureSession
   gpointer schedule_data;
   GoodixSecureSessionTerminalFunc terminal;
   gpointer terminal_data;
+  GoodixSecureSessionPhaseFunc phase_callback;
+  gpointer phase_data;
   GoodixSecureSessionAudit *audit;
   GoodixTlsAudit *tls_audit;
   GError *error;
@@ -78,6 +80,14 @@ static gboolean try_submit_phase (GoodixSecureSession *session,
                                   GError **error);
 static void maybe_finish_tls (GoodixSecureSession *session);
 static void maybe_start_b0 (GoodixSecureSession *session);
+
+static void
+notify_phase (GoodixSecureSession *session)
+{
+  if (session->phase_callback != NULL)
+    session->phase_callback (session, session->phase, session->generation,
+                             session->phase_data);
+}
 
 const gchar *
 goodix_secure_phase_name (GoodixSecurePhase phase)
@@ -224,6 +234,7 @@ session_fail_error (GoodixSecureSession *session,
       return;
     }
   session->phase = GOODIX_SECURE_PHASE_TERMINAL;
+  notify_phase (session);
   if (session->error == NULL)
     session->error = error;
   else
@@ -349,6 +360,7 @@ advance_phase (GoodixSecureSession *session)
     session->phase++;
   else
     return;
+  notify_phase (session);
   session->ack_seen = FALSE;
   session->logical_done = FALSE;
   session->command_submitted = FALSE;
@@ -673,8 +685,27 @@ goodix_secure_session_free (GoodixSecureSession *session)
   g_queue_free (session->tls_records);
   goodix_tls_server_free (session->tls);
   g_clear_error (&session->error);
-  g_clear_pointer (&session->e4_validator, g_free);
-  g_clear_pointer (&session->config90, g_free);
+  if (session->e4_validator != NULL)
+    {
+      OPENSSL_cleanse (session->e4_validator, 32);
+      if (session->audit != NULL)
+        session->audit->e4_validator_cleanse_count++;
+      g_clear_pointer (&session->e4_validator, g_free);
+    }
+  if (session->config90 != NULL)
+    {
+      OPENSSL_cleanse (session->config90,
+                       GOODIX_SECURE_SESSION_CONFIG90_LENGTH);
+      if (session->audit != NULL)
+        session->audit->config90_cleanse_count++;
+      g_clear_pointer (&session->config90, g_free);
+    }
+  OPENSSL_cleanse (&session->material, sizeof session->material);
+  if (session->audit != NULL)
+    {
+      session->audit->material_descriptor_cleanse_count++;
+      session->audit->project_material_zeroized = TRUE;
+    }
   g_free (session);
 }
 
@@ -690,6 +721,7 @@ goodix_secure_session_start (GoodixSecureSession *session,
       return FALSE;
     }
   session->started = TRUE;
+  notify_phase (session);
   return try_submit_phase (session, error);
 }
 
@@ -828,7 +860,10 @@ maybe_finish_tls (GoodixSecureSession *session)
     session->audit->tls_established = TRUE;
   if (!session->out_pending && session->b0_logical == NULL &&
       g_queue_is_empty (session->tls_records) && !session->pace_pending)
-    session->phase = GOODIX_SECURE_PHASE_STOP;
+    {
+      session->phase = GOODIX_SECURE_PHASE_STOP;
+      notify_phase (session);
+    }
 }
 
 void
@@ -900,6 +935,16 @@ goodix_secure_session_cancel (GoodixSecureSession *session,
     return;
   session_fail_literal (session, GOODIX_SECURE_ERROR_STATE,
                         reason != NULL ? reason : "secure session cancelled");
+}
+
+void
+goodix_secure_session_set_phase_callback (GoodixSecureSession          *session,
+                                          GoodixSecureSessionPhaseFunc  callback,
+                                          gpointer                      user_data)
+{
+  g_return_if_fail (session != NULL);
+  session->phase_callback = callback;
+  session->phase_data = user_data;
 }
 
 GoodixSecurePhase

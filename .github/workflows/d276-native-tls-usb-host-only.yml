@@ -31,6 +31,15 @@ jobs:
           test "$(grep -h '^REAL_USB_ACCESS=0$' /tmp/d278-run-*.log | wc -l)" -eq 2
           test "$(grep -h '^REAL_USB_SUBMIT=0$' /tmp/d278-run-*.log | wc -l)" -eq 2
           test "$(grep -h '^D4_REACHABLE=false$' /tmp/d278-run-*.log | wc -l)" -eq 2
+      - name: D278/02 native target-material and live-capable harness runs
+        run: |
+          libfprint-driver/tests/run_goodix_d278_02_test.sh | tee /tmp/d278-02-run-1.log
+          libfprint-driver/tests/run_goodix_d278_02_test.sh | tee /tmp/d278-02-run-2.log
+          test "$(grep -h '^D278_02_PRINCIPAL_RESULT=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^D278_02_LIVE_HARNESS_BUILD=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^D278_02_SELF_TEST=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^REAL_USB_ACCESS=0$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^REAL_USB_SUBMIT=0$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
       - name: D276/02 and D276/03 regressions
         run: |
           libfprint-driver/tests/run_goodix_fpimage_device_test.sh
@@ -48,8 +57,11 @@ jobs:
         run: |
           python3 -m json.tool analysis/D276/D276_04_native_tls_fpi_usb_host_only.json >/dev/null
           python3 -m json.tool analysis/D278/D278_01_native_secure_session_host_only.json >/dev/null
+          python3 -m json.tool analysis/D278/D278_02_native_target_material_secure_session_prep.json >/dev/null
           ! rg -n 'socket\s*\(|connect\s*\(|/dev/bus/usb|27c6.*5125' libfprint-driver/goodix_tls_server.[ch] libfprint-driver/goodix_fpi_usb_backend.[ch]
           test "$(rg -n 'goodix_usb_router_receive_complete \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 1
           ! rg -n '0xd4|D4|--live-|g_usb_device_open|fpi_usb_transfer_submit' libfprint-driver/goodix_secure_session.[ch] libfprint-driver/goodix_a0_protocol.[ch]
+          ! rg -n 'LoadLibrary|dlopen|execve|posix_spawn|system\s*\(' tools/goodix_d190_pe.[ch]
+          test "$(rg -n 'production_submit_in \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 2
           git diff --check HEAD^
           test -z "$(git status --short)"

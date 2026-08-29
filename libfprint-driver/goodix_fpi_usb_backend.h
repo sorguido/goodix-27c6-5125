@@ -19,6 +19,11 @@ typedef void (*GoodixFpiUsbBackendOutCompletedFunc) (
   guint64              submit_generation,
   const GError        *error,
   gpointer             user_data);
+typedef void (*GoodixFpiUsbBackendInCompletedFunc) (
+  GoodixFpiUsbBackend *backend,
+  guint64              submit_generation,
+  const GError        *error,
+  gpointer             user_data);
 
 GoodixFpiUsbBackend *goodix_fpi_usb_backend_new (FpDevice *device,
                                                   GoodixUsbRouter *router,
@@ -40,6 +45,10 @@ void goodix_fpi_usb_backend_set_out_completed_callback (
   GoodixFpiUsbBackend                 *backend,
   GoodixFpiUsbBackendOutCompletedFunc  callback,
   gpointer                             user_data);
+void goodix_fpi_usb_backend_set_in_completed_callback (
+  GoodixFpiUsbBackend                *backend,
+  GoodixFpiUsbBackendInCompletedFunc  callback,
+  gpointer                            user_data);
 gboolean goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                                                    guint64 generation,
                                                    GCancellable *cancellable,
@@ -64,7 +73,10 @@ gboolean goodix_fpi_usb_backend_can_free (GoodixFpiUsbBackend *backend);
 guint goodix_fpi_usb_backend_get_outstanding (GoodixFpiUsbBackend *backend);
 guint goodix_fpi_usb_backend_get_out_outstanding (GoodixFpiUsbBackend *backend);
 guint goodix_fpi_usb_backend_get_max_outstanding (GoodixFpiUsbBackend *backend);
+guint goodix_fpi_usb_backend_get_max_out_outstanding (GoodixFpiUsbBackend *backend);
 guint64 goodix_fpi_usb_backend_get_delivery_count (GoodixFpiUsbBackend *backend);
 guint64 goodix_fpi_usb_backend_get_real_submit_count (GoodixFpiUsbBackend *backend);
 guint64 goodix_fpi_usb_backend_get_out_submit_count (GoodixFpiUsbBackend *backend);
+guint64 goodix_fpi_usb_backend_get_in_completion_count (GoodixFpiUsbBackend *backend);
+guint64 goodix_fpi_usb_backend_get_out_completion_count (GoodixFpiUsbBackend *backend);
 #endif

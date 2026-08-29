@@ -63,6 +63,10 @@ typedef struct
   guint transport_reopen_count;
   guint device_reset_count;
   guint persistent_write_count;
+  guint e4_validator_cleanse_count;
+  guint config90_cleanse_count;
+  guint material_descriptor_cleanse_count;
+  gboolean project_material_zeroized;
   gboolean tls_established;
   gboolean d4_reachable;
   guint64 generation;
@@ -80,6 +84,10 @@ typedef void (*GoodixSecureSessionScheduleFunc) (GoodixSecureSession *session,
 typedef void (*GoodixSecureSessionTerminalFunc) (GoodixSecureSession *session,
                                                  const GError *error,
                                                  gpointer user_data);
+typedef void (*GoodixSecureSessionPhaseFunc) (GoodixSecureSession *session,
+                                              GoodixSecurePhase    phase,
+                                              guint64              generation,
+                                              gpointer             user_data);
 
 GoodixSecureSession *goodix_secure_session_new (
   GoodixFpiUsbBackend                  *backend,
@@ -103,6 +111,10 @@ void     goodix_secure_session_pacing_ready (GoodixSecureSession *session,
                                              guint64 generation);
 void     goodix_secure_session_cancel (GoodixSecureSession *session,
                                        const gchar *reason);
+void     goodix_secure_session_set_phase_callback (
+  GoodixSecureSession          *session,
+  GoodixSecureSessionPhaseFunc  callback,
+  gpointer                      user_data);
 
 GoodixSecurePhase goodix_secure_session_get_phase (const GoodixSecureSession *session);
 const GError     *goodix_secure_session_get_error (const GoodixSecureSession *session);
