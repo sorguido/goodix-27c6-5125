@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-audit D278/04 — re-entry cross-session supportato come gap architetturale, occorrenza device-side irrisolta; nessuna live autorizzata
+### Stato corrente post-audit D278/04 riconciliato con la seconda single-shot — gap di re-entry cross-session provato e fenomeno osservato sul target, identità causale non provata; nessuna live autorizzata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -177,7 +177,8 @@ D278_03_PRELIVE_LAUNCHER_SHA256=a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f
 D278_03_PRELIVE_OPERATOR_PROCEDURE_PREPARED=true
 D278_03_PRELIVE_OPERATOR_STOP_GATE_PRESENT=true
 D278_03_LIVE_EXECUTION_PERFORMED=true
-D278_03_LIVE_RUN_COUNT=1
+D278_03_LIVE_RUN_COUNT=1  # prima single-shot; la seconda è tracciata dai marker D278_03_SECOND_SINGLE_SHOT_*
+D278_03_LIVE_RUN_COUNT_TOTAL=2
 D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE
 D278_03_LIVE_AUTHORIZATION_CONSUMED=true
 D278_03_A8_NATIVE_LIVE=PASS
@@ -223,18 +224,58 @@ D278_03_POST_CORRECTIVE_HOST_NATIVE_LDD=PASS
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST=PASS
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST_RC=0
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST_REAL_USB_ACCESS=0
-D278_04_OUTCOME=READY
-D278_04_ADVANCEMENT=ARCHITECTURAL_BOUNDARY_CLARIFIED
+D278_03_SECOND_SINGLE_SHOT_AUTHORIZED_AND_EXECUTED=true
+D278_03_SECOND_SINGLE_SHOT_RUN_COUNT=1
+D278_03_SECOND_SINGLE_SHOT_REPOSITORY_HEAD_AT_AUTHORIZATION=5fbbe3f37d09d2b9f41e4a3906a2a759e8122f21
+D278_03_SECOND_SINGLE_SHOT_LIVE_CRITICAL_BASELINE=4e5d74770bce6e0a9de929b19279038827abff8c
+D278_03_SECOND_SINGLE_SHOT_LAUNCHER_SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d
+D278_03_SECOND_SINGLE_SHOT_LIVE_RC=1
+D278_03_SECOND_SINGLE_SHOT_LIVE_LOG=/tmp/d278_03_native_secure_session_second_single_shot_20260829.log
+D278_03_SECOND_SINGLE_SHOT_LIVE_LOG_SHA256=647b3c21f6954440fa29e54d6d31c29647d4d8434d08bc46f73dae1d8c553c5a
+D278_03_SECOND_SINGLE_SHOT_RESULT=FAIL_SECURE_SESSION_TERMINAL_AT_A8
+D278_03_SECOND_SINGLE_SHOT_PHASE_TRACE=A8,TERMINAL
+D278_03_SECOND_SINGLE_SHOT_COMMAND_COUNT=1
+D278_03_SECOND_SINGLE_SHOT_ACK_COUNT=0
+D278_03_SECOND_SINGLE_SHOT_TYPED_RESPONSE_COUNT=0
+D278_03_SECOND_SINGLE_SHOT_PROTOCOL_FAILURE_PHASE=A8
+D278_03_SECOND_SINGLE_SHOT_PROTOCOL_FAILURE_KIND=TYPED_SHAPE_MISMATCH
+D278_03_SECOND_SINGLE_SHOT_OBSERVED_OUTER_TYPE=160
+D278_03_SECOND_SINGLE_SHOT_OBSERVED_A0_CONTROL=228
+D278_03_SECOND_SINGLE_SHOT_OBSERVED_BODY_LENGTH=41
+D278_03_SECOND_SINGLE_SHOT_E4_BINDING_MATCH=true
+D278_03_SECOND_SINGLE_SHOT_TLS_ESTABLISHED=false
+D278_03_SECOND_SINGLE_SHOT_D4_REACHABLE=false
+D278_03_SECOND_SINGLE_SHOT_RETRY_COUNT=0
+D278_03_SECOND_SINGLE_SHOT_TRANSPORT_REOPEN_COUNT=0
+D278_03_SECOND_SINGLE_SHOT_DEVICE_RESET_COUNT=0
+D278_03_SECOND_SINGLE_SHOT_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_03_SECOND_SINGLE_SHOT_PROJECT_SECRET_ZEROIZED=true
+D278_03_SECOND_SINGLE_SHOT_BACKEND_DRAINED=true
+D278_03_SECOND_SINGLE_SHOT_TERMINAL_CLEANUP_COMPLETED=true
+D278_03_SECOND_SINGLE_SHOT_LIVE_AUTHORIZATION_CONSUMED=true
+D278_03_SECOND_SINGLE_SHOT_DO_NOT_RUN_AGAIN=true
+D278_04_OUTCOME=READY_FOR_AI_PM_REVIEW
+D278_04_ADVANCEMENT=ARCHITECTURAL_BOUNDARY_PROVEN_AND_TARGET_REENTRY_PHENOMENON_OBSERVED
 HOST_ASYNC_TRANSFER_DRAIN=PROVEN_HOST_ONLY
 CROSS_SESSION_FRAME_PROVENANCE=ABSENT_AS_HOST_GUARANTEE
 DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED
 PRE_A8_REENTRY_SYNCHRONIZATION=UNRESOLVED
-CROSS_SESSION_REENTRY_GAP=SUPPORTED_BUT_DEVICE_SIDE_UNRESOLVED
-H6_CROSS_SESSION_RX_RESIDUAL_CURRENT_EXPLANATION=SUPPORTED_AS_ARCHITECTURAL_RISK_NOT_PROVEN_AS_D278_03_CAUSE
-SAFE_READ_ONLY_RESYNC_DESIGN=NOT_YET_JUSTIFIED
+CROSS_SESSION_REENTRY_ARCHITECTURAL_GAP=PROVEN
+TARGET_UNEXPECTED_PRIOR_PHASE_SHAPE_AT_REENTRY=OBSERVED
+OBSERVED_REENTRY_FRAME_OUTER=0xA0
+OBSERVED_REENTRY_FRAME_CONTROL=0xE4
+OBSERVED_REENTRY_FRAME_BODY_LENGTH=41
+OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_TYPED_SHAPE=true
+CROSS_SESSION_RX_RESIDUAL_TARGET_HYPOTHESIS=STRONGLY_LIVE_CORROBORATED
+CROSS_SESSION_RX_RESIDUAL_CAUSAL_IDENTITY=UNPROVEN
+H6_CROSS_SESSION_RX_RESIDUAL_CURRENT_EXPLANATION=STRONGLY_LIVE_CORROBORATED_CAUSAL_IDENTITY_UNPROVEN
+ACK_POLICY_CORRECTIVE_REFUTED=false
+ACK_POLICY_CORRECTIVE_LIVE_RETESTED=false
+SAFE_READ_ONLY_RESYNC_DESIGN=NOT_IMPLEMENTED_DESIGN_REVIEW_REQUIRED
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_04;NO_NEW_LIVE_WITHOUT_A_MATERIALLY_DIFFERENT_SAFETY_JUSTIFIED_DIAGNOSTIC_AND_SEPARATE_AUTHORIZATION
+RETRY_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_04_POST_SECOND_LIVE_EVIDENCE_THEN_DESIGN_REVIEW_OF_BOUNDED_READ_ONLY_CROSS_SESSION_REENTRY_DISCRIMINATION
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -840,7 +881,8 @@ non ha usato `sudo`, store protetto, USB reale o live.
 ```text
 D278_03_OUTCOME=READY_FOR_AI_PM_REVIEW
 D278_03_LIVE_EXECUTION_PERFORMED=true
-D278_03_LIVE_RUN_COUNT=1
+D278_03_LIVE_RUN_COUNT=1  # prima single-shot
+D278_03_LIVE_RUN_COUNT_TOTAL=2
 D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE
 D278_03_LIVE_AUTHORIZATION_CONSUMED=true
 D278_03_A8_NATIVE_LIVE=PASS
@@ -893,7 +935,7 @@ D278_03_POST_CORRECTIVE_HOST_NATIVE_LDD=PASS
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST=PASS
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST_RC=0
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST_REAL_USB_ACCESS=0
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_FINAL_DOCUMENTATION_THEN_SEPARATE_SECOND_SINGLE_SHOT_LIVE_AUTHORIZATION_DECISION
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D278_03_CORRECTIVE=AI_PM_REVIEW_OF_FINAL_DOCUMENTATION_THEN_SEPARATE_SECOND_SINGLE_SHOT_LIVE_AUTHORIZATION_DECISION  # decisione poi presa; seconda run eseguita e autorizzazione consumata
 ```
 
 La procedura copiabile, lo STOP gate e la matrice della review pre-live restano
@@ -901,15 +943,30 @@ come provenance storica in
 `analysis/D278/D278_03_native_secure_session_prelive_closure.md`. Il risultato
 live e il riesame/correttivo sono nei due artefatti D278/03 post-live.
 
+Quella decisione separata è stata poi presa: l'Utente ha autorizzato ed eseguito
+esattamente **una seconda** single-shot sulla baseline post-corrective
+`4e5d74770bce6e0a9de929b19279038827abff8c` con il launcher
+`SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d`. La
+run non ha ritestato E4: ha trasmesso il solo A8 (`command_count=1`) e si è
+fermata `SECURE_SESSION_TERMINAL` già in fase A8, perché il primissimo frame IN
+non era l'ACK A8 atteso. La telemetria completa, la lettura epistemica e le
+conseguenze sono nella sezione D278/04 qui sotto, che è l'autorità corrente per
+quella evidenza. L'autorizzazione live è consumata
+(`D278_03_SECOND_SINGLE_SHOT_LIVE_AUTHORIZATION_CONSUMED=true`,
+`RETRY_AUTHORIZED=false`, `DO_NOT_RUN_AGAIN=true`) e il correttivo ACK resta
+quindi non ritestato live (`ACK_POLICY_CORRECTIVE_LIVE_RETESTED=false`) e non
+refutato (`ACK_POLICY_CORRECTIVE_REFUTED=false`).
+
 Riesame metodologico per qualunque futura proposta, qui non autorizzata:
 (1) il cambiamento materiale è la riconciliazione della policy C a D238, non
 la sola telemetria; (2) la nuova ipotesi è che il binding E4 autentico fosse
 corretto e che il gate sia fallito per il rifiuto dello status di successo;
 (3) se E4 fallisse ancora, `NO THIRD EQUIVALENT FULL RUN`: riesame offline
 della telemetria strutturale e nuova diagnostica solo se progettata,
-revisionata e autorizzata separatamente.
+revisionata e autorizzata separatamente. Il punto (2) resta un'ipotesi non
+verificata sul target: la seconda run è terminata prima di E4.
 
-### D278/04 — boundary del protocol re-entry cross-session
+### D278/04 — boundary del protocol re-entry cross-session, riconciliato con la seconda single-shot live
 
 L'audit statico/host-only D278/04 separa per la prima volta il drain dei
 transfer host dalla provenance causale dei byte. D276 prova che un callback
@@ -953,12 +1010,53 @@ risposte già prodotte. Queste sono
 la quiescenza del protocollo dopo cancel/release/close/new open restano
 target-specific `UNKNOWN/UNRESOLVED`.
 
-Il gap è quindi `SUPPORTED_BUT_DEVICE_SIDE_UNRESOLVED`: è verificata l'assenza
-di una garanzia host di cross-session frame provenance, ma non è osservato un
-residuo sul target. `CROSS_SESSION_RX_RESIDUAL` è supportato solo come rischio
-architetturale, non come causa della run D278/03. Per D278/03 resta più forte la
-causa ACK C/D238 già documentata e lo status E4 corrente non era
-telemetrizzato.
+Il gap architetturale è quindi `PROVEN`: è verificata staticamente l'assenza di
+una garanzia host di cross-session frame provenance, mentre il fencing copre
+correttamente il solo `OLD_CALLBACK_FROM_GENERATION_N`.
+
+La seconda single-shot live D278/03 ha poi aggiunto il fatto che l'audit
+statico non possedeva. In una **nuova** sessione, con una sola
+open/claim/release/close, un solo OUT (`command_count=1`, il solo A8) e un solo
+IN, quel primissimo IN non era l'ACK A8 atteso ma
+`observed_outer_type=160` (`0xA0`), `observed_a0_control=228` (`0xE4`),
+`observed_body_length=41`, senza campi ACK
+(`observed_ack_echo=-1`, `observed_ack_status=-1`, `ack_count=0`,
+`typed_response_count=0`). Il parser ha fallito chiuso con
+`protocol_failure_kind=TYPED_SHAPE_MISMATCH` in `protocol_failure_phase=A8` e la
+run si è chiusa a `phase_trace=A8,TERMINAL` con cleanup completo, zero
+retry/reopen/reset, zero scritture persistenti e secret azzerato. `control=0xE4`
+con body di 41 byte è esattamente la shape canonica della typed response E4
+(`libfprint-driver/goodix_secure_session.c::validate_typed`: prefisso di 9 byte
+più 32 byte di validator). Il fenomeno del re-entry non è dunque più soltanto un
+rischio architetturale: è **osservato sul target**.
+
+L'identità causale resta però non provata. Il frame è stato rifiutato in fase A8
+per control inatteso, quindi i 41 byte non sono stati confrontati con il
+validator corrente; e nemmeno un confronto byte-esatto discriminerebbe, perché il
+validator E4 deriva dal materiale protetto persistente pinnato per SHA-256 ed è
+identico fra le run, senza componente per-run. Il wire A0 non porta nonce,
+session ID, epoch o timestamp causale. Restano quindi compatibili, e non
+discriminabili con questa telemetria, il residuo cross-session della typed
+response E4 mai letta dalla prima run, una risposta tardiva/retransmissione della
+nuova sessione, uno stato di protocollo APP12509 non quiescente e un dato
+bufferizzato nella catena kernel/host-controller. La prima spiegazione è la più
+naturale e ora fortemente corroborata, non provata.
+
+La catena epistemica canonica è pertanto:
+
+```text
+D278/04 static audit
+  → gap architetturale host/device provenance (PROVEN staticamente)
+  → seconda single-shot (autorizzazione consumata, nessun retry)
+  → nuova sessione in A8 riceve A0/E4/body41
+  → fenomeno target OBSERVED
+  → causal identity con la precedente typed response E4 ancora UNPROVEN
+```
+
+La seconda run non ritesta il correttivo ACK: con un solo comando inviato non ha
+raggiunto l'E4 della sessione corrente e non ha ricevuto alcun ACK. Il correttivo
+non è né refutato né riprovato live, e per la prima run resta valida la causa ACK
+C/D238 già documentata con status E4 corrente non telemetrizzato.
 
 ```text
 H1_HISTORICAL_GENERIC_PRE_A8_DRAIN=DISPROVEN
@@ -966,26 +1064,40 @@ H2_A8_CROSS_SESSION_SYNCHRONIZER=UNRESOLVED
 H3_D266_CROSS_SESSION_PROVENANCE=DISPROVEN
 H4_MULTI_IMAGE_CROSS_SESSION_REENTRY=DISPROVEN
 H5_NATIVE_GENERATION_FENCING_SUFFICIENT=DISPROVEN
-H6_CROSS_SESSION_RX_RESIDUAL_CURRENT_EXPLANATION=SUPPORTED
-CROSS_SESSION_REENTRY_GAP=SUPPORTED_BUT_DEVICE_SIDE_UNRESOLVED
-SAFE_READ_ONLY_RESYNC_DESIGN=NOT_YET_JUSTIFIED
+H6_CROSS_SESSION_RX_RESIDUAL_CURRENT_EXPLANATION=STRONGLY_LIVE_CORROBORATED_CAUSAL_IDENTITY_UNPROVEN
+CROSS_SESSION_REENTRY_ARCHITECTURAL_GAP=PROVEN
+TARGET_UNEXPECTED_PRIOR_PHASE_SHAPE_AT_REENTRY=OBSERVED
+OBSERVED_REENTRY_FRAME_OUTER=0xA0
+OBSERVED_REENTRY_FRAME_CONTROL=0xE4
+OBSERVED_REENTRY_FRAME_BODY_LENGTH=41
+OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_TYPED_SHAPE=true
+CROSS_SESSION_RX_RESIDUAL_TARGET_HYPOTHESIS=STRONGLY_LIVE_CORROBORATED
+CROSS_SESSION_RX_RESIDUAL_CAUSAL_IDENTITY=UNPROVEN
+ACK_POLICY_CORRECTIVE_REFUTED=false
+ACK_POLICY_CORRECTIVE_LIVE_RETESTED=false
+SAFE_READ_ONLY_RESYNC_DESIGN=NOT_IMPLEMENTED_DESIGN_REVIEW_REQUIRED
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+DO_NOT_RUN_AGAIN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_04_POST_SECOND_LIVE_EVIDENCE_THEN_DESIGN_REVIEW_OF_BOUNDED_READ_ONLY_CROSS_SESSION_REENTRY_DISCRIMINATION
 ```
 
-Non è giustificato alcun pre-A8 blind read, discard-until-A8, timeout-drain,
-clear-halt, reset, reopen, retry o parser permissivo: un frame inatteso resta
-evidenza finché non esiste un discriminante sicuro. Per decidere l'occorrenza
-APP12509 servirebbe osservazione reale e un diagnostico separato, bounded,
-safety-reviewed e autorizzato. La sola telemetria aggiuntiva non è un cambio di
-metodo sufficiente; un vero test dovrebbe distinguere il callback host vecchio,
-già chiuso offline, dal callback nuovo con dati causalmente vecchi. Se un
-futuro tentativo fallisse ancora allo stesso punto, non è ammessa una run
-equivalente ulteriore: si conserva fail-closed la prima failure strutturale e
-si torna ad audit. Il report canonico è
+Non è giustificato né implementato alcun pre-A8 blind read, discard-until-A8,
+timeout-drain, clear-halt, reset, reopen, retry o parser permissivo: un frame
+inatteso resta evidenza finché non esiste un discriminante sicuro, e la seconda
+run lo dimostra proprio conservandolo fail-closed invece di scartarlo. Il lavoro
+successivo non è più stabilire se il fenomeno esista sul target, ma una **design
+review** che decida se sia possibile una discriminazione read-only, bounded e
+fail-closed del primissimo IN di una nuova sessione, senza comandi aggiuntivi,
+senza reset/clear-halt/reopen/retry, senza allentare il parser e senza perdere
+evidenza valida; il design non è oggetto di questo aggiornamento e non è
+implementato. Nessuna nuova run equivalente è ammessa: l'autorizzazione live è
+consumata, `RETRY_AUTHORIZED=false` e una futura diagnostica richiederebbe
+progettazione, review e autorizzazione separate. Il report canonico è
 `analysis/D278/D278_04_cross_session_protocol_reentry_audit.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
@@ -2774,8 +2886,11 @@ transfer nuovo ricevesse byte prodotti prima della propria generation, i
 check host vedrebbero correttamente N+1. Né la generation né il frame A0/B0
 contengono provenance cross-open/process. `goodix_usb_router_begin_generation`
 svuota il solo buffer di riassemblaggio userspace; non asserisce la coda
-endpoint o lo stato del protocollo device. Questa seconda classe è supportata
-come rischio architetturale ma resta non osservata sul target APP12509.
+endpoint o lo stato del protocollo device. Questo boundary è provato
+staticamente e la seconda single-shot D278/03 ne ha osservato il fenomeno sul
+target APP12509 — nuova sessione in fase A8, primo IN `A0/E4/body41` — senza
+però provare che quei byte fossero causalmente la typed response E4 della run
+precedente.
 
 La cancellazione prima di `activate_complete(NULL)` termina invece la fase con
 `fpi_image_device_activate_complete(..., G_IO_ERROR_CANCELLED)`: in quel punto
@@ -5611,7 +5726,7 @@ eseguito il 29 agosto 2026 il preflight autentico read-only dei materiali
 protetti (`--material-preflight-only`) con `PASS`, `e4_binding_match=true` e
 zero accesso USB. D278/03 ha poi confermato sulla baseline revisionata la
 executable closure locale Fedora e ha preparato la procedura single-shot
-fail-closed. La singola run successivamente autorizzata e consumata ha provato
+fail-closed. La prima run autorizzata e consumata ha provato
 A8 nativo, inviato E4 ed è terminata sul primo frame IN E4 prima di un ACK
 accettato, senza raggiungere TLS. Il riesame post-live ha provato la divergenza
 della policy ACK C rispetto a D238 e l'ha corretta offline con test normal e
@@ -5629,14 +5744,44 @@ vecchio launcher pre-corrective (`SHA256=a48488b0817256d896a77bf2ac037ff5bef1052
 diverso e preservato in `/tmp`. La post-corrective executable closure e i relativi
 log sono stati revisionati AI-PM con PASS; il launcher candidate è stato inoltre
 verificato host-native sul Fedora operatore con ldd e self-test PASS, RC=0 e
-zero USB. Il confine immediato è quindi la review AI-PM finale della
-documentazione e, soltanto dopo, una separata decisione su un'eventuale seconda
-run hardware single-shot, senza alcuna autorizzazione live implicita: `CURRENT_LIVE_AUTHORIZED=false`,
+zero USB.
+
+Dopo quella review l'Utente ha deciso separatamente e ha eseguito **una sola
+seconda** single-shot con quel launcher sulla baseline
+`4e5d74770bce6e0a9de929b19279038827abff8c`. La run non ha ritestato E4: ha
+inviato il solo A8 (`command_count=1`) e si è chiusa
+`SECURE_SESSION_TERMINAL` già in fase A8 (`phase_trace=A8,TERMINAL`,
+`LIVE_RC=1`), perché il primissimo frame IN della nuova sessione era
+`outer=0xA0`, `control=0xE4`, `body_length=41` — la shape canonica della typed
+response E4 — invece dell'ACK A8 atteso, con
+`protocol_failure_kind=TYPED_SHAPE_MISMATCH`. Cleanup, drain e safety sono
+`PASS`: una open/claim/release/close, un IN e un OUT, zero retry, reopen, reset e
+scritture persistenti, secret azzerato, D4/TLS/finger/image irraggiungibili.
+
+Il current critical boundary del percorso nativo si sposta quindi al **protocol
+re-entry cross-session**, non più al solo gate E4. Il gap architetturale
+host/device provenance è provato staticamente
+(`CROSS_SESSION_REENTRY_ARCHITECTURAL_GAP=PROVEN`), il fenomeno è ora osservato
+sul target (`TARGET_UNEXPECTED_PRIOR_PHASE_SHAPE_AT_REENTRY=OBSERVED`), ma
+l'identità causale con la typed response E4 rimasta dalla prima run resta non
+provata (`CROSS_SESSION_RX_RESIDUAL_TARGET_HYPOTHESIS=STRONGLY_LIVE_CORROBORATED`,
+`CROSS_SESSION_RX_RESIDUAL_CAUSAL_IDENTITY=UNPROVEN`), perché il wire A0 non
+porta provenance e il validator E4 dipende dal solo materiale persistente. Il
+correttivo ACK non è stato esercitato in questa run
+(`ACK_POLICY_CORRECTIVE_LIVE_RETESTED=false`) e non è refutato
+(`ACK_POLICY_CORRECTIVE_REFUTED=false`). Il confine immediato è quindi la review
+AI-PM di D278/04 alla luce di questa seconda evidenza live e, soltanto dopo, una
+design review su un'eventuale discriminazione read-only, bounded e fail-closed
+del re-entry, qui non progettata né implementata. Nessun retry equivalente è
+autorizzato: `CURRENT_LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false`,
+`RETRY_AUTHORIZED=false`, `DO_NOT_RUN_AGAIN=true`,
 `TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true`,
 `D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE`,
+`D278_03_SECOND_SINGLE_SHOT_RESULT=FAIL_SECURE_SESSION_TERMINAL_AT_A8`,
 `D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS`,
-`D278_03_ACK_POLICY_CORRECTIVE_AI_PM_REVIEW=PASS` e
-`NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
+`D278_03_ACK_POLICY_CORRECTIVE_AI_PM_REVIEW=PASS`,
+`NATIVE_SECURE_SESSION_TARGET_PROVEN=false`,
+`TARGET_E4_NATIVE_LIVE_PROVEN=false` e `TARGET_TLS_NATIVE_LIVE_PROVEN=false`.
 
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
 la submission AF zero-tail e restituito direttamente una A0/AE con checksum
