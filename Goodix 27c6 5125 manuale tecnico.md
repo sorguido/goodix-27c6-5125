@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/02 — boundary materiali e harness live-capable chiusi host-only, target proof nativa limitata ad A8/A0
+### Stato corrente post-D278/02 — boundary materiali e harness live-capable chiusi host-only; preflight materiali protetti autentico PASS (E4 binding MATCH, zero USB); target proof nativa limitata ad A8/A0
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -104,8 +104,8 @@ NATIVE_TLS12_PSK_HANDSHAKE_HOST_ONLY_PROVEN=true
 NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
 NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
 
-D278_02_OUTCOME=READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW
-D278_02_ADVANCEMENT=PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED
+D278_02_OUTCOME=READY
+D278_02_ADVANCEMENT=AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_PASS_WITH_E4_BINDING_MATCH_AND_ZERO_USB
 D190_EXPRESSION_PROVENANCE_GATE=PASS
 NATIVE_D190_E4_BINDER_KAT_PROVEN=true
 D190_FIVE_INDEPENDENT_KATS=PASS
@@ -138,12 +138,32 @@ CORRECTIVE_CI=PASS
 PROTECTED_PREFLIGHT_FAILURE_OBSERVABILITY=PASS
 PROTECTED_PREFLIGHT_REDACTION=PASS
 NO_SECRET_BYTES_IN_FAILURE_TELEMETRY=PASS
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT
-TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
+D278_02_MICRO_CORRECTIVE_AI_PM_REVIEW=PASS
+D278_02_MICRO_CORRECTIVE_MERGED_MAIN=1d25abc7b4a99ea1719cc4381d6f780501483209
+D278_02_POST_MERGE_CI_RUN=33255017404
+D278_02_POST_MERGE_CI=PASS
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION
+TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true
+TARGET_PROTECTED_MATERIAL_PREFLIGHT=PASS
+TARGET_E4_BINDING_PREFLIGHT=PASS
+TARGET_MATERIAL_PREFLIGHT_FAILURE_STAGE=NONE
+TARGET_MATERIAL_PREFLIGHT_FAILURE_CLASS=none
+TARGET_MATERIAL_PREFLIGHT_RC=0
+TARGET_MATERIAL_PREFLIGHT_REAL_USB_ACCESS=0
+TARGET_MATERIAL_PREFLIGHT_USB_OPEN_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_USB_CLAIM_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_REAL_USB_SUBMIT_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_RETRY_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_DEVICE_RESET_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_PERSISTENT_DEVICE_WRITE_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_PROJECT_SECRET_ZEROIZED=true
+TARGET_E4_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
 LIVE_EXECUTION_PERFORMED=false
 D4_REACHABLE=false
 REAL_USB_ACCESS=0
 REAL_USB_SUBMIT=0
+APPLICATION_DATA_COUNT=0
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
@@ -523,10 +543,12 @@ CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=D278_02_NATIVE_TARGET_MATERIAL_AND_LIVE_CAPABLE_HARNESS_PREPARATION
 ```
 
-### D278/02 — boundary nativo dei materiali e harness secure-session live-capable, host-only
+### D278/02 — boundary nativo dei materiali, harness secure-session live-capable e preflight materiali protetti autentico
 
-D278/02 chiude il boundary preparatorio che D278/01 lasciava aperto, senza
-contattare il sensore e senza leggere lo store protetto reale. Il nuovo loader
+D278/02 chiude il boundary preparatorio che D278/01 lasciava aperto. La
+preparazione host-only e il ramo `--self-test` non contattano il sensore né
+leggono lo store protetto reale; in seguito l'operatore ha eseguito il solo
+preflight read-only dei materiali autentici. Il nuovo loader
 LGPL applica sui tre file target policy produttiva uid 0/mode 0600,
 `O_RDONLY|O_CLOEXEC|O_NOFOLLOW`, `fstat` pre/post, tipo/owner/mode/lunghezza,
 device/inode, hash, magic/layout PSK e contratti CONFIG90
@@ -552,8 +574,9 @@ La suite contiene 62 casi: 6 D190, 6 PE, 23 loader, 7 preflight-observability e 
 invocazioni consecutive del runner hanno eseguito ciascuna 62/62 normal e
 62/62 ASAN/UBSAN PASS, compilato il binding libfprint/GUsb completo ed eseguito
 soltanto `--self-test`, che termina intenzionalmente sul watchdog A8 con cleanup
-completo e contatori USB reali a zero. Il protected preflight e il ramo live
-non sono stati eseguiti.
+completo e contatori USB reali a zero. Il ramo live non è stato eseguito;
+il protected preflight autentico è stato invece eseguito dall'operatore
+(29 agosto 2026) in modalità `--material-preflight-only` con zero USB.
 
 Il correttivo D278/02 ha corretto il pin A2 della policy produttiva in
 `goodix_target_material_policy_production()`: il valore canonico, verificato in
@@ -564,16 +587,19 @@ policy produttiva con costanti attese ricavate dalle evidenze canoniche.
 
 La review AI-PM del correttivo A2 è `PASS`; il correttivo è confluito su main
 come `01b2379395b59219112236a6387bee9e5bd47bbf` e la CI `33252621869` è
-PASS. Il micro-correttivo corrente, ancora da revisionare, rende il preflight
-osservabile senza segreti: il JSON espone coppie stabili `failure_stage` e
-`failure_class` per policy/argomenti, open, metadata, read, content, PE/DLL,
-binding E4 ed export/state, senza propagare messaggi GError liberi. I test usano
-solo fixture sintetiche. Il preflight autentico non è stato eseguito e nessuna
-run USB/live è autorizzata.
+PASS. Il micro-correttivo di osservabilità ha superato la review AI-PM
+(`PASS`), è confluito su main con merge
+`1d25abc7b4a99ea1719cc4381d6f780501483209` e la CI post-merge `33255017404`
+è `PASS`; rende il preflight osservabile senza segreti: il JSON espone coppie
+stabili `failure_stage` e `failure_class` per policy/argomenti, open, metadata,
+read, content, PE/DLL, binding E4 ed export/state, senza propagare messaggi
+GError liberi. I test usano solo fixture sintetiche. Il preflight autentico è
+stato eseguito dall'operatore il 29 agosto 2026 con `PASS`, zero USB e
+`e4_binding_match=true`; nessuna run USB/live è autorizzata.
 
 ```text
-OUTCOME=READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW
-ADVANCEMENT=PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED
+OUTCOME=READY
+ADVANCEMENT=AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_PASS_WITH_E4_BINDING_MATCH_AND_ZERO_USB
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 MATERIAL_INVALID_BLOCKS_BEFORE_USB_OPEN=PASS
 SYNTHETIC_SINGLE_OPEN_CLAIM_EPOCH=PASS
@@ -589,10 +615,6 @@ D4_REACHABLE=false
 APPLICATION_DATA_COUNT=0
 PROJECT_SECRET_ZEROIZATION=PASS_TO_IMPLEMENTATION_BOUNDARY
 OPENSSL_INTERNAL_ZEROIZATION_ASSERTED=false
-TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
-LIVE_EXECUTION_PERFORMED=false
-NATIVE_SECURE_SESSION_TARGET_PROVEN=false
-CURRENT_LIVE_AUTHORIZED=false
 D278_02_TEST_COUNT_PER_BINARY_RUN=62
 PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
@@ -606,7 +628,30 @@ CORRECTIVE_CI=PASS
 PROTECTED_PREFLIGHT_FAILURE_OBSERVABILITY=PASS
 PROTECTED_PREFLIGHT_REDACTION=PASS
 NO_SECRET_BYTES_IN_FAILURE_TELEMETRY=PASS
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT
+D278_02_MICRO_CORRECTIVE_AI_PM_REVIEW=PASS
+D278_02_MICRO_CORRECTIVE_MERGED_MAIN=1d25abc7b4a99ea1719cc4381d6f780501483209
+D278_02_POST_MERGE_CI_RUN=33255017404
+D278_02_POST_MERGE_CI=PASS
+TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true
+TARGET_PROTECTED_MATERIAL_PREFLIGHT=PASS
+TARGET_E4_BINDING_PREFLIGHT=PASS
+TARGET_MATERIAL_PREFLIGHT_FAILURE_STAGE=NONE
+TARGET_MATERIAL_PREFLIGHT_FAILURE_CLASS=none
+TARGET_MATERIAL_PREFLIGHT_RC=0
+TARGET_MATERIAL_PREFLIGHT_REAL_USB_ACCESS=0
+TARGET_MATERIAL_PREFLIGHT_USB_OPEN_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_USB_CLAIM_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_REAL_USB_SUBMIT_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_RETRY_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_DEVICE_RESET_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_PERSISTENT_DEVICE_WRITE_COUNT=0
+TARGET_MATERIAL_PREFLIGHT_PROJECT_SECRET_ZEROIZED=true
+TARGET_E4_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
+LIVE_EXECUTION_PERFORMED=false
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION
 ```
 
 Riesame metodologico preparato, non eseguito come live: (1) rispetto a D277/02
@@ -616,8 +661,37 @@ APP12509 `A8→E4 MATCH→A2→82→A6→A2→70→80x4→90→D1→TLS→STOP` 
 persistenza; (3) al primo fallimento si ferma, registra fase/classe redatta,
 non ritenta/riapre/resetta, drena, azzera e torna ad AI-PM.
 
-Il prossimo boundary è la review AI-PM del micro-correttivo e, soltanto dopo accettazione, la decisione operatore su un preflight locale read-only dei materiali autentici, senza USB. La live secure-session resta una decisione futura separata. D278/02 non auto-approva una baseline e non autorizza
-una run.
+Il prossimo boundary è la review pre-live del live-critical set e, soltanto
+dopo approvazione esplicita di uno SHA live-critical, una eventuale nuova
+autorizzazione single-shot separata dell'Utente per la native target
+secure-session. La review AI-PM del micro-correttivo è `PASS` e il preflight
+autentico dei materiali protetti è `PASS` (29 agosto 2026, zero USB). La live
+secure-session resta una decisione futura separata. D278/02 non auto-approva
+una baseline e non autorizza una run.
+
+#### Preflight autentico dei materiali protetti — 29 agosto 2026
+
+L'operatore ha eseguito una sola volta `--material-preflight-only` dalla root
+canonica del repository, leggendo i file `root:root` `0600` con i privilegi
+host necessari a quel solo scopo; tale privilegio non costituisce autorizzazione
+USB/live. Il preflight ha verificato il percorso produttivo di caricamento e
+validazione dei materiali autentici e il binding D190 PSK→E4, ottenendo
+`failure_stage=NONE`, `preflight_passed=true`, `failure_class=none`,
+`e4_binding_match=true`, `project_secret_zeroized=true`, `PREFLIGHT_RC=0`,
+`usb_open_count=0`, `usb_claim_count=0`, `real_usb_submit_count=0`,
+`command_count=0`, `tls_handshake_count=0`, `persistent_device_write_count=0`
+e `retry_count=0`. L'evidenza redatta è in
+`analysis/D278/D278_02_operator_protected_material_preflight_20260829.json`.
+
+Questo PASS prova che il materiale reale supera il boundary protetto nativo con
+E4 binding `MATCH` e zero accesso USB; non prova l'invio live nativo di E4, la
+sua accettazione dal sensore, il completamento del pre-D1/D1, né il TLS nativo
+live. La taxonomy probatoria resta distinta: `D277_02_TARGET_PROOF` (A8/A0/APP12509),
+`D278_01_HOST_ONLY_PROOF` (secure-session sintetica host-only),
+`D278_02_HOST_ONLY_PROOF` (loader/binder/PE/composizione/watchdog/telemetria
+host-only) e `D278_02_AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT` (materiali autentici
+PASS, E4 binding MATCH, zero USB). `TARGET_UNPROVEN` resta vero per E4, pre-D1,
+D1 e TLS nativi live sul sensore.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -2434,7 +2508,7 @@ D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; generation authority context-onl
 D277/01 -> harness nativo A8 PASS_HOST_ONLY; singola run BLOCKED a USB open prima di claim/submit; storico preservato
 D277/02 -> prova nativa A8/A0 su target reale PASS; exact A8 → ACK → risposta tipata APP12509; autorizzazione consumata
 D278/01 -> secure-session A8→E4→pre-D1→D1→TLS→STOP PASS_HOST_ONLY; target proof resta falsa oltre A8/A0
-D278/02 -> binder D190 + PE + protected-material loader + harness/watchdog live-capable PASS_HOST_ONLY; live/preflight non eseguiti
+D278/02 -> binder D190 + PE + protected-material loader + harness/watchdog live-capable PASS_HOST_ONLY; authentic protected-material preflight PASS (E4 binding MATCH, zero USB); live non eseguita
 review   -> AI-PM valuta review set e baseline SHA; ogni nuova run richiede approvazione/autorizzazione esplicite
 ```
 
@@ -5223,13 +5297,16 @@ D278/01 ha chiuso host-only l'intera catena
 single-IN/single-OUT, B0 fixed64 zero-tail e pacing 10 ms generation-owned. È
 nuova evidenza eseguibile host-only, non target-specific: sul sensore reale il
 percorso nativo resta provato soltanto fino ad A8/ACK/typed APP12509 da D277/02.
-D278/02 aggiunge ora il loader protetto nativo, il binder D190 PSK→E4, il gate
+D278/02 aggiunge il loader protetto nativo, il binder D190 PSK→E4, il gate
 PE bounded, la composizione live-capable e il watchdog per fase, tutti provati
 host-only con fixture sintetiche; il binding GUsb/libfprint completo compila e
-il solo `--self-test` passa con zero accessi reali. Il confine immediato è
-review AI-PM e approvazione esplicita di uno SHA live-critical prima di una
-eventuale autorizzazione single-shot separata; `CURRENT_LIVE_AUTHORIZED=false`,
-`TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false` e
+il solo `--self-test` passa con zero accessi reali. In aggiunta, l'operatore ha
+eseguito il 29 agosto 2026 il preflight autentico read-only dei materiali
+protetti (`--material-preflight-only`) con `PASS`, `e4_binding_match=true` e
+zero accesso USB. Il confine immediato è la review pre-live del live-critical
+set e l'approvazione esplicita di uno SHA live-critical prima di una eventuale
+autorizzazione single-shot separata; `CURRENT_LIVE_AUTHORIZED=false`,
+`TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true` e
 `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
 
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
@@ -7576,8 +7653,12 @@ non modifica i costanti produttivi. `GoodixD278Harness` orchestra la stessa
 state machine per transport sintetico o `FpiUsbTransfer`, deriva telemetria
 redatta dallo stato reale e impedisce teardown prima del drain. Il launcher
 `d278_native_secure_session_once` è live-capable ma, nello step, soltanto il
-ramo sintetico `--self-test` è stato eseguito. Il protected store reale, GUsb
-enumeration/open/claim e ogni transfer reale sono rimasti irraggiungibili.
+ramo sintetico `--self-test` è stato eseguito. In seguito l'operatore ha
+eseguito il preflight autentico read-only dei materiali protetti (`--material-preflight-only`,
+29 agosto 2026): il protected store reale è stato letto una sola volta in modo
+read-only con i privilegi host necessari, mentre GUsb enumeration/open/claim e
+ogni transfer reale sono rimasti irraggiungibili (zero accesso USB,
+`e4_binding_match=true`, `project_secret_zeroized=true`).
 
 Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
