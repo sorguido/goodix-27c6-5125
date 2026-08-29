@@ -34,6 +34,31 @@ static const guint8 app12509_identity[] = "GF_ST411SEC_APP_12509";
 static const guint16 dac_registers[] = { 0x0220, 0x0236, 0x0238, 0x023a };
 static const guint config_dac_offsets[] = { 117, 121, 125, 129 };
 
+typedef struct
+{
+  GoodixSecurePhase phase;
+  guint8 allowed_statuses[2];
+} PhaseAckPolicy;
+
+/* D238 is the canonical cold-start/pre-D1 ACK authority.  Every row is
+ * explicit so future phases cannot inherit this bounded allowlist by opcode
+ * accident.  D1 is intentionally absent because it transitions directly to
+ * B0/TLS and never accepts an A0 ACK. */
+static const PhaseAckPolicy phase_ack_policies[] = {
+  { GOODIX_SECURE_PHASE_A8,        { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_E4,        { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_A2_1,      { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_CHIP_82,   { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_OTP_A6,    { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_A2_2,      { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_MODE_70,   { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_DAC_220,   { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_DAC_236,   { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_DAC_238,   { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_DAC_23A,   { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_CONFIG_90, { 0x01, 0x07 } },
+};
+
 struct _GoodixSecureSession
 {
   GoodixFpiUsbBackend *backend;
@@ -99,6 +124,68 @@ goodix_secure_phase_name (GoodixSecurePhase phase)
   };
 
   return (guint) phase < G_N_ELEMENTS (names) ? names[phase] : "INVALID";
+}
+
+const gchar *
+goodix_protocol_failure_kind_name (GoodixProtocolFailureKind kind)
+{
+  static const gchar *const names[] = {
+    "none",
+    "ACK_STATUS_REJECTED",
+    "ACK_ECHO_MISMATCH",
+    "ACK_SHAPE_MISMATCH",
+    "TYPED_CONTROL_MISMATCH",
+    "TYPED_SHAPE_MISMATCH",
+    "UNEXPECTED_OUTER_CLASS",
+    "MALFORMED_FRAME",
+  };
+
+  return (guint) kind < G_N_ELEMENTS (names) ? names[kind] : "INVALID";
+}
+
+static gboolean
+phase_ack_status_allowed (GoodixSecurePhase phase,
+                          guint8            status)
+{
+  for (guint i = 0; i < G_N_ELEMENTS (phase_ack_policies); i++)
+    if (phase_ack_policies[i].phase == phase)
+      return status == phase_ack_policies[i].allowed_statuses[0] ||
+             status == phase_ack_policies[i].allowed_statuses[1];
+  return FALSE;
+}
+
+static void
+record_protocol_failure (GoodixSecureSession      *session,
+                         GoodixProtocolFailureKind kind,
+                         gint                      outer_type,
+                         gint                      a0_control,
+                         gint                      ack_echo,
+                         gint                      ack_status,
+                         gssize                    body_length)
+{
+  if (session->audit == NULL || session->audit->protocol_failure_recorded)
+    return;
+  session->audit->protocol_failure_recorded = TRUE;
+  session->audit->protocol_failure_phase = session->phase;
+  session->audit->protocol_failure_kind = kind;
+  session->audit->observed_outer_type = outer_type;
+  session->audit->observed_a0_control = a0_control;
+  session->audit->observed_ack_echo = ack_echo;
+  session->audit->observed_ack_status = ack_status;
+  session->audit->observed_body_length = body_length;
+}
+
+static void
+record_malformed_frame (GoodixSecureSession *session,
+                        GBytes              *frame)
+{
+  gsize length;
+  const guint8 *data = g_bytes_get_data (frame, &length);
+
+  record_protocol_failure (session, GOODIX_PROTOCOL_FAILURE_MALFORMED_FRAME,
+                           length >= 1 ? data[0] : -1,
+                           length >= 5 ? data[4] : -1,
+                           -1, -1, -1);
 }
 
 static gboolean
@@ -656,6 +743,12 @@ goodix_secure_session_new (GoodixFpiUsbBackend                *backend,
       memset (audit, 0, sizeof *audit);
       audit->generation = generation;
       audit->d4_reachable = FALSE;
+      audit->protocol_failure_phase = GOODIX_SECURE_PHASE_TERMINAL;
+      audit->observed_outer_type = -1;
+      audit->observed_a0_control = -1;
+      audit->observed_ack_echo = -1;
+      audit->observed_ack_status = -1;
+      audit->observed_body_length = -1;
     }
   session->tls = goodix_tls_server_new (material->psk, material->psk_length,
                                         tls_output, tls_plaintext, session,
@@ -785,18 +878,31 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
     return;
   if (session->phase >= GOODIX_SECURE_PHASE_D1)
     {
+      gsize length;
+      const guint8 *data = g_bytes_get_data (frame, &length);
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_UNEXPECTED_OUTER_CLASS,
+        length >= 1 ? data[0] : -1, length >= 5 ? data[4] : -1,
+        -1, -1, -1);
       session_fail_literal (session, GOODIX_SECURE_ERROR_PROTOCOL,
                             "A0 is forbidden after D1");
       return;
     }
   if (session->logical_done)
     {
+      gsize length;
+      const guint8 *data = g_bytes_get_data (frame, &length);
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+        length >= 1 ? data[0] : -1, length >= 5 ? data[4] : -1,
+        -1, -1, -1);
       session_fail_literal (session, GOODIX_SECURE_ERROR_PROTOCOL,
                             "duplicate A0 response for completed phase");
       return;
     }
   if (g_bytes_get_size (frame) < 5)
     {
+      record_malformed_frame (session, frame);
       session_fail_literal (session, GOODIX_SECURE_ERROR_PROTOCOL,
                             "truncated A0 response");
       return;
@@ -806,6 +912,7 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
                               ((const guint8 *) g_bytes_get_data (frame, NULL))[4],
                               &message, &error))
     {
+      record_malformed_frame (session, frame);
       session_fail_error (session, g_steal_pointer (&error));
       return;
     }
@@ -813,15 +920,28 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
   expected = phase_control (session->phase);
   if (message.control == 0xb0)
     {
-      guint8 allowed_status;
-      if (session->ack_seen || body_length != 2 || body[0] != expected)
-        goto invalid_response;
-      allowed_status = body[1];
-      if (!((session->phase == GOODIX_SECURE_PHASE_A8 &&
-             (allowed_status == 0x01 || allowed_status == 0x07)) ||
-            (session->phase != GOODIX_SECURE_PHASE_A8 &&
-             allowed_status == 0x01)))
-        goto invalid_response;
+      if (session->ack_seen || body_length != 2)
+        {
+          record_protocol_failure (
+            session, GOODIX_PROTOCOL_FAILURE_ACK_SHAPE_MISMATCH,
+            0xa0, message.control, body_length >= 1 ? body[0] : -1,
+            body_length >= 2 ? body[1] : -1, (gssize) body_length);
+          goto invalid_response;
+        }
+      if (body[0] != expected)
+        {
+          record_protocol_failure (
+            session, GOODIX_PROTOCOL_FAILURE_ACK_ECHO_MISMATCH,
+            0xa0, message.control, body[0], body[1], (gssize) body_length);
+          goto invalid_response;
+        }
+      if (!phase_ack_status_allowed (session->phase, body[1]))
+        {
+          record_protocol_failure (
+            session, GOODIX_PROTOCOL_FAILURE_ACK_STATUS_REJECTED,
+            0xa0, message.control, body[0], body[1], (gssize) body_length);
+          goto invalid_response;
+        }
       session->ack_seen = TRUE;
       if (session->audit != NULL)
         session->audit->ack_count++;
@@ -833,9 +953,27 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
       goodix_a0_message_clear (&message);
       return;
     }
-  if (!session->ack_seen || phase_ack_only (session->phase) ||
-      !validate_typed (session, message.control, body, body_length))
-    goto invalid_response;
+  if (!session->ack_seen || phase_ack_only (session->phase))
+    {
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+        0xa0, message.control, -1, -1, (gssize) body_length);
+      goto invalid_response;
+    }
+  if (message.control != expected)
+    {
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_TYPED_CONTROL_MISMATCH,
+        0xa0, message.control, -1, -1, (gssize) body_length);
+      goto invalid_response;
+    }
+  if (!validate_typed (session, message.control, body, body_length))
+    {
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+        0xa0, message.control, -1, -1, (gssize) body_length);
+      goto invalid_response;
+    }
   if (session->audit != NULL)
     session->audit->typed_response_count++;
   session->logical_done = TRUE;
@@ -881,6 +1019,11 @@ goodix_secure_session_handle_b0 (GoodixSecureSession *session,
   if (session->phase < GOODIX_SECURE_PHASE_D1 ||
       session->phase == GOODIX_SECURE_PHASE_STOP)
     {
+      gsize observed_length;
+      const guint8 *observed = g_bytes_get_data (frame, &observed_length);
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_UNEXPECTED_OUTER_CLASS,
+        observed_length >= 1 ? observed[0] : -1, -1, -1, -1, -1);
       session_fail_literal (session, GOODIX_SECURE_ERROR_PROTOCOL,
                             "B0 is forbidden in the current phase");
       return;
@@ -908,6 +1051,7 @@ goodix_secure_session_handle_b0 (GoodixSecureSession *session,
   return;
 
 malformed:
+  record_malformed_frame (session, frame);
   session_fail_literal (session, GOODIX_SECURE_ERROR_PROTOCOL,
                         "malformed B0 wrapper");
 }

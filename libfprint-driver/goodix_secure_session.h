@@ -33,6 +33,18 @@ typedef enum
   GOODIX_SECURE_PHASE_TERMINAL,
 } GoodixSecurePhase;
 
+typedef enum
+{
+  GOODIX_PROTOCOL_FAILURE_NONE = 0,
+  GOODIX_PROTOCOL_FAILURE_ACK_STATUS_REJECTED,
+  GOODIX_PROTOCOL_FAILURE_ACK_ECHO_MISMATCH,
+  GOODIX_PROTOCOL_FAILURE_ACK_SHAPE_MISMATCH,
+  GOODIX_PROTOCOL_FAILURE_TYPED_CONTROL_MISMATCH,
+  GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+  GOODIX_PROTOCOL_FAILURE_UNEXPECTED_OUTER_CLASS,
+  GOODIX_PROTOCOL_FAILURE_MALFORMED_FRAME,
+} GoodixProtocolFailureKind;
+
 typedef struct
 {
   const guint8 *expected_identity;
@@ -70,6 +82,14 @@ typedef struct
   gboolean tls_established;
   gboolean d4_reachable;
   guint64 generation;
+  gboolean protocol_failure_recorded;
+  GoodixSecurePhase protocol_failure_phase;
+  GoodixProtocolFailureKind protocol_failure_kind;
+  gint observed_outer_type;
+  gint observed_a0_control;
+  gint observed_ack_echo;
+  gint observed_ack_status;
+  gssize observed_body_length;
 } GoodixSecureSessionAudit;
 
 typedef struct _GoodixSecureSession GoodixSecureSession;
@@ -121,6 +141,8 @@ const GError     *goodix_secure_session_get_error (const GoodixSecureSession *se
 GoodixTlsServer  *goodix_secure_session_get_tls_server (GoodixSecureSession *session);
 gboolean          goodix_secure_session_needs_receive (const GoodixSecureSession *session);
 const gchar      *goodix_secure_phase_name (GoodixSecurePhase phase);
+const gchar      *goodix_protocol_failure_kind_name (
+  GoodixProtocolFailureKind kind);
 
 G_END_DECLS
 

@@ -89,6 +89,13 @@ typedef struct
   gboolean terminal_cleanup_completed;
   guint synthetic_in_submit_count;
   guint synthetic_out_submit_count;
+  gchar protocol_failure_kind[64];
+  GoodixSecurePhase protocol_failure_phase;
+  gint observed_outer_type;
+  gint observed_a0_control;
+  gint observed_ack_echo;
+  gint observed_ack_status;
+  gssize observed_body_length;
 } GoodixD278Telemetry;
 
 typedef void (*GoodixD278SyntheticSubmitFunc) (GoodixD278Harness  *harness,

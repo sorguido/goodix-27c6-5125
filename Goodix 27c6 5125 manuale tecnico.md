@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/03 — executable closure locale PASS sull'host Fedora e procedura single-shot preparata; live non autorizzato, target proof nativa limitata ad A8/A0
+### Stato corrente post-live D278/03 — una run consumata fallita al gate E4; correttivo ACK D238 host-only PASS; nessuna live autorizzata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -142,7 +142,7 @@ D278_02_MICRO_CORRECTIVE_AI_PM_REVIEW=PASS
 D278_02_MICRO_CORRECTIVE_MERGED_MAIN=1d25abc7b4a99ea1719cc4381d6f780501483209
 D278_02_POST_MERGE_CI_RUN=33255017404
 D278_02_POST_MERGE_CI=PASS
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION
+D278_02_NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION
 TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true
 TARGET_PROTECTED_MATERIAL_PREFLIGHT=PASS
 TARGET_E4_BINDING_PREFLIGHT=PASS
@@ -159,17 +159,16 @@ TARGET_MATERIAL_PREFLIGHT_PERSISTENT_DEVICE_WRITE_COUNT=0
 TARGET_MATERIAL_PREFLIGHT_PROJECT_SECRET_ZEROIZED=true
 TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
-LIVE_EXECUTION_PERFORMED=false
-D4_REACHABLE=false
-REAL_USB_ACCESS=0
-REAL_USB_SUBMIT=0
-APPLICATION_DATA_COUNT=0
-CURRENT_LIVE_AUTHORIZED=false
+D278_02_LIVE_EXECUTION_PERFORMED=false
+D278_02_D4_REACHABLE=false
+D278_02_REAL_USB_ACCESS=0
+D278_02_REAL_USB_SUBMIT=0
+D278_02_APPLICATION_DATA_COUNT=0
 
 D278_03_BASELINE_HEAD=843290e7790d7930bb136d91510a3db9d3a97027
 AI_PM_STATIC_PRELIVE_REVIEW=PASS
 EXISTING_LAUNCHER_SUFFICIENT=true
-LIVE_CRITICAL_CODE_CHANGE_REQUIRED=false
+D278_03_PRELIVE_LIVE_CRITICAL_CODE_CHANGE_REQUIRED=false
 D278_03_EXECUTION_ENVIRONMENT=OPERATOR_FEDORA_HOST
 D278_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 D278_03_D278_02_RUNNER=PASS
@@ -177,10 +176,35 @@ D278_03_D278_01_D1_TLS_RUNNER=PASS
 D278_03_LAUNCHER_SHA256=a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f31d1c2bb5d3a251a
 D278_03_OPERATOR_PROCEDURE_PREPARED=true
 D278_03_OPERATOR_STOP_GATE_PRESENT=true
+D278_03_LIVE_EXECUTION_PERFORMED=true
+D278_03_LIVE_RUN_COUNT=1
+D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE
+D278_03_LIVE_AUTHORIZATION_CONSUMED=true
+D278_03_A8_NATIVE_LIVE=PASS
+D278_03_E4_OUT_NATIVE_LIVE=SENT
+D278_03_E4_ACCEPTED_ACK=false
+D278_03_TLS_REACHED=false
+D278_03_USB_OPEN_COUNT=1
+D278_03_USB_CLAIM_COUNT=1
+D278_03_USB_RELEASE_COUNT=1
+D278_03_USB_CLOSE_COUNT=1
+D278_03_RETRY_COUNT=0
+D278_03_TRANSPORT_REOPEN_COUNT=0
+D278_03_DEVICE_RESET_COUNT=0
+D278_03_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_03_PROJECT_SECRET_ZEROIZED=true
+D278_03_BACKEND_DRAINED=true
+D278_03_TERMINAL_CLEANUP_COMPLETED=true
+D278_03_NATIVE_ACK_POLICY_CORRECTIVE_REQUIRED=true
+D278_03_ACK_POLICY_AUTHORITY=D238
+D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS
+CURRENT_RUN_E4_ACK_07_NOT_DIRECTLY_TELEMETRIZED=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_03_ACK_POLICY_CORRECTIVE_NO_LIVE_AUTHORIZATION
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -483,9 +507,16 @@ Il codec A0 valida type, length LE16, tag esterno, control, length interno e
 checksum additivo; D1 conserva wire control `D1` e checksum seed `D0`. I golden
 vector A8 `a00600a6a803000000ff`, E4
 `a00c00ace40900030002bb00000000fd` e D1
-`a00600a6d103000000d7` passano normal e sanitizer. La policy ACK è
-phase-specific: solo A8 ammette `0x01|0x07`; E4..90 ammettono esattamente
-`0x01`; D1 non ammette A0 e richiede come prima classe B0/TLS ClientHello. Il passaggio
+`a00600a6d103000000d7` passano normal e sanitizer. La policy ACK originaria
+D278/01, oggi superata per la semantica ACK da D238 e dal correttivo post-live
+D278/03, era phase-specific ma ammetteva `0x01|0x07` soltanto per A8 ed
+esattamente `0x01` per E4..90. La policy C canonica corrente ammette invece
+esclusivamente `0x01|0x07` per ogni fase ACK-bearing, preservando echo esatto,
+body di due byte e il contratto ACK+typed oppure ACK-only specifico della fase.
+Nella matrice D238 da E4 in avanti, `0x07` resta osservato live direttamente
+soltanto per E4 e A2_1; sulle fasi successive l'ammissione è la bounded
+transport/session inference D238. D1 non
+ammette A0 e richiede come prima classe B0/TLS ClientHello. Il passaggio
 D1→TLS non deriva dal solo successo di `goodix_tls_server_push()`: avviene una
 sola volta soltanto dopo che OpenSSL ha elaborato abbastanza ClientHello da
 produrre il primo flight server. Frammenti TLS incompleti restano in D1 senza
@@ -664,10 +695,10 @@ TARGET_MATERIAL_PREFLIGHT_PERSISTENT_DEVICE_WRITE_COUNT=0
 TARGET_MATERIAL_PREFLIGHT_PROJECT_SECRET_ZEROIZED=true
 TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
-LIVE_EXECUTION_PERFORMED=false
+D278_02_LIVE_EXECUTION_PERFORMED=false
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION
+D278_02_NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION
 ```
 
 Riesame metodologico preparato, non eseguito come live: (1) rispetto a D277/02
@@ -677,10 +708,11 @@ APP12509 `A8→E4 MATCH→A2→82→A6→A2→70→80x4→90→D1→TLS→STOP` 
 persistenza; (3) al primo fallimento si ferma, registra fase/classe redatta,
 non ritenta/riapre/resetta, drena, azzera e torna ad AI-PM.
 
-Il prossimo boundary è la review pre-live del live-critical set e, soltanto
-dopo approvazione esplicita di uno SHA live-critical, una eventuale nuova
+Il boundary successivo a D278/02 era la review pre-live del live-critical set
+e, soltanto dopo approvazione esplicita di uno SHA live-critical, una eventuale
 autorizzazione single-shot separata dell'Utente per la native target
-secure-session. La review AI-PM del micro-correttivo è `PASS` e il preflight
+secure-session; tale stato storico è stato poi superato dalla singola run
+D278/03 descritta sotto. La review AI-PM del micro-correttivo è `PASS` e il preflight
 autentico dei materiali protetti è `PASS` (29 agosto 2026, zero USB). La live
 secure-session resta una decisione futura separata. D278/02 non auto-approva
 una baseline e non autorizza una run.
@@ -709,7 +741,7 @@ host-only) e `D278_02_AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT` (materiali autenti
 PASS, E4 binding MATCH, zero USB). `TARGET_UNPROVEN` resta vero per E4, pre-D1,
 D1 e TLS nativi live sul sensore.
 
-### D278/03 — executable closure locale Fedora e procedura single-shot pre-live
+### D278/03 — singola run live consumata, failure E4 e correttivo ACK offline
 
 La review statica HIGH AI-PM della baseline
 `843290e7790d7930bb136d91510a3db9d3a97027` è `PASS` e conclude che il
@@ -731,44 +763,102 @@ Entrambi i primi avvii nel sandbox AI si sono fermati prima di build/test per
 il blocco ambientale Flatpak/bwrap su `NETLINK_ROUTE`; per ciascun runner è
 stato eseguito un solo rerun diagnostico identico fuori sandbox, riuscito.
 Nessuna configurazione o flag è stata cambiata e non vi sono stati ulteriori
-rerun. Tutta l'esecuzione D278/03 è rimasta host-only: zero `sudo`, zero letture
-dello store protetto, zero USB e zero live.
+rerun. Tutta questa executable closure pre-live è rimasta host-only: zero
+`sudo`, zero letture dello store protetto, zero USB e zero live.
 
-La procedura futura usa lo stesso launcher dal terminale Fedora e lascia il
-`sudo` manuale all'Utente. Prima del singolo comando hardware ripete controlli
-shell fail-closed sul set live-critical rispetto alla baseline approvata e
-sullo SHA-256 del launcher. Il timeout host è 30 secondi più 5 secondi di kill
-grace, derivato dalla somma dei watchdog reali (11,75 secondi) con margine. La
-procedura contiene uno STOP gate esplicito ed è solo preparazione: richiede
-ancora review AI-PM, approvazione separata della baseline live-critical e dello
-SHA-256 e autorizzazione esplicita dell'Utente per una sola run.
+Quella procedura è stata successivamente autorizzata ed eseguita esattamente
+una volta sulla baseline live-critical approvata
+`843290e7790d7930bb136d91510a3db9d3a97027`, con `main` revisionato
+`a38fd26301069e4b2119e2d8cb342e0bcf8926a3` e launcher dello SHA-256 sopra
+indicato. L'autorizzazione single-shot è consumata. La run ha completato A8,
+inviato E4 e ha terminato sul primo frame IN di E4 prima di un ACK accettato:
+`phase_trace=A8,E4,TERMINAL`, due comandi, un ACK, una risposta tipata, tre
+completion IN e due OUT. TLS non è stato raggiunto.
+
+Il cleanup è `PASS`: una open/claim/release/close, massimo un IN e un OUT,
+zero retry, reopen, reset e scritture persistenti, secret project-owned
+azzerato, backend drenato e cleanup terminale completato. D4, application data,
+finger e image sono rimasti irraggiungibili. L'evidenza redatta è
+`analysis/D278/D278_03_native_secure_session_live_result_20260829.json`.
+
+Il riesame offline ha provato una divergenza del sequencer C rispetto
+all'autorità D238: D278/01 ammetteva status ACK `0x01|0x07` solo ad A8 e
+`0x01` nelle fasi successive, mentre D238 e il modello Python canonico
+ammettono come soli successi `0x01|0x07` per ogni fase ACK-bearing. D236
+corrobora causalmente il difetto: E4 `0x07` falliva come `unexpected_ack`, la
+correzione storica raggiungeva `E4_MATCH`, e la diagnostica A2_1 osservava
+direttamente status `0x07`. Il wording status-`0x01` di D232 resta evidenza
+storica immutata ma è superato da D238 limitatamente alla semantica ACK.
+
+La causa primaria è quindi
+`CURRENT_NATIVE_C_REJECTED_A_PROVEN_SUCCESS_ACK_CLASS_AT_E4`, con confidenza
+`HIGH_CAUSAL_HISTORICAL_CORROBORATION_BUT_CURRENT_STATUS_NOT_TELEMETRIZED`.
+Lo status E4 della run corrente non era presente nel log: `0x07` è probabile,
+non direttamente provato. Il correttivo C usa ora una tabella per fase che
+ammette soltanto `0x01|0x07`, mantenendo echo esatto, body ACK di due byte,
+risposte typed obbligatorie dove previste, fasi ACK-only e D1 diretto B0/TLS.
+La prima failure protocollare strutturale è inoltre conservata in telemetria
+redatta senza payload o materiale segreto.
+
+Le suite host-only post-correttivo passano: secure-session 11/11 normal e
+ASAN/UBSAN, D278/02 62/62 normal e ASAN/UBSAN, D276/02 15/15, D276/03 8/8,
+D276/04 5/5 e D277 15/15, ciascuna normal e sanitizer. I test coprono E4 e
+A2_1 `0x07`, `0x01` su tutte le classi, rifiuto di `0x02`, echo/shape errati,
+contratti typed/ACK-only, D1/B0 e telemetria E4 `0x02` redatta. Il correttivo
+non ha usato `sudo`, store protetto, USB reale o live.
 
 ```text
 D278_03_OUTCOME=READY_FOR_AI_PM_REVIEW
-D278_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D278_03_LIVE_EXECUTION_PERFORMED=true
+D278_03_LIVE_RUN_COUNT=1
+D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE
+D278_03_LIVE_AUTHORIZATION_CONSUMED=true
+D278_03_A8_NATIVE_LIVE=PASS
+D278_03_E4_OUT_NATIVE_LIVE=SENT
+D278_03_E4_ACCEPTED_ACK=false
+D278_03_TLS_REACHED=false
+D278_03_NATIVE_ACK_POLICY_CORRECTIVE_REQUIRED=true
+D278_03_ACK_POLICY_AUTHORITY=D238
+D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS
 AI_PM_STATIC_PRELIVE_REVIEW=PASS
 EXISTING_LAUNCHER_SUFFICIENT=true
-LIVE_CRITICAL_CODE_CHANGE_REQUIRED=false
+D278_03_PRELIVE_LIVE_CRITICAL_CODE_CHANGE_REQUIRED=false
 D278_03_D278_02_RUNNER=PASS
 D278_03_D278_01_D1_TLS_RUNNER=PASS
 D278_03_OPERATOR_PROCEDURE_PREPARED=true
 D278_03_OPERATOR_STOP_GATE_PRESENT=true
-D278_03_SUDO_USED=0
-D278_03_PROTECTED_STORE_READ_COUNT=0
-D278_03_REAL_USB_ACCESS=0
-D278_03_REAL_USB_SUBMIT=0
-LIVE_EXECUTION_PERFORMED=false
+D278_03_USB_OPEN_COUNT=1
+D278_03_USB_CLAIM_COUNT=1
+D278_03_USB_RELEASE_COUNT=1
+D278_03_USB_CLOSE_COUNT=1
+D278_03_RETRY_COUNT=0
+D278_03_TRANSPORT_REOPEN_COUNT=0
+D278_03_DEVICE_RESET_COUNT=0
+D278_03_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_03_PROJECT_SECRET_ZEROIZED=true
+D278_03_BACKEND_DRAINED=true
+D278_03_TERMINAL_CLEANUP_COMPLETED=true
+CURRENT_RUN_E4_ACK_07_NOT_DIRECTLY_TELEMETRIZED=true
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AND_SEPARATE_EXPLICIT_LIVE_AUTHORIZATION_DECISION
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_03_ACK_POLICY_CORRECTIVE_NO_LIVE_AUTHORIZATION
 ```
 
-La procedura copiabile, lo STOP gate e la matrice della review statica sono in
-`analysis/D278/D278_03_native_secure_session_prelive_closure.md`. Non è stato
-creato alcun JSON duplicato.
+La procedura copiabile, lo STOP gate e la matrice della review pre-live restano
+come provenance storica in
+`analysis/D278/D278_03_native_secure_session_prelive_closure.md`. Il risultato
+live e il riesame/correttivo sono nei due artefatti D278/03 post-live.
+
+Riesame metodologico per qualunque futura proposta, qui non autorizzata:
+(1) il cambiamento materiale è la riconciliazione della policy C a D238, non
+la sola telemetria; (2) la nuova ipotesi è che il binding E4 autentico fosse
+corretto e che il gate sia fallito per il rifiuto dello status di successo;
+(3) se E4 fallisse ancora, `NO THIRD EQUIVALENT FULL RUN`: riesame offline
+della telemetria strutturale e nuova diagnostica solo se progettata,
+revisionata e autorizzata separatamente.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -5382,12 +5472,16 @@ eseguito il 29 agosto 2026 il preflight autentico read-only dei materiali
 protetti (`--material-preflight-only`) con `PASS`, `e4_binding_match=true` e
 zero accesso USB. D278/03 ha poi confermato sulla baseline revisionata la
 executable closure locale Fedora e ha preparato la procedura single-shot
-fail-closed senza cambiare codice. Il confine immediato è la review AI-PM di
-D278/03 e, separatamente, l'approvazione esplicita della baseline live-critical
-e dello SHA-256 del launcher prima di una eventuale autorizzazione single-shot;
-`CURRENT_LIVE_AUTHORIZED=false`,
+fail-closed. La singola run successivamente autorizzata e consumata ha provato
+A8 nativo, inviato E4 ed è terminata sul primo frame IN E4 prima di un ACK
+accettato, senza raggiungere TLS. Il riesame post-live ha provato la divergenza
+della policy ACK C rispetto a D238 e l'ha corretta offline con test normal e
+sanitizer PASS; lo status E4 `0x07` della run corrente resta probabile ma non
+direttamente telemetrizzato. Il confine immediato è la review AI-PM del
+correttivo, senza autorizzazione live implicita: `CURRENT_LIVE_AUTHORIZED=false`,
 `TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true`,
-`D278_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY` e
+`D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE`,
+`D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS` e
 `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
 
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
@@ -7741,14 +7835,16 @@ read-only con i privilegi host necessari, mentre GUsb enumeration/open/claim e
 ogni transfer reale sono rimasti irraggiungibili (zero accesso USB,
 `e4_binding_match=true`, `project_secret_zeroized=true`).
 
-D278/03 non modifica il percorso runtime. La review statica AI-PM della
-baseline `843290e7790d7930bb136d91510a3db9d3a97027` ha confermato che il
-launcher D278/02 è già la superficie operatore sufficiente e che non occorre
-un wrapper aggiuntivo. Sul Fedora host dell'operatore i runner D278/02 e
-D278/01 focalizzato D1→TLS sono PASS normal e ASAN/UBSAN; il launcher locale è
-stato preservato e identificato tramite SHA-256. La procedura futura usa il
-terminale Fedora con `sudo` manuale dell'Utente, ma resta non autorizzata e
-protetta da STOP gate e controlli live-critical/SHA fail-closed.
+D278/03 ha dapprima chiuso la review pre-live senza modificare il runtime. La
+singola run poi autorizzata ha completato A8, inviato E4 ed è terminata al gate
+del primo frame E4, con cleanup sicuro e autorizzazione consumata. Il
+correttivo post-live modifica soltanto il sequencer/harness nativo e i test:
+una tabella ACK per fase riconcilia il C a D238 con i soli successi
+`0x01|0x07`, preserva D1 diretto B0/TLS e aggiunge telemetria strutturale
+redatta della prima failure. Tutte le suite pertinenti passano host-only; non
+è stata eseguita una seconda run, né usato `sudo`, store protetto o USB reale.
+Una futura live resta non autorizzata e, in caso di nuova failure E4, è vietata
+una terza full run equivalente senza diagnostica separata.
 
 Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
@@ -7758,7 +7854,9 @@ Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D277/D277_02_native_a8_real_usb.{md,json}` e
 `analysis/D278/D278_01_native_secure_session_host_only.{md,json}` e
 `analysis/D278/D278_02_native_target_material_secure_session_prep.{md,json}` e
-`analysis/D278/D278_03_native_secure_session_prelive_closure.md`.
+`analysis/D278/D278_03_native_secure_session_prelive_closure.md`,
+`analysis/D278/D278_03_native_secure_session_live_result_20260829.json` e
+`analysis/D278/D278_03_e4_ack_policy_corrective.md`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint

@@ -249,7 +249,15 @@ goodix_d278_telemetry_init (GoodixD278Telemetry *telemetry,
   g_strlcpy (telemetry->result, "pending", sizeof telemetry->result);
   g_strlcpy (telemetry->failure_class, "none",
              sizeof telemetry->failure_class);
+  g_strlcpy (telemetry->protocol_failure_kind, "none",
+             sizeof telemetry->protocol_failure_kind);
   telemetry->reached_phase = GOODIX_SECURE_PHASE_A8;
+  telemetry->protocol_failure_phase = GOODIX_SECURE_PHASE_TERMINAL;
+  telemetry->observed_outer_type = -1;
+  telemetry->observed_a0_control = -1;
+  telemetry->observed_ack_echo = -1;
+  telemetry->observed_ack_status = -1;
+  telemetry->observed_body_length = -1;
   telemetry->current_live_authorized = live_mode;
 }
 
@@ -638,6 +646,26 @@ refresh_telemetry (GoodixD278Harness   *harness,
   telemetry->persistent_device_write_count =
     harness->session_audit.persistent_write_count;
   telemetry->d4_reachable = harness->session_audit.d4_reachable;
+  if (harness->session_audit.protocol_failure_recorded &&
+      g_str_equal (telemetry->protocol_failure_kind, "none"))
+    {
+      telemetry->protocol_failure_phase =
+        harness->session_audit.protocol_failure_phase;
+      g_strlcpy (telemetry->protocol_failure_kind,
+                 goodix_protocol_failure_kind_name (
+                   harness->session_audit.protocol_failure_kind),
+                 sizeof telemetry->protocol_failure_kind);
+      telemetry->observed_outer_type =
+        harness->session_audit.observed_outer_type;
+      telemetry->observed_a0_control =
+        harness->session_audit.observed_a0_control;
+      telemetry->observed_ack_echo =
+        harness->session_audit.observed_ack_echo;
+      telemetry->observed_ack_status =
+        harness->session_audit.observed_ack_status;
+      telemetry->observed_body_length =
+        harness->session_audit.observed_body_length;
+    }
   telemetry->tls_handshake_count = harness->tls_audit.handshake_count;
   telemetry->secret_handoff_count = harness->tls_audit.secret_handoff_count;
   telemetry->application_data_count = harness->tls_audit.plaintext_delivery_count;
@@ -665,6 +693,11 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     "\"physical_out_completion_count\":%" G_GUINT64_FORMAT ","
     "\"max_outstanding_bulk_in\":%u,\"max_outstanding_bulk_out\":%u,"
     "\"command_count\":%u,\"ack_count\":%u,\"typed_response_count\":%u,"
+    "\"protocol_failure_phase\":\"%s\","
+    "\"protocol_failure_kind\":\"%s\","
+    "\"observed_outer_type\":%d,\"observed_a0_control\":%d,"
+    "\"observed_ack_echo\":%d,\"observed_ack_status\":%d,"
+    "\"observed_body_length\":%" G_GSSIZE_FORMAT ","
     "\"e4_binding_match\":%s,\"tls_handshake_count\":%u,"
     "\"tls_established\":%s,\"secret_handoff_count\":%u,"
     "\"project_secret_zeroized\":%s,\"retry_count\":%u,"
@@ -690,6 +723,12 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     telemetry->max_outstanding_bulk_out,
     telemetry->command_count, telemetry->ack_count,
     telemetry->typed_response_count,
+    g_str_equal (telemetry->protocol_failure_kind, "none") ? "none" :
+      goodix_secure_phase_name (telemetry->protocol_failure_phase),
+    telemetry->protocol_failure_kind,
+    telemetry->observed_outer_type, telemetry->observed_a0_control,
+    telemetry->observed_ack_echo, telemetry->observed_ack_status,
+    telemetry->observed_body_length,
     telemetry->e4_binding_match ? "true" : "false",
     telemetry->tls_handshake_count,
     telemetry->tls_established ? "true" : "false",

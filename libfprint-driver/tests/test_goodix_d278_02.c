@@ -1065,10 +1065,17 @@ harness_build_response (guint8       control,
 }
 
 static GBytes *
+harness_build_ack_status (guint8 echo,
+                          guint8 status)
+{
+  guint8 body[2] = { echo, status };
+  return harness_build_response (0xb0, body, sizeof body);
+}
+
+static GBytes *
 harness_build_ack (guint8 echo)
 {
-  guint8 body[2] = { echo, 0x01 };
-  return harness_build_response (0xb0, body, sizeof body);
+  return harness_build_ack_status (echo, 0x01);
 }
 
 static guint8
@@ -1691,6 +1698,42 @@ test_harness_redacted_telemetry (void)
   g_assert_nonnull (strstr (boundary_json,
                             "\"usb_open_attempt_count\":0"));
   g_assert_null (strstr (boundary_json, "psk"));
+  harness_fixture_free (fixture);
+
+  /* A future first rejected E4 frame is causally classifiable without
+   * retaining validator, PSK, CONFIG90 or any raw payload. */
+  fixture = harness_fixture_new ();
+  harness_advance_to (fixture, GOODIX_SECURE_PHASE_E4);
+  {
+    HarnessSubmission *submission = harness_pop_out (fixture);
+    g_autoptr(GBytes) rejected = harness_build_ack_status (0xe4, 0x02);
+    gsize length;
+    const guint8 *data;
+
+    goodix_d278_harness_complete_out (fixture->harness,
+                                      submission->generation, NULL);
+    harness_submission_free (submission);
+    data = g_bytes_get_data (rejected, &length);
+    goodix_d278_harness_complete_receive (fixture->harness,
+                                          fixture->generation,
+                                          data, length, NULL);
+  }
+  g_assert_true (goodix_d278_harness_is_terminal (fixture->harness));
+  harness_fixture_drain_and_seal (fixture);
+  g_clear_pointer (&json, g_free);
+  json = goodix_d278_telemetry_to_json (fixture->harness,
+                                        &fixture->telemetry);
+  g_assert_nonnull (strstr (json, "\"protocol_failure_phase\":\"E4\""));
+  g_assert_nonnull (strstr (json,
+                            "\"protocol_failure_kind\":\"ACK_STATUS_REJECTED\""));
+  g_assert_nonnull (strstr (json, "\"observed_outer_type\":160"));
+  g_assert_nonnull (strstr (json, "\"observed_a0_control\":176"));
+  g_assert_nonnull (strstr (json, "\"observed_ack_echo\":228"));
+  g_assert_nonnull (strstr (json, "\"observed_ack_status\":2"));
+  g_assert_nonnull (strstr (json, "\"observed_body_length\":2"));
+  g_assert_null (strstr (json, "8081828384858687"));
+  g_assert_null (strstr (json, "/var/lib/goodix-5125-poc"));
+  g_assert_null (strstr (json, "psk"));
   harness_fixture_free (fixture);
 }
 

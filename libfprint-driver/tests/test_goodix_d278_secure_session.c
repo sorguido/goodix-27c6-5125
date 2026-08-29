@@ -468,7 +468,7 @@ assert_command_shape (Fixture *fixture,
 static void
 respond_valid (Fixture *fixture,
                guint mode,
-               guint8 a8_status)
+               guint8 ack_status)
 {
   GoodixSecurePhase phase = goodix_secure_session_get_phase (fixture->session);
   g_autoptr(GBytes) ack = NULL;
@@ -479,8 +479,7 @@ respond_valid (Fixture *fixture,
   complete_submission (fixture, submission, NULL);
   if (phase == GOODIX_SECURE_PHASE_D1)
     return;
-  ack = build_ack (control_for_phase (phase),
-                   phase == GOODIX_SECURE_PHASE_A8 ? a8_status : 0x01);
+  ack = build_ack (control_for_phase (phase), ack_status);
   typed = typed_for_phase (fixture, phase);
   feed_frames (fixture, ack, typed, mode);
 }
@@ -900,6 +899,48 @@ test_d1_client_hello_gate (void)
 }
 
 static void
+test_ack07_phase_policy (void)
+{
+  Fixture *fixture = fixture_new ();
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (goodix_secure_session_start (fixture->session, &error));
+  g_assert_no_error (error);
+  respond_valid (fixture, 0, 0x01);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_E4);
+
+  /* Direct D236 evidence: E4 ACK 0x07 plus the valid typed E4 response
+   * advances exactly once and submits exactly one A2_1 command. */
+  respond_valid (fixture, 1, 0x07);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_A2_1);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 3);
+
+  /* Direct D236 evidence: A2_1 ACK 0x07 plus the valid typed response
+   * advances exactly once and submits exactly one CHIP_82 command. */
+  respond_valid (fixture, 2, 0x07);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_CHIP_82);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 4);
+
+  /* D238's bounded cross-control inference covers every remaining
+   * ACK-bearing pre-D1 phase. */
+  while (goodix_secure_session_get_phase (fixture->session) <
+         GOODIX_SECURE_PHASE_D1)
+    respond_valid (fixture, 0, 0x07);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 12);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 7);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 13);
+  {
+    Submission *submission = pop_out (fixture);
+    goodix_secure_session_cancel (fixture->session, "ACK07 matrix closure");
+    complete_submission (fixture, submission, NULL);
+  }
+  fixture_free (fixture);
+}
+
+static void
 test_ack_policy_and_response_failures (void)
 {
   for (guint status_index = 0; status_index < 2; status_index++)
@@ -941,9 +982,12 @@ test_ack_policy_and_response_failures (void)
       else if (variant == 2)
         response = build_response (0xa8, fixture->a2, 3); /* typed before ACK */
       else if (variant == 3)
-        response = build_ack (0xe4, 0x07);       /* 07 must not leak */
-      else if (variant == 4)
         response = build_ack (0xe4, 0x02);
+      else if (variant == 4)
+        {
+          static const guint8 short_ack[] = { 0xe4 };
+          response = build_response (0xb0, short_ack, sizeof short_ack);
+        }
       else
         {
           g_autoptr(GBytes) ack = build_ack (0xe4, 0x01);
@@ -969,6 +1013,46 @@ test_ack_policy_and_response_failures (void)
       g_assert_cmpuint (fixture->terminal_count, ==, 1);
       fixture_free (fixture);
     }
+
+  /* ACK alone cannot complete an ACK+typed phase. */
+  {
+    Fixture *fixture = fixture_new ();
+    g_autoptr(GBytes) ack = NULL;
+    Submission *submission;
+
+    start_and_advance_to (fixture, GOODIX_SECURE_PHASE_E4);
+    submission = pop_out (fixture);
+    complete_submission (fixture, submission, NULL);
+    ack = build_ack (0xe4, 0x07);
+    feed_frames (fixture, ack, NULL, 0);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_E4);
+    g_assert_cmpuint (fixture->audit.command_count, ==, 2);
+    goodix_secure_session_cancel (fixture->session, "ACK-only test closure");
+    fixture_free (fixture);
+  }
+
+  /* ACK-only phases reject an additional typed response. */
+  {
+    Fixture *fixture = fixture_new ();
+    g_autoptr(GBytes) ack = NULL;
+    g_autoptr(GBytes) typed = NULL;
+    Submission *submission;
+
+    start_and_advance_to (fixture, GOODIX_SECURE_PHASE_MODE_70);
+    submission = pop_out (fixture);
+    complete_submission (fixture, submission, NULL);
+    ack = build_ack (0x70, 0x01);
+    typed = build_response (0x70, fixture->a2, sizeof fixture->a2);
+    feed_frames (fixture, ack, typed, 1);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_TERMINAL);
+    fixture_clear_out (fixture);
+    if (goodix_fpi_usb_backend_get_out_outstanding (fixture->backend) != 0)
+      goodix_fpi_usb_backend_complete_out (fixture->backend,
+                                            fixture->generation, NULL);
+    fixture_free (fixture);
+  }
 }
 
 static void
@@ -1234,6 +1318,8 @@ main (int argc,
   g_test_add_func ("/goodix/d278/happy-path-real-tls", test_happy_path);
   g_test_add_func ("/goodix/d278/d1-client-hello-gate",
                    test_d1_client_hello_gate);
+  g_test_add_func ("/goodix/d278/ack07-phase-policy",
+                   test_ack07_phase_policy);
   g_test_add_func ("/goodix/d278/ack-policy-response-failures",
                    test_ack_policy_and_response_failures);
   g_test_add_func ("/goodix/d278/typed-length-hash-90",
