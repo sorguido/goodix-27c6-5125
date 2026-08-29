@@ -1,11 +1,11 @@
 {
   "schema": "d278-02-native-target-material-secure-session-prep-v1",
-  "outcome": "READY_FOR_AI_PM_CORRECTIVE_REVIEW",
-  "advancement": "CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED",
+  "outcome": "READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW",
+  "advancement": "PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED",
   "executable_closure": "PASS_HOST_ONLY",
-  "branch": "main",
-  "starting_head": "6f98d80c8fc82ea9d69d17fa0e18df325eee9128",
-  "technical_baseline": "6f98d80c8fc82ea9d69d17fa0e18df325eee9128",
+  "branch": "work",
+  "starting_head": "01b2379395b59219112236a6387bee9e5bd47bbf",
+  "technical_baseline": "01b2379395b59219112236a6387bee9e5bd47bbf",
   "initial_worktree_clean": true,
   "ai_pm_initial_review": "FAIL_CORRECTIVE_REQUIRED",
   "initial_review_blocker": "CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH",
@@ -96,20 +96,26 @@
     "live_harness_executed": false,
     "phase_watchdog_implemented": true,
     "phase_watchdog_host_only_proven": true,
-    "dynamic_redacted_telemetry": "PASS"
+    "dynamic_redacted_telemetry": "PASS",
+    "protected_preflight_failure_observability": "PASS",
+    "protected_preflight_redaction": "PASS",
+    "no_secret_bytes_in_failure_telemetry": "PASS",
+    "failure_class_stable": "PASS",
+    "failure_stage_stable": "PASS"
   },
   "tests": {
-    "test_count_per_binary_run": 55,
+    "test_count_per_binary_run": 62,
     "groups": {
       "d190": 6,
       "pe": 6,
       "material": 23,
+      "preflight_observability": 7,
       "harness_watchdog_telemetry": 20
     },
     "normal": "PASS",
     "asan_ubsan": "PASS",
     "principal_runner_consecutive_invocations": 2,
-    "total_d278_02_case_executions": 220,
+    "total_d278_02_case_executions": 248,
     "production_policy_canonical_pin_matrix": "PASS",
     "leak_detection": "DISABLED_UNDER_FLATPAK_BWRAP_PTRACE_BOUNDARY",
     "d278_01_regression": "PASS",
@@ -151,39 +157,32 @@
     "failure_policy": "At the first failure stop, record reached phase and redacted class, perform no retry/reopen/reset, drain and zeroize, and return to AI-PM before any methodologically equivalent attempt.",
     "constitutes_live_authorization": false
   },
-  "residual_blocker_or_risk": "TARGET_PROTECTED_MATERIAL_PREFLIGHT_NOT_EXECUTED;NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;NEXT_LIVE_BASELINE_SHA_NOT_APPROVED;CURRENT_LIVE_AUTHORIZED_FALSE",
+  "residual_blocker_or_risk": "AI_PM_MICRO_CORRECTIVE_REVIEW_PENDING;TARGET_PROTECTED_MATERIAL_PREFLIGHT_NOT_EXECUTED;NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;CURRENT_LIVE_AUTHORIZED_FALSE",
   "canonical_documentation": {
     "updated": true,
     "path": "Goodix 27c6 5125 manuale tecnico.md"
   },
   "review_set": {
-    "baseline": "94a61c69c6f31d1ace196549c96c1e2410c598d2",
+    "baseline": "01b2379395b59219112236a6387bee9e5bd47bbf",
     "final_commit_self_reference_omitted": true,
     "paths": [
-      "libfprint-driver/goodix_d190_binder.c",
-      "libfprint-driver/goodix_d190_binder.h",
       "libfprint-driver/goodix_target_material.c",
       "libfprint-driver/goodix_target_material.h",
-      "libfprint-driver/goodix_secure_session.c",
-      "libfprint-driver/goodix_secure_session.h",
-      "libfprint-driver/goodix_fpi_usb_backend.c",
-      "libfprint-driver/goodix_fpi_usb_backend.h",
+      "libfprint-driver/tests/test_goodix_d278_02.c",
+      "libfprint-driver/tests/run_goodix_d278_02_test_inner.sh",
       "tools/goodix_d190_pe.c",
       "tools/goodix_d190_pe.h",
       "tools/goodix_d278_harness.c",
       "tools/goodix_d278_harness.h",
       "tools/d278_native_secure_session_once.c",
-      "libfprint-driver/tests/test_goodix_d278_02.c",
-      "libfprint-driver/tests/run_goodix_d278_02_test.sh",
-      "libfprint-driver/tests/run_goodix_d278_02_test_inner.sh",
-      ".github/workflows/d276-native-tls-usb-host-only.yml",
-      "docs/LICENSING_AND_PROVENANCE.md",
-      "analysis/D278/D278_01_native_secure_session_host_only.md",
-      "analysis/D278/D278_01_native_secure_session_host_only.json",
       "analysis/D278/D278_02_native_target_material_secure_session_prep.md",
       "analysis/D278/D278_02_native_target_material_secure_session_prep.json",
       "Goodix 27c6 5125 manuale tecnico.md"
     ]
   },
-  "next_primary_boundary": "AI_PM_REVIEW_AND_EXPLICIT_BASELINE_APPROVAL_BEFORE_ANY_SEPARATELY_AUTHORIZED_SINGLE_SHOT_LIVE_RUN"
+  "next_primary_boundary": "AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT",
+  "d278_02_canonical_a2_corrective_ai_pm_review": "PASS",
+  "ai_pm_reviewed_main_baseline": "01b2379395b59219112236a6387bee9e5bd47bbf",
+  "corrective_ci_run": 33252621869,
+  "corrective_ci": "PASS"
 }

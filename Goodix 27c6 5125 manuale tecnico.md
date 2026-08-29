@@ -104,8 +104,8 @@ NATIVE_TLS12_PSK_HANDSHAKE_HOST_ONLY_PROVEN=true
 NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
 NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
 
-D278_02_OUTCOME=READY_FOR_AI_PM_CORRECTIVE_REVIEW
-D278_02_ADVANCEMENT=CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED
+D278_02_OUTCOME=READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW
+D278_02_ADVANCEMENT=PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED
 D190_EXPRESSION_PROVENANCE_GATE=PASS
 NATIVE_D190_E4_BINDER_KAT_PROVEN=true
 D190_FIVE_INDEPENDENT_KATS=PASS
@@ -125,12 +125,20 @@ D278_02_PHASE_WATCHDOG_HOST_ONLY_PROVEN=true
 D278_02_NORMAL=PASS
 D278_02_ASAN_UBSAN=PASS
 D278_02_DETERMINISM_RUNS=2
-D278_02_TEST_COUNT_PER_BINARY_RUN=55
+D278_02_TEST_COUNT_PER_BINARY_RUN=62
 PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
 INITIAL_REVIEW_BLOCKER=CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
 CANONICAL_A2_SHA256_EXPECTED=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
 CANONICAL_A2_SHA256_IMPLEMENTED_AFTER_FIX=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+D278_02_CANONICAL_A2_CORRECTIVE_AI_PM_REVIEW=PASS
+AI_PM_REVIEWED_MAIN_BASELINE=01b2379395b59219112236a6387bee9e5bd47bbf
+CORRECTIVE_CI_RUN=33252621869
+CORRECTIVE_CI=PASS
+PROTECTED_PREFLIGHT_FAILURE_OBSERVABILITY=PASS
+PROTECTED_PREFLIGHT_REDACTION=PASS
+NO_SECRET_BYTES_IN_FAILURE_TELEMETRY=PASS
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT
 TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
 LIVE_EXECUTION_PERFORMED=false
 D4_REACHABLE=false
@@ -540,10 +548,9 @@ massimo un IN/OUT fisico in flight. Il watchdog GLib è phase-aware, reinvalidat
 ad ogni progresso e terminalmente fenced. STOP/cancel precedono il drain;
 sessione, backend e router vengono liberati soltanto dopo drain.
 
-La suite contiene 55 casi: 6 D190, 6 PE, 23 loader (22 precedenti +
-`production_policy_canonical_pins`) e 20 harness/watchdog/telemetria. Due
-invocazioni consecutive del runner hanno eseguito ciascuna 55/55 normal e
-55/55 ASAN/UBSAN PASS, compilato il binding libfprint/GUsb completo ed eseguito
+La suite contiene 62 casi: 6 D190, 6 PE, 23 loader, 7 preflight-observability e 20 harness/watchdog/telemetria. Due
+invocazioni consecutive del runner hanno eseguito ciascuna 62/62 normal e
+62/62 ASAN/UBSAN PASS, compilato il binding libfprint/GUsb completo ed eseguito
 soltanto `--self-test`, che termina intenzionalmente sul watchdog A8 con cleanup
 completo e contatori USB reali a zero. Il protected preflight e il ramo live
 non sono stati eseguiti.
@@ -555,9 +562,18 @@ Il correttivo D278/02 ha corretto il pin A2 della policy produttiva in
 È stato aggiunto un test indipendente che confronta tutti i pin critici della
 policy produttiva con costanti attese ricavate dalle evidenze canoniche.
 
+La review AI-PM del correttivo A2 è `PASS`; il correttivo è confluito su main
+come `01b2379395b59219112236a6387bee9e5bd47bbf` e la CI `33252621869` è
+PASS. Il micro-correttivo corrente, ancora da revisionare, rende il preflight
+osservabile senza segreti: il JSON espone coppie stabili `failure_stage` e
+`failure_class` per policy/argomenti, open, metadata, read, content, PE/DLL,
+binding E4 ed export/state, senza propagare messaggi GError liberi. I test usano
+solo fixture sintetiche. Il preflight autentico non è stato eseguito e nessuna
+run USB/live è autorizzata.
+
 ```text
-OUTCOME=READY_FOR_AI_PM_CORRECTIVE_REVIEW
-ADVANCEMENT=CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED
+OUTCOME=READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW
+ADVANCEMENT=PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 MATERIAL_INVALID_BLOCKS_BEFORE_USB_OPEN=PASS
 SYNTHETIC_SINGLE_OPEN_CLAIM_EPOCH=PASS
@@ -577,12 +593,20 @@ TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
 LIVE_EXECUTION_PERFORMED=false
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-D278_02_TEST_COUNT_PER_BINARY_RUN=55
+D278_02_TEST_COUNT_PER_BINARY_RUN=62
 PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
 INITIAL_REVIEW_BLOCKER=CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
 CANONICAL_A2_SHA256_EXPECTED=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
 CANONICAL_A2_SHA256_IMPLEMENTED_AFTER_FIX=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+D278_02_CANONICAL_A2_CORRECTIVE_AI_PM_REVIEW=PASS
+AI_PM_REVIEWED_MAIN_BASELINE=01b2379395b59219112236a6387bee9e5bd47bbf
+CORRECTIVE_CI_RUN=33252621869
+CORRECTIVE_CI=PASS
+PROTECTED_PREFLIGHT_FAILURE_OBSERVABILITY=PASS
+PROTECTED_PREFLIGHT_REDACTION=PASS
+NO_SECRET_BYTES_IN_FAILURE_TELEMETRY=PASS
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT
 ```
 
 Riesame metodologico preparato, non eseguito come live: (1) rispetto a D277/02
@@ -592,8 +616,7 @@ APP12509 `A8→E4 MATCH→A2→82→A6→A2→70→80x4→90→D1→TLS→STOP` 
 persistenza; (3) al primo fallimento si ferma, registra fase/classe redatta,
 non ritenta/riapre/resetta, drena, azzera e torna ad AI-PM.
 
-Il prossimo boundary è review AI-PM e approvazione esplicita di uno SHA
-completo live-critical. D278/02 non auto-approva una baseline e non autorizza
+Il prossimo boundary è la review AI-PM del micro-correttivo e, soltanto dopo accettazione, la decisione operatore su un preflight locale read-only dei materiali autentici, senza USB. La live secure-session resta una decisione futura separata. D278/02 non auto-approva una baseline e non autorizza
 una run.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded

@@ -5,11 +5,31 @@
 #include <gio/gio.h>
 
 #include "goodix_secure_session.h"
+#include "goodix_d190_pe.h"
+#include "goodix_target_material.h"
 
 G_BEGIN_DECLS
 
 typedef struct _GoodixD278Watchdog GoodixD278Watchdog;
 typedef struct _GoodixD278Harness GoodixD278Harness;
+
+typedef struct
+{
+  const gchar *failure_stage;
+  const gchar *failure_class;
+} GoodixD278PreflightFailure;
+
+GoodixTargetMaterial *goodix_d278_prepare_target_material (
+  const gchar                      *manifest_path,
+  const gchar                      *transport_path,
+  const gchar                      *config90_path,
+  const gchar                      *dll_path,
+  const GoodixTargetMaterialPolicy *material_policy,
+  const GoodixD190PePolicy         *pe_policy,
+  GoodixTargetMaterialAudit        *audit,
+  GoodixSecureSessionMaterial      *view,
+  GoodixD278PreflightFailure       *failure,
+  GError                          **error);
 
 typedef void (*GoodixD278WatchdogTimeoutFunc) (GoodixSecurePhase phase,
                                                guint64           generation,

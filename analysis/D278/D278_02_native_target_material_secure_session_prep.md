@@ -1,12 +1,12 @@
 # D278/02 — native target-material boundary e harness secure-session live-capable
 
 ```text
-OUTCOME=READY_FOR_AI_PM_CORRECTIVE_REVIEW
-ADVANCEMENT=CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED
+OUTCOME=READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW
+ADVANCEMENT=PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-RESIDUAL_BLOCKER_OR_RISK=TARGET_PROTECTED_MATERIAL_PREFLIGHT_NOT_EXECUTED;NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;NEXT_LIVE_BASELINE_SHA_NOT_APPROVED;CURRENT_LIVE_AUTHORIZED_FALSE
+RESIDUAL_BLOCKER_OR_RISK=AI_PM_MICRO_CORRECTIVE_REVIEW_PENDING;TARGET_PROTECTED_MATERIAL_PREFLIGHT_NOT_EXECUTED;NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;CURRENT_LIVE_AUTHORIZED_FALSE
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=BASELINE_6f98d80c8fc82ea9d69d17fa0e18df325eee9128_PLUS_STEP_LOCAL_GIT_DIFF
+REVIEW_SET=BASELINE_01b2379395b59219112236a6387bee9e5bd47bbf_PLUS_STEP_LOCAL_GIT_DIFF
 
 AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
 INITIAL_REVIEW_BLOCKER=CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
@@ -16,7 +16,7 @@ CANONICAL_A2_SHA256_IMPLEMENTED_AFTER_FIX=39e469ce5a5ba3136c4a44381f2e4183dca275
 D278_02_NORMAL=PASS
 D278_02_ASAN_UBSAN=PASS
 D278_02_DETERMINISM_RUNS=2
-D278_02_TEST_COUNT_PER_BINARY_RUN=55
+D278_02_TEST_COUNT_PER_BINARY_RUN=62
 PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 ```
 
@@ -54,6 +54,50 @@ precedenti + 1 nuovo).
 Nota: il testo del prompt correttivo riportava un hash A2 terminante in `5f`;
 questo valore non è presente nel repository né nel manuale tecnico canonico, e
 non è stato utilizzato. L'unica fonte canonica rimane il manifest D232.
+
+
+## Micro-correttivo di osservabilità e closure canonica
+
+La cronologia resta distinta: implementazione iniziale `6f98d80...`, review
+AI-PM iniziale `FAIL_CORRECTIVE_REQUIRED`, correttivo A2, quindi review AI-PM
+del correttivo A2 `PASS` e merge su main
+`01b2379395b59219112236a6387bee9e5bd47bbf` con CI `33252621869` PASS. Il
+presente diff locale non è ancora revisionato da AI-PM.
+
+La composizione del preflight conserva ora la provenance redatta come coppia
+stabile `failure_stage`/`failure_class`: load (`ARGUMENT_OR_POLICY`,
+`PROTECTED_OPEN`, `PROTECTED_METADATA`, `PROTECTED_READ`,
+`PROTECTED_CONTENT`), PE/DLL (`CANONICAL_PE_OR_DLL`), bind E4
+(`E4_BINDING`) ed export/state (`MATERIAL_EXPORT_OR_STATE`). Nessun messaggio
+GError libero né byte protetto entra nella telemetria JSON. I sette nuovi casi
+usano esclusivamente fixture temporanee sintetiche; `PROTECTED_READ` conserva
+la mappatura dell'errore loader ma non viene forzato con un seam artificiale.
+
+```text
+D278_02_CANONICAL_A2_CORRECTIVE_AI_PM_REVIEW=PASS
+AI_PM_REVIEWED_MAIN_BASELINE=01b2379395b59219112236a6387bee9e5bd47bbf
+CORRECTIVE_CI_RUN=33252621869
+CORRECTIVE_CI=PASS
+PROTECTED_PREFLIGHT_FAILURE_OBSERVABILITY=PASS
+PROTECTED_PREFLIGHT_REDACTION=PASS
+NO_SECRET_BYTES_IN_FAILURE_TELEMETRY=PASS
+FAILURE_CLASS_STABLE=PASS
+FAILURE_STAGE_STABLE=PASS
+TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
+LIVE_EXECUTION_PERFORMED=false
+REAL_USB_ACCESS=0
+REAL_USB_SUBMIT=0
+USB_OPEN_COUNT=0
+USB_CLAIM_COUNT=0
+D4_REACHABLE=false
+APPLICATION_DATA_COUNT=0
+FINGER_PATH_NOT_EXERCISED=true
+IMAGE_PATH_NOT_EXERCISED=true
+PERSISTENT_DEVICE_WRITE_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT
+```
 
 ## Risultato e confine probatorio
 
@@ -180,22 +224,21 @@ autorizzazione live.
 
 Il runner principale `libfprint-driver/tests/run_goodix_d278_02_test.sh` è
 stato eseguito due volte consecutivamente nell’SDK Freedesktop 25.08 offline.
-Ogni invocazione esegue 55 casi normali e gli stessi 55 sotto ASAN/UBSAN,
+Ogni invocazione esegue 62 casi normali e gli stessi 62 sotto ASAN/UBSAN,
 compila il binding libfprint/GUsb completo e avvia `--self-test`. In totale:
 
 ```text
-D278_02_TEST_COUNT_PER_BINARY_RUN=55
-D278_02_NORMAL=55/55 PASS per invocazione
-D278_02_ASAN_UBSAN=55/55 PASS per invocazione
+D278_02_TEST_COUNT_PER_BINARY_RUN=62
+D278_02_NORMAL=62/62 PASS per invocazione
+D278_02_ASAN_UBSAN=62/62 PASS per invocazione
 D278_02_PRINCIPAL_RUNNER_INVOCATIONS=2
-D278_02_TOTAL_CASE_EXECUTIONS=220
+D278_02_TOTAL_CASE_EXECUTIONS=248
 D278_02_LIVE_HARNESS_BUILD=PASS
 D278_02_SELF_TEST=PASS_EXPECTED_A8_WATCHDOG_TERMINAL
 PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 ```
 
-I 55 casi sono 6 D190, 6 PE, 23 material-loader (22 precedenti +
-`production_policy_canonical_pins`) e 20 harness/watchdog/telemetria.
+I 62 casi sono 6 D190, 6 PE, 23 material-loader, 7 preflight-observability e 20 harness/watchdog/telemetria.
 LeakSanitizer resta disabilitato perché il confine Flatpak/bwrap non rende
 disponibile ptrace; ASAN address checks e UBSAN sono attivi.
 

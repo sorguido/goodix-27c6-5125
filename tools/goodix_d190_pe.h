@@ -24,6 +24,13 @@ gboolean goodix_d190_pe_extract (
   guint8       seed_b[GOODIX_D190_PE_SEED_LENGTH],
   GError     **error);
 
+gboolean goodix_d190_pe_extract_with_policy (
+  const gchar              *path,
+  const GoodixD190PePolicy *policy,
+  guint8                    seed_a[GOODIX_D190_PE_SEED_LENGTH],
+  guint8                    seed_b[GOODIX_D190_PE_SEED_LENGTH],
+  GError                  **error);
+
 /* Explicit test seam: production callers use goodix_d190_pe_extract(). */
 gboolean goodix_d190_pe_extract_bytes_with_policy (
   const guint8                 *data,
