@@ -14,8 +14,8 @@ La seconda single-shot live D278/03, autorizzata ed eseguita una sola volta
 dall'Utente sulla baseline post-corrective, aggiunge un fatto nuovo che questo
 audit non possedeva: sul target APP12509, in una **nuova** sessione e in fase
 `A8`, il primissimo frame IN ricevuto è stato `outer=0xA0`, `control=0xE4`,
-`body_length=41`, cioè esattamente la shape canonica della typed response E4 e
-non l'ACK A8 atteso. Il fenomeno descritto dall'audit come rischio
+`body_length=41`, cioè con control e lunghezza compatibili con la typed response
+E4 canonica, ma senza verifica del body completo; non era l'ACK A8 atteso. Il fenomeno descritto dall'audit come rischio
 architetturale è pertanto ora **osservato sul target**.
 
 Resta però non provato che quel frame *sia* la typed response E4 rimasta dalla
@@ -383,11 +383,12 @@ ACK (`observed_ack_echo=-1`, `observed_ack_status=-1`, `ack_count=0`,
 run è terminata a `phase_trace=A8,TERMINAL`, con cleanup completo, zero retry,
 zero reopen, zero reset, zero scritture persistenti e secret azzerato.
 
-Identità di shape, verificabile staticamente. In
+Compatibilità di control e lunghezza, verificabile staticamente. In
 `libfprint-driver/goodix_secure_session.c::validate_typed` la typed response E4
 canonica ha `control=0xE4` e body di `9 + 32 = 41` byte (prefisso
-`00 03 00 02 bb 20 00 00 00` più i 32 byte del validator). La struttura
-osservata al re-entry coincide dunque esattamente con quella shape:
+`00 03 00 02 bb 20 00 00 00` più i 32 byte del validator). Al re-entry sono
+stati osservati lo stesso control e la stessa lunghezza; il body completo non è
+stato telemetrizzato e quindi non è stato verificato byte-exact:
 
 ```text
 OBSERVED_REENTRY_FRAME_OUTER=0xA0

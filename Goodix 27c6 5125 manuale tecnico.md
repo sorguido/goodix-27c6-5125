@@ -1025,11 +1025,11 @@ IN, quel primissimo IN non era l'ACK A8 atteso ma
 `typed_response_count=0`). Il parser ha fallito chiuso con
 `protocol_failure_kind=TYPED_SHAPE_MISMATCH` in `protocol_failure_phase=A8` e la
 run si è chiusa a `phase_trace=A8,TERMINAL` con cleanup completo, zero
-retry/reopen/reset, zero scritture persistenti e secret azzerato. `control=0xE4`
-con body di 41 byte è esattamente la shape canonica della typed response E4
-(`libfprint-driver/goodix_secure_session.c::validate_typed`: prefisso di 9 byte
-più 32 byte di validator). Il fenomeno del re-entry non è dunque più soltanto un
-rischio architetturale: è **osservato sul target**.
+retry/reopen/reset, zero scritture persistenti e secret azzerato. Il
+`control=0xE4` e la lunghezza di 41 byte coincidono con control e lunghezza
+della typed response E4 canonica; il body completo non è stato telemetrizzato e
+quindi non è stato verificato byte-exact. Il fenomeno del re-entry non è dunque
+più soltanto un rischio architetturale: è **osservato sul target**.
 
 L'identità causale resta però non provata. Il frame è stato rifiutato in fase A8
 per control inatteso, quindi i 41 byte non sono stati confrontati con il
