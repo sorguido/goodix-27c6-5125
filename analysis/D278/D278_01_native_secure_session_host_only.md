@@ -1,18 +1,19 @@
 # D278/01 — catena secure-session nativa host-only
 
 ```text
-OUTCOME=READY_PASS_HOST_ONLY
+OUTCOME=READY_PASS_HOST_ONLY_CORRECTIVE_LOCAL
 ADVANCEMENT=NEW_NATIVE_LGPL_SECURE_SESSION_IMPLEMENTATION_AND_HOST_ONLY_EXECUTABLE_EVIDENCE
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-RESIDUAL_BLOCKER_OR_RISK=NATIVE_SECURE_SESSION_TARGET_PROVEN_FALSE;TARGET_CONFIG90_RAW_MATERIAL_NOT_READABLE_IN_CURRENT_ENVIRONMENT;TARGET_TYPED_RESPONSE_RAW_MATERIAL_NOT_EMBEDDED;GITHUB_ACTIONS_CONFIRMATION_PENDING;NO_LIVE_AUTHORIZATION
+RESIDUAL_BLOCKER_OR_RISK=NATIVE_SECURE_SESSION_TARGET_PROVEN_FALSE;TARGET_CONFIG90_RAW_MATERIAL_NOT_READABLE_IN_CURRENT_ENVIRONMENT;TARGET_TYPED_RESPONSE_RAW_MATERIAL_NOT_EMBEDDED;D1_TLS_GATE_AI_PM_REVIEW_PENDING;D1_TLS_GATE_CI_PENDING;NO_LIVE_AUTHORIZATION
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=BASELINE_2a5701620230ef93d677a72dab6013c6cbef7238_PLUS_WORKING_TREE_REVIEW_analysis/D278_AND_LIBFPRINT_DRIVER_D278_FILES_AND_CI_AND_MANUAL
+REVIEW_SET=BASELINE_0efa30f681e0a3aa284565ce581536ad00606c39_PLUS_CORRECTIVE_WORKING_TREE_REVIEW
 ```
 
 ## Baseline, scope e risultato
 
-La baseline iniziale era pulita, su `main`, con HEAD esatto
-`2a5701620230ef93d677a72dab6013c6cbef7238`. D278/01 non ha enumerato, aperto,
+La baseline della correzione era pulita, sul task branch `work`, con HEAD e
+merge-base esatti `0efa30f681e0a3aa284565ce581536ad00606c39`. Il checkpoint
+iniziale D278/01 deriva da `2a5701620230ef93d677a72dab6013c6cbef7238`. D278/01 non ha enumerato, aperto,
 reclamato o contattato il sensore e non ha eseguito il launcher live D277.
 
 La nuova state machine LGPL impone:
@@ -25,7 +26,11 @@ A8 -> E4 -> A2_1 -> CHIP_82 -> OTP_A6 -> A2_2 -> MODE_70
 
 Non esistono D4, retry, recovery, reopen o reset nel vocabolario del modulo.
 Ogni fase A0 avanza solo dopo il contratto logico completo e dopo il completion
-OUT corrispondente. D1 ammette come prima classe soltanto B0; un A0 da D1 in
+OUT corrispondente. D1 ammette come prima classe soltanto B0; una push accettata non basta ad
+avanzare. Il gate si soddisfa solo se, durante una push poi conclusa con
+successo, OpenSSL emette il primo flight server. Il callback sincrono accoda e
+registra il progresso, ma l’avanzamento e l’egress avvengono dopo la push; un
+fallimento prevale e svuota la coda. ClientHello frammentati restano streamabili; un A0 da D1 in
 poi è terminale. Un frame ulteriore dopo `STOP` è respinto e porta al fence
 terminale senza emettere comandi.
 
@@ -94,17 +99,19 @@ Risultato locale di due invocazioni consecutive del runner nell'SDK
 Freedesktop 25.08 offline; ciascuna invocazione ha prodotto:
 
 ```text
-D278 normal:       9/9 PASS
-D278 ASAN/UBSAN:   9/9 PASS
+D278 normal:       10/10 PASS
+D278 ASAN/UBSAN:   10/10 PASS
 LeakSanitizer:     non disponibile sotto il boundary Flatpak/bwrap ptrace;
                    detect_leaks=0, address checks e UBSAN attivi
 ```
 
-I nove gruppi esercitano vettori/malformed A0; happy path completo con peer
+I dieci gruppi esercitano vettori/malformed A0; happy path completo con peer
 OpenSSL reale; ACK/status/echo/reorder; typed length/hash/prefix; classi A0/B0
 inattese; tutti i material gate; single-OUT/stale generation/drain; cancel in
 A8/E4/CONFIG_90/D1; completion sincrono del seam; risposta tipizzata duplicata;
-PSK e identity errate. La happy path alterna ACK+typed coalesciuti, separati e
+PSK e identity errate; inoltre un client OpenSSL reale prova ClientHello
+frammentato dopo il solo header record e nel body, avanzamento singolo al
+completamento, assenza di egress prematuro e TLS malformato fail-closed. La happy path alterna ACK+typed coalesciuti, separati e
 frammentati; valida ogni comando uscente in ordine, ricostruisce tutti i B0 dai
 chunk fisici, verifica tail zero e rilascia il pacing senza sleep. Una seconda
 happy path prova inoltre che il pacing resta attivo quando la telemetria audit
@@ -133,13 +140,21 @@ D277 live harness: build PASS, execution NOT PERFORMED
 ```
 
 Il workflow `.github/workflows/d276-native-tls-usb-host-only.yml` esegue ora
-due volte D278 normal+sanitizer e conserva i gate D276/D277. La conferma GitHub
-Actions è `PENDING` perché D278/01 non crea commit né push.
+due volte D278 normal+sanitizer e conserva i gate D276/D277. Il checkpoint iniziale D278/01 è il commit
+`0efa30f681e0a3aa284565ce581536ad00606c39`; la GitHub Actions run
+`33237274978` è PASS per quel checkpoint pre-correttivo. La nuova correzione è
+PASS locale; review AI-PM e CI correttiva restano `PENDING`.
 
 ## Safety e provenance
 
 ```text
-D278_01_HOST_ONLY_RESULT=PASS
+D278_01_INITIAL_IMPLEMENTATION_HOST_ONLY=PASS
+D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
+D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
+D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
+D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
+D278_01_D1_TLS_GATE_CI=PENDING
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true

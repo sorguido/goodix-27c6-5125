@@ -1,15 +1,27 @@
 {
-  "schema": "d278-01-native-secure-session-host-only-v1",
-  "starting_head": "2a5701620230ef93d677a72dab6013c6cbef7238",
-  "branch": "main",
+  "schema": "d278-01-native-secure-session-host-only-v2",
+  "starting_head": "0efa30f681e0a3aa284565ce581536ad00606c39",
+  "branch": "work",
   "initial_worktree_clean": true,
-  "outcome": "READY_PASS_HOST_ONLY",
+  "outcome": "READY_PASS_HOST_ONLY_CORRECTIVE_LOCAL",
   "advancement": "NEW_NATIVE_LGPL_SECURE_SESSION_IMPLEMENTATION_AND_HOST_ONLY_EXECUTABLE_EVIDENCE",
   "executable_closure": "PASS_HOST_ONLY",
   "exact_phase_sequence": [
-    "A8", "E4", "A2_1", "CHIP_82", "OTP_A6", "A2_2", "MODE_70",
-    "DAC_220", "DAC_236", "DAC_238", "DAC_23A", "CONFIG_90", "D1",
-    "TLS", "STOP"
+    "A8",
+    "E4",
+    "A2_1",
+    "CHIP_82",
+    "OTP_A6",
+    "A2_2",
+    "MODE_70",
+    "DAC_220",
+    "DAC_236",
+    "DAC_238",
+    "DAC_23A",
+    "CONFIG_90",
+    "D1",
+    "TLS",
+    "STOP"
   ],
   "d278_01_host_only_result": "PASS",
   "native_secure_session_chain_host_only_proven": true,
@@ -47,10 +59,10 @@
     "config90_sha_finalizer_dac_correlation_gated": true
   },
   "tests": {
-    "d278_groups_per_run": 9,
+    "d278_groups_per_run": 10,
     "d278_final_consecutive_runner_invocations": 2,
-    "normal": "9/9 PASS",
-    "asan_ubsan": "9/9 PASS",
+    "normal": "10/10 PASS",
+    "asan_ubsan": "10/10 PASS",
     "leak_detection": "DISABLED_ENVIRONMENT_FLATPAK_BWRAP_PTRACE_UNAVAILABLE",
     "d276_02": "15/15 NORMAL_AND_15/15_ASAN_UBSAN_PASS",
     "d276_03": "8/8_NORMAL_AND_8/8_ASAN_UBSAN_PASS",
@@ -58,7 +70,7 @@
     "d277": "15/15_NORMAL_AND_15/15_ASAN_UBSAN_PASS",
     "d277_live_harness": "BUILD_ONLY_NOT_EXECUTED",
     "github_actions_workflow_integrated": true,
-    "github_actions_confirmation": "PENDING_NO_COMMIT_OR_PUSH"
+    "github_actions_confirmation": "INITIAL_IMPLEMENTATION_PASS_CORRECTIVE_PENDING"
   },
   "safety": {
     "physical_receive_owner_count": 1,
@@ -84,9 +96,9 @@
       "Stato implementazione Linux"
     ]
   },
-  "residual_blocker_or_risk": "TARGET_EQUIVALENCE_UNPROVEN;TARGET_CONFIG90_RAW_NOT_READABLE;TARGET_TYPED_RESPONSE_RAW_NOT_EMBEDDED;GITHUB_ACTIONS_CONFIRMATION_PENDING;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;CURRENT_LIVE_AUTHORIZED_FALSE",
+  "residual_blocker_or_risk": "TARGET_EQUIVALENCE_UNPROVEN;TARGET_CONFIG90_RAW_NOT_READABLE;TARGET_TYPED_RESPONSE_RAW_NOT_EMBEDDED;CORRECTIVE_AI_PM_REVIEW_PENDING;CORRECTIVE_CI_PENDING;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;CURRENT_LIVE_AUTHORIZED_FALSE",
   "review_set": {
-    "baseline": "2a5701620230ef93d677a72dab6013c6cbef7238",
+    "baseline": "0efa30f681e0a3aa284565ce581536ad00606c39",
     "working_tree_review": true,
     "final_head": null,
     "paths": [
@@ -110,5 +122,22 @@
       "analysis/D278/D278_01_native_secure_session_host_only.json"
     ]
   },
-  "next_primary_boundary": "AI_PM_REVIEW_FOR_D278_02_SINGLE_SHOT_NATIVE_SECURE_SESSION_TARGET_VALIDATION"
+  "next_primary_boundary": "AI_PM_REVIEW_FOR_D278_02_SINGLE_SHOT_NATIVE_SECURE_SESSION_TARGET_VALIDATION",
+  "initial_implementation": {
+    "host_only": "PASS",
+    "commit": "0efa30f681e0a3aa284565ce581536ad00606c39",
+    "ci_run": 33237274978,
+    "ci_result": "PASS"
+  },
+  "d1_tls_gate_corrective": {
+    "local": "PASS",
+    "ai_pm_review": "PENDING",
+    "ci": "PENDING",
+    "push_true_alone_cannot_advance": true,
+    "partial_client_hello_stays_d1": true,
+    "partial_client_hello_emits_no_server_flight": true,
+    "completed_valid_client_hello_advances_once": true,
+    "malformed_tls_fails_closed": true,
+    "advancement_criterion": "SUCCESSFUL_TLS_PUSH_AND_SYNCHRONOUS_OPENSSL_SERVER_FLIGHT_OUTPUT"
+  }
 }

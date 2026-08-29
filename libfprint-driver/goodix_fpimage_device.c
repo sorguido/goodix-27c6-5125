@@ -3,8 +3,9 @@
  * Host-only FpImageDevice shell for the Goodix 27c6:5125 boundary.
  *
  * This file implements the first production-shaped slice of the libfprint
- * device glue with an in-memory fake backend.  It intentionally contains no
- * USB, TLS, secret, fprintd, persistent write or real sensor command path.
+ * device glue with an in-memory fake backend and the production-shaped USB
+ * router, TLS server, USB backend and secure-session integration.  It still
+ * contains no fprintd, persistent-write or real sensor execution path.
  *
  * Architecture source: analysis/D276/D276_01_libfprint_device_architecture.md
  * API source: repository-local libfprint 1.94.5 (LGPL).

@@ -63,6 +63,7 @@ struct _GoodixSecureSession
   GBytes *b0_logical;
   gsize b0_offset;
   gboolean pace_pending;
+  gboolean d1_server_flight_seen;
   guint pace_source_id;
   guint64 pace_generation;
 };
@@ -582,8 +583,13 @@ tls_output (GBytes *record,
   if (session->phase == GOODIX_SECURE_PHASE_TERMINAL ||
       session->phase == GOODIX_SECURE_PHASE_STOP)
     return;
+  if (session->phase == GOODIX_SECURE_PHASE_D1)
+    session->d1_server_flight_seen = TRUE;
   g_queue_push_tail (session->tls_records, g_bytes_ref (record));
-  maybe_start_b0 (session);
+  /* SSL_do_handshake() invokes this callback synchronously.  D1 egress must
+   * wait until the caller has established that the push itself succeeded. */
+  if (session->phase != GOODIX_SECURE_PHASE_D1)
+    maybe_start_b0 (session);
 }
 
 static void
@@ -856,7 +862,8 @@ goodix_secure_session_handle_b0 (GoodixSecureSession *session,
       session_fail_error (session, g_steal_pointer (&error));
       return;
     }
-  if (session->phase == GOODIX_SECURE_PHASE_D1)
+  if (session->phase == GOODIX_SECURE_PHASE_D1 &&
+      session->d1_server_flight_seen)
     {
       session->logical_done = TRUE;
       advance_phase (session);
