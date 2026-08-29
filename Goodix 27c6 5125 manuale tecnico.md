@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/02 — boundary materiali e harness live-capable chiusi host-only; preflight materiali protetti autentico PASS (E4 binding MATCH, zero USB); target proof nativa limitata ad A8/A0
+### Stato corrente post-D278/03 — executable closure locale PASS sull'host Fedora e procedura single-shot preparata; live non autorizzato, target proof nativa limitata ad A8/A0
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -164,6 +164,22 @@ D4_REACHABLE=false
 REAL_USB_ACCESS=0
 REAL_USB_SUBMIT=0
 APPLICATION_DATA_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+
+D278_03_BASELINE_HEAD=843290e7790d7930bb136d91510a3db9d3a97027
+AI_PM_STATIC_PRELIVE_REVIEW=PASS
+EXISTING_LAUNCHER_SUFFICIENT=true
+LIVE_CRITICAL_CODE_CHANGE_REQUIRED=false
+D278_03_EXECUTION_ENVIRONMENT=OPERATOR_FEDORA_HOST
+D278_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D278_03_D278_02_RUNNER=PASS
+D278_03_D278_01_D1_TLS_RUNNER=PASS
+D278_03_LAUNCHER_SHA256=a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f31d1c2bb5d3a251a
+D278_03_OPERATOR_PROCEDURE_PREPARED=true
+D278_03_OPERATOR_STOP_GATE_PRESENT=true
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+TARGET_E4_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
@@ -692,6 +708,67 @@ live. La taxonomy probatoria resta distinta: `D277_02_TARGET_PROOF` (A8/A0/APP12
 host-only) e `D278_02_AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT` (materiali autentici
 PASS, E4 binding MATCH, zero USB). `TARGET_UNPROVEN` resta vero per E4, pre-D1,
 D1 e TLS nativi live sul sensore.
+
+### D278/03 — executable closure locale Fedora e procedura single-shot pre-live
+
+La review statica HIGH AI-PM della baseline
+`843290e7790d7930bb136d91510a3db9d3a97027` è `PASS` e conclude che il
+launcher D278/02 esistente è sufficiente: non serve un nuovo wrapper/operator
+kit e non è richiesta alcuna modifica al live-critical code. D278/03 ha chiuso
+il residuo eseguibile sul Fedora 44 dell'operatore, nello stesso clone e nello
+stesso `/tmp` disponibile all'Utente.
+
+Il runner D278/02 ha passato 62/62 casi normal e 62/62 ASAN/UBSAN, build del
+binding live-capable e `--self-test`; il runner focalizzato D278/01 ha passato
+10/10 normal e 10/10 ASAN/UBSAN, incluso il gate D1/ClientHello frammentato e
+fail-closed. Il launcher preservato è
+`/tmp/goodix-d278-03-prelive.a65WgM/d278_native_secure_session_once`, con
+SHA-256 osservato
+`a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f31d1c2bb5d3a251a`.
+Il path `/tmp` resta effimero e non è parte del review set.
+
+Entrambi i primi avvii nel sandbox AI si sono fermati prima di build/test per
+il blocco ambientale Flatpak/bwrap su `NETLINK_ROUTE`; per ciascun runner è
+stato eseguito un solo rerun diagnostico identico fuori sandbox, riuscito.
+Nessuna configurazione o flag è stata cambiata e non vi sono stati ulteriori
+rerun. Tutta l'esecuzione D278/03 è rimasta host-only: zero `sudo`, zero letture
+dello store protetto, zero USB e zero live.
+
+La procedura futura usa lo stesso launcher dal terminale Fedora e lascia il
+`sudo` manuale all'Utente. Prima del singolo comando hardware ripete controlli
+shell fail-closed sul set live-critical rispetto alla baseline approvata e
+sullo SHA-256 del launcher. Il timeout host è 30 secondi più 5 secondi di kill
+grace, derivato dalla somma dei watchdog reali (11,75 secondi) con margine. La
+procedura contiene uno STOP gate esplicito ed è solo preparazione: richiede
+ancora review AI-PM, approvazione separata della baseline live-critical e dello
+SHA-256 e autorizzazione esplicita dell'Utente per una sola run.
+
+```text
+D278_03_OUTCOME=READY_FOR_AI_PM_REVIEW
+D278_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+AI_PM_STATIC_PRELIVE_REVIEW=PASS
+EXISTING_LAUNCHER_SUFFICIENT=true
+LIVE_CRITICAL_CODE_CHANGE_REQUIRED=false
+D278_03_D278_02_RUNNER=PASS
+D278_03_D278_01_D1_TLS_RUNNER=PASS
+D278_03_OPERATOR_PROCEDURE_PREPARED=true
+D278_03_OPERATOR_STOP_GATE_PRESENT=true
+D278_03_SUDO_USED=0
+D278_03_PROTECTED_STORE_READ_COUNT=0
+D278_03_REAL_USB_ACCESS=0
+D278_03_REAL_USB_SUBMIT=0
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+TARGET_E4_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_AND_SEPARATE_EXPLICIT_LIVE_AUTHORIZATION_DECISION
+```
+
+La procedura copiabile, lo STOP gate e la matrice della review statica sono in
+`analysis/D278/D278_03_native_secure_session_prelive_closure.md`. Non è stato
+creato alcun JSON duplicato.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -5303,10 +5380,14 @@ host-only con fixture sintetiche; il binding GUsb/libfprint completo compila e
 il solo `--self-test` passa con zero accessi reali. In aggiunta, l'operatore ha
 eseguito il 29 agosto 2026 il preflight autentico read-only dei materiali
 protetti (`--material-preflight-only`) con `PASS`, `e4_binding_match=true` e
-zero accesso USB. Il confine immediato è la review pre-live del live-critical
-set e l'approvazione esplicita di uno SHA live-critical prima di una eventuale
-autorizzazione single-shot separata; `CURRENT_LIVE_AUTHORIZED=false`,
-`TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true` e
+zero accesso USB. D278/03 ha poi confermato sulla baseline revisionata la
+executable closure locale Fedora e ha preparato la procedura single-shot
+fail-closed senza cambiare codice. Il confine immediato è la review AI-PM di
+D278/03 e, separatamente, l'approvazione esplicita della baseline live-critical
+e dello SHA-256 del launcher prima di una eventuale autorizzazione single-shot;
+`CURRENT_LIVE_AUTHORIZED=false`,
+`TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true`,
+`D278_03_EXECUTABLE_CLOSURE=PASS_HOST_ONLY` e
 `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
 
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
@@ -7595,7 +7676,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D278/02: la shell `FpImageDevice` non registrata
+Stato corrente post-D278/03: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa
@@ -7660,6 +7741,15 @@ read-only con i privilegi host necessari, mentre GUsb enumeration/open/claim e
 ogni transfer reale sono rimasti irraggiungibili (zero accesso USB,
 `e4_binding_match=true`, `project_secret_zeroized=true`).
 
+D278/03 non modifica il percorso runtime. La review statica AI-PM della
+baseline `843290e7790d7930bb136d91510a3db9d3a97027` ha confermato che il
+launcher D278/02 è già la superficie operatore sufficiente e che non occorre
+un wrapper aggiuntivo. Sul Fedora host dell'operatore i runner D278/02 e
+D278/01 focalizzato D1→TLS sono PASS normal e ASAN/UBSAN; il launcher locale è
+stato preservato e identificato tramite SHA-256. La procedura futura usa il
+terminale Fedora con `sudo` manuale dell'Utente, ma resta non autorizzata e
+protetta da STOP gate e controlli live-critical/SHA fail-closed.
+
 Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
 `analysis/D276/D276_03_usb_router_host_only.{md,json}`,
@@ -7667,7 +7757,8 @@ Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D277/D277_01_native_a8_real_usb.{md,json}` e
 `analysis/D277/D277_02_native_a8_real_usb.{md,json}` e
 `analysis/D278/D278_01_native_secure_session_host_only.{md,json}` e
-`analysis/D278/D278_02_native_target_material_secure_session_prep.{md,json}`.
+`analysis/D278/D278_02_native_target_material_secure_session_prep.{md,json}` e
+`analysis/D278/D278_03_native_secure_session_prelive_closure.md`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint
