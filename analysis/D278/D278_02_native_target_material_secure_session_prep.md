@@ -1,13 +1,59 @@
 # D278/02 — native target-material boundary e harness secure-session live-capable
 
 ```text
-OUTCOME=READY_PASS_HOST_ONLY_PRELIVE
-ADVANCEMENT=NEW_NATIVE_TARGET_MATERIAL_BOUNDARY_AND_LIVE_CAPABLE_SECURE_SESSION_HARNESS_HOST_ONLY_PROVEN
+OUTCOME=READY_FOR_AI_PM_CORRECTIVE_REVIEW
+ADVANCEMENT=CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 RESIDUAL_BLOCKER_OR_RISK=TARGET_PROTECTED_MATERIAL_PREFLIGHT_NOT_EXECUTED;NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;NEXT_LIVE_BASELINE_SHA_NOT_APPROVED;CURRENT_LIVE_AUTHORIZED_FALSE
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=BASELINE_94a61c69c6f31d1ace196549c96c1e2410c598d2_PLUS_STEP_LOCAL_GIT_DIFF
+REVIEW_SET=BASELINE_6f98d80c8fc82ea9d69d17fa0e18df325eee9128_PLUS_STEP_LOCAL_GIT_DIFF
+
+AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
+INITIAL_REVIEW_BLOCKER=CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
+CANONICAL_A2_SHA256_EXPECTED=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+CANONICAL_A2_SHA256_IMPLEMENTED_AFTER_FIX=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+
+D278_02_NORMAL=PASS
+D278_02_ASAN_UBSAN=PASS
+D278_02_DETERMINISM_RUNS=2
+D278_02_TEST_COUNT_PER_BINARY_RUN=55
+PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 ```
+
+## Cronologia del correttivo D278/02
+
+La revisione AI-PM iniziale sul commit
+`6f98d80c8fc82ea9d69d17fa0e18df325eee9128` ha richiesto un correttivo
+focalizzato: il pin A2 della policy produttiva in
+`goodix_target_material_policy_production()` non corrispondeva all'evidenza
+canonica D232.
+
+```text
+initial clean D278/02 implementation = 6f98d80c8fc82ea9d69d17fa0e18df325eee9128
+initial GitHub Actions run = 33246743946
+initial CI = PASS
+AI-PM initial review = FAIL_CORRECTIVE_REQUIRED
+reason = CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
+```
+
+Il valore canonico è stato verificato direttamente in
+`analysis/D232/D232_target_material_manifest.json`:
+
+```text
+A2 response length = 3
+A2 response SHA-256 = 39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+```
+
+L'array C è stato corretto per allinearsi a questo valore. È stato aggiunto un
+nuovo test indipendente `/d278_02/material/production_policy_canonical_pins`
+che confronta i pin critici della policy produttiva con costanti attese
+indipendenti, ricavate dalle evidenze canoniche del progetto, senza derivarle
+dalla policy stessa. Il test conta 55 casi per esecuzione binaria (54
+precedenti + 1 nuovo).
+
+Nota: il testo del prompt correttivo riportava un hash A2 terminante in `5f`;
+questo valore non è presente nel repository né nel manuale tecnico canonico, e
+non è stato utilizzato. L'unica fonte canonica rimane il manifest D232.
 
 ## Risultato e confine probatorio
 
@@ -134,23 +180,24 @@ autorizzazione live.
 
 Il runner principale `libfprint-driver/tests/run_goodix_d278_02_test.sh` è
 stato eseguito due volte consecutivamente nell’SDK Freedesktop 25.08 offline.
-Ogni invocazione esegue 54 casi normali e gli stessi 54 sotto ASAN/UBSAN,
+Ogni invocazione esegue 55 casi normali e gli stessi 55 sotto ASAN/UBSAN,
 compila il binding libfprint/GUsb completo e avvia `--self-test`. In totale:
 
 ```text
-D278_02_TEST_COUNT_PER_BINARY_RUN=54
-D278_02_NORMAL=54/54 PASS per invocazione
-D278_02_ASAN_UBSAN=54/54 PASS per invocazione
+D278_02_TEST_COUNT_PER_BINARY_RUN=55
+D278_02_NORMAL=55/55 PASS per invocazione
+D278_02_ASAN_UBSAN=55/55 PASS per invocazione
 D278_02_PRINCIPAL_RUNNER_INVOCATIONS=2
-D278_02_TOTAL_CASE_EXECUTIONS=216
+D278_02_TOTAL_CASE_EXECUTIONS=220
 D278_02_LIVE_HARNESS_BUILD=PASS
 D278_02_SELF_TEST=PASS_EXPECTED_A8_WATCHDOG_TERMINAL
+PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
 ```
 
-I 54 casi sono 6 D190, 6 PE, 22 material-loader e 20
-harness/watchdog/telemetria. LeakSanitizer resta disabilitato perché il confine
-Flatpak/bwrap non rende disponibile ptrace; ASAN address checks e UBSAN sono
-attivi.
+I 55 casi sono 6 D190, 6 PE, 23 material-loader (22 precedenti +
+`production_policy_canonical_pins`) e 20 harness/watchdog/telemetria.
+LeakSanitizer resta disabilitato perché il confine Flatpak/bwrap non rende
+disponibile ptrace; ASAN address checks e UBSAN sono attivi.
 
 Regressioni finali:
 

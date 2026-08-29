@@ -1,12 +1,16 @@
 {
   "schema": "d278-02-native-target-material-secure-session-prep-v1",
-  "outcome": "READY_PASS_HOST_ONLY_PRELIVE",
-  "advancement": "NEW_NATIVE_TARGET_MATERIAL_BOUNDARY_AND_LIVE_CAPABLE_SECURE_SESSION_HARNESS_HOST_ONLY_PROVEN",
+  "outcome": "READY_FOR_AI_PM_CORRECTIVE_REVIEW",
+  "advancement": "CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED",
   "executable_closure": "PASS_HOST_ONLY",
   "branch": "main",
-  "starting_head": "94a61c69c6f31d1ace196549c96c1e2410c598d2",
-  "technical_baseline": "52e190b2ceaee0e8de618accd4da9fadbad54115",
+  "starting_head": "6f98d80c8fc82ea9d69d17fa0e18df325eee9128",
+  "technical_baseline": "6f98d80c8fc82ea9d69d17fa0e18df325eee9128",
   "initial_worktree_clean": true,
+  "ai_pm_initial_review": "FAIL_CORRECTIVE_REQUIRED",
+  "initial_review_blocker": "CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH",
+  "canonical_a2_sha256_expected": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
+  "canonical_a2_sha256_implemented_after_fix": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
   "evidence_classes": {
     "historical_provenance": {
       "d190_commit": "b475a6eca72e340816779afae917334a6146c986",
@@ -68,6 +72,8 @@
     "transport_psk_length": 32,
     "config90_length": 224,
     "config90_finalizer_le_hex": "519a",
+    "a2_response_length": 3,
+    "a2_response_sha256": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
     "production_owner_uid": 0,
     "production_mode_octal": "0600"
   },
@@ -93,17 +99,18 @@
     "dynamic_redacted_telemetry": "PASS"
   },
   "tests": {
-    "test_count_per_binary_run": 54,
+    "test_count_per_binary_run": 55,
     "groups": {
       "d190": 6,
       "pe": 6,
-      "material": 22,
+      "material": 23,
       "harness_watchdog_telemetry": 20
     },
     "normal": "PASS",
     "asan_ubsan": "PASS",
     "principal_runner_consecutive_invocations": 2,
-    "total_d278_02_case_executions": 216,
+    "total_d278_02_case_executions": 220,
+    "production_policy_canonical_pin_matrix": "PASS",
     "leak_detection": "DISABLED_UNDER_FLATPAK_BWRAP_PTRACE_BOUNDARY",
     "d278_01_regression": "PASS",
     "d276_04_regression": "PASS",

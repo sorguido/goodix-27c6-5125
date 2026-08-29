@@ -8,6 +8,16 @@
 #include <openssl/ssl.h>
 #include <string.h>
 
+/* ASSERT_CMPMEM in some GLib versions stores lengths in int, which trips
+ * -Wsign-conversion under -Wconversion.  Use a size_t-safe local wrapper. */
+#define ASSERT_CMPMEM(m1, l1, m2, l2) G_STMT_START { \
+  gconstpointer __m1 = (m1), __m2 = (m2); \
+  gsize __l1 = (l1), __l2 = (l2); \
+  g_assert_cmpuint (__l1, ==, __l2); \
+  if (__l1 != 0) \
+    g_assert_true (memcmp (__m1, __m2, __l1) == 0); \
+} G_STMT_END
+
 typedef struct
 {
   guint64 generation;
@@ -448,9 +458,9 @@ assert_command_shape (Fixture *fixture,
         { 0x20, 0x02 }, { 0x36, 0x02 }, { 0x38, 0x02 }, { 0x3a, 0x02 }
       };
       g_assert_cmpuint (body_length, ==, 5);
-      g_assert_cmpmem (body, 2, addresses[index], 2);
+      ASSERT_CMPMEM (body, 2, addresses[index], 2);
       g_assert_cmphex (body[2], ==, 2);
-      g_assert_cmpmem (body + 3, 2, fixture->material.dac_values[index], 2);
+      ASSERT_CMPMEM (body + 3, 2, fixture->material.dac_values[index], 2);
     }
   goodix_a0_message_clear (&message);
 }
@@ -742,7 +752,7 @@ test_a0_vectors_and_malformed (void)
           expected[j] = (guint8) g_ascii_strtoull (pair, NULL, 16);
           expected_length++;
         }
-      g_assert_cmpmem (data, length, expected, expected_length);
+      ASSERT_CMPMEM (data, length, expected, expected_length);
     }
 
   g_autoptr(GError) error = NULL;
@@ -994,7 +1004,7 @@ test_typed_length_hash_and_90 (void)
                                                 control_for_phase (phase),
                                                 &message, &error));
           valid_body = g_bytes_get_data (message.body, &body_length);
-          body = g_memdup2 (valid_body, body_length + 1u);
+          body = g_memdup2 (valid_body, body_length);
           if (wrong_length != 0)
             body_length--;
           else

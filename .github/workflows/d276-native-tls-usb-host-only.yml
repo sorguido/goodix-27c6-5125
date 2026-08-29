@@ -38,6 +38,7 @@ jobs:
           test "$(grep -h '^D278_02_PRINCIPAL_RESULT=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
           test "$(grep -h '^D278_02_LIVE_HARNESS_BUILD=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
           test "$(grep -h '^D278_02_SELF_TEST=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
           test "$(grep -h '^REAL_USB_ACCESS=0$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
           test "$(grep -h '^REAL_USB_SUBMIT=0$' /tmp/d278-02-run-*.log | wc -l)" -eq 2
       - name: D276/02 and D276/03 regressions
