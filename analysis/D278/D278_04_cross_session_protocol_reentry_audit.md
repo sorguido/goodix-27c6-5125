@@ -30,7 +30,7 @@ TARGET_UNEXPECTED_PRIOR_PHASE_SHAPE_AT_REENTRY=OBSERVED
 OBSERVED_REENTRY_FRAME_OUTER=0xA0
 OBSERVED_REENTRY_FRAME_CONTROL=0xE4
 OBSERVED_REENTRY_FRAME_BODY_LENGTH=41
-OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_TYPED_SHAPE=true
+OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_CONTROL_AND_LENGTH=true
 
 CROSS_SESSION_RX_RESIDUAL_TARGET_HYPOTHESIS=STRONGLY_LIVE_CORROBORATED
 CROSS_SESSION_RX_RESIDUAL_CAUSAL_IDENTITY=UNPROVEN
@@ -349,7 +349,8 @@ observed_ack_echo=-1
 observed_ack_status=-1
 observed_body_length=41
 
-e4_binding_match=true
+D278_03_SECOND_SINGLE_SHOT_LOCAL_E4_BINDING_MATCH=true
+D278_03_SECOND_SINGLE_SHOT_LIVE_E4_TYPED_MATCH=NOT_REACHED
 tls_handshake_count=0
 tls_established=false
 secret_handoff_count=0
@@ -392,7 +393,7 @@ osservata al re-entry coincide dunque esattamente con quella shape:
 OBSERVED_REENTRY_FRAME_OUTER=0xA0
 OBSERVED_REENTRY_FRAME_CONTROL=0xE4
 OBSERVED_REENTRY_FRAME_BODY_LENGTH=41
-OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_TYPED_SHAPE=true
+OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_CONTROL_AND_LENGTH=true
 CANONICAL_E4_TYPED_BODY_LENGTH_SOURCE=libfprint-driver/goodix_secure_session.c::validate_typed
 ```
 
@@ -408,11 +409,12 @@ disponibile:
 
 1. residuo cross-session: la typed response E4 prodotta durante la prima run,
    mai letta, consegnata al primo transfer della nuova sessione;
-2. risposta tardiva o retransmissione del device nella nuova sessione;
-3. stato di protocollo APP12509 non quiescente, che risponde alla nuova A8 con
-   un frame della fase precedente;
-4. dato bufferizzato lungo la catena kernel/host-controller attraverso
-   release/close/open/claim.
+2. emissione tardiva / stato di protocollo APP12509 non quiescente lato device
+   (un frame della fase precedente emesso in risposta alla nuova A8, senza che
+   sia stato inviato alcun E4 nella seconda run: solo A8, `command_count=1`);
+3. dato bufferizzato lungo la catena kernel/host-controller attraverso
+   release/close/open/claim;
+4. altra origine device-side non discriminabile con la telemetria disponibile.
 
 L'ipotesi (1) è la più naturale e ora fortemente corroborata dai fatti live —
 la run precedente aveva lasciato pendente esattamente una typed response E4 e
@@ -618,7 +620,7 @@ TARGET_UNEXPECTED_PRIOR_PHASE_SHAPE_AT_REENTRY=OBSERVED
 OBSERVED_REENTRY_FRAME_OUTER=0xA0
 OBSERVED_REENTRY_FRAME_CONTROL=0xE4
 OBSERVED_REENTRY_FRAME_BODY_LENGTH=41
-OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_TYPED_SHAPE=true
+OBSERVED_REENTRY_FRAME_MATCHES_CANONICAL_E4_CONTROL_AND_LENGTH=true
 CROSS_SESSION_RX_RESIDUAL_TARGET_HYPOTHESIS=STRONGLY_LIVE_CORROBORATED
 CROSS_SESSION_RX_RESIDUAL_CAUSAL_IDENTITY=UNPROVEN
 ACK_POLICY_CORRECTIVE_REFUTED=false
