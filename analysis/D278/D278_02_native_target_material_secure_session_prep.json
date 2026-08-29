@@ -1,16 +1,29 @@
 {
   "schema": "d278-02-native-target-material-secure-session-prep-v1",
-  "outcome": "READY_FOR_AI_PM_MICRO_CORRECTIVE_REVIEW",
-  "advancement": "PROTECTED_PREFLIGHT_REDACTED_FAILURE_OBSERVABILITY_AND_CANONICAL_CLOSURE_FIXED",
-  "executable_closure": "PASS_HOST_ONLY",
-  "branch": "work",
-  "starting_head": "01b2379395b59219112236a6387bee9e5bd47bbf",
-  "technical_baseline": "01b2379395b59219112236a6387bee9e5bd47bbf",
-  "initial_worktree_clean": true,
+  "outcome": "READY",
+  "advancement": "REAL_EXECUTION_COMPLETED_AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_WITH_E4_BINDING_MATCH_AND_ZERO_USB_ACCESS",
+  "executable_closure": "PASS",
+  "canonical_baseline": "1d25abc7b4a99ea1719cc4381d6f780501483209",
   "ai_pm_initial_review": "FAIL_CORRECTIVE_REQUIRED",
   "initial_review_blocker": "CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH",
   "canonical_a2_sha256_expected": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
   "canonical_a2_sha256_implemented_after_fix": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
+  "review_history": {
+    "initial_implementation_commit": "6f98d80c8fc82ea9d69d17fa0e18df325eee9128",
+    "initial_github_actions_run": 33246743946,
+    "initial_ci": "PASS",
+    "canonical_a2_corrective_commit": "77cf978e2cb56e96b03e11dcd589c2787270c263",
+    "canonical_a2_corrective_ai_pm_review": "PASS",
+    "a2_corrective_merged_main": "01b2379395b59219112236a6387bee9e5bd47bbf",
+    "a2_corrective_ci_run": 33252621869,
+    "a2_corrective_ci": "PASS",
+    "micro_corrective_commit": "4d388a8031f99f8cee07102811680ee6167353c1",
+    "micro_corrective_ai_pm_review": "PASS",
+    "micro_corrective_pr": 35,
+    "micro_corrective_merged_main": "1d25abc7b4a99ea1719cc4381d6f780501483209",
+    "post_merge_ci_run": 33255017404,
+    "post_merge_ci": "PASS"
+  },
   "evidence_classes": {
     "historical_provenance": {
       "d190_commit": "b475a6eca72e340816779afae917334a6146c986",
@@ -40,7 +53,7 @@
       "corrective_ci_run": 33239781874,
       "merged_main": "52e190b2ceaee0e8de618accd4da9fadbad54115"
     },
-    "d278_02_new_host_only_proof": {
+    "d278_02_host_only_proof": {
       "native_d190_binder_five_kats": "PASS",
       "bounded_pe_hash_and_negative_gates": "PASS",
       "protected_material_loader_negative_matrix": "PASS",
@@ -51,8 +64,30 @@
       "self_test": "PASS_EXPECTED_A8_WATCHDOG_TERMINAL",
       "real_usb_access": 0
     },
+    "d278_02_authentic_protected_material_preflight": {
+      "evidence_path": "analysis/D278/D278_02_operator_protected_material_preflight_20260829.json",
+      "provenance": "OPERATOR_EXECUTED_AI_PM_TRANSCRIBED",
+      "executed_at_local": "2026-08-29T20:51:37+02:00",
+      "evidence_class": "AUTHENTIC_PROTECTED_MATERIAL_HOST_PREFLIGHT_WITH_ZERO_USB_ACCESS",
+      "preflight_passed": true,
+      "failure_stage": "NONE",
+      "failure_class": "none",
+      "preflight_rc": 0,
+      "e4_binding_match": true,
+      "project_secret_zeroized": true,
+      "usb_open_attempt_count": 0,
+      "usb_open_count": 0,
+      "usb_claim_count": 0,
+      "real_usb_submit_count": 0,
+      "command_count": 0,
+      "tls_handshake_count": 0,
+      "persistent_device_write_count": 0,
+      "retry_count": 0,
+      "device_reset_count": 0,
+      "current_live_authorized": false
+    },
     "target_unproven": {
-      "target_protected_material_preflight_executed": false,
+      "target_protected_material_preflight_executed": true,
       "live_execution_performed": false,
       "native_secure_session_target_proven": false,
       "live_e4_match_proven": false,
@@ -126,6 +161,19 @@
     "d277_live_harness": "BUILD_ONLY_NOT_EXECUTED",
     "github_actions_updated": true
   },
+  "operator_preflight": {
+    "launcher_ephemeral_path": "/tmp/goodix-d278-02-operator.AecsU1/d278_native_secure_session_once",
+    "launcher_sha256": "3ef04925dd440c8c6d1f14d1e764e99a10355f4d205c90529df4ad30d22deacb",
+    "local_log_path": "/tmp/d278_02_material_preflight_20260829T205137.log",
+    "local_log_status": "EPHEMERAL_NOT_PART_OF_REVIEW_SET",
+    "preflight_passed": true,
+    "failure_stage": "NONE",
+    "failure_class": "none",
+    "e4_binding_match": true,
+    "project_secret_zeroized": true,
+    "preflight_rc": 0,
+    "generic_telemetry_note": "Preflight mode does not instantiate/execute the live USB backend/session lifecycle; reached_phase=A8 and backend_drained=false/terminal_cleanup_completed=false are not live-cleanup failure signals."
+  },
   "safety": {
     "material_invalid_blocks_before_usb_open": "PASS",
     "synthetic_single_open_claim_epoch": "PASS",
@@ -149,40 +197,31 @@
     "real_usb_submit": 0,
     "usb_open_count": 0,
     "usb_claim_count": 0,
-    "current_live_authorized": false
+    "current_live_authorized": false,
+    "live_execution_performed": false
   },
   "methodological_pre_live_review": {
-    "material_change": "D277/02 proved target-native A8/A0/APP12509 only; D278/02 adds a native protected-material boundary, one PSK-to-E4 binder shared with TLS, full secure-session composition and a bounded phase watchdog.",
-    "live_hypothesis": "With authentic protected target material, APP12509 will advance A8,E4_MATCH,A2,82,A6,A2,70,80x4,90,D1,TLS12_PSK_ESTABLISHED,STOP without D4 or persistent state change.",
+    "material_change": "D277/02 proved target-native A8/A0/APP12509 only; D278/02 adds a native protected-material boundary, one PSK-to-E4 binder shared with TLS, full secure-session composition and a bounded phase watchdog. The authentic operator preflight now confirms that the real protected material passes this boundary with e4_binding_match=true and zero USB access.",
+    "live_hypothesis": "With the same authentic preflighted material, APP12509 will advance A8,E4_MATCH,A2,82,A6,A2,70,80x4,90,D1,TLS12_PSK_ESTABLISHED,STOP without D4 or persistent state change.",
     "failure_policy": "At the first failure stop, record reached phase and redacted class, perform no retry/reopen/reset, drain and zeroize, and return to AI-PM before any methodologically equivalent attempt.",
     "constitutes_live_authorization": false
   },
-  "residual_blocker_or_risk": "AI_PM_MICRO_CORRECTIVE_REVIEW_PENDING;TARGET_PROTECTED_MATERIAL_PREFLIGHT_NOT_EXECUTED;NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;CURRENT_LIVE_AUTHORIZED_FALSE",
+  "residual_blocker_or_risk": "NATIVE_SECURE_SESSION_TARGET_UNPROVEN_BEYOND_A8_A0;TARGET_E4_NATIVE_LIVE_UNPROVEN;TARGET_TLS_NATIVE_LIVE_UNPROVEN;CURRENT_LIVE_AUTHORIZED_FALSE",
   "canonical_documentation": {
     "updated": true,
-    "path": "Goodix 27c6 5125 manuale tecnico.md"
+    "manual_path": "Goodix 27c6 5125 manuale tecnico.md",
+    "report_path": "analysis/D278/D278_02_native_target_material_secure_session_prep.md",
+    "operator_evidence_path": "analysis/D278/D278_02_operator_protected_material_preflight_20260829.json"
   },
   "review_set": {
-    "baseline": "01b2379395b59219112236a6387bee9e5bd47bbf",
-    "final_commit_self_reference_omitted": true,
+    "baseline": "1d25abc7b4a99ea1719cc4381d6f780501483209",
+    "branch": "ai-pm/d27802-preflight-closure",
     "paths": [
-      "libfprint-driver/goodix_target_material.c",
-      "libfprint-driver/goodix_target_material.h",
-      "libfprint-driver/tests/test_goodix_d278_02.c",
-      "libfprint-driver/tests/run_goodix_d278_02_test_inner.sh",
-      "tools/goodix_d190_pe.c",
-      "tools/goodix_d190_pe.h",
-      "tools/goodix_d278_harness.c",
-      "tools/goodix_d278_harness.h",
-      "tools/d278_native_secure_session_once.c",
+      "analysis/D278/D278_02_operator_protected_material_preflight_20260829.json",
       "analysis/D278/D278_02_native_target_material_secure_session_prep.md",
       "analysis/D278/D278_02_native_target_material_secure_session_prep.json",
       "Goodix 27c6 5125 manuale tecnico.md"
     ]
   },
-  "next_primary_boundary": "AI_PM_REVIEW_THEN_OPERATOR_PROTECTED_MATERIAL_PREFLIGHT",
-  "d278_02_canonical_a2_corrective_ai_pm_review": "PASS",
-  "ai_pm_reviewed_main_baseline": "01b2379395b59219112236a6387bee9e5bd47bbf",
-  "corrective_ci_run": 33252621869,
-  "corrective_ci": "PASS"
+  "next_primary_boundary": "AI_PM_REVIEW_THEN_EXPLICITLY_AUTHORIZED_SINGLE_SHOT_NATIVE_TARGET_SECURE_SESSION"
 }
