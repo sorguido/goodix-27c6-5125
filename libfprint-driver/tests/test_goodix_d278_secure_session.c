@@ -588,6 +588,39 @@ feed_client_records (Fixture *fixture,
   g_assert_cmpuint (pending->len, ==, 0);
 }
 
+static GBytes *
+take_initial_client_hello (TlsClient *client)
+{
+  guint8 buffer[8192];
+  int result;
+  int length;
+
+  result = SSL_do_handshake (client->ssl);
+  g_assert_cmpint (result, ==, -1);
+  g_assert_cmpint (SSL_get_error (client->ssl, result), ==,
+                   SSL_ERROR_WANT_READ);
+  length = BIO_read (SSL_get_wbio (client->ssl), buffer, sizeof buffer);
+  g_assert_cmpint (length, >, 9);
+  g_assert_cmpuint ((gsize) length, ==,
+                    5u + ((gsize) buffer[3] << 8) + buffer[4]);
+  return g_bytes_new (buffer, (gsize) length);
+}
+
+static void
+feed_b0_payload (Fixture *fixture,
+                 const guint8 *payload,
+                 gsize payload_length)
+{
+  guint8 header[4] = { 0xb0, (guint8) payload_length,
+                       (guint8) (payload_length >> 8), 0 };
+  g_autoptr(GByteArray) frame = g_byte_array_new ();
+
+  header[3] = (guint8) (header[0] + header[1] + header[2]);
+  g_byte_array_append (frame, header, sizeof header);
+  g_byte_array_append (frame, payload, (guint) payload_length);
+  feed_completion (fixture, frame->data, frame->len, fixture->generation);
+}
+
 static void
 drain_server_records (Fixture *fixture,
                       TlsClient *client,
@@ -794,6 +827,66 @@ test_happy_path (void)
   g_assert_cmpuint (fixture->schedule_count, >, 0);
   client_clear (&client);
   fixture_free (fixture);
+}
+
+static void
+test_d1_client_hello_gate (void)
+{
+  const gsize split_points[] = { 5u, 11u };
+
+  for (guint i = 0; i < G_N_ELEMENTS (split_points); i++)
+    {
+      Fixture *fixture = fixture_new ();
+      TlsClient client;
+      g_autoptr(GBytes) hello = NULL;
+      gsize hello_length;
+      const guint8 *hello_data;
+
+      start_and_advance_to (fixture, GOODIX_SECURE_PHASE_D1);
+      respond_valid (fixture, 0, 0x01);
+      client_init (&client, fixture);
+      hello = take_initial_client_hello (&client);
+      hello_data = g_bytes_get_data (hello, &hello_length);
+      g_assert_cmpuint (split_points[i], <, hello_length);
+
+      feed_b0_payload (fixture, hello_data, split_points[i]);
+      g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                       GOODIX_SECURE_PHASE_D1);
+      g_assert_true (g_queue_is_empty (fixture->out));
+      g_assert_cmpuint (fixture->audit.b0_physical_submit_count, ==, 0);
+      g_assert_cmpuint (fixture->audit.retry_count, ==, 0);
+      g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0);
+      g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0);
+
+      feed_b0_payload (fixture, hello_data + split_points[i],
+                       hello_length - split_points[i]);
+      g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                       GOODIX_SECURE_PHASE_TLS);
+      g_assert_false (g_queue_is_empty (fixture->out));
+      drain_server_records (fixture, &client, FALSE);
+      g_assert_true (pump_tls (fixture, &client, FALSE));
+      g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                       GOODIX_SECURE_PHASE_STOP);
+      client_clear (&client);
+      fixture_free (fixture);
+    }
+
+  {
+    Fixture *fixture = fixture_new ();
+    static const guint8 malformed[] = { 0x16, 0x03, 0x03, 0, 4,
+                                        0xff, 0, 0, 0 };
+    start_and_advance_to (fixture, GOODIX_SECURE_PHASE_D1);
+    respond_valid (fixture, 0, 0x01);
+    feed_b0_payload (fixture, malformed, sizeof malformed);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_TERMINAL);
+    g_assert_cmpuint (fixture->audit.b0_physical_submit_count, ==, 0);
+    g_assert_cmpuint (fixture->audit.retry_count, ==, 0);
+    g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0);
+    g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0);
+    g_assert_false (fixture->audit.d4_reachable);
+    fixture_free (fixture);
+  }
 }
 
 static void
@@ -1129,6 +1222,8 @@ main (int argc,
   g_test_add_func ("/goodix/d278/a0-vectors-malformed",
                    test_a0_vectors_and_malformed);
   g_test_add_func ("/goodix/d278/happy-path-real-tls", test_happy_path);
+  g_test_add_func ("/goodix/d278/d1-client-hello-gate",
+                   test_d1_client_hello_gate);
   g_test_add_func ("/goodix/d278/ack-policy-response-failures",
                    test_ack_policy_and_response_failures);
   g_test_add_func ("/goodix/d278/typed-length-hash-90",

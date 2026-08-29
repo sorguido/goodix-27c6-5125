@@ -87,7 +87,13 @@ E4_NOT_EXERCISED=true
 FINGER_PATH_NOT_EXERCISED=true
 IMAGE_PATH_NOT_EXERCISED=true
 
-D278_01_HOST_ONLY_RESULT=PASS
+D278_01_INITIAL_IMPLEMENTATION_HOST_ONLY=PASS
+D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
+D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
+D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
+D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
+D278_01_D1_TLS_GATE_CI=PENDING
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
@@ -403,7 +409,12 @@ vector A8 `a00600a6a803000000ff`, E4
 `a00c00ace40900030002bb00000000fd` e D1
 `a00600a6d103000000d7` passano normal e sanitizer. La policy ACK è
 phase-specific: solo A8 ammette `0x01|0x07`; E4..90 ammettono esattamente
-`0x01`; D1 non ammette A0 e richiede come prima classe B0/TLS ClientHello.
+`0x01`; D1 non ammette A0 e richiede come prima classe B0/TLS ClientHello. Il passaggio
+D1→TLS non deriva dal solo successo di `goodix_tls_server_push()`: avviene una
+sola volta soltanto dopo che OpenSSL ha elaborato abbastanza ClientHello da
+produrre il primo flight server. Frammenti TLS incompleti restano in D1 senza
+egress; un errore della push prevale su qualsiasi alert sincrono e chiude la
+sessione.
 
 Il material boundary riceve in memoria identity APP12509, validator/pin E4,
 pin A2/82/A6, quattro DAC, CONFIG_90 con hash/finalizer/correlazione e PSK da
@@ -428,15 +439,25 @@ chiusa.
 Il peer sintetico asincrono attraversa il vero sequencer, router, backend e
 `GoodixTlsServer`, completa una vera handshake OpenSSL TLS 1.2
 `PSK-AES128-GCM-SHA256` con identity `Client_identity`, un handoff secret e
-zeroizzazione della copia project-owned. La suite D278 passa 9/9 normal e 9/9
-ASAN/UBSAN. Passano inoltre D276/02 15/15, D276/03 8/8, D276/04 5/5 e D277
+zeroizzazione della copia project-owned. La suite D278 passa 10/10 normal e 10/10
+ASAN/UBSAN. Il decimo gruppo usa un client OpenSSL reale e prova split
+deterministici dopo il solo header record e nel body ClientHello, completamento
+con avanzamento singolo, e TLS malformato fail-closed. Passano inoltre D276/02 15/15, D276/03 8/8, D276/04 5/5 e D277
 15/15 sia normal sia sanitizer. LeakSanitizer è disabilitato perché non
 disponibile sotto il boundary Flatpak/bwrap ptrace; ASAN address checks e UBSAN
-restano attivi. Il workflow CI esegue due run D278 ma la conferma GitHub
-Actions resta pending fino a un futuro commit/push revisionato.
+restano attivi. Il checkpoint iniziale `0efa30f681e0a3aa284565ce581536ad00606c39` ha
+GitHub Actions PASS nella run `33237274978`; questa evidenza precede la
+correzione del gate. La correzione è PASS locale, mentre review AI-PM e nuova
+CI restano pending.
 
 ```text
-D278_01_HOST_ONLY_RESULT=PASS
+D278_01_INITIAL_IMPLEMENTATION_HOST_ONLY=PASS
+D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
+D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
+D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
+D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
+D278_01_D1_TLS_GATE_CI=PENDING
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
