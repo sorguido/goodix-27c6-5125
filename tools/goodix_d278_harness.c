@@ -12,6 +12,67 @@
 #define D278_EP_OUT 0x01u
 #define D278_RECEIVE_SIZE 32768u
 
+GoodixTargetMaterial *
+goodix_d278_prepare_target_material (
+  const gchar                      *manifest_path,
+  const gchar                      *transport_path,
+  const gchar                      *config90_path,
+  const gchar                      *dll_path,
+  const GoodixTargetMaterialPolicy *material_policy,
+  const GoodixD190PePolicy         *pe_policy,
+  GoodixTargetMaterialAudit        *audit,
+  GoodixSecureSessionMaterial      *view,
+  GoodixD278PreflightFailure       *failure,
+  GError                          **error)
+{
+  GoodixTargetMaterial *owner = NULL;
+  guint8 seed_a[GOODIX_D190_PE_SEED_LENGTH] = { 0 };
+  guint8 seed_b[GOODIX_D190_PE_SEED_LENGTH] = { 0 };
+
+  g_return_val_if_fail (failure != NULL, NULL);
+  failure->failure_stage = "NONE";
+  failure->failure_class = "NONE";
+  owner = goodix_target_material_load (manifest_path, transport_path,
+                                       config90_path, material_policy, audit,
+                                       error);
+  if (owner == NULL)
+    {
+      failure->failure_stage = "TARGET_MATERIAL_LOAD";
+      failure->failure_class = goodix_target_material_error_class (
+        error != NULL ? *error : NULL);
+      goto out;
+    }
+  if (!goodix_d190_pe_extract_with_policy (dll_path, pe_policy, seed_a, seed_b,
+                                            error))
+    {
+      failure->failure_stage = "CANONICAL_PE";
+      failure->failure_class = "CANONICAL_PE_OR_DLL";
+      goto fail;
+    }
+  if (!goodix_target_material_bind (owner, seed_a, seed_b, error))
+    {
+      failure->failure_stage = "E4_BIND";
+      failure->failure_class = goodix_target_material_error_class (
+        error != NULL ? *error : NULL);
+      goto fail;
+    }
+  if (!goodix_target_material_get_secure_session_material (owner, view, error))
+    {
+      failure->failure_stage = "MATERIAL_EXPORT";
+      failure->failure_class = "MATERIAL_EXPORT_OR_STATE";
+      goto fail;
+    }
+  goto out;
+
+fail:
+  goodix_target_material_free (owner);
+  owner = NULL;
+out:
+  goodix_d190_pe_cleanse_seed (seed_a);
+  goodix_d190_pe_cleanse_seed (seed_b);
+  return owner;
+}
+
 typedef struct
 {
   GoodixD278Watchdog *watchdog;

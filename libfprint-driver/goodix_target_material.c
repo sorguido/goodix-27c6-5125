@@ -42,6 +42,32 @@ goodix_target_material_error_quark (void)
   return g_quark_from_static_string ("goodix-target-material-error");
 }
 
+const gchar *
+goodix_target_material_error_class (const GError *error)
+{
+  if (error == NULL || error->domain != GOODIX_TARGET_MATERIAL_ERROR)
+    return "ARGUMENT_OR_POLICY";
+
+  switch ((GoodixTargetMaterialError) error->code)
+    {
+    case GOODIX_TARGET_MATERIAL_ERROR_OPEN:
+      return "PROTECTED_OPEN";
+    case GOODIX_TARGET_MATERIAL_ERROR_METADATA:
+      return "PROTECTED_METADATA";
+    case GOODIX_TARGET_MATERIAL_ERROR_READ:
+      return "PROTECTED_READ";
+    case GOODIX_TARGET_MATERIAL_ERROR_CONTENT:
+      return "PROTECTED_CONTENT";
+    case GOODIX_TARGET_MATERIAL_ERROR_BINDING:
+      return "E4_BINDING";
+    case GOODIX_TARGET_MATERIAL_ERROR_STATE:
+      return "MATERIAL_EXPORT_OR_STATE";
+    case GOODIX_TARGET_MATERIAL_ERROR_ARGUMENT:
+    default:
+      return "ARGUMENT_OR_POLICY";
+    }
+}
+
 static gboolean
 digest (const guint8 *data,
         gsize         length,

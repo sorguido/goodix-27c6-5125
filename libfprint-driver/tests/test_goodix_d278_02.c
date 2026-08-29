@@ -729,6 +729,108 @@ test_material_failure_path_cleansed (void)
   material_fixture_clear (&fixture);
 }
 
+typedef enum
+{
+  PREFLIGHT_SUCCESS,
+  PREFLIGHT_OPEN,
+  PREFLIGHT_METADATA,
+  PREFLIGHT_CONTENT,
+  PREFLIGHT_PE,
+  PREFLIGHT_E4,
+} PreflightCase;
+
+static void
+test_preflight_observability (gconstpointer user_data)
+{
+  PreflightCase test_case = (PreflightCase) GPOINTER_TO_UINT (user_data);
+  MaterialFixture fixture;
+  GoodixD190PePolicy pe_policy;
+  GoodixD278PreflightFailure failure;
+  GoodixSecureSessionMaterial view = { 0 };
+  g_autoptr(GError) error = NULL;
+  GoodixTargetMaterial *owner;
+  const gchar *manifest;
+  const gchar *dll = CANONICAL_DLL;
+
+  material_fixture_init (&fixture);
+  goodix_d190_pe_policy_production (&pe_policy);
+  manifest = fixture.manifest;
+  switch (test_case)
+    {
+    case PREFLIGHT_SUCCESS:
+      break;
+    case PREFLIGHT_OPEN:
+      manifest = fixture.symlink_target;
+      break;
+    case PREFLIGHT_METADATA:
+      g_assert_cmpint (g_chmod (fixture.manifest, 0644), ==, 0);
+      break;
+    case PREFLIGHT_CONTENT:
+      fixture.policy.manifest_sha256[0] ^= 1;
+      break;
+    case PREFLIGHT_PE:
+      dll = fixture.symlink_target;
+      break;
+    case PREFLIGHT_E4:
+      fixture.policy.e4_validator_sha256[0] ^= 1;
+      break;
+    }
+
+  owner = goodix_d278_prepare_target_material (
+    manifest, fixture.transport, fixture.config, dll, &fixture.policy,
+    &pe_policy, &fixture.audit, &view, &failure, &error);
+  if (test_case == PREFLIGHT_SUCCESS)
+    {
+      g_assert_nonnull (owner);
+      g_assert_no_error (error);
+      g_assert_cmpstr (failure.failure_stage, ==, "NONE");
+      g_assert_cmpstr (failure.failure_class, ==, "NONE");
+    }
+  else
+    {
+      static const gchar *const stages[] = {
+        "NONE", "TARGET_MATERIAL_LOAD", "TARGET_MATERIAL_LOAD",
+        "TARGET_MATERIAL_LOAD", "CANONICAL_PE", "E4_BIND"
+      };
+      static const gchar *const classes[] = {
+        "NONE", "PROTECTED_OPEN", "PROTECTED_METADATA",
+        "PROTECTED_CONTENT", "CANONICAL_PE_OR_DLL", "E4_BINDING"
+      };
+      g_assert_null (owner);
+      g_assert_nonnull (error);
+      g_assert_cmpstr (failure.failure_stage, ==, stages[test_case]);
+      g_assert_cmpstr (failure.failure_class, ==, classes[test_case]);
+      g_assert_null (strstr (failure.failure_stage, "G5125POC"));
+      g_assert_null (strstr (failure.failure_class, "G5125POC"));
+      g_assert_null (strstr (failure.failure_stage, "b5e0beeb"));
+      g_assert_null (strstr (failure.failure_class, "b5e0beeb"));
+    }
+  goodix_target_material_free (owner);
+  OPENSSL_cleanse (&view, sizeof view);
+  material_fixture_clear (&fixture);
+}
+
+static void
+test_preflight_material_export_state_mapping (void)
+{
+  MaterialFixture fixture;
+  GoodixSecureSessionMaterial view = { 0 };
+  g_autoptr(GError) error = NULL;
+  GoodixTargetMaterial *owner;
+
+  material_fixture_init (&fixture);
+  owner = load_fixture (&fixture, NULL, FALSE, &error);
+  g_assert_nonnull (owner);
+  g_assert_no_error (error);
+  g_assert_false (goodix_target_material_get_secure_session_material (
+    owner, &view, &error));
+  g_assert_cmpstr (goodix_target_material_error_class (error), ==,
+                   "MATERIAL_EXPORT_OR_STATE");
+  goodix_target_material_free (owner);
+  OPENSSL_cleanse (&view, sizeof view);
+  material_fixture_clear (&fixture);
+}
+
 typedef struct
 {
   guint64 generation;
@@ -1616,6 +1718,10 @@ main (int argc,
   static const gchar *const pe_pattern_names[] = {
     "wrong", "ambiguous"
   };
+  static const gchar *const preflight_names[] = {
+    "success_redacted", "protected_open", "protected_metadata",
+    "protected_content", "canonical_pe", "e4_binding"
+  };
   static const struct
   {
     const gchar *name;
@@ -1685,6 +1791,15 @@ main (int argc,
                    test_material_psk_scratch_cleansed);
   g_test_add_func ("/d278_02/material/failure_path_cleansed",
                    test_material_failure_path_cleansed);
+  for (guint i = 0; i < G_N_ELEMENTS (preflight_names); i++)
+    {
+      g_autofree gchar *path = g_strdup_printf (
+        "/d278_02/preflight/%s", preflight_names[i]);
+      g_test_add_data_func (path, GUINT_TO_POINTER (i),
+                            test_preflight_observability);
+    }
+  g_test_add_func ("/d278_02/preflight/material_export_state_mapping",
+                   test_preflight_material_export_state_mapping);
 
   g_test_add_func ("/d278_02/harness/material_failure_before_open",
                    test_harness_material_failure_before_open);

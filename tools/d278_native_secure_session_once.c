@@ -67,30 +67,18 @@ canonical_dll_path (void)
 static GoodixTargetMaterial *
 prepare_target_material (GoodixTargetMaterialAudit *audit,
                          GoodixSecureSessionMaterial *view,
+                         GoodixD278PreflightFailure *failure,
                          GError                    **error)
 {
   GoodixTargetMaterialPolicy policy;
-  GoodixTargetMaterial *owner = NULL;
+  GoodixD190PePolicy pe_policy;
   g_autofree gchar *dll = canonical_dll_path ();
-  guint8 seed_a[6] = { 0 };
-  guint8 seed_b[6] = { 0 };
 
   goodix_target_material_policy_production (&policy);
-  owner = goodix_target_material_load (manifest_path, transport_path,
-                                       config90_path, &policy, audit, error);
-  if (owner == NULL)
-    goto out;
-  if (!goodix_d190_pe_extract (dll, seed_a, seed_b, error) ||
-      !goodix_target_material_bind (owner, seed_a, seed_b, error) ||
-      !goodix_target_material_get_secure_session_material (owner, view, error))
-    {
-      goodix_target_material_free (owner);
-      owner = NULL;
-    }
-out:
-  goodix_d190_pe_cleanse_seed (seed_a);
-  goodix_d190_pe_cleanse_seed (seed_b);
-  return owner;
+  goodix_d190_pe_policy_production (&pe_policy);
+  return goodix_d278_prepare_target_material (
+    manifest_path, transport_path, config90_path, dll, &policy, &pe_policy,
+    audit, view, failure, error);
 }
 
 static void
@@ -213,26 +201,29 @@ run_material_preflight (void)
   GoodixTargetMaterialAudit audit;
   GoodixSecureSessionMaterial view = { 0 };
   GoodixD278Telemetry telemetry;
+  GoodixD278PreflightFailure failure;
   g_autoptr(GError) error = NULL;
   GoodixTargetMaterial *owner;
   g_autofree gchar *json = NULL;
   gboolean match;
 
   goodix_d278_telemetry_init (&telemetry, FALSE);
-  owner = prepare_target_material (&audit, &view, &error);
+  owner = prepare_target_material (&audit, &view, &failure, &error);
   match = owner != NULL && audit.e4_binding_match;
   goodix_target_material_free (owner);
   OPENSSL_cleanse (&view, sizeof view);
   g_strlcpy (telemetry.result, match ? "pass" : "fail",
              sizeof telemetry.result);
   if (!match)
-    g_strlcpy (telemetry.failure_class,
-               "PROTECTED_MATERIAL_PREFLIGHT_FAILED",
+    g_strlcpy (telemetry.failure_class, failure.failure_class,
                sizeof telemetry.failure_class);
   telemetry.e4_binding_match = match;
   telemetry.project_secret_zeroized = audit.project_secret_zeroized;
   json = goodix_d278_boundary_telemetry_to_json (&telemetry);
-  g_print ("%s\n", json);
+  g_print ("{\"failure_stage\":\"%s\",\"preflight_passed\":%s,"
+           "\"telemetry\":%s}\n",
+           match ? "NONE" : failure.failure_stage,
+           match ? "true" : "false", json);
   return match ? 0 : 1;
 }
 
@@ -273,6 +264,7 @@ static int
 run_live_once (void)
 {
   GoodixTargetMaterialAudit material_audit;
+  GoodixD278PreflightFailure preflight_failure;
   GoodixSecureSessionMaterial view = { 0 };
   GoodixD278Telemetry telemetry;
   g_autoptr(GError) error = NULL;
@@ -289,13 +281,13 @@ run_live_once (void)
   int rc = 1;
 
   goodix_d278_telemetry_init (&telemetry, TRUE);
-  owner = prepare_target_material (&material_audit, &view, &error);
+  owner = prepare_target_material (&material_audit, &view, &preflight_failure,
+                                   &error);
   if (owner == NULL)
     {
       g_autofree gchar *boundary_json = NULL;
       telemetry.current_live_authorized = FALSE;
-      record_host_failure (&telemetry,
-                           "PROTECTED_MATERIAL_BEFORE_USB_OPEN");
+      record_host_failure (&telemetry, preflight_failure.failure_class);
       telemetry.project_secret_zeroized =
         material_audit.project_secret_zeroized;
       boundary_json = goodix_d278_boundary_telemetry_to_json (&telemetry);

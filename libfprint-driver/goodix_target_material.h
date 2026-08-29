@@ -66,6 +66,9 @@ typedef struct
 
 void goodix_target_material_policy_production (GoodixTargetMaterialPolicy *policy);
 
+/* Stable redacted classification for this module's GError provenance. */
+const gchar *goodix_target_material_error_class (const GError *error);
+
 GoodixTargetMaterial *goodix_target_material_load (
   const gchar                      *manifest_path,
   const gchar                      *transport_path,

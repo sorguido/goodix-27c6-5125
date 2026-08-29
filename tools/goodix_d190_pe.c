@@ -247,16 +247,17 @@ out:
 }
 
 gboolean
-goodix_d190_pe_extract (const gchar *path,
-                        guint8       seed_a[6],
-                        guint8       seed_b[6],
-                        GError     **error)
+goodix_d190_pe_extract_with_policy (const gchar              *path,
+                                    const GoodixD190PePolicy *policy,
+                                    guint8                    seed_a[6],
+                                    guint8                    seed_b[6],
+                                    GError                  **error)
 {
   g_autofree gchar *contents = NULL;
   gsize length = 0;
-  GoodixD190PePolicy policy;
 
-  if (path == NULL || !g_file_get_contents (path, &contents, &length, error))
+  if (path == NULL || policy == NULL ||
+      !g_file_get_contents (path, &contents, &length, error))
     {
       if (error != NULL && *error == NULL)
         g_set_error_literal (error, GOODIX_D190_PE_ERROR,
@@ -264,10 +265,22 @@ goodix_d190_pe_extract (const gchar *path,
                              "canonical gfusb.dll could not be read");
       return FALSE;
     }
-  goodix_d190_pe_policy_production (&policy);
   return goodix_d190_pe_extract_bytes_with_policy ((const guint8 *) contents,
-                                                    length, &policy,
+                                                    length, policy,
                                                     seed_a, seed_b, error);
+}
+
+gboolean
+goodix_d190_pe_extract (const gchar *path,
+                        guint8       seed_a[6],
+                        guint8       seed_b[6],
+                        GError     **error)
+{
+  GoodixD190PePolicy policy;
+
+  goodix_d190_pe_policy_production (&policy);
+  return goodix_d190_pe_extract_with_policy (path, &policy, seed_a, seed_b,
+                                              error);
 }
 
 void
