@@ -5525,9 +5525,12 @@ e self-test PASS, zero `sudo`, zero store protetto, zero USB reale, zero live. I
 vecchio launcher pre-corrective (`SHA256=a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f31d1c2bb5d3a251a`)
 è stato ritirato e non è autorizzato per uso futuro; il nuovo candidate
 (`SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d`) è
-diverso e preservato in `/tmp`. Il confine immediato è la review AI-PM della
-post-corrective executable closure, poi una separata decisione di autorizzazione
-live, senza autorizzazione live implicita: `CURRENT_LIVE_AUTHORIZED=false`,
+diverso e preservato in `/tmp`. La post-corrective executable closure e i relativi
+log sono stati revisionati AI-PM con PASS; il launcher candidate è stato inoltre
+verificato host-native sul Fedora operatore con ldd e self-test PASS, RC=0 e
+zero USB. Il confine immediato è quindi la review AI-PM finale della
+documentazione e, soltanto dopo, una separata decisione su un'eventuale seconda
+run hardware single-shot, senza alcuna autorizzazione live implicita: `CURRENT_LIVE_AUTHORIZED=false`,
 `TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true`,
 `D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE`,
 `D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS`,
