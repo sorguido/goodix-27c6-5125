@@ -141,3 +141,41 @@ TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
 factory_firmware_and_persistent_state_must_remain_untouched
 ```
+
+## Post-corrective operator-host executable closure
+
+L'AI-PM ha revisionato il correttivo post-live D278/03 e concluso
+`AI_PM_D278_03_ACK_CORRECTIVE_REVIEW=PASS` con
+`NATIVE_C_ACK_POLICY_DIVERGENCE=PROVEN_AND_CORRECTED`. Questo task ha costruito e
+qualificato un nuovo launcher candidate dal commit corretto, senza eseguire live,
+`sudo`, accesso a store protetto o USB reale.
+
+```text
+POST_CORRECTIVE_BASELINE=4e5d74770bce6e0a9de929b19279038827abff8c
+EXECUTION_ENVIRONMENT=OPERATOR_FEDORA_HOST
+POST_CORRECTIVE_D278_02_RUNNER=PASS
+POST_CORRECTIVE_D278_01_FOCUSED_RUNNER=PASS
+POST_CORRECTIVE_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+POST_CORRECTIVE_BUILD=/tmp/goodix-d278-03-ackfix-prelive.IJUtHz
+POST_CORRECTIVE_LAUNCHER=/tmp/goodix-d278-03-ackfix-prelive.IJUtHz/d278_native_secure_session_once
+POST_CORRECTIVE_LAUNCHER_SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d
+PRE_CORRECTIVE_LAUNCHER_RETIRED=true
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
+
+Il vecchio launcher pre-corrective
+(`SHA256=a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f31d1c2bb5d3a251a`) è
+ritirato e non autorizzato per uso futuro. Il nuovo SHA-256 differisce da quello
+pre-corrective. Il live-critical set è stato costruito dal commit
+`4e5d74770bce6e0a9de929b19279038827abff8c`. Non è stata aggiunta alcuna nuova
+procedura live eseguibile.
+
+```text
+D278_03_ACK_POLICY_CORRECTIVE_AI_PM_REVIEW=PASS
+D278_03_POST_CORRECTIVE_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+TARGET_E4_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_POST_CORRECTIVE_EXECUTABLE_CLOSURE_THEN_SEPARATE_LIVE_AUTHORIZATION_DECISION
+```

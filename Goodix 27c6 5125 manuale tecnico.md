@@ -204,7 +204,12 @@ TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_03_ACK_POLICY_CORRECTIVE_NO_LIVE_AUTHORIZATION
+D278_03_ACK_POLICY_CORRECTIVE_AI_PM_REVIEW=PASS
+D278_03_POST_CORRECTIVE_BASELINE=4e5d74770bce6e0a9de929b19279038827abff8c
+D278_03_POST_CORRECTIVE_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D278_03_POST_CORRECTIVE_LAUNCHER_SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d
+D278_03_PRE_CORRECTIVE_LAUNCHER_RETIRED=true
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_POST_CORRECTIVE_EXECUTABLE_CLOSURE_THEN_SEPARATE_LIVE_AUTHORIZATION_DECISION
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -844,7 +849,12 @@ READY_FOR_LIVE=false
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 TARGET_E4_NATIVE_LIVE_PROVEN=false
 TARGET_TLS_NATIVE_LIVE_PROVEN=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_03_ACK_POLICY_CORRECTIVE_NO_LIVE_AUTHORIZATION
+D278_03_ACK_POLICY_CORRECTIVE_AI_PM_REVIEW=PASS
+D278_03_POST_CORRECTIVE_BASELINE=4e5d74770bce6e0a9de929b19279038827abff8c
+D278_03_POST_CORRECTIVE_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D278_03_POST_CORRECTIVE_LAUNCHER_SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d
+D278_03_PRE_CORRECTIVE_LAUNCHER_RETIRED=true
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_POST_CORRECTIVE_EXECUTABLE_CLOSURE_THEN_SEPARATE_LIVE_AUTHORIZATION_DECISION
 ```
 
 La procedura copiabile, lo STOP gate e la matrice della review pre-live restano
@@ -5477,11 +5487,23 @@ A8 nativo, inviato E4 ed è terminata sul primo frame IN E4 prima di un ACK
 accettato, senza raggiungere TLS. Il riesame post-live ha provato la divergenza
 della policy ACK C rispetto a D238 e l'ha corretta offline con test normal e
 sanitizer PASS; lo status E4 `0x07` della run corrente resta probabile ma non
-direttamente telemetrizzato. Il confine immediato è la review AI-PM del
-correttivo, senza autorizzazione live implicita: `CURRENT_LIVE_AUTHORIZED=false`,
+direttamente telemetrizzato. La review AI-PM del correttivo ha concluso
+`AI_PM_D278_03_ACK_CORRECTIVE_REVIEW=PASS` con
+`NATIVE_C_ACK_POLICY_DIVERGENCE=PROVEN_AND_CORRECTED`. Dopo tale review, sul
+commit corretto `4e5d74770bce6e0a9de929b19279038827abff8c` è stata qualificata
+host-only la post-corrective executable closure: D278/02 62/62 normal e
+ASAN/UBSAN, D278/01 secure-session 11/11 normal e ASAN/UBSAN, build live-capable
+e self-test PASS, zero `sudo`, zero store protetto, zero USB reale, zero live. Il
+vecchio launcher pre-corrective (`SHA256=a48488b0817256d896a77bf2ac037ff5bef10524dd9c018f31d1c2bb5d3a251a`)
+è stato ritirato e non è autorizzato per uso futuro; il nuovo candidate
+(`SHA256=bf7a1b0dae42d1c17b613c3f03338d10c3448be622e8bc46383f1923f56f192d`) è
+diverso e preservato in `/tmp`. Il confine immediato è la review AI-PM della
+post-corrective executable closure, poi una separata decisione di autorizzazione
+live, senza autorizzazione live implicita: `CURRENT_LIVE_AUTHORIZED=false`,
 `TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true`,
 `D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE`,
-`D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS` e
+`D278_03_ACK_POLICY_CORRECTIVE_HOST_ONLY=PASS`,
+`D278_03_ACK_POLICY_CORRECTIVE_AI_PM_REVIEW=PASS` e
 `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
 
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
