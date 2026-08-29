@@ -105,7 +105,7 @@ NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
 NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
 
 D278_02_OUTCOME=READY
-D278_02_ADVANCEMENT=AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_PASS_WITH_E4_BINDING_MATCH_AND_ZERO_USB
+D278_02_ADVANCEMENT=REAL_EXECUTION_COMPLETED_AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_WITH_E4_BINDING_MATCH_AND_ZERO_USB_ACCESS
 D190_EXPRESSION_PROVENANCE_GATE=PASS
 NATIVE_D190_E4_BINDER_KAT_PROVEN=true
 D190_FIVE_INDEPENDENT_KATS=PASS
@@ -599,8 +599,8 @@ stato eseguito dall'operatore il 29 agosto 2026 con `PASS`, zero USB e
 
 ```text
 OUTCOME=READY
-ADVANCEMENT=AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_PASS_WITH_E4_BINDING_MATCH_AND_ZERO_USB
-EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+ADVANCEMENT=REAL_EXECUTION_COMPLETED_AUTHENTIC_PROTECTED_MATERIAL_PREFLIGHT_WITH_E4_BINDING_MATCH_AND_ZERO_USB_ACCESS
+EXECUTABLE_CLOSURE=PASS
 MATERIAL_INVALID_BLOCKS_BEFORE_USB_OPEN=PASS
 SYNTHETIC_SINGLE_OPEN_CLAIM_EPOCH=PASS
 PHYSICAL_RECEIVE_OWNER_COUNT=1
@@ -7642,8 +7642,8 @@ solo OUT fisico, mentre l'egress TLS conserva un B0 per record, chunk fisici da
 64 byte, tail zero e pacing 10 ms cancellabile. La suite sintetica usa il vero
 OpenSSL e chiude TLS 1.2 PSK senza application data, D4 o azioni
 post-handshake. La disponibilità del codice e dei test non promuove equivalenza
-hardware: `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`, il raw CONFIG_90 target
-non è disponibile nell'ambiente corrente e il live non è autorizzato.
+hardware: `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`; nel contesto D278/01 il
+raw CONFIG_90 target non era disponibile all'esecutore e il live non era autorizzato.
 
 D278/02 introduce `GoodixTargetMaterial` come unico owner dello scratch
 protetto, della PSK, di CONFIG90 e del validator E4 fino alla costruzione della
