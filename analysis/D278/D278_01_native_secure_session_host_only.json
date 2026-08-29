@@ -3,7 +3,7 @@
   "starting_head": "0efa30f681e0a3aa284565ce581536ad00606c39",
   "branch": "work",
   "initial_worktree_clean": true,
-  "outcome": "READY_PASS_HOST_ONLY_CORRECTIVE_LOCAL",
+  "outcome": "READY_PASS_HOST_ONLY",
   "advancement": "NEW_NATIVE_LGPL_SECURE_SESSION_IMPLEMENTATION_AND_HOST_ONLY_EXECUTABLE_EVIDENCE",
   "executable_closure": "PASS_HOST_ONLY",
   "exact_phase_sequence": [
@@ -70,7 +70,7 @@
     "d277": "15/15_NORMAL_AND_15/15_ASAN_UBSAN_PASS",
     "d277_live_harness": "BUILD_ONLY_NOT_EXECUTED",
     "github_actions_workflow_integrated": true,
-    "github_actions_confirmation": "INITIAL_IMPLEMENTATION_PASS_CORRECTIVE_PENDING"
+    "github_actions_confirmation": "INITIAL_AND_CORRECTIVE_PASS_RUN_33239781874"
   },
   "safety": {
     "physical_receive_owner_count": 1,
@@ -96,7 +96,7 @@
       "Stato implementazione Linux"
     ]
   },
-  "residual_blocker_or_risk": "TARGET_EQUIVALENCE_UNPROVEN;TARGET_CONFIG90_RAW_NOT_READABLE;TARGET_TYPED_RESPONSE_RAW_NOT_EMBEDDED;CORRECTIVE_AI_PM_REVIEW_PENDING;CORRECTIVE_CI_PENDING;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;CURRENT_LIVE_AUTHORIZED_FALSE",
+  "residual_blocker_or_risk": "TARGET_EQUIVALENCE_UNPROVEN;TARGET_CONFIG90_RAW_NOT_READABLE;TARGET_TYPED_RESPONSE_RAW_NOT_EMBEDDED;PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL_UNRESOLVED;CURRENT_LIVE_AUTHORIZED_FALSE",
   "review_set": {
     "baseline": "0efa30f681e0a3aa284565ce581536ad00606c39",
     "working_tree_review": true,
@@ -131,13 +131,16 @@
   },
   "d1_tls_gate_corrective": {
     "local": "PASS",
-    "ai_pm_review": "PENDING",
-    "ci": "PENDING",
+    "ai_pm_review": "PASS",
+    "ci": "PASS",
     "push_true_alone_cannot_advance": true,
     "partial_client_hello_stays_d1": true,
     "partial_client_hello_emits_no_server_flight": true,
     "completed_valid_client_hello_advances_once": true,
     "malformed_tls_fails_closed": true,
-    "advancement_criterion": "SUCCESSFUL_TLS_PUSH_AND_SYNCHRONOUS_OPENSSL_SERVER_FLIGHT_OUTPUT"
+    "advancement_criterion": "SUCCESSFUL_TLS_PUSH_AND_SYNCHRONOUS_OPENSSL_SERVER_FLIGHT_OUTPUT",
+    "ci_run": 33239781874,
+    "corrective_commit": "5030c66e67db5a7f6cedfbf3bb0deeec107e79db",
+    "merged_main_commit": "52e190b2ceaee0e8de618accd4da9fadbad54115"
   }
 }

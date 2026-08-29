@@ -673,8 +673,11 @@ goodix_secure_session_free (GoodixSecureSession *session)
   g_queue_free (session->tls_records);
   goodix_tls_server_free (session->tls);
   g_clear_error (&session->error);
-  g_clear_pointer (&session->e4_validator, g_free);
-  g_clear_pointer (&session->config90, g_free);
+  if (session->e4_validator != NULL)
+    OPENSSL_clear_free (session->e4_validator, 32);
+  if (session->config90 != NULL)
+    OPENSSL_clear_free (session->config90,
+                        GOODIX_SECURE_SESSION_CONFIG90_LENGTH);
   g_free (session);
 }
 

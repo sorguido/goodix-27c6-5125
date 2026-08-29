@@ -92,8 +92,11 @@ D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
 D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
 D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
 D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
-D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
-D278_01_D1_TLS_GATE_CI=PENDING
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PASS
+D278_01_D1_TLS_GATE_CORRECTIVE_COMMIT=5030c66e67db5a7f6cedfbf3bb0deeec107e79db
+D278_01_D1_TLS_GATE_CI=PASS
+D278_01_D1_TLS_GATE_CI_RUN=33239781874
+D278_01_MERGED_MAIN_COMMIT=52e190b2ceaee0e8de618accd4da9fadbad54115
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
@@ -447,8 +450,9 @@ con avanzamento singolo, e TLS malformato fail-closed. Passano inoltre D276/02 1
 disponibile sotto il boundary Flatpak/bwrap ptrace; ASAN address checks e UBSAN
 restano attivi. Il checkpoint iniziale `0efa30f681e0a3aa284565ce581536ad00606c39` ha
 GitHub Actions PASS nella run `33237274978`; questa evidenza precede la
-correzione del gate. La correzione è PASS locale, mentre review AI-PM e nuova
-CI restano pending.
+correzione del gate. La correzione è PASS locale e AI-PM; la CI correttiva è PASS nella run
+`33239781874`, commit `5030c66e67db5a7f6cedfbf3bb0deeec107e79db`, confluito in main
+`52e190b2ceaee0e8de618accd4da9fadbad54115`.
 
 ```text
 D278_01_INITIAL_IMPLEMENTATION_HOST_ONLY=PASS
@@ -456,8 +460,11 @@ D278_01_INITIAL_IMPLEMENTATION_COMMIT=0efa30f681e0a3aa284565ce581536ad00606c39
 D278_01_INITIAL_IMPLEMENTATION_CI_RUN=33237274978
 D278_01_INITIAL_IMPLEMENTATION_CI_RESULT=PASS
 D278_01_D1_TLS_GATE_CORRECTIVE_LOCAL=PASS
-D278_01_D1_TLS_GATE_AI_PM_REVIEW=PENDING
-D278_01_D1_TLS_GATE_CI=PENDING
+D278_01_D1_TLS_GATE_AI_PM_REVIEW=PASS
+D278_01_D1_TLS_GATE_CORRECTIVE_COMMIT=5030c66e67db5a7f6cedfbf3bb0deeec107e79db
+D278_01_D1_TLS_GATE_CI=PASS
+D278_01_D1_TLS_GATE_CI_RUN=33239781874
+D278_01_MERGED_MAIN_COMMIT=52e190b2ceaee0e8de618accd4da9fadbad54115
 NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
@@ -9566,4 +9573,55 @@ NEXT_PRIMARY_BOUNDARY=SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION
 NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
+```
+
+### D278/02 — boundary nativa materiale target (host-only)
+
+D278/02 separa la derivazione D190 in un binder LGPL minimale
+`secret32 + seed[6] x2 -> validator32`, provato sui cinque KAT OEM-oracle, e
+mantiene l'acquisizione delle seed dal `gfusb.dll` canonico in tooling GPL
+hash-gated, read-only e mai eseguito. La provenance storica BSD-2-Clause è
+stata verificata read-only da AI-PM sul repository completo ed è registrata
+nel ledger; non è confusa con correttezza tecnica, verificata separatamente.
+
+Il nuovo owner protetto apre soltanto file regolari non symlink con
+`O_RDONLY|O_CLOEXEC|O_NOFOLLOW`, richiede in produzione uid 0/mode 0600,
+ricontrolla inode/metadata e valida manifest, transport envelope, CONFIG90,
+finalizer, quattro tuple DAC e pin E4 prima di rendere disponibile l'unico
+`GoodixSecureSessionMaterial`. PSK, seed, intermedi, validator e copie
+project-owned sono azzerati; la precedente copia E4 del sequencer usa ora
+`OPENSSL_clear_free`. Nessun JSON parser o secondo modello di protocollo è
+stato introdotto.
+
+Il percorso CLI test-only ha modalità self-test, preflight materiale e live
+exact; in questo step il live resta fenced e non è stato eseguito. I timeout
+per fase sono A8/E4/A2_1 1000 ms, 82 500 ms, A6 750 ms, A2_2 1000 ms, 70 500
+ms, quattro DAC 250 ms, 90/D1 1000 ms e TLS 3000 ms. D4, application data,
+retry, reopen e reset restano assenti.
+
+Riesame metodologico: rispetto a D277/02 (solo A8/A0), il futuro esperimento
+aggiunge sequencer completo host-only-proven, materiale protetto e binding E4
+dalla stessa PSK TLS. Testerà se APP12509 raggiunge una sola TLS 1.2 established
+senza D4. Al primo failure: STOP, nessun retry/reopen/reset, errore/fase redatti,
+drain/cleanup/zeroization e ritorno ad AI-PM; nessun secondo tentativo è incluso.
+
+```text
+D278_02_HOST_ONLY_PREPARATION=PASS
+NATIVE_D190_E4_BINDER_KAT_PROVEN=true
+NATIVE_PROTECTED_MATERIAL_LOADER_HOST_ONLY_PROVEN=true
+TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
+D278_02_LIVE_HARNESS_BUILD=PASS
+D278_02_LIVE_HARNESS_EXECUTED=false
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+TARGET_E4_DERIVATION_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
+REAL_USB_ACCESS=0
+REAL_USB_SUBMIT=0
+D4_REACHABLE=false
+APPLICATION_DATA_COUNT=0
+FINGER_PATH_NOT_EXERCISED=true
+IMAGE_PATH_NOT_EXERCISED=true
+PERSISTENT_DEVICE_WRITE_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_FOR_D278_02_SINGLE_SHOT_NATIVE_SECURE_SESSION_TARGET_VALIDATION
 ```

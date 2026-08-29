@@ -1,0 +1,19 @@
+{
+  "schema": "d278-02-native-target-material-prep-v1",
+  "logical_baseline": "52e190b2ceaee0e8de618accd4da9fadbad54115",
+  "transport_head": "94a61c69c6f31d1ace196549c96c1e2410c598d2",
+  "outcome": "READY",
+  "executable_closure": "PASS_HOST_ONLY",
+  "d190_expression_provenance_gate": "PASS_AI_PM_EXTERNAL_READ_ONLY_VERIFICATION",
+  "native_d190_e4_binder_kat_proven": true,
+  "native_protected_material_loader_host_only_proven": true,
+  "target_protected_material_preflight_executed": false,
+  "d278_02_live_harness_build": "PASS",
+  "d278_02_live_harness_executed": false,
+  "native_secure_session_target_proven": false,
+  "target_e4_derivation_native_live_proven": false,
+  "target_tls_native_live_proven": false,
+  "safety": {"real_usb_access": 0, "real_usb_submit": 0, "usb_open_count": 0, "usb_claim_count": 0, "d4_reachable": false, "application_data_count": 0, "finger_path_not_exercised": true, "image_path_not_exercised": true, "persistent_device_write_count": 0, "current_live_authorized": false},
+  "d278_01_closure": {"ai_pm_review": "PASS", "ci": "PASS", "ci_run": 33239781874, "corrective_commit": "5030c66e67db5a7f6cedfbf3bb0deeec107e79db", "merged_main_commit": "52e190b2ceaee0e8de618accd4da9fadbad54115"},
+  "next_primary_boundary": "AI_PM_REVIEW_FOR_D278_02_SINGLE_SHOT_NATIVE_SECURE_SESSION_TARGET_VALIDATION"
+}

@@ -174,3 +174,21 @@ e secret autentici non sono incorporati. L'estensione del backend e del
 `GoodixDeviceContext` preserva la stessa provenance D276/04 e aggiunge solo
 single-OUT ownership, completion generation-captured e wiring della nuova
 state machine.
+
+## D278/02 — D190 binder e parser PE
+
+La determinazione di engineering provenance AI-PM, eseguita read-only sul
+repository canonico completo, ha verificato il commit storico
+`b475a6eca72e340816779afae917334a6146c986`, il `LICENSE` BSD-2-Clause blob
+`42fd7050a89d195cacb4b002f91a2f679a8b5285` (Copyright (c) 2026 sorguido) e
+gli esatti blob D190: `crypto_reference.py` `98c45c87c91b5d3e64e003788df31b5c3d8fb12e`,
+`pe_parser.py` `c2f6451308f1f0e78942c02b46daa3b85b061577`, `runtime.py`
+`9e6643e7c77fcc53947b87cca22ef9eb565fb95c` e `known_answers.py`
+`eb804cc713f90f9b0ba0d5bcbb9516b5525e76a5`. Il clone Cloud shallow non
+contiene quell'oggetto; questa è una determinazione di provenance ingegneristica
+del progetto, non una conclusione legale generale.
+
+| LOCAL_PATH | SOURCE_REPO | SOURCE_COMMIT | SOURCE_PATH | LICENSE | COPYRIGHT | IMPORT_STEP | NOTES |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `libfprint-driver/goodix_d190_binder.[ch]` | `sorguido/goodix-27c6-5125-private` | `b475a6eca72e340816779afae917334a6146c986` | `poc/goodix5125/tools/binding_reference/crypto_reference.py` | `BSD-2-Clause` | Copyright (c) 2026 sorguido | `D278/02` | Adapted to C/OpenSSL under LGPL-2.1-or-later; only `secret32 + seed[6]x2 -> validator32`; Python runtime and PE architecture excluded. |
+| `tools/goodix_d190_pe.[ch]` | `sorguido/goodix-27c6-5125-private` | `b475a6eca72e340816779afae917334a6146c986` | `poc/goodix5125/tools/binding_reference/pe_parser.py` | `BSD-2-Clause` | Copyright (c) 2026 sorguido | `D278/02` | Tool-only GPL adaptation; bounded read-only canonical-hash PE parsing, never loading/executing the DLL. |

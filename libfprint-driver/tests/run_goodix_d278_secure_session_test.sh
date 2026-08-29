@@ -40,6 +40,8 @@ build_run () {
   extra=$2
   gcc $strict $extra $cflags $includes \
     "$root/libfprint-driver/goodix_a0_protocol.c" \
+    "$root/libfprint-driver/goodix_d190_binder.c" \
+    "$root/libfprint-driver/goodix_target_material.c" \
     "$root/libfprint-driver/goodix_secure_session.c" \
     "$root/libfprint-driver/goodix_tls_server.c" \
     "$root/libfprint-driver/goodix_usb_router.c" \
@@ -58,6 +60,14 @@ build_run d278-normal ""
 echo NORMAL_TEST_RUN=PASS
 build_run d278-sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
 echo SANITIZER_TEST_RUN=PASS
+gcc $strict $cflags $includes -I"$root/tools" \
+  "$root/libfprint-driver/goodix_d190_binder.c" \
+  "$root/libfprint-driver/goodix_target_material.c" \
+  "$root/tools/goodix_d190_pe.c" \
+  "$root/tools/d278_native_secure_session_once.c" \
+  $libs -o "$build/d278-02-harness"
+"$build/d278-02-harness" --self-test >/dev/null
+echo D278_02_LIVE_HARNESS_BUILD=PASS
 echo D278_01_HOST_ONLY_RESULT=PASS
 echo NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
 echo NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
