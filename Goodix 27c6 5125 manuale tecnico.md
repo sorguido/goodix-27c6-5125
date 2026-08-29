@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-live D278/03 — una run consumata fallita al gate E4; correttivo ACK D238 host-only PASS; nessuna live autorizzata
+### Stato corrente post-audit D278/04 — re-entry cross-session supportato come gap architetturale, occorrenza device-side irrisolta; nessuna live autorizzata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -223,7 +223,18 @@ D278_03_POST_CORRECTIVE_HOST_NATIVE_LDD=PASS
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST=PASS
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST_RC=0
 D278_03_POST_CORRECTIVE_HOST_NATIVE_SELF_TEST_REAL_USB_ACCESS=0
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_FINAL_DOCUMENTATION_THEN_SEPARATE_SECOND_SINGLE_SHOT_LIVE_AUTHORIZATION_DECISION
+D278_04_OUTCOME=READY
+D278_04_ADVANCEMENT=ARCHITECTURAL_BOUNDARY_CLARIFIED
+HOST_ASYNC_TRANSFER_DRAIN=PROVEN_HOST_ONLY
+CROSS_SESSION_FRAME_PROVENANCE=ABSENT_AS_HOST_GUARANTEE
+DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED
+PRE_A8_REENTRY_SYNCHRONIZATION=UNRESOLVED
+CROSS_SESSION_REENTRY_GAP=SUPPORTED_BUT_DEVICE_SIDE_UNRESOLVED
+H6_CROSS_SESSION_RX_RESIDUAL_CURRENT_EXPLANATION=SUPPORTED_AS_ARCHITECTURAL_RISK_NOT_PROVEN_AS_D278_03_CAUSE
+SAFE_READ_ONLY_RESYNC_DESIGN=NOT_YET_JUSTIFIED
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_04;NO_NEW_LIVE_WITHOUT_A_MATERIALLY_DIFFERENT_SAFETY_JUSTIFIED_DIAGNOSTIC_AND_SEPARATE_AUTHORIZATION
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -897,6 +908,85 @@ corretto e che il gate sia fallito per il rifiuto dello status di successo;
 (3) se E4 fallisse ancora, `NO THIRD EQUIVALENT FULL RUN`: riesame offline
 della telemetria strutturale e nuova diagnostica solo se progettata,
 revisionata e autorizzata separatamente.
+
+### D278/04 — boundary del protocol re-entry cross-session
+
+L'audit statico/host-only D278/04 separa per la prima volta il drain dei
+transfer host dalla provenance causale dei byte. D276 prova che un callback
+della generation N non può consumare il token N+1 e che cancel/free attendono
+il ritorno dei callback matching. Non prova invece che un transfer realmente
+sottomesso nella generation N+1 non possa ricevere byte prodotti dal
+device/controller/kernel prima della sua creazione. Quel callback possiede
+correttamente il token N+1 e supera il generation fencing corrente; generation
+significa ownership host del submit, non session ID wire o causalità device.
+
+La ricostruzione storica nega tre equivalenze troppo forti. D245 non eseguiva
+alcun read/drain prima di A8: inviava direttamente l'exact A8, leggeva ACK e
+risposta tipata e bloccava E4 se il proprio buffer userspace conteneva byte
+ulteriori. A8 resta un
+`TARGET_LIVE_PROVEN_READ_ONLY_PRECONDITION_DISCRIMINATOR`, non un reset, flush,
+wake, initializer o sincronizzatore cross-session provato. D266 risolveva il
+demux command/event nello stesso router e nella stessa sessione, senza
+provenance cross-open/process. D268–D275 raggiungevano entrambe le immagini con
+una sola sessione USB, un solo oggetto/handshake TLS e zero reopen/retry: non
+esercitavano re-entry dopo un abort.
+
+Nel live entrypoint D278 il primo IN viene armato prima del submit A8. Il router
+C azzera soltanto il proprio `GByteArray` a begin/cancel e il parser secure
+attribuisce ogni A0 valido alla fase corrente, fallendo chiuso su echo,
+control, shape o status inattesi. Una vecchia coppia A8 ACK + risposta
+APP12509, se consegnata da un transfer nuovo mentre la nuova fase è A8, non
+contiene un nonce/session ID che ne riveli l'origine. I test stale-generation
+esistenti coprono callback host N, non
+`NEW_CALLBACK_GENERATION_N_PLUS_1_RECEIVING_OLD_DEVICE_CAUSAL_DATA`.
+Il harness D278 usa inoltre generation `1` a ogni nuovo processo, non un epoch
+globale; renderla globalmente univoca non attribuirebbe comunque causalità ai
+byte ricevuti.
+
+La documentazione generale libusb conferma soltanto che cancel è asincrono,
+che alcuni dati possono essere già stati trasferiti al momento del cancel e
+che `close()` non invia richieste sul bus. `release_interface()` riporta
+l'interfaccia al primo alternate setting, ma non documenta un reset della
+state machine applicativa Goodix o una regola portabile sulla sorte di tutte le
+risposte già prodotte. Queste sono
+`EXTERNAL_GENERAL_USB_SEMANTICS`, non prova APP12509. La sorte di dati unread e
+la quiescenza del protocollo dopo cancel/release/close/new open restano
+target-specific `UNKNOWN/UNRESOLVED`.
+
+Il gap è quindi `SUPPORTED_BUT_DEVICE_SIDE_UNRESOLVED`: è verificata l'assenza
+di una garanzia host di cross-session frame provenance, ma non è osservato un
+residuo sul target. `CROSS_SESSION_RX_RESIDUAL` è supportato solo come rischio
+architetturale, non come causa della run D278/03. Per D278/03 resta più forte la
+causa ACK C/D238 già documentata e lo status E4 corrente non era
+telemetrizzato.
+
+```text
+H1_HISTORICAL_GENERIC_PRE_A8_DRAIN=DISPROVEN
+H2_A8_CROSS_SESSION_SYNCHRONIZER=UNRESOLVED
+H3_D266_CROSS_SESSION_PROVENANCE=DISPROVEN
+H4_MULTI_IMAGE_CROSS_SESSION_REENTRY=DISPROVEN
+H5_NATIVE_GENERATION_FENCING_SUFFICIENT=DISPROVEN
+H6_CROSS_SESSION_RX_RESIDUAL_CURRENT_EXPLANATION=SUPPORTED
+CROSS_SESSION_REENTRY_GAP=SUPPORTED_BUT_DEVICE_SIDE_UNRESOLVED
+SAFE_READ_ONLY_RESYNC_DESIGN=NOT_YET_JUSTIFIED
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+TARGET_E4_NATIVE_LIVE_PROVEN=false
+TARGET_TLS_NATIVE_LIVE_PROVEN=false
+```
+
+Non è giustificato alcun pre-A8 blind read, discard-until-A8, timeout-drain,
+clear-halt, reset, reopen, retry o parser permissivo: un frame inatteso resta
+evidenza finché non esiste un discriminante sicuro. Per decidere l'occorrenza
+APP12509 servirebbe osservazione reale e un diagnostico separato, bounded,
+safety-reviewed e autorizzato. La sola telemetria aggiuntiva non è un cambio di
+metodo sufficiente; un vero test dovrebbe distinguere il callback host vecchio,
+già chiuso offline, dal callback nuovo con dati causalmente vecchi. Se un
+futuro tentativo fallisse ancora allo stesso punto, non è ammessa una run
+equivalente ulteriore: si conserva fail-closed la prima failure strutturale e
+si torna ad audit. Il report canonico è
+`analysis/D278/D278_04_cross_session_protocol_reentry_audit.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -2675,6 +2765,17 @@ quiescenza production dopo cancel arbitrario resta `UNRESOLVED` (`DEVICE_PROTOCO
 lifecycle framework futuro richiede una policy esplicita. Timeout, TLS,
 frame/ACK/CRC o lifecycle inattesi sono fail-closed e non invocano
 `fpi_image_device_retry_scan()`.
+
+D278/04 precisa il limite di questa garanzia: il fencing copre
+`OLD_CALLBACK_FROM_GENERATION_N`, perché quel callback non può consumare il
+token N+1. Non copre la diversa classe
+`NEW_CALLBACK_GENERATION_N_PLUS_1_RECEIVING_OLD_DEVICE_CAUSAL_DATA`: se un
+transfer nuovo ricevesse byte prodotti prima della propria generation, i
+check host vedrebbero correttamente N+1. Né la generation né il frame A0/B0
+contengono provenance cross-open/process. `goodix_usb_router_begin_generation`
+svuota il solo buffer di riassemblaggio userspace; non asserisce la coda
+endpoint o lo stato del protocollo device. Questa seconda classe è supportata
+come rischio architetturale ma resta non osservata sul target APP12509.
 
 La cancellazione prima di `activate_complete(NULL)` termina invece la fase con
 `fpi_image_device_activate_complete(..., G_IO_ERROR_CANCELLED)`: in quel punto
