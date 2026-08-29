@@ -14,6 +14,11 @@ typedef void (*GoodixUsbSubmitSeam) (GoodixFpiUsbBackend *backend,
                                      gpointer user_data);
 typedef void (*GoodixFpiUsbBackendDrainedFunc) (GoodixFpiUsbBackend *backend,
                                                 gpointer             user_data);
+typedef void (*GoodixFpiUsbBackendOutCompletedFunc) (
+  GoodixFpiUsbBackend *backend,
+  guint64              submit_generation,
+  const GError        *error,
+  gpointer             user_data);
 
 GoodixFpiUsbBackend *goodix_fpi_usb_backend_new (FpDevice *device,
                                                   GoodixUsbRouter *router,
@@ -31,6 +36,10 @@ void goodix_fpi_usb_backend_set_async_submit_seam (GoodixFpiUsbBackend *backend,
 void goodix_fpi_usb_backend_set_drained_callback (GoodixFpiUsbBackend *backend,
                                                    GoodixFpiUsbBackendDrainedFunc callback,
                                                    gpointer user_data);
+void goodix_fpi_usb_backend_set_out_completed_callback (
+  GoodixFpiUsbBackend                 *backend,
+  GoodixFpiUsbBackendOutCompletedFunc  callback,
+  gpointer                             user_data);
 gboolean goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                                                    guint64 generation,
                                                    GCancellable *cancellable,

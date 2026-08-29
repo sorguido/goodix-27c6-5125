@@ -23,6 +23,14 @@ jobs:
           libfprint-driver/tests/run_goodix_d276_04_test.sh | tee /tmp/d276-04-run-1.log
           libfprint-driver/tests/run_goodix_d276_04_test.sh | tee /tmp/d276-04-run-2.log
           test "$(grep -h '^REAL_USB_TRANSFER_SUBMIT_COUNT=0$' /tmp/d276-04-run-*.log | wc -l)" -eq 2
+      - name: D278/01 native secure-session normal and sanitizer runs
+        run: |
+          libfprint-driver/tests/run_goodix_d278_secure_session_test.sh | tee /tmp/d278-run-1.log
+          libfprint-driver/tests/run_goodix_d278_secure_session_test.sh | tee /tmp/d278-run-2.log
+          test "$(grep -h '^D278_01_HOST_ONLY_RESULT=PASS$' /tmp/d278-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^REAL_USB_ACCESS=0$' /tmp/d278-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^REAL_USB_SUBMIT=0$' /tmp/d278-run-*.log | wc -l)" -eq 2
+          test "$(grep -h '^D4_REACHABLE=false$' /tmp/d278-run-*.log | wc -l)" -eq 2
       - name: D276/02 and D276/03 regressions
         run: |
           libfprint-driver/tests/run_goodix_fpimage_device_test.sh
@@ -39,7 +47,9 @@ jobs:
       - name: Static safety audit
         run: |
           python3 -m json.tool analysis/D276/D276_04_native_tls_fpi_usb_host_only.json >/dev/null
+          python3 -m json.tool analysis/D278/D278_01_native_secure_session_host_only.json >/dev/null
           ! rg -n 'socket\s*\(|connect\s*\(|/dev/bus/usb|27c6.*5125' libfprint-driver/goodix_tls_server.[ch] libfprint-driver/goodix_fpi_usb_backend.[ch]
           test "$(rg -n 'goodix_usb_router_receive_complete \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 1
+          ! rg -n '0xd4|D4|--live-|g_usb_device_open|fpi_usb_transfer_submit' libfprint-driver/goodix_secure_session.[ch] libfprint-driver/goodix_a0_protocol.[ch]
           git diff --check HEAD^
           test -z "$(git status --short)"

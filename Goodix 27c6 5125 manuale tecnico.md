@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D277/02 — percorso nativo A8/A0 target-proven, autorizzazione live esaurita
+### Stato corrente post-D278/01 — secure-session nativa chiusa host-only, target proof limitata ad A8/A0
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -86,6 +86,19 @@ TLS_NOT_EXERCISED=true
 E4_NOT_EXERCISED=true
 FINGER_PATH_NOT_EXERCISED=true
 IMAGE_PATH_NOT_EXERCISED=true
+
+D278_01_HOST_ONLY_RESULT=PASS
+NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
+NATIVE_D1_B0_TLS_TRANSITION_HOST_ONLY_PROVEN=true
+NATIVE_TLS12_PSK_HANDSHAKE_HOST_ONLY_PROVEN=true
+NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
+NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
+D4_REACHABLE=false
+REAL_USB_ACCESS=0
+REAL_USB_SUBMIT=0
+CURRENT_LIVE_AUTHORIZED=false
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -371,6 +384,83 @@ Dopo la run l'operatore ha rimosso la ACL temporanea; il check effettivo ha
 prodotto `WRITE_ACCESS_REMOVED`. I file production D276/04 restano
 byte-identici alla baseline approvata
 `95f40ca791011d637e2040a87014bbb8e946275e`.
+
+### D278/01 — catena secure-session nativa C/LGPL, solo host-only
+
+D278/01 estende il confine nativo già target-proven A8/A0 senza eseguire nuovo
+hardware. La nuova state machine indipendente LGPL, posseduta dal medesimo
+`GoodixDeviceContext`, impone esattamente:
+
+```text
+A8 -> E4 -> A2_1 -> CHIP_82 -> OTP_A6 -> A2_2 -> MODE_70
+-> DAC_220 -> DAC_236 -> DAC_238 -> DAC_23A -> CONFIG_90
+-> D1 -> B0/TLS 1.2 PSK -> TLS ESTABLISHED -> STOP
+```
+
+Il codec A0 valida type, length LE16, tag esterno, control, length interno e
+checksum additivo; D1 conserva wire control `D1` e checksum seed `D0`. I golden
+vector A8 `a00600a6a803000000ff`, E4
+`a00c00ace40900030002bb00000000fd` e D1
+`a00600a6d103000000d7` passano normal e sanitizer. La policy ACK è
+phase-specific: solo A8 ammette `0x01|0x07`; E4..90 ammettono esattamente
+`0x01`; D1 non ammette A0 e richiede come prima classe B0/TLS ClientHello.
+
+Il material boundary riceve in memoria identity APP12509, validator/pin E4,
+pin A2/82/A6, quattro DAC, CONFIG_90 con hash/finalizer/correlazione e PSK da
+32 byte. Nessun file, capture, PE o store viene aperto dal protocol engine. Il
+raw CONFIG_90 target non è leggibile nell'ambiente corrente e i raw typed body
+target non sono incorporati: l'esecuzione host-only usa fixture esplicitamente
+sintetiche e non dichiara match con gli hash target. I pin canonici D232
+restano invariati.
+
+Il backend è ora single-OUT-in-flight anche nella stessa generation e notifica
+il completion catturando la generation; un response contract non avanza dal
+solo submit. Gli A0 restano alla lunghezza logica non padded. Ogni record TLS
+uscente è un B0 distinto, spezzato in submission fisiche da 64 byte con tail
+finale zero-initialized; record distinti non sono coalesciuti e sono separati da
+un'azione scheduler da 10 ms. Scheduler, queue, callback e completion sono
+posseduti dalla stessa generation e diventano inerti su cancel/fence/teardown.
+La telemetria audit è osservativa e opzionale: il pacing usa stato operativo
+interno, non i contatori audit. I test coprono anche completion OUT sincrono del
+seam e risposta typed duplicata prima del completion fisico, che fallisce
+chiusa.
+
+Il peer sintetico asincrono attraversa il vero sequencer, router, backend e
+`GoodixTlsServer`, completa una vera handshake OpenSSL TLS 1.2
+`PSK-AES128-GCM-SHA256` con identity `Client_identity`, un handoff secret e
+zeroizzazione della copia project-owned. La suite D278 passa 9/9 normal e 9/9
+ASAN/UBSAN. Passano inoltre D276/02 15/15, D276/03 8/8, D276/04 5/5 e D277
+15/15 sia normal sia sanitizer. LeakSanitizer è disabilitato perché non
+disponibile sotto il boundary Flatpak/bwrap ptrace; ASAN address checks e UBSAN
+restano attivi. Il workflow CI esegue due run D278 ma la conferma GitHub
+Actions resta pending fino a un futuro commit/push revisionato.
+
+```text
+D278_01_HOST_ONLY_RESULT=PASS
+NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true
+NATIVE_SECURE_SESSION_TARGET_PROVEN=false
+NATIVE_PRE_D1_SEQUENCE_HOST_ONLY_PROVEN=true
+NATIVE_D1_B0_TLS_TRANSITION_HOST_ONLY_PROVEN=true
+NATIVE_TLS12_PSK_HANDSHAKE_HOST_ONLY_PROVEN=true
+NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
+NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
+PHYSICAL_RECEIVE_OWNER_COUNT=1
+MAX_OUTSTANDING_BULK_IN=1
+MAX_OUTSTANDING_BULK_OUT=1
+RETRY_COUNT=0
+TRANSPORT_REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+D4_REACHABLE=false
+REAL_USB_ACCESS=0
+REAL_USB_SUBMIT=0
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_FOR_D278_02_SINGLE_SHOT_NATIVE_SECURE_SESSION_TARGET_VALIDATION
+```
+
+Il prossimo boundary è una review AI-PM, non un'autorizzazione live. Una futura
+D278/02 richiede riesame metodologico pre-live, nuovo preflight permessi host e
+nuova autorizzazione esplicita dell'Utente.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -2067,8 +2157,10 @@ LGPL native FpImageDevice driver (production topology)
   GoodixDeviceContext per open epoch
     ├── unico claim/owner USB e unico bulk-IN reader
     ├── unico router A0/B0
+    ├── GoodixSecureSession A8→E4→pre-D1→D1→TLS→STOP, senza D4
     ├── GoodixTlsServer OpenSSL TLS 1.2 PSK Memory-BIO + ScopedSecret one-handoff
-    ├── GoodixFpiUsbBackend async; completion esclusivo nel router
+    ├── GoodixFpiUsbBackend async; one-IN/one-OUT, completion generation-captured
+    ├── B0 egress fixed64 zero-tail + pacing 10 ms generation-owned
     ├── unico lifecycle Goodix/FDT
     └── adapter FpImage 80x64 già LGPL
 ```
@@ -2184,7 +2276,8 @@ D276/03 -> router A0/B0 clean-room con una sola receive + transcript sintetici C
 D276/04 -> B0→TLS + TLS OUT + FpiUsbTransfer; generation authority context-only e callback drain CLOSED / PASS_HOST_ONLY, AI-PM+CI PASS
 D277/01 -> harness nativo A8 PASS_HOST_ONLY; singola run BLOCKED a USB open prima di claim/submit; storico preservato
 D277/02 -> prova nativa A8/A0 su target reale PASS; exact A8 → ACK → risposta tipata APP12509; autorizzazione consumata
-review   -> AI-PM seleziona prossimo boundary; ogni nuova run richiede nuova autorizzazione esplicita
+D278/01 -> secure-session A8→E4→pre-D1→D1→TLS→STOP PASS_HOST_ONLY; target proof resta falsa oltre A8/A0
+review   -> AI-PM valuta D278/02; ogni nuova run richiede nuova autorizzazione esplicita
 ```
 
 Stato rescue D276/02 (28 agosto 2026): il WIP è classificato **B**. La shell è
@@ -4966,6 +5059,16 @@ post-handshake: il target ha accettato una sola inizializzazione volatile D4
 per il receiver APP12509 esatto con ACK `0x01`, e la run si è fermata a
 `STOP_AFTER_D4`. A8, E4, TLS e D4 non sono più blocker aperti.
 
+Sul percorso nativo C/LGPL, distinto dal runtime GPL storico sopra descritto,
+D278/01 ha ora chiuso host-only l'intera catena
+`A8→E4→A2→82→A6→A2→70→80x4→90→D1→TLS ESTABLISHED→STOP`, inclusi ownership
+single-IN/single-OUT, B0 fixed64 zero-tail e pacing 10 ms generation-owned. È
+nuova evidenza eseguibile host-only, non target-specific: sul sensore reale il
+percorso nativo resta provato soltanto fino ad A8/ACK/typed APP12509 da D277/02.
+Il confine immediato nativo è quindi review AI-PM per una possibile D278/02
+single-shot; `CURRENT_LIVE_AUTHORIZED=false` e
+`NATIVE_SECURE_SESSION_TARGET_PROVEN=false`.
+
 Il boundary A0/AF è stato raggiunto una volta in D250. Il target ha accettato
 la submission AF zero-tail e restituito direttamente una A0/AE con checksum
 valido e body da 16 byte. La run è terminata nel validator host-side, non per
@@ -7252,7 +7355,7 @@ replay senza tale estrazione.
 
 ## Stato implementazione Linux
 
-Stato corrente post-D277/02: la shell `FpImageDevice` non registrata
+Stato corrente post-D278/01: la shell `FpImageDevice` non registrata
 è ora implementata in C/LGPL con backend in-memory e validata host-only
 (`LOCAL_LIBFPRINT_DEVICE_GLUE_SLICE_1=IMPLEMENTED_CORRECTIVE_EXECUTABLY_CLOSED_HOST_ONLY`).
 L'architettura production resta chiusa
@@ -7292,12 +7395,23 @@ scrittura persistente non sono stati esercitati. L'autorizzazione live corrente
 è falsa e ogni nuova run richiede un nuovo preflight permessi e nuova
 autorizzazione esplicita.
 
+D278/01 integra nello stesso `GoodixDeviceContext` una state machine
+secure-session LGPL isolata e un codec A0 indipendente. Il context resta la sola
+generation authority e il router l'unico receive owner; il backend ammette un
+solo OUT fisico, mentre l'egress TLS conserva un B0 per record, chunk fisici da
+64 byte, tail zero e pacing 10 ms cancellabile. La suite sintetica usa il vero
+OpenSSL e chiude TLS 1.2 PSK senza application data, D4 o azioni
+post-handshake. La disponibilità del codice e dei test non promuove equivalenza
+hardware: `NATIVE_SECURE_SESSION_TARGET_PROVEN=false`, il raw CONFIG_90 target
+non è disponibile nell'ambiente corrente e il live non è autorizzato.
+
 Artefatti: `analysis/D276/D276_01_libfprint_device_architecture.{md,json}`,
 `analysis/D276/D276_02_fpimage_device_shell_host_only.{md,json}` e
 `analysis/D276/D276_03_usb_router_host_only.{md,json}`,
 `analysis/D276/D276_04_native_tls_fpi_usb_host_only.{md,json}` e
 `analysis/D277/D277_01_native_a8_real_usb.{md,json}` e
-`analysis/D277/D277_02_native_a8_real_usb.{md,json}`.
+`analysis/D277/D277_02_native_a8_real_usb.{md,json}` e
+`analysis/D278/D278_01_native_secure_session_host_only.{md,json}`.
 
 Il repository implementa il codec immagine clean-room, il seam D232, la
 reference D190 recuperata, il backend/orchestratore D233, l'entrypoint

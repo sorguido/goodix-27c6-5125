@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "goodix_tls_server.h"
 #include "goodix_fpi_usb_backend.h"
+#include "goodix_secure_session.h"
 
 G_BEGIN_DECLS
 
@@ -54,6 +55,15 @@ gboolean goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
                                                         gpointer user_data,
                                                         GoodixTlsAudit *audit,
                                                         GError **error);
+gboolean goodix_device_context_start_secure_session (
+  GoodixDeviceContext                  *ctx,
+  const GoodixSecureSessionMaterial    *material,
+  GoodixSecureSessionScheduleFunc       schedule,
+  gpointer                              schedule_data,
+  GoodixSecureSessionAudit             *audit,
+  GoodixTlsAudit                       *tls_audit,
+  GError                              **error);
+GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
                                                  GoodixUsbSubmitSeam seam,
                                                  gpointer user_data);

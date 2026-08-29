@@ -18,7 +18,9 @@ build_and_run () {
     "$root/libfprint-driver/goodix_usb_router.c" \
     "$script_dir/test_goodix_usb_router.c" $libs \
     -o "$build_dir/router_test_$suffix"
-  ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+  # LeakSanitizer is unavailable under the Flatpak/bwrap ptrace boundary;
+  # ASAN address checks and UBSAN remain enabled.
+  ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
   UBSAN_OPTIONS=halt_on_error=1 \
     timeout 30 "$build_dir/router_test_$suffix"
 }

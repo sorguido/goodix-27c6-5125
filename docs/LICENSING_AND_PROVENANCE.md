@@ -153,3 +153,24 @@ drain/begin-generation e una seam asincrona host-only. L'implementazione deriva
 dal contratto pubblico `FpiUsbTransfer` della copia repository-local libfprint
 1.94.5 e da fixture sintetiche; non incorpora espressione GPL, secret o dati
 biometrici.
+
+## D278/01 — secure-session nativa LGPL indipendente
+
+`libfprint-driver/goodix_a0_protocol.[ch]`,
+`libfprint-driver/goodix_secure_session.[ch]` e i test D278 sono nuova
+espressione locale `LGPL-2.1-or-later`. Le fonti implementative sono soltanto i
+fatti neutrali e i vettori canonici registrati in `docs/EVIDENCE.md`, D232,
+D242/D243 e D245, le API pubbliche GLib/OpenSSL 3 e le API LGPL della copia
+repository-local libfprint 1.94.5. Il serializer storico GPL è stato usato
+unicamente come oracle black-box per confermare vettori/fatti già canonizzati;
+non ne sono stati letti, copiati, adattati o tradotti gli algoritmi nel dominio
+LGPL. Non è stato importato codice da `tools/d277_native_a8_once.c`, `src/`,
+`core/` o Rockytkg.
+
+Le fixture contengono soltanto validator, response body, CONFIG_90 e PSK
+sintetici non factory e non biometrici. I pin target restano riferimenti
+hash-only negli artefatti canonici; raw CONFIG_90, raw response target, capture
+e secret autentici non sono incorporati. L'estensione del backend e del
+`GoodixDeviceContext` preserva la stessa provenance D276/04 e aggiunge solo
+single-OUT ownership, completion generation-captured e wiring della nuova
+state machine.

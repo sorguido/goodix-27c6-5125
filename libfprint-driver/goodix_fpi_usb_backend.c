@@ -25,6 +25,8 @@ struct _GoodixFpiUsbBackend
   gpointer seam_data;
   GoodixFpiUsbBackendDrainedFunc drained_callback;
   gpointer drained_data;
+  GoodixFpiUsbBackendOutCompletedFunc out_completed_callback;
+  gpointer out_completed_data;
 };
 
 static GQuark
@@ -173,6 +175,17 @@ goodix_fpi_usb_backend_set_drained_callback (
   backend->drained_data = data;
 }
 
+void
+goodix_fpi_usb_backend_set_out_completed_callback (
+  GoodixFpiUsbBackend                 *backend,
+  GoodixFpiUsbBackendOutCompletedFunc  callback,
+  gpointer                             data)
+{
+  g_return_if_fail (backend != NULL);
+  backend->out_completed_callback = callback;
+  backend->out_completed_data = data;
+}
+
 gboolean
 goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                                          guint64               generation,
@@ -231,14 +244,13 @@ goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
                            "OUT stale or fenced");
       return FALSE;
     }
-  if (backend->out_outstanding != 0 &&
-      backend->out_generation != generation)
+  if (backend->out_outstanding != 0)
     {
       g_set_error_literal (error, backend_error_quark (), 2,
-                           "OUT belongs to another generation");
+                           "a physical OUT is already pending");
       return FALSE;
     }
-  backend->out_outstanding++;
+  backend->out_outstanding = 1;
   backend->out_generation = generation;
   backend->out_submit_count++;
   if (backend->seam != NULL)
@@ -280,13 +292,14 @@ goodix_fpi_usb_backend_complete_out (GoodixFpiUsbBackend *backend,
                                      guint64 submit_generation,
                                      const GError *error)
 {
-  (void) error;
   if (backend == NULL || backend->out_outstanding == 0 ||
       submit_generation != backend->out_generation)
     return;
-  backend->out_outstanding--;
-  if (backend->out_outstanding == 0)
-    backend->out_generation = 0;
+  backend->out_outstanding = 0;
+  backend->out_generation = 0;
+  if (backend->out_completed_callback != NULL)
+    backend->out_completed_callback (backend, submit_generation, error,
+                                     backend->out_completed_data);
   maybe_notify_drained (backend);
 }
 

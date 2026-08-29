@@ -16,6 +16,7 @@
 #include "goodix_usb_router.h"
 #include "goodix_tls_server.h"
 #include "goodix_fpi_usb_backend.h"
+#include "goodix_secure_session.h"
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -61,6 +62,7 @@ struct _GoodixDeviceContext
   GoodixUsbRouter           *usb_router;
   GoodixTlsServer           *tls_server;
   GoodixFpiUsbBackend       *fpi_usb_backend;
+  GoodixSecureSession       *secure_session;
   GoodixTlsPlaintextFunc     tls_plaintext;
   gpointer                   tls_user_data;
   guint                      a0_delivery_count;
@@ -98,15 +100,30 @@ goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
   return ctx->usb_router;
 }
 
-GoodixTlsServer *goodix_device_context_get_tls_server (GoodixDeviceContext *ctx) { return ctx ? ctx->tls_server : NULL; }
+GoodixTlsServer *goodix_device_context_get_tls_server (GoodixDeviceContext *ctx)
+{
+  if (ctx == NULL)
+    return NULL;
+  return ctx->secure_session != NULL ?
+    goodix_secure_session_get_tls_server (ctx->secure_session) : ctx->tls_server;
+}
 GoodixFpiUsbBackend *goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx) { return ctx ? ctx->fpi_usb_backend : NULL; }
 
 static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
-{ GoodixDeviceContext *ctx=user_data; (void)frame; if(type==0xa0&&!ctx->terminal_fence)ctx->a0_delivery_count++; }
+{
+  GoodixDeviceContext *ctx = user_data;
+  if (type != 0xa0 || ctx->terminal_fence)
+    return;
+  ctx->a0_delivery_count++;
+  if (ctx->secure_session != NULL)
+    goodix_secure_session_handle_a0 (ctx->secure_session, frame);
+}
 static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
 {
   GoodixDeviceContext *ctx=user_data; gsize n; const guint8 *p; g_autoptr(GError) error=NULL;
-  if(type!=0xb0||ctx->terminal_fence||!ctx->tls_server)return;
+  if(type!=0xb0||ctx->terminal_fence)return;
+  if(ctx->secure_session!=NULL){goodix_secure_session_handle_b0(ctx->secure_session,frame);return;}
+  if(!ctx->tls_server)return;
   p=g_bytes_get_data(frame,&n);
   if(n<=4||!goodix_tls_server_push(ctx->tls_server,p+4,n-4,&error))
     { goodix_device_context_set_terminal_fence(ctx); goodix_device_context_set_poisoned(ctx,error); }
@@ -194,6 +211,7 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
   g_clear_object (&ctx->usb_cancellable);
   g_clear_error (&ctx->terminal_error);
   g_free (ctx->backend.last_command);
+  goodix_secure_session_free (ctx->secure_session);
   goodix_tls_server_free (ctx->tls_server);
   g_return_if_fail (goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend));
   goodix_fpi_usb_backend_free (ctx->fpi_usb_backend);
@@ -221,6 +239,9 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
+  if (ctx->secure_session != NULL)
+    goodix_secure_session_cancel (ctx->secure_session,
+                                  "GoodixDeviceContext terminal fence");
   goodix_tls_server_cancel (ctx->tls_server);
   goodix_fpi_usb_backend_cancel (ctx->fpi_usb_backend);
 }
@@ -537,13 +558,64 @@ goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
                                                GoodixTlsAudit *audit,
                                                GError **error)
 {
-  g_return_val_if_fail (ctx != NULL && ctx->tls_server == NULL, FALSE);
+  g_return_val_if_fail (ctx != NULL && ctx->tls_server == NULL &&
+                        ctx->secure_session == NULL, FALSE);
   ctx->tls_plaintext = plaintext;
   ctx->tls_user_data = user_data;
   ctx->tls_server = goodix_tls_server_new (psk, psk_length, context_tls_output,
                                            context_tls_plaintext, ctx, audit,
                                            error);
   return ctx->tls_server != NULL;
+}
+
+static void
+context_secure_terminal (GoodixSecureSession *session,
+                         const GError        *error,
+                         gpointer             user_data)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  (void) session;
+  ctx->terminal_fence = TRUE;
+  goodix_device_context_set_poisoned (ctx, error);
+}
+
+gboolean
+goodix_device_context_start_secure_session (
+  GoodixDeviceContext               *ctx,
+  const GoodixSecureSessionMaterial *material,
+  GoodixSecureSessionScheduleFunc    schedule,
+  gpointer                           schedule_data,
+  GoodixSecureSessionAudit          *audit,
+  GoodixTlsAudit                    *tls_audit,
+  GError                           **error)
+{
+  if (ctx == NULL || ctx->secure_session != NULL || ctx->tls_server != NULL ||
+      ctx->generation == 0 || ctx->terminal_fence)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "GoodixDeviceContext cannot start secure session");
+      return FALSE;
+    }
+  ctx->secure_session = goodix_secure_session_new (
+    ctx->fpi_usb_backend, ctx->generation, material, schedule, schedule_data,
+    context_secure_terminal, ctx, audit, tls_audit, error);
+  if (ctx->secure_session == NULL)
+    return FALSE;
+  if (!goodix_secure_session_start (ctx->secure_session, error) ||
+      !goodix_device_context_arm_receive (ctx, error))
+    {
+      goodix_secure_session_cancel (ctx->secure_session,
+                                    "secure-session start/receive failed");
+      return FALSE;
+    }
+  return TRUE;
+}
+
+GoodixSecureSession *
+goodix_device_context_get_secure_session (GoodixDeviceContext *ctx)
+{
+  return ctx != NULL ? ctx->secure_session : NULL;
 }
 
 void
@@ -583,6 +655,15 @@ goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
   goodix_fpi_usb_backend_complete_receive (ctx->fpi_usb_backend,
                                            submit_generation, data, length,
                                            error);
+  if (ctx->secure_session != NULL &&
+      goodix_secure_session_needs_receive (ctx->secure_session) &&
+      goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend) == 0)
+    {
+      g_autoptr(GError) arm_error = NULL;
+      if (!goodix_device_context_arm_receive (ctx, &arm_error))
+        goodix_secure_session_cancel (ctx->secure_session,
+                                      arm_error->message);
+    }
 }
 
 /* --- Context accessors --- */

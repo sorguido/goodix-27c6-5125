@@ -63,6 +63,12 @@ gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_usb_router.c" \
   -o "$build_dir/goodix_usb_router.o"
 gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_a0_protocol.c" \
+  -o "$build_dir/goodix_a0_protocol.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_secure_session.c" \
+  -o "$build_dir/goodix_secure_session.o"
+gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_device.c" \
   -o "$build_dir/goodix_fpimage_device.o"
 gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_tls_server.c" -o "$build_dir/goodix_tls_server.o"
@@ -102,6 +108,8 @@ gcc -Wl,--gc-sections \
   "$build_dir/goodix_u16_to_fpimage.o" \
   "$build_dir/goodix_fpimage_pipeline.o" \
   "$build_dir/goodix_usb_router.o" \
+  "$build_dir/goodix_a0_protocol.o" \
+  "$build_dir/goodix_secure_session.o" \
   "$build_dir/goodix_fpimage_device.o" \
   "$build_dir/goodix_tls_server.o" \
   "$build_dir/goodix_fpi_usb_backend.o" \
@@ -151,6 +159,12 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_usb_router.c" \
   -o "$build_dir/goodix_usb_router_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_a0_protocol.c" \
+  -o "$build_dir/goodix_a0_protocol_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_secure_session.c" \
+  -o "$build_dir/goodix_secure_session_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_fpimage_device.c" \
   -o "$build_dir/goodix_fpimage_device_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_tls_server.c" -o "$build_dir/goodix_tls_server_san.o"
@@ -179,6 +193,8 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/goodix_u16_to_fpimage_san.o" \
   "$build_dir/goodix_fpimage_pipeline_san.o" \
   "$build_dir/goodix_usb_router_san.o" \
+  "$build_dir/goodix_a0_protocol_san.o" \
+  "$build_dir/goodix_secure_session_san.o" \
   "$build_dir/goodix_fpimage_device_san.o" \
   "$build_dir/goodix_tls_server_san.o" \
   "$build_dir/goodix_fpi_usb_backend_san.o" \
