@@ -104,7 +104,8 @@ NATIVE_TLS12_PSK_HANDSHAKE_HOST_ONLY_PROVEN=true
 NATIVE_B0_FIXED64_EGRESS_HOST_ONLY_PROVEN=true
 NATIVE_TLS_RECORD_PACING_HOST_ONLY_PROVEN=true
 
-D278_02_OUTCOME=READY_PASS_HOST_ONLY_PRELIVE
+D278_02_OUTCOME=READY_FOR_AI_PM_CORRECTIVE_REVIEW
+D278_02_ADVANCEMENT=CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED
 D190_EXPRESSION_PROVENANCE_GATE=PASS
 NATIVE_D190_E4_BINDER_KAT_PROVEN=true
 D190_FIVE_INDEPENDENT_KATS=PASS
@@ -124,6 +125,12 @@ D278_02_PHASE_WATCHDOG_HOST_ONLY_PROVEN=true
 D278_02_NORMAL=PASS
 D278_02_ASAN_UBSAN=PASS
 D278_02_DETERMINISM_RUNS=2
+D278_02_TEST_COUNT_PER_BINARY_RUN=55
+PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
+AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
+INITIAL_REVIEW_BLOCKER=CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
+CANONICAL_A2_SHA256_EXPECTED=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+CANONICAL_A2_SHA256_IMPLEMENTED_AFTER_FIX=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
 TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
 LIVE_EXECUTION_PERFORMED=false
 D4_REACHABLE=false
@@ -533,15 +540,24 @@ massimo un IN/OUT fisico in flight. Il watchdog GLib è phase-aware, reinvalidat
 ad ogni progresso e terminalmente fenced. STOP/cancel precedono il drain;
 sessione, backend e router vengono liberati soltanto dopo drain.
 
-La suite contiene 54 casi: 6 D190, 6 PE, 22 loader e 20
-harness/watchdog/telemetria. Due invocazioni consecutive del runner hanno
-eseguito ciascuna 54/54 normal e 54/54 ASAN/UBSAN PASS, compilato il binding
-libfprint/GUsb completo ed eseguito soltanto `--self-test`, che termina
-intenzionalmente sul watchdog A8 con cleanup completo e contatori USB reali a
-zero. Il protected preflight e il ramo live non sono stati eseguiti.
+La suite contiene 55 casi: 6 D190, 6 PE, 23 loader (22 precedenti +
+`production_policy_canonical_pins`) e 20 harness/watchdog/telemetria. Due
+invocazioni consecutive del runner hanno eseguito ciascuna 55/55 normal e
+55/55 ASAN/UBSAN PASS, compilato il binding libfprint/GUsb completo ed eseguito
+soltanto `--self-test`, che termina intenzionalmente sul watchdog A8 con cleanup
+completo e contatori USB reali a zero. Il protected preflight e il ramo live
+non sono stati eseguiti.
+
+Il correttivo D278/02 ha corretto il pin A2 della policy produttiva in
+`goodix_target_material_policy_production()`: il valore canonico, verificato in
+`analysis/D232/D232_target_material_manifest.json`, è
+`39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5`.
+È stato aggiunto un test indipendente che confronta tutti i pin critici della
+policy produttiva con costanti attese ricavate dalle evidenze canoniche.
 
 ```text
-OUTCOME=READY_PASS_HOST_ONLY_PRELIVE
+OUTCOME=READY_FOR_AI_PM_CORRECTIVE_REVIEW
+ADVANCEMENT=CANONICAL_A2_TARGET_PIN_CORRECTED_AND_PRODUCTION_POLICY_PIN_MATRIX_CLOSED
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 MATERIAL_INVALID_BLOCKS_BEFORE_USB_OPEN=PASS
 SYNTHETIC_SINGLE_OPEN_CLAIM_EPOCH=PASS
@@ -561,6 +577,12 @@ TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=false
 LIVE_EXECUTION_PERFORMED=false
 NATIVE_SECURE_SESSION_TARGET_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
+D278_02_TEST_COUNT_PER_BINARY_RUN=55
+PRODUCTION_POLICY_CANONICAL_PIN_MATRIX=PASS
+AI_PM_INITIAL_REVIEW=FAIL_CORRECTIVE_REQUIRED
+INITIAL_REVIEW_BLOCKER=CANONICAL_A2_RESPONSE_SHA256_PRODUCTION_PIN_MISMATCH
+CANONICAL_A2_SHA256_EXPECTED=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
+CANONICAL_A2_SHA256_IMPLEMENTED_AFTER_FIX=39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5
 ```
 
 Riesame metodologico preparato, non eseguito come live: (1) rispetto a D277/02

@@ -1,6 +1,16 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "goodix_usb_router.h"
 
+/* ASSERT_CMPMEM in some GLib versions stores lengths in int, which trips
+ * -Wsign-conversion under -Wconversion.  Use a size_t-safe local wrapper. */
+#define ASSERT_CMPMEM(m1, l1, m2, l2) G_STMT_START { \
+  gconstpointer __m1 = (m1), __m2 = (m2); \
+  gsize __l1 = (l1), __l2 = (l2); \
+  g_assert_cmpuint (__l1, ==, __l2); \
+  if (__l1 != 0) \
+    g_assert_true (memcmp (__m1, __m2, __l1) == 0); \
+} G_STMT_END
+
 typedef struct
 {
   GPtrArray *frames;
@@ -95,9 +105,9 @@ test_incremental_and_concatenated (void)
   feed (&r, generation, b + 7, b_len - 7);
 
   g_assert_cmpuint (r.frames->len, ==, 2);
-  g_assert_cmpmem (g_bytes_get_data (g_ptr_array_index (r.frames, 0), NULL),
+  ASSERT_CMPMEM (g_bytes_get_data (g_ptr_array_index (r.frames, 0), NULL),
                    a_len, a, a_len);
-  g_assert_cmpmem (g_bytes_get_data (g_ptr_array_index (r.frames, 1), NULL),
+  ASSERT_CMPMEM (g_bytes_get_data (g_ptr_array_index (r.frames, 1), NULL),
                    b_len, b, b_len);
   g_assert_cmpuint (goodix_usb_router_get_delivery_count (r.router), ==, 2);
   recorder_clear (&r);
@@ -125,7 +135,7 @@ test_synthetic_demux_order (void)
     }
   feed (&r, generation, all->data, all->len);
   g_assert_cmpuint (r.frames->len, ==, G_N_ELEMENTS (types));
-  g_assert_cmpmem (r.types->data, r.types->len, types, sizeof types);
+  ASSERT_CMPMEM (r.types->data, r.types->len, types, sizeof types);
   for (guint i = 0; i < r.frames->len; i++)
     {
       gsize length;

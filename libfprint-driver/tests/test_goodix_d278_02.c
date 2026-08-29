@@ -18,6 +18,16 @@
 
 #define CANONICAL_DLL "analysis/D230/work/GoodixExport/gfusb.dll"
 
+/* ASSERT_CMPMEM in some GLib versions stores lengths in int, which trips
+ * -Wsign-conversion under -Wconversion.  Use a size_t-safe local wrapper. */
+#define ASSERT_CMPMEM(m1, l1, m2, l2) G_STMT_START { \
+  gconstpointer __m1 = (m1), __m2 = (m2); \
+  gsize __l1 = (l1), __l2 = (l2); \
+  g_assert_cmpuint (__l1, ==, __l2); \
+  if (__l1 != 0) \
+    g_assert_true (memcmp (__m1, __m2, __l1) == 0); \
+} G_STMT_END
+
 typedef struct
 {
   gchar *directory;
@@ -239,7 +249,7 @@ test_binder_kat (gconstpointer user_data)
                                              seed_a, 6, seed_b, 6,
                                              actual, &error));
   g_assert_no_error (error);
-  g_assert_cmpmem (actual, 32, wanted, 32);
+  ASSERT_CMPMEM (actual, (gsize) 32, wanted, (gsize) 32);
   goodix_d190_pe_cleanse_seed (seed_a);
   goodix_d190_pe_cleanse_seed (seed_b);
   OPENSSL_cleanse (secrets, sizeof secrets);
@@ -387,6 +397,78 @@ test_material_production_policy (void)
 }
 
 static void
+test_material_production_policy_canonical_pins (void)
+{
+  GoodixTargetMaterialPolicy policy;
+  guint8 expected_manifest_sha256[32];
+  guint8 expected_transport_sha256[32];
+  guint8 expected_config90_sha256[32];
+  guint8 expected_e4_sha256[32];
+  guint8 expected_a2_sha256[32];
+  guint8 expected_chip82_sha256[32];
+  guint8 expected_otp_a6_sha256[32];
+  static const guint16 expected_registers[4] = {
+    0x0220, 0x0236, 0x0238, 0x023a
+  };
+  static const guint8 expected_values[4][2] = {
+    { 0xd8, 0x0b }, { 0xbe, 0x00 }, { 0xbd, 0x00 }, { 0xbc, 0x00 }
+  };
+  static const guint expected_offsets[4] = { 117, 121, 125, 129 };
+
+  decode_hex ("1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15",
+              expected_manifest_sha256, 32);
+  decode_hex ("eb47bbed40e079ca780cd9cd4b2324520a67584ad3d576674914152fd6080a75",
+              expected_transport_sha256, 32);
+  decode_hex ("e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82",
+              expected_config90_sha256, 32);
+  decode_hex ("1fa642d3f190e7074d1db201aa32ee8f34e41d69d55797158b9480affb3d0b87",
+              expected_e4_sha256, 32);
+  decode_hex ("39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
+              expected_a2_sha256, 32);
+  decode_hex ("82537d2c108887baef128b47ad401fc888d54b184673b1fc23811d79ab6d5703",
+              expected_chip82_sha256, 32);
+  decode_hex ("d7e81a415aa5e7b0168c9a632756d1dc8b7b47346cc0a44dc68796f854c2b92b",
+              expected_otp_a6_sha256, 32);
+
+  goodix_target_material_policy_production (&policy);
+  g_assert_cmpuint (policy.owner_uid, ==, 0);
+  g_assert_cmpuint (policy.mode, ==, 0600);
+  g_assert_cmpuint (policy.manifest_length, ==, 2305);
+  ASSERT_CMPMEM (policy.manifest_sha256, (gsize) 32,
+                   expected_manifest_sha256, (gsize) 32);
+  g_assert_cmpuint (policy.transport_length, ==, 88);
+  ASSERT_CMPMEM (policy.transport_sha256, (gsize) 32,
+                   expected_transport_sha256, (gsize) 32);
+  g_assert_cmpuint (policy.config90_length, ==, 224);
+  ASSERT_CMPMEM (policy.config90_sha256, (gsize) 32,
+                   expected_config90_sha256, (gsize) 32);
+  g_assert_cmphex (policy.config90_finalizer[0], ==, 0x51);
+  g_assert_cmphex (policy.config90_finalizer[1], ==, 0x9a);
+  ASSERT_CMPMEM (policy.e4_validator_sha256, (gsize) 32,
+                   expected_e4_sha256, (gsize) 32);
+  ASSERT_CMPMEM (policy.a2_response_sha256, (gsize) 32,
+                   expected_a2_sha256, (gsize) 32);
+  ASSERT_CMPMEM (policy.chip82_response_sha256, (gsize) 32,
+                   expected_chip82_sha256, (gsize) 32);
+  ASSERT_CMPMEM (policy.otp_a6_response_sha256, (gsize) 32,
+                   expected_otp_a6_sha256, (gsize) 32);
+  ASSERT_CMPMEM (policy.dac_registers, sizeof expected_registers,
+                   expected_registers, sizeof expected_registers);
+  ASSERT_CMPMEM (policy.dac_values, sizeof expected_values,
+                   expected_values, sizeof expected_values);
+  ASSERT_CMPMEM (policy.dac_offsets, sizeof expected_offsets,
+                   expected_offsets, sizeof expected_offsets);
+
+  OPENSSL_cleanse (expected_manifest_sha256, sizeof expected_manifest_sha256);
+  OPENSSL_cleanse (expected_transport_sha256, sizeof expected_transport_sha256);
+  OPENSSL_cleanse (expected_config90_sha256, sizeof expected_config90_sha256);
+  OPENSSL_cleanse (expected_e4_sha256, sizeof expected_e4_sha256);
+  OPENSSL_cleanse (expected_a2_sha256, sizeof expected_a2_sha256);
+  OPENSSL_cleanse (expected_chip82_sha256, sizeof expected_chip82_sha256);
+  OPENSSL_cleanse (expected_otp_a6_sha256, sizeof expected_otp_a6_sha256);
+}
+
+static void
 test_material_positive (void)
 {
   MaterialFixture fixture;
@@ -399,8 +481,10 @@ test_material_positive (void)
   g_assert_nonnull (owner);
   g_assert_no_error (error);
   g_assert_true (fixture.audit.e4_binding_match);
-  g_assert_cmpmem (view.e4_validator, 32, fixture.expected_validator, 32);
-  g_assert_cmpmem (view.psk, 32, fixture.transport_bytes + 24, 32);
+  ASSERT_CMPMEM (view.e4_validator, (gsize) 32,
+                   fixture.expected_validator, (gsize) 32);
+  ASSERT_CMPMEM (view.psk, (gsize) 32,
+                   fixture.transport_bytes + 24, (gsize) 32);
   goodix_target_material_free (owner);
   g_assert_true (fixture.audit.project_secret_zeroized);
   g_assert_true (fixture.cleanse_all_zero);
@@ -1574,6 +1658,8 @@ main (int argc,
 
   g_test_add_func ("/d278_02/material/production_policy",
                    test_material_production_policy);
+  g_test_add_func ("/d278_02/material/production_policy_canonical_pins",
+                   test_material_production_policy_canonical_pins);
   g_test_add_func ("/d278_02/material/positive", test_material_positive);
   g_test_add_func ("/d278_02/material/symlink_rejected",
                    test_material_symlink);
