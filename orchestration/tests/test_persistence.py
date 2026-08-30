@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 import sqlite3
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,7 +29,7 @@ class PersistenceTests(unittest.TestCase):
         self.store.initialize()
 
     def test_transactional_compare_and_swap_and_reload(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 4)
+        self.assertEqual(SCHEMA_VERSION, 5)
         first = self.store.save_runtime(
             RuntimeRecord(OrchestratorState.BOOTSTRAP, "ORCH-20260830-001"),
             expected_revision=None,
@@ -121,6 +122,20 @@ class PersistenceTests(unittest.TestCase):
         )
         self.assertEqual(recovered.state, OrchestratorState.ERROR_LOCKED)
         self.assertEqual(recovered.error_code, "STORE_INCOMPATIBLE")
+
+    def test_v4_store_is_incompatible_and_remains_unmodified(self) -> None:
+        connection = sqlite3.connect(self.path)
+        connection.execute(
+            "UPDATE metadata SET value = '4' WHERE key = 'schema_version'"
+        )
+        connection.commit()
+        connection.close()
+        before = hashlib.sha256(self.path.read_bytes()).hexdigest()
+        recovered = DeterministicEngine.recover(
+            self.path, CapabilityPolicy(), expected_run_id="ORCH-LEGACY-V4"
+        )
+        self.assertEqual(recovered.error_code, "STORE_INCOMPATIBLE")
+        self.assertEqual(hashlib.sha256(self.path.read_bytes()).hexdigest(), before)
 
     def test_unknown_persisted_state_is_corruption(self) -> None:
         self.store.save_runtime(

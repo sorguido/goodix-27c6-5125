@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 from __future__ import annotations
 
+import hashlib
+import json
+
 from goodix_orchestrator.policy import Capability
 from goodix_orchestrator.protocols import (
     CanonicalDocumentation,
@@ -91,6 +94,12 @@ def pending_gate(
     task_id: str = "TASK-20260830-001",
     gate_id: str = "HG-20260830-001",
 ) -> HumanGateManifest:
+    action_payload = {"action_id": "SYNTHETIC_CONTINUE", "payload": {"mode": "host-only"}}
+    action_digest = hashlib.sha256(
+        json.dumps(
+            action_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("ascii")
+    ).hexdigest()
     return HumanGateManifest(
         protocol_version=PROTOCOL_VERSION,
         gate_id=gate_id,
@@ -98,6 +107,8 @@ def pending_gate(
         decision_required="Approve a synthetic continuation",
         reason="Exercise deterministic gate semantics",
         commit_sha=HEAD_ONE,
+        action_id="SYNTHETIC_CONTINUE",
+        action_digest=action_digest,
         action_to_unlock="Return to PM planning",
         residual_risks=("No real identity validation exists in O001",),
         still_forbidden=("USB_GOODIX", "MAIN_MERGE"),

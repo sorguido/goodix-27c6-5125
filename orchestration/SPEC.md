@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix Autonomous Orchestration — Architecture & Safety Specification
 
-> **Versione**: v0.2 (O003) — 30 agosto 2026
+> **Versione**: v0.3 (O003 corrective closure) — 30 agosto 2026
 > **Stato**: Contratto canonico O001–O003; bootstrap ancora non pronto per Goodix.
 > **Scope**: solo infrastruttura di orchestrazione host-only. Nessun avanzamento funzionale Goodix, nessun USB reale, nessun `sudo`, nessun secret reale, nessuna esecuzione live.
 
@@ -299,7 +299,7 @@ MUST rifiutare:
 
 ### 6.5 State Store
 
-Il formato canonico O003 è SQLite locale singolo-file schema v4 sotto XDG. Deve privilegiare:
+Il formato canonico O003 è SQLite locale singolo-file schema v5 sotto XDG. Deve privilegiare:
 
 - transazioni/atomicità;
 - backup semplice;
@@ -307,6 +307,8 @@ Il formato canonico O003 è SQLite locale singolo-file schema v4 sotto XDG. Deve
 - nessun servizio esterno.
 - backup consistente tramite API SQLite con retention bounded;
 - incompatibilità fail-closed per store operativi legacy non ricostruibili.
+- ledger persistente dei turni `IN_PROGRESS/COMPLETED/FAILED/RECONCILIATION_REQUIRED`;
+- stato del coordinatore sufficiente a riprendere plan/result senza inventare esiti.
 
 Lo state store MUST contenere solo metadata operativi, mai secret.
 
@@ -713,7 +715,7 @@ MUST NOT:
 - passare a API key;
 - scegliere automaticamente un provider a pagamento alternativo.
 
-La ripresa non dipende da una data teorica di reset. Durante `PAUSED_RATE_LIMIT` o `PAUSED_MODEL_UNAVAILABLE` il servizio esegue re-probe periodici bounded di account, rate-limit e catalogo modelli. Riprende autonomamente solo quando la route esatta modello/effort è provata disponibile e SQLite, Git, task/worktree, gate ed ultimo effetto risultano riconciliati. Il probe non crea task, commit, FF o avanzamento di control flow.
+La ripresa non dipende da una data teorica di reset. Durante `PAUSED_RATE_LIMIT` o `PAUSED_MODEL_UNAVAILABLE` il servizio usa telemetry e catalogo soltanto come preflight, quindi esegue un turno Codex bounded, read-only e senza tool sull'esatta coppia modello/effort richiesta. Soltanto l'output strutturato atteso e la route effettiva riosservata autorizzano la disponibilità. La ripresa autonoma richiede inoltre riconciliazione di SQLite, Git, task/worktree, gate, turn ledger ed ultimo effetto. Il probe non crea task, commit, FF o avanzamento di control flow.
 
 ---
 
@@ -730,6 +732,8 @@ Ogni gate contiene:
   "decision_required": "...",
   "reason": "...",
   "commit_sha": "...",
+  "action_id": "...",
+  "action_digest": "<64 lowercase hex SHA-256>",
   "action_to_unlock": "...",
   "residual_risks": ["..."],
   "still_forbidden": ["..."],
@@ -781,7 +785,7 @@ Al bootstrap/restart:
 2. validare schema e latch operator/maintenance/emergency;
 3. verificare repo/root e fetch/reconcile di `main`/`development`;
 4. verificare eventuale task branch/worktree;
-5. verificare thread state Codex se recuperabile;
+5. verificare il ledger dei turni Codex: un turno non terminale o dall'esito non ricostruibile richiede riconciliazione e blocca il dispatch;
 6. riconciliare Human Gate e decisione terminale persistita;
 7. classificare l'ultima azione esterna e cleanup parziale;
 8. solo dopo scegliere la transizione o restare fail-closed.
@@ -802,9 +806,11 @@ AMBIGUOUS
 
 ### 16.1 Servizio e operator control
 
-Il runtime è local-first: `PC_OFF => ORCHESTRATION_OFF`. L'unità `systemd --user` usa single-instance lock, `KillMode=control-group`, shutdown SIGTERM e path XDG; non contiene credenziali né path repository hard-coded. `status`, `pause`, `resume`, `stop`, `emergency-stop`, clear esplicito del latch e maintenance enter/exit sono superfici locali deterministiche.
+Il runtime è local-first: `PC_OFF => ORCHESTRATION_OFF`. L'unità `systemd --user` è una risorsa del package installabile anche da wheel non-editable; l'installer genera un drop-in locale dai path canonici verificati. Il sandbox rende il repository read-only salvo Git common-dir, state/config/worktree XDG necessari al lifecycle, usa single-instance lock, `KillMode=control-group` e shutdown SIGTERM, e non contiene credenziali o path repository hard-coded nella risorsa distribuita. `status`, `pause`, `resume`, `stop`, `emergency-stop`, clear esplicito del latch e maintenance enter/exit sono superfici locali deterministiche.
 
-Maintenance richiede operator pause e `NO_INFLIGHT_TURN/NO_INFLIGHT_EFFECT`; salva SHA e task dell'epoch, blocca ogni dispatch/FF/cleanup e al termine richiede fetch e riconciliazione Git+SQLite. Divergenza vieta merge/rebase automatici. L'emergency latch persiste dopo restart e `resume` normale non può cancellarlo.
+Maintenance richiede operator pause e `NO_INFLIGHT_TURN/NO_INFLIGHT_EFFECT`, valori derivati esclusivamente dai ledger persistenti di turni ed effetti; salva SHA e task dell'epoch, blocca ogni dispatch/FF/cleanup e al termine richiede fetch e riconciliazione Git+SQLite. Divergenza vieta merge/rebase automatici. L'emergency latch persiste dopo restart e `resume` normale non può cancellarlo; un avvio con latch termina con successo senza dispatch, evitando restart storm con `Restart=on-failure`.
+
+Il percorso normale del servizio usa il coordinatore production: contesti separati PM-plan, Executor e PM-review; task manifest reale; worktree `task/<TASK_ID>` fuori dalla root canonica; commit e push tipizzati; `CORRECTIVE` sul medesimo branch; `ACCEPT` con FF/CAS di `development` e cleanup verificato; `REPLAN`, `HUMAN_GATE`, `PAUSE` e `DONE` restano disposition strutturate. Il processo deterministico, non l'output AI, possiede l'autorità sugli effetti Git.
 
 ---
 
@@ -1003,6 +1009,9 @@ Dopo approvazione/merge di questa SPEC, la costruzione dovrebbe essere suddivisa
 - `development` persistente, task effimero singolo, FF/CAS e cleanup recovery-safe;
 - re-probe quota/modello e safe autonomous resume;
 - maintenance lock, emergency latch, backup e journald redatto.
+- loop production PM -> task reale -> Executor -> PM review collegato al tick ordinario;
+- turn ledger autorevole, resume con riconciliazione e route probe tramite turno esatto;
+- unità installabile da package e sandbox Git/XDG compatibile con il lifecycle.
 
 ### O004 — Real-repo low-risk qualification
 

@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/goodix-orchestrator service-run
+ExecStart="@PYTHON_EXECUTABLE@" -m goodix_orchestrator service-run
 Restart=on-failure
 RestartSec=15s
 TimeoutStopSec=30s
@@ -16,8 +16,6 @@ PrivateDevices=yes
 RestrictSUIDSGID=yes
 ProtectSystem=strict
 ProtectHome=read-only
-# install-service generates a user drop-in bound to the exact resolved Git
-# common-dir and XDG config/state/worktree roots.
 UMask=0077
 
 [Install]

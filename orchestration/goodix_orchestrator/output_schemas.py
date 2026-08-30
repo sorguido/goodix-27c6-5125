@@ -144,6 +144,35 @@ POLICY_ASSERTIONS_SCHEMA: dict[str, Any] = {
 }
 
 
+HUMAN_GATE_MANIFEST_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "protocol_version", "gate_id", "task_id", "decision_required", "reason",
+        "commit_sha", "action_id", "action_digest", "action_to_unlock",
+        "residual_risks", "still_forbidden", "requested_by", "status",
+        "approval_state", "denial_state",
+    ],
+    "properties": {
+        "protocol_version": {"enum": ["1.0"]},
+        "gate_id": {"type": "string"},
+        "task_id": TASK_ID,
+        "decision_required": {"type": "string"},
+        "reason": {"type": "string"},
+        "commit_sha": {"anyOf": [SHA, {"type": "null"}]},
+        "action_id": {"type": "string"},
+        "action_digest": {"type": "string"},
+        "action_to_unlock": {"type": "string"},
+        "residual_risks": {"type": "array", "items": {"type": "string"}},
+        "still_forbidden": {"type": "array", "items": {"type": "string"}},
+        "requested_by": {"enum": ["AI_PM"]},
+        "status": {"enum": ["PENDING"]},
+        "approval_state": {"enum": ["PM_PLANNING", "TASK_READY", "DONE"]},
+        "denial_state": {"enum": ["PM_PLANNING", "DONE"]},
+    },
+}
+
+
 EXECUTOR_WORK_REPORT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -199,7 +228,7 @@ PM_DISPOSITION_SCHEMA: dict[str, Any] = {
     "properties": {
         "protocol_version": {"enum": ["1.0"]},
         "task_id": TASK_ID,
-        "disposition": {"enum": ["ACCEPT", "CORRECTIVE", "REPLAN", "PAUSE", "DONE"]},
+        "disposition": {"enum": ["ACCEPT", "CORRECTIVE", "REPLAN", "HUMAN_GATE", "PAUSE", "DONE"]},
         "reason": {"type": "string"},
         "reviewed_head_sha": {"anyOf": [SHA, {"type": "null"}]},
         "findings": {"type": "array", "items": {"type": "string"}},
@@ -209,7 +238,7 @@ PM_DISPOSITION_SCHEMA: dict[str, Any] = {
                 {"type": "null"},
             ]
         },
-        "gate": {"type": "null"},
+        "gate": {"anyOf": [HUMAN_GATE_MANIFEST_SCHEMA, {"type": "null"}]},
         "pause_reason": {
             "anyOf": [
                 {"enum": ["RATE_LIMIT", "MODEL_UNAVAILABLE", "INFRASTRUCTURE"]},

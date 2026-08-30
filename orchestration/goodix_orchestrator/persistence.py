@@ -27,7 +27,7 @@ from .state import OrchestratorState, PAUSED_STATES
 from .structured_output import ContextClass, RoutingClass
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _RUN_ID_RE = re.compile(r"^ORCH-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TASK_ID_RE = re.compile(r"^TASK-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TURN_ID_RE = re.compile(r"^TURN-[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
@@ -98,6 +98,13 @@ class ReconciliationOutcome(StrEnum):
     NO_EFFECT = "NO_EFFECT"
     COMPLETED = "COMPLETED"
     UNKNOWN = "UNKNOWN"
+
+
+class TurnActivityStatus(StrEnum):
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    RECONCILIATION_REQUIRED = "RECONCILIATION_REQUIRED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +277,64 @@ class DispatchRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class TurnActivityRecord:
+    activity_id: str
+    dispatch_id: str
+    thread_id: str
+    context_class: ContextClass
+    routing_class: RoutingClass
+    requested_model_id: str
+    requested_reasoning_effort: str
+    status: TurnActivityStatus
+    turn_id: str | None = None
+    error_class: str | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "activity_id",
+            "dispatch_id",
+            "thread_id",
+            "requested_model_id",
+            "requested_reasoning_effort",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip() or len(value) > 1024:
+                raise UnsafePersistenceDataError(f"invalid turn activity {name}: {value!r}")
+        try:
+            object.__setattr__(
+                self,
+                "context_class",
+                self.context_class
+                if isinstance(self.context_class, ContextClass)
+                else ContextClass(self.context_class),
+            )
+            object.__setattr__(
+                self,
+                "routing_class",
+                self.routing_class
+                if isinstance(self.routing_class, RoutingClass)
+                else RoutingClass(self.routing_class),
+            )
+            object.__setattr__(
+                self,
+                "status",
+                self.status
+                if isinstance(self.status, TurnActivityStatus)
+                else TurnActivityStatus(self.status),
+            )
+        except (TypeError, ValueError) as exc:
+            raise UnsafePersistenceDataError(f"invalid turn activity enum: {exc}") from exc
+        for name in ("turn_id", "error_class"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, str) or not value.strip() or len(value) > 1024
+            ):
+                raise UnsafePersistenceDataError(f"invalid turn activity {name}: {value!r}")
+        if self.status is TurnActivityStatus.COMPLETED and self.turn_id is None:
+            raise UnsafePersistenceDataError("completed turn activity lacks turn_id")
+
+
+@dataclass(frozen=True, slots=True)
 class GitStateRecord:
     integration_branch: str
     integration_sha: str
@@ -382,20 +447,13 @@ class OperatorStateRecord:
     operator_paused: bool = False
     emergency_stop_latched: bool = False
     maintenance_id: str | None = None
-    inflight_turn: bool = False
-    inflight_effect: bool = False
     last_event: str = "UNINITIALIZED"
     last_error_class: str | None = None
     reprobe_due_at: str | None = None
     availability_class: str = "UNKNOWN"
 
     def __post_init__(self) -> None:
-        for name in (
-            "operator_paused",
-            "emergency_stop_latched",
-            "inflight_turn",
-            "inflight_effect",
-        ):
+        for name in ("operator_paused", "emergency_stop_latched"):
             if not isinstance(getattr(self, name), bool):
                 raise UnsafePersistenceDataError(f"invalid {name}")
         if self.maintenance_id is not None and re.fullmatch(
@@ -523,11 +581,17 @@ class PushIntent(_EffectIntentMixin):
     task_id: str
     branch: str
     commit_sha: str
+    expected_remote_sha: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
         object.__setattr__(self, "branch", _validated_ref(self.branch, target=True))
         object.__setattr__(self, "commit_sha", _validated_sha(self.commit_sha))
+        object.__setattr__(
+            self,
+            "expected_remote_sha",
+            _validated_sha(self.expected_remote_sha, optional=True),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -675,6 +739,8 @@ class SQLiteStateStore:
             "gates",
             "contexts",
             "dispatches",
+            "turn_activity",
+            "coordinator_state",
             "git_state",
             "gate_external",
             "operator_state",
@@ -711,7 +777,7 @@ class SQLiteStateStore:
                     self._create_schema(connection)
                 elif "metadata" in tables:
                     # Version mismatch is incompatibility, not corruption. Check it
-                    # before comparing the richer v4 table set so legacy files stay
+                    # before comparing the richer v5 table set so legacy files stay
                     # byte-for-byte untouched and receive the correct classification.
                     schema_version = self._read_schema_version(connection)
                     if schema_version != SCHEMA_VERSION:
@@ -792,6 +858,26 @@ class SQLiteStateStore:
                 schema_repair INTEGER NOT NULL CHECK (schema_repair IN (0, 1)),
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(thread_id) REFERENCES contexts(thread_id)
+            )""",
+            """CREATE TABLE turn_activity (
+                activity_id TEXT PRIMARY KEY,
+                dispatch_id TEXT NOT NULL UNIQUE,
+                thread_id TEXT NOT NULL,
+                context_class TEXT NOT NULL,
+                routing_class TEXT NOT NULL,
+                requested_model_id TEXT NOT NULL,
+                requested_reasoning_effort TEXT NOT NULL,
+                status TEXT NOT NULL,
+                turn_id TEXT,
+                error_class TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(thread_id) REFERENCES contexts(thread_id)
+            )""",
+            """CREATE TABLE coordinator_state (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                record_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )""",
             """CREATE TABLE git_state (
                 singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -974,6 +1060,8 @@ class SQLiteStateStore:
                     "gates",
                     "contexts",
                     "dispatches",
+                    "turn_activity",
+                    "coordinator_state",
                     "git_state",
                     "gate_external",
                     "operator_state",
@@ -1435,6 +1523,175 @@ class SQLiteStateStore:
                 "SELECT * FROM dispatches ORDER BY created_at, dispatch_id"
             ).fetchall()
         return tuple(self._dispatch_from_row(row) for row in rows)
+
+    def start_turn_activity(self, record: TurnActivityRecord) -> TurnActivityRecord:
+        if record.status is not TurnActivityStatus.IN_PROGRESS:
+            raise UnsafePersistenceDataError("new turn activity must be IN_PROGRESS")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            context = connection.execute(
+                "SELECT thread_id FROM contexts WHERE thread_id = ? AND active = 1",
+                (record.thread_id,),
+            ).fetchone()
+            if context is None:
+                raise UnsafePersistenceDataError(
+                    f"turn activity references inactive context: {record.thread_id}"
+                )
+            try:
+                connection.execute(
+                    """INSERT INTO turn_activity(
+                           activity_id, dispatch_id, thread_id, context_class,
+                           routing_class, requested_model_id,
+                           requested_reasoning_effort, status, turn_id,
+                           error_class, created_at, updated_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        record.activity_id,
+                        record.dispatch_id,
+                        record.thread_id,
+                        record.context_class.value,
+                        record.routing_class.value,
+                        record.requested_model_id,
+                        record.requested_reasoning_effort,
+                        record.status.value,
+                        record.turn_id,
+                        record.error_class,
+                        _utc_now(),
+                        _utc_now(),
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                existing = connection.execute(
+                    "SELECT * FROM turn_activity WHERE activity_id = ? OR dispatch_id = ?",
+                    (record.activity_id, record.dispatch_id),
+                ).fetchone()
+                if existing is None or self._turn_activity_from_row(existing) != record:
+                    raise UnsafePersistenceDataError(
+                        f"turn activity identity collision: {record.activity_id}"
+                    ) from exc
+            connection.commit()
+        return record
+
+    @staticmethod
+    def _turn_activity_from_row(row: sqlite3.Row) -> TurnActivityRecord:
+        try:
+            return TurnActivityRecord(
+                activity_id=row["activity_id"],
+                dispatch_id=row["dispatch_id"],
+                thread_id=row["thread_id"],
+                context_class=row["context_class"],
+                routing_class=row["routing_class"],
+                requested_model_id=row["requested_model_id"],
+                requested_reasoning_effort=row["requested_reasoning_effort"],
+                status=row["status"],
+                turn_id=row["turn_id"],
+                error_class=row["error_class"],
+            )
+        except (TypeError, ValueError, UnsafePersistenceDataError) as exc:
+            raise StoreCorruptionError(f"malformed turn activity: {exc}") from exc
+
+    def update_turn_activity(
+        self,
+        activity_id: str,
+        *,
+        status: TurnActivityStatus,
+        turn_id: str | None = None,
+        error_class: str | None = None,
+    ) -> TurnActivityRecord:
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM turn_activity WHERE activity_id = ?", (activity_id,)
+            ).fetchone()
+            if row is None:
+                raise StoreCorruptionError(f"unknown turn activity: {activity_id}")
+            current = self._turn_activity_from_row(row)
+            if current.status is not TurnActivityStatus.IN_PROGRESS:
+                candidate = replace(
+                    current, status=status, turn_id=turn_id or current.turn_id,
+                    error_class=error_class,
+                )
+                if candidate != current:
+                    raise ConcurrentStateError(
+                        f"terminal turn activity replay: {activity_id}"
+                    )
+                connection.commit()
+                return current
+            updated = replace(
+                current,
+                status=status,
+                turn_id=turn_id or current.turn_id,
+                error_class=error_class,
+            )
+            connection.execute(
+                """UPDATE turn_activity SET status = ?, turn_id = ?,
+                   error_class = ?, updated_at = ? WHERE activity_id = ?""",
+                (
+                    updated.status.value,
+                    updated.turn_id,
+                    updated.error_class,
+                    _utc_now(),
+                    activity_id,
+                ),
+            )
+            connection.commit()
+        return updated
+
+    def turn_activities(
+        self, statuses: tuple[TurnActivityStatus, ...] | None = None
+    ) -> tuple[TurnActivityRecord, ...]:
+        query = "SELECT * FROM turn_activity"
+        parameters: tuple[str, ...] = ()
+        if statuses:
+            query += " WHERE status IN (" + ",".join("?" for _ in statuses) + ")"
+            parameters = tuple(status.value for status in statuses)
+        query += " ORDER BY created_at, activity_id"
+        with self._checked_connection() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return tuple(self._turn_activity_from_row(row) for row in rows)
+
+    def save_coordinator_state(self, record: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(record, dict):
+            raise UnsafePersistenceDataError("coordinator state must be an object")
+        encoded = _canonical_json(record)
+        if len(encoded.encode("utf-8")) > 1024 * 1024:
+            raise UnsafePersistenceDataError("coordinator state exceeds bounded size")
+        lowered = encoded.casefold()
+        if any(marker in lowered for marker in ('"token"', '"password"', '"secret"', '"email"')):
+            raise UnsafePersistenceDataError("coordinator state contains forbidden key")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """INSERT INTO coordinator_state(singleton, record_json, updated_at)
+                   VALUES (1, ?, ?)
+                   ON CONFLICT(singleton) DO UPDATE SET
+                       record_json = excluded.record_json,
+                       updated_at = excluded.updated_at""",
+                (encoded, _utc_now()),
+            )
+            connection.commit()
+        return record
+
+    def load_coordinator_state(self) -> dict[str, Any] | None:
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT record_json FROM coordinator_state WHERE singleton = 1"
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            value = json.loads(row[0])
+        except json.JSONDecodeError as exc:
+            raise StoreCorruptionError(f"malformed coordinator state: {exc}") from exc
+        if not isinstance(value, dict):
+            raise StoreCorruptionError("coordinator state is not an object")
+        return value
+
+    def clear_coordinator_state(self) -> None:
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("DELETE FROM coordinator_state WHERE singleton = 1")
+            connection.commit()
 
     def load_dispatch(self, dispatch_id: str) -> DispatchRecord:
         if not isinstance(dispatch_id, str) or not dispatch_id.strip():

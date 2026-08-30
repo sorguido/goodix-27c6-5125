@@ -535,6 +535,8 @@ class HumanGateManifest(ProtocolMixin):
     decision_required: str
     reason: str
     commit_sha: str | None
+    action_id: str
+    action_digest: str
     action_to_unlock: str
     residual_risks: tuple[str, ...]
     still_forbidden: tuple[str, ...]
@@ -550,6 +552,16 @@ class HumanGateManifest(ProtocolMixin):
         object.__setattr__(self, "decision_required", _nonempty(self.decision_required, "decision_required"))
         object.__setattr__(self, "reason", _nonempty(self.reason, "reason"))
         object.__setattr__(self, "commit_sha", _sha(self.commit_sha, "commit_sha", optional=True))
+        if not isinstance(self.action_id, str) or re.fullmatch(
+            r"[A-Z][A-Z0-9_]{2,79}", self.action_id
+        ) is None:
+            raise ProtocolValidationError("INVALID_GATE_ACTION_ID", "action_id", repr(self.action_id))
+        if not isinstance(self.action_digest, str) or re.fullmatch(
+            r"[0-9a-f]{64}", self.action_digest
+        ) is None:
+            raise ProtocolValidationError(
+                "INVALID_GATE_ACTION_DIGEST", "action_digest", repr(self.action_digest)
+            )
         object.__setattr__(self, "action_to_unlock", _nonempty(self.action_to_unlock, "action_to_unlock"))
         object.__setattr__(self, "residual_risks", _string_tuple(self.residual_risks, "residual_risks"))
         object.__setattr__(self, "still_forbidden", _string_tuple(self.still_forbidden, "still_forbidden"))
@@ -587,6 +599,8 @@ class HumanGateManifest(ProtocolMixin):
             decision_required=data.get("decision_required"),
             reason=data.get("reason"),
             commit_sha=data.get("commit_sha"),
+            action_id=data.get("action_id"),
+            action_digest=data.get("action_digest"),
             action_to_unlock=data.get("action_to_unlock"),
             residual_risks=tuple(data.get("residual_risks", ())),
             still_forbidden=tuple(data.get("still_forbidden", ())),

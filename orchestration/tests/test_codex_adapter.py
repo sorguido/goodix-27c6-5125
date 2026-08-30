@@ -16,7 +16,7 @@ from goodix_orchestrator.codex_adapter import (
     TurnResult,
     classify_server_message,
 )
-from goodix_orchestrator.persistence import SQLiteStateStore
+from goodix_orchestrator.persistence import SQLiteStateStore, TurnActivityStatus
 from goodix_orchestrator.protocols import ProtocolValidationError
 from goodix_orchestrator.structured_output import (
     ExecutionClass,
@@ -145,6 +145,10 @@ class CodexAdapterTests(unittest.TestCase):
                 )
             self.assertEqual(caught.exception.code, "PAUSED_MODEL_UNAVAILABLE")
             self.assertEqual(adapter.store.list_dispatches(), ())
+            self.assertEqual(
+                adapter.store.turn_activities()[0].status,
+                TurnActivityStatus.FAILED,
+            )
 
     def test_schema_repair_does_not_echo_invalid_content(self) -> None:
         adapter = self.adapter()
@@ -218,7 +222,7 @@ class CodexAdapterTests(unittest.TestCase):
             adapter.close()
 
     def test_transport_loss_during_turn_is_not_retried(self) -> None:
-        adapter = self.adapter("transport-loss")
+        adapter = self.adapter("transport-loss", store=True)
         with adapter:
             context = adapter.start_thread(ModelRouter.review(), self.root)
             with self.assertRaises(AdapterError) as caught:
@@ -229,6 +233,10 @@ class CodexAdapterTests(unittest.TestCase):
                     dispatch_id="DISPATCH-LOSS",
                 )
             self.assertEqual(caught.exception.code, "TRANSPORT_LOST_AMBIGUOUS")
+            self.assertEqual(
+                adapter.store.turn_activities()[0].status,
+                TurnActivityStatus.RECONCILIATION_REQUIRED,
+            )
 
     def test_turn_error_classes(self) -> None:
         for scenario, code in (

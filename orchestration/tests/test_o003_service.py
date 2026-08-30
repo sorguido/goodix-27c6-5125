@@ -3,11 +3,23 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from goodix_orchestrator.engine import DeterministicEngine
-from goodix_orchestrator.persistence import OperatorStateRecord, SCHEMA_VERSION, SQLiteStateStore
+from goodix_orchestrator.persistence import (
+    ContextRecord,
+    DevelopmentInitIntent,
+    EffectKind,
+    EffectStatus,
+    GitStateRecord,
+    OperatorStateRecord,
+    SCHEMA_VERSION,
+    SQLiteStateStore,
+    TurnActivityRecord,
+    TurnActivityStatus,
+)
 from goodix_orchestrator.policy import Capability, CapabilityPolicy
 from goodix_orchestrator.protocols import Disposition, PMDisposition, PROTOCOL_VERSION, PauseReason
 from goodix_orchestrator.service import (
@@ -17,8 +29,12 @@ from goodix_orchestrator.service import (
     RuntimePaths,
     ServiceError,
     SingleInstanceLock,
+    LocalService,
+    CodexRouteAvailabilityProbe,
     redact,
 )
+from goodix_orchestrator.structured_output import ContextClass, ModelRouter, PMPlanningClass
+from goodix_orchestrator.codex_adapter import ThreadContext, TurnResult
 
 from tests.common import executor_result, task_manifest
 
@@ -71,8 +87,8 @@ class O003ServiceTests(unittest.TestCase):
         )
         return engine
 
-    def test_schema_v4_operator_state_and_bounded_backup(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 4)
+    def test_schema_v5_operator_state_and_bounded_backup(self) -> None:
+        self.assertEqual(SCHEMA_VERSION, 5)
         self.store.save_operator_state(OperatorStateRecord(operator_paused=True))
         for _ in range(4):
             self.store.consistent_backup(self.root / "backups", retain=2)
@@ -129,11 +145,17 @@ class O003ServiceTests(unittest.TestCase):
         self.assertFalse(self.store.load_operator_state().emergency_stop_latched)
 
     def test_maintenance_requires_quiescence_and_remains_paused_on_exit(self) -> None:
-        self.store.save_operator_state(OperatorStateRecord(inflight_effect=True))
+        self.store.request_effect(
+            effect_id="EFFECT-INFLIGHT",
+            idempotency_key="EFFECT-INFLIGHT",
+            kind=EffectKind.DEVELOPMENT_INIT,
+            intent=DevelopmentInitIntent("a" * 40),
+        )
+        self.store.begin_effect("EFFECT-INFLIGHT")
         with self.assertRaises(ServiceError) as caught:
             self.controller.maintenance_enter("MAINT-O003-A")
         self.assertEqual(caught.exception.code, "MAINTENANCE_ENTRY_DENIED_NOT_QUIESCENT")
-        self.store.save_operator_state(OperatorStateRecord())
+        self.store.complete_effect("EFFECT-INFLIGHT")
         epoch = self.controller.maintenance_enter("MAINT-O003-B")
         self.assertEqual(epoch.development_sha, "b" * 40)
         closed = self.controller.maintenance_exit()
@@ -141,6 +163,98 @@ class O003ServiceTests(unittest.TestCase):
         state = self.store.load_operator_state()
         self.assertTrue(state.operator_paused)
         self.assertIsNone(state.maintenance_id)
+
+    def test_turn_activity_is_authoritative_for_status_and_maintenance(self) -> None:
+        route = ModelRouter.planning(PMPlanningClass.STANDARD)
+        self.store.record_context(
+            ContextRecord(
+                "thread-quiescence",
+                route.context_class,
+                "AI_PM",
+                route.model_id,
+                route.reasoning_effort,
+                route.routing_class,
+                str(self.root),
+                "codex fixture",
+            )
+        )
+        self.store.start_turn_activity(
+            TurnActivityRecord(
+                "ACTIVITY-QUIESCENCE",
+                "DISPATCH-QUIESCENCE",
+                "thread-quiescence",
+                route.context_class,
+                route.routing_class,
+                route.model_id,
+                route.reasoning_effort,
+                TurnActivityStatus.IN_PROGRESS,
+            )
+        )
+        self.assertFalse(self.controller.status()["NO_INFLIGHT_TURN"])
+        with self.assertRaises(ServiceError):
+            self.controller.maintenance_enter("MAINT-O003-TURN")
+
+    def test_emergency_latch_exits_success_without_dispatch_or_restart_signal(self) -> None:
+        self.controller.emergency_stop()
+        calls = []
+        service = LocalService(
+            self.store,
+            SingleInstanceLock(self.root / "emergency.lock"),
+            tick=lambda: calls.append(True),
+            poll_seconds=0.1,
+        )
+        self.assertEqual(service.run(), 0)
+        self.assertEqual(calls, [])
+
+    def test_resume_rejects_unreconciled_git_drift(self) -> None:
+        self.store.save_git_state(
+            GitStateRecord("development", "b" * 40, main_sha="a" * 40)
+        )
+        self.controller.pause()
+        self.snap = GitSnapshot("c" * 40, "b" * 40)
+        with self.assertRaises(ServiceError) as caught:
+            self.controller.resume()
+        self.assertEqual(caught.exception.code, "PAUSED_INFRASTRUCTURE")
+        self.assertTrue(self.store.load_operator_state().operator_paused)
+
+    def test_exact_route_probe_uses_bounded_read_only_turn(self) -> None:
+        observed = {"turns": 0}
+
+        class FakeServer:
+            def __init__(self, *args, **kwargs): self.store = kwargs["store"]
+            def start(self): pass
+            def account_mode(self): return "CHATGPT"
+            def require_route(self, route): pass
+            def rate_limit_telemetry(self): return {"available": True, "buckets": []}
+            def start_thread(inner, route, cwd):
+                context = ThreadContext(
+                    "thread-probe", route.context_class, route,
+                    str(Path(cwd).resolve()), "read-only"
+                )
+                inner.store.record_context(
+                    ContextRecord(
+                        context.thread_id, context.context_class, "AI_PM",
+                        route.model_id, route.reasoning_effort, route.routing_class,
+                        context.cwd, "codex fixture",
+                    )
+                )
+                return context
+            def run_turn(self, context, prompt, **kwargs):
+                observed["turns"] += 1
+                return TurnResult("turn-probe", "completed", '{"route_probe":"OK"}')
+            def close(self): pass
+
+        route = ModelRouter.planning(PMPlanningClass.STANDARD)
+        with patch("goodix_orchestrator.service.CodexAppServer", FakeServer):
+            available, classification = CodexRouteAvailabilityProbe(
+                self.store, route, cwd=self.root
+            ).probe_exact_route()
+        self.assertTrue(available)
+        self.assertEqual(classification, "EXACT_ROUTE_AVAILABLE")
+        self.assertEqual(observed["turns"], 1)
+        self.assertEqual(
+            self.store.effects_with_statuses((EffectStatus.IN_PROGRESS,)), ()
+        )
 
     def test_maintenance_ff_development_requires_replan(self) -> None:
         self.controller.maintenance_enter("MAINT-O003-C")

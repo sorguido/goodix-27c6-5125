@@ -10,6 +10,11 @@ L'architettura adotta il paradigma Symphony (supervisore persistente,
 state-machine, task isolati e recovery), ma non installa Symphony: il codice è
 project-authored e il low-level agent harness reale è Codex App Server.
 
+Il tick ordinario collega realmente contesti distinti PM-plan, Executor e
+PM-review. Il coordinatore deterministico crea il manifest e il worktree,
+tipizza commit/push/FF e applica `CORRECTIVE`, `REPLAN`, `HUMAN_GATE`, `PAUSE`,
+`ACCEPT` e `DONE`; l'AI non possiede direttamente l'autorità sugli effetti Git.
+
 ## Topologia Git canonica
 
 ```text
@@ -64,10 +69,14 @@ goodix-orchestrator install-service
 systemctl --user enable --now goodix-orchestrator.service
 ```
 
-La unit versionata è `systemd/goodix-orchestrator.service`: `KillMode=control-group`,
-single-instance lock, `NoNewPrivileges`, `PrivateDevices`, `RestrictSUIDSGID`,
-filesystem read-only salvo config/state XDG, nessuna credential e nessun path
-repository hard-coded. La compatibilità effettiva va verificata con:
+La unit è inclusa come risorsa del package, quindi `install-service` funziona
+anche da wheel non-editable. L'installer genera un drop-in con gli esatti path
+canonici verificati per Git common-dir, config/state e worktree XDG:
+`KillMode=control-group`, single-instance lock, `NoNewPrivileges`,
+`PrivateDevices`, `RestrictSUIDSGID`, repository read-only salvo le superfici
+Git/XDG strettamente necessarie, nessuna credential e nessun path repository
+hard-coded nella risorsa distribuita. La compatibilità effettiva va verificata
+con:
 
 ```bash
 systemd-analyze --user verify ~/.config/systemd/user/goodix-orchestrator.service
@@ -100,10 +109,14 @@ goodix-orchestrator backup
 
 `status` è read-only e redatto. `pause` impedisce nuovi turn/effect; verificare
 `NO_INFLIGHT_TURN=true` e `NO_INFLIGHT_EFFECT=true` prima dello stop ordinario.
+Questi due indicatori sono derivati dai ledger persistenti dei turni e degli
+effetti, non da flag dichiarativi modificabili dall'operatore.
 `stop` arresta il service tree senza inventare transizioni macchina.
 
 `emergency-stop` persiste prima il latch e poi arresta l'unità. Il latch
-sopravvive a restart/login e `resume` non può cancellarlo. Dopo aver
+sopravvive a restart/login e `resume` non può cancellarlo; un avvio con latch
+termina con successo senza dispatch, quindi non innesca una restart storm con
+`Restart=on-failure`. Dopo aver
 riconciliato eventuali effetti in-flight, soltanto l'azione locale esplicita
 `emergency-clear` lo rimuove.
 
@@ -139,9 +152,10 @@ operatore.
 `PAUSED_RATE_LIMIT` e `PAUSED_MODEL_UNAVAILABLE` non fanno fallback a API key,
 pay-as-you-go, provider alternativo o modello/effort diverso. Il servizio locale
 esegue un re-probe conservativo (default 900 secondi) di account ChatGPT,
-rate-limit e catalogo modello tramite Codex App Server. Riprende solo quando la
-route esatta è disponibile e store, Git, task/worktree, gate ed effetti sono
-riconciliati; il probe non avanza il task.
+rate-limit e catalogo modello tramite Codex App Server, seguito da un turno
+bounded, read-only e senza tool sull'esatta coppia modello/effort. Riprende solo
+dopo output atteso, route effettiva riosservata e riconciliazione di store, Git,
+task/worktree, gate, turn ledger ed effetti; il probe non avanza il task.
 
 ## Stato, log e recovery
 
@@ -151,7 +165,7 @@ riconciliati; il probe non avanza il task.
 - log: stdout/stderr strutturato e redatto sotto journald, con rotazione
   system-managed.
 
-Schema O003: v4. Store operativi v1/v2/v3 incompatibili non vengono migrati
+Schema O003: v5. Store operativi v1/v2/v3/v4 incompatibili non vengono migrati
 inventando metadata; restano fail-closed. SQLite non conserva prompt/reasoning,
 token, email, PSK, protected material, biometria o environment dump.
 
@@ -167,11 +181,16 @@ python -m compileall -q goodix_orchestrator tests
 python -W error::ResourceWarning -m unittest discover -s tests -v
 python -m goodix_orchestrator --help
 systemd-analyze --user verify systemd/goodix-orchestrator.service
+python -m goodix_orchestrator.service_qualification \
+  --repository <repo-disposable> \
+  --state-dir <xdg-state-disposable>
 ```
 
-La CI deterministica non richiede USB, root, secret, GitHub auth, interazione
-Human reale, quota esaurita o user systemd manager. Il drill GitHub reale e la
-service closure reale devono essere distinti dalla coverage fake. La qualifica
+La suite deterministica copre il loop production completo su repository
+disposable: PM plan, task/worktree/commit/push, review, `CORRECTIVE` sullo stesso
+branch, seconda review, `ACCEPT`, FF di `development`, cleanup e `DONE`, con
+`main` invariato. La CI non richiede USB, root, secret, GitHub auth o interazione
+Human reale. Il drill GitHub reale deve restare distinto dalla coverage fake. La qualifica
 Codex sintetica O002 resta disponibile con
 `python -m goodix_orchestrator.qualification --real-codex ...`.
 

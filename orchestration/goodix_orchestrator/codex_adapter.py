@@ -14,7 +14,13 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Mapping, TypeVar
 
-from .persistence import ContextRecord, DispatchRecord, SQLiteStateStore
+from .persistence import (
+    ContextRecord,
+    DispatchRecord,
+    SQLiteStateStore,
+    TurnActivityRecord,
+    TurnActivityStatus,
+)
 from .protocols import ProtocolValidationError
 from .structured_output import ContextClass, ModelRoute, ModelRouter
 
@@ -607,42 +613,99 @@ class CodexAppServer:
         schema_repair: bool = False,
     ) -> TurnResult:
         self.require_route(context.route)
-        result = self._request(
-            "turn/start",
-            {
-                "threadId": context.thread_id,
-                "input": [{"type": "text", "text": prompt}],
-                "cwd": context.cwd,
-                "model": context.route.model_id,
-                "effort": context.route.reasoning_effort,
-                "approvalPolicy": "never",
-                "outputSchema": dict(output_schema),
-            },
-        )
-        turn = result.get("turn")
-        if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
-            raise AdapterError("TURN_START_MALFORMED", context.thread_id)
-        turn_id = turn["id"]
-        completed = self._wait_turn(turn_id)
-        # A successful thread/start or an earlier observation is not evidence
-        # for this dispatch. Re-observe and verify the effective route after
-        # every completed turn before persisting or using its output.
-        self._observe_thread_route(context)
+        activity_id = f"ACTIVITY-{dispatch_id}"
+        turn_id: str | None = None
+        terminal_observed = False
         if self.store is not None:
-            self.store.record_dispatch(
-                DispatchRecord(
+            self.store.start_turn_activity(
+                TurnActivityRecord(
+                    activity_id=activity_id,
                     dispatch_id=dispatch_id,
                     thread_id=context.thread_id,
-                    turn_id=turn_id,
                     context_class=context.context_class,
                     routing_class=context.route.routing_class,
-                    effective_model_id=context.route.model_id,
-                    effective_reasoning_effort=context.route.reasoning_effort,
-                    codex_version=self.codex_version,
-                    schema_repair=schema_repair,
+                    requested_model_id=context.route.model_id,
+                    requested_reasoning_effort=context.route.reasoning_effort,
+                    status=TurnActivityStatus.IN_PROGRESS,
                 )
             )
-        return completed
+        try:
+            result = self._request(
+                "turn/start",
+                {
+                    "threadId": context.thread_id,
+                    "input": [{"type": "text", "text": prompt}],
+                    "cwd": context.cwd,
+                    "model": context.route.model_id,
+                    "effort": context.route.reasoning_effort,
+                    "approvalPolicy": "never",
+                    "outputSchema": dict(output_schema),
+                },
+            )
+            turn = result.get("turn")
+            if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
+                raise AdapterError("TURN_START_MALFORMED", context.thread_id)
+            turn_id = turn["id"]
+            if self.store is not None:
+                self.store.update_turn_activity(
+                    activity_id,
+                    status=TurnActivityStatus.IN_PROGRESS,
+                    turn_id=turn_id,
+                )
+            completed = self._wait_turn(turn_id)
+            terminal_observed = True
+            # A successful thread/start or an earlier observation is not evidence
+            # for this dispatch. Re-observe and verify the effective route after
+            # every completed turn before persisting or using its output.
+            self._observe_thread_route(context)
+            if self.store is not None:
+                self.store.record_dispatch(
+                    DispatchRecord(
+                        dispatch_id=dispatch_id,
+                        thread_id=context.thread_id,
+                        turn_id=turn_id,
+                        context_class=context.context_class,
+                        routing_class=context.route.routing_class,
+                        effective_model_id=context.route.model_id,
+                        effective_reasoning_effort=context.route.reasoning_effort,
+                        codex_version=self.codex_version,
+                        schema_repair=schema_repair,
+                    )
+                )
+                self.store.update_turn_activity(
+                    activity_id,
+                    status=TurnActivityStatus.COMPLETED,
+                    turn_id=turn_id,
+                )
+            return completed
+        except Exception as exc:
+            if self.store is not None:
+                code = getattr(exc, "code", type(exc).__name__)
+                terminal_failure = (
+                    isinstance(exc, AdapterError)
+                    and turn_id is not None
+                    and exc.detail.startswith(f"turn={turn_id},status=")
+                )
+                ambiguous = (
+                    turn_id is not None
+                    and not terminal_observed
+                    and not terminal_failure
+                ) or code in {
+                    "TRANSPORT_LOST_AMBIGUOUS",
+                    "TURN_TIMEOUT_AMBIGUOUS",
+                    "APP_SERVER_TIMEOUT",
+                }
+                self.store.update_turn_activity(
+                    activity_id,
+                    status=(
+                        TurnActivityStatus.RECONCILIATION_REQUIRED
+                        if ambiguous
+                        else TurnActivityStatus.FAILED
+                    ),
+                    turn_id=turn_id,
+                    error_class=str(code)[:256],
+                )
+            raise
 
     def _next_event(self, timeout: float) -> dict[str, Any]:
         if self._notifications:

@@ -28,7 +28,10 @@ congelato. O001 ha implementato il core deterministico; O002 ha aggiunto Codex
 App Server e loop Git reale su repository sintetico; O003 aggiunge adapter
 GitHub Human Gate, servizio local-first, operator control, maintenance,
 emergency latch, re-probe quota/modello, schema SQLite v4 e lifecycle
-`development`/task qualificato soltanto su repository disposable. Nessuna di
+`development`/task qualificato soltanto su repository disposable. Il corrective
+service-closure porta lo schema a v5, collega il coordinatore production al tick
+ordinario, rende autorevoli i ledger di turni/effetti e qualifica installazione
+wheel più lifecycle Git sotto un vero sandbox transiente `systemd --user`. Nessuna di
 queste attività concede USB, privilegi, materiali protetti, aggiornamenti di
 `main`, live runner o avanzamento funzionale Goodix.
 
@@ -96,35 +99,44 @@ O002_REPORT_SHA256=fb2e3dbbb07c21bf10bfefba78600f53eeb80589d7d1c0a79edec4fd45041
 O002_NEGATIVE_CAPABILITY_EVIDENCE_CLASS=QUALIFICATION_PATH_NOT_OS_PROOF
 O002_OS_NEGATIVE_CAPABILITY_ISOLATION_PROVEN=false
 O003_GOVERNANCE_VERSION=2.7
-O003_STATE_SCHEMA_VERSION=4
+O003_STATE_SCHEMA_VERSION=5
 O003_GITHUB_GATE_ADAPTER_IMPLEMENTED=true
-O003_GATE_IDENTITY_COMMIT_ACTION_BINDING=PASS_DETERMINISTIC_FAKE
+O003_GATE_IDENTITY_COMMIT_ACTION_BINDING=PASS_SINGLE_CANONICAL_MANIFEST_ACTION_ID_DIGEST
 O003_GATE_REPLAY_AND_CRASH_RECOVERY=PASS_DETERMINISTIC_FAKE
 O003_REAL_GITHUB_GATE_E2E=NOT_EXECUTED_REQUIRES_AUTHORITY_COMMENT
 O003_LOCAL_FIRST_SERVICE_IMPLEMENTED=true
-O003_SYSTEMD_UNIT_STATIC_VERIFY=PASS_WITH_SANDBOX_WARNINGS
-O003_SYSTEMD_USER_MANAGER_E2E=NOT_EXECUTED_SANDBOX_USER_BUS_DENIED
-O003_OPERATOR_STATUS_PAUSE_RESUME=PASS
+O003_NORMAL_SERVICE_LOOP=PASS_DISPOSABLE_FULL_PM_EXECUTOR_CORRECTIVE_ACCEPT_DONE
+O003_REAL_TASK_CREATION=PASS_DISPOSABLE_REAL_GIT
+O003_SYSTEMD_UNIT_STATIC_VERIFY=PASS
+O003_SYSTEMD_USER_MANAGER_E2E=PASS_TRANSIENT_DISPOSABLE_GIT_LIFECYCLE
+O003_INSTALLED_SERVICE_RESOURCE=PASS_NON_EDITABLE_WHEEL
+O003_SYSTEMD_GIT_WRITABILITY=PASS_EXACT_GENERATED_DROPIN
+O003_OPERATOR_STATUS_PAUSE_RESUME=PASS_AUTHORITATIVE_RECONCILIATION
 O003_MAINTENANCE_LOCK_RECONCILIATION=PASS_DETERMINISTIC
-O003_EMERGENCY_STOP_LATCH=PASS_DETERMINISTIC
-O003_RATE_LIMIT_MODEL_REPROBE=PASS_DETERMINISTIC_FAKE
+O003_AUTHORITATIVE_QUIESCENCE=PASS_TURN_AND_EFFECT_LEDGERS
+O003_EMERGENCY_STOP_LATCH=PASS_NO_RESTART_STORM_NO_DISPATCH
+O003_RATE_LIMIT_MODEL_REPROBE=PASS_EXACT_BOUNDED_TURN_DETERMINISTIC
+O003_RESUME_RECONCILIATION=PASS_FAIL_CLOSED_ON_DRIFT
 O003_DEVELOPMENT_FF_CAS_CLEANUP=PASS_DISPOSABLE_REPOSITORY
 O003_FAILED_AMBIGUOUS_INTEGRATION_PRESERVES_TASK=PASS
 O003_BACKUP=PASS
 O003_LOG_SINK=JOURNALD_SYSTEM_MANAGED_ROTATION
 O003_DETERMINISTIC_TESTS=PASS
-O003_TEST_COUNT=137
-O003_CLI_TEMP_XDG_CLOSURE=PASS
+O003_TEST_COUNT=147
+O003_CLI_TEMP_XDG_CLOSURE=PASS_NON_EDITABLE_WHEEL_AND_TRANSIENT_USER_MANAGER
 O003_IMPLEMENTATION_COMMIT=4f0fe61b8eaaf28f092b36ce3a62a4393b6850d3
 O003_DEDICATED_CI=PASS
 O003_DEDICATED_CI_EVIDENCE=GitHub Actions run 33317298835 on 4f0fe61b8eaaf28f092b36ce3a62a4393b6850d3
 O003_GOODIX_REGRESSION_CI=PASS
 O003_GOODIX_REGRESSION_CI_EVIDENCE=GitHub Actions run 33317298898 on 4f0fe61b8eaaf28f092b36ce3a62a4393b6850d3
+O003_CORRECTIVE_REVIEW_HEAD=GIT_REVIEW_HEAD_DYNAMIC
+O003_CORRECTIVE_DEDICATED_CI=PENDING_FRESH_PUSH
+O003_CORRECTIVE_GOODIX_REGRESSION_CI=PENDING_FRESH_PUSH
 ORCHESTRATION_READY_FOR_GOODIX=false
 CURRENT_LIVE_AUTHORIZED=false
 GOODIX_FUNCTIONAL_ADVANCEMENT=NONE
 GITHUB_HUMAN_GATE_ADAPTER_READY=IMPLEMENTED_FAKE_QUALIFIED_REAL_E2E_PENDING
-SYSTEMD_SERVICE_READY=IMPLEMENTED_STATIC_AND_CLI_QUALIFIED_REAL_USER_MANAGER_E2E_PENDING
+SYSTEMD_SERVICE_READY=PASS_DISPOSABLE_INSTALL_AND_USER_MANAGER_LIFECYCLE
 REAL_GOODIX_REPO_AUTONOMOUS_LOOP_PROVEN=false
 LIVE_RUNNER_ENABLED=false
 ```
@@ -139,17 +151,18 @@ assenti; persistenza e enforcement dell'esatto `expected_next_task_id` dopo
 baseline, branch, modello, gate class, capability, scope, non-goal e obbligo di
 aggiornamento manuale; store SQLite single-file con schema/protocol versionati,
 revisioni compare-and-swap e fail-closed su corruzione o incompatibilità. Lo
-schema operativo O002 era v3; O003 introduce v4. Gli store operativi legacy
-v1/v2/v3 vengono respinti
+schema operativo O002 era v3; il primo O003 introduceva v4 e il corrective
+service-closure introduce v5. Gli store operativi legacy v1/v2/v3/v4 vengono respinti
 come `STORE_INCOMPATIBLE` senza modificarne metadata, colonne o runtime row. La
 v1 non conserva `expected_next_task_id` né l'envelope immutabile del task; la
 v2 non conserva identità dei tre contesti, routing effettivo, dispatch o stato
 Git. Nessuno dei due stati in-flight è quindi ricostruibile senza ipotesi. In
-v4 la freshness conta `runtime_state`, effetti, gate/binding GitHub, contesti,
-dispatch, stato Git esteso, operator state e maintenance epoch: anche un
+v5 la freshness conta `runtime_state`, effetti, turn activity, stato
+coordinatore, gate/binding GitHub, contesti, dispatch, stato Git esteso,
+operator state e maintenance epoch: anche un
 residuo operativo privo di runtime rende `create()` non fresco e
 viene respinto senza cancellazione o normalizzazione.
-Poiché l'orchestratore non è ancora un servizio production deployed, non
+Poiché nessuno store production è stato installato nel profilo operatore, non
 esiste un beneficio operativo che giustifichi una migrazione ambigua.
 `create()` opera solo su store privo di
 stato operativo, `recover()` è l'unico ingresso per stato già persistito e la
@@ -237,12 +250,16 @@ Il report redatto canonico ha SHA-256
 registra zero relay umano, fallback a pagamento, accessi USB Goodix, `sudo`,
 materiale protetto, `xhigh`/`max` e aggiornamenti di `main`.
 
-O003 implementa ora il gate GitHub identity/commit/action-bound, l'unità
-`systemd --user`, controlli operatore, maintenance/emergency latch, re-probe e
-lifecycle Git su repository disposable. Restano pending il drill reale con
-commento dell'Autorità Umana, l'E2E del vero user manager non accessibile dal
-sandbox e soprattutto O004: isolamento negativo e ciclo low-risk sul repository
-Goodix reale. La bootstrap closure complessiva resta falsa, il lavoro
+O003 implementa ora il gate GitHub identity/commit/action-bound con una sola
+sorgente macchina `action_id/action_digest`, il coordinatore PM → Executor → PM
+nel tick ordinario, il ledger persistente dei turni, controlli operatore e
+resume derivati dallo stato autorevole, probe dell'esatta route mediante turno
+bounded, e una unità installabile da wheel. Una qualificazione transiente sotto
+il vero user manager `systemd` ha eseguito il lifecycle Git disposable con
+repository read-only salvo Git common-dir/XDG, `main` invariato, FF di
+`development`, cleanup e restart riusciti. Restano pending il drill GitHub reale
+con commento dell'Autorità Umana e soprattutto O004: isolamento negativo e ciclo
+low-risk sul repository Goodix reale. La bootstrap closure complessiva resta falsa, il lavoro
 funzionale Goodix non viene riaperto e non è implementato alcun live runner.
 
 ### Stato corrente post-audit D278/04 riconciliato con la seconda single-shot — gap di re-entry cross-session provato e fenomeno osservato sul target, identità causale non provata; nessuna live autorizzata
@@ -2820,7 +2837,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Orchestrazione O001 + O002 | core O001 preservato; adapter App Server/Git, routing chiuso e verifier sintetico data-only implementati; 105 test deterministici PASS; ciclo Codex reale sintetico con review neutrale PASS; bootstrap complessivo non pronto | schema v3 con v1/v2 fail-closed e freshness completa, route effettiva riverificata per dispatch e review legata al dispatch persistito, PM plan/review distinti Sol medium/high, Executor Terra high e correttivo medium nello stesso thread, commit e integrazione FF reali soltanto nel repo sintetico, `main` invariato; contatori path zero USB/sudo/protected/payg/human relay non promossi a prova OS; freeze Goodix invariato |
-| Orchestrazione O003 | implementazione host-only su branch dedicato; 137 test deterministici PASS; CLI XDG e servizio transiente `systemd --user` start/restart/stop PASS; GitHub reale non eseguito | governance v2.7, schema v4, gate identity/commit/action-bound fake-qualified, `development`/task FF-cleanup su repo disposable, maintenance/emergency/re-probe/backup; `development` canonico ancora assente pending accept+merge, O004 e negative-capability proof restano obbligatori |
+| Orchestrazione O003 | corrective host-only su branch dedicato; 147 test deterministici PASS; loop PM→Executor→PM con corrective/accept/done, wheel non-editable e lifecycle Git sotto vero `systemd --user` disposable PASS; GitHub reale non eseguito | governance v2.7, schema v5, gate con singola sorgente `action_id/action_digest`, ledger turn/effect autorevoli, exact-route turn probe, `development`/task FF-cleanup su repo disposable; `development` canonico ancora assente pending accept+merge, O004 e negative-capability proof restano obbligatori |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
@@ -3024,8 +3041,8 @@ richiama i loro moduli:
                   state.py  policy.py  protocols.py
                         \       |       /
                          \      v      /
-                      SQLiteStateStore v4
-              runtime/gate/effect/operator/maintenance
+                      SQLiteStateStore v5
+          runtime/gate/effect/turn/coordinator/operator/maintenance
                contexts/dispatches/Git/cleanup state
 
  systemd --user + single-instance + XDG + emergency latch

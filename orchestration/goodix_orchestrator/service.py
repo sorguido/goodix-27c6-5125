@@ -22,9 +22,19 @@ from .persistence import (
     MaintenanceEpochRecord,
     OperatorStateRecord,
     SQLiteStateStore,
+    TurnActivityStatus,
 )
 from .state import OrchestratorState
-from .structured_output import ModelRoute
+from .structured_output import ContextClass, ModelRoute
+
+
+_COORDINATOR_STATE_REQUIRED = {
+    OrchestratorState.TASK_READY,
+    OrchestratorState.EXECUTOR_RUNNING,
+    OrchestratorState.EXECUTOR_RESULT_READY,
+    OrchestratorState.PM_REVIEWING,
+    OrchestratorState.HUMAN_GATE_WAIT,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +53,7 @@ class RuntimePaths:
     state_db: Path
     lock_file: Path
     backup_dir: Path
+    worktree_dir: Path
 
     @classmethod
     def discover(cls, env: dict[str, str] | None = None) -> "RuntimePaths":
@@ -52,12 +63,20 @@ class RuntimePaths:
         state_base = Path(values.get("XDG_STATE_HOME", home / ".local" / "state"))
         config = config_base / "goodix-orchestrator"
         state = state_base / "goodix-orchestrator"
-        return cls(config, state, state / "state.sqlite", state / "service.lock", state / "backups")
+        return cls(
+            config,
+            state,
+            state / "state.sqlite",
+            state / "service.lock",
+            state / "backups",
+            state / "worktrees",
+        )
 
     def ensure(self) -> None:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        self.worktree_dir.mkdir(parents=True, exist_ok=True)
 
 
 class SingleInstanceLock:
@@ -124,6 +143,7 @@ class GitSnapshot:
     development_sha: str | None
     task_id: str | None = None
     task_branch: str | None = None
+    task_worktree: str | None = None
 
 
 class AvailabilityProbe(Protocol):
@@ -139,29 +159,59 @@ class CodexRouteAvailabilityProbe:
         route: ModelRoute,
         *,
         executable: str = "codex",
+        cwd: str | Path | None = None,
     ) -> None:
         self.store = store
         self.route = route
         self.executable = executable
+        self.cwd = Path(cwd or Path.cwd()).resolve(strict=True)
 
     def probe_exact_route(self) -> tuple[bool, str]:
-        server = CodexAppServer(executable=self.executable, store=self.store)
+        server: CodexAppServer | None = None
         try:
+            server = CodexAppServer(executable=self.executable, store=self.store)
             server.start()
             if server.account_mode() != "CHATGPT":
                 return False, "AUTH_NOT_CHATGPT"
             server.require_route(self.route)
-            telemetry = server.rate_limit_telemetry()
-            if not telemetry.get("available", False):
-                return False, "RATE_LIMIT_SIGNAL_UNAVAILABLE"
-            buckets = telemetry.get("buckets", ())
-            if any(bool(bucket.get("reached")) for bucket in buckets if isinstance(bucket, dict)):
-                return False, "RATE_LIMIT_REACHED"
-            return True, "EXACT_ROUTE_AVAILABLE"
+            # Generic telemetry is advisory only: it is not bound to the exact
+            # model/effort route and therefore cannot authorize resume.
+            server.rate_limit_telemetry()
+            probe_route = ModelRoute(
+                self.route.routing_class,
+                ContextClass.AI_PM_REVIEW,
+                self.route.model_id,
+                self.route.reasoning_effort,
+            )
+            context = server.start_thread(probe_route, self.cwd)
+            try:
+                result = server.run_turn(
+                    context,
+                    "Read no files and use no tools. Return exactly the structured route probe acknowledgement.",
+                    output_schema={
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["route_probe"],
+                        "properties": {"route_probe": {"enum": ["OK"]}},
+                    },
+                    dispatch_id=f"PROBE-{int(time.time() * 1_000_000)}",
+                )
+                payload = json.loads(result.final_text)
+                if payload != {"route_probe": "OK"}:
+                    return False, "EXACT_ROUTE_PROBE_OUTPUT_INVALID"
+                return True, "EXACT_ROUTE_AVAILABLE"
+            finally:
+                self.store.retire_context(context.thread_id)
         except Exception as exc:  # Adapter exceptions are reduced to a redacted class.
-            return False, f"PROBE_{type(exc).__name__}"
+            code = str(getattr(exc, "code", type(exc).__name__))
+            if code in {"PAUSED_RATE_LIMIT", "USAGE_LIMIT_REACHED"}:
+                return False, "RATE_LIMIT_REACHED"
+            if code == "PAUSED_MODEL_UNAVAILABLE":
+                return False, "MODEL_UNAVAILABLE"
+            return False, f"PROBE_{code[:96]}"
         finally:
-            server.close()
+            if server is not None:
+                server.close()
 
 
 class OperatorController:
@@ -180,6 +230,28 @@ class OperatorController:
 
     def _operator(self) -> OperatorStateRecord:
         return self.store.load_operator_state()
+
+    def _unresolved_effects(self):
+        return self.store.effects_with_statuses(
+            (EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS)
+        )
+
+    def _unresolved_turns(self):
+        return self.store.turn_activities(
+            (
+                TurnActivityStatus.IN_PROGRESS,
+                TurnActivityStatus.RECONCILIATION_REQUIRED,
+            )
+        )
+
+    def _require_quiescent(self, code: str) -> None:
+        turns = self._unresolved_turns()
+        effects = self._unresolved_effects()
+        if turns or effects:
+            detail = ",".join(
+                [*(turn.activity_id for turn in turns), *(effect.effect_id for effect in effects)]
+            )
+            raise ServiceError(code, detail or "authoritative ledger is not quiescent")
 
     def status(self, engine: DeterministicEngine | None = None) -> dict[str, Any]:
         operator = self._operator()
@@ -209,8 +281,8 @@ class OperatorController:
                 "operator_pause": operator.operator_paused,
                 "maintenance_lock": operator.maintenance_id,
                 "emergency_stop_latch": operator.emergency_stop_latched,
-                "NO_INFLIGHT_TURN": not operator.inflight_turn,
-                "NO_INFLIGHT_EFFECT": not operator.inflight_effect,
+                "NO_INFLIGHT_TURN": not self._unresolved_turns(),
+                "NO_INFLIGHT_EFFECT": not self._unresolved_effects(),
                 "last_redacted_error_class": operator.last_error_class,
                 "persisted_integration_sha": git.integration_sha if git else None,
             }
@@ -226,8 +298,57 @@ class OperatorController:
             raise ServiceError("EMERGENCY_STOP_LATCHED", "use emergency-clear after reconciliation")
         if state.maintenance_id is not None:
             raise ServiceError("MAINTENANCE_LOCKED", state.maintenance_id)
-        if state.inflight_turn or state.inflight_effect:
-            raise ServiceError("NOT_QUIESCENT", "turn/effect remains in flight")
+        self._require_quiescent("NOT_QUIESCENT")
+        self.fetch()
+        runtime = self.store.load_runtime()
+        if runtime is not None and runtime.current_state is OrchestratorState.ERROR_LOCKED:
+            raise ServiceError("ERROR_LOCKED", "runtime requires explicit reconciliation")
+        if runtime is not None and runtime.current_state is OrchestratorState.HUMAN_GATE_WAIT:
+            if (
+                runtime.gate_id is None
+                or self.store.load_gate(runtime.gate_id) is None
+                or self.store.load_gate_external(runtime.gate_id) is None
+            ):
+                raise ServiceError("PAUSED_INFRASTRUCTURE", "pending gate binding missing")
+        effective_state = (
+            runtime.previous_recoverable_state
+            if runtime is not None and runtime.current_state in {
+                OrchestratorState.PAUSED_RATE_LIMIT,
+                OrchestratorState.PAUSED_MODEL_UNAVAILABLE,
+                OrchestratorState.PAUSED_INFRASTRUCTURE,
+            }
+            else runtime.current_state if runtime is not None else None
+        )
+        if (
+            effective_state in _COORDINATOR_STATE_REQUIRED
+            and self.store.load_coordinator_state() is None
+        ):
+            raise ServiceError(
+                "PAUSED_INFRASTRUCTURE", "coordinator state missing for active task"
+            )
+        persisted = self.store.load_git_state()
+        observed = self.snapshot()
+        if persisted is not None:
+            mismatch = (
+                (persisted.main_sha is not None and observed.main_sha != persisted.main_sha)
+                or observed.development_sha != persisted.integration_sha
+                or observed.task_id != persisted.task_id
+                or observed.task_branch != persisted.task_branch
+                or (
+                    persisted.task_worktree is not None
+                    and observed.task_worktree != persisted.task_worktree
+                )
+            )
+            if mismatch:
+                self.store.save_operator_state(
+                    replace(
+                        state,
+                        operator_paused=True,
+                        last_event="RESUME_RECONCILIATION_BLOCKED",
+                        last_error_class="PAUSED_INFRASTRUCTURE",
+                    )
+                )
+                raise ServiceError("PAUSED_INFRASTRUCTURE", "Git/runtime state drift")
         return self.store.save_operator_state(
             replace(state, operator_paused=False, last_event="OPERATOR_RESUME")
         )
@@ -243,16 +364,7 @@ class OperatorController:
 
     def emergency_clear(self) -> OperatorStateRecord:
         state = self._operator()
-        if state.inflight_turn or state.inflight_effect:
-            raise ServiceError("RECONCILIATION_REQUIRED", "in-flight state is not reconciled")
-        unresolved = self.store.effects_with_statuses(
-            (EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS)
-        )
-        if unresolved:
-            raise ServiceError(
-                "RECONCILIATION_REQUIRED",
-                ",".join(effect.effect_id for effect in unresolved),
-            )
+        self._require_quiescent("RECONCILIATION_REQUIRED")
         git = self.store.load_git_state()
         snapshot = self.snapshot()
         if git is not None and (
@@ -266,8 +378,7 @@ class OperatorController:
 
     def maintenance_enter(self, maintenance_id: str) -> MaintenanceEpochRecord:
         state = self._operator()
-        if state.inflight_turn or state.inflight_effect:
-            raise ServiceError("MAINTENANCE_ENTRY_DENIED_NOT_QUIESCENT", maintenance_id)
+        self._require_quiescent("MAINTENANCE_ENTRY_DENIED_NOT_QUIESCENT")
         if state.maintenance_id is not None:
             raise ServiceError("MAINTENANCE_ALREADY_ACTIVE", state.maintenance_id)
         snapshot = self.snapshot()
@@ -298,8 +409,7 @@ class OperatorController:
         state = self._operator()
         if state.maintenance_id is None:
             raise ServiceError("MAINTENANCE_NOT_ACTIVE", "no epoch")
-        if state.inflight_turn or state.inflight_effect:
-            raise ServiceError("MAINTENANCE_EXIT_DENIED_NOT_QUIESCENT", state.maintenance_id)
+        self._require_quiescent("MAINTENANCE_EXIT_DENIED_NOT_QUIESCENT")
         epoch = self.store.load_maintenance_epoch(state.maintenance_id)
         if epoch is None or epoch.exited_at is not None:
             raise ServiceError("MAINTENANCE_EPOCH_INVALID", state.maintenance_id)
@@ -436,15 +546,22 @@ class LocalService:
             operator = self.store.load_operator_state()
             if operator.emergency_stop_latched:
                 log_event("SERVICE_NON_DISPATCHING_EMERGENCY_LATCH")
-                return 3
+                return 0
             previous_term = signal.signal(signal.SIGTERM, self.request_stop)
             previous_int = signal.signal(signal.SIGINT, self.request_stop)
             try:
                 log_event("SERVICE_STARTED")
                 while not self._stop:
                     operator = self.store.load_operator_state()
-                    if not operator.operator_paused and operator.maintenance_id is None:
+                    if (
+                        not operator.operator_paused
+                        and operator.maintenance_id is None
+                        and not operator.emergency_stop_latched
+                    ):
                         self.tick()
+                        runtime = self.store.load_runtime()
+                        if runtime is not None and runtime.current_state is OrchestratorState.DONE:
+                            self.request_stop()
                     time.sleep(self.poll_seconds)
                 log_event("SERVICE_STOPPED")
                 return 0
@@ -484,7 +601,29 @@ def git_snapshot(repository: str | Path) -> GitSnapshot:
             "GIT_LOCAL_REMOTE_DEVELOPMENT_MISMATCH",
             f"{development}!={remote_development}",
         )
-    return GitSnapshot(main, development)
+    task_refs = tuple(
+        line
+        for line in (command("for-each-ref", "--format=%(refname:short)", "refs/heads/task/") or "").splitlines()
+        if line
+    )
+    if len(task_refs) > 1:
+        raise ServiceError("MAX_CONCURRENT_TASKS_EXCEEDED", repr(task_refs))
+    task_branch = task_refs[0] if task_refs else None
+    task_id = task_branch.removeprefix("task/") if task_branch else None
+    task_worktree: str | None = None
+    if task_branch is not None:
+        listing = command("worktree", "list", "--porcelain") or ""
+        current: str | None = None
+        matches: list[str] = []
+        for line in listing.splitlines():
+            if line.startswith("worktree "):
+                current = str(Path(line.removeprefix("worktree ")).resolve())
+            elif line == f"branch refs/heads/{task_branch}" and current is not None:
+                matches.append(current)
+        if len(matches) != 1:
+            raise ServiceError("TASK_WORKTREE_AMBIGUOUS", task_branch)
+        task_worktree = matches[0]
+    return GitSnapshot(main, development, task_id, task_branch, task_worktree)
 
 
 def systemctl_user(action: str) -> None:

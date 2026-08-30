@@ -6,19 +6,24 @@ from __future__ import annotations
 import re
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
+from .git_manager import CommitResult, GitManager, TaskWorktree
 from .persistence import (
+    BranchCreateIntent,
+    CommitIntent,
     DevelopmentInitIntent,
     EffectKind,
     EffectRequestAction,
     EffectStatus,
     GitStateRecord,
     IntegrationFFIntent,
+    PushIntent,
     ReconciliationOutcome,
     SQLiteStateStore,
     TaskCleanupIntent,
 )
+from .protocols import TaskManifest
 
 
 DEVELOPMENT_BRANCH = "development"
@@ -51,10 +56,26 @@ class BranchLifecycle:
         store: SQLiteStateStore,
         *,
         remote: str = "origin",
+        worktree_root: str | Path | None = None,
     ) -> None:
         self.repository = Path(repository).resolve(strict=True)
         self.store = store
         self.remote = remote
+        proposed_root = Path(worktree_root or (self.store.path.parent / "worktrees"))
+        if not proposed_root.is_absolute():
+            raise BranchLifecycleError("WORKTREE_ROOT_NOT_ABSOLUTE", str(proposed_root))
+        if proposed_root.exists() and proposed_root.is_symlink():
+            raise BranchLifecycleError("WORKTREE_ROOT_SYMLINK_DENIED", str(proposed_root))
+        proposed_root.mkdir(parents=True, exist_ok=True)
+        self.worktree_root = proposed_root.resolve(strict=True)
+        try:
+            self.worktree_root.relative_to(self.repository)
+        except ValueError:
+            pass
+        else:
+            raise BranchLifecycleError(
+                "WORKTREE_ROOT_INSIDE_REPOSITORY_DENIED", str(self.worktree_root)
+            )
         root = self._text("rev-parse", "--show-toplevel")
         if Path(root).resolve(strict=True) != self.repository:
             raise BranchLifecycleError("REPOSITORY_ROOT_MISMATCH", root)
@@ -194,6 +215,220 @@ class BranchLifecycle:
         unexpected = tuple(ref for ref in refs if ref != allowed)
         if unexpected or (allowed is None and refs):
             raise BranchLifecycleError("MAX_CONCURRENT_TASKS_EXCEEDED", repr(refs))
+
+    def create_task_worktree(
+        self,
+        *,
+        task_id: str,
+        expected_development_sha: str,
+        effect_id: str,
+    ) -> TaskWorktree:
+        branch = self.task_branch(task_id)
+        if _SHA_RE.fullmatch(expected_development_sha) is None:
+            raise BranchLifecycleError("INVALID_DEVELOPMENT_SHA", expected_development_sha)
+        local_development = self._sha(f"refs/heads/{DEVELOPMENT_BRANCH}")
+        remote_development = self._remote_sha(DEVELOPMENT_BRANCH)
+        if local_development != expected_development_sha or remote_development != expected_development_sha:
+            raise BranchLifecycleError(
+                "DEVELOPMENT_BASELINE_MISMATCH",
+                repr((local_development, remote_development)),
+            )
+        self.assert_single_task(allowed_task_id=task_id)
+        worktree = self.worktree_root / task_id
+        if worktree.parent.resolve(strict=True) != self.worktree_root:
+            raise BranchLifecycleError("WORKTREE_PATH_ESCAPE_DENIED", str(worktree))
+        if worktree.exists() and worktree.is_symlink():
+            raise BranchLifecycleError("WORKTREE_SYMLINK_DENIED", str(worktree))
+        branch_head = self._sha(f"refs/heads/{branch}", optional=True)
+        bound_worktree = self._worktree_for_branch(branch)
+        existing = self.store.load_effect(effect_id)
+        if existing is not None and existing.status is EffectStatus.IN_PROGRESS:
+            if (
+                branch_head == expected_development_sha
+                and bound_worktree == worktree
+                and worktree.is_dir()
+            ):
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            else:
+                raise BranchLifecycleError(
+                    "TASK_CREATE_OUTCOME_AMBIGUOUS_PRESERVE_TASK",
+                    repr((branch_head, bound_worktree)),
+                )
+        else:
+            request = self.store.request_effect(
+                effect_id=effect_id,
+                idempotency_key=f"{task_id}:BRANCH_CREATE:{branch}:{expected_development_sha}",
+                kind=EffectKind.BRANCH_CREATE,
+                intent=BranchCreateIntent(
+                    task_id, branch, DEVELOPMENT_BRANCH, expected_development_sha
+                ),
+            )
+            if request.action is EffectRequestAction.EXECUTE:
+                if branch_head is not None or bound_worktree is not None or worktree.exists():
+                    raise BranchLifecycleError(
+                        "TASK_ALREADY_EXISTS_PRESERVE_TASK",
+                        repr((branch_head, bound_worktree, worktree.exists())),
+                    )
+                self.store.begin_effect(effect_id)
+                self._git(
+                    "worktree",
+                    "add",
+                    "-b",
+                    branch,
+                    str(worktree),
+                    expected_development_sha,
+                )
+                self.store.complete_effect(effect_id)
+        GitManager._validate_worktree_gitfile(self.repository, worktree)
+        actual_head = GitManager._text(worktree, ("rev-parse", "HEAD"))
+        actual_branch = GitManager._text(worktree, ("branch", "--show-current"))
+        if actual_head != expected_development_sha or actual_branch != branch:
+            raise BranchLifecycleError(
+                "TASK_WORKTREE_MISMATCH_PRESERVE_TASK",
+                f"{actual_branch}@{actual_head}",
+            )
+        self.store.save_git_state(
+            GitStateRecord(
+                DEVELOPMENT_BRANCH,
+                expected_development_sha,
+                str(worktree),
+                main_sha=self._sha("refs/heads/main"),
+                task_id=task_id,
+                task_branch=branch,
+            )
+        )
+        return TaskWorktree(worktree, self.repository, branch, expected_development_sha)
+
+    @staticmethod
+    def _scope_paths(worktree: TaskWorktree, manifest: TaskManifest) -> tuple[str, ...]:
+        GitManager._validate_worktree_gitfile(worktree.repository_root, worktree.root)
+        paths = GitManager._status_paths(worktree.root)
+        if not paths:
+            raise BranchLifecycleError("NO_TASK_CHANGES", manifest.task_id)
+        scopes = tuple(GitManager._normalized_scope_path(item) for item in manifest.scope.paths)
+        for relative in paths:
+            pure = PurePosixPath(relative)
+            if pure.is_absolute() or ".." in pure.parts or ".git" in pure.parts:
+                raise BranchLifecycleError("GIT_METADATA_CHANGE_DENIED", relative)
+            allowed = any(
+                relative == scope or (directory and relative.startswith(scope + "/"))
+                for scope, directory in scopes
+            )
+            if not allowed:
+                raise BranchLifecycleError("OUT_OF_SCOPE_CHANGE_DENIED", relative)
+            candidate = worktree.root / relative
+            if candidate.is_symlink():
+                raise BranchLifecycleError("SYMLINK_PATH_ESCAPE_DENIED", relative)
+        if GitManager._git(worktree.root, ("diff", "--check"), check=False).returncode != 0:
+            raise BranchLifecycleError("DIFF_CHECK_FAILURE_DENIED", "tracked diff")
+        return paths
+
+    def commit_task(
+        self,
+        worktree: TaskWorktree,
+        manifest: TaskManifest,
+        *,
+        expected_parent_sha: str,
+        effect_id: str,
+    ) -> CommitResult:
+        branch = self.task_branch(manifest.task_id)
+        if worktree.branch != branch or worktree.repository_root != self.repository:
+            raise BranchLifecycleError("TASK_WORKTREE_BINDING_MISMATCH", branch)
+        current_branch = GitManager._text(worktree.root, ("branch", "--show-current"))
+        current_head = GitManager._text(worktree.root, ("rev-parse", "HEAD"))
+        if current_branch != branch:
+            raise BranchLifecycleError("TASK_HEAD_MISMATCH", current_branch)
+        intent = CommitIntent(manifest.task_id, branch, expected_parent_sha)
+        existing = self.store.load_effect(effect_id)
+        if existing is not None and existing.status is EffectStatus.IN_PROGRESS:
+            if current_head != expected_parent_sha and GitManager._is_ancestor(
+                worktree.root, expected_parent_sha, current_head
+            ):
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            else:
+                raise BranchLifecycleError(
+                    "TASK_COMMIT_OUTCOME_AMBIGUOUS_PRESERVE_TASK", current_head
+                )
+        else:
+            request = self.store.request_effect(
+                effect_id=effect_id,
+                idempotency_key=f"{manifest.task_id}:COMMIT:{expected_parent_sha}",
+                kind=EffectKind.COMMIT,
+                intent=intent,
+            )
+            if request.action is EffectRequestAction.EXECUTE:
+                if current_head != expected_parent_sha:
+                    raise BranchLifecycleError("TASK_HEAD_MISMATCH", current_head)
+                paths = self._scope_paths(worktree, manifest)
+                self.store.begin_effect(effect_id)
+                GitManager._git(worktree.root, ("add", "--", *paths))
+                if GitManager._git(
+                    worktree.root, ("diff", "--cached", "--check"), check=False
+                ).returncode != 0:
+                    raise BranchLifecycleError("DIFF_CHECK_FAILURE_DENIED", "staged")
+                title = " ".join(manifest.title.split())[:120]
+                GitManager._git(
+                    worktree.root,
+                    ("commit", "-m", f"{manifest.task_id}: {title}"),
+                )
+                self.store.complete_effect(effect_id)
+        head = GitManager._text(worktree.root, ("rev-parse", "HEAD"))
+        if head == expected_parent_sha or not GitManager._is_ancestor(
+            worktree.root, expected_parent_sha, head
+        ):
+            raise BranchLifecycleError("TASK_COMMIT_NOT_CREATED", head)
+        changed = tuple(
+            line
+            for line in GitManager._text(
+                worktree.root, ("diff", "--name-only", expected_parent_sha, head)
+            ).splitlines()
+            if line
+        )
+        return CommitResult(expected_parent_sha, head, tuple(sorted(changed)))
+
+    def push_task(
+        self,
+        *,
+        task_id: str,
+        commit_sha: str,
+        expected_remote_sha: str | None,
+        effect_id: str,
+    ) -> str:
+        branch = self.task_branch(task_id)
+        if self._sha(f"refs/heads/{branch}") != commit_sha:
+            raise BranchLifecycleError("TASK_PUSH_HEAD_MISMATCH", commit_sha)
+        intent = PushIntent(task_id, branch, commit_sha, expected_remote_sha)
+        existing = self.store.load_effect(effect_id)
+        remote = self._remote_sha(branch)
+        if existing is not None and existing.status is EffectStatus.IN_PROGRESS:
+            if remote == commit_sha:
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            else:
+                raise BranchLifecycleError(
+                    "TASK_PUSH_OUTCOME_AMBIGUOUS_PRESERVE_TASK", repr(remote)
+                )
+        else:
+            request = self.store.request_effect(
+                effect_id=effect_id,
+                idempotency_key=f"{task_id}:PUSH:{branch}:{commit_sha}",
+                kind=EffectKind.PUSH,
+                intent=intent,
+            )
+            if request.action is EffectRequestAction.EXECUTE:
+                if remote != expected_remote_sha:
+                    raise BranchLifecycleError("REMOTE_TASK_DRIFT_PRESERVE_TASK", remote)
+                self.store.begin_effect(effect_id)
+                if expected_remote_sha is not None and not self._is_ancestor(
+                    expected_remote_sha, commit_sha
+                ):
+                    raise BranchLifecycleError(
+                        "REMOTE_TASK_NON_FF_PRESERVE_TASK", commit_sha
+                    )
+                self._git("push", self.remote, f"{commit_sha}:refs/heads/{branch}")
+                self.store.complete_effect(effect_id)
+        if self._remote_sha(branch) != commit_sha:
+            raise BranchLifecycleError("TASK_PUSH_VERIFY_FAILED", branch)
+        return commit_sha
 
     def fast_forward_development(
         self,

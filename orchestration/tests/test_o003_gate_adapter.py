@@ -154,6 +154,17 @@ class O003GateAdapterTests(unittest.TestCase):
                 effect_id="EFFECT-GATE-ISSUE",
             )
 
+    def test_initial_manifest_action_mismatch_is_denied(self) -> None:
+        mismatched = replace(self.gate, action_id="OTHER_ACTION")
+        with self.assertRaises(GateAdapterError) as caught:
+            self.adapter.create_or_reconcile(
+                mismatched,
+                self.action,
+                effect_id="EFFECT-GATE-INITIAL-MISMATCH",
+            )
+        self.assertEqual(caught.exception.code, "GATE_ACTION_BINDING_MISMATCH")
+        self.assertIsNone(self.github.issue)
+
     def test_crash_after_issue_creation_reconciles_without_duplicate(self) -> None:
         body = self.adapter._body(self.gate, self.action)
         self.github.create_issue("sorguido/goodix-private", "gate", body)

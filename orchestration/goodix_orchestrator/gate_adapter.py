@@ -261,6 +261,11 @@ class HumanGateAdapter:
     ) -> GateExternalRecord:
         if manifest.status is not GateStatus.PENDING:
             raise GateAdapterError("GATE_NOT_PENDING", manifest.gate_id)
+        if manifest.action_id != action.action_id or manifest.action_digest != action.digest:
+            raise GateAdapterError(
+                "GATE_ACTION_BINDING_MISMATCH",
+                f"{manifest.action_id}/{manifest.action_digest}",
+            )
         body = self._body(manifest, action)
         marker = self._marker(manifest.gate_id)
         intent = GateCreateIntent(manifest.task_id, manifest.gate_id, manifest.commit_sha)

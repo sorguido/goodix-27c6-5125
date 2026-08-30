@@ -16,3 +16,6 @@ goodix-orchestrator = "goodix_orchestrator.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["goodix_orchestrator*"]
+
+[tool.setuptools.package-data]
+goodix_orchestrator = ["resources/*.service"]
