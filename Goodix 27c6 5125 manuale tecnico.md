@@ -42,8 +42,10 @@ O001_TEST_COMMAND=python -W error::ResourceWarning -m unittest discover -s tests
 O001_STATE_SCHEMA_VERSION=2
 LEGACY_STATE_SCHEMA_V1_AUTO_MIGRATION=false
 LEGACY_STATE_SCHEMA_V1_POLICY=FAIL_CLOSED_INCOMPATIBLE
-O001_DEDICATED_CI=PENDING_MICRO_CORRECTIVE_RUN
-O001_DEDICATED_CI_EVIDENCE=GitHub Actions run 33297069984 on 23b3470633d0b1dff6b23902bb671ff08c22f3c6
+O001_DEDICATED_CI=PASS
+O001_DEDICATED_CI_EVIDENCE=GitHub Actions run 33297717230 on 0a2b9b24dff187aad6e28e25efa51646b613dd3d
+EXISTING_GOODIX_CI=PASS
+EXISTING_GOODIX_CI_EVIDENCE=GitHub Actions run 33297717243 on 0a2b9b24dff187aad6e28e25efa51646b613dd3d
 O001_LICENSE=GPL-2.0-or-later
 ORCHESTRATION_READY_FOR_GOODIX=false
 CURRENT_LIVE_AUTHORIZED=false
@@ -90,8 +92,10 @@ protocollo e non sono promosse a prova dell'isolamento OS reale.
 Il workflow dedicato `.github/workflows/orchestration-o001-host-only.yml`
 esegue su push, pull request e richiesta manuale la compilazione Python e
 l'esatto comando di test O001, senza installazioni, segreti, USB o privilegi;
-la prima esecuzione sul correttivo, run `33297069984` al commit
-`23b3470633d0b1dff6b23902bb671ff08c22f3c6`, è conclusa `success`.
+la run micro-correttiva `33297717230` al commit
+`0a2b9b24dff187aad6e28e25efa51646b613dd3d` è conclusa `success`. Sullo stesso
+commit anche la regressione Goodix host-only preesistente, run `33297717243`,
+è conclusa `success`.
 Il codice del dominio `orchestration/` e il workflow sono project-authored,
 marcati SPDX e distribuiti come `GPL-2.0-or-later`; non incorporano codice o
 materiale Rockytkg, Goodix/OEM, capture, dati biometrici o segreti.
@@ -2676,7 +2680,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
-| Orchestrazione O001 | micro-correttivo legacy-schema implementato e 63 test PASS locali; CI dedicata in attesa della run sul nuovo commit; bootstrap complessivo non pronto | schema nativo v2 e v1 fail-closed senza modifica, `main` strutturalmente vietato, expected-next ed envelope REPLAN persistiti, create/recover separati, assertion Executor fail-closed, intenti tipizzati, `GATE_DENY` ristretto, SPDX/provenance; nessun adapter o side effect reale; freeze Goodix invariato |
+| Orchestrazione O001 | micro-correttivo legacy-schema implementato, 63 test PASS e CI O001/Goodix host-only PASS; bootstrap complessivo non pronto | schema nativo v2 e v1 fail-closed senza modifica, `main` strutturalmente vietato, expected-next ed envelope REPLAN persistiti, create/recover separati, assertion Executor fail-closed, intenti tipizzati, `GATE_DENY` ristretto, SPDX/provenance; nessun adapter o side effect reale; freeze Goodix invariato |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
