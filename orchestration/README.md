@@ -1,32 +1,89 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix orchestrator deterministic core (O001)
+# Goodix host-only orchestrator (O001 + O002)
 
-O001 implements only the deterministic, host-only orchestration core described
-by `SPEC.md`: explicit state transitions, structured protocols, deny-by-default
-capability policy, SQLite persistence, an external-effect ledger model, and
-fake-agent flows.
+`orchestration/` now contains the deterministic O001 engine and the bounded
+O002 adapters that prove a real PM → Executor → PM loop on a disposable
+synthetic Git repository. It remains completely separate from Goodix USB,
+protected material, `sudo`, `main`, live execution and publication.
 
-It contains no Codex App Server, Git/GitHub, shell, network, USB, privileged,
-protected-material, or live-runner adapter. Effect records are data only and
-cannot execute an external action.
+The O001 engine remains authoritative for transitions, capability policy,
+idempotency and fail-closed recovery. O002 adds:
 
-The persisted state schema is versioned at v2. Legacy v1 stores are rejected
-as incompatible without modification: v1 cannot retain the expected-next task
-or immutable replan envelope, so arbitrary operational state cannot be
-reconstructed exactly. Engine creation is fresh-store-only; every existing
-store must enter through recovery. Task manifests structurally deny `main`,
-and persisted next-task/envelope metadata prevents identity or scope drift.
+- a JSONL Codex App Server client with initialize/initialized handshake,
+  explicit request correlation, server-request denial, ChatGPT-only auth,
+  model discovery, one bounded schema-repair turn and error classification;
+- three independent contexts: PM planning (read-only), PM review (read-only)
+  and Executor (synthetic-worktree write only), implemented with named Codex
+  permission profiles and command network disabled;
+- strict typed planning, work-report and review contracts, with
+  App-Server-compatible Structured Outputs schemas and stronger local
+  validation before any state or Git effect;
+- a deterministic Git Manager for synthetic repositories only: task branch
+  and worktree creation, scoped diff validation, task-derived commits and an
+  exact expected-old fast-forward of the integration ref after PM `ACCEPT`;
+- SQLite schema v3 for contexts, dispatch routing evidence and Git state. v1
+  and v2 stores are rejected as incompatible without modification.
 
-Project-authored content in `orchestration/` is licensed
-`GPL-2.0-or-later`. O001 incorporates no external implementation code.
+## Closed model routing
 
-## Test invocation
+| Context/class | Exact route |
+| --- | --- |
+| PM plan `STANDARD` | `gpt-5.6-sol` / `medium` |
+| PM plan `ESCALATED` | `gpt-5.6-sol` / `high` |
+| PM review | `gpt-5.6-sol` / `high` |
+| Executor `MECHANICAL` | `gpt-5.6-luna` / `medium` |
+| Executor `LOCAL_CORRECTIVE` | `gpt-5.6-terra` / `medium` |
+| Executor `BOUNDED_IMPLEMENTATION` | `gpt-5.6-terra` / `high` |
+| Executor `ARCHITECTURAL_OR_HIGH_RISK` | `gpt-5.6-sol` / `high` |
 
-From `<git-root>/orchestration` run:
+Unknown routes, raw model/effort overrides, unavailable exact pairs, hidden
+downgrades and autonomous `xhigh`/`max` use fail closed. API-key auth and paid
+API fallback are denied.
+
+## Deterministic tests
+
+From `<git-root>/orchestration`:
 
 ```bash
+python -m compileall -q goodix_orchestrator tests
 python -W error::ResourceWarning -m unittest discover -s tests -v
 ```
 
-The command uses only the Python standard library and does not install the
-package or any dependency.
+The suite uses only the Python standard library. It includes the 63 O001
+regressions plus fake App Server, routing, persistence, synthetic Git-manager
+and full fake corrective/accept/next-task/DONE coverage. CI runs only these
+deterministic host-only checks; it never runs the real model qualification.
+
+## Real local synthetic qualification
+
+Use an existing ChatGPT-authenticated Codex installation. Choose new paths
+outside the Goodix Git root for every run:
+
+```bash
+cd <git-root>/orchestration
+python -m goodix_orchestrator.qualification \
+  --real-codex \
+  --state-dir /tmp/o002-qualification-state \
+  --report /tmp/o002-qualification-report.json
+```
+
+The command creates its own synthetic repository and requires no install,
+`sudo`, USB, protected material or GitHub credentials. It exits nonzero on
+failure, never silently falls back to pay-as-you-go, and emits a redacted JSON
+report. Default paths use `XDG_STATE_HOME` or
+`~/.local/state/goodix-orchestrator/` and do not dirty this repository.
+
+A successful run prints `O002_REAL_CODEX_SYNTHETIC_CYCLE=PASS`. Its report
+must also show `AUTH_MODE=CHATGPT`, pinned/effective routing PASS, observed
+CORRECTIVE/ACCEPT/second-task DONE, real task branch/worktree/commits and
+integration fast-forward PASS, `MAIN_UNCHANGED=true`, and zero counts for
+human relay, paid fallback, Goodix USB, `sudo`, protected material and
+autonomous `xhigh`/`max` use.
+
+O002 does not make the orchestration ready for Goodix. GitHub Human-Gate
+identity binding, persistent-service isolation and any live runner remain
+future O003/O004 work requiring their own scope and gates.
+
+Project-authored content in this domain is `GPL-2.0-or-later`; no external,
+Rockytkg, OEM, capture, biometric or protected implementation material is
+incorporated.

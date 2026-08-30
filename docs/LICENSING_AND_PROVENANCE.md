@@ -129,6 +129,27 @@ biometric data. This licensing assignment does not change the established GPL
 domain of `core/`/`tools/`, the LGPL boundary of `libfprint-driver/`, or the
 file-specific/historical status of other repository paths.
 
+## O002 — Codex App Server, model routing and synthetic Git loop
+
+The O002 additions under `orchestration/`, their tests, role prompts, the
+redacted synthetic qualification report under `analysis/O002/`, and the
+host-only workflow updates are project-authored `GPL-2.0-or-later` expression.
+They were implemented from project governance, `orchestration/SPEC.md`, the
+O002 task contract and public Codex App Server/permission/Structured Outputs
+interfaces. Runtime protocol discovery used the installed Codex schema
+generator; no generated schema or external source code is copied into the
+repository.
+
+O002 uses only Python standard-library APIs and the installed `codex` and `git`
+executables at runtime. It does not copy, translate, adapt or incorporate
+Rockytkg, Goodix/OEM, firmware, capture, biometric, protected or third-party
+implementation material. The retained qualification report contains only
+redacted routing/Git/safety telemetry from a disposable synthetic repository;
+it contains no thread identifiers, account email, token, auth blob, PSK,
+environment dump or biometric data. This addition does not change the GPL
+boundary of `core/`/`tools/`, the LGPL boundary of `libfprint-driver/`, or the
+status of other historical paths.
+
 ## D276/03 — componente router LGPL indipendente
 
 `libfprint-driver/goodix_usb_router.[ch]` e i relativi test/launcher D276/03

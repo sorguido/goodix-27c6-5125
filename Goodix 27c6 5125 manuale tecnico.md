@@ -16,14 +16,16 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Bootstrap dell'orchestrazione autonoma — freeze funzionale Goodix e O001 host-only
+### Bootstrap dell'orchestrazione autonoma — freeze Goodix, O001 deterministico e O002 reale sintetico
 
 Con la governance v2.6 il boundary funzionale Goodix è intenzionalmente
 congelato mentre viene costruita e qualificata l'orchestrazione autonoma. O001
-ha implementato il primo slice eseguibile, limitato al core deterministico in
-`orchestration/`: non è un servizio, non invoca modelli e non possiede adapter
-Git, GitHub, Codex App Server, shell, rete, USB, privilegi, materiali protetti o
-live runner.
+ha implementato il core deterministico in `orchestration/`; O002 lo conserva
+come motore autoritativo e aggiunge adapter Codex App Server e Git reali,
+limitati a repository sintetici esterni alla root Goodix. O002 non è ancora un
+servizio, non possiede adapter GitHub/Human-Gate né live runner e non concede
+USB, privilegi, materiali protetti, aggiornamenti di `main` o lavoro funzionale
+Goodix.
 
 Lo stato verificato nel task branch O001, basato su
 `6530fc875a1dd3d7fba7b45f02ed3d9c6259c8f2` e corretto a partire dal commit
@@ -39,17 +41,41 @@ O001_FAKE_AGENT_FLOWS=PASS
 O001_TEST_COUNT=63
 O001_TEST_CWD=<git-root>/orchestration
 O001_TEST_COMMAND=python -W error::ResourceWarning -m unittest discover -s tests -v
-O001_STATE_SCHEMA_VERSION=2
+O001_ORIGINAL_STATE_SCHEMA_VERSION=2
+O002_STATE_SCHEMA_VERSION=3
 LEGACY_STATE_SCHEMA_V1_AUTO_MIGRATION=false
-LEGACY_STATE_SCHEMA_V1_POLICY=FAIL_CLOSED_INCOMPATIBLE
+LEGACY_STATE_SCHEMA_V1_V2_POLICY=FAIL_CLOSED_INCOMPATIBLE
 O001_DEDICATED_CI=PASS
 O001_DEDICATED_CI_EVIDENCE=GitHub Actions run 33297717230 on 0a2b9b24dff187aad6e28e25efa51646b613dd3d
 EXISTING_GOODIX_CI=PASS
 EXISTING_GOODIX_CI_EVIDENCE=GitHub Actions run 33297717243 on 0a2b9b24dff187aad6e28e25efa51646b613dd3d
 O001_LICENSE=GPL-2.0-or-later
+O002_CODEX_APP_SERVER_IMPLEMENTED=true
+O002_GIT_MANAGER_IMPLEMENTED=true
+O002_MODEL_ROUTER=PASS
+O002_PM_PLAN_REVIEW_CONTEXT_SEPARATION=PASS
+O002_PM_PLAN_MODEL=gpt-5.6-sol/medium
+O002_PM_REVIEW_MODEL=gpt-5.6-sol/high
+O002_EXECUTOR_DEFAULT_MODEL=gpt-5.6-terra/high
+O002_EXECUTOR_CORRECTIVE_MODEL=gpt-5.6-terra/medium
+O002_CODEX_VERSION=codex-cli 0.144.1
+O002_AUTH_MODE=CHATGPT
+O002_DETERMINISTIC_TESTS=PASS
+O002_TEST_COUNT=90
+O002_REAL_CODEX_SYNTHETIC_CYCLE=PASS
+O002_REAL_CORRECTIVE_LOOP=PASS
+O002_REAL_INTEGRATION_FF=PASS
+O002_REAL_SECOND_TASK_DONE=PASS
+O002_HUMAN_RELAY_COUNT=0
+O002_REPORT=analysis/O002/O002_real_qualification_20260830.json
+O002_REPORT_SHA256=9bb5c19c0a32036221e253ea010fb14056a21ac05fe0cdc30af7d9bfe566f8a5
 ORCHESTRATION_READY_FOR_GOODIX=false
 CURRENT_LIVE_AUTHORIZED=false
 GOODIX_FUNCTIONAL_ADVANCEMENT=NONE
+GITHUB_HUMAN_GATE_ADAPTER_READY=false
+SYSTEMD_SERVICE_READY=false
+REAL_GOODIX_REPO_AUTONOMOUS_LOOP_PROVEN=false
+LIVE_RUNNER_ENABLED=false
 ```
 
 Sono verificati host-only: stati ed eventi espliciti con errori strutturati;
@@ -62,12 +88,14 @@ assenti; persistenza e enforcement dell'esatto `expected_next_task_id` dopo
 baseline, branch, modello, gate class, capability, scope, non-goal e obbligo di
 aggiornamento manuale; store SQLite single-file con schema/protocol versionati,
 revisioni compare-and-swap e fail-closed su corruzione o incompatibilità. Lo
-schema operativo nativo è v2; uno store legacy v1 viene respinto come
-`STORE_INCOMPATIBLE` senza modificarne metadata, colonne o runtime row. La v1
-non conserva `expected_next_task_id` né l'envelope immutabile del task e quindi
-un suo stato in-flight non è ricostruibile senza ipotesi. Poiché O001 non è
-ancora un servizio production deployed, non esiste un beneficio operativo che
-giustifichi una migrazione ambigua. `create()` opera solo su store privo di
+schema operativo O002 nativo è v3; gli store legacy v1 e v2 vengono respinti
+come `STORE_INCOMPATIBLE` senza modificarne metadata, colonne o runtime row. La
+v1 non conserva `expected_next_task_id` né l'envelope immutabile del task; la
+v2 non conserva identità dei tre contesti, routing effettivo, dispatch o stato
+Git. Nessuno dei due stati in-flight è quindi ricostruibile senza ipotesi.
+Poiché l'orchestratore non è ancora un servizio production deployed, non
+esiste un beneficio operativo che giustifichi una migrazione ambigua.
+`create()` opera solo su store privo di
 stato operativo, `recover()` è l'unico ingresso per stato già persistito e la
 costruzione diretta dell'engine è vietata.
 
@@ -91,7 +119,8 @@ protocollo e non sono promosse a prova dell'isolamento OS reale.
 
 Il workflow dedicato `.github/workflows/orchestration-o001-host-only.yml`
 esegue su push, pull request e richiesta manuale la compilazione Python e
-l'esatto comando di test O001, senza installazioni, segreti, USB o privilegi;
+l'esatto comando di test deterministico O001/O002, senza installazioni,
+segreti, USB o privilegi;
 la run micro-correttiva `33297717230` al commit
 `0a2b9b24dff187aad6e28e25efa51646b613dd3d` è conclusa `success`. Sullo stesso
 commit anche la regressione Goodix host-only preesistente, run `33297717243`,
@@ -100,11 +129,38 @@ Il codice del dominio `orchestration/` e il workflow sono project-authored,
 marcati SPDX e distribuiti come `GPL-2.0-or-later`; non incorporano codice o
 materiale Rockytkg, Goodix/OEM, capture, dati biometrici o segreti.
 
-Restano deliberatamente futuri O002/O003: process isolation negativa a livello
-OS, App Server e modelli reali, worktree/ref e fast-forward reali, GitHub gate
-identity/commit-bound, rete, servizio persistente e qualunque live runner. O001
-non soddisfa quindi la bootstrap closure complessiva, non riapre il lavoro
-Goodix e non modifica lo stato tecnico target-specific documentato sotto.
+O002 aggiunge tre thread App Server distinti: pianificazione PM
+`gpt-5.6-sol/medium`, review PM indipendente `gpt-5.6-sol/high` ed Executor nel
+solo worktree sintetico. Il router chiuso associa classi, non testo libero, a
+Luna/medium, Terra/medium, Terra/high o Sol/high; mismatch, modello assente,
+override raw e uso autonomo `xhigh`/`max` causano pausa/fail-closed. L'auth
+ammessa è soltanto ChatGPT: API key e fallback pay-as-you-go sono negati. I
+permission profile nominati concedono ai PM sola lettura e all'Executor
+scrittura nel solo worktree, rete comandi disabilitata e accesso read-only al
+solo helper Codex necessario al sandbox.
+
+Il Git Manager rifiuta la root Goodix e suoi alias, crea task branch/worktree
+dal preciso SHA d'integrazione, valida scope, symlink, metadata Git, diff e
+whitespace, produce commit task-derived senza identità globale e applica
+`INTEGRATION_FF` con compare-and-swap sull'esatto old SHA solo dopo `ACCEPT` sul
+medesimo head revisionato. La qualificazione reale del 2026-08-30 con
+`codex-cli 0.144.1` ha provato: CORRECTIVE deterministico; riuso dello stesso
+thread/worktree Executor con Terra/medium effettivo; secondo commit; review
+Sol/high; ACCEPT dell'head sintetico
+`3e712e92be41b87cf07cf2a3b7493b697975615a`; fast-forward dell'integrazione;
+nuovo task bounded Terra/high con commit
+`089d565e773272859344c6a45eab6086566aaf7d`; review finale e DONE. Il branch
+`main` sintetico è rimasto a `acab85dab0696da05c2bd0bec5aaf8167b30f828`.
+Il report redatto canonico ha SHA-256
+`9bb5c19c0a32036221e253ea010fb14056a21ac05fe0cdc30af7d9bfe566f8a5` e
+registra zero relay umano, fallback a pagamento, accessi USB Goodix, `sudo`,
+materiale protetto, `xhigh`/`max` e aggiornamenti di `main`.
+
+Restano deliberatamente futuri O003/O004: adapter GitHub Human-Gate
+identity/commit-bound, isolamento negativo del servizio persistente,
+installazione/attivazione del servizio e qualunque live runner. O002 non
+soddisfa quindi la bootstrap closure complessiva, non riapre il lavoro Goodix e
+non modifica lo stato tecnico target-specific documentato sotto.
 
 ### Stato corrente post-audit D278/04 riconciliato con la seconda single-shot — gap di re-entry cross-session provato e fenomeno osservato sul target, identità causale non provata; nessuna live autorizzata
 
@@ -2680,7 +2736,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
-| Orchestrazione O001 | micro-correttivo legacy-schema implementato, 63 test PASS e CI O001/Goodix host-only PASS; bootstrap complessivo non pronto | schema nativo v2 e v1 fail-closed senza modifica, `main` strutturalmente vietato, expected-next ed envelope REPLAN persistiti, create/recover separati, assertion Executor fail-closed, intenti tipizzati, `GATE_DENY` ristretto, SPDX/provenance; nessun adapter o side effect reale; freeze Goodix invariato |
+| Orchestrazione O001 + O002 | core O001 preservato; adapter App Server/Git e routing chiuso implementati; 90 test deterministici PASS; ciclo Codex reale sintetico PASS; bootstrap complessivo non pronto | schema v3 con v1/v2 fail-closed, PM plan/review distinti Sol medium/high, Executor Terra high e correttivo medium nello stesso thread, commit e integrazione FF reali soltanto nel repo sintetico, `main` invariato, zero USB/sudo/protected/payg/human relay; freeze Goodix invariato |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
@@ -2863,42 +2919,54 @@ locale.
 
 ### Architettura dell'orchestrazione in bootstrap
 
-Il core O001 è separato dai runtime Goodix GPL/LGPL e non importa né richiama i
-loro moduli:
+Il dominio O001/O002 è separato dai runtime Goodix GPL/LGPL e non importa né
+richiama i loro moduli:
 
 ```text
-manifest validati + fake PM/Executor
-                 |
-                 v
-       DeterministicEngine
-        |       |       |
-        v       v       v
-  state.py  policy.py  protocols.py
-        \       |       /
-         \      v      /
-      SQLiteStateStore
-        runtime state + gate state
-        idempotency/effect ledger (data only)
+ Codex App Server                    synthetic Git repository
+  PM plan | PM review | Executor       branch/worktree/commit/FF
+      \          |          /                    |
+       \         v         /                     v
+        typed structured outputs          GitManager guardrail
+                 |                               |
+                 +---------------+---------------+
+                                 v
+                       O002Supervisor
+                                 |
+                                 v
+                       DeterministicEngine
+                        |       |       |
+                        v       v       v
+                  state.py  policy.py  protocols.py
+                        \       |       /
+                         \      v      /
+                      SQLiteStateStore v3
+                    runtime/gate/effect state
+                    contexts/dispatches/Git state
 
-external adapters / real effects = ABSENT IN O001
-Goodix USB / root / secrets / live = UNAVAILABLE BY SCOPE
+Goodix USB / root / secrets / main / live = UNAVAILABLE BY SCOPE
 ```
 
-`engine.py` accetta soltanto oggetti già validati e traduce disposition in
-eventi espliciti; l'entrypoint `create()` è fresh-store-only e `recover()` è
-l'unico percorso ammesso per stato persistito. Uno store schema v1 non viene
-migrato: recovery restituisce `ERROR_LOCKED/STORE_INCOMPATIBLE` lasciando il
-file invariato, perché i vincoli expected-next ed envelope non sono
+`engine.py` resta l'unica autorità sulle transizioni: accetta soltanto oggetti
+già validati e traduce disposition in eventi espliciti. L'entrypoint `create()`
+è fresh-store-only e `recover()` è l'unico percorso ammesso per stato già
+persistito. Gli store schema v1/v2 non vengono migrati: recovery restituisce
+`ERROR_LOCKED/STORE_INCOMPATIBLE` lasciando il file invariato, perché i vincoli
+expected-next/envelope e, per v2, identità di contesto/dispatch/Git non sono
 ricostruibili esattamente. `state.py` è l'unica tabella delle transizioni;
 `policy.py` non deriva capability da testo e vieta
 strutturalmente i branch protetti; `protocols.py` materializza anche l'envelope
 immutabile del task. `persistence.py` conserva soltanto metadati operativi
 ammessi e intenti tipizzati con schema esatto per ciascun `EffectKind`,
-rifiutando mapping arbitrari, campi extra e payload binari. I record degli
-effetti descrivono l'intento immutabile e l'idempotency identity, ma O001 non
-contiene alcun executor capace di applicarli. Questa separazione impedisce di
-scambiare i fake flow Phase A/B per il loop reale richiesto dalle successive
-fasi di qualificazione.
+rifiutando mapping arbitrari, campi extra e payload binari. O002 applica solo
+gli effetti Git sintetici allow-listed mediante `git_manager.py`, dopo averne
+persistito l'identità e verificato l'esito esatto; nessun adapter applica
+effetti sul repository Goodix. `codex_adapter.py` possiede una pending table
+JSONL, distingue response/notification/server-request, nega approval inattese,
+verifica auth ChatGPT, catalogo, modello/effort e permission profile.
+`supervisor.py` trasforma esclusivamente fatti Git/test misurati in
+`ExecutorResult` e payload di review: la conversazione libera del planner non
+viene inoltrata al reviewer.
 
 L'architettura target Goodix, attualmente congelata ma preservata, resta:
 
