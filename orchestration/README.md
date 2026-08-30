@@ -23,7 +23,7 @@ Project-authored content in `orchestration/` is licensed
 From `<git-root>/orchestration` run:
 
 ```bash
-python -m unittest discover -s tests -v
+python -W error::ResourceWarning -m unittest discover -s tests -v
 ```
 
 The command uses only the Python standard library and does not install the
