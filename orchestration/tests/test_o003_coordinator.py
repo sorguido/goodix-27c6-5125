@@ -312,6 +312,8 @@ class O003CoordinatorTests(unittest.TestCase):
         crash_targets = {
             CoordinatorPhase.PLAN_COMPLETED,
             CoordinatorPhase.EXECUTOR_REPORT_PERSISTED,
+            CoordinatorPhase.COMMITTED,
+            CoordinatorPhase.PUSHED,
             CoordinatorPhase.REVIEW_COMPLETED,
             CoordinatorPhase.ACCEPT_FF_VERIFIED,
             CoordinatorPhase.CLEANUP_VERIFIED,
