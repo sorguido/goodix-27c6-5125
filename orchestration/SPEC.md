@@ -202,8 +202,8 @@ Fino ad allora `LIVE_RUNNER_ENABLED=false`.
 |       +-------------+-------------+-------------+            |
 |                             |                               |
 |                     Codex App-Server Client                  |
-|                       /                 \\                    |
-|                      /                   \\                   |
+|                       /                 \                    |
+|                      /                   \                   |
 |             PM THREAD                     EXECUTOR THREAD    |
 |           GPT-5.6 Sol                    allowed model      |
 |                 |                            |               |
