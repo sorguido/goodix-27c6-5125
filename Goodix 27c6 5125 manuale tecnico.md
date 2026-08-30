@@ -73,6 +73,11 @@ O002_DEDICATED_CI=PASS
 O002_DEDICATED_CI_EVIDENCE=GitHub Actions run 33301414210 on 5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
 O002_GOODIX_REGRESSION_CI=PASS
 O002_GOODIX_REGRESSION_CI_EVIDENCE=GitHub Actions run 33301414266 on 5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
+O002_CORRECTIVE_COMMIT=7fd957cd455b982e402ad54f241ea1053bf45a0a
+O002_CORRECTIVE_DEDICATED_CI=PASS
+O002_CORRECTIVE_DEDICATED_CI_EVIDENCE=GitHub Actions run 33302758345 on 7fd957cd455b982e402ad54f241ea1053bf45a0a
+O002_CORRECTIVE_GOODIX_REGRESSION_CI=PASS
+O002_CORRECTIVE_GOODIX_REGRESSION_CI_EVIDENCE=GitHub Actions run 33302758348 on 7fd957cd455b982e402ad54f241ea1053bf45a0a
 O002_REAL_CODEX_SYNTHETIC_CYCLE=PASS
 O002_REAL_CORRECTIVE_LOOP=PASS
 O002_REAL_CORRECTIVE_INDEPENDENT=PASS
@@ -147,7 +152,10 @@ commit anche la regressione Goodix host-only preesistente, run `33297717243`,
 è conclusa `success`. Il checkpoint implementativo O002
 `5c46feacd950c869c0cf0b3ae234c6ea278f7ba2` è stato quindi validato sul task
 branch dalla run dedicata O001/O002 `33301414210` e dalla regressione Goodix
-host-only `33301414266`, entrambe concluse `success`.
+host-only `33301414266`, entrambe concluse `success`. Il corrective di
+hardening `7fd957cd455b982e402ad54f241ea1053bf45a0a`, che porta la suite a 105
+test, è stato validato sul task branch dalla run dedicata `33302758345` e dalla
+regressione Goodix host-only `33302758348`, entrambe concluse `success`.
 Il codice del dominio `orchestration/` e il workflow sono project-authored,
 marcati SPDX e distribuiti come `GPL-2.0-or-later`; non incorporano codice o
 materiale Rockytkg, Goodix/OEM, capture, dati biometrici o segreti.
