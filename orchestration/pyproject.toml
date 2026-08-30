@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goodix-orchestrator"
+version = "0.1.0"
+description = "Deterministic host-only orchestration core for the Goodix project"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["goodix_orchestrator*"]

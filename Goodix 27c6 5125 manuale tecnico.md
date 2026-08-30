@@ -16,6 +16,55 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
+### Bootstrap dell'orchestrazione autonoma — freeze funzionale Goodix e O001 host-only
+
+Con la governance v2.6 il boundary funzionale Goodix è intenzionalmente
+congelato mentre viene costruita e qualificata l'orchestrazione autonoma. O001
+ha implementato il primo slice eseguibile, limitato al core deterministico in
+`orchestration/`: non è un servizio, non invoca modelli e non possiede adapter
+Git, GitHub, Codex App Server, shell, rete, USB, privilegi, materiali protetti o
+live runner.
+
+Lo stato verificato nel task branch O001 basato su
+`6530fc875a1dd3d7fba7b45f02ed3d9c6259c8f2` è:
+
+```text
+ORCHESTRATION_BOOTSTRAP_FREEZE=true
+O001_DETERMINISTIC_CORE_IMPLEMENTED=true
+O001_DETERMINISTIC_CORE_TESTS=PASS
+O001_FAKE_AGENT_FLOWS=PASS
+O001_TEST_COUNT=42
+O001_TEST_CWD=<git-root>/orchestration
+O001_TEST_COMMAND=python -W error::ResourceWarning -m unittest discover -s tests -v
+ORCHESTRATION_READY_FOR_GOODIX=false
+CURRENT_LIVE_AUTHORIZED=false
+GOODIX_FUNCTIONAL_ADVANCEMENT=NONE
+```
+
+Sono verificati host-only: stati ed eventi espliciti con errori strutturati;
+contratti validati `TaskManifest`, `ExecutorResult`, `PMDisposition` e
+`HumanGateManifest`; capability policy deny-by-default che rifiuta nomi
+sconosciuti, capability protette e grant assenti; store SQLite single-file con
+schema/protocol versionati, transazioni, revisioni compare-and-swap e
+fail-closed su corruzione o incompatibilità; ledger puramente dichiarativo per
+`BRANCH_CREATE`, `COMMIT`, `PUSH`, `INTEGRATION_FF` e `GATE_CREATE`; recovery
+dei gate sui due confini di crash create/state-update e decision/state-update;
+replay terminale vietato; riconciliazione degli effetti
+`NOT_STARTED/IN_PROGRESS/COMPLETED/AMBIGUOUS`, con esito ignoto che porta a
+`ERROR_LOCKED`.
+
+I fake flow coprono `ACCEPT` con task successivo e `DONE`, `CORRECTIVE`,
+`REPLAN`, stop/approve/deny del Human Gate, pausa rate-limit e resume esplicito,
+restart pulito, store corrotto/incompatibile, effetto completato e confine
+esterno ambiguo. Le policy assertion dell'Executor restano dati di protocollo e
+non sono promosse a prova di enforcement reale.
+
+Restano deliberatamente futuri O002/O003: process isolation negativa a livello
+OS, App Server e modelli reali, worktree/ref e fast-forward reali, GitHub gate
+identity/commit-bound, rete, servizio persistente e qualunque live runner. O001
+non soddisfa quindi la bootstrap closure complessiva, non riapre il lavoro
+Goodix e non modifica lo stato tecnico target-specific documentato sotto.
+
 ### Stato corrente post-audit D278/04 riconciliato con la seconda single-shot — gap di re-entry cross-session provato e fenomeno osservato sul target, identità causale non provata; nessuna live autorizzata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
@@ -2590,6 +2639,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
+| Orchestrazione O001 | core deterministico host-only implementato e 42 test PASS; bootstrap complessivo non pronto | state machine, contratti, policy, SQLite, idempotenza/recovery e fake flow provati; nessun adapter o side effect reale; freeze Goodix invariato |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
@@ -2769,6 +2819,40 @@ state. Nessuna di queste affermazioni terze parti promuove un fatto del target
 locale.
 
 ## Architettura
+
+### Architettura dell'orchestrazione in bootstrap
+
+Il core O001 è separato dai runtime Goodix GPL/LGPL e non importa né richiama i
+loro moduli:
+
+```text
+manifest validati + fake PM/Executor
+                 |
+                 v
+       DeterministicEngine
+        |       |       |
+        v       v       v
+  state.py  policy.py  protocols.py
+        \       |       /
+         \      v      /
+      SQLiteStateStore
+        runtime state + gate state
+        idempotency/effect ledger (data only)
+
+external adapters / real effects = ABSENT IN O001
+Goodix USB / root / secrets / live = UNAVAILABLE BY SCOPE
+```
+
+`engine.py` accetta soltanto oggetti già validati e traduce disposition in
+eventi espliciti; `state.py` è l'unica tabella delle transizioni; `policy.py`
+non deriva capability da testo; `persistence.py` conserva soltanto metadati
+operativi ammessi e rifiuta chiavi secret-shaped o payload binari. I record
+degli effetti descrivono l'intento immutabile e l'idempotency identity, ma O001
+non contiene alcun executor capace di applicarli. Questa separazione impedisce
+di scambiare i fake flow Phase A/B per il loop reale richiesto dalle successive
+fasi di qualificazione.
+
+L'architettura target Goodix, attualmente congelata ma preservata, resta:
 
 ```text
 Windows Biometric Framework
