@@ -1,3 +1,4 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix orchestrator deterministic core (O001)
 
 O001 implements only the deterministic, host-only orchestration core described
@@ -8,6 +9,14 @@ fake-agent flows.
 It contains no Codex App Server, Git/GitHub, shell, network, USB, privileged,
 protected-material, or live-runner adapter. Effect records are data only and
 cannot execute an external action.
+
+The persisted schema is versioned and migrates O001 schema v1 to v2 without
+discarding runtime state. Engine creation is fresh-store-only; every existing
+store must enter through recovery. Task manifests structurally deny `main`,
+and persisted next-task/envelope metadata prevents identity or scope drift.
+
+Project-authored content in `orchestration/` is licensed
+`GPL-2.0-or-later`. O001 incorporates no external implementation code.
 
 ## Test invocation
 

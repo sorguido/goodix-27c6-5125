@@ -7,6 +7,7 @@
 | --- | --- | --- |
 | `core/` | `GPL-2.0-or-later` | Userspace transport, protocol, TLS, FDT, capture and image code. |
 | `tools/` | `GPL-2.0-or-later` | Tools connected to or derived from the GPL core. |
+| `orchestration/` | `GPL-2.0-or-later` | Project-authored autonomous orchestration infrastructure and deterministic core. |
 | `libfprint-driver/` | `LGPL-2.1-or-later` | Upstream-facing driver/glue; separate copyright boundary. |
 | `src/`, `operator_kit/`, historical `analysis/D239`–`D246` | historical status retained | Frozen/reproducibility paths are not mass-moved or mass-relicensed by D247. |
 | `docs/`, `analysis/` | file-specific | Check the file header and provenance; private evidence is not made open source by location. |
@@ -110,6 +111,23 @@ Before release, perform a separate audit of content and history for proprietary
 binaries/firmware, captures, secrets and biometric/private data. Use a clean
 export, new history or a purpose-built filter when needed; never automatically
 push or expose the private history. D247 does not modify the public repository.
+
+## O001 — autonomous orchestration deterministic core
+
+`orchestration/` is a project-authored `GPL-2.0-or-later` domain under the
+licensing decision explicitly approved by the Human Authority for O001. The
+Python core, tests, Markdown/configuration and dedicated host-only workflow use
+SPDX identifiers consistent with that domain. The workflow lives under
+`.github/workflows/` for GitHub discovery but is part of the same O001
+project-authored expression.
+
+O001 was implemented from the project governance and the canonical
+`orchestration/SPEC.md`, using only Python standard-library APIs. It does not
+copy, translate, adapt or incorporate Rockytkg code, external implementation
+code, Goodix runtime code, OEM material, captures, protected material or
+biometric data. This licensing assignment does not change the established GPL
+domain of `core/`/`tools/`, the LGPL boundary of `libfprint-driver/`, or the
+file-specific/historical status of other repository paths.
 
 ## D276/03 — componente router LGPL indipendente
 

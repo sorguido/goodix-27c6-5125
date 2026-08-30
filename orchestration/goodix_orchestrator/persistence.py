@@ -1,4 +1,5 @@
-"""Single-file SQLite persistence and idempotency ledger for O001."""
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Single-file SQLite persistence and typed idempotency ledger for O001."""
 
 from __future__ import annotations
 
@@ -6,38 +7,31 @@ import json
 import re
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator
+
+from .policy import ProtectedBranchError, require_ordinary_branch
 
 from .protocols import (
     GateStatus,
     HumanGateManifest,
     PROTOCOL_VERSION,
     ProtocolValidationError,
+    TaskEnvelope,
 )
 from .state import OrchestratorState, PAUSED_STATES
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _RUN_ID_RE = re.compile(r"^ORCH-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
+_TASK_ID_RE = re.compile(r"^TASK-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
+_TURN_ID_RE = re.compile(r"^TURN-[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
+_GATE_ID_RE = re.compile(r"^HG-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-_FORBIDDEN_METADATA_KEYS = frozenset(
-    {
-        "auth",
-        "authorization",
-        "biometric",
-        "credential",
-        "password",
-        "private_key",
-        "protected_material",
-        "psk",
-        "secret",
-        "token",
-    }
-)
+_REF_FORBIDDEN_RE = re.compile(r"[\s~^:?*\[\\]")
 
 
 class PersistenceError(Exception):
@@ -108,6 +102,8 @@ class RuntimeRecord:
     gate_id: str | None = None
     baseline_sha: str | None = None
     result_sha: str | None = None
+    expected_next_task_id: str | None = None
+    task_envelope: TaskEnvelope | None = None
     protocol_version: str = PROTOCOL_VERSION
     revision: int = 0
 
@@ -129,6 +125,17 @@ class RuntimeRecord:
             raise StoreIncompatibleError(f"runtime protocol version {self.protocol_version!r}")
         if not isinstance(self.revision, int) or self.revision < 0:
             raise StoreCorruptionError(f"invalid revision: {self.revision!r}")
+        for field_name, pattern in (
+            ("task_id", _TASK_ID_RE),
+            ("expected_next_task_id", _TASK_ID_RE),
+            ("turn_id", _TURN_ID_RE),
+            ("gate_id", _GATE_ID_RE),
+        ):
+            value = getattr(self, field_name)
+            if value is not None and (
+                not isinstance(value, str) or pattern.fullmatch(value) is None
+            ):
+                raise StoreCorruptionError(f"invalid {field_name}: {value!r}")
         for field_name in ("baseline_sha", "result_sha"):
             value = getattr(self, field_name)
             if value is not None and (not isinstance(value, str) or _SHA_RE.fullmatch(value) is None):
@@ -141,8 +148,159 @@ class RuntimeRecord:
             raise StoreCorruptionError("HUMAN_GATE_WAIT is missing GATE_ID")
         if state is not OrchestratorState.HUMAN_GATE_WAIT and self.gate_id is not None:
             raise StoreCorruptionError("GATE_ID is present outside HUMAN_GATE_WAIT")
+        if self.expected_next_task_id is not None:
+            if state not in {
+                OrchestratorState.PM_PLANNING,
+                OrchestratorState.ERROR_LOCKED,
+            }:
+                raise StoreCorruptionError(
+                    "expected next TASK_ID exists outside PM_PLANNING/ERROR_LOCKED"
+                )
+            if self.task_envelope is not None:
+                raise StoreCorruptionError(
+                    "expected next TASK_ID conflicts with retained task envelope"
+                )
+        if self.task_envelope is not None:
+            if not isinstance(self.task_envelope, TaskEnvelope):
+                raise StoreCorruptionError("invalid task envelope object")
+            if self.task_envelope.task_id != self.task_id:
+                raise StoreCorruptionError("task envelope TASK_ID mismatch")
+        if state is OrchestratorState.DONE and self.expected_next_task_id is not None:
+            raise StoreCorruptionError("DONE retains an expected next TASK_ID")
         object.__setattr__(self, "current_state", state)
         object.__setattr__(self, "previous_recoverable_state", previous)
+
+
+@dataclass(frozen=True, slots=True)
+class _EffectIntentMixin:
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _validated_task_id(value: str) -> str:
+    if not isinstance(value, str) or _TASK_ID_RE.fullmatch(value) is None:
+        raise UnsafePersistenceDataError(f"invalid task_id: {value!r}")
+    return value
+
+
+def _validated_gate_id(value: str) -> str:
+    if not isinstance(value, str) or _GATE_ID_RE.fullmatch(value) is None:
+        raise UnsafePersistenceDataError(f"invalid gate_id: {value!r}")
+    return value
+
+
+def _validated_sha(value: str, *, optional: bool = False) -> str | None:
+    if optional and value is None:
+        return None
+    if not isinstance(value, str) or _SHA_RE.fullmatch(value) is None:
+        raise UnsafePersistenceDataError(f"invalid SHA: {value!r}")
+    return value
+
+
+def _validated_ref(value: str, *, target: bool) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value.startswith("/")
+        or value.endswith("/")
+        or value.endswith(".")
+        or ".." in value
+        or "//" in value
+        or "@{" in value
+        or _REF_FORBIDDEN_RE.search(value)
+    ):
+        raise UnsafePersistenceDataError(f"invalid ref: {value!r}")
+    if target:
+        try:
+            require_ordinary_branch(value)
+        except ProtectedBranchError as exc:
+            raise UnsafePersistenceDataError(str(exc)) from exc
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class BranchCreateIntent(_EffectIntentMixin):
+    task_id: str
+    branch: str
+    source_ref: str
+    baseline_sha: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "branch", _validated_ref(self.branch, target=True))
+        object.__setattr__(self, "source_ref", _validated_ref(self.source_ref, target=False))
+        object.__setattr__(self, "baseline_sha", _validated_sha(self.baseline_sha))
+
+
+@dataclass(frozen=True, slots=True)
+class CommitIntent(_EffectIntentMixin):
+    task_id: str
+    branch: str
+    baseline_sha: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "branch", _validated_ref(self.branch, target=True))
+        object.__setattr__(self, "baseline_sha", _validated_sha(self.baseline_sha))
+
+
+@dataclass(frozen=True, slots=True)
+class PushIntent(_EffectIntentMixin):
+    task_id: str
+    branch: str
+    commit_sha: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "branch", _validated_ref(self.branch, target=True))
+        object.__setattr__(self, "commit_sha", _validated_sha(self.commit_sha))
+
+
+@dataclass(frozen=True, slots=True)
+class IntegrationFFIntent(_EffectIntentMixin):
+    task_id: str
+    source_ref: str
+    target_ref: str
+    baseline_sha: str
+    commit_sha: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "source_ref", _validated_ref(self.source_ref, target=False))
+        object.__setattr__(self, "target_ref", _validated_ref(self.target_ref, target=True))
+        object.__setattr__(self, "baseline_sha", _validated_sha(self.baseline_sha))
+        object.__setattr__(self, "commit_sha", _validated_sha(self.commit_sha))
+
+
+@dataclass(frozen=True, slots=True)
+class GateCreateIntent(_EffectIntentMixin):
+    task_id: str
+    gate_id: str
+    commit_sha: str | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "gate_id", _validated_gate_id(self.gate_id))
+        object.__setattr__(
+            self, "commit_sha", _validated_sha(self.commit_sha, optional=True)
+        )
+
+
+EffectIntent = (
+    BranchCreateIntent
+    | CommitIntent
+    | PushIntent
+    | IntegrationFFIntent
+    | GateCreateIntent
+)
+
+_EFFECT_INTENT_TYPES: dict[EffectKind, type[_EffectIntentMixin]] = {
+    EffectKind.BRANCH_CREATE: BranchCreateIntent,
+    EffectKind.COMMIT: CommitIntent,
+    EffectKind.PUSH: PushIntent,
+    EffectKind.INTEGRATION_FF: IntegrationFFIntent,
+    EffectKind.GATE_CREATE: GateCreateIntent,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,7 +309,7 @@ class EffectRecord:
     idempotency_key: str
     kind: EffectKind
     status: EffectStatus
-    intent: dict[str, Any]
+    intent: EffectIntent
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,26 +324,6 @@ def _utc_now() -> str:
 
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-
-
-def _validate_safe_metadata(value: Any, path: str = "intent") -> None:
-    if isinstance(value, bytes):
-        raise UnsafePersistenceDataError(f"binary data rejected at {path}")
-    if isinstance(value, Mapping):
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise UnsafePersistenceDataError(f"non-string key at {path}")
-            normalized = key.lower().replace("-", "_")
-            if normalized in _FORBIDDEN_METADATA_KEYS or any(
-                token in normalized for token in ("password", "private_key", "secret", "token", "psk")
-            ):
-                raise UnsafePersistenceDataError(f"forbidden metadata key at {path}.{key}")
-            _validate_safe_metadata(item, f"{path}.{key}")
-    elif isinstance(value, (list, tuple)):
-        for index, item in enumerate(value):
-            _validate_safe_metadata(item, f"{path}[{index}]")
-    elif value is not None and not isinstance(value, (str, int, float, bool)):
-        raise UnsafePersistenceDataError(f"unsupported metadata type at {path}: {type(value).__name__}")
 
 
 class SQLiteStateStore:
@@ -224,7 +362,11 @@ class SQLiteStateStore:
                     raise StoreCorruptionError(
                         f"unexpected schema tables: expected {sorted(self._REQUIRED_TABLES)}, got {sorted(tables)}"
                     )
+                elif self._read_schema_version(connection) == 1:
+                    self._migrate_v1_to_v2(connection)
                 self._validate_schema(connection)
+                for row in connection.execute("SELECT * FROM effects"):
+                    self._effect_from_row(row)
                 connection.commit()
         except (StoreCorruptionError, StoreIncompatibleError):
             raise
@@ -247,6 +389,8 @@ class SQLiteStateStore:
                 gate_id TEXT,
                 baseline_sha TEXT,
                 result_sha TEXT,
+                expected_next_task_id TEXT,
+                task_envelope_json TEXT,
                 protocol_version TEXT NOT NULL,
                 revision INTEGER NOT NULL CHECK (revision >= 0)
             )""",
@@ -278,12 +422,37 @@ class SQLiteStateStore:
             (PROTOCOL_VERSION,),
         )
 
+    @staticmethod
+    def _read_schema_version(connection: sqlite3.Connection) -> int:
+        row = connection.execute(
+            "SELECT value FROM metadata WHERE key = 'schema_version'"
+        ).fetchone()
+        try:
+            return int(row[0])
+        except (TypeError, ValueError, IndexError) as exc:
+            raise StoreCorruptionError("missing or malformed schema_version") from exc
+
+    def _migrate_v1_to_v2(self, connection: sqlite3.Connection) -> None:
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(runtime_state)")
+        }
+        if "expected_next_task_id" in columns or "task_envelope_json" in columns:
+            raise StoreCorruptionError("partial v1 to v2 runtime migration")
+        connection.execute(
+            "ALTER TABLE runtime_state ADD COLUMN expected_next_task_id TEXT"
+        )
+        connection.execute(
+            "ALTER TABLE runtime_state ADD COLUMN task_envelope_json TEXT"
+        )
+        connection.execute(
+            "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
+            (str(SCHEMA_VERSION),),
+        )
+
     def _validate_schema(self, connection: sqlite3.Connection) -> None:
         metadata = dict(connection.execute("SELECT key, value FROM metadata"))
-        try:
-            schema_version = int(metadata["schema_version"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise StoreCorruptionError("missing or malformed schema_version") from exc
+        schema_version = self._read_schema_version(connection)
         if schema_version != SCHEMA_VERSION:
             raise StoreIncompatibleError(
                 f"schema version {schema_version}, expected {SCHEMA_VERSION}"
@@ -314,6 +483,20 @@ class SQLiteStateStore:
             raise StoreCorruptionError(str(exc)) from exc
         if row is None:
             return None
+        envelope = None
+        if row["task_envelope_json"] is not None:
+            try:
+                payload = json.loads(row["task_envelope_json"])
+                if not isinstance(payload, dict):
+                    raise TypeError("task envelope is not an object")
+                envelope = TaskEnvelope.from_dict(payload)
+            except (
+                json.JSONDecodeError,
+                ProtocolValidationError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                raise StoreCorruptionError(f"malformed task envelope: {exc}") from exc
         return RuntimeRecord(
             current_state=row["current_state"],
             previous_recoverable_state=row["previous_recoverable_state"],
@@ -323,6 +506,8 @@ class SQLiteStateStore:
             gate_id=row["gate_id"],
             baseline_sha=row["baseline_sha"],
             result_sha=row["result_sha"],
+            expected_next_task_id=row["expected_next_task_id"],
+            task_envelope=envelope,
             protocol_version=row["protocol_version"],
             revision=row["revision"],
         )
@@ -341,6 +526,10 @@ class SQLiteStateStore:
             persisted.gate_id,
             persisted.baseline_sha,
             persisted.result_sha,
+            persisted.expected_next_task_id,
+            _canonical_json(persisted.task_envelope.to_dict())
+            if persisted.task_envelope is not None
+            else None,
             persisted.protocol_version,
             persisted.revision,
         )
@@ -353,8 +542,9 @@ class SQLiteStateStore:
                             """INSERT INTO runtime_state(
                                    singleton, current_state, previous_recoverable_state,
                                    run_id, task_id, turn_id, gate_id, baseline_sha,
-                                   result_sha, protocol_version, revision
-                               ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                   result_sha, expected_next_task_id,
+                                   task_envelope_json, protocol_version, revision
+                               ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             values,
                         )
                     except sqlite3.IntegrityError as exc:
@@ -364,8 +554,9 @@ class SQLiteStateStore:
                         """UPDATE runtime_state
                            SET current_state = ?, previous_recoverable_state = ?,
                                run_id = ?, task_id = ?, turn_id = ?, gate_id = ?,
-                               baseline_sha = ?, result_sha = ?, protocol_version = ?,
-                               revision = ?
+                               baseline_sha = ?, result_sha = ?,
+                               expected_next_task_id = ?, task_envelope_json = ?,
+                               protocol_version = ?, revision = ?
                            WHERE singleton = 1 AND revision = ?""",
                         values + (expected_revision,),
                     )
@@ -380,13 +571,22 @@ class SQLiteStateStore:
             raise StoreCorruptionError(str(exc)) from exc
         return persisted
 
+    def operational_record_count(self) -> int:
+        with self._checked_connection() as connection:
+            runtime_count = connection.execute(
+                "SELECT COUNT(*) FROM runtime_state"
+            ).fetchone()[0]
+            effect_count = connection.execute("SELECT COUNT(*) FROM effects").fetchone()[0]
+            gate_count = connection.execute("SELECT COUNT(*) FROM gates").fetchone()[0]
+        return int(runtime_count) + int(effect_count) + int(gate_count)
+
     def request_effect(
         self,
         *,
         effect_id: str,
         idempotency_key: str,
         kind: EffectKind | str,
-        intent: Mapping[str, Any],
+        intent: EffectIntent,
     ) -> EffectRequest:
         if not effect_id or not idempotency_key:
             raise IdempotencyIntentMismatchError("effect_id and idempotency_key must be non-empty")
@@ -394,8 +594,12 @@ class SQLiteStateStore:
             parsed_kind = kind if isinstance(kind, EffectKind) else EffectKind(kind)
         except (TypeError, ValueError) as exc:
             raise IdempotencyIntentMismatchError(f"unknown effect kind: {kind!r}") from exc
-        intent_data = dict(intent)
-        _validate_safe_metadata(intent_data)
+        expected_intent_type = _EFFECT_INTENT_TYPES[parsed_kind]
+        if type(intent) is not expected_intent_type:
+            raise UnsafePersistenceDataError(
+                f"{parsed_kind.value} requires {expected_intent_type.__name__}"
+            )
+        intent_data = intent.to_dict()
         intent_json = _canonical_json(intent_data)
         now = _utc_now()
 
@@ -426,7 +630,7 @@ class SQLiteStateStore:
                 )
                 connection.commit()
                 record = EffectRecord(
-                    effect_id, idempotency_key, parsed_kind, EffectStatus.NOT_STARTED, intent_data
+                    effect_id, idempotency_key, parsed_kind, EffectStatus.NOT_STARTED, intent
                 )
                 return EffectRequest(EffectRequestAction.EXECUTE, record)
 
@@ -460,14 +664,16 @@ class SQLiteStateStore:
     @staticmethod
     def _effect_from_row(row: sqlite3.Row) -> EffectRecord:
         try:
-            intent = json.loads(row["intent_json"])
-            if not isinstance(intent, dict):
+            kind = EffectKind(row["kind"])
+            intent_data = json.loads(row["intent_json"])
+            if not isinstance(intent_data, dict):
                 raise TypeError("effect intent is not an object")
-            _validate_safe_metadata(intent)
+            intent_type = _EFFECT_INTENT_TYPES[kind]
+            intent = intent_type(**intent_data)
             return EffectRecord(
                 effect_id=row["effect_id"],
                 idempotency_key=row["idempotency_key"],
-                kind=EffectKind(row["kind"]),
+                kind=kind,
                 status=EffectStatus(row["status"]),
                 intent=intent,
             )

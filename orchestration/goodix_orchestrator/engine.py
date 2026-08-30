@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Pure deterministic loop coordinator; contains no external adapters."""
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from .protocols import (
     GateStatus,
     PMDisposition,
     PauseReason,
+    TaskEnvelope,
     TaskManifest,
 )
 from .state import OrchestratorState, StateEvent, transition
@@ -41,6 +43,9 @@ class RecoveryResult:
     detail: str | None = None
 
 
+_ENGINE_CONSTRUCTION_TOKEN = object()
+
+
 class DeterministicEngine:
     """Persist every state change and reject all implicit interpretations."""
 
@@ -49,7 +54,14 @@ class DeterministicEngine:
         store: SQLiteStateStore,
         policy: CapabilityPolicy,
         runtime: RuntimeRecord,
+        *,
+        _construction_token: object | None = None,
     ) -> None:
+        if _construction_token is not _ENGINE_CONSTRUCTION_TOKEN:
+            raise EngineError(
+                "DIRECT_CONSTRUCTION_FORBIDDEN",
+                "use create() for a fresh store or recover() for persisted state",
+            )
         self.store = store
         self.policy = policy
         self.runtime = runtime
@@ -63,18 +75,21 @@ class DeterministicEngine:
         run_id: str,
     ) -> "DeterministicEngine":
         store.initialize()
-        runtime = store.load_runtime()
-        if runtime is None:
-            runtime = store.save_runtime(
-                RuntimeRecord(current_state=OrchestratorState.BOOTSTRAP, run_id=run_id),
-                expected_revision=None,
-            )
-        elif runtime.run_id != run_id:
+        if store.operational_record_count() != 0:
             raise EngineError(
-                "RUN_ID_MISMATCH",
-                f"persisted {runtime.run_id}, requested {run_id}",
+                "EXISTING_STATE_REQUIRES_RECOVERY",
+                "create() is fresh-only; use recover() for an existing store",
             )
-        return cls(store, policy, runtime)
+        runtime = store.save_runtime(
+            RuntimeRecord(current_state=OrchestratorState.BOOTSTRAP, run_id=run_id),
+            expected_revision=None,
+        )
+        return cls(
+            store,
+            policy,
+            runtime,
+            _construction_token=_ENGINE_CONSTRUCTION_TOKEN,
+        )
 
     @classmethod
     def recover(
@@ -95,7 +110,12 @@ class DeterministicEngine:
                     "RUN_ID_MISMATCH",
                     f"persisted {runtime.run_id}, expected {expected_run_id}",
                 )
-            engine = cls(store, policy, runtime)
+            engine = cls(
+                store,
+                policy,
+                runtime,
+                _construction_token=_ENGINE_CONSTRUCTION_TOKEN,
+            )
 
             unresolved = store.effects_with_statuses(
                 (EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS)
@@ -205,12 +225,31 @@ class DeterministicEngine:
                 "BASELINE_MISMATCH",
                 f"persisted {self.runtime.baseline_sha}, manifest {manifest.baseline_sha}",
             )
+        if (
+            self.runtime.expected_next_task_id is not None
+            and manifest.task_id != self.runtime.expected_next_task_id
+        ):
+            self.fail_closed(
+                "EXPECTED_NEXT_TASK_MISMATCH",
+                f"expected {self.runtime.expected_next_task_id}, manifest {manifest.task_id}",
+            )
+        proposed_envelope = TaskEnvelope.from_manifest(manifest)
+        if (
+            self.runtime.task_envelope is not None
+            and proposed_envelope != self.runtime.task_envelope
+        ):
+            self.fail_closed(
+                "TASK_ENVELOPE_MISMATCH",
+                "replanned manifest changed the immutable delegated envelope",
+            )
         self.policy.require(manifest.capabilities_required)
         return self._advance(
             StateEvent.TASK_PREPARED,
             task_id=manifest.task_id,
             baseline_sha=manifest.baseline_sha,
             result_sha=None,
+            expected_next_task_id=None,
+            task_envelope=proposed_envelope,
             gate_id=None,
         )
 
@@ -231,6 +270,20 @@ class DeterministicEngine:
             self.fail_closed(
                 "RESULT_BASELINE_MISMATCH",
                 f"persisted {self.runtime.baseline_sha}, result {result.review_set.baseline_sha}",
+            )
+        assertions = result.policy_assertions
+        violations: list[str] = []
+        if assertions.usb_open_count != 0:
+            violations.append(f"usb_open_count={assertions.usb_open_count}")
+        if assertions.sudo_used:
+            violations.append("sudo_used=true")
+        if assertions.protected_material_accessed:
+            violations.append("protected_material_accessed=true")
+        if assertions.main_modified:
+            violations.append("main_modified=true")
+        if violations:
+            self.fail_closed(
+                "EXECUTOR_POLICY_ASSERTION_VIOLATION", ",".join(violations)
             )
         return self._advance(
             StateEvent.EXECUTOR_COMPLETED,
@@ -259,8 +312,9 @@ class DeterministicEngine:
             return self._advance(
                 StateEvent.ACCEPT,
                 target=disposition.accept_target,
-                task_id=disposition.next_task_id or self.runtime.task_id,
                 baseline_sha=self.runtime.result_sha,
+                expected_next_task_id=disposition.next_task_id,
+                task_envelope=None,
             )
         if primary is Disposition.CORRECTIVE:
             return self._advance(StateEvent.CORRECTIVE)
@@ -278,7 +332,11 @@ class DeterministicEngine:
             }[disposition.pause_reason]
             return self._advance(pause_event)
         if primary is Disposition.DONE:
-            return self._advance(StateEvent.DONE)
+            return self._advance(
+                StateEvent.DONE,
+                expected_next_task_id=None,
+                task_envelope=None,
+            )
         self.fail_closed("UNKNOWN_DISPOSITION", repr(primary))
 
     def resolve_gate(self, *, gate_id: str, approve: bool) -> OrchestratorState:

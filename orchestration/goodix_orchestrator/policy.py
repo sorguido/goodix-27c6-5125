@@ -1,4 +1,5 @@
-"""Deny-by-default O001 capability policy."""
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Deny-by-default O001 capability and protected-branch policy."""
 
 from __future__ import annotations
 
@@ -43,6 +44,7 @@ HOST_ONLY_CAPABILITIES = frozenset(
 )
 
 PROTECTED_CAPABILITIES = frozenset(set(Capability) - set(HOST_ONLY_CAPABILITIES))
+PROTECTED_MAIN_REFS = frozenset({"main", "heads/main", "refs/heads/main"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +62,20 @@ class CapabilityDeniedError(Exception):
 
     def __str__(self) -> str:
         return f"CAPABILITY_DENIED: {', '.join(self.decision.reasons)}"
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedBranchError(Exception):
+    branch: str
+
+    def __str__(self) -> str:
+        return f"PROTECTED_MAIN_BRANCH: {self.branch}"
+
+
+def require_ordinary_branch(branch: str) -> str:
+    if branch in PROTECTED_MAIN_REFS:
+        raise ProtectedBranchError(branch)
+    return branch
 
 
 def parse_capability(value: Capability | str) -> Capability:

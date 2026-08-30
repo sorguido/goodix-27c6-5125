@@ -25,17 +25,21 @@ ha implementato il primo slice eseguibile, limitato al core deterministico in
 Git, GitHub, Codex App Server, shell, rete, USB, privilegi, materiali protetti o
 live runner.
 
-Lo stato verificato nel task branch O001 basato su
-`6530fc875a1dd3d7fba7b45f02ed3d9c6259c8f2` è:
+Lo stato verificato nel task branch O001, basato su
+`6530fc875a1dd3d7fba7b45f02ed3d9c6259c8f2` e corretto a partire dal commit
+reviewato `9610246e8dfc55afe21697850b1337e318e162a1`, è:
 
 ```text
 ORCHESTRATION_BOOTSTRAP_FREEZE=true
 O001_DETERMINISTIC_CORE_IMPLEMENTED=true
+O001_AI_PM_FINDINGS_CORRECTED=true
 O001_DETERMINISTIC_CORE_TESTS=PASS
 O001_FAKE_AGENT_FLOWS=PASS
-O001_TEST_COUNT=42
+O001_TEST_COUNT=62
 O001_TEST_CWD=<git-root>/orchestration
 O001_TEST_COMMAND=python -W error::ResourceWarning -m unittest discover -s tests -v
+O001_DEDICATED_CI=CONFIGURED
+O001_LICENSE=GPL-2.0-or-later
 ORCHESTRATION_READY_FOR_GOODIX=false
 CURRENT_LIVE_AUTHORIZED=false
 GOODIX_FUNCTIONAL_ADVANCEMENT=NONE
@@ -43,21 +47,42 @@ GOODIX_FUNCTIONAL_ADVANCEMENT=NONE
 
 Sono verificati host-only: stati ed eventi espliciti con errori strutturati;
 contratti validati `TaskManifest`, `ExecutorResult`, `PMDisposition` e
-`HumanGateManifest`; capability policy deny-by-default che rifiuta nomi
-sconosciuti, capability protette e grant assenti; store SQLite single-file con
-schema/protocol versionati, transazioni, revisioni compare-and-swap e
-fail-closed su corruzione o incompatibilità; ledger puramente dichiarativo per
-`BRANCH_CREATE`, `COMMIT`, `PUSH`, `INTEGRATION_FF` e `GATE_CREATE`; recovery
-dei gate sui due confini di crash create/state-update e decision/state-update;
-replay terminale vietato; riconciliazione degli effetti
+`HumanGateManifest`; rifiuto strutturale di `main`, `heads/main` e
+`refs/heads/main` come task branch o integration branch; capability policy
+deny-by-default che rifiuta nomi sconosciuti, capability protette e grant
+assenti; persistenza e enforcement dell'esatto `expected_next_task_id` dopo
+`ACCEPT`; envelope operativo immutabile del task attraverso `REPLAN`, inclusi
+baseline, branch, modello, gate class, capability, scope, non-goal e obbligo di
+aggiornamento manuale; store SQLite single-file con schema/protocol versionati,
+migrazione transazionale v1→v2, revisioni compare-and-swap e fail-closed su
+corruzione o incompatibilità. `create()` opera solo su store privo di stato
+operativo, `recover()` è l'unico ingresso per stato già persistito e la
+costruzione diretta dell'engine è vietata.
+
+Il ledger puramente dichiarativo usa intenti tipizzati e allow-listed per
+`BRANCH_CREATE`, `COMMIT`, `PUSH`, `INTEGRATION_FF` e `GATE_CREATE`: ogni tipo
+ha campi esatti e validati, mentre mapping arbitrari, campi ignoti, payload
+binari e target `main` falliscono chiuso. Sono inoltre verificati recovery dei
+gate sui due confini di crash create/state-update e decision/state-update,
+replay terminale vietato e riconciliazione degli effetti
 `NOT_STARTED/IN_PROGRESS/COMPLETED/AMBIGUOUS`, con esito ignoto che porta a
-`ERROR_LOCKED`.
+`ERROR_LOCKED`. `GATE_DENY` può continuare soltanto verso pianificazione PM o
+`DONE`, mai direttamente verso un nuovo task pronto.
 
 I fake flow coprono `ACCEPT` con task successivo e `DONE`, `CORRECTIVE`,
 `REPLAN`, stop/approve/deny del Human Gate, pausa rate-limit e resume esplicito,
 restart pulito, store corrotto/incompatibile, effetto completato e confine
-esterno ambiguo. Le policy assertion dell'Executor restano dati di protocollo e
-non sono promosse a prova di enforcement reale.
+esterno ambiguo. Qualunque policy assertion non-zero dell'Executor per accesso
+USB, uso di `sudo`, uso di materiale protetto o modifica di `main` porta ora il
+runtime in `ERROR_LOCKED`; tali assertion restano però dichiarazioni del
+protocollo e non sono promosse a prova dell'isolamento OS reale.
+
+Il workflow dedicato `.github/workflows/orchestration-o001-host-only.yml`
+esegue su push, pull request e richiesta manuale la compilazione Python e
+l'esatto comando di test O001, senza installazioni, segreti, USB o privilegi.
+Il codice del dominio `orchestration/` e il workflow sono project-authored,
+marcati SPDX e distribuiti come `GPL-2.0-or-later`; non incorporano codice o
+materiale Rockytkg, Goodix/OEM, capture, dati biometrici o segreti.
 
 Restano deliberatamente futuri O002/O003: process isolation negativa a livello
 OS, App Server e modelli reali, worktree/ref e fast-forward reali, GitHub gate
@@ -2639,7 +2664,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
-| Orchestrazione O001 | core deterministico host-only implementato e 42 test PASS; bootstrap complessivo non pronto | state machine, contratti, policy, SQLite, idempotenza/recovery e fake flow provati; nessun adapter o side effect reale; freeze Goodix invariato |
+| Orchestrazione O001 | correttivo del core deterministico host-only implementato e 62 test PASS; CI dedicata configurata; bootstrap complessivo non pronto | `main` strutturalmente vietato, expected-next ed envelope REPLAN persistiti, create/recover separati, assertion Executor fail-closed, intenti tipizzati, `GATE_DENY` ristretto, schema v1→v2, SPDX/provenance; nessun adapter o side effect reale; freeze Goodix invariato |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
@@ -2844,12 +2869,16 @@ Goodix USB / root / secrets / live = UNAVAILABLE BY SCOPE
 ```
 
 `engine.py` accetta soltanto oggetti già validati e traduce disposition in
-eventi espliciti; `state.py` è l'unica tabella delle transizioni; `policy.py`
-non deriva capability da testo; `persistence.py` conserva soltanto metadati
-operativi ammessi e rifiuta chiavi secret-shaped o payload binari. I record
-degli effetti descrivono l'intento immutabile e l'idempotency identity, ma O001
-non contiene alcun executor capace di applicarli. Questa separazione impedisce
-di scambiare i fake flow Phase A/B per il loop reale richiesto dalle successive
+eventi espliciti; l'entrypoint `create()` è fresh-store-only e `recover()` è
+l'unico percorso ammesso per stato persistito. `state.py` è l'unica tabella
+delle transizioni; `policy.py` non deriva capability da testo e vieta
+strutturalmente i branch protetti; `protocols.py` materializza anche l'envelope
+immutabile del task. `persistence.py` conserva soltanto metadati operativi
+ammessi e intenti tipizzati con schema esatto per ciascun `EffectKind`,
+rifiutando mapping arbitrari, campi extra e payload binari. I record degli
+effetti descrivono l'intento immutabile e l'idempotency identity, ma O001 non
+contiene alcun executor capace di applicarli. Questa separazione impedisce di
+scambiare i fake flow Phase A/B per il loop reale richiesto dalle successive
 fasi di qualificazione.
 
 L'architettura target Goodix, attualmente congelata ma preservata, resta:

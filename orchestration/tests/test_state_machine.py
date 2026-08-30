@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 import unittest
 
 from goodix_orchestrator.state import (
@@ -57,6 +58,17 @@ class StateMachineTests(unittest.TestCase):
                 target=OrchestratorState.EXECUTOR_RUNNING,
             )
         self.assertEqual(caught.exception.code, "INVALID_GATE_CONTINUATION")
+
+    def test_gate_deny_cannot_continue_to_task_ready(self) -> None:
+        with self.assertRaises(StateTransitionError) as caught:
+            transition(
+                OrchestratorState.HUMAN_GATE_WAIT,
+                StateEvent.GATE_DENY,
+                target=OrchestratorState.TASK_READY,
+            )
+        self.assertEqual(
+            caught.exception.code, "INVALID_GATE_DENIAL_CONTINUATION"
+        )
 
     def test_pause_requires_exact_reconciliation_target(self) -> None:
         with self.assertRaises(StateTransitionError) as caught:

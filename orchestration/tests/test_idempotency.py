@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 import tempfile
 import unittest
 from pathlib import Path
@@ -5,10 +6,15 @@ from pathlib import Path
 from goodix_orchestrator.engine import DeterministicEngine, EngineError
 from goodix_orchestrator.persistence import (
     AmbiguousEffectError,
+    BranchCreateIntent,
+    CommitIntent,
     EffectKind,
     EffectRequestAction,
     EffectStatus,
     IdempotencyIntentMismatchError,
+    IntegrationFFIntent,
+    GateCreateIntent,
+    PushIntent,
     ReconciliationOutcome,
     SQLiteStateStore,
     UnsafePersistenceDataError,
@@ -30,7 +36,12 @@ class IdempotencyTests(unittest.TestCase):
             effect_id="EFFECT-001",
             idempotency_key="TASK-001:COMMIT:one",
             kind=EffectKind.COMMIT,
-            intent=intent or {"task_id": "TASK-001", "tree": "abc"},
+            intent=intent
+            or CommitIntent(
+                task_id="TASK-001",
+                branch="ai-executor/task-001",
+                baseline_sha="a" * 40,
+            ),
         )
 
     def test_completed_same_identity_skips_duplicate(self) -> None:
@@ -44,7 +55,13 @@ class IdempotencyTests(unittest.TestCase):
     def test_same_identity_different_intent_fails_closed(self) -> None:
         self.request()
         with self.assertRaises(IdempotencyIntentMismatchError):
-            self.request({"task_id": "TASK-001", "tree": "different"})
+            self.request(
+                CommitIntent(
+                    task_id="TASK-001",
+                    branch="ai-executor/task-001",
+                    baseline_sha="b" * 40,
+                )
+            )
 
     def test_crash_before_effect_start_is_recoverable(self) -> None:
         self.request()
@@ -54,7 +71,11 @@ class IdempotencyTests(unittest.TestCase):
             effect_id="EFFECT-001",
             idempotency_key="TASK-001:COMMIT:one",
             kind=EffectKind.COMMIT,
-            intent={"task_id": "TASK-001", "tree": "abc"},
+            intent=CommitIntent(
+                task_id="TASK-001",
+                branch="ai-executor/task-001",
+                baseline_sha="a" * 40,
+            ),
         )
         self.assertEqual(retry.action, EffectRequestAction.EXECUTE)
         self.assertEqual(retry.record.status, EffectStatus.NOT_STARTED)
@@ -99,10 +120,93 @@ class IdempotencyTests(unittest.TestCase):
         )
         self.assertEqual(recovered.state, OrchestratorState.ERROR_LOCKED)
         self.assertEqual(recovered.error_code, "AMBIGUOUS_SIDE_EFFECT")
+        with self.assertRaises(EngineError) as caught:
+            DeterministicEngine.create(
+                self.store, policy, run_id="ORCH-20260830-011"
+            )
+        self.assertEqual(
+            caught.exception.code, "EXISTING_STATE_REQUIRES_RECOVERY"
+        )
+
+    def test_restart_with_persisted_ambiguous_effect_locks(self) -> None:
+        policy = CapabilityPolicy((Capability.HOST_READ,))
+        engine = DeterministicEngine.create(
+            self.store, policy, run_id="ORCH-20260830-012"
+        )
+        engine.bootstrap_complete()
+        self.request()
+        self.store.begin_effect("EFFECT-001")
+        self.store.reconcile_effect("EFFECT-001", ReconciliationOutcome.UNKNOWN)
+        recovered = DeterministicEngine.recover(
+            self.path, policy, expected_run_id="ORCH-20260830-012"
+        )
+        self.assertEqual(recovered.state, OrchestratorState.ERROR_LOCKED)
+        self.assertEqual(recovered.error_code, "AMBIGUOUS_SIDE_EFFECT")
+        with self.assertRaises(EngineError) as caught:
+            DeterministicEngine.create(
+                self.store, policy, run_id="ORCH-20260830-012"
+            )
+        self.assertEqual(
+            caught.exception.code, "EXISTING_STATE_REQUIRES_RECOVERY"
+        )
+
+    def test_arbitrary_mapping_payload_and_unknown_fields_are_rejected(self) -> None:
+        for intent in (
+            {"task_id": "TASK-001", "payload": "opaque"},
+            {"task_id": "TASK-001", "value": "opaque"},
+            {"task_id": "TASK-001", "payload": b"binary"},
+            {"task_id": "TASK-001", "branch": "x", "unknown": "extra"},
+        ):
+            with self.subTest(intent=intent), self.assertRaises(
+                UnsafePersistenceDataError
+            ):
+                self.request(intent)
 
     def test_secret_shaped_effect_intent_is_rejected(self) -> None:
         with self.assertRaises(UnsafePersistenceDataError):
             self.request({"task_id": "TASK-001", "auth_token": "must-not-persist"})
+
+    def test_typed_intent_allowlist_covers_each_effect_kind(self) -> None:
+        cases = (
+            (
+                EffectKind.BRANCH_CREATE,
+                BranchCreateIntent(
+                    "TASK-001", "ai-executor/task-001", "orchestration/integration", "a" * 40
+                ),
+            ),
+            (
+                EffectKind.COMMIT,
+                CommitIntent("TASK-001", "ai-executor/task-001", "a" * 40),
+            ),
+            (
+                EffectKind.PUSH,
+                PushIntent("TASK-001", "ai-executor/task-001", "b" * 40),
+            ),
+            (
+                EffectKind.INTEGRATION_FF,
+                IntegrationFFIntent(
+                    "TASK-001",
+                    "ai-executor/task-001",
+                    "orchestration/integration",
+                    "a" * 40,
+                    "b" * 40,
+                ),
+            ),
+            (
+                EffectKind.GATE_CREATE,
+                GateCreateIntent("TASK-001", "HG-001", "b" * 40),
+            ),
+        )
+        for index, (kind, intent) in enumerate(cases):
+            with self.subTest(kind=kind):
+                request = self.store.request_effect(
+                    effect_id=f"EFFECT-{index}",
+                    idempotency_key=f"TASK-001:{kind.value}:{index}",
+                    kind=kind,
+                    intent=intent,
+                )
+                self.assertEqual(request.action, EffectRequestAction.EXECUTE)
+                self.assertEqual(request.record.intent, intent)
 
 
 if __name__ == "__main__":

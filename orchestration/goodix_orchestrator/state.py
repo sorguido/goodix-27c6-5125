@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Explicit state machine for the O001 deterministic core."""
 
 from __future__ import annotations
@@ -177,10 +178,7 @@ def transition(
             )
         return parsed_target
 
-    if source is OrchestratorState.HUMAN_GATE_WAIT and parsed_event in {
-        StateEvent.GATE_APPROVE,
-        StateEvent.GATE_DENY,
-    }:
+    if source is OrchestratorState.HUMAN_GATE_WAIT and parsed_event is StateEvent.GATE_APPROVE:
         if parsed_target not in GATE_CONTINUATION_STATES:
             raise StateTransitionError(
                 "INVALID_GATE_CONTINUATION",
@@ -188,6 +186,18 @@ def transition(
                 parsed_event.value,
                 parsed_target.value if parsed_target else None,
                 tuple(sorted(item.value for item in GATE_CONTINUATION_STATES)),
+            )
+        return parsed_target
+
+    if source is OrchestratorState.HUMAN_GATE_WAIT and parsed_event is StateEvent.GATE_DENY:
+        allowed = {OrchestratorState.PM_PLANNING, OrchestratorState.DONE}
+        if parsed_target not in allowed:
+            raise StateTransitionError(
+                "INVALID_GATE_DENIAL_CONTINUATION",
+                source.value,
+                parsed_event.value,
+                parsed_target.value if parsed_target else None,
+                tuple(sorted(item.value for item in allowed)),
             )
         return parsed_target
 

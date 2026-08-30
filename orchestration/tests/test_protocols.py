@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 import unittest
 
 from goodix_orchestrator.policy import Capability
@@ -44,6 +45,21 @@ class ProtocolTests(unittest.TestCase):
             with self.subTest(capability=capability), self.assertRaises(ProtocolValidationError) as caught:
                 TaskManifest.from_dict(data)
             self.assertEqual(caught.exception.code, code)
+
+    def test_task_and_integration_main_branches_are_structurally_denied(self) -> None:
+        for field, value in (
+            ("task_branch", "main"),
+            ("integration_branch", "main"),
+            ("task_branch", "refs/heads/main"),
+            ("integration_branch", "heads/main"),
+        ):
+            data = task_manifest().to_dict()
+            data[field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(
+                ProtocolValidationError
+            ) as caught:
+                TaskManifest.from_dict(data)
+            self.assertEqual(caught.exception.code, "PROTECTED_MAIN_BRANCH")
 
     def test_executor_result_round_trip_and_validation(self) -> None:
         result = executor_result()

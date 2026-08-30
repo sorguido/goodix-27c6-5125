@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 """Validated structured contracts for the O001 orchestration boundary."""
 
 from __future__ import annotations
@@ -7,7 +8,12 @@ from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from typing import Any, Mapping
 
-from .policy import Capability, PROTECTED_CAPABILITIES
+from .policy import (
+    Capability,
+    PROTECTED_CAPABILITIES,
+    ProtectedBranchError,
+    require_ordinary_branch,
+)
 from .state import GATE_CONTINUATION_STATES, OrchestratorState
 
 
@@ -143,7 +149,12 @@ def _branch(value: Any, field: str) -> str:
         or _BRANCH_FORBIDDEN_RE.search(branch)
     ):
         raise ProtocolValidationError("MALFORMED_BRANCH", field, repr(value))
-    return branch
+    try:
+        return require_ordinary_branch(branch)
+    except ProtectedBranchError as exc:
+        raise ProtocolValidationError(
+            "PROTECTED_MAIN_BRANCH", field, branch
+        ) from exc
 
 
 def _json_ready(value: Any) -> Any:
@@ -267,6 +278,126 @@ class TaskManifest(ProtocolMixin):
             acceptance_criteria=tuple(data.get("acceptance_criteria", ())),
             manual_update_required=data.get("manual_update_required"),
             stop_conditions=tuple(data.get("stop_conditions", ())),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TaskEnvelope(ProtocolMixin):
+    """Immutable delegation envelope retained across a REPLAN."""
+
+    task_id: str
+    parent_task_id: str | None
+    baseline_sha: str
+    integration_branch: str
+    task_branch: str
+    model_preferred: str
+    model_allowed: tuple[str, ...]
+    gate_class: GateClass
+    capabilities_required: tuple[Capability, ...]
+    scope_paths: tuple[str, ...]
+    scope_non_goals: tuple[str, ...]
+    manual_update_required: bool
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _task_id(self.task_id))
+        object.__setattr__(
+            self,
+            "parent_task_id",
+            _task_id(self.parent_task_id, "parent_task_id", optional=True),
+        )
+        object.__setattr__(self, "baseline_sha", _sha(self.baseline_sha, "baseline_sha"))
+        object.__setattr__(
+            self,
+            "integration_branch",
+            _branch(self.integration_branch, "integration_branch"),
+        )
+        object.__setattr__(
+            self, "task_branch", _branch(self.task_branch, "task_branch")
+        )
+        object.__setattr__(
+            self, "model_preferred", _nonempty(self.model_preferred, "model_preferred")
+        )
+        allowed = _string_tuple(self.model_allowed, "model_allowed")
+        if self.model_preferred not in allowed:
+            raise ProtocolValidationError(
+                "PREFERRED_MODEL_NOT_ALLOWED", "model_allowed", self.model_preferred
+            )
+        object.__setattr__(self, "model_allowed", allowed)
+        object.__setattr__(self, "gate_class", _enum(GateClass, self.gate_class, "gate_class"))
+
+        capabilities: list[Capability] = []
+        for raw in self.capabilities_required:
+            try:
+                capability = raw if isinstance(raw, Capability) else Capability(raw)
+            except (TypeError, ValueError) as exc:
+                raise ProtocolValidationError(
+                    "UNKNOWN_CAPABILITY", "capabilities_required", repr(raw)
+                ) from exc
+            if capability in PROTECTED_CAPABILITIES:
+                raise ProtocolValidationError(
+                    "PROTECTED_CAPABILITY_REQUEST",
+                    "capabilities_required",
+                    capability.value,
+                )
+            capabilities.append(capability)
+        if not capabilities:
+            raise ProtocolValidationError(
+                "EMPTY_CRITICAL_FIELD",
+                "capabilities_required",
+                "at least one capability required",
+            )
+        object.__setattr__(
+            self,
+            "capabilities_required",
+            tuple(sorted(set(capabilities), key=lambda item: item.value)),
+        )
+        object.__setattr__(
+            self, "scope_paths", _string_tuple(self.scope_paths, "scope_paths")
+        )
+        object.__setattr__(
+            self,
+            "scope_non_goals",
+            _string_tuple(self.scope_non_goals, "scope_non_goals"),
+        )
+        if not isinstance(self.manual_update_required, bool):
+            raise ProtocolValidationError(
+                "INVALID_BOOLEAN",
+                "manual_update_required",
+                repr(self.manual_update_required),
+            )
+
+    @classmethod
+    def from_manifest(cls, manifest: TaskManifest) -> "TaskEnvelope":
+        return cls(
+            task_id=manifest.task_id,
+            parent_task_id=manifest.parent_task_id,
+            baseline_sha=manifest.baseline_sha,
+            integration_branch=manifest.integration_branch,
+            task_branch=manifest.task_branch,
+            model_preferred=manifest.model_policy.preferred,
+            model_allowed=manifest.model_policy.allowed,
+            gate_class=manifest.gate_class,
+            capabilities_required=manifest.capabilities_required,
+            scope_paths=manifest.scope.paths,
+            scope_non_goals=manifest.scope.non_goals,
+            manual_update_required=manifest.manual_update_required,
+        )
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "TaskEnvelope":
+        return cls(
+            task_id=data.get("task_id"),
+            parent_task_id=data.get("parent_task_id"),
+            baseline_sha=data.get("baseline_sha"),
+            integration_branch=data.get("integration_branch"),
+            task_branch=data.get("task_branch"),
+            model_preferred=data.get("model_preferred"),
+            model_allowed=tuple(data.get("model_allowed", ())),
+            gate_class=data.get("gate_class"),
+            capabilities_required=tuple(data.get("capabilities_required", ())),
+            scope_paths=tuple(data.get("scope_paths", ())),
+            scope_non_goals=tuple(data.get("scope_non_goals", ())),
+            manual_update_required=data.get("manual_update_required"),
         )
 
 

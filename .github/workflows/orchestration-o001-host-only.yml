@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: O001 orchestration deterministic core host-only
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Inventory system Python
+        run: python --version
+
+      - name: Import and byte-compile O001 sources
+        working-directory: orchestration
+        run: python -m compileall -q goodix_orchestrator tests
+
+      - name: Run deterministic core tests
+        working-directory: orchestration
+        run: python -W error::ResourceWarning -m unittest discover -s tests -v

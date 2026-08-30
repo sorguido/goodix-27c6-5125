@@ -1,11 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
-from goodix_orchestrator.engine import DeterministicEngine
+from goodix_orchestrator.engine import DeterministicEngine, EngineError
 from goodix_orchestrator.persistence import (
+    CommitIntent,
     ConcurrentStateError,
+    EffectKind,
     RuntimeRecord,
     SQLiteStateStore,
     StoreCorruptionError,
@@ -53,6 +56,46 @@ class PersistenceTests(unittest.TestCase):
         self.assertEqual(recovered.state, OrchestratorState.IDLE)
         self.assertIsNotNone(recovered.engine)
 
+    def test_create_is_fresh_only_and_second_create_is_denied(self) -> None:
+        policy = CapabilityPolicy((Capability.HOST_READ,))
+        engine = DeterministicEngine.create(
+            self.store, policy, run_id="ORCH-20260830-006"
+        )
+        self.assertEqual(engine.state, OrchestratorState.BOOTSTRAP)
+        with self.assertRaises(EngineError) as caught:
+            DeterministicEngine.create(
+                self.store, policy, run_id="ORCH-20260830-006"
+            )
+        self.assertEqual(
+            caught.exception.code, "EXISTING_STATE_REQUIRES_RECOVERY"
+        )
+
+    def test_direct_engine_construction_is_denied(self) -> None:
+        runtime = self.store.save_runtime(
+            RuntimeRecord(OrchestratorState.BOOTSTRAP, "ORCH-20260830-007"),
+            expected_revision=None,
+        )
+        with self.assertRaises(EngineError) as caught:
+            DeterministicEngine(self.store, CapabilityPolicy(), runtime)
+        self.assertEqual(caught.exception.code, "DIRECT_CONSTRUCTION_FORBIDDEN")
+
+    def test_create_rejects_nonfresh_store_even_without_runtime(self) -> None:
+        self.store.request_effect(
+            effect_id="EFFECT-FRESHNESS",
+            idempotency_key="TASK-001:COMMIT:freshness",
+            kind=EffectKind.COMMIT,
+            intent=CommitIntent(
+                "TASK-001", "ai-executor/task-001", "a" * 40
+            ),
+        )
+        with self.assertRaises(EngineError) as caught:
+            DeterministicEngine.create(
+                self.store, CapabilityPolicy(), run_id="ORCH-20260830-008"
+            )
+        self.assertEqual(
+            caught.exception.code, "EXISTING_STATE_REQUIRES_RECOVERY"
+        )
+
     def test_corrupt_file_fails_closed_without_replacement(self) -> None:
         corrupt = Path(self.temp.name) / "corrupt.sqlite3"
         payload = b"not a sqlite database"
@@ -89,6 +132,54 @@ class PersistenceTests(unittest.TestCase):
         connection.close()
         with self.assertRaises(StoreCorruptionError):
             self.store.load_runtime()
+
+    def test_v1_store_migrates_transactionally_without_losing_runtime(self) -> None:
+        legacy_path = Path(self.temp.name) / "legacy-v1.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        connection.executescript(
+            """
+            CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO metadata VALUES ('schema_version', '1');
+            INSERT INTO metadata VALUES ('protocol_version', '1.0');
+            CREATE TABLE runtime_state (
+                singleton INTEGER PRIMARY KEY,
+                current_state TEXT NOT NULL,
+                previous_recoverable_state TEXT,
+                run_id TEXT NOT NULL,
+                task_id TEXT,
+                turn_id TEXT,
+                gate_id TEXT,
+                baseline_sha TEXT,
+                result_sha TEXT,
+                protocol_version TEXT NOT NULL,
+                revision INTEGER NOT NULL
+            );
+            INSERT INTO runtime_state VALUES (
+                1, 'BOOTSTRAP', NULL, 'ORCH-20260830-009', NULL, NULL,
+                NULL, NULL, NULL, '1.0', 0
+            );
+            CREATE TABLE effects (
+                effect_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+                kind TEXT NOT NULL, status TEXT NOT NULL, intent_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
+            CREATE TABLE gates (
+                gate_id TEXT PRIMARY KEY, task_id TEXT NOT NULL,
+                status TEXT NOT NULL, manifest_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        legacy = SQLiteStateStore(legacy_path)
+        legacy.initialize()
+        self.assertEqual(legacy.raw_metadata()["schema_version"], "2")
+        runtime = legacy.load_runtime()
+        self.assertEqual(runtime.run_id, "ORCH-20260830-009")
+        self.assertIsNone(runtime.expected_next_task_id)
+        self.assertIsNone(runtime.task_envelope)
 
 
 if __name__ == "__main__":

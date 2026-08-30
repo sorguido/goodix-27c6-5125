@@ -1,9 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
 import unittest
 
 from goodix_orchestrator.policy import (
     Capability,
     CapabilityDeniedError,
     CapabilityPolicy,
+    ProtectedBranchError,
+    require_ordinary_branch,
 )
 
 
@@ -48,6 +51,17 @@ class PolicyTests(unittest.TestCase):
     def test_protected_capability_cannot_be_configured_as_grant(self) -> None:
         with self.assertRaises(ValueError):
             CapabilityPolicy((Capability.USB_GOODIX,))
+
+    def test_main_aliases_are_denied_by_policy_primitive(self) -> None:
+        for branch in ("main", "heads/main", "refs/heads/main"):
+            with self.subTest(branch=branch), self.assertRaises(
+                ProtectedBranchError
+            ):
+                require_ordinary_branch(branch)
+        self.assertEqual(
+            require_ordinary_branch("orchestration/integration"),
+            "orchestration/integration",
+        )
 
 
 if __name__ == "__main__":

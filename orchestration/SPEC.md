@@ -1,7 +1,8 @@
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix Autonomous Orchestration — Architecture & Safety Specification
 
 > **Versione**: Draft v0.1 — 30 agosto 2026
-> **Stato**: AI-PM authored; candidato alla review/merge umano, non canonico finché non integrato in `main`.
+> **Stato**: Canonico in `main`; implementazione del bootstrap in corso.
 > **Scope**: solo infrastruttura di orchestrazione host-only. Nessun avanzamento funzionale Goodix, nessun USB reale, nessun `sudo`, nessun secret reale, nessuna esecuzione live.
 
 ---
