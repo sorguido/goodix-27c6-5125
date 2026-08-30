@@ -8,7 +8,7 @@ from pathlib import Path
 
 from goodix_orchestrator.engine import DeterministicEngine
 from goodix_orchestrator.git_manager import GitManager
-from goodix_orchestrator.persistence import SQLiteStateStore
+from goodix_orchestrator.persistence import ContextRecord, DispatchRecord, SQLiteStateStore
 from goodix_orchestrator.policy import Capability, CapabilityPolicy
 from goodix_orchestrator.protocols import (
     CanonicalDocumentation,
@@ -25,12 +25,15 @@ from goodix_orchestrator.protocols import (
 )
 from goodix_orchestrator.state import OrchestratorState
 from goodix_orchestrator.structured_output import (
+    ContextClass,
     ExecutionClass,
     ExecutorWorkReport,
+    ModelRouter,
     PMPlanningOutput,
     PMReviewOutput,
 )
 from goodix_orchestrator.supervisor import O002Supervisor
+from goodix_orchestrator.synthetic_verifier import VerificationProfile
 
 from tests.common import task_manifest
 
@@ -103,6 +106,33 @@ class O002SupervisorTests(unittest.TestCase):
             policy_assertions=PolicyAssertions(0, False, False, False),
         )
 
+    def executor_dispatch(self, label, execution_class, worktree, *, thread=None):
+        route = ModelRouter.execution(execution_class)
+        thread_id = thread or f"thread-{label}"
+        context = ContextRecord(
+            thread_id=thread_id,
+            context_class=ContextClass.AI_EXECUTOR,
+            role="AI_EXECUTOR",
+            effective_model_id=route.model_id,
+            effective_reasoning_effort=route.reasoning_effort,
+            routing_class=route.routing_class,
+            cwd=str(worktree.root.resolve()),
+            codex_version="codex-cli 0.fixture",
+        )
+        self.store.record_context(context)
+        dispatch = DispatchRecord(
+            dispatch_id=f"dispatch-{label}",
+            thread_id=thread_id,
+            turn_id=f"turn-{label}",
+            context_class=ContextClass.AI_EXECUTOR,
+            routing_class=route.routing_class,
+            effective_model_id=route.model_id,
+            effective_reasoning_effort=route.reasoning_effort,
+            codex_version="codex-cli 0.fixture",
+        )
+        self.store.record_dispatch(dispatch)
+        return dispatch
+
     def test_fake_corrective_accept_next_done_uses_o001_engine(self) -> None:
         initial_main = self.supervisor.repository.main_sha
         first_plan = self.plan(
@@ -122,18 +152,32 @@ class O002SupervisorTests(unittest.TestCase):
             "# Synthetic project manual\n\nalpha implemented; beta missing.\n",
             encoding="utf-8",
         )
+        first_dispatch = self.executor_dispatch(
+            "initial", ExecutionClass.BOUNDED_IMPLEMENTATION, worktree,
+            thread="thread-first-executor",
+        )
         first_result = self.supervisor.materialize_executor_result(
             self.work_report(first_plan.task_manifest.task_id, complete=False),
             expected_parent_sha=first_plan.task_manifest.baseline_sha,
             commit_effect_id="EFFECT-FIRST-COMMIT",
+            executor_dispatch_id=first_dispatch.dispatch_id,
+            expected_execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION,
+            verification_profile=VerificationProfile.TASK_ONE,
         )
-        evidence = self.supervisor.start_review(
-            "TURN-FIRST-REVIEW", execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION
-        )
+        evidence = self.supervisor.start_review("TURN-FIRST-REVIEW")
         payload = evidence.to_dict()
         self.assertNotIn("planner_history", payload)
         self.assertNotIn("planner_prompt", payload)
         self.assertEqual(payload["measured_test"]["status"], "FAIL")
+        self.assertEqual(
+            payload["executor_routing"]["dispatch_id"], first_dispatch.dispatch_id
+        )
+        self.assertEqual(
+            payload["executor_routing"]["effective_model_id"], "gpt-5.6-terra"
+        )
+        self.assertEqual(
+            payload["executor_routing"]["effective_reasoning_effort"], "high"
+        )
         corrective = PMReviewOutput(
             PMDisposition(
                 protocol_version=PROTOCOL_VERSION,
@@ -154,15 +198,19 @@ class O002SupervisorTests(unittest.TestCase):
             "# Synthetic project manual\n\nalpha and beta implemented.\n",
             encoding="utf-8",
         )
+        corrected_dispatch = self.executor_dispatch(
+            "corrective", ExecutionClass.LOCAL_CORRECTIVE, worktree,
+            thread="thread-first-executor",
+        )
         corrected = self.supervisor.materialize_executor_result(
             self.work_report(first_plan.task_manifest.task_id, complete=True),
             expected_parent_sha=first_result.review_set.head_sha,
             commit_effect_id="EFFECT-CORRECTIVE-COMMIT",
+            executor_dispatch_id=corrected_dispatch.dispatch_id,
+            expected_execution_class=ExecutionClass.LOCAL_CORRECTIVE,
+            verification_profile=VerificationProfile.TASK_ONE,
         )
-        evidence = self.supervisor.start_review(
-            "TURN-CORRECTIVE-REVIEW",
-            execution_class=ExecutionClass.LOCAL_CORRECTIVE,
-        )
+        evidence = self.supervisor.start_review("TURN-CORRECTIVE-REVIEW")
         self.assertEqual(evidence.measured_test["status"], "PASS")
         accepted = PMReviewOutput(
             PMDisposition(
@@ -198,20 +246,24 @@ class O002SupervisorTests(unittest.TestCase):
         )
         self.supervisor.start_executor("TURN-SECOND-EXEC")
         (second_worktree.root / "FINAL_STATUS.md").write_text(
-            "O002 synthetic completion marker\n", encoding="utf-8"
+            "O002 synthetic cycle complete\n", encoding="utf-8"
         )
         with (second_worktree.root / "PROJECT_MANUAL.md").open(
             "a", encoding="utf-8"
         ) as stream:
-            stream.write("\nSynthetic cycle complete.\n")
+            stream.write("\nO002 synthetic cycle complete.\n")
+        second_dispatch = self.executor_dispatch(
+            "second", ExecutionClass.BOUNDED_IMPLEMENTATION, second_worktree
+        )
         second_result = self.supervisor.materialize_executor_result(
             self.work_report(second_plan.task_manifest.task_id, complete=True),
             expected_parent_sha=second_plan.task_manifest.baseline_sha,
             commit_effect_id="EFFECT-SECOND-COMMIT",
+            executor_dispatch_id=second_dispatch.dispatch_id,
+            expected_execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION,
+            verification_profile=VerificationProfile.TASK_TWO,
         )
-        self.supervisor.start_review(
-            "TURN-SECOND-REVIEW", execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION
-        )
+        self.supervisor.start_review("TURN-SECOND-REVIEW")
         done = PMReviewOutput(
             PMDisposition(
                 protocol_version=PROTOCOL_VERSION,

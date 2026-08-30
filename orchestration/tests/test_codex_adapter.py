@@ -7,14 +7,17 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from goodix_orchestrator.codex_adapter import (
     AdapterError,
     CodexAppServer,
     MessageKind,
+    TurnResult,
     classify_server_message,
 )
 from goodix_orchestrator.persistence import SQLiteStateStore
+from goodix_orchestrator.protocols import ProtocolValidationError
 from goodix_orchestrator.structured_output import (
     ExecutionClass,
     ModelRouter,
@@ -99,6 +102,73 @@ class CodexAdapterTests(unittest.TestCase):
                 adapter.store.routing_counts(),
                 {"EXEC_BOUNDED_IMPLEMENTATION": 1, "EXEC_LOCAL_CORRECTIVE": 1},
             )
+
+    def test_every_completed_dispatch_reobserves_effective_route(self) -> None:
+        adapter = self.adapter(store=True)
+        with adapter, patch.object(
+            adapter, "_observe_thread_route", wraps=adapter._observe_thread_route
+        ) as observe:
+            plan = adapter.start_thread(ModelRouter.planning("STANDARD"), self.root)
+            review = adapter.start_thread(ModelRouter.review(), self.root)
+            executor = adapter.start_thread(
+                ModelRouter.execution(ExecutionClass.BOUNDED_IMPLEMENTATION), self.root
+            )
+            contexts = (plan, plan, review, review, executor, executor)
+            for index, context in enumerate(contexts):
+                adapter.run_turn(
+                    context,
+                    "fixture",
+                    output_schema={"type": "object"},
+                    dispatch_id=f"DISPATCH-REVERIFY-{index}",
+                )
+            corrective = adapter.reroute_context(
+                executor, ModelRouter.execution(ExecutionClass.LOCAL_CORRECTIVE)
+            )
+            adapter.run_turn(
+                corrective,
+                "fixture",
+                output_schema={"type": "object"},
+                dispatch_id="DISPATCH-REVERIFY-CORRECTIVE",
+            )
+            self.assertEqual(observe.call_count, 7)
+
+    def test_post_turn_route_mismatch_is_not_persisted(self) -> None:
+        adapter = self.adapter("post-turn-effort-mismatch", store=True)
+        with adapter:
+            context = adapter.start_thread(ModelRouter.review(), self.root)
+            with self.assertRaises(AdapterError) as caught:
+                adapter.run_turn(
+                    context,
+                    "fixture",
+                    output_schema={"type": "object"},
+                    dispatch_id="DISPATCH-POST-TURN-MISMATCH",
+                )
+            self.assertEqual(caught.exception.code, "PAUSED_MODEL_UNAVAILABLE")
+            self.assertEqual(adapter.store.list_dispatches(), ())
+
+    def test_schema_repair_does_not_echo_invalid_content(self) -> None:
+        adapter = self.adapter()
+        invalid = TurnResult("turn-1", "completed", '{"bad":"SECRET_SENTINEL"}')
+        valid = TurnResult("turn-2", "completed", '{"ok":true}')
+
+        def validator(payload):
+            if payload.get("ok") is not True:
+                raise ProtocolValidationError("MISSING_FIELD", "ok", repr(payload))
+            return payload
+
+        with patch.object(adapter, "run_turn", side_effect=(invalid, valid)) as run:
+            result = adapter.run_structured_turn(
+                object(),
+                "ORIGINAL",
+                output_schema={"type": "object"},
+                validator=validator,
+                dispatch_id="DISPATCH-REPAIR",
+            )
+        self.assertEqual(result, {"ok": True})
+        repair_prompt = run.call_args_list[1].args[1]
+        self.assertIn("VALIDATION_FAILURE_CODE=MISSING_FIELD", repair_prompt)
+        self.assertNotIn("VALIDATION_FAILURE_DETAIL", repair_prompt)
+        self.assertNotIn("SECRET_SENTINEL", repair_prompt)
 
     def test_api_key_and_unknown_auth_are_denied_without_email_output(self) -> None:
         for scenario in ("api-key", "unknown-auth"):

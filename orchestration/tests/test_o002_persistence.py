@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from goodix_orchestrator.engine import DeterministicEngine, EngineError
 from goodix_orchestrator.persistence import (
     ContextRecord,
     DispatchRecord,
@@ -10,6 +11,7 @@ from goodix_orchestrator.persistence import (
     SQLiteStateStore,
     UnsafePersistenceDataError,
 )
+from goodix_orchestrator.policy import CapabilityPolicy
 from goodix_orchestrator.structured_output import ContextClass, RoutingClass
 
 
@@ -86,6 +88,99 @@ class O002PersistenceTests(unittest.TestCase):
                     RoutingClass.EXEC_LOCAL_CORRECTIVE, "gpt-5.6-terra", "medium",
                     "codex-cli 0.fixture",
                 )
+            )
+
+    def test_dispatch_must_match_context_route_model_and_effort(self) -> None:
+        root = str(Path(self.temp.name).resolve())
+        self.store.record_context(
+            self.context(
+                "thread-exec", ContextClass.AI_EXECUTOR,
+                RoutingClass.EXEC_BOUNDED_IMPLEMENTATION,
+                "gpt-5.6-terra", "high", root,
+            )
+        )
+        mismatches = (
+            (RoutingClass.EXEC_LOCAL_CORRECTIVE, "gpt-5.6-terra", "high"),
+            (RoutingClass.EXEC_BOUNDED_IMPLEMENTATION, "gpt-5.6-sol", "high"),
+            (RoutingClass.EXEC_BOUNDED_IMPLEMENTATION, "gpt-5.6-terra", "medium"),
+        )
+        for index, (routing, model, effort) in enumerate(mismatches):
+            with self.subTest(index=index), self.assertRaises(UnsafePersistenceDataError):
+                self.store.record_dispatch(
+                    DispatchRecord(
+                        f"dispatch-mismatch-{index}", "thread-exec", f"turn-{index}",
+                        ContextClass.AI_EXECUTOR, routing, model, effort,
+                        "codex-cli 0.fixture",
+                    )
+                )
+
+    def test_dispatch_lookup_is_exact_and_latest_is_persisted(self) -> None:
+        root = str(Path(self.temp.name).resolve())
+        self.store.record_context(
+            self.context(
+                "thread-exec", ContextClass.AI_EXECUTOR,
+                RoutingClass.EXEC_BOUNDED_IMPLEMENTATION,
+                "gpt-5.6-terra", "high", root,
+            )
+        )
+        first = DispatchRecord(
+            "dispatch-first", "thread-exec", "turn-first",
+            ContextClass.AI_EXECUTOR, RoutingClass.EXEC_BOUNDED_IMPLEMENTATION,
+            "gpt-5.6-terra", "high", "codex-cli 0.fixture",
+        )
+        second = DispatchRecord(
+            "dispatch-second", "thread-exec", "turn-second",
+            ContextClass.AI_EXECUTOR, RoutingClass.EXEC_BOUNDED_IMPLEMENTATION,
+            "gpt-5.6-terra", "high", "codex-cli 0.fixture", schema_repair=True,
+        )
+        self.store.record_dispatch(first)
+        self.store.record_dispatch(second)
+        self.assertEqual(self.store.load_dispatch(first.dispatch_id), first)
+        self.assertEqual(self.store.latest_dispatch_for_thread("thread-exec"), second)
+
+    def test_context_only_store_is_not_fresh(self) -> None:
+        root = str(Path(self.temp.name).resolve())
+        self.store.record_context(
+            self.context(
+                "thread-plan", ContextClass.AI_PM_PLAN,
+                RoutingClass.AI_PM_PLAN_STANDARD, "gpt-5.6-sol", "medium", root,
+            )
+        )
+        self.assertEqual(self.store.operational_record_count(), 1)
+        with self.assertRaises(EngineError) as caught:
+            DeterministicEngine.create(
+                self.store, CapabilityPolicy(), run_id="ORCH-O002-RESIDUE-CONTEXT"
+            )
+        self.assertEqual(caught.exception.code, "EXISTING_STATE_REQUIRES_RECOVERY")
+
+    def test_dispatch_state_store_is_not_fresh(self) -> None:
+        root = str(Path(self.temp.name).resolve())
+        self.store.record_context(
+            self.context(
+                "thread-exec", ContextClass.AI_EXECUTOR,
+                RoutingClass.EXEC_BOUNDED_IMPLEMENTATION,
+                "gpt-5.6-terra", "high", root,
+            )
+        )
+        self.store.record_dispatch(
+            DispatchRecord(
+                "dispatch-residue", "thread-exec", "turn-residue",
+                ContextClass.AI_EXECUTOR, RoutingClass.EXEC_BOUNDED_IMPLEMENTATION,
+                "gpt-5.6-terra", "high", "codex-cli 0.fixture",
+            )
+        )
+        self.assertEqual(self.store.operational_record_count(), 2)
+        with self.assertRaises(EngineError):
+            DeterministicEngine.create(
+                self.store, CapabilityPolicy(), run_id="ORCH-O002-RESIDUE-DISPATCH"
+            )
+
+    def test_git_state_only_store_is_not_fresh(self) -> None:
+        self.store.save_git_state(GitStateRecord("autopilot/integration", "a" * 40))
+        self.assertEqual(self.store.operational_record_count(), 1)
+        with self.assertRaises(EngineError):
+            DeterministicEngine.create(
+                self.store, CapabilityPolicy(), run_id="ORCH-O002-RESIDUE-GIT"
             )
 
     def test_git_state_round_trip_rejects_main(self) -> None:

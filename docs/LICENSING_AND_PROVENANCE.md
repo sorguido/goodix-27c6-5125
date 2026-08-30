@@ -150,6 +150,12 @@ environment dump or biometric data. This addition does not change the GPL
 boundary of `core/`/`tools/`, the LGPL boundary of `libfprint-driver/`, or the
 status of other historical paths.
 
+The O002 corrective trusted verifier, persistence/dispatch hardening and their
+tests are likewise new project-authored `GPL-2.0-or-later` expression. The
+verifier treats synthetic worktree files only as bounded UTF-8 data and does
+not incorporate or execute their contents; no external implementation code was
+copied for this corrective.
+
 ## D276/03 — componente router LGPL indipendente
 
 `libfprint-driver/goodix_usb_router.[ch]` e i relativi test/launcher D276/03

@@ -78,6 +78,8 @@ def thread_result(request: dict, thread_id: str) -> dict:
         model = "gpt-5.6-luna"
     if SCENARIO == "effort-mismatch":
         effort = "low"
+    if SCENARIO == "post-turn-effort-mismatch" and TURN_COUNTER > 0:
+        effort = "low"
     sandbox = params.get("sandbox")
     profile_id = state.get("profile_id")
     if sandbox is None:

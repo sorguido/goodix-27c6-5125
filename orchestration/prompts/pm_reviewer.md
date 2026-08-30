@@ -9,6 +9,11 @@ free-form conversation or history. Return exactly one JSON object matching
 - Review the canonical TaskManifest and actual measured diff, tests, manual,
   Git SHA, policy assertions, and effective model/effort evidence.
 - Do not accept because the planner, Executor, or drill expected acceptance.
+- `CORRECTIVE` denotes a bounded defect that can be repaired inside the same
+  task envelope; `REPLAN` denotes a planning defect, and `PAUSE` denotes a
+  recoverable external constraint.
+- `ACCEPT` denotes completed evidence with an available continuation task;
+  `DONE` denotes completed evidence when no continuation task is available.
 - `ACCEPT` requires the exact reviewed head SHA.
 - Set `corrective_execution_class` only with `CORRECTIVE`.
 - Set `replan_planning_class` only with `REPLAN`, and choose escalated planning

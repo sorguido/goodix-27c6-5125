@@ -31,6 +31,7 @@ from .structured_output import (
     PMReviewOutput,
 )
 from .supervisor import O002Supervisor, SupervisorError
+from .synthetic_verifier import VerificationProfile
 
 
 def _default_state_dir() -> Path:
@@ -67,7 +68,7 @@ def _planner_prompt(
         criteria = [
             "FINAL_STATUS.md contains the exact completion line",
             "PROJECT_MANUAL.md documents completion",
-            "existing synthetic tests remain green",
+            "trusted data-only synthetic verifier passes",
         ]
     else:
         objective = (
@@ -78,7 +79,7 @@ def _planner_prompt(
         criteria = [
             "artifact.txt contains alpha and beta",
             "PROJECT_MANUAL.md documents alpha and beta",
-            "python -m unittest discover -s tests -v passes",
+            "trusted data-only synthetic verifier passes",
         ]
     facts = {
         "required_task_id": task_id,
@@ -114,17 +115,17 @@ def _executor_prompt(plan: PMPlanningOutput, *, phase: str) -> str:
     phase_instruction = {
         "initial": (
             "SYNTHETIC_CORRECTIVE_DRILL=true. Implement only alpha and document alpha. "
-            "Do not implement or document beta. Run the test with "
-            "PYTHONDONTWRITEBYTECODE=1, report the unmet beta criterion honestly, use "
+            "Do not implement or document beta. Do not execute project code; perform only "
+            "a data-content self-check, report the unmet beta criterion honestly, use "
             "outcome BLOCKED and executable_closure FAIL."
         ),
         "corrective": (
-            "Implement the missing beta requirement, preserve alpha, document both, and run "
-            "the tests with PYTHONDONTWRITEBYTECODE=1. Report measured completion honestly."
+            "Implement the missing beta requirement, preserve alpha, document both, and do "
+            "not execute project code. Report the data-content self-check honestly."
         ),
         "second": (
             "Implement the harmless completion marker exactly, update PROJECT_MANUAL.md, "
-            "and run the existing tests with PYTHONDONTWRITEBYTECODE=1."
+            "and do not execute project code. Report a data-content self-check."
         ),
     }[phase]
     return (
@@ -137,27 +138,32 @@ def _executor_prompt(plan: PMPlanningOutput, *, phase: str) -> str:
 
 
 def _review_prompt(evidence: dict[str, Any], *, phase: str, next_task_id: str | None) -> str:
-    if phase == "initial":
-        context = (
-            "This is the first drill review. Choose disposition from evidence; incomplete "
-            "criteria should produce CORRECTIVE with LOCAL_CORRECTIVE."
-        )
-    elif phase == "corrected":
-        context = (
-            f"If all measured criteria pass, ACCEPT to PM_PLANNING and set exact next_task_id "
-            f"{next_task_id}. Otherwise fail closed."
-        )
-    else:
-        context = "This is the final harmless task. If measured evidence passes, return DONE."
+    state = {
+        "phase_id": phase,
+        "current_state": "PM_REVIEWING",
+        "continuation_task_id": next_task_id,
+    }
     return (
         _role_prompt("pm_reviewer.md")
-        + "\nREVIEW_PHASE="
-        + phase
-        + "\nREVIEW_CONTEXT="
-        + context
+        + "\nORCHESTRATION_STATE="
+        + _json(state)
         + "\nMEASURED_REVIEW_EVIDENCE="
         + _json(evidence)
     )
+
+
+def _review_disposition_hint_count(prompt: str) -> int:
+    lowered = prompt.casefold()
+    forbidden = (
+        "choose corrective",
+        "choose accept",
+        "choose done",
+        "should produce corrective",
+        "if all measured criteria pass, accept",
+        "if measured evidence passes, return done",
+        "expected disposition",
+    )
+    return sum(lowered.count(item) for item in forbidden)
 
 
 def _report_base() -> dict[str, Any]:
@@ -178,6 +184,10 @@ def _report_base() -> dict[str, Any]:
         "SUDO_USE_COUNT": 0,
         "PROTECTED_MATERIAL_ACCESS_COUNT": 0,
         "XHIGH_MAX_AUTONOMOUS_USE_COUNT": 0,
+        "UNSANDBOXED_TASK_CODE_EXECUTION_COUNT": 0,
+        "PM_REVIEW_DISPOSITION_HINT_COUNT": 0,
+        "OS_NEGATIVE_CAPABILITY_ISOLATION_PROVEN": False,
+        "NEGATIVE_CAPABILITY_EVIDENCE_CLASS": "QUALIFICATION_PATH_NOT_OS_PROOF",
     }
 
 
@@ -246,6 +256,7 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 validator=PMPlanningOutput.from_dict,
                 dispatch_id="DISPATCH-PM-PLAN-1",
             )
+            first_plan_dispatch = store.latest_dispatch_for_thread(plan_context.thread_id)
             if first_plan.execution_class is not ExecutionClass.BOUNDED_IMPLEMENTATION:
                 raise SupervisorError("REAL_PLAN_ROUTING_MISMATCH", first_plan.execution_class.value)
             first_worktree = supervisor.accept_plan(
@@ -265,28 +276,36 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 validator=ExecutorWorkReport.from_dict,
                 dispatch_id="DISPATCH-EXEC-INITIAL",
             )
+            first_work_dispatch = store.latest_dispatch_for_thread(exec_context.thread_id)
             first_result = supervisor.materialize_executor_result(
                 first_work,
                 expected_parent_sha=first_plan.task_manifest.baseline_sha,
                 commit_effect_id="EFFECT-REAL-FIRST-COMMIT",
+                executor_dispatch_id=first_work_dispatch.dispatch_id,
+                expected_execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION,
+                verification_profile=VerificationProfile.TASK_ONE,
             )
-            evidence = supervisor.start_review(
-                "TURN-REAL-FIRST-REVIEW",
-                execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION,
+            evidence = supervisor.start_review("TURN-REAL-FIRST-REVIEW")
+            first_review_prompt = _review_prompt(
+                evidence.to_dict(), phase="DRILL-1A", next_task_id=None
             )
+            if _review_disposition_hint_count(first_review_prompt):
+                raise SupervisorError("REVIEW_DISPOSITION_HINT_DETECTED", "DRILL-1A")
             first_review = adapter.run_structured_turn(
                 review_context,
-                _review_prompt(evidence.to_dict(), phase="initial", next_task_id=None),
+                first_review_prompt,
                 output_schema=PM_REVIEW_OUTPUT_SCHEMA,
                 validator=PMReviewOutput.from_dict,
                 dispatch_id="DISPATCH-PM-REVIEW-1",
             )
+            first_review_dispatch = store.latest_dispatch_for_thread(review_context.thread_id)
             if first_review.disposition.disposition.value != "CORRECTIVE":
                 raise SupervisorError(
                     "REAL_CORRECTIVE_NOT_OBSERVED",
                     first_review.disposition.disposition.value,
                 )
             report["REAL_PM_CORRECTIVE"] = "OBSERVED"
+            report["REAL_PM_CORRECTIVE_INDEPENDENT"] = "PASS"
             supervisor.apply_review(first_review)
 
             corrective_route = ModelRouter.execution(ExecutionClass.LOCAL_CORRECTIVE)
@@ -299,21 +318,30 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 validator=ExecutorWorkReport.from_dict,
                 dispatch_id="DISPATCH-EXEC-CORRECTIVE",
             )
+            corrective_dispatch = store.latest_dispatch_for_thread(exec_context.thread_id)
             corrected_result = supervisor.materialize_executor_result(
                 corrective_work,
                 expected_parent_sha=first_result.review_set.head_sha,
                 commit_effect_id="EFFECT-REAL-CORRECTIVE-COMMIT",
+                executor_dispatch_id=corrective_dispatch.dispatch_id,
+                expected_execution_class=ExecutionClass.LOCAL_CORRECTIVE,
+                verification_profile=VerificationProfile.TASK_ONE,
             )
-            evidence = supervisor.start_review(
-                "TURN-REAL-CORRECTIVE-REVIEW",
-                execution_class=ExecutionClass.LOCAL_CORRECTIVE,
+            evidence = supervisor.start_review("TURN-REAL-CORRECTIVE-REVIEW")
+            corrected_review_prompt = _review_prompt(
+                evidence.to_dict(), phase="DRILL-1B", next_task_id=second_id
             )
+            if _review_disposition_hint_count(corrected_review_prompt):
+                raise SupervisorError("REVIEW_DISPOSITION_HINT_DETECTED", "DRILL-1B")
             accepted = adapter.run_structured_turn(
                 review_context,
-                _review_prompt(evidence.to_dict(), phase="corrected", next_task_id=second_id),
+                corrected_review_prompt,
                 output_schema=PM_REVIEW_OUTPUT_SCHEMA,
                 validator=PMReviewOutput.from_dict,
                 dispatch_id="DISPATCH-PM-REVIEW-2",
+            )
+            accepted_review_dispatch = store.latest_dispatch_for_thread(
+                review_context.thread_id
             )
             if accepted.disposition.disposition.value != "ACCEPT":
                 raise SupervisorError(
@@ -325,6 +353,7 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 accepted, integration_effect_id="EFFECT-REAL-FIRST-FF"
             )
             report["REAL_PM_ACCEPT"] = "OBSERVED"
+            report["REAL_PM_ACCEPT_INDEPENDENT"] = "PASS"
             report["REAL_INTEGRATION_FF"] = "PASS"
 
             second_plan = adapter.run_structured_turn(
@@ -341,6 +370,7 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 validator=PMPlanningOutput.from_dict,
                 dispatch_id="DISPATCH-PM-PLAN-2",
             )
+            second_plan_dispatch = store.latest_dispatch_for_thread(plan_context.thread_id)
             if second_plan.execution_class is not ExecutionClass.BOUNDED_IMPLEMENTATION:
                 raise SupervisorError("REAL_PLAN_ROUTING_MISMATCH", second_plan.execution_class.value)
             second_worktree = supervisor.accept_plan(
@@ -361,42 +391,50 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 validator=ExecutorWorkReport.from_dict,
                 dispatch_id="DISPATCH-EXEC-SECOND",
             )
+            second_work_dispatch = store.latest_dispatch_for_thread(second_exec.thread_id)
             second_result = supervisor.materialize_executor_result(
                 second_work,
                 expected_parent_sha=second_plan.task_manifest.baseline_sha,
                 commit_effect_id="EFFECT-REAL-SECOND-COMMIT",
+                executor_dispatch_id=second_work_dispatch.dispatch_id,
+                expected_execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION,
+                verification_profile=VerificationProfile.TASK_TWO,
             )
-            evidence = supervisor.start_review(
-                "TURN-REAL-SECOND-REVIEW",
-                execution_class=ExecutionClass.BOUNDED_IMPLEMENTATION,
+            evidence = supervisor.start_review("TURN-REAL-SECOND-REVIEW")
+            final_review_prompt = _review_prompt(
+                evidence.to_dict(), phase="DRILL-2", next_task_id=None
             )
+            if _review_disposition_hint_count(final_review_prompt):
+                raise SupervisorError("REVIEW_DISPOSITION_HINT_DETECTED", "DRILL-2")
             done = adapter.run_structured_turn(
                 review_context,
-                _review_prompt(evidence.to_dict(), phase="final", next_task_id=None),
+                final_review_prompt,
                 output_schema=PM_REVIEW_OUTPUT_SCHEMA,
                 validator=PMReviewOutput.from_dict,
                 dispatch_id="DISPATCH-PM-REVIEW-3",
             )
+            done_review_dispatch = store.latest_dispatch_for_thread(review_context.thread_id)
             if done.disposition.disposition.value != "DONE":
                 raise SupervisorError(
                     "REAL_DONE_NOT_OBSERVED", done.disposition.disposition.value
                 )
             supervisor.apply_review(done)
             report["REAL_SECOND_TASK_DONE"] = "OBSERVED"
+            report["REAL_PM_DONE_INDEPENDENT"] = "PASS"
             report["REAL_PM_TASK_MANIFEST"] = "VALID"
             report["REAL_EXECUTOR_WORK_REPORT"] = "VALID"
             report["REAL_MODEL_ROUTING_PINNED"] = "PASS"
             report["REAL_EFFECTIVE_MODEL_EFFORT_VERIFIED"] = "PASS"
-            report["PM_PLAN_MODEL_ID"] = "gpt-5.6-sol"
-            report["PM_PLAN_REASONING"] = "medium"
-            report["PM_REVIEW_MODEL_ID"] = "gpt-5.6-sol"
-            report["PM_REVIEW_REASONING"] = "high"
-            report["EXECUTOR_INITIAL_MODEL_ID"] = "gpt-5.6-terra"
-            report["EXECUTOR_INITIAL_REASONING"] = "high"
-            report["EXECUTOR_CORRECTIVE_MODEL_ID"] = "gpt-5.6-terra"
-            report["EXECUTOR_CORRECTIVE_REASONING"] = "medium"
-            report["EXECUTOR_SECOND_MODEL_ID"] = "gpt-5.6-terra"
-            report["EXECUTOR_SECOND_REASONING"] = "high"
+            report["PM_PLAN_MODEL_ID"] = first_plan_dispatch.effective_model_id
+            report["PM_PLAN_REASONING"] = first_plan_dispatch.effective_reasoning_effort
+            report["PM_REVIEW_MODEL_ID"] = first_review_dispatch.effective_model_id
+            report["PM_REVIEW_REASONING"] = first_review_dispatch.effective_reasoning_effort
+            report["EXECUTOR_INITIAL_MODEL_ID"] = first_work_dispatch.effective_model_id
+            report["EXECUTOR_INITIAL_REASONING"] = first_work_dispatch.effective_reasoning_effort
+            report["EXECUTOR_CORRECTIVE_MODEL_ID"] = corrective_dispatch.effective_model_id
+            report["EXECUTOR_CORRECTIVE_REASONING"] = corrective_dispatch.effective_reasoning_effort
+            report["EXECUTOR_SECOND_MODEL_ID"] = second_work_dispatch.effective_model_id
+            report["EXECUTOR_SECOND_REASONING"] = second_work_dispatch.effective_reasoning_effort
             report["PM_PLAN_THREAD_ID_CREATED"] = True
             report["PM_REVIEW_THREAD_ID_CREATED"] = True
             report["EXECUTOR_THREAD_ID_CREATED"] = True
@@ -405,6 +443,36 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
                 {plan_context.thread_id, review_context.thread_id, exec_context.thread_id}
             ) == 3
             report["ROUTING_TURN_COUNTS"] = store.routing_counts()
+            report["PERSISTED_VERIFIED_DISPATCH_IDS"] = [
+                dispatch.dispatch_id
+                for dispatch in (
+                    first_plan_dispatch,
+                    first_work_dispatch,
+                    first_review_dispatch,
+                    corrective_dispatch,
+                    accepted_review_dispatch,
+                    second_plan_dispatch,
+                    second_work_dispatch,
+                    done_review_dispatch,
+                )
+            ]
+            report["REVIEW_ROUTING_EVIDENCE_SOURCE"] = "PERSISTED_VERIFIED_DISPATCH"
+            report["REAL_REPORT_ROUTING_FIELDS_DERIVED"] = True
+            report["O002_EFFECTIVE_ROUTE_VERIFIED_PER_DISPATCH"] = "PASS"
+            report["PM_SECOND_TURN_EFFECTIVE_ROUTE_REVERIFIED"] = "PASS"
+            report["REVIEW_SECOND_TURN_EFFECTIVE_ROUTE_REVERIFIED"] = "PASS"
+            report["EXECUTOR_SAME_ROUTE_REVERIFIED"] = "PASS"
+            report["CORRECTIVE_REROUTE_REVERIFIED"] = "PASS"
+            report["PM_REVIEW_DISPOSITION_HINT_COUNT"] = sum(
+                _review_disposition_hint_count(prompt)
+                for prompt in (
+                    first_review_prompt,
+                    corrected_review_prompt,
+                    final_review_prompt,
+                )
+            )
+            report["SYNTHETIC_TRUSTED_VERIFIER"] = "PASS"
+            report["SCHEMA_REPAIR_ECHOES_INVALID_CONTENT"] = False
             report["MAIN_UNCHANGED"] = (
                 manager._text(repository.root, ("rev-parse", "refs/heads/main"))
                 == repository.main_sha

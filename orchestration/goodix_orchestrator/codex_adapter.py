@@ -46,7 +46,6 @@ class ThreadContext:
     route: ModelRoute
     cwd: str
     sandbox: str
-    verify_after_turn: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -512,9 +511,8 @@ class CodexAppServer:
 
         App Server applies model/effort turn overrides to the current and later
         turns.  A pre-turn thread/resume only reports the old loaded settings,
-        so it cannot prove a corrective reroute.  The post-turn observation in
-        run_turn verifies the effective settings before the dispatch is
-        persisted as evidence.
+        so it cannot prove a corrective reroute. Every turn, rerouted or not,
+        is observed after completion before its dispatch is persisted.
         """
 
         self.require_route(route)
@@ -529,7 +527,6 @@ class CodexAppServer:
             route,
             context.cwd,
             context.sandbox,
-            True,
         )
 
     def _observe_thread_route(self, context: ThreadContext) -> None:
@@ -627,8 +624,10 @@ class CodexAppServer:
             raise AdapterError("TURN_START_MALFORMED", context.thread_id)
         turn_id = turn["id"]
         completed = self._wait_turn(turn_id)
-        if context.verify_after_turn:
-            self._observe_thread_route(context)
+        # A successful thread/start or an earlier observation is not evidence
+        # for this dispatch. Re-observe and verify the effective route after
+        # every completed turn before persisting or using its output.
+        self._observe_thread_route(context)
         if self.store is not None:
             self.store.record_dispatch(
                 DispatchRecord(
@@ -710,9 +709,15 @@ class CodexAppServer:
             if repair:
                 assert validation_error is not None
                 code = getattr(validation_error, "code", "STRUCTURED_OUTPUT_INVALID")
+                if (
+                    not isinstance(code, str)
+                    or not code.isascii()
+                    or not 1 <= len(code) <= 64
+                    or any(character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" for character in code)
+                ):
+                    code = "STRUCTURED_OUTPUT_INVALID"
                 turn_prompt = (
                     f"VALIDATION_FAILURE_CODE={code}\n"
-                    f"VALIDATION_FAILURE_DETAIL={str(validation_error)}\n"
                     "Correct every disposition-specific field consistently, using JSON null "
                     "for fields that do not belong to the selected disposition. Return only "
                     "one JSON object matching the previously supplied output contract."

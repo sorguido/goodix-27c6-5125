@@ -718,12 +718,18 @@ class SQLiteStateStore:
 
     def operational_record_count(self) -> int:
         with self._checked_connection() as connection:
-            runtime_count = connection.execute(
-                "SELECT COUNT(*) FROM runtime_state"
-            ).fetchone()[0]
-            effect_count = connection.execute("SELECT COUNT(*) FROM effects").fetchone()[0]
-            gate_count = connection.execute("SELECT COUNT(*) FROM gates").fetchone()[0]
-        return int(runtime_count) + int(effect_count) + int(gate_count)
+            counts = (
+                connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in (
+                    "runtime_state",
+                    "effects",
+                    "gates",
+                    "contexts",
+                    "dispatches",
+                    "git_state",
+                )
+            )
+            return sum(int(count) for count in counts)
 
     def request_effect(
         self,
@@ -1073,6 +1079,17 @@ class SQLiteStateStore:
             rows = connection.execute(query).fetchall()
         return tuple(self._context_from_row(row) for row in rows)
 
+    def load_context(self, thread_id: str) -> ContextRecord:
+        if not isinstance(thread_id, str) or not thread_id.strip():
+            raise UnsafePersistenceDataError(f"invalid thread_id: {thread_id!r}")
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM contexts WHERE thread_id = ?", (thread_id,)
+            ).fetchone()
+        if row is None:
+            raise StoreCorruptionError(f"unknown context thread: {thread_id}")
+        return self._context_from_row(row)
+
     def retire_context(self, thread_id: str) -> None:
         if not isinstance(thread_id, str) or not thread_id.strip():
             raise UnsafePersistenceDataError(f"invalid thread_id: {thread_id!r}")
@@ -1102,6 +1119,11 @@ class SQLiteStateStore:
             if (
                 observed_context.context_class is not record.context_class
                 or observed_context.codex_version != record.codex_version
+                or observed_context.routing_class is not record.routing_class
+                or observed_context.effective_model_id != record.effective_model_id
+                or observed_context.effective_reasoning_effort
+                != record.effective_reasoning_effort
+                or not observed_context.active
             ):
                 raise UnsafePersistenceDataError(
                     f"dispatch/context routing mismatch: {record.dispatch_id}"
@@ -1162,6 +1184,30 @@ class SQLiteStateStore:
                 "SELECT * FROM dispatches ORDER BY created_at, dispatch_id"
             ).fetchall()
         return tuple(self._dispatch_from_row(row) for row in rows)
+
+    def load_dispatch(self, dispatch_id: str) -> DispatchRecord:
+        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
+            raise UnsafePersistenceDataError(f"invalid dispatch_id: {dispatch_id!r}")
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM dispatches WHERE dispatch_id = ?", (dispatch_id,)
+            ).fetchone()
+        if row is None:
+            raise StoreCorruptionError(f"unknown dispatch: {dispatch_id}")
+        return self._dispatch_from_row(row)
+
+    def latest_dispatch_for_thread(self, thread_id: str) -> DispatchRecord:
+        if not isinstance(thread_id, str) or not thread_id.strip():
+            raise UnsafePersistenceDataError(f"invalid thread_id: {thread_id!r}")
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                """SELECT * FROM dispatches WHERE thread_id = ?
+                   ORDER BY created_at DESC, rowid DESC LIMIT 1""",
+                (thread_id,),
+            ).fetchone()
+        if row is None:
+            raise StoreCorruptionError(f"thread has no dispatch: {thread_id}")
+        return self._dispatch_from_row(row)
 
     def routing_counts(self) -> dict[str, int]:
         with self._checked_connection() as connection:

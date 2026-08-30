@@ -61,7 +61,13 @@ O002_EXECUTOR_CORRECTIVE_MODEL=gpt-5.6-terra/medium
 O002_CODEX_VERSION=codex-cli 0.144.1
 O002_AUTH_MODE=CHATGPT
 O002_DETERMINISTIC_TESTS=PASS
-O002_TEST_COUNT=90
+O002_TEST_COUNT=105
+O002_EFFECTIVE_ROUTE_VERIFIED_PER_DISPATCH=PASS
+O002_REVIEW_ROUTING_EVIDENCE=PERSISTED_VERIFIED_DISPATCH
+O002_SYNTHETIC_TRUSTED_VERIFIER=PASS
+O002_UNSANDBOXED_TASK_CODE_EXECUTION_COUNT=0
+O002_SCHEMA_REPAIR_ECHO_SAFE=PASS
+O002_FRESH_STORE_ACCOUNTING=PASS
 O002_IMPLEMENTATION_COMMIT=5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
 O002_DEDICATED_CI=PASS
 O002_DEDICATED_CI_EVIDENCE=GitHub Actions run 33301414210 on 5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
@@ -69,11 +75,16 @@ O002_GOODIX_REGRESSION_CI=PASS
 O002_GOODIX_REGRESSION_CI_EVIDENCE=GitHub Actions run 33301414266 on 5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
 O002_REAL_CODEX_SYNTHETIC_CYCLE=PASS
 O002_REAL_CORRECTIVE_LOOP=PASS
+O002_REAL_CORRECTIVE_INDEPENDENT=PASS
+O002_REAL_ACCEPT_INDEPENDENT=PASS
+O002_REAL_DONE_INDEPENDENT=PASS
 O002_REAL_INTEGRATION_FF=PASS
 O002_REAL_SECOND_TASK_DONE=PASS
 O002_HUMAN_RELAY_COUNT=0
 O002_REPORT=analysis/O002/O002_real_qualification_20260830.json
-O002_REPORT_SHA256=9bb5c19c0a32036221e253ea010fb14056a21ac05fe0cdc30af7d9bfe566f8a5
+O002_REPORT_SHA256=fb2e3dbbb07c21bf10bfefba78600f53eeb80589d7d1c0a79edec4fd45041b24
+O002_NEGATIVE_CAPABILITY_EVIDENCE_CLASS=QUALIFICATION_PATH_NOT_OS_PROOF
+O002_OS_NEGATIVE_CAPABILITY_ISOLATION_PROVEN=false
 ORCHESTRATION_READY_FOR_GOODIX=false
 CURRENT_LIVE_AUTHORIZED=false
 GOODIX_FUNCTIONAL_ADVANCEMENT=NONE
@@ -97,7 +108,10 @@ schema operativo O002 nativo è v3; gli store legacy v1 e v2 vengono respinti
 come `STORE_INCOMPATIBLE` senza modificarne metadata, colonne o runtime row. La
 v1 non conserva `expected_next_task_id` né l'envelope immutabile del task; la
 v2 non conserva identità dei tre contesti, routing effettivo, dispatch o stato
-Git. Nessuno dei due stati in-flight è quindi ricostruibile senza ipotesi.
+Git. Nessuno dei due stati in-flight è quindi ricostruibile senza ipotesi. In
+v3 la freshness conta ora `runtime_state`, effetti, gate, contesti, dispatch e
+stato Git: anche un residuo O002 privo di runtime rende `create()` non fresco e
+viene respinto senza cancellazione o normalizzazione.
 Poiché l'orchestratore non è ancora un servizio production deployed, non
 esiste un beneficio operativo che giustifichi una migrazione ambigua.
 `create()` opera solo su store privo di
@@ -119,8 +133,9 @@ I fake flow coprono `ACCEPT` con task successivo e `DONE`, `CORRECTIVE`,
 restart pulito, store corrotto/incompatibile, effetto completato e confine
 esterno ambiguo. Qualunque policy assertion non-zero dell'Executor per accesso
 USB, uso di `sudo`, uso di materiale protetto o modifica di `main` porta ora il
-runtime in `ERROR_LOCKED`; tali assertion restano però dichiarazioni del
-protocollo e non sono promosse a prova dell'isolamento OS reale.
+runtime in `ERROR_LOCKED`. I corrispondenti contatori zero della qualificazione
+reale descrivono soltanto il percorso osservato e le assertion di design: non
+provano ancora l'impossibilità OS-level di esercitare tali capability.
 
 Il workflow dedicato `.github/workflows/orchestration-o001-host-only.yml`
 esegue su push, pull request e richiesta manuale la compilazione Python e
@@ -147,20 +162,37 @@ permission profile nominati concedono ai PM sola lettura e all'Executor
 scrittura nel solo worktree, rete comandi disabilitata e accesso read-only al
 solo helper Codex necessario al sandbox.
 
+Ogni dispatch reale richiede esplicitamente modello ed effort e, dopo il turno,
+riosserva la route effettiva via App Server prima di persistere o usare l'output.
+La review riceve modello, effort, routing class e versione Codex dall'esatto
+`DispatchRecord` verificato che ha prodotto il work report, non da una nuova
+consultazione della tabella di routing. Un record mancante o incoerente con il
+contesto fallisce chiuso. Il repair strutturale include soltanto un codice
+bounded e il contratto generico: non riecheggia dettaglio o output invalido.
+
+Il supervisor non esegue più `unittest`, script o moduli provenienti dal
+worktree sintetico. `SyntheticVerifier` legge soltanto gli artefatti UTF-8
+allow-listed e bounded dei due profili, ne verifica invarianti esatti e tratta
+qualunque payload Python come dati inerti; symlink e file non regolari sono
+respinti. I prompt della drill review sono disposition-neutral e contengono
+soltanto ruolo canonico, fase opaca, stato di continuazione ed evidenza misurata.
+
 Il Git Manager rifiuta la root Goodix e suoi alias, crea task branch/worktree
 dal preciso SHA d'integrazione, valida scope, symlink, metadata Git, diff e
 whitespace, produce commit task-derived senza identità globale e applica
 `INTEGRATION_FF` con compare-and-swap sull'esatto old SHA solo dopo `ACCEPT` sul
 medesimo head revisionato. La qualificazione reale del 2026-08-30 con
-`codex-cli 0.144.1` ha provato: CORRECTIVE deterministico; riuso dello stesso
+`codex-cli 0.144.1` ha provato senza hint di disposition: CORRECTIVE rilevato
+indipendentemente; riuso dello stesso
 thread/worktree Executor con Terra/medium effettivo; secondo commit; review
 Sol/high; ACCEPT dell'head sintetico
-`3e712e92be41b87cf07cf2a3b7493b697975615a`; fast-forward dell'integrazione;
+`64e6aafd896f1bd208bfccd0a4894e0c729550aa`; fast-forward dell'integrazione;
 nuovo task bounded Terra/high con commit
-`089d565e773272859344c6a45eab6086566aaf7d`; review finale e DONE. Il branch
-`main` sintetico è rimasto a `acab85dab0696da05c2bd0bec5aaf8167b30f828`.
+`0f3fe5da042d1bc9a7d0d8220c4132db204b843c`; review finale e DONE indipendente.
+Il branch `main` sintetico è rimasto a
+`e4f97ae5d13ab6103ea71a290b49674d16098a01`.
 Il report redatto canonico ha SHA-256
-`9bb5c19c0a32036221e253ea010fb14056a21ac05fe0cdc30af7d9bfe566f8a5` e
+`fb2e3dbbb07c21bf10bfefba78600f53eeb80589d7d1c0a79edec4fd45041b24` e
 registra zero relay umano, fallback a pagamento, accessi USB Goodix, `sudo`,
 materiale protetto, `xhigh`/`max` e aggiornamenti di `main`.
 
@@ -2744,7 +2776,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
-| Orchestrazione O001 + O002 | core O001 preservato; adapter App Server/Git e routing chiuso implementati; 90 test deterministici PASS; ciclo Codex reale sintetico PASS; bootstrap complessivo non pronto | schema v3 con v1/v2 fail-closed, PM plan/review distinti Sol medium/high, Executor Terra high e correttivo medium nello stesso thread, commit e integrazione FF reali soltanto nel repo sintetico, `main` invariato, zero USB/sudo/protected/payg/human relay; freeze Goodix invariato |
+| Orchestrazione O001 + O002 | core O001 preservato; adapter App Server/Git, routing chiuso e verifier sintetico data-only implementati; 105 test deterministici PASS; ciclo Codex reale sintetico con review neutrale PASS; bootstrap complessivo non pronto | schema v3 con v1/v2 fail-closed e freshness completa, route effettiva riverificata per dispatch e review legata al dispatch persistito, PM plan/review distinti Sol medium/high, Executor Terra high e correttivo medium nello stesso thread, commit e integrazione FF reali soltanto nel repo sintetico, `main` invariato; contatori path zero USB/sudo/protected/payg/human relay non promossi a prova OS; freeze Goodix invariato |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |

@@ -4,9 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -19,7 +16,7 @@ from .git_manager import (
     SyntheticRepository,
     TaskWorktree,
 )
-from .persistence import GitStateRecord
+from .persistence import DispatchRecord, GitStateRecord, PersistenceError
 from .protocols import (
     ExecutorResult,
     PolicyAssertions,
@@ -34,6 +31,12 @@ from .structured_output import (
     ModelRouter,
     PMPlanningOutput,
     PMReviewOutput,
+)
+from .synthetic_verifier import (
+    SyntheticVerification,
+    SyntheticVerificationError,
+    SyntheticVerifier,
+    VerificationProfile,
 )
 
 
@@ -51,14 +54,6 @@ class SupervisorError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
-class MeasuredTest:
-    command: str
-    status: TestStatus
-    exit_code: int
-    summary: str
-
-
-@dataclass(frozen=True, slots=True)
 class ReviewEvidence:
     task_manifest: dict[str, Any]
     executor_result: dict[str, Any]
@@ -70,7 +65,7 @@ class ReviewEvidence:
     project_manual: str
     policy_assertions_verified: bool
     current_integration_sha: str
-    executor_routing: dict[str, str]
+    executor_routing: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         # Deliberately no planner prompt, free-form conversation, or history.
@@ -96,14 +91,17 @@ class O002Supervisor:
         engine: DeterministicEngine,
         git_manager: GitManager,
         repository: SyntheticRepository,
+        synthetic_verifier: SyntheticVerifier | None = None,
     ) -> None:
         self.engine = engine
         self.git_manager = git_manager
         self.repository = repository
+        self.synthetic_verifier = synthetic_verifier or SyntheticVerifier()
         self.current_plan: PMPlanningOutput | None = None
         self.current_worktree: TaskWorktree | None = None
         self.current_result: ExecutorResult | None = None
-        self.current_test: MeasuredTest | None = None
+        self.current_test: SyntheticVerification | None = None
+        self.current_executor_dispatch_id: str | None = None
 
     def bootstrap(self) -> OrchestratorState:
         if self.engine.state is OrchestratorState.BOOTSTRAP:
@@ -156,6 +154,7 @@ class O002Supervisor:
         self.current_worktree = worktree
         self.current_result = None
         self.current_test = None
+        self.current_executor_dispatch_id = None
         self.engine.store.save_git_state(
             GitStateRecord(
                 self.repository.integration_branch,
@@ -170,32 +169,35 @@ class O002Supervisor:
             raise SupervisorError("NO_CURRENT_TASK", turn_id)
         self.engine.start_executor(turn_id=turn_id)
 
-    @staticmethod
-    def _run_measured_test(worktree: Path) -> MeasuredTest:
-        command = "python -m unittest discover -s tests -v"
+    def _verified_executor_dispatch(
+        self,
+        dispatch_id: str,
+        expected_execution_class: ExecutionClass,
+    ) -> DispatchRecord:
         try:
-            completed = subprocess.run(
-                [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"],
-                cwd=worktree,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                shell=False,
-                check=False,
-                timeout=30.0,
-                text=True,
-                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            dispatch = self.engine.store.load_dispatch(dispatch_id)
+            context = self.engine.store.load_context(dispatch.thread_id)
+        except PersistenceError as exc:
+            raise SupervisorError(
+                "EXECUTOR_DISPATCH_EVIDENCE_UNAVAILABLE", dispatch_id
+            ) from exc
+        expected_routing = ModelRouter.execution(expected_execution_class).routing_class
+        if (
+            dispatch.context_class.value != "AI_EXECUTOR"
+            or dispatch.routing_class is not expected_routing
+            or context.context_class is not dispatch.context_class
+            or context.thread_id != dispatch.thread_id
+            or context.routing_class is not dispatch.routing_class
+            or context.effective_model_id != dispatch.effective_model_id
+            or context.effective_reasoning_effort
+            != dispatch.effective_reasoning_effort
+            or context.codex_version != dispatch.codex_version
+            or not context.active
+        ):
+            raise SupervisorError(
+                "EXECUTOR_DISPATCH_EVIDENCE_MISMATCH", dispatch_id
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise SupervisorError("MEASURED_TEST_FAILED", type(exc).__name__) from exc
-        output = completed.stdout[-8192:]
-        status = TestStatus.PASS if completed.returncode == 0 else TestStatus.FAIL
-        return MeasuredTest(
-            command,
-            status,
-            completed.returncode,
-            output,
-        )
+        return dispatch
 
     def materialize_executor_result(
         self,
@@ -203,6 +205,9 @@ class O002Supervisor:
         *,
         expected_parent_sha: str,
         commit_effect_id: str,
+        executor_dispatch_id: str,
+        expected_execution_class: ExecutionClass,
+        verification_profile: VerificationProfile,
     ) -> ExecutorResult:
         if self.engine.state is not OrchestratorState.EXECUTOR_RUNNING:
             raise SupervisorError("EXECUTOR_STATE_MISMATCH", self.engine.state.value)
@@ -219,13 +224,21 @@ class O002Supervisor:
             self.engine.fail_closed(
                 "EXECUTOR_POLICY_ASSERTION_VIOLATION", repr(assertions.to_dict())
             )
+        dispatch = self._verified_executor_dispatch(
+            executor_dispatch_id, expected_execution_class
+        )
         commit = self.git_manager.commit_task(
             self.current_worktree,
             manifest,
             expected_parent_sha=expected_parent_sha,
             effect_id=commit_effect_id,
         )
-        measured = self._run_measured_test(self.current_worktree.root)
+        try:
+            measured = self.synthetic_verifier.verify(
+                self.current_worktree.root, verification_profile
+            )
+        except SyntheticVerificationError as exc:
+            raise SupervisorError(exc.code, exc.detail) from exc
         changed_from_task_baseline = tuple(
             path
             for path in self.git_manager._text(
@@ -253,9 +266,10 @@ class O002Supervisor:
         self.engine.complete_executor(result)
         self.current_result = result
         self.current_test = measured
+        self.current_executor_dispatch_id = dispatch.dispatch_id
         return result
 
-    def start_review(self, turn_id: str, *, execution_class: ExecutionClass) -> ReviewEvidence:
+    def start_review(self, turn_id: str) -> ReviewEvidence:
         if self.current_result is None or self.current_plan is None or self.current_worktree is None:
             raise SupervisorError("NO_EXECUTOR_RESULT", turn_id)
         self.engine.start_review(turn_id=turn_id)
@@ -263,6 +277,30 @@ class O002Supervisor:
         result = self.current_result
         measured = self.current_test
         assert measured is not None
+        if self.current_executor_dispatch_id is None:
+            raise SupervisorError("EXECUTOR_DISPATCH_EVIDENCE_UNAVAILABLE", turn_id)
+        try:
+            dispatch = self.engine.store.load_dispatch(
+                self.current_executor_dispatch_id
+            )
+            context = self.engine.store.load_context(dispatch.thread_id)
+        except PersistenceError as exc:
+            raise SupervisorError(
+                "EXECUTOR_DISPATCH_EVIDENCE_UNAVAILABLE",
+                self.current_executor_dispatch_id,
+            ) from exc
+        if (
+            dispatch.context_class.value != "AI_EXECUTOR"
+            or context.context_class is not dispatch.context_class
+            or context.routing_class is not dispatch.routing_class
+            or context.effective_model_id != dispatch.effective_model_id
+            or context.effective_reasoning_effort
+            != dispatch.effective_reasoning_effort
+            or context.codex_version != dispatch.codex_version
+        ):
+            raise SupervisorError(
+                "EXECUTOR_DISPATCH_EVIDENCE_MISMATCH", dispatch.dispatch_id
+            )
         manual_path = self.current_worktree.root / "PROJECT_MANUAL.md"
         manual = manual_path.read_text(encoding="utf-8")
         if len(manual.encode("utf-8")) > MAX_MANUAL_BYTES:
@@ -272,7 +310,6 @@ class O002Supervisor:
             manifest.baseline_sha,
             result.review_set.head_sha,
         )
-        route = ModelRouter.execution(execution_class)
         evidence = ReviewEvidence(
             task_manifest=manifest.to_dict(),
             executor_result=result.to_dict(),
@@ -290,9 +327,12 @@ class O002Supervisor:
             policy_assertions_verified=True,
             current_integration_sha=self.repository.integration_sha,
             executor_routing={
-                "execution_class": execution_class.value,
-                "effective_model_id": route.model_id,
-                "effective_reasoning_effort": route.reasoning_effort,
+                "dispatch_id": dispatch.dispatch_id,
+                "routing_class": dispatch.routing_class.value,
+                "effective_model_id": dispatch.effective_model_id,
+                "effective_reasoning_effort": dispatch.effective_reasoning_effort,
+                "codex_version": dispatch.codex_version,
+                "schema_repair": dispatch.schema_repair,
             },
         )
         encoded = json.dumps(evidence.to_dict(), ensure_ascii=True).encode("utf-8")
@@ -347,6 +387,7 @@ class O002Supervisor:
                 self.current_worktree = None
                 self.current_result = None
                 self.current_test = None
+                self.current_executor_dispatch_id = None
             return state
         state = self.engine.apply_disposition(disposition)
         if state in {OrchestratorState.PM_PLANNING, OrchestratorState.DONE}:
@@ -354,4 +395,5 @@ class O002Supervisor:
             self.current_worktree = None
             self.current_result = None
             self.current_test = None
+            self.current_executor_dispatch_id = None
         return state

@@ -18,11 +18,15 @@ idempotency and fail-closed recovery. O002 adds:
 - strict typed planning, work-report and review contracts, with
   App-Server-compatible Structured Outputs schemas and stronger local
   validation before any state or Git effect;
+- a trusted data-only verifier that reads only fixed, bounded synthetic files;
+  deterministic acceptance never imports or executes task-controlled project
+  code outside the Codex sandbox;
 - a deterministic Git Manager for synthetic repositories only: task branch
   and worktree creation, scoped diff validation, task-derived commits and an
   exact expected-old fast-forward of the integration ref after PM `ACCEPT`;
-- SQLite schema v3 for contexts, dispatch routing evidence and Git state. v1
-  and v2 stores are rejected as incompatible without modification.
+- SQLite schema v3 for contexts, dispatch routing evidence and Git state, with
+  freshness accounting across every operational table. v1 and v2 stores are
+  rejected as incompatible without modification.
 
 ## Closed model routing
 
@@ -51,8 +55,11 @@ python -W error::ResourceWarning -m unittest discover -s tests -v
 
 The suite uses only the Python standard library. It includes the 63 O001
 regressions plus fake App Server, routing, persistence, synthetic Git-manager
-and full fake corrective/accept/next-task/DONE coverage. CI runs only these
-deterministic host-only checks; it never runs the real model qualification.
+and full fake corrective/accept/next-task/DONE coverage. It also proves that
+malicious-looking synthetic bytes remain inert, every route is reverified after
+every dispatch, and schema repair does not echo invalid content. CI runs only
+these 105 deterministic host-only checks; it never runs the real model
+qualification.
 
 ## Real local synthetic qualification
 
@@ -75,10 +82,12 @@ report. Default paths use `XDG_STATE_HOME` or
 
 A successful run prints `O002_REAL_CODEX_SYNTHETIC_CYCLE=PASS`. Its report
 must also show `AUTH_MODE=CHATGPT`, pinned/effective routing PASS, observed
-CORRECTIVE/ACCEPT/second-task DONE, real task branch/worktree/commits and
-integration fast-forward PASS, `MAIN_UNCHANGED=true`, and zero counts for
-human relay, paid fallback, Goodix USB, `sudo`, protected material and
-autonomous `xhigh`/`max` use.
+independent CORRECTIVE/ACCEPT/second-task DONE from disposition-neutral review
+prompts, persisted verified dispatch routing, real task
+branch/worktree/commits and integration fast-forward PASS, and
+`MAIN_UNCHANGED=true`. Zero qualification-path counters for human relay, paid
+fallback, Goodix USB, `sudo` and protected material are observations of this
+path, not proof of OS-level negative isolation; that proof remains future work.
 
 O002 does not make the orchestration ready for Goodix. GitHub Human-Gate
 identity binding, persistent-service isolation and any live runner remain
