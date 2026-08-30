@@ -1,21 +1,23 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.5 — Revisione 27 agosto 2026
-**Stato**: Attivo; sostituisce la v2.4 del 21 agosto 2026
-**Motivazione**: La v2.5 conserva l'ossatura metodologica e di sicurezza della v2.4, ma abolisce il bundle ZIP step-local come requisito standard. La review diventa Git-native: commit/HEAD, diff, branch/PR e artefatti versionati nel repository costituiscono il review set canonico. ZIP e rappresentazioni Base64 non fanno più parte della closure ordinaria e sono ammessi solo come eccezioni di trasporto o export esplicitamente necessarie. La modifica riduce packaging e incompatibilità tra piattaforme AI senza ridurre auditabilità, provenance o controllo.
+> **Versione**: 2.6 — Revisione 30 agosto 2026
+**Stato**: Attivo; sostituisce la v2.5 del 27 agosto 2026
+**Motivazione**: La v2.6 mantiene invarianti factory-preserving, evidence-first, executable closure, licensing/provenance e review Git-native della v2.5, ma cambia il modello operativo per rimuovere l'Utente dal ruolo di relay continuo tra AI PM e AI esecutrice. Introduce una **standing delegation** per il lavoro autonomo non-live entro un envelope già approvato, un **orchestratore deterministico** non-AI che trasferisce task e risultati, una state machine PM → Executor → PM, Human Gate espliciti per le decisioni materiali e le capability sensibili, separazione tecnica tra ambiente host-only e live runner, pausa fail-closed su quota/modello indisponibile e divieto di fallback automatico verso API a consumo. L'Utente conserva autorità finale e viene coinvolto soltanto quando una decisione supera la delega permanente o richiede una capability protetta.
 > 
 
 ---
 
 ## 1. Scopo del documento
 
-Questo documento definisce come devono operare, nel progetto Goodix 27c6:5125, i tre soggetti coinvolti:
+Questo documento definisce come devono operare, nel progetto Goodix 27c6:5125, i tre soggetti decisionali coinvolti:
 
-- **Utente**: decisore finale, proprietario dell'hardware e dell'ambiente operativo reale.
-- **AI Project Manager (AI PM)**: pianificatrice tecnica, responsabile della decomposizione, della supervisione e della review.
+- **Utente**: autorità umana finale, proprietario dell'hardware e dell'ambiente operativo reale.
+- **AI Project Manager (AI PM)**: pianificatrice tecnica, responsabile della decomposizione, della guidance, della supervisione e della review.
 - **AI esecutrice**: implementatrice, responsabile della consegna tecnica nel repository.
 
-Le linee guida sono vincolanti per qualsiasi modello AI impiegato nel progetto (ChatGPT, Codex, Aider, Qwen o futuri strumenti equivalenti).
+A supporto dei tre soggetti può operare un **orchestratore deterministico locale**. L'orchestratore non è una quarta AI e non possiede autorità tecnica o di governance: trasferisce task e risultati, applica policy meccaniche, persiste stato, controlla capability e arresta il flusso sui Human Gate.
+
+Le linee guida sono vincolanti per qualsiasi modello AI impiegato nel progetto (ChatGPT, Codex, Aider, Qwen o futuri strumenti equivalenti) e per qualsiasi orchestratore o runner che ne automatizzi il flusso.
 
 Il repository privato di sviluppo è il workspace canonico. La root reale va determinata dal repository stesso, ad esempio con `git rev-parse --show-toplevel`; non si deve assumere un path locale hard-coded se il clone viene rinominato o spostato.
 
@@ -50,7 +52,7 @@ In caso di conflitto tra principi, l'ordine seguente è vincolante.
 
 ### 3.1 Factory-preserving — massima priorità
 
-Nessuna operazione deve modificare firmware, PSK, OTP, factory data o configurazione persistente del sensore. Questo principio non si bilancia con comodità implementativa, velocità o compatibilità con codice esterno.
+Nessuna operazione deve modificare firmware, PSK, OTP, factory data o configurazione persistente del sensore. Questo principio non si bilancia con comodità implementativa, velocità, automazione o compatibilità con codice esterno.
 
 ### 3.2 Eseguibilità reale > correttezza teorica
 
@@ -58,7 +60,7 @@ Quando uno step produce o modifica un percorso eseguibile, il codice deve funzio
 
 ### 3.3 Avanzamento di confine > produzione di artefatti
 
-Review set, report e numerazione Dxxx non sono di per sé avanzamento. Avanzamento tecnico reale significa nuova esecuzione, nuova evidenza, nuovo comportamento/protocollo compreso o nuovo confine hardware raggiunto. Una decisione architetturale, di licensing o di repository che cambia realmente lo stato del progetto può essere uno step legittimo, ma deve essere dichiarata come avanzamento non hardware e non confusa con evidenza device-side.
+Review set, report e numerazione Dxxx non sono di per sé avanzamento. Avanzamento tecnico reale significa nuova esecuzione, nuova evidenza, nuovo comportamento/protocollo compreso o nuovo confine hardware raggiunto. Una decisione architetturale, di licensing, repository o orchestrazione che cambia realmente lo stato del progetto può essere uno step legittimo, ma deve essere dichiarata come avanzamento non hardware e non confusa con evidenza device-side.
 
 ### 3.4 Conservatività operativa, non cerimoniale
 
@@ -66,19 +68,25 @@ Preferire cambi piccoli, verificabili e reversibili. Non trasformare la sicurezz
 
 ### 3.5 Fail-closed intelligente
 
-L'AI non deve dichiarare completato un task in presenza di ambiguità hardware o di comportamento non compreso. Non deve però inventare blocker di governance host-side quando il dispositivo è già protetto e il problema non incide sul rischio reale.
+L'AI non deve dichiarare completato un task in presenza di ambiguità hardware o di comportamento non compreso. Non deve però inventare blocker di governance host-side quando il dispositivo è già protetto e il problema non incide sul rischio reale. L'orchestrazione deve fermarsi automaticamente quando incontra un Human Gate, una capability non autorizzata, una quota esaurita o una condizione che supera la standing delegation.
 
 ### 3.6 Evidence-first
 
 Distinguere sempre tra **osservato**, **verificato**, **inferito**, **ipotizzato** e **non noto**. Non promuovere ipotesi a fatti.
 
-### 3.7 Nessuna conoscenza confinata nella chat
+### 3.7 Nessuna conoscenza confinata nella chat o nella sessione agente
 
-La conoscenza tecnica o metodologica rilevante deve essere integrata nel manuale o negli artefatti canonici; non deve rimanere solo in chat, report isolati o artefatti temporanei.
+La conoscenza tecnica o metodologica rilevante deve essere integrata nel manuale o negli artefatti canonici; non deve rimanere solo in chat, sessioni PM/Executor, report isolati o artefatti temporanei. La ripresa dopo crash, pausa quota o nuova sessione deve dipendere da stato persistito e fonti canoniche, non dalla memoria effimera del modello.
 
-### 3.8 Validazione umana finale
+### 3.8 Autorità umana finale senza relay umano obbligatorio
 
-L'Utente mantiene sempre la decisione finale su scope, rischio, autorizzazioni live, accettazione delle modifiche, merge, sospensione o cambio di strategia.
+L'Utente mantiene sempre la decisione finale su obiettivo generale, factory-preserving, rischio live, cambi materiali di scope/strategia, capability sensibili, merge in `main`, history rewrite, pubblicazione e sospensione del progetto.
+
+Questa autorità **non implica** che l'Utente debba approvare o trasferire manualmente ogni prompt, risultato, review o corrective. Entro la standing delegation definita dalla v2.6, AI PM e AI esecutrice possono concatenare autonomamente step non-live tramite l'orchestratore. L'Utente viene coinvolto solo quando si verifica un Human Gate o quando decide volontariamente di intervenire.
+
+### 3.9 Capability separation > divieti solo linguistici
+
+Quando tecnicamente praticabile, i vincoli critici devono essere enforceable dall'infrastruttura: un executor host-only non deve avere accesso al sensore, ai privilegi o ai secret reali solo perché un prompt glielo vieta. Le capability live, Git distruttive e sensibili devono essere separate e concesse dal supervisore deterministico soltanto dopo il gate richiesto.
 
 ---
 
@@ -88,13 +96,23 @@ L'Utente mantiene sempre la decisione finale su scope, rischio, autorizzazioni l
 
 Per le regole di processo e sicurezza valgono, in ordine:
 
-1. decisione o autorizzazione esplicita corrente dell'Utente;
-2. versione MD canonica e immutabile delle presenti linee guida nel repository;
+1. decisione, revoca o Human Gate esplicito corrente dell'Utente;
+2. versione MD canonica corrente delle presenti linee guida nel repository privato;
 3. `AGENTS.md` come sintesi operativa persistente;
-4. prompt Dxxx corrente approvato dall'Utente;
-5. manuale tecnico per lo stato tecnico corrente.
+4. envelope/state machine dell'orchestratore, purché derivati dalle fonti 1-3 e senza possibilità di ampliarle;
+5. prompt/task Dxxx corrente emesso dall'AI PM entro la standing delegation;
+6. manuale tecnico per lo stato tecnico corrente.
 
 Un prompt specifico non può rilassare implicitamente un vincolo permanente. Una vera eccezione deve essere esplicita, limitata e autorizzata dall'Utente.
+
+Un prompt Dxxx **non richiede approvazione manuale separata dell'Utente** quando:
+
+- resta integralmente dentro la standing delegation;
+- non apre alcun Human Gate;
+- non amplia scope o capability;
+- è stato prodotto dall'AI PM dopo review del risultato precedente o come bootstrap approvato.
+
+L'AI PM e l'orchestratore non possono auto-modificare la standing delegation né auto-approvare un Human Gate.
 
 ### 4.2 Autorità probatoria tecnica
 
@@ -105,7 +123,7 @@ Per affermazioni target-specific su `GF_ST411SEC_APP_12509`, sicurezza, persiste
 3. manuale tecnico canonico;
 4. report e artefatti degli step precedenti;
 5. fonti esterne, implementazioni terze e conversazioni esterne;
-6. contenuto delle chat;
+6. contenuto delle chat o delle sessioni agente;
 7. supposizioni del modello.
 
 Una fonte esterna può essere eccellente per implementazione o corroborazione senza diventare prova primaria del target 12509.
@@ -114,37 +132,58 @@ Una fonte esterna può essere eccellente per implementazione o corroborazione se
 
 ## 5. Ruoli
 
-### 5.1 Utente
+### 5.1 Utente — Human Authority
 
-- definisce obiettivo e priorità;
-- autorizza scope e cambi di scope;
-- controlla i risultati;
-- esegue o autorizza la validazione sull'hardware reale;
-- autorizza operazioni rischiose, live, irreversibili o di history rewrite;
-- decide se accettare, correggere, annullare, sospendere o mergiare il lavoro.
+- definisce obiettivo generale e priorità;
+- approva la standing delegation e può restringerla o revocarla in qualunque momento;
+- autorizza i Human Gate;
+- autorizza scope expansion o cambi strategici materiali;
+- autorizza operazioni live, sensibili, irreversibili o di history rewrite;
+- autorizza merge in `main` e pubblicazione;
+- può sospendere, correggere o terminare il flusso in qualunque momento;
+- **non è il relay ordinario** tra AI PM e AI esecutrice.
 
 ### 5.2 AI Project Manager
 
-- chiarisce il problema con l'Utente;
-- definisce criteri di accettazione coerenti con lo scope;
+- definisce criteri di accettazione coerenti con lo scope già autorizzato;
 - individua rischi, dipendenze ed esclusioni;
 - prepara task piccoli ma non artificialmente frammentati, con un path di esecuzione chiaro quando applicabile;
+- sceglie la classe di modello/ragionamento appropriata e vieta downgrade silenziosi;
 - riesamina diff, test, report, review set e stato reale del repository;
 - verifica aggiornamento organico del manuale;
-- prepara il prompt della milestone successiva solo dopo la review;
+- emette una decisione strutturata `ACCEPT`, `CORRECTIVE`, `REPLAN`, `HUMAN_GATE`, `PAUSE` o `DONE`;
+- prepara e invia autonomamente il task successivo all'AI esecutrice quando la decisione resta dentro la standing delegation;
 - non approva governance host-side aggiuntiva se non riduce un rischio reale;
-- non modifica repository remoto, PR, branch, history o merge senza autorizzazione esplicita dell'Utente.
+- non auto-autorizza live, scope expansion, merge, history rewrite o altre capability soggette a Human Gate;
+- in modalità orchestrata opera preferibilmente come reviewer/planner senza capability dirette di modifica del worktree o del sensore.
 
 ### 5.3 AI esecutrice
 
-- opera nel repository e legge prima il contesto canonico;
+- opera nel worktree/branch assegnato e legge prima il contesto canonico;
 - identifica root, branch, HEAD e stato Git;
-- propone e applica il cambiamento minimo necessario;
+- applica il cambiamento minimo necessario;
 - esegue test coerenti con lo scope;
 - quando esiste un percorso eseguibile, verifica executable closure nel contesto appropriato;
-- aggiorna il manuale tecnico;
+- aggiorna ricorsivamente e organicamente il manuale tecnico canonico;
 - rende disponibile un review set step-local versionato nel repository, senza creare ZIP o Base64 salvo necessità esplicita;
-- riporta limiti, rischi e verifiche con linguaggio fedele all'evidenza.
+- riporta limiti, rischi e verifiche con linguaggio fedele all'evidenza;
+- non decide autonomamente di ampliare scope o capability;
+- non può usare capability live/sensibili non concesse dal supervisore.
+
+### 5.4 Orchestratore deterministico — infrastruttura, non quarto decisore
+
+L'orchestratore:
+
+- mantiene la state machine del flusso;
+- trasferisce task PM → Executor e risultati Executor → PM senza intervento manuale dell'Utente;
+- persiste gli identificatori necessari a ripresa, audit e idempotenza;
+- applica allow-list, capability, policy Git e Human Gate meccanici;
+- crea o assegna worktree/branch di task secondo policy;
+- mantiene, quando previsto, un branch di integrazione autonomo separato da `main` e lo avanza solo fast-forward dopo `ACCEPT` dell'AI PM;
+- può aprire/aggiornare PR e superfici di notifica quando autorizzato dalla standing delegation;
+- arresta e persiste il flusso su gate, quota, errore infrastrutturale o stato non determinabile;
+- non interpreta autonomamente evidenze tecniche e non prende decisioni architetturali: queste appartengono all'AI PM o all'Utente;
+- non può trasformare un `HUMAN_GATE` in `ACCEPT` né ampliare la propria allow-list.
 
 ---
 
@@ -154,15 +193,29 @@ Una fonte esterna può essere eccellente per implementazione o corroborazione se
 
 Prima di consegnare il task:
 
-- chiarire obiettivo preciso;
+- chiarire obiettivo preciso sulla base dello stato canonico;
 - definire scope, rischi, esclusioni e criteri di completamento;
-- indicare il livello di ragionamento **MEDIUM** o **HIGH** più appropriato;
-- creare il prompt come file `.md` scaricabile, non come semplice testo da copiare in chat;
+- indicare classe di ragionamento/modello appropriata;
+- creare il prompt come file `.md` versionabile o persistibile dall'orchestratore, non come testo che richiede copia/incolla dell'Utente;
 - richiedere aggiornamento del manuale canonico;
 - richiedere un review set step-local Git-native, identificabile tramite baseline, HEAD/commit e file rilevanti;
+- dichiarare il `GATE_CLASS` dello step e le capability necessarie;
 - vietare espansioni di scope non autorizzate.
 
-### 6.2 Lettura iniziale — AI esecutrice
+### 6.2 Handoff automatico PM → Executor
+
+In modalità orchestrata il task `.md` viene passato direttamente all'AI esecutrice. L'Utente non deve scaricarlo, leggerlo, copiarlo o inoltrarlo per consentire l'esecuzione ordinaria.
+
+Prima del dispatch l'orchestratore verifica almeno:
+
+- task identificabile e non già eseguito in modo ambiguo;
+- baseline/ref attesa;
+- capability richieste consentite dalla standing delegation;
+- assenza di Human Gate pendenti;
+- modello richiesto disponibile nell'allow-list;
+- quota sufficiente oppure possibilità di mettere il task in pausa senza fallback a pagamento.
+
+### 6.3 Lettura iniziale — AI esecutrice
 
 Prima di modificare file:
 
@@ -170,9 +223,10 @@ Prima di modificare file:
 - leggere linee guida canoniche, `AGENTS.md`, manuale e prompt dello step;
 - esaminare gli step precedenti pertinenti;
 - controllare stato Git e baseline;
-- identificare file, launcher, test e artefatti coinvolti.
+- identificare file, launcher, test e artefatti coinvolti;
+- verificare le capability effettivamente disponibili e non tentare di aggirarne l'assenza.
 
-### 6.3 Analisi preliminare
+### 6.4 Analisi preliminare
 
 Dichiarare sinteticamente:
 
@@ -183,9 +237,9 @@ Dichiarare sinteticamente:
 - esclusioni;
 - criteri di completamento.
 
-In caso di contraddizione sostanziale, fermarsi e chiedere istruzioni.
+In caso di contraddizione sostanziale, l'AI esecutrice non chiede automaticamente all'Utente: restituisce il problema all'AI PM. L'AI PM risolve autonomamente se la decisione resta dentro lo scope delegato; altrimenti emette `HUMAN_GATE`.
 
-### 6.4 Implementazione
+### 6.5 Implementazione
 
 - cambiamento minimo;
 - no refactoring globali non richiesti;
@@ -194,9 +248,9 @@ In caso di contraddizione sostanziale, fermarsi e chiedere istruzioni.
 - no occultamento di modifiche automatiche o generate;
 - no risultati dipendenti da stato sporco non controllato;
 - usare directory temporanee per simulazioni distruttive;
-- rispettare sempre sicurezza e scope.
+- rispettare sempre sicurezza, capability e scope.
 
-### 6.5 Verifica tecnica
+### 6.6 Verifica tecnica
 
 - eseguire test pertinenti;
 - ripetere test quando serve dimostrare determinismo;
@@ -204,6 +258,27 @@ In caso di contraddizione sostanziale, fermarsi e chiedere istruzioni.
 - verificare modifiche fuori scope;
 - distinguere test passati, falliti, saltati e non disponibili;
 - non mascherare pass parziali come completamento.
+
+### 6.7 Handoff automatico Executor → PM e prosecuzione
+
+Il risultato torna direttamente all'AI PM insieme a baseline, HEAD/ref, diff, test, report e documentazione canonica aggiornata.
+
+L'AI PM deve emettere una sola disposition macchina primaria:
+
+- `ACCEPT` — step chiuso; può generare il successivo entro la standing delegation;
+- `CORRECTIVE` — genera e invia un corrective nello stesso boundary quando possibile;
+- `REPLAN` — cambia metodo restando dentro scope/capability già delegati;
+- `HUMAN_GATE` — arresto obbligatorio in attesa dell'Utente;
+- `PAUSE` — arresto recuperabile per quota/modello/infrastruttura;
+- `DONE` — obiettivo delegato completato, nessun task successivo automatico.
+
+Il loop ordinario è quindi:
+
+```
+AI PM -> AI esecutrice -> AI PM -> decisione -> [AI esecutrice | Human Gate | pausa | fine]
+```
+
+L'Utente non è un hop di trasporto del loop.
 
 ---
 
@@ -258,10 +333,12 @@ L'AI PM deve:
 - controllare executable closure quando applicabile;
 - controllare coerenza del manuale;
 - distinguere blocker reali da limiti accettabili;
-- proporre accettazione, correzione o rigetto all'Utente;
-- preparare lo step successivo solo dopo review conclusa.
+- decidere `ACCEPT`, `CORRECTIVE`, `REPLAN`, `HUMAN_GATE`, `PAUSE` o `DONE`;
+- preparare e dispatchare automaticamente lo step successivo quando la decisione resta dentro la standing delegation.
 
-Se commit/branch/PR e gli artefatti dello step sono disponibili nel repository remoto accessibile all'AI PM, la review avviene direttamente sullo stato Git e sui file versionati. L'Utente non deve creare, scaricare, riconvertire o ricaricare ZIP/Base64 per consentire la review.
+L'AI PM **non deve chiedere all'Utente l'accettazione ordinaria di ogni step host-only**. Deve coinvolgerlo soltanto quando la decisione ricade nei Human Gate definiti dalla governance o quando non può stabilire in modo affidabile che la decisione resti dentro la delega.
+
+Se commit/branch/PR e gli artefatti dello step sono disponibili nel repository remoto accessibile all'AI PM, la review avviene direttamente sullo stato Git e sui file versionati. L'Utente non deve creare, scaricare, riconvertire, ricaricare o inoltrare ZIP/Base64, prompt o summary per consentire la review.
 
 ---
 
@@ -310,21 +387,31 @@ ZIP, `.zip.b64` e altri packaging equivalenti **non sono requisiti di closure n�
 
 ## 11. Git e integrità del repository
 
-L'AI esecutrice e l'AI PM devono:
+### 11.1 Separazione delle capability Git
+
+In modalità orchestrata si applica il principio del minimo privilegio:
+
+- **AI esecutrice**: può modificare e committare soltanto nel worktree/branch di task assegnato; non deve spostare `main`, fare merge o riscrivere history;
+- **AI PM**: review e decisione; preferibilmente nessuna capability diretta di scrittura Git;
+- **orchestratore**: può creare/assegnare worktree e task branch, eseguire push fast-forward, e mantenere un **branch di integrazione autonomo** separato da `main`; dopo `ACCEPT` dell'AI PM può avanzare tale branch solo fast-forward al commit accettato e usarlo come baseline del task successivo; può inoltre aprire/aggiornare PR quando previsto dalla standing delegation;
+- **Utente**: mantiene il gate per merge del branch di integrazione in `main`, force operation, history rewrite e pubblicazione salvo futura delega esplicita più restrittivamente definita.
+
+Regole permanenti:
 
 - non assumere che uno stato sporco sia baseline valida;
 - non cancellare modifiche dell'Utente;
-- non eseguire reset distruttivi senza autorizzazione;
-- non creare commit o push salvo autorizzazione esplicita;
-- non fare merge salvo autorizzazione esplicita dell'Utente;
-- non fare rebase, amend, force push o history rewrite senza autorizzazione esplicita e specifica;
-- non installare hook Git o modificare configurazioni Git globali/utente;
+- non eseguire reset distruttivi senza Human Gate;
+- commit e push sono ammessi autonomamente **solo sul task branch assegnato o sul branch di integrazione autonomo tramite fast-forward controllato dall'orchestratore** e solo entro la standing delegation;
+- nessun merge in `main` senza Human Gate esplicito;
+- nessun rebase, amend, force push o history rewrite senza Human Gate esplicito e specifico;
+- non installare hook Git o modificare configurazioni Git globali/utente senza autorizzazione specifica;
 - non aggiungere artefatti generati fuori scope;
-- spiegare ogni modifica retroattiva necessaria.
+- spiegare ogni modifica retroattiva necessaria;
+- l'orchestratore deve rifiutare aggiornamenti di ref non fast-forward salvo Human Gate dedicato.
 
-### 11.1 Baseline Git approvata per il live-critical set
+### 11.2 Baseline Git approvata per il live-critical set
 
-Per i percorsi live evitare pinning SHA-256 manuale diffuso di manuali, report e test. Quando serve una baseline live, identificarla con un commit SHA completo approvato esplicitamente dall'Utente/AI PM.
+Per i percorsi live evitare pinning SHA-256 manuale diffuso di manuali, report e test. Quando serve una baseline live, identificarla con un commit SHA completo reviewato dall'AI PM e legato al relativo Human Gate dell'Utente.
 
 La verifica di integrità riguarda il **live-critical set**, normalmente:
 
@@ -336,40 +423,83 @@ La verifica di integrità riguarda il **live-critical set**, normalmente:
 
 Modifiche a manuale, report, manifest o test offline non devono invalidare automaticamente una baseline live già approvata.
 
-Codex non deve inventare o auto-approvare un commit SHA. Hash per-file indipendenti sono ammessi quando proteggono un artefatto esterno o un rischio concreto non coperto dalla baseline Git, non come cerimonia generalizzata.
+Né Codex, né l'AI PM, né l'orchestratore possono inventare o auto-approvare un commit SHA per un live. Hash per-file indipendenti sono ammessi quando proteggono un artefatto esterno o un rischio concreto non coperto dalla baseline Git, non come cerimonia generalizzata.
 
 ---
 
 ## 12. Sicurezza hardware, firmware e host
 
-### 12.1 Operazioni vietate senza autorizzazione esplicita
+### 12.1 Operazioni permanentemente vietate nel progetto
 
-Salvo task specifico autorizzato dall'Utente, l'AI esecutrice non deve eseguire:
+La standing delegation e i Human Gate **non possono** autorizzare:
 
-- flashing, provisioning, OTP, IAP;
-- modifica firmware del sensore;
-- accesso USB reale o invio di comandi sensor-reaching;
-- scrittura su memoria persistente;
-- provisioning o sostituzione PSK;
-- estrazione/manipolazione di secret non necessaria allo scope;
-- installazione di driver/plugin caricabili o attivazione runtime libfprint;
-- `sudo` o equivalenti privilegiati per conto dell'Utente;
-- operazioni di rete non necessarie.
+- flashing, erase, ClearApp, provisioning o IAP del firmware;
+- modifica del firmware residente;
+- provisioning, sostituzione o randomizzazione della PSK factory;
+- scrittura OTP, factory data o configurazione persistente;
+- cambio permanente di VID:PID o modalità boot;
+- procedure che rendano incerta la compatibilità Windows successiva;
+- introduzione intenzionale di una persistent-write family non già dimostrata sicura e necessaria allo scope factory-preserving.
 
-### 12.2 Invarianti factory-preserving
+Una futura eccezione a questi invarianti richiederebbe un diverso progetto/governance, non un semplice Human Gate della v2.6.
 
-- nessun erase o flash/IAP del firmware;
-- nessun provisioning o rimpiazzo PSK;
-- nessuna scrittura OTP, factory data o configurazione persistente;
-- nessun cambio permanente di VID:PID o modalità boot;
-- nessuna procedura che renda incerta la compatibilità Windows successiva;
-- nessun asset proprietario OEM nei review set o artefatti destinati alla pubblicazione.
+### 12.2 Capability soggette a Human Gate
 
-### 12.3 Gerarchia di sicurezza
+Salvo futura delega esplicita dell'Utente, richiedono Human Gate specifico:
+
+- apertura/claim/accesso USB reale e qualunque comando sensor-reaching;
+- esecuzione live sul Goodix;
+- uso di protected material o secret reali oltre un preflight esplicitamente già delegato;
+- `sudo`, root o privilegi equivalenti;
+- accesso della Windows VM/OEM path al sensore per nuove evidenze;
+- installazione/attivazione runtime di driver, plugin libfprint/fprintd o PAM;
+- merge in `main` e pubblicazione;
+- operazioni Git distruttive o history rewrite;
+- cambi di scope/strategia che alterano in modo materiale safety boundary, licensing boundary, architettura canonica o obiettivo approvato.
+
+### 12.3 Standing delegation host-only
+
+Sono autonomamente delegabili, quando non richiedono capability della sezione 12.2:
+
+- lettura e analisi del repository;
+- progettazione e review AI PM;
+- modifica codice/documenti su task branch;
+- build, test, sanitizer e fixture offline;
+- dry-run e preflight senza apertura del device;
+- aggiornamento del manuale;
+- commit/push fast-forward su task branch e PR;
+- corrective e replan nello stesso scope;
+- step host-only successivi coerenti con l'obiettivo già approvato.
+
+### 12.4 Capability separation e live runner
+
+L'ambiente standard dell'AI esecutrice deve essere **host-only**. Quando tecnicamente praticabile deve essere privo di:
+
+- accesso a `/dev/bus/usb` del Goodix;
+- `sudo`/root;
+- protected material/secret reali;
+- credenziali o capability per aggiornare `main`;
+- capability di pubblicazione.
+
+Il percorso live deve essere eseguito da un **live runner separato e deterministico**, non dalla libera shell dell'AI esecutrice. Il runner può eseguire soltanto l'azione/baseline esplicitamente autorizzata dal Human Gate.
+
+Un Human Gate live deve essere:
+
+- legato a un `GATE_ID` univoco;
+- legato a commit/ref e azione precisa;
+- one-shot salvo diversa autorizzazione esplicita;
+- non trasferibile a un task successivo;
+- invalidato da cambi live-critical non reviewati;
+- consumato o revocato al termine dell'azione;
+- `retry_count=0` per default.
+
+`LIVE_AUTHORIZED` è quindi `false` per default e non si eredita da un precedente step o da una precedente sessione.
+
+### 12.5 Gerarchia di sicurezza
 
 La sicurezza dispositivo ha priorità massima. La sicurezza host-side è secondaria e deve servire la prima.
 
-Guardrail economici che riducono direttamente un rischio sul device vanno preservati: autorizzazione esplicita, single-shot, zero retry implicito, fail-closed sui comandi non compresi o persistenti, cleanup/release/reseal, verifica del live-critical set.
+Guardrail economici che riducono direttamente un rischio sul device vanno preservati: autorizzazione esplicita, capability separation, single-shot, zero retry implicito, fail-closed sui comandi non compresi o persistenti, cleanup/release/reseal, verifica del live-critical set.
 
 Preflight, marker, sealing e reporting host-side non devono diventare un ostacolo insuperabile se non proteggono un rischio reale. Un meccanismo host-side che blocca ripetutamente l'esecuzione senza migliorare la safety va semplificato, corretto o rimosso, non ulteriormente stratificato.
 
@@ -443,7 +573,7 @@ Questa regola non vieta step deliberatamente non hardware, come licensing, prove
 
 ---
 
-## 16. [AGENTS.md](http://AGENTS.md) e prompt Codex
+## 16. [AGENTS.md](http://AGENTS.md), prompt Codex e contratti macchina
 
 ### 16.1 [AGENTS.md](http://AGENTS.md) come costituzione operativa persistente
 
@@ -453,9 +583,10 @@ Deve contenere almeno:
 
 - root/manuale canonici;
 - invarianti factory-preserving e compatibilità Windows;
-- divieti hardware permanenti salvo autorizzazione;
+- standing delegation e Human Gate;
+- capability separation host-only/live;
 - disciplina Git e scope;
-- ciclo Design → Implementazione → Esecuzione;
+- ciclo Design → Implementazione → Esecuzione/Review;
 - definizione di avanzamento reale;
 - riesame metodologico pre-live;
 - aggiornamento organico del manuale;
@@ -463,22 +594,42 @@ Deve contenere almeno:
 - closure minima;
 - distinzione safety telemetry / project reporting;
 - licensing boundary e regole minime di provenance post-D247;
-- repository hygiene minima post-D248.
+- repository hygiene minima post-D248;
+- divieto di fallback silenzioso su modello o API a consumo.
 
 `AGENTS.md` è un'istruzione operativa derivata, non una fonte normativa alternativa e non può contraddire il MD canonico.
 
-### 16.2 Prompt Dxxx: solo delta dello step
+### 16.2 Prompt Dxxx: delta dello step e handoff automatico
 
 Il prompt specifico non deve ricopiare inutilmente regole permanenti già in `AGENTS.md` e nelle linee guida. Deve contenere:
 
-- reasoning **MEDIUM** o **HIGH**;
+- classe di modello/ragionamento richiesta;
 - contesto tecnico strettamente necessario;
 - obiettivo specifico;
 - scope e file particolari;
 - criteri di accettazione specifici;
-- eventuali eccezioni esplicitamente autorizzate.
+- `GATE_CLASS` e capability necessarie;
+- eventuali eccezioni esplicitamente autorizzate;
+- obbligo di aggiornare organicamente il manuale canonico.
+
+Il prompt resta un file `.md` identificabile e auditabile, ma in modalità orchestrata **non deve essere consegnato all'Utente per il semplice trasporto**. L'orchestratore lo passa direttamente all'AI esecutrice.
 
 La prevenzione dei conflitti avviene riducendo la duplicazione, non dichiarando artificialmente una fonte "insuperabile".
+
+### 16.3 Contratto macchina minimo AI PM
+
+In modalità orchestrata, oltre al testo tecnico, l'AI PM deve produrre campi strutturati sufficienti perché l'orchestratore non debba interpretare liberamente il linguaggio naturale. Almeno:
+
+- `TASK_ID`;
+- `BASELINE`;
+- `EXECUTOR_MODEL_CLASS`;
+- `GATE_CLASS`;
+- `REQUIRED_CAPABILITIES`;
+- `DISPOSITION`;
+- `NEXT_TASK` oppure `NONE`;
+- `HUMAN_GATE_ID` quando applicabile.
+
+L'orchestratore valida lo schema e fallisce chiuso se i campi necessari sono mancanti o contraddittori.
 
 ---
 
@@ -579,9 +730,9 @@ Nessuna operazione sul repository pubblico è implicita nelle attività sul priv
 
 ---
 
-## 22. Closure e safety telemetry
+## 22. Closure, disposition di orchestrazione e safety telemetry
 
-La sintesi finale di ogni step usa, salvo necessità concreta, sei campi:
+La sintesi finale di ogni step usa, salvo necessità concreta, i sei campi tecnici canonici:
 
 1. `OUTCOME` — `READY` | `BLOCKED` + classificazione tecnica breve;
 2. `ADVANCEMENT` — esecuzione reale, nuova evidenza, avanzamento architetturale/non hardware oppure `NONE`, senza fingere device progress;
@@ -589,6 +740,13 @@ La sintesi finale di ogni step usa, salvo necessità concreta, sei campi:
 4. `RESIDUAL_BLOCKER_OR_RISK` — descrizione sintetica;
 5. `CANONICAL_DOCUMENTATION` — manuale aggiornato sì/no + sezioni toccate;
 6. `REVIEW_SET` — baseline + HEAD/commit (o branch/PR) e path/file rilevanti che compongono il review set step-local.
+
+In modalità orchestrata si aggiungono obbligatoriamente:
+
+7. `PM_DISPOSITION` — `ACCEPT` | `CORRECTIVE` | `REPLAN` | `HUMAN_GATE` | `PAUSE` | `DONE`;
+8. `NEXT_ACTION` — task successivo identificabile oppure `NONE`;
+9. `GATE_STATE` — `NONE` oppure `PENDING:<GATE_ID>`;
+10. `RATE_LIMIT_STATE` — stato utile a decidere prosecuzione o pausa senza consumo alternativo.
 
 Campi aggiuntivi sono ammessi quando rappresentano informazione tecnica non derivabile e realmente utile.
 
@@ -630,47 +788,162 @@ La qualità si misura in:
 
 ---
 
-## 24. Fonte canonica immutabile delle linee guida
+## 24. Fonte normativa canonica e modifica della policy
 
-Questa pagina Notion è la **fonte di authoring** delle linee guida. Dopo approvazione dell'Utente, la versione viene esportata nella root del repository privato come **unica fonte normativa canonica e immutabile delle linee guida per quella versione**.
+Il file:
+
+```
+<git-root>/Linee Guida di Progetto Goodix 27c6 5125 per AI.md
+```
+
+sul branch canonico privato è la **fonte normativa primaria delle linee guida**. Eventuali pagine Notion o copie locali sono superfici di authoring, consultazione o backup e non prevalgono sul file versionato nel repository.
 
 Regole:
 
-- l'AI non modifica direttamente il MD canonico;
-- una modifica di policy richiede decisione esplicita dell'Utente, aggiornamento della pagina Notion, incremento di versione e nuovo export MD;
+- una modifica di policy richiede decisione esplicita dell'Utente;
+- dopo tale decisione, l'AI può applicare direttamente al MD canonico la modifica espressamente delegata, con incremento di versione e commit identificabile;
+- AI PM, AI esecutrice e orchestratore **non possono auto-emendare la governance** per facilitare un task o superare un gate;
 - `AGENTS.md` resta una sintesi operativa derivata e deve essere mantenuto coerente, ma non sostituisce né supera il MD;
-- il manuale tecnico resta separatamente la fonte narrativa canonica dello **stato tecnico**, non delle regole permanenti di governance.
+- il manuale tecnico resta separatamente la fonte narrativa canonica dello **stato tecnico**, non delle regole permanenti di governance;
+- ogni divergenza tra `AGENTS.md` e il MD canonico deve essere risolta aggiornando `AGENTS.md`, non reinterpretando il MD.
 
 ---
 
-## 25. Principio sintetico della v2.5
+## 25. Orchestrazione autonoma, standing delegation e Human Gate
 
-**sicurezza hardware forte**
+### 25.1 Obiettivo operativo
 
-- 
+La v2.6 elimina il relay umano ordinario tra AI PM e AI esecutrice. Il sistema deve poter avanzare autonomamente per più step host-only consecutivi, fermandosi soltanto quando:
 
-**evidence-first e executable closure quando applicabile**
+- serve una decisione materiale dell'Utente;
+- serve una capability soggetta a Human Gate;
+- si esaurisce la quota o il modello richiesto non è disponibile;
+- emerge un errore infrastrutturale non recuperabile in modo deterministico;
+- l'AI PM dichiara `DONE` o un blocker non risolvibile entro la delega.
 
-- 
+### 25.2 Standing delegation iniziale
 
-**anti-frammentazione e riesame metodologico**
+Con l'approvazione della v2.6 l'Utente delega permanentemente, fino a revoca o modifica, le seguenti attività non-live:
 
-- 
+- pianificazione AI PM entro l'obiettivo e la safety boundary già approvati;
+- generazione e dispatch di prompt Dxxx;
+- implementazione e test host-only;
+- review AI PM;
+- corrective e replan entro lo stesso scope;
+- aggiornamento del manuale;
+- gestione di task branch/worktree e push fast-forward;
+- avanzamento fast-forward del branch di integrazione autonomo dopo `ACCEPT` AI PM, senza toccare `main`;
+- apertura/aggiornamento di PR private;
+- prosecuzione automatica allo step host-only successivo quando l'AI PM emette `ACCEPT`.
 
-**licensing/provenance espliciti**
+La standing delegation non include le capability elencate nella sezione 12.2.
 
-- 
+### 25.3 Human Gate
 
-**review Git-native senza packaging obbligatorio**
+Il Human Gate è l'unico meccanismo ordinario che richiede l'intervento dell'Utente durante il loop autonomo.
 
-- 
+Il gate deve presentare in modo conciso almeno:
 
-**repository hygiene senza rompere riproducibilità**
+- `GATE_ID`;
+- decisione richiesta;
+- ragione tecnica;
+- commit/ref e, se pertinente, live-critical set;
+- azione esatta che verrebbe sbloccata;
+- rischi residui noti;
+- cosa resta tecnicamente impossibile o vietato anche dopo l'approvazione.
 
-- 
+Il meccanismo iniziale preferito per i gate è una **issue o superficie equivalente nel repository GitHub privato**, in modo che le normali notifiche GitHub possano raggiungere l'Utente anche via email/mobile. L'implementazione deve verificare che l'approvazione provenga dall'identità GitHub autorizzata dell'Utente.
 
-**una sola fonte normativa immutabile + un solo manuale tecnico canonico**
+Per evitare autorizzazioni ambigue, l'approvazione deve usare una forma strutturata equivalente a:
+
+```
+/approve <GATE_ID>
+```
+
+oppure:
+
+```
+/deny <GATE_ID>
+```
+
+Il gate non può essere approvato da AI PM, AI esecutrice o orchestratore.
+
+### 25.4 Pausa per quota, modello o infrastruttura
+
+Quando il modello richiesto o la quota inclusa nel piano non sono disponibili:
+
+- salvare stato e review set;
+- impostare `PM_DISPOSITION=PAUSE` o stato macchina equivalente;
+- non degradare silenziosamente a un modello non autorizzato;
+- non passare automaticamente ad API a consumo, crediti pay-as-you-go o provider a pagamento;
+- riprendere dal medesimo stato quando la risorsa torna disponibile, previa verifica di baseline e idempotenza.
+
+L'esaurimento token è una pausa operativa, non un motivo per ridurre safety o qualità.
+
+### 25.5 Ripresa, idempotenza e crash recovery
+
+L'orchestratore deve poter riprendere dopo reboot, crash o perdita della sessione AI senza affidarsi alla memoria della chat. Prima di rieseguire un'azione deve stabilire se essa è:
+
+- non iniziata;
+- iniziata ma non conclusa;
+- conclusa e già reviewata;
+- conclusa ma in attesa di review;
+- in attesa di Human Gate;
+- in pausa quota/modello.
+
+Azioni con effetti esterni devono avere identificatori/idempotency guard sufficienti a evitare doppia esecuzione involontaria.
+
+### 25.6 Bootstrap obbligatorio prima dell'autopilot Goodix
+
+Dal passaggio alla v2.6 l'avanzamento funzionale Goodix viene intenzionalmente sospeso durante la costruzione dell'orchestrazione, salvo esplicita riapertura dell'Utente.
+
+Prima di usare l'autopilot per nuovi step tecnici Goodix devono essere dimostrati almeno:
+
+- loop PM → Executor → PM senza relay umano;
+- `ACCEPT`, `CORRECTIVE`, `REPLAN`, `HUMAN_GATE`, `PAUSE` e `DONE` gestiti correttamente;
+- persistenza e ripresa dopo arresto simulato;
+- impossibilità dell'executor host-only di raggiungere il sensore o usare `sudo`;
+- impossibilità di merge/main o history rewrite senza gate;
+- funzionamento del branch di integrazione autonomo con avanzamento solo fast-forward dopo `ACCEPT`;
+- `AGENTS.md` sincronizzato con la v2.6 e nessuna contraddizione operativa residua;
+- stop reale su Human Gate e ripresa solo dopo approvazione valida;
+- pausa pulita su quota/modello indisponibile e nessun fallback a pagamento;
+- review reale di diff/test/manuale da parte dell'AI PM;
+- assenza di secret nei log/stato/notifiche;
+- almeno un ciclo sintetico completo e un ciclo reale host-only a basso rischio.
+
+Solo dopo questa closure l'AI PM può dichiarare `ORCHESTRATION_READY_FOR_GOODIX=true` e proporre all'Utente l'eventuale riapertura del boundary tecnico corrente.
+
+---
+
+## 26. Principio sintetico della v2.6
+
+**sicurezza hardware forte e capability separation**
+
++
+
+**AI PM ed Executor collegati direttamente, senza Utente-relay**
+
++
+
+**standing delegation per il lavoro host-only**
+
++
+
+**Human Gate stretti per live, scope materiale, main e operazioni distruttive**
+
++
+
+**evidence-first, executable closure e review Git-native**
+
++
+
+**manuale tecnico e stato persistente come memoria del progetto**
+
++
+
+**pausa fail-closed su quota/modello, senza fallback a pagamento**
 
 =
 
-**meno cerimonia senza perdere ingegneria, memoria o controllo**
+**più autonomia delle AI senza cedere all'automazione l'autorità umana o la safety del sensore**
