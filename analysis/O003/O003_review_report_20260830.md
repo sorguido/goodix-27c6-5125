@@ -29,6 +29,9 @@ re-probe della route Codex esatta, backup consistente e lifecycle
 - Git lifecycle con repository e remote bare disposable: init SHA esatto,
   expected-old/FF, mismatch refusal, crash after FF, cleanup e crash cleanup:
   PASS; `main` invariato.
+- CI privata sul commit `4f0fe61b8eaaf28f092b36ce3a62a4393b6850d3`:
+  orchestration run `33317298835` PASS (compile + O001/O002/O003 test step) e
+  regressione Goodix host-only run `33317298898` PASS.
 
 Il drill GitHub reale non è stato eseguito perché l'Autorità Human numeric
 ID/login non può essere inferita dall'account `gh` corrente: serve configurazione
