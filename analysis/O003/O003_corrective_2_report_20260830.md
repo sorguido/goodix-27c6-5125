@@ -40,9 +40,11 @@ recovery, three-way reconciliation and qualification results.
 
 ## REVIEW_SET
 
-Baseline: `90ef3e1a691fd3f35cd80a0447c2711c92192c4a` on
-`ai-executor/o003-human-gate-service-hardening`. Final commit and fresh CI runs
-are recorded in the final corrective report update after push.
+Baseline: `90ef3e1a691fd3f35cd80a0447c2711c92192c4a`; implementation head:
+`a070603b141b68da992eadb3d0c937cb515296a8` on
+`ai-executor/o003-human-gate-service-hardening`. Fresh CI on that exact head:
+orchestration run `33322451868` PASS and Goodix host-only regression run
+`33322451893` PASS.
 
 ```text
 FINDING_J_RUNTIME_PAUSE_WIRING=PASS
@@ -64,5 +66,5 @@ REAL_EXACT_ROUTE_PROBE=PASS: CHATGPT; catalog PASS; quota bucket reached=false; 
 REAL_GITHUB_GATE_E2E=NOT_EXECUTED: authorized human comment required
 DETERMINISTIC_TESTS=PASS: 153
 SYNTHETIC_SERVICE_QUALIFICATION=PASS: DONE; cleanup PASS; main unchanged; task branch absent
-FRESH_CI=PENDING_PUSH
+FRESH_CI=PASS: orchestration 33322451868; Goodix host-only 33322451893; head a070603b141b68da992eadb3d0c937cb515296a8
 ```

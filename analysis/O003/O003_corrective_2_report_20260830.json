@@ -12,7 +12,7 @@
   "executor_crash_recovery": "PASS",
   "finding_j_runtime_pause_wiring": "PASS",
   "finding_k_coordinator_crash_consistency": "PASS",
-  "fresh_ci": "PENDING_PUSH",
+  "fresh_ci": "PASS:ORCHESTRATION_33322451868:GOODIX_33322451893",
   "human_gate_coordinator_crash_recovery": "PASS",
   "no_effect_vs_completed_reconciliation": "PASS",
   "outcome": "PASS",
@@ -22,5 +22,6 @@
   "real_production_coordinator_codex_qualification": "PASS:DONE:CLEANUP_PASS:MAIN_UNCHANGED:DISPATCH_1_1_1",
   "review_crash_recovery": "PASS",
   "schema_version": 6,
+  "implementation_head": "a070603b141b68da992eadb3d0c937cb515296a8",
   "synthetic_service_qualification": "PASS:DONE:CLEANUP_PASS:MAIN_UNCHANGED:TASK_BRANCH_ABSENT"
 }
