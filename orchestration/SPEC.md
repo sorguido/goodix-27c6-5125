@@ -1,7 +1,7 @@
 # Goodix Autonomous Orchestration — Architecture & Safety Specification
 
-> **Versione**: Draft v0.1 — 30 agosto 2026  
-> **Stato**: AI-PM authored; candidato alla review/merge umano, non canonico finché non integrato in `main`.  
+> **Versione**: Draft v0.1 — 30 agosto 2026
+> **Stato**: AI-PM authored; candidato alla review/merge umano, non canonico finché non integrato in `main`.
 > **Scope**: solo infrastruttura di orchestrazione host-only. Nessun avanzamento funzionale Goodix, nessun USB reale, nessun `sudo`, nessun secret reale, nessuna esecuzione live.
 
 ---
