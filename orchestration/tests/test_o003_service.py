@@ -87,8 +87,8 @@ class O003ServiceTests(unittest.TestCase):
         )
         return engine
 
-    def test_schema_v5_operator_state_and_bounded_backup(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 5)
+    def test_schema_v6_operator_state_and_bounded_backup(self) -> None:
+        self.assertEqual(SCHEMA_VERSION, 6)
         self.store.save_operator_state(OperatorStateRecord(operator_paused=True))
         for _ in range(4):
             self.store.consistent_backup(self.root / "backups", retain=2)

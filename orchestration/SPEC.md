@@ -299,7 +299,7 @@ MUST rifiutare:
 
 ### 6.5 State Store
 
-Il formato canonico O003 è SQLite locale singolo-file schema v5 sotto XDG. Deve privilegiare:
+Il formato canonico O003 è SQLite locale singolo-file schema v6 sotto XDG. Deve privilegiare:
 
 - transazioni/atomicità;
 - backup semplice;
@@ -308,7 +308,13 @@ Il formato canonico O003 è SQLite locale singolo-file schema v5 sotto XDG. Deve
 - backup consistente tramite API SQLite con retention bounded;
 - incompatibilità fail-closed per store operativi legacy non ricostruibili.
 - ledger persistente dei turni `IN_PROGRESS/COMPLETED/FAILED/RECONCILIATION_REQUIRED`;
-- stato del coordinatore sufficiente a riprendere plan/result senza inventare esiti.
+- stato del coordinatore a fasi esplicite sufficiente a riprendere plan,
+  Executor, review, accept/cleanup e gate senza inventare esiti;
+- identità logiche di dispatch persistite prima di ogni turno e risultato
+  strutturato bounded persistito prima del relativo checkpoint;
+- checkpoint pre-effetto e riconciliazione three-way: exact pre-state =
+  `NO_EFFECT` e retry, exact post-state = `COMPLETED`, ogni altro stato =
+  ambiguo e fail-closed.
 
 Lo state store MUST contenere solo metadata operativi, mai secret.
 
@@ -387,6 +393,9 @@ PM_REVIEWING + REPLAN     -> PM_PLANNING
 PM_REVIEWING + HUMAN_GATE -> HUMAN_GATE_WAIT
 PM_REVIEWING + PAUSE      -> PAUSED_*
 PM_REVIEWING + DONE       -> DONE
+
+PM_PLANNING | EXECUTOR_RUNNING | PM_REVIEWING + availability failure
+  -> PAUSED_RATE_LIMIT | PAUSED_MODEL_UNAVAILABLE | PAUSED_INFRASTRUCTURE
 
 HUMAN_GATE_WAIT + APPROVE -> stato autorizzato specificato dal gate
 HUMAN_GATE_WAIT + DENY    -> PM_PLANNING | DONE

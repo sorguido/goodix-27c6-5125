@@ -270,12 +270,14 @@ class HumanGateAdapter:
         marker = self._marker(manifest.gate_id)
         intent = GateCreateIntent(manifest.task_id, manifest.gate_id, manifest.commit_sha)
         effect = self.store.load_effect(effect_id)
+        issue = self.transport.find_gate_issue(self.repository, marker)
         if effect is not None and effect.status is EffectStatus.IN_PROGRESS:
-            issue = self.transport.find_gate_issue(self.repository, marker)
             if issue is None:
-                raise GateAdapterError("GATE_CREATE_OUTCOME_AMBIGUOUS", manifest.gate_id)
-            self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
-        else:
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.NO_EFFECT)
+                effect = None
+            else:
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+        if effect is None or effect.status is EffectStatus.NOT_STARTED:
             try:
                 request = self.store.request_effect(
                     effect_id=effect_id,

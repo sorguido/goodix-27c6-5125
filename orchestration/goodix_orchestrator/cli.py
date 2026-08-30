@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 from .persistence import SQLiteStateStore
 from .branch_lifecycle import BranchLifecycle
-from .coordinator import CodexCoordinatorDriver, ProductionCoordinator
+from .coordinator import CodexCoordinatorDriver, ProductionCoordinator, persist_unresolved_turn_pause
 from .engine import DeterministicEngine
 from .gate_adapter import GhCliTransport, HumanGateAdapter
 from .persistence import EffectStatus, GitStateRecord, TurnActivityStatus
@@ -34,7 +34,7 @@ from .service import (
     systemctl_user,
 )
 from .state import OrchestratorState
-from .structured_output import ModelRoute
+from .structured_output import ContextClass, ModelRoute, RoutingClass
 
 
 def _read_config(paths: RuntimePaths) -> dict[str, Any]:
@@ -279,70 +279,19 @@ def _service_tick(
     active_contexts = store.list_contexts(active_only=True)
     active = active_contexts[-1] if active_contexts else None
     reprobe: ReprobeController | None = None
+    def reconciled() -> bool:
+        git = store.load_git_state()
+        snapshot = git_snapshot(repository)
+        unresolved = store.effects_with_statuses((EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS))
+        unresolved_turns = store.turn_activities((TurnActivityStatus.IN_PROGRESS, TurnActivityStatus.RECONCILIATION_REQUIRED))
+        current = store.load_runtime()
+        gate_ok = current is not None and (current.gate_id is None or (store.load_gate(current.gate_id) is not None and store.load_gate_external(current.gate_id) is not None))
+        effective_state = current.previous_recoverable_state if current is not None and current.current_state in {OrchestratorState.PAUSED_RATE_LIMIT, OrchestratorState.PAUSED_MODEL_UNAVAILABLE, OrchestratorState.PAUSED_INFRASTRUCTURE} else current.current_state if current is not None else None
+        coordinator_ok = not (effective_state in {OrchestratorState.TASK_READY, OrchestratorState.EXECUTOR_RUNNING, OrchestratorState.EXECUTOR_RESULT_READY, OrchestratorState.PM_REVIEWING, OrchestratorState.HUMAN_GATE_WAIT} and store.load_coordinator_state() is None)
+        return not unresolved and not unresolved_turns and git is not None and snapshot.development_sha == git.integration_sha and (git.main_sha is None or snapshot.main_sha == git.main_sha) and snapshot.task_id == git.task_id and snapshot.task_branch == git.task_branch and snapshot.task_worktree == git.task_worktree and gate_ok and coordinator_ok
+
     if active is not None:
-        route = ModelRoute(
-            active.routing_class,
-            active.context_class,
-            active.effective_model_id,
-            active.effective_reasoning_effort,
-        )
-
-        def reconciled() -> bool:
-            git = store.load_git_state()
-            snapshot = git_snapshot(repository)
-            unresolved = store.effects_with_statuses(
-                (EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS)
-            )
-            unresolved_turns = store.turn_activities(
-                (
-                    TurnActivityStatus.IN_PROGRESS,
-                    TurnActivityStatus.RECONCILIATION_REQUIRED,
-                )
-            )
-            current = store.load_runtime()
-            gate_ok = (
-                current is not None
-                and (
-                    current.gate_id is None
-                    or (
-                        store.load_gate(current.gate_id) is not None
-                        and store.load_gate_external(current.gate_id) is not None
-                    )
-                )
-            )
-            effective_state = (
-                current.previous_recoverable_state
-                if current is not None
-                and current.current_state in {
-                    OrchestratorState.PAUSED_RATE_LIMIT,
-                    OrchestratorState.PAUSED_MODEL_UNAVAILABLE,
-                    OrchestratorState.PAUSED_INFRASTRUCTURE,
-                }
-                else current.current_state if current is not None else None
-            )
-            coordinator_ok = not (
-                effective_state in {
-                    OrchestratorState.TASK_READY,
-                    OrchestratorState.EXECUTOR_RUNNING,
-                    OrchestratorState.EXECUTOR_RESULT_READY,
-                    OrchestratorState.PM_REVIEWING,
-                    OrchestratorState.HUMAN_GATE_WAIT,
-                }
-                and store.load_coordinator_state() is None
-            )
-            return (
-                not unresolved
-                and not unresolved_turns
-                and git is not None
-                and snapshot.development_sha == git.integration_sha
-                and (git.main_sha is None or snapshot.main_sha == git.main_sha)
-                and snapshot.task_id == git.task_id
-                and snapshot.task_branch == git.task_branch
-                and snapshot.task_worktree == git.task_worktree
-                and gate_ok
-                and coordinator_ok
-            )
-
+        route = ModelRoute(active.routing_class, active.context_class, active.effective_model_id, active.effective_reasoning_effort)
         reprobe = ReprobeController(
             store,
             CodexRouteAvailabilityProbe(store, route, cwd=repository),
@@ -352,16 +301,46 @@ def _service_tick(
 
     coordinator: ProductionCoordinator | None = None
 
+    def ensure_coordinator() -> ProductionCoordinator:
+        nonlocal coordinator
+        if coordinator is None:
+            coordinator = ProductionCoordinator(
+                engine=engine,
+                lifecycle=BranchLifecycle(repository, store),
+                driver=CodexCoordinatorDriver(store, repository),
+                gate_adapter=adapter,
+            )
+        return coordinator
+
+    def ensure_failed_route_reprobe() -> ReprobeController | None:
+        nonlocal reprobe
+        raw = store.load_coordinator_state() or {}
+        failed = raw.get("failed_route")
+        if not isinstance(failed, dict):
+            return reprobe
+        required = ("routing_class", "context_class", "model_id", "reasoning_effort")
+        if any(not isinstance(failed.get(key), str) for key in required):
+            return reprobe
+        route = ModelRoute(RoutingClass(failed["routing_class"]), ContextClass(failed["context_class"]), failed["model_id"], failed["reasoning_effort"])
+        reprobe = ReprobeController(store, CodexRouteAvailabilityProbe(store, route, cwd=repository), interval_seconds=int(config.get("reprobe_seconds", 900)), reconcile=reconciled)
+        return reprobe
+
     def tick() -> None:
         nonlocal coordinator
         try:
             if engine.state is OrchestratorState.HUMAN_GATE_WAIT:
-                adapter.poll(engine)
-            elif reprobe is not None and engine.state in {
+                checkpoint = store.load_coordinator_state() or {}
+                if checkpoint.get("phase") == "GATE_BINDING_PENDING":
+                    ensure_coordinator().tick()
+                else:
+                    adapter.poll(engine)
+            elif engine.state in {
                 OrchestratorState.PAUSED_RATE_LIMIT,
                 OrchestratorState.PAUSED_MODEL_UNAVAILABLE,
             }:
-                reprobe.tick(engine)
+                current_reprobe = ensure_failed_route_reprobe()
+                if current_reprobe is not None:
+                    current_reprobe.tick(engine)
             elif engine.state not in {
                 OrchestratorState.PAUSED_INFRASTRUCTURE,
                 OrchestratorState.DONE,
@@ -374,18 +353,9 @@ def _service_tick(
                     )
                 )
                 if unresolved_turns:
-                    raise ServiceError(
-                        "TURN_RECONCILIATION_REQUIRED",
-                        ",".join(item.activity_id for item in unresolved_turns),
-                    )
-                if coordinator is None:
-                    coordinator = ProductionCoordinator(
-                        engine=engine,
-                        lifecycle=BranchLifecycle(repository, store),
-                        driver=CodexCoordinatorDriver(store, repository),
-                        gate_adapter=adapter,
-                    )
-                coordinator.tick()
+                    persist_unresolved_turn_pause(store, engine, unresolved_turns)
+                else:
+                    ensure_coordinator().tick()
         except Exception as exc:
             if coordinator is not None:
                 coordinator.driver.close()

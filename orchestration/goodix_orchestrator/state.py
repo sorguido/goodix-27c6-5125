@@ -166,6 +166,31 @@ def transition(
             )
         return fixed
 
+    availability_pause_targets = {
+        StateEvent.PAUSE_RATE_LIMIT: OrchestratorState.PAUSED_RATE_LIMIT,
+        StateEvent.PAUSE_MODEL_UNAVAILABLE: OrchestratorState.PAUSED_MODEL_UNAVAILABLE,
+        StateEvent.PAUSE_INFRASTRUCTURE: OrchestratorState.PAUSED_INFRASTRUCTURE,
+    }
+    if (
+        source
+        in {
+            OrchestratorState.PM_PLANNING,
+            OrchestratorState.EXECUTOR_RUNNING,
+            OrchestratorState.PM_REVIEWING,
+        }
+        and parsed_event in availability_pause_targets
+    ):
+        paused = availability_pause_targets[parsed_event]
+        if parsed_target is not None and parsed_target is not paused:
+            raise StateTransitionError(
+                "TARGET_MISMATCH",
+                source.value,
+                parsed_event.value,
+                parsed_target.value,
+                (paused.value,),
+            )
+        return paused
+
     if source is OrchestratorState.PM_REVIEWING and parsed_event is StateEvent.ACCEPT:
         allowed = (OrchestratorState.PM_PLANNING, OrchestratorState.DONE)
         if parsed_target not in allowed:

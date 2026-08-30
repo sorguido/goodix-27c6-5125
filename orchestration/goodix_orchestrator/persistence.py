@@ -27,7 +27,7 @@ from .state import OrchestratorState, PAUSED_STATES
 from .structured_output import ContextClass, RoutingClass
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 _RUN_ID_RE = re.compile(r"^ORCH-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TASK_ID_RE = re.compile(r"^TASK-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TURN_ID_RE = re.compile(r"^TURN-[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
@@ -569,11 +569,33 @@ class CommitIntent(_EffectIntentMixin):
     task_id: str
     branch: str
     baseline_sha: str
+    changed_paths: tuple[str, ...] = ()
+    content_digest: str = "0" * 64
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
         object.__setattr__(self, "branch", _validated_ref(self.branch, target=True))
         object.__setattr__(self, "baseline_sha", _validated_sha(self.baseline_sha))
+        paths = tuple(self.changed_paths)
+        if len(paths) > 256 or tuple(sorted(set(paths))) != paths:
+            raise UnsafePersistenceDataError("commit changed_paths must be sorted and unique")
+        for path in paths:
+            if (
+                not isinstance(path, str)
+                or not path
+                or path.startswith("/")
+                or ".." in path.split("/")
+                or ".git" in path.split("/")
+                or len(path) > 4096
+            ):
+                raise UnsafePersistenceDataError(f"invalid commit path: {path!r}")
+        if not isinstance(self.content_digest, str) or re.fullmatch(
+            r"[0-9a-f]{64}", self.content_digest
+        ) is None:
+            raise UnsafePersistenceDataError("invalid commit content digest")
+        if not paths and self.content_digest != "0" * 64:
+            raise UnsafePersistenceDataError("legacy commit intent digest mismatch")
+        object.__setattr__(self, "changed_paths", paths)
 
 
 @dataclass(frozen=True, slots=True)
@@ -777,7 +799,7 @@ class SQLiteStateStore:
                     self._create_schema(connection)
                 elif "metadata" in tables:
                     # Version mismatch is incompatibility, not corruption. Check it
-                    # before comparing the richer v5 table set so legacy files stay
+                    # before comparing the richer v6 table set so legacy files stay
                     # byte-for-byte untouched and receive the correct classification.
                     schema_version = self._read_schema_version(connection)
                     if schema_version != SCHEMA_VERSION:
@@ -870,6 +892,7 @@ class SQLiteStateStore:
                 status TEXT NOT NULL,
                 turn_id TEXT,
                 error_class TEXT,
+                structured_result_json TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY(thread_id) REFERENCES contexts(thread_id)
@@ -1543,8 +1566,8 @@ class SQLiteStateStore:
                            activity_id, dispatch_id, thread_id, context_class,
                            routing_class, requested_model_id,
                            requested_reasoning_effort, status, turn_id,
-                           error_class, created_at, updated_at
-                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           error_class, structured_result_json, created_at, updated_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         record.activity_id,
                         record.dispatch_id,
@@ -1556,6 +1579,7 @@ class SQLiteStateStore:
                         record.status.value,
                         record.turn_id,
                         record.error_class,
+                        None,
                         _utc_now(),
                         _utc_now(),
                     ),
@@ -1649,6 +1673,93 @@ class SQLiteStateStore:
         with self._checked_connection() as connection:
             rows = connection.execute(query, parameters).fetchall()
         return tuple(self._turn_activity_from_row(row) for row in rows)
+
+    def save_turn_structured_result(
+        self, dispatch_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
+            raise UnsafePersistenceDataError("invalid structured-result dispatch ID")
+        if not isinstance(payload, dict):
+            raise UnsafePersistenceDataError("structured turn result must be an object")
+        encoded = _canonical_json(payload)
+        if len(encoded.encode("utf-8")) > 1024 * 1024:
+            raise UnsafePersistenceDataError("structured turn result exceeds bounded size")
+        lowered = encoded.casefold()
+        if any(marker in lowered for marker in ('"token"', '"password"', '"secret"', '"email"')):
+            raise UnsafePersistenceDataError("structured turn result contains forbidden key")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT status, structured_result_json FROM turn_activity WHERE dispatch_id = ?",
+                (dispatch_id,),
+            ).fetchone()
+            if row is None or row["status"] != TurnActivityStatus.COMPLETED.value:
+                raise UnsafePersistenceDataError(
+                    f"structured result requires completed activity: {dispatch_id}"
+                )
+            existing = row["structured_result_json"]
+            if existing is not None and existing != encoded:
+                raise ConcurrentStateError(
+                    f"structured turn result mutation: {dispatch_id}"
+                )
+            connection.execute(
+                "UPDATE turn_activity SET structured_result_json = ?, updated_at = ? WHERE dispatch_id = ?",
+                (encoded, _utc_now(), dispatch_id),
+            )
+            connection.commit()
+        return payload
+
+    def load_logical_turn_result(
+        self, logical_dispatch_id: str
+    ) -> tuple[str, dict[str, Any]] | None:
+        if not isinstance(logical_dispatch_id, str) or not logical_dispatch_id.strip():
+            raise UnsafePersistenceDataError("invalid logical dispatch ID")
+        candidates = (f"{logical_dispatch_id}-R0", f"{logical_dispatch_id}-R1")
+        with self._checked_connection() as connection:
+            rows = connection.execute(
+                """SELECT dispatch_id, structured_result_json FROM turn_activity
+                   WHERE dispatch_id IN (?, ?) AND structured_result_json IS NOT NULL
+                   ORDER BY dispatch_id""",
+                candidates,
+            ).fetchall()
+        if len(rows) > 1:
+            raise StoreCorruptionError(
+                f"multiple structured results for logical dispatch: {logical_dispatch_id}"
+            )
+        if not rows:
+            return None
+        try:
+            payload = json.loads(rows[0]["structured_result_json"])
+        except json.JSONDecodeError as exc:
+            raise StoreCorruptionError("malformed structured turn result") from exc
+        if not isinstance(payload, dict):
+            raise StoreCorruptionError("structured turn result is not an object")
+        return rows[0]["dispatch_id"], payload
+
+    def activities_for_logical_dispatch(
+        self, logical_dispatch_id: str
+    ) -> tuple[TurnActivityRecord, ...]:
+        candidates = (f"{logical_dispatch_id}-R0", f"{logical_dispatch_id}-R1")
+        with self._checked_connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM turn_activity WHERE dispatch_id IN (?, ?) ORDER BY dispatch_id",
+                candidates,
+            ).fetchall()
+        return tuple(self._turn_activity_from_row(row) for row in rows)
+
+    def next_logical_dispatch_id(self, prefix: str) -> str:
+        if not isinstance(prefix, str) or not prefix or len(prefix) > 900:
+            raise UnsafePersistenceDataError("invalid dispatch prefix")
+        existing = {item.dispatch_id for item in self.turn_activities()}
+        for attempt in range(1, 10_000):
+            candidate = f"{prefix}-{attempt:04d}"
+            if not any(
+                dispatch == candidate
+                or dispatch in {f"{candidate}-R0", f"{candidate}-R1"}
+                for dispatch in existing
+            ):
+                return candidate
+        raise UnsafePersistenceDataError(f"dispatch ID space exhausted: {prefix}")
 
     def save_coordinator_state(self, record: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(record, dict):

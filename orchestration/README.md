@@ -165,7 +165,7 @@ task/worktree, gate, turn ledger ed effetti; il probe non avanza il task.
 - log: stdout/stderr strutturato e redatto sotto journald, con rotazione
   system-managed.
 
-Schema O003: v5. Store operativi v1/v2/v3/v4 incompatibili non vengono migrati
+Schema O003: v6. Store operativi v1/v2/v3/v4/v5 incompatibili non vengono migrati
 inventando metadata; restano fail-closed. SQLite non conserva prompt/reasoning,
 token, email, PSK, protected material, biometria o environment dump.
 
@@ -184,9 +184,18 @@ systemd-analyze --user verify systemd/goodix-orchestrator.service
 python -m goodix_orchestrator.service_qualification \
   --repository <repo-disposable> \
   --state-dir <xdg-state-disposable>
+python -m goodix_orchestrator.service_qualification --real-codex \
+  --repository <repo-disposable> \
+  --state-dir <xdg-state-disposable>
 ```
 
-La suite deterministica copre il loop production completo su repository
+La suite deterministica copre anche crash dopo plan, Executor, review, FF,
+cleanup e creazione issue, con checkpoint di fase e identità logiche di
+dispatch persistite. Un risultato strutturato completato viene conservato in
+forma bounded per impedire un secondo turno dopo crash. Gli effetti Git/GitHub
+distinguono `NO_EFFECT`, `COMPLETED` e stato ambiguo prima del retry.
+
+Il loop production completo su repository
 disposable: PM plan, task/worktree/commit/push, review, `CORRECTIVE` sullo stesso
 branch, seconda review, `ACCEPT`, FF di `development`, cleanup e `DONE`, con
 `main` invariato. La CI non richiede USB, root, secret, GitHub auth o interazione
@@ -194,8 +203,9 @@ Human reale. Il drill GitHub reale deve restare distinto dalla coverage fake. La
 Codex sintetica O002 resta disponibile con
 `python -m goodix_orchestrator.qualification --real-codex ...`.
 
-O003 non rende l'orchestrazione pronta per Goodix. O004 deve ancora provare il
-boundary negativo sul repository/service reale. Restano falsi:
+O003 non rende ancora l'orchestrazione pronta per Goodix: restano necessarie la
+prova negativa sul repository/service reale e la decisione Human sul merge.
+Restano falsi:
 
 ```text
 ORCHESTRATION_READY_FOR_GOODIX=false

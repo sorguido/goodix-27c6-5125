@@ -117,8 +117,10 @@ class DeterministicEngine:
                 _construction_token=_ENGINE_CONSTRUCTION_TOKEN,
             )
 
-            unresolved = store.effects_with_statuses(
-                (EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS)
+            ambiguous = store.effects_with_statuses((EffectStatus.AMBIGUOUS,))
+            in_progress = store.effects_with_statuses((EffectStatus.IN_PROGRESS,))
+            unresolved = ambiguous or (
+                in_progress if store.load_coordinator_state() is None else ()
             )
             if unresolved:
                 engine._advance(StateEvent.FAIL_CLOSED)
@@ -338,6 +340,14 @@ class DeterministicEngine:
                 task_envelope=None,
             )
         self.fail_closed("UNKNOWN_DISPOSITION", repr(primary))
+
+    def pause(self, reason: PauseReason) -> OrchestratorState:
+        pause_event = {
+            PauseReason.RATE_LIMIT: StateEvent.PAUSE_RATE_LIMIT,
+            PauseReason.MODEL_UNAVAILABLE: StateEvent.PAUSE_MODEL_UNAVAILABLE,
+            PauseReason.INFRASTRUCTURE: StateEvent.PAUSE_INFRASTRUCTURE,
+        }[reason]
+        return self._advance(pause_event)
 
     def resolve_gate(self, *, gate_id: str, approve: bool) -> OrchestratorState:
         if self.runtime.current_state is not OrchestratorState.HUMAN_GATE_WAIT:

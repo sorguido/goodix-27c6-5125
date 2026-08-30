@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import subprocess
 from dataclasses import dataclass
@@ -249,12 +250,15 @@ class BranchLifecycle:
                 and worktree.is_dir()
             ):
                 self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            elif branch_head is None and bound_worktree is None and not worktree.exists():
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.NO_EFFECT)
+                existing = None
             else:
                 raise BranchLifecycleError(
                     "TASK_CREATE_OUTCOME_AMBIGUOUS_PRESERVE_TASK",
                     repr((branch_head, bound_worktree)),
                 )
-        else:
+        if existing is None or existing.status is EffectStatus.NOT_STARTED:
             request = self.store.request_effect(
                 effect_id=effect_id,
                 idempotency_key=f"{task_id}:BRANCH_CREATE:{branch}:{expected_development_sha}",
@@ -321,7 +325,36 @@ class BranchLifecycle:
                 raise BranchLifecycleError("SYMLINK_PATH_ESCAPE_DENIED", relative)
         if GitManager._git(worktree.root, ("diff", "--check"), check=False).returncode != 0:
             raise BranchLifecycleError("DIFF_CHECK_FAILURE_DENIED", "tracked diff")
-        return paths
+        return tuple(sorted(paths))
+
+    @staticmethod
+    def _content_digest(worktree: TaskWorktree, paths: tuple[str, ...]) -> str:
+        digest = hashlib.sha256()
+        total = 0
+        for relative in paths:
+            candidate = worktree.root / relative
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            if not candidate.exists():
+                digest.update(b"DELETED\0")
+                continue
+            if candidate.is_symlink() or not candidate.is_file():
+                raise BranchLifecycleError("COMMIT_PATH_NOT_REGULAR", relative)
+            data = candidate.read_bytes()
+            total += len(data)
+            if total > 8 * 1024 * 1024:
+                raise BranchLifecycleError("COMMIT_CONTENT_BOUND_EXCEEDED", str(total))
+            digest.update(str(len(data)).encode("ascii"))
+            digest.update(b"\0")
+            digest.update(data)
+            digest.update(b"\0")
+        return digest.hexdigest()
+
+    def measure_task_changes(
+        self, worktree: TaskWorktree, manifest: TaskManifest
+    ) -> tuple[tuple[str, ...], str]:
+        paths = self._scope_paths(worktree, manifest)
+        return paths, self._content_digest(worktree, paths)
 
     def commit_task(
         self,
@@ -330,6 +363,8 @@ class BranchLifecycle:
         *,
         expected_parent_sha: str,
         effect_id: str,
+        expected_changed_paths: tuple[str, ...] | None = None,
+        expected_content_digest: str | None = None,
     ) -> CommitResult:
         branch = self.task_branch(manifest.task_id)
         if worktree.branch != branch or worktree.repository_root != self.repository:
@@ -338,18 +373,62 @@ class BranchLifecycle:
         current_head = GitManager._text(worktree.root, ("rev-parse", "HEAD"))
         if current_branch != branch:
             raise BranchLifecycleError("TASK_HEAD_MISMATCH", current_branch)
-        intent = CommitIntent(manifest.task_id, branch, expected_parent_sha)
         existing = self.store.load_effect(effect_id)
+        if existing is not None:
+            if not isinstance(existing.intent, CommitIntent):
+                raise BranchLifecycleError("COMMIT_EFFECT_KIND_MISMATCH", effect_id)
+            expected_changed_paths = existing.intent.changed_paths
+            expected_content_digest = existing.intent.content_digest
+        if expected_changed_paths is None or expected_content_digest is None:
+            if current_head != expected_parent_sha:
+                raise BranchLifecycleError("COMMIT_CHECKPOINT_MISSING", current_head)
+            expected_changed_paths, expected_content_digest = self.measure_task_changes(
+                worktree, manifest
+            )
+        expected_changed_paths = tuple(expected_changed_paths)
+        intent = CommitIntent(
+            manifest.task_id,
+            branch,
+            expected_parent_sha,
+            expected_changed_paths,
+            expected_content_digest,
+        )
         if existing is not None and existing.status is EffectStatus.IN_PROGRESS:
             if current_head != expected_parent_sha and GitManager._is_ancestor(
                 worktree.root, expected_parent_sha, current_head
             ):
+                changed_after = tuple(
+                    sorted(
+                        line
+                        for line in GitManager._text(
+                            worktree.root,
+                            ("diff", "--name-only", expected_parent_sha, current_head),
+                        ).splitlines()
+                        if line
+                    )
+                )
+                if (
+                    changed_after != expected_changed_paths
+                    or self._content_digest(worktree, expected_changed_paths)
+                    != expected_content_digest
+                ):
+                    raise BranchLifecycleError(
+                        "TASK_COMMIT_POST_STATE_MISMATCH", current_head
+                    )
                 self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            elif (
+                current_head == expected_parent_sha
+                and self._scope_paths(worktree, manifest) == expected_changed_paths
+                and self._content_digest(worktree, expected_changed_paths)
+                == expected_content_digest
+            ):
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.NO_EFFECT)
+                existing = None
             else:
                 raise BranchLifecycleError(
                     "TASK_COMMIT_OUTCOME_AMBIGUOUS_PRESERVE_TASK", current_head
                 )
-        else:
+        if existing is None or existing.status is EffectStatus.NOT_STARTED:
             request = self.store.request_effect(
                 effect_id=effect_id,
                 idempotency_key=f"{manifest.task_id}:COMMIT:{expected_parent_sha}",
@@ -360,6 +439,11 @@ class BranchLifecycle:
                 if current_head != expected_parent_sha:
                     raise BranchLifecycleError("TASK_HEAD_MISMATCH", current_head)
                 paths = self._scope_paths(worktree, manifest)
+                if (
+                    paths != expected_changed_paths
+                    or self._content_digest(worktree, paths) != expected_content_digest
+                ):
+                    raise BranchLifecycleError("TASK_COMMIT_PRE_STATE_MISMATCH", branch)
                 self.store.begin_effect(effect_id)
                 GitManager._git(worktree.root, ("add", "--", *paths))
                 if GitManager._git(
@@ -377,13 +461,15 @@ class BranchLifecycle:
             worktree.root, expected_parent_sha, head
         ):
             raise BranchLifecycleError("TASK_COMMIT_NOT_CREATED", head)
-        changed = tuple(
+        changed = tuple(sorted(
             line
             for line in GitManager._text(
                 worktree.root, ("diff", "--name-only", expected_parent_sha, head)
             ).splitlines()
             if line
-        )
+        ))
+        if changed != expected_changed_paths:
+            raise BranchLifecycleError("TASK_COMMIT_CHANGED_PATHS_MISMATCH", repr(changed))
         return CommitResult(expected_parent_sha, head, tuple(sorted(changed)))
 
     def push_task(
@@ -403,11 +489,14 @@ class BranchLifecycle:
         if existing is not None and existing.status is EffectStatus.IN_PROGRESS:
             if remote == commit_sha:
                 self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            elif remote == expected_remote_sha:
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.NO_EFFECT)
+                existing = None
             else:
                 raise BranchLifecycleError(
                     "TASK_PUSH_OUTCOME_AMBIGUOUS_PRESERVE_TASK", repr(remote)
                 )
-        else:
+        if existing is None or existing.status is EffectStatus.NOT_STARTED:
             request = self.store.request_effect(
                 effect_id=effect_id,
                 idempotency_key=f"{task_id}:PUSH:{branch}:{commit_sha}",
@@ -454,10 +543,12 @@ class BranchLifecycle:
             ):
                 if existing_effect.status is EffectStatus.IN_PROGRESS:
                     self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+                previous = self.store.load_git_state()
                 self.store.save_git_state(
                     GitStateRecord(
                         DEVELOPMENT_BRANCH,
                         reviewed_head_sha,
+                        previous.task_worktree if previous else None,
                         main_sha=self._sha("refs/heads/main"),
                         task_id=task_id,
                         task_branch=branch,
@@ -466,7 +557,14 @@ class BranchLifecycle:
                     )
                 )
                 return reviewed_head_sha
-            if existing_effect.status is EffectStatus.IN_PROGRESS:
+            if (
+                existing_effect.status is EffectStatus.IN_PROGRESS
+                and observed_local == observed_remote == expected_old_sha
+            ):
+                self.store.reconcile_effect(
+                    effect_id, ReconciliationOutcome.NO_EFFECT
+                )
+            elif existing_effect.status is EffectStatus.IN_PROGRESS:
                 raise BranchLifecycleError(
                     "INTEGRATION_OUTCOME_AMBIGUOUS_PRESERVE_TASK",
                     repr((observed_local, observed_remote)),
@@ -618,10 +716,10 @@ class BranchLifecycle:
     ) -> bool:
         effect = self.store.load_effect(effect_id)
         if effect is not None and effect.status is EffectStatus.IN_PROGRESS:
-            if not already_done:
-                raise BranchLifecycleError("CLEANUP_OUTCOME_AMBIGUOUS_PRESERVE_TASK", effect_id)
-            self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
-            return False
+            if already_done:
+                self.store.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+                return False
+            self.store.reconcile_effect(effect_id, ReconciliationOutcome.NO_EFFECT)
         request = self.store.request_effect(
             effect_id=effect_id,
             idempotency_key=effect_id,

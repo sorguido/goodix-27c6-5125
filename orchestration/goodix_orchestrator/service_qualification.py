@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from .branch_lifecycle import BranchLifecycle
-from .coordinator import ProductionCoordinator
+from .coordinator import CodexCoordinatorDriver, ProductionCoordinator
 from .engine import DeterministicEngine
 from .persistence import SQLiteStateStore
 from .policy import Capability, CapabilityPolicy
@@ -38,7 +38,7 @@ from .structured_output import (
 
 
 class _Driver:
-    def plan(self, facts, planning_class):
+    def plan(self, facts, planning_class, *, dispatch_id):
         manifest = TaskManifest(
             PROTOCOL_VERSION,
             facts["task_id"],
@@ -63,7 +63,7 @@ class _Driver:
         )
         return PMPlanningOutput(manifest, ExecutionClass.BOUNDED_IMPLEMENTATION)
 
-    def execute(self, plan, worktree, execution_class, *, corrective):
+    def execute(self, plan, worktree, execution_class, *, corrective, dispatch_id):
         (worktree / "artifact.txt").write_text("systemd sandbox pass\n", encoding="utf-8")
         (worktree / "PROJECT_MANUAL.md").write_text("systemd sandbox pass\n", encoding="utf-8")
         return ExecutorWorkReport(
@@ -77,7 +77,7 @@ class _Driver:
             PolicyAssertions(0, False, False, False),
         )
 
-    def review(self, evidence):
+    def review(self, evidence, *, dispatch_id):
         return PMReviewOutput(
             PMDisposition(
                 PROTOCOL_VERSION,
@@ -110,7 +110,13 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def run(repository: Path, state_dir: Path) -> dict[str, object]:
+def run(
+    repository: Path,
+    state_dir: Path,
+    *,
+    real_codex: bool = False,
+    codex: str = "codex",
+) -> dict[str, object]:
     repository = repository.resolve(strict=True)
     state_dir = state_dir.resolve(strict=True)
     main_before = _git(repository, "rev-parse", "main")
@@ -134,13 +140,35 @@ def run(repository: Path, state_dir: Path) -> dict[str, object]:
     lifecycle.initialize_development(
         main_before, effect_id="EFFECT-DEVELOPMENT-INIT-SYSTEMD"
     )
+    driver = CodexCoordinatorDriver(store, repository, executable=codex) if real_codex else _Driver()
     coordinator = ProductionCoordinator(
         engine=engine,
         lifecycle=lifecycle,
-        driver=_Driver(),
+        driver=driver,
         gate_adapter=_NoGate(),
+        planning_directive=(
+            {
+                "objective": "Create artifact.txt containing exactly 'production coordinator pass' and document it in PROJECT_MANUAL.md.",
+                "scope_paths": ["artifact.txt", "PROJECT_MANUAL.md"],
+                "acceptance_criteria": [
+                    "artifact.txt contains the exact inert marker",
+                    "PROJECT_MANUAL.md documents the marker",
+                ],
+                "required_execution_class": "BOUNDED_IMPLEMENTATION",
+                "model_policy": {
+                    "preferred": "gpt-5.6-terra",
+                    "allowed": ["gpt-5.6-terra"],
+                },
+                "capabilities_required": [
+                    "HOST_READ", "WORKTREE_WRITE", "TASK_COMMIT", "INTEGRATION_FF"
+                ],
+                "manual_update_required": True,
+                "stop_conditions": ["Stop on any scope or capability expansion"],
+            }
+            if real_codex else None
+        ),
     )
-    for _ in range(8):
+    for _ in range(64):
         coordinator.tick()
         if engine.state is OrchestratorState.DONE:
             break
@@ -148,6 +176,7 @@ def run(repository: Path, state_dir: Path) -> dict[str, object]:
     git_state = store.load_git_state()
     result = {
         "status": "PASS" if engine.state is OrchestratorState.DONE else "FAIL",
+        "driver": "REAL_CODEX" if real_codex else "SYNTHETIC",
         "state": engine.state.value,
         "main_unchanged": main_before == main_after,
         "cleanup": git_state.cleanup_status if git_state else None,
@@ -163,8 +192,15 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", required=True, type=Path)
     parser.add_argument("--state-dir", required=True, type=Path)
+    parser.add_argument("--real-codex", action="store_true")
+    parser.add_argument("--codex", default="codex")
     args = parser.parse_args(argv)
-    result = run(args.repository, args.state_dir)
+    result = run(
+        args.repository,
+        args.state_dir,
+        real_codex=args.real_codex,
+        codex=args.codex,
+    )
     print(json.dumps(result, sort_keys=True))
     return 0 if result["status"] == "PASS" else 1
 

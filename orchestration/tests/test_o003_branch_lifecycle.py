@@ -165,7 +165,7 @@ class O003BranchLifecycleTests(unittest.TestCase):
             self.lifecycle.assert_single_task(allowed_task_id="TASK-O003-001")
         self.assertEqual(caught.exception.code, "MAX_CONCURRENT_TASKS_EXCEEDED")
 
-    def test_cleanup_crash_with_unremoved_worktree_preserves_evidence(self) -> None:
+    def test_cleanup_crash_with_exact_pre_state_retries_once(self) -> None:
         self.init_development()
         head, worktree = self.create_task()
         self.lifecycle.fast_forward_development(
@@ -183,15 +183,14 @@ class O003BranchLifecycleTests(unittest.TestCase):
             intent=intent,
         )
         self.store.begin_effect(effect_id)
-        with self.assertRaises(BranchLifecycleError) as caught:
-            self.lifecycle.cleanup_verified_task(
-                task_id="TASK-O003-001",
-                accepted_sha=head,
-                worktree=worktree,
-                remote_branch_exists=True,
-            )
-        self.assertEqual(caught.exception.code, "CLEANUP_OUTCOME_AMBIGUOUS_PRESERVE_TASK")
-        self.assertTrue(worktree.exists())
+        self.lifecycle.cleanup_verified_task(
+            task_id="TASK-O003-001",
+            accepted_sha=head,
+            worktree=worktree,
+            remote_branch_exists=True,
+        )
+        self.assertFalse(worktree.exists())
+        self.assertEqual(self.store.load_git_state().cleanup_status, "PASS")
 
     def test_crash_after_development_ff_reconciles_without_second_ff(self) -> None:
         self.init_development()

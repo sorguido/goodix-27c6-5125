@@ -796,7 +796,12 @@ class CodexAppServer:
                 payload = json.loads(result.final_text)
                 if not isinstance(payload, dict):
                     raise AdapterError("STRUCTURED_OUTPUT_INVALID", "not an object")
-                return validator(payload)
+                validated = validator(payload)
+                if self.store is not None:
+                    self.store.save_turn_structured_result(
+                        f"{dispatch_id}-R{repair}", payload
+                    )
+                return validated
             except (json.JSONDecodeError, ProtocolValidationError, AdapterError) as exc:
                 validation_error = exc
         raise AdapterError(

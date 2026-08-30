@@ -35,6 +35,14 @@ wheel più lifecycle Git sotto un vero sandbox transiente `systemd --user`. Ness
 queste attività concede USB, privilegi, materiali protetti, aggiornamenti di
 `main`, live runner o avanzamento funzionale Goodix.
 
+Il secondo corrective O003 porta lo schema a v6 e rende il coordinatore
+crash-consistent: fase/checkpoint persistente, identità stabile prima di ogni
+turno, risultato strutturato bounded riusabile dopo restart, riconciliazione
+three-way degli effetti Git/GitHub e pause normative per rate limit, modello
+indisponibile, infrastruttura e trasporto ambiguo. La qualifica reale su
+repository disposable ha completato PM-plan → Executor → PM-review → ACCEPT →
+FF → cleanup → DONE con `main` invariato e tre soli dispatch reali.
+
 Lo stato verificato nel task branch O001, basato su
 `6530fc875a1dd3d7fba7b45f02ed3d9c6259c8f2` e corretto a partire dal commit
 reviewato `9610246e8dfc55afe21697850b1337e318e162a1`, è:
@@ -99,7 +107,7 @@ O002_REPORT_SHA256=fb2e3dbbb07c21bf10bfefba78600f53eeb80589d7d1c0a79edec4fd45041
 O002_NEGATIVE_CAPABILITY_EVIDENCE_CLASS=QUALIFICATION_PATH_NOT_OS_PROOF
 O002_OS_NEGATIVE_CAPABILITY_ISOLATION_PROVEN=false
 O003_GOVERNANCE_VERSION=2.7
-O003_STATE_SCHEMA_VERSION=5
+O003_STATE_SCHEMA_VERSION=6
 O003_GITHUB_GATE_ADAPTER_IMPLEMENTED=true
 O003_GATE_IDENTITY_COMMIT_ACTION_BINDING=PASS_SINGLE_CANONICAL_MANIFEST_ACTION_ID_DIGEST
 O003_GATE_REPLAY_AND_CRASH_RECOVERY=PASS_DETERMINISTIC_FAKE
@@ -122,7 +130,15 @@ O003_FAILED_AMBIGUOUS_INTEGRATION_PRESERVES_TASK=PASS
 O003_BACKUP=PASS
 O003_LOG_SINK=JOURNALD_SYSTEM_MANAGED_ROTATION
 O003_DETERMINISTIC_TESTS=PASS
-O003_TEST_COUNT=147
+O003_TEST_COUNT=153
+O003_FINDING_J_RUNTIME_PAUSE_WIRING=PASS_PLAN_EXECUTOR_REVIEW
+O003_FINDING_K_COORDINATOR_CRASH_CONSISTENCY=PASS_SYNTHETIC_BOUNDARIES
+O003_DUPLICATE_PM_PLAN_DISPATCH_COUNT=0
+O003_DUPLICATE_EXECUTOR_DISPATCH_COUNT=0
+O003_DUPLICATE_PM_REVIEW_DISPATCH_COUNT=0
+O003_DUPLICATE_COMMIT_PUSH_GATE_COUNT=0
+O003_REAL_PRODUCTION_COORDINATOR_CODEX_QUALIFICATION=PASS_DISPOSABLE
+O003_REAL_EXACT_ROUTE_PROBE=PASS_GPT_5_6_SOL_MEDIUM
 O003_CLI_TEMP_XDG_CLOSURE=PASS_NON_EDITABLE_WHEEL_AND_TRANSIENT_USER_MANAGER
 O003_IMPLEMENTATION_COMMIT=4f0fe61b8eaaf28f092b36ce3a62a4393b6850d3
 O003_DEDICATED_CI=PASS
@@ -154,13 +170,14 @@ assenti; persistenza e enforcement dell'esatto `expected_next_task_id` dopo
 baseline, branch, modello, gate class, capability, scope, non-goal e obbligo di
 aggiornamento manuale; store SQLite single-file con schema/protocol versionati,
 revisioni compare-and-swap e fail-closed su corruzione o incompatibilità. Lo
-schema operativo O002 era v3; il primo O003 introduceva v4 e il corrective
-service-closure introduce v5. Gli store operativi legacy v1/v2/v3/v4 vengono respinti
+schema operativo O002 era v3; il primo O003 introduceva v4, il corrective
+service-closure introduce v5 e il secondo corrective introduce v6. Gli store
+operativi legacy v1/v2/v3/v4/v5 vengono respinti
 come `STORE_INCOMPATIBLE` senza modificarne metadata, colonne o runtime row. La
 v1 non conserva `expected_next_task_id` né l'envelope immutabile del task; la
 v2 non conserva identità dei tre contesti, routing effettivo, dispatch o stato
 Git. Nessuno dei due stati in-flight è quindi ricostruibile senza ipotesi. In
-v5 la freshness conta `runtime_state`, effetti, turn activity, stato
+v6 la freshness conta `runtime_state`, effetti, turn activity, stato
 coordinatore, gate/binding GitHub, contesti, dispatch, stato Git esteso,
 operator state e maintenance epoch: anche un
 residuo operativo privo di runtime rende `create()` non fresco e
@@ -2840,7 +2857,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Orchestrazione O001 + O002 | core O001 preservato; adapter App Server/Git, routing chiuso e verifier sintetico data-only implementati; 105 test deterministici PASS; ciclo Codex reale sintetico con review neutrale PASS; bootstrap complessivo non pronto | schema v3 con v1/v2 fail-closed e freshness completa, route effettiva riverificata per dispatch e review legata al dispatch persistito, PM plan/review distinti Sol medium/high, Executor Terra high e correttivo medium nello stesso thread, commit e integrazione FF reali soltanto nel repo sintetico, `main` invariato; contatori path zero USB/sudo/protected/payg/human relay non promossi a prova OS; freeze Goodix invariato |
-| Orchestrazione O003 | corrective host-only su branch dedicato; 147 test deterministici PASS; loop PM→Executor→PM con corrective/accept/done, wheel non-editable e lifecycle Git sotto vero `systemd --user` disposable PASS; GitHub reale non eseguito | governance v2.7, schema v5, gate con singola sorgente `action_id/action_digest`, ledger turn/effect autorevoli, exact-route turn probe, `development`/task FF-cleanup su repo disposable; `development` canonico ancora assente pending accept+merge, O004 e negative-capability proof restano obbligatori |
+| Orchestrazione O003 | secondo corrective host-only; 153 test deterministici PASS; crash recovery plan/Executor/review/FF/cleanup/gate PASS; ProductionCoordinator Codex reale disposable PASS; GitHub reale non eseguito | governance v2.7, schema v6, checkpoint di fase, dispatch stabili, risultati bounded, pause normative e riconciliazione three-way; `development` canonico ancora assente pending accept+merge e negative-capability proof ancora obbligatoria |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
@@ -3044,7 +3061,7 @@ richiama i loro moduli:
                   state.py  policy.py  protocols.py
                         \       |       /
                          \      v      /
-                      SQLiteStateStore v5
+                      SQLiteStateStore v6
           runtime/gate/effect/turn/coordinator/operator/maintenance
                contexts/dispatches/Git/cleanup state
 
