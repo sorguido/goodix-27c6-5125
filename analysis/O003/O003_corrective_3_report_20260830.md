@@ -41,8 +41,10 @@ pre-binding.
 
 Baseline: `ddaa4ba7ff116104f1ffd0736c7abbe5f45bd285`; branch:
 `ai-executor/o003-human-gate-service-hardening`; review head:
-`GIT_REVIEW_HEAD_DYNAMIC`. La CI fresca è risolta dai check sull'esatto review
-head finale dopo push.
+`GIT_REVIEW_HEAD_DYNAMIC`. L'implementation head
+`b8999c2a418e7dc15eb78bcbe04021c252b59bb4` ha superato orchestration run
+`33330314349` e Goodix host-only run `33330314355`; il solo commit documentale
+successivo deve a sua volta mantenere verdi i check allegati al review head.
 
 ```text
 FINDING_M_TRUE_PROCESS_RESTART=PASS
@@ -68,8 +70,8 @@ REAL_STRUCTURED_TURN_SMOKE=PASS_CHATGPT_ONE_DISPATCH_ONE_COMPLETED_ZERO_MISSING_
 REAL_GITHUB_GATE_E2E=NOT_EXECUTED
 
 FINAL_HEAD=GIT_REVIEW_HEAD_DYNAMIC
-FRESH_ORCHESTRATION_CI=PENDING_FINAL_HEAD_PUSH
-FRESH_GOODIX_REGRESSION_CI=PENDING_FINAL_HEAD_PUSH
+FRESH_ORCHESTRATION_CI=PASS_RUN_33330314349_IMPLEMENTATION_HEAD_B8999C2
+FRESH_GOODIX_REGRESSION_CI=PASS_RUN_33330314355_IMPLEMENTATION_HEAD_B8999C2
 
 GOODIX_USB_OPEN_COUNT=0
 SUDO_USE_COUNT=0
