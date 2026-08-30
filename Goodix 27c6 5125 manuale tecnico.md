@@ -62,6 +62,11 @@ O002_CODEX_VERSION=codex-cli 0.144.1
 O002_AUTH_MODE=CHATGPT
 O002_DETERMINISTIC_TESTS=PASS
 O002_TEST_COUNT=90
+O002_IMPLEMENTATION_COMMIT=5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
+O002_DEDICATED_CI=PASS
+O002_DEDICATED_CI_EVIDENCE=GitHub Actions run 33301414210 on 5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
+O002_GOODIX_REGRESSION_CI=PASS
+O002_GOODIX_REGRESSION_CI_EVIDENCE=GitHub Actions run 33301414266 on 5c46feacd950c869c0cf0b3ae234c6ea278f7ba2
 O002_REAL_CODEX_SYNTHETIC_CYCLE=PASS
 O002_REAL_CORRECTIVE_LOOP=PASS
 O002_REAL_INTEGRATION_FF=PASS
@@ -124,7 +129,10 @@ segreti, USB o privilegi;
 la run micro-correttiva `33297717230` al commit
 `0a2b9b24dff187aad6e28e25efa51646b613dd3d` è conclusa `success`. Sullo stesso
 commit anche la regressione Goodix host-only preesistente, run `33297717243`,
-è conclusa `success`.
+è conclusa `success`. Il checkpoint implementativo O002
+`5c46feacd950c869c0cf0b3ae234c6ea278f7ba2` è stato quindi validato sul task
+branch dalla run dedicata O001/O002 `33301414210` e dalla regressione Goodix
+host-only `33301414266`, entrambe concluse `success`.
 Il codice del dominio `orchestration/` e il workflow sono project-authored,
 marcati SPDX e distribuiti come `GPL-2.0-or-later`; non incorporano codice o
 materiale Rockytkg, Goodix/OEM, capture, dati biometrici o segreti.
