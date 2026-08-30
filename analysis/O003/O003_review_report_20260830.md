@@ -46,6 +46,9 @@ emergency termina il servizio con exit zero e zero dispatch.
 - start/restart/stop della unit installata in ambiente disposable: PASS.
 - drift su resume, turn/effect in-flight, gate-action mismatch, emergency latch
   e exact-route probe sono coperti da test deterministici fail-closed: PASS.
+- CI privata sul commit `076c3ef4244d5f5eee602a422db41a87a0b13b9e`:
+  orchestration host-only run `33320017452` PASS e regressione Goodix host-only
+  run `33320017443` PASS.
 
 Il drill GitHub reale è deliberatamente non eseguito: richiede numeric ID/login
 dell'Autorità Umana configurati esplicitamente e un suo commento esatto
@@ -93,5 +96,4 @@ LIVE_RUNNER_ENABLED=false
 ```
 
 Il report JSON adiacente è la superficie macchina. `O003_FINAL_HEAD` resta
-dinamico per evitare l'impossibile self-hash del commit che contiene il report;
-gli identificativi CI vengono registrati dopo il primo push corrective.
+dinamico per evitare l'impossibile self-hash del commit che contiene il report.
