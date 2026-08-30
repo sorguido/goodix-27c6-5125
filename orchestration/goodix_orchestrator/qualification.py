@@ -19,7 +19,7 @@ from .output_schemas import (
     PM_PLANNING_OUTPUT_SCHEMA,
     PM_REVIEW_OUTPUT_SCHEMA,
 )
-from .persistence import SQLiteStateStore
+from .persistence import SCHEMA_VERSION, SQLiteStateStore
 from .policy import Capability, CapabilityPolicy
 from .state import OrchestratorState
 from .structured_output import (
@@ -486,7 +486,7 @@ def run_real(state_dir: Path, report_path: Path, codex: str) -> tuple[int, dict[
             report["FIRST_TASK_HEAD_SHA"] = corrected_result.review_set.head_sha
             report["SECOND_TASK_HEAD_SHA"] = second_result.review_set.head_sha
             report["SYNTHETIC_INTEGRATION_SHA"] = supervisor.repository.integration_sha
-            report["STATE_SCHEMA_VERSION"] = 3
+            report["STATE_SCHEMA_VERSION"] = SCHEMA_VERSION
             return 0, report
     except (AdapterError, GitManagerError, SupervisorError, EngineError) as exc:
         report["ERROR_CLASS"] = getattr(exc, "code", type(exc).__name__)

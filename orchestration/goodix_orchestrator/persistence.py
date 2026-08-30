@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -26,7 +27,7 @@ from .state import OrchestratorState, PAUSED_STATES
 from .structured_output import ContextClass, RoutingClass
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _RUN_ID_RE = re.compile(r"^ORCH-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TASK_ID_RE = re.compile(r"^TASK-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TURN_ID_RE = re.compile(r"^TURN-[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
@@ -73,6 +74,12 @@ class EffectKind(StrEnum):
     PUSH = "PUSH"
     INTEGRATION_FF = "INTEGRATION_FF"
     GATE_CREATE = "GATE_CREATE"
+    GATE_DECISION_CONSUME = "GATE_DECISION_CONSUME"
+    DEVELOPMENT_INIT = "DEVELOPMENT_INIT"
+    TASK_WORKTREE_REMOVE = "TASK_WORKTREE_REMOVE"
+    TASK_LOCAL_BRANCH_DELETE = "TASK_LOCAL_BRANCH_DELETE"
+    TASK_REMOTE_BRANCH_DELETE = "TASK_REMOTE_BRANCH_DELETE"
+    STATE_BACKUP = "STATE_BACKUP"
 
 
 class EffectStatus(StrEnum):
@@ -267,6 +274,12 @@ class GitStateRecord:
     integration_branch: str
     integration_sha: str
     task_worktree: str | None = None
+    main_sha: str | None = None
+    task_id: str | None = None
+    task_branch: str | None = None
+    reviewed_head_sha: str | None = None
+    integration_verified: bool = False
+    cleanup_status: str = "NOT_STARTED"
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -283,6 +296,153 @@ class GitStateRecord:
             raise UnsafePersistenceDataError(
                 f"invalid task_worktree: {self.task_worktree!r}"
             )
+        object.__setattr__(self, "main_sha", _validated_sha(self.main_sha, optional=True))
+        object.__setattr__(
+            self, "reviewed_head_sha", _validated_sha(self.reviewed_head_sha, optional=True)
+        )
+        if self.task_id is not None:
+            object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        if self.task_branch is not None:
+            object.__setattr__(self, "task_branch", _validated_ref(self.task_branch, target=True))
+        if (self.task_id is None) != (self.task_branch is None):
+            raise UnsafePersistenceDataError("task_id/task_branch must be present together")
+        if not isinstance(self.integration_verified, bool):
+            raise UnsafePersistenceDataError("invalid integration_verified")
+        if self.cleanup_status not in {
+            "NOT_STARTED",
+            "IN_PROGRESS",
+            "PASS",
+            "PRESERVED",
+        }:
+            raise UnsafePersistenceDataError(f"invalid cleanup_status: {self.cleanup_status!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class GateExternalRecord:
+    gate_id: str
+    task_id: str
+    repository: str
+    issue_number: int
+    issue_node_id: str
+    issue_body_digest: str
+    action_id: str
+    action_digest: str
+    commit_sha: str | None
+    authorized_user_id: int
+    authorized_login: str
+    decision_comment_id: int | None = None
+    decision_author_id: int | None = None
+    decision: GateStatus = GateStatus.PENDING
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "gate_id", _validated_gate_id(self.gate_id))
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", self.repository):
+            raise UnsafePersistenceDataError(f"invalid repository: {self.repository!r}")
+        if not isinstance(self.issue_number, int) or self.issue_number <= 0:
+            raise UnsafePersistenceDataError(f"invalid issue_number: {self.issue_number!r}")
+        for name in (
+            "issue_node_id",
+            "action_id",
+            "authorized_login",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value or len(value) > 256:
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
+        for name in ("issue_body_digest", "action_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
+        object.__setattr__(self, "commit_sha", _validated_sha(self.commit_sha, optional=True))
+        if not isinstance(self.authorized_user_id, int) or self.authorized_user_id <= 0:
+            raise UnsafePersistenceDataError(
+                f"invalid authorized_user_id: {self.authorized_user_id!r}"
+            )
+        for name in ("decision_comment_id", "decision_author_id"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, int) or value <= 0):
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
+        try:
+            decision = self.decision if isinstance(self.decision, GateStatus) else GateStatus(self.decision)
+        except (TypeError, ValueError) as exc:
+            raise UnsafePersistenceDataError(f"invalid decision: {self.decision!r}") from exc
+        if decision is GateStatus.PENDING and any(
+            value is not None for value in (self.decision_comment_id, self.decision_author_id)
+        ):
+            raise UnsafePersistenceDataError("pending gate has terminal decision provenance")
+        if decision is not GateStatus.PENDING and (
+            self.decision_comment_id is None or self.decision_author_id is None
+        ):
+            raise UnsafePersistenceDataError("terminal gate lacks decision provenance")
+        object.__setattr__(self, "decision", decision)
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorStateRecord:
+    operator_paused: bool = False
+    emergency_stop_latched: bool = False
+    maintenance_id: str | None = None
+    inflight_turn: bool = False
+    inflight_effect: bool = False
+    last_event: str = "UNINITIALIZED"
+    last_error_class: str | None = None
+    reprobe_due_at: str | None = None
+    availability_class: str = "UNKNOWN"
+
+    def __post_init__(self) -> None:
+        for name in (
+            "operator_paused",
+            "emergency_stop_latched",
+            "inflight_turn",
+            "inflight_effect",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise UnsafePersistenceDataError(f"invalid {name}")
+        if self.maintenance_id is not None and re.fullmatch(
+            r"MAINT-[A-Za-z0-9][A-Za-z0-9._-]{0,119}", self.maintenance_id
+        ) is None:
+            raise UnsafePersistenceDataError(f"invalid maintenance_id: {self.maintenance_id!r}")
+        for name in ("last_event", "availability_class"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value or len(value) > 256:
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
+        for name in ("last_error_class", "reprobe_due_at"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or len(value) > 256):
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class MaintenanceEpochRecord:
+    maintenance_id: str
+    entered_at: str
+    main_sha: str
+    development_sha: str | None
+    task_id: str | None
+    task_branch: str | None
+    orchestrator_state: str
+    integration_baseline: str | None
+    exited_at: str | None = None
+    reconciliation: str | None = None
+
+    def __post_init__(self) -> None:
+        if re.fullmatch(r"MAINT-[A-Za-z0-9][A-Za-z0-9._-]{0,119}", self.maintenance_id) is None:
+            raise UnsafePersistenceDataError(f"invalid maintenance_id: {self.maintenance_id!r}")
+        object.__setattr__(self, "main_sha", _validated_sha(self.main_sha))
+        object.__setattr__(self, "development_sha", _validated_sha(self.development_sha, optional=True))
+        object.__setattr__(self, "integration_baseline", _validated_sha(self.integration_baseline, optional=True))
+        if self.task_id is not None:
+            object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        if self.task_branch is not None:
+            object.__setattr__(self, "task_branch", _validated_ref(self.task_branch, target=True))
+        for name in ("entered_at", "orchestrator_state"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value or len(value) > 256:
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
+        for name in ("exited_at", "reconciliation"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or len(value) > 512):
+                raise UnsafePersistenceDataError(f"invalid {name}: {value!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,12 +560,70 @@ class GateCreateIntent(_EffectIntentMixin):
         )
 
 
+@dataclass(frozen=True, slots=True)
+class GateDecisionIntent(_EffectIntentMixin):
+    task_id: str
+    gate_id: str
+    decision: str
+    comment_id: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "gate_id", _validated_gate_id(self.gate_id))
+        if self.decision not in {GateStatus.APPROVED.value, GateStatus.DENIED.value}:
+            raise UnsafePersistenceDataError(f"invalid gate decision: {self.decision!r}")
+        if not isinstance(self.comment_id, int) or self.comment_id <= 0:
+            raise UnsafePersistenceDataError(f"invalid comment_id: {self.comment_id!r}")
+
+
+@dataclass(frozen=True, slots=True)
+class DevelopmentInitIntent(_EffectIntentMixin):
+    commit_sha: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "commit_sha", _validated_sha(self.commit_sha))
+
+
+@dataclass(frozen=True, slots=True)
+class TaskCleanupIntent(_EffectIntentMixin):
+    task_id: str
+    branch: str
+    accepted_sha: str
+    integration_sha: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "task_id", _validated_task_id(self.task_id))
+        object.__setattr__(self, "branch", _validated_ref(self.branch, target=True))
+        if not self.branch.startswith("task/"):
+            raise UnsafePersistenceDataError(f"cleanup branch outside task namespace: {self.branch!r}")
+        object.__setattr__(self, "accepted_sha", _validated_sha(self.accepted_sha))
+        object.__setattr__(self, "integration_sha", _validated_sha(self.integration_sha))
+
+
+@dataclass(frozen=True, slots=True)
+class StateBackupIntent(_EffectIntentMixin):
+    run_id: str
+    source_revision: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.run_id, str) or _RUN_ID_RE.fullmatch(self.run_id) is None:
+            raise UnsafePersistenceDataError(f"invalid run_id: {self.run_id!r}")
+        if not isinstance(self.source_revision, int) or self.source_revision < 0:
+            raise UnsafePersistenceDataError(
+                f"invalid source_revision: {self.source_revision!r}"
+            )
+
+
 EffectIntent = (
     BranchCreateIntent
     | CommitIntent
     | PushIntent
     | IntegrationFFIntent
     | GateCreateIntent
+    | GateDecisionIntent
+    | DevelopmentInitIntent
+    | TaskCleanupIntent
+    | StateBackupIntent
 )
 
 _EFFECT_INTENT_TYPES: dict[EffectKind, type[_EffectIntentMixin]] = {
@@ -414,6 +632,12 @@ _EFFECT_INTENT_TYPES: dict[EffectKind, type[_EffectIntentMixin]] = {
     EffectKind.PUSH: PushIntent,
     EffectKind.INTEGRATION_FF: IntegrationFFIntent,
     EffectKind.GATE_CREATE: GateCreateIntent,
+    EffectKind.GATE_DECISION_CONSUME: GateDecisionIntent,
+    EffectKind.DEVELOPMENT_INIT: DevelopmentInitIntent,
+    EffectKind.TASK_WORKTREE_REMOVE: TaskCleanupIntent,
+    EffectKind.TASK_LOCAL_BRANCH_DELETE: TaskCleanupIntent,
+    EffectKind.TASK_REMOTE_BRANCH_DELETE: TaskCleanupIntent,
+    EffectKind.STATE_BACKUP: StateBackupIntent,
 }
 
 
@@ -452,6 +676,9 @@ class SQLiteStateStore:
             "contexts",
             "dispatches",
             "git_state",
+            "gate_external",
+            "operator_state",
+            "maintenance_epochs",
         }
     )
 
@@ -484,7 +711,7 @@ class SQLiteStateStore:
                     self._create_schema(connection)
                 elif "metadata" in tables:
                     # Version mismatch is incompatibility, not corruption. Check it
-                    # before comparing the richer v3 table set so v1/v2 files stay
+                    # before comparing the richer v4 table set so legacy files stay
                     # byte-for-byte untouched and receive the correct classification.
                     schema_version = self._read_schema_version(connection)
                     if schema_version != SCHEMA_VERSION:
@@ -571,6 +798,27 @@ class SQLiteStateStore:
                 integration_branch TEXT NOT NULL,
                 integration_sha TEXT NOT NULL,
                 task_worktree TEXT,
+                main_sha TEXT,
+                task_id TEXT,
+                task_branch TEXT,
+                reviewed_head_sha TEXT,
+                integration_verified INTEGER NOT NULL CHECK (integration_verified IN (0, 1)),
+                cleanup_status TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE gate_external (
+                gate_id TEXT PRIMARY KEY,
+                record_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE operator_state (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                record_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE maintenance_epochs (
+                maintenance_id TEXT PRIMARY KEY,
+                record_json TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )""",
         )
@@ -727,6 +975,9 @@ class SQLiteStateStore:
                     "contexts",
                     "dispatches",
                     "git_state",
+                    "gate_external",
+                    "operator_state",
+                    "maintenance_epochs",
                 )
             )
             return sum(int(count) for count in counts)
@@ -1224,17 +1475,31 @@ class SQLiteStateStore:
             connection.execute(
                 """INSERT INTO git_state(
                        singleton, integration_branch, integration_sha,
-                       task_worktree, updated_at
-                   ) VALUES (1, ?, ?, ?, ?)
+                       task_worktree, main_sha, task_id, task_branch,
+                       reviewed_head_sha, integration_verified, cleanup_status,
+                       updated_at
+                   ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(singleton) DO UPDATE SET
                        integration_branch = excluded.integration_branch,
                        integration_sha = excluded.integration_sha,
                        task_worktree = excluded.task_worktree,
+                       main_sha = excluded.main_sha,
+                       task_id = excluded.task_id,
+                       task_branch = excluded.task_branch,
+                       reviewed_head_sha = excluded.reviewed_head_sha,
+                       integration_verified = excluded.integration_verified,
+                       cleanup_status = excluded.cleanup_status,
                        updated_at = excluded.updated_at""",
                 (
                     record.integration_branch,
                     record.integration_sha,
                     record.task_worktree,
+                    record.main_sha,
+                    record.task_id,
+                    record.task_branch,
+                    record.reviewed_head_sha,
+                    int(record.integration_verified),
+                    record.cleanup_status,
                     _utc_now(),
                 ),
             )
@@ -1253,6 +1518,224 @@ class SQLiteStateStore:
                 integration_branch=row["integration_branch"],
                 integration_sha=row["integration_sha"],
                 task_worktree=row["task_worktree"],
+                main_sha=row["main_sha"],
+                task_id=row["task_id"],
+                task_branch=row["task_branch"],
+                reviewed_head_sha=row["reviewed_head_sha"],
+                integration_verified=bool(row["integration_verified"]),
+                cleanup_status=row["cleanup_status"],
             )
         except UnsafePersistenceDataError as exc:
             raise StoreCorruptionError(f"malformed git state: {exc}") from exc
+
+    def save_gate_external(self, record: GateExternalRecord) -> GateExternalRecord:
+        if not isinstance(record, GateExternalRecord):
+            raise UnsafePersistenceDataError("save_gate_external requires GateExternalRecord")
+        payload = _canonical_json(asdict(record))
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT record_json FROM gate_external WHERE gate_id = ?",
+                (record.gate_id,),
+            ).fetchone()
+            if existing is not None:
+                old = self._gate_external_from_json(existing[0])
+                immutable_old = replace(
+                    old,
+                    decision_comment_id=None,
+                    decision_author_id=None,
+                    decision=GateStatus.PENDING,
+                )
+                immutable_new = replace(
+                    record,
+                    decision_comment_id=None,
+                    decision_author_id=None,
+                    decision=GateStatus.PENDING,
+                )
+                if immutable_old != immutable_new:
+                    raise GateReplayError(f"external gate binding mutation: {record.gate_id}")
+                if old.decision is not GateStatus.PENDING and record != old:
+                    raise GateReplayError(f"external terminal gate replay: {record.gate_id}")
+            connection.execute(
+                """INSERT INTO gate_external(gate_id, record_json, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(gate_id) DO UPDATE SET
+                       record_json = excluded.record_json,
+                       updated_at = excluded.updated_at""",
+                (record.gate_id, payload, _utc_now()),
+            )
+            connection.commit()
+        return record
+
+    @staticmethod
+    def _gate_external_from_json(payload: str) -> GateExternalRecord:
+        try:
+            data = json.loads(payload)
+            return GateExternalRecord(**data)
+        except (json.JSONDecodeError, TypeError, ValueError, UnsafePersistenceDataError) as exc:
+            raise StoreCorruptionError(f"malformed external gate record: {exc}") from exc
+
+    def load_gate_external(self, gate_id: str) -> GateExternalRecord | None:
+        _validated_gate_id(gate_id)
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT record_json FROM gate_external WHERE gate_id = ?", (gate_id,)
+            ).fetchone()
+        return None if row is None else self._gate_external_from_json(row[0])
+
+    def save_operator_state(self, record: OperatorStateRecord) -> OperatorStateRecord:
+        if not isinstance(record, OperatorStateRecord):
+            raise UnsafePersistenceDataError("save_operator_state requires OperatorStateRecord")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """INSERT INTO operator_state(singleton, record_json, updated_at)
+                   VALUES (1, ?, ?)
+                   ON CONFLICT(singleton) DO UPDATE SET
+                       record_json = excluded.record_json,
+                       updated_at = excluded.updated_at""",
+                (_canonical_json(asdict(record)), _utc_now()),
+            )
+            connection.commit()
+        return record
+
+    def load_operator_state(self) -> OperatorStateRecord:
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT record_json FROM operator_state WHERE singleton = 1"
+            ).fetchone()
+        if row is None:
+            return OperatorStateRecord()
+        try:
+            return OperatorStateRecord(**json.loads(row[0]))
+        except (json.JSONDecodeError, TypeError, ValueError, UnsafePersistenceDataError) as exc:
+            raise StoreCorruptionError(f"malformed operator state: {exc}") from exc
+
+    def save_maintenance_epoch(
+        self, record: MaintenanceEpochRecord
+    ) -> MaintenanceEpochRecord:
+        if not isinstance(record, MaintenanceEpochRecord):
+            raise UnsafePersistenceDataError(
+                "save_maintenance_epoch requires MaintenanceEpochRecord"
+            )
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT record_json FROM maintenance_epochs WHERE maintenance_id = ?",
+                (record.maintenance_id,),
+            ).fetchone()
+            if existing is not None:
+                old = self._maintenance_from_json(existing[0])
+                if replace(old, exited_at=None, reconciliation=None) != replace(
+                    record, exited_at=None, reconciliation=None
+                ):
+                    raise ConcurrentStateError("maintenance entry snapshot mutation")
+                if old.exited_at is not None and record != old:
+                    raise ConcurrentStateError("terminal maintenance epoch replay")
+            connection.execute(
+                """INSERT INTO maintenance_epochs(maintenance_id, record_json, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(maintenance_id) DO UPDATE SET
+                       record_json = excluded.record_json,
+                       updated_at = excluded.updated_at""",
+                (record.maintenance_id, _canonical_json(asdict(record)), _utc_now()),
+            )
+            connection.commit()
+        return record
+
+    @staticmethod
+    def _maintenance_from_json(payload: str) -> MaintenanceEpochRecord:
+        try:
+            return MaintenanceEpochRecord(**json.loads(payload))
+        except (json.JSONDecodeError, TypeError, ValueError, UnsafePersistenceDataError) as exc:
+            raise StoreCorruptionError(f"malformed maintenance epoch: {exc}") from exc
+
+    def load_maintenance_epoch(self, maintenance_id: str) -> MaintenanceEpochRecord | None:
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT record_json FROM maintenance_epochs WHERE maintenance_id = ?",
+                (maintenance_id,),
+            ).fetchone()
+        return None if row is None else self._maintenance_from_json(row[0])
+
+    def consistent_backup(self, backup_dir: str | Path, *, retain: int = 5) -> Path:
+        if not isinstance(retain, int) or retain < 1 or retain > 20:
+            raise UnsafePersistenceDataError(f"invalid backup retention: {retain!r}")
+        directory = Path(backup_dir)
+        directory.mkdir(parents=True, exist_ok=True)
+        if directory.resolve() == self.path.parent.resolve():
+            raise UnsafePersistenceDataError("backup directory must be a state subdirectory")
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        destination = directory / f"state-{stamp}.sqlite"
+        with self._checked_connection() as source:
+            target = sqlite3.connect(destination)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+        backups = sorted(directory.glob("state-*.sqlite"), reverse=True)
+        for obsolete in backups[retain:]:
+            obsolete.unlink()
+        return destination
+
+    def backup_with_effect(
+        self,
+        backup_dir: str | Path,
+        *,
+        effect_id: str,
+        retain: int = 5,
+    ) -> Path:
+        """Create/reconcile one consistent backup as an allow-listed effect."""
+        runtime = self.load_runtime()
+        run_id = runtime.run_id if runtime is not None else "ORCH-OPERATOR"
+        revision = runtime.revision if runtime is not None else 0
+        intent = StateBackupIntent(run_id, revision)
+        suffix = hashlib.sha256(effect_id.encode("utf-8")).hexdigest()[:24]
+        directory = Path(backup_dir)
+        destination = directory / f"state-effect-{suffix}.sqlite"
+        effect = self.load_effect(effect_id)
+        if effect is not None and effect.status is EffectStatus.IN_PROGRESS:
+            if not destination.is_file():
+                raise AmbiguousEffectError(
+                    f"backup effect {effect_id} has no verifiable destination"
+                )
+            probe = SQLiteStateStore(destination)
+            probe.initialize()
+            self.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            backup_effect = probe.load_effect(effect_id)
+            if backup_effect is not None and backup_effect.status is EffectStatus.IN_PROGRESS:
+                probe.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            return destination
+        request = self.request_effect(
+            effect_id=effect_id,
+            idempotency_key=f"STATE_BACKUP:{run_id}:{revision}:{suffix}",
+            kind=EffectKind.STATE_BACKUP,
+            intent=intent,
+        )
+        if request.action is EffectRequestAction.SKIP_COMPLETED:
+            if not destination.is_file():
+                raise StoreCorruptionError("completed backup effect has no destination")
+            probe = SQLiteStateStore(destination)
+            probe.initialize()
+            backup_effect = probe.load_effect(effect_id)
+            if backup_effect is not None and backup_effect.status is EffectStatus.IN_PROGRESS:
+                probe.reconcile_effect(effect_id, ReconciliationOutcome.COMPLETED)
+            return destination
+        directory.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            raise AmbiguousEffectError("backup destination pre-exists before effect")
+        self.begin_effect(effect_id)
+        with self._checked_connection() as source:
+            target = sqlite3.connect(destination)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+        SQLiteStateStore(destination).initialize()
+        self.complete_effect(effect_id)
+        SQLiteStateStore(destination).complete_effect(effect_id)
+        backups = sorted(directory.glob("state-*.sqlite"), reverse=True)
+        for obsolete in backups[retain:]:
+            if obsolete != destination:
+                obsolete.unlink()
+        return destination

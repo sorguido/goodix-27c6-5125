@@ -5,10 +5,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "goodix-orchestrator"
-version = "0.2.0"
-description = "Deterministic host-only Codex and synthetic-Git orchestrator for the Goodix project"
+version = "0.3.0"
+description = "Deterministic local-first host-only orchestrator for the Goodix project"
 requires-python = ">=3.11"
 dependencies = []
+
+[project.scripts]
+goodix-orchestrator = "goodix_orchestrator.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

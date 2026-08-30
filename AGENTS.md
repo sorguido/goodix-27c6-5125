@@ -1,6 +1,6 @@
 # AGENTS.md — Goodix 27c6:5125
 
-> Sintesi operativa derivata da `Linee Guida di Progetto Goodix 27c6 5125 per AI.md` v2.6.
+> Sintesi operativa derivata da `Linee Guida di Progetto Goodix 27c6 5125 per AI.md` v2.7.
 > In caso di conflitto prevalgono le linee guida canoniche e l'eventuale decisione/Human Gate corrente dell'Utente.
 
 ## 1. Repository e fonti canoniche
@@ -42,7 +42,7 @@ Invariante assoluto:
 factory_firmware_and_persistent_state_must_remain_untouched
 ```
 
-Sono permanentemente fuori scope della governance v2.6:
+Sono permanentemente fuori scope della governance v2.7:
 
 - flash / erase / ClearApp / IAP;
 - provisioning o riprovisionamento del sensore;
@@ -56,7 +56,7 @@ Questi invarianti non possono essere superati da un normale Human Gate. Una loro
 
 ---
 
-## 3. Governance v2.6: standing delegation e Human Authority
+## 3. Governance v2.7: standing delegation e Human Authority
 
 L'Utente resta l'autorità umana finale, ma **non è il relay ordinario** tra AI PM e AI esecutrice.
 
@@ -73,6 +73,15 @@ Entro la standing delegation sono autonomamente consentiti, se host-only e dentr
 - avanzamento fast-forward del branch di integrazione dopo `ACCEPT` AI PM;
 - apertura/aggiornamento di PR private;
 - prosecuzione allo step host-only successivo.
+
+Policy O003 autorizzata:
+
+- orchestrazione local-first (`PC_OFF => ORCHESTRATION_OFF`) come servizio `systemd --user`;
+- issue/commento GitHub privato come control plane macchina del Human Gate, con identità numerica, gate, commit/ref e azione esatta bound e replay-safe;
+- re-probe periodico quota/modello e ripresa autonoma soltanto dopo disponibilità della route esatta e riconciliazione;
+- latch locale persistente di emergency-stop e maintenance lock formale;
+- `main` branch Human, `development` branch persistente di integrazione autonoma accettata, `task/<TASK_ID>` branch effimero;
+- `MAX_CONCURRENT_TASKS=1`, corrective sullo stesso branch, cleanup soltanto dopo FF verificato, preservazione su failure/ambiguità.
 
 Richiedono Human Gate specifico, salvo futura delega esplicita:
 
@@ -133,7 +142,9 @@ Non è una quarta AI e non prende decisioni tecniche. Deve:
 - applicare allow-list, capability e policy Git;
 - creare/assegnare worktree e task branch;
 - mantenere, quando previsto, un branch di integrazione separato da `main`;
+- mantenere `development` come branch di integrazione autonomo persistente e un solo `task/<TASK_ID>` attivo;
 - avanzare tale branch solo fast-forward dopo `ACCEPT` AI PM;
+- rimuovere worktree/branch task solo dopo verifica esatta dell'integrazione, preservandoli su outcome fallito o ambiguo;
 - arrestarsi su Human Gate, quota, modello indisponibile, errore infrastrutturale o stato ambiguo;
 - non trasformare mai `HUMAN_GATE` in `ACCEPT`.
 
@@ -174,7 +185,7 @@ Principio del minimo privilegio:
 
 - AI esecutrice: modifica/commit solo nel task branch assegnato;
 - AI PM: preferibilmente review-only;
-- orchestratore: worktree/task branch, push fast-forward, PR private e branch di integrazione autonomo;
+- orchestratore: `task/<TASK_ID>`/worktree effimero, push fast-forward, PR private e `development` come branch di integrazione autonomo persistente;
 - Utente: Human Gate per `main`, history rewrite e pubblicazione.
 
 Regole:
@@ -184,6 +195,10 @@ Regole:
 - niente merge in `main` senza Human Gate;
 - niente rebase/amend/force push/history rewrite senza Human Gate;
 - niente update di ref non fast-forward salvo Human Gate dedicato;
+- massimo un task branch/worktree operativo; `CORRECTIVE` riusa lo stesso branch;
+- l'integrazione `development@A -> accepted B` richiede SHA reviewato esatto, CAS/FF, rilettura local/remote e prova di reachability;
+- cleanup automatico solo per l'esatto task corrente dopo integrazione verificata; ogni failure/ambiguità preserva le evidenze;
+- mai cancellare `main`, `development` o branch ignoti; mai creare `development` da codice non accettato;
 - niente hook Git o modifiche globali/utente senza autorizzazione specifica;
 - niente file fuori scope o retro-modifica gratuita di artefatti storici.
 
@@ -353,7 +368,7 @@ Safety telemetry resta più ricca quando necessaria (`usb_open_count`, `command_
 
 ## 13. Bootstrap orchestrazione: freeze del progresso Goodix
 
-Con la v2.6 il progresso funzionale Goodix è intenzionalmente sospeso durante la costruzione dell'orchestrazione, salvo riapertura esplicita dell'Utente.
+Con la v2.7 il progresso funzionale Goodix è intenzionalmente sospeso durante la costruzione dell'orchestrazione, salvo riapertura esplicita dell'Utente.
 
 Prima dell'autopilot Goodix devono essere dimostrati almeno:
 
@@ -367,7 +382,13 @@ Prima dell'autopilot Goodix devono essere dimostrati almeno:
 - pausa pulita su quota/modello senza fallback a pagamento;
 - review reale di diff/test/manuale da parte dell'AI PM;
 - assenza di secret in log/stato/notifiche;
+- servizio local-first con single-instance, operator pause/resume/status/stop, maintenance ed emergency latch;
+- Human Gate GitHub esatto e replay-safe, con stop reale del dispatch;
+- re-probe quota/modello senza fallback a pagamento;
+- lifecycle `development`/task e cleanup/recovery verificati;
 - almeno un ciclo sintetico completo e un ciclo reale host-only a basso rischio.
+
+Durante maintenance o con emergency latch attivo non sono consentiti dispatch, integrazione o cleanup. `resume` normale non cancella il latch. I log devono essere redatti; SQLite e backup XDG non contengono token, email, secret, protected material o chain-of-thought.
 
 Solo dopo questa closure l'AI PM può dichiarare:
 

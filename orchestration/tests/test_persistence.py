@@ -28,7 +28,7 @@ class PersistenceTests(unittest.TestCase):
         self.store.initialize()
 
     def test_transactional_compare_and_swap_and_reload(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 3)
+        self.assertEqual(SCHEMA_VERSION, 4)
         first = self.store.save_runtime(
             RuntimeRecord(OrchestratorState.BOOTSTRAP, "ORCH-20260830-001"),
             expected_revision=None,

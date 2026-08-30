@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-name: O001/O002 orchestration host-only
+name: O001/O002/O003 orchestration host-only
 
 on:
   push:
@@ -25,6 +25,6 @@ jobs:
         working-directory: orchestration
         run: python -m compileall -q goodix_orchestrator tests
 
-      - name: Run deterministic O001/O002 tests
+      - name: Run deterministic O001/O002/O003 tests
         working-directory: orchestration
         run: python -W error::ResourceWarning -m unittest discover -s tests -v

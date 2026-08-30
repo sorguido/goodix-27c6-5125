@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+[Unit]
+Description=Goodix host-only autonomous orchestrator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/goodix-orchestrator service-run
+Restart=on-failure
+RestartSec=15s
+TimeoutStopSec=30s
+KillMode=control-group
+NoNewPrivileges=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/goodix-orchestrator %h/.config/goodix-orchestrator
+UMask=0077
+
+[Install]
+WantedBy=default.target

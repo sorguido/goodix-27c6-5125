@@ -1,15 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix Autonomous Orchestration — Architecture & Safety Specification
 
-> **Versione**: Draft v0.1 — 30 agosto 2026
-> **Stato**: Canonico in `main`; implementazione del bootstrap in corso.
+> **Versione**: v0.2 (O003) — 30 agosto 2026
+> **Stato**: Contratto canonico O001–O003; bootstrap ancora non pronto per Goodix.
 > **Scope**: solo infrastruttura di orchestrazione host-only. Nessun avanzamento funzionale Goodix, nessun USB reale, nessun `sudo`, nessun secret reale, nessuna esecuzione live.
 
 ---
 
 ## 1. Scopo
 
-Questa specifica definisce il servizio locale che deve rimuovere l'Utente dal ruolo di relay continuo tra **AI Project Manager (AI PM)** e **AI esecutrice**, preservando integralmente la governance v2.6 del progetto Goodix 27c6:5125.
+Questa specifica definisce il servizio locale che deve rimuovere l'Utente dal ruolo di relay continuo tra **AI Project Manager (AI PM)** e **AI esecutrice**, preservando integralmente la governance v2.7 del progetto Goodix 27c6:5125.
 
 Il servizio deve permettere il ciclo:
 
@@ -29,7 +29,7 @@ L'orchestratore è un **coordinatore deterministico non-AI**. Non interpreta evi
 Questa specifica è subordinata a:
 
 1. decisione/Human Gate corrente dell'Utente;
-2. `Linee Guida di Progetto Goodix 27c6 5125 per AI.md` v2.6 o successiva;
+2. `Linee Guida di Progetto Goodix 27c6 5125 per AI.md` v2.7 o successiva;
 3. `AGENTS.md` coerente con la governance corrente;
 4. manuale tecnico canonico per lo stato tecnico.
 
@@ -283,6 +283,8 @@ Gestisce esclusivamente operazioni allow-listed:
 - push task branch;
 - fast-forward del branch di integrazione dopo `ACCEPT`;
 - apertura/aggiornamento PR private se configurato.
+- inizializzazione esatta e una tantum di `development` da uno SHA accettato;
+- cleanup dell'esatto task worktree/branch soltanto dopo integrazione verificata.
 
 MUST rifiutare:
 
@@ -297,18 +299,20 @@ MUST rifiutare:
 
 ### 6.5 State Store
 
-Il formato iniziale SHOULD essere file JSON atomico o SQLite locale singolo-file. La scelta implementativa deve privilegiare:
+Il formato canonico O003 è SQLite locale singolo-file schema v4 sotto XDG. Deve privilegiare:
 
 - transazioni/atomicità;
 - backup semplice;
 - ispezionabilità umana;
 - nessun servizio esterno.
+- backup consistente tramite API SQLite con retention bounded;
+- incompatibilità fail-closed per store operativi legacy non ricostruibili.
 
 Lo state store MUST contenere solo metadata operativi, mai secret.
 
 ### 6.6 Human Gate Adapter
 
-Adapter iniziale preferito: issue GitHub nel repository privato.
+Adapter canonico: issue/commento GitHub nel repository privato configurato, tramite wrapper stretto `gh api` senza token nello state store.
 
 Responsabilità:
 
@@ -318,6 +322,8 @@ Responsabilità:
 - verificare identità autorizzata;
 - accettare soltanto sintassi strutturata;
 - impedire replay.
+- legare repository, issue node/number/body digest, identità numerica/login, task, gate, commit/ref, action ID e action digest;
+- riconciliare crash issue-create e decision-consume senza doppio effetto.
 
 ### 6.7 Structured Logger
 
@@ -635,8 +641,10 @@ Per Goodix USB il test finale del bootstrap deve dimostrare che l'Executor non p
 ### 13.1 Branch canonici del flusso
 
 - `main`: branch umano/canonico; autopilot non lo modifica.
-- branch di integrazione autonomo: nome configurabile, inizialmente raccomandato `orchestration/integration` durante bootstrap e successivamente un nome dedicato al flusso Goodix.
-- task branch: un branch per task/corrective logicamente separato.
+- `development`: `AUTONOMOUS_INTEGRATION_BRANCH` persistente e unico.
+- `task/<TASK_ID>`: branch/worktree effimero dell'unico task operativo.
+
+`MAX_CONCURRENT_TASKS=1`. `CORRECTIVE` riusa lo stesso task branch/worktree. `main` e `development` non possono essere target di cleanup.
 
 ### 13.2 Creazione task
 
@@ -655,16 +663,21 @@ Dopo `ACCEPT` PM:
 1. verificare `reviewed_head_sha` == task branch HEAD;
 2. verificare ancestry;
 3. avanzare integration branch **solo fast-forward**;
-4. persistere nuova integration SHA;
-5. generare task successivo dalla nuova baseline.
+4. applicare compare-and-swap sull'esatto old SHA;
+5. rileggere `development` local e remote e provare che l'head accettato sia raggiungibile;
+6. persistere integration verified;
+7. rimuovere worktree, branch locale e branch remoto task in quest'ordine;
+8. verificare cleanup e generare il task successivo dalla nuova baseline.
 
 Nessun merge commit automatico è necessario nel bootstrap.
 
 ### 13.4 Reject/corrective
 
-`CORRECTIVE` SHOULD continuare sullo stesso task branch salvo ragione tecnica documentata.
+`CORRECTIVE` MUST continuare sullo stesso task branch/worktree.
 
-`REPLAN` MAY creare un nuovo task branch se il piano precedente viene abbandonato, ma deve preservare provenance e non cancellare il branch/evidenza precedente automaticamente.
+`REPLAN` può invalidare il task precedente soltanto preservandone provenance. Qualunque mismatch, non-FF, outcome ambiguo o reachability non provata preserva branch/worktree/commit/effect ledger e blocca il cleanup.
+
+L'inizializzazione del `development` canonico è separata dall'implementazione O003: dopo `ACCEPT` O003 e merge Human-gated in `main`, un'azione deterministica lo crea esattamente allo SHA `main` accettato e verifica il remote ref. L'assenza prima di tale gate è corretta.
 
 ---
 
@@ -700,7 +713,7 @@ MUST NOT:
 - passare a API key;
 - scegliere automaticamente un provider a pagamento alternativo.
 
-La ripresa dopo reset quota deve riconciliare baseline e stato prima di continuare.
+La ripresa non dipende da una data teorica di reset. Durante `PAUSED_RATE_LIMIT` o `PAUSED_MODEL_UNAVAILABLE` il servizio esegue re-probe periodici bounded di account, rate-limit e catalogo modelli. Riprende autonomamente solo quando la route esatta modello/effort è provata disponibile e SQLite, Git, task/worktree, gate ed ultimo effetto risultano riconciliati. Il probe non crea task, commit, FF o avanzamento di control flow.
 
 ---
 
@@ -742,6 +755,9 @@ Il gate adapter MUST verificare:
 - ID esatto;
 - stato ancora PENDING;
 - commit/ref invariato se il gate è commit-bound.
+- identità numerica GitHub configurata esplicitamente e login di cross-check;
+- action ID e digest payload invariati;
+- comando normalizzato come singola riga esatta, senza testo extra.
 
 ### 15.3 Replay protection
 
@@ -753,6 +769,8 @@ Una nuova live attempt o nuova baseline richiede un nuovo gate ID.
 
 Le normali notifiche GitHub/email/mobile sono sufficienti per il bootstrap. Non introdurre un mail sender separato finché non emerge una necessità reale.
 
+Mentre lo stato è `HUMAN_GATE_WAIT`, il delta di dispatch PM/Executor, task, commit, integration FF e retry modello ordinario è zero. Sono ammesse soltanto riconciliazione gate, health/re-probe bounded e controlli locali.
+
 ---
 
 ## 16. Crash recovery e reconciliation
@@ -760,14 +778,13 @@ Le normali notifiche GitHub/email/mobile sono sufficienti per il bootstrap. Non 
 Al bootstrap/restart:
 
 1. acquisire instance lock;
-2. leggere state store;
-3. verificare repo/root;
-4. verificare integration branch/ref;
-5. verificare eventuale task branch/worktree;
-6. verificare thread state Codex se recuperabile;
-7. verificare Human Gate;
-8. classificare l'ultima azione esterna;
-9. solo dopo scegliere la transizione.
+2. validare schema e latch operator/maintenance/emergency;
+3. verificare repo/root e fetch/reconcile di `main`/`development`;
+4. verificare eventuale task branch/worktree;
+5. verificare thread state Codex se recuperabile;
+6. riconciliare Human Gate e decisione terminale persistita;
+7. classificare l'ultima azione esterna e cleanup parziale;
+8. solo dopo scegliere la transizione o restare fail-closed.
 
 Il sistema deve distinguere almeno:
 
@@ -782,6 +799,12 @@ AMBIGUOUS
 ```
 
 `AMBIGUOUS` -> `ERROR_LOCKED`.
+
+### 16.1 Servizio e operator control
+
+Il runtime è local-first: `PC_OFF => ORCHESTRATION_OFF`. L'unità `systemd --user` usa single-instance lock, `KillMode=control-group`, shutdown SIGTERM e path XDG; non contiene credenziali né path repository hard-coded. `status`, `pause`, `resume`, `stop`, `emergency-stop`, clear esplicito del latch e maintenance enter/exit sono superfici locali deterministiche.
+
+Maintenance richiede operator pause e `NO_INFLIGHT_TURN/NO_INFLIGHT_EFFECT`; salva SHA e task dell'epoch, blocca ogni dispatch/FF/cleanup e al termine richiede fetch e riconciliazione Git+SQLite. Divergenza vieta merge/rebase automatici. L'emergency latch persiste dopo restart e `resume` normale non può cancellarlo.
 
 ---
 
@@ -908,7 +931,7 @@ Il flag può essere emesso dall'AI PM soltanto se tutti i seguenti criteri sono 
 14. `AGENTS.md` e governance non contraddetti dall'implementazione;
 15. review set bootstrap disponibile e verificabile.
 
-Anche dopo questo flag, la ripresa del progresso tecnico Goodix richiede Human Gate/decisione esplicita dell'Utente secondo la governance v2.6.
+Anche dopo questo flag, la ripresa del progresso tecnico Goodix richiede Human Gate/decisione esplicita dell'Utente secondo la governance v2.7.
 
 ---
 
@@ -977,6 +1000,9 @@ Dopo approvazione/merge di questa SPEC, la costruzione dovrebbe essere suddivisa
 - systemd user service;
 - restart reconciliation;
 - end-to-end gate test.
+- `development` persistente, task effimero singolo, FF/CAS e cleanup recovery-safe;
+- re-probe quota/modello e safe autonomous resume;
+- maintenance lock, emergency latch, backup e journald redatto.
 
 ### O004 — Real-repo low-risk qualification
 

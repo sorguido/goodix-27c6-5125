@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.6 — Revisione 30 agosto 2026
-**Stato**: Attivo; sostituisce la v2.5 del 27 agosto 2026
-**Motivazione**: La v2.6 mantiene invarianti factory-preserving, evidence-first, executable closure, licensing/provenance e review Git-native della v2.5, ma cambia il modello operativo per rimuovere l'Utente dal ruolo di relay continuo tra AI PM e AI esecutrice. Introduce una **standing delegation** per il lavoro autonomo non-live entro un envelope già approvato, un **orchestratore deterministico** non-AI che trasferisce task e risultati, una state machine PM → Executor → PM, Human Gate espliciti per le decisioni materiali e le capability sensibili, separazione tecnica tra ambiente host-only e live runner, pausa fail-closed su quota/modello indisponibile e divieto di fallback automatico verso API a consumo. L'Utente conserva autorità finale e viene coinvolto soltanto quando una decisione supera la delega permanente o richiede una capability protetta.
+> **Versione**: 2.7 — Revisione 30 agosto 2026
+**Stato**: Attivo; sostituisce la v2.6 del 30 agosto 2026
+**Motivazione**: La v2.7 preserva integralmente invarianti factory-preserving, safety Goodix, licensing/provenance, standing delegation e Human Gate della v2.6 e rende normativa la decisione O003 dell'Autorità Umana: orchestrazione local-first persistente, issue/commento GitHub privato come control plane macchina dei gate, ripresa autonoma sicura dopo re-probe di quota/modello, latch locale di emergenza, maintenance lock formale e lifecycle Git con `development` come branch di integrazione autonomo persistente e un solo task branch effimero alla volta. `main`, live, publication e history rewrite restano soggetti ai gate precedenti.
 > 
 
 ---
@@ -914,9 +914,41 @@ Prima di usare l'autopilot per nuovi step tecnici Goodix devono essere dimostrat
 
 Solo dopo questa closure l'AI PM può dichiarare `ORCHESTRATION_READY_FOR_GOODIX=true` e proporre all'Utente l'eventuale riapertura del boundary tecnico corrente.
 
+### 25.7 Servizio local-first e control plane Human Gate
+
+L'orchestratore è un servizio locale persistente: `PC_OFF => ORCHESTRATION_OFF`. Non esiste un coordinatore cloud sostitutivo. Il percorso operativo usa un servizio `systemd --user`, stato SQLite sotto XDG, un solo supervisore e processi figli contenuti nel service boundary. Il control plane macchina ufficiale del Human Gate è una issue/commento nel repository GitHub privato configurato, con soli comandi esatti `/approve <GATE_ID>` e `/deny <GATE_ID>`. Ogni decisione è legata deterministicamente a repository, issue, identità GitHub numerica autorizzata, `GATE_ID`, task, commit/ref e digest dell'azione; è terminale e non riutilizzabile. Chat, email, reazioni, prose libere e identità inferite non autorizzano transizioni.
+
+### 25.8 Lifecycle Git autonomo canonico
+
+La topologia normativa è:
+
+```text
+main                       = branch Human, aggiornabile soltanto con Human Gate
+development                = branch persistente di integrazione autonoma accettata
+task/<TASK_ID>             = branch/worktree effimero dell'unico task attivo
+MAX_CONCURRENT_TASKS       = 1
+CORRECTIVE                  = stesso task branch/worktree
+```
+
+Un task nasce esattamente da `development@A`. Dopo `ACCEPT` dell'AI PM sull'esatto head `B`, l'orchestratore può avanzare `development` soltanto fast-forward con compare-and-swap `A -> B`, rileggere local e remote, provare la raggiungibilità di `B` e solo allora rimuovere worktree e branch task. Cleanup automatico è autorizzato unicamente per l'esatto `task/<TASK_ID>` corrente dopo integrazione verificata. Mismatch, non-FF, esito ambiguo o prova incompleta preservano branch, worktree quando sicuro, commit ed effect ledger. `development` non è mai cancellato, rebased, force-pushed o resettato silenziosamente a `main`.
+
+L'attivazione iniziale canonica di `development` avviene soltanto a un esatto SHA accettato. Durante l'implementazione O003 non può essere inizializzato da codice O003 non ancora accettato; dopo il merge Human-gated di O003 in `main`, viene creato o riconciliato esattamente allo SHA `main` accettato.
+
+### 25.9 Controlli locali, emergenza e manutenzione
+
+L'operatore dispone almeno di `status`, `pause`, `resume`, `stop`, `emergency-stop` e ingresso/uscita maintenance. Il latch di emergenza è persistente, impedisce ogni ripresa autonoma dopo restart e può essere cancellato soltanto con azione locale esplicita dopo riconciliazione. La maintenance richiede pausa operatore e assenza provata di turn/effect in flight, salva un epoch con SHA e task correnti, blocca dispatch/integrazione/cleanup e richiede fetch, confronto Git e riconciliazione SQLite prima dell'uscita. Divergenze non producono merge o rebase automatici; restano in pausa infrastrutturale o error lock.
+
+### 25.10 Quota/modello: re-probe e ripresa autonoma sicura
+
+`PAUSED_RATE_LIMIT` e `PAUSED_MODEL_UNAVAILABLE` persistono senza downgrade, provider switch o fallback API/pay-as-you-go. Mentre il servizio locale è attivo esegue re-probe periodici, bounded e configurabili tramite le API supportate del Codex App Server. La data teorica di reset non basta: la route esatta modello/effort deve risultare nuovamente disponibile. Prima della ripresa autonoma sono obbligatorie riconciliazioni di SQLite, Git, task/worktree, gate ed effetti esterni. Ambiguità o cambi manuali impediscono l'auto-resume.
+
+### 25.11 Stato, log e backup
+
+SQLite conserva soltanto stato strutturato bounded dell'orchestrazione; non chain-of-thought, token, email, secret, protected material o dati biometrici. I log sono strutturati e redatti su stdout/stderr sotto journald, la cui rotazione resta system-managed. I backup usano l'API consistente SQLite, retention bounded e directory di stato XDG; non sovrascrivono silenziosamente stato più nuovo.
+
 ---
 
-## 26. Principio sintetico della v2.6
+## 26. Principio sintetico della v2.7
 
 **sicurezza hardware forte e capability separation**
 

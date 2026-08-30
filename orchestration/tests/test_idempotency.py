@@ -8,15 +8,19 @@ from goodix_orchestrator.persistence import (
     AmbiguousEffectError,
     BranchCreateIntent,
     CommitIntent,
+    DevelopmentInitIntent,
     EffectKind,
     EffectRequestAction,
     EffectStatus,
     IdempotencyIntentMismatchError,
     IntegrationFFIntent,
     GateCreateIntent,
+    GateDecisionIntent,
     PushIntent,
     ReconciliationOutcome,
     SQLiteStateStore,
+    StateBackupIntent,
+    TaskCleanupIntent,
     UnsafePersistenceDataError,
 )
 from goodix_orchestrator.policy import Capability, CapabilityPolicy
@@ -195,6 +199,30 @@ class IdempotencyTests(unittest.TestCase):
             (
                 EffectKind.GATE_CREATE,
                 GateCreateIntent("TASK-001", "HG-001", "b" * 40),
+            ),
+            (
+                EffectKind.GATE_DECISION_CONSUME,
+                GateDecisionIntent("TASK-001", "HG-001", "APPROVED", 41),
+            ),
+            (
+                EffectKind.DEVELOPMENT_INIT,
+                DevelopmentInitIntent("b" * 40),
+            ),
+            (
+                EffectKind.TASK_WORKTREE_REMOVE,
+                TaskCleanupIntent("TASK-001", "task/TASK-001", "b" * 40, "b" * 40),
+            ),
+            (
+                EffectKind.TASK_LOCAL_BRANCH_DELETE,
+                TaskCleanupIntent("TASK-001", "task/TASK-001", "b" * 40, "b" * 40),
+            ),
+            (
+                EffectKind.TASK_REMOTE_BRANCH_DELETE,
+                TaskCleanupIntent("TASK-001", "task/TASK-001", "b" * 40, "b" * 40),
+            ),
+            (
+                EffectKind.STATE_BACKUP,
+                StateBackupIntent("ORCH-001", 1),
             ),
         )
         for index, (kind, intent) in enumerate(cases):
