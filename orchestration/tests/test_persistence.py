@@ -13,6 +13,7 @@ from goodix_orchestrator.persistence import (
     SQLiteStateStore,
     StoreCorruptionError,
     StoreIncompatibleError,
+    SCHEMA_VERSION,
 )
 from goodix_orchestrator.policy import Capability, CapabilityPolicy
 from goodix_orchestrator.state import OrchestratorState
@@ -27,6 +28,7 @@ class PersistenceTests(unittest.TestCase):
         self.store.initialize()
 
     def test_transactional_compare_and_swap_and_reload(self) -> None:
+        self.assertEqual(SCHEMA_VERSION, 3)
         first = self.store.save_runtime(
             RuntimeRecord(OrchestratorState.BOOTSTRAP, "ORCH-20260830-001"),
             expected_revision=None,
@@ -243,6 +245,41 @@ class PersistenceTests(unittest.TestCase):
         self.assertIsNone(recovered.engine)
         self.assertEqual(self.legacy_snapshot(legacy_path), before)
         self.assertEqual(legacy_path.read_bytes(), before_bytes)
+
+    def test_v2_store_is_incompatible_and_remains_unmodified(self) -> None:
+        legacy_path = Path(self.temp.name) / "legacy-v2.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        connection.executescript(
+            """
+            CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO metadata VALUES ('schema_version', '2');
+            INSERT INTO metadata VALUES ('protocol_version', '1.0');
+            CREATE TABLE runtime_state (
+                singleton INTEGER PRIMARY KEY, current_state TEXT NOT NULL,
+                previous_recoverable_state TEXT, run_id TEXT NOT NULL,
+                task_id TEXT, turn_id TEXT, gate_id TEXT, baseline_sha TEXT,
+                result_sha TEXT, expected_next_task_id TEXT,
+                task_envelope_json TEXT, protocol_version TEXT NOT NULL,
+                revision INTEGER NOT NULL
+            );
+            CREATE TABLE effects (
+                effect_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+                kind TEXT NOT NULL, status TEXT NOT NULL, intent_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
+            CREATE TABLE gates (
+                gate_id TEXT PRIMARY KEY, task_id TEXT NOT NULL,
+                status TEXT NOT NULL, manifest_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """
+        )
+        connection.commit()
+        connection.close()
+        before = legacy_path.read_bytes()
+        recovered = DeterministicEngine.recover(legacy_path, CapabilityPolicy())
+        self.assertEqual(recovered.error_code, "STORE_INCOMPATIBLE")
+        self.assertEqual(legacy_path.read_bytes(), before)
 
 
 if __name__ == "__main__":

@@ -23,9 +23,10 @@ from .protocols import (
     TaskEnvelope,
 )
 from .state import OrchestratorState, PAUSED_STATES
+from .structured_output import ContextClass, RoutingClass
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _RUN_ID_RE = re.compile(r"^ORCH-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TASK_ID_RE = re.compile(r"^TASK-[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 _TURN_ID_RE = re.compile(r"^TURN-[A-Za-z0-9][A-Za-z0-9._-]{0,159}$")
@@ -169,6 +170,119 @@ class RuntimeRecord:
             raise StoreCorruptionError("DONE retains an expected next TASK_ID")
         object.__setattr__(self, "current_state", state)
         object.__setattr__(self, "previous_recoverable_state", previous)
+
+
+@dataclass(frozen=True, slots=True)
+class ContextRecord:
+    thread_id: str
+    context_class: ContextClass
+    role: str
+    effective_model_id: str
+    effective_reasoning_effort: str
+    routing_class: RoutingClass
+    cwd: str
+    codex_version: str
+    active: bool = True
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "thread_id",
+            "role",
+            "effective_model_id",
+            "effective_reasoning_effort",
+            "cwd",
+            "codex_version",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip() or len(value) > 1024:
+                raise UnsafePersistenceDataError(f"invalid {field_name}: {value!r}")
+        try:
+            context = (
+                self.context_class
+                if isinstance(self.context_class, ContextClass)
+                else ContextClass(self.context_class)
+            )
+            routing = (
+                self.routing_class
+                if isinstance(self.routing_class, RoutingClass)
+                else RoutingClass(self.routing_class)
+            )
+        except (TypeError, ValueError) as exc:
+            raise UnsafePersistenceDataError(f"invalid context routing: {exc}") from exc
+        if not isinstance(self.active, bool):
+            raise UnsafePersistenceDataError(f"invalid active flag: {self.active!r}")
+        object.__setattr__(self, "context_class", context)
+        object.__setattr__(self, "routing_class", routing)
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchRecord:
+    dispatch_id: str
+    thread_id: str
+    turn_id: str
+    context_class: ContextClass
+    routing_class: RoutingClass
+    effective_model_id: str
+    effective_reasoning_effort: str
+    codex_version: str
+    schema_repair: bool = False
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "dispatch_id",
+            "thread_id",
+            "turn_id",
+            "effective_model_id",
+            "effective_reasoning_effort",
+            "codex_version",
+        ):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip() or len(value) > 1024:
+                raise UnsafePersistenceDataError(f"invalid {field_name}: {value!r}")
+        try:
+            object.__setattr__(
+                self,
+                "context_class",
+                self.context_class
+                if isinstance(self.context_class, ContextClass)
+                else ContextClass(self.context_class),
+            )
+            object.__setattr__(
+                self,
+                "routing_class",
+                self.routing_class
+                if isinstance(self.routing_class, RoutingClass)
+                else RoutingClass(self.routing_class),
+            )
+        except (TypeError, ValueError) as exc:
+            raise UnsafePersistenceDataError(f"invalid dispatch routing: {exc}") from exc
+        if not isinstance(self.schema_repair, bool):
+            raise UnsafePersistenceDataError(
+                f"invalid schema_repair flag: {self.schema_repair!r}"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class GitStateRecord:
+    integration_branch: str
+    integration_sha: str
+    task_worktree: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "integration_branch",
+            _validated_ref(self.integration_branch, target=True),
+        )
+        object.__setattr__(self, "integration_sha", _validated_sha(self.integration_sha))
+        if self.task_worktree is not None and (
+            not isinstance(self.task_worktree, str)
+            or not self.task_worktree.strip()
+            or len(self.task_worktree) > 4096
+        ):
+            raise UnsafePersistenceDataError(
+                f"invalid task_worktree: {self.task_worktree!r}"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,7 +443,17 @@ def _canonical_json(value: Any) -> str:
 class SQLiteStateStore:
     """Inspectable transactional store; never replaces incompatible data."""
 
-    _REQUIRED_TABLES = frozenset({"metadata", "runtime_state", "effects", "gates"})
+    _REQUIRED_TABLES = frozenset(
+        {
+            "metadata",
+            "runtime_state",
+            "effects",
+            "gates",
+            "contexts",
+            "dispatches",
+            "git_state",
+        }
+    )
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -358,7 +482,16 @@ class SQLiteStateStore:
                 }
                 if not tables:
                     self._create_schema(connection)
-                elif tables != self._REQUIRED_TABLES:
+                elif "metadata" in tables:
+                    # Version mismatch is incompatibility, not corruption. Check it
+                    # before comparing the richer v3 table set so v1/v2 files stay
+                    # byte-for-byte untouched and receive the correct classification.
+                    schema_version = self._read_schema_version(connection)
+                    if schema_version != SCHEMA_VERSION:
+                        raise StoreIncompatibleError(
+                            f"schema version {schema_version}, expected {SCHEMA_VERSION}"
+                        )
+                if tables and tables != self._REQUIRED_TABLES:
                     raise StoreCorruptionError(
                         f"unexpected schema tables: expected {sorted(self._REQUIRED_TABLES)}, got {sorted(tables)}"
                     )
@@ -406,6 +539,38 @@ class SQLiteStateStore:
                 task_id TEXT NOT NULL,
                 status TEXT NOT NULL,
                 manifest_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE contexts (
+                thread_id TEXT PRIMARY KEY,
+                context_class TEXT NOT NULL,
+                role TEXT NOT NULL,
+                effective_model_id TEXT NOT NULL,
+                effective_reasoning_effort TEXT NOT NULL,
+                routing_class TEXT NOT NULL,
+                cwd TEXT NOT NULL,
+                codex_version TEXT NOT NULL,
+                active INTEGER NOT NULL CHECK (active IN (0, 1)),
+                updated_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE dispatches (
+                dispatch_id TEXT PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                turn_id TEXT NOT NULL,
+                context_class TEXT NOT NULL,
+                routing_class TEXT NOT NULL,
+                effective_model_id TEXT NOT NULL,
+                effective_reasoning_effort TEXT NOT NULL,
+                codex_version TEXT NOT NULL,
+                schema_repair INTEGER NOT NULL CHECK (schema_repair IN (0, 1)),
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(thread_id) REFERENCES contexts(thread_id)
+            )""",
+            """CREATE TABLE git_state (
+                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                integration_branch TEXT NOT NULL,
+                integration_sha TEXT NOT NULL,
+                task_worktree TEXT,
                 updated_at TEXT NOT NULL
             )""",
         )
@@ -553,12 +718,18 @@ class SQLiteStateStore:
 
     def operational_record_count(self) -> int:
         with self._checked_connection() as connection:
-            runtime_count = connection.execute(
-                "SELECT COUNT(*) FROM runtime_state"
-            ).fetchone()[0]
-            effect_count = connection.execute("SELECT COUNT(*) FROM effects").fetchone()[0]
-            gate_count = connection.execute("SELECT COUNT(*) FROM gates").fetchone()[0]
-        return int(runtime_count) + int(effect_count) + int(gate_count)
+            counts = (
+                connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in (
+                    "runtime_state",
+                    "effects",
+                    "gates",
+                    "contexts",
+                    "dispatches",
+                    "git_state",
+                )
+            )
+            return sum(int(count) for count in counts)
 
     def request_effect(
         self,
@@ -810,3 +981,278 @@ class SQLiteStateStore:
         """Small inspection helper used by compatibility tests."""
         with self._checked_connection() as connection:
             return dict(connection.execute("SELECT key, value FROM metadata"))
+
+    def record_context(self, record: ContextRecord) -> ContextRecord:
+        """Persist a bounded context identity and enforce active-thread separation."""
+        if not isinstance(record, ContextRecord):
+            raise UnsafePersistenceDataError("record_context requires ContextRecord")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT * FROM contexts WHERE thread_id = ?", (record.thread_id,)
+            ).fetchone()
+            if existing is not None:
+                observed = self._context_from_row(existing)
+                if (
+                    observed.thread_id != record.thread_id
+                    or observed.context_class is not record.context_class
+                    or observed.role != record.role
+                    or observed.cwd != record.cwd
+                    or observed.codex_version != record.codex_version
+                ):
+                    raise UnsafePersistenceDataError(
+                        f"thread identity collision: {record.thread_id}"
+                    )
+                if observed != record:
+                    connection.execute(
+                        """UPDATE contexts SET
+                               effective_model_id = ?,
+                               effective_reasoning_effort = ?,
+                               routing_class = ?, active = ?, updated_at = ?
+                           WHERE thread_id = ?""",
+                        (
+                            record.effective_model_id,
+                            record.effective_reasoning_effort,
+                            record.routing_class.value,
+                            int(record.active),
+                            _utc_now(),
+                            record.thread_id,
+                        ),
+                    )
+                connection.commit()
+                return record
+            if record.active:
+                collision = connection.execute(
+                    """SELECT thread_id FROM contexts
+                       WHERE active = 1 AND thread_id = ?""",
+                    (record.thread_id,),
+                ).fetchone()
+                if collision is not None:
+                    raise UnsafePersistenceDataError(
+                        f"active context thread collision: {record.thread_id}"
+                    )
+            connection.execute(
+                """INSERT INTO contexts(
+                       thread_id, context_class, role, effective_model_id,
+                       effective_reasoning_effort, routing_class, cwd,
+                       codex_version, active, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    record.thread_id,
+                    record.context_class.value,
+                    record.role,
+                    record.effective_model_id,
+                    record.effective_reasoning_effort,
+                    record.routing_class.value,
+                    record.cwd,
+                    record.codex_version,
+                    int(record.active),
+                    _utc_now(),
+                ),
+            )
+            connection.commit()
+        return record
+
+    @staticmethod
+    def _context_from_row(row: sqlite3.Row) -> ContextRecord:
+        try:
+            return ContextRecord(
+                thread_id=row["thread_id"],
+                context_class=row["context_class"],
+                role=row["role"],
+                effective_model_id=row["effective_model_id"],
+                effective_reasoning_effort=row["effective_reasoning_effort"],
+                routing_class=row["routing_class"],
+                cwd=row["cwd"],
+                codex_version=row["codex_version"],
+                active=bool(row["active"]),
+            )
+        except (ValueError, TypeError, UnsafePersistenceDataError) as exc:
+            raise StoreCorruptionError(f"malformed context record: {exc}") from exc
+
+    def list_contexts(self, *, active_only: bool = False) -> tuple[ContextRecord, ...]:
+        query = "SELECT * FROM contexts"
+        if active_only:
+            query += " WHERE active = 1"
+        query += " ORDER BY updated_at, thread_id"
+        with self._checked_connection() as connection:
+            rows = connection.execute(query).fetchall()
+        return tuple(self._context_from_row(row) for row in rows)
+
+    def load_context(self, thread_id: str) -> ContextRecord:
+        if not isinstance(thread_id, str) or not thread_id.strip():
+            raise UnsafePersistenceDataError(f"invalid thread_id: {thread_id!r}")
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM contexts WHERE thread_id = ?", (thread_id,)
+            ).fetchone()
+        if row is None:
+            raise StoreCorruptionError(f"unknown context thread: {thread_id}")
+        return self._context_from_row(row)
+
+    def retire_context(self, thread_id: str) -> None:
+        if not isinstance(thread_id, str) or not thread_id.strip():
+            raise UnsafePersistenceDataError(f"invalid thread_id: {thread_id!r}")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                "UPDATE contexts SET active = 0, updated_at = ? WHERE thread_id = ?",
+                (_utc_now(), thread_id),
+            )
+            if cursor.rowcount != 1:
+                raise StoreCorruptionError(f"unknown context thread: {thread_id}")
+            connection.commit()
+
+    def record_dispatch(self, record: DispatchRecord) -> DispatchRecord:
+        if not isinstance(record, DispatchRecord):
+            raise UnsafePersistenceDataError("record_dispatch requires DispatchRecord")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            context = connection.execute(
+                "SELECT * FROM contexts WHERE thread_id = ?", (record.thread_id,)
+            ).fetchone()
+            if context is None:
+                raise UnsafePersistenceDataError(
+                    f"dispatch references unknown thread: {record.thread_id}"
+                )
+            observed_context = self._context_from_row(context)
+            if (
+                observed_context.context_class is not record.context_class
+                or observed_context.codex_version != record.codex_version
+                or observed_context.routing_class is not record.routing_class
+                or observed_context.effective_model_id != record.effective_model_id
+                or observed_context.effective_reasoning_effort
+                != record.effective_reasoning_effort
+                or not observed_context.active
+            ):
+                raise UnsafePersistenceDataError(
+                    f"dispatch/context routing mismatch: {record.dispatch_id}"
+                )
+            try:
+                connection.execute(
+                    """INSERT INTO dispatches(
+                           dispatch_id, thread_id, turn_id, context_class,
+                           routing_class, effective_model_id,
+                           effective_reasoning_effort, codex_version,
+                           schema_repair, created_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        record.dispatch_id,
+                        record.thread_id,
+                        record.turn_id,
+                        record.context_class.value,
+                        record.routing_class.value,
+                        record.effective_model_id,
+                        record.effective_reasoning_effort,
+                        record.codex_version,
+                        int(record.schema_repair),
+                        _utc_now(),
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                row = connection.execute(
+                    "SELECT * FROM dispatches WHERE dispatch_id = ?",
+                    (record.dispatch_id,),
+                ).fetchone()
+                if row is None or self._dispatch_from_row(row) != record:
+                    raise UnsafePersistenceDataError(
+                        f"dispatch identity collision: {record.dispatch_id}"
+                    ) from exc
+            connection.commit()
+        return record
+
+    @staticmethod
+    def _dispatch_from_row(row: sqlite3.Row) -> DispatchRecord:
+        try:
+            return DispatchRecord(
+                dispatch_id=row["dispatch_id"],
+                thread_id=row["thread_id"],
+                turn_id=row["turn_id"],
+                context_class=row["context_class"],
+                routing_class=row["routing_class"],
+                effective_model_id=row["effective_model_id"],
+                effective_reasoning_effort=row["effective_reasoning_effort"],
+                codex_version=row["codex_version"],
+                schema_repair=bool(row["schema_repair"]),
+            )
+        except (ValueError, TypeError, UnsafePersistenceDataError) as exc:
+            raise StoreCorruptionError(f"malformed dispatch record: {exc}") from exc
+
+    def list_dispatches(self) -> tuple[DispatchRecord, ...]:
+        with self._checked_connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM dispatches ORDER BY created_at, dispatch_id"
+            ).fetchall()
+        return tuple(self._dispatch_from_row(row) for row in rows)
+
+    def load_dispatch(self, dispatch_id: str) -> DispatchRecord:
+        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
+            raise UnsafePersistenceDataError(f"invalid dispatch_id: {dispatch_id!r}")
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM dispatches WHERE dispatch_id = ?", (dispatch_id,)
+            ).fetchone()
+        if row is None:
+            raise StoreCorruptionError(f"unknown dispatch: {dispatch_id}")
+        return self._dispatch_from_row(row)
+
+    def latest_dispatch_for_thread(self, thread_id: str) -> DispatchRecord:
+        if not isinstance(thread_id, str) or not thread_id.strip():
+            raise UnsafePersistenceDataError(f"invalid thread_id: {thread_id!r}")
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                """SELECT * FROM dispatches WHERE thread_id = ?
+                   ORDER BY created_at DESC, rowid DESC LIMIT 1""",
+                (thread_id,),
+            ).fetchone()
+        if row is None:
+            raise StoreCorruptionError(f"thread has no dispatch: {thread_id}")
+        return self._dispatch_from_row(row)
+
+    def routing_counts(self) -> dict[str, int]:
+        with self._checked_connection() as connection:
+            rows = connection.execute(
+                "SELECT routing_class, COUNT(*) FROM dispatches GROUP BY routing_class"
+            ).fetchall()
+        return {str(row[0]): int(row[1]) for row in rows}
+
+    def save_git_state(self, record: GitStateRecord) -> GitStateRecord:
+        if not isinstance(record, GitStateRecord):
+            raise UnsafePersistenceDataError("save_git_state requires GitStateRecord")
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """INSERT INTO git_state(
+                       singleton, integration_branch, integration_sha,
+                       task_worktree, updated_at
+                   ) VALUES (1, ?, ?, ?, ?)
+                   ON CONFLICT(singleton) DO UPDATE SET
+                       integration_branch = excluded.integration_branch,
+                       integration_sha = excluded.integration_sha,
+                       task_worktree = excluded.task_worktree,
+                       updated_at = excluded.updated_at""",
+                (
+                    record.integration_branch,
+                    record.integration_sha,
+                    record.task_worktree,
+                    _utc_now(),
+                ),
+            )
+            connection.commit()
+        return record
+
+    def load_git_state(self) -> GitStateRecord | None:
+        with self._checked_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM git_state WHERE singleton = 1"
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            return GitStateRecord(
+                integration_branch=row["integration_branch"],
+                integration_sha=row["integration_sha"],
+                task_worktree=row["task_worktree"],
+            )
+        except UnsafePersistenceDataError as exc:
+            raise StoreCorruptionError(f"malformed git state: {exc}") from exc
