@@ -1470,58 +1470,63 @@ class SQLiteStateStore:
             raise UnsafePersistenceDataError("record_dispatch requires DispatchRecord")
         with self._checked_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            context = connection.execute(
-                "SELECT * FROM contexts WHERE thread_id = ?", (record.thread_id,)
-            ).fetchone()
-            if context is None:
-                raise UnsafePersistenceDataError(
-                    f"dispatch references unknown thread: {record.thread_id}"
-                )
-            observed_context = self._context_from_row(context)
-            if (
-                observed_context.context_class is not record.context_class
-                or observed_context.codex_version != record.codex_version
-                or observed_context.routing_class is not record.routing_class
-                or observed_context.effective_model_id != record.effective_model_id
-                or observed_context.effective_reasoning_effort
-                != record.effective_reasoning_effort
-                or not observed_context.active
-            ):
-                raise UnsafePersistenceDataError(
-                    f"dispatch/context routing mismatch: {record.dispatch_id}"
-                )
-            try:
-                connection.execute(
-                    """INSERT INTO dispatches(
-                           dispatch_id, thread_id, turn_id, context_class,
-                           routing_class, effective_model_id,
-                           effective_reasoning_effort, codex_version,
-                           schema_repair, created_at
-                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        record.dispatch_id,
-                        record.thread_id,
-                        record.turn_id,
-                        record.context_class.value,
-                        record.routing_class.value,
-                        record.effective_model_id,
-                        record.effective_reasoning_effort,
-                        record.codex_version,
-                        int(record.schema_repair),
-                        _utc_now(),
-                    ),
-                )
-            except sqlite3.IntegrityError as exc:
-                row = connection.execute(
-                    "SELECT * FROM dispatches WHERE dispatch_id = ?",
-                    (record.dispatch_id,),
-                ).fetchone()
-                if row is None or self._dispatch_from_row(row) != record:
-                    raise UnsafePersistenceDataError(
-                        f"dispatch identity collision: {record.dispatch_id}"
-                    ) from exc
+            self._insert_dispatch(connection, record)
             connection.commit()
         return record
+
+    def _insert_dispatch(
+        self, connection: sqlite3.Connection, record: DispatchRecord
+    ) -> None:
+        context = connection.execute(
+            "SELECT * FROM contexts WHERE thread_id = ?", (record.thread_id,)
+        ).fetchone()
+        if context is None:
+            raise UnsafePersistenceDataError(
+                f"dispatch references unknown thread: {record.thread_id}"
+            )
+        observed_context = self._context_from_row(context)
+        if (
+            observed_context.context_class is not record.context_class
+            or observed_context.codex_version != record.codex_version
+            or observed_context.routing_class is not record.routing_class
+            or observed_context.effective_model_id != record.effective_model_id
+            or observed_context.effective_reasoning_effort
+            != record.effective_reasoning_effort
+            or not observed_context.active
+        ):
+            raise UnsafePersistenceDataError(
+                f"dispatch/context routing mismatch: {record.dispatch_id}"
+            )
+        try:
+            connection.execute(
+                """INSERT INTO dispatches(
+                       dispatch_id, thread_id, turn_id, context_class,
+                       routing_class, effective_model_id,
+                       effective_reasoning_effort, codex_version,
+                       schema_repair, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    record.dispatch_id,
+                    record.thread_id,
+                    record.turn_id,
+                    record.context_class.value,
+                    record.routing_class.value,
+                    record.effective_model_id,
+                    record.effective_reasoning_effort,
+                    record.codex_version,
+                    int(record.schema_repair),
+                    _utc_now(),
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            row = connection.execute(
+                "SELECT * FROM dispatches WHERE dispatch_id = ?",
+                (record.dispatch_id,),
+            ).fetchone()
+            if row is None or self._dispatch_from_row(row) != record:
+                raise UnsafePersistenceDataError(
+                    f"dispatch identity collision: {record.dispatch_id}"
+                ) from exc
 
     @staticmethod
     def _dispatch_from_row(row: sqlite3.Row) -> DispatchRecord:
@@ -1641,6 +1646,13 @@ class SQLiteStateStore:
                     )
                 connection.commit()
                 return current
+            if (
+                status is TurnActivityStatus.COMPLETED
+                and current.dispatch_id.endswith(("-R0", "-R1"))
+            ):
+                raise UnsafePersistenceDataError(
+                    "structured project turns require atomic completion"
+                )
             updated = replace(
                 current,
                 status=status,
@@ -1674,19 +1686,170 @@ class SQLiteStateStore:
             rows = connection.execute(query, parameters).fetchall()
         return tuple(self._turn_activity_from_row(row) for row in rows)
 
-    def save_turn_structured_result(
-        self, dispatch_id: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
-        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
-            raise UnsafePersistenceDataError("invalid structured-result dispatch ID")
+    @staticmethod
+    def _encode_structured_result(payload: dict[str, Any]) -> str:
         if not isinstance(payload, dict):
             raise UnsafePersistenceDataError("structured turn result must be an object")
         encoded = _canonical_json(payload)
         if len(encoded.encode("utf-8")) > 1024 * 1024:
             raise UnsafePersistenceDataError("structured turn result exceeds bounded size")
         lowered = encoded.casefold()
-        if any(marker in lowered for marker in ('"token"', '"password"', '"secret"', '"email"')):
-            raise UnsafePersistenceDataError("structured turn result contains forbidden key")
+        if any(
+            marker in lowered
+            for marker in ('"token"', '"password"', '"secret"', '"email"')
+        ):
+            raise UnsafePersistenceDataError(
+                "structured turn result contains forbidden key"
+            )
+        return encoded
+
+    def complete_structured_turn(
+        self,
+        activity_id: str,
+        record: DispatchRecord,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Atomically persist route evidence, validated result and COMPLETED."""
+        if not isinstance(record, DispatchRecord):
+            raise UnsafePersistenceDataError(
+                "complete_structured_turn requires DispatchRecord"
+            )
+        encoded = self._encode_structured_result(payload)
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM turn_activity WHERE activity_id = ?", (activity_id,)
+            ).fetchone()
+            if row is None:
+                raise StoreCorruptionError(f"unknown turn activity: {activity_id}")
+            current = self._turn_activity_from_row(row)
+            if (
+                current.dispatch_id != record.dispatch_id
+                or current.thread_id != record.thread_id
+                or current.context_class is not record.context_class
+                or current.routing_class is not record.routing_class
+                or current.requested_model_id != record.effective_model_id
+                or current.requested_reasoning_effort
+                != record.effective_reasoning_effort
+                or current.turn_id != record.turn_id
+            ):
+                raise UnsafePersistenceDataError(
+                    f"structured completion identity mismatch: {activity_id}"
+                )
+            if current.status is TurnActivityStatus.COMPLETED:
+                existing = row["structured_result_json"]
+                dispatch = connection.execute(
+                    "SELECT * FROM dispatches WHERE dispatch_id = ?",
+                    (record.dispatch_id,),
+                ).fetchone()
+                if (
+                    existing != encoded
+                    or dispatch is None
+                    or self._dispatch_from_row(dispatch) != record
+                ):
+                    raise ConcurrentStateError(
+                        f"structured completion mutation: {activity_id}"
+                    )
+                connection.commit()
+                return payload
+            if current.status is not TurnActivityStatus.IN_PROGRESS:
+                raise ConcurrentStateError(
+                    f"terminal structured turn replay: {activity_id}"
+                )
+            self._insert_dispatch(connection, record)
+            connection.execute(
+                """UPDATE turn_activity
+                   SET status = ?, error_class = NULL,
+                       structured_result_json = ?, updated_at = ?
+                   WHERE activity_id = ?""",
+                (
+                    TurnActivityStatus.COMPLETED.value,
+                    encoded,
+                    _utc_now(),
+                    activity_id,
+                ),
+            )
+            connection.commit()
+        return payload
+
+    def fail_structured_turn(
+        self,
+        activity_id: str,
+        record: DispatchRecord,
+        *,
+        error_class: str,
+    ) -> TurnActivityRecord:
+        """Durably close an observed but schema-invalid structured turn."""
+        if not isinstance(error_class, str) or not error_class.strip():
+            raise UnsafePersistenceDataError("invalid structured failure class")
+        bounded_error = error_class[:256]
+        with self._checked_connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM turn_activity WHERE activity_id = ?", (activity_id,)
+            ).fetchone()
+            if row is None:
+                raise StoreCorruptionError(f"unknown turn activity: {activity_id}")
+            current = self._turn_activity_from_row(row)
+            if (
+                current.dispatch_id != record.dispatch_id
+                or current.thread_id != record.thread_id
+                or current.turn_id != record.turn_id
+            ):
+                raise UnsafePersistenceDataError(
+                    f"structured failure identity mismatch: {activity_id}"
+                )
+            if current.status is not TurnActivityStatus.IN_PROGRESS:
+                candidate = replace(
+                    current,
+                    status=TurnActivityStatus.FAILED,
+                    error_class=bounded_error,
+                )
+                if candidate != current:
+                    raise ConcurrentStateError(
+                        f"terminal structured failure replay: {activity_id}"
+                    )
+                connection.commit()
+                return current
+            self._insert_dispatch(connection, record)
+            connection.execute(
+                """UPDATE turn_activity SET status = ?, error_class = ?,
+                   structured_result_json = NULL, updated_at = ?
+                   WHERE activity_id = ?""",
+                (
+                    TurnActivityStatus.FAILED.value,
+                    bounded_error,
+                    _utc_now(),
+                    activity_id,
+                ),
+            )
+            connection.commit()
+        return replace(
+            current,
+            status=TurnActivityStatus.FAILED,
+            error_class=bounded_error,
+        )
+
+    def completed_structured_turns_without_result(
+        self,
+    ) -> tuple[TurnActivityRecord, ...]:
+        """Return impossible project-turn states from pre-invariant stores."""
+        with self._checked_connection() as connection:
+            rows = connection.execute(
+                """SELECT * FROM turn_activity
+                   WHERE status = ? AND structured_result_json IS NULL
+                     AND (dispatch_id LIKE '%-R0' OR dispatch_id LIKE '%-R1')
+                   ORDER BY created_at, activity_id""",
+                (TurnActivityStatus.COMPLETED.value,),
+            ).fetchall()
+        return tuple(self._turn_activity_from_row(row) for row in rows)
+
+    def save_turn_structured_result(
+        self, dispatch_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        if not isinstance(dispatch_id, str) or not dispatch_id.strip():
+            raise UnsafePersistenceDataError("invalid structured-result dispatch ID")
+        encoded = self._encode_structured_result(payload)
         with self._checked_connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
@@ -1698,14 +1861,14 @@ class SQLiteStateStore:
                     f"structured result requires completed activity: {dispatch_id}"
                 )
             existing = row["structured_result_json"]
-            if existing is not None and existing != encoded:
+            if existing is None:
+                raise UnsafePersistenceDataError(
+                    "structured result requires atomic completion"
+                )
+            if existing != encoded:
                 raise ConcurrentStateError(
                     f"structured turn result mutation: {dispatch_id}"
                 )
-            connection.execute(
-                "UPDATE turn_activity SET structured_result_json = ?, updated_at = ? WHERE dispatch_id = ?",
-                (encoded, _utc_now(), dispatch_id),
-            )
             connection.commit()
         return payload
 

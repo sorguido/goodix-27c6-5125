@@ -611,6 +611,7 @@ class CodexAppServer:
         output_schema: Mapping[str, Any],
         dispatch_id: str,
         schema_repair: bool = False,
+        _defer_structured_completion: bool = False,
     ) -> TurnResult:
         self.require_route(context.route)
         activity_id = f"ACTIVITY-{dispatch_id}"
@@ -658,17 +659,12 @@ class CodexAppServer:
             # for this dispatch. Re-observe and verify the effective route after
             # every completed turn before persisting or using its output.
             self._observe_thread_route(context)
-            if self.store is not None:
+            if self.store is not None and not _defer_structured_completion:
                 self.store.record_dispatch(
-                    DispatchRecord(
-                        dispatch_id=dispatch_id,
-                        thread_id=context.thread_id,
-                        turn_id=turn_id,
-                        context_class=context.context_class,
-                        routing_class=context.route.routing_class,
-                        effective_model_id=context.route.model_id,
-                        effective_reasoning_effort=context.route.reasoning_effort,
-                        codex_version=self.codex_version,
+                    self._dispatch_record(
+                        context,
+                        dispatch_id,
+                        turn_id,
                         schema_repair=schema_repair,
                     )
                 )
@@ -706,6 +702,26 @@ class CodexAppServer:
                     error_class=str(code)[:256],
                 )
             raise
+
+    def _dispatch_record(
+        self,
+        context: ThreadContext,
+        dispatch_id: str,
+        turn_id: str,
+        *,
+        schema_repair: bool,
+    ) -> DispatchRecord:
+        return DispatchRecord(
+            dispatch_id=dispatch_id,
+            thread_id=context.thread_id,
+            turn_id=turn_id,
+            context_class=context.context_class,
+            routing_class=context.route.routing_class,
+            effective_model_id=context.route.model_id,
+            effective_reasoning_effort=context.route.reasoning_effort,
+            codex_version=self.codex_version,
+            schema_repair=schema_repair,
+        )
 
     def _next_event(self, timeout: float) -> dict[str, Any]:
         if self._notifications:
@@ -791,6 +807,7 @@ class CodexAppServer:
                 output_schema=output_schema,
                 dispatch_id=f"{dispatch_id}-R{repair}",
                 schema_repair=bool(repair),
+                _defer_structured_completion=self.store is not None,
             )
             try:
                 payload = json.loads(result.final_text)
@@ -798,11 +815,33 @@ class CodexAppServer:
                     raise AdapterError("STRUCTURED_OUTPUT_INVALID", "not an object")
                 validated = validator(payload)
                 if self.store is not None:
-                    self.store.save_turn_structured_result(
-                        f"{dispatch_id}-R{repair}", payload
+                    structured_dispatch_id = f"{dispatch_id}-R{repair}"
+                    self.store.complete_structured_turn(
+                        f"ACTIVITY-{structured_dispatch_id}",
+                        self._dispatch_record(
+                            context,
+                            structured_dispatch_id,
+                            result.turn_id,
+                            schema_repair=bool(repair),
+                        ),
+                        payload,
                     )
                 return validated
             except (json.JSONDecodeError, ProtocolValidationError, AdapterError) as exc:
+                if self.store is not None:
+                    structured_dispatch_id = f"{dispatch_id}-R{repair}"
+                    self.store.fail_structured_turn(
+                        f"ACTIVITY-{structured_dispatch_id}",
+                        self._dispatch_record(
+                            context,
+                            structured_dispatch_id,
+                            result.turn_id,
+                            schema_repair=bool(repair),
+                        ),
+                        error_class=str(
+                            getattr(exc, "code", "STRUCTURED_OUTPUT_INVALID")
+                        ),
+                    )
                 validation_error = exc
         raise AdapterError(
             "PAUSED_INFRASTRUCTURE",

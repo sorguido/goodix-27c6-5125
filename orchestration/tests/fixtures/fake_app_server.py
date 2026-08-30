@@ -154,6 +154,14 @@ try:
             response(request, thread_result(request, thread_id))
         elif method == "turn/start":
             TURN_COUNTER += 1
+            if SCENARIO == "count-turns" and LOG_PATH is not None:
+                prior = 0
+                if LOG_PATH.exists():
+                    prior = int(json.loads(LOG_PATH.read_text(encoding="utf-8"))["turn_count"])
+                LOG_PATH.write_text(
+                    json.dumps({"turn_count": prior + 1}, sort_keys=True),
+                    encoding="utf-8",
+                )
             turn_id = f"turn-{TURN_COUNTER}"
             params = request["params"]
             thread_state = THREADS[params["threadId"]]

@@ -414,8 +414,6 @@ class ProductionCoordinator:
                 attempt = int(raw.get("plan_attempt", 0)) + 1
                 self._save_phase(raw, CoordinatorPhase.PLAN_DISPATCH_REQUIRED, planning_class=review.replan_planning_class.value, execution_class=None, plan=None, report=None, result=None, review=None, plan_attempt=attempt, dispatch_id=f"DISPATCH-PM-PLAN-{manifest.task_id}-{attempt:04d}")
             elif disposition.disposition is Disposition.HUMAN_GATE:
-                if self.engine.state is OrchestratorState.PM_REVIEWING:
-                    self.engine.apply_disposition(disposition)
                 self._save_phase(raw, CoordinatorPhase.GATE_BINDING_PENDING)
             elif disposition.disposition is Disposition.DONE:
                 if self.engine.state is OrchestratorState.PM_REVIEWING:
@@ -440,6 +438,12 @@ class ProductionCoordinator:
             disposition = self._review(raw).disposition
             assert disposition.gate is not None
             gate = disposition.gate
+            if self.engine.state is OrchestratorState.PM_REVIEWING:
+                self.engine.apply_disposition(disposition)
+            elif self.engine.state is not OrchestratorState.HUMAN_GATE_WAIT:
+                raise CoordinatorError(
+                    "GATE_BINDING_ENGINE_STATE_MISMATCH", self.engine.state.value
+                )
             action = GateAction(gate.action_id, {"approval_state": gate.approval_state.value, "denial_state": gate.denial_state.value})
             if action.digest != gate.action_digest:
                 raise CoordinatorError("GATE_ACTION_BINDING_MISMATCH", gate.gate_id)

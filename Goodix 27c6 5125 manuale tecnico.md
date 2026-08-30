@@ -43,6 +43,19 @@ indisponibile, infrastruttura e trasporto ambiguo. La qualifica reale su
 repository disposable ha completato PM-plan → Executor → PM-review → ACCEPT →
 FF → cleanup → DONE con `main` invariato e tre soli dispatch reali.
 
+Il terzo e ultimo corrective di recovery chiude la distinzione tra semplice
+re-entry del coordinatore e vero restart: la qualifica riapre SQLite dal disco,
+invoca lo stesso helper di startup di `service-run` e
+`DeterministicEngine.recover()`, quindi ricrea lifecycle, driver e coordinator
+senza riusare oggetti runtime. Una qualifica aggiuntiva completa il ciclo con un
+processo distinto per ogni tick. Per i turni strutturati, dispatch verificato,
+risultato JSON validato bounded e stato `COMPLETED` diventano durevoli nella
+stessa transazione; se il processo cade dopo l'osservazione terminale ma prima
+di quella transazione, il turno resta irrisolto e il servizio fallisce chiuso
+senza redispatch. `GATE_BINDING_PENDING` viene ora salvato prima della
+transizione locale `HUMAN_GATE`, e il recovery riconosce sia `PM_REVIEWING` sia
+`HUMAN_GATE_WAIT` prima di creare o riconciliare l'unica issue.
+
 Lo stato verificato nel task branch O001, basato su
 `6530fc875a1dd3d7fba7b45f02ed3d9c6259c8f2` e corretto a partire dal commit
 reviewato `9610246e8dfc55afe21697850b1337e318e162a1`, è:
@@ -130,15 +143,29 @@ O003_FAILED_AMBIGUOUS_INTEGRATION_PRESERVES_TASK=PASS
 O003_BACKUP=PASS
 O003_LOG_SINK=JOURNALD_SYSTEM_MANAGED_ROTATION
 O003_DETERMINISTIC_TESTS=PASS
-O003_TEST_COUNT=153
+O003_TEST_COUNT=160
 O003_FINDING_J_RUNTIME_PAUSE_WIRING=PASS_PLAN_EXECUTOR_REVIEW
 O003_FINDING_K_COORDINATOR_CRASH_CONSISTENCY=PASS_SYNTHETIC_BOUNDARIES
+O003_FINDING_M_TRUE_PROCESS_RESTART=PASS_STORE_ENGINE_LIFECYCLE_DRIVER_COORDINATOR_RECREATED
+O003_FINDING_N_STRUCTURED_TURN_DURABILITY=PASS_ATOMIC_OR_FAIL_CLOSED_NO_REDISPATCH
+O003_FINDING_O_GATE_PREBINDING_RESTART=PASS_PENDING_BEFORE_LOCAL_TRANSITION
+O003_COORDINATOR_REENTRY_TEST=PASS
+O003_TRUE_STORE_ENGINE_RESTART_TEST=PASS
+O003_SUBPROCESS_SERVICE_RESTART_TEST=PASS_ONE_PROCESS_PER_TICK
+O003_COMPLETED_WITHOUT_STRUCTURED_RESULT_COUNT=0
 O003_DUPLICATE_PM_PLAN_DISPATCH_COUNT=0
 O003_DUPLICATE_EXECUTOR_DISPATCH_COUNT=0
 O003_DUPLICATE_PM_REVIEW_DISPATCH_COUNT=0
-O003_DUPLICATE_COMMIT_PUSH_GATE_COUNT=0
+O003_DUPLICATE_COMMIT_COUNT=0
+O003_DUPLICATE_PUSH_COUNT=0
+O003_DUPLICATE_INTEGRATION_FF_COUNT=0
+O003_DUPLICATE_GATE_ISSUE_COUNT=0
 O003_REAL_PRODUCTION_COORDINATOR_CODEX_QUALIFICATION=PASS_DISPOSABLE
 O003_REAL_EXACT_ROUTE_PROBE=PASS_GPT_5_6_SOL_MEDIUM
+O003_CORRECTIVE_3_REAL_STRUCTURED_TURN_SMOKE=PASS_CHATGPT_ONE_DISPATCH_ONE_COMPLETED_ZERO_MISSING_RESULT
+O003_CORRECTIVE_3_REVIEW_HEAD=GIT_REVIEW_HEAD_DYNAMIC
+O003_CORRECTIVE_3_FRESH_ORCHESTRATION_CI=PENDING_FINAL_HEAD_PUSH
+O003_CORRECTIVE_3_FRESH_GOODIX_REGRESSION_CI=PENDING_FINAL_HEAD_PUSH
 O003_CORRECTIVE_2_IMPLEMENTATION_HEAD=a070603b141b68da992eadb3d0c937cb515296a8
 O003_CORRECTIVE_2_DEDICATED_CI=PASS_RUN_33322451868
 O003_CORRECTIVE_2_GOODIX_REGRESSION_CI=PASS_RUN_33322451893
@@ -2860,7 +2887,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 | Area | Stato | Risultato |
 | --- | --- | --- |
 | Orchestrazione O001 + O002 | core O001 preservato; adapter App Server/Git, routing chiuso e verifier sintetico data-only implementati; 105 test deterministici PASS; ciclo Codex reale sintetico con review neutrale PASS; bootstrap complessivo non pronto | schema v3 con v1/v2 fail-closed e freshness completa, route effettiva riverificata per dispatch e review legata al dispatch persistito, PM plan/review distinti Sol medium/high, Executor Terra high e correttivo medium nello stesso thread, commit e integrazione FF reali soltanto nel repo sintetico, `main` invariato; contatori path zero USB/sudo/protected/payg/human relay non promossi a prova OS; freeze Goodix invariato |
-| Orchestrazione O003 | secondo corrective host-only; 153 test deterministici PASS; crash recovery plan/Executor/review/FF/cleanup/gate PASS; ProductionCoordinator Codex reale disposable PASS; GitHub reale non eseguito | governance v2.7, schema v6, checkpoint di fase, dispatch stabili, risultati bounded, pause normative e riconciliazione three-way; `development` canonico ancora assente pending accept+merge e negative-capability proof ancora obbligatoria |
+| Orchestrazione O003 | terzo corrective host-only; 160 test deterministici PASS; true store/engine restart, subprocess service restart, structured-result atomicity e gate pre-binding PASS; ProductionCoordinator Codex reale disposable precedente preservato; GitHub reale non eseguito | governance v2.7, schema v6, checkpoint di fase, dispatch+risultato+COMPLETED atomici, fail-closed senza redispatch e riconciliazione three-way; `development` canonico ancora assente pending accept+merge e negative-capability proof ancora obbligatoria |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |

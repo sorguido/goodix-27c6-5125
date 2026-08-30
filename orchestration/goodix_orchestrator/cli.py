@@ -215,6 +215,36 @@ def _systemd_state() -> str:
     return value.upper() if value else "INACTIVE_OR_UNAVAILABLE"
 
 
+def _recover_service_engine(
+    store: SQLiteStateStore,
+    adapter: HumanGateAdapter,
+    policy: CapabilityPolicy,
+) -> DeterministicEngine:
+    """Run the service-start gate/engine recovery ordering in one reusable path."""
+    runtime = store.load_runtime()
+    if runtime is None:
+        raise ServiceError("MISSING_RUNTIME_STATE", str(store.path))
+    checkpoint = store.load_coordinator_state() or {}
+    gate_binding_pending = (
+        checkpoint.get("phase") == "GATE_BINDING_PENDING"
+    )
+    if (
+        runtime.current_state is OrchestratorState.HUMAN_GATE_WAIT
+        and not gate_binding_pending
+    ):
+        adapter.reconcile_decision_before_engine_recovery()
+    recovered = DeterministicEngine.recover(
+        store.path,
+        policy,
+        expected_run_id=runtime.run_id,
+    )
+    if recovered.engine is None:
+        raise ServiceError(
+            recovered.error_code or "RECOVERY_FAILED", recovered.detail or ""
+        )
+    return recovered.engine
+
+
 def _service_tick(
     store: SQLiteStateStore,
     config: dict[str, Any],
@@ -265,17 +295,12 @@ def _service_tick(
         authorized_user_id=int(config.get("authorized_github_user_id", 0)),
         authorized_login=str(config.get("authorized_github_login", "")),
     )
-    if runtime.current_state is OrchestratorState.HUMAN_GATE_WAIT:
-        adapter.reconcile_decision_before_engine_recovery()
     if not fresh:
-        recovered = DeterministicEngine.recover(
-            store.path,
+        engine = _recover_service_engine(
+            store,
+            adapter,
             CapabilityPolicy(HOST_ONLY_CAPABILITIES),
-            expected_run_id=runtime.run_id,
         )
-        if recovered.engine is None:
-            raise ServiceError(recovered.error_code or "RECOVERY_FAILED", recovered.detail or "")
-        engine = recovered.engine
     active_contexts = store.list_contexts(active_only=True)
     active = active_contexts[-1] if active_contexts else None
     reprobe: ReprobeController | None = None
@@ -283,7 +308,7 @@ def _service_tick(
         git = store.load_git_state()
         snapshot = git_snapshot(repository)
         unresolved = store.effects_with_statuses((EffectStatus.IN_PROGRESS, EffectStatus.AMBIGUOUS))
-        unresolved_turns = store.turn_activities((TurnActivityStatus.IN_PROGRESS, TurnActivityStatus.RECONCILIATION_REQUIRED))
+        unresolved_turns = store.turn_activities((TurnActivityStatus.IN_PROGRESS, TurnActivityStatus.RECONCILIATION_REQUIRED)) + store.completed_structured_turns_without_result()
         current = store.load_runtime()
         gate_ok = current is not None and (current.gate_id is None or (store.load_gate(current.gate_id) is not None and store.load_gate_external(current.gate_id) is not None))
         effective_state = current.previous_recoverable_state if current is not None and current.current_state in {OrchestratorState.PAUSED_RATE_LIMIT, OrchestratorState.PAUSED_MODEL_UNAVAILABLE, OrchestratorState.PAUSED_INFRASTRUCTURE} else current.current_state if current is not None else None
@@ -351,7 +376,7 @@ def _service_tick(
                         TurnActivityStatus.IN_PROGRESS,
                         TurnActivityStatus.RECONCILIATION_REQUIRED,
                     )
-                )
+                ) + store.completed_structured_turns_without_result()
                 if unresolved_turns:
                     persist_unresolved_turn_pause(store, engine, unresolved_turns)
                 else:

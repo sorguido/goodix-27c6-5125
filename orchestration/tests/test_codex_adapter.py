@@ -16,7 +16,11 @@ from goodix_orchestrator.codex_adapter import (
     TurnResult,
     classify_server_message,
 )
-from goodix_orchestrator.persistence import SQLiteStateStore, TurnActivityStatus
+from goodix_orchestrator.persistence import (
+    SQLiteStateStore,
+    TurnActivityStatus,
+    UnsafePersistenceDataError,
+)
 from goodix_orchestrator.protocols import ProtocolValidationError
 from goodix_orchestrator.structured_output import (
     ExecutionClass,
@@ -173,6 +177,69 @@ class CodexAdapterTests(unittest.TestCase):
         self.assertIn("VALIDATION_FAILURE_CODE=MISSING_FIELD", repair_prompt)
         self.assertNotIn("VALIDATION_FAILURE_DETAIL", repair_prompt)
         self.assertNotIn("SECRET_SENTINEL", repair_prompt)
+
+    def test_structured_completion_is_one_atomic_durable_record(self) -> None:
+        adapter = self.adapter(store=True)
+        with adapter:
+            context = adapter.start_thread(ModelRouter.review(), self.root)
+            result = adapter.run_structured_turn(
+                context,
+                "fixture",
+                output_schema={"type": "object"},
+                validator=lambda payload: payload,
+                dispatch_id="DISPATCH-ATOMIC",
+            )
+            self.assertEqual(result, {"ok": True})
+            activity = adapter.store.turn_activities()[0]
+            self.assertEqual(activity.status, TurnActivityStatus.COMPLETED)
+            self.assertEqual(
+                adapter.store.load_logical_turn_result("DISPATCH-ATOMIC"),
+                ("DISPATCH-ATOMIC-R0", {"ok": True}),
+            )
+            self.assertEqual(len(adapter.store.list_dispatches()), 1)
+            self.assertEqual(
+                adapter.store.completed_structured_turns_without_result(), ()
+            )
+
+    def test_crash_after_terminal_observation_fails_closed_without_redispatch(self) -> None:
+        turn_log = self.root / "turn-count.json"
+        adapter = self.adapter("count-turns", store=True, extra=(str(turn_log),))
+        with adapter:
+            context = adapter.start_thread(ModelRouter.review(), self.root)
+            with patch.object(
+                adapter.store,
+                "complete_structured_turn",
+                side_effect=RuntimeError("synthetic crash before durable result"),
+            ), self.assertRaisesRegex(RuntimeError, "synthetic crash"):
+                adapter.run_structured_turn(
+                    context,
+                    "fixture",
+                    output_schema={"type": "object"},
+                    validator=lambda payload: payload,
+                    dispatch_id="DISPATCH-TERMINAL-CRASH",
+                )
+            activity = adapter.store.turn_activities()[0]
+            self.assertEqual(activity.status, TurnActivityStatus.IN_PROGRESS)
+            self.assertIsNotNone(activity.turn_id)
+            self.assertEqual(adapter.store.list_dispatches(), ())
+            self.assertEqual(
+                adapter.store.completed_structured_turns_without_result(), ()
+            )
+
+        restarted = self.adapter("count-turns", store=True, extra=(str(turn_log),))
+        with restarted:
+            context = restarted.start_thread(ModelRouter.review(), self.root)
+            with self.assertRaises(UnsafePersistenceDataError):
+                restarted.run_structured_turn(
+                    context,
+                    "must not redispatch",
+                    output_schema={"type": "object"},
+                    validator=lambda payload: payload,
+                    dispatch_id="DISPATCH-TERMINAL-CRASH",
+                )
+        self.assertEqual(
+            json.loads(turn_log.read_text(encoding="utf-8"))["turn_count"], 1
+        )
 
     def test_api_key_and_unknown_auth_are_denied_without_email_output(self) -> None:
         for scenario in ("api-key", "unknown-auth"):

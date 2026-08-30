@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from dataclasses import replace
@@ -9,12 +11,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 from goodix_orchestrator.branch_lifecycle import BranchLifecycle
-from goodix_orchestrator.cli import _service_tick
+from goodix_orchestrator.cli import _recover_service_engine, _service_tick
 from goodix_orchestrator.codex_adapter import AdapterError
 from goodix_orchestrator.coordinator import CoordinatorPhase, ProductionCoordinator
 from goodix_orchestrator.engine import DeterministicEngine
 from goodix_orchestrator.gate_adapter import GateAction, GitHubIssue, HumanGateAdapter
-from goodix_orchestrator.persistence import EffectStatus, SQLiteStateStore
+from goodix_orchestrator.persistence import EffectKind, EffectStatus, SQLiteStateStore
 from goodix_orchestrator.policy import Capability, CapabilityPolicy
 from goodix_orchestrator.protocols import (
     CanonicalDocumentation,
@@ -121,7 +123,7 @@ class FakeDriver:
             return self.results[dispatch_id]
         self.review_calls += 1
         task_id = evidence["task_manifest"]["task_id"]
-        if self.review_calls == 1:
+        if dispatch_id.endswith("-0001"):
             output = PMReviewOutput(
                 PMDisposition(
                     PROTOCOL_VERSION,
@@ -220,6 +222,124 @@ class GateDriver(FakeDriver):
         return output
 
 
+class DurableFakeDriver(FakeDriver):
+    """File-backed stand-in for durable Codex structured-result reuse."""
+
+    def __init__(self, ledger_path: Path) -> None:
+        super().__init__()
+        self.ledger_path = ledger_path
+
+    def _ledger(self):
+        if not self.ledger_path.exists():
+            return {"remote_dispatches": {}}
+        return json.loads(self.ledger_path.read_text(encoding="utf-8"))
+
+    def _save(self, data):
+        temporary = self.ledger_path.with_suffix(".tmp")
+        temporary.write_text(
+            json.dumps(data, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        temporary.replace(self.ledger_path)
+
+    def _cached(self, kind, dispatch_id, parser):
+        record = self._ledger()["remote_dispatches"].get(dispatch_id)
+        if record is None:
+            return None
+        if record["kind"] != kind:
+            raise AssertionError(f"dispatch kind changed: {dispatch_id}")
+        return parser(record["payload"])
+
+    def _persist(self, kind, dispatch_id, output):
+        data = self._ledger()
+        if dispatch_id in data["remote_dispatches"]:
+            raise AssertionError(f"duplicate remote project turn: {dispatch_id}")
+        data["remote_dispatches"][dispatch_id] = {
+            "kind": kind,
+            "payload": output.to_dict(),
+        }
+        self._save(data)
+        return output
+
+    def plan(self, facts, planning_class, *, dispatch_id):
+        cached = self._cached("plan", dispatch_id, PMPlanningOutput.from_dict)
+        if cached is not None:
+            return cached
+        return self._persist(
+            "plan",
+            dispatch_id,
+            super().plan(facts, planning_class, dispatch_id=dispatch_id),
+        )
+
+    def execute(
+        self, plan, worktree, execution_class, *, corrective, dispatch_id
+    ):
+        cached = self._cached("execute", dispatch_id, ExecutorWorkReport.from_dict)
+        if cached is not None:
+            return cached
+        return self._persist(
+            "execute",
+            dispatch_id,
+            super().execute(
+                plan,
+                worktree,
+                execution_class,
+                corrective=corrective,
+                dispatch_id=dispatch_id,
+            ),
+        )
+
+    def _new_review(self, evidence, dispatch_id):
+        return super().review(evidence, dispatch_id=dispatch_id)
+
+    def review(self, evidence, *, dispatch_id):
+        cached = self._cached("review", dispatch_id, PMReviewOutput.from_dict)
+        if cached is not None:
+            return cached
+        return self._persist(
+            "review", dispatch_id, self._new_review(evidence, dispatch_id)
+        )
+
+
+class DurableGateDriver(DurableFakeDriver):
+    def _new_review(self, evidence, dispatch_id):
+        return GateDriver.review(self, evidence, dispatch_id=dispatch_id)
+
+
+class DurableFailingDriver(DurableFakeDriver):
+    failure_method = ""
+    failure_code = ""
+
+    def _fail_once(self, method):
+        if method != self.failure_method:
+            return
+        data = self._ledger()
+        failures = data.setdefault("injected_failures", [])
+        if method in failures:
+            return
+        failures.append(method)
+        self._save(data)
+        raise AdapterError(self.failure_code, "synthetic durable availability failure")
+
+    def plan(self, *args, **kwargs):
+        self._fail_once("plan")
+        return super().plan(*args, **kwargs)
+
+    def execute(self, *args, **kwargs):
+        self._fail_once("execute")
+        return super().execute(*args, **kwargs)
+
+
+class DurableRateLimitDriver(DurableFailingDriver):
+    failure_method = "plan"
+    failure_code = "PAUSED_RATE_LIMIT"
+
+
+class DurableModelUnavailableDriver(DurableFailingDriver):
+    failure_method = "execute"
+    failure_code = "PAUSED_MODEL_UNAVAILABLE"
+
+
 class FakeGateTransport:
     def __init__(self):
         self.issue = None
@@ -240,6 +360,59 @@ class FakeGateTransport:
         return ()
 
 
+class PersistentGateTransport:
+    def __init__(self, state_path: Path):
+        self.state_path = state_path
+
+    def _load(self):
+        if not self.state_path.exists():
+            return {"create_count": 0, "issue": None}
+        return json.loads(self.state_path.read_text(encoding="utf-8"))
+
+    def _save(self, value):
+        self.state_path.write_text(
+            json.dumps(value, sort_keys=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _issue(value):
+        return None if value is None else GitHubIssue(**value)
+
+    @property
+    def create_count(self):
+        return int(self._load()["create_count"])
+
+    def find_gate_issue(self, repository, marker):
+        issue = self._issue(self._load()["issue"])
+        return issue if issue is not None and marker in issue.body else None
+
+    def create_issue(self, repository, title, body):
+        data = self._load()
+        data["create_count"] += 1
+        issue = GitHubIssue(repository, 1, "ISSUE_NODE_1", title, body)
+        data["issue"] = {
+            "repository": issue.repository,
+            "number": issue.number,
+            "node_id": issue.node_id,
+            "title": issue.title,
+            "body": issue.body,
+        }
+        self._save(data)
+        return issue
+
+    def read_issue(self, repository, number):
+        return self._issue(self._load()["issue"])
+
+    def list_comments(self, repository, number):
+        return ()
+
+
+class CrashBeforeGateEffect:
+    def create_or_reconcile(self, *args, **kwargs):
+        raise RuntimeError("synthetic crash before GitHub issue effect")
+
+
 class UnusedGateAdapter:
     def create_or_reconcile(self, *args, **kwargs):
         raise AssertionError("gate adapter unexpectedly used")
@@ -250,6 +423,7 @@ class O003CoordinatorTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         root = Path(self.temp.name)
+        self.root = root
         self.remote = root / "remote.git"
         subprocess.run(("git", "init", "--bare", str(self.remote)), check=True, stdout=subprocess.DEVNULL)
         self.repo = root / "repo"
@@ -262,22 +436,27 @@ class O003CoordinatorTests(unittest.TestCase):
         git(self.repo, "remote", "add", "origin", str(self.remote))
         git(self.repo, "push", "-u", "origin", "main")
         self.main = git(self.repo, "rev-parse", "main")
-        self.store = SQLiteStateStore(root / "state" / "state.sqlite")
+        self.state_path = root / "state" / "state.sqlite"
+        self.worktree_root = root / "xdg-worktrees"
+        self.ledger_path = root / "durable-driver.json"
+        self.gate_transport_path = root / "gate-transport.json"
+        self.store = SQLiteStateStore(self.state_path)
+        self.policy = CapabilityPolicy(
+            (
+                Capability.HOST_READ,
+                Capability.WORKTREE_WRITE,
+                Capability.TASK_COMMIT,
+                Capability.INTEGRATION_FF,
+                Capability.CODEX_APP_SERVER,
+            )
+        )
         self.engine = DeterministicEngine.create(
             self.store,
-            CapabilityPolicy(
-                (
-                    Capability.HOST_READ,
-                    Capability.WORKTREE_WRITE,
-                    Capability.TASK_COMMIT,
-                    Capability.INTEGRATION_FF,
-                    Capability.CODEX_APP_SERVER,
-                )
-            ),
+            self.policy,
             run_id="ORCH-O003-COORD",
         )
         self.lifecycle = BranchLifecycle(
-            self.repo, self.store, worktree_root=root / "xdg-worktrees"
+            self.repo, self.store, worktree_root=self.worktree_root
         )
         self.lifecycle.initialize_development(
             self.main, effect_id="EFFECT-DEVELOPMENT-INIT"
@@ -289,6 +468,66 @@ class O003CoordinatorTests(unittest.TestCase):
             driver=self.driver,
             gate_adapter=UnusedGateAdapter(),
         )
+
+    def _gate_adapter(self, store, transport=None):
+        return HumanGateAdapter(
+            store,
+            transport or PersistentGateTransport(self.gate_transport_path),
+            repository="owner/private",
+            authorized_user_id=1,
+            authorized_login="authority",
+        )
+
+    def _restart_runtime(
+        self,
+        driver_class=DurableFakeDriver,
+        *,
+        before_checkpoint=None,
+        transport=None,
+    ):
+        try:
+            self.coordinator.driver.close()
+        except Exception:
+            pass
+        old_objects = (
+            self.store,
+            self.engine,
+            self.lifecycle,
+            self.coordinator.driver,
+            self.coordinator,
+        )
+        self.coordinator = None
+        self.lifecycle = None
+        self.engine = None
+        self.store = None
+        reopened = SQLiteStateStore(self.state_path)
+        reopened.initialize()
+        adapter = self._gate_adapter(reopened, transport)
+        engine = _recover_service_engine(reopened, adapter, self.policy)
+        self.store = engine.store
+        self.engine = engine
+        self.lifecycle = BranchLifecycle(
+            self.repo, self.store, worktree_root=self.worktree_root
+        )
+        self.driver = driver_class(self.ledger_path)
+        self.coordinator = ProductionCoordinator(
+            engine=self.engine,
+            lifecycle=self.lifecycle,
+            driver=self.driver,
+            gate_adapter=adapter,
+            before_checkpoint=before_checkpoint,
+        )
+        new_objects = (
+            self.store,
+            self.engine,
+            self.lifecycle,
+            self.driver,
+            self.coordinator,
+        )
+        self.assertTrue(
+            all(old is not new for old, new in zip(old_objects, new_objects))
+        )
+        return self.coordinator
 
     def test_service_loop_corrective_accept_ff_cleanup_done(self):
         for _ in range(64):
@@ -352,6 +591,221 @@ class O003CoordinatorTests(unittest.TestCase):
         self.assertEqual(self.driver.review_calls, 2)
         effects = self.store.effects_with_statuses(tuple(EffectStatus))
         self.assertEqual(len({item.effect_id for item in effects}), len(effects))
+
+    def test_true_store_engine_restart_covers_durable_phase_boundaries(self):
+        crash_targets = {
+            CoordinatorPhase.PLAN_COMPLETED,
+            CoordinatorPhase.TASK_PREPARED,
+            CoordinatorPhase.WORKTREE_READY,
+            CoordinatorPhase.EXECUTOR_REPORT_PERSISTED,
+            CoordinatorPhase.COMMIT_PENDING,
+            CoordinatorPhase.COMMITTED,
+            CoordinatorPhase.PUSH_PENDING,
+            CoordinatorPhase.PUSHED,
+            CoordinatorPhase.EXECUTOR_RESULT_PERSISTED,
+            CoordinatorPhase.REVIEW_COMPLETED,
+            CoordinatorPhase.ACCEPT_FF_PENDING,
+            CoordinatorPhase.ACCEPT_FF_VERIFIED,
+            CoordinatorPhase.CLEANUP_PENDING,
+            CoordinatorPhase.CLEANUP_VERIFIED,
+        }
+        crashed = set()
+
+        def crash_once(phase, checkpoint):
+            if phase in crash_targets and phase not in crashed:
+                crashed.add(phase)
+                raise RuntimeError(f"synthetic process crash before {phase.value}")
+
+        self.driver = DurableFakeDriver(self.ledger_path)
+        self.coordinator = ProductionCoordinator(
+            engine=self.engine,
+            lifecycle=self.lifecycle,
+            driver=self.driver,
+            gate_adapter=self._gate_adapter(self.store),
+            before_checkpoint=crash_once,
+        )
+        for _ in range(512):
+            try:
+                self.coordinator.tick()
+            except RuntimeError:
+                local_tasks = tuple(
+                    line
+                    for line in git(
+                        self.repo, "branch", "--list", "task/*"
+                    ).splitlines()
+                    if line.strip()
+                )
+                self.assertLessEqual(len(local_tasks), 1)
+                self._restart_runtime(
+                    DurableFakeDriver, before_checkpoint=crash_once
+                )
+            if self.engine.state is OrchestratorState.DONE:
+                break
+
+        self.assertEqual(crashed, crash_targets)
+        self.assertEqual(self.engine.state, OrchestratorState.DONE)
+        self.assertEqual(self.engine.runtime.run_id, "ORCH-O003-COORD")
+        self.assertEqual(self.engine.runtime.task_id, "TASK-O003-COORD-001")
+        self.assertEqual(git(self.repo, "rev-parse", "main"), self.main)
+        self.assertEqual(git(self.repo, "branch", "--list", "task/*"), "")
+        self.assertEqual(self.store.load_git_state().cleanup_status, "PASS")
+
+        remote_dispatches = self.ledger_path.exists() and json.loads(
+            self.ledger_path.read_text(encoding="utf-8")
+        )["remote_dispatches"]
+        kinds = [item["kind"] for item in remote_dispatches.values()]
+        self.assertEqual(kinds.count("plan"), 1)
+        self.assertEqual(kinds.count("execute"), 2)
+        self.assertEqual(kinds.count("review"), 2)
+        self.assertEqual(len(remote_dispatches), 5)
+
+        effects = self.store.effects_with_statuses(tuple(EffectStatus))
+        self.assertEqual(len({item.effect_id for item in effects}), len(effects))
+        kind_counts = {
+            kind: sum(item.kind is kind for item in effects) for kind in EffectKind
+        }
+        self.assertEqual(kind_counts[EffectKind.BRANCH_CREATE], 1)
+        self.assertEqual(kind_counts[EffectKind.COMMIT], 2)
+        self.assertEqual(kind_counts[EffectKind.PUSH], 2)
+        self.assertEqual(kind_counts[EffectKind.INTEGRATION_FF], 1)
+        self.assertEqual(kind_counts[EffectKind.TASK_WORKTREE_REMOVE], 1)
+        self.assertEqual(kind_counts[EffectKind.TASK_LOCAL_BRANCH_DELETE], 1)
+        self.assertEqual(kind_counts[EffectKind.TASK_REMOTE_BRANCH_DELETE], 1)
+
+    def test_subprocess_service_restart_uses_production_startup_path(self):
+        state_path = self.root / "subprocess-state" / "state.sqlite"
+        worker = Path(__file__).parent / "fixtures" / "service_restart_worker.py"
+        observed = []
+        for _ in range(96):
+            completed = subprocess.run(
+                (sys.executable, str(worker), str(self.repo), str(state_path)),
+                cwd=Path(__file__).parents[1],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            self.assertEqual(
+                completed.returncode,
+                0,
+                f"stdout={completed.stdout}\nstderr={completed.stderr}",
+            )
+            result = json.loads(completed.stdout)
+            observed.append(result)
+            local_tasks = tuple(
+                line
+                for line in git(self.repo, "branch", "--list", "task/*").splitlines()
+                if line.strip()
+            )
+            self.assertLessEqual(len(local_tasks), 1)
+            if result["state"] == OrchestratorState.DONE.value:
+                break
+
+        self.assertEqual(observed[-1]["state"], OrchestratorState.DONE.value)
+        self.assertGreater(len({item["pid"] for item in observed}), 1)
+        self.assertEqual(len({item["run_id"] for item in observed}), 1)
+        restarted = SQLiteStateStore(state_path)
+        restarted.initialize()
+        self.assertEqual(restarted.load_git_state().cleanup_status, "PASS")
+        self.assertEqual(git(self.repo, "rev-parse", "main"), self.main)
+        self.assertEqual(git(self.repo, "branch", "--list", "task/*"), "")
+
+    def test_gate_prebinding_restart_recovers_one_local_and_external_gate(self):
+        transport = PersistentGateTransport(self.gate_transport_path)
+        self.driver = DurableGateDriver(self.ledger_path)
+        self.coordinator = ProductionCoordinator(
+            engine=self.engine,
+            lifecycle=self.lifecycle,
+            driver=self.driver,
+            gate_adapter=self._gate_adapter(self.store, transport),
+        )
+        for _ in range(64):
+            self.coordinator.tick()
+            checkpoint = self.store.load_coordinator_state() or {}
+            if checkpoint.get("phase") == CoordinatorPhase.REVIEW_COMPLETED.value:
+                break
+        self.assertEqual(
+            self.store.load_coordinator_state()["phase"],
+            CoordinatorPhase.REVIEW_COMPLETED.value,
+        )
+        self.coordinator.tick()
+        self.assertEqual(
+            self.store.load_coordinator_state()["phase"],
+            CoordinatorPhase.GATE_BINDING_PENDING.value,
+        )
+        self.assertEqual(self.engine.state, OrchestratorState.PM_REVIEWING)
+
+        dispatches_before = len(
+            json.loads(self.ledger_path.read_text(encoding="utf-8"))[
+                "remote_dispatches"
+            ]
+        )
+        self.coordinator.gate_adapter = CrashBeforeGateEffect()
+        with self.assertRaisesRegex(RuntimeError, "before GitHub issue"):
+            self.coordinator.tick()
+        self.assertEqual(self.engine.state, OrchestratorState.HUMAN_GATE_WAIT)
+        self.assertEqual(
+            self.store.load_coordinator_state()["phase"],
+            CoordinatorPhase.GATE_BINDING_PENDING.value,
+        )
+        self.assertEqual(transport.create_count, 0)
+
+        self._restart_runtime(DurableGateDriver, transport=transport)
+        self.assertEqual(self.engine.state, OrchestratorState.HUMAN_GATE_WAIT)
+        self.coordinator.tick()
+        self.assertEqual(
+            self.store.load_coordinator_state()["phase"],
+            CoordinatorPhase.GATE_BOUND.value,
+        )
+        self.assertEqual(transport.create_count, 1)
+        self.assertEqual(
+            len(self.store.pending_gates_for_task("TASK-O003-COORD-001")), 1
+        )
+        self.assertIsNotNone(
+            self.store.load_gate_external("HG-O003-COORD-001")
+        )
+        dispatches_after = len(
+            json.loads(self.ledger_path.read_text(encoding="utf-8"))[
+                "remote_dispatches"
+            ]
+        )
+        self.assertEqual(dispatches_after - dispatches_before, 0)
+        self.assertEqual(git(self.repo, "rev-parse", "main"), self.main)
+
+    def _availability_restart(self, driver_class, paused_state):
+        self.driver = driver_class(self.ledger_path)
+        self.coordinator = ProductionCoordinator(
+            engine=self.engine,
+            lifecycle=self.lifecycle,
+            driver=self.driver,
+            gate_adapter=self._gate_adapter(self.store),
+        )
+        for _ in range(64):
+            self.coordinator.tick()
+            if self.engine.state is paused_state:
+                break
+        self.assertEqual(self.engine.state, paused_state)
+        self._restart_runtime(driver_class)
+        self.assertEqual(self.engine.state, paused_state)
+        self.engine.resume_pause()
+        for _ in range(160):
+            self.coordinator.tick()
+            if self.engine.state is OrchestratorState.DONE:
+                break
+        self.assertEqual(self.engine.state, OrchestratorState.DONE)
+        self.assertEqual(git(self.repo, "rev-parse", "main"), self.main)
+
+    def test_rate_limit_pause_survives_true_store_engine_restart(self):
+        self._availability_restart(
+            DurableRateLimitDriver, OrchestratorState.PAUSED_RATE_LIMIT
+        )
+
+    def test_model_unavailable_pause_survives_true_store_engine_restart(self):
+        self._availability_restart(
+            DurableModelUnavailableDriver,
+            OrchestratorState.PAUSED_MODEL_UNAVAILABLE,
+        )
 
     def _availability_failure(self, method, code, paused_state, failure_class):
         driver = FailingDriver(method, code)

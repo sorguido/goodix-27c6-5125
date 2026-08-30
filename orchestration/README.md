@@ -189,11 +189,17 @@ python -m goodix_orchestrator.service_qualification --real-codex \
   --state-dir <xdg-state-disposable>
 ```
 
-La suite deterministica copre anche crash dopo plan, Executor, review, FF,
-cleanup e creazione issue, con checkpoint di fase e identità logiche di
-dispatch persistite. Un risultato strutturato completato viene conservato in
-forma bounded per impedire un secondo turno dopo crash. Gli effetti Git/GitHub
-distinguono `NO_EFFECT`, `COMPLETED` e stato ambiguo prima del retry.
+La suite deterministica distingue il precedente test di coordinator re-entry
+dal vero restart: riapre SQLite, usa lo startup/recovery di `service-run`,
+ricrea engine, lifecycle, driver e coordinator e attraversa i checkpoint di
+plan, worktree, Executor, commit/push, review, FF, cleanup, gate e pause. Una
+seconda qualifica completa il ciclo avviando un processo distinto per ogni
+tick. Il risultato strutturato validato, il dispatch verificato e
+`COMPLETED` sono committati atomicamente; un crash subito prima del commit
+resta fail-closed e non avvia un secondo turno. Il pre-binding del gate salva
+`GATE_BINDING_PENDING` prima della transizione locale e riconcilia una sola
+issue. Gli effetti Git/GitHub distinguono `NO_EFFECT`, `COMPLETED` e stato
+ambiguo prima del retry.
 
 Il loop production completo su repository
 disposable: PM plan, task/worktree/commit/push, review, `CORRECTIVE` sullo stesso

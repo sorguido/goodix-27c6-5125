@@ -312,6 +312,10 @@ Il formato canonico O003 è SQLite locale singolo-file schema v6 sotto XDG. Deve
   Executor, review, accept/cleanup e gate senza inventare esiti;
 - identità logiche di dispatch persistite prima di ogni turno e risultato
   strutturato bounded persistito prima del relativo checkpoint;
+- per ogni turno strutturato di progetto, `COMPLETED` implica che dispatch
+  verificato e JSON già validato siano durevoli nella stessa transazione; un
+  terminale remoto osservato ma non ancora committato resta irrisolto e blocca
+  il redispatch in `PAUSED_INFRASTRUCTURE`/reconciliation;
 - checkpoint pre-effetto e riconciliazione three-way: exact pre-state =
   `NO_EFFECT` e retry, exact post-state = `COMPLETED`, ogni altro stato =
   ambiguo e fail-closed.
@@ -332,6 +336,9 @@ Responsabilità:
 - impedire replay.
 - legare repository, issue node/number/body digest, identità numerica/login, task, gate, commit/ref, action ID e action digest;
 - riconciliare crash issue-create e decision-consume senza doppio effetto.
+- salvare `GATE_BINDING_PENDING` prima di applicare la transizione locale
+  `HUMAN_GATE`; al restart continuare sia da `PM_REVIEWING` sia da
+  `HUMAN_GATE_WAIT`, rifiutando ogni altro stato.
 
 ### 6.7 Structured Logger
 
@@ -813,6 +820,13 @@ AMBIGUOUS
 
 `AMBIGUOUS` -> `ERROR_LOCKED`.
 
+La qualifica di recovery distingue obbligatoriamente: re-entry con il solo
+coordinator ricreato; vero restart con nuovo store/engine/lifecycle/driver e
+`DeterministicEngine.recover()`; restart di processi distinti che attraversano
+lo stesso helper di startup di `service-run`. Solo le ultime due classi provano
+restart del runtime/store, e i contatori mutabili di un fake non sono autorità
+di recovery.
+
 ### 16.1 Servizio e operator control
 
 Il runtime è local-first: `PC_OFF => ORCHESTRATION_OFF`. L'unità `systemd --user` è una risorsa del package installabile anche da wheel non-editable; l'installer genera un drop-in locale dai path canonici verificati. Il sandbox rende il repository read-only salvo Git common-dir, state/config/worktree XDG necessari al lifecycle, usa single-instance lock, `KillMode=control-group` e shutdown SIGTERM, e non contiene credenziali o path repository hard-coded nella risorsa distribuita. `status`, `pause`, `resume`, `stop`, `emergency-stop`, clear esplicito del latch e maintenance enter/exit sono superfici locali deterministiche.
@@ -1021,6 +1035,12 @@ Dopo approvazione/merge di questa SPEC, la costruzione dovrebbe essere suddivisa
 - loop production PM -> task reale -> Executor -> PM review collegato al tick ordinario;
 - turn ledger autorevole, resume con riconciliazione e route probe tramite turno esatto;
 - unità installabile da package e sandbox Git/XDG compatibile con il lifecycle.
+- persistenza atomica del risultato strutturato con crash tra terminale remoto
+  e commit locale qualificato fail-closed senza secondo turno;
+- true store/engine restart su tutti i checkpoint del coordinatore e qualifica
+  subprocess dello startup path production;
+- pre-binding Human Gate restart-safe con una sola transizione locale e una
+  sola issue esterna.
 
 ### O004 — Real-repo low-risk qualification
 
