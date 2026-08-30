@@ -362,8 +362,6 @@ class SQLiteStateStore:
                     raise StoreCorruptionError(
                         f"unexpected schema tables: expected {sorted(self._REQUIRED_TABLES)}, got {sorted(tables)}"
                     )
-                elif self._read_schema_version(connection) == 1:
-                    self._migrate_v1_to_v2(connection)
                 self._validate_schema(connection)
                 for row in connection.execute("SELECT * FROM effects"):
                     self._effect_from_row(row)
@@ -431,24 +429,6 @@ class SQLiteStateStore:
             return int(row[0])
         except (TypeError, ValueError, IndexError) as exc:
             raise StoreCorruptionError("missing or malformed schema_version") from exc
-
-    def _migrate_v1_to_v2(self, connection: sqlite3.Connection) -> None:
-        columns = {
-            row[1]
-            for row in connection.execute("PRAGMA table_info(runtime_state)")
-        }
-        if "expected_next_task_id" in columns or "task_envelope_json" in columns:
-            raise StoreCorruptionError("partial v1 to v2 runtime migration")
-        connection.execute(
-            "ALTER TABLE runtime_state ADD COLUMN expected_next_task_id TEXT"
-        )
-        connection.execute(
-            "ALTER TABLE runtime_state ADD COLUMN task_envelope_json TEXT"
-        )
-        connection.execute(
-            "UPDATE metadata SET value = ? WHERE key = 'schema_version'",
-            (str(SCHEMA_VERSION),),
-        )
 
     def _validate_schema(self, connection: sqlite3.Connection) -> None:
         metadata = dict(connection.execute("SELECT key, value FROM metadata"))

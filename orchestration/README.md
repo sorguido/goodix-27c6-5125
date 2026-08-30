@@ -10,8 +10,10 @@ It contains no Codex App Server, Git/GitHub, shell, network, USB, privileged,
 protected-material, or live-runner adapter. Effect records are data only and
 cannot execute an external action.
 
-The persisted schema is versioned and migrates O001 schema v1 to v2 without
-discarding runtime state. Engine creation is fresh-store-only; every existing
+The persisted state schema is versioned at v2. Legacy v1 stores are rejected
+as incompatible without modification: v1 cannot retain the expected-next task
+or immutable replan envelope, so arbitrary operational state cannot be
+reconstructed exactly. Engine creation is fresh-store-only; every existing
 store must enter through recovery. Task manifests structurally deny `main`,
 and persisted next-task/envelope metadata prevents identity or scope drift.
 

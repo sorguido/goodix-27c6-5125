@@ -33,12 +33,16 @@ reviewato `9610246e8dfc55afe21697850b1337e318e162a1`, è:
 ORCHESTRATION_BOOTSTRAP_FREEZE=true
 O001_DETERMINISTIC_CORE_IMPLEMENTED=true
 O001_AI_PM_FINDINGS_CORRECTED=true
+O001_LEGACY_SCHEMA_FAIL_CLOSED=true
 O001_DETERMINISTIC_CORE_TESTS=PASS
 O001_FAKE_AGENT_FLOWS=PASS
-O001_TEST_COUNT=62
+O001_TEST_COUNT=63
 O001_TEST_CWD=<git-root>/orchestration
 O001_TEST_COMMAND=python -W error::ResourceWarning -m unittest discover -s tests -v
-O001_DEDICATED_CI=PASS
+O001_STATE_SCHEMA_VERSION=2
+LEGACY_STATE_SCHEMA_V1_AUTO_MIGRATION=false
+LEGACY_STATE_SCHEMA_V1_POLICY=FAIL_CLOSED_INCOMPATIBLE
+O001_DEDICATED_CI=PENDING_MICRO_CORRECTIVE_RUN
 O001_DEDICATED_CI_EVIDENCE=GitHub Actions run 33297069984 on 23b3470633d0b1dff6b23902bb671ff08c22f3c6
 O001_LICENSE=GPL-2.0-or-later
 ORCHESTRATION_READY_FOR_GOODIX=false
@@ -55,9 +59,14 @@ assenti; persistenza e enforcement dell'esatto `expected_next_task_id` dopo
 `ACCEPT`; envelope operativo immutabile del task attraverso `REPLAN`, inclusi
 baseline, branch, modello, gate class, capability, scope, non-goal e obbligo di
 aggiornamento manuale; store SQLite single-file con schema/protocol versionati,
-migrazione transazionale v1→v2, revisioni compare-and-swap e fail-closed su
-corruzione o incompatibilità. `create()` opera solo su store privo di stato
-operativo, `recover()` è l'unico ingresso per stato già persistito e la
+revisioni compare-and-swap e fail-closed su corruzione o incompatibilità. Lo
+schema operativo nativo è v2; uno store legacy v1 viene respinto come
+`STORE_INCOMPATIBLE` senza modificarne metadata, colonne o runtime row. La v1
+non conserva `expected_next_task_id` né l'envelope immutabile del task e quindi
+un suo stato in-flight non è ricostruibile senza ipotesi. Poiché O001 non è
+ancora un servizio production deployed, non esiste un beneficio operativo che
+giustifichi una migrazione ambigua. `create()` opera solo su store privo di
+stato operativo, `recover()` è l'unico ingresso per stato già persistito e la
 costruzione diretta dell'engine è vietata.
 
 Il ledger puramente dichiarativo usa intenti tipizzati e allow-listed per
@@ -2667,7 +2676,7 @@ D232–D246. Il nuovo sviluppo post-D247 continua invece nei domini `core/`,
 
 | Area | Stato | Risultato |
 | --- | --- | --- |
-| Orchestrazione O001 | correttivo del core deterministico host-only implementato e 62 test PASS; CI dedicata PASS; bootstrap complessivo non pronto | `main` strutturalmente vietato, expected-next ed envelope REPLAN persistiti, create/recover separati, assertion Executor fail-closed, intenti tipizzati, `GATE_DENY` ristretto, schema v1→v2, SPDX/provenance; nessun adapter o side effect reale; freeze Goodix invariato |
+| Orchestrazione O001 | micro-correttivo legacy-schema implementato e 63 test PASS locali; CI dedicata in attesa della run sul nuovo commit; bootstrap complessivo non pronto | schema nativo v2 e v1 fail-closed senza modifica, `main` strutturalmente vietato, expected-next ed envelope REPLAN persistiti, create/recover separati, assertion Executor fail-closed, intenti tipizzati, `GATE_DENY` ristretto, SPDX/provenance; nessun adapter o side effect reale; freeze Goodix invariato |
 | Framing USB A0/B0 | confermato | endpoint, chunk da 64 byte, checksum e correlazione sono noti |
 | TLS 1.2 PSK | handshake completo verificato live in D245 | D241 aveva provato il server flight; D245 ha completato il handshake sul target e si è fermato prima di D4 |
 | Configurazione `0x80`/`0x90` | confermata per i path studiati | effetti volatili per quelle sole operazioni |
@@ -2873,8 +2882,11 @@ Goodix USB / root / secrets / live = UNAVAILABLE BY SCOPE
 
 `engine.py` accetta soltanto oggetti già validati e traduce disposition in
 eventi espliciti; l'entrypoint `create()` è fresh-store-only e `recover()` è
-l'unico percorso ammesso per stato persistito. `state.py` è l'unica tabella
-delle transizioni; `policy.py` non deriva capability da testo e vieta
+l'unico percorso ammesso per stato persistito. Uno store schema v1 non viene
+migrato: recovery restituisce `ERROR_LOCKED/STORE_INCOMPATIBLE` lasciando il
+file invariato, perché i vincoli expected-next ed envelope non sono
+ricostruibili esattamente. `state.py` è l'unica tabella delle transizioni;
+`policy.py` non deriva capability da testo e vieta
 strutturalmente i branch protetti; `protocols.py` materializza anche l'envelope
 immutabile del task. `persistence.py` conserva soltanto metadati operativi
 ammessi e intenti tipizzati con schema esatto per ciascun `EffectKind`,

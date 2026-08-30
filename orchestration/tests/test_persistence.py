@@ -12,6 +12,7 @@ from goodix_orchestrator.persistence import (
     RuntimeRecord,
     SQLiteStateStore,
     StoreCorruptionError,
+    StoreIncompatibleError,
 )
 from goodix_orchestrator.policy import Capability, CapabilityPolicy
 from goodix_orchestrator.state import OrchestratorState
@@ -133,9 +134,16 @@ class PersistenceTests(unittest.TestCase):
         with self.assertRaises(StoreCorruptionError):
             self.store.load_runtime()
 
-    def test_v1_store_migrates_transactionally_without_losing_runtime(self) -> None:
-        legacy_path = Path(self.temp.name) / "legacy-v1.sqlite3"
-        connection = sqlite3.connect(legacy_path)
+    def create_legacy_v1(
+        self,
+        path: Path,
+        *,
+        state: str,
+        task_id: str | None = None,
+        baseline_sha: str | None = None,
+        result_sha: str | None = None,
+    ) -> None:
+        connection = sqlite3.connect(path)
         connection.executescript(
             """
             CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -154,10 +162,6 @@ class PersistenceTests(unittest.TestCase):
                 protocol_version TEXT NOT NULL,
                 revision INTEGER NOT NULL
             );
-            INSERT INTO runtime_state VALUES (
-                1, 'BOOTSTRAP', NULL, 'ORCH-20260830-009', NULL, NULL,
-                NULL, NULL, NULL, '1.0', 0
-            );
             CREATE TABLE effects (
                 effect_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
                 kind TEXT NOT NULL, status TEXT NOT NULL, intent_json TEXT NOT NULL,
@@ -170,16 +174,75 @@ class PersistenceTests(unittest.TestCase):
             );
             """
         )
+        connection.execute(
+            """INSERT INTO runtime_state VALUES (
+                   1, ?, NULL, 'ORCH-20260830-009', ?, NULL,
+                   NULL, ?, ?, '1.0', 0
+               )""",
+            (state, task_id, baseline_sha, result_sha),
+        )
         connection.commit()
         connection.close()
 
-        legacy = SQLiteStateStore(legacy_path)
-        legacy.initialize()
-        self.assertEqual(legacy.raw_metadata()["schema_version"], "2")
-        runtime = legacy.load_runtime()
-        self.assertEqual(runtime.run_id, "ORCH-20260830-009")
-        self.assertIsNone(runtime.expected_next_task_id)
-        self.assertIsNone(runtime.task_envelope)
+    @staticmethod
+    def legacy_snapshot(path: Path) -> tuple[tuple, tuple, tuple[str, ...]]:
+        connection = sqlite3.connect(path)
+        metadata = tuple(
+            connection.execute("SELECT key, value FROM metadata ORDER BY key")
+        )
+        runtime = connection.execute("SELECT * FROM runtime_state").fetchone()
+        columns = tuple(
+            row[1] for row in connection.execute("PRAGMA table_info(runtime_state)")
+        )
+        connection.close()
+        return metadata, runtime, columns
+
+    def test_v1_bootstrap_is_incompatible_and_remains_unmodified(self) -> None:
+        legacy_path = Path(self.temp.name) / "legacy-bootstrap-v1.sqlite3"
+        self.create_legacy_v1(legacy_path, state="BOOTSTRAP")
+        before = self.legacy_snapshot(legacy_path)
+        before_bytes = legacy_path.read_bytes()
+
+        with self.assertRaises(StoreIncompatibleError):
+            SQLiteStateStore(legacy_path).initialize()
+        recovered = DeterministicEngine.recover(
+            legacy_path,
+            CapabilityPolicy(),
+            expected_run_id="ORCH-20260830-009",
+        )
+
+        self.assertEqual(recovered.state, OrchestratorState.ERROR_LOCKED)
+        self.assertEqual(recovered.error_code, "STORE_INCOMPATIBLE")
+        self.assertIsNone(recovered.engine)
+        self.assertEqual(self.legacy_snapshot(legacy_path), before)
+        self.assertEqual(legacy_path.read_bytes(), before_bytes)
+        self.assertEqual(dict(before[0])["schema_version"], "1")
+        self.assertNotIn("expected_next_task_id", before[2])
+        self.assertNotIn("task_envelope_json", before[2])
+
+    def test_v1_in_flight_state_is_incompatible_and_remains_unmodified(self) -> None:
+        legacy_path = Path(self.temp.name) / "legacy-in-flight-v1.sqlite3"
+        self.create_legacy_v1(
+            legacy_path,
+            state="PM_PLANNING",
+            task_id="TASK-LEGACY",
+            baseline_sha="a" * 40,
+            result_sha="b" * 40,
+        )
+        before = self.legacy_snapshot(legacy_path)
+        before_bytes = legacy_path.read_bytes()
+
+        recovered = DeterministicEngine.recover(
+            legacy_path,
+            CapabilityPolicy(),
+            expected_run_id="ORCH-20260830-009",
+        )
+
+        self.assertEqual(recovered.state, OrchestratorState.ERROR_LOCKED)
+        self.assertEqual(recovered.error_code, "STORE_INCOMPATIBLE")
+        self.assertIsNone(recovered.engine)
+        self.assertEqual(self.legacy_snapshot(legacy_path), before)
+        self.assertEqual(legacy_path.read_bytes(), before_bytes)
 
 
 if __name__ == "__main__":
