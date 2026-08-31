@@ -405,9 +405,25 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
 
   g_assert (ctx != NULL);
   g_assert (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
-            ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
+            ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVE ||
+            ctx->state == GOODIX_DEVICE_CONTEXT_STATE_POISONED);
 
   g_autoptr(GError) error = NULL;
+
+  /* A non-quiescent terminal poisons the complete open epoch.  Re-entry is
+   * forbidden until img_close destroys the context; activation must not clear
+   * the fence, allocate a generation or reach either backend while poisoned. */
+  if (ctx->poisoned)
+    {
+      if (ctx->terminal_error != NULL)
+        error = g_error_copy (ctx->terminal_error);
+      else
+        error = g_error_new_literal (
+          FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+          "Goodix protocol session is poisoned until device close");
+      fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+      return;
+    }
 
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;
@@ -416,7 +432,6 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   ctx->fresh_down_table = FALSE;
   ctx->rearm_issued_generation = 0;
   ctx->terminal_fence = FALSE;
-  ctx->poisoned = FALSE;
   ctx->activation_completed = FALSE;
   g_clear_object (&ctx->activation_cancellable);
   ctx->activation_cancellable = g_object_ref (

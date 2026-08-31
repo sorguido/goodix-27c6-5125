@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-audit D278/04 riconciliato con la seconda single-shot — gap di re-entry cross-session provato e fenomeno osservato sul target, identità causale non provata; nessuna live autorizzata
+### Stato corrente post-D278/05 — causal cut pre-OUT chiuso offline e poison dell'open epoch reso sticky; recovery OEM pre-D1 irrisolta, nessuna live autorizzata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -276,7 +276,17 @@ SAFE_READ_ONLY_RESYNC_DESIGN=NOT_IMPLEMENTED_DESIGN_REVIEW_REQUIRED
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_04_POST_SECOND_LIVE_EVIDENCE_THEN_DESIGN_REVIEW_OF_BOUNDED_READ_ONLY_CROSS_SESSION_REENTRY_DISCRIMINATION
+D278_05_OUTCOME=READY
+D278_05_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+POST_A8_WIRE_CAUSAL_PROVENANCE=UNAVAILABLE
+PRECOMMAND_FRAME_EXCLUDES_CURRENT_HOST_COMMAND_CAUSATION=true
+PRECOMMAND_FRAME_PREVIOUS_SESSION_IDENTITY=UNPROVEN
+OEM_PRE_D1_FAILURE_RECOVERY=UNRESOLVED
+POISON_AFTER_NONQUIESCENT_TERMINAL_MUST_BE_STICKY=true
+AUTOMATIC_REENTRY_FROM_POISONED=false
+FUTURE_ZERO_OUT_PRECOMMAND_DIAGNOSTIC=JUSTIFIED_FOR_SEPARATE_REVIEW
+ZERO_OUT_DIAGNOSTIC_IMPLEMENTED=false
+NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_05_THEN_SEPARATE_DECISION_ON_ZERO_OUT_PRECOMMAND_DIAGNOSTIC
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -1090,16 +1100,100 @@ NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_04_POST_SECOND_LIVE_EVIDENCE_THEN_DES
 Non è giustificato né implementato alcun pre-A8 blind read, discard-until-A8,
 timeout-drain, clear-halt, reset, reopen, retry o parser permissivo: un frame
 inatteso resta evidenza finché non esiste un discriminante sicuro, e la seconda
-run lo dimostra proprio conservandolo fail-closed invece di scartarlo. Il lavoro
-successivo non è più stabilire se il fenomeno esista sul target, ma una **design
-review** che decida se sia possibile una discriminazione read-only, bounded e
-fail-closed del primissimo IN di una nuova sessione, senza comandi aggiuntivi,
-senza reset/clear-halt/reopen/retry, senza allentare il parser e senza perdere
-evidenza valida; il design non è oggetto di questo aggiornamento e non è
-implementato. Nessuna nuova run equivalente è ammessa: l'autorizzazione live è
+run lo dimostra proprio conservandolo fail-closed invece di scartarlo. D278/04
+lasciava quindi aperta una **design review** su una discriminazione read-only,
+bounded e fail-closed del primissimo IN di una nuova sessione, senza comandi
+aggiuntivi, reset/clear-halt/reopen/retry, parser permissivo o perdita di
+evidenza; D278/05 qui sotto chiude quella review senza implementare una live.
+Nessuna nuova run equivalente è ammessa: l'autorizzazione live è
 consumata, `RETRY_AUTHORIZED=false` e una futura diagnostica richiederebbe
 progettazione, review e autorizzazione separate. Il report canonico è
 `analysis/D278/D278_04_cross_session_protocol_reentry_audit.md`.
+
+### D278/05 — causal cut pre-OUT, recovery OEM e sticky `POISONED`
+
+D278/05 ricostruisce separatamente i due terminal point. Nella prima
+single-shot A8 OUT, ACK e typed APP12509 furono consumati; E4 OUT fu trasmesso
+e il primo frame E4 venne consumato ma non accettato, mentre la typed E4 non fu
+mai consumata. Essa è il candidato residuale più forte, senza prova che fosse
+già prodotta o che il successivo `A0/E4/body41` fosse causalmente proprio quel
+frame. Nella seconda single-shot il nuovo A8 era già stato trasmesso prima del
+terminale: dopo quella run il set dei candidati comprende quindi anche ACK e
+typed A8 correnti non letti. Un futuro A8 non potrebbe distinguere una coppia
+A8 precedente da una corrente, perché A0/B0 non portano nonce, session ID,
+epoch o timestamp causale:
+
+```text
+POST_A8_WIRE_CAUSAL_PROVENANCE=UNAVAILABLE
+CROSS_SESSION_RX_RESIDUAL_CAUSAL_IDENTITY=UNPROVEN
+```
+
+Il causal cut valido è più debole: dopo nuovo open/claim, ma prima di qualunque
+OUT della nuova command stream, un frame ricevuto non può essere causato da un
+comando host corrente. Non ne segue che appartenga certamente alla sessione
+precedente; restano possibili emissione autonoma o tardiva e buffering non
+localizzato.
+
+```text
+PRECOMMAND_FRAME_EXCLUDES_CURRENT_HOST_COMMAND_CAUSATION=true
+PRECOMMAND_FRAME_PREVIOUS_SESSION_IDENTITY=UNPROVEN
+```
+
+Un futuro diagnostico zero-OUT è metodologicamente diverso dalle due D278/03 e
+merita review separata: un solo bulk-IN bounded prima di ogni OUT, al più un
+frame completo, poi cleanup e stop. Un frame proverebbe dati disponibili prima
+della causalità host-command corrente ma verrebbe consumato, non osservato con
+un peek. Un timeout proverebbe soltanto assenza di un frame completo nel bound,
+non FIFO vuota permanente, quiescenza APP12509 o readiness per A8. Frame
+parziale/extra/concatenato è terminale; nessun loop o drain è ammesso.
+
+```text
+FUTURE_ZERO_OUT_PRECOMMAND_DIAGNOSTIC=JUSTIFIED_FOR_SEPARATE_REVIEW
+PRECOMMAND_SILENCE_DOES_NOT_PROVE_DEVICE_PROTOCOL_QUIESCENCE=true
+ZERO_OUT_DIAGNOSTIC_IMPLEMENTED=false
+```
+
+L'audit OEM locale non chiude la recovery pre-D1. Il cold-start Windows prova
+la sequenza normale e D231 prova A2 `{01,14}` come reset volatile del sensore,
+non il suo uso dopo failure A8/E4. `gfusb.dll` contiene retry generici, un
+branch `SetDriverState` descritto come hard reset MCU, handler D0 e primitive
+reset; manca però il call-flow dal failure A8/E4 alla policy superiore e manca
+una capture/log target di init failure. D255/D256 prova cancel/re-entry nella
+diversa fase FDT post-D1 senza reset USB osservato, non recovery da failure
+pre-D1.
+
+```text
+OEM_PRE_D1_FAILURE_RECOVERY=UNRESOLVED
+```
+
+Infine l'audit del production-shaped C ha confermato una discrepanza reale:
+`activate()` azzerava `terminal_fence` e `poisoned`, permettendo a una nuova
+activation di cancellare il poison senza recovery dimostrata. Il correttivo
+host-only ora fallisce chiuso all'ingresso di `activate()` quando il contesto è
+poisoned, prima di generation, cancellable, backend command o submit USB; non
+azzera più il poison. Il boundary resta `img_close`, che distrugge il contesto.
+Activation pulite non cambiano comportamento.
+
+```text
+POISON_AFTER_NONQUIESCENT_TERMINAL_MUST_BE_STICKY=true
+AUTOMATIC_REENTRY_FROM_POISONED=false
+POISON_LIFETIME=REMAINDER_OF_OPEN_EPOCH_UNTIL_IMG_CLOSE
+FPIMAGE_DEVICE_NORMAL=16/16_PASS
+FPIMAGE_DEVICE_ASAN_UBSAN=16/16_PASS
+D276_04_NORMAL_AND_ASAN_UBSAN=5/5_PASS_EACH
+D276_03_ROUTER_NORMAL_AND_ASAN_UBSAN=8/8_PASS_EACH
+REAL_USB_ACCESS=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+```
+
+Il modello minimo distingue `CLEAN`, `POISONED`, il solo futuro e
+non-production `REENTRY_OBSERVATION_CANDIDATE` e `TERMINAL`. Da `POISONED` sono
+ammessi solo cleanup/drain host e close; sono vietati activation, generation,
+command, submit, retry, TLS restart e reopen implicito. Nessun resume production
+è autorizzato. Il report completo è
+`analysis/D278/D278_05_cross_session_reentry_resolution.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
@@ -2831,7 +2925,7 @@ bloccante.
 | Evento | API libfprint verificata | Regola di ownership/teardown |
 | --- | --- | --- |
 | open | `img_open` → `fpi_image_device_open_complete()` | crea il contesto e reclama l'interfaccia; il context possiede TLS/secret, con un handoff per sessione TLS, ma la policy di lifetime cross-activation resta irrisolta; failure pulisce senza retry |
-| activate | `activate` → `fpi_image_device_activate_complete()` | crea generation e `GCancellable` locali; completa success solo dopo arm valido |
+| activate | `activate` → `fpi_image_device_activate_complete()` | da contesto pulito crea generation e `GCancellable` locali e completa success solo dopo arm valido; da `POISONED` fallisce prima di generation/backend/submit |
 | framework pronto | `change_state(AWAIT_FINGER_ON)` | gatea soltanto il re-arm `0x32`, insieme a `GOODIX_RELEASE_TAIL_COMPLETE` e down-table fresca same-cycle; nessun contatore stage driver |
 | IRQ finger-down `0x0002` | `fpi_image_device_report_finger_status(dev, TRUE)` | l'API pubblica `PRESENT` e porta il framework in `CAPTURE`; callback stale non produce comandi |
 | B0 immagine | helper LGPL → `fpi_image_device_image_captured()` | consegna una `FpImage(80,64)`, flags zero e ppmm semanticamente ignoto; parse/CRC/shape failure è terminale |
@@ -2873,7 +2967,10 @@ risultato prova lifetime e drain host, non la quiescenza del protocollo
 device-side. Non esiste un comando cancel device-side provato e non
 ne è ammesso uno non compreso. Se il lifecycle non è quiescente, la sessione di
 protocollo diventa `POISONED/QUIESCENCE_UNKNOWN`: nessun resume mascherato nella
-stessa sessione, recovery, reset, retry, TLS restart o reopen automatico. La
+stessa sessione, recovery, reset, retry, TLS restart o reopen automatico.
+D278/05 rende questo poison concretamente sticky per il restante open epoch:
+una nuova `activate()` fallisce prima di creare una generation o raggiungere il
+backend, e solo `img_close` distrugge il contesto. La
 quiescenza production dopo cancel arbitrario resta `UNRESOLVED` (`DEVICE_PROTOCOL_QUIESCENCE=UNRESOLVED`) e un normale
 lifecycle framework futuro richiede una policy esplicita. Timeout, TLS,
 frame/ACK/CRC o lifecycle inattesi sono fail-closed e non invocano
@@ -5770,11 +5867,17 @@ provata (`CROSS_SESSION_RX_RESIDUAL_TARGET_HYPOTHESIS=STRONGLY_LIVE_CORROBORATED
 porta provenance e il validator E4 dipende dal solo materiale persistente. Il
 correttivo ACK non è stato esercitato in questa run
 (`ACK_POLICY_CORRECTIVE_LIVE_RETESTED=false`) e non è refutato
-(`ACK_POLICY_CORRECTIVE_REFUTED=false`). Il confine immediato è quindi la review
-AI-PM di D278/04 alla luce di questa seconda evidenza live e, soltanto dopo, una
-design review su un'eventuale discriminazione read-only, bounded e fail-closed
-del re-entry, qui non progettata né implementata. Nessun retry equivalente è
-autorizzato: `CURRENT_LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false`,
+(`ACK_POLICY_CORRECTIVE_REFUTED=false`). D278/05 chiude offline la successiva
+design review: dopo A8 la provenance wire è indisponibile; prima di ogni OUT un
+frame esclude la causalità di un comando host corrente senza provare identità
+con la sessione precedente. Un futuro diagnostico zero-OUT, one-receive e
+bounded è `JUSTIFIED_FOR_SEPARATE_REVIEW`, non implementato né autorizzato; un
+timeout non proverebbe quiescenza o readiness APP12509. La recovery OEM pre-D1
+resta `UNRESOLVED`, mentre il production-shaped C ora mantiene `POISONED`
+sticky fino a `img_close` e rifiuta activation prima di generation/backend/USB.
+Il confine immediato è quindi la review AI-PM di D278/05 e una decisione
+separata sul solo design diagnostico. Nessun retry equivalente è autorizzato:
+`CURRENT_LIVE_AUTHORIZED=false`, `READY_FOR_LIVE=false`,
 `RETRY_AUTHORIZED=false`, `DO_NOT_RUN_AGAIN=true`,
 `TARGET_PROTECTED_MATERIAL_PREFLIGHT_EXECUTED=true`,
 `D278_03_LIVE_RESULT=FAIL_E4_PROTOCOL_GATE`,

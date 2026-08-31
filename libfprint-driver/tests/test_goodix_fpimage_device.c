@@ -809,6 +809,82 @@ test_terminal_error_path (void)
 }
 
 static void
+test_poison_is_sticky_until_close (void)
+{
+  TestFixture *f = test_fixture_new ();
+  g_autoptr(GCancellable) first_cancellable = g_cancellable_new ();
+  g_autoptr(GCancellable) second_cancellable = g_cancellable_new ();
+  g_autoptr(GError) terminal = NULL;
+  GoodixFpiUsbBackend *usb_backend;
+  guint64 poisoned_generation;
+  guint64 real_submits_before;
+  guint64 out_submits_before;
+  guint commands_before;
+
+  fixture_open (f);
+  usb_backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
+
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_capture (FP_DEVICE (f->device), TRUE, first_cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+  poisoned_generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpuint (poisoned_generation, >, 0);
+
+  terminal = g_error_new (FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+                          "host-only sticky poison trigger");
+  goodix_device_context_emit_terminal_error (f->ctx, terminal);
+  test_wait (f);
+
+  g_assert_false (f->success);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
+
+  commands_before = goodix_device_context_get_backend_command_count (f->ctx);
+  real_submits_before =
+    goodix_fpi_usb_backend_get_real_submit_count (usb_backend);
+  out_submits_before =
+    goodix_fpi_usb_backend_get_out_submit_count (usb_backend);
+
+  g_clear_error (&f->error);
+  f->done = FALSE;
+  f->completion_count = 0;
+  f->success = FALSE;
+  fp_device_capture (FP_DEVICE (f->device), TRUE, second_cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  test_wait (f);
+
+  g_assert_false (f->success);
+  g_assert_error (f->error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
+  g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
+                    ==, commands_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (usb_backend),
+                    ==, real_submits_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (usb_backend),
+                    ==, out_submits_before);
+
+  /* Neither an old-generation callback nor a fake device event may reopen
+   * the poisoned context or reach a backend command. */
+  goodix_device_context_complete_receive (f->ctx, poisoned_generation,
+                                           NULL, 0, NULL);
+  goodix_device_context_emit_finger_down_for_generation (
+    f->ctx, poisoned_generation);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
+  g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
+                    ==, commands_before);
+
+  fixture_close (f);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  test_fixture_free (f);
+}
+
+static void
 test_d276_04_context_ownership (void)
 {
   static const guint8 synthetic_secret[] = { 0x44, 0x32, 0x37, 0x36, 0x2d, 0x30, 0x34 };
@@ -866,6 +942,8 @@ main (int argc, char **argv)
                    test_stale_callback_generation_guard);
   g_test_add_func ("/goodix-fpimage-device/terminal-error-path",
                    test_terminal_error_path);
+  g_test_add_func ("/goodix-fpimage-device/poison-is-sticky-until-close",
+                   test_poison_is_sticky_until_close);
   g_test_add_func ("/goodix-fpimage-device/d276-04-context-ownership",
                    test_d276_04_context_ownership);
 
