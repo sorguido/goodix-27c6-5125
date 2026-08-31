@@ -8,6 +8,7 @@
 #include "goodix_tls_server.h"
 #include "goodix_fpi_usb_backend.h"
 #include "goodix_secure_session.h"
+#include "goodix_post_tls_lifecycle.h"
 
 G_BEGIN_DECLS
 
@@ -63,7 +64,14 @@ gboolean goodix_device_context_start_secure_session (
   GoodixSecureSessionAudit             *audit,
   GoodixTlsAudit                       *tls_audit,
   GError                              **error);
+gboolean goodix_device_context_configure_post_tls_lifecycle (
+  GoodixDeviceContext          *ctx,
+  const GoodixPostTlsMaterial  *material,
+  GoodixPostTlsAudit           *audit,
+  GError                      **error);
 GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
+GoodixPostTlsLifecycle *goodix_device_context_get_post_tls_lifecycle (
+  GoodixDeviceContext *ctx);
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
                                                  GoodixUsbSubmitSeam seam,
                                                  gpointer user_data);
@@ -75,6 +83,9 @@ void goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                               guint64 submit_generation,
                                               const guint8 *data, gsize length,
                                               const GError *error);
+void goodix_device_context_set_post_tls_await_finger_on (
+  GoodixDeviceContext *ctx,
+  gboolean             awaiting);
 
 /* --- Context read-only accessors (test instrumentation) --- */
 GoodixDeviceContextState goodix_device_context_get_state (GoodixDeviceContext *ctx);

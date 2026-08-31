@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/11 — recovery A2→A8 provata live e integrata host-only nel secure-session nativo
+### Stato corrente post-D278/12 — secure-session reentry-prefixed e due acquisizioni unite nel percorso C nativo host-only
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -31,12 +31,21 @@ frame inattesi e non sono stati eseguiti E4, TLS, retry, reopen, reset,
 clear-halt o write persistenti.
 
 D278/11 promuove quindi A2 a policy di recovery del progetto provata efficace
-per ristabilire A8 nel target/context corrente e la integra, solo host-only,
-come prefisso del secure-session nativo completo. La fase
+per ristabilire A8 nel target/context corrente e la integra come prefisso del
+secure-session nativo completo. Dopo la closure host-only, la singola live
+D278/11 sulla baseline
+`b704d52ccc292c4fc669373c7eb8d8b296518ff7` ha attraversato l'intera catena
+reentry-prefixed fino al TLS 1.2 PSK con esito `PASS`; la one-shot è consumata
+e non autorizza rerun. La fase
 `REENTRY_RECOVERY_A2` resta semanticamente distinta da
 `OEM_COLD_START_A2_1/2`; il meccanismo causale, la necessità universale e la
-nonmutazione NVM assoluta restano non provati. Nessuna nuova baseline live è
-stata scelta e nessuna live D278/11 è autorizzata.
+nonmutazione NVM assoluta restano non provati.
+
+D278/12 collega poi, esclusivamente host-only, lo `STOP` del secure-session al
+lifecycle D4→AF→fresh-FDT→prima acquisizione→release→rearm→seconda acquisizione
+nel medesimo `GoodixDeviceContext`, backend, router, generation e oggetto TLS.
+Il passaggio di ownership è callback-driven e avviene solo a egress TLS
+drenato; non introduce polling, secondo reader, seconda sessione TLS o reopen.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -61,6 +70,16 @@ REENTRY_RECOVERY_A2_OEM_EQUIVALENCE=false
 REENTRY_RECOVERY_A2_PROJECT_POLICY=true
 NATIVE_SECURE_SESSION_REENTRY_PREFIX_IMPLEMENTED=true
 NATIVE_SECURE_SESSION_REENTRY_PREFIX_HOST_ONLY_PROVEN=true
+D278_11_LIVE_OUTCOME=PASS
+D278_11_ONE_SHOT_CONSUMED=true
+D278_11_RERUN_AUTHORIZED=false
+REENTRY_PREFIXED_NATIVE_SECURE_SESSION_TARGET_PROVEN=true
+REENTRY_RECOVERY_A2_TO_TLS_TARGET_PROVEN=true
+NATIVE_TLS12_PSK_HANDSHAKE_WITH_REENTRY_RECOVERY_TARGET_PROVEN=true
+POST_TLS_TWO_ACQUISITION_NATIVE_C_INTEGRATION_IMPLEMENTED=true
+REENTRY_PREFIXED_NATIVE_C_TO_SECOND_B0_HOST_ONLY_PROVEN=true
+SAME_OPEN_EPOCH_USB_OWNER_HOST_ONLY_PROVEN=true
+SAME_TLS_SESSION_THROUGH_SECOND_B0_HOST_ONLY_PROVEN=true
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
@@ -1833,6 +1852,152 @@ RETRY_AUTHORIZED=false
 
 Il report Git-native è
 `analysis/D278/D278_11_reentry_prefixed_native_secure_session_host_only.md`.
+
+La successiva esecuzione live D278/11, autorizzata come singola one-shot sulla
+baseline completa `b704d52ccc292c4fc669373c7eb8d8b296518ff7`, ha chiuso il
+confine target-specific che il report host-only lasciava aperto. L'esatta
+traccia osservata è:
+
+```text
+REENTRY_RECOVERY_A2,A8,E4,OEM_COLD_START_A2_1,CHIP_82,OTP_A6,
+OEM_COLD_START_A2_2,MODE_70,DAC_220,DAC_236,DAC_238,DAC_23A,
+CONFIG_90,D1,TLS,STOP
+```
+
+La run ha prodotto `14` comandi Goodix, `13` ACK, `8` risposte tipate, un
+handshake TLS e un solo handoff del secret; open/claim/release/close sono
+ciascuno `1`. Il materiale posseduto dal progetto è stato zeroizzato, backend
+e cleanup sono terminati correttamente. Retry, reopen, reset, clear-halt,
+scritture persistenti, application data, finger, image sono rimasti a zero.
+La run ha contato `26` submit IN fisici e `19` OUT fisici, con massimo uno
+outstanding per direzione. Il riferimento sintetico aveva `18` IN e `19` OUT:
+la differenza IN è frammentazione/completion fisica osservata e non modifica
+la sequenza logica A0/B0, validata dal router incrementale. Non si promuovono
+la causalità interna di A2, la sua necessità universale o una prova assoluta di
+nonmutazione NVM.
+
+```text
+D278_11_LIVE_BASELINE=b704d52ccc292c4fc669373c7eb8d8b296518ff7
+D278_11_LIVE_OUTCOME=PASS
+D278_11_ONE_SHOT_CONSUMED=true
+D278_11_RERUN_AUTHORIZED=false
+D278_11_LIVE_COMMAND_COUNT=14
+D278_11_LIVE_ACK_COUNT=13
+D278_11_LIVE_TYPED_RESPONSE_COUNT=8
+D278_11_LIVE_TLS_HANDSHAKE_COUNT=1
+D278_11_LIVE_SECRET_HANDOFF_COUNT=1
+D278_11_LIVE_PHYSICAL_IN_SUBMIT_COUNT=26
+D278_11_LIVE_PHYSICAL_OUT_SUBMIT_COUNT=19
+D278_11_LIVE_MAX_OUTSTANDING_IN=1
+D278_11_LIVE_MAX_OUTSTANDING_OUT=1
+REAL_USB_RX_FRAGMENTATION_DIFFERS_FROM_SYNTHETIC_REFERENCE=OBSERVED
+LOGICAL_PROTOCOL_SEQUENCE_UNAFFECTED=true
+REENTRY_PREFIXED_NATIVE_SECURE_SESSION_TARGET_PROVEN=true
+REENTRY_RECOVERY_A2_TO_TLS_TARGET_PROVEN=true
+NATIVE_TLS12_PSK_HANDSHAKE_WITH_REENTRY_RECOVERY_TARGET_PROVEN=true
+```
+
+### D278/12 — secure-session reentry-prefixed fino al secondo B0, composizione C host-only
+
+D278/12 non esegue USB reale e non abilita il VID:PID production. Introduce un
+lifecycle LGPL indipendente posseduto dal `GoodixDeviceContext` già esistente.
+Al callback di fase `STOP`, e soltanto con coda TLS ed OUT drenati, il
+secure-session cede il callback di completion dello stesso backend; lo stesso
+oggetto `GoodixTlsServer` resta proprietario della decifratura B0 per tutto il
+post-TLS. Gli A0 successivi sono instradati al lifecycle, mentre il plaintext
+applicativo TLS è consegnato per callback, senza polling o flag globale.
+
+```text
+GoodixDeviceContext
+  -> un GoodixFpiUsbBackend / un GoodixUsbRouter / una generation
+  -> GoodixSecureSession: REENTRY_RECOVERY_A2 ... D1 -> TLS -> STOP
+  -> handoff callback-driven a egress drenato
+  -> GoodixPostTlsLifecycle: D4 -> AF -> fresh FDT -> IRQ2 -> 0x22
+     -> first B0/image -> 0x34 -> IRQ0200 -> 0x20/post-up B0
+     -> 0x50/NAV -> gate AWAIT_FINGER_ON + release + fresh down-table
+     -> 0x32 -> second IRQ2 -> 0x22 -> second B0/image -> STOP
+```
+
+Il lifecycle deriva la FDT-up esclusivamente dall'IRQ `0x0002`/flags `0x003f`
+del primo ciclo come coppie `0x80,((raw>>1)+0x1d)` e la down-table
+esclusivamente dall'IRQ `0x0200`/flags `0` dello stesso ciclo come coppie
+`0x80,(raw>>1)`. Overflow, shape/IRQ/flags errati, tabella stale, generation
+stale o cancel sono terminali. Il rearm viene emesso esattamente una volta
+solo dopo release completa, fresh down-table e stato framework
+`AWAIT_FINGER_ON`; il post-up B0 è consumato e scartato e non raggiunge il
+decoder immagine.
+
+La soglia della risposta tipizzata `0x82` alimenta davvero la policy di
+classificazione: vengono calcolati i delta assoluti dei sei word FDT tra prima
+e seconda lettura e tra seconda e terza lettura. L'arm finale è ammesso solo
+dopo entrambe le classificazioni nella generation corrente. La classe
+within/outside resta telemetria host-side e non altera wire, payload o blocking,
+coerentemente con il confine D259; il vettore D278/12 produce due classificazioni
+within soglia `0x20` e zero outside.
+
+Il decoder C clean-room accetta il contratto canonico
+`7693 -> 7690 -> 7689 -> 5+7684 -> 7680+4`, applica il marker image-specific
+`0x88`, CRC-32/MPEG-2 strict, unpack packed-12 e mapping wire→raster `80x64`.
+Il plaintext immagine può essere frammentato dalle chiamate `SSL_read_ex`: il
+lifecycle lo ricompone secondo la length dichiarata prima del decode e azzera
+il buffer temporaneo. Nel `GoodixDeviceContext` entrambi i raster passano al
+medesimo helper `goodix_fpimage_pipeline_new()` e quindi a un vero `FpImage`.
+Orientation, polarity e ppmm fisico rimangono irrisolti.
+
+La fixture composta completa un handshake OpenSSL TLS 1.2 PSK reale in memoria
+attraverso il prefisso reentry, mantiene la stessa identità del TLS/backend e
+invia cifrati bootstrap B0, prima immagine, post-up B0 e seconda immagine fino
+allo stop. La fixture lifecycle separata varia i confini fisici (header/body
+spezzati, ACK+typed concatenati e conteggi IN diversi da 18) preservando lo
+stesso transcript logico. I test focalizzati passano normal e ASAN/UBSAN; le
+regressioni secure-session D278/11, router, pipeline FpImage, D275 e shell
+`FpImageDevice` passano. Nessun simbolo di reset/clear-halt, secondo TLS o
+provenance GPL è raggiungibile dai nuovi moduli LGPL.
+
+```text
+D278_12_BASELINE=b704d52ccc292c4fc669373c7eb8d8b296518ff7
+POST_TLS_TWO_ACQUISITION_NATIVE_C_INTEGRATION_IMPLEMENTED=true
+REENTRY_PREFIXED_NATIVE_C_TO_SECOND_B0_HOST_ONLY_PROVEN=true
+SAME_OPEN_EPOCH_USB_OWNER_HOST_ONLY_PROVEN=true
+SAME_TLS_SESSION_THROUGH_SECOND_B0_HOST_ONLY_PROVEN=true
+TLS_HANDSHAKE_COUNT_MAX=1
+SECRET_HANDOFF_COUNT_MAX=1
+TRANSPORT_REOPEN_COUNT=0
+FIRST_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
+SECOND_B0_LIFECYCLE_HOST_ONLY_PROVEN=true
+SECOND_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
+SECOND_IMAGE_RASTER_TARGET_PROVEN=false
+RELEASE_TAIL_ORDER_HOST_ONLY_PROVEN=true
+FRESH_SAME_CYCLE_DOWN_TABLE_GATE_HOST_ONLY_PROVEN=true
+REARM_EXACTLY_ONCE_HOST_ONLY_PROVEN=true
+THIRD_CYCLE_COMMAND_COUNT=0
+PHYSICAL_RX_FRAGMENTATION_INVARIANCE_HOST_ONLY_PROVEN=true
+MAX_PHYSICAL_IN_OUTSTANDING=1
+MAX_PHYSICAL_OUT_OUTSTANDING=1
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+ENROLLMENT_STAGE_POLICY=NOT_SELECTED
+REAL_USB_ACCESS=false
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+FUTURE_REENTRY_PREFIXED_NATIVE_TWO_ACQUISITION_LIVE_READY_FOR_AI_PM_REVIEW=false
+```
+
+Il secondo B0 è target-proven dalla run D275/04, ma quella run non ha
+serializzato o validato come evidenza una seconda raster. D278/12 prova invece
+host-only che una seconda immagine sintetica valida attraversa decoder C e
+pipeline `FpImage`; una prova target della seconda raster richiederebbe nuova
+evidenza live separata e nuova autorizzazione, oggi assente. Il report
+Git-native è
+`analysis/D278/D278_12_reentry_secure_session_to_two_acquisition_host_only.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy

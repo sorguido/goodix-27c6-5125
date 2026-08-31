@@ -75,6 +75,8 @@ struct _GoodixSecureSession
   gpointer terminal_data;
   GoodixSecureSessionPhaseFunc phase_callback;
   gpointer phase_data;
+  GoodixTlsPlaintextFunc post_tls_plaintext;
+  gpointer post_tls_plaintext_data;
   GoodixSecureSessionAudit *audit;
   GoodixTlsAudit *tls_audit;
   GError *error;
@@ -92,6 +94,7 @@ struct _GoodixSecureSession
   gsize b0_offset;
   gboolean pace_pending;
   gboolean d1_server_flight_seen;
+  gboolean backend_callback_owned;
   guint pace_source_id;
   guint64 pace_generation;
 };
@@ -771,7 +774,12 @@ tls_plaintext (GBytes *bytes,
 {
   GoodixSecureSession *session = user_data;
 
-  (void) bytes;
+  if (session->phase == GOODIX_SECURE_PHASE_STOP &&
+      session->post_tls_plaintext != NULL)
+    {
+      session->post_tls_plaintext (bytes, session->post_tls_plaintext_data);
+      return;
+    }
   session_fail_literal (session, GOODIX_SECURE_ERROR_TLS,
                         "TLS application data is outside D278/01");
 }
@@ -837,6 +845,7 @@ goodix_secure_session_new (GoodixFpiUsbBackend                *backend,
   goodix_fpi_usb_backend_set_out_completed_callback (backend,
                                                       backend_out_complete,
                                                       session);
+  session->backend_callback_owned = TRUE;
   return session;
 }
 
@@ -846,8 +855,9 @@ goodix_secure_session_free (GoodixSecureSession *session)
   if (session == NULL)
     return;
   g_return_if_fail (goodix_fpi_usb_backend_is_drained (session->backend));
-  goodix_fpi_usb_backend_set_out_completed_callback (session->backend,
-                                                      NULL, NULL);
+  if (session->backend_callback_owned)
+    goodix_fpi_usb_backend_set_out_completed_callback (session->backend,
+                                                        NULL, NULL);
   if (session->pace_source_id != 0)
     g_source_remove (session->pace_source_id);
   clear_record_queue (session);
@@ -1079,6 +1089,7 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
       if (session->phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2)
         {
           session->audit->reentry_recovery_a2_typed_count++;
+          session->audit->secure_session_target_prefix_completed = TRUE;
           session->audit->reentry_recovery_a2_result_class =
             GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH;
         }
@@ -1129,7 +1140,8 @@ goodix_secure_session_handle_b0 (GoodixSecureSession *session,
       session->phase == GOODIX_SECURE_PHASE_TERMINAL)
     return;
   if (session->phase < GOODIX_SECURE_PHASE_D1 ||
-      session->phase == GOODIX_SECURE_PHASE_STOP)
+      (session->phase == GOODIX_SECURE_PHASE_STOP &&
+       session->post_tls_plaintext == NULL))
     {
       gsize observed_length;
       const guint8 *observed = g_bytes_get_data (frame, &observed_length);
@@ -1201,6 +1213,38 @@ goodix_secure_session_set_phase_callback (GoodixSecureSession          *session,
   g_return_if_fail (session != NULL);
   session->phase_callback = callback;
   session->phase_data = user_data;
+}
+
+void
+goodix_secure_session_set_post_tls_plaintext_callback (
+  GoodixSecureSession   *session,
+  GoodixTlsPlaintextFunc callback,
+  gpointer               user_data)
+{
+  g_return_if_fail (session != NULL);
+  session->post_tls_plaintext = callback;
+  session->post_tls_plaintext_data = user_data;
+}
+
+gboolean
+goodix_secure_session_handoff_backend (GoodixSecureSession *session,
+                                       GError             **error)
+{
+  g_return_val_if_fail (session != NULL, FALSE);
+  if (session->phase != GOODIX_SECURE_PHASE_STOP || session->out_pending ||
+      session->b0_logical != NULL || !g_queue_is_empty (session->tls_records) ||
+      session->pace_pending || !session->backend_callback_owned ||
+      goodix_fpi_usb_backend_get_out_outstanding (session->backend) != 0)
+    {
+      g_set_error_literal (error, GOODIX_SECURE_ERROR,
+                           GOODIX_SECURE_ERROR_STATE,
+                           "secure-session backend is not ready for handoff");
+      return FALSE;
+    }
+  goodix_fpi_usb_backend_set_out_completed_callback (session->backend,
+                                                      NULL, NULL);
+  session->backend_callback_owned = FALSE;
+  return TRUE;
 }
 
 GoodixSecurePhase

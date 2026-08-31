@@ -194,3 +194,25 @@ D277, resta fuori dal dominio LGPL e non è stato eseguito in D278/02. Il
 percorso sintetico usa la stessa orchestrazione, la state machine LGPL reale e
 un peer OpenSSL TLS 1.2 reale; non contiene una seconda implementazione del
 protocollo. Nessun codice Rockytkg è stato importato.
+
+## D278/12 — decoder immagine e lifecycle post-TLS LGPL indipendenti
+
+`libfprint-driver/goodix_image_decoder.[ch]` e
+`libfprint-driver/goodix_post_tls_lifecycle.[ch]` sono nuova espressione locale
+`LGPL-2.1-or-later`. Le fonti implementative sono i fatti wire neutrali e i
+vettori canonizzati nel manuale e nei report D249, D252–D275: framing payload,
+marker image-specific `0x88`, record 7684-byte, CRC-32/MPEG-2, KAT packed-12,
+mapping raster 80×64, ordine D4/AF/FDT/acquisizione/release/rearm e derivazioni
+FDT target-specific. Il serializer GPL storico è stato usato soltanto come
+oracle black-box per un KAT additivo già espresso come fatto di protocollo; non
+ne è stato copiato, letto, tradotto o adattato l'algoritmo nel dominio LGPL.
+
+L'integrazione modifica i moduli LGPL D276/D278 esistenti per un handoff
+callback-driven del medesimo backend e per mantenere lo stesso oggetto TLS. Non
+introduce helper, IPC, Python embedded, secondo TLS, secondo reader o nuovo
+backend USB. Le fixture contengono soltanto immagini sintetiche deterministiche
+e PSK sintetiche; non incorporano secret, capture o biometria reale. L'audit
+step-local controlla sorgenti e simboli per riferimenti GPL, reset/clear-halt,
+control transfer e provider TLS indipendenti. L'etichetta clean-room descrive
+il controllo ingegneristico di provenance e non costituisce una conclusione
+legale.

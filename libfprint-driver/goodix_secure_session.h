@@ -81,6 +81,7 @@ typedef struct
   guint reentry_recovery_a2_submit_count;
   guint reentry_recovery_a2_ack_count;
   guint reentry_recovery_a2_typed_count;
+  gboolean secure_session_target_prefix_completed;
   GoodixReentryRecoveryA2ResultClass reentry_recovery_a2_result_class;
   guint a8_submit_count;
   guint a8_ack_count;
@@ -157,6 +158,13 @@ void     goodix_secure_session_set_phase_callback (
   GoodixSecureSession          *session,
   GoodixSecureSessionPhaseFunc  callback,
   gpointer                      user_data);
+void     goodix_secure_session_set_post_tls_plaintext_callback (
+  GoodixSecureSession   *session,
+  GoodixTlsPlaintextFunc callback,
+  gpointer               user_data);
+gboolean goodix_secure_session_handoff_backend (
+  GoodixSecureSession *session,
+  GError             **error);
 
 GoodixSecurePhase goodix_secure_session_get_phase (const GoodixSecureSession *session);
 const GError     *goodix_secure_session_get_error (const GoodixSecureSession *session);

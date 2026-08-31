@@ -3,6 +3,7 @@
 #include "goodix_a0_protocol.h"
 #include "goodix_fpi_usb_backend.h"
 #include "goodix_secure_session.h"
+#include "goodix_post_tls_lifecycle.h"
 #include "goodix_usb_router.h"
 
 #include <openssl/ssl.h>
@@ -29,6 +30,7 @@ typedef struct
   GoodixUsbRouter *router;
   GoodixFpiUsbBackend *backend;
   GoodixSecureSession *session;
+  GoodixPostTlsLifecycle *post_tls;
   GoodixSecureSessionMaterial material;
   GoodixSecureSessionAudit audit;
   GoodixTlsAudit tls_audit;
@@ -37,6 +39,10 @@ typedef struct
   guint64 generation;
   guint in_submit_count;
   guint terminal_count;
+  guint post_tls_plaintext_count;
+  GBytes *post_tls_plaintext;
+  GoodixPostTlsAudit post_audit;
+  guint post_image_count;
   guint schedule_count;
   guint64 scheduled_generation;
   gboolean schedule_pending;
@@ -152,7 +158,12 @@ a0_consumer (guint8 type,
   Fixture *fixture = user_data;
 
   g_assert_cmphex (type, ==, 0xa0);
-  goodix_secure_session_handle_a0 (fixture->session, frame);
+  if (fixture->post_tls != NULL &&
+      goodix_post_tls_lifecycle_get_phase (fixture->post_tls) !=
+        GOODIX_POST_TLS_PHASE_NOT_STARTED)
+    goodix_post_tls_lifecycle_handle_a0 (fixture->post_tls, frame);
+  else
+    goodix_secure_session_handle_a0 (fixture->session, frame);
 }
 
 static void
@@ -277,12 +288,25 @@ fixture_free (Fixture *fixture)
     return;
   fixture_clear_out (fixture);
   g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  goodix_post_tls_lifecycle_free (fixture->post_tls);
   goodix_secure_session_free (fixture->session);
   goodix_fpi_usb_backend_free (fixture->backend);
   goodix_usb_router_free (fixture->router);
   g_queue_free (fixture->out);
   g_byte_array_unref (fixture->server_record);
+  g_clear_pointer (&fixture->post_tls_plaintext, g_bytes_unref);
   g_free (fixture);
+}
+
+static void
+post_tls_plaintext_seam (GBytes   *bytes,
+                         gpointer  user_data)
+{
+  Fixture *fixture = user_data;
+
+  fixture->post_tls_plaintext_count++;
+  g_clear_pointer (&fixture->post_tls_plaintext, g_bytes_unref);
+  fixture->post_tls_plaintext = g_bytes_ref (bytes);
 }
 
 static Submission *
@@ -724,6 +748,225 @@ pump_tls (Fixture *fixture,
   return FALSE;
 }
 
+static guint32
+post_crc32_mpeg2 (const guint8 *data,
+                  gsize         length)
+{
+  guint32 crc = UINT32_C (0xffffffff);
+
+  for (gsize i = 0; i < length; i++)
+    {
+      crc ^= (guint32) data[i] << 24;
+      for (guint bit = 0; bit < 8u; bit++)
+        crc = (crc & UINT32_C (0x80000000)) != 0 ?
+          (crc << 1) ^ UINT32_C (0x04c11db7) : crc << 1;
+    }
+  return crc;
+}
+
+static GBytes *
+post_zero_image (void)
+{
+  g_autoptr(GByteArray) bytes = g_byte_array_sized_new (
+    GOODIX_IMAGE_PLAINTEXT_LENGTH);
+  static const guint8 header[] = { 0x20, 0x0a, 0x1e };
+  static const guint8 prefix[5] = { 0 };
+  guint8 packed[GOODIX_IMAGE_PACKED_LENGTH] = { 0 };
+  guint32 crc = post_crc32_mpeg2 (packed, sizeof packed);
+  guint8 trailer[4] = {
+    (guint8) (crc >> 8), (guint8) crc,
+    (guint8) (crc >> 24), (guint8) (crc >> 16)
+  };
+  guint8 no_check = 0x88;
+
+  g_byte_array_append (bytes, header, sizeof header);
+  g_byte_array_append (bytes, prefix, sizeof prefix);
+  g_byte_array_append (bytes, packed, sizeof packed);
+  g_byte_array_append (bytes, trailer, sizeof trailer);
+  g_byte_array_append (bytes, &no_check, 1u);
+  g_assert_cmpuint (bytes->len, ==, GOODIX_IMAGE_PLAINTEXT_LENGTH);
+  return g_byte_array_free_to_bytes (g_steal_pointer (&bytes));
+}
+
+static gboolean
+post_image_seam (GoodixPostTlsLifecycle *lifecycle,
+                 guint                   acquisition_index,
+                 const uint16_t          samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT],
+                 gpointer                user_data,
+                 GError                **error)
+{
+  Fixture *fixture = user_data;
+
+  (void) lifecycle;
+  (void) error;
+  g_assert_cmpuint (acquisition_index, ==, fixture->post_image_count + 1u);
+  for (gsize i = 0; i < GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT; i++)
+    g_assert_cmpuint (samples[i], ==, 0u);
+  fixture->post_image_count++;
+  return TRUE;
+}
+
+static void
+post_event_seam (GoodixPostTlsLifecycle *lifecycle,
+                 gpointer                user_data)
+{
+  (void) lifecycle;
+  (void) user_data;
+}
+
+static void
+post_terminal_seam (GoodixPostTlsLifecycle *lifecycle,
+                    const GError           *error,
+                    gpointer                user_data)
+{
+  (void) lifecycle;
+  (void) user_data;
+  g_error ("unexpected post-TLS terminal: %s", error->message);
+}
+
+static void
+post_plaintext_to_lifecycle (GBytes   *bytes,
+                             gpointer  user_data)
+{
+  Fixture *fixture = user_data;
+  goodix_post_tls_lifecycle_handle_plaintext (fixture->post_tls, bytes);
+}
+
+static void
+post_complete_command (Fixture *fixture,
+                       guint8   expected_control)
+{
+  Submission *submission = pop_out (fixture);
+  gsize length;
+  const guint8 *data = g_bytes_get_data (submission->bytes, &length);
+
+  g_assert_cmpuint (length, ==, 64u);
+  g_assert_cmphex (data[0], ==, 0xa0);
+  g_assert_cmphex (data[4], ==, expected_control);
+  complete_submission (fixture, submission, NULL);
+}
+
+static void
+post_feed_response (Fixture      *fixture,
+                    guint8        control,
+                    const guint8 *body,
+                    gsize         body_length)
+{
+  g_autoptr(GBytes) frame = build_response (control, body, body_length);
+  gsize length;
+  const guint8 *data = g_bytes_get_data (frame, &length);
+  feed_completion (fixture, data, length, fixture->generation);
+}
+
+static void
+post_feed_ack (Fixture *fixture,
+               guint8   control)
+{
+  const guint8 body[2] = { control, 0x01 };
+  post_feed_response (fixture, 0xb0, body, sizeof body);
+}
+
+static void
+post_feed_event (Fixture *fixture,
+                 guint8   control,
+                 guint16  irq,
+                 guint16  flags,
+                 guint16  raw_base)
+{
+  guint8 body[16];
+
+  body[0] = (guint8) irq;
+  body[1] = (guint8) (irq >> 8);
+  body[2] = (guint8) flags;
+  body[3] = (guint8) (flags >> 8);
+  for (guint i = 0; i < 6u; i++)
+    {
+      guint16 word = (guint16) (raw_base + i * 2u);
+      body[4u + i * 2u] = (guint8) word;
+      body[5u + i * 2u] = (guint8) (word >> 8);
+    }
+  post_feed_response (fixture, control, body, sizeof body);
+}
+
+static void
+post_write_application_data (Fixture    *fixture,
+                             TlsClient  *client,
+                             const guint8 *data,
+                             gsize       length)
+{
+  g_assert_cmpuint (length, <=, G_MAXINT);
+  g_assert_cmpint (SSL_write (client->ssl, data, (gint) length), ==,
+                   (gint) length);
+  feed_client_records (fixture, client);
+}
+
+static void
+drive_post_tls_two_acquisitions (Fixture   *fixture,
+                                 TlsClient *client)
+{
+  guint8 af[16] = { 0 };
+  guint8 nav[2409] = { 0 };
+  static const guint8 typed82[2] = { 0, 0x20 };
+  static const guint8 auxiliary[] = "post-up-or-bootstrap";
+  g_autoptr(GBytes) image = post_zero_image ();
+  gsize image_length;
+  const guint8 *image_data = g_bytes_get_data (image, &image_length);
+
+  post_complete_command (fixture, 0xd4);
+  post_feed_ack (fixture, 0xd4);
+  post_complete_command (fixture, 0xaf);
+  af[1] = 0x02;
+  post_feed_response (fixture, 0xae, af, sizeof af);
+
+  for (guint cycle = 0; cycle < 3u; cycle++)
+    {
+      post_complete_command (fixture, 0x36);
+      post_feed_ack (fixture, 0x36);
+      post_feed_event (fixture, 0x36, 0x0100, 0,
+                       (guint16) (0x0100u + cycle * 0x20u));
+      if (cycle == 0)
+        {
+          post_complete_command (fixture, 0x50);
+          post_feed_ack (fixture, 0x50);
+          post_feed_response (fixture, 0x50, nav, sizeof nav);
+        }
+      else if (cycle == 1)
+        {
+          post_complete_command (fixture, 0x82);
+          post_feed_ack (fixture, 0x82);
+          post_feed_response (fixture, 0x82, typed82, sizeof typed82);
+          post_complete_command (fixture, 0x20);
+          post_feed_ack (fixture, 0x20);
+          post_write_application_data (fixture, client, auxiliary,
+                                       sizeof auxiliary);
+        }
+    }
+
+  post_complete_command (fixture, 0x32);
+  post_feed_ack (fixture, 0x32);
+  post_feed_event (fixture, 0x32, 0x0002, 0x003f, 0x0180);
+  post_complete_command (fixture, 0x22);
+  post_feed_ack (fixture, 0x22);
+  post_write_application_data (fixture, client, image_data, image_length);
+  post_complete_command (fixture, 0x34);
+  post_feed_ack (fixture, 0x34);
+  post_feed_event (fixture, 0x34, 0x0200, 0, 0x0120);
+  post_complete_command (fixture, 0x20);
+  post_feed_ack (fixture, 0x20);
+  post_write_application_data (fixture, client, auxiliary, sizeof auxiliary);
+  post_complete_command (fixture, 0x50);
+  post_feed_ack (fixture, 0x50);
+  post_feed_response (fixture, 0x50, nav, sizeof nav);
+  goodix_post_tls_lifecycle_set_framework_await_finger_on (
+    fixture->post_tls, fixture->generation, TRUE);
+  post_complete_command (fixture, 0x32);
+  post_feed_ack (fixture, 0x32);
+  post_feed_event (fixture, 0x32, 0x0002, 0x003f, 0x0180);
+  post_complete_command (fixture, 0x22);
+  post_feed_ack (fixture, 0x22);
+  post_write_application_data (fixture, client, image_data, image_length);
+}
+
 static void
 test_a0_vectors_and_malformed (void)
 {
@@ -813,6 +1056,7 @@ test_happy_path (void)
   g_assert_cmpuint (fixture->audit.reentry_recovery_a2_typed_count, ==, 1);
   g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
                    GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH);
+  g_assert_true (fixture->audit.secure_session_target_prefix_completed);
   g_assert_cmpuint (fixture->audit.a8_submit_count, ==, 1);
   g_assert_cmpuint (fixture->audit.a8_ack_count, ==, 1);
   g_assert_cmpuint (fixture->audit.a8_typed_count, ==, 1);
@@ -857,6 +1101,108 @@ test_happy_path (void)
   client_init (&client, fixture);
   g_assert_true (pump_tls (fixture, &client, FALSE));
   g_assert_cmpuint (fixture->schedule_count, >, 0);
+  client_clear (&client);
+  fixture_free (fixture);
+}
+
+static void
+test_retained_tls_post_handshake_handoff (void)
+{
+  static const guint8 application_data[] = "post-tls-same-owner";
+  Fixture *fixture = fixture_new ();
+  TlsClient client;
+  g_autoptr(GError) error = NULL;
+  gsize plaintext_length;
+  const guint8 *plaintext;
+
+  start_and_advance_to (fixture, GOODIX_SECURE_PHASE_D1);
+  respond_valid (fixture, 0, 0x01);
+  client_init (&client, fixture);
+  g_assert_true (pump_tls (fixture, &client, FALSE));
+  GoodixTlsServer *retained = goodix_secure_session_get_tls_server (
+    fixture->session);
+  goodix_secure_session_set_post_tls_plaintext_callback (
+    fixture->session, post_tls_plaintext_seam, fixture);
+  g_assert_true (goodix_secure_session_handoff_backend (fixture->session,
+                                                        &error));
+  g_assert_no_error (error);
+  g_assert_true (retained == goodix_secure_session_get_tls_server (
+                            fixture->session));
+  g_assert_cmpint (SSL_write (client.ssl, application_data,
+                              sizeof application_data), ==,
+                   (gint) sizeof application_data);
+  feed_client_records (fixture, &client);
+  g_assert_cmpuint (fixture->post_tls_plaintext_count, ==, 1u);
+  plaintext = g_bytes_get_data (fixture->post_tls_plaintext,
+                                &plaintext_length);
+  ASSERT_CMPMEM (plaintext, plaintext_length, application_data,
+                 sizeof application_data);
+  g_assert_cmpuint (fixture->tls_audit.handshake_count, ==, 1u);
+  g_assert_cmpuint (fixture->tls_audit.secret_handoff_count, ==, 1u);
+  g_assert_true (fixture->tls_audit.project_secret_zeroized);
+  client_clear (&client);
+  fixture_free (fixture);
+}
+
+static void
+test_reentry_tls_to_two_acquisitions_composed (void)
+{
+  Fixture *fixture = fixture_new ();
+  TlsClient client;
+  GoodixPostTlsMaterial material = { 0 };
+  GoodixTlsServer *retained;
+  g_autoptr(GError) error = NULL;
+
+  for (guint i = 0; i < 6u; i++)
+    {
+      material.initial_fdt_table[i * 2u] = 0x80;
+      material.initial_fdt_table[i * 2u + 1u] = (guint8) (0x40u + i);
+    }
+  material.af_timestamp = 0x1234;
+  material.first_arm_timestamp = 0x2345;
+  material.second_arm_timestamp = 0x3456;
+
+  start_and_advance_to (fixture, GOODIX_SECURE_PHASE_D1);
+  respond_valid (fixture, 0, 0x01);
+  client_init (&client, fixture);
+  g_assert_true (pump_tls (fixture, &client, FALSE));
+  retained = goodix_secure_session_get_tls_server (fixture->session);
+  fixture->post_tls = goodix_post_tls_lifecycle_new (
+    fixture->backend, fixture->generation, &material, post_image_seam,
+    post_event_seam, post_event_seam, post_event_seam, post_terminal_seam,
+    fixture, &fixture->post_audit, &error);
+  g_assert_nonnull (fixture->post_tls);
+  g_assert_no_error (error);
+  goodix_secure_session_set_post_tls_plaintext_callback (
+    fixture->session, post_plaintext_to_lifecycle, fixture);
+  g_assert_true (goodix_secure_session_handoff_backend (fixture->session,
+                                                        &error));
+  g_assert_no_error (error);
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->post_tls, &error));
+  g_assert_no_error (error);
+
+  drive_post_tls_two_acquisitions (fixture, &client);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+                   GOODIX_POST_TLS_PHASE_STOP);
+  g_assert_true (retained == goodix_secure_session_get_tls_server (
+                            fixture->session));
+  g_assert_cmpuint (fixture->audit.command_count, ==, 14u);
+  g_assert_true (fixture->audit.secure_session_target_prefix_completed);
+  g_assert_cmpuint (fixture->tls_audit.handshake_count, ==, 1u);
+  g_assert_cmpuint (fixture->tls_audit.secret_handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_image_count, ==, 2u);
+  g_assert_cmpuint (fixture->post_audit.command_count, ==, 15u);
+  g_assert_cmpuint (fixture->post_audit.first_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.second_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.post_up_b0_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.second_b0_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.third_cycle_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.reopen_count, ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
+                     fixture->backend), ==, 1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_out_outstanding (
+                     fixture->backend), ==, 1u);
   client_clear (&client);
   fixture_free (fixture);
 }
@@ -1510,6 +1856,10 @@ main (int argc,
   g_test_add_func ("/goodix/d278/a0-vectors-malformed",
                    test_a0_vectors_and_malformed);
   g_test_add_func ("/goodix/d278/happy-path-real-tls", test_happy_path);
+  g_test_add_func ("/goodix/d278/retained-tls-post-handshake-handoff",
+                   test_retained_tls_post_handshake_handoff);
+  g_test_add_func ("/goodix/d278/reentry-tls-to-two-acquisitions-composed",
+                   test_reentry_tls_to_two_acquisitions_composed);
   g_test_add_func ("/goodix/d278/d1-client-hello-gate",
                    test_d1_client_hello_gate);
   g_test_add_func ("/goodix/d278/ack07-phase-policy",

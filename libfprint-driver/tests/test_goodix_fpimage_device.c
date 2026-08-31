@@ -967,6 +967,49 @@ test_d276_04_context_ownership (void)
   test_fixture_free (f);
 }
 
+static void
+test_d278_12_post_tls_context_ownership (void)
+{
+  TestFixture *f = test_fixture_new ();
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  GoodixPostTlsMaterial material = { 0 };
+  GoodixPostTlsAudit audit = { 0 };
+  GoodixFpiUsbBackend *backend;
+  GoodixUsbRouter *router;
+  g_autoptr(GError) error = NULL;
+
+  fixture_open (f);
+  backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
+  router = goodix_device_context_get_usb_router (f->ctx);
+  for (guint i = 0; i < 6u; i++)
+    {
+      material.initial_fdt_table[i * 2u] = 0x80;
+      material.initial_fdt_table[i * 2u + 1u] = (guint8) (0x40u + i);
+    }
+  material.af_timestamp = 1;
+  material.first_arm_timestamp = 2;
+  material.second_arm_timestamp = 3;
+
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_capture (FP_DEVICE (f->device), TRUE, cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), >, 0u);
+  g_assert_true (goodix_device_context_configure_post_tls_lifecycle (
+    f->ctx, &material, &audit, &error));
+  g_assert_no_error (error);
+  g_assert_nonnull (goodix_device_context_get_post_tls_lifecycle (f->ctx));
+  g_assert_true (goodix_device_context_get_fpi_usb_backend (f->ctx) == backend);
+  g_assert_true (goodix_device_context_get_usb_router (f->ctx) == router);
+
+  g_cancellable_cancel (cancellable);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+  fixture_close (f);
+  test_fixture_free (f);
+}
+
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
@@ -1007,6 +1050,8 @@ main (int argc, char **argv)
                    test_poison_is_sticky_until_close);
   g_test_add_func ("/goodix-fpimage-device/d276-04-context-ownership",
                    test_d276_04_context_ownership);
+  g_test_add_func ("/goodix-fpimage-device/d278-12-post-tls-context-ownership",
+                   test_d278_12_post_tls_context_ownership);
 
   return g_test_run ();
 }
