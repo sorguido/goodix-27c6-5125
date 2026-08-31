@@ -1,5 +1,14 @@
 # D278/07 — audit offline della recovery OEM pre-D1
 
+> **Nota di supersessione D278/08.** Questo file conserva la conclusione
+> storica raggiunta in D278/07. D278/08 ha poi risolto il boundary: dopo il
+> ritorno di `gfUpdatefirmware`, `init_MCU` chiama direttamente il production
+> process a `0x18006ae04`, che raggiunge l'E4 tramite
+> `0x18003c348 -> 0x18003b514 -> 0x18003cc90 -> 0x18003c7f4`. Inoltre
+> `0x18003cfd8` è `production_write_key`, non un wrapper E4: dopo due check
+> falliti porta a `production_write_mcu`/E0. Lo stato canonico corrente è in
+> `D278_08_project8_e4_indirect_edge_audit.md` e nel manuale tecnico.
+
 ## Closure
 
 ```text

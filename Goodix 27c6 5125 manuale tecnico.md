@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/07 — zero-OUT live consumata; policy A8 OEM chiusa, recovery E4 target ancora irrisolta
+### Stato corrente post-D278/08 — policy E4 OEM risolta offline come non factory-preserving
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -355,7 +355,31 @@ D278_07_LIVE_EXECUTION_PERFORMED=false
 D278_07_CURRENT_LIVE_AUTHORIZED=false
 D278_07_READY_FOR_LIVE=false
 D278_07_RETRY_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_RESOLUTION_OF_PROJECT_8_GFUPDATEFIRMWARE_INDIRECT_E4_FAILURE_EDGE_AND_RETURN_PROPAGATION
+
+D278_08_OUTCOME=READY
+D278_08_ADVANCEMENT=NEW_STATIC_TARGET_SPECIFIC_DIRECT_E4_EDGE_AND_PERSISTENT_PROVISIONING_FAILURE_FALLBACK_RESOLVED
+D278_08_EXECUTABLE_CLOSURE=ANALYSIS_ONLY
+D278_08_BASELINE=4c73dcdaad5df9f9a429626109a4be2a3b1a8b19
+OEM_PRE_D1_FAILURE_RECOVERY=RESOLVED
+OEM_A8_FAILURE_POLICY=RESOLVED
+OEM_E4_FAILURE_POLICY=RESOLVED
+OEM_USES_A2_SENSOR_ONLY_AS_PRE_A8_FAILURE_RECOVERY=false
+A2_PRE_A8_RECOVERY_LIVE_JUSTIFIED=false
+A8_RETRY_BOUND_RUNTIME_VALUE=UNKNOWN_CONFIG_BYTE_AT_OFFSET_0x45A
+PROJECT8_E4_SENDER_RESOLVED=true
+PROJECT8_E4_INDIRECT_EDGE_RESOLVED=true
+PROJECT8_E4_FAILURE_RETURN_PROPAGATION_RESOLVED=true
+PROJECT8_E4_RETRY_BOUND_RESOLVED=true
+PROJECT8_E4_PRE_FAILURE_PERSISTENT_WRITE_REACHABLE=true
+PROJECT8_E4_POST_FAILURE_PERSISTENT_WRITE_REACHABLE=true
+PROJECT8_E4_FAILURE_PATH_FACTORY_PRESERVING=false
+LINUX_SAFE_E4_RECOVERY_CANDIDATE=false
+D278_08_REAL_USB_ACCESS=false
+D278_08_LIVE_EXECUTION_PERFORMED=false
+D278_08_CURRENT_LIVE_AUTHORIZED=false
+D278_08_READY_FOR_LIVE=false
+D278_08_RETRY_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_DATAFLOW_CLASSIFICATION_OF_PRODUCTION_WRITE_KEY_E0_PAYLOAD_AND_PERSISTENT_DESTINATION
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -1342,7 +1366,7 @@ D278_06_RETRY_AUTHORIZED=false
 
 Report completo: `analysis/D278/D278_06_zero_out_precommand_observation.md`.
 
-### D278/07 — recovery OEM pre-D1: A8 risolta, E4 bloccata
+### D278/07 — recovery OEM pre-D1: A8 risolta, E4 bloccata (stato storico, superato da D278/08)
 
 D278/07 ha ricostruito offline `gfusb.dll` 1.1.125.14 distinguendo il project
 target 8 dai percorsi generici. La policy A8 è target-specifica e chiusa:
@@ -1393,6 +1417,89 @@ RETRY_AUTHORIZED=false
 
 Audit e matrice: `analysis/D278/D278_07_oem_pre_d1_recovery_audit.md` e
 `analysis/D278/D278_07_oem_pre_d1_recovery_matrix.csv`.
+
+### D278/08 — sender E4 project 8 e failure policy risolti; recovery OEM esclusa
+
+D278/08 ha corretto il boundary storico D278/07. La policy A8 non viene
+riaperta: resta risolta, bounded dal byte runtime
+`N_CFG` ancora ignoto e non è un candidato Linux minimale perché include
+retry annidati e A2 MCU-only `{02 14}`.
+
+L'E4 del project 8 non è raggiunto da una callback o tabella indiretta dentro
+`gfUpdatefirmware`. `init_MCU`, dopo il ritorno dell'updater e i suoi gate,
+continua direttamente:
+
+```text
+project == 8 @ 0x18006abec
+  -> gfUpdatefirmware 0x180064a18 @ 0x18006ac4c
+  -> production process 0x18003c348 @ 0x18006ae04
+  -> production_check_psk_is_valid 0x18003b514 @ 0x18003c499
+  -> selector 0xbb020003 @ 0x18003b77b
+  -> production_read_specific_data 0x18003cc90 @ 0x18003b780
+  -> production_read_mcu 0x18003c7f4 @ 0x18003ce0c
+  -> generic sender 0x18005c148 @ 0x18003c94c
+```
+
+Con `r8=0x0e`, `r9=0x02`, body length 8, la routine costruisce E4 con body
+`03 00 02 bb 00 00 00 00`. I timeout statici sono 500 ms per ACK e 1000 ms
+per typed response. Il sender ritenta immediatamente una sola volta se il
+generic send ritorna zero; due zeri producono `0xffdffffd`. Errori di forma,
+status o confronto del valore letto restano nonzero e risalgono al production
+process.
+
+Il production process ripete l'intera validazione al massimo due volte. Dopo
+due failure non abortisce: chiama fino a due volte `0x18003cfd8`, identificata
+ora correttamente come `production_write_key`, che raggiunge
+`production_write_mcu` (`0x18003d8e0`) e il sender E0. Ogni write ha a sua
+volta un solo retry del generic send. Ne risultano al massimo quattro E4 per
+failure di trasporto prima del fallback e fino a quattro E0 nel fallback. Un
+write riuscito è seguito da una nuova `production_check_psk_is_valid` a
+`0x18003c6fb`; solo una revalidation E4 riuscita fa proseguire l'init. Se
+entrambi i write sono accettati ma le relative revalidation falliscono per
+trasporto, il massimo complessivo nel production process è otto E4. Il loop
+write/recheck esaurito nonzero risale a `init_MCU`, `_DeviceInit` e al loop
+esterno `InitThread` bounded da `N_CFG`.
+
+Esiste anche rischio persistente prima dell'E4: il precedente
+`gfUpdatefirmware` può raggiungere A4 Clear App e firmware update, benché la
+capture successful D255/D256 abbia corroborato un singolo passaggio senza A4.
+L'E4 in sé è read-only, ma il suo failure path diretto raggiunge provisioning
+E0. Pertanto la policy è risolta come non factory-preserving e non è un
+candidato Linux:
+
+```text
+OUTCOME=READY
+ADVANCEMENT=NEW_STATIC_TARGET_SPECIFIC_DIRECT_E4_EDGE_AND_PERSISTENT_PROVISIONING_FAILURE_FALLBACK_RESOLVED
+EXECUTABLE_CLOSURE=ANALYSIS_ONLY
+CANONICAL_DOCUMENTATION=UPDATED
+D278_08_BASELINE=4c73dcdaad5df9f9a429626109a4be2a3b1a8b19
+OEM_A8_FAILURE_POLICY=RESOLVED
+OEM_USES_A2_SENSOR_ONLY_AS_PRE_A8_FAILURE_RECOVERY=false
+A2_PRE_A8_RECOVERY_LIVE_JUSTIFIED=false
+A8_RETRY_BOUND_RUNTIME_VALUE=UNKNOWN_CONFIG_BYTE_AT_OFFSET_0x45A
+PROJECT8_E4_SENDER_RESOLVED=true
+PROJECT8_E4_INDIRECT_EDGE_RESOLVED=true
+PROJECT8_E4_FAILURE_RETURN_PROPAGATION_RESOLVED=true
+PROJECT8_E4_RETRY_BOUND_RESOLVED=true
+PROJECT8_E4_PRE_FAILURE_PERSISTENT_WRITE_REACHABLE=true
+PROJECT8_E4_POST_FAILURE_PERSISTENT_WRITE_REACHABLE=true
+PROJECT8_E4_FAILURE_PATH_FACTORY_PRESERVING=false
+OEM_E4_FAILURE_POLICY=RESOLVED
+OEM_PRE_D1_FAILURE_RECOVERY=RESOLVED
+LINUX_SAFE_E4_RECOVERY_CANDIDATE=false
+REAL_USB_ACCESS=false
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+```
+
+La conclusione D278/07 `UNRESOLVED` resta registrata come stato storico ma è
+superata. Audit, grafo, edge machine-readable e verifica riproducibile:
+`analysis/D278/D278_08_project8_e4_indirect_edge_audit.md`,
+`analysis/D278/D278_08_project8_e4_failure_graph.md`,
+`analysis/D278/D278_08_project8_e4_edges.csv` e
+`analysis/D278/tools/verify_d278_08_static.py`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
