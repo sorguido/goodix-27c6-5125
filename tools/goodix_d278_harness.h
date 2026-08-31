@@ -72,6 +72,17 @@ typedef struct
   guint command_count;
   guint ack_count;
   guint typed_response_count;
+  guint reentry_recovery_a2_submit_count;
+  guint reentry_recovery_a2_ack_count;
+  guint reentry_recovery_a2_typed_count;
+  gchar reentry_recovery_a2_result_class[32];
+  guint a8_submit_count;
+  guint a8_ack_count;
+  guint a8_typed_count;
+  gboolean a8_app12509_pin_match;
+  guint e4_submit_count;
+  guint oem_cold_start_a2_1_submit_count;
+  guint oem_cold_start_a2_2_submit_count;
   gboolean e4_binding_match;
   guint tls_handshake_count;
   gboolean tls_established;
@@ -80,6 +91,7 @@ typedef struct
   guint retry_count;
   guint transport_reopen_count;
   guint device_reset_count;
+  guint clear_halt_count;
   guint persistent_device_write_count;
   gboolean d4_reachable;
   guint application_data_count;

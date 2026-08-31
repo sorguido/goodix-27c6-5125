@@ -1085,8 +1085,9 @@ harness_control_for_phase (GoodixSecurePhase phase)
     {
     case GOODIX_SECURE_PHASE_A8: return 0xa8;
     case GOODIX_SECURE_PHASE_E4: return 0xe4;
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2: return 0xa2;
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2: return 0xa2;
     case GOODIX_SECURE_PHASE_CHIP_82: return 0x82;
     case GOODIX_SECURE_PHASE_OTP_A6: return 0xa6;
     case GOODIX_SECURE_PHASE_MODE_70: return 0x70;
@@ -1116,8 +1117,9 @@ harness_typed_for_phase (HarnessFixture   *fixture,
     case GOODIX_SECURE_PHASE_E4:
       memcpy (e4 + 9, fixture->validator, sizeof fixture->validator);
       return harness_build_response (0xe4, e4, sizeof e4);
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2:
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
       return harness_build_response (0xa2, fixture->a2, sizeof fixture->a2);
     case GOODIX_SECURE_PHASE_CHIP_82:
       return harness_build_response (0x82, fixture->chip,
@@ -1434,7 +1436,8 @@ test_harness_full_secure_session_to_stop (void)
   HarnessFixture *fixture = harness_fixture_new ();
   const GoodixSecureSessionAudit *session_audit;
   static const gchar expected_trace[] =
-    "A8,E4,A2_1,CHIP_82,OTP_A6,A2_2,MODE_70,DAC_220,DAC_236,"
+    "REENTRY_RECOVERY_A2,A8,E4,OEM_COLD_START_A2_1,CHIP_82,OTP_A6,"
+    "OEM_COLD_START_A2_2,MODE_70,DAC_220,DAC_236,"
     "DAC_238,DAC_23A,CONFIG_90,D1,TLS,STOP";
 
   harness_run_success (fixture);
@@ -1449,14 +1452,38 @@ test_harness_full_secure_session_to_stop (void)
   g_assert_cmpuint (session_audit->material_descriptor_cleanse_count, ==, 1);
   g_assert_true (session_audit->project_material_zeroized);
   g_assert_cmpstr (fixture->telemetry.result, ==, "pass");
-  g_assert_cmpuint (fixture->telemetry.command_count, ==, 13);
-  g_assert_cmpuint (fixture->telemetry.ack_count, ==, 12);
-  g_assert_cmpuint (fixture->telemetry.typed_response_count, ==, 7);
+  g_assert_cmpuint (fixture->telemetry.command_count, ==, 14);
+  g_assert_cmpuint (fixture->telemetry.ack_count, ==, 13);
+  g_assert_cmpuint (fixture->telemetry.typed_response_count, ==, 8);
+  g_assert_cmpuint (fixture->telemetry.reentry_recovery_a2_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->telemetry.reentry_recovery_a2_ack_count, ==, 1);
+  g_assert_cmpuint (fixture->telemetry.reentry_recovery_a2_typed_count, ==, 1);
+  g_assert_cmpstr (fixture->telemetry.reentry_recovery_a2_result_class, ==,
+                   "STRICT_MATCH");
+  g_assert_cmpuint (fixture->telemetry.a8_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->telemetry.a8_ack_count, ==, 1);
+  g_assert_cmpuint (fixture->telemetry.a8_typed_count, ==, 1);
+  g_assert_true (fixture->telemetry.a8_app12509_pin_match);
+  g_assert_cmpuint (fixture->telemetry.e4_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->telemetry.oem_cold_start_a2_1_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->telemetry.oem_cold_start_a2_2_submit_count, ==, 1);
   g_assert_cmpuint (fixture->telemetry.tls_handshake_count, ==, 1);
   g_assert_true (fixture->telemetry.tls_established);
   g_assert_true (fixture->telemetry.backend_drained);
   g_assert_true (fixture->telemetry.terminal_cleanup_completed);
   g_assert_cmpuint (fixture->telemetry.real_usb_submit_count, ==, 0);
+  /* The deterministic OpenSSL peer and fixed 64-byte B0 egress policy make
+   * the complete host-only reference path's physical budget reproducible. */
+  g_assert_cmpuint (fixture->telemetry.physical_in_submit_count, ==, 18);
+  g_assert_cmpuint (fixture->telemetry.physical_in_completion_count, ==, 18);
+  g_assert_cmpuint (fixture->telemetry.physical_out_submit_count, ==, 19);
+  g_assert_cmpuint (fixture->telemetry.physical_out_completion_count, ==, 19);
+  g_assert_cmpuint (session_audit->b0_physical_submit_count, ==, 5);
+  g_test_message ("D278/11 happy physical IN=%" G_GUINT64_FORMAT
+                  " OUT=%" G_GUINT64_FORMAT " B0=%u",
+                  fixture->telemetry.physical_in_submit_count,
+                  fixture->telemetry.physical_out_submit_count,
+                  session_audit->b0_physical_submit_count);
   harness_fixture_free (fixture);
 }
 
@@ -1472,11 +1499,18 @@ fire_harness_watchdog (HarnessFixture *fixture)
 }
 
 static void
-test_harness_phase_watchdog_a8 (void)
+test_harness_phase_watchdog_reentry_recovery_a2 (void)
 {
   HarnessFixture *fixture = harness_fixture_new ();
   fire_harness_watchdog (fixture);
-  g_assert_cmpstr (fixture->telemetry.failure_class, ==, "PHASE_TIMEOUT_A8");
+  harness_fixture_drain_and_seal (fixture);
+  g_assert_cmpstr (fixture->telemetry.failure_class, ==,
+                   "PHASE_TIMEOUT_REENTRY_RECOVERY_A2");
+  g_assert_cmpuint (fixture->telemetry.a8_submit_count, ==, 0);
+  g_assert_cmpuint (fixture->telemetry.e4_submit_count, ==, 0);
+  g_assert_cmpuint (fixture->telemetry.command_count, ==, 1);
+  g_assert_true (fixture->telemetry.backend_drained);
+  g_assert_true (fixture->telemetry.terminal_cleanup_completed);
   harness_fixture_free (fixture);
 }
 
@@ -1520,7 +1554,7 @@ static void
 test_harness_watchdog_cancelled_on_progress (void)
 {
   static const guint expected_bounds[] = {
-    1000, 1000, 1000, 500, 750, 1000, 500,
+    1000, 1000, 1000, 1000, 500, 750, 1000, 500,
     250, 250, 250, 250, 1000, 1000, 3000
   };
   WatchdogObservation observation = { 0 };
@@ -1652,6 +1686,7 @@ test_harness_no_reset (void)
 {
   HarnessFixture *fixture = successful_sealed_fixture ();
   g_assert_cmpuint (fixture->telemetry.device_reset_count, ==, 0);
+  g_assert_cmpuint (fixture->telemetry.clear_halt_count, ==, 0);
   harness_fixture_free (fixture);
 }
 
@@ -1685,6 +1720,17 @@ test_harness_redacted_telemetry (void)
 
   g_assert_nonnull (strstr (json, "\"real_usb_access\":0"));
   g_assert_nonnull (strstr (json, "\"current_live_authorized\":false"));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_recovery_a2_submit_count\":1"));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_recovery_a2_result_class\":\"STRICT_MATCH\""));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_recovery_a2_oem_equivalence\":false"));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_recovery_a2_project_policy\":true"));
+  g_assert_nonnull (strstr (json, "\"a8_submit_count\":1"));
+  g_assert_nonnull (strstr (json, "\"a8_app12509_pin_match\":true"));
+  g_assert_nonnull (strstr (json, "\"e4_submit_count\":1"));
   g_assert_null (strstr (json, "8081828384858687"));
   g_assert_null (strstr (json, "/var/lib/goodix-5125-poc"));
   g_assert_null (strstr (json, "psk"));
@@ -1850,8 +1896,8 @@ main (int argc,
                    test_harness_synthetic_single_open_claim);
   g_test_add_func ("/d278_02/harness/full_secure_session_to_stop",
                    test_harness_full_secure_session_to_stop);
-  g_test_add_func ("/d278_02/harness/phase_watchdog_a8",
-                   test_harness_phase_watchdog_a8);
+  g_test_add_func ("/d278_02/harness/phase_watchdog_reentry_recovery_a2",
+                   test_harness_phase_watchdog_reentry_recovery_a2);
   g_test_add_func ("/d278_02/harness/phase_watchdog_pre_d1",
                    test_harness_phase_watchdog_pre_d1);
   g_test_add_func ("/d278_02/harness/phase_watchdog_tls",

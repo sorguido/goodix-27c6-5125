@@ -105,6 +105,31 @@ echo D278_02_LIVE_HARNESS_BUILD=PASS
   echo "$self_test_output" | grep -F '"current_live_authorized":false' >/dev/null
 )
 echo D278_02_SELF_TEST=PASS
+(
+  cd "$root"
+  set +e
+  gate_output=$(LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    timeout 30 "$build/d278_native_secure_session_once" \
+      --live-exact-secure-session 2>&1)
+  gate_rc=$?
+  set -e
+  test "$gate_rc" -eq 3
+  echo "$gate_output" | grep -F \
+    'LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED' >/dev/null
+)
+echo D278_11_UNAPPROVED_LIVE_GATE=PASS_BEFORE_MATERIAL_AND_USB_CONTEXT
+runtime_sources="$root/libfprint-driver/goodix_secure_session.c $root/tools/goodix_d278_harness.c $root/tools/d278_native_secure_session_once.c"
+if grep -En '0x[eE]0|0x[aA]4|production_write_key|ClearApp|IAP|firmware[ _-]*update|g_usb_device_reset|g_usb_device_clear_halt|libusb_reset_device|libusb_clear_halt|0x02[[:space:]]*,[[:space:]]*0x14' $runtime_sources; then
+  echo D278_11_FORBIDDEN_PERSISTENT_RECOVERY_SOURCE_AUDIT=FAIL >&2
+  exit 1
+fi
+if nm -u "$build/d278_native_secure_session_once" | \
+   grep -E 'g_usb_device_(reset|clear_halt)|libusb_(reset_device|clear_halt)|production_write_key|ClearApp|IAP|firmware[ _-]*update'; then
+  echo D278_11_FORBIDDEN_PERSISTENT_RECOVERY_SYMBOL_AUDIT=FAIL >&2
+  exit 1
+fi
+echo D278_11_FORBIDDEN_PERSISTENT_RECOVERY_SOURCE_AUDIT=PASS
+echo D278_11_FORBIDDEN_PERSISTENT_RECOVERY_SYMBOL_AUDIT=PASS
 echo D278_02_TEST_COUNT=62
 echo D190_FIVE_INDEPENDENT_KATS=PASS
 echo PROTECTED_MATERIAL_NEGATIVE_MATRIX=PASS

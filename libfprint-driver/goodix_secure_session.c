@@ -40,17 +40,18 @@ typedef struct
   guint8 allowed_statuses[2];
 } PhaseAckPolicy;
 
-/* D238 is the canonical cold-start/pre-D1 ACK authority.  Every row is
- * explicit so future phases cannot inherit this bounded allowlist by opcode
- * accident.  D1 is intentionally absent because it transitions directly to
- * B0/TLS and never accepts an A0 ACK. */
+/* D278/09-10 pin the project reentry-recovery ACK contract; D238 remains the
+ * canonical cold-start/pre-D1 ACK authority.  Every row is explicit so future
+ * phases cannot inherit this bounded allowlist by opcode accident.  D1 is
+ * intentionally absent because it transitions directly to B0/TLS. */
 static const PhaseAckPolicy phase_ack_policies[] = {
+  { GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2, { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_A8,        { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_E4,        { 0x01, 0x07 } },
-  { GOODIX_SECURE_PHASE_A2_1,      { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1, { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_CHIP_82,   { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_OTP_A6,    { 0x01, 0x07 } },
-  { GOODIX_SECURE_PHASE_A2_2,      { 0x01, 0x07 } },
+  { GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2, { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_MODE_70,   { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_DAC_220,   { 0x01, 0x07 } },
   { GOODIX_SECURE_PHASE_DAC_236,   { 0x01, 0x07 } },
@@ -118,12 +119,25 @@ const gchar *
 goodix_secure_phase_name (GoodixSecurePhase phase)
 {
   static const gchar *const names[] = {
-    "A8", "E4", "A2_1", "CHIP_82", "OTP_A6", "A2_2", "MODE_70",
-    "DAC_220", "DAC_236", "DAC_238", "DAC_23A", "CONFIG_90", "D1",
-    "TLS", "STOP", "TERMINAL"
+    "REENTRY_RECOVERY_A2", "A8", "E4", "OEM_COLD_START_A2_1",
+    "CHIP_82", "OTP_A6", "OEM_COLD_START_A2_2", "MODE_70", "DAC_220",
+    "DAC_236", "DAC_238", "DAC_23A", "CONFIG_90", "D1", "TLS", "STOP",
+    "TERMINAL"
   };
 
   return (guint) phase < G_N_ELEMENTS (names) ? names[phase] : "INVALID";
+}
+
+const gchar *
+goodix_reentry_recovery_a2_result_class_name (
+  GoodixReentryRecoveryA2ResultClass result_class)
+{
+  static const gchar *const names[] = {
+    "NOT_STARTED", "SUBMITTED", "ACK_STRICT", "STRICT_MATCH", "FAIL_CLOSED"
+  };
+
+  return (guint) result_class < G_N_ELEMENTS (names) ?
+         names[result_class] : "INVALID";
 }
 
 const gchar *
@@ -320,6 +334,12 @@ session_fail_error (GoodixSecureSession *session,
       g_clear_error (&error);
       return;
     }
+  if (session->phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2 &&
+      session->audit != NULL &&
+      session->audit->reentry_recovery_a2_result_class !=
+        GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH)
+    session->audit->reentry_recovery_a2_result_class =
+      GOODIX_REENTRY_RECOVERY_A2_FAIL_CLOSED;
   session->phase = GOODIX_SECURE_PHASE_TERMINAL;
   notify_phase (session);
   if (session->error == NULL)
@@ -361,10 +381,11 @@ phase_control (GoodixSecurePhase phase)
 {
   switch (phase)
     {
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2: return 0xa2;
     case GOODIX_SECURE_PHASE_A8: return 0xa8;
     case GOODIX_SECURE_PHASE_E4: return 0xe4;
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2: return 0xa2;
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2: return 0xa2;
     case GOODIX_SECURE_PHASE_CHIP_82: return 0x82;
     case GOODIX_SECURE_PHASE_OTP_A6: return 0xa6;
     case GOODIX_SECURE_PHASE_MODE_70: return 0x70;
@@ -396,10 +417,13 @@ build_phase_frame (GoodixSecureSession *session,
 
   switch (session->phase)
     {
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+      body = a2; body_length = sizeof a2; break;
     case GOODIX_SECURE_PHASE_A8: body = a8; body_length = sizeof a8; break;
     case GOODIX_SECURE_PHASE_E4: body = e4; body_length = sizeof e4; break;
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2: body = a2; body_length = sizeof a2; break;
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
+      body = a2; body_length = sizeof a2; break;
     case GOODIX_SECURE_PHASE_CHIP_82: body = chip; body_length = sizeof chip; break;
     case GOODIX_SECURE_PHASE_OTP_A6: body = zero2; body_length = sizeof zero2; break;
     case GOODIX_SECURE_PHASE_MODE_70: body = mode; body_length = sizeof mode; break;
@@ -469,6 +493,7 @@ try_submit_phase (GoodixSecureSession *session,
                   GError             **error)
 {
   g_autoptr(GBytes) frame = NULL;
+  GoodixSecurePhase submitted_phase;
 
   if (session->phase >= GOODIX_SECURE_PHASE_TLS || session->command_submitted)
     return TRUE;
@@ -477,13 +502,38 @@ try_submit_phase (GoodixSecureSession *session,
   frame = build_phase_frame (session, error);
   if (frame == NULL)
     return FALSE;
+  submitted_phase = session->phase;
   /* Publish ownership before submission so the explicitly supported
    * synchronous backend seam cannot complete before our state is visible. */
   session->out_pending = TRUE;
   session->out_kind = OUT_KIND_A0;
   session->command_submitted = TRUE;
   if (session->audit != NULL)
-    session->audit->command_count++;
+    {
+      session->audit->command_count++;
+      switch (submitted_phase)
+        {
+        case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+          session->audit->reentry_recovery_a2_submit_count++;
+          session->audit->reentry_recovery_a2_result_class =
+            GOODIX_REENTRY_RECOVERY_A2_SUBMITTED;
+          break;
+        case GOODIX_SECURE_PHASE_A8:
+          session->audit->a8_submit_count++;
+          break;
+        case GOODIX_SECURE_PHASE_E4:
+          session->audit->e4_submit_count++;
+          break;
+        case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+          session->audit->oem_cold_start_a2_1_submit_count++;
+          break;
+        case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
+          session->audit->oem_cold_start_a2_2_submit_count++;
+          break;
+        default:
+          break;
+        }
+    }
   if (!goodix_fpi_usb_backend_submit_out (session->backend,
                                           session->generation, frame, error))
     {
@@ -491,7 +541,31 @@ try_submit_phase (GoodixSecureSession *session,
       session->out_kind = OUT_KIND_NONE;
       session->command_submitted = FALSE;
       if (session->audit != NULL)
-        session->audit->command_count--;
+        {
+          session->audit->command_count--;
+          switch (submitted_phase)
+            {
+            case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+              session->audit->reentry_recovery_a2_submit_count--;
+              session->audit->reentry_recovery_a2_result_class =
+                GOODIX_REENTRY_RECOVERY_A2_FAIL_CLOSED;
+              break;
+            case GOODIX_SECURE_PHASE_A8:
+              session->audit->a8_submit_count--;
+              break;
+            case GOODIX_SECURE_PHASE_E4:
+              session->audit->e4_submit_count--;
+              break;
+            case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+              session->audit->oem_cold_start_a2_1_submit_count--;
+              break;
+            case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
+              session->audit->oem_cold_start_a2_2_submit_count--;
+              break;
+            default:
+              break;
+            }
+        }
       return FALSE;
     }
   if (session->phase == GOODIX_SECURE_PHASE_TERMINAL)
@@ -722,7 +796,7 @@ goodix_secure_session_new (GoodixFpiUsbBackend                *backend,
   session = g_new0 (GoodixSecureSession, 1);
   session->backend = backend;
   session->generation = generation;
-  session->phase = GOODIX_SECURE_PHASE_A8;
+  session->phase = GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2;
   session->material = *material;
   session->e4_validator = g_memdup2 (material->e4_validator, 32);
   session->config90 = g_memdup2 (material->config90,
@@ -743,6 +817,8 @@ goodix_secure_session_new (GoodixFpiUsbBackend                *backend,
       memset (audit, 0, sizeof *audit);
       audit->generation = generation;
       audit->d4_reachable = FALSE;
+      audit->reentry_recovery_a2_result_class =
+        GOODIX_REENTRY_RECOVERY_A2_NOT_STARTED;
       audit->protocol_failure_phase = GOODIX_SECURE_PHASE_TERMINAL;
       audit->observed_outer_type = -1;
       audit->observed_a0_control = -1;
@@ -806,11 +882,20 @@ gboolean
 goodix_secure_session_start (GoodixSecureSession *session,
                              GError             **error)
 {
-  if (session == NULL || session->started ||
-      session->phase != GOODIX_SECURE_PHASE_A8)
+  if (session == NULL)
     {
       g_set_error_literal (error, GOODIX_SECURE_ERROR, GOODIX_SECURE_ERROR_STATE,
-                           "secure session cannot be started twice");
+                           "secure session is unavailable");
+      return FALSE;
+    }
+  if (session->started ||
+      session->phase != GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2)
+    {
+      if (session->phase != GOODIX_SECURE_PHASE_TERMINAL)
+        session_fail_literal (session, GOODIX_SECURE_ERROR_STATE,
+                              "second reentry recovery attempt rejected");
+      g_set_error_literal (error, GOODIX_SECURE_ERROR, GOODIX_SECURE_ERROR_STATE,
+                           "secure session cannot start recovery twice");
       return FALSE;
     }
   session->started = TRUE;
@@ -833,6 +918,10 @@ validate_typed (GoodixSecureSession *session,
     return FALSE;
   switch (session->phase)
     {
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+      return body_length == 3 &&
+             digest_matches (body, body_length,
+                             session->material.a2_response_sha256);
     case GOODIX_SECURE_PHASE_A8:
       return body_length == sizeof app12509_identity &&
              memcmp (body, app12509_identity, body_length) == 0;
@@ -843,8 +932,8 @@ validate_typed (GoodixSecureSession *session,
                             session->e4_validator, 32) == 0 &&
              digest_matches (body + sizeof e4_prefix, 32,
                              session->material.e4_validator_sha256);
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
       return body_length == 3 &&
              digest_matches (body, body_length,
                              session->material.a2_response_sha256);
@@ -944,7 +1033,17 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
         }
       session->ack_seen = TRUE;
       if (session->audit != NULL)
-        session->audit->ack_count++;
+        {
+          session->audit->ack_count++;
+          if (session->phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2)
+            {
+              session->audit->reentry_recovery_a2_ack_count++;
+              session->audit->reentry_recovery_a2_result_class =
+                GOODIX_REENTRY_RECOVERY_A2_ACK_STRICT;
+            }
+          else if (session->phase == GOODIX_SECURE_PHASE_A8)
+            session->audit->a8_ack_count++;
+        }
       if (phase_ack_only (session->phase))
         {
           session->logical_done = TRUE;
@@ -975,7 +1074,20 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
       goto invalid_response;
     }
   if (session->audit != NULL)
-    session->audit->typed_response_count++;
+    {
+      session->audit->typed_response_count++;
+      if (session->phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2)
+        {
+          session->audit->reentry_recovery_a2_typed_count++;
+          session->audit->reentry_recovery_a2_result_class =
+            GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH;
+        }
+      else if (session->phase == GOODIX_SECURE_PHASE_A8)
+        {
+          session->audit->a8_typed_count++;
+          session->audit->a8_app12509_pin_match = TRUE;
+        }
+    }
   session->logical_done = TRUE;
   advance_phase (session);
   goodix_a0_message_clear (&message);

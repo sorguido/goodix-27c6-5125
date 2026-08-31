@@ -394,8 +394,9 @@ typed_for_phase (Fixture *fixture,
     case GOODIX_SECURE_PHASE_E4:
       memcpy (e4 + 9, fixture->validator, sizeof fixture->validator);
       return build_response (0xe4, e4, sizeof e4);
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2:
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2:
       return build_response (0xa2, fixture->a2, sizeof fixture->a2);
     case GOODIX_SECURE_PHASE_CHIP_82:
       return build_response (0x82, fixture->chip, sizeof fixture->chip);
@@ -415,8 +416,9 @@ control_for_phase (GoodixSecurePhase phase)
     {
     case GOODIX_SECURE_PHASE_A8: return 0xa8;
     case GOODIX_SECURE_PHASE_E4: return 0xe4;
-    case GOODIX_SECURE_PHASE_A2_1:
-    case GOODIX_SECURE_PHASE_A2_2: return 0xa2;
+    case GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1:
+    case GOODIX_SECURE_PHASE_OEM_COLD_START_A2_2: return 0xa2;
     case GOODIX_SECURE_PHASE_CHIP_82: return 0x82;
     case GOODIX_SECURE_PHASE_OTP_A6: return 0xa6;
     case GOODIX_SECURE_PHASE_MODE_70: return 0x70;
@@ -448,7 +450,16 @@ assert_command_shape (Fixture *fixture,
                                         &message, &error));
   g_assert_no_error (error);
   g_assert_cmphex (message.control, ==, control_for_phase (phase));
-  if (phase >= GOODIX_SECURE_PHASE_DAC_220 &&
+  if (phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2)
+    {
+      static const guint8 exact_reentry_body[] = { 0x01, 0x14 };
+      gsize body_length;
+      const guint8 *body = g_bytes_get_data (message.body, &body_length);
+
+      ASSERT_CMPMEM (body, body_length, exact_reentry_body,
+                     sizeof exact_reentry_body);
+    }
+  else if (phase >= GOODIX_SECURE_PHASE_DAC_220 &&
       phase <= GOODIX_SECURE_PHASE_DAC_23A)
     {
       gsize body_length;
@@ -794,9 +805,21 @@ test_happy_path (void)
   g_assert_cmpstr (goodix_tls_server_get_cipher (
                      goodix_secure_session_get_tls_server (fixture->session)),
                    ==, "PSK-AES128-GCM-SHA256");
-  g_assert_cmpuint (fixture->audit.command_count, ==, 13);
-  g_assert_cmpuint (fixture->audit.ack_count, ==, 12);
-  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 7);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 14);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 13);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 8);
+  g_assert_cmpuint (fixture->audit.reentry_recovery_a2_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.reentry_recovery_a2_ack_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.reentry_recovery_a2_typed_count, ==, 1);
+  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
+                   GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH);
+  g_assert_cmpuint (fixture->audit.a8_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.a8_ack_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.a8_typed_count, ==, 1);
+  g_assert_true (fixture->audit.a8_app12509_pin_match);
+  g_assert_cmpuint (fixture->audit.e4_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.oem_cold_start_a2_1_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.oem_cold_start_a2_2_submit_count, ==, 1);
   g_assert_cmpuint (fixture->audit.retry_count, ==, 0);
   g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0);
   g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0);
@@ -907,31 +930,32 @@ test_ack07_phase_policy (void)
   g_assert_true (goodix_secure_session_start (fixture->session, &error));
   g_assert_no_error (error);
   respond_valid (fixture, 0, 0x01);
+  respond_valid (fixture, 0, 0x01);
   g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
                    GOODIX_SECURE_PHASE_E4);
 
   /* Direct D236 evidence: E4 ACK 0x07 plus the valid typed E4 response
-   * advances exactly once and submits exactly one A2_1 command. */
+   * advances exactly once and submits exactly one OEM cold-start A2. */
   respond_valid (fixture, 1, 0x07);
   g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
-                   GOODIX_SECURE_PHASE_A2_1);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 3);
+                   GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 4);
 
-  /* Direct D236 evidence: A2_1 ACK 0x07 plus the valid typed response
+  /* Direct D236 evidence: OEM cold-start A2_1 ACK 0x07 plus the valid typed response
    * advances exactly once and submits exactly one CHIP_82 command. */
   respond_valid (fixture, 2, 0x07);
   g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
                    GOODIX_SECURE_PHASE_CHIP_82);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 4);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 5);
 
   /* D238's bounded cross-control inference covers every remaining
    * ACK-bearing pre-D1 phase. */
   while (goodix_secure_session_get_phase (fixture->session) <
          GOODIX_SECURE_PHASE_D1)
     respond_valid (fixture, 0, 0x07);
-  g_assert_cmpuint (fixture->audit.ack_count, ==, 12);
-  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 7);
-  g_assert_cmpuint (fixture->audit.command_count, ==, 13);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 13);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 8);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 14);
   {
     Submission *submission = pop_out (fixture);
     goodix_secure_session_cancel (fixture->session, "ACK07 matrix closure");
@@ -951,7 +975,7 @@ test_ack_policy_and_response_failures (void)
       g_autoptr(GBytes) ack = NULL;
       g_autoptr(GBytes) typed = NULL;
       Submission *submission;
-      g_assert_true (goodix_secure_session_start (fixture->session, &error));
+      start_and_advance_to (fixture, GOODIX_SECURE_PHASE_A8);
       submission = pop_out (fixture);
       complete_submission (fixture, submission, NULL);
       ack = build_ack (0xa8, status);
@@ -1027,7 +1051,7 @@ test_ack_policy_and_response_failures (void)
     feed_frames (fixture, ack, NULL, 0);
     g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
                      GOODIX_SECURE_PHASE_E4);
-    g_assert_cmpuint (fixture->audit.command_count, ==, 2);
+    g_assert_cmpuint (fixture->audit.command_count, ==, 3);
     goodix_secure_session_cancel (fixture->session, "ACK-only test closure");
     fixture_free (fixture);
   }
@@ -1056,10 +1080,168 @@ test_ack_policy_and_response_failures (void)
 }
 
 static void
+assert_reentry_stopped_before_a8 (Fixture *fixture)
+{
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_TERMINAL);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.reentry_recovery_a2_submit_count, ==, 1);
+  g_assert_cmpuint (fixture->audit.a8_submit_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.e4_submit_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.oem_cold_start_a2_1_submit_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.oem_cold_start_a2_2_submit_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.clear_halt_count, ==, 0);
+  g_assert_cmpuint (fixture->audit.persistent_write_count, ==, 0);
+  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
+                   GOODIX_REENTRY_RECOVERY_A2_FAIL_CLOSED);
+}
+
+static void
+test_reentry_recovery_failure_boundary (void)
+{
+  /* R2: ACK timeout is ambiguous and terminal; no next command. */
+  {
+    Fixture *fixture = fixture_new ();
+    g_autoptr(GError) error = NULL;
+    Submission *submission;
+
+    g_assert_true (goodix_secure_session_start (fixture->session, &error));
+    submission = pop_out (fixture);
+    complete_submission (fixture, submission, NULL);
+    goodix_secure_session_cancel (fixture->session, "reentry ACK timeout");
+    assert_reentry_stopped_before_a8 (fixture);
+    fixture_free (fixture);
+  }
+
+  /* R3: ACK mismatch/status rejection is terminal. */
+  for (guint variant = 0; variant < 2; variant++)
+    {
+      Fixture *fixture = fixture_new ();
+      g_autoptr(GError) error = NULL;
+      g_autoptr(GBytes) bad_ack = NULL;
+      Submission *submission;
+
+      g_assert_true (goodix_secure_session_start (fixture->session, &error));
+      submission = pop_out (fixture);
+      complete_submission (fixture, submission, NULL);
+      bad_ack = build_ack (variant == 0 ? 0xa8 : 0xa2,
+                           variant == 0 ? 0x01 : 0x02);
+      feed_frames (fixture, bad_ack, NULL, 0);
+      assert_reentry_stopped_before_a8 (fixture);
+      fixture_free (fixture);
+    }
+
+  /* R4/R5: typed timeout or target-pin mismatch after a strict ACK stops. */
+  for (guint variant = 0; variant < 2; variant++)
+    {
+      Fixture *fixture = fixture_new ();
+      g_autoptr(GError) error = NULL;
+      g_autoptr(GBytes) ack = NULL;
+      Submission *submission;
+
+      g_assert_true (goodix_secure_session_start (fixture->session, &error));
+      submission = pop_out (fixture);
+      complete_submission (fixture, submission, NULL);
+      ack = build_ack (0xa2, 0x07);
+      feed_frames (fixture, ack, NULL, 0);
+      if (variant == 0)
+        goodix_secure_session_cancel (fixture->session,
+                                      "reentry typed timeout");
+      else
+        {
+          guint8 bad_body[3] = { 0, 0, 0 };
+          g_autoptr(GBytes) bad_typed = build_response (
+            0xa2, bad_body, sizeof bad_body);
+          feed_frames (fixture, bad_typed, NULL, 0);
+        }
+      assert_reentry_stopped_before_a8 (fixture);
+      fixture_free (fixture);
+    }
+
+  /* R6: an E4-shaped response is evidence, not a discard candidate. */
+  {
+    Fixture *fixture = fixture_new ();
+    g_autoptr(GError) error = NULL;
+    guint8 e4[41] = { 0x00, 0x03, 0x00, 0x02, 0xbb, 0x20, 0, 0, 0 };
+    g_autoptr(GBytes) unexpected_e4 = NULL;
+    Submission *submission;
+
+    memcpy (e4 + 9, fixture->validator, sizeof fixture->validator);
+    g_assert_true (goodix_secure_session_start (fixture->session, &error));
+    submission = pop_out (fixture);
+    complete_submission (fixture, submission, NULL);
+    unexpected_e4 = build_response (0xe4, e4, sizeof e4);
+    feed_frames (fixture, unexpected_e4, NULL, 0);
+    assert_reentry_stopped_before_a8 (fixture);
+    fixture_free (fixture);
+  }
+
+  /* R7/R8: A8 failure or a duplicate recovery completion cannot reach E4. */
+  for (guint duplicate = 0; duplicate < 2; duplicate++)
+    {
+      Fixture *fixture = fixture_new ();
+      g_autoptr(GError) error = NULL;
+      g_autoptr(GBytes) duplicate_or_bad = NULL;
+      Submission *reentry_submission;
+      Submission *a8_submission;
+
+      g_assert_true (goodix_secure_session_start (fixture->session, &error));
+      reentry_submission = pop_out (fixture);
+      complete_submission (fixture, reentry_submission, NULL);
+      {
+        g_autoptr(GBytes) ack = build_ack (0xa2, 0x07);
+        g_autoptr(GBytes) typed = typed_for_phase (
+          fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+        feed_frames (fixture, ack, typed, 1);
+      }
+      g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                       GOODIX_SECURE_PHASE_A8);
+      a8_submission = pop_out (fixture);
+      complete_submission (fixture, a8_submission, NULL);
+      duplicate_or_bad = duplicate ?
+        typed_for_phase (fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2) :
+        build_ack (0xa8, 0x02);
+      feed_frames (fixture, duplicate_or_bad, NULL, 0);
+      g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                       GOODIX_SECURE_PHASE_TERMINAL);
+      g_assert_cmpuint (fixture->audit.command_count, ==, 2);
+      g_assert_cmpuint (fixture->audit.a8_submit_count, ==, 1);
+      g_assert_cmpuint (fixture->audit.e4_submit_count, ==, 0);
+      g_assert_cmpuint (fixture->audit.oem_cold_start_a2_1_submit_count, ==, 0);
+      g_assert_cmpuint (fixture->audit.retry_count, ==, 0);
+      fixture_free (fixture);
+    }
+
+  /* R9: the one start attempt is the only recovery attempt. */
+  {
+    Fixture *fixture = fixture_new ();
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GError) second_error = NULL;
+    Submission *submission;
+
+    g_assert_true (goodix_secure_session_start (fixture->session, &error));
+    submission = pop_out (fixture);
+    g_assert_false (goodix_secure_session_start (fixture->session,
+                                                  &second_error));
+    g_assert_nonnull (second_error);
+    g_assert_cmpuint (fixture->audit.command_count, ==, 1);
+    g_assert_cmpuint (fixture->audit.reentry_recovery_a2_submit_count, ==, 1);
+    g_assert_cmpuint (fixture->audit.a8_submit_count, ==, 0);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_TERMINAL);
+    complete_submission (fixture, submission, NULL);
+    fixture_free (fixture);
+  }
+}
+
+static void
 test_typed_length_hash_and_90 (void)
 {
   const GoodixSecurePhase phases[] = {
-    GOODIX_SECURE_PHASE_A2_1, GOODIX_SECURE_PHASE_CHIP_82,
+    GOODIX_SECURE_PHASE_OEM_COLD_START_A2_1, GOODIX_SECURE_PHASE_CHIP_82,
     GOODIX_SECURE_PHASE_OTP_A6, GOODIX_SECURE_PHASE_CONFIG_90
   };
 
@@ -1140,9 +1322,9 @@ test_unexpected_classes_and_terminal (void)
   fixture = fixture_new ();
   {
     g_autoptr(GError) start_error = NULL;
-    g_autoptr(GBytes) ack = build_ack (0xa8, 0x01);
+    g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
     g_autoptr(GBytes) typed = typed_for_phase (fixture,
-                                               GOODIX_SECURE_PHASE_A8);
+      GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
     Submission *submission;
 
     g_assert_true (goodix_secure_session_start (fixture->session,
@@ -1242,6 +1424,18 @@ test_cancel_generation_and_out_order (void)
   g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (
                      fixture->backend), ==, 0);
   submission = pop_out (fixture);
+  assert_command_shape (fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2,
+                        submission->bytes);
+  submission_free (submission);
+  {
+    g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+    g_autoptr(GBytes) typed = typed_for_phase (fixture,
+      GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+    feed_frames (fixture, ack, typed, 1);
+  }
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_A8);
+  submission = pop_out (fixture);
   assert_command_shape (fixture, GOODIX_SECURE_PHASE_A8, submission->bytes);
   submission_free (submission);
   {
@@ -1322,6 +1516,8 @@ main (int argc,
                    test_ack07_phase_policy);
   g_test_add_func ("/goodix/d278/ack-policy-response-failures",
                    test_ack_policy_and_response_failures);
+  g_test_add_func ("/goodix/d278/reentry-recovery-failure-boundary",
+                   test_reentry_recovery_failure_boundary);
   g_test_add_func ("/goodix/d278/typed-length-hash-90",
                    test_typed_length_hash_and_90);
   g_test_add_func ("/goodix/d278/unexpected-classes-terminal",

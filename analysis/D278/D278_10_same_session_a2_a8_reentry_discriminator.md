@@ -4,9 +4,9 @@
 
 ```text
 OUTCOME=READY
-ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED_HOST_ONLY_SAME_SESSION_A2_A8_CAUSAL_GATE_AND_FAILURE_BOUNDARY
+ADVANCEMENT=REAL_EXECUTION_COMPLETED_SAME_SESSION_A2_THEN_A8_APP12509_STRICT_MATCH
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-RESIDUAL_BLOCKER_OR_RISK=DEVICE_SIDE_POST_A2_A8_BEHAVIOR_AND_ABSOLUTE_WIRE_CAUSAL_PROVENANCE_REMAIN_UNPROVEN
+RESIDUAL_BLOCKER_OR_RISK=A2_RECOVERY_CAUSAL_MECHANISM_AND_ABSOLUTE_WIRE_PROVENANCE_AND_DEVICE_NVM_NONMUTATION_REMAIN_UNPROVEN
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=BASELINE_1c40f6b7b7282ca6e0a39a2c3e2d8672d9544dd6_ON_main_PLUS_WORKTREE_DIFF_PLUS_analysis/D278/D278_09_a2_sensor_only_risk_probe.md_PLUS_analysis/D278/D278_10_same_session_a2_a8_reentry_discriminator.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_tools/goodix_d278_a2_a8_reentry_probe.c_PLUS_tools/goodix_d278_a2_a8_reentry_probe.h_PLUS_tools/d278_a2_a8_reentry_observe_once.c_PLUS_libfprint-driver/tests/test_goodix_d278_10_a2_a8_reentry_probe.c_PLUS_libfprint-driver/tests/run_goodix_d278_10_a2_a8_reentry_probe_test.sh_PLUS_libfprint-driver/tests/run_goodix_d278_10_a2_a8_reentry_probe_test_inner.sh
 
@@ -24,7 +24,7 @@ POST_A2_A8_RESPONSE_CAUSAL_PROVENANCE_ABSOLUTE=false
 
 A2_A8_REENTRY_PROBE_IMPLEMENTED=true
 A2_A8_REENTRY_PROBE_LIVE_CAPABLE=true
-A2_A8_REENTRY_PROBE_LIVE_EXECUTED=false
+A2_A8_REENTRY_PROBE_LIVE_EXECUTED=true
 
 GOODIX_COMMAND_SUBMIT_MAX=2
 GOODIX_BULK_OUT_SUBMIT_MAX=2
@@ -41,18 +41,81 @@ DEVICE_RESET_COUNT=0
 CLEAR_HALT_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
 
-FUTURE_SINGLE_SHOT_A2_A8_LIVE_READY_FOR_AI_PM_REVIEW=true
+FUTURE_SINGLE_SHOT_A2_A8_LIVE_READY_FOR_AI_PM_REVIEW=false
 
-REAL_USB_ACCESS=false
-LIVE_EXECUTION_PERFORMED=false
+REAL_USB_ACCESS=true
+LIVE_EXECUTION_PERFORMED=true
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
 ```
 
-`FUTURE_SINGLE_SHOT_A2_A8_LIVE_READY_FOR_AI_PM_REVIEW=true` indica soltanto
-che il candidato host-only è disponibile per review. D278/10 non seleziona o
-approva una baseline live e non trasferisce l'autorizzazione D278/09.
+La successiva autorizzazione D278/10 è stata usata una sola volta ed è
+consumata. Nessun rerun equivalente è autorizzato.
+
+## Risultato live D278/10 integrato
+
+L'operatore ha eseguito la singola live sulla baseline approvata
+`529e98626421b3f3fc1e85f9a25c5e938b357482`. Exact A2 `{01 14}` ha chiuso
+ACK `0x07` più typed target-pinned strict; A8 ha poi chiuso ACK `0x07` più
+typed byte-identical a `GF_ST411SEC_APP_12509`. Il precedente frame E4-shaped
+in fase A8 non si è ripetuto.
+
+```text
+D278_10_LIVE_OUTCOME=PASS
+APPROVED_BASELINE=529e98626421b3f3fc1e85f9a25c5e938b357482
+USB_OPEN_COUNT=1
+USB_CLAIM_COUNT=1
+USB_RELEASE_COUNT=1
+USB_CLOSE_COUNT=1
+GOODIX_COMMAND_COUNT=2
+OUT_SUBMIT_COUNT=2
+A2_SENSOR_ONLY_SUBMIT_COUNT=1
+A2_ACK_COUNT=1
+A2_TYPED_RESPONSE_COUNT=1
+A2_ACK_STATUS=0x07
+A2_TYPED_RESULT_CLASS=STRICT_MATCH
+A8_SUBMIT_COUNT=1
+A8_ACK_COUNT=1
+A8_TYPED_RESPONSE_COUNT=1
+A8_ACK_STATUS=0x07
+A8_TYPED_RESULT_CLASS=STRICT_MATCH
+A8_APP12509_PIN_MATCH=true
+PHYSICAL_IN_SUBMIT_COUNT=4
+PHYSICAL_IN_COMPLETION_COUNT=4
+TIMEOUT_COUNT=0
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+TLS_HANDSHAKE_COUNT=0
+UNEXPECTED_FRAME_COUNT=0
+STALE_CALLBACK_COUNT=0
+PROHIBITED_SECOND_COMMAND_COUNT=0
+COMPLETION_CLASS=A2_A8_REENTRY_ACCEPTED
+ERROR_CLASS=NONE
+REENTRY_RESULT_CLASS=SAME_SESSION_A2_A8_APP12509_STRICT_MATCH
+BACKEND_DRAINED=true
+CLEANUP_COMPLETED=true
+D278_10_ONE_SHOT_CONSUMED=true
+D278_10_RERUN_AUTHORIZED=false
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Interpretazione bounded:
+
+```text
+A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT=true
+SAME_SESSION_A2_THEN_A8_APP12509_TARGET_PROVEN=true
+A2_SENSOR_ONLY_REENTRY_RECOVERY_EFFECTIVE_FOR_A8_ON_CURRENT_TARGET_CONTEXT=true
+PROJECT_REENTRY_RECOVERY_CANDIDATE=PROVEN_EFFECTIVE_FOR_A8_ON_CURRENT_TARGET_CONTEXT
+A2_REENTRY_RECOVERY_CAUSAL_MECHANISM=UNKNOWN
+A2_REENTRY_RECOVERY_UNIVERSALLY_REQUIRED=false
+A2_REENTRY_RECOVERY_UNIVERSALLY_SAFE_ALL_FIRMWARE=false
+A2_DEVICE_NVM_NONMUTATION_ABSOLUTELY_PROVEN=false
+WIRE_CAUSAL_PROVENANCE_ABSOLUTE=false
+```
 
 ## Input live D278/09
 
@@ -164,7 +227,7 @@ L'audit statico e dei simboli non risolti conferma l'assenza di E4, 70, 80,
 90, D1, E0, A4, F0, F4, TLS, secure-session, USB reset, clear-halt e control
 transfer dal path runtime.
 
-## Riesame metodologico pre-live
+## Riesame metodologico pre-live preservato
 
 1. **Cosa cambia realmente?** A differenza di D278/03, A8 non è il primo
    comando della open epoch: è causalmente gated dal completamento strict di
@@ -177,6 +240,6 @@ transfer dal path runtime.
    all'analisi offline. Nessun secondo A2/A8, retry, E4, reset o nuova run
    equivalente viene proposto automaticamente.
 
-D278/10 non esegue questa ipotesi sul device. Una eventuale live richiede
-review AI-PM, full SHA esplicitamente approvata e autorizzazione single-shot
-nuova e specifica dell'Utente.
+Questo riesame ha governato la singola live poi eseguita e documentata sopra.
+L'autorizzazione è consumata: `D278_10_RERUN_AUTHORIZED=false` e
+`CURRENT_LIVE_AUTHORIZED=false`.

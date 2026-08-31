@@ -143,7 +143,7 @@ guint
 goodix_d278_watchdog_timeout_for_phase (GoodixSecurePhase phase)
 {
   static const guint bounds[] = {
-    1000, 1000, 1000, 500, 750, 1000, 500,
+    1000, 1000, 1000, 1000, 500, 750, 1000, 500,
     250, 250, 250, 250, 1000, 1000, 3000
   };
 
@@ -251,7 +251,9 @@ goodix_d278_telemetry_init (GoodixD278Telemetry *telemetry,
              sizeof telemetry->failure_class);
   g_strlcpy (telemetry->protocol_failure_kind, "none",
              sizeof telemetry->protocol_failure_kind);
-  telemetry->reached_phase = GOODIX_SECURE_PHASE_A8;
+  g_strlcpy (telemetry->reentry_recovery_a2_result_class, "NOT_STARTED",
+             sizeof telemetry->reentry_recovery_a2_result_class);
+  telemetry->reached_phase = GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2;
   telemetry->protocol_failure_phase = GOODIX_SECURE_PHASE_TERMINAL;
   telemetry->observed_outer_type = -1;
   telemetry->observed_a0_control = -1;
@@ -639,10 +641,31 @@ refresh_telemetry (GoodixD278Harness   *harness,
   telemetry->command_count = harness->session_audit.command_count;
   telemetry->ack_count = harness->session_audit.ack_count;
   telemetry->typed_response_count = harness->session_audit.typed_response_count;
+  telemetry->reentry_recovery_a2_submit_count =
+    harness->session_audit.reentry_recovery_a2_submit_count;
+  telemetry->reentry_recovery_a2_ack_count =
+    harness->session_audit.reentry_recovery_a2_ack_count;
+  telemetry->reentry_recovery_a2_typed_count =
+    harness->session_audit.reentry_recovery_a2_typed_count;
+  g_strlcpy (telemetry->reentry_recovery_a2_result_class,
+             goodix_reentry_recovery_a2_result_class_name (
+               harness->session_audit.reentry_recovery_a2_result_class),
+             sizeof telemetry->reentry_recovery_a2_result_class);
+  telemetry->a8_submit_count = harness->session_audit.a8_submit_count;
+  telemetry->a8_ack_count = harness->session_audit.a8_ack_count;
+  telemetry->a8_typed_count = harness->session_audit.a8_typed_count;
+  telemetry->a8_app12509_pin_match =
+    harness->session_audit.a8_app12509_pin_match;
+  telemetry->e4_submit_count = harness->session_audit.e4_submit_count;
+  telemetry->oem_cold_start_a2_1_submit_count =
+    harness->session_audit.oem_cold_start_a2_1_submit_count;
+  telemetry->oem_cold_start_a2_2_submit_count =
+    harness->session_audit.oem_cold_start_a2_2_submit_count;
   telemetry->tls_established = harness->session_audit.tls_established;
   telemetry->retry_count = harness->session_audit.retry_count;
   telemetry->transport_reopen_count = harness->session_audit.transport_reopen_count;
   telemetry->device_reset_count = harness->session_audit.device_reset_count;
+  telemetry->clear_halt_count = harness->session_audit.clear_halt_count;
   telemetry->persistent_device_write_count =
     harness->session_audit.persistent_write_count;
   telemetry->d4_reachable = harness->session_audit.d4_reachable;
@@ -693,6 +716,17 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     "\"physical_out_completion_count\":%" G_GUINT64_FORMAT ","
     "\"max_outstanding_bulk_in\":%u,\"max_outstanding_bulk_out\":%u,"
     "\"command_count\":%u,\"ack_count\":%u,\"typed_response_count\":%u,"
+    "\"reentry_recovery_a2_submit_count\":%u,"
+    "\"reentry_recovery_a2_ack_count\":%u,"
+    "\"reentry_recovery_a2_typed_count\":%u,"
+    "\"reentry_recovery_a2_result_class\":\"%s\","
+    "\"reentry_recovery_a2_oem_equivalence\":false,"
+    "\"reentry_recovery_a2_project_policy\":true,"
+    "\"a8_submit_count\":%u,\"a8_ack_count\":%u,\"a8_typed_count\":%u,"
+    "\"a8_app12509_pin_match\":%s,"
+    "\"e4_submit_count\":%u,"
+    "\"oem_cold_start_a2_1_submit_count\":%u,"
+    "\"oem_cold_start_a2_2_submit_count\":%u,"
     "\"protocol_failure_phase\":\"%s\","
     "\"protocol_failure_kind\":\"%s\","
     "\"observed_outer_type\":%d,\"observed_a0_control\":%d,"
@@ -701,7 +735,8 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     "\"e4_binding_match\":%s,\"tls_handshake_count\":%u,"
     "\"tls_established\":%s,\"secret_handoff_count\":%u,"
     "\"project_secret_zeroized\":%s,\"retry_count\":%u,"
-    "\"transport_reopen_count\":%u,\"device_reset_count\":%u,"
+    "\"transport_reopen_count\":%u,\"reopen_count\":%u,"
+    "\"device_reset_count\":%u,\"clear_halt_count\":%u,"
     "\"persistent_device_write_count\":%u,\"d4_reachable\":%s,"
     "\"application_data_count\":%u,\"finger_wait_count\":%u,"
     "\"image_count\":%u,\"backend_drained\":%s,"
@@ -723,6 +758,16 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     telemetry->max_outstanding_bulk_out,
     telemetry->command_count, telemetry->ack_count,
     telemetry->typed_response_count,
+    telemetry->reentry_recovery_a2_submit_count,
+    telemetry->reentry_recovery_a2_ack_count,
+    telemetry->reentry_recovery_a2_typed_count,
+    telemetry->reentry_recovery_a2_result_class,
+    telemetry->a8_submit_count, telemetry->a8_ack_count,
+    telemetry->a8_typed_count,
+    telemetry->a8_app12509_pin_match ? "true" : "false",
+    telemetry->e4_submit_count,
+    telemetry->oem_cold_start_a2_1_submit_count,
+    telemetry->oem_cold_start_a2_2_submit_count,
     g_str_equal (telemetry->protocol_failure_kind, "none") ? "none" :
       goodix_secure_phase_name (telemetry->protocol_failure_phase),
     telemetry->protocol_failure_kind,
@@ -735,7 +780,8 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     telemetry->secret_handoff_count,
     zeroized ? "true" : "false",
     telemetry->retry_count, telemetry->transport_reopen_count,
-    telemetry->device_reset_count, telemetry->persistent_device_write_count,
+    telemetry->transport_reopen_count, telemetry->device_reset_count,
+    telemetry->clear_halt_count, telemetry->persistent_device_write_count,
     telemetry->d4_reachable ? "true" : "false",
     telemetry->application_data_count, telemetry->finger_wait_count,
     telemetry->image_count,

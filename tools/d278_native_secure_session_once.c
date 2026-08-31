@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- * D278/02 single-shot operator harness.  --self-test is synthetic and
+ * D278/11 reentry-prefixed native secure-session harness.  --self-test is synthetic and
  * hardware-free.  --material-preflight-only reads only the protected store
  * and inert canonical DLL.  --live-exact-secure-session is intentionally
  * compiled and fully wired, but execution requires separate procedural
@@ -22,6 +22,15 @@
 #define D278_PID 0x5125u
 #define D278_INTERFACE 0u
 
+#ifndef D278_11_APPROVED_BASELINE
+#define D278_11_APPROVED_BASELINE "UNAPPROVED_FOR_LIVE"
+#endif
+
+#define D278_11_AUTHORIZATION_TOKEN \
+  "D278_11_ONE_REENTRY_PREFIXED_NATIVE_SECURE_SESSION_NO_RETRY"
+#define D278_11_OPERATION_NAME \
+  "D278_11_REENTRY_PREFIXED_NATIVE_SECURE_SESSION"
+
 static const gchar *const manifest_path =
   "/var/lib/goodix-5125-poc/target-material-manifest.json";
 static const gchar *const transport_path =
@@ -30,6 +39,36 @@ static const gchar *const config90_path =
   "/var/lib/goodix-5125-poc/target-config-90.bin";
 
 #ifdef D278_LIVE_BINDING
+static gboolean
+is_full_sha (const gchar *value)
+{
+  if (value == NULL || strlen (value) != 40)
+    return FALSE;
+  for (guint i = 0; i < 40; i++)
+    if (!g_ascii_isxdigit (value[i]))
+      return FALSE;
+  return TRUE;
+}
+
+static gboolean
+live_authorization_gate (void)
+{
+  const gchar *runtime_sha =
+    g_getenv ("D278_11_APPROVED_LIVE_BASELINE_SHA");
+  const gchar *authorization =
+    g_getenv ("D278_11_OPERATOR_AUTHORIZATION");
+  const gchar *operation = g_getenv ("D278_11_OPERATION");
+
+  if (g_str_equal (D278_11_APPROVED_BASELINE, "UNAPPROVED_FOR_LIVE") ||
+      !is_full_sha (D278_11_APPROVED_BASELINE))
+    return FALSE;
+  return runtime_sha != NULL && authorization != NULL && operation != NULL &&
+         is_full_sha (runtime_sha) &&
+         g_str_equal (runtime_sha, D278_11_APPROVED_BASELINE) &&
+         g_str_equal (authorization, D278_11_AUTHORIZATION_TOKEN) &&
+         g_str_equal (operation, D278_11_OPERATION_NAME);
+}
+
 static void
 record_host_failure (GoodixD278Telemetry *telemetry,
                      const gchar         *failure_class)
@@ -185,8 +224,10 @@ run_self_test (void)
   passed = telemetry.backend_drained && telemetry.terminal_cleanup_completed &&
            telemetry.real_usb_submit_count == 0 && telemetry.usb_open_count == 0 &&
            telemetry.usb_claim_count == 0 && telemetry.project_secret_zeroized &&
-           g_str_has_prefix (telemetry.failure_class, "PHASE_TIMEOUT_A8");
-  g_print ("{\"result\":\"%s\",\"self_test\":\"EXPECTED_A8_WATCHDOG_TERMINAL\","
+           g_str_has_prefix (telemetry.failure_class,
+                             "PHASE_TIMEOUT_REENTRY_RECOVERY_A2");
+  g_print ("{\"result\":\"%s\",\"self_test\":"
+           "\"EXPECTED_REENTRY_RECOVERY_A2_WATCHDOG_TERMINAL\","
            "\"real_usb_access\":0,\"real_usb_submit\":0,"
            "\"usb_open_count\":0,\"usb_claim_count\":0,"
            "\"current_live_authorized\":false,\"terminal_case\":%s}\n",
@@ -279,6 +320,14 @@ run_live_once (void)
   gboolean opened = FALSE;
   gboolean claimed = FALSE;
   int rc = 1;
+
+  /* Every ordinary build stops before protected material reads, GUsb context
+   * creation or enumeration.  D278/11 never auto-selects a live baseline. */
+  if (!live_authorization_gate ())
+    {
+      g_printerr ("LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED\n");
+      return 3;
+    }
 
   goodix_d278_telemetry_init (&telemetry, TRUE);
   owner = prepare_target_material (&material_audit, &view, &preflight_failure,
