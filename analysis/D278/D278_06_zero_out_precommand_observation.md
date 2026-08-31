@@ -1,12 +1,14 @@
-# D278/06 — observer precommand zero-OUT, implementazione e closure host-only
+# D278/06 — observer precommand zero-OUT, closure host-only e risultato live
 
 ## Closure
 
 ```text
 OUTCOME=READY
-ADVANCEMENT=NEW_DEDICATED_ZERO_OUT_ONE_IN_ARCHITECTURAL_PATH_IMPLEMENTED_AND_HOST_ONLY_VERIFIED
+ADVANCEMENT=REAL_EXECUTION_COMPLETED_ONE_ZERO_OUT_ONE_IN_BOUNDED_OBSERVATION_WITH_NO_DATA_WITHIN_1000MS
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-RESIDUAL_BLOCKER_OR_RISK=CURRENT_APP12509_FIRMWARE_IDENTITY_CANNOT_BE_REREAD_WITHOUT_A8_AND_IS_NOT_REVALIDATED_BY_THIS_CAUSAL_CUT;DEVICE_PROTOCOL_QUIESCENCE_UNPROVEN;LIVE_REQUIRES_AI_PM_REVIEW_APPROVED_BASELINE_AND_NEW_EXPLICIT_AUTHORIZATION
+HOST_ONLY_CLOSURE=PASS
+LIVE_EXECUTION_RESULT=VALID_SINGLE_SHOT_TIMEOUT_NO_DATA
+RESIDUAL_BLOCKER_OR_RISK=CURRENT_APP12509_FIRMWARE_IDENTITY_WAS_NOT_REREAD_DUE_TO_CAUSAL_CUT;DEVICE_PROTOCOL_QUIESCENCE_AND_READINESS_FOR_A8_REMAIN_UNPROVEN;EQUIVALENT_OBSERVATION_MUST_NOT_BE_REPEATED
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=BASELINE_8ca15e343572676d2ed0de24abda8ebeb3ad0698_ON_main_PLUS_WORKTREE_DIFF_PLUS_analysis/D278/D278_06_zero_out_precommand_observation.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_tools/goodix_d278_precommand_observer.c_PLUS_tools/goodix_d278_precommand_observer.h_PLUS_tools/d278_precommand_observe_once.c_PLUS_libfprint-driver/tests/test_goodix_d278_06_precommand_observer.c_PLUS_libfprint-driver/tests/run_goodix_d278_06_precommand_observer_test.sh_PLUS_libfprint-driver/tests/run_goodix_d278_06_precommand_observer_test_inner.sh
 
@@ -16,7 +18,7 @@ PRECOMMAND_FRAME_PREVIOUS_SESSION_IDENTITY=UNPROVEN
 POST_A8_WIRE_CAUSAL_PROVENANCE=UNAVAILABLE
 ZERO_OUT_OBSERVER_IMPLEMENTED=true
 LIVE_CAPABLE_LAUNCHER_IMPLEMENTED=true
-LIVE_CAPABLE_LAUNCHER_EXECUTED=false
+LIVE_CAPABLE_LAUNCHER_EXECUTED=true
 GOODIX_BULK_OUT_SUBMIT_MAX=0
 GOODIX_COMMAND_COUNT=0
 SECURE_SESSION_START_COUNT=0
@@ -31,15 +33,72 @@ REOPEN_COUNT=0
 DEVICE_RESET_COUNT=0
 CLEAR_HALT_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
-REAL_USB_ACCESS=false
-LIVE_EXECUTION_PERFORMED=false
-FUTURE_SINGLE_SHOT_ZERO_OUT_LIVE_READY_FOR_AI_PM_REVIEW=true
+REAL_USB_ACCESS=true
+LIVE_EXECUTION_PERFORMED=true
+FUTURE_SINGLE_SHOT_ZERO_OUT_LIVE_READY_FOR_AI_PM_REVIEW=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
 ```
 
-## Baseline, scope e safety
+## Risultato live integrato post-review
+
+La AI-PM ha approvato la baseline completa
+`1682e01bcc2817f5a0b5028ab6bf4bcac32a61d0` e l'operatore ha consumato una
+sola autorizzazione `D278_06_ONE_ZERO_OUT_PRECOMMAND_OBSERVATION_NO_RETRY`.
+Questa evidenza è fornita come input canonico a D278/07: non è stata ripetuta
+né rieseguita durante l'audit offline. La telemetria esatta è:
+
+```json
+{"identity_preflight_result":"EXACT_ONE_27C6_5125_PRIOR_D277_02_APP12509_PROOF_CURRENT_FW_NOT_READ","usb_open_count":1,"usb_claim_count":1,"usb_release_count":1,"usb_close_count":1,"observation_generation":1,"physical_in_submit_count":1,"physical_in_completion_count":1,"received_byte_count":0,"out_submit_count":0,"goodix_command_count":0,"secure_session_start_count":0,"tls_handshake_count":0,"completion_class":"TIMEOUT_NO_COMPLETE_DATA","timeout_count":1,"cancel_count":0,"error_class":"TIMEOUT","frame_class":"NOT_OBSERVED","frame_complete":false,"frame_partial":false,"extra_or_concatenated_data":false,"observed_outer_type":-1,"observed_control":-1,"observed_ack_echo":-1,"observed_ack_status":-1,"observed_body_length":-1,"retry_count":0,"reopen_count":0,"device_reset_count":0,"clear_halt_count":0,"persistent_device_write_count":0,"stale_callback_count":0,"prohibited_out_attempt_count":0,"backend_drained":true,"cleanup_completed":true}
+```
+
+```text
+D278_06_LIVE_EXECUTION_PERFORMED=true
+D278_06_LIVE_EXECUTION_COUNT=1
+D278_06_LIVE_BASELINE=1682e01bcc2817f5a0b5028ab6bf4bcac32a61d0
+D278_06_LIVE_OUTCOME=VALID_SINGLE_SHOT_TIMEOUT_NO_DATA
+D278_06_HYPOTHESIS_RESULT=NO_PRECOMMAND_DATA_OBSERVED_WITHIN_1000MS
+D278_06_PHYSICAL_BULK_IN_SUBMIT_COUNT=1
+D278_06_PHYSICAL_BULK_IN_COMPLETION_COUNT=1
+D278_06_RECEIVED_BYTE_COUNT=0
+D278_06_GOODIX_BULK_OUT_SUBMIT_COUNT=0
+D278_06_GOODIX_COMMAND_COUNT=0
+D278_06_TLS_HANDSHAKE_COUNT=0
+D278_06_COMPLETION_CLASS=TIMEOUT_NO_COMPLETE_DATA
+D278_06_TIMEOUT_COUNT=1
+D278_06_FRAME_CLASS=NOT_OBSERVED
+D278_06_USB_OPEN_COUNT=1
+D278_06_USB_CLAIM_COUNT=1
+D278_06_USB_RELEASE_COUNT=1
+D278_06_USB_CLOSE_COUNT=1
+D278_06_BACKEND_DRAINED=true
+D278_06_CLEANUP_COMPLETED=true
+D278_06_RETRY_COUNT=0
+D278_06_REOPEN_COUNT=0
+D278_06_DEVICE_RESET_COUNT=0
+D278_06_CLEAR_HALT_COUNT=0
+D278_06_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_06_CURRENT_LIVE_AUTHORIZED=false
+D278_06_RETRY_AUTHORIZED=false
+D278_06_DO_NOT_RUN_EQUIVALENT_OBSERVATION_AGAIN=true
+```
+
+Il risultato è metodologicamente valido e non è un failure del launcher. Prova
+che, entro una sola finestra host di 1000 ms dopo open/claim e prima di ogni
+Goodix OUT corrente, il singolo IN ha completato per timeout con zero byte;
+prova inoltre zero OUT/comandi/TLS/retry/reopen/reset/clear-halt/write
+persistente e cleanup completo. Non prova endpoint permanentemente vuoto,
+quiescenza del protocollo, assenza di emissioni tardive, identità di una
+sessione precedente, revisione firmware corrente o readiness APP12509 per A8.
+
+```text
+IMMEDIATE_PRECOMMAND_BACKLOG_WITHIN_1000MS=NOT_OBSERVED
+DEVICE_PROTOCOL_QUIESCENCE_PROVEN=false
+APP12509_READY_FOR_A8_PROVEN=false
+```
+
+## Baseline, scope e safety della closure originaria
 
 Lo step è partito da tree pulito, branch `main`, con `HEAD` e `origin/main`
 coincidenti a `8ca15e343572676d2ed0de24abda8ebeb3ad0698` (`feat: enhance
@@ -48,7 +107,7 @@ stati letti il contesto canonico, D277/02, D278/01–D278/05, backend, router,
 harness, launcher secure-session e test pertinenti. La parentesi
 orchestration/O001/O002/O003 non è stata usata.
 
-Lo sviluppo e tutte le verifiche sono stati sintetici. Non sono stati
+Lo sviluppo e tutte le verifiche host-only originarie sono stati sintetici. Non sono stati
 enumerati, aperti o reclamati device reali; non sono stati eseguiti launcher in
 modalità live, `sudo`, store protetti, PSK, TLS, power-cycle, reset, clear-halt,
 reopen, retry o comandi Goodix. Il build live-capable usa deliberatamente la

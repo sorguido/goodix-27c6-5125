@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/06 — observer precommand zero-OUT dedicato chiuso host-only; causal cut preservato, firmware corrente non riletto, nessuna live autorizzata
+### Stato corrente post-D278/07 — zero-OUT live consumata; policy A8 OEM chiusa, recovery E4 target ancora irrisolta
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -298,7 +298,32 @@ D278_06_OUTCOME=READY
 D278_06_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 D278_06_ZERO_OUT_OBSERVER_IMPLEMENTED=true
 D278_06_LIVE_CAPABLE_LAUNCHER_IMPLEMENTED=true
-D278_06_LIVE_CAPABLE_LAUNCHER_EXECUTED=false
+D278_06_LIVE_CAPABLE_LAUNCHER_EXECUTED=true
+D278_06_LIVE_EXECUTION_PERFORMED=true
+D278_06_LIVE_EXECUTION_COUNT=1
+D278_06_LIVE_BASELINE=1682e01bcc2817f5a0b5028ab6bf4bcac32a61d0
+D278_06_LIVE_OUTCOME=VALID_SINGLE_SHOT_TIMEOUT_NO_DATA
+D278_06_HYPOTHESIS_RESULT=NO_PRECOMMAND_DATA_OBSERVED_WITHIN_1000MS
+D278_06_PHYSICAL_BULK_IN_SUBMIT_COUNT=1
+D278_06_PHYSICAL_BULK_IN_COMPLETION_COUNT=1
+D278_06_RECEIVED_BYTE_COUNT=0
+D278_06_GOODIX_BULK_OUT_SUBMIT_COUNT=0
+D278_06_GOODIX_COMMAND_COUNT=0
+D278_06_TLS_HANDSHAKE_COUNT=0
+D278_06_COMPLETION_CLASS=TIMEOUT_NO_COMPLETE_DATA
+D278_06_TIMEOUT_COUNT=1
+D278_06_FRAME_CLASS=NOT_OBSERVED
+D278_06_USB_OPEN_COUNT=1
+D278_06_USB_CLAIM_COUNT=1
+D278_06_USB_RELEASE_COUNT=1
+D278_06_USB_CLOSE_COUNT=1
+D278_06_BACKEND_DRAINED=true
+D278_06_CLEANUP_COMPLETED=true
+D278_06_RETRY_COUNT=0
+D278_06_REOPEN_COUNT=0
+D278_06_DEVICE_RESET_COUNT=0
+D278_06_CLEAR_HALT_COUNT=0
+D278_06_PERSISTENT_DEVICE_WRITE_COUNT=0
 D278_06_GOODIX_BULK_OUT_SUBMIT_MAX=0
 D278_06_PHYSICAL_BULK_IN_SUBMIT_MAX=1
 D278_06_PHYSICAL_BULK_IN_COMPLETION_MAX=1
@@ -306,11 +331,31 @@ D278_06_SECOND_RECEIVE_PATH_PRESENT=false
 D278_06_CURRENT_HOST_DESCRIPTOR_GATE=EXACTLY_ONE_27C6_5125
 D278_06_PRIOR_TARGET_FIRMWARE_PROOF=D277_02_APP12509
 D278_06_CURRENT_APP12509_FIRMWARE_READBACK=NOT_PERFORMED_CAUSAL_CUT
-D278_06_FUTURE_SINGLE_SHOT_ZERO_OUT_LIVE_READY_FOR_AI_PM_REVIEW=true
+D278_06_FUTURE_SINGLE_SHOT_ZERO_OUT_LIVE_READY_FOR_AI_PM_REVIEW=false
 D278_06_CURRENT_LIVE_AUTHORIZED=false
 D278_06_READY_FOR_LIVE=false
 D278_06_RETRY_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_06_THEN_SEPARATE_EXPLICIT_DECISION_ON_ONE_ZERO_OUT_LIVE_OBSERVATION
+D278_06_DO_NOT_RUN_EQUIVALENT_OBSERVATION_AGAIN=true
+IMMEDIATE_PRECOMMAND_BACKLOG_WITHIN_1000MS=NOT_OBSERVED
+DEVICE_PROTOCOL_QUIESCENCE_PROVEN=false
+APP12509_READY_FOR_A8_PROVEN=false
+
+D278_07_OUTCOME=BLOCKED
+D278_07_ADVANCEMENT=NEW_STATIC_TARGET_SPECIFIC_A8_FAILURE_POLICY_CLOSED_AND_E4_TARGET_EDGE_ISOLATED_AS_THE_REMAINING_BOUNDARY
+D278_07_EXECUTABLE_CLOSURE=ANALYSIS_ONLY
+OEM_PRE_D1_FAILURE_RECOVERY=UNRESOLVED
+OEM_A8_FAILURE_POLICY=RESOLVED
+OEM_E4_FAILURE_POLICY=UNRESOLVED
+OEM_USES_A2_SENSOR_ONLY_AS_PRE_A8_FAILURE_RECOVERY=false
+A2_HOST_SEMANTICS=CONVERGED_SENSOR_ONLY_RESET
+A2_PRE_A8_RECOVERY_LIVE_JUSTIFIED=false
+D278_07_RECOVERY_CANDIDATE_IMPLEMENTED_HOST_ONLY=false
+D278_07_REAL_USB_ACCESS=false
+D278_07_LIVE_EXECUTION_PERFORMED=false
+D278_07_CURRENT_LIVE_AUTHORIZED=false
+D278_07_READY_FOR_LIVE=false
+D278_07_RETRY_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_RESOLUTION_OF_PROJECT_8_GFUPDATEFIRMWARE_INDIRECT_E4_FAILURE_EDGE_AND_RETURN_PROPAGATION
 ```
 
 D276/01 non riapre né estende il confine live D275. Chiude invece offline il
@@ -1231,98 +1276,123 @@ command, submit, retry, TLS restart e reopen implicito. Nessun resume production
 è autorizzato. Il report completo è
 `analysis/D278/D278_05_cross_session_reentry_resolution.md`.
 
-### D278/06 — observer precommand zero-OUT dedicato, chiuso host-only
+### D278/06 — observer precommand zero-OUT: closure host-only e live consumata
 
-D278/06 implementa il diagnostico separato giustificato da D278/05 senza
-toccare il path secure-session D278/03, il backend/router condiviso o il
-production-shaped driver. Il router ordinario ricompone stream fra completion
-e può consegnare più frame concatenati; per non trasformare l'esperimento in un
-drain, il nuovo `GoodixD278PrecommandObserver` classifica invece il buffer di
-una sola completion come unità indivisibile e termina sempre.
+D278/06 ha implementato il diagnostico separato senza toccare il path
+secure-session D278/03. `GoodixD278PrecommandObserver` espone un solo start,
+ammette esclusivamente IN e classifica il buffer di una sola completion come
+unità indivisibile. Timeout, errore, frame completo/parziale o concatenato sono
+terminali; non esistono OUT, TLS, retry, reopen, reset, clear-halt o secondo
+receive. La closure sintetica originaria resta `PASS_HOST_ONLY`.
 
-Il core GPL nel dominio `tools/` espone un solo start single-shot, un seam la
-cui direzione ammessa è soltanto IN e nessuna API di submit OUT. Un token di
-generation permette al massimo un physical bulk-IN submit e una completion.
-Timeout, cancellazione, errore, frame completo, frame parziale, trailing byte o
-concatenazione sono tutti terminali; callback stale vengono osservati ma non
-possono riarmare. La telemetria conserva contatori e metadati strutturali
-outer/control/ACK/body length, non il payload raw, validator, secret TLS o dati
-biometrici.
+La successiva review AI-PM ha approvato la baseline completa
+`1682e01bcc2817f5a0b5028ab6bf4bcac32a61d0` per una sola live. Il target gate
+ha verificato un unico `27c6:5125` riferendo la prova APP12509 pregressa
+D277/02; la revisione firmware corrente non è stata riletta perché richiederebbe
+A8 e contaminerebbe il causal cut.
 
-Il launcher dedicato ha soltanto endpoint IN `0x81`, timeout host finito di
-1000 ms in un unico punto, cleanup su completion e cancellazione SIGINT/SIGTERM,
-release/close e stop. Non istanzia `GoodixSecureSession`, non configura TLS,
-non legge materiali protetti e non contiene A8, E4 o altri command builder,
-reset, clear-halt, reopen, retry o secondo receive. Il build di closure è
-sigillato con baseline `UNAPPROVED_FOR_LIVE` e il relativo gate è stato provato
-host-only fermarsi prima della creazione del contesto GUsb. Nessuna baseline
-live viene selezionata da D278/06.
+La live ha sottomesso e completato un solo bulk-IN con timeout host 1000 ms,
+ricevuto zero byte e terminato `TIMEOUT_NO_COMPLETE_DATA`. Open, claim, release
+e close sono avvenuti una volta; cleanup e drain sono riusciti. Non vi sono
+stati OUT Goodix, comandi, TLS, retry, reopen, reset, clear-halt o write
+persistenti. L'autorizzazione è consumata e l'osservazione equivalente non va
+ripetuta.
 
-L'identity gate conserva una limitazione esplicita. La prova APP12509 canonica
-D277/02 dipendeva dalla typed response a un A8 OUT e non può essere riletta
-senza contaminare il causal cut. Il futuro path può verificare host-side un
-unico `27c6:5125` e riferire la prova target APP12509 pregressa D277/02, ma deve
-telemetrizzare `CURRENT_APP12509_FIRMWARE_READBACK=NOT_PERFORMED_CAUSAL_CUT`.
-Questa base è adeguata a sottoporre a review un singolo read-only IN sul target
-incorporato già provato; non equivale a revalidation della revisione firmware
-corrente e la AI-PM può ancora bloccare la futura live.
-
-La classificazione non è permissiva: length dichiarata maggiore dei byte
-ricevuti produce `PARTIAL_FRAME`; length minore produce
-`EXTRA_OR_CONCATENATED_DATA`; outer/tag/inner length/checksum inattesi restano
-classi terminali. ACK-shaped pubblica solo echo/status, typed-shaped solo
-control/lunghezza e la shape sintetica `E4/body41` non usa il validator reale.
-Non segue mai una read di completamento o separazione.
-
-Il timeout di 1000 ms riusa un bound host semplice già adottato dal probe D277,
-non una conoscenza di `TARGET_DEVICE_TIMEOUT`. Prova soltanto che l'observation
-host è bounded. Un futuro frame escluderebbe la causalità di un Goodix OUT
-corrente ma non identificherebbe sessione/comando/buffer precedente; un timeout
-proverebbe soltanto assenza di una observation completa in quel bound, non
-endpoint vuoto permanente, quiescenza APP12509 o readiness per A8.
+`VALID_SINGLE_SHOT_TIMEOUT_NO_DATA` è un risultato metodologicamente valido,
+non un failure del launcher. Dimostra solo che nessun backlog precommand è
+stato consegnato entro quella singola finestra. Non prova endpoint vuoto
+permanente, assenza di emissioni tardive, quiescenza APP12509, identità di una
+sessione precedente o readiness per A8.
 
 ```text
 D278_06_OUTCOME=READY
-D278_06_ADVANCEMENT=NEW_DEDICATED_ZERO_OUT_ONE_IN_ARCHITECTURAL_PATH_IMPLEMENTED_AND_HOST_ONLY_VERIFIED
+D278_06_ADVANCEMENT=REAL_EXECUTION_COMPLETED_ONE_ZERO_OUT_ONE_IN_BOUNDED_OBSERVATION_WITH_NO_DATA_WITHIN_1000MS
 D278_06_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-ZERO_OUT_OBSERVER_IMPLEMENTED=true
-LIVE_CAPABLE_LAUNCHER_IMPLEMENTED=true
-LIVE_CAPABLE_LAUNCHER_EXECUTED=false
-GOODIX_BULK_OUT_SUBMIT_MAX=0
-GOODIX_COMMAND_COUNT=0
-SECURE_SESSION_START_COUNT=0
-TLS_HANDSHAKE_COUNT=0
-PHYSICAL_BULK_IN_SUBMIT_MAX=1
-PHYSICAL_BULK_IN_COMPLETION_MAX=1
-SECOND_RECEIVE_PATH_PRESENT=false
-TIMEOUT_PROVES_DEVICE_QUIESCENCE=false
-PRECOMMAND_SILENCE_PROVES_READY_FOR_A8=false
-RETRY_COUNT=0
-REOPEN_COUNT=0
-DEVICE_RESET_COUNT=0
-CLEAR_HALT_COUNT=0
-PERSISTENT_DEVICE_WRITE_COUNT=0
-D278_06_NORMAL=10/10_PASS_TWO_DETERMINISTIC_RUNS
-D278_06_ASAN_UBSAN=10/10_PASS
-D276_04_NORMAL_AND_ASAN_UBSAN=5/5_PASS_EACH
-D276_03_ROUTER_NORMAL_AND_ASAN_UBSAN=8/8_PASS_EACH
-D277_A8_NORMAL_AND_ASAN_UBSAN=15/15_PASS_EACH
-D278_SECURE_SESSION_NORMAL_AND_ASAN_UBSAN=11/11_PASS_EACH
+HOST_ONLY_CLOSURE=PASS
+LIVE_EXECUTION_RESULT=VALID_SINGLE_SHOT_TIMEOUT_NO_DATA
+D278_06_LIVE_EXECUTION_PERFORMED=true
+D278_06_LIVE_EXECUTION_COUNT=1
+D278_06_LIVE_BASELINE=1682e01bcc2817f5a0b5028ab6bf4bcac32a61d0
+D278_06_PHYSICAL_BULK_IN_SUBMIT_COUNT=1
+D278_06_PHYSICAL_BULK_IN_COMPLETION_COUNT=1
+D278_06_RECEIVED_BYTE_COUNT=0
+D278_06_GOODIX_BULK_OUT_SUBMIT_COUNT=0
+D278_06_GOODIX_COMMAND_COUNT=0
+D278_06_TLS_HANDSHAKE_COUNT=0
+D278_06_TIMEOUT_COUNT=1
+D278_06_USB_OPEN_COUNT=1
+D278_06_USB_CLAIM_COUNT=1
+D278_06_USB_RELEASE_COUNT=1
+D278_06_USB_CLOSE_COUNT=1
+D278_06_BACKEND_DRAINED=true
+D278_06_CLEANUP_COMPLETED=true
+D278_06_RETRY_COUNT=0
+D278_06_REOPEN_COUNT=0
+D278_06_DEVICE_RESET_COUNT=0
+D278_06_CLEAR_HALT_COUNT=0
+D278_06_PERSISTENT_DEVICE_WRITE_COUNT=0
+IMMEDIATE_PRECOMMAND_BACKLOG_WITHIN_1000MS=NOT_OBSERVED
+DEVICE_PROTOCOL_QUIESCENCE_PROVEN=false
+APP12509_READY_FOR_A8_PROVEN=false
+D278_06_DO_NOT_RUN_EQUIVALENT_OBSERVATION_AGAIN=true
+D278_06_CURRENT_LIVE_AUTHORIZED=false
+D278_06_READY_FOR_LIVE=false
+D278_06_RETRY_AUTHORIZED=false
+```
+
+Report completo: `analysis/D278/D278_06_zero_out_precommand_observation.md`.
+
+### D278/07 — recovery OEM pre-D1: A8 risolta, E4 bloccata
+
+D278/07 ha ricostruito offline `gfusb.dll` 1.1.125.14 distinguendo il project
+target 8 dai percorsi generici. La policy A8 è target-specifica e chiusa:
+`GetEvkVersionWithRetry` prova A8 fino al byte configurabile `N_CFG`, con
+timeout response 500 ms; dopo l'esaurimento chiama `HardResetMcu`. Per project
+8 l'hard reset non è supportato e il ramo invia A2 MCU-only `{02 14}`, quindi
+prova una sola A8 finale. Un ulteriore failure diventa `0xffcffffd`, risale a
+`_DeviceInit` e il loop esterno può ripetere l'intera init fino a `N_CFG`. Il
+valore runtime concreto di `N_CFG` non è presente nel corpus.
+
+Il sensor-only A2 `{01 14}` non appartiene a quel branch. La capture OEM
+riuscita lo colloca dopo A8 ed E4 riuscite; quindi
+`OEM_USES_A2_SENSOR_ONLY_AS_PRE_A8_FAILURE_RECOVERY=false` e nessun A2 pre-A8
+live è giustificato.
+
+Per E4 esiste una routine generica verificata che ritenta lo stesso send una
+volta e poi restituisce `0xffdffffd`. Il target project 8 entra però nel ramo
+`gfUpdatefirmware`: il grafo diretto non chiude il dispatch dall'update
+all'esatto builder E4 osservato né il relativo return path di failure. Quel
+wrapper comprende inoltre primitive clear/erase/update APP e reset MCU, quindi
+non è un candidato Linux sicuro. La successful capture D255/D256 prova il wire
+A8→E4→A2, ma non contiene failure A8/E4 né log OEM.
+
+La recovery pre-D1 complessiva resta `UNRESOLVED`, non viene implementato alcun
+candidato e non è autorizzata alcuna live. L'unico prossimo discriminante è
+offline: risolvere lo slot indiretto/dataflow dal branch project 8
+`init_MCU -> gfUpdatefirmware -> 0x1800656f4` all'esatto E4 e seguirne le due
+uscite fino al return di `init_MCU`.
+
+```text
+OUTCOME=BLOCKED
+ADVANCEMENT=NEW_STATIC_TARGET_SPECIFIC_A8_FAILURE_POLICY_CLOSED_AND_E4_TARGET_EDGE_ISOLATED_AS_THE_REMAINING_BOUNDARY
+EXECUTABLE_CLOSURE=ANALYSIS_ONLY
+CANONICAL_DOCUMENTATION=UPDATED
+OEM_PRE_D1_FAILURE_RECOVERY=UNRESOLVED
+OEM_A8_FAILURE_POLICY=RESOLVED
+OEM_E4_FAILURE_POLICY=UNRESOLVED
+OEM_USES_A2_SENSOR_ONLY_AS_PRE_A8_FAILURE_RECOVERY=false
+A2_HOST_SEMANTICS=CONVERGED_SENSOR_ONLY_RESET
+A2_PRE_A8_RECOVERY_LIVE_JUSTIFIED=false
+D278_07_RECOVERY_CANDIDATE_IMPLEMENTED_HOST_ONLY=false
 REAL_USB_ACCESS=false
 LIVE_EXECUTION_PERFORMED=false
-FUTURE_SINGLE_SHOT_ZERO_OUT_LIVE_READY_FOR_AI_PM_REVIEW=true
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
 ```
 
-Il riesame metodologico è ora concretizzato nel codice. Rispetto a D278/03 il
-primo receive precede qualsiasi Goodix OUT corrente; l'ipotesi futura resta
-`PENDING_OR_DELAYED_FRAME_EXISTS_BEFORE_ANY_CURRENT_GOODIX_COMMAND_OUT`. Se la
-singola observation futura restituisse timeout, errore o dato inatteso, la
-policy è stop senza A8, secondo receive o tentativo equivalente e ritorno
-all'analisi offline. Report e matrice completa:
-`analysis/D278/D278_06_zero_out_precommand_observation.md`.
+Audit e matrice: `analysis/D278/D278_07_oem_pre_d1_recovery_audit.md` e
+`analysis/D278/D278_07_oem_pre_d1_recovery_matrix.csv`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
