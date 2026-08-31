@@ -6,9 +6,10 @@
 OUTCOME=READY
 ADVANCEMENT=CROSS_SESSION_CAUSAL_BOUNDARY_CLOSED_OFFLINE_AND_OPEN_EPOCH_POISON_MADE_STICKY_HOST_ONLY
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+AI_PM_CORRECTIVE_REQUIRED=RESOLVED
 RESIDUAL_BLOCKER_OR_RISK=DEVICE_PROTOCOL_QUIESCENCE_AFTER_INTERRUPTED_SESSION_UNPROVEN;CROSS_SESSION_FRAME_CAUSAL_IDENTITY_UNPROVEN;OEM_PRE_D1_FAILURE_RECOVERY_UNRESOLVED;ZERO_OUT_DIAGNOSTIC_REQUIRES_SEPARATE_REVIEW_AND_AUTHORIZATION
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=BASELINE_a2d59808ac4b6d3b9a6608bd7b29e329fa42a03e_ON_main_PLUS_CURRENT_WORKTREE_DIFF_PLUS_analysis/D278/D278_05_cross_session_reentry_resolution.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_libfprint-driver/goodix_fpimage_device.c_PLUS_libfprint-driver/tests/test_goodix_fpimage_device.c
+REVIEW_SET=BASELINE_5fd457d115837abcc9488d8dde582dfd7b3e1084_ON_main_PLUS_HEAD_MICRO_CORRECTIVE_PLUS_analysis/D278/D278_05_cross_session_reentry_resolution.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_libfprint-driver/goodix_fpimage_device.c_PLUS_libfprint-driver/tests/test_goodix_fpimage_device.c
 
 ORCHESTRATION_WORK_USED=false
 ORCHESTRATION_IGNORED_BYTECODE_RESIDUE=OBSERVED_NONCANONICAL
@@ -20,10 +21,19 @@ PRECOMMAND_FRAME_PREVIOUS_SESSION_IDENTITY=UNPROVEN
 OEM_PRE_D1_FAILURE_RECOVERY=UNRESOLVED
 POISON_AFTER_NONQUIESCENT_TERMINAL_MUST_BE_STICKY=true
 AUTOMATIC_REENTRY_FROM_POISONED=false
+ACTIVATING_CANCEL_NONQUIESCENT_POISONS_OPEN_EPOCH=true
+ACTIVATING_CANCEL_FRAMEWORK_ERROR=G_IO_ERROR_CANCELLED
+ACTIVATION_COMPLETION_EXACTLY_ONCE=PASS
+SECOND_ACTIVATION_FROM_POISONED_REJECTED=PASS
+NEW_GENERATION_AFTER_POISON_COUNT=0
+NEW_BACKEND_COMMAND_AFTER_POISON_COUNT=0
+NEW_REAL_USB_SUBMIT_AFTER_POISON_COUNT=0
 FUTURE_ZERO_OUT_PRECOMMAND_DIAGNOSTIC=JUSTIFIED_FOR_SEPARATE_REVIEW
 ZERO_OUT_DIAGNOSTIC_IMPLEMENTED=false
 ACK_POLICY_CORRECTIVE_REFUTED=false
 ACK_POLICY_CORRECTIVE_LIVE_RETESTED=false
+REAL_USB_ACCESS=false
+LIVE_EXECUTION_PERFORMED=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
@@ -239,7 +249,56 @@ riabilitare il contesto; distruzione del contesto a close. Le regressioni
 esistenti continuano a coprire activation pulite, cancellazione e generation
 stale.
 
-## E. Modello di re-entry
+## E. Micro-correttivo: cancellation durante `ACTIVATING`
+
+La review AI-PM ha evidenziato che il path `on_activation_cancellable_cancelled()`
+marcava `terminal_fence=true` e `generation=0`, ma non impostava `poisoned`.  Nel
+flusso corrente `activate()` entra in `ACTIVATING` solo dopo aver già raggiunto
+`goodix_fpi_usb_backend_begin_generation()` e il backend `arm`; non esiste un
+sotto-path pre-arm osservabile dal cancellable.  La quiescenza device-side è
+quindi non provata, e la cancellazione deve avvelenare l'open epoch secondo il
+contratto D276.
+
+Il delta applicato è minimo:
+
+```text
+on_activation_cancellable_cancelled()
+  -> terminal fence
+  -> generation = 0
+  -> goodix_device_context_set_poisoned(ctx, NULL)
+  -> state = INACTIVE
+  -> activation_completed = TRUE
+  -> idle -> fpi_image_device_activate_complete(G_IO_ERROR_CANCELLED)
+```
+
+Lo stato interno resta `INACTIVE` fino al completamento dell'idle, perché
+`complete_activation_cancel_idle()` controlla esplicitamente quello stato per
+delivery exactly-once della cancellation al framework.  Il poison è invece un
+flag separato che permane per tutto l'open epoch; `activate()` fallisce chiuso
+prima di generazione, cancellable o backend se `ctx->poisoned` è vero.  Il test
+`/goodix-fpimage-device/cancellation-activating` verifica:
+
+- arm_count == 1 (backend arm raggiunto prima del cancel);
+- errore framework = `G_IO_ERROR_CANCELLED`;
+- completion exactly-once;
+- `terminal_fence == true`, `poisoned == true`, `generation == 0`;
+- seconda capture rifiutata con `FP_DEVICE_ERROR_PROTO`;
+- zero nuova generation, backend command, IN/OUT submit;
+- callback/evento stale della generation interrotta incapace di riabilitare il
+  context;
+- `img_close` distrugge il context.
+
+```text
+ACTIVATING_CANCEL_NONQUIESCENT_POISONS_OPEN_EPOCH=true
+ACTIVATING_CANCEL_FRAMEWORK_ERROR=G_IO_ERROR_CANCELLED
+ACTIVATION_COMPLETION_EXACTLY_ONCE=PASS
+SECOND_ACTIVATION_FROM_POISONED_REJECTED=PASS
+NEW_GENERATION_AFTER_POISON_COUNT=0
+NEW_BACKEND_COMMAND_AFTER_POISON_COUNT=0
+NEW_REAL_USB_SUBMIT_AFTER_POISON_COUNT=0
+```
+
+## F. Modello di re-entry
 
 | Stato | Ingresso | Azioni ammesse | Azioni vietate / uscita |
 | --- | --- | --- | --- |
@@ -284,9 +343,9 @@ LIVE_EXECUTION_PERFORMED=false
 GIT_DIFF_CHECK=PASS
 ```
 
-Il primo avvio della suite `FpImageDevice` nel sandbox è terminato prima della
-build perché Flatpak/bwrap non poteva creare `NETLINK_ROUTE`. La stessa suite
-host-only è stata eseguita fuori sandbox nel runtime Freedesktop SDK 25.08 ed è
-passata; lo stub compile/link abortirebbe se un submit USB reale venisse
-raggiunto. Le regressioni D276 sono state eseguite nello stesso runtime con
-rete disabilitata.
+Il micro-correttivo è stato validato nello stesso runtime Freedesktop SDK 25.08
+con rete disabilitata.  Il test `/goodix-fpimage-device/cancellation-activating`
+verifica il nuovo path poisoned; le regressioni D276/04 e D276/03 router
+confermano l'assenza di regressioni.  Lo stub compile/link abortirebbe se un
+submit USB reale venisse raggiunto.  Nessuna live, nessun sensore reale, nessun
+secret materializzato.

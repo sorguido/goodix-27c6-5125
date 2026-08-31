@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/05 — causal cut pre-OUT chiuso offline e poison dell'open epoch reso sticky; recovery OEM pre-D1 irrisolta, nessuna live autorizzata
+### Stato corrente post-D278/05 — causal cut pre-OUT chiuso offline, poison dell'open epoch reso sticky e path cancellation durante ACTIVATING chiuso; recovery OEM pre-D1 irrisolta, nessuna live autorizzata
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -278,12 +278,20 @@ READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
 D278_05_OUTCOME=READY
 D278_05_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+D278_05_AI_PM_CORRECTIVE_REQUIRED=RESOLVED
 POST_A8_WIRE_CAUSAL_PROVENANCE=UNAVAILABLE
 PRECOMMAND_FRAME_EXCLUDES_CURRENT_HOST_COMMAND_CAUSATION=true
 PRECOMMAND_FRAME_PREVIOUS_SESSION_IDENTITY=UNPROVEN
 OEM_PRE_D1_FAILURE_RECOVERY=UNRESOLVED
 POISON_AFTER_NONQUIESCENT_TERMINAL_MUST_BE_STICKY=true
 AUTOMATIC_REENTRY_FROM_POISONED=false
+ACTIVATING_CANCEL_NONQUIESCENT_POISONS_OPEN_EPOCH=true
+ACTIVATING_CANCEL_FRAMEWORK_ERROR=G_IO_ERROR_CANCELLED
+ACTIVATION_COMPLETION_EXACTLY_ONCE=PASS
+SECOND_ACTIVATION_FROM_POISONED_REJECTED=PASS
+NEW_GENERATION_AFTER_POISON_COUNT=0
+NEW_BACKEND_COMMAND_AFTER_POISON_COUNT=0
+NEW_REAL_USB_SUBMIT_AFTER_POISON_COUNT=0
 FUTURE_ZERO_OUT_PRECOMMAND_DIAGNOSTIC=JUSTIFIED_FOR_SEPARATE_REVIEW
 ZERO_OUT_DIAGNOSTIC_IMPLEMENTED=false
 NEXT_PRIMARY_BOUNDARY=AI_PM_REVIEW_OF_D278_05_THEN_SEPARATE_DECISION_ON_ZERO_OUT_PRECOMMAND_DIAGNOSTIC
@@ -1171,13 +1179,25 @@ Infine l'audit del production-shaped C ha confermato una discrepanza reale:
 activation di cancellare il poison senza recovery dimostrata. Il correttivo
 host-only ora fallisce chiuso all'ingresso di `activate()` quando il contesto è
 poisoned, prima di generation, cancellable, backend command o submit USB; non
-azzera più il poison. Il boundary resta `img_close`, che distrugge il contesto.
-Activation pulite non cambiano comportamento.
+azzera più il poison. Il micro-correttivo successivo ha inoltre chiuso il path
+cancellation durante `ACTIVATING`: `on_activation_cancellable_cancelled()`
+marca ora sticky `poisoned`, perché il flusso corrente ha già raggiunto il
+backend `arm` e `begin_generation()` e la quiescenza device-side non è provata.
+Il framework continua a ricevere `G_IO_ERROR_CANCELLED` exactly-once; l'open
+epoch resta poisoned fino a `img_close`, che distrugge il contesto.  Activation
+pulite non cambiano comportamento.
 
 ```text
 POISON_AFTER_NONQUIESCENT_TERMINAL_MUST_BE_STICKY=true
 AUTOMATIC_REENTRY_FROM_POISONED=false
 POISON_LIFETIME=REMAINDER_OF_OPEN_EPOCH_UNTIL_IMG_CLOSE
+ACTIVATING_CANCEL_NONQUIESCENT_POISONS_OPEN_EPOCH=true
+ACTIVATING_CANCEL_FRAMEWORK_ERROR=G_IO_ERROR_CANCELLED
+ACTIVATION_COMPLETION_EXACTLY_ONCE=PASS
+SECOND_ACTIVATION_FROM_POISONED_REJECTED=PASS
+NEW_GENERATION_AFTER_POISON_COUNT=0
+NEW_BACKEND_COMMAND_AFTER_POISON_COUNT=0
+NEW_REAL_USB_SUBMIT_AFTER_POISON_COUNT=0
 FPIMAGE_DEVICE_NORMAL=16/16_PASS
 FPIMAGE_DEVICE_ASAN_UBSAN=16/16_PASS
 D276_04_NORMAL_AND_ASAN_UBSAN=5/5_PASS_EACH

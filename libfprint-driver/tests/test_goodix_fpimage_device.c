@@ -517,8 +517,16 @@ test_cancellation_activating (void)
 {
   TestFixture *f = test_fixture_new ();
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GCancellable) second_cancellable = g_cancellable_new ();
+  guint64 poisoned_generation;
+  GLogLevelFlags old_fatal;
+  guint commands_before;
+  guint64 real_submits_before;
+  guint64 out_submits_before;
+  GoodixFpiUsbBackend *usb_backend;
 
   fixture_open (f);
+  usb_backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
 
   f->done = FALSE;
   f->completion_count = 0;
@@ -526,14 +534,67 @@ test_cancellation_activating (void)
                      (GAsyncReadyCallback) capture_cb, f);
   g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING);
+  /* The backend arm is reached before the cancellable can fire; the remaining
+   * open epoch is therefore non-quiescent and must become sticky poisoned. */
+  g_assert_cmpuint (goodix_in_memory_backend_get_arm_count (f->ctx), ==, 1);
+  poisoned_generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpuint (poisoned_generation, >, 0);
+
   g_cancellable_cancel (cancellable);
 
   test_wait (f);
   g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
   g_assert_cmpuint (f->completion_count, ==, 1);
   g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
+
+  commands_before = goodix_device_context_get_backend_command_count (f->ctx);
+  real_submits_before = goodix_fpi_usb_backend_get_real_submit_count (usb_backend);
+  out_submits_before = goodix_fpi_usb_backend_get_out_submit_count (usb_backend);
+
+  /* A second capture request in the same open epoch must be rejected by the
+   * sticky poison gate without creating a new generation, backend command or
+   * USB submit.  libfprint leaves FpImageDevice in ACTIVATING after
+   * activate_complete(error), which would normally be a host-side warning; the
+   * only assertion of interest here is that the driver stays poisoned and does
+   * not reach the backend or USB. */
+  g_clear_error (&f->error);
+  f->done = FALSE;
+  f->completion_count = 0;
+  f->success = FALSE;
+  old_fatal = g_log_set_always_fatal (0);
+  fp_device_capture (FP_DEVICE (f->device), TRUE, second_cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  g_log_set_always_fatal (old_fatal);
+  test_wait (f);
+
+  g_assert_false (f->success);
+  g_assert_error (f->error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_true (goodix_device_context_get_terminal_fence (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
+  g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
+                    ==, commands_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (usb_backend),
+                    ==, real_submits_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (usb_backend),
+                    ==, out_submits_before);
+
+  /* Stale callbacks / events from the interrupted activation cannot reopen
+   * the poisoned context. */
+  goodix_device_context_complete_receive (f->ctx, poisoned_generation,
+                                           NULL, 0, NULL);
+  goodix_device_context_emit_finger_down_for_generation (
+    f->ctx, poisoned_generation);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0);
+  g_assert_cmpuint (goodix_device_context_get_backend_command_count (f->ctx),
+                    ==, commands_before);
 
   fixture_close (f);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
   test_fixture_free (f);
 }
 

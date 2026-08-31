@@ -328,6 +328,11 @@ on_activation_cancellable_cancelled (GCancellable *cancellable,
   ctx->cancel_handler_id = 0;
   goodix_device_context_set_terminal_fence (ctx);
   ctx->generation = 0;
+  /* The backend arm and USB begin_generation have already been reached; the
+   * device-side quiescence is unproven, so the remaining open epoch must stay
+   * poisoned.  The state is still INACTIVE here so that the activate completion
+   * idle can deliver G_IO_ERROR_CANCELLED exactly once. */
+  goodix_device_context_set_poisoned (ctx, NULL);
   goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
   ctx->activation_completed = TRUE;
