@@ -16,23 +16,31 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/09 — probe A2 sensor-only chiuso host-only, nessuna live autorizzata
+### Stato corrente post-D278/10 — A2 corrente live accettato; discriminante same-session A2→A8 chiuso host-only
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
 progettuale distinto, deliberatamente bounded: exact A2 sensor-only `{01 14}`
-una sola volta, seguito esclusivamente da ACK e typed A2 strict, senza retry o
-comandi successivi. Implementazione, test e launcher live-gated sono chiusi
-host-only; il current re-entry context non è ancora stato testato e nessuna
-baseline/live è approvata.
+una sola volta, seguito esclusivamente da ACK e typed A2 strict. La singola
+live D278/09 è ora consumata e ha provato che A2 viene accettato nel current
+re-entry context con ACK `0x07` e typed target-pinned. D278/10 costruisce il
+successivo discriminante dedicato: nella stessa open epoch, A8 può seguire
+solo il completamento strict A2. D278/10 è chiuso host-only, non ha eseguito
+USB reale e nessuna baseline/live corrente è approvata.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
 OEM_RECOVERY_EQUIVALENCE=false
 A2_RISK_PROBE_IMPLEMENTED=true
 A2_RISK_PROBE_LIVE_CAPABLE=true
-A2_RISK_PROBE_LIVE_EXECUTED=false
-FUTURE_SINGLE_SHOT_A2_SENSOR_ONLY_LIVE_READY_FOR_AI_PM_REVIEW=true
+A2_RISK_PROBE_LIVE_EXECUTED=true
+A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT=true
+D278_09_ONE_SHOT_CONSUMED=true
+D278_09_RERUN_AUTHORIZED=false
+A2_A8_REENTRY_PROBE_IMPLEMENTED=true
+A2_A8_REENTRY_PROBE_LIVE_CAPABLE=true
+A2_A8_REENTRY_PROBE_LIVE_EXECUTED=false
+FUTURE_SINGLE_SHOT_A2_A8_LIVE_READY_FOR_AI_PM_REVIEW=true
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
@@ -42,6 +50,7 @@ live** i seguenti confini:
 
 ```text
 A8
+exact A2 sensor-only nel current re-entry context
 E4
 TLS 1.2 PSK
 D4
@@ -1557,7 +1566,8 @@ ROCKY_12513_A2_SENSOR_ONLY_SEMANTICS_CORROBORATES_LOCAL=true
 ROCKY_12513_A2_NVM_SAFETY_CLAIM=EXTERNAL_CORROBORATION_ONLY
 INDEPENDENT_12509_STACK_SUCCESS=CORROBORATING_CONTEXT
 INDEPENDENT_12509_EXACT_A2_EXECUTION=NOT_BYTE_EXACTLY_PROVEN_FROM_COMMENT_ALONE
-RESIDUAL_RISK_CLASS=CURRENT_REENTRY_CONTEXT_ONLY_WITH_DEVICE_SIDE_NVM_ABSOLUTE_PROOF_MISSING
+HISTORICAL_PRE_LIVE_RESIDUAL_RISK_CLASS=CURRENT_REENTRY_CONTEXT_ONLY_WITH_DEVICE_SIDE_NVM_ABSOLUTE_PROOF_MISSING
+CURRENT_RESIDUAL_RISK_CLASS=POST_A2_A8_REENTRY_BEHAVIOR_UNPROVEN_WITH_DEVICE_SIDE_NVM_ABSOLUTE_PROOF_MISSING
 ```
 
 Il probe dedicato riusa `goodix_a0_build_frame()` e costruisce l'unico wire
@@ -1593,14 +1603,44 @@ auto-selezionata una baseline. Il gate descriptor futuro richiede un solo
 precedente successo exact A2 e mancata rilettura firmware corrente: A8 non
 contamina il probe.
 
-Le suite focali passano 9/9 per due run normali deterministiche e 9/9
-ASAN/UBSAN; self-test, strict build, forbidden call/control audit e gate
-pre-USB passano. La regressione secure-session/codec passa 11/11 normal e
-11/11 ASAN/UBSAN. Non è stato creato alcun contesto USB reale e nessuna live è
-stata eseguita. Il successo di una futura run significherebbe soltanto
-`A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT=true`, non readiness A8 o re-entry
-risolta. Timeout o mismatch significano risultato ambiguo/rifiutato, cleanup e
-stop senza retry.
+Le suite focali della closure originaria passano 9/9 per due run normali
+deterministiche e 9/9 ASAN/UBSAN; self-test, strict build, forbidden
+call/control audit e gate pre-USB passano. La regressione
+secure-session/codec passa 11/11 normal e 11/11 ASAN/UBSAN. Queste verifiche
+erano host-only e non avevano creato contesti USB reali.
+
+La successiva singola live autorizzata è stata eseguita una volta sulla
+baseline `1c40f6b7b7282ca6e0a39a2c3e2d8672d9544dd6` ed è consumata. Ha
+prodotto open/claim/release/close `1/1/1/1`, command/OUT `1/1`, IN
+submit/completion `2/2`, ACK echo `0xA2`, status `0x07`, typed control `0xA2`,
+body length 3 e target pin strict match. Timeout, retry, reopen, extra USB
+reset, clear-halt, persistent write, TLS, frame inattesi e callback stale sono
+zero; backend e cleanup sono completi.
+
+```text
+D278_09_LIVE_OUTCOME=PASS
+D278_09_LIVE_BASELINE=1c40f6b7b7282ca6e0a39a2c3e2d8672d9544dd6
+A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT=true
+A2_SENSOR_ONLY_LIVE_ACK_ECHO=0xA2
+A2_SENSOR_ONLY_LIVE_ACK_STATUS=0x07
+A2_SENSOR_ONLY_LIVE_TYPED_CONTROL=0xA2
+A2_SENSOR_ONLY_LIVE_TYPED_BODY_LENGTH=3
+A2_SENSOR_ONLY_LIVE_TYPED_TARGET_PIN_MATCH=true
+A2_SENSOR_ONLY_LIVE_RETRY_COUNT=0
+A2_SENSOR_ONLY_LIVE_PERSISTENT_WRITE_COUNT=0
+A2_SENSOR_ONLY_LIVE_CLEANUP_COMPLETE=true
+D278_09_ONE_SHOT_CONSUMED=true
+D278_09_RERUN_AUTHORIZED=false
+CURRENT_REENTRY_CONTEXT_REJECTS_EXACT_A2_SENSOR_ONLY=false
+CURRENT_REENTRY_CONTEXT_ACCEPTS_EXACT_A2_SENSOR_ONLY=true
+```
+
+`0x07` è classificato successo perché appartiene alla allowlist canonica e il
+typed target-pinned successivo è strict match; non è disponibile una semantica
+bit-level dimostrata. La live non prova nonmutazione NVM assoluta, readiness
+A8, soluzione della re-entry, quiescenza permanente dell'endpoint o assenza di
+emissioni tardive. `device_reset_count=0` esclude primitive USB/device-reset
+aggiuntive, non il comando A2 sensor-only contato separatamente.
 
 Riesame metodologico: (1) rispetto a D278/03 non si ripete A8/secure-session e
 rispetto a D278/06 non si ripete il receive zero-OUT; si invia soltanto il noto
@@ -1609,6 +1649,73 @@ A2 sensor-only e si leggono le sue sole risposte bounded; (2) la nuova ipotesi
 nuovo failure non porta a resend o A8, ma a stop e analisi offline di un
 discriminante diverso. Report completo:
 `analysis/D278/D278_09_a2_sensor_only_risk_probe.md`.
+
+### D278/10 — discriminante same-session A2→A8, closure host-only
+
+D278/10 mantiene congelati il probe A2 D278/09 e il secure-session D278/03.
+Il path dedicato riusa l'exact A2 `a00600a6a203000114f0`, l'exact A8
+target-proven `a00600a6a803000000ff` e il codec A0 canonico. Nella stessa open
+epoch accetta soltanto A2 OUT, ACK A2 strict, typed A2 target-pinned, A8 OUT,
+ACK A8 strict e typed A8 byte-identical a `GF_ST411SEC_APP_12509` incluso il
+terminatore NUL, poi cleanup e stop.
+
+A8 è irraggiungibile se ACK o typed A2 falliscono. Timeout, mismatch, frame
+fuori fase, errore, callback stale o duplicata sono terminali; non esistono
+drain, discard-until-expected, precommand observation, retry, secondo A2,
+secondo A8, E4, secure session, TLS, reset, clear-halt o reopen.
+
+```text
+GOODIX_COMMAND_SUBMIT_MAX=2
+GOODIX_BULK_OUT_SUBMIT_MAX=2
+A2_SENSOR_ONLY_SUBMIT_MAX=1
+A8_SUBMIT_MAX=1
+PHYSICAL_BULK_IN_SUBMIT_MAX=4
+PHYSICAL_BULK_IN_COMPLETION_MAX=4
+E4_SUBMIT_MAX=0
+A2_MCU_ONLY_SUBMIT_MAX=0
+TLS_HANDSHAKE_COUNT=0
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+```
+
+La build ordinaria resta `UNAPPROVED_FOR_LIVE`. Il gate richiede prima della
+creazione del contesto GUsb full SHA compile-time approvata, la stessa SHA
+runtime, token D278/10 e operation name D278/10 esatti. D278/10 non sceglie
+una baseline live e l'autorizzazione D278/09 non è trasferibile.
+
+La matrice focalizzata passa 14/14 per due run normali deterministiche e
+14/14 ASAN/UBSAN; strict build, self-test, launcher live-capable, gate
+unapproved pre-USB e forbidden command/call/symbol audit passano. Il self-test
+conferma 2 command/OUT, un A2, un A8, quattro IN, entrambi i contratti
+ACK+typed e exact APP12509. Tutta la closure D278/10 è host-only: zero USB
+reale e zero live.
+
+Il completamento A2 nella stessa open epoch fornisce un anchor causale più
+forte prima di A8 rispetto a D278/03, ma non prova provenance assoluta perché
+il wire A0 non espone nonce/session-id. La futura ipotesi è che APP12509,
+subito dopo quel successful A2, accetti un singolo A8 e riproduca il normale
+contratto target-pinned senza l'anomalia cross-session. Un failure impone stop,
+cleanup e analisi offline, senza nuova run equivalente automatica.
+
+```text
+SAME_SESSION_A2_COMPLETION_PROVIDES_STRONGER_CAUSAL_ANCHOR_BEFORE_A8=true
+POST_A2_A8_RESPONSE_CAUSAL_PROVENANCE_ABSOLUTE=false
+A2_A8_REENTRY_PROBE_IMPLEMENTED=true
+A2_A8_REENTRY_PROBE_LIVE_CAPABLE=true
+A2_A8_REENTRY_PROBE_LIVE_EXECUTED=false
+FUTURE_SINGLE_SHOT_A2_A8_LIVE_READY_FOR_AI_PM_REVIEW=true
+REAL_USB_ACCESS=false
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+```
+
+Report completo:
+`analysis/D278/D278_10_same_session_a2_a8_reentry_discriminator.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy

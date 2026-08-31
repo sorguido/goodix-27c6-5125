@@ -1,12 +1,12 @@
-# D278/09 — exact A2 sensor-only one-shot risk probe, closure host-only
+# D278/09 — exact A2 sensor-only one-shot risk probe, live consumata
 
 ## Closure
 
 ```text
 OUTCOME=READY
-ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED_HOST_ONLY_EXACT_A2_ONE_COMMAND_ENFORCEMENT_AND_PRELIVE_BOUNDARY
+ADVANCEMENT=REAL_EXECUTION_COMPLETED_EXACT_A2_ACCEPTED_IN_CURRENT_REENTRY_CONTEXT
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-RESIDUAL_BLOCKER_OR_RISK=CURRENT_REENTRY_CONTEXT_REMAINS_UNTESTED_DEVICE_SIDE_AND_ABSOLUTE_DEVICE_NVM_NONMUTATION_PROOF_IS_UNAVAILABLE
+RESIDUAL_BLOCKER_OR_RISK=A8_AFTER_SUCCESSFUL_SAME_SESSION_A2_REMAINS_UNTESTED_AND_ABSOLUTE_DEVICE_NVM_NONMUTATION_PROOF_IS_UNAVAILABLE
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=BASELINE_07eb95c95e955fe915bd0ef8f5c5f3e057e452c4_ON_main_PLUS_WORKTREE_DIFF_PLUS_analysis/D278/D278_09_a2_sensor_only_risk_probe.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_tools/goodix_d278_a2_sensor_only_probe.c_PLUS_tools/goodix_d278_a2_sensor_only_probe.h_PLUS_tools/d278_a2_sensor_only_observe_once.c_PLUS_libfprint-driver/tests/test_goodix_d278_09_a2_sensor_only_probe.c_PLUS_libfprint-driver/tests/run_goodix_d278_09_a2_sensor_only_probe_test.sh_PLUS_libfprint-driver/tests/run_goodix_d278_09_a2_sensor_only_probe_test_inner.sh
 
@@ -30,11 +30,11 @@ ROCKY_12513_A2_NVM_SAFETY_CLAIM=EXTERNAL_CORROBORATION_ONLY
 INDEPENDENT_12509_STACK_SUCCESS=CORROBORATING_CONTEXT
 INDEPENDENT_12509_EXACT_A2_EXECUTION=NOT_BYTE_EXACTLY_PROVEN_FROM_COMMENT_ALONE
 
-RESIDUAL_RISK_CLASS=CURRENT_REENTRY_CONTEXT_ONLY_WITH_DEVICE_SIDE_NVM_ABSOLUTE_PROOF_MISSING
+RESIDUAL_RISK_CLASS=POST_A2_A8_REENTRY_BEHAVIOR_UNPROVEN_WITH_DEVICE_SIDE_NVM_ABSOLUTE_PROOF_MISSING
 
 A2_RISK_PROBE_IMPLEMENTED=true
 A2_RISK_PROBE_LIVE_CAPABLE=true
-A2_RISK_PROBE_LIVE_EXECUTED=false
+A2_RISK_PROBE_LIVE_EXECUTED=true
 
 GOODIX_COMMAND_SUBMIT_MAX=1
 GOODIX_BULK_OUT_SUBMIT_MAX=1
@@ -52,19 +52,57 @@ DEVICE_RESET_COUNT=0
 CLEAR_HALT_COUNT=0
 PERSISTENT_DEVICE_WRITE_COUNT=0
 
-FUTURE_SINGLE_SHOT_A2_SENSOR_ONLY_LIVE_READY_FOR_AI_PM_REVIEW=true
+FUTURE_SINGLE_SHOT_A2_SENSOR_ONLY_LIVE_READY_FOR_AI_PM_REVIEW=false
 
-REAL_USB_ACCESS=false
-LIVE_EXECUTION_PERFORMED=false
+REAL_USB_ACCESS=true
+LIVE_EXECUTION_PERFORMED=true
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
+
+D278_09_LIVE_OUTCOME=PASS
+D278_09_LIVE_BASELINE=1c40f6b7b7282ca6e0a39a2c3e2d8672d9544dd6
+A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT=true
+A2_SENSOR_ONLY_LIVE_ACK_ECHO=0xA2
+A2_SENSOR_ONLY_LIVE_ACK_STATUS=0x07
+A2_SENSOR_ONLY_LIVE_TYPED_CONTROL=0xA2
+A2_SENSOR_ONLY_LIVE_TYPED_BODY_LENGTH=3
+A2_SENSOR_ONLY_LIVE_TYPED_TARGET_PIN_MATCH=true
+A2_SENSOR_ONLY_LIVE_RETRY_COUNT=0
+A2_SENSOR_ONLY_LIVE_PERSISTENT_WRITE_COUNT=0
+A2_SENSOR_ONLY_LIVE_CLEANUP_COMPLETE=true
+D278_09_ONE_SHOT_CONSUMED=true
+D278_09_RERUN_AUTHORIZED=false
 ```
 
-`FUTURE_SINGLE_SHOT_A2_SENSOR_ONLY_LIVE_READY_FOR_AI_PM_REVIEW=true` significa
-solo che implementazione e closure host-only sono disponibili alla review. Non
-seleziona una baseline live, non approva il rischio residuo e non autorizza
-l'esecuzione.
+## Risultato live integrato
+
+L'operatore ha eseguito una sola volta il probe sulla baseline approvata
+`1c40f6b7b7282ca6e0a39a2c3e2d8672d9544dd6`. L'autorizzazione è consumata,
+non trasferibile e non consente rerun né A8. La telemetria canonica è:
+
+```json
+{"approved_baseline":"1c40f6b7b7282ca6e0a39a2c3e2d8672d9544dd6","identity_preflight_result":"EXACT_ONE_27C6_5125_PRIOR_D277_02_APP12509_AND_EXACT_A2_PROOF_NO_CURRENT_A8","usb_open_count":1,"usb_claim_count":1,"usb_release_count":1,"usb_close_count":1,"goodix_command_count":1,"out_submit_count":1,"a2_sensor_only_submit_count":1,"physical_in_submit_count":2,"physical_in_completion_count":2,"ack_count":1,"typed_response_count":1,"ack_echo":162,"ack_status":7,"typed_control":162,"typed_body_length":3,"typed_result_class":"STRICT_MATCH","timeout_count":0,"retry_count":0,"reopen_count":0,"device_reset_count":0,"clear_halt_count":0,"persistent_device_write_count":0,"tls_handshake_count":0,"unexpected_frame_count":0,"stale_callback_count":0,"prohibited_second_command_count":0,"completion_class":"A2_ACCEPTED","error_class":"NONE","current_context_result":"A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT","backend_drained":true,"cleanup_completed":true}
+```
+
+```text
+LIVE_RC=0
+ONE_SHOT_CONSUMED=true
+RETRY_AUTHORIZED=false
+A8_AFTER_A2_AUTHORIZED=false
+DO_NOT_RERUN=true
+```
+
+È quindi osservato sul target che exact A2 `{01 14}` è stato accettato nello
+stato reale corrente e ha completato ACK strict più typed target-pinned. Lo
+status ACK `0x07` è successo perché appartiene alla allowlist canonica
+`0x01|0x07` ed è seguito dal typed strict match; non gli viene attribuita una
+semantica bit-level non dimostrata.
+
+La live non prova nonmutazione NVM assoluta, readiness A8, soluzione della
+re-entry, endpoint permanentemente quiescente o assenza di emissioni autonome
+tardive. `device_reset_count=0` significa soltanto assenza di primitive USB
+reset aggiuntive: il comando A2 sensor-only è contato separatamente.
 
 ## Baseline, scope e invarianti
 
@@ -76,7 +114,7 @@ D278/07 e D278/08 richiesti, l'audit semantico A2 e la matrice timeout D231, il
 contratto backend D233 e i builder/test correnti. La parentesi
 O001/O002/O003/orchestration non è stata usata.
 
-Tutto lo sviluppo e tutte le verifiche sono stati host-only. Non sono stati
+Lo sviluppo e la closure originaria sono stati host-only. In quella fase non sono stati
 enumerati o aperti dispositivi, non sono stati inviati A2/A8/E4, non sono stati
 letti store protetti e non sono stati usati `sudo`, TLS, PSK, reset USB,
 clear-halt, retry, reopen o comandi persistenti. I file congelati D278/03 e i
@@ -126,19 +164,21 @@ preservazione PSK/factory. Il commento non prova byte-per-byte che quella
 singola esecuzione abbia inviato exact A2; la plausibilità deriva dal path del
 driver e resta `INFERRED_FROM_DRIVER_PATH`.
 
-La classificazione del rischio è quindi più precisa di un generico comando
-ignoto:
+Prima della live, la classificazione del rischio era più precisa di un
+generico comando ignoto:
 
 ```text
 KNOWN_VOLATILE_SENSOR_RESET
 + KNOWN_PROJECT_TARGET_COMPATIBILITY
 + CROSS_VERSION_INDEPENDENT_SEMANTIC_CORROBORATION
 + INDEPENDENT_NATIVE_12509_STACK_CORROBORATION
-+ UNPROVEN_CURRENT_REENTRY_CONTEXT
++ UNPROVEN_CURRENT_REENTRY_CONTEXT  # chiuso dalla successiva live D278/09
 ```
 
-L'incertezza sperimentale è concentrata sullo stato corrente/non quiescente.
-Non viene dichiarato `A2_SENSOR_ONLY_SAFE_IN_CURRENT_REENTRY_CONTEXT=true`.
+La live documentata sopra ha poi sostituito quella componente con
+`A2_ACCEPTED_IN_CURRENT_REENTRY_CONTEXT`. Restano non provati la nonmutazione
+NVM assoluta, la readiness A8 e la quiescenza permanente; non viene quindi
+promossa l'accettazione osservata a una safety assoluta del receiver.
 
 ## Implementazione dedicata
 
@@ -247,7 +287,7 @@ D278_09_UNAPPROVED_LIVE_GATE=PASS_BEFORE_USB_CONTEXT
 FORBIDDEN_SYMBOL_AND_CALL_AUDIT=PASS
 D278_SECURE_SESSION_REGRESSION_NORMAL=11/11_PASS
 D278_SECURE_SESSION_REGRESSION_ASAN_UBSAN=11/11_PASS
-REAL_USB_ACCESS=false
+HOST_ONLY_CLOSURE_REAL_USB_ACCESS=false
 ```
 
 ## Riesame metodologico pre-live
@@ -266,5 +306,5 @@ REAL_USB_ACCESS=false
    all'analisi offline del device state e a un discriminante metodologicamente
    diverso, previa nuova review.
 
-Una futura esecuzione richiede review AI-PM, selezione esplicita di una full
-SHA live-critical e nuova autorizzazione esplicita dell'Utente.
+Questa procedura è stata poi eseguita una sola volta come documentato sopra.
+L'autorizzazione è consumata e nessuna nuova esecuzione D278/09 è ammessa.
