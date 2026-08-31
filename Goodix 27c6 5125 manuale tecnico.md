@@ -16,7 +16,26 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/08 — policy E4 OEM risolta offline come non factory-preserving
+### Stato corrente post-D278/09 — probe A2 sensor-only chiuso host-only, nessuna live autorizzata
+
+D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
+non factory-preserving e non è un candidato Linux. Aggiunge un candidato
+progettuale distinto, deliberatamente bounded: exact A2 sensor-only `{01 14}`
+una sola volta, seguito esclusivamente da ACK e typed A2 strict, senza retry o
+comandi successivi. Implementazione, test e launcher live-gated sono chiusi
+host-only; il current re-entry context non è ancora stato testato e nessuna
+baseline/live è approvata.
+
+```text
+CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
+OEM_RECOVERY_EQUIVALENCE=false
+A2_RISK_PROBE_IMPLEMENTED=true
+A2_RISK_PROBE_LIVE_CAPABLE=true
+A2_RISK_PROBE_LIVE_EXECUTED=false
+FUTURE_SINGLE_SHOT_A2_SENSOR_ONLY_LIVE_READY_FOR_AI_PM_REVIEW=true
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+```
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
 live** i seguenti confini:
@@ -1500,6 +1519,96 @@ superata. Audit, grafo, edge machine-readable e verifica riproducibile:
 `analysis/D278/D278_08_project8_e4_failure_graph.md`,
 `analysis/D278/D278_08_project8_e4_edges.csv` e
 `analysis/D278/tools/verify_d278_08_static.py`.
+
+### D278/09 — exact A2 sensor-only one-shot, closure host-only
+
+D278/09 non riapre né trapianta la recovery OEM. D278/08 resta l'autorità sul
+failure path E4: due check PSK falliti raggiungono
+`production_write_key → production_write_mcu → E0`, mentre il surrounding
+updater può raggiungere A4 Clear App e firmware update. Quella machinery resta
+non factory-preserving e vietata.
+
+Il candidato D278/09 è una decisione progettuale distinta. D231 lega nel
+`gfusb.dll` 1.1.125.14 `gfresetMCUAndfingerprint(false,true,...)` al control A2
+e body `{01 14}`: bit 0 reset sensore, bit 1 reset MCU, quindi `{02 14}` è una
+primitiva diversa e non ammessa. La capture target D255/D256 ha già osservato
+due exact `{01 14}` accettati con ACK e typed A2 sul nostro
+`GF_ST411SEC_APP_12509`. Questo prova identità, semantica host e compatibilità
+generale sul target, non l'uso nell'attuale re-entry/non-quiescenza.
+
+La semantica è corroborata cross-version dal claim Rocky su `gfusb.dll`
+1.1.125.13. Lo snapshot locale Rocky preservato contiene inoltre
+`gx_dev_reset()` con `data[2] = {1,20}` e lo usa come SetIdle nell'init sensore.
+È corroborazione esterna/implementativa, non prova primaria APP12509 e non
+prova assoluta di nonmutazione NVM. Il report indipendente native 12509 nella
+stessa Issue #1 corrobora uno stack Linux funzionante con firmware 12509
+mantenuto, TLS, enrollment, match/no-match e PAM; non conferma però la
+preservazione PSK, perché quella macchina riportava PSK assente (`status 0x01`)
+e ne ha provisionata una nuova. Il commento non prova da solo una esecuzione
+byte-exact A2; il collegamento al driver resta inferito.
+
+```text
+A2_SENSOR_ONLY_EXACT_BODY=01_14
+A2_SENSOR_ONLY_HOST_SEMANTICS=CONVERGED_SENSOR_ONLY_RESET
+A2_SENSOR_ONLY_ACCEPTED_ON_APP12509_PREVIOUSLY=true
+A2_SENSOR_ONLY_PERSISTENT_MUTATION_EVIDENCE=false
+A2_SENSOR_ONLY_DEVICE_NVM_NONMUTATION_ABSOLUTELY_PROVEN=false
+ROCKY_12513_A2_SENSOR_ONLY_SEMANTICS_CORROBORATES_LOCAL=true
+ROCKY_12513_A2_NVM_SAFETY_CLAIM=EXTERNAL_CORROBORATION_ONLY
+INDEPENDENT_12509_STACK_SUCCESS=CORROBORATING_CONTEXT
+INDEPENDENT_12509_EXACT_A2_EXECUTION=NOT_BYTE_EXACTLY_PROVEN_FROM_COMMENT_ALONE
+RESIDUAL_RISK_CLASS=CURRENT_REENTRY_CONTEXT_ONLY_WITH_DEVICE_SIDE_NVM_ABSOLUTE_PROOF_MISSING
+```
+
+Il probe dedicato riusa `goodix_a0_build_frame()` e costruisce l'unico wire
+`a0 06 00 a6 a2 03 00 01 14 f0`. Non istanzia `GoodixSecureSession`, router o
+TLS e non legge PSK/store. Dopo l'unico OUT ammette al massimo due IN fisici:
+ACK A2 strict con status `0x01|0x07`, poi typed A2 di tre byte con hash target
+pinnato. Timeout in qualunque fase, typed missing dopo ACK, mismatch, E4/A8
+inatteso, errore, callback stale o secondo start sono terminali; non esistono
+discard, drain generico, retry, A8 o altro comando successivo.
+
+```text
+GOODIX_COMMAND_SUBMIT_MAX=1
+GOODIX_BULK_OUT_SUBMIT_MAX=1
+A2_SENSOR_ONLY_SUBMIT_MAX=1
+PHYSICAL_BULK_IN_SUBMIT_MAX=2
+PHYSICAL_BULK_IN_COMPLETION_MAX=2
+A8_SUBMIT_MAX=0
+E4_SUBMIT_MAX=0
+A2_MCU_ONLY_SUBMIT_MAX=0
+TLS_HANDSHAKE_COUNT=0
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+```
+
+Il launcher live-capable è compilato `UNAPPROVED_FOR_LIVE` e richiede, prima
+della creazione del contesto GUsb, full SHA compile-time approvata, identica
+full SHA runtime, token operatore e operation name D278/09 esatti. Non è stata
+auto-selezionata una baseline. Il gate descriptor futuro richiede un solo
+`27c6:5125` e dichiara separatamente prova APP12509 D277/02 pregressa,
+precedente successo exact A2 e mancata rilettura firmware corrente: A8 non
+contamina il probe.
+
+Le suite focali passano 9/9 per due run normali deterministiche e 9/9
+ASAN/UBSAN; self-test, strict build, forbidden call/control audit e gate
+pre-USB passano. La regressione secure-session/codec passa 11/11 normal e
+11/11 ASAN/UBSAN. Non è stato creato alcun contesto USB reale e nessuna live è
+stata eseguita. Il successo di una futura run significherebbe soltanto
+`A2_SENSOR_ONLY_ACCEPTED_IN_CURRENT_CONTEXT=true`, non readiness A8 o re-entry
+risolta. Timeout o mismatch significano risultato ambiguo/rifiutato, cleanup e
+stop senza retry.
+
+Riesame metodologico: (1) rispetto a D278/03 non si ripete A8/secure-session e
+rispetto a D278/06 non si ripete il receive zero-OUT; si invia soltanto il noto
+A2 sensor-only e si leggono le sue sole risposte bounded; (2) la nuova ipotesi
+è l'accettazione dello stesso exact A2 nell'attuale stato contestuale; (3) un
+nuovo failure non porta a resend o A8, ma a stop e analisi offline di un
+discriminante diverso. Report completo:
+`analysis/D278/D278_09_a2_sensor_only_risk_probe.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
