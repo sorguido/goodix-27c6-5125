@@ -20,6 +20,7 @@ typedef enum
 
 #define GOODIX_POST_TLS_ERROR (goodix_post_tls_error_quark ())
 #define GOODIX_POST_TLS_D4_PRE_SUBMIT_PACING_MS 20u
+#define GOODIX_POST_TLS_AF_PRE_SUBMIT_PACING_MS 20u
 
 struct _GoodixPostTlsLifecycle
 {
@@ -509,6 +510,9 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
           0x55, (guint8) lifecycle->material.af_timestamp,
           (guint8) (lifecycle->material.af_timestamp >> 8), 0x00, 0x00
         };
+        /* D251 live evidence retained a bounded 20 ms quiet interval
+         * after the exact D4/01 ACK and before the fixed64 AF OUT. */
+        g_usleep ((gulong) GOODIX_POST_TLS_AF_PRE_SUBMIT_PACING_MS * 1000u);
         if (lifecycle->audit != NULL)
           lifecycle->audit->af_count++;
         submit_or_fail (lifecycle,
