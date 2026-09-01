@@ -63,6 +63,6 @@ jobs:
           test "$(rg -n 'goodix_usb_router_receive_complete \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 1
           ! rg -n '0xd4|D4|--live-|g_usb_device_open|fpi_usb_transfer_submit' libfprint-driver/goodix_secure_session.[ch] libfprint-driver/goodix_a0_protocol.[ch]
           ! rg -n 'LoadLibrary|dlopen|execve|posix_spawn|system\s*\(' tools/goodix_d190_pe.[ch]
-          test "$(rg -n 'production_submit_in \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 2
+          test "$(rg -n 'production_submit_in \(' libfprint-driver/goodix_fpi_usb_backend.c | wc -l)" -eq 3
           git diff --check HEAD^
           test -z "$(git status --short)"
