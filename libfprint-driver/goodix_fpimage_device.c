@@ -69,6 +69,9 @@ struct _GoodixDeviceContext
   GoodixTlsPlaintextFunc     tls_plaintext;
   gpointer                   tls_user_data;
   guint                      a0_delivery_count;
+  gboolean                   operator_epoch;
+  GoodixDeviceContextSecurePhaseObserver phase_observer;
+  gpointer                   phase_observer_data;
 
   FpiImageDeviceState        last_framework_state;
 
@@ -247,10 +250,18 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
-  if (ctx->secure_session != NULL)
+  if (ctx->secure_session != NULL &&
+      goodix_secure_session_get_phase (ctx->secure_session) !=
+        GOODIX_SECURE_PHASE_STOP &&
+      goodix_secure_session_get_phase (ctx->secure_session) !=
+        GOODIX_SECURE_PHASE_TERMINAL)
     goodix_secure_session_cancel (ctx->secure_session,
                                   "GoodixDeviceContext terminal fence");
-  if (ctx->post_tls_lifecycle != NULL)
+  if (ctx->post_tls_lifecycle != NULL &&
+      goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
+        GOODIX_POST_TLS_PHASE_STOP &&
+      goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
+        GOODIX_POST_TLS_PHASE_TERMINAL)
     goodix_post_tls_lifecycle_cancel (ctx->post_tls_lifecycle,
                                       "GoodixDeviceContext terminal fence");
   goodix_tls_server_cancel (ctx->tls_server);
@@ -582,6 +593,16 @@ goodix_fpimage_device_new (void)
   return g_object_new (GOODIX_TYPE_FPIMAGE_DEVICE, NULL);
 }
 
+GoodixFpImageDevice *
+goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device)
+{
+  g_return_val_if_fail (usb_device != NULL, NULL);
+  return g_object_new (GOODIX_TYPE_FPIMAGE_DEVICE,
+                       "fpi-usb-device", usb_device,
+                       "fpi-driver-data", (guint64) 0,
+                       NULL);
+}
+
 GoodixDeviceContext *
 goodix_fpimage_device_get_context (GoodixFpImageDevice *dev)
 {
@@ -631,6 +652,22 @@ context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
 
   (void) lifecycle;
   (void) acquisition_index;
+  if (ctx->operator_epoch)
+    {
+      GoodixFpImagePipeline *pipeline = NULL;
+      GoodixFpImagePipelineResult result;
+
+      result = goodix_fpimage_pipeline_new (
+        samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT, &pipeline);
+      if (result != GOODIX_FPIMAGE_PIPELINE_OK)
+        {
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                       "FpImage pipeline failed with result %u", result);
+          return FALSE;
+        }
+      goodix_fpimage_pipeline_free (pipeline);
+      return TRUE;
+    }
   goodix_device_context_emit_image_ready (
     ctx, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
   if (ctx->terminal_fence)
@@ -646,8 +683,11 @@ static void
 context_post_tls_finger_down (GoodixPostTlsLifecycle *lifecycle,
                               gpointer                user_data)
 {
+  GoodixDeviceContext *ctx = user_data;
+
   (void) lifecycle;
-  goodix_device_context_emit_finger_down (user_data);
+  if (!ctx->operator_epoch)
+    goodix_device_context_emit_finger_down (ctx);
 }
 
 static void
@@ -658,15 +698,21 @@ context_post_tls_release_tail (GoodixPostTlsLifecycle *lifecycle,
 
   (void) lifecycle;
   ctx->fresh_down_table = TRUE;
-  goodix_device_context_emit_release_tail_complete (ctx);
+  if (ctx->operator_epoch)
+    ctx->release_tail_complete = TRUE;
+  else
+    goodix_device_context_emit_release_tail_complete (ctx);
 }
 
 static void
 context_post_tls_finger_up (GoodixPostTlsLifecycle *lifecycle,
                             gpointer                user_data)
 {
+  GoodixDeviceContext *ctx = user_data;
+
   (void) lifecycle;
-  goodix_device_context_emit_finger_up_ready (user_data);
+  if (!ctx->operator_epoch)
+    goodix_device_context_emit_finger_up_ready (ctx);
 }
 
 static void
@@ -700,6 +746,8 @@ context_secure_phase (GoodixSecureSession *session,
   GoodixDeviceContext *ctx = user_data;
   g_autoptr(GError) error = NULL;
 
+  if (generation == ctx->generation && ctx->phase_observer != NULL)
+    ctx->phase_observer (phase, generation, ctx->phase_observer_data);
   if (phase != GOODIX_SECURE_PHASE_STOP || generation != ctx->generation ||
       ctx->terminal_fence || ctx->post_tls_lifecycle == NULL)
     return;
@@ -842,6 +890,69 @@ goodix_device_context_set_post_tls_await_finger_on (GoodixDeviceContext *ctx,
   if (ctx->post_tls_lifecycle != NULL)
     goodix_post_tls_lifecycle_set_framework_await_finger_on (
       ctx->post_tls_lifecycle, ctx->generation, awaiting);
+}
+
+void
+goodix_device_context_set_secure_phase_observer (
+  GoodixDeviceContext                    *ctx,
+  GoodixDeviceContextSecurePhaseObserver  observer,
+  gpointer                                user_data)
+{
+  g_return_if_fail (ctx != NULL);
+  ctx->phase_observer = observer;
+  ctx->phase_observer_data = user_data;
+}
+
+gboolean
+goodix_device_context_begin_operator_epoch (GoodixDeviceContext *ctx,
+                                             GCancellable        *cancellable,
+                                             GError             **error)
+{
+  if (ctx == NULL || cancellable == NULL || ctx->operator_epoch ||
+      ctx->generation != 0 || ctx->secure_session != NULL ||
+      ctx->post_tls_lifecycle != NULL || ctx->poisoned)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "Goodix operator epoch cannot begin");
+      return FALSE;
+    }
+
+  ctx->generation_seq++;
+  if (ctx->generation_seq == 0)
+    ctx->generation_seq++;
+  ctx->generation = ctx->generation_seq;
+  ctx->terminal_fence = FALSE;
+  ctx->operator_epoch = TRUE;
+  g_set_object (&ctx->usb_cancellable, cancellable);
+  if (!goodix_fpi_usb_backend_begin_generation (ctx->fpi_usb_backend,
+                                                ctx->generation,
+                                                ctx->usb_cancellable, error))
+    {
+      ctx->operator_epoch = FALSE;
+      ctx->generation = 0;
+      return FALSE;
+    }
+  goodix_usb_router_begin_generation (ctx->usb_router, ctx->generation);
+  goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
+  return TRUE;
+}
+
+void
+goodix_device_context_stop_operator_epoch (GoodixDeviceContext *ctx)
+{
+  if (ctx == NULL || !ctx->operator_epoch)
+    return;
+  goodix_device_context_set_terminal_fence (ctx);
+  ctx->operator_epoch = FALSE;
+  ctx->generation = 0;
+  goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+}
+
+gboolean
+goodix_device_context_operator_epoch_is_drained (GoodixDeviceContext *ctx)
+{
+  return ctx != NULL && goodix_fpi_usb_backend_is_drained (
+                          ctx->fpi_usb_backend);
 }
 
 /* --- Context accessors --- */

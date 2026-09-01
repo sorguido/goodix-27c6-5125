@@ -31,6 +31,11 @@ typedef enum
 typedef struct _GoodixDeviceContext GoodixDeviceContext;
 typedef struct _GoodixInMemoryBackend GoodixInMemoryBackend;
 typedef struct _GoodixUsbRouter GoodixUsbRouter;
+typedef struct _GUsbDevice GUsbDevice;
+typedef void (*GoodixDeviceContextSecurePhaseObserver) (
+  GoodixSecurePhase phase,
+  guint64           generation,
+  gpointer          user_data);
 
 typedef struct
 {
@@ -44,6 +49,9 @@ typedef struct
  * subclass, but it is not registered in any production id table.
  */
 GoodixFpImageDevice * goodix_fpimage_device_new (void);
+/* Harness-only construction over an already selected GUsbDevice.  The class
+ * remains absent from every production id table. */
+GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device);
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
@@ -86,6 +94,20 @@ void goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
 void goodix_device_context_set_post_tls_await_finger_on (
   GoodixDeviceContext *ctx,
   gboolean             awaiting);
+void goodix_device_context_set_secure_phase_observer (
+  GoodixDeviceContext                    *ctx,
+  GoodixDeviceContextSecurePhaseObserver  observer,
+  gpointer                                user_data);
+
+/* Bounded operator-harness epoch.  This is activation plumbing only: all
+ * protocol/TLS/FDT/image semantics remain in the objects owned by @ctx. */
+gboolean goodix_device_context_begin_operator_epoch (
+  GoodixDeviceContext *ctx,
+  GCancellable        *cancellable,
+  GError             **error);
+void goodix_device_context_stop_operator_epoch (GoodixDeviceContext *ctx);
+gboolean goodix_device_context_operator_epoch_is_drained (
+  GoodixDeviceContext *ctx);
 
 /* --- Context read-only accessors (test instrumentation) --- */
 GoodixDeviceContextState goodix_device_context_get_state (GoodixDeviceContext *ctx);

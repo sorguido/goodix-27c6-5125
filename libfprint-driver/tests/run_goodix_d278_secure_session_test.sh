@@ -32,23 +32,38 @@ python3 "$script_dir/support/generate_libfprint_enums.py" \
   --output-header "$build/fpi-enums.h" --output-source "$build/fpi-enums.c" \
   "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
-includes="-I$build -I$root/libfprint-driver -I$local_fp -I$root/Rockytkg/libfprint -I$script_dir/support"
+includes="-I$build -I$root/libfprint-driver -I$local_fp -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include -I$root/Rockytkg/libfprint -I$script_dir/support"
 strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+local_relax="-Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -Wno-conversion -Wno-sign-conversion -Wno-float-conversion"
 
 build_run () {
   name=$1
   extra=$2
-  gcc $strict $extra $cflags $includes \
+  gcc $strict $local_relax $extra $cflags $includes \
+    "$local_fp/fp-device.c" \
+    "$local_fp/fpi-device.c" \
+    "$local_fp/fp-image-device.c" \
+    "$local_fp/fpi-image-device.c" \
+    "$local_fp/fp-image.c" \
+    "$local_fp/fp-print.c" \
+    "$local_fp/fpi-print.c" \
+    "$build/fp-enums.c" \
+    "$build/fpi-enums.c" \
+    "$root/libfprint-driver/goodix_u16_to_fpimage.c" \
+    "$root/libfprint-driver/goodix_fpimage_pipeline.c" \
     "$root/libfprint-driver/goodix_a0_protocol.c" \
     "$root/libfprint-driver/goodix_secure_session.c" \
     "$root/libfprint-driver/goodix_image_decoder.c" \
     "$root/libfprint-driver/goodix_post_tls_lifecycle.c" \
+    "$root/libfprint-driver/goodix_fpimage_device.c" \
     "$root/libfprint-driver/goodix_tls_server.c" \
     "$root/libfprint-driver/goodix_usb_router.c" \
     "$root/libfprint-driver/goodix_fpi_usb_backend.c" \
     "$script_dir/test_goodix_d278_secure_session.c" \
     "$script_dir/support/fpi_usb_transfer_compile_stub.c" \
-    $libs -o "$build/$name"
+    "$script_dir/support/gusb_stub.c" \
+    "$script_dir/support/fpimage_link_stubs.c" \
+    $libs -lm -o "$build/$name"
   # LeakSanitizer is unavailable under the Flatpak/bwrap ptrace boundary;
   # ASAN address checks and UBSAN remain fully enabled.
   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
@@ -73,3 +88,12 @@ echo REAL_USB_ACCESS=0
 echo REAL_USB_SUBMIT=0
 echo CURRENT_LIVE_AUTHORIZED=false
 echo D4_REACHABLE=false
+echo D4_HOST_ONLY_REACHABLE=true
+echo LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
+echo SAME_GOODIX_DEVICE_CONTEXT=true
+echo SINGLE_USB_BACKEND_OWNER=true
+echo SINGLE_USB_ROUTER=true
+echo SINGLE_PHYSICAL_IN_OWNER=true
+echo SINGLE_TLS_OBJECT=true
+echo TLS_HANDSHAKE_COUNT_MAX=1
+echo SECRET_HANDOFF_COUNT_MAX=1

@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/12 — secure-session reentry-prefixed e due acquisizioni unite nel percorso C nativo host-only
+### Stato corrente post-D278/13 — percorso C integrato live-capable, chiuso pre-live solo host
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -46,6 +46,15 @@ lifecycle D4→AF→fresh-FDT→prima acquisizione→release→rearm→seconda a
 nel medesimo `GoodixDeviceContext`, backend, router, generation e oggetto TLS.
 Il passaggio di ownership è callback-driven e avviene solo a egress TLS
 drenato; non introduce polling, secondo reader, seconda sessione TLS o reopen.
+
+D278/13 chiude il successivo gap di binding senza creare un altro stack: un
+adapter GPL operator-only costruisce la shell non registrata sul `GUsbDevice`
+già selezionato, apre una sola epoch del medesimo `GoodixDeviceContext` e gli
+consegna il loader protetto D278/02 e il seed FDT canonico read-only. Il driver
+LGPL continua a possedere l'unico backend/router/reader, secure-session, TLS e
+lifecycle post-TLS. L'entrypoint è stato eseguito soltanto con peer e materiale
+sintetici; il binario live-shaped ordinario ha baseline `UNAPPROVED_FOR_LIVE`
+e il suo gate ha arrestato l'esecuzione prima di secret, cache e contesto USB.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -80,6 +89,16 @@ POST_TLS_TWO_ACQUISITION_NATIVE_C_INTEGRATION_IMPLEMENTED=true
 REENTRY_PREFIXED_NATIVE_C_TO_SECOND_B0_HOST_ONLY_PROVEN=true
 SAME_OPEN_EPOCH_USB_OWNER_HOST_ONLY_PROVEN=true
 SAME_TLS_SESSION_THROUGH_SECOND_B0_HOST_ONLY_PROVEN=true
+INTEGRATED_PATH_LIVE_CAPABLE_IMPLEMENTED=true
+LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
+SAME_GOODIX_DEVICE_CONTEXT=true
+SINGLE_USB_BACKEND_OWNER=true
+SINGLE_USB_ROUTER=true
+SINGLE_PHYSICAL_IN_OWNER=true
+SINGLE_TLS_OBJECT=true
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+REAL_PRODUCTION_SECRET_READ=false
+LIVE_EXECUTION_PERFORMED=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
@@ -1998,6 +2017,110 @@ pipeline `FpImage`; una prova target della seconda raster richiederebbe nuova
 evidenza live separata e nuova autorizzazione, oggi assente. Il report
 Git-native è
 `analysis/D278/D278_12_reentry_secure_session_to_two_acquisition_host_only.md`.
+
+### D278/13 — binding fisico-shaped dell'unico percorso integrato, pre-live host-only
+
+Il gap architetturale residuo di D278/12 era nel punto di ingresso: la fixture
+end-to-end componeva manualmente oggetti compatibili, mentre il tool live
+storico D278/11 possedeva un harness distinto e terminava al TLS. D278/13 non
+estende quel tool. Espone invece una costruzione harness-only del
+`GoodixFpImageDevice` non registrato su un `GUsbDevice` già selezionato e una
+epoch operator bounded sul suo unico `GoodixDeviceContext`. Il context crea e
+mantiene una sola istanza di:
+
+```text
+GoodixDeviceContext
+  -> GoodixFpiUsbBackend -> GoodixUsbRouter -> un owner IN fisico
+  -> GoodixSecureSession -> GoodixTlsServer (un handshake/un handoff)
+  -> handoff dello stesso backend soltanto dopo drain TLS OUT
+  -> GoodixPostTlsLifecycle -> decoder -> goodix_fpimage_pipeline_new()
+  -> STOP dopo la seconda pipeline -> cancel/fence -> drain -> release/close
+```
+
+`tools/d278_integrated_path_once.c` è solo glue GPL: seleziona esattamente un
+`27c6:5125`, applica open/claim/release/close, carica il materiale tramite gli
+stessi `goodix_target_material_*` e `goodix_d190_pe_*` di D278/02, fornisce il
+seed FDT12 dal blob raw privato canonico D255 con hash, layout, CRC e binding
+OTP hash-gated, imposta il gate framework `AWAIT_FINGER_ON`, registra
+telemetria bounded e delega ogni comando/protocollo/TLS/FDT/decode al context.
+Non contiene costruttori di backend/router/TLS/session/lifecycle, un secondo
+reader, retry, reopen, reset, clear-halt o famiglia di write persistente. La
+shell resta assente da ogni id table production e non viene installata.
+
+Il launcher realistico è:
+
+```text
+./operator_kit/d278-13-integrated-path-once.sh --host-only-prelive
+```
+
+Questa modalità ha eseguito dalla Git root 17/17 test normali e 17/17
+ASAN/UBSAN, incluso il path integrato completo, e ha compilato/linkato il
+binario GUsb live-shaped. L'entrypoint sintetico attraversa il prefisso
+reentry, un handshake TLS 1.2 PSK OpenSSL reale in-process, lo stesso oggetto
+TLS fino al secondo B0, entrambe le pipeline `FpImage`, release tail, fresh
+same-cycle down-table e un solo rearm. Le cancellazioni durante secure-session
+e post-TLS sono terminali e drenate. Run ripetute hanno mantenuto gli stessi
+17 casi e gli stessi invarianti logici; gli seed casuali GLib non cambiano il
+risultato.
+
+Il percorso fisico-shaped è soltanto compile/API/executable-closure proven.
+Nel build ordinario il comando live ritorna codice `3` con
+`LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED` prima di leggere materiale
+protetto, blob cache o creare/enumerare il contesto GUsb. D278/13 non ha aperto,
+enumerato o claimato il sensore, non ha letto secret reali, non ha eseguito USB
+submit e non ha approvato una baseline live. Una futura run richiede review
+AI-PM separata, SHA completo esplicitamente approvato e token operatore
+single-shot; `READY_FOR_LIVE` resta false.
+
+La telemetria futura comprende open/claim/release/close, submit/completion e
+massimi outstanding, trace delle fasi secure, contatori ACK/typed/reentry/A8/E4,
+handshake/handoff/zeroizzazione, tutti i contatori post-TLS fino alla seconda
+pipeline e cleanup. Non serializza raster, PSK, validator, OTP o seed FDT raw.
+Il conteggio IN fisico non è congelato. Failure e cancellation applicano
+generation fence, zero retry/reopen/reset/clear-halt e drain; ciò non dimostra
+la quiescenza device-side dopo una cancellazione arbitraria.
+
+```text
+D278_13_BASELINE=78230ff1ebd4f1db5d5fd06fbfe6d41fa3a07eca
+INTEGRATED_PATH_LIVE_CAPABLE_IMPLEMENTED=true
+LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
+SAME_GOODIX_DEVICE_CONTEXT=true
+SINGLE_USB_BACKEND_OWNER=true
+SINGLE_USB_ROUTER=true
+SINGLE_PHYSICAL_IN_OWNER=true
+SINGLE_TLS_OBJECT=true
+TLS_HANDSHAKE_COUNT_MAX=1
+SECRET_HANDOFF_COUNT_MAX=1
+FIRST_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
+SECOND_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
+SECOND_IMAGE_RASTER_TARGET_PROVEN=false
+RELEASE_TAIL_ORDER_HOST_ONLY_PROVEN=true
+FRESH_SAME_CYCLE_DOWN_TABLE_GATE_HOST_ONLY_PROVEN=true
+REARM_EXACTLY_ONCE_HOST_ONLY_PROVEN=true
+THIRD_CYCLE_COMMAND_COUNT=0
+PHYSICAL_RX_FRAGMENTATION_INVARIANCE_HOST_ONLY_PROVEN=true
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+PRODUCTION_DEVICE_QUIESCENCE_AFTER_ARBITRARY_CANCEL=UNRESOLVED
+ORIENTATION_CONTRACT=UNRESOLVED
+POLARITY_CONTRACT=UNRESOLVED
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+ENROLLMENT_STAGE_POLICY=NOT_SELECTED
+REAL_USB_ACCESS=false
+REAL_USB_SUBMIT=0
+REAL_PRODUCTION_SECRET_READ=false
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+```
+
+Il review set canonico è descritto in
+`analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md`.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy

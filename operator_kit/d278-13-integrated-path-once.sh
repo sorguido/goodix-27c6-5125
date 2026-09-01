@@ -1,0 +1,40 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+root=$(git -C "$script_dir" rev-parse --show-toplevel)
+
+case "${1:-}" in
+  --host-only-prelive)
+    cd "$root"
+    "$root/libfprint-driver/tests/run_goodix_d278_secure_session_test.sh"
+    "$root/libfprint-driver/tests/build_goodix_d278_13_adapter.sh"
+    echo EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+    echo LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
+    echo REAL_USB_ACCESS=false
+    echo REAL_USB_SUBMIT=0
+    echo REAL_PRODUCTION_SECRET_READ=false
+    echo LIVE_EXECUTION_PERFORMED=false
+    echo CURRENT_LIVE_AUTHORIZED=false
+    echo READY_FOR_LIVE=false
+    echo RETRY_AUTHORIZED=false
+    ;;
+  --live-integrated-once)
+    build=$(mktemp -d /tmp/goodix-d278-13-operator.XXXXXX)
+    cleanup () {
+      find "$build" -maxdepth 1 -type f -delete 2>/dev/null || true
+      rmdir "$build" 2>/dev/null || true
+    }
+    trap cleanup EXIT HUP INT TERM
+    D278_13_BUILD_DIR=$build \
+      "$root/libfprint-driver/tests/build_goodix_d278_13_adapter.sh"
+    cd "$root"
+    LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+      "$build/d278_integrated_path_once" --live-integrated-once
+    ;;
+  *)
+    echo "usage: $0 --host-only-prelive | --live-integrated-once" >&2
+    exit 2
+    ;;
+esac

@@ -216,3 +216,33 @@ step-local controlla sorgenti e simboli per riferimenti GPL, reset/clear-halt,
 control transfer e provider TLS indipendenti. L'etichetta clean-room descrive
 il controllo ingegneristico di provenance e non costituisce una conclusione
 legale.
+
+## D278/13 — binding operatore integrato
+
+Le modifiche a `libfprint-driver/goodix_fpimage_device.[ch]` e ai test restano
+`LGPL-2.1-or-later`. Sono plumbing e osservabilità dell'oggetto già esistente:
+costruzione non registrata su un `GUsbDevice`, epoch bounded, callback di fase
+e consegna dei due raster alla pipeline `FpImage` senza attraversare un'azione
+framework fittizia. Le fonti sono le API pubbliche GLib/GObject/GUsb e libfprint
+1.94.5, più l'architettura canonica D276/D278. Non è stata trasferita
+espressione GPL nel dominio LGPL.
+
+`tools/d278_integrated_path_once.c`, gli script build/operatore D278/13 e il
+relativo glue sono `GPL-2.0-or-later`. Il wrapper di caricamento materiale
+riapplica, nello stesso dominio GPL, la sequenza già project-owned di
+`tools/goodix_d278_harness.c` (load → estrazione PE policy-gated → bind E4 →
+view → cleanse), sostituendo l'harness runtime con il solo
+`GoodixDeviceContext`. Il reader FDT12 read-only deriva dal contratto GPL
+project-owned `core/fdt_seed.py` e dai fatti D255/D261: blob canonico 13.520
+byte, SHA-256 esatto, CRC-32/MPEG-2 little-endian, OTP64 hash-bound e campo
+FDT12 offset 64. La destinazione è esclusivamente tool GPL; non sono stati
+copiati algoritmi o orchestration nel driver LGPL.
+
+Il tool non implementa comandi A0/B0, TLS, FDT lifecycle, decoder o pipeline e
+non collega il legacy `GoodixD278Harness`. Il build host-only usa stub
+link-only libfprint per extractor fuori scope, ma il percorso bounded costruisce
+soltanto il vero `FpImage`; non seleziona matcher o enrollment. La fixture usa
+materiale e immagini sintetici. Il raw cache privato è soltanto un input
+future-live hash-gated: D278/13 non lo legge, perché il gate ordinario termina
+prima di cache, secret e USB. L'etichetta clean-room descrive il controllo
+ingegneristico di provenance e non costituisce una conclusione legale.

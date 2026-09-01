@@ -2,6 +2,7 @@
 /* Deterministic host-only integration tests for the native D278/01 chain. */
 #include "goodix_a0_protocol.h"
 #include "goodix_fpi_usb_backend.h"
+#include "goodix_fpimage_device.h"
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_usb_router.h"
@@ -52,6 +53,10 @@ typedef struct
   guint8 chip[4];
   guint8 otp[64];
   guint8 psk[GOODIX_SECURE_SESSION_PSK_LENGTH];
+  GoodixFpImageDevice *device;
+  GoodixDeviceContext *context;
+  GCancellable *operator_cancellable;
+  gboolean integrated_context;
 } Fixture;
 
 typedef struct
@@ -265,6 +270,51 @@ fixture_new (void)
   return fixture_new_with_audit (TRUE);
 }
 
+static Fixture *
+fixture_new_integrated_context (void)
+{
+  Fixture *fixture = g_new0 (Fixture, 1);
+  GoodixPostTlsMaterial post_material = { 0 };
+  g_autoptr(GError) error = NULL;
+
+  fixture->integrated_context = TRUE;
+  fixture->out = g_queue_new ();
+  fixture->server_record = g_byte_array_new ();
+  material_init (fixture);
+  fixture->device = goodix_fpimage_device_new ();
+  fixture->context = goodix_fpimage_device_get_context (fixture->device);
+  fixture->operator_cancellable = g_cancellable_new ();
+  goodix_device_context_set_async_usb_submit_seam (
+    fixture->context, submit_seam, fixture);
+  g_assert_true (goodix_device_context_begin_operator_epoch (
+    fixture->context, fixture->operator_cancellable, &error));
+  g_assert_no_error (error);
+  fixture->generation = goodix_device_context_get_generation (
+    fixture->context);
+  fixture->router = goodix_device_context_get_usb_router (fixture->context);
+  fixture->backend = goodix_device_context_get_fpi_usb_backend (
+    fixture->context);
+  for (guint i = 0; i < 6u; i++)
+    {
+      post_material.initial_fdt_table[i * 2u] = 0x80;
+      post_material.initial_fdt_table[i * 2u + 1u] =
+        (guint8) (0x40u + i);
+    }
+  post_material.af_timestamp = 0x1234;
+  post_material.first_arm_timestamp = 0x2345;
+  post_material.second_arm_timestamp = 0x3456;
+  g_assert_true (goodix_device_context_configure_post_tls_lifecycle (
+    fixture->context, &post_material, &fixture->post_audit, &error));
+  g_assert_no_error (error);
+  g_assert_true (goodix_device_context_start_secure_session (
+    fixture->context, &fixture->material, schedule_seam, fixture,
+    &fixture->audit, &fixture->tls_audit, &error));
+  g_assert_no_error (error);
+  fixture->session = goodix_device_context_get_secure_session (
+    fixture->context);
+  return fixture;
+}
+
 static void
 submission_free (Submission *submission)
 {
@@ -288,6 +338,19 @@ fixture_free (Fixture *fixture)
     return;
   fixture_clear_out (fixture);
   g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  if (fixture->integrated_context)
+    {
+      goodix_device_context_stop_operator_epoch (fixture->context);
+      g_assert_true (goodix_device_context_operator_epoch_is_drained (
+        fixture->context));
+      g_clear_object (&fixture->operator_cancellable);
+      g_clear_object (&fixture->device);
+      g_queue_free (fixture->out);
+      g_byte_array_unref (fixture->server_record);
+      g_clear_pointer (&fixture->post_tls_plaintext, g_bytes_unref);
+      g_free (fixture);
+      return;
+    }
   goodix_post_tls_lifecycle_free (fixture->post_tls);
   goodix_secure_session_free (fixture->session);
   goodix_fpi_usb_backend_free (fixture->backend);
@@ -357,6 +420,12 @@ feed_completion (Fixture *fixture,
 {
   g_autoptr(GError) error = NULL;
 
+  if (fixture->integrated_context)
+    {
+      goodix_device_context_complete_receive (fixture->context, generation,
+                                               data, length, NULL);
+      return;
+    }
   g_assert_true (goodix_fpi_usb_backend_arm_receive (
     fixture->backend, fixture->generation, &error));
   g_assert_no_error (error);
@@ -691,6 +760,14 @@ drain_server_records (Fixture *fixture,
         }
       submission = pop_out (fixture);
       data = g_bytes_get_data (submission->bytes, &length);
+      if (fixture->integrated_context &&
+          goodix_secure_session_get_phase (fixture->session) ==
+            GOODIX_SECURE_PHASE_STOP &&
+          length != 0 && data[0] == 0xa0)
+        {
+          g_queue_push_head (fixture->out, submission);
+          break;
+        }
       g_assert_cmpuint (length, ==, 64);
       g_byte_array_append (fixture->server_record, data, (guint) length);
       if (fixture->server_record->len >= 4)
@@ -1203,6 +1280,116 @@ test_reentry_tls_to_two_acquisitions_composed (void)
                      fixture->backend), ==, 1u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_max_out_outstanding (
                      fixture->backend), ==, 1u);
+  client_clear (&client);
+  fixture_free (fixture);
+}
+
+static void
+test_integrated_context_live_binding_host_only (void)
+{
+  Fixture *fixture = fixture_new_integrated_context ();
+  TlsClient client;
+  GoodixTlsServer *retained;
+
+  while (goodix_secure_session_get_phase (fixture->session) <
+         GOODIX_SECURE_PHASE_D1)
+    respond_valid (fixture, 0, 0x01);
+  respond_valid (fixture, 0, 0x01);
+  client_init (&client, fixture);
+  g_assert_true (pump_tls (fixture, &client, FALSE));
+  retained = goodix_secure_session_get_tls_server (fixture->session);
+  fixture->post_tls = goodix_device_context_get_post_tls_lifecycle (
+    fixture->context);
+  g_assert_nonnull (fixture->post_tls);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+                   GOODIX_POST_TLS_PHASE_D4);
+
+  drive_post_tls_two_acquisitions (fixture, &client);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+                   GOODIX_POST_TLS_PHASE_STOP);
+  g_assert_true (retained == goodix_device_context_get_tls_server (
+                            fixture->context));
+  g_assert_true (fixture->backend ==
+                 goodix_device_context_get_fpi_usb_backend (fixture->context));
+  g_assert_true (fixture->router ==
+                 goodix_device_context_get_usb_router (fixture->context));
+  g_assert_cmpuint (fixture->audit.command_count, ==, 14u);
+  g_assert_cmpuint (fixture->tls_audit.handshake_count, ==, 1u);
+  g_assert_cmpuint (fixture->tls_audit.secret_handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.first_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.second_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.rearm_0x32_count, ==, 1u);
+  g_assert_cmpuint (fixture->post_audit.third_cycle_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.reopen_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.device_reset_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.clear_halt_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.persistent_device_write_count, ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
+                     fixture->backend), ==, 1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_out_outstanding (
+                     fixture->backend), ==, 1u);
+  client_clear (&client);
+  fixture_free (fixture);
+}
+
+static void
+cancel_and_drain_integrated_context (Fixture *fixture)
+{
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "host-only operator cancellation");
+
+  goodix_device_context_stop_operator_epoch (fixture->context);
+  while (!g_queue_is_empty (fixture->out))
+    complete_submission (fixture, pop_out (fixture), cancelled);
+  if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, NULL, 0, cancelled);
+  g_assert_true (goodix_device_context_operator_epoch_is_drained (
+    fixture->context));
+}
+
+static void
+test_integrated_context_cancel_secure (void)
+{
+  Fixture *fixture = fixture_new_integrated_context ();
+
+  cancel_and_drain_integrated_context (fixture);
+  g_assert_true (goodix_device_context_get_terminal_fence (fixture->context));
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.clear_halt_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.persistent_write_count, ==, 0u);
+  fixture_free (fixture);
+}
+
+static void
+test_integrated_context_cancel_post_tls (void)
+{
+  Fixture *fixture = fixture_new_integrated_context ();
+  TlsClient client;
+
+  while (goodix_secure_session_get_phase (fixture->session) <
+         GOODIX_SECURE_PHASE_D1)
+    respond_valid (fixture, 0, 0x01);
+  respond_valid (fixture, 0, 0x01);
+  client_init (&client, fixture);
+  g_assert_true (pump_tls (fixture, &client, FALSE));
+  fixture->post_tls = goodix_device_context_get_post_tls_lifecycle (
+    fixture->context);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+                   GOODIX_POST_TLS_PHASE_D4);
+  cancel_and_drain_integrated_context (fixture);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+                   GOODIX_POST_TLS_PHASE_TERMINAL);
+  g_assert_cmpuint (fixture->post_audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.reopen_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.device_reset_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.clear_halt_count, ==, 0u);
+  g_assert_cmpuint (fixture->post_audit.persistent_device_write_count, ==, 0u);
   client_clear (&client);
   fixture_free (fixture);
 }
@@ -1860,6 +2047,12 @@ main (int argc,
                    test_retained_tls_post_handshake_handoff);
   g_test_add_func ("/goodix/d278/reentry-tls-to-two-acquisitions-composed",
                    test_reentry_tls_to_two_acquisitions_composed);
+  g_test_add_func ("/goodix/d278/integrated-context-live-binding-host-only",
+                   test_integrated_context_live_binding_host_only);
+  g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",
+                   test_integrated_context_cancel_secure);
+  g_test_add_func ("/goodix/d278/integrated-context-cancel-post-tls",
+                   test_integrated_context_cancel_post_tls);
   g_test_add_func ("/goodix/d278/d1-client-hello-gate",
                    test_d1_client_hello_gate);
   g_test_add_func ("/goodix/d278/ack07-phase-policy",
