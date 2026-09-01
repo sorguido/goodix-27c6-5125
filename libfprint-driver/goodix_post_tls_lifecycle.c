@@ -877,6 +877,75 @@ goodix_post_tls_lifecycle_cancel (GoodixPostTlsLifecycle *lifecycle,
                                            "post-TLS lifecycle cancelled");
 }
 
+const gchar *
+goodix_post_tls_phase_name (GoodixPostTlsPhase phase)
+{
+  switch (phase)
+    {
+    case GOODIX_POST_TLS_PHASE_NOT_STARTED:
+      return "NOT_STARTED";
+    case GOODIX_POST_TLS_PHASE_D4:
+      return "D4";
+    case GOODIX_POST_TLS_PHASE_AF:
+      return "AF";
+    case GOODIX_POST_TLS_PHASE_FDT36_1:
+      return "FDT36_1";
+    case GOODIX_POST_TLS_PHASE_FDT_IRQ100_1:
+      return "FDT_IRQ100_1";
+    case GOODIX_POST_TLS_PHASE_FDT_NAV_1:
+      return "FDT_NAV_1";
+    case GOODIX_POST_TLS_PHASE_FDT36_2:
+      return "FDT36_2";
+    case GOODIX_POST_TLS_PHASE_FDT_IRQ100_2:
+      return "FDT_IRQ100_2";
+    case GOODIX_POST_TLS_PHASE_FDT_82:
+      return "FDT_82";
+    case GOODIX_POST_TLS_PHASE_FDT_20:
+      return "FDT_20";
+    case GOODIX_POST_TLS_PHASE_FDT_B0:
+      return "FDT_B0";
+    case GOODIX_POST_TLS_PHASE_FDT36_3:
+      return "FDT36_3";
+    case GOODIX_POST_TLS_PHASE_FDT_IRQ100_3:
+      return "FDT_IRQ100_3";
+    case GOODIX_POST_TLS_PHASE_FIRST_ARM:
+      return "FIRST_ARM";
+    case GOODIX_POST_TLS_PHASE_FIRST_IRQ2:
+      return "FIRST_IRQ2";
+    case GOODIX_POST_TLS_PHASE_FIRST_22:
+      return "FIRST_22";
+    case GOODIX_POST_TLS_PHASE_FIRST_B0:
+      return "FIRST_B0";
+    case GOODIX_POST_TLS_PHASE_RELEASE_34:
+      return "RELEASE_34";
+    case GOODIX_POST_TLS_PHASE_RELEASE_IRQ200:
+      return "RELEASE_IRQ200";
+    case GOODIX_POST_TLS_PHASE_RELEASE_20:
+      return "RELEASE_20";
+    case GOODIX_POST_TLS_PHASE_RELEASE_B0:
+      return "RELEASE_B0";
+    case GOODIX_POST_TLS_PHASE_RELEASE_50:
+      return "RELEASE_50";
+    case GOODIX_POST_TLS_PHASE_RELEASE_NAV:
+      return "RELEASE_NAV";
+    case GOODIX_POST_TLS_PHASE_REARM_GATE:
+      return "REARM_GATE";
+    case GOODIX_POST_TLS_PHASE_SECOND_ARM:
+      return "SECOND_ARM";
+    case GOODIX_POST_TLS_PHASE_SECOND_IRQ2:
+      return "SECOND_IRQ2";
+    case GOODIX_POST_TLS_PHASE_SECOND_22:
+      return "SECOND_22";
+    case GOODIX_POST_TLS_PHASE_SECOND_B0:
+      return "SECOND_B0";
+    case GOODIX_POST_TLS_PHASE_STOP:
+      return "STOP";
+    case GOODIX_POST_TLS_PHASE_TERMINAL:
+      return "TERMINAL";
+    }
+  return "UNKNOWN";
+}
+
 GoodixPostTlsPhase
 goodix_post_tls_lifecycle_get_phase (const GoodixPostTlsLifecycle *lifecycle)
 {

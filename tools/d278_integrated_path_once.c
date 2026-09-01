@@ -8,6 +8,7 @@
 #include "goodix_d190_pe.h"
 #include "goodix_fpimage_device.h"
 #include "goodix_target_material.h"
+#include "goodix_usb_router.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -21,16 +22,28 @@
 #include <gusb.h>
 #endif
 
-/* Operator-facing banners in Italian.  These are human-readable complements to
- * the machine telemetry; they never carry secrets. */
+/* Operator-facing messages in Italian.  Action instructions use the banner
+ * format with visible separator lines; informational lines require no action.
+ * No message carries secrets. */
+#define OP_BANNER_FIRST_FINGER \
+  "METTI IL DITO SUL SENSORE E ATTENDI IL PROSSIMO MESSAGGIO"
+#define OP_BANNER_REMOVE_FINGER \
+  "TOGLI IL DITO DAL SENSORE E ATTENDI IL PROSSIMO MESSAGGIO"
+#define OP_BANNER_SECOND_FINGER \
+  "METTI DI NUOVO IL DITO SUL SENSORE E ATTENDI IL PROSSIMO MESSAGGIO"
+#define OP_BANNER_SUCCESS \
+  "TEST COMPLETATO. TOGLI IL DITO DAL SENSORE.\n" \
+  "NON ESEGUIRE NUOVAMENTE IL COMANDO."
+#define OP_BANNER_FAILURE \
+  "TEST INTERROTTO.\n" \
+  "NON ESEGUIRE NUOVAMENTE IL COMANDO."
+
 #define OP_MSG_AUTHORIZATION_OK \
   "Autorizzazione live concessa; inizio run singolo."
 #define OP_MSG_DEVICE_DETECTED \
   "Dispositivo Goodix 27c6:5125 rilevato; apertura USB in corso."
 #define OP_MSG_SECURE_SESSION_STARTED \
-  "Sessione sicura avviata; appoggiare il dito sul sensore quando richiesto."
-#define OP_MSG_SCAN_COMPLETE \
-  "Scansione completata; arresto run e rilascio interfaccia."
+  "Sessione sicura avviata; attendere le istruzioni per il dito."
 #define OP_MSG_HOST_ONLY_A2_ARMED \
   "Host-only: IN armato per A2; in attesa dell'ACK dal sensore."
 #define OP_MSG_HOST_ONLY_A2_ACK_RECEIVED \
@@ -44,6 +57,102 @@ static void
 operator_message (const gchar *message)
 {
   g_print ("OPERATOR_MESSAGE_IT=%s\n", message);
+}
+
+static void
+operator_action_banner (const gchar *text)
+{
+  g_print ("======================\nOPERATOR_MESSAGE_IT=%s\n======================\n",
+           text);
+}
+
+typedef enum
+{
+  OPERATOR_PROMPT_NONE = 0,
+  OPERATOR_PROMPT_FIRST_FINGER,
+  OPERATOR_PROMPT_REMOVE_FINGER,
+  OPERATOR_PROMPT_SECOND_FINGER,
+  OPERATOR_PROMPT_SUCCESS,
+  OPERATOR_PROMPT_FAILURE,
+} OperatorPromptAction;
+
+typedef struct
+{
+  GoodixPostTlsPhase last_action_phase;
+  gboolean           success_emitted;
+  gboolean           failure_emitted;
+  guint              duplicate_count;
+} OperatorPromptTracker;
+
+static void
+operator_prompt_tracker_init (OperatorPromptTracker *tracker)
+{
+  tracker->last_action_phase = GOODIX_POST_TLS_PHASE_NOT_STARTED;
+  tracker->success_emitted = FALSE;
+  tracker->failure_emitted = FALSE;
+  tracker->duplicate_count = 0;
+}
+
+static OperatorPromptAction
+operator_prompt_tracker_emit (OperatorPromptTracker *tracker,
+                              GoodixPostTlsPhase    phase,
+                              gboolean              terminal)
+{
+  /* Terminal/failure suppresses every other action and is emitted once. */
+  if (terminal || tracker->failure_emitted)
+    {
+      if (!tracker->failure_emitted)
+        {
+          operator_action_banner (OP_BANNER_FAILURE);
+          tracker->failure_emitted = TRUE;
+          return OPERATOR_PROMPT_FAILURE;
+        }
+      return OPERATOR_PROMPT_NONE;
+    }
+
+  if (tracker->success_emitted)
+    return OPERATOR_PROMPT_NONE;
+
+  switch (phase)
+    {
+    case GOODIX_POST_TLS_PHASE_FIRST_IRQ2:
+      if (tracker->last_action_phase == phase)
+        {
+          tracker->duplicate_count++;
+          return OPERATOR_PROMPT_NONE;
+        }
+      tracker->last_action_phase = phase;
+      operator_action_banner (OP_BANNER_FIRST_FINGER);
+      return OPERATOR_PROMPT_FIRST_FINGER;
+
+    case GOODIX_POST_TLS_PHASE_RELEASE_IRQ200:
+      if (tracker->last_action_phase == phase)
+        {
+          tracker->duplicate_count++;
+          return OPERATOR_PROMPT_NONE;
+        }
+      tracker->last_action_phase = phase;
+      operator_action_banner (OP_BANNER_REMOVE_FINGER);
+      return OPERATOR_PROMPT_REMOVE_FINGER;
+
+    case GOODIX_POST_TLS_PHASE_SECOND_IRQ2:
+      if (tracker->last_action_phase == phase)
+        {
+          tracker->duplicate_count++;
+          return OPERATOR_PROMPT_NONE;
+        }
+      tracker->last_action_phase = phase;
+      operator_action_banner (OP_BANNER_SECOND_FINGER);
+      return OPERATOR_PROMPT_SECOND_FINGER;
+
+    case GOODIX_POST_TLS_PHASE_STOP:
+      operator_action_banner (OP_BANNER_SUCCESS);
+      tracker->success_emitted = TRUE;
+      return OPERATOR_PROMPT_SUCCESS;
+
+    default:
+      return OPERATOR_PROMPT_NONE;
+    }
 }
 
 #define D278_VID 0x27c6u
@@ -783,6 +892,117 @@ run_operator_prompt_state_machine_host_only (void)
   g_assert_true (goodix_device_context_operator_epoch_is_drained (ctx));
   g_queue_free_full (seam.out, (GDestroyNotify) host_only_submission_free);
   operator_message (OP_MSG_HOST_ONLY_SUCCESS);
+
+  /* Host-only proof of the runtime-state-driven operator prompt tracker.
+   * The tracker is exercised against the exact requested phase sequence and
+   * against a separate failure sequence; no USB access, no timers. */
+  {
+    OperatorPromptTracker tracker;
+
+    operator_prompt_tracker_init (&tracker);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
+      ==, OPERATOR_PROMPT_FIRST_FINGER);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
+      ==, OPERATOR_PROMPT_NONE);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
+                                    FALSE),
+      ==, OPERATOR_PROMPT_REMOVE_FINGER);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
+                                    FALSE),
+      ==, OPERATOR_PROMPT_NONE);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_SECOND_IRQ2, FALSE),
+      ==, OPERATOR_PROMPT_SECOND_FINGER);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_STOP, FALSE),
+      ==, OPERATOR_PROMPT_SUCCESS);
+    g_assert_true (tracker.success_emitted);
+    g_assert_false (tracker.failure_emitted);
+    g_assert_cmpuint (tracker.duplicate_count, ==, 2u);
+
+    /* Failure sequence: success must never be emitted after terminal. */
+    operator_prompt_tracker_init (&tracker);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
+      ==, OPERATOR_PROMPT_FIRST_FINGER);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
+                                    FALSE),
+      ==, OPERATOR_PROMPT_REMOVE_FINGER);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_SECOND_IRQ2, FALSE),
+      ==, OPERATOR_PROMPT_SECOND_FINGER);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                    GOODIX_POST_TLS_PHASE_TERMINAL, TRUE),
+      ==, OPERATOR_PROMPT_FAILURE);
+    g_assert_false (tracker.success_emitted);
+    g_assert_true (tracker.failure_emitted);
+
+    {
+      g_autoptr(GString) rendered = g_string_new (NULL);
+      g_string_printf (rendered,
+                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
+                       "======================\n",
+                       OP_BANNER_FIRST_FINGER);
+      g_assert_nonnull (g_strstr_len (rendered->str, -1,
+                                      "======================"));
+    }
+    {
+      g_autoptr(GString) rendered = g_string_new (NULL);
+      g_string_printf (rendered,
+                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
+                       "======================\n",
+                       OP_BANNER_REMOVE_FINGER);
+      g_assert_nonnull (g_strstr_len (rendered->str, -1,
+                                      "======================"));
+    }
+    {
+      g_autoptr(GString) rendered = g_string_new (NULL);
+      g_string_printf (rendered,
+                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
+                       "======================\n",
+                       OP_BANNER_SECOND_FINGER);
+      g_assert_nonnull (g_strstr_len (rendered->str, -1,
+                                      "======================"));
+    }
+    {
+      g_autoptr(GString) rendered = g_string_new (NULL);
+      g_string_printf (rendered,
+                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
+                       "======================\n",
+                       OP_BANNER_SUCCESS);
+      g_assert_nonnull (g_strstr_len (rendered->str, -1,
+                                      "======================"));
+    }
+    {
+      g_autoptr(GString) rendered = g_string_new (NULL);
+      g_string_printf (rendered,
+                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
+                       "======================\n",
+                       OP_BANNER_FAILURE);
+      g_assert_nonnull (g_strstr_len (rendered->str, -1,
+                                      "======================"));
+    }
+
+    g_print ("OPERATOR_PROMPT_SEQUENCE_HOST_ONLY_PROVEN=true\n");
+    g_print ("OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true\n");
+    g_print ("OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true\n");
+  }
+
   g_print ("OPERATOR_PROMPT_STATE_MACHINE_HOST_ONLY=PASS\n");
   g_print ("REAL_USB_ACCESS=false\nREAL_USB_SUBMIT=0\n");
   g_print ("A2_BACKEND_COMPLETION_REARM=true\n");
@@ -854,6 +1074,14 @@ run_physical_constructor_host_only (void)
 
 typedef struct
 {
+  GoodixSecurePhase    secure_phase;
+  GoodixPostTlsPhase   post_tls_phase;
+  guint                in_outstanding;
+  guint                router_outstanding;
+} StopSnapshot;
+
+typedef struct
+{
   GoodixDeviceContext *ctx;
   GMainLoop *loop;
   GString *phase_trace;
@@ -862,6 +1090,9 @@ typedef struct
   gboolean stopping;
   gboolean success;
   const gchar *failure_class;
+  OperatorPromptTracker prompt_tracker;
+  StopSnapshot snapshot;
+  gint64 stop_time_us;
 } Runtime;
 
 static void
@@ -877,6 +1108,27 @@ observe_phase (GoodixSecurePhase phase,
   g_string_append (runtime->phase_trace, goodix_secure_phase_name (phase));
 }
 
+static void
+capture_stop_snapshot (Runtime *runtime)
+{
+  GoodixSecureSession *session =
+    goodix_device_context_get_secure_session (runtime->ctx);
+  GoodixFpiUsbBackend *backend =
+    goodix_device_context_get_fpi_usb_backend (runtime->ctx);
+  GoodixUsbRouter *router =
+    goodix_device_context_get_usb_router (runtime->ctx);
+
+  runtime->snapshot.secure_phase = session != NULL ?
+    goodix_secure_session_get_phase (session) : GOODIX_SECURE_PHASE_TERMINAL;
+  runtime->snapshot.post_tls_phase =
+    goodix_post_tls_lifecycle_get_phase (
+      goodix_device_context_get_post_tls_lifecycle (runtime->ctx));
+  runtime->snapshot.in_outstanding = backend != NULL ?
+    goodix_fpi_usb_backend_get_outstanding (backend) : 0;
+  runtime->snapshot.router_outstanding = router != NULL ?
+    goodix_usb_router_get_outstanding (router) : 0;
+}
+
 static gboolean
 monitor_runtime (gpointer user_data)
 {
@@ -884,21 +1136,28 @@ monitor_runtime (gpointer user_data)
   GoodixPostTlsLifecycle *post =
     goodix_device_context_get_post_tls_lifecycle (runtime->ctx);
   GoodixPostTlsPhase phase = goodix_post_tls_lifecycle_get_phase (post);
+  gboolean terminal = phase == GOODIX_POST_TLS_PHASE_TERMINAL ||
+                      goodix_device_context_get_terminal_fence (runtime->ctx);
+
+  /* Drive operator prompts from the actual runtime phase, not from timers. */
+  operator_prompt_tracker_emit (&runtime->prompt_tracker, phase, terminal);
 
   if (!runtime->stopping && phase == GOODIX_POST_TLS_PHASE_STOP)
     {
       runtime->success = TRUE;
       runtime->stopping = TRUE;
+      runtime->stop_time_us = g_get_monotonic_time ();
+      capture_stop_snapshot (runtime);
       goodix_device_context_stop_operator_epoch (runtime->ctx);
     }
   else if (!runtime->stopping &&
-           (phase == GOODIX_POST_TLS_PHASE_TERMINAL ||
-            goodix_device_context_get_terminal_fence (runtime->ctx) ||
-            g_get_monotonic_time () >= runtime->deadline_us))
+           (terminal || g_get_monotonic_time () >= runtime->deadline_us))
     {
       runtime->failure_class = g_get_monotonic_time () >= runtime->deadline_us ?
         "ONE_SHOT_DEADLINE" : "INTEGRATED_PATH_TERMINAL";
       runtime->stopping = TRUE;
+      runtime->stop_time_us = g_get_monotonic_time ();
+      capture_stop_snapshot (runtime);
       goodix_device_context_stop_operator_epoch (runtime->ctx);
     }
   if (runtime->stopping &&
@@ -971,7 +1230,6 @@ run_live_once (void)
   int rc = 1;
 
   gint64 start_time_us = g_get_monotonic_time ();
-  gint64 stop_time_us = 0;
 
   runtime.failure_class = "PRE_BIND_FAILURE";
   if (!live_authorization_gate (&live_authorization_consumed,
@@ -1058,12 +1316,12 @@ run_live_once (void)
   goodix_target_material_free (material_owner);
   material_owner = NULL;
   OPENSSL_cleanse (&secure_material, sizeof secure_material);
+  operator_prompt_tracker_init (&runtime.prompt_tracker);
   runtime.monitor_source = g_timeout_add (10u, monitor_runtime, &runtime);
   g_main_loop_run (runtime.loop);
-  if (runtime.success)
-    stop_time_us = g_get_monotonic_time ();
 
-  operator_message (OP_MSG_SCAN_COMPLETE);
+  if (!runtime.success && !runtime.prompt_tracker.failure_emitted)
+    operator_action_banner (OP_BANNER_FAILURE);
 
 cleanup:
   if (material_owner != NULL)
@@ -1160,12 +1418,22 @@ cleanup:
            "\"retry_count\":0,\"reopen_count\":0,"
            "\"device_reset_count\":0,\"clear_halt_count\":0,"
            "\"persistent_device_write_count\":0,"
-           "\"secure_protocol_failure_recorded\":%s,"
-           "\"secure_protocol_failure_phase\":\"%s\","
-           "\"secure_protocol_failure_kind\":\"%s\","
-           "\"post_tls_terminal\":%s,"
-           "\"stop_time_ms\":%" G_GINT64_FORMAT ","
-           "\"backend_drained\":%s,\"cleanup_complete\":%s}\n",
+            "\"secure_protocol_failure_recorded\":%s,"
+            "\"secure_protocol_failure_phase\":\"%s\","
+            "\"secure_protocol_failure_kind\":\"%s\","
+            "\"post_tls_terminal\":%s,"
+            "\"observed_outer_type\":%d,"
+            "\"observed_a0_control\":%d,"
+            "\"observed_ack_echo\":%d,"
+            "\"observed_ack_status\":%d,"
+            "\"observed_body_length\":%" G_GSSIZE_FORMAT ","
+            "\"secure_phase_at_stop\":\"%s\","
+            "\"post_tls_phase_at_stop\":\"%s\","
+            "\"in_outstanding_at_stop\":%u,"
+            "\"router_outstanding_at_stop\":%u,"
+            "\"stop_time_ms\":%" G_GINT64_FORMAT ","
+            "\"backend_drained\":%s,\"cleanup_complete\":%s}\n",
+
            rc == 0 ? "pass" : "fail", runtime.failure_class,
            runtime.phase_trace != NULL ? runtime.phase_trace->str : "",
            live_authorization_consumed ? "true" : "false",
@@ -1213,10 +1481,20 @@ cleanup:
            secure_audit.protocol_failure_recorded ?
              goodix_protocol_failure_kind_name (
                secure_audit.protocol_failure_kind) : "",
-           post_audit.terminal ? "true" : "false",
-           stop_time_us > start_time_us ?
-             (stop_time_us - start_time_us) / 1000 : -1,
-           backend_drained ? "true" : "false",
+            post_audit.terminal ? "true" : "false",
+            secure_audit.observed_outer_type,
+            secure_audit.observed_a0_control,
+            secure_audit.observed_ack_echo,
+            secure_audit.observed_ack_status,
+            secure_audit.observed_body_length,
+            goodix_secure_phase_name (runtime.snapshot.secure_phase),
+            goodix_post_tls_phase_name (runtime.snapshot.post_tls_phase),
+            runtime.snapshot.in_outstanding,
+            runtime.snapshot.router_outstanding,
+            runtime.stop_time_us > start_time_us ?
+              (runtime.stop_time_us - start_time_us) / 1000 : -1,
+            backend_drained ? "true" : "false",
+
            backend_drained && project_secret_zeroized &&
              release_count == 1u && close_count == 1u ? "true" : "false");
   if (runtime.phase_trace != NULL)

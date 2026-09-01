@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/14 attempt-2 corrective — binding USB e IN re-arm corretti solo host, nessuna nuova live autorizzata
+### Stato corrente post-D278/14 — due live consumate, due correttivi host-only, chiusura UX/telemetry
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -63,43 +63,42 @@ esplicito `0600` lega SHA/operation/nonce ed è reclamato atomicamente una sola
 volta prima di qualunque materiale protetto, cache o GUsb. Il precedente token
 statico era riutilizzabile e non costituiva da solo un single-shot meccanico.
 
-La singola live D278/14 autorizzata sulla baseline
-`2172e750ae7c100a3a891ba25d0797286230a4ab` è stata eseguita una volta ed è
-consumata. Dopo selezione target e, secondo l'ordine eseguibile allora
-presente, open/claim, `goodix_fpimage_device_new_for_usb()` ha terminato con
-`SIGABRT` nell'assert di `fp_device_set_property()`: la classe comune era
-`FP_DEVICE_TYPE_VIRTUAL` ma il costruttore assegnava un `fpi-usb-device` non
-nullo, ammesso dalla libfprint locale soltanto per `FP_DEVICE_TYPE_USB`. Il
-failure è quindi host binding prima del protocollo, non un failure del sensore;
-`begin_operator_epoch`, A2/A8, TLS e post-TLS non sono stati raggiunti. L'abort
-ha bypassato il cleanup normale, che non è dichiarato PASS. Il core dump
-osservato può contenere materiale protetto residente in memoria e resta non
-letto, non copiato e fuori dal review set.
+D278/14 ha richiesto **due live autorizzate separate**, entrambe consumate. La
+prima, sulla baseline `2172e750ae7c100a3a891ba25d0797286230a4ab`, è fallita
+nell'assert di `fp_device_set_property()` durante il binding USB del `FpDevice`
+(`SIGABRT`, exit 134): la classe comune era `FP_DEVICE_TYPE_VIRTUAL` ma il
+costruttore assegnava un `fpi-usb-device` non nullo. `begin_operator_epoch`,
+A2/A8, TLS e post-TLS non sono stati raggiunti. Il core dump osservato non è
+stato letto, copiato o incluso nel review set.
 
-Il correttivo host-only mantiene la shell sintetica base `VIRTUAL` e aggiunge
-una sottoclasse sottilissima di sola tipizzazione `USB` usata esclusivamente da
-`goodix_fpimage_device_new_for_usb()`. La sottoclasse eredita lo stesso identico
-`GoodixDeviceContext` e non contiene protocollo, backend, router, TLS, lifecycle
-o decoder. Il costruttore e la validazione del binding sono ora eseguiti dopo
-la selezione del target ma prima di open/claim. Una regressione con oggetto non
-nullo attraversa il vero setter della libfprint locale; la closure live-shaped
-usa inoltre il tipo `GUsbDevice` concreto della libgusb installata senza
-enumerazione, open, claim o submit. Entrambe provano tipo USB, identità del
-puntatore associato, grafo context/backend/router unico, drain e zero transfer.
+La seconda live, sulla baseline
+`fceae05d9ff3ed14348f9031706e70d5a808ff91` con binario
+`de935e0a3fc89a345a2bad624ba3d218f51ab036597d13566d985efbada4f270`, ha
+inviato il comando A2 e ricevuto il suo ACK, ma non ha mai sottomesso un
+secondo IN fisico, quindi la risposta tipata A2 non era osservabile. La run è
+terminata per `ONE_SHOT_DEADLINE` con trace `REENTRY_RECOVERY_A2>TERMINAL`.
+Il dito non è stato appoggiato perché la run non ha mai raggiunto A8, TLS,
+post-TLS o acquisizione. Cleanup e zeroizzazione secret di progetto sono
+completati.
 
-Il tentativo live D278/14 non ha raggiunto il protocollo, quindi non ha potuto
-verificare il re-arm della ricezione IN dopo ACK. Una seconda correzione
-host-only (attempt #2) unifica il follow-up di completamento IN tra il percorso
-sintetico dei test e il percorso reale USB: `GoodixDeviceContext` registra un
-callback `in_completed` sul backend, dove avviene il re-arm condizionato; la
-funzione `goodix_device_context_complete_receive()` resta solo un'injection seam
-per host/test. Questo garantisce che, dopo un ACK A2 su IN fisico, un secondo IN
-venga sottomesso e la risposta tipata A2 possa far avanzare lo stato verso A8.
-La regressione esercita esplicitamente `goodix_fpi_usb_backend_complete_receive()`
-dal livello backend (non dal context helper), dimostrando il re-arm e
-l'avanzamento a A8. Un nuovo percorso host-only dell'adapter D278/13 stampa
-banner operatore in italiano e guida la catena ACK+risposta tipata A2 con
-materiale sintetico, senza USB reale.
+Il **correttivo #1** host-only ha aggiunto una sottoclasse `USB` sottilissima
+usata solo da `goodix_fpimage_device_new_for_usb()`, con lo stesso
+`GoodixDeviceContext` e nessun nuovo protocollo/backend/router/TLS/lifecycle.
+Il costruttore e la validazione avvengono dopo selezione target e prima di
+open/claim. Il **correttivo #2** host-only ha registrato su `GoodixFpiUsbBackend`
+il callback `in_completed` per il re-arm condizionato della ricezione, rendendo
+convergente il percorso sintetico e quello USB reale; la funzione
+`goodix_device_context_complete_receive()` resta solo injection seam per
+host/test. La regressione esercita `goodix_fpi_usb_backend_complete_receive()`
+dal livello backend, dimostrando re-arm del secondo IN e avanzamento a A8.
+
+La **micro-correttiva #3** corregge il resoconto storico, rende i messaggi
+operatore in italiano con banner delimitati da `======================`,
+monitora la `GoodixPostTlsPhase` reale per decidere quando richiedere
+l'appoggio/ritiro del dito, e aggiunge la telemetria di stop limitata
+(`observed_*`, `*_at_stop`, `stop_time_ms`) senza mai esporre PSK, OTP, CONFIG90,
+FDT, immagini o nonce. La chiusura pre-live canonica esegue automaticamente la
+prova host-only del prompt tracker.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -151,38 +150,86 @@ LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
 SECOND_USE_OF_AUTHORIZATION_REJECTED=true
-D278_14_LIVE_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
-D278_14_APPROVED_LIVE_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
-D278_14_LIVE_EXECUTION_COUNT=1
-D278_14_ONE_SHOT_CONSUMED=true
-D278_14_RERUN_AUTHORIZED=false
-D278_14_ROOT_CAUSE=NON_NULL_FPI_USB_DEVICE_BOUND_TO_FP_DEVICE_TYPE_VIRTUAL
-FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
-PROCESS_EXIT_CODE=134
-PROCESS_TERMINATION=SIGABRT
-GOODIX_APPLICATION_PROTOCOL_SUBMIT_REACHED=false
-A2_REACHED=false
-TLS_REACHED=false
-POST_TLS_REACHED=false
-CORE_DUMP_CREATED=OBSERVED
-CORE_DUMP_MAY_CONTAIN_PROTECTED_IN_MEMORY_MATERIAL=true
-CORE_DUMP_NOT_PART_OF_REVIEW_SET=true
+D278_14_TOTAL_LIVE_ATTEMPTS=2
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=2
+D278_14_HISTORY_CORRECTED=true
+D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
+D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
+D278_14_ATTEMPT_1_FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
+D278_14_ATTEMPT_1_PROCESS_EXIT_CODE=134
+D278_14_ATTEMPT_1_PROCESS_TERMINATION=SIGABRT
+D278_14_ATTEMPT_1_A2_REACHED=false
+D278_14_ATTEMPT_1_TLS_REACHED=false
+D278_14_ATTEMPT_1_POST_TLS_REACHED=false
+D278_14_ATTEMPT_1_CORE_DUMP_CREATED=OBSERVED
+D278_14_ATTEMPT_1_AUTHORIZATION_CONSUMED=true
+D278_14_ATTEMPT_2_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
+D278_14_ATTEMPT_2_BINARY_SHA256=de935e0a3fc89a345a2bad624ba3d218f51ab036597d13566d985efbada4f270
+D278_14_ATTEMPT_2_OUTCOME=FAIL_RECEIVE_REARM_HOST_PLUMBING
+D278_14_ATTEMPT_2_FAILURE_CLASS=ONE_SHOT_DEADLINE
+D278_14_ATTEMPT_2_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
+D278_14_ATTEMPT_2_SECURE_COMMAND_COUNT=1
+D278_14_ATTEMPT_2_ACK_COUNT=1
+D278_14_ATTEMPT_2_TYPED_COUNT=0
+D278_14_ATTEMPT_2_PHYSICAL_IN_SUBMIT_COUNT=1
+D278_14_ATTEMPT_2_PHYSICAL_OUT_SUBMIT_COUNT=1
+D278_14_ATTEMPT_2_REENTRY_A2_RESULT=FAIL_CLOSED
+D278_14_ATTEMPT_2_A8_REACHED=false
+D278_14_ATTEMPT_2_TLS_REACHED=false
+D278_14_ATTEMPT_2_POST_TLS_REACHED=false
+D278_14_ATTEMPT_2_FIRST_ACQUISITION_REACHED=false
+D278_14_ATTEMPT_2_SECOND_ACQUISITION_REACHED=false
+D278_14_ATTEMPT_2_USB_OPEN_COUNT=1
+D278_14_ATTEMPT_2_USB_CLAIM_COUNT=1
+D278_14_ATTEMPT_2_USB_RELEASE_COUNT=1
+D278_14_ATTEMPT_2_USB_CLOSE_COUNT=1
+D278_14_ATTEMPT_2_BACKEND_DRAINED=true
+D278_14_ATTEMPT_2_CLEANUP_COMPLETE=true
+D278_14_ATTEMPT_2_PROJECT_SECRET_ZEROIZED=true
+D278_14_ATTEMPT_2_CORE_DUMP_LIMIT=0
+D278_14_ATTEMPT_2_RETRY_COUNT=0
+D278_14_ATTEMPT_2_REOPEN_COUNT=0
+D278_14_ATTEMPT_2_DEVICE_RESET_COUNT=0
+D278_14_ATTEMPT_2_CLEAR_HALT_COUNT=0
+D278_14_ATTEMPT_2_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_14_ATTEMPT_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+D278_14_CORRECTIVE_1=FPDEVICE_USB_BINDING_CONSTRUCTION
+D278_14_CORRECTIVE_1_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
+D278_14_CORRECTIVE_1_OUTCOME=PASS_HOST_ONLY
+D278_14_CORRECTIVE_2=IN_COMPLETION_REARM_UNIFICATION
+D278_14_CORRECTIVE_2_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
+D278_14_CORRECTIVE_2_OUTCOME=PASS_HOST_ONLY
+D278_14_CORRECTIVE_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+D278_14_CORRECTIVE_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
+CORE_IN_REARM_CORRECTIVE_RETAINED=true
+SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
+BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
+BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
 FPDEVICE_USB_BINDING_CORRECTED=true
 FPDEVICE_TRANSPORT_TYPE_USB_COMPATIBLE=true
 NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true
 PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
 FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS
-D278_14_ATTEMPT_2_HOST_ONLY_CORRECTIVE=true
-D278_14_ATTEMPT_2_ROOT_CAUSE=BACKEND_IN_COMPLETION_BYPASSED_CONTEXT_REARM
-D278_14_ATTEMPT_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
-D278_14_ATTEMPT_2_A2_BACKEND_REARM_HOST_ONLY_PROVEN=true
-D278_14_ATTEMPT_2_A2_TYPED_ADVANCE_TO_A8_HOST_ONLY_PROVEN=true
-D278_14_ATTEMPT_2_OPERATOR_PROMPT_STATE_MACHINE_HOST_ONLY=PASS
-D278_14_ATTEMPT_2_ITALIAN_OPERATOR_MESSAGES=true
-D278_14_ATTEMPT_2_TELEMETRY_FAILURE_AND_STOP_TIME_FIELDS=true
-D278_14_ATTEMPT_2_LIVE_EXECUTION_PERFORMED=false
-D278_14_ATTEMPT_2_CURRENT_LIVE_AUTHORIZED=false
-D278_14_ATTEMPT_2_READY_FOR_LIVE=false
+OPERATOR_MESSAGES_LANGUAGE=ITALIAN
+OPERATOR_ACTION_BANNERS_IMPLEMENTED=true
+OPERATOR_PROMPTS_RUNTIME_STATE_DRIVEN=true
+OPERATOR_PROMPT_SEQUENCE_HOST_ONLY_PROVEN=true
+OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true
+OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true
+OPERATOR_PROMPT_PRELIVE_GATED=true
+BOUNDED_STOP_TELEMETRY_COMPLETE=true
+SENSITIVE_TELEMETRY_EXPOSURE=false
+NO_PARALLEL_STACK=true
+MAX_PHYSICAL_IN_OUTSTANDING=1
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+REAL_USB_ACCESS=false
+REAL_USB_SUBMIT=0
+REAL_PRODUCTION_SECRET_READ=false
+LIVE_EXECUTION_PERFORMED=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
@@ -2245,65 +2292,105 @@ HISTORICAL_D278_13_EXECUTABLE_CLOSURE=INVALIDATED_BY_D278_14_NON_NULL_BINDING_GA
 Il review set canonico è descritto in
 `analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md`.
 
-### D278/14 corrective — failure live consumato e binding fisico chiuso solo host
+### D278/14 — due live consumate, due correttivi host-only, chiusura UX/telemetry
 
-La live D278/14 non è ripetibile. L'unico tentativo ha raggiunto il contesto
-USB reale e la selezione target; l'ordine del tool supporta fortemente che
-open e claim abbiano preceduto l'assert. La prima boundary fallita è però
-interamente host-side: la property `fpi-usb-device` non nulla è stata assegnata
-a una classe `VIRTUAL`. Il processo ha terminato con exit `134`/`SIGABRT`
-prima dell'operator epoch e di qualunque submit Goodix. L'abort non consente di
-promuovere release/close o cleanup del progetto a PASS. Il core dump osservato
-non è stato ispezionato perché può contenere materiale protetto in memoria.
+D278/14 ha richiesto due live autorizzate separate, entrambe consumate. Il
+primo tentativo, sulla baseline
+`2172e750ae7c100a3a891ba25d0797286230a4ab`, è fallito nell'assert di
+`fp_device_set_property()`: `fpi-usb-device` non nullo assegnato a una classe
+`VIRTUAL`, exit `134`/`SIGABRT` prima dell'operator epoch e di qualunque
+submit Goodix. Il core dump osservato non è stato ispezionato.
 
-Il correttivo non cambia wire o state machine. `GoodixFpImageDevice` diventa
-una base derivabile con private context; la shell sintetica conserva tipo
-`VIRTUAL`, mentre il solo costruttore fisico restituisce una sottoclasse senza
-logica propria il cui unico delta di classe è `FP_DEVICE_TYPE_USB`. Questo è
-coerente con `fp_device_set_property()`, che consulta il tipo della classe
-finale prima di `constructed()`, e consente alla property di conservare lo
-stesso oggetto `GUsbDevice`. Il context e tutti i suoi owner restano quelli
-ereditati dalla base.
+Il secondo tentativo, sulla baseline
+`fceae05d9ff3ed14348f9031706e70d5a808ff91`, ha inviato A2 e ricevuto il suo
+ACK, ma nessun secondo IN fisico è stato sottomesso perché il re-arm della
+ricezione viveva in `goodix_device_context_complete_receive()`, che il
+percorso USB reale non invoca. La run è terminata per `ONE_SHOT_DEADLINE` con
+trace `REENTRY_RECOVERY_A2>TERMINAL`. Il dito non è stato appoggiato.
 
-La regressione FpImageDevice crea un oggetto non nullo compatibile con la seam
-GUsb, chiama il costruttore reale, verifica identità della property, tipo USB,
-context/backend/router unici, drain, zero outstanding, zero open/close e zero
-submit; passa 18/18 normale e 18/18 ASAN/UBSAN. Il ramo live-shaped dedicato
-usa invece il tipo concreto `GUsbDevice` della libgusb runtime installata e
-produce gli stessi risultati senza enumerazione/open/claim. Un audit eseguibile
-dell'ordine sorgente prova inoltre `constructor/validation < open < claim`.
-Le regressioni secure-session 17/17, post-TLS 6/6 e materiali D278/02 62/62
-passano sia normali sia sanitizer. L'adapter, il baseline guard, il ticket
-single-shot, gli audit persistent-recovery, duplicate-stack e legacy fallback
-restano verdi.
+Il **correttivo #1** ha reso `GoodixFpImageDevice` base derivabile, mantenuto
+la shell `VIRTUAL` e aggiunto un sottoclasse `USB` senza logica propria per il
+solo costruttore fisico. Il **correttivo #2** ha registrato il callback
+`in_completed` sul backend per unificare il re-arm della ricezione tra percorso
+sintetico e USB reale. La **micro-correttiva #3** ha corretto il resoconto
+storico, reso i messaggi operatore in italiano con banner delimitati, reso i
+prompt guidati dalla fase post-TLS reale e aggiunto i campi di stop telemetry.
+
+Le regressioni passano: FpImageDevice 18/18 normale e sanitizer,
+secure-session 18/18, post-TLS 6/6, D278/02 62/62. L'adapter, il baseline
+guard, il ticket single-shot, gli audit persistent-recovery, duplicate-stack e
+legacy fallback restano verdi; la chiusura pre-live canonica esegue la prova
+host-only del prompt tracker.
 
 ```text
-D278_14_LIVE_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
-D278_14_APPROVED_LIVE_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
-D278_14_LIVE_EXECUTION_COUNT=1
-D278_14_ONE_SHOT_CONSUMED=true
-D278_14_RERUN_AUTHORIZED=false
-D278_14_ROOT_CAUSE=NON_NULL_FPI_USB_DEVICE_BOUND_TO_FP_DEVICE_TYPE_VIRTUAL
-FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
-PROCESS_EXIT_CODE=134
-PROCESS_TERMINATION=SIGABRT
-REAL_USB_CONTEXT_REACHED=true
-USB_TARGET_SELECTION_REACHED=true
-USB_OPEN_AND_CLAIM_PRECEDED_ASSERT=STRONGLY_SUPPORTED_BY_EXECUTION_ORDER
-GOODIX_APPLICATION_PROTOCOL_SUBMIT_REACHED=false
-A2_REACHED=false
-TLS_REACHED=false
-POST_TLS_REACHED=false
-PERSISTENT_DEVICE_WRITE_COUNT=0
-RETRY_COUNT=0
-CORE_DUMP_CREATED=OBSERVED
-CORE_DUMP_MAY_CONTAIN_PROTECTED_IN_MEMORY_MATERIAL=true
-CORE_DUMP_NOT_PART_OF_REVIEW_SET=true
+D278_14_TOTAL_LIVE_ATTEMPTS=2
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=2
+D278_14_HISTORY_CORRECTED=true
+D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
+D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
+D278_14_ATTEMPT_1_FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
+D278_14_ATTEMPT_1_PROCESS_EXIT_CODE=134
+D278_14_ATTEMPT_1_PROCESS_TERMINATION=SIGABRT
+D278_14_ATTEMPT_1_A2_REACHED=false
+D278_14_ATTEMPT_1_TLS_REACHED=false
+D278_14_ATTEMPT_1_POST_TLS_REACHED=false
+D278_14_ATTEMPT_1_CORE_DUMP_CREATED=OBSERVED
+D278_14_ATTEMPT_1_AUTHORIZATION_CONSUMED=true
+D278_14_ATTEMPT_2_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
+D278_14_ATTEMPT_2_BINARY_SHA256=de935e0a3fc89a345a2bad624ba3d218f51ab036597d13566d985efbada4f270
+D278_14_ATTEMPT_2_OUTCOME=FAIL_RECEIVE_REARM_HOST_PLUMBING
+D278_14_ATTEMPT_2_FAILURE_CLASS=ONE_SHOT_DEADLINE
+D278_14_ATTEMPT_2_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
+D278_14_ATTEMPT_2_SECURE_COMMAND_COUNT=1
+D278_14_ATTEMPT_2_ACK_COUNT=1
+D278_14_ATTEMPT_2_TYPED_COUNT=0
+D278_14_ATTEMPT_2_PHYSICAL_IN_SUBMIT_COUNT=1
+D278_14_ATTEMPT_2_PHYSICAL_OUT_SUBMIT_COUNT=1
+D278_14_ATTEMPT_2_REENTRY_A2_RESULT=FAIL_CLOSED
+D278_14_ATTEMPT_2_A8_REACHED=false
+D278_14_ATTEMPT_2_TLS_REACHED=false
+D278_14_ATTEMPT_2_POST_TLS_REACHED=false
+D278_14_ATTEMPT_2_FIRST_ACQUISITION_REACHED=false
+D278_14_ATTEMPT_2_SECOND_ACQUISITION_REACHED=false
+D278_14_ATTEMPT_2_USB_OPEN_COUNT=1
+D278_14_ATTEMPT_2_USB_CLAIM_COUNT=1
+D278_14_ATTEMPT_2_USB_RELEASE_COUNT=1
+D278_14_ATTEMPT_2_USB_CLOSE_COUNT=1
+D278_14_ATTEMPT_2_BACKEND_DRAINED=true
+D278_14_ATTEMPT_2_CLEANUP_COMPLETE=true
+D278_14_ATTEMPT_2_PROJECT_SECRET_ZEROIZED=true
+D278_14_ATTEMPT_2_RETRY_COUNT=0
+D278_14_ATTEMPT_2_REOPEN_COUNT=0
+D278_14_ATTEMPT_2_DEVICE_RESET_COUNT=0
+D278_14_ATTEMPT_2_CLEAR_HALT_COUNT=0
+D278_14_ATTEMPT_2_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_14_ATTEMPT_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+D278_14_CORRECTIVE_1=FPDEVICE_USB_BINDING_CONSTRUCTION
+D278_14_CORRECTIVE_1_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
+D278_14_CORRECTIVE_1_OUTCOME=PASS_HOST_ONLY
+D278_14_CORRECTIVE_2=IN_COMPLETION_REARM_UNIFICATION
+D278_14_CORRECTIVE_2_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
+D278_14_CORRECTIVE_2_OUTCOME=PASS_HOST_ONLY
+D278_14_CORRECTIVE_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+D278_14_CORRECTIVE_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
+CORE_IN_REARM_CORRECTIVE_RETAINED=true
+SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
+BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
+BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
 FPDEVICE_USB_BINDING_CORRECTED=true
 FPDEVICE_TRANSPORT_TYPE_USB_COMPATIBLE=true
 NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true
 PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
 FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS
+OPERATOR_MESSAGES_LANGUAGE=ITALIAN
+OPERATOR_ACTION_BANNERS_IMPLEMENTED=true
+OPERATOR_PROMPTS_RUNTIME_STATE_DRIVEN=true
+OPERATOR_PROMPT_SEQUENCE_HOST_ONLY_PROVEN=true
+OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true
+OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true
+OPERATOR_PROMPT_PRELIVE_GATED=true
+BOUNDED_STOP_TELEMETRY_COMPLETE=true
+SENSITIVE_TELEMETRY_EXPOSURE=false
 D278_13_ARCHITECTURE_RETAINED=true
 NO_PARALLEL_STACK=true
 SINGLE_GOODIX_DEVICE_CONTEXT=true
@@ -2314,9 +2401,12 @@ SINGLE_TLS_OBJECT=true
 TLS_HANDSHAKE_COUNT_MAX=1
 SECRET_HANDOFF_COUNT_MAX=1
 THIRD_CYCLE_COMMAND_COUNT=0
+RETRY_COUNT=0
 REOPEN_COUNT=0
 DEVICE_RESET_COUNT=0
 CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+MAX_PHYSICAL_IN_OUTSTANDING=1
 REAL_USB_ACCESS=false
 REAL_USB_SUBMIT=0
 REAL_PRODUCTION_SECRET_READ=false

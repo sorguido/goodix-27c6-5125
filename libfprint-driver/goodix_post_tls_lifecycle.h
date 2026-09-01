@@ -138,6 +138,7 @@ void goodix_post_tls_lifecycle_set_framework_await_finger_on (
   gboolean                awaiting);
 void goodix_post_tls_lifecycle_cancel (GoodixPostTlsLifecycle *lifecycle,
                                        const gchar *reason);
+const gchar *goodix_post_tls_phase_name (GoodixPostTlsPhase phase);
 GoodixPostTlsPhase goodix_post_tls_lifecycle_get_phase (
   const GoodixPostTlsLifecycle *lifecycle);
 const GError *goodix_post_tls_lifecycle_get_error (
