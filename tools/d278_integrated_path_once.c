@@ -62,8 +62,7 @@ operator_message (const gchar *message)
 static void
 operator_action_banner (const gchar *text)
 {
-  g_print ("======================\nOPERATOR_MESSAGE_IT=%s\n======================\n",
-           text);
+  g_print ("======================\n%s\n======================\n", text);
 }
 
 typedef enum
@@ -81,6 +80,8 @@ typedef struct
   GoodixPostTlsPhase last_action_phase;
   gboolean           success_emitted;
   gboolean           failure_emitted;
+  guint              success_count;
+  guint              failure_count;
   guint              duplicate_count;
 } OperatorPromptTracker;
 
@@ -90,6 +91,8 @@ operator_prompt_tracker_init (OperatorPromptTracker *tracker)
   tracker->last_action_phase = GOODIX_POST_TLS_PHASE_NOT_STARTED;
   tracker->success_emitted = FALSE;
   tracker->failure_emitted = FALSE;
+  tracker->success_count = 0;
+  tracker->failure_count = 0;
   tracker->duplicate_count = 0;
 }
 
@@ -98,20 +101,18 @@ operator_prompt_tracker_emit (OperatorPromptTracker *tracker,
                               GoodixPostTlsPhase    phase,
                               gboolean              terminal)
 {
-  /* Terminal/failure suppresses every other action and is emitted once. */
-  if (terminal || tracker->failure_emitted)
-    {
-      if (!tracker->failure_emitted)
-        {
-          operator_action_banner (OP_BANNER_FAILURE);
-          tracker->failure_emitted = TRUE;
-          return OPERATOR_PROMPT_FAILURE;
-        }
-      return OPERATOR_PROMPT_NONE;
-    }
-
-  if (tracker->success_emitted)
+  /* Success and failure are mutually exclusive and each emitted at most once.
+   * Once either outcome is emitted, no further action banner is produced. */
+  if (tracker->success_emitted || tracker->failure_emitted)
     return OPERATOR_PROMPT_NONE;
+
+  if (terminal)
+    {
+      operator_action_banner (OP_BANNER_FAILURE);
+      tracker->failure_emitted = TRUE;
+      tracker->failure_count++;
+      return OPERATOR_PROMPT_FAILURE;
+    }
 
   switch (phase)
     {
@@ -148,6 +149,7 @@ operator_prompt_tracker_emit (OperatorPromptTracker *tracker,
     case GOODIX_POST_TLS_PHASE_STOP:
       operator_action_banner (OP_BANNER_SUCCESS);
       tracker->success_emitted = TRUE;
+      tracker->success_count++;
       return OPERATOR_PROMPT_SUCCESS;
 
     default:
@@ -895,112 +897,152 @@ run_operator_prompt_state_machine_host_only (void)
 
   /* Host-only proof of the runtime-state-driven operator prompt tracker.
    * The tracker is exercised against the exact requested phase sequence and
-   * against a separate failure sequence; no USB access, no timers. */
+   * against separate success-then-failure and failure-then-success sequences;
+   * no USB access, no timers. */
   {
     OperatorPromptTracker tracker;
 
+    /* Normal success sequence with duplicate suppression. */
     operator_prompt_tracker_init (&tracker);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
+                                     GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
       ==, OPERATOR_PROMPT_FIRST_FINGER);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
+                                     GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
       ==, OPERATOR_PROMPT_NONE);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
-                                    FALSE),
+                                     GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
+                                     FALSE),
       ==, OPERATOR_PROMPT_REMOVE_FINGER);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
-                                    FALSE),
+                                     GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
+                                     FALSE),
       ==, OPERATOR_PROMPT_NONE);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_SECOND_IRQ2, FALSE),
+                                     GOODIX_POST_TLS_PHASE_SECOND_IRQ2, FALSE),
       ==, OPERATOR_PROMPT_SECOND_FINGER);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_STOP, FALSE),
+                                     GOODIX_POST_TLS_PHASE_STOP, FALSE),
       ==, OPERATOR_PROMPT_SUCCESS);
     g_assert_true (tracker.success_emitted);
     g_assert_false (tracker.failure_emitted);
+    g_assert_cmpuint (tracker.success_count, ==, 1u);
+    g_assert_cmpuint (tracker.failure_count, ==, 0u);
     g_assert_cmpuint (tracker.duplicate_count, ==, 2u);
 
-    /* Failure sequence: success must never be emitted after terminal. */
+    /* STOP -> TERMINAL: success emitted, failure must never follow. */
     operator_prompt_tracker_init (&tracker);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
+                                     GOODIX_POST_TLS_PHASE_STOP, FALSE),
+      ==, OPERATOR_PROMPT_SUCCESS);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                     GOODIX_POST_TLS_PHASE_TERMINAL, TRUE),
+      ==, OPERATOR_PROMPT_NONE);
+    g_assert_true (tracker.success_emitted);
+    g_assert_false (tracker.failure_emitted);
+    g_assert_cmpuint (tracker.success_count, ==, 1u);
+    g_assert_cmpuint (tracker.failure_count, ==, 0u);
+
+    /* TERMINAL -> STOP: terminal emitted, success must never follow. */
+    operator_prompt_tracker_init (&tracker);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                     GOODIX_POST_TLS_PHASE_FIRST_IRQ2, FALSE),
       ==, OPERATOR_PROMPT_FIRST_FINGER);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
-                                    FALSE),
+                                     GOODIX_POST_TLS_PHASE_RELEASE_IRQ200,
+                                     FALSE),
       ==, OPERATOR_PROMPT_REMOVE_FINGER);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_SECOND_IRQ2, FALSE),
+                                     GOODIX_POST_TLS_PHASE_SECOND_IRQ2, FALSE),
       ==, OPERATOR_PROMPT_SECOND_FINGER);
     g_assert_cmpint (
       operator_prompt_tracker_emit (&tracker,
-                                    GOODIX_POST_TLS_PHASE_TERMINAL, TRUE),
+                                     GOODIX_POST_TLS_PHASE_TERMINAL, TRUE),
       ==, OPERATOR_PROMPT_FAILURE);
+    g_assert_cmpint (
+      operator_prompt_tracker_emit (&tracker,
+                                     GOODIX_POST_TLS_PHASE_STOP, FALSE),
+      ==, OPERATOR_PROMPT_NONE);
     g_assert_false (tracker.success_emitted);
     g_assert_true (tracker.failure_emitted);
+    g_assert_cmpuint (tracker.success_count, ==, 0u);
+    g_assert_cmpuint (tracker.failure_count, ==, 1u);
 
+    /* Exact banner format: separator lines, human text, no machine prefix. */
     {
+      g_autofree gchar *expected = NULL;
       g_autoptr(GString) rendered = g_string_new (NULL);
       g_string_printf (rendered,
-                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
-                       "======================\n",
+                       "======================\n%s\n======================\n",
                        OP_BANNER_FIRST_FINGER);
-      g_assert_nonnull (g_strstr_len (rendered->str, -1,
-                                      "======================"));
+      expected = g_strdup_printf ("======================\n%s\n======================\n",
+                                  OP_BANNER_FIRST_FINGER);
+      g_assert_cmpstr (rendered->str, ==, expected);
+      g_assert_null (g_strstr_len (rendered->str, -1, "OPERATOR_MESSAGE_IT="));
     }
     {
+      g_autofree gchar *expected = NULL;
       g_autoptr(GString) rendered = g_string_new (NULL);
       g_string_printf (rendered,
-                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
-                       "======================\n",
+                       "======================\n%s\n======================\n",
                        OP_BANNER_REMOVE_FINGER);
-      g_assert_nonnull (g_strstr_len (rendered->str, -1,
-                                      "======================"));
+      expected = g_strdup_printf ("======================\n%s\n======================\n",
+                                  OP_BANNER_REMOVE_FINGER);
+      g_assert_cmpstr (rendered->str, ==, expected);
+      g_assert_null (g_strstr_len (rendered->str, -1, "OPERATOR_MESSAGE_IT="));
     }
     {
+      g_autofree gchar *expected = NULL;
       g_autoptr(GString) rendered = g_string_new (NULL);
       g_string_printf (rendered,
-                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
-                       "======================\n",
+                       "======================\n%s\n======================\n",
                        OP_BANNER_SECOND_FINGER);
-      g_assert_nonnull (g_strstr_len (rendered->str, -1,
-                                      "======================"));
+      expected = g_strdup_printf ("======================\n%s\n======================\n",
+                                  OP_BANNER_SECOND_FINGER);
+      g_assert_cmpstr (rendered->str, ==, expected);
+      g_assert_null (g_strstr_len (rendered->str, -1, "OPERATOR_MESSAGE_IT="));
     }
     {
+      g_autofree gchar *expected = NULL;
       g_autoptr(GString) rendered = g_string_new (NULL);
       g_string_printf (rendered,
-                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
-                       "======================\n",
+                       "======================\n%s\n======================\n",
                        OP_BANNER_SUCCESS);
-      g_assert_nonnull (g_strstr_len (rendered->str, -1,
-                                      "======================"));
+      expected = g_strdup_printf ("======================\n%s\n======================\n",
+                                  OP_BANNER_SUCCESS);
+      g_assert_cmpstr (rendered->str, ==, expected);
+      g_assert_null (g_strstr_len (rendered->str, -1, "OPERATOR_MESSAGE_IT="));
     }
     {
+      g_autofree gchar *expected = NULL;
       g_autoptr(GString) rendered = g_string_new (NULL);
       g_string_printf (rendered,
-                       "======================\nOPERATOR_MESSAGE_IT=%s\n"
-                       "======================\n",
+                       "======================\n%s\n======================\n",
                        OP_BANNER_FAILURE);
-      g_assert_nonnull (g_strstr_len (rendered->str, -1,
-                                      "======================"));
+      expected = g_strdup_printf ("======================\n%s\n======================\n",
+                                  OP_BANNER_FAILURE);
+      g_assert_cmpstr (rendered->str, ==, expected);
+      g_assert_null (g_strstr_len (rendered->str, -1, "OPERATOR_MESSAGE_IT="));
     }
 
     g_print ("OPERATOR_PROMPT_SEQUENCE_HOST_ONLY_PROVEN=true\n");
     g_print ("OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true\n");
     g_print ("OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true\n");
+    g_print ("OPERATOR_PROMPT_STOP_THEN_TERMINAL_HOST_ONLY_PROVEN=true\n");
+    g_print ("OPERATOR_PROMPT_TERMINAL_THEN_STOP_HOST_ONLY_PROVEN=true\n");
+    g_print ("OPERATOR_ACTION_BANNER_FORMAT_EXACT=true\n");
+    g_print ("OPERATOR_ACTION_BANNER_MACHINE_PREFIX=false\n");
   }
 
   g_print ("OPERATOR_PROMPT_STATE_MACHINE_HOST_ONLY=PASS\n");

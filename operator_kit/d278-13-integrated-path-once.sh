@@ -30,6 +30,14 @@ case "${1:-}" in
       'OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true' >/dev/null
     printf '%s\n' "$proof_output" | grep -F \
       'OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true' >/dev/null
+    printf '%s\n' "$proof_output" | grep -F \
+      'OPERATOR_PROMPT_STOP_THEN_TERMINAL_HOST_ONLY_PROVEN=true' >/dev/null
+    printf '%s\n' "$proof_output" | grep -F \
+      'OPERATOR_PROMPT_TERMINAL_THEN_STOP_HOST_ONLY_PROVEN=true' >/dev/null
+    printf '%s\n' "$proof_output" | grep -F \
+      'OPERATOR_ACTION_BANNER_FORMAT_EXACT=true' >/dev/null
+    printf '%s\n' "$proof_output" | grep -F \
+      'OPERATOR_ACTION_BANNER_MACHINE_PREFIX=false' >/dev/null
     echo EXECUTABLE_CLOSURE=PASS_HOST_ONLY
     echo LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
     echo LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
@@ -38,6 +46,8 @@ case "${1:-}" in
     echo OPERATOR_PROMPT_PRELIVE_GATED=true
     echo OPERATOR_MESSAGES_LANGUAGE=ITALIAN
     echo OPERATOR_ACTION_BANNERS_IMPLEMENTED=true
+    echo OPERATOR_ACTION_BANNER_FORMAT_EXACT=true
+    echo OPERATOR_ACTION_BANNER_MACHINE_PREFIX=false
     echo OPERATOR_PROMPTS_RUNTIME_STATE_DRIVEN=true
     echo REAL_USB_ACCESS=false
     echo REAL_USB_SUBMIT=0
