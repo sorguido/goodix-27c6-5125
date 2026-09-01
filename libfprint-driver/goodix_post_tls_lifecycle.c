@@ -19,6 +19,7 @@ typedef enum
 } GoodixPostTlsError;
 
 #define GOODIX_POST_TLS_ERROR (goodix_post_tls_error_quark ())
+#define GOODIX_POST_TLS_D4_PRE_SUBMIT_PACING_MS 20u
 
 struct _GoodixPostTlsLifecycle
 {
@@ -462,6 +463,13 @@ goodix_post_tls_lifecycle_start (GoodixPostTlsLifecycle *lifecycle,
   goodix_fpi_usb_backend_set_out_completed_callback (lifecycle->backend,
                                                       backend_out_complete,
                                                       lifecycle);
+
+  /* D246 live evidence on this target established a 20 ms quiet interval
+   * between cryptographic TLS completion and the canonical fixed64 D4 OUT.
+   * Preserve that proven transport timing here; this is a single bounded
+   * pre-submit pacing delay, not a retry or recovery action. */
+  g_usleep ((gulong) GOODIX_POST_TLS_D4_PRE_SUBMIT_PACING_MS * 1000u);
+
   if (lifecycle->audit != NULL)
     {
       lifecycle->audit->post_tls_lifecycle_started = TRUE;
