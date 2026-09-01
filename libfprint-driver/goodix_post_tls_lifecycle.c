@@ -117,7 +117,8 @@ fixed64_command (guint8        control,
   gsize length;
   static const guint8 zeroes[64] = { 0 };
 
-  logical = goodix_a0_build_frame (control, control, body, body_length, error);
+  logical = goodix_a0_build_frame (control, (guint8) (control & 0xfeu),
+                                   body, body_length, error);
   if (logical == NULL)
     return NULL;
   bytes = g_bytes_get_data (logical, &length);

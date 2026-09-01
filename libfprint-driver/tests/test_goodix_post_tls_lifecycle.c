@@ -320,8 +320,8 @@ complete_command (Fixture      *fixture,
   for (gsize i = logical_length; i < physical_length; i++)
     g_assert_cmphex (physical[i], ==, 0);
   g_autoptr(GBytes) logical = g_bytes_new (physical, logical_length);
-  g_assert_true (goodix_a0_parse_frame (logical, expected_control,
-                                        &message, &error));
+  g_assert_true (goodix_a0_parse_frame (
+    logical, (guint8) (expected_control & 0xfeu), &message, &error));
   g_assert_no_error (error);
   g_assert_cmphex (message.control, ==, expected_control);
   body = g_bytes_get_data (message.body, &body_length);
