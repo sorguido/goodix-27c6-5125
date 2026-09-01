@@ -970,6 +970,24 @@ post_feed_response (Fixture      *fixture,
                     gsize         body_length)
 {
   g_autoptr(GBytes) frame = build_response (control, body, body_length);
+
+  if (control == 0x50 && body_length == 2409u)
+    {
+      const guint8 *data;
+      guint8 *copy;
+      gsize length;
+
+      g_assert_cmphex (body[0], ==, 0x50);
+      g_assert_cmphex (body[1], ==, 0x01);
+
+      data = g_bytes_get_data (frame, &length);
+      copy = g_malloc (length);
+      memcpy (copy, data, length);
+      copy[length - 1u] = 0x88;
+
+      g_clear_pointer (&frame, g_bytes_unref);
+      frame = g_bytes_new_take (copy, length);
+    }
   gsize length;
   const guint8 *data = g_bytes_get_data (frame, &length);
   feed_completion (fixture, data, length, fixture->generation);
@@ -1028,6 +1046,9 @@ drive_post_tls_two_acquisitions (Fixture   *fixture,
   g_autoptr(GBytes) image = post_zero_image ();
   gsize image_length;
   const guint8 *image_data = g_bytes_get_data (image, &image_length);
+
+  nav[0] = 0x50;
+  nav[1] = 0x01;
 
   post_complete_command (fixture, 0xd4);
   post_feed_ack (fixture, 0xd4);
