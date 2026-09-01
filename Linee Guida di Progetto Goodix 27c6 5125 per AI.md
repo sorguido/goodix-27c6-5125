@@ -1,7 +1,7 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.6 — Revisione 1 settembre 2026  
-> **Stato**: Attivo; sostituisce la v2.5 del 27 agosto 2026  
+> **Versione**: 2.6 — Revisione 1 settembre 2026
+> **Stato**: Attivo; sostituisce la v2.5 del 27 agosto 2026
 > **Motivazione**: la v2.6 introduce la modalità autonoma monostrumento PM↔Executor sul branch `development`. Il sistema deve poter riprendere il progetto dopo un'interruzione ricostruendo lo stato reale dal repository, alternare implementazione e review indipendente nella stessa sessione e continuare autonomamente fino a un vero Human Gate. Restano invariati i principi factory-preserving, evidence-first, executable closure, licensing/provenance, review Git-native e anti-frammentazione. La v2.6 rende inoltre `main` e `bakcup_pre_agentic_mode` read-only per l'agente autonomo, integra i Human Gate in `AGENTS.md`, definisce gli operator kit per i live manuali e rimuove dal repository qualunque prescrizione sul modello AI o sul livello di ragionamento.
 
 ---
