@@ -246,3 +246,13 @@ materiale e immagini sintetici. Il raw cache privato è soltanto un input
 future-live hash-gated: D278/13 non lo legge, perché il gate ordinario termina
 prima di cache, secret e USB. L'etichetta clean-room descrive il controllo
 ingegneristico di provenance e non costituisce una conclusione legale.
+
+Il correttivo D278/13 successivo alla review AI-PM della baseline
+`8abab4a96075ef4057226ef0c5077f483a7636c0` modifica soltanto il dominio GPL:
+adapter, launcher, build e test del guard. Il binding della baseline usa
+esclusivamente Git e utility POSIX per verificare/esportare il sorgente locale;
+il ticket one-shot usa API POSIX/GLib pubbliche e fixture sintetiche. Non entra
+nuova espressione nel dominio LGPL, non viene importato codice esterno e non
+sono aggiunti secret, capture o dati biometrici. Gli oggetti LGPL già accettati
+e l'architettura con un solo context/backend/router/TLS/lifecycle restano
+invariati.

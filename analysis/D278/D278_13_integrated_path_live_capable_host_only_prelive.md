@@ -23,6 +23,12 @@ START_HEAD=78230ff1ebd4f1db5d5fd06fbfe6d41fa3a07eca
 START_WORKTREE=CLEAN
 FINAL_HEAD=78230ff1ebd4f1db5d5fd06fbfe6d41fa3a07eca
 FINAL_STATE=STEP_LOCAL_WORKTREE_DIFF_NO_COMMIT
+D278_13_AI_PM_REVIEWED_PRE_CORRECTIVE_BASELINE=8abab4a96075ef4057226ef0c5077f483a7636c0
+D278_13_CORRECTIVE_START_BRANCH=main
+D278_13_CORRECTIVE_START_HEAD=8abab4a96075ef4057226ef0c5077f483a7636c0
+D278_13_CORRECTIVE_START_WORKTREE=CLEAN
+D278_13_CORRECTIVE_FINAL_HEAD=8abab4a96075ef4057226ef0c5077f483a7636c0
+D278_13_CORRECTIVE_FINAL_STATE=STEP_LOCAL_WORKTREE_DIFF_NO_COMMIT
 ```
 
 ## Architettura scelta
@@ -77,9 +83,31 @@ ramo live, il binario termina con codice `3` e marker
 3. creare o enumerare `GUsbContext`;
 4. aprire/claimare o sottomettere transfer.
 
-Una futura run richiede sia un SHA completo approvato al build sia match esatto
-runtime dello SHA, token single-shot e operation name. D278/13 non ha fornito
-né consumato tali valori.
+La review AI-PM sul commit
+`8abab4a96075ef4057226ef0c5077f483a7636c0` ha rilevato che il controllo
+pre-correttivo provava soltanto l'uguaglianza tra uno SHA incorporato da
+variabile d'ambiente e lo SHA runtime: non legava ancora lo SHA ai sorgenti
+realmente compilati. Inoltre il token statico era riutilizzabile e non era
+quindi meccanicamente single-shot. Le formulazioni precedenti che lo
+descrivevano come tale erano più forti dell'implementazione.
+
+Il correttivo mantiene i controlli statici come difesa additiva, ma rende i due
+guardrail effettivi. Per un build con SHA pieno, lo script richiede commit
+locale, `HEAD` esattamente uguale e set live-critical pulito; compila poi da
+uno snapshot `git archive` di quel commit e pubblica il nome finale del binario
+solo dopo una seconda verifica. Launcher, entrambi gli script build, adapter,
+moduli e header realmente compilati e supporto che genera/linka il binario
+sono nel set; manuale, report e test non esecutivi non lo invalidano.
+
+Il ramo live richiede inoltre un ticket esplicito fornito dall'operatore. Il
+launcher non lo crea. Il ticket è un file regolare non-symlink, owner corrente,
+mode `0600`, in directory owner corrente mode `0700`, e lega SHA, operation
+`D278_13_INTEGRATED_PATH_ONCE` e nonce. Dopo la validazione e prima di secret,
+cache o GUsb, il gate crea nella stessa directory un marker `0600` con
+`openat(O_CREAT|O_EXCL|O_NOFOLLOW)`, nominato con SHA-256 redatto del binding.
+Il marker resta: failure successive non rigenerano l'autorizzazione e la
+stessa coppia ticket/nonce non può vincere due volte nella directory fidata.
+Il nonce non viene loggato.
 
 Il monitor tool-side osserva soltanto STOP/terminal/deadline e gestisce pacing
 GLib e cleanup; non decide fasi o comandi. Il success boundary è la seconda
@@ -133,6 +161,11 @@ un loader production raggiungibile.
 | `./libfprint-driver/tests/build_goodix_d278_13_adapter.sh` | live-shaped GUsb adapter build/link/`ldd` PASS |
 | gate self-test del binario | `EXECUTABLE_CLOSURE=PASS_HOST_ONLY` |
 | ramo live su build ordinario | exit 3 prima di secret/cache/GUsb, PASS |
+| SHA approvato diverso da HEAD, clone Git temporaneo | rifiutato prima del build approvato, PASS |
+| sorgente live-critical dirty, clone Git temporaneo | rifiutato; manuale/report/test-only dirty non bloccano, PASS |
+| ticket mancante/malformato/SHA errato/operation errata/symlink | rifiutati prima di secret/cache/GUsb, PASS |
+| ticket sintetico valido in gate-only | claim atomico PASS; seconda use `ticket_already_consumed`, PASS |
+| doppio claim concorrente sintetico | esattamente un vincitore e un rifiuto, PASS |
 | `./operator_kit/d278-13-integrated-path-once.sh --host-only-prelive` | PASS, invocazione operatore realistica |
 | stesso launcher via path assoluto con cwd `/tmp` | PASS, Git-root discovery e cwd independence |
 | source/symbol persistent-recovery audit | PASS |
@@ -214,12 +247,22 @@ READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 CANONICAL_DOCUMENTATION=UPDATED
+
+D278_13_CORRECTIVE_BASELINE=8abab4a96075ef4057226ef0c5077f483a7636c0
+D278_13_ARCHITECTURE_RETAINED=true
+NO_PARALLEL_STACK=true
+LIVE_BASELINE_BINDING_GUARD_IMPLEMENTED=true
+LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
+LIVE_CRITICAL_DIRTY_SOURCE_REJECTED=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
+SECOND_USE_OF_AUTHORIZATION_REJECTED=true
 ```
 
 ## Review set Git-native
 
 ```text
-REVIEW_SET=BASELINE_78230ff1ebd4f1db5d5fd06fbfe6d41fa3a07eca_ON_main_PLUS_CURRENT_WORKTREE_DIFF_PLUS_analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_docs/LICENSING_AND_PROVENANCE.md_PLUS_libfprint-driver/goodix_fpimage_device.[ch]_PLUS_libfprint-driver/tests/test_goodix_d278_secure_session.c_PLUS_libfprint-driver/tests/run_goodix_d278_secure_session_test.sh_PLUS_libfprint-driver/tests/build_goodix_d278_13_adapter*.sh_PLUS_tools/d278_integrated_path_once.c_PLUS_operator_kit/d278-13-integrated-path-once.sh
+REVIEW_SET=PRE_CORRECTIVE_BASELINE_8abab4a96075ef4057226ef0c5077f483a7636c0_ON_main_PLUS_CURRENT_WORKTREE_DIFF_PLUS_analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_docs/LICENSING_AND_PROVENANCE.md_PLUS_libfprint-driver/tests/build_goodix_d278_13_adapter*.sh_PLUS_libfprint-driver/tests/test_goodix_d278_13_live_guards.sh_PLUS_tools/d278_integrated_path_once.c_PLUS_operator_kit/d278-13-integrated-path-once.sh
 ```
 
 Nessun ZIP/Base64 è stato creato. HEAD non è stato modificato; nessun commit,

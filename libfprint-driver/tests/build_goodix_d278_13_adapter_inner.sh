@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 set -eu
 
-if [ "$#" -ne 4 ]; then
-  echo "usage: $0 <git-root> <build-dir> <host-libgusb> <approved-sha-or-unapproved>" >&2
+if [ "$#" -ne 6 ]; then
+  echo "usage: $0 <source-root> <build-dir> <host-libgusb> <approved-sha-or-unapproved> <synthetic-existing-ref> <other-existing-ref>" >&2
   exit 2
 fi
 root=$1
 build=$2
 host_gusb=$3
 approved=$4
+test_reference=$5
+test_other_reference=$6
 test_dir="$root/libfprint-driver/tests"
 local_fp="$root/Rockytkg/libfprint/libfprint"
 
@@ -26,6 +28,11 @@ includes="-I$test_dir/support/d277 -I$test_dir/support -I$build -I$root/libfprin
 strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 approved_define="-DD278_13_APPROVED_BASELINE=\"$approved\""
+if [ "$approved" = UNAPPROVED_FOR_LIVE ]; then
+  binary="$build/d278_integrated_path_once"
+else
+  binary="$build/d278_integrated_path_once.pending"
+fi
 
 python3 "$test_dir/support/generate_libfprint_enums.py" \
   --identifier-prefix Fp --symbol-prefix fp \
@@ -79,14 +86,17 @@ gcc -Wl,--gc-sections \
   "$build/goodix_d190_pe.o" "$build/d278_integrated_path_once.o" \
   "$build/fpimage_link_stubs.o" \
   -L"$build" -Wl,-rpath-link,"$build" -l:libgusb.so.2 $libs -lm \
-  -o "$build/d278_integrated_path_once"
+  -o "$binary"
 
 test -f "$host_gusb"
 echo D278_13_LIVE_ADAPTER_BUILD=PASS
 (
   cd "$root"
-  output=$(LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-    timeout 30 "$build/d278_integrated_path_once" \
+  output=$(env -u D278_13_APPROVED_LIVE_BASELINE_SHA \
+    -u D278_13_OPERATOR_AUTHORIZATION -u D278_13_OPERATION \
+    -u D278_13_AUTHORIZATION_TICKET \
+    LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    timeout 30 "$binary" \
       --authorization-gate-self-test)
   echo "$output"
   echo "$output" | grep -F 'EXECUTABLE_CLOSURE=PASS_HOST_ONLY' >/dev/null
@@ -98,23 +108,31 @@ if [ "$approved" = UNAPPROVED_FOR_LIVE ]; then
     cd "$root"
     set +e
     output=$(LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-      timeout 30 "$build/d278_integrated_path_once" \
+      timeout 30 "$binary" \
         --live-integrated-once 2>&1)
     rc=$?
     set -e
     test "$rc" -eq 3
     echo "$output" | grep -F \
       'LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED' >/dev/null
+    echo "$output" | grep -F 'LIVE_AUTHORIZATION_CONSUMED=false' >/dev/null
+    echo "$output" | grep -F 'REAL_PRODUCTION_SECRET_READ=false' >/dev/null
+    echo "$output" | grep -F 'REAL_USB_ACCESS=false' >/dev/null
+    echo "$output" | grep -F 'REAL_USB_SUBMIT=0' >/dev/null
   )
   echo D278_13_GATE_BEFORE_SECRET_CACHE_OR_USB=PASS
 fi
+
+LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "$test_dir/test_goodix_d278_13_live_guards.sh" \
+  --ticket-only "$binary" "$test_reference" "$test_other_reference" "$build"
 
 runtime_sources="$root/libfprint-driver/goodix_fpimage_device.c $root/libfprint-driver/goodix_secure_session.c $root/libfprint-driver/goodix_post_tls_lifecycle.c $root/tools/d278_integrated_path_once.c"
 if grep -En '0x[eE]0|0x[aA]4|production_write_key|ClearApp|IAP|firmware[ _-]*update|g_usb_device_reset|g_usb_device_clear_halt|libusb_reset_device|libusb_clear_halt' $runtime_sources; then
   echo D278_13_FORBIDDEN_PERSISTENT_RECOVERY_SOURCE_AUDIT=FAIL >&2
   exit 1
 fi
-if nm -u "$build/d278_integrated_path_once" | \
+if nm -u "$binary" | \
    grep -E 'g_usb_device_(reset|clear_halt)|libusb_(reset_device|clear_halt)|production_write_key|ClearApp|IAP|firmware[ _-]*update'; then
   echo D278_13_FORBIDDEN_PERSISTENT_RECOVERY_SYMBOL_AUDIT=FAIL >&2
   exit 1
@@ -126,7 +144,7 @@ if grep -En 'goodix_(secure_session|tls_server|post_tls_lifecycle|fpi_usb_backen
   echo D278_13_DUPLICATE_STACK_SOURCE_AUDIT=FAIL >&2
   exit 1
 fi
-if nm "$build/d278_integrated_path_once" | grep -F 'goodix_d278_harness_' ; then
+if nm "$binary" | grep -F 'goodix_d278_harness_' ; then
   echo D278_13_LEGACY_HARNESS_FALLBACK_AUDIT=FAIL >&2
   exit 1
 fi

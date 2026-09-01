@@ -55,6 +55,13 @@ LGPL continua a possedere l'unico backend/router/reader, secure-session, TLS e
 lifecycle post-TLS. L'entrypoint è stato eseguito soltanto con peer e materiale
 sintetici; il binario live-shaped ordinario ha baseline `UNAPPROVED_FOR_LIVE`
 e il suo gate ha arrestato l'esecuzione prima di secret, cache e contesto USB.
+Il correttivo revisionato rispetto alla baseline AI-PM
+`8abab4a96075ef4057226ef0c5077f483a7636c0` chiude due gap host-side senza
+creare D278/14: un build con SHA pieno usa soltanto lo snapshot Git dell'esatto
+commit dopo verifica HEAD e pulizia del set live-critical, mentre un ticket
+esplicito `0600` lega SHA/operation/nonce ed è reclamato atomicamente una sola
+volta prima di qualunque materiale protetto, cache o GUsb. Il precedente token
+statico era riutilizzabile e non costituiva da solo un single-shot meccanico.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -101,6 +108,11 @@ REAL_PRODUCTION_SECRET_READ=false
 LIVE_EXECUTION_PERFORMED=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
+LIVE_BASELINE_BINDING_GUARD_IMPLEMENTED=true
+LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
+SECOND_USE_OF_AUTHORIZATION_REJECTED=true
 ```
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
@@ -2069,8 +2081,32 @@ Nel build ordinario il comando live ritorna codice `3` con
 protetto, blob cache o creare/enumerare il contesto GUsb. D278/13 non ha aperto,
 enumerato o claimato il sensore, non ha letto secret reali, non ha eseguito USB
 submit e non ha approvato una baseline live. Una futura run richiede review
-AI-PM separata, SHA completo esplicitamente approvato e token operatore
+AI-PM separata, SHA completo esplicitamente approvato e ticket operatore
 single-shot; `READY_FOR_LIVE` resta false.
+
+La review AI-PM della baseline pre-correttiva
+`8abab4a96075ef4057226ef0c5077f483a7636c0` ha corretto due overclaim. Il
+vecchio build incorporava lo SHA ricevuto dall'ambiente senza provare che i
+sorgenti compilati gli corrispondessero; il vecchio token statico poteva essere
+riusato. Lo stato corrente risolve entrambi senza modificare il grafo accettato.
+Un build con SHA pieno richiede che il commit esista localmente, che `HEAD` sia
+esattamente quello SHA e che launcher, build, adapter, sorgenti/header runtime e
+supporto effettivamente usato dal build siano puliti. Il compilatore riceve poi
+uno snapshot `git archive` di quel commit; il binario resta `.pending` e viene
+rinominato nel nome operativo soltanto dopo una seconda verifica. Manuale,
+report e test non esecutivi restano fuori dal set live-critical.
+
+Il ticket non è un secret e non viene mai auto-creato dal launcher. Deve essere
+un file regolare non-symlink dell'operatore, mode `0600`, in una directory dello
+stesso operatore mode `0700`, con tre campi esatti: baseline SHA, operation
+`D278_13_INTEGRATED_PATH_ONCE` e nonce. Dopo la validazione, il gate calcola un
+SHA-256 del binding e reclama un marker redatto nella stessa directory tramite
+`openat` con `O_CREAT|O_EXCL|O_NOFOLLOW`, mode `0600`. Il marker viene creato
+prima di loader protetto, cache FDT e GUsb e non viene rimosso su failure: una
+seconda use dello stesso ticket/nonce fallisce `ticket_already_consumed`. I test
+gate-only sintetici provano anche doppio claim concorrente con esattamente un
+vincitore, senza secret autentici o USB. I controlli statici restano soltanto
+difesa in profondità.
 
 La telemetria futura comprende open/claim/release/close, submit/completion e
 massimi outstanding, trace delle fasi secure, contatori ACK/typed/reentry/A8/E4,
@@ -2082,8 +2118,17 @@ la quiescenza device-side dopo una cancellazione arbitraria.
 
 ```text
 D278_13_BASELINE=78230ff1ebd4f1db5d5fd06fbfe6d41fa3a07eca
+D278_13_CORRECTIVE_BASELINE=8abab4a96075ef4057226ef0c5077f483a7636c0
+D278_13_ARCHITECTURE_RETAINED=true
+NO_PARALLEL_STACK=true
 INTEGRATED_PATH_LIVE_CAPABLE_IMPLEMENTED=true
 LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
+LIVE_BASELINE_BINDING_GUARD_IMPLEMENTED=true
+LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
+LIVE_CRITICAL_DIRTY_SOURCE_REJECTED=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
+SECOND_USE_OF_AUTHORIZATION_REJECTED=true
 SAME_GOODIX_DEVICE_CONTEXT=true
 SINGLE_USB_BACKEND_OWNER=true
 SINGLE_USB_ROUTER=true

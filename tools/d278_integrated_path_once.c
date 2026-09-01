@@ -34,6 +34,9 @@
 #define D278_13_AUTHORIZATION_TOKEN \
   "D278_13_ONE_INTEGRATED_TWO_ACQUISITION_RUN_NO_RETRY"
 #define D278_13_OPERATION_NAME "D278_13_INTEGRATED_PATH_ONCE"
+#define D278_13_TICKET_MAX_SIZE 512u
+#define D278_13_NONCE_MIN_SIZE 16u
+#define D278_13_NONCE_MAX_SIZE 128u
 
 static const gchar *const manifest_path =
   "/var/lib/goodix-5125-poc/target-material-manifest.json";
@@ -59,7 +62,7 @@ is_full_sha (const gchar *value)
 }
 
 static gboolean
-live_authorization_gate (void)
+static_authorization_gate (const gchar **reason)
 {
   const gchar *runtime_sha =
     g_getenv ("D278_13_APPROVED_LIVE_BASELINE_SHA");
@@ -67,14 +70,252 @@ live_authorization_gate (void)
     g_getenv ("D278_13_OPERATOR_AUTHORIZATION");
   const gchar *operation = g_getenv ("D278_13_OPERATION");
 
-  if (!is_full_sha (D278_13_APPROVED_BASELINE) ||
-      g_str_equal (D278_13_APPROVED_BASELINE, "UNAPPROVED_FOR_LIVE"))
+  if (!is_full_sha (D278_13_APPROVED_BASELINE))
+    {
+      *reason = "compiled_baseline_unapproved";
+      return FALSE;
+    }
+  if (!is_full_sha (runtime_sha) ||
+      !g_str_equal (runtime_sha, D278_13_APPROVED_BASELINE))
+    {
+      *reason = "runtime_baseline_mismatch";
+      return FALSE;
+    }
+  if (authorization == NULL ||
+      !g_str_equal (authorization, D278_13_AUTHORIZATION_TOKEN))
+    {
+      *reason = "static_authorization_missing_or_invalid";
+      return FALSE;
+    }
+  if (operation == NULL || !g_str_equal (operation, D278_13_OPERATION_NAME))
+    {
+      *reason = "runtime_operation_mismatch";
+      return FALSE;
+    }
+  *reason = "none";
+  return TRUE;
+}
+
+static gboolean
+nonce_valid (const gchar *nonce)
+{
+  gsize length;
+
+  if (nonce == NULL)
     return FALSE;
-  return is_full_sha (runtime_sha) && authorization != NULL &&
-         operation != NULL &&
-         g_str_equal (runtime_sha, D278_13_APPROVED_BASELINE) &&
-         g_str_equal (authorization, D278_13_AUTHORIZATION_TOKEN) &&
-         g_str_equal (operation, D278_13_OPERATION_NAME);
+  length = strlen (nonce);
+  if (length < D278_13_NONCE_MIN_SIZE || length > D278_13_NONCE_MAX_SIZE)
+    return FALSE;
+  for (gsize i = 0; i < length; i++)
+    if (!g_ascii_isalnum (nonce[i]) && nonce[i] != '-' && nonce[i] != '_')
+      return FALSE;
+  return TRUE;
+}
+
+static gboolean
+write_all (gint          fd,
+           const guint8 *data,
+           gsize         length)
+{
+  gsize offset = 0;
+
+  while (offset < length)
+    {
+      ssize_t written = write (fd, data + offset, length - offset);
+      if (written < 0 && errno == EINTR)
+        continue;
+      if (written <= 0)
+        return FALSE;
+      offset += (gsize) written;
+    }
+  return TRUE;
+}
+
+static gboolean
+claim_authorization_ticket (const gchar  *path,
+                            const gchar  *expected_baseline,
+                            const gchar  *expected_operation,
+                            gboolean     *consumed,
+                            const gchar **reason)
+{
+  static const guint8 receipt[] =
+    "D278_13_AUTHORIZATION_CONSUMED\n";
+  g_autofree gchar *directory = NULL;
+  g_autofree gchar *basename = NULL;
+  g_autofree gchar *contents = NULL;
+  g_autofree gchar *claim_input = NULL;
+  g_autofree gchar *claim_hash = NULL;
+  g_autofree gchar *marker = NULL;
+  g_auto(GStrv) lines = NULL;
+  const gchar *baseline = NULL;
+  const gchar *operation = NULL;
+  const gchar *nonce = NULL;
+  struct stat directory_status;
+  struct stat ticket_status;
+  struct stat current_status;
+  gint directory_fd = -1;
+  gint ticket_fd = -1;
+  gint marker_fd = -1;
+  gsize offset = 0;
+  guint field_count = 0;
+  gboolean ok = FALSE;
+
+  *consumed = FALSE;
+  *reason = "ticket_missing";
+  if (path == NULL || !g_path_is_absolute (path))
+    goto out;
+  directory = g_path_get_dirname (path);
+  basename = g_path_get_basename (path);
+  if (g_str_equal (basename, ".") || g_str_equal (basename, "..") ||
+      strchr (basename, G_DIR_SEPARATOR) != NULL)
+    {
+      *reason = "ticket_path_policy";
+      goto out;
+    }
+  directory_fd = open (directory, O_RDONLY | O_CLOEXEC | O_DIRECTORY |
+                                  O_NOFOLLOW);
+  if (directory_fd < 0 || fstat (directory_fd, &directory_status) != 0 ||
+      !S_ISDIR (directory_status.st_mode) ||
+      directory_status.st_uid != geteuid () ||
+      (directory_status.st_mode & 0777) != 0700)
+    {
+      *reason = "ticket_directory_policy";
+      goto out;
+    }
+  ticket_fd = openat (directory_fd, basename, O_RDONLY | O_CLOEXEC |
+                                               O_NOFOLLOW);
+  if (ticket_fd < 0)
+    {
+      if (errno == ELOOP)
+        *reason = "ticket_file_policy";
+      goto out;
+    }
+  if (fstat (ticket_fd, &ticket_status) != 0 ||
+      !S_ISREG (ticket_status.st_mode) || ticket_status.st_nlink != 1 ||
+      ticket_status.st_uid != geteuid () ||
+      (ticket_status.st_mode & 0777) != 0600 || ticket_status.st_size <= 0 ||
+      (guint64) ticket_status.st_size > D278_13_TICKET_MAX_SIZE)
+    {
+      *reason = "ticket_file_policy";
+      goto out;
+    }
+  contents = g_malloc0 ((gsize) ticket_status.st_size + 1u);
+  while (offset < (gsize) ticket_status.st_size)
+    {
+      ssize_t got = read (ticket_fd, contents + offset,
+                          (gsize) ticket_status.st_size - offset);
+      if (got < 0 && errno == EINTR)
+        continue;
+      if (got <= 0)
+        {
+          *reason = "ticket_read_failed";
+          goto out;
+        }
+      offset += (gsize) got;
+    }
+  if (contents[offset - 1u] != '\n')
+    {
+      *reason = "ticket_malformed";
+      goto out;
+    }
+  lines = g_strsplit (contents, "\n", -1);
+  for (guint i = 0; lines[i] != NULL; i++)
+    {
+      if (lines[i][0] == '\0')
+        {
+          if (lines[i + 1u] != NULL)
+            {
+              *reason = "ticket_malformed";
+              goto out;
+            }
+          continue;
+        }
+      if (g_str_has_prefix (lines[i], "D278_13_BASELINE_SHA=") &&
+          baseline == NULL)
+        baseline = lines[i] + strlen ("D278_13_BASELINE_SHA=");
+      else if (g_str_has_prefix (lines[i], "D278_13_OPERATION=") &&
+               operation == NULL)
+        operation = lines[i] + strlen ("D278_13_OPERATION=");
+      else if (g_str_has_prefix (lines[i], "D278_13_NONCE=") && nonce == NULL)
+        nonce = lines[i] + strlen ("D278_13_NONCE=");
+      else
+        {
+          *reason = "ticket_malformed";
+          goto out;
+        }
+      field_count++;
+    }
+  if (field_count != 3u || !is_full_sha (baseline) || !nonce_valid (nonce))
+    {
+      *reason = "ticket_malformed";
+      goto out;
+    }
+  if (!g_str_equal (baseline, expected_baseline))
+    {
+      *reason = "ticket_baseline_mismatch";
+      goto out;
+    }
+  if (!g_str_equal (operation, expected_operation))
+    {
+      *reason = "ticket_operation_mismatch";
+      goto out;
+    }
+  if (fstatat (directory_fd, basename, &current_status,
+               AT_SYMLINK_NOFOLLOW) != 0 ||
+      current_status.st_dev != ticket_status.st_dev ||
+      current_status.st_ino != ticket_status.st_ino ||
+      current_status.st_uid != ticket_status.st_uid ||
+      current_status.st_mode != ticket_status.st_mode ||
+      current_status.st_size != ticket_status.st_size)
+    {
+      *reason = "ticket_changed_during_validation";
+      goto out;
+    }
+  claim_input = g_strdup_printf ("%s\n%s\n%s", baseline, operation, nonce);
+  claim_hash = g_compute_checksum_for_string (G_CHECKSUM_SHA256, claim_input,
+                                               -1);
+  marker = g_strdup_printf (".d278-13-consumed-%s", claim_hash);
+  marker_fd = openat (directory_fd, marker,
+                      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+                      0600);
+  if (marker_fd < 0)
+    {
+      *reason = errno == EEXIST ? "ticket_already_consumed" :
+                                  "ticket_claim_failed";
+      goto out;
+    }
+  *consumed = TRUE;
+  if (!write_all (marker_fd, receipt, sizeof receipt - 1u) ||
+      fsync (marker_fd) != 0 || fsync (directory_fd) != 0)
+    {
+      *reason = "ticket_claim_persist_failed";
+      goto out;
+    }
+  *reason = "none";
+  ok = TRUE;
+
+out:
+  if (marker_fd >= 0)
+    close (marker_fd);
+  if (ticket_fd >= 0)
+    close (ticket_fd);
+  if (directory_fd >= 0)
+    close (directory_fd);
+  return ok;
+}
+
+static gboolean
+live_authorization_gate (gboolean     *consumed,
+                         const gchar **reason)
+{
+  const gchar *ticket_path;
+
+  *consumed = FALSE;
+  if (!static_authorization_gate (reason))
+    return FALSE;
+  ticket_path = g_getenv ("D278_13_AUTHORIZATION_TICKET");
+  return claim_authorization_ticket (ticket_path, D278_13_APPROVED_BASELINE,
+                                     D278_13_OPERATION_NAME, consumed, reason);
 }
 
 static gboolean
@@ -217,7 +458,8 @@ out:
 static int
 run_gate_self_test (void)
 {
-  gboolean closed = !live_authorization_gate ();
+  const gchar *reason = NULL;
+  gboolean closed = !static_authorization_gate (&reason);
 
   g_print ("EXECUTABLE_CLOSURE=%s\n", closed ? "PASS_HOST_ONLY" : "FAIL");
   g_print ("REAL_USB_ACCESS=false\nREAL_USB_SUBMIT=0\n");
@@ -225,6 +467,28 @@ run_gate_self_test (void)
   g_print ("LIVE_EXECUTION_PERFORMED=false\n");
   g_print ("CURRENT_LIVE_AUTHORIZED=false\nREADY_FOR_LIVE=false\n");
   return closed ? 0 : 1;
+}
+
+static int
+run_ticket_gate_only (const gchar *ticket_path,
+                      const gchar *expected_baseline)
+{
+  const gchar *reason = "ticket_malformed";
+  gboolean consumed = FALSE;
+  gboolean accepted = FALSE;
+
+  if (is_full_sha (expected_baseline))
+    accepted = claim_authorization_ticket (ticket_path, expected_baseline,
+                                           D278_13_OPERATION_NAME,
+                                           &consumed, &reason);
+  g_print ("{\"gate_only\":true,\"accepted\":%s,"
+           "\"authorization_failure_reason\":\"%s\","
+           "\"live_authorization_consumed\":%s,"
+           "\"real_production_secret_read\":false,"
+           "\"real_usb_access\":false,\"real_usb_submit\":0}\n",
+           accepted ? "true" : "false", reason,
+           consumed ? "true" : "false");
+  return accepted ? 0 : 3;
 }
 
 #ifdef D278_13_LIVE_BINDING
@@ -342,12 +606,21 @@ run_live_once (void)
   guint64 out_completion_count = 0;
   guint max_in_outstanding = 0;
   guint max_out_outstanding = 0;
+  const gchar *authorization_reason = "none";
+  gboolean live_authorization_consumed = FALSE;
   int rc = 1;
 
   runtime.failure_class = "PRE_BIND_FAILURE";
-  if (!live_authorization_gate ())
+  if (!live_authorization_gate (&live_authorization_consumed,
+                                &authorization_reason))
     {
-      g_printerr ("LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED\n");
+      g_printerr ("LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED\n"
+                  "AUTHORIZATION_FAILURE_REASON=%s\n"
+                  "LIVE_AUTHORIZATION_CONSUMED=%s\n"
+                  "REAL_PRODUCTION_SECRET_READ=false\n"
+                  "REAL_USB_ACCESS=false\nREAL_USB_SUBMIT=0\n",
+                  authorization_reason,
+                  live_authorization_consumed ? "true" : "false");
       return 3;
     }
 
@@ -476,7 +749,7 @@ cleanup:
     rc = 1;
   g_print ("{\"result\":\"%s\",\"failure_class\":\"%s\","
            "\"phase_trace\":\"%s\","
-           "\"live_authorization_consumed\":true,"
+           "\"live_authorization_consumed\":%s,"
            "\"usb_open_attempt_count\":%u,"
            "\"usb_open_count\":%u,\"usb_claim_count\":%u,"
            "\"usb_release_count\":%u,\"usb_close_count\":%u,"
@@ -512,6 +785,7 @@ cleanup:
            "\"backend_drained\":%s,\"cleanup_complete\":%s}\n",
            rc == 0 ? "pass" : "fail", runtime.failure_class,
            runtime.phase_trace != NULL ? runtime.phase_trace->str : "",
+           live_authorization_consumed ? "true" : "false",
            open_count, opened ? 1u : 0u, claim_count, release_count,
            close_count,
            real_submit_count,
@@ -565,11 +839,16 @@ main (int argc, char **argv)
 {
   if (argc == 2 && g_str_equal (argv[1], "--authorization-gate-self-test"))
     return run_gate_self_test ();
+  if (argc == 4 && g_str_equal (argv[1],
+                                "--authorization-ticket-gate-only"))
+    return run_ticket_gate_only (argv[2], argv[3]);
 #ifdef D278_13_LIVE_BINDING
   if (argc == 2 && g_str_equal (argv[1], "--live-integrated-once"))
     return run_live_once ();
 #endif
-  g_printerr ("usage: %s --authorization-gate-self-test%s\n", argv[0],
+  g_printerr ("usage: %s --authorization-gate-self-test | "
+              "--authorization-ticket-gate-only <ticket> <expected-sha>%s\n",
+              argv[0],
 #ifdef D278_13_LIVE_BINDING
               " | --live-integrated-once"
 #else
