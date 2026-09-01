@@ -1,27 +1,38 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.5 — Revisione 27 agosto 2026
-**Stato**: Attivo; sostituisce la v2.4 del 21 agosto 2026
-**Motivazione**: La v2.5 conserva l'ossatura metodologica e di sicurezza della v2.4, ma abolisce il bundle ZIP step-local come requisito standard. La review diventa Git-native: commit/HEAD, diff, branch/PR e artefatti versionati nel repository costituiscono il review set canonico. ZIP e rappresentazioni Base64 non fanno più parte della closure ordinaria e sono ammessi solo come eccezioni di trasporto o export esplicitamente necessarie. La modifica riduce packaging e incompatibilità tra piattaforme AI senza ridurre auditabilità, provenance o controllo.
-> 
+> **Versione**: 2.6 — Revisione 1 settembre 2026  
+> **Stato**: Attivo; sostituisce la v2.5 del 27 agosto 2026  
+> **Motivazione**: la v2.6 introduce la modalità autonoma monostrumento PM↔Executor sul branch `development`. Il sistema deve poter riprendere il progetto dopo un'interruzione ricostruendo lo stato reale dal repository, alternare implementazione e review indipendente nella stessa sessione e continuare autonomamente fino a un vero Human Gate. Restano invariati i principi factory-preserving, evidence-first, executable closure, licensing/provenance, review Git-native e anti-frammentazione. La v2.6 rende inoltre `main` e `bakcup_pre_agentic_mode` read-only per l'agente autonomo, integra i Human Gate in `AGENTS.md`, definisce gli operator kit per i live manuali e rimuove dal repository qualunque prescrizione sul modello AI o sul livello di ragionamento.
 
 ---
 
 ## 1. Scopo del documento
 
-Questo documento definisce come devono operare, nel progetto Goodix 27c6:5125, i tre soggetti coinvolti:
+Questo documento definisce le regole permanenti di governance, sicurezza, qualità e metodo del progetto Goodix 27c6:5125.
 
-- **Utente**: decisore finale, proprietario dell'hardware e dell'ambiente operativo reale.
-- **AI Project Manager (AI PM)**: pianificatrice tecnica, responsabile della decomposizione, della supervisione e della review.
-- **AI esecutrice**: implementatrice, responsabile della consegna tecnica nel repository.
+I soggetti logici sono:
 
-Le linee guida sono vincolanti per qualsiasi modello AI impiegato nel progetto (ChatGPT, Codex, Aider, Qwen o futuri strumenti equivalenti).
+- **Utente**: autorità finale, proprietario dell'hardware e decisore su scope, rischio, live, main e cambi di policy;
+- **AI PM / Reviewer**: ruolo logico di pianificazione, recovery, review critica e scelta del passo successivo;
+- **AI Executor**: ruolo logico di implementazione, test, documentazione e produzione delle evidenze.
 
-Il repository privato di sviluppo è il workspace canonico. La root reale va determinata dal repository stesso, ad esempio con `git rev-parse --show-toplevel`; non si deve assumere un path locale hard-coded se il clone viene rinominato o spostato.
+Nella modalità autonoma AI PM e AI Executor possono essere due ruoli alternati dalla stessa sessione Codex. La condivisione del runtime non riduce l'obbligo di review indipendente: il ruolo PM deve riesaminare direttamente repository ed evidenze e non limitarsi a confermare il summary del ruolo Executor.
 
-Il manuale tecnico canonico è sempre:
+Repository privato canonico:
 
+```text
+sorguido/goodix-27c6-5125-private
 ```
+
+La root reale del clone deve essere determinata dal repository, ad esempio con:
+
+```bash
+git rev-parse --show-toplevel
+```
+
+Manuale tecnico canonico:
+
+```text
 <git-root>/Goodix 27c6 5125 manuale tecnico.md
 ```
 
@@ -29,16 +40,22 @@ Il manuale tecnico canonico è sempre:
 
 ## 2. Obiettivo generale
 
-Arrivare in modo tecnicamente fondato, riproducibile e documentato a uno stack Linux funzionante per il sensore **Goodix USB 27c6:5125**. Il risultato atteso comprende:
+Arrivare in modo tecnicamente fondato, riproducibile e documentato a uno stack Linux funzionante per il sensore **Goodix USB 27c6:5125**, mantenendo integralmente stato factory e compatibilità Windows.
+
+Il risultato atteso comprende:
 
 - comprensione documentata del protocollo;
 - userspace core e/o integrazione driver coerente con l'architettura Linux/libfprint;
-- preservazione totale di firmware residente, PSK/OTP, factory data e configurazione persistente;
-- compatibilità mantenuta con il percorso Windows preesistente;
-- procedura di build, test, installazione e rollback documentata;
-- materiale verificabile e con provenance sufficiente per review futura.
+- preservazione di firmware residente, PSK/OTP, factory data e configurazione persistente;
+- compatibilità con il percorso Windows preesistente;
+- procedure di build, test, installazione e rollback documentate;
+- evidenze e provenance sufficienti per review futura e ripresa autonoma.
 
-**Invariante assoluto**: `factory_firmware_and_persistent_state_must_remain_untouched`.
+Invariante assoluto:
+
+```text
+factory_firmware_and_persistent_state_must_remain_untouched
+```
 
 Supporto Linux ≠ riprovisionamento del sensore.
 
@@ -46,39 +63,65 @@ Supporto Linux ≠ riprovisionamento del sensore.
 
 ## 3. Principi fondamentali gerarchizzati
 
-In caso di conflitto tra principi, l'ordine seguente è vincolante.
+In caso di conflitto valgono, in ordine:
 
 ### 3.1 Factory-preserving — massima priorità
 
-Nessuna operazione deve modificare firmware, PSK, OTP, factory data o configurazione persistente del sensore. Questo principio non si bilancia con comodità implementativa, velocità o compatibilità con codice esterno.
+Nessuna operazione deve modificare firmware, PSK, OTP, factory data o configurazione persistente del sensore senza una decisione esplicita e specifica dell'Utente.
 
-### 3.2 Eseguibilità reale > correttezza teorica
+### 3.2 Evidence-first
 
-Quando uno step produce o modifica un percorso eseguibile, il codice deve funzionare nell'ambiente reale dell'operatore: stesso comando, `cwd`, meccanismo di import/PYTHONPATH e, quando pertinente, stesso contesto di privilegi. Una suite offline verde non dimostra executable closure.
+Distinguere sempre tra:
 
-### 3.3 Avanzamento di confine > produzione di artefatti
+- **osservato**;
+- **verificato**;
+- **inferito**;
+- **ipotizzato**;
+- **non noto**.
 
-Review set, report e numerazione Dxxx non sono di per sé avanzamento. Avanzamento tecnico reale significa nuova esecuzione, nuova evidenza, nuovo comportamento/protocollo compreso o nuovo confine hardware raggiunto. Una decisione architetturale, di licensing o di repository che cambia realmente lo stato del progetto può essere uno step legittimo, ma deve essere dichiarata come avanzamento non hardware e non confusa con evidenza device-side.
+Non promuovere ipotesi a fatti.
 
-### 3.4 Conservatività operativa, non cerimoniale
+### 3.3 Eseguibilità reale > correttezza teorica
 
-Preferire cambi piccoli, verificabili e reversibili. Non trasformare la sicurezza in accumulo di preflight, marker, sealing, hash o report che non riducono un rischio reale. La conservatività si misura nella capacità di prevenire danni e fare rollback, non nella quantità di cerimonia.
+Quando uno step crea o modifica un percorso eseguibile, una suite offline verde non dimostra executable closure. Il percorso reale deve essere verificato nel massimo grado consentito dallo scope e dai Human Gate.
 
-### 3.5 Fail-closed intelligente
+### 3.4 Avanzamento di confine > produzione di artefatti
 
-L'AI non deve dichiarare completato un task in presenza di ambiguità hardware o di comportamento non compreso. Non deve però inventare blocker di governance host-side quando il dispositivo è già protetto e il problema non incide sul rischio reale.
+Review set, report, commit e numerazione Dxxx non sono di per sé avanzamento.
 
-### 3.6 Evidence-first
+Avanzamento reale significa almeno uno tra:
 
-Distinguere sempre tra **osservato**, **verificato**, **inferito**, **ipotizzato** e **non noto**. Non promuovere ipotesi a fatti.
+```text
+REAL_EXECUTION_COMPLETED
+NEW_TECHNICAL_EVIDENCE_PRODUCED
+NEW_PROTOCOL_OR_HARDWARE_BOUNDARY_REACHED
+MATERIAL_ARCHITECTURAL_OR_REPOSITORY_ADVANCEMENT
+```
 
-### 3.7 Nessuna conoscenza confinata nella chat
+### 3.5 Conservatività operativa, non cerimoniale
 
-La conoscenza tecnica o metodologica rilevante deve essere integrata nel manuale o negli artefatti canonici; non deve rimanere solo in chat, report isolati o artefatti temporanei.
+Preferire cambi piccoli, verificabili e reversibili. Non accumulare preflight, marker, sealing, hash o report che non riducono un rischio reale.
 
-### 3.8 Validazione umana finale
+### 3.6 Fail-closed intelligente
 
-L'Utente mantiene sempre la decisione finale su scope, rischio, autorizzazioni live, accettazione delle modifiche, merge, sospensione o cambio di strategia.
+Non dichiarare completato un task in presenza di ambiguità hardware o comportamento non compreso. Non trasformare però prudenza generica o governance host-side ridondante in blocker artificiale.
+
+### 3.7 Nessuna conoscenza confinata nella sessione
+
+La conoscenza tecnica o metodologica necessaria alla prosecuzione deve essere integrata nel manuale o negli artefatti canonici. La memoria della sessione AI non è fonte persistente.
+
+### 3.8 Autorità umana finale
+
+L'Utente mantiene sempre la decisione finale su:
+
+- scope e cambi di scope;
+- strategia materiale;
+- live e USB reale;
+- privilegi e protected material;
+- main e history rewrite;
+- licensing boundary;
+- modifiche alle policy permanenti;
+- pubblicazione.
 
 ---
 
@@ -89,420 +132,571 @@ L'Utente mantiene sempre la decisione finale su scope, rischio, autorizzazioni l
 Per le regole di processo e sicurezza valgono, in ordine:
 
 1. decisione o autorizzazione esplicita corrente dell'Utente;
-2. versione MD canonica e immutabile delle presenti linee guida nel repository;
-3. `AGENTS.md` come sintesi operativa persistente;
-4. prompt Dxxx corrente approvato dall'Utente;
-5. manuale tecnico per lo stato tecnico corrente.
+2. questa versione canonica delle Linee Guida nel repository;
+3. `AGENTS.md` come costituzione operativa derivata;
+4. `START_PROMPT.md` come bootstrap/recovery e protocollo del loop autonomo;
+5. manuale tecnico per lo stato tecnico corrente;
+6. task logico `CURRENT_TASK` prodotto dall'AI PM.
 
-Un prompt specifico non può rilassare implicitamente un vincolo permanente. Una vera eccezione deve essere esplicita, limitata e autorizzata dall'Utente.
+Un task generato autonomamente può restringere lo scope, ma non può rilassare implicitamente un vincolo permanente.
 
 ### 4.2 Autorità probatoria tecnica
 
-Per affermazioni target-specific su `GF_ST411SEC_APP_12509`, sicurezza, persistenza, PSK/factory state e comportamento del device, la priorità è:
+Per affermazioni target-specific su `GF_ST411SEC_APP_12509`, safety, persistenza, PSK/factory state e comportamento del device, la priorità è:
 
 1. stato reale del repository e dell'ambiente host;
 2. evidenza locale prodotta da test ripetibili, capture canoniche, `gfusb.dll`, APP12509 e live autorizzati;
 3. manuale tecnico canonico;
 4. report e artefatti degli step precedenti;
-5. fonti esterne, implementazioni terze e conversazioni esterne;
-6. contenuto delle chat;
+5. fonti esterne e implementazioni terze;
+6. contenuto della sessione AI;
 7. supposizioni del modello.
 
 Una fonte esterna può essere eccellente per implementazione o corroborazione senza diventare prova primaria del target 12509.
 
 ---
 
-## 5. Ruoli
+## 5. Branch e isolamento operativo
 
-### 5.1 Utente
+La modalità autonoma opera esclusivamente su:
 
-- definisce obiettivo e priorità;
-- autorizza scope e cambi di scope;
-- controlla i risultati;
-- esegue o autorizza la validazione sull'hardware reale;
-- autorizza operazioni rischiose, live, irreversibili o di history rewrite;
-- decide se accettare, correggere, annullare, sospendere o mergiare il lavoro.
+```text
+development
+```
 
-### 5.2 AI Project Manager
+Prima di qualsiasi modifica l'agente deve verificare il branch corrente.
 
-- chiarisce il problema con l'Utente;
-- definisce criteri di accettazione coerenti con lo scope;
-- individua rischi, dipendenze ed esclusioni;
-- prepara task piccoli ma non artificialmente frammentati, con un path di esecuzione chiaro quando applicabile;
-- riesamina diff, test, report, review set e stato reale del repository;
-- verifica aggiornamento organico del manuale;
-- prepara il prompt della milestone successiva solo dopo la review;
-- non approva governance host-side aggiuntiva se non riduce un rischio reale;
-- non modifica repository remoto, PR, branch, history o merge senza autorizzazione esplicita dell'Utente.
+Se il branch corrente non è `development`:
 
-### 5.3 AI esecutrice
+- non modificare file;
+- non cambiare branch autonomamente;
+- non creare commit;
+- non eseguire push;
+- terminare con `HUMAN_REQUIRED`.
 
-- opera nel repository e legge prima il contesto canonico;
-- identifica root, branch, HEAD e stato Git;
-- propone e applica il cambiamento minimo necessario;
-- esegue test coerenti con lo scope;
-- quando esiste un percorso eseguibile, verifica executable closure nel contesto appropriato;
-- aggiorna il manuale tecnico;
-- rende disponibile un review set step-local versionato nel repository, senza creare ZIP o Base64 salvo necessità esplicita;
-- riporta limiti, rischi e verifiche con linguaggio fedele all'evidenza.
+I branch seguenti sono superfici read-only per l'agente autonomo:
 
----
+```text
+main
+bakcup_pre_agentic_mode
+```
 
-## 6. Procedura obbligatoria per ogni step
+Possono essere letti e confrontati, ma non modificati.
 
-### 6.1 Preparazione dello step — AI PM
+### 5.1 `development`
 
-Prima di consegnare il task:
+Consentiti:
 
-- chiarire obiettivo preciso;
-- definire scope, rischi, esclusioni e criteri di completamento;
-- indicare il livello di ragionamento **MEDIUM** o **HIGH** più appropriato;
-- creare il prompt come file `.md` scaricabile, non come semplice testo da copiare in chat;
-- richiedere aggiornamento del manuale canonico;
-- richiedere un review set step-local Git-native, identificabile tramite baseline, HEAD/commit e file rilevanti;
-- vietare espansioni di scope non autorizzate.
+- modifiche coerenti con scope e policy;
+- commit normali;
+- push normali verso `origin/development`;
+- confronto con altri ref.
 
-### 6.2 Lettura iniziale — AI esecutrice
+Vietati:
 
-Prima di modificare file:
+- force push;
+- history rewrite;
+- amend di storia condivisa;
+- reset/stash distruttivi;
+- cancellazione di lavoro preesistente non attribuito con certezza;
+- switch di branch per aggirare la policy.
 
-- determinare la Git root reale;
-- leggere linee guida canoniche, `AGENTS.md`, manuale e prompt dello step;
-- esaminare gli step precedenti pertinenti;
-- controllare stato Git e baseline;
-- identificare file, launcher, test e artefatti coinvolti.
+### 5.2 `main`
 
-### 6.3 Analisi preliminare
+Per l'agente autonomo:
 
-Dichiarare sinteticamente:
+```text
+READ / COMPARE = consentito
+WRITE / COMMIT / PUSH / MERGE / REBASE / CHERRY-PICK / UPDATE-REF = vietato
+```
 
-- obiettivo compreso;
-- stato iniziale osservato;
-- file presumibilmente coinvolti;
-- rischi principali;
-- esclusioni;
-- criteri di completamento.
+Qualunque aggiornamento di `main` richiede decisione e azione autorizzata dall'Utente fuori dal loop autonomo.
 
-In caso di contraddizione sostanziale, fermarsi e chiedere istruzioni.
+### 5.3 `bakcup_pre_agentic_mode`
 
-### 6.4 Implementazione
-
-- cambiamento minimo;
-- no refactoring globali non richiesti;
-- no nuove dipendenze senza necessità documentata;
-- no modifiche a file storici come effetto collaterale;
-- no occultamento di modifiche automatiche o generate;
-- no risultati dipendenti da stato sporco non controllato;
-- usare directory temporanee per simulazioni distruttive;
-- rispettare sempre sicurezza e scope.
-
-### 6.5 Verifica tecnica
-
-- eseguire test pertinenti;
-- ripetere test quando serve dimostrare determinismo;
-- confrontare hash/blob prima e dopo quando rilevante;
-- verificare modifiche fuori scope;
-- distinguere test passati, falliti, saltati e non disponibili;
-- non mascherare pass parziali come completamento.
+È il punto di conservazione dello stato pre-agentic e deve rimanere read-only per l'agente autonomo.
 
 ---
 
-## 7. Executable Closure Gate
+## 6. Bootstrap e recovery obbligatori
 
-L'Executable Closure Gate è **vincolante quando lo step crea, modifica, abilita o dichiara pronto un percorso eseguibile/operator/runtime**. Per step puramente documentali, di licensing, provenance o repository hygiene che dimostrano assenza di modifiche runtime, il valore corretto è `NOT_APPLICABLE`.
+`START_PROMPT.md` è il punto d'ingresso standard.
 
-Quando applicabile, prima di dichiarare lo step ready l'AI esecutrice deve:
+La sessione non deve aspettarsi un primo prompt operativo esterno. All'avvio assume il ruolo **AI PM / Recovery Reviewer** e ricostruisce lo stato reale.
 
-1. eseguire il launcher nel modo in cui verrebbe realmente invocato dall'operatore, oppure il dry-run/preflight equivalente quando il live non è autorizzato;
-2. usare stesso comando shell, `cwd`, meccanismo di import/PYTHONPATH e contesto di privilegi pertinente;
-3. confrontare ambiente di test e ambiente operativo;
-4. considerare bloccanti errori come `ModuleNotFoundError`, `PermissionError`, path errati o marker incoerenti se impediscono l'esecuzione reale;
-5. dare priorità al fallimento del launcher rispetto a una suite offline verde.
+Prima di definire il primo `CURRENT_TASK` deve:
 
-Un review set perfettamente ordinato non rende eseguibile un launcher rotto.
+1. individuare Git root;
+2. verificare branch, HEAD e `git status --short`;
+3. leggere integralmente:
+   - `AGENTS.md`;
+   - le presenti Linee Guida;
+   - `Goodix 27c6 5125 manuale tecnico.md`;
+4. esaminare storia recente e struttura pertinente del repository;
+5. identificare ultimo avanzamento tecnico reale e ultimo confine aperto;
+6. esaminare ultimi Dxxx pertinenti, codice, test, launcher e operator kit;
+7. verificare se esiste lavoro parziale o non committato;
+8. determinare se l'ultimo step è realmente chiuso o deve essere completato/corretto.
 
----
+### 6.1 Worktree sporco
 
-## 8. Review interna, chiusura tecnica e review AI PM
+Un worktree sporco non è automaticamente un errore.
 
-### 8.1 Review interna
+Una sessione precedente può essersi interrotta dopo avere modificato file e prima del commit. L'agente deve quindi:
 
-Prima di chiudere lo step, l'AI esecutrice verifica:
+- analizzare il diff;
+- ricostruire provenienza e intento probabile;
+- non cancellare, reset, stashare o sovrascrivere modifiche preesistenti;
+- riprendere il lavoro se è chiaramente coerente e recuperabile;
+- usare `HUMAN_REQUIRED` se l'origine o l'intento sono materialmente ambigui e una scelta autonoma potrebbe distruggere lavoro o deviare il progetto.
 
-- requisito iniziale realmente soddisfatto;
-- executable closure superata o correttamente `NOT_APPLICABLE`;
-- diff non più ampio del necessario;
-- assenza di file inattesi o assunzioni non dimostrate;
-- test pertinenti realmente probanti;
-- manuale coerente con il nuovo stato;
-- review set limitato ai file e alle evidenze necessarie allo step.
+### 6.2 Definizione del primo task
 
-### 8.2 Chiusura tecnica
+Solo dopo la recovery review, l'AI PM determina `CURRENT_TASK`.
 
-Uno step può essere `READY` solo se:
-
-- criteri di accettazione soddisfatti;
-- executable closure `PASS` oppure `NOT_APPLICABLE` per ragione documentata;
-- limiti residui espliciti;
-- manuale aggiornato quando cambia stato o conoscenza;
-- review set identificabile e verificabile nel repository;
-- report finale fedele.
-
-### 8.3 Review esterna — AI PM
-
-L'AI PM deve:
-
-- confrontare risultato e prompt originale;
-- verificare lo stato reale del repository, non solo il summary dell'AI esecutrice;
-- verificare diff, report, test e review set;
-- controllare executable closure quando applicabile;
-- controllare coerenza del manuale;
-- distinguere blocker reali da limiti accettabili;
-- proporre accettazione, correzione o rigetto all'Utente;
-- preparare lo step successivo solo dopo review conclusa.
-
-Se commit/branch/PR e gli artefatti dello step sono disponibili nel repository remoto accessibile all'AI PM, la review avviene direttamente sullo stato Git e sui file versionati. L'Utente non deve creare, scaricare, riconvertire o ricaricare ZIP/Base64 per consentire la review.
+Se esiste un task precedente incompleto ma recuperabile, il primo compito deve completare o correggere quello prima di saltare a una nuova milestone.
 
 ---
 
-## 9. Manuale tecnico canonico
+## 7. Autonomous Execute–Review Loop
 
-`Goodix 27c6 5125 manuale tecnico.md` nella Git root è la **fonte narrativa canonica dello stato tecnico**.
+La sessione alterna due ruoli logici.
 
-L'AI esecutrice deve integrare organicamente ogni nuova conoscenza, decisione, correzione o cambiamento di stato. Il manuale:
+### 7.1 AI Executor
 
-- non deve diventare un log append-only di step o review set;
-- deve aggiornare sezioni alte/canoniche quando cambia una decisione;
-- aggiunge una sezione Dxxx solo quando utile a provenance o ricostruzione;
-- mantiene indice, tabelle, spiegazioni e stato tecnico coerenti;
-- non lascia conoscenza nuova solo in chat, report o artefatti di review;
-- non duplica o depreca inutilmente contenuto ancora valido.
+L'Executor:
 
-Le presenti linee guida regolano **come lavorare**; il manuale descrive **cosa sappiamo tecnicamente e qual è lo stato corrente**. Gli snapshot tecnici volatili non appartengono alle linee guida.
+- implementa `CURRENT_TASK`;
+- applica il cambiamento minimo necessario;
+- rispetta scope, licensing e safety;
+- esegue test e verifiche pertinenti;
+- verifica executable closure quando applicabile;
+- aggiorna organicamente il manuale tecnico quando cambia conoscenza o stato;
+- può creare commit e push normali solo su `development`;
+- non auto-approva il proprio lavoro.
 
----
+### 7.2 AI PM / Reviewer
 
-## 10. Review set Git-native e repository hygiene
+Dopo ogni esecuzione il PM:
 
-Al termine di ogni step l'AI esecutrice rende disponibile un **review set step-local Git-native**. Il review set non è un archivio separato: è l'insieme verificabile delle modifiche, evidenze e documentazione versionate nel repository e necessarie alla review dello step.
+- rileggere il task appena eseguito;
+- esamina direttamente repository, diff, file modificati, test, report, artefatti e manuale;
+- non si fida soltanto del summary dell'Executor;
+- tratta il lavoro precedente come se fosse stato prodotto da un'altra AI;
+- cerca attivamente errori, omissioni, regressioni, scope creep e claim non provati;
+- durante la sola fase di review non modifica il repository.
 
-La superficie di audit standard è costituita da:
+### 7.3 Decisioni del loop
 
-- baseline Git rilevante;
-- HEAD/commit finale, oppure branch/PR quando il commit finale non è ancora stato integrato;
-- diff rispetto alla baseline;
-- artefatti Dxxx in `analysis/Dxxx/`;
-- file di codice, test e documentazione realmente modificati dallo step.
+Sono ammesse solo:
 
-Regole permanenti:
+```text
+ACCEPT_AND_CONTINUE
+CORRECTIVE
+REPLAN
+HUMAN_REQUIRED
+PROJECT_STEP_COMPLETE
+```
 
-- output Dxxx e report step-local risiedono in `analysis/Dxxx/`;
-- non duplicare manuale, policy, storia o file non modificati solo per rendere il review set autosufficiente;
-- niente cache, file temporanei, backup `.orig/.bak`, credenziali, PSK, chiavi TLS, firmware/DLL OEM, capture reali o dati biometrici nei review set o artefatti destinati alla pubblicazione;
-- il report dello step indica baseline/commit o ref rilevante e riferimenti al manuale quando necessari alla review;
-- eventuali artefatti storici vengono relocati solo byte-preserving e solo se il move non rompe consumatori eseguibili o riproducibilità;
-- eccezioni di compatibilità sono documentate e possono restare in root se necessarie alla executable closure storica;
-- i bundle ZIP storici già versionati restano evidenza storica e non devono essere cancellati, rigenerati o riconvertiti senza una ragione tecnica specifica.
+#### ACCEPT_AND_CONTINUE
 
-ZIP, `.zip.b64` e altri packaging equivalenti **non sono requisiti di closure né mezzi di trasporto standard**. Possono essere creati solo quando una piattaforma, un destinatario o un'attività di export lo richiede esplicitamente; in tal caso devono restare temporanei quando possibile, non duplicare inutilmente il tree canonico e usare hash/round-trip solo quando servono a proteggere un rischio concreto. Il repository Git resta la fonte canonica per la review.
+Il lavoro è corretto e il progetto può avanzare. Il PM determina il successivo task e lo esegue nel ciclo seguente senza richiedere conferma.
 
----
+#### CORRECTIVE
 
-## 11. Git e integrità del repository
+Esiste un difetto locale o una closure incompleta correggibile nello scope corrente. Il PM formula il corrective minimo e torna a Executor.
 
-L'AI esecutrice e l'AI PM devono:
+#### REPLAN
 
-- non assumere che uno stato sporco sia baseline valida;
-- non cancellare modifiche dell'Utente;
-- non eseguire reset distruttivi senza autorizzazione;
-- non creare commit o push salvo autorizzazione esplicita;
-- non fare merge salvo autorizzazione esplicita dell'Utente;
-- non fare rebase, amend, force push o history rewrite senza autorizzazione esplicita e specifica;
-- non installare hook Git o modificare configurazioni Git globali/utente;
-- non aggiungere artefatti generati fuori scope;
-- spiegare ogni modifica retroattiva necessaria.
+Le evidenze richiedono un nuovo piano entro strategia, scope e rischio già autorizzati. Il PM riformula il task e torna a Executor.
 
-### 11.1 Baseline Git approvata per il live-critical set
+Un cambio materiale di strategia, scope, licensing boundary o rischio richiede invece `HUMAN_REQUIRED`.
 
-Per i percorsi live evitare pinning SHA-256 manuale diffuso di manuali, report e test. Quando serve una baseline live, identificarla con un commit SHA completo approvato esplicitamente dall'Utente/AI PM.
+#### HUMAN_REQUIRED
 
-La verifica di integrità riguarda il **live-critical set**, normalmente:
+Il loop si ferma prima dell'azione soggetta a gate. Il PM riporta stato, motivo, decisione richiesta e passo successivo previsto.
 
-- launcher live corrente;
-- backend USB reale;
-- entrypoint reale;
-- moduli che possono inviare comandi USB o cambiare il percorso live;
-- guardrail che implementano single-shot, cleanup/reseal o autorizzazione operatore.
+#### PROJECT_STEP_COMPLETE
 
-Modifiche a manuale, report, manifest o test offline non devono invalidare automaticamente una baseline live già approvata.
+Usare solo quando l'obiettivo complessivo attualmente perseguibile senza nuovo Human Gate è realmente esaurito.
 
-Codex non deve inventare o auto-approvare un commit SHA. Hash per-file indipendenti sono ammessi quando proteggono un artefatto esterno o un rischio concreto non coperto dalla baseline Git, non come cerimonia generalizzata.
+Non usare `PROJECT_STEP_COMPLETE` solo perché:
 
----
+- un Dxxx è chiuso;
+- un commit esiste;
+- i test sono verdi;
+- una review è positiva;
+- il prossimo task è stato identificato.
 
-## 12. Sicurezza hardware, firmware e host
-
-### 12.1 Operazioni vietate senza autorizzazione esplicita
-
-Salvo task specifico autorizzato dall'Utente, l'AI esecutrice non deve eseguire:
-
-- flashing, provisioning, OTP, IAP;
-- modifica firmware del sensore;
-- accesso USB reale o invio di comandi sensor-reaching;
-- scrittura su memoria persistente;
-- provisioning o sostituzione PSK;
-- estrazione/manipolazione di secret non necessaria allo scope;
-- installazione di driver/plugin caricabili o attivazione runtime libfprint;
-- `sudo` o equivalenti privilegiati per conto dell'Utente;
-- operazioni di rete non necessarie.
-
-### 12.2 Invarianti factory-preserving
-
-- nessun erase o flash/IAP del firmware;
-- nessun provisioning o rimpiazzo PSK;
-- nessuna scrittura OTP, factory data o configurazione persistente;
-- nessun cambio permanente di VID:PID o modalità boot;
-- nessuna procedura che renda incerta la compatibilità Windows successiva;
-- nessun asset proprietario OEM nei review set o artefatti destinati alla pubblicazione.
-
-### 12.3 Gerarchia di sicurezza
-
-La sicurezza dispositivo ha priorità massima. La sicurezza host-side è secondaria e deve servire la prima.
-
-Guardrail economici che riducono direttamente un rischio sul device vanno preservati: autorizzazione esplicita, single-shot, zero retry implicito, fail-closed sui comandi non compresi o persistenti, cleanup/release/reseal, verifica del live-critical set.
-
-Preflight, marker, sealing e reporting host-side non devono diventare un ostacolo insuperabile se non proteggono un rischio reale. Un meccanismo host-side che blocca ripetutamente l'esecuzione senza migliorare la safety va semplificato, corretto o rimosso, non ulteriormente stratificato.
+Se esiste un ulteriore passo autonomamente consentito verso il target finale, la decisione ordinaria è `ACCEPT_AND_CONTINUE`.
 
 ---
 
-## 13. Observability dei failure
+## 8. Human Gate
 
-Quando un gate o launcher fallisce, il sistema deve esporre immediatamente una causa redatta e utile.
+I dettagli operativi sono duplicati intenzionalmente in `AGENTS.md` perché devono essere immediatamente visibili all'agente.
 
-Sono insufficienti messaggi come `root preflight failed`, `unexpected_ack` o `import failed` senza dettaglio.
+Una autorizzazione precedente non si riutilizza implicitamente. Hardware disponibile ≠ live autorizzato.
 
-Quando pertinenti, il report deve rendere visibili almeno:
+### 8.1 Hardware e live
 
-- classificazione del failure;
-- path/modulo/marker coinvolto;
-- ACK/response o frame osservato;
-- `USB_OPEN_COUNT` e se il live è iniziato;
-- stato cleanup/reseal;
-- eventuale contatore retry.
+Richiedono intervento/autorizzazione umana:
 
-Un gate che produce diagnostica ma la nasconde all'operatore è un gate fallito.
+- nuova esecuzione live sul sensore;
+- accesso USB Goodix reale;
+- invio di comandi sensor-reaching;
+- retry live non autorizzato;
+- installazione o attivazione runtime che possa raggiungere il device;
+- operazioni con possibile effetto persistente;
+- qualsiasi eccezione alle invarianti factory-preserving.
 
----
+Ogni autorizzazione live è one-shot salvo formulazione esplicita diversa dell'Utente.
 
-## 14. Evidenze e linguaggio tecnico
+### 8.2 Privilegi e protected material
 
-Ogni affermazione importante va classificata come:
+Richiedono Human Gate:
 
-- **osservato**: derivato direttamente da file, test o catture;
-- **verificato**: confermato da procedura ripetibile;
-- **inferito**: dedotto da più evidenze ma non dimostrato direttamente;
-- **ipotizzato**: spiegazione plausibile da verificare;
-- **non noto**: informazione non disponibile.
+- `sudo`, root o privilegi equivalenti da parte dell'agente nel workflow VS Code;
+- accesso/manipolazione di PSK, secret, chiavi o protected material non già specificamente autorizzati;
+- estrazione o trasferimento di protected material fuori dallo scope approvato.
 
-Non usare implementazioni terze, commenti esterni o analogie come sostituto della validazione target-specific.
+### 8.3 Git protetto
 
----
+Richiedono Human Gate e non sono mai impliciti nel loop:
 
-## 15. Scope, milestone e regole anti-frammentazione
+- qualunque modifica di `main`;
+- merge in `main`;
+- update/ref/reset/rebase/cherry-pick che alteri `main`;
+- qualunque modifica di `bakcup_pre_agentic_mode`;
+- force push;
+- history rewrite;
+- reset/stash distruttivo;
+- cancellazione di modifiche preesistenti dell'Utente.
 
-Ogni milestone deve ridurre almeno una incertezza reale tra protocollo, firmware, inizializzazione, USB, cifratura, formato dati, interfaccia driver, integrazione libfprint, build, test, riproducibilità, sicurezza o manutenzione.
+### 8.4 Governance, scope e licensing
 
-### 15.1 Fix di classe, non di singolo sintomo
+Richiedono Human Gate:
 
-Se un fallimento appartiene a una classe (per esempio policy ACK troppo stretta), la correzione deve coprire l'intera classe prima della nuova run. Evitare successioni di patch una-opcode-alla-volta quando il pattern è già riconoscibile.
+- ampliamento materiale dello scope;
+- cambio materiale di strategia tecnica;
+- nuovo profilo di rischio;
+- modifica del licensing boundary;
+- modifica delle policy permanenti;
+- operazioni sul repository pubblico;
+- pubblicazione di materiale privato/non auditato.
 
-### 15.2 Audit orizzontale prima del live
+### 8.5 Ambiguità materiale
 
-Prima di autorizzare una nuova run live, le fasi del percorso atteso devono avere policy ACK/response e failure handling coerenti con transcript/capture disponibili.
+Le normali incertezze tecniche vanno investigate autonomamente.
 
-### 15.3 Prerequisiti locali nello stesso step
+Usare `HUMAN_REQUIRED` solo quando:
 
-Difetti locali emersi durante la costruzione di un operator kit (shell, import, path, quoting, marker fixture) vanno chiusi nello stesso Dxxx quando possibile. Non creare automaticamente D+1 per correggere un difetto locale di D.
+1. l'ambiguità non può essere risolta affidabilmente con repository, documentazione ed evidenze disponibili; e
+2. una scelta autonoma potrebbe alterare materialmente sicurezza, scope, strategia, licensing, stato Git protetto o lavoro significativo dell'Utente.
 
-### 15.4 Numerazione Dxxx ≠ avanzamento
+Non usare l'ambiguità come scappatoia per evitare normale lavoro investigativo.
 
-Un nuovo numero Dxxx è giustificato da almeno uno tra:
+### 8.6 Blocker reale
 
-- nuova esecuzione reale autorizzata;
-- nuova evidenza tecnica;
-- nuovo confine protocollo/hardware;
-- decisione architetturale/licensing/repository che cambia realmente lo stato del progetto.
-
-Una correzione locale senza nuovo confine resta nello stesso Dxxx con revisione degli artefatti.
-
-### 15.5 Stop metodologico
-
-Se due tentativi consecutivi orientati allo stesso confine device-side non producono nuova evidenza o un avanzamento sostanziale, l'AI PM deve fermare la ripetizione e riesaminare il metodo prima di proporre un terzo tentativo equivalente.
-
-Questa regola non vieta step deliberatamente non hardware, come licensing, provenance o repository hygiene, purché siano dichiarati per ciò che sono e non usati per fingere avanzamento device-side.
-
----
-
-## 16. [AGENTS.md](http://AGENTS.md) e prompt Codex
-
-### 16.1 [AGENTS.md](http://AGENTS.md) come costituzione operativa persistente
-
-La root deve contenere `AGENTS.md` con un riepilogo breve e stabile delle regole permanenti necessarie a Codex. `AGENTS.md` non deve diventare copia integrale delle presenti linee guida né del manuale.
-
-Deve contenere almeno:
-
-- root/manuale canonici;
-- invarianti factory-preserving e compatibilità Windows;
-- divieti hardware permanenti salvo autorizzazione;
-- disciplina Git e scope;
-- ciclo Design → Implementazione → Esecuzione;
-- definizione di avanzamento reale;
-- riesame metodologico pre-live;
-- aggiornamento organico del manuale;
-- review set step-local Git-native;
-- closure minima;
-- distinzione safety telemetry / project reporting;
-- licensing boundary e regole minime di provenance post-D247;
-- repository hygiene minima post-D248.
-
-`AGENTS.md` è un'istruzione operativa derivata, non una fonte normativa alternativa e non può contraddire il MD canonico.
-
-### 16.2 Prompt Dxxx: solo delta dello step
-
-Il prompt specifico non deve ricopiare inutilmente regole permanenti già in `AGENTS.md` e nelle linee guida. Deve contenere:
-
-- reasoning **MEDIUM** o **HIGH**;
-- contesto tecnico strettamente necessario;
-- obiettivo specifico;
-- scope e file particolari;
-- criteri di accettazione specifici;
-- eventuali eccezioni esplicitamente autorizzate.
-
-La prevenzione dei conflitti avviene riducendo la duplicazione, non dichiarando artificialmente una fonte "insuperabile".
+Fermarsi anche quando manca una capability, informazione o risorsa esterna indispensabile e non esiste un percorso autonomo sicuro equivalente.
 
 ---
 
-## 17. Riesame metodologico pre-live
+## 9. Test live e operator kit
 
-Prima di preparare o autorizzare una nuova run live dopo un fallimento precedente, l'AI esecutrice deve produrre un blocco conciso che risponda a tre domande:
+Se il progresso richiede live, USB reale o un'operazione privilegiata dell'Utente, l'agente non deve eseguirla direttamente dal workflow Codex/VS Code.
+
+Deve preparare, quando tecnicamente possibile:
+
+```text
+<git-root>/operator_kit/<step-o-scopo>/
+```
+
+Il kit deve includere almeno:
+
+- uno script `.sh` eseguibile dall'Utente quando appropriato;
+- istruzioni operative in italiano;
+- output interattivi dello script in italiano;
+- prerequisiti;
+- rischio e scopo della run;
+- comportamento atteso;
+- stop conditions;
+- percorso degli output/evidenze;
+- cleanup/release/reseal quando applicabili;
+- failure reporting leggibile.
+
+Regole:
+
+- l'agente può costruire e verificare offline il kit;
+- non esegue il live;
+- non esegue `sudo` direttamente nel workflow attivo VS Code;
+- eventuale `sudo` necessario può essere presente nel percorso manualmente avviato dall'Utente e deve essere chiaramente documentato;
+- dopo la preparazione del kit il loop termina con `HUMAN_REQUIRED`;
+- non sostituire un kit dedicato con comandi USB/Python improvvisati quando il kit è praticabile.
+
+---
+
+## 10. Riesame metodologico pre-live
+
+Prima di preparare una nuova run live dopo un fallimento, il sistema deve rispondere:
 
 1. **Cosa cambia realmente nel metodo rispetto all'ultimo tentativo?**
 2. **Quale nuova ipotesi tecnica viene testata?**
 3. **Se fallisce di nuovo nello stesso punto, quale azione diversa verrà intrapresa?**
 
-Il riesame deve distinguere una variazione sostanziale da modifiche cosmetiche a pacing, logging, packaging, hash, preflight o altre cautele host-side.
+Pacing, logging, packaging, hash, preflight o altre cautele host-side non costituiscono da soli una nuova ipotesi tecnica.
 
-Se non esiste una risposta sostanziale alle prime due domande, non va creato un nuovo step live solo per ripetere lo stesso esperimento con nuova cerimonia.
+Se non esiste una risposta sostanziale alle prime due domande, non preparare un ulteriore tentativo equivalente. Riesaminare il metodo; se il nuovo metodo cambia materialmente strategia o rischio, usare `HUMAN_REQUIRED`.
 
-Non creare per default un secondo diario metodologico: la conclusione rilevante confluisce nel manuale canonico.
+La conclusione metodologica rilevante deve essere integrata nel manuale tecnico. Non creare per default un secondo diario canonico.
 
 ---
 
-## 18. Architettura software e licensing boundary post-D247
+## 11. Sicurezza hardware, firmware e host
 
-La decisione D247 introduce una separazione intenzionale:
+### 11.1 Operazioni vietate senza autorizzazione esplicita
 
+- flash;
+- IAP;
+- ClearApp;
+- provisioning;
+- modifica firmware;
+- accesso USB reale;
+- comando sensor-reaching;
+- scrittura persistente;
+- provisioning/sostituzione PSK;
+- PSK random/null;
+- scrittura OTP/factory data;
+- cambio persistente VID:PID/mode;
+- operazioni che rendano incerta la compatibilità Windows;
+- uso autonomo di `sudo`/root;
+- installazione di driver/plugin caricabili che possano raggiungere il device;
+- accesso non autorizzato a protected material.
+
+### 11.2 Guardrail live permanenti
+
+Quando applicabili preservare:
+
+- autorizzazione esplicita della singola run;
+- single-shot;
+- zero retry implicito;
+- fail-closed su comandi non compresi o potenzialmente persistenti;
+- cleanup/release/reseal anche su uscita anomala;
+- verifica del live-critical set contro baseline approvata;
+- diagnostica leggibile del failure.
+
+Questi sono guardrail hardware e non devono essere sostituiti da sola prosa.
+
+### 11.3 Baseline live
+
+La baseline live revisionata è identificata da un **commit SHA completo approvato esplicitamente dall'Utente** per il percorso live interessato.
+
+L'agente non può inventare o auto-approvare tale SHA.
+
+Il live-critical set comprende normalmente:
+
+- launcher live;
+- backend USB;
+- entrypoint reale;
+- moduli che possono inviare comandi USB;
+- guardrail software che implementano autorizzazione, single-shot, cleanup/reseal.
+
+Modifiche a manuale, report o test offline non devono invalidare automaticamente una baseline live già approvata.
+
+---
+
+## 12. Procedura ordinaria di implementazione
+
+Per ogni `CURRENT_TASK` l'Executor deve:
+
+1. chiarire obiettivo, scope, rischi, non-goals e criteri di accettazione;
+2. identificare file e test realmente coinvolti;
+3. applicare il cambiamento minimo;
+4. non introdurre refactoring globali non necessari;
+5. non introdurre nuove dipendenze senza necessità documentata;
+6. non retro-modificare artefatti storici per farli sembrare coerenti col presente;
+7. usare directory temporanee per simulazioni distruttive;
+8. eseguire test pertinenti;
+9. distinguere test passati, falliti, saltati e non disponibili;
+10. verificare modifiche fuori scope;
+11. aggiornare il manuale quando cambia conoscenza o stato;
+12. passare al PM per review indipendente.
+
+I task generati internamente devono descrivere il delta necessario e non ricopiare inutilmente la costituzione permanente.
+
+---
+
+## 13. Executable Closure Gate
+
+L'Executable Closure Gate è vincolante quando lo step crea, modifica, abilita o dichiara pronto un percorso eseguibile/operator/runtime.
+
+Quando applicabile, verificare nel massimo grado consentito:
+
+- cwd reale;
+- import/PYTHONPATH;
+- path resolution;
+- modalità reale di invocazione;
+- dry-run/offline path;
+- failure reporting;
+- differenze tra ambiente di test e ambiente operatore.
+
+Errori come `ModuleNotFoundError`, `PermissionError`, path errati o marker incoerenti sono bloccanti se impediscono l'esecuzione reale.
+
+Se la verifica finale richiede live o privilegi, chiudere la parte offline e preparare operator kit + `HUMAN_REQUIRED`.
+
+Per step puramente documentali, licensing/provenance o repository hygiene, `EXECUTABLE_CLOSURE=NOT_APPLICABLE` è legittimo se motivato.
+
+---
+
+## 14. Review indipendente AI PM
+
+Dopo ogni implementazione il PM deve:
+
+- confrontare risultato e `CURRENT_TASK`;
+- verificare lo stato reale del repository, non solo il summary;
+- verificare diff, file modificati, report, test e review set;
+- controllare executable closure;
+- controllare manuale e coerenza narrativa;
+- cercare regressioni e claim non provati;
+- distinguere blocker reali da limiti accettabili;
+- decidere `ACCEPT_AND_CONTINUE`, `CORRECTIVE`, `REPLAN`, `HUMAN_REQUIRED` o `PROJECT_STEP_COMPLETE`.
+
+Durante la sola fase PM di review non modificare il repository. Eventuali correzioni vengono formalizzate come nuovo task e applicate nel successivo passaggio Executor.
+
+---
+
+## 15. Manuale tecnico canonico
+
+`Goodix 27c6 5125 manuale tecnico.md` è la **fonte narrativa canonica dello stato tecnico**.
+
+Ogni nuova conoscenza, decisione, correzione o cambiamento di stato deve essere integrato organicamente nel manuale.
+
+Il manuale:
+
+- non è un log append-only;
+- aggiorna sezioni alte/canoniche quando cambia una decisione;
+- mantiene indice, tabelle, roadmap e stato tecnico coerenti;
+- aggiunge una sezione Dxxx solo quando utile alla provenance o ricostruzione;
+- corregge o marca come superate formulazioni stale;
+- non lascia conoscenza nuova soltanto in sessione AI, report o commit message;
+- non duplica inutilmente contenuto ancora valido.
+
+Questo obbligo è parte della closure e permette a una futura sessione `START_PROMPT.md` di riprendere il progetto anche dopo un'interruzione brusca.
+
+---
+
+## 16. Review set Git-native e repository hygiene
+
+Il review set standard è Git-native, non un archivio separato.
+
+La superficie di audit comprende:
+
+- baseline Git rilevante;
+- HEAD/commit finale o stato corrente del branch;
+- diff;
+- artefatti Dxxx in `analysis/Dxxx/`;
+- file di codice, test e documentazione realmente modificati;
+- manuale tecnico.
+
+Regole:
+
+- output Dxxx e report step-local vivono normalmente in `analysis/Dxxx/`;
+- non duplicare manuale, policy, history o file non modificati per rendere il review set autosufficiente;
+- niente cache, file temporanei, backup `.orig/.bak`, credenziali, PSK, chiavi TLS, firmware/DLL OEM, dati biometrici o materiale non redistribuibile nei review set destinati a pubblicazione;
+- le evidenze raw private autentiche possono vivere in `<git-root>/captures/` nel repository privato secondo le regole correnti;
+- futuri export pubblici devono escludere protected/private material e richiedono audit separato;
+- i bundle ZIP storici già versionati restano evidenza storica e non vanno rigenerati senza ragione tecnica.
+
+ZIP, `.zip.b64` e packaging equivalenti non sono requisiti ordinari di closure o trasporto. Possono essere creati solo per reale necessità esplicita.
+
+---
+
+## 17. Observability e safety telemetry
+
+Quando un gate o launcher fallisce, deve esporre una causa utile e leggibile.
+
+Messaggi come `root preflight failed`, `unexpected_ack` o `import failed` senza dettaglio sono insufficienti.
+
+Quando pertinenti, rendere visibili:
+
+- classificazione del failure;
+- path/modulo/marker coinvolto;
+- ACK/response o frame osservato;
+- `USB_OPEN_COUNT` e se il live è iniziato;
+- cleanup/reseal;
+- retry count;
+- device state.
+
+Non confondere telemetria di sicurezza con sintesi di progetto.
+
+I report macchina possono mantenere:
+
+```text
+usb_open_count
+command_count
+tls_count
+retry_count
+claim/release
+cleanup/reseal
+ACK/response
+persistent_write_family_count
+device_state
 ```
+
+La closure ordinaria usa:
+
+```text
+OUTCOME
+ADVANCEMENT
+EXECUTABLE_CLOSURE
+RESIDUAL_BLOCKER_OR_RISK
+CANONICAL_DOCUMENTATION
+REVIEW_SET
+```
+
+Campi aggiuntivi solo quando contengono informazione non derivabile e realmente utile.
+
+---
+
+## 18. Scope, milestone e anti-frammentazione
+
+Ogni milestone deve ridurre almeno una incertezza reale tra protocollo, firmware, inizializzazione, USB, cifratura, formato dati, interfaccia driver, integrazione libfprint, build, test, riproducibilità, sicurezza o manutenzione.
+
+### 18.1 Fix di classe, non di singolo sintomo
+
+Se un fallimento appartiene a una classe, la correzione deve coprire la classe prima di una nuova run. Evitare patch una-opcode-alla-volta quando il pattern è già riconoscibile.
+
+### 18.2 Audit orizzontale prima del live
+
+Prima di una nuova run live, le fasi del percorso atteso devono avere policy ACK/response e failure handling coerenti con transcript/capture disponibili.
+
+### 18.3 Prerequisiti locali nello stesso step
+
+Difetti locali emersi durante la costruzione di un operator kit vanno chiusi nello stesso Dxxx quando possibile.
+
+### 18.4 Nuovo Dxxx
+
+Un nuovo Dxxx è giustificato da almeno uno tra:
+
+- nuova esecuzione reale autorizzata;
+- nuova evidenza tecnica;
+- nuovo confine protocollo/hardware;
+- decisione architetturale/licensing/repository che cambia realmente lo stato;
+- avanzamento tecnico sostanziale.
+
+Una correzione locale senza nuovo confine resta nello stesso Dxxx.
+
+### 18.5 Stop metodologico
+
+Se due tentativi consecutivi orientati allo stesso confine device-side non producono nuova evidenza o avanzamento sostanziale, fermare la ripetizione e riesaminare il metodo prima di un terzo tentativo equivalente.
+
+---
+
+## 19. Architettura software e licensing boundary post-D247
+
+La separazione canonica resta:
+
+```text
 core/              GPL-2.0-or-later
   transport
   protocol
@@ -518,52 +712,50 @@ libfprint-driver/  LGPL-2.1-or-later
 tools/             GPL-2.0-or-later
 ```
 
-Il materiale originale già pubblicato fino a D246 sotto BSD-2-Clause conserva quella concessione: non viene relicenziato retroattivamente. Codice di terzi mantiene i propri termini. Firmware/DLL OEM, capture, secret, materiale biometrico, factory data e asset non redistribuibili non ricevono alcuna blanket open-source license.
+Il materiale originale già pubblicato fino a D246 sotto BSD-2-Clause conserva quella concessione e non viene relicenziato retroattivamente. Codice di terzi mantiene i propri termini. Firmware/DLL OEM, capture, secret, materiale biometrico, factory data e asset non redistribuibili non ricevono blanket open-source license.
 
-L'architettura post-D247 è stata adottata **precisamente per consentire il riuso diretto, l'adattamento e l'integrazione nel dominio GPL del codice esterno compatibile GPL**, preservando licenza, attribution e provenance. Il licensing boundary non vieta il riuso: impedisce che espressione GPL-only entri involontariamente nel driver upstream-facing LGPL.
+Il dominio GPL può incorporare codice esterno GPL compatibile preservando licenza, attribution e provenance.
 
-Codice con una licenza LGPL compatibile può essere valutato per `libfprint-driver/` dopo audit per-file dei diritti, degli header SPDX, dei contributi e delle eventuali origini terze. Espressione GPL-only può entrare nel driver LGPL solo in presenza di dual licensing o licenza alternativa compatibile concessa da tutti i titolari pertinenti; in assenza, il driver deve essere implementato indipendentemente da specifiche, fatti di protocollo, test ed evidenza.
-
----
-
-## 19. Rockytkg: fonte implementativa, non autorità probatoria
-
-Snapshot locale canonico di riferimento:
-
-`<git-root>/Rockytkg/`
-
-La scheda di provenance dello snapshot è:
-
-`<git-root>/Rockytkg/PROVENANCE.md`
-
-Per audit, confronto, adattamento o riuso del materiale Rockytkg, Codex e le altre AI devono usare **come riferimento operativo unico** lo snapshot presente nella Git root e leggere prima `Rockytkg/PROVENANCE.md`. Il repository online non è una dipendenza del normale workflow: lo snapshot locale è preservato e versionato proprio per mantenere disponibile la conoscenza anche in assenza della fonte remota e per consentire analisi offline.
-
-Conversazione tecnica principale:
-
-[Issue #1 — goodix-linux-27c6-5125](https://github.com/Rockytkg/goodix-linux-27c6-5125/issues/1)
-
-Codice Rockytkg verificato come compatibile GPL può essere letto, copiato, adattato e incorporato nel dominio GPL `core/`/`tools/`, con licenza, attribution e provenance. Eventuale codice specificamente disponibile sotto licenza LGPL compatibile può essere valutato per il dominio LGPL dopo audit per-file. La presenza di un file nello snapshot non implica automaticamente che esso sia coperto dalla licenza GPL/LGPL del codice: valgono le eccezioni e i diritti descritti nella scheda di provenance e nei file di licenza originali, in particolare per firmware/vendor material e componenti terzi.
-
-Questo permesso non promuove Rockytkg a prova primaria per APP12509 e non dimostra da solo safety, assenza di persistenza, compatibilità con PSK/factory state o correttezza sul target locale. Ogni comportamento sensor-reaching richiede validazione differenziale locale e, quando necessario, autorizzazione live separata.
+Il dominio LGPL upstream-facing non può ricevere espressione GPL-only senza dual/alternative license valida. In assenza, deve essere implementato indipendentemente da specifiche, fatti di protocollo, test ed evidenza.
 
 ---
 
-## 20. Provenance permanente
+## 20. Rockytkg e provenance
 
-Ogni import o adattamento di codice esterno registra almeno:
+Snapshot locale canonico:
+
+```text
+<git-root>/Rockytkg/
+```
+
+Scheda di provenance:
+
+```text
+<git-root>/Rockytkg/PROVENANCE.md
+```
+
+Per audit, confronto, adattamento o riuso leggere prima `Rockytkg/PROVENANCE.md`.
+
+La Issue #1 del repository Rockytkg resta una fonte esterna distinta. Rockytkg è fonte implementativa/corroborativa, non autorità probatoria per APP12509.
+
+Codice verificato come compatibile GPL può essere adattato nel dominio GPL `core/`/`tools/` con corretta provenance. Materiale compatibile LGPL può essere valutato per `libfprint-driver/` dopo audit per-file.
+
+Ogni import/adattamento registra almeno:
 
 - repository e commit/ref sorgente;
 - path sorgente;
-- licenza/SPDX originale;
+- licenza/SPDX;
 - copyright holder noto;
-- eventuali componenti o contributi di terzi;
+- eventuali contributi terzi;
 - data/step locale;
-- path di destinazione;
+- path destinazione;
 - natura delle modifiche.
 
-Preservare gli header applicabili e non assumere che la licenza repository-level copra automaticamente ogni file o dipendenza.
+Ledger operativo:
 
-Il ledger operativo è `docs/LICENSING_AND_PROVENANCE.md`.
+```text
+docs/LICENSING_AND_PROVENANCE.md
+```
 
 ---
 
@@ -571,52 +763,61 @@ Il ledger operativo è `docs/LICENSING_AND_PROVENANCE.md`.
 
 Il repository privato è il workspace canonico di sviluppo.
 
-Il repository pubblico resta una superficie congelata finché uno step separato non esegue sanitizzazione e audit di **contenuto e history**.
+Il repository pubblico resta congelato finché uno step separato non esegue sanitizzazione e audit di **contenuto e history**.
 
-L'uguaglianza del working tree non dimostra che la storia privata sia pubblicabile. Quando necessario usare clean export, nuova storia o filtri espliciti, senza sincronizzazione automatica.
+L'uguaglianza del working tree non dimostra che la history privata sia pubblicabile.
 
-Nessuna operazione sul repository pubblico è implicita nelle attività sul privato.
-
----
-
-## 22. Closure e safety telemetry
-
-La sintesi finale di ogni step usa, salvo necessità concreta, sei campi:
-
-1. `OUTCOME` — `READY` | `BLOCKED` + classificazione tecnica breve;
-2. `ADVANCEMENT` — esecuzione reale, nuova evidenza, avanzamento architetturale/non hardware oppure `NONE`, senza fingere device progress;
-3. `EXECUTABLE_CLOSURE` — `PASS` | `FAIL` | `NOT_APPLICABLE`;
-4. `RESIDUAL_BLOCKER_OR_RISK` — descrizione sintetica;
-5. `CANONICAL_DOCUMENTATION` — manuale aggiornato sì/no + sezioni toccate;
-6. `REVIEW_SET` — baseline + HEAD/commit (o branch/PR) e path/file rilevanti che compongono il review set step-local.
-
-Campi aggiuntivi sono ammessi quando rappresentano informazione tecnica non derivabile e realmente utile.
-
-La riduzione della closure non riduce la safety telemetry. I report macchina possono e devono conservare, quando pertinenti:
-
-- `usb_open_count`;
-- `command_count`;
-- `tls_count`;
-- `retry_count`;
-- D4/application-data reachability;
-- claim/release;
-- cleanup/reseal;
-- device state;
-- ACK/response osservati;
-- persistent-write-family count.
-
-Questi dati non devono essere duplicati in molte fonti con nomi differenti quando una singola fonte macchina è sufficiente.
+Nessuna operazione sul repository pubblico è implicita nelle attività su `development`.
 
 ---
 
-## 23. Criterio generale di qualità
+## 22. Configurazione del modello AI
+
+Le policy del repository non devono prescrivere, raccomandare o registrare:
+
+- nome del modello AI;
+- variante del modello;
+- livello di ragionamento.
+
+La scelta del modello e della relativa configurazione appartiene all'Utente e all'ambiente di esecuzione, non ai documenti canonici del repository.
+
+I prompt/task devono descrivere requisiti tecnici, scope, rischi, verifiche e criteri di accettazione, non la configurazione del modello.
+
+---
+
+## 23. Modifica delle policy permanenti
+
+Le presenti Linee Guida, `AGENTS.md` e `START_PROMPT.md` costituiscono il set di governance della modalità autonoma.
+
+Il file Git delle Linee Guida nel repository privato è la **fonte normativa canonica versionata**.
+
+L'agente autonomo non modifica questi documenti come normale attività tecnica.
+
+Una modifica di policy richiede:
+
+1. decisione esplicita dell'Utente;
+2. modifica controllata sul branch autorizzato;
+3. incremento/versionamento appropriato delle Linee Guida quando cambia la policy;
+4. review incrociata di Linee Guida, `AGENTS.md` e `START_PROMPT.md` per evitare contraddizioni.
+
+Se durante il loop emerge una discrasia procedurale:
+
+- non autoriscrivere le regole per adattarle al comportamento corrente;
+- descrivere la discrasia;
+- usare `HUMAN_REQUIRED` se è materiale;
+- attendere decisione dell'Utente.
+
+---
+
+## 24. Criterio generale di qualità
 
 La qualità non si misura in:
 
 - numero di file prodotti;
 - numero di test offline passati;
-- numero di report o artefatti di review;
-- numero di step Dxxx.
+- numero di commit;
+- numero di report;
+- numero di Dxxx.
 
 La qualità si misura in:
 
@@ -624,53 +825,35 @@ La qualità si misura in:
 - repository più comprensibile;
 - progetto più riproducibile;
 - assenza di rischi nascosti;
-- documentazione chiara di ciò che è noto e non noto;
+- documentazione chiara di noto/non noto;
 - avanzamento concreto verso lo stack Linux finale;
-- quando lo step è device-oriented, avanzamento o apprendimento reale al confine device-side.
+- quando lo step è device-oriented, avanzamento o apprendimento reale al confine device-side;
+- capacità di riprendere il lavoro dopo un'interruzione senza dipendere dalla memoria della sessione precedente.
 
 ---
 
-## 24. Fonte canonica immutabile delle linee guida
+## 25. Principio sintetico della v2.6
 
-Questa pagina Notion è la **fonte di authoring** delle linee guida. Dopo approvazione dell'Utente, la versione viene esportata nella root del repository privato come **unica fonte normativa canonica e immutabile delle linee guida per quella versione**.
-
-Regole:
-
-- l'AI non modifica direttamente il MD canonico;
-- una modifica di policy richiede decisione esplicita dell'Utente, aggiornamento della pagina Notion, incremento di versione e nuovo export MD;
-- `AGENTS.md` resta una sintesi operativa derivata e deve essere mantenuto coerente, ma non sostituisce né supera il MD;
-- il manuale tecnico resta separatamente la fonte narrativa canonica dello **stato tecnico**, non delle regole permanenti di governance.
-
----
-
-## 25. Principio sintetico della v2.5
-
-**sicurezza hardware forte**
-
-- 
-
-**evidence-first e executable closure quando applicabile**
-
-- 
-
-**anti-frammentazione e riesame metodologico**
-
-- 
-
-**licensing/provenance espliciti**
-
-- 
-
-**review Git-native senza packaging obbligatorio**
-
-- 
-
-**repository hygiene senza rompere riproducibilità**
-
-- 
-
-**una sola fonte normativa immutabile + un solo manuale tecnico canonico**
-
+```text
+sicurezza hardware forte
++
+factory state preservato
++
+branch development isolato
++
+recovery evidence-first
++
+manuale canonico vivo
++
+alternanza disciplinata Executor/PM
++
+Human Gate espliciti
++
+operator kit per live manuali
++
+review Git-native
++
+licensing/provenance preservati
 =
-
-**meno cerimonia senza perdere ingegneria, memoria o controllo**
+autonomia senza perdere controllo, memoria o reversibilità
+```
