@@ -152,6 +152,16 @@ volta, crea un ticket runtime e usa il binario preparato senza rebuild. Il
 vecchio `--live-integrated-once` diretto è chiuso. Nessun grant live è stato
 creato e nessuna esecuzione live è autorizzata da questo correttivo.
 
+Il **correttivo #6a** (host-only) indurisce il workflow operatore per
+l'esecuzione reale sotto sudo: la root canonica viene determinata senza
+invocare Git, quindi ogni chiamata Git del percorso di validazione usa
+`-c safe.directory=<canonical-root>` senza configurazione globale; il grant
+esterno è accettato se di proprietà di `SUDO_UID` (oltre a root/EUID) con
+permessi `0600` o più restrittivi; il marker di grant consumato è spostato
+sotto `/var/tmp/goodix-d278-14-consumed-grants` per sopravvivere al cleanup di
+`/tmp` e a un reboot. La chiusura pre-live `--host-only-prelive` asserisce
+tutti i marker corrispondenti.
+
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
 OEM_RECOVERY_EQUIVALENCE=false
@@ -202,6 +212,14 @@ LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
 SECOND_USE_OF_AUTHORIZATION_REJECTED=true
+REAL_SUDO_GIT_SAFE_DIRECTORY_HOST_ONLY_PROVEN=true
+SUDO_OPERATOR_OWNED_GRANT_ACCEPTED_HOST_ONLY=true
+UNRELATED_GRANT_OWNER_REJECTED_HOST_ONLY=true
+PERSISTENT_ONE_SHOT_GRANT_CLAIM_HOST_ONLY_PROVEN=true
+GENERIC_BASELINE_BOUND_OPERATOR_WORKFLOW_HOST_ONLY_PROVEN=true
+DIRECT_UNPREPARED_LIVE_PATH_REJECTED=true
+PRE_SESSION_RX_SYNC_CORE_RETAINED=true
+STRICT_A2_ACK_THEN_TYPED_RETAINED=true
 D278_14_TOTAL_LIVE_ATTEMPTS=4
 D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=4
 D278_14_HISTORY_CORRECTED=true

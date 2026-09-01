@@ -2,9 +2,30 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 set -eu
 
+canonical_repo_root () {
+  _dir=$1
+  while [ "$_dir" != "/" ]; do
+    if [ -e "$_dir/.git" ]; then
+      printf '%s\n' "$_dir"
+      return 0
+    fi
+    _dir=$(dirname "$_dir")
+  done
+  return 1
+}
+
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-root=$(git -C "$script_dir" rev-parse --show-toplevel)
+root=$(canonical_repo_root "$script_dir") || {
+  echo "canonical_repo_root: no .git found above $script_dir" >&2
+  exit 2
+}
 approved=${D278_13_BUILD_APPROVED_BASELINE_SHA:-UNAPPROVED_FOR_LIVE}
+
+git_in () {
+  _dir=$1
+  shift
+  git -C "$_dir" -c safe.directory="$_dir" "$@"
+}
 snapshot=
 host_gusb=
 
@@ -75,20 +96,20 @@ verify_live_baseline () {
       return 1
       ;;
   esac
-  git -C "$guard_root" cat-file -e "$guard_approved^{commit}" 2>/dev/null || {
+  git_in "$guard_root" cat-file -e "$guard_approved^{commit}" 2>/dev/null || {
     guard_refused false unknown APPROVED_COMMIT_NOT_LOCAL
     return 1
   }
-  resolved=$(git -C "$guard_root" rev-parse "$guard_approved^{commit}")
-  head=$(git -C "$guard_root" rev-parse HEAD)
+  resolved=$(git_in "$guard_root" rev-parse "$guard_approved^{commit}")
+  head=$(git_in "$guard_root" rev-parse HEAD)
   if [ "$head" != "$resolved" ]; then
     guard_refused false unknown HEAD_MISMATCH
     return 1
   fi
-  header_paths=$(git -C "$guard_root" ls-tree -r --name-only "$resolved" -- \
+  header_paths=$(git_in "$guard_root" ls-tree -r --name-only "$resolved" -- \
     Rockytkg/libfprint/libfprint | grep '\.h$' | grep -v '/tests/' || true)
   set -- $live_critical_paths $header_paths
-  if [ -n "$(git -C "$guard_root" status --porcelain --untracked-files=all -- "$@")" ]; then
+  if [ -n "$(git_in "$guard_root" status --porcelain --untracked-files=all -- "$@")" ]; then
     guard_refused true false LIVE_CRITICAL_SOURCE_DIRTY
     return 1
   fi
@@ -132,18 +153,18 @@ if [ "$approved" != UNAPPROVED_FOR_LIVE ]; then
   guard_output=$(verify_live_baseline "$root" "$approved") || exit 1
   approved=$(printf '%s\n' "$guard_output" | tail -n 1)
   snapshot=$(mktemp -d /tmp/goodix-d278-13-approved-source.XXXXXX)
-  git -C "$root" archive "$approved" -- \
+  git_in "$root" archive "$approved" -- \
     libfprint-driver tools operator_kit Rockytkg/libfprint/libfprint | \
     tar -x -C "$snapshot"
   source_root=$snapshot
 fi
 inner="$source_root/libfprint-driver/tests/build_goodix_d278_13_adapter_inner.sh"
 if [ "$approved" = UNAPPROVED_FOR_LIVE ]; then
-  test_reference=$(git -C "$root" rev-parse HEAD)
+  test_reference=$(git_in "$root" rev-parse HEAD)
 else
   test_reference=$approved
 fi
-test_other_reference=$(git -C "$root" rev-parse "$test_reference^")
+test_other_reference=$(git_in "$root" rev-parse "$test_reference^")
 
 for candidate in \
   /usr/lib64/libgusb.so.2.0.10 \

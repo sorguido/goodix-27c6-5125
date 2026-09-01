@@ -3,7 +3,26 @@
 set -euo pipefail
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-root=$(git -C "$script_dir" rev-parse --show-toplevel)
+
+canonical_repo_root () {
+  local dir=$1
+  while [[ $dir != / ]]; do
+    if [[ -e $dir/.git ]]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir=$(dirname "$dir")
+  done
+  return 1
+}
+
+root=$(canonical_repo_root "$script_dir") || {
+  echo "canonical_repo_root: no .git found above $script_dir" >&2
+  exit 2
+}
+
+git_root () { git -C "$root" -c safe.directory="$root" "$@"; }
+
 build_script="$root/libfprint-driver/tests/build_goodix_d278_13_adapter.sh"
 operation=D278_13_INTEGRATED_PATH_ONCE
 test_only=${D278_14_WORKFLOW_GUARD_TEST_ONLY:-0}
@@ -35,9 +54,9 @@ state_value () {
 verify_canonical_baseline () {
   local approved=$1
   is_full_sha "$approved" || guard_refusal INVALID_APPROVED_SHA
-  [[ $(git -C "$root" branch --show-current) == main ]] ||
+  [[ $(git_root branch --show-current) == main ]] ||
     guard_refusal BRANCH_NOT_MAIN
-  [[ $(git -C "$root" rev-parse HEAD) == "$approved" ]] ||
+  [[ $(git_root rev-parse HEAD) == "$approved" ]] ||
     guard_refusal HEAD_MISMATCH
   D278_13_BASELINE_GUARD_TEST_ONLY=1 \
     D278_13_BASELINE_GUARD_TEST_ROOT="$root" \
@@ -65,7 +84,19 @@ host_only_prelive () {
   done
   "$root/libfprint-driver/tests/test_goodix_d278_13_live_guards.sh" \
     --baseline-only "$root" "$build_script"
-  "$root/libfprint-driver/tests/test_goodix_d278_14_workflow.sh" "$root"
+  workflow_output=$("$root/libfprint-driver/tests/test_goodix_d278_14_workflow.sh" "$root")
+  printf '%s\n' "$workflow_output"
+  for marker in \
+    REAL_SUDO_GIT_SAFE_DIRECTORY_HOST_ONLY_PROVEN=true \
+    SUDO_OPERATOR_OWNED_GRANT_ACCEPTED_HOST_ONLY=true \
+    UNRELATED_GRANT_OWNER_REJECTED_HOST_ONLY=true \
+    PERSISTENT_ONE_SHOT_GRANT_CLAIM_HOST_ONLY_PROVEN=true \
+    GENERIC_BASELINE_BOUND_OPERATOR_WORKFLOW_HOST_ONLY_PROVEN=true \
+    DIRECT_UNPREPARED_LIVE_PATH_REJECTED=true \
+    ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true \
+    SECOND_USE_OF_AUTHORIZATION_REJECTED=true; do
+    grep -F "$marker" <<<"$workflow_output" >/dev/null
+  done
   build=$(mktemp -d /tmp/goodix-d278-13-prelive.XXXXXX)
   cleanup () {
     find "$build" -maxdepth 1 -type f -delete 2>/dev/null || true
@@ -91,6 +122,9 @@ host_only_prelive () {
     grep -F "$marker" <<<"$proof_output" >/dev/null
   done
   echo EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+  echo OUTCOME=PASS_HOST_ONLY_WORKFLOW_HARDENING
+  echo PRE_SESSION_RX_SYNC_CORE_RETAINED=true
+  echo STRICT_A2_ACK_THEN_TYPED_RETAINED=true
   echo LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
   echo LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
   echo ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
@@ -186,8 +220,18 @@ run_approved_live () {
   [[ -f $grant && ! -L $grant ]] || guard_refusal GRANT_FILE_POLICY
   mode=$(stat -c %a "$grant")
   owner=$(stat -c %u "$grant")
-  [[ $((8#$mode & 077)) -eq 0 ]] || guard_refusal GRANT_FILE_POLICY
-  [[ $test_only == 1 || $owner -eq $EUID ]] || guard_refusal GRANT_FILE_POLICY
+  # mode must be 0600 or stricter (no group/other bits, no owner execute)
+  [[ $((8#$mode & 0177)) -eq 0 ]] || guard_refusal GRANT_FILE_POLICY
+  # owner: accept the invoking operator under sudo (SUDO_UID), root, or EUID
+  grant_accepted=0
+  if [[ $owner -eq $EUID ]]; then
+    grant_accepted=1
+  elif [[ $EUID -eq 0 && ${SUDO_UID:-} =~ ^[0-9]+$ && $owner -eq $SUDO_UID ]]; then
+    grant_accepted=1
+  elif [[ $owner -eq 0 ]]; then
+    grant_accepted=1
+  fi
+  [[ $grant_accepted -eq 1 ]] || guard_refusal GRANT_FILE_POLICY
   [[ $(wc -l <"$grant") -eq 3 ]] || guard_refusal GRANT_MALFORMED
   grant_baseline=$(state_value "$grant" D278_14_BASELINE_SHA) ||
     guard_refusal GRANT_MALFORMED
@@ -201,7 +245,7 @@ run_approved_live () {
   if [[ $test_only == 1 ]]; then
     claim_root=${D278_14_TEST_CLAIM_ROOT:?missing D278_14_TEST_CLAIM_ROOT}
   else
-    claim_root=/tmp/goodix-d278-14-consumed-grants
+    claim_root=/var/tmp/goodix-d278-14-consumed-grants
   fi
   if [[ ! -e $claim_root ]]; then
     mkdir -m 0700 "$claim_root" 2>/dev/null ||
