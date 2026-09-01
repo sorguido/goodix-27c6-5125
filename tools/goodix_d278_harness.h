@@ -75,6 +75,9 @@ typedef struct
   guint reentry_recovery_a2_submit_count;
   guint reentry_recovery_a2_ack_count;
   guint reentry_recovery_a2_typed_count;
+  gboolean reentry_pre_ack_typed_observed;
+  gboolean reentry_pre_ack_typed_pin_match;
+  guint reentry_pre_ack_typed_discard_count;
   gchar reentry_recovery_a2_result_class[32];
   guint a8_submit_count;
   guint a8_ack_count;

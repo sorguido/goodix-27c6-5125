@@ -1458,6 +1458,10 @@ test_harness_full_secure_session_to_stop (void)
   g_assert_cmpuint (fixture->telemetry.reentry_recovery_a2_submit_count, ==, 1);
   g_assert_cmpuint (fixture->telemetry.reentry_recovery_a2_ack_count, ==, 1);
   g_assert_cmpuint (fixture->telemetry.reentry_recovery_a2_typed_count, ==, 1);
+  g_assert_false (fixture->telemetry.reentry_pre_ack_typed_observed);
+  g_assert_false (fixture->telemetry.reentry_pre_ack_typed_pin_match);
+  g_assert_cmpuint (fixture->telemetry.reentry_pre_ack_typed_discard_count,
+                    ==, 0);
   g_assert_cmpstr (fixture->telemetry.reentry_recovery_a2_result_class, ==,
                    "STRICT_MATCH");
   g_assert_cmpuint (fixture->telemetry.a8_submit_count, ==, 1);
@@ -1724,6 +1728,12 @@ test_harness_redacted_telemetry (void)
                             "\"reentry_recovery_a2_submit_count\":1"));
   g_assert_nonnull (strstr (json,
                             "\"reentry_recovery_a2_result_class\":\"STRICT_MATCH\""));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_pre_ack_typed_observed\":false"));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_pre_ack_typed_pin_match\":false"));
+  g_assert_nonnull (strstr (json,
+                            "\"reentry_pre_ack_typed_discard_count\":0"));
   g_assert_nonnull (strstr (json,
                             "\"reentry_recovery_a2_oem_equivalence\":false"));
   g_assert_nonnull (strstr (json,

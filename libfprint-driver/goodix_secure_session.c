@@ -83,6 +83,7 @@ struct _GoodixSecureSession
 
   gboolean started;
   gboolean ack_seen;
+  guint pre_ack_typed_discard_count;
   gboolean logical_done;
   gboolean command_submitted;
   gboolean out_pending;
@@ -136,7 +137,8 @@ goodix_reentry_recovery_a2_result_class_name (
   GoodixReentryRecoveryA2ResultClass result_class)
 {
   static const gchar *const names[] = {
-    "NOT_STARTED", "SUBMITTED", "ACK_STRICT", "STRICT_MATCH", "FAIL_CLOSED"
+    "NOT_STARTED", "SUBMITTED", "PRE_ACK_PINNED_TYPED_DISCARDED",
+    "ACK_STRICT", "STRICT_MATCH", "FAIL_CLOSED"
   };
 
   return (guint) result_class < G_N_ELEMENTS (names) ?
@@ -1062,7 +1064,41 @@ goodix_secure_session_handle_a0 (GoodixSecureSession *session,
       goodix_a0_message_clear (&message);
       return;
     }
-  if (!session->ack_seen || phase_ack_only (session->phase))
+  if (!session->ack_seen)
+    {
+      gboolean pinned_reentry_typed =
+        session->phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2 &&
+        message.control == 0xa2 && body_length == 3 &&
+        digest_matches (body, body_length,
+                        session->material.a2_response_sha256);
+
+      if (session->phase == GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2 &&
+          message.control == 0xa2 && session->audit != NULL)
+        {
+          session->audit->reentry_pre_ack_typed_observed = TRUE;
+          session->audit->reentry_pre_ack_typed_pin_match =
+            pinned_reentry_typed;
+        }
+      if (pinned_reentry_typed &&
+          session->pre_ack_typed_discard_count == 0u)
+        {
+          session->pre_ack_typed_discard_count++;
+          if (session->audit != NULL)
+            {
+              session->audit->reentry_pre_ack_typed_discard_count =
+                session->pre_ack_typed_discard_count;
+              session->audit->reentry_recovery_a2_result_class =
+                GOODIX_REENTRY_RECOVERY_A2_PRE_ACK_PINNED_TYPED_DISCARDED;
+            }
+          goodix_a0_message_clear (&message);
+          return;
+        }
+      record_protocol_failure (
+        session, GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,
+        0xa0, message.control, -1, -1, (gssize) body_length);
+      goto invalid_response;
+    }
+  if (phase_ack_only (session->phase))
     {
       record_protocol_failure (
         session, GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH,

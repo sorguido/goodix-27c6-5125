@@ -1356,6 +1356,182 @@ test_backend_in_completion_rearms_receive (void)
 }
 
 static void
+complete_backend_a0 (Fixture *fixture,
+                     GBytes  *frame)
+{
+  gsize length;
+  const guint8 *data = g_bytes_get_data (frame, &length);
+
+  goodix_fpi_usb_backend_complete_receive (fixture->backend,
+                                           fixture->generation,
+                                           data, length, NULL);
+}
+
+static void
+close_integrated_fixture (Fixture *fixture)
+{
+  goodix_secure_session_cancel (
+    goodix_device_context_get_secure_session (fixture->context),
+    "bounded pre-ACK test closure");
+  while (!g_queue_is_empty (fixture->out))
+    {
+      Submission *submission = pop_out (fixture);
+      goodix_fpi_usb_backend_complete_out (fixture->backend,
+                                           submission->generation, NULL);
+      submission_free (submission);
+    }
+  if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, NULL, 0, NULL);
+  fixture_free (fixture);
+}
+
+static void
+test_backend_pre_ack_pinned_typed_bounded_discard (void)
+{
+  Fixture *fixture = fixture_new_integrated_context ();
+  g_autoptr(GBytes) typed = typed_for_phase (
+    fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+  Submission *submission = pop_out (fixture);
+
+  g_assert_cmpuint (fixture->in_submit_count, ==, 1u);
+  complete_submission (fixture, submission, NULL);
+
+  complete_backend_a0 (fixture, typed);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
+  g_assert_true (fixture->audit.reentry_pre_ack_typed_observed);
+  g_assert_true (fixture->audit.reentry_pre_ack_typed_pin_match);
+  g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
+  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
+    GOODIX_REENTRY_RECOVERY_A2_PRE_ACK_PINNED_TYPED_DISCARDED);
+  g_assert_cmpuint (fixture->in_submit_count, ==, 2u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
+                     fixture->backend), ==, 1u);
+
+  complete_backend_a0 (fixture, ack);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 1u);
+  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
+                   GOODIX_REENTRY_RECOVERY_A2_ACK_STRICT);
+  g_assert_cmpuint (fixture->in_submit_count, ==, 3u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
+                     fixture->backend), ==, 1u);
+
+  complete_backend_a0 (fixture, typed);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_A8);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 1u);
+  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
+                   GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH);
+  g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.reentry_recovery_a2_submit_count, ==, 1u);
+  close_integrated_fixture (fixture);
+}
+
+static Fixture *
+integrated_reentry_ready (void)
+{
+  Fixture *fixture = fixture_new_integrated_context ();
+  Submission *submission = pop_out (fixture);
+
+  complete_submission (fixture, submission, NULL);
+  return fixture;
+}
+
+static void
+assert_integrated_pre_ack_terminal (Fixture *fixture)
+{
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_TERMINAL);
+  g_assert_cmpint (fixture->audit.protocol_failure_kind, ==,
+                   GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.clear_halt_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.persistent_write_count, ==, 0u);
+  fixture_free (fixture);
+}
+
+static void
+test_backend_pre_ack_typed_fail_closed (void)
+{
+  /* Wrong pin. */
+  {
+    Fixture *fixture = integrated_reentry_ready ();
+    guint8 wrong[3];
+    g_autoptr(GBytes) frame = NULL;
+
+    memcpy (wrong, fixture->a2, sizeof wrong);
+    wrong[0] ^= 0xff;
+    frame = build_response (0xa2, wrong, sizeof wrong);
+    complete_backend_a0 (fixture, frame);
+    g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
+    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
+    g_assert_true (fixture->audit.reentry_pre_ack_typed_observed);
+    g_assert_false (fixture->audit.reentry_pre_ack_typed_pin_match);
+    g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 0u);
+    assert_integrated_pre_ack_terminal (fixture);
+  }
+
+  /* Wrong length. */
+  {
+    Fixture *fixture = integrated_reentry_ready ();
+    g_autoptr(GBytes) frame = build_response (0xa2, fixture->a2, 2u);
+
+    complete_backend_a0 (fixture, frame);
+    g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
+    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
+    g_assert_true (fixture->audit.reentry_pre_ack_typed_observed);
+    g_assert_false (fixture->audit.reentry_pre_ack_typed_pin_match);
+    g_assert_cmpint (fixture->audit.observed_body_length, ==, 2);
+    assert_integrated_pre_ack_terminal (fixture);
+  }
+
+  /* A second pinned pre-ACK typed frame exceeds the one-frame bound. */
+  {
+    Fixture *fixture = integrated_reentry_ready ();
+    g_autoptr(GBytes) frame = typed_for_phase (
+      fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+
+    complete_backend_a0 (fixture, frame);
+    g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
+    complete_backend_a0 (fixture, frame);
+    g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
+    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
+    g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
+    assert_integrated_pre_ack_terminal (fixture);
+  }
+
+  /* The exception is unavailable once the current phase is A8. */
+  {
+    Fixture *fixture = integrated_reentry_ready ();
+    g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+    g_autoptr(GBytes) typed = typed_for_phase (
+      fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+    g_autoptr(GBytes) stale_a2 = NULL;
+    Submission *submission;
+
+    complete_backend_a0 (fixture, ack);
+    complete_backend_a0 (fixture, typed);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_A8);
+    submission = pop_out (fixture);
+    complete_submission (fixture, submission, NULL);
+    stale_a2 = build_response (0xa2, fixture->a2, sizeof fixture->a2);
+    complete_backend_a0 (fixture, stale_a2);
+    g_assert_cmpuint (fixture->audit.ack_count, ==, 1u);
+    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 1u);
+    assert_integrated_pre_ack_terminal (fixture);
+  }
+}
+
+static void
 test_integrated_context_live_binding_host_only (void)
 {
   Fixture *fixture = fixture_new_integrated_context ();
@@ -2120,6 +2296,10 @@ main (int argc,
                    test_reentry_tls_to_two_acquisitions_composed);
   g_test_add_func ("/goodix/d278/backend-in-completion-rearms-receive",
                    test_backend_in_completion_rearms_receive);
+  g_test_add_func ("/goodix/d278/backend-pre-ack-pinned-typed-bounded-discard",
+                   test_backend_pre_ack_pinned_typed_bounded_discard);
+  g_test_add_func ("/goodix/d278/backend-pre-ack-typed-fail-closed",
+                   test_backend_pre_ack_typed_fail_closed);
   g_test_add_func ("/goodix/d278/integrated-context-live-binding-host-only",
                    test_integrated_context_live_binding_host_only);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",

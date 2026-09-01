@@ -58,7 +58,6 @@ operator_message (const gchar *message)
 {
   g_print ("OPERATOR_MESSAGE_IT=%s\n", message);
 }
-
 static void
 operator_action_banner (const gchar *text)
 {
@@ -1439,6 +1438,9 @@ cleanup:
            "\"max_outstanding_in\":%u,\"max_outstanding_out\":%u,"
            "\"secure_command_count\":%u,\"ack_count\":%u,"
            "\"typed_count\":%u,\"reentry_a2_result\":\"%s\","
+           "\"reentry_pre_ack_typed_observed\":%s,"
+           "\"reentry_pre_ack_typed_pin_match\":%s,"
+           "\"reentry_pre_ack_typed_discard_count\":%u,"
            "\"a8_app12509_pin\":%s,\"e4_binding\":%s,"
            "\"tls_handshake_count\":%u,\"tls_established\":%s,"
            "\"secret_handoff_count\":%u,\"project_secret_zeroized\":%s,"
@@ -1490,6 +1492,9 @@ cleanup:
            secure_audit.typed_response_count,
            goodix_reentry_recovery_a2_result_class_name (
              secure_audit.reentry_recovery_a2_result_class),
+           secure_audit.reentry_pre_ack_typed_observed ? "true" : "false",
+           secure_audit.reentry_pre_ack_typed_pin_match ? "true" : "false",
+           secure_audit.reentry_pre_ack_typed_discard_count,
            secure_audit.a8_app12509_pin_match ? "true" : "false",
            material_audit.e4_binding_match ? "true" : "false",
            tls_audit.handshake_count,
@@ -1577,4 +1582,3 @@ main (int argc, char **argv)
               );
   return 2;
 }
-

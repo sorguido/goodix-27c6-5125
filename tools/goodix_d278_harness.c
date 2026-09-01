@@ -647,6 +647,12 @@ refresh_telemetry (GoodixD278Harness   *harness,
     harness->session_audit.reentry_recovery_a2_ack_count;
   telemetry->reentry_recovery_a2_typed_count =
     harness->session_audit.reentry_recovery_a2_typed_count;
+  telemetry->reentry_pre_ack_typed_observed =
+    harness->session_audit.reentry_pre_ack_typed_observed;
+  telemetry->reentry_pre_ack_typed_pin_match =
+    harness->session_audit.reentry_pre_ack_typed_pin_match;
+  telemetry->reentry_pre_ack_typed_discard_count =
+    harness->session_audit.reentry_pre_ack_typed_discard_count;
   g_strlcpy (telemetry->reentry_recovery_a2_result_class,
              goodix_reentry_recovery_a2_result_class_name (
                harness->session_audit.reentry_recovery_a2_result_class),
@@ -719,6 +725,9 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     "\"reentry_recovery_a2_submit_count\":%u,"
     "\"reentry_recovery_a2_ack_count\":%u,"
     "\"reentry_recovery_a2_typed_count\":%u,"
+    "\"reentry_pre_ack_typed_observed\":%s,"
+    "\"reentry_pre_ack_typed_pin_match\":%s,"
+    "\"reentry_pre_ack_typed_discard_count\":%u,"
     "\"reentry_recovery_a2_result_class\":\"%s\","
     "\"reentry_recovery_a2_oem_equivalence\":false,"
     "\"reentry_recovery_a2_project_policy\":true,"
@@ -761,6 +770,9 @@ telemetry_to_json (const GoodixD278Telemetry *telemetry,
     telemetry->reentry_recovery_a2_submit_count,
     telemetry->reentry_recovery_a2_ack_count,
     telemetry->reentry_recovery_a2_typed_count,
+    telemetry->reentry_pre_ack_typed_observed ? "true" : "false",
+    telemetry->reentry_pre_ack_typed_pin_match ? "true" : "false",
+    telemetry->reentry_pre_ack_typed_discard_count,
     telemetry->reentry_recovery_a2_result_class,
     telemetry->a8_submit_count, telemetry->a8_ack_count,
     telemetry->a8_typed_count,

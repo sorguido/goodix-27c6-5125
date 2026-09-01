@@ -1,21 +1,21 @@
-# D278/14 — two consumed live attempts, two host-only correctives, operator UX/telemetry micro-corrective
+# D278/14 — three consumed live attempts and five host-only correctives
 
 ## Outcome
 
 ```text
-OUTCOME=PASS_HOST_ONLY_MICRO_CORRECTIVE
-ADVANCEMENT=D278_14_HISTORY_CORRECTED_AND_OPERATOR_TELEMETRY_CLOSED_HOST_ONLY
+OUTCOME=PASS_HOST_ONLY_CORRECTIVE
+ADVANCEMENT=BOUNDED_PRE_ACK_PINNED_TYPED_A2_RESIDUE_HANDLING_PROVEN_HOST_ONLY
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 CANONICAL_DOCUMENTATION=UPDATED
 ```
 
-This document records **two consumed D278/14 live attempts** and the host-only
+This document records **three consumed D278/14 live attempts** and the host-only
 correctives that followed. No new live execution is performed or authorized.
 
 ```text
 START_BRANCH=main
-START_HEAD=3f495b5176ba4c37f72710b7f26f179a5ab8df96
-FINAL_STATE=STEP_LOCAL_WORKTREE_DIFF_NO_COMMIT
+START_HEAD=87c1bf89d0ba28497313f4bb75a8de4bbdb37b75
+FINAL_STATE=COMMITTED_AND_PUSHED_TO_MAIN
 ```
 
 ## Live attempt #1
@@ -100,9 +100,60 @@ finger; finger interaction was irrelevant because the run never reached A8,
 TLS, post-TLS or acquisition.
 
 ```text
-D278_14_TOTAL_LIVE_ATTEMPTS=2
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=2
+D278_14_TOTAL_LIVE_ATTEMPTS=3
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=3
 ```
+
+## Live attempt #3
+
+The third authorization was consumed on baseline
+`87c1bf89d0ba28497313f4bb75a8de4bbdb37b75`. Its first receive completed with
+an A0/A2 typed-shaped three-byte body before any ACK. The run did not log that
+body's hash, so a match against the pinned A2 response is unknown and must not
+be claimed.
+
+```text
+D278_14_ATTEMPT_3_BASELINE=87c1bf89d0ba28497313f4bb75a8de4bbdb37b75
+D278_14_ATTEMPT_3_BINARY_SHA256=346aadf64c49b6757c236a097264465ef4de130798aa82109056604930162d90
+D278_14_ATTEMPT_3_OUTCOME=FAIL_PRE_ACK_TYPED_A2
+D278_14_ATTEMPT_3_FAILURE_CLASS=INTEGRATED_PATH_TERMINAL
+D278_14_ATTEMPT_3_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
+D278_14_ATTEMPT_3_SECURE_COMMAND_COUNT=1
+D278_14_ATTEMPT_3_ACK_COUNT=0
+D278_14_ATTEMPT_3_TYPED_COUNT=0
+D278_14_ATTEMPT_3_PHYSICAL_IN_SUBMIT_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_OUT_SUBMIT_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_IN_COMPLETION_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_OUT_COMPLETION_COUNT=1
+D278_14_ATTEMPT_3_PROTOCOL_FAILURE_KIND=TYPED_SHAPE_MISMATCH
+D278_14_ATTEMPT_3_OBSERVED_OUTER_TYPE=0xA0
+D278_14_ATTEMPT_3_OBSERVED_A0_CONTROL=0xA2
+D278_14_ATTEMPT_3_OBSERVED_BODY_LENGTH=3
+D278_14_ATTEMPT_3_OBSERVED_ACK_ECHO=UNAVAILABLE
+D278_14_ATTEMPT_3_OBSERVED_ACK_STATUS=UNAVAILABLE
+D278_14_ATTEMPT_3_A8_REACHED=false
+D278_14_ATTEMPT_3_TLS_REACHED=false
+D278_14_ATTEMPT_3_POST_TLS_REACHED=false
+D278_14_ATTEMPT_3_STOP_TIME_MS=145
+D278_14_ATTEMPT_3_BACKEND_DRAINED=true
+D278_14_ATTEMPT_3_CLEANUP_COMPLETE=true
+D278_14_ATTEMPT_3_PROJECT_SECRET_ZEROIZED=true
+D278_14_ATTEMPT_3_RETRY_COUNT=0
+D278_14_ATTEMPT_3_REOPEN_COUNT=0
+D278_14_ATTEMPT_3_DEVICE_RESET_COUNT=0
+D278_14_ATTEMPT_3_CLEAR_HALT_COUNT=0
+D278_14_ATTEMPT_3_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_14_ATTEMPT_3_CORE_DUMP_LIMIT=0
+PRE_ACK_TYPED_A2_OBSERVED=true
+PRE_ACK_TYPED_A2_PIN_MATCH=UNKNOWN
+STALE_TYPED_FROM_ATTEMPT_2=STRONG_HYPOTHESIS_NOT_PROVEN
+```
+
+The bounded hypothesis is that attempt #2 received the A2 ACK but terminated
+before submitting the next IN, leaving the expected typed A2 unread; attempt
+#3 then received a typed-shaped A2 first. The router preserves byte order and
+can parse multiple frames from one completion, excluding software reordering.
+This remains a strong hypothesis, not proof of provenance or pin equality.
 
 ## Corrective #1 — FpDevice USB binding
 
@@ -151,7 +202,7 @@ NO_PARALLEL_STACK=true
 that a second IN is submitted, then feeds the typed A2 response on that second
 IN and asserts advancement to A8.
 
-## Micro-corrective #3 — operator UX, evidence history, telemetry closure
+## Corrective #3 — operator UX, evidence history, telemetry closure
 
 This step corrects the historical record and closes operator-facing UX without
 changing protocol semantics or the core re-arm design.
@@ -219,6 +270,45 @@ BOUNDED_STOP_TELEMETRY_COMPLETE=true
 SENSITIVE_TELEMETRY_EXPOSURE=false
 ```
 
+## Corrective #4 — exact banners and terminal/STOP exclusivity
+
+The follow-up micro-corrective pins the exact multiline banner format, removes
+machine prefixes from operator actions, and proves that STOP→TERMINAL and
+TERMINAL→STOP callback orderings cannot emit contradictory final banners.
+
+## Corrective #5 — bounded pre-ACK pinned A2 residue
+
+Only in `REENTRY_RECOVERY_A2`, the secure-session policy may discard exactly
+one typed A2 received before the current ACK when its body is exactly three
+bytes and its SHA-256 matches `material.a2_response_sha256`. The discarded
+frame is audited as `PRE_ACK_PINNED_TYPED_DISCARDED`, does not increment the
+normal typed count, complete the phase, advance to A8 or submit another A2.
+The existing backend completion callback re-arms the sole physical IN, after
+which the current command must still complete the normal strict sequence:
+valid ACK, then a second pinned typed A2, then A8.
+
+Wrong length, wrong pin, a second pre-ACK pinned A2, any attempt outside the
+reentry phase, unexpected control/class and malformed frames remain terminal.
+No raw three-byte body is logged.
+
+The integrated backend-level regression uses one `GoodixDeviceContext` and
+calls `goodix_fpi_usb_backend_complete_receive()` directly. It proves IN
+submit counts 1→2→3 across pre-ACK discard and ACK, maximum one outstanding
+IN, normal typed count 0 until the post-ACK typed response, and final advance
+to A8. The unchanged ACK→typed regression remains green.
+
+```text
+REENTRY_PRE_ACK_PINNED_TYPED_BOUNDED_DISCARD_IMPLEMENTED=true
+PRE_ACK_PINNED_TYPED_THEN_ACK_THEN_TYPED_TO_A8_HOST_ONLY_PROVEN=true
+SECOND_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+WRONG_PIN_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+WRONG_LENGTH_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+PRE_ACK_TYPED_OUTSIDE_REENTRY_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+CORE_IN_REARM_CORRECTIVE_RETAINED=true
+MAX_PHYSICAL_IN_OUTSTANDING=1
+NO_PARALLEL_STACK=true
+```
+
 ## Regression results
 
 All commands ran from the Git root. Flatpak tests used Freedesktop SDK 25.08
@@ -228,7 +318,7 @@ device.
 | Check | Result |
 | --- | --- |
 | `run_goodix_fpimage_device_test.sh` | 18/18 normal PASS; 18/18 ASAN/UBSAN PASS |
-| `run_goodix_d278_secure_session_test.sh` | 18/18 normal PASS; 18/18 ASAN/UBSAN PASS |
+| `run_goodix_d278_secure_session_test.sh` | 20/20 normal PASS; 20/20 ASAN/UBSAN PASS |
 | `run_goodix_d278_12_post_tls_test.sh` | 6/6 normal PASS; 6/6 ASAN/UBSAN PASS |
 | `run_goodix_d278_02_test.sh` | 62/62 normal PASS; 62/62 ASAN/UBSAN PASS |
 | D278/13 adapter build/link/`ldd` | PASS |
@@ -273,8 +363,8 @@ CORE_IN_REARM_CORRECTIVE_RETAINED=true
 SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
 BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
 BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
-D278_14_TOTAL_LIVE_ATTEMPTS=2
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=2
+D278_14_TOTAL_LIVE_ATTEMPTS=3
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=3
 D278_14_HISTORY_CORRECTED=true
 OPERATOR_MESSAGES_LANGUAGE=ITALIAN
 OPERATOR_ACTION_BANNERS_IMPLEMENTED=true
@@ -311,8 +401,8 @@ one-shot operator kit/ticket.
 ## Git-native review set
 
 ```text
-REVIEW_SET=BASELINE_3f495b5176ba4c37f72710b7f26f179a5ab8df96_ON_main_PLUS_CURRENT_WORKTREE_DIFF_PLUS_analysis/D278/D278_14_integrated_native_c_two_acquisition_live_once.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md_PLUS_libfprint-driver/goodix_post_tls_lifecycle.c_PLUS_libfprint-driver/goodix_post_tls_lifecycle.h_PLUS_libfprint-driver/goodix_fpimage_device.c_PLUS_libfprint-driver/goodix_fpimage_device.h_PLUS_libfprint-driver/goodix_fpi_usb_backend.c_PLUS_libfprint-driver/goodix_fpi_usb_backend.h_PLUS_tools/d278_integrated_path_once.c_PLUS_operator_kit/d278-13-integrated-path-once.sh_PLUS_libfprint-driver/tests/test_goodix_d278_secure_session.c_PLUS_libfprint-driver/tests/build_goodix_d278_13_adapter_inner.sh_PLUS_libfprint-driver/tests/test_goodix_fpimage_device.c_PLUS_libfprint-driver/tests/support/gusb_stub.c
+REVIEW_SET=BASELINE_87c1bf89d0ba28497313f4bb75a8de4bbdb37b75_ON_main_PLUS_FINAL_COMMIT_PLUS_CURRENT_STEP_CHANGED_FILES
 ```
 
-No ZIP/Base64, commit, push, branch change, merge, reset, core-dump operation,
-real USB access or production-secret read was performed by this corrective.
+No ZIP/Base64, branch change, merge, reset, core-dump operation, real USB
+access or production-secret read was performed by this corrective.

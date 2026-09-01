@@ -50,6 +50,7 @@ typedef enum
 {
   GOODIX_REENTRY_RECOVERY_A2_NOT_STARTED = 0,
   GOODIX_REENTRY_RECOVERY_A2_SUBMITTED,
+  GOODIX_REENTRY_RECOVERY_A2_PRE_ACK_PINNED_TYPED_DISCARDED,
   GOODIX_REENTRY_RECOVERY_A2_ACK_STRICT,
   GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH,
   GOODIX_REENTRY_RECOVERY_A2_FAIL_CLOSED,
@@ -81,6 +82,9 @@ typedef struct
   guint reentry_recovery_a2_submit_count;
   guint reentry_recovery_a2_ack_count;
   guint reentry_recovery_a2_typed_count;
+  gboolean reentry_pre_ack_typed_observed;
+  gboolean reentry_pre_ack_typed_pin_match;
+  guint reentry_pre_ack_typed_discard_count;
   gboolean secure_session_target_prefix_completed;
   GoodixReentryRecoveryA2ResultClass reentry_recovery_a2_result_class;
   guint a8_submit_count;

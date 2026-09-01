@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/14 — due live consumate, due correttivi host-only, chiusura UX/telemetry
+### Stato corrente post-D278/14 — tre live consumate, cinque correttivi host-only
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -63,7 +63,7 @@ esplicito `0600` lega SHA/operation/nonce ed è reclamato atomicamente una sola
 volta prima di qualunque materiale protetto, cache o GUsb. Il precedente token
 statico era riutilizzabile e non costituiva da solo un single-shot meccanico.
 
-D278/14 ha richiesto **due live autorizzate separate**, entrambe consumate. La
+D278/14 ha richiesto **tre live autorizzate separate**, tutte consumate. La
 prima, sulla baseline `2172e750ae7c100a3a891ba25d0797286230a4ab`, è fallita
 nell'assert di `fp_device_set_property()` durante il binding USB del `FpDevice`
 (`SIGABRT`, exit 134): la classe comune era `FP_DEVICE_TYPE_VIRTUAL` ma il
@@ -99,6 +99,26 @@ l'appoggio/ritiro del dito, e aggiunge la telemetria di stop limitata
 (`observed_*`, `*_at_stop`, `stop_time_ms`) senza mai esporre PSK, OTP, CONFIG90,
 FDT, immagini o nonce. La chiusura pre-live canonica esegue automaticamente la
 prova host-only del prompt tracker.
+
+Il terzo tentativo live, sulla baseline
+`87c1bf89d0ba28497313f4bb75a8de4bbdb37b75`, ha ricevuto come primo frame un
+A0/A2 typed-shaped con body di tre byte prima di qualunque ACK ed è terminato
+fail-closed. L'hash del body non è stato registrato: il match con il pin A2 è
+quindi `UNKNOWN`. È una forte ipotesi, non una prova, che il frame fosse il
+typed A2 lasciato non letto dal tentativo #2, nel quale l'ACK era arrivato ma
+non era stato sottomesso il secondo IN. Il router preserva l'ordine dei byte e
+può estrarre più frame da una completion, quindi non emerge riordinamento
+software.
+
+Il **correttivo #4** separa esito STOP e terminale e rende esatto il formato
+dei banner. Il **correttivo #5**, esclusivamente host-only, consente nella sola
+`REENTRY_RECOVERY_A2` di scartare al massimo un typed A2 pre-ACK solo se body
+length `3` e SHA-256 uguale al pin corrente. Lo scarto non vale come risposta
+del comando: typed count e fase non avanzano, non viene inviato un secondo A2,
+e restano obbligatori ACK strict e un successivo typed A2 pinned prima di A8.
+Wrong pin/length, secondo scarto e qualunque uso fuori fase restano terminali.
+La regressione integrata chiama direttamente il completion backend e preserva
+un solo IN fisico outstanding.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -150,8 +170,8 @@ LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
 SECOND_USE_OF_AUTHORIZATION_REJECTED=true
-D278_14_TOTAL_LIVE_ATTEMPTS=2
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=2
+D278_14_TOTAL_LIVE_ATTEMPTS=3
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=3
 D278_14_HISTORY_CORRECTED=true
 D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
 D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
@@ -193,6 +213,40 @@ D278_14_ATTEMPT_2_DEVICE_RESET_COUNT=0
 D278_14_ATTEMPT_2_CLEAR_HALT_COUNT=0
 D278_14_ATTEMPT_2_PERSISTENT_DEVICE_WRITE_COUNT=0
 D278_14_ATTEMPT_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+D278_14_ATTEMPT_3_BASELINE=87c1bf89d0ba28497313f4bb75a8de4bbdb37b75
+D278_14_ATTEMPT_3_BINARY_SHA256=346aadf64c49b6757c236a097264465ef4de130798aa82109056604930162d90
+D278_14_ATTEMPT_3_OUTCOME=FAIL_PRE_ACK_TYPED_A2
+D278_14_ATTEMPT_3_FAILURE_CLASS=INTEGRATED_PATH_TERMINAL
+D278_14_ATTEMPT_3_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
+D278_14_ATTEMPT_3_SECURE_COMMAND_COUNT=1
+D278_14_ATTEMPT_3_ACK_COUNT=0
+D278_14_ATTEMPT_3_TYPED_COUNT=0
+D278_14_ATTEMPT_3_PHYSICAL_IN_SUBMIT_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_OUT_SUBMIT_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_IN_COMPLETION_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_OUT_COMPLETION_COUNT=1
+D278_14_ATTEMPT_3_PROTOCOL_FAILURE_KIND=TYPED_SHAPE_MISMATCH
+D278_14_ATTEMPT_3_OBSERVED_OUTER_TYPE=0xA0
+D278_14_ATTEMPT_3_OBSERVED_A0_CONTROL=0xA2
+D278_14_ATTEMPT_3_OBSERVED_BODY_LENGTH=3
+D278_14_ATTEMPT_3_OBSERVED_ACK_ECHO=UNAVAILABLE
+D278_14_ATTEMPT_3_OBSERVED_ACK_STATUS=UNAVAILABLE
+D278_14_ATTEMPT_3_A8_REACHED=false
+D278_14_ATTEMPT_3_TLS_REACHED=false
+D278_14_ATTEMPT_3_POST_TLS_REACHED=false
+D278_14_ATTEMPT_3_STOP_TIME_MS=145
+D278_14_ATTEMPT_3_BACKEND_DRAINED=true
+D278_14_ATTEMPT_3_CLEANUP_COMPLETE=true
+D278_14_ATTEMPT_3_PROJECT_SECRET_ZEROIZED=true
+D278_14_ATTEMPT_3_RETRY_COUNT=0
+D278_14_ATTEMPT_3_REOPEN_COUNT=0
+D278_14_ATTEMPT_3_DEVICE_RESET_COUNT=0
+D278_14_ATTEMPT_3_CLEAR_HALT_COUNT=0
+D278_14_ATTEMPT_3_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_14_ATTEMPT_3_CORE_DUMP_LIMIT=0
+PRE_ACK_TYPED_A2_OBSERVED=true
+PRE_ACK_TYPED_A2_PIN_MATCH=UNKNOWN
+STALE_TYPED_FROM_ATTEMPT_2=STRONG_HYPOTHESIS_NOT_PROVEN
 D278_14_CORRECTIVE_1=FPDEVICE_USB_BINDING_CONSTRUCTION
 D278_14_CORRECTIVE_1_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
 D278_14_CORRECTIVE_1_OUTCOME=PASS_HOST_ONLY
@@ -202,6 +256,12 @@ D278_14_CORRECTIVE_2_OUTCOME=PASS_HOST_ONLY
 D278_14_CORRECTIVE_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
 D278_14_CORRECTIVE_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
 CORE_IN_REARM_CORRECTIVE_RETAINED=true
+REENTRY_PRE_ACK_PINNED_TYPED_BOUNDED_DISCARD_IMPLEMENTED=true
+PRE_ACK_PINNED_TYPED_THEN_ACK_THEN_TYPED_TO_A8_HOST_ONLY_PROVEN=true
+SECOND_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+WRONG_PIN_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+WRONG_LENGTH_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+PRE_ACK_TYPED_OUTSIDE_REENTRY_FAIL_CLOSED_HOST_ONLY_PROVEN=true
 SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
 BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
 BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
@@ -2296,9 +2356,9 @@ HISTORICAL_D278_13_EXECUTABLE_CLOSURE=INVALIDATED_BY_D278_14_NON_NULL_BINDING_GA
 Il review set canonico è descritto in
 `analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md`.
 
-### D278/14 — due live consumate, due correttivi host-only, chiusura UX/telemetry
+### D278/14 — tre live consumate, cinque correttivi host-only
 
-D278/14 ha richiesto due live autorizzate separate, entrambe consumate. Il
+D278/14 ha richiesto tre live autorizzate separate, tutte consumate. Il
 primo tentativo, sulla baseline
 `2172e750ae7c100a3a891ba25d0797286230a4ab`, è fallito nell'assert di
 `fp_device_set_property()`: `fpi-usb-device` non nullo assegnato a una classe
@@ -2312,6 +2372,13 @@ ricezione viveva in `goodix_device_context_complete_receive()`, che il
 percorso USB reale non invoca. La run è terminata per `ONE_SHOT_DEADLINE` con
 trace `REENTRY_RECOVERY_A2>TERMINAL`. Il dito non è stato appoggiato.
 
+Il terzo tentativo, sulla baseline
+`87c1bf89d0ba28497313f4bb75a8de4bbdb37b75`, ha ricevuto prima dell'ACK un
+A0/A2 typed-shaped con body length `3` ed è terminato fail-closed in 145 ms.
+Poiché la run non ha registrato l'hash del body, il match con il pin resta
+`UNKNOWN`; l'origine come typed residuo del tentativo #2 è una forte ipotesi,
+non una prova.
+
 Il **correttivo #1** ha reso `GoodixFpImageDevice` base derivabile, mantenuto
 la shell `VIRTUAL` e aggiunto un sottoclasse `USB` senza logica propria per il
 solo costruttore fisico. Il **correttivo #2** ha registrato il callback
@@ -2319,16 +2386,21 @@ solo costruttore fisico. Il **correttivo #2** ha registrato il callback
 sintetico e USB reale. La **micro-correttiva #3** ha corretto il resoconto
 storico, reso i messaggi operatore in italiano con banner delimitati, reso i
 prompt guidati dalla fase post-TLS reale e aggiunto i campi di stop telemetry.
+Il **correttivo #4** ha reso esatti i banner e mutuamente esclusivi gli esiti
+STOP/terminale. Il **correttivo #5** scarta al massimo un typed A2 pre-ACK
+pin-matched nella sola `REENTRY_RECOVERY_A2`, senza contarlo o usarlo per
+completare il comando; ACK e successivo typed strict restano obbligatori.
+Wrong hash/length, secondo frame e uso fuori fase falliscono chiuso.
 
 Le regressioni passano: FpImageDevice 18/18 normale e sanitizer,
-secure-session 18/18, post-TLS 6/6, D278/02 62/62. L'adapter, il baseline
+secure-session 20/20, post-TLS 6/6, D278/02 62/62. L'adapter, il baseline
 guard, il ticket single-shot, gli audit persistent-recovery, duplicate-stack e
 legacy fallback restano verdi; la chiusura pre-live canonica esegue la prova
 host-only del prompt tracker.
 
 ```text
-D278_14_TOTAL_LIVE_ATTEMPTS=2
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=2
+D278_14_TOTAL_LIVE_ATTEMPTS=3
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=3
 D278_14_HISTORY_CORRECTED=true
 D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
 D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
@@ -2369,6 +2441,40 @@ D278_14_ATTEMPT_2_DEVICE_RESET_COUNT=0
 D278_14_ATTEMPT_2_CLEAR_HALT_COUNT=0
 D278_14_ATTEMPT_2_PERSISTENT_DEVICE_WRITE_COUNT=0
 D278_14_ATTEMPT_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+D278_14_ATTEMPT_3_BASELINE=87c1bf89d0ba28497313f4bb75a8de4bbdb37b75
+D278_14_ATTEMPT_3_BINARY_SHA256=346aadf64c49b6757c236a097264465ef4de130798aa82109056604930162d90
+D278_14_ATTEMPT_3_OUTCOME=FAIL_PRE_ACK_TYPED_A2
+D278_14_ATTEMPT_3_FAILURE_CLASS=INTEGRATED_PATH_TERMINAL
+D278_14_ATTEMPT_3_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
+D278_14_ATTEMPT_3_SECURE_COMMAND_COUNT=1
+D278_14_ATTEMPT_3_ACK_COUNT=0
+D278_14_ATTEMPT_3_TYPED_COUNT=0
+D278_14_ATTEMPT_3_PHYSICAL_IN_SUBMIT_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_OUT_SUBMIT_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_IN_COMPLETION_COUNT=1
+D278_14_ATTEMPT_3_PHYSICAL_OUT_COMPLETION_COUNT=1
+D278_14_ATTEMPT_3_PROTOCOL_FAILURE_KIND=TYPED_SHAPE_MISMATCH
+D278_14_ATTEMPT_3_OBSERVED_OUTER_TYPE=0xA0
+D278_14_ATTEMPT_3_OBSERVED_A0_CONTROL=0xA2
+D278_14_ATTEMPT_3_OBSERVED_BODY_LENGTH=3
+D278_14_ATTEMPT_3_OBSERVED_ACK_ECHO=UNAVAILABLE
+D278_14_ATTEMPT_3_OBSERVED_ACK_STATUS=UNAVAILABLE
+D278_14_ATTEMPT_3_A8_REACHED=false
+D278_14_ATTEMPT_3_TLS_REACHED=false
+D278_14_ATTEMPT_3_POST_TLS_REACHED=false
+D278_14_ATTEMPT_3_STOP_TIME_MS=145
+D278_14_ATTEMPT_3_BACKEND_DRAINED=true
+D278_14_ATTEMPT_3_CLEANUP_COMPLETE=true
+D278_14_ATTEMPT_3_PROJECT_SECRET_ZEROIZED=true
+D278_14_ATTEMPT_3_RETRY_COUNT=0
+D278_14_ATTEMPT_3_REOPEN_COUNT=0
+D278_14_ATTEMPT_3_DEVICE_RESET_COUNT=0
+D278_14_ATTEMPT_3_CLEAR_HALT_COUNT=0
+D278_14_ATTEMPT_3_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_14_ATTEMPT_3_CORE_DUMP_LIMIT=0
+PRE_ACK_TYPED_A2_OBSERVED=true
+PRE_ACK_TYPED_A2_PIN_MATCH=UNKNOWN
+STALE_TYPED_FROM_ATTEMPT_2=STRONG_HYPOTHESIS_NOT_PROVEN
 D278_14_CORRECTIVE_1=FPDEVICE_USB_BINDING_CONSTRUCTION
 D278_14_CORRECTIVE_1_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
 D278_14_CORRECTIVE_1_OUTCOME=PASS_HOST_ONLY
@@ -2378,6 +2484,12 @@ D278_14_CORRECTIVE_2_OUTCOME=PASS_HOST_ONLY
 D278_14_CORRECTIVE_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
 D278_14_CORRECTIVE_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
 CORE_IN_REARM_CORRECTIVE_RETAINED=true
+REENTRY_PRE_ACK_PINNED_TYPED_BOUNDED_DISCARD_IMPLEMENTED=true
+PRE_ACK_PINNED_TYPED_THEN_ACK_THEN_TYPED_TO_A8_HOST_ONLY_PROVEN=true
+SECOND_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+WRONG_PIN_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+WRONG_LENGTH_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+PRE_ACK_TYPED_OUTSIDE_REENTRY_FAIL_CLOSED_HOST_ONLY_PROVEN=true
 SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
 BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
 BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
