@@ -314,6 +314,46 @@ parse_message (GoodixPostTlsLifecycle *lifecycle,
   return TRUE;
 }
 
+/* Target-observed 0x50 NAV responses use the OEM 0x88 no-check marker
+ * instead of the ordinary additive A0 checksum.  Accept this shape only
+ * in the two lifecycle slots that explicitly expect the NAV response. */
+static gboolean
+parse_nav_no_check (GBytes          *frame,
+                    GoodixA0Message *message)
+{
+  const guint8 *data;
+  gsize length;
+  guint16 outer_length;
+  guint16 inner_length;
+
+  if (frame == NULL || message == NULL)
+    return FALSE;
+
+  message->control = 0;
+  message->body = NULL;
+  data = g_bytes_get_data (frame, &length);
+
+  if (length != 2417u || data[0] != 0xa0)
+    return FALSE;
+
+  outer_length = (guint16) data[1] | ((guint16) data[2] << 8);
+  if (outer_length != 2413u ||
+      data[3] != (guint8) (data[0] + data[1] + data[2]) ||
+      data[4] != 0x50)
+    return FALSE;
+
+  inner_length = (guint16) data[5] | ((guint16) data[6] << 8);
+  if (inner_length != 2410u ||
+      data[length - 1u] != 0x88 ||
+      data[7] != 0x50 ||
+      data[8] != 0x01)
+    return FALSE;
+
+  message->control = 0x50;
+  message->body = g_bytes_new (data + 7, 2409u);
+  return TRUE;
+}
+
 static gboolean
 accept_ack (GoodixPostTlsLifecycle *lifecycle,
             const GoodixA0Message  *message)
@@ -497,8 +537,20 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
       lifecycle->phase == GOODIX_POST_TLS_PHASE_TERMINAL ||
       lifecycle->phase == GOODIX_POST_TLS_PHASE_STOP)
     return;
-  if (!parse_message (lifecycle, frame, &message))
+  if ((lifecycle->phase == GOODIX_POST_TLS_PHASE_FDT_NAV_1 &&
+       lifecycle->ack_seen) ||
+      lifecycle->phase == GOODIX_POST_TLS_PHASE_RELEASE_NAV)
+    {
+      if (!parse_nav_no_check (frame, &message))
+        {
+          lifecycle_fail_literal (lifecycle, GOODIX_POST_TLS_ERROR_PROTOCOL,
+                                  "OEM NAV no-check response mismatch");
+          return;
+        }
+    }
+  else if (!parse_message (lifecycle, frame, &message))
     return;
+
   body = g_bytes_get_data (message.body, &length);
 
   switch (lifecycle->phase)

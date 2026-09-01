@@ -291,6 +291,7 @@ run_approved_live () {
   echo "======================"
   echo "AVVIO DEL TENTATIVO LIVE APPROVATO. NON RIPETERE IL COMANDO."
   echo "======================"
+  cd "$root" || guard_refusal RUNTIME_CANONICAL_CWD_FAILED
   set +e
   D278_13_APPROVED_LIVE_BASELINE_SHA="$baseline" \
     D278_13_OPERATOR_AUTHORIZATION=D278_13_ONE_INTEGRATED_TWO_ACQUISITION_RUN_NO_RETRY \

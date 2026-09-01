@@ -217,6 +217,34 @@ build_response (guint8        control,
 }
 
 static GBytes *
+build_nav_no_check (const guint8 *body,
+                    gsize         body_length)
+{
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GBytes) additive = NULL;
+  const guint8 *data;
+  guint8 *copy;
+  gsize length;
+
+  g_assert_cmpuint (body_length, ==, 2409u);
+  g_assert_cmphex (body[0], ==, 0x50);
+  g_assert_cmphex (body[1], ==, 0x01);
+
+  additive = goodix_a0_build_frame (0x50, 0x50, body, body_length, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (additive);
+
+  data = g_bytes_get_data (additive, &length);
+  g_assert_cmpuint (length, ==, 2417u);
+
+  copy = g_malloc (length);
+  memcpy (copy, data, length);
+  copy[length - 1u] = 0x88;
+
+  return g_bytes_new_take (copy, length);
+}
+
+static GBytes *
 build_ack (guint8 control)
 {
   const guint8 body[2] = { control, 0x01 };
@@ -416,6 +444,9 @@ run_full_trace (Fixture *fixture,
   g_autoptr(GBytes) auxiliary = g_bytes_new_static ("aux", 3u);
   g_autoptr(GError) error = NULL;
 
+  nav[0] = 0x50;
+  nav[1] = 0x01;
+
   g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, &error));
   g_assert_no_error (error);
   complete_command (fixture, 0xd4, d4, sizeof d4);
@@ -447,7 +478,7 @@ run_full_trace (Fixture *fixture,
           g_clear_pointer (&ack, g_bytes_unref);
           ack = build_ack (0x50);
           g_clear_pointer (&typed, g_bytes_unref);
-          typed = build_response (0x50, nav, sizeof nav);
+          typed = build_nav_no_check (nav, sizeof nav);
           feed_pair (fixture, ack, typed, fragmentation);
         }
       else if (fdt_index == 1)
@@ -501,7 +532,7 @@ run_full_trace (Fixture *fixture,
   ack = build_ack (0x50);
   feed_frame (fixture, ack, fragmentation);
   g_clear_pointer (&typed, g_bytes_unref);
-  typed = build_response (0x50, nav, sizeof nav);
+  typed = build_nav_no_check (nav, sizeof nav);
   feed_frame (fixture, typed, fragmentation);
 
   g_assert_true (g_queue_is_empty (fixture->out));
