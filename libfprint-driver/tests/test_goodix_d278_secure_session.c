@@ -1042,7 +1042,7 @@ drive_post_tls_two_acquisitions (Fixture   *fixture,
   guint8 af[16] = { 0 };
   guint8 nav[2409] = { 0 };
   static const guint8 typed82[2] = { 0, 0x20 };
-  static const guint8 auxiliary[] = "post-up-or-bootstrap";
+  guint8 auxiliary[GOODIX_IMAGE_PLAINTEXT_LENGTH] = { 0 };
   g_autoptr(GBytes) image = post_zero_image ();
   gsize image_length;
   const guint8 *image_data = g_bytes_get_data (image, &image_length);

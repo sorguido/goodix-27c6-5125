@@ -470,7 +470,7 @@ run_full_trace (Fixture *fixture,
       feed_frame (fixture, ack, fragmentation);
       g_clear_pointer (&event, g_bytes_unref);
       event = build_event (0x36, 0x0100, 0x0000,
-                           (guint16) (0x0100u + fdt_index * 0x20u));
+                           (guint16) (0x0300u + fdt_index * 0x20u));
       feed_frame (fixture, event, fragmentation);
       if (fdt_index == 0)
         {
@@ -729,6 +729,76 @@ test_image_decoder_crc_terminal (void)
   fixture_free (fixture);
 }
 
+static void
+test_fdt_delta_outside_threshold_terminal (void)
+{
+  Fixture *fixture = fixture_new ();
+  static const guint8 cmd01[] = { 0x01, 0x00 };
+  guint8 af[16] = { 0 };
+  guint8 nav[2409] = { 0 };
+  guint8 typed82[2] = { 0x00, 0x20 };
+  g_autoptr(GBytes) ack = NULL;
+  g_autoptr(GBytes) typed = NULL;
+  g_autoptr(GBytes) event = NULL;
+  g_autoptr(GError) error = NULL;
+
+  nav[0] = 0x50;
+  nav[1] = 0x01;
+
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, &error));
+  g_assert_no_error (error);
+
+  complete_command (fixture, 0xd4, NULL, 0);
+  ack = build_ack (0xd4);
+  feed_frame (fixture, ack, 0);
+
+  complete_command (fixture, 0xaf, NULL, 0);
+  af[1] = 0x02;
+  typed = build_response (0xae, af, sizeof af);
+  feed_frame (fixture, typed, 0);
+
+  complete_command (fixture, 0x36, NULL, 0);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x36);
+  feed_frame (fixture, ack, 0);
+  event = build_event (0x36, 0x0100, 0x0000, 0x0300);
+  feed_frame (fixture, event, 0);
+
+  complete_command (fixture, 0x50, cmd01, sizeof cmd01);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x50);
+  feed_frame (fixture, ack, 0);
+  g_clear_pointer (&typed, g_bytes_unref);
+  typed = build_nav_no_check (nav, sizeof nav);
+  feed_frame (fixture, typed, 0);
+
+  complete_command (fixture, 0x36, NULL, 0);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x36);
+  feed_frame (fixture, ack, 0);
+  g_clear_pointer (&event, g_bytes_unref);
+  event = build_event (0x36, 0x0100, 0x0000, 0x0342);
+  feed_frame (fixture, event, 0);
+
+  complete_command (fixture, 0x82, NULL, 0);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x82);
+  feed_frame (fixture, ack, 0);
+  g_clear_pointer (&typed, g_bytes_unref);
+  typed = build_response (0x82, typed82, sizeof typed82);
+  feed_frame (fixture, typed, 0);
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_TERMINAL);
+  g_assert_cmpuint (fixture->audit.fdt_delta_classification_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.fdt_delta_within_threshold_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.fdt_delta_outside_threshold_count, ==, 1u);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+
+  fixture_free (fixture);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -745,5 +815,7 @@ main (int argc, char **argv)
                    test_cancel_invalidates_generation);
   g_test_add_func ("/d278-12/image-crc-terminal",
                    test_image_decoder_crc_terminal);
+  g_test_add_func ("/d278-12/fdt-delta-outside-threshold-terminal",
+                   test_fdt_delta_outside_threshold_terminal);
   return g_test_run ();
 }

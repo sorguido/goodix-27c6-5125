@@ -10,7 +10,58 @@ static void terminal(GoodixTlsServer*s,GError**e,const char*m){if(s->state!=GOOD
 static void cleanse_project_secret(GoodixTlsServer*s){if(s->psk){OPENSSL_cleanse(s->psk,s->psk_length);g_free(s->psk);s->psk=NULL;s->psk_length=0;if(s->audit)s->audit->project_secret_zeroized=TRUE;}}
 static unsigned int psk_cb(SSL*ssl,const char*identity,unsigned char*out,unsigned int max){GoodixTlsServer*s=SSL_get_app_data(ssl);gsize n;if(!s||s->handed_off||!s->psk||!identity||strcmp(identity,GOODIX_TLS_IDENTITY)!=0||s->psk_length>max){if(s&&s->handed_off&&s->audit)s->audit->second_handoff_rejected=TRUE;return 0;}n=s->psk_length;memcpy(out,s->psk,n);s->handed_off=TRUE;if(s->audit)s->audit->secret_handoff_count++;cleanse_project_secret(s);return(unsigned int)n;}
 static gboolean drain_output(GoodixTlsServer*s,GError**e){BIO*b=SSL_get_wbio(s->ssl);guint8 buf[4096];while(BIO_ctrl_pending(b)){int n=BIO_read(b,buf,sizeof buf);if(n<=0){terminal(s,e,"TLS output BIO failure");return FALSE;}g_byte_array_append(s->output_pending,buf,(guint)n);}while(s->output_pending->len>=5){gsize record_length=5+((gsize)s->output_pending->data[3]<<8)+s->output_pending->data[4];if(record_length>G_MAXUINT16+5){terminal(s,e,"TLS output record oversized");return FALSE;}if(s->output_pending->len<record_length)break;if(s->output){g_autoptr(GBytes)x=g_bytes_new(s->output_pending->data,record_length);s->output(x,s->user_data);}g_byte_array_remove_range(s->output_pending,0,(guint)record_length);}return TRUE;}
-static gboolean read_plaintext(GoodixTlsServer*s,GError**e){guint8 buf[4096];for(;;){size_t n=0;int r=SSL_read_ex(s->ssl,buf,sizeof buf,&n);if(r==1){if(n&&s->plaintext){g_autoptr(GBytes)x=g_bytes_new(buf,n);s->plaintext(x,s->user_data);if(s->audit)s->audit->plaintext_delivery_count++;}continue;}int x=SSL_get_error(s->ssl,r);if(x==SSL_ERROR_WANT_READ||x==SSL_ERROR_WANT_WRITE)break;if(x==SSL_ERROR_ZERO_RETURN){terminal(s,e,"TLS peer closed");return FALSE;}terminal(s,e,"TLS application record failed closed");return FALSE;}return drain_output(s,e);}
+static gboolean
+read_plaintext (GoodixTlsServer *s,
+                GError         **e)
+{
+  g_autoptr(GByteArray) plaintext = g_byte_array_new ();
+  guint8 buf[4096];
+  gboolean ok = FALSE;
+
+  for (;;)
+    {
+      size_t n = 0;
+      int r = SSL_read_ex (s->ssl, buf, sizeof buf, &n);
+
+      if (r == 1)
+        {
+          if (n != 0)
+            g_byte_array_append (plaintext, buf, (guint) n);
+          continue;
+        }
+
+      int ssl_error = SSL_get_error (s->ssl, r);
+
+      if (ssl_error == SSL_ERROR_WANT_READ ||
+          ssl_error == SSL_ERROR_WANT_WRITE)
+        break;
+
+      if (ssl_error == SSL_ERROR_ZERO_RETURN)
+        terminal (s, e, "TLS peer closed");
+      else
+        terminal (s, e, "TLS application record failed closed");
+      goto out;
+    }
+
+  if (plaintext->len != 0 && s->plaintext != NULL)
+    {
+      g_autoptr(GBytes) bytes =
+        g_bytes_new (plaintext->data, plaintext->len);
+
+      s->plaintext (bytes, s->user_data);
+      if (s->audit != NULL)
+        s->audit->plaintext_delivery_count++;
+    }
+
+  ok = drain_output (s, e);
+
+out:
+  if (plaintext->len != 0)
+    OPENSSL_cleanse (plaintext->data, plaintext->len);
+  OPENSSL_cleanse (buf, sizeof buf);
+  return ok;
+}
+
 GoodixTlsServer*goodix_tls_server_new(const guint8*psk,gsize length,GoodixTlsOutputFunc output,GoodixTlsPlaintextFunc plaintext,gpointer data,GoodixTlsAudit*audit,GError**error){GoodixTlsServer*s;BIO*in=NULL,*out=NULL;if(!psk||!length||length>G_MAXUINT){g_set_error_literal(error,tls_quark(),2,"invalid secret");return NULL;}s=g_new0(GoodixTlsServer,1);s->psk=g_memdup2(psk,length);s->psk_length=length;s->output=output;s->plaintext=plaintext;s->user_data=data;s->audit=audit;s->state=GOODIX_TLS_STATE_HANDSHAKE;s->output_pending=g_byte_array_new();s->context=SSL_CTX_new(TLS_server_method());if(!s->context||SSL_CTX_set_min_proto_version(s->context,TLS1_2_VERSION)!=1||SSL_CTX_set_max_proto_version(s->context,TLS1_2_VERSION)!=1||SSL_CTX_set_cipher_list(s->context,"PSK-AES128-GCM-SHA256")!=1)goto fail;SSL_CTX_set_options(s->context,SSL_OP_NO_TICKET);SSL_CTX_set_psk_server_callback(s->context,psk_cb);s->ssl=SSL_new(s->context);in=BIO_new(BIO_s_mem());out=BIO_new(BIO_s_mem());if(!s->ssl||!in||!out)goto fail;BIO_set_mem_eof_return(in,-1);SSL_set_bio(s->ssl,in,out);in=out=NULL;SSL_set_app_data(s->ssl,s);SSL_set_accept_state(s->ssl);return s;fail:BIO_free(in);BIO_free(out);g_set_error_literal(error,tls_quark(),3,"TLS setup failed");goodix_tls_server_free(s);return NULL;}
 gboolean goodix_tls_server_push(GoodixTlsServer*s,const guint8*data,gsize length,GError**error){if(!s||s->state==GOODIX_TLS_STATE_TERMINAL||!data||!length||length>G_MAXINT||BIO_write(SSL_get_rbio(s->ssl),data,(int)length)!=(int)length){if(s)terminal(s,error,"TLS input rejected by fence");return FALSE;}if(s->state==GOODIX_TLS_STATE_ESTABLISHED)return read_plaintext(s,error);int r=SSL_do_handshake(s->ssl);if(!drain_output(s,error))return FALSE;if(r==1){s->state=GOODIX_TLS_STATE_ESTABLISHED;if(s->audit)s->audit->handshake_count++;return read_plaintext(s,error);}int x=SSL_get_error(s->ssl,r);if(x==SSL_ERROR_WANT_READ||x==SSL_ERROR_WANT_WRITE)return TRUE;terminal(s,error,"TLS handshake failed closed");return FALSE;}
 gboolean goodix_tls_server_eof(GoodixTlsServer*s,GError**e){if(!s)return FALSE;terminal(s,e,"truncated TLS stream");return FALSE;}

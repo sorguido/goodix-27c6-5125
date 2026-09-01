@@ -202,6 +202,25 @@ derive_fdt (const guint8 raw[12],
 }
 
 static gboolean
+derive_fdt_baseline (const guint8 raw[12],
+                     guint8       table[12])
+{
+  for (guint i = 0; i < 6u; i++)
+    {
+      guint16 word = (guint16) raw[i * 2u] |
+                     ((guint16) raw[i * 2u + 1u] << 8);
+      guint8 component = (guint8) ((word >> 1) & 0xffu);
+
+      if (component == 0x00 || component == 0xff)
+        return FALSE;
+
+      table[i * 2u] = 0x80;
+      table[i * 2u + 1u] = component;
+    }
+  return TRUE;
+}
+
+static gboolean
 record_fdt_raw (GoodixPostTlsLifecycle *lifecycle,
                 const guint8            raw[12])
 {
@@ -242,7 +261,7 @@ classify_fdt_delta (GoodixPostTlsLifecycle *lifecycle,
       else
         lifecycle->audit->fdt_delta_outside_threshold_count++;
     }
-  return TRUE;
+  return within;
 }
 
 static gboolean
@@ -602,7 +621,7 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
           !event_fields (&message, &irq, &flags, &raw) ||
           irq != 0x0100 || flags != 0 ||
           !record_fdt_raw (lifecycle, raw) ||
-          !derive_fdt (raw, FALSE, lifecycle->current_fdt_table))
+          !derive_fdt_baseline (raw, lifecycle->current_fdt_table))
         goto unexpected;
       if (lifecycle->audit != NULL)
         lifecycle->audit->fdt_irq100_count++;
