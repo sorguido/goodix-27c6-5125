@@ -133,6 +133,39 @@ context_usb_drained (GoodixFpiUsbBackend *backend,
     goodix_device_context_complete_deactivation (ctx);
 }
 
+/* Production real-USB IN completions call goodix_fpi_usb_backend_complete_receive()
+ * only; this callback ensures the same receive re-arm logic that the synthetic
+ * test seam used is also reached on the real backend path. */
+static void
+context_usb_in_completed (GoodixFpiUsbBackend *backend,
+                          guint64              submit_generation,
+                          const GError        *error,
+                          gpointer             user_data)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  (void) backend;
+  (void) submit_generation;
+  (void) error;
+
+  if (ctx->terminal_fence)
+    return;
+
+  if (((ctx->post_tls_lifecycle != NULL &&
+        goodix_post_tls_lifecycle_needs_receive (ctx->post_tls_lifecycle)) ||
+       (ctx->secure_session != NULL &&
+        goodix_secure_session_needs_receive (ctx->secure_session))) &&
+      goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend) == 0)
+    {
+      g_autoptr(GError) arm_error = NULL;
+      if (!goodix_device_context_arm_receive (ctx, &arm_error))
+        {
+          goodix_device_context_set_terminal_fence (ctx);
+          goodix_device_context_set_poisoned (ctx, arm_error);
+        }
+    }
+}
+
 GoodixUsbRouter *
 goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
 {
@@ -241,6 +274,9 @@ goodix_device_context_new (GoodixFpImageDevice *device)
   ctx->fpi_usb_backend = goodix_fpi_usb_backend_new (FP_DEVICE (device), ctx->usb_router, 0x81, 0x01, 32768);
   goodix_fpi_usb_backend_set_drained_callback (ctx->fpi_usb_backend,
                                                context_usb_drained, ctx);
+  goodix_fpi_usb_backend_set_in_completed_callback (ctx->fpi_usb_backend,
+                                                    context_usb_in_completed,
+                                                    ctx);
 
   return ctx;
 }
@@ -919,22 +955,12 @@ goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                          const GError *error)
 {
   g_return_if_fail (ctx != NULL);
+  /* Host/test injection seam.  The real backend completion path invokes the
+   * registered in-completed callback, which performs receive re-arming so that
+   * both synthetic and production IN completions share one follow-up policy. */
   goodix_fpi_usb_backend_complete_receive (ctx->fpi_usb_backend,
                                            submit_generation, data, length,
                                            error);
-  if (((ctx->post_tls_lifecycle != NULL &&
-        goodix_post_tls_lifecycle_needs_receive (ctx->post_tls_lifecycle)) ||
-       (ctx->secure_session != NULL &&
-        goodix_secure_session_needs_receive (ctx->secure_session))) &&
-      goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend) == 0)
-    {
-      g_autoptr(GError) arm_error = NULL;
-      if (!goodix_device_context_arm_receive (ctx, &arm_error))
-        {
-          goodix_device_context_set_terminal_fence (ctx);
-          goodix_device_context_set_poisoned (ctx, arm_error);
-        }
-    }
 }
 
 void

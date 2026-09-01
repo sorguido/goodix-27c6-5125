@@ -4,6 +4,7 @@
  * in the single GoodixDeviceContext-owned LGPL graph.  The ordinary build is
  * deliberately unapproved and exits before material or USB access.
  */
+#include "goodix_a0_protocol.h"
 #include "goodix_d190_pe.h"
 #include "goodix_fpimage_device.h"
 #include "goodix_target_material.h"
@@ -19,6 +20,31 @@
 #ifdef D278_13_LIVE_BINDING
 #include <gusb.h>
 #endif
+
+/* Operator-facing banners in Italian.  These are human-readable complements to
+ * the machine telemetry; they never carry secrets. */
+#define OP_MSG_AUTHORIZATION_OK \
+  "Autorizzazione live concessa; inizio run singolo."
+#define OP_MSG_DEVICE_DETECTED \
+  "Dispositivo Goodix 27c6:5125 rilevato; apertura USB in corso."
+#define OP_MSG_SECURE_SESSION_STARTED \
+  "Sessione sicura avviata; appoggiare il dito sul sensore quando richiesto."
+#define OP_MSG_SCAN_COMPLETE \
+  "Scansione completata; arresto run e rilascio interfaccia."
+#define OP_MSG_HOST_ONLY_A2_ARMED \
+  "Host-only: IN armato per A2; in attesa dell'ACK dal sensore."
+#define OP_MSG_HOST_ONLY_A2_ACK_RECEIVED \
+  "Host-only: ACK A2 ricevuto; secondo IN ri-armato per la risposta tipata."
+#define OP_MSG_HOST_ONLY_A2_TYPED_RECEIVED \
+  "Host-only: risposta tipata A2 ricevuta; transizione verso A8."
+#define OP_MSG_HOST_ONLY_SUCCESS \
+  "Host-only: catena A2 ACK+risposta tipata completata con successo."
+
+static void
+operator_message (const gchar *message)
+{
+  g_print ("OPERATOR_MESSAGE_IT=%s\n", message);
+}
 
 #define D278_VID 0x27c6u
 #define D278_PID 0x5125u
@@ -388,6 +414,95 @@ prepare_target_material (GoodixTargetMaterialAudit  *audit,
   return owner;
 }
 
+/* --- Host-only synthetic material for prompt-state-machine proof --- */
+
+static void
+set_config_finalizer (guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH])
+{
+  guint32 sum = 0;
+  guint16 finalizer;
+
+  for (guint i = 0; i < 111; i++)
+    {
+      guint16 word = (guint16) ((guint16) config[i * 2u] |
+                                (guint16) ((guint16) config[i * 2u + 1u] << 8));
+      sum += (guint32) word;
+    }
+  finalizer = (guint16) (0u - 0xa5a5u - sum);
+  config[222] = (guint8) finalizer;
+  config[223] = (guint8) (finalizer >> 8);
+}
+
+static void
+build_synthetic_secure_material (GoodixSecureSessionMaterial *material,
+                                 guint8                      *config,
+                                 gsize                        config_length,
+                                 guint8                      *validator,
+                                 guint8                      *a2,
+                                 guint8                      *chip,
+                                 guint8                      *otp,
+                                 guint8                      *psk)
+{
+  static const guint8 identity[] = "GF_ST411SEC_APP_12509";
+  static const guint8 registers[4][2] = {
+    { 0x20, 0x02 }, { 0x36, 0x02 }, { 0x38, 0x02 }, { 0x3a, 0x02 }
+  };
+  static const guint8 values[4][2] = {
+    { 0xd8, 0x0b }, { 0xbe, 0x00 }, { 0xbd, 0x00 }, { 0xbc, 0x00 }
+  };
+  static const guint offsets[] = { 117, 121, 125, 129 };
+
+  memset (config, 0, config_length);
+  for (guint i = 0; i < 32; i++)
+    {
+      validator[i] = (guint8) (0x20u + i);
+      psk[i] = (guint8) (0x80u + i);
+    }
+  a2[0] = 0x11;
+  a2[1] = 0x22;
+  a2[2] = 0x33;
+  chip[0] = 0x25;
+  chip[1] = 0x04;
+  chip[2] = 0x12;
+  chip[3] = 0x50;
+  for (guint i = 0; i < 64; i++)
+    otp[i] = (guint8) (i * 3u + 1u);
+  for (guint i = 0; i < 4; i++)
+    {
+      memcpy (material->dac_values[i], values[i], 2);
+      memcpy (config + offsets[i], registers[i], 2);
+      memcpy (config + offsets[i] + 2u, values[i], 2);
+    }
+  set_config_finalizer (config);
+
+  material->expected_identity = identity;
+  material->expected_identity_length = sizeof identity;
+  material->e4_validator = validator;
+  material->e4_validator_length = 32;
+  material->config90 = config;
+  material->config90_length = config_length;
+  material->psk = psk;
+  material->psk_length = 32;
+  digest (validator, 32, material->e4_validator_sha256);
+  digest (a2, 3, material->a2_response_sha256);
+  digest (chip, 4, material->chip82_response_sha256);
+  digest (otp, 64, material->otp_a6_response_sha256);
+  digest (config, config_length, material->config90_sha256);
+}
+
+static GBytes *
+build_a0_frame (guint8        control,
+                const guint8 *body,
+                gsize         body_length)
+{
+  g_autoptr(GError) error = NULL;
+  GBytes *frame = goodix_a0_build_frame (control, control, body, body_length,
+                                         &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (frame);
+  return frame;
+}
+
 static gboolean
 read_exact (gint     fd,
             guint8  *data,
@@ -489,6 +604,190 @@ run_ticket_gate_only (const gchar *ticket_path,
            accepted ? "true" : "false", reason,
            consumed ? "true" : "false");
   return accepted ? 0 : 3;
+}
+
+typedef struct
+{
+  guint64 generation;
+  GBytes *bytes;
+} HostOnlySubmission;
+
+typedef struct
+{
+  GQueue *out;
+  guint in_submit_count;
+  guint64 generation;
+} HostOnlySeam;
+
+static void
+host_only_submission_free (HostOnlySubmission *submission)
+{
+  if (submission == NULL)
+    return;
+  g_bytes_unref (submission->bytes);
+  g_free (submission);
+}
+
+static void
+host_only_submit_seam (GoodixFpiUsbBackend *backend,
+                       GoodixUsbDirection   direction,
+                       guint64              generation,
+                       GBytes              *bytes,
+                       gpointer             user_data)
+{
+  HostOnlySeam *seam = user_data;
+
+  (void) backend;
+  if (direction == GOODIX_USB_TRANSFER_IN)
+    {
+      seam->in_submit_count++;
+      return;
+    }
+  g_assert_nonnull (bytes);
+  HostOnlySubmission *submission = g_new0 (HostOnlySubmission, 1);
+  submission->generation = generation;
+  submission->bytes = g_bytes_ref (bytes);
+  g_queue_push_tail (seam->out, submission);
+}
+
+/* Host-only proof for D278/14 attempt-2: exercises the exact real-USB-shaped
+ * A2 receive chain (backend-level IN completion -> re-arm -> typed response)
+ * and prints Italian operator banners.  No USB access, no secrets. */
+static int
+run_operator_prompt_state_machine_host_only (void)
+{
+  g_autoptr(GoodixFpImageDevice) device = goodix_fpimage_device_new ();
+  GoodixDeviceContext *ctx = goodix_fpimage_device_get_context (device);
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GError) error = NULL;
+  GoodixSecureSessionMaterial secure_material = { 0 };
+  GoodixPostTlsMaterial post_material = { 0 };
+  GoodixSecureSessionAudit secure_audit = { 0 };
+  GoodixTlsAudit tls_audit = { 0 };
+  GoodixPostTlsAudit post_audit = { 0 };
+  guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH] = { 0 };
+  guint8 validator[32] = { 0 };
+  guint8 a2[3] = { 0 };
+  guint8 chip[4] = { 0 };
+  guint8 otp[64] = { 0 };
+  guint8 psk[GOODIX_SECURE_SESSION_PSK_LENGTH] = { 0 };
+  HostOnlySeam seam = { 0 };
+  GoodixFpiUsbBackend *backend;
+  guint64 generation;
+  g_autoptr(GBytes) ack = NULL;
+  g_autoptr(GBytes) typed = NULL;
+  gsize ack_length;
+  const guint8 *ack_data;
+  gsize typed_length;
+  const guint8 *typed_data;
+  const guint8 ack_body[2] = { 0xa2, 0x01 };
+
+  build_synthetic_secure_material (&secure_material, config,
+                                   sizeof config, validator, a2, chip, otp,
+                                   psk);
+  for (guint i = 0; i < 6u; i++)
+    {
+      post_material.initial_fdt_table[i * 2u] = 0x80;
+      post_material.initial_fdt_table[i * 2u + 1u] = (guint8) (0x40u + i);
+    }
+  post_material.af_timestamp = 0x1234;
+  post_material.first_arm_timestamp = 0x2345;
+  post_material.second_arm_timestamp = 0x3456;
+
+  seam.out = g_queue_new ();
+  goodix_device_context_set_async_usb_submit_seam (ctx, host_only_submit_seam,
+                                                   &seam);
+
+  if (!goodix_device_context_begin_operator_epoch (ctx, cancellable, &error))
+    {
+      g_printerr ("OPERATOR_EPOCH_BEGIN_FAILED: %s\n", error->message);
+      return 1;
+    }
+  generation = goodix_device_context_get_generation (ctx);
+  seam.generation = generation;
+  backend = goodix_device_context_get_fpi_usb_backend (ctx);
+
+  if (!goodix_device_context_configure_post_tls_lifecycle (
+        ctx, &post_material, &post_audit, &error))
+    {
+      g_printerr ("POST_TLS_CONFIGURE_FAILED: %s\n", error->message);
+      return 1;
+    }
+  if (!goodix_device_context_start_secure_session (
+        ctx, &secure_material, NULL, NULL, &secure_audit, &tls_audit, &error))
+    {
+      g_printerr ("SECURE_SESSION_START_FAILED: %s\n", error->message);
+      return 1;
+    }
+
+  g_print ("PHASE=%s\n", goodix_secure_phase_name (
+             goodix_secure_session_get_phase (
+               goodix_device_context_get_secure_session (ctx))));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 1u);
+  g_assert_cmpuint (seam.in_submit_count, ==, 1u);
+  operator_message (OP_MSG_HOST_ONLY_A2_ARMED);
+
+  /* Complete the physical A2 command OUT first; advance_phase() is gated on
+   * out_pending being clear, exactly as on real USB. */
+  {
+    HostOnlySubmission *submission = g_queue_pop_head (seam.out);
+    g_assert_nonnull (submission);
+    goodix_fpi_usb_backend_complete_out (backend, submission->generation, NULL);
+    host_only_submission_free (submission);
+  }
+
+  /* Production-shaped backend-level IN completion for the A2 ACK. */
+  ack = build_a0_frame (0xb0, ack_body, sizeof ack_body);
+  ack_data = g_bytes_get_data (ack, &ack_length);
+  goodix_fpi_usb_backend_complete_receive (backend, generation,
+                                           ack_data, ack_length, NULL);
+  g_print ("PHASE=%s\n", goodix_secure_phase_name (
+             goodix_secure_session_get_phase (
+               goodix_device_context_get_secure_session (ctx))));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 1u);
+  g_assert_cmpuint (seam.in_submit_count, ==, 2u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_in_completion_count (backend),
+                    ==, 1u);
+  operator_message (OP_MSG_HOST_ONLY_A2_ACK_RECEIVED);
+
+  /* Typed A2 response on the re-armed second IN. */
+  typed = build_a0_frame (0xa2, a2, sizeof a2);
+  typed_data = g_bytes_get_data (typed, &typed_length);
+  goodix_fpi_usb_backend_complete_receive (backend, generation,
+                                           typed_data, typed_length, NULL);
+  g_print ("PHASE=%s\n", goodix_secure_phase_name (
+             goodix_secure_session_get_phase (
+               goodix_device_context_get_secure_session (ctx))));
+  g_assert_cmpint (goodix_secure_session_get_phase (
+                     goodix_device_context_get_secure_session (ctx)), ==,
+                   GOODIX_SECURE_PHASE_A8);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_in_completion_count (backend),
+                    ==, 2u);
+  operator_message (OP_MSG_HOST_ONLY_A2_TYPED_RECEIVED);
+
+  /* Cancel the session and drain outstanding transfers for clean teardown. */
+  goodix_secure_session_cancel (
+    goodix_device_context_get_secure_session (ctx), "host-only closure");
+  while (!g_queue_is_empty (seam.out))
+    {
+      HostOnlySubmission *submission = g_queue_pop_head (seam.out);
+      goodix_fpi_usb_backend_complete_out (backend, submission->generation,
+                                           NULL);
+      host_only_submission_free (submission);
+    }
+  if (goodix_fpi_usb_backend_get_outstanding (backend) != 0u)
+    goodix_device_context_complete_receive (
+      ctx, generation, NULL, 0, NULL);
+
+  goodix_device_context_stop_operator_epoch (ctx);
+  g_assert_true (goodix_device_context_operator_epoch_is_drained (ctx));
+  g_queue_free_full (seam.out, (GDestroyNotify) host_only_submission_free);
+  operator_message (OP_MSG_HOST_ONLY_SUCCESS);
+  g_print ("OPERATOR_PROMPT_STATE_MACHINE_HOST_ONLY=PASS\n");
+  g_print ("REAL_USB_ACCESS=false\nREAL_USB_SUBMIT=0\n");
+  g_print ("A2_BACKEND_COMPLETION_REARM=true\n");
+  g_print ("A2_TYPED_ADVANCE_TO_A8=true\n");
+  return 0;
 }
 
 #ifdef D278_13_LIVE_BINDING
@@ -671,6 +970,9 @@ run_live_once (void)
   gboolean live_authorization_consumed = FALSE;
   int rc = 1;
 
+  gint64 start_time_us = g_get_monotonic_time ();
+  gint64 stop_time_us = 0;
+
   runtime.failure_class = "PRE_BIND_FAILURE";
   if (!live_authorization_gate (&live_authorization_consumed,
                                 &authorization_reason))
@@ -684,9 +986,11 @@ run_live_once (void)
                   live_authorization_consumed ? "true" : "false");
       return 3;
     }
+  operator_message (OP_MSG_AUTHORIZATION_OK);
 
   material_owner = prepare_target_material (&material_audit,
-                                             &secure_material, &error);
+                                              &secure_material, &error);
+
   if (material_owner == NULL ||
       !load_canonical_fdt_seed (post_material.initial_fdt_table, &error))
     goto cleanup;
@@ -710,6 +1014,7 @@ run_live_once (void)
     }
   if (matches != 1u)
     goto cleanup;
+  operator_message (OP_MSG_DEVICE_DETECTED);
 
   runtime.failure_class = "FPDEVICE_USB_BINDING_CONSTRUCTION";
   device = goodix_fpimage_device_new_for_usb (target);
@@ -724,8 +1029,8 @@ run_live_once (void)
     goto cleanup;
   opened = TRUE;
   if (!g_usb_device_claim_interface (target, D278_INTERFACE,
-                                      G_USB_DEVICE_CLAIM_INTERFACE_NONE,
-                                      &error))
+                                       G_USB_DEVICE_CLAIM_INTERFACE_NONE,
+                                       &error))
     goto cleanup;
   claimed = TRUE;
   claim_count = 1u;
@@ -736,11 +1041,11 @@ run_live_once (void)
   runtime.deadline_us = g_get_monotonic_time () + 120 * G_TIME_SPAN_SECOND;
   cancellable = g_cancellable_new ();
   if (!goodix_device_context_begin_operator_epoch (runtime.ctx, cancellable,
-                                                    &error))
+                                                     &error))
     goto cleanup;
   epoch_started = TRUE;
   goodix_device_context_set_secure_phase_observer (runtime.ctx,
-                                                    observe_phase, &runtime);
+                                                     observe_phase, &runtime);
   if (!goodix_device_context_configure_post_tls_lifecycle (
         runtime.ctx, &post_material, &post_audit, &error))
     goto cleanup;
@@ -749,11 +1054,16 @@ run_live_once (void)
         runtime.ctx, &secure_material, NULL, NULL,
         &secure_audit, &tls_audit, &error))
     goto cleanup;
+  operator_message (OP_MSG_SECURE_SESSION_STARTED);
   goodix_target_material_free (material_owner);
   material_owner = NULL;
   OPENSSL_cleanse (&secure_material, sizeof secure_material);
   runtime.monitor_source = g_timeout_add (10u, monitor_runtime, &runtime);
   g_main_loop_run (runtime.loop);
+  if (runtime.success)
+    stop_time_us = g_get_monotonic_time ();
+
+  operator_message (OP_MSG_SCAN_COMPLETE);
 
 cleanup:
   if (material_owner != NULL)
@@ -769,8 +1079,8 @@ cleanup:
     {
       g_clear_error (&error);
       if (g_usb_device_release_interface (target, D278_INTERFACE,
-                                           G_USB_DEVICE_CLAIM_INTERFACE_NONE,
-                                           &error))
+                                            G_USB_DEVICE_CLAIM_INTERFACE_NONE,
+                                            &error))
         release_count = 1u;
     }
   if (opened)
@@ -779,6 +1089,7 @@ cleanup:
       if (g_usb_device_close (target, &error))
         close_count = 1u;
     }
+
   if (backend != NULL)
     {
       backend_drained = goodix_fpi_usb_backend_is_drained (backend);
@@ -849,6 +1160,11 @@ cleanup:
            "\"retry_count\":0,\"reopen_count\":0,"
            "\"device_reset_count\":0,\"clear_halt_count\":0,"
            "\"persistent_device_write_count\":0,"
+           "\"secure_protocol_failure_recorded\":%s,"
+           "\"secure_protocol_failure_phase\":\"%s\","
+           "\"secure_protocol_failure_kind\":\"%s\","
+           "\"post_tls_terminal\":%s,"
+           "\"stop_time_ms\":%" G_GINT64_FORMAT ","
            "\"backend_drained\":%s,\"cleanup_complete\":%s}\n",
            rc == 0 ? "pass" : "fail", runtime.failure_class,
            runtime.phase_trace != NULL ? runtime.phase_trace->str : "",
@@ -890,6 +1206,16 @@ cleanup:
            post_audit.second_image_pipeline_count,
            post_audit.third_cycle_command_count,
            runtime.success ? "true" : "false",
+           secure_audit.protocol_failure_recorded ? "true" : "false",
+           secure_audit.protocol_failure_recorded ?
+             goodix_secure_phase_name (secure_audit.protocol_failure_phase) :
+             "",
+           secure_audit.protocol_failure_recorded ?
+             goodix_protocol_failure_kind_name (
+               secure_audit.protocol_failure_kind) : "",
+           post_audit.terminal ? "true" : "false",
+           stop_time_us > start_time_us ?
+             (stop_time_us - start_time_us) / 1000 : -1,
            backend_drained ? "true" : "false",
            backend_drained && project_secret_zeroized &&
              release_count == 1u && close_count == 1u ? "true" : "false");
@@ -907,17 +1233,21 @@ main (int argc, char **argv)
   if (argc == 2 && g_str_equal (argv[1], "--authorization-gate-self-test"))
     return run_gate_self_test ();
   if (argc == 4 && g_str_equal (argv[1],
-                                "--authorization-ticket-gate-only"))
+                                 "--authorization-ticket-gate-only"))
     return run_ticket_gate_only (argv[2], argv[3]);
+  if (argc == 2 && g_str_equal (argv[1],
+                                 "--operator-prompt-state-machine-host-only"))
+    return run_operator_prompt_state_machine_host_only ();
 #ifdef D278_13_LIVE_BINDING
   if (argc == 2 && g_str_equal (argv[1],
-                                "--physical-constructor-host-only"))
+                                 "--physical-constructor-host-only"))
     return run_physical_constructor_host_only ();
   if (argc == 2 && g_str_equal (argv[1], "--live-integrated-once"))
     return run_live_once ();
 #endif
   g_printerr ("usage: %s --authorization-gate-self-test | "
-              "--authorization-ticket-gate-only <ticket> <expected-sha>%s\n",
+              "--authorization-ticket-gate-only <ticket> <expected-sha> | "
+              "--operator-prompt-state-machine-host-only%s\n",
               argv[0],
 #ifdef D278_13_LIVE_BINDING
               " | --physical-constructor-host-only | --live-integrated-once"
@@ -927,3 +1257,4 @@ main (int argc, char **argv)
               );
   return 2;
 }
+

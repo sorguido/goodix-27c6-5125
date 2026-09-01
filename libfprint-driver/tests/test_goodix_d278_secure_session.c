@@ -1284,6 +1284,77 @@ test_reentry_tls_to_two_acquisitions_composed (void)
   fixture_free (fixture);
 }
 
+/* Regression for D278/14 attempt-2: the production real-USB path invokes
+ * goodix_fpi_usb_backend_complete_receive() directly, not the context-level
+ * helper.  The registered in-completed callback must therefore be the single
+ * place that re-arms receive after an ACK so a later typed response can be
+ * received on the second IN. */
+static void
+test_backend_in_completion_rearms_receive (void)
+{
+  Fixture *fixture = fixture_new_integrated_context ();
+  g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+  gsize ack_length;
+  const guint8 *ack_data = g_bytes_get_data (ack, &ack_length);
+
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (fixture->backend),
+                    ==, 1u);
+  g_assert_cmpuint (fixture->in_submit_count, ==, 1u);
+
+  /* Complete the physical A2 command OUT first; advance_phase() is gated on
+   * out_pending being clear, exactly as on real USB. */
+  {
+    Submission *submission = pop_out (fixture);
+    g_assert_nonnull (submission);
+    complete_submission (fixture, submission, NULL);
+  }
+
+  /* Production-shaped backend-level IN completion. */
+  goodix_fpi_usb_backend_complete_receive (fixture->backend,
+                                           fixture->generation,
+                                           ack_data, ack_length, NULL);
+
+  /* The in-completed callback must have re-armed a fresh IN. */
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (fixture->backend),
+                    ==, 1u);
+  g_assert_cmpuint (fixture->in_submit_count, ==, 2u);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 1u);
+
+  /* Feed the typed A2 on the re-armed IN. */
+  {
+    g_autoptr(GBytes) typed = typed_for_phase (
+      fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+    gsize typed_length;
+    const guint8 *typed_data = g_bytes_get_data (typed, &typed_length);
+    goodix_fpi_usb_backend_complete_receive (fixture->backend,
+                                             fixture->generation,
+                                             typed_data, typed_length, NULL);
+  }
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_A8);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 1u);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 1u);
+
+  /* Cancel the session and drain the backend so fixture_free() succeeds. */
+  goodix_secure_session_cancel (
+    goodix_device_context_get_secure_session (fixture->context),
+    "test closure");
+  while (!g_queue_is_empty (fixture->out))
+    {
+      Submission *submission = pop_out (fixture);
+      goodix_fpi_usb_backend_complete_out (fixture->backend,
+                                           submission->generation, NULL);
+      submission_free (submission);
+    }
+  if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, NULL, 0, NULL);
+
+  fixture_free (fixture);
+}
+
 static void
 test_integrated_context_live_binding_host_only (void)
 {
@@ -2047,6 +2118,8 @@ main (int argc,
                    test_retained_tls_post_handshake_handoff);
   g_test_add_func ("/goodix/d278/reentry-tls-to-two-acquisitions-composed",
                    test_reentry_tls_to_two_acquisitions_composed);
+  g_test_add_func ("/goodix/d278/backend-in-completion-rearms-receive",
+                   test_backend_in_completion_rearms_receive);
   g_test_add_func ("/goodix/d278/integrated-context-live-binding-host-only",
                    test_integrated_context_live_binding_host_only);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",

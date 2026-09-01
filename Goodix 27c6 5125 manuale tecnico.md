@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/14 corrective — binding USB corretto solo host, nessuna nuova live autorizzata
+### Stato corrente post-D278/14 attempt-2 corrective — binding USB e IN re-arm corretti solo host, nessuna nuova live autorizzata
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -86,6 +86,20 @@ nullo attraversa il vero setter della libfprint locale; la closure live-shaped
 usa inoltre il tipo `GUsbDevice` concreto della libgusb installata senza
 enumerazione, open, claim o submit. Entrambe provano tipo USB, identità del
 puntatore associato, grafo context/backend/router unico, drain e zero transfer.
+
+Il tentativo live D278/14 non ha raggiunto il protocollo, quindi non ha potuto
+verificare il re-arm della ricezione IN dopo ACK. Una seconda correzione
+host-only (attempt #2) unifica il follow-up di completamento IN tra il percorso
+sintetico dei test e il percorso reale USB: `GoodixDeviceContext` registra un
+callback `in_completed` sul backend, dove avviene il re-arm condizionato; la
+funzione `goodix_device_context_complete_receive()` resta solo un'injection seam
+per host/test. Questo garantisce che, dopo un ACK A2 su IN fisico, un secondo IN
+venga sottomesso e la risposta tipata A2 possa far avanzare lo stato verso A8.
+La regressione esercita esplicitamente `goodix_fpi_usb_backend_complete_receive()`
+dal livello backend (non dal context helper), dimostrando il re-arm e
+l'avanzamento a A8. Un nuovo percorso host-only dell'adapter D278/13 stampa
+banner operatore in italiano e guida la catena ACK+risposta tipata A2 con
+materiale sintetico, senza USB reale.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -158,6 +172,17 @@ FPDEVICE_TRANSPORT_TYPE_USB_COMPATIBLE=true
 NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true
 PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
 FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS
+D278_14_ATTEMPT_2_HOST_ONLY_CORRECTIVE=true
+D278_14_ATTEMPT_2_ROOT_CAUSE=BACKEND_IN_COMPLETION_BYPASSED_CONTEXT_REARM
+D278_14_ATTEMPT_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
+D278_14_ATTEMPT_2_A2_BACKEND_REARM_HOST_ONLY_PROVEN=true
+D278_14_ATTEMPT_2_A2_TYPED_ADVANCE_TO_A8_HOST_ONLY_PROVEN=true
+D278_14_ATTEMPT_2_OPERATOR_PROMPT_STATE_MACHINE_HOST_ONLY=PASS
+D278_14_ATTEMPT_2_ITALIAN_OPERATOR_MESSAGES=true
+D278_14_ATTEMPT_2_TELEMETRY_FAILURE_AND_STOP_TIME_FIELDS=true
+D278_14_ATTEMPT_2_LIVE_EXECUTION_PERFORMED=false
+D278_14_ATTEMPT_2_CURRENT_LIVE_AUTHORIZED=false
+D278_14_ATTEMPT_2_READY_FOR_LIVE=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
