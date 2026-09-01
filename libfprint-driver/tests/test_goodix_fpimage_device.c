@@ -21,6 +21,10 @@
 
 #define TEST_TIMEOUT_MS 5000
 
+void  goodix_test_gusb_reset_counts (void);
+guint goodix_test_gusb_get_open_count (void);
+guint goodix_test_gusb_get_close_count (void);
+
 typedef struct
 {
   GMainLoop            *loop;
@@ -1010,6 +1014,46 @@ test_d278_12_post_tls_context_ownership (void)
   test_fixture_free (f);
 }
 
+static void
+test_d278_14_non_null_usb_binding (void)
+{
+  g_autoptr(GUsbDevice) usb_device = NULL;
+  g_autoptr(GoodixFpImageDevice) device = NULL;
+  GoodixDeviceContext *ctx;
+  GoodixFpiUsbBackend *backend;
+  GoodixUsbRouter *router;
+  FpDeviceClass *device_class;
+
+  goodix_test_gusb_reset_counts ();
+  usb_device = (GUsbDevice *) g_object_new (G_USB_TYPE_DEVICE, NULL);
+  g_assert_nonnull (usb_device);
+
+  device = goodix_fpimage_device_new_for_usb (usb_device);
+  g_assert_nonnull (device);
+  g_assert_true (fpi_device_get_usb_device (FP_DEVICE (device)) == usb_device);
+  device_class = FP_DEVICE_GET_CLASS (device);
+  g_assert_cmpint (device_class->type, ==, FP_DEVICE_TYPE_USB);
+
+  ctx = goodix_fpimage_device_get_context (device);
+  backend = goodix_device_context_get_fpi_usb_backend (ctx);
+  router = goodix_device_context_get_usb_router (ctx);
+  g_assert_nonnull (ctx);
+  g_assert_nonnull (backend);
+  g_assert_nonnull (router);
+  g_assert_true (goodix_device_context_get_fpi_usb_backend (ctx) == backend);
+  g_assert_true (goodix_device_context_get_usb_router (ctx) == router);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (backend));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==,
+                    0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==,
+                    0u);
+  g_assert_cmpuint (goodix_test_gusb_get_open_count (), ==, 0u);
+  g_assert_cmpuint (goodix_test_gusb_get_close_count (), ==, 0u);
+
+  g_print ("NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true\n");
+}
+
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
@@ -1052,6 +1096,8 @@ main (int argc, char **argv)
                    test_d276_04_context_ownership);
   g_test_add_func ("/goodix-fpimage-device/d278-12-post-tls-context-ownership",
                    test_d278_12_post_tls_context_ownership);
+  g_test_add_func ("/goodix-fpimage-device/d278-14-non-null-usb-binding",
+                   test_d278_14_non_null_usb_binding);
 
   return g_test_run ();
 }

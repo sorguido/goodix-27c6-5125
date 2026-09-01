@@ -92,6 +92,39 @@ test -f "$host_gusb"
 echo D278_13_LIVE_ADAPTER_BUILD=PASS
 (
   cd "$root"
+  output=$(LD_LIBRARY_PATH="$build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    timeout 30 "$binary" --physical-constructor-host-only)
+  echo "$output"
+  echo "$output" | grep -F \
+    'FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS' >/dev/null
+  echo "$output" | grep -F 'FPDEVICE_TRANSPORT_TYPE=USB' >/dev/null
+  echo "$output" | grep -F 'NON_NULL_GUSBDEVICE_BOUND=true' >/dev/null
+  echo "$output" | grep -F \
+    'NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true' >/dev/null
+  echo "$output" | grep -F 'SINGLE_GOODIX_DEVICE_CONTEXT=true' >/dev/null
+  echo "$output" | grep -F 'SINGLE_USB_BACKEND_OWNER=true' >/dev/null
+  echo "$output" | grep -F 'SINGLE_USB_ROUTER=true' >/dev/null
+  echo "$output" | grep -F 'REAL_USB_ENUMERATION_COUNT=0' >/dev/null
+  echo "$output" | grep -F 'REAL_USB_OPEN_COUNT=0' >/dev/null
+  echo "$output" | grep -F 'REAL_USB_CLAIM_COUNT=0' >/dev/null
+  echo "$output" | grep -F 'REAL_USB_ACCESS=false' >/dev/null
+  echo "$output" | grep -F 'REAL_USB_SUBMIT=0' >/dev/null
+  echo "$output" | grep -F 'REAL_PRODUCTION_SECRET_READ=false' >/dev/null
+)
+tool_source="$root/tools/d278_integrated_path_once.c"
+constructor_line=$(grep -n \
+  'device = goodix_fpimage_device_new_for_usb (target);' "$tool_source" | \
+  cut -d: -f1)
+open_line=$(grep -n 'if (!g_usb_device_open (target' "$tool_source" | \
+  cut -d: -f1)
+claim_line=$(grep -n 'if (!g_usb_device_claim_interface (target' \
+  "$tool_source" | cut -d: -f1)
+test -n "$constructor_line" && test -n "$open_line" && test -n "$claim_line"
+test "$constructor_line" -lt "$open_line"
+test "$open_line" -lt "$claim_line"
+echo PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
+(
+  cd "$root"
   output=$(env -u D278_13_APPROVED_LIVE_BASELINE_SHA \
     -u D278_13_OPERATOR_AUTHORIZATION -u D278_13_OPERATION \
     -u D278_13_AUTHORIZATION_TICKET \

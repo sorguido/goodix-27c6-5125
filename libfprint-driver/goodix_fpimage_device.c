@@ -78,13 +78,47 @@ struct _GoodixDeviceContext
   GError                  *terminal_error;
 };
 
-struct _GoodixFpImageDevice
+typedef struct
 {
-  FpImageDevice parent_instance;
   GoodixDeviceContext *ctx;
-};
+} GoodixFpImageDevicePrivate;
 
-G_DEFINE_TYPE (GoodixFpImageDevice, goodix_fpimage_device, FP_TYPE_IMAGE_DEVICE)
+typedef struct _GoodixUsbFpImageDevice
+{
+  GoodixFpImageDevice parent_instance;
+} GoodixUsbFpImageDevice;
+
+typedef struct _GoodixUsbFpImageDeviceClass
+{
+  GoodixFpImageDeviceClass parent_class;
+} GoodixUsbFpImageDeviceClass;
+
+#define GOODIX_TYPE_USB_FPIMAGE_DEVICE (goodix_usb_fpimage_device_get_type ())
+GType goodix_usb_fpimage_device_get_type (void) G_GNUC_CONST;
+
+G_DEFINE_TYPE_WITH_PRIVATE (GoodixFpImageDevice, goodix_fpimage_device,
+                            FP_TYPE_IMAGE_DEVICE)
+G_DEFINE_TYPE (GoodixUsbFpImageDevice, goodix_usb_fpimage_device,
+               GOODIX_TYPE_FPIMAGE_DEVICE)
+
+static GoodixDeviceContext *
+goodix_fpimage_device_peek_context (GoodixFpImageDevice *self)
+{
+  GoodixFpImageDevicePrivate *priv =
+    goodix_fpimage_device_get_instance_private (self);
+
+  return priv->ctx;
+}
+
+static void
+goodix_fpimage_device_set_context (GoodixFpImageDevice *self,
+                                   GoodixDeviceContext *ctx)
+{
+  GoodixFpImageDevicePrivate *priv =
+    goodix_fpimage_device_get_instance_private (self);
+
+  priv->ctx = ctx;
+}
 
 static void goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx);
 static void goodix_device_context_set_poisoned (GoodixDeviceContext *ctx,
@@ -322,7 +356,7 @@ static gboolean
 complete_activation_cancel_idle (gpointer user_data)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (user_data);
-  GoodixDeviceContext *ctx = self->ctx;
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
   g_autoptr(GError) error = NULL;
 
   if (ctx == NULL ||
@@ -377,7 +411,7 @@ static gboolean
 open_complete_idle (gpointer user_data)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (user_data);
-  GoodixDeviceContext *ctx = self->ctx;
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
   g_autoptr(GError) error = NULL;
   GCancellable *cancellable;
 
@@ -404,11 +438,12 @@ static void
 goodix_fpimage_device_img_open (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
-  g_assert (self->ctx != NULL);
-  g_assert (self->ctx->state == GOODIX_DEVICE_CONTEXT_STATE_OPENING);
+  g_assert (ctx != NULL);
+  g_assert (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_OPENING);
 
-  goodix_device_context_set_state (self->ctx,
+  goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_OPENING);
   g_object_ref (self);
   g_idle_add (open_complete_idle, self);
@@ -418,16 +453,17 @@ static void
 goodix_fpimage_device_img_close (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
-  g_assert (self->ctx != NULL);
-  g_assert (self->ctx->state != GOODIX_DEVICE_CONTEXT_STATE_CLOSING);
+  g_assert (ctx != NULL);
+  g_assert (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_CLOSING);
 
-  goodix_device_context_set_terminal_fence (self->ctx);
-  goodix_device_context_set_state (self->ctx,
+  goodix_device_context_set_terminal_fence (ctx);
+  goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_CLOSING);
 
-  goodix_device_context_free (self->ctx);
-  self->ctx = NULL;
+  goodix_device_context_free (ctx);
+  goodix_fpimage_device_set_context (self, NULL);
 
   fpi_image_device_close_complete (dev, NULL);
 }
@@ -436,7 +472,7 @@ static void
 goodix_fpimage_device_activate (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
-  GoodixDeviceContext *ctx = self->ctx;
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
   g_assert (ctx != NULL);
   g_assert (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
@@ -500,7 +536,7 @@ goodix_fpimage_device_change_state (FpImageDevice      *dev,
                                     FpiImageDeviceState  state)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
-  GoodixDeviceContext *ctx = self->ctx;
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
   if (ctx == NULL)
     return;
@@ -515,7 +551,7 @@ static void
 goodix_fpimage_device_deactivate (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
-  GoodixDeviceContext *ctx = self->ctx;
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
   g_assert (ctx != NULL);
 
@@ -544,9 +580,10 @@ static void
 goodix_fpimage_device_finalize (GObject *object)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (object);
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
 
-  goodix_device_context_free (self->ctx);
-  self->ctx = NULL;
+  goodix_device_context_free (ctx);
+  goodix_fpimage_device_set_context (self, NULL);
 
   G_OBJECT_CLASS (goodix_fpimage_device_parent_class)->finalize (object);
 }
@@ -580,9 +617,27 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
 static void
 goodix_fpimage_device_init (GoodixFpImageDevice *self)
 {
-  self->ctx = goodix_device_context_new (self);
-  goodix_device_context_set_state (self->ctx,
+  GoodixDeviceContext *ctx = goodix_device_context_new (self);
+
+  goodix_fpimage_device_set_context (self, ctx);
+  goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_OPENING);
+}
+
+static void
+goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
+{
+  FpDeviceClass *device_class = FP_DEVICE_CLASS (klass);
+
+  /* fp_device_set_property() consults the final instance class before
+   * constructed() copies the transport type into private state. */
+  device_class->type = FP_DEVICE_TYPE_USB;
+}
+
+static void
+goodix_usb_fpimage_device_init (GoodixUsbFpImageDevice *self)
+{
+  (void) self;
 }
 
 /* --- Public constructor --- */
@@ -597,7 +652,7 @@ GoodixFpImageDevice *
 goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device)
 {
   g_return_val_if_fail (usb_device != NULL, NULL);
-  return g_object_new (GOODIX_TYPE_FPIMAGE_DEVICE,
+  return g_object_new (GOODIX_TYPE_USB_FPIMAGE_DEVICE,
                        "fpi-usb-device", usb_device,
                        "fpi-driver-data", (guint64) 0,
                        NULL);
@@ -607,7 +662,7 @@ GoodixDeviceContext *
 goodix_fpimage_device_get_context (GoodixFpImageDevice *dev)
 {
   g_return_val_if_fail (GOODIX_IS_FPIMAGE_DEVICE (dev), NULL);
-  return dev->ctx;
+  return goodix_fpimage_device_peek_context (dev);
 }
 
 gboolean

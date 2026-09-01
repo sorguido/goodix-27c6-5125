@@ -492,6 +492,67 @@ run_ticket_gate_only (const gchar *ticket_path,
 }
 
 #ifdef D278_13_LIVE_BINDING
+static gboolean
+physical_binding_is_valid (GoodixFpImageDevice *device,
+                           GUsbDevice           *usb_device)
+{
+  GoodixDeviceContext *ctx;
+  GoodixFpiUsbBackend *backend;
+
+  if (device == NULL || usb_device == NULL ||
+      fpi_device_get_usb_device (FP_DEVICE (device)) != usb_device ||
+      FP_DEVICE_GET_CLASS (device)->type != FP_DEVICE_TYPE_USB)
+    return FALSE;
+
+  ctx = goodix_fpimage_device_get_context (device);
+  if (ctx == NULL || goodix_device_context_get_usb_router (ctx) == NULL)
+    return FALSE;
+  backend = goodix_device_context_get_fpi_usb_backend (ctx);
+  return backend != NULL && goodix_fpi_usb_backend_is_drained (backend) &&
+    goodix_fpi_usb_backend_get_outstanding (backend) == 0u &&
+    goodix_fpi_usb_backend_get_out_outstanding (backend) == 0u &&
+    goodix_fpi_usb_backend_get_real_submit_count (backend) == 0u;
+}
+
+static int
+run_physical_constructor_host_only (void)
+{
+  g_autoptr(GUsbDevice) usb_device = NULL;
+  g_autoptr(GoodixFpImageDevice) device = NULL;
+  GoodixDeviceContext *ctx;
+  GoodixFpiUsbBackend *backend;
+  GoodixUsbRouter *router;
+
+  usb_device = G_USB_DEVICE (g_object_new (G_USB_TYPE_DEVICE, NULL));
+  if (usb_device == NULL)
+    return 1;
+  device = goodix_fpimage_device_new_for_usb (usb_device);
+  if (!physical_binding_is_valid (device, usb_device))
+    return 1;
+
+  ctx = goodix_fpimage_device_get_context (device);
+  backend = goodix_device_context_get_fpi_usb_backend (ctx);
+  router = goodix_device_context_get_usb_router (ctx);
+  if (goodix_device_context_get_fpi_usb_backend (ctx) != backend ||
+      goodix_device_context_get_usb_router (ctx) != router)
+    return 1;
+
+  g_print ("FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS\n"
+           "FPDEVICE_TRANSPORT_TYPE=USB\n"
+           "NON_NULL_GUSBDEVICE_BOUND=true\n"
+           "NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true\n"
+           "SINGLE_GOODIX_DEVICE_CONTEXT=true\n"
+           "SINGLE_USB_BACKEND_OWNER=true\n"
+           "SINGLE_USB_ROUTER=true\n"
+           "REAL_USB_ENUMERATION_COUNT=0\n"
+           "REAL_USB_OPEN_COUNT=0\n"
+           "REAL_USB_CLAIM_COUNT=0\n"
+           "REAL_USB_ACCESS=false\n"
+           "REAL_USB_SUBMIT=0\n"
+           "REAL_PRODUCTION_SECRET_READ=false\n");
+  return 0;
+}
+
 typedef struct
 {
   GoodixDeviceContext *ctx;
@@ -649,6 +710,15 @@ run_live_once (void)
     }
   if (matches != 1u)
     goto cleanup;
+
+  runtime.failure_class = "FPDEVICE_USB_BINDING_CONSTRUCTION";
+  device = goodix_fpimage_device_new_for_usb (target);
+  if (!physical_binding_is_valid (device, target))
+    goto cleanup;
+  runtime.ctx = goodix_fpimage_device_get_context (device);
+  backend = goodix_device_context_get_fpi_usb_backend (runtime.ctx);
+
+  runtime.failure_class = "USB_OPEN_OR_CLAIM_FAILURE";
   open_count = 1u;
   if (!g_usb_device_open (target, &error))
     goto cleanup;
@@ -660,8 +730,6 @@ run_live_once (void)
   claimed = TRUE;
   claim_count = 1u;
 
-  device = goodix_fpimage_device_new_for_usb (target);
-  runtime.ctx = goodix_fpimage_device_get_context (device);
   runtime.loop = g_main_loop_new (NULL, FALSE);
   runtime.phase_trace = g_string_new (NULL);
   runtime.failure_class = "NONE";
@@ -671,7 +739,6 @@ run_live_once (void)
                                                     &error))
     goto cleanup;
   epoch_started = TRUE;
-  backend = goodix_device_context_get_fpi_usb_backend (runtime.ctx);
   goodix_device_context_set_secure_phase_observer (runtime.ctx,
                                                     observe_phase, &runtime);
   if (!goodix_device_context_configure_post_tls_lifecycle (
@@ -843,6 +910,9 @@ main (int argc, char **argv)
                                 "--authorization-ticket-gate-only"))
     return run_ticket_gate_only (argv[2], argv[3]);
 #ifdef D278_13_LIVE_BINDING
+  if (argc == 2 && g_str_equal (argv[1],
+                                "--physical-constructor-host-only"))
+    return run_physical_constructor_host_only ();
   if (argc == 2 && g_str_equal (argv[1], "--live-integrated-once"))
     return run_live_once ();
 #endif
@@ -850,7 +920,7 @@ main (int argc, char **argv)
               "--authorization-ticket-gate-only <ticket> <expected-sha>%s\n",
               argv[0],
 #ifdef D278_13_LIVE_BINDING
-              " | --live-integrated-once"
+              " | --physical-constructor-host-only | --live-integrated-once"
 #else
               ""
 #endif

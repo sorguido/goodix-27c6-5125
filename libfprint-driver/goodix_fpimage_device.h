@@ -13,8 +13,13 @@
 G_BEGIN_DECLS
 
 #define GOODIX_TYPE_FPIMAGE_DEVICE (goodix_fpimage_device_get_type ())
-G_DECLARE_FINAL_TYPE (GoodixFpImageDevice, goodix_fpimage_device,
-                      GOODIX, FPIMAGE_DEVICE, FpImageDevice)
+G_DECLARE_DERIVABLE_TYPE (GoodixFpImageDevice, goodix_fpimage_device,
+                          GOODIX, FPIMAGE_DEVICE, FpImageDevice)
+
+struct _GoodixFpImageDeviceClass
+{
+  FpImageDeviceClass parent_class;
+};
 
 typedef enum
 {
@@ -49,8 +54,10 @@ typedef struct
  * subclass, but it is not registered in any production id table.
  */
 GoodixFpImageDevice * goodix_fpimage_device_new (void);
-/* Harness-only construction over an already selected GUsbDevice.  The class
- * remains absent from every production id table. */
+/* Physical construction over an already selected GUsbDevice.  A thin
+ * transport-typing subclass supplies FP_DEVICE_TYPE_USB while reusing the
+ * exact same GoodixDeviceContext implementation.  The class remains absent
+ * from every production id table and construction submits no USB traffic. */
 GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device);
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);

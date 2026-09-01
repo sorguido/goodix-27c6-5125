@@ -10,10 +10,33 @@
 #include <glib.h>
 #include <gio/gio.h>
 
+static guint open_count;
+static guint close_count;
+
+void
+goodix_test_gusb_reset_counts (void)
+{
+  open_count = 0;
+  close_count = 0;
+}
+
+guint
+goodix_test_gusb_get_open_count (void)
+{
+  return open_count;
+}
+
+guint
+goodix_test_gusb_get_close_count (void)
+{
+  return close_count;
+}
+
 gboolean
 g_usb_device_open (GUsbDevice  *self,
                    GError     **error)
 {
+  open_count++;
   (void) self;
   if (error)
     g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
@@ -25,6 +48,7 @@ gboolean
 g_usb_device_close (GUsbDevice  *self,
                     GError     **error)
 {
+  close_count++;
   (void) self;
   if (error)
     g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,

@@ -16,7 +16,7 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/13 — percorso C integrato live-capable, chiuso pre-live solo host
+### Stato corrente post-D278/14 corrective — binding USB corretto solo host, nessuna nuova live autorizzata
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -62,6 +62,30 @@ commit dopo verifica HEAD e pulizia del set live-critical, mentre un ticket
 esplicito `0600` lega SHA/operation/nonce ed è reclamato atomicamente una sola
 volta prima di qualunque materiale protetto, cache o GUsb. Il precedente token
 statico era riutilizzabile e non costituiva da solo un single-shot meccanico.
+
+La singola live D278/14 autorizzata sulla baseline
+`2172e750ae7c100a3a891ba25d0797286230a4ab` è stata eseguita una volta ed è
+consumata. Dopo selezione target e, secondo l'ordine eseguibile allora
+presente, open/claim, `goodix_fpimage_device_new_for_usb()` ha terminato con
+`SIGABRT` nell'assert di `fp_device_set_property()`: la classe comune era
+`FP_DEVICE_TYPE_VIRTUAL` ma il costruttore assegnava un `fpi-usb-device` non
+nullo, ammesso dalla libfprint locale soltanto per `FP_DEVICE_TYPE_USB`. Il
+failure è quindi host binding prima del protocollo, non un failure del sensore;
+`begin_operator_epoch`, A2/A8, TLS e post-TLS non sono stati raggiunti. L'abort
+ha bypassato il cleanup normale, che non è dichiarato PASS. Il core dump
+osservato può contenere materiale protetto residente in memoria e resta non
+letto, non copiato e fuori dal review set.
+
+Il correttivo host-only mantiene la shell sintetica base `VIRTUAL` e aggiunge
+una sottoclasse sottilissima di sola tipizzazione `USB` usata esclusivamente da
+`goodix_fpimage_device_new_for_usb()`. La sottoclasse eredita lo stesso identico
+`GoodixDeviceContext` e non contiene protocollo, backend, router, TLS, lifecycle
+o decoder. Il costruttore e la validazione del binding sono ora eseguiti dopo
+la selezione del target ma prima di open/claim. Una regressione con oggetto non
+nullo attraversa il vero setter della libfprint locale; la closure live-shaped
+usa inoltre il tipo `GUsbDevice` concreto della libgusb installata senza
+enumerazione, open, claim o submit. Entrambe provano tipo USB, identità del
+puntatore associato, grafo context/backend/router unico, drain e zero transfer.
 
 ```text
 CONTROLLED_RISK_EXPLORATORY_RECOVERY_CANDIDATE=A2_SENSOR_ONLY_EXACT_01_14
@@ -113,6 +137,30 @@ LIVE_BASELINE_BINDING_GUARD_HOST_ONLY_PROVEN=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_IMPLEMENTED=true
 ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
 SECOND_USE_OF_AUTHORIZATION_REJECTED=true
+D278_14_LIVE_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
+D278_14_APPROVED_LIVE_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
+D278_14_LIVE_EXECUTION_COUNT=1
+D278_14_ONE_SHOT_CONSUMED=true
+D278_14_RERUN_AUTHORIZED=false
+D278_14_ROOT_CAUSE=NON_NULL_FPI_USB_DEVICE_BOUND_TO_FP_DEVICE_TYPE_VIRTUAL
+FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
+PROCESS_EXIT_CODE=134
+PROCESS_TERMINATION=SIGABRT
+GOODIX_APPLICATION_PROTOCOL_SUBMIT_REACHED=false
+A2_REACHED=false
+TLS_REACHED=false
+POST_TLS_REACHED=false
+CORE_DUMP_CREATED=OBSERVED
+CORE_DUMP_MAY_CONTAIN_PROTECTED_IN_MEMORY_MATERIAL=true
+CORE_DUMP_NOT_PART_OF_REVIEW_SET=true
+FPDEVICE_USB_BINDING_CORRECTED=true
+FPDEVICE_TRANSPORT_TYPE_USB_COMPATIBLE=true
+NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true
+PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
+FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
 ```
 
 Sul target APP12509 (firmware `GF_ST411SEC_APP_12509`) risultano ora **chiusi
@@ -2035,9 +2083,11 @@ Git-native è
 Il gap architetturale residuo di D278/12 era nel punto di ingresso: la fixture
 end-to-end componeva manualmente oggetti compatibili, mentre il tool live
 storico D278/11 possedeva un harness distinto e terminava al TLS. D278/13 non
-estende quel tool. Espone invece una costruzione harness-only del
+estende quel tool. Intendeva invece esporre una costruzione harness-only del
 `GoodixFpImageDevice` non registrato su un `GUsbDevice` già selezionato e una
-epoch operator bounded sul suo unico `GoodixDeviceContext`. Il context crea e
+epoch operator bounded sul suo unico `GoodixDeviceContext`; la closure
+host-only di quello step non esercitava però la property con un `GUsbDevice`
+non nullo e non provava il binding fisico effettivo. Il context crea e
 mantiene una sola istanza di:
 
 ```text
@@ -2075,7 +2125,10 @@ e post-TLS sono terminali e drenate. Run ripetute hanno mantenuto gli stessi
 17 casi e gli stessi invarianti logici; gli seed casuali GLib non cambiano il
 risultato.
 
-Il percorso fisico-shaped è soltanto compile/API/executable-closure proven.
+Il percorso fisico-shaped D278/13 era soltanto compile/API closure: la
+successiva live D278/14 ha dimostrato che non includeva la costruzione con
+property `fpi-usb-device` non nulla e ha quindi invalidato quella executable
+closure, senza invalidare il grafo context/backend/router/TLS/lifecycle.
 Nel build ordinario il comando live ritorna codice `3` con
 `LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED` prima di leggere materiale
 protetto, blob cache o creare/enumerare il contesto GUsb. D278/13 non ha aperto,
@@ -2161,11 +2214,98 @@ LIVE_EXECUTION_PERFORMED=false
 CURRENT_LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
-EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+HISTORICAL_D278_13_EXECUTABLE_CLOSURE=INVALIDATED_BY_D278_14_NON_NULL_BINDING_GAP
 ```
 
 Il review set canonico è descritto in
 `analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md`.
+
+### D278/14 corrective — failure live consumato e binding fisico chiuso solo host
+
+La live D278/14 non è ripetibile. L'unico tentativo ha raggiunto il contesto
+USB reale e la selezione target; l'ordine del tool supporta fortemente che
+open e claim abbiano preceduto l'assert. La prima boundary fallita è però
+interamente host-side: la property `fpi-usb-device` non nulla è stata assegnata
+a una classe `VIRTUAL`. Il processo ha terminato con exit `134`/`SIGABRT`
+prima dell'operator epoch e di qualunque submit Goodix. L'abort non consente di
+promuovere release/close o cleanup del progetto a PASS. Il core dump osservato
+non è stato ispezionato perché può contenere materiale protetto in memoria.
+
+Il correttivo non cambia wire o state machine. `GoodixFpImageDevice` diventa
+una base derivabile con private context; la shell sintetica conserva tipo
+`VIRTUAL`, mentre il solo costruttore fisico restituisce una sottoclasse senza
+logica propria il cui unico delta di classe è `FP_DEVICE_TYPE_USB`. Questo è
+coerente con `fp_device_set_property()`, che consulta il tipo della classe
+finale prima di `constructed()`, e consente alla property di conservare lo
+stesso oggetto `GUsbDevice`. Il context e tutti i suoi owner restano quelli
+ereditati dalla base.
+
+La regressione FpImageDevice crea un oggetto non nullo compatibile con la seam
+GUsb, chiama il costruttore reale, verifica identità della property, tipo USB,
+context/backend/router unici, drain, zero outstanding, zero open/close e zero
+submit; passa 18/18 normale e 18/18 ASAN/UBSAN. Il ramo live-shaped dedicato
+usa invece il tipo concreto `GUsbDevice` della libgusb runtime installata e
+produce gli stessi risultati senza enumerazione/open/claim. Un audit eseguibile
+dell'ordine sorgente prova inoltre `constructor/validation < open < claim`.
+Le regressioni secure-session 17/17, post-TLS 6/6 e materiali D278/02 62/62
+passano sia normali sia sanitizer. L'adapter, il baseline guard, il ticket
+single-shot, gli audit persistent-recovery, duplicate-stack e legacy fallback
+restano verdi.
+
+```text
+D278_14_LIVE_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
+D278_14_APPROVED_LIVE_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
+D278_14_LIVE_EXECUTION_COUNT=1
+D278_14_ONE_SHOT_CONSUMED=true
+D278_14_RERUN_AUTHORIZED=false
+D278_14_ROOT_CAUSE=NON_NULL_FPI_USB_DEVICE_BOUND_TO_FP_DEVICE_TYPE_VIRTUAL
+FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
+PROCESS_EXIT_CODE=134
+PROCESS_TERMINATION=SIGABRT
+REAL_USB_CONTEXT_REACHED=true
+USB_TARGET_SELECTION_REACHED=true
+USB_OPEN_AND_CLAIM_PRECEDED_ASSERT=STRONGLY_SUPPORTED_BY_EXECUTION_ORDER
+GOODIX_APPLICATION_PROTOCOL_SUBMIT_REACHED=false
+A2_REACHED=false
+TLS_REACHED=false
+POST_TLS_REACHED=false
+PERSISTENT_DEVICE_WRITE_COUNT=0
+RETRY_COUNT=0
+CORE_DUMP_CREATED=OBSERVED
+CORE_DUMP_MAY_CONTAIN_PROTECTED_IN_MEMORY_MATERIAL=true
+CORE_DUMP_NOT_PART_OF_REVIEW_SET=true
+FPDEVICE_USB_BINDING_CORRECTED=true
+FPDEVICE_TRANSPORT_TYPE_USB_COMPATIBLE=true
+NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true
+PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
+FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS
+D278_13_ARCHITECTURE_RETAINED=true
+NO_PARALLEL_STACK=true
+SINGLE_GOODIX_DEVICE_CONTEXT=true
+SINGLE_USB_BACKEND_OWNER=true
+SINGLE_USB_ROUTER=true
+SINGLE_PHYSICAL_IN_OWNER=true
+SINGLE_TLS_OBJECT=true
+TLS_HANDSHAKE_COUNT_MAX=1
+SECRET_HANDOFF_COUNT_MAX=1
+THIRD_CYCLE_COMMAND_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+REAL_USB_ACCESS=false
+REAL_USB_SUBMIT=0
+REAL_PRODUCTION_SECRET_READ=false
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+READY_FOR_LIVE=false
+RETRY_AUTHORIZED=false
+EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+```
+
+Questo `REAL_USB_ACCESS=false` descrive il solo correttivo host-only, non la
+live fallita già consumata. Una futura run sensor-reaching richiede commit e
+push del correttivo, review AI-PM indipendente della nuova baseline,
+autorizzazione esplicita dell'Utente e nuovo ticket/kit one-shot.
 
 Il default locale libfprint `IMG_ENROLL_STAGES=5`, il modello offline bounded
 `2..8` e la corroborazione esterna di otto capture non sono autorità di policy
