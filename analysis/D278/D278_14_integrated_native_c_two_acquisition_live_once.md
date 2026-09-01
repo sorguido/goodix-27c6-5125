@@ -1,385 +1,296 @@
-# D278/14 — three consumed live attempts and five host-only correctives
+# D278/14 — four consumed live attempts and corrective #6
 
 ## Outcome
 
 ```text
 OUTCOME=PASS_HOST_ONLY_CORRECTIVE
-ADVANCEMENT=BOUNDED_PRE_ACK_PINNED_TYPED_A2_RESIDUE_HANDLING_PROVEN_HOST_ONLY
+ADVANCEMENT=STRUCTURAL_PRE_SESSION_RX_SYNCHRONIZATION_AND_GENERIC_OPERATOR_WORKFLOW_PROVEN_HOST_ONLY
 EXECUTABLE_CLOSURE=PASS_HOST_ONLY
 CANONICAL_DOCUMENTATION=UPDATED
-```
-
-This document records **three consumed D278/14 live attempts** and the host-only
-correctives that followed. No new live execution is performed or authorized.
-
-```text
 START_BRANCH=main
-START_HEAD=87c1bf89d0ba28497313f4bb75a8de4bbdb37b75
-FINAL_STATE=COMMITTED_AND_PUSHED_TO_MAIN
+START_HEAD=7ce15fa72d0806f34202d2603ef397a740453c63
 ```
 
-## Live attempt #1
+This corrective performs no live execution. It records the fourth consumed
+authorization, retires corrective #5 before any live validation, implements a
+passive pre-protocol RX quiet boundary in the existing backend/context, and
+consolidates the tracked baseline-bound operator workflow.
 
-The first authorized D278/14 live was attempted on baseline
-`2172e750ae7c100a3a891ba25d0797286230a4ab`.
+## Live attempts
+
+The four attempts remain distinct:
+
+- `LIVE_ATTEMPT_1`: baseline
+  `2172e750ae7c100a3a891ba25d0797286230a4ab`; host binding abort before
+  protocol (`SIGABRT`, exit 134).
+- `LIVE_ATTEMPT_2`: baseline
+  `fceae05d9ff3ed14348f9031706e70d5a808ff91`; current A2 ACK received, but
+  no second physical IN was armed and the run reached its one-shot deadline.
+- `LIVE_ATTEMPT_3`: baseline
+  `87c1bf89d0ba28497313f4bb75a8de4bbdb37b75`; first IN returned an A2
+  typed-shaped frame before ACK and strict parsing terminated.
+- `LIVE_ATTEMPT_4`: baseline
+  `7ce15fa72d0806f34202d2603ef397a740453c63`; first IN returned an accepted
+  A2 ACK and the rearmed second IN returned another valid-shaped A2 ACK;
+  duplicate ACK parsing terminated.
+
+Canonical attempt #4 evidence:
 
 ```text
-D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
-D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
-D278_14_ATTEMPT_1_FIRST_FAILURE_BOUNDARY=FPDEVICE_USB_BINDING_CONSTRUCTION
-D278_14_ATTEMPT_1_PROCESS_EXIT_CODE=134
-D278_14_ATTEMPT_1_PROCESS_TERMINATION=SIGABRT
-D278_14_ATTEMPT_1_A2_REACHED=false
-D278_14_ATTEMPT_1_TLS_REACHED=false
-D278_14_ATTEMPT_1_POST_TLS_REACHED=false
-D278_14_ATTEMPT_1_CORE_DUMP_CREATED=OBSERVED
-D278_14_ATTEMPT_1_AUTHORIZATION_CONSUMED=true
+D278_14_TOTAL_LIVE_ATTEMPTS=4
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=4
+
+D278_14_ATTEMPT_4_BASELINE=7ce15fa72d0806f34202d2603ef397a740453c63
+D278_14_ATTEMPT_4_BINARY_SHA256=01f6e3ff9cc023ade55d69f94108d8546d0ee321b90475aa43b1128f6255089e
+D278_14_ATTEMPT_4_OUTCOME=FAIL_DUPLICATE_A2_ACK_AFTER_REARM
+D278_14_ATTEMPT_4_FAILURE_CLASS=INTEGRATED_PATH_TERMINAL
+D278_14_ATTEMPT_4_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
+D278_14_ATTEMPT_4_SECURE_COMMAND_COUNT=1
+D278_14_ATTEMPT_4_ACK_COUNT=1
+D278_14_ATTEMPT_4_TYPED_COUNT=0
+D278_14_ATTEMPT_4_PHYSICAL_SUBMIT_COUNT=3
+D278_14_ATTEMPT_4_PHYSICAL_IN_SUBMIT_COUNT=2
+D278_14_ATTEMPT_4_PHYSICAL_OUT_SUBMIT_COUNT=1
+D278_14_ATTEMPT_4_PHYSICAL_IN_COMPLETION_COUNT=2
+D278_14_ATTEMPT_4_PHYSICAL_OUT_COMPLETION_COUNT=1
+D278_14_ATTEMPT_4_PROTOCOL_FAILURE_KIND=ACK_SHAPE_MISMATCH
+D278_14_ATTEMPT_4_OBSERVED_OUTER_TYPE=0xA0
+D278_14_ATTEMPT_4_OBSERVED_A0_CONTROL=0xB0
+D278_14_ATTEMPT_4_OBSERVED_ACK_ECHO=0xA2
+D278_14_ATTEMPT_4_OBSERVED_ACK_STATUS=0x01
+D278_14_ATTEMPT_4_OBSERVED_BODY_LENGTH=2
+D278_14_ATTEMPT_4_REENTRY_PRE_ACK_TYPED_OBSERVED=false
+D278_14_ATTEMPT_4_REENTRY_PRE_ACK_TYPED_DISCARD_COUNT=0
+D278_14_ATTEMPT_4_A8_REACHED=false
+D278_14_ATTEMPT_4_TLS_REACHED=false
+D278_14_ATTEMPT_4_POST_TLS_REACHED=false
+D278_14_ATTEMPT_4_STOP_TIME_MS=158
+D278_14_ATTEMPT_4_BACKEND_DRAINED=true
+D278_14_ATTEMPT_4_CLEANUP_COMPLETE=true
+D278_14_ATTEMPT_4_PROJECT_SECRET_ZEROIZED=true
+D278_14_ATTEMPT_4_RETRY_COUNT=0
+D278_14_ATTEMPT_4_REOPEN_COUNT=0
+D278_14_ATTEMPT_4_DEVICE_RESET_COUNT=0
+D278_14_ATTEMPT_4_CLEAR_HALT_COUNT=0
+D278_14_ATTEMPT_4_PERSISTENT_DEVICE_WRITE_COUNT=0
+D278_14_ATTEMPT_4_CORE_DUMP_LIMIT=0
 ```
 
-After target selection and open/claim, `goodix_fpimage_device_new_for_usb()`
-aborted in repository-local `fp_device_set_property()`:
+Evidence classification and bounded model:
 
 ```text
-Rockytkg/libfprint/libfprint/fp-device.c:336:
-fp_device_set_property:
-assertion failed: (g_value_get_object (value) == NULL)
+INTER_SESSION_RX_RESIDUE_OBSERVED_DIRECTLY=false
+INTER_SESSION_RX_RESIDUE_MODEL=STRONG_HYPOTHESIS
+NEW_OPEN_CLAIM_IMPLIES_EMPTY_RX=DISPROVEN_AS_SAFE_ASSUMPTION
+BACKEND_DRAINED_IMPLIES_DEVICE_RX_EMPTY=false
+
+attempt #2:
+  current A2 ACK read
+  typed A2 not read because no second IN
+
+attempt #3:
+  first IN receives A2 typed-shaped frame before ACK
+  run fails
+  current attempt #3 ACK may remain unread
+
+attempt #4:
+  first IN produces accepted A2 ACK
+  second IN produces another valid-shaped A2 ACK
+  run fails as duplicate ACK
 ```
 
-The failure is host-side construction, not a Goodix protocol response. The
-abort occurred before `begin_operator_epoch`, A2, A8, TLS or post-TLS. The
-core dump was not read, copied, uploaded, analyzed or added to Git.
+This sequence strongly supports inter-session RX residue. It does not prove
+the exact origin, age, or causal provenance of any quarantined or observed
+frame.
 
-## Live attempt #2
-
-A second, separate explicit one-shot authorization was granted for baseline
-`fceae05d9ff3ed14348f9031706e70d5a808ff91`.
+## Correctives #1–#5 retained as history
 
 ```text
-D278_14_ATTEMPT_2_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
-D278_14_ATTEMPT_2_BINARY_SHA256=de935e0a3fc89a345a2bad624ba3d218f51ab036597d13566d985efbada4f270
-D278_14_ATTEMPT_2_OUTCOME=FAIL_RECEIVE_REARM_HOST_PLUMBING
-D278_14_ATTEMPT_2_FAILURE_CLASS=ONE_SHOT_DEADLINE
-D278_14_ATTEMPT_2_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
-D278_14_ATTEMPT_2_SECURE_COMMAND_COUNT=1
-D278_14_ATTEMPT_2_ACK_COUNT=1
-D278_14_ATTEMPT_2_TYPED_COUNT=0
-D278_14_ATTEMPT_2_PHYSICAL_IN_SUBMIT_COUNT=1
-D278_14_ATTEMPT_2_PHYSICAL_OUT_SUBMIT_COUNT=1
-D278_14_ATTEMPT_2_REENTRY_A2_RESULT=FAIL_CLOSED
-D278_14_ATTEMPT_2_A8_REACHED=false
-D278_14_ATTEMPT_2_TLS_REACHED=false
-D278_14_ATTEMPT_2_POST_TLS_REACHED=false
-D278_14_ATTEMPT_2_FIRST_ACQUISITION_REACHED=false
-D278_14_ATTEMPT_2_SECOND_ACQUISITION_REACHED=false
-D278_14_ATTEMPT_2_USB_OPEN_COUNT=1
-D278_14_ATTEMPT_2_USB_CLAIM_COUNT=1
-D278_14_ATTEMPT_2_USB_RELEASE_COUNT=1
-D278_14_ATTEMPT_2_USB_CLOSE_COUNT=1
-D278_14_ATTEMPT_2_BACKEND_DRAINED=true
-D278_14_ATTEMPT_2_CLEANUP_COMPLETE=true
-D278_14_ATTEMPT_2_PROJECT_SECRET_ZEROIZED=true
-D278_14_ATTEMPT_2_CORE_DUMP_LIMIT=0
-D278_14_ATTEMPT_2_RETRY_COUNT=0
-D278_14_ATTEMPT_2_REOPEN_COUNT=0
-D278_14_ATTEMPT_2_DEVICE_RESET_COUNT=0
-D278_14_ATTEMPT_2_CLEAR_HALT_COUNT=0
-D278_14_ATTEMPT_2_PERSISTENT_DEVICE_WRITE_COUNT=0
+CORRECTIVE_1=FPDEVICE_USB_BINDING_CONSTRUCTION
+CORRECTIVE_2=IN_COMPLETION_REARM_UNIFICATION
+CORRECTIVE_3=OPERATOR_UX_HISTORY_AND_STOP_TELEMETRY
+CORRECTIVE_4=EXACT_BANNERS_AND_TERMINAL_STOP_EXCLUSIVITY
+CORRECTIVE_5=BOUNDED_PRE_ACK_PINNED_A2_TOLERANCE
+D278_14_CORRECTIVE_5_STATUS=SUPERSEDED_BEFORE_NEXT_LIVE
+D278_14_CORRECTIVE_5_LIVE_VALIDATION_PERFORMED=false
 ```
 
-Root cause:
+Corrective #5 existed only in host tests and production-shaped code at
+baseline `7ce15fa72d0806f34202d2603ef397a740453c63`. Corrective #6 removes its
+one-frame discard behavior and result class. The protocol contract is strict
+again: ACK must precede typed A2; typed-before-ACK, duplicate ACK, wrong ACK
+status, wrong typed control/pin/shape, or malformed input is terminal.
 
 ```text
-D278_14_ATTEMPT_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
+CORRECTIVE_5_RUNTIME_TOLERANCE_RETIRED=true
+STRICT_A2_ACK_THEN_TYPED_RESTORED=true
 ```
 
-The A2 command was submitted and its ACK was received, but the typed A2
-response was **not observable because no second physical IN was submitted**.
-The receive re-arm logic lived in `goodix_device_context_complete_receive()`,
-which the production real-USB path does not call. The operator did not place a
-finger; finger interaction was irrelevant because the run never reached A8,
-TLS, post-TLS or acquisition.
+## Corrective #6 — structural pre-session RX synchronization
+
+The live-shaped physical order is now:
 
 ```text
-D278_14_TOTAL_LIVE_ATTEMPTS=3
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=3
+authorization gate
+protected material preparation
+target enumeration and Goodix FpDevice construction
+USB open and claim
+one GoodixDeviceContext operator epoch / generation
+PRE_SESSION_RX_SYNC
+only after PASS: post-TLS configuration, secure-session start, first A2 OUT
 ```
 
-## Live attempt #3
+`GoodixFpiUsbBackend` records each outstanding IN purpose as either
+`PROTOCOL_RX` or `PRE_SESSION_SYNC_RX`. The sync purpose is the same physical
+backend and never reaches `GoodixUsbRouter` or `GoodixSecureSession`. Its
+completion callback receives only length/error metadata for bounded counting;
+raw bytes are neither parsed nor logged. `context_usb_in_completed()` remains
+the normal protocol rearm callback and is not invoked for sync completions.
 
-The third authorization was consumed on baseline
-`87c1bf89d0ba28497313f4bb75a8de4bbdb37b75`. Its first receive completed with
-an A0/A2 typed-shaped three-byte body before any ACK. The run did not log that
-body's hash, so a match against the pinned A2 response is unknown and must not
-be claimed.
+The production receive uses the existing `FpiUsbTransfer` timeout argument.
+Repository-local libfprint passes through the error from
+`g_usb_device_bulk_transfer_finish()`, so the accepted quiet-boundary error is
+the actual GUsb classification:
 
 ```text
-D278_14_ATTEMPT_3_BASELINE=87c1bf89d0ba28497313f4bb75a8de4bbdb37b75
-D278_14_ATTEMPT_3_BINARY_SHA256=346aadf64c49b6757c236a097264465ef4de130798aa82109056604930162d90
-D278_14_ATTEMPT_3_OUTCOME=FAIL_PRE_ACK_TYPED_A2
-D278_14_ATTEMPT_3_FAILURE_CLASS=INTEGRATED_PATH_TERMINAL
-D278_14_ATTEMPT_3_PHASE_TRACE=REENTRY_RECOVERY_A2>TERMINAL
-D278_14_ATTEMPT_3_SECURE_COMMAND_COUNT=1
-D278_14_ATTEMPT_3_ACK_COUNT=0
-D278_14_ATTEMPT_3_TYPED_COUNT=0
-D278_14_ATTEMPT_3_PHYSICAL_IN_SUBMIT_COUNT=1
-D278_14_ATTEMPT_3_PHYSICAL_OUT_SUBMIT_COUNT=1
-D278_14_ATTEMPT_3_PHYSICAL_IN_COMPLETION_COUNT=1
-D278_14_ATTEMPT_3_PHYSICAL_OUT_COMPLETION_COUNT=1
-D278_14_ATTEMPT_3_PROTOCOL_FAILURE_KIND=TYPED_SHAPE_MISMATCH
-D278_14_ATTEMPT_3_OBSERVED_OUTER_TYPE=0xA0
-D278_14_ATTEMPT_3_OBSERVED_A0_CONTROL=0xA2
-D278_14_ATTEMPT_3_OBSERVED_BODY_LENGTH=3
-D278_14_ATTEMPT_3_OBSERVED_ACK_ECHO=UNAVAILABLE
-D278_14_ATTEMPT_3_OBSERVED_ACK_STATUS=UNAVAILABLE
-D278_14_ATTEMPT_3_A8_REACHED=false
-D278_14_ATTEMPT_3_TLS_REACHED=false
-D278_14_ATTEMPT_3_POST_TLS_REACHED=false
-D278_14_ATTEMPT_3_STOP_TIME_MS=145
-D278_14_ATTEMPT_3_BACKEND_DRAINED=true
-D278_14_ATTEMPT_3_CLEANUP_COMPLETE=true
-D278_14_ATTEMPT_3_PROJECT_SECRET_ZEROIZED=true
-D278_14_ATTEMPT_3_RETRY_COUNT=0
-D278_14_ATTEMPT_3_REOPEN_COUNT=0
-D278_14_ATTEMPT_3_DEVICE_RESET_COUNT=0
-D278_14_ATTEMPT_3_CLEAR_HALT_COUNT=0
-D278_14_ATTEMPT_3_PERSISTENT_DEVICE_WRITE_COUNT=0
-D278_14_ATTEMPT_3_CORE_DUMP_LIMIT=0
-PRE_ACK_TYPED_A2_OBSERVED=true
-PRE_ACK_TYPED_A2_PIN_MATCH=UNKNOWN
-STALE_TYPED_FROM_ATTEMPT_2=STRONG_HYPOTHESIS_NOT_PROVEN
+timeout_domain=G_USB_DEVICE_ERROR
+timeout_code=G_USB_DEVICE_ERROR_TIMED_OUT
+PRE_SESSION_RX_QUIET_TIMEOUT_MS=250
+PRE_SESSION_RX_MAX_COMPLETIONS=16
+PRE_SESSION_RX_MAX_BYTES=65536
+PRE_SESSION_RX_MAX_TOTAL_MS=2000
 ```
 
-The bounded hypothesis is that attempt #2 received the A2 ACK but terminated
-before submitting the next IN, leaving the expected typed A2 unread; attempt
-#3 then received a typed-shaped A2 first. The router preserves byte order and
-can parse multiple frames from one completion, excluding software reordering.
-This remains a strong hypothesis, not proof of provenance or pin equality.
+A quiet timeout passes only while sync is active, with zero returned data and
+no outstanding IN/OUT. Each non-empty success is counted, discarded and
+immediately followed by one new timed IN. A non-timeout error, empty success,
+completion/byte/time bound failure, OUT attempt, or secure-session start before
+PASS fails closed before A2.
 
-## Corrective #1 — FpDevice USB binding
-
-The first host-only corrective kept the base shell `VIRTUAL` and added a
-thin transport-typing `USB` subclass used only by
-`goodix_fpimage_device_new_for_usb()`. The subclass inherits the same
-`GoodixDeviceContext`, backend, router, secure-session, TLS, lifecycle and
-decoder. Construction and binding validation now happen after target selection
-but before open/claim.
+The integrated tests use `GoodixDeviceContext` and
+`goodix_fpi_usb_backend_complete_receive()` directly. They quarantine stale
+typed-A2/ACK-A2/typed-A2 as separate completions and the same sequence
+concatenated into one completion, prove zero router delivery/command/OUT before
+quiet PASS, then submit exactly one current A2 and advance with current
+ACK→typed→A8. Maximum physical IN outstanding remains one.
 
 ```text
-D278_14_CORRECTIVE_1=FPDEVICE_USB_BINDING_CONSTRUCTION
-D278_14_CORRECTIVE_1_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
-D278_14_CORRECTIVE_1_OUTCOME=PASS_HOST_ONLY
-FPDEVICE_USB_BINDING_CORRECTED=true
-FPDEVICE_TRANSPORT_TYPE_USB_COMPATIBLE=true
-NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true
-PHYSICAL_CONSTRUCTOR_BEFORE_USB_OPEN_CLAIM=true
-FPDEVICE_USB_BINDING_CONSTRUCTION_HOST_ONLY=PASS
-```
-
-## Corrective #2 — IN completion re-arm unification
-
-The second host-only corrective unified IN-completion follow-up between the
-synthetic test seam and the production backend path. `GoodixDeviceContext`
-registers `context_usb_in_completed()` once on the backend; the callback
-re-arms receive when needed and no IN is outstanding.
-`goodix_device_context_complete_receive()` remains only a host/test injection
-seam.
-
-```text
-D278_14_CORRECTIVE_2=IN_COMPLETION_REARM_UNIFICATION
-D278_14_CORRECTIVE_2_BASELINE=fceae05d9ff3ed14348f9031706e70d5a808ff91
-D278_14_CORRECTIVE_2_OUTCOME=PASS_HOST_ONLY
-D278_14_CORRECTIVE_2_ROOT_CAUSE=REAL_USB_BACKEND_COMPLETION_BYPASSES_CONTEXT_RECEIVE_REARM_FOLLOWUP
-D278_14_CORRECTIVE_2_FIX=IN_COMPLETED_CALLBACK_UNIFIES_REAL_AND_SYNTHETIC_PATHS
-SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
-BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
-BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
-MAX_PHYSICAL_IN_OUTSTANDING=1
-NO_PARALLEL_STACK=true
-```
-
-`test_backend_in_completion_rearms_receive` calls
-`goodix_fpi_usb_backend_complete_receive()` directly for the A2 ACK, asserts
-that a second IN is submitted, then feeds the typed A2 response on that second
-IN and asserts advancement to A8.
-
-## Corrective #3 — operator UX, evidence history, telemetry closure
-
-This step corrects the historical record and closes operator-facing UX without
-changing protocol semantics or the core re-arm design.
-
-### Operator prompt state machine
-
-The operator tool now monitors the actual `GoodixPostTlsPhase` at 10 ms and
-emits Italian action banners only once per persistent wait phase:
-
-- `GOODIX_POST_TLS_PHASE_FIRST_IRQ2`
-  `METTI IL DITO SUL SENSORE E ATTENDI IL PROSSIMO MESSAGGIO`
-- `GOODIX_POST_TLS_PHASE_RELEASE_IRQ200`
-  `TOGLI IL DITO DAL SENSORE E ATTENDI IL PROSSIMO MESSAGGIO`
-- `GOODIX_POST_TLS_PHASE_SECOND_IRQ2`
-  `METTI DI NUOVO IL DITO SUL SENSORE E ATTENDI IL PROSSIMO MESSAGGIO`
-- `GOODIX_POST_TLS_PHASE_STOP`
-  `TEST COMPLETATO. TOGLI IL DITO DAL SENSORE. NON ESEGUIRE NUOVAMENTE IL COMANDO.`
-- terminal / one-shot deadline
-  `TEST INTERROTTO. NON ESEGUIRE NUOVAMENTE IL COMANDO.`
-
-Banners are surrounded by visible `======================` separator lines.
-Success and failure banners are mutually exclusive; duplicate suppression is
-proven host-only.
-
-```text
-OPERATOR_MESSAGES_LANGUAGE=ITALIAN
-OPERATOR_ACTION_BANNERS_IMPLEMENTED=true
-OPERATOR_ACTION_BANNER_FORMAT_EXACT=true
-OPERATOR_ACTION_BANNER_MACHINE_PREFIX=false
-OPERATOR_PROMPTS_RUNTIME_STATE_DRIVEN=true
-OPERATOR_PROMPT_SEQUENCE_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true
-OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_STOP_THEN_TERMINAL_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_TERMINAL_THEN_STOP_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_PRELIVE_GATED=true
-```
-
-### Bounded stop telemetry
-
-The live-shaped JSON output now captures stop-state values before teardown:
-
-```text
-secure_protocol_failure_recorded
-secure_protocol_failure_phase
-secure_protocol_failure_kind
-post_tls_terminal
-observed_outer_type
-observed_a0_control
-observed_ack_echo
-observed_ack_status
-observed_body_length
-secure_phase_at_stop
-post_tls_phase_at_stop
-in_outstanding_at_stop
-router_outstanding_at_stop
-stop_time_ms
-```
-
-No PSK, raw OTP, raw CONFIG90, FDT bytes, raw fingerprint/image data,
-authorization nonce or protected material is logged.
-
-```text
-BOUNDED_STOP_TELEMETRY_COMPLETE=true
-SENSITIVE_TELEMETRY_EXPOSURE=false
-```
-
-## Corrective #4 — exact banners and terminal/STOP exclusivity
-
-The follow-up micro-corrective pins the exact multiline banner format, removes
-machine prefixes from operator actions, and proves that STOP→TERMINAL and
-TERMINAL→STOP callback orderings cannot emit contradictory final banners.
-
-## Corrective #5 — bounded pre-ACK pinned A2 residue
-
-Only in `REENTRY_RECOVERY_A2`, the secure-session policy may discard exactly
-one typed A2 received before the current ACK when its body is exactly three
-bytes and its SHA-256 matches `material.a2_response_sha256`. The discarded
-frame is audited as `PRE_ACK_PINNED_TYPED_DISCARDED`, does not increment the
-normal typed count, complete the phase, advance to A8 or submit another A2.
-The existing backend completion callback re-arms the sole physical IN, after
-which the current command must still complete the normal strict sequence:
-valid ACK, then a second pinned typed A2, then A8.
-
-Wrong length, wrong pin, a second pre-ACK pinned A2, any attempt outside the
-reentry phase, unexpected control/class and malformed frames remain terminal.
-No raw three-byte body is logged.
-
-The integrated backend-level regression uses one `GoodixDeviceContext` and
-calls `goodix_fpi_usb_backend_complete_receive()` directly. It proves IN
-submit counts 1→2→3 across pre-ACK discard and ACK, maximum one outstanding
-IN, normal typed count 0 until the post-ACK typed response, and final advance
-to A8. The unchanged ACK→typed regression remains green.
-
-```text
-REENTRY_PRE_ACK_PINNED_TYPED_BOUNDED_DISCARD_IMPLEMENTED=true
-PRE_ACK_PINNED_TYPED_THEN_ACK_THEN_TYPED_TO_A8_HOST_ONLY_PROVEN=true
-SECOND_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-WRONG_PIN_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-WRONG_LENGTH_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-PRE_ACK_TYPED_OUTSIDE_REENTRY_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-CORE_IN_REARM_CORRECTIVE_RETAINED=true
-MAX_PHYSICAL_IN_OUTSTANDING=1
-NO_PARALLEL_STACK=true
-```
-
-## Regression results
-
-All commands ran from the Git root. Flatpak tests used Freedesktop SDK 25.08
-with networking explicitly disabled. No test enumerated or opened a real USB
-device.
-
-| Check | Result |
-| --- | --- |
-| `run_goodix_fpimage_device_test.sh` | 18/18 normal PASS; 18/18 ASAN/UBSAN PASS |
-| `run_goodix_d278_secure_session_test.sh` | 20/20 normal PASS; 20/20 ASAN/UBSAN PASS |
-| `run_goodix_d278_12_post_tls_test.sh` | 6/6 normal PASS; 6/6 ASAN/UBSAN PASS |
-| `run_goodix_d278_02_test.sh` | 62/62 normal PASS; 62/62 ASAN/UBSAN PASS |
-| D278/13 adapter build/link/`ldd` | PASS |
-| operator launcher `--host-only-prelive` from cwd `/tmp` | PASS |
-| adapter `--operator-prompt-state-machine-host-only` | PASS |
-| operator prompt STOP→TERMINAL exclusivity | PASS |
-| operator prompt TERMINAL→STOP exclusivity | PASS |
-| operator action banner exact format (no machine prefix) | PASS |
-| adapter `--physical-constructor-host-only` | PASS |
-| canonical baseline guard (`--baseline-only`) | PASS |
-| ticket single-shot guard tests (built-in) | PASS |
-| forbidden persistent-recovery source/symbol audit | PASS |
-| duplicate-stack audit | PASS |
-| legacy-harness fallback audit | PASS |
-| changed shell `sh -n` | PASS |
-| `git diff --check` | PASS |
-
-The unchanged architecture tests retain:
-
-```text
-D278_13_ARCHITECTURE_RETAINED=true
-NO_PARALLEL_STACK=true
+PRE_SESSION_RX_SYNC_IMPLEMENTED=true
+PRE_SESSION_RX_CLEAN_QUIET_BOUNDARY_HOST_ONLY_PROVEN=true
+PRE_SESSION_RX_RESIDUE_CHAIN_QUARANTINED_HOST_ONLY_PROVEN=true
+PRE_SESSION_RX_MULTI_FRAME_COMPLETION_QUARANTINED_HOST_ONLY_PROVEN=true
+PRE_SESSION_RX_NON_TIMEOUT_ERROR_FAIL_CLOSED=true
+PRE_SESSION_RX_BOUNDS_FAIL_CLOSED=true
+PRE_SESSION_RX_OUT_BEFORE_SYNC_REJECTED=true
+PRE_SESSION_RX_SECURE_START_BEFORE_SYNC_REJECTED=true
+SAME_GOODIX_DEVICE_CONTEXT=true
 SINGLE_GOODIX_DEVICE_CONTEXT=true
 SINGLE_USB_BACKEND_OWNER=true
 SINGLE_USB_ROUTER=true
 SINGLE_PHYSICAL_IN_OWNER=true
-SINGLE_TLS_OBJECT=true
-TLS_HANDSHAKE_COUNT_MAX=1
-SECRET_HANDOFF_COUNT_MAX=1
-THIRD_CYCLE_COMMAND_COUNT=0
-RETRY_COUNT=0
-REOPEN_COUNT=0
-DEVICE_RESET_COUNT=0
-CLEAR_HALT_COUNT=0
-PERSISTENT_DEVICE_WRITE_COUNT=0
+NO_PARALLEL_RX_DRAIN_STACK=true
+MAX_PHYSICAL_IN_OUTSTANDING=1
 ```
 
-## No-live boundary and residual gate
+Only bounded non-sensitive live-shaped telemetry was added:
 
 ```text
-CORE_IN_REARM_CORRECTIVE_RETAINED=true
-SYNTHETIC_AND_REAL_IN_COMPLETION_FOLLOWUP_UNIFIED=true
-BACKEND_LEVEL_A2_ACK_COMPLETION_REARMS_NEXT_IN=true
-BACKEND_LEVEL_A2_TYPED_COMPLETION_ADVANCES_TO_A8=true
-D278_14_TOTAL_LIVE_ATTEMPTS=3
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=3
-D278_14_HISTORY_CORRECTED=true
-OPERATOR_MESSAGES_LANGUAGE=ITALIAN
-OPERATOR_ACTION_BANNERS_IMPLEMENTED=true
-OPERATOR_ACTION_BANNER_FORMAT_EXACT=true
-OPERATOR_ACTION_BANNER_MACHINE_PREFIX=false
-OPERATOR_PROMPTS_RUNTIME_STATE_DRIVEN=true
-OPERATOR_PROMPT_SEQUENCE_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_SUCCESS_FAILURE_EXCLUSIVE=true
-OPERATOR_PROMPT_DUPLICATE_SUPPRESSION_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_STOP_THEN_TERMINAL_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_TERMINAL_THEN_STOP_HOST_ONLY_PROVEN=true
-OPERATOR_PROMPT_PRELIVE_GATED=true
-BOUNDED_STOP_TELEMETRY_COMPLETE=true
-SENSITIVE_TELEMETRY_EXPOSURE=false
-NO_PARALLEL_STACK=true
+pre_session_rx_sync_started
+pre_session_rx_sync_completed
+pre_session_rx_quiet_boundary
+pre_session_rx_discarded_completion_count
+pre_session_rx_discarded_byte_count
+pre_session_rx_timeout_count
+pre_session_rx_non_timeout_error_count
+pre_session_rx_max_outstanding
+pre_session_rx_elapsed_ms
+pre_session_rx_result
+first_protocol_out_after_rx_sync
+SENSITIVE_RX_SYNC_TELEMETRY_EXPOSURE=false
+```
+
+## Generic baseline-bound operator workflow
+
+The tracked launcher now exposes:
+
+```text
+--host-only-prelive
+--prepare-approved-live <FULL_APPROVED_SHA>
+--run-approved-live <PREPARED_BUILD_DIR> --grant <GRANT_FILE>
+```
+
+Preparation is normal-user-only, requires canonical `main`, exact HEAD and a
+clean live-critical set, runs canonical host-only prelive, builds from the
+approved Git archive with the existing build guard, and writes
+`d278-14-prepared.state` containing the full baseline, operation, build path
+and binary SHA-256. It does not touch USB, production material, grants, or live.
+
+The one-shot mode is root-only, sets `ulimit -c 0`, rechecks canonical HEAD and
+live-critical cleanliness, validates state and the prepared binary hash,
+validates a nonsymlink grant with private permissions and exact
+baseline/operation/unique ID, atomically claims that ID once, creates a private
+runtime ticket, copies and re-hashes the exact prepared binary, saves a live
+log and never rebuilds. The baseline is data; no new baseline-specific wrapper
+is required. The legacy direct mode is a fail-closed refusal.
+
+Host-only workflow tests cover wrong HEAD, dirty live-critical input, exact
+state binding, binary hash mismatch, malformed/baseline-mismatched/symlink
+grants, second use, concurrent double claim and direct unprepared invocation.
+The test-only branch can only skip live; it cannot enable it.
+
+```text
+GENERIC_BASELINE_BOUND_OPERATOR_WORKFLOW_HOST_ONLY_PROVEN=true
+DIRECT_UNPREPARED_LIVE_PATH_REJECTED=true
+ONE_AUTHORIZATION_ONE_ATTEMPT_GUARD_HOST_ONLY_PROVEN=true
+SECOND_USE_OF_AUTHORIZATION_REJECTED=true
+```
+
+## Methodological review before any future live
+
+1. What changes from attempt #4: synchronization occurs passively before the
+   first protocol OUT, rather than tolerating one response inside the active A2
+   transaction.
+2. New hypothesis: a bounded sequence of immediately available RX completions
+   followed by a genuine timed quiet interval isolates inter-session residue
+   without interpreting or attributing it.
+3. If another authorized run fails at the same first A2 boundary, do not add
+   another shape-specific tolerance or repeat the run; reassess endpoint/device
+   queue semantics from the new sync telemetry and captured failure boundary.
+
+This is a substantive method and hypothesis change, not a pacing, logging,
+packaging or preflight-only change. It does not authorize a future live.
+
+## Regression and no-live boundary
+
+All commands ran from the Git root except the explicitly required canonical
+prelive invocation, which ran from `/tmp`. Flatpak suites used Freedesktop SDK
+25.08 with networking disabled.
+
+| Check | Result |
+| --- | --- |
+| `run_goodix_fpimage_device_test.sh` | 18/18 normal; 18/18 ASAN/UBSAN PASS |
+| `run_goodix_d278_secure_session_test.sh` | 24/24 normal; 24/24 ASAN/UBSAN PASS |
+| `run_goodix_d278_12_post_tls_test.sh` | 6/6 normal; 6/6 ASAN/UBSAN PASS |
+| `run_goodix_d278_02_test.sh` | 62/62 normal; 62/62 ASAN/UBSAN PASS |
+| D278/13 adapter build/link + physical constructor | PASS |
+| baseline and original ticket guards | PASS |
+| D278/14 prepared-state/grant workflow guards | PASS |
+| persistent-recovery source/symbol audits | PASS |
+| duplicate-stack and legacy-harness audits | PASS |
+| canonical `--host-only-prelive` from `/tmp` | PASS |
+| changed shell `bash -n` and `sh -n` | PASS |
+| `git diff --check` | PASS |
+
+```text
+NO_FLASH=true
+NO_IAP=true
+NO_CLEARAPP=true
+NO_PSK_PROVISIONING=true
+NO_PSK_REPLACEMENT=true
+NO_OTP_WRITE=true
+NO_FACTORY_WRITE=true
+NO_PERSISTENT_DEVICE_WRITE=true
+NO_PERSISTENT_VID_PID_MODE_CHANGE=true
 RETRY_COUNT=0
 REOPEN_COUNT=0
 DEVICE_RESET_COUNT=0
@@ -394,15 +305,13 @@ READY_FOR_LIVE=false
 RETRY_AUTHORIZED=false
 ```
 
-A future sensor-reaching execution requires commit/push, independent AI-PM
-review of a new live-critical baseline, explicit User authorization and a new
-one-shot operator kit/ticket.
-
 ## Git-native review set
 
 ```text
-REVIEW_SET=BASELINE_87c1bf89d0ba28497313f4bb75a8de4bbdb37b75_ON_main_PLUS_FINAL_COMMIT_PLUS_CURRENT_STEP_CHANGED_FILES
+PARENT_HEAD=7ce15fa72d0806f34202d2603ef397a740453c63
+REVIEW_SET=PARENT_HEAD_PLUS_FINAL_COMMIT_ON_main_PLUS_CURRENT_D278_14_CHANGED_FILES
 ```
 
 No ZIP/Base64, branch change, merge, reset, core-dump operation, real USB
-access or production-secret read was performed by this corrective.
+access, production-secret read, grant creation, or live execution was performed
+by corrective #6.

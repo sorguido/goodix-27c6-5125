@@ -37,6 +37,36 @@ typedef struct _GoodixDeviceContext GoodixDeviceContext;
 typedef struct _GoodixInMemoryBackend GoodixInMemoryBackend;
 typedef struct _GoodixUsbRouter GoodixUsbRouter;
 typedef struct _GUsbDevice GUsbDevice;
+
+#define GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS 250u
+#define GOODIX_PRE_SESSION_RX_MAX_COMPLETIONS 16u
+#define GOODIX_PRE_SESSION_RX_MAX_BYTES 65536u
+#define GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS 2000u
+
+typedef enum
+{
+  GOODIX_PRE_SESSION_RX_SYNC_NOT_STARTED = 0,
+  GOODIX_PRE_SESSION_RX_SYNC_ACTIVE,
+  GOODIX_PRE_SESSION_RX_SYNC_PASS,
+  GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED,
+} GoodixPreSessionRxSyncResult;
+
+typedef struct
+{
+  gboolean pre_session_rx_sync_started;
+  gboolean pre_session_rx_sync_completed;
+  gboolean pre_session_rx_quiet_boundary;
+  guint64 pre_session_rx_discarded_completion_count;
+  guint64 pre_session_rx_discarded_byte_count;
+  guint64 pre_session_rx_timeout_count;
+  guint64 pre_session_rx_non_timeout_error_count;
+  guint pre_session_rx_max_outstanding;
+  guint64 pre_session_rx_elapsed_ms;
+  GoodixPreSessionRxSyncResult pre_session_rx_result;
+  gboolean first_protocol_out_after_rx_sync;
+} GoodixPreSessionRxSyncAudit;
+
+typedef gint64 (*GoodixPreSessionRxSyncClockFunc) (gpointer user_data);
 typedef void (*GoodixDeviceContextSecurePhaseObserver) (
   GoodixSecurePhase phase,
   guint64           generation,
@@ -112,6 +142,21 @@ gboolean goodix_device_context_begin_operator_epoch (
   GoodixDeviceContext *ctx,
   GCancellable        *cancellable,
   GError             **error);
+gboolean goodix_device_context_begin_pre_session_rx_sync (
+  GoodixDeviceContext *ctx,
+  GError             **error);
+GoodixPreSessionRxSyncResult goodix_device_context_get_pre_session_rx_sync_result (
+  GoodixDeviceContext *ctx);
+void goodix_device_context_get_pre_session_rx_sync_audit (
+  GoodixDeviceContext          *ctx,
+  GoodixPreSessionRxSyncAudit  *audit);
+const gchar *goodix_pre_session_rx_sync_result_name (
+  GoodixPreSessionRxSyncResult result);
+/* Deterministic host-only bound testing; set only while no sync is active. */
+void goodix_device_context_set_pre_session_rx_sync_clock (
+  GoodixDeviceContext                *ctx,
+  GoodixPreSessionRxSyncClockFunc     clock_func,
+  gpointer                            user_data);
 void goodix_device_context_stop_operator_epoch (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_operator_epoch_is_drained (
   GoodixDeviceContext *ctx);

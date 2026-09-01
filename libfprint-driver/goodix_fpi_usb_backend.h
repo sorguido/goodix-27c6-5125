@@ -7,6 +7,12 @@ typedef struct _GoodixUsbRouter GoodixUsbRouter;
 typedef struct _GoodixFpiUsbBackend GoodixFpiUsbBackend;
 
 typedef enum { GOODIX_USB_TRANSFER_IN, GOODIX_USB_TRANSFER_OUT } GoodixUsbDirection;
+typedef enum
+{
+  GOODIX_USB_RECEIVE_NONE = 0,
+  GOODIX_USB_RECEIVE_PROTOCOL_RX,
+  GOODIX_USB_RECEIVE_PRE_SESSION_SYNC_RX,
+} GoodixUsbReceivePurpose;
 /* @bytes is borrowed (transfer-none) during the callback. */
 typedef void (*GoodixUsbSubmitSeam) (GoodixFpiUsbBackend *backend,
                                      GoodixUsbDirection direction,
@@ -22,6 +28,13 @@ typedef void (*GoodixFpiUsbBackendOutCompletedFunc) (
 typedef void (*GoodixFpiUsbBackendInCompletedFunc) (
   GoodixFpiUsbBackend *backend,
   guint64              submit_generation,
+  const GError        *error,
+  gpointer             user_data);
+typedef void (*GoodixFpiUsbBackendSyncCompletedFunc) (
+  GoodixFpiUsbBackend *backend,
+  guint64              submit_generation,
+  const guint8        *data,
+  gsize                length,
   const GError        *error,
   gpointer             user_data);
 
@@ -49,6 +62,10 @@ void goodix_fpi_usb_backend_set_in_completed_callback (
   GoodixFpiUsbBackend                *backend,
   GoodixFpiUsbBackendInCompletedFunc  callback,
   gpointer                            user_data);
+void goodix_fpi_usb_backend_set_sync_completed_callback (
+  GoodixFpiUsbBackend                  *backend,
+  GoodixFpiUsbBackendSyncCompletedFunc  callback,
+  gpointer                              user_data);
 gboolean goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                                                    guint64 generation,
                                                    GCancellable *cancellable,
@@ -56,6 +73,19 @@ gboolean goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
 gboolean goodix_fpi_usb_backend_arm_receive (GoodixFpiUsbBackend *backend,
                                              guint64 generation,
                                              GError **error);
+gboolean goodix_fpi_usb_backend_begin_pre_session_sync (
+  GoodixFpiUsbBackend *backend,
+  guint64              generation,
+  GError              **error);
+gboolean goodix_fpi_usb_backend_arm_pre_session_sync_receive (
+  GoodixFpiUsbBackend *backend,
+  guint64              generation,
+  guint                timeout_ms,
+  GError              **error);
+gboolean goodix_fpi_usb_backend_end_pre_session_sync (
+  GoodixFpiUsbBackend *backend,
+  guint64              generation,
+  GError              **error);
 gboolean goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
                                             guint64 generation, GBytes *bytes,
                                             GError **error);
@@ -79,4 +109,10 @@ guint64 goodix_fpi_usb_backend_get_real_submit_count (GoodixFpiUsbBackend *backe
 guint64 goodix_fpi_usb_backend_get_out_submit_count (GoodixFpiUsbBackend *backend);
 guint64 goodix_fpi_usb_backend_get_in_completion_count (GoodixFpiUsbBackend *backend);
 guint64 goodix_fpi_usb_backend_get_out_completion_count (GoodixFpiUsbBackend *backend);
+GoodixUsbReceivePurpose goodix_fpi_usb_backend_get_receive_purpose (
+  GoodixFpiUsbBackend *backend);
+gboolean goodix_fpi_usb_backend_pre_session_sync_is_active (
+  GoodixFpiUsbBackend *backend);
+guint goodix_fpi_usb_backend_get_last_in_timeout_ms (
+  GoodixFpiUsbBackend *backend);
 #endif

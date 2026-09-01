@@ -817,6 +817,24 @@ run_operator_prompt_state_machine_host_only (void)
   seam.generation = generation;
   backend = goodix_device_context_get_fpi_usb_backend (ctx);
 
+  if (!goodix_device_context_begin_pre_session_rx_sync (ctx, &error))
+    {
+      g_printerr ("PRE_SESSION_RX_SYNC_BEGIN_FAILED: %s\n", error->message);
+      return 1;
+    }
+  g_assert_cmpuint (seam.in_submit_count, ==, 1u);
+  g_assert_cmpuint (g_queue_get_length (seam.out), ==, 0u);
+  {
+    g_autoptr(GError) timeout = g_error_new_literal (
+      G_USB_DEVICE_ERROR, G_USB_DEVICE_ERROR_TIMED_OUT,
+      "synthetic GUsb bulk timeout");
+    goodix_device_context_complete_receive (ctx, generation, NULL, 0,
+                                             timeout);
+  }
+  g_assert_cmpint (goodix_device_context_get_pre_session_rx_sync_result (ctx),
+                   ==, GOODIX_PRE_SESSION_RX_SYNC_PASS);
+  seam.in_submit_count = 0;
+
   if (!goodix_device_context_configure_post_tls_lifecycle (
         ctx, &post_material, &post_audit, &error))
     {
@@ -857,7 +875,7 @@ run_operator_prompt_state_machine_host_only (void)
   g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 1u);
   g_assert_cmpuint (seam.in_submit_count, ==, 2u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_in_completion_count (backend),
-                    ==, 1u);
+                    ==, 2u);
   operator_message (OP_MSG_HOST_ONLY_A2_ACK_RECEIVED);
 
   /* Typed A2 response on the re-armed second IN. */
@@ -872,7 +890,7 @@ run_operator_prompt_state_machine_host_only (void)
                      goodix_device_context_get_secure_session (ctx)), ==,
                    GOODIX_SECURE_PHASE_A8);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_in_completion_count (backend),
-                    ==, 2u);
+                    ==, 3u);
   operator_message (OP_MSG_HOST_ONLY_A2_TYPED_RECEIVED);
 
   /* Cancel the session and drain outstanding transfers for clean teardown. */
@@ -1048,6 +1066,10 @@ run_operator_prompt_state_machine_host_only (void)
   g_print ("REAL_USB_ACCESS=false\nREAL_USB_SUBMIT=0\n");
   g_print ("A2_BACKEND_COMPLETION_REARM=true\n");
   g_print ("A2_TYPED_ADVANCE_TO_A8=true\n");
+  g_print ("PRE_SESSION_RX_SYNC_IMPLEMENTED=true\n");
+  g_print ("PRE_SESSION_RX_CLEAN_QUIET_BOUNDARY_HOST_ONLY_PROVEN=true\n");
+  g_print ("STRICT_A2_ACK_THEN_TYPED_RESTORED=true\n");
+  g_print ("CORRECTIVE_5_RUNTIME_TOLERANCE_RETIRED=true\n");
   return 0;
 }
 
@@ -1241,6 +1263,7 @@ run_live_once (void)
   GoodixTlsAudit tls_audit = { 0 };
   GoodixPostTlsAudit post_audit = { 0 };
   GoodixPostTlsMaterial post_material = { 0 };
+  GoodixPreSessionRxSyncAudit rx_sync_audit = { 0 };
   g_autoptr(GError) error = NULL;
   g_autoptr(GUsbContext) usb_context = NULL;
   g_autoptr(GPtrArray) devices = NULL;
@@ -1343,6 +1366,16 @@ run_live_once (void)
                                                      &error))
     goto cleanup;
   epoch_started = TRUE;
+  runtime.failure_class = "PRE_SESSION_RX_SYNC_FAILURE";
+  if (!goodix_device_context_begin_pre_session_rx_sync (runtime.ctx, &error))
+    goto cleanup;
+  while (goodix_device_context_get_pre_session_rx_sync_result (runtime.ctx) ==
+         GOODIX_PRE_SESSION_RX_SYNC_ACTIVE)
+    g_main_context_iteration (NULL, TRUE);
+  if (goodix_device_context_get_pre_session_rx_sync_result (runtime.ctx) !=
+      GOODIX_PRE_SESSION_RX_SYNC_PASS)
+    goto cleanup;
+  runtime.failure_class = "NONE";
   goodix_device_context_set_secure_phase_observer (runtime.ctx,
                                                      observe_phase, &runtime);
   if (!goodix_device_context_configure_post_tls_lifecycle (
@@ -1401,6 +1434,8 @@ cleanup:
       max_in_outstanding = goodix_fpi_usb_backend_get_max_outstanding (backend);
       max_out_outstanding =
         goodix_fpi_usb_backend_get_max_out_outstanding (backend);
+      goodix_device_context_get_pre_session_rx_sync_audit (
+        runtime.ctx, &rx_sync_audit);
       rc = runtime.success && backend_drained &&
          post_audit.second_image_pipeline_count == 1u &&
          post_audit.third_cycle_command_count == 0u &&
@@ -1427,6 +1462,17 @@ cleanup:
   g_print ("{\"result\":\"%s\",\"failure_class\":\"%s\","
            "\"phase_trace\":\"%s\","
            "\"live_authorization_consumed\":%s,"
+           "\"pre_session_rx_sync_started\":%s,"
+           "\"pre_session_rx_sync_completed\":%s,"
+           "\"pre_session_rx_quiet_boundary\":%s,"
+           "\"pre_session_rx_discarded_completion_count\":%" G_GUINT64_FORMAT ","
+           "\"pre_session_rx_discarded_byte_count\":%" G_GUINT64_FORMAT ","
+           "\"pre_session_rx_timeout_count\":%" G_GUINT64_FORMAT ","
+           "\"pre_session_rx_non_timeout_error_count\":%" G_GUINT64_FORMAT ","
+           "\"pre_session_rx_max_outstanding\":%u,"
+           "\"pre_session_rx_elapsed_ms\":%" G_GUINT64_FORMAT ","
+           "\"pre_session_rx_result\":\"%s\","
+           "\"first_protocol_out_after_rx_sync\":%s,"
            "\"usb_open_attempt_count\":%u,"
            "\"usb_open_count\":%u,\"usb_claim_count\":%u,"
            "\"usb_release_count\":%u,\"usb_close_count\":%u,"
@@ -1481,6 +1527,18 @@ cleanup:
            rc == 0 ? "pass" : "fail", runtime.failure_class,
            runtime.phase_trace != NULL ? runtime.phase_trace->str : "",
            live_authorization_consumed ? "true" : "false",
+           rx_sync_audit.pre_session_rx_sync_started ? "true" : "false",
+           rx_sync_audit.pre_session_rx_sync_completed ? "true" : "false",
+           rx_sync_audit.pre_session_rx_quiet_boundary ? "true" : "false",
+           rx_sync_audit.pre_session_rx_discarded_completion_count,
+           rx_sync_audit.pre_session_rx_discarded_byte_count,
+           rx_sync_audit.pre_session_rx_timeout_count,
+           rx_sync_audit.pre_session_rx_non_timeout_error_count,
+           rx_sync_audit.pre_session_rx_max_outstanding,
+           rx_sync_audit.pre_session_rx_elapsed_ms,
+           goodix_pre_session_rx_sync_result_name (
+             rx_sync_audit.pre_session_rx_result),
+           rx_sync_audit.first_protocol_out_after_rx_sync ? "true" : "false",
            open_count, opened ? 1u : 0u, claim_count, release_count,
            close_count,
            real_submit_count,

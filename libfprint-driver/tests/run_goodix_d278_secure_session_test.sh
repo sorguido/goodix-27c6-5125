@@ -32,7 +32,7 @@ python3 "$script_dir/support/generate_libfprint_enums.py" \
   --output-header "$build/fpi-enums.h" --output-source "$build/fpi-enums.c" \
   "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
-includes="-I$build -I$root/libfprint-driver -I$local_fp -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include -I$root/Rockytkg/libfprint -I$script_dir/support"
+includes="-I$script_dir/support/d277 -I$build -I$root/libfprint-driver -I$local_fp -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include -I$root/Rockytkg/libfprint -I$script_dir/support"
 strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 local_relax="-Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -Wno-conversion -Wno-sign-conversion -Wno-float-conversion"
 
@@ -97,9 +97,14 @@ echo SINGLE_PHYSICAL_IN_OWNER=true
 echo SINGLE_TLS_OBJECT=true
 echo TLS_HANDSHAKE_COUNT_MAX=1
 echo SECRET_HANDOFF_COUNT_MAX=1
-echo REENTRY_PRE_ACK_PINNED_TYPED_BOUNDED_DISCARD_IMPLEMENTED=true
-echo PRE_ACK_PINNED_TYPED_THEN_ACK_THEN_TYPED_TO_A8_HOST_ONLY_PROVEN=true
-echo SECOND_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-echo WRONG_PIN_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-echo WRONG_LENGTH_PRE_ACK_TYPED_FAIL_CLOSED_HOST_ONLY_PROVEN=true
-echo PRE_ACK_TYPED_OUTSIDE_REENTRY_FAIL_CLOSED_HOST_ONLY_PROVEN=true
+echo PRE_SESSION_RX_SYNC_IMPLEMENTED=true
+echo PRE_SESSION_RX_CLEAN_QUIET_BOUNDARY_HOST_ONLY_PROVEN=true
+echo PRE_SESSION_RX_RESIDUE_CHAIN_QUARANTINED_HOST_ONLY_PROVEN=true
+echo PRE_SESSION_RX_MULTI_FRAME_COMPLETION_QUARANTINED_HOST_ONLY_PROVEN=true
+echo PRE_SESSION_RX_NON_TIMEOUT_ERROR_FAIL_CLOSED=true
+echo PRE_SESSION_RX_BOUNDS_FAIL_CLOSED=true
+echo PRE_SESSION_RX_OUT_BEFORE_SYNC_REJECTED=true
+echo PRE_SESSION_RX_SECURE_START_BEFORE_SYNC_REJECTED=true
+echo STRICT_A2_ACK_THEN_TYPED_RESTORED=true
+echo CORRECTIVE_5_RUNTIME_TOLERANCE_RETIRED=true
+echo NO_PARALLEL_RX_DRAIN_STACK=true

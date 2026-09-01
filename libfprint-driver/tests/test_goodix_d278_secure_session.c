@@ -7,6 +7,7 @@
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_usb_router.h"
 
+#include <gusb.h>
 #include <openssl/ssl.h>
 #include <string.h>
 
@@ -271,10 +272,9 @@ fixture_new (void)
 }
 
 static Fixture *
-fixture_new_integrated_context (void)
+fixture_new_integrated_epoch (void)
 {
   Fixture *fixture = g_new0 (Fixture, 1);
-  GoodixPostTlsMaterial post_material = { 0 };
   g_autoptr(GError) error = NULL;
 
   fixture->integrated_context = TRUE;
@@ -294,6 +294,32 @@ fixture_new_integrated_context (void)
   fixture->router = goodix_device_context_get_usb_router (fixture->context);
   fixture->backend = goodix_device_context_get_fpi_usb_backend (
     fixture->context);
+  return fixture;
+}
+
+static void
+complete_pre_session_sync_timeout (Fixture *fixture)
+{
+  g_autoptr(GError) timeout = g_error_new_literal (
+    G_USB_DEVICE_ERROR, G_USB_DEVICE_ERROR_TIMED_OUT,
+    "synthetic GUsb bulk timeout");
+  GoodixPreSessionRxSyncAudit sync_audit;
+
+  goodix_device_context_complete_receive (
+    fixture->context, fixture->generation, NULL, 0, timeout);
+  goodix_device_context_get_pre_session_rx_sync_audit (
+    fixture->context, &sync_audit);
+  g_assert_cmpint (sync_audit.pre_session_rx_result, ==,
+                   GOODIX_PRE_SESSION_RX_SYNC_PASS);
+  g_assert_true (sync_audit.pre_session_rx_quiet_boundary);
+}
+
+static void
+start_integrated_secure_session (Fixture *fixture)
+{
+  GoodixPostTlsMaterial post_material = { 0 };
+  g_autoptr(GError) error = NULL;
+
   for (guint i = 0; i < 6u; i++)
     {
       post_material.initial_fdt_table[i * 2u] = 0x80;
@@ -312,6 +338,20 @@ fixture_new_integrated_context (void)
   g_assert_no_error (error);
   fixture->session = goodix_device_context_get_secure_session (
     fixture->context);
+}
+
+static Fixture *
+fixture_new_integrated_context (void)
+{
+  Fixture *fixture = fixture_new_integrated_epoch ();
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+    fixture->context, &error));
+  g_assert_no_error (error);
+  complete_pre_session_sync_timeout (fixture);
+  fixture->in_submit_count = 0;
+  start_integrated_secure_session (fixture);
   return fixture;
 }
 
@@ -1368,88 +1408,22 @@ complete_backend_a0 (Fixture *fixture,
 }
 
 static void
-close_integrated_fixture (Fixture *fixture)
-{
-  goodix_secure_session_cancel (
-    goodix_device_context_get_secure_session (fixture->context),
-    "bounded pre-ACK test closure");
-  while (!g_queue_is_empty (fixture->out))
-    {
-      Submission *submission = pop_out (fixture);
-      goodix_fpi_usb_backend_complete_out (fixture->backend,
-                                           submission->generation, NULL);
-      submission_free (submission);
-    }
-  if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
-    goodix_device_context_complete_receive (
-      fixture->context, fixture->generation, NULL, 0, NULL);
-  fixture_free (fixture);
-}
-
-static void
-test_backend_pre_ack_pinned_typed_bounded_discard (void)
+test_backend_pre_ack_typed_fail_closed (void)
 {
   Fixture *fixture = fixture_new_integrated_context ();
   g_autoptr(GBytes) typed = typed_for_phase (
     fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
-  g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
-  Submission *submission = pop_out (fixture);
-
-  g_assert_cmpuint (fixture->in_submit_count, ==, 1u);
-  complete_submission (fixture, submission, NULL);
-
-  complete_backend_a0 (fixture, typed);
-  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
-                   GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
-  g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
-  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
-  g_assert_true (fixture->audit.reentry_pre_ack_typed_observed);
-  g_assert_true (fixture->audit.reentry_pre_ack_typed_pin_match);
-  g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
-  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
-    GOODIX_REENTRY_RECOVERY_A2_PRE_ACK_PINNED_TYPED_DISCARDED);
-  g_assert_cmpuint (fixture->in_submit_count, ==, 2u);
-  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
-                     fixture->backend), ==, 1u);
-
-  complete_backend_a0 (fixture, ack);
-  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
-                   GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
-  g_assert_cmpuint (fixture->audit.ack_count, ==, 1u);
-  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
-                   GOODIX_REENTRY_RECOVERY_A2_ACK_STRICT);
-  g_assert_cmpuint (fixture->in_submit_count, ==, 3u);
-  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
-                     fixture->backend), ==, 1u);
-
-  complete_backend_a0 (fixture, typed);
-  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
-                   GOODIX_SECURE_PHASE_A8);
-  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 1u);
-  g_assert_cmpint (fixture->audit.reentry_recovery_a2_result_class, ==,
-                   GOODIX_REENTRY_RECOVERY_A2_STRICT_MATCH);
-  g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
-  g_assert_cmpuint (fixture->audit.reentry_recovery_a2_submit_count, ==, 1u);
-  close_integrated_fixture (fixture);
-}
-
-static Fixture *
-integrated_reentry_ready (void)
-{
-  Fixture *fixture = fixture_new_integrated_context ();
   Submission *submission = pop_out (fixture);
 
   complete_submission (fixture, submission, NULL);
-  return fixture;
-}
-
-static void
-assert_integrated_pre_ack_terminal (Fixture *fixture)
-{
+  complete_backend_a0 (fixture, typed);
   g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
                    GOODIX_SECURE_PHASE_TERMINAL);
   g_assert_cmpint (fixture->audit.protocol_failure_kind, ==,
                    GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.transport_reopen_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.device_reset_count, ==, 0u);
@@ -1459,75 +1433,321 @@ assert_integrated_pre_ack_terminal (Fixture *fixture)
 }
 
 static void
-test_backend_pre_ack_typed_fail_closed (void)
+close_started_integrated_fixture (Fixture *fixture)
 {
-  /* Wrong pin. */
+  goodix_secure_session_cancel (fixture->session, "integrated test closure");
+  while (!g_queue_is_empty (fixture->out))
+    {
+      Submission *submission = pop_out (fixture);
+      complete_submission (fixture, submission, NULL);
+    }
+  if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, NULL, 0, NULL);
+  fixture_free (fixture);
+}
+
+static void
+assert_sync_pass_and_start_a2 (Fixture *fixture)
+{
+  GoodixPreSessionRxSyncAudit sync_audit;
+
+  complete_pre_session_sync_timeout (fixture);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_delivery_count (
+                     fixture->backend), ==, 0u);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 0u);
+  start_integrated_secure_session (fixture);
+  goodix_device_context_get_pre_session_rx_sync_audit (
+    fixture->context, &sync_audit);
+  g_assert_true (sync_audit.first_protocol_out_after_rx_sync);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 1u);
+}
+
+static void
+complete_current_a2_to_a8 (Fixture *fixture)
+{
+  g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+  g_autoptr(GBytes) typed = typed_for_phase (
+    fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  Submission *submission = pop_out (fixture);
+
+  complete_submission (fixture, submission, NULL);
+  complete_backend_a0 (fixture, ack);
+  complete_backend_a0 (fixture, typed);
+  g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                   GOODIX_SECURE_PHASE_A8);
+}
+
+static void
+test_pre_session_rx_sync_clean_start (void)
+{
+  Fixture *fixture = fixture_new_integrated_epoch ();
+  GoodixPreSessionRxSyncAudit sync_audit;
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+    fixture->context, &error));
+  g_assert_no_error (error);
+  g_assert_cmpuint (fixture->in_submit_count, ==, 1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_last_in_timeout_ms (
+                     fixture->backend), ==,
+                   GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS);
+  g_assert_cmpint (goodix_fpi_usb_backend_get_receive_purpose (
+                    fixture->backend), ==,
+                   GOODIX_USB_RECEIVE_PRE_SESSION_SYNC_RX);
+  assert_sync_pass_and_start_a2 (fixture);
+  goodix_device_context_get_pre_session_rx_sync_audit (
+    fixture->context, &sync_audit);
+  g_assert_true (sync_audit.pre_session_rx_sync_started);
+  g_assert_true (sync_audit.pre_session_rx_sync_completed);
+  g_assert_true (sync_audit.pre_session_rx_quiet_boundary);
+  g_assert_cmpuint (sync_audit.pre_session_rx_discarded_completion_count,
+                    ==, 0u);
+  g_assert_cmpuint (sync_audit.pre_session_rx_discarded_byte_count, ==, 0u);
+  g_assert_cmpuint (sync_audit.pre_session_rx_timeout_count, ==, 1u);
+  g_assert_cmpuint (sync_audit.pre_session_rx_max_outstanding, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 1u);
+  complete_current_a2_to_a8 (fixture);
+  close_started_integrated_fixture (fixture);
+}
+
+static void
+test_pre_session_rx_sync_residue_chain (void)
+{
+  Fixture *fixture = fixture_new_integrated_epoch ();
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GBytes) typed = typed_for_phase (
+    fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
+  g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+  gsize typed_length;
+  gsize ack_length;
+  const guint8 *typed_data = g_bytes_get_data (typed, &typed_length);
+  const guint8 *ack_data = g_bytes_get_data (ack, &ack_length);
+  g_autoptr(GByteArray) combined = g_byte_array_sized_new (
+    (guint) (typed_length + ack_length + typed_length));
+  GoodixPreSessionRxSyncAudit sync_audit;
+
+  g_byte_array_append (combined, typed_data, (guint) typed_length);
+  g_byte_array_append (combined, ack_data, (guint) ack_length);
+  g_byte_array_append (combined, typed_data, (guint) typed_length);
+  g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+    fixture->context, &error));
+  g_assert_no_error (error);
+
+  goodix_device_context_complete_receive (
+    fixture->context, fixture->generation, typed_data, typed_length, NULL);
+  goodix_device_context_complete_receive (
+    fixture->context, fixture->generation, ack_data, ack_length, NULL);
+  goodix_device_context_complete_receive (
+    fixture->context, fixture->generation, typed_data, typed_length, NULL);
+  goodix_device_context_complete_receive (
+    fixture->context, fixture->generation, combined->data, combined->len, NULL);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_delivery_count (
+                     fixture->backend), ==, 0u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 0u);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (
+                     fixture->backend), ==, 1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_max_outstanding (
+                     fixture->backend), ==, 1u);
+  assert_sync_pass_and_start_a2 (fixture);
+  goodix_device_context_get_pre_session_rx_sync_audit (
+    fixture->context, &sync_audit);
+  g_assert_cmpuint (sync_audit.pre_session_rx_discarded_completion_count,
+                    ==, 4u);
+  g_assert_cmpuint (sync_audit.pre_session_rx_discarded_byte_count, ==,
+                    typed_length * 4u + ack_length * 2u);
+  complete_current_a2_to_a8 (fixture);
+  close_started_integrated_fixture (fixture);
+}
+
+static gint64
+synthetic_sync_clock (gpointer user_data)
+{
+  return *(gint64 *) user_data;
+}
+
+static void
+test_pre_session_rx_sync_negative_bounds (void)
+{
+  /* A non-timeout GUsb transport error is terminal before A2. */
   {
-    Fixture *fixture = integrated_reentry_ready ();
+    Fixture *fixture = fixture_new_integrated_epoch ();
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GError) io_error = g_error_new_literal (
+      G_USB_DEVICE_ERROR, G_USB_DEVICE_ERROR_IO, "synthetic USB I/O error");
+    GoodixPreSessionRxSyncAudit audit;
+
+    g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+      fixture->context, &error));
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, NULL, 0, io_error);
+    goodix_device_context_get_pre_session_rx_sync_audit (
+      fixture->context, &audit);
+    g_assert_cmpint (audit.pre_session_rx_result, ==,
+                     GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED);
+    g_assert_cmpuint (audit.pre_session_rx_non_timeout_error_count, ==, 1u);
+    g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 0u);
+    fixture_free (fixture);
+  }
+
+  /* A seventeenth non-empty completion exceeds the explicit count bound. */
+  {
+    Fixture *fixture = fixture_new_integrated_epoch ();
+    g_autoptr(GError) error = NULL;
+    const guint8 byte = 0x5a;
+
+    g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+      fixture->context, &error));
+    for (guint i = 0; i <= GOODIX_PRE_SESSION_RX_MAX_COMPLETIONS; i++)
+      goodix_device_context_complete_receive (
+        fixture->context, fixture->generation, &byte, 1, NULL);
+    g_assert_cmpint (goodix_device_context_get_pre_session_rx_sync_result (
+                      fixture->context), ==,
+                     GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED);
+    g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 0u);
+    fixture_free (fixture);
+  }
+
+  /* Byte and total-duration bounds fail independently and before A2. */
+  {
+    Fixture *fixture = fixture_new_integrated_epoch ();
+    g_autoptr(GError) error = NULL;
+    g_autofree guint8 *large = g_malloc0 (
+      GOODIX_PRE_SESSION_RX_MAX_BYTES + 1u);
+
+    g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+      fixture->context, &error));
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, large,
+      GOODIX_PRE_SESSION_RX_MAX_BYTES + 1u, NULL);
+    g_assert_cmpint (goodix_device_context_get_pre_session_rx_sync_result (
+                      fixture->context), ==,
+                     GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED);
+    fixture_free (fixture);
+  }
+  {
+    Fixture *fixture = fixture_new_integrated_epoch ();
+    g_autoptr(GError) error = NULL;
+    gint64 now = 1000000;
+    const guint8 byte = 0x5a;
+
+    goodix_device_context_set_pre_session_rx_sync_clock (
+      fixture->context, synthetic_sync_clock, &now);
+    g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+      fixture->context, &error));
+    now += (GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS -
+            GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS + 1u) * 1000u;
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, &byte, 1, NULL);
+    g_assert_cmpint (goodix_device_context_get_pre_session_rx_sync_result (
+                      fixture->context), ==,
+                     GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED);
+    fixture_free (fixture);
+  }
+  {
+    Fixture *fixture = fixture_new_integrated_epoch ();
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GError) timeout = g_error_new_literal (
+      G_USB_DEVICE_ERROR, G_USB_DEVICE_ERROR_TIMED_OUT,
+      "synthetic late GUsb bulk timeout");
+    gint64 now = 1000000;
+
+    goodix_device_context_set_pre_session_rx_sync_clock (
+      fixture->context, synthetic_sync_clock, &now);
+    g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+      fixture->context, &error));
+    now += (GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS + 1u) * 1000u;
+    goodix_device_context_complete_receive (
+      fixture->context, fixture->generation, NULL, 0, timeout);
+    g_assert_cmpint (goodix_device_context_get_pre_session_rx_sync_result (
+                      fixture->context), ==,
+                     GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED);
+    g_assert_cmpuint (g_queue_get_length (fixture->out), ==, 0u);
+    fixture_free (fixture);
+  }
+}
+
+static void
+test_pre_session_rx_sync_out_and_start_gates (void)
+{
+  Fixture *fixture = fixture_new_integrated_epoch ();
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GError) gate_error = NULL;
+  g_autoptr(GBytes) bytes = g_bytes_new_static ("x", 1);
+
+  g_assert_true (goodix_device_context_begin_pre_session_rx_sync (
+    fixture->context, &error));
+  g_assert_false (goodix_fpi_usb_backend_submit_out (
+    fixture->backend, fixture->generation, bytes, &gate_error));
+  g_assert_error (gate_error,
+                  g_quark_from_static_string ("goodix-fpi-usb-backend-error"),
+                  2);
+  g_clear_error (&gate_error);
+  g_assert_false (goodix_device_context_start_secure_session (
+    fixture->context, &fixture->material, schedule_seam, fixture,
+    &fixture->audit, &fixture->tls_audit, &gate_error));
+  g_assert_error (gate_error, G_IO_ERROR, G_IO_ERROR_CLOSED);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (
+                     fixture->backend), ==, 0u);
+  g_assert_null (goodix_device_context_get_secure_session (fixture->context));
+  complete_pre_session_sync_timeout (fixture);
+  fixture_free (fixture);
+}
+
+static void
+test_strict_protocol_after_pre_session_sync (void)
+{
+  /* Duplicate ACK after sync is terminal. */
+  {
+    Fixture *fixture = fixture_new_integrated_context ();
+    g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
+    Submission *submission = pop_out (fixture);
+
+    complete_submission (fixture, submission, NULL);
+    complete_backend_a0 (fixture, ack);
+    complete_backend_a0 (fixture, ack);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_TERMINAL);
+    g_assert_cmpint (fixture->audit.protocol_failure_kind, ==,
+                     GOODIX_PROTOCOL_FAILURE_ACK_SHAPE_MISMATCH);
+    fixture_free (fixture);
+  }
+
+  /* Wrong ACK status after sync is terminal. */
+  {
+    Fixture *fixture = fixture_new_integrated_context ();
+    g_autoptr(GBytes) ack = build_ack (0xa2, 0x02);
+    Submission *submission = pop_out (fixture);
+
+    complete_submission (fixture, submission, NULL);
+    complete_backend_a0 (fixture, ack);
+    g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
+                     GOODIX_SECURE_PHASE_TERMINAL);
+    g_assert_cmpint (fixture->audit.protocol_failure_kind, ==,
+                     GOODIX_PROTOCOL_FAILURE_ACK_STATUS_REJECTED);
+    fixture_free (fixture);
+  }
+
+  /* Wrong typed pin after a valid current ACK is terminal. */
+  {
+    Fixture *fixture = fixture_new_integrated_context ();
+    g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
     guint8 wrong[3];
-    g_autoptr(GBytes) frame = NULL;
+    g_autoptr(GBytes) typed = NULL;
+    Submission *submission = pop_out (fixture);
 
     memcpy (wrong, fixture->a2, sizeof wrong);
     wrong[0] ^= 0xff;
-    frame = build_response (0xa2, wrong, sizeof wrong);
-    complete_backend_a0 (fixture, frame);
-    g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
-    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
-    g_assert_true (fixture->audit.reentry_pre_ack_typed_observed);
-    g_assert_false (fixture->audit.reentry_pre_ack_typed_pin_match);
-    g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 0u);
-    assert_integrated_pre_ack_terminal (fixture);
-  }
-
-  /* Wrong length. */
-  {
-    Fixture *fixture = integrated_reentry_ready ();
-    g_autoptr(GBytes) frame = build_response (0xa2, fixture->a2, 2u);
-
-    complete_backend_a0 (fixture, frame);
-    g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
-    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
-    g_assert_true (fixture->audit.reentry_pre_ack_typed_observed);
-    g_assert_false (fixture->audit.reentry_pre_ack_typed_pin_match);
-    g_assert_cmpint (fixture->audit.observed_body_length, ==, 2);
-    assert_integrated_pre_ack_terminal (fixture);
-  }
-
-  /* A second pinned pre-ACK typed frame exceeds the one-frame bound. */
-  {
-    Fixture *fixture = integrated_reentry_ready ();
-    g_autoptr(GBytes) frame = typed_for_phase (
-      fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
-
-    complete_backend_a0 (fixture, frame);
-    g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
-    complete_backend_a0 (fixture, frame);
-    g_assert_cmpuint (fixture->audit.ack_count, ==, 0u);
-    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 0u);
-    g_assert_cmpuint (fixture->audit.reentry_pre_ack_typed_discard_count, ==, 1u);
-    assert_integrated_pre_ack_terminal (fixture);
-  }
-
-  /* The exception is unavailable once the current phase is A8. */
-  {
-    Fixture *fixture = integrated_reentry_ready ();
-    g_autoptr(GBytes) ack = build_ack (0xa2, 0x01);
-    g_autoptr(GBytes) typed = typed_for_phase (
-      fixture, GOODIX_SECURE_PHASE_REENTRY_RECOVERY_A2);
-    g_autoptr(GBytes) stale_a2 = NULL;
-    Submission *submission;
-
+    typed = build_response (0xa2, wrong, sizeof wrong);
+    complete_submission (fixture, submission, NULL);
     complete_backend_a0 (fixture, ack);
     complete_backend_a0 (fixture, typed);
     g_assert_cmpint (goodix_secure_session_get_phase (fixture->session), ==,
-                     GOODIX_SECURE_PHASE_A8);
-    submission = pop_out (fixture);
-    complete_submission (fixture, submission, NULL);
-    stale_a2 = build_response (0xa2, fixture->a2, sizeof fixture->a2);
-    complete_backend_a0 (fixture, stale_a2);
-    g_assert_cmpuint (fixture->audit.ack_count, ==, 1u);
-    g_assert_cmpuint (fixture->audit.typed_response_count, ==, 1u);
-    assert_integrated_pre_ack_terminal (fixture);
+                     GOODIX_SECURE_PHASE_TERMINAL);
+    g_assert_cmpint (fixture->audit.protocol_failure_kind, ==,
+                     GOODIX_PROTOCOL_FAILURE_TYPED_SHAPE_MISMATCH);
+    fixture_free (fixture);
   }
 }
 
@@ -2296,10 +2516,18 @@ main (int argc,
                    test_reentry_tls_to_two_acquisitions_composed);
   g_test_add_func ("/goodix/d278/backend-in-completion-rearms-receive",
                    test_backend_in_completion_rearms_receive);
-  g_test_add_func ("/goodix/d278/backend-pre-ack-pinned-typed-bounded-discard",
-                   test_backend_pre_ack_pinned_typed_bounded_discard);
   g_test_add_func ("/goodix/d278/backend-pre-ack-typed-fail-closed",
                    test_backend_pre_ack_typed_fail_closed);
+  g_test_add_func ("/goodix/d278/pre-session-rx-sync-clean-start",
+                   test_pre_session_rx_sync_clean_start);
+  g_test_add_func ("/goodix/d278/pre-session-rx-sync-residue-chain",
+                   test_pre_session_rx_sync_residue_chain);
+  g_test_add_func ("/goodix/d278/pre-session-rx-sync-negative-bounds",
+                   test_pre_session_rx_sync_negative_bounds);
+  g_test_add_func ("/goodix/d278/pre-session-rx-sync-out-start-gates",
+                   test_pre_session_rx_sync_out_and_start_gates);
+  g_test_add_func ("/goodix/d278/strict-protocol-after-pre-session-sync",
+                   test_strict_protocol_after_pre_session_sync);
   g_test_add_func ("/goodix/d278/integrated-context-live-binding-host-only",
                    test_integrated_context_live_binding_host_only);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",

@@ -24,6 +24,7 @@
 #include "fpi-image-device.h"
 #include "fp-device.h"
 #include "fp-image-device-private.h"
+#include <gusb.h>
 
 #include <string.h>
 
@@ -70,6 +71,11 @@ struct _GoodixDeviceContext
   gpointer                   tls_user_data;
   guint                      a0_delivery_count;
   gboolean                   operator_epoch;
+  GoodixPreSessionRxSyncAudit pre_session_rx_sync_audit;
+  gint64                      pre_session_rx_sync_started_us;
+  guint64                     pre_session_rx_sync_out_count_at_pass;
+  GoodixPreSessionRxSyncClockFunc pre_session_rx_sync_clock;
+  gpointer                    pre_session_rx_sync_clock_data;
   GoodixDeviceContextSecurePhaseObserver phase_observer;
   gpointer                   phase_observer_data;
 
@@ -123,6 +129,46 @@ goodix_fpimage_device_set_context (GoodixFpImageDevice *self,
 static void goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx);
 static void goodix_device_context_set_poisoned (GoodixDeviceContext *ctx,
                                                 const GError        *error);
+static gint64
+pre_session_rx_sync_now (GoodixDeviceContext *ctx)
+{
+  if (ctx->pre_session_rx_sync_clock != NULL)
+    return ctx->pre_session_rx_sync_clock (
+      ctx->pre_session_rx_sync_clock_data);
+  return g_get_monotonic_time ();
+}
+
+static void
+pre_session_rx_sync_update_elapsed (GoodixDeviceContext *ctx)
+{
+  gint64 elapsed = pre_session_rx_sync_now (ctx) -
+                   ctx->pre_session_rx_sync_started_us;
+
+  if (elapsed < 0)
+    elapsed = 0;
+  ctx->pre_session_rx_sync_audit.pre_session_rx_elapsed_ms =
+    (guint64) elapsed / 1000u;
+}
+
+static void
+pre_session_rx_sync_fail (GoodixDeviceContext *ctx,
+                          const GError        *error)
+{
+  g_autoptr(GError) end_error = NULL;
+
+  pre_session_rx_sync_update_elapsed (ctx);
+  ctx->pre_session_rx_sync_audit.pre_session_rx_sync_completed = TRUE;
+  ctx->pre_session_rx_sync_audit.pre_session_rx_result =
+    GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED;
+  if (goodix_fpi_usb_backend_pre_session_sync_is_active (
+        ctx->fpi_usb_backend) &&
+      goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
+    (void) goodix_fpi_usb_backend_end_pre_session_sync (
+      ctx->fpi_usb_backend, ctx->generation, &end_error);
+  goodix_device_context_set_terminal_fence (ctx);
+  goodix_device_context_set_poisoned (
+    ctx, error != NULL ? error : end_error);
+}
 static void
 context_usb_drained (GoodixFpiUsbBackend *backend,
                      gpointer             user_data)
@@ -164,6 +210,96 @@ context_usb_in_completed (GoodixFpiUsbBackend *backend,
           goodix_device_context_set_poisoned (ctx, arm_error);
         }
     }
+}
+
+static void
+context_pre_session_sync_completed (GoodixFpiUsbBackend *backend,
+                                    guint64 submit_generation,
+                                    const guint8 *data,
+                                    gsize length,
+                                    const GError *error,
+                                    gpointer user_data)
+{
+  GoodixDeviceContext *ctx = user_data;
+  GoodixPreSessionRxSyncAudit *audit = &ctx->pre_session_rx_sync_audit;
+  g_autoptr(GError) local_error = NULL;
+
+  (void) backend;
+  pre_session_rx_sync_update_elapsed (ctx);
+  audit->pre_session_rx_max_outstanding = MAX (
+    audit->pre_session_rx_max_outstanding,
+    goodix_fpi_usb_backend_get_max_outstanding (ctx->fpi_usb_backend));
+  if (submit_generation != ctx->generation ||
+      audit->pre_session_rx_result != GOODIX_PRE_SESSION_RX_SYNC_ACTIVE)
+    return;
+
+  if (audit->pre_session_rx_elapsed_ms >
+      GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS)
+    {
+      local_error = g_error_new_literal (
+        G_IO_ERROR, G_IO_ERROR_TIMED_OUT,
+        "pre-session RX sync total-time bound exceeded");
+      pre_session_rx_sync_fail (ctx, local_error);
+      return;
+    }
+
+  if (error != NULL)
+    {
+      if (g_error_matches (error, G_USB_DEVICE_ERROR,
+                           G_USB_DEVICE_ERROR_TIMED_OUT) && length == 0 &&
+          goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
+        {
+          audit->pre_session_rx_timeout_count++;
+          audit->pre_session_rx_quiet_boundary = TRUE;
+          if (!goodix_fpi_usb_backend_end_pre_session_sync (
+                ctx->fpi_usb_backend, ctx->generation, &local_error))
+            {
+              pre_session_rx_sync_fail (ctx, local_error);
+              return;
+            }
+          audit->pre_session_rx_sync_completed = TRUE;
+          audit->pre_session_rx_result = GOODIX_PRE_SESSION_RX_SYNC_PASS;
+          ctx->pre_session_rx_sync_out_count_at_pass =
+            goodix_fpi_usb_backend_get_out_submit_count (
+              ctx->fpi_usb_backend);
+          return;
+        }
+      audit->pre_session_rx_non_timeout_error_count++;
+      pre_session_rx_sync_fail (ctx, error);
+      return;
+    }
+
+  if (length == 0 || data == NULL)
+    {
+      local_error = g_error_new_literal (
+        G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+        "pre-session RX sync completed without timeout or data");
+      pre_session_rx_sync_fail (ctx, local_error);
+      return;
+    }
+
+  audit->pre_session_rx_discarded_completion_count++;
+  audit->pre_session_rx_discarded_byte_count += length;
+  if (audit->pre_session_rx_discarded_completion_count >
+        GOODIX_PRE_SESSION_RX_MAX_COMPLETIONS ||
+      audit->pre_session_rx_discarded_byte_count >
+        GOODIX_PRE_SESSION_RX_MAX_BYTES ||
+      audit->pre_session_rx_elapsed_ms > GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS ||
+      audit->pre_session_rx_elapsed_ms +
+        GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS >
+        GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS)
+    {
+      local_error = g_error_new_literal (
+        G_IO_ERROR, G_IO_ERROR_NO_SPACE,
+        "pre-session RX sync hard bound exceeded");
+      pre_session_rx_sync_fail (ctx, local_error);
+      return;
+    }
+
+  if (!goodix_fpi_usb_backend_arm_pre_session_sync_receive (
+        ctx->fpi_usb_backend, ctx->generation,
+        GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS, &local_error))
+    pre_session_rx_sync_fail (ctx, local_error);
 }
 
 GoodixUsbRouter *
@@ -277,6 +413,8 @@ goodix_device_context_new (GoodixFpImageDevice *device)
   goodix_fpi_usb_backend_set_in_completed_callback (ctx->fpi_usb_backend,
                                                     context_usb_in_completed,
                                                     ctx);
+  goodix_fpi_usb_backend_set_sync_completed_callback (
+    ctx->fpi_usb_backend, context_pre_session_sync_completed, ctx);
 
   return ctx;
 }
@@ -885,7 +1023,10 @@ goodix_device_context_start_secure_session (
   GError                           **error)
 {
   if (ctx == NULL || ctx->secure_session != NULL || ctx->tls_server != NULL ||
-      ctx->generation == 0 || ctx->terminal_fence)
+      ctx->generation == 0 || ctx->terminal_fence ||
+      (ctx->operator_epoch &&
+       ctx->pre_session_rx_sync_audit.pre_session_rx_result !=
+         GOODIX_PRE_SESSION_RX_SYNC_PASS))
     {
       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
                            "GoodixDeviceContext cannot start secure session");
@@ -1004,6 +1145,9 @@ goodix_device_context_begin_operator_epoch (GoodixDeviceContext *ctx,
   ctx->generation = ctx->generation_seq;
   ctx->terminal_fence = FALSE;
   ctx->operator_epoch = TRUE;
+  memset (&ctx->pre_session_rx_sync_audit, 0,
+          sizeof ctx->pre_session_rx_sync_audit);
+  ctx->pre_session_rx_sync_out_count_at_pass = 0;
   g_set_object (&ctx->usb_cancellable, cancellable);
   if (!goodix_fpi_usb_backend_begin_generation (ctx->fpi_usb_backend,
                                                 ctx->generation,
@@ -1016,6 +1160,87 @@ goodix_device_context_begin_operator_epoch (GoodixDeviceContext *ctx,
   goodix_usb_router_begin_generation (ctx->usb_router, ctx->generation);
   goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
   return TRUE;
+}
+
+gboolean
+goodix_device_context_begin_pre_session_rx_sync (GoodixDeviceContext *ctx,
+                                                  GError **error)
+{
+  g_autoptr(GError) local_error = NULL;
+
+  if (ctx == NULL || !ctx->operator_epoch || ctx->generation == 0 ||
+      ctx->terminal_fence || ctx->secure_session != NULL ||
+      ctx->pre_session_rx_sync_audit.pre_session_rx_result !=
+        GOODIX_PRE_SESSION_RX_SYNC_NOT_STARTED)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "pre-session RX sync cannot begin");
+      return FALSE;
+    }
+
+  memset (&ctx->pre_session_rx_sync_audit, 0,
+          sizeof ctx->pre_session_rx_sync_audit);
+  ctx->pre_session_rx_sync_audit.pre_session_rx_sync_started = TRUE;
+  ctx->pre_session_rx_sync_audit.pre_session_rx_result =
+    GOODIX_PRE_SESSION_RX_SYNC_ACTIVE;
+  ctx->pre_session_rx_sync_started_us = pre_session_rx_sync_now (ctx);
+  if (!goodix_fpi_usb_backend_begin_pre_session_sync (
+        ctx->fpi_usb_backend, ctx->generation, &local_error) ||
+      !goodix_fpi_usb_backend_arm_pre_session_sync_receive (
+        ctx->fpi_usb_backend, ctx->generation,
+        GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS, &local_error))
+    {
+      pre_session_rx_sync_fail (ctx, local_error);
+      g_propagate_error (error, g_steal_pointer (&local_error));
+      return FALSE;
+    }
+  ctx->pre_session_rx_sync_audit.pre_session_rx_max_outstanding =
+    goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend);
+  return TRUE;
+}
+
+GoodixPreSessionRxSyncResult
+goodix_device_context_get_pre_session_rx_sync_result (GoodixDeviceContext *ctx)
+{
+  return ctx != NULL ? ctx->pre_session_rx_sync_audit.pre_session_rx_result :
+    GOODIX_PRE_SESSION_RX_SYNC_FAIL_CLOSED;
+}
+
+void
+goodix_device_context_get_pre_session_rx_sync_audit (
+  GoodixDeviceContext         *ctx,
+  GoodixPreSessionRxSyncAudit *audit)
+{
+  g_return_if_fail (ctx != NULL && audit != NULL);
+  *audit = ctx->pre_session_rx_sync_audit;
+  audit->first_protocol_out_after_rx_sync =
+    audit->pre_session_rx_result == GOODIX_PRE_SESSION_RX_SYNC_PASS &&
+    goodix_fpi_usb_backend_get_out_submit_count (ctx->fpi_usb_backend) >
+      ctx->pre_session_rx_sync_out_count_at_pass;
+}
+
+const gchar *
+goodix_pre_session_rx_sync_result_name (GoodixPreSessionRxSyncResult result)
+{
+  static const gchar *const names[] = {
+    "NOT_STARTED", "ACTIVE", "PASS", "FAIL_CLOSED"
+  };
+
+  return (guint) result < G_N_ELEMENTS (names) ? names[result] : "INVALID";
+}
+
+void
+goodix_device_context_set_pre_session_rx_sync_clock (
+  GoodixDeviceContext             *ctx,
+  GoodixPreSessionRxSyncClockFunc  clock_func,
+  gpointer                         user_data)
+{
+  g_return_if_fail (ctx != NULL);
+  g_return_if_fail (
+    ctx->pre_session_rx_sync_audit.pre_session_rx_result !=
+      GOODIX_PRE_SESSION_RX_SYNC_ACTIVE);
+  ctx->pre_session_rx_sync_clock = clock_func;
+  ctx->pre_session_rx_sync_clock_data = user_data;
 }
 
 void

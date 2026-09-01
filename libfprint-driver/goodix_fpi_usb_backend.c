@@ -18,10 +18,13 @@ struct _GoodixFpiUsbBackend
   guint8 in_endpoint, out_endpoint;
   gsize receive_size;
   guint64 generation, in_generation, out_generation;
+  GoodixUsbReceivePurpose in_purpose;
+  guint in_timeout_ms;
   guint in_outstanding, out_outstanding, max_outstanding, max_out_outstanding;
   guint64 delivery_count, real_submit_count, out_submit_count;
   guint64 in_completion_count, out_completion_count;
   gboolean terminal_fence, async_seam, drain_notified;
+  gboolean pre_session_sync_active;
   GoodixUsbSubmitSeam seam;
   gpointer seam_data;
   GoodixFpiUsbBackendDrainedFunc drained_callback;
@@ -30,6 +33,8 @@ struct _GoodixFpiUsbBackend
   gpointer out_completed_data;
   GoodixFpiUsbBackendInCompletedFunc in_completed_callback;
   gpointer in_completed_data;
+  GoodixFpiUsbBackendSyncCompletedFunc sync_completed_callback;
+  gpointer sync_completed_data;
 };
 
 static GQuark
@@ -87,13 +92,14 @@ transfer_complete_cb (FpiUsbTransfer *transfer,
 }
 
 static void
-production_submit_in (GoodixFpiUsbBackend *backend)
+production_submit_in (GoodixFpiUsbBackend *backend,
+                      guint                timeout_ms)
 {
   FpiUsbTransfer *transfer = fpi_usb_transfer_new (backend->device);
   fpi_usb_transfer_fill_bulk (transfer, backend->in_endpoint,
                               backend->receive_size);
   backend->real_submit_count++;
-  fpi_usb_transfer_submit (transfer, 0, backend->cancellable,
+  fpi_usb_transfer_submit (transfer, timeout_ms, backend->cancellable,
                            transfer_complete_cb,
                            pending_new (backend, TRUE));
 }
@@ -200,6 +206,17 @@ goodix_fpi_usb_backend_set_in_completed_callback (
   backend->in_completed_data = data;
 }
 
+void
+goodix_fpi_usb_backend_set_sync_completed_callback (
+  GoodixFpiUsbBackend                  *backend,
+  GoodixFpiUsbBackendSyncCompletedFunc  callback,
+  gpointer                              data)
+{
+  g_return_if_fail (backend != NULL);
+  backend->sync_completed_callback = callback;
+  backend->sync_completed_data = data;
+}
+
 gboolean
 goodix_fpi_usb_backend_begin_generation (GoodixFpiUsbBackend *backend,
                                          guint64               generation,
@@ -225,6 +242,7 @@ goodix_fpi_usb_backend_arm_receive (GoodixFpiUsbBackend *backend,
                                     GError              **error)
 {
   if (backend == NULL || backend->terminal_fence ||
+      backend->pre_session_sync_active ||
       generation != backend->generation || backend->in_outstanding != 0)
     {
       g_set_error_literal (error, backend_error_quark (), 1,
@@ -235,13 +253,80 @@ goodix_fpi_usb_backend_arm_receive (GoodixFpiUsbBackend *backend,
     return FALSE;
   backend->in_outstanding = 1;
   backend->in_generation = generation;
+  backend->in_purpose = GOODIX_USB_RECEIVE_PROTOCOL_RX;
+  backend->in_timeout_ms = 0;
   backend->max_outstanding = MAX (backend->max_outstanding,
                                   backend->in_outstanding);
   if (backend->seam != NULL)
     backend->seam (backend, GOODIX_USB_TRANSFER_IN, generation, NULL,
                    backend->seam_data);
   else
-    production_submit_in (backend);
+    production_submit_in (backend, 0);
+  return TRUE;
+}
+
+gboolean
+goodix_fpi_usb_backend_begin_pre_session_sync (GoodixFpiUsbBackend *backend,
+                                                guint64 generation,
+                                                GError **error)
+{
+  if (backend == NULL || backend->terminal_fence ||
+      generation != backend->generation || !backend_is_drained (backend) ||
+      backend->pre_session_sync_active)
+    {
+      g_set_error_literal (error, backend_error_quark (), 4,
+                           "pre-session RX sync cannot begin");
+      return FALSE;
+    }
+  backend->pre_session_sync_active = TRUE;
+  return TRUE;
+}
+
+gboolean
+goodix_fpi_usb_backend_arm_pre_session_sync_receive (
+  GoodixFpiUsbBackend *backend,
+  guint64 generation,
+  guint timeout_ms,
+  GError **error)
+{
+  if (backend == NULL || backend->terminal_fence ||
+      !backend->pre_session_sync_active || timeout_ms == 0 ||
+      generation != backend->generation || backend->in_outstanding != 0 ||
+      backend->out_outstanding != 0)
+    {
+      g_set_error_literal (error, backend_error_quark (), 5,
+                           "sync receive stale, fenced, or already pending");
+      return FALSE;
+    }
+  backend->in_outstanding = 1;
+  backend->in_generation = generation;
+  backend->in_purpose = GOODIX_USB_RECEIVE_PRE_SESSION_SYNC_RX;
+  backend->in_timeout_ms = timeout_ms;
+  backend->max_outstanding = MAX (backend->max_outstanding,
+                                  backend->in_outstanding);
+  if (backend->seam != NULL)
+    backend->seam (backend, GOODIX_USB_TRANSFER_IN, generation, NULL,
+                   backend->seam_data);
+  else
+    production_submit_in (backend, timeout_ms);
+  return TRUE;
+}
+
+gboolean
+goodix_fpi_usb_backend_end_pre_session_sync (GoodixFpiUsbBackend *backend,
+                                              guint64 generation,
+                                              GError **error)
+{
+  if (backend == NULL || !backend->pre_session_sync_active ||
+      generation != backend->generation || !backend_is_drained (backend))
+    {
+      g_set_error_literal (error, backend_error_quark (), 6,
+                           "pre-session RX sync cannot end before drain");
+      return FALSE;
+    }
+  backend->pre_session_sync_active = FALSE;
+  backend->in_purpose = GOODIX_USB_RECEIVE_NONE;
+  backend->in_timeout_ms = 0;
   return TRUE;
 }
 
@@ -252,6 +337,7 @@ goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
                                    GError              **error)
 {
   if (backend == NULL || bytes == NULL || backend->terminal_fence ||
+      backend->pre_session_sync_active ||
       generation != backend->generation)
     {
       g_set_error_literal (error, backend_error_quark (), 2,
@@ -292,16 +378,25 @@ goodix_fpi_usb_backend_complete_receive (GoodixFpiUsbBackend *backend,
       submit_generation != backend->in_generation)
     return;
 
+  GoodixUsbReceivePurpose purpose = backend->in_purpose;
   backend->in_outstanding = 0;
   backend->in_generation = 0;
-  if (!backend->terminal_fence && submit_generation == backend->generation)
+  backend->in_purpose = GOODIX_USB_RECEIVE_NONE;
+  backend->in_timeout_ms = 0;
+  if (!backend->terminal_fence && submit_generation == backend->generation &&
+      purpose == GOODIX_USB_RECEIVE_PROTOCOL_RX)
     {
       backend->delivery_count++;
       goodix_usb_router_receive_complete (backend->router, submit_generation,
                                           data, length, error);
     }
   backend->in_completion_count++;
-  if (backend->in_completed_callback != NULL)
+  if (purpose == GOODIX_USB_RECEIVE_PRE_SESSION_SYNC_RX &&
+      backend->sync_completed_callback != NULL)
+    backend->sync_completed_callback (backend, submit_generation, data, length,
+                                      error, backend->sync_completed_data);
+  else if (purpose == GOODIX_USB_RECEIVE_PROTOCOL_RX &&
+           backend->in_completed_callback != NULL)
     backend->in_completed_callback (backend, submit_generation, error,
                                     backend->in_completed_data);
   maybe_notify_drained (backend);
@@ -360,3 +455,12 @@ guint64 goodix_fpi_usb_backend_get_in_completion_count (GoodixFpiUsbBackend *bac
 { return backend != NULL ? backend->in_completion_count : 0; }
 guint64 goodix_fpi_usb_backend_get_out_completion_count (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->out_completion_count : 0; }
+GoodixUsbReceivePurpose
+goodix_fpi_usb_backend_get_receive_purpose (GoodixFpiUsbBackend *backend)
+{ return backend != NULL ? backend->in_purpose : GOODIX_USB_RECEIVE_NONE; }
+gboolean
+goodix_fpi_usb_backend_pre_session_sync_is_active (GoodixFpiUsbBackend *backend)
+{ return backend != NULL && backend->pre_session_sync_active; }
+guint
+goodix_fpi_usb_backend_get_last_in_timeout_ms (GoodixFpiUsbBackend *backend)
+{ return backend != NULL ? backend->in_timeout_ms : 0; }

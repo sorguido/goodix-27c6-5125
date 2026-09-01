@@ -13,6 +13,18 @@
 static guint open_count;
 static guint close_count;
 
+GType
+g_usb_device_get_type (void)
+{
+  return G_TYPE_OBJECT;
+}
+
+GQuark
+g_usb_device_error_quark (void)
+{
+  return g_quark_from_static_string ("g-usb-device-error-quark");
+}
+
 void
 goodix_test_gusb_reset_counts (void)
 {
