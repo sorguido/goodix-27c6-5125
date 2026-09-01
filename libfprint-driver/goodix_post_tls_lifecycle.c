@@ -550,12 +550,15 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
   gsize length;
   guint16 irq;
   guint16 flags;
+  GoodixPostTlsPhase phase_at_entry;
   g_autoptr(GError) error = NULL;
 
   if (lifecycle == NULL || frame == NULL ||
       lifecycle->phase == GOODIX_POST_TLS_PHASE_TERMINAL ||
       lifecycle->phase == GOODIX_POST_TLS_PHASE_STOP)
     return;
+
+  phase_at_entry = lifecycle->phase;
   if ((lifecycle->phase == GOODIX_POST_TLS_PHASE_FDT_NAV_1 &&
        lifecycle->ack_seen) ||
       lifecycle->phase == GOODIX_POST_TLS_PHASE_RELEASE_NAV)
@@ -803,6 +806,34 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
   return;
 
 unexpected:
+  if (lifecycle->audit != NULL)
+    {
+      const guint8 *rejected_body = NULL;
+      const guint8 *rejected_raw = NULL;
+      gsize rejected_length = 0;
+      guint16 rejected_irq = 0;
+      guint16 rejected_flags = 0;
+
+      if (message.body != NULL)
+        rejected_body = g_bytes_get_data (message.body, &rejected_length);
+
+      lifecycle->audit->rejected_a0_observed = TRUE;
+      lifecycle->audit->rejected_a0_phase = phase_at_entry;
+      lifecycle->audit->rejected_a0_control = message.control;
+      lifecycle->audit->rejected_a0_body_length =
+        message.body != NULL ? (gssize) rejected_length : (gssize) -1;
+      lifecycle->audit->rejected_a0_irq = -1;
+      lifecycle->audit->rejected_a0_flags = -1;
+
+      if (rejected_body != NULL &&
+          event_fields (&message, &rejected_irq,
+                        &rejected_flags, &rejected_raw))
+        {
+          lifecycle->audit->rejected_a0_irq = rejected_irq;
+          lifecycle->audit->rejected_a0_flags = rejected_flags;
+        }
+    }
+
   goodix_a0_message_clear (&message);
   lifecycle_fail_literal (lifecycle, GOODIX_POST_TLS_ERROR_PROTOCOL,
                           "unexpected post-TLS A0 frame or state");

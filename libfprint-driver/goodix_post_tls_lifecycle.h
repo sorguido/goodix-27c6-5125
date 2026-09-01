@@ -95,6 +95,12 @@ typedef struct
   gboolean terminal;
   gboolean backend_drained;
   gboolean terminal_cleanup_completed;
+  gboolean rejected_a0_observed;
+  GoodixPostTlsPhase rejected_a0_phase;
+  gint rejected_a0_control;
+  gint rejected_a0_irq;
+  gint rejected_a0_flags;
+  gssize rejected_a0_body_length;
   guint64 generation;
 } GoodixPostTlsAudit;
 

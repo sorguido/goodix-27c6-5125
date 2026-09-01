@@ -799,6 +799,36 @@ test_fdt_delta_outside_threshold_terminal (void)
   fixture_free (fixture);
 }
 
+static void
+test_rejected_a0_sanitized_telemetry (void)
+{
+  Fixture *fixture = fixture_new ();
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GBytes) event = NULL;
+
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, &error));
+  g_assert_no_error (error);
+
+  /* Complete physical D4 OUT, then inject a structurally valid FDT event
+   * where the lifecycle is still expecting the D4 ACK. */
+  complete_command (fixture, 0xd4, NULL, 0);
+  event = build_event (0x32, 0x0080, 0x1234, 0x0300);
+  feed_frame (fixture, event, 0);
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_TERMINAL);
+  g_assert_true (fixture->audit.rejected_a0_observed);
+  g_assert_cmpint (fixture->audit.rejected_a0_phase,
+                   ==, GOODIX_POST_TLS_PHASE_D4);
+  g_assert_cmpint (fixture->audit.rejected_a0_control, ==, 0x32);
+  g_assert_cmpint (fixture->audit.rejected_a0_irq, ==, 0x0080);
+  g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x1234);
+  g_assert_cmpint (fixture->audit.rejected_a0_body_length, ==, 16);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+
+  fixture_free (fixture);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -817,5 +847,7 @@ main (int argc, char **argv)
                    test_image_decoder_crc_terminal);
   g_test_add_func ("/d278-12/fdt-delta-outside-threshold-terminal",
                    test_fdt_delta_outside_threshold_terminal);
+  g_test_add_func ("/d278-12/rejected-a0-sanitized-telemetry",
+                   test_rejected_a0_sanitized_telemetry);
   return g_test_run ();
 }

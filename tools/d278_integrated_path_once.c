@@ -1512,6 +1512,12 @@ cleanup:
             "\"secure_protocol_failure_phase\":\"%s\","
             "\"secure_protocol_failure_kind\":\"%s\","
             "\"post_tls_terminal\":%s,"
+            "\"post_tls_rejected_a0_observed\":%s,"
+            "\"post_tls_rejected_phase\":\"%s\","
+            "\"post_tls_rejected_control\":%d,"
+            "\"post_tls_rejected_irq\":%d,"
+            "\"post_tls_rejected_flags\":%d,"
+            "\"post_tls_rejected_body_length\":%" G_GSSIZE_FORMAT ","
             "\"observed_outer_type\":%d,"
             "\"observed_a0_control\":%d,"
             "\"observed_ack_echo\":%d,"
@@ -1587,6 +1593,17 @@ cleanup:
              goodix_protocol_failure_kind_name (
                secure_audit.protocol_failure_kind) : "",
             post_audit.terminal ? "true" : "false",
+            post_audit.rejected_a0_observed ? "true" : "false",
+            post_audit.rejected_a0_observed ?
+              goodix_post_tls_phase_name (post_audit.rejected_a0_phase) : "",
+            post_audit.rejected_a0_observed ?
+              post_audit.rejected_a0_control : -1,
+            post_audit.rejected_a0_observed ?
+              post_audit.rejected_a0_irq : -1,
+            post_audit.rejected_a0_observed ?
+              post_audit.rejected_a0_flags : -1,
+            post_audit.rejected_a0_observed ?
+              post_audit.rejected_a0_body_length : (gssize) -1,
             secure_audit.observed_outer_type,
             secure_audit.observed_a0_control,
             secure_audit.observed_ack_echo,
