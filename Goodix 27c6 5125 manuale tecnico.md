@@ -16,7 +16,58 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
-### Stato corrente post-D278/14 — quattro live consumate, sei correttivi host-only
+### Stato corrente post-D278/14 — CLOSED_LIVE: doppia acquisizione native C target-proven
+
+**Closure canonica del 1 settembre 2026.** D278/14 è chiuso con esito live
+`PASS` sul target reale `27c6:5125` / `GF_ST411SEC_APP_12509`. La dodicesima
+autorizzazione one-shot, eseguita sulla baseline
+`5b7b8415d57a474ae9915a4e46954a7afaafe327` con binario SHA-256
+`7f9ecad1097c279d54c6ba7f61be9e00c7ef1e5edd6b9362f72320dcf8e34379`,
+ha completato nello stesso percorso nativo C:
+
+`reentry A2 -> A8 -> E4 -> cold-start -> D1 -> TLS -> D4 -> AF ->
+fresh-FDT -> primo IRQ2 -> 0x22 -> primo B0/decode/FpImage ->
+0x34 -> IRQ0200 -> 0x20/B0 -> NAV -> fresh-down -> rearm 0x32 ->
+secondo IRQ2 -> 0x22 -> secondo B0/decode/FpImage -> STOP`.
+
+La run ha usato un solo open/claim USB, un solo backend/router/reader fisico,
+una sola sessione TLS e un solo secret handoff; ha chiuso con zero retry,
+reopen, reset, clear-halt, terzo ciclo e scritture persistenti. Entrambi i
+raster target sono stati decodificati e consegnati alla pipeline immagine.
+
+```text
+D278_14_LIVE_RESULT=PASS
+D278_14_FINAL_BASELINE=5b7b8415d57a474ae9915a4e46954a7afaafe327
+D278_14_FINAL_BINARY_SHA256=7f9ecad1097c279d54c6ba7f61be9e00c7ef1e5edd6b9362f72320dcf8e34379
+D278_14_TOTAL_LIVE_ATTEMPTS=12
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=12
+D278_14_CLOSED_LIVE=true
+LINUX_FIRST_IMAGE_PIPELINE_LIVE_PROVEN=true
+LINUX_SECOND_IMAGE_PIPELINE_LIVE_PROVEN=true
+SECOND_IMAGE_RASTER_TARGET_PROVEN=true
+TWO_ACQUISITION_REARM_LIVE_PROVEN=true
+SAME_GOODIX_DEVICE_CONTEXT_LIVE_PROVEN=true
+SINGLE_USB_BACKEND_OWNER_LIVE_PROVEN=true
+SINGLE_USB_ROUTER_LIVE_PROVEN=true
+SINGLE_PHYSICAL_IN_OWNER_LIVE_PROVEN=true
+SAME_TLS_SESSION_THROUGH_SECOND_IMAGE_LIVE_PROVEN=true
+SINGLE_SECRET_HANDOFF_LIVE_PROVEN=true
+THIRD_CYCLE_COMMAND_COUNT=0
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+BACKEND_DRAINED=true
+CLEANUP_COMPLETE=true
+CURRENT_LIVE_AUTHORIZED=false
+D278_14_RERUN_REQUIRED=false
+```
+
+Le sezioni cronologiche D278 precedenti restano nel manuale come **storia
+probatoria**: i loro marker `false`/`UNOBSERVED` descrivono correttamente ciò
+che era noto a quel momento, ma non rappresentano più lo stato corrente quando
+sono esplicitamente marcati come superati dalla closure D278/14 live #12.
 
 D278/09 preserva la conclusione D278/08: la recovery OEM pre-D1 è risolta ma
 non factory-preserving e non è un candidato Linux. Aggiunge un candidato
@@ -220,8 +271,8 @@ GENERIC_BASELINE_BOUND_OPERATOR_WORKFLOW_HOST_ONLY_PROVEN=true
 DIRECT_UNPREPARED_LIVE_PATH_REJECTED=true
 PRE_SESSION_RX_SYNC_CORE_RETAINED=true
 STRICT_A2_ACK_THEN_TYPED_RETAINED=true
-D278_14_TOTAL_LIVE_ATTEMPTS=4
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=4
+D278_14_TOTAL_LIVE_ATTEMPTS=12
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=12
 D278_14_HISTORY_CORRECTED=true
 D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
 D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
@@ -2278,7 +2329,7 @@ TRANSPORT_REOPEN_COUNT=0
 FIRST_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
 SECOND_B0_LIFECYCLE_HOST_ONLY_PROVEN=true
 SECOND_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
-SECOND_IMAGE_RASTER_TARGET_PROVEN=false
+SECOND_IMAGE_RASTER_TARGET_PROVEN=false  # HISTORICAL_SCOPE; SUPERSEDED_BY_D278_14_LIVE_12_CURRENT_TRUE
 RELEASE_TAIL_ORDER_HOST_ONLY_PROVEN=true
 FRESH_SAME_CYCLE_DOWN_TABLE_GATE_HOST_ONLY_PROVEN=true
 REARM_EXACTLY_ONCE_HOST_ONLY_PROVEN=true
@@ -2424,7 +2475,7 @@ TLS_HANDSHAKE_COUNT_MAX=1
 SECRET_HANDOFF_COUNT_MAX=1
 FIRST_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
 SECOND_IMAGE_PIPELINE_HOST_ONLY_PROVEN=true
-SECOND_IMAGE_RASTER_TARGET_PROVEN=false
+SECOND_IMAGE_RASTER_TARGET_PROVEN=false  # HISTORICAL_SCOPE; SUPERSEDED_BY_D278_14_LIVE_12_CURRENT_TRUE
 RELEASE_TAIL_ORDER_HOST_ONLY_PROVEN=true
 FRESH_SAME_CYCLE_DOWN_TABLE_GATE_HOST_ONLY_PROVEN=true
 REARM_EXACTLY_ONCE_HOST_ONLY_PROVEN=true
@@ -2453,7 +2504,12 @@ HISTORICAL_D278_13_EXECUTABLE_CLOSURE=INVALIDATED_BY_D278_14_NON_NULL_BINDING_GA
 Il review set canonico è descritto in
 `analysis/D278/D278_13_integrated_path_live_capable_host_only_prelive.md`.
 
-### D278/14 — quattro live consumate, sei correttivi host-only
+### D278/14 — cronologia iniziale: prime quattro live e correttivi host-only
+
+> **Stato storico.** Questa sezione conserva la prima tranche della campagna
+> D278/14. È superseded, per lo stato corrente, dalla closure live finale
+> D278/14 del 1 settembre 2026: dodici tentativi consumati, ultimo tentativo
+> `PASS` con due pipeline immagine target complete.
 
 D278/14 ha richiesto quattro live autorizzate separate, tutte consumate. Il
 primo tentativo, sulla baseline
@@ -2518,8 +2574,8 @@ legacy fallback restano verdi; la chiusura pre-live canonica esegue la prova
 host-only del prompt tracker.
 
 ```text
-D278_14_TOTAL_LIVE_ATTEMPTS=4
-D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=4
+D278_14_TOTAL_LIVE_ATTEMPTS=12
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=12
 D278_14_HISTORY_CORRECTED=true
 D278_14_ATTEMPT_1_BASELINE=2172e750ae7c100a3a891ba25d0797286230a4ab
 D278_14_ATTEMPT_1_OUTCOME=FAIL_HOST_BINDING_BEFORE_PROTOCOL
@@ -9174,7 +9230,7 @@ ORIENTATION_CONTRACT=UNRESOLVED
 POLARITY_CONTRACT=UNRESOLVED
 TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
 TARGET_APP12509_PHYSICAL_DPI=UNKNOWN
-SECOND_TARGET_CYCLE=UNOBSERVED
+SECOND_TARGET_CYCLE=UNOBSERVED  # HISTORICAL_SCOPE; SUPERSEDED_BY_D278_14_LIVE_12
 
 LINUX_TLS_REBUILD_REQUIRED=false
 LIBFPRINT_ENROLLMENT_AGGREGATION=FRAMEWORK_OWNED_VERIFIED
@@ -9263,7 +9319,7 @@ suite D268 è riproducibile. Nessuna USB reale, nessun comando sensore, nessuna
 nuova evidenza live.
 
 ```text
-LINUX_SECOND_B0_LIVE_OBSERVED=false
+LINUX_SECOND_B0_LIVE_OBSERVED=false  # HISTORICAL_SCOPE; SUPERSEDED_BY_D278_14_LIVE_12
 LIVE_AUTHORIZED=false
 TARGET_DEVICE_TIMEOUT=UNKNOWN
 NEXT_PRIMARY_BOUNDARY=AI_PM_PRE_LIVE_REVIEW_D275_02
@@ -11869,3 +11925,290 @@ NEXT_BOUNDARY_PREREQUISITE=AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AN
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
 ```
+
+### D278/14 — closure live finale native C a due acquisizioni
+
+Data closure: **1 settembre 2026**.
+
+Questa sezione è la fonte canonica corrente per il boundary D278/14 e
+**supersede**, senza cancellarne il valore storico, tutti i precedenti marker
+D278/12–D278/14 che classificavano il secondo raster, il secondo ciclo o
+l'integrazione live native C come `HOST_ONLY`, `UNOBSERVED` o
+`TARGET_PROVEN=false`.
+
+#### Baseline finale e risultato
+
+```text
+D278_14_FINAL_LIVE_ATTEMPT=12
+D278_14_FINAL_LIVE_RESULT=PASS
+D278_14_FINAL_BASELINE=5b7b8415d57a474ae9915a4e46954a7afaafe327
+D278_14_FINAL_PREPARED_BUILD_DIR=/tmp/goodix-d278-14-approved.LXYYuS
+D278_14_FINAL_BINARY_SHA256=7f9ecad1097c279d54c6ba7f61be9e00c7ef1e5edd6b9362f72320dcf8e34379
+D278_14_TOTAL_LIVE_ATTEMPTS=12
+D278_14_TOTAL_CONSUMED_AUTHORIZATIONS=12
+D278_14_RERUN_AUTHORIZED=false
+```
+
+La run ha raggiunto `STOP` normalmente in **5287 ms**. Non è stata una
+closure per timeout o cleanup successivo al failure:
+
+```text
+RESULT=pass
+FAILURE_CLASS=NONE
+STOP_REACHED=true
+SECURE_PHASE_AT_STOP=STOP
+POST_TLS_PHASE_AT_STOP=STOP
+POST_TLS_TERMINAL=false
+IN_OUTSTANDING_AT_STOP=0
+ROUTER_OUTSTANDING_AT_STOP=0
+BACKEND_DRAINED=true
+CLEANUP_COMPLETE=true
+```
+
+#### Sequenza target live chiusa
+
+La seguente catena è ora osservata/provata sul target reale nello stesso
+percorso native C:
+
+```text
+PRE_SESSION_RX_SYNC
+→ REENTRY_RECOVERY_A2
+→ A8 / GF_ST411SEC_APP_12509
+→ E4
+→ OEM_COLD_START_A2_1
+→ CHIP_82
+→ OTP_A6
+→ OEM_COLD_START_A2_2
+→ MODE_70
+→ DAC_220
+→ DAC_236
+→ DAC_238
+→ DAC_23A
+→ CONFIG_90
+→ D1
+→ TLS 1.2 PSK
+→ D4
+→ AF
+→ 0x36 / IRQ0100
+→ 0x50 / NAV
+→ 0x36 / IRQ0100
+→ 0x82
+→ 0x20 / baseline B0
+→ 0x36 / IRQ0100
+→ fresh FDT
+→ first 0x32 arm
+→ first IRQ0002
+→ first 0x22
+→ first B0
+→ first decode
+→ first FpImage pipeline
+→ 0x34
+→ IRQ0200
+→ post-up 0x20
+→ post-up B0
+→ 0x50 / NAV
+→ release tail complete
+→ fresh down table
+→ exactly one rearm 0x32
+→ second IRQ0002
+→ second 0x22
+→ second B0
+→ second decode
+→ second FpImage pipeline
+→ STOP
+```
+
+Contatori canonici:
+
+```text
+D4_COUNT=1
+AF_COUNT=1
+
+FDT36_COUNT=3
+FDT_IRQ100_COUNT=3
+FRESH_FDT_COUNT=1
+
+FIRST_IRQ0002_COUNT=1
+FIRST_0X22_COUNT=1
+FIRST_B0_COUNT=1
+FIRST_DECODE_COUNT=1
+FIRST_IMAGE_PIPELINE_COUNT=1
+
+RELEASE_0X34_COUNT=1
+IRQ0200_COUNT=1
+POST_UP_0X20_COUNT=1
+POST_UP_B0_COUNT=1
+NAV_0X50_COUNT=1
+NAV_RESPONSE_COUNT=1
+RELEASE_TAIL_COMPLETE_COUNT=1
+FRESH_DOWN_TABLE_COUNT=1
+REARM_COUNT=1
+
+SECOND_IRQ0002_COUNT=1
+SECOND_0X22_COUNT=1
+SECOND_B0_COUNT=1
+SECOND_DECODE_COUNT=1
+SECOND_IMAGE_PIPELINE_COUNT=1
+
+THIRD_CYCLE_COMMAND_COUNT=0
+```
+
+#### Ownership USB/TLS e invarianti di sicurezza
+
+La run finale prova il boundary con:
+
+```text
+USB_OPEN_ATTEMPT_COUNT=1
+USB_OPEN_COUNT=1
+USB_CLAIM_COUNT=1
+USB_RELEASE_COUNT=1
+USB_CLOSE_COUNT=1
+
+PHYSICAL_SUBMIT_COUNT=88
+PHYSICAL_IN_SUBMIT_COUNT=54
+PHYSICAL_OUT_SUBMIT_COUNT=34
+PHYSICAL_IN_COMPLETION_COUNT=54
+PHYSICAL_OUT_COMPLETION_COUNT=34
+MAX_OUTSTANDING_IN=1
+MAX_OUTSTANDING_OUT=1
+
+TLS_HANDSHAKE_COUNT=1
+TLS_ESTABLISHED=true
+SECRET_HANDOFF_COUNT=1
+PROJECT_SECRET_ZEROIZED=true
+
+RETRY_COUNT=0
+REOPEN_COUNT=0
+DEVICE_RESET_COUNT=0
+CLEAR_HALT_COUNT=0
+PERSISTENT_DEVICE_WRITE_COUNT=0
+```
+
+Promozioni probatorie correnti:
+
+```text
+REENTRY_PREFIXED_NATIVE_SECURE_SESSION_TARGET_PROVEN=true
+NATIVE_TLS12_PSK_HANDSHAKE_WITH_REENTRY_RECOVERY_TARGET_PROVEN=true
+POST_TLS_TWO_ACQUISITION_NATIVE_C_INTEGRATION_LIVE_PROVEN=true
+
+LINUX_FIRST_IMAGE_PIPELINE_LIVE_PROVEN=true
+LINUX_SECOND_IMAGE_PIPELINE_LIVE_PROVEN=true
+SECOND_IMAGE_RASTER_TARGET_PROVEN=true
+TWO_ACQUISITION_REARM_LIVE_PROVEN=true
+
+SAME_GOODIX_DEVICE_CONTEXT_LIVE_PROVEN=true
+SAME_OPEN_EPOCH_USB_OWNER_LIVE_PROVEN=true
+SINGLE_USB_BACKEND_OWNER_LIVE_PROVEN=true
+SINGLE_USB_ROUTER_LIVE_PROVEN=true
+SINGLE_PHYSICAL_IN_OWNER_LIVE_PROVEN=true
+
+SINGLE_TLS_OBJECT_LIVE_PROVEN=true
+SAME_TLS_SESSION_THROUGH_SECOND_IMAGE_LIVE_PROVEN=true
+SINGLE_SECRET_HANDOFF_LIVE_PROVEN=true
+
+NO_RETRY_LIVE_PROVEN=true
+NO_REOPEN_LIVE_PROVEN=true
+NO_DEVICE_RESET_LIVE_PROVEN=true
+NO_CLEAR_HALT_LIVE_PROVEN=true
+NO_PERSISTENT_DEVICE_WRITE_LIVE_PROVEN=true
+```
+
+Questa prova è target-specific per `27c6:5125` /
+`GF_ST411SEC_APP_12509`. Non generalizza automaticamente ad altri firmware o
+modelli Goodix e non modifica i vincoli factory-preserving.
+
+#### Ledger delle dodici autorizzazioni consumate
+
+| # | Baseline | Confine raggiunto / esito | Conoscenza prodotta |
+|---:|---|---|---|
+| 1 | `2172e750...` | `SIGABRT` prima del protocollo | `FpDevice` virtuale incompatibile con `fpi-usb-device` reale |
+| 2 | `fceae05d...` | A2 ACK, poi deadline | callback USB reale non riarmava il secondo IN |
+| 3 | `87c1bf89...` | typed-shaped pre-ACK | evidenza compatibile con residui RX inter-sessione |
+| 4 | `7ce15fa7...` | ACK + secondo ACK-shaped | backend drained non implica RX device vuoto |
+| 5 | `b64c01a3...` | TLS + D4, stop su D4 | delta live rispetto alla policy storica di pacing |
+| 6 | `ddc01a3b...` | D4 ACK + AF, timeout AF | pre-D4 20 ms ripristina avanzamento; AF resta bloccato |
+| 7 | `e2f11d40...` | timeout AF | pre-AF pacing non è la causa del blocco |
+| 8 | `5aa04e71...` | PRE_BIND, USB non aperto | CWD caller leaked nei path live-critical; autorizzazione consumata ma sensore non toccato |
+| 9 | `5aa04e71...` | AF superato, primo IRQ0100, stop NAV | checksum AF `wire 0xAF / checksum coordinate 0xAE` validato live; NAV OEM richiede `0x88` |
+| 10 | `fbfcd583...` | NAV superato, terzo `0x36` | plaintext B0 >4096 veniva erroneamente spezzato in più callback lifecycle |
+| 11 | `9c8fb80c...` | prima immagine + release + rearm, stop prima del secondo IRQ2 | intero primo ciclo e rearm live-proven; evento finale non osservabile con telemetry precedente |
+| 12 | `5b7b8415...` | **PASS fino al secondo raster e STOP** | closure native C completa a due acquisizioni |
+
+La live #11 non deve essere retro-classificata come «errore operatore»:
+l'evento esatto che causò il terminale non era registrato. Fra #11 e #12 è
+stata aggiunta soltanto telemetry sanitizzata del reject post-TLS, **senza
+cambio di protocollo**. La #12, eseguita con la stessa semantica wire, ha
+completato il secondo IRQ2/B0/decode/pipeline. La classificazione corretta di
+#11 resta quindi `TRANSIENT_OR_PHYSICAL_SENSOR_EVENT_NOT_STRUCTURAL_PROTOCOL_DEFECT`,
+con causa precisa `UNKNOWN`.
+
+#### Difetti di porting definitivamente chiusi durante D278/14
+
+La campagna non deve essere ripercorsa in futuro per riscoprire i seguenti
+fatti:
+
+```text
+FPDEVICE_USB_SUBTYPE_REQUIRED=true
+REAL_USB_IN_COMPLETION_MUST_REARM_CONTEXT_RX=true
+PRE_SESSION_RX_QUIET_BOUNDARY_REQUIRED_FOR_REENTRY=true
+CALLER_CWD_MUST_NOT_DEFINE_LIVE_CRITICAL_RESOURCE_PATHS=true
+
+A0_ODD_WIRE_CONTROL_CHECKSUM_COORDINATE=control&0xfe
+AF_WIRE_CONTROL=0xaf
+AF_CHECKSUM_COORDINATE=0xae
+
+OEM_NAV_0X50_RESPONSE_TRAILER=0x88
+OEM_NAV_0X50_ADDITIVE_CHECKSUM_REQUIRED=false
+
+TLS_B0_PLAINTEXT_DELIVERY_CONTRACT=ONE_LOGICAL_DELIVERY_PER_CONSUMED_B0_RECORD
+TLS_INTERNAL_SSL_READ_CHUNK_SIZE_IS_NOT_LIFECYCLE_BOUNDARY=true
+
+FDT_IRQ0100_BASELINE_COMPONENT=(word>>1)&0xff
+FDT_DELTA_OUTSIDE_THRESHOLD=FAIL_CLOSED
+```
+
+Il fix AF è causalmente target-validato dal passaggio live da timeout `AF` a
+risposta AF/FDT. Il fix NAV è target-validato dal passaggio fino ai successivi
+stadi FDT. Il contratto TLS/B0 è target-validato dal passaggio del terzo
+`0x36`, dall'intero primo ciclo e infine dalla closure #12.
+
+#### Supersession dei vecchi marker
+
+Sono da leggere esclusivamente come stato storico al loro milestone originario:
+
+```text
+D278_12 SECOND_IMAGE_RASTER_TARGET_PROVEN=false
+D274/D275 SECOND_TARGET_CYCLE=UNOBSERVED
+eventuali marker pre-D278 LINUX_SECOND_B0_LIVE_OBSERVED=false
+D278_13 LIVE_CAPABLE_INTEGRATED_PATH_HOST_ONLY_PROVEN=true
+```
+
+Lo stato corrente è invece:
+
+```text
+SECOND_IMAGE_RASTER_TARGET_PROVEN=true
+SECOND_TARGET_CYCLE_NATIVE_C_LIVE_OBSERVED=true
+LINUX_SECOND_B0_NATIVE_C_LIVE_OBSERVED=true
+LIVE_CAPABLE_INTEGRATED_PATH_TARGET_PROVEN=true
+D278_14_EXECUTABLE_CLOSURE=PASS_LIVE
+```
+
+#### Decisione
+
+D278/14 è **CHIUSO**. Una nuova esecuzione equivalente non aggiungerebbe
+conoscenza necessaria e non è richiesta per confermare questo boundary.
+
+```text
+D278_14_OUTCOME=PASS
+D278_14_ADVANCEMENT=NATIVE_C_TWO_ACQUISITION_TARGET_LIVE_CLOSURE
+D278_14_EXECUTABLE_CLOSURE=PASS_LIVE
+D278_14_RERUN_REQUIRED=false
+D278_14_RERUN_AUTHORIZED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_NATIVE_C_DRIVER_INTEGRATION_AND_PRODUCTIONIZATION
+EQUIVALENT_TWO_ACQUISITION_LIVE_RERUN_REQUIRED=false
+```
+
+Il prossimo lavoro deve quindi partire da questa closure e non ricostruire
+A2/A8, TLS, D4/AF, bootstrap FDT, first-image, release-tail, rearm o second-image
+come se fossero ancora ipotesi del percorso native C.
