@@ -16,6 +16,62 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
+### Stato corrente post-D279/01 — BLOCKED: incompatibilità extractor con libfprint 1.94.100
+
+**Audit offline del 2 settembre 2026.** D279/01 è iniziato sulla baseline
+`f609c865f760768edb6a9e404b863ccd0569e1c8`, con `main` pulito e sincronizzato
+con `origin/main`, per integrare il driver nel source target canonico
+`reference/libfprint-fedora44-1.94.100/source`. La base target verificata è
+Fedora 44 x86_64, pacchetto `libfprint-1.94.100-1.fc44.x86_64`, SONAME
+`libfprint-2.so.2` e `fprintd-1.94.5-5.fc44.x86_64`. Il libfprint 1.94.5 in
+`Rockytkg/` resta una reference storica/secondaria e non è il target production.
+
+L'integrazione si arresta prima di modificare codice o Meson: il
+`FpImageDeviceClass` upstream 1.94.100 non ha il selettore `algorithm`, il suo
+`FpiPrintType` non contiene SIGFM e il call-flow immagine seleziona sempre NBIS
+(`fp_image_detect_minutiae`, `FPI_PRINT_NBIS`, `fpi_print_bz3_match`). La classe
+Goodix corrente seleziona invece esplicitamente `FPI_DEVICE_ALGO_SIGFM`.
+Rimuovere l'assegnazione cambierebbe implicitamente extractor e porterebbe il
+percorso su NBIS con il ppmm fisico APP12509 tuttora ignoto; portare SIGFM dal
+fork storico richiederebbe un'estensione multi-file del core libfprint,
+matching/serializzazione e OpenCV, cioè l'allargamento architetturale vietato da
+D279/01.
+
+La closure live D278/14 resta integralmente valida e chiusa: non è stata
+ripetuta né reinterpretata. D279/01 produce nuova evidenza solo host-side sulla
+compatibilità della reference Fedora; non prova registrazione/build production,
+fprintd, enrollment, matching, login o runtime target. Nessun `FpIdEntry`,
+registrar, backend, router, TLS, lifecycle o stack parallelo è stato creato.
+
+```text
+D279_01_OUTCOME=BLOCKED
+D279_01_BASELINE=f609c865f760768edb6a9e404b863ccd0569e1c8
+TARGET_OS=Fedora_44_x86_64
+TARGET_LIBFPRINT_VERSION=1.94.100
+TARGET_LIBFPRINT_PACKAGE=libfprint-1.94.100-1.fc44.x86_64
+TARGET_LIBFPRINT_RUNTIME_SONAME=libfprint-2.so.2
+TARGET_FPRINTD_PACKAGE=fprintd-1.94.5-5.fc44.x86_64
+TARGET_LIBFPRINT_REFERENCE=reference/libfprint-fedora44-1.94.100/source
+ROCKYTKG_LIBFPRINT_IS_PRODUCTION_TARGET=false
+TARGET_1_94_100_IMAGE_PATH=NBIS_ONLY_VERIFIED
+CURRENT_GOODIX_ALGORITHM=SIGFM
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+PRODUCTION_USB_ID_27C6_5125_REGISTERED=false
+LIBFPRINT_1_94_100_PRODUCTION_SHAPED_BUILD=NOT_REACHED_BLOCKED
+REAL_USB_ACCESS=0
+REAL_USB_OPEN=0
+REAL_USB_CLAIM=0
+REAL_USB_SUBMIT=0
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+PERSISTENT_DEVICE_WRITE_COUNT=0
+FACTORY_STATE_MUTATION=0
+WIRE_PROTOCOL_SEMANTICS_CHANGED=false
+D278_14_RERUN_REQUIRED=false
+D278_14_RERUN_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_EXTRACTOR_COMPATIBILITY_DECISION
+```
+
 ### Stato corrente post-D278/14 — CLOSED_LIVE: doppia acquisizione native C target-proven
 
 **Closure canonica del 1 settembre 2026.** D278/14 è chiuso con esito live
@@ -12212,3 +12268,47 @@ EQUIVALENT_TWO_ACQUISITION_LIVE_RERUN_REQUIRED=false
 Il prossimo lavoro deve quindi partire da questa closure e non ricostruire
 A2/A8, TLS, D4/AF, bootstrap FDT, first-image, release-tail, rearm o second-image
 come se fossero ancora ipotesi del percorso native C.
+
+### D279/01 — audit di registrazione USB production Fedora 44/libfprint 1.94.100
+
+D279/01 ha verificato integralmente provenance e spec Fedora, le convenzioni
+Meson/registry 1.94.100 e il call-flow `FpImageDevice` target prima di applicare
+una patch. Il registry standard costruisce `fpi-drivers.c` dai nomi in
+`supported_drivers`; una futura registrazione Goodix dovrebbe quindi usare
+quel meccanismo e un `FpIdEntry` esatto `27c6:5125`, separato da `goodixmoc`.
+Nessun registrar custom è necessario o ammesso.
+
+Il blocker precede però la registrazione. Nella reference target:
+
+```text
+FpImageDeviceClass.algorithm=ABSENT
+FPI_DEVICE_ALGO_SIGFM=ABSENT
+FPI_PRINT_SIGFM=ABSENT
+SIGFM_EXTRACTION_AND_MATCHING=ABSENT
+fpi_image_device_image_captured=UNCONDITIONALLY_NBIS
+```
+
+Nel grafo Goodix già provato la classe imposta invece SIGFM e la pipeline lascia
+correttamente `FpImage::ppmm` senza un valore fisico inventato. NBIS consuma
+ppmm per la quality delle minutiae; quindi rimuovere soltanto l'assegnazione
+SIGFM non preserva il comportamento e viola il gate fail-closed D269–D271.
+Integrare SIGFM in 1.94.100 non è una piccola modifica di construction/build:
+coinvolgerebbe il core image/print, extraction, matching,
+serializzazione/deserializzazione, C++/OpenCV e Meson. Il prompt D279/01 impone
+di non allargare lo scope e di classificare questo caso come `BLOCKED`.
+
+Nessun sorgente production, registry o build file è stato modificato; nessuna
+regressione runtime è stata eseguita dopo l'identificazione del blocker perché
+non esiste una patch conforme da validare. Le prove hardware, discovery
+operativa, open/claim/submit e fprintd sono rimaste esplicitamente non eseguite.
+Il report step-local è
+`analysis/D279/D279_01_offline_production_usb_driver_registration_Fedora44_libfprint_1.94.100.md`.
+
+```text
+OUTCOME=BLOCKED
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
+EXECUTABLE_CLOSURE=NOT_REACHED_BLOCKED_BEFORE_IMPLEMENTATION
+RESIDUAL_BLOCKER_OR_RISK=FEDORA_44_LIBFPRINT_1_94_100_HAS_ONLY_NBIS_IMAGE_EXTRACTION_WHILE_THE_CANONICAL_GOODIX_CLASS_SELECTS_SIGFM_AND_TARGET_PPMM_IS_UNKNOWN
+CANONICAL_DOCUMENTATION=UPDATED_UNCOMMITTED_FOR_HUMAN_REVIEW
+REVIEW_SET=BASELINE_f609c865f760768edb6a9e404b863ccd0569e1c8_PLUS_UNCOMMITTED_analysis/D279/D279_01_offline_production_usb_driver_registration_Fedora44_libfprint_1.94.100.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md
+```
