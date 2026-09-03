@@ -16,6 +16,101 @@ GIT_CANONICAL_BRANCH=main
 DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
 ```
 
+### Stato corrente post-D279/02 — EXTRACTOR_DECISION=NBIS (architetturale/tecnica)
+
+**Decisione offline del 2 settembre 2026.** D279/02 chiude il boundary
+lasciato da D279/01: sul target production Fedora 44 /
+`libfprint-1.94.100-1.fc44.x86_64` l'extractor dell'image path Goodix
+`27c6:5125` / `GF_ST411SEC_APP_12509` è **NBIS**, non SIGFM.
+
+Il path 1.94.100 è NBIS-only (`fp_image_detect_minutiae`, `FPI_PRINT_NBIS`,
+`fpi_print_bz3_match`). `FpImage::ppmm` è consumato solo da
+`combined_minutia_quality()` per il raggio del vicinato di reliability; le
+minutiae e Bozorth3 usano coordinate pixel. La reliability calcolata viene
+scartata in `minutiae_to_xyt()` prima del matcher. Non esiste default/fallback
+codice di `ppmm`: resta `0.0` per zero-init, come nella quasi totalità dei
+driver upstream. Quindi `TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN` **non** rende
+NBIS ineseguibile e **non** autorizza a inventare un DPI. Il raster live-proven
+`80x64` supera il blocksize minimo 8; la sufficienza biometrica (≥10 minutiae,
+soglia Bozorth) resta non provata.
+
+SIGFM resta la selezione storica della classe Goodix locale e del fork
+Rockytkg. Non è necessità target-proven. Portarlo in 1.94.100 richiederebbe un
+fork del core (tipi print/device, extract/match, serializzazione FP3, OpenCV,
+Meson, ABI). Non è il path production.
+
+La decisione è `ARCHITECTURAL_TECHNICAL`. Non prova enrollment, matching,
+fprintd, FAR/FRR né qualità biometrica. D278/14 resta chiuso. D279/01 resta
+storicamente `BLOCKED` sulla registrazione USB, che non è stata eseguita.
+Nessun `FpIdEntry`, Meson production o live.
+
+Il gate locale D270/D271 che fail-close NBIS per ppmm ignoto cessa di essere un
+veto architetturale; riallinearlo è compito dello step implementativo
+successivo, senza assegnare un `ppmm` inventato.
+
+```text
+D279_02_OUTCOME=READY
+D279_02_BASELINE=924774e9bd7ea10eabdfd540bf8a4be9b8413c99
+EXTRACTOR_DECISION=NBIS
+DECISION_CLASS=ARCHITECTURAL_TECHNICAL
+NBIS_PIPELINE_COMPATIBLE=true
+NBIS_BIOMETRICALLY_VALIDATED=false
+SIGFM_PIPELINE_COMPATIBLE=false
+SIGFM_BIOMETRICALLY_VALIDATED=false
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+PPMM_EVIDENCE_CLASS=UNKNOWN
+NBIS_80X64_COMPATIBILITY=CONDITIONAL
+SIGFM_TARGET_SPECIFIC_NECESSITY=NOT_PROVEN
+BIOMETRIC_VALIDATION_PENDING=true
+TARGET_REAL_DECODED_RASTER_DATASET_IN_MAIN=false
+BIOMETRIC_MATCHER_BENCHMARK_READY=false
+TARGET_OS=Fedora_44_x86_64
+TARGET_LIBFPRINT_VERSION=1.94.100
+TARGET_LIBFPRINT_PACKAGE=libfprint-1.94.100-1.fc44.x86_64
+TARGET_LIBFPRINT_REFERENCE=reference/libfprint-fedora44-1.94.100/source
+ROCKYTKG_LIBFPRINT_IS_PRODUCTION_TARGET=false
+TARGET_1_94_100_IMAGE_PATH=NBIS_ONLY_VERIFIED
+CURRENT_GOODIX_ALGORITHM=SIGFM
+PRODUCTION_USB_ID_27C6_5125_REGISTERED=false
+LIBFPRINT_1_94_100_PRODUCTION_SHAPED_BUILD=NOT_REACHED
+D279_01_OUTCOME=BLOCKED
+D278_14_CLOSED_LIVE=true
+REAL_USB_ACCESS=0
+REAL_USB_OPEN=0
+REAL_USB_CLAIM=0
+REAL_USB_SUBMIT=0
+LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+PERSISTENT_DEVICE_WRITE_COUNT=0
+FACTORY_STATE_MUTATION=0
+WIRE_PROTOCOL_SEMANTICS_CHANGED=false
+D278_14_RERUN_REQUIRED=false
+D278_14_RERUN_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_PRODUCTION_USB_DRIVER_REGISTRATION_WITH_NBIS
+```
+
+### D279/01 — BLOCKED storico: incompatibilità extractor prima della decisione D279/02
+
+**Audit offline del 2 settembre 2026.** D279/01 è iniziato sulla baseline
+`f609c865f760768edb6a9e404b863ccd0569e1c8` per integrare il driver nel source
+target `reference/libfprint-fedora44-1.94.100/source`. Si è arrestato prima di
+modificare codice o Meson: 1.94.100 è NBIS-only, la classe Goodix selezionava
+SIGFM, e il contratto canonico D269–D271 trattava ancora `ppmm` ignoto come
+veto NBIS. Portare SIGFM era fuori scope. I documenti D279/01, lasciati
+inizialmente non committati per review umana, sono stati poi integrati in
+`924774e9bd7ea10eabdfd540bf8a4be9b8413c99`. D279/02 ha poi chiuso la decisione
+extractor; la registrazione USB production resta non eseguita.
+
+```text
+D279_01_OUTCOME=BLOCKED
+D279_01_BASELINE=f609c865f760768edb6a9e404b863ccd0569e1c8
+D279_01_DOCS_COMMITTED_AS=924774e9bd7ea10eabdfd540bf8a4be9b8413c99
+TARGET_1_94_100_IMAGE_PATH=NBIS_ONLY_VERIFIED
+CURRENT_GOODIX_ALGORITHM=SIGFM
+PRODUCTION_USB_ID_27C6_5125_REGISTERED=false
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_01=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_EXTRACTOR_COMPATIBILITY_DECISION
+```
+
 ### Stato corrente post-D278/14 — CLOSED_LIVE: doppia acquisizione native C target-proven
 
 **Closure canonica del 1 settembre 2026.** D278/14 è chiuso con esito live
@@ -12212,3 +12307,79 @@ EQUIVALENT_TWO_ACQUISITION_LIVE_RERUN_REQUIRED=false
 Il prossimo lavoro deve quindi partire da questa closure e non ricostruire
 A2/A8, TLS, D4/AF, bootstrap FDT, first-image, release-tail, rearm o second-image
 come se fossero ancora ipotesi del percorso native C.
+
+### D279/01 — audit di registrazione USB production Fedora 44/libfprint 1.94.100
+
+D279/01 ha verificato integralmente provenance e spec Fedora, le convenzioni
+Meson/registry 1.94.100 e il call-flow `FpImageDevice` target prima di applicare
+una patch. Il registry standard costruisce `fpi-drivers.c` dai nomi in
+`supported_drivers`; una futura registrazione Goodix dovrebbe quindi usare
+quel meccanismo e un `FpIdEntry` esatto `27c6:5125`, separato da `goodixmoc`.
+Nessun registrar custom è necessario o ammesso.
+
+Il blocker precede però la registrazione. Nella reference target:
+
+```text
+FpImageDeviceClass.algorithm=ABSENT
+FPI_DEVICE_ALGO_SIGFM=ABSENT
+FPI_PRINT_SIGFM=ABSENT
+SIGFM_EXTRACTION_AND_MATCHING=ABSENT
+fpi_image_device_image_captured=UNCONDITIONALLY_NBIS
+```
+
+Nel grafo Goodix già provato la classe imposta invece SIGFM e la pipeline lascia
+correttamente `FpImage::ppmm` senza un valore fisico inventato. All'epoca di
+D279/01 il contratto canonico D269–D271 trattava il consumo NBIS di `ppmm`
+nella quality come veto fail-closed; quindi rimuovere soltanto l'assegnazione
+SIGFM non era una correzione meccanica ammessa da quello step. Integrare SIGFM
+in 1.94.100 non è una piccola modifica di construction/build: coinvolgerebbe il
+core image/print, extraction, matching, serializzazione/deserializzazione,
+C++/OpenCV e Meson. Il prompt D279/01 imponeva di non allargare lo scope e di
+classificare questo caso come `BLOCKED`.
+
+Nessun sorgente production, registry o build file è stato modificato in
+D279/01; nessuna regressione runtime è stata eseguita dopo l'identificazione
+del blocker perché non esisteva una patch conforme da validare. Le prove
+hardware, discovery operativa, open/claim/submit e fprintd sono rimaste
+esplicitamente non eseguite. Il report step-local è
+`analysis/D279/D279_01_offline_production_usb_driver_registration_Fedora44_libfprint_1.94.100.md`.
+I documenti D279/01, inizialmente non committati per review umana, risultano
+poi versionati in `924774e9bd7ea10eabdfd540bf8a4be9b8413c99`.
+
+```text
+OUTCOME=BLOCKED
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
+EXECUTABLE_CLOSURE=NOT_REACHED_BLOCKED_BEFORE_IMPLEMENTATION
+RESIDUAL_BLOCKER_OR_RISK=FEDORA_44_LIBFPRINT_1_94_100_HAS_ONLY_NBIS_IMAGE_EXTRACTION_WHILE_THE_CANONICAL_GOODIX_CLASS_SELECTS_SIGFM_AND_TARGET_PPMM_IS_UNKNOWN
+CANONICAL_DOCUMENTATION=COMMITTED_AS_924774e9bd7ea10eabdfd540bf8a4be9b8413c99
+REVIEW_SET=BASELINE_f609c865f760768edb6a9e404b863ccd0569e1c8_HEAD_924774e9bd7ea10eabdfd540bf8a4be9b8413c99_analysis/D279/D279_01_offline_production_usb_driver_registration_Fedora44_libfprint_1.94.100.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md
+```
+
+D279/02 ha poi riesaminato il contratto NBIS 1.94.100 e chiuso la decisione
+extractor: `EXTRACTOR_DECISION=NBIS`, senza inventare `ppmm` e senza portare
+SIGFM. La registrazione USB production resta il prossimo boundary, non uno
+step già eseguito.
+
+### D279/02 — decisione extractor NBIS vs SIGFM per Fedora 44 / libfprint 1.94.100
+
+D279/02 è un step di analisi/decisione, non di integrazione production. Sul
+sorgente target `reference/libfprint-fedora44-1.94.100/source` il call-flow
+immagine è NBIS-only. `ppmm` influenza solo la quality radius e quella
+reliability non entra in Bozorth3. `80x64` supera il blocksize 8. SIGFM non è
+necessità target-proven e non è isolabile nel solo driver. La decisione è
+quindi NBIS come path nativo a delta minore, classe
+`ARCHITECTURAL_TECHNICAL`, validazione biometrica ancora `false`. Report:
+`analysis/D279/D279_02_offline_extractor_compatibility_decision_NBIS_vs_SIGFM.md`.
+
+```text
+D279_02_OUTCOME=READY
+EXTRACTOR_DECISION=NBIS
+DECISION_CLASS=ARCHITECTURAL_TECHNICAL
+NBIS_PIPELINE_COMPATIBLE=true
+NBIS_BIOMETRICALLY_VALIDATED=false
+SIGFM_PIPELINE_COMPATIBLE=false
+SIGFM_BIOMETRICALLY_VALIDATED=false
+TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
+BIOMETRIC_MATCHER_BENCHMARK_READY=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_PRODUCTION_USB_DRIVER_REGISTRATION_WITH_NBIS
+```
