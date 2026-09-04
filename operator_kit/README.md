@@ -1,6 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D279/10 terza acquisizione OEM passiva (pre-live, hard-gated)
+
+`d279-10-third-acquisition-observe/` osserva metadata USBPcap del lifecycle
+dal secondo al terzo B0 senza sender Goodix. Il template authority e chiuso e
+il live non e autorizzato. I test sintetici Linux sono 14/14; resta necessaria
+la qualificazione nativa Windows con Goodix assente. Il terzo contatto ha un
+rischio esplicito non risolto di commit enrollment host-side e non potra essere
+autorizzato implicitamente.
+
 ## D279/07 layout privato production (gate concluso PASS)
 
 `target_compatibility/d279_07_fprintd_layout/` contiene il provisioning

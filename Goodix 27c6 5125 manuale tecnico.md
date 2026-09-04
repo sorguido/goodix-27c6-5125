@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/09 — activation production bounded collegata offline
+### Stato corrente post-D279/10 — terza acquisizione preparata, live chiuso
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -96,6 +96,21 @@ builder D278 interessati sono stati corretti per linkare le dipendenze runtime
 introdotte da D279/08; non è cambiato il protocollo né è stata abilitata una
 baseline live.
 D279/09 non autorizza installazione, fprintd o live.
+
+D279/10 prepara offline il successivo confine senza estendere il sender Linux:
+un Kit Windows/OEM passivo osserva con USBPcap/TShark la ripetizione completa
+del release-tail/re-arm dopo il secondo B0 e si arresta wire-driven sul terzo
+B0. Riusa il parser D274/03, richiede il prefisso gia provato fino al secondo
+B0 e pubblica solo metadata; hash-gate e concordanza observer/finalizer sono
+obbligatori, un quarto ciclo fallisce chiuso. Quattordici fixture sintetiche passano
+su Linux senza leggere capture autentiche.
+
+Il Kit resta hard-gated: authority versionata interamente false, nessuna
+baseline approvata e qualificazione PowerShell 5.1 nativa ancora pendente con
+Goodix assente. Esiste inoltre un rischio non eliminabile offline: non e noto
+se Windows/OEM persista un enrollment host gia al terzo contatto. Il futuro
+live dovra accettare espressamente tale possibile mutazione oltre ad
+autorizzare capture e terzo contatto; per ora non e autorizzato nulla.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
 solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
@@ -206,6 +221,14 @@ PRODUCTION_PRE_SESSION_RX_SYNC_REQUIRED=true
 PRODUCTION_RUNTIME_HANDOFF_VIEWS_CLEARED=true
 PRODUCTION_ENROLLMENT_ENABLED=false
 PRODUCTION_ENROLLMENT_REJECTION_SUBMIT_COUNT=0
+D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION
+D279_10_BASELINE=1cc2b839dbbd3f7c7c13354bca5997fc1ce01fe2
+D279_10_EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_WINDOWS_NATIVE_PENDING
+D279_10_SYNTHETIC_TESTS=14/14_PASS
+D279_10_PASSIVE_OEM_OBSERVER=true
+D279_10_LIVE_AUTHORITY_TEMPLATE_CLOSED=true
+D279_10_LIVE_AUTHORIZED=false
+D279_10_HOST_ENROLLMENT_COMMIT_EDGE=UNKNOWN
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -265,10 +288,26 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=THIRD_ACQUISITION_TARGET_EVIDENCE
+NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
-NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
+NEXT_LIVE_PREREQUISITE=NATIVE_QUALIFICATION_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_RISK_ACCEPTANCE
 ```
+
+### D279/10 — Kit passivo per la terza acquisizione
+
+Il metodo differisce dal precedente live Linux: non generalizza il lifecycle
+e non invia wire command. Il workflow OEM e osservato passivamente oltre il
+precedente stop, per testare se `0x34 → IRQ0200 → 0x20/B0 → 0x50/NAV → 0x32`
+si ripete dopo la seconda immagine e raggiunge il terzo
+`IRQ2 → 0x22 → ACK 0x01 → B0`. Se fallisce, non e ammesso retry: si analizza la
+singola traccia e si effettua replan.
+
+Il launcher applica full SHA, branch `development`, live-critical set pulito,
+assenza target same-run prima di marker/capture/attach, marker CreateNew,
+deadline 300 s, cleanup e output privato metadata-only. La qualificazione
+nativa Windows con target assente e il rischio di commit enrollment host sono
+i blocker correnti. Report:
+`analysis/D279/D279_10_third_acquisition_operator_kit_prep.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
@@ -322,8 +361,9 @@ open epoch, senza duplicare PSK/validator/CONFIG90. La suite osserva cleanse
 dei buffer PE/cache, dei due seed produttore, del descriptor, di FDT12 e dei
 tre oggetti protetti al teardown. L'audit passato al loader deve vivere almeno
 quanto l'owner. D279/07 ha chiuso path, provisioning e compatibilità target;
-D279/08 ha poi collegato owner e claim alla sottoclasse USB. Activation secure
-production e ogni esecuzione fprintd/live restano aperte. Report:
+D279/08 ha poi collegato owner e claim alla sottoclasse USB e D279/09 ha
+cablato l'activation secure bounded. Ogni esecuzione fprintd/live resta
+aperta. Report:
 `analysis/D279/D279_06_offline_open_epoch_material_owner.md`.
 
 ### D279/05 — reader dei due input privati PE/cache

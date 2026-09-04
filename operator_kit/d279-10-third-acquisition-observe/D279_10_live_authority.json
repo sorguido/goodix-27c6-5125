@@ -1,0 +1,10 @@
+{
+  "schema": "D279_10_LIVE_AUTHORITY_V1",
+  "baseline_approved": false,
+  "approved_for_passive_capture": false,
+  "third_contact_authorized": false,
+  "possible_host_enrollment_mutation_accepted": false,
+  "live_authorized": false,
+  "approved_full_commit_sha": null,
+  "one_shot_authorization_id": null
+}
