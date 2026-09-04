@@ -1,18 +1,16 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
-## D279/07 layout privato production (preparato, esecuzione non autorizzata)
+## D279/07 layout privato production (gate concluso PASS)
 
 `target_compatibility/d279_07_fprintd_layout/` contiene il provisioning
 fail-closed dei cinque input in `/var/lib/goodix-5125-poc` e un probe
 read-only a due fasi per identità root, sandbox systemd, metadata e policy
 SELinux. Il corrective successivo al primo probe salta integralmente le
 operazioni SELinux quando `getenforce=Disabled`; mapping e label sono
-condizionali a Enforcing/Permissive. Il provisioning non è stato eseguito:
-sudo, file autentici, installazione, fprintd, USB e live restano non
-autorizzati. Il Real Target Compatibility Gate resta
-`BLOCKED_HUMAN_REQUIRED` fino al provisioning autorizzato e al probe completo
-post-provision.
+condizionali a Enforcing/Permissive. L'Utente ha poi eseguito provisioning e
+probe full autorizzati con SELinux `Enforcing`: layout, policy e label sono
+`PASS`. fprintd, USB e live non sono stati eseguiti.
 
 ## D272/01 validazione SIGFM (solo preflight offline)
 

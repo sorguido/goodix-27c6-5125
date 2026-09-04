@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/07 corrective — ambiente PASS, layout incompleto
+### Stato corrente post-D279/07 — gate production layout PASS
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -49,13 +49,21 @@ Ora Disabled salta integralmente `semanage`, `restorecon`, `matchpathcon`,
 `fprintd_var_lib_t` limitati ai sei path. Il test a sentinella dimostra che
 nessun mutator SELinux viene chiamato nel ramo Disabled.
 
-Il nuovo controllo autonomo non privilegiato produce
-`REAL_TARGET_ENVIRONMENT=PASS` e
-`SELINUX_PROVISIONING=NOT_APPLICABLE_DISABLED`, senza accedere al layout. La
-compatibilità complessiva resta `BLOCKED_HUMAN_REQUIRED`: serve prima
-autorizzazione al provisioning degli input mancanti e poi una distinta
-autorizzazione al probe full sudo read-only. Nessun provisioning, sudo, input
-autentico, installazione, fprintd, USB o live è stato eseguito dall'AI.
+Il controllo autonomo non privilegiato aveva prodotto
+`REAL_TARGET_ENVIRONMENT=PASS` con SELinux allora osservato `Disabled`, senza
+accedere al layout. Successivamente l'Utente ha eseguito manualmente il
+provisioning e il probe full autorizzati. Entrambe le run hanno rilevato lo
+stato reale corrente `Enforcing`: il provisioning ha quindi applicato e
+verificato il percorso `fprintd_var_lib_t`, preservato i primi tre input e
+installato `gfusb.dll` e `fdt-cache.bin`; il probe ha confermato policy di
+lettura, label, identità root, sandbox e metadata `0700/0600`.
+
+Il risultato conclusivo è `REAL_TARGET_COMPATIBILITY=PASS` e chiude il gate
+D279/07 per il layout production. Le operazioni protette sono state compiute
+solo dall'operatore nell'ambito dell'autorizzazione dichiarata; l'AI non ha
+usato sudo né letto gli input. fprintd non è stato avviato e USB/live non sono
+stati toccati. Il prossimo boundary autonomo è il collegamento offline
+dell'owner D279/06 al lifecycle `img_open`/`img_close` della sottoclasse USB.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
 solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
@@ -132,10 +140,10 @@ ancora operativo il lifecycle `img_open` production. D278/14 resta chiuso e
 non è autorizzata alcuna nuova run live.
 
 ```text
-D279_07_OUTCOME=HUMAN_REQUIRED
+D279_07_OUTCOME=PASS
 D279_07_BASELINE=ba8750874df3f7c38d515be7d6b0412a5f0ab478
 D279_07_CORRECTIVE_BASELINE=95c5346dcb2938bca0d1af364daef94948866bd2
-D279_07_EXECUTABLE_CLOSURE=PASS_OFFLINE_CORRECTIVE_POST_PROVISION_PROBE_PENDING
+D279_07_EXECUTABLE_CLOSURE=PASS_REAL_TARGET_LAYOUT_PROVISIONING_AND_METADATA_POLICY_PROBE
 PRODUCTION_LAYOUT=/var/lib/goodix-5125-poc
 PRODUCTION_LAYOUT_DIRECTORY=root:root_0700
 PRODUCTION_LAYOUT_FILES=root:root_0600
@@ -143,13 +151,13 @@ PRODUCTION_LAYOUT_FILE_COUNT=5
 FPRINTD_RUNTIME_IDENTITY=root:root
 FPRINTD_PROTECT_SYSTEM_STRICT_READ_COMPATIBLE=true
 SELINUX_REQUIRED_LAYOUT_TYPE_WHEN_ACTIVE=fprintd_var_lib_t
-SELINUX_CURRENT_ENFORCEMENT=Disabled
-SELINUX_PROVISIONING=NOT_APPLICABLE_DISABLED
+SELINUX_CURRENT_ENFORCEMENT=Enforcing
+SELINUX_PROVISIONING=REQUIRED_FPRINTD_VAR_LIB_T_COMPLETED
 REAL_TARGET_ENVIRONMENT=PASS
 FIRST_HUMAN_PROBE_RESULT=EXPECTED_INCOMPLETE_LAYOUT_GFUSB_DLL_ABSENT
-LAYOUT_PROVISIONING_STATE=INCOMPLETE
-REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED
-PRODUCTION_LAYOUT_PROVISIONED=false
+LAYOUT_PROVISIONING_STATE=COMPLETE_METADATA_ONLY
+REAL_TARGET_COMPATIBILITY=PASS
+PRODUCTION_LAYOUT_PROVISIONED=true
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -209,8 +217,8 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_AUTHORIZATION_REAL_LAYOUT_PROVISIONING
-REAL_PATH_PROVISIONING=HUMAN_GATE_OPERATOR_KIT_PREPARED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_RUNTIME_MATERIAL_OWNER_IMG_OPEN_IMG_CLOSE_INTEGRATION
+REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
 
@@ -222,13 +230,12 @@ autorizzati; la policy e i loader impongono directory uid/gid/mode
 sintetici normali e ASan/UBSan passano; la regressione D278 passa 63/63 in
 entrambe le modalità e la build/registry Fedora 44 resta verde.
 
-Il Real Target Compatibility Gate non è chiuso da questi test. Il probe
-environment-only ha attestato unit effettiva e compatibilità dell'ambiente. Il
-primo full probe ha confermato il layout incompleto. Dopo provisioning, il full
-probe deve attestare metadata reali e, soltanto quando SELinux è attivo,
-mapping/label/allow `fprintd_var_lib_t`, senza leggere contenuto o avviare
-fprintd. Il provisioning separato verifica pin e non sovrascrive file
-esistenti, ma richiede nuova autorizzazione per essere eseguito. Report:
+Il Real Target Compatibility Gate è stato chiuso dal provisioning e dal probe
+full eseguiti manualmente dall'Utente: layout completo, metadata reali,
+identità root, sandbox e mapping/label/allow `fprintd_var_lib_t` con SELinux
+`Enforcing` sono `PASS`. Il probe non ha letto contenuto né avviato fprintd;
+USB è rimasto non acceduto. Il provisioning separato ha verificato i pin, non
+ha sovrascritto i tre file esistenti e ha installato i due mancanti. Report:
 `analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md`.
 
 ### D279/06 — owner unico dei materiali runtime

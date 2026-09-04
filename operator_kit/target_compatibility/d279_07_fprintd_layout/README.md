@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D279/07 — layout privato production e compatibilità fprintd
 
-Questo kit è stato preparato offline. **Non è stato eseguito.** Non autorizza
-installazione, accesso ai cinque input autentici, avvio/arresto di `fprintd`,
-USB Goodix o una run live.
+Questo kit è stato preparato offline e successivamente eseguito manualmente
+dall'Utente con autorizzazioni distinte per provisioning e probe full. Entrambe
+le run sono concluse con successo; non hanno avviato `fprintd`, aperto USB
+Goodix o eseguito una run live.
 
 ## Layout autorizzato
 
@@ -32,10 +33,11 @@ Sul Fedora 44 ispezionato offline, `fprintd.service` non imposta `User=`,
 `Group=` o `DynamicUser=`: per una system service systemd usa quindi root.
 `ProtectSystem=strict` rende il layout sola lettura ma non lo nasconde.
 
-La macchina osservata ha SELinux disabilitato. In tale stato il controllo MAC e
-la configurazione delle label sono non applicabili: il provisioning corretto
-usa soltanto DAC e non richiede né invoca `semanage`, `restorecon`,
-`matchpathcon` o `chcon`. Se SELinux è invece Enforcing o Permissive, la policy
+Una prima osservazione aveva rilevato SELinux Disabled; provisioning e probe
+conclusivi hanno entrambi rilevato lo stato reale corrente `Enforcing`. In
+stato Disabled il controllo MAC e la configurazione delle label sono non
+applicabili e il provisioning non invoca tool SELinux. Con Enforcing o
+Permissive, come nella run conclusiva, la policy
 assegna inizialmente il tipo generico `var_lib_t`; le regole per `fprintd_t`
 permettono lettura completa di `fprintd_var_lib_t`, non dei normali file
 `var_lib_t`, e il provisioning configura allora i sei path esatti.
@@ -44,7 +46,9 @@ Il primo probe manuale autorizzato ha restituito
 `MOTIVO=FILE_ASSENTE_O_NON_REGOLARE_gfusb.dll`. È evidenza attesa di layout non
 ancora provisionato, non evidenza di incompatibilità dell'identità fprintd. La
 versione corretta separa il controllo ambiente dalla validazione layout e, nel
-probe completo, elenca in una sola esecuzione tutti i file assenti.
+probe completo, elenca in una sola esecuzione tutti i file assenti. Il
+provisioning successivo ha installato entrambi i file mancanti e il probe full
+ha concluso `REAL_TARGET_COMPATIBILITY=PASS`.
 
 ## Sequenza corretta
 
@@ -68,11 +72,11 @@ soltanto unit, metadata e, se attiva, policy/label SELinux. Termina fail-closed
 se il layout non è esattamente quello previsto o se non può dimostrare
 l'accesso.
 
-## Provisioning (preparato, non autorizzato all'esecuzione)
+## Provisioning (run conclusa; istruzioni conservate per provenance)
 
-`prepare-production-layout.sh` è destinato a una successiva azione operatore
-esplicitamente autorizzata per `sudo` e accesso/copia degli input reali
-mancanti; la modifica SELinux è richiesta soltanto se SELinux è attivo. Ogni
+`prepare-production-layout.sh` è stato eseguito dall'operatore con
+autorizzazione esplicita per `sudo` e accesso/copia degli input reali mancanti;
+la modifica SELinux era condizionata allo stato attivo effettivamente rilevato. Ogni
 destinazione assente richiede una sorgente esplicita; un file esistente
 conforme è preservato. Lo script non sovrascrive mai un file esistente e
 installa solo file già verificati per size e SHA-256. Esempio puramente
@@ -88,14 +92,15 @@ sudo ./operator_kit/target_compatibility/d279_07_fprintd_layout/prepare-producti
   --fdt-cache /PERCORSO/PRIVATO/fdt-cache.bin
 ```
 
-Per il corrective corrente non serve un altro probe privilegiato pre-
-provisioning per stabilire quali dei due nuovi input manchino. Le sorgenti già
+Per il corrective non serviva un altro probe privilegiato pre-provisioning per
+stabilire quali dei due nuovi input mancassero. Le sorgenti già
 individuate per solo nome/path, senza leggerne il contenuto, sono
 `analysis/D230/work/GoodixExport/gfusb.dll` e
 `captures/D255_20260822T205631772Z_85c8c41f/raw/cache_before/9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2.bin`.
-Una futura run autorizzata può passarle entrambe: se una destinazione è già
-presente e conforme, lo script la preserva senza accedere alla sorgente
-corrispondente; se è assente, la installa come `gfusb.dll` o `fdt-cache.bin`.
+La run autorizzata le ha passate entrambe: per una destinazione già presente e
+conforme lo script preserva il file senza accedere alla sorgente
+corrispondente; per una destinazione assente lo installa come `gfusb.dll` o
+`fdt-cache.bin`.
 
 Prima di qualsiasi autorizzazione, la selezione SELinux è osservabile senza
 scritture con `prepare-production-layout.sh --check-selinux-plan`. Lo script
@@ -108,5 +113,5 @@ rimuove soltanto lo stato creato dalla stessa invocazione, non elimina o
 sovrascrive file già presenti, non avvia servizi e non contiene accesso USB.
 
 Output prodotti: solo stdout/stderr dell'operatore. Il kit non crea report con
-contenuti privati. La closure production resta sospesa finché il probe non
-produce `REAL_TARGET_COMPATIBILITY=PASS` sul target reale.
+contenuti privati. Il probe conclusivo ha prodotto
+`REAL_TARGET_COMPATIBILITY=PASS`; il gate D279/07 è chiuso.

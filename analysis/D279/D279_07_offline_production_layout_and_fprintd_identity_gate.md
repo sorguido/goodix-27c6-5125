@@ -4,19 +4,20 @@
 ## Esito
 
 ```text
-D279_07_OUTCOME=HUMAN_REQUIRED
+D279_07_OUTCOME=PASS
 D279_07_BASELINE=ba8750874df3f7c38d515be7d6b0412a5f0ab478
 D279_07_CORRECTIVE_BASELINE=95c5346dcb2938bca0d1af364daef94948866bd2
 ADVANCEMENT=MATERIAL_ARCHITECTURAL_OR_REPOSITORY_ADVANCEMENT
-EXECUTABLE_CLOSURE=PASS_OFFLINE_CORRECTIVE;POST_PROVISION_PROBE_PENDING
-REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED
+EXECUTABLE_CLOSURE=PASS_REAL_TARGET_LAYOUT_PROVISIONING_AND_METADATA_POLICY_PROBE
+REAL_TARGET_COMPATIBILITY=PASS
 REAL_TARGET_ENVIRONMENT=PASS
-LAYOUT_PROVISIONING_STATE=INCOMPLETE_CONFIRMED_GFUSB_DLL_ABSENT
-SELINUX_PROVISIONING=NOT_APPLICABLE_DISABLED
+LAYOUT_PROVISIONING_STATE=COMPLETE_METADATA_ONLY
+SELINUX_CURRENT_ENFORCEMENT=Enforcing
+SELINUX_PROVISIONING=REQUIRED_FPRINTD_VAR_LIB_T_COMPLETED
 PRODUCTION_LAYOUT_API=READY_OFFLINE
-PRODUCTION_LAYOUT_PROVISIONED=false
-AUTHENTIC_PROTECTED_INPUTS_ACCESSED=false
-SUDO_EXECUTED=false
+PRODUCTION_LAYOUT_PROVISIONED=true
+AUTHENTIC_PROTECTED_INPUTS_ACCESSED=AUTHORIZED_OPERATOR_HASH_VERIFICATION_AND_COPY
+SUDO_EXECUTED=AUTHORIZED_OPERATOR_ONLY
 FPRINTD_EXECUTED=false
 REAL_USB_ACCESS=0
 LIVE_EXECUTION_PERFORMED=false
@@ -35,9 +36,11 @@ progettazione/implementazione offline e preparazione del kit, il riuso di
 /var/lib/goodix-5125-poc/fdt-cache.bin                  root:root 0600
 ```
 
-Non sono autorizzati né avvenuti sudo, creazione/copia dei file reali,
-lettura di materiale autentico, installazione, esecuzione di fprintd, USB o
-live.
+Nella fase offline iniziale non erano avvenuti sudo, creazione/copia dei file
+reali o lettura di materiale autentico. L'Utente ha successivamente eseguito e
+riportato il provisioning autorizzato e il probe full: tali azioni operatore
+sono documentate sotto e non costituiscono esecuzione AI. fprintd, USB e live
+non sono stati eseguiti.
 
 ## Evidenza del primo probe operatore e sequencing
 
@@ -129,10 +132,11 @@ PROTECT_SYSTEM_STRICT_READ_ONLY_ACCESS=COMPATIBLE
 
 ### SELinux
 
-Il target osservato contiene `selinux-policy-targeted-44.8-1.fc44`, ma
-`getenforce` e `sestatus` riportano `Disabled`. Il path non personalizzato ha
-expected type `var_lib_t`; `/var/lib/fprint` usa invece
-`fprintd_var_lib_t`.
+Il target osservato contiene `selinux-policy-targeted-44.8-1.fc44`. Una prima
+osservazione riportava `Disabled`; il provisioning e il probe conclusivi,
+temporalmente più recenti e autoritativi per lo stato corrente, riportano
+entrambi `Enforcing`. Il path non personalizzato ha expected type `var_lib_t`;
+`/var/lib/fprint` usa invece `fprintd_var_lib_t`.
 
 Una query read-only con la libreria SETools sul policy binary installato
 `policy.35` mostra:
@@ -196,13 +200,34 @@ Contiene:
   SELinux persistenti limitati ai sei path autorizzati;
 - `README.md`: prerequisiti, rischi, stop condition e invocazioni in italiano.
 
-Il provisioning richiede una distinta autorizzazione per sudo e accesso/copia
-dei file reali mancanti. Sul target Disabled osservato non richiederà modifica
-SELinux. Il probe completo post-provision richiederà una successiva
-autorizzazione sudo read-only perché la directory `0700` non è attraversabile
-dall'utente ordinario. Finché quel probe non produce
-`REAL_TARGET_COMPATIBILITY=PASS`, la compatibilità production del layout non è
-chiusa.
+## Evidenza conclusiva operatore
+
+L'Utente ha eseguito manualmente provisioning e probe full autorizzati. Il
+provisioning ha preservato e verificato i primi tre file, installato e
+verificato `gfusb.dll` e `fdt-cache.bin`, rilevato SELinux `Enforcing` e
+completato il percorso `fprintd_var_lib_t`. Non ha avviato fprintd né aperto
+USB.
+
+Il probe full post-provision ha quindi prodotto:
+
+```text
+FPRINTD_RUNTIME_IDENTITY=root:root
+FPRINTD_PROTECT_SYSTEM=strict_read_only_visible
+SELINUX_ENFORCEMENT=Enforcing
+SELINUX_FPRINTD_READ_POLICY=PASS
+REAL_TARGET_ENVIRONMENT=PASS
+LAYOUT_METADATA=root:root_0700_files_0600
+LAYOUT_PROVISIONING_STATE=COMPLETE_METADATA_ONLY
+FPRINTD_STARTED=false
+FILE_CONTENT_READ=false
+USB_ACCESSED=false
+REAL_TARGET_COMPATIBILITY=PASS
+```
+
+Il Real Target Compatibility Gate D279/07 per il layout production è pertanto
+chiuso positivamente. `COMPLETE_METADATA_ONLY` descrive correttamente lo scope
+del probe: il contenuto era stato verificato per pin dal provisioning, mentre
+il probe successivo ha letto soltanto metadata, label/policy e unit systemd.
 
 ## Verifiche
 
@@ -214,6 +239,10 @@ D279_07_UNKNOWN_SELINUX_FAIL_CLOSED=PASS
 D279_07_ENVIRONMENT_ONLY_BEFORE_LAYOUT=PASS
 actual_disabled_selinux_plan=PASS_NO_MUTATION
 actual_environment_only_probe=PASS_ENVIRONMENT_LAYOUT_PENDING
+authorized_operator_provisioning=PASS
+authorized_operator_full_probe=PASS
+SELINUX_CURRENT_ENFORCEMENT=Enforcing
+REAL_TARGET_COMPATIBILITY=PASS
 git diff --check=PASS
 runtime_material_normal=9/9_PASS
 runtime_material_ASAN_UBSAN=9/9_PASS
@@ -236,5 +265,5 @@ passata.
 ## Review set
 
 ```text
-REVIEW_SET=BASELINE_95c5346dcb2938bca0d1af364daef94948866bd2_PLUS_CURRENT_DEVELOPMENT_DIFF_PLUS_analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md_PLUS_analysis/D279/test_d279_07_selinux_and_probe_sequencing.sh_PLUS_operator_kit/target_compatibility/d279_07_fprintd_layout_PLUS_Goodix_27c6_5125_manuale_tecnico.md
+REVIEW_SET=BASELINE_1ee5e0b03b6555360bd74f97bd511759db1f3ac1_PLUS_FINAL_DEVELOPMENT_COMMIT_PLUS_analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md_PLUS_operator_kit/target_compatibility/d279_07_fprintd_layout_PLUS_Goodix_27c6_5125_manuale_tecnico.md
 ```
