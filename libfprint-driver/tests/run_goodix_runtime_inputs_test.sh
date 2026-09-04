@@ -22,21 +22,27 @@ run_tests ()
   strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 
   gcc $strict $cflags -I"$root/libfprint-driver" \
+    "$root/libfprint-driver/goodix_d190_binder.c" \
+    "$root/libfprint-driver/goodix_target_material.c" \
     "$root/libfprint-driver/goodix_runtime_inputs.c" \
+    "$root/libfprint-driver/goodix_runtime_material.c" \
     "$root/libfprint-driver/tests/test_goodix_runtime_inputs.c" \
     $libs -o "$build/test-goodix-runtime-inputs"
   timeout 30 "$build/test-goodix-runtime-inputs"
-  echo D279_05_RUNTIME_INPUTS_NORMAL=PASS
+  echo D279_06_RUNTIME_MATERIAL_NORMAL=PASS
 
   gcc $strict -O1 -fno-omit-frame-pointer -fsanitize=address,undefined \
     $cflags -I"$root/libfprint-driver" \
+    "$root/libfprint-driver/goodix_d190_binder.c" \
+    "$root/libfprint-driver/goodix_target_material.c" \
     "$root/libfprint-driver/goodix_runtime_inputs.c" \
+    "$root/libfprint-driver/goodix_runtime_material.c" \
     "$root/libfprint-driver/tests/test_goodix_runtime_inputs.c" \
     $libs -o "$build/test-goodix-runtime-inputs-sanitized"
   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
     UBSAN_OPTIONS=halt_on_error=1 \
     timeout 30 "$build/test-goodix-runtime-inputs-sanitized"
-  echo D279_05_RUNTIME_INPUTS_ASAN_UBSAN=PASS
+  echo D279_06_RUNTIME_MATERIAL_ASAN_UBSAN=PASS
 }
 
 if command -v flatpak >/dev/null 2>&1 && \
@@ -50,12 +56,12 @@ if command -v flatpak >/dev/null 2>&1 && \
        cflags=$(pkg-config --cflags glib-2.0 openssl)
        libs=$(pkg-config --libs glib-2.0 openssl)
        strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
-       gcc $strict $cflags -I"$root/libfprint-driver" "$root/libfprint-driver/goodix_runtime_inputs.c" "$root/libfprint-driver/tests/test_goodix_runtime_inputs.c" $libs -o "$build/test-goodix-runtime-inputs"
+       gcc $strict $cflags -I"$root/libfprint-driver" "$root/libfprint-driver/goodix_d190_binder.c" "$root/libfprint-driver/goodix_target_material.c" "$root/libfprint-driver/goodix_runtime_inputs.c" "$root/libfprint-driver/goodix_runtime_material.c" "$root/libfprint-driver/tests/test_goodix_runtime_inputs.c" $libs -o "$build/test-goodix-runtime-inputs"
        timeout 30 "$build/test-goodix-runtime-inputs"
-       echo D279_05_RUNTIME_INPUTS_NORMAL=PASS
-       gcc $strict -O1 -fno-omit-frame-pointer -fsanitize=address,undefined $cflags -I"$root/libfprint-driver" "$root/libfprint-driver/goodix_runtime_inputs.c" "$root/libfprint-driver/tests/test_goodix_runtime_inputs.c" $libs -o "$build/test-goodix-runtime-inputs-sanitized"
+       echo D279_06_RUNTIME_MATERIAL_NORMAL=PASS
+       gcc $strict -O1 -fno-omit-frame-pointer -fsanitize=address,undefined $cflags -I"$root/libfprint-driver" "$root/libfprint-driver/goodix_d190_binder.c" "$root/libfprint-driver/goodix_target_material.c" "$root/libfprint-driver/goodix_runtime_inputs.c" "$root/libfprint-driver/goodix_runtime_material.c" "$root/libfprint-driver/tests/test_goodix_runtime_inputs.c" $libs -o "$build/test-goodix-runtime-inputs-sanitized"
        ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 timeout 30 "$build/test-goodix-runtime-inputs-sanitized"
-       echo D279_05_RUNTIME_INPUTS_ASAN_UBSAN=PASS
+       echo D279_06_RUNTIME_MATERIAL_ASAN_UBSAN=PASS
      }
      run_tests "$1" "$2"' sh "$git_root" "$build_dir"
 else

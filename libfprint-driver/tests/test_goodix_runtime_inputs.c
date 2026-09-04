@@ -1,7 +1,10 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "goodix_runtime_inputs.h"
+#include "goodix_runtime_material.h"
+#include "goodix_d190_binder.h"
 
 #include <glib/gstdio.h>
+#include <openssl/crypto.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -396,6 +399,152 @@ test_file_provider_changed_fail_closed (void)
   g_assert_cmpint (g_rmdir (directory), ==, 0);
 }
 
+static void
+set_config_finalizer (guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH])
+{
+  guint32 sum = 0;
+  guint16 finalizer;
+
+  for (guint i = 0; i < 111u; i++)
+    sum += (guint32) config[i * 2u] |
+           ((guint32) config[i * 2u + 1u] << 8);
+  finalizer = (guint16) (0u - 0xa5a5u - sum);
+  config[222] = (guint8) finalizer;
+  config[223] = (guint8) (finalizer >> 8);
+}
+
+static void
+observe_target_cleanse (const gchar *label,
+                        const guint8 *bytes,
+                        gsize length,
+                        gpointer user_data)
+{
+  (void) label;
+  observe_input_cleanse (bytes, length, user_data);
+}
+
+static void
+test_runtime_material_owner (void)
+{
+  static const guint8 seed_a[6] = { 1u, 2u, 3u, 4u, 5u, 6u };
+  static const guint8 seed_b[6] = { 0x11u, 0x22u, 0x33u,
+                                    0x44u, 0x55u, 0x66u };
+  static const gchar manifest[] = "synthetic runtime material manifest";
+  guint8 pe[SYNTHETIC_PE_LENGTH];
+  guint8 cache[SYNTHETIC_CACHE_LENGTH];
+  guint8 transport[GOODIX_TARGET_TRANSPORT_LENGTH];
+  guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH];
+  guint8 validator[32] = { 0 };
+  guint8 fdt[GOODIX_RUNTIME_FDT_SEED_LENGTH] = { 0 };
+  GoodixRuntimeMaterialPolicy policy;
+  GoodixRuntimeMaterialPaths paths;
+  GoodixRuntimeMaterialAudit audit;
+  GoodixSecureSessionMaterial view;
+  GoodixRuntimeMaterial *owner = NULL;
+  CleanseObservation input_observation = { .all_zero = TRUE };
+  CleanseObservation target_observation = { .all_zero = TRUE };
+  g_autofree gchar *directory = NULL;
+  g_autofree gchar *manifest_path = NULL;
+  g_autofree gchar *transport_path = NULL;
+  g_autofree gchar *config_path = NULL;
+  g_autofree gchar *pe_path = NULL;
+  g_autofree gchar *cache_path = NULL;
+  g_autoptr(GError) error = NULL;
+
+  goodix_runtime_material_policy_production (&policy);
+  build_pe (pe, &policy.pe);
+  build_cache (cache, &policy.fdt);
+  policy.private_files.owner_uid = getuid ();
+  policy.private_files.cleanse_observer = observe_input_cleanse;
+  policy.private_files.cleanse_observer_data = &input_observation;
+  policy.target.owner_uid = getuid ();
+  policy.target.manifest_length = sizeof manifest - 1u;
+  policy.target.cleanse_observer = observe_target_cleanse;
+  policy.target.cleanse_observer_data = &target_observation;
+
+  memset (transport, 0x5au, sizeof transport);
+  memcpy (transport, "G5125POC", 8u);
+  memset (transport + 24u, 0x3cu, 32u);
+  memset (config, 0, sizeof config);
+  for (guint i = 0; i < 4u; i++)
+    {
+      guint offset = policy.target.dac_offsets[i];
+      guint16 reg = policy.target.dac_registers[i];
+      config[offset] = (guint8) reg;
+      config[offset + 1u] = (guint8) (reg >> 8);
+      memcpy (config + offset + 2u, policy.target.dac_values[i], 2u);
+    }
+  set_config_finalizer (config);
+  memcpy (policy.target.config90_finalizer, config + 222u, 2u);
+  digest ((const guint8 *) manifest, sizeof manifest - 1u,
+          policy.target.manifest_sha256);
+  digest (transport, sizeof transport, policy.target.transport_sha256);
+  digest (config, sizeof config, policy.target.config90_sha256);
+  g_assert_true (goodix_d190_bind_validator (
+    transport + 24u, 32u, seed_a, sizeof seed_a, seed_b, sizeof seed_b,
+    validator, &error));
+  g_assert_no_error (error);
+  digest (validator, sizeof validator, policy.target.e4_validator_sha256);
+
+  directory = g_dir_make_tmp ("goodix-runtime-owner.XXXXXX", &error);
+  g_assert_no_error (error);
+  manifest_path = g_build_filename (directory, "manifest", NULL);
+  transport_path = g_build_filename (directory, "transport", NULL);
+  config_path = g_build_filename (directory, "config", NULL);
+  pe_path = g_build_filename (directory, "pe", NULL);
+  cache_path = g_build_filename (directory, "cache", NULL);
+  write_private_fixture (manifest_path, (const guint8 *) manifest,
+                         sizeof manifest - 1u);
+  write_private_fixture (transport_path, transport, sizeof transport);
+  write_private_fixture (config_path, config, sizeof config);
+  write_private_fixture (pe_path, pe, sizeof pe);
+  write_private_fixture (cache_path, cache, sizeof cache);
+  paths = (GoodixRuntimeMaterialPaths) {
+    .manifest_path = manifest_path,
+    .transport_path = transport_path,
+    .config90_path = config_path,
+    .pe_path = pe_path,
+    .fdt_cache_path = cache_path,
+  };
+
+  owner = goodix_runtime_material_load (&paths, &policy, &audit, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (owner);
+  g_assert_true (goodix_runtime_material_get_secure_view (owner, &view,
+                                                          &error));
+  g_assert_no_error (error);
+  g_assert_true (goodix_runtime_material_get_fdt_seed (owner, fdt, &error));
+  g_assert_no_error (error);
+  g_assert_cmpuint (view.psk_length, ==, 32u);
+  g_assert_cmpuint (view.config90_length, ==,
+                    GOODIX_SECURE_SESSION_CONFIG90_LENGTH);
+  g_assert_cmpuint (view.psk[0], ==, 0x3cu);
+  g_assert_cmpuint (fdt[0], ==, 0x80u);
+  g_assert_true (audit.target.e4_binding_match);
+  g_assert_true (audit.private_files.all_buffers_cleansed);
+  g_assert_true (input_observation.all_zero);
+  g_assert_true (audit.producer_seeds_cleansed);
+  memset (&view, 0, sizeof view);
+  memset (fdt, 0, sizeof fdt);
+  goodix_runtime_material_free (owner);
+  g_assert_cmpuint (audit.owner_free_count, ==, 1u);
+  g_assert_cmpuint (audit.target.owner_free_count, ==, 1u);
+  g_assert_true (audit.target.project_secret_zeroized);
+  g_assert_true (audit.descriptor_cleansed);
+  g_assert_true (audit.fdt_seed_cleansed);
+  g_assert_true (target_observation.all_zero);
+
+  g_assert_cmpint (g_remove (manifest_path), ==, 0);
+  g_assert_cmpint (g_remove (transport_path), ==, 0);
+  g_assert_cmpint (g_remove (config_path), ==, 0);
+  g_assert_cmpint (g_remove (pe_path), ==, 0);
+  g_assert_cmpint (g_remove (cache_path), ==, 0);
+  g_assert_cmpint (g_rmdir (directory), ==, 0);
+  OPENSSL_cleanse (transport, sizeof transport);
+  OPENSSL_cleanse (config, sizeof config);
+  OPENSSL_cleanse (validator, sizeof validator);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -413,5 +562,7 @@ main (int argc, char **argv)
                    test_file_provider_roundtrip);
   g_test_add_func ("/goodix/runtime-inputs/file-changed-fail-closed",
                    test_file_provider_changed_fail_closed);
+  g_test_add_func ("/goodix/runtime-material/owner-composition",
+                   test_runtime_material_owner);
   return g_test_run ();
 }

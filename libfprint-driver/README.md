@@ -90,6 +90,21 @@ protected-material loader, but `img_open` does not yet own/compose them or
 claim interface 0. D279/05 does not choose installation paths and does not read
 authentic protected material.
 
+## D279/06 open-epoch material owner
+
+`goodix_runtime_material.[ch]` composes the five explicit inputs into one
+owner. It first validates the PE/cache pair, then loads the existing protected
+manifest/transport/CONFIG90 boundary, binds the producer seeds, stores only
+the non-owning secure descriptor plus FDT12, and cleanses all producer scratch.
+Freeing the owner clears the descriptor and FDT seed and delegates PSK,
+validator and CONFIG90 cleansing to the sole `GoodixTargetMaterial` owner.
+
+Paths remain caller-supplied and no production location is selected. Returned
+secure descriptors borrow the owner's storage and must be cleared by callers
+after configuring the session. The eight-test synthetic suite proves complete
+composition and teardown under normal and ASan/UBSan builds. `img_open` still
+does not instantiate this owner or claim USB.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

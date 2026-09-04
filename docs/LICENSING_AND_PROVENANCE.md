@@ -302,3 +302,14 @@ il pattern di ownership già espresso localmente in
 pubblicazione atomica. Non viene importata espressione GPL e non vengono
 aggiunti discovery, fallback, path production hard-coded, USB o write. Test e
 sanitizer usano esclusivamente file sintetici temporanei mode 0600.
+
+## D279/06 — owner materiali della open epoch
+
+`libfprint-driver/goodix_runtime_material.[ch]` è nuova espressione locale
+`LGPL-2.1-or-later` che compone esclusivamente le API LGPL D278/02 e D279/04–05.
+Non contiene protocollo, USB, path predefiniti o algoritmi provenienti dal glue
+GPL. Le view secure sono descrittori non-owning del singolo
+`GoodixTargetMaterial`; il teardown cancella descriptor/FDT e delega al loader
+esistente il cleanse di PSK, validator e CONFIG90. Il test usa cinque file
+sintetici temporanei e un validator calcolato dal binder LGPL già verificato;
+nessun input autentico viene letto.

@@ -16,9 +16,22 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/05 — reader privato input runtime chiuso offline
+### Stato corrente post-D279/06 — owner unico della open epoch chiuso offline
 
-**Integrazione offline del 4 settembre 2026.** D279/05 estende i provider con
+**Integrazione offline del 4 settembre 2026.** D279/06 compone i cinque input
+espliciti in un solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un
+solo `GoodixTargetMaterial`, lega i seed, conserva soltanto una view secure
+non-owning e FDT12, poi cancella tutti gli intermedi. Al free cancella
+descriptor/FDT e delega al singolo owner esistente il cleanse di PSK,
+validator e CONFIG90. Nessun path production è selezionato e il modulo non ha
+USB o protocollo.
+
+La prova completa usa cinque file sintetici 0600, verifica composizione e
+teardown in otto test normali e ASan/UBSan, e la source map Fedora 44 compila
+il nuovo owner. Nessun input autentico è letto e `img_open` non istanzia ancora
+l'owner né reclama l'interfaccia.
+
+D279/05 aveva immediatamente prima esteso i provider con
 un reader read-only di due soli path espliciti. Richiede regular file con uid,
 mode `0600` e size esatti, usa `O_NOFOLLOW|O_CLOEXEC`, confronta identità,
 size, mtime nanosecond e metadata via `fstat` pre/post, cancella ogni buffer e
@@ -78,6 +91,12 @@ ancora operativo il lifecycle `img_open` production. D278/14 resta chiuso e
 non è autorizzata alcuna nuova run live.
 
 ```text
+D279_06_OUTCOME=READY
+D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
+D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
+SINGLE_TARGET_MATERIAL_OWNER=true
+SECURE_VIEW_NON_OWNING=true
+FDT_SEED_SAME_OWNER=true
 D279_05_OUTCOME=READY
 D279_05_BASELINE=8f11ad0997451ff1ce06f8daf8dabe41f694cca8
 D279_05_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FILES
@@ -131,9 +150,21 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_OPEN_EPOCH_MATERIAL_OWNER_COMPOSITION
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FPIMAGEDEVICE_PRODUCTION_OPEN_CLOSE_BINDING_WITH_INJECTED_PATHS_AND_USB_SEAMS
+REAL_PATH_PROVISIONING=HUMAN_GATE
 NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
+
+### D279/06 — owner unico dei materiali runtime
+
+`goodix_runtime_material.[ch]` mantiene la lifetime delle view coerente con una
+open epoch, senza duplicare PSK/validator/CONFIG90. La suite osserva cleanse
+dei buffer PE/cache, dei due seed produttore, del descriptor, di FDT12 e dei
+tre oggetti protetti al teardown. L'audit passato al loader deve vivere almeno
+quanto l'owner. Il prossimo boundary può collegare questo owner alla
+sottoclasse USB usando path iniettati e seam USB offline; la scelta/installazione
+dei path reali e ogni esecuzione fprintd/live restano Human Gate. Report:
+`analysis/D279/D279_06_offline_open_epoch_material_owner.md`.
 
 ### D279/05 — reader dei due input privati PE/cache
 
