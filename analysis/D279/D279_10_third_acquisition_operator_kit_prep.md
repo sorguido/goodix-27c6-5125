@@ -48,7 +48,8 @@ Il launcher PowerShell 5.1 ha tre modalita: self-test, qualificazione nativa
 con target assente e futuro live hard-gated. Authority, full SHA, branch
 `development`, live-critical set pulito, same-run target absence, marker
 CreateNew, privacy ACL, deadline e cleanup sono verificati prima/durante la
-run. Il template authority e chiuso.
+run. La qualifica registra full HEAD/branch e richiede gia il live-critical set
+pulito, rendendo il suo PASS attribuibile. Il template authority e chiuso.
 
 ## Verifiche
 

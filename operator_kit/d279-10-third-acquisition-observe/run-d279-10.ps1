@@ -15,6 +15,12 @@ $script:CaptureProcess = $null
 $script:ObserverProcess = $null
 $script:CaptureStarted = $false
 $script:CaptureStopped = $false
+$script:Critical = @(
+    "operator_kit/d279-10-third-acquisition-observe/run-d279-10.ps1",
+    "operator_kit/d279-10-third-acquisition-observe/d279_10_third_cycle.py",
+    "operator_kit/d279-10-third-acquisition-observe/d279_10_observer.py",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/d274_03_postprocess_second_cycle.py"
+)
 
 function Fail-D279([string]$Message) {
     Stop-D279Observer
@@ -173,6 +179,21 @@ function Invoke-D279NativeQualification {
     if ($authority.live_authorized -ne $false) { Fail-D279 "authority template aperta" }
     Assert-D279GoodixAbsentSameRun
     $root = Get-D279RepositoryRoot
+    $headOutput = & git -C $root rev-parse HEAD 2>&1
+    $headExitCode = $LASTEXITCODE
+    if ($headExitCode -ne 0) { Fail-D279 "HEAD non leggibile" }
+    $head = ([string](@($headOutput) | Select-Object -First 1)).Trim()
+    if ($head -notmatch '^[0-9a-f]{40}$') { Fail-D279 "HEAD completo non valido" }
+    $branchOutput = & git -C $root branch --show-current 2>&1
+    $branchExitCode = $LASTEXITCODE
+    if ($branchExitCode -ne 0) { Fail-D279 "branch non leggibile" }
+    $branch = ([string](@($branchOutput) | Select-Object -First 1)).Trim()
+    if ($branch -ne "development") { Fail-D279 "qualificazione ammessa solo su development" }
+    $critical = $script:Critical
+    $criticalStatus = @(& git -C $root status --porcelain -- @critical)
+    if ($LASTEXITCODE -ne 0 -or $criticalStatus.Count -ne 0) {
+        Fail-D279 "live-critical set sporco o non tracciato"
+    }
     $python = Get-D279Python
     if ($null -eq $python) { Fail-D279 "Python non disponibile" }
     $tshark = Get-D279Tshark
@@ -191,6 +212,9 @@ function Invoke-D279NativeQualification {
         result = "PASS"
         powershell = $PSVersionTable.PSVersion.ToString()
         repository_root_resolved = $true
+        git_branch = $branch
+        git_full_head = $head
+        live_critical_set_clean = $true
         goodix_present_in_guest = $false
         tshark_present = $true
         usbpcap_selector = $selector
@@ -238,12 +262,7 @@ if ($branchExitCode -ne 0) { Fail-D279 "branch non leggibile" }
 $branch = ([string](@($branchOutput) | Select-Object -First 1)).Trim()
 if ($branch -ne "development") { Fail-D279 "branch diversa da development" }
 
-$critical = @(
-    "operator_kit/d279-10-third-acquisition-observe/run-d279-10.ps1",
-    "operator_kit/d279-10-third-acquisition-observe/d279_10_third_cycle.py",
-    "operator_kit/d279-10-third-acquisition-observe/d279_10_observer.py",
-    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/d274_03_postprocess_second_cycle.py"
-)
+$critical = $script:Critical
 & git -C $root diff --quiet $approvedSha -- @critical
 if ($LASTEXITCODE -ne 0) { Fail-D279 "live-critical set diverso dalla baseline" }
 $criticalStatus = @(& git -C $root status --porcelain -- @critical)

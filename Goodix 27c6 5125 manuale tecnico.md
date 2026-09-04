@@ -305,8 +305,9 @@ singola traccia e si effettua replan.
 Il launcher applica full SHA, branch `development`, live-critical set pulito,
 assenza target same-run prima di marker/capture/attach, marker CreateNew,
 deadline 300 s, cleanup e output privato metadata-only. La qualificazione
-nativa Windows con target assente e il rischio di commit enrollment host sono
-i blocker correnti. Report:
+nativa registra full HEAD/branch e pretende gia il live-critical set pulito;
+con target assente e il rischio di commit enrollment host sono i blocker
+correnti. Report:
 `analysis/D279/D279_10_third_acquisition_operator_kit_prep.md`.
 
 ### D279/07 — layout production e identità runtime fprintd

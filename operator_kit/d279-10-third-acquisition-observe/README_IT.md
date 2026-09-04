@@ -72,7 +72,9 @@ python3 -m unittest -v analysis/D279/test_d279_10_third_acquisition_kit.py
 
 La qualificazione nativa richiede Windows PowerShell Desktop 5.1, Python,
 Wireshark/TShark e una sola interfaccia USBPcap. Il target deve essere assente
-dal guest. Non avvia capture, non crea marker e non mostra prompt dito:
+dal guest; checkout `development` e live-critical set devono essere puliti.
+L'output registra branch e full HEAD per attribuire il PASS al commit esatto.
+Non avvia capture, non crea marker e non mostra prompt dito:
 
 ```powershell
 cd operator_kit\d279-10-third-acquisition-observe
