@@ -5,6 +5,9 @@ umask 077
 
 target=/var/lib/goodix-5125-poc
 apply=false
+check_selinux_plan=false
+selinux_active=false
+selinux_state=
 declare -A sources=()
 declare -A original_contexts=()
 names=(
@@ -53,13 +56,46 @@ committed=false
 usage ()
 {
   cat >&2 <<'EOF'
-Uso: prepare-production-layout.sh --apply \
-  --manifest PATH --transport PATH --config90 PATH --gfusb PATH --fdt-cache PATH
+Uso: prepare-production-layout.sh --apply [--manifest PATH] [--transport PATH] \
+  [--config90 PATH] [--gfusb PATH] [--fdt-cache PATH]
+     prepare-production-layout.sh --check-selinux-plan
 
-Lo script non sovrascrive file esistenti. L'esecuzione richiede una distinta
-autorizzazione umana per sudo, accesso/copia dei file e configurazione SELinux.
+Ogni destinazione assente richiede la corrispondente sorgente esplicita; i file
+esistenti conformi sono preservati e non richiedono una sorgente. Lo script non
+sovrascrive file esistenti. L'esecuzione richiede una distinta autorizzazione
+umana per sudo e accesso/copia dei file. La configurazione
+SELinux è eseguita soltanto quando `getenforce` restituisce Enforcing o
+Permissive; con Disabled non sono richiesti né invocati tool SELinux mutanti.
 EOF
   exit 2
+}
+
+detect_selinux ()
+{
+  command -v getenforce >/dev/null 2>&1 || {
+    echo "ERRORE: comando richiesto assente: getenforce" >&2
+    exit 3
+  }
+  selinux_state=$(getenforce)
+  case $selinux_state in
+    Enforcing|Permissive) selinux_active=true ;;
+    Disabled) selinux_active=false ;;
+    *)
+      echo "ERRORE: stato SELinux sconosciuto: $selinux_state" >&2
+      exit 3 ;;
+  esac
+}
+
+print_selinux_plan ()
+{
+  echo "SELINUX_ENFORCEMENT=$selinux_state"
+  if [[ $selinux_active == true ]]; then
+    echo "SELINUX_PROVISIONING=REQUIRED_FPRINTD_VAR_LIB_T"
+    echo "SELINUX_MUTATION_COMMANDS_REQUIRED=true"
+  else
+    echo "SELINUX_PROVISIONING=NOT_APPLICABLE_DISABLED"
+    echo "SELINUX_MUTATION_COMMANDS_REQUIRED=false"
+  fi
 }
 
 cleanup ()
@@ -68,13 +104,15 @@ cleanup ()
   if [[ $committed != true ]]; then
     [[ -z $temporary ]] || rm -f -- "$temporary"
     for path in "${created[@]}"; do rm -f -- "$path"; done
-    for regex in "${fcontexts_created[@]}"; do
-      semanage fcontext -d "$regex" >/dev/null 2>&1 || true
-    done
-    for path in "${!original_contexts[@]}"; do
-      [[ -e $path && ! -L $path ]] &&
-        chcon -- "${original_contexts[$path]}" "$path" >/dev/null 2>&1 || true
-    done
+    if [[ $selinux_active == true ]]; then
+      for regex in "${fcontexts_created[@]}"; do
+        semanage fcontext -d "$regex" >/dev/null 2>&1 || true
+      done
+      for path in "${!original_contexts[@]}"; do
+        [[ -e $path && ! -L $path ]] &&
+          chcon -- "${original_contexts[$path]}" "$path" >/dev/null 2>&1 || true
+      done
+    fi
     if [[ $directory_created == true ]]; then rmdir -- "$target" 2>/dev/null || true; fi
   fi
   exit "$rc"
@@ -84,6 +122,7 @@ trap cleanup EXIT HUP INT TERM
 while (($#)); do
   case $1 in
     --apply) apply=true; shift ;;
+    --check-selinux-plan) check_selinux_plan=true; shift ;;
     --manifest|--transport|--config90|--gfusb|--fdt-cache)
       (($# >= 2)) || usage
       case $1 in
@@ -100,17 +139,34 @@ while (($#)); do
   esac
 done
 
+detect_selinux
+if [[ $check_selinux_plan == true ]]; then
+  [[ $apply == false && ${#sources[@]} -eq 0 ]] || usage
+  print_selinux_plan
+  echo "FILES_ACCESSED=false"
+  echo "SYSTEM_STATE_CHANGED=false"
+  exit 0
+fi
 [[ $apply == true ]] || usage
 [[ $EUID -eq 0 ]] || { echo "ERRORE: eseguire manualmente con sudo" >&2; exit 3; }
-for command in install sha256sum stat semanage restorecon matchpathcon chcon ln; do
+for command in install sha256sum stat ln; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "ERRORE: comando richiesto assente: $command" >&2
     exit 3
   }
 done
+if [[ $selinux_active == true ]]; then
+  for command in semanage restorecon matchpathcon chcon; do
+    command -v "$command" >/dev/null 2>&1 || {
+      echo "ERRORE: tool SELinux richiesto in stato $selinux_state: $command" >&2
+      exit 3
+    }
+  done
+fi
 
 echo "Scopo: predisporre cinque input privati read-only per fprintd."
 echo "Target: $target (root:root 0700; file root:root 0600)."
+print_selinux_plan
 echo "Non saranno avviati servizi e non sarà aperto alcun dispositivo USB."
 read -r -p "Digitare INSTALLA_LAYOUT_D279_07 per continuare: " confirmation
 [[ $confirmation == INSTALLA_LAYOUT_D279_07 ]] || {
@@ -131,14 +187,16 @@ else
   install -d -o 0 -g 0 -m 0700 -- "$target"
   directory_created=true
 fi
-if [[ $directory_created != true ]]; then
+if [[ $selinux_active == true && $directory_created != true ]]; then
   original_contexts[$target]=$(stat -c '%C' -- "$target")
 fi
-for name in "${names[@]}"; do
-  if [[ -e $target/$name && ! -L $target/$name ]]; then
-    original_contexts[$target/$name]=$(stat -c '%C' -- "$target/$name")
-  fi
-done
+if [[ $selinux_active == true ]]; then
+  for name in "${names[@]}"; do
+    if [[ -e $target/$name && ! -L $target/$name ]]; then
+      original_contexts[$target/$name]=$(stat -c '%C' -- "$target/$name")
+    fi
+  done
+fi
 
 verify_file ()
 {
@@ -173,7 +231,6 @@ for name in "${names[@]}"; do
   }
   temporary=$target/.d279-07.$name.$$
   install -o 0 -g 0 -m 0600 -- "$source" "$temporary"
-  restorecon -F -- "$temporary"
   verify_file "$temporary" "$name" || {
     echo "ERRORE: verifica della copia temporanea fallita per $name" >&2
     exit 3
@@ -185,25 +242,27 @@ for name in "${names[@]}"; do
   echo "INSTALLATO_E_VERIFICATO=$name"
 done
 
-for index in "${!label_paths[@]}"; do
-  path=${label_paths[$index]}
-  regex=${label_regexes[$index]}
-  if [[ $(matchpathcon -n "$path") != system_u:object_r:fprintd_var_lib_t:s0 ]]; then
-    semanage fcontext -a -t fprintd_var_lib_t "$regex"
-    fcontexts_created+=("$regex")
-  fi
-done
-for path in "${label_paths[@]}"; do
-  [[ $(matchpathcon -n "$path") == system_u:object_r:fprintd_var_lib_t:s0 ]] || {
-    echo "ERRORE: mapping SELinux inatteso per $path" >&2
-    exit 3
-  }
-  restorecon -F -- "$path"
-  [[ $(stat -c '%C' -- "$path") == *:fprintd_var_lib_t:* ]] || {
-    echo "ERRORE: label SELinux finale non conforme per $path" >&2
-    exit 3
-  }
-done
+if [[ $selinux_active == true ]]; then
+  for index in "${!label_paths[@]}"; do
+    path=${label_paths[$index]}
+    regex=${label_regexes[$index]}
+    if [[ $(matchpathcon -n "$path") != system_u:object_r:fprintd_var_lib_t:s0 ]]; then
+      semanage fcontext -a -t fprintd_var_lib_t "$regex"
+      fcontexts_created+=("$regex")
+    fi
+  done
+  for path in "${label_paths[@]}"; do
+    [[ $(matchpathcon -n "$path") == system_u:object_r:fprintd_var_lib_t:s0 ]] || {
+      echo "ERRORE: mapping SELinux inatteso per $path" >&2
+      exit 3
+    }
+    restorecon -F -- "$path"
+    [[ $(stat -c '%C' -- "$path") == *:fprintd_var_lib_t:* ]] || {
+      echo "ERRORE: label SELinux finale non conforme per $path" >&2
+      exit 3
+    }
+  done
+fi
 
 for name in "${names[@]}"; do
   verify_file "$target/$name" "$name" || {
@@ -213,6 +272,7 @@ for name in "${names[@]}"; do
 done
 committed=true
 echo "LAYOUT_PRODUCTION_D279_07=PREPARATO"
+print_selinux_plan
 echo "FPRINTD_STARTED=false"
 echo "USB_ACCESSED=false"
-echo "PASSO_SUCCESSIVO=ESEGUIRE_PROBE_READ_ONLY_CON_AUTORIZZAZIONE_SEPARATA"
+echo "PASSO_SUCCESSIVO=ESEGUIRE_PROBE_FULL_READ_ONLY_CON_AUTORIZZAZIONE_SEPARATA"

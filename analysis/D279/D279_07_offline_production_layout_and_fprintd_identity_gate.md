@@ -6,9 +6,13 @@
 ```text
 D279_07_OUTCOME=HUMAN_REQUIRED
 D279_07_BASELINE=ba8750874df3f7c38d515be7d6b0412a5f0ab478
+D279_07_CORRECTIVE_BASELINE=95c5346dcb2938bca0d1af364daef94948866bd2
 ADVANCEMENT=MATERIAL_ARCHITECTURAL_OR_REPOSITORY_ADVANCEMENT
-EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC;REAL_TARGET_PROBE_PENDING
+EXECUTABLE_CLOSURE=PASS_OFFLINE_CORRECTIVE;POST_PROVISION_PROBE_PENDING
 REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED
+REAL_TARGET_ENVIRONMENT=PASS
+LAYOUT_PROVISIONING_STATE=INCOMPLETE_CONFIRMED_GFUSB_DLL_ABSENT
+SELINUX_PROVISIONING=NOT_APPLICABLE_DISABLED
 PRODUCTION_LAYOUT_API=READY_OFFLINE
 PRODUCTION_LAYOUT_PROVISIONED=false
 AUTHENTIC_PROTECTED_INPUTS_ACCESSED=false
@@ -34,6 +38,42 @@ progettazione/implementazione offline e preparazione del kit, il riuso di
 Non sono autorizzati né avvenuti sudo, creazione/copia dei file reali,
 lettura di materiale autentico, installazione, esecuzione di fprintd, USB o
 live.
+
+## Evidenza del primo probe operatore e sequencing
+
+Il primo probe read-only D279/07, eseguito manualmente e autorizzato
+dall'Utente, ha prodotto integralmente:
+
+```text
+REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED
+MOTIVO=FILE_ASSENTE_O_NON_REGOLARE_gfusb.dll
+FPRINTD_STARTED=false
+FILE_CONTENT_READ=false
+USB_ACCESSED=false
+```
+
+Questo è un esito atteso di layout non ancora provisionato. Non dimostra una
+incompatibilità di UID/GID o sandbox fprintd. La versione `95c5346` verificava
+la unit prima dei file, ma emetteva i relativi risultati soltanto dopo la
+validazione layout e fermava la scansione al primo file assente: il sequencing
+era quindi diagnosticamente incompleto.
+
+Il corrective divide ora il probe in:
+
+1. `--environment-only`, non privilegiato e senza accesso al layout;
+2. provisioning, soggetto a distinta autorizzazione;
+3. `--full`, probe sudo read-only post-provision che enumera insieme tutti i
+   file assenti prima di controllare metadata e label.
+
+Il controllo environment-only eseguito autonomamente dopo il corrective ha
+prodotto `REAL_TARGET_ENVIRONMENT=PASS`, identità `root:root`,
+`ProtectSystem=strict_read_only_visible` e
+`SELINUX_FPRINTD_READ_POLICY=NOT_APPLICABLE_DISABLED`, senza accedere ai file.
+La ricognizione dei soli path versionati, senza apertura dei blob, ha inoltre
+individuato le sorgenti già note per `gfusb.dll` e per il cache D255. Non serve
+quindi spendere un'altra autorizzazione sudo in un probe pre-provisioning:
+la futura run può fornire entrambe le sorgenti e lo script ignorerà quella
+associata a una destinazione eventualmente già presente e conforme.
 
 ## Implementazione offline
 
@@ -102,11 +142,33 @@ Una query read-only con la libreria SETools sul policy binary installato
 - sul generico `var_lib_t` non emerge un allow equivalente di apertura e
   lettura file per `fprintd_t`.
 
-Il provisioning preparato registra quindi mapping persistenti
-`fprintd_var_lib_t` soltanto per la directory e i cinque file, e applica
-`restorecon` agli stessi path. Non usa una regola ricorsiva: report, marker e
-altri contenuti storici nella directory restano fuori scope. Queste operazioni
-non sono state eseguite.
+### Corrective SELinux Disabled
+
+La review esterna del commit `95c5346` ha identificato correttamente una
+asimmetria: il probe considerava Disabled non applicabile, mentre il
+provisioning richiedeva e invocava incondizionatamente `semanage`, `restorecon`,
+`matchpathcon` e `chcon`, configurava mapping e pretendeva label finali. Su un
+target SELinux Disabled ciò era inutile e poteva bloccare un layout DAC-valido
+per assenza dei tool.
+
+Il corrective rileva `getenforce` prima dell'apply:
+
+- Disabled: non richiede e non invoca alcun tool SELinux, non legge/scrive
+  context e non configura mapping;
+- Enforcing/Permissive: conserva il percorso fail-closed
+  `fprintd_var_lib_t`, limitato alla directory e ai cinque file;
+- qualunque valore sconosciuto: stop fail-closed.
+
+`--check-selinux-plan` espone la decisione senza sudo, file o mutazioni. Sul
+target corrente ha prodotto:
+
+```text
+SELINUX_ENFORCEMENT=Disabled
+SELINUX_PROVISIONING=NOT_APPLICABLE_DISABLED
+SELINUX_MUTATION_COMMANDS_REQUIRED=false
+FILES_ACCESSED=false
+SYSTEM_STATE_CHANGED=false
+```
 
 ## Real Target Compatibility Gate e operator kit
 
@@ -134,10 +196,11 @@ Contiene:
   SELinux persistenti limitati ai sei path autorizzati;
 - `README.md`: prerequisiti, rischi, stop condition e invocazioni in italiano.
 
-Entrambi gli script richiedono un'azione futura dell'operatore. Il provisioning
-richiede una distinta autorizzazione per sudo, accesso/copia dei file reali e
-modifica SELinux. Il probe richiede almeno sudo read-only perché la directory
-`0700` non è attraversabile dall'utente ordinario. Finché il probe non produce
+Il provisioning richiede una distinta autorizzazione per sudo e accesso/copia
+dei file reali mancanti. Sul target Disabled osservato non richiederà modifica
+SELinux. Il probe completo post-provision richiederà una successiva
+autorizzazione sudo read-only perché la directory `0700` non è attraversabile
+dall'utente ordinario. Finché quel probe non produce
 `REAL_TARGET_COMPATIBILITY=PASS`, la compatibilità production del layout non è
 chiusa.
 
@@ -145,6 +208,12 @@ chiusa.
 
 ```text
 bash -n operator_kit/target_compatibility/d279_07_fprintd_layout/*.sh=PASS
+D279_07_SELINUX_DISABLED_NO_MUTATORS=PASS
+D279_07_SELINUX_ACTIVE_PLAN=PASS
+D279_07_UNKNOWN_SELINUX_FAIL_CLOSED=PASS
+D279_07_ENVIRONMENT_ONLY_BEFORE_LAYOUT=PASS
+actual_disabled_selinux_plan=PASS_NO_MUTATION
+actual_environment_only_probe=PASS_ENVIRONMENT_LAYOUT_PENDING
 git diff --check=PASS
 runtime_material_normal=9/9_PASS
 runtime_material_ASAN_UBSAN=9/9_PASS
@@ -167,5 +236,5 @@ passata.
 ## Review set
 
 ```text
-REVIEW_SET=BASELINE_ba8750874df3f7c38d515be7d6b0412a5f0ab478_PLUS_WORKTREE_DIFF_PLUS_analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md_PLUS_operator_kit/target_compatibility/d279_07_fprintd_layout_PLUS_Goodix_27c6_5125_manuale_tecnico.md
+REVIEW_SET=BASELINE_95c5346dcb2938bca0d1af364daef94948866bd2_PLUS_CURRENT_DEVELOPMENT_DIFF_PLUS_analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md_PLUS_analysis/D279/test_d279_07_selinux_and_probe_sequencing.sh_PLUS_operator_kit/target_compatibility/d279_07_fprintd_layout_PLUS_Goodix_27c6_5125_manuale_tecnico.md
 ```

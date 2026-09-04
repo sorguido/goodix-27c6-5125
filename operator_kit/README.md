@@ -5,10 +5,14 @@
 
 `target_compatibility/d279_07_fprintd_layout/` contiene il provisioning
 fail-closed dei cinque input in `/var/lib/goodix-5125-poc` e un probe
-read-only per identità root, sandbox systemd, metadata e policy SELinux.
-Nessuno dei due script è stato eseguito: sudo, file autentici, installazione,
-fprintd, USB e live restano non autorizzati. Il Real Target Compatibility Gate
-resta `BLOCKED_HUMAN_REQUIRED` fino al probe sul target reale.
+read-only a due fasi per identità root, sandbox systemd, metadata e policy
+SELinux. Il corrective successivo al primo probe salta integralmente le
+operazioni SELinux quando `getenforce=Disabled`; mapping e label sono
+condizionali a Enforcing/Permissive. Il provisioning non è stato eseguito:
+sudo, file autentici, installazione, fprintd, USB e live restano non
+autorizzati. Il Real Target Compatibility Gate resta
+`BLOCKED_HUMAN_REQUIRED` fino al provisioning autorizzato e al probe completo
+post-provision.
 
 ## D272/01 validazione SIGFM (solo preflight offline)
 
