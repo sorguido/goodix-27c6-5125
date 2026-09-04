@@ -291,3 +291,14 @@ modulo accetta esclusivamente byte caller-owned e non offre API di file, USB,
 discovery, mapping eseguibile, subprocess o scrittura. Le prove eseguite usano
 soltanto fixture sintetiche; i pin autentici sono compilati ma nessun secret,
 cache privata o seed autentico è stato letto durante D279/04.
+
+## D279/05 — adapter file privati per gli input runtime
+
+D279/05 estende la medesima espressione LGPL con un reader POSIX di due soli
+path espliciti. Le fonti implementative sono API POSIX/GLib/OpenSSL pubbliche e
+il pattern di ownership già espresso localmente in
+`goodix_target_material.c`: regular file, uid/mode/size esatti,
+`O_NOFOLLOW|O_CLOEXEC`, identità e metadata `fstat` pre/post, cleanup e
+pubblicazione atomica. Non viene importata espressione GPL e non vengono
+aggiunti discovery, fallback, path production hard-coded, USB o write. Test e
+sanitizer usano esclusivamente file sintetici temporanei mode 0600.

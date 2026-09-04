@@ -16,9 +16,18 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/04 — provider input runtime LGPL chiusi offline
+### Stato corrente post-D279/05 — reader privato input runtime chiuso offline
 
-**Integrazione offline del 4 settembre 2026.** D279/04 aggiunge al dominio
+**Integrazione offline del 4 settembre 2026.** D279/05 estende i provider con
+un reader read-only di due soli path espliciti. Richiede regular file con uid,
+mode `0600` e size esatti, usa `O_NOFOLLOW|O_CLOEXEC`, confronta identità,
+size, mtime nanosecond e metadata via `fstat` pre/post, cancella ogni buffer e
+pubblica seed A/B e FDT12 soltanto dopo la validazione di entrambi gli input.
+La policy production richiede uid 0; i sette test normali e ASan/UBSan usano
+soltanto file sintetici temporanei con uid corrente. Nessun path production è
+hard-coded o scoperto e nessun input autentico è stato aperto.
+
+D279/04 aveva immediatamente prima aggiunto al dominio
 `libfprint-driver/` i provider inerti che mancavano al futuro lifecycle
 production: estrazione bounded dei due seed D190 da byte PE hash-pinned e del
 seed FDT12 da byte cache legati a hash, CRC-32/MPEG-2, OTP64 e layout esatto.
@@ -69,6 +78,11 @@ ancora operativo il lifecycle `img_open` production. D278/14 resta chiuso e
 non è autorizzata alcuna nuova run live.
 
 ```text
+D279_05_OUTCOME=READY
+D279_05_BASELINE=8f11ad0997451ff1ce06f8daf8dabe41f694cca8
+D279_05_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FILES
+PRIVATE_INPUT_READER_LGPL=true
+OUTPUT_PUBLICATION=ATOMIC_AFTER_BOTH_INPUTS_VALIDATE
 D279_04_OUTCOME=READY
 D279_04_BASELINE=c48acb4bacfb6a3ccfd2c45b60733be1ce4075db
 D279_04_EXECUTABLE_CLOSURE=PASS_OFFLINE
@@ -117,9 +131,20 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_INPUT_FILE_READER_AND_OPEN_EPOCH_OWNERSHIP
+NEXT_PRIMARY_BOUNDARY=OFFLINE_OPEN_EPOCH_MATERIAL_OWNER_COMPOSITION
 NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
+
+### D279/05 — reader dei due input privati PE/cache
+
+`goodix_runtime_extract_inputs_from_files()` risolve il boundary filesystem
+senza un path searcher e senza toccare USB o i tre file del loader protetto.
+Il test roundtrip prova due file sintetici 0600; una seam post-read cambia i
+metadata e dimostra rifiuto, output tutti zero e cleanse del buffer già
+allocato. Il prossimo slice deve comporre un owner dell'intera open epoch che
+possegga `GoodixTargetMaterial`, view secure e FDT12 senza duplicare secret o
+state machine. Report:
+`analysis/D279/D279_05_offline_private_runtime_input_reader.md`.
 
 ### D279/04 — provider inerti PE/FDT nel dominio LGPL
 

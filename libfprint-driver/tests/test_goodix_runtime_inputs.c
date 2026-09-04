@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "goodix_runtime_inputs.h"
 
+#include <glib/gstdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #define SYNTHETIC_PE_LENGTH 1024u
 #define SYNTHETIC_CACHE_LENGTH 128u
@@ -80,6 +82,7 @@ build_pe (guint8 bytes[SYNTHETIC_PE_LENGTH],
   memcpy (bytes + 0x230u, instruction, sizeof instruction);
 
   memset (policy, 0, sizeof *policy);
+  policy->file_length = SYNTHETIC_PE_LENGTH;
   policy->first_seed_rva = 0x1010u;
   policy->second_instruction_rva = 0x1030u;
   digest (bytes, SYNTHETIC_PE_LENGTH, policy->expected_sha256);
@@ -230,12 +233,167 @@ test_production_policies (void)
 
   goodix_runtime_pe_policy_production (&pe);
   goodix_runtime_fdt_policy_production (&fdt);
+  g_assert_cmpuint (pe.file_length, ==, 5771496u);
   g_assert_cmpuint (pe.first_seed_rva, ==, 0x56f030u);
   g_assert_cmpuint (pe.second_instruction_rva, ==, 0x69d0u);
   g_assert_cmpuint (fdt.cache_length, ==, 13520u);
   g_assert_cmpuint (fdt.crc_offset, ==, 13516u);
   g_assert_cmpuint (fdt.otp_length, ==, 64u);
   g_assert_cmpuint (fdt.fdt_offset, ==, 64u);
+}
+
+static void
+write_private_fixture (const gchar *path,
+                       const guint8 *bytes,
+                       gsize length)
+{
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (g_file_set_contents (path, (const gchar *) bytes,
+                                      (gssize) length, &error));
+  g_assert_no_error (error);
+  g_assert_cmpint (g_chmod (path, 0600), ==, 0);
+}
+
+typedef struct
+{
+  guint count;
+  gboolean all_zero;
+} CleanseObservation;
+
+static void
+observe_input_cleanse (const guint8 *bytes,
+                       gsize length,
+                       gpointer user_data)
+{
+  CleanseObservation *observation = user_data;
+  guint8 aggregate = 0;
+
+  for (gsize i = 0; i < length; i++)
+    aggregate |= bytes[i];
+  observation->count++;
+  observation->all_zero = observation->all_zero && aggregate == 0u;
+}
+
+static void
+test_file_provider_roundtrip (void)
+{
+  guint8 pe[SYNTHETIC_PE_LENGTH];
+  guint8 cache[SYNTHETIC_CACHE_LENGTH];
+  GoodixRuntimePePolicy pe_policy;
+  GoodixRuntimeFdtPolicy fdt_policy;
+  GoodixRuntimeInputFilePolicy file_policy = { 0 };
+  GoodixRuntimeInputFileAudit audit;
+  CleanseObservation observation = { .all_zero = TRUE };
+  guint8 seed_a[6] = { 0 };
+  guint8 seed_b[6] = { 0 };
+  guint8 fdt[12] = { 0 };
+  g_autofree gchar *directory = NULL;
+  g_autofree gchar *pe_path = NULL;
+  g_autofree gchar *cache_path = NULL;
+  g_autoptr(GError) error = NULL;
+
+  build_pe (pe, &pe_policy);
+  build_cache (cache, &fdt_policy);
+  directory = g_dir_make_tmp ("goodix-runtime-inputs-test.XXXXXX", &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (directory);
+  pe_path = g_build_filename (directory, "synthetic-pe.bin", NULL);
+  cache_path = g_build_filename (directory, "synthetic-cache.bin", NULL);
+  write_private_fixture (pe_path, pe, sizeof pe);
+  write_private_fixture (cache_path, cache, sizeof cache);
+  file_policy.owner_uid = getuid ();
+  file_policy.mode = 0600;
+  file_policy.cleanse_observer = observe_input_cleanse;
+  file_policy.cleanse_observer_data = &observation;
+
+  g_assert_true (goodix_runtime_extract_inputs_from_files (
+    pe_path, cache_path, &pe_policy, &fdt_policy, &file_policy,
+    seed_a, seed_b, fdt, &audit, &error));
+  g_assert_no_error (error);
+  g_assert_cmpuint (audit.open_count, ==, 2u);
+  g_assert_cmpuint (audit.read_count, ==, 2u);
+  g_assert_cmpuint (audit.buffer_allocation_count, ==, 2u);
+  g_assert_cmpuint (audit.buffer_cleanse_count, ==, 2u);
+  g_assert_true (audit.all_buffers_cleansed);
+  g_assert_cmpuint (observation.count, ==, 2u);
+  g_assert_true (observation.all_zero);
+  g_assert_cmpuint (seed_a[0], ==, 1u);
+  g_assert_cmpuint (seed_b[0], ==, 0x11u);
+  g_assert_cmpuint (fdt[0], ==, 0x80u);
+
+  g_assert_cmpint (g_remove (pe_path), ==, 0);
+  g_assert_cmpint (g_remove (cache_path), ==, 0);
+  g_assert_cmpint (g_rmdir (directory), ==, 0);
+}
+
+static void
+change_mode_after_read (const gchar *path,
+                        gint fd,
+                        gpointer user_data)
+{
+  (void) path;
+  (void) user_data;
+  g_assert_cmpint (fchmod (fd, 0644), ==, 0);
+}
+
+static void
+test_file_provider_changed_fail_closed (void)
+{
+  guint8 pe[SYNTHETIC_PE_LENGTH];
+  guint8 cache[SYNTHETIC_CACHE_LENGTH];
+  GoodixRuntimePePolicy pe_policy;
+  GoodixRuntimeFdtPolicy fdt_policy;
+  GoodixRuntimeInputFilePolicy file_policy = { 0 };
+  GoodixRuntimeInputFileAudit audit;
+  CleanseObservation observation = { .all_zero = TRUE };
+  guint8 seed_a[6];
+  guint8 seed_b[6];
+  guint8 fdt[12];
+  g_autofree gchar *directory = NULL;
+  g_autofree gchar *pe_path = NULL;
+  g_autofree gchar *cache_path = NULL;
+  g_autoptr(GError) error = NULL;
+
+  build_pe (pe, &pe_policy);
+  build_cache (cache, &fdt_policy);
+  directory = g_dir_make_tmp ("goodix-runtime-inputs-change.XXXXXX", &error);
+  g_assert_no_error (error);
+  pe_path = g_build_filename (directory, "synthetic-pe.bin", NULL);
+  cache_path = g_build_filename (directory, "synthetic-cache.bin", NULL);
+  write_private_fixture (pe_path, pe, sizeof pe);
+  write_private_fixture (cache_path, cache, sizeof cache);
+  file_policy.owner_uid = getuid ();
+  file_policy.mode = 0600;
+  file_policy.after_read = change_mode_after_read;
+  file_policy.cleanse_observer = observe_input_cleanse;
+  file_policy.cleanse_observer_data = &observation;
+  memset (seed_a, 0xa5, sizeof seed_a);
+  memset (seed_b, 0xa5, sizeof seed_b);
+  memset (fdt, 0xa5, sizeof fdt);
+
+  g_assert_false (goodix_runtime_extract_inputs_from_files (
+    pe_path, cache_path, &pe_policy, &fdt_policy, &file_policy,
+    seed_a, seed_b, fdt, &audit, &error));
+  g_assert_cmpstr (goodix_runtime_inputs_error_class (error), ==,
+                   "PRIVATE_INPUT_METADATA");
+  g_assert_cmpuint (audit.open_count, ==, 1u);
+  g_assert_cmpuint (audit.buffer_allocation_count, ==, 1u);
+  g_assert_cmpuint (audit.buffer_cleanse_count, ==, 1u);
+  g_assert_true (audit.all_buffers_cleansed);
+  g_assert_cmpuint (observation.count, ==, 1u);
+  g_assert_true (observation.all_zero);
+  for (guint i = 0; i < 6u; i++)
+    {
+      g_assert_cmpuint (seed_a[i], ==, 0u);
+      g_assert_cmpuint (seed_b[i], ==, 0u);
+    }
+  for (guint i = 0; i < 12u; i++)
+    g_assert_cmpuint (fdt[i], ==, 0u);
+
+  g_assert_cmpint (g_remove (pe_path), ==, 0);
+  g_assert_cmpint (g_remove (cache_path), ==, 0);
+  g_assert_cmpint (g_rmdir (directory), ==, 0);
 }
 
 int
@@ -251,5 +409,9 @@ main (int argc, char **argv)
                    test_fdt_fail_closed);
   g_test_add_func ("/goodix/runtime-inputs/production-policies",
                    test_production_policies);
+  g_test_add_func ("/goodix/runtime-inputs/file-roundtrip",
+                   test_file_provider_roundtrip);
+  g_test_add_func ("/goodix/runtime-inputs/file-changed-fail-closed",
+                   test_file_provider_changed_fail_closed);
   return g_test_run ();
 }

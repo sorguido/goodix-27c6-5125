@@ -8,13 +8,22 @@
  * poc/goodix5125/tools/binding_reference/pe_parser.py.  Its BSD notice and
  * provenance are retained in docs/LICENSING_AND_PROVENANCE.md.  The FDT
  * portion is independently expressed from the neutral D255/D261 cache
- * contract.  This unit consumes inert caller-owned bytes only.
+ * contract.  Transformations consume inert caller-owned bytes; the optional
+ * file adapter reads only two explicit paths under a strict private-file
+ * policy and never discovers paths or writes inputs.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #include "goodix_runtime_inputs.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <openssl/crypto.h>
 
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 typedef enum
 {
@@ -26,6 +35,9 @@ typedef enum
   GOODIX_RUNTIME_INPUTS_ERROR_CACHE_CRC,
   GOODIX_RUNTIME_INPUTS_ERROR_CACHE_OTP,
   GOODIX_RUNTIME_INPUTS_ERROR_CACHE_FDT,
+  GOODIX_RUNTIME_INPUTS_ERROR_FILE_OPEN,
+  GOODIX_RUNTIME_INPUTS_ERROR_FILE_METADATA,
+  GOODIX_RUNTIME_INPUTS_ERROR_FILE_READ,
 } GoodixRuntimeInputsError;
 
 #define GOODIX_RUNTIME_INPUTS_ERROR (goodix_runtime_inputs_error_quark ())
@@ -66,6 +78,12 @@ goodix_runtime_inputs_error_class (const GError *error)
       return "FDT_CACHE_OTP_BINDING";
     case GOODIX_RUNTIME_INPUTS_ERROR_CACHE_FDT:
       return "FDT_CACHE_SEED";
+    case GOODIX_RUNTIME_INPUTS_ERROR_FILE_OPEN:
+      return "PRIVATE_INPUT_OPEN";
+    case GOODIX_RUNTIME_INPUTS_ERROR_FILE_METADATA:
+      return "PRIVATE_INPUT_METADATA";
+    case GOODIX_RUNTIME_INPUTS_ERROR_FILE_READ:
+      return "PRIVATE_INPUT_READ";
     case GOODIX_RUNTIME_INPUTS_ERROR_ARGUMENT:
     default:
       return "ARGUMENT_OR_POLICY";
@@ -132,6 +150,7 @@ goodix_runtime_pe_policy_production (GoodixRuntimePePolicy *policy)
   g_return_if_fail (policy != NULL);
   memset (policy, 0, sizeof *policy);
   memcpy (policy->expected_sha256, hash, sizeof hash);
+  policy->file_length = 5771496u;
   policy->first_seed_rva = 0x56f030u;
   policy->second_instruction_rva = 0x69d0u;
 }
@@ -160,6 +179,16 @@ goodix_runtime_fdt_policy_production (GoodixRuntimeFdtPolicy *policy)
   policy->crc_offset = 13516u;
   policy->otp_length = 64u;
   policy->fdt_offset = 64u;
+}
+
+void
+goodix_runtime_input_file_policy_production (
+  GoodixRuntimeInputFilePolicy *policy)
+{
+  g_return_if_fail (policy != NULL);
+  memset (policy, 0, sizeof *policy);
+  policy->owner_uid = 0;
+  policy->mode = 0600;
 }
 
 static gboolean
@@ -410,4 +439,194 @@ goodix_runtime_cleanse_producer_seed (
 {
   if (seed != NULL)
     OPENSSL_cleanse (seed, GOODIX_RUNTIME_PRODUCER_SEED_LENGTH);
+}
+
+static gboolean
+private_metadata_valid (const struct stat                  *status,
+                        const GoodixRuntimeInputFilePolicy *policy,
+                        gsize                               expected_length)
+{
+  return S_ISREG (status->st_mode) && status->st_uid == policy->owner_uid &&
+         (status->st_mode & 07777u) == policy->mode && status->st_size >= 0 &&
+         (guint64) status->st_size == expected_length;
+}
+
+static guint8 *
+read_private_exact (const gchar                        *path,
+                    gsize                               expected_length,
+                    const GoodixRuntimeInputFilePolicy *policy,
+                    GoodixRuntimeInputFileAudit        *audit,
+                    GError                            **error)
+{
+  struct stat before;
+  struct stat after;
+  guint8 *bytes = NULL;
+  gsize offset = 0;
+  gint fd = -1;
+
+  fd = open (path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+  if (fd < 0)
+    {
+      g_set_error (error, GOODIX_RUNTIME_INPUTS_ERROR,
+                   GOODIX_RUNTIME_INPUTS_ERROR_FILE_OPEN,
+                   "private runtime input open failed: %s",
+                   g_strerror (errno));
+      goto fail;
+    }
+  if (audit != NULL)
+    audit->open_count++;
+  if (fstat (fd, &before) != 0 ||
+      !private_metadata_valid (&before, policy, expected_length))
+    {
+      g_set_error_literal (error, GOODIX_RUNTIME_INPUTS_ERROR,
+                           GOODIX_RUNTIME_INPUTS_ERROR_FILE_METADATA,
+                           "private runtime input metadata mismatch");
+      goto fail;
+    }
+
+  bytes = g_malloc0 (expected_length);
+  if (audit != NULL)
+    audit->buffer_allocation_count++;
+  while (offset < expected_length)
+    {
+      ssize_t count = read (fd, bytes + offset, expected_length - offset);
+      if (count < 0 && errno == EINTR)
+        continue;
+      if (count <= 0)
+        {
+          g_set_error_literal (error, GOODIX_RUNTIME_INPUTS_ERROR,
+                               GOODIX_RUNTIME_INPUTS_ERROR_FILE_READ,
+                               "private runtime input short/error read");
+          goto fail;
+        }
+      offset += (gsize) count;
+    }
+  if (policy->after_read != NULL)
+    policy->after_read (path, fd, policy->after_read_data);
+  if (fstat (fd, &after) != 0 || before.st_dev != after.st_dev ||
+      before.st_ino != after.st_ino || before.st_size != after.st_size ||
+      before.st_mtim.tv_sec != after.st_mtim.tv_sec ||
+      before.st_mtim.tv_nsec != after.st_mtim.tv_nsec ||
+      !private_metadata_valid (&after, policy, expected_length))
+    {
+      g_set_error_literal (error, GOODIX_RUNTIME_INPUTS_ERROR,
+                           GOODIX_RUNTIME_INPUTS_ERROR_FILE_METADATA,
+                           "private runtime input changed during read");
+      goto fail;
+    }
+  if (audit != NULL)
+    audit->read_count++;
+  close (fd);
+  return bytes;
+
+fail:
+  if (fd >= 0)
+    close (fd);
+  if (bytes != NULL)
+    {
+      OPENSSL_cleanse (bytes, expected_length);
+      if (policy->cleanse_observer != NULL)
+        policy->cleanse_observer (bytes, expected_length,
+                                  policy->cleanse_observer_data);
+      if (audit != NULL)
+        audit->buffer_cleanse_count++;
+      g_free (bytes);
+    }
+  return NULL;
+}
+
+gboolean
+goodix_runtime_extract_inputs_from_files (
+  const gchar                        *pe_path,
+  const gchar                        *cache_path,
+  const GoodixRuntimePePolicy        *pe_policy,
+  const GoodixRuntimeFdtPolicy       *fdt_policy,
+  const GoodixRuntimeInputFilePolicy *file_policy,
+  guint8 seed_a[GOODIX_RUNTIME_PRODUCER_SEED_LENGTH],
+  guint8 seed_b[GOODIX_RUNTIME_PRODUCER_SEED_LENGTH],
+  guint8 fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeInputFileAudit        *audit,
+  GError                            **error)
+{
+  guint8 *pe_bytes = NULL;
+  guint8 *cache_bytes = NULL;
+  guint8 local_a[GOODIX_RUNTIME_PRODUCER_SEED_LENGTH] = { 0 };
+  guint8 local_b[GOODIX_RUNTIME_PRODUCER_SEED_LENGTH] = { 0 };
+  guint8 local_fdt[GOODIX_RUNTIME_FDT_SEED_LENGTH] = { 0 };
+  gboolean ok = FALSE;
+
+  if (audit != NULL)
+    memset (audit, 0, sizeof *audit);
+  if (seed_a != NULL)
+    OPENSSL_cleanse (seed_a, GOODIX_RUNTIME_PRODUCER_SEED_LENGTH);
+  if (seed_b != NULL)
+    OPENSSL_cleanse (seed_b, GOODIX_RUNTIME_PRODUCER_SEED_LENGTH);
+  if (fdt_seed != NULL)
+    memset (fdt_seed, 0, GOODIX_RUNTIME_FDT_SEED_LENGTH);
+  if (pe_path == NULL || cache_path == NULL || pe_policy == NULL ||
+      fdt_policy == NULL || file_policy == NULL || seed_a == NULL ||
+      seed_b == NULL || fdt_seed == NULL || pe_policy->file_length == 0u ||
+      file_policy->mode != 0600)
+    {
+      g_set_error_literal (error, GOODIX_RUNTIME_INPUTS_ERROR,
+                           GOODIX_RUNTIME_INPUTS_ERROR_ARGUMENT,
+                           "private runtime input policy or output is invalid");
+      goto out;
+    }
+
+  pe_bytes = read_private_exact (pe_path, pe_policy->file_length, file_policy,
+                                 audit, error);
+  if (pe_bytes == NULL ||
+      !goodix_runtime_extract_producer_seeds (
+        pe_bytes, pe_policy->file_length, pe_policy, local_a, local_b, error))
+    goto out;
+  cache_bytes = read_private_exact (cache_path, fdt_policy->cache_length,
+                                    file_policy, audit, error);
+  if (cache_bytes == NULL ||
+      !goodix_runtime_extract_fdt_seed (cache_bytes, fdt_policy->cache_length,
+                                       fdt_policy, local_fdt, error))
+    goto out;
+
+  memcpy (seed_a, local_a, sizeof local_a);
+  memcpy (seed_b, local_b, sizeof local_b);
+  memcpy (fdt_seed, local_fdt, sizeof local_fdt);
+  ok = TRUE;
+
+out:
+  OPENSSL_cleanse (local_a, sizeof local_a);
+  OPENSSL_cleanse (local_b, sizeof local_b);
+  memset (local_fdt, 0, sizeof local_fdt);
+  if (pe_bytes != NULL)
+    {
+      OPENSSL_cleanse (pe_bytes, pe_policy->file_length);
+      if (file_policy->cleanse_observer != NULL)
+        file_policy->cleanse_observer (pe_bytes, pe_policy->file_length,
+                                       file_policy->cleanse_observer_data);
+      if (audit != NULL)
+        audit->buffer_cleanse_count++;
+      g_free (pe_bytes);
+    }
+  if (cache_bytes != NULL)
+    {
+      OPENSSL_cleanse (cache_bytes, fdt_policy->cache_length);
+      if (file_policy->cleanse_observer != NULL)
+        file_policy->cleanse_observer (cache_bytes, fdt_policy->cache_length,
+                                       file_policy->cleanse_observer_data);
+      if (audit != NULL)
+        audit->buffer_cleanse_count++;
+      g_free (cache_bytes);
+    }
+  if (!ok)
+    {
+      if (seed_a != NULL)
+        OPENSSL_cleanse (seed_a, GOODIX_RUNTIME_PRODUCER_SEED_LENGTH);
+      if (seed_b != NULL)
+        OPENSSL_cleanse (seed_b, GOODIX_RUNTIME_PRODUCER_SEED_LENGTH);
+      if (fdt_seed != NULL)
+        memset (fdt_seed, 0, GOODIX_RUNTIME_FDT_SEED_LENGTH);
+    }
+  if (audit != NULL)
+    audit->all_buffers_cleansed =
+      audit->buffer_cleanse_count == audit->buffer_allocation_count;
+  return ok;
 }

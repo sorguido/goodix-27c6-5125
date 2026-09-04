@@ -69,13 +69,26 @@ bytes and the 12-byte FDT seed from a hash/CRC/OTP-bound cache byte array.  The
 PE parser is adapted directly from the project-owned BSD-2-Clause D190 source;
 the FDT provider is expressed from the neutral D255/D261 cache contract.
 
-The unit has no filesystem, USB, discovery, subprocess, executable mapping or
-write API.  Failure zeroes every output, producer seeds have an explicit
-cleanse API, and errors expose stable redacted classes.  Production pins are
-compiled but only synthetic fixtures are executed in the host-only test; no
-authentic protected material is read.  The Fedora 44 Meson target compiles the
-provider, binder and protected-material loader, but `img_open` does not yet
-connect them to file loading, interface claim or the secure session.
+At the D279/04 baseline the unit had no filesystem, USB, discovery, subprocess,
+executable mapping or write API. Failure zeroes every output, producer seeds
+have an explicit cleanse API, and errors expose stable redacted classes.
+Production pins are compiled but only synthetic fixtures are executed in the
+host-only test; no authentic protected material is read.
+
+## D279/05 private input file adapter
+
+The same module now includes an explicit-path, read-only adapter for the PE and
+cache inputs. It requires regular files with exact uid, mode `0600` and size,
+uses `O_NOFOLLOW|O_CLOEXEC`, compares `fstat` identity/size/mtime/metadata
+before and after the read, cleanses all allocated input buffers, and publishes
+the three outputs atomically only after both inputs pass. Production requires
+uid 0; test policy can select the current uid for synthetic temporary files.
+It never searches paths or opens the three PSK/CONFIG inputs.
+
+The Fedora 44 Meson target compiles the provider, binder and
+protected-material loader, but `img_open` does not yet own/compose them or
+claim interface 0. D279/05 does not choose installation paths and does not read
+authentic protected material.
 
 ## D272/01 ephemeral SIGFM metric seam
 
