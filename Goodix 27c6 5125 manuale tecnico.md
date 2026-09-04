@@ -6,21 +6,21 @@ Il progetto studia il sensore Goodix USB `27c6:5125` del Huawei MateBook D15 /
 BohrD-WDH9D con un vincolo assoluto: preservare firmware, identità,
 configurazione factory, stato persistente/secure e compatibilità con Windows.
 
-Il branch Git canonico corrente è `main`. Il branch `development` è ritirato
-dalla policy operativa dopo l'allineamento completo del lavoro corrente su
-`main`; i riferimenti storici a esecuzioni e baseline avvenute su
-`development` restano invariati.
+Il branch Git operativo canonico per il loop autonomo è `development`. `main`
+e `bakcup_pre_agentic_mode` sono read-only per l'agente; i riferimenti storici
+a esecuzioni e baseline avvenute su altri branch restano invariati.
 
 ```text
-GIT_CANONICAL_BRANCH=main
-DEVELOPMENT_BRANCH_POLICY=RETIRED_AFTER_MAIN_ALIGNMENT
+GIT_CANONICAL_BRANCH=development
+MAIN_BRANCH_POLICY=READ_ONLY
+BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/02 — EXTRACTOR_DECISION=NBIS (architetturale/tecnica)
+### Stato corrente post-D279/03 — registrazione USB production 1.94.100 chiusa offline
 
-**Decisione offline del 2 settembre 2026.** D279/02 chiude il boundary
-lasciato da D279/01: sul target production Fedora 44 /
-`libfprint-1.94.100-1.fc44.x86_64` l'extractor dell'image path Goodix
+**Integrazione offline del 4 settembre 2026.** D279/03 applica la decisione
+D279/02 sul target production Fedora 44 /
+`libfprint-1.94.100-1.fc44.x86_64`: l'extractor dell'image path Goodix
 `27c6:5125` / `GF_ST411SEC_APP_12509` è **NBIS**, non SIGFM.
 
 Il path 1.94.100 è NBIS-only (`fp_image_detect_minutiae`, `FPI_PRINT_NBIS`,
@@ -34,23 +34,28 @@ NBIS ineseguibile e **non** autorizza a inventare un DPI. Il raster live-proven
 `80x64` supera il blocksize minimo 8; la sufficienza biometrica (≥10 minutiae,
 soglia Bozorth) resta non provata.
 
-SIGFM resta la selezione storica della classe Goodix locale e del fork
-Rockytkg. Non è necessità target-proven. Portarlo in 1.94.100 richiederebbe un
-fork del core (tipi print/device, extract/match, serializzazione FP3, OpenCV,
-Meson, ABI). Non è il path production.
+SIGFM resta la selezione storica della build host-only basata sul fork
+Rockytkg. La build target 1.94.100 omette soltanto quel selettore tramite una
+define scoped al driver e usa NBIS nativo; non porta SIGFM, OpenCV o nuovi tipi
+print.
 
-La decisione è `ARCHITECTURAL_TECHNICAL`. Non prova enrollment, matching,
-fprintd, FAR/FRR né qualità biometrica. D278/14 resta chiuso. D279/01 resta
-storicamente `BLOCKED` sulla registrazione USB, che non è stata eseguita.
-Nessun `FpIdEntry`, Meson production o live.
+Il registry Meson standard ora genera
+`fpi_device_goodix_27c6_5125_get_type()`. La sottoclasse USB espone un solo
+`FpIdEntry`, `27c6:5125`, riusa lo stesso `GoodixDeviceContext` D278 e compare
+una sola volta nel tool `fprint-list-supported-devices`. La reference esatta
+compila `libfprint-2.so.2.0.0` e il tool registry nel Freedesktop SDK 25.08
+contro il runtime Fedora `libgusb.so.2`, senza enumerare o aprire USB.
 
-Il gate locale D270/D271 che fail-close NBIS per ppmm ignoto cessa di essere un
-veto architetturale; riallinearlo è compito dello step implementativo
-successivo, senza assegnare un `ppmm` inventato.
+Il gate locale D270/D271 è riallineato: NBIS non è più bloccato, ma lo stato
+fisico resta `UNKNOWN` e `FpImage::ppmm` non viene assegnato. Questa closure non
+prova enrollment, matching, fprintd, FAR/FRR o qualità biometrica e non rende
+ancora operativo il lifecycle `img_open` production. D278/14 resta chiuso e
+non è autorizzata alcuna nuova run live.
 
 ```text
-D279_02_OUTCOME=READY
-D279_02_BASELINE=924774e9bd7ea10eabdfd540bf8a4be9b8413c99
+D279_03_OUTCOME=READY
+D279_03_BASELINE=3c8b846c4dd0ffbb493f11590f3c5d6c7f647692
+EXECUTABLE_CLOSURE=PASS_OFFLINE
 EXTRACTOR_DECISION=NBIS
 DECISION_CLASS=ARCHITECTURAL_TECHNICAL
 NBIS_PIPELINE_COMPATIBLE=true
@@ -62,7 +67,7 @@ PPMM_EVIDENCE_CLASS=UNKNOWN
 NBIS_80X64_COMPATIBILITY=CONDITIONAL
 SIGFM_TARGET_SPECIFIC_NECESSITY=NOT_PROVEN
 BIOMETRIC_VALIDATION_PENDING=true
-TARGET_REAL_DECODED_RASTER_DATASET_IN_MAIN=false
+TARGET_REAL_DECODED_RASTER_DATASET_IN_REPOSITORY=false
 BIOMETRIC_MATCHER_BENCHMARK_READY=false
 TARGET_OS=Fedora_44_x86_64
 TARGET_LIBFPRINT_VERSION=1.94.100
@@ -70,9 +75,12 @@ TARGET_LIBFPRINT_PACKAGE=libfprint-1.94.100-1.fc44.x86_64
 TARGET_LIBFPRINT_REFERENCE=reference/libfprint-fedora44-1.94.100/source
 ROCKYTKG_LIBFPRINT_IS_PRODUCTION_TARGET=false
 TARGET_1_94_100_IMAGE_PATH=NBIS_ONLY_VERIFIED
-CURRENT_GOODIX_ALGORITHM=SIGFM
-PRODUCTION_USB_ID_27C6_5125_REGISTERED=false
-LIBFPRINT_1_94_100_PRODUCTION_SHAPED_BUILD=NOT_REACHED
+TARGET_GOODIX_ALGORITHM=NBIS
+HOST_ONLY_HISTORICAL_GOODIX_ALGORITHM=SIGFM
+PRODUCTION_USB_ID_27C6_5125_REGISTERED=true
+LIBFPRINT_1_94_100_PRODUCTION_SHAPED_BUILD=PASS
+FPIMAGE_PPMM_ASSIGNED=false
+FPRINTD_OPERATIONAL_PATH_PROVEN=false
 D279_01_OUTCOME=BLOCKED
 D278_14_CLOSED_LIVE=true
 REAL_USB_ACCESS=0
@@ -86,8 +94,30 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_PRODUCTION_USB_DRIVER_REGISTRATION_WITH_NBIS
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_FPIMAGEDEVICE_PRODUCTION_OPEN_CLOSE_BINDING_DESIGN_AND_IMPLEMENTATION
 ```
+
+### D279/03 — registrazione e build production-shaped con NBIS
+
+D279/03 chiude offline il boundary di registry: la source map 1.94.100 usa i
+sorgenti canonici LGPL in `libfprint-driver/`, dichiara la dipendenza OpenSSL
+già necessaria al TLS nativo e registra il tipo tramite il meccanismo standard
+`supported_drivers`/`fpi-drivers.c`. Non esiste un registrar custom e non viene
+creato un secondo backend, router, TLS o lifecycle.
+
+Il runner
+`libfprint-driver/tests/run_goodix_fedora44_registration_test.sh` costruisce i
+target `fprint-2` e `fprint-list-supported-devices`, verifica simbolo, define
+NBIS, ID unico e output registry. L'host non ha `libgusb-devel`: il runner usa
+un header ABI compile-only dedicato e collega il vero runtime Fedora 0.4.9. La
+generazione GIR completa non è parte della closure perché manca anche
+`GUsb-1.0.gir`; libreria e registry production-relevant compilano.
+
+Il limite corrente è esplicito: la classe è registrata, ma `img_open` conserva
+ancora il comportamento host-only e non configura autonomamente claim USB,
+materiale protetto e secure-session D278. Installazione, fprintd e qualunque
+esecuzione sensor-reaching restano fuori scope e non autorizzati. Report:
+`analysis/D279/D279_03_offline_fedora44_production_usb_registration_NBIS.md`.
 
 ### D279/01 — BLOCKED storico: incompatibilità extractor prima della decisione D279/02
 
@@ -99,15 +129,16 @@ SIGFM, e il contratto canonico D269–D271 trattava ancora `ppmm` ignoto come
 veto NBIS. Portare SIGFM era fuori scope. I documenti D279/01, lasciati
 inizialmente non committati per review umana, sono stati poi integrati in
 `924774e9bd7ea10eabdfd540bf8a4be9b8413c99`. D279/02 ha poi chiuso la decisione
-extractor; la registrazione USB production resta non eseguita.
+extractor; alla fine di quello step la registrazione restava non eseguita.
+D279/03 la chiude successivamente senza cambiare l'esito storico D279/01.
 
 ```text
 D279_01_OUTCOME=BLOCKED
 D279_01_BASELINE=f609c865f760768edb6a9e404b863ccd0569e1c8
 D279_01_DOCS_COMMITTED_AS=924774e9bd7ea10eabdfd540bf8a4be9b8413c99
 TARGET_1_94_100_IMAGE_PATH=NBIS_ONLY_VERIFIED
-CURRENT_GOODIX_ALGORITHM=SIGFM
-PRODUCTION_USB_ID_27C6_5125_REGISTERED=false
+D279_01_CURRENT_GOODIX_ALGORITHM=SIGFM
+D279_01_PRODUCTION_USB_ID_27C6_5125_REGISTERED=false
 HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_01=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_EXTRACTOR_COMPATIBILITY_DECISION
 ```
 

@@ -32,6 +32,19 @@ No active `PatchN`, `%patch`, or `%autopatch` directives were observed.
 Therefore `source/` is the extracted upstream libfprint v1.94.100 source tree
 corresponding to the Fedora 44 `libfprint-1.94.100-1.fc44` package source.
 
+## Local integration delta
+
+Starting with D279/03, the preserved upstream tree has a bounded local Meson
+delta in `source/meson.build` and `source/libfprint/meson.build`. It registers
+the repository-owned LGPL driver `goodix_27c6_5125` and references its
+canonical sources in `<repository-root>/libfprint-driver/`; no upstream driver
+source was overwritten. The original tarball digest below remains the
+provenance anchor, not a claim that the working `source/` directory is still
+byte-identical to the archive after this documented overlay.
+
+The D279/03 delta is recorded in
+`analysis/D279/D279_03_offline_fedora44_production_usb_registration_NBIS.md`.
+
 Purpose:
 
 This tree is the production integration reference for the Goodix 27c6:5125

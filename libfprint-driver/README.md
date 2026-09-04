@@ -38,12 +38,27 @@ reference until `goodix_fpimage_pipeline_free()`.
 
 The physical scan resolution remains target-specifically unknown. The opaque
 owner records `GOODIX_FPIMAGE_PHYSICAL_PPMM_UNKNOWN` separately; the numerical
-zero left by GObject initialization is not treated as a measurement or usable
-NBIS input. `goodix_fpimage_pipeline_check_ppmm_requirement()` therefore blocks
-NBIS explicitly. Its OK result for SIGFM means only that the locally audited
-SIGFM extractor does not consume `ppmm`; it does not select an extractor or
+zero left by GObject initialization is not treated as a measurement. D279/02
+verified that libfprint 1.94.100 uses `ppmm` only for reliability quality that
+is discarded before Bozorth3, so the local gate no longer blocks NBIS while it
+still leaves `FpImage::ppmm` unset. This does not prove biometric quality or
 authorize preprocessing, matching, enrollment, or live use. Image flags remain
 zero solely because no orientation or polarity transformation is yet justified.
+
+## D279/03 Fedora 44 registration boundary
+
+The standard Meson registry in the Fedora 44/libfprint 1.94.100 reference now
+builds the canonical sources in this directory as `goodix_27c6_5125`. The
+registered USB subclass has the single exact ID `27c6:5125`, reuses the same
+`GoodixDeviceContext` as the host-only and D278 paths, and omits the historical
+SIGFM selector only under the target-specific NBIS build definition. No
+physical `ppmm` is assigned.
+
+`tests/run_goodix_fedora44_registration_test.sh` performs the offline
+production-shaped build and checks the generated registry, linked type symbol,
+USB ID listing and zero-reachability of USB enumeration in the listing tool.
+It does not install libfprint, contact fprintd or access a USB device. A fully
+operational fprintd open/claim/secret lifecycle remains a later boundary.
 
 ## D272/01 ephemeral SIGFM metric seam
 

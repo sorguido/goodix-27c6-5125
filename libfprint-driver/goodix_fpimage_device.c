@@ -107,6 +107,11 @@ G_DEFINE_TYPE_WITH_PRIVATE (GoodixFpImageDevice, goodix_fpimage_device,
 G_DEFINE_TYPE (GoodixUsbFpImageDevice, goodix_usb_fpimage_device,
                GOODIX_TYPE_FPIMAGE_DEVICE)
 
+static const FpIdEntry goodix_usb_id_table[] = {
+  { .vid = 0x27c6, .pid = 0x5125 },
+  { .vid = 0, .pid = 0, .driver_data = 0 },
+};
+
 static GoodixDeviceContext *
 goodix_fpimage_device_peek_context (GoodixFpImageDevice *self)
 {
@@ -783,7 +788,9 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   img_class->deactivate   = goodix_fpimage_device_deactivate;
   img_class->img_width    = (gint) GOODIX_CANONICAL_IMAGE_WIDTH;
   img_class->img_height   = (gint) GOODIX_CANONICAL_IMAGE_HEIGHT;
+#ifndef GOODIX_LIBFPRINT_1_94_100_NBIS
   img_class->algorithm    = FPI_DEVICE_ALGO_SIGFM;
+#endif
 
   fpi_device_class_auto_initialize_features (device_class);
 }
@@ -805,13 +812,26 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
 
   /* fp_device_set_property() consults the final instance class before
    * constructed() copies the transport type into private state. */
-  device_class->type = FP_DEVICE_TYPE_USB;
+  device_class->id        = "goodix_27c6_5125";
+  device_class->full_name = "Goodix 27c6:5125 Fingerprint Sensor";
+  device_class->type      = FP_DEVICE_TYPE_USB;
+  device_class->scan_type = FP_SCAN_TYPE_PRESS;
+  device_class->id_table  = goodix_usb_id_table;
 }
 
 static void
 goodix_usb_fpimage_device_init (GoodixUsbFpImageDevice *self)
 {
   (void) self;
+}
+
+/* Standard libfprint registry entry point.  The registered production type is
+ * the USB-typed subclass; both it and the host-only constructor below reuse
+ * the exact same GoodixDeviceContext implementation. */
+GType
+fpi_device_goodix_27c6_5125_get_type (void)
+{
+  return goodix_usb_fpimage_device_get_type ();
 }
 
 /* --- Public constructor --- */

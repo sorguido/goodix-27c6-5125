@@ -1033,6 +1033,17 @@ test_d278_14_non_null_usb_binding (void)
   g_assert_true (fpi_device_get_usb_device (FP_DEVICE (device)) == usb_device);
   device_class = FP_DEVICE_GET_CLASS (device);
   g_assert_cmpint (device_class->type, ==, FP_DEVICE_TYPE_USB);
+  g_assert_cmpstr (device_class->id, ==, "goodix_27c6_5125");
+  g_assert_cmpstr (device_class->full_name, ==,
+                   "Goodix 27c6:5125 Fingerprint Sensor");
+  g_assert_nonnull (device_class->id_table);
+  g_assert_cmpuint (device_class->id_table[0].vid, ==, 0x27c6u);
+  g_assert_cmpuint (device_class->id_table[0].pid, ==, 0x5125u);
+  g_assert_cmpuint (device_class->id_table[0].driver_data, ==, 0u);
+  g_assert_cmpuint (device_class->id_table[1].vid, ==, 0u);
+  g_assert_cmpuint (device_class->id_table[1].pid, ==, 0u);
+  g_assert_cmpuint (fpi_device_goodix_27c6_5125_get_type (), ==,
+                    G_OBJECT_TYPE (device));
 
   ctx = goodix_fpimage_device_get_context (device);
   backend = goodix_device_context_get_fpi_usb_backend (ctx);

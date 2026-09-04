@@ -126,7 +126,11 @@ goodix_fpimage_pipeline_check_ppmm_requirement (
   switch (consumer)
     {
     case GOODIX_FPIMAGE_PPMM_CONSUMER_NBIS:
-      return GOODIX_FPIMAGE_PIPELINE_PHYSICAL_PPMM_REQUIRED;
+      /* libfprint 1.94.100 consumes ppmm only for a reliability
+       * neighbourhood whose value is discarded before Bozorth3.  Keeping the
+       * field unset therefore preserves the unknown physical scale without
+       * blocking extraction or matching (D279/02). */
+      return GOODIX_FPIMAGE_PIPELINE_OK;
     case GOODIX_FPIMAGE_PPMM_CONSUMER_SIGFM:
       return GOODIX_FPIMAGE_PIPELINE_OK;
     default:

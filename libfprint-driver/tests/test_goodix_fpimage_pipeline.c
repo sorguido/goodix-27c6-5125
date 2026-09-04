@@ -134,7 +134,7 @@ test_ppmm_gate_is_truth_preserving (void)
           GOODIX_FPIMAGE_PIPELINE_OK);
   assert (goodix_fpimage_pipeline_check_ppmm_requirement (
             pipeline, GOODIX_FPIMAGE_PPMM_CONSUMER_NBIS) ==
-          GOODIX_FPIMAGE_PIPELINE_PHYSICAL_PPMM_REQUIRED);
+          GOODIX_FPIMAGE_PIPELINE_OK);
   assert (goodix_fpimage_pipeline_check_ppmm_requirement (
             pipeline, GOODIX_FPIMAGE_PPMM_CONSUMER_SIGFM) ==
           GOODIX_FPIMAGE_PIPELINE_OK);

@@ -51,10 +51,10 @@ goodix_fpimage_pipeline_get_physical_ppmm_state (
   const GoodixFpImagePipeline *pipeline);
 
 /*
- * Gate only the physical-ppmm requirement of the selected extractor.  OK for
- * SIGFM does not select or authorize SIGFM, matching, or enrollment; it only
- * records the verified fact that this local SIGFM call path does not consume
- * FpImage::ppmm.  NBIS fails closed while physical ppmm is unknown.
+ * Gate only the physical-ppmm requirement of the selected extractor.  Neither
+ * the production NBIS extraction/matching path in libfprint 1.94.100 nor the
+ * historical SIGFM path requires a physical value.  NBIS quality remains
+ * physically uncalibrated; no value is synthesized for FpImage::ppmm.
  */
 GoodixFpImagePipelineResult
 goodix_fpimage_pipeline_check_ppmm_requirement (

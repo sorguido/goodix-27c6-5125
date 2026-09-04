@@ -256,3 +256,18 @@ nuova espressione nel dominio LGPL, non viene importato codice esterno e non
 sono aggiunti secret, capture o dati biometrici. Gli oggetti LGPL già accettati
 e l'architettura con un solo context/backend/router/TLS/lifecycle restano
 invariati.
+
+## D279/03 — integrazione Fedora 44/libfprint 1.94.100
+
+La registrazione `goodix_27c6_5125`, il wrapper GType, la tabella USB e il
+riallineamento NBIS/ppmm modificano esclusivamente il codice locale
+`LGPL-2.1-or-later` già tracciato in `libfprint-driver/`. I due file Meson nella
+reference Fedora 44 usano le normali API di build/registry upstream e puntano
+ai sorgenti canonici locali; nessun file driver upstream è stato copiato o
+sovrascritto e nessuna espressione Rockytkg/SIGFM è stata trasferita.
+
+Gli header e la metadata pkg-config sotto `tests/support/d279/` sono una seam
+compile-only derivata dalle chiamate API pubbliche GUsb usate da libfprint
+1.94.100 e collegano il runtime Fedora `libgusb.so.2`; non implementano GUsb e
+non entrano nel prodotto. Test e report D279/03 contengono solo metadata di
+build e fixture non biometriche, senza secret o capture.

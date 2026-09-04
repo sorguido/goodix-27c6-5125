@@ -134,6 +134,18 @@ driver_sources = {
         'drivers/goodixmoc/goodix.c',
         'drivers/goodixmoc/goodix_proto.c',
     ),
+    'goodix_27c6_5125' : files(
+        '../../../../libfprint-driver/goodix_u16_to_fpimage.c',
+        '../../../../libfprint-driver/goodix_fpimage_pipeline.c',
+        '../../../../libfprint-driver/goodix_usb_router.c',
+        '../../../../libfprint-driver/goodix_a0_protocol.c',
+        '../../../../libfprint-driver/goodix_secure_session.c',
+        '../../../../libfprint-driver/goodix_image_decoder.c',
+        '../../../../libfprint-driver/goodix_post_tls_lifecycle.c',
+        '../../../../libfprint-driver/goodix_fpimage_device.c',
+        '../../../../libfprint-driver/goodix_tls_server.c',
+        '../../../../libfprint-driver/goodix_fpi_usb_backend.c',
+    ),
     'fpcmoc' : files('drivers/fpcmoc/fpc.c'),
     'realtek' : files('drivers/realtek/realtek.c'),
     'focaltech_moc' : files('drivers/focaltech_moc/focaltech_moc.c'),
@@ -153,6 +165,9 @@ helper_sources = {
 
 drivers_sources = []
 drivers_cflags = []
+if 'goodix_27c6_5125' in drivers
+    drivers_cflags += '-DGOODIX_LIBFPRINT_1_94_100_NBIS'
+endif
 foreach driver: drivers
     drivers_sources += driver_sources[driver]
 endforeach

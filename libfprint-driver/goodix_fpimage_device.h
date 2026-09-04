@@ -80,15 +80,18 @@ typedef struct
 } GoodixBackendVTable;
 
 /*
- * Host-only instantiation.  The returned device is a real FpImageDevice
- * subclass, but it is not registered in any production id table.
+ * Host-only instantiation.  The returned device is the virtual base type and
+ * is never selected by the production USB registry.
  */
 GoodixFpImageDevice * goodix_fpimage_device_new (void);
 /* Physical construction over an already selected GUsbDevice.  A thin
  * transport-typing subclass supplies FP_DEVICE_TYPE_USB while reusing the
- * exact same GoodixDeviceContext implementation.  The class remains absent
- * from every production id table and construction submits no USB traffic. */
+ * exact same GoodixDeviceContext implementation.  Construction submits no USB
+ * traffic. */
 GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device);
+
+/* Entry point consumed by libfprint's generated standard driver registry. */
+GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
