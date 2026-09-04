@@ -66,6 +66,18 @@ gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_a0_protocol.c" \
   -o "$build_dir/goodix_a0_protocol.o"
 gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_d190_binder.c" \
+  -o "$build_dir/goodix_d190_binder.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_target_material.c" \
+  -o "$build_dir/goodix_target_material.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_runtime_inputs.c" \
+  -o "$build_dir/goodix_runtime_inputs.o"
+gcc $strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_runtime_material.c" \
+  -o "$build_dir/goodix_runtime_material.o"
+gcc $strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session.o"
 gcc $strict_flags $glib_cflags $includes -c \
@@ -115,6 +127,10 @@ gcc -Wl,--gc-sections \
   "$build_dir/goodix_fpimage_pipeline.o" \
   "$build_dir/goodix_usb_router.o" \
   "$build_dir/goodix_a0_protocol.o" \
+  "$build_dir/goodix_d190_binder.o" \
+  "$build_dir/goodix_target_material.o" \
+  "$build_dir/goodix_runtime_inputs.o" \
+  "$build_dir/goodix_runtime_material.o" \
   "$build_dir/goodix_secure_session.o" \
   "$build_dir/goodix_image_decoder.o" \
   "$build_dir/goodix_post_tls_lifecycle.o" \
@@ -170,6 +186,18 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_a0_protocol.c" \
   -o "$build_dir/goodix_a0_protocol_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_d190_binder.c" \
+  -o "$build_dir/goodix_d190_binder_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_target_material.c" \
+  -o "$build_dir/goodix_target_material_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_runtime_inputs.c" \
+  -o "$build_dir/goodix_runtime_inputs_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
+  "$git_root/libfprint-driver/goodix_runtime_material.c" \
+  -o "$build_dir/goodix_runtime_material_san.o"
+gcc $san_strict_flags $glib_cflags $includes -c \
   "$git_root/libfprint-driver/goodix_secure_session.c" \
   -o "$build_dir/goodix_secure_session_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
@@ -208,6 +236,10 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/goodix_fpimage_pipeline_san.o" \
   "$build_dir/goodix_usb_router_san.o" \
   "$build_dir/goodix_a0_protocol_san.o" \
+  "$build_dir/goodix_d190_binder_san.o" \
+  "$build_dir/goodix_target_material_san.o" \
+  "$build_dir/goodix_runtime_inputs_san.o" \
+  "$build_dir/goodix_runtime_material_san.o" \
   "$build_dir/goodix_secure_session_san.o" \
   "$build_dir/goodix_image_decoder_san.o" \
   "$build_dir/goodix_post_tls_lifecycle_san.o" \

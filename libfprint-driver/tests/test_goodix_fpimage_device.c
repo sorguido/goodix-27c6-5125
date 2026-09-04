@@ -24,6 +24,7 @@
 void  goodix_test_gusb_reset_counts (void);
 guint goodix_test_gusb_get_open_count (void);
 guint goodix_test_gusb_get_close_count (void);
+void  goodix_test_gusb_set_open_close_success (gboolean value);
 
 typedef struct
 {
@@ -68,18 +69,24 @@ state_changed_cb (FpImageDevice      *dev,
 }
 
 static TestFixture *
-test_fixture_new (void)
+test_fixture_new_with_device (GoodixFpImageDevice *device)
 {
   TestFixture *f;
 
   f = g_new0 (TestFixture, 1);
   f->loop = g_main_loop_new (NULL, FALSE);
-  f->device = goodix_fpimage_device_new ();
+  f->device = device;
   f->ctx = goodix_fpimage_device_get_context (f->device);
   g_signal_connect (f->device, "fpi-image-device-state-changed",
                     G_CALLBACK (state_changed_cb), f);
 
   return f;
+}
+
+static TestFixture *
+test_fixture_new (void)
+{
+  return test_fixture_new_with_device (goodix_fpimage_device_new ());
 }
 
 static void
@@ -199,6 +206,7 @@ fixture_open (TestFixture *f)
   test_wait (f);
   g_assert_true (f->success);
   g_assert_cmpuint (f->completion_count, ==, 1);
+  f->ctx = goodix_fpimage_device_get_context (f->device);
   g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
   f->completion_count = 0;
@@ -1014,6 +1022,247 @@ test_d278_12_post_tls_context_ownership (void)
   test_fixture_free (f);
 }
 
+typedef struct
+{
+  GoodixFpImageDevice *device;
+  GString *events;
+  guint acquire_count;
+  guint material_release_count;
+  guint claim_count;
+  guint interface_release_count;
+  gboolean fail_acquire;
+  gboolean fail_claim;
+  gboolean fail_release;
+  gboolean cancel_after_acquire;
+  guint8 synthetic_psk[GOODIX_SECURE_SESSION_PSK_LENGTH];
+} ProductionOpenSeam;
+
+static gboolean
+production_acquire_seam (
+  GoodixRuntimeMaterial       **owner,
+  GoodixSecureSessionMaterial  *secure_view,
+  guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeMaterialAudit   *audit,
+  gpointer                      user_data,
+  GError                      **error)
+{
+  ProductionOpenSeam *seam = user_data;
+
+  seam->acquire_count++;
+  g_string_append_c (seam->events, 'A');
+  g_assert_cmpuint (goodix_test_gusb_get_open_count (), ==,
+                    seam->acquire_count);
+  memset (audit, 0, sizeof *audit);
+  memset (secure_view, 0, sizeof *secure_view);
+  memset (fdt_seed, 0x80, GOODIX_RUNTIME_FDT_SEED_LENGTH);
+  if (seam->fail_acquire)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                           "synthetic runtime material failure");
+      return FALSE;
+    }
+  secure_view->psk = seam->synthetic_psk;
+  secure_view->psk_length = sizeof seam->synthetic_psk;
+  *owner = (GoodixRuntimeMaterial *) g_malloc0 (1u);
+  if (seam->cancel_after_acquire)
+    g_cancellable_cancel (
+      fpi_device_get_cancellable (FP_DEVICE (seam->device)));
+  return TRUE;
+}
+
+static void
+production_material_release_seam (GoodixRuntimeMaterial *owner,
+                                  gpointer               user_data)
+{
+  ProductionOpenSeam *seam = user_data;
+
+  seam->material_release_count++;
+  g_string_append_c (seam->events, 'F');
+  g_free (owner);
+}
+
+static gboolean
+production_claim_seam (GUsbDevice *usb_device,
+                       guint8      interface_number,
+                       gpointer    user_data,
+                       GError    **error)
+{
+  ProductionOpenSeam *seam = user_data;
+  GoodixDeviceContext *ctx =
+    goodix_fpimage_device_get_context (seam->device);
+
+  (void) usb_device;
+  g_assert_cmpuint (interface_number, ==, 0u);
+  g_assert_true (goodix_device_context_has_runtime_material (ctx));
+  g_assert_false (goodix_device_context_has_usb_claim (ctx));
+  seam->claim_count++;
+  g_string_append_c (seam->events, 'C');
+  if (seam->fail_claim)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                           "synthetic interface claim failure");
+      return FALSE;
+    }
+  return TRUE;
+}
+
+static gboolean
+production_release_seam (GUsbDevice *usb_device,
+                         guint8      interface_number,
+                         gpointer    user_data,
+                         GError    **error)
+{
+  ProductionOpenSeam *seam = user_data;
+  GoodixDeviceContext *ctx =
+    goodix_fpimage_device_get_context (seam->device);
+
+  (void) usb_device;
+  g_assert_cmpuint (interface_number, ==, 0u);
+  g_assert_true (goodix_device_context_has_runtime_material (ctx));
+  g_assert_true (goodix_device_context_has_usb_claim (ctx));
+  seam->interface_release_count++;
+  g_string_append_c (seam->events, 'R');
+  if (seam->fail_release)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                           "synthetic interface release failure");
+      return FALSE;
+    }
+  return TRUE;
+}
+
+static TestFixture *
+production_fixture_new (ProductionOpenSeam *seam)
+{
+  g_autoptr(GUsbDevice) usb_device = NULL;
+  TestFixture *f;
+
+  goodix_test_gusb_reset_counts ();
+  goodix_test_gusb_set_open_close_success (TRUE);
+  usb_device = (GUsbDevice *) g_object_new (G_USB_TYPE_DEVICE, NULL);
+  f = test_fixture_new_with_device (
+    goodix_fpimage_device_new_for_usb (usb_device));
+  seam->device = f->device;
+  seam->events = g_string_new (NULL);
+  memset (seam->synthetic_psk, 0x5a, sizeof seam->synthetic_psk);
+  goodix_fpimage_device_set_production_open_seams (
+    f->device, production_acquire_seam, production_material_release_seam,
+    production_claim_seam, production_release_seam, seam);
+  return f;
+}
+
+static void
+production_seam_clear (ProductionOpenSeam *seam)
+{
+  if (seam->events != NULL)
+    g_string_free (seam->events, TRUE);
+  seam->events = NULL;
+  memset (seam->synthetic_psk, 0, sizeof seam->synthetic_psk);
+}
+
+static void
+test_d279_08_production_open_close_ownership (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  TestFixture *f = production_fixture_new (&seam);
+
+  fixture_open (f);
+  g_assert_true (goodix_device_context_has_runtime_material (f->ctx));
+  g_assert_true (goodix_device_context_has_usb_claim (f->ctx));
+  g_assert_cmpstr (seam.events->str, ==, "AC");
+  fixture_close (f);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+
+  /* A second open on the same FpDevice creates a distinct owned epoch. */
+  fixture_open (f);
+  fixture_close (f);
+  g_assert_cmpstr (seam.events->str, ==, "ACRFACRF");
+  g_assert_cmpuint (seam.acquire_count, ==, 2u);
+  g_assert_cmpuint (seam.claim_count, ==, 2u);
+  g_assert_cmpuint (seam.interface_release_count, ==, 2u);
+  g_assert_cmpuint (seam.material_release_count, ==, 2u);
+  g_assert_cmpuint (goodix_test_gusb_get_open_count (), ==, 2u);
+  g_assert_cmpuint (goodix_test_gusb_get_close_count (), ==, 2u);
+
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
+test_d279_08_production_open_failures (void)
+{
+  ProductionOpenSeam acquire_failure = { .fail_acquire = TRUE };
+  ProductionOpenSeam claim_failure = { .fail_claim = TRUE };
+  ProductionOpenSeam cancelled = { .cancel_after_acquire = TRUE };
+  g_autoptr(GCancellable) cancellable = NULL;
+  TestFixture *f;
+
+  f = production_fixture_new (&acquire_failure);
+  f->done = FALSE;
+  fp_device_open (FP_DEVICE (f->device), NULL,
+                  (GAsyncReadyCallback) open_cb, f);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_cmpstr (acquire_failure.events->str, ==, "A");
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  test_fixture_free (f);
+  production_seam_clear (&acquire_failure);
+
+  f = production_fixture_new (&claim_failure);
+  f->done = FALSE;
+  fp_device_open (FP_DEVICE (f->device), NULL,
+                  (GAsyncReadyCallback) open_cb, f);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_cmpstr (claim_failure.events->str, ==, "ACF");
+  g_assert_cmpuint (claim_failure.material_release_count, ==, 1u);
+  g_assert_cmpuint (claim_failure.interface_release_count, ==, 0u);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  test_fixture_free (f);
+  production_seam_clear (&claim_failure);
+
+  f = production_fixture_new (&cancelled);
+  cancellable = g_cancellable_new ();
+  f->done = FALSE;
+  fp_device_open (FP_DEVICE (f->device), cancellable,
+                  (GAsyncReadyCallback) open_cb, f);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+  g_assert_cmpstr (cancelled.events->str, ==, "AF");
+  g_assert_cmpuint (cancelled.claim_count, ==, 0u);
+  g_assert_cmpuint (cancelled.material_release_count, ==, 1u);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  test_fixture_free (f);
+  production_seam_clear (&cancelled);
+}
+
+static void
+test_d279_08_production_release_failure (void)
+{
+  ProductionOpenSeam seam = { .fail_release = TRUE };
+  TestFixture *f = production_fixture_new (&seam);
+
+  fixture_open (f);
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_close (FP_DEVICE (f->device), NULL,
+                   (GAsyncReadyCallback) close_cb, f);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+  g_assert_cmpuint (seam.material_release_count, ==, 1u);
+  g_assert_null (goodix_fpimage_device_get_context (f->device));
+  g_assert_cmpuint (goodix_test_gusb_get_close_count (), ==, 1u);
+
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
 static void
 test_d278_14_non_null_usb_binding (void)
 {
@@ -1109,6 +1358,12 @@ main (int argc, char **argv)
                    test_d278_12_post_tls_context_ownership);
   g_test_add_func ("/goodix-fpimage-device/d278-14-non-null-usb-binding",
                    test_d278_14_non_null_usb_binding);
+  g_test_add_func ("/goodix-fpimage-device/d279-08-production-open-close-ownership",
+                   test_d279_08_production_open_close_ownership);
+  g_test_add_func ("/goodix-fpimage-device/d279-08-production-open-failures",
+                   test_d279_08_production_open_failures);
+  g_test_add_func ("/goodix-fpimage-device/d279-08-production-release-failure",
+                   test_d279_08_production_release_failure);
 
   return g_test_run ();
 }

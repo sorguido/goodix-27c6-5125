@@ -15,6 +15,10 @@ typedef struct _GUsbDevice GUsbDevice;
 typedef enum { G_USB_DEVICE_DIRECTION_HOST_TO_DEVICE, G_USB_DEVICE_DIRECTION_DEVICE_TO_HOST } GUsbDeviceDirection;
 typedef enum { G_USB_DEVICE_REQUEST_TYPE_STANDARD, G_USB_DEVICE_REQUEST_TYPE_CLASS, G_USB_DEVICE_REQUEST_TYPE_VENDOR } GUsbDeviceRequestType;
 typedef enum { G_USB_DEVICE_RECIPIENT_DEVICE, G_USB_DEVICE_RECIPIENT_INTERFACE, G_USB_DEVICE_RECIPIENT_ENDPOINT, G_USB_DEVICE_RECIPIENT_OTHER } GUsbDeviceRecipient;
+typedef enum {
+  G_USB_DEVICE_CLAIM_INTERFACE_NONE = 0,
+  G_USB_DEVICE_CLAIM_INTERFACE_BIND_KERNEL_DRIVER = 1 << 0
+} GUsbDeviceClaimInterfaceFlags;
 
 #define G_USB_TYPE_DEVICE G_TYPE_OBJECT
 
@@ -22,6 +26,12 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (GUsbDevice, g_object_unref)
 
 gboolean g_usb_device_open  (GUsbDevice  *self, GError **error);
 gboolean g_usb_device_close (GUsbDevice  *self, GError **error);
+gboolean g_usb_device_claim_interface (GUsbDevice *self, guint8 interface,
+                                       GUsbDeviceClaimInterfaceFlags flags,
+                                       GError **error);
+gboolean g_usb_device_release_interface (GUsbDevice *self, guint8 interface,
+                                         GUsbDeviceClaimInterfaceFlags flags,
+                                         GError **error);
 guint8   g_usb_device_get_bus (GUsbDevice *self);
 GUsbDevice *g_usb_device_get_parent (GUsbDevice *self);
 guint8   g_usb_device_get_port_number (GUsbDevice *self);

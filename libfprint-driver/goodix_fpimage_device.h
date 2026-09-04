@@ -9,6 +9,7 @@
 #include "goodix_fpi_usb_backend.h"
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
+#include "goodix_runtime_material.h"
 
 G_BEGIN_DECLS
 
@@ -72,6 +73,24 @@ typedef void (*GoodixDeviceContextSecurePhaseObserver) (
   guint64           generation,
   gpointer          user_data);
 
+/* Offline-test seams for the production img_open/img_close boundary.  NULL
+ * callbacks select the real production implementation. */
+typedef gboolean (*GoodixRuntimeMaterialAcquireSeam) (
+  GoodixRuntimeMaterial       **owner,
+  GoodixSecureSessionMaterial  *secure_view,
+  guint8                        fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH],
+  GoodixRuntimeMaterialAudit   *audit,
+  gpointer                      user_data,
+  GError                      **error);
+typedef void (*GoodixRuntimeMaterialReleaseSeam) (
+  GoodixRuntimeMaterial *owner,
+  gpointer               user_data);
+typedef gboolean (*GoodixUsbInterfaceSeam) (
+  GUsbDevice *usb_device,
+  guint8      interface_number,
+  gpointer    user_data,
+  GError    **error);
+
 typedef struct
 {
   void (*arm)    (GoodixDeviceContext *ctx, gpointer user_data);
@@ -94,6 +113,15 @@ GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device)
 GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
+void goodix_fpimage_device_set_production_open_seams (
+  GoodixFpImageDevice               *dev,
+  GoodixRuntimeMaterialAcquireSeam   acquire_material,
+  GoodixRuntimeMaterialReleaseSeam   release_material,
+  GoodixUsbInterfaceSeam             claim_interface,
+  GoodixUsbInterfaceSeam             release_interface,
+  gpointer                           user_data);
+gboolean goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx);
+gboolean goodix_device_context_has_usb_claim (GoodixDeviceContext *ctx);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
 GoodixTlsServer *      goodix_device_context_get_tls_server (GoodixDeviceContext *ctx);
 GoodixFpiUsbBackend *  goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx);

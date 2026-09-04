@@ -99,11 +99,25 @@ the non-owning secure descriptor plus FDT12, and cleanses all producer scratch.
 Freeing the owner clears the descriptor and FDT seed and delegates PSK,
 validator and CONFIG90 cleansing to the sole `GoodixTargetMaterial` owner.
 
-Paths remain caller-supplied and no production location is selected. Returned
-secure descriptors borrow the owner's storage and must be cleared by callers
-after configuring the session. The eight-test synthetic suite proves complete
-composition and teardown under normal and ASan/UBSan builds. `img_open` still
-does not instantiate this owner or claim USB.
+Returned secure descriptors borrow the owner's storage and must be cleared by
+callers after configuring the session. The synthetic suite proves complete
+composition and teardown under normal and ASan/UBSan builds. D279/07 later
+selected and validated the production paths.
+
+## D279/08 production open/close binding
+
+The registered USB subclass now loads the single runtime-material owner at
+`img_open`, then claims only USB interface 0. The owner, borrowed secure view,
+FDT12 and audit remain in the same `GoodixDeviceContext` for the complete open
+epoch. Close and all open failures release the claim before clearing local
+descriptors and freeing the owner; a second open creates a fresh epoch.
+
+libfprint 1.94.100 itself opens `GUsbDevice` before invoking `img_open`, so the
+target-compatible order is core USB open, material load, interface claim. No
+USB submit or protocol action occurs in `img_open`. Injected test seams prove
+ordering and failure cleanup without real paths or hardware; NULL seams select
+the production loader and libgusb calls. Production activation still does not
+start the secure/post-TLS graph, so this is not fprintd operational closure.
 
 ## D272/01 ephemeral SIGFM metric seam
 

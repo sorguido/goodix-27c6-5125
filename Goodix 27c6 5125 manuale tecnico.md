@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/07 — gate production layout PASS
+### Stato corrente post-D279/08 — open/close production collegati offline
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -62,8 +62,22 @@ Il risultato conclusivo è `REAL_TARGET_COMPATIBILITY=PASS` e chiude il gate
 D279/07 per il layout production. Le operazioni protette sono state compiute
 solo dall'operatore nell'ambito dell'autorizzazione dichiarata; l'AI non ha
 usato sudo né letto gli input. fprintd non è stato avviato e USB/live non sono
-stati toccati. Il prossimo boundary autonomo è il collegamento offline
-dell'owner D279/06 al lifecycle `img_open`/`img_close` della sottoclasse USB.
+stati toccati. D279/08 ha assunto il successivo boundary offline.
+
+D279/08 ha ora completato quel collegamento offline. Nel lifecycle standard
+libfprint 1.94.100 il core apre necessariamente `GUsbDevice` prima della vfunc;
+il driver carica quindi immediatamente l'owner dai cinque path D279/07 e solo
+dopo reclama l'interfaccia 0. Nessun submit avviene durante open. Owner, secure
+view, FDT12 e audit appartengono allo stesso `GoodixDeviceContext`; close e
+ogni failure tentano il release del claim una sola volta, poi cancellano le
+view e liberano l'owner anche se libgusb segnala errore. Due open consecutivi
+sullo stesso oggetto creano due epoch distinte.
+
+Le prove sono soltanto sintetiche: 21/21 test normali e sanitizer, 9/9
+regressione material owner e build/registry Fedora 44 `PASS`, senza input
+production o USB reale. L'activation USB continua però a usare l'arm host-only:
+pre-session RX sync, secure session e post-TLS non sono ancora avviati dalla
+vfunc production. D279/08 non autorizza quindi installazione o fprintd/live.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
 solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
@@ -74,10 +88,11 @@ validator e CONFIG90. D279/06 non selezionava ancora path production; quella
 limitazione storica è superata dalla sola selezione offline D279/07. Il modulo
 non ha USB o protocollo.
 
-La prova completa usa cinque file sintetici 0600, verifica composizione e
-teardown in otto test normali e ASan/UBSan, e la source map Fedora 44 compila
-il nuovo owner. Nessun input autentico è letto e `img_open` non istanzia ancora
-l'owner né reclama l'interfaccia.
+La prova completa usa cinque file sintetici 0600; al milestone D279/06
+verificava composizione e teardown in otto test normali e ASan/UBSan, ora nove
+con il layout production D279/07. La source map Fedora 44 compila il nuovo
+owner. Il limite storico su `img_open` e claim è superato da D279/08; i test
+AI non leggono input autentici.
 
 D279/05 aveva immediatamente prima esteso i provider con
 un reader read-only di due soli path espliciti. Richiede regular file con uid,
@@ -158,6 +173,13 @@ FIRST_HUMAN_PROBE_RESULT=EXPECTED_INCOMPLETE_LAYOUT_GFUSB_DLL_ABSENT
 LAYOUT_PROVISIONING_STATE=COMPLETE_METADATA_ONLY
 REAL_TARGET_COMPATIBILITY=PASS
 PRODUCTION_LAYOUT_PROVISIONED=true
+D279_08_OUTCOME=READY_OFFLINE
+D279_08_BASELINE=9d601d2db2848b624c6345dd5b2ad545704d6bbd
+D279_08_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_OPEN_CLOSE_AND_FEDORA44_BUILD
+PRODUCTION_RUNTIME_MATERIAL_OWNED_PER_OPEN_EPOCH=true
+PRODUCTION_USB_INTERFACE_0_CLAIMED_PER_OPEN_EPOCH=true
+PRODUCTION_IMG_OPEN_USB_SUBMIT_COUNT=0
+PRODUCTION_ACTIVATION_SECURE_GRAPH_WIRED=false
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -217,7 +239,7 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_RUNTIME_MATERIAL_OWNER_IMG_OPEN_IMG_CLOSE_INTEGRATION
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_ACTIVATION_SECURE_GRAPH_BINDING
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
@@ -238,16 +260,27 @@ USB è rimasto non acceduto. Il provisioning separato ha verificato i pin, non
 ha sovrascritto i tre file esistenti e ha installato i due mancanti. Report:
 `analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md`.
 
+### D279/08 — binding production `img_open` / `img_close`
+
+La sottoclasse USB ora istanzia l'owner unico D279/06 dai path D279/07 prima
+del claim dell'interfaccia 0. Il core libfprint ha già aperto `GUsbDevice` prima
+della vfunc, vincolo verificato sul sorgente e nella build target; il driver
+non introduce open/close paralleli. Close, failure e cancellation convergono
+su un solo tentativo di release e sul cleanse/free garantito; il path virtuale
+resta senza filesystem o USB.
+Tre test specifici con seam sintetiche verificano ordine, due epoch e failure,
+mentre la suite completa passa normale e ASan/UBSan. Report:
+`analysis/D279/D279_08_offline_production_open_close_binding.md`.
+
 ### D279/06 — owner unico dei materiali runtime
 
 `goodix_runtime_material.[ch]` mantiene la lifetime delle view coerente con una
 open epoch, senza duplicare PSK/validator/CONFIG90. La suite osserva cleanse
 dei buffer PE/cache, dei due seed produttore, del descriptor, di FDT12 e dei
 tre oggetti protetti al teardown. L'audit passato al loader deve vivere almeno
-quanto l'owner. D279/07 ha successivamente chiuso la scelta offline dei path,
-ma non il probe target né il loro provisioning. Il prossimo boundary dopo il
-gate può collegare l'owner alla sottoclasse USB usando seam offline; installazione
-dei path reali e ogni esecuzione fprintd/live restano Human Gate. Report:
+quanto l'owner. D279/07 ha chiuso path, provisioning e compatibilità target;
+D279/08 ha poi collegato owner e claim alla sottoclasse USB. Activation secure
+production e ogni esecuzione fprintd/live restano aperte. Report:
 `analysis/D279/D279_06_offline_open_epoch_material_owner.md`.
 
 ### D279/05 — reader dei due input privati PE/cache
