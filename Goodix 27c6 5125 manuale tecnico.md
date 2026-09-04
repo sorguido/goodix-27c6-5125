@@ -16,15 +16,42 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/06 — owner unico della open epoch chiuso offline
+### Stato corrente post-D279/07 — layout production fissato, gate target aperto
 
-**Integrazione offline del 4 settembre 2026.** D279/06 compone i cinque input
-espliciti in un solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un
-solo `GoodixTargetMaterial`, lega i seed, conserva soltanto una view secure
+**Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
+dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
+dei cinque input privati: conserva `target-material-manifest.json`,
+`transport-material.bin` e `target-config-90.bin`, aggiunge `gfusb.dll` e
+`fdt-cache.bin`, richiede directory `root:root 0700` e file `root:root 0600`.
+L'API espone questi path senza discovery/I/O; il loader verifica directory
+comune, parent diretto e stabilità pre/post. I reader ora controllano anche il
+GID root, correggendo il precedente contratto incompleto UID+mode.
+
+L'identità runtime è stata verificata per quanto consentito sul Fedora 44
+reale: `fprintd-1.94.5-5.fc44.x86_64` non imposta `User=`, `Group=` o
+`DynamicUser=`, quindi gira come root. `ProtectSystem=strict` rende il layout
+read-only ma visibile: il DAC `0700/0600` è compatibile con la lettura root.
+La policy SELinux installata concede a `fprintd_t` la lettura di
+`fprintd_var_lib_t`, non un allow file equivalente per il tipo generico
+`var_lib_t`; il kit prepara perciò mapping persistenti e `restorecon` limitati
+alla directory e ai cinque file, senza riclassificare altri artefatti storici.
+
+Sul target osservato SELinux è disabilitato e il namespace AI non permette di
+attestare gli UID/GID host dei cinque file senza privilegi/accesso non
+autorizzati. Il probe read-only e il provisioning fail-closed sono preparati
+in `operator_kit/target_compatibility/d279_07_fprintd_layout/`, ma non eseguiti.
+La compatibilità production del layout resta quindi esplicitamente
+`BLOCKED_HUMAN_REQUIRED`; sudo, file autentici, installazione, fprintd, USB e
+live non sono stati usati.
+
+D279/06 aveva immediatamente prima composto i cinque input espliciti in un
+solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
+`GoodixTargetMaterial`, lega i seed, conserva soltanto una view secure
 non-owning e FDT12, poi cancella tutti gli intermedi. Al free cancella
 descriptor/FDT e delega al singolo owner esistente il cleanse di PSK,
-validator e CONFIG90. Nessun path production è selezionato e il modulo non ha
-USB o protocollo.
+validator e CONFIG90. D279/06 non selezionava ancora path production; quella
+limitazione storica è superata dalla sola selezione offline D279/07. Il modulo
+non ha USB o protocollo.
 
 La prova completa usa cinque file sintetici 0600, verifica composizione e
 teardown in otto test normali e ASan/UBSan, e la source map Fedora 44 compila
@@ -36,9 +63,10 @@ un reader read-only di due soli path espliciti. Richiede regular file con uid,
 mode `0600` e size esatti, usa `O_NOFOLLOW|O_CLOEXEC`, confronta identità,
 size, mtime nanosecond e metadata via `fstat` pre/post, cancella ogni buffer e
 pubblica seed A/B e FDT12 soltanto dopo la validazione di entrambi gli input.
-La policy production richiede uid 0; i sette test normali e ASan/UBSan usano
-soltanto file sintetici temporanei con uid corrente. Nessun path production è
-hard-coded o scoperto e nessun input autentico è stato aperto.
+La policy D279/05 richiedeva uid 0; D279/07 ha aggiunto anche il GID 0. I test
+usano soltanto file sintetici temporanei con uid/gid correnti. D279/05 non
+hard-codava o scopriva path production; D279/07 ha poi aggiunto esclusivamente
+il layout autorizzato. Nessun input autentico è stato aperto.
 
 D279/04 aveva immediatamente prima aggiunto al dominio
 `libfprint-driver/` i provider inerti che mancavano al futuro lifecycle
@@ -91,6 +119,18 @@ ancora operativo il lifecycle `img_open` production. D278/14 resta chiuso e
 non è autorizzata alcuna nuova run live.
 
 ```text
+D279_07_OUTCOME=HUMAN_REQUIRED
+D279_07_BASELINE=ba8750874df3f7c38d515be7d6b0412a5f0ab478
+D279_07_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_REAL_TARGET_PROBE_PENDING
+PRODUCTION_LAYOUT=/var/lib/goodix-5125-poc
+PRODUCTION_LAYOUT_DIRECTORY=root:root_0700
+PRODUCTION_LAYOUT_FILES=root:root_0600
+PRODUCTION_LAYOUT_FILE_COUNT=5
+FPRINTD_RUNTIME_IDENTITY=root:root
+FPRINTD_PROTECT_SYSTEM_STRICT_READ_COMPATIBLE=true
+SELINUX_REQUIRED_LAYOUT_TYPE=fprintd_var_lib_t
+REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED
+PRODUCTION_LAYOUT_PROVISIONED=false
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -150,10 +190,25 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_FPIMAGEDEVICE_PRODUCTION_OPEN_CLOSE_BINDING_WITH_INJECTED_PATHS_AND_USB_SEAMS
-REAL_PATH_PROVISIONING=HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=HUMAN_READ_ONLY_REAL_TARGET_LAYOUT_COMPATIBILITY_PROBE
+REAL_PATH_PROVISIONING=HUMAN_GATE_OPERATOR_KIT_PREPARED
 NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
+
+### D279/07 — layout production e identità runtime fprintd
+
+`goodix_runtime_material_paths_production()` rende canonici i cinque path
+autorizzati; la policy e i loader impongono directory uid/gid/mode
+`0:0/0700`, file `0:0/0600`, parent diretto e controlli pre/post. Nove test
+sintetici normali e ASan/UBSan passano; la regressione D278 passa 63/63 in
+entrambe le modalità e la build/registry Fedora 44 resta verde.
+
+Il Real Target Compatibility Gate non è chiuso da questi test. Il probe
+operatore deve attestare unit effettiva, metadata reali e, quando SELinux è
+attivo, mapping/label/allow `fprintd_var_lib_t`, senza leggere contenuto o
+avviare fprintd. Il provisioning separato verifica pin e non sovrascrive file
+esistenti, ma richiede nuova autorizzazione per essere eseguito. Report:
+`analysis/D279/D279_07_offline_production_layout_and_fprintd_identity_gate.md`.
 
 ### D279/06 — owner unico dei materiali runtime
 
@@ -161,8 +216,9 @@ NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SH
 open epoch, senza duplicare PSK/validator/CONFIG90. La suite osserva cleanse
 dei buffer PE/cache, dei due seed produttore, del descriptor, di FDT12 e dei
 tre oggetti protetti al teardown. L'audit passato al loader deve vivere almeno
-quanto l'owner. Il prossimo boundary può collegare questo owner alla
-sottoclasse USB usando path iniettati e seam USB offline; la scelta/installazione
+quanto l'owner. D279/07 ha successivamente chiuso la scelta offline dei path,
+ma non il probe target né il loro provisioning. Il prossimo boundary dopo il
+gate può collegare l'owner alla sottoclasse USB usando seam offline; installazione
 dei path reali e ogni esecuzione fprintd/live restano Human Gate. Report:
 `analysis/D279/D279_06_offline_open_epoch_material_owner.md`.
 
@@ -172,9 +228,9 @@ dei path reali e ogni esecuzione fprintd/live restano Human Gate. Report:
 senza un path searcher e senza toccare USB o i tre file del loader protetto.
 Il test roundtrip prova due file sintetici 0600; una seam post-read cambia i
 metadata e dimostra rifiuto, output tutti zero e cleanse del buffer già
-allocato. Il prossimo slice deve comporre un owner dell'intera open epoch che
-possegga `GoodixTargetMaterial`, view secure e FDT12 senza duplicare secret o
-state machine. Report:
+allocato. D279/06 ha poi composto l'owner dell'intera open epoch e D279/07 ha
+aggiunto GID e directory production senza duplicare secret o state machine.
+Report:
 `analysis/D279/D279_05_offline_private_runtime_input_reader.md`.
 
 ### D279/04 — provider inerti PE/FDT nel dominio LGPL

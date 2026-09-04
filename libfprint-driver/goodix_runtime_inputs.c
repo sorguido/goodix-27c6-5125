@@ -188,6 +188,7 @@ goodix_runtime_input_file_policy_production (
   g_return_if_fail (policy != NULL);
   memset (policy, 0, sizeof *policy);
   policy->owner_uid = 0;
+  policy->owner_gid = 0;
   policy->mode = 0600;
 }
 
@@ -447,6 +448,7 @@ private_metadata_valid (const struct stat                  *status,
                         gsize                               expected_length)
 {
   return S_ISREG (status->st_mode) && status->st_uid == policy->owner_uid &&
+         status->st_gid == policy->owner_gid &&
          (status->st_mode & 07777u) == policy->mode && status->st_size >= 0 &&
          (guint64) status->st_size == expected_length;
 }

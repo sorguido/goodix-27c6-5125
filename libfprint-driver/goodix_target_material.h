@@ -26,6 +26,7 @@ typedef void (*GoodixTargetMaterialCleanseObserver) (const gchar  *label,
 typedef struct
 {
   uid_t owner_uid;
+  gid_t owner_gid;
   mode_t mode;
   gsize manifest_length;
   gsize transport_length;

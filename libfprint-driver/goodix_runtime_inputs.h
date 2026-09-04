@@ -39,6 +39,7 @@ typedef void (*GoodixRuntimeInputsCleanseObserver) (const guint8 *bytes,
 typedef struct
 {
   uid_t owner_uid;
+  gid_t owner_gid;
   mode_t mode;
   GoodixRuntimeInputsAfterReadFunc after_read;
   gpointer after_read_data;

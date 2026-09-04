@@ -306,6 +306,7 @@ test_file_provider_roundtrip (void)
   write_private_fixture (pe_path, pe, sizeof pe);
   write_private_fixture (cache_path, cache, sizeof cache);
   file_policy.owner_uid = getuid ();
+  file_policy.owner_gid = getgid ();
   file_policy.mode = 0600;
   file_policy.cleanse_observer = observe_input_cleanse;
   file_policy.cleanse_observer_data = &observation;
@@ -324,6 +325,17 @@ test_file_provider_roundtrip (void)
   g_assert_cmpuint (seed_a[0], ==, 1u);
   g_assert_cmpuint (seed_b[0], ==, 0x11u);
   g_assert_cmpuint (fdt[0], ==, 0x80u);
+
+  file_policy.owner_gid = (gid_t) (getgid () + 1u);
+  g_clear_error (&error);
+  g_assert_false (goodix_runtime_extract_inputs_from_files (
+    pe_path, cache_path, &pe_policy, &fdt_policy, &file_policy,
+    seed_a, seed_b, fdt, &audit, &error));
+  g_assert_cmpstr (goodix_runtime_inputs_error_class (error), ==,
+                   "PRIVATE_INPUT_METADATA");
+  g_assert_cmpuint (seed_a[0], ==, 0u);
+  g_assert_cmpuint (seed_b[0], ==, 0u);
+  g_assert_cmpuint (fdt[0], ==, 0u);
 
   g_assert_cmpint (g_remove (pe_path), ==, 0);
   g_assert_cmpint (g_remove (cache_path), ==, 0);
@@ -367,6 +379,7 @@ test_file_provider_changed_fail_closed (void)
   write_private_fixture (pe_path, pe, sizeof pe);
   write_private_fixture (cache_path, cache, sizeof cache);
   file_policy.owner_uid = getuid ();
+  file_policy.owner_gid = getgid ();
   file_policy.mode = 0600;
   file_policy.after_read = change_mode_after_read;
   file_policy.cleanse_observer = observe_input_cleanse;
@@ -438,6 +451,7 @@ test_runtime_material_owner (void)
   guint8 fdt[GOODIX_RUNTIME_FDT_SEED_LENGTH] = { 0 };
   GoodixRuntimeMaterialPolicy policy;
   GoodixRuntimeMaterialPaths paths;
+  GoodixRuntimeMaterialPaths invalid_paths;
   GoodixRuntimeMaterialAudit audit;
   GoodixSecureSessionMaterial view;
   GoodixRuntimeMaterial *owner = NULL;
@@ -455,9 +469,13 @@ test_runtime_material_owner (void)
   build_pe (pe, &policy.pe);
   build_cache (cache, &policy.fdt);
   policy.private_files.owner_uid = getuid ();
+  policy.private_files.owner_gid = getgid ();
   policy.private_files.cleanse_observer = observe_input_cleanse;
   policy.private_files.cleanse_observer_data = &input_observation;
   policy.target.owner_uid = getuid ();
+  policy.target.owner_gid = getgid ();
+  policy.directory_owner_uid = getuid ();
+  policy.directory_owner_gid = getgid ();
   policy.target.manifest_length = sizeof manifest - 1u;
   policy.target.cleanse_observer = observe_target_cleanse;
   policy.target.cleanse_observer_data = &target_observation;
@@ -500,6 +518,7 @@ test_runtime_material_owner (void)
   write_private_fixture (pe_path, pe, sizeof pe);
   write_private_fixture (cache_path, cache, sizeof cache);
   paths = (GoodixRuntimeMaterialPaths) {
+    .directory_path = directory,
     .manifest_path = manifest_path,
     .transport_path = transport_path,
     .config90_path = config_path,
@@ -521,6 +540,8 @@ test_runtime_material_owner (void)
   g_assert_cmpuint (view.psk[0], ==, 0x3cu);
   g_assert_cmpuint (fdt[0], ==, 0x80u);
   g_assert_true (audit.target.e4_binding_match);
+  g_assert_cmpuint (audit.directory_open_count, ==, 1u);
+  g_assert_true (audit.directory_verified);
   g_assert_true (audit.private_files.all_buffers_cleansed);
   g_assert_true (input_observation.all_zero);
   g_assert_true (audit.producer_seeds_cleansed);
@@ -534,6 +555,14 @@ test_runtime_material_owner (void)
   g_assert_true (audit.fdt_seed_cleansed);
   g_assert_true (target_observation.all_zero);
 
+  invalid_paths = paths;
+  invalid_paths.pe_path = "/tmp/not-a-direct-layout-child";
+  g_clear_error (&error);
+  g_assert_null (goodix_runtime_material_load (&invalid_paths, &policy, &audit,
+                                               &error));
+  g_assert_nonnull (error);
+  g_assert_cmpuint (audit.directory_open_count, ==, 0u);
+
   g_assert_cmpint (g_remove (manifest_path), ==, 0);
   g_assert_cmpint (g_remove (transport_path), ==, 0);
   g_assert_cmpint (g_remove (config_path), ==, 0);
@@ -543,6 +572,36 @@ test_runtime_material_owner (void)
   OPENSSL_cleanse (transport, sizeof transport);
   OPENSSL_cleanse (config, sizeof config);
   OPENSSL_cleanse (validator, sizeof validator);
+}
+
+static void
+test_production_layout (void)
+{
+  GoodixRuntimeMaterialPaths paths;
+  GoodixRuntimeMaterialPolicy policy;
+
+  goodix_runtime_material_paths_production (&paths);
+  goodix_runtime_material_policy_production (&policy);
+  g_assert_cmpstr (paths.directory_path, ==, "/var/lib/goodix-5125-poc");
+  g_assert_cmpstr (paths.manifest_path, ==,
+                   "/var/lib/goodix-5125-poc/target-material-manifest.json");
+  g_assert_cmpstr (paths.transport_path, ==,
+                   "/var/lib/goodix-5125-poc/transport-material.bin");
+  g_assert_cmpstr (paths.config90_path, ==,
+                   "/var/lib/goodix-5125-poc/target-config-90.bin");
+  g_assert_cmpstr (paths.pe_path, ==,
+                   "/var/lib/goodix-5125-poc/gfusb.dll");
+  g_assert_cmpstr (paths.fdt_cache_path, ==,
+                   "/var/lib/goodix-5125-poc/fdt-cache.bin");
+  g_assert_cmpuint (policy.directory_owner_uid, ==, 0u);
+  g_assert_cmpuint (policy.directory_owner_gid, ==, 0u);
+  g_assert_cmpuint (policy.directory_mode, ==, 0700u);
+  g_assert_cmpuint (policy.target.owner_uid, ==, 0u);
+  g_assert_cmpuint (policy.target.owner_gid, ==, 0u);
+  g_assert_cmpuint (policy.target.mode, ==, 0600u);
+  g_assert_cmpuint (policy.private_files.owner_uid, ==, 0u);
+  g_assert_cmpuint (policy.private_files.owner_gid, ==, 0u);
+  g_assert_cmpuint (policy.private_files.mode, ==, 0600u);
 }
 
 int
@@ -564,5 +623,7 @@ main (int argc, char **argv)
                    test_file_provider_changed_fail_closed);
   g_test_add_func ("/goodix/runtime-material/owner-composition",
                    test_runtime_material_owner);
+  g_test_add_func ("/goodix/runtime-material/production-layout",
+                   test_production_layout);
   return g_test_run ();
 }

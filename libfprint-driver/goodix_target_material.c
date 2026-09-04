@@ -163,6 +163,7 @@ goodix_target_material_policy_production (GoodixTargetMaterialPolicy *policy)
   g_return_if_fail (policy != NULL);
   memset (policy, 0, sizeof *policy);
   policy->owner_uid = 0;
+  policy->owner_gid = 0;
   policy->mode = 0600;
   policy->manifest_length = GOODIX_TARGET_MANIFEST_LENGTH;
   policy->transport_length = GOODIX_TARGET_TRANSPORT_LENGTH;
@@ -201,6 +202,7 @@ metadata_valid (const struct stat                 *status,
                 gsize                             expected_length)
 {
   return S_ISREG (status->st_mode) && status->st_uid == policy->owner_uid &&
+         status->st_gid == policy->owner_gid &&
          (status->st_mode & 07777) == policy->mode &&
          status->st_size >= 0 && (guint64) status->st_size == expected_length;
 }
@@ -234,7 +236,7 @@ read_exact_protected (const gchar                      *path,
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_METADATA,
-                           "protected file type/uid/mode/size mismatch");
+                           "protected file type/uid/gid/mode/size mismatch");
       goto fail;
     }
   buffer = g_malloc0 (expected_length);

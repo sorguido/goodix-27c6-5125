@@ -131,6 +131,7 @@ material_fixture_init (MaterialFixture *fixture)
 
   goodix_target_material_policy_production (&fixture->policy);
   fixture->policy.owner_uid = getuid ();
+  fixture->policy.owner_gid = getgid ();
   fixture->policy.manifest_length = sizeof manifest_text - 1u;
   fixture->policy.cleanse_observer = cleanse_observer;
   fixture->policy.cleanse_observer_data = fixture;
@@ -389,6 +390,7 @@ test_material_production_policy (void)
   GoodixTargetMaterialPolicy policy;
   goodix_target_material_policy_production (&policy);
   g_assert_cmpuint (policy.owner_uid, ==, 0);
+  g_assert_cmpuint (policy.owner_gid, ==, 0);
   g_assert_cmpuint (policy.mode, ==, 0600);
   g_assert_cmphex (policy.config90_finalizer[0], ==, 0x51);
   g_assert_cmphex (policy.config90_finalizer[1], ==, 0x9a);
@@ -432,6 +434,7 @@ test_material_production_policy_canonical_pins (void)
 
   goodix_target_material_policy_production (&policy);
   g_assert_cmpuint (policy.owner_uid, ==, 0);
+  g_assert_cmpuint (policy.owner_gid, ==, 0);
   g_assert_cmpuint (policy.mode, ==, 0600);
   g_assert_cmpuint (policy.manifest_length, ==, 2305);
   ASSERT_CMPMEM (policy.manifest_sha256, (gsize) 32,
@@ -545,6 +548,19 @@ test_material_wrong_owner_policy (void)
 
   material_fixture_init (&fixture);
   fixture.policy.owner_uid = getuid () + 1u;
+  g_assert_null (load_fixture (&fixture, NULL, FALSE, &error));
+  g_assert_nonnull (error);
+  material_fixture_clear (&fixture);
+}
+
+static void
+test_material_wrong_group_policy (void)
+{
+  MaterialFixture fixture;
+  g_autoptr(GError) error = NULL;
+
+  material_fixture_init (&fixture);
+  fixture.policy.owner_gid = (gid_t) (getgid () + 1u);
   g_assert_null (load_fixture (&fixture, NULL, FALSE, &error));
   g_assert_nonnull (error);
   material_fixture_clear (&fixture);
@@ -1874,6 +1890,8 @@ main (int argc,
                    test_material_wrong_mode);
   g_test_add_func ("/d278_02/material/wrong_owner_policy_rejected",
                    test_material_wrong_owner_policy);
+  g_test_add_func ("/d278_02/material/wrong_group_policy_rejected",
+                   test_material_wrong_group_policy);
   g_test_add_func ("/d278_02/material/change_during_read_rejected",
                    test_material_change_during_read);
   for (guint i = 0; i < G_N_ELEMENTS (material_mutations); i++)
