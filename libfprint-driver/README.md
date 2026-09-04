@@ -60,6 +60,23 @@ USB ID listing and zero-reachability of USB enumeration in the listing tool.
 It does not install libfprint, contact fprintd or access a USB device. A fully
 operational fprintd open/claim/secret lifecycle remains a later boundary.
 
+## D279/04 inert runtime-input providers
+
+`goodix_runtime_inputs.[ch]` closes the LGPL computation gap for the two
+runtime inputs that had previously existed only in the GPL operator harness.
+It extracts the two six-byte D190 producer seeds from hash-pinned inert PE
+bytes and the 12-byte FDT seed from a hash/CRC/OTP-bound cache byte array.  The
+PE parser is adapted directly from the project-owned BSD-2-Clause D190 source;
+the FDT provider is expressed from the neutral D255/D261 cache contract.
+
+The unit has no filesystem, USB, discovery, subprocess, executable mapping or
+write API.  Failure zeroes every output, producer seeds have an explicit
+cleanse API, and errors expose stable redacted classes.  Production pins are
+compiled but only synthetic fixtures are executed in the host-only test; no
+authentic protected material is read.  The Fedora 44 Meson target compiles the
+provider, binder and protected-material loader, but `img_open` does not yet
+connect them to file loading, interface claim or the secure session.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

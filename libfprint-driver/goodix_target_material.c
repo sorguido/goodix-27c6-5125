@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "goodix_target_material.h"
 
 #include "goodix_d190_binder.h"

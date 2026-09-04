@@ -44,6 +44,9 @@ byte-identical to the archive after this documented overlay.
 
 The D279/03 delta is recorded in
 `analysis/D279/D279_03_offline_fedora44_production_usb_registration_NBIS.md`.
+Starting with D279/04 the same source map also compiles the repository-owned
+LGPL binder, protected-material loader and inert runtime-input providers; no
+additional upstream file is replaced.
 
 Purpose:
 

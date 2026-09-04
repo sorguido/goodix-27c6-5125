@@ -271,3 +271,23 @@ compile-only derivata dalle chiamate API pubbliche GUsb usate da libfprint
 1.94.100 e collegano il runtime Fedora `libgusb.so.2`; non implementano GUsb e
 non entrano nel prodotto. Test e report D279/03 contengono solo metadata di
 build e fixture non biometriche, senza secret o capture.
+
+## D279/04 — provider LGPL degli input runtime inerti
+
+`libfprint-driver/goodix_runtime_inputs.[ch]` è distribuito come
+`LGPL-2.1-or-later`. La porzione PE è un adattamento delimitato direttamente
+dalla reference project-owned `BSD-2-Clause` al commit
+`b475a6eca72e340816779afae917334a6146c986`, path
+`poc/goodix5125/tools/binding_reference/pe_parser.py`, blob
+`c2f6451308f1f0e78942c02b46daa3b85b061577`; copyright e provenance sono
+preservati nel sorgente e in questo ledger. Non deriva dal successivo port C
+GPL sotto `tools/`.
+
+La porzione FDT è nuova espressione locale dal contratto neutrale già
+canonizzato D255/D261: layout 13.520 byte, hash esatto, CRC-32/MPEG-2 con word
+little-endian finale, OTP64 hash-bound e FDT12 all'offset 64. Non copia
+orchestrazione, filesystem provider o reporting dal modulo GPL. Il nuovo
+modulo accetta esclusivamente byte caller-owned e non offre API di file, USB,
+discovery, mapping eseguibile, subprocess o scrittura. Le prove eseguite usano
+soltanto fixture sintetiche; i pin autentici sono compilati ma nessun secret,
+cache privata o seed autentico è stato letto durante D279/04.

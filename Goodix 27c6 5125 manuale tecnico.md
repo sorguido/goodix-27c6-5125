@@ -16,9 +16,25 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/03 — registrazione USB production 1.94.100 chiusa offline
+### Stato corrente post-D279/04 — provider input runtime LGPL chiusi offline
 
-**Integrazione offline del 4 settembre 2026.** D279/03 applica la decisione
+**Integrazione offline del 4 settembre 2026.** D279/04 aggiunge al dominio
+`libfprint-driver/` i provider inerti che mancavano al futuro lifecycle
+production: estrazione bounded dei due seed D190 da byte PE hash-pinned e del
+seed FDT12 da byte cache legati a hash, CRC-32/MPEG-2, OTP64 e layout esatto.
+Ogni failure azzera gli output; i seed produttore hanno cleanse esplicito. Il
+modulo non apre file, non scopre path, non carica/esegue il PE, non offre
+subprocess o write e non contiene API USB.
+
+La porzione PE è adattata direttamente dalla reference project-owned
+BSD-2-Clause D190, non dal successivo port C GPL. La porzione FDT è nuova
+espressione locale dei fatti neutrali D255/D261. La source map Fedora 44 ora
+compila provider, binder e loader protetto nello stesso driver registrato.
+Cinque test sintetici normali e ASan/UBSan passano; la build esatta
+`libfprint-2.so.2.0.0` e registry continua a passare. I pin production sono
+compilati, ma nessun PE/cache/secret autentico è stato letto.
+
+D279/03 aveva immediatamente prima applicato la decisione
 D279/02 sul target production Fedora 44 /
 `libfprint-1.94.100-1.fc44.x86_64`: l'extractor dell'image path Goodix
 `27c6:5125` / `GF_ST411SEC_APP_12509` è **NBIS**, non SIGFM.
@@ -53,6 +69,13 @@ ancora operativo il lifecycle `img_open` production. D278/14 resta chiuso e
 non è autorizzata alcuna nuova run live.
 
 ```text
+D279_04_OUTCOME=READY
+D279_04_BASELINE=c48acb4bacfb6a3ccfd2c45b60733be1ce4075db
+D279_04_EXECUTABLE_CLOSURE=PASS_OFFLINE
+PE_PRODUCER_PROVIDER_LGPL=true
+FDT_SEED_PROVIDER_LGPL=true
+PRODUCTION_PINS_COMPILED=true
+AUTHENTIC_PROTECTED_INPUTS_EXECUTED=false
 D279_03_OUTCOME=READY
 D279_03_BASELINE=3c8b846c4dd0ffbb493f11590f3c5d6c7f647692
 EXECUTABLE_CLOSURE=PASS_OFFLINE
@@ -94,8 +117,25 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_FPIMAGEDEVICE_PRODUCTION_OPEN_CLOSE_BINDING_DESIGN_AND_IMPLEMENTATION
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_INPUT_FILE_READER_AND_OPEN_EPOCH_OWNERSHIP
+NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
+
+### D279/04 — provider inerti PE/FDT nel dominio LGPL
+
+`libfprint-driver/goodix_runtime_inputs.[ch]` riceve soltanto array di byte
+caller-owned. Il parser PE valida hash, header, section table, file-backed RVA
+e unicità del pattern produttore prima di restituire due seed da sei byte. Il
+provider cache verifica hash intero, CRC memorizzato little-endian, hash OTP64,
+offset FDT12 e presenza del seed. Errori e output sono fail-closed.
+
+`libfprint-driver/tests/run_goodix_runtime_inputs_test.sh` usa solo fixture
+sintetiche nel Freedesktop SDK 25.08 senza rete e passa in modalità normale e
+ASan/UBSan. La successiva build Meson production-shaped include anche binder,
+loader protetto e provider, ma non li collega ancora a `img_open`: file
+ownership/TOCTOU, vita delle view, claim/release USB e cleanup di close sono il
+boundary successivo. Report:
+`analysis/D279/D279_04_offline_lgpl_runtime_input_providers.md`.
 
 ### D279/03 — registrazione e build production-shaped con NBIS
 
