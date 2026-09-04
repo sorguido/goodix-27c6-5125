@@ -18,6 +18,7 @@
 #include "fp-print.h"
 
 #include <glib.h>
+#include <openssl/evp.h>
 
 #define TEST_TIMEOUT_MS 5000
 
@@ -1034,8 +1035,75 @@ typedef struct
   gboolean fail_claim;
   gboolean fail_release;
   gboolean cancel_after_acquire;
+  guint in_submit_count;
+  guint out_submit_count;
+  guint8 validator[32];
+  guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH];
+  guint8 a2[3];
+  guint8 chip[4];
+  guint8 otp[64];
   guint8 synthetic_psk[GOODIX_SECURE_SESSION_PSK_LENGTH];
 } ProductionOpenSeam;
+
+static void
+production_digest (const guint8 *data,
+                   gsize         length,
+                   guint8        output[32])
+{
+  unsigned int output_length = 0;
+
+  g_assert_true (EVP_Digest (data, length, output, &output_length,
+                             EVP_sha256 (), NULL));
+  g_assert_cmpuint (output_length, ==, 32u);
+}
+
+static void
+production_set_config_finalizer (
+  guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH])
+{
+  guint32 sum = 0;
+  guint16 finalizer;
+
+  for (guint i = 0; i < 111u; i++)
+    sum += (guint16) ((guint16) config[i * 2u] |
+                     (guint16) ((guint16) config[i * 2u + 1u] << 8));
+  finalizer = (guint16) (0u - 0xa5a5u - sum);
+  config[222] = (guint8) finalizer;
+  config[223] = (guint8) (finalizer >> 8);
+}
+
+static void
+production_material_init (ProductionOpenSeam *seam)
+{
+  static const guint8 registers[4][2] = {
+    { 0x20, 0x02 }, { 0x36, 0x02 }, { 0x38, 0x02 }, { 0x3a, 0x02 }
+  };
+  static const guint8 values[4][2] = {
+    { 0xd8, 0x0b }, { 0xbe, 0x00 }, { 0xbd, 0x00 }, { 0xbc, 0x00 }
+  };
+  static const guint offsets[] = { 117, 121, 125, 129 };
+
+  for (guint i = 0; i < 32u; i++)
+    {
+      seam->validator[i] = (guint8) (0x20u + i);
+      seam->synthetic_psk[i] = (guint8) (0x80u + i);
+    }
+  seam->a2[0] = 0x11;
+  seam->a2[1] = 0x22;
+  seam->a2[2] = 0x33;
+  seam->chip[0] = 0x25;
+  seam->chip[1] = 0x04;
+  seam->chip[2] = 0x12;
+  seam->chip[3] = 0x50;
+  for (guint i = 0; i < sizeof seam->otp; i++)
+    seam->otp[i] = (guint8) (i * 3u + 1u);
+  for (guint i = 0; i < G_N_ELEMENTS (offsets); i++)
+    {
+      memcpy (seam->config + offsets[i], registers[i], 2u);
+      memcpy (seam->config + offsets[i] + 2u, values[i], 2u);
+    }
+  production_set_config_finalizer (seam->config);
+}
 
 static gboolean
 production_acquire_seam (
@@ -1047,6 +1115,10 @@ production_acquire_seam (
   GError                      **error)
 {
   ProductionOpenSeam *seam = user_data;
+  static const guint8 identity[] = "GF_ST411SEC_APP_12509";
+  static const guint8 values[4][2] = {
+    { 0xd8, 0x0b }, { 0xbe, 0x00 }, { 0xbd, 0x00 }, { 0xbc, 0x00 }
+  };
 
   seam->acquire_count++;
   g_string_append_c (seam->events, 'A');
@@ -1061,8 +1133,25 @@ production_acquire_seam (
                            "synthetic runtime material failure");
       return FALSE;
     }
+  secure_view->expected_identity = identity;
+  secure_view->expected_identity_length = sizeof identity;
+  secure_view->e4_validator = seam->validator;
+  secure_view->e4_validator_length = sizeof seam->validator;
+  secure_view->config90 = seam->config;
+  secure_view->config90_length = sizeof seam->config;
   secure_view->psk = seam->synthetic_psk;
   secure_view->psk_length = sizeof seam->synthetic_psk;
+  memcpy (secure_view->dac_values, values, sizeof values);
+  production_digest (seam->validator, sizeof seam->validator,
+                     secure_view->e4_validator_sha256);
+  production_digest (seam->a2, sizeof seam->a2,
+                     secure_view->a2_response_sha256);
+  production_digest (seam->chip, sizeof seam->chip,
+                     secure_view->chip82_response_sha256);
+  production_digest (seam->otp, sizeof seam->otp,
+                     secure_view->otp_a6_response_sha256);
+  production_digest (seam->config, sizeof seam->config,
+                     secure_view->config90_sha256);
   *owner = (GoodixRuntimeMaterial *) g_malloc0 (1u);
   if (seam->cancel_after_acquire)
     g_cancellable_cancel (
@@ -1144,7 +1233,7 @@ production_fixture_new (ProductionOpenSeam *seam)
     goodix_fpimage_device_new_for_usb (usb_device));
   seam->device = f->device;
   seam->events = g_string_new (NULL);
-  memset (seam->synthetic_psk, 0x5a, sizeof seam->synthetic_psk);
+  production_material_init (seam);
   goodix_fpimage_device_set_production_open_seams (
     f->device, production_acquire_seam, production_material_release_seam,
     production_claim_seam, production_release_seam, seam);
@@ -1158,6 +1247,46 @@ production_seam_clear (ProductionOpenSeam *seam)
     g_string_free (seam->events, TRUE);
   seam->events = NULL;
   memset (seam->synthetic_psk, 0, sizeof seam->synthetic_psk);
+  memset (seam->validator, 0, sizeof seam->validator);
+  memset (seam->config, 0, sizeof seam->config);
+  memset (seam->a2, 0, sizeof seam->a2);
+  memset (seam->chip, 0, sizeof seam->chip);
+  memset (seam->otp, 0, sizeof seam->otp);
+}
+
+static void
+production_graph_submit_seam (GoodixFpiUsbBackend *backend,
+                              GoodixUsbDirection   direction,
+                              guint64              generation,
+                              GBytes              *bytes,
+                              gpointer             user_data)
+{
+  ProductionOpenSeam *seam = user_data;
+
+  (void) backend;
+  g_assert_cmpuint (generation, >, 0u);
+  if (direction == GOODIX_USB_TRANSFER_IN)
+    {
+      g_assert_null (bytes);
+      seam->in_submit_count++;
+    }
+  else
+    {
+      g_assert_nonnull (bytes);
+      seam->out_submit_count++;
+    }
+}
+
+static void
+wait_for_context_state (GoodixDeviceContext      *ctx,
+                        GoodixDeviceContextState  state)
+{
+  gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+
+  while (goodix_device_context_get_state (ctx) != state &&
+         g_get_monotonic_time () < deadline)
+    g_main_context_iteration (NULL, TRUE);
+  g_assert_cmpint (goodix_device_context_get_state (ctx), ==, state);
 }
 
 static void
@@ -1264,6 +1393,159 @@ test_d279_08_production_release_failure (void)
 }
 
 static void
+test_d279_09_production_activation_binding (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GError) timeout = NULL;
+  g_autoptr(GError) cancelled = NULL;
+  TestFixture *f = production_fixture_new (&seam);
+  GoodixFpiUsbBackend *backend;
+  GoodixPreSessionRxSyncAudit sync_audit;
+  guint64 generation;
+
+  fixture_open (f);
+  backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_capture (FP_DEVICE (f->device), TRUE, cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpuint (generation, >, 0u);
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING);
+  g_assert_cmpuint (seam.in_submit_count, ==, 1u);
+  g_assert_cmpuint (seam.out_submit_count, ==, 0u);
+  g_assert_cmpint (goodix_fpi_usb_backend_get_receive_purpose (backend), ==,
+                   GOODIX_USB_RECEIVE_PRE_SESSION_SYNC_RX);
+
+  timeout = g_error_new_literal (G_USB_DEVICE_ERROR,
+                                 G_USB_DEVICE_ERROR_TIMED_OUT,
+                                 "synthetic quiet boundary");
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0,
+                                           timeout);
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
+  g_assert_cmpint (f->last_state, ==,
+                   FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
+  g_assert_nonnull (goodix_device_context_get_secure_session (f->ctx));
+  g_assert_nonnull (goodix_device_context_get_post_tls_lifecycle (f->ctx));
+  g_assert_true (goodix_device_context_runtime_handoff_views_cleared (f->ctx));
+  g_assert_cmpuint (seam.out_submit_count, ==, 1u);
+  g_assert_cmpuint (seam.in_submit_count, ==, 2u);
+  goodix_device_context_get_pre_session_rx_sync_audit (f->ctx, &sync_audit);
+  g_assert_cmpint (sync_audit.pre_session_rx_result, ==,
+                   GOODIX_PRE_SESSION_RX_SYNC_PASS);
+  g_assert_true (sync_audit.first_protocol_out_after_rx_sync);
+
+  g_cancellable_cancel (cancellable);
+  wait_for_context_state (f->ctx, GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+  cancelled = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                                   "synthetic cancelled transfer");
+  goodix_fpi_usb_backend_complete_out (backend, generation, cancelled);
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0,
+                                           cancelled);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_true (goodix_device_context_has_runtime_material (f->ctx));
+  g_assert_cmpuint (seam.material_release_count, ==, 0u);
+
+  fixture_close (f);
+  g_assert_cmpstr (seam.events->str, ==, "ACRF");
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
+test_d279_09_production_activation_sync_failure (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GCancellable) enroll_cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
+  g_autoptr(GError) transport_error = NULL;
+  TestFixture *f = production_fixture_new (&seam);
+  GLogLevelFlags old_fatal;
+  guint in_submits_before;
+  guint out_submits_before;
+  guint64 generation;
+
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_capture (FP_DEVICE (f->device), TRUE, cancellable,
+                     (GAsyncReadyCallback) capture_cb, f);
+  generation = goodix_device_context_get_generation (f->ctx);
+  transport_error = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_FAILED,
+                                         "synthetic sync transport failure");
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0,
+                                           transport_error);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (seam.out_submit_count, ==, 0u);
+  g_assert_cmpuint (seam.in_submit_count, ==, 1u);
+
+  /* The enrollment policy gate must not mask an existing sticky poison. */
+  in_submits_before = seam.in_submit_count;
+  out_submits_before = seam.out_submit_count;
+  template = fp_print_new (FP_DEVICE (f->device));
+  g_clear_error (&f->error);
+  f->done = FALSE;
+  f->completion_count = 0;
+  old_fatal = g_log_set_always_fatal (0);
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    enroll_cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
+  g_log_set_always_fatal (old_fatal);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_true (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0u);
+  g_assert_cmpuint (seam.in_submit_count, ==, in_submits_before);
+  g_assert_cmpuint (seam.out_submit_count, ==, out_submits_before);
+  fixture_close (f);
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
+test_d279_09_production_enrollment_rejected_before_submit (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
+  TestFixture *f = production_fixture_new (&seam);
+
+  fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+  template = fp_print_new (FP_DEVICE (f->device));
+  f->done = FALSE;
+  f->completion_count = 0;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED);
+  g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, 0u);
+  g_assert_false (goodix_device_context_get_poisoned (f->ctx));
+  g_assert_cmpuint (seam.in_submit_count, ==, 0u);
+  g_assert_cmpuint (seam.out_submit_count, ==, 0u);
+  fixture_close (f);
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
 test_d278_14_non_null_usb_binding (void)
 {
   g_autoptr(GUsbDevice) usb_device = NULL;
@@ -1364,6 +1646,12 @@ main (int argc, char **argv)
                    test_d279_08_production_open_failures);
   g_test_add_func ("/goodix-fpimage-device/d279-08-production-release-failure",
                    test_d279_08_production_release_failure);
+  g_test_add_func ("/goodix-fpimage-device/d279-09-production-activation-binding",
+                   test_d279_09_production_activation_binding);
+  g_test_add_func ("/goodix-fpimage-device/d279-09-production-activation-sync-failure",
+                   test_d279_09_production_activation_sync_failure);
+  g_test_add_func ("/goodix-fpimage-device/d279-09-production-enrollment-rejected",
+                   test_d279_09_production_enrollment_rejected_before_submit);
 
   return g_test_run ();
 }

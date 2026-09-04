@@ -49,6 +49,10 @@ libfprint-driver/goodix_d190_binder.c
 libfprint-driver/goodix_d190_binder.h
 libfprint-driver/goodix_target_material.c
 libfprint-driver/goodix_target_material.h
+libfprint-driver/goodix_runtime_inputs.c
+libfprint-driver/goodix_runtime_inputs.h
+libfprint-driver/goodix_runtime_material.c
+libfprint-driver/goodix_runtime_material.h
 libfprint-driver/goodix_secure_session.c
 libfprint-driver/goodix_secure_session.h
 libfprint-driver/goodix_image_decoder.c

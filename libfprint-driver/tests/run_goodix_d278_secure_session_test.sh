@@ -52,6 +52,10 @@ build_run () {
     "$root/libfprint-driver/goodix_u16_to_fpimage.c" \
     "$root/libfprint-driver/goodix_fpimage_pipeline.c" \
     "$root/libfprint-driver/goodix_a0_protocol.c" \
+    "$root/libfprint-driver/goodix_d190_binder.c" \
+    "$root/libfprint-driver/goodix_target_material.c" \
+    "$root/libfprint-driver/goodix_runtime_inputs.c" \
+    "$root/libfprint-driver/goodix_runtime_material.c" \
     "$root/libfprint-driver/goodix_secure_session.c" \
     "$root/libfprint-driver/goodix_image_decoder.c" \
     "$root/libfprint-driver/goodix_post_tls_lifecycle.c" \

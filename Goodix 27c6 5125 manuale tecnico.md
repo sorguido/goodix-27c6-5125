@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/08 — open/close production collegati offline
+### Stato corrente post-D279/09 — activation production bounded collegata offline
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -73,11 +73,29 @@ ogni failure tentano il release del claim una sola volta, poi cancellano le
 view e liberano l'owner anche se libgusb segnala errore. Due open consecutivi
 sullo stesso oggetto creano due epoch distinte.
 
-Le prove sono soltanto sintetiche: 21/21 test normali e sanitizer, 9/9
-regressione material owner e build/registry Fedora 44 `PASS`, senza input
-production o USB reale. L'activation USB continua però a usare l'arm host-only:
-pre-session RX sync, secure session e post-TLS non sono ancora avviati dalla
-vfunc production. D279/08 non autorizza quindi installazione o fprintd/live.
+Le prove D279/08 erano soltanto sintetiche: 21/21 test normali e sanitizer,
+9/9 regressione material owner e build/registry Fedora 44 `PASS`, senza input
+production o USB reale.
+
+D279/09 ha ora sostituito l'arm host-only della sottoclasse USB con la catena
+production `pre-session RX sync quiet → GoodixSecureSession → TLS retained →
+GoodixPostTlsLifecycle`. Il primo protocol OUT è irraggiungibile prima del
+quiet boundary; failure/cancellation completano il corretto punto libfprint e
+avvelenano l'epoch. Dopo la costruzione dei consumer, la glue cancella secure
+descriptor e FDT12 borrowed mentre mantiene il solo owner fino a close.
+
+Questo collegamento è volutamente bounded: capture/identify sono cablati
+offline, ma l'enrollment viene rifiutato con `NOT_SUPPORTED` prima della
+generation e con zero submit. Fedora 44 richiede per default cinque stage in
+una sola activation, mentre la prova target e il lifecycle locale terminano al
+secondo B0. Il terzo ciclo e la policy stage restano quindi il prossimo vero
+boundary hardware; non sono stati inferiti dal default framework. La suite è
+ora 24/24 normale e sanitizer, con regressione D278 24/24 normale/sanitizer e
+build Fedora 44 e builder adapter D278/13 unapproved host-only `PASS`. I due
+builder D278 interessati sono stati corretti per linkare le dipendenze runtime
+introdotte da D279/08; non è cambiato il protocollo né è stata abilitata una
+baseline live.
+D279/09 non autorizza installazione, fprintd o live.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
 solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
@@ -179,7 +197,15 @@ D279_08_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_OPEN_CLOSE_AND_FEDORA44_BUILD
 PRODUCTION_RUNTIME_MATERIAL_OWNED_PER_OPEN_EPOCH=true
 PRODUCTION_USB_INTERFACE_0_CLAIMED_PER_OPEN_EPOCH=true
 PRODUCTION_IMG_OPEN_USB_SUBMIT_COUNT=0
-PRODUCTION_ACTIVATION_SECURE_GRAPH_WIRED=false
+D279_08_PRODUCTION_ACTIVATION_SECURE_GRAPH_WIRED=false
+D279_09_OUTCOME=READY_OFFLINE_BOUNDED_NON_ENROLL
+D279_09_BASELINE=81b01731f37b23618413c31e1cde31aeeed1152d
+D279_09_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_ACTIVATION_AND_FEDORA44_BUILD
+PRODUCTION_CAPTURE_IDENTIFY_ACTIVATION_GRAPH_WIRED=true
+PRODUCTION_PRE_SESSION_RX_SYNC_REQUIRED=true
+PRODUCTION_RUNTIME_HANDOFF_VIEWS_CLEARED=true
+PRODUCTION_ENROLLMENT_ENABLED=false
+PRODUCTION_ENROLLMENT_REJECTION_SUBMIT_COUNT=0
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -239,7 +265,7 @@ FACTORY_STATE_MUTATION=0
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_ACTIVATION_SECURE_GRAPH_BINDING
+NEXT_PRIMARY_BOUNDARY=THIRD_ACQUISITION_TARGET_EVIDENCE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=SEPARATE_OPERATOR_KIT_BASELINE_REVIEW_AND_EXPLICIT_ONE_SHOT_AUTHORIZATION
 ```
@@ -271,6 +297,23 @@ resta senza filesystem o USB.
 Tre test specifici con seam sintetiche verificano ordine, due epoch e failure,
 mentre la suite completa passa normale e ASan/UBSan. Report:
 `analysis/D279/D279_08_offline_production_open_close_binding.md`.
+
+### D279/09 — activation production bounded
+
+La vfunc USB avvia ora il pre-session RX sync e, soltanto dopo il quiet PASS,
+costruisce secure session, TLS retained e lifecycle post-TLS usando l'owner
+della open epoch. Le view borrowed vengono cancellate dopo l'handoff; errori
+asincroni raggiungono `activate_complete(error)` o `session_error(error)` in
+base allo stato reale del framework. Il path virtuale e quello operator D278
+restano separati.
+
+L'enrollment non è dichiarato risolto: viene respinto prima di generation e
+submit perché libfprint richiede cinque stage mentre APP12509 è provato solo
+fino al secondo B0. Nessuna scelta automatica di due stage e nessuna
+generalizzazione del terzo ciclo sono state introdotte. Il gate enrollment non
+maschera uno sticky poison preesistente: l'errore terminale dell'open epoch ha
+precedenza e non genera nuovi submit. Report:
+`analysis/D279/D279_09_offline_production_activation_binding.md`.
 
 ### D279/06 — owner unico dei materiali runtime
 

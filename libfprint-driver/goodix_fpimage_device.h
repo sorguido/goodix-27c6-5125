@@ -122,6 +122,8 @@ void goodix_fpimage_device_set_production_open_seams (
   gpointer                           user_data);
 gboolean goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_has_usb_claim (GoodixDeviceContext *ctx);
+gboolean goodix_device_context_runtime_handoff_views_cleared (
+  GoodixDeviceContext *ctx);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
 GoodixTlsServer *      goodix_device_context_get_tls_server (GoodixDeviceContext *ctx);
 GoodixFpiUsbBackend *  goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx);

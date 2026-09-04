@@ -64,6 +64,7 @@ compile_local "$test_dir/support/fpimage_link_stubs.c" "$build/fpimage_link_stub
 for source in \
   goodix_u16_to_fpimage goodix_fpimage_pipeline goodix_usb_router \
   goodix_a0_protocol goodix_d190_binder goodix_target_material \
+  goodix_runtime_inputs goodix_runtime_material \
   goodix_secure_session goodix_image_decoder goodix_post_tls_lifecycle \
   goodix_fpimage_device goodix_tls_server goodix_fpi_usb_backend; do
   compile_strict "$root/libfprint-driver/$source.c" "$build/$source.o"
@@ -80,6 +81,7 @@ gcc -Wl,--gc-sections \
   "$build/goodix_u16_to_fpimage.o" "$build/goodix_fpimage_pipeline.o" \
   "$build/goodix_usb_router.o" "$build/goodix_a0_protocol.o" \
   "$build/goodix_d190_binder.o" "$build/goodix_target_material.o" \
+  "$build/goodix_runtime_inputs.o" "$build/goodix_runtime_material.o" \
   "$build/goodix_secure_session.o" "$build/goodix_image_decoder.o" \
   "$build/goodix_post_tls_lifecycle.o" "$build/goodix_fpimage_device.o" \
   "$build/goodix_tls_server.o" "$build/goodix_fpi_usb_backend.o" \

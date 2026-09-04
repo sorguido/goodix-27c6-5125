@@ -119,6 +119,25 @@ ordering and failure cleanup without real paths or hardware; NULL seams select
 the production loader and libgusb calls. Production activation still does not
 start the secure/post-TLS graph, so this is not fprintd operational closure.
 
+## D279/09 bounded production activation
+
+For the registered USB subclass, activation now requires the drained
+pre-session RX quiet boundary and then constructs the existing native secure
+session, retained TLS and post-TLS lifecycle from the open-epoch material.
+The first protocol OUT therefore cannot precede RX synchronization. Borrowed
+secure/FDT views are cleared after both consumers copy their inputs; their sole
+runtime-material owner remains alive until close.
+
+Asynchronous sync, secure-session, post-TLS and receive-rearm failures are
+routed to the appropriate libfprint activation/session completion. Synthetic
+tests exercise that production vfunc without real paths or USB.
+
+Enrollment remains deliberately disabled before any submit. Fedora 44
+`FpImageDevice` expects five captures in one activation, while target evidence
+and the current lifecycle stop at the second B0. D279/09 does not silently set
+two stages or extrapolate an unproven third acquisition. Capture/identify are
+only offline-wired and still require a separately authorized live validation.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

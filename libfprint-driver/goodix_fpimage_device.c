@@ -85,8 +85,12 @@ struct _GoodixDeviceContext
   GoodixSecureSessionMaterial runtime_secure_view;
   guint8                     runtime_fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH];
   GoodixRuntimeMaterialAudit runtime_material_audit;
+  GoodixSecureSessionAudit    runtime_secure_audit;
+  GoodixTlsAudit              runtime_tls_audit;
+  GoodixPostTlsAudit          runtime_post_tls_audit;
   GoodixRuntimeMaterialReleaseSeam runtime_material_release;
   gpointer                   runtime_material_release_data;
+  gboolean                   runtime_handoff_views_cleared;
   gboolean                   usb_interface_claimed;
 
   FpiImageDeviceState        last_framework_state;
@@ -149,6 +153,32 @@ goodix_fpimage_device_set_context (GoodixFpImageDevice *self,
 static void goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx);
 static void goodix_device_context_set_poisoned (GoodixDeviceContext *ctx,
                                                 const GError        *error);
+static void emit_terminal (GoodixDeviceContext *ctx, GError *error);
+static gboolean
+goodix_fpimage_device_is_production_usb (GoodixFpImageDevice *self);
+
+static void
+context_protocol_failure (GoodixDeviceContext *ctx,
+                          const GError        *error)
+{
+  g_autoptr(GError) local_error = NULL;
+
+  if (ctx->terminal_fence)
+    {
+      goodix_device_context_set_poisoned (ctx, error);
+      return;
+    }
+  local_error = error != NULL ? g_error_copy (error) :
+    g_error_new_literal (FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+                         "Goodix production protocol failed closed");
+  goodix_device_context_set_terminal_fence (ctx);
+  goodix_device_context_set_poisoned (ctx, local_error);
+  if (!ctx->operator_epoch &&
+      (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
+       ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVE))
+    emit_terminal (ctx, g_steal_pointer (&local_error));
+}
+
 static gint64
 pre_session_rx_sync_now (GoodixDeviceContext *ctx)
 {
@@ -185,9 +215,7 @@ pre_session_rx_sync_fail (GoodixDeviceContext *ctx,
       goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
     (void) goodix_fpi_usb_backend_end_pre_session_sync (
       ctx->fpi_usb_backend, ctx->generation, &end_error);
-  goodix_device_context_set_terminal_fence (ctx);
-  goodix_device_context_set_poisoned (
-    ctx, error != NULL ? error : end_error);
+  context_protocol_failure (ctx, error != NULL ? error : end_error);
 }
 static void
 context_usb_drained (GoodixFpiUsbBackend *backend,
@@ -225,11 +253,55 @@ context_usb_in_completed (GoodixFpiUsbBackend *backend,
     {
       g_autoptr(GError) arm_error = NULL;
       if (!goodix_device_context_arm_receive (ctx, &arm_error))
-        {
-          goodix_device_context_set_terminal_fence (ctx);
-          goodix_device_context_set_poisoned (ctx, arm_error);
-        }
+        context_protocol_failure (ctx, arm_error);
     }
+}
+
+static guint16
+production_timestamp (void)
+{
+  return (guint16) ((guint64) (g_get_monotonic_time () / 1000) & 0xffffu);
+}
+
+static void
+production_activation_start_secure_graph (GoodixDeviceContext *ctx)
+{
+  GoodixPostTlsMaterial post_material = { 0 };
+  g_autoptr(GError) error = NULL;
+
+  if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
+      ctx->terminal_fence || ctx->operator_epoch ||
+      ctx->runtime_material == NULL || !ctx->usb_interface_claimed)
+    return;
+
+  memcpy (post_material.initial_fdt_table, ctx->runtime_fdt_seed,
+          sizeof post_material.initial_fdt_table);
+  post_material.af_timestamp = production_timestamp ();
+  post_material.first_arm_timestamp = production_timestamp ();
+  post_material.second_arm_timestamp = production_timestamp ();
+  if (!goodix_device_context_configure_post_tls_lifecycle (
+        ctx, &post_material, &ctx->runtime_post_tls_audit, &error) ||
+      !goodix_device_context_start_secure_session (
+        ctx, &ctx->runtime_secure_view, NULL, NULL,
+        &ctx->runtime_secure_audit, &ctx->runtime_tls_audit, &error))
+    {
+      OPENSSL_cleanse (&ctx->runtime_secure_view,
+                       sizeof ctx->runtime_secure_view);
+      OPENSSL_cleanse (ctx->runtime_fdt_seed,
+                       sizeof ctx->runtime_fdt_seed);
+      ctx->runtime_handoff_views_cleared = TRUE;
+      context_protocol_failure (ctx, error);
+      return;
+    }
+
+  /* Both consumers now own the data they need.  The runtime-material owner
+   * remains alive until img_close, but no borrowed secret/FDT view is kept in
+   * the glue after the handoff. */
+  OPENSSL_cleanse (&ctx->runtime_secure_view,
+                   sizeof ctx->runtime_secure_view);
+  OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+  ctx->runtime_handoff_views_cleared = TRUE;
+  goodix_device_context_emit_arm_complete (ctx, NULL);
 }
 
 static void
@@ -282,6 +354,8 @@ context_pre_session_sync_completed (GoodixFpiUsbBackend *backend,
           ctx->pre_session_rx_sync_out_count_at_pass =
             goodix_fpi_usb_backend_get_out_submit_count (
               ctx->fpi_usb_backend);
+          if (!ctx->operator_epoch)
+            production_activation_start_secure_graph (ctx);
           return;
         }
       audit->pre_session_rx_non_timeout_error_count++;
@@ -865,6 +939,18 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       return;
     }
 
+  if (goodix_fpimage_device_is_production_usb (self) &&
+      fpi_device_get_current_action (FP_DEVICE (self)) ==
+        FPI_DEVICE_ACTION_ENROLL)
+    {
+      error = g_error_new_literal (
+        FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+        "Goodix enrollment is disabled until the target stage policy and "
+        "third acquisition are proven");
+      fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+      return;
+    }
+
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;
   ctx->generation = ctx->generation_seq;
@@ -897,6 +983,21 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
                            ctx, NULL);
 
   goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING);
+  if (goodix_fpimage_device_is_production_usb (self))
+    {
+      if (ctx->runtime_material == NULL || !ctx->usb_interface_claimed)
+        {
+          error = g_error_new_literal (
+            FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_OPEN,
+            "Goodix production activation lacks its open-epoch resources");
+          context_protocol_failure (ctx, error);
+          return;
+        }
+      if (!goodix_device_context_begin_pre_session_rx_sync (ctx, &error) &&
+          ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING)
+        context_protocol_failure (ctx, error);
+      return;
+    }
   ctx->backend_vtable->arm (ctx, ctx->backend_user_data);
 }
 
@@ -1093,6 +1194,12 @@ goodix_device_context_has_usb_claim (GoodixDeviceContext *ctx)
 }
 
 gboolean
+goodix_device_context_runtime_handoff_views_cleared (GoodixDeviceContext *ctx)
+{
+  return ctx != NULL && ctx->runtime_handoff_views_cleared;
+}
+
+gboolean
 goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
                                                const guint8 *psk,
                                                gsize psk_length,
@@ -1119,8 +1226,7 @@ context_secure_terminal (GoodixSecureSession *session,
   GoodixDeviceContext *ctx = user_data;
 
   (void) session;
-  ctx->terminal_fence = TRUE;
-  goodix_device_context_set_poisoned (ctx, error);
+  context_protocol_failure (ctx, error);
 }
 
 static gboolean
@@ -1205,8 +1311,7 @@ context_post_tls_terminal (GoodixPostTlsLifecycle *lifecycle,
   GoodixDeviceContext *ctx = user_data;
 
   (void) lifecycle;
-  ctx->terminal_fence = TRUE;
-  goodix_device_context_set_poisoned (ctx, error);
+  context_protocol_failure (ctx, error);
 }
 
 static void
@@ -1237,10 +1342,7 @@ context_secure_phase (GoodixSecureSession *session,
     session, context_post_tls_plaintext, ctx);
   if (!goodix_secure_session_handoff_backend (session, &error) ||
       !goodix_post_tls_lifecycle_start (ctx->post_tls_lifecycle, &error))
-    {
-      goodix_device_context_set_terminal_fence (ctx);
-      goodix_device_context_set_poisoned (ctx, error);
-    }
+    context_protocol_failure (ctx, error);
 }
 
 gboolean
@@ -1277,7 +1379,8 @@ goodix_device_context_start_secure_session (
 {
   if (ctx == NULL || ctx->secure_session != NULL || ctx->tls_server != NULL ||
       ctx->generation == 0 || ctx->terminal_fence ||
-      (ctx->operator_epoch &&
+      ((ctx->operator_epoch ||
+        goodix_fpimage_device_is_production_usb (ctx->device)) &&
        ctx->pre_session_rx_sync_audit.pre_session_rx_result !=
          GOODIX_PRE_SESSION_RX_SYNC_PASS))
     {
@@ -1421,7 +1524,11 @@ goodix_device_context_begin_pre_session_rx_sync (GoodixDeviceContext *ctx,
 {
   g_autoptr(GError) local_error = NULL;
 
-  if (ctx == NULL || !ctx->operator_epoch || ctx->generation == 0 ||
+  if (ctx == NULL ||
+      (!ctx->operator_epoch &&
+       !(goodix_fpimage_device_is_production_usb (ctx->device) &&
+         ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING)) ||
+      ctx->generation == 0 ||
       ctx->terminal_fence || ctx->secure_session != NULL ||
       ctx->pre_session_rx_sync_audit.pre_session_rx_result !=
         GOODIX_PRE_SESSION_RX_SYNC_NOT_STARTED)
