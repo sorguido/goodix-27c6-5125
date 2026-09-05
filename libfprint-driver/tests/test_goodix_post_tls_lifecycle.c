@@ -26,6 +26,9 @@ typedef struct
   guint release_tail_count;
   guint finger_up_count;
   guint image_count;
+  guint handoff_count;
+  guint new_owner_completion_count;
+  gboolean handoff_should_fail;
   guint64 generation;
   uint16_t expected[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   guint8 expected_up[12];
@@ -135,6 +138,46 @@ terminal_callback (GoodixPostTlsLifecycle *lifecycle,
   (void) lifecycle;
   g_assert_nonnull (error);
   ((Fixture *) user_data)->terminal_count++;
+}
+
+static void
+new_owner_out_complete (GoodixFpiUsbBackend *backend,
+                        guint64               generation,
+                        const GError         *error,
+                        gpointer              user_data)
+{
+  Fixture *fixture = user_data;
+
+  (void) backend;
+  g_assert_cmpuint (generation, ==, fixture->generation);
+  g_assert_null (error);
+  fixture->new_owner_completion_count++;
+}
+
+static gboolean
+first_arm_handoff_callback (GoodixPostTlsLifecycle *lifecycle,
+                            GoodixFpiUsbBackend    *backend,
+                            guint64                 generation,
+                            gpointer                user_data,
+                            GError                **error)
+{
+  Fixture *fixture = user_data;
+
+  (void) lifecycle;
+  (void) error;
+  g_assert_true (backend == fixture->backend);
+  g_assert_cmpuint (generation, ==, fixture->generation);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (backend));
+  fixture->handoff_count++;
+  if (fixture->handoff_should_fail)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                           "synthetic handoff rejection");
+      return FALSE;
+    }
+  goodix_fpi_usb_backend_set_out_completed_callback (
+    backend, new_owner_out_complete, fixture);
+  return TRUE;
 }
 
 static Fixture *
@@ -502,6 +545,11 @@ run_full_trace (Fixture *fixture,
   g_clear_pointer (&ack, g_bytes_unref);
   ack = build_ack (0x32);
   feed_frame (fixture, ack, fragmentation);
+  if (fixture->handoff_count != 0u)
+    {
+      g_assert_true (g_queue_is_empty (fixture->out));
+      return;
+    }
   g_clear_pointer (&event, g_bytes_unref);
   event = build_event (0x32, 0x0002, 0x003f, 0x0180);
   feed_frame (fixture, event, fragmentation);
@@ -829,6 +877,73 @@ test_rejected_a0_sanitized_telemetry (void)
   fixture_free (fixture);
 }
 
+static void
+test_first_arm_backend_handoff (void)
+{
+  Fixture *fixture = fixture_new ();
+  const guint8 synthetic[] = { 0xa5 };
+  g_autoptr(GBytes) bytes = g_bytes_new_static (synthetic,
+                                                 sizeof synthetic);
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (goodix_post_tls_lifecycle_set_first_arm_handoff (
+    fixture->lifecycle, first_arm_handoff_callback, &error));
+  g_assert_no_error (error);
+  run_full_trace (fixture, 1u);
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_STOP);
+  g_assert_cmpuint (fixture->handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.first_arm_handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.backend_handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 8u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_cmpuint (fixture->finger_down_count, ==, 0u);
+
+  g_assert_true (goodix_fpi_usb_backend_submit_out (
+    fixture->backend, fixture->generation, bytes, &error));
+  g_assert_no_error (error);
+  goodix_fpi_usb_backend_complete_out (fixture->backend,
+                                       fixture->generation, NULL);
+  g_assert_cmpuint (fixture->new_owner_completion_count, ==, 1u);
+
+  goodix_post_tls_lifecycle_free (fixture->lifecycle);
+  fixture->lifecycle = NULL;
+  g_assert_true (goodix_fpi_usb_backend_submit_out (
+    fixture->backend, fixture->generation, bytes, &error));
+  g_assert_no_error (error);
+  goodix_fpi_usb_backend_complete_out (fixture->backend,
+                                       fixture->generation, NULL);
+  g_assert_cmpuint (fixture->new_owner_completion_count, ==, 2u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
+  fixture_free (fixture);
+}
+
+static void
+test_first_arm_backend_handoff_failure (void)
+{
+  Fixture *fixture = fixture_new ();
+
+  fixture->handoff_should_fail = TRUE;
+  g_assert_true (goodix_post_tls_lifecycle_set_first_arm_handoff (
+    fixture->lifecycle, first_arm_handoff_callback, NULL));
+  run_full_trace (fixture, 0u);
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_TERMINAL);
+  g_assert_cmpuint (fixture->handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.first_arm_handoff_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.backend_handoff_count, ==, 1u);
+  g_assert_true (fixture->audit.terminal);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
+  fixture_free (fixture);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -849,5 +964,9 @@ main (int argc, char **argv)
                    test_fdt_delta_outside_threshold_terminal);
   g_test_add_func ("/d278-12/rejected-a0-sanitized-telemetry",
                    test_rejected_a0_sanitized_telemetry);
+  g_test_add_func ("/d279-21/first-arm-backend-handoff",
+                   test_first_arm_backend_handoff);
+  g_test_add_func ("/d279-21/first-arm-backend-handoff-failure",
+                   test_first_arm_backend_handoff_failure);
   return g_test_run ();
 }

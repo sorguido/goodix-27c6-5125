@@ -33,10 +33,12 @@ struct _GoodixPostTlsLifecycle
   GoodixPostTlsEventFunc release_tail;
   GoodixPostTlsEventFunc finger_up;
   GoodixPostTlsTerminalFunc terminal;
+  GoodixPostTlsFirstArmHandoffFunc first_arm_handoff;
   gpointer user_data;
   GoodixPostTlsAudit *audit;
   GError *error;
   gboolean out_pending;
+  gboolean backend_callback_owned;
   guint8 expected_ack;
   gboolean ack_seen;
   gboolean framework_await;
@@ -495,8 +497,9 @@ goodix_post_tls_lifecycle_free (GoodixPostTlsLifecycle *lifecycle)
       lifecycle->audit->backend_drained = TRUE;
       lifecycle->audit->terminal_cleanup_completed = TRUE;
     }
-  goodix_fpi_usb_backend_set_out_completed_callback (lifecycle->backend,
-                                                      NULL, NULL);
+  if (lifecycle->backend_callback_owned)
+    goodix_fpi_usb_backend_set_out_completed_callback (lifecycle->backend,
+                                                        NULL, NULL);
   g_clear_error (&lifecycle->error);
   memset (&lifecycle->material, 0, sizeof lifecycle->material);
   memset (lifecycle->current_fdt_table, 0, sizeof lifecycle->current_fdt_table);
@@ -506,6 +509,25 @@ goodix_post_tls_lifecycle_free (GoodixPostTlsLifecycle *lifecycle)
   clear_byte_array (lifecycle->plaintext_pending);
   g_byte_array_unref (lifecycle->plaintext_pending);
   g_free (lifecycle);
+}
+
+gboolean
+goodix_post_tls_lifecycle_set_first_arm_handoff (
+  GoodixPostTlsLifecycle           *lifecycle,
+  GoodixPostTlsFirstArmHandoffFunc  handoff,
+  GError                          **error)
+{
+  if (lifecycle == NULL || handoff == NULL ||
+      lifecycle->phase != GOODIX_POST_TLS_PHASE_NOT_STARTED ||
+      lifecycle->first_arm_handoff != NULL)
+    {
+      g_set_error_literal (error, GOODIX_POST_TLS_ERROR,
+                           GOODIX_POST_TLS_ERROR_STATE,
+                           "first-arm handoff must be configured once before start");
+      return FALSE;
+    }
+  lifecycle->first_arm_handoff = handoff;
+  return TRUE;
 }
 
 gboolean
@@ -524,6 +546,7 @@ goodix_post_tls_lifecycle_start (GoodixPostTlsLifecycle *lifecycle,
   goodix_fpi_usb_backend_set_out_completed_callback (lifecycle->backend,
                                                       backend_out_complete,
                                                       lifecycle);
+  lifecycle->backend_callback_owned = TRUE;
 
   /* D246 live evidence on this target established a 20 ms quiet interval
    * between cryptographic TLS completion and the canonical fixed64 D4 OUT.
@@ -697,6 +720,28 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
     case GOODIX_POST_TLS_PHASE_FIRST_ARM:
       if (!accept_ack (lifecycle, &message))
         goto unexpected;
+      if (lifecycle->first_arm_handoff != NULL)
+        {
+          if (lifecycle->out_pending ||
+              goodix_fpi_usb_backend_get_out_outstanding (
+                lifecycle->backend) != 0u ||
+              !lifecycle->backend_callback_owned)
+            goto unexpected;
+          goodix_fpi_usb_backend_set_out_completed_callback (
+            lifecycle->backend, NULL, NULL);
+          lifecycle->backend_callback_owned = FALSE;
+          lifecycle->phase = GOODIX_POST_TLS_PHASE_STOP;
+          if (lifecycle->audit != NULL)
+            {
+              lifecycle->audit->first_arm_handoff_count++;
+              lifecycle->audit->backend_handoff_count++;
+            }
+          if (!lifecycle->first_arm_handoff (
+                lifecycle, lifecycle->backend, lifecycle->generation,
+                lifecycle->user_data, &error))
+            lifecycle_fail (lifecycle, g_steal_pointer (&error));
+          break;
+        }
       lifecycle->phase = GOODIX_POST_TLS_PHASE_FIRST_IRQ2;
       break;
     case GOODIX_POST_TLS_PHASE_FIRST_IRQ2:

@@ -255,6 +255,15 @@ context cancels it at the terminal fence and frees the graph only after backend
 drain. The context neither constructs nor submits through the binding, and the
 production enrollment activation gate remains unchanged.
 
+## D279/21 first-arm backend handoff
+
+The legacy post-TLS lifecycle has an optional, pre-start callback that stops
+after the initial `0x32` arm ACK, with no OUT outstanding, and transfers the
+single backend completion slot before the first IRQ2. The default two-capture
+path is unchanged. Host-only tests prove that the next owner keeps its callback
+even after the legacy lifecycle is freed. No production caller configures this
+handoff and no real USB submit is performed.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

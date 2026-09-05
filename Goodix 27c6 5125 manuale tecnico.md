@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_SECURE_TO_ENROLLMENT_HANDOFF_AND_LIBFPRINT_CALLBACK_DESIGN_WITH_ACTIVATION_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_FIRST_ARM_HANDOFF_TO_PARAMETRIC_ENROLLMENT_GRAPH_WITH_LIBFPRINT_CALLBACKS_AND_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -701,6 +701,35 @@ ancora autorizzata alcuna attivazione live. Il conteggio rimane configurabile:
 restano preservati opacamente e la loro semantica quality/template/NBIS non è
 determinata. Report:
 `analysis/D279/D279_20_dormant_device_context_enrollment_ownership.md`.
+
+### D279/21 — handoff backend dopo il primo arm post-TLS
+
+Un handoff diretto dalla secure session al modello enrollment sarebbe
+incompleto: il modello D279/11 inizia dal primo IRQ2, mentre il target osservato
+richiede prima il bootstrap post-TLS fino all'arm `0x32/ACK`. Il lifecycle
+legacy offre ora un callback opzionale configurabile soltanto prima dello
+start. Dopo l'ACK del primo arm verifica OUT zero, rilascia il proprio callback
+backend, entra in STOP e invoca il nuovo owner prima del primo IRQ2. Il path
+default a due acquisizioni resta invariato.
+
+La regressione percorre il bootstrap host-only di nove comandi, verifica otto
+ACK più la risposta AF, zero immagini/finger event, handoff singolo e backend
+drenato. Un callback nuovo viene installato durante l'handoff e riceve due
+completion sintetiche, una anche dopo il free del lifecycle precedente: ciò
+prova che il vecchio owner non cancella il callback successivo. Il rifiuto del
+successore porta invece a terminal fence senza retry. La suite passa 10/10
+normal e ASan/UBSan, con submit reale zero. La build Fedora 44/libfprint
+1.94.100 con registry standard e NBIS resta verde senza enumerazione/open/
+claim/submit USB.
+
+Questo confine non afferma che i due re-entry OEM osservati dopo le lunghe pause
+di ATTEMPT02 siano sempre necessari né sempre evitabili: un avvio Linux
+immediato non è stato provato live. Il prossimo step offline può collegare
+questo callback all'ownership context e al grafo enrollment parametrico con
+callback libfprint, mantenendo il gate production. `21` resta il solo conteggio
+target-local osservato; i B0 ausiliari restano opachi con semantica quality/
+template/NBIS non determinata. Report:
+`analysis/D279/D279_21_first_arm_backend_handoff.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

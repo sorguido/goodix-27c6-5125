@@ -90,6 +90,8 @@ typedef struct
   guint clear_halt_count;
   guint persistent_device_write_count;
   guint release_tail_complete_count;
+  guint first_arm_handoff_count;
+  guint backend_handoff_count;
   gboolean fresh_down_table;
   gboolean framework_rearm_gate_seen;
   gboolean terminal;
@@ -117,6 +119,12 @@ typedef void (*GoodixPostTlsEventFunc) (GoodixPostTlsLifecycle *lifecycle,
 typedef void (*GoodixPostTlsTerminalFunc) (GoodixPostTlsLifecycle *lifecycle,
                                            const GError *error,
                                            gpointer user_data);
+typedef gboolean (*GoodixPostTlsFirstArmHandoffFunc) (
+  GoodixPostTlsLifecycle *lifecycle,
+  GoodixFpiUsbBackend    *backend,
+  guint64                 generation,
+  gpointer                user_data,
+  GError                **error);
 
 GoodixPostTlsLifecycle *goodix_post_tls_lifecycle_new (
   GoodixFpiUsbBackend          *backend,
@@ -131,6 +139,10 @@ GoodixPostTlsLifecycle *goodix_post_tls_lifecycle_new (
   GoodixPostTlsAudit           *audit,
   GError                      **error);
 void goodix_post_tls_lifecycle_free (GoodixPostTlsLifecycle *lifecycle);
+gboolean goodix_post_tls_lifecycle_set_first_arm_handoff (
+  GoodixPostTlsLifecycle            *lifecycle,
+  GoodixPostTlsFirstArmHandoffFunc   handoff,
+  GError                           **error);
 gboolean goodix_post_tls_lifecycle_start (GoodixPostTlsLifecycle *lifecycle,
                                           GError **error);
 void goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
