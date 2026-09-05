@@ -137,6 +137,8 @@ driver_sources = {
     'goodix_27c6_5125' : files(
         '../../../../libfprint-driver/goodix_u16_to_fpimage.c',
         '../../../../libfprint-driver/goodix_fpimage_pipeline.c',
+        '../../../../libfprint-driver/goodix_enrollment_model.c',
+        '../../../../libfprint-driver/goodix_enrollment_pipeline.c',
         '../../../../libfprint-driver/goodix_usb_router.c',
         '../../../../libfprint-driver/goodix_a0_protocol.c',
         '../../../../libfprint-driver/goodix_d190_binder.c',

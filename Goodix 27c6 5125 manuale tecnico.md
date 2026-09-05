@@ -372,6 +372,9 @@ D279_11_ATTEMPT02_OBSERVED_STAGE_COUNT=21
 D279_11_OEM_UNIVERSAL_STAGE_COUNT_CLAIM=false
 D279_11_PRIMARY_B0_LIBFPRINT_STAGE_EVENT=true
 D279_11_AUXILIARY_B0_PROTOCOL_INTERNAL_APPLICATION_SEMANTICS=UNDETERMINED
+D279_11_PRIMARY_FPIMAGE_DELIVERY_PROFILES=2,3,21
+D279_11_AUXILIARY_B0_FPIMAGE_DELIVERY_COUNT=0
+D279_11_FEDORA44_LIBFPRINT_1_94_100_NBIS_BUILD=PASS
 D279_11_PRODUCTION_ENROLLMENT_ENABLED=false
 D279_11_SENSOR_REACHING_CODE_CHANGED=false
 D279_06_OUTCOME=READY
@@ -433,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_ENROLLMENT_MODEL_TO_LIBFPRINT_STAGE_DELIVERY_FIXTURE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_FPIMAGEDEVICE_NBIS_ENROLLMENT_FIXTURE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -496,7 +499,12 @@ Il modulo non dipende da USB, TLS o backend, non è collegato ai vfunc e non
 modifica il lifecycle sensor-reaching D275. Enrollment production resta quindi
 respinto prima di ogni submit. Sei test passano sia normal sia ASan/UBSan per
 i tre profili, separazione primary/auxiliary, callback failure e fail-closed
-con diagnostica expected/actual. Report:
+con diagnostica expected/actual. La seam
+`goodix_enrollment_pipeline.[ch]` aggiunge il vero mapping `u16 → FpImage`:
+consegna 2/3/21 immagini primarie transfer-none, zero immagini ausiliarie e
+rifiuta raster fuori posizione. Quattro test aggiuntivi passano normal e
+ASan/UBSan; la build Fedora 44/libfprint 1.94.100 NBIS resta verde senza
+enumerazione USB. Report:
 `analysis/D279/D279_11_configurable_enrollment_model.md`.
 
 ### D279/07 — layout production e identità runtime fprintd

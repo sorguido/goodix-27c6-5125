@@ -151,6 +151,10 @@ or NBIS relevance remains unknown.
 The module has no USB/backend/TLS dependency and is not wired into the
 production lifecycle or device vfuncs. It therefore validates sequencing and
 stage accounting without enabling enrollment or changing sensor-reaching code.
+`goodix_enrollment_pipeline.[ch]` composes the same oracle with the canonical
+`u16 → FpImage` adapter. It requires one raster only at a primary B0, checks the
+NBIS ppmm contract, exposes the image as transfer-none during the callback and
+destroys it afterward. Non-primary events carrying a raster fail closed.
 
 ## D272/01 ephemeral SIGFM metric seam
 
