@@ -68,7 +68,7 @@ commit (GoodixEnrollmentCommandPlan   *plan,
   g_assert_cmpint (intent.purpose, ==, purpose);
   g_assert_cmpint (intent.body_class, ==, body_class);
   g_assert_cmpuint (intent.stage_index, ==, stage);
-  g_assert_false (intent.serializable);
+  g_assert_false (intent.wire_frame_serializable);
   g_assert_true (goodix_enrollment_command_plan_commit (plan, event, &error));
   g_assert_no_error (error);
 }

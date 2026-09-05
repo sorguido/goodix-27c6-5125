@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PER_CYCLE_FDT_AND_TIMESTAMP_MATERIAL_CONTRACT_WITH_PRODUCTION_GATE_RETAINED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_DYNAMIC_FDT_DERIVATION_AND_ITERATIVE_LIFECYCLE_ADAPTER_WITH_PRODUCTION_GATE_RETAINED
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -527,6 +527,14 @@ classi body distinguono semplici, FDT e FDT+timestamp, ma non espongono bytes,
 builder A0 o backend; i due test passano normal e ASan/UBSan e gli audit
 restano a zero serializzazioni, submit e retry. Il confine successivo è il
 contratto per-ciclo delle tabelle FDT e dei timestamp, non ancora il sender.
+`goodix_enrollment_command_body.[ch]` chiude ora la parte strutturale di tale
+contratto: body interni da 2/14/16 byte, binding fail-closed a stage e ruolo
+`STAGE_UP`/`STAGE_AUX_SCAN`/`TRANSITION_DOWN`, timestamp obbligatorio solo per
+`0x32` e clear esplicito. Non costruisce A0/fixed64 e non ha backend. Tutti gli
+otto purpose sono coperti; stage stale, ruolo errato, timestamp mancante e
+materiale superfluo falliscono. Resta da derivare dinamicamente la corretta
+tabella per ruolo dagli IRQ del singolo ciclo e da inserirla in un adapter
+lifecycle iterativo mantenendo il gate production.
 Report:
 `analysis/D279/D279_11_configurable_enrollment_model.md`.
 

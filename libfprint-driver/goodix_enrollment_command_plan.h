@@ -35,8 +35,8 @@ typedef struct
   GoodixEnrollmentBodyClass body_class;
   guint stage_index;
   guint8 control;
-  /* This layer deliberately has no body bytes or serializer. */
-  gboolean serializable;
+  /* This layer deliberately has no body bytes or wire-frame serializer. */
+  gboolean wire_frame_serializable;
 } GoodixEnrollmentCommandIntent;
 
 typedef struct

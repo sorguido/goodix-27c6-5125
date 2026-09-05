@@ -32,7 +32,9 @@ if grep -En '(Rockytkg|core/|goodix_fpi_usb|g_usb_|libusb_|control_transfer|subm
   "$root/libfprint-driver/goodix_enrollment_pipeline.c" \
   "$root/libfprint-driver/goodix_enrollment_pipeline.h" \
   "$root/libfprint-driver/goodix_enrollment_command_plan.c" \
-  "$root/libfprint-driver/goodix_enrollment_command_plan.h"; then
+  "$root/libfprint-driver/goodix_enrollment_command_plan.h" \
+  "$root/libfprint-driver/goodix_enrollment_command_body.c" \
+  "$root/libfprint-driver/goodix_enrollment_command_body.h"; then
   echo "forbidden provenance or sensor-reaching symbol in D279/11 model" >&2
   exit 1
 fi
@@ -154,6 +156,34 @@ build_command_plan_run normal ""
 echo D279_11_COMMAND_PLAN_NORMAL=PASS
 build_command_plan_run sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
 echo D279_11_COMMAND_PLAN_ASAN_UBSAN=PASS
+
+build_command_body_run () {
+  suffix=$1
+  extra=$2
+  # shellcheck disable=SC2086
+  gcc $strict $extra $cflags $includes \
+    "$root/libfprint-driver/goodix_enrollment_command_body.c" \
+    "$script_dir/test_goodix_enrollment_command_body.c" $libs \
+    -o "$build/command_body_${suffix}"
+  if nm -u "$build/command_body_${suffix}" | \
+     grep -E '(^|[[:space:]])(g_usb_|libusb_|SSL_|mbedtls_|gnutls_|open|read|write|socket)'; then
+    echo "forbidden I/O, USB or TLS symbol in D279/11 command body" >&2
+    exit 1
+  fi
+  if grep -En '(goodix_fpi_usb|goodix_a0_build|fixed64_command)' \
+      "$root/libfprint-driver/goodix_enrollment_command_body.c"; then
+    echo "wire-frame serializer or sender dependency in D279/11 command body" >&2
+    exit 1
+  fi
+  ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
+  UBSAN_OPTIONS=halt_on_error=1 \
+    timeout 30 "$build/command_body_${suffix}"
+}
+
+build_command_body_run normal ""
+echo D279_11_COMMAND_BODY_NORMAL=PASS
+build_command_body_run sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
+echo D279_11_COMMAND_BODY_ASAN_UBSAN=PASS
 echo CONFIGURABLE_STAGE_PROFILES_2_3_21=PASS
 echo ATTEMPT02_OBSERVED_STAGE_COUNT=21
 echo OEM_UNIVERSAL_STAGE_COUNT_CLAIM=false
@@ -163,5 +193,7 @@ echo PRIMARY_FPIMAGE_DELIVERY_PROFILES_2_3_21=PASS
 echo AUXILIARY_B0_FPIMAGE_DELIVERY_COUNT=0
 echo COMMAND_PLAN_SERIALIZED_COMMAND_COUNT=0
 echo COMMAND_PLAN_REAL_SUBMIT_COUNT=0
+echo COMMAND_BODY_A0_FRAME_BUILD_COUNT=0
+echo COMMAND_BODY_REAL_SUBMIT_COUNT=0
 echo REAL_USB_ACCESS=0
 echo REAL_USB_SUBMIT=0

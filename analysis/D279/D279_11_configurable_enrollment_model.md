@@ -17,6 +17,8 @@ senza promuovere 21 a costante OEM universale.
 `goodix_enrollment_command_plan.[ch]` aggiunge infine un piano host-only non
 serializzabile: compone lo stesso oracle e la pipeline immagine, ma restituisce
 soltanto intenti tipizzati per i sei controlli osservati.
+`goodix_enrollment_command_body.[ch]` materializza separatamente il solo body
+logico, con binding fail-closed a stage e ruolo FDT; non costruisce frame A0.
 
 ```text
 OUTCOME=READY_OFFLINE_MODEL
@@ -35,6 +37,8 @@ FULL_FPIMAGEDEVICE_FIXTURE_EXTRACTION=SIGFM_TEST_DOUBLE
 COMMAND_PLAN_21_STAGE_CONTROL_COUNTS=20x21,22x21,32x21,34x41,36x20,50x1
 COMMAND_PLAN_SERIALIZED_COMMAND_COUNT=0
 COMMAND_PLAN_REAL_SUBMIT_COUNT=0
+COMMAND_BODY_A0_FRAME_BUILD_COUNT=0
+COMMAND_BODY_REAL_SUBMIT_COUNT=0
 REAL_USB_ACCESS=0
 REAL_USB_SUBMIT=0
 ```
@@ -75,6 +79,14 @@ finger-up, `0x36` come scan FDT ausiliario, i due ruoli iniziali/inter-stage di
 possiede body bytes, builder A0, backend o API di submit. Per 21 stage il piano
 conta 125 intenti: è la sola porzione enrollment e non include i comandi
 bootstrap/re-entry presenti nei conteggi globali ATTEMPT02.
+
+Il contratto body richiede materiale esplicito per lo stesso `stage_index` e
+per uno dei ruoli `STAGE_UP`, `STAGE_AUX_SCAN` o `TRANSITION_DOWN`. I semplici
+`0x20/0x22/0x50` rifiutano materiale; `0x34` accetta soltanto `STAGE_UP`,
+`0x36` soltanto `STAGE_AUX_SCAN`, `0x32` soltanto `TRANSITION_DOWN` con
+timestamp dichiarato. Produce esclusivamente 2, 14 o 16 byte interni e offre
+clear esplicito; stage stale, ruolo errato, timestamp mancante o intento
+marcato wire-serializzabile falliscono prima di produrre output.
 
 Il B0 cifrato successivo a `0x20` è contato e consumato come transizione
 protocol-internal, ma non genera callback stage. Questa classificazione non
@@ -120,6 +132,10 @@ NBIS_21_STAGE_BIOMETRIC_ENROLLMENT=NOT_TESTED
 COMMAND_PLAN_TESTS=2/2_PASS_NORMAL;2/2_PASS_ASAN_UBSAN
 COMMAND_PLAN_21_STAGE_TOTAL_INTENTS=125
 COMMAND_PLAN_BODY_SERIALIZATION=ABSENT
+COMMAND_BODY_TESTS=2/2_PASS_NORMAL;2/2_PASS_ASAN_UBSAN
+COMMAND_BODY_ALL_EIGHT_PURPOSES=PASS
+COMMAND_BODY_STAGE_ROLE_BINDING=FAIL_CLOSED
+COMMAND_BODY_A0_SERIALIZATION=ABSENT
 REAL_TARGET_COMPATIBILITY=PASS_BUILD_API_ABI_ONLY
 ```
 
@@ -130,11 +146,13 @@ generica resta parametrica; il `FpImageDevice` del target seleziona 21 come
 policy target-local derivata dalla sola ATTEMPT02. La fixture attraversa ora
 la state machine completa, ma non prova l'estrazione NBIS sui raster reali e
 il lifecycle production sensor-reaching resta ancora bounded al secondo B0.
-Il command-plan chiude la topologia e i conteggi, ma lascia intenzionalmente
-irrisolta la materializzazione per-ciclo dei body dinamici FDT/timestamp. Il
-successivo passo offline minimo è definire tale contratto dati e provarne
-derivazione/ownership senza collegarlo al backend e senza abilitare il vfunc.
+Il command-plan chiude topologia e conteggi e il body layer chiude forma,
+ownership e binding stage/ruolo. Resta intenzionalmente irrisolta la
+derivazione dinamica delle tre tabelle dai rispettivi IRQ per ogni ciclo; il
+successivo passo offline minimo è modellare quella derivazione e l'adapter
+lifecycle iterativo, ancora senza collegarlo al backend e senza abilitare il
+vfunc.
 
 ```text
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PER_CYCLE_FDT_AND_TIMESTAMP_MATERIAL_CONTRACT_WITH_PRODUCTION_GATE_RETAINED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_DYNAMIC_FDT_DERIVATION_AND_ITERATIVE_LIFECYCLE_ADAPTER_WITH_PRODUCTION_GATE_RETAINED
 ```

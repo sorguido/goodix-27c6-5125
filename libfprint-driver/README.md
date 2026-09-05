@@ -172,6 +172,13 @@ bytes, A0 serializer or backend. For the observed 21-stage profile it matches
 the enrollment-only ATTEMPT02 control counts. Dynamic per-cycle FDT tables and
 timestamps remain a separate unresolved material contract.
 
+`goodix_enrollment_command_body.[ch]` implements that structural contract
+without adding a wire-frame serializer. It binds each FDT table to the exact
+stage and role, requires a timestamp only for `0x32`, rejects stale or
+extraneous material, and builds only the 2/14/16-byte inner body. Dynamic
+derivation of per-cycle tables from IRQ observations remains outside this
+layer.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

@@ -137,7 +137,7 @@ goodix_enrollment_command_plan_peek (const GoodixEnrollmentCommandPlan *plan,
 
   *intent = (GoodixEnrollmentCommandIntent) { 0 };
   intent->event = event;
-  intent->serializable = FALSE;
+  intent->wire_frame_serializable = FALSE;
   observed = plan->audit->pipeline.protocol.observed_primary_stage_count;
   intent->stage_index = event == GOODIX_ENROLLMENT_EVENT_COMMAND_22 ?
     observed + 1u : observed;
