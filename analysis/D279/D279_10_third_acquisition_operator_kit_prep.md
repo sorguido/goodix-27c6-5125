@@ -17,6 +17,27 @@ Baseline del replan: `fc2172f9973ea5a13f067dc3abfd98881c274efa`.
 Il correttivo resta nello stesso D279/10 perché sostituisce il boundary e il
 contratto operativo del Kit già introdotto, senza creare un nuovo fatto live.
 
+## Corrective PowerShell 5.1 post-qualificazione `cc8754e`
+
+La prima qualificazione nativa della versione full-enrollment è stata eseguita
+dall’Utente su clone fresco, branch `development`, HEAD esatto
+`cc8754e009da52e392996c045deb57fca2b30c32` e worktree pulito. Il self-test è
+passato; `NativeQualificationOnly` si è fermato alla precedente riga 259 con
+`FullyQualifiedErrorId: NativeCommandError`. Nessun live era autorizzato o
+eseguito.
+
+La causa è host-side e riproducibile: `unittest -q` scrive il normale riepilogo
+su stderr; Windows PowerShell Desktop 5.1, con
+`$ErrorActionPreference = "Stop"` e `2>&1`, può promuoverlo a errore terminante
+prima che il launcher salvi `$LASTEXITCODE`.
+
+Il corrective introduce `Invoke-D279NativeCaptured`. Solo durante il comando
+nativo imposta localmente `Continue`, cattura entrambi gli stream, salva
+l’exit code nativo e ripristina sempre la policy globale nel `finally`. Il
+controllo non è indebolito: la qualificazione esegue un probe `stderr + exit 0`
+e un probe separato con exit intenzionale `7`, poi pretende exit zero dalla
+suite. L’output qualification diventa V3 e registra entrambi i probe.
+
 ## Decisione metodologica
 
 Il precedente metodo terminava wire-driven al terzo B0 e quindi non poteva
@@ -103,13 +124,14 @@ observer non terminale, collisioni output, authority chiusa, soli input
 numerici, ordering dei gate, attempt scope e dipendenza D274 pin.
 
 ```text
-LINUX_SYNTHETIC_TESTS=15/15_PASS
+LINUX_SYNTHETIC_TESTS=16/16_PASS
 AUTHORITY_TEMPLATE_CLOSED=true
 GLOBAL_MARKER_PRESENT=false
 ATTEMPT_SCOPED_ANTI_OVERWRITE=true
 AUTOMATIC_RETRY_COUNT=0
 MANUAL_GOODIX_COMMAND_PATH=false
 WINDOWS_POWERSHELL_5_1_NATIVE_QUALIFICATION=PENDING_HUMAN
+WINDOWS_POWERSHELL_5_1_NATIVE_STDERR_CORRECTIVE=PENDING_REAL_TARGET_RETEST
 ```
 
 ## Gate successivo

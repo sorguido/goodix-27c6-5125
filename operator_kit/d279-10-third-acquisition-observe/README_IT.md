@@ -128,7 +128,17 @@ python3 -m unittest -v analysis/D279/test_d279_10_third_acquisition_kit.py
 
 La qualificazione nativa richiede Windows PowerShell Desktop 5.1, Python,
 TShark e una sola interfaccia USBPcap, con target assente, branch `development`
-e live-critical set pulito. Non avvia la capture e non presenta prompt dito:
+e live-critical set pulito. Non avvia la capture e non presenta prompt dito.
+
+PowerShell 5.1 può promuovere a `NativeCommandError` lo stderr ordinario di un
+programma nativo quando `$ErrorActionPreference` è `Stop`, anche con exit code
+zero. Il runner usa quindi un wrapper ristretto alla singola invocazione: porta
+temporaneamente la preference a `Continue`, cattura stdout/stderr, salva
+`$LASTEXITCODE` e ripristina sempre `Stop` in `finally`. La qualificazione prova
+prima sia `stderr + exit 0` sia un exit intenzionale `7`; solo dopo esegue la
+suite e ne verifica l’exit code reale.
+
+Comandi:
 
 ```powershell
 cd operator_kit\d279-10-third-acquisition-observe

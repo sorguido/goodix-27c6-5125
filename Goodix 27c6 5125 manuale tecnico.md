@@ -124,11 +124,23 @@ Lo snapshot copre solo la mutazione host-side, non il sensore. L'authority V2
 mantiene quindi chiuso il gate separato
 `possible_sensor_side_template_persistence_accepted=false`.
 
-Quindici fixture sintetiche passano su Linux senza leggere capture autentiche.
+La prima qualificazione Windows della versione full-enrollment, eseguita
+dall'Utente su clone fresco `cc8754e`, ha confermato precondizioni e self-test
+ma ha trovato un failure host-side reale: PowerShell Desktop 5.1 promuoveva lo
+stderr ordinario di `unittest -q` a `NativeCommandError` sotto
+`$ErrorActionPreference=Stop`, prima della lettura di `$LASTEXITCODE`.
+
+Il corrective usa ora un wrapper circoscritto: solo durante l'invocazione
+nativa applica `Continue`, cattura stdout/stderr, salva l'exit code e ripristina
+sempre la policy globale in `finally`. La qualifica V3 prova esplicitamente
+`stderr + exit 0` e un exit nonzero intenzionale `7`, quindi non indebolisce il
+controllo del risultato della suite. Sedici fixture sintetiche passano su Linux
+senza leggere capture autentiche; la nuova qualifica Windows resta da ripetere.
+
 Il Kit resta hard-gated: la sola accettazione host-side è `true`, mentre
 baseline, capture/enrollment live, snapshot della run e rischio sensor-side
 restano chiusi; nessuna nuova baseline è approvata e la qualificazione
-PowerShell 5.1 nativa della versione V2 è ancora pendente con Goodix assente.
+PowerShell 5.1 nativa della versione V3 è ancora pendente con Goodix assente.
 Nessuna nuova esecuzione live è autorizzata.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
@@ -243,7 +255,10 @@ PRODUCTION_ENROLLMENT_REJECTION_SUBMIT_COUNT=0
 D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION_AND_LIVE_GATE
 D279_10_REPLAN_BASELINE=fc2172f9973ea5a13f067dc3abfd98881c274efa
 D279_10_EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_WINDOWS_NATIVE_PENDING
-D279_10_SYNTHETIC_TESTS=15/15_PASS
+D279_10_SYNTHETIC_TESTS=16/16_PASS
+D279_10_WINDOWS_NATIVE_CC8754E=FAIL_NATIVE_COMMAND_ERROR_ON_UNITTEST_STDERR
+D279_10_WINDOWS_NATIVE_STDERR_CORRECTIVE=APPLIED_PENDING_REAL_TARGET_RETEST
+D279_10_WINDOWS_NATIVE_QUALIFICATION_SCHEMA=V3
 D279_10_PASSIVE_OEM_OBSERVER=true
 D279_10_WORKFLOW=FULL_FIRST_OEM_ENROLLMENT_UI_CONFIRMED_PLUS_TERMINAL_TAIL
 D279_10_CONTACT_COUNT_ASSUMED=false

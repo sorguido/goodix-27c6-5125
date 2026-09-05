@@ -242,6 +242,27 @@ class D27910Tests(unittest.TestCase):
         self.assertLess(attempt, capture_start)
         self.assertLess(capture_start, attach)
 
+    def test_powershell_51_native_stderr_wrapper_preserves_exit_status(self):
+        source = (KIT / "run-d279-10.ps1").read_text(encoding="ascii")
+        start = source.index("function Invoke-D279NativeCaptured")
+        end = source.index("function Get-D279UsbPcapSelector", start)
+        wrapper = source[start:end]
+        self.assertIn('$savedErrorActionPreference = $ErrorActionPreference',
+                      wrapper)
+        self.assertIn('$ErrorActionPreference = "Continue"', wrapper)
+        self.assertIn('$nativeExitCode = $LASTEXITCODE', wrapper)
+        self.assertIn('$ErrorActionPreference = $savedErrorActionPreference',
+                      wrapper)
+        self.assertIn('ExitCode = [int]$nativeExitCode', wrapper)
+        qualification = source[source.index(
+            "function Invoke-D279NativeQualification"):]
+        self.assertIn("D279_10_STDERR_PROBE", qualification)
+        self.assertIn("$nonzeroProbe.ExitCode -ne 7", qualification)
+        self.assertIn(
+            "$testResult = Invoke-D279NativeCaptured $python", qualification)
+        self.assertNotIn(
+            "$testOutput = @(& $python -m unittest", qualification)
+
     def test_live_critical_dependency_remains_pinned(self):
         source = (KIT / "run-d279-10.ps1").read_text(encoding="ascii")
         relative = (

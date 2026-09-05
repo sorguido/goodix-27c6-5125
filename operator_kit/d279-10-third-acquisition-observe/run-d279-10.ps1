@@ -105,6 +105,28 @@ function Get-D279Tshark {
     return $null
 }
 
+function Invoke-D279NativeCaptured([string]$Executable, [string[]]$Arguments) {
+    # Windows PowerShell Desktop 5.1 promotes redirected native stderr to a
+    # NativeCommandError when the ambient preference is Stop.  Limit Continue
+    # to the native invocation, capture both streams, preserve the real native
+    # exit code, and restore the fail-closed preference even on exceptions.
+    $savedErrorActionPreference = $ErrorActionPreference
+    $captured = @()
+    $nativeExitCode = $null
+    try {
+        $ErrorActionPreference = "Continue"
+        $captured = @(& $Executable @Arguments 2>&1)
+        $nativeExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $savedErrorActionPreference
+    }
+    if ($null -eq $nativeExitCode) { Fail-D279 "exit code nativo non disponibile" }
+    return [pscustomobject]@{
+        ExitCode = [int]$nativeExitCode
+        Output = @($captured | ForEach-Object { [string]$_ })
+    }
+}
+
 function Get-D279UsbPcapSelector([string]$Tshark) {
     $interfaces = @(& $Tshark -D 2>&1 | Where-Object { $_ -match "USBPcap" })
     if ($interfaces.Count -ne 1) { Fail-D279 "interfaccia USBPcap assente o ambigua" }
@@ -254,14 +276,30 @@ function Invoke-D279NativeQualification {
     $tshark = Get-D279Tshark
     if ($null -eq $tshark) { Fail-D279 "TShark non disponibile" }
     $selector = Get-D279UsbPcapSelector $tshark
+
+    $stderrProbe = Invoke-D279NativeCaptured $python @(
+        "-c", "import sys; sys.stderr.write('D279_10_STDERR_PROBE\n')")
+    if ($stderrProbe.ExitCode -ne 0 -or
+        (($stderrProbe.Output -join "`n") -notmatch "D279_10_STDERR_PROBE")) {
+        Fail-D279 "regressione PowerShell 5.1 stderr/exit-zero fallita"
+    }
+    $nonzeroProbe = Invoke-D279NativeCaptured $python @(
+        "-c", "import sys; sys.exit(7)")
+    if ($nonzeroProbe.ExitCode -ne 7) {
+        Fail-D279 "regressione PowerShell 5.1 exit-nonzero fallita"
+    }
+
     Push-Location $root
     try {
-        $testOutput = @(& $python -m unittest -q analysis.D279.test_d279_10_third_acquisition_kit 2>&1)
-        $testExitCode = $LASTEXITCODE
+        $testResult = Invoke-D279NativeCaptured $python @(
+            "-m", "unittest", "-q",
+            "analysis.D279.test_d279_10_third_acquisition_kit")
     } finally { Pop-Location }
-    if ($testExitCode -ne 0) { Fail-D279 ("test Python falliti: " + ($testOutput -join " ")) }
+    if ($testResult.ExitCode -ne 0) {
+        Fail-D279 ("test Python falliti: " + ($testResult.Output -join " "))
+    }
     [ordered]@{
-        schema = "D279_10_WINDOWS_NATIVE_QUALIFICATION_V2"
+        schema = "D279_10_WINDOWS_NATIVE_QUALIFICATION_V3"
         result = "PASS"
         powershell = $PSVersionTable.PSVersion.ToString()
         repository_root_resolved = $true
@@ -272,6 +310,8 @@ function Invoke-D279NativeQualification {
         tshark_present = $true
         usbpcap_selector = $selector
         synthetic_tests = "PASS"
+        powershell_native_stderr_exit_zero_regression = "PASS"
+        powershell_native_nonzero_exit_code_regression = "PASS"
         authority_template_closed = $true
         global_marker_created = $false
         capture_started = $false
