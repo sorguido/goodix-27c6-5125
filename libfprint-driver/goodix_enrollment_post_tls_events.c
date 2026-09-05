@@ -21,6 +21,8 @@ struct _GoodixEnrollmentPostTlsEvents
   GoodixEnrollmentPostTlsEventsAudit internal_audit;
   GoodixEnrollmentPostTlsEventsAudit *audit;
   GoodixEnrollmentAuxiliaryB0Func auxiliary_ready;
+  GoodixEnrollmentContactFunc contact;
+  gpointer contact_data;
   gpointer user_data;
   GByteArray *b0_pending;
   gboolean failed;
@@ -108,6 +110,24 @@ goodix_enrollment_post_tls_events_free (GoodixEnrollmentPostTlsEvents *events)
   g_byte_array_unref (events->b0_pending);
   goodix_enrollment_lifecycle_adapter_free (events->lifecycle);
   g_free (events);
+}
+
+gboolean
+goodix_enrollment_post_tls_events_set_contact_callback (
+  GoodixEnrollmentPostTlsEvents *events,
+  GoodixEnrollmentContactFunc    contact,
+  gpointer                       user_data,
+  GError                       **error)
+{
+  if (events == NULL || contact == NULL || events->contact != NULL ||
+      events->audit->parsed_a0_count != 0u || events->b0_pending->len != 0u ||
+      events->failed)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
+                        "contact callback must be configured once before input",
+                        error);
+  events->contact = contact;
+  events->contact_data = user_data;
+  return TRUE;
 }
 
 static gboolean
@@ -250,7 +270,15 @@ goodix_enrollment_post_tls_events_handle_a0 (
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, raw, 12u, error);
       if (accepted)
-        events->audit->irq2_count++;
+        {
+          events->audit->irq2_count++;
+          if (events->contact != NULL &&
+              !events->contact (events->audit->irq2_count, TRUE,
+                                events->contact_data, error))
+            accepted = FALSE;
+          else if (events->contact != NULL)
+            events->audit->finger_down_delivery_count++;
+        }
     }
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
            parse_irq (&message, 0x36, 0x0100, 0x0000, &raw))
@@ -266,7 +294,15 @@ goodix_enrollment_post_tls_events_handle_a0 (
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, raw, 12u, error);
       if (accepted)
-        events->audit->irq0200_count++;
+        {
+          events->audit->irq0200_count++;
+          if (events->contact != NULL &&
+              !events->contact (events->audit->irq0200_count, FALSE,
+                                events->contact_data, error))
+            accepted = FALSE;
+          else if (events->contact != NULL)
+            events->audit->finger_up_delivery_count++;
+        }
     }
 
 out:

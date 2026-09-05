@@ -264,6 +264,15 @@ path is unchanged. Host-only tests prove that the next owner keeps its callback
 even after the legacy lifecycle is freed. No production caller configures this
 handoff and no real USB submit is performed.
 
+## D279/22 ordered enrollment contact callbacks
+
+The strict inbound enrollment layer can optionally emit validated contact
+events. IRQ2 produces finger-down only after adapter acceptance; IRQ0200
+produces finger-up after acceptance and, on the terminal stage, after the
+deferred `FpImage` has synchronously entered the libfprint capture path. This
+orders finger-up before asynchronous extraction completion without inventing
+an image from IRQ data. Callback rejection is terminal and retry-free.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

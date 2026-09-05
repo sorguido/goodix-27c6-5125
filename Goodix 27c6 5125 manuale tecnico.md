@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_FIRST_ARM_HANDOFF_TO_PARAMETRIC_ENROLLMENT_GRAPH_WITH_LIBFPRINT_CALLBACKS_AND_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_FIRST_ARM_HANDOFF_TO_PARAMETRIC_ENROLLMENT_GRAPH_ORCHESTRATION_WITH_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -730,6 +730,28 @@ callback libfprint, mantenendo il gate production. `21` resta il solo conteggio
 target-local osservato; i B0 ausiliari restano opachi con semantica quality/
 template/NBIS non determinata. Report:
 `analysis/D279/D279_21_first_arm_backend_handoff.md`.
+
+### D279/22 — callback contact ordinati per libfprint
+
+L'event layer enrollment espone ora un callback contact opzionale configurabile
+una sola volta prima dell'input. Un IRQ2 viene notificato come finger-down solo
+dopo la validazione e l'accettazione dell'adapter. Un IRQ0200 viene notificato
+come finger-up dopo l'accettazione; nello stage terminale ciò avviene dopo che
+il `FpImage` differito è entrato sincronicamente in
+`fpi_image_device_image_captured()`, ma prima della conclusione asincrona
+dell'estrazione. L'IRQ non diventa mai provenance immagine.
+
+I profili sintetici 2/3/21 verificano esattamente un down/up per stage e
+l'ordering immagine-prima-di-up sul terminale. Il rifiuto del callback rende
+terminale l'event layer e non produce retry. La suite combinata passa 10/10
+normal e ASan/UBSan, mantenendo il layer inbound privo di serializer/backend/
+submit. La build Fedora 44/libfprint 1.94.100 con registry standard/NBIS resta
+verde senza enumerazione/open/claim/submit USB. Il prossimo passo offline è
+l'orchestrazione nel context del callback
+D279/21 verso grafo parametrico e callback D279/22, ancora dietro il gate
+production. `21` resta target-local ATTEMPT02; il contenuto B0 ausiliario resta
+opaco e potenzialmente rilevante, con semantica non determinata. Report:
+`analysis/D279/D279_22_ordered_enrollment_contact_callbacks.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

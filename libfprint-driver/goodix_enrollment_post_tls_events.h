@@ -19,6 +19,11 @@ typedef gboolean (*GoodixEnrollmentAuxiliaryB0Func) (
   GBytes    *plaintext,
   gpointer   user_data,
   GError   **error);
+typedef gboolean (*GoodixEnrollmentContactFunc) (
+  guint      stage_index,
+  gboolean   present,
+  gpointer   user_data,
+  GError   **error);
 
 typedef struct
 {
@@ -28,6 +33,8 @@ typedef struct
   guint irq2_count;
   guint irq0100_count;
   guint irq0200_count;
+  guint finger_down_delivery_count;
+  guint finger_up_delivery_count;
   guint nav_count;
   guint primary_b0_count;
   guint auxiliary_b0_count;
@@ -52,6 +59,11 @@ GoodixEnrollmentPostTlsEvents *goodix_enrollment_post_tls_events_new (
   GError                            **error);
 void goodix_enrollment_post_tls_events_free (
   GoodixEnrollmentPostTlsEvents *events);
+gboolean goodix_enrollment_post_tls_events_set_contact_callback (
+  GoodixEnrollmentPostTlsEvents *events,
+  GoodixEnrollmentContactFunc    contact,
+  gpointer                       user_data,
+  GError                       **error);
 
 /* Accepts one complete decrypted A0 application frame. It maps only the exact
  * ACK, IRQ and OEM NAV shape expected by the lifecycle's current state. */

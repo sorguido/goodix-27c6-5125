@@ -14,6 +14,8 @@ typedef struct
   guint auxiliary_delivery_count;
   guint8 auxiliary_last_byte;
   guint backend_out_count;
+  guint contact_down_count;
+  guint contact_up_count;
 } Fixture;
 
 static gboolean
@@ -63,6 +65,46 @@ auxiliary_ready (GBytes   *plaintext,
   fixture->auxiliary_last_byte = bytes[length - 1u];
   fixture->auxiliary_delivery_count++;
   return TRUE;
+}
+
+static gboolean
+contact_ready (guint      stage_index,
+               gboolean   present,
+               gpointer   user_data,
+               GError   **error)
+{
+  Fixture *fixture = user_data;
+
+  (void) error;
+  if (present)
+    {
+      g_assert_cmpuint (stage_index, ==, fixture->contact_down_count + 1u);
+      g_assert_cmpuint (fixture->image_count, ==, stage_index - 1u);
+      fixture->contact_down_count++;
+    }
+  else
+    {
+      g_assert_cmpuint (stage_index, ==, fixture->contact_up_count + 1u);
+      /* A deferred terminal image is delivered during IRQ0200 acceptance,
+       * before finger-up reaches the eventual libfprint consumer. */
+      g_assert_cmpuint (fixture->image_count, ==, stage_index);
+      fixture->contact_up_count++;
+    }
+  return TRUE;
+}
+
+static gboolean
+reject_contact (guint      stage_index,
+                gboolean   present,
+                gpointer   user_data,
+                GError   **error)
+{
+  (void) stage_index;
+  (void) present;
+  (void) user_data;
+  g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                       "synthetic contact callback rejection");
+  return FALSE;
 }
 
 static GBytes *
@@ -282,6 +324,9 @@ run_profile (guint stages)
 
   g_assert_nonnull (events);
   g_assert_no_error (error);
+  g_assert_true (goodix_enrollment_post_tls_events_set_contact_callback (
+    events, contact_ready, &fixture, &error));
+  g_assert_no_error (error);
   for (guint stage = 1u; stage <= stages; stage++)
     {
       fill_raw (0x80u + stage * 8u, irq2_raw[stage - 1u]);
@@ -322,11 +367,15 @@ run_profile (guint stages)
   g_assert_true (goodix_enrollment_post_tls_events_is_complete (events));
   g_assert_false (goodix_enrollment_post_tls_events_is_failed (events));
   g_assert_cmpuint (fixture.image_count, ==, stages);
+  g_assert_cmpuint (fixture.contact_down_count, ==, stages);
+  g_assert_cmpuint (fixture.contact_up_count, ==, stages);
   g_assert_cmpuint (fixture.timestamp_count, ==, stages);
   g_assert_cmpuint (audit.ack_count, ==, 6u * stages - 1u);
   g_assert_cmpuint (audit.irq2_count, ==, stages);
   g_assert_cmpuint (audit.irq0100_count, ==, stages - 1u);
   g_assert_cmpuint (audit.irq0200_count, ==, stages);
+  g_assert_cmpuint (audit.finger_down_delivery_count, ==, stages);
+  g_assert_cmpuint (audit.finger_up_delivery_count, ==, stages);
   g_assert_cmpuint (audit.nav_count, ==, 1u);
   g_assert_cmpuint (audit.primary_b0_count, ==, stages);
   g_assert_cmpuint (audit.auxiliary_b0_count, ==, stages);
@@ -392,6 +441,34 @@ test_bad_irq_flags_fail_closed (void)
     events, frame, &error));
   g_assert_nonnull (error);
   g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+  goodix_enrollment_post_tls_events_free (events);
+}
+
+static void
+test_contact_callback_failure_fails_closed (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit audit;
+  Fixture fixture = { 0 };
+  guint8 raw[12];
+  g_autoptr(GBytes) frame = NULL;
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
+
+  g_assert_true (goodix_enrollment_post_tls_events_set_contact_callback (
+    events, reject_contact, NULL, &error));
+  fill_raw (0x88u, raw);
+  frame = build_irq (0x32, 0x0002, 0x003f, raw);
+  g_assert_false (goodix_enrollment_post_tls_events_handle_a0 (
+    events, frame, &error));
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+  g_assert_cmpuint (audit.irq2_count, ==, 1u);
+  g_assert_cmpuint (audit.finger_down_delivery_count, ==, 0u);
+  g_assert_cmpuint (audit.rejected_inbound_count, ==, 1u);
   goodix_enrollment_post_tls_events_free (events);
 }
 
@@ -726,6 +803,8 @@ main (int argc, char **argv)
                    test_wrong_ack_fails_closed);
   g_test_add_func ("/d279-14-post-tls-events/bad-irq-flags-fail-closed",
                    test_bad_irq_flags_fail_closed);
+  g_test_add_func ("/d279-22-contact/callback-failure-fails-closed",
+                   test_contact_callback_failure_fails_closed);
   g_test_add_func ("/d279-15-b0-stream/fragmented-primary-opaque-auxiliary",
                    test_fragmented_primary_and_opaque_auxiliary);
   g_test_add_func ("/d279-15-b0-stream/invalid-primary-length-fails-closed",
