@@ -14,6 +14,9 @@ costruire e consegnare un `FpImage` soltanto per ciascun B0 primario. La
 fixture `FpImageDevice` completa applica inoltre al solo target 27c6:5125 la
 policy osservata di 21 stage e chiude un problema reale di ordering terminale,
 senza promuovere 21 a costante OEM universale.
+`goodix_enrollment_command_plan.[ch]` aggiunge infine un piano host-only non
+serializzabile: compone lo stesso oracle e la pipeline immagine, ma restituisce
+soltanto intenti tipizzati per i sei controlli osservati.
 
 ```text
 OUTCOME=READY_OFFLINE_MODEL
@@ -29,6 +32,9 @@ AUXILIARY_B0_FPIMAGE_DELIVERY_COUNT=0
 TARGET_LOCAL_FPIMAGEDEVICE_STAGE_POLICY=21
 PRODUCTION_EXTRACTION_ALGORITHM=NBIS
 FULL_FPIMAGEDEVICE_FIXTURE_EXTRACTION=SIGFM_TEST_DOUBLE
+COMMAND_PLAN_21_STAGE_CONTROL_COUNTS=20x21,22x21,32x21,34x41,36x20,50x1
+COMMAND_PLAN_SERIALIZED_COMMAND_COUNT=0
+COMMAND_PLAN_REAL_SUBMIT_COUNT=0
 REAL_USB_ACCESS=0
 REAL_USB_SUBMIT=0
 ```
@@ -60,6 +66,15 @@ osservati e stage consegnati e, quando il flag esplicito
 fino all'IRQ0200 terminale. Il caller può così notificare finger-up prima di
 avviare l'ultima estrazione. La provenienza del raster resta il B0 primario;
 l'IRQ non trasporta né crea immagine.
+
+Il command-plan classifica `0x22` come acquisizione primaria, `0x20` come
+transizione ausiliaria, le due posizioni di `0x34` come preparazione FDT e
+finger-up, `0x36` come scan FDT ausiliario, i due ruoli iniziali/inter-stage di
+`0x32` e il solo NAV `0x50`. Espone inoltre la classe strutturale del body
+(`01 00`, prefisso FDT `0a 01`/`09 01`, oppure FDT+timestamp `08 01`) ma non
+possiede body bytes, builder A0, backend o API di submit. Per 21 stage il piano
+conta 125 intenti: è la sola porzione enrollment e non include i comandi
+bootstrap/re-entry presenti nei conteggi globali ATTEMPT02.
 
 Il B0 cifrato successivo a `0x20` è contato e consumato come transizione
 protocol-internal, ma non genera callback stage. Questa classificazione non
@@ -102,6 +117,9 @@ FPIMAGEDEVICE_TESTS=25/25_PASS_NORMAL;25/25_PASS_ASAN_UBSAN
 FPIMAGEDEVICE_21_STAGE_PROGRESS_AND_COMPLETION=PASS_SIGFM_TEST_DOUBLE
 TERMINAL_STAGE_DELIVERY_AFTER_IRQ0200=PASS
 NBIS_21_STAGE_BIOMETRIC_ENROLLMENT=NOT_TESTED
+COMMAND_PLAN_TESTS=2/2_PASS_NORMAL;2/2_PASS_ASAN_UBSAN
+COMMAND_PLAN_21_STAGE_TOTAL_INTENTS=125
+COMMAND_PLAN_BODY_SERIALIZATION=ABSENT
 REAL_TARGET_COMPATIBILITY=PASS_BUILD_API_ABI_ONLY
 ```
 
@@ -112,9 +130,11 @@ generica resta parametrica; il `FpImageDevice` del target seleziona 21 come
 policy target-local derivata dalla sola ATTEMPT02. La fixture attraversa ora
 la state machine completa, ma non prova l'estrazione NBIS sui raster reali e
 il lifecycle production sensor-reaching resta ancora bounded al secondo B0.
-Il successivo passo offline minimo è integrare il contratto parametrico nel
-piano post-TLS senza abilitare il vfunc enrollment production.
+Il command-plan chiude la topologia e i conteggi, ma lascia intenzionalmente
+irrisolta la materializzazione per-ciclo dei body dinamici FDT/timestamp. Il
+successivo passo offline minimo è definire tale contratto dati e provarne
+derivazione/ownership senza collegarlo al backend e senza abilitare il vfunc.
 
 ```text
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_POST_TLS_ENROLLMENT_COMMAND_PLAN_WITH_PRODUCTION_GATE_RETAINED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PER_CYCLE_FDT_AND_TIMESTAMP_MATERIAL_CONTRACT_WITH_PRODUCTION_GATE_RETAINED
 ```

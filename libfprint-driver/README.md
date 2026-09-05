@@ -165,6 +165,13 @@ the historical SIGFM test double and therefore proves state/progress ordering,
 not production NBIS biometric quality. Production enrollment remains rejected
 before any submit while the sensor-reaching lifecycle is still bounded.
 
+`goodix_enrollment_command_plan.[ch]` provides the next zero-sender layer. It
+maps the configured protocol position to typed `0x20/0x22/0x32/0x34/0x36/0x50`
+intents and structural body classes, while deliberately exposing no body
+bytes, A0 serializer or backend. For the observed 21-stage profile it matches
+the enrollment-only ATTEMPT02 control counts. Dynamic per-cycle FDT tables and
+timestamps remain a separate unresolved material contract.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

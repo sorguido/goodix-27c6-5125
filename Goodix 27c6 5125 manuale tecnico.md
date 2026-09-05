@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_POST_TLS_ENROLLMENT_COMMAND_PLAN_WITH_PRODUCTION_GATE_RETAINED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PER_CYCLE_FDT_AND_TIMESTAMP_MATERIAL_CONTRACT_WITH_PRODUCTION_GATE_RETAINED
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -519,6 +519,14 @@ harness e non prova NBIS né qualità biometrica. La suite completa è 25/25
 normal e ASan/UBSan e la build Fedora 44/libfprint 1.94.100 con NBIS resta
 verde senza enumerazione USB. Enrollment production resta respinto prima di
 ogni submit finché il lifecycle sensor-reaching non è integrato e revisionato.
+Il nuovo `goodix_enrollment_command_plan.[ch]` compone oracle e pipeline senza
+serializzare: per il profilo 21 produce 125 intenti tipizzati, con conteggi
+enrollment-only `0x20×21`, `0x22×21`, `0x32×21`, `0x34×41`, `0x36×20` e
+`0x50×1`, coerenti con ATTEMPT02 una volta esclusi bootstrap e re-entry. Le
+classi body distinguono semplici, FDT e FDT+timestamp, ma non espongono bytes,
+builder A0 o backend; i due test passano normal e ASan/UBSan e gli audit
+restano a zero serializzazioni, submit e retry. Il confine successivo è il
+contratto per-ciclo delle tabelle FDT e dei timestamp, non ancora il sender.
 Report:
 `analysis/D279/D279_11_configurable_enrollment_model.md`.
 
