@@ -187,6 +187,15 @@ IRQ2-up, `0x36` uses previous-stage IRQ0200-down, and `0x32` uses same-stage
 IRQ0200-down plus a caller timestamp. Stage order and material availability
 are fail-closed. The module has no A0 serializer, backend or submit path.
 
+## D279/13 iterative enrollment lifecycle adapter
+
+`goodix_enrollment_lifecycle_adapter.[ch]` transactionally composes the
+configurable command plan, dynamic FDT state and inner-body contract. IRQ FDT
+sources and primary rasters remain typed observations; the next command is
+resolved once, cached (including its caller-supplied timestamp), and must be
+committed exactly before another observation. Profiles 2/3/21 exercise the
+full sequence. The adapter still has no A0 serializer, backend or submit path.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

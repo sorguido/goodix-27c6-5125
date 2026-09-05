@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ITERATIVE_ENROLLMENT_LIFECYCLE_ADAPTER_WITHOUT_BACKEND
+NEXT_PRIMARY_BOUNDARY=OFFLINE_POST_TLS_EVENT_BINDING_WITH_SENDER_GATE_RETAINED
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -555,6 +555,24 @@ normal e ASan/UBSan, l'audit autentico passa 3/3 e `captures/` resta invariato.
 Il modulo non contiene A0, backend, retry o submit e non modifica il gate
 production. Il B0 ausiliario resta semanticamente indeterminato. Report:
 `analysis/D279/D279_12_target_local_dynamic_fdt_derivation.md`.
+
+### D279/13 — adapter lifecycle enrollment iterativo
+
+`goodix_enrollment_lifecycle_adapter.[ch]` compone oracle parametrico, stato
+FDT e body contract in transazioni `observe → prepare → commit`. IRQ FDT e
+raster primario sono payload tipizzati; un comando preparato resta in cache,
+incluso il timestamp `0x32`, fino al commit esatto. Osservazioni con comando
+pending e commit discordanti falliscono chiuso, senza retry.
+
+I profili sintetici 2/3/21 passano 3/3 normal e ASan/UBSan. Nel profilo
+ATTEMPT02 vengono prodotti e committati offline 125 body interni, con 21
+timestamp e 21 immagini, ma 21 resta il valore target-local osservato e non
+una costante OEM universale. Il modulo non contiene A0, backend o submit;
+l'enrollment production resta esplicitamente disabilitato. La build Fedora 44
+production-shaped con registry standard e NBIS passa senza enumerazione/open/
+claim/submit USB. Il B0 ausiliario rimane semanticamente indeterminato,
+incluso l'eventuale ruolo in quality, template o NBIS. Report:
+`analysis/D279/D279_13_iterative_enrollment_lifecycle_adapter.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
