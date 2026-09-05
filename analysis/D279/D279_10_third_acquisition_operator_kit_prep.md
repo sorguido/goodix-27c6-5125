@@ -4,9 +4,9 @@
 ## Esito offline
 
 ```text
-D279_10_OUTCOME=ATTEMPT01_FAIL_CLOSED_A0_CORRECTIVE_READY_OFFLINE
+D279_10_OUTCOME=ATTEMPT02_COMPLETE_OEM_ENROLLMENT_ANALYZED
 ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
-EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC;WINDOWS_NATIVE_PENDING
+EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_AND_REAL_EVIDENCE_AUDIT
 REAL_TARGET_EXECUTION_BY_OPERATOR=true
 USB_ACCESSED_BY_AI=false
 AUTHENTIC_CAPTURE_ACCESSED_BY_AI=true
@@ -85,6 +85,27 @@ raw prova sia growing sia final; una variante con solo trailer `0x89` continua
 a fallire definitivamente `MALFORMED_A0`. Sul raw autentico corretto risultano
 75 eventi senza errori, quattro `OEM_FIXED_CONTROL_01`, zero cicli (atteso
 prima del wizard) e observer state `OBSERVING`.
+
+## Attempt 02: enrollment OEM completo
+
+L'Utente ha poi eseguito con successo l'attempt
+`D27910_20260905_ATTEMPT02` e lo ha preservato nel commit
+`6c1564b6e7f58a5694113ffcb2e35f9ea0847c7e`. L'audit diretto dell'intero raw
+hash-gated e di tutti i sanitized è in
+`D279_10_attempt02_full_enrollment_analysis.md`, con report macchina
+`D279_10_attempt02_full_enrollment_audit.json` e regressione dedicata.
+
+La run dimostra 21 lifecycle primari completi e zero contraddizioni finali.
+I 22 contatti operatore lasciano un contatto senza lifecycle wire completo;
+non esistendo timestamp per singolo contatto né un prefisso wire incompleto,
+non è possibile localizzarlo. I cicli 2–20 hanno la stessa forma con re-arm,
+il primo include la sola transizione NAV enrollment e il ventunesimo termina
+al finger-up senza re-arm. La finalizzazione UI segue in silenzio: zero frame
+e zero pacchetti target dopo la conferma.
+
+Nessuna famiglia nota `0xE0/0xA4/0xF0/0xF4` è osservata. Questo non esclude
+persistenza template sensor-side precedente o cifrata e non altera la deroga
+limitata già concessa dall'Utente per il workflow OEM normale.
 
 ## Decisione metodologica
 
@@ -180,19 +201,23 @@ GLOBAL_MARKER_PRESENT=false
 ATTEMPT_SCOPED_ANTI_OVERWRITE=true
 AUTOMATIC_RETRY_COUNT=0
 MANUAL_GOODIX_COMMAND_PATH=false
-WINDOWS_POWERSHELL_5_1_NATIVE_QUALIFICATION=PENDING_HUMAN
-WINDOWS_POWERSHELL_5_1_NATIVE_STDERR_CORRECTIVE=PENDING_REAL_TARGET_RETEST
+WINDOWS_POWERSHELL_5_1_NATIVE_QUALIFICATION=SUPERSEDED_AS_CURRENT_GATE_BY_SUCCESSFUL_ATTEMPT02
+WINDOWS_POWERSHELL_5_1_NATIVE_STDERR_CORRECTIVE=USED_BY_ATTEMPT02_BASELINE
 ```
 
 ## Gate successivo
 
-La nuova versione richiede prima una qualificazione nativa Windows con Goodix
-assente, poi review del full SHA e una nuova authority live per-attempt. La
-decisione sensor-side è acquisita ma non costituisce autorizzazione live.
+L'attempt OEM riuscito rende la qualificazione nativa separata non più il gate
+corrente, ma il relativo output non è archiviato nell'evidence commit. Il
+successivo passo economico è ora offline: estendere il lifecycle Linux a 21
+stage primari target-specifici, mantenendo i B0 `0x20` come transizione
+interna e modellando primo ciclo, loop 2–20 e terminale senza re-arm. Una
+futura enrollment Linux reale richiederà nuova baseline e autorizzazione
+single-shot separate.
 
 ```text
-RESIDUAL_BLOCKER_OR_RISK=WINDOWS_NATIVE_QUALIFICATION_PENDING;NEW_LIVE_NOT_AUTHORIZED
-NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT
-NEXT_LIVE_PREREQUISITE=FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_LIVE_DECISION
-REVIEW_SET=EVIDENCE_COMMIT_98ec62b_PLUS_D279_10_A0_CORRECTIVE_KIT_TEST_REPORT_MANUAL
+RESIDUAL_BLOCKER_OR_RISK=LINUX_21_STAGE_LIFECYCLE_NOT_IMPLEMENTED;NEW_LIVE_NOT_AUTHORIZED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_21_STAGE_GOODIX_POST_TLS_AND_LIBFPRINT_ENROLLMENT_MODEL
+NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_PLUS_FULL_SHA_BASELINE_APPROVAL_PLUS_EXPLICIT_SINGLE_SHOT_DECISION
+REVIEW_SET=EVIDENCE_COMMIT_6c1564b_PLUS_D279_10_ATTEMPT02_AUDIT_REPORT_TEST_AND_MANUAL
 ```

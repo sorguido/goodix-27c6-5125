@@ -1,0 +1,338 @@
+{
+  "schema": "D279_10_ATTEMPT02_FULL_ENROLLMENT_AUDIT_V1",
+  "attempt_id": "D27910_20260905_ATTEMPT02",
+  "evidence_commit": "6c1564b6e7f58a5694113ffcb2e35f9ea0847c7e",
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "source_integrity": {
+    "pcapng_packet_count": 924,
+    "target_packet_count": 912,
+    "target_frame_count": 442,
+    "firmware_identity": "GF_ST411SEC_APP_12509",
+    "finalized_parse": "PASS"
+  },
+  "timeline": {
+    "first_target_frame_utc": "2026-09-05T06:13:33.323Z",
+    "cold_bootstrap": {
+      "frame_range": "25-181",
+      "relative_range_ms": [
+        0.0,
+        952.631
+      ],
+      "command_trace": "F01,D5,F01,A8,F01,97,AF,F01,A8,E4,A2,82,A6,A2,70,80x4,90,D1,TLS,D4,AF,36,50/NAV,36,82,20/B0,36,32"
+    },
+    "pre_enrollment_reentry_1": {
+      "frame_range": "187-195",
+      "relative_range_ms": [
+        58282.904,
+        58339.146
+      ],
+      "command_trace": "F01,D5,F01,AF"
+    },
+    "pre_enrollment_reentry_2": {
+      "frame_range": "199-211",
+      "relative_range_ms": [
+        79813.572,
+        79919.041
+      ],
+      "command_trace": "F01,D5,F01,AF,32/ACK"
+    },
+    "wizard_started_relative_to_first_target_ms": 88185.645,
+    "first_irq2_after_wizard_ms": 8907.929,
+    "acquisition_window": {
+      "first_irq2_frame": 213,
+      "last_primary_b0_frame": 899,
+      "terminal_finger_up_irq_frame": 921,
+      "cycle_count": 21,
+      "primary_irq2_to_b0_ms": {
+        "minimum": 47.958,
+        "median": 48.937,
+        "maximum": 59.622
+      },
+      "primary_b0_to_next_irq2_ms": {
+        "minimum": 5058.74,
+        "median": 6141.725,
+        "maximum": 16783.284,
+        "maximum_after_cycle": 9,
+        "maximum_is_only_a_candidate_for_ineffective_contact": true
+      }
+    },
+    "terminal": {
+      "visible_finalization_trace": "I0002,C22,K22:01,BF,C34,K34:01,C36,K36:01,I0100,C20,K20:01,BF,C34,K34:01,I0200",
+      "last_protocol_frame": 921,
+      "last_protocol_frame_utc": "2026-09-05T06:17:31.515Z",
+      "last_target_packet": 923,
+      "last_target_packet_class": "ZERO_LENGTH_BULK_IN_COMPLETION",
+      "last_target_packet_utc": "2026-09-05T06:17:40.514Z",
+      "last_protocol_frame_to_ui_confirmation_seconds": 11.37,
+      "last_target_packet_to_ui_confirmation_seconds": 2.372,
+      "post_ui_target_frame_count": 0,
+      "post_ui_target_packet_count": 0,
+      "ui_to_capture_stop_seconds": 5.167
+    }
+  },
+  "cycle_shapes": {
+    "cycle_1": "FIRST_CYCLE_NAV_TRANSITION",
+    "cycles_2_through_20": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM",
+    "cycle_21": "TERMINAL_ACQUISITION_TRANSITION_WITHOUT_REARM",
+    "inter_cycle_rearm_count": 20,
+    "finger_up_irq0200_count": 21,
+    "irq0100_count": 23,
+    "nav_response_count": 2,
+    "fingerprint_shape_b0_count": 43,
+    "primary_cycle_rows": [
+      {
+        "cycle": 1,
+        "irq2_frame": 213,
+        "primary_b0_frame": 219,
+        "irq2_timestamp_ms": 97093.574,
+        "primary_b0_timestamp_ms": 97143.283,
+        "transition_last_frame": 245,
+        "transition_class": "FIRST_CYCLE_NAV_TRANSITION"
+      },
+      {
+        "cycle": 2,
+        "irq2_frame": 247,
+        "primary_b0_frame": 253,
+        "irq2_timestamp_ms": 105964.292,
+        "primary_b0_timestamp_ms": 106013.742,
+        "transition_last_frame": 279,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 3,
+        "irq2_frame": 281,
+        "primary_b0_frame": 287,
+        "irq2_timestamp_ms": 113950.581,
+        "primary_b0_timestamp_ms": 113999.962,
+        "transition_last_frame": 313,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 4,
+        "irq2_frame": 315,
+        "primary_b0_frame": 321,
+        "irq2_timestamp_ms": 120611.357,
+        "primary_b0_timestamp_ms": 120659.327,
+        "transition_last_frame": 347,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 5,
+        "irq2_frame": 349,
+        "primary_b0_frame": 355,
+        "irq2_timestamp_ms": 127752.708,
+        "primary_b0_timestamp_ms": 127801.057,
+        "transition_last_frame": 381,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 6,
+        "irq2_frame": 383,
+        "primary_b0_frame": 389,
+        "irq2_timestamp_ms": 134366.458,
+        "primary_b0_timestamp_ms": 134414.453,
+        "transition_last_frame": 415,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 7,
+        "irq2_frame": 417,
+        "primary_b0_frame": 423,
+        "irq2_timestamp_ms": 142655.64,
+        "primary_b0_timestamp_ms": 142703.84,
+        "transition_last_frame": 449,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 8,
+        "irq2_frame": 451,
+        "primary_b0_frame": 457,
+        "irq2_timestamp_ms": 152161.381,
+        "primary_b0_timestamp_ms": 152209.612,
+        "transition_last_frame": 483,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 9,
+        "irq2_frame": 485,
+        "primary_b0_frame": 491,
+        "irq2_timestamp_ms": 158815.498,
+        "primary_b0_timestamp_ms": 158875.12,
+        "transition_last_frame": 517,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 10,
+        "irq2_frame": 519,
+        "primary_b0_frame": 525,
+        "irq2_timestamp_ms": 175658.404,
+        "primary_b0_timestamp_ms": 175709.314,
+        "transition_last_frame": 551,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 11,
+        "irq2_frame": 553,
+        "primary_b0_frame": 559,
+        "irq2_timestamp_ms": 182742.982,
+        "primary_b0_timestamp_ms": 182793.987,
+        "transition_last_frame": 585,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 12,
+        "irq2_frame": 587,
+        "primary_b0_frame": 593,
+        "irq2_timestamp_ms": 188378.314,
+        "primary_b0_timestamp_ms": 188427.251,
+        "transition_last_frame": 619,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 13,
+        "irq2_frame": 621,
+        "primary_b0_frame": 627,
+        "irq2_timestamp_ms": 194145.3,
+        "primary_b0_timestamp_ms": 194197.037,
+        "transition_last_frame": 653,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 14,
+        "irq2_frame": 655,
+        "primary_b0_frame": 661,
+        "irq2_timestamp_ms": 199255.777,
+        "primary_b0_timestamp_ms": 199305.918,
+        "transition_last_frame": 687,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 15,
+        "irq2_frame": 689,
+        "primary_b0_frame": 695,
+        "irq2_timestamp_ms": 204643.065,
+        "primary_b0_timestamp_ms": 204691.085,
+        "transition_last_frame": 721,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 16,
+        "irq2_frame": 723,
+        "primary_b0_frame": 729,
+        "irq2_timestamp_ms": 209970.043,
+        "primary_b0_timestamp_ms": 210018.001,
+        "transition_last_frame": 755,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 17,
+        "irq2_frame": 757,
+        "primary_b0_frame": 763,
+        "irq2_timestamp_ms": 215301.229,
+        "primary_b0_timestamp_ms": 215350.99,
+        "transition_last_frame": 789,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 18,
+        "irq2_frame": 791,
+        "primary_b0_frame": 797,
+        "irq2_timestamp_ms": 220751.257,
+        "primary_b0_timestamp_ms": 220803.204,
+        "transition_last_frame": 823,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 19,
+        "irq2_frame": 825,
+        "primary_b0_frame": 831,
+        "irq2_timestamp_ms": 226139.119,
+        "primary_b0_timestamp_ms": 226187.835,
+        "transition_last_frame": 857,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 20,
+        "irq2_frame": 859,
+        "primary_b0_frame": 865,
+        "irq2_timestamp_ms": 231606.214,
+        "primary_b0_timestamp_ms": 231654.259,
+        "transition_last_frame": 891,
+        "transition_class": "REPEATED_ACQUISITION_TRANSITION_WITH_REARM"
+      },
+      {
+        "cycle": 21,
+        "irq2_frame": 893,
+        "primary_b0_frame": 899,
+        "irq2_timestamp_ms": 236968.629,
+        "primary_b0_timestamp_ms": 237017.105,
+        "transition_last_frame": 921,
+        "transition_class": "TERMINAL_ACQUISITION_TRANSITION_WITHOUT_REARM"
+      }
+    ]
+  },
+  "contact_correlation": {
+    "operator_contact_count": 22,
+    "complete_wire_acquisition_lifecycle_count": 21,
+    "operator_contact_without_complete_wire_acquisition_lifecycle_count": 1,
+    "per_contact_timestamps_available": false,
+    "specific_unmatched_contact_identifiable": false,
+    "classification": "ONE_OPERATOR_CONTACT_WITHOUT_COMPLETE_WIRE_ACQUISITION_LIFECYCLE_NOT_TEMPORALLY_LOCALIZABLE",
+    "unmatched_irq2_count": 0,
+    "unmatched_command_0x22_count": 0,
+    "unmatched_ack_0x22_count": 0,
+    "protocol_inference": "NO_COMPLETE_OR_PARTIAL_PRIMARY_WIRE_LIFECYCLE_IDENTIFIES_THE_EXTRA_CONTACT"
+  },
+  "observer_incremental_state": {
+    "transient_contradiction_snapshots": 11,
+    "finalized_protocol_contradiction_count": 0,
+    "classification": "INCREMENTAL_SNAPSHOT_ARTIFACTS_CLEARED_BY_FINALIZED_PARSE"
+  },
+  "command_family_counts": {
+    "0xd5": 3,
+    "0xa8": 2,
+    "0x97": 1,
+    "0xaf": 4,
+    "0xe4": 1,
+    "0xa2": 2,
+    "0x82": 2,
+    "0xa6": 1,
+    "0x70": 1,
+    "0x80": 4,
+    "0x90": 1,
+    "0xd1": 1,
+    "0xd4": 1,
+    "0x36": 23,
+    "0x50": 2,
+    "0x20": 22,
+    "0x32": 23,
+    "0x22": 21,
+    "0x34": 41
+  },
+  "command_shape_observations": {
+    "fixed_control_01_count_excluded_from_command_family_counts": 8,
+    "0x20_all_exact_image_mode_shape": true,
+    "0x22_all_exact_image_mode_shape": true,
+    "0x50_all_exact_nav_mode_shape": true,
+    "0xa2_all_sensor_only_reset_shape": true,
+    "0x32_distinct_body_count": 23,
+    "0x34_distinct_body_count": 21,
+    "0x36_distinct_body_count": 22,
+    "0x34_cycles_2_through_21_reuse_same_cycle_table_twice": true
+  },
+  "known_persistent_command_families_observed": [],
+  "known_persistent_command_families_checked": [
+    "0xe0",
+    "0xa4",
+    "0xf0",
+    "0xf4"
+  ],
+  "bounded_persistence_conclusion": "NO_KNOWN_VISIBLE_PERSISTENT_FAMILY_OBSERVED; SENSOR_SIDE_TEMPLATE_PERSISTENCE_NOT_EXCLUDED",
+  "automatic_retry_count": 0,
+  "observer_is_passive": true,
+  "goodix_sender_present": false,
+  "content_bytes_exported": false,
+  "biometric_plaintext_exported": false,
+  "biometric_hash_exported": false,
+  "secret_material_exported": false
+}

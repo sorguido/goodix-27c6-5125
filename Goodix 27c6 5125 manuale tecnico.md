@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-replan D279/10 — enrollment OEM completo preparato, live chiuso
+### Stato corrente D279/10 — enrollment OEM completo target-local osservato
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -87,9 +87,10 @@ descriptor e FDT12 borrowed mentre mantiene il solo owner fino a close.
 Questo collegamento è volutamente bounded: capture/identify sono cablati
 offline, ma l'enrollment viene rifiutato con `NOT_SUPPORTED` prima della
 generation e con zero submit. Fedora 44 richiede per default cinque stage in
-una sola activation, mentre la prova target e il lifecycle locale terminano al
-secondo B0. Il terzo ciclo e la policy stage restano quindi il prossimo vero
-boundary hardware; non sono stati inferiti dal default framework. La suite è
+una sola activation, mentre quel lifecycle locale termina al secondo B0. La
+successiva evidenza D279/10 attempt 02 ha superato questo limite storico e
+misurato 21 stage OEM primari; il sender Linux resta però ancora bounded al
+secondo B0. La suite è
 ora 24/24 normale e sanitizer, con regressione D278 24/24 normale/sanitizer e
 build Fedora 44 e builder adapter D278/13 unapproved host-only `PASS`. I due
 builder D278 interessati sono stati corretti per linkare le dipendenze runtime
@@ -142,7 +143,10 @@ nativa applica `Continue`, cattura stdout/stderr, salva l'exit code e ripristina
 sempre la policy globale in `finally`. La qualifica V3 prova esplicitamente
 `stderr + exit 0` e un exit nonzero intenzionale `7`, quindi non indebolisce il
 controllo del risultato della suite. Sedici fixture sintetiche passano su Linux
-senza leggere capture autentiche; la nuova qualifica Windows resta da ripetere.
+senza leggere capture autentiche. Il relativo corrective è poi entrato nella
+baseline `7d0c9bd3c638a1ab5d180b03eb969bd1dd840813` usata dall'attempt 02;
+l'output separato della ripetizione `NativeQualificationOnly` non è parte
+dell'evidence commit, ma non è più il boundary tecnico corrente.
 
 Il primo live attempt full-enrollment è stato poi eseguito dall'Utente e
 preservato integralmente nel commit `98ec62b`, attempt
@@ -170,11 +174,45 @@ autentico il parser corretto produce 75 eventi, quattro
 `OEM_FIXED_CONTROL_01`, zero errori e observer `OBSERVING`, coerente con lo
 stop pre-wizard. Ora passano 18 fixture D279 e 79 test D274+D279 complessivi.
 
-Il Kit resta hard-gated: le accettazioni host-side e sensor-side del solo
-workflow OEM sono `true`, mentre baseline, capture/enrollment live e snapshot
-della nuova run restano chiusi; nessuna nuova baseline è approvata e la qualificazione
-PowerShell 5.1 nativa della versione V3 è ancora pendente con Goodix assente.
-Nessuna nuova esecuzione live è autorizzata.
+Il secondo live attempt è stato quindi eseguito dall'Utente sulla baseline
+`7d0c9bd3c638a1ab5d180b03eb969bd1dd840813` e preservato nel commit
+`6c1564b6e7f58a5694113ffcb2e35f9ea0847c7e`, attempt
+`D27910_20260905_ATTEMPT02`. Il finalizer ha chiuso `PASS` la prima
+registrazione OEM: 22 contatti dichiarati dall'operatore, 21 lifecycle wire
+primari completi, milestone terzo B0 osservata, zero contraddizioni finali,
+zero retry e zero sender Goodix del Kit.
+
+L'audit diretto dell'intero pcapng hash-gated
+`3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab`
+ricostruisce 924 pacchetti, 912 pacchetti target e 442 frame target. Tutti i 21
+IRQ2, i 21 `0x22 [01 00]` e i 21 ACK `0x22/01` appartengono a lifecycle
+completi: non esiste un 22º prefisso parziale. Poiché `operator_events.json`
+conserva solo il totale e non i timestamp per contatto, il delta è classificato
+semplicemente `1 operator contact without complete wire acquisition lifecycle`;
+il contatto specifico non è localizzabile. Il gap più lungo, dopo il ciclo 9,
+è solo un candidato non probante.
+
+Il primo ciclo usa una transizione distinta con NAV; i cicli 2–20 ripetono
+`primary B0 → 0x34 → 0x36/IRQ0100 → 0x20/auxiliary B0 → 0x34/IRQ0200 → 0x32`;
+il ciclo 21 omette il re-arm terminale. Si osservano quindi 21 stage primari,
+20 re-arm inter-ciclo, 21 finger-up IRQ0200 e 43 B0 fingerprint-shape totali:
+uno nel bootstrap, 21 primari e 21 ausiliari. La forma cifrata non permette di
+promuovere i B0 ausiliari a score di qualità, template o stage operatore.
+
+La finalizzazione target-visibile termina a packet 921 con l'ultimo IRQ0200.
+Un bulk-IN pendente completa a zero byte al packet 923; la conferma UI arriva
+2,372 s dopo e 11,370 s dopo l'ultimo frame. Non esistono frame né pacchetti
+target post-UI nei successivi 5,167 s. Non compare un distinto comando A0 di
+commit: non è possibile distinguere commit cifrato, implicito sensor-side e
+persistenza host-side.
+
+Nessuna famiglia nota `0xE0/0xA4/0xF0/0xF4` è visibile, ma ciò non esclude
+persistenza template sensor-side. La nuova evidenza non autorizza ulteriori
+live. Il boundary corrente torna offline: estendere il lifecycle Linux e il
+contratto libfprint/NBIS a 21 stage primari, mantenendo `0x20` come transizione
+interna e modellando la chiusura senza re-arm. L'audit metadata-only dedicato
+passa 3/3 e la regressione combinata D274+D279 passa 112/112; `captures/` resta
+byte-identico all'evidence commit.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
 solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
@@ -285,12 +323,12 @@ PRODUCTION_PRE_SESSION_RX_SYNC_REQUIRED=true
 PRODUCTION_RUNTIME_HANDOFF_VIEWS_CLEARED=true
 PRODUCTION_ENROLLMENT_ENABLED=false
 PRODUCTION_ENROLLMENT_REJECTION_SUBMIT_COUNT=0
-D279_10_OUTCOME=ATTEMPT01_FAIL_CLOSED_A0_CORRECTIVE_READY_OFFLINE
+D279_10_OUTCOME=ATTEMPT02_COMPLETE_OEM_ENROLLMENT_ANALYZED
 D279_10_REPLAN_BASELINE=fc2172f9973ea5a13f067dc3abfd98881c274efa
-D279_10_EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_WINDOWS_NATIVE_PENDING
+D279_10_EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_AND_REAL_EVIDENCE_AUDIT
 D279_10_SYNTHETIC_TESTS=18/18_PASS
 D279_10_WINDOWS_NATIVE_CC8754E=FAIL_NATIVE_COMMAND_ERROR_ON_UNITTEST_STDERR
-D279_10_WINDOWS_NATIVE_STDERR_CORRECTIVE=APPLIED_PENDING_REAL_TARGET_RETEST
+D279_10_WINDOWS_NATIVE_STDERR_CORRECTIVE=APPLIED_AND_USED_BY_ATTEMPT02_BASELINE
 D279_10_WINDOWS_NATIVE_QUALIFICATION_SCHEMA=V3
 D279_10_ATTEMPT01_EVIDENCE_COMMIT=98ec62bea75d7764e44296a1d70da7a2f06609c5
 D279_10_ATTEMPT01_RESULT=FAIL_CLOSED_PRE_WIZARD_ZERO_CONTACTS
@@ -300,6 +338,20 @@ D279_10_ATTEMPT01_FRAME_CLASS=VALID_OEM_CONTROL_SPECIFIC_A0
 D279_10_ATTEMPT01_INCREMENTAL_PCAP_ARTIFACT=false
 D279_10_OEM_FIXED_CONTROL_01_EXACT_ALLOWLIST=true
 D279_10_OEM_FIXED_CONTROL_01_NEAR_MISS_FAIL_CLOSED=true
+D279_10_ATTEMPT02_EVIDENCE_COMMIT=6c1564b6e7f58a5694113ffcb2e35f9ea0847c7e
+D279_10_ATTEMPT02_RESULT=PASS_COMPLETE_UI_CONFIRMED
+D279_10_ATTEMPT02_CAPTURE_SHA256=3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab
+D279_10_ATTEMPT02_OPERATOR_CONTACT_COUNT=22
+D279_10_ATTEMPT02_PRIMARY_ACQUISITION_STAGE_COUNT=21
+D279_10_ATTEMPT02_UNMATCHED_CONTACT_COUNT=1
+D279_10_ATTEMPT02_UNMATCHED_CONTACT_IDENTITY=UNKNOWN_NO_PER_CONTACT_TIMESTAMPS
+D279_10_ATTEMPT02_INTER_CYCLE_REARM_COUNT=20
+D279_10_ATTEMPT02_FINGER_UP_IRQ0200_COUNT=21
+D279_10_ATTEMPT02_FINGERPRINT_SHAPE_B0_COUNT=43
+D279_10_ATTEMPT02_TERMINAL_TARGET_FRAME=921_IRQ0200
+D279_10_ATTEMPT02_POST_UI_TARGET_FRAME_COUNT=0
+D279_10_ATTEMPT02_POST_UI_TARGET_PACKET_COUNT=0
+D279_10_ATTEMPT02_KNOWN_PERSISTENT_FAMILY_COUNT=0
 D279_10_PASSIVE_OEM_OBSERVER=true
 D279_10_WORKFLOW=FULL_FIRST_OEM_ENROLLMENT_UI_CONFIRMED_PLUS_TERMINAL_TAIL
 D279_10_CONTACT_COUNT_ASSUMED=false
@@ -362,20 +414,20 @@ FPIMAGE_PPMM_ASSIGNED=false
 FPRINTD_OPERATIONAL_PATH_PROVEN=false
 D279_01_OUTCOME=BLOCKED
 D278_14_CLOSED_LIVE=true
-REAL_USB_ACCESS=OPERATOR_OEM_PASSIVE_CAPTURE_ATTEMPT01
+REAL_USB_ACCESS=OPERATOR_OEM_PASSIVE_CAPTURE_ATTEMPT02
 REAL_USB_OPEN=OEM_DRIVER_NOT_KIT_SENDER
 REAL_USB_CLAIM=OEM_DRIVER_NOT_KIT_SENDER
 REAL_USB_SUBMIT=OEM_DRIVER_NOT_KIT_SENDER
 LIVE_EXECUTION_PERFORMED=true
 CURRENT_LIVE_AUTHORIZED=false
 VISIBLE_KNOWN_PERSISTENT_COMMAND_FAMILY_COUNT=0
-FACTORY_STATE_MUTATION=NOT_OBSERVED_PRE_WIZARD
+FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_AFTER_A0_CORRECTIVE_WITH_GOODIX_ABSENT
+NEXT_PRIMARY_BOUNDARY=OFFLINE_21_STAGE_GOODIX_POST_TLS_AND_LIBFPRINT_ENROLLMENT_MODEL
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
-NEXT_LIVE_PREREQUISITE=NATIVE_QUALIFICATION_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_LIVE_AUTHORIZATION
+NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
 
 ### D279/10 — Kit passivo per il primo enrollment OEM completo
@@ -404,9 +456,17 @@ La decisione non autorizza una nuova run né i comandi manutentivi esclusi.
 L'attempt 01 si è fermato prima del wizard per quattro frame OEM fissi control
 `0x01` completi che D274 sottoponeva erroneamente al checksum generico. La forma
 esatta è ora allowlistata; strict final e growing parse concordano, mentre ogni
-near-miss resta fail-closed. Qualificazione nativa del corrective, baseline live
-e autorizzazione per-attempt restano pendenti. Report:
-`analysis/D279/D279_10_third_acquisition_operator_kit_prep.md`.
+near-miss resta fail-closed.
+
+L'attempt 02 ha poi osservato l'intero enrollment: 21 stage primari completi,
+20 re-arm, una transizione NAV specifica del primo ciclo e un ciclo terminale
+senza re-arm. Il contatto operatore extra non è localizzabile perché manca la
+telemetria per-contact e non esiste un lifecycle wire parziale. La sequenza
+target termina prima della conferma UI e il tail post-UI resta senza pacchetti.
+L'assenza visibile delle famiglie persistenti note non esclude persistenza
+sensor-side. Report:
+`analysis/D279/D279_10_attempt02_full_enrollment_analysis.md` e
+`analysis/D279/D279_10_attempt02_full_enrollment_audit.json`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
