@@ -29,6 +29,16 @@ if [ "$adoption_mentions" -ne 2 ]; then
   exit 1
 fi
 echo D279_20_NO_PRODUCTION_ADOPTION_CALLER_SOURCE_AUDIT=PASS
+configuration_mentions=$(find "$git_root/libfprint-driver" \
+  -path "$git_root/libfprint-driver/tests" -prune -o \
+  \( -name '*.c' -o -name '*.h' \) -type f -exec \
+  grep -H 'goodix_device_context_configure_enrollment_graph' {} + | \
+  wc -l)
+if [ "$configuration_mentions" -ne 2 ]; then
+  echo "enrollment graph configuration acquired a production caller" >&2
+  exit 1
+fi
+echo D279_24_NO_PRODUCTION_CONFIGURATION_CALLER_SOURCE_AUDIT=PASS
 
 # ---- Generated enum registrations (host-only Python shim) ----
 python3 "$test_dir/support/generate_libfprint_enums.py" \
@@ -332,5 +342,6 @@ if [ "$normal_rc" -ne 0 ] || [ "$san_rc" -ne 0 ]; then
   exit 1
 fi
 echo D279_20_DORMANT_CONTEXT_OWNERSHIP_AND_DRAIN=PASS
+echo D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS
 echo D279_20_PRODUCTION_ENROLLMENT_GATE_RETAINED=PASS
 echo D279_20_REAL_USB_SUBMIT=0

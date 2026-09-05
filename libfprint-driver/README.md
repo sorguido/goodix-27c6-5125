@@ -282,6 +282,16 @@ still commits only on its matching positive backend completion. This is a
 host-tested prerequisite for the first-arm context handoff, not a production
 enrollment caller or gate change.
 
+## D279/24 context-owned first-arm handoff
+
+An explicit offline configuration seam lets `GoodixDeviceContext` prepare a
+parametric enrollment graph before the legacy post-TLS lifecycle starts. At
+the drained first-arm boundary the context transfers event ownership into the
+FpiUsb binding, routes later A0/TLS plaintext to it, and rearms protocol receive
+after each positive OUT completion. A synthetic bootstrap-through-first-IRQ2
+test covers the ownership transition; production enrollment remains rejected
+before activation and has no configuration caller.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

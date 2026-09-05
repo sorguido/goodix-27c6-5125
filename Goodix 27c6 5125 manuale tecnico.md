@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_OWNED_FIRST_ARM_HANDOFF_TO_PARAMETRIC_ENROLLMENT_GRAPH_WITH_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_FULL_PARAMETRIC_ENROLLMENT_TRANSCRIPT_AND_LIBFPRINT_STAGE_DELIVERY_WITH_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -779,6 +779,36 @@ la sua possibile rilevanza quality/template/NBIS non è risolta. Il prossimo
 step offline è fare costruire e possedere questo binding al context mediante
 l'handoff D279/21, ancora con il gate production chiuso. Report:
 `analysis/D279/D279_23_graph_ready_enrollment_progression.md`.
+
+### D279/24 — handoff first-arm posseduto dal context
+
+`GoodixDeviceContext` dispone ora di una seam di configurazione esplicita che
+prepara il grafo enrollment parametrico soltanto dopo la configurazione del
+lifecycle post-TLS e prima del suo start. Non invia né avvia nulla. Al confine
+D279/21, dopo ACK del primo arm e backend drenato, il callback del context
+costruisce il binding D279/18, trasferisce a esso l'ownership dell'event layer
+e installa la continuation di ricezione. Da quel momento A0 e plaintext TLS
+sono instradati al binding; ogni completion OUT positiva ri-arma un solo IN
+quando il grafo attende un input.
+
+La regressione host-only attraversa i nove comandi del bootstrap post-TLS,
+verifica STOP del vecchio owner e singolo handoff, poi consegna il primo IRQ2
+tramite router/context. Il grafo genera automaticamente il `0x22`, lo lascia
+pending fino alla completion e ri-arma la ricezione soltanto dopo il commit.
+La cancellazione terminale drena l'IN prima del free. La suite FpImageDevice
+passa 27/27 normal e ASan/UBSan; D279/14–24 resta 10/10 nelle due modalità,
+e la build Fedora 44/libfprint 1.94.100 con registry standard/NBIS passa senza
+enumerazione/open/claim/submit USB reale.
+
+La seam conserva un callback obbligatorio per il B0 ausiliario completo e
+opaco: non ne interpreta né ne nega la possibile rilevanza per quality,
+template o NBIS. Il profilo usato nel test di composizione è 2 stage per costo;
+i test del grafo continuano a coprire 2/3/21, e 21 resta soltanto l'osservazione
+target-local ATTEMPT02. Nessun caller production configura la seam e il gate
+enrollment continua a rifiutare prima dell'attivazione. Il prossimo step
+offline è percorrere nel context un transcript enrollment completo parametrico
+e verificare la consegna stage/libfprint, ancora dietro il gate. Report:
+`analysis/D279/D279_24_context_first_arm_enrollment_handoff.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

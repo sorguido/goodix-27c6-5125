@@ -10,6 +10,7 @@
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_runtime_material.h"
+#include "goodix_enrollment_fpi_usb_binding.h"
 
 G_BEGIN_DECLS
 
@@ -37,7 +38,6 @@ typedef enum
 typedef struct _GoodixDeviceContext GoodixDeviceContext;
 typedef struct _GoodixInMemoryBackend GoodixInMemoryBackend;
 typedef struct _GoodixUsbRouter GoodixUsbRouter;
-typedef struct _GoodixEnrollmentFpiUsbBinding GoodixEnrollmentFpiUsbBinding;
 typedef struct _GUsbDevice GUsbDevice;
 
 #define GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS 250u
@@ -159,6 +159,19 @@ gboolean goodix_device_context_configure_post_tls_lifecycle (
   const GoodixPostTlsMaterial  *material,
   GoodixPostTlsAudit           *audit,
   GError                      **error);
+/* Offline integration seam. It prepares a parametric graph and installs the
+ * first-arm handoff, but does not start either lifecycle or bypass the
+ * production enrollment activation gate. */
+gboolean goodix_device_context_configure_enrollment_graph (
+  GoodixDeviceContext                    *ctx,
+  const GoodixEnrollmentModelConfig      *config,
+  GoodixEnrollmentAuxiliaryB0Func         auxiliary_ready,
+  gpointer                                auxiliary_data,
+  GoodixEnrollmentPostTlsEventsAudit     *events_audit,
+  GoodixEnrollmentFpiUsbBindingAudit     *binding_audit,
+  GError                                **error);
+gboolean goodix_device_context_has_pending_enrollment_graph (
+  GoodixDeviceContext *ctx);
 GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
 GoodixPostTlsLifecycle *goodix_device_context_get_post_tls_lifecycle (
   GoodixDeviceContext *ctx);

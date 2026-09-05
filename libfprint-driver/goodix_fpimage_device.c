@@ -71,6 +71,10 @@ struct _GoodixDeviceContext
   GoodixSecureSession       *secure_session;
   GoodixPostTlsLifecycle    *post_tls_lifecycle;
   GoodixEnrollmentFpiUsbBinding *enrollment_binding;
+  GoodixEnrollmentPostTlsEvents *pending_enrollment_events;
+  GoodixEnrollmentAuxiliaryB0Func enrollment_auxiliary;
+  gpointer                   enrollment_auxiliary_data;
+  GoodixEnrollmentFpiUsbBindingAudit *enrollment_binding_audit;
   GoodixTlsPlaintextFunc     tls_plaintext;
   gpointer                   tls_user_data;
   guint                      a0_delivery_count;
@@ -250,7 +254,10 @@ context_usb_in_completed (GoodixFpiUsbBackend *backend,
   if (((ctx->post_tls_lifecycle != NULL &&
         goodix_post_tls_lifecycle_needs_receive (ctx->post_tls_lifecycle)) ||
        (ctx->secure_session != NULL &&
-        goodix_secure_session_needs_receive (ctx->secure_session))) &&
+        goodix_secure_session_needs_receive (ctx->secure_session)) ||
+       (ctx->enrollment_binding != NULL &&
+        goodix_enrollment_fpi_usb_binding_needs_receive (
+          ctx->enrollment_binding))) &&
       goodix_fpi_usb_backend_get_outstanding (ctx->fpi_usb_backend) == 0)
     {
       g_autoptr(GError) arm_error = NULL;
@@ -452,7 +459,15 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
   if (type != 0xa0 || ctx->terminal_fence)
     return;
   ctx->a0_delivery_count++;
-  if (ctx->post_tls_lifecycle != NULL &&
+  if (ctx->enrollment_binding != NULL)
+    {
+      g_autoptr(GError) error = NULL;
+
+      if (!goodix_enrollment_fpi_usb_binding_handle_a0 (
+            ctx->enrollment_binding, frame, &error))
+        context_protocol_failure (ctx, error);
+    }
+  else if (ctx->post_tls_lifecycle != NULL &&
       goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
         GOODIX_POST_TLS_PHASE_NOT_STARTED)
     goodix_post_tls_lifecycle_handle_a0 (ctx->post_tls_lifecycle, frame);
@@ -567,6 +582,7 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
   goodix_secure_session_free (ctx->secure_session);
   goodix_tls_server_free (ctx->tls_server);
   goodix_enrollment_fpi_usb_binding_free (ctx->enrollment_binding);
+  goodix_enrollment_post_tls_events_free (ctx->pending_enrollment_events);
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
@@ -1363,8 +1379,157 @@ context_post_tls_plaintext (GBytes   *bytes,
 {
   GoodixDeviceContext *ctx = user_data;
 
-  if (!ctx->terminal_fence && ctx->post_tls_lifecycle != NULL)
+  if (ctx->terminal_fence)
+    return;
+  if (ctx->enrollment_binding != NULL)
+    {
+      g_autoptr(GError) error = NULL;
+
+      if (!goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (
+            ctx->enrollment_binding, bytes, &error))
+        context_protocol_failure (ctx, error);
+    }
+  else if (ctx->post_tls_lifecycle != NULL)
     goodix_post_tls_lifecycle_handle_plaintext (ctx->post_tls_lifecycle, bytes);
+}
+
+static gboolean
+context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
+                          guint                     stage_index,
+                          FpImage                  *image,
+                          gpointer                  user_data,
+                          GError                  **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  (void) pipeline;
+  (void) stage_index;
+  if (ctx->terminal_fence || image == NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "enrollment image reached a fenced context");
+      return FALSE;
+    }
+  if (!ctx->operator_epoch)
+    fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
+                                     g_object_ref (image));
+  return !ctx->terminal_fence;
+}
+
+static gboolean
+context_enrollment_timestamp (guint                           stage_index,
+                              GoodixEnrollmentCommandPurpose  purpose,
+                              guint16                        *timestamp,
+                              gpointer                        user_data,
+                              GError                        **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  (void) stage_index;
+  (void) purpose;
+  if (ctx->terminal_fence || timestamp == NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "enrollment timestamp reached a fenced context");
+      return FALSE;
+    }
+  *timestamp = production_timestamp ();
+  return TRUE;
+}
+
+static gboolean
+context_enrollment_auxiliary (GBytes   *plaintext,
+                              gpointer  user_data,
+                              GError  **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  if (ctx->terminal_fence || ctx->enrollment_auxiliary == NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "auxiliary enrollment B0 has no active consumer");
+      return FALSE;
+    }
+  return ctx->enrollment_auxiliary (
+    plaintext, ctx->enrollment_auxiliary_data, error);
+}
+
+static gboolean
+context_enrollment_contact (guint      stage_index,
+                            gboolean   present,
+                            gpointer   user_data,
+                            GError   **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  (void) stage_index;
+  if (ctx->terminal_fence)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "enrollment contact reached a fenced context");
+      return FALSE;
+    }
+  if (present)
+    {
+      if (!ctx->operator_epoch)
+        goodix_device_context_emit_finger_down (ctx);
+    }
+  else
+    {
+      ctx->fresh_down_table = TRUE;
+      ctx->release_tail_complete = TRUE;
+      if (!ctx->operator_epoch)
+        goodix_device_context_emit_finger_up_ready (ctx);
+    }
+  return !ctx->terminal_fence;
+}
+
+static gboolean
+context_enrollment_ready (GoodixEnrollmentFpiUsbBinding *binding,
+                          gpointer                       user_data,
+                          GError                       **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  if (ctx->terminal_fence || binding != ctx->enrollment_binding ||
+      !goodix_enrollment_fpi_usb_binding_needs_receive (binding))
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "enrollment receive continuation is not current");
+      return FALSE;
+    }
+  return goodix_device_context_arm_receive (ctx, error);
+}
+
+static gboolean
+context_enrollment_first_arm_handoff (GoodixPostTlsLifecycle *lifecycle,
+                                      GoodixFpiUsbBackend    *backend,
+                                      guint64                 generation,
+                                      gpointer                user_data,
+                                      GError                **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+  GoodixEnrollmentFpiUsbBinding *binding;
+
+  if (ctx->terminal_fence || lifecycle != ctx->post_tls_lifecycle ||
+      backend != ctx->fpi_usb_backend || generation != ctx->generation ||
+      ctx->pending_enrollment_events == NULL ||
+      ctx->enrollment_binding != NULL ||
+      !goodix_fpi_usb_backend_is_drained (backend))
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "enrollment first-arm handoff preconditions failed");
+      return FALSE;
+    }
+  binding = goodix_enrollment_fpi_usb_binding_new (
+    ctx->pending_enrollment_events, backend, generation,
+    ctx->enrollment_binding_audit, error);
+  if (binding == NULL)
+    return FALSE;
+  ctx->pending_enrollment_events = NULL;
+  ctx->enrollment_binding = binding;
+  return goodix_enrollment_fpi_usb_binding_set_ready_callback (
+    binding, context_enrollment_ready, ctx, error);
 }
 
 static void
@@ -1408,6 +1573,56 @@ goodix_device_context_configure_post_tls_lifecycle (
     context_post_tls_finger_down, context_post_tls_release_tail,
     context_post_tls_finger_up, context_post_tls_terminal, ctx, audit, error);
   return ctx->post_tls_lifecycle != NULL;
+}
+
+gboolean
+goodix_device_context_configure_enrollment_graph (
+  GoodixDeviceContext                *ctx,
+  const GoodixEnrollmentModelConfig  *config,
+  GoodixEnrollmentAuxiliaryB0Func     auxiliary_ready,
+  gpointer                            auxiliary_data,
+  GoodixEnrollmentPostTlsEventsAudit *events_audit,
+  GoodixEnrollmentFpiUsbBindingAudit *binding_audit,
+  GError                            **error)
+{
+  GoodixEnrollmentPostTlsEvents *events;
+
+  if (ctx == NULL || config == NULL || auxiliary_ready == NULL ||
+      ctx->generation == 0u || ctx->terminal_fence ||
+      ctx->post_tls_lifecycle == NULL ||
+      goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
+        GOODIX_POST_TLS_PHASE_NOT_STARTED ||
+      ctx->secure_session != NULL || ctx->pending_enrollment_events != NULL ||
+      ctx->enrollment_binding != NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "GoodixDeviceContext cannot configure enrollment graph");
+      return FALSE;
+    }
+  events = goodix_enrollment_post_tls_events_new (
+    config, context_enrollment_image, context_enrollment_timestamp,
+    context_enrollment_auxiliary, ctx, events_audit, error);
+  if (events == NULL)
+    return FALSE;
+  if (!goodix_enrollment_post_tls_events_set_contact_callback (
+        events, context_enrollment_contact, ctx, error) ||
+      !goodix_post_tls_lifecycle_set_first_arm_handoff (
+        ctx->post_tls_lifecycle, context_enrollment_first_arm_handoff, error))
+    {
+      goodix_enrollment_post_tls_events_free (events);
+      return FALSE;
+    }
+  ctx->pending_enrollment_events = events;
+  ctx->enrollment_auxiliary = auxiliary_ready;
+  ctx->enrollment_auxiliary_data = auxiliary_data;
+  ctx->enrollment_binding_audit = binding_audit;
+  return TRUE;
+}
+
+gboolean
+goodix_device_context_has_pending_enrollment_graph (GoodixDeviceContext *ctx)
+{
+  return ctx != NULL && ctx->pending_enrollment_events != NULL;
 }
 
 gboolean

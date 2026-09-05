@@ -8,6 +8,10 @@
 G_BEGIN_DECLS
 
 typedef struct _GoodixEnrollmentFpiUsbBinding GoodixEnrollmentFpiUsbBinding;
+typedef gboolean (*GoodixEnrollmentFpiUsbReadyFunc) (
+  GoodixEnrollmentFpiUsbBinding *binding,
+  gpointer                       user_data,
+  GError                       **error);
 
 typedef struct
 {
@@ -36,6 +40,11 @@ GoodixEnrollmentFpiUsbBinding *goodix_enrollment_fpi_usb_binding_new (
 /* Free only after the backend OUT count is drained. */
 void goodix_enrollment_fpi_usb_binding_free (
   GoodixEnrollmentFpiUsbBinding *binding);
+gboolean goodix_enrollment_fpi_usb_binding_set_ready_callback (
+  GoodixEnrollmentFpiUsbBinding  *binding,
+  GoodixEnrollmentFpiUsbReadyFunc ready,
+  gpointer                        user_data,
+  GError                        **error);
 
 gboolean goodix_enrollment_fpi_usb_binding_submit_next (
   GoodixEnrollmentFpiUsbBinding *binding,
@@ -62,6 +71,8 @@ guint64 goodix_enrollment_fpi_usb_binding_get_generation (
   const GoodixEnrollmentFpiUsbBinding *binding);
 
 gboolean goodix_enrollment_fpi_usb_binding_has_pending (
+  const GoodixEnrollmentFpiUsbBinding *binding);
+gboolean goodix_enrollment_fpi_usb_binding_needs_receive (
   const GoodixEnrollmentFpiUsbBinding *binding);
 gboolean goodix_enrollment_fpi_usb_binding_is_complete (
   const GoodixEnrollmentFpiUsbBinding *binding);

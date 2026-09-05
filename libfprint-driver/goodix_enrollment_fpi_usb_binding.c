@@ -19,6 +19,8 @@ struct _GoodixEnrollmentFpiUsbBinding
   GoodixEnrollmentOutboundTransaction *transaction;
   GoodixEnrollmentFpiUsbBindingAudit internal_audit;
   GoodixEnrollmentFpiUsbBindingAudit *audit;
+  GoodixEnrollmentFpiUsbReadyFunc ready;
+  gpointer ready_data;
   GError *terminal_error;
 };
 
@@ -85,6 +87,19 @@ backend_out_complete (GoodixFpiUsbBackend *backend,
           GOODIX_ENROLLMENT_USB_BINDING_ERROR,
           GOODIX_ENROLLMENT_USB_BINDING_ERROR_STATE,
           "enrollment backend completion failed");
+      binding->audit->terminal = TRUE;
+    }
+  else if (binding->terminal_error == NULL &&
+           !goodix_enrollment_outbound_transaction_is_complete (
+             binding->transaction) && binding->ready != NULL &&
+           !binding->ready (binding, binding->ready_data, &error))
+    {
+      binding->terminal_error = g_steal_pointer (&error);
+      if (binding->terminal_error == NULL)
+        binding->terminal_error = g_error_new_literal (
+          GOODIX_ENROLLMENT_USB_BINDING_ERROR,
+          GOODIX_ENROLLMENT_USB_BINDING_ERROR_STATE,
+          "enrollment receive continuation failed");
       binding->audit->terminal = TRUE;
     }
 }
@@ -192,6 +207,25 @@ goodix_enrollment_fpi_usb_binding_free (GoodixEnrollmentFpiUsbBinding *binding)
 }
 
 gboolean
+goodix_enrollment_fpi_usb_binding_set_ready_callback (
+  GoodixEnrollmentFpiUsbBinding  *binding,
+  GoodixEnrollmentFpiUsbReadyFunc ready,
+  gpointer                        user_data,
+  GError                        **error)
+{
+  if (binding == NULL || ready == NULL || binding->ready != NULL ||
+      binding->terminal_error != NULL ||
+      binding->audit->backend_submit_attempt_count != 0u ||
+      binding->audit->transaction.positive_completion_count != 0u)
+    return binding_fail (
+      binding, "enrollment ready callback must be configured before input",
+      error);
+  binding->ready = ready;
+  binding->ready_data = user_data;
+  return TRUE;
+}
+
+gboolean
 goodix_enrollment_fpi_usb_binding_submit_next (
   GoodixEnrollmentFpiUsbBinding *binding,
   GError                       **error)
@@ -281,6 +315,20 @@ goodix_enrollment_fpi_usb_binding_has_pending (
   return binding != NULL && binding->terminal_error == NULL &&
          goodix_enrollment_outbound_transaction_has_pending (
            binding->transaction);
+}
+
+gboolean
+goodix_enrollment_fpi_usb_binding_needs_receive (
+  const GoodixEnrollmentFpiUsbBinding *binding)
+{
+  return binding != NULL && binding->terminal_error == NULL &&
+         !goodix_enrollment_outbound_transaction_has_pending (
+           binding->transaction) &&
+         !goodix_enrollment_outbound_transaction_is_complete (
+           binding->transaction) &&
+         !expected_event_is_command (
+           goodix_enrollment_post_tls_events_get_expected_event (
+             binding->events));
 }
 
 gboolean
