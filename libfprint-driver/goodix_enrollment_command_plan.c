@@ -275,3 +275,12 @@ goodix_enrollment_command_plan_is_failed (
   return plan == NULL || plan->failed ||
          goodix_enrollment_pipeline_is_failed (plan->pipeline);
 }
+
+GoodixEnrollmentEvent
+goodix_enrollment_command_plan_get_expected_event (
+  const GoodixEnrollmentCommandPlan *plan)
+{
+  return plan != NULL && !plan->failed ?
+    goodix_enrollment_pipeline_get_expected_event (plan->pipeline) :
+    GOODIX_ENROLLMENT_EVENT_NONE;
+}

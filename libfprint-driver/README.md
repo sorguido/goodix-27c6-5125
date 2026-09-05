@@ -196,6 +196,14 @@ resolved once, cached (including its caller-supplied timestamp), and must be
 committed exactly before another observation. Profiles 2/3/21 exercise the
 full sequence. The adapter still has no A0 serializer, backend or submit path.
 
+## D279/14 inbound post-TLS enrollment events
+
+`goodix_enrollment_post_tls_events.[ch]` strictly maps complete decrypted A0
+ACK/IRQ/NAV frames to the lifecycle adapter. Echo/status, IRQ control/id/flags
+and the target-observed NAV no-check shape are state-bound and fail closed.
+Primary samples and the opaque auxiliary B0 use separate typed calls. B0
+reassembly/decoding, A0 serialization, transport and submit remain outside.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

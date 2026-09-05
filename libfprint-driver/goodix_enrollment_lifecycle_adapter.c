@@ -268,6 +268,15 @@ goodix_enrollment_lifecycle_adapter_is_failed (
          goodix_enrollment_command_plan_is_failed (adapter->plan);
 }
 
+GoodixEnrollmentEvent
+goodix_enrollment_lifecycle_adapter_get_expected_event (
+  const GoodixEnrollmentLifecycleAdapter *adapter)
+{
+  return adapter != NULL && !adapter->failed ?
+    goodix_enrollment_command_plan_get_expected_event (adapter->plan) :
+    GOODIX_ENROLLMENT_EVENT_NONE;
+}
+
 void
 goodix_enrollment_prepared_command_clear (
   GoodixEnrollmentPreparedCommand *prepared)

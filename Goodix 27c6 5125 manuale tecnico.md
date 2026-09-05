@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_POST_TLS_EVENT_BINDING_WITH_SENDER_GATE_RETAINED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_B0_PLAINTEXT_REASSEMBLY_AND_TYPED_DELIVERY_ZERO_SENDER
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -573,6 +573,23 @@ production-shaped con registry standard e NBIS passa senza enumerazione/open/
 claim/submit USB. Il B0 ausiliario rimane semanticamente indeterminato,
 incluso l'eventuale ruolo in quality, template o NBIS. Report:
 `analysis/D279/D279_13_iterative_enrollment_lifecycle_adapter.md`.
+
+### D279/14 — binding inbound post-TLS enrollment
+
+`goodix_enrollment_post_tls_events.[ch]` traduce frame A0 completi già
+decifrati nell'evento esatto atteso dall'adapter. Sono ammessi soltanto ACK con
+echo/status esatti, IRQ2/IRQ0100/IRQ0200 con control/id/flags target-local e il
+NAV OEM no-check 2417/2410 con control `0x50` e marker `0x88`. Raster primario
+già decodificato e B0 ausiliario opaco hanno API distinte.
+
+La sequenza completa passa per profili 2/3/21, normal e ASan/UBSan; il profilo
+ATTEMPT02 conta 188 A0 inbound, di cui 125 ACK, 62 IRQ e un NAV. Echo e flags
+errati falliscono chiuso. Il binding non include builder A0, fixed64, backend
+o submit; la build Fedora 44 con registry standard/NBIS passa e il gate
+enrollment production resta invariato. Il B0 ausiliario è
+trattato come transizione protocol-internal, ma la sua eventuale utilità per
+quality, template o NBIS resta non determinata. Report:
+`analysis/D279/D279_14_inbound_post_tls_enrollment_events.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

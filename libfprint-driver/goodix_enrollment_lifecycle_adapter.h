@@ -77,6 +77,8 @@ gboolean goodix_enrollment_lifecycle_adapter_is_complete (
   const GoodixEnrollmentLifecycleAdapter *adapter);
 gboolean goodix_enrollment_lifecycle_adapter_is_failed (
   const GoodixEnrollmentLifecycleAdapter *adapter);
+GoodixEnrollmentEvent goodix_enrollment_lifecycle_adapter_get_expected_event (
+  const GoodixEnrollmentLifecycleAdapter *adapter);
 void goodix_enrollment_prepared_command_clear (
   GoodixEnrollmentPreparedCommand *prepared);
 

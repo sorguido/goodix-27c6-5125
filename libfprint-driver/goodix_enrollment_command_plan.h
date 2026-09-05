@@ -90,6 +90,8 @@ gboolean goodix_enrollment_command_plan_is_complete (
   const GoodixEnrollmentCommandPlan *plan);
 gboolean goodix_enrollment_command_plan_is_failed (
   const GoodixEnrollmentCommandPlan *plan);
+GoodixEnrollmentEvent goodix_enrollment_command_plan_get_expected_event (
+  const GoodixEnrollmentCommandPlan *plan);
 
 G_END_DECLS
 
