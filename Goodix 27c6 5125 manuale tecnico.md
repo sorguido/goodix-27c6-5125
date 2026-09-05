@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ENROLLMENT_SYNTHETIC_SUBMIT_TRANSACTION_WITH_PRODUCTION_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_DORMANT_ENROLLMENT_FPI_USB_BACKEND_BINDING_WITH_ACTIVATION_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -621,6 +621,21 @@ Tutti gli otto purpose passano round-trip parser/body/padding fixed64; un body
 manomesso fallisce prima del build. 2/2 test passano normal e ASan/UBSan. Il
 gate production continua a rifiutare enrollment prima dell'attivazione.
 Report: `analysis/D279/D279_16_enrollment_outbound_serializer.md`.
+
+### D279/17 — transazione OUT sintetica completion-gated
+
+`goodix_enrollment_outbound_transaction.[ch]` aggiunge uno sink astratto e un
+solo OUT pending. Il planner viene committato esclusivamente dopo completion
+positiva con la stessa generation; fino a quel momento l'ACK non è accettato.
+Doppio OUT, inbound anticipato, generation stale ed errore transport sono
+terminali e non generano retry.
+
+I profili 2/3/21 passano ora ogni comando attraverso la transazione; il profilo
+ATTEMPT02 esegue offline 125 build/sink/completion/commit. La suite combinata
+passa 7/7 normal e ASan/UBSan e prova stale generation e ACK anticipato senza
+commit. Il modulo non dipende dal backend USB reale e il gate production
+continua a rifiutare enrollment. Report:
+`analysis/D279/D279_17_completion_gated_synthetic_out.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

@@ -31,6 +31,13 @@ if grep -En '(goodix_a0_build|goodix_fpi_usb|fixed64_command|submit_out|g_usb_|l
   exit 1
 fi
 echo D279_14_INBOUND_ONLY_SOURCE_AUDIT=PASS
+if grep -En '(goodix_fpi_usb|submit_out|g_usb_|libusb_)' \
+    "$root/libfprint-driver/goodix_enrollment_outbound_transaction.c" \
+    "$root/libfprint-driver/goodix_enrollment_outbound_transaction.h"; then
+  echo "real backend dependency in D279/17 transaction" >&2
+  exit 1
+fi
+echo D279_17_SYNTHETIC_SINK_SOURCE_AUDIT=PASS
 
 run_build () {
   suffix=$1
@@ -46,7 +53,9 @@ run_build () {
     goodix_enrollment_command_body.c \
     goodix_enrollment_fdt_state.c \
     goodix_enrollment_lifecycle_adapter.c \
-    goodix_enrollment_post_tls_events.c; do
+    goodix_enrollment_post_tls_events.c \
+    goodix_enrollment_outbound_frame.c \
+    goodix_enrollment_outbound_transaction.c; do
     # shellcheck disable=SC2086
     gcc $strict $extra $cflags $includes -c \
       "$root/libfprint-driver/$source" \
@@ -80,6 +89,7 @@ echo D279_14_NORMAL=PASS
 run_build sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
 echo D279_14_ASAN_UBSAN=PASS
 echo D279_15_B0_STREAM=PASS
+echo D279_17_COMPLETION_GATED_SYNTHETIC_SUBMIT=PASS
 echo PRIMARY_B0_EXACT_PLAINTEXT_LENGTH=7693
 echo AUXILIARY_B0_DECLARED_LENGTH_MAX=8192
 echo AUXILIARY_B0_OPAQUE_CALLBACK=PASS
@@ -87,6 +97,7 @@ echo CONFIGURABLE_STAGE_PROFILES_2_3_21=PASS
 echo ATTEMPT02_OBSERVED_STAGE_COUNT=21
 echo OEM_UNIVERSAL_STAGE_COUNT_CLAIM=false
 echo AUXILIARY_B0_APPLICATION_SEMANTICS=UNDETERMINED
-echo A0_FRAME_BUILD_COUNT=0
+echo INBOUND_LAYER_A0_FRAME_BUILD_COUNT=0
+echo ATTEMPT02_PROFILE_SYNTHETIC_FIXED64_BUILD_COUNT=125
 echo REAL_USB_ACCESS=0
 echo REAL_USB_SUBMIT=0

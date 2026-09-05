@@ -220,6 +220,14 @@ serializes only controls `0x20/0x22/0x32/0x34/0x36/0x50` into zero-padded
 fixed64 A0. It has no backend or submit API. Known persistent families are not
 allowlisted, and production enrollment remains gated before activation.
 
+## D279/17 completion-gated synthetic OUT transaction
+
+`goodix_enrollment_outbound_transaction.[ch]` joins the serializer to an
+abstract host-test sink. Exactly one frame may be pending; the lifecycle is
+committed only after a positive same-generation completion. Early inbound,
+duplicate OUT, stale generation and transport failure are terminal with zero
+retry. The module has no production USB backend dependency.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

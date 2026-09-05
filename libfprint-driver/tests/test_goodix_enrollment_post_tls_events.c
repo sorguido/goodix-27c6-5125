@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "goodix_enrollment_post_tls_events.h"
+#include "goodix_enrollment_outbound_transaction.h"
 
 #include <fpi-image.h>
 #include <string.h>
@@ -166,14 +167,52 @@ prepare_commit (GoodixEnrollmentPostTlsEvents *events,
   goodix_enrollment_prepared_command_clear (&prepared);
 }
 
+static gboolean
+synthetic_frame_sink (guint64    generation,
+                      GBytes    *frame,
+                      gpointer   user_data,
+                      GError   **error)
+{
+  gsize length;
+
+  (void) user_data;
+  (void) error;
+  g_assert_cmpuint (generation, ==, 1u);
+  (void) g_bytes_get_data (frame, &length);
+  g_assert_cmpuint (length, ==, GOODIX_ENROLLMENT_FIXED64_LENGTH);
+  return TRUE;
+}
+
 static void
 command_ack (GoodixEnrollmentPostTlsEvents *events,
              GoodixEnrollmentEvent          command_event,
              guint8                         echo)
 {
   g_autoptr(GBytes) ack = NULL;
+  GoodixEnrollmentOutboundTransactionAudit transaction_audit;
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentOutboundTransaction *transaction =
+    goodix_enrollment_outbound_transaction_new (
+      events, 1u, synthetic_frame_sink, NULL, &transaction_audit, &error);
 
-  prepare_commit (events, command_event);
+  g_assert_nonnull (transaction);
+  g_assert_no_error (error);
+  g_assert_true (goodix_enrollment_outbound_transaction_submit_next (
+    transaction, &error));
+  g_assert_no_error (error);
+  g_assert_true (goodix_enrollment_outbound_transaction_has_pending (
+    transaction));
+  g_assert_cmpint (goodix_enrollment_post_tls_events_get_expected_event (events),
+                   ==, command_event);
+  g_assert_true (goodix_enrollment_outbound_transaction_complete_out (
+    transaction, 1u, NULL, &error));
+  g_assert_no_error (error);
+  g_assert_cmpuint (transaction_audit.sink_call_count, ==, 1u);
+  g_assert_cmpuint (transaction_audit.positive_completion_count, ==, 1u);
+  g_assert_cmpuint (transaction_audit.committed_after_completion_count, ==, 1u);
+  g_assert_cmpuint (transaction_audit.retry_count, ==, 0u);
+  g_assert_cmpuint (transaction_audit.real_usb_submit_count, ==, 0u);
+  goodix_enrollment_outbound_transaction_free (transaction);
   ack = build_ack (echo);
   handle_a0 (events, ack);
 }
@@ -464,6 +503,78 @@ test_primary_declared_length_fails_closed (void)
   goodix_enrollment_post_tls_events_free (events);
 }
 
+static void
+test_transaction_stale_completion_fails_closed (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit events_audit;
+  GoodixEnrollmentOutboundTransactionAudit transaction_audit;
+  Fixture fixture = { 0 };
+  guint8 raw[12];
+  g_autoptr(GBytes) irq = NULL;
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &events_audit, &error);
+  GoodixEnrollmentOutboundTransaction *transaction =
+    goodix_enrollment_outbound_transaction_new (
+      events, 1u, synthetic_frame_sink, NULL, &transaction_audit, &error);
+
+  fill_raw (0x88u, raw);
+  irq = build_irq (0x32, 0x0002, 0x003f, raw);
+  g_assert_true (goodix_enrollment_outbound_transaction_handle_a0 (
+    transaction, irq, &error));
+  g_assert_true (goodix_enrollment_outbound_transaction_submit_next (
+    transaction, &error));
+  g_assert_false (goodix_enrollment_outbound_transaction_complete_out (
+    transaction, 2u, NULL, &error));
+  g_assert_nonnull (error);
+  g_assert_true (goodix_enrollment_outbound_transaction_is_failed (
+    transaction));
+  g_assert_cmpuint (transaction_audit.stale_generation_count, ==, 1u);
+  g_assert_cmpuint (transaction_audit.committed_after_completion_count, ==, 0u);
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==, 0u);
+  goodix_enrollment_outbound_transaction_free (transaction);
+  goodix_enrollment_post_tls_events_free (events);
+}
+
+static void
+test_transaction_early_ack_fails_closed (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit events_audit;
+  GoodixEnrollmentOutboundTransactionAudit transaction_audit;
+  Fixture fixture = { 0 };
+  guint8 raw[12];
+  g_autoptr(GBytes) irq = NULL;
+  g_autoptr(GBytes) ack = build_ack (0x22);
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &events_audit, &error);
+  GoodixEnrollmentOutboundTransaction *transaction =
+    goodix_enrollment_outbound_transaction_new (
+      events, 1u, synthetic_frame_sink, NULL, &transaction_audit, &error);
+
+  fill_raw (0x88u, raw);
+  irq = build_irq (0x32, 0x0002, 0x003f, raw);
+  g_assert_true (goodix_enrollment_outbound_transaction_handle_a0 (
+    transaction, irq, &error));
+  g_assert_true (goodix_enrollment_outbound_transaction_submit_next (
+    transaction, &error));
+  g_assert_false (goodix_enrollment_outbound_transaction_handle_a0 (
+    transaction, ack, &error));
+  g_assert_nonnull (error);
+  g_assert_true (goodix_enrollment_outbound_transaction_is_failed (
+    transaction));
+  g_assert_cmpuint (transaction_audit.committed_after_completion_count, ==, 0u);
+  g_assert_cmpuint (events_audit.ack_count, ==, 0u);
+  goodix_enrollment_outbound_transaction_free (transaction);
+  goodix_enrollment_post_tls_events_free (events);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -478,5 +589,9 @@ main (int argc, char **argv)
                    test_fragmented_primary_and_opaque_auxiliary);
   g_test_add_func ("/d279-15-b0-stream/invalid-primary-length-fails-closed",
                    test_primary_declared_length_fails_closed);
+  g_test_add_func ("/d279-17-transaction/stale-completion-fails-closed",
+                   test_transaction_stale_completion_fails_closed);
+  g_test_add_func ("/d279-17-transaction/early-ack-fails-closed",
+                   test_transaction_early_ack_fails_closed);
   return g_test_run ();
 }
