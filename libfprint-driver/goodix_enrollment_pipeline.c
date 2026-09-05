@@ -104,6 +104,8 @@ pipeline_fail (GoodixEnrollmentPipeline *pipeline,
                const gchar             *message,
                GError                 **error)
 {
+  goodix_fpimage_pipeline_free (pipeline->pending_image);
+  pipeline->pending_image = NULL;
   pipeline->failed = TRUE;
   if (pipeline->audit != NULL)
     pipeline->audit->failed = TRUE;
@@ -120,6 +122,7 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
 {
   GoodixFpImagePipelineResult image_result;
   gboolean accepted;
+  guint completed_before;
 
   if (pipeline == NULL)
     {
@@ -139,6 +142,8 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
     {
       accepted = goodix_enrollment_model_feed (pipeline->model, event, error);
       g_assert (!accepted);
+      goodix_fpimage_pipeline_free (pipeline->pending_image);
+      pipeline->pending_image = NULL;
       pipeline->failed = TRUE;
       if (pipeline->audit != NULL)
         pipeline->audit->failed = TRUE;
@@ -173,8 +178,12 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
                           "non-primary enrollment event cannot carry a raster",
                           error);
 
+  completed_before = goodix_enrollment_model_get_completed_stage_count (
+    pipeline->model);
   accepted = goodix_enrollment_model_feed (pipeline->model, event, error);
-  if (event == GOODIX_ENROLLMENT_EVENT_PRIMARY_B0)
+  if (!accepted ||
+      goodix_enrollment_model_get_completed_stage_count (pipeline->model) >
+        completed_before)
     {
       goodix_fpimage_pipeline_free (pipeline->pending_image);
       pipeline->pending_image = NULL;

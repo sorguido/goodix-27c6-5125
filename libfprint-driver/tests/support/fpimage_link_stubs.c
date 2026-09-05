@@ -40,7 +40,6 @@ goodix_test_sigfm_extract_unblock (void)
 {
   g_mutex_lock (&sigfm_mutex);
   sigfm_extract_block = 0;
-  sigfm_extract_blocked_count = 0;
   g_cond_broadcast (&sigfm_cond);
   g_mutex_unlock (&sigfm_mutex);
 }
@@ -51,6 +50,22 @@ goodix_test_sigfm_extract_is_blocked (void)
   gboolean blocked;
 
   g_mutex_lock (&sigfm_mutex);
+  blocked = sigfm_extract_blocked_count > 0;
+  g_mutex_unlock (&sigfm_mutex);
+
+  return blocked;
+}
+
+gboolean
+goodix_test_sigfm_extract_wait_blocked (gint64 timeout_us)
+{
+  gint64 deadline = g_get_monotonic_time () + timeout_us;
+  gboolean blocked;
+
+  g_mutex_lock (&sigfm_mutex);
+  while (sigfm_extract_blocked_count == 0 &&
+         g_cond_wait_until (&sigfm_cond, &sigfm_mutex, deadline))
+    ;
   blocked = sigfm_extract_blocked_count > 0;
   g_mutex_unlock (&sigfm_mutex);
 
@@ -174,6 +189,7 @@ sigfm_extract (const SigfmPix *pix, int width, int height)
   if (sigfm_extract_block)
     {
       sigfm_extract_blocked_count++;
+      g_cond_broadcast (&sigfm_cond);
       while (sigfm_extract_block)
         g_cond_wait (&sigfm_cond, &sigfm_mutex);
       sigfm_extract_blocked_count--;

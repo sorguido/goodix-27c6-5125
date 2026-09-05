@@ -15,6 +15,7 @@ typedef enum
 struct _GoodixEnrollmentModel
 {
   guint required_stage_count;
+  guint observed_stage_count;
   guint completed_stage_count;
   GoodixEnrollmentEvent expected;
   GoodixEnrollmentTransition transition;
@@ -25,6 +26,8 @@ struct _GoodixEnrollmentModel
   gboolean failed;
   gboolean repeated_after_auxiliary;
   gboolean first_nav_seen;
+  gboolean defer_terminal_stage_delivery;
+  gboolean terminal_stage_pending;
 };
 
 static GQuark
@@ -78,6 +81,8 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
 
   model = g_new0 (GoodixEnrollmentModel, 1);
   model->required_stage_count = config->required_stage_count;
+  model->defer_terminal_stage_delivery =
+    config->defer_terminal_stage_delivery;
   model->expected = GOODIX_ENROLLMENT_EVENT_IRQ2;
   model->stage_ready = stage_ready;
   model->user_data = user_data;
@@ -86,6 +91,8 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
     {
       *audit = (GoodixEnrollmentModelAudit) { 0 };
       audit->configured_required_stage_count = config->required_stage_count;
+      audit->configured_defer_terminal_stage_delivery =
+        config->defer_terminal_stage_delivery;
     }
   return model;
 }
@@ -103,9 +110,46 @@ expect (GoodixEnrollmentModel *model,
   model->expected = event;
 }
 
-static void
-finish (GoodixEnrollmentModel *model)
+static gboolean
+deliver_stage (GoodixEnrollmentModel *model,
+               guint                  stage_index,
+               GError               **error)
 {
+  g_autoptr(GError) callback_error = NULL;
+
+  if (!model->stage_ready (model, stage_index, model->user_data,
+                           &callback_error))
+    {
+      model->failed = TRUE;
+      model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
+      if (model->audit != NULL)
+        model->audit->failed = TRUE;
+      if (callback_error == NULL)
+        callback_error = g_error_new_literal (
+          GOODIX_ENROLLMENT_ERROR, GOODIX_ENROLLMENT_ERROR_STAGE,
+          "enrollment stage callback rejected without an error");
+      g_propagate_error (error, g_steal_pointer (&callback_error));
+      return FALSE;
+    }
+  model->completed_stage_count++;
+  if (model->audit != NULL)
+    {
+      model->audit->completed_stage_count = model->completed_stage_count;
+      model->audit->libfprint_stage_report_count++;
+    }
+  return TRUE;
+}
+
+static gboolean
+finish (GoodixEnrollmentModel *model,
+        GError               **error)
+{
+  if (model->terminal_stage_pending)
+    {
+      if (!deliver_stage (model, model->observed_stage_count, error))
+        return FALSE;
+      model->terminal_stage_pending = FALSE;
+    }
   model->complete = TRUE;
   model->transition = GOODIX_ENROLLMENT_TRANSITION_TERMINAL;
   model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
@@ -114,6 +158,7 @@ finish (GoodixEnrollmentModel *model)
       model->audit->terminal_transition_count++;
       model->audit->complete = TRUE;
     }
+  return TRUE;
 }
 
 gboolean
@@ -121,8 +166,6 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
                               GoodixEnrollmentEvent  event,
                               GError               **error)
 {
-  g_autoptr(GError) callback_error = NULL;
-
   if (model == NULL)
     {
       g_set_error_literal (error, GOODIX_ENROLLMENT_ERROR,
@@ -154,33 +197,28 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
       expect (model, GOODIX_ENROLLMENT_EVENT_PRIMARY_B0);
       break;
     case GOODIX_ENROLLMENT_EVENT_PRIMARY_B0:
-      if (model->audit != NULL)
-        model->audit->primary_b0_count++;
-      if (!model->stage_ready (model, model->completed_stage_count + 1u,
-                               model->user_data, &callback_error))
+      if (model->observed_stage_count >= model->required_stage_count)
         {
-          model->failed = TRUE;
-          model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
-          if (model->audit != NULL)
-            model->audit->failed = TRUE;
-          if (callback_error == NULL)
-            callback_error = g_error_new_literal (
-              GOODIX_ENROLLMENT_ERROR, GOODIX_ENROLLMENT_ERROR_STAGE,
-              "enrollment stage callback rejected without an error");
-          g_propagate_error (error, g_steal_pointer (&callback_error));
-          return FALSE;
+          return model_fail (model, GOODIX_ENROLLMENT_ERROR_PROTOCOL,
+                             event, error);
         }
-      model->completed_stage_count++;
+      model->observed_stage_count++;
       if (model->audit != NULL)
         {
-          model->audit->completed_stage_count = model->completed_stage_count;
-          model->audit->libfprint_stage_report_count++;
+          model->audit->observed_primary_stage_count =
+            model->observed_stage_count;
+          model->audit->primary_b0_count++;
         }
-      model->transition = model->completed_stage_count == 1u ?
+      model->transition = model->observed_stage_count == 1u ?
         GOODIX_ENROLLMENT_TRANSITION_FIRST_NAV :
-        (model->completed_stage_count == model->required_stage_count ?
+        (model->observed_stage_count == model->required_stage_count ?
          GOODIX_ENROLLMENT_TRANSITION_TERMINAL :
          GOODIX_ENROLLMENT_TRANSITION_REPEATED_REARM);
+      if (model->transition == GOODIX_ENROLLMENT_TRANSITION_TERMINAL &&
+          model->defer_terminal_stage_delivery)
+        model->terminal_stage_pending = TRUE;
+      else if (!deliver_stage (model, model->observed_stage_count, error))
+        return FALSE;
       expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_34);
       break;
     case GOODIX_ENROLLMENT_EVENT_COMMAND_34:
@@ -224,7 +262,10 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
       if (model->transition == GOODIX_ENROLLMENT_TRANSITION_FIRST_NAV)
         expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_20);
       else if (model->transition == GOODIX_ENROLLMENT_TRANSITION_TERMINAL)
-        finish (model);
+        {
+          if (!finish (model, error))
+            return FALSE;
+        }
       else
         expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_32);
       break;

@@ -156,6 +156,15 @@ stage accounting without enabling enrollment or changing sensor-reaching code.
 NBIS ppmm contract, exposes the image as transfer-none during the callback and
 destroys it afterward. Non-primary events carrying a raster fail closed.
 
+The 27c6:5125 `FpImageDevice` class now advertises the target-local 21-stage
+policy observed in ATTEMPT02; the generic model remains configurable. With
+terminal deferral enabled, the final primary raster is retained until the
+terminal IRQ0200 so the caller can report finger-up before asynchronous image
+extraction can complete enrollment. The full 21-stage framework fixture uses
+the historical SIGFM test double and therefore proves state/progress ordering,
+not production NBIS biometric quality. Production enrollment remains rejected
+before any submit while the sensor-reaching lifecycle is still bounded.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

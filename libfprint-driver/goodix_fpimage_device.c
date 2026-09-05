@@ -945,8 +945,8 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
     {
       error = g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-        "Goodix enrollment is disabled until the target stage policy and "
-        "third acquisition are proven");
+        "Goodix enrollment is disabled until the target-observed multistage "
+        "lifecycle is integrated and reviewed");
       fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
       return;
     }
@@ -1073,6 +1073,7 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   device_class->full_name = "Goodix 27c6:5125 host-only shell";
   device_class->type      = FP_DEVICE_TYPE_VIRTUAL;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
+  device_class->nr_enroll_stages = GOODIX_TARGET_LOCAL_ENROLL_STAGES;
 
   img_class->img_open     = goodix_fpimage_device_img_open;
   img_class->img_close    = goodix_fpimage_device_img_close;

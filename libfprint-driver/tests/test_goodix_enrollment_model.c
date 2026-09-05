@@ -95,7 +95,10 @@ feed_repeated_transition (GoodixEnrollmentModel *model,
 static void
 run_profile (guint required_stages)
 {
-  GoodixEnrollmentModelConfig config = { required_stages };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = required_stages,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentModelAudit audit;
   Fixture fixture = { 0 };
   g_autoptr(GError) error = NULL;
@@ -107,6 +110,14 @@ run_profile (guint required_stages)
   for (guint stage = 1u; stage <= required_stages; stage++)
     {
       feed_primary (model);
+      if (stage == required_stages)
+        {
+          g_assert_cmpuint (fixture.callback_count, ==,
+                            required_stages - 1u);
+          g_assert_cmpuint (audit.primary_b0_count, ==, required_stages);
+          g_assert_cmpuint (audit.completed_stage_count, ==,
+                            required_stages - 1u);
+        }
       if (stage == 1u)
         feed_first_transition (model);
       else
@@ -118,6 +129,8 @@ run_profile (guint required_stages)
   g_assert_cmpuint (fixture.callback_count, ==, required_stages);
   g_assert_cmpuint (audit.configured_required_stage_count, ==,
                     required_stages);
+  g_assert_true (audit.configured_defer_terminal_stage_delivery);
+  g_assert_cmpuint (audit.observed_primary_stage_count, ==, required_stages);
   g_assert_cmpuint (audit.completed_stage_count, ==, required_stages);
   g_assert_cmpuint (audit.primary_b0_count, ==, required_stages);
   g_assert_cmpuint (audit.auxiliary_b0_count, ==, required_stages);
@@ -145,7 +158,7 @@ test_configurable_profiles (void)
 static void
 test_auxiliary_does_not_report_stage (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u };
+  GoodixEnrollmentModelConfig config = { .required_stage_count = 2u };
   GoodixEnrollmentModelAudit audit;
   Fixture fixture = { 0 };
   g_autoptr(GError) error = NULL;
@@ -171,7 +184,7 @@ test_auxiliary_does_not_report_stage (void)
 static void
 test_mismatch_is_terminal (void)
 {
-  GoodixEnrollmentModelConfig config = { 21u };
+  GoodixEnrollmentModelConfig config = { .required_stage_count = 21u };
   GoodixEnrollmentModelAudit audit;
   Fixture fixture = { 0 };
   g_autoptr(GError) error = NULL;
@@ -199,7 +212,7 @@ test_callback_failure_is_terminal (void)
 {
   for (guint with_error = 0u; with_error < 2u; with_error++)
     {
-      GoodixEnrollmentModelConfig config = { 2u };
+      GoodixEnrollmentModelConfig config = { .required_stage_count = 2u };
       GoodixEnrollmentModelAudit audit;
       Fixture fixture = { 0 };
       g_autoptr(GError) error = NULL;
@@ -227,7 +240,7 @@ test_callback_failure_is_terminal (void)
 static void
 test_post_completion_rejected_without_audit_corruption (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u };
+  GoodixEnrollmentModelConfig config = { .required_stage_count = 2u };
   GoodixEnrollmentModelAudit audit;
   Fixture fixture = { 0 };
   g_autoptr(GError) error = NULL;
@@ -252,7 +265,7 @@ test_post_completion_rejected_without_audit_corruption (void)
 static void
 test_invalid_stage_count (void)
 {
-  GoodixEnrollmentModelConfig config = { 1u };
+  GoodixEnrollmentModelConfig config = { .required_stage_count = 1u };
   Fixture fixture = { 0 };
   g_autoptr(GError) error = NULL;
   GoodixEnrollmentModel *model = goodix_enrollment_model_new (

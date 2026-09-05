@@ -392,7 +392,7 @@ run_enroll_cycle (TestFixture *f,
   goodix_device_context_emit_release_tail_complete (f->ctx);
   g_assert_cmpuint (goodix_in_memory_backend_get_rearm_count (f->ctx), ==, 1);
 
-  /* Cancel before the full five-stage enrollment proceeds further. */
+  /* Cancel before the configured multistage enrollment proceeds further. */
   g_cancellable_cancel (cancellable);
   test_wait (f);
   g_assert_false (f->success);
@@ -416,6 +416,80 @@ test_enroll_finger_off_before_minutiae_done (void)
 
   fixture_open (f);
   run_enroll_cycle (f, TRUE, FALSE);
+  fixture_close (f);
+  test_fixture_free (f);
+}
+
+static void
+test_d279_11_full_target_local_stage_policy (void)
+{
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  TestFixture *f = test_fixture_new ();
+
+  fixture_open (f);
+  g_assert_cmpint (fp_device_get_nr_enroll_stages (FP_DEVICE (f->device)), ==,
+                   (gint) GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+  template = fp_print_new (FP_DEVICE (f->device));
+  fill_gradient_samples (samples);
+  f->done = FALSE;
+  f->completion_count = 0;
+  f->enroll_progress_count = 0;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+
+  for (guint stage = 1u; stage <= GOODIX_TARGET_LOCAL_ENROLL_STAGES; stage++)
+    {
+      gint64 deadline;
+      gboolean final_stage = stage == GOODIX_TARGET_LOCAL_ENROLL_STAGES;
+
+      g_assert_cmpint (f->last_state, ==,
+                       FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
+      goodix_device_context_emit_finger_down (f->ctx);
+      g_assert_cmpint (f->last_state, ==, FPI_IMAGE_DEVICE_STATE_CAPTURE);
+      samples[stage % G_N_ELEMENTS (samples)] = (uint16_t) (stage * 17u);
+      if (final_stage)
+        goodix_test_sigfm_extract_set_block (TRUE);
+      goodix_device_context_emit_image_ready (
+        f->ctx, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+
+      if (final_stage)
+        {
+          g_assert_true (goodix_test_sigfm_extract_wait_blocked (
+            TEST_TIMEOUT_MS * 1000));
+          goodix_device_context_emit_release_tail_complete (f->ctx);
+          goodix_device_context_emit_finger_up_ready (f->ctx);
+          g_assert_cmpint (f->last_state, ==, FPI_IMAGE_DEVICE_STATE_IDLE);
+          goodix_test_sigfm_extract_unblock ();
+        }
+
+      deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+      while (f->enroll_progress_count < stage && !f->done &&
+             g_get_monotonic_time () < deadline)
+        g_main_context_iteration (NULL, FALSE);
+      g_assert_cmpuint (f->enroll_progress_count, ==, stage);
+
+      if (!final_stage)
+        {
+          goodix_device_context_emit_release_tail_complete (f->ctx);
+          goodix_device_context_emit_finger_up_ready (f->ctx);
+          g_assert_cmpint (f->last_state, ==,
+                           FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
+        }
+    }
+
+  test_wait (f);
+  g_assert_true (f->success);
+  g_assert_nonnull (f->enroll_print);
+  g_assert_cmpuint (f->completion_count, ==, 1u);
+  g_assert_cmpuint (f->enroll_progress_count, ==,
+                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+
   fixture_close (f);
   test_fixture_free (f);
 }
@@ -1612,6 +1686,8 @@ main (int argc, char **argv)
                    test_enroll_minutiae_done_before_finger_off);
   g_test_add_func ("/goodix-fpimage-device/enroll-finger-off-before-minutiae-done",
                    test_enroll_finger_off_before_minutiae_done);
+  g_test_add_func ("/goodix-fpimage-device/d279-11-full-target-local-stage-policy",
+                   test_d279_11_full_target_local_stage_policy);
   g_test_add_func ("/goodix-fpimage-device/no-rearm-before-both-gates",
                    test_no_rearm_before_both_gates);
   g_test_add_func ("/goodix-fpimage-device/no-command-after-deactivate-fence",

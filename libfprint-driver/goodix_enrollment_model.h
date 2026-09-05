@@ -47,11 +47,17 @@ typedef struct
   /* Target/profile input, not a universal OEM constant.  The observed
    * ATTEMPT02 value is 21; the model intentionally accepts other values. */
   guint required_stage_count;
+  /* FpImageDevice may complete enrollment as soon as final extraction ends.
+   * Defer the final stage callback until terminal IRQ0200 so the caller can
+   * immediately report finger-up before that asynchronous completion. */
+  gboolean defer_terminal_stage_delivery;
 } GoodixEnrollmentModelConfig;
 
 typedef struct
 {
   guint configured_required_stage_count;
+  gboolean configured_defer_terminal_stage_delivery;
+  guint observed_primary_stage_count;
   guint completed_stage_count;
   guint primary_b0_count;
   guint auxiliary_b0_count;

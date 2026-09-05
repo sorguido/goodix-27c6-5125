@@ -44,6 +44,11 @@ typedef struct _GUsbDevice GUsbDevice;
 #define GOODIX_PRE_SESSION_RX_MAX_BYTES 65536u
 #define GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS 2000u
 
+/* Successful primary stages observed for this exact target/profile in
+ * D279/10 ATTEMPT02.  This is the current libfprint policy for 27c6:5125,
+ * not a universal OEM or firmware constant. */
+#define GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u
+
 typedef enum
 {
   GOODIX_PRE_SESSION_RX_SYNC_NOT_STARTED = 0,

@@ -37,7 +37,9 @@ GoodixEnrollmentPipeline *goodix_enrollment_pipeline_new (
 void goodix_enrollment_pipeline_free (GoodixEnrollmentPipeline *pipeline);
 
 /* Samples are required exactly for PRIMARY_B0 and forbidden for all other
- * events.  In particular, AUXILIARY_B0 remains an opaque protocol event. */
+ * events.  In particular, AUXILIARY_B0 remains an opaque protocol event.
+ * PRIMARY_B0 is always the raster provenance boundary; when terminal-stage
+ * deferral is configured, delivery occurs only at terminal IRQ0200. */
 gboolean goodix_enrollment_pipeline_feed (
   GoodixEnrollmentPipeline *pipeline,
   GoodixEnrollmentEvent     event,

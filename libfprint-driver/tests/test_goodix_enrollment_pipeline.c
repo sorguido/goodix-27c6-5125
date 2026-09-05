@@ -116,7 +116,10 @@ feed_repeated_transition (GoodixEnrollmentPipeline *pipeline,
 static void
 run_profile (guint stages)
 {
-  GoodixEnrollmentModelConfig config = { stages };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = stages,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPipelineAudit audit;
   Fixture fixture = { 0 };
   g_autoptr(GError) error = NULL;
@@ -128,6 +131,12 @@ run_profile (guint stages)
   for (guint stage = 1u; stage <= stages; stage++)
     {
       feed_primary (pipeline, stage, &fixture);
+      if (stage == stages)
+        {
+          g_assert_cmpuint (audit.fpimage_construct_count, ==, stages);
+          g_assert_cmpuint (audit.fpimage_delivery_count, ==, stages - 1u);
+          g_assert_cmpuint (audit.protocol.primary_b0_count, ==, stages);
+        }
       if (stage == 1u)
         feed_first_transition (pipeline);
       else
@@ -156,7 +165,10 @@ test_configurable_image_delivery (void)
 static void
 test_auxiliary_raster_rejected (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPipelineAudit audit;
   Fixture fixture = { 0 };
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT] = { 0 };
@@ -184,7 +196,10 @@ test_auxiliary_raster_rejected (void)
 static void
 test_delivery_failure_is_terminal (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPipelineAudit audit;
   Fixture fixture = { 0 };
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT] = { 0 };
@@ -213,7 +228,10 @@ test_delivery_failure_is_terminal (void)
 static void
 test_out_of_order_primary_does_not_construct (void)
 {
-  GoodixEnrollmentModelConfig config = { 21u };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 21u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPipelineAudit audit;
   Fixture fixture = { 0 };
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT] = { 0 };
@@ -234,6 +252,34 @@ test_out_of_order_primary_does_not_construct (void)
   goodix_enrollment_pipeline_free (pipeline);
 }
 
+static void
+test_terminal_pending_image_released_on_mismatch (void)
+{
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
+  GoodixEnrollmentPipelineAudit audit;
+  Fixture fixture = { 0 };
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPipeline *pipeline = goodix_enrollment_pipeline_new (
+    &config, image_ready, &fixture, &audit, &error);
+
+  g_assert_nonnull (pipeline);
+  feed_primary (pipeline, 1u, &fixture);
+  feed_first_transition (pipeline);
+  feed_primary (pipeline, 2u, &fixture);
+  g_assert_cmpuint (fixture.delivery_count, ==, 1u);
+  g_assert_cmpuint (audit.fpimage_construct_count, ==, 2u);
+  g_assert_cmpuint (audit.fpimage_delivery_count, ==, 1u);
+  g_assert_false (goodix_enrollment_pipeline_feed (
+    pipeline, GOODIX_ENROLLMENT_EVENT_COMMAND_36, NULL, 0u, &error));
+  g_assert_nonnull (error);
+  g_assert_true (goodix_enrollment_pipeline_is_failed (pipeline));
+  g_assert_cmpuint (fixture.delivery_count, ==, 1u);
+  goodix_enrollment_pipeline_free (pipeline);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -246,5 +292,7 @@ main (int argc, char **argv)
                    test_delivery_failure_is_terminal);
   g_test_add_func ("/d279-11-pipeline/out-of-order-primary-no-construct",
                    test_out_of_order_primary_does_not_construct);
+  g_test_add_func ("/d279-11-pipeline/terminal-pending-mismatch",
+                   test_terminal_pending_image_released_on_mismatch);
   return g_test_run ();
 }

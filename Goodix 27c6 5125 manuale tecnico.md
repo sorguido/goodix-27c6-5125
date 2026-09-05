@@ -90,8 +90,8 @@ generation e con zero submit. Fedora 44 richiede per default cinque stage in
 una sola activation, mentre quel lifecycle locale termina al secondo B0. La
 successiva evidenza D279/10 attempt 02 ha superato questo limite storico e
 misurato 21 stage OEM primari; il sender Linux resta però ancora bounded al
-secondo B0. La suite è
-ora 24/24 normale e sanitizer, con regressione D278 24/24 normale/sanitizer e
+secondo B0. La suite è ora 25/25 normale e sanitizer, con regressione D278
+24/24 normale/sanitizer e
 build Fedora 44 e builder adapter D278/13 unapproved host-only `PASS`. I due
 builder D278 interessati sono stati corretti per linkare le dipendenze runtime
 introdotte da D279/08; non è cambiato il protocollo né è stata abilitata una
@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_FPIMAGEDEVICE_NBIS_ENROLLMENT_FIXTURE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_POST_TLS_ENROLLMENT_COMMAND_PLAN_WITH_PRODUCTION_GATE_RETAINED
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -495,6 +495,13 @@ un'immagine accettata, ma non esclude né nega possibili ruoli quality/template/
 NBIS, che restano semanticamente indeterminati. Eventi fuori ordine chiudono
 l'istanza senza retry.
 
+La seam distingue ora stage primari osservati da stage consegnati. Con il flag
+esplicito di deferral, l'ultimo `FpImage` conserva provenienza dal B0 primario
+ma viene consegnato solo all'IRQ0200 terminale: il caller può notificare
+finger-up prima che l'estrazione asincrona concluda l'enrollment. Questo evita
+la race reale riprodotta in cui libfprint tentava la deactivation mentre era
+ancora in `AWAIT_FINGER_OFF`; non attribuisce contenuto immagine all'IRQ.
+
 Il modulo non dipende da USB, TLS o backend, non è collegato ai vfunc e non
 modifica il lifecycle sensor-reaching D275. Enrollment production resta quindi
 respinto prima di ogni submit. Sei test passano sia normal sia ASan/UBSan per
@@ -502,9 +509,17 @@ i tre profili, separazione primary/auxiliary, callback failure e fail-closed
 con diagnostica expected/actual. La seam
 `goodix_enrollment_pipeline.[ch]` aggiunge il vero mapping `u16 → FpImage`:
 consegna 2/3/21 immagini primarie transfer-none, zero immagini ausiliarie e
-rifiuta raster fuori posizione. Quattro test aggiuntivi passano normal e
-ASan/UBSan; la build Fedora 44/libfprint 1.94.100 NBIS resta verde senza
-enumerazione USB. Report:
+rifiuta raster fuori posizione e rilascia immediatamente l'immagine terminale
+pending se la transizione fallisce. Cinque test aggiuntivi passano normal e
+ASan/UBSan; la classe 27c6:5125 pubblica ora la policy target-local di 21 stage
+osservata in ATTEMPT02, mentre l'oracle generico resta parametrico. Una vera
+operazione asincrona `FpImageDevice` attraversa 21 progress e un solo
+completion con ordering terminale corretto; usa il double SIGFM del test
+harness e non prova NBIS né qualità biometrica. La suite completa è 25/25
+normal e ASan/UBSan e la build Fedora 44/libfprint 1.94.100 con NBIS resta
+verde senza enumerazione USB. Enrollment production resta respinto prima di
+ogni submit finché il lifecycle sensor-reaching non è integrato e revisionato.
+Report:
 `analysis/D279/D279_11_configurable_enrollment_model.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
