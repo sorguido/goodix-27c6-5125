@@ -228,6 +228,14 @@ committed only after a positive same-generation completion. Early inbound,
 duplicate OUT, stale generation and transport failure are terminal with zero
 retry. The module has no production USB backend dependency.
 
+## D279/18 dormant FpiUsbBackend binding
+
+`goodix_enrollment_fpi_usb_binding.[ch]` adapts the transaction sink and OUT
+completion callback to the existing `GoodixFpiUsbBackend`. Construction sends
+nothing. Offline tests require the asynchronous host seam and prove zero real
+USB submit. No production device code constructs the binding, and the
+pre-activation enrollment rejection remains intact.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

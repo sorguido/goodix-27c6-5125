@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "goodix_enrollment_post_tls_events.h"
 #include "goodix_enrollment_outbound_transaction.h"
+#include "goodix_enrollment_fpi_usb_binding.h"
 
 #include <fpi-image.h>
 #include <string.h>
@@ -11,6 +12,7 @@ typedef struct
   guint timestamp_count;
   guint auxiliary_delivery_count;
   guint8 auxiliary_last_byte;
+  guint backend_out_count;
 } Fixture;
 
 static gboolean
@@ -181,6 +183,25 @@ synthetic_frame_sink (guint64    generation,
   (void) g_bytes_get_data (frame, &length);
   g_assert_cmpuint (length, ==, GOODIX_ENROLLMENT_FIXED64_LENGTH);
   return TRUE;
+}
+
+static void
+backend_submit_seam (GoodixFpiUsbBackend *backend,
+                     GoodixUsbDirection   direction,
+                     guint64              generation,
+                     GBytes              *bytes,
+                     gpointer             user_data)
+{
+  Fixture *fixture = user_data;
+  gsize length;
+
+  (void) backend;
+  g_assert_cmpint (direction, ==, GOODIX_USB_TRANSFER_OUT);
+  g_assert_cmpuint (generation, ==, 7u);
+  g_assert_nonnull (bytes);
+  (void) g_bytes_get_data (bytes, &length);
+  g_assert_cmpuint (length, ==, GOODIX_ENROLLMENT_FIXED64_LENGTH);
+  fixture->backend_out_count++;
 }
 
 static void
@@ -575,6 +596,71 @@ test_transaction_early_ack_fails_closed (void)
   goodix_enrollment_post_tls_events_free (events);
 }
 
+static void
+test_dormant_backend_binding_completion_gate (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit events_audit;
+  GoodixEnrollmentFpiUsbBindingAudit binding_audit;
+  Fixture fixture = { 0 };
+  guint8 raw[12];
+  g_autoptr(GBytes) irq = NULL;
+  g_autoptr(GBytes) ack = build_ack (0x22);
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GError) error = NULL;
+  GoodixFpiUsbBackend *backend = goodix_fpi_usb_backend_new (
+    NULL, NULL, 0x81, 0x01, 8192u);
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &events_audit, &error);
+  GoodixEnrollmentFpiUsbBinding *binding;
+
+  g_assert_true (goodix_fpi_usb_backend_begin_generation (
+    backend, 7u, cancellable, &error));
+  goodix_fpi_usb_backend_set_async_submit_seam (
+    backend, backend_submit_seam, &fixture);
+  binding = goodix_enrollment_fpi_usb_binding_new (
+    events, backend, 7u, &binding_audit, &error);
+  g_assert_nonnull (binding);
+  fill_raw (0x88u, raw);
+  irq = build_irq (0x32, 0x0002, 0x003f, raw);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
+    binding, irq, &error));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_submit_next (
+    binding, &error));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+  g_assert_cmpuint (fixture.backend_out_count, ==, 1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==,
+                    1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==,
+                    0u);
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    0u);
+
+  /* Stale backend completion is ignored and cannot commit the planner. */
+  goodix_fpi_usb_backend_complete_out (backend, 6u, NULL);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    0u);
+  goodix_fpi_usb_backend_complete_out (backend, 7u, NULL);
+  g_assert_false (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    1u);
+  g_assert_cmpuint (binding_audit.backend_submit_attempt_count, ==, 1u);
+  g_assert_cmpuint (binding_audit.backend_completion_count, ==, 1u);
+  g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
+                    ==, 1u);
+  g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
+    binding, ack, &error));
+  g_assert_no_error (error);
+
+  goodix_enrollment_fpi_usb_binding_free (binding);
+  goodix_fpi_usb_backend_free (backend);
+  goodix_enrollment_post_tls_events_free (events);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -593,5 +679,7 @@ main (int argc, char **argv)
                    test_transaction_stale_completion_fails_closed);
   g_test_add_func ("/d279-17-transaction/early-ack-fails-closed",
                    test_transaction_early_ack_fails_closed);
+  g_test_add_func ("/d279-18-fpi-usb-binding/completion-gate",
+                   test_dormant_backend_binding_completion_gate);
   return g_test_run ();
 }

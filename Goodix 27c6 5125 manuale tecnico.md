@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_DORMANT_ENROLLMENT_FPI_USB_BACKEND_BINDING_WITH_ACTIVATION_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ENROLLMENT_BINDING_CANCELLATION_DRAIN_AND_CONTEXT_OWNERSHIP_WITH_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -636,6 +636,20 @@ passa 7/7 normal e ASan/UBSan e prova stale generation e ACK anticipato senza
 commit. Il modulo non dipende dal backend USB reale e il gate production
 continua a rifiutare enrollment. Report:
 `analysis/D279/D279_17_completion_gated_synthetic_out.md`.
+
+### D279/18 — binding dormant a GoodixFpiUsbBackend
+
+`goodix_enrollment_fpi_usb_binding.[ch]` adatta lo sink e la completion della
+transazione al backend USB esistente. La costruzione non invia; il test usa
+obbligatoriamente la seam asincrona host-only, verifica stale generation senza
+commit e completion corretta con un commit, con `real_submit_count=0`.
+
+Il modulo è sensor-reaching se un futuro caller lo invoca senza seam. Oggi non
+esiste alcun caller production e `goodix_fpimage_device_activate()` respinge
+ancora `FPI_DEVICE_ACTION_ENROLL` prima di iniziare la generation. Il binding
+non va reso raggiungibile prima di chiudere cancellation/drain/ownership e di
+una nuova review esplicita. 8/8 test combinati passano normal e ASan/UBSan.
+Report: `analysis/D279/D279_18_dormant_fpi_usb_enrollment_binding.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
