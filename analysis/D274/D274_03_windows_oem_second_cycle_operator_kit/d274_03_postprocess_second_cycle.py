@@ -30,6 +30,11 @@ TARGET_PID_LE = bytes.fromhex("2551")
 HOST_CAPTURE_DEADLINE_SECONDS = 180
 FINGERPRINT_B0_TOTAL_LENGTH = 7726
 FINGERPRINT_B0_DECLARED_LENGTH = 7722
+# Exact OEM fixed frame observed four times in D279/10 attempt 01 and already
+# represented in the D273 sanitized positive/zero-finger censuses.  Its 0x88
+# trailer does not satisfy the generic A0 checksum formula, so it must be
+# recognized before generic parsing.  No nearby shape is accepted.
+OEM_FIXED_CONTROL_01_FRAME = bytes.fromhex("a00800a80105000000000088")
 WORKFLOW = "WINDOWS_HELLO_SETUP_CANDIDATE_NO_COMMIT"
 
 
@@ -231,6 +236,10 @@ def _event(frame: Frame) -> dict:
     if frame.outer == 0xB0:
         require(not frame.truncated, "MALFORMED_B0")
         return {"kind": "B0", "b0_class": classify_b0(frame), "frame": frame}
+    if (frame.direction == "host_to_device" and not frame.truncated
+            and frame.raw == OEM_FIXED_CONTROL_01_FRAME):
+        return {"kind": "OEM_FIXED_CONTROL_01", "control": 0x01,
+                "frame": frame}
     # Il NAV target-observed ha una forma A0 command-specific senza checksum
     # corto ordinario: 2417 byte outer, inner 2410, control wire esatto 0x50.
     if (frame.direction == "device_to_host" and not frame.truncated

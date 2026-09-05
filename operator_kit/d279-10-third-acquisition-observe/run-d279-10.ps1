@@ -236,7 +236,7 @@ function Invoke-D279SelfTest {
         $authority.approved_for_passive_capture -ne $false -or
         $authority.full_oem_enrollment_authorized -ne $false -or
         $authority.host_vm_enrollment_mutation_accepted -ne $true -or
-        $authority.possible_sensor_side_template_persistence_accepted -ne $false -or
+        $authority.possible_sensor_side_template_persistence_accepted -ne $true -or
         $authority.snapshot_prerun_confirmed -ne $false -or
         $authority.live_authorized -ne $false) {
         Fail-D279 "il template authority versionato non e chiuso"

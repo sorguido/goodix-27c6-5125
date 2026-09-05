@@ -2,15 +2,17 @@
 
 ## Stato
 
-Il Kit è stato ripianificato e verificato soltanto offline. Non è autorizzato
-al live. Il template `D279_10_live_authority.json` è interamente chiuso e la
-qualificazione nativa Windows della nuova versione è ancora pendente.
+Il Kit è stato corretto offline dopo l’attempt 01. Non è autorizzata una nuova
+run live. Il template `D279_10_live_authority.json` registra le accettazioni
+host/sensor già concesse, ma mantiene chiusi enrollment, snapshot della nuova
+run, baseline e autorizzazione live. La nuova qualificazione nativa Windows è
+pendente.
 
 ```text
 D279_10_KIT_STATUS=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION
 FULL_OEM_ENROLLMENT_AUTHORIZED=false
 HOST_VM_ENROLLMENT_MUTATION_ACCEPTED=true
-POSSIBLE_SENSOR_SIDE_TEMPLATE_PERSISTENCE_ACCEPTED=false
+POSSIBLE_SENSOR_SIDE_TEMPLATE_PERSISTENCE_ACCEPTED=true
 SNAPSHOT_PRERUN_CONFIRMED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
@@ -37,10 +39,32 @@ anche essere cifrato.
 
 Di conseguenza l’assenza nel pcap delle famiglie note non autorizza il claim
 “nessuna mutazione sensor-side”. Il finalizer segnala le famiglie visibili, ma
-mantiene il rischio non escluso. Il percorso live pretende perciò una decisione
-esplicita sul campo
-`possible_sensor_side_template_persistence_accepted`; il template resta
-`false`. Non impostarlo autonomamente.
+mantiene il rischio non escluso. L’Utente ha ora accettato questa possibilità
+esclusivamente per il normale workflow OEM Windows Hello su un sensore già
+usato storicamente per enrollment Windows; il template registra quindi
+`possible_sensor_side_template_persistence_accepted=true`. Questo non
+autorizza una nuova run e non si estende a flash/IAP, ClearApp, PSK, OTP,
+factory write, cambio persistente VID:PID/mode o comandi manuali/manutentivi.
+
+## Corrective raw attempt 01
+
+Il raw finalizzato SHA-256
+`557ff136e5a1d383f7413ca24d731eeae32d2b377e61003846b034ecda991743`
+contiene 186 pacchetti e 75 frame target completi. I packet index
+`25, 29, 37, 45` sono quattro copie identiche del frame OEM fisso
+`a00800a80105000000000088`: A0 OUT, totale dichiarato/osservato 12 byte,
+inner length 5, non troncato. Il trailer `0x88` non soddisfa la formula checksum
+A0 generica, ma il census sanitizzato D230 conserva lo stesso payload corto
+nella reference OEM positiva; D273 conferma inoltre la stessa forma metadata
+nella reference positiva e zero-finger. Il driver continua normalmente.
+Il packet `25` è quello che ha terminato l’observer; gli altri tre sarebbero
+stati incontrati successivamente.
+
+È quindi una forma OEM control-specific valida non contemplata da D274, non un
+frame incompleto e non un artefatto di lettura mentre TShark scrive. Il parser
+la riconosce ora solo per direzione OUT e uguaglianza byte-esatta prima del
+checksum generico. Qualsiasi near-miss resta `MALFORMED_A0`; nessun errore
+generico è stato trasformato in `PENDING`.
 
 ## Snapshot ed evidenze
 
@@ -146,7 +170,7 @@ cd operator_kit\d279-10-third-acquisition-observe
 .\run-d279-10.ps1 -NativeQualificationOnly
 ```
 
-L'accettazione già concessa della mutazione host-side è registrata nel template
-ma non autorizza il live. Non eseguire `-AutorizzoEnrollmentOemCompletoD27910`:
-mancano baseline full-SHA approvata, authority per-attempt e decisione esplicita
-sul rischio sensor-side.
+Le accettazioni già concesse delle possibili mutazioni host-side e sensor-side
+del solo workflow OEM sono registrate nel template ma non autorizzano il live.
+Non eseguire `-AutorizzoEnrollmentOemCompletoD27910`: mancano qualificazione
+nativa del corrective, baseline full-SHA approvata e authority per-attempt.

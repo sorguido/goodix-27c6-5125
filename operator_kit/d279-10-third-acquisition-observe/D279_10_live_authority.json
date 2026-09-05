@@ -4,7 +4,7 @@
   "approved_for_passive_capture": false,
   "full_oem_enrollment_authorized": false,
   "host_vm_enrollment_mutation_accepted": true,
-  "possible_sensor_side_template_persistence_accepted": false,
+  "possible_sensor_side_template_persistence_accepted": true,
   "snapshot_prerun_confirmed": false,
   "live_authorized": false,
   "approved_full_commit_sha": null,

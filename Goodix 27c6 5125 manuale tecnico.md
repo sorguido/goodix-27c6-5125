@@ -114,15 +114,22 @@ essere ripristinato. La procedura preferita fotografa VM, repository e Kit già
 qualificato; prima del restore vanno esportate fuori dalla VM sia `raw/` sia
 `sanitized/` dell'attempt.
 
-La review sensor-side impedisce tuttavia un claim factory-preserving certo per
+La review sensor-side impedisce un claim di assenza certa di persistenza per
 il completamento OEM. Le famiglie persistenti note sono
 `0xE0/0xA4/0xF0/0xF4`; la superficie statica `gfusb.dll` espone inoltre API e
 messaggi PBA di add/update/delete template e scrittura su flash. Non è provato
 che il normale percorso Windows Hello/WBDI non raggiunga capacità equivalenti,
 e il traffico cifrato rende insufficiente l'assenza delle famiglie visibili.
-Lo snapshot copre solo la mutazione host-side, non il sensore. L'authority V2
-mantiene quindi chiuso il gate separato
-`possible_sensor_side_template_persistence_accepted=false`.
+Lo snapshot copre solo la mutazione host-side, non il sensore.
+
+L'Utente ha ora autorizzato il normale workflow OEM Windows Hello anche se
+comportasse persistenza template sensor-side, precisando che il sensore era già
+stato usato per anni con impronte Windows e non è factory-virgin. L'authority
+V2 registra quindi `possible_sensor_side_template_persistence_accepted=true`.
+La deroga è limitata al workflow OEM: restano vietati flash/IAP, ClearApp, PSK
+provisioning/substitution, OTP/factory writes, modifiche persistenti
+VID:PID/mode e comandi Goodix manuali/manutentivi. Non è autorizzata una nuova
+run live.
 
 La prima qualificazione Windows della versione full-enrollment, eseguita
 dall'Utente su clone fresco `cc8754e`, ha confermato precondizioni e self-test
@@ -137,9 +144,35 @@ sempre la policy globale in `finally`. La qualifica V3 prova esplicitamente
 controllo del risultato della suite. Sedici fixture sintetiche passano su Linux
 senza leggere capture autentiche; la nuova qualifica Windows resta da ripetere.
 
-Il Kit resta hard-gated: la sola accettazione host-side è `true`, mentre
-baseline, capture/enrollment live, snapshot della run e rischio sensor-side
-restano chiusi; nessuna nuova baseline è approvata e la qualificazione
+Il primo live attempt full-enrollment è stato poi eseguito dall'Utente e
+preservato integralmente nel commit `98ec62b`, attempt
+`D27910_20260905_ATTEMPT01`. È terminato fail-closed dopo attach ma prima del
+wizard e dei contatti: observer `MALFORMED_A0`, capture arrestata, zero retry e
+restore richiesto per stato prudenzialmente incerto.
+
+L'analisi diretta autorizzata del raw finalizzato, hash
+`557ff136e5a1d383f7413ca24d731eeae32d2b377e61003846b034ecda991743`,
+identifica quattro occorrenze agli indici pacchetto `25/29/37/45` del frame
+byte-identico `a0 08 00 a8 01 05 00 00 00 00 00 88`: A0 OUT completo,
+outer 12 byte, inner 5, non troncato. Il trailer `0x88` non soddisfa il checksum
+generico (`0x8d`, non `0xaa`); il census sanitizzato D230 conserva lo stesso
+payload corto `0000000088` nella reference OEM positiva, mentre D273 conferma
+la forma metadata 10 volte nella reference positiva e 8 nella zero-finger. Il
+driver prosegue normalmente. È quindi una forma OEM control-specific valida mancante
+dal parser D274, non un frame realmente malformato né un artefatto del pcap in
+scrittura. Il trigger effettivo dell'observer è il primo, packet `25`; le altre
+tre occorrenze erano latenti dietro il fail immediato.
+
+Il corrective allowlista esclusivamente quel frame completo, direction OUT e
+byte-esatto prima del checksum generico. Una variante `...89` resta
+`MALFORMED_A0`; nessun failure generico è degradato a `PENDING`. Sul raw
+autentico il parser corretto produce 75 eventi, quattro
+`OEM_FIXED_CONTROL_01`, zero errori e observer `OBSERVING`, coerente con lo
+stop pre-wizard. Ora passano 18 fixture D279 e 79 test D274+D279 complessivi.
+
+Il Kit resta hard-gated: le accettazioni host-side e sensor-side del solo
+workflow OEM sono `true`, mentre baseline, capture/enrollment live e snapshot
+della nuova run restano chiusi; nessuna nuova baseline è approvata e la qualificazione
 PowerShell 5.1 nativa della versione V3 è ancora pendente con Goodix assente.
 Nessuna nuova esecuzione live è autorizzata.
 
@@ -252,13 +285,21 @@ PRODUCTION_PRE_SESSION_RX_SYNC_REQUIRED=true
 PRODUCTION_RUNTIME_HANDOFF_VIEWS_CLEARED=true
 PRODUCTION_ENROLLMENT_ENABLED=false
 PRODUCTION_ENROLLMENT_REJECTION_SUBMIT_COUNT=0
-D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION_AND_LIVE_GATE
+D279_10_OUTCOME=ATTEMPT01_FAIL_CLOSED_A0_CORRECTIVE_READY_OFFLINE
 D279_10_REPLAN_BASELINE=fc2172f9973ea5a13f067dc3abfd98881c274efa
 D279_10_EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_WINDOWS_NATIVE_PENDING
-D279_10_SYNTHETIC_TESTS=16/16_PASS
+D279_10_SYNTHETIC_TESTS=18/18_PASS
 D279_10_WINDOWS_NATIVE_CC8754E=FAIL_NATIVE_COMMAND_ERROR_ON_UNITTEST_STDERR
 D279_10_WINDOWS_NATIVE_STDERR_CORRECTIVE=APPLIED_PENDING_REAL_TARGET_RETEST
 D279_10_WINDOWS_NATIVE_QUALIFICATION_SCHEMA=V3
+D279_10_ATTEMPT01_EVIDENCE_COMMIT=98ec62bea75d7764e44296a1d70da7a2f06609c5
+D279_10_ATTEMPT01_RESULT=FAIL_CLOSED_PRE_WIZARD_ZERO_CONTACTS
+D279_10_ATTEMPT01_FAILURE=MALFORMED_A0_FALSE_POSITIVE_ON_OEM_FIXED_CONTROL_01
+D279_10_ATTEMPT01_FRAME_INDICES=25,29,37,45
+D279_10_ATTEMPT01_FRAME_CLASS=VALID_OEM_CONTROL_SPECIFIC_A0
+D279_10_ATTEMPT01_INCREMENTAL_PCAP_ARTIFACT=false
+D279_10_OEM_FIXED_CONTROL_01_EXACT_ALLOWLIST=true
+D279_10_OEM_FIXED_CONTROL_01_NEAR_MISS_FAIL_CLOSED=true
 D279_10_PASSIVE_OEM_OBSERVER=true
 D279_10_WORKFLOW=FULL_FIRST_OEM_ENROLLMENT_UI_CONFIRMED_PLUS_TERMINAL_TAIL
 D279_10_CONTACT_COUNT_ASSUMED=false
@@ -269,7 +310,7 @@ D279_10_ATTEMPT_SCOPED_ANTI_OVERWRITE=true
 D279_10_AUTOMATIC_RETRY_COUNT=0
 D279_10_SNAPSHOT_PRERUN_PREFERRED=true
 D279_10_EXPORT_BEFORE_RESTORE=RAW_AND_SANITIZED_OUTSIDE_VM
-D279_10_SENSOR_SIDE_TEMPLATE_PERSISTENCE=NOT_EXCLUDED
+D279_10_SENSOR_SIDE_TEMPLATE_PERSISTENCE=NOT_EXCLUDED_BUT_OEM_WORKFLOW_ACCEPTED_BY_USER
 D279_10_LIVE_AUTHORITY_TEMPLATE_CLOSED=true
 D279_10_LIVE_AUTHORIZED=false
 D279_10_HOST_VM_ENROLLMENT_MUTATION=ACCEPTED_BY_USER_SNAPSHOT_MANAGED
@@ -321,20 +362,20 @@ FPIMAGE_PPMM_ASSIGNED=false
 FPRINTD_OPERATIONAL_PATH_PROVEN=false
 D279_01_OUTCOME=BLOCKED
 D278_14_CLOSED_LIVE=true
-REAL_USB_ACCESS=0
-REAL_USB_OPEN=0
-REAL_USB_CLAIM=0
-REAL_USB_SUBMIT=0
-LIVE_EXECUTION_PERFORMED=false
+REAL_USB_ACCESS=OPERATOR_OEM_PASSIVE_CAPTURE_ATTEMPT01
+REAL_USB_OPEN=OEM_DRIVER_NOT_KIT_SENDER
+REAL_USB_CLAIM=OEM_DRIVER_NOT_KIT_SENDER
+REAL_USB_SUBMIT=OEM_DRIVER_NOT_KIT_SENDER
+LIVE_EXECUTION_PERFORMED=true
 CURRENT_LIVE_AUTHORIZED=false
-PERSISTENT_DEVICE_WRITE_COUNT=0
-FACTORY_STATE_MUTATION=0
+VISIBLE_KNOWN_PERSISTENT_COMMAND_FAMILY_COUNT=0
+FACTORY_STATE_MUTATION=NOT_OBSERVED_PRE_WIZARD
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT
+NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_AFTER_A0_CORRECTIVE_WITH_GOODIX_ABSENT
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
-NEXT_LIVE_PREREQUISITE=NATIVE_QUALIFICATION_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_SENSOR_RISK_DECISION
+NEXT_LIVE_PREREQUISITE=NATIVE_QUALIFICATION_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_LIVE_AUTHORIZATION
 ```
 
 ### D279/10 — Kit passivo per il primo enrollment OEM completo
@@ -355,12 +396,16 @@ soltanto prima di attach/wizard e richiede altrimenti il restore dello snapshot.
 Un restore è vietato operativamente finché `raw/` e `sanitized/` non sono stati
 esportati fuori dalla VM/snapshot.
 
-La mutation host-side della prima impronta è stata accettata esplicitamente
-dall'Utente ed è snapshot-manageable, ma resta
-irrisolto il rischio sensor-side: le API statiche PBA di persistenza template e
-il traffico cifrato impediscono di provare l'assenza di mutazioni al sensore.
-Il template authority V2 è chiuso anche su questo punto; qualificazione nativa,
-baseline live e decisione esplicita per-attempt restano pendenti. Report:
+Le possibili mutazioni host-side e sensor-side del solo workflow OEM sono state
+accettate esplicitamente dall'Utente; la prima è snapshot-manageable, mentre la
+seconda resta non escludibile ma riguarda un sensore già storicamente enrolled.
+La decisione non autorizza una nuova run né i comandi manutentivi esclusi.
+
+L'attempt 01 si è fermato prima del wizard per quattro frame OEM fissi control
+`0x01` completi che D274 sottoponeva erroneamente al checksum generico. La forma
+esatta è ora allowlistata; strict final e growing parse concordano, mentre ogni
+near-miss resta fail-closed. Qualificazione nativa del corrective, baseline live
+e autorizzazione per-attempt restano pendenti. Report:
 `analysis/D279/D279_10_third_acquisition_operator_kit_prep.md`.
 
 ### D279/07 — layout production e identità runtime fprintd

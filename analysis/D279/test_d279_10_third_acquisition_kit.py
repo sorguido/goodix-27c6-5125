@@ -17,6 +17,8 @@ ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "operator_kit/d279-10-third-acquisition-observe"
 LEGACY_TEST_PATH = ROOT / "analysis/D274/test_d274_03_second_cycle_operator_kit.py"
 ATTEMPT_ID = "D27910_SYNTHETIC_0001"
+ATTEMPT01_OEM_FIXED_CONTROL_01 = bytes.fromhex(
+    "a00800a80105000000000088")
 
 
 def load(name: str, path: Path):
@@ -162,6 +164,30 @@ class D27910Tests(unittest.TestCase):
         self.assertEqual(result["wire_acquisition_cycle_count"], 5)
         self.assertEqual(result["protocol_contradiction_count"], 1)
 
+    def test_attempt01_exact_oem_control_01_is_valid_in_final_and_growing_parse(self):
+        def extra(rows):
+            rows.insert(1, ("attempt01_oem_fixed_01",
+                            ATTEMPT01_OEM_FIXED_CONTROL_01, 0x01))
+            return rows
+        data = capture(extra=extra)
+        result = self.process(data)
+        self.assertEqual(result["boundary_status"],
+                         "OBSERVED_COMPLETE_UI_CONFIRMED")
+        with tempfile.TemporaryDirectory(prefix="d279-10-growing-fixed01-") as directory:
+            path = Path(directory) / "wire.pcapng"
+            path.write_bytes(data)
+            state = TARGET.inspect_growing_capture(path)
+            self.assertEqual(state["status"], "OBSERVING")
+
+    def test_attempt01_control_01_near_miss_remains_definitive_malformed_a0(self):
+        near_miss = ATTEMPT01_OEM_FIXED_CONTROL_01[:-1] + b"\x89"
+
+        def extra(rows):
+            rows.insert(1, ("attempt01_oem_fixed_01_near_miss",
+                            near_miss, 0x01))
+            return rows
+        self.assertEqual(self.failure(capture(extra=extra)), "MALFORMED_A0")
+
     def test_observer_journals_third_milestone_but_stops_only_on_control(self):
         data = capture(total_cycles=4)
         with tempfile.TemporaryDirectory(prefix="d279-10-observer-") as directory:
@@ -202,7 +228,7 @@ class D27910Tests(unittest.TestCase):
             "approved_for_passive_capture": False,
             "full_oem_enrollment_authorized": False,
             "host_vm_enrollment_mutation_accepted": True,
-            "possible_sensor_side_template_persistence_accepted": False,
+            "possible_sensor_side_template_persistence_accepted": True,
             "snapshot_prerun_confirmed": False,
             "live_authorized": False,
             "approved_full_commit_sha": None,

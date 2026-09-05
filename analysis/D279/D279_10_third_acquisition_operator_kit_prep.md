@@ -4,12 +4,12 @@
 ## Esito offline
 
 ```text
-D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION_AND_LIVE_GATE
-ADVANCEMENT=MATERIAL_REPOSITORY_ADVANCEMENT
+D279_10_OUTCOME=ATTEMPT01_FAIL_CLOSED_A0_CORRECTIVE_READY_OFFLINE
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
 EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC;WINDOWS_NATIVE_PENDING
-REAL_TARGET_EXECUTION=false
+REAL_TARGET_EXECUTION_BY_OPERATOR=true
 USB_ACCESSED_BY_AI=false
-AUTHENTIC_CAPTURE_ACCESSED_BY_AI=false
+AUTHENTIC_CAPTURE_ACCESSED_BY_AI=true
 LIVE_AUTHORIZED=false
 ```
 
@@ -37,6 +37,54 @@ l’exit code nativo e ripristina sempre la policy globale nel `finally`. Il
 controllo non è indebolito: la qualificazione esegue un probe `stderr + exit 0`
 e un probe separato con exit intenzionale `7`, poi pretende exit zero dalla
 suite. L’output qualification diventa V3 e registra entrambi i probe.
+
+## Attempt 01: analisi diretta del raw autentico
+
+L’Utente ha eseguito e preservato nel commit
+`98ec62bea75d7764e44296a1d70da7a2f06609c5` l’attempt
+`D27910_20260905_ATTEMPT01`. Il launcher è fallito chiuso prima del wizard e di
+qualsiasi contatto: target attached, capture started/stopped, zero retry,
+restore richiesto per stato prudenzialmente incerto. L’AI ha letto il solo raw
+autentico espressamente autorizzato, hash
+`557ff136e5a1d383f7413ca24d731eeae32d2b377e61003846b034ecda991743`.
+
+Il pcapng finalizzato passa il parser strutturale stretto: 186 pacchetti, 75
+frame target, firmware APP12509 riconosciuto, nessun frame pending. La stessa
+analisi in modalità growing e finalizzata individua quattro errori agli indici
+pacchetto `25, 29, 37, 45`. Tutti sono A0 OUT completi, physical USB 64 byte,
+outer logico dichiarato/osservato 12 byte, inner length 5, non troncati e
+byte-identici:
+
+```text
+a0 08 00 a8 01 05 00 00 00 00 00 88
+```
+
+Il trigger effettivo dell’observer è il primo della serie, packet index `25`;
+gli altri tre sono occorrenze latenti della stessa lacuna che il fail immediato
+non aveva raggiunto.
+
+La somma del checksum generico è `0x8d`, non `0xaa`; perciò D274 emetteva
+`MALFORMED_A0`. Non è però un A0 incompatibile: il census sanitizzato D230
+`analysis/D230/work/offline_census.json` conserva per 10 occorrenze della
+reference OEM positiva lo stesso payload corto `0000000088`; i censimenti
+metadata D273 mostrano inoltre la forma `A0/0x01/outer 12/inner 5` 10 volte
+nella reference positiva e 8 volte nella reference zero-finger, sempre senza
+inventare un logical control. Nell’attempt il driver prosegue dopo ogni
+occorrenza con ulteriori comandi validi. La classificazione probatoria è quindi:
+
+```text
+COMPLETE_TRULY_MALFORMED_A0=false
+VALID_OEM_CONTROL_SPECIFIC_A0_NOT_HANDLED_BY_D274=true
+INCREMENTAL_PCAP_ARTIFACT=false
+```
+
+Il corrective D274 riconosce la costante solo se frame completo, direzione
+host-to-device e uguaglianza byte-esatta, prima del parser checksum generico.
+Non modifica il trattamento incremental/PENDING. Una regressione derivata dal
+raw prova sia growing sia final; una variante con solo trailer `0x89` continua
+a fallire definitivamente `MALFORMED_A0`. Sul raw autentico corretto risultano
+75 eventi senza errori, quattro `OEM_FIXED_CONTROL_01`, zero cicli (atteso
+prima del wizard) e observer state `OBSERVING`.
 
 ## Decisione metodologica
 
@@ -108,12 +156,14 @@ La review delle evidenze versionate ha trovato:
 - l’assenza di famiglie visibili nel pcap non è prova negativa sufficiente,
   perché parte del traffico applicativo è cifrato.
 
-Quindi `factory_firmware_and_persistent_state_must_remain_untouched` non può
-essere affermato per la run completa con le evidenze correnti. Il finalizer
-segnala famiglie note osservate ma, in loro assenza, produce esplicitamente
-`...TEMPLATE_PERSISTENCE_NOT_EXCLUDED`. L’authority V2 aggiunge il gate chiuso
-`possible_sensor_side_template_persistence_accepted=false`; nessuna
-autorizzazione corrente permette di aprirlo.
+Quindi l’assenza di persistenza sensor-side non può essere affermata per la run
+completa. Il finalizer segnala famiglie note osservate ma, in loro assenza,
+produce esplicitamente `...TEMPLATE_PERSISTENCE_NOT_EXCLUDED`. L’Utente ha ora
+autorizzato il normale workflow OEM Windows Hello anche qualora persista un
+template sul sensore, già usato per anni con enrollment Windows. L’authority
+V2 registra questa sola accettazione a `true`, senza autorizzare una nuova run.
+Restano vietati flash/IAP, ClearApp, PSK provisioning/substitution, OTP/factory
+writes, cambi persistenti VID:PID/mode e comandi Goodix manuali/manutentivi.
 
 ## Verifiche offline
 
@@ -124,7 +174,7 @@ observer non terminale, collisioni output, authority chiusa, soli input
 numerici, ordering dei gate, attempt scope e dipendenza D274 pin.
 
 ```text
-LINUX_SYNTHETIC_TESTS=16/16_PASS
+LINUX_SYNTHETIC_TESTS=18/18_PASS
 AUTHORITY_TEMPLATE_CLOSED=true
 GLOBAL_MARKER_PRESENT=false
 ATTEMPT_SCOPED_ANTI_OVERWRITE=true
@@ -137,13 +187,12 @@ WINDOWS_POWERSHELL_5_1_NATIVE_STDERR_CORRECTIVE=PENDING_REAL_TARGET_RETEST
 ## Gate successivo
 
 La nuova versione richiede prima una qualificazione nativa Windows con Goodix
-assente, poi review del full SHA. Anche dopo tali passaggi il live resta
-bloccato finché l’Utente non risolve esplicitamente il conflitto tra enrollment
-OEM completo e rischio sensor-side non escluso.
+assente, poi review del full SHA e una nuova authority live per-attempt. La
+decisione sensor-side è acquisita ma non costituisce autorizzazione live.
 
 ```text
-RESIDUAL_BLOCKER_OR_RISK=SENSOR_SIDE_TEMPLATE_PERSISTENCE_NOT_EXCLUDED;WINDOWS_NATIVE_QUALIFICATION_PENDING
+RESIDUAL_BLOCKER_OR_RISK=WINDOWS_NATIVE_QUALIFICATION_PENDING;NEW_LIVE_NOT_AUTHORIZED
 NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT
 NEXT_LIVE_PREREQUISITE=FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_LIVE_DECISION
-REVIEW_SET=BASELINE_fc2172f_PLUS_D279_10_REPLAN_KIT_TEST_REPORT_MANUAL
+REVIEW_SET=EVIDENCE_COMMIT_98ec62b_PLUS_D279_10_A0_CORRECTIVE_KIT_TEST_REPORT_MANUAL
 ```
