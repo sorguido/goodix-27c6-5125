@@ -98,6 +98,30 @@ def _symbol(event: dict) -> str:
     return f"O{event.get('control', 0):02X}"
 
 
+def _irq_fdt_raw(event: dict) -> bytes:
+    require(event["kind"] == "IRQ", "FDT_SOURCE_NOT_IRQ")
+    _, body = D274.parse_a0(event["frame"])
+    require(len(body) == 16, "FDT_IRQ_BODY_LENGTH")
+    return body[4:16]
+
+
+def _derive_fdt_table(raw: bytes, *, finger_up: bool) -> bytes:
+    require(len(raw) == 12, "FDT_RAW_LENGTH")
+    table = bytearray()
+    for offset in range(0, 12, 2):
+        word = int.from_bytes(raw[offset:offset + 2], "little")
+        value = (word >> 1) + (0x1D if finger_up else 0)
+        require(value <= 0xFF, "FDT_DERIVATION_RANGE")
+        table.extend((0x80, value))
+    return bytes(table)
+
+
+def _command_fdt_table(event: dict) -> bytes:
+    require(event["kind"] == "COMMAND" and len(event["body"]) in (14, 16),
+            "FDT_COMMAND_BODY_LENGTH")
+    return event["body"][2:14]
+
+
 CYCLE1_SHAPE = (
     "I0002", "C22", "K22:01", "BF", "C34", "K34:01", "I0200",
     "C20", "K20:01", "BF", "C32", "K32:01", "C50", "K50:01",
@@ -179,6 +203,14 @@ def analyze(root: Path = ROOT) -> dict:
 
     starts = [cycle["frames"]["irq2"]["frame"] for cycle in cycles]
     cycle_rows = []
+    fdt_relations = {
+        "0x34_table_equals_same_stage_irq2_up_derivation": [],
+        "0x34_pair_is_byte_identical_cycles_2_through_21": [],
+        "0x36_table_equals_previous_stage_irq0200_down_derivation": [],
+        "0x36_table_differs_from_same_stage_0x34_table": [],
+        "0x32_table_equals_same_stage_irq0200_down_derivation": [],
+    }
+    previous_down_table = None
     for index, cycle in enumerate(cycles):
         start = starts[index]
         end = starts[index + 1] if index + 1 < len(starts) else 1 << 31
@@ -186,6 +218,37 @@ def analyze(root: Path = ROOT) -> dict:
         symbols = tuple(_symbol(event) for _, event in segment)
         shape = classify_cycle_shape(index + 1, symbols)
         primary = cycle["frames"]
+        irq2 = next(event for _, event in segment
+                    if event["kind"] == "IRQ" and event["irq"] == 0x0002)
+        irq0200 = next(event for _, event in segment
+                       if event["kind"] == "IRQ" and event["irq"] == 0x0200)
+        commands_34 = [event for _, event in segment
+                       if event["kind"] == "COMMAND" and event["control"] == 0x34]
+        commands_36 = [event for _, event in segment
+                       if event["kind"] == "COMMAND" and event["control"] == 0x36]
+        commands_32 = [event for _, event in segment
+                       if event["kind"] == "COMMAND" and event["control"] == 0x32]
+        up_table = _derive_fdt_table(_irq_fdt_raw(irq2), finger_up=True)
+        down_table = _derive_fdt_table(_irq_fdt_raw(irq0200), finger_up=False)
+        fdt_relations["0x34_table_equals_same_stage_irq2_up_derivation"].extend(
+            _command_fdt_table(event) == up_table for event in commands_34
+        )
+        if index > 0:
+            require(len(commands_34) == 2 and len(commands_36) == 1,
+                    f"FDT_REPEATED_COMMAND_COUNT_{index + 1}")
+            fdt_relations["0x34_pair_is_byte_identical_cycles_2_through_21"].append(
+                commands_34[0]["body"] == commands_34[1]["body"]
+            )
+            fdt_relations["0x36_table_equals_previous_stage_irq0200_down_derivation"].append(
+                _command_fdt_table(commands_36[0]) == previous_down_table
+            )
+            fdt_relations["0x36_table_differs_from_same_stage_0x34_table"].append(
+                _command_fdt_table(commands_36[0]) != _command_fdt_table(commands_34[0])
+            )
+        fdt_relations["0x32_table_equals_same_stage_irq0200_down_derivation"].extend(
+            _command_fdt_table(event) == down_table for event in commands_32
+        )
+        previous_down_table = down_table
         cycle_rows.append({
             "cycle": index + 1,
             "irq2_frame": primary["irq2"]["frame"],
@@ -195,6 +258,18 @@ def analyze(root: Path = ROOT) -> dict:
             "transition_last_frame": segment[-1][0].packet_index,
             "transition_class": shape,
         })
+
+    for relation, observations in fdt_relations.items():
+        require(observations and all(observations), f"FDT_RELATION_{relation}")
+    first_segment = [(frame, event) for frame, event in rows
+                     if starts[0] <= frame.packet_index < starts[1]]
+    first_32 = [event for _, event in first_segment
+                if event["kind"] == "COMMAND" and event["control"] == 0x32]
+    require(len(first_32) == 2, "FIRST_STAGE_0X32_COUNT")
+    first_32_same_table = _command_fdt_table(first_32[0]) == _command_fdt_table(first_32[1])
+    first_32_distinct_timestamp = first_32[0]["body"] != first_32[1]["body"]
+    require(first_32_same_table and first_32_distinct_timestamp,
+            "FIRST_STAGE_0X32_TABLE_TIMESTAMP_RELATION")
 
     irq2_count = sum(event["kind"] == "IRQ" and event["irq"] == 0x0002 for _, event in rows)
     command22_count = sum(event["kind"] == "COMMAND" and event["control"] == 0x22 for _, event in rows)
@@ -348,6 +423,14 @@ def analyze(root: Path = ROOT) -> dict:
             "0x34_distinct_body_count": len(set(command_bodies[0x34])),
             "0x36_distinct_body_count": len(set(command_bodies[0x36])),
             "0x34_cycles_2_through_21_reuse_same_cycle_table_twice": True,
+            "fdt_table_derivation_relations": {
+                "0x34_all_41_equal_same_stage_irq2_up_derivation": True,
+                "0x36_all_20_equal_previous_stage_irq0200_down_derivation": True,
+                "0x36_all_20_differ_from_same_stage_0x34_table": True,
+                "0x32_all_21_equal_same_stage_irq0200_down_derivation": True,
+                "cycle_1_two_0x32_share_table_but_have_distinct_timestamps": True,
+                "raw_table_bytes_exported": False,
+            },
         },
         "known_persistent_command_families_observed": [],
         "known_persistent_command_families_checked": ["0xe0", "0xa4", "0xf0", "0xf4"],

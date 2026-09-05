@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_DYNAMIC_FDT_DERIVATION_AND_ITERATIVE_LIFECYCLE_ADAPTER_WITH_PRODUCTION_GATE_RETAINED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ITERATIVE_ENROLLMENT_LIFECYCLE_ADAPTER_WITHOUT_BACKEND
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -537,6 +537,24 @@ tabella per ruolo dagli IRQ del singolo ciclo e da inserirla in un adapter
 lifecycle iterativo mantenendo il gate production.
 Report:
 `analysis/D279/D279_11_configurable_enrollment_model.md`.
+
+### D279/12 — derivazione FDT dinamica target-local
+
+Il riesame hash-gated del raw ATTEMPT02 aggiunge solo relazioni booleane al
+JSON sanitizzato: tutti i 41 `0x34` equivalgono alla trasformazione up
+dell'IRQ2 dello stesso stage; tutti i 20 `0x36` enrollment equivalgono alla
+trasformazione down dell'IRQ0200 dello stage precedente e differiscono dalla
+tabella `0x34` corrente; tutti i 21 `0x32` equivalgono alla trasformazione down
+dell'IRQ0200 dello stesso stage. I due `0x32` del primo ciclo condividono la
+tabella ma hanno timestamp distinti. Nessun byte tabellare viene esportato.
+
+`goodix_enrollment_fdt_state.[ch]` implementa queste relazioni con stage
+consecutivi, retention della sola latest-down e output material tipizzato per
+il body contract. La fixture percorre i 21 stage osservati; 2/2 test passano
+normal e ASan/UBSan, l'audit autentico passa 3/3 e `captures/` resta invariato.
+Il modulo non contiene A0, backend, retry o submit e non modifica il gate
+production. Il B0 ausiliario resta semanticamente indeterminato. Report:
+`analysis/D279/D279_12_target_local_dynamic_fdt_derivation.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

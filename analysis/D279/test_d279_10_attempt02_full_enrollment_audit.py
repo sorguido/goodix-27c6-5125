@@ -55,6 +55,13 @@ class Attempt02AuditTests(unittest.TestCase):
             9,
         )
         self.assertEqual(result["command_shape_observations"]["0x34_distinct_body_count"], 21)
+        relations = result["command_shape_observations"]["fdt_table_derivation_relations"]
+        self.assertTrue(relations["0x34_all_41_equal_same_stage_irq2_up_derivation"])
+        self.assertTrue(relations["0x36_all_20_equal_previous_stage_irq0200_down_derivation"])
+        self.assertTrue(relations["0x36_all_20_differ_from_same_stage_0x34_table"])
+        self.assertTrue(relations["0x32_all_21_equal_same_stage_irq0200_down_derivation"])
+        self.assertTrue(relations["cycle_1_two_0x32_share_table_but_have_distinct_timestamps"])
+        self.assertFalse(relations["raw_table_bytes_exported"])
         self.assertEqual(result["timeline"]["terminal"]["post_ui_target_packet_count"], 0)
         self.assertEqual(result["observer_incremental_state"]["finalized_protocol_contradiction_count"], 0)
         self.assertFalse(result["content_bytes_exported"])

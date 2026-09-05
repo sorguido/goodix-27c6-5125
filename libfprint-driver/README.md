@@ -179,6 +179,14 @@ extraneous material, and builds only the 2/14/16-byte inner body. Dynamic
 derivation of per-cycle tables from IRQ observations remains outside this
 layer.
 
+## D279/12 target-local dynamic FDT state
+
+`goodix_enrollment_fdt_state.[ch]` implements the hash-gated ATTEMPT02 table
+relations without exporting authentic table bytes: `0x34` uses same-stage
+IRQ2-up, `0x36` uses previous-stage IRQ0200-down, and `0x32` uses same-stage
+IRQ0200-down plus a caller timestamp. Stage order and material availability
+are fail-closed. The module has no A0 serializer, backend or submit path.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

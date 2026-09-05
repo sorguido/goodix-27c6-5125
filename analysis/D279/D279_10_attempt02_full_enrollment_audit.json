@@ -318,7 +318,15 @@
     "0x32_distinct_body_count": 23,
     "0x34_distinct_body_count": 21,
     "0x36_distinct_body_count": 22,
-    "0x34_cycles_2_through_21_reuse_same_cycle_table_twice": true
+    "0x34_cycles_2_through_21_reuse_same_cycle_table_twice": true,
+    "fdt_table_derivation_relations": {
+      "0x34_all_41_equal_same_stage_irq2_up_derivation": true,
+      "0x36_all_20_equal_previous_stage_irq0200_down_derivation": true,
+      "0x36_all_20_differ_from_same_stage_0x34_table": true,
+      "0x32_all_21_equal_same_stage_irq0200_down_derivation": true,
+      "cycle_1_two_0x32_share_table_but_have_distinct_timestamps": true,
+      "raw_table_bytes_exported": false
+    }
   },
   "known_persistent_command_families_observed": [],
   "known_persistent_command_families_checked": [
