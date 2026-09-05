@@ -2,6 +2,7 @@
 #include "goodix_enrollment_post_tls_events.h"
 #include "goodix_enrollment_outbound_transaction.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
+#include "goodix_usb_router.h"
 
 #include <fpi-image.h>
 #include <string.h>
@@ -661,6 +662,62 @@ test_dormant_backend_binding_completion_gate (void)
   goodix_enrollment_post_tls_events_free (events);
 }
 
+static void
+test_backend_binding_cancel_waits_for_drain (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit events_audit;
+  GoodixEnrollmentFpiUsbBindingAudit binding_audit;
+  Fixture fixture = { 0 };
+  guint8 raw[12];
+  g_autoptr(GBytes) irq = NULL;
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic cancelled OUT");
+  GoodixUsbRouter *router = goodix_usb_router_new (NULL, NULL, NULL);
+  GoodixFpiUsbBackend *backend = goodix_fpi_usb_backend_new (
+    NULL, router, 0x81, 0x01, 8192u);
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &events_audit, &error);
+  GoodixEnrollmentFpiUsbBinding *binding;
+
+  goodix_usb_router_begin_generation (router, 7u);
+  g_assert_true (goodix_fpi_usb_backend_begin_generation (
+    backend, 7u, cancellable, &error));
+  goodix_fpi_usb_backend_set_async_submit_seam (
+    backend, backend_submit_seam, &fixture);
+  binding = goodix_enrollment_fpi_usb_binding_new (
+    events, backend, 7u, &binding_audit, &error);
+  fill_raw (0x88u, raw);
+  irq = build_irq (0x32, 0x0002, 0x003f, raw);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
+    binding, irq, &error));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_submit_next (
+    binding, &error));
+  goodix_enrollment_fpi_usb_binding_cancel (binding, "synthetic cancel");
+  goodix_enrollment_fpi_usb_binding_cancel (binding, "duplicate cancel");
+  g_assert_true (g_cancellable_is_cancelled (cancellable));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_is_failed (binding));
+  g_assert_false (goodix_enrollment_fpi_usb_binding_can_free (binding));
+  g_assert_cmpuint (binding_audit.cancellation_count, ==, 1u);
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    0u);
+
+  goodix_fpi_usb_backend_complete_out (backend, 7u, cancelled);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_can_free (binding));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_completion_count (backend),
+                    ==, 1u);
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    0u);
+  goodix_enrollment_fpi_usb_binding_free (binding);
+  goodix_fpi_usb_backend_free (backend);
+  goodix_usb_router_free (router);
+  goodix_enrollment_post_tls_events_free (events);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -681,5 +738,7 @@ main (int argc, char **argv)
                    test_transaction_early_ack_fails_closed);
   g_test_add_func ("/d279-18-fpi-usb-binding/completion-gate",
                    test_dormant_backend_binding_completion_gate);
+  g_test_add_func ("/d279-19-fpi-usb-binding/cancel-waits-for-drain",
+                   test_backend_binding_cancel_waits_for_drain);
   return g_test_run ();
 }

@@ -51,6 +51,9 @@ gboolean goodix_enrollment_outbound_transaction_complete_out (
   guint64                              generation,
   const GError                        *completion_error,
   GError                             **error);
+void goodix_enrollment_outbound_transaction_cancel (
+  GoodixEnrollmentOutboundTransaction *transaction,
+  const gchar                         *reason);
 
 gboolean goodix_enrollment_outbound_transaction_handle_a0 (
   GoodixEnrollmentOutboundTransaction *transaction,

@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ENROLLMENT_BINDING_CANCELLATION_DRAIN_AND_CONTEXT_OWNERSHIP_WITH_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_DEVICE_CONTEXT_DORMANT_ENROLLMENT_OWNERSHIP_WITH_ACTIVATION_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -650,6 +650,28 @@ ancora `FPI_DEVICE_ACTION_ENROLL` prima di iniziare la generation. Il binding
 non va reso raggiungibile prima di chiudere cancellation/drain/ownership e di
 una nuova review esplicita. 8/8 test combinati passano normal e ASan/UBSan.
 Report: `analysis/D279/D279_18_dormant_fpi_usb_enrollment_binding.md`.
+
+### D279/19 — cancellation terminale e drain OUT del binding
+
+Il binding dormant annulla prima il backend, porta la transazione in stato
+terminale senza retry e vieta la propria distruzione finché l'OUT fisico resta
+outstanding. Una completion tardiva della stessa generation dopo cancellation
+chiude il drain host ma non può committare il planner. La cancellazione è
+idempotente e l'audit distingue una sola transizione terminale.
+
+La regressione con backend/router host-only e seam asincrona passa 9/9 sia
+normal sia ASan/UBSan: prima della completion `can_free=false`, dopo la
+completion cancellata `can_free=true`, commit lifecycle zero e submit USB reale
+zero. La build Fedora 44/libfprint 1.94.100 con registry standard e NBIS resta
+verde senza enumerazione/open/claim/submit USB. Non esiste ancora un owner nel
+device context e nessun caller production;
+`goodix_fpimage_device_activate()` continua quindi a respingere enrollment
+prima della generation. Il successivo confine offline è l'ownership dormant
+nel context con lo stesso activation gate, non l'abilitazione live. Il profilo
+resta configurabile: 21 è soltanto il numero target-local osservato in
+ATTEMPT02. I B0 ausiliari restano consegnati opacamente e la loro semantica
+quality/template/NBIS non è determinata. Report:
+`analysis/D279/D279_19_enrollment_binding_cancellation_drain.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

@@ -126,8 +126,7 @@ goodix_enrollment_fpi_usb_binding_free (GoodixEnrollmentFpiUsbBinding *binding)
 {
   if (binding == NULL)
     return;
-  g_return_if_fail (goodix_fpi_usb_backend_get_out_outstanding (
-                      binding->backend) == 0u);
+  g_return_if_fail (goodix_enrollment_fpi_usb_binding_can_free (binding));
   goodix_fpi_usb_backend_set_out_completed_callback (binding->backend,
                                                       NULL, NULL);
   goodix_enrollment_outbound_transaction_free (binding->transaction);
@@ -147,6 +146,31 @@ goodix_enrollment_fpi_usb_binding_submit_next (
         binding->transaction, error))
     return binding_fail (binding, "enrollment USB OUT submission failed", error);
   return TRUE;
+}
+
+void
+goodix_enrollment_fpi_usb_binding_cancel (
+  GoodixEnrollmentFpiUsbBinding *binding,
+  const gchar                   *reason)
+{
+  const gchar *message;
+
+  if (binding == NULL || binding->terminal_error != NULL)
+    return;
+  message = reason != NULL ? reason : "enrollment USB binding cancelled";
+  binding->audit->cancellation_count++;
+  goodix_fpi_usb_backend_cancel (binding->backend);
+  goodix_enrollment_outbound_transaction_cancel (binding->transaction,
+                                                   message);
+  (void) binding_fail (binding, message, NULL);
+}
+
+gboolean
+goodix_enrollment_fpi_usb_binding_can_free (
+  const GoodixEnrollmentFpiUsbBinding *binding)
+{
+  return binding != NULL &&
+         goodix_fpi_usb_backend_get_out_outstanding (binding->backend) == 0u;
 }
 
 gboolean

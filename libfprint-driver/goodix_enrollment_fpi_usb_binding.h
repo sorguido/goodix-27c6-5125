@@ -15,6 +15,7 @@ typedef struct
   guint backend_submit_attempt_count;
   guint backend_completion_count;
   guint backend_completion_error_count;
+  guint cancellation_count;
   guint retry_count;
   gboolean terminal;
 } GoodixEnrollmentFpiUsbBindingAudit;
@@ -44,6 +45,11 @@ gboolean goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (
   GoodixEnrollmentFpiUsbBinding *binding,
   GBytes                        *chunk,
   GError                       **error);
+void goodix_enrollment_fpi_usb_binding_cancel (
+  GoodixEnrollmentFpiUsbBinding *binding,
+  const gchar                   *reason);
+gboolean goodix_enrollment_fpi_usb_binding_can_free (
+  const GoodixEnrollmentFpiUsbBinding *binding);
 
 gboolean goodix_enrollment_fpi_usb_binding_has_pending (
   const GoodixEnrollmentFpiUsbBinding *binding);

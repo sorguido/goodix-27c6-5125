@@ -182,6 +182,18 @@ goodix_enrollment_outbound_transaction_complete_out (
   return TRUE;
 }
 
+void
+goodix_enrollment_outbound_transaction_cancel (
+  GoodixEnrollmentOutboundTransaction *transaction,
+  const gchar                         *reason)
+{
+  if (transaction == NULL || transaction->failed)
+    return;
+  (void) transaction_fail (
+    transaction, GOODIX_ENROLLMENT_TRANSACTION_ERROR_STATE,
+    reason != NULL ? reason : "enrollment OUT transaction cancelled", NULL);
+}
+
 gboolean
 goodix_enrollment_outbound_transaction_handle_a0 (
   GoodixEnrollmentOutboundTransaction *transaction,

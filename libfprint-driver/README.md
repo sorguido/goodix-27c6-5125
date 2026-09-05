@@ -236,6 +236,15 @@ nothing. Offline tests require the asynchronous host seam and prove zero real
 USB submit. No production device code constructs the binding, and the
 pre-activation enrollment rejection remains intact.
 
+## D279/19 terminal cancellation and OUT drain
+
+The dormant enrollment binding now cancels the backend first, terminally
+fences its transaction without retry, and remains non-freeable while its
+physical OUT completion is outstanding. A late same-generation cancellation
+completion drains the backend but cannot commit the lifecycle planner. The
+operation is idempotent and still has no production device-context owner or
+caller; production enrollment remains rejected before activation.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
