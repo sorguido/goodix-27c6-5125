@@ -213,6 +213,13 @@ decoder contract. Auxiliary B0 is never decoded or discarded: the complete
 unchanged message is delivered to a mandatory opaque callback before the
 lifecycle transition. Serialization, transport and submit remain absent.
 
+## D279/16 enrollment-only outbound serializer
+
+`goodix_enrollment_outbound_frame.[ch]` revalidates a prepared inner body and
+serializes only controls `0x20/0x22/0x32/0x34/0x36/0x50` into zero-padded
+fixed64 A0. It has no backend or submit API. Known persistent families are not
+allowlisted, and production enrollment remains gated before activation.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ENROLLMENT_OUTBOUND_SERIALIZATION_AND_SUBMIT_CONTRACT_WITH_PRODUCTION_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ENROLLMENT_SYNTHETIC_SUBMIT_TRANSACTION_WITH_PRODUCTION_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -607,6 +607,20 @@ ausiliario volutamente non valido come immagine per provarne la consegna
 opaca. Lunghezza primaria errata fallisce chiuso. 5/5 test passano normal e
 ASan/UBSan, senza A0 build, backend o submit. Report:
 `analysis/D279/D279_15_bounded_b0_plaintext_delivery.md`.
+
+### D279/16 — serializer outbound enrollment-only
+
+`goodix_enrollment_outbound_frame.[ch]` ri-valida un comando preparato e
+costruisce il relativo A0 fixed64 con allowlist chiusa
+`0x20/0x22/0x32/0x34/0x36/0x50`. Non contiene backend o submit API e non
+ammette le famiglie persistenti note. L'assenza di tali famiglie non dimostra
+assenza di mutazioni sensor-side nel workflow OEM; definisce soltanto il
+confine del nuovo serializer.
+
+Tutti gli otto purpose passano round-trip parser/body/padding fixed64; un body
+manomesso fallisce prima del build. 2/2 test passano normal e ASan/UBSan. Il
+gate production continua a rifiutare enrollment prima dell'attivazione.
+Report: `analysis/D279/D279_16_enrollment_outbound_serializer.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
