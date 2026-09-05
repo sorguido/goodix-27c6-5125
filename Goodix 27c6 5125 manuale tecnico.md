@@ -366,6 +366,14 @@ D279_10_SENSOR_SIDE_TEMPLATE_PERSISTENCE=NOT_EXCLUDED_BUT_OEM_WORKFLOW_ACCEPTED_
 D279_10_LIVE_AUTHORITY_TEMPLATE_CLOSED=true
 D279_10_LIVE_AUTHORIZED=false
 D279_10_HOST_VM_ENROLLMENT_MUTATION=ACCEPTED_BY_USER_SNAPSHOT_MANAGED
+D279_11_OUTCOME=READY_OFFLINE_MODEL
+D279_11_CONFIGURABLE_STAGE_PROFILES_TESTED=2,3,21
+D279_11_ATTEMPT02_OBSERVED_STAGE_COUNT=21
+D279_11_OEM_UNIVERSAL_STAGE_COUNT_CLAIM=false
+D279_11_PRIMARY_B0_LIBFPRINT_STAGE_EVENT=true
+D279_11_AUXILIARY_B0_PROTOCOL_INTERNAL_APPLICATION_SEMANTICS=UNDETERMINED
+D279_11_PRODUCTION_ENROLLMENT_ENABLED=false
+D279_11_SENSOR_REACHING_CODE_CHANGED=false
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -425,7 +433,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_21_STAGE_GOODIX_POST_TLS_AND_LIBFPRINT_ENROLLMENT_MODEL
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PARAMETRIC_ENROLLMENT_MODEL_TO_LIBFPRINT_STAGE_DELIVERY_FIXTURE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -467,6 +475,29 @@ L'assenza visibile delle famiglie persistenti note non esclude persistenza
 sensor-side. Report:
 `analysis/D279/D279_10_attempt02_full_enrollment_analysis.md` e
 `analysis/D279/D279_10_attempt02_full_enrollment_audit.json`.
+
+### D279/11 — oracle enrollment parametrico host-only
+
+Il primo modello post-ATTEMPT02 è intenzionalmente separato dal sender:
+`goodix_enrollment_model.[ch]` accetta una sequenza metadata-only e verifica le
+tre forme osservate (prima con NAV, ripetute con re-arm, terminale senza
+re-arm). Il conteggio richiesto è configurazione esplicita; le fixture coprono
+2, 3 e il profilo target-local osservato di 21 stage. Quest'ultimo non viene
+promosso a costante OEM universale.
+
+Soltanto il B0 primario che segue `0x22` produce il callback di avanzamento
+libfprint-oriented. Il B0 cifrato successivo a `0x20` viene consumato nella
+transizione interna e contato separatamente: il modello non gli attribuisce
+un'immagine accettata, ma non esclude né nega possibili ruoli quality/template/
+NBIS, che restano semanticamente indeterminati. Eventi fuori ordine chiudono
+l'istanza senza retry.
+
+Il modulo non dipende da USB, TLS o backend, non è collegato ai vfunc e non
+modifica il lifecycle sensor-reaching D275. Enrollment production resta quindi
+respinto prima di ogni submit. Sei test passano sia normal sia ASan/UBSan per
+i tre profili, separazione primary/auxiliary, callback failure e fail-closed
+con diagnostica expected/actual. Report:
+`analysis/D279/D279_11_configurable_enrollment_model.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

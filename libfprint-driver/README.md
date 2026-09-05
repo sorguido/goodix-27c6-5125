@@ -138,6 +138,20 @@ and the current lifecycle stop at the second B0. D279/09 does not silently set
 two stages or extrapolate an unproven third acquisition. Capture/identify are
 only offline-wired and still require a separately authorized live validation.
 
+## D279/11 configurable enrollment oracle
+
+`goodix_enrollment_model.[ch]` is a host-only, zero-sender state oracle for the
+three enrollment transition shapes observed in D279/10 ATTEMPT02. Its required
+stage count is explicit configuration: 21 is the successful target-local count
+from that run, not an OEM-wide constant. Only a primary B0 after `0x22` emits
+the libfprint-oriented stage callback. The encrypted B0 after `0x20` is
+consumed in its stable protocol position, but its possible quality, template
+or NBIS relevance remains unknown.
+
+The module has no USB/backend/TLS dependency and is not wired into the
+production lifecycle or device vfuncs. It therefore validates sequencing and
+stage accounting without enabling enrollment or changing sensor-reaching code.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
