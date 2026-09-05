@@ -246,7 +246,9 @@ goodix_enrollment_fpi_usb_binding_cancel (
 {
   const gchar *message;
 
-  if (binding == NULL || binding->terminal_error != NULL)
+  if (binding == NULL || binding->terminal_error != NULL ||
+      goodix_enrollment_outbound_transaction_is_complete (
+        binding->transaction))
     return;
   message = reason != NULL ? reason : "enrollment USB binding cancelled";
   binding->audit->cancellation_count++;

@@ -1816,10 +1816,108 @@ d279_24_auxiliary_ready (GBytes   *plaintext,
   return TRUE;
 }
 
+static guint32
+d279_25_crc32_mpeg2 (const guint8 *data,
+                     gsize         length)
+{
+  guint32 crc = UINT32_C (0xffffffff);
+
+  for (gsize i = 0u; i < length; i++)
+    {
+      crc ^= (guint32) data[i] << 24;
+      for (guint bit = 0u; bit < 8u; bit++)
+        crc = (crc & UINT32_C (0x80000000)) != 0u ?
+          (crc << 1) ^ UINT32_C (0x04c11db7) : crc << 1;
+    }
+  return crc;
+}
+
+static GBytes *
+d279_25_build_primary_plaintext (guint stage)
+{
+  guint8 bytes[GOODIX_IMAGE_PLAINTEXT_LENGTH] = { 0 };
+  guint32 crc;
+
+  bytes[0] = 0x20;
+  bytes[1] = 0x0a;
+  bytes[2] = 0x1e;
+  bytes[8u + stage] = (guint8) stage;
+  crc = d279_25_crc32_mpeg2 (bytes + 8u, GOODIX_IMAGE_PACKED_LENGTH);
+  bytes[7688] = (guint8) (crc >> 8);
+  bytes[7689] = (guint8) crc;
+  bytes[7690] = (guint8) (crc >> 24);
+  bytes[7691] = (guint8) (crc >> 16);
+  bytes[7692] = 0x88;
+  return g_bytes_new (bytes, sizeof bytes);
+}
+
+static GBytes *
+d279_25_wrap_b0 (GBytes *plaintext)
+{
+  gsize length;
+  const guint8 *data = g_bytes_get_data (plaintext, &length);
+  guint8 header[4];
+  g_autoptr(GByteArray) frame = NULL;
+
+  g_assert_cmpuint (length, <=, G_MAXUINT16);
+  header[0] = 0xb0;
+  header[1] = (guint8) length;
+  header[2] = (guint8) (length >> 8);
+  header[3] = (guint8) (header[0] + header[1] + header[2]);
+  frame = g_byte_array_sized_new ((guint) length + 4u);
+  g_byte_array_append (frame, header, sizeof header);
+  g_byte_array_append (frame, data, (guint) length);
+  return g_byte_array_free_to_bytes (g_steal_pointer (&frame));
+}
+
+static void
+d279_25_feed_context_frame (GoodixDeviceContext *ctx,
+                            guint64              generation,
+                            GBytes              *frame)
+{
+  GoodixFpiUsbBackend *backend =
+    goodix_device_context_get_fpi_usb_backend (ctx);
+  gsize length;
+  const guint8 *data = g_bytes_get_data (frame, &length);
+
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 1u);
+  g_assert_cmpint (goodix_fpi_usb_backend_get_receive_purpose (backend), ==,
+                   GOODIX_USB_RECEIVE_PROTOCOL_RX);
+  goodix_device_context_complete_receive (
+    ctx, generation, data, length, NULL);
+  if (goodix_device_context_get_terminal_fence (ctx))
+    {
+      const GError *error = goodix_device_context_get_terminal_error (ctx);
+      g_error ("D279/25 context fenced after input: %s",
+               error != NULL ? error->message : "unknown error");
+    }
+}
+
+static void
+d279_25_complete_and_ack (GoodixDeviceContext *ctx,
+                          guint64              generation,
+                          guint8               command)
+{
+  g_autoptr(GBytes) ack = d279_24_build_ack (command);
+
+  d279_24_complete_out (ctx, generation);
+  d279_25_feed_context_frame (ctx, generation, ack);
+}
+
+static void
+d279_25_feed_plaintext (GoodixDeviceContext *ctx,
+                        guint64              generation,
+                        GBytes              *plaintext)
+{
+  g_autoptr(GBytes) frame = d279_25_wrap_b0 (plaintext);
+
+  d279_25_feed_context_frame (ctx, generation, frame);
+}
+
 static void
 test_d279_24_context_first_arm_enrollment_handoff (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = { 21u, TRUE };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentFpiUsbBindingAudit binding_audit;
   GoodixPostTlsMaterial material = { 0 };
@@ -1827,8 +1925,6 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   TestFixture *f = test_fixture_new ();
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   g_autoptr(GError) error = NULL;
-  g_autoptr(GError) cancelled = g_error_new_literal (
-    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic D279/24 cancellation");
   GoodixFpiUsbBackend *backend;
   GoodixPostTlsLifecycle *post_tls;
   guint64 generation;
@@ -1948,15 +2044,88 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   g_assert_cmpint (goodix_fpi_usb_backend_get_receive_purpose (backend), ==,
                    GOODIX_USB_RECEIVE_PROTOCOL_RX);
 
+  for (guint stage = 1u; stage <= 21u; stage++)
+    {
+      g_autoptr(GBytes) primary = d279_25_build_primary_plaintext (stage);
+      const guint8 auxiliary_bytes[] = { 0x20, 0x01, 0x00, 0x88 };
+      g_autoptr(GBytes) auxiliary = g_bytes_new_static (
+        auxiliary_bytes, sizeof auxiliary_bytes);
+
+      if (stage > 1u)
+        {
+          g_autoptr(GBytes) irq2 = d279_24_build_event (
+            0x32, 0x0002, 0x003f, (guint16) (0x80u + stage * 8u));
+          d279_25_feed_context_frame (f->ctx, generation, irq2);
+          d279_25_complete_and_ack (f->ctx, generation, 0x22);
+        }
+      else
+        {
+          g_autoptr(GBytes) ack22 = d279_24_build_ack (0x22);
+          d279_25_feed_context_frame (f->ctx, generation, ack22);
+        }
+      d279_25_feed_plaintext (f->ctx, generation, primary);
+      d279_25_complete_and_ack (f->ctx, generation, 0x34);
+      if (stage == 1u)
+        {
+          g_autoptr(GBytes) irq0200 = d279_24_build_event (
+            0x34, 0x0200, 0x0000, 0x48);
+          g_autoptr(GBytes) nav = d279_24_build_nav ();
+
+          d279_25_feed_context_frame (f->ctx, generation, irq0200);
+          d279_25_complete_and_ack (f->ctx, generation, 0x20);
+          d279_25_feed_plaintext (f->ctx, generation, auxiliary);
+          d279_25_complete_and_ack (f->ctx, generation, 0x32);
+          d279_25_complete_and_ack (f->ctx, generation, 0x50);
+          d279_25_feed_context_frame (f->ctx, generation, nav);
+          d279_25_complete_and_ack (f->ctx, generation, 0x32);
+        }
+      else
+        {
+          g_autoptr(GBytes) irq0100 = d279_24_build_event (
+            0x36, 0x0100, 0x0000, (guint16) (0x80u + stage * 8u));
+          g_autoptr(GBytes) irq0200 = d279_24_build_event (
+            0x34, 0x0200, 0x0000, (guint16) (0x40u + stage * 8u));
+
+          d279_25_complete_and_ack (f->ctx, generation, 0x36);
+          d279_25_feed_context_frame (f->ctx, generation, irq0100);
+          d279_25_complete_and_ack (f->ctx, generation, 0x20);
+          d279_25_feed_plaintext (f->ctx, generation, auxiliary);
+          d279_25_complete_and_ack (f->ctx, generation, 0x34);
+          d279_25_feed_context_frame (f->ctx, generation, irq0200);
+          if (stage < 21u)
+            d279_25_complete_and_ack (f->ctx, generation, 0x32);
+        }
+    }
+
+  g_assert_true (events_audit.lifecycle.plan.pipeline.protocol.complete);
+  g_assert_cmpuint (
+    events_audit.lifecycle.plan.pipeline.protocol.configured_required_stage_count,
+    ==, 21u);
+  g_assert_cmpuint (events_audit.parsed_a0_count, ==, 188u);
+  g_assert_cmpuint (events_audit.primary_b0_count, ==, 21u);
+  g_assert_cmpuint (events_audit.auxiliary_b0_count, ==, 21u);
+  g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count,
+                    ==, 21u);
+  g_assert_cmpuint (events_audit.finger_down_delivery_count, ==, 21u);
+  g_assert_cmpuint (events_audit.finger_up_delivery_count, ==, 21u);
+  g_assert_cmpuint (events_audit.auxiliary_b0_delivery_count, ==, 21u);
+  g_assert_cmpuint (auxiliary_count, ==, 21u);
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 125u);
+  g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
+                    ==, 125u);
+  g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
+
   goodix_device_context_stop_operator_epoch (f->ctx);
-  goodix_device_context_complete_receive (
-    f->ctx, generation, NULL, 0u, cancelled);
   g_assert_true (goodix_device_context_operator_epoch_is_drained (f->ctx));
+  g_assert_cmpuint (binding_audit.cancellation_count, ==, 0u);
+  g_assert_false (binding_audit.terminal);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==,
                     0u);
   fixture_close (f);
   test_fixture_free (f);
   g_print ("D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS\n");
+  g_print ("D279_25_CONTEXT_21_STAGE_TRANSCRIPT=PASS\n");
 }
 
 static void

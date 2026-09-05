@@ -292,6 +292,16 @@ after each positive OUT completion. A synthetic bootstrap-through-first-IRQ2
 test covers the ownership transition; production enrollment remains rejected
 before activation and has no configuration caller.
 
+## D279/25 complete target-local 21-stage context transcript
+
+The host-only operator epoch can inject already-decrypted B0 plaintext through
+the router only when no secure session exists; production always takes the TLS
+branch first. The regression drives the full ATTEMPT02-shaped 21-stage graph
+through the context: 125 completion-gated commands, 21 primary images, 21
+opaque auxiliary deliveries and 21 ordered contact pairs. The stage count is
+test configuration, not a universal OEM constant, and completed bindings are
+not retroactively cancelled during teardown.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_FULL_PARAMETRIC_ENROLLMENT_TRANSCRIPT_AND_LIBFPRINT_STAGE_DELIVERY_WITH_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_LIBFPRINT_21_STAGE_ACTION_TRANSCRIPT_WITH_PRODUCTION_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -809,6 +809,33 @@ enrollment continua a rifiutare prima dell'attivazione. Il prossimo step
 offline è percorrere nel context un transcript enrollment completo parametrico
 e verificare la consegna stage/libfprint, ancora dietro il gate. Report:
 `analysis/D279/D279_24_context_first_arm_enrollment_handoff.md`.
+
+### D279/25 — transcript context completo a 21 stage target-local
+
+Il path host-only `operator_epoch` può ora consegnare al binding B0 plaintext
+già decifrati racchiusi nel framing esterno, esclusivamente quando non esiste
+una secure session. Nel path production la secure session ha precedenza
+assoluta e continua a autenticare/decrittare ogni B0; la seam non è quindi un
+bypass TLS raggiungibile dal driver reale.
+
+La regressione attraversa l'intero profilo ATTEMPT02 di 21 stage dopo il
+bootstrap D279/24: router e context consegnano 188 A0, 21 B0 primari e 21 B0
+ausiliari opachi; il binding emette e committa dopo completion positiva tutti
+i 125 comandi. Sono osservate 21 immagini `FpImage`, 21 finger-down e 21
+finger-up, un solo NAV iniziale, i re-arm ripetuti e la transizione terminale.
+Zero retry e zero submit USB reale. La deactivation successiva lascia un
+binding completo tale: cancel è ora idempotente anche rispetto alla completion
+e non retrocede l'esito a failure. La build Fedora 44/libfprint 1.94.100 con
+registry standard e NBIS passa senza enumerazione/open/claim/submit USB reale.
+
+Il numero 21 è configurato nel test perché è il conteggio target-local riuscito
+di ATTEMPT02, non perché il modello lo imponga: le regressioni parametriche
+2/3/21 restano verdi. Tutti i 21 B0 ausiliari vengono consegnati integri al
+consumer opaco; il test non conclude nulla sulla loro utilità per quality,
+template o NBIS. Il prossimo confine offline è percorrere la stessa sequenza
+come vera action enrollment del `FpImageDevice` virtuale, verificando i 21
+progress callback e il completamento NBIS, mentre il gate production resta
+chiuso. Report: `analysis/D279/D279_25_context_21_stage_transcript.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
