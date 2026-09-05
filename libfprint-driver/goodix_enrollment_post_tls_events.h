@@ -4,10 +4,21 @@
 
 #include "goodix_a0_protocol.h"
 #include "goodix_enrollment_lifecycle_adapter.h"
+#include "goodix_image_decoder.h"
 
 G_BEGIN_DECLS
 
+#define GOODIX_ENROLLMENT_B0_MAX_PLAINTEXT_LENGTH 8192u
+
 typedef struct _GoodixEnrollmentPostTlsEvents GoodixEnrollmentPostTlsEvents;
+
+/* @plaintext is transfer-none and valid for the callback duration.  The
+ * callback deliberately receives the complete auxiliary message unchanged;
+ * its quality/template/NBIS semantics are not interpreted here. */
+typedef gboolean (*GoodixEnrollmentAuxiliaryB0Func) (
+  GBytes    *plaintext,
+  gpointer   user_data,
+  GError   **error);
 
 typedef struct
 {
@@ -20,6 +31,10 @@ typedef struct
   guint nav_count;
   guint primary_b0_count;
   guint auxiliary_b0_count;
+  guint plaintext_chunk_count;
+  guint completed_b0_message_count;
+  guint primary_b0_decode_count;
+  guint auxiliary_b0_delivery_count;
   guint rejected_inbound_count;
   guint retry_count;
   guint a0_frame_build_count;
@@ -31,6 +46,7 @@ GoodixEnrollmentPostTlsEvents *goodix_enrollment_post_tls_events_new (
   const GoodixEnrollmentModelConfig  *config,
   GoodixEnrollmentImageFunc           image_ready,
   GoodixEnrollmentTimestampFunc       timestamp_ready,
+  GoodixEnrollmentAuxiliaryB0Func     auxiliary_ready,
   gpointer                            user_data,
   GoodixEnrollmentPostTlsEventsAudit *audit,
   GError                            **error);
@@ -54,6 +70,14 @@ gboolean goodix_enrollment_post_tls_events_handle_primary_samples (
   GError                       **error);
 gboolean goodix_enrollment_post_tls_events_handle_auxiliary_b0 (
   GoodixEnrollmentPostTlsEvents *events,
+  GError                       **error);
+
+/* Reassembles one declared-length B0 plaintext message within a strict bound.
+ * Primary messages retain the decoder's exact 7693-byte contract; auxiliary
+ * messages are delivered unchanged to @auxiliary_ready. */
+gboolean goodix_enrollment_post_tls_events_handle_plaintext_chunk (
+  GoodixEnrollmentPostTlsEvents *events,
+  GBytes                        *chunk,
   GError                       **error);
 
 gboolean goodix_enrollment_post_tls_events_prepare (

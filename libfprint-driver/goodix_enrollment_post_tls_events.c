@@ -2,6 +2,8 @@
 /* Strict inbound-only binding from decrypted post-TLS events to enrollment. */
 #include "goodix_enrollment_post_tls_events.h"
 
+#include <string.h>
+
 typedef enum
 {
   GOODIX_ENROLLMENT_POST_TLS_ERROR_ARGUMENT,
@@ -18,8 +20,21 @@ struct _GoodixEnrollmentPostTlsEvents
   GoodixEnrollmentLifecycleAdapter *lifecycle;
   GoodixEnrollmentPostTlsEventsAudit internal_audit;
   GoodixEnrollmentPostTlsEventsAudit *audit;
+  GoodixEnrollmentAuxiliaryB0Func auxiliary_ready;
+  gpointer user_data;
+  GByteArray *b0_pending;
   gboolean failed;
 };
+
+static void
+clear_pending (GByteArray *pending)
+{
+  if (pending == NULL)
+    return;
+  for (gsize i = 0u; i < pending->len; i++)
+    ((volatile guint8 *) pending->data)[i] = 0;
+  g_byte_array_set_size (pending, 0u);
+}
 
 static GQuark
 goodix_enrollment_post_tls_error_quark (void)
@@ -38,6 +53,7 @@ events_fail (GoodixEnrollmentPostTlsEvents *events,
       events->failed = TRUE;
       events->audit->failed = TRUE;
       events->audit->rejected_inbound_count++;
+      clear_pending (events->b0_pending);
     }
   if (error == NULL || *error == NULL)
     g_set_error_literal (error, GOODIX_ENROLLMENT_POST_TLS_ERROR, code,
@@ -50,20 +66,33 @@ goodix_enrollment_post_tls_events_new (
   const GoodixEnrollmentModelConfig  *config,
   GoodixEnrollmentImageFunc           image_ready,
   GoodixEnrollmentTimestampFunc       timestamp_ready,
+  GoodixEnrollmentAuxiliaryB0Func     auxiliary_ready,
   gpointer                            user_data,
   GoodixEnrollmentPostTlsEventsAudit *audit,
   GError                            **error)
 {
   GoodixEnrollmentPostTlsEvents *events;
 
+  if (auxiliary_ready == NULL)
+    {
+      g_set_error_literal (error, GOODIX_ENROLLMENT_POST_TLS_ERROR,
+                           GOODIX_ENROLLMENT_POST_TLS_ERROR_ARGUMENT,
+                           "auxiliary B0 callback is required");
+      return NULL;
+    }
   events = g_new0 (GoodixEnrollmentPostTlsEvents, 1);
   events->audit = audit != NULL ? audit : &events->internal_audit;
   *events->audit = (GoodixEnrollmentPostTlsEventsAudit) { 0 };
+  events->auxiliary_ready = auxiliary_ready;
+  events->user_data = user_data;
+  events->b0_pending = g_byte_array_sized_new (
+    GOODIX_ENROLLMENT_B0_MAX_PLAINTEXT_LENGTH);
   events->lifecycle = goodix_enrollment_lifecycle_adapter_new (
     config, image_ready, timestamp_ready, user_data,
     &events->audit->lifecycle, error);
   if (events->lifecycle == NULL)
     {
+      g_byte_array_unref (events->b0_pending);
       g_free (events);
       return NULL;
     }
@@ -75,6 +104,8 @@ goodix_enrollment_post_tls_events_free (GoodixEnrollmentPostTlsEvents *events)
 {
   if (events == NULL)
     return;
+  clear_pending (events->b0_pending);
+  g_byte_array_unref (events->b0_pending);
   goodix_enrollment_lifecycle_adapter_free (events->lifecycle);
   g_free (events);
 }
@@ -175,7 +206,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
   if (events == NULL || frame == NULL)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_ARGUMENT,
                         "post-TLS event adapter or frame is absent", error);
-  if (events->failed)
+  if (events->failed || events->b0_pending->len != 0u)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
                         "post-TLS event adapter is terminal", error);
   expected = goodix_enrollment_lifecycle_adapter_get_expected_event (
@@ -254,7 +285,7 @@ goodix_enrollment_post_tls_events_handle_primary_samples (
   size_t                         sample_count,
   GError                       **error)
 {
-  if (events == NULL || events->failed)
+  if (events == NULL || events->failed || events->b0_pending->len != 0u)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_observe (
@@ -271,7 +302,7 @@ goodix_enrollment_post_tls_events_handle_auxiliary_b0 (
   GoodixEnrollmentPostTlsEvents *events,
   GError                       **error)
 {
-  if (events == NULL || events->failed)
+  if (events == NULL || events->failed || events->b0_pending->len != 0u)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_observe (
@@ -284,12 +315,109 @@ goodix_enrollment_post_tls_events_handle_auxiliary_b0 (
 }
 
 gboolean
+goodix_enrollment_post_tls_events_handle_plaintext_chunk (
+  GoodixEnrollmentPostTlsEvents *events,
+  GBytes                        *chunk,
+  GError                       **error)
+{
+  GoodixEnrollmentEvent expected;
+  const guint8 *data;
+  gsize length;
+  guint16 declared_length;
+  gsize expected_length;
+  g_autoptr(GBytes) complete = NULL;
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  GoodixImageDecodeAudit decode_audit;
+  gboolean accepted;
+
+  if (events == NULL || chunk == NULL)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_ARGUMENT,
+                        "post-TLS event adapter or plaintext chunk is absent",
+                        error);
+  if (events->failed)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
+                        "post-TLS event adapter is terminal", error);
+  expected = goodix_enrollment_post_tls_events_get_expected_event (events);
+  if (expected != GOODIX_ENROLLMENT_EVENT_PRIMARY_B0 &&
+      expected != GOODIX_ENROLLMENT_EVENT_AUXILIARY_B0)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
+                        "plaintext arrived outside an enrollment B0 slot",
+                        error);
+  data = g_bytes_get_data (chunk, &length);
+  if (length == 0u ||
+      length > GOODIX_ENROLLMENT_B0_MAX_PLAINTEXT_LENGTH ||
+      events->b0_pending->len >
+        GOODIX_ENROLLMENT_B0_MAX_PLAINTEXT_LENGTH - length)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_FRAME,
+                        "B0 plaintext reassembly exceeds its bound", error);
+  g_byte_array_append (events->b0_pending, data, (guint) length);
+  events->audit->plaintext_chunk_count++;
+  if (events->b0_pending->len < 3u)
+    return TRUE;
+  declared_length = (guint16) (
+    (guint16) events->b0_pending->data[1] |
+    ((guint16) events->b0_pending->data[2] << 8));
+  expected_length = (gsize) declared_length + 3u;
+  if (declared_length == 0u ||
+      expected_length > GOODIX_ENROLLMENT_B0_MAX_PLAINTEXT_LENGTH ||
+      (expected == GOODIX_ENROLLMENT_EVENT_PRIMARY_B0 &&
+       expected_length != GOODIX_IMAGE_PLAINTEXT_LENGTH) ||
+      events->b0_pending->len > expected_length)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_FRAME,
+                        "B0 plaintext declared length is invalid", error);
+  if (events->b0_pending->len < expected_length)
+    return TRUE;
+
+  complete = g_bytes_new (events->b0_pending->data,
+                          events->b0_pending->len);
+  events->audit->completed_b0_message_count++;
+  if (expected == GOODIX_ENROLLMENT_EVENT_PRIMARY_B0)
+    {
+      if (!goodix_image_decode_plaintext (complete, samples, &decode_audit,
+                                          error))
+        {
+          clear_pending (events->b0_pending);
+          memset (samples, 0, sizeof samples);
+          return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_FRAME,
+                              "primary B0 image decode failed", error);
+        }
+      events->audit->primary_b0_decode_count++;
+      /* The complete message is independently owned by @complete. */
+      clear_pending (events->b0_pending);
+      accepted = goodix_enrollment_post_tls_events_handle_primary_samples (
+        events, samples, G_N_ELEMENTS (samples), error);
+      memset (samples, 0, sizeof samples);
+    }
+  else
+    {
+      accepted = events->auxiliary_ready (complete, events->user_data, error);
+      if (accepted)
+        {
+          events->audit->auxiliary_b0_delivery_count++;
+          /* Clear before the lower-level typed call, whose direct API rejects
+           * partially assembled plaintext. */
+          clear_pending (events->b0_pending);
+          accepted = goodix_enrollment_post_tls_events_handle_auxiliary_b0 (
+            events, error);
+          return accepted || events_fail (
+            events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
+            "auxiliary B0 lifecycle delivery failed", error);
+        }
+    }
+  clear_pending (events->b0_pending);
+  if (!accepted)
+    return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
+                        "complete B0 delivery failed", error);
+  return TRUE;
+}
+
+gboolean
 goodix_enrollment_post_tls_events_prepare (
   GoodixEnrollmentPostTlsEvents    *events,
   GoodixEnrollmentPreparedCommand *prepared,
   GError                          **error)
 {
-  if (events == NULL || events->failed)
+  if (events == NULL || events->failed || events->b0_pending->len != 0u)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_prepare (
@@ -305,7 +433,7 @@ goodix_enrollment_post_tls_events_commit (
   GoodixEnrollmentEvent          command_event,
   GError                       **error)
 {
-  if (events == NULL || events->failed)
+  if (events == NULL || events->failed || events->b0_pending->len != 0u)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_STATE,
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_commit (

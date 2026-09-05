@@ -8,6 +8,8 @@ typedef struct
 {
   guint image_count;
   guint timestamp_count;
+  guint auxiliary_delivery_count;
+  guint8 auxiliary_last_byte;
 } Fixture;
 
 static gboolean
@@ -40,6 +42,22 @@ timestamp_ready (guint                           stage_index,
   (void) purpose;
   (void) error;
   *timestamp = (guint16) (0x3000u + fixture->timestamp_count++);
+  return TRUE;
+}
+
+static gboolean
+auxiliary_ready (GBytes   *plaintext,
+                 gpointer  user_data,
+                 GError  **error)
+{
+  Fixture *fixture = user_data;
+  gsize length;
+
+  (void) error;
+  const guint8 *bytes = g_bytes_get_data (plaintext, &length);
+  g_assert_cmpuint (length, ==, GOODIX_IMAGE_PLAINTEXT_LENGTH);
+  fixture->auxiliary_last_byte = bytes[length - 1u];
+  fixture->auxiliary_delivery_count++;
   return TRUE;
 }
 
@@ -198,7 +216,8 @@ run_profile (guint stages)
   g_autoptr(GError) error = NULL;
   GoodixEnrollmentPostTlsEvents *events =
     goodix_enrollment_post_tls_events_new (
-      &config, image_ready, timestamp_ready, &fixture, &audit, &error);
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
 
   g_assert_nonnull (events);
   g_assert_no_error (error);
@@ -250,6 +269,7 @@ run_profile (guint stages)
   g_assert_cmpuint (audit.nav_count, ==, 1u);
   g_assert_cmpuint (audit.primary_b0_count, ==, stages);
   g_assert_cmpuint (audit.auxiliary_b0_count, ==, stages);
+  g_assert_cmpuint (fixture.auxiliary_delivery_count, ==, 0u);
   g_assert_cmpuint (audit.parsed_a0_count, ==, 9u * stages - 1u);
   g_assert_cmpuint (audit.retry_count, ==, 0u);
   g_assert_cmpuint (audit.a0_frame_build_count, ==, 0u);
@@ -276,7 +296,8 @@ test_wrong_ack_fails_closed (void)
   g_autoptr(GError) error = NULL;
   GoodixEnrollmentPostTlsEvents *events =
     goodix_enrollment_post_tls_events_new (
-      &config, image_ready, timestamp_ready, &fixture, &audit, &error);
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
 
   fill_raw (0x88u, raw);
   handle_irq (events, 0x32, 0x0002, 0x003f, raw);
@@ -301,7 +322,8 @@ test_bad_irq_flags_fail_closed (void)
   g_autoptr(GError) error = NULL;
   GoodixEnrollmentPostTlsEvents *events =
     goodix_enrollment_post_tls_events_new (
-      &config, image_ready, timestamp_ready, &fixture, &audit, &error);
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
 
   fill_raw (0x88u, raw);
   frame = build_irq (0x32, 0x0002, 0x0000, raw);
@@ -309,6 +331,136 @@ test_bad_irq_flags_fail_closed (void)
     events, frame, &error));
   g_assert_nonnull (error);
   g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+  goodix_enrollment_post_tls_events_free (events);
+}
+
+static guint32
+test_crc32_mpeg2 (const guint8 *data,
+                  gsize         length)
+{
+  guint32 crc = UINT32_C (0xffffffff);
+
+  for (gsize i = 0u; i < length; i++)
+    {
+      crc ^= (guint32) data[i] << 24;
+      for (guint bit = 0u; bit < 8u; bit++)
+        crc = (crc & UINT32_C (0x80000000)) != 0u ?
+          (crc << 1) ^ UINT32_C (0x04c11db7) : crc << 1;
+    }
+  return crc;
+}
+
+static GBytes *
+build_image_plaintext (void)
+{
+  guint8 bytes[GOODIX_IMAGE_PLAINTEXT_LENGTH] = { 0 };
+  guint32 crc;
+
+  bytes[0] = 0x20;
+  bytes[1] = 0x0a;
+  bytes[2] = 0x1e;
+  crc = test_crc32_mpeg2 (bytes + 8u, GOODIX_IMAGE_PACKED_LENGTH);
+  bytes[7688] = (guint8) (crc >> 8);
+  bytes[7689] = (guint8) crc;
+  bytes[7690] = (guint8) (crc >> 24);
+  bytes[7691] = (guint8) (crc >> 16);
+  bytes[7692] = 0x88;
+  return g_bytes_new (bytes, sizeof bytes);
+}
+
+static void
+feed_fragmented_plaintext (GoodixEnrollmentPostTlsEvents *events,
+                           GBytes                        *plaintext)
+{
+  const gsize splits[] = { 2u, 31u, GOODIX_IMAGE_PLAINTEXT_LENGTH - 33u };
+  gsize offset = 0u;
+
+  for (guint i = 0u; i < G_N_ELEMENTS (splits); i++)
+    {
+      g_autoptr(GBytes) chunk = g_bytes_new_from_bytes (
+        plaintext, offset, splits[i]);
+      g_autoptr(GError) error = NULL;
+
+      g_assert_true (goodix_enrollment_post_tls_events_handle_plaintext_chunk (
+        events, chunk, &error));
+      g_assert_no_error (error);
+      offset += splits[i];
+    }
+}
+
+static void
+test_fragmented_primary_and_opaque_auxiliary (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit audit;
+  Fixture fixture = { 0 };
+  guint8 irq2[12];
+  guint8 irq0200[12];
+  g_autoptr(GBytes) primary = build_image_plaintext ();
+  g_autoptr(GBytes) auxiliary = NULL;
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
+  gsize length;
+  const guint8 *source = g_bytes_get_data (primary, &length);
+  guint8 *opaque = g_memdup2 (source, length);
+
+  /* Keep only the generic length framing valid. Deliberately invalidate the
+   * image CRC/no-check trailer: auxiliary delivery must remain opaque. */
+  opaque[7688] ^= 0x5a;
+  opaque[7692] = 0x00;
+  auxiliary = g_bytes_new_take (opaque, length);
+
+  fill_raw (0x88u, irq2);
+  fill_raw (0x48u, irq0200);
+  handle_irq (events, 0x32, 0x0002, 0x003f, irq2);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_22, 0x22);
+  feed_fragmented_plaintext (events, primary);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_34, 0x34);
+  handle_irq (events, 0x34, 0x0200, 0x0000, irq0200);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_20, 0x20);
+  feed_fragmented_plaintext (events, auxiliary);
+
+  g_assert_cmpuint (fixture.image_count, ==, 1u);
+  g_assert_cmpuint (fixture.auxiliary_delivery_count, ==, 1u);
+  g_assert_cmphex (fixture.auxiliary_last_byte, ==, 0x00);
+  g_assert_cmpuint (audit.plaintext_chunk_count, ==, 6u);
+  g_assert_cmpuint (audit.completed_b0_message_count, ==, 2u);
+  g_assert_cmpuint (audit.primary_b0_decode_count, ==, 1u);
+  g_assert_cmpuint (audit.auxiliary_b0_delivery_count, ==, 1u);
+  g_assert_cmpuint (audit.primary_b0_count, ==, 1u);
+  g_assert_cmpuint (audit.auxiliary_b0_count, ==, 1u);
+  g_assert_false (goodix_enrollment_post_tls_events_is_failed (events));
+  goodix_enrollment_post_tls_events_free (events);
+}
+
+static void
+test_primary_declared_length_fails_closed (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit audit;
+  Fixture fixture = { 0 };
+  guint8 irq2[12];
+  const guint8 invalid_header[] = { 0x20, 0x01, 0x00 };
+  g_autoptr(GBytes) chunk = g_bytes_new_static (
+    invalid_header, sizeof invalid_header);
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
+
+  fill_raw (0x88u, irq2);
+  handle_irq (events, 0x32, 0x0002, 0x003f, irq2);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_22, 0x22);
+  g_assert_false (goodix_enrollment_post_tls_events_handle_plaintext_chunk (
+    events, chunk, &error));
+  g_assert_nonnull (error);
+  g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+  g_assert_cmpuint (audit.rejected_inbound_count, ==, 1u);
+  g_assert_cmpuint (audit.primary_b0_decode_count, ==, 0u);
   goodix_enrollment_post_tls_events_free (events);
 }
 
@@ -322,5 +474,9 @@ main (int argc, char **argv)
                    test_wrong_ack_fails_closed);
   g_test_add_func ("/d279-14-post-tls-events/bad-irq-flags-fail-closed",
                    test_bad_irq_flags_fail_closed);
+  g_test_add_func ("/d279-15-b0-stream/fragmented-primary-opaque-auxiliary",
+                   test_fragmented_primary_and_opaque_auxiliary);
+  g_test_add_func ("/d279-15-b0-stream/invalid-primary-length-fails-closed",
+                   test_primary_declared_length_fails_closed);
   return g_test_run ();
 }

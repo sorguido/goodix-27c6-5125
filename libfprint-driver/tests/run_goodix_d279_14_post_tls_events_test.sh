@@ -37,6 +37,7 @@ run_build () {
   extra=$2
   for source in \
     goodix_a0_protocol.c \
+    goodix_image_decoder.c \
     goodix_u16_to_fpimage.c \
     goodix_fpimage_pipeline.c \
     goodix_enrollment_model.c \
@@ -78,6 +79,10 @@ run_build normal ""
 echo D279_14_NORMAL=PASS
 run_build sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
 echo D279_14_ASAN_UBSAN=PASS
+echo D279_15_B0_STREAM=PASS
+echo PRIMARY_B0_EXACT_PLAINTEXT_LENGTH=7693
+echo AUXILIARY_B0_DECLARED_LENGTH_MAX=8192
+echo AUXILIARY_B0_OPAQUE_CALLBACK=PASS
 echo CONFIGURABLE_STAGE_PROFILES_2_3_21=PASS
 echo ATTEMPT02_OBSERVED_STAGE_COUNT=21
 echo OEM_UNIVERSAL_STAGE_COUNT_CLAIM=false

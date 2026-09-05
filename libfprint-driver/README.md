@@ -202,7 +202,16 @@ full sequence. The adapter still has no A0 serializer, backend or submit path.
 ACK/IRQ/NAV frames to the lifecycle adapter. Echo/status, IRQ control/id/flags
 and the target-observed NAV no-check shape are state-bound and fail closed.
 Primary samples and the opaque auxiliary B0 use separate typed calls. B0
-reassembly/decoding, A0 serialization, transport and submit remain outside.
+reassembly/decoding is added by the D279/15 layer below; A0 serialization,
+transport and submit remain outside.
+
+## D279/15 bounded B0 plaintext delivery
+
+The inbound event layer also reassembles a single declared-length plaintext
+B0 within an 8192-byte bound. Primary B0 retains the exact 7693-byte image
+decoder contract. Auxiliary B0 is never decoded or discarded: the complete
+unchanged message is delivered to a mandatory opaque callback before the
+lifecycle transition. Serialization, transport and submit remain absent.
 
 ## D272/01 ephemeral SIGFM metric seam
 

@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_B0_PLAINTEXT_REASSEMBLY_AND_TYPED_DELIVERY_ZERO_SENDER
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ENROLLMENT_OUTBOUND_SERIALIZATION_AND_SUBMIT_CONTRACT_WITH_PRODUCTION_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -590,6 +590,23 @@ enrollment production resta invariato. Il B0 ausiliario è
 trattato come transizione protocol-internal, ma la sua eventuale utilità per
 quality, template o NBIS resta non determinata. Report:
 `analysis/D279/D279_14_inbound_post_tls_enrollment_events.md`.
+
+### D279/15 — reassembly B0 bounded e contenuto ausiliario preservato
+
+Il binding inbound ricompone ora un messaggio plaintext B0 dalla lunghezza
+dichiarata entro 8192 byte. Il primario mantiene il contratto decoder esatto
+7693 e produce il raster canonico. L'ausiliario viene consegnato completo e
+invariato a un callback opaco obbligatorio prima della transizione: non viene
+decodificato, scartato né dichiarato inutile a quality/template/NBIS.
+
+La lunghezza wire cifrata 7726 osservata per entrambi i B0 in ATTEMPT02 è solo
+compatibile con una forma simile; non dimostra una lunghezza plaintext OEM
+universale, quindi il ramo ausiliario resta declared-length e bounded. La
+regressione frammenta entrambi i messaggi, usa un primario CRC-valido e un
+ausiliario volutamente non valido come immagine per provarne la consegna
+opaca. Lunghezza primaria errata fallisce chiuso. 5/5 test passano normal e
+ASan/UBSan, senza A0 build, backend o submit. Report:
+`analysis/D279/D279_15_bounded_b0_plaintext_delivery.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
