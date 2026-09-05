@@ -21,8 +21,10 @@ typedef struct
 } GoodixEnrollmentFpiUsbBindingAudit;
 
 /* Dormant production-shaped binding. The caller must have begun @generation
- * on @backend. Construction submits nothing. The production FpImageDevice
- * enrollment activation gate remains the authority that prevents reachability. */
+ * on @backend. On success the binding takes ownership of @events; on failure
+ * ownership stays with the caller. Construction submits nothing. The
+ * production FpImageDevice enrollment activation gate remains the authority
+ * that prevents reachability. */
 GoodixEnrollmentFpiUsbBinding *goodix_enrollment_fpi_usb_binding_new (
   GoodixEnrollmentPostTlsEvents       *events,
   GoodixFpiUsbBackend                 *backend,
@@ -49,6 +51,10 @@ void goodix_enrollment_fpi_usb_binding_cancel (
   GoodixEnrollmentFpiUsbBinding *binding,
   const gchar                   *reason);
 gboolean goodix_enrollment_fpi_usb_binding_can_free (
+  const GoodixEnrollmentFpiUsbBinding *binding);
+GoodixFpiUsbBackend *goodix_enrollment_fpi_usb_binding_get_backend (
+  const GoodixEnrollmentFpiUsbBinding *binding);
+guint64 goodix_enrollment_fpi_usb_binding_get_generation (
   const GoodixEnrollmentFpiUsbBinding *binding);
 
 gboolean goodix_enrollment_fpi_usb_binding_has_pending (

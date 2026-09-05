@@ -659,7 +659,6 @@ test_dormant_backend_binding_completion_gate (void)
 
   goodix_enrollment_fpi_usb_binding_free (binding);
   goodix_fpi_usb_backend_free (backend);
-  goodix_enrollment_post_tls_events_free (events);
 }
 
 static void
@@ -715,7 +714,6 @@ test_backend_binding_cancel_waits_for_drain (void)
   goodix_enrollment_fpi_usb_binding_free (binding);
   goodix_fpi_usb_backend_free (backend);
   goodix_usb_router_free (router);
-  goodix_enrollment_post_tls_events_free (events);
 }
 
 int

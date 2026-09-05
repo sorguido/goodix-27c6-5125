@@ -19,6 +19,17 @@ includes="-I$test_dir/support/d277 -I$test_dir/support -I$git_root/libfprint-dri
 strict_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 
+adoption_mentions=$(find "$git_root/libfprint-driver" \
+  -path "$git_root/libfprint-driver/tests" -prune -o \
+  \( -name '*.c' -o -name '*.h' \) -type f -exec \
+  grep -H 'goodix_device_context_adopt_dormant_enrollment_binding' {} + | \
+  wc -l)
+if [ "$adoption_mentions" -ne 2 ]; then
+  echo "dormant enrollment adoption acquired a production caller" >&2
+  exit 1
+fi
+echo D279_20_NO_PRODUCTION_ADOPTION_CALLER_SOURCE_AUDIT=PASS
+
 # ---- Generated enum registrations (host-only Python shim) ----
 python3 "$test_dir/support/generate_libfprint_enums.py" \
   --identifier-prefix Fpi --symbol-prefix fpi \
@@ -91,6 +102,22 @@ gcc $strict_flags $glib_cflags $includes -c \
   -o "$build_dir/goodix_fpimage_device.o"
 gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_tls_server.c" -o "$build_dir/goodix_tls_server.o"
 gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_fpi_usb_backend.c" -o "$build_dir/goodix_fpi_usb_backend.o"
+for source in \
+  goodix_enrollment_model.c \
+  goodix_enrollment_pipeline.c \
+  goodix_enrollment_command_plan.c \
+  goodix_enrollment_command_body.c \
+  goodix_enrollment_fdt_state.c \
+  goodix_enrollment_lifecycle_adapter.c \
+  goodix_enrollment_post_tls_events.c \
+  goodix_enrollment_outbound_frame.c \
+  goodix_enrollment_outbound_transaction.c \
+  goodix_enrollment_fpi_usb_binding.c; do
+  # shellcheck disable=SC2086
+  gcc $strict_flags $glib_cflags $includes -c \
+    "$git_root/libfprint-driver/$source" \
+    -o "$build_dir/${source%.c}.o"
+done
 gcc $local_flags $glib_cflags $includes -c "$test_dir/support/fpi_usb_transfer_compile_stub.c" -o "$build_dir/fpi_usb_transfer_compile_stub.o"
 gcc $strict_flags $glib_cflags $includes -c \
   "$test_dir/test_goodix_fpimage_device.c" \
@@ -137,6 +164,16 @@ gcc -Wl,--gc-sections \
   "$build_dir/goodix_fpimage_device.o" \
   "$build_dir/goodix_tls_server.o" \
   "$build_dir/goodix_fpi_usb_backend.o" \
+  "$build_dir/goodix_enrollment_model.o" \
+  "$build_dir/goodix_enrollment_pipeline.o" \
+  "$build_dir/goodix_enrollment_command_plan.o" \
+  "$build_dir/goodix_enrollment_command_body.o" \
+  "$build_dir/goodix_enrollment_fdt_state.o" \
+  "$build_dir/goodix_enrollment_lifecycle_adapter.o" \
+  "$build_dir/goodix_enrollment_post_tls_events.o" \
+  "$build_dir/goodix_enrollment_outbound_frame.o" \
+  "$build_dir/goodix_enrollment_outbound_transaction.o" \
+  "$build_dir/goodix_enrollment_fpi_usb_binding.o" \
   "$build_dir/fpi_usb_transfer_compile_stub.o" \
   "$build_dir/test_goodix_fpimage_device.o" \
   "$build_dir/gusb_stub.o" \
@@ -211,6 +248,22 @@ gcc $san_strict_flags $glib_cflags $includes -c \
   -o "$build_dir/goodix_fpimage_device_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_tls_server.c" -o "$build_dir/goodix_tls_server_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_fpi_usb_backend.c" -o "$build_dir/goodix_fpi_usb_backend_san.o"
+for source in \
+  goodix_enrollment_model.c \
+  goodix_enrollment_pipeline.c \
+  goodix_enrollment_command_plan.c \
+  goodix_enrollment_command_body.c \
+  goodix_enrollment_fdt_state.c \
+  goodix_enrollment_lifecycle_adapter.c \
+  goodix_enrollment_post_tls_events.c \
+  goodix_enrollment_outbound_frame.c \
+  goodix_enrollment_outbound_transaction.c \
+  goodix_enrollment_fpi_usb_binding.c; do
+  # shellcheck disable=SC2086
+  gcc $san_strict_flags $glib_cflags $includes -c \
+    "$git_root/libfprint-driver/$source" \
+    -o "$build_dir/${source%.c}_san.o"
+done
 gcc $san_local_flags $glib_cflags $includes -c "$test_dir/support/fpi_usb_transfer_compile_stub.c" -o "$build_dir/fpi_usb_transfer_compile_stub_san.o"
 gcc $san_strict_flags $glib_cflags $includes -c \
   "$test_dir/test_goodix_fpimage_device.c" \
@@ -246,6 +299,16 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/goodix_fpimage_device_san.o" \
   "$build_dir/goodix_tls_server_san.o" \
   "$build_dir/goodix_fpi_usb_backend_san.o" \
+  "$build_dir/goodix_enrollment_model_san.o" \
+  "$build_dir/goodix_enrollment_pipeline_san.o" \
+  "$build_dir/goodix_enrollment_command_plan_san.o" \
+  "$build_dir/goodix_enrollment_command_body_san.o" \
+  "$build_dir/goodix_enrollment_fdt_state_san.o" \
+  "$build_dir/goodix_enrollment_lifecycle_adapter_san.o" \
+  "$build_dir/goodix_enrollment_post_tls_events_san.o" \
+  "$build_dir/goodix_enrollment_outbound_frame_san.o" \
+  "$build_dir/goodix_enrollment_outbound_transaction_san.o" \
+  "$build_dir/goodix_enrollment_fpi_usb_binding_san.o" \
   "$build_dir/fpi_usb_transfer_compile_stub_san.o" \
   "$build_dir/test_goodix_fpimage_device_san.o" \
   "$build_dir/gusb_stub_san.o" \
@@ -268,3 +331,6 @@ set -e
 if [ "$normal_rc" -ne 0 ] || [ "$san_rc" -ne 0 ]; then
   exit 1
 fi
+echo D279_20_DORMANT_CONTEXT_OWNERSHIP_AND_DRAIN=PASS
+echo D279_20_PRODUCTION_ENROLLMENT_GATE_RETAINED=PASS
+echo D279_20_REAL_USB_SUBMIT=0

@@ -6,6 +6,9 @@
  * state machine through public async actions, with an in-memory fake backend.
  */
 #include "../goodix_fpimage_device.h"
+#include "../goodix_a0_protocol.h"
+#include "../goodix_enrollment_fpi_usb_binding.h"
+#include "../goodix_enrollment_post_tls_events.h"
 #include "../goodix_fpi_usb_backend.h"
 #include "../goodix_usb_router.h"
 #include "../goodix_u16_to_fpimage.h"
@@ -230,6 +233,67 @@ fill_gradient_samples (uint16_t *samples)
 
   for (i = 0; i < GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT; i++)
     samples[i] = (uint16_t) (i % (GOODIX_SENSOR_SAMPLE_MAX + 1));
+}
+
+static gboolean
+d279_20_image_ready (GoodixEnrollmentPipeline *pipeline,
+                     guint                     stage_index,
+                     FpImage                  *image,
+                     gpointer                  user_data,
+                     GError                  **error)
+{
+  (void) pipeline;
+  (void) stage_index;
+  (void) image;
+  (void) user_data;
+  (void) error;
+  return TRUE;
+}
+
+static gboolean
+d279_20_timestamp_ready (guint                           stage_index,
+                         GoodixEnrollmentCommandPurpose purpose,
+                         guint16                        *timestamp,
+                         gpointer                        user_data,
+                         GError                        **error)
+{
+  (void) stage_index;
+  (void) purpose;
+  (void) user_data;
+  (void) error;
+  *timestamp = 0x3000u;
+  return TRUE;
+}
+
+static gboolean
+d279_20_auxiliary_ready (GBytes   *plaintext,
+                         gpointer  user_data,
+                         GError  **error)
+{
+  (void) plaintext;
+  (void) user_data;
+  (void) error;
+  return TRUE;
+}
+
+static GBytes *
+d279_20_build_irq2 (void)
+{
+  guint8 body[16] = { 0x02, 0x00, 0x3f, 0x00 };
+  g_autoptr(GError) error = NULL;
+  GBytes *frame;
+
+  for (guint i = 0u; i < 6u; i++)
+    {
+      guint16 word = (guint16) (0x88u + i * 2u);
+
+      body[4u + i * 2u] = (guint8) word;
+      body[5u + i * 2u] = (guint8) (word >> 8);
+    }
+  frame = goodix_a0_build_frame (0x32, 0x32, body, sizeof body, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (frame);
+  return frame;
 }
 
 /* -------------------------------------------------------------
@@ -1670,6 +1734,94 @@ test_d278_14_non_null_usb_binding (void)
   g_print ("NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true\n");
 }
 
+static void
+test_d279_20_dormant_enrollment_context_ownership (void)
+{
+  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentPostTlsEventsAudit events_audit;
+  GoodixEnrollmentFpiUsbBindingAudit binding_audit;
+  GoodixEnrollmentPostTlsEventsAudit foreign_events_audit;
+  GoodixEnrollmentFpiUsbBindingAudit foreign_binding_audit;
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GError) cancelled = g_error_new_literal (
+    G_IO_ERROR, G_IO_ERROR_CANCELLED, "synthetic context cancellation");
+  g_autoptr(GBytes) irq = d279_20_build_irq2 ();
+  GoodixFpImageDevice *device = goodix_fpimage_device_new ();
+  GoodixDeviceContext *ctx = goodix_fpimage_device_get_context (device);
+  GoodixFpiUsbBackend *backend =
+    goodix_device_context_get_fpi_usb_backend (ctx);
+  GoodixEnrollmentPostTlsEvents *events;
+  GoodixEnrollmentFpiUsbBinding *binding;
+  GoodixUsbRouter *foreign_router;
+  GoodixFpiUsbBackend *foreign_backend;
+  GoodixEnrollmentPostTlsEvents *foreign_events;
+  GoodixEnrollmentFpiUsbBinding *foreign_binding;
+  guint64 generation;
+
+  goodix_device_context_set_async_usb_submit_seam (
+    ctx, host_only_usb_submit, NULL);
+  g_assert_true (goodix_device_context_begin_operator_epoch (
+    ctx, cancellable, &error));
+  generation = goodix_device_context_get_generation (ctx);
+
+  foreign_router = goodix_usb_router_new (NULL, NULL, NULL);
+  foreign_backend = goodix_fpi_usb_backend_new (
+    NULL, foreign_router, 0x81, 0x01, 8192u);
+  goodix_usb_router_begin_generation (foreign_router, generation);
+  g_assert_true (goodix_fpi_usb_backend_begin_generation (
+    foreign_backend, generation, cancellable, &error));
+  foreign_events = goodix_enrollment_post_tls_events_new (
+    &config, d279_20_image_ready, d279_20_timestamp_ready,
+    d279_20_auxiliary_ready, NULL, &foreign_events_audit, &error);
+  foreign_binding = goodix_enrollment_fpi_usb_binding_new (
+    foreign_events, foreign_backend, generation, &foreign_binding_audit,
+    &error);
+  g_assert_nonnull (foreign_binding);
+  g_assert_false (goodix_device_context_adopt_dormant_enrollment_binding (
+    ctx, foreign_binding, &error));
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_CLOSED);
+  g_clear_error (&error);
+  g_assert_false (goodix_device_context_has_dormant_enrollment_binding (ctx));
+  goodix_enrollment_fpi_usb_binding_free (foreign_binding);
+  goodix_fpi_usb_backend_free (foreign_backend);
+  goodix_usb_router_free (foreign_router);
+
+  events = goodix_enrollment_post_tls_events_new (
+    &config, d279_20_image_ready, d279_20_timestamp_ready,
+    d279_20_auxiliary_ready, NULL, &events_audit, &error);
+  g_assert_nonnull (events);
+  binding = goodix_enrollment_fpi_usb_binding_new (
+    events, backend, generation, &binding_audit, &error);
+  g_assert_nonnull (binding);
+  g_assert_true (goodix_device_context_adopt_dormant_enrollment_binding (
+    ctx, binding, &error));
+  g_assert_true (goodix_device_context_has_dormant_enrollment_binding (ctx));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
+    binding, irq, &error));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_submit_next (
+    binding, &error));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==,
+                    1u);
+
+  goodix_device_context_stop_operator_epoch (ctx);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_is_failed (binding));
+  g_assert_cmpuint (binding_audit.cancellation_count, ==, 1u);
+  g_assert_false (goodix_device_context_operator_epoch_is_drained (ctx));
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    0u);
+
+  goodix_fpi_usb_backend_complete_out (backend, generation, cancelled);
+  g_assert_true (goodix_device_context_operator_epoch_is_drained (ctx));
+  g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
+                    0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==,
+                    0u);
+
+  g_object_unref (device);
+  g_print ("D279_20_DORMANT_CONTEXT_OWNERSHIP=PASS\n");
+}
+
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
@@ -1728,6 +1880,8 @@ main (int argc, char **argv)
                    test_d279_09_production_activation_sync_failure);
   g_test_add_func ("/goodix-fpimage-device/d279-09-production-enrollment-rejected",
                    test_d279_09_production_enrollment_rejected_before_submit);
+  g_test_add_func ("/goodix-fpimage-device/d279-20-dormant-enrollment-context-ownership",
+                   test_d279_20_dormant_enrollment_context_ownership);
 
   return g_test_run ();
 }

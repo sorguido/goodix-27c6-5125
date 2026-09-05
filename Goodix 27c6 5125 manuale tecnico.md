@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_DEVICE_CONTEXT_DORMANT_ENROLLMENT_OWNERSHIP_WITH_ACTIVATION_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_SECURE_TO_ENROLLMENT_HANDOFF_AND_LIBFPRINT_CALLBACK_DESIGN_WITH_ACTIVATION_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -672,6 +672,35 @@ resta configurabile: 21 è soltanto il numero target-local osservato in
 ATTEMPT02. I B0 ausiliari restano consegnati opacamente e la loro semantica
 quality/template/NBIS non è determinata. Report:
 `analysis/D279/D279_19_enrollment_binding_cancellation_drain.md`.
+
+### D279/20 — ownership dormant nel device context
+
+`GoodixDeviceContext` può ora adottare, solo durante un operator epoch
+host-only esplicito, un binding enrollment già costruito. L'adozione fallisce
+se backend o generation non coincidono, se il context è fenced/terminale, se
+esiste già un binding o se TLS, secure session o lifecycle post-TLS legacy sono
+ancora owner del callback OUT. Il context non costruisce il grafo e non invoca
+submit: conserva soltanto ownership, cancellation e teardown.
+
+Una costruzione riuscita del binding trasferisce anche ownership dell'intero
+`GoodixEnrollmentPostTlsEvents`; il teardown è quindi autosufficiente. Il
+terminal fence cancella il binding e il context verifica il drain backend e
+del binding prima di liberare nell'ordine binding → backend → router. La
+regressione lascia un OUT sintetico pending, ferma l'epoch, osserva zero commit,
+completa il drain cancellato e distrugge il context. La suite `FpImageDevice`
+passa 26/26 normal e ASan/UBSan; la suite enrollment passa 9/9 in entrambe le
+modalità. La build Fedora 44/libfprint 1.94.100 con registry standard/NBIS
+passa, senza warning nuovi e con zero enumerazione/open/claim/submit USB.
+
+Il gate production che rifiuta `FPI_DEVICE_ACTION_ENROLL` prima della
+generation è invariato e non esiste un caller production dell'API di adozione.
+Il prossimo confine è progettare offline l'handoff esclusivo dal secure/post-
+TLS graph all'enrollment e le callback libfprint, mantenendo il gate; non è
+ancora autorizzata alcuna attivazione live. Il conteggio rimane configurabile:
+21 indica soltanto gli stage riusciti osservati in ATTEMPT02. I B0 ausiliari
+restano preservati opacamente e la loro semantica quality/template/NBIS non è
+determinata. Report:
+`analysis/D279/D279_20_dormant_device_context_enrollment_ownership.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

@@ -20,6 +20,7 @@
 #include "goodix_secure_session.h"
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_runtime_material.h"
+#include "goodix_enrollment_fpi_usb_binding.h"
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -69,6 +70,7 @@ struct _GoodixDeviceContext
   GoodixFpiUsbBackend       *fpi_usb_backend;
   GoodixSecureSession       *secure_session;
   GoodixPostTlsLifecycle    *post_tls_lifecycle;
+  GoodixEnrollmentFpiUsbBinding *enrollment_binding;
   GoodixTlsPlaintextFunc     tls_plaintext;
   gpointer                   tls_user_data;
   guint                      a0_delivery_count;
@@ -412,6 +414,38 @@ GoodixTlsServer *goodix_device_context_get_tls_server (GoodixDeviceContext *ctx)
 }
 GoodixFpiUsbBackend *goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx) { return ctx ? ctx->fpi_usb_backend : NULL; }
 
+gboolean
+goodix_device_context_adopt_dormant_enrollment_binding (
+  GoodixDeviceContext           *ctx,
+  GoodixEnrollmentFpiUsbBinding *binding,
+  GError                       **error)
+{
+  if (ctx == NULL || binding == NULL || !ctx->operator_epoch ||
+      ctx->terminal_fence || ctx->generation == 0u ||
+      ctx->enrollment_binding != NULL || ctx->secure_session != NULL ||
+      ctx->post_tls_lifecycle != NULL || ctx->tls_server != NULL ||
+      goodix_enrollment_fpi_usb_binding_is_failed (binding) ||
+      goodix_enrollment_fpi_usb_binding_get_backend (binding) !=
+        ctx->fpi_usb_backend ||
+      goodix_enrollment_fpi_usb_binding_get_generation (binding) !=
+        ctx->generation)
+    {
+      g_set_error_literal (
+        error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+        "dormant enrollment binding ownership preconditions failed");
+      return FALSE;
+    }
+  ctx->enrollment_binding = binding;
+  return TRUE;
+}
+
+gboolean
+goodix_device_context_has_dormant_enrollment_binding (
+  GoodixDeviceContext *ctx)
+{
+  return ctx != NULL && ctx->enrollment_binding != NULL;
+}
+
 static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
 {
   GoodixDeviceContext *ctx = user_data;
@@ -519,6 +553,12 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
   if (ctx == NULL)
     return;
 
+  g_return_if_fail (goodix_fpi_usb_backend_is_drained (
+                      ctx->fpi_usb_backend));
+  g_return_if_fail (ctx->enrollment_binding == NULL ||
+                    goodix_enrollment_fpi_usb_binding_can_free (
+                      ctx->enrollment_binding));
+
   g_clear_object (&ctx->activation_cancellable);
   g_clear_object (&ctx->usb_cancellable);
   g_clear_error (&ctx->terminal_error);
@@ -526,6 +566,7 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
   goodix_post_tls_lifecycle_free (ctx->post_tls_lifecycle);
   goodix_secure_session_free (ctx->secure_session);
   goodix_tls_server_free (ctx->tls_server);
+  goodix_enrollment_fpi_usb_binding_free (ctx->enrollment_binding);
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
@@ -536,7 +577,6 @@ goodix_device_context_free (GoodixDeviceContext *ctx)
                                      ctx->runtime_material_release_data);
       ctx->runtime_material = NULL;
     }
-  g_return_if_fail (goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend));
   goodix_fpi_usb_backend_free (ctx->fpi_usb_backend);
   goodix_usb_router_free (ctx->usb_router);
   g_free (ctx);
@@ -657,6 +697,8 @@ static void
 goodix_device_context_set_terminal_fence (GoodixDeviceContext *ctx)
 {
   ctx->terminal_fence = TRUE;
+  goodix_enrollment_fpi_usb_binding_cancel (
+    ctx->enrollment_binding, "GoodixDeviceContext terminal fence");
   if (ctx->secure_session != NULL &&
       goodix_secure_session_get_phase (ctx->secure_session) !=
         GOODIX_SECURE_PHASE_STOP &&

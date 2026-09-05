@@ -37,6 +37,7 @@ typedef enum
 typedef struct _GoodixDeviceContext GoodixDeviceContext;
 typedef struct _GoodixInMemoryBackend GoodixInMemoryBackend;
 typedef struct _GoodixUsbRouter GoodixUsbRouter;
+typedef struct _GoodixEnrollmentFpiUsbBinding GoodixEnrollmentFpiUsbBinding;
 typedef struct _GUsbDevice GUsbDevice;
 
 #define GOODIX_PRE_SESSION_RX_QUIET_TIMEOUT_MS 250u
@@ -132,6 +133,12 @@ gboolean goodix_device_context_runtime_handoff_views_cleared (
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
 GoodixTlsServer *      goodix_device_context_get_tls_server (GoodixDeviceContext *ctx);
 GoodixFpiUsbBackend *  goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx);
+gboolean goodix_device_context_adopt_dormant_enrollment_binding (
+  GoodixDeviceContext           *ctx,
+  GoodixEnrollmentFpiUsbBinding *binding,
+  GError                       **error);
+gboolean goodix_device_context_has_dormant_enrollment_binding (
+  GoodixDeviceContext *ctx);
 gboolean goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
                                                         const guint8 *psk,
                                                         gsize psk_length,

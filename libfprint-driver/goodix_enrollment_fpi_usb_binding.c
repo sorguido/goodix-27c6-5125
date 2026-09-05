@@ -14,6 +14,8 @@ typedef enum
 struct _GoodixEnrollmentFpiUsbBinding
 {
   GoodixFpiUsbBackend *backend;
+  guint64 generation;
+  GoodixEnrollmentPostTlsEvents *events;
   GoodixEnrollmentOutboundTransaction *transaction;
   GoodixEnrollmentFpiUsbBindingAudit internal_audit;
   GoodixEnrollmentFpiUsbBindingAudit *audit;
@@ -106,6 +108,7 @@ goodix_enrollment_fpi_usb_binding_new (
     }
   binding = g_new0 (GoodixEnrollmentFpiUsbBinding, 1);
   binding->backend = backend;
+  binding->generation = generation;
   binding->audit = audit != NULL ? audit : &binding->internal_audit;
   *binding->audit = (GoodixEnrollmentFpiUsbBindingAudit) { 0 };
   binding->transaction = goodix_enrollment_outbound_transaction_new (
@@ -116,6 +119,7 @@ goodix_enrollment_fpi_usb_binding_new (
       g_free (binding);
       return NULL;
     }
+  binding->events = events;
   goodix_fpi_usb_backend_set_out_completed_callback (
     backend, backend_out_complete, binding);
   return binding;
@@ -130,6 +134,7 @@ goodix_enrollment_fpi_usb_binding_free (GoodixEnrollmentFpiUsbBinding *binding)
   goodix_fpi_usb_backend_set_out_completed_callback (binding->backend,
                                                       NULL, NULL);
   goodix_enrollment_outbound_transaction_free (binding->transaction);
+  goodix_enrollment_post_tls_events_free (binding->events);
   g_clear_error (&binding->terminal_error);
   g_free (binding);
 }
@@ -171,6 +176,20 @@ goodix_enrollment_fpi_usb_binding_can_free (
 {
   return binding != NULL &&
          goodix_fpi_usb_backend_get_out_outstanding (binding->backend) == 0u;
+}
+
+GoodixFpiUsbBackend *
+goodix_enrollment_fpi_usb_binding_get_backend (
+  const GoodixEnrollmentFpiUsbBinding *binding)
+{
+  return binding != NULL ? binding->backend : NULL;
+}
+
+guint64
+goodix_enrollment_fpi_usb_binding_get_generation (
+  const GoodixEnrollmentFpiUsbBinding *binding)
+{
+  return binding != NULL ? binding->generation : 0u;
 }
 
 gboolean

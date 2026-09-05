@@ -245,6 +245,16 @@ completion drains the backend but cannot commit the lifecycle planner. The
 operation is idempotent and still has no production device-context owner or
 caller; production enrollment remains rejected before activation.
 
+## D279/20 dormant device-context ownership
+
+During an explicit host-only operator epoch, the device context may adopt an
+already constructed enrollment binding only when it uses the context backend
+and current generation and no TLS, secure-session, or legacy post-TLS owner is
+present. The binding owns its event graph after successful construction; the
+context cancels it at the terminal fence and frees the graph only after backend
+drain. The context neither constructs nor submits through the binding, and the
+production enrollment activation gate remains unchanged.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
