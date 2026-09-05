@@ -1,10 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D279/10 — preparazione operator kit terza acquisizione
+# D279/10 — replan del Kit per il primo enrollment OEM completo
 
 ## Esito offline
 
 ```text
-D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION
+D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION_AND_LIVE_GATE
 ADVANCEMENT=MATERIAL_REPOSITORY_ADVANCEMENT
 EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC;WINDOWS_NATIVE_PENDING
 REAL_TARGET_EXECUTION=false
@@ -13,70 +13,115 @@ AUTHENTIC_CAPTURE_ACCESSED_BY_AI=false
 LIVE_AUTHORIZED=false
 ```
 
-Baseline di partenza: `1cc2b83` (`D279/09`). Il Kit e in
-`operator_kit/d279-10-third-acquisition-observe/`.
+Baseline del replan: `fc2172f9973ea5a13f067dc3abfd98881c274efa`.
+Il correttivo resta nello stesso D279/10 perché sostituisce il boundary e il
+contratto operativo del Kit già introdotto, senza creare un nuovo fatto live.
 
 ## Decisione metodologica
 
-D279/09 ha reso esplicito che il default libfprint di cinque stage non e
-authority target e che il lifecycle locale termina al secondo B0. Il prossimo
-fatto minimo non viene cercato estendendo alla cieca il sender Linux: il Kit
-osserva passivamente il workflow OEM Windows e non invia comandi Goodix.
+Il precedente metodo terminava wire-driven al terzo B0 e quindi non poteva
+rispondere alla domanda sul workflow OEM completo. Il nuovo metodo:
 
-Risposte pre-live obbligatorie:
+1. cattura passivamente dall’avvio del wizard alla conferma reale Windows più
+   un tail host di cinque secondi;
+2. usa la conferma numerica dell’operatore sull’UI come authority di completion;
+3. conta dinamicamente tutti i lifecycle esatti
+   `IRQ2 → 0x22 → ACK 0x01 → fingerprint B0`, senza imporre il default
+   libfprint di cinque stage;
+4. registra il terzo B0 come milestone e continua;
+5. non contiene sender Goodix né retry automatici.
 
-1. il metodo cambia da stop Linux al secondo B0 a osservazione OEM passiva fino
-   al terzo edge;
-2. viene testata l'ipotesi che il release-tail/re-arm gia provato fra prima e
-   seconda acquisizione si ripeta dopo la seconda, nella stessa sessione;
-3. al medesimo failure non segue un retry: si classifica la singola traccia e
-   si effettua replan.
+Se una run fallisce, non viene rilanciata nella stessa invocazione. Il suo
+`attempt_status.json` distingue il solo failure pre-attach/pre-wizard, per cui
+un nuovo tentativo può essere ragionevole senza restore, da ogni failure dopo
+attach, per cui lo stato è prudenzialmente incerto e si richiede restore.
+
+## Attempt, snapshot e conservazione
+
+Il marker globale è rimosso. Ogni authority specifica un
+`authorized_attempt_id` distinto; la directory e `attempt.lock` sono creati
+con protezione per-attempt e non vengono mai riusati, sovrascritti o rimossi.
+Un failure non rende inutilizzabile il Kit, ma una nuova invocazione richiede
+nuova authority/autorizzazione e nuovo ID.
+
+La procedura preferita crea uno snapshot VM pre-run dopo aver inserito e
+qualificato repository e Kit. Poiché il restore elimina anche le evidenze
+create dopo lo snapshot, il runner e il manuale impongono di esportare prima,
+verso storage esterno alla VM/snapshot, entrambe:
+
+```text
+captures/D279_10/<attempt_id>/raw/
+captures/D279_10/<attempt_id>/sanitized/
+```
 
 ## Superficie implementata
 
-Il sanitizer riusa soltanto il parser pcapng/USBPcap e i classificatori di
-framing D274/03 gia revisionati. La sequenza D274 fino al secondo B0 e un
-prefisso obbligatorio. Il delta D279/10 richiede poi quindici eventi ordinati,
-dal secondo release `0x34` al terzo B0. Sono ammessi interposti FDT/housekeeping
-non appartenenti al lifecycle; un evento lifecycle confliggente fallisce
-chiuso. Il growing observer produce il segnale terminale metadata-only; il
-finalizer verifica raw SHA-256, frame terminale identico e assenza di un quarto
-ciclo completo o contraddittorio. Failure e deadline dell'observer lasciano un
-segnale metadata-only la cui classe viene propagata al runner.
+L’observer resta passivo per tutta la run e mantiene un journal JSONL
+append-only. Un aumento dei cicli o il terzo B0 produce soltanto una milestone
+con `stop_triggered=false`. L’arresto arriva esclusivamente da un control file
+CreateNew scritto dal runner dopo conferma UI e tail. Il finalizer rilegge il
+pcapng finalizzato, verifica SHA-256, operator event e durata tail, poi esporta
+solo metadata di frame, conteggi e famiglie comando.
 
-Il launcher PowerShell 5.1 ha tre modalita: self-test, qualificazione nativa
-con target assente e futuro live hard-gated. Authority, full SHA, branch
-`development`, live-critical set pulito, same-run target absence, marker
-CreateNew, privacy ACL, deadline e cleanup sono verificati prima/durante la
-run. La qualifica registra full HEAD/branch e richiede gia il live-critical set
-pulito, rendendo il suo PASS attribuibile. Il template authority e chiuso.
+Tutti gli input interattivi passano da un solo `Read-Host` racchiuso in menu
+numerici brevi. Il loop contatti non ha limite di stage assunto; resta bounded
+dalla deadline host di 1200 secondi, che non è un claim su timeout device.
 
-## Verifiche
+## Review specifica del rischio sensor-side
 
-Quattordici test sintetici coprono successo, sequenza incompleta/malformed,
-ACK errato, FDT interposto, quarto ciclo, hash, growing observer, collisione
-output e concordanza observer/finalizer. Non leggono il raw D274 autentico.
+La mutazione host-side della VM, inclusa la prima impronta, è stata accettata
+esplicitamente dall’Utente ed è registrata `true` nel template, senza che ciò
+autorizzi il live; viene gestita con snapshot. La stessa soluzione non copre
+il sensore.
+
+La review delle evidenze versionate ha trovato:
+
+- le famiglie note `0xE0`, `0xA4`, `0xF0`, `0xF4` sono già classificate come
+  persistenti/manutentive;
+- le stringhe statiche di `gfusb.dll` in
+  `analysis/D230/work/GoodixExport/gfusb_static_refs/gfusb_strings_utf16_off.txt`
+  espongono `HwAddOrUpdateTemplate`, `HwDeleteTemplate` e messaggi di scrittura
+  template su flash nel dominio PBA;
+- non esiste evidenza target-local che provi che il normale completamento
+  Windows Hello/WBDI non raggiunga alcuna capacità sensor-side equivalente;
+- l’assenza di famiglie visibili nel pcap non è prova negativa sufficiente,
+  perché parte del traffico applicativo è cifrato.
+
+Quindi `factory_firmware_and_persistent_state_must_remain_untouched` non può
+essere affermato per la run completa con le evidenze correnti. Il finalizer
+segnala famiglie note osservate ma, in loro assenza, produce esplicitamente
+`...TEMPLATE_PERSISTENCE_NOT_EXCLUDED`. L’authority V2 aggiunge il gate chiuso
+`possible_sensor_side_template_persistence_accepted=false`; nessuna
+autorizzazione corrente permette di aprirlo.
+
+## Verifiche offline
+
+La suite sintetica copre completion UI, numero dinamico di cicli, terzo B0 non
+terminale, mismatch operator/wire conservato come dato, tail, SHA-256,
+risincronizzazione dopo contraddizione, famiglie persistenti, privacy,
+observer non terminale, collisioni output, authority chiusa, soli input
+numerici, ordering dei gate, attempt scope e dipendenza D274 pin.
 
 ```text
-LINUX_SYNTHETIC_TESTS=14/14_PASS
+LINUX_SYNTHETIC_TESTS=15/15_PASS
 AUTHORITY_TEMPLATE_CLOSED=true
+GLOBAL_MARKER_PRESENT=false
+ATTEMPT_SCOPED_ANTI_OVERWRITE=true
 AUTOMATIC_RETRY_COUNT=0
 MANUAL_GOODIX_COMMAND_PATH=false
 WINDOWS_POWERSHELL_5_1_NATIVE_QUALIFICATION=PENDING_HUMAN
 ```
 
-## Rischio e gate successivo
+## Gate successivo
 
-Il numero di contatti dopo il quale Windows/OEM persiste l'enrollment host non
-e target-provato. Il terzo contatto puo quindi mutare lo stato account prima
-dello stop wire-driven. Questo non viene rappresentato come no-commit certo:
-il futuro live richiede un'accettazione esplicita separata del rischio. Prima
-di qualunque baseline/live serve inoltre la qualificazione nativa innocua con
-Goodix assente.
+La nuova versione richiede prima una qualificazione nativa Windows con Goodix
+assente, poi review del full SHA. Anche dopo tali passaggi il live resta
+bloccato finché l’Utente non risolve esplicitamente il conflitto tra enrollment
+OEM completo e rischio sensor-side non escluso.
 
 ```text
-RESIDUAL_BLOCKER_OR_RISK=WINDOWS_NATIVE_QUALIFICATION_PENDING;HOST_ENROLLMENT_COMMIT_EDGE_UNKNOWN
+RESIDUAL_BLOCKER_OR_RISK=SENSOR_SIDE_TEMPLATE_PERSISTENCE_NOT_EXCLUDED;WINDOWS_NATIVE_QUALIFICATION_PENDING
 NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT
-NEXT_LIVE_PREREQUISITE=AI_PM_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_RISK_ACCEPTANCE
-REVIEW_SET=BASELINE_1cc2b83_PLUS_D279_10_KIT_TEST_REPORT_MANUAL
+NEXT_LIVE_PREREQUISITE=FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_LIVE_DECISION
+REVIEW_SET=BASELINE_fc2172f_PLUS_D279_10_REPLAN_KIT_TEST_REPORT_MANUAL
 ```

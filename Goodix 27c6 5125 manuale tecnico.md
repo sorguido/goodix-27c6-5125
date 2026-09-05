@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/10 — terza acquisizione preparata, live chiuso
+### Stato corrente post-replan D279/10 — enrollment OEM completo preparato, live chiuso
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -97,20 +97,39 @@ introdotte da D279/08; non è cambiato il protocollo né è stata abilitata una
 baseline live.
 D279/09 non autorizza installazione, fprintd o live.
 
-D279/10 prepara offline il successivo confine senza estendere il sender Linux:
-un Kit Windows/OEM passivo osserva con USBPcap/TShark la ripetizione completa
-del release-tail/re-arm dopo il secondo B0 e si arresta wire-driven sul terzo
-B0. Riusa il parser D274/03, richiede il prefisso gia provato fino al secondo
-B0 e pubblica solo metadata; hash-gate e concordanza observer/finalizer sono
-obbligatori, un quarto ciclo fallisce chiuso. Quattordici fixture sintetiche passano
-su Linux senza leggere capture autentiche.
+D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
+Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
+prima impronta registrata, poi conserva cinque secondi di tail terminale. Il
+numero di contatti non è assunto: l'operatore risponde soltanto tramite menu
+numerici e il parser conta tutti i lifecycle esatti osservati. Il terzo B0 è
+una milestone metadata-only e non è più uno stop condition. Il default
+libfprint di cinque stage non entra nel criterio di closure.
 
-Il Kit resta hard-gated: authority versionata interamente false, nessuna
-baseline approvata e qualificazione PowerShell 5.1 nativa ancora pendente con
-Goodix assente. Esiste inoltre un rischio non eliminabile offline: non e noto
-se Windows/OEM persista un enrollment host gia al terzo contatto. Il futuro
-live dovra accettare espressamente tale possibile mutazione oltre ad
-autorizzare capture e terzo contatto; per ora non e autorizzato nulla.
+Il marker globale è stato rimosso. Ogni invocazione live futura usa un
+`authorized_attempt_id` distinto e crea directory/lock con protezione
+anti-riuso per-attempt; un failure non rende inutilizzabile il Kit e non genera
+retry automatici. Lo stato finale classifica se una nuova run pre-attach è
+ragionevole senza restore oppure se, dopo attach/wizard, lo snapshot VM deve
+essere ripristinato. La procedura preferita fotografa VM, repository e Kit già
+qualificato; prima del restore vanno esportate fuori dalla VM sia `raw/` sia
+`sanitized/` dell'attempt.
+
+La review sensor-side impedisce tuttavia un claim factory-preserving certo per
+il completamento OEM. Le famiglie persistenti note sono
+`0xE0/0xA4/0xF0/0xF4`; la superficie statica `gfusb.dll` espone inoltre API e
+messaggi PBA di add/update/delete template e scrittura su flash. Non è provato
+che il normale percorso Windows Hello/WBDI non raggiunga capacità equivalenti,
+e il traffico cifrato rende insufficiente l'assenza delle famiglie visibili.
+Lo snapshot copre solo la mutazione host-side, non il sensore. L'authority V2
+mantiene quindi chiuso il gate separato
+`possible_sensor_side_template_persistence_accepted=false`.
+
+Quindici fixture sintetiche passano su Linux senza leggere capture autentiche.
+Il Kit resta hard-gated: la sola accettazione host-side è `true`, mentre
+baseline, capture/enrollment live, snapshot della run e rischio sensor-side
+restano chiusi; nessuna nuova baseline è approvata e la qualificazione
+PowerShell 5.1 nativa della versione V2 è ancora pendente con Goodix assente.
+Nessuna nuova esecuzione live è autorizzata.
 
 D279/06 aveva immediatamente prima composto i cinque input espliciti in un
 solo `GoodixRuntimeMaterial`: valida prima PE/cache, crea un solo
@@ -221,14 +240,24 @@ PRODUCTION_PRE_SESSION_RX_SYNC_REQUIRED=true
 PRODUCTION_RUNTIME_HANDOFF_VIEWS_CLEARED=true
 PRODUCTION_ENROLLMENT_ENABLED=false
 PRODUCTION_ENROLLMENT_REJECTION_SUBMIT_COUNT=0
-D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION
-D279_10_BASELINE=1cc2b839dbbd3f7c7c13354bca5997fc1ce01fe2
+D279_10_OUTCOME=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION_AND_LIVE_GATE
+D279_10_REPLAN_BASELINE=fc2172f9973ea5a13f067dc3abfd98881c274efa
 D279_10_EXECUTABLE_CLOSURE=PASS_LINUX_SYNTHETIC_WINDOWS_NATIVE_PENDING
-D279_10_SYNTHETIC_TESTS=14/14_PASS
+D279_10_SYNTHETIC_TESTS=15/15_PASS
 D279_10_PASSIVE_OEM_OBSERVER=true
+D279_10_WORKFLOW=FULL_FIRST_OEM_ENROLLMENT_UI_CONFIRMED_PLUS_TERMINAL_TAIL
+D279_10_CONTACT_COUNT_ASSUMED=false
+D279_10_THIRD_B0_ROLE=MILESTONE_ONLY
+D279_10_OPERATOR_INPUTS=NUMERIC_ONLY
+D279_10_GLOBAL_MARKER=false
+D279_10_ATTEMPT_SCOPED_ANTI_OVERWRITE=true
+D279_10_AUTOMATIC_RETRY_COUNT=0
+D279_10_SNAPSHOT_PRERUN_PREFERRED=true
+D279_10_EXPORT_BEFORE_RESTORE=RAW_AND_SANITIZED_OUTSIDE_VM
+D279_10_SENSOR_SIDE_TEMPLATE_PERSISTENCE=NOT_EXCLUDED
 D279_10_LIVE_AUTHORITY_TEMPLATE_CLOSED=true
 D279_10_LIVE_AUTHORIZED=false
-D279_10_HOST_ENROLLMENT_COMMIT_EDGE=UNKNOWN
+D279_10_HOST_VM_ENROLLMENT_MUTATION=ACCEPTED_BY_USER_SNAPSHOT_MANAGED
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -290,24 +319,33 @@ D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=D279_10_WINDOWS_NATIVE_QUALIFICATION_WITH_GOODIX_ABSENT
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
-NEXT_LIVE_PREREQUISITE=NATIVE_QUALIFICATION_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_ONE_SHOT_RISK_ACCEPTANCE
+NEXT_LIVE_PREREQUISITE=NATIVE_QUALIFICATION_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_PER_ATTEMPT_SENSOR_RISK_DECISION
 ```
 
-### D279/10 — Kit passivo per la terza acquisizione
+### D279/10 — Kit passivo per il primo enrollment OEM completo
 
-Il metodo differisce dal precedente live Linux: non generalizza il lifecycle
-e non invia wire command. Il workflow OEM e osservato passivamente oltre il
-precedente stop, per testare se `0x34 → IRQ0200 → 0x20/B0 → 0x50/NAV → 0x32`
-si ripete dopo la seconda immagine e raggiunge il terzo
-`IRQ2 → 0x22 → ACK 0x01 → B0`. Se fallisce, non e ammesso retry: si analizza la
-singola traccia e si effettua replan.
+Il metodo non generalizza il sender Linux e non invia wire command. USBPcap è
+avviato prima dell'attach; observer e capture restano attivi per tutti i
+contatti richiesti dall'UI Windows. La conferma numerica dell'operatore che
+l'impronta è realmente registrata è l'authority terminale, seguita da un tail
+host di cinque secondi. Il finalizer verifica pcap finalizzato, SHA-256, eventi
+operatore e tail, conta dinamicamente i lifecycle
+`IRQ2 → 0x22 → ACK 0x01 → B0` e conserva il terzo come sola milestone.
 
 Il launcher applica full SHA, branch `development`, live-critical set pulito,
-assenza target same-run prima di marker/capture/attach, marker CreateNew,
-deadline 300 s, cleanup e output privato metadata-only. La qualificazione
-nativa registra full HEAD/branch e pretende gia il live-critical set pulito;
-con target assente e il rischio di commit enrollment host sono i blocker
-correnti. Report:
+assenza target same-run prima di attempt/capture/attach, output CreateNew
+scoped a un `attempt_id`, deadline 1200 s, cleanup e output metadata-only. Ogni
+prompt è numerico. Nessun failure avvia retry: lo stato suggerisce no-restore
+soltanto prima di attach/wizard e richiede altrimenti il restore dello snapshot.
+Un restore è vietato operativamente finché `raw/` e `sanitized/` non sono stati
+esportati fuori dalla VM/snapshot.
+
+La mutation host-side della prima impronta è stata accettata esplicitamente
+dall'Utente ed è snapshot-manageable, ma resta
+irrisolto il rischio sensor-side: le API statiche PBA di persistenza template e
+il traffico cifrato impediscono di provare l'assenza di mutazioni al sensore.
+Il template authority V2 è chiuso anche su questo punto; qualificazione nativa,
+baseline live e decisione esplicita per-attempt restano pendenti. Report:
 `analysis/D279/D279_10_third_acquisition_operator_kit_prep.md`.
 
 ### D279/07 — layout production e identità runtime fprintd

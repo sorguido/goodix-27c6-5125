@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Sanitize a passive USBPcap capture at the APP12509 third-acquisition edge.
+"""Finalize a passive capture of a complete Windows Hello OEM enrollment.
 
-This module reuses the reviewed D274/03 framing parser.  It exports metadata
-only: no B0 body, TLS plaintext, image, biometric hash, PIN or secret material.
+The Windows UI/operator event is the enrollment-completion authority. Wire
+events are metadata-only observations: the third fingerprint B0 is a milestone,
+not a stop condition, and no number of contacts is assumed.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -30,29 +32,10 @@ D274 = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = D274
 SPEC.loader.exec_module(D274)
 
-HOST_CAPTURE_DEADLINE_SECONDS = 300
-WORKFLOW = "WINDOWS_HELLO_SETUP_CANDIDATE_THIRD_EDGE_NO_COMMIT_ASSUMPTION"
-
-# The first part is the already reviewed D274/03 sequence through second B0.
-# The suffix tests the new hypothesis: the same release/re-arm lifecycle repeats
-# after image two before the third finger-down edge.
-SUFFIX = (
-    ("second_release_0x34", "COMMAND", 0x34),
-    ("second_release_0x34_ack", "ACK", 0x34),
-    ("second_release_irq0200", "IRQ", 0x0200),
-    ("second_release_0x20", "COMMAND", 0x20),
-    ("second_release_0x20_ack", "ACK", 0x20),
-    ("second_release_b0", "FINGERPRINT_B0", None),
-    ("second_release_0x50", "COMMAND", 0x50),
-    ("second_release_0x50_ack", "ACK", 0x50),
-    ("second_release_nav", "NAV", 0x50),
-    ("third_rearm_0x32", "COMMAND", 0x32),
-    ("third_rearm_0x32_ack", "ACK", 0x32),
-    ("third_irq2", "IRQ", 0x0002),
-    ("third_0x22", "COMMAND", 0x22),
-    ("third_0x22_ack", "ACK", 0x22),
-    ("third_b0", "FINGERPRINT_B0", None),
-)
+HOST_CAPTURE_DEADLINE_SECONDS = 1200
+MINIMUM_TERMINAL_TAIL_SECONDS = 5
+WORKFLOW = "WINDOWS_HELLO_FIRST_OEM_ENROLLMENT_COMPLETE_UI_CONFIRMED"
+KNOWN_PERSISTENT_COMMAND_FAMILIES = {0xE0, 0xA4, 0xF0, 0xF4}
 
 
 class EvidenceError(RuntimeError):
@@ -72,76 +55,6 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _matches(event: dict, kind: str, value: int | None) -> bool:
-    if not D274._matches(event, kind, value):
-        return False
-    if kind == "COMMAND" and value == 0x34:
-        body = event.get("body", b"")
-        return len(body) == 14 and body[:2] == b"\x0a\x01"
-    if kind == "COMMAND" and value == 0x32:
-        return len(event.get("body", b"")) == 14
-    return True
-
-
-def _lifecycle_bearing(event: dict) -> bool:
-    if event.get("kind") == "COMMAND":
-        return event.get("control") in {0x20, 0x22, 0x32, 0x34, 0x50}
-    if event.get("kind") == "ACK":
-        return event.get("echo") in {0x20, 0x22, 0x32, 0x34, 0x50}
-    if event.get("kind") == "IRQ":
-        return event.get("irq") in {0x0002, 0x0200}
-    return (event.get("kind") == "NAV" or
-            (event.get("kind") == "B0" and
-             event.get("b0_class") == "FINGERPRINT_B0"))
-
-
-def _frame_metadata(frame, event: dict, event_class: str, base: float) -> dict:
-    row = D274._meta(frame, base, event_class, event)
-    # No body bytes are serialized.  Shape-sensitive checks stay in memory.
-    return row
-
-
-def _match_prefix(events: list[tuple[object, dict]]) -> tuple[int, dict]:
-    observed: dict[str, tuple[object, dict]] = {}
-    active = False
-    index = 0
-    for position, (frame, event) in enumerate(events):
-        if not active:
-            if D274._matches(event, "IRQ", 0x0002):
-                active = True
-            else:
-                continue
-        name, kind, value = D274.SEQUENCE[index]
-        if not D274._matches(event, kind, value):
-            raise EvidenceError("D279_10_PREFIX_" +
-                                D274._failure(name, event))
-        observed[name] = (frame, event)
-        index += 1
-        if index == len(D274.SEQUENCE):
-            return position + 1, observed
-    missing = D274.SEQUENCE[index][0] if active else "first_irq2"
-    raise EvidenceError("D279_10_PREFIX_MISSING_" + missing.upper())
-
-
-def _match_suffix(events: list[tuple[object, dict]], start: int) -> tuple[int, dict]:
-    observed: dict[str, tuple[object, dict]] = {}
-    index = 0
-    for position in range(start, len(events)):
-        frame, event = events[position]
-        name, kind, value = SUFFIX[index]
-        if _matches(event, kind, value):
-            observed[name] = (frame, event)
-            index += 1
-            if index == len(SUFFIX):
-                return position + 1, observed
-            continue
-        # FDT polling (0x36/IRQ0100), housekeeping and non-fingerprint B0 are
-        # allowed between edges.  A conflicting lifecycle event is not.
-        if _lifecycle_bearing(event):
-            raise EvidenceError("THIRD_CYCLE_PROTOCOL_CONTRADICTION_AT_" + name.upper())
-    raise EvidenceError("MISSING_" + SUFFIX[index][0].upper())
-
-
 def _event_rows(frames: list) -> list[tuple[object, dict]]:
     rows = []
     for frame in frames:
@@ -152,30 +65,178 @@ def _event_rows(frames: list) -> list[tuple[object, dict]]:
     return rows
 
 
-def analyze_frames(frames: list, base: float, synthetic: bool) -> dict:
+def _is_irq2(event: dict) -> bool:
+    return D274._matches(event, "IRQ", 0x0002)
+
+
+def _is_command_22(event: dict) -> bool:
+    return D274._matches(event, "COMMAND", 0x22)
+
+
+def _is_ack_22(event: dict) -> bool:
+    return D274._matches(event, "ACK", 0x22)
+
+
+def _is_fingerprint_b0(event: dict) -> bool:
+    return D274._matches(event, "FINGERPRINT_B0", None)
+
+
+def _cycle_lifecycle_bearing(event: dict) -> bool:
+    return (
+        _is_irq2(event)
+        or (event.get("kind") == "COMMAND" and event.get("control") == 0x22)
+        or (event.get("kind") == "ACK" and event.get("echo") == 0x22)
+        or _is_fingerprint_b0(event)
+    )
+
+
+def _frame_metadata(frame, event: dict, event_class: str, base: float) -> dict:
+    return D274._meta(frame, base, event_class, event)
+
+
+def detect_acquisition_cycles(events: list[tuple[object, dict]], base: float) -> tuple[list[dict], int]:
+    """Find every exact IRQ2 -> 0x22 -> ACK -> fingerprint-B0 lifecycle."""
+    state = 0
+    current: list[tuple[str, object, dict]] = []
+    cycles: list[dict] = []
+    contradictions = 0
+
+    for frame, event in events:
+        if state == 0:
+            if _is_irq2(event):
+                state = 1
+                current = [("irq2", frame, event)]
+            continue
+
+        matched = False
+        if state == 1 and _is_command_22(event):
+            state = 2
+            current.append(("command_0x22", frame, event))
+            matched = True
+        elif state == 2 and _is_ack_22(event):
+            state = 3
+            current.append(("ack_0x22", frame, event))
+            matched = True
+        elif state == 3 and _is_fingerprint_b0(event):
+            current.append(("fingerprint_b0", frame, event))
+            cycle_number = len(cycles) + 1
+            cycles.append({
+                "cycle_number": cycle_number,
+                "frames": {
+                    name: _frame_metadata(
+                        row_frame, row_event,
+                        f"ACQUISITION_{cycle_number}_{name.upper()}", base,
+                    )
+                    for name, row_frame, row_event in current
+                },
+            })
+            state = 0
+            current = []
+            matched = True
+
+        if matched:
+            continue
+        if _cycle_lifecycle_bearing(event):
+            contradictions += 1
+            if _is_irq2(event):
+                state = 1
+                current = [("irq2", frame, event)]
+            else:
+                state = 0
+                current = []
+
+    if state != 0:
+        contradictions += 1
+    return cycles, contradictions
+
+
+def _parse_utc(value: object, field: str) -> datetime:
+    require(isinstance(value, str), "OPERATOR_EVENTS_" + field.upper())
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise EvidenceError("OPERATOR_EVENTS_" + field.upper()) from exc
+    require(parsed.tzinfo is not None, "OPERATOR_EVENTS_" + field.upper())
+    return parsed.astimezone(timezone.utc)
+
+
+def load_operator_events(path: Path, attempt_id: str) -> dict:
+    require(path.is_file(), "OPERATOR_EVENTS_MISSING")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise EvidenceError("OPERATOR_EVENTS_INVALID_JSON") from exc
+    required = {
+        "schema", "attempt_id", "capture_started_utc", "wizard_started_utc",
+        "enrollment_completed_utc", "capture_stopped_utc", "contact_count",
+        "enrollment_completed", "terminal_tail_seconds",
+        "automatic_retry_count",
+    }
+    require(isinstance(document, dict) and set(document) == required,
+            "OPERATOR_EVENTS_SCHEMA_FIELDS")
+    require(document["schema"] == "D279_10_OPERATOR_EVENTS_V2",
+            "OPERATOR_EVENTS_SCHEMA_ID")
+    require(document["attempt_id"] == attempt_id,
+            "OPERATOR_EVENTS_ATTEMPT_ID")
+    require(document["enrollment_completed"] is True,
+            "WINDOWS_UI_ENROLLMENT_NOT_CONFIRMED")
+    require(isinstance(document["contact_count"], int)
+            and document["contact_count"] >= 1,
+            "OPERATOR_EVENTS_CONTACT_COUNT")
+    require(document["automatic_retry_count"] == 0,
+            "OPERATOR_EVENTS_RETRY")
+    require(document["terminal_tail_seconds"] == MINIMUM_TERMINAL_TAIL_SECONDS,
+            "OPERATOR_EVENTS_TAIL_POLICY")
+    started = _parse_utc(document["capture_started_utc"], "capture_started_utc")
+    wizard = _parse_utc(document["wizard_started_utc"], "wizard_started_utc")
+    complete = _parse_utc(
+        document["enrollment_completed_utc"], "enrollment_completed_utc")
+    stopped = _parse_utc(document["capture_stopped_utc"], "capture_stopped_utc")
+    require(started <= wizard <= complete <= stopped,
+            "OPERATOR_EVENTS_TIME_ORDER")
+    tail = (stopped - complete).total_seconds()
+    require(tail >= MINIMUM_TERMINAL_TAIL_SECONDS,
+            "TERMINAL_TAIL_TOO_SHORT")
+    require((stopped - started).total_seconds() <= HOST_CAPTURE_DEADLINE_SECONDS + 15,
+            "CAPTURE_DEADLINE_EXCEEDED")
+    return {**document, "validated_tail_seconds": round(tail, 3),
+            "completion_epoch": complete.timestamp()}
+
+
+def analyze_frames(frames: list, base: float, synthetic: bool,
+                   operator_events: dict, attempt_id: str) -> dict:
     events = _event_rows(frames)
-    suffix_start, prefix = _match_prefix(events)
-    after_third, suffix = _match_suffix(events, suffix_start)
+    cycles, contradictions = detect_acquisition_cycles(events, base)
+    require(bool(cycles), "ACQUISITION_CYCLE_MISSING")
 
-    trailing = [event for _, event in events[after_third:]]
-    fourth = D274._third_cycle_lifecycle(trailing)
-    if fourth is D274.ThirdCycleLifecycleResult.COMPLETE:
-        raise EvidenceError("FOURTH_CYCLE_OBSERVED")
-    if fourth is D274.ThirdCycleLifecycleResult.CONTRADICTION:
-        raise EvidenceError("FOURTH_CYCLE_PROTOCOL_CONTRADICTION")
+    control_counts: dict[str, int] = {}
+    persistent_observed: set[int] = set()
+    for _, event in events:
+        if event.get("kind") != "COMMAND":
+            continue
+        control = event.get("control")
+        if not isinstance(control, int):
+            continue
+        key = f"0x{control:02x}"
+        control_counts[key] = control_counts.get(key, 0) + 1
+        if control in KNOWN_PERSISTENT_COMMAND_FAMILIES:
+            persistent_observed.add(control)
 
-    observed = {**prefix, **suffix}
-    sequence_frames = {}
-    timing = {}
-    for name, _, _ in SUFFIX:
-        frame, event = observed[name]
-        sequence_frames[name] = _frame_metadata(
-            frame, event, name.upper(), base)
-        timing[name] = round((frame.timestamp - base) * 1000, 3)
+    third = cycles[2] if len(cycles) >= 3 else None
+    completion_epoch = operator_events["completion_epoch"]
+    post_ui_target_frames = sum(
+        1 for frame in frames if frame.timestamp >= completion_epoch)
+    if persistent_observed:
+        sensor_risk = "KNOWN_PERSISTENT_COMMAND_FAMILY_OBSERVED"
+    else:
+        sensor_risk = (
+            "NO_KNOWN_PERSISTENT_FAMILY_OBSERVED_"
+            "BUT_ENCRYPTED_TEMPLATE_PERSISTENCE_NOT_EXCLUDED"
+        )
 
-    terminal = observed["third_b0"][0]
     return {
-        "schema": "D279_10_THIRD_ACQUISITION_EVIDENCE_V1",
+        "schema": "D279_10_FULL_ENROLLMENT_EVIDENCE_V2",
+        "attempt_id": attempt_id,
         "capture_sha256": None,
         "target_vid": "27c6",
         "target_pid": "5125",
@@ -184,17 +245,33 @@ def analyze_frames(frames: list, base: float, synthetic: bool) -> dict:
             "TARGET_CAPTURE_OBSERVED_APP12509"
         ),
         "workflow_class": WORKFLOW,
-        "boundary_status": "OBSERVED_COMPLETE",
-        "stop_reason": "THIRD_FINGERPRINT_B0",
-        "failure_class": None,
-        "terminal_frame": terminal.packet_index,
-        "sequence_frames": sequence_frames,
-        "timing_observations_ms": timing,
+        "boundary_status": "OBSERVED_COMPLETE_UI_CONFIRMED",
+        "completion_authority": "WINDOWS_UI_OPERATOR_NUMERIC_CONFIRMATION",
+        "stop_reason": "WINDOWS_UI_ENROLLMENT_CONFIRMED_PLUS_TERMINAL_TAIL",
+        "operator_contact_count": operator_events["contact_count"],
+        "wire_acquisition_cycle_count": len(cycles),
+        "operator_wire_count_equal": (
+            operator_events["contact_count"] == len(cycles)),
+        "acquisition_cycles": cycles,
+        "third_b0_milestone_observed": third is not None,
+        "third_b0_milestone_frame": (
+            third["frames"]["fingerprint_b0"]["frame"]
+            if third is not None else None
+        ),
+        "protocol_contradiction_count": contradictions,
+        "terminal_tail_host_seconds": operator_events["validated_tail_seconds"],
+        "terminal_tail_target_frame_count": post_ui_target_frames,
         "host_capture_deadline_seconds": HOST_CAPTURE_DEADLINE_SECONDS,
         "host_deadline_policy": "EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM",
         "device_timeout_claim": "UNKNOWN",
+        "command_family_counts": dict(sorted(control_counts.items())),
+        "known_persistent_command_families_observed": [
+            f"0x{value:02x}" for value in sorted(persistent_observed)
+        ],
+        "sensor_side_risk_assessment": sensor_risk,
         "automatic_retry_count": 0,
-        "fourth_cycle_observed": False,
+        "observer_is_passive": True,
+        "goodix_sender_present": False,
         "privacy_payload_exported": False,
         "biometric_plaintext_exported": False,
         "biometric_hash_exported": False,
@@ -203,7 +280,7 @@ def analyze_frames(frames: list, base: float, synthetic: bool) -> dict:
     }
 
 
-def _target_analysis(data: bytes, *, growing: bool, synthetic: bool) -> dict:
+def _target_frames(data: bytes, *, growing: bool, synthetic: bool) -> tuple[list, float]:
     try:
         packets = D274.parse_usbpcap_bytes(
             data, allow_trailing_incomplete=growing)
@@ -213,64 +290,57 @@ def _target_analysis(data: bytes, *, growing: bool, synthetic: bool) -> dict:
         raise EvidenceError(str(exc)) from exc
     require(firmware_ok or synthetic, "WRONG_OR_MISSING_FIRMWARE_APP12509")
     require(bool(frames), "TARGET_FRAMES_MISSING")
-    base = min(frame.timestamp for frame in frames)
-    document = analyze_frames(frames, base, synthetic)
-    if frames[-1].timestamp - base > HOST_CAPTURE_DEADLINE_SECONDS:
-        raise EvidenceError("CAPTURE_DEADLINE_EXCEEDED")
-    return document
+    return frames, min(frame.timestamp for frame in frames)
 
 
 def inspect_growing_capture(path: Path) -> dict:
     if not path.exists() or path.stat().st_size == 0:
-        return {"status": "PENDING", "failure_class": "CAPTURE_NOT_MATERIALIZED"}
+        return {"status": "PENDING", "wire_acquisition_cycle_count": 0,
+                "third_b0_milestone_observed": False}
     try:
-        document = _target_analysis(path.read_bytes(), growing=True,
-                                    synthetic=False)
+        frames, base = _target_frames(path.read_bytes(), growing=True,
+                                      synthetic=False)
+        cycles, contradictions = detect_acquisition_cycles(
+            _event_rows(frames), base)
     except EvidenceError as exc:
         failure = str(exc)
-        pending = (failure.startswith("MISSING_") or
-                   failure.startswith("D279_10_PREFIX_MISSING_") or
-                   failure in {"TRUNCATED_PCAP_METADATA", "PCAP_INTERFACE_MISSING",
-                               "TARGET_27C6_5125_NOT_IDENTIFIED",
-                               "WRONG_OR_MISSING_FIRMWARE_APP12509",
-                               "TARGET_FRAMES_MISSING"})
+        pending = failure in {
+            "TRUNCATED_PCAP_METADATA", "PCAP_INTERFACE_MISSING",
+            "TARGET_27C6_5125_NOT_IDENTIFIED",
+            "WRONG_OR_MISSING_FIRMWARE_APP12509", "TARGET_FRAMES_MISSING",
+        }
         return {"status": "PENDING" if pending else "FAIL_CLOSED",
-                "failure_class": failure}
-    return {"status": "THIRD_FINGERPRINT_B0_OBSERVED",
-            "terminal_frame": document["terminal_frame"]}
+                "failure_class": failure,
+                "wire_acquisition_cycle_count": 0,
+                "third_b0_milestone_observed": False}
+    return {
+        "status": "OBSERVING",
+        "wire_acquisition_cycle_count": len(cycles),
+        "third_b0_milestone_observed": len(cycles) >= 3,
+        "protocol_contradiction_count": contradictions,
+    }
 
 
 def validate_document(document: dict) -> None:
-    required = {
-        "schema", "capture_sha256", "target_vid", "target_pid",
-        "firmware_identity_status", "workflow_class", "boundary_status",
-        "stop_reason", "failure_class", "terminal_frame", "sequence_frames",
-        "timing_observations_ms", "host_capture_deadline_seconds",
-        "host_deadline_policy", "device_timeout_claim",
-        "automatic_retry_count", "fourth_cycle_observed",
-        "privacy_payload_exported", "biometric_plaintext_exported",
-        "biometric_hash_exported", "secret_material_exported",
-        "pin_value_exported",
-    }
-    require(set(document) == required, "SCHEMA_TOP_LEVEL_FIELDS")
-    require(document["schema"] == "D279_10_THIRD_ACQUISITION_EVIDENCE_V1",
+    require(document["schema"] == "D279_10_FULL_ENROLLMENT_EVIDENCE_V2",
             "SCHEMA_ID")
-    require(set(document["sequence_frames"]) == {row[0] for row in SUFFIX},
-            "SCHEMA_SEQUENCE_FIELDS")
-    require(isinstance(document["terminal_frame"], int) and
-            document["terminal_frame"] >= 0, "SCHEMA_TERMINAL_FRAME")
+    require(document["boundary_status"] == "OBSERVED_COMPLETE_UI_CONFIRMED",
+            "SCHEMA_BOUNDARY")
     require(document["automatic_retry_count"] == 0, "SCHEMA_RETRY")
-    require(document["fourth_cycle_observed"] is False, "SCHEMA_FOURTH")
+    require(document["observer_is_passive"] is True, "SCHEMA_OBSERVER")
+    require(document["goodix_sender_present"] is False, "SCHEMA_SENDER")
+    require(document["wire_acquisition_cycle_count"] ==
+            len(document["acquisition_cycles"]), "SCHEMA_CYCLE_COUNT")
     forbidden = re.compile(
-        r"(^|_)(raw|body|payload|plaintext|image|raster|pixel|template|"
-        r"descriptor|psk|secret|pin)($|_)", re.IGNORECASE)
+        r"(^|_)(raw|body|payload|plaintext|image|raster|pixel|descriptor|"
+        r"psk|secret|pin_value)($|_)", re.IGNORECASE)
 
     def walk(node) -> None:
         if isinstance(node, dict):
             for key, value in node.items():
                 require(forbidden.search(key) is None or key in {
                     "privacy_payload_exported", "biometric_plaintext_exported",
-                    "secret_material_exported", "pin_value_exported"
+                    "secret_material_exported", "pin_value_exported",
                 }, "PRIVACY_FORBIDDEN_FIELD")
                 walk(value)
         elif isinstance(node, list):
@@ -278,33 +348,30 @@ def validate_document(document: dict) -> None:
                 walk(value)
 
     walk(document)
-    for key in ("privacy_payload_exported", "biometric_plaintext_exported",
-                "biometric_hash_exported", "secret_material_exported",
-                "pin_value_exported", "fourth_cycle_observed"):
+    for key in (
+        "privacy_payload_exported", "biometric_plaintext_exported",
+        "biometric_hash_exported", "secret_material_exported",
+        "pin_value_exported", "goodix_sender_present",
+    ):
         require(document[key] is False, "PRIVACY_OR_SCOPE_FLAG")
 
 
-def process_capture(path: Path, expected_sha256: str, *, synthetic=False,
-                    observer_signal: Path | None = None) -> dict:
+def process_capture(path: Path, expected_sha256: str, operator_events_path: Path,
+                    attempt_id: str, *, synthetic: bool = False) -> dict:
+    require(re.fullmatch(r"D27910_[A-Za-z0-9_-]{8,64}", attempt_id) is not None,
+            "ATTEMPT_ID_INVALID")
     require(re.fullmatch(r"[0-9a-f]{64}", expected_sha256) is not None,
             "EXPECTED_SHA256_INVALID")
     require(path.is_file(), "CAPTURE_NOT_REGULAR")
     actual = sha256_file(path)
     require(actual == expected_sha256, "CAPTURE_SHA256_MISMATCH")
-    document = _target_analysis(path.read_bytes(), growing=False,
-                                synthetic=synthetic)
+    operator_events = load_operator_events(operator_events_path, attempt_id)
+    frames, base = _target_frames(path.read_bytes(), growing=False,
+                                  synthetic=synthetic)
+    document = analyze_frames(frames, base, synthetic, operator_events,
+                              attempt_id)
     document["capture_sha256"] = actual
     validate_document(document)
-    if observer_signal is not None:
-        require(observer_signal.is_file(), "OBSERVER_SIGNAL_MISSING")
-        signal = json.loads(observer_signal.read_text(encoding="utf-8"))
-        require(signal == {
-            "schema": "D279_10_WIRE_OBSERVER_SIGNAL_V1",
-            "status": "THIRD_FINGERPRINT_B0_OBSERVED",
-            "terminal_frame": document["terminal_frame"],
-            "stop_trigger": "WIRE_DRIVEN",
-            "automatic_retry_count": 0,
-        }, "OBSERVER_SIGNAL_FINAL_MISMATCH")
     return document
 
 
@@ -312,6 +379,7 @@ def write_once(path: Path, document: dict) -> None:
     require(not path.exists(), "OUTPUT_COLLISION")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
+    require(not temporary.exists(), "OUTPUT_TEMP_COLLISION")
     temporary.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     os.replace(str(temporary), str(path))
 
@@ -320,15 +388,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pcap", type=Path, required=True)
     parser.add_argument("--expected-sha256", required=True)
+    parser.add_argument("--operator-events", type=Path, required=True)
+    parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--observer-signal", type=Path)
     args = parser.parse_args()
     try:
-        document = process_capture(args.pcap, args.expected_sha256,
-                                   observer_signal=args.observer_signal)
+        document = process_capture(
+            args.pcap, args.expected_sha256, args.operator_events,
+            args.attempt_id)
         write_once(args.output, document)
-        print(json.dumps({"boundary_status": document["boundary_status"],
-                          "terminal_frame": document["terminal_frame"]}))
+        print(json.dumps({
+            "boundary_status": document["boundary_status"],
+            "wire_acquisition_cycle_count":
+                document["wire_acquisition_cycle_count"],
+            "third_b0_milestone_observed":
+                document["third_b0_milestone_observed"],
+        }))
         return 0
     except (EvidenceError, OSError, ValueError) as exc:
         print(json.dumps({"boundary_status": "NOT_OBSERVED_COMPLETE",

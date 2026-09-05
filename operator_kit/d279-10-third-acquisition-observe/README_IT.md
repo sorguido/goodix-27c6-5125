@@ -1,80 +1,134 @@
-# D279/10 — osservazione passiva del terzo edge
+# D279/10 — capture passiva del primo enrollment OEM completo
 
-## Stato e scopo
+## Stato
 
-Questo Kit e stato preparato offline ma non e autorizzato al live. Il template
-`D279_10_live_authority.json` ha tutti i gate a `false`; il flag del launcher
-non puo sostituire una authority separata.
+Il Kit è stato ripianificato e verificato soltanto offline. Non è autorizzato
+al live. Il template `D279_10_live_authority.json` è interamente chiuso e la
+qualificazione nativa Windows della nuova versione è ancora pendente.
 
 ```text
 D279_10_KIT_STATUS=READY_OFFLINE_PENDING_WINDOWS_NATIVE_QUALIFICATION
-BASELINE_APPROVED=false
-PASSIVE_CAPTURE_APPROVED=false
-THIRD_CONTACT_AUTHORIZED=false
-POSSIBLE_HOST_ENROLLMENT_MUTATION_ACCEPTED=false
+FULL_OEM_ENROLLMENT_AUTHORIZED=false
+HOST_VM_ENROLLMENT_MUTATION_ACCEPTED=true
+POSSIBLE_SENSOR_SIDE_TEMPLATE_PERSISTENCE_ACCEPTED=false
+SNAPSHOT_PRERUN_CONFIRMED=false
 LIVE_AUTHORIZED=false
 READY_FOR_LIVE=false
-REAL_USB_EXECUTION=false
 ```
 
-La futura run osserverebbe passivamente con USBPcap/TShark il traffico prodotto
-dal driver OEM Windows. Il Kit non contiene un sender Goodix e non apre il
-sensore. Il boundary richiesto e:
+Il launcher non contiene sender Goodix. Avvia soltanto USBPcap/TShark e un
+observer Python metadata-only; sono vietati retry automatici. La capture parte
+prima del collegamento e prosegue fino alla conferma reale dell’UI Windows che
+l’impronta è registrata, più cinque secondi di tail terminale. Il numero di
+contatti non è predefinito. Il terzo B0 è registrato come milestone, ma non
+ferma observer o capture.
+
+## Rischio sensor-side: esito della review
+
+Lo snapshot risolve la mutazione host-side della VM, inclusa la prima impronta
+Windows Hello, ma non può ripristinare il sensore. Le evidenze versionate
+provano che le famiglie `0xE0`, `0xA4`, `0xF0`, `0xF4` hanno capacità
+persistenti/manutentive. Inoltre la superficie statica di `gfusb.dll` contiene
+entrypoint e messaggi PBA quali `HwAddOrUpdateTemplate`, `HwDeleteTemplate` e
+“write a template to flash”. Non è però disponibile una prova target-local che
+separi con certezza il completamento ordinario WBDI/Windows Hello da ogni
+percorso di persistenza template sensor-side; il traffico applicativo può
+anche essere cifrato.
+
+Di conseguenza l’assenza nel pcap delle famiglie note non autorizza il claim
+“nessuna mutazione sensor-side”. Il finalizer segnala le famiglie visibili, ma
+mantiene il rischio non escluso. Il percorso live pretende perciò una decisione
+esplicita sul campo
+`possible_sensor_side_template_persistence_accepted`; il template resta
+`false`. Non impostarlo autonomamente.
+
+## Snapshot ed evidenze
+
+La procedura preferita è:
+
+1. preparare e qualificare repository e Kit nella VM;
+2. creare lo snapshot pre-run con il target ancora assente;
+3. fornire una authority per-attempt distinta;
+4. eseguire una sola invocazione, senza retry interno;
+5. prima di qualsiasi restore, esportare **fuori dalla VM e fuori dal disco
+   coperto dallo snapshot** entrambe le directory indicate dal launcher:
+
+   ```text
+   captures/D279_10/<attempt_id>/raw/
+   captures/D279_10/<attempt_id>/sanitized/
+   ```
+
+6. verificare l’export, poi applicare l’eventuale restore.
+
+Il raw contiene il pcapng autentico e il journal append-only dell’observer; è
+privato e non condivisibile senza audit. `sanitized/` contiene eventi operatore,
+risultato observer, stato dell’attempt e, in caso di successo, evidenza
+metadata-only. Un restore prima dell’export perde entrambe le directory.
+
+## Attempt e riuso del Kit
+
+Non esiste più un marker globale. Ogni authority live deve avere un
+`authorized_attempt_id` nuovo nel formato `D27910_...`. Il runner crea
+`captures/D279_10/<attempt_id>/` e `attempt.lock` con semantica CreateNew: un
+ID già esistente viene rifiutato senza cancellare o sovrascrivere nulla.
+
+Dopo un failure il medesimo Kit può essere avviato manualmente in una nuova
+invocazione, solo con una nuova authority/autorizzazione e un nuovo attempt ID.
+Il launcher non effettua mai retry. `attempt_status.json` classifica:
+
+- `RERUN_WITHOUT_RESTORE_REASONABLE` soltanto se il failure avviene prima di
+  attach e avvio wizard;
+- `RESTORE_SNAPSHOT_REQUIRED_STATE_UNCERTAIN` dopo attach o avvio wizard;
+- `RESTORE_SNAPSHOT_REQUIRED_BEFORE_ANOTHER_FIRST_ENROLLMENT` dopo una
+  conclusione reale, perché la VM non è più nello stato “prima impronta”.
+
+La classificazione è prudenziale e non sostituisce l’export delle evidenze.
+
+## Input numerici e workflow
+
+Ogni `Read-Host` passa da un unico menu numerico breve, ristampato a ogni
+richiesta. L’operatore non deve digitare descrizioni libere.
+
+- snapshot: `1` conferma, `0` stop;
+- attach: `1` collegato, `0` stop;
+- setup: `1` pronto, `2` autenticazione con PIN esistente, `3` anomalia,
+  `0` stop;
+- dopo ogni contatto: `1` la UI ne richiede un altro, `2` la UI conferma
+  realmente la registrazione, `3` anomalia, `0` stop.
+
+Il PIN esistente va inserito solo nell’UI Windows. Creazione/modifica di PIN o
+credenziali è una condizione terminale. Non indicare `2` finché Windows non ha
+mostrato una conferma reale di registrazione.
+
+## Failure e stop condition
+
+Il runner fallisce chiuso su authority/baseline/branch errati, live-critical
+set sporco, target presente al preflight, dipendenze mancanti, tentativo già
+esistente, capture/observer terminati, prerequisiti inattesi, output collision
+o finalizzazione incoerente. Il cleanup tenta sempre l’arresto di observer e
+TShark. Nessun failure provoca un nuovo attach, un nuovo contatto o un retry.
+
+La sola stop condition di successo è:
 
 ```text
-secondo B0
--> release 0x34 / ACK / IRQ 0x0200
--> 0x20 / ACK / B0 discard
--> 0x50 / ACK / NAV
--> re-arm 0x32 / ACK
--> terzo IRQ 0x0002
--> 0x22 / ACK status esatto 0x01
--> terzo B0 fingerprint strutturale
--> STOP wire-driven
+CONFERMA_REALE_UI_WINDOWS
++ CAPTURE_TAIL_HOST_5S
++ PCAP_FINALIZZATO_E_HASH_VERIFICATO
 ```
 
-Polling FDT `0x36`/IRQ `0x0100` e housekeeping non appartenenti al lifecycle
-possono essere interposti; un evento lifecycle fuori ordine o malformed causa
-`FAIL_CLOSED`. Il finalizer rilegge il pcapng finalizzato, verifica SHA-256 e
-richiede lo stesso frame terminale dell'observer. Un quarto lifecycle non e
-accettato. Anche un failure/deadline dell'observer produce soltanto un segnale
-metadata-only con la classe diagnostica, che il runner mostra all'operatore.
+Il default libfprint di cinque stage non viene usato come evidenza OEM.
 
-## Perche il metodo e diverso
+## Verifiche offline e qualificazione nativa
 
-1. L'ultima prova Linux si fermava deliberatamente al secondo B0; questa e una
-   osservazione OEM passiva e prolunga il confine fino al terzo B0.
-2. L'ipotesi nuova e che release-tail e re-arm si ripetano dopo la seconda
-   immagine nella stessa sessione TLS.
-3. Se la sequenza non si chiude, la capture viene arrestata senza retry e si
-   analizzano i metadata della singola run prima di qualunque replan.
-
-## Rischio non risolto
-
-Non e provato quanti contatti richieda Windows Hello/OEM prima di persistere un
-enrollment nell'account. Il terzo contatto potrebbe quindi causare una
-mutazione host-side prima che l'arresto del capture possa chiudere la UI. Il
-runner non nasconde questo rischio: per il live pretende esplicitamente
-`possible_host_enrollment_mutation_accepted=true` oltre all'autorizzazione del
-terzo contatto. Senza tale accettazione la run fallisce prima del marker.
-
-Questo Kit non autorizza mutazioni sensor-side: restano vietati provisioning,
-ClearApp, flash/IAP, OTP/factory write, cambio persistente di modalita o
-comandi Goodix manuali.
-
-## Verifiche offline disponibili
-
-La suite Linux sintetica (14 test) non accede a capture autentiche o hardware:
+La suite sintetica non usa hardware né capture autentiche:
 
 ```bash
 python3 -m unittest -v analysis/D279/test_d279_10_third_acquisition_kit.py
 ```
 
 La qualificazione nativa richiede Windows PowerShell Desktop 5.1, Python,
-Wireshark/TShark e una sola interfaccia USBPcap. Il target deve essere assente
-dal guest; checkout `development` e live-critical set devono essere puliti.
-L'output registra branch e full HEAD per attribuire il PASS al commit esatto.
-Non avvia capture, non crea marker e non mostra prompt dito:
+TShark e una sola interfaccia USBPcap, con target assente, branch `development`
+e live-critical set pulito. Non avvia la capture e non presenta prompt dito:
 
 ```powershell
 cd operator_kit\d279-10-third-acquisition-observe
@@ -82,28 +136,7 @@ cd operator_kit\d279-10-third-acquisition-observe
 .\run-d279-10.ps1 -NativeQualificationOnly
 ```
 
-La qualificazione nativa non e ancora stata eseguita. Non eseguire la modalita
-`-AutorizzoUnaSolaOsservazioneD27910`: manca sia una baseline full-SHA approvata
-sia una authority live one-shot.
-
-## Contratto della futura run
-
-- branch esatto `development`, HEAD uguale al full SHA approvato;
-- live-critical set Git pulito e byte-identico alla baseline;
-- target assente nella stessa invocazione prima di marker/capture/attach;
-- marker `captures/D279_10/D279_10_ONE_SHOT_CONSUMED.marker` creato con
-  `CreateNew` e mai riusato o cancellato;
-- un solo attach, tre contatti al massimo, zero retry e zero quarto contatto;
-- PIN esistente ammesso soltanto nella UI Windows; il Kit non lo legge;
-- creazione/modifica PIN, account/credential mutation, prerequisito inatteso o
-  UI di commit prima del terzo edge causano stop;
-- deadline host 300 s, che non prova alcun timeout device;
-- cleanup sempre tenta stop observer e TShark;
-- raw autentico soltanto in `captures/D279_10/<authorization-id>/raw/`;
-- output condivisibile soltanto metadata-only in `sanitized/`.
-
-I metadata non includono body B0, plaintext TLS, immagini, raster, pixel, hash
-biometrici, PSK/secret o valore PIN. Dopo PASS o FAIL non rilanciare. Chiudere
-la UI, scollegare il passthrough dalla VM e consegnare soltanto il JSON
-sanitizzato; il raw resta nel repository privato per una review espressamente
-autorizzata.
+L'accettazione già concessa della mutazione host-side è registrata nel template
+ma non autorizza il live. Non eseguire `-AutorizzoEnrollmentOemCompletoD27910`:
+mancano baseline full-SHA approvata, authority per-attempt e decisione esplicita
+sul rischio sensor-side.

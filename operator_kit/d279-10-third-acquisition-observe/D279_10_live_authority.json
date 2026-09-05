@@ -1,10 +1,12 @@
 {
-  "schema": "D279_10_LIVE_AUTHORITY_V1",
+  "schema": "D279_10_LIVE_AUTHORITY_V2",
   "baseline_approved": false,
   "approved_for_passive_capture": false,
-  "third_contact_authorized": false,
-  "possible_host_enrollment_mutation_accepted": false,
+  "full_oem_enrollment_authorized": false,
+  "host_vm_enrollment_mutation_accepted": true,
+  "possible_sensor_side_template_persistence_accepted": false,
+  "snapshot_prerun_confirmed": false,
   "live_authorized": false,
   "approved_full_commit_sha": null,
-  "one_shot_authorization_id": null
+  "authorized_attempt_id": null
 }

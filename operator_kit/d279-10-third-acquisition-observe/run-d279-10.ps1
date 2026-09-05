@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# D279/10 passive Windows OEM observation. Windows PowerShell Desktop 5.1.
+# D279/10 passive full Windows OEM enrollment observation. PowerShell 5.1.
 [CmdletBinding()]
 param(
     [switch]$SelfTestOnly,
     [switch]$NativeQualificationOnly,
-    [switch]$AutorizzoUnaSolaOsservazioneD27910,
+    [switch]$AutorizzoEnrollmentOemCompletoD27910,
     [string]$AuthorityPath = (Join-Path $PSScriptRoot "D279_10_live_authority.json")
 )
 
@@ -15,6 +15,15 @@ $script:CaptureProcess = $null
 $script:ObserverProcess = $null
 $script:CaptureStarted = $false
 $script:CaptureStopped = $false
+$script:TargetAttached = $false
+$script:WizardStarted = $false
+$script:EnrollmentCompleted = $false
+$script:ContactCount = 0
+$script:RunRoot = $null
+$script:RawRoot = $null
+$script:SanitizedRoot = $null
+$script:AttemptStatus = $null
+$script:Pcap = $null
 $script:Critical = @(
     "operator_kit/d279-10-third-acquisition-observe/run-d279-10.ps1",
     "operator_kit/d279-10-third-acquisition-observe/d279_10_third_cycle.py",
@@ -23,8 +32,6 @@ $script:Critical = @(
 )
 
 function Fail-D279([string]$Message) {
-    Stop-D279Observer
-    Stop-D279Capture | Out-Null
     throw "D279_10_FAIL_CLOSED: $Message"
 }
 
@@ -46,30 +53,37 @@ function Stop-D279Capture {
     return $script:CaptureStopped
 }
 
-function Read-D279Exact([string]$Prompt, [string[]]$Allowed) {
-    $answer = (Read-Host $Prompt).Trim().ToUpperInvariant()
-    if ($Allowed -notcontains $answer) { Fail-D279 ("risposta non ammessa: " + $answer) }
-    return $answer
+function Read-D279Menu([string]$Title, [hashtable]$Options) {
+    Write-Host ""
+    Write-Host $Title
+    foreach ($key in @($Options.Keys | Sort-Object)) {
+        Write-Host ("{0} - {1}" -f $key, $Options[$key])
+    }
+    $raw = (Read-Host "Scelta numerica").Trim()
+    $value = 0
+    if (-not [int]::TryParse($raw, [ref]$value) -or -not $Options.ContainsKey($value)) {
+        Fail-D279 "risposta non numerica o non ammessa"
+    }
+    return $value
 }
 
-function Read-D279SetupReady {
-    $terminal = @(
-        "NEW_PIN_REQUIRED", "PIN_CREATION_UI", "PIN_MUTATION_UI",
-        "ACCOUNT_MUTATION_UI", "CREDENTIAL_MUTATION_UI",
-        "UNEXPECTED_PREREQUISITE", "ENROLLMENT_COMMIT_UI", "STOP"
-    )
-    $state = Read-D279Exact "Apri Configura Windows Hello senza confermare modifiche. Digita PRONTO, EXISTING_PIN_AUTHENTICATION o una categoria terminale" (@("PRONTO", "EXISTING_PIN_AUTHENTICATION") + $terminal)
-    if ($state -eq "EXISTING_PIN_AUTHENTICATION") {
-        Write-Host "Inserisci il PIN esistente solo nella UI Windows. Il Kit non lo legge. Se viene chiesta creazione o modifica, usa la categoria terminale."
-        $state = Read-D279Exact "Dopo la sola verifica identita, digita PRONTO o una categoria terminale" (@("PRONTO") + $terminal)
+function Write-D279JsonOnce([string]$Path, [object]$Document) {
+    $json = $Document | ConvertTo-Json -Depth 12
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json + "`n")
+    $stream = $null
+    try {
+        $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::CreateNew,
+            [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush()
+    } finally {
+        if ($null -ne $stream) { $stream.Dispose() }
     }
-    if ($state -ne "PRONTO") { Fail-D279 ("condizione UI terminale: " + $state) }
 }
 
 function Get-D279RepositoryRoot {
     $rootOutput = & git -C $PSScriptRoot rev-parse --show-toplevel 2>&1
-    $gitExitCode = $LASTEXITCODE
-    if ($gitExitCode -ne 0) { Fail-D279 "repository Git non individuabile" }
+    if ($LASTEXITCODE -ne 0) { Fail-D279 "repository Git non individuabile" }
     $root = ([string](@($rootOutput) | Select-Object -First 1)).Trim()
     if ([string]::IsNullOrWhiteSpace($root)) { Fail-D279 "repository Git vuoto" }
     return [System.IO.Path]::GetFullPath($root)
@@ -107,13 +121,13 @@ function Assert-D279GoodixAbsentSameRun {
     $devices = @(Get-PnpDevice -PresentOnly -ErrorAction Stop |
         Where-Object { $_.InstanceId -match $target })
     if ($devices.Count -ne 0) {
-        Fail-D279 "GOODIX_PRESENT_IN_GUEST=true; il target deve essere assente prima della run"
+        Fail-D279 "GOODIX_PRESENT_IN_GUEST=true; il target deve essere assente"
     }
 }
 
 function Test-D279PrivateRoot([string]$Root) {
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) {
-        New-Item -ItemType Directory -Path $Root -Force | Out-Null
+        New-Item -ItemType Directory -Path $Root | Out-Null
     }
     $item = Get-Item -LiteralPath $Root -ErrorAction Stop
     if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }
@@ -136,18 +150,61 @@ function Test-D279PrivateRoot([string]$Root) {
 function Read-D279Authority([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail-D279 "authority assente" }
     $authority = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-    if ($authority.schema -ne "D279_10_LIVE_AUTHORITY_V1") { Fail-D279 "schema authority non valido" }
+    if ($authority.schema -ne "D279_10_LIVE_AUTHORITY_V2") { Fail-D279 "schema authority non valido" }
     return $authority
+}
+
+function Assert-D279LiveProcesses {
+    if ($null -eq $script:CaptureProcess -or $script:CaptureProcess.HasExited) {
+        Fail-D279 "capture terminata prima della conclusione UI"
+    }
+    if ($null -eq $script:ObserverProcess -or $script:ObserverProcess.HasExited) {
+        Fail-D279 "observer terminato prima della conclusione UI"
+    }
+}
+
+function Get-D279RestoreClassification {
+    if ($script:EnrollmentCompleted) {
+        return "RESTORE_SNAPSHOT_REQUIRED_BEFORE_ANOTHER_FIRST_ENROLLMENT"
+    }
+    if (-not $script:TargetAttached -and -not $script:WizardStarted) {
+        return "RERUN_WITHOUT_RESTORE_REASONABLE"
+    }
+    return "RESTORE_SNAPSHOT_REQUIRED_STATE_UNCERTAIN"
+}
+
+function Write-D279AttemptStatus([string]$Result, [string]$FailureClass) {
+    if ($null -eq $script:AttemptStatus -or (Test-Path -LiteralPath $script:AttemptStatus)) { return }
+    $rawHash = $null
+    if ($null -ne $script:Pcap -and (Test-Path -LiteralPath $script:Pcap -PathType Leaf)) {
+        $rawHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $script:Pcap).Hash.ToLowerInvariant()
+    }
+    $document = [ordered]@{
+        schema = "D279_10_ATTEMPT_STATUS_V2"
+        attempt_id = (Split-Path $script:RunRoot -Leaf)
+        result = $Result
+        failure_class = $FailureClass
+        target_attached = $script:TargetAttached
+        wizard_started = $script:WizardStarted
+        contact_count = $script:ContactCount
+        enrollment_completed = $script:EnrollmentCompleted
+        capture_started = $script:CaptureStarted
+        capture_stopped = $script:CaptureStopped
+        capture_sha256 = $rawHash
+        automatic_retry_count = 0
+        rerun_classification = Get-D279RestoreClassification
+        export_before_snapshot_restore_raw = $script:RawRoot
+        export_before_snapshot_restore_sanitized = $script:SanitizedRoot
+    }
+    Write-D279JsonOnce $script:AttemptStatus $document
 }
 
 function Invoke-D279SelfTest {
     if ($PSVersionTable.PSEdition -ne "Desktop" -or $PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -lt 1) {
         Fail-D279 "e richiesto Windows PowerShell Desktop 5.1"
     }
-    $required = @(
-        "d279_10_third_cycle.py", "d279_10_observer.py",
-        "D279_10_live_authority.json", "README_IT.md"
-    )
+    $required = @("d279_10_third_cycle.py", "d279_10_observer.py",
+        "D279_10_live_authority.json", "README_IT.md")
     $missing = @($required | Where-Object {
         -not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $_) -PathType Leaf)
     })
@@ -155,38 +212,36 @@ function Invoke-D279SelfTest {
     $authority = Read-D279Authority (Join-Path $PSScriptRoot "D279_10_live_authority.json")
     if ($authority.baseline_approved -ne $false -or
         $authority.approved_for_passive_capture -ne $false -or
-        $authority.third_contact_authorized -ne $false -or
-        $authority.possible_host_enrollment_mutation_accepted -ne $false -or
+        $authority.full_oem_enrollment_authorized -ne $false -or
+        $authority.host_vm_enrollment_mutation_accepted -ne $true -or
+        $authority.possible_sensor_side_template_persistence_accepted -ne $false -or
+        $authority.snapshot_prerun_confirmed -ne $false -or
         $authority.live_authorized -ne $false) {
         Fail-D279 "il template authority versionato non e chiuso"
     }
     [ordered]@{
-        schema = "D279_10_SELFTEST_V1"
+        schema = "D279_10_SELFTEST_V2"
         result = "PASS"
-        operator_language = "ITALIAN"
+        operator_inputs = "NUMERIC_ONLY"
         authority_template_closed = $true
+        global_marker_present = $false
+        attempt_scoped_create_new = $true
         live_path_executed = $false
         hardware_action_count = 0
-        capture_start_count = 0
-        finger_prompt_count = 0
         automatic_retry_count = 0
     } | ConvertTo-Json -Depth 4
 }
 
 function Invoke-D279NativeQualification {
     Invoke-D279SelfTest | Out-Null
-    $authority = Read-D279Authority (Join-Path $PSScriptRoot "D279_10_live_authority.json")
-    if ($authority.live_authorized -ne $false) { Fail-D279 "authority template aperta" }
     Assert-D279GoodixAbsentSameRun
     $root = Get-D279RepositoryRoot
     $headOutput = & git -C $root rev-parse HEAD 2>&1
-    $headExitCode = $LASTEXITCODE
-    if ($headExitCode -ne 0) { Fail-D279 "HEAD non leggibile" }
+    if ($LASTEXITCODE -ne 0) { Fail-D279 "HEAD non leggibile" }
     $head = ([string](@($headOutput) | Select-Object -First 1)).Trim()
     if ($head -notmatch '^[0-9a-f]{40}$') { Fail-D279 "HEAD completo non valido" }
     $branchOutput = & git -C $root branch --show-current 2>&1
-    $branchExitCode = $LASTEXITCODE
-    if ($branchExitCode -ne 0) { Fail-D279 "branch non leggibile" }
+    if ($LASTEXITCODE -ne 0) { Fail-D279 "branch non leggibile" }
     $branch = ([string](@($branchOutput) | Select-Object -First 1)).Trim()
     if ($branch -ne "development") { Fail-D279 "qualificazione ammessa solo su development" }
     $critical = $script:Critical
@@ -203,12 +258,10 @@ function Invoke-D279NativeQualification {
     try {
         $testOutput = @(& $python -m unittest -q analysis.D279.test_d279_10_third_acquisition_kit 2>&1)
         $testExitCode = $LASTEXITCODE
-    } finally {
-        Pop-Location
-    }
+    } finally { Pop-Location }
     if ($testExitCode -ne 0) { Fail-D279 ("test Python falliti: " + ($testOutput -join " ")) }
     [ordered]@{
-        schema = "D279_10_WINDOWS_NATIVE_QUALIFICATION_V1"
+        schema = "D279_10_WINDOWS_NATIVE_QUALIFICATION_V2"
         result = "PASS"
         powershell = $PSVersionTable.PSVersion.ToString()
         repository_root_resolved = $true
@@ -218,50 +271,50 @@ function Invoke-D279NativeQualification {
         goodix_present_in_guest = $false
         tshark_present = $true
         usbpcap_selector = $selector
-        synthetic_tests = "14_PASS"
+        synthetic_tests = "PASS"
         authority_template_closed = $true
-        marker_created = $false
+        global_marker_created = $false
         capture_started = $false
-        finger_prompt_presented = $false
         hardware_action_count = 0
         automatic_retry_count = 0
     } | ConvertTo-Json -Depth 4
 }
 
 $selected = @(@($SelfTestOnly, $NativeQualificationOnly,
-    $AutorizzoUnaSolaOsservazioneD27910) | Where-Object { $_ })
+    $AutorizzoEnrollmentOemCompletoD27910) | Where-Object { $_ })
 if ($selected.Count -ne 1) { Fail-D279 "selezionare esattamente una modalita" }
 if ($SelfTestOnly) { Invoke-D279SelfTest; exit 0 }
 if ($NativeQualificationOnly) { Invoke-D279NativeQualification; exit 0 }
 
-# Live path. A command-line switch is insufficient: a separately supplied,
-# one-shot authority must acknowledge both the third contact and the unresolved
-# risk that Windows may persist a host-side enrollment at this edge.
+# Live path. The separately supplied authority remains per-attempt and one-shot.
 $authority = Read-D279Authority $AuthorityPath
 if ($authority.baseline_approved -ne $true) { Fail-D279 "baseline non approvata" }
 if ($authority.approved_for_passive_capture -ne $true) { Fail-D279 "capture passiva non approvata" }
-if ($authority.third_contact_authorized -ne $true) { Fail-D279 "terzo contatto non autorizzato" }
-if ($authority.possible_host_enrollment_mutation_accepted -ne $true) {
-    Fail-D279 "rischio di mutazione enrollment host non accettato"
+if ($authority.full_oem_enrollment_authorized -ne $true) { Fail-D279 "enrollment OEM completo non autorizzato" }
+if ($authority.host_vm_enrollment_mutation_accepted -ne $true) {
+    Fail-D279 "mutazione enrollment nella VM non accettata"
+}
+if ($authority.possible_sensor_side_template_persistence_accepted -ne $true) {
+    Fail-D279 "rischio non escluso di persistenza template sensor-side non accettato"
+}
+if ($authority.snapshot_prerun_confirmed -ne $true) {
+    Fail-D279 "snapshot VM pre-run con repository e kit qualificato non confermato"
 }
 if ($authority.live_authorized -ne $true) { Fail-D279 "live non autorizzato" }
 $approvedSha = [string]$authority.approved_full_commit_sha
-$authorizationId = [string]$authority.one_shot_authorization_id
+$attemptId = [string]$authority.authorized_attempt_id
 if ($approvedSha -notmatch '^[0-9a-f]{40}$') { Fail-D279 "SHA completo approvato non valido" }
-if ($authorizationId -notmatch '^D27910_[A-Za-z0-9_-]{8,64}$') { Fail-D279 "authorization ID non valido" }
+if ($attemptId -notmatch '^D27910_[A-Za-z0-9_-]{8,64}$') { Fail-D279 "attempt_id non valido" }
 
 $root = Get-D279RepositoryRoot
 $headOutput = & git -C $root rev-parse HEAD 2>&1
-$headExitCode = $LASTEXITCODE
-if ($headExitCode -ne 0) { Fail-D279 "HEAD non leggibile" }
+if ($LASTEXITCODE -ne 0) { Fail-D279 "HEAD non leggibile" }
 $head = ([string](@($headOutput) | Select-Object -First 1)).Trim()
 if ($head -ne $approvedSha) { Fail-D279 "HEAD diverso dalla baseline approvata" }
 $branchOutput = & git -C $root branch --show-current 2>&1
-$branchExitCode = $LASTEXITCODE
-if ($branchExitCode -ne 0) { Fail-D279 "branch non leggibile" }
+if ($LASTEXITCODE -ne 0) { Fail-D279 "branch non leggibile" }
 $branch = ([string](@($branchOutput) | Select-Object -First 1)).Trim()
 if ($branch -ne "development") { Fail-D279 "branch diversa da development" }
-
 $critical = $script:Critical
 & git -C $root diff --quiet $approvedSha -- @critical
 if ($LASTEXITCODE -ne 0) { Fail-D279 "live-critical set diverso dalla baseline" }
@@ -273,125 +326,189 @@ if ($null -eq $python) { Fail-D279 "Python non disponibile" }
 $tshark = Get-D279Tshark
 if ($null -eq $tshark) { Fail-D279 "TShark non disponibile" }
 $usbPcap = Get-D279UsbPcapSelector $tshark
-
-# Same-run absence gate precedes marker, capture, attach and finger prompts.
 Assert-D279GoodixAbsentSameRun
+
 $captureRoot = Join-Path $root "captures\D279_10"
 if (-not (Test-D279PrivateRoot $captureRoot)) { Fail-D279 "radice capture non privata" }
-$marker = Join-Path $captureRoot "D279_10_ONE_SHOT_CONSUMED.marker"
-$markerStream = $null
-try {
-    $markerStream = [System.IO.File]::Open($marker, [System.IO.FileMode]::CreateNew,
-        [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
-    $markerText = "authorization_id=$authorizationId`napproved_sha=$approvedSha`nconsumed_utc=$([DateTimeOffset]::UtcNow.ToString('o'))`n"
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($markerText)
-    $markerStream.Write($bytes, 0, $bytes.Length)
-    $markerStream.Flush()
-} catch {
-    Fail-D279 "marker one-shot gia esistente o non creabile; nessun retry"
-} finally {
-    if ($null -ne $markerStream) { $markerStream.Dispose() }
+$script:RunRoot = Join-Path $captureRoot $attemptId
+if (Test-Path -LiteralPath $script:RunRoot) {
+    Fail-D279 "attempt_id gia usato; scegliere una nuova authority per-attempt"
 }
+New-Item -ItemType Directory -Path $script:RunRoot | Out-Null
+$attemptLock = Join-Path $script:RunRoot "attempt.lock"
+Write-D279JsonOnce $attemptLock ([ordered]@{
+    schema = "D279_10_ATTEMPT_LOCK_V2"
+    attempt_id = $attemptId
+    approved_full_commit_sha = $approvedSha
+    created_utc = [DateTimeOffset]::UtcNow.ToString('o')
+})
+$script:RawRoot = Join-Path $script:RunRoot "raw"
+$script:SanitizedRoot = Join-Path $script:RunRoot "sanitized"
+New-Item -ItemType Directory -Path $script:RawRoot | Out-Null
+New-Item -ItemType Directory -Path $script:SanitizedRoot | Out-Null
+$script:AttemptStatus = Join-Path $script:SanitizedRoot "attempt_status.json"
+$script:Pcap = Join-Path $script:RawRoot "wire.pcapng"
+$journal = Join-Path $script:RawRoot "observer_journal.jsonl"
+$stopControl = Join-Path $script:RawRoot "observer_stop_control.json"
+$observerResult = Join-Path $script:SanitizedRoot "observer_result.json"
+$operatorEvents = Join-Path $script:SanitizedRoot "operator_events.json"
+$evidence = Join-Path $script:SanitizedRoot "D279_10_full_enrollment_evidence.json"
 
-$runRoot = Join-Path $captureRoot $authorizationId
-if (Test-Path -LiteralPath $runRoot) { Fail-D279 "output one-shot gia esistente" }
-$rawRoot = Join-Path $runRoot "raw"
-$sanitizedRoot = Join-Path $runRoot "sanitized"
-New-Item -ItemType Directory -Path $rawRoot -Force | Out-Null
-New-Item -ItemType Directory -Path $sanitizedRoot -Force | Out-Null
-$pcap = Join-Path $rawRoot "wire.pcapng"
-$signal = Join-Path $rawRoot "observer_third_b0_signal.json"
-$evidence = Join-Path $sanitizedRoot "D279_10_third_acquisition_evidence.json"
+$captureStartedUtc = $null
+$wizardStartedUtc = $null
+$enrollmentCompletedUtc = $null
+$captureStoppedUtc = $null
+$failure = $null
 
-Write-Host "D279/10: osservazione passiva OEM one-shot del terzo edge."
-Write-Host "RISCHIO ESPLICITO: Windows potrebbe persistere un enrollment host al terzo contatto."
-Write-Host "Nessun retry; nessun comando Goodix e inviato dal Kit."
-
-$captureArgs = @("-i", $usbPcap, "-a", "duration:300", "-q", "-w", ('"{0}"' -f $pcap))
 try {
+    Write-Host "D279/10: capture passiva dell'intero primo enrollment OEM."
+    Write-Host "Zero sender Goodix e zero retry automatico."
+    Write-Host "Il terzo B0 e una milestone e non arresta la capture."
+    Write-Host "La VM puo mutare; lo snapshot non ripristina eventuale stato sensor-side."
+
+    $snapshotChoice = Read-D279Menu "Snapshot pre-run" @{
+        1 = "Snapshot VM creato con repository e kit gia qualificati"
+        0 = "Stop"
+    }
+    if ($snapshotChoice -ne 1) { Fail-D279 "stop prima della capture" }
+
+    $captureArgs = @("-i", $usbPcap, "-a", "duration:1200", "-q", "-w", ('"{0}"' -f $script:Pcap))
     $script:CaptureProcess = Start-Process -FilePath $tshark -ArgumentList $captureArgs -PassThru -WindowStyle Hidden
     $script:CaptureStarted = $true
+    $captureStartedUtc = [DateTimeOffset]::UtcNow.ToString('o')
     Start-Sleep -Milliseconds 800
     if ($script:CaptureProcess.HasExited) { Fail-D279 "capture arrestata all'avvio" }
+
     $observerPath = Join-Path $PSScriptRoot "d279_10_observer.py"
     $observerArgs = @(
-        ('"{0}"' -f $observerPath), "--pcap", ('"{0}"' -f $pcap),
-        "--signal-output", ('"{0}"' -f $signal), "--deadline-seconds", "300",
-        "--poll-milliseconds", "100"
+        ('"{0}"' -f $observerPath), "--pcap", ('"{0}"' -f $script:Pcap),
+        "--journal-output", ('"{0}"' -f $journal),
+        "--stop-control", ('"{0}"' -f $stopControl),
+        "--result-output", ('"{0}"' -f $observerResult),
+        "--deadline-seconds", "1200", "--poll-milliseconds", "100"
     )
     $script:ObserverProcess = Start-Process -FilePath $python -ArgumentList $observerArgs -PassThru -WindowStyle Hidden
     Start-Sleep -Milliseconds 200
     if ($script:ObserverProcess.HasExited) { Fail-D279 "observer arrestato all'avvio" }
 
-    $attach = Read-D279Exact "Collega il solo sensore target alla VM. Digita COLLEGATO o STOP" @("COLLEGATO", "STOP")
-    if ($attach -ne "COLLEGATO") { Fail-D279 "stop prima dell'attach" }
+    $attach = Read-D279Menu "Collegamento target" @{
+        1 = "Il solo sensore target e collegato alla VM"
+        0 = "Stop"
+    }
+    if ($attach -ne 1) { Fail-D279 "stop prima dell'attach" }
+    $script:TargetAttached = $true
     Start-Sleep -Milliseconds 700
     $target = [regex]::Escape($script:ExpectedTarget)
     $devices = @(Get-PnpDevice -PresentOnly -ErrorAction Stop |
         Where-Object { $_.InstanceId -match $target })
     if ($devices.Count -ne 1) { Fail-D279 "target assente o ambiguo dopo attach" }
+    Assert-D279LiveProcesses
 
-    Read-D279SetupReady
-    Write-Host "Esegui il PRIMO contatto e solleva il dito quando richiesto."
-    $secondState = Read-D279Exact "Digita SECONDO_RICHIESTO o una categoria terminale" @(
-        "SECONDO_RICHIESTO", "NEW_PIN_REQUIRED", "PIN_CREATION_UI",
-        "PIN_MUTATION_UI", "ACCOUNT_MUTATION_UI", "CREDENTIAL_MUTATION_UI",
-        "UNEXPECTED_PREREQUISITE", "ENROLLMENT_COMMIT_UI", "STOP")
-    if ($secondState -ne "SECONDO_RICHIESTO") { Fail-D279 ("condizione UI terminale: " + $secondState) }
-    Write-Host "Esegui il SECONDO contatto e solleva il dito quando richiesto."
-    $thirdState = Read-D279Exact "Digita TERZO_RICHIESTO o una categoria terminale" @(
-        "TERZO_RICHIESTO", "NEW_PIN_REQUIRED", "PIN_CREATION_UI",
-        "PIN_MUTATION_UI", "ACCOUNT_MUTATION_UI", "CREDENTIAL_MUTATION_UI",
-        "UNEXPECTED_PREREQUISITE", "ENROLLMENT_COMMIT_UI", "STOP")
-    if ($thirdState -ne "TERZO_RICHIESTO") { Fail-D279 ("condizione UI terminale: " + $thirdState) }
-    Write-Host "Esegui il TERZO contatto una sola volta. Non eseguire un quarto contatto."
-    if (-not $script:ObserverProcess.WaitForExit(305000)) {
-        Fail-D279 "THIRD_B0_OBSERVER_DEADLINE; AUTOMATIC_RETRY_COUNT=0"
+    $setup = Read-D279Menu "Avvio wizard Windows Hello" @{
+        1 = "Wizard pronto per il primo contatto"
+        2 = "UI richiede autenticazione con PIN esistente"
+        3 = "Prerequisito, creazione PIN o stato inatteso"
+        0 = "Stop"
     }
-    if ($script:ObserverProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $signal -PathType Leaf)) {
-        $observerFailure = "OBSERVER_FAILED_WITHOUT_SIGNAL"
-        if (Test-Path -LiteralPath $signal -PathType Leaf) {
-            try {
-                $failureSignal = Get-Content -LiteralPath $signal -Raw | ConvertFrom-Json
-                if ($failureSignal.schema -eq "D279_10_WIRE_OBSERVER_FAILURE_V1" -and
-                    $failureSignal.status -eq "FAIL_CLOSED") {
-                    $observerFailure = [string]$failureSignal.failure_class
-                }
-            } catch {
-                $observerFailure = "OBSERVER_FAILURE_SIGNAL_INVALID"
-            }
+    if ($setup -eq 2) {
+        Write-Host "Inserisci il PIN esistente soltanto nella UI Windows."
+        $setup = Read-D279Menu "Dopo autenticazione PIN" @{
+            1 = "Wizard pronto per il primo contatto"
+            3 = "Prerequisito, modifica credenziale o stato inatteso"
+            0 = "Stop"
         }
-        Fail-D279 ("terzo B0 non osservato: " + $observerFailure + "; AUTOMATIC_RETRY_COUNT=0")
     }
-    if (-not (Stop-D279Capture)) { Fail-D279 "CAPTURE_PROCESS_STOP_TIMEOUT" }
-    Write-Host "Terzo B0 osservato. Chiudi subito la UI; non eseguire altri contatti."
+    if ($setup -ne 1) { Fail-D279 "wizard non pronto senza mutazioni credenziali" }
+    $script:WizardStarted = $true
+    $wizardStartedUtc = [DateTimeOffset]::UtcNow.ToString('o')
+
+    while (-not $script:EnrollmentCompleted) {
+        Assert-D279LiveProcesses
+        $script:ContactCount += 1
+        Write-Host ("Esegui il contatto numero {0} richiesto dalla UI e solleva il dito." -f $script:ContactCount)
+        $state = Read-D279Menu "Stato UI dopo il contatto" @{
+            1 = "La UI richiede un altro contatto"
+            2 = "La UI conferma realmente l'impronta registrata"
+            3 = "Errore, prerequisito o stato inatteso"
+            0 = "Stop"
+        }
+        if ($state -eq 1) { continue }
+        if ($state -eq 2) {
+            $script:EnrollmentCompleted = $true
+            $enrollmentCompletedUtc = [DateTimeOffset]::UtcNow.ToString('o')
+            break
+        }
+        Fail-D279 "enrollment non concluso con conferma reale"
+    }
+
+    Write-Host "Conferma UI registrata. Capture tail terminale: 5 secondi."
+    Start-Sleep -Seconds 5
+    Assert-D279LiveProcesses
+    Write-D279JsonOnce $stopControl ([ordered]@{
+        schema = "D279_10_OBSERVER_STOP_CONTROL_V2"
+        attempt_id = $attemptId
+        reason = "WINDOWS_UI_CONFIRMED_AND_TERMINAL_TAIL_ELAPSED"
+        created_utc = [DateTimeOffset]::UtcNow.ToString('o')
+    })
+    if (-not $script:ObserverProcess.WaitForExit(10000)) {
+        Fail-D279 "observer non arrestato sul control file"
+    }
+    if ($script:ObserverProcess.ExitCode -ne 0) { Fail-D279 "observer finalizzato in failure" }
+    if (-not (Stop-D279Capture)) { Fail-D279 "capture non arrestata" }
+    $captureStoppedUtc = [DateTimeOffset]::UtcNow.ToString('o')
+
+    Write-D279JsonOnce $operatorEvents ([ordered]@{
+        schema = "D279_10_OPERATOR_EVENTS_V2"
+        attempt_id = $attemptId
+        capture_started_utc = $captureStartedUtc
+        wizard_started_utc = $wizardStartedUtc
+        enrollment_completed_utc = $enrollmentCompletedUtc
+        capture_stopped_utc = $captureStoppedUtc
+        contact_count = $script:ContactCount
+        enrollment_completed = $true
+        terminal_tail_seconds = 5
+        automatic_retry_count = 0
+    })
+    if (-not (Test-Path -LiteralPath $script:Pcap -PathType Leaf) -or
+        (Get-Item $script:Pcap).Length -le 0) { Fail-D279 "capture mancante o vuota" }
+    $rawHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $script:Pcap).Hash.ToLowerInvariant()
+    $post = Join-Path $PSScriptRoot "d279_10_third_cycle.py"
+    $postOutput = @(& $python $post --pcap $script:Pcap --expected-sha256 $rawHash `
+        --operator-events $operatorEvents --attempt-id $attemptId --output $evidence 2>&1)
+    if ($LASTEXITCODE -ne 0) { Fail-D279 ("finalizer fallito: " + ($postOutput -join " ")) }
+    $result = Get-Content -LiteralPath $evidence -Raw | ConvertFrom-Json
+    if ($result.boundary_status -ne "OBSERVED_COMPLETE_UI_CONFIRMED") {
+        Fail-D279 "evidenza finale non chiude l'enrollment UI"
+    }
+    Write-D279AttemptStatus "PASS" $null
+} catch {
+    $failure = $_.Exception.Message
+    Stop-D279Observer
+    Stop-D279Capture | Out-Null
+    Write-D279AttemptStatus "FAIL" $failure
 } finally {
     Stop-D279Observer
     Stop-D279Capture | Out-Null
 }
 
-if (-not (Test-Path -LiteralPath $pcap -PathType Leaf) -or (Get-Item $pcap).Length -le 0) {
-    Fail-D279 "capture mancante o vuota"
-}
-$rawHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $pcap).Hash.ToLowerInvariant()
-$post = Join-Path $PSScriptRoot "d279_10_third_cycle.py"
-$postOutput = @(& $python $post --pcap $pcap --expected-sha256 $rawHash --output $evidence --observer-signal $signal 2>&1)
-$postExitCode = $LASTEXITCODE
-if ($postExitCode -ne 0) { Fail-D279 ("finalizer fallito: " + ($postOutput -join " ")) }
-$result = Get-Content -LiteralPath $evidence -Raw | ConvertFrom-Json
-if ($result.boundary_status -ne "OBSERVED_COMPLETE" -or $result.stop_reason -ne "THIRD_FINGERPRINT_B0") {
-    Fail-D279 "evidenza finale non chiude il boundary"
-}
+Write-Host ("ESPORTA PRIMA DI QUALSIASI RESTORE RAW: " + $script:RawRoot)
+Write-Host ("ESPORTA PRIMA DI QUALSIASI RESTORE SANITIZED: " + $script:SanitizedRoot)
+if ($null -ne $failure) { throw $failure }
 
 [ordered]@{
-    schema = "D279_10_LIVE_RUN_SUMMARY_V1"
+    schema = "D279_10_LIVE_RUN_SUMMARY_V2"
     result = "PASS"
+    attempt_id = $attemptId
     capture_started = $script:CaptureStarted
     capture_stopped = $script:CaptureStopped
-    stop_trigger = "WIRE_DRIVEN_THIRD_FINGERPRINT_B0"
+    completion_authority = "WINDOWS_UI_OPERATOR_NUMERIC_CONFIRMATION"
+    operator_contact_count = $script:ContactCount
+    third_b0_is_milestone_only = $true
+    terminal_tail_seconds = 5
     automatic_retry_count = 0
     goodix_manual_command_count = 0
-    fourth_contact_authorized = $false
-    possible_host_enrollment_mutation_was_accepted = $true
+    rerun_classification = Get-D279RestoreClassification
+    export_before_snapshot_restore_raw = $script:RawRoot
+    export_before_snapshot_restore_sanitized = $script:SanitizedRoot
     sanitized_evidence = $evidence
 } | ConvertTo-Json -Depth 4
