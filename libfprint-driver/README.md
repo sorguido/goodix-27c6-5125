@@ -273,6 +273,15 @@ deferred `FpImage` has synchronously entered the libfprint capture path. This
 orders finger-up before asynchronous extraction completion without inventing
 an image from IRQ data. Callback rejection is terminal and retry-free.
 
+## D279/23 graph-ready enrollment progression
+
+The dormant FpiUsb binding now advances one command automatically only after
+an accepted A0 or completed plaintext message leaves the parametric graph in a
+command slot. Inbound slots and fragmented plaintext do not submit; each OUT
+still commits only on its matching positive backend completion. This is a
+host-tested prerequisite for the first-arm context handoff, not a production
+enrollment caller or gate change.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

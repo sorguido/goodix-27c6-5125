@@ -1799,8 +1799,6 @@ test_d279_20_dormant_enrollment_context_ownership (void)
   g_assert_true (goodix_device_context_has_dormant_enrollment_binding (ctx));
   g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
     binding, irq, &error));
-  g_assert_true (goodix_enrollment_fpi_usb_binding_submit_next (
-    binding, &error));
   g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==,
                     1u);
 

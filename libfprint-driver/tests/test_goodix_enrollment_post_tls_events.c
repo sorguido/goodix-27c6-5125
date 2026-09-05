@@ -684,6 +684,9 @@ test_dormant_backend_binding_completion_gate (void)
   guint8 raw[12];
   g_autoptr(GBytes) irq = NULL;
   g_autoptr(GBytes) ack = build_ack (0x22);
+  g_autoptr(GBytes) primary = build_image_plaintext ();
+  g_autoptr(GBytes) primary_header = NULL;
+  g_autoptr(GBytes) primary_tail = NULL;
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   g_autoptr(GError) error = NULL;
   GoodixFpiUsbBackend *backend = goodix_fpi_usb_backend_new (
@@ -705,8 +708,6 @@ test_dormant_backend_binding_completion_gate (void)
   irq = build_irq (0x32, 0x0002, 0x003f, raw);
   g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
     binding, irq, &error));
-  g_assert_true (goodix_enrollment_fpi_usb_binding_submit_next (
-    binding, &error));
   g_assert_true (goodix_enrollment_fpi_usb_binding_has_pending (binding));
   g_assert_cmpuint (fixture.backend_out_count, ==, 1u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (backend), ==,
@@ -726,6 +727,7 @@ test_dormant_backend_binding_completion_gate (void)
   g_assert_cmpuint (events_audit.lifecycle.plan.committed_command_count, ==,
                     1u);
   g_assert_cmpuint (binding_audit.backend_submit_attempt_count, ==, 1u);
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 1u);
   g_assert_cmpuint (binding_audit.backend_completion_count, ==, 1u);
   g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
                     ==, 1u);
@@ -733,6 +735,25 @@ test_dormant_backend_binding_completion_gate (void)
   g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
     binding, ack, &error));
   g_assert_no_error (error);
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 1u);
+  g_assert_false (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+
+  primary_header = g_bytes_new_from_bytes (primary, 0u, 2u);
+  primary_tail = g_bytes_new_from_bytes (
+    primary, 2u, GOODIX_IMAGE_PLAINTEXT_LENGTH - 2u);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (
+    binding, primary_header, &error));
+  g_assert_false (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 1u);
+  g_assert_true (goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (
+    binding, primary_tail, &error));
+  g_assert_true (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 2u);
+  g_assert_cmpuint (fixture.image_count, ==, 1u);
+  goodix_fpi_usb_backend_complete_out (backend, 7u, NULL);
+  g_assert_false (goodix_enrollment_fpi_usb_binding_has_pending (binding));
+  g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
+                    ==, 2u);
 
   goodix_enrollment_fpi_usb_binding_free (binding);
   goodix_fpi_usb_backend_free (backend);
@@ -771,8 +792,6 @@ test_backend_binding_cancel_waits_for_drain (void)
   irq = build_irq (0x32, 0x0002, 0x003f, raw);
   g_assert_true (goodix_enrollment_fpi_usb_binding_handle_a0 (
     binding, irq, &error));
-  g_assert_true (goodix_enrollment_fpi_usb_binding_submit_next (
-    binding, &error));
   goodix_enrollment_fpi_usb_binding_cancel (binding, "synthetic cancel");
   goodix_enrollment_fpi_usb_binding_cancel (binding, "duplicate cancel");
   g_assert_true (g_cancellable_is_cancelled (cancellable));

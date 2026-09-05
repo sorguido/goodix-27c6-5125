@@ -436,7 +436,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_FIRST_ARM_HANDOFF_TO_PARAMETRIC_ENROLLMENT_GRAPH_ORCHESTRATION_WITH_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_CONTEXT_OWNED_FIRST_ARM_HANDOFF_TO_PARAMETRIC_ENROLLMENT_GRAPH_WITH_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -752,6 +752,33 @@ D279/21 verso grafo parametrico e callback D279/22, ancora dietro il gate
 production. `21` resta target-local ATTEMPT02; il contenuto B0 ausiliario resta
 opaco e potenzialmente rilevante, con semantica non determinata. Report:
 `analysis/D279/D279_22_ordered_enrollment_contact_callbacks.md`.
+
+### D279/23 — progressione automatica soltanto nei command slot
+
+Il binding enrollment dormiente ora esegue esattamente un submit quando, e
+solo quando, un A0 accettato o il completamento di un plaintext B0 porta il
+grafo parametrico in uno slot comando. Un input parziale o uno slot inbound
+non invia nulla. La transazione resta il gate: il comando viene commit solo
+dopo completion backend positiva della stessa generazione; ACK anticipati,
+completion stale, errore transport e cancellazione restano terminali e senza
+retry.
+
+La regressione prova sul primo IRQ2 che il `0x22` viene preparato e sottoposto
+automaticamente, resta non commit fino alla completion, quindi accetta l'ACK
+senza generare un secondo submit perché lo slot successivo è il B0 primario.
+Il test di cancellazione prova ancora che un OUT pendente non viene riusato e
+che il binding si libera solo dopo drain. Le suite D279/14–23 passano 10/10
+normal e ASan/UBSan; la suite FpImageDevice passa 26/26 nelle due modalità,
+mentre la build Fedora 44/libfprint 1.94.100 con registry standard e NBIS
+passa senza enumerazione/open/claim/submit USB reale.
+
+Questo non aggiunge un caller production e non cambia il gate che rifiuta
+l'enrollment reale. `21` resta il numero target-local osservato in ATTEMPT02;
+il grafo continua ad accettare profili 2/3/21. Il B0 ausiliario rimane opaco e
+la sua possibile rilevanza quality/template/NBIS non è risolta. Il prossimo
+step offline è fare costruire e possedere questo binding al context mediante
+l'handoff D279/21, ancora con il gate production chiuso. Report:
+`analysis/D279/D279_23_graph_ready_enrollment_progression.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

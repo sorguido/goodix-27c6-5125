@@ -89,6 +89,58 @@ backend_out_complete (GoodixFpiUsbBackend *backend,
     }
 }
 
+static gboolean
+expected_event_is_command (GoodixEnrollmentEvent event)
+{
+  switch (event)
+    {
+    case GOODIX_ENROLLMENT_EVENT_COMMAND_20:
+    case GOODIX_ENROLLMENT_EVENT_COMMAND_22:
+    case GOODIX_ENROLLMENT_EVENT_COMMAND_32:
+    case GOODIX_ENROLLMENT_EVENT_COMMAND_34:
+    case GOODIX_ENROLLMENT_EVENT_COMMAND_36:
+    case GOODIX_ENROLLMENT_EVENT_COMMAND_50:
+      return TRUE;
+    case GOODIX_ENROLLMENT_EVENT_NONE:
+    case GOODIX_ENROLLMENT_EVENT_IRQ2:
+    case GOODIX_ENROLLMENT_EVENT_ACK_20:
+    case GOODIX_ENROLLMENT_EVENT_ACK_22:
+    case GOODIX_ENROLLMENT_EVENT_ACK_32:
+    case GOODIX_ENROLLMENT_EVENT_ACK_34:
+    case GOODIX_ENROLLMENT_EVENT_ACK_36:
+    case GOODIX_ENROLLMENT_EVENT_ACK_50:
+    case GOODIX_ENROLLMENT_EVENT_PRIMARY_B0:
+    case GOODIX_ENROLLMENT_EVENT_IRQ0200:
+    case GOODIX_ENROLLMENT_EVENT_AUXILIARY_B0:
+    case GOODIX_ENROLLMENT_EVENT_NAV:
+    case GOODIX_ENROLLMENT_EVENT_IRQ0100:
+      return FALSE;
+    }
+  return FALSE;
+}
+
+static gboolean
+submit_if_graph_ready (GoodixEnrollmentFpiUsbBinding *binding,
+                       GError                       **error)
+{
+  GoodixEnrollmentEvent expected;
+
+  if (binding->terminal_error != NULL ||
+      goodix_enrollment_outbound_transaction_has_pending (
+        binding->transaction) ||
+      goodix_enrollment_outbound_transaction_is_complete (
+        binding->transaction))
+    return binding->terminal_error == NULL;
+  expected = goodix_enrollment_post_tls_events_get_expected_event (
+    binding->events);
+  if (!expected_event_is_command (expected))
+    return TRUE;
+  if (!goodix_enrollment_fpi_usb_binding_submit_next (binding, error))
+    return FALSE;
+  binding->audit->graph_ready_submit_count++;
+  return TRUE;
+}
+
 GoodixEnrollmentFpiUsbBinding *
 goodix_enrollment_fpi_usb_binding_new (
   GoodixEnrollmentPostTlsEvents      *events,
@@ -204,7 +256,7 @@ goodix_enrollment_fpi_usb_binding_handle_a0 (
   if (!goodix_enrollment_outbound_transaction_handle_a0 (
         binding->transaction, frame, error))
     return binding_fail (binding, "enrollment inbound A0 failed", error);
-  return TRUE;
+  return submit_if_graph_ready (binding, error);
 }
 
 gboolean
@@ -219,7 +271,7 @@ goodix_enrollment_fpi_usb_binding_handle_plaintext_chunk (
   if (!goodix_enrollment_outbound_transaction_handle_plaintext_chunk (
         binding->transaction, chunk, error))
     return binding_fail (binding, "enrollment plaintext failed", error);
-  return TRUE;
+  return submit_if_graph_ready (binding, error);
 }
 
 gboolean

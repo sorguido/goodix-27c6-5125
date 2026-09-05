@@ -15,6 +15,7 @@ typedef struct
   guint backend_submit_attempt_count;
   guint backend_completion_count;
   guint backend_completion_error_count;
+  guint graph_ready_submit_count;
   guint cancellation_count;
   guint retry_count;
   gboolean terminal;
@@ -39,6 +40,9 @@ void goodix_enrollment_fpi_usb_binding_free (
 gboolean goodix_enrollment_fpi_usb_binding_submit_next (
   GoodixEnrollmentFpiUsbBinding *binding,
   GError                       **error);
+/* Accepted inbound events automatically submit exactly one next command when
+ * the parametric graph moves to a command slot.  Fragmentary/plain inbound
+ * slots are no-ops; transport completion remains the only commit gate. */
 gboolean goodix_enrollment_fpi_usb_binding_handle_a0 (
   GoodixEnrollmentFpiUsbBinding *binding,
   GBytes                        *frame,
