@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/39 — quality discriminator chiuso offline, Human Gate protected
+### Stato corrente D279/42 — baseline-delta pronto, Human Gate protected
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -259,10 +259,29 @@ reliability rappresentano soltanto i tier della quality-map, non una reliability
 grayscale a scala fisica. L'esperimento non inventa quindi un `ppmm`, non prova
 matching e non autorizza fusion primary/auxiliary o modifiche production.
 
-Ogni incertezza residua del confine D279/39 dipende ora dai raster autentici.
-Serve un Human Gate separato sul full SHA per una sola
-`D279_39_ONE_OFFLINE_PROTECTED_NBIS_QUALITY_EVALUATION`. D279/35 e D279/37
-restano consumate; nessuna lettura protetta, USB/live o retry è autorizzata.
+L'operatore ha poi eseguito una sola D279/39 sulla baseline
+`4001bf07413ec09afb29db39d78fb65aa7c6f904`. Il risultato autentico, SHA-256
+`861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c`, è
+preservato byte-per-byte. `frame_minmax x2` separa la baseline nella quality-map:
+A/B è zero sul no-finger, presente su 21/21 primary e 20/21 auxiliary con
+mediana 366‰. I massimi restano però 3 e 4 minutiae, sotto le 10 necessarie per
+un match Bozorth computabile su una singola immagine.
+
+La review D279/40 precisa che con `ppmm=0` reliability ≥0,25/0,50 equivale
+esattamente a minutiae collocate nei tier B/A e A: non è reliability grayscale
+fisica. Una quality-map forte misura ridge flow a blocchi e non implica
+endings/bifurcations. D279/41 lo dimostra offline: sinusoidi a creste continue
+raggiungono A/B elevata ma zero minutiae. La penalità edge fissa di due blocchi
+rende inoltre le percentuali A/B dipendenti dalla dimensione, quindi non sono
+confrontabili ingenuamente tra x1/x2/x3. Lo sweep non identifica DPI/ppmm.
+
+Il prossimo esperimento minimo D279/42 sottrae il B0 no-finger pixel-per-pixel
+prima di `frame_minmax x2`, in entrambe le polarità, mantenendo il controllo
+D279/39. Questa ipotesi è corroborata dai pipeline background-subtraction nel
+corpus libfprint/Goodix, ma non è ancora evidenza target-specific. Evaluator e
+kit aggregate-only passano 31 test, build normale/ASan/UBSan e snapshot
+preflight senza USB. D279/35, D279/37 e D279/39 sono consumate; nessuna nuova
+lettura protetta, USB/live o retry è autorizzata.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1565,6 +1584,27 @@ CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
+
+### D279/40–D279/42 — result review, scale calibration e baseline-delta gate
+
+L'aggregate D279/39 autentico è preservato con digest
+`861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c` e
+validato fail-closed. `frame_minmax x2` discrimina la baseline nella quality-map
+ma non produce in alcun frame almeno 10 minutiae. Tale soglia appartiene alla
+computabilità Bozorth, non all'inserimento di un'immagine con almeno una
+minutia nel print libfprint.
+
+La calibrazione sintetica sul NBIS pinned chiude la falsa dicotomia tra mappa
+buona e pochi punti e mostra che A/B è sensibile alla geometria della mappa.
+Non consente di dedurre la scala fisica. Il successivo boundary D279/42 testa
+quindi il più piccolo preprocessing target-motivato ancora non misurato:
+sottrazione del baseline no-finger e min/max x2, senza fusion o enhancement.
+Il kit è completamente chiuso offline e attende un nuovo Human Gate sul full
+SHA per una sola protected evaluation.
+
+Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
+`analysis/D279/D279_41_synthetic_nbis_scale_calibration.md` e
+`analysis/D279/D279_42_baseline_delta_operator_boundary.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
