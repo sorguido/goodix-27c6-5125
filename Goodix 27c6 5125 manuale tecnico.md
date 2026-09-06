@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/10 — enrollment OEM completo target-local osservato
+### Stato corrente D279/30 — primo enrollment Linux live fermato da NBIS
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -86,22 +86,46 @@ descriptor e FDT12 borrowed mentre mantiene il solo owner fino a close.
 
 Quel collegamento D279/09 era volutamente bounded e respingeva enrollment.
 D279/10 attempt 02 ha poi misurato 21 stage OEM primari e D279/28 ha sostituito
-il gate storico con il binding production one-shot a 21 stage. Lo stato
-corrente ammette esclusivamente la prima action enrollment per open epoch;
-capture/identify production e ogni seconda action sono respinti prima del
-submit. Non è comunque autorizzata alcuna installazione, esecuzione fprintd o
-run live.
+il gate storico con il binding production one-shot a 21 stage. Quel candidate
+ammetteva esclusivamente la prima action enrollment per open epoch;
+capture/identify production e ogni seconda action erano respinti prima del
+submit. L'unica run D279/29 descritta sotto ha consumato la propria
+autorizzazione; nello stato corrente non è autorizzata alcuna installazione,
+esecuzione fprintd o nuova run live.
 
-D279/29 ha ora completato anche il solo operator boundary necessario alla
-prima prova: build effimero da snapshot dello SHA approvato, driver production
-con NBIS nativo, assenza delle seam sintetiche verificata, grant deterministico
-single-use e client libfprint con un open, una enrollment action,
-zero retry/seconda action/reopen, nessun salvataggio biometrico e close sempre
+D279/29 ha completato il solo operator boundary necessario alla prima prova:
+build effimero da snapshot dello SHA approvato, driver production con NBIS
+nativo, assenza delle seam sintetiche verificata, grant deterministico
+single-use e client libfprint con un open, una enrollment action, zero
+retry/seconda action/reopen, nessun salvataggio biometrico e close sempre
 tentato. Dopo la review, tutte le seam di open/claim/submit sono escluse a
 compile-time dal target production e un solo accessor read-only conserva la
-telemetria sanitizzata dopo il close. Il preflight compilato
-`UNAPPROVED_FOR_LIVE` si ferma prima di `FpContext` e USB. Resta soltanto il
-Human Gate sul full SHA; nessuna run live è autorizzata da questo stato.
+telemetria sanitizzata dopo il close.
+
+L'Utente ha poi autorizzato ed eseguito manualmente una sola run sulla baseline
+`f4f0436acb887d9724a0ee77b51975fe3e072f44`. L'autorizzazione è consumata e
+non abilita retry. Il percorso production ha identificato il solo device
+target, completato open, sessione secure, TLS e primo B0 primario, quindi ha
+consegnato il primo raster al vero NBIS Fedora 44/libfprint 1.94.100. NBIS ha
+restituito `No minutiae found`: zero stage completati, una progress error,
+cancellazione della stessa action, nessun retry/seconda action/reopen e close
+riuscito. Non esiste evidenza che attribuisca il failure all'operatore.
+
+La telemetria osserva backend drenato, nessun outstanding, claim rilasciato,
+owner liberato e secret TLS azzerato. I deadline restano safety bound
+host-side e non provano quiescenza device-side. L'assenza osservata delle
+famiglie persistenti note resta un guardrail del sender, non una prova
+dell'assenza di qualunque persistenza sensor-side.
+
+Il nuovo confine è biometric/image-quality: il raster corrente usa il mapping
+fisso `round(sample*255/4095)`, nessuna normalizzazione frame-local e
+`flags=0`; contrasto, polarità, orientamento, adeguatezza NBIS a 80×64 e
+qualità fisica del contatto non sono distinguibili dalla telemetria D279/29.
+Il prossimo boundary è quindi una verifica offline della fattibilità di
+ricostruire in memoria i raster reali già presenti, cifrati, in ATTEMPT02 e di
+valutare trasformazioni controllate senza persistere raster/template. Il PSK e
+ogni protected material restano fuori dall'autorizzazione corrente e
+costituiscono Human Gate separato.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -459,9 +483,9 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_EXACT_SHA_FOR_D279_29_ONE_SHOT_ENROLLMENT
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
-NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
+NEXT_LIVE_PREREQUISITE=NEW_TECHNICAL_HYPOTHESIS_THEN_OFFLINE_REVIEW_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
 
 ### D279/10 — Kit passivo per il primo enrollment OEM completo
@@ -1030,7 +1054,7 @@ regressioni D276/04 5/5, D277/A8 15/15 e D278/02 63/63 passano normali e
 ASan/UBSan, con live harness soltanto compilati e `REAL_USB_ACCESS=0`.
 
 ```text
-D279_29_OUTCOME=READY_FOR_HUMAN_GATE
+D279_29_OUTCOME=LIVE_EXECUTED_FAIL_CLOSED_NO_MINUTIAE_FIRST_STAGE
 D279_29_OPERATOR_EXECUTABLE_CLOSURE=PASS_OFFLINE
 D279_29_EXACT_TARGET_LIBFPRINT=1.94.100
 D279_29_EXTRACTOR=NBIS_NATIVE
@@ -1045,14 +1069,82 @@ D279_29_BIOMETRIC_TEMPLATE_SAVED=false
 D279_29_KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
 D279_29_SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 D279_29_DEVICE_SIDE_QUIESCENCE_INFERRED=false
-D279_29_REAL_USB_ENUMERATION_ATTEMPTED=false
-D279_29_LIVE_EXECUTION_PERFORMED=false
+D279_29_REAL_USB_ENUMERATION_ATTEMPTED=true
+D279_29_LIVE_EXECUTION_PERFORMED=true
+D279_29_LIVE_BASELINE=f4f0436acb887d9724a0ee77b51975fe3e072f44
+D279_29_LIVE_AUTHORIZATION_CONSUMED=true
+D279_29_RERUN_AUTHORIZED=false
+D279_29_TARGET_DRIVER_MATCH_COUNT=1
+D279_29_OPEN_SUCCEEDED=true
+D279_29_TLS_HANDSHAKE_COUNT=1
+D279_29_PRIMARY_B0_COUNT=1
+D279_29_COMPLETED_STAGE_COUNT=0
+D279_29_PROGRESS_ERROR_COUNT=1
+D279_29_NBIS_RESULT=NO_MINUTIAE_FOUND
+D279_29_CLOSE_SUCCEEDED=true
+D279_30_OUTCOME=READY_POST_LIVE_EVIDENCE_CLOSED
+D279_30_PRODUCTION_USB_TO_NATIVE_NBIS_LIVE_PROVEN=true
+D279_30_OPERATOR_ERROR_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_EXACT_SHA_FOR_D279_29_ONE_SHOT_ENROLLMENT
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
 ```
 
 Kit: `operator_kit/d279-29-one-shot-enrollment/`. Report:
 `analysis/D279/D279_29_one_shot_enrollment_operator_kit.md`.
+
+### D279/30 — recovery post-live e failure NBIS al primo stage
+
+La run manuale D279/29 sulla baseline approvata
+`f4f0436acb887d9724a0ee77b51975fe3e072f44` è stata assorbita come evidenza
+target-local. Gli output sanitizzati sono preservati byte-identici in
+`captures/D279_29/D27929_20260906_LIVE/sanitized/`: `operator.log` ha SHA-256
+`85348fe527e5d2373734fa288604c7a569ec1f3e5bc61c10acf8952a83178727` e
+`summary.env` ha SHA-256
+`9a7c9ff13976e324f3eaa6cb2f3b0628bbf36ce5467a876eea94ddd35022a9fb`.
+
+È osservato un solo match driver, open riuscito, una sola action, handshake TLS,
+un B0 primario e consegna al vero path NBIS. La prima detection termina con
+`No minutiae found`; nessuno dei 21 stage avanza. Il client cancella la stessa
+action, non ritenta, non esegue una seconda action o reopen e chiude con
+successo. Nessuna evidenza disponibile prova un errore di posa dell'operatore.
+
+I contatori sanitizzati osservano zero reset/clear-halt e zero famiglie
+persistenti note, backend drenato, zero outstanding, claim rilasciato, owner
+liberato e secret azzerato. Non ne segue una prova di quiescenza o timeout
+device-side, né dell'assenza di qualunque persistenza sensor-side.
+
+Il nuovo boundary non è più il wiring USB, ma la qualità della rappresentazione
+fornita a NBIS. Il mapping production è fixed full-range 12→8 bit, senza
+normalizzazione frame-local e senza flag di inversione/flip. Il solo risultato
+zero-minutiae non discrimina contrasto, polarità, orientamento, limite NBIS
+80×64 o qualità del contatto. Nessun corrective production è quindi applicato
+in D279/30.
+
+Il prossimo step è la fattibilità offline di una ricostruzione in-memory e
+privacy-preserving dei raster ATTEMPT02, con output solo aggregato. Il pcap OEM
+contiene TLS 1.2 PSK cifrato; accesso al PSK/protected material e qualunque
+nuova run restano Human Gate separati e non autorizzati.
+
+```text
+D279_30_OUTCOME=READY_POST_LIVE_EVIDENCE_CLOSED
+ADVANCEMENT=NEW_TARGET_REAL_PRODUCTION_USB_TO_NATIVE_NBIS_BOUNDARY_REACHED
+EXECUTABLE_CLOSURE=NOT_APPLICABLE_EVIDENCE_INTEGRATION
+D279_29_LIVE_AUTHORIZATION_CONSUMED=true
+D279_29_RERUN_AUTHORIZED=false
+PRODUCTION_USB_TO_FIRST_PRIMARY_B0_LIVE_PROVEN=true
+PRODUCTION_FIRST_RASTER_TO_NATIVE_NBIS_LIVE_PROVEN=true
+TARGET_REAL_MINUTIAE_COUNT=0
+OPERATOR_ERROR_PROVEN=false
+KNOWN_PERSISTENT_FAMILY_OBSERVED_COUNT=0
+SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
+DEVICE_SIDE_TIMEOUT_OR_QUIESCENCE_INFERRED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report e audit macchina:
+`analysis/D279/D279_30_post_29_live_failure_recovery.md` e
+`analysis/D279/D279_30_post_29_live_failure_audit.json`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
