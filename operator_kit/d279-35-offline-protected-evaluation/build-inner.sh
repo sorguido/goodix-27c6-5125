@@ -31,7 +31,21 @@ if grep -E 'goodix_fpimage_device_new_for_usb|g_usb_|fp_context_(new|enumerate)'
 fi
 helper="$build_dir/tests/test-goodix-nbis-count-pipe"
 test -f "$helper" && test ! -L "$helper"
-ldd "$helper" | grep -F "$build_dir/libfprint/libfprint-2.so.2" >/dev/null
+
+# The helper pulls the pinned NBIS implementation into the executable from the
+# build tree's static archives. With the toolchain's default --as-needed
+# behaviour, the shared libfprint object can legitimately disappear from
+# DT_NEEDED, so an ldd dependency on libfprint-2.so is not a valid closure
+# invariant. Verify the material dependency directly instead: the expected NBIS
+# entry points/data must be defined in the helper and must not remain unresolved.
+if nm -u "$helper" | grep -Eq '(^|[[:space:]])(get_minutiae|free_minutiae|g_lfsparms_V2)$'; then
+  echo "NBIS helper leaves pinned NBIS symbols unresolved" >&2
+  exit 1
+fi
+nm "$helper" | grep -Eq '[[:space:]][Tt][[:space:]]get_minutiae$'
+nm "$helper" | grep -Eq '[[:space:]][Tt][[:space:]]free_minutiae$'
+nm "$helper" | grep -Eq '[[:space:]][RrDdBb][[:space:]]g_lfsparms_V2$'
+
 cp "$helper" "$output_dir/d279_nbis_count.pending"
 chmod 0600 "$output_dir/d279_nbis_count.pending"
 
