@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/36 — aggregate autentico revisionato, resize spaziale selezionato
+### Stato corrente D279/37 — resize spaziale chiuso offline, Human Gate protected
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -205,6 +205,33 @@ differiti fino a questa misura più piccola.
 
 L'autorizzazione D279/35 è consumata. Nessuna nuova lettura protetta, USB, live
 o retry è autorizzata.
+
+D279/37 ha ora implementato e chiuso sinteticamente il resize spaziale scelto.
+La matrice minima mantiene identity/normal, combina i tre mapping D279/34 con
+fattori 1/2/3 e conserva solo aggregati 1+21+21. Il fattore 1 bypassa
+l'interpolazione come controllo D279/35; 2 e 3 invocano direttamente il
+`fpi_image_resize()` bilineare del tree libfprint 1.94.100 pinned prima dello
+stesso NBIS.
+
+Il primo build Goodix-only ha mostrato fail-closed che pixman non è abilitato
+per il driver production corrente. L'esperimento offline usa pertanto il
+feature switch già richiesto da AES3500 e pinna runtime e header pixman 0.46.4
+dalla stessa SDK Flatpak. Questo non modifica né abilita il resize nel percorso
+Goodix production: un eventuale risultato positivo richiederà una separata
+decisione di integrazione Meson/driver.
+
+Il target è test-only e non installato; helper e runner non hanno entry point
+USB. Ventisei test Python e build normale/ASan/UBSan sono verdi, così come il
+preflight end-to-end del kit. Nessuna seam sintetica nuova è raggiungibile dal
+percorso USB production. I timeout della pipe sono safety bound host-side
+offline e non implicano proprietà device-side. Sender e allowlist persistente
+restano invariati.
+
+La prosecuzione utile richiede ora un nuovo Human Gate sul full SHA per una
+sola `D279_37_ONE_OFFLINE_PROTECTED_SPATIAL_RESIZE_EVALUATION`. L'operazione
+leggerebbe una volta il transport protetto e userebbe in memoria i 43 raster
+ATTEMPT02 già acquisiti, senza USB/live, retry, seconda lettura o persistenza
+di raster/template. Non è autorizzata nello stato corrente.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1414,6 +1441,37 @@ CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_36_authentic_aggregate_review.md`.
+
+### D279/37 — resize spaziale pinned e operator boundary
+
+Il helper test-only `test-goodix-nbis-resize-count-pipe` riceve frame nativi
+via pipe. Fattore 1 percorre l'esatto controllo NBIS D279/34; fattori 2/3 usano
+il resize pixman bilineare del tree libfprint 1.94.100. La matrice autentica
+futura comprende soltanto 3 mapping × 3 fattori con identity/normal, separando
+l'ipotesi spaziale dalle variabili già non dominanti in D279/35.
+
+Il kit `operator_kit/d279-37-offline-protected-spatial-resize/` costruisce da
+snapshot del futuro SHA approvato, pinna helper, capture, interpretatori e
+pixman 0.46.4 della SDK. Usa operation, grant id, marker e result namespace
+distinti dal D279/35 consumato. Il marker viene consumato prima della lettura
+protetta e l'output resta aggregate-only.
+
+```text
+D279_37_OUTCOME=READY_FOR_HUMAN_GATE_ONE_OFFLINE_PROTECTED_SPATIAL_RESIZE_EVALUATION
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_AND_OPERATOR_BOUNDARY_REACHED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_ONLY
+D279_31_THROUGH_D279_37_PYTHON_TESTS=26/26_PASS
+D279_37_EXACT_TARGET_LIBFPRINT=1.94.100
+D279_37_PINNED_PIXMAN=0.46.4
+D279_37_NORMAL_AND_ASAN_UBSAN=PASS
+D279_37_OPERATOR_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D279_35_AUTHORIZATION_CONSUMED=true
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OFFLINE_PROTECTED_SPATIAL_RESIZE_EVALUATION
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_37_spatial_resize_operator_boundary.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
