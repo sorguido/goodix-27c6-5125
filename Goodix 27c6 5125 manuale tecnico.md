@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/46 — matrice half-wave/polarità pronta, Human Gate protected
+### Stato corrente D279/47 — D279/46 autentica, replan biometrico NBIS↔SIGFM
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -323,9 +323,26 @@ riprodurre esattamente l'aggregate D279/44 digest-pinned o la run fallisce.
 Evaluator e kit aggregate-only passano 43 test, build normale/ASan/UBSan,
 snapshot preflight, source/symbol seam checks e percorso end-to-end su raster
 sintetici non protetti. Nessun entry point USB è raggiungibile dal helper;
-production, sender e allowlist sono invariati. Il prossimo confine è un nuovo
-Human Gate sul full SHA per una sola protected evaluation offline. Le deadline
-della pipe sono safety bound host-side e non implicano quiescenza device-side.
+production, sender e allowlist sono invariati. Le deadline della pipe sono
+safety bound host-side e non implicano quiescenza device-side.
+
+L'operatore ha poi eseguito una sola D279/46 sulla baseline
+`9a7162879ffc656197daa2fa54dea0670f45be74`. Il summary autentico, SHA-256
+`7dfb2feab05a11b01830903c773211d811f5b9a55aac35bd478fd57e4707f90b`, è
+preservato byte-per-byte. Il controllo signed riproduce esattamente D279/44:
+10/42 frame fingerprint con minutiae nel tier NBIS B/A e 2/42 nel tier A.
+Il complemento dark-on-white della half-wave `frame > baseline` resta 1/0;
+quello di `baseline > frame` resta 9 nel tier B/A e sale soltanto da 1 a 2 nel
+tier A. La polarità non produce quindi un rescue materiale.
+
+La review D279/47 ferma il parameter search per trasformazioni semplicemente
+plausibili. `NBIS_PIPELINE_COMPATIBLE=true` resta valido per il contratto
+strutturale Fedora 44/libfprint 1.94.100, ma la suitability biometrica passa da
+mancanza neutra di validazione a `CHALLENGED_BY_TARGET_EVIDENCE`. NBIS non è
+dichiarato inadatto e SIGFM non è selezionato: il nuovo discriminante è un
+confronto sullo stesso input tra checkpoint immagine Rockytkg R1/R2 e gli
+extractor NBIS/SIGFM, senza tuning. D279/46 e tutte le precedenti
+autorizzazioni protected sono consumate; protected e live correnti sono false.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1629,7 +1646,7 @@ CURRENT_LIVE_AUTHORIZED=false
 
 Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
 
-### D279/40–D279/46 — quality review e matrice half-wave/polarità
+### D279/40–D279/47 — quality review, matrice half-wave e replan biometrico
 
 L'aggregate D279/39 autentico è preservato con digest
 `861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c` e
@@ -1648,7 +1665,9 @@ D279/44 è stato poi eseguito una sola volta. La review D279/45 accetta
 l'aggregate autentico ma identifica il confondimento supporto×polarità delle
 due half-wave; il gate D279/44 è consumato e non autorizza ulteriori letture.
 D279/46 completa offline la matrice con i due complementi mancanti e prepara
-un nuovo boundary one-shot aggregate-only, senza modifiche production.
+un nuovo boundary one-shot aggregate-only, senza modifiche production. La run
+autentica non mostra rescue materiale dalla polarità; D279/47 chiude quindi il
+parameter search e riapre D279/02 esclusivamente sulla suitability biometrica.
 
 Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
 `analysis/D279/D279_41_synthetic_nbis_scale_calibration.md`,
@@ -1656,7 +1675,8 @@ Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
 `analysis/D279/D279_43_authentic_baseline_delta_review.md` e
 `analysis/D279/D279_44_halfwave_delta_operator_boundary.md` e
 `analysis/D279/D279_45_authentic_halfwave_delta_review.md` e
-`analysis/D279/D279_46_halfwave_output_polarity_boundary.md`.
+`analysis/D279/D279_46_halfwave_output_polarity_boundary.md` e
+`analysis/D279/D279_47_authentic_halfwave_polarity_review.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

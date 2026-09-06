@@ -1,6 +1,27 @@
 <!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
 # D279/02 — decisione offline di compatibilità extractor NBIS vs SIGFM
 
+## Aggiornamento D279/47 — suitability biometrica riaperta
+
+La decisione storica sotto resta valida come scelta architetturale basata sul
+target Fedora 44/libfprint 1.94.100: NBIS è strutturalmente compatibile e
+SIGFM richiede un fork. D279/29 e D279/39–46 aggiungono però evidenza autentica
+che D279/02 non possedeva: sui frammenti APP12509 80×64 il path live non trova
+minutiae e i migliori preprocessori controllati restano troppo poveri per
+provare Bozorth/enrollment robusti.
+
+La suitability biometrica NBIS è quindi formalmente riaperta, senza dichiarare
+NBIS inadatto e senza selezionare SIGFM. Il prossimo boundary confronta NBIS e
+SIGFM sugli stessi raster prodotti dai checkpoint R1/R2 della pipeline
+Rockytkg preservata, senza tuning e con output aggregate-only.
+
+```text
+NBIS_PIPELINE_COMPATIBLE=true
+NBIS_BIOMETRICALLY_VALIDATED=false
+NBIS_BIOMETRIC_SUITABILITY=CHALLENGED_BY_TARGET_EVIDENCE_PENDING_CONTROLLED_COMPARISON
+EXTRACTOR_DECISION=UNDER_BIOMETRIC_REVIEW_ARCHITECTURAL_BASELINE_NBIS_UNCHANGED
+```
+
 ## Esito
 
 ```text
