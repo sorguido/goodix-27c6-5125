@@ -313,3 +313,35 @@ GPL. Le view secure sono descrittori non-owning del singolo
 esistente il cleanse di PSK, validator e CONFIG90. Il test usa cinque file
 sintetici temporanei e un validator calcolato dal binder LGPL già verificato;
 nessun input autentico viene letto.
+
+## D279/48 — confronto host-only Rockytkg / NBIS / SIGFM
+
+`analysis/D279/d279_48_rocky_imgproc_pipe.c`, il relativo header, evaluator,
+operator kit e report sono nel dominio `GPL-2.0-or-later`. Il binario
+preprocessor compila direttamente, senza copia nel driver production, i file
+GPL `Rockytkg/src/goodix_imgproc.c` e
+`Rockytkg/include/goodix_imgproc.h` dal commit preservato
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`. La destinazione è esclusivamente
+un processo host-only dell'esperimento protetto; nessuna espressione Rocky
+entra in `libfprint-driver/` production.
+
+`libfprint-driver/tests/test_goodix_nbis_pair_pipe.c` è un target test-only
+non installato `LGPL-2.1-or-later`. La conversione minutiae→XYT è tratta dal
+file LGPL `reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.c`
+della reference Fedora 44 pinned; il resto è adapter locale per le API NBIS e
+Bozorth dello stesso tree. La destinazione resta test/comparator, non modifica
+il driver.
+
+`libfprint-driver/tests/test_goodix_sigfm_pair_pipe.cpp` è adapter test-only
+`LGPL-2.1-or-later`. Collega direttamente l'implementazione SIGFM del fork
+libfprint materializzato, commit
+`7ebe0c809b4d1df3400e84299a4ec4acdea84590`, conservandone copyright e licenza
+LGPL-2.1-or-later, e gli RPM Fedora OpenCV 4.13.0 soggetti alle rispettive
+licenze di pacchetto. Descriptor e template restano soltanto in memoria del
+processo e non vengono esportati.
+
+Il confronto non importa `goodixgf.c`, lifecycle, protocollo, USB, firmware,
+PSK provisioning o scritture persistenti Rocky. I fatti osservati nello
+snapshot sono corroborativi e non vengono elevati a prova APP12509. Un futuro
+uso production di preprocessing GPL o SIGFM richiederà una distinta decisione
+architetturale/licensing; D279/48 non la anticipa.

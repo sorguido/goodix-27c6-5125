@@ -1,6 +1,29 @@
 <!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
 # D279/02 — decisione offline di compatibilità extractor NBIS vs SIGFM
 
+## Aggiornamento D279/48 — esperimento discriminante pronto al gate
+
+D279/48 ha chiuso offline l'evaluator richiesto senza cambiare la selection
+production. R1 compila direttamente il preprocessing comune Rockytkg
+preservato; R2 aggiunge soltanto il suo enhancement SIGFM-specifico. A ogni
+checkpoint NBIS e SIGFM ricevono lo stesso raster nativo 80×64 e producono
+solo aggregati di feature, gate e score same-session bidirezionali.
+
+La decisione biometrica resta aperta fino a una singola valutazione protetta
+ATTEMPT02 e alla successiva classificazione A/B/C/D. In particolare, la
+presenza tecnica di SIGFM/OpenCV nel comparator host-only non costituisce una
+selezione production o un'autorizzazione a trasferire codice GPL nel driver
+LGPL.
+
+```text
+NBIS_PIPELINE_COMPATIBLE=true
+NBIS_BIOMETRIC_SUITABILITY=CHALLENGED_BY_TARGET_EVIDENCE_PENDING_CONTROLLED_COMPARISON
+EXTRACTOR_DECISION=UNDER_BIOMETRIC_REVIEW_ARCHITECTURAL_BASELINE_NBIS_UNCHANGED
+D279_48_COMPARISON_EXECUTABLE_CLOSURE=PASS_OFFLINE
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+CURRENT_LIVE_AUTHORIZED=false
+```
+
 ## Aggiornamento D279/47 — suitability biometrica riaperta
 
 La decisione storica sotto resta valida come scelta architetturale basata sul

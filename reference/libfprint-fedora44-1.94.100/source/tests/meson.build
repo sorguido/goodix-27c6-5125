@@ -337,6 +337,13 @@ if 'goodix_27c6_5125' in drivers and cairo_dep.found()
         c_args: common_cflags + ['-Wno-error=redundant-decls'],
         install: false,
     )
+
+    goodix_nbis_pair_pipe = executable('test-goodix-nbis-pair-pipe',
+        sources: '../../../../libfprint-driver/tests/test_goodix_nbis_pair_pipe.c',
+        dependencies: libfprint_private_dep,
+        c_args: common_cflags + ['-Wno-error=redundant-decls'],
+        install: false,
+    )
 endif
 
 unit_tests = [

@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/47 — D279/46 autentica, replan biometrico NBIS↔SIGFM
+### Stato corrente D279/48 — confronto Rockytkg/NBIS/SIGFM pronto al gate protetto
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -343,6 +343,30 @@ dichiarato inadatto e SIGFM non è selezionato: il nuovo discriminante è un
 confronto sullo stesso input tra checkpoint immagine Rockytkg R1/R2 e gli
 extractor NBIS/SIGFM, senza tuning. D279/46 e tutte le precedenti
 autorizzazioni protected sono consumate; protected e live correnti sono false.
+
+D279/48 ha ora chiuso offline l'esperimento discriminante, senza modificare il
+percorso production. L'audit del codice preservato conferma che Rockytkg usa
+una vera no-finger baseline 80×64 e tratta ogni pressione 80×64 come campione
+autonomo di un template multi-sample, senza resize o image fusion. La pipeline
+comune è `clamp(2048+raw-baseline)` → flat-field r12 → percentile 1/99; il
+solo stadio SIGFM-specifico è unsharp boost 0,8/sigma 1,5.
+
+Il comparator compila direttamente i sorgenti Rockytkg/SIGFM preservati e il
+NBIS/Bozorth Fedora 44 libfprint 1.94.100. R1 e R2 consegnano lo stesso identico
+raster nativo 80×64 a entrambi gli extractor e aggregano feature, gate e score
+same-session nelle due direzioni, senza esportare dati biometrici per-frame.
+Ventisei test, build dei tre helper, KAT, seam audit ed end-to-end sintetico
+sono verdi; preprocessor e NBIS passano anche ASan/UBSan. Nessuna seam
+host-only è raggiungibile dal percorso USB production. Il limite temporale del
+kit è un safety bound host-side e non implica quiescenza device-side.
+
+ATTEMPT02 resta un solo contesto sessione/dito, senza negative o
+different-finger control; non consente FAR/FRR, accuratezza o validazione di
+soglie production. Il suo B0 resta una baseline sperimentale, non una prova di
+equivalenza con la vera no-finger baseline Rocky. D279/02 resta strutturalmente
+NBIS ma biometricamente sotto review. Il prossimo confine è il Human Gate su
+SHA completo per una sola lettura protected offline D279/48, zero USB/live e
+zero retry. Nessuna autorizzazione è attualmente attiva.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1646,7 +1670,7 @@ CURRENT_LIVE_AUTHORIZED=false
 
 Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
 
-### D279/40–D279/47 — quality review, matrice half-wave e replan biometrico
+### D279/40–D279/48 — quality review, matrice half-wave e confronto biometrico
 
 L'aggregate D279/39 autentico è preservato con digest
 `861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c` e
@@ -1668,6 +1692,10 @@ D279/46 completa offline la matrice con i due complementi mancanti e prepara
 un nuovo boundary one-shot aggregate-only, senza modifiche production. La run
 autentica non mostra rescue materiale dalla polarità; D279/47 chiude quindi il
 parameter search e riapre D279/02 esclusivamente sulla suitability biometrica.
+D279/48 compila poi la pipeline Rockytkg esatta e costruisce il confronto
+same-input R1/R2 tra NBIS e SIGFM, con score aggregati bidirezionali e kit
+one-shot protetto. La decisione A/B/C/D resta sospesa fino all'evidenza
+autentica; production, sender e allowlist non cambiano.
 
 Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
 `analysis/D279/D279_41_synthetic_nbis_scale_calibration.md`,
@@ -1676,7 +1704,8 @@ Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
 `analysis/D279/D279_44_halfwave_delta_operator_boundary.md` e
 `analysis/D279/D279_45_authentic_halfwave_delta_review.md` e
 `analysis/D279/D279_46_halfwave_output_polarity_boundary.md` e
-`analysis/D279/D279_47_authentic_halfwave_polarity_review.md`.
+`analysis/D279/D279_47_authentic_halfwave_polarity_review.md` e
+`analysis/D279/D279_48_rocky_nbis_sigfm_comparison_boundary.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
