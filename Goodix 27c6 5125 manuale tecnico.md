@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/37 — resize spaziale chiuso offline, Human Gate protected
+### Stato corrente D279/38 — ordine ruoli corretto, quality discriminator offline
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -227,11 +227,34 @@ percorso USB production. I timeout della pipe sono safety bound host-side
 offline e non implicano proprietà device-side. Sender e allowlist persistente
 restano invariati.
 
-La prosecuzione utile richiede ora un nuovo Human Gate sul full SHA per una
-sola `D279_37_ONE_OFFLINE_PROTECTED_SPATIAL_RESIZE_EVALUATION`. L'operazione
-leggerebbe una volta il transport protetto e userebbe in memoria i 43 raster
-ATTEMPT02 già acquisiti, senza USB/live, retry, seconda lettura o persistenza
-di raster/template. Non è autorizzata nello stato corrente.
+L'Utente ha poi autorizzato ed eseguito una sola
+`D279_37_ONE_OFFLINE_PROTECTED_SPATIAL_RESIZE_EVALUATION` sulla baseline
+`f9a63db71799aa337e6d4856cfc731abac23f5a5`. Il grant è consumato: nessun
+retry, seconda lettura protetta o accesso USB/live è autorizzato. Il riscontro
+testuale attesta che minmax x3 produce 38/42 frame fingerprint con minutiae,
+4/42 sopra soglia 10 e massimo 19 contro baseline 1; robust x3 produce ancora
+38/42 e 7/42 sopra soglia, ma baseline 8. Il `summary.json` autentico dichiarato
+nel riscontro non è disponibile nel workspace e questi numeri restano quindi
+`USER_ATTESTED`, non un JSON autenticato.
+
+La review PM D279/38 ha scoperto un errore precedente più fondamentale. I 43
+TLS application record seguono l'ordine di cattura provato da D279/10 e D279/31:
+`baseline,(primary,auxiliary)*21`. D279/34 e D279/37 li etichettavano invece
+come tre blocchi contigui. I vecchi gruppi “primary” e “auxiliary” contengono
+rispettivamente 11+10 e 10+11 frame dei due ruoli: tutte le statistiche
+role-specific D279/35 e D279/37 sono invalidate. Restano valide solo le
+proprietà dell'insieme complessivo dei 42 frame fingerprint e il confronto con
+la baseline. Gli evaluator condivisi ora applicano l'alternanza corretta; i kit
+storici e i grant consumati non vengono riscritti o riutilizzati.
+
+Il prossimo lavoro è ancora offline: costruire e chiudere sinteticamente un
+evaluator correct-role che, sui candidati minmax x3 e sui controlli artefatto,
+aggreghi quality-map NBIS e soglie di reliability oltre al conteggio totale.
+L'incertezza da chiudere è se il segnale spaziale sia sostenuto da struttura
+A/B e minutiae affidabili oppure riproduca falsi positivi della baseline. Solo
+dopo review e pubblicazione di quel boundary sarà formulabile un nuovo Human
+Gate separato. Fusion primary/auxiliary, matching e modifica production restano
+fuori scope.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1472,6 +1495,38 @@ CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_37_spatial_resize_operator_boundary.md`.
+
+### D279/38 — corrective ordine ruoli TLS → raster
+
+La review metadata-only collega l'identità già provata fra i 43 TLS application
+record e i 43 B0 fingerprint-shape alle 21 righe primarie D279/10. La sequenza
+esatta è `baseline,(primary,auxiliary)*21`: per ogni ciclo il B0 dopo `0x22`
+precede quello dopo `0x20`. La vecchia partizione contigua usata da D279/34 e
+D279/37 mescolava quindi i ruoli 11/10 e 10/11.
+
+Gli evaluator condivisi sono corretti e i test fissano esplicitamente il nuovo
+contratto. Le statistiche D279/35 e D279/37 separate per primary/auxiliary sono
+superate; rimangono valide soltanto le proprietà invarianti sull'insieme dei 42
+frame fingerprint. Il risultato D279/35 autentico resta preservato senza
+riscritture. Per D279/37 è disponibile solo il riscontro testuale hashato,
+mentre il `summary.json` autentico non è presente: i numeri sono
+`USER_ATTESTED`. Entrambe le autorizzazioni protette sono consumate.
+
+```text
+D279_38_OUTCOME=ROLE_ORDER_ERROR_CONFIRMED_AND_CORRECTED_OFFLINE
+ADVANCEMENT=NEW_PROTOCOL_TO_EVALUATOR_MAPPING_EVIDENCE
+EXECUTABLE_CLOSURE=PASS_METADATA_AUDIT_AND_SYNTHETIC_ROLE_TESTS
+CORRECT_TARGET_ROLE_ORDER=baseline,(primary,auxiliary)*21
+D279_35_ROLE_SPECIFIC_AGGREGATES_VALID=false
+D279_37_ROLE_SPECIFIC_ATTESTED_AGGREGATES_VALID=false
+D279_37_AUTHENTIC_SUMMARY_JSON_AVAILABLE=false
+D279_37_AUTHORIZATION_CONSUMED=true
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_CORRECT_ROLE_NBIS_QUALITY_EVALUATOR
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_38_target_role_order_corrective.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

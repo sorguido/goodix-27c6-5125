@@ -94,6 +94,13 @@ class SpatialResizeEvaluatorTests(unittest.TestCase):
         self.assertEqual(
             result["frame_roles"], {"baseline": 1, "primary": 21, "auxiliary": 21}
         )
+        self.assertEqual(
+            D37.TARGET_RASTER_ROLES[:7],
+            ("baseline", "primary", "auxiliary", "primary", "auxiliary",
+             "primary", "auxiliary"),
+        )
+        self.assertEqual(D37.TARGET_RASTER_ROLES[-2:],
+                         ("primary", "auxiliary"))
         self.assertEqual(len(runner.calls), 9 * 43)
 
     def test_invalid_scale_output_is_cleansed_and_rejected(self):

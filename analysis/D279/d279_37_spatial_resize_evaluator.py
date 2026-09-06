@@ -16,6 +16,9 @@ WIDTH = 80
 HEIGHT = 64
 PIXELS = WIDTH * HEIGHT
 ROLES = ("baseline", "primary", "auxiliary")
+TARGET_RASTER_ROLES = (
+    "baseline",
+) + tuple(role for _cycle in range(21) for role in ("primary", "auxiliary"))
 INTENSITY_SCALES = ("fixed_12bit", "frame_minmax", "robust_p01_p99")
 SPATIAL_FACTORS = (1, 2, 3)
 
@@ -183,9 +186,9 @@ def evaluate_target_attempt(
     scale_raster: ScaleRaster,
 ) -> dict:
     require(len(rasters) == 43, "TARGET_RASTER_COUNT")
-    roles = ("baseline",) + ("primary",) * 21 + ("auxiliary",) * 21
     return evaluate(
-        (Frame(role, raster) for role, raster in zip(roles, rasters)),
+        (Frame(role, raster)
+         for role, raster in zip(TARGET_RASTER_ROLES, rasters)),
         runner,
         scale_raster,
     )

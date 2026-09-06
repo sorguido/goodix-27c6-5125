@@ -1,5 +1,11 @@
 # D279/36 — review dell'aggregate autentico D279/35
 
+> **Corrective D279/38:** l'ordine reale dei raster è
+> `baseline,(primary,auxiliary)*21`, non tre blocchi contigui. Le statistiche
+> separate primary/auxiliary qui riportate sono quindi superate. Restano valide
+> solo le conclusioni invarianti sulla partizione complessiva dei 42 B0
+> fingerprint; si veda `D279_38_target_role_order_corrective.md`.
+
 ## Decisione PM
 
 Il risultato autentico D279/35 è accettato come evidenza aggregate-only della

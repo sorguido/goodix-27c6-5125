@@ -23,6 +23,9 @@ WIDTH = 80
 HEIGHT = 64
 PIXELS = WIDTH * HEIGHT
 ROLES = ("baseline", "primary", "auxiliary")
+TARGET_RASTER_ROLES = (
+    "baseline",
+) + tuple(role for _cycle in range(21) for role in ("primary", "auxiliary"))
 SCALES = ("fixed_12bit", "frame_minmax", "robust_p01_p99")
 ORIENTATIONS = (
     "identity", "hflip", "vflip", "rot180",
@@ -237,7 +240,7 @@ def evaluate(frames: Iterable[Frame], runner: CountRunner) -> dict:
 def evaluate_target_attempt(rasters: Sequence[Sequence[int]],
                             runner: CountRunner) -> dict:
     require(len(rasters) == 43, "TARGET_RASTER_COUNT")
-    roles = ("baseline",) + ("primary",) * 21 + ("auxiliary",) * 21
     return evaluate(
-        (Frame(role, raster) for role, raster in zip(roles, rasters)), runner
+        (Frame(role, raster)
+         for role, raster in zip(TARGET_RASTER_ROLES, rasters)), runner
     )

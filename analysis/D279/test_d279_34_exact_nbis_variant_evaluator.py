@@ -92,6 +92,13 @@ class ExactNbisVariantEvaluatorTests(unittest.TestCase):
         self.assertEqual(result["frame_roles"], {
             "baseline": 1, "primary": 21, "auxiliary": 21,
         })
+        self.assertEqual(
+            EVALUATOR.TARGET_RASTER_ROLES[:7],
+            ("baseline", "primary", "auxiliary", "primary", "auxiliary",
+             "primary", "auxiliary"),
+        )
+        self.assertEqual(EVALUATOR.TARGET_RASTER_ROLES[-2:],
+                         ("primary", "auxiliary"))
         self.assertEqual(len(runner.calls), 48 * 43)
 
 

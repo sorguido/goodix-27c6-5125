@@ -1,5 +1,11 @@
 # D279/37 — resize spaziale pinned e operator boundary
 
+> **Corrective D279/38:** la run storica su questo SHA ha usato una partizione
+> contigua errata dei ruoli. L'ordine provato è
+> `baseline,(primary,auxiliary)*21`. Le statistiche separate per ruolo della run
+> non sono valide; restano utilizzabili soltanto gli aggregati invarianti sui 42
+> frame fingerprint complessivi. Il grant D279/37 resta consumato.
+
 ## Obiettivo e ipotesi
 
 D279/37 isola la più piccola ipotesi ancora discriminante dopo l'aggregate
