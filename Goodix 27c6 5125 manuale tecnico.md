@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/30 — primo enrollment Linux live fermato da NBIS
+### Stato corrente D279/31 — ricostruzione TLS OEM fattibile, PSK gated
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -126,6 +126,16 @@ ricostruire in memoria i raster reali già presenti, cifrati, in ATTEMPT02 e di
 valutare trasformazioni controllate senza persistere raster/template. Il PSK e
 ogni protected material restano fuori dall'autorizzazione corrente e
 costituiscono Human Gate separato.
+
+D279/31 ha ora chiuso quella fattibilità senza leggere il PSK. Il pcap hash-gated
+contiene l'intera handshake TLS 1.2 pure-PSK con suite `0x00a8`, entrambe le
+CCS/Finished e 43 record application-data device→host in sequenza completa.
+Client/server random, nonce espliciti, header e numerazione record sono
+disponibili; l'unico input crittografico mancante è la PSK target protetta.
+Non serve quindi una nuova action hardware per ottenere i raster OEM esistenti.
+Prima del Human Gate resta consentito costruire e validare sinteticamente un
+evaluator in-memory fail-closed; l'esecuzione autentica dovrà fermarsi prima
+della lettura PSK finché non sarà specificamente autorizzata.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -483,7 +493,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
+NEXT_PRIMARY_BOUNDARY=OFFLINE_IN_MEMORY_TLS_PSK_DECRYPTION_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=NEW_TECHNICAL_HYPOTHESIS_THEN_OFFLINE_REVIEW_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -1082,11 +1092,8 @@ D279_29_COMPLETED_STAGE_COUNT=0
 D279_29_PROGRESS_ERROR_COUNT=1
 D279_29_NBIS_RESULT=NO_MINUTIAE_FOUND
 D279_29_CLOSE_SUCCEEDED=true
-D279_30_OUTCOME=READY_POST_LIVE_EVIDENCE_CLOSED
-D279_30_PRODUCTION_USB_TO_NATIVE_NBIS_LIVE_PROVEN=true
-D279_30_OPERATOR_ERROR_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_29=D279_30_POST_LIVE_EVIDENCE_INTEGRATION
 ```
 
 Kit: `operator_kit/d279-29-one-shot-enrollment/`. Report:
@@ -1138,13 +1145,54 @@ OPERATOR_ERROR_PROVEN=false
 KNOWN_PERSISTENT_FAMILY_OBSERVED_COUNT=0
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 DEVICE_SIDE_TIMEOUT_OR_QUIESCENCE_INFERRED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_30=OFFLINE_ATTEMPT02_PRIVACY_PRESERVING_RASTER_RECONSTRUCTION_FEASIBILITY
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report e audit macchina:
 `analysis/D279/D279_30_post_29_live_failure_recovery.md` e
 `analysis/D279/D279_30_post_29_live_failure_audit.json`.
+
+### D279/31 — fattibilità metadata-only della ricostruzione ATTEMPT02
+
+L'audit del pcap ATTEMPT02, sempre hash-gated al digest
+`3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab`,
+verifica 51 B0 contenenti ciascuno un solo record TLS 1.2. La handshake è
+completa dal ClientHello a entrambe le Finished e seleziona la suite pure-PSK
+AES-128-GCM `0x00a8`. Tutti gli input non segreti del key schedule e tutti i
+nonce/header/record necessari sono presenti.
+
+Dopo la CCS client si osservano un Finished cifrato sequence 0 e 43 record
+application-data sequence 1–43. Questi ultimi coincidono esattamente con i 43
+B0 fingerprint-shape D279/10 (`1 baseline + 21 primary + 21 auxiliary`). Non
+esistono gap né application-data host→device. La decrittazione passiva è quindi
+tecnicamente fattibile con la PSK target, senza nuova acquisizione hardware.
+
+D279/31 non accetta né legge PSK, non decifra record e non esporta ciphertext,
+random, nonce, plaintext, raster, template, hash biometrici o secret. Passano
+3/3 test, incluso l'audit autentico hash-gated; la regressione D279/10 resta
+3/3 PASS.
+
+```text
+D279_31_OUTCOME=READY_OFFLINE_TLS_RECONSTRUCTION_FEASIBILITY_CLOSED
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
+EXECUTABLE_CLOSURE=PASS_HASH_GATED_METADATA_ONLY
+ATTEMPT02_TLS_HANDSHAKE_COMPLETE=true
+ATTEMPT02_TLS_CIPHER=TLS_PSK_WITH_AES_128_GCM_SHA256_0x00a8
+ATTEMPT02_CLIENT_APPLICATION_RECORD_COUNT=43
+ATTEMPT02_CLIENT_APPLICATION_RECORD_SEQUENCE=1_THROUGH_43_NO_GAP
+PASSIVE_RECONSTRUCTION=FEASIBLE_WITH_AUTHORIZED_TARGET_PSK
+LIVE_OR_USB_ACTION_REQUIRED=false
+PSK_ACCESSED=false
+RECORDS_DECRYPTED=0
+NEXT_PRIMARY_BOUNDARY=OFFLINE_IN_MEMORY_TLS_PSK_DECRYPTION_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report, JSON e audit riproducibile:
+`analysis/D279/D279_31_attempt02_tls_reconstruction_feasibility.md`,
+`analysis/D279/D279_31_attempt02_tls_reconstruction_feasibility.json` e
+`analysis/D279/d279_31_attempt02_tls_reconstruction_feasibility.py`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

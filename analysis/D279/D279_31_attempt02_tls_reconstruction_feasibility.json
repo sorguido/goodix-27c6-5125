@@ -1,0 +1,77 @@
+{
+  "schema": "D279_31_ATTEMPT02_TLS_RECONSTRUCTION_FEASIBILITY_V1",
+  "attempt_id": "D27910_20260905_ATTEMPT02",
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "target_firmware": "GF_ST411SEC_APP_12509",
+  "source_integrity": {
+    "pcapng_packet_count": 924,
+    "target_frame_count": 442,
+    "b0_tls_record_count": 51,
+    "all_b0_wrap_exactly_one_tls_record": true
+  },
+  "handshake": {
+    "client_hello": {
+      "tls12_version": true,
+      "client_random_present": true,
+      "offered_cipher_0x00a8": true,
+      "cipher_suite_count": 2
+    },
+    "server_hello": {
+      "tls12_version": true,
+      "server_random_present": true,
+      "selected_cipher": "0x00a8",
+      "selected_cipher_is_psk_aes128_gcm_sha256": true
+    },
+    "server_hello_done_present": true,
+    "client_key_exchange": {
+      "psk_identity_present": true,
+      "psk_identity_is_expected_client_identity": true,
+      "psk_identity_value_exported": false
+    },
+    "client_change_cipher_spec_present": true,
+    "client_encrypted_finished_present": true,
+    "server_change_cipher_spec_present": true,
+    "server_encrypted_finished_present": true,
+    "complete_from_client_hello_through_both_finished": true
+  },
+  "application_records": {
+    "device_to_host_count": 43,
+    "host_to_device_count": 0,
+    "all_tls_application_data": true,
+    "all_ciphertext_fragment_length": 7717,
+    "fingerprint_shape_b0_identity_count": 43,
+    "baseline_primary_auxiliary_decomposition": "1_PLUS_21_PLUS_21"
+  },
+  "record_sequence_assignment": {
+    "client_encrypted_finished_sequence": 0,
+    "client_application_sequence_first": 1,
+    "client_application_sequence_last": 43,
+    "server_encrypted_finished_sequence": 0,
+    "record_gap_detected": false
+  },
+  "passive_reconstruction": {
+    "cipher": "TLS_PSK_WITH_AES_128_GCM_SHA256_0x00a8",
+    "client_random_available_in_capture": true,
+    "server_random_available_in_capture": true,
+    "explicit_record_nonce_available_in_capture": true,
+    "record_type_version_length_and_sequence_available": true,
+    "protected_psk_required": true,
+    "other_missing_cryptographic_input": false,
+    "feasibility": "FEASIBLE_WITH_AUTHORIZED_TARGET_PSK",
+    "psk_accessed": false,
+    "records_decrypted": 0
+  },
+  "privacy": {
+    "ciphertext_exported": false,
+    "handshake_random_exported": false,
+    "record_nonce_exported": false,
+    "plaintext_exported": false,
+    "raster_exported": false,
+    "template_exported": false,
+    "biometric_hash_exported": false,
+    "secret_exported": false
+  },
+  "next_gate": "HUMAN_GATE_AUTHORIZED_PROTECTED_PSK_READ_FOR_IN_MEMORY_OFFLINE_EVALUATION",
+  "live_or_usb_action_required": false,
+  "live_authorized": false
+}
