@@ -1,0 +1,40 @@
+{
+  "aggregate_contract_valid": true,
+  "baseline_sha": "c73caaad561823a5f5748a506f7f9c2ebd177cbb",
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "correct_role_order_valid": true,
+  "current_live_authorized": false,
+  "current_protected_evaluation_authorized": false,
+  "d279_44_authorization_consumed": true,
+  "fingerprint_frames_with_reliable_minutiae": {
+    "baseline_positive_halfwave": {
+      "quality_tier_a": 1,
+      "quality_tier_b_or_a": 9
+    },
+    "frame_positive_halfwave": {
+      "quality_tier_a": 0,
+      "quality_tier_b_or_a": 1
+    },
+    "signed_control": {
+      "quality_tier_a": 2,
+      "quality_tier_b_or_a": 10
+    }
+  },
+  "interpretation": {
+    "b0_oem_calibration_role": "NOT_PROVEN",
+    "baseline_positive_halfwave_observed_pair": "PRESERVES_MOST_SIGNED_CONTROL_SIGNAL",
+    "dominant_component_in_this_capture": "NEGATIVE_FRAME_MINUS_BASELINE_DEVIATIONS",
+    "frame_positive_halfwave_observed_pair": "STRONGLY_DISFAVORED",
+    "halfwave_component_only_claim": "NOT_IDENTIFIED_BECAUSE_OUTPUT_POLARITY_IS_CONFOUNDED",
+    "independent_opposite_sign_information": "NOT_PROVEN_BY_AGGREGATE_COUNTS",
+    "next_minimal_hypothesis": "COMPLETE_HALFWAVE_SUPPORT_BY_OUTPUT_POLARITY_MATRIX",
+    "production_preprocessing_decision": "NOT_AUTHORIZED_BY_THIS_RESULT",
+    "self_subtracted_baseline": "CONSTRUCTED_ZERO_NOT_INDEPENDENT_DISCRIMINATOR",
+    "signed_control": "BEST_OBSERVED_SINGLE_FRAME_CANDIDATE"
+  },
+  "live_or_usb_action_count": 0,
+  "privacy_contract_valid": true,
+  "schema": "D279_45_AUTHENTIC_HALFWAVE_DELTA_REVIEW_V1",
+  "source_contract_valid": true,
+  "source_summary_sha256": "86a98984949b483a8c8887e3f3cfb8742cd6eff5ec1c32943af66cdb7374a331"
+}

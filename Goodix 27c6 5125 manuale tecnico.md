@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/44 — half-wave delta pronto, Human Gate protected
+### Stato corrente D279/45 — half-wave autentica, confondimento di polarità
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -290,13 +290,26 @@ field. Il baseline auto-sottratto nullo è inoltre una conseguenza matematica.
 Il B0 può fungere da riferimento sperimentale nella cattura, ma la sua funzione
 OEM come calibration frame non è provata.
 
-Il prossimo esperimento minimo D279/44 confronta il controllo signed con
-`max(frame-baseline,0)` e `max(baseline-frame,0)`: la rettifica half-wave è
-usata con entrambi i segni in driver libfprint sensor-specifici e scarta la
-deviazione opposta prima del min/max x2. Evaluator e kit aggregate-only passano
-37 test, build normale/ASan/UBSan, snapshot preflight e percorso end-to-end su
-raster sintetici non protetti, senza USB. D279/35, D279/37, D279/39 e D279/42
-sono consumate; nessuna nuova lettura protetta, USB/live o retry è autorizzata.
+L'operatore ha eseguito una sola D279/44 sulla baseline
+`c73caaad561823a5f5748a506f7f9c2ebd177cbb`. Il summary autentico, SHA-256
+`86a98984949b483a8c8887e3f3cfb8742cd6eff5ec1c32943af66cdb7374a331`, è
+preservato byte-per-byte. Sui 42 fingerprint il controllo signed conserva
+10 frame con minutiae nei tier NBIS B/A e 2 nel tier A; le half-wave
+`max(frame-baseline,0)` e `max(baseline-frame,0)` producono rispettivamente
+1/0 e 9/1. Il signed resta quindi il miglior candidato single-frame osservato,
+senza essere pronto per enrollment, matching o production.
+
+La review D279/45 corregge però il claim sulla componente positiva: ogni
+half-wave D279/44 è stata misurata soltanto come segnale positivo su fondo
+nero, quindi supporto di segno e polarità d'uscita sono confusi. NBIS è
+sensibile alla polarità; il collasso 1/42 prova il fallimento della specifica
+coppia misurata, non l'assenza intrinseca di struttura nella componente
+`frame > baseline`. Anche il piccolo vantaggio signed non prova contributi
+indipendenti del segno opposto, perché min/max e combinazione cambiano insieme
+e il summary non contiene overlap per-frame. Il prossimo discriminante minimo
+deve completare offline la matrice supporto×polarità prima di introdurre pesi,
+clipping robusto o fusion. D279/35, D279/37, D279/39, D279/42 e D279/44 sono
+consumate; nessuna nuova lettura protetta, USB/live o retry è autorizzata.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1600,7 +1613,7 @@ CURRENT_LIVE_AUTHORIZED=false
 
 Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
 
-### D279/40–D279/44 — quality review, baseline-delta e half-wave gate
+### D279/40–D279/45 — quality review, baseline-delta e half-wave autentica
 
 L'aggregate D279/39 autentico è preservato con digest
 `861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c` e
@@ -1615,14 +1628,16 @@ Non consente di dedurre la scala fisica. D279/42 ha poi misurato un migliorament
 autentico ma non risolutivo dalla sottrazione signed del B0. D279/43 ha corretto
 l'interpretazione delle due polarità complementari e selezionato il successivo
 discriminante single-frame: rettifica half-wave prima del min/max x2. Il kit
-D279/44 è completamente chiuso offline e attende un nuovo Human Gate sul full
-SHA per una sola protected evaluation.
+D279/44 è stato poi eseguito una sola volta. La review D279/45 accetta
+l'aggregate autentico ma identifica il confondimento supporto×polarità delle
+due half-wave; il gate D279/44 è consumato e non autorizza ulteriori letture.
 
 Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
 `analysis/D279/D279_41_synthetic_nbis_scale_calibration.md`,
 `analysis/D279/D279_42_baseline_delta_operator_boundary.md`,
 `analysis/D279/D279_43_authentic_baseline_delta_review.md` e
-`analysis/D279/D279_44_halfwave_delta_operator_boundary.md`.
+`analysis/D279/D279_44_halfwave_delta_operator_boundary.md` e
+`analysis/D279/D279_45_authentic_halfwave_delta_review.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
