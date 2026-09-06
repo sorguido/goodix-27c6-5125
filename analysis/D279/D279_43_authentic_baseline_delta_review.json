@@ -1,0 +1,29 @@
+{
+  "aggregate_contract_valid": true,
+  "baseline_sha": "cf7ecb6c4df7f053e4a8f4203e6a6262b12e35f2",
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "correct_role_order_valid": true,
+  "fingerprint_frames_with_minutiae_in_quality_tier_a": {
+    "baseline_minus_frame": 1,
+    "frame_minmax_control": 0,
+    "frame_minus_baseline": 2
+  },
+  "fingerprint_frames_with_minutiae_in_quality_tier_b_or_a": {
+    "baseline_minus_frame": 10,
+    "frame_minmax_control": 5,
+    "frame_minus_baseline": 10
+  },
+  "interpretation": {
+    "baseline_subtraction_signal": "POSITIVE_BUT_INSUFFICIENT_FOR_ENROLLMENT_OR_PRODUCTION",
+    "frame_minus_baseline": "SLIGHT_EXPERIMENTAL_PREFERENCE_ONLY",
+    "next_minimal_hypothesis": "POLARITY_SPECIFIC_HALF_WAVE_RECTIFICATION_BEFORE_MINMAX_X2",
+    "production_preprocessing_decision": "NOT_AUTHORIZED_BY_THIS_RESULT",
+    "self_subtracted_baseline": "CONSTRUCTED_ZERO_NOT_INDEPENDENT_DISCRIMINATOR",
+    "signed_polarity_variants": "COMPLEMENTARY_IMAGES_NOT_INDEPENDENT_FIXED_FIELD_REPLICATIONS"
+  },
+  "live_or_usb_action_count": 0,
+  "privacy_contract_valid": true,
+  "schema": "D279_43_AUTHENTIC_BASELINE_DELTA_REVIEW_V1",
+  "source_contract_valid": true,
+  "source_summary_sha256": "0fc29eb7ece380e548b3cdc2caa995564a15c4e062bce4e83677c6367ee6ffb3"
+}
