@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/45 — half-wave autentica, confondimento di polarità
+### Stato corrente D279/46 — matrice half-wave/polarità pronta, Human Gate protected
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -310,6 +310,22 @@ e il summary non contiene overlap per-frame. Il prossimo discriminante minimo
 deve completare offline la matrice supporto×polarità prima di introdurre pesi,
 clipping robusto o fusion. D279/35, D279/37, D279/39, D279/42 e D279/44 sono
 consumate; nessuna nuova lettura protetta, USB/live o retry è autorizzata.
+
+D279/46 ha esaurito il confondimento risolvibile offline. Nel libfprint pinned
+il flag `FPI_IMAGE_COLORS_INVERTED` viene applicato prima di `get_minutiae()`;
+Egis0570 combina `max(frame-background,0)` con tale inversione, mentre Elan e
+VFS7552 mostrano altre coppie sensor-specifiche. Questa è corroborazione del
+metodo, non prova APP12509. Il nuovo evaluator mantiene il controllo signed e
+aggiunge soltanto i due complementi half-wave mancanti, cioè deviazione
+conservata scura su fondo bianco per entrambi i supporti. Il controllo deve
+riprodurre esattamente l'aggregate D279/44 digest-pinned o la run fallisce.
+
+Evaluator e kit aggregate-only passano 43 test, build normale/ASan/UBSan,
+snapshot preflight, source/symbol seam checks e percorso end-to-end su raster
+sintetici non protetti. Nessun entry point USB è raggiungibile dal helper;
+production, sender e allowlist sono invariati. Il prossimo confine è un nuovo
+Human Gate sul full SHA per una sola protected evaluation offline. Le deadline
+della pipe sono safety bound host-side e non implicano quiescenza device-side.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1613,7 +1629,7 @@ CURRENT_LIVE_AUTHORIZED=false
 
 Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
 
-### D279/40–D279/45 — quality review, baseline-delta e half-wave autentica
+### D279/40–D279/46 — quality review e matrice half-wave/polarità
 
 L'aggregate D279/39 autentico è preservato con digest
 `861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c` e
@@ -1631,13 +1647,16 @@ discriminante single-frame: rettifica half-wave prima del min/max x2. Il kit
 D279/44 è stato poi eseguito una sola volta. La review D279/45 accetta
 l'aggregate autentico ma identifica il confondimento supporto×polarità delle
 due half-wave; il gate D279/44 è consumato e non autorizza ulteriori letture.
+D279/46 completa offline la matrice con i due complementi mancanti e prepara
+un nuovo boundary one-shot aggregate-only, senza modifiche production.
 
 Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
 `analysis/D279/D279_41_synthetic_nbis_scale_calibration.md`,
 `analysis/D279/D279_42_baseline_delta_operator_boundary.md`,
 `analysis/D279/D279_43_authentic_baseline_delta_review.md` e
 `analysis/D279/D279_44_halfwave_delta_operator_boundary.md` e
-`analysis/D279/D279_45_authentic_halfwave_delta_review.md`.
+`analysis/D279/D279_45_authentic_halfwave_delta_review.md` e
+`analysis/D279/D279_46_halfwave_output_polarity_boundary.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
