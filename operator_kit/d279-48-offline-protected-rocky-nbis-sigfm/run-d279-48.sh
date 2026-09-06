@@ -68,6 +68,7 @@ critical_paths=(
   analysis/D279/d279_48_rocky_nbis_sigfm_evaluator.py
   analysis/D279/test_d279_48_rocky_nbis_sigfm_evaluator.py
   core/post_d4.py
+  src/goodix5125_cleanroom.py
   libfprint-driver
   reference/libfprint-fedora44-1.94.100/source
   Rockytkg/PROVENANCE.md
@@ -270,9 +271,46 @@ PY
   echo D279_48_SYNTHETIC_END_TO_END=PASS
 }
 
+verify_snapshot_python_closure ()
+{
+  local snapshot=$1
+  (
+    cd "$snapshot"
+    env -u PYTHONPATH -u PYTHONHOME -u PYTHONOPTIMIZE PYTHONNOUSERSITE=1 \
+      python3 -B - <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+root = Path.cwd()
+
+def load_module(name: str, relative: str):
+    path = root / relative
+    if not path.is_file() or path.is_symlink():
+        raise RuntimeError(f"{relative}_NOT_REGULAR")
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"{relative}_NOT_LOADABLE")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+# Mirror the protected runner's module-load chain exactly, but stop before
+# read_transport_psk(): this proves the reduced snapshot is self-contained
+# without reaching any protected input.
+load_module("d279_48_closure_d33", "analysis/D279/d279_33_attempt02_in_memory_composer.py")
+load_module("d279_48_closure_d35", "operator_kit/d279-35-offline-protected-evaluation/d279_35_protected_attempt02_eval.py")
+load_module("d279_39_nbis_quality_evaluator", "analysis/D279/d279_39_nbis_quality_evaluator.py")
+load_module("d279_48_closure_comparison", "analysis/D279/d279_48_rocky_nbis_sigfm_evaluator.py")
+print("D279_48_SNAPSHOT_PYTHON_CLOSURE=PASS")
+PY
+  ) || refuse SNAPSHOT_PYTHON_DEPENDENCY_CLOSURE
+}
+
 offline_preflight ()
 {
-  local work
+  local work snapshot
   [[ $EUID -ne 0 ]] || refuse OFFLINE_PREFLIGHT_REQUIRES_NORMAL_USER
   python3 -B -m unittest -q \
     analysis/D279/test_d279_31_attempt02_tls_reconstruction_feasibility.py \
@@ -285,8 +323,12 @@ offline_preflight ()
   work=$(mktemp -d /tmp/goodix-d279-48-offline.XXXXXX)
   cleanup_root=$work
   trap cleanup_temp EXIT HUP INT TERM
-  build_snapshot_helpers "$root" "$work"
-  run_synthetic_kat "$root" "$work"
+  snapshot="$work/snapshot"
+  mkdir -m 0700 "$snapshot"
+  git_root archive HEAD -- "${critical_paths[@]}" | tar -x -C "$snapshot"
+  verify_snapshot_python_closure "$snapshot"
+  build_snapshot_helpers "$snapshot" "$work"
+  run_synthetic_kat "$snapshot" "$work"
   echo D279_48_OPERATOR_EXECUTABLE_CLOSURE=PASS_OFFLINE
   echo TARGET_PSK_ACCESSED=false
   echo REAL_RASTER_EVALUATED_COUNT=0
@@ -315,6 +357,7 @@ prepare_approved_analysis ()
   snapshot="$prepared/snapshot"
   mkdir -m 0700 "$snapshot"
   git_root archive "$approved" -- "${critical_paths[@]}" | tar -x -C "$snapshot"
+  verify_snapshot_python_closure "$snapshot"
   build_snapshot_helpers "$snapshot" "$prepared"
   run_synthetic_kat "$snapshot" "$prepared"
   verify_approved_baseline "$approved"
