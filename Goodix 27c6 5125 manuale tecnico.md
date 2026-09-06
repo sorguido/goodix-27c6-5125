@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/31 — ricostruzione TLS OEM fattibile, PSK gated
+### Stato corrente D279/32 — primitive TLS PSK chiusa, composer ancora offline
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -136,6 +136,15 @@ Non serve quindi una nuova action hardware per ottenere i raster OEM esistenti.
 Prima del Human Gate resta consentito costruire e validare sinteticamente un
 evaluator in-memory fail-closed; l'esecuzione autentica dovrà fermarsi prima
 della lettura PSK finché non sarà specificamente autorizzata.
+
+D279/32 ha chiuso la primitive crittografica senza aggiungere un loader di
+secret: key schedule pure-PSK, profili TLS 1.2 classico ed Extended Master
+Secret distinti, AES-128-GCM e verifica delle Finished. Un transcript OpenSSL
+indipendente con PSK sintetica autentica entrambe le Finished e recupera
+l'application-data; PSK o sequence errate falliscono sul tag GCM. I buffer
+mutabili owned dal modulo sono azzerati, senza dichiarare provata la
+zeroizzazione di eventuali copie interne Python/OpenSSL. Restano da comporre
+offline parser ATTEMPT02, profilo OEM non-EMS, decoder immagine e metriche NBIS.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -493,7 +502,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_IN_MEMORY_TLS_PSK_DECRYPTION_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_DECRYPTION_IMAGE_DECODE_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=NEW_TECHNICAL_HYPOTHESIS_THEN_OFFLINE_REVIEW_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -1185,7 +1194,7 @@ PASSIVE_RECONSTRUCTION=FEASIBLE_WITH_AUTHORIZED_TARGET_PSK
 LIVE_OR_USB_ACTION_REQUIRED=false
 PSK_ACCESSED=false
 RECORDS_DECRYPTED=0
-NEXT_PRIMARY_BOUNDARY=OFFLINE_IN_MEMORY_TLS_PSK_DECRYPTION_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_31=OFFLINE_IN_MEMORY_TLS_PSK_DECRYPTION_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
@@ -1193,6 +1202,34 @@ Report, JSON e audit riproducibile:
 `analysis/D279/D279_31_attempt02_tls_reconstruction_feasibility.md`,
 `analysis/D279/D279_31_attempt02_tls_reconstruction_feasibility.json` e
 `analysis/D279/d279_31_attempt02_tls_reconstruction_feasibility.py`.
+
+### D279/32 — primitive di decrittazione TLS 1.2 pure-PSK
+
+Il modulo `analysis/D279/d279_32_tls12_psk_decrypt.py` implementa il solo
+confine crittografico offline per la suite target `0x00a8`: premaster
+pure-PSK, PRF SHA-256, key block, AES-128-GCM e verifica Finished. Non apre
+file, non conosce path production e non offre una CLI per secret.
+
+Il profilo master classico usato da ATTEMPT02 e quello EMS negoziato da OpenSSL
+moderno sono espliciti e non intercambiabili. Il test indipendente usa una vera
+handshake OpenSSL su `MemoryBIO` con PSK sintetica: entrambe le Finished e una
+application-data vengono autenticate e decifrate. PSK o sequence errate
+falliscono chiuse; l'owner di master/chiavi/IV azzera i propri byte su close.
+
+```text
+D279_32_OUTCOME=READY_OFFLINE_TLS12_PSK_DECRYPT_PRIMITIVE
+ADVANCEMENT=MATERIAL_EXECUTABLE_CRYPTOGRAPHIC_BOUNDARY
+EXECUTABLE_CLOSURE=PASS_SYNTHETIC_INDEPENDENT_OPENSSL
+D279_32_TESTS=3/3_PASS
+TARGET_PSK_ACCESSED=false
+ATTEMPT02_RECORD_DECRYPTED_COUNT=0
+LIVE_OR_USB_ACTION_COUNT=0
+PYTHON_OPENSSL_INTERNAL_COPY_ZEROIZATION_PROVEN=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_DECRYPTION_IMAGE_DECODE_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_32_tls12_psk_decrypt_primitive.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
