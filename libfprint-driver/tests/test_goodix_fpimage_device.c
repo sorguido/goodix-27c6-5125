@@ -1711,6 +1711,13 @@ test_d279_28_production_enrollment_starts_reviewed_graph (void)
   g_assert_false (f->success);
   g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
   fixture_close (f);
+  goodix_fpimage_device_get_production_enrollment_audit (f->device, &audit);
+  g_assert_true (audit.context_closed);
+  g_assert_false (audit.usb_interface_claimed);
+  g_assert_true (audit.usb_backend_drained);
+  g_assert_false (audit.runtime_material_present);
+  g_assert_cmpuint (audit.usb_outstanding_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_out_outstanding_count, ==, 0u);
   test_fixture_free (f);
   production_seam_clear (&seam);
 }

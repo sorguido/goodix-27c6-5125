@@ -32,6 +32,8 @@ grep -F -- '-DGOODIX_LIBFPRINT_1_94_100_NBIS' \
   "$build_dir/compile_commands.json" >/dev/null
 nm "$build_library" | grep -F ' fpi_device_goodix_27c6_5125_get_type' >/dev/null
 for forbidden_test_symbol in \
+  goodix_fpi_usb_backend_set_submit_seam \
+  goodix_fpi_usb_backend_set_async_submit_seam \
   goodix_fpimage_device_set_production_open_seams \
   goodix_device_context_set_usb_submit_seam \
   goodix_device_context_set_async_usb_submit_seam \
@@ -59,6 +61,8 @@ if readelf -d "$library" | grep -E '(RPATH|RUNPATH)' >/dev/null; then
   echo "staged production library retains a build path" >&2
   exit 1
 fi
+nm -D "$library" | grep -F \
+  ' goodix_fpimage_device_get_production_enrollment_audit' >/dev/null
 
 cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 gusb)
 libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 gusb)
@@ -66,6 +70,7 @@ cc -std=gnu11 -O2 -g \
   -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes \
   -Wmissing-prototypes -Wconversion \
   -DD279_29_APPROVED_BASELINE=\"$baseline\" \
+  -I"$snapshot_root/libfprint-driver" \
   -I"$source_root" -I"$source_root/libfprint" \
   -I"$build_dir" -I"$build_dir/libfprint" \
   $cflags "$tool_source" "$library" $libs \
@@ -81,6 +86,7 @@ ln -s libfprint-2.so.2 "$output_dir/libfprint-2.so"
 echo D279_29_EXACT_TARGET_LIBFPRINT=1.94.100
 echo D279_29_EXTRACTOR=NBIS_NATIVE
 echo HOST_ONLY_TRANSCRIPT_SEAMS_IN_PRODUCTION_LIBRARY=false
+echo SANITIZED_PRODUCTION_AUDIT_ACCESSOR_EXPORTED=true
 echo PRODUCTION_LIBRARY_BUILD_RPATH_PRESENT=false
 echo REAL_USB_ENUMERATION_ATTEMPTED=false
 echo LIVE_EXECUTION_PERFORMED=false

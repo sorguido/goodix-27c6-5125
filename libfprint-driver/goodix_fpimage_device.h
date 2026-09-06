@@ -79,11 +79,26 @@ typedef struct
 {
   gboolean production_action_consumed;
   guint auxiliary_b0_observed_count;
+  GoodixPreSessionRxSyncAudit pre_session_rx_sync;
+  GoodixRuntimeMaterialAudit runtime_material;
   GoodixSecureSessionAudit secure;
   GoodixTlsAudit tls;
   GoodixPostTlsAudit post_tls;
   GoodixEnrollmentPostTlsEventsAudit enrollment_events;
   GoodixEnrollmentFpiUsbBindingAudit enrollment_binding;
+  guint64 usb_real_submit_count;
+  guint64 usb_out_submit_count;
+  guint64 usb_in_completion_count;
+  guint64 usb_out_completion_count;
+  guint usb_outstanding_count;
+  guint usb_out_outstanding_count;
+  guint usb_max_in_outstanding_count;
+  guint usb_max_out_outstanding_count;
+  gboolean usb_interface_claimed;
+  gboolean usb_backend_drained;
+  gboolean runtime_material_present;
+  gboolean runtime_handoff_views_cleared;
+  gboolean context_closed;
 } GoodixProductionEnrollmentAudit;
 
 typedef gint64 (*GoodixPreSessionRxSyncClockFunc) (gpointer user_data);
@@ -92,8 +107,8 @@ typedef void (*GoodixDeviceContextSecurePhaseObserver) (
   guint64           generation,
   gpointer          user_data);
 
-/* Offline-test seams for the production img_open/img_close boundary.  NULL
- * callbacks select the real production implementation. */
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+/* Offline-test seams for the production img_open/img_close boundary. */
 typedef gboolean (*GoodixRuntimeMaterialAcquireSeam) (
   GoodixRuntimeMaterial       **owner,
   GoodixSecureSessionMaterial  *secure_view,
@@ -109,6 +124,7 @@ typedef gboolean (*GoodixUsbInterfaceSeam) (
   guint8      interface_number,
   gpointer    user_data,
   GError    **error);
+#endif
 
 typedef struct
 {
@@ -147,6 +163,11 @@ gboolean goodix_device_context_runtime_handoff_views_cleared (
   GoodixDeviceContext *ctx);
 void goodix_device_context_get_production_enrollment_audit (
   GoodixDeviceContext              *ctx,
+  GoodixProductionEnrollmentAudit *audit);
+/* Read-only, sanitized operator telemetry. It submits no work and returns the
+ * final snapshot after close when the live context has already been freed. */
+void goodix_fpimage_device_get_production_enrollment_audit (
+  GoodixFpImageDevice             *dev,
   GoodixProductionEnrollmentAudit *audit);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
 GoodixTlsServer *      goodix_device_context_get_tls_server (GoodixDeviceContext *ctx);

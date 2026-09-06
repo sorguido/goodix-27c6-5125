@@ -23,10 +23,13 @@ struct _GoodixFpiUsbBackend
   guint in_outstanding, out_outstanding, max_outstanding, max_out_outstanding;
   guint64 delivery_count, real_submit_count, out_submit_count;
   guint64 in_completion_count, out_completion_count;
-  gboolean terminal_fence, async_seam, drain_notified;
+  gboolean terminal_fence, drain_notified;
   gboolean pre_session_sync_active;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  gboolean async_seam;
   GoodixUsbSubmitSeam seam;
   gpointer seam_data;
+#endif
   GoodixFpiUsbBackendDrainedFunc drained_callback;
   gpointer drained_data;
   GoodixFpiUsbBackendOutCompletedFunc out_completed_callback;
@@ -145,6 +148,7 @@ goodix_fpi_usb_backend_free (GoodixFpiUsbBackend *backend)
   g_free (backend);
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 static void
 set_submit_seam (GoodixFpiUsbBackend *backend,
                  GoodixUsbSubmitSeam  seam,
@@ -172,6 +176,7 @@ goodix_fpi_usb_backend_set_async_submit_seam (GoodixFpiUsbBackend *backend,
 {
   set_submit_seam (backend, seam, data, TRUE);
 }
+#endif
 
 void
 goodix_fpi_usb_backend_set_drained_callback (
@@ -257,10 +262,12 @@ goodix_fpi_usb_backend_arm_receive (GoodixFpiUsbBackend *backend,
   backend->in_timeout_ms = 0;
   backend->max_outstanding = MAX (backend->max_outstanding,
                                   backend->in_outstanding);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
   if (backend->seam != NULL)
     backend->seam (backend, GOODIX_USB_TRANSFER_IN, generation, NULL,
                    backend->seam_data);
   else
+#endif
     production_submit_in (backend, 0);
   return TRUE;
 }
@@ -304,10 +311,12 @@ goodix_fpi_usb_backend_arm_pre_session_sync_receive (
   backend->in_timeout_ms = timeout_ms;
   backend->max_outstanding = MAX (backend->max_outstanding,
                                   backend->in_outstanding);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
   if (backend->seam != NULL)
     backend->seam (backend, GOODIX_USB_TRANSFER_IN, generation, NULL,
                    backend->seam_data);
   else
+#endif
     production_submit_in (backend, timeout_ms);
   return TRUE;
 }
@@ -355,6 +364,7 @@ goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
   backend->out_submit_count++;
   backend->max_out_outstanding = MAX (backend->max_out_outstanding,
                                       backend->out_outstanding);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
   if (backend->seam != NULL)
     {
       backend->seam (backend, GOODIX_USB_TRANSFER_OUT, generation, bytes,
@@ -363,6 +373,7 @@ goodix_fpi_usb_backend_submit_out (GoodixFpiUsbBackend *backend,
         goodix_fpi_usb_backend_complete_out (backend, generation, NULL);
     }
   else
+#endif
     production_submit_out (backend, bytes);
   return TRUE;
 }

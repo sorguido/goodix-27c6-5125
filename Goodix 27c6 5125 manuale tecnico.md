@@ -95,11 +95,13 @@ run live.
 D279/29 ha ora completato anche il solo operator boundary necessario alla
 prima prova: build effimero da snapshot dello SHA approvato, driver production
 con NBIS nativo, assenza delle seam sintetiche verificata, grant deterministico
-single-use e client pubblico libfprint con un open, una enrollment action,
+single-use e client libfprint con un open, una enrollment action,
 zero retry/seconda action/reopen, nessun salvataggio biometrico e close sempre
-tentato. Il preflight compilato `UNAPPROVED_FOR_LIVE` si ferma prima di
-`FpContext` e USB. Resta soltanto il Human Gate sul full SHA; nessuna run live
-è autorizzata da questo stato.
+tentato. Dopo la review, tutte le seam di open/claim/submit sono escluse a
+compile-time dal target production e un solo accessor read-only conserva la
+telemetria sanitizzata dopo il close. Il preflight compilato
+`UNAPPROVED_FOR_LIVE` si ferma prima di `FpContext` e USB. Resta soltanto il
+Human Gate sul full SHA; nessuna run live è autorizzata da questo stato.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1004,12 +1006,36 @@ provato il rifiuto prima di `FpContext`/USB. Packaging/install-tree, fprintd,
 multi-action/cancel/reactivation, verify/PAM e robustezza generale restano
 deliberatamente post-live.
 
+La review PM di D279/29 ha prodotto un micro-correttivo live-critical prima del
+gate. Le callback sintetiche di material/open/claim e i setter di submit del
+backend sono ora racchiusi da `GOODIX_ENABLE_TEST_SEAMS`: nel target production
+non sono compilati né i setter low-level né i branch che possono selezionare
+una callback di transcript. Il solo simbolo Goodix aggiunto alla version map è
+un accessor audit read-only, incapace di mutare il contesto o inviare comandi.
+Il client lo legge dopo il close e conserva telemetria sanitizzata su submit e
+completion USB, comandi/ACK, TLS, progressione enrollment,
+retry/reopen/reset/clear-halt, famiglie persistenti note e cleanup host. Non
+espone payload, raster, template o secret e non introduce nuovi timeout,
+recovery o action.
+
+Il dubbio sulla sovrapposizione dei mount durante il build da `git archive` è
+stato chiuso con una prova controllata in `/tmp`: il mount figlio dello snapshot
+resta `ro` dentro il parent di output `rw` e la scrittura è rifiutata. Le suite
+post-correttivo passano 28/28 FpImageDevice, 25/25 secure/TLS, 10/10
+eventi/binding enrollment e 10/10 post-TLS, normali e ASan/UBSan; il preflight
+Fedora 44 target passa con NBIS nativo, accessor audit esportato, seam assenti,
+RPATH assente e rifiuto pre-USB della baseline non approvata. I build host che
+dipendono intenzionalmente dalle seam le abilitano ora in modo esplicito; le
+regressioni D276/04 5/5, D277/A8 15/15 e D278/02 63/63 passano normali e
+ASan/UBSan, con live harness soltanto compilati e `REAL_USB_ACCESS=0`.
+
 ```text
 D279_29_OUTCOME=READY_FOR_HUMAN_GATE
 D279_29_OPERATOR_EXECUTABLE_CLOSURE=PASS_OFFLINE
 D279_29_EXACT_TARGET_LIBFPRINT=1.94.100
 D279_29_EXTRACTOR=NBIS_NATIVE
 D279_29_HOST_ONLY_TRANSCRIPT_SEAMS_IN_PRODUCTION_LIBRARY=false
+D279_29_SANITIZED_PRODUCTION_AUDIT_ACCESSOR_EXPORTED=true
 D279_29_PRODUCTION_LIBRARY_BUILD_RPATH_PRESENT=false
 D279_29_ACTION_ATTEMPT_MAX=1
 D279_29_OPERATOR_RETRY_COUNT=0

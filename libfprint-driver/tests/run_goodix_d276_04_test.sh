@@ -15,7 +15,7 @@ python3 "$script_dir/support/generate_libfprint_enums.py" --identifier-prefix Fp
 python3 "$script_dir/support/generate_libfprint_enums.py" --identifier-prefix Fpi --symbol-prefix fpi --header-guard FPI_ENUMS_H --header-name fpi-enums.h --output-header "$build/fpi-enums.h" --output-source "$build/fpi-enums.c" "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
 includes="-I$build -I$script_dir/support -I$root/libfprint-driver -I$local_fp -I$root/Rockytkg/libfprint"
-strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 build_run () {
   name=$1; extra=$2
   gcc $strict $extra $cflags $includes \

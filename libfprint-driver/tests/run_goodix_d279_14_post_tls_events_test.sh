@@ -21,7 +21,7 @@ cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0)
 libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0)
 local_fp="$root/Rockytkg/libfprint/libfprint"
 includes="-I$build -I$script_dir/support/d277 -I$script_dir/support -I$root/libfprint-driver -I$root/Rockytkg/libfprint -I$local_fp -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include"
-strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 local_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter"
 
 python3 "$script_dir/support/generate_libfprint_enums.py" \

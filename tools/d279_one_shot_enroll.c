@@ -2,14 +2,16 @@
 /*
  * Minimal operator client for one Goodix 27c6:5125 enrollment action.
  *
- * This process deliberately uses only libfprint's public API.  It performs no
- * retry, no second action and no template serialization.  The compiled and
- * runtime authorization gates are checked before fp_context_new(), so a
- * normal/offline build cannot enumerate USB devices.
+ * This process uses libfprint's public action API plus one read-only,
+ * sanitized Goodix audit accessor.  It performs no retry, no second action
+ * and no template serialization.  The compiled and runtime authorization
+ * gates are checked before fp_context_new(), so a normal/offline build cannot
+ * enumerate USB devices.
  */
 #define FP_COMPONENT "d279-one-shot-enroll"
 
 #include <libfprint/fprint.h>
+#include "goodix_fpimage_device.h"
 
 #include <glib-unix.h>
 #include <signal.h>
@@ -35,6 +37,123 @@ typedef struct
   gboolean       deadline_expired;
   gboolean       signal_received;
 } RunState;
+
+static const gchar *
+bool_text (gboolean value)
+{
+  return value ? "true" : "false";
+}
+
+static void
+print_production_audit (FpDevice *device)
+{
+  GoodixProductionEnrollmentAudit audit = { 0 };
+  guint known_persistent_family_count;
+
+  goodix_fpimage_device_get_production_enrollment_audit (
+    (GoodixFpImageDevice *) device, &audit);
+  known_persistent_family_count =
+    audit.secure.persistent_write_count +
+    audit.post_tls.persistent_device_write_count +
+    audit.enrollment_binding.transaction.frame.persistent_family_count;
+
+  g_print ("PRODUCTION_AUDIT_AVAILABLE=true\n");
+  g_print ("AUDIT_CONTEXT_CLOSED=%s\n", bool_text (audit.context_closed));
+  g_print ("AUDIT_ACTION_CONSUMED=%s\n",
+           bool_text (audit.production_action_consumed));
+  g_print ("AUDIT_PRE_SESSION_RESULT=%d\n",
+           (gint) audit.pre_session_rx_sync.pre_session_rx_result);
+  g_print ("AUDIT_PRE_SESSION_COMPLETION_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.pre_session_rx_sync.pre_session_rx_discarded_completion_count);
+  g_print ("AUDIT_PRE_SESSION_BYTE_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.pre_session_rx_sync.pre_session_rx_discarded_byte_count);
+  g_print ("AUDIT_PRE_SESSION_HOST_TIMEOUT_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.pre_session_rx_sync.pre_session_rx_timeout_count);
+  g_print ("AUDIT_USB_REAL_SUBMIT_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.usb_real_submit_count);
+  g_print ("AUDIT_USB_OUT_SUBMIT_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.usb_out_submit_count);
+  g_print ("AUDIT_USB_IN_COMPLETION_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.usb_in_completion_count);
+  g_print ("AUDIT_USB_OUT_COMPLETION_COUNT=%" G_GUINT64_FORMAT "\n",
+           audit.usb_out_completion_count);
+  g_print ("AUDIT_USB_MAX_IN_OUTSTANDING=%u\n",
+           audit.usb_max_in_outstanding_count);
+  g_print ("AUDIT_USB_MAX_OUT_OUTSTANDING=%u\n",
+           audit.usb_max_out_outstanding_count);
+  g_print ("AUDIT_USB_OUTSTANDING_AT_SNAPSHOT=%u\n",
+           audit.usb_outstanding_count);
+  g_print ("AUDIT_USB_OUT_OUTSTANDING_AT_SNAPSHOT=%u\n",
+           audit.usb_out_outstanding_count);
+  g_print ("AUDIT_USB_BACKEND_DRAINED=%s\n",
+           bool_text (audit.usb_backend_drained));
+  g_print ("AUDIT_USB_INTERFACE_CLAIMED_AT_SNAPSHOT=%s\n",
+           bool_text (audit.usb_interface_claimed));
+  g_print ("AUDIT_RUNTIME_MATERIAL_PRESENT_AT_SNAPSHOT=%s\n",
+           bool_text (audit.runtime_material_present));
+  g_print ("AUDIT_RUNTIME_OWNER_FREE_COUNT=%u\n",
+           audit.runtime_material.owner_free_count);
+  g_print ("AUDIT_RUNTIME_DESCRIPTOR_CLEANSED=%s\n",
+           bool_text (audit.runtime_material.descriptor_cleansed));
+  g_print ("AUDIT_RUNTIME_FDT_SEED_CLEANSED=%s\n",
+           bool_text (audit.runtime_material.fdt_seed_cleansed));
+  g_print ("AUDIT_RUNTIME_HANDOFF_VIEWS_CLEARED=%s\n",
+           bool_text (audit.runtime_handoff_views_cleared));
+  g_print ("AUDIT_SECURE_COMMAND_COUNT=%u\n", audit.secure.command_count);
+  g_print ("AUDIT_SECURE_ACK_COUNT=%u\n", audit.secure.ack_count);
+  g_print ("AUDIT_SECURE_TYPED_RESPONSE_COUNT=%u\n",
+           audit.secure.typed_response_count);
+  g_print ("AUDIT_SECURE_RETRY_COUNT=%u\n", audit.secure.retry_count);
+  g_print ("AUDIT_SECURE_REOPEN_COUNT=%u\n",
+           audit.secure.transport_reopen_count);
+  g_print ("AUDIT_SECURE_DEVICE_RESET_COUNT=%u\n",
+           audit.secure.device_reset_count);
+  g_print ("AUDIT_SECURE_CLEAR_HALT_COUNT=%u\n",
+           audit.secure.clear_halt_count);
+  g_print ("AUDIT_SECURE_PROTOCOL_FAILURE_RECORDED=%s\n",
+           bool_text (audit.secure.protocol_failure_recorded));
+  g_print ("AUDIT_SECURE_PROTOCOL_FAILURE_PHASE=%d\n",
+           (gint) audit.secure.protocol_failure_phase);
+  g_print ("AUDIT_SECURE_PROTOCOL_FAILURE_KIND=%d\n",
+           (gint) audit.secure.protocol_failure_kind);
+  g_print ("AUDIT_TLS_HANDSHAKE_COUNT=%u\n", audit.tls.handshake_count);
+  g_print ("AUDIT_TLS_TERMINAL_COMPLETION_COUNT=%u\n",
+           audit.tls.terminal_completion_count);
+  g_print ("AUDIT_TLS_SECRET_ZEROIZED=%s\n",
+           bool_text (audit.tls.project_secret_zeroized));
+  g_print ("AUDIT_POST_TLS_COMMAND_COUNT=%u\n",
+           audit.post_tls.command_count);
+  g_print ("AUDIT_POST_TLS_ACK_COUNT=%u\n", audit.post_tls.ack_count);
+  g_print ("AUDIT_POST_TLS_RETRY_COUNT=%u\n", audit.post_tls.retry_count);
+  g_print ("AUDIT_POST_TLS_REOPEN_COUNT=%u\n", audit.post_tls.reopen_count);
+  g_print ("AUDIT_POST_TLS_DEVICE_RESET_COUNT=%u\n",
+           audit.post_tls.device_reset_count);
+  g_print ("AUDIT_POST_TLS_CLEAR_HALT_COUNT=%u\n",
+           audit.post_tls.clear_halt_count);
+  g_print ("AUDIT_ENROLL_EVENT_SUBMIT_COUNT=%u\n",
+           audit.enrollment_events.submit_count);
+  g_print ("AUDIT_ENROLL_EVENT_ACK_COUNT=%u\n",
+           audit.enrollment_events.ack_count);
+  g_print ("AUDIT_ENROLL_EVENT_PRIMARY_B0_COUNT=%u\n",
+           audit.enrollment_events.primary_b0_count);
+  g_print ("AUDIT_ENROLL_EVENT_AUXILIARY_B0_COUNT=%u\n",
+           audit.enrollment_events.auxiliary_b0_count);
+  g_print ("AUDIT_ENROLL_EVENT_RETRY_COUNT=%u\n",
+           audit.enrollment_events.retry_count);
+  g_print ("AUDIT_ENROLL_BINDING_BACKEND_SUBMIT_ATTEMPT_COUNT=%u\n",
+           audit.enrollment_binding.backend_submit_attempt_count);
+  g_print ("AUDIT_ENROLL_BINDING_BACKEND_COMPLETION_COUNT=%u\n",
+           audit.enrollment_binding.backend_completion_count);
+  g_print ("AUDIT_ENROLL_BINDING_CANCELLATION_COUNT=%u\n",
+           audit.enrollment_binding.cancellation_count);
+  g_print ("AUDIT_ENROLL_BINDING_RETRY_COUNT=%u\n",
+           audit.enrollment_binding.retry_count);
+  g_print ("AUDIT_ENROLL_REAL_USB_SUBMIT_COUNT=%u\n",
+           audit.enrollment_binding.transaction.real_usb_submit_count);
+  g_print ("AUDIT_KNOWN_PERSISTENT_FAMILY_OBSERVED_COUNT=%u\n",
+           known_persistent_family_count);
+  g_print ("SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false\n");
+}
 
 static gboolean
 is_full_sha (const gchar *value)
@@ -189,7 +308,7 @@ run_once (void)
   g_autoptr(GError) action_error = NULL;
   g_autoptr(GError) close_error = NULL;
   GPtrArray *devices;
-  FpDevice *device;
+  FpDevice *device = NULL;
   RunState state = { .cancellable = cancellable };
   guint target_count = 0u;
   guint deadline_source;
@@ -282,6 +401,8 @@ out:
       if (!close_ok)
         g_printerr ("ERRORE_CLOSE=%s\n", close_error->message);
     }
+  if (device != NULL)
+    print_production_audit (device);
   if (deadline_source != 0u &&
       g_main_context_find_source_by_id (NULL, deadline_source) != NULL)
     g_source_remove (deadline_source);

@@ -118,6 +118,13 @@ Il client invoca `fp_device_enroll_sync()` una sola volta. Un errore/retry di
 stage cancella immediatamente l'action: il client non ritenta. Il template
 NBIS risultante resta soltanto in memoria e non viene serializzato.
 
+Il client legge dopo il close un audit production sanitizzato e read-only:
+contatori USB, comandi/ACK, handshake TLS, progressione enrollment,
+retry/reopen/reset/clear-halt, famiglie persistenti note e stato del cleanup
+host. L'accessor non espone payload e non può inviare comandi o modificare lo
+stato del driver. Le seam sintetiche di open/claim e submit sono escluse a
+compile-time dalla libreria production, inclusi i setter low-level del backend.
+
 ## Stop condition
 
 Premere `Ctrl+C` una sola volta solo se necessario. Esiste anche un limite di
@@ -148,3 +155,9 @@ I risultati sono scritti con permessi privati in:
 Contengono `operator.log` e `summary.env`. Non contengono raster, template
 biometrici, PSK, CONFIG90, FDT raw o altri secret. Dopo la run copiare questi
 due file nel canale concordato senza modificarli; non pubblicarli.
+
+`operator.log` deve contenere `PRODUCTION_AUDIT_AVAILABLE=true` e il blocco
+`AUDIT_*`. I valori descrivono soltanto osservazioni host-side. In particolare,
+un contatore persistente noto pari a zero non dimostra assenza assoluta di
+effetti persistenti sensor-side, e una deadline/cancellazione non dimostra
+timeout o quiescenza del dispositivo.

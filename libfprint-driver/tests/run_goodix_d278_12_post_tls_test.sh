@@ -33,7 +33,7 @@ python3 "$script_dir/support/generate_libfprint_enums.py" \
   "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
 includes="-I$build -I$root/libfprint-driver -I$local_fp -I$root/Rockytkg/libfprint -I$script_dir/support"
-strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 sources="
 $root/libfprint-driver/goodix_a0_protocol.c
 $root/libfprint-driver/goodix_image_decoder.c

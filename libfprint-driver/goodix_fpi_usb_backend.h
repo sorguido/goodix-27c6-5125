@@ -13,11 +13,13 @@ typedef enum
   GOODIX_USB_RECEIVE_PROTOCOL_RX,
   GOODIX_USB_RECEIVE_PRE_SESSION_SYNC_RX,
 } GoodixUsbReceivePurpose;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 /* @bytes is borrowed (transfer-none) during the callback. */
 typedef void (*GoodixUsbSubmitSeam) (GoodixFpiUsbBackend *backend,
                                      GoodixUsbDirection direction,
                                      guint64 generation, GBytes *bytes,
                                      gpointer user_data);
+#endif
 typedef void (*GoodixFpiUsbBackendDrainedFunc) (GoodixFpiUsbBackend *backend,
                                                 gpointer             user_data);
 typedef void (*GoodixFpiUsbBackendOutCompletedFunc) (
@@ -44,6 +46,7 @@ GoodixFpiUsbBackend *goodix_fpi_usb_backend_new (FpDevice *device,
                                                   guint8 out_endpoint,
                                                   gsize receive_size);
 void goodix_fpi_usb_backend_free (GoodixFpiUsbBackend *backend);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_fpi_usb_backend_set_submit_seam (GoodixFpiUsbBackend *backend,
                                               GoodixUsbSubmitSeam seam,
                                               gpointer user_data);
@@ -51,6 +54,7 @@ void goodix_fpi_usb_backend_set_submit_seam (GoodixFpiUsbBackend *backend,
 void goodix_fpi_usb_backend_set_async_submit_seam (GoodixFpiUsbBackend *backend,
                                                     GoodixUsbSubmitSeam seam,
                                                     gpointer user_data);
+#endif
 void goodix_fpi_usb_backend_set_drained_callback (GoodixFpiUsbBackend *backend,
                                                    GoodixFpiUsbBackendDrainedFunc callback,
                                                    gpointer user_data);
