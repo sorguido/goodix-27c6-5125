@@ -1,7 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
-## D279/29 enrollment production one-shot (in attesa di Human Gate)
+## D279/35 valutazione ATTEMPT02 offline protetta (in attesa di Human Gate)
+
+`d279-35-offline-protected-evaluation/` costruisce da snapshot Git l'evaluator
+aggregate-only D279/31–34. Il preflight è interamente sintetico e non legge il
+layout protetto. La singola run futura richiede full SHA approvato, grant
+single-use e `sudo` manuale per leggere una sola volta la PSK dal transport
+production; non contiene USB, fprintd o sender e non persiste plaintext,
+raster, template o conteggi per-frame. Nessuna analisi protetta è attualmente
+autorizzata.
+
+## D279/29 enrollment production one-shot (run conclusa, grant consumato)
 
 `d279-29-one-shot-enrollment/` compila da snapshot Git la libreria production
 Fedora 44/libfprint 1.94.100 con NBIS nativo e un client che esegue al massimo
@@ -9,7 +19,8 @@ una sola action enrollment, senza retry, seconda action, reopen o salvataggio
 del template. Il preflight usa una baseline `UNAPPROVED_FOR_LIVE` e si arresta
 prima di `FpContext`/USB. Preparazione e run live richiedono approvazione
 esplicita del full SHA, grant deterministico single-use e avvio manuale con
-`sudo`; nessuna run è attualmente autorizzata.
+`sudo`. La run approvata su `f4f0436acb887d9724a0ee77b51975fe3e072f44` è
+conclusa e il grant è consumato; non è autorizzato alcun retry.
 
 ## D279/10 terza acquisizione OEM passiva (pre-live, hard-gated)
 
@@ -72,9 +83,10 @@ richiede review, baseline e autorizzazione esplicite.
 | `d250-live-af-once.sh` | storico, single-shot eseguito e marker consumato; non riutilizzabile |
 | `d251-live-af-once.sh` | candidate corretto live-capable hard-gated; executable closure solo offline, review baseline AI PM e autorizzazione Utente pendenti |
 | `d255-windows-evidence-capture.ps1` | storico, single-shot consumato; capture completata e recuperata offline, nessuna nuova run richiesta o autorizzata |
-| `d279-29-one-shot-enrollment/` | current path enrollment production, offline-ready; Human Gate su full SHA pendente |
+| `d279-29-one-shot-enrollment/` | enrollment production one-shot concluso su `f4f0436…`; grant consumato, nessun retry autorizzato |
+| `d279-35-offline-protected-evaluation/` | current path offline aggregate-only; Human Gate per singola lettura protected pendente |
 
-Non esiste un kit operativo corrente **autorizzato live**. D279/29 è il current
-path revisionabile ma non incorpora né auto-approva il commit SHA richiesto:
-la sua presenza non autorizza una run. I marker storici non devono essere
-cancellati o riutilizzati.
+Non esiste un kit operativo corrente **autorizzato live**. La run D279/29 è
+consumata. D279/35 non è live e non incorpora né auto-approva il commit SHA
+richiesto per la lettura protetta: la sua presenza non autorizza l'analisi. I
+marker storici non devono essere cancellati o riutilizzati.

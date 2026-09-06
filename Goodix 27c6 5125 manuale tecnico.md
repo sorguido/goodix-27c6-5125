@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/34 — evaluator NBIS chiuso, operator boundary offline
+### Stato corrente D279/35 — operator kit offline chiuso, Human Gate protected
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -166,6 +166,16 @@ baseline/21 primarie/21 ausiliarie. Build normale e ASan/UBSan e test sintetici
 sono verdi. Nessuna PSK è stata letta e nessun raster reale è stato decifrato.
 Resta da preparare offline il kit short-lived e hash-pinned; la sua futura
 lettura del materiale protetto resta un Human Gate distinto e non autorizzato.
+
+D279/35 ha ora preparato quel boundary senza attraversarlo. Il kit costruisce
+da `git archive` dello SHA approvato, pinna helper/librerie/capture/runner e
+dipendenze, consuma un grant one-shot prima di qualunque accesso al transport e
+accetta soltanto `/var/lib/goodix-5125-poc/transport-material.bin` con metadata,
+lunghezza e hash production esatti. La futura run non raggiunge USB e scrive
+solo metriche aggregate delle 48 varianti. Il preflight sintetico passa 19/19
+test e build normale/ASan/UBSan; la PSK non è stata letta e nessun raster reale
+è stato valutato. Il prossimo confine è quindi un Human Gate sul full SHA per
+una singola lettura protected offline, non una nuova prova hardware.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -523,7 +533,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PROTECTED_ATTEMPT02_EVALUATION_OPERATOR_KIT_AND_REVIEW
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OFFLINE_PROTECTED_EVALUATION
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=NEW_TECHNICAL_HYPOTHESIS_THEN_OFFLINE_REVIEW_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -1312,11 +1322,39 @@ TARGET_PSK_ACCESSED=false
 REAL_RASTER_EVALUATED_COUNT=0
 LIVE_OR_USB_ACTION_COUNT=0
 PER_FRAME_MINUTIAE_COUNT_EXPORTED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PROTECTED_ATTEMPT02_EVALUATION_OPERATOR_KIT_AND_REVIEW
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_34=OFFLINE_PROTECTED_ATTEMPT02_EVALUATION_OPERATOR_KIT_AND_REVIEW
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_34_exact_nbis_variant_evaluator.md`.
+
+### D279/35 — operator kit per valutazione offline protetta
+
+`operator_kit/d279-35-offline-protected-evaluation/` separa preflight,
+preparazione da SHA, grant single-use e run manuale privilegiata. Il grant
+viene consumato prima di esaminare il transport; il reader usa openat e
+no-follow, richiede directory `0:0/0700`, file `0:0/0600`, 88 byte e hash
+production. PSK, plaintext e raster mutable owned vengono azzerati; le copie
+interne/transitorie del runtime non sono dichiarate provabilmente azzerate.
+
+Il solo output autentico ammesso è `summary.json` 0600 aggregate-only, con 48
+varianti e gruppi 1+21+21; niente conteggi per-frame, raster o template. Il kit
+non contiene USB/fprintd/sender e non impone deadline. Il preflight passa 19/19
+test, build NBIS normale e ASan/UBSan e integrazione Python→pipe→NBIS.
+
+```text
+D279_35_OUTCOME=READY_FOR_HUMAN_GATE_ONE_OFFLINE_PROTECTED_EVALUATION
+ADVANCEMENT=MATERIAL_OPERATOR_BOUNDARY_REACHED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_ONLY
+TARGET_PSK_ACCESSED=false
+REAL_RASTER_EVALUATED_COUNT=0
+LIVE_OR_USB_ACTION_COUNT=0
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OFFLINE_PROTECTED_EVALUATION
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_35_offline_protected_evaluation_operator_kit.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
