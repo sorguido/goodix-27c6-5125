@@ -316,6 +316,13 @@ if 'goodix_27c6_5125' in drivers and cairo_dep.found()
         link_with: libfprint_drivers,
         install: false,
     )
+
+    goodix_nbis_count_pipe = executable('test-goodix-nbis-count-pipe',
+        sources: '../../../../libfprint-driver/tests/test_goodix_nbis_count_pipe.c',
+        dependencies: libfprint_private_dep,
+        c_args: common_cflags + ['-Wno-error=redundant-decls'],
+        install: false,
+    )
 endif
 
 unit_tests = [

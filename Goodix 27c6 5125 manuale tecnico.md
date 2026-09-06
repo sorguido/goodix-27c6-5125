@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/33 — composer TLS→raster chiuso, NBIS evaluator offline
+### Stato corrente D279/34 — evaluator NBIS chiuso, operator boundary offline
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -156,6 +156,16 @@ sintetica: nessun record reale è stato decifrato e nessun raster reale è stato
 esposto. I buffer owned vengono azzerati, senza estendere il claim alle copie
 temporanee del runtime. Restano offline l'evaluator NBIS esatto e il futuro
 operator boundary per la lettura protetta, che richiederà Human Gate separato.
+
+D279/34 ha chiuso anche l'evaluator senza usare dati autentici. Un helper test
+non installato chiama lo stesso `get_minutiae()` NBIS pinned Fedora 44/libfprint
+1.94.100 con `g_lfsparms_V2`, `ppmm=0` e flags 0; riceve soltanto raw 8-bit su
+pipe e non contiene path immagine o entry point USB. La matrice copre tre
+scale, otto geometrie e due polarità, mantenendo soltanto aggregati per
+baseline/21 primarie/21 ausiliarie. Build normale e ASan/UBSan e test sintetici
+sono verdi. Nessuna PSK è stata letta e nessun raster reale è stato decifrato.
+Resta da preparare offline il kit short-lived e hash-pinned; la sua futura
+lettura del materiale protetto resta un Human Gate distinto e non autorizzato.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -513,7 +523,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_EXACT_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PROTECTED_ATTEMPT02_EVALUATION_OPERATOR_KIT_AND_REVIEW
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=NEW_TECHNICAL_HYPOTHESIS_THEN_OFFLINE_REVIEW_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -1271,11 +1281,42 @@ TARGET_PSK_ACCESSED=false
 ATTEMPT02_RECORD_DECRYPTED_COUNT=0
 REAL_RASTER_DECODED_COUNT=0
 LIVE_OR_USB_ACTION_COUNT=0
-NEXT_PRIMARY_BOUNDARY=OFFLINE_EXACT_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_33=OFFLINE_EXACT_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_33_attempt02_in_memory_composer.md`.
+
+### D279/34 — evaluator esatto NBIS, aggregate-only
+
+`analysis/D279/d279_34_exact_nbis_variant_evaluator.py` definisce 48 varianti:
+mapping fisso 12-bit, min/max frame-local o p01/p99 robusto; otto trasformazioni
+diedrali; polarità normale o invertita. L'output conserva solo frame count,
+presenza minutiae, soglia 10, minimo, mediana e massimo per i gruppi
+baseline/primario/ausiliario, senza conteggi per-frame.
+
+Il target Meson `test-goodix-nbis-count-pipe`, non installato, collega il NBIS
+del tree pinned e chiama `get_minutiae()` con `g_lfsparms_V2`, `ppmm=0`, depth 8
+e flags 0. Il protocollo è solo stdin/stdout raw/count e il sorgente non
+contiene entry point USB. Build normale e ASan/UBSan passano su frame sintetico
+uniforme; 4/4 test Python verificano trasformazioni, aggregazione, decomposizione
+1+21+21 e cleanup dei buffer mutabili owned.
+
+```text
+D279_34_OUTCOME=READY_OFFLINE_EXACT_NBIS_VARIANT_EVALUATOR
+ADVANCEMENT=MATERIAL_EXECUTABLE_BIOMETRIC_EVALUATION_BOUNDARY
+EXECUTABLE_CLOSURE=PASS_SYNTHETIC_PINNED_NBIS_NORMAL_ASAN_UBSAN
+D279_34_PYTHON_TESTS=4/4_PASS
+D279_34_VARIANT_COUNT=48
+TARGET_PSK_ACCESSED=false
+REAL_RASTER_EVALUATED_COUNT=0
+LIVE_OR_USB_ACTION_COUNT=0
+PER_FRAME_MINUTIAE_COUNT_EXPORTED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PROTECTED_ATTEMPT02_EVALUATION_OPERATOR_KIT_AND_REVIEW
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_34_exact_nbis_variant_evaluator.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
