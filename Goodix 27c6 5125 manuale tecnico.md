@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/38 — ordine ruoli corretto, quality discriminator offline
+### Stato corrente D279/39 — quality discriminator chiuso offline, Human Gate protected
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -247,14 +247,22 @@ proprietà dell'insieme complessivo dei 42 frame fingerprint e il confronto con
 la baseline. Gli evaluator condivisi ora applicano l'alternanza corretta; i kit
 storici e i grant consumati non vengono riscritti o riutilizzati.
 
-Il prossimo lavoro è ancora offline: costruire e chiudere sinteticamente un
-evaluator correct-role che, sui candidati minmax x3 e sui controlli artefatto,
-aggreghi quality-map NBIS e soglie di reliability oltre al conteggio totale.
-L'incertezza da chiudere è se il segnale spaziale sia sostenuto da struttura
-A/B e minutiae affidabili oppure riproduca falsi positivi della baseline. Solo
-dopo review e pubblicazione di quel boundary sarà formulabile un nuovo Human
-Gate separato. Fusion primary/auxiliary, matching e modifica production restano
-fuori scope.
+D279/39 ha ora chiuso offline quell'evaluator correct-role. Sulle stesse nove
+varianti aggrega totale minutiae, soglie reliability, istogramma quality-map e
+proporzioni A/B per baseline, 21 primari e 21 ausiliari correttamente alternati.
+Il helper usa il `get_minutiae()` e il resize pixman pinned, è test-only,
+`install:false` e privo di entry point USB/production. Ventisette test Python,
+build normale/ASan/UBSan e preflight end-to-end da snapshot sono verdi.
+
+Il `ppmm` resta zero come nel percorso production corrente: le soglie
+reliability rappresentano soltanto i tier della quality-map, non una reliability
+grayscale a scala fisica. L'esperimento non inventa quindi un `ppmm`, non prova
+matching e non autorizza fusion primary/auxiliary o modifiche production.
+
+Ogni incertezza residua del confine D279/39 dipende ora dai raster autentici.
+Serve un Human Gate separato sul full SHA per una sola
+`D279_39_ONE_OFFLINE_PROTECTED_NBIS_QUALITY_EVALUATION`. D279/35 e D279/37
+restano consumate; nessuna lettura protetta, USB/live o retry è autorizzata.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1527,6 +1535,36 @@ CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_38_target_role_order_corrective.md`.
+
+### D279/39 — quality-map NBIS correct-role e operator kit
+
+Il target test-only `test-goodix-nbis-resize-quality-pipe` espone, oltre al
+numero totale di minutiae, le soglie reliability 0,25/0,50 e l'istogramma dei
+livelli quality-map 0..4 dell'esatto NBIS Fedora 44/libfprint 1.94.100. Il
+runner Python valida le invarianti e persiste soltanto aggregati statistici e
+proporzioni A/B per i ruoli D279/38 corretti sulle nove varianti 3×3.
+
+Con `ppmm=0` la componente grayscale della reliability collassa: le soglie
+sono quindi proxy esatti dei tier quality-map, non una misura fisica. Nessun
+file production è modificato; il binario non è installato e non collega entry
+point USB. Build normale/ASan/UBSan, 27 test Python e preflight completo del kit
+da snapshot sono `PASS`.
+
+```text
+D279_39_OUTCOME=READY_FOR_HUMAN_GATE_ONE_OFFLINE_PROTECTED_NBIS_QUALITY_EVALUATION
+ADVANCEMENT=NEW_BIOMETRIC_DISCRIMINATOR_AND_OPERATOR_BOUNDARY_REACHED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_ONLY
+D279_39_PYTHON_PREFLIGHT_TESTS=27/27_PASS
+D279_39_NORMAL_AND_ASAN_UBSAN=PASS
+D279_39_OPERATOR_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D279_35_AUTHORIZATION_CONSUMED=true
+D279_37_AUTHORIZATION_CONSUMED=true
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OFFLINE_PROTECTED_NBIS_QUALITY_EVALUATION
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
