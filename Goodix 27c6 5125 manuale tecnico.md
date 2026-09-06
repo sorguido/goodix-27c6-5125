@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/35 — operator kit offline chiuso, Human Gate protected
+### Stato corrente D279/36 — aggregate autentico revisionato, resize spaziale selezionato
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -176,6 +176,35 @@ solo metriche aggregate delle 48 varianti. Il preflight sintetico passa 19/19
 test e build normale/ASan/UBSan; la PSK non è stata letta e nessun raster reale
 è stato valutato. Il prossimo confine è quindi un Human Gate sul full SHA per
 una singola lettura protected offline, non una nuova prova hardware.
+
+Il boundary D279/35 è stato poi attraversato una sola volta dall'operatore su
+autorizzazione esplicita e baseline
+`5b2cb03b04e68225134316fb049712830f7ff9f8`. Il primo preflight sul parent
+aveva fallito soltanto perché il guard `ldd` pretendeva erroneamente un
+`DT_NEEDED` verso libfprint anche se NBIS è staticamente incluso e
+`--as-needed` può eliminare quella dipendenza. Il commit approvato verifica
+invece i simboli NBIS definiti e non irrisolti; il preflight corretto ha
+passato 19/19 test e build normale/ASan/UBSan.
+
+L'aggregate autentico D279/35 è ora preservato e revisionato in D279/36. Tutte
+le 48 varianti hanno zero frame con almeno 10 minutiae e mediana primaria zero.
+Il migliore primario è 9/21 con massimo 5; gli ausiliari arrivano a 17/21 ma
+con massimo 3. Ventisei varianti producono minutiae anche sulla baseline, fino
+a 5: la sola presenza di pochi punti dopo normalizzazione non discrimina
+qualità biometrica da artefatto di preprocessing. Nessuna geometria o polarità
+domina.
+
+Uno sweep del solo `ppmm` non è un esperimento valido sui conteggi: nel NBIS
+pinned quel parametro entra dopo la detection soltanto nel calcolo della
+reliability delle minutiae già presenti e non modifica `minutiae->num`. Il
+prossimo boundary offline è invece un resize spaziale con l'algoritmo bilineare
+`fpi_image_resize()` del tree pinned e fattori 1/2/3. Driver libfprint per
+sensori piccoli applicano già fattori 2 o 3 per rendere l'immagine adeguata a
+NBIS. Fusion primary/aux, accumulo multi-frame e altro preprocessing restano
+differiti fino a questa misura più piccola.
+
+L'autorizzazione D279/35 è consumata. Nessuna nuova lettura protetta, USB, live
+o retry è autorizzata.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1355,6 +1384,36 @@ CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_35_offline_protected_evaluation_operator_kit.md`.
+
+### D279/36 — review dell'aggregate autentico D279/35
+
+Il risultato autentico è preservato byte-per-byte in
+`captures/D279_35/D27935_20260906T072751Z/sanitized/summary.json`, hash
+`5010f695f539b60b1f03e63d0bcbd6b60d57c06607f9a6340216cf7518cb7d04`.
+L'auditor D279/36 pinna quel digest e valida schema, baseline, capture,
+privacy, matrice 3×8×2, cardinalità 1+21+21 e invarianti statistiche.
+
+Il risultato non contiene frame con almeno 10 minutiae. Il massimo primario è
+5 e anche la baseline raggiunge 5 sotto alcune normalizzazioni; nessuna
+geometria o polarità costituisce una spiegazione dominante. `ppmm` è escluso
+come sweep di conteggio perché nel NBIS pinned modifica soltanto reliability
+dopo la detection. Il successivo esperimento offline isolerà il resize
+spaziale bilineare fattore 1/2/3 prima di qualunque nuovo gate protetto.
+
+```text
+D279_36_OUTCOME=AUTHENTIC_AGGREGATE_ACCEPTED_NEXT_HYPOTHESIS_SELECTED
+ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
+EXECUTABLE_CLOSURE=PASS_AGGREGATE_AUDIT_ONLY
+D279_36_TESTS=4/4_PASS
+ALL_VARIANTS_ZERO_FRAMES_AT_OR_ABOVE_10=true
+PPMM_ONLY_COUNT_EXPERIMENT=REJECTED_NON_DISCRIMINATING
+D279_35_AUTHORIZATION_CONSUMED=true
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PINNED_LIBFPRINT_SPATIAL_RESIZE_EVALUATOR_AND_SYNTHETIC_CLOSURE
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_36_authentic_aggregate_review.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

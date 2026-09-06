@@ -80,3 +80,19 @@ D279_35_ONE_OFFLINE_PROTECTED_EVALUATION
 L'autorizzazione non comprenderà USB, live, retry, seconda valutazione,
 modifica/copia del transport, persistenza di raster/template o qualunque
 operazione sul sensore.
+
+## Integrazione post-run D279/36
+
+Il primo preflight della baseline parent `9a9c88d` aveva in realtà superato
+tutti i test ma fallito sul guard post-link `ldd`: NBIS è staticamente incluso
+nel helper e `--as-needed` non garantisce un `DT_NEEDED` verso libfprint. Il
+corrective manuale `5b2cb03b04e68225134316fb049712830f7ff9f8` verifica invece
+simboli NBIS definiti e non irrisolti. Il preflight corretto è passato.
+
+L'Utente ha autorizzato ed eseguito una singola
+`D279_35_ONE_OFFLINE_PROTECTED_EVALUATION` su quello SHA. L'autorizzazione è
+consumata. Il risultato aggregate-only autentico, integrato e revisionato in
+D279/36, ha hash
+`5010f695f539b60b1f03e63d0bcbd6b60d57c06607f9a6340216cf7518cb7d04`.
+Tutte le varianti hanno zero frame con almeno 10 minutiae; nessuna nuova
+lettura protetta, USB o live è autorizzata.

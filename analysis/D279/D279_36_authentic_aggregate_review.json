@@ -1,0 +1,162 @@
+{
+  "aggregate_contract_valid": true,
+  "all_variants_zero_frames_at_or_above_10": true,
+  "baseline_best_maximum": 5,
+  "baseline_nonzero_variant_count": 26,
+  "baseline_sha": "5b2cb03b04e68225134316fb049712830f7ff9f8",
+  "best_auxiliary_by_presence": {
+    "frame_count": 21,
+    "frames_with_at_least_10_minutiae": 0,
+    "frames_with_minutiae": 17,
+    "maximum": 3,
+    "median": 1,
+    "minimum": 0,
+    "variant": "robust_p01_p99/vflip/inverted"
+  },
+  "best_primary": {
+    "frame_count": 21,
+    "frames_with_at_least_10_minutiae": 0,
+    "frames_with_minutiae": 9,
+    "maximum": 5,
+    "median": 0,
+    "minimum": 0,
+    "variant": "robust_p01_p99/hflip/inverted"
+  },
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "frame_roles": {
+    "auxiliary": 21,
+    "baseline": 1,
+    "primary": 21
+  },
+  "live_or_usb_action_count": 0,
+  "marginals": {
+    "orientation": [
+      {
+        "auxiliary_best_frames_with_minutiae": 15,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 4,
+        "orientation": "hflip",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 5,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 15,
+        "auxiliary_best_maximum": 2,
+        "baseline_best_maximum": 2,
+        "orientation": "identity",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 3,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 15,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 3,
+        "orientation": "rot180",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 2,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 3,
+        "orientation": "transpose",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 4,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 15,
+        "auxiliary_best_maximum": 2,
+        "baseline_best_maximum": 3,
+        "orientation": "transpose_hflip",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 2,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 4,
+        "orientation": "transpose_rot180",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 4,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 15,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 5,
+        "orientation": "transpose_vflip",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 3,
+        "variant_count": 6
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 1,
+        "orientation": "vflip",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 2,
+        "variant_count": 6
+      }
+    ],
+    "polarity": [
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 5,
+        "polarity": "inverted",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 5,
+        "variant_count": 24
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 15,
+        "auxiliary_best_maximum": 2,
+        "baseline_best_maximum": 5,
+        "polarity": "normal",
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 4,
+        "variant_count": 24
+      }
+    ],
+    "scale": [
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 0,
+        "primary_best_frames_with_minutiae": 8,
+        "primary_best_maximum": 2,
+        "scale": "fixed_12bit",
+        "variant_count": 16
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 3,
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 4,
+        "scale": "frame_minmax",
+        "variant_count": 16
+      },
+      {
+        "auxiliary_best_frames_with_minutiae": 17,
+        "auxiliary_best_maximum": 3,
+        "baseline_best_maximum": 5,
+        "primary_best_frames_with_minutiae": 9,
+        "primary_best_maximum": 5,
+        "scale": "robust_p01_p99",
+        "variant_count": 16
+      }
+    ]
+  },
+  "privacy_contract_valid": true,
+  "schema": "D279_36_AUTHENTIC_AGGREGATE_REVIEW_V1",
+  "source_contract_valid": true,
+  "source_summary_sha256": "5010f695f539b60b1f03e63d0bcbd6b60d57c06607f9a6340216cf7518cb7d04",
+  "variant_count": 48
+}
