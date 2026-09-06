@@ -52,6 +52,12 @@ class ProtectedRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(RUNNER.ProtectedComparisonError, "missing_NOT_REGULAR"):
             RUNNER.load_module("missing", Path("/missing/module.py"))
 
+    def test_launcher_pins_snapshot_python_dependency_closure(self):
+        launcher = MODULE_PATH.with_name("run-d279-48.sh").read_text(encoding="utf-8")
+        self.assertIn("src/goodix5125_cleanroom.py", launcher)
+        self.assertIn("verify_snapshot_python_closure", launcher)
+        self.assertIn('verify_snapshot_python_closure "$snapshot"', launcher)
+
     def test_output_validator_accepts_only_complete_aggregate_contract(self):
         rasters = [[1000] * COMPARISON.PIXELS]
         rasters += [[1000 + index] * COMPARISON.PIXELS for index in range(1, 43)]
