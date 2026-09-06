@@ -1,11 +1,11 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 /*
- * Host-only FpImageDevice shell for the Goodix 27c6:5125 boundary.
+ * FpImageDevice glue for the Goodix 27c6:5125 boundary.
  *
  * This file implements the first production-shaped slice of the libfprint
- * device glue with an in-memory fake backend and the production-shaped USB
- * router, TLS server, USB backend and secure-session integration.  It still
- * contains no fprintd, persistent-write or real sensor execution path.
+ * device glue with an in-memory fake backend and the production USB router,
+ * TLS server, USB backend, secure-session and one-shot enrollment integration.
+ * It contains no fprintd or persistent-write path.
  *
  * Architecture source: analysis/D276/D276_01_libfprint_device_architecture.md
  * API source: repository-local libfprint 1.94.5 (LGPL).
@@ -94,6 +94,10 @@ struct _GoodixDeviceContext
   GoodixSecureSessionAudit    runtime_secure_audit;
   GoodixTlsAudit              runtime_tls_audit;
   GoodixPostTlsAudit          runtime_post_tls_audit;
+  GoodixEnrollmentPostTlsEventsAudit runtime_enrollment_events_audit;
+  GoodixEnrollmentFpiUsbBindingAudit runtime_enrollment_binding_audit;
+  guint                      runtime_enrollment_auxiliary_count;
+  gboolean                   production_action_consumed;
   GoodixRuntimeMaterialReleaseSeam runtime_material_release;
   gpointer                   runtime_material_release_data;
   gboolean                   runtime_handoff_views_cleared;
@@ -272,16 +276,45 @@ production_timestamp (void)
   return (guint16) ((guint64) (g_get_monotonic_time () / 1000) & 0xffffu);
 }
 
+static gboolean
+production_enrollment_auxiliary (GBytes   *plaintext,
+                                 gpointer  user_data,
+                                 GError  **error)
+{
+  GoodixDeviceContext *ctx = user_data;
+
+  if (ctx == NULL || ctx->terminal_fence || plaintext == NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "production auxiliary enrollment B0 is fenced");
+      return FALSE;
+    }
+
+  /* This target-observed message advances the graph, but its biometric and
+   * application semantics remain unknown.  Keep it opaque in production. */
+  ctx->runtime_enrollment_auxiliary_count++;
+  return TRUE;
+}
+
 static void
 production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 {
   GoodixPostTlsMaterial post_material = { 0 };
+  GoodixEnrollmentModelConfig enrollment_config = {
+    .required_stage_count = GOODIX_TARGET_LOCAL_ENROLL_STAGES,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   g_autoptr(GError) error = NULL;
+  gboolean enrollment_action;
 
   if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
       ctx->terminal_fence || ctx->operator_epoch ||
       ctx->runtime_material == NULL || !ctx->usb_interface_claimed)
     return;
+
+  enrollment_action =
+    fpi_device_get_current_action (FP_DEVICE (ctx->device)) ==
+      FPI_DEVICE_ACTION_ENROLL;
 
   memcpy (post_material.initial_fdt_table, ctx->runtime_fdt_seed,
           sizeof post_material.initial_fdt_table);
@@ -290,6 +323,11 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   post_material.second_arm_timestamp = production_timestamp ();
   if (!goodix_device_context_configure_post_tls_lifecycle (
         ctx, &post_material, &ctx->runtime_post_tls_audit, &error) ||
+      (enrollment_action &&
+       !goodix_device_context_configure_enrollment_graph (
+         ctx, &enrollment_config, production_enrollment_auxiliary, ctx,
+         &ctx->runtime_enrollment_events_audit,
+         &ctx->runtime_enrollment_binding_audit, &error)) ||
       !goodix_device_context_start_secure_session (
         ctx, &ctx->runtime_secure_view, NULL, NULL,
         &ctx->runtime_secure_audit, &ctx->runtime_tls_audit, &error))
@@ -1012,16 +1050,30 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
     }
 
   if (goodix_fpimage_device_is_production_usb (self) &&
-      fpi_device_get_current_action (FP_DEVICE (self)) ==
+      fpi_device_get_current_action (FP_DEVICE (self)) !=
         FPI_DEVICE_ACTION_ENROLL)
     {
       error = g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-        "Goodix enrollment is disabled until the target-observed multistage "
-        "lifecycle is integrated and reviewed");
+        "Goodix production first-live boundary permits enrollment only");
       fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
       return;
     }
+
+  /* The first production action consumes this complete open epoch, including
+   * an activation that later fails.  No retry or second action can reuse
+   * potentially ambiguous device-side state: img_close/img_open is required. */
+  if (goodix_fpimage_device_is_production_usb (self) &&
+      ctx->production_action_consumed)
+    {
+      error = g_error_new_literal (
+        FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+        "Goodix production open epoch already consumed; close/reopen required");
+      fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+      return;
+    }
+  if (goodix_fpimage_device_is_production_usb (self))
+    ctx->production_action_consumed = TRUE;
 
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;
@@ -1225,6 +1277,7 @@ goodix_fpimage_device_get_context (GoodixFpImageDevice *dev)
   return goodix_fpimage_device_peek_context (dev);
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
@@ -1253,6 +1306,7 @@ goodix_fpimage_device_set_production_open_seams (
   priv->release_interface = release_interface;
   priv->production_seam_data = user_data;
 }
+#endif
 
 gboolean
 goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx)
@@ -1270,6 +1324,26 @@ gboolean
 goodix_device_context_runtime_handoff_views_cleared (GoodixDeviceContext *ctx)
 {
   return ctx != NULL && ctx->runtime_handoff_views_cleared;
+}
+
+void
+goodix_device_context_get_production_enrollment_audit (
+  GoodixDeviceContext              *ctx,
+  GoodixProductionEnrollmentAudit *audit)
+{
+  g_return_if_fail (ctx != NULL);
+  g_return_if_fail (audit != NULL);
+
+  *audit = (GoodixProductionEnrollmentAudit) {
+    .production_action_consumed = ctx->production_action_consumed,
+    .auxiliary_b0_observed_count =
+      ctx->runtime_enrollment_auxiliary_count,
+    .secure = ctx->runtime_secure_audit,
+    .tls = ctx->runtime_tls_audit,
+    .post_tls = ctx->runtime_post_tls_audit,
+    .enrollment_events = ctx->runtime_enrollment_events_audit,
+    .enrollment_binding = ctx->runtime_enrollment_binding_audit,
+  };
 }
 
 gboolean
@@ -1690,6 +1764,7 @@ goodix_device_context_get_post_tls_lifecycle (GoodixDeviceContext *ctx)
   return ctx != NULL ? ctx->post_tls_lifecycle : NULL;
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
                                             GoodixUsbSubmitSeam seam,
@@ -1708,6 +1783,7 @@ goodix_device_context_set_async_usb_submit_seam (GoodixDeviceContext *ctx,
   goodix_fpi_usb_backend_set_async_submit_seam (ctx->fpi_usb_backend, seam,
                                                 user_data);
 }
+#endif
 
 gboolean
 goodix_device_context_arm_receive (GoodixDeviceContext *ctx, GError **error)
@@ -1717,6 +1793,7 @@ goodix_device_context_arm_receive (GoodixDeviceContext *ctx, GError **error)
                                              ctx->generation, error);
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                          guint64 submit_generation,
@@ -1731,6 +1808,7 @@ goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                            submit_generation, data, length,
                                            error);
 }
+#endif
 
 void
 goodix_device_context_set_post_tls_await_finger_on (GoodixDeviceContext *ctx,
@@ -1753,6 +1831,7 @@ goodix_device_context_set_secure_phase_observer (
   ctx->phase_observer_data = user_data;
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 gboolean
 goodix_device_context_begin_operator_epoch (GoodixDeviceContext *ctx,
                                              GCancellable        *cancellable,
@@ -1789,6 +1868,7 @@ goodix_device_context_begin_operator_epoch (GoodixDeviceContext *ctx,
   goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
   return TRUE;
 }
+#endif
 
 gboolean
 goodix_device_context_begin_pre_session_rx_sync (GoodixDeviceContext *ctx,
@@ -1861,6 +1941,7 @@ goodix_pre_session_rx_sync_result_name (GoodixPreSessionRxSyncResult result)
   return (guint) result < G_N_ELEMENTS (names) ? names[result] : "INVALID";
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_device_context_set_pre_session_rx_sync_clock (
   GoodixDeviceContext             *ctx,
@@ -1892,6 +1973,7 @@ goodix_device_context_operator_epoch_is_drained (GoodixDeviceContext *ctx)
   return ctx != NULL && goodix_fpi_usb_backend_is_drained (
                           ctx->fpi_usb_backend);
 }
+#endif
 
 /* --- Context accessors --- */
 

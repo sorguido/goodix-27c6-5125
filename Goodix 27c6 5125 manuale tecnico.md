@@ -84,19 +84,13 @@ quiet boundary; failure/cancellation completano il corretto punto libfprint e
 avvelenano l'epoch. Dopo la costruzione dei consumer, la glue cancella secure
 descriptor e FDT12 borrowed mentre mantiene il solo owner fino a close.
 
-Questo collegamento è volutamente bounded: capture/identify sono cablati
-offline, ma l'enrollment viene rifiutato con `NOT_SUPPORTED` prima della
-generation e con zero submit. Fedora 44 richiede per default cinque stage in
-una sola activation, mentre quel lifecycle locale termina al secondo B0. La
-successiva evidenza D279/10 attempt 02 ha superato questo limite storico e
-misurato 21 stage OEM primari; il sender Linux resta però ancora bounded al
-secondo B0. La suite è ora 25/25 normale e sanitizer, con regressione D278
-24/24 normale/sanitizer e
-build Fedora 44 e builder adapter D278/13 unapproved host-only `PASS`. I due
-builder D278 interessati sono stati corretti per linkare le dipendenze runtime
-introdotte da D279/08; non è cambiato il protocollo né è stata abilitata una
-baseline live.
-D279/09 non autorizza installazione, fprintd o live.
+Quel collegamento D279/09 era volutamente bounded e respingeva enrollment.
+D279/10 attempt 02 ha poi misurato 21 stage OEM primari e D279/28 ha sostituito
+il gate storico con il binding production one-shot a 21 stage. Lo stato
+corrente ammette esclusivamente la prima action enrollment per open epoch;
+capture/identify production e ogni seconda action sono respinti prima del
+submit. Non è comunque autorizzata alcuna installazione, esecuzione fprintd o
+run live.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -454,7 +448,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=MINIMAL_PRODUCTION_USB_ONE_SHOT_ENROLLMENT_BINDING_OFFLINE
+NEXT_PRIMARY_BOUNDARY=LIVE_CRITICAL_REVIEW_THEN_ONE_SHOT_OPERATOR_KIT_AND_HUMAN_GATE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -904,14 +898,70 @@ successo live. Il test usa soltanto il constructor virtuale e un gate sorgente
 esclude constructor USB, GUsb ed enumerazione: zero accesso USB reale.
 
 Le regressioni complete FpImageDevice (27/27 normale e ASan/UBSan), modello
-enrollment e build/registry Fedora 44 restano verdi. Nessun codice runtime né
-il gate che respinge enrollment production è stato modificato.
+enrollment e build/registry Fedora 44 restano verdi. Alla closure D279/27 non
+era stato modificato codice runtime e il gate production era ancora chiuso;
+D279/28, descritto subito sotto, supera ora esplicitamente quello stato.
 
 Le deadline del runner sono safety bound host-side e non implicano quiescenza
 o timeout device-side dopo un'interruzione. Il prossimo confine è il solo
 binding offline della action one-shot al percorso USB production; multi-action,
 reactivation, verify/fprintd e packaging restano post-live. Report:
 `analysis/D279/D279_27_fedora44_native_nbis_action.md`.
+
+### D279/28 — binding enrollment USB production one-shot
+
+La action `FPI_DEVICE_ACTION_ENROLL` della sottoclasse USB registrata configura
+ora, dopo il completamento della pre-session RX, il grafo enrollment esatto a
+21 stage fra lifecycle post-TLS e `GoodixFpiUsbBackend`. La catena conserva
+owner dei materiali, secure session, handshake TLS 1.2 PSK reale, router unico,
+backend unico e handoff al primo arm. I plaintext B0 production raggiungono il
+grafo soltanto dal callback post-TLS autenticato; il B0 ausiliario resta opaco,
+viene contato e non è interpretato.
+
+La allowlist first-live ammette soltanto enrollment e respinge le altre action
+production prima di generation e submit. Il primo tentativo enrollment
+consuma l'intero open epoch, anche se fallisce. Ogni seconda action viene respinta prima di allocare una generation o
+fare submit; dopo successo o failure è richiesto il close completo e un nuovo
+open. Questo chiude il solo requisito one-shot pre-live. Non prova né tenta
+teardown/cancel/reactivation multi-action nello stesso epoch, che resta
+deliberatamente post-live insieme a fprintd, verify/PAM e packaging di sistema.
+
+Il transcript sintetico production-shaped percorre open, pre-session RX,
+secure protocol, handshake TLS reale, bootstrap post-TLS, 21 stage, 21 progress,
+un solo completion libfprint, rifiuto senza submit della seconda action e
+close/release. Le suite secure-session passano 25/25 normale e ASan/UBSan; la
+suite FpImageDevice passa 28/28 in entrambe le modalità. La build/registry del
+target Fedora 44/libfprint 1.94.100 passa e il relativo oggetto production non
+contiene i simboli delle seam di open/submit/ricezione/operator epoch usate dai
+test. Il path NBIS nativo esatto resta verificato separatamente da D279/27,
+normale e sanitizer. Nessuna di queste prove ha enumerato, aperto, reclamato o
+raggiunto il Goodix reale.
+
+Le deadline osservate sono esclusivamente safety bound host-side: una
+completion di timeout senza byte non prova timeout semantico, readiness o
+quiescenza device-side, soprattutto dopo un’interruzione. Analogamente, il
+sender enrollment ammette soltanto `0x20/0x22/0x32/0x34/0x36/0x50` e mantiene a
+zero le famiglie persistenti note; questo è un guardrail di allowlist, non prova
+l’assenza di qualunque possibile persistenza sensor-side.
+
+```text
+D279_28_OUTCOME=READY_OFFLINE
+D279_28_PRODUCTION_ENROLLMENT_STAGE_COUNT=21
+D279_28_PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
+D279_28_PRODUCTION_ACTION_ALLOWLIST=ENROLL_ONLY
+D279_28_IMPLICIT_RETRY_COUNT=0
+D279_28_SECOND_ACTION_SUBMIT_COUNT=0
+D279_28_HOST_ONLY_TRANSCRIPT_SEAMS_IN_PRODUCTION_LIBRARY=false
+D279_28_KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
+D279_28_SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
+D279_28_DEVICE_SIDE_QUIESCENCE_INFERRED_FROM_DEADLINES=false
+D279_28_REAL_USB_SUBMIT=0
+D279_28_LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=LIVE_CRITICAL_REVIEW_THEN_ONE_SHOT_OPERATOR_KIT_AND_HUMAN_GATE
+```
+
+Report: `analysis/D279/D279_28_production_usb_one_shot_enrollment_binding.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

@@ -115,28 +115,29 @@ descriptors and freeing the owner; a second open creates a fresh epoch.
 libfprint 1.94.100 itself opens `GUsbDevice` before invoking `img_open`, so the
 target-compatible order is core USB open, material load, interface claim. No
 USB submit or protocol action occurs in `img_open`. Injected test seams prove
-ordering and failure cleanup without real paths or hardware; NULL seams select
-the production loader and libgusb calls. Production activation still does not
-start the secure/post-TLS graph, so this is not fprintd operational closure.
+ordering and failure cleanup without real paths or hardware. Those setters are
+compiled only with `GOODIX_ENABLE_TEST_SEAMS`; the production library contains
+neither their symbols nor the direct receive-injection helper. The unmodified
+production build therefore selects the runtime loader and libgusb calls.
 
 ## D279/09 bounded production activation
 
-For the registered USB subclass, activation now requires the drained
-pre-session RX quiet boundary and then constructs the existing native secure
+For the registered USB subclass, activation now requires a bounded host
+pre-session RX deadline completion without bytes and then constructs the native secure
 session, retained TLS and post-TLS lifecycle from the open-epoch material.
 The first protocol OUT therefore cannot precede RX synchronization. Borrowed
 secure/FDT views are cleared after both consumers copy their inputs; their sole
 runtime-material owner remains alive until close.
 
+The host deadline is a transition/safety bound only. It does not prove a
+device-side timeout or quiescence, either normally or after interruption.
+
 Asynchronous sync, secure-session, post-TLS and receive-rearm failures are
 routed to the appropriate libfprint activation/session completion. Synthetic
 tests exercise that production vfunc without real paths or USB.
 
-Enrollment remains deliberately disabled before any submit. Fedora 44
-`FpImageDevice` expects five captures in one activation, while target evidence
-and the current lifecycle stop at the second B0. D279/09 does not silently set
-two stages or extrapolate an unproven third acquisition. Capture/identify are
-only offline-wired and still require a separately authorized live validation.
+This section records the D279/09 boundary. D279/28 supersedes its enrollment
+gate with the reviewed 21-stage one-shot binding described below.
 
 ## D279/11 configurable enrollment oracle
 
@@ -218,7 +219,31 @@ lifecycle transition. Serialization, transport and submit remain absent.
 `goodix_enrollment_outbound_frame.[ch]` revalidates a prepared inner body and
 serializes only controls `0x20/0x22/0x32/0x34/0x36/0x50` into zero-padded
 fixed64 A0. It has no backend or submit API. Known persistent families are not
-allowlisted, and production enrollment remains gated before activation.
+allowlisted. That is an allowlist guardrail over known families, not proof that
+no other sensor-side persistence is possible.
+
+## D279/28 minimal production USB one-shot enrollment binding
+
+The registered USB action now installs the exact target-observed 21-stage
+enrollment graph between the retained post-TLS lifecycle and the existing
+production `GoodixFpiUsbBackend`. It does so only for `FPI_DEVICE_ACTION_ENROLL`;
+all B0 application plaintext reaches the graph through the authenticated TLS
+server. The auxiliary B0 stays opaque and is counted without interpretation.
+
+Only enrollment is admitted by the first-live action allowlist. Its first
+attempt consumes the complete open epoch even on failure.
+A second action is rejected before generation allocation or USB submit, and a
+full close/open is required. There is no retry, automatic reopen, reset,
+clear-halt, or persistent-family sender. Multi-action reactivation and fprintd
+packaging remain intentionally outside this first-live boundary.
+
+The offline production-shaped test covers open, pre-session host deadline,
+secure protocol, real TLS 1.2 PSK handshake, post-TLS bootstrap, all 21 stages,
+one libfprint completion, second-action rejection, and close/release. Its USB
+and protected-material inputs are test seams, so it records zero real USB
+submits. The Fedora 44 production library is separately built without any of
+those transcript seam symbols; the native NBIS action remains covered by the
+exact-target D279/27 test.
 
 ## D279/17 completion-gated synthetic OUT transaction
 

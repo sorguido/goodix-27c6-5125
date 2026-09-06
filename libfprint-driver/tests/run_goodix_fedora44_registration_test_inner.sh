@@ -36,6 +36,19 @@ grep -F 't = fpi_device_goodix_27c6_5125_get_type ();' "$registry" >/dev/null
 grep -F -- '-DGOODIX_LIBFPRINT_1_94_100_NBIS' \
   "$build_dir/compile_commands.json" >/dev/null
 nm "$library" | grep -F ' fpi_device_goodix_27c6_5125_get_type' >/dev/null
+for forbidden_test_symbol in \
+  goodix_fpimage_device_set_production_open_seams \
+  goodix_device_context_set_usb_submit_seam \
+  goodix_device_context_set_async_usb_submit_seam \
+  goodix_device_context_complete_receive \
+  goodix_device_context_begin_operator_epoch \
+  goodix_device_context_set_pre_session_rx_sync_clock \
+  goodix_device_context_stop_operator_epoch; do
+  if nm "$library" | grep -F " $forbidden_test_symbol" >/dev/null; then
+    echo "production library contains host-only seam: $forbidden_test_symbol" >&2
+    exit 1
+  fi
+done
 
 supported=$(LD_LIBRARY_PATH="$build_dir/libfprint:$pkgconfig_dir" "$list_tool")
 printf '%s\n' "$supported"
@@ -57,6 +70,7 @@ echo D279_03_STANDARD_DRIVER_REGISTRY=PASS
 echo PRODUCTION_USB_ID_27C6_5125_REGISTERED=true
 echo EXTRACTOR_DECISION=NBIS
 echo FPIMAGE_PPMM_ASSIGNED=false
+echo HOST_ONLY_TRANSCRIPT_SEAMS_IN_PRODUCTION_LIBRARY=false
 echo REAL_USB_ENUMERATION_COUNT=0
 echo REAL_USB_OPEN_COUNT=0
 echo REAL_USB_CLAIM_COUNT=0

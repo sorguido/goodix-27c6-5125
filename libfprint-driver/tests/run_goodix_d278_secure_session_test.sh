@@ -33,7 +33,7 @@ python3 "$script_dir/support/generate_libfprint_enums.py" \
   "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
 includes="-I$script_dir/support/d277 -I$build -I$root/libfprint-driver -I$local_fp -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include -I$root/Rockytkg/libfprint -I$script_dir/support"
-strict="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 local_relax="-Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -Wno-conversion -Wno-sign-conversion -Wno-float-conversion"
 
 build_run () {
@@ -59,6 +59,16 @@ build_run () {
     "$root/libfprint-driver/goodix_secure_session.c" \
     "$root/libfprint-driver/goodix_image_decoder.c" \
     "$root/libfprint-driver/goodix_post_tls_lifecycle.c" \
+    "$root/libfprint-driver/goodix_enrollment_model.c" \
+    "$root/libfprint-driver/goodix_enrollment_pipeline.c" \
+    "$root/libfprint-driver/goodix_enrollment_command_plan.c" \
+    "$root/libfprint-driver/goodix_enrollment_command_body.c" \
+    "$root/libfprint-driver/goodix_enrollment_fdt_state.c" \
+    "$root/libfprint-driver/goodix_enrollment_lifecycle_adapter.c" \
+    "$root/libfprint-driver/goodix_enrollment_post_tls_events.c" \
+    "$root/libfprint-driver/goodix_enrollment_outbound_frame.c" \
+    "$root/libfprint-driver/goodix_enrollment_outbound_transaction.c" \
+    "$root/libfprint-driver/goodix_enrollment_fpi_usb_binding.c" \
     "$root/libfprint-driver/goodix_fpimage_device.c" \
     "$root/libfprint-driver/goodix_tls_server.c" \
     "$root/libfprint-driver/goodix_usb_router.c" \
@@ -102,7 +112,8 @@ echo SINGLE_TLS_OBJECT=true
 echo TLS_HANDSHAKE_COUNT_MAX=1
 echo SECRET_HANDOFF_COUNT_MAX=1
 echo PRE_SESSION_RX_SYNC_IMPLEMENTED=true
-echo PRE_SESSION_RX_CLEAN_QUIET_BOUNDARY_HOST_ONLY_PROVEN=true
+echo PRE_SESSION_RX_HOST_DEADLINE_WITHOUT_BYTES_OBSERVED=true
+echo PRE_SESSION_RX_DEVICE_QUIESCENCE_INFERRED=false
 echo PRE_SESSION_RX_RESIDUE_CHAIN_QUARANTINED_HOST_ONLY_PROVEN=true
 echo PRE_SESSION_RX_MULTI_FRAME_COMPLETION_QUARANTINED_HOST_ONLY_PROVEN=true
 echo PRE_SESSION_RX_NON_TIMEOUT_ERROR_FAIL_CLOSED=true
@@ -112,3 +123,7 @@ echo PRE_SESSION_RX_SECURE_START_BEFORE_SYNC_REJECTED=true
 echo STRICT_A2_ACK_THEN_TYPED_RESTORED=true
 echo CORRECTIVE_5_RUNTIME_TOLERANCE_RETIRED=true
 echo NO_PARALLEL_RX_DRAIN_STACK=true
+echo D279_28_PRODUCTION_ONE_SHOT_ENROLLMENT_FULL_TLS=PASS
+echo D279_28_PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
+echo D279_28_KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
+echo D279_28_SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false

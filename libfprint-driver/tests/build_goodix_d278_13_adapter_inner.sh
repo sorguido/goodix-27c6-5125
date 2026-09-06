@@ -47,7 +47,7 @@ python3 "$test_dir/support/generate_libfprint_enums.py" \
 cp "$test_dir/support/config.h" "$build/config.h"
 
 compile_local () { gcc $local_flags $cflags $includes -c "$1" -o "$2"; }
-compile_strict () { gcc $strict -DD278_13_LIVE_BINDING $approved_define $cflags $includes -c "$1" -o "$2"; }
+compile_strict () { gcc $strict -DGOODIX_ENABLE_TEST_SEAMS -DD278_13_LIVE_BINDING $approved_define $cflags $includes -c "$1" -o "$2"; }
 
 compile_local "$local_fp/fp-device.c" "$build/fp-device.o"
 compile_local "$local_fp/fpi-device.c" "$build/fpi-device.o"

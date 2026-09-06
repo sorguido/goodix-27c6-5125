@@ -16,7 +16,7 @@ test_dir="$git_root/libfprint-driver/tests"
 glib_cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 openssl)
 glib_libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 openssl)
 includes="-I$test_dir/support/d277 -I$test_dir/support -I$git_root/libfprint-driver -I$git_root/Rockytkg/libfprint -I$local_fp_dir -I$local_fp_dir/nbis/include -I$local_fp_dir/nbis/libfprint-include -I$build_dir"
-strict_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
+strict_flags="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 
 adoption_mentions=$(find "$git_root/libfprint-driver" \
@@ -34,11 +34,14 @@ configuration_mentions=$(find "$git_root/libfprint-driver" \
   \( -name '*.c' -o -name '*.h' \) -type f -exec \
   grep -H 'goodix_device_context_configure_enrollment_graph' {} + | \
   wc -l)
-if [ "$configuration_mentions" -ne 2 ]; then
-  echo "enrollment graph configuration acquired a production caller" >&2
+if [ "$configuration_mentions" -ne 3 ] ||
+   ! grep -A60 '^production_activation_start_secure_graph' \
+      "$git_root/libfprint-driver/goodix_fpimage_device.c" | \
+      grep -F 'goodix_device_context_configure_enrollment_graph (' >/dev/null; then
+  echo "production enrollment graph caller set is not the reviewed singleton" >&2
   exit 1
 fi
-echo D279_24_NO_PRODUCTION_CONFIGURATION_CALLER_SOURCE_AUDIT=PASS
+echo D279_28_SINGLE_PRODUCTION_CONFIGURATION_CALLER_SOURCE_AUDIT=PASS
 
 # ---- Generated enum registrations (host-only Python shim) ----
 python3 "$test_dir/support/generate_libfprint_enums.py" \
@@ -345,5 +348,6 @@ echo D279_20_DORMANT_CONTEXT_OWNERSHIP_AND_DRAIN=PASS
 echo D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS
 echo D279_25_CONTEXT_21_STAGE_TRANSCRIPT=PASS
 echo D279_26_LIBFPRINT_21_STAGE_ACTION=PASS
-echo D279_20_PRODUCTION_ENROLLMENT_GATE_RETAINED=PASS
+echo D279_28_PRODUCTION_ENROLLMENT_GRAPH_BOUND=PASS
+echo D279_28_PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
 echo D279_20_REAL_USB_SUBMIT=0

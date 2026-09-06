@@ -62,6 +62,8 @@ typedef struct
 {
   gboolean pre_session_rx_sync_started;
   gboolean pre_session_rx_sync_completed;
+  /* A host bulk-IN deadline expired with no bytes in that completion.  This
+   * legacy field name does not assert device-side timeout or quiescence. */
   gboolean pre_session_rx_quiet_boundary;
   guint64 pre_session_rx_discarded_completion_count;
   guint64 pre_session_rx_discarded_byte_count;
@@ -72,6 +74,17 @@ typedef struct
   GoodixPreSessionRxSyncResult pre_session_rx_result;
   gboolean first_protocol_out_after_rx_sync;
 } GoodixPreSessionRxSyncAudit;
+
+typedef struct
+{
+  gboolean production_action_consumed;
+  guint auxiliary_b0_observed_count;
+  GoodixSecureSessionAudit secure;
+  GoodixTlsAudit tls;
+  GoodixPostTlsAudit post_tls;
+  GoodixEnrollmentPostTlsEventsAudit enrollment_events;
+  GoodixEnrollmentFpiUsbBindingAudit enrollment_binding;
+} GoodixProductionEnrollmentAudit;
 
 typedef gint64 (*GoodixPreSessionRxSyncClockFunc) (gpointer user_data);
 typedef void (*GoodixDeviceContextSecurePhaseObserver) (
@@ -119,6 +132,7 @@ GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device)
 GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 
 GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
   GoodixRuntimeMaterialAcquireSeam   acquire_material,
@@ -126,10 +140,14 @@ void goodix_fpimage_device_set_production_open_seams (
   GoodixUsbInterfaceSeam             claim_interface,
   GoodixUsbInterfaceSeam             release_interface,
   gpointer                           user_data);
+#endif
 gboolean goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_has_usb_claim (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_runtime_handoff_views_cleared (
   GoodixDeviceContext *ctx);
+void goodix_device_context_get_production_enrollment_audit (
+  GoodixDeviceContext              *ctx,
+  GoodixProductionEnrollmentAudit *audit);
 GoodixUsbRouter *      goodix_device_context_get_usb_router (GoodixDeviceContext *ctx);
 GoodixTlsServer *      goodix_device_context_get_tls_server (GoodixDeviceContext *ctx);
 GoodixFpiUsbBackend *  goodix_device_context_get_fpi_usb_backend (GoodixDeviceContext *ctx);
@@ -160,8 +178,7 @@ gboolean goodix_device_context_configure_post_tls_lifecycle (
   GoodixPostTlsAudit           *audit,
   GError                      **error);
 /* Offline integration seam. It prepares a parametric graph and installs the
- * first-arm handoff, but does not start either lifecycle or bypass the
- * production enrollment activation gate. */
+ * first-arm handoff, but does not start either lifecycle. */
 gboolean goodix_device_context_configure_enrollment_graph (
   GoodixDeviceContext                    *ctx,
   const GoodixEnrollmentModelConfig      *config,
@@ -175,17 +192,21 @@ gboolean goodix_device_context_has_pending_enrollment_graph (
 GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
 GoodixPostTlsLifecycle *goodix_device_context_get_post_tls_lifecycle (
   GoodixDeviceContext *ctx);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
                                                  GoodixUsbSubmitSeam seam,
                                                  gpointer user_data);
 void goodix_device_context_set_async_usb_submit_seam (GoodixDeviceContext *ctx,
                                                        GoodixUsbSubmitSeam seam,
                                                        gpointer user_data);
+#endif
 gboolean goodix_device_context_arm_receive (GoodixDeviceContext *ctx, GError **error);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                               guint64 submit_generation,
                                               const guint8 *data, gsize length,
                                               const GError *error);
+#endif
 void goodix_device_context_set_post_tls_await_finger_on (
   GoodixDeviceContext *ctx,
   gboolean             awaiting);
@@ -194,12 +215,14 @@ void goodix_device_context_set_secure_phase_observer (
   GoodixDeviceContextSecurePhaseObserver  observer,
   gpointer                                user_data);
 
-/* Bounded operator-harness epoch.  This is activation plumbing only: all
- * protocol/TLS/FDT/image semantics remain in the objects owned by @ctx. */
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+/* Bounded host-only operator-harness epoch.  This API is absent from the
+ * production libfprint build. */
 gboolean goodix_device_context_begin_operator_epoch (
   GoodixDeviceContext *ctx,
   GCancellable        *cancellable,
   GError             **error);
+#endif
 gboolean goodix_device_context_begin_pre_session_rx_sync (
   GoodixDeviceContext *ctx,
   GError             **error);
@@ -210,6 +233,7 @@ void goodix_device_context_get_pre_session_rx_sync_audit (
   GoodixPreSessionRxSyncAudit  *audit);
 const gchar *goodix_pre_session_rx_sync_result_name (
   GoodixPreSessionRxSyncResult result);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 /* Deterministic host-only bound testing; set only while no sync is active. */
 void goodix_device_context_set_pre_session_rx_sync_clock (
   GoodixDeviceContext                *ctx,
@@ -218,6 +242,7 @@ void goodix_device_context_set_pre_session_rx_sync_clock (
 void goodix_device_context_stop_operator_epoch (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_operator_epoch_is_drained (
   GoodixDeviceContext *ctx);
+#endif
 
 /* --- Context read-only accessors (test instrumentation) --- */
 GoodixDeviceContextState goodix_device_context_get_state (GoodixDeviceContext *ctx);

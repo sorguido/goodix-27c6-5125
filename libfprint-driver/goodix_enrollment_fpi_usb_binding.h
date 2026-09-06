@@ -25,11 +25,10 @@ typedef struct
   gboolean terminal;
 } GoodixEnrollmentFpiUsbBindingAudit;
 
-/* Dormant production-shaped binding. The caller must have begun @generation
+/* Production-capable binding. The caller must have begun @generation
  * on @backend. On success the binding takes ownership of @events; on failure
- * ownership stays with the caller. Construction submits nothing. The
- * production FpImageDevice enrollment activation gate remains the authority
- * that prevents reachability. */
+ * ownership stays with the caller. Construction submits nothing; reachability
+ * remains controlled by the owning FpImageDevice action and open epoch. */
 GoodixEnrollmentFpiUsbBinding *goodix_enrollment_fpi_usb_binding_new (
   GoodixEnrollmentPostTlsEvents       *events,
   GoodixFpiUsbBackend                 *backend,
