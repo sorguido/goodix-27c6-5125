@@ -50,11 +50,12 @@ il test deriva le chiavi indipendentemente, autentica entrambe le Finished e
 recupera l'application-data client. Questo ha rilevato e corretto durante lo
 step la differenza EMS rispetto al target OEM non-EMS.
 
-Tre test passano:
+Quattro test passano:
 
-1. handshake/Finished/application-data OpenSSL indipendente;
-2. PSK e sequence errate respinte dal tag GCM;
-3. owner mutabile azzerato e close idempotente.
+1. PRF SHA-256 classica contro un vector prodotto da `openssl kdf TLS1-PRF`;
+2. handshake/Finished/application-data OpenSSL indipendente con EMS;
+3. PSK e sequence errate respinte dal tag GCM;
+4. owner mutabile azzerato e close idempotente.
 
 ## Limite e prossimo step
 

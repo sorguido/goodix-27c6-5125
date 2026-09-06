@@ -41,7 +41,10 @@ host→device CCS + encrypted Finished
 La suite selezionata è
 `TLS_PSK_WITH_AES_128_GCM_SHA256`. Client random, server random, nonce espliciti,
 type/version/length e ordine dei record sono presenti nella capture, ma i loro
-byte non vengono esportati nel report.
+byte non vengono esportati nel report. L'audit delle extension vector registra
+esplicitamente `extended_master_secret_offered=false` e
+`extended_master_secret_selected=false`: il key schedule target è quello TLS
+1.2 classico, non EMS.
 
 Dopo la CCS client esistono esattamente 43 record application-data
 device→host, tutti lunghi 7717 byte cifrati e identici come insieme ai 43 B0

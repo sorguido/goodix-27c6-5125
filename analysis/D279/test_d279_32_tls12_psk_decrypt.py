@@ -162,6 +162,20 @@ def transcript_inputs(records: list[Record]):
 @unittest.skipUnless(hasattr(ssl.SSLContext, "set_psk_client_callback"),
                      "Python OpenSSL PSK callbacks unavailable")
 class Tls12PskDecryptTests(unittest.TestCase):
+    def test_prf_matches_independent_openssl_kdf_vector(self) -> None:
+        expected = bytes.fromhex(
+            "c4f064f337bb25748806723d3168a4f9e7466bf88e71e67e602b303942cd2607"
+            "9458799a187cd65a0480b3450e94d171"
+        )
+        actual = TLS.tls12_prf(
+            b"0123456789abcdefghijklmnopqrstuv",
+            b"master secret",
+            b"C" * 32 + b"S" * 32,
+            48,
+        )
+        self.assertEqual(actual, expected)
+        TLS.cleanse(actual)
+
     def test_independent_openssl_handshake_finished_and_application(self) -> None:
         application = b"D279_32_SYNTHETIC_APPLICATION_DATA"
         records = openssl_psk_transcript(application)

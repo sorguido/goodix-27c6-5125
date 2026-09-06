@@ -1188,6 +1188,8 @@ ADVANCEMENT=NEW_TECHNICAL_EVIDENCE_PRODUCED
 EXECUTABLE_CLOSURE=PASS_HASH_GATED_METADATA_ONLY
 ATTEMPT02_TLS_HANDSHAKE_COMPLETE=true
 ATTEMPT02_TLS_CIPHER=TLS_PSK_WITH_AES_128_GCM_SHA256_0x00a8
+ATTEMPT02_EXTENDED_MASTER_SECRET_OFFERED=false
+ATTEMPT02_EXTENDED_MASTER_SECRET_SELECTED=false
 ATTEMPT02_CLIENT_APPLICATION_RECORD_COUNT=43
 ATTEMPT02_CLIENT_APPLICATION_RECORD_SEQUENCE=1_THROUGH_43_NO_GAP
 PASSIVE_RECONSTRUCTION=FEASIBLE_WITH_AUTHORIZED_TARGET_PSK
@@ -1211,7 +1213,9 @@ pure-PSK, PRF SHA-256, key block, AES-128-GCM e verifica Finished. Non apre
 file, non conosce path production e non offre una CLI per secret.
 
 Il profilo master classico usato da ATTEMPT02 e quello EMS negoziato da OpenSSL
-moderno sono espliciti e non intercambiabili. Il test indipendente usa una vera
+moderno sono espliciti e non intercambiabili. L'assenza EMS nel ClientHello e
+ServerHello ATTEMPT02 è un campo dell'audit hash-gated D279/31. Il test
+indipendente usa una vera
 handshake OpenSSL su `MemoryBIO` con PSK sintetica: entrambe le Finished e una
 application-data vengono autenticate e decifrate. PSK o sequence errate
 falliscono chiuse; l'owner di master/chiavi/IV azzera i propri byte su close.
@@ -1220,7 +1224,7 @@ falliscono chiuse; l'owner di master/chiavi/IV azzera i propri byte su close.
 D279_32_OUTCOME=READY_OFFLINE_TLS12_PSK_DECRYPT_PRIMITIVE
 ADVANCEMENT=MATERIAL_EXECUTABLE_CRYPTOGRAPHIC_BOUNDARY
 EXECUTABLE_CLOSURE=PASS_SYNTHETIC_INDEPENDENT_OPENSSL
-D279_32_TESTS=3/3_PASS
+D279_32_TESTS=4/4_PASS
 TARGET_PSK_ACCESSED=false
 ATTEMPT02_RECORD_DECRYPTED_COUNT=0
 LIVE_OR_USB_ACTION_COUNT=0

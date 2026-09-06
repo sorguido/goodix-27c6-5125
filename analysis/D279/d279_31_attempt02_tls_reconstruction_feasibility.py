@@ -91,6 +91,26 @@ def parse_handshake(record: TlsRecord, expected_type: int) -> bytes:
     return record.fragment[4:]
 
 
+def hello_extension_types(body: bytes, cursor: int) -> tuple[int, ...]:
+    if cursor == len(body):
+        return ()
+    require(cursor + 2 <= len(body), "HELLO_EXTENSION_VECTOR")
+    total = int.from_bytes(body[cursor:cursor + 2], "big")
+    cursor += 2
+    end = cursor + total
+    require(end == len(body), "HELLO_EXTENSION_VECTOR")
+    result = []
+    while cursor < end:
+        require(cursor + 4 <= end, "HELLO_EXTENSION_HEADER")
+        extension_type = int.from_bytes(body[cursor:cursor + 2], "big")
+        length = int.from_bytes(body[cursor + 2:cursor + 4], "big")
+        cursor += 4
+        require(cursor + length <= end, "HELLO_EXTENSION_LENGTH")
+        result.append(extension_type)
+        cursor += length
+    return tuple(result)
+
+
 def client_hello_metadata(record: TlsRecord) -> dict:
     body = parse_handshake(record, 0x01)
     require(len(body) >= 35 and body[:2] == b"\x03\x03", "CLIENT_HELLO_SHAPE")
@@ -105,11 +125,20 @@ def client_hello_metadata(record: TlsRecord) -> dict:
     require(cursor + suites_length <= len(body), "CLIENT_HELLO_CIPHER_VECTOR")
     suites = [int.from_bytes(body[index:index + 2], "big")
               for index in range(cursor, cursor + suites_length, 2)]
+    cursor += suites_length
+    require(cursor < len(body), "CLIENT_HELLO_COMPRESSION_VECTOR")
+    compression_length = body[cursor]
+    cursor += 1
+    require(cursor + compression_length <= len(body),
+            "CLIENT_HELLO_COMPRESSION_VECTOR")
+    cursor += compression_length
+    extensions = hello_extension_types(body, cursor)
     return {
         "tls12_version": True,
         "client_random_present": True,
         "offered_cipher_0x00a8": 0x00A8 in suites,
         "cipher_suite_count": len(suites),
+        "extended_master_secret_offered": 0x0017 in extensions,
     }
 
 
@@ -120,11 +149,14 @@ def server_hello_metadata(record: TlsRecord) -> dict:
     cursor = 35 + session_length
     require(cursor + 3 <= len(body), "SERVER_HELLO_SESSION_VECTOR")
     selected = int.from_bytes(body[cursor:cursor + 2], "big")
+    cursor += 3
+    extensions = hello_extension_types(body, cursor)
     return {
         "tls12_version": True,
         "server_random_present": True,
         "selected_cipher": f"0x{selected:04x}",
         "selected_cipher_is_psk_aes128_gcm_sha256": selected == 0x00A8,
+        "extended_master_secret_selected": 0x0017 in extensions,
     }
 
 

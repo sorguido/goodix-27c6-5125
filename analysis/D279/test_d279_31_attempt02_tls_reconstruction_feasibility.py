@@ -64,6 +64,8 @@ class Attempt02TlsFeasibilityTests(unittest.TestCase):
             "FEASIBLE_WITH_AUTHORIZED_TARGET_PSK",
         )
         self.assertTrue(result["passive_reconstruction"]["protected_psk_required"])
+        self.assertFalse(result["handshake"]["client_hello"]["extended_master_secret_offered"])
+        self.assertFalse(result["handshake"]["server_hello"]["extended_master_secret_selected"])
         self.assertFalse(result["passive_reconstruction"]["psk_accessed"])
         self.assertEqual(result["passive_reconstruction"]["records_decrypted"], 0)
         self.assertFalse(any(result["privacy"].values()))

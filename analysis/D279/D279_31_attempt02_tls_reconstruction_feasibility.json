@@ -14,13 +14,15 @@
       "tls12_version": true,
       "client_random_present": true,
       "offered_cipher_0x00a8": true,
-      "cipher_suite_count": 2
+      "cipher_suite_count": 2,
+      "extended_master_secret_offered": false
     },
     "server_hello": {
       "tls12_version": true,
       "server_random_present": true,
       "selected_cipher": "0x00a8",
-      "selected_cipher_is_psk_aes128_gcm_sha256": true
+      "selected_cipher_is_psk_aes128_gcm_sha256": true,
+      "extended_master_secret_selected": false
     },
     "server_hello_done_present": true,
     "client_key_exchange": {
