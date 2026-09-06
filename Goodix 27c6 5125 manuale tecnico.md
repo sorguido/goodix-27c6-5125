@@ -92,6 +92,15 @@ capture/identify production e ogni seconda action sono respinti prima del
 submit. Non è comunque autorizzata alcuna installazione, esecuzione fprintd o
 run live.
 
+D279/29 ha ora completato anche il solo operator boundary necessario alla
+prima prova: build effimero da snapshot dello SHA approvato, driver production
+con NBIS nativo, assenza delle seam sintetiche verificata, grant deterministico
+single-use e client pubblico libfprint con un open, una enrollment action,
+zero retry/seconda action/reopen, nessun salvataggio biometrico e close sempre
+tentato. Il preflight compilato `UNAPPROVED_FOR_LIVE` si ferma prima di
+`FpContext` e USB. Resta soltanto il Human Gate sul full SHA; nessuna run live
+è autorizzata da questo stato.
+
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
 prima impronta registrata, poi conserva cinque secondi di tail terminale. Il
@@ -448,7 +457,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=LIVE_CRITICAL_REVIEW_THEN_ONE_SHOT_OPERATOR_KIT_AND_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_EXACT_SHA_FOR_D279_29_ONE_SHOT_ENROLLMENT
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -958,10 +967,66 @@ D279_28_DEVICE_SIDE_QUIESCENCE_INFERRED_FROM_DEADLINES=false
 D279_28_REAL_USB_SUBMIT=0
 D279_28_LIVE_EXECUTION_PERFORMED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=LIVE_CRITICAL_REVIEW_THEN_ONE_SHOT_OPERATOR_KIT_AND_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_EXACT_SHA_FOR_D279_29_ONE_SHOT_ENROLLMENT
 ```
 
 Report: `analysis/D279/D279_28_production_usb_one_shot_enrollment_binding.md`.
+
+### D279/29 — operator kit della prima enrollment one-shot
+
+La review PM separata ha accettato il commit D279/28 e il suo live-critical
+set. Il kit D279/29 usa ora soltanto il percorso production registrato contro
+Fedora 44/libfprint 1.94.100: costruisce libreria e client da `git archive`
+dello SHA autorizzato, verifica branch `development`, uguaglianza
+`origin/development`, pulizia dei sorgenti live-critical, NBIS nativo e assenza
+delle API di iniezione transcript dall'artefatto production. Binario, libreria
+RPATH-free ottenuta tramite staging runtime-only in `/tmp` e copia della
+`libgusb` host sono legati da SHA-256 e ricopiati in runtime root-owned prima
+dell'esecuzione; non viene installato nulla nel sistema.
+
+Il client controlla il gate prima di creare `FpContext`, seleziona esattamente
+un device del driver `goodix_27c6_5125`, apre una sola volta, invoca una sola
+`fp_device_enroll_sync()` a 21 stage e tenta sempre il close. Un errore/retry
+di progress cancella immediatamente la stessa action. Non esistono loop,
+seconda action, reopen, verify/capture/identify/storage action o
+serializzazione di raster/template. Il grant deterministico è consumato
+atomicamente prima di secret, enumerazione e USB e non è riutilizzabile.
+
+Il deadline interno di 600 secondi e quello esterno di 660 secondi sono safety
+bound host-side: anche dopo cancellazione e close tentato non permettono di
+inferire timeout o quiescenza del sensore. L'allowlist del sender continua a
+escludere le famiglie persistenti note, senza provare l'assenza di effetti
+sensor-side non compresi.
+
+Il preflight offline ha compilato lo stesso target con baseline
+`UNAPPROVED_FOR_LIVE`, verificato con `nm` che le seam sintetiche sono assenti e
+provato il rifiuto prima di `FpContext`/USB. Packaging/install-tree, fprintd,
+multi-action/cancel/reactivation, verify/PAM e robustezza generale restano
+deliberatamente post-live.
+
+```text
+D279_29_OUTCOME=READY_FOR_HUMAN_GATE
+D279_29_OPERATOR_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D279_29_EXACT_TARGET_LIBFPRINT=1.94.100
+D279_29_EXTRACTOR=NBIS_NATIVE
+D279_29_HOST_ONLY_TRANSCRIPT_SEAMS_IN_PRODUCTION_LIBRARY=false
+D279_29_PRODUCTION_LIBRARY_BUILD_RPATH_PRESENT=false
+D279_29_ACTION_ATTEMPT_MAX=1
+D279_29_OPERATOR_RETRY_COUNT=0
+D279_29_SECOND_ACTION_COUNT=0
+D279_29_REOPEN_COUNT=0
+D279_29_BIOMETRIC_TEMPLATE_SAVED=false
+D279_29_KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
+D279_29_SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
+D279_29_DEVICE_SIDE_QUIESCENCE_INFERRED=false
+D279_29_REAL_USB_ENUMERATION_ATTEMPTED=false
+D279_29_LIVE_EXECUTION_PERFORMED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_EXACT_SHA_FOR_D279_29_ONE_SHOT_ENROLLMENT
+```
+
+Kit: `operator_kit/d279-29-one-shot-enrollment/`. Report:
+`analysis/D279/D279_29_one_shot_enrollment_operator_kit.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
