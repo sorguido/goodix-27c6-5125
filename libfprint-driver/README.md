@@ -302,6 +302,21 @@ opaque auxiliary deliveries and 21 ordered contact pairs. The stage count is
 test configuration, not a universal OEM constant, and completed bindings are
 not retroactively cancelled during teardown.
 
+## D279/26 true libfprint 21-stage action
+
+The same ATTEMPT02-shaped transcript now runs inside a real asynchronous
+`fp_device_enroll()` action on the virtual host-only device. It reports all 21
+progress callbacks, returns one `FpPrint`, completes once, deactivates and
+closes without cancelling the already-complete enrollment binding.
+
+The router plaintext injection used by this regression is allowed only for an
+operator epoch or a non-production device and only when no secure session
+exists. The registered USB subclass still rejects enrollment before creating
+a generation, and the source audit still proves that no production caller can
+configure the enrollment graph. The host action uses the historical SIGFM
+test double; the Fedora 44 build compiles the same driver with native NBIS but
+does not execute biometric extraction, so target NBIS quality remains unknown.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without

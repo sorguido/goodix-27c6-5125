@@ -377,6 +377,15 @@ D279_11_AUXILIARY_B0_FPIMAGE_DELIVERY_COUNT=0
 D279_11_FEDORA44_LIBFPRINT_1_94_100_NBIS_BUILD=PASS
 D279_11_PRODUCTION_ENROLLMENT_ENABLED=false
 D279_11_SENSOR_REACHING_CODE_CHANGED=false
+D279_26_OUTCOME=READY_OFFLINE_TRUE_LIBFPRINT_ACTION
+D279_26_LIBFPRINT_ACTION_STAGE_COUNT=21
+D279_26_LIBFPRINT_PROGRESS_COUNT=21
+D279_26_LIBFPRINT_COMPLETION_COUNT=1
+D279_26_HOST_EXTRACTOR=SIGFM_TEST_DOUBLE
+D279_26_FEDORA44_NBIS_BUILD=PASS_COMPILE_ONLY
+D279_26_NBIS_BIOMETRICALLY_VALIDATED=false
+D279_26_HOST_ONLY_PLAINTEXT_INJECTION_PRODUCTION_REACHABLE=false
+D279_26_PRODUCTION_ENROLLMENT_ENABLED=false
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -436,7 +445,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_LIBFPRINT_21_STAGE_ACTION_TRANSCRIPT_WITH_PRODUCTION_GATE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_REAL_NBIS_ACTION_MECHANICS_THEN_MINIMAL_PRODUCTION_USB_ONE_SHOT_BINDING
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -836,6 +845,33 @@ template o NBIS. Il prossimo confine offline è percorrere la stessa sequenza
 come vera action enrollment del `FpImageDevice` virtuale, verificando i 21
 progress callback e il completamento NBIS, mentre il gate production resta
 chiuso. Report: `analysis/D279/D279_25_context_21_stage_transcript.md`.
+
+### D279/26 — vera action libfprint a 21 stage, host-only
+
+Il transcript completo D279/25 attraversa ora una vera action asincrona
+`fp_device_enroll()` sul device virtuale: la state machine libfprint riceve 21
+progress, produce un solo `FpPrint`, completa una sola volta e torna
+`INACTIVE` prima del close. Il binding già completo non viene riclassificato
+come cancellato durante il teardown.
+
+La sola modifica runtime estende l'iniezione plaintext del transcript ai
+device non-production. La secure session, quando presente, conserva precedenza
+assoluta; il device USB production non soddisfa il predicato host-only e non
+esiste ancora alcun caller production della configurazione enrollment. Il
+gate che respinge `FPI_DEVICE_ACTION_ENROLL` prima della generation e di ogni
+submit resta invariato.
+
+La regressione completa passa 27/27 sia normale sia ASan/UBSan; le suite del
+modello enrollment restano verdi e la build Fedora 44/libfprint 1.94.100 con
+registry standard e NBIS passa senza enumerazione, open, claim o submit USB.
+La vera action host usa però il double SIGFM storico: la build NBIS è soltanto
+compile/link closure e non prova estrazione o qualità biometrica target.
+
+Il prossimo prerequisite minimo è esercitare offline la meccanica della vera
+action con NBIS 1.94.100; segue il solo binding production USB one-shot con
+normal/failure cleanup definitivo. Multi-action, reactivation e integrazione
+fprintd restano deliberatamente successivi alla prima evidenza hardware.
+Report: `analysis/D279/D279_26_true_libfprint_21_stage_action.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 

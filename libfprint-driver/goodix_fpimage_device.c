@@ -481,7 +481,9 @@ static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
   if(ctx->secure_session!=NULL){goodix_secure_session_handle_b0(ctx->secure_session,frame);return;}
   /* Host-only decrypted-plaintext injection. Production always retains the
    * secure-session branch above, so TLS records cannot bypass authentication. */
-  if(ctx->operator_epoch&&ctx->enrollment_binding!=NULL){
+  if((ctx->operator_epoch||
+      !goodix_fpimage_device_is_production_usb(ctx->device))&&
+     ctx->enrollment_binding!=NULL){
     g_autoptr(GBytes) plaintext=NULL;
     p=g_bytes_get_data(frame,&n);
     if(n<=4){context_protocol_failure(ctx,NULL);return;}

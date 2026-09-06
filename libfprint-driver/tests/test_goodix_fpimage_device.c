@@ -1924,6 +1924,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   GoodixPostTlsAudit post_audit;
   TestFixture *f = test_fixture_new ();
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
   g_autoptr(GError) error = NULL;
   GoodixFpiUsbBackend *backend;
   GoodixPostTlsLifecycle *post_tls;
@@ -1937,8 +1938,13 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
   goodix_device_context_set_async_usb_submit_seam (
     f->ctx, host_only_usb_submit, NULL);
-  g_assert_true (goodix_device_context_begin_operator_epoch (
-    f->ctx, cancellable, &error));
+  template = fp_print_new (FP_DEVICE (f->device));
+  f->done = FALSE;
+  f->completion_count = 0u;
+  f->enroll_progress_count = 0u;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
   generation = goodix_device_context_get_generation (f->ctx);
   for (guint i = 0u; i < 6u; i++)
     {
@@ -1955,6 +1961,9 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
     &events_audit, &binding_audit, &error));
   g_assert_true (goodix_device_context_has_pending_enrollment_graph (f->ctx));
   g_assert_false (goodix_device_context_has_dormant_enrollment_binding (f->ctx));
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+  g_assert_cmpint (f->last_state, ==,
+                   FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
   post_tls = goodix_device_context_get_post_tls_lifecycle (f->ctx);
   g_assert_true (goodix_post_tls_lifecycle_start (post_tls, &error));
 
@@ -2095,6 +2104,17 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
           if (stage < 21u)
             d279_25_complete_and_ack (f->ctx, generation, 0x32);
         }
+      {
+        gint64 deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+
+        while (f->enroll_progress_count < stage && !f->done &&
+               g_get_monotonic_time () < deadline)
+          g_main_context_iteration (NULL, FALSE);
+        g_assert_cmpuint (f->enroll_progress_count, ==, stage);
+        if (stage < 21u)
+          g_assert_cmpint (f->last_state, ==,
+                           FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
+      }
     }
 
   g_assert_true (events_audit.lifecycle.plan.pipeline.protocol.complete);
@@ -2116,8 +2136,12 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
 
-  goodix_device_context_stop_operator_epoch (f->ctx);
-  g_assert_true (goodix_device_context_operator_epoch_is_drained (f->ctx));
+  test_wait (f);
+  g_assert_true (f->success);
+  g_assert_nonnull (f->enroll_print);
+  g_assert_cmpuint (f->completion_count, ==, 1u);
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
   g_assert_cmpuint (binding_audit.cancellation_count, ==, 0u);
   g_assert_false (binding_audit.terminal);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==,
@@ -2126,6 +2150,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   test_fixture_free (f);
   g_print ("D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS\n");
   g_print ("D279_25_CONTEXT_21_STAGE_TRANSCRIPT=PASS\n");
+  g_print ("D279_26_LIBFPRINT_21_STAGE_ACTION=PASS\n");
 }
 
 static void
