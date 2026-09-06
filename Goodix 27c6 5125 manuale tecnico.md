@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/42 — baseline-delta pronto, Human Gate protected
+### Stato corrente D279/44 — half-wave delta pronto, Human Gate protected
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -275,13 +275,28 @@ raggiungono A/B elevata ma zero minutiae. La penalità edge fissa di due blocchi
 rende inoltre le percentuali A/B dipendenti dalla dimensione, quindi non sono
 confrontabili ingenuamente tra x1/x2/x3. Lo sweep non identifica DPI/ppmm.
 
-Il prossimo esperimento minimo D279/42 sottrae il B0 no-finger pixel-per-pixel
-prima di `frame_minmax x2`, in entrambe le polarità, mantenendo il controllo
-D279/39. Questa ipotesi è corroborata dai pipeline background-subtraction nel
-corpus libfprint/Goodix, ma non è ancora evidenza target-specific. Evaluator e
-kit aggregate-only passano 31 test, build normale/ASan/UBSan e snapshot
-preflight senza USB. D279/35, D279/37 e D279/39 sono consumate; nessuna nuova
-lettura protetta, USB/live o retry è autorizzata.
+L'operatore ha eseguito una sola D279/42 sulla baseline
+`cf7ecb6c4df7f053e4a8f4203e6a6262b12e35f2`. Il summary autentico, SHA-256
+`0fc29eb7ece380e548b3cdc2caa995564a15c4e062bce4e83677c6367ee6ffb3`, è
+preservato byte-per-byte. La sottrazione baseline signed porta da 5/42 a 10/42
+i fingerprint frame con almeno una minutia nei tier NBIS B/A e introduce i
+primi frame con minutiae nel tier A: 2/42 per `frame-baseline`, 1/42 per la
+polarità opposta. È evidenza positiva ma insufficiente per enrollment,
+matching o production.
+
+La review D279/43 precisa che le due polarità signed, dopo min/max, sono
+immagini complementari e non repliche indipendenti della rimozione del fixed
+field. Il baseline auto-sottratto nullo è inoltre una conseguenza matematica.
+Il B0 può fungere da riferimento sperimentale nella cattura, ma la sua funzione
+OEM come calibration frame non è provata.
+
+Il prossimo esperimento minimo D279/44 confronta il controllo signed con
+`max(frame-baseline,0)` e `max(baseline-frame,0)`: la rettifica half-wave è
+usata con entrambi i segni in driver libfprint sensor-specifici e scarta la
+deviazione opposta prima del min/max x2. Evaluator e kit aggregate-only passano
+37 test, build normale/ASan/UBSan, snapshot preflight e percorso end-to-end su
+raster sintetici non protetti, senza USB. D279/35, D279/37, D279/39 e D279/42
+sono consumate; nessuna nuova lettura protetta, USB/live o retry è autorizzata.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -1585,7 +1600,7 @@ CURRENT_LIVE_AUTHORIZED=false
 
 Report: `analysis/D279/D279_39_nbis_quality_operator_boundary.md`.
 
-### D279/40–D279/42 — result review, scale calibration e baseline-delta gate
+### D279/40–D279/44 — quality review, baseline-delta e half-wave gate
 
 L'aggregate D279/39 autentico è preservato con digest
 `861bc73e743a444b4894598c34c11b20c31b5152a0f5410e6deb7febba8b677c` e
@@ -1596,15 +1611,18 @@ minutia nel print libfprint.
 
 La calibrazione sintetica sul NBIS pinned chiude la falsa dicotomia tra mappa
 buona e pochi punti e mostra che A/B è sensibile alla geometria della mappa.
-Non consente di dedurre la scala fisica. Il successivo boundary D279/42 testa
-quindi il più piccolo preprocessing target-motivato ancora non misurato:
-sottrazione del baseline no-finger e min/max x2, senza fusion o enhancement.
-Il kit è completamente chiuso offline e attende un nuovo Human Gate sul full
+Non consente di dedurre la scala fisica. D279/42 ha poi misurato un miglioramento
+autentico ma non risolutivo dalla sottrazione signed del B0. D279/43 ha corretto
+l'interpretazione delle due polarità complementari e selezionato il successivo
+discriminante single-frame: rettifica half-wave prima del min/max x2. Il kit
+D279/44 è completamente chiuso offline e attende un nuovo Human Gate sul full
 SHA per una sola protected evaluation.
 
 Report: `analysis/D279/D279_40_authentic_nbis_quality_review.md`,
-`analysis/D279/D279_41_synthetic_nbis_scale_calibration.md` e
-`analysis/D279/D279_42_baseline_delta_operator_boundary.md`.
+`analysis/D279/D279_41_synthetic_nbis_scale_calibration.md`,
+`analysis/D279/D279_42_baseline_delta_operator_boundary.md`,
+`analysis/D279/D279_43_authentic_baseline_delta_review.md` e
+`analysis/D279/D279_44_halfwave_delta_operator_boundary.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
