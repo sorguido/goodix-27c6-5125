@@ -386,6 +386,15 @@ D279_26_FEDORA44_NBIS_BUILD=PASS_COMPILE_ONLY
 D279_26_NBIS_BIOMETRICALLY_VALIDATED=false
 D279_26_HOST_ONLY_PLAINTEXT_INJECTION_PRODUCTION_REACHABLE=false
 D279_26_PRODUCTION_ENROLLMENT_ENABLED=false
+D279_27_OUTCOME=READY_OFFLINE_NATIVE_NBIS_ACTION
+D279_27_LIBFPRINT_ACTION_STAGE_COUNT=21
+D279_27_LIBFPRINT_PROGRESS_COUNT=21
+D279_27_LIBFPRINT_COMPLETION_COUNT=1
+D279_27_EXTRACTOR=NBIS_NATIVE
+D279_27_NBIS_MIN_MINUTIAE_IN_SYNTHETIC_FIXTURE=3
+D279_27_NORMAL_AND_ASAN_UBSAN=PASS
+D279_27_PRODUCTION_USB_REACHED=false
+D279_27_TARGET_BIOMETRICALLY_VALIDATED=false
 D279_06_OUTCOME=READY
 D279_06_BASELINE=91d62a6ef775f03ec6a38d1d6febb68d216aaa86
 D279_06_EXECUTABLE_CLOSURE=PASS_OFFLINE_SYNTHETIC_FULL_COMPOSITION
@@ -445,7 +454,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_REAL_NBIS_ACTION_MECHANICS_THEN_MINIMAL_PRODUCTION_USB_ONE_SHOT_BINDING
+NEXT_PRIMARY_BOUNDARY=MINIMAL_PRODUCTION_USB_ONE_SHOT_ENROLLMENT_BINDING_OFFLINE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=OFFLINE_IMPLEMENTATION_REVIEW_THEN_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -872,6 +881,37 @@ action con NBIS 1.94.100; segue il solo binding production USB one-shot con
 normal/failure cleanup definitivo. Multi-action, reactivation e integrazione
 fprintd restano deliberatamente successivi alla prima evidenza hardware.
 Report: `analysis/D279/D279_26_true_libfprint_21_stage_action.md`.
+
+### D279/27 — action enrollment con NBIS nativo Fedora 44
+
+La vera action host-only è ora compilata ed eseguita contro il core esatto
+Fedora 44/libfprint 1.94.100 e il relativo NBIS nativo, non contro il double
+SIGFM. Un raster NIST public-domain viene ridotto deterministicamente a 80x64,
+rimappato a u16 e consegnato attraverso l'adapter Goodix reale per 21 stage.
+Sono osservati 21 progress callback, un solo completion, un template finale
+`FPI_PRINT_NBIS` con 21 sample, ritorno `INACTIVE` e close riuscito. La suite
+passa normale e ASan/UBSan.
+
+L'ordine richiesto dalla state machine è esplicito: release tail e finger-off
+devono poter precedere il completamento asincrono NBIS, soprattutto allo stage
+finale. La regressione segue già l'ordine production-shaped del transcript;
+nessuna modifica runtime è stata necessaria.
+
+La fixture produce tre minutiae per sample e dimostra soltanto che meccanica,
+ownership e action target-native sono eseguibili. Non è evidenza APP12509 e non
+prova qualità biometrica, sufficienza Bozorth3, polarità/orientamento, FAR/FRR o
+successo live. Il test usa soltanto il constructor virtuale e un gate sorgente
+esclude constructor USB, GUsb ed enumerazione: zero accesso USB reale.
+
+Le regressioni complete FpImageDevice (27/27 normale e ASan/UBSan), modello
+enrollment e build/registry Fedora 44 restano verdi. Nessun codice runtime né
+il gate che respinge enrollment production è stato modificato.
+
+Le deadline del runner sono safety bound host-side e non implicano quiescenza
+o timeout device-side dopo un'interruzione. Il prossimo confine è il solo
+binding offline della action one-shot al percorso USB production; multi-action,
+reactivation, verify/fprintd e packaging restano post-live. Report:
+`analysis/D279/D279_27_fedora44_native_nbis_action.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
