@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/32 — primitive TLS PSK chiusa, composer ancora offline
+### Stato corrente D279/33 — composer TLS→raster chiuso, NBIS evaluator offline
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -145,6 +145,17 @@ l'application-data; PSK o sequence errate falliscono sul tag GCM. I buffer
 mutabili owned dal modulo sono azzerati, senza dichiarare provata la
 zeroizzazione di eventuali copie interne Python/OpenSSL. Restano da comporre
 offline parser ATTEMPT02, profilo OEM non-EMS, decoder immagine e metriche NBIS.
+
+D279/33 ha composto i primi tre elementi senza leggere la PSK target. Il pcap
+hash-gated viene accettato solo con il profilo ATTEMPT02 non-EMS esatto; il
+composer ricostruisce il transcript, autentica entrambe le Finished, assegna
+sequence 1..43 agli application record e richiede plaintext da 7693 byte. Il
+decoder è direttamente quello canonico `core/post_d4.py`, quindi checksum,
+CRC, unpacking 12-bit e mapping 80×64 non vengono duplicati. La closure è
+sintetica: nessun record reale è stato decifrato e nessun raster reale è stato
+esposto. I buffer owned vengono azzerati, senza estendere il claim alle copie
+temporanee del runtime. Restano offline l'evaluator NBIS esatto e il futuro
+operator boundary per la lettura protetta, che richiederà Human Gate separato.
 
 D279/10 è stato ripianificato offline senza estendere il sender Linux. Il Kit
 Windows/OEM passivo ora cattura dall'avvio del wizard alla conferma reale della
@@ -502,7 +513,7 @@ FACTORY_STATE_MUTATION=NOT_DETERMINABLE_FROM_VISIBLE_FAMILIES_OR_TAIL
 WIRE_PROTOCOL_SEMANTICS_CHANGED=false
 D278_14_RERUN_REQUIRED=false
 D278_14_RERUN_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_DECRYPTION_IMAGE_DECODE_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_EXACT_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
 REAL_PATH_PROVISIONING=PASS_AUTHORIZED_OPERATOR
 NEXT_LIVE_PREREQUISITE=NEW_TECHNICAL_HYPOTHESIS_THEN_OFFLINE_REVIEW_FULL_SHA_BASELINE_APPROVAL_AND_EXPLICIT_SINGLE_SHOT_AUTHORIZATION
 ```
@@ -1229,11 +1240,42 @@ TARGET_PSK_ACCESSED=false
 ATTEMPT02_RECORD_DECRYPTED_COUNT=0
 LIVE_OR_USB_ACTION_COUNT=0
 PYTHON_OPENSSL_INTERNAL_COPY_ZEROIZATION_PROVEN=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_ATTEMPT02_DECRYPTION_IMAGE_DECODE_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D279_32=OFFLINE_ATTEMPT02_DECRYPTION_IMAGE_DECODE_AND_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
 CURRENT_LIVE_AUTHORIZED=false
 ```
 
 Report: `analysis/D279/D279_32_tls12_psk_decrypt_primitive.md`.
+
+### D279/33 — composer ATTEMPT02 in-memory TLS → raster
+
+`analysis/D279/d279_33_attempt02_in_memory_composer.py` collega l'audit reale
+D279/31, la primitive D279/32 e `core/post_d4.py::parse_image_payload`. Il
+profilo è deliberatamente non generico: ATTEMPT02 deve essere non-EMS, le due
+Finished devono autenticarsi a sequence 0, devono seguire 43 application
+record device→host a sequence 1..43, ciascuno con ciphertext da 7717 byte e
+plaintext da 7693 byte.
+
+Il test reale si ferma alla struttura cifrata e non riceve una PSK. La closure
+end-to-end usa soltanto PSK, record e immagini sintetici; include mismatch
+Finished fail-closed, decoder canonico 80×64 e azzeramento idempotente dei
+plaintext/raster owned. L'API non contiene CLI né loader di secret e non
+esporta raster o template. Il chiamante futuro mantiene ownership della PSK;
+la zeroizzazione delle copie transitorie del runtime non è provata.
+
+```text
+D279_33_OUTCOME=READY_OFFLINE_ATTEMPT02_IN_MEMORY_COMPOSER
+ADVANCEMENT=MATERIAL_EXECUTABLE_COMPOSITION_BOUNDARY
+EXECUTABLE_CLOSURE=PASS_SYNTHETIC_AND_HASH_GATED_REAL_STRUCTURE
+D279_31_THROUGH_D279_33_TESTS=11/11_PASS
+TARGET_PSK_ACCESSED=false
+ATTEMPT02_RECORD_DECRYPTED_COUNT=0
+REAL_RASTER_DECODED_COUNT=0
+LIVE_OR_USB_ACTION_COUNT=0
+NEXT_PRIMARY_BOUNDARY=OFFLINE_EXACT_NBIS_VARIANT_EVALUATOR_SYNTHETIC_CLOSURE
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+Report: `analysis/D279/D279_33_attempt02_in_memory_composer.md`.
 
 ### D279/07 — layout production e identità runtime fprintd
 
