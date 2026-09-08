@@ -71,9 +71,9 @@ reimplementazione indipendente è soltanto fallback a un blocker concreto.
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
 ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
-CURRENT_PROTECTED_EVALUATION_AUTHORIZED=true
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=MANUAL_EXECUTION_OF_ALREADY_AUTHORIZED_D279_56_PROTECTED_OFFLINE_REPLAY
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_57_STAGE8_EARLY_TERMINAL_LIVE_BOUNDARY_PREPARATION
 ```
 
 Report e review machine-readable:
@@ -475,6 +475,53 @@ REAL_RASTER_EVALUATED_COUNT=0
 LIVE_OR_USB_ACTION_COUNT=0
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=MANUAL_EXECUTION_OF_ALREADY_AUTHORIZED_D279_56_PROTECTED_OFFLINE_REPLAY
+```
+
+#### D279/56 post-run — risultato autentico: cap a 8
+
+La run protetta offline sulla baseline
+`10d041da31f571408f53ba1029230e830d19fd60` è riuscita e il validator
+aggregate-only passa. Il summary autentico è preservato byte-identico come
+`analysis/D279/D279_56_SUCCESS_summary.json`, SHA-256
+`f16977450fe01d03990409d479dd3daaab30a522d0a00b2a6f0c59225713f6be`;
+anche l'operator log è byte-identico, SHA-256
+`1cba568ade84cf7a6cc098fc0e185e2aa93e49a3bb6a84c7c763931d7c6816b9`.
+
+I primi otto primary R2 sono tutti `ACCEPT`: zero duplicati, nessuna
+convergenza per streak e terminale `MAX_STAGE_REACHED`. Sul dataset autentico
+ATTEMPT02 la policy Rockytkg avrebbe quindi consegnato 8 sample e ignorato i
+successivi 13, anziché richiederne 21. Questo ritira fixed-21 come policy
+biometrica finale, ma conserva integralmente il profilo 21-stage come autorità
+wire e regression.
+
+Il risultato non valida le costanti su dita/sessioni diverse, FAR/FRR o la
+sicurezza sensor-side del terminale anticipato. La production resta perciò a
+21: prima di adottare 8/dinamico bisogna provare separatamente che, dopo lo
+stage 8 completo fino a IRQ0200, l'omissione del successivo `0x32` seguita da
+deactivation/drain/close lascia APP12509 sicuro e riutilizzabile. D279/54
+identify resta ortogonale e non è usato come prova enrollment.
+
+La run ha riportato lettura protetta riuscita, nessun export PSK/raster/feature
+e zero live/USB. Il primo export ha richiesto una copia manuale perché il parent
+risultati root era 0700; il corrective del launcher crea ora automaticamente
+una `EXPORT_DIRECTORY` privata posseduta dall'operatore. Non serve alcun retry.
+
+```text
+D279_56_POST_RUN_OUTCOME=READY
+D279_56_ADVANCEMENT=AUTHENTIC_ATTEMPT02_DYNAMIC_POLICY_REPLAY_COMPLETED
+D279_56_EXECUTABLE_CLOSURE=PASS_PROTECTED_OFFLINE_AND_AGGREGATE_VALIDATION
+AUTHENTIC_RESULT_PRESERVED_BYTE_IDENTICAL=true
+REFERENCE_SELECTED_SAMPLE_COUNT=8
+REFERENCE_TERMINAL_REASON=MAX_STAGE_REACHED
+DUPLICATE_REJECT_COUNT=0
+FIXED_21_FINAL_BIOMETRIC_POLICY_RETIRED=true
+ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
+PRODUCTION_ENROLLMENT_STAGE_POLICY=21_UNCHANGED_PENDING_DEVICE_PROOF
+ROCKYTKG_CONSTANTS_PRODUCTION_VALIDATED=false
+DYNAMIC_EARLY_TERMINAL_APP12509_PROVEN=false
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_57_STAGE8_EARLY_TERMINAL_LIVE_BOUNDARY_PREPARATION
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

@@ -40,6 +40,7 @@ class ProtectedRunnerTests(unittest.TestCase):
         self.assertIn("--prepare-authorized-study", runner)
         self.assertIn("--run-authorized-study", runner)
         self.assertIn("RUN_REQUIRES_VISIBLE_SUDO_OPERATOR", runner)
+        self.assertIn("EXPORT_DIRECTORY=", runner)
 
     def test_validator_accepts_only_classification_aggregate(self):
         validator = load_validator()

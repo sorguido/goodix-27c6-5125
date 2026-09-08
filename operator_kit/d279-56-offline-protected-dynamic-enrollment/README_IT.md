@@ -52,8 +52,11 @@ Gli output vengono creati mode 0600 sotto:
 /var/tmp/goodix-d279-56-results/<timestamp>-<sha12>/
 ```
 
-Riportare nel repository soltanto `summary.json` e `operator.log`. Non copiare
-alcun file temporaneo, snapshot, materiale protetto o output diverso. In caso
+Il launcher crea inoltre una directory `EXPORT_DIRECTORY` privata e posseduta
+dall'operatore sotto `/tmp`, perché il parent root di `/var/tmp` non è
+attraversabile dall'utente normale. Riportare nel repository soltanto
+`summary.json` e `operator.log`. Non copiare alcun file temporaneo, snapshot,
+materiale protetto o output diverso. In caso
 di failure, il documento originario consente la correzione e il retry tecnico
 nello stesso perimetro; non usare tale autorizzazione per ampliare lo studio.
 

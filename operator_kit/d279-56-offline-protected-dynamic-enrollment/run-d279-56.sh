@@ -258,7 +258,7 @@ verify_manifests ()
 
 run_authorized_study ()
 {
-  local prepared=$1 state approved result_root result_dir output log status
+  local prepared=$1 state approved result_root result_dir output log status export_dir
   local operator_uid operator_gid
   [[ $EUID -eq 0 ]] || refuse RUN_REQUIRES_ROOT
   [[ -n ${SUDO_UID:-} && -n ${SUDO_GID:-} && $SUDO_UID != 0 ]] ||
@@ -317,6 +317,15 @@ run_authorized_study ()
     fi
   fi
   chown -R "$operator_uid:$operator_gid" "$result_dir"
+  if [[ $status -eq 0 ]]; then
+    export_dir=$(mktemp -d /tmp/goodix-d279-56-export.XXXXXX)
+    chmod 0700 "$export_dir"
+    cp "$output" "$export_dir/summary.json"
+    cp "$log" "$export_dir/operator.log"
+    chmod 0600 "$export_dir/summary.json" "$export_dir/operator.log"
+    chown -R "$operator_uid:$operator_gid" "$export_dir"
+    echo "EXPORT_DIRECTORY=$export_dir"
+  fi
   echo "RESULT_DIRECTORY=$result_dir"
   echo "RUN_EXIT_STATUS=$status"
   echo RETRY_WITHIN_AUTHORIZED_STUDY=true
