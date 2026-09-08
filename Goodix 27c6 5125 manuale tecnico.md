@@ -454,6 +454,12 @@ il layout production richiede root e l'agent sudo è escluso. Serve quindi la
 sola esecuzione manuale del comando `sudo` stampato dal kit; è un requisito di
 capability, non un nuovo Human Gate autorizzativo.
 
+La prima preparazione post-commit si è fermata prima dell'accesso protetto:
+`unittest -m` interpretava il punto nel path temporaneo randomizzato come
+separatore di modulo. Il correttivo esegue direttamente i due file test e
+cancella sempre una directory preparata incompleta. Il failure era soltanto
+host-side; `TARGET_PSK_ACCESSED=false` e raster autentici non letti.
+
 ```text
 D279_56_OUTCOME=HUMAN_REQUIRED
 D279_56_ADVANCEMENT=AUTHORIZED_AUTHENTIC_DYNAMIC_POLICY_REPLAY_EXECUTABLE_READY

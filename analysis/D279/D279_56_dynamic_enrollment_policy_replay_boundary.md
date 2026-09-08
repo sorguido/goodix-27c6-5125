@@ -58,6 +58,12 @@ The normal-user preflight passes 8 tests, the D279/49 R2 KAT hash
 `2ff834cd...153b3`, Python reduced-scope logic, output rejection and a helper
 symbol audit.  It reads no protected input and performs zero USB action.
 
+The first post-commit snapshot preparation failed before protected access
+because `unittest -m` treated the randomized dot in the absolute temporary
+path as a module separator.  The corrective executes each test file directly
+and guarantees cleanup of incomplete prepared directories.  This was a
+host-side executable-closure failure only: PSK/raster access remained false.
+
 The actual replay cannot be executed by the current AI process: the production
 material directory requires root access, while both governance and the origin
 authorization exclude agent sudo.  This is a manual capability boundary, not

@@ -33,7 +33,8 @@ refuse ()
 
 cleanup_temp ()
 {
-  if [[ ${cleanup_root:-} == /tmp/goodix-d279-56-offline.* ]]; then
+  if [[ ${cleanup_root:-} == /tmp/goodix-d279-56-offline.* ||
+        ${cleanup_root:-} == /tmp/goodix-d279-56-authorized.* ]]; then
     find "$cleanup_root" -depth -delete 2>/dev/null || true
   fi
 }
@@ -99,9 +100,9 @@ build_and_test ()
   command -v cc >/dev/null 2>&1 || refuse CC_NOT_FOUND
   command -v nm >/dev/null 2>&1 || refuse NM_NOT_FOUND
   PYTHONPATH="$source_root/analysis/D279" PYTHONNOUSERSITE=1 \
-    python3 -B -m unittest -q \
-      "$source_root/analysis/D279/test_d279_56_dynamic_enrollment_policy.py" \
-      "$source_root/operator_kit/d279-56-offline-protected-dynamic-enrollment/test_d279_56_protected_runner.py"
+    python3 -B "$source_root/analysis/D279/test_d279_56_dynamic_enrollment_policy.py" -q
+  PYTHONPATH="$source_root/analysis/D279" PYTHONNOUSERSITE=1 \
+    python3 -B "$source_root/operator_kit/d279-56-offline-protected-dynamic-enrollment/test_d279_56_protected_runner.py" -q
   cc -std=c11 -O2 -g -Wall -Wextra -Werror -Wconversion -Wshadow \
     -I"$source_root/libfprint-driver" \
     -I"$source_root/libfprint-driver/rockytkg-imgproc" \
@@ -202,6 +203,8 @@ prepare_authorized_study ()
   verify_baseline "$approved"
   prepared=$(mktemp -d /tmp/goodix-d279-56-authorized.XXXXXX)
   chmod 0700 "$prepared"
+  cleanup_root=$prepared
+  trap cleanup_temp EXIT HUP INT TERM
   snapshot="$prepared/snapshot"
   mkdir -m 0700 "$snapshot"
   git_root archive "$approved" -- "${critical_paths[@]}" | tar -x -C "$snapshot"
@@ -231,6 +234,8 @@ prepare_authorized_study ()
   echo "NEXT_COMMAND=sudo $0 --run-authorized-study $prepared"
   echo TARGET_PSK_ACCESSED=false
   echo LIVE_OR_USB_ACTION_COUNT=0
+  cleanup_root=
+  trap - EXIT HUP INT TERM
 }
 
 verify_manifests ()
