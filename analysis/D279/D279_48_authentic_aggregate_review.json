@@ -1,0 +1,55 @@
+{
+  "schema": "D279_48_AUTHENTIC_AGGREGATE_REVIEW_V1",
+  "source_artifact": "analysis/D279/D279_48_SUCCESS_summary.json",
+  "source_summary_sha256": "71ec1922eb97f4804d7e228b09ef3edede04cbc4b3799eff433a418c1efa1ff3",
+  "source_summary_bytes": 37475,
+  "source_baseline_sha": "36999004b9971f7004aaaa4da85d7c2d1afc79d1",
+  "source_schema_validation": "PASS_WITH_D279_48_VALIDATOR",
+  "source_outcome": "AUTHENTIC_ROCKY_NBIS_SIGFM_AGGREGATE_READY",
+  "review_decision_class": "B_SIGFM_MATERIALLY_OUTPERFORMS_NBIS_ON_SAME_INPUT",
+  "same_input_native_80x64": true,
+  "resize_applied": false,
+  "r1": {
+    "nbis_bozorth_computable_frames": 0,
+    "nbis_frame_count": 42,
+    "sigfm_primary_keypoints": {"minimum": 87, "median": 120, "maximum": 132},
+    "sigfm_auxiliary_keypoints": {"minimum": 39, "median": 117, "maximum": 133},
+    "sigfm_gate_ge_25_frames": 42,
+    "sigfm_paired_cycle_directed": 42,
+    "sigfm_paired_cycle_nonzero": 40,
+    "sigfm_paired_cycle_ge_reference_20": 40,
+    "sigfm_paired_cycle_score_median": 238047,
+    "sigfm_paired_cycle_score_maximum": 418769
+  },
+  "r2": {
+    "nbis_bozorth_computable_frames": 0,
+    "nbis_frame_count": 42,
+    "sigfm_primary_keypoints_median": 128,
+    "sigfm_auxiliary_keypoints_median": 132,
+    "sigfm_gate_ge_25_frames": 42,
+    "sigfm_paired_cycle_directed": 42,
+    "sigfm_paired_cycle_nonzero": 40,
+    "sigfm_paired_cycle_ge_reference_20": 40,
+    "sigfm_paired_cycle_score_median": 310975,
+    "sigfm_paired_cycle_score_maximum": 624104
+  },
+  "dataset_limitations": {
+    "single_session_finger_context_only": true,
+    "different_finger_control_available": false,
+    "far_frr_or_accuracy_claim_permitted": false,
+    "production_threshold_validation_permitted": false,
+    "attempt02_baseline_is_proven_rocky_no_finger_equivalent": false
+  },
+  "privacy": {
+    "transport_or_psk_exported": false,
+    "plaintext_or_raster_exported": false,
+    "biometric_feature_or_template_exported": false,
+    "live_or_usb_action_count": 0
+  },
+  "direction": {
+    "extractor": "SIGFM",
+    "nbis_parameter_search": "STOP",
+    "nbis_pipeline_compatibility": true,
+    "nbis_biometric_direction": "SUPERSEDED"
+  }
+}

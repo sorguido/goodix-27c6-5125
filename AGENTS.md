@@ -476,13 +476,14 @@ Non duplicare gli stessi dati in più report senza necessità.
 
 ---
 
-## 16. Licenze, provenance e clean-room boundary
+## 16. Licenze, provenance e compatibilità della distribuzione
 
 - nuovo core userspace e tool collegati: `core/`, `tools/` = `GPL-2.0-or-later`;
-- driver/glue upstream: `libfprint-driver/` = `LGPL-2.1-or-later`;
-- riuso diretto di codice Rockytkg GPL è autorizzato solo nel dominio GPL, con commit/path/licenza/copyright/destinazione/modifiche registrati;
-- nessuna espressione GPL-only entra nel dominio LGPL senza dual/alternative license valida o implementazione indipendente;
-- Rocky è fonte implementativa/corroborativa, non prova target-specific per APP12509;
+- `libfprint-driver/` conserva la licenza per-file esistente; `LGPL-2.1-or-later` è il default per nuovo codice locale, non un vincolo architetturale assoluto sulla fork Goodix o sul combined work distribuito;
+- il riuso diretto o l'adattamento minimo di codice Rockytkg è la via preferita quando licenza, attribution, provenance e compatibilità della distribuzione risultante lo consentono;
+- espressione GPL-only può entrare nel percorso production/libfprint soltanto sotto termini GPL-compatible applicabili all'insieme risultante: non diventa LGPL e non autorizza il relicensing indiscriminato di file di terzi;
+- prima del riuso verificare per file commit/path/licenza/copyright/destinazione/modifiche e aggiornare il ledger; l'implementazione indipendente è fallback quando esiste un blocker concreto di licenza o integrazione;
+- Rocky è reference implementativa primaria per il percorso SIGFM, ma non prova target-specific per APP12509;
 - safety e comportamento sensor-reaching richiedono evidenza locale;
 - il repository privato è il workspace canonico; il pubblico resta congelato fino a export separato, sanitizzato e con audit della history.
 

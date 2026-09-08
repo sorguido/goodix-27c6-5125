@@ -1,5 +1,37 @@
 # D279/48 — confronto controllato Rockytkg / NBIS / SIGFM
 
+## Aggiornamento post-run — aggregate autentico e classe B
+
+Il gate descritto sotto è stato attraversato con una nuova autorizzazione sulla
+baseline completa `36999004b9971f7004aaaa4da85d7c2d1afc79d1`, dopo il
+corrective di dependency closure del reduced snapshot. Il summary autentico,
+SHA-256 `71ec1922eb97f4804d7e228b09ef3edede04cbc4b3799eff433a418c1efa1ff3`,
+passa il validator D279/48.
+
+La review classifica l'esito come
+`B_SIGFM_MATERIALLY_OUTPERFORMS_NBIS_ON_SAME_INPUT`: NBIS ha zero frame
+Bozorth-computable su 42 sia a R1 sia a R2; SIGFM supera il gate keypoint su
+tutti i 42 frame e produce 40/42 score paired-cycle diretti nonzero e almeno
+20. Limiti single-session/same-finger e soglia non validata restano invariati.
+
+```text
+D279_48_AUTHENTIC_RUN=PASS
+D279_48_CLASS=B
+EXTRACTOR_DIRECTION=SIGFM
+NBIS_PARAMETER_SEARCH=STOP
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+CURRENT_LIVE_AUTHORIZED=false
+```
+
+La fonte primaria aggregate-only è conservata byte-identica in
+`analysis/D279/D279_48_SUCCESS_summary.json`, SHA-256
+`71ec1922eb97f4804d7e228b09ef3edede04cbc4b3799eff433a418c1efa1ff3`.
+Il JSON di review è derivato e non sostituisce tale fonte.
+
+La preparazione pre-run e il testo del gate sotto restano provenance storica.
+La closure corrente è in `D279_48_post_run_sigfm_pivot.md` e
+`D279_48_authentic_aggregate_review.json`.
+
 ## Esito dello step offline
 
 D279/48 non seleziona ancora un extractor. Ha costruito e chiuso offline

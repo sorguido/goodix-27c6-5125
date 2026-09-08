@@ -51,12 +51,17 @@ In this project snapshot, `Rockytkg/libfprint/` is materialized as ordinary file
 
 The upstream `LICENSE` at the preserved commit states the following scope. Per-file SPDX headers and third-party origins remain controlling where more specific.
 
-| Snapshot material | Upstream licensing status | Project reuse rule |
+The first two columns below record immutable snapshot/upstream facts. The last
+column is the project's current local reuse policy, effective after D279/48;
+changes to that column do not assert any retroactive change to the upstream
+license, copyright, commit, tree or historical origin.
+
+| Snapshot material | Immutable upstream licensing status | Current local project reuse policy |
 | --- | --- | --- |
-| `src/` original Rockytkg code | `GPL-2.0-or-later`, except where a more specific per-file notice applies | May be copied/adapted into project GPL domains such as `core/` and `tools/`, with attribution and source-path/commit provenance |
-| `include/` original Rockytkg headers | `GPL-2.0-or-later`, subject to per-file notices and the firmware exception below | May be reused in GPL domains after per-file audit |
-| `tools/`, `Makefile`, install/uninstall scripts | `GPL-2.0-or-later` | May be reused in GPL domains with attribution and provenance |
-| `src/goodixgf.c` | `LGPL-2.1-or-later` | May be evaluated for the LGPL-facing driver domain after per-file provenance/licensing audit |
+| `src/` original Rockytkg code | `GPL-2.0-or-later`, except where a more specific per-file notice applies | May be copied/adapted into GPL-compatible project components or a GPL-compatible fork/combined work, with attribution and source-path/commit provenance |
+| `include/` original Rockytkg headers | `GPL-2.0-or-later`, subject to per-file notices and the firmware exception below | May be reused in GPL-compatible project components after per-file audit |
+| `tools/`, `Makefile`, install/uninstall scripts | `GPL-2.0-or-later` | May be reused under GPL-compatible terms with attribution and provenance |
+| `src/goodixgf.c` | `LGPL-2.1-or-later` | May be evaluated after per-file provenance/licensing audit; its hardware stack is not selected because it duplicates the locally proven APP12509 path, not because it resides in a nominal LGPL-facing domain |
 | `libfprint/` | Third-party upstream libfprint licensing | Reuse only under its own upstream terms; never treat as relicensed by Rockytkg or by this snapshot |
 | `firmware/st411sec_app.bin` | Vendor-copyrighted; explicitly **not** covered by Rockytkg GPL/LGPL grant | Preserved as evidence/reference only; do not assume redistribution, modification or incorporation rights |
 | Firmware data embedded in `include/goodix_fw.h` | Vendor-copyrighted; explicitly **not** covered by Rockytkg GPL/LGPL grant | Same restriction as the binary firmware; do not treat embedded bytes as GPL material |
@@ -73,11 +78,23 @@ When code or expressive material from this snapshot is imported or adapted into 
 3. verify the relevant per-file SPDX/license and any third-party origin before reuse;
 4. preserve required copyright, attribution and license notices;
 5. classify the resulting project component using the project provenance vocabulary where applicable (`IMPORTED_FROM_ROCKY`, `ADAPTED_FROM_ROCKY`, etc.);
-6. keep GPL-only expression inside GPL-compatible project domains unless a separate compatible license grants broader use;
+6. keep GPL-only expression under applicable GPL-compatible terms; its placement does not convert it to LGPL, and a distributed fork/combined work must satisfy every applicable per-file license;
 7. do not infer target-specific APP12509 behavior solely from Rockytkg implementation;
 8. do not import unsafe device lifecycle, firmware-update/IAP, PSK provisioning, persistent-write or factory-state-changing behavior merely because its source code is license-compatible.
 
 Facts learned from the snapshot may inform clean-room implementation and differential analysis, but factual protocol claims must still be classified according to the project's evidence hierarchy.
+
+After the authentic D279/48 comparison, this snapshot is the primary
+implementation reference for the production SIGFM path. Direct reuse or
+minimal adaptation is preferred over independent reimplementation when the
+per-file audit, dependency licenses and resulting distribution terms are
+compatible. Local APP12509 evidence remains authoritative for sensor-reaching
+behavior, and the factory-preserving exclusions above remain unchanged.
+
+This policy update does not rewrite the provenance of any snapshot file. The
+preserved upstream commit/tree, materialized submodule identity, per-file
+licenses, copyright holders and vendor-firmware exclusions above remain the
+same facts recorded when the snapshot was acquired.
 
 ## Snapshot maintenance rule
 

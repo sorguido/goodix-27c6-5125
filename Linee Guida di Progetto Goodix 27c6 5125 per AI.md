@@ -692,9 +692,10 @@ Se due tentativi consecutivi orientati allo stesso confine device-side non produ
 
 ---
 
-## 19. Architettura software e licensing boundary post-D247
+## 19. Architettura software e licensing post-D279/48
 
-La separazione canonica resta:
+La mappa seguente descrive i default storici/per-file, non impone una
+architettura LGPL-only alla fork Goodix o al combined work distribuito:
 
 ```text
 core/              GPL-2.0-or-later
@@ -707,16 +708,23 @@ core/              GPL-2.0-or-later
       |
       | licensing boundary
       v
-libfprint-driver/  LGPL-2.1-or-later
+libfprint-driver/  licenza per-file; LGPL-2.1-or-later come default locale
 
 tools/             GPL-2.0-or-later
 ```
 
 Il materiale originale già pubblicato fino a D246 sotto BSD-2-Clause conserva quella concessione e non viene relicenziato retroattivamente. Codice di terzi mantiene i propri termini. Firmware/DLL OEM, capture, secret, materiale biometrico, factory data e asset non redistribuibili non ricevono blanket open-source license.
 
-Il dominio GPL può incorporare codice esterno GPL compatibile preservando licenza, attribution e provenance.
+Il dominio GPL e una fork/combined work distribuita sotto termini
+GPL-compatible possono incorporare direttamente codice esterno GPL compatibile,
+preservando licenza, attribution e provenance. Un file GPL-only non diventa
+LGPL per la sua collocazione sotto `libfprint-driver/`, e nessun file terzo può
+essere relicenziato indiscriminatamente. La compatibilità dell'insieme
+risultante va determinata prima della distribuzione.
 
-Il dominio LGPL upstream-facing non può ricevere espressione GPL-only senza dual/alternative license valida. In assenza, deve essere implementato indipendentemente da specifiche, fatti di protocollo, test ed evidenza.
+Per il percorso SIGFM la priorità è riuso diretto o adattamento minimo della
+reference Rockytkg. Una reimplementazione indipendente LGPL è fallback soltanto
+quando un blocker concreto di licenza, API/ABI o integrazione impedisce il riuso.
 
 ---
 
@@ -736,9 +744,13 @@ Scheda di provenance:
 
 Per audit, confronto, adattamento o riuso leggere prima `Rockytkg/PROVENANCE.md`.
 
-La Issue #1 del repository Rockytkg resta una fonte esterna distinta. Rockytkg è fonte implementativa/corroborativa, non autorità probatoria per APP12509.
+La Issue #1 del repository Rockytkg resta una fonte esterna distinta. Rockytkg
+è reference implementativa primaria per il percorso SIGFM, ma non autorità
+probatoria per APP12509.
 
-Codice verificato come compatibile GPL può essere adattato nel dominio GPL `core/`/`tools/` con corretta provenance. Materiale compatibile LGPL può essere valutato per `libfprint-driver/` dopo audit per-file.
+Codice Rockytkg GPL o LGPL può essere riusato direttamente o adattato nel
+percorso production quando l'audit per-file e la licenza dell'insieme risultante
+lo consentono. La directory di destinazione non cambia la licenza originaria.
 
 Ogni import/adattamento registra almeno:
 

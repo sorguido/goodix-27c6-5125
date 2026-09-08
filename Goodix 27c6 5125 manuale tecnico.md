@@ -16,7 +16,72 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D279/48 — confronto Rockytkg/NBIS/SIGFM pronto al gate protetto
+### Stato corrente post-D279/48 — classe B e pivot production SIGFM
+
+La valutazione protetta D279/48 è stata completata offline sulla baseline
+`36999004b9971f7004aaaa4da85d7c2d1afc79d1`, senza USB/live e senza export di
+PSK, plaintext, raster, feature o template. La prima autorizzazione era stata
+consumata da un failure di reduced-snapshot dependency closure prima della
+lettura PSK; i commit `286443207...` e `36999004...` hanno chiuso il difetto e
+la seconda autorizzazione ha prodotto l'aggregate autentico valido.
+
+Il summary primario, SHA-256
+`71ec1922eb97f4804d7e228b09ef3edede04cbc4b3799eff433a418c1efa1ff3`, passa il
+validator D279/48 ed è preservato byte-identico come
+`analysis/D279/D279_48_SUCCESS_summary.json` (37.475 byte). Il JSON
+`D279_48_authentic_aggregate_review.json` è un artefatto derivato, non una
+sostituzione della fonte primaria. Il campo decisionale del summary resta
+correttamente pending; la
+review successiva classifica l'esito:
+
+```text
+D279_48_AUTHENTIC_RUN=PASS
+D279_48_CLASS=B_SIGFM_MATERIALLY_OUTPERFORMS_NBIS_ON_SAME_INPUT
+LIVE_OR_USB_ACTION_COUNT=0
+NBIS_PIPELINE_COMPATIBLE=true
+NBIS_BIOMETRICALLY_VALIDATED=false
+NBIS_BIOMETRIC_DIRECTION=SUPERSEDED
+EXTRACTOR_DIRECTION=SIGFM
+NBIS_PARAMETER_SEARCH=STOP
+```
+
+R1/R2 hanno consegnato byte-per-byte gli stessi raster nativi 80×64 a NBIS e
+SIGFM. NBIS non ha prodotto alcun frame Bozorth-computable su 42. SIGFM ha
+superato il gate di 25 keypoint su tutti i 42 frame; i confronti primary↔
+auxiliary paired-cycle hanno 40/42 score diretti nonzero e almeno 20, con
+mediana 238047 in R1 e 310975 in R2. Il dataset resta single-session/same-finger:
+non prova FAR/FRR, accuratezza, different-finger separation o soglia production.
+Il B0 iniziale ATTEMPT02 è un riferimento sperimentale, non una vera no-finger
+baseline Rockytkg provata equivalente.
+
+La decisione D279/02 resta storia architetturale ma è superseded sul piano
+biometrico. Non si esegue rollback Git. Si preservano USB/TLS/PSK/FDT/lifecycle
+e i guardrail factory-preserving; si sostituiscono soltanto build, preprocessing,
+extractor, print/storage e action binding dipendenti da NBIS.
+
+L'architettura corrente è una fork minima Fedora 44/libfprint 1.94.100 con
+massimo riuso diretto sicuro della reference Rockytkg. La directory
+`libfprint-driver/` mantiene licenze per-file: LGPL resta il default dei file
+locali esistenti, ma non è più un vincolo assoluto sulla distribuzione della
+fork/combined work. `goodix_imgproc.c` GPL deve essere riusato direttamente o
+adattato minimamente sotto termini GPL-compatible, dopo audit e ledger; la
+reimplementazione indipendente è soltanto fallback a un blocker concreto.
+
+```text
+PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
+ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
+IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORWARD_PORT
+```
+
+Report e review machine-readable:
+`analysis/D279/D279_48_SUCCESS_summary.json`,
+`analysis/D279/D279_48_post_run_sigfm_pivot.md` e
+`analysis/D279/D279_48_authentic_aggregate_review.json`.
+
+### Stato storico pre-run D279/48 — confronto pronto al gate protetto
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita
 dell'Utente, D279/07 fissa `/var/lib/goodix-5125-poc` come directory production
@@ -2684,6 +2749,7 @@ D276_02_GITHUB_ACTIONS_RUN=33165906857
 D276_02_NORMAL_TEST_RUN=PASS
 D276_02_SANITIZER_TEST_RUN=PASS
 D276_02_DETERMINISM_RUNS=2
+# Historical D276 provenance policy; superseded for new work by D279/48.
 GPL_TO_LGPL_CODE_COPY_ALLOWED=false
 MECHANICAL_TRANSLATION_ALLOWED=false
 CLEANROOM_NATIVE_REIMPLEMENTATION_REQUIRED_IF_SELECTED=true
@@ -6229,15 +6295,15 @@ Il target dichiara `GF_ST411SEC_APP_12509`. L'APP mappata disponibile inizia a
 `0x0802c000`; il codice resident necessario per interpretare A2 e `0x70` è sotto
 questo indirizzo.
 
-### Architettura software e licensing boundary post-D276/01
+### Architettura software e licensing post-D279/48
 
 ```text
 GPL userspace core di ricerca / oracle comportamentale
   transport + protocol + TLS + FDT + capture + image
       |
-      | solo fatti/spec neutra + test black-box; nessun link/copia/traduzione
+      | API/ownership boundary; riuso per-file sotto termini compatibili
       v
-LGPL native FpImageDevice driver (production topology)
+native FpImageDevice driver/fork (licenze per-file; combined work GPL-compatible)
   GoodixDeviceContext per open epoch
     ├── unico claim/owner USB e unico bulk-IN reader
     ├── unico router A0/B0
@@ -6249,9 +6315,17 @@ LGPL native FpImageDevice driver (production topology)
     └── adapter FpImage 80x64 già LGPL
 ```
 
-L'architettura post-D247 è stata adottata precisamente per consentire il riuso diretto, l'adattamento e l'integrazione nel core/ e nei tools/ GPL del codice Rockytkg compatibile GPL, preservandone licenza, attribuzione e provenienza. Analogamente, codice Rockytkg specificamente disponibile sotto licenza LGPL compatibile può essere valutato per libfprint-driver/.
+La decisione post-D279/48 sostituisce il precedente firewall architetturale
+LGPL-only. I file esistenti conservano la propria licenza, ma una fork o
+combined work Goodix può incorporare direttamente componenti GPL Rockytkg e
+essere distribuita sotto termini GPL-compatible, quando l'audit per-file e le
+altre licenze lo consentono. La directory non relicenzia i file: copyright,
+notice, sorgenti e attribution restano obbligatori.
 
-Il licensing boundary non vieta quindi il riuso di Rockytkg: impedisce soltanto che espressione GPL-only venga trasferita dal dominio GPL al driver upstream-facing LGPL. Tale passaggio è possibile solo in presenza di dual licensing o di una licenza alternativa compatibile concessa da tutti i titolari pertinenti; in assenza, l'implementazione LGPL deve essere indipendente e basata su specifiche, fatti di protocollo, test ed evidenza, non sull'espressione GPL-only.
+Per SIGFM Rockytkg è la reference implementativa primaria. Riuso diretto e
+adattamento minimo precedono la reimplementazione indipendente, che resta
+fallback a blocker concreti di licensing/API/ABI/integrazione. L'evidenza
+locale APP12509 conserva invece l'autorità sul comportamento hardware.
 
 D276/01 seleziona per production la topologia nativa C/LGPL in-process. Un
 helper GPL out-of-process resta tecnicamente possibile come harness di ricerca,
@@ -6354,18 +6428,18 @@ stack frame. Il solo `0x32` è una continuazione separata che ricontrolla i tre
 gate, generation e terminal fence. Se cancellation è già intervenuta, prevale
 il fence e il tail non viene proseguito.
 
-La provenance-controlled independent reimplementation richiede: specifica neutra derivata da evidenza
-canonica; SPDX/autore/fonti per ogni file; implementazione indipendente contro
-API libfprint e primitive GLib/TLS; confronto black-box di transcript sintetici
-con il runtime Python; nessuna consultazione/copia/traduzione del core GPL
-durante il slice LGPL; golden vector senza secret/biometrica; review provenance
-per slice. Un eventuale riuso di `Rockytkg/src/goodixgf.c`, LGPL, richiede audit
-e ledger per-file; D276 non importa codice. Il suo `500 DPI`, flag inverted,
-policy dinamica `3..8`, worker blocking e dipendenze dal core Rocky GPL non
-sono adottati. `GPL_TO_LGPL_CODE_COPY_ALLOWED=false` e
-`MECHANICAL_TRANSLATION_ALLOWED=false`; questa etichetta è controllo
-ingegneristico di provenance, non conclusione o garanzia legale
-(`CLEANROOM_LABEL=PROJECT_ENGINEERING_PROVENANCE_CONTROL_NOT_LEGAL_CONCLUSION`).
+Le reimplementazioni indipendenti storiche D276–D279 restano validi file LGPL e
+non vengono relicenziate retroattivamente. Il nuovo percorso può però riusare
+direttamente file GPL/LGPL Rockytkg dopo audit e ledger. `goodixgf.c` non viene
+adottato perché duplicherebbe lo stack APP12509 locale già provato, non per un
+divieto astratto; restano esclusi il suo eventuale `500 DPI`, flag/orientamento
+non provati, provisioning, firmware, ClearApp, PSK/OTP e recovery unsafe.
+
+```text
+MANDATORY_LGPL_ONLY_ARCHITECTURE=false
+DIRECT_ROCKYTKG_REUSE=PREFERRED_WHEN_PER_FILE_COMPATIBLE
+INDEPENDENT_LGPL_REIMPLEMENTATION=FALLBACK_ONLY
+```
 
 Roadmap corrente:
 
@@ -14080,10 +14154,10 @@ CANONICAL_DOCUMENTATION=COMMITTED_AS_924774e9bd7ea10eabdfd540bf8a4be9b8413c99
 REVIEW_SET=BASELINE_f609c865f760768edb6a9e404b863ccd0569e1c8_HEAD_924774e9bd7ea10eabdfd540bf8a4be9b8413c99_analysis/D279/D279_01_offline_production_usb_driver_registration_Fedora44_libfprint_1.94.100.md_PLUS_Goodix_27c6_5125_manuale_tecnico.md
 ```
 
-D279/02 ha poi riesaminato il contratto NBIS 1.94.100 e chiuso la decisione
-extractor: `EXTRACTOR_DECISION=NBIS`, senza inventare `ppmm` e senza portare
-SIGFM. La registrazione USB production resta il prossimo boundary, non uno
-step già eseguito.
+D279/02 ha poi riesaminato il contratto NBIS 1.94.100 e chiuso storicamente la
+decisione extractor come NBIS. D279/48 ha successivamente superseded quella
+direzione sul piano biometrico con classe B; la compatibilità strutturale NBIS
+resta vera, ma il percorso production corrente è SIGFM.
 
 ### D279/02 — decisione extractor NBIS vs SIGFM per Fedora 44 / libfprint 1.94.100
 
@@ -14107,4 +14181,13 @@ SIGFM_BIOMETRICALLY_VALIDATED=false
 TARGET_APP12509_PHYSICAL_PPMM=UNKNOWN
 BIOMETRIC_MATCHER_BENCHMARK_READY=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_PRODUCTION_USB_DRIVER_REGISTRATION_WITH_NBIS
+```
+
+Override corrente post-D279/48:
+
+```text
+D279_02_HISTORICAL_DECISION=NBIS
+D279_02_BIOMETRIC_DIRECTION=SUPERSEDED_BY_D279_48_CLASS_B
+EXTRACTOR_DIRECTION=SIGFM
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORWARD_PORT
 ```

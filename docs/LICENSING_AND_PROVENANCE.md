@@ -7,7 +7,7 @@
 | --- | --- | --- |
 | `core/` | `GPL-2.0-or-later` | Userspace transport, protocol, TLS, FDT, capture and image code. |
 | `tools/` | `GPL-2.0-or-later` | Tools connected to or derived from the GPL core. |
-| `libfprint-driver/` | `LGPL-2.1-or-later` | Upstream-facing driver/glue; separate copyright boundary. |
+| `libfprint-driver/` | Per-file; `LGPL-2.1-or-later` default for new local work | Existing LGPL files remain LGPL. GPL-compatible production components may be added without relicensing them; distribution of the resulting fork/combined work must satisfy every applicable license. |
 | `src/`, `operator_kit/`, historical `analysis/D239`–`D246` | historical status retained | Frozen/reproducibility paths are not mass-moved or mass-relicensed by D247. |
 | `docs/`, `analysis/` | file-specific | Check the file header and provenance; private evidence is not made open source by location. |
 
@@ -31,8 +31,9 @@ local 12509 capture/DLL/APP/live evidence and repeatable local tests
     > external implementation
 
 IMPLEMENTATION REUSE:
-Rockytkg GPL-2.0-or-later code = approved implementation source for core/tools
-    only, subject to verified source license, attribution and provenance
+Rockytkg = primary implementation reference for the SIGFM path
+direct reuse/minimal adaptation preferred when per-file licenses,
+attribution, provenance and resulting-distribution compatibility permit it
 ```
 
 External behavior does not prove that an operation is safe, non-persistent,
@@ -88,15 +89,21 @@ target-specific APP12509 claim. Per-file rights and SPDX validation remains a
 future import-time gate, not a D247 blocker because D247 imports no functional
 file.
 
-## GPL/LGPL firewall
+## Per-file licensing and GPL-compatible combined work
 
-GPL-only expression must not be copied, translated or adapted into
-`libfprint-driver/`. Crossing is permitted only when the particular code is
-already compatibly dual-licensed, every relevant rights holder supplies a
-compatible alternative license, or the LGPL implementation is independently
-created from specifications, protocol facts, tests and evidence without
-transferring GPL expression. Keep design/evidence records sufficient to audit
-that separation.
+The historical directory split is not a mandatory LGPL-only architecture.
+Existing LGPL files keep their LGPL grant; GPL-only files keep GPL terms even
+when used by the Goodix libfprint production path or placed next to LGPL files.
+A Goodix fork or combined work may be distributed under GPL-compatible terms
+when legally possible, provided that every per-file license, copyright notice,
+source obligation and attribution requirement is preserved.
+
+Do not describe GPL material as LGPL merely because of its destination, and do
+not relicense third-party files without authority. Before direct reuse, record
+the exact source commit/path and determine the distribution regime of the
+resulting set. Independent LGPL implementation is a fallback only for a
+concrete licensing or integration blocker, not the default response to a GPL
+source file.
 
 ## Publication boundary
 
@@ -318,12 +325,14 @@ nessun input autentico viene letto.
 
 `analysis/D279/d279_48_rocky_imgproc_pipe.c`, il relativo header, evaluator,
 operator kit e report sono nel dominio `GPL-2.0-or-later`. Il binario
-preprocessor compila direttamente, senza copia nel driver production, i file
+preprocessor compila direttamente i file
 GPL `Rockytkg/src/goodix_imgproc.c` e
 `Rockytkg/include/goodix_imgproc.h` dal commit preservato
-`227eba219fa9e3fbac5bd59aca79f624f67cd11b`. La destinazione è esclusivamente
-un processo host-only dell'esperimento protetto; nessuna espressione Rocky
-entra in `libfprint-driver/` production.
+`227eba219fa9e3fbac5bd59aca79f624f67cd11b`. In D279/48 la destinazione resta
+un processo host-only dell'esperimento protetto. La decisione post-run autorizza
+per il successivo percorso production il riuso diretto dello stesso componente
+GPL in una fork/combined work GPL-compatible, dopo audit per-file e ledger;
+D279/48 in sé non aveva ancora effettuato tale import.
 
 `libfprint-driver/tests/test_goodix_nbis_pair_pipe.c` è un target test-only
 non installato `LGPL-2.1-or-later`. La conversione minutiae→XYT è tratta dal
@@ -343,5 +352,6 @@ processo e non vengono esportati.
 Il confronto non importa `goodixgf.c`, lifecycle, protocollo, USB, firmware,
 PSK provisioning o scritture persistenti Rocky. I fatti osservati nello
 snapshot sono corroborativi e non vengono elevati a prova APP12509. Un futuro
-uso production di preprocessing GPL o SIGFM richiederà una distinta decisione
-architetturale/licensing; D279/48 non la anticipa.
+uso production continua a richiedere audit/ledger per-file; la decisione
+architetturale post-D279/48 ha però già scelto massimo riuso diretto Rockytkg e
+una distribuzione GPL-compatible quando necessaria.

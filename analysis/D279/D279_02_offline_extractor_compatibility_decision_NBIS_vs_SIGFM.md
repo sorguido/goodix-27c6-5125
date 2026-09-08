@@ -1,6 +1,27 @@
 <!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
 # D279/02 — decisione offline di compatibilità extractor NBIS vs SIGFM
 
+## Aggiornamento post-D279/48 — decisione biometrica superseded
+
+La valutazione autentica D279/48 ha chiuso la review con classe
+`B_SIGFM_MATERIALLY_OUTPERFORMS_NBIS_ON_SAME_INPUT`. La compatibilità
+strutturale NBIS qui dimostrata resta vera, ma non governa più la direzione
+biometrica production.
+
+```text
+D279_02_HISTORICAL_EXTRACTOR_DECISION=NBIS
+NBIS_PIPELINE_COMPATIBLE=true
+NBIS_BIOMETRICALLY_VALIDATED=false
+NBIS_BIOMETRIC_SUITABILITY=MATERIALLY_OUTPERFORMED_BY_SIGFM_ON_AUTHENTIC_SAME_INPUT
+EXTRACTOR_DIRECTION=SIGFM
+NBIS_PARAMETER_SEARCH=STOP
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORWARD_PORT
+```
+
+La nuova architettura è una fork minima 1.94.100 con massimo riuso diretto
+sicuro Rockytkg e licenze conservate per file. Le sezioni successive restano
+provenance della decisione architetturale D279/02, non stato corrente.
+
 ## Aggiornamento D279/48 — esperimento discriminante pronto al gate
 
 D279/48 ha chiuso offline l'evaluator richiesto senza cambiare la selection
