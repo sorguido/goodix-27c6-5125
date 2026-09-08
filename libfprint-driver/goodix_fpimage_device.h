@@ -46,9 +46,16 @@ typedef struct _GUsbDevice GUsbDevice;
 #define GOODIX_PRE_SESSION_RX_MAX_TOTAL_MS 2000u
 
 /* Successful primary stages observed for this exact target/profile in
- * D279/10 ATTEMPT02.  This is the current libfprint policy for 27c6:5125,
- * not a universal OEM or firmware constant. */
+ * D279/10 ATTEMPT02.  This is retained as the authentic wire/regression
+ * profile, not as the final biometric policy or a universal firmware
+ * constant. */
 #define GOODIX_TARGET_LOCAL_ENROLL_STAGES 21u
+
+/* D279/56 replayed the exact Rockytkg selector over ATTEMPT02 and reached its
+ * maximum with eight distinct accepted samples.  D279/57 stages that maximum
+ * as the production candidate for the separate APP12509 early-terminal
+ * hardware boundary.  It is not yet target-live validated. */
+#define GOODIX_SIGFM_ENROLL_MAX_STAGES 8u
 
 typedef enum
 {

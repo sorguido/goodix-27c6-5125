@@ -497,7 +497,7 @@ test_enroll_finger_off_before_minutiae_done (void)
 }
 
 static void
-test_d279_11_full_target_local_stage_policy (void)
+test_d279_57_sigfm_stage8_candidate_policy (void)
 {
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
   g_autoptr(FpPrint) template = NULL;
@@ -506,7 +506,7 @@ test_d279_11_full_target_local_stage_policy (void)
 
   fixture_open (f);
   g_assert_cmpint (fp_device_get_nr_enroll_stages (FP_DEVICE (f->device)), ==,
-                   (gint) GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                   (gint) GOODIX_SIGFM_ENROLL_MAX_STAGES);
   template = fp_print_new (FP_DEVICE (f->device));
   fill_gradient_samples (samples);
   f->done = FALSE;
@@ -517,10 +517,10 @@ test_d279_11_full_target_local_stage_policy (void)
                     (GAsyncReadyCallback) enroll_cb, f);
   goodix_device_context_emit_arm_complete (f->ctx, NULL);
 
-  for (guint stage = 1u; stage <= GOODIX_TARGET_LOCAL_ENROLL_STAGES; stage++)
+  for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES; stage++)
     {
       gint64 deadline;
-      gboolean final_stage = stage == GOODIX_TARGET_LOCAL_ENROLL_STAGES;
+      gboolean final_stage = stage == GOODIX_SIGFM_ENROLL_MAX_STAGES;
 
       g_assert_cmpint (f->last_state, ==,
                        FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
@@ -562,7 +562,7 @@ test_d279_11_full_target_local_stage_policy (void)
   g_assert_nonnull (f->enroll_print);
   g_assert_cmpuint (f->completion_count, ==, 1u);
   g_assert_cmpuint (f->enroll_progress_count, ==,
-                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
 
@@ -2398,8 +2398,8 @@ main (int argc, char **argv)
                    test_enroll_minutiae_done_before_finger_off);
   g_test_add_func ("/goodix-fpimage-device/enroll-finger-off-before-minutiae-done",
                    test_enroll_finger_off_before_minutiae_done);
-  g_test_add_func ("/goodix-fpimage-device/d279-11-full-target-local-stage-policy",
-                   test_d279_11_full_target_local_stage_policy);
+  g_test_add_func ("/goodix-fpimage-device/d279-57-sigfm-stage8-candidate-policy",
+                   test_d279_57_sigfm_stage8_candidate_policy);
   g_test_add_func ("/goodix-fpimage-device/no-rearm-before-both-gates",
                    test_no_rearm_before_both_gates);
   g_test_add_func ("/goodix-fpimage-device/no-command-after-deactivate-fence",

@@ -191,7 +191,7 @@ fill_structured_sigfm_samples (
 }
 
 static void
-test_true_sigfm_21_stage_action (void)
+test_true_sigfm_stage8_action (void)
 {
   uint16_t baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
@@ -248,7 +248,11 @@ test_true_sigfm_21_stage_action (void)
   g_assert_cmpint (fixture.last_state, ==,
                    FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
 
-  for (guint stage = 1u; stage <= GOODIX_TARGET_LOCAL_ENROLL_STAGES; stage++)
+  g_assert_cmpint (fp_device_get_nr_enroll_stages (
+                     FP_DEVICE (fixture.device)), ==,
+                   (gint) GOODIX_SIGFM_ENROLL_MAX_STAGES);
+
+  for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES; stage++)
     {
       guint expected_progress = stage;
 
@@ -268,7 +272,7 @@ test_true_sigfm_21_stage_action (void)
       g_assert_false (fixture.done && fixture.progress_count < expected_progress);
       g_assert_cmpuint (fixture.progress_count, ==, expected_progress);
 
-      if (stage < GOODIX_TARGET_LOCAL_ENROLL_STAGES)
+      if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
         {
           g_assert_cmpint (fixture.last_state, ==,
                            FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
@@ -284,7 +288,7 @@ test_true_sigfm_21_stage_action (void)
                    FPI_PRINT_SIGFM);
   g_assert_nonnull (fixture.enroll_print->prints);
   g_assert_cmpuint (fixture.enroll_print->prints->len, ==,
-                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpint (goodix_device_context_get_state (fixture.ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
 
@@ -375,7 +379,7 @@ main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
   g_assert_cmpint (argc, ==, 1);
-  g_test_add_func ("/goodix/d279-52-fedora44-native-sigfm-action",
-                   test_true_sigfm_21_stage_action);
+  g_test_add_func ("/goodix/d279-57-fedora44-native-sigfm-stage8-action",
+                   test_true_sigfm_stage8_action);
   return g_test_run ();
 }

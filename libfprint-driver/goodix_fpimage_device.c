@@ -313,7 +313,7 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 {
   GoodixPostTlsMaterial post_material = { 0 };
   GoodixEnrollmentModelConfig enrollment_config = {
-    .required_stage_count = GOODIX_TARGET_LOCAL_ENROLL_STAGES,
+    .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
     .defer_terminal_stage_delivery = TRUE,
   };
   g_autoptr(GError) error = NULL;
@@ -1306,7 +1306,7 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   device_class->full_name = "Goodix 27c6:5125 host-only shell";
   device_class->type      = FP_DEVICE_TYPE_VIRTUAL;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
-  device_class->nr_enroll_stages = GOODIX_TARGET_LOCAL_ENROLL_STAGES;
+  device_class->nr_enroll_stages = GOODIX_SIGFM_ENROLL_MAX_STAGES;
 
   img_class->img_open     = goodix_fpimage_device_img_open;
   img_class->img_close    = goodix_fpimage_device_img_close;

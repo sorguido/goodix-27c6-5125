@@ -1253,7 +1253,7 @@ drive_post_tls_two_acquisitions (Fixture   *fixture,
   guint8 af[16] = { 0 };
   guint8 nav[2409] = { 0 };
   static const guint8 typed82[2] = { 0, 0x20 };
-  guint8 auxiliary[GOODIX_IMAGE_PLAINTEXT_LENGTH] = { 0 };
+  static const guint8 auxiliary[4] = { 0x20, 0x01, 0x00, 0x88 };
   g_autoptr(GBytes) image = post_zero_image ();
   gsize image_length;
   const guint8 *image_data = g_bytes_get_data (image, &image_length);
@@ -1286,8 +1286,8 @@ drive_post_tls_two_acquisitions (Fixture   *fixture,
           post_feed_response (fixture, 0x82, typed82, sizeof typed82);
           post_complete_command (fixture, 0x20);
           post_feed_ack (fixture, 0x20);
-          post_write_application_data (fixture, client, auxiliary,
-                                       sizeof auxiliary);
+          post_write_application_data (fixture, client,
+                                       image_data, image_length);
         }
     }
 
@@ -1323,7 +1323,10 @@ drive_production_enrollment_bootstrap (Fixture   *fixture,
   guint8 af[16] = { 0 };
   guint8 nav[2409] = { 0x50, 0x01 };
   const guint8 typed82[2] = { 0, 0x20 };
-  const guint8 auxiliary[4] = { 0x20, 0x01, 0x00, 0x88 };
+  g_autoptr(GBytes) baseline = post_zero_image ();
+  gsize baseline_length;
+  const guint8 *baseline_data = g_bytes_get_data (baseline,
+                                                   &baseline_length);
 
   post_complete_command (fixture, 0xd4);
   post_feed_ack (fixture, 0xd4);
@@ -1349,8 +1352,8 @@ drive_production_enrollment_bootstrap (Fixture   *fixture,
           post_feed_response (fixture, 0x82, typed82, sizeof typed82);
           post_complete_command (fixture, 0x20);
           post_feed_ack (fixture, 0x20);
-          post_write_application_data (fixture, client, auxiliary,
-                                       sizeof auxiliary);
+          post_write_application_data (fixture, client,
+                                       baseline_data, baseline_length);
         }
     }
   post_complete_command (fixture, 0x32);
@@ -1383,7 +1386,7 @@ drive_production_enrollment_stages (Fixture   *fixture,
   gsize image_length;
   const guint8 *image_data = g_bytes_get_data (image, &image_length);
 
-  for (guint stage = 1u; stage <= GOODIX_TARGET_LOCAL_ENROLL_STAGES; stage++)
+  for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES; stage++)
     {
       if (stage > 1u)
         post_feed_event (fixture, 0x32, 0x0002, 0x003f,
@@ -1425,7 +1428,7 @@ drive_production_enrollment_stages (Fixture   *fixture,
           post_feed_ack (fixture, 0x34);
           post_feed_event (fixture, 0x34, 0x0200, 0,
                            (guint16) (0x40u + stage * 8u));
-          if (stage < GOODIX_TARGET_LOCAL_ENROLL_STAGES)
+          if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
             {
               post_complete_command (fixture, 0x32);
               post_feed_ack (fixture, 0x32);
@@ -1471,7 +1474,7 @@ test_production_one_shot_enrollment_full_tls (void)
   g_assert_no_error (fixture->action_error);
   g_assert_nonnull (fixture->enroll_print);
   g_assert_cmpuint (fixture->enroll_progress_count, ==,
-                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
 
   goodix_device_context_get_production_enrollment_audit (
@@ -1484,11 +1487,26 @@ test_production_one_shot_enrollment_full_tls (void)
                     ==, 0u);
   g_assert_cmpuint (enrollment_audit.post_tls.retry_count, ==, 0u);
   g_assert_cmpuint (enrollment_audit.enrollment_events.primary_b0_count, ==,
-                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (enrollment_audit.enrollment_events.auxiliary_b0_count, ==,
-                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (enrollment_audit.auxiliary_b0_observed_count, ==,
-                    GOODIX_TARGET_LOCAL_ENROLL_STAGES);
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (
+    enrollment_audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_required_stage_count,
+    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (
+    enrollment_audit.enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
+    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (
+    enrollment_audit.enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
+    ==, 1u);
+  g_assert_cmpuint (
+    enrollment_audit.enrollment_events.lifecycle.plan.inter_stage_rearm_count,
+    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES - 1u);
+  g_assert_cmpuint (
+    enrollment_audit.enrollment_events.lifecycle.plan.command_32_count,
+    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (
     enrollment_audit.enrollment_binding.transaction.frame.persistent_family_count,
     ==, 0u);

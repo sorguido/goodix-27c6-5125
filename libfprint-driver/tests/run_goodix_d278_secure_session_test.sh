@@ -12,7 +12,7 @@ if [ "${GOODIX_D278_IN_SDK:-0}" != 1 ] &&
   exec flatpak run --user --unshare=network \
     --filesystem="$root":ro --filesystem=/tmp \
     --env=GOODIX_D278_IN_SDK=1 \
-    --command=sh org.freedesktop.Sdk//25.08 "$0"
+    --command=sh org.freedesktop.Sdk//25.08 "$0" "$@"
 fi
 
 build=$(mktemp -d /tmp/goodix-d278-secure-session.XXXXXX)
@@ -39,6 +39,7 @@ local_relax="-Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualif
 build_run () {
   name=$1
   extra=$2
+  shift 2
   gcc $strict $local_relax $extra $cflags $includes \
     "$local_fp/fp-device.c" \
     "$local_fp/fpi-device.c" \
@@ -82,12 +83,12 @@ build_run () {
   # ASAN address checks and UBSAN remain fully enabled.
   ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
   UBSAN_OPTIONS=halt_on_error=1 \
-    timeout 90 "$build/$name"
+    timeout 90 "$build/$name" "$@"
 }
 
-build_run d278-normal ""
+build_run d278-normal "" "$@"
 echo NORMAL_TEST_RUN=PASS
-build_run d278-sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
+build_run d278-sanitized "-O1 -fno-omit-frame-pointer -fsanitize=address,undefined" "$@"
 echo SANITIZER_TEST_RUN=PASS
 echo D278_01_HOST_ONLY_RESULT=PASS
 echo NATIVE_SECURE_SESSION_CHAIN_HOST_ONLY_PROVEN=true

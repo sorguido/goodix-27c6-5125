@@ -1,6 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D279/57 enrollment SIGFM stage-8 (pre-live, hard-gated)
+
+`d279-57-stage8-early-terminal/` prepara una sola action enrollment production
+SIGFM a otto stage per verificare su APP12509 il terminale senza nono `0x32`.
+Il cap fisso isola il boundary sensor-side; non implementa ancora la selezione
+dinamica né prova la riutilizzabilità post-close. Preflight offline verde;
+preparazione, grant e run richiedono approvazione esplicita del full SHA. Non è
+autorizzato alcun live o retry.
+
 ## D279/54 identify OEM passiva (pre-live, hard-gated)
 
 `d279-54-oem-passive-identify-observe/` cattura con TShark/USBPcap una sola
@@ -95,8 +104,9 @@ richiede review, baseline e autorizzazione esplicite.
 | `d279-29-one-shot-enrollment/` | enrollment production one-shot concluso su `f4f0436…`; grant consumato, nessun retry autorizzato |
 | `d279-35-offline-protected-evaluation/` | current path offline aggregate-only; Human Gate per singola lettura protected pendente |
 | `d279-54-oem-passive-identify-observe/` | candidate passivo OEM identify hard-gated; authority chiusa, qualificazione Windows/full SHA/autorizzazione one-shot pendenti |
+| `d279-57-stage8-early-terminal/` | candidate production SIGFM stage-8 hard-gated; preflight offline verde, full SHA e autorizzazione one-shot pendenti; nessun retry o test di reusability incluso |
 
 Non esiste un kit operativo corrente **autorizzato live**. La run D279/29 è
-consumata. D279/35 non è live e non incorpora né auto-approva il commit SHA
-richiesto per la lettura protetta: la sua presenza non autorizza l'analisi. I
-marker storici non devono essere cancellati o riutilizzati.
+consumata; D279/57 resta al Human Gate. D279/35 e D279/56 sono percorsi offline
+protetti e la loro presenza non autorizza operazioni live. I marker storici
+non devono essere cancellati o riutilizzati.

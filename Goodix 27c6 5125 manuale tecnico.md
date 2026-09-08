@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/55 — SIGFM production identify offline
+### Stato corrente post-D279/57 — SIGFM production stage-8 candidate offline
 
 La valutazione protetta D279/48 è stata completata offline sulla baseline
 `36999004b9971f7004aaaa4da85d7c2d1afc79d1`, senza USB/live e senza export di
@@ -73,13 +73,17 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_57_STAGE8_EARLY_TERMINAL_LIVE_BOUNDARY_PREPARATION
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_D279_57_STAGE8_EARLY_TERMINAL_ENROLLMENT
 ```
 
 Report e review machine-readable:
 `analysis/D279/D279_48_SUCCESS_summary.json`,
 `analysis/D279/D279_48_post_run_sigfm_pivot.md` e
-`analysis/D279/D279_48_authentic_aggregate_review.json`.
+`analysis/D279/D279_48_authentic_aggregate_review.json`. Per la policy
+enrollment corrente vedere
+`analysis/D279/D279_56_dynamic_enrollment_policy_replay_boundary.md`, il
+summary autentico `analysis/D279/D279_56_SUCCESS_summary.json` e
+`analysis/D279/D279_57_stage8_early_terminal_live_boundary.md`.
 
 ### Stato D279/49 — preprocessing Rockytkg R2 production isolato
 
@@ -522,6 +526,75 @@ DYNAMIC_EARLY_TERMINAL_APP12509_PROVEN=false
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_57_STAGE8_EARLY_TERMINAL_LIVE_BOUNDARY_PREPARATION
+```
+
+### Stato D279/57 — candidato production stage-8 e gate terminale anticipato
+
+D279/57 traduce il risultato autentico D279/56 nel minimo esperimento
+sensor-side discriminante. La production SIGFM dichiara ora otto stage e il
+grafo enrollment configura lo stesso cap; il valore 21 resta separato come
+profilo wire/regression autentico ATTEMPT02. Non viene ancora implementata la
+selezione dinamica per duplicati: tutti i primi otto sample ATTEMPT02 erano
+distinti e il cap fisso isola l'effetto dell'omissione del nono re-arm.
+
+La semantica attesa è: otto cicli completi fino a finger-up `IRQ 0x0200`, sette
+re-arm inter-stage e otto comandi `0x32` complessivi (bootstrap più sette
+re-arm), quindi terminale del grafo, deactivation, drain e close senza un nono
+`0x32`. Il client one-shot non salva il template, non esegue retry, seconda
+action o reopen. Un successo non proverà ancora la riutilizzabilità: quella
+richiede una distinta action in un nuovo open epoch, dopo review e nuova
+autorizzazione.
+
+L'error propagation D279/52 è stato riesaminato esplicitamente. La action
+SIGFM usa `fpi_image_device_add_enroll_sample_checked()`, che delega
+all'append atomico `fpi_print_add_print_checked()` e incrementa lo stage
+libfprint soltanto dopo copia riuscita. Un failure di extraction o
+`goodix_sigfm_sample_copy()` termina la action e avvia deactivation; non viene
+pubblicato progresso enrollment per un sample non acquisito nel template. I
+test `checked-append-atomic-failure` e
+`enroll-stage-stable-on-copy-failure` passano normali e ASan/UBSan.
+
+I test focused della classe/action e della sessione TLS production provano
+offline 8/8 progressi, terminale unico, sette re-arm, otto `0x32`, drain e
+rifiuto di una seconda action nello stesso open epoch. Il test con SIGFM reale
+Rockytkg/OpenCV passa extraction, template multi-sample, serialization e
+identify su otto sample. I modelli storici D279/11 e D279/13 restano verdi sui
+profili 2/3/21. Le fixture TLS obsolete usavano per il B0 bootstrap un payload
+opaco che il nuovo preprocessing production rifiuta correttamente; sono state
+allineate al record immagine sintetico già validato senza rilassare il codice
+production.
+
+Il kit `operator_kit/d279-57-stage8-early-terminal/` passa il preflight
+offline: costruisce da snapshot Git la fork Fedora 44/libfprint 1.94.100 con
+R2/SIGFM e OpenCV RPM hash-pinned, verifica l'assenza delle seam di test e
+rifiuta la baseline `UNAPPROVED_FOR_LIVE` prima di `FpContext`/USB. La futura
+run è una singola azione live e resta soggetta a Human Gate su full SHA.
+
+Riesame metodologico pre-live:
+
+1. rispetto a D279/29 cambiano realmente extractor/template production
+   (SIGFM anziché NBIS) e terminale enrollment (8 invece di 21, senza nono
+   `0x32` dopo un finger-up completo);
+2. l'ipotesi è che APP12509 accetti il terminale host dopo lo stage 8 e possa
+   essere drenato/released/chiuso senza richiedere lo stage 9;
+3. se fallisce nello stesso boundary non è autorizzato alcun retry: si
+   analizzano gli artefatti e si passa a un replan protocol-specifico. La
+   riutilizzabilità resta comunque uno step separato.
+
+```text
+D279_57_OUTCOME=HUMAN_REQUIRED
+D279_57_ADVANCEMENT=PRODUCTION_SIGFM_STAGE8_CANDIDATE_AND_ONE_SHOT_KIT_READY
+D279_57_EXECUTABLE_CLOSURE=PASS_OFFLINE
+PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_CANDIDATE_PENDING_LIVE_PROOF
+ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
+DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
+SIGFM_APPEND_FAILURE_ADVANCES_STAGE=false
+EXPECTED_COMMAND_32_COUNT=8
+EXPECTED_INTER_STAGE_REARM_COUNT=7
+EXPECTED_POST_STAGE8_REARM_COUNT=0
+REUSABILITY_PROVEN=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_D279_57_STAGE8_EARLY_TERMINAL_ENROLLMENT
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

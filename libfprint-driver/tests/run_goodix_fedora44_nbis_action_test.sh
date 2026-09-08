@@ -31,7 +31,7 @@ cleanup ()
 trap cleanup EXIT HUP INT TERM
 
 manifest="$repo_root/operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256"
-grep -F 'FPI_DEVICE_ACTION_ENROLL)' "$production_source" >/dev/null
+grep -F 'FPI_DEVICE_ACTION_ENROLL &&' "$production_source" >/dev/null
 grep -F 'FPI_DEVICE_ACTION_IDENTIFY)' "$production_source" >/dev/null
 grep -F 'GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION' \
   "$production_source" >/dev/null
@@ -110,7 +110,7 @@ if command -v flatpak >/dev/null 2>&1 &&
     printf '%s\n' "$provided_symbols" | grep -Fx "$abi_symbol" >/dev/null
   done
   echo D279_52_STANDARD_DRIVER_REGISTRY=PASS
-  echo D279_52_NATIVE_SIGFM_ACTION_21_STAGE=PASS
+  echo D279_57_NATIVE_SIGFM_ACTION_STAGE8=PASS
   echo D279_52_ACTION_TEST_COMPATIBILITY_FILENAME=run_goodix_fedora44_nbis_action_test.sh
   echo D279_53_FPRINTD_PACKAGE="$fprintd_package"
   echo D279_53_FPRINTD_LIBFPRINT_REQUIRED_SYMBOL_COUNT="$required_count"
