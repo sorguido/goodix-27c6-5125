@@ -31,10 +31,11 @@ cleanup ()
 trap cleanup EXIT HUP INT TERM
 
 manifest="$repo_root/operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256"
-grep -F 'fpi_device_get_current_action (FP_DEVICE (self)) !=' \
-  "$production_source" >/dev/null
 grep -F 'FPI_DEVICE_ACTION_ENROLL)' "$production_source" >/dev/null
-grep -F 'Goodix production first-live boundary permits enrollment only' \
+grep -F 'FPI_DEVICE_ACTION_IDENTIFY)' "$production_source" >/dev/null
+grep -F 'GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION' \
+  "$production_source" >/dev/null
+grep -F 'Goodix production boundary permits enrollment and identify only' \
   "$production_source" >/dev/null
 (cd "$rpm_dir" && sha256sum -c "$manifest")
 mkdir -p "$pkgconfig_dir" "$opencv_prefix" "$runtime"
@@ -115,7 +116,9 @@ if command -v flatpak >/dev/null 2>&1 &&
   echo D279_53_FPRINTD_LIBFPRINT_REQUIRED_SYMBOL_COUNT="$required_count"
   echo D279_53_FPRINTD_LIBFPRINT_ABI_CLOSURE=PASS
   echo D279_53_FPRINTD_EXECUTION_COUNT=0
-  echo D279_53_PRODUCTION_IDENTIFY_ACTION_ENABLED=false
+  echo D279_55_PRODUCTION_IDENTIFY_ACTION_ENABLED=true
+  echo D279_55_PRODUCTION_IDENTIFY_CAPTURE_COUNT=1
+  echo D279_55_PRODUCTION_IDENTIFY_REARM_COUNT=0
   exit 0
 fi
 

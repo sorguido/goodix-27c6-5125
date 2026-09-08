@@ -185,6 +185,18 @@ enroll_cb (FpDevice *device, GAsyncResult *res, gpointer user_data)
 }
 
 static void
+identify_cb (FpDevice *device, GAsyncResult *res, gpointer user_data)
+{
+  TestFixture *f = user_data;
+  g_autoptr(FpPrint) match = NULL;
+  g_autoptr(FpPrint) print = NULL;
+
+  f->success = fp_device_identify_finish (device, res, &match, &print,
+                                           &f->error);
+  test_complete (f);
+}
+
+static void
 progress_cb (FpDevice     *device,
              gint          completed_stages,
              FpPrint      *print,
@@ -1750,6 +1762,71 @@ test_d279_28_production_non_enrollment_rejected (void)
 }
 
 static void
+test_d279_55_production_identify_single_acquisition (void)
+{
+  ProductionOpenSeam seam = { 0 };
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(GPtrArray) gallery = g_ptr_array_new_with_free_func (
+    g_object_unref);
+  g_autoptr(GError) timeout = NULL;
+  g_autoptr(GError) cancelled = NULL;
+  TestFixture *f = production_fixture_new (&seam);
+  GoodixProductionEnrollmentAudit audit;
+  GoodixFpiUsbBackend *backend;
+  GoodixPostTlsLifecycle *post_tls;
+  guint64 generation;
+
+  fixture_open (f);
+  backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
+  goodix_device_context_set_async_usb_submit_seam (
+    f->ctx, production_graph_submit_seam, &seam);
+  f->done = FALSE;
+  f->completion_count = 0u;
+  fp_device_identify (FP_DEVICE (f->device), gallery, cancellable,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) identify_cb, f);
+  generation = goodix_device_context_get_generation (f->ctx);
+  g_assert_cmpuint (generation, >, 0u);
+  g_assert_cmpuint (seam.in_submit_count, ==, 1u);
+  g_assert_cmpuint (seam.out_submit_count, ==, 0u);
+  timeout = g_error_new_literal (G_USB_DEVICE_ERROR,
+                                 G_USB_DEVICE_ERROR_TIMED_OUT,
+                                 "synthetic host-side receive deadline");
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0,
+                                           timeout);
+  post_tls = goodix_device_context_get_post_tls_lifecycle (f->ctx);
+  g_assert_nonnull (goodix_device_context_get_secure_session (f->ctx));
+  g_assert_nonnull (post_tls);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_capture_profile (post_tls),
+                   ==, GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  g_assert_false (goodix_device_context_has_pending_enrollment_graph (f->ctx));
+  goodix_device_context_get_production_enrollment_audit (f->ctx, &audit);
+  g_assert_true (audit.production_action_consumed);
+  g_assert_cmpuint (seam.out_submit_count, ==, 1u);
+
+  g_cancellable_cancel (cancellable);
+  wait_for_context_state (f->ctx, GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+  cancelled = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED,
+                                   "synthetic cancelled transfer");
+  goodix_fpi_usb_backend_complete_out (backend, generation, cancelled);
+  goodix_device_context_complete_receive (f->ctx, generation, NULL, 0,
+                                           cancelled);
+  test_wait (f);
+  g_assert_false (f->success);
+  g_assert_error (f->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+  fixture_close (f);
+  goodix_fpimage_device_get_production_enrollment_audit (f->device, &audit);
+  g_assert_true (audit.context_closed);
+  g_assert_false (audit.usb_interface_claimed);
+  g_assert_true (audit.usb_backend_drained);
+  g_assert_false (audit.runtime_material_present);
+  g_assert_cmpuint (audit.usb_outstanding_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_out_outstanding_count, ==, 0u);
+  test_fixture_free (f);
+  production_seam_clear (&seam);
+}
+
+static void
 test_d278_14_non_null_usb_binding (void)
 {
   g_autoptr(GUsbDevice) usb_device = NULL;
@@ -2365,6 +2442,8 @@ main (int argc, char **argv)
                    test_d279_28_production_enrollment_starts_reviewed_graph);
   g_test_add_func ("/goodix-fpimage-device/d279-28-production-action-allowlist",
                    test_d279_28_production_non_enrollment_rejected);
+  g_test_add_func ("/goodix-fpimage-device/d279-55-production-identify-single-acquisition",
+                   test_d279_55_production_identify_single_acquisition);
   g_test_add_func ("/goodix-fpimage-device/d279-20-dormant-enrollment-context-ownership",
                    test_d279_20_dormant_enrollment_context_ownership);
   g_test_add_func ("/goodix-fpimage-device/d279-24-context-first-arm-enrollment-handoff",

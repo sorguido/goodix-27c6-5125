@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/48 — classe B e pivot production SIGFM
+### Stato corrente post-D279/55 — SIGFM production identify offline
 
 La valutazione protetta D279/48 è stata completata offline sulla baseline
 `36999004b9971f7004aaaa4da85d7c2d1afc79d1`, senza USB/live e senza export di
@@ -71,9 +71,9 @@ reimplementazione indipendente è soltanto fallback a un blocker concreto.
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
 ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
-CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
+CURRENT_PROTECTED_EVALUATION_AUTHORIZED=true
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_55_PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_PROFILE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_56_AUTHENTIC_ENROLLMENT_DYNAMIC_POLICY_REPLAY
 ```
 
 Report e review machine-readable:
@@ -372,6 +372,55 @@ OEM_IDENTIFY_TERMINAL_PROTOCOL_EVENT=NAV
 PRODUCTION_IDENTIFY_ACTION_ENABLED=false
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_55_PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_PROFILE
+```
+
+### Stato D279/55 — identify production single-acquisition
+
+D279/55 collega offline i due livelli di autorità mantenendoli distinti:
+D279/54 definisce il lifecycle USB APP12509 osservato, mentre Rockytkg resta il
+riferimento implementativo per R2, SIGFM e l'action libfprint a singolo probe.
+Non si assume equivalenza wire tra OEM e Rockytkg e non si ricava alcuna policy
+enrollment dalla cattura identify.
+
+Il lifecycle post-TLS ha ora un profilo esplicito. Il valore predefinito
+preserva il percorso a due acquisizioni e l'handoff enrollment. La production
+`IDENTIFY` seleziona invece `SINGLE_ACQUISITION`, usa bootstrap/baseline e il
+vero percorso R2/SIGFM già chiuso da D279/52–53, completa la release
+`0x34 -> IRQ0200 -> 0x20 -> B0 -> 0x50 -> NAV` e passa a `STOP` prima dei
+callback libfprint. Non entra quindi in `REARM_GATE`, non invia un secondo
+`0x32` e non può acquisire un secondo probe. La verify pubblica di libfprint
+1.94.100 ricade sulla vfunc identify con gallery di un solo print e usa lo
+stesso profilo.
+
+La allowlist production ammette ora soltanto `ENROLL` e `IDENTIFY`; `CAPTURE`
+resta rifiutata. Restano invariati one-action-per-open-epoch, generation fence,
+pre-session sync, TLS, drain e guardrail persistent-family. I test lifecycle e
+production-device focalizzati passano normali e ASan/UBSan con backend fake e
+zero USB reale. Il runner completo non-SIGFM ha esposto una fixture D279/24
+legacy già incompatibile con il failure asincrono dell'extractor; il test
+D279/55 focalizzato e la suite lifecycle restano verdi. La cache RPM OpenCV
+pinned non era presente, quindi la build production-shaped SIGFM già provata
+in D279/52–53 non è stata rieseguita in questo step.
+
+Il delta è espressione locale LGPL sui file già locali, guidata dai fatti
+D279/54; non importa codice wire Rockytkg. Il ledger licensing registra questa
+separazione. Nessun live, USB, secret o dato biometrico è stato raggiunto.
+
+```text
+D279_55_OUTCOME=READY
+D279_55_ADVANCEMENT=PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_BOUNDARY_CLOSED_OFFLINE
+D279_55_EXECUTABLE_CLOSURE=PASS_FOCUSED_NORMAL_ASAN_UBSAN
+PRODUCTION_IDENTIFY_ACTION_ENABLED=true
+PRODUCTION_VERIFY_VIA_IDENTIFY=true
+IDENTIFY_PRIMARY_ACQUISITION_COUNT=1
+IDENTIFY_POST_TOUCH_REARM_COUNT=0
+IDENTIFY_RELEASE_TERMINAL=NAV_THEN_STOP
+IDENTIFY_ENROLLMENT_GRAPH_INSTALLED=false
+ENROLLMENT_BEHAVIOR_CHANGED=false
+SIGFM_THRESHOLD_PRODUCTION_VALIDATED=false
+LIVE_OR_USB_ACTION_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_56_AUTHENTIC_ENROLLMENT_DYNAMIC_POLICY_REPLAY
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

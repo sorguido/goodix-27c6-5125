@@ -466,6 +466,16 @@ goodix_post_tls_lifecycle_new (
                            "post-TLS lifecycle material or owner is absent");
       return NULL;
     }
+  if (material->capture_profile <
+        GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION ||
+      material->capture_profile >
+        GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION)
+    {
+      g_set_error_literal (error, GOODIX_POST_TLS_ERROR,
+                           GOODIX_POST_TLS_ERROR_ARGUMENT,
+                           "unsupported post-TLS capture profile");
+      return NULL;
+    }
   lifecycle = g_new0 (GoodixPostTlsLifecycle, 1);
   lifecycle->backend = backend;
   lifecycle->generation = generation;
@@ -827,11 +837,16 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
     case GOODIX_POST_TLS_PHASE_RELEASE_NAV:
       if (message.control != 0x50 || length != 2409u)
         goto unexpected;
-      lifecycle->phase = GOODIX_POST_TLS_PHASE_REARM_GATE;
+      lifecycle->phase =
+        lifecycle->material.capture_profile ==
+          GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION ?
+          GOODIX_POST_TLS_PHASE_STOP : GOODIX_POST_TLS_PHASE_REARM_GATE;
       if (lifecycle->audit != NULL)
         {
           lifecycle->audit->nav_response_count++;
           lifecycle->audit->release_tail_complete_count++;
+          if (lifecycle->phase == GOODIX_POST_TLS_PHASE_STOP)
+            lifecycle->audit->single_acquisition_terminal_count++;
         }
       if (lifecycle->release_tail != NULL)
         lifecycle->release_tail (lifecycle, lifecycle->user_data);
@@ -1124,6 +1139,14 @@ goodix_post_tls_lifecycle_get_phase (const GoodixPostTlsLifecycle *lifecycle)
 {
   return lifecycle != NULL ? lifecycle->phase :
                              GOODIX_POST_TLS_PHASE_TERMINAL;
+}
+
+GoodixPostTlsCaptureProfile
+goodix_post_tls_lifecycle_get_capture_profile (
+  const GoodixPostTlsLifecycle *lifecycle)
+{
+  return lifecycle != NULL ? lifecycle->material.capture_profile :
+                             GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION;
 }
 
 const GError *

@@ -222,16 +222,26 @@ fixed64 A0. It has no backend or submit API. Known persistent families are not
 allowlisted. That is an allowlist guardrail over known families, not proof that
 no other sensor-side persistence is possible.
 
-## D279/28 minimal production USB one-shot enrollment binding
+## D279/28 and D279/55 production USB action binding
 
-The registered USB action now installs the exact target-observed 21-stage
-enrollment graph between the retained post-TLS lifecycle and the existing
-production `GoodixFpiUsbBackend`. It does so only for `FPI_DEVICE_ACTION_ENROLL`;
-all B0 application plaintext reaches the graph through the authenticated TLS
-server. The auxiliary B0 stays opaque and is counted without interpretation.
+For `FPI_DEVICE_ACTION_ENROLL`, the registered USB action installs the exact
+target-observed 21-stage enrollment graph between the retained post-TLS
+lifecycle and the existing production `GoodixFpiUsbBackend`. All B0
+application plaintext reaches the graph through the authenticated TLS server.
+The auxiliary B0 stays opaque and is counted without interpretation.
 
-Only enrollment is admitted by the first-live action allowlist. Its first
-attempt consumes the complete open epoch even on failure.
+For `FPI_DEVICE_ACTION_IDENTIFY`, D279/55 keeps the same target-specific OEM
+bootstrap and release lifecycle but selects a single-acquisition profile. One
+primary B0 is passed through the Rockytkg-derived R2/SIGFM path; after the
+release `0x34 -> IRQ 0x0200 -> 0x20 -> B0 -> 0x50 -> NAV`, the lifecycle enters
+`STOP` before libfprint release callbacks. It never enters `REARM_GATE`, sends
+no second `0x32`, and cannot request a second image. Public verify falls back
+to the image-device identify action with a one-print gallery in this libfprint
+version, so it uses the same boundary.
+
+Enrollment and identify are admitted by the production action allowlist;
+capture remains rejected. The first admitted attempt consumes the complete
+open epoch even on failure.
 A second action is rejected before generation allocation or USB submit, and a
 full close/open is required. There is no retry, automatic reopen, reset,
 clear-halt, or persistent-family sender. Multi-action reactivation and fprintd

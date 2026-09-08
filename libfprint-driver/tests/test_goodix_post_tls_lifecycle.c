@@ -181,7 +181,7 @@ first_arm_handoff_callback (GoodixPostTlsLifecycle *lifecycle,
 }
 
 static Fixture *
-fixture_new (void)
+fixture_new_for_profile (GoodixPostTlsCaptureProfile capture_profile)
 {
   Fixture *fixture = g_new0 (Fixture, 1);
   g_autoptr(GCancellable) cancellable = g_cancellable_new ();
@@ -202,6 +202,7 @@ fixture_new (void)
   fixture->material.af_timestamp = 0x1234;
   fixture->material.first_arm_timestamp = 0x2345;
   fixture->material.second_arm_timestamp = 0x3456;
+  fixture->material.capture_profile = capture_profile;
   for (gsize i = 0; i < GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT; i++)
     fixture->expected[i] = (uint16_t) (i & 0x0fffu);
   fixture->router = goodix_usb_router_new (a0_consumer, b0_consumer, fixture);
@@ -220,6 +221,13 @@ fixture_new (void)
   g_assert_nonnull (fixture->lifecycle);
   g_assert_no_error (error);
   return fixture;
+}
+
+static Fixture *
+fixture_new (void)
+{
+  return fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION);
 }
 
 static void
@@ -584,6 +592,14 @@ run_full_trace (Fixture *fixture,
   feed_frame (fixture, typed, fragmentation);
 
   g_assert_true (g_queue_is_empty (fixture->out));
+  if (fixture->material.capture_profile ==
+      GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION)
+    {
+      goodix_post_tls_lifecycle_set_framework_await_finger_on (
+        fixture->lifecycle, fixture->generation, TRUE);
+      g_assert_true (g_queue_is_empty (fixture->out));
+      return;
+    }
   goodix_post_tls_lifecycle_set_framework_await_finger_on (
     fixture->lifecycle, fixture->generation - 1u, TRUE);
   g_assert_true (g_queue_is_empty (fixture->out));
@@ -645,6 +661,7 @@ assert_full_audit (Fixture *fixture)
   g_assert_cmpuint (fixture->audit.nav_0x50_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.nav_response_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.release_tail_complete_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.single_acquisition_terminal_count, ==, 0u);
   g_assert_cmpuint (fixture->audit.fresh_down_table_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.second_b0_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.second_irq0002_count, ==, 1u);
@@ -664,6 +681,44 @@ assert_full_audit (Fixture *fixture)
                      fixture->backend), ==, 1u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
                      fixture->backend), ==, 0u);
+}
+
+static void
+test_single_acquisition_terminal_no_rearm (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+
+  run_full_trace (fixture, 1u);
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_capture_profile (
+                     fixture->lifecycle), ==,
+                   GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_STOP);
+  g_assert_cmpuint (fixture->image_count, ==, 1u);
+  g_assert_cmpuint (fixture->finger_down_count, ==, 1u);
+  g_assert_cmpuint (fixture->release_tail_count, ==, 1u);
+  g_assert_cmpuint (fixture->finger_up_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 13u);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 12u);
+  g_assert_cmpuint (fixture->audit.first_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.release_tail_complete_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.single_acquisition_terminal_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.second_irq0002_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.second_image_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.second_image_pipeline_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.third_cycle_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.persistent_device_write_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (
+                     fixture->backend), ==, 0u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_outstanding (
+                     fixture->backend), ==, 0u);
+
+  fixture_free (fixture);
 }
 
 static void
@@ -956,6 +1011,8 @@ main (int argc, char **argv)
                    test_full_trace_fragmented);
   g_test_add_func ("/d278-12/deterministic-repeat",
                    test_deterministic_repeat);
+  g_test_add_func ("/d279-55/single-acquisition-terminal-no-rearm",
+                   test_single_acquisition_terminal_no_rearm);
   g_test_add_func ("/d278-12/wrong-ack-terminal",
                    test_wrong_ack_terminal);
   g_test_add_func ("/d278-12/cancel-generation-fence",

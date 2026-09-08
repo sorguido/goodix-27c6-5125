@@ -44,12 +44,19 @@ typedef enum
   GOODIX_POST_TLS_PHASE_TERMINAL,
 } GoodixPostTlsPhase;
 
+typedef enum
+{
+  GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION = 0,
+  GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION,
+} GoodixPostTlsCaptureProfile;
+
 typedef struct
 {
   guint8 initial_fdt_table[12];
   guint16 af_timestamp;
   guint16 first_arm_timestamp;
   guint16 second_arm_timestamp;
+  GoodixPostTlsCaptureProfile capture_profile;
 } GoodixPostTlsMaterial;
 
 typedef struct
@@ -92,6 +99,7 @@ typedef struct
   guint clear_halt_count;
   guint persistent_device_write_count;
   guint release_tail_complete_count;
+  guint single_acquisition_terminal_count;
   guint first_arm_handoff_count;
   guint backend_handoff_count;
   gboolean fresh_down_table;
@@ -160,6 +168,8 @@ void goodix_post_tls_lifecycle_cancel (GoodixPostTlsLifecycle *lifecycle,
                                        const gchar *reason);
 const gchar *goodix_post_tls_phase_name (GoodixPostTlsPhase phase);
 GoodixPostTlsPhase goodix_post_tls_lifecycle_get_phase (
+  const GoodixPostTlsLifecycle *lifecycle);
+GoodixPostTlsCaptureProfile goodix_post_tls_lifecycle_get_capture_profile (
   const GoodixPostTlsLifecycle *lifecycle);
 const GError *goodix_post_tls_lifecycle_get_error (
   const GoodixPostTlsLifecycle *lifecycle);

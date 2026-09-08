@@ -317,6 +317,7 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
     .defer_terminal_stage_delivery = TRUE,
   };
   g_autoptr(GError) error = NULL;
+  FpiDeviceAction action;
   gboolean enrollment_action;
 
   if (ctx->state != GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING ||
@@ -324,15 +325,18 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
       ctx->runtime_material == NULL || !ctx->usb_interface_claimed)
     return;
 
-  enrollment_action =
-    fpi_device_get_current_action (FP_DEVICE (ctx->device)) ==
-      FPI_DEVICE_ACTION_ENROLL;
+  action = fpi_device_get_current_action (FP_DEVICE (ctx->device));
+  enrollment_action = action == FPI_DEVICE_ACTION_ENROLL;
 
   memcpy (post_material.initial_fdt_table, ctx->runtime_fdt_seed,
           sizeof post_material.initial_fdt_table);
   post_material.af_timestamp = production_timestamp ();
   post_material.first_arm_timestamp = production_timestamp ();
   post_material.second_arm_timestamp = production_timestamp ();
+  post_material.capture_profile =
+    action == FPI_DEVICE_ACTION_IDENTIFY ?
+      GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION :
+      GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION;
   if (!goodix_device_context_configure_post_tls_lifecycle (
         ctx, &post_material, &ctx->runtime_post_tls_audit, &error) ||
       (enrollment_action &&
@@ -1154,11 +1158,13 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
 
   if (goodix_fpimage_device_is_production_usb (self) &&
       fpi_device_get_current_action (FP_DEVICE (self)) !=
-        FPI_DEVICE_ACTION_ENROLL)
+        FPI_DEVICE_ACTION_ENROLL &&
+      fpi_device_get_current_action (FP_DEVICE (self)) !=
+        FPI_DEVICE_ACTION_IDENTIFY)
     {
       error = g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-        "Goodix production first-live boundary permits enrollment only");
+        "Goodix production boundary permits enrollment and identify only");
       fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
       return;
     }
@@ -1641,6 +1647,7 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
 {
   GoodixDeviceContext *ctx = user_data;
 
+  (void) pipeline;
   (void) stage_index;
   if (ctx->terminal_fence || image == NULL)
     {

@@ -361,7 +361,7 @@ test_true_sigfm_21_stage_action (void)
   g_print ("D279_52_PRODUCTION_USB_REACHED=false\n");
   g_print ("D279_53_PUBLIC_FP3_STORAGE_ROUNDTRIP=PASS\n");
   g_print ("D279_53_TRUE_SIGFM_IDENTIFY_ACTION=PASS\n");
-  g_print ("D279_53_PRODUCTION_IDENTIFY_ACTION_ENABLED=false\n");
+  g_print ("D279_55_PRODUCTION_IDENTIFY_ACTION_ENABLED=true\n");
   g_clear_object (&fixture.identify_match);
   g_clear_object (&fixture.identify_print);
   g_clear_object (&fixture.enroll_print);
