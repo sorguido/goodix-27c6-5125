@@ -73,7 +73,7 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=true
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_56_AUTHENTIC_ENROLLMENT_DYNAMIC_POLICY_REPLAY
+NEXT_PRIMARY_BOUNDARY=MANUAL_EXECUTION_OF_ALREADY_AUTHORIZED_D279_56_PROTECTED_OFFLINE_REPLAY
 ```
 
 Report e review machine-readable:
@@ -421,6 +421,54 @@ SIGFM_THRESHOLD_PRODUCTION_VALIDATED=false
 LIVE_OR_USB_ACTION_COUNT=0
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_56_AUTHENTIC_ENROLLMENT_DYNAMIC_POLICY_REPLAY
+```
+
+### Stato D279/56 — replay protetto policy enrollment dinamica
+
+Il riesame enrollment è accettato come flusso di evidenza separato. I 21 stage
+restano profilo autentico ATTEMPT02 e regression target, ma non sono provati
+come requisito universale, ottimo biometrico o requisito SIGFM. La direzione
+preferita diventa la selezione dinamica Rockytkg, senza modificare ancora la
+policy production e senza usare D279/54 come evidenza sul numero di stage.
+
+L'evaluator riproduce esattamente i default preservati in `goodixgf.c`: almeno
+3 frame distinti, massimo 8 sample consegnati, convergenza al secondo duplicato
+consecutivo e duplicato se MAD strettamente minore di 8.0 contro qualunque
+frame accettato. Su 80×64 u8 il confronto è implementato senza rounding come
+somma delle differenze assolute `<40960`. Il secondo duplicato convergente è
+consegnato come sample terminale, quindi il minimo finale è normalmente 4.
+
+Il replay usa esclusivamente baseline e 21 primary raster ATTEMPT02, passa dal
+componente R2 production D279/49 e produce soltanto classificazioni ordinate
+`ACCEPT/DUPLICATE/CONVERGE`, conteggi e causa terminale. Non esporta MAD
+per-stage, raster, plaintext, feature, descriptor o template. L'autorizzazione
+originaria allo studio, documento SHA-256 `9b93693a...c631f6`, copre lettura,
+ricostruzione, preprocessing, analisi e retry tecnici offline; non serve nuovo
+consenso per-run. Restano esclusi live/USB, nuove acquisizioni, installazioni,
+provisioning, modifiche PSK/persistenti e sudo da parte dell'AI.
+
+Il kit `operator_kit/d279-56-offline-protected-dynamic-enrollment/` passa 8
+test, KAT R2 byte-identico e audit simboli. Prepara uno snapshot Git hash-bound
+e valida fail-closed l'aggregate. Il processo AI non può completare la lettura:
+il layout production richiede root e l'agent sudo è escluso. Serve quindi la
+sola esecuzione manuale del comando `sudo` stampato dal kit; è un requisito di
+capability, non un nuovo Human Gate autorizzativo.
+
+```text
+D279_56_OUTCOME=HUMAN_REQUIRED
+D279_56_ADVANCEMENT=AUTHORIZED_AUTHENTIC_DYNAMIC_POLICY_REPLAY_EXECUTABLE_READY
+D279_56_EXECUTABLE_CLOSURE=PASS_OFFLINE_PREFLIGHT
+FIXED_21_FINAL_BIOMETRIC_POLICY_JUSTIFIED=false
+ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
+DYNAMIC_POLICY_DIRECTION=ROCKYTKG_STYLE_PENDING_AUTHENTIC_RESULT
+AUTHORIZATION_STATUS=GRANTED_AT_ORIGIN
+FURTHER_PER_RUN_USER_AUTHORIZATION_REQUIRED=false
+AGENT_SUDO_AUTHORIZED=false
+PROTECTED_INPUT_ACCESSED=false
+REAL_RASTER_EVALUATED_COUNT=0
+LIVE_OR_USB_ACTION_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=MANUAL_EXECUTION_OF_ALREADY_AUTHORIZED_D279_56_PROTECTED_OFFLINE_REPLAY
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
