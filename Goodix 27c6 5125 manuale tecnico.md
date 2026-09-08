@@ -102,6 +102,28 @@ PRODUCTION_PREPROCESSOR=ROCKYTKG_R2_MINIMALLY_ADAPTED
 NEXT_PRIMARY_BOUNDARY=OFFLINE_REAL_SIGFM_SAMPLE_OWNERSHIP_COPY_SERIALIZE_DESERIALIZE_MATCH
 ```
 
+### Stato D279/50 — ownership e storage SIGFM reale
+
+D279/50 estende il seam SIGFM con extraction da pixel R2, copy, match e
+serialize/deserialize usando direttamente `sigfm.cpp` preservato. Il wrapper
+`GSF1` rifiuta input prima dell'allocazione OpenCV se ABI, lunghezze, CRC,
+keypoint 25..1024, record 28-byte, coordinate 80×64, matrice SIFT 128×float o
+valori finiti non sono esatti. Dopo il deserialize richiede una
+serializzazione canonica byte-identica del payload.
+
+La closure reale usa gli RPM OpenCV Fedora 44 già hash-pinned, estratti in
+`/tmp` senza installazione: fixture sintetica 220 keypoint, round-trip/copy e
+match score 160 passano. Questi valori non sono evidenza biometrica o soglia
+production. Test double e ASan/UBSan passano nell'SDK 25.08. Nessun USB/live o
+secret viene raggiunto.
+
+```text
+D279_50_OUTCOME=READY
+D279_50_EXECUTABLE_CLOSURE=PASS_HOST_ONLY_REAL_SIGFM_OPENCV_4_13
+SIGFM_SAMPLE_STORAGE=GSF1_STRICT_X86_64_LITTLE_ENDIAN
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_SIGFM_PRINT_FORWARD_PORT
+```
+
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita

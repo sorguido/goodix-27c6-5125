@@ -30,8 +30,9 @@ g++ $cxxflags $includes -c "$git_root/libfprint-driver/goodix_sigfm_metrics.cpp"
 g++ $cxxflags $includes -c "$test_dir/support/sigfm_metric_test_double.cpp" -o "$build_dir/double.o"
 g++ $cxxflags $includes -c "$test_dir/test_goodix_sigfm_metrics.cpp" -o "$build_dir/test.o"
 
-if nm -u "$build_dir/metrics.o" | grep -E "(serialize|fopen|open|read|write|socket|libusb_|SSL_|gnutls_)"; then
-  echo "forbidden persistence, I/O, USB, or TLS symbol" >&2
+if nm -u "$build_dir/metrics.o" | awk "{print \$NF}" |
+   grep -E "^(fopen|open|read|write|socket|libusb_.*|g_usb_.*|SSL_.*|gnutls_.*|gx_.*)$"; then
+  echo "forbidden I/O, USB, TLS, or sensor-reaching symbol" >&2
   exit 1
 fi
 echo "goodix_sigfm_metrics forbidden-symbol audit: PASS"

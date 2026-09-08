@@ -2,11 +2,14 @@
 #include "sigfm_metric_test_double.h"
 #include "sigfm.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 
 struct SigfmImgInfo
 {
   int marker;
+  int keypoints;
 };
 
 static SigfmTestMode mode = SIGFM_TEST_OK;
@@ -39,7 +42,7 @@ sigfm_extract (const SigfmPix *pixels, int width, int height)
     throw std::runtime_error ("synthetic extract exception");
   if (mode == SIGFM_TEST_EXTRACT_NULL)
     return nullptr;
-  SigfmImgInfo *info = new SigfmImgInfo { 0x5125 };
+  SigfmImgInfo *info = new SigfmImgInfo { 0x5125, keypoint_count };
   ++live_info_count;
   return info;
 }
@@ -55,7 +58,7 @@ sigfm_free_info (SigfmImgInfo *info)
 extern "C" int
 sigfm_keypoints_count (SigfmImgInfo *info)
 {
-  return info == nullptr ? -1 : keypoint_count;
+  return info == nullptr ? -1 : info->keypoints;
 }
 
 extern "C" int
@@ -64,4 +67,67 @@ sigfm_match_score (SigfmImgInfo *, SigfmImgInfo *)
   if (mode == SIGFM_TEST_MATCH_THROW)
     throw std::runtime_error ("synthetic match exception");
   return match_score;
+}
+
+extern "C" SigfmImgInfo *
+sigfm_copy_info (SigfmImgInfo *info)
+{
+  if (info == nullptr)
+    return nullptr;
+  auto *copy = new SigfmImgInfo { *info };
+  ++live_info_count;
+  return copy;
+}
+
+extern "C" unsigned char *
+sigfm_serialize_binary (SigfmImgInfo *info,
+                        int          *size_out)
+{
+  const size_t keypoints = static_cast<size_t> (info->keypoints);
+  const size_t matrix_header = 8u + keypoints * 28u;
+  const size_t size = 20u + keypoints * 540u;
+  auto *data = static_cast<unsigned char *> (std::calloc (1, size));
+  const int type = 5;
+  const int rows = info->keypoints;
+  const int columns = 128;
+
+  if (data == nullptr)
+    return nullptr;
+  std::memcpy (data, &keypoints, sizeof keypoints);
+  std::memcpy (&data[matrix_header], &type, sizeof type);
+  std::memcpy (&data[matrix_header + 4u], &rows, sizeof rows);
+  std::memcpy (&data[matrix_header + 8u], &columns, sizeof columns);
+  for (size_t i = 0; i < keypoints; i++)
+    {
+      const size_t point = 8u + i * 28u;
+      const float angle = 1.0f;
+      const float response = 1.0f;
+      const float scale = 1.0f;
+      const float x = 1.0f;
+      const float y = 1.0f;
+
+      std::memcpy (&data[point + 4u], &angle, sizeof angle);
+      std::memcpy (&data[point + 12u], &response, sizeof response);
+      std::memcpy (&data[point + 16u], &scale, sizeof scale);
+      std::memcpy (&data[point + 20u], &x, sizeof x);
+      std::memcpy (&data[point + 24u], &y, sizeof y);
+    }
+  *size_out = static_cast<int> (size);
+  return data;
+}
+
+extern "C" SigfmImgInfo *
+sigfm_deserialize_binary (const unsigned char *data,
+                          int                  size)
+{
+  size_t keypoints = 0;
+
+  if (data == nullptr || size < 20)
+    return nullptr;
+  std::memcpy (&keypoints, data, sizeof keypoints);
+  auto *info = new SigfmImgInfo {
+    0x5125, static_cast<int> (keypoints)
+  };
+  ++live_info_count;
+  return info;
 }

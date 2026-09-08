@@ -363,7 +363,33 @@ This slice does not yet bind preprocessing to the libfprint action or persist
 SIGFM templates. The next boundary connects the baseline-aware output to real
 SIGFM extraction and establishes strict sample ownership/storage.
 
-## D272/01 ephemeral SIGFM metric seam
+## D279/50 SIGFM ownership and strict storage
+
+D279/50 extends the original D272 C++ seam with production-grade owned sample
+copy, extraction from D279/49 preprocessed pixels, matching, and a bounded
+storage envelope. The Rockytkg extraction/match/copy/serialization functions
+remain the implementation; the local wrapper contains every exception at the
+C ABI and validates the native Rocky payload before deserialization.
+
+The `GSF1` envelope is currently restricted to the target x86_64
+little-endian ABI. It carries version, ABI marker, keypoint count, payload
+length and CRC-32. The inner parser requires 25..1024 keypoints, exact SIFT
+128×float descriptors, exact length, finite keypoint/descriptor floats and
+80×64 coordinate bounds. A successful deserialize must reserialize
+byte-identically before ownership is released to the caller. Invalid data is
+rejected before Rockytkg/OpenCV allocation.
+
+The test-double suite passes normal and ASan/UBSan paths. The real
+`sigfm.cpp` suite passes against the five Fedora 44 OpenCV 4.13 RPMs already
+pinned by D279/48, extracted only under `/tmp`; no package is installed. It
+proves real extraction (220 keypoints), copy, strict round-trip, corruption
+rejection and matching. `run_goodix_sigfm_storage_real_test.sh` reproduces the
+closure from a directory containing those RPMs.
+
+This is the inner sample format only. D279/51 must forward-port its multi-sample
+container into libfprint 1.94.100 FP3 serialization and verify/identify paths.
+
+## D272/01 historical ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
 reimplementing it. It applies only the D269 mapper, contains every C++/OpenCV
@@ -374,7 +400,7 @@ are transient and are released after comparison. Stack u8 pixels are
 explicitly cleared, while complete zeroization of allocations owned internally
 by C++/OpenCV cannot be guaranteed by this seam.
 
-The synthetic test double verifies mapping and error plumbing only. On the
-current D272 environment OpenCV4 development files are absent, so the real
-SIGFM object cannot be compiled/linked and the full executable path remains
-blocked. This is not evidence of target biometric quality.
+At D272 the synthetic test double verified mapping and error plumbing only,
+because OpenCV4 development files were absent. D279/48 and D279/50 later close
+the real-SIGFM executable path using hash-pinned extracted Fedora RPMs. The
+historical limitation was not evidence of target biometric quality.

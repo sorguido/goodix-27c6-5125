@@ -67,6 +67,11 @@ main ()
   uint16_t flat[N];
   GoodixSigfmSample *first = nullptr;
   GoodixSigfmSample *second = nullptr;
+  GoodixSigfmSample *copy = nullptr;
+  GoodixSigfmSample *restored = nullptr;
+  GoodixSigfmSample *rejected = nullptr;
+  uint8_t *serialized = nullptr;
+  size_t serialized_size = 0;
   int first_keypoints = 0;
   int second_keypoints = 0;
   int score = 0;
@@ -91,11 +96,35 @@ main ()
   assert (match_result == GOODIX_SIGFM_OK);
   assert (score >= 0);
 
+  assert (goodix_sigfm_sample_copy (first, &copy) == GOODIX_SIGFM_OK);
+  assert (copy != nullptr);
+  assert (goodix_sigfm_sample_serialize (
+            copy, &serialized, &serialized_size) == GOODIX_SIGFM_OK);
+  assert (serialized != nullptr && serialized_size > 24u &&
+          serialized_size <= GOODIX_SIGFM_MAX_SERIALIZED_SIZE);
+  assert (goodix_sigfm_sample_deserialize (
+            serialized, serialized_size, &restored, &second_keypoints) ==
+          GOODIX_SIGFM_OK);
+  assert (restored != nullptr && second_keypoints == first_keypoints);
+  assert (goodix_sigfm_match_ephemeral (restored, second, &score) ==
+          GOODIX_SIGFM_OK);
+  assert (score >= 0);
+  serialized[20] ^= 1u;
+  assert (goodix_sigfm_sample_deserialize (
+            serialized, serialized_size, &rejected, &second_keypoints) ==
+          GOODIX_SIGFM_DESERIALIZE_INVALID);
+  assert (rejected == nullptr);
+  serialized[20] ^= 1u;
+
   std::printf ("REAL_SIGFM_POSITIVE_EXTRACT=PASS\n");
   std::printf ("REAL_SIGFM_KEYPOINTS=%d\n", first_keypoints);
   std::printf ("REAL_SIGFM_MATCH_PATH=PASS\n");
+  std::printf ("REAL_SIGFM_STRICT_STORAGE_ROUNDTRIP=PASS\n");
   std::printf ("REAL_SIGFM_IDENTICAL_FIXTURE_SCORE=%d\n", score);
 
+  goodix_sigfm_serialized_free (serialized, serialized_size);
+  goodix_sigfm_sample_free (restored);
+  goodix_sigfm_sample_free (copy);
   goodix_sigfm_sample_free (first);
   goodix_sigfm_sample_free (second);
 
