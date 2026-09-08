@@ -481,6 +481,8 @@ run_approved_live ()
   mkdir -m 0700 "$result_root" || refuse RESULT_DIR_CREATE_FAILED
   log="$result_root/operator.log"
   echo "INIZIO RUN ONE-SHOT. Non rilanciare questo comando in caso di errore."
+  echo "ISTRUZIONE_STAGE8=Il riposizionamento dopo STAGE_COMPLETATO=7/8 e il contatto 8: eseguilo come touch-and-release; NON attendere STAGE_COMPLETATO=8/8 prima di sollevare il dito."
+  echo "NOTA_STAGE8=STAGE_COMPLETATO=8/8 viene emesso solo dopo il finger-up finale IRQ0200."
   set +e
   env \
     LD_LIBRARY_PATH="$runtime" \
