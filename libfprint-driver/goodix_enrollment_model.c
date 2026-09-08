@@ -27,7 +27,9 @@ struct _GoodixEnrollmentModel
   gboolean repeated_after_auxiliary;
   gboolean first_nav_seen;
   gboolean defer_terminal_stage_delivery;
-  gboolean terminal_stage_pending;
+  gboolean defer_terminal_stage_delivery_until_release_ready;
+  gboolean defer_intermediate_stage_delivery_until_release_ready;
+  gboolean stage_delivery_pending;
 };
 
 static GQuark
@@ -71,11 +73,13 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
    * repeated/terminal transition, so fewer than two stages cannot instantiate
    * this profile without inventing an unobserved single-stage shape. */
   if (config == NULL || config->required_stage_count < 2u ||
-      stage_ready == NULL)
+      stage_ready == NULL ||
+      (config->defer_terminal_stage_delivery &&
+       config->defer_terminal_stage_delivery_until_release_ready))
     {
       g_set_error_literal (error, GOODIX_ENROLLMENT_ERROR,
                            GOODIX_ENROLLMENT_ERROR_ARGUMENT,
-                           "enrollment model requires at least two stages and a callback");
+                           "enrollment model requires at least two stages, a callback, and one terminal delivery mode");
       return NULL;
     }
 
@@ -83,6 +87,10 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
   model->required_stage_count = config->required_stage_count;
   model->defer_terminal_stage_delivery =
     config->defer_terminal_stage_delivery;
+  model->defer_terminal_stage_delivery_until_release_ready =
+    config->defer_terminal_stage_delivery_until_release_ready;
+  model->defer_intermediate_stage_delivery_until_release_ready =
+    config->defer_intermediate_stage_delivery_until_release_ready;
   model->expected = GOODIX_ENROLLMENT_EVENT_IRQ2;
   model->stage_ready = stage_ready;
   model->user_data = user_data;
@@ -93,6 +101,10 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
       audit->configured_required_stage_count = config->required_stage_count;
       audit->configured_defer_terminal_stage_delivery =
         config->defer_terminal_stage_delivery;
+      audit->configured_defer_terminal_stage_delivery_until_release_ready =
+        config->defer_terminal_stage_delivery_until_release_ready;
+      audit->configured_defer_intermediate_stage_delivery_until_release_ready =
+        config->defer_intermediate_stage_delivery_until_release_ready;
     }
   return model;
 }
@@ -141,15 +153,24 @@ deliver_stage (GoodixEnrollmentModel *model,
 }
 
 static gboolean
-finish (GoodixEnrollmentModel *model,
-        GError               **error)
+deliver_pending_stage (GoodixEnrollmentModel *model,
+                       GError               **error)
 {
-  if (model->terminal_stage_pending)
+  if (model->stage_delivery_pending)
     {
       if (!deliver_stage (model, model->observed_stage_count, error))
         return FALSE;
-      model->terminal_stage_pending = FALSE;
+      model->stage_delivery_pending = FALSE;
     }
+  return TRUE;
+}
+
+static gboolean
+finish (GoodixEnrollmentModel *model,
+        GError               **error)
+{
+  if (!deliver_pending_stage (model, error))
+    return FALSE;
   model->complete = TRUE;
   model->transition = GOODIX_ENROLLMENT_TRANSITION_TERMINAL;
   model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
@@ -214,9 +235,12 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
         (model->observed_stage_count == model->required_stage_count ?
          GOODIX_ENROLLMENT_TRANSITION_TERMINAL :
          GOODIX_ENROLLMENT_TRANSITION_REPEATED_REARM);
-      if (model->transition == GOODIX_ENROLLMENT_TRANSITION_TERMINAL &&
-          model->defer_terminal_stage_delivery)
-        model->terminal_stage_pending = TRUE;
+      if ((model->transition == GOODIX_ENROLLMENT_TRANSITION_TERMINAL &&
+           (model->defer_terminal_stage_delivery ||
+            model->defer_terminal_stage_delivery_until_release_ready)) ||
+          (model->transition != GOODIX_ENROLLMENT_TRANSITION_TERMINAL &&
+           model->defer_intermediate_stage_delivery_until_release_ready))
+        model->stage_delivery_pending = TRUE;
       else if (!deliver_stage (model, model->observed_stage_count, error))
         return FALSE;
       expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_34);
@@ -227,7 +251,13 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
     case GOODIX_ENROLLMENT_EVENT_ACK_34:
       if (model->transition == GOODIX_ENROLLMENT_TRANSITION_FIRST_NAV ||
           model->repeated_after_auxiliary)
-        expect (model, GOODIX_ENROLLMENT_EVENT_IRQ0200);
+        {
+          expect (model, GOODIX_ENROLLMENT_EVENT_IRQ0200);
+          if ((model->transition != GOODIX_ENROLLMENT_TRANSITION_TERMINAL ||
+               model->defer_terminal_stage_delivery_until_release_ready) &&
+              !deliver_pending_stage (model, error))
+            return FALSE;
+        }
       else
         expect (model, GOODIX_ENROLLMENT_EVENT_COMMAND_36);
       break;

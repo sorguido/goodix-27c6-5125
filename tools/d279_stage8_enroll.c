@@ -34,6 +34,9 @@ typedef struct
   GCancellable *cancellable;
   guint          completed_stages;
   guint          progress_error_count;
+  guint          release_ready_prompt_count;
+  guint          reposition_prompt_count;
+  FpFingerStatusFlags last_finger_status;
   gboolean       deadline_expired;
   gboolean       signal_received;
 } RunState;
@@ -42,6 +45,19 @@ static const gchar *
 bool_text (gboolean value)
 {
   return value ? "true" : "false";
+}
+
+static const gchar *
+enrollment_event_text (GoodixEnrollmentEvent event)
+{
+  static const gchar *const names[] = {
+    "NONE", "IRQ2", "COMMAND_22", "ACK_22", "PRIMARY_B0",
+    "COMMAND_34", "ACK_34", "IRQ0200", "COMMAND_20", "ACK_20",
+    "AUXILIARY_B0", "COMMAND_32", "ACK_32", "COMMAND_50", "ACK_50",
+    "NAV", "COMMAND_36", "ACK_36", "IRQ0100"
+  };
+
+  return (guint) event < G_N_ELEMENTS (names) ? names[event] : "UNKNOWN";
 }
 
 static gboolean
@@ -151,6 +167,20 @@ print_production_audit (FpDevice *device)
            audit.enrollment_binding.retry_count);
   g_print ("AUDIT_ENROLL_CONFIGURED_STAGE_COUNT=%u\n",
            audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_required_stage_count);
+  g_print ("AUDIT_ENROLL_INTERMEDIATE_DELIVERY_DEFERRED_UNTIL_RELEASE_READY=%s\n",
+           bool_text (
+             audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_defer_intermediate_stage_delivery_until_release_ready));
+  g_print ("AUDIT_ENROLL_TERMINAL_DELIVERY_DEFERRED_UNTIL_RELEASE_READY=%s\n",
+           bool_text (
+             audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_defer_terminal_stage_delivery_until_release_ready));
+  g_print ("AUDIT_ENROLL_TERMINAL_COMPLETION_HOLD_COUNT=%u\n",
+           audit.terminal_enroll_completion_hold_count);
+  g_print ("AUDIT_ENROLL_TERMINAL_COMPLETION_RELEASE_COUNT=%u\n",
+           audit.terminal_enroll_completion_release_count);
+  g_print ("AUDIT_ENROLL_TERMINAL_COMPLETION_ABORT_COUNT=%u\n",
+           audit.terminal_enroll_completion_abort_count);
+  g_print ("AUDIT_ENROLL_TERMINAL_COMPLETION_HELD_AT_SNAPSHOT=%s\n",
+           bool_text (audit.terminal_enroll_completion_held));
   g_print ("AUDIT_ENROLL_OBSERVED_PRIMARY_STAGE_COUNT=%u\n",
            audit.enrollment_events.lifecycle.plan.pipeline.protocol.observed_primary_stage_count);
   g_print ("AUDIT_ENROLL_COMPLETED_STAGE_COUNT=%u\n",
@@ -161,6 +191,20 @@ print_production_audit (FpDevice *device)
            audit.enrollment_events.lifecycle.plan.inter_stage_rearm_count);
   g_print ("AUDIT_ENROLL_COMMAND_32_COUNT=%u\n",
            audit.enrollment_events.lifecycle.plan.command_32_count);
+  g_print ("AUDIT_ENROLL_REJECTED_INBOUND_COUNT=%u\n",
+           audit.enrollment_events.rejected_inbound_count);
+  g_print ("AUDIT_ENROLL_LAST_MISMATCH_EXPECTED_EVENT=%s\n",
+           enrollment_event_text (
+             audit.enrollment_events.last_mismatch_expected_event));
+  g_print ("AUDIT_ENROLL_LAST_MISMATCH_OBSERVED_CONTROL=0x%02x\n",
+           audit.enrollment_events.last_mismatch_observed_control);
+  g_print ("AUDIT_ENROLL_LAST_MISMATCH_IRQ_CLASSIFIED=%s\n",
+           bool_text (
+             audit.enrollment_events.last_mismatch_observed_irq_classified));
+  g_print ("AUDIT_ENROLL_LAST_MISMATCH_IRQ=0x%04x\n",
+           audit.enrollment_events.last_mismatch_observed_irq);
+  g_print ("AUDIT_ENROLL_LAST_MISMATCH_IRQ_FLAGS=0x%04x\n",
+           audit.enrollment_events.last_mismatch_observed_irq_flags);
   g_print ("AUDIT_ENROLL_REAL_USB_SUBMIT_COUNT=%u\n",
            audit.enrollment_binding.transaction.real_usb_submit_count);
   g_print ("AUDIT_KNOWN_PERSISTENT_FAMILY_OBSERVED_COUNT=%u\n",
@@ -172,6 +216,12 @@ print_production_audit (FpDevice *device)
     !audit.usb_interface_claimed && !audit.runtime_material_present &&
     audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_required_stage_count ==
       D279_57_ENROLL_STAGES &&
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_defer_intermediate_stage_delivery_until_release_ready &&
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.configured_defer_terminal_stage_delivery_until_release_ready &&
+    audit.terminal_enroll_completion_hold_count == 1u &&
+    audit.terminal_enroll_completion_release_count == 1u &&
+    audit.terminal_enroll_completion_abort_count == 0u &&
+    !audit.terminal_enroll_completion_held &&
     audit.enrollment_events.lifecycle.plan.pipeline.protocol.observed_primary_stage_count ==
       D279_57_ENROLL_STAGES &&
     audit.enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count ==
@@ -182,6 +232,9 @@ print_production_audit (FpDevice *device)
     audit.enrollment_events.lifecycle.plan.command_32_count ==
       D279_57_ENROLL_STAGES &&
     audit.enrollment_events.primary_b0_count == D279_57_ENROLL_STAGES &&
+    audit.enrollment_events.rejected_inbound_count == 0u &&
+    audit.enrollment_events.last_mismatch_expected_event ==
+      GOODIX_ENROLLMENT_EVENT_NONE &&
     audit.enrollment_events.retry_count == 0u &&
     audit.enrollment_binding.retry_count == 0u &&
     known_persistent_family_count == 0u;
@@ -276,6 +329,44 @@ signal_cb (gpointer user_data)
 }
 
 static void
+finger_status_changed (GObject    *object,
+                       GParamSpec *pspec,
+                       gpointer    user_data)
+{
+  RunState *state = user_data;
+  FpFingerStatusFlags status = fp_device_get_finger_status (
+    FP_DEVICE (object));
+  gboolean release_ready;
+  gboolean was_release_ready;
+
+  (void) pspec;
+  release_ready = (status & FP_FINGER_STATUS_PRESENT) != 0 &&
+                  (status & FP_FINGER_STATUS_NEEDED) == 0;
+  was_release_ready =
+    (state->last_finger_status & FP_FINGER_STATUS_PRESENT) != 0 &&
+    (state->last_finger_status & FP_FINGER_STATUS_NEEDED) == 0;
+  if (release_ready && !was_release_ready &&
+      state->release_ready_prompt_count < D279_57_ENROLL_STAGES)
+    {
+      state->release_ready_prompt_count++;
+      g_print ("RILASCIO_FISICO_PRONTO=%u\n",
+               state->release_ready_prompt_count);
+      g_print ("AZIONE_OPERATORE=ORA TOGLI IL DITO; non riposizionarlo finche non viene richiesto.\n");
+    }
+  else if ((status & FP_FINGER_STATUS_NEEDED) != 0 &&
+           (status & FP_FINGER_STATUS_PRESENT) == 0 &&
+           state->completed_stages > 0u &&
+           (state->last_finger_status & FP_FINGER_STATUS_NEEDED) == 0)
+    {
+      state->reposition_prompt_count++;
+      g_print ("RIPOSIZIONAMENTO_RICHIESTO=%u\n",
+               state->reposition_prompt_count);
+      g_print ("AZIONE_OPERATORE=RIPOSIZIONA LO STESSO DITO in una zona diversa.\n");
+    }
+  state->last_finger_status = status;
+}
+
+static void
 enroll_progress_cb (FpDevice *device,
                     gint      completed_stages,
                     FpPrint  *print,
@@ -307,10 +398,7 @@ enroll_progress_cb (FpDevice *device,
   state->completed_stages = (guint) completed_stages;
   g_print ("STAGE_COMPLETATO=%u/%u\n", state->completed_stages,
            D279_57_ENROLL_STAGES);
-  if (state->completed_stages < D279_57_ENROLL_STAGES)
-    {
-      g_print ("AZIONE_OPERATORE=TOGLI IL DITO; attendi un istante e riposiziona lo stesso dito.\n");
-    }
+  g_print ("NOTA_STAGE=Progresso biometrico registrato; non e un'istruzione fisica.\n");
 }
 
 static FpDevice *
@@ -350,6 +438,7 @@ run_once (void)
   guint deadline_source;
   guint sigint_source;
   guint sigterm_source;
+  gulong finger_status_handler = 0u;
   gboolean opened = FALSE;
   gboolean close_ok = FALSE;
   int result = 1;
@@ -392,6 +481,10 @@ run_once (void)
 
   template_print = fp_print_new (device);
   fp_print_set_finger (template_print, FP_FINGER_RIGHT_INDEX);
+  state.last_finger_status = fp_device_get_finger_status (device);
+  finger_status_handler = g_signal_connect (
+    device, "notify::finger-status", G_CALLBACK (finger_status_changed),
+    &state);
   g_print ("AZIONE_OPERATORE=METTI L'INDICE DESTRO SUL SENSORE; usa sempre lo stesso dito.\n");
   g_print ("ACTION_ATTEMPT_COUNT=1\n");
   enrolled_print = fp_device_enroll_sync (device,
@@ -410,6 +503,13 @@ run_once (void)
     {
       g_printerr ("ENROLLMENT_SUCCEEDED=false\n");
       g_printerr ("ERRORE_ENROLLMENT=completion senza 8 progressi\n");
+      goto close;
+    }
+  if (state.release_ready_prompt_count != D279_57_ENROLL_STAGES ||
+      state.reposition_prompt_count != D279_57_ENROLL_STAGES - 1u)
+    {
+      g_printerr ("ENROLLMENT_SUCCEEDED=false\n");
+      g_printerr ("ERRORE_ENROLLMENT=sequenza prompt fisici incompleta\n");
       goto close;
     }
 
@@ -439,6 +539,8 @@ out:
     }
   if (device != NULL && !print_production_audit (device))
     result = 1;
+  if (device != NULL && finger_status_handler != 0u)
+    g_signal_handler_disconnect (device, finger_status_handler);
   if (deadline_source != 0u &&
       g_main_context_find_source_by_id (NULL, deadline_source) != NULL)
     g_source_remove (deadline_source);
@@ -451,6 +553,11 @@ out:
 
   g_print ("COMPLETED_STAGE_COUNT=%u\n", state.completed_stages);
   g_print ("PROGRESS_ERROR_COUNT=%u\n", state.progress_error_count);
+  g_print ("RELEASE_READY_PROMPT_COUNT=%u\n",
+           state.release_ready_prompt_count);
+  g_print ("REPOSITION_PROMPT_COUNT=%u\n",
+           state.reposition_prompt_count);
+  g_print ("PHYSICAL_INSTRUCTION_SOURCE=LIBFPRINT_FINGER_STATUS\n");
   g_print ("OPERATOR_RETRY_COUNT=0\n");
   g_print ("SECOND_ACTION_COUNT=0\n");
   g_print ("REOPEN_COUNT=0\n");

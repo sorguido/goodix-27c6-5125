@@ -26,12 +26,21 @@ static GMutex sigfm_mutex;
 static GCond  sigfm_cond;
 static gint   sigfm_extract_block = 0;
 static gint   sigfm_extract_blocked_count = 0;
+static gint   sigfm_extract_fail = 0;
 
 void
 goodix_test_sigfm_extract_set_block (gboolean block)
 {
   g_mutex_lock (&sigfm_mutex);
   sigfm_extract_block = block ? 1 : 0;
+  g_mutex_unlock (&sigfm_mutex);
+}
+
+void
+goodix_test_sigfm_extract_set_failure (gboolean fail)
+{
+  g_mutex_lock (&sigfm_mutex);
+  sigfm_extract_fail = fail ? 1 : 0;
   g_mutex_unlock (&sigfm_mutex);
 }
 
@@ -223,7 +232,16 @@ sigfm_copy_info (SigfmImgInfo *info)
 int
 sigfm_keypoints_count (SigfmImgInfo *info)
 {
+  gboolean fail;
+
   (void) info;
+
+  g_mutex_lock (&sigfm_mutex);
+  fail = sigfm_extract_fail != 0;
+  g_mutex_unlock (&sigfm_mutex);
+
+  if (fail)
+    return 0;
   return 30;
 }
 

@@ -33,6 +33,8 @@ typedef struct
   gint                enroll_stage;
 
   gboolean            minutiae_scan_active;
+  gboolean            enroll_completion_held;
+  gboolean            enroll_terminal_sample_committed;
   GError             *action_error;
   FpImage            *capture_image;
 

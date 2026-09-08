@@ -96,6 +96,17 @@ preserved upstream commit/tree, materialized submodule identity, per-file
 licenses, copyright holders and vendor-firmware exclusions above remain the
 same facts recorded when the snapshot was acquired.
 
+## Documented local working-tree adaptations
+
+The directory retains the immutable upstream identity above, but its current
+Git working tree is not asserted to be byte-identical to that upstream tree.
+D279/57 applies the project's bounded enrollment-completion hold to
+`libfprint/libfprint/{fp-image-device-private.h,fp-image-device.c,fpi-image-device.c,fpi-image-device.h}`
+so host-only tests exercise the same internal contract as the Fedora 44
+production fork. This is local LGPL-2.1-or-later adaptation and does not alter
+the preserved upstream commit/tree, original licensing, copyright, or the
+historical facts of the materialized libfprint submodule.
+
 ## Snapshot maintenance rule
 
 Do not silently replace this directory with a newer upstream state.

@@ -97,6 +97,11 @@ struct _GoodixDeviceContext
   GoodixEnrollmentPostTlsEventsAudit runtime_enrollment_events_audit;
   GoodixEnrollmentFpiUsbBindingAudit runtime_enrollment_binding_audit;
   guint                      runtime_enrollment_auxiliary_count;
+  guint                      terminal_enroll_completion_hold_count;
+  guint                      terminal_enroll_completion_release_count;
+  guint                      terminal_enroll_completion_abort_count;
+  gboolean                   terminal_enroll_completion_held;
+  gboolean                   terminal_delivery_at_release_ready;
   gboolean                   production_action_consumed;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeMaterialReleaseSeam runtime_material_release;
@@ -314,7 +319,8 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   GoodixPostTlsMaterial post_material = { 0 };
   GoodixEnrollmentModelConfig enrollment_config = {
     .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
-    .defer_terminal_stage_delivery = TRUE,
+    .defer_terminal_stage_delivery_until_release_ready = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
   g_autoptr(GError) error = NULL;
   FpiDeviceAction action;
@@ -524,6 +530,17 @@ static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
       if (!goodix_enrollment_fpi_usb_binding_handle_a0 (
             ctx->enrollment_binding, frame, &error))
         context_protocol_failure (ctx, error);
+      else if (ctx->terminal_enroll_completion_held &&
+               ctx->runtime_enrollment_events_audit.lifecycle.plan.pipeline.protocol.complete)
+        {
+          /* The terminal contact callback has already reported finger-off.
+           * Release only after the complete A0 transaction unwinds, so the
+           * resulting framework deactivation cannot cancel its own event. */
+          ctx->terminal_enroll_completion_held = FALSE;
+          ctx->terminal_enroll_completion_release_count++;
+          fpi_image_device_release_enroll_completion (
+            FP_IMAGE_DEVICE (ctx->device));
+        }
     }
   else if (ctx->post_tls_lifecycle != NULL &&
       goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
@@ -646,6 +663,14 @@ goodix_device_context_collect_production_enrollment_audit (
   *audit = (GoodixProductionEnrollmentAudit) {
     .production_action_consumed = ctx->production_action_consumed,
     .auxiliary_b0_observed_count = ctx->runtime_enrollment_auxiliary_count,
+    .terminal_enroll_completion_hold_count =
+      ctx->terminal_enroll_completion_hold_count,
+    .terminal_enroll_completion_release_count =
+      ctx->terminal_enroll_completion_release_count,
+    .terminal_enroll_completion_abort_count =
+      ctx->terminal_enroll_completion_abort_count,
+    .terminal_enroll_completion_held =
+      ctx->terminal_enroll_completion_held,
     .pre_session_rx_sync = ctx->pre_session_rx_sync_audit,
     .runtime_material = ctx->runtime_material_audit,
     .secure = ctx->runtime_secure_audit,
@@ -1261,6 +1286,12 @@ goodix_fpimage_device_deactivate (FpImageDevice *dev)
   if (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING)
     return;
 
+  if (ctx->terminal_enroll_completion_held)
+    {
+      ctx->terminal_enroll_completion_held = FALSE;
+      ctx->terminal_enroll_completion_abort_count++;
+    }
+
   goodix_device_context_set_state (ctx,
                                    GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
   ctx->deactivation_pending = TRUE;
@@ -1648,7 +1679,6 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
   GoodixDeviceContext *ctx = user_data;
 
   (void) pipeline;
-  (void) stage_index;
   if (ctx->terminal_fence || image == NULL)
     {
       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
@@ -1680,11 +1710,27 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
                        "SIGFM enrollment preprocessing failed: %u", result);
           return FALSE;
         }
+      if (stage_index == GOODIX_SIGFM_ENROLL_MAX_STAGES &&
+          ctx->terminal_delivery_at_release_ready)
+        {
+          fpi_image_device_hold_enroll_completion (
+            FP_IMAGE_DEVICE (ctx->device));
+          ctx->terminal_enroll_completion_held = TRUE;
+          ctx->terminal_enroll_completion_hold_count++;
+        }
       fpi_image_device_image_captured (
         FP_IMAGE_DEVICE (ctx->device),
         g_object_ref (goodix_fpimage_pipeline_get_image (sigfm_pipeline)));
       goodix_fpimage_pipeline_free (sigfm_pipeline);
 #else
+      if (stage_index == GOODIX_SIGFM_ENROLL_MAX_STAGES &&
+          ctx->terminal_delivery_at_release_ready)
+        {
+          fpi_image_device_hold_enroll_completion (
+            FP_IMAGE_DEVICE (ctx->device));
+          ctx->terminal_enroll_completion_held = TRUE;
+          ctx->terminal_enroll_completion_hold_count++;
+        }
       fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
                                        g_object_ref (image));
 #endif
@@ -1899,6 +1945,8 @@ goodix_device_context_configure_enrollment_graph (
       return FALSE;
     }
   ctx->pending_enrollment_events = events;
+  ctx->terminal_delivery_at_release_ready =
+    config->defer_terminal_stage_delivery_until_release_ready;
   ctx->enrollment_auxiliary = auxiliary_ready;
   ctx->enrollment_auxiliary_data = auxiliary_data;
   ctx->enrollment_binding_audit = binding_audit;

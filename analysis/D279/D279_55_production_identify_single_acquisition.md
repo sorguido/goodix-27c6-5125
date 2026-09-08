@@ -59,12 +59,11 @@ real USB submit remains zero.
 
 The broader legacy `run_goodix_fpimage_device_test.sh` first required a local
 compile-only correction for an otherwise unused parameter when SIGFM is not
-defined.  Its D279/55 focused run is green.  The unfiltered run exposes a
-pre-existing D279/24 test-harness incompatibility: the old non-SIGFM 21-stage
-fixture loses its enrollment binding after image extraction fails, then feeds
-more plaintext into the stopped bootstrap lifecycle.  That unrelated legacy
-fixture remains a residual test-harness issue; it does not occur in either the
-D279/55 lifecycle test or the production SIGFM build configuration.
+defined. Its D279/55 focused run is green. D279/57 subsequently reproduced
+and closed the stale D279/24 harness incompatibility: the fixture now uses the
+current eight-stage SIGFM action profile and a valid synthetic bootstrap image.
+The context-first handoff remained valid; no D279/55 production behavior was
+changed by that corrective.
 
 The Fedora/OpenCV production-shaped runner was updated to assert the new
 allowlist/profile and output state.  Its pinned RPM cache was not present in
@@ -76,7 +75,7 @@ not re-executed here.  No dependency was installed or downloaded.
 ```text
 OUTCOME=READY
 ADVANCEMENT=PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_BOUNDARY_CLOSED_OFFLINE
-EXECUTABLE_CLOSURE=PASS_FOCUSED_NORMAL_ASAN_UBSAN;FULL_LEGACY_NON_SIGFM_FIXTURE_RESIDUAL
+EXECUTABLE_CLOSURE=PASS_FOCUSED_NORMAL_ASAN_UBSAN;LEGACY_FIXTURE_RESOLVED_BY_D279_57
 PRODUCTION_IDENTIFY_ACTION_ENABLED=true
 PRODUCTION_VERIFY_VIA_IDENTIFY=true
 IDENTIFY_PRIMARY_ACQUISITION_COUNT=1
@@ -92,6 +91,13 @@ CURRENT_LIVE_AUTHORIZED=false
 SIGFM_THRESHOLD_PRODUCTION_VALIDATED=false
 CANONICAL_DOCUMENTATION=Goodix 27c6 5125 manuale tecnico.md
 REVIEW_SET=GIT_NATIVE
-RESIDUAL_BLOCKER_OR_RISK=NO_LIVE_LINUX_IDENTIFY_PROOF;ADAPTIVE_PERSISTENCE_UNEXCLUDED;SIGFM_THRESHOLD_NOT_VALIDATED;LEGACY_NON_SIGFM_D279_24_FIXTURE_RED
+RESIDUAL_BLOCKER_OR_RISK=NO_LIVE_LINUX_IDENTIFY_PROOF;ADAPTIVE_PERSISTENCE_UNEXCLUDED;SIGFM_THRESHOLD_NOT_VALIDATED
 NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_56_AUTHENTIC_ENROLLMENT_DYNAMIC_POLICY_REPLAY
 ```
+
+D279/57 corrective addendum: the D279/24 fixture residual was reproduced and
+confirmed stale, not an identify-production regression. It mixed a 21-stage
+pre-SIGFM action expectation and a non-image bootstrap payload with the
+current fixed-eight SIGFM action. The fixture now retains the context-first
+handoff while using the production stage profile and valid synthetic image;
+its focused normal and ASan/UBSan runs pass.

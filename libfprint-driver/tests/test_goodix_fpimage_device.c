@@ -475,6 +475,98 @@ run_enroll_cycle (TestFixture *f,
 }
 
 static void
+test_terminal_hold_release_before_sigfm_completion (void)
+{
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  TestFixture *f = test_fixture_new ();
+  gint64 deadline;
+
+  fixture_open (f);
+  fpi_device_set_nr_enroll_stages (FP_DEVICE (f->device), 1);
+  template = fp_print_new (FP_DEVICE (f->device));
+  fill_gradient_samples (samples);
+  goodix_test_sigfm_extract_set_block (TRUE);
+
+  f->done = FALSE;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+  goodix_device_context_emit_finger_down (f->ctx);
+  fpi_image_device_hold_enroll_completion (FP_IMAGE_DEVICE (f->device));
+  goodix_device_context_emit_image_ready (
+    f->ctx, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+  goodix_device_context_emit_release_tail_complete (f->ctx);
+  goodix_device_context_emit_finger_up_ready (f->ctx);
+  fpi_image_device_release_enroll_completion (FP_IMAGE_DEVICE (f->device));
+
+  deadline = g_get_monotonic_time () + TEST_TIMEOUT_MS * 1000;
+  while (!goodix_test_sigfm_extract_is_blocked () &&
+         g_get_monotonic_time () < deadline)
+    g_main_context_iteration (NULL, FALSE);
+  g_assert_true (goodix_test_sigfm_extract_is_blocked ());
+  g_assert_false (f->done);
+  g_assert_cmpint (f->last_state, ==, FPI_IMAGE_DEVICE_STATE_IDLE);
+
+  goodix_test_sigfm_extract_unblock ();
+  test_wait (f);
+  g_assert_true (f->success);
+  g_assert_cmpuint (f->enroll_progress_count, ==, 1u);
+  fixture_close (f);
+  test_fixture_free (f);
+}
+
+static void
+test_terminal_release_before_sigfm_failure_is_fail_closed (void)
+{
+  g_autoptr(GCancellable) cancellable = g_cancellable_new ();
+  g_autoptr(FpPrint) template = NULL;
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  TestFixture *f = test_fixture_new ();
+
+  fixture_open (f);
+  fpi_device_set_nr_enroll_stages (FP_DEVICE (f->device), 1);
+  template = fp_print_new (FP_DEVICE (f->device));
+  fill_gradient_samples (samples);
+  goodix_test_sigfm_extract_set_block (TRUE);
+
+  f->done = FALSE;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template),
+                    cancellable, progress_cb, f, NULL,
+                    (GAsyncReadyCallback) enroll_cb, f);
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+  goodix_device_context_emit_finger_down (f->ctx);
+  fpi_image_device_hold_enroll_completion (FP_IMAGE_DEVICE (f->device));
+  g_test_expect_message ("libfprint-image_device", G_LOG_LEVEL_WARNING,
+                         "*Failed to detect minutiae*");
+  goodix_device_context_emit_image_ready (
+    f->ctx, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+
+  g_assert_true (goodix_test_sigfm_extract_wait_blocked (
+    TEST_TIMEOUT_MS * 1000));
+  goodix_device_context_emit_release_tail_complete (f->ctx);
+  goodix_device_context_emit_finger_up_ready (f->ctx);
+  fpi_image_device_release_enroll_completion (FP_IMAGE_DEVICE (f->device));
+  goodix_test_sigfm_extract_set_failure (TRUE);
+  goodix_test_sigfm_extract_unblock ();
+
+  test_wait (f);
+  g_test_assert_expected_messages ();
+  goodix_test_sigfm_extract_set_failure (FALSE);
+
+  g_assert_false (f->success);
+  g_assert_error (f->error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID);
+  g_assert_cmpuint (f->enroll_progress_count, ==, 0u);
+  g_assert_cmpint (goodix_device_context_get_state (f->ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+
+  fixture_close (f);
+  test_fixture_free (f);
+}
+
+static void
 test_enroll_minutiae_done_before_finger_off (void)
 {
   TestFixture *f = test_fixture_new ();
@@ -2060,7 +2152,11 @@ d279_25_feed_plaintext (GoodixDeviceContext *ctx,
 static void
 test_d279_24_context_first_arm_enrollment_handoff (void)
 {
-  GoodixEnrollmentModelConfig config = { 21u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
+    .defer_terminal_stage_delivery = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentFpiUsbBindingAudit binding_audit;
   GoodixPostTlsMaterial material = { 0 };
@@ -2075,7 +2171,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   guint auxiliary_count = 0u;
   guint8 af[16] = { 0 };
   const guint8 typed82_body[2] = { 0x00, 0x20 };
-  const guint8 auxiliary_body[] = { 'a', 'u', 'x' };
+  g_autoptr(GBytes) baseline = d279_25_build_primary_plaintext (0u);
 
   fixture_open (f);
   backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
@@ -2157,10 +2253,8 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
           d279_24_complete_out (f->ctx, generation);
           {
             g_autoptr(GBytes) ack = d279_24_build_ack (0x20);
-            g_autoptr(GBytes) auxiliary = g_bytes_new_static (
-              auxiliary_body, sizeof auxiliary_body);
             goodix_post_tls_lifecycle_handle_a0 (post_tls, ack);
-            goodix_post_tls_lifecycle_handle_plaintext (post_tls, auxiliary);
+            goodix_post_tls_lifecycle_handle_plaintext (post_tls, baseline);
           }
         }
     }
@@ -2196,7 +2290,9 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   g_assert_cmpint (goodix_fpi_usb_backend_get_receive_purpose (backend), ==,
                    GOODIX_USB_RECEIVE_PROTOCOL_RX);
 
-  for (guint stage = 1u; stage <= 21u; stage++)
+  for (guint stage = 1u;
+       stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES;
+       stage++)
     {
       g_autoptr(GBytes) primary = d279_25_build_primary_plaintext (stage);
       const guint8 auxiliary_bytes[] = { 0x20, 0x01, 0x00, 0x88 };
@@ -2244,7 +2340,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
           d279_25_feed_plaintext (f->ctx, generation, auxiliary);
           d279_25_complete_and_ack (f->ctx, generation, 0x34);
           d279_25_feed_context_frame (f->ctx, generation, irq0200);
-          if (stage < 21u)
+          if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
             d279_25_complete_and_ack (f->ctx, generation, 0x32);
         }
       {
@@ -2254,7 +2350,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
                g_get_monotonic_time () < deadline)
           g_main_context_iteration (NULL, FALSE);
         g_assert_cmpuint (f->enroll_progress_count, ==, stage);
-        if (stage < 21u)
+        if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
           g_assert_cmpint (f->last_state, ==,
                            FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
       }
@@ -2263,19 +2359,24 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   g_assert_true (events_audit.lifecycle.plan.pipeline.protocol.complete);
   g_assert_cmpuint (
     events_audit.lifecycle.plan.pipeline.protocol.configured_required_stage_count,
-    ==, 21u);
-  g_assert_cmpuint (events_audit.parsed_a0_count, ==, 188u);
-  g_assert_cmpuint (events_audit.primary_b0_count, ==, 21u);
-  g_assert_cmpuint (events_audit.auxiliary_b0_count, ==, 21u);
+    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (events_audit.parsed_a0_count, ==, 71u);
+  g_assert_cmpuint (events_audit.primary_b0_count, ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (events_audit.auxiliary_b0_count, ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (events_audit.lifecycle.plan.pipeline.fpimage_delivery_count,
-                    ==, 21u);
-  g_assert_cmpuint (events_audit.finger_down_delivery_count, ==, 21u);
-  g_assert_cmpuint (events_audit.finger_up_delivery_count, ==, 21u);
-  g_assert_cmpuint (events_audit.auxiliary_b0_delivery_count, ==, 21u);
-  g_assert_cmpuint (auxiliary_count, ==, 21u);
-  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 125u);
+                    ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (events_audit.finger_down_delivery_count, ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (events_audit.finger_up_delivery_count, ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (events_audit.auxiliary_b0_delivery_count, ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (auxiliary_count, ==, GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (binding_audit.graph_ready_submit_count, ==, 47u);
   g_assert_cmpuint (binding_audit.transaction.committed_after_completion_count,
-                    ==, 125u);
+                    ==, 47u);
   g_assert_cmpuint (binding_audit.retry_count, ==, 0u);
   g_assert_cmpuint (goodix_fpi_usb_backend_get_outstanding (backend), ==, 0u);
 
@@ -2292,14 +2393,17 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
   fixture_close (f);
   test_fixture_free (f);
   g_print ("D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS\n");
-  g_print ("D279_25_CONTEXT_21_STAGE_TRANSCRIPT=PASS\n");
-  g_print ("D279_26_LIBFPRINT_21_STAGE_ACTION=PASS\n");
+  g_print ("D279_57_SIGFM_STAGE8_CONTEXT_TRANSCRIPT=PASS\n");
+  g_print ("D279_57_LEGACY_21_STAGE_FIXTURE_RETIRED=PASS\n");
 }
 
 static void
 test_d279_20_dormant_enrollment_context_ownership (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentFpiUsbBindingAudit binding_audit;
   GoodixEnrollmentPostTlsEventsAudit foreign_events_audit;
@@ -2398,6 +2502,10 @@ main (int argc, char **argv)
                    test_enroll_minutiae_done_before_finger_off);
   g_test_add_func ("/goodix-fpimage-device/enroll-finger-off-before-minutiae-done",
                    test_enroll_finger_off_before_minutiae_done);
+  g_test_add_func ("/goodix-fpimage-device/d279-57-terminal-release-before-sigfm",
+                   test_terminal_hold_release_before_sigfm_completion);
+  g_test_add_func ("/goodix-fpimage-device/d279-57-terminal-release-before-sigfm-failure-fail-closed",
+                   test_terminal_release_before_sigfm_failure_is_fail_closed);
   g_test_add_func ("/goodix-fpimage-device/d279-57-sigfm-stage8-candidate-policy",
                    test_d279_57_sigfm_stage8_candidate_policy);
   g_test_add_func ("/goodix-fpimage-device/no-rearm-before-both-gates",

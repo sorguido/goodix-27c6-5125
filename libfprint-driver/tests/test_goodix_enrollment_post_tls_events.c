@@ -311,6 +311,7 @@ run_profile (guint stages)
   GoodixEnrollmentModelConfig config = {
     .required_stage_count = stages,
     .defer_terminal_stage_delivery = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
   GoodixEnrollmentPostTlsEventsAudit audit;
   Fixture fixture = { 0 };
@@ -335,6 +336,7 @@ run_profile (guint stages)
                   irq2_raw[stage - 1u]);
       command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_22, 0x22);
       handle_primary (events, stage);
+      g_assert_cmpuint (fixture.image_count, ==, stage - 1u);
       command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_34, 0x34);
       if (stage == 1u)
         {
@@ -388,6 +390,75 @@ run_profile (guint stages)
 }
 
 static void
+test_repeated_primary_early_finger_up_is_diagnostic_fail_closed (void)
+{
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 3u,
+    .defer_terminal_stage_delivery = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
+  };
+  GoodixEnrollmentPostTlsEventsAudit audit;
+  Fixture fixture = { 0 };
+  guint8 irq2_raw[12];
+  guint8 irq0200_raw[12];
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GBytes) nav = NULL;
+  g_autoptr(GBytes) early_up = NULL;
+  GoodixEnrollmentPostTlsEvents *events =
+    goodix_enrollment_post_tls_events_new (
+      &config, image_ready, timestamp_ready, auxiliary_ready,
+      &fixture, &audit, &error);
+
+  g_assert_nonnull (events);
+  fill_raw (0x88u, irq2_raw);
+  fill_raw (0x48u, irq0200_raw);
+
+  /* Complete the distinct first contact. */
+  handle_irq (events, 0x32, 0x0002, 0x003f, irq2_raw);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_22, 0x22);
+  handle_primary (events, 1u);
+  g_assert_cmpuint (fixture.image_count, ==, 0u);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_34, 0x34);
+  g_assert_cmpuint (fixture.image_count, ==, 1u);
+  handle_irq (events, 0x34, 0x0200, 0x0000, irq0200_raw);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_20, 0x20);
+  handle_auxiliary (events);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_32, 0x32);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_50, 0x50);
+  nav = build_nav_no_check ();
+  handle_a0 (events, nav);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_32, 0x32);
+
+  /* On a repeated contact, PRIMARY_B0 is not release-ready. Simulate the
+   * observed operator action: an early physical release causes IRQ0200 while
+   * the graph still expects IRQ0100 after ACK_36. */
+  handle_irq (events, 0x32, 0x0002, 0x003f, irq2_raw);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_22, 0x22);
+  handle_primary (events, 2u);
+  g_assert_cmpuint (fixture.image_count, ==, 1u);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_34, 0x34);
+  g_assert_cmpuint (fixture.image_count, ==, 1u);
+  command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_36, 0x36);
+  early_up = build_irq (0x34, 0x0200, 0x0000, irq0200_raw);
+  g_assert_false (goodix_enrollment_post_tls_events_handle_a0 (
+    events, early_up, &error));
+  g_assert_nonnull (error);
+  g_assert_nonnull (strstr (error->message, "expected IRQ0100"));
+  g_assert_nonnull (strstr (error->message, "control 0x34"));
+  g_assert_nonnull (strstr (error->message, "IRQ 0x0200"));
+  g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+  g_assert_cmpuint (fixture.image_count, ==, 1u);
+  g_assert_cmpint (audit.last_mismatch_expected_event, ==,
+                   GOODIX_ENROLLMENT_EVENT_IRQ0100);
+  g_assert_cmphex (audit.last_mismatch_observed_control, ==, 0x34);
+  g_assert_true (audit.last_mismatch_observed_irq_classified);
+  g_assert_cmphex (audit.last_mismatch_observed_irq, ==, 0x0200);
+  g_assert_cmphex (audit.last_mismatch_observed_irq_flags, ==, 0x0000);
+  g_assert_cmpuint (audit.rejected_inbound_count, ==, 1u);
+  goodix_enrollment_post_tls_events_free (events);
+}
+
+static void
 test_profiles (void)
 {
   run_profile (2u);
@@ -398,7 +469,10 @@ test_profiles (void)
 static void
 test_wrong_ack_fails_closed (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit audit;
   Fixture fixture = { 0 };
   guint8 raw[12];
@@ -418,13 +492,20 @@ test_wrong_ack_fails_closed (void)
   g_assert_nonnull (error);
   g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
   g_assert_cmpuint (audit.rejected_inbound_count, ==, 1u);
+  g_assert_cmpint (audit.last_mismatch_expected_event, ==,
+                   GOODIX_ENROLLMENT_EVENT_ACK_22);
+  g_assert_cmphex (audit.last_mismatch_observed_control, ==, 0xb0);
+  g_assert_false (audit.last_mismatch_observed_irq_classified);
   goodix_enrollment_post_tls_events_free (events);
 }
 
 static void
 test_bad_irq_flags_fail_closed (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit audit;
   Fixture fixture = { 0 };
   guint8 raw[12];
@@ -441,13 +522,22 @@ test_bad_irq_flags_fail_closed (void)
     events, frame, &error));
   g_assert_nonnull (error);
   g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+  g_assert_cmpint (audit.last_mismatch_expected_event, ==,
+                   GOODIX_ENROLLMENT_EVENT_IRQ2);
+  g_assert_cmphex (audit.last_mismatch_observed_control, ==, 0x32);
+  g_assert_true (audit.last_mismatch_observed_irq_classified);
+  g_assert_cmphex (audit.last_mismatch_observed_irq, ==, 0x0002);
+  g_assert_cmphex (audit.last_mismatch_observed_irq_flags, ==, 0x0000);
   goodix_enrollment_post_tls_events_free (events);
 }
 
 static void
 test_contact_callback_failure_fails_closed (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit audit;
   Fixture fixture = { 0 };
   guint8 raw[12];
@@ -469,6 +559,8 @@ test_contact_callback_failure_fails_closed (void)
   g_assert_cmpuint (audit.irq2_count, ==, 1u);
   g_assert_cmpuint (audit.finger_down_delivery_count, ==, 0u);
   g_assert_cmpuint (audit.rejected_inbound_count, ==, 1u);
+  g_assert_cmpint (audit.last_mismatch_expected_event, ==,
+                   GOODIX_ENROLLMENT_EVENT_NONE);
   goodix_enrollment_post_tls_events_free (events);
 }
 
@@ -529,7 +621,10 @@ feed_fragmented_plaintext (GoodixEnrollmentPostTlsEvents *events,
 static void
 test_fragmented_primary_and_opaque_auxiliary (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit audit;
   Fixture fixture = { 0 };
   guint8 irq2[12];
@@ -577,7 +672,10 @@ test_fragmented_primary_and_opaque_auxiliary (void)
 static void
 test_primary_declared_length_fails_closed (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit audit;
   Fixture fixture = { 0 };
   guint8 irq2[12];
@@ -605,7 +703,10 @@ test_primary_declared_length_fails_closed (void)
 static void
 test_transaction_stale_completion_fails_closed (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentOutboundTransactionAudit transaction_audit;
   Fixture fixture = { 0 };
@@ -641,7 +742,10 @@ test_transaction_stale_completion_fails_closed (void)
 static void
 test_transaction_early_ack_fails_closed (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentOutboundTransactionAudit transaction_audit;
   Fixture fixture = { 0 };
@@ -677,7 +781,10 @@ test_transaction_early_ack_fails_closed (void)
 static void
 test_dormant_backend_binding_completion_gate (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentFpiUsbBindingAudit binding_audit;
   Fixture fixture = { 0 };
@@ -762,7 +869,10 @@ test_dormant_backend_binding_completion_gate (void)
 static void
 test_backend_binding_cancel_waits_for_drain (void)
 {
-  GoodixEnrollmentModelConfig config = { 2u, TRUE };
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery = TRUE,
+  };
   GoodixEnrollmentPostTlsEventsAudit events_audit;
   GoodixEnrollmentFpiUsbBindingAudit binding_audit;
   Fixture fixture = { 0 };
@@ -822,6 +932,8 @@ main (int argc, char **argv)
                    test_wrong_ack_fails_closed);
   g_test_add_func ("/d279-14-post-tls-events/bad-irq-flags-fail-closed",
                    test_bad_irq_flags_fail_closed);
+  g_test_add_func ("/d279-57-contact/early-up-after-repeated-primary-diagnostic",
+                   test_repeated_primary_early_finger_up_is_diagnostic_fail_closed);
   g_test_add_func ("/d279-22-contact/callback-failure-fails-closed",
                    test_contact_callback_failure_fails_closed);
   g_test_add_func ("/d279-15-b0-stream/fragmented-primary-opaque-auxiliary",

@@ -16,7 +16,38 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/57 — SIGFM production stage-8 candidate offline
+### Stato corrente post-D279/57 — live fail-closed e correttivo contact boundary
+
+La singola run live D279/57 autorizzata sul full SHA
+`1afe72e4d875daa60319cbbfb55d19a1e151de86` è consumata e non è
+riutilizzabile. Ha completato 2/8 stage e si è arrestata fail-closed su un A0
+non conforme all'evento atteso, senza retry o seconda action. L'audit
+dichiarato dall'operatore riporta 2 B0 primari, 1 B0 ausiliario, 9 ACK, un
+re-arm e due comandi `0x32`; close, drain, release e rimozione del materiale
+runtime sono riusciti, con retry/reopen/persistent-family osservati pari a
+zero.
+
+La combinazione dei conteggi è fortemente compatibile con un `IRQ0200`
+anticipato dopo che l'operatore ha rimosso il dito al progresso biometrico
+dello stage 2, mentre il ciclo ripetuto attendeva ancora `IRQ0100` e il B0
+ausiliario. È una inferenza, non una osservazione diretta: la vecchia
+telemetria non classificava il frame inatteso. Gli originali root-only
+`operator.log` e `summary.env` non sono ancora stati importati né hashati;
+restano separati dalla trascrizione dichiarata dall'operatore.
+
+Il correttivo offline separa ora i boundary: `PRIMARY_B0` conserva la
+provenance del sample, ma in tutti gli stage la consegna a `FpImageDevice`
+avviene soltanto dopo l'ACK finale `0x34`, quando è armato `IRQ0200`.
+L'istruzione fisica deriva da `finger-status`, non dal callback di progresso.
+Allo stage terminale una hold interna trattiene soltanto la completion
+biometrica riuscita fino al consumo di `IRQ0200`; errori e cancellazione non
+sono trattenuti. Una failure SIGFM retry-class dopo l'arm della hold diventa
+fatale `DATA_INVALID`, con zero progress: la cattura sensor-side finale è già
+consumata e non è lecito attendere un nono sample né lasciare l'action in
+deadlock. La nuova telemetria
+sanitizzata espone evento atteso, control A0 e, quando classificabile, IRQ e
+flags, senza payload. I test offline del boundary, della vera action full-TLS
+e della fixture storica D279/24 sono verdi normali e ASan/UBSan.
 
 La valutazione protetta D279/48 è stata completata offline sulla baseline
 `36999004b9971f7004aaaa4da85d7c2d1afc79d1`, senza USB/live e senza export di
@@ -73,7 +104,9 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_D279_57_STAGE8_EARLY_TERMINAL_ENROLLMENT
+D279_57_ATTEMPT01_GRANT_CONSUMED=true
+D279_57_ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_CORRECTED_D279_57_ACTION_NO_RETRY
 ```
 
 Report e review machine-readable:
@@ -400,9 +433,11 @@ La allowlist production ammette ora soltanto `ENROLL` e `IDENTIFY`; `CAPTURE`
 resta rifiutata. Restano invariati one-action-per-open-epoch, generation fence,
 pre-session sync, TLS, drain e guardrail persistent-family. I test lifecycle e
 production-device focalizzati passano normali e ASan/UBSan con backend fake e
-zero USB reale. Il runner completo non-SIGFM ha esposto una fixture D279/24
-legacy già incompatibile con il failure asincrono dell'extractor; il test
-D279/55 focalizzato e la suite lifecycle restano verdi. La cache RPM OpenCV
+zero USB reale. Il runner completo non-SIGFM aveva esposto una fixture D279/24
+legacy incompatibile con il failure asincrono dell'extractor; il correttivo
+D279/57 l'ha poi riallineata al profilo SIGFM a otto stage e a un'immagine
+sintetica valida, con test normale e ASan/UBSan verdi. Il test D279/55
+focalizzato e la suite lifecycle restano verdi. La cache RPM OpenCV
 pinned non era presente, quindi la build production-shaped SIGFM già provata
 in D279/52–53 non è stata rieseguita in questo step.
 
@@ -528,73 +563,117 @@ CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_57_STAGE8_EARLY_TERMINAL_LIVE_BOUNDARY_PREPARATION
 ```
 
-### Stato D279/57 — candidato production stage-8 e gate terminale anticipato
+### Stato D279/57 — run consumata e correttivo contact boundary
 
 D279/57 traduce il risultato autentico D279/56 nel minimo esperimento
-sensor-side discriminante. La production SIGFM dichiara ora otto stage e il
-grafo enrollment configura lo stesso cap; il valore 21 resta separato come
-profilo wire/regression autentico ATTEMPT02. Non viene ancora implementata la
-selezione dinamica per duplicati: tutti i primi otto sample ATTEMPT02 erano
-distinti e il cap fisso isola l'effetto dell'omissione del nono re-arm.
+sensor-side discriminante. La production SIGFM dichiara otto stage e il grafo
+enrollment configura lo stesso cap; 21 resta il profilo wire autentico
+ATTEMPT02, non il numero di stage della action production SIGFM.
 
-La semantica attesa è: otto cicli completi fino a finger-up `IRQ 0x0200`, sette
-re-arm inter-stage e otto comandi `0x32` complessivi (bootstrap più sette
-re-arm), quindi terminale del grafo, deactivation, drain e close senza un nono
-`0x32`. Il client one-shot non salva il template, non esegue retry, seconda
-action o reopen. Un successo non proverà ancora la riutilizzabilità: quella
-richiede una distinta action in un nuovo open epoch, dopo review e nuova
-autorizzazione.
+La singola run autorizzata sul full SHA
+`1afe72e4d875daa60319cbbfb55d19a1e151de86` ha aperto il device e
+completato due stage, poi ha respinto un A0 non conforme all'evento atteso. Il
+grant è consumato, il return code è 1 e non si sono verificati retry, seconda
+action o reopen. L'audit dichiarato dall'operatore è:
 
-L'error propagation D279/52 è stato riesaminato esplicitamente. La action
-SIGFM usa `fpi_image_device_add_enroll_sample_checked()`, che delega
-all'append atomico `fpi_print_add_print_checked()` e incrementa lo stage
-libfprint soltanto dopo copia riuscita. Un failure di extraction o
-`goodix_sigfm_sample_copy()` termina la action e avvia deactivation; non viene
-pubblicato progresso enrollment per un sample non acquisito nel template. I
-test `checked-append-atomic-failure` e
-`enroll-stage-stable-on-copy-failure` passano normali e ASan/UBSan.
+```text
+PRIMARY_B0=2
+AUXILIARY_B0=1
+ACK=9
+OBSERVED_PRIMARY_STAGE=2
+COMPLETED_STAGE=2
+TERMINAL_TRANSITION=0
+INTER_STAGE_REARM=1
+COMMAND_32=2
+CLOSE/CONTEXT_DRAIN/USB_DRAIN/INTERFACE_RELEASE/RUNTIME_CLEANUP=PASS
+SECURE_RETRY/POST_TLS_RETRY/SECURE_REOPEN/POST_TLS_REOPEN=0
+KNOWN_PERSISTENT_FAMILY_OBSERVED=0
+```
 
-I test focused della classe/action e della sessione TLS production provano
-offline 8/8 progressi, terminale unico, sette re-arm, otto `0x32`, drain e
-rifiuto di una seconda action nello stesso open epoch. Il test con SIGFM reale
-Rockytkg/OpenCV passa extraction, template multi-sample, serialization e
-identify su otto sample. I modelli storici D279/11 e D279/13 restano verdi sui
-profili 2/3/21. Le fixture TLS obsolete usavano per il B0 bootstrap un payload
-opaco che il nuovo preprocessing production rifiuta correttamente; sono state
-allineate al record immagine sintetico già validato senza rilassare il codice
-production.
+La run era fail-closed e host-safe, ma non prova il terminale anticipato dello
+stage 8. I suoi due file originali nella directory risultati root-only non sono
+ancora stati letti dall'AI, importati o hashati: i valori sopra sono
+esplicitamente una trascrizione della dichiarazione operatore. Il launcher
+corretto aggiunge `--export-results`, che copia soltanto `operator.log` e
+`summary.env`, verifica l'uguaglianza SHA-256 source/copia e non enumera USB.
 
-Il kit `operator_kit/d279-57-stage8-early-terminal/` passa il preflight
-offline: costruisce da snapshot Git la fork Fedora 44/libfprint 1.94.100 con
-R2/SIGFM e OpenCV RPM hash-pinned, verifica l'assenza delle seam di test e
-rifiuta la baseline `UNAPPROVED_FOR_LIVE` prima di `FpContext`/USB. La futura
-run è una singola azione live e resta soggetta a Human Gate su full SHA.
+Il riesame confronta la sequenza D279/10: dopo il B0 primario di uno stage
+ripetuto devono ancora avvenire `0x34/ACK`, `0x36/ACK`, `IRQ0100`, `0x20/ACK`,
+B0 ausiliario e `0x34/ACK`, prima del finger-up `IRQ0200`. Il precedente client
+stampava “togli il dito” al callback di progresso emesso subito dopo il B0
+primario. I conteggi della run sono quindi fortemente compatibili con un
+`IRQ0200` anticipato mentre il modello attendeva `IRQ0100`; questa classe resta
+un'inferenza perché la telemetria della run consumata non esponeva control e
+IRQ inattesi.
 
-Riesame metodologico pre-live:
+La semantica production corretta separa i due piani:
 
-1. rispetto a D279/29 cambiano realmente extractor/template production
-   (SIGFM anziché NBIS) e terminale enrollment (8 invece di 21, senza nono
-   `0x32` dopo un finger-up completo);
-2. l'ipotesi è che APP12509 accetti il terminale host dopo lo stage 8 e possa
-   essere drenato/released/chiuso senza richiedere lo stage 9;
-3. se fallisce nello stesso boundary non è autorizzato alcun retry: si
-   analizzano gli artefatti e si passa a un replan protocol-specifico. La
-   riutilizzabilità resta comunque uno step separato.
+- `PRIMARY_B0` resta l'unica provenance del sample biometrico;
+- in tutti gli stage il sample viene trattenuto fino all'ACK finale `0x34`,
+  quando il grafo ha armato `IRQ0200`;
+- la consegna a `FpImageDevice` produce lo stato standard
+  `AWAIT_FINGER_OFF` e `finger-status=PRESENT`; soltanto questo stato genera
+  l'istruzione fisica di rimozione;
+- il callback di progresso segnala soltanto avanzamento biometrico;
+- nello stage terminale la stessa consegna genera il prompt release-ready 8;
+  una hold `FpImageDevice` separata impedisce la sola completion riuscita fino
+  al consumo di `IRQ0200`, in entrambi gli ordini temporali SIGFM/IRQ.
+
+Un nuovo test riproduce esplicitamente la rimozione immediata dopo il primary
+B0 dello stage 2: nessuna immagine/stage viene consegnata, l'`IRQ0200`
+anticipato fallisce chiuso con `IRQ0100` atteso e l'audit registra soltanto
+evento atteso, control, IRQ e flags sanitizzati. Il test full-TLS della vera
+action dimostra anche `CAPTURE + NEEDED|PRESENT` al primary B0 e
+`AWAIT_FINGER_OFF + PRESENT` dopo l'ACK finale `0x34`, anche allo stage 8.
+Test distinti coprono SIGFM prima dell'IRQ e IRQ prima di SIGFM: la completion
+avviene solo dopo entrambi. Un terzo test forza la failure SIGFM durante la
+finestra terminale, dopo che `IRQ0200` ha già liberato la hold, e prova
+deattivazione fail-closed `DATA_INVALID`, zero progress, nessun retry e assenza
+di deadlock. Tutti passano normali e ASan/UBSan.
+
+Il residual storico D279/24 è stato riprodotto direttamente e non era una
+regressione production: la fixture pilotava ancora 21 stage non-SIGFM dentro
+la action ora correttamente limitata a 8 e usava un vecchio payload bootstrap
+non immagine. È stata aggiornata al profilo SIGFM production e al record
+sintetico valido, preservando l'handoff context-first. Il test focalizzato è
+verde normale e ASan/UBSan; i vecchi marker correnti “libfprint 21-stage
+action” sono ritirati, mentre i fatti storici D279/25–26 restano nei rispettivi
+report.
+
+L'error propagation D279/52 resta invariato: l'append checked è atomico e un
+failure di extraction/copia non incrementa lo stage. La telemetria D279/57
+aggiunge l'ultimo mismatch strutturale sanitizzato senza payload, raster,
+template, secret o plaintext protetto.
+
+Riesame metodologico prima di una eventuale nuova run:
+
+1. cambia realmente il boundary di contatto: ogni consegna avviene
+   dopo l'ACK finale `0x34` e l'operatore segue `finger-status`, non il
+   progresso al primary B0; allo stage 8 attende esplicitamente
+   `RILASCIO_FISICO_PRONTO=8`;
+2. la nuova ipotesi è che mantenere il dito durante il ramo ausiliario e
+   rimuoverlo soltanto al release-ready permetta di chiudere ogni ciclo
+   ripetuto e raggiungere il terminale stage 8 senza nono `0x32`;
+3. un nuovo fallimento non autorizza retry: evento/control/IRQ sanitizzati
+   determinano il replan protocol-specifico. La riutilizzabilità resta uno
+   step distinto.
 
 ```text
 D279_57_OUTCOME=HUMAN_REQUIRED
-D279_57_ADVANCEMENT=PRODUCTION_SIGFM_STAGE8_CANDIDATE_AND_ONE_SHOT_KIT_READY
+D279_57_ADVANCEMENT=LIVE_FAIL_CLOSED_NEW_CONTACT_BOUNDARY_AND_OFFLINE_CORRECTIVE
 D279_57_EXECUTABLE_CLOSURE=PASS_OFFLINE
 PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_CANDIDATE_PENDING_LIVE_PROOF
 ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
 DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
 SIGFM_APPEND_FAILURE_ADVANCES_STAGE=false
+ATTEMPT01_GRANT_CONSUMED=true
+ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
 EXPECTED_COMMAND_32_COUNT=8
 EXPECTED_INTER_STAGE_REARM_COUNT=7
 EXPECTED_POST_STAGE8_REARM_COUNT=0
 REUSABILITY_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_D279_57_STAGE8_EARLY_TERMINAL_ENROLLMENT
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_CORRECTED_D279_57_ACTION_NO_RETRY
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

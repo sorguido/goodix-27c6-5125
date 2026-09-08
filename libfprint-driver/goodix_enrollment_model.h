@@ -7,7 +7,8 @@
 G_BEGIN_DECLS
 
 /* Metadata-only observations accepted by the host-only enrollment oracle.
- * PRIMARY_B0 is the image-bearing stage boundary exposed to libfprint.
+ * PRIMARY_B0 is the image-bearing sample provenance boundary for libfprint;
+ * delivery may be deferred by the explicit contact-boundary configuration.
  * AUXILIARY_B0 is the encrypted B0 observed after 0x20.  Its stable position
  * makes it protocol-internal in this model; its possible quality, template or
  * NBIS relevance is deliberately left undetermined. */
@@ -51,12 +52,24 @@ typedef struct
    * Defer the final stage callback until terminal IRQ0200 so the caller can
    * immediately report finger-up before that asynchronous completion. */
   gboolean defer_terminal_stage_delivery;
+  /* Deliver the final PRIMARY_B0-derived image at the final ACK_34, after the
+   * auxiliary branch and immediately before the expected IRQ0200.  This lets
+   * FpImageDevice publish its normal release-ready finger status while a
+   * separate completion hold preserves the device-side terminal boundary. */
+  gboolean defer_terminal_stage_delivery_until_release_ready;
+  /* A repeated-cycle PRIMARY_B0 precedes the auxiliary scan and is not the
+   * physical contact-complete boundary.  When enabled, retain intermediate
+   * primary images until the final ACK_34 has armed the expected IRQ0200.
+   * The image remains sourced exclusively from PRIMARY_B0. */
+  gboolean defer_intermediate_stage_delivery_until_release_ready;
 } GoodixEnrollmentModelConfig;
 
 typedef struct
 {
   guint configured_required_stage_count;
   gboolean configured_defer_terminal_stage_delivery;
+  gboolean configured_defer_terminal_stage_delivery_until_release_ready;
+  gboolean configured_defer_intermediate_stage_delivery_until_release_ready;
   guint observed_primary_stage_count;
   guint completed_stage_count;
   guint primary_b0_count;

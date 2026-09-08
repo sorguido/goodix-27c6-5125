@@ -37,6 +37,7 @@ usage ()
   echo "  $0 --prepare-approved-live <SHA_COMPLETO_APPROVATO>" >&2
   echo "  $0 --write-grant <SHA_COMPLETO_APPROVATO> <FILE_GRANT>" >&2
   echo "  sudo $0 --run-approved-live <BUILD_PREPARATO> --grant <FILE_GRANT>" >&2
+  echo "  sudo $0 --export-results <DIRECTORY_RISULTATI>" >&2
   exit 2
 }
 
@@ -222,6 +223,14 @@ source_guard_audit ()
     refuse STAGE8_GUARD_MISSING
   grep -F 'D279_57_STAGE8_TERMINAL_AUDIT_PASS=' "$tool" >/dev/null ||
     refuse TERMINAL_AUDIT_GUARD_MISSING
+  grep -F 'PHYSICAL_INSTRUCTION_SOURCE=LIBFPRINT_FINGER_STATUS' \
+    "$tool" >/dev/null || refuse PHYSICAL_INSTRUCTION_SOURCE_MISSING
+  grep -F 'AUDIT_ENROLL_LAST_MISMATCH_EXPECTED_EVENT=' "$tool" >/dev/null ||
+    refuse SANITIZED_MISMATCH_TELEMETRY_MISSING
+  grep -F 'AUDIT_ENROLL_TERMINAL_COMPLETION_HOLD_COUNT=' "$tool" >/dev/null ||
+    refuse TERMINAL_COMPLETION_HOLD_TELEMETRY_MISSING
+  grep -F 'release_ready_prompt_count != D279_57_ENROLL_STAGES' "$tool" >/dev/null ||
+    refuse ALL_STAGE_RELEASE_READY_GUARD_MISSING
 }
 
 offline_preflight ()
@@ -252,6 +261,11 @@ offline_preflight ()
   echo HOST_DEADLINE_IS_DEVICE_QUIESCENCE_PROOF=false
   echo KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
   echo SANITIZED_PRODUCTION_AUDIT_ACCESSOR_EXPORTED=true
+  echo PHYSICAL_INSTRUCTION_SOURCE=LIBFPRINT_FINGER_STATUS
+  echo INTERMEDIATE_STAGE_DELIVERY_BOUNDARY=FINAL_ACK34_RELEASE_READY
+  echo INTERMEDIATE_SAMPLE_DELIVERY_BOUNDARY=FINAL_ACK34_BEFORE_IRQ0200
+  echo TERMINAL_SAMPLE_DELIVERY_BOUNDARY=FINAL_ACK34_BEFORE_IRQ0200
+  echo TERMINAL_COMPLETION_BOUNDARY=IRQ0200_AND_SIGFM_COMPLETE
   echo SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo LIVE_EXECUTION_PERFORMED=false
@@ -481,8 +495,8 @@ run_approved_live ()
   mkdir -m 0700 "$result_root" || refuse RESULT_DIR_CREATE_FAILED
   log="$result_root/operator.log"
   echo "INIZIO RUN ONE-SHOT. Non rilanciare questo comando in caso di errore."
-  echo "ISTRUZIONE_STAGE8=Il riposizionamento dopo STAGE_COMPLETATO=7/8 e il contatto 8: eseguilo come touch-and-release; NON attendere STAGE_COMPLETATO=8/8 prima di sollevare il dito."
-  echo "NOTA_STAGE8=STAGE_COMPLETATO=8/8 viene emesso solo dopo il finger-up finale IRQ0200."
+  echo "ISTRUZIONE_CONTATTI=Segui soltanto AZIONE_OPERATORE: il progresso STAGE_COMPLETATO non indica quando sollevare il dito."
+  echo "ISTRUZIONE_STAGE8=Mantieni anche il contatto 8 finche compare RILASCIO_FISICO_PRONTO=8; quindi togli il dito."
   set +e
   env \
     LD_LIBRARY_PATH="$runtime" \
@@ -525,6 +539,43 @@ run_approved_live ()
   return "$rc"
 }
 
+export_results ()
+{
+  local result_root=$1 basename export_dir source_sha copied_sha
+
+  [[ $EUID -eq 0 ]] || refuse EXPORT_REQUIRES_ROOT
+  [[ ${SUDO_UID:-} =~ ^[0-9]+$ && ${SUDO_GID:-} =~ ^[0-9]+$ ]] ||
+    refuse EXPORT_REQUIRES_SUDO_CALLER
+  [[ $result_root == /var/tmp/goodix-d279-57-results/* &&
+     -d $result_root && ! -L $result_root ]] || refuse EXPORT_SOURCE_INVALID
+  basename=${result_root##*/}
+  [[ $basename =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$ ]] ||
+    refuse EXPORT_SOURCE_INVALID
+  [[ $(readlink -f -- "$result_root") == "$result_root" ]] ||
+    refuse EXPORT_SOURCE_INVALID
+  for name in operator.log summary.env; do
+    [[ -f $result_root/$name && ! -L $result_root/$name &&
+       $(stat -c %u "$result_root/$name") -eq 0 ]] ||
+      refuse EXPORT_SOURCE_FILE_INVALID
+  done
+
+  export_dir=$(mktemp -d /tmp/goodix-d279-57-export.XXXXXX)
+  chmod 0700 "$export_dir"
+  for name in operator.log summary.env; do
+    source_sha=$(sha256sum "$result_root/$name" | awk '{print $1}')
+    install -m 0600 -o "$SUDO_UID" -g "$SUDO_GID" \
+      "$result_root/$name" "$export_dir/$name"
+    copied_sha=$(sha256sum "$export_dir/$name" | awk '{print $1}')
+    [[ $source_sha == "$copied_sha" ]] || refuse EXPORT_HASH_MISMATCH
+    echo "${name}_SHA256=$source_sha"
+  done
+  chown "$SUDO_UID:$SUDO_GID" "$export_dir"
+  echo D279_57_RESULTS_EXPORT=PASS_BYTE_IDENTICAL
+  echo "EXPORT_DIRECTORY=$export_dir"
+  echo REAL_USB_ENUMERATION_ATTEMPTED=false
+  echo LIVE_EXECUTION_PERFORMED=false
+}
+
 case ${1:-} in
   --offline-preflight)
     [[ $# -eq 1 ]] || usage
@@ -541,6 +592,10 @@ case ${1:-} in
   --run-approved-live)
     [[ $# -eq 4 && $3 == --grant ]] || usage
     run_approved_live "$2" "$4"
+    ;;
+  --export-results)
+    [[ $# -eq 2 ]] || usage
+    export_results "$2"
     ;;
   *)
     usage

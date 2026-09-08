@@ -86,6 +86,10 @@ typedef struct
 {
   gboolean production_action_consumed;
   guint auxiliary_b0_observed_count;
+  guint terminal_enroll_completion_hold_count;
+  guint terminal_enroll_completion_release_count;
+  guint terminal_enroll_completion_abort_count;
+  gboolean terminal_enroll_completion_held;
   GoodixPreSessionRxSyncAudit pre_session_rx_sync;
   GoodixRuntimeMaterialAudit runtime_material;
   GoodixSecureSessionAudit secure;

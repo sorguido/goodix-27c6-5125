@@ -9,6 +9,7 @@
 
 #include "fp-device.h"
 #include "fp-print.h"
+#include "fpi-image-device.h"
 #include <gusb.h>
 #include <openssl/ssl.h>
 #include <string.h>
@@ -70,6 +71,7 @@ typedef struct
   GError *action_error;
   FpPrint *enroll_print;
   guint enroll_progress_count;
+  FpiImageDeviceState last_image_state;
   guint material_release_count;
   guint interface_claim_count;
   guint interface_release_count;
@@ -467,6 +469,17 @@ production_close_complete (FpDevice     *device,
 }
 
 static void
+production_image_state_changed (FpImageDevice      *device,
+                                FpiImageDeviceState state,
+                                gpointer            user_data)
+{
+  Fixture *fixture = user_data;
+
+  (void) device;
+  fixture->last_image_state = state;
+}
+
+static void
 production_enroll_complete (FpDevice     *device,
                             GAsyncResult *result,
                             gpointer      user_data)
@@ -521,6 +534,8 @@ fixture_new_production_action (void)
   goodix_test_gusb_set_open_close_success (TRUE);
   usb_device = (GUsbDevice *) g_object_new (G_USB_TYPE_DEVICE, NULL);
   fixture->device = goodix_fpimage_device_new_for_usb (usb_device);
+  g_signal_connect (fixture->device, "fpi-image-device-state-changed",
+                    G_CALLBACK (production_image_state_changed), fixture);
   goodix_fpimage_device_set_production_open_seams (
     fixture->device, production_material_acquire,
     production_material_release, production_interface_claim,
@@ -1396,11 +1411,22 @@ drive_production_enrollment_stages (Fixture   *fixture,
       post_complete_command (fixture, 0x22);
       post_feed_ack (fixture, 0x22);
       post_write_application_data (fixture, client, image_data, image_length);
+      g_assert_cmpuint (fixture->enroll_progress_count, ==, stage - 1u);
+      g_assert_cmpint (fixture->last_image_state, ==,
+                       FPI_IMAGE_DEVICE_STATE_CAPTURE);
+      g_assert_cmpuint (fp_device_get_finger_status (
+                          FP_DEVICE (fixture->device)), ==,
+                        FP_FINGER_STATUS_NEEDED | FP_FINGER_STATUS_PRESENT);
       post_complete_command (fixture, 0x34);
       post_feed_ack (fixture, 0x34);
 
       if (stage == 1u)
         {
+          g_assert_cmpint (fixture->last_image_state, ==,
+                           FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+          g_assert_cmpuint (fp_device_get_finger_status (
+                              FP_DEVICE (fixture->device)), ==,
+                            FP_FINGER_STATUS_PRESENT);
           post_feed_event (fixture, 0x34, 0x0200, 0, 0x0120);
           post_complete_command (fixture, 0x20);
           post_feed_ack (fixture, 0x20);
@@ -1426,6 +1452,28 @@ drive_production_enrollment_stages (Fixture   *fixture,
                                        sizeof auxiliary);
           post_complete_command (fixture, 0x34);
           post_feed_ack (fixture, 0x34);
+          g_assert_cmpint (fixture->last_image_state, ==,
+                           FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+          g_assert_cmpuint (fp_device_get_finger_status (
+                              FP_DEVICE (fixture->device)), ==,
+                            FP_FINGER_STATUS_PRESENT);
+          if (stage == GOODIX_SIGFM_ENROLL_MAX_STAGES)
+            {
+              GoodixProductionEnrollmentAudit held_audit;
+
+              /* Exercise the harder ordering: SIGFM finishes before the
+               * terminal IRQ, but action completion remains held. */
+              wait_for_enrollment_progress (fixture, stage);
+              g_assert_false (fixture->done);
+              goodix_device_context_get_production_enrollment_audit (
+                fixture->context, &held_audit);
+              g_assert_cmpuint (
+                held_audit.terminal_enroll_completion_hold_count, ==, 1u);
+              g_assert_cmpuint (
+                held_audit.terminal_enroll_completion_release_count, ==, 0u);
+              g_assert_true (
+                held_audit.terminal_enroll_completion_held);
+            }
           post_feed_event (fixture, 0x34, 0x0200, 0,
                            (guint16) (0x40u + stage * 8u));
           if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
@@ -1490,6 +1538,13 @@ test_production_one_shot_enrollment_full_tls (void)
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (enrollment_audit.enrollment_events.auxiliary_b0_count, ==,
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_cmpuint (enrollment_audit.terminal_enroll_completion_hold_count,
+                    ==, 1u);
+  g_assert_cmpuint (enrollment_audit.terminal_enroll_completion_release_count,
+                    ==, 1u);
+  g_assert_cmpuint (enrollment_audit.terminal_enroll_completion_abort_count,
+                    ==, 0u);
+  g_assert_false (enrollment_audit.terminal_enroll_completion_held);
   g_assert_cmpuint (enrollment_audit.auxiliary_b0_observed_count, ==,
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
   g_assert_cmpuint (

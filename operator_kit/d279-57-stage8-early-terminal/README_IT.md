@@ -3,6 +3,12 @@
 
 ## Stato e scopo
 
+La prima run autorizzata sul full SHA
+`1afe72e4d875daa60319cbbfb55d19a1e151de86` si è arrestata fail-closed
+dopo 2/8 stage; il grant è consumato e non è autorizzato alcun retry. Questa
+versione è il correttivo offline del boundary di contatto e richiede un nuovo
+full SHA e una nuova autorizzazione prima di qualsiasi action live.
+
 Il kit prepara una sola action enrollment sul Goodix USB `27c6:5125` per
 verificare il confine sensor-side rimasto dopo D279/56: completare lo stage 8
 fino all'IRQ finger-up `0x0200`, non inviare il successivo re-arm `0x32`, quindi
@@ -107,10 +113,15 @@ dell'enumerazione e dell'USB. Non cancellare il marker in
 
 ## Durante la singola action
 
-Usare sempre l'indice destro. Appoggiare il dito quando richiesto; dopo ogni
-`STAGE_COMPLETATO=n/8` inferiore a 8, toglierlo, attendere un istante e
-riposizionare lo stesso dito in una zona diversa. Non cambiare dito e non
-avviare altri comandi.
+Usare sempre l'indice destro e seguire esclusivamente le righe
+`AZIONE_OPERATORE`. `STAGE_COMPLETATO=n/8` conferma soltanto che il sample è
+entrato nel template: **non** è un'istruzione a sollevare il dito. Sollevarlo
+solo dopo `RILASCIO_FISICO_PRONTO=n` / `AZIONE_OPERATORE=ORA TOGLI IL DITO`;
+riposizionarlo soltanto dopo `RIPOSIZIONAMENTO_RICHIESTO=n`. Il contatto 8 è
+regolato dallo stesso boundary degli altri: mantenerlo finché compare
+`RILASCIO_FISICO_PRONTO=8`, quindi toglierlo. La completion biometrica finale
+resta trattenuta finché il sensore produce l'IRQ `0x0200`. Non cambiare dito e
+non avviare altri comandi.
 
 Attendere `ENROLLMENT_SUCCEEDED=true`, `CLOSE_SUCCEEDED=true` e
 `D279_57_STAGE8_TERMINAL_AUDIT_PASS=true`. Il template resta solo in memoria e
@@ -134,6 +145,14 @@ non provano timeout o quiescenza del sensore.
 ```
 
 I file sono privati e non contengono raster, template, PSK, CONFIG90 o FDT raw.
-Copiarli senza modificarli nel canale concordato per la review. Anche con
-successo, non eseguire una seconda action: la prova di reusability è il
-boundary successivo e richiede una nuova decisione esplicita.
+Per esportarli byte-identici in una directory privata dell'utente, senza USB:
+
+```bash
+sudo ./operator_kit/d279-57-stage8-early-terminal/run-d279-57.sh \
+  --export-results /var/tmp/goodix-d279-57-results/<UTC>-<SHA12>
+```
+
+Il comando stampa gli SHA-256 e `EXPORT_DIRECTORY`. Copiare i due file da
+quella directory nel canale concordato per la review. Anche con successo, non
+eseguire una seconda action: la prova di reusability è il boundary successivo
+e richiede una nuova decisione esplicita.

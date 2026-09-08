@@ -130,6 +130,8 @@ fp_image_device_start_capture_action (FpDevice *device)
     }
 
   priv->enroll_stage = 0;
+  priv->enroll_completion_held = FALSE;
+  priv->enroll_terminal_sample_committed = FALSE;
   /* The internal state machine guarantees both of these. */
   g_assert (!priv->finger_present);
   g_assert (!priv->minutiae_scan_active);

@@ -7,6 +7,7 @@
 G_BEGIN_DECLS
 
 void     goodix_test_sigfm_extract_set_block   (gboolean block);
+void     goodix_test_sigfm_extract_set_failure (gboolean fail);
 void     goodix_test_sigfm_extract_unblock     (void);
 gboolean goodix_test_sigfm_extract_is_blocked  (void);
 gboolean goodix_test_sigfm_extract_wait_blocked (gint64 timeout_us);

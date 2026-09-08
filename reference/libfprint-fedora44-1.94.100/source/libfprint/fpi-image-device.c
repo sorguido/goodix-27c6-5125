@@ -67,6 +67,10 @@ fpi_image_device_deactivate (FpImageDevice *self, gboolean cancelling)
   FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
   FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (device);
 
+  if (cancelling)
+    priv->enroll_completion_held = FALSE;
+  priv->enroll_terminal_sample_committed = FALSE;
+
   if (!priv->active || priv->state == FPI_IMAGE_DEVICE_STATE_DEACTIVATING)
     {
       /* XXX: We currently deactivate both from minutiae scan result
@@ -173,7 +177,8 @@ fp_image_device_enroll_maybe_await_finger_on (FpImageDevice *self)
 
   /* We wait for both the minutiae scan to complete and the finger to
    * be removed before we switch to AWAIT_FINGER_ON. */
-  if (priv->minutiae_scan_active || priv->finger_present)
+  if (priv->minutiae_scan_active || priv->finger_present ||
+      priv->enroll_completion_held)
     return;
 
   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
@@ -326,14 +331,33 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
             }
         }
 
+      /* A retryable extraction failure cannot be retried after a driver marks
+       * the sensor-side final acquisition. Abort instead of leaving the action
+       * pending or advancing enrollment without a template sample. */
+      if (priv->enroll_terminal_sample_committed && !print)
+        {
+          g_clear_error (&error);
+          error = fpi_device_error_new_msg (
+            FP_DEVICE_ERROR_DATA_INVALID,
+            "Final enrollment sample processing failed after terminal acquisition");
+          fp_image_device_maybe_complete_action (
+            self, g_steal_pointer (&error));
+          fpi_image_device_deactivate (self, TRUE);
+          return;
+        }
+
       fpi_device_enroll_progress (device, priv->enroll_stage,
                                   g_steal_pointer (&print), error);
 
       /* Start another scan or deactivate. */
       if (priv->enroll_stage == fp_device_get_nr_enroll_stages (device))
         {
-          fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
-          fpi_image_device_deactivate (self, FALSE);
+          if (!priv->enroll_completion_held)
+            {
+              fp_image_device_maybe_complete_action (
+                self, g_steal_pointer (&error));
+              fpi_image_device_deactivate (self, FALSE);
+            }
         }
       else
         {
@@ -527,6 +551,59 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
 
   /* XXX: This is wrong if we add support for raw capture mode. */
   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+}
+
+/**
+ * fpi_image_device_hold_enroll_completion:
+ * @self: a #FpImageDevice imaging fingerprint device
+ *
+ * Marks the next image as the final sensor-side acquisition and holds only a
+ * successful enrollment completion. Fatal processing errors and cancellation
+ * remain fail-closed. The driver must pair this with
+ * fpi_image_device_release_enroll_completion().
+ */
+void
+fpi_image_device_hold_enroll_completion (FpImageDevice *self)
+{
+  FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
+
+  g_return_if_fail (FP_IS_IMAGE_DEVICE (self));
+  g_return_if_fail (fpi_device_get_current_action (FP_DEVICE (self)) ==
+                    FPI_DEVICE_ACTION_ENROLL);
+  g_return_if_fail (priv->active);
+  g_return_if_fail (!priv->enroll_completion_held);
+
+  priv->enroll_completion_held = TRUE;
+  priv->enroll_terminal_sample_committed = TRUE;
+}
+
+/**
+ * fpi_image_device_release_enroll_completion:
+ * @self: a #FpImageDevice imaging fingerprint device
+ *
+ * Releases a driver-owned final enrollment hold. If biometric processing has
+ * already completed, deactivation starts now; otherwise its completion will
+ * observe the cleared hold and perform the normal terminal path.
+ */
+void
+fpi_image_device_release_enroll_completion (FpImageDevice *self)
+{
+  FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
+
+  g_return_if_fail (FP_IS_IMAGE_DEVICE (self));
+  g_return_if_fail (fpi_device_get_current_action (FP_DEVICE (self)) ==
+                    FPI_DEVICE_ACTION_ENROLL);
+  g_return_if_fail (priv->enroll_completion_held);
+  g_return_if_fail (priv->enroll_terminal_sample_committed);
+
+  priv->enroll_completion_held = FALSE;
+  if (priv->active &&
+      !priv->minutiae_scan_active &&
+      priv->enroll_stage == fp_device_get_nr_enroll_stages (FP_DEVICE (self)))
+    {
+      fp_image_device_maybe_complete_action (self, NULL);
+      fpi_image_device_deactivate (self, FALSE);
+    }
 }
 
 /**

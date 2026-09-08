@@ -43,6 +43,11 @@ typedef struct
   guint primary_b0_decode_count;
   guint auxiliary_b0_delivery_count;
   guint rejected_inbound_count;
+  GoodixEnrollmentEvent last_mismatch_expected_event;
+  guint8 last_mismatch_observed_control;
+  gboolean last_mismatch_observed_irq_classified;
+  guint16 last_mismatch_observed_irq;
+  guint16 last_mismatch_observed_irq_flags;
   guint retry_count;
   guint a0_frame_build_count;
   guint submit_count;

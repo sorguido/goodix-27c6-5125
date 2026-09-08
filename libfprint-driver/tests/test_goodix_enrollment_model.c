@@ -98,6 +98,7 @@ run_profile (guint required_stages)
   GoodixEnrollmentModelConfig config = {
     .required_stage_count = required_stages,
     .defer_terminal_stage_delivery = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
   GoodixEnrollmentModelAudit audit;
   Fixture fixture = { 0 };
@@ -110,18 +111,14 @@ run_profile (guint required_stages)
   for (guint stage = 1u; stage <= required_stages; stage++)
     {
       feed_primary (model);
-      if (stage == required_stages)
-        {
-          g_assert_cmpuint (fixture.callback_count, ==,
-                            required_stages - 1u);
-          g_assert_cmpuint (audit.primary_b0_count, ==, required_stages);
-          g_assert_cmpuint (audit.completed_stage_count, ==,
-                            required_stages - 1u);
-        }
+      g_assert_cmpuint (fixture.callback_count, ==, stage - 1u);
+      g_assert_cmpuint (audit.primary_b0_count, ==, stage);
+      g_assert_cmpuint (audit.completed_stage_count, ==, stage - 1u);
       if (stage == 1u)
         feed_first_transition (model);
       else
         feed_repeated_transition (model, stage == required_stages);
+      g_assert_cmpuint (fixture.callback_count, ==, stage);
     }
 
   g_assert_true (goodix_enrollment_model_is_complete (model));
@@ -130,6 +127,8 @@ run_profile (guint required_stages)
   g_assert_cmpuint (audit.configured_required_stage_count, ==,
                     required_stages);
   g_assert_true (audit.configured_defer_terminal_stage_delivery);
+  g_assert_true (
+    audit.configured_defer_intermediate_stage_delivery_until_release_ready);
   g_assert_cmpuint (audit.observed_primary_stage_count, ==, required_stages);
   g_assert_cmpuint (audit.completed_stage_count, ==, required_stages);
   g_assert_cmpuint (audit.primary_b0_count, ==, required_stages);
@@ -144,6 +143,49 @@ run_profile (guint required_stages)
   g_assert_cmpuint (audit.unexpected_event_count, ==, 0u);
   g_assert_true (audit.complete);
   g_assert_false (audit.failed);
+  goodix_enrollment_model_free (model);
+}
+
+static void
+test_terminal_release_ready_delivery (void)
+{
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 2u,
+    .defer_terminal_stage_delivery_until_release_ready = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
+  };
+  GoodixEnrollmentModelAudit audit;
+  Fixture fixture = { 0 };
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentModel *model = goodix_enrollment_model_new (
+    &config, stage_ready, &fixture, &audit, &error);
+
+  g_assert_nonnull (model);
+  g_assert_no_error (error);
+  feed_primary (model);
+  feed_first_transition (model);
+  feed_primary (model);
+  g_assert_cmpuint (fixture.callback_count, ==, 1u);
+  feed (model, GOODIX_ENROLLMENT_EVENT_COMMAND_34);
+  feed (model, GOODIX_ENROLLMENT_EVENT_ACK_34);
+  feed (model, GOODIX_ENROLLMENT_EVENT_COMMAND_36);
+  feed (model, GOODIX_ENROLLMENT_EVENT_ACK_36);
+  feed (model, GOODIX_ENROLLMENT_EVENT_IRQ0100);
+  feed (model, GOODIX_ENROLLMENT_EVENT_COMMAND_20);
+  feed (model, GOODIX_ENROLLMENT_EVENT_ACK_20);
+  feed (model, GOODIX_ENROLLMENT_EVENT_AUXILIARY_B0);
+  feed (model, GOODIX_ENROLLMENT_EVENT_COMMAND_34);
+  feed (model, GOODIX_ENROLLMENT_EVENT_ACK_34);
+  g_assert_cmpuint (fixture.callback_count, ==, 2u);
+  g_assert_cmpuint (audit.completed_stage_count, ==, 2u);
+  g_assert_false (goodix_enrollment_model_is_complete (model));
+  g_assert_cmpint (goodix_enrollment_model_get_expected_event (model), ==,
+                   GOODIX_ENROLLMENT_EVENT_IRQ0200);
+  feed (model, GOODIX_ENROLLMENT_EVENT_IRQ0200);
+  g_assert_true (goodix_enrollment_model_is_complete (model));
+  g_assert_true (
+    audit.configured_defer_terminal_stage_delivery_until_release_ready);
+  g_assert_false (audit.configured_defer_terminal_stage_delivery);
   goodix_enrollment_model_free (model);
 }
 
@@ -281,6 +323,8 @@ main (int argc, char **argv)
   g_test_init (&argc, &argv, NULL);
   g_test_add_func ("/d279-11/configurable-profiles",
                    test_configurable_profiles);
+  g_test_add_func ("/d279-57/terminal-release-ready-delivery",
+                   test_terminal_release_ready_delivery);
   g_test_add_func ("/d279-11/auxiliary-not-stage",
                    test_auxiliary_does_not_report_stage);
   g_test_add_func ("/d279-11/mismatch-terminal",

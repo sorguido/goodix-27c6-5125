@@ -64,6 +64,14 @@ direct Rockytkg code import. These are local downstream modifications:
 they do not change the historical origin, package license, copyright holders,
 or byte digests of the upstream Fedora source material recorded below.
 
+D279/57 further adds a bounded local enrollment-completion hold to
+`fp-image-device-private.h`, `fp-image-device.c`, `fpi-image-device.c` and
+`fpi-image-device.h`. It lets the Goodix driver expose the standard
+release-ready state for its final image while delaying only successful action
+completion until the target-local terminal finger-up event. This is a local
+state-machine adaptation, not an upstream Fedora or Rockytkg historical fact;
+the source-package identity and digests below remain unchanged.
+
 The Goodix-enabled D279/52 build links the separately ledgered Rockytkg R2
 preprocessor under `GPL-2.0-or-later`; that combined build is therefore
 distributed under GPL-compatible terms.  This local build policy does not

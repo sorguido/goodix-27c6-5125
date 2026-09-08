@@ -207,6 +207,32 @@ parse_irq (const GoodixA0Message *message,
   return TRUE;
 }
 
+static void
+record_a0_mismatch (GoodixEnrollmentPostTlsEvents *events,
+                    GoodixEnrollmentEvent          expected,
+                    const GoodixA0Message          *message)
+{
+  const guint8 *body;
+  gsize length;
+
+  events->audit->last_mismatch_expected_event = expected;
+  events->audit->last_mismatch_observed_control = message->control;
+  events->audit->last_mismatch_observed_irq_classified = FALSE;
+  events->audit->last_mismatch_observed_irq = 0u;
+  events->audit->last_mismatch_observed_irq_flags = 0u;
+  body = g_bytes_get_data (message->body, &length);
+  if (length == 16u &&
+      (message->control == 0x32 || message->control == 0x34 ||
+       message->control == 0x36))
+    {
+      events->audit->last_mismatch_observed_irq_classified = TRUE;
+      events->audit->last_mismatch_observed_irq = (guint16) (
+        (guint16) body[0] | ((guint16) body[1] << 8));
+      events->audit->last_mismatch_observed_irq_flags = (guint16) (
+        (guint16) body[2] | ((guint16) body[3] << 8));
+    }
+}
+
 gboolean
 goodix_enrollment_post_tls_events_handle_a0 (
   GoodixEnrollmentPostTlsEvents *events,
@@ -222,6 +248,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
   gsize body_length;
   guint8 echo = 0u;
   gboolean accepted = FALSE;
+  gboolean frame_matches_expected = FALSE;
 
   if (events == NULL || frame == NULL)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_ARGUMENT,
@@ -236,6 +263,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
       if (!parse_nav_no_check (frame))
         return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_FRAME,
                             "OEM NAV no-check frame mismatch", error);
+      frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, NULL, 0u, error);
       if (accepted)
@@ -259,6 +287,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
       if (message.control != 0xb0 || body_length != 2u ||
           body[0] != echo || body[1] != 0x01)
         goto out;
+      frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, NULL, 0u, error);
       if (accepted)
@@ -267,6 +296,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ2 &&
            parse_irq (&message, 0x32, 0x0002, 0x003f, &raw))
     {
+      frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, raw, 12u, error);
       if (accepted)
@@ -283,6 +313,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
            parse_irq (&message, 0x36, 0x0100, 0x0000, &raw))
     {
+      frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, NULL, 0u, error);
       if (accepted)
@@ -291,6 +322,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0200 &&
            parse_irq (&message, 0x34, 0x0200, 0x0000, &raw))
     {
+      frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, expected, NULL, 0u, raw, 12u, error);
       if (accepted)
@@ -306,6 +338,27 @@ goodix_enrollment_post_tls_events_handle_a0 (
     }
 
 out:
+  if (!accepted && !frame_matches_expected)
+    {
+      record_a0_mismatch (events, expected, &message);
+      if (error != NULL && *error == NULL)
+        {
+          if (events->audit->last_mismatch_observed_irq_classified)
+            g_set_error (
+              error, GOODIX_ENROLLMENT_POST_TLS_ERROR,
+              GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
+              "A0 mismatch: expected %s, observed control 0x%02x IRQ 0x%04x flags 0x%04x",
+              goodix_enrollment_event_name (expected), message.control,
+              events->audit->last_mismatch_observed_irq,
+              events->audit->last_mismatch_observed_irq_flags);
+          else
+            g_set_error (
+              error, GOODIX_ENROLLMENT_POST_TLS_ERROR,
+              GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
+              "A0 mismatch: expected %s, observed control 0x%02x (not classified as IRQ)",
+              goodix_enrollment_event_name (expected), message.control);
+        }
+    }
   goodix_a0_message_clear (&message);
   if (!accepted)
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,

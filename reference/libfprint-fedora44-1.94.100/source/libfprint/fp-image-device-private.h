@@ -33,6 +33,12 @@ typedef struct
   gint                enroll_stage;
 
   gboolean            minutiae_scan_active;
+  /* A driver may need the successful final enrollment result to remain
+   * active until a device-side release boundary has been observed. */
+  gboolean            enroll_completion_held;
+  /* Persists after release until action teardown so a late biometric failure
+   * cannot fall back to a retry after the final sensor acquisition. */
+  gboolean            enroll_terminal_sample_committed;
   GError             *action_error;
   FpImage            *capture_image;
 

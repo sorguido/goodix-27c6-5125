@@ -155,5 +155,7 @@ void fpi_image_device_report_finger_status (FpImageDevice *self,
                                             gboolean       present);
 void fpi_image_device_image_captured (FpImageDevice *self,
                                       FpImage       *image);
+void fpi_image_device_hold_enroll_completion (FpImageDevice *self);
+void fpi_image_device_release_enroll_completion (FpImageDevice *self);
 void fpi_image_device_retry_scan (FpImageDevice *self,
                                   FpDeviceRetry  retry);

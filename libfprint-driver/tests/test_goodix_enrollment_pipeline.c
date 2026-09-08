@@ -119,6 +119,7 @@ run_profile (guint stages)
   GoodixEnrollmentModelConfig config = {
     .required_stage_count = stages,
     .defer_terminal_stage_delivery = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
   GoodixEnrollmentPipelineAudit audit;
   Fixture fixture = { 0 };
@@ -131,16 +132,14 @@ run_profile (guint stages)
   for (guint stage = 1u; stage <= stages; stage++)
     {
       feed_primary (pipeline, stage, &fixture);
-      if (stage == stages)
-        {
-          g_assert_cmpuint (audit.fpimage_construct_count, ==, stages);
-          g_assert_cmpuint (audit.fpimage_delivery_count, ==, stages - 1u);
-          g_assert_cmpuint (audit.protocol.primary_b0_count, ==, stages);
-        }
+      g_assert_cmpuint (audit.fpimage_construct_count, ==, stage);
+      g_assert_cmpuint (audit.fpimage_delivery_count, ==, stage - 1u);
+      g_assert_cmpuint (audit.protocol.primary_b0_count, ==, stage);
       if (stage == 1u)
         feed_first_transition (pipeline);
       else
         feed_repeated_transition (pipeline, stage == stages);
+      g_assert_cmpuint (audit.fpimage_delivery_count, ==, stage);
     }
   g_assert_true (goodix_enrollment_pipeline_is_complete (pipeline));
   g_assert_false (goodix_enrollment_pipeline_is_failed (pipeline));
