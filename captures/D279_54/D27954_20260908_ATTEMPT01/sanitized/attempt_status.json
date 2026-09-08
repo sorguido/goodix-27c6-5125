@@ -1,0 +1,17 @@
+{
+    "schema":  "D279_54_ATTEMPT_STATUS_V1",
+    "attempt_id":  "D27954_20260908_ATTEMPT01",
+    "result":  "PASS_UI_CONFIRMED",
+    "failure_class":  "NONE",
+    "target_attached":  true,
+    "verification_started":  true,
+    "verification_completed":  true,
+    "verification_result":  "WINDOWS_UI_FINGERPRINT_SUCCESS",
+    "capture_started":  true,
+    "capture_stopped":  true,
+    "capture_sha256":  "6875b2d784d11cd4b3a8b68bd02af249f4b318883441a26068ef894767985c9b",
+    "automatic_retry_count":  0,
+    "rerun_classification":  "RESTORE_SNAPSHOT_REQUIRED_AFTER_OEM_IDENTIFY",
+    "export_before_snapshot_restore_raw":  "C:\\Users\\sorgu\\Documents\\goodix-27c6-5125-private\\captures\\D279_54\\D27954_20260908_ATTEMPT01\\raw",
+    "export_before_snapshot_restore_sanitized":  "C:\\Users\\sorgu\\Documents\\goodix-27c6-5125-private\\captures\\D279_54\\D27954_20260908_ATTEMPT01\\sanitized"
+}
