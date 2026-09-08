@@ -49,35 +49,82 @@
 void
 fpi_print_add_print (FpPrint *print, FpPrint *add)
 {
-  g_return_if_fail (print->type == FPI_PRINT_NBIS ||
-#ifdef GOODIX_LIBFPRINT_SIGFM
-                    print->type == FPI_PRINT_SIGFM
-#else
-                    FALSE
-#endif
-                    );
-  g_return_if_fail (add->type == print->type);
+  g_autoptr(GError) error = NULL;
 
-  g_assert (add->prints->len == 1);
+  if (!fpi_print_add_print_checked (print, add, &error))
+    fp_warn ("Could not append print sample: %s",
+             error != NULL ? error->message : "invalid print sample");
+}
+
+/**
+ * fpi_print_add_print_checked:
+ * @print: A template #FpPrint
+ * @add: A single-sample #FpPrint to append
+ * @error: Return location for an error
+ *
+ * Checked and atomic variant of fpi_print_add_print(). The destination is
+ * changed only after the sample has been copied successfully.
+ *
+ * Returns: %TRUE if one sample was appended
+ */
+gboolean
+fpi_print_add_print_checked (FpPrint  *print,
+                             FpPrint  *add,
+                             GError  **error)
+{
+  gpointer copy = NULL;
+
+  if (!FP_IS_PRINT (print) || !FP_IS_PRINT (add) ||
+      !(print->type == FPI_PRINT_NBIS ||
+#ifdef GOODIX_LIBFPRINT_SIGFM
+        print->type == FPI_PRINT_SIGFM
+#else
+        FALSE
+#endif
+        ) || add->type != print->type || print->prints == NULL ||
+      add->prints == NULL || add->prints->len != 1 ||
+      add->prints->pdata[0] == NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                           "Print append requires matching supported types and exactly one source sample");
+      return FALSE;
+    }
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  if (print->type == FPI_PRINT_SIGFM &&
+      print->prints->len >= GOODIX_SIGFM_MAX_PRINT_SAMPLES)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
+                           "SIGFM template already has the maximum sample count");
+      return FALSE;
+    }
+#endif
   if (print->type == FPI_PRINT_NBIS)
-    g_ptr_array_add (print->prints,
-                     g_memdup2 (add->prints->pdata[0],
-                                sizeof (struct xyt_struct)));
+    copy = g_memdup2 (add->prints->pdata[0], sizeof (struct xyt_struct));
 #ifdef GOODIX_LIBFPRINT_SIGFM
   else
     {
-      GoodixSigfmSample *copy = NULL;
+      GoodixSigfmSample *sigfm_copy = NULL;
       GoodixSigfmResult result;
 
-      result = goodix_sigfm_sample_copy (add->prints->pdata[0], &copy);
+      result = goodix_sigfm_sample_copy (add->prints->pdata[0], &sigfm_copy);
       if (result != GOODIX_SIGFM_OK)
         {
-          fp_warn ("Could not copy SIGFM print sample: %d", result);
-          return;
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                       "Could not copy SIGFM print sample: %d", result);
+          return FALSE;
         }
-      g_ptr_array_add (print->prints, copy);
+      copy = sigfm_copy;
     }
 #endif
+
+  if (copy == NULL)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
+                           "Could not allocate print sample copy");
+      return FALSE;
+    }
+  g_ptr_array_add (print->prints, copy);
+  return TRUE;
 }
 
 /**
@@ -219,12 +266,38 @@ fpi_print_add_from_image (FpPrint *print,
   struct fp_minutiae _minutiae;
   struct xyt_struct *xyt;
 
-  if (print->type != FPI_PRINT_NBIS || !image)
+  if (!image)
     {
       g_set_error (error,
                    G_IO_ERROR,
                    G_IO_ERROR_INVALID_DATA,
                    "Cannot add print data from image!");
+      return FALSE;
+    }
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  if (print->type == FPI_PRINT_SIGFM)
+    {
+      GoodixSigfmSample *sample = fpi_image_get_sigfm_sample (image);
+
+      if (sample == NULL)
+        {
+          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                               "No SIGFM sample found in image or not yet extracted");
+          return FALSE;
+        }
+      if (!fpi_print_add_sigfm_sample (print, sample, error))
+        return FALSE;
+      g_clear_object (&print->image);
+      print->image = g_object_ref (image);
+      g_object_notify (G_OBJECT (print), "image");
+      return TRUE;
+    }
+#endif
+  if (print->type != FPI_PRINT_NBIS)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                           "Cannot add print data from image");
       return FALSE;
     }
 
@@ -330,10 +403,17 @@ fpi_print_add_sigfm_sample (FpPrint                 *print,
   GoodixSigfmSample *copy = NULL;
   GoodixSigfmResult result;
 
-  if (!FP_IS_PRINT (print) || print->type != FPI_PRINT_SIGFM || !sample)
+  if (!FP_IS_PRINT (print) || print->type != FPI_PRINT_SIGFM || !sample ||
+      print->prints == NULL)
     {
       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
                            "Cannot add a SIGFM sample to this print");
+      return FALSE;
+    }
+  if (print->prints->len >= GOODIX_SIGFM_MAX_PRINT_SAMPLES)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
+                           "SIGFM template already has the maximum sample count");
       return FALSE;
     }
 
@@ -376,6 +456,7 @@ fpi_print_sigfm_match (FpPrint *print_template,
       return FPI_MATCH_ERROR;
     }
   if (!print_template->prints || print_template->prints->len == 0 ||
+      print_template->prints->len > GOODIX_SIGFM_MAX_PRINT_SAMPLES ||
       !print->prints || print->prints->len != 1 || score_threshold <= 0)
     {
       g_set_error_literal (error, FP_DEVICE_ERROR,

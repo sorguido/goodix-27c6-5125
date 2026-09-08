@@ -63,6 +63,8 @@ typedef struct
   guint fdt_delta_classification_count;
   guint fdt_delta_within_threshold_count;
   guint fdt_delta_outside_threshold_count;
+  guint baseline_b0_count;
+  guint baseline_decode_count;
   guint first_irq0002_count;
   guint first_image_command_count;
   guint first_image_b0_count;
@@ -163,6 +165,9 @@ const GError *goodix_post_tls_lifecycle_get_error (
   const GoodixPostTlsLifecycle *lifecycle);
 gboolean goodix_post_tls_lifecycle_needs_receive (
   const GoodixPostTlsLifecycle *lifecycle);
+gboolean goodix_post_tls_lifecycle_copy_baseline (
+  const GoodixPostTlsLifecycle *lifecycle,
+  uint16_t                      samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT]);
 
 G_END_DECLS
 

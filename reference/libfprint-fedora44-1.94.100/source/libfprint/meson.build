@@ -137,6 +137,10 @@ driver_sources = {
     'goodix_27c6_5125' : files(
         '../../../../libfprint-driver/goodix_u16_to_fpimage.c',
         '../../../../libfprint-driver/goodix_fpimage_pipeline.c',
+        '../../../../libfprint-driver/goodix_sigfm_preprocess.c',
+        '../../../../libfprint-driver/rockytkg-imgproc/goodix_imgproc.c',
+        '../../../../libfprint-driver/goodix_sigfm_metrics.cpp',
+        '../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp',
         '../../../../libfprint-driver/goodix_enrollment_model.c',
         '../../../../libfprint-driver/goodix_enrollment_pipeline.c',
         '../../../../libfprint-driver/goodix_enrollment_command_plan.c',
@@ -179,8 +183,18 @@ helper_sources = {
 
 drivers_sources = []
 drivers_cflags = []
+drivers_cppflags = []
+libfprint_goodix_cflags = []
+goodix_sigfm_deps = []
 if 'goodix_27c6_5125' in drivers
-    drivers_cflags += '-DGOODIX_LIBFPRINT_1_94_100_NBIS'
+    drivers_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
+    drivers_cppflags += '-DGOODIX_LIBFPRINT_SIGFM'
+    libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
+    goodix_sigfm_deps += dependency('opencv4', required: true)
+    goodix_sigfm_deps += declare_dependency(include_directories: [
+        include_directories('../../../../libfprint-driver'),
+        include_directories('../../../../Rockytkg/libfprint/libfprint/sigfm'),
+    ])
 endif
 foreach driver: drivers
     drivers_sources += driver_sources[driver]
@@ -246,6 +260,7 @@ deps = [
     gusb_dep,
     mathlib_dep,
 ] + optional_deps
+deps += goodix_sigfm_deps
 
 # These are empty and only exist so that the include directories are created
 # in the build tree. This silences a build time warning.
@@ -276,12 +291,14 @@ libfprint_private = static_library('fprint-private',
         libfprint_private_sources,
     ],
     dependencies: deps,
+    c_args: libfprint_goodix_cflags,
     link_with: libnbis,
     install: false)
 
 libfprint_drivers = static_library('fprint-drivers',
     sources: drivers_sources,
     c_args: drivers_cflags,
+    cpp_args: drivers_cppflags,
     dependencies: deps,
     link_with: libfprint_private,
     install: false)
@@ -305,6 +322,7 @@ libfprint = shared_library(versioned_libname.split('lib')[1],
     link_depends : mapfile,
     link_with: [libfprint_drivers, libfprint_private],
     dependencies: deps,
+    c_args: libfprint_goodix_cflags,
     install: true)
 
 libfprint_dep = declare_dependency(link_with: libfprint,

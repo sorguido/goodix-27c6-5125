@@ -104,6 +104,10 @@ struct _GoodixDeviceContext
 #endif
   gboolean                   runtime_handoff_views_cleared;
   gboolean                   usb_interface_claimed;
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  uint16_t                   sigfm_baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  gboolean                   sigfm_baseline_valid;
+#endif
 
   FpiImageDeviceState        last_framework_state;
 
@@ -355,6 +359,10 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  OPENSSL_cleanse (ctx->sigfm_baseline, sizeof ctx->sigfm_baseline);
+  ctx->sigfm_baseline_valid = FALSE;
+#endif
   ctx->runtime_handoff_views_cleared = TRUE;
   goodix_device_context_emit_arm_complete (ctx, NULL);
 }
@@ -691,6 +699,10 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  OPENSSL_cleanse (ctx->sigfm_baseline, sizeof ctx->sigfm_baseline);
+  ctx->sigfm_baseline_valid = FALSE;
+#endif
   if (ctx->runtime_material != NULL)
     {
 #ifdef GOODIX_ENABLE_TEST_SEAMS
@@ -1297,7 +1309,8 @@ goodix_fpimage_device_class_init (GoodixFpImageDeviceClass *klass)
   img_class->deactivate   = goodix_fpimage_device_deactivate;
   img_class->img_width    = (gint) GOODIX_CANONICAL_IMAGE_WIDTH;
   img_class->img_height   = (gint) GOODIX_CANONICAL_IMAGE_HEIGHT;
-#ifndef GOODIX_LIBFPRINT_1_94_100_NBIS
+#if defined(GOODIX_LIBFPRINT_SIGFM) || \
+    !defined(GOODIX_LIBFPRINT_1_94_100_NBIS)
   img_class->algorithm    = FPI_DEVICE_ALGO_SIGFM;
 #endif
 
@@ -1511,8 +1524,38 @@ context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
       goodix_fpimage_pipeline_free (pipeline);
       return TRUE;
     }
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  {
+    uint16_t baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+    GoodixFpImagePipeline *pipeline = NULL;
+    GoodixFpImagePipelineResult result;
+    FpImage *image;
+
+    if (!goodix_post_tls_lifecycle_copy_baseline (lifecycle, baseline))
+      {
+        g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                             "SIGFM capture has no session baseline");
+        return FALSE;
+      }
+    result = goodix_fpimage_pipeline_new_sigfm (
+      baseline, G_N_ELEMENTS (baseline), samples,
+      GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT, &pipeline);
+    OPENSSL_cleanse (baseline, sizeof baseline);
+    if (result != GOODIX_FPIMAGE_PIPELINE_OK)
+      {
+        g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                     "SIGFM FpImage pipeline failed with result %u", result);
+        return FALSE;
+      }
+    image = goodix_fpimage_pipeline_get_image (pipeline);
+    fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
+                                     g_object_ref (image));
+    goodix_fpimage_pipeline_free (pipeline);
+  }
+#else
   goodix_device_context_emit_image_ready (
     ctx, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+#endif
   if (ctx->terminal_fence)
     {
       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
@@ -1598,7 +1641,6 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
 {
   GoodixDeviceContext *ctx = user_data;
 
-  (void) pipeline;
   (void) stage_index;
   if (ctx->terminal_fence || image == NULL)
     {
@@ -1607,8 +1649,39 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
       return FALSE;
     }
   if (!ctx->operator_epoch)
-    fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
-                                     g_object_ref (image));
+    {
+#ifdef GOODIX_LIBFPRINT_SIGFM
+      GoodixFpImagePipeline *sigfm_pipeline = NULL;
+      GoodixFpImagePipelineResult result;
+      const uint16_t *samples;
+      size_t sample_count = 0u;
+
+      samples = goodix_enrollment_pipeline_get_pending_source_samples (
+        pipeline, &sample_count);
+      if (!ctx->sigfm_baseline_valid || samples == NULL)
+        {
+          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                               "SIGFM enrollment image lacks baseline or source raster");
+          return FALSE;
+        }
+      result = goodix_fpimage_pipeline_new_sigfm (
+        ctx->sigfm_baseline, G_N_ELEMENTS (ctx->sigfm_baseline),
+        samples, sample_count, &sigfm_pipeline);
+      if (result != GOODIX_FPIMAGE_PIPELINE_OK)
+        {
+          g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                       "SIGFM enrollment preprocessing failed: %u", result);
+          return FALSE;
+        }
+      fpi_image_device_image_captured (
+        FP_IMAGE_DEVICE (ctx->device),
+        g_object_ref (goodix_fpimage_pipeline_get_image (sigfm_pipeline)));
+      goodix_fpimage_pipeline_free (sigfm_pipeline);
+#else
+      fpi_image_device_image_captured (FP_IMAGE_DEVICE (ctx->device),
+                                       g_object_ref (image));
+#endif
+    }
   return !ctx->terminal_fence;
 }
 
@@ -1717,6 +1790,16 @@ context_enrollment_first_arm_handoff (GoodixPostTlsLifecycle *lifecycle,
                            "enrollment first-arm handoff preconditions failed");
       return FALSE;
     }
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  if (!goodix_post_tls_lifecycle_copy_baseline (
+        lifecycle, ctx->sigfm_baseline))
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                           "enrollment handoff has no decoded SIGFM baseline");
+      return FALSE;
+    }
+  ctx->sigfm_baseline_valid = TRUE;
+#endif
   binding = goodix_enrollment_fpi_usb_binding_new (
     ctx->pending_enrollment_events, backend, generation,
     ctx->enrollment_binding_audit, error);
@@ -2297,6 +2380,35 @@ goodix_device_context_emit_image_ready (GoodixDeviceContext *ctx,
 
   goodix_fpimage_pipeline_free (pipeline);
 }
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+void
+goodix_device_context_emit_sigfm_image_ready (GoodixDeviceContext *ctx,
+                                              const uint16_t      *baseline,
+                                              const uint16_t      *samples,
+                                              size_t               sample_count)
+{
+  GoodixFpImagePipeline *pipeline = NULL;
+  GoodixFpImagePipelineResult result;
+
+  g_return_if_fail (ctx != NULL);
+  if (goodix_device_context_is_stale_or_fenced (ctx))
+    return;
+  result = goodix_fpimage_pipeline_new_sigfm (
+    baseline, sample_count, samples, sample_count, &pipeline);
+  if (result != GOODIX_FPIMAGE_PIPELINE_OK)
+    {
+      emit_terminal (ctx, g_error_new (
+        FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
+        "Goodix SIGFM image pipeline failed: %d", result));
+      return;
+    }
+  fpi_image_device_image_captured (
+    FP_IMAGE_DEVICE (ctx->device),
+    g_object_ref (goodix_fpimage_pipeline_get_image (pipeline)));
+  goodix_fpimage_pipeline_free (pipeline);
+}
+#endif
 
 void
 goodix_device_context_emit_release_tail_complete (GoodixDeviceContext *ctx)

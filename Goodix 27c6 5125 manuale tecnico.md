@@ -73,7 +73,7 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_SIGFM_IMAGE_ACTION_AND_PRODUCTION_MESON_BINDING
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FPRINTD_STORAGE_AND_SIGFM_IDENTIFY_INTEROP_REVIEW
 ```
 
 Report e review machine-readable:
@@ -159,6 +159,65 @@ NBIS_REGRESSION_BUILD=PASS
 PRODUCTION_MESON_SIGFM_ENABLED=false
 LIVE_OR_USB_ACTION_COUNT=0
 NEXT_PRIMARY_BOUNDARY=OFFLINE_SIGFM_IMAGE_ACTION_AND_PRODUCTION_MESON_BINDING
+```
+
+### Stato D279/52 — SIGFM nella vera action FpImageDevice e build production
+
+D279/52 collega il percorso SIGFM al core Fedora 44/libfprint 1.94.100 senza
+sostituirne la state machine. Il driver registrato seleziona SIGFM; la prima
+B0 autenticata del bootstrap FDT viene ora reassemblata e decodificata come
+baseline di sessione, e ogni raster primario passa dalla trasformazione R2
+D279/49 prima dell'extraction asincrona Rockytkg/OpenCV. Baseline e raster u16
+transienti sono cancellati nel teardown dei rispettivi owner.
+
+Il difetto di error propagation evidenziato in review è chiuso con
+`fpi_print_add_print_checked()`: il sample viene copiato prima della mutazione
+del template e l'errore SIGFM attraversa il call-flow. Lo stage enrollment è
+incrementato soltanto dopo l'append riuscito; un copy failure lascia template
+e stage invariati e termina l'action prima di qualunque progress callback.
+La compatibilità della vecchia API `void` resta come wrapper con warning, ma
+la vera action usa esclusivamente la variante checked.
+
+Il grafo Meson Goodix abilita `GOODIX_LIBFPRINT_SIGFM`, compila il componente
+R2 GPL, il wrapper D279/50 e il `sigfm.cpp` preservato, e richiede OpenCV4. La
+closure production-shaped usa gli RPM Fedora 44 già hash-pinned, estratti in
+`/tmp` senza installazione o rete. Il test azione attraversa il vero
+`FpImageDevice` per 21 stage su un raster deterministico non biometrico,
+verifica un template finale SIGFM con 21 sample e il registry standard con una
+sola entry `27c6:5125`. La suite core separata prova build production, source
+closure reale, extraction, match e round-trip FP3; la suite con test double
+inietta anche il copy failure e passa normale più ASan/UBSan.
+
+Questa è closure host-only. Non sono stati eseguiti USB, live, fprintd,
+installazione di sistema o lettura di secret/capture. La soglia numerica
+ereditata nel campo `bz3_threshold` è soltanto plumbing del dispatch SIGFM:
+D279/48 resta single-session/same-finger e non prova FAR/FRR,
+different-finger separation o una soglia production. Il ramo identify è
+compilato e il matcher core è testato, ma il driver production continua ad
+ammettere soltanto la prima action enrollment; interoperabilità fprintd,
+persistenza e vera action identify restano il successivo confine offline.
+
+La provenance della reference Fedora è stata aggiornata senza modificare
+retroattivamente origine, licenza, copyright o digest dello snapshot upstream.
+Le modifiche D279/51–52 sono esplicitamente un delta downstream; il combined
+build Goodix che collega R2 GPL richiede distribuzione GPL-compatible, mentre
+le licenze per-file preesistenti restano distinte.
+
+```text
+D279_52_OUTCOME=READY
+D279_52_ADVANCEMENT=REAL_SIGFM_FPIMAGE_ACTION_AND_PRODUCTION_MESON_BOUNDARY_CLOSED_OFFLINE
+D279_52_EXECUTABLE_CLOSURE=PASS_HOST_ONLY_REAL_SIGFM_21_STAGE_ACTION
+PRODUCTION_MESON_SIGFM_ENABLED=true
+STANDARD_DRIVER_REGISTRY=PASS_EXACT_27C6_5125
+ENROLL_STAGE_ADVANCES_ONLY_AFTER_APPEND=true
+SIGFM_APPEND_FAILURE_ATOMIC=true
+SIGFM_BASELINE_AND_SOURCE_TEARDOWN_CLEANSE=true
+SIGFM_THRESHOLD_PRODUCTION_VALIDATED=false
+FPRINTD_STORAGE_INTEROP_VALIDATED=false
+PRODUCTION_IDENTIFY_ACTION_ENABLED=false
+LIVE_OR_USB_ACTION_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_FPRINTD_STORAGE_AND_SIGFM_IDENTIFY_INTEROP_REVIEW
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

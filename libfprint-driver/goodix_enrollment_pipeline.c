@@ -221,3 +221,13 @@ goodix_enrollment_pipeline_is_failed (
   return pipeline == NULL || pipeline->failed ||
          goodix_enrollment_model_is_failed (pipeline->model);
 }
+
+const uint16_t *
+goodix_enrollment_pipeline_get_pending_source_samples (
+  const GoodixEnrollmentPipeline *pipeline,
+  size_t                         *sample_count)
+{
+  return pipeline != NULL ?
+    goodix_fpimage_pipeline_get_source_samples (pipeline->pending_image,
+                                                 sample_count) : NULL;
+}

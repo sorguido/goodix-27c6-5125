@@ -64,6 +64,9 @@ fp_image_finalize (GObject *object)
   g_clear_pointer (&self->data, g_free);
   g_clear_pointer (&self->binarized, g_free);
   g_clear_pointer (&self->minutiae, g_ptr_array_unref);
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  g_clear_pointer (&self->sigfm_sample, goodix_sigfm_sample_free);
+#endif
 
   G_OBJECT_CLASS (fp_image_parent_class)->finalize (object);
 }
@@ -180,6 +183,49 @@ fp_image_detect_minutiae_free (DetectMinutiaeNbisData *data)
 }
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC (DetectMinutiaeNbisData, fp_image_detect_minutiae_free)
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+static void
+fp_image_detect_sigfm_thread_func (GTask        *task,
+                                   gpointer      source_object,
+                                   gpointer      task_data,
+                                   GCancellable *cancellable)
+{
+  g_autoptr(GTask) thread_task = g_steal_pointer (&task);
+  FpImage *self = FP_IMAGE (source_object);
+  GoodixSigfmSample *sample = NULL;
+  GoodixSigfmResult result;
+  gint keypoints = 0;
+
+  (void) task_data;
+  (void) cancellable;
+  if (g_task_return_error_if_cancelled (thread_task))
+    return;
+  if (self->flags != FPI_IMAGE_NONE)
+    {
+      g_task_return_new_error (thread_task, G_IO_ERROR,
+                               G_IO_ERROR_INVALID_DATA,
+                               "SIGFM requires a normalized image");
+      return;
+    }
+  result = goodix_sigfm_extract_pixels (self->data,
+                                        self->width * self->height,
+                                        &sample, &keypoints);
+  if (result != GOODIX_SIGFM_OK)
+    {
+      g_task_return_new_error (thread_task, G_IO_ERROR, G_IO_ERROR_FAILED,
+                               "SIGFM extraction failed: %d", result);
+      return;
+    }
+  if (g_task_return_error_if_cancelled (thread_task))
+    {
+      goodix_sigfm_sample_free (sample);
+      return;
+    }
+  g_task_return_pointer (thread_task, sample,
+                         (GDestroyNotify) goodix_sigfm_sample_free);
+}
+#endif
 
 
 static gboolean
@@ -521,6 +567,56 @@ fp_image_detect_minutiae_finish (FpImage      *self,
 
   return fp_image_detect_minutiae_nbis_finish (self, task, error);
 }
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+void
+fp_image_detect_sigfm (FpImage            *self,
+                       GCancellable       *cancellable,
+                       GAsyncReadyCallback callback,
+                       gpointer            user_data)
+{
+  g_autoptr(GTask) task = NULL;
+
+  g_return_if_fail (FP_IS_IMAGE (self));
+  g_return_if_fail (callback != NULL);
+  task = g_task_new (self, cancellable, callback, user_data);
+  g_task_set_source_tag (task, fp_image_detect_sigfm);
+  g_task_set_check_cancellable (task, TRUE);
+  if (!g_atomic_int_compare_and_exchange (&self->detection_in_progress,
+                                          FALSE, TRUE))
+    {
+      g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_ADDRESS_IN_USE,
+                               "Image feature detection is already in progress");
+      return;
+    }
+  g_task_run_in_thread (g_steal_pointer (&task),
+                        fp_image_detect_sigfm_thread_func);
+}
+
+gboolean
+fp_image_detect_sigfm_finish (FpImage      *self,
+                              GAsyncResult *result,
+                              GError      **error)
+{
+  GoodixSigfmSample *sample;
+  gboolean changed;
+
+  g_return_val_if_fail (FP_IS_IMAGE (self), FALSE);
+  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
+  g_return_val_if_fail (g_task_get_source_tag (G_TASK (result)) ==
+                        fp_image_detect_sigfm, FALSE);
+  changed = g_atomic_int_compare_and_exchange (&self->detection_in_progress,
+                                               TRUE, FALSE);
+  g_assert (changed);
+  sample = g_task_propagate_pointer (G_TASK (result), error);
+  if (sample == NULL)
+    return FALSE;
+  g_clear_pointer (&self->sigfm_sample, goodix_sigfm_sample_free);
+  self->sigfm_sample = sample;
+  return TRUE;
+}
+
+#endif
 
 /**
  * fp_minutia_get_coords:

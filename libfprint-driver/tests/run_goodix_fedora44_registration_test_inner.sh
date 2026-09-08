@@ -1,5 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: LGPL-2.1-or-later
+# Historical D279/03 inner runner retained for provenance only.  The supported
+# outer entrypoint delegates to the D279/52 SIGFM production closure.
 set -eu
 
 if [ "$#" -ne 3 ]; then

@@ -8,6 +8,7 @@ enum SigfmTestMode
   SIGFM_TEST_EXTRACT_NULL,
   SIGFM_TEST_EXTRACT_THROW,
   SIGFM_TEST_MATCH_THROW,
+  SIGFM_TEST_COPY_THROW,
 };
 
 #ifdef __cplusplus

@@ -152,3 +152,12 @@ fpi_image_resize (FpImage *orig_img,
   return g_object_ref (orig_img);
 #endif
 }
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+GoodixSigfmSample *
+fpi_image_get_sigfm_sample (FpImage *self)
+{
+  g_return_val_if_fail (FP_IS_IMAGE (self), NULL);
+  return self->sigfm_sample;
+}
+#endif

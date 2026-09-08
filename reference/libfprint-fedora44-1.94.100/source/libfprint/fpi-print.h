@@ -1,5 +1,7 @@
 #pragma once
 
+#define GOODIX_SIGFM_MAX_PRINT_SAMPLES 21u
+
 #include "fpi-enums.h"
 #include "fp-device.h"
 #include "fp-print.h"
@@ -34,6 +36,9 @@ typedef enum {
 
 void     fpi_print_add_print (FpPrint *print,
                               FpPrint *add);
+gboolean fpi_print_add_print_checked (FpPrint  *print,
+                                      FpPrint  *add,
+                                      GError  **error);
 
 void     fpi_print_set_type (FpPrint     *print,
                              FpiPrintType type);

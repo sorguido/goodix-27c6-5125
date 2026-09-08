@@ -21,6 +21,9 @@
 #pragma once
 
 #include "fp-image.h"
+#ifdef GOODIX_LIBFPRINT_SIGFM
+#include "goodix_sigfm_metrics.h"
+#endif
 
 /**
  * FpiImageFlags:
@@ -70,6 +73,10 @@ struct _FpImage
 
   GPtrArray *minutiae;
 
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  GoodixSigfmSample *sigfm_sample;
+#endif
+
   gboolean   detection_in_progress;
 };
 
@@ -82,3 +89,14 @@ gint fpi_mean_sq_diff_norm (const guint8 *buf1,
 FpImage *fpi_image_resize (FpImage *orig,
                            guint    w_factor,
                            guint    h_factor);
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+void fp_image_detect_sigfm (FpImage            *self,
+                            GCancellable       *cancellable,
+                            GAsyncReadyCallback callback,
+                            gpointer            user_data);
+gboolean fp_image_detect_sigfm_finish (FpImage      *self,
+                                       GAsyncResult *result,
+                                       GError      **error);
+GoodixSigfmSample *fpi_image_get_sigfm_sample (FpImage *self);
+#endif

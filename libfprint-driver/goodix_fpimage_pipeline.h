@@ -42,9 +42,22 @@ goodix_fpimage_pipeline_new (const uint16_t          *samples,
                              size_t                   sample_count,
                              GoodixFpImagePipeline **pipeline_out);
 
+/* Build an FpImage containing the exact D279/49 R2 raster for SIGFM. */
+GoodixFpImagePipelineResult
+goodix_fpimage_pipeline_new_sigfm (const uint16_t          *baseline,
+                                   size_t                   baseline_count,
+                                   const uint16_t          *samples,
+                                   size_t                   sample_count,
+                                   GoodixFpImagePipeline **pipeline_out);
+
 /* Transfer none: the image remains owned by the opaque pipeline object. */
 FpImage *
 goodix_fpimage_pipeline_get_image (GoodixFpImagePipeline *pipeline);
+
+/* Transfer none; valid for the pipeline lifetime. */
+const uint16_t *goodix_fpimage_pipeline_get_source_samples (
+  const GoodixFpImagePipeline *pipeline,
+  size_t                      *sample_count);
 
 GoodixFpImagePhysicalPpmmState
 goodix_fpimage_pipeline_get_physical_ppmm_state (

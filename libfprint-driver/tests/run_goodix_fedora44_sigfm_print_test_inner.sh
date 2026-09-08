@@ -17,9 +17,22 @@ objects="$build_root/objects"
 test_binary="$build_root/test-goodix-fedora44-sigfm-print"
 
 export PKG_CONFIG_PATH=$pkgconfig_dir
+
+grep -F 'fp_image_detect_sigfm (' \
+  "$source_root/libfprint/fpi-image-device.c" >/dev/null
+grep -F 'fpi_image_device_add_enroll_sample_checked (' \
+  "$source_root/libfprint/fpi-image-device.c" >/dev/null
+if grep -F 'fpi_print_add_print (enroll_print, print)' \
+     "$source_root/libfprint/fpi-image-device.c" >/dev/null; then
+  echo "unchecked enrollment append remains in FpImageDevice" >&2
+  exit 1
+fi
+grep -F 'img_class->algorithm    = FPI_DEVICE_ALGO_SIGFM' \
+  "$repo_root/libfprint-driver/goodix_fpimage_device.c" >/dev/null
+echo D279_52_SIGFM_ACTION_DISPATCH_SOURCE_AUDIT=PASS
 mkdir -p "$objects"
 meson setup "$meson_build" "$source_root" \
-  -Ddrivers=goodix_27c6_5125 \
+  -Ddrivers=virtual_image \
   -Dintrospection=true \
   -Ddoc=false \
   -Dinstalled-tests=false \
@@ -76,4 +89,6 @@ fi
 echo D279_51_FEDORA44_SIGFM_PRINT_CORE=PASS
 echo D279_51_FP3_STRICT_MULTI_SAMPLE=PASS
 echo D279_51_CORRUPTION_AND_SAMPLE_BOUNDS=PASS
+echo D279_52_CHECKED_APPEND_ATOMIC=PASS
+echo D279_52_ENROLL_STAGE_STABLE_ON_COPY_FAILURE=PASS
 echo D279_51_REAL_USB_ACCESS=0

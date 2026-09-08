@@ -26,7 +26,6 @@
 
 #ifdef GOODIX_LIBFPRINT_SIGFM
 #include "goodix_sigfm_metrics.h"
-#define GOODIX_SIGFM_MAX_PRINT_SAMPLES 21u
 #endif
 
 /**

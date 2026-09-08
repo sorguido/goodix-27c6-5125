@@ -20,7 +20,13 @@
 #pragma once
 
 #include "fpi-device.h"
+#include "fpi-print.h"
 #include "fp-image-device.h"
+
+typedef enum {
+  FPI_DEVICE_ALGO_NBIS = FPI_PRINT_NBIS,
+  FPI_DEVICE_ALGO_SIGFM = FPI_PRINT_SIGFM,
+} FpiImageDeviceAlgorithm;
 
 /**
  * FpiImageDeviceState:
@@ -105,6 +111,7 @@ struct _FpImageDeviceClass
   FpDeviceClass parent_class;
 
   gint          bz3_threshold;
+  FpiImageDeviceAlgorithm algorithm;
   gint          img_width;
   gint          img_height;
 
@@ -115,6 +122,19 @@ struct _FpImageDeviceClass
                                  FpiImageDeviceState state);
   void          (*deactivate)   (FpImageDevice *dev);
 };
+
+static inline gboolean
+fpi_image_device_add_enroll_sample_checked (FpPrint  *enroll_print,
+                                            FpPrint  *sample_print,
+                                            gint     *enroll_stage,
+                                            GError  **error)
+{
+  g_return_val_if_fail (enroll_stage != NULL, FALSE);
+  if (!fpi_print_add_print_checked (enroll_print, sample_print, error))
+    return FALSE;
+  *enroll_stage += 1;
+  return TRUE;
+}
 
 void fpi_image_device_set_bz3_threshold (FpImageDevice *self,
                                          gint           bz3_threshold);

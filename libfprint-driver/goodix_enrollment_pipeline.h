@@ -53,6 +53,9 @@ gboolean goodix_enrollment_pipeline_is_complete (
   const GoodixEnrollmentPipeline *pipeline);
 gboolean goodix_enrollment_pipeline_is_failed (
   const GoodixEnrollmentPipeline *pipeline);
+const uint16_t *goodix_enrollment_pipeline_get_pending_source_samples (
+  const GoodixEnrollmentPipeline *pipeline,
+  size_t                         *sample_count);
 
 G_END_DECLS
 

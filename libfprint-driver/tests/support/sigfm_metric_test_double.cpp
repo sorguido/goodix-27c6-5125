@@ -72,6 +72,8 @@ sigfm_match_score (SigfmImgInfo *, SigfmImgInfo *)
 extern "C" SigfmImgInfo *
 sigfm_copy_info (SigfmImgInfo *info)
 {
+  if (mode == SIGFM_TEST_COPY_THROW)
+    throw std::runtime_error ("synthetic copy exception");
   if (info == nullptr)
     return nullptr;
   auto *copy = new SigfmImgInfo { *info };

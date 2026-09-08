@@ -308,12 +308,13 @@ test_utils = static_library('fprint-test-utils',
     dependencies: libfprint_private_dep,
     install: false)
 
-if 'goodix_27c6_5125' in drivers and cairo_dep.found()
-    goodix_nbis_action = executable('test-goodix-fpimage-nbis-action',
+if 'goodix_27c6_5125' in drivers
+    goodix_sigfm_action = executable('test-goodix-fpimage-sigfm-action',
         sources: '../../../../libfprint-driver/tests/test_goodix_fedora44_nbis_action.c',
-        dependencies: [libfprint_private_dep, cairo_dep],
-        c_args: common_cflags,
+        dependencies: libfprint_private_dep,
+        c_args: common_cflags + libfprint_goodix_cflags,
         link_with: libfprint_drivers,
+        link_args: ['-Wl,--allow-shlib-undefined'],
         install: false,
     )
 

@@ -295,6 +295,12 @@ void goodix_device_context_emit_finger_down          (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_image_ready          (GoodixDeviceContext *ctx,
                                                       const uint16_t      *samples,
                                                       size_t               sample_count);
+#ifdef GOODIX_LIBFPRINT_SIGFM
+void goodix_device_context_emit_sigfm_image_ready    (GoodixDeviceContext *ctx,
+                                                      const uint16_t      *baseline,
+                                                      const uint16_t      *samples,
+                                                      size_t               sample_count);
+#endif
 void goodix_device_context_emit_release_tail_complete (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_finger_up_ready      (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_cancelled            (GoodixDeviceContext *ctx);

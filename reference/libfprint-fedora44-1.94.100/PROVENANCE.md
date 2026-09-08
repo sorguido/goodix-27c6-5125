@@ -48,6 +48,23 @@ Starting with D279/04 the same source map also compiles the repository-owned
 LGPL binder, protected-material loader and inert runtime-input providers; no
 additional upstream file is replaced.
 
+Starting with D279/51, the working tree is also a documented forward-port of
+the Rockytkg SIGFM print semantics onto Fedora's newer libfprint 1.94.100
+core.  The local delta modifies `source/libfprint/fp-print.c`,
+`source/libfprint/fpi-print.c` and `source/libfprint/fpi-print.h`; D279/52 adds
+the bounded image/action integration in `fp-image.c`, `fp-image-device.c`,
+`fpi-image-device.c` and their directly related private headers, plus the
+Meson source/dependency selection.  These are local downstream modifications:
+they do not change the historical origin, package license, copyright holders,
+or byte digests of the upstream Fedora source material recorded below.
+
+The Goodix-enabled D279/52 build links the separately ledgered Rockytkg R2
+preprocessor under `GPL-2.0-or-later`; that combined build is therefore
+distributed under GPL-compatible terms.  This local build policy does not
+retroactively relicense the untouched upstream libfprint snapshot.  Per-file
+origins and adaptations remain recorded in
+`docs/LICENSING_AND_PROVENANCE.md`.
+
 Purpose:
 
 This tree is the production integration reference for the Goodix 27c6:5125

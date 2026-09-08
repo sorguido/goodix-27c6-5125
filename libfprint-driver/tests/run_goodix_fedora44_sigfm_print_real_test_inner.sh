@@ -17,6 +17,16 @@ meson setup "$meson_build" "$source_root" \
   -Dinstalled-tests=false -Dudev_rules=disabled -Dudev_hwdb=disabled
 ninja -C "$meson_build" --quiet libfprint/libfprint-2.so.2.0.0
 
+compile_db="$meson_build/compile_commands.json"
+grep -F -- '-DGOODIX_LIBFPRINT_SIGFM' "$compile_db" >/dev/null
+grep -F 'goodix_sigfm_preprocess.c' "$compile_db" >/dev/null
+grep -F 'rockytkg-imgproc/goodix_imgproc.c' "$compile_db" >/dev/null
+grep -F 'goodix_sigfm_metrics.cpp' "$compile_db" >/dev/null
+grep -F 'Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp' "$compile_db" >/dev/null
+readelf -d "$meson_build/libfprint/libfprint-2.so.2.0.0" | \
+  grep -F 'libopencv_features2d.so.413' >/dev/null
+echo D279_52_PRODUCTION_MESON_SIGFM_SOURCE_CLOSURE=PASS
+
 includes="-I$source_root -I$source_root/libfprint -I$source_root/libfprint/nbis/include -I$source_root/libfprint/nbis/libfprint-include -I$meson_build -I$meson_build/libfprint -I$repo_root/libfprint-driver -I$repo_root/libfprint-driver/tests -I$repo_root/Rockytkg/libfprint/libfprint/sigfm -I$opencv_prefix/usr/include/opencv4"
 cflags="-std=c11 -O2 -g -fPIC -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wno-unused-parameter -Wno-sign-compare -DGOODIX_LIBFPRINT_SIGFM"
 cxxflags="-std=c++17 -O2 -g -fPIC -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wconversion -Wshadow -Wold-style-cast"

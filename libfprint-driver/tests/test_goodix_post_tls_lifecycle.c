@@ -537,7 +537,7 @@ run_full_trace (Fixture *fixture,
           ack = build_ack (0x20);
           feed_frame (fixture, ack, fragmentation);
           goodix_post_tls_lifecycle_handle_plaintext (fixture->lifecycle,
-                                                       auxiliary);
+                                                       image);
         }
     }
 
@@ -632,6 +632,8 @@ assert_full_audit (Fixture *fixture)
   g_assert_cmpuint (fixture->audit.fdt_delta_classification_count, ==, 2u);
   g_assert_cmpuint (fixture->audit.fdt_delta_within_threshold_count, ==, 2u);
   g_assert_cmpuint (fixture->audit.fdt_delta_outside_threshold_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.baseline_b0_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.baseline_decode_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.first_irq0002_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.first_image_b0_count, ==, 1u);
   g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 1u);

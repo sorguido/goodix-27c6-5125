@@ -52,6 +52,8 @@ struct _GoodixPostTlsLifecycle
   guint8 fdt_threshold;
   gboolean fdt_threshold_valid;
   gboolean fdt_delta_classified;
+  uint16_t baseline_samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  gboolean baseline_valid;
   GByteArray *plaintext_pending;
 };
 
@@ -506,6 +508,9 @@ goodix_post_tls_lifecycle_free (GoodixPostTlsLifecycle *lifecycle)
   memset (lifecycle->first_up_table, 0, sizeof lifecycle->first_up_table);
   memset (lifecycle->fresh_down_table, 0, sizeof lifecycle->fresh_down_table);
   memset (lifecycle->fdt_raw, 0, sizeof lifecycle->fdt_raw);
+  for (gsize i = 0; i < sizeof lifecycle->baseline_samples; i++)
+    ((volatile guint8 *) lifecycle->baseline_samples)[i] = 0;
+  lifecycle->baseline_valid = FALSE;
   clear_byte_array (lifecycle->plaintext_pending);
   g_byte_array_unref (lifecycle->plaintext_pending);
   g_free (lifecycle);
@@ -897,15 +902,6 @@ goodix_post_tls_lifecycle_handle_plaintext (GoodixPostTlsLifecycle *lifecycle,
       lifecycle->phase == GOODIX_POST_TLS_PHASE_TERMINAL ||
       lifecycle->phase == GOODIX_POST_TLS_PHASE_STOP)
     return;
-  if (lifecycle->phase == GOODIX_POST_TLS_PHASE_FDT_B0)
-    {
-      lifecycle->phase = GOODIX_POST_TLS_PHASE_FDT36_3;
-      submit_or_fail (lifecycle,
-                      submit_fdt36 (lifecycle,
-                                    GOODIX_POST_TLS_PHASE_FDT36_3, &error),
-                      &error);
-      return;
-    }
   if (lifecycle->phase == GOODIX_POST_TLS_PHASE_RELEASE_B0)
     {
       if (lifecycle->audit != NULL)
@@ -919,7 +915,8 @@ goodix_post_tls_lifecycle_handle_plaintext (GoodixPostTlsLifecycle *lifecycle,
                                      &error), &error);
       return;
     }
-  if (lifecycle->phase != GOODIX_POST_TLS_PHASE_FIRST_B0 &&
+  if (lifecycle->phase != GOODIX_POST_TLS_PHASE_FDT_B0 &&
+      lifecycle->phase != GOODIX_POST_TLS_PHASE_FIRST_B0 &&
       lifecycle->phase != GOODIX_POST_TLS_PHASE_SECOND_B0)
     {
       lifecycle_fail_literal (lifecycle, GOODIX_POST_TLS_ERROR_PROTOCOL,
@@ -968,6 +965,22 @@ goodix_post_tls_lifecycle_handle_plaintext (GoodixPostTlsLifecycle *lifecycle,
       return;
     }
   clear_byte_array (lifecycle->plaintext_pending);
+  if (lifecycle->phase == GOODIX_POST_TLS_PHASE_FDT_B0)
+    {
+      memcpy (lifecycle->baseline_samples, samples, sizeof samples);
+      lifecycle->baseline_valid = TRUE;
+      if (lifecycle->audit != NULL)
+        {
+          lifecycle->audit->baseline_b0_count++;
+          lifecycle->audit->baseline_decode_count++;
+        }
+      lifecycle->phase = GOODIX_POST_TLS_PHASE_FDT36_3;
+      submit_or_fail (lifecycle,
+                      submit_fdt36 (lifecycle,
+                                    GOODIX_POST_TLS_PHASE_FDT36_3, &error),
+                      &error);
+      return;
+    }
   if (lifecycle->phase == GOODIX_POST_TLS_PHASE_FIRST_B0)
     {
       guint8 body34[14] = { 0x0a, 0x01 };
@@ -1127,4 +1140,16 @@ goodix_post_tls_lifecycle_needs_receive (
          lifecycle->phase != GOODIX_POST_TLS_PHASE_NOT_STARTED &&
          lifecycle->phase != GOODIX_POST_TLS_PHASE_STOP &&
          lifecycle->phase != GOODIX_POST_TLS_PHASE_TERMINAL;
+}
+
+gboolean
+goodix_post_tls_lifecycle_copy_baseline (
+  const GoodixPostTlsLifecycle *lifecycle,
+  uint16_t                      samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT])
+{
+  if (lifecycle == NULL || samples == NULL || !lifecycle->baseline_valid)
+    return FALSE;
+  memcpy (samples, lifecycle->baseline_samples,
+          sizeof lifecycle->baseline_samples);
+  return TRUE;
 }

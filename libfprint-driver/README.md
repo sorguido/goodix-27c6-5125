@@ -1,15 +1,14 @@
 <!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
 # libfprint driver boundary
 
-This directory contains the bounded upstream-facing image adapter and is
-reserved for future driver/glue under `LGPL-2.1-or-later`.
-GPL-only implementation expression, including GPL-only Rockytkg code, must not
-cross this boundary without a valid compatible alternative license or a
-genuinely independent implementation from specifications, tests and evidence.
-A specific Rockytkg file already validly licensed LGPL-2.1-or-later may be
-evaluated for this domain only after per-file provenance and rights/third-party
-review, preservation of notices/SPDX, and confirmation of compatibility with
-upstream libfprint.
+This directory contains the upstream-facing driver and image integration.
+Existing LGPL files retain `LGPL-2.1-or-later`; licensing remains per-file.
+The current Goodix-enabled production build also links the separately
+ledgered GPL Rockytkg R2 component, so distribution of that combined build
+must use GPL-compatible terms while preserving every original notice and
+grant. Direct reuse still requires per-file provenance, rights/third-party
+review and compatible destination terms; it does not retroactively relicense
+the preserved upstream libfprint sources.
 
 ## D269/01 bounded image adapter
 
@@ -54,11 +53,12 @@ registered USB subclass has the single exact ID `27c6:5125`, reuses the same
 SIGFM selector only under the target-specific NBIS build definition. No
 physical `ppmm` is assigned.
 
-`tests/run_goodix_fedora44_registration_test.sh` performs the offline
-production-shaped build and checks the generated registry, linked type symbol,
-USB ID listing and zero-reachability of USB enumeration in the listing tool.
-It does not install libfprint, contact fprintd or access a USB device. A fully
-operational fprintd open/claim/secret lifecycle remains a later boundary.
+The original D279/03 runner was NBIS-only. Its outer compatibility entrypoint
+now delegates to the D279/52 production-shaped SIGFM action closure, which
+checks the generated registry and exact USB ID listing in addition to the
+action path. It requires the pinned Fedora OpenCV RPM directory and does not
+install libfprint, contact fprintd or access a USB device. The old inner runner
+is retained only as historical provenance.
 
 ## D279/04 inert runtime-input providers
 
@@ -388,6 +388,43 @@ closure from a directory containing those RPMs.
 
 This is the inner sample format only. D279/51 must forward-port its multi-sample
 container into libfprint 1.94.100 FP3 serialization and verify/identify paths.
+
+## D279/51 Fedora 44 SIGFM print core
+
+The Fedora 44/libfprint 1.94.100 fork now has a private `FPI_PRINT_SIGFM`
+type with 1..21 owned samples, single-sample probes, SIGFM score dispatch and
+strict FP3 `(a(ay))` storage. Every stored `ay` is the bounded D279/50 `GSF1`
+envelope; copy, equality and deserialization stay behind the exception-safe C
+wrapper. Builds without SIGFM reject the type rather than treating it as raw.
+
+The focused double suite passes normal and ASan/UBSan paths. A separate
+closure links the authentic preserved Rockytkg `sigfm.cpp` with the pinned
+Fedora OpenCV RPMs and proves extraction, match and byte-identical FP3
+round-trip on a deterministic non-biometric raster. It does not validate a
+production threshold or target biometric accuracy.
+
+## D279/52 SIGFM image action and production Meson binding
+
+The registered Goodix class now selects SIGFM in the real `FpImageDevice`
+action path. The initial authenticated FDT B0 is decoded and retained only for
+the session; each primary 80x64 u16 raster is transformed by the exact R2
+pipeline before asynchronous SIGFM extraction. Baseline and source rasters are
+cleansed at owner teardown.
+
+Template append is checked and atomic. If copying the new SIGFM sample fails,
+the destination is unchanged and enrollment completes with an error before
+the progress callback; the stage counter cannot advance. The focused suite
+injects that failure and passes normal plus ASan/UBSan.
+
+The production Meson graph compiles the R2 component, the real Rockytkg SIGFM
+source and OpenCV4. The compatibility-named
+`tests/run_goodix_fedora44_nbis_action_test.sh` is now the D279/52 SIGFM action
+runner: given the pinned OpenCV RPM directory, it builds the production graph,
+checks the standard registry, and executes 21 real SIGFM enrollment stages on
+a deterministic non-biometric raster with zero USB access. The historical
+filename avoids unnecessary test reorganization; its markers identify D279/52.
+The default score threshold remains plumbing only and is not a FAR/FRR or
+different-finger validation.
 
 ## D272/01 historical ephemeral SIGFM metric seam
 

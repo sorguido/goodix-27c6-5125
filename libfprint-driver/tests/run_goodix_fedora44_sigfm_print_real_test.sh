@@ -38,6 +38,8 @@ cp "$host_gusb" "$pkgconfig_dir/libgusb.so.2"
 sed -e "s|@PREFIX@|$pkgconfig_dir|g" \
     -e "s|@INCLUDEDIR@|$script_dir/support/d279|g" \
     "$script_dir/support/d279/gusb.pc.in" >"$pkgconfig_dir/gusb.pc"
+sed -e "s|@PREFIX@|$opencv_prefix/usr|g" \
+    "$script_dir/support/d279/opencv4.pc.in" >"$pkgconfig_dir/opencv4.pc"
 
 flatpak run --user --unshare=network \
   --filesystem="$repo_root":ro --filesystem="$build_root" \
@@ -69,5 +71,7 @@ LD_LIBRARY_PATH="$meson_build/libfprint:$runtime:$pkgconfig_dir" \
   G_DEBUG=fatal-warnings "$build_root/test-real"
 echo D279_51_REAL_ROCKY_SIGFM_SOURCE=PASS
 echo D279_51_REAL_SIGFM_PRINT_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+echo D279_52_PRODUCTION_MESON_SIGFM_ENABLED=true
+echo D279_52_IMAGE_ACTION_SIGFM_COMPILED=true
 echo REAL_USB_ACCESS_COUNT=0
 echo LIVE_EXECUTION_PERFORMED=false

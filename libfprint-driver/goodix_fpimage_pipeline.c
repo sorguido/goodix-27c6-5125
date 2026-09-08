@@ -2,6 +2,9 @@
 #include "goodix_fpimage_pipeline.h"
 
 #include "goodix_u16_to_fpimage.h"
+#ifdef GOODIX_LIBFPRINT_SIGFM
+#include "goodix_sigfm_preprocess.h"
+#endif
 
 #include <fpi-image.h>
 #include <glib-object.h>
@@ -9,8 +12,19 @@
 struct _GoodixFpImagePipeline
 {
   FpImage                           *image;
+  uint16_t                          *source_samples;
   GoodixFpImagePhysicalPpmmState     physical_ppmm_state;
 };
+
+static void
+secure_clear (void *data,
+              size_t size)
+{
+  volatile guint8 *cursor = data;
+
+  while (size-- > 0)
+    *cursor++ = 0;
+}
 
 static GoodixFpImagePipelineResult
 map_adapter_result (GoodixU16ToFpImageResult result)
@@ -57,6 +71,15 @@ goodix_fpimage_pipeline_new (const uint16_t          *samples,
       g_free (pipeline);
       return GOODIX_FPIMAGE_PIPELINE_ALLOCATION_FAILED;
     }
+  pipeline->source_samples = g_try_malloc (
+    GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT * sizeof (uint16_t));
+  if (pipeline->source_samples == NULL)
+    {
+      g_free (pipeline);
+      return GOODIX_FPIMAGE_PIPELINE_ALLOCATION_FAILED;
+    }
+  memcpy (pipeline->source_samples, samples,
+          GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT * sizeof (uint16_t));
 
   adapter_result = goodix_u16_to_fpimage (
     samples,
@@ -96,6 +119,54 @@ goodix_fpimage_pipeline_new (const uint16_t          *samples,
   return GOODIX_FPIMAGE_PIPELINE_OK;
 }
 
+#ifdef GOODIX_LIBFPRINT_SIGFM
+GoodixFpImagePipelineResult
+goodix_fpimage_pipeline_new_sigfm (const uint16_t          *baseline,
+                                   size_t                   baseline_count,
+                                   const uint16_t          *samples,
+                                   size_t                   sample_count,
+                                   GoodixFpImagePipeline **pipeline_out)
+{
+  GoodixFpImagePipeline *pipeline;
+  GoodixSigfmPreprocessResult preprocess_result;
+
+  if (baseline == NULL || samples == NULL || pipeline_out == NULL ||
+      *pipeline_out != NULL)
+    return GOODIX_FPIMAGE_PIPELINE_INVALID_ARGUMENT;
+  if (baseline_count != GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT ||
+      sample_count != GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT)
+    return GOODIX_FPIMAGE_PIPELINE_INVALID_SAMPLE_COUNT;
+  pipeline = g_try_new0 (GoodixFpImagePipeline, 1);
+  if (pipeline == NULL)
+    return GOODIX_FPIMAGE_PIPELINE_ALLOCATION_FAILED;
+  pipeline->source_samples = g_try_malloc (
+    GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT * sizeof (uint16_t));
+  pipeline->image = fp_image_new ((gint) GOODIX_CANONICAL_IMAGE_WIDTH,
+                                  (gint) GOODIX_CANONICAL_IMAGE_HEIGHT);
+  if (pipeline->source_samples == NULL || pipeline->image == NULL)
+    {
+      goodix_fpimage_pipeline_free (pipeline);
+      return GOODIX_FPIMAGE_PIPELINE_ALLOCATION_FAILED;
+    }
+  memcpy (pipeline->source_samples, samples,
+          GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT * sizeof (uint16_t));
+  preprocess_result = goodix_sigfm_preprocess_r2 (
+    baseline, baseline_count, samples, sample_count, pipeline->image->data,
+    GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+  if (preprocess_result != GOODIX_SIGFM_PREPROCESS_OK)
+    {
+      goodix_fpimage_pipeline_free (pipeline);
+      return preprocess_result == GOODIX_SIGFM_PREPROCESS_SAMPLE_OUT_OF_RANGE ?
+        GOODIX_FPIMAGE_PIPELINE_SAMPLE_OUT_OF_RANGE :
+        GOODIX_FPIMAGE_PIPELINE_CONTRACT_VIOLATION;
+    }
+  pipeline->image->flags = FPI_IMAGE_NONE;
+  pipeline->physical_ppmm_state = GOODIX_FPIMAGE_PHYSICAL_PPMM_UNKNOWN;
+  *pipeline_out = pipeline;
+  return GOODIX_FPIMAGE_PIPELINE_OK;
+}
+#endif
+
 FpImage *
 goodix_fpimage_pipeline_get_image (GoodixFpImagePipeline *pipeline)
 {
@@ -103,6 +174,17 @@ goodix_fpimage_pipeline_get_image (GoodixFpImagePipeline *pipeline)
     return NULL;
 
   return pipeline->image;
+}
+
+const uint16_t *
+goodix_fpimage_pipeline_get_source_samples (
+  const GoodixFpImagePipeline *pipeline,
+  size_t                      *sample_count)
+{
+  if (sample_count != NULL)
+    *sample_count = pipeline != NULL && pipeline->source_samples != NULL ?
+      GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT : 0u;
+  return pipeline != NULL ? pipeline->source_samples : NULL;
 }
 
 GoodixFpImagePhysicalPpmmState
@@ -145,5 +227,11 @@ goodix_fpimage_pipeline_free (GoodixFpImagePipeline *pipeline)
     return;
 
   g_clear_object (&pipeline->image);
+  if (pipeline->source_samples != NULL)
+    {
+      secure_clear (pipeline->source_samples,
+                    GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT * sizeof (uint16_t));
+      g_free (pipeline->source_samples);
+    }
   g_free (pipeline);
 }

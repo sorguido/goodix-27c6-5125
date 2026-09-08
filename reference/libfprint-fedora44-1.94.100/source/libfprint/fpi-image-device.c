@@ -22,6 +22,7 @@
 
 #include "fp-image-device-private.h"
 #include "fp-image-device.h"
+#include "fpi-image.h"
 
 /**
  * SECTION: fpi-image-device
@@ -253,7 +254,17 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
   priv = fp_image_device_get_instance_private (FP_IMAGE_DEVICE (device));
   priv->minutiae_scan_active = FALSE;
 
-  if (!fp_image_detect_minutiae_finish (image, res, &error))
+  if (
+#ifdef GOODIX_LIBFPRINT_SIGFM
+      (priv->algorithm == FPI_PRINT_SIGFM &&
+       !fp_image_detect_sigfm_finish (image, res, &error)) ||
+      (priv->algorithm != FPI_PRINT_SIGFM &&
+#endif
+       !fp_image_detect_minutiae_finish (image, res, &error)
+#ifdef GOODIX_LIBFPRINT_SIGFM
+      )
+#endif
+      )
     {
       /* Cancel operation . */
       if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
@@ -282,7 +293,7 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
   if (!error)
     {
       print = fp_print_new (device);
-      fpi_print_set_type (print, FPI_PRINT_NBIS);
+      fpi_print_set_type (print, priv->algorithm);
       if (!fpi_print_add_from_image (print, image, &error))
         {
           g_clear_object (&print);
@@ -304,8 +315,15 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
 
       if (print)
         {
-          fpi_print_add_print (enroll_print, print);
-          priv->enroll_stage += 1;
+          if (!fpi_image_device_add_enroll_sample_checked (
+                enroll_print, print, &priv->enroll_stage, &error))
+            {
+              g_clear_object (&print);
+              fp_image_device_maybe_complete_action (
+                self, g_steal_pointer (&error));
+              fpi_image_device_deactivate (self, TRUE);
+              return;
+            }
         }
 
       fpi_device_enroll_progress (device, priv->enroll_stage,
@@ -333,7 +351,17 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
         {
           FpPrint *template = g_ptr_array_index (templates, i);
 
-          if (fpi_print_bz3_match (template, print, priv->bz3_threshold, &error) == FPI_MATCH_SUCCESS)
+          FpiMatchResult match_result;
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+          if (priv->algorithm == FPI_PRINT_SIGFM)
+            match_result = fpi_print_sigfm_match (
+              template, print, priv->bz3_threshold, &error);
+          else
+#endif
+            match_result = fpi_print_bz3_match (
+              template, print, priv->bz3_threshold, &error);
+          if (match_result == FPI_MATCH_SUCCESS)
             {
               result = template;
               break;
@@ -483,12 +511,19 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
 
   priv->minutiae_scan_active = TRUE;
 
-  /* XXX: We also detect minutiae in capture mode, we solely do this
-   *      to normalize the image which will happen as a by-product. */
-  fp_image_detect_minutiae (image,
-                            fpi_device_get_cancellable (FP_DEVICE (self)),
-                            fpi_image_device_minutiae_detected,
-                            self);
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  if (priv->algorithm == FPI_PRINT_SIGFM)
+    fp_image_detect_sigfm (image,
+                           fpi_device_get_cancellable (FP_DEVICE (self)),
+                           fpi_image_device_minutiae_detected, self);
+  else
+#endif
+    {
+      /* Capture mode also uses NBIS normalization as a by-product. */
+      fp_image_detect_minutiae (image,
+                                fpi_device_get_cancellable (FP_DEVICE (self)),
+                                fpi_image_device_minutiae_detected, self);
+    }
 
   /* XXX: This is wrong if we add support for raw capture mode. */
   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);

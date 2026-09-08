@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "fp-print-private.h"
 #include "fpi-print.h"
+#include "fpi-image-device.h"
 #include "goodix_sigfm_metrics.h"
 #include "support/sigfm_metric_test_double.h"
 
@@ -59,7 +60,8 @@ test_multi_sample_roundtrip_and_match (void)
   g_assert_no_error (error);
   g_assert_true (fpi_print_add_sigfm_sample (copy_source, second, &error));
   g_assert_no_error (error);
-  fpi_print_add_print (template, copy_source);
+  g_assert_true (fpi_print_add_print_checked (template, copy_source, &error));
+  g_assert_no_error (error);
   g_assert_cmpuint (template->prints->len, ==, 2);
   g_assert_true (fpi_print_add_sigfm_sample (probe, probe_sample, &error));
   g_assert_no_error (error);
@@ -98,6 +100,48 @@ test_multi_sample_roundtrip_and_match (void)
   goodix_sigfm_sample_free (first);
   goodix_sigfm_sample_free (second);
   goodix_sigfm_sample_free (probe_sample);
+}
+
+static void
+test_checked_append_is_atomic_on_copy_failure (void)
+{
+  g_autoptr(FpPrint) template = new_sigfm_print ();
+  g_autoptr(FpPrint) source = new_sigfm_print ();
+  GoodixSigfmSample *sample = new_sample (6);
+  g_autoptr(GError) error = NULL;
+
+  g_assert_true (fpi_print_add_sigfm_sample (source, sample, &error));
+  g_assert_no_error (error);
+  g_assert_cmpuint (template->prints->len, ==, 0);
+
+  sigfm_test_set_mode (SIGFM_TEST_COPY_THROW);
+  g_assert_false (fpi_print_add_print_checked (template, source, &error));
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_cmpuint (template->prints->len, ==, 0);
+  sigfm_test_set_mode (SIGFM_TEST_OK);
+
+  goodix_sigfm_sample_free (sample);
+}
+
+static void
+test_enroll_stage_does_not_advance_on_copy_failure (void)
+{
+  g_autoptr(FpPrint) template = new_sigfm_print ();
+  g_autoptr(FpPrint) source = new_sigfm_print ();
+  GoodixSigfmSample *sample = new_sample (7);
+  g_autoptr(GError) error = NULL;
+  gint enroll_stage = 3;
+
+  g_assert_true (fpi_print_add_sigfm_sample (source, sample, &error));
+  g_assert_no_error (error);
+  sigfm_test_set_mode (SIGFM_TEST_COPY_THROW);
+  g_assert_false (fpi_image_device_add_enroll_sample_checked (
+                    template, source, &enroll_stage, &error));
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_FAILED);
+  g_assert_cmpint (enroll_stage, ==, 3);
+  g_assert_cmpuint (template->prints->len, ==, 0);
+  sigfm_test_set_mode (SIGFM_TEST_OK);
+  goodix_sigfm_sample_free (sample);
 }
 
 static void
@@ -145,11 +189,19 @@ test_sample_count_bounds (void)
   g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
   g_clear_error (&error);
 
-  for (guint i = 0; i < 22; i++)
+  for (guint i = 0; i < GOODIX_SIGFM_MAX_PRINT_SAMPLES; i++)
     g_assert_true (fpi_print_add_sigfm_sample (oversized, sample, &error));
-  g_assert_false (fp_print_serialize (oversized, &serialized,
-                                     &serialized_size, &error));
-  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
+  g_assert_cmpuint (oversized->prints->len, ==,
+                    GOODIX_SIGFM_MAX_PRINT_SAMPLES);
+  g_assert_false (fpi_print_add_sigfm_sample (oversized, sample, &error));
+  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE);
+  g_assert_cmpuint (oversized->prints->len, ==,
+                    GOODIX_SIGFM_MAX_PRINT_SAMPLES);
+  g_clear_error (&error);
+  g_assert_true (fp_print_serialize (oversized, &serialized,
+                                    &serialized_size, &error));
+  g_assert_no_error (error);
+  g_clear_pointer (&serialized, g_free);
 
   goodix_sigfm_sample_free (sample);
 }
@@ -166,5 +218,9 @@ main (int argc, char **argv)
                    test_corrupt_payload_rejected);
   g_test_add_func ("/goodix/sigfm-print/sample-count-bounds",
                    test_sample_count_bounds);
+  g_test_add_func ("/goodix/sigfm-print/checked-append-atomic-failure",
+                   test_checked_append_is_atomic_on_copy_failure);
+  g_test_add_func ("/goodix/sigfm-print/enroll-stage-stable-on-copy-failure",
+                   test_enroll_stage_does_not_advance_on_copy_failure);
   return g_test_run ();
 }
