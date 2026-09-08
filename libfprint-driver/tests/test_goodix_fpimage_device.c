@@ -2330,7 +2330,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
       else
         {
           g_autoptr(GBytes) irq0100 = d279_24_build_event (
-            0x36, 0x0100, 0x0000, (guint16) (0x80u + stage * 8u));
+            0x36, 0x0100, 0x003f, (guint16) (0x80u + stage * 8u));
           g_autoptr(GBytes) irq0200 = d279_24_build_event (
             0x34, 0x0200, 0x0000, (guint16) (0x40u + stage * 8u));
 

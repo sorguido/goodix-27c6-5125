@@ -311,7 +311,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
         }
     }
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
-           parse_irq (&message, 0x36, 0x0100, 0x0000, &raw))
+           parse_irq (&message, 0x36, 0x0100, 0x003f, &raw))
     {
       frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (

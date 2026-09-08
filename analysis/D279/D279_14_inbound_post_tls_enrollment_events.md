@@ -9,7 +9,7 @@ Il binding è guidato dall'evento atteso e accetta soltanto:
 
 - ACK B0 con echo esatto e status `0x01`;
 - IRQ2 come control `0x32`, IRQ `0x0002`, flags `0x003f`;
-- IRQ0100 come control `0x36`, IRQ `0x0100`, flags zero;
+- IRQ0100 come control `0x36`, IRQ `0x0100`, flags `0x003f`;
 - IRQ0200 come control `0x34`, IRQ `0x0200`, flags zero;
 - NAV con la forma OEM no-check target-observed 2417/2410, control esatto
   `0x50`, prefisso body `0x50 0x01` e marker finale `0x88`.

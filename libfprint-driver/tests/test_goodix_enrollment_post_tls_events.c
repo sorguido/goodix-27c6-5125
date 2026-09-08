@@ -355,7 +355,7 @@ run_profile (guint stages)
       else
         {
           command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_36, 0x36);
-          handle_irq (events, 0x36, 0x0100, 0x0000,
+          handle_irq (events, 0x36, 0x0100, 0x003f,
                       irq2_raw[stage - 1u]);
           command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_20, 0x20);
           handle_auxiliary (events);
