@@ -81,6 +81,27 @@ Report e review machine-readable:
 `analysis/D279/D279_48_post_run_sigfm_pivot.md` e
 `analysis/D279/D279_48_authentic_aggregate_review.json`.
 
+### Stato D279/49 — preprocessing Rockytkg R2 production isolato
+
+D279/49 promuove gli stadi algoritmici di `goodix_imgproc.c` a componente
+production puro `GPL-2.0-or-later`, registrato `ADAPTED_FROM_ROCKY`. Il delta
+elimina `goodix_dev`, ambiente e dump/file I/O, preservando baseline signed
++2048, flatfield r=12, percentile 1/99 e unsharp SIGFM 0,8/1,5. Il wrapper
+80×64 valida entrambi i raster u16/12-bit prima di mutare l'output.
+
+Il KAT R2 D279/48 è byte-identico (`2ff834cd...153b3`) e l'audit dei simboli
+sensor-reaching/I/O passa. Nessun USB/live o secret è stato raggiunto. ASan/
+UBSan passa offline nell'SDK Freedesktop 25.08 già installato (LeakSanitizer
+disabilitato per il boundary ptrace del sandbox); non sono state installate
+dipendenze. Questo slice non collega ancora action o storage.
+
+```text
+D279_49_OUTCOME=READY
+D279_49_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
+PRODUCTION_PREPROCESSOR=ROCKYTKG_R2_MINIMALLY_ADAPTED
+NEXT_PRIMARY_BOUNDARY=OFFLINE_REAL_SIGFM_SAMPLE_OWNERSHIP_COPY_SERIALIZE_DESERIALIZE_MATCH
+```
+
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
 
 **Integrazione offline del 4 settembre 2026.** Su autorizzazione esplicita

@@ -342,6 +342,27 @@ configure the enrollment graph. The host action uses the historical SIGFM
 test double; the Fedora 44 build compiles the same driver with native NBIS but
 does not execute biometric extraction, so target NBIS quality remains unknown.
 
+## D279/49 production SIGFM preprocessing boundary
+
+`goodix_sigfm_preprocess.[ch]` fixes the authenticated D279/48 R2 chain for
+the canonical 80×64 u16/12-bit frame plus a session-local baseline. The
+algorithm implementation under `rockytkg-imgproc/` is a GPL-2.0-or-later
+minimal adaptation of the preserved Rockytkg source: its image stages remain,
+while the complete `goodix_dev`, environment overrides and debug/file dump
+surface are absent. No USB, TLS, secret or persistence API is reachable.
+
+`tests/run_goodix_sigfm_preprocess_test.sh` validates argument/range failure
+before output mutation, audits forbidden symbols, and reproduces the exact
+D279/48 R2 KAT digest
+`2ff834cdef0316b3280d86a46fa75881c50bff3f4240e03dc31c24f6fc4153b3`.
+The host sanitizer lane reports an explicit environment block when `libasan`
+is absent. The same ASan/UBSan suite passes offline in the already installed
+Freedesktop SDK 25.08 (LeakSanitizer disabled at the sandbox ptrace boundary).
+
+This slice does not yet bind preprocessing to the libfprint action or persist
+SIGFM templates. The next boundary connects the baseline-aware output to real
+SIGFM extraction and establishes strict sample ownership/storage.
+
 ## D272/01 ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
