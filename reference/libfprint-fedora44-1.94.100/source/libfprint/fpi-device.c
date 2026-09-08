@@ -2271,6 +2271,9 @@ fpi_device_identify_report (FpDevice *device,
   else
     {
       if (match && print && fpi_print_get_type (print) != FPI_PRINT_NBIS &&
+#ifdef GOODIX_LIBFPRINT_SIGFM
+          fpi_print_get_type (print) != FPI_PRINT_SIGFM &&
+#endif
           !g_ptr_array_find_with_equal_func (data->gallery, print,
                                              (GEqualFunc) fp_print_equal, NULL))
         {

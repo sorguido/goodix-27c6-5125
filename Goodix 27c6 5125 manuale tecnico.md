@@ -73,7 +73,7 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_FPRINTD_STORAGE_AND_SIGFM_IDENTIFY_INTEROP_REVIEW
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_IDENTIFY_PROTOCOL_AND_SAFETY_DESIGN_REVIEW
 ```
 
 Report e review machine-readable:
@@ -218,6 +218,57 @@ PRODUCTION_IDENTIFY_ACTION_ENABLED=false
 LIVE_OR_USB_ACTION_COUNT=0
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_FPRINTD_STORAGE_AND_SIGFM_IDENTIFY_INTEROP_REVIEW
+```
+
+### Stato D279/53 — storage pubblico, identify SIGFM e ABI fprintd
+
+D279/53 chiude offline il confine di interoperabilità host successivo. Il
+template SIGFM prodotto dalla vera action enrollment a 21 stage attraversa
+le API pubbliche `fp_print_serialize()` e `fp_print_deserialize()` e conserva
+uguaglianza canonica, compatibilità device e metadati FP3. Il print
+deserializzato viene quindi usato come gallery in una vera
+`fp_device_identify()`: un probe SIGFM estratto dallo stesso raster strutturato
+non biometrico viene riconosciuto e restituisce sia il match della gallery sia
+il scanned print SIGFM a un campione.
+
+Il primo test ha esposto un gap reale del forward-port: con score SIGFM
+`1026/40`, `fpi_device_identify_report()` di libfprint 1.94.100 scartava lo
+scanned print perché applicava l'uguaglianza byte-per-byte a tutti i tipi salvo
+NBIS. Tale uguaglianza non rappresenta la semantica di un probe matcher-backed
+rispetto a un template multi-sample. Il corrective locale esenta anche
+`FPI_PRINT_SIGFM`, mantenendo invariata la validazione per i tipi che devono
+essere byte-identici. Il tree Rockytkg 1.94.5 non contiene questa validazione
+più recente: il delta in `fpi-device.c` è quindi un adattamento downstream del
+core Fedora 1.94.100, non riuso diretto di espressione Rockytkg.
+
+L'audit statico del daemon installato identifica esattamente
+`fprintd-1.94.5-5.fc44.x86_64`: `/usr/libexec/fprintd` richiede il SONAME
+`libfprint-2.so.2` e 47 simboli `LIBFPRINT_2.0.0`, tutti esportati dalla nuova
+build production-shaped. Sono verificati esplicitamente anche serialize,
+deserialize, identify e identify-finish. Il daemon non è stato avviato e non
+sono state provate policy on-disk, D-Bus, SELinux o persistenza reale.
+
+La production USB allowlist resta intenzionalmente enrollment-only: l'action
+host-only prova l'integrazione del core, ma `goodix_fpimage_device_activate()`
+continua a rifiutare ogni action production diversa da `ENROLL`. Non sono
+stati raggiunti USB, hardware, secret o capture; non è stata installata alcuna
+dipendenza. La soglia resta non validata biometricamente.
+
+```text
+D279_53_OUTCOME=READY
+D279_53_ADVANCEMENT=PUBLIC_FP3_AND_TRUE_SIGFM_IDENTIFY_ACTION_CLOSED_OFFLINE
+D279_53_EXECUTABLE_CLOSURE=PASS_HOST_ONLY_WITH_EXACT_INSTALLED_FPRINTD_ABI_AUDIT
+PUBLIC_FP3_STORAGE_ROUNDTRIP=PASS
+TRUE_SIGFM_IDENTIFY_ACTION=PASS
+FPRINTD_PACKAGE=fprintd-1.94.5-5.fc44.x86_64
+FPRINTD_LIBFPRINT_REQUIRED_SYMBOL_COUNT=47
+FPRINTD_LIBFPRINT_ABI_CLOSURE=PASS
+FPRINTD_EXECUTION_COUNT=0
+PRODUCTION_IDENTIFY_ACTION_ENABLED=false
+SIGFM_THRESHOLD_PRODUCTION_VALIDATED=false
+LIVE_OR_USB_ACTION_COUNT=0
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_IDENTIFY_PROTOCOL_AND_SAFETY_DESIGN_REVIEW
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

@@ -32,6 +32,8 @@ typedef struct
   guint                progress_count;
   GError              *error;
   FpPrint             *enroll_print;
+  FpPrint             *identify_match;
+  FpPrint             *identify_print;
 } SigfmFixture;
 
 static gboolean
@@ -137,6 +139,21 @@ enroll_cb (FpDevice     *device,
 }
 
 static void
+identify_cb (FpDevice     *device,
+             GAsyncResult *result,
+             gpointer      user_data)
+{
+  SigfmFixture *fixture = user_data;
+
+  fixture->success = fp_device_identify_finish (
+    device, result, &fixture->identify_match, &fixture->identify_print,
+    &fixture->error);
+  fixture->completion_count++;
+  fixture->done = TRUE;
+  g_main_loop_quit (fixture->loop);
+}
+
+static void
 progress_cb (FpDevice *device,
              gint      completed_stages,
              FpPrint  *print,
@@ -179,6 +196,14 @@ test_true_sigfm_21_stage_action (void)
   uint16_t baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   g_autoptr(FpPrint) template = NULL;
+  g_autoptr(FpPrint) restored = NULL;
+  g_autoptr(GPtrArray) gallery = NULL;
+  g_autoptr(GVariant) stored_blob = NULL;
+  g_autofree guchar *serialized = NULL;
+  const guchar *stored_bytes;
+  gsize serialized_size = 0u;
+  gsize stored_size = 0u;
+  GDate *enroll_date;
   SigfmFixture fixture = { 0 };
 
   fill_structured_sigfm_samples (samples);
@@ -207,6 +232,12 @@ test_true_sigfm_21_stage_action (void)
   fixture.success = FALSE;
   fixture.completion_count = 0u;
   template = fp_print_new (FP_DEVICE (fixture.device));
+  fp_print_set_finger (template, FP_FINGER_RIGHT_INDEX);
+  fp_print_set_username (template, "d279-53-offline");
+  fp_print_set_description (template, "D279/53 synthetic SIGFM");
+  enroll_date = g_date_new_dmy (8u, G_DATE_SEPTEMBER, 2026u);
+  fp_print_set_enroll_date (template, enroll_date);
+  g_date_free (enroll_date);
   fp_device_enroll (FP_DEVICE (fixture.device),
                     g_steal_pointer (&template), NULL,
                     progress_cb, &fixture, NULL,
@@ -257,6 +288,63 @@ test_true_sigfm_21_stage_action (void)
   g_assert_cmpint (goodix_device_context_get_state (fixture.ctx), ==,
                    GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
 
+  g_assert_true (fp_print_serialize (fixture.enroll_print, &serialized,
+                                    &serialized_size, &fixture.error));
+  g_assert_no_error (fixture.error);
+  stored_blob = g_variant_ref_sink (g_variant_new_fixed_array (
+    G_VARIANT_TYPE_BYTE, serialized, serialized_size, 1u));
+  stored_bytes = g_variant_get_fixed_array (stored_blob, &stored_size, 1u);
+  g_assert_cmpuint (stored_size, ==, serialized_size);
+  restored = fp_print_deserialize (stored_bytes, stored_size, &fixture.error);
+  g_assert_no_error (fixture.error);
+  g_assert_nonnull (restored);
+  g_assert_true (fp_print_equal (fixture.enroll_print, restored));
+  g_assert_true (fp_print_compatible (restored,
+                                     FP_DEVICE (fixture.device)));
+  g_assert_cmpint (fp_print_get_finger (restored), ==,
+                   FP_FINGER_RIGHT_INDEX);
+  g_assert_cmpstr (fp_print_get_username (restored), ==,
+                   "d279-53-offline");
+  g_assert_cmpstr (fp_print_get_description (restored), ==,
+                   "D279/53 synthetic SIGFM");
+  g_assert_nonnull (fp_print_get_enroll_date (restored));
+  g_assert_cmpuint (g_date_get_day (fp_print_get_enroll_date (restored)), ==,
+                    8u);
+  g_assert_cmpint (g_date_get_month (fp_print_get_enroll_date (restored)), ==,
+                   G_DATE_SEPTEMBER);
+  g_assert_cmpuint (g_date_get_year (fp_print_get_enroll_date (restored)), ==,
+                    2026u);
+
+  gallery = g_ptr_array_new_with_free_func (g_object_unref);
+  g_ptr_array_add (gallery, g_object_ref (restored));
+  fixture.done = FALSE;
+  fixture.success = FALSE;
+  fixture.completion_count = 0u;
+  fp_device_identify (FP_DEVICE (fixture.device), gallery, NULL,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) identify_cb, &fixture);
+  g_assert_cmpint (goodix_device_context_get_state (fixture.ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING);
+  goodix_device_context_emit_arm_complete (fixture.ctx, NULL);
+  g_assert_cmpint (fixture.last_state, ==,
+                   FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
+  goodix_device_context_emit_finger_down (fixture.ctx);
+  g_assert_cmpint (fixture.last_state, ==, FPI_IMAGE_DEVICE_STATE_CAPTURE);
+  goodix_device_context_emit_sigfm_image_ready (
+    fixture.ctx, baseline, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+  goodix_device_context_emit_release_tail_complete (fixture.ctx);
+  goodix_device_context_emit_finger_up_ready (fixture.ctx);
+  wait_until (&fixture, &fixture.done);
+  g_assert_no_error (fixture.error);
+  g_assert_true (fixture.success);
+  g_assert_cmpuint (fixture.completion_count, ==, 1u);
+  g_assert_nonnull (fixture.identify_match);
+  g_assert_nonnull (fixture.identify_print);
+  g_assert_true (fp_print_equal (restored, fixture.identify_match));
+  g_assert_cmpint (fpi_print_get_type (fixture.identify_print), ==,
+                   FPI_PRINT_SIGFM);
+  g_assert_cmpuint (fixture.identify_print->prints->len, ==, 1u);
+
   fixture.done = FALSE;
   fixture.success = FALSE;
   fixture.completion_count = 0u;
@@ -271,6 +359,11 @@ test_true_sigfm_21_stage_action (void)
   g_print ("D279_52_SIGFM_PROGRESS_COUNT=%u\n", fixture.progress_count);
   g_print ("D279_52_R2_PREPROCESSING_IN_ACTION=true\n");
   g_print ("D279_52_PRODUCTION_USB_REACHED=false\n");
+  g_print ("D279_53_PUBLIC_FP3_STORAGE_ROUNDTRIP=PASS\n");
+  g_print ("D279_53_TRUE_SIGFM_IDENTIFY_ACTION=PASS\n");
+  g_print ("D279_53_PRODUCTION_IDENTIFY_ACTION_ENABLED=false\n");
+  g_clear_object (&fixture.identify_match);
+  g_clear_object (&fixture.identify_print);
   g_clear_object (&fixture.enroll_print);
   g_clear_error (&fixture.error);
   g_clear_object (&fixture.device);

@@ -54,7 +54,13 @@ core.  The local delta modifies `source/libfprint/fp-print.c`,
 `source/libfprint/fpi-print.c` and `source/libfprint/fpi-print.h`; D279/52 adds
 the bounded image/action integration in `fp-image.c`, `fp-image-device.c`,
 `fpi-image-device.c` and their directly related private headers, plus the
-Meson source/dependency selection.  These are local downstream modifications:
+Meson source/dependency selection. D279/53 additionally changes
+`source/libfprint/fpi-device.c` so the newer 1.94.100 identify-report
+validation treats SIGFM like the existing matcher-backed NBIS type instead of
+requiring byte equality between a single-sample probe and a multi-sample
+gallery template. Rockytkg's older libfprint tree does not contain that newer
+validation, so this is a local adaptation of the Fedora core rather than a
+direct Rockytkg code import. These are local downstream modifications:
 they do not change the historical origin, package license, copyright holders,
 or byte digests of the upstream Fedora source material recorded below.
 

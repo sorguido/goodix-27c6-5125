@@ -426,6 +426,28 @@ filename avoids unnecessary test reorganization; its markers identify D279/52.
 The default score threshold remains plumbing only and is not a FAR/FRR or
 different-finger validation.
 
+## D279/53 public FP3 and true SIGFM identify interoperability
+
+The same production-shaped build now proves that the 21-sample enrollment
+template survives the public `fp_print_serialize()`/
+`fp_print_deserialize()` boundary with metadata intact and can be used as the
+gallery for a true host-only `fp_device_identify()` action. The deterministic
+single-sample SIGFM probe matches and both the gallery match and scanned print
+are returned.
+
+Fedora 44/libfprint 1.94.100 validates non-NBIS scanned prints by byte equality
+against the gallery. D279/53 extends the existing matcher-backed NBIS
+exception to SIGFM, whose single-sample probe is intentionally not identical
+to its multi-sample template. This is a local adaptation of the newer Fedora
+core; the older Rockytkg tree has no equivalent validation.
+
+The runner also audits, without executing it, the exact installed
+`fprintd-1.94.5-5.fc44.x86_64` binary. Its `libfprint-2.so.2` dependency and
+all 47 required `LIBFPRINT_2.0.0` symbols are satisfied by the built library.
+This does not prove daemon execution, on-disk policy, D-Bus/SELinux behavior,
+production identify protocol safety or a biometric threshold. The production
+driver remains enrollment-only.
+
 ## D272/01 historical ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
