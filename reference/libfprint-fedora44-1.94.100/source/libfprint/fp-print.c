@@ -24,6 +24,11 @@
 #include "fpi-compat.h"
 #include "fpi-log.h"
 
+#ifdef GOODIX_LIBFPRINT_SIGFM
+#include "goodix_sigfm_metrics.h"
+#define GOODIX_SIGFM_MAX_PRINT_SAMPLES 21u
+#endif
+
 /**
  * SECTION: fp-print
  * @title: FpPrint
@@ -628,6 +633,40 @@ fp_print_equal (FpPrint *self, FpPrint *other)
 
       return TRUE;
 
+    case FPI_PRINT_SIGFM:
+#ifdef GOODIX_LIBFPRINT_SIGFM
+      if (!self->prints || !other->prints ||
+          self->prints->len != other->prints->len)
+        return FALSE;
+
+      for (guint i = 0; i < self->prints->len; i++)
+        {
+          GoodixSigfmSample *a = g_ptr_array_index (self->prints, i);
+          GoodixSigfmSample *b = g_ptr_array_index (other->prints, i);
+          guint8 *a_data = NULL;
+          guint8 *b_data = NULL;
+          gsize a_size = 0;
+          gsize b_size = 0;
+          GoodixSigfmResult a_result;
+          GoodixSigfmResult b_result;
+          gboolean equal;
+
+          a_result = goodix_sigfm_sample_serialize (a, &a_data, &a_size);
+          b_result = goodix_sigfm_sample_serialize (b, &b_data, &b_size);
+          equal = a_result == GOODIX_SIGFM_OK &&
+                  b_result == GOODIX_SIGFM_OK &&
+                  a_size == b_size &&
+                  memcmp (a_data, b_data, a_size) == 0;
+          goodix_sigfm_serialized_free (a_data, a_size);
+          goodix_sigfm_serialized_free (b_data, b_size);
+          if (!equal)
+            return FALSE;
+        }
+      return TRUE;
+#else
+      return FALSE;
+#endif
+
     case FPI_PRINT_UNDEFINED:
       g_assert_not_reached ();
     }
@@ -682,7 +721,7 @@ fp_print_serialize (FpPrint *print,
   g_variant_builder_open (&builder, G_VARIANT_TYPE_VARDICT);
   g_variant_builder_close (&builder);
 
-  /* Insert NBIS print data for type NBIS, otherwise the GVariant directly */
+  /* Insert matcher-specific print data, otherwise the GVariant directly. */
   if (print->type == FPI_PRINT_NBIS)
     {
       GVariantBuilder nested = G_VARIANT_BUILDER_INIT (G_VARIANT_TYPE ("(a(aiaiai))"));
@@ -716,6 +755,63 @@ fp_print_serialize (FpPrint *print,
       g_variant_builder_close (&nested);
       g_variant_builder_add (&builder, "v", g_variant_builder_end (&nested));
     }
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  else if (print->type == FPI_PRINT_SIGFM)
+    {
+      GVariantBuilder nested =
+        G_VARIANT_BUILDER_INIT (G_VARIANT_TYPE ("(a(ay))"));
+
+      if (!print->prints || print->prints->len == 0 ||
+          print->prints->len > GOODIX_SIGFM_MAX_PRINT_SAMPLES)
+        {
+          g_variant_builder_clear (&builder);
+          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                               "SIGFM print has an invalid sample count");
+          return FALSE;
+        }
+
+      g_variant_builder_open (&nested, G_VARIANT_TYPE ("a(ay)"));
+      for (guint i = 0; i < print->prints->len; i++)
+        {
+          GoodixSigfmSample *sample = g_ptr_array_index (print->prints, i);
+          guint8 *serialized = NULL;
+          gsize serialized_size = 0;
+          GoodixSigfmResult sigfm_result;
+
+          sigfm_result = goodix_sigfm_sample_serialize (
+            sample, &serialized, &serialized_size);
+          if (sigfm_result != GOODIX_SIGFM_OK ||
+              serialized_size > GOODIX_SIGFM_MAX_SERIALIZED_SIZE)
+            {
+              goodix_sigfm_serialized_free (serialized, serialized_size);
+              g_variant_builder_clear (&nested);
+              g_variant_builder_clear (&builder);
+              g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                           "Could not serialize SIGFM sample (result %d)",
+                           sigfm_result);
+              return FALSE;
+            }
+
+          g_variant_builder_open (&nested, G_VARIANT_TYPE ("(ay)"));
+          g_variant_builder_add_value (
+            &nested,
+            g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE,
+                                       serialized, serialized_size, 1));
+          g_variant_builder_close (&nested);
+          goodix_sigfm_serialized_free (serialized, serialized_size);
+        }
+      g_variant_builder_close (&nested);
+      g_variant_builder_add (&builder, "v", g_variant_builder_end (&nested));
+    }
+#else
+  else if (print->type == FPI_PRINT_SIGFM)
+    {
+      g_variant_builder_clear (&builder);
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                           "SIGFM support is not enabled in this build");
+      return FALSE;
+    }
+#endif
   else
     {
       g_variant_builder_add (&builder, "v", g_variant_new_variant (print->data));
@@ -778,8 +874,8 @@ fp_print_deserialize (const guchar *data,
   const gchar *device_id;
   gboolean device_stored;
 
-  g_assert (data);
-  g_assert (length > 3);
+  if (!data || length <= 3)
+    goto invalid_format;
 
   if (memcmp (data, "FP3", 3) != 0)
     goto invalid_format;
@@ -872,6 +968,65 @@ fp_print_deserialize (const guchar *data,
       }
       break;
 
+    case FPI_PRINT_SIGFM:
+#ifdef GOODIX_LIBFPRINT_SIGFM
+      {
+        g_autoptr(GVariant) prints = NULL;
+        guint sample_count;
+
+        if (!g_variant_is_of_type (print_data,
+                                   G_VARIANT_TYPE ("(a(ay))")))
+          goto invalid_format;
+        prints = g_variant_get_child_value (print_data, 0);
+        sample_count = g_variant_n_children (prints);
+        if (sample_count == 0 ||
+            sample_count > GOODIX_SIGFM_MAX_PRINT_SAMPLES)
+          goto invalid_format;
+
+        result = g_object_new (FP_TYPE_PRINT,
+                               "driver", driver,
+                               "device-id", device_id,
+                               "device-stored", device_stored,
+                               NULL);
+        g_object_ref_sink (result);
+        fpi_print_set_type (result, FPI_PRINT_SIGFM);
+        for (guint i = 0; i < sample_count; i++)
+          {
+            g_autoptr(GVariant) sample_tuple = NULL;
+            g_autoptr(GVariant) sample_bytes = NULL;
+            const guint8 *serialized;
+            gsize serialized_size;
+            GoodixSigfmSample *sample = NULL;
+            GoodixSigfmResult sigfm_result;
+            gint keypoints = 0;
+
+            sample_tuple = g_variant_get_child_value (prints, i);
+            if (!g_variant_is_of_type (sample_tuple,
+                                       G_VARIANT_TYPE ("(ay)")))
+              goto invalid_format;
+            sample_bytes = g_variant_get_child_value (sample_tuple, 0);
+            serialized = g_variant_get_fixed_array (sample_bytes,
+                                                     &serialized_size, 1);
+            if (!serialized ||
+                serialized_size > GOODIX_SIGFM_MAX_SERIALIZED_SIZE)
+              goto invalid_format;
+
+            sigfm_result = goodix_sigfm_sample_deserialize (
+              serialized, serialized_size, &sample, &keypoints);
+            if (sigfm_result != GOODIX_SIGFM_OK || !sample ||
+                keypoints < GOODIX_SIGFM_MIN_KEYPOINTS)
+              {
+                goodix_sigfm_sample_free (sample);
+                goto invalid_format;
+              }
+            g_ptr_array_add (result->prints, sample);
+          }
+      }
+      break;
+#else
+      goto invalid_format;
+#endif
+
     case FPI_PRINT_RAW:
       {
         g_autoptr(GVariant) fp_data = g_variant_get_child_value (print_data, 0);
@@ -894,6 +1049,10 @@ fp_print_deserialize (const guchar *data,
 
         goto invalid_format;
       }
+
+    default:
+      g_warning ("Invalid print type: 0x%X", type);
+      goto invalid_format;
     }
 
   date = g_date_new_julian (julian_date);

@@ -25,6 +25,10 @@
 #include "fpi-device.h"
 #include "fpi-compat.h"
 
+#ifdef GOODIX_LIBFPRINT_SIGFM
+#include "goodix_sigfm_metrics.h"
+#endif
+
 /**
  * SECTION: fpi-print
  * @title: Internal FpPrint
@@ -39,18 +43,41 @@
  * @print: A #FpPrint
  * @add: Print to append to @print
  *
- * Appends the single #FPI_PRINT_NBIS print from @add to the collection of
- * prints in @print. Both print objects need to be of type #FPI_PRINT_NBIS
- * for this to work.
+ * Appends the single NBIS or SIGFM sample from @add to the collection in
+ * @print. Both print objects must have the same supported type.
  */
 void
 fpi_print_add_print (FpPrint *print, FpPrint *add)
 {
-  g_return_if_fail (print->type == FPI_PRINT_NBIS);
-  g_return_if_fail (add->type == FPI_PRINT_NBIS);
+  g_return_if_fail (print->type == FPI_PRINT_NBIS ||
+#ifdef GOODIX_LIBFPRINT_SIGFM
+                    print->type == FPI_PRINT_SIGFM
+#else
+                    FALSE
+#endif
+                    );
+  g_return_if_fail (add->type == print->type);
 
   g_assert (add->prints->len == 1);
-  g_ptr_array_add (print->prints, g_memdup2 (add->prints->pdata[0], sizeof (struct xyt_struct)));
+  if (print->type == FPI_PRINT_NBIS)
+    g_ptr_array_add (print->prints,
+                     g_memdup2 (add->prints->pdata[0],
+                                sizeof (struct xyt_struct)));
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  else
+    {
+      GoodixSigfmSample *copy = NULL;
+      GoodixSigfmResult result;
+
+      result = goodix_sigfm_sample_copy (add->prints->pdata[0], &copy);
+      if (result != GOODIX_SIGFM_OK)
+        {
+          fp_warn ("Could not copy SIGFM print sample: %d", result);
+          return;
+        }
+      g_ptr_array_add (print->prints, copy);
+    }
+#endif
 }
 
 /**
@@ -70,11 +97,27 @@ fpi_print_set_type (FpPrint     *print,
   /* We only allow setting this once! */
   g_return_if_fail (print->type == FPI_PRINT_UNDEFINED);
 
+  if (type == FPI_PRINT_SIGFM)
+    {
+#ifndef GOODIX_LIBFPRINT_SIGFM
+      g_return_if_reached ();
+#endif
+    }
+
   print->type = type;
-  if (print->type == FPI_PRINT_NBIS)
+  if (print->type == FPI_PRINT_NBIS
+#ifdef GOODIX_LIBFPRINT_SIGFM
+      || print->type == FPI_PRINT_SIGFM
+#endif
+      )
     {
       g_assert_null (print->prints);
-      print->prints = g_ptr_array_new_with_free_func (g_free);
+      print->prints = g_ptr_array_new_with_free_func (
+#ifdef GOODIX_LIBFPRINT_SIGFM
+        print->type == FPI_PRINT_SIGFM ?
+        (GDestroyNotify) goodix_sigfm_sample_free :
+#endif
+        g_free);
     }
   g_object_notify (G_OBJECT (print), "fpi-type");
 }
@@ -267,6 +310,103 @@ fpi_print_bz3_match (FpPrint *print_template,
 
   return FPI_MATCH_FAIL;
 }
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+/**
+ * fpi_print_add_sigfm_sample:
+ * @print: A #FPI_PRINT_SIGFM print
+ * @sample: A validated SIGFM sample
+ * @error: Return location for error
+ *
+ * Copies @sample into @print. The caller retains ownership of @sample.
+ *
+ * Returns: %TRUE on success
+ */
+gboolean
+fpi_print_add_sigfm_sample (FpPrint                 *print,
+                            const GoodixSigfmSample *sample,
+                            GError                 **error)
+{
+  GoodixSigfmSample *copy = NULL;
+  GoodixSigfmResult result;
+
+  if (!FP_IS_PRINT (print) || print->type != FPI_PRINT_SIGFM || !sample)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                           "Cannot add a SIGFM sample to this print");
+      return FALSE;
+    }
+
+  result = goodix_sigfm_sample_copy (sample, &copy);
+  if (result != GOODIX_SIGFM_OK)
+    {
+      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                   "Could not copy SIGFM sample (result %d)", result);
+      return FALSE;
+    }
+
+  g_ptr_array_add (print->prints, copy);
+  return TRUE;
+}
+
+/**
+ * fpi_print_sigfm_match:
+ * @print_template: A SIGFM print containing one or more enrollment samples
+ * @print: A SIGFM print containing exactly one probe sample
+ * @score_threshold: The SIGFM score threshold
+ * @error: Return location for error
+ *
+ * Returns: Whether any enrollment sample matches, or #FPI_MATCH_ERROR
+ */
+FpiMatchResult
+fpi_print_sigfm_match (FpPrint *print_template,
+                       FpPrint *print,
+                       gint     score_threshold,
+                       GError **error)
+{
+  GoodixSigfmSample *probe;
+
+  if (!FP_IS_PRINT (print_template) || !FP_IS_PRINT (print) ||
+      print_template->type != FPI_PRINT_SIGFM ||
+      print->type != FPI_PRINT_SIGFM)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR,
+                           FP_DEVICE_ERROR_NOT_SUPPORTED,
+                           "SIGFM matching requires two SIGFM prints");
+      return FPI_MATCH_ERROR;
+    }
+  if (!print_template->prints || print_template->prints->len == 0 ||
+      !print->prints || print->prints->len != 1 || score_threshold <= 0)
+    {
+      g_set_error_literal (error, FP_DEVICE_ERROR,
+                           FP_DEVICE_ERROR_DATA_INVALID,
+                           "Invalid SIGFM template, probe, or threshold");
+      return FPI_MATCH_ERROR;
+    }
+
+  probe = g_ptr_array_index (print->prints, 0);
+  for (guint i = 0; i < print_template->prints->len; i++)
+    {
+      GoodixSigfmSample *enrolled =
+        g_ptr_array_index (print_template->prints, i);
+      GoodixSigfmResult result;
+      gint score = 0;
+
+      result = goodix_sigfm_match_ephemeral (probe, enrolled, &score);
+      if (result != GOODIX_SIGFM_OK)
+        {
+          g_set_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
+                       "SIGFM matcher failed (result %d)", result);
+          return FPI_MATCH_ERROR;
+        }
+      fp_dbg ("SIGFM score %d/%d", score, score_threshold);
+      if (score >= score_threshold)
+        return FPI_MATCH_SUCCESS;
+    }
+
+  return FPI_MATCH_FAIL;
+}
+#endif
 
 /**
  * fpi_print_generate_user_id:

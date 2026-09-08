@@ -73,7 +73,7 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORWARD_PORT
+NEXT_PRIMARY_BOUNDARY=OFFLINE_SIGFM_IMAGE_ACTION_AND_PRODUCTION_MESON_BINDING
 ```
 
 Report e review machine-readable:
@@ -122,6 +122,43 @@ D279_50_OUTCOME=READY
 D279_50_EXECUTABLE_CLOSURE=PASS_HOST_ONLY_REAL_SIGFM_OPENCV_4_13
 SIGFM_SAMPLE_STORAGE=GSF1_STRICT_X86_64_LITTLE_ENDIAN
 NEXT_PRIMARY_BOUNDARY=OFFLINE_FEDORA44_LIBFPRINT_1_94_100_SIGFM_PRINT_FORWARD_PORT
+```
+
+### Stato D279/51 — core FpPrint SIGFM multi-sample e FP3 strict
+
+D279/51 porta nel fork Fedora 44/libfprint 1.94.100 il tipo privato
+`FPI_PRINT_SIGFM`, preservando il percorso NBIS. La semantica multi-sample e
+di match deriva dal fork libfprint materializzato in Rockytkg; ownership,
+uguaglianza e storage non copiano però i puntatori/payload grezzi del fork:
+usano esclusivamente il wrapper validato D279/50.
+
+Un template contiene da 1 a 21 campioni (coerente con i 21 stage Goodix
+correnti), il probe deve contenerne esattamente uno e ogni copy ha ownership
+indipendente. FP3 conserva `(a(ay))`, ma ogni `ay` è un envelope `GSF1` con i
+controlli D279/50. Deserializzazione, tipo disabilitato, count fuori limite,
+payload corrotto e tipo enum sconosciuto falliscono chiusi. `fp_print_equal()`
+confronta le serializzazioni canoniche e azzera i buffer temporanei tramite il
+wrapper.
+
+La suite focalizzata passa normale e ASan/UBSan con test double. Una seconda
+closure collega gli stessi sorgenti core al `sigfm.cpp` Rockytkg autentico e
+agli RPM Fedora 44 OpenCV 4.13 digest-pinned: raster sintetico, 220 keypoint,
+match multi-sample, round-trip FP3 byte-identico e corruzione rifiutata. Non
+sono stati installati pacchetti e non è stato eseguito alcun accesso USB/live.
+
+Questo slice non abilita ancora `GOODIX_LIBFPRINT_SIGFM` nel grafo Meson di
+produzione e non modifica ancora `FpImageDevice`: l'attivazione deve includere
+preprocessing R2, extraction dalla cattura e dispatch enroll/identify senza
+regredire la state machine 1.94.100.
+
+```text
+D279_51_OUTCOME=READY
+D279_51_EXECUTABLE_CLOSURE=PASS_HOST_ONLY_REAL_SIGFM_FOCUSED_LINK
+SIGFM_FP3_STORAGE=GSF1_STRICT_MULTI_SAMPLE_1_TO_21
+NBIS_REGRESSION_BUILD=PASS
+PRODUCTION_MESON_SIGFM_ENABLED=false
+LIVE_OR_USB_ACTION_COUNT=0
+NEXT_PRIMARY_BOUNDARY=OFFLINE_SIGFM_IMAGE_ACTION_AND_PRODUCTION_MESON_BINDING
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

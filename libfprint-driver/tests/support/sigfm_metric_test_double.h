@@ -10,6 +10,10 @@ enum SigfmTestMode
   SIGFM_TEST_MATCH_THROW,
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void sigfm_test_set_mode (enum SigfmTestMode mode);
 void sigfm_test_set_keypoints (int keypoints);
 void sigfm_test_set_score (int score);
@@ -17,5 +21,9 @@ int sigfm_test_last_width (void);
 int sigfm_test_last_height (void);
 unsigned int sigfm_test_last_pixel (unsigned int index);
 int sigfm_test_live_info_count (void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

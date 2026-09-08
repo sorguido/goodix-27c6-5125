@@ -11,11 +11,13 @@ G_BEGIN_DECLS
  * @FPI_PRINT_UNDEFINED: Undefined type, this happens prior to enrollment
  * @FPI_PRINT_RAW: A raw print where the data is directly compared
  * @FPI_PRINT_NBIS: NBIS minutiae comparison
+ * @FPI_PRINT_SIGFM: SIGFM feature comparison
  */
 typedef enum {
   FPI_PRINT_UNDEFINED = 0,
   FPI_PRINT_RAW,
   FPI_PRINT_NBIS,
+  FPI_PRINT_SIGFM,
 } FpiPrintType;
 
 /**
@@ -49,6 +51,19 @@ FpiMatchResult fpi_print_bz3_match (FpPrint *print_template,
                                     FpPrint *print,
                                     gint     bz3_threshold,
                                     GError **error);
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+typedef struct GoodixSigfmSample GoodixSigfmSample;
+
+gboolean fpi_print_add_sigfm_sample (FpPrint                 *print,
+                                     const GoodixSigfmSample *sample,
+                                     GError                 **error);
+
+FpiMatchResult fpi_print_sigfm_match (FpPrint *print_template,
+                                      FpPrint *print,
+                                      gint     score_threshold,
+                                      GError **error);
+#endif
 
 /* Helpers to encode metadata into user ID strings. */
 gchar *  fpi_print_generate_user_id (FpPrint *print);
