@@ -73,7 +73,7 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_IDENTIFY_PROTOCOL_AND_SAFETY_DESIGN_REVIEW
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OEM_PASSIVE_IDENTIFY_CAPTURE
 ```
 
 Report e review machine-readable:
@@ -269,6 +269,65 @@ SIGFM_THRESHOLD_PRODUCTION_VALIDATED=false
 LIVE_OR_USB_ACTION_COUNT=0
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_PRODUCTION_IDENTIFY_PROTOCOL_AND_SAFETY_DESIGN_REVIEW
+```
+
+### Stato D279/54 — design safety identify production e kit OEM passivo
+
+La review D279/54 conclude che non è ancora lecito abilitare `IDENTIFY` nella
+production allowlist. Il core libfprint/SIGFM D279/53 è action-ready, ma il
+protocollo USB oggi collegato alla production è specifico dei 21 stage
+enrollment e non può essere riusato per inferenza. D278/14 prova sul target un
+lifecycle a due acquisizioni che raggiunge `STOP` soltanto dopo il secondo B0;
+dopo la prima acquisizione resta a `REARM_GATE`. D279/29 prova cleanup host,
+backend drenato e close dopo il primo raster fallito, ma dichiara correttamente
+`DEVICE_SIDE_TIMEOUT_OR_QUIESCENCE_INFERRED=false`. Nessuna delle due evidenze
+prova dunque il terminale OEM di una singola identify.
+
+Restano da mantenere pre-session RX sync, secure session/TLS, bootstrap
+D4/AF/FDT, decoder, baseline R2, extractor/storage SIGFM e la state machine
+libfprint 1.94.100. Il futuro delta dovrà invece introdurre un profilo action
+identify separato e target-derived. Il grafo enrollment, i suoi 125 comandi e
+la semantica 21-stage non devono essere adattati o resi raggiungibili da
+identify. L'allowlist corrente resta invariata.
+
+Il prossimo esperimento minimo è quindi una singola capture passiva USBPcap di
+una verifica Windows Hello già configurata, non una run Linux. Il nuovo kit
+`operator_kit/d279-54-oem-passive-identify-observe/` non contiene sender
+Goodix, richiede target assente al preflight, full SHA approvato, live-critical
+set pulito, snapshot, template OEM già esistente, authority per-attempt e
+accettazione separata del possibile aggiornamento adattivo host/sensor-side.
+Registra una sola verifica, vieta retry e richiede export raw/sanitized prima
+del restore.
+
+Il riesame metodologico pre-live è sostanziale:
+
+1. rispetto a D279/29 non si esegue il sender Linux enrollment: si osserva
+   passivamente una sola identify OEM già supportata da Windows;
+2. l'ipotesi testata è che il workflow OEM esponga una sequenza bounded
+   single-acquisition e il suo vero terminale/release, distinguibili dal
+   profilo enrollment e dal lifecycle a due acquisizioni;
+3. se la run fallisce senza produrre l'action classificabile, non si ripete:
+   si esportano gli artefatti, si ripristina la VM quando richiesto e si
+   corregge il metodo in base al punto di failure prima di chiedere una nuova
+   autorizzazione.
+
+La suite Linux hardware-free verifica authority chiusa, gate order,
+single-attempt, output, tail, restore policy, assenza di sender e ACL private.
+La qualificazione PowerShell Desktop 5.1 con Goodix assente è ancora pendente.
+Nessuna capture o azione hardware è autorizzata dal kit o da questo report.
+
+```text
+D279_54_OUTCOME=HUMAN_REQUIRED
+D279_54_ADVANCEMENT=PRODUCTION_IDENTIFY_PROTOCOL_AND_SAFETY_BOUNDARY_CLASSIFIED
+D279_54_EXECUTABLE_CLOSURE=PASS_LINUX_SOURCE_TESTS;WINDOWS_NATIVE_QUALIFICATION_PENDING
+KEEP=PRE_SESSION_SYNC,SECURE_TLS,D4_AF_FDT,DECODER,R2,SIGFM,LIBFPRINT_IDENTIFY_CORE
+DO_NOT_REUSE_FOR_IDENTIFY=ENROLLMENT_21_STAGE_GRAPH_AND_125_COMMAND_PROFILE
+PRODUCTION_IDENTIFY_ACTION_ENABLED=false
+OEM_PASSIVE_IDENTIFY_CAPTURE_REQUIRED=true
+OEM_PASSIVE_IDENTIFY_CAPTURE_AUTHORIZED=false
+POSSIBLE_ADAPTIVE_TEMPLATE_PERSISTENCE_ACCEPTED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OEM_PASSIVE_IDENTIFY_CAPTURE
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto

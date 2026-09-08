@@ -1,6 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D279/54 identify OEM passiva (pre-live, hard-gated)
+
+`d279-54-oem-passive-identify-observe/` cattura con TShark/USBPcap una sola
+verifica Windows Hello già configurata e non contiene sender Goodix. Authority,
+baseline, snapshot, template esistente, rischio di aggiornamento adattivo e
+live sono tutti chiusi nel template versionato. I test Linux hardware-free
+passano; qualificazione PowerShell Desktop 5.1, full SHA e autorizzazione
+one-shot restano Human Gate.
+
 ## D279/35 valutazione ATTEMPT02 offline protetta (in attesa di Human Gate)
 
 `d279-35-offline-protected-evaluation/` costruisce da snapshot Git l'evaluator
@@ -85,6 +94,7 @@ richiede review, baseline e autorizzazione esplicite.
 | `d255-windows-evidence-capture.ps1` | storico, single-shot consumato; capture completata e recuperata offline, nessuna nuova run richiesta o autorizzata |
 | `d279-29-one-shot-enrollment/` | enrollment production one-shot concluso su `f4f0436…`; grant consumato, nessun retry autorizzato |
 | `d279-35-offline-protected-evaluation/` | current path offline aggregate-only; Human Gate per singola lettura protected pendente |
+| `d279-54-oem-passive-identify-observe/` | candidate passivo OEM identify hard-gated; authority chiusa, qualificazione Windows/full SHA/autorizzazione one-shot pendenti |
 
 Non esiste un kit operativo corrente **autorizzato live**. La run D279/29 è
 consumata. D279/35 non è live e non incorpora né auto-approva il commit SHA
