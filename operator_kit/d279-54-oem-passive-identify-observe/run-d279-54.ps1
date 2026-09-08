@@ -353,7 +353,7 @@ try {
     Write-Host "D279/54: capture passiva di una sola identify OEM Windows."
     Write-Host "Nessun retry, enrollment o sender Goodix e consentito."
     $script:CaptureProcess = Start-Process -FilePath $tshark -ArgumentList @(
-        "-i", $selector, "-w", ('\"{0}\"' -f $script:Pcap), "-q") -PassThru
+        "-i", $selector, "-w", ('"{0}"' -f $script:Pcap), "-q") -PassThru
     $script:CaptureStarted = $true
     $captureStartedUtc = [DateTimeOffset]::UtcNow.ToString('o')
     Start-Sleep -Milliseconds 500
