@@ -3,15 +3,62 @@
 
 ## Decision
 
-Production `FPI_DEVICE_ACTION_IDENTIFY` must remain disabled. D279/53 closes
-public FP3 and the true libfprint/SIGFM identify action on a host-only device;
-it does not supply a target-specific USB protocol or a proven single-capture
-terminal boundary.
+At the design checkpoint, production `FPI_DEVICE_ACTION_IDENTIFY` had to remain
+disabled. D279/53 closed public FP3 and the true libfprint/SIGFM identify action
+on a host-only device, but did not yet supply a target-specific USB protocol or
+a proven single-capture terminal boundary. ATTEMPT01 has now supplied that
+missing evidence; the production gate remains unchanged until the distinct
+D279/55 implementation and regression review.
 
 ```text
-DECISION=HUMAN_REQUIRED
+DECISION=ACCEPT_EVIDENCE_AND_CONTINUE_OFFLINE_TO_D279_55
 PRODUCTION_IDENTIFY_ACTION_ENABLED=false
 ```
+
+## Post-run evidence review
+
+The authorized passive run `D27954_20260908_ATTEMPT01` completed exactly one
+Windows Hello verification with UI-confirmed success and zero automatic retry.
+The three supplied files are preserved unchanged under `captures/D279_54/`.
+Their SHA-256 values are:
+
+```text
+wire.pcapng=6875b2d784d11cd4b3a8b68bd02af249f4b318883441a26068ef894767985c9b
+operator_events.json=bb258a20f00f01efe271ca282e3dd6d0cba1ac6a4d6747da67e16417b2ddf555
+attempt_status.json=20b45b1a07d0843a55e9314fe0d20668331258ba0a722b48126ed7d298f039bc
+```
+
+The strict repository-local parser reads 228 pcapng packets, 216 packets for
+the unique `27c6:5125` target and 95 complete target protocol frames. It also
+observes `GF_ST411SEC_APP_12509`. After the final action arm the exact
+metadata-only trace is:
+
+```text
+C32,K32:01,I0002,C22,K22:01,BF,C34,K34:01,I0200,
+C20,K20:01,BF,C50,K50:01,NAV
+```
+
+There is exactly one finger-on IRQ, one primary image lifecycle, one post-up
+B0 and no subsequent `0x32`, second finger-on or second primary image. NAV is
+the last protocol frame. The sole target packet after UI completion is an
+empty IN completion; there are no later non-empty target packets or protocol
+frames. This directly establishes the APP12509 OEM identify action as
+single-touch/single-acquisition and its normal terminal boundary as release
+NAV followed by no re-arm.
+
+No known persistent command family (`E0`, `A4`, `F0`, `F4`) appears. This does
+not prove that Windows or the sensor performed no adaptive template update;
+that risk remains explicitly unexcluded. The capture is authority for the
+target-specific USB lifecycle, not for the biometric matcher or enrollment
+sample count. The derived audit is
+`analysis/D279/D279_54_oem_identify_capture_audit.json`; it exports no payload,
+plaintext, raster, feature, template or secret.
+
+Rockytkg independently delivers one frame for verify/identify and delegates
+matching to SIGFM. This is architectural corroboration only: its wire protocol
+is not treated as identical to ATTEMPT01. The justified D279/55 composition is
+therefore OEM lifecycle through release NAV, one R2/SIGFM probe, libfprint
+identify, then terminal completion without a second arm.
 
 ## Evidence reviewed
 
@@ -100,7 +147,7 @@ versioned authority remains closed; no live action is authorized.
    UI action failed, and redesign that boundary before requesting a distinct
    authorization.
 
-## Closure
+## Original pre-run closure
 
 ```text
 OUTCOME=HUMAN_REQUIRED
@@ -121,4 +168,26 @@ CANONICAL_DOCUMENTATION=Goodix 27c6 5125 manuale tecnico.md
 REVIEW_SET=GIT_NATIVE
 RESIDUAL_BLOCKER_OR_RISK=EXACT_OEM_IDENTIFY_TRANSCRIPT_AND_SINGLE_CAPTURE_DEVICE_TERMINAL_UNKNOWN;WINDOWS_NATIVE_QUALIFICATION_PENDING;EXPLICIT_ADAPTIVE_PERSISTENCE_ACCEPTANCE_AND_ONE_SHOT_AUTHORIZATION_REQUIRED
 NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OEM_PASSIVE_IDENTIFY_CAPTURE
+```
+
+## Post-run closure
+
+```text
+OUTCOME=READY
+ADVANCEMENT=TARGET_SPECIFIC_OEM_IDENTIFY_SINGLE_ACQUISITION_LIFECYCLE_PROVEN
+EXECUTABLE_CLOSURE=PASS_OFFLINE_STRICT_PCAP_AUDIT
+OEM_IDENTIFY_ATTEMPT_COUNT=1
+OEM_IDENTIFY_UI_RESULT=SUCCESS
+OEM_IDENTIFY_SINGLE_TOUCH=true
+OEM_IDENTIFY_PRIMARY_IMAGE_COUNT=1
+OEM_IDENTIFY_POST_UP_B0_COUNT=1
+OEM_IDENTIFY_POST_TOUCH_REARM_COUNT=0
+OEM_IDENTIFY_SECOND_FINGER_ON_COUNT=0
+OEM_IDENTIFY_TERMINAL_PROTOCOL_EVENT=NAV
+KNOWN_PERSISTENT_COMMAND_FAMILY_COUNT=0
+ADAPTIVE_TEMPLATE_PERSISTENCE_EXCLUDED=false
+PRODUCTION_IDENTIFY_ACTION_ENABLED=false
+LIVE_AUTHORIZATION_CONSUMED=true
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_55_PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_PROFILE
 ```

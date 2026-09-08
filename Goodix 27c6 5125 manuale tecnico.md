@@ -73,7 +73,7 @@ ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
 IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OEM_PASSIVE_IDENTIFY_CAPTURE
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_55_PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_PROFILE
 ```
 
 Report e review machine-readable:
@@ -328,6 +328,50 @@ OEM_PASSIVE_IDENTIFY_CAPTURE_AUTHORIZED=false
 POSSIBLE_ADAPTIVE_TEMPLATE_PERSISTENCE_ACCEPTED=false
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_FULL_SHA_ONE_OEM_PASSIVE_IDENTIFY_CAPTURE
+```
+
+#### D279/54 post-run — identify OEM APP12509 single-acquisition
+
+L'ATTEMPT01 passivo autorizzato è stato completato con successo su Windows
+Hello usando un template già registrato. I tre originali sono preservati sotto
+`captures/D279_54/D27954_20260908_ATTEMPT01/`; il PCAP ha SHA-256
+`6875b2d784d11cd4b3a8b68bd02af249f4b318883441a26068ef894767985c9b`.
+L'audit stretto locale valida 228 pacchetti pcapng, 216 pacchetti del solo
+target, 95 frame protocollo completi e firmware `GF_ST411SEC_APP_12509`.
+
+La sequenza action, con ACK espliciti, è:
+
+```text
+0x32/ACK -> IRQ0002 -> 0x22/ACK -> primary B0 -> 0x34/ACK -> IRQ0200
+-> 0x20/ACK -> post-up B0 -> 0x50/ACK -> NAV -> STOP osservato
+```
+
+Esistono un solo finger-on e una sola primary image. Dopo NAV non compaiono un
+nuovo `0x32`, un secondo IRQ0002 o una seconda immagine. Non esistono frame
+protocollo dopo il successo UI; il solo pacchetto target successivo è una
+completion IN vuota durante la tail di 5,048 s. L'identify OEM APP12509 è
+quindi target-proven come `single-touch/single-acquisition`, con terminale dopo
+la release NAV e senza re-arm.
+
+Rockytkg corrobora l'architettura biometric/libfprint a singolo probe SIGFM,
+ma non viene assunto wire-identico. D279/54 è autorità per il lifecycle USB
+sensor-side; Rockytkg resta reference primaria per R2/SIGFM/libfprint. Non
+compare alcuna famiglia di comando persistente nota, ma un aggiornamento
+adattivo del template host/sensore non è escluso. Questa evidenza non informa
+il numero di stage enrollment.
+
+```text
+D279_54_POST_RUN_OUTCOME=READY
+D279_54_ADVANCEMENT=TARGET_SPECIFIC_OEM_IDENTIFY_SINGLE_ACQUISITION_LIFECYCLE_PROVEN
+D279_54_EXECUTABLE_CLOSURE=PASS_OFFLINE_STRICT_PCAP_AUDIT
+OEM_IDENTIFY_SINGLE_TOUCH=true
+OEM_IDENTIFY_PRIMARY_IMAGE_COUNT=1
+OEM_IDENTIFY_POST_UP_B0_COUNT=1
+OEM_IDENTIFY_POST_TOUCH_REARM_COUNT=0
+OEM_IDENTIFY_TERMINAL_PROTOCOL_EVENT=NAV
+PRODUCTION_IDENTIFY_ACTION_ENABLED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_55_PRODUCTION_IDENTIFY_SINGLE_ACQUISITION_PROFILE
 ```
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
