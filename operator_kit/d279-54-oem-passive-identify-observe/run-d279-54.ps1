@@ -223,8 +223,10 @@ function Invoke-D27954SelfTest {
     }
     foreach ($name in @("run-d279-54.ps1", "README_IT.md",
                          "D279_54_live_authority.json")) {
-        if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $name)
-                  -PathType Leaf)) { Fail-D27954 "file del kit mancante" }
+        $kitFile = Join-Path $PSScriptRoot $name
+        if (-not (Test-Path -LiteralPath $kitFile -PathType Leaf)) {
+            Fail-D27954 "file del kit mancante"
+        }
     }
     $authority = Read-D27954Authority (
         Join-Path $PSScriptRoot "D279_54_live_authority.json")
@@ -351,7 +353,7 @@ try {
     Write-Host "D279/54: capture passiva di una sola identify OEM Windows."
     Write-Host "Nessun retry, enrollment o sender Goodix e consentito."
     $script:CaptureProcess = Start-Process -FilePath $tshark -ArgumentList @(
-        "-i", $selector, "-w", ('"{0}"' -f $script:Pcap), "-q") -PassThru
+        "-i", $selector, "-w", ('\"{0}\"' -f $script:Pcap), "-q") -PassThru
     $script:CaptureStarted = $true
     $captureStartedUtc = [DateTimeOffset]::UtcNow.ToString('o')
     Start-Sleep -Milliseconds 500
