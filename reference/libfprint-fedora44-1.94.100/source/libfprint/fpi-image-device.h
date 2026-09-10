@@ -81,6 +81,8 @@ typedef enum {
  * @bz3_threshold: Threshold to consider bozorth3 score a match, default: 40
  * @img_width: Width of the image, only provide if constant
  * @img_height: Height of the image, only provide if constant
+ * @enroll_processing_fail_closed: Whether an enrollment image-processing
+ *   failure after capture is terminal instead of retryable
  * @img_open: Open the device and do basic initialization
  *   (use this instead of the #FpDeviceClass open vfunc)
  * @img_close: Close the device
@@ -114,6 +116,7 @@ struct _FpImageDeviceClass
   FpiImageDeviceAlgorithm algorithm;
   gint          img_width;
   gint          img_height;
+  gboolean      enroll_processing_fail_closed;
 
   void          (*img_open)     (FpImageDevice *dev);
   void          (*img_close)    (FpImageDevice *dev);

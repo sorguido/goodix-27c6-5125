@@ -17,6 +17,9 @@ fattore di autenticazione sono fuori scope.
 
 ```text
 D282_01_HUMAN_GATE_READINESS=READY
+D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
+D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
+EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
 CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 APPROVED_BASELINE=NONE
@@ -45,6 +48,14 @@ Il no-match è un risultato terminale normale: una sola callback e nessun
 retry. Il client `fprintd-verify` restituisce exit code `1` per no-match; il
 launcher lo richiede assieme alla singola riga
 `Verify result: verify-no-match (done)`.
+
+Per enrollment la policy è ancora più stretta. Soltanto la sottoclasse USB
+Goodix production abilita `enroll_processing_fail_closed`: dopo una
+acquisizione sensor-side consumata, un fallimento di extraction o processing
+del template termina l'action con errore device, senza `FP_DEVICE_RETRY`,
+nuovo `AWAIT_FINGER_ON` o rearm. Gli altri image driver conservano la
+semantica generica. Il launcher rifiuta inoltre qualunque apparente successo
+se l'output di `fprintd-enroll` contiene un marker `enroll-retry-*`.
 
 ## Sequenza futura e contabilità
 
@@ -97,11 +108,14 @@ chiusi.
 
 Il grant viene prima validato senza mutarlo. Collisioni, stato iniziale del
 servizio, libreria di sistema e relativo hash, precondizioni SELinux, snapshot
-della unit e inventario storage devono passare mentre
+della unit, inventario storage e cardinalità passiva esatta di un solo
+`27c6:5125` letta da `/sys/bus/usb/devices` devono passare mentre
 `GRANT_CONSUMED=false`. Il trap è già attivo per snapshot e inventario. Solo
 dopo questi gate viene preparato il namespace one-shot e il claim è acquisito
 con `mkdir` atomica; da `GRANT_CONSUMED=true` il launcher entra subito nello
-staging. Un rifiuto precedente stampa anche
+staging. Dopo lo start del daemon la stessa cardinalità viene verificata di
+nuovo come fence anti-TOCTOU. Un rifiuto precedente al consumo stampa anche il
+conteggio autentico `TARGET_PRECONSUMPTION_MATCH_COUNT` e
 `REAL_USB_ENUMERATION_ATTEMPTED=false` e `LIVE_EXECUTION_PERFORMED=false`.
 
 Il trap di rollback è installato prima della prima mutazione di staging.
@@ -109,8 +123,10 @@ Rimuove soltanto runtime, drop-in e storage con nomi D282 risolti in anticipo,
 ripristina lo stato active/inactive del servizio, confronta unit, libreria di
 sistema e inventario preesistente. Un confronto fallito imposta
 `ROLLBACK_COMPLETE=false`, stampa istruzioni di recovery e vieta altre action.
-Il materiale FP3 autentico resta sotto `private/`; l'export copia soltanto
-`operator.log` e `summary.env` verificandone l'identità byte per byte.
+L'FP3 autentico esiste soltanto nello storage D282 isolato durante le phase A
+e B. Viene eliminato dalla phase C o dal rollback e non viene copiato in
+`private/`; l'export contiene soltanto `operator.log` e `summary.env`,
+verificati byte per byte, quindi `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 
 ## Prerequisiti e comandi offline
 

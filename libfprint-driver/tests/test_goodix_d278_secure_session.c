@@ -18,6 +18,9 @@ void goodix_test_gusb_reset_counts (void);
 void goodix_test_gusb_set_open_close_success (gboolean value);
 void goodix_test_sigfm_match_set_score (gint score);
 void goodix_test_sigfm_extract_set_failure (gboolean fail);
+void goodix_test_sigfm_extract_set_block (gboolean block);
+void goodix_test_sigfm_extract_unblock (void);
+gboolean goodix_test_sigfm_extract_wait_blocked (gint64 timeout_us);
 
 /* ASSERT_CMPMEM in some GLib versions stores lengths in int, which trips
  * -Wsign-conversion under -Wconversion.  Use a size_t-safe local wrapper. */
@@ -80,6 +83,10 @@ typedef struct
   guint verify_no_match_callback_count;
   guint verify_retry_callback_count;
   guint enroll_progress_count;
+  guint enroll_retry_callback_count;
+  guint await_finger_on_count;
+  guint enrollment_extraction_failure_stage;
+  guint await_finger_on_count_at_failure;
   FpiImageDeviceState last_image_state;
   guint material_release_count;
   guint interface_claim_count;
@@ -486,6 +493,8 @@ production_image_state_changed (FpImageDevice      *device,
 
   (void) device;
   fixture->last_image_state = state;
+  if (state == FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON)
+    fixture->await_finger_on_count++;
 }
 
 static void
@@ -560,7 +569,12 @@ production_enroll_progress (FpDevice *device,
 
   (void) device;
   (void) print;
-  g_assert_no_error (error);
+  if (error != NULL)
+    {
+      if (error->domain == FP_DEVICE_RETRY)
+        fixture->enroll_retry_callback_count++;
+      return;
+    }
   g_assert_cmpint (completed_stages, ==,
                    (gint) fixture->enroll_progress_count + 1);
   fixture->enroll_progress_count++;
@@ -1530,6 +1544,12 @@ drive_production_enrollment_stages (Fixture   *fixture,
         post_feed_event (fixture, 0x32, 0x0002, 0x003f, 0x0180);
       post_complete_command (fixture, 0x22);
       post_feed_ack (fixture, 0x22);
+      if (stage == fixture->enrollment_extraction_failure_stage)
+        {
+          fixture->await_finger_on_count_at_failure =
+            fixture->await_finger_on_count;
+          goodix_test_sigfm_extract_set_block (TRUE);
+        }
       post_write_application_data (fixture, client, image_data, image_length);
       g_assert_cmpuint (fixture->enroll_progress_count, ==, stage - 1u);
       g_assert_cmpint (fixture->last_image_state, ==,
@@ -1596,6 +1616,13 @@ drive_production_enrollment_stages (Fixture   *fixture,
             }
           post_feed_event (fixture, 0x34, 0x0200, 0,
                            (guint16) (0x40u + stage * 8u));
+          if (stage == fixture->enrollment_extraction_failure_stage)
+            {
+              g_assert_true (goodix_test_sigfm_extract_wait_blocked (5000000));
+              goodix_test_sigfm_extract_set_failure (TRUE);
+              goodix_test_sigfm_extract_unblock ();
+              return;
+            }
           if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
             {
               post_complete_command (fixture, 0x32);
@@ -2097,6 +2124,100 @@ test_production_one_shot_enrollment_full_tls (void)
   g_assert_cmpuint (fixture->material_release_count, ==, 1u);
   g_assert_null (goodix_fpimage_device_get_context (fixture->device));
   client_clear (&client);
+  fixture_free (fixture);
+}
+
+static void
+test_d282_01_production_intermediate_enrollment_extraction_failure (void)
+{
+  Fixture *fixture = fixture_new_production_action ();
+  g_autoptr(FpPrint) template = fp_print_new (FP_DEVICE (fixture->device));
+  TlsClient client;
+  GoodixProductionEnrollmentAudit audit;
+  guint in_at_failure;
+  guint out_at_failure;
+  gint64 deadline;
+
+  fp_print_set_finger (template, FP_FINGER_RIGHT_INDEX);
+  fp_print_set_username (template, "d282-01-enrollment-fail-closed");
+  fp_device_enroll (FP_DEVICE (fixture->device),
+                    g_steal_pointer (&template), NULL,
+                    production_enroll_progress, fixture, NULL,
+                    (GAsyncReadyCallback) production_enroll_complete,
+                    fixture);
+  production_establish_tls_for_action (fixture, &client);
+  drive_production_enrollment_bootstrap (fixture, &client);
+
+  /* Stage three is already a consumed sensor acquisition.  A host SIGFM
+   * extraction failure must terminate this action after its release tail and
+   * before the following rearm can request a fourth contact. */
+  fixture->enrollment_extraction_failure_stage = 3u;
+  g_test_expect_message ("libfprint-image_device", G_LOG_LEVEL_WARNING,
+                         "Failed to detect minutiae:*");
+  drive_production_enrollment_stages (fixture, &client);
+  in_at_failure = fixture->in_submit_count;
+  out_at_failure = goodix_fpi_usb_backend_get_out_submit_count (
+    fixture->backend);
+
+  deadline = g_get_monotonic_time () + 5000000;
+  while (!fixture->done &&
+         fixture->last_image_state != FPI_IMAGE_DEVICE_STATE_DEACTIVATING &&
+         fixture->last_image_state != FPI_IMAGE_DEVICE_STATE_INACTIVE &&
+         g_get_monotonic_time () < deadline)
+    g_main_context_iteration (NULL, FALSE);
+
+  {
+    g_autoptr(GError) cancelled = g_error_new_literal (
+      G_IO_ERROR, G_IO_ERROR_CANCELLED,
+      "D282 enrollment extraction terminal cleanup");
+
+    while (!g_queue_is_empty (fixture->out))
+      complete_submission (fixture, pop_out (fixture), cancelled);
+    if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
+      goodix_device_context_complete_receive (
+        fixture->context, fixture->generation, NULL, 0, cancelled);
+  }
+  production_wait (fixture);
+  g_test_assert_expected_messages ();
+  goodix_test_sigfm_extract_set_failure (FALSE);
+
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, FP_DEVICE_ERROR,
+                  FP_DEVICE_ERROR_DATA_INVALID);
+  g_assert_cmpuint (fixture->enroll_progress_count, ==, 2u);
+  g_assert_cmpuint (fixture->enroll_retry_callback_count, ==, 0u);
+  g_assert_cmpuint (fixture->await_finger_on_count, ==,
+                    fixture->await_finger_on_count_at_failure);
+  g_assert_cmpuint (fixture->in_submit_count, ==, in_at_failure);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (
+                     fixture->backend), ==, out_at_failure);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_cmpuint (audit.production_action, ==, FPI_DEVICE_ACTION_ENROLL);
+  g_assert_cmpuint (audit.production_action_attempt_count, ==, 1u);
+  g_assert_cmpuint (audit.production_rejected_action_count, ==, 0u);
+  g_assert_true (audit.production_action_consumed);
+  g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
+  g_assert_cmpuint (audit.secure.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.enrollment_events.primary_b0_count, ==, 3u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
+    ==, 3u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.inter_stage_rearm_count, ==, 2u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.command_32_count, ==, 3u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+
+  g_clear_error (&fixture->action_error);
+  client_clear (&client);
+  production_close_epoch (fixture);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 1u);
+  g_assert_cmpuint (fixture->interface_release_count, ==, 1u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 1u);
   fixture_free (fixture);
 }
 
@@ -3550,6 +3671,8 @@ main (int argc,
                    test_production_one_shot_enrollment_full_tls);
   g_test_add_func ("/goodix/d280/production-two-epoch-template-reuse",
                    test_d280_01_production_two_epoch_template_reuse);
+  g_test_add_func ("/goodix/d282/production-enrollment-intermediate-extraction-terminal",
+                   test_d282_01_production_intermediate_enrollment_extraction_failure);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",
                    test_integrated_context_cancel_secure);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-post-tls",

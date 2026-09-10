@@ -23,7 +23,11 @@ grep -F 'fpi_device_get_verify_data' \
   "$source_root/libfprint/fpi-image-device.c" >/dev/null
 grep -F 'fpi_print_sigfm_match' \
   "$source_root/libfprint/fpi-image-device.c" >/dev/null
+grep -F 'cls->enroll_processing_fail_closed' \
+  "$source_root/libfprint/fpi-image-device.c" >/dev/null
 grep -F 'FPI_DEVICE_ACTION_VERIFY) ?' \
+  "$snapshot_root/libfprint-driver/goodix_fpimage_device.c" >/dev/null
+grep -F 'img_class->enroll_processing_fail_closed = TRUE' \
   "$snapshot_root/libfprint-driver/goodix_fpimage_device.c" >/dev/null
 
 meson setup "$build_dir" "$source_root" \

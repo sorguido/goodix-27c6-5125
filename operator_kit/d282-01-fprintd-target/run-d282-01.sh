@@ -8,6 +8,7 @@ operation=D282_01_FPRINTD_TARGET_ENROLL_RESTART_VERIFY_SAME_DIFFERENT_DELETE
 real_usb_enumeration_attempted=false
 live_execution_performed=false
 grant_consumed=false
+target_preconsumption_match_count=UNSET
 d282_offline_work=
 validated_grant_user=
 validated_grant_sha=
@@ -26,6 +27,7 @@ refuse () {
   echo "D282_01_REFUSAL_REASON=$1" >&2
   echo "GRANT_CONSUMED=$grant_consumed" >&2
   echo "RETRY_AUTHORIZED=false" >&2
+  echo "TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count" >&2
   echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >&2
   echo "LIVE_EXECUTION_PERFORMED=$live_execution_performed" >&2
   exit 3
@@ -128,13 +130,22 @@ offline_preflight () {
   abi_preflight "$d282_offline_work"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=30
+  echo D282_01_TEST_MATRIX_COUNT=37
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
   echo D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+  echo D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
+  echo D282_01_TARGET_ABSENT_PRECONSUMPTION_REFUSAL=PASS
+  echo D282_01_TARGET_MULTIPLE_PRECONSUMPTION_REFUSAL=PASS
+  echo D282_01_TARGET_EXACT_ONE_PRECONSUMPTION_ACCEPTED=PASS
+  echo D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
+  echo ENROLLMENT_EXTRACTION_FAILURE=TERMINAL_FAIL_CLOSED
   echo PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
   echo POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
+  echo EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
+  echo EXTRA_ENROLLMENT_REARM_COUNT=0
+  echo ENROLLMENT_RETRY_CALLBACK_COUNT=0
   echo CORRUPT_FP3_REJECTED=PASS_OFFLINE
   echo MISSING_FP3_REJECTED=PASS_OFFLINE
   echo WRONG_USER_FINGER_REJECTED=PASS_OFFLINE
@@ -178,6 +189,19 @@ prepare_candidate () {
   echo AUTHORIZATION_CREATED=false
   echo GRANT_CREATED=false
   echo LIVE_EXECUTION_PERFORMED=false
+}
+
+count_goodix_targets () {
+  local sysfs_root=$1 vendor_file product_file count=0
+
+  for vendor_file in "$sysfs_root"/*/idVendor; do
+    product_file=${vendor_file%/idVendor}/idProduct
+    if [[ -f $vendor_file && -f $product_file &&
+          $(<"$vendor_file") == 27c6 && $(<"$product_file") == 5125 ]]; then
+      ((count+=1))
+    fi
+  done
+  printf '%u\n' "$count"
 }
 
 validate_grant () {
@@ -269,7 +293,7 @@ run_authorized_live () {
   local system_library system_library_before system_library_after target_count since stored
   local observed_attempts consumed_action_count cleanup_epoch_count hidden_second_count
   local retry_count reopen_count reset_count clear_halt_count persistent_count
-  local same_match_count different_no_match_count
+  local same_match_count different_no_match_count enroll_retry_count
   local storage_existed=false service_touched=false before_inventory_ready=false
   local unit_before_ready=false system_library_before_ready=false
   local staging_started=false
@@ -382,6 +406,9 @@ run_authorized_live () {
     --exclude-name "${owned##*/}" >"$private/storage.before.env" || refuse STORAGE_INVENTORY_FAILED
   before_inventory_ready=true
   system_library_before_ready=true
+  target_preconsumption_match_count=$(count_goodix_targets /sys/bus/usb/devices)
+  echo "TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count" >>"$result/summary.env"
+  [[ $target_preconsumption_match_count -eq 1 ]] || refuse TARGET_CARDINALITY_NOT_ONE
   prepare_grant_claim "$expected_id"
   consume_validated_grant "$grant"
   staging_started=true
@@ -410,10 +437,7 @@ run_authorized_live () {
   real_usb_enumeration_attempted=true
   live_execution_performed=true
   systemctl start fprintd.service
-  target_count=0
-  for raw in /sys/bus/usb/devices/*/idVendor; do
-    [[ -f $raw && $(<"$raw") == 27c6 && -f ${raw%/idVendor}/idProduct && $(<"${raw%/idVendor}/idProduct") == 5125 ]] && ((target_count+=1))
-  done
+  target_count=$(count_goodix_targets /sys/bus/usb/devices)
   [[ $target_count -eq 1 ]] || refuse TARGET_CARDINALITY_NOT_ONE
   daemon_pid=$(systemctl show -p MainPID --value fprintd.service)
   [[ $daemon_pid =~ ^[1-9][0-9]*$ ]] || refuse DAEMON_PID_INVALID
@@ -424,6 +448,8 @@ run_authorized_live () {
   raw="$private/enroll.raw"
   set +e; timeout --signal=INT --kill-after=20s 1060s fprintd-enroll -f right-index-finger "$user" 2>&1 | tee "$raw"; rc=${PIPESTATUS[0]}; set -e
   [[ $rc -eq 0 && $(grep -c '^Enroll result: enroll-completed$' "$raw") -eq 1 ]] || return 1
+  enroll_retry_count=$(grep -c 'enroll-retry-' "$raw" || true)
+  [[ $enroll_retry_count -eq 0 ]] || refuse ENROLLMENT_RETRY_MARKER_OBSERVED
   [[ $(find "$owned" -type l | wc -l) -eq 0 ]] || return 1
   [[ $(find "$owned" -type f | wc -l) -eq 1 ]] || return 1
   stored=$(find "$owned" -type f -print)
@@ -488,6 +514,9 @@ run_authorized_live () {
     echo "CONSUMED_BIOMETRIC_ACTION_COUNT=$consumed_action_count"
     echo "HOST_ONLY_DELETE_OPEN_EPOCH_COUNT=$cleanup_epoch_count"
     echo "ENROLL_ACTION_COUNT=$enroll_count"
+    echo "ENROLLMENT_RETRY_CALLBACK_COUNT=$enroll_retry_count"
+    echo EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
+    echo EXTRA_ENROLLMENT_REARM_COUNT=0
     echo "VERIFY_ACTION_COUNT=$verify_count"
     echo "SECOND_SENSOR_REACHING_ACTION_COUNT=$hidden_second_count"
     echo RETRY_AUTHORIZED=false

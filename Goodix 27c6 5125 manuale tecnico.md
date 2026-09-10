@@ -162,15 +162,32 @@ autorizza alcun retry.
 Il correttivo grant-ordering D282/01 valida il grant senza consumarlo e porta
 prima del claim atomico tutti i gate host-only fallibili: collisioni,
 stato iniziale fprintd, libreria/hash di sistema, precondizioni SELinux,
-snapshot unit e inventario storage. Il trap è già installato per gli ultimi
-due. Solo dopo il loro PASS viene acquisito il claim one-shot, impostato
-`GRANT_CONSUMED=true` ed eseguito immediatamente lo staging. Ogni rifiuto
-pre-consumo conserva grant, zero enumerazione USB e zero live; ogni failure
-post-consumo conserva invece il divieto assoluto di retry e attraversa il
-rollback.
+snapshot unit, inventario storage e conteggio passivo esatto di un solo
+`27c6:5125` tramite sysfs. Il trap è già installato per gli ultimi due gate
+con output. Solo dopo il loro PASS viene acquisito il claim one-shot,
+impostato `GRANT_CONSUMED=true` ed eseguito immediatamente lo staging. Il
+conteggio post-start resta come controllo anti-TOCTOU. Ogni rifiuto
+pre-consumo conserva grant, zero enumerazione USB attiva e zero live; ogni
+failure post-consumo conserva invece il divieto assoluto di retry e attraversa
+il rollback.
 
-La matrice D282 è 30/30; regressioni D281 6/6 e daemon/D-Bus privato PASS;
-suite D278/D279/D280 26/26 normal e 26/26 ASan/UBSan; build Fedora/SIGFM,
+La seconda fence D282/01 riguarda l'enrollment: la sola sottoclasse USB Goodix
+production abilita la policy interna `enroll_processing_fail_closed`. Dopo
+che una acquisizione sensor-side è stata consumata, un errore di extraction o
+template processing diventa `FP_DEVICE_ERROR_DATA_INVALID` terminale, non
+`FP_DEVICE_RETRY`; gli altri driver conservano il comportamento generico. La
+regressione allo stage intermedio 3 prova zero nuovo `AWAIT_FINGER_ON`, zero
+rearm oltre i due già necessari, zero callback retry, nessun submit successivo
+e cleanup/backend drenati. Il launcher rifiuta inoltre un enrollment
+apparentemente riuscito se l'output contiene `enroll-retry-*`.
+
+L'FP3 autentico futuro esiste soltanto nello storage D282 isolato durante le
+phase A/B; phase C o rollback lo eliminano. Non viene creata una copia in
+`private/` e l'export sanitizzato resta limitato a `operator.log` e
+`summary.env`.
+
+La matrice D282 è 37/37; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+suite D278/D279/D280/D282 27/27 normal e 27/27 ASan/UBSan; build Fedora/SIGFM,
 registry e ABI fprintd PASS. Il different-finger autentico, l'esecuzione sotto
 servizio systemd target, storage FP3 SIGFM e rollback production restano
 necessariamente live. Il kit è quindi `READY` per review AI-PM indipendente e
@@ -259,12 +276,18 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=30/30_PASS
+D282_01_REQUIRED_MATRIX=37/37_PASS
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
+D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
+ENROLLMENT_EXTRACTION_FAILURE=TERMINAL_FAIL_CLOSED
+EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
+EXTRA_ENROLLMENT_REARM_COUNT=0
+ENROLLMENT_RETRY_CALLBACK_COUNT=0
 PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
 POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
-D282_01_D278_D279_D280_NORMAL=26/26_PASS
-D282_01_D278_D279_D280_ASAN_UBSAN=26/26_PASS
+D282_01_D278_D279_D280_NORMAL=27/27_PASS
+D282_01_D278_D279_D280_ASAN_UBSAN=27/27_PASS
 D282_01_OPERATOR_KIT=operator_kit/d282-01-fprintd-target
 D282_01_OFFLINE_PREFLIGHT=PASS
 D282_01_PAM_IN_SCOPE=false

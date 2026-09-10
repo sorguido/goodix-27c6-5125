@@ -1427,7 +1427,8 @@ goodix_fpimage_device_init (GoodixFpImageDevice *self)
 static void
 goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
 {
-  FpDeviceClass *device_class = FP_DEVICE_CLASS (klass);
+  FpDeviceClass      *device_class = FP_DEVICE_CLASS (klass);
+  FpImageDeviceClass *img_class   = FP_IMAGE_DEVICE_CLASS (klass);
 
   /* fp_device_set_property() consults the final instance class before
    * constructed() copies the transport type into private state. */
@@ -1436,6 +1437,11 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
   device_class->type      = FP_DEVICE_TYPE_USB;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
   device_class->id_table  = goodix_usb_id_table;
+
+  /* The production protocol permits exactly eight sensor acquisitions for
+   * enrollment.  Once an image has been delivered, host-side SIGFM failure
+   * is terminal and must not become an implicit ninth contact. */
+  img_class->enroll_processing_fail_closed = TRUE;
 }
 
 static void

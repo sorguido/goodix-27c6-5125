@@ -74,6 +74,19 @@ backend è drenato e retry/reopen/reset/clear-halt restano zero. Un secondo
 VerifyStart inatteso usa lo stesso fence. Un nuovo open epoch è possibile solo
 dopo close esplicito; non è prodotto dal callback retry.
 
+L'enrollment ha un contratto diverso e più stretto: otto acquisizioni
+sensor-side massime, senza contatto sostitutivo. La policy interna
+`enroll_processing_fail_closed` è abilitata soltanto dalla sottoclasse USB
+Goodix production. Se extraction o processing del template falliscono dopo
+una acquisizione consumata, il core restituisce
+`FP_DEVICE_ERROR_DATA_INVALID`, deattiva e completa terminalmente senza
+inoltrare `FP_DEVICE_RETRY`. La regressione induce il failure allo stage 3:
+tre stage sensor-side risultano consumati, soltanto due rearm precedenti,
+nessun nuovo `AWAIT_FINGER_ON`, nessun quarto contatto, nessun submit
+successivo, callback retry zero e backend drenato. Il launcher aggiunge una
+seconda fence e rifiuta il successo se `fprintd-enroll` mostra marker
+`enroll-retry-*`.
+
 ## Staging e storage reversibili
 
 Il kit `operator_kit/d282-01-fprintd-target/` costruisce da `git archive` del
@@ -99,9 +112,13 @@ del grant. Il launcher valida prima formato, baseline, operation, ID, owner,
 mode e utente; completa poi tooling, collisioni, stato fprintd, libreria/hash,
 precondizioni SELinux, creazione del result sink, snapshot della unit e
 inventario storage. Il trap è attivo prima degli ultimi due controlli. Solo
-dopo il PASS completo prepara il namespace one-shot e acquisisce con `mkdir`
-atomica il claim; imposta immediatamente `GRANT_CONSUMED=true` e passa allo
-staging. Non resta alcun probe `command -v`/`getenforce` dopo il consumo.
+dopo questi controlli conta passivamente le entry esatte `27c6:5125` in
+`/sys/bus/usb/devices`: zero o più di una rifiutano con il conteggio osservato,
+grant intatto, zero enumerazione attiva e zero live. Dopo il PASS completo
+prepara il namespace one-shot e acquisisce con `mkdir` atomica il claim;
+imposta immediatamente `GRANT_CONSUMED=true` e passa allo staging. Il
+controllo ripetuto dopo lo start di fprintd resta come fence anti-TOCTOU. Non
+resta alcun probe `command -v`/`getenforce` dopo il consumo.
 
 La futura sequenza usa un grant composto per evitare che un errore host-side
 dopo enrollment obblighi a ripetere otto contatti. Le phase A/B/C sono gated
@@ -114,8 +131,9 @@ quindi open epoch e action consumate. Tutti i contatori finali sono calcolati
 dai log, non stampati come esito predefinito.
 
 L'export contiene soltanto `operator.log` e `summary.env` byte-identici. Gli
-inventari e ogni FP3 autentico restano in `private/` e
-`TEMPLATE_INCLUDED_IN_EXPORT=false`.
+inventari restano in `private/`; l'FP3 autentico rimane esclusivamente nello
+storage D282 isolato durante A/B, viene eliminato in C o dal rollback e non è
+copiato in `private/`. `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 
 ## Matrice obbligatoria e risultati
 
@@ -151,15 +169,22 @@ inventari e ogni FP3 autentico restano in `private/` e
 | 28 | grant malformed/baseline/operation/user errati pre-consumo | modello + sorgente | PASS |
 | 29 | claim one-shot impedisce riuso | modello + `mkdir` atomica | PASS |
 | 30 | failure post-consumo: rollback, zero retry; flow invariato | modello + sorgente | PASS |
+| 31 | target assente contato passivamente | sysfs sintetico | PASS |
+| 32 | target multiplo contato passivamente | sysfs sintetico | PASS |
+| 33 | cardinalità esatta uno accettata | sysfs sintetico | PASS |
+| 34 | gate cardinalità prima del claim atomico | modello + audit launcher | PASS |
+| 35 | controllo cardinalità post-start preservato | audit launcher anti-TOCTOU | PASS |
+| 36 | extraction enrollment intermedia terminale solo Goodix production | action-shaped stage 3 | PASS |
+| 37 | marker enrollment retry rifiutato prima del restart | audit launcher | PASS |
 
 Esecuzioni di closure:
 
-- `analysis.D282.test_d282_01_offline_contract`: **30/30 PASS**;
+- `analysis.D282.test_d282_01_offline_contract`: **37/37 PASS**;
 - `analysis.D281.test_d281_01_fprintd_storage_integration`: **6/6 PASS**;
 - integrazione D281 con vero daemon/client, bus privato e USB compile-disabled:
   **PASS**;
-- suite D278/D279/D280 production-shaped: **26/26 PASS normal** e
-  **26/26 PASS ASan/UBSan**;
+- suite D278/D279/D280/D282 production-shaped: **27/27 PASS normal** e
+  **27/27 PASS ASan/UBSan**;
 - build Fedora 44/libfprint 1.94.100 con vero SIGFM/OpenCV, stage 8, FP3,
   identify e VERIFY same-template: **PASS**;
 - standard driver registry e ABI esatto fprintd: **PASS**;
@@ -173,8 +198,9 @@ dichiarata una soglia FAR/FRR. Soltanto una futura Human Gate può elevare
 
 Il percorso futuro è stato riesaminato da CLI → D-Bus → fprintd → API
 libfprint → core FpImageDevice/SIGFM → driver Goodix. VERIFY non introduce
-protocollo rispetto all'IDENTIFY D280 target-proven. Ogni retry è bounded dal
-fence prima del sensore. A e B sono auditati prima di avanzare; ogni failure
+protocollo rispetto all'IDENTIFY D280 target-proven. Il retry VERIFY è bounded
+dal fence prima del sensore; un processing failure enrollment è invece
+terminale già dopo l'acquisizione consumata. A e B sono auditati prima di avanzare; ogni failure
 attiva rollback, senza ripetere enrollment. Stato preesistente e libreria di
 sistema sono confrontati dopo cleanup. Non compare alcuna modifica PAM.
 
@@ -183,6 +209,9 @@ di una eventuale richiesta di Human Gate. D283/PAM non è preparato.
 
 ```text
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
+D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
+EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
 PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
 POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false

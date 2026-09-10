@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -15,6 +16,7 @@ FPRINTD = ROOT / "reference/fprintd-fedora44-1.94.5/source/src/device.c"
 VERIFY_UTILITY = ROOT / "reference/fprintd-fedora44-1.94.5/source/utils/verify.c"
 FPRINTD_SPEC = ROOT / "reference/fprintd-fedora44-1.94.5/fprintd.spec"
 CORE = ROOT / "reference/libfprint-fedora44-1.94.100/source/libfprint"
+ROCKY_CORE = ROOT / "Rockytkg/libfprint/libfprint"
 DRIVER = ROOT / "libfprint-driver/goodix_fpimage_device.c"
 PRODUCTION_TEST = ROOT / "libfprint-driver/tests/test_goodix_d278_secure_session.c"
 FEDORA_ACTION_TEST = ROOT / "libfprint-driver/tests/test_goodix_fedora44_nbis_action.c"
@@ -42,6 +44,8 @@ class D282OfflineContract(unittest.TestCase):
         cls.verify_utility = VERIFY_UTILITY.read_text()
         cls.core = (CORE / "fpi-image-device.c").read_text()
         cls.public_core = (CORE / "fp-image-device.c").read_text()
+        cls.rocky_core = (ROCKY_CORE / "fpi-image-device.c").read_text()
+        cls.rocky_core_header = (ROCKY_CORE / "fpi-image-device.h").read_text()
         cls.driver = DRIVER.read_text()
         cls.production_test = PRODUCTION_TEST.read_text()
         cls.fedora_action_test = FEDORA_ACTION_TEST.read_text()
@@ -270,6 +274,90 @@ class D282OfflineContract(unittest.TestCase):
         positions = [live.index(item) for item in sequence]
         self.assertEqual(positions, sorted(positions))
 
+    def test_31_missing_target_is_counted_before_consumption(self):
+        self.assertEqual(self._count_synthetic_targets([]), 0)
+
+    def test_32_multiple_targets_are_counted_before_consumption(self):
+        self.assertEqual(self._count_synthetic_targets([
+            ("1-1", "27c6", "5125"),
+            ("2-1", "27c6", "5125"),
+            ("3-1", "1234", "5678"),
+        ]), 2)
+
+    def test_33_exactly_one_target_passes_cardinality_count(self):
+        self.assertEqual(self._count_synthetic_targets([
+            ("1-1", "27c6", "5125"),
+            ("2-1", "27c6", "0001"),
+        ]), 1)
+
+    def test_34_target_cardinality_gate_precedes_atomic_claim(self):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        count = live.index(
+            "target_preconsumption_match_count=$(count_goodix_targets")
+        gate = live.index("refuse TARGET_CARDINALITY_NOT_ONE", count)
+        prepare = live.index('prepare_grant_claim "$expected_id"')
+        consume = live.index('consume_validated_grant "$grant"')
+        self.assertLess(count, gate)
+        self.assertLess(gate, prepare)
+        self.assertLess(prepare, consume)
+        self.assertIn(
+            'TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count',
+            function_slice(self.kit, "refuse ()", "is_sha ()"))
+        self._assert_preconsumption_refusal("TARGET_CARDINALITY_NOT_ONE")
+
+    def test_35_post_start_cardinality_check_remains_as_anti_toctou(self):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        consume = live.index('consume_validated_grant "$grant"')
+        start = live.index("systemctl start fprintd.service", consume)
+        post_count = live.index(
+            "target_count=$(count_goodix_targets /sys/bus/usb/devices)", start)
+        post_gate = live.index("refuse TARGET_CARDINALITY_NOT_ONE", post_count)
+        self.assertLess(start, post_count)
+        self.assertLess(post_count, post_gate)
+        self.assertEqual(live.count("count_goodix_targets /sys/bus/usb/devices"), 2)
+
+    def test_36_goodix_production_enrollment_processing_failure_is_terminal(self):
+        usb_class = function_slice(
+            self.driver, "goodix_usb_fpimage_device_class_init (",
+            "goodix_usb_fpimage_device_init (")
+        base_class = function_slice(
+            self.driver, "goodix_fpimage_device_class_init (",
+            "goodix_fpimage_device_init (")
+        self.assertIn("enroll_processing_fail_closed", self.rocky_core_header)
+        self.assertIn("img_class->enroll_processing_fail_closed = TRUE",
+                      usb_class)
+        self.assertNotIn("enroll_processing_fail_closed", base_class)
+        self.assertIn("action == FPI_DEVICE_ACTION_ENROLL", self.rocky_core)
+        self.assertIn("cls->enroll_processing_fail_closed", self.rocky_core)
+        self.assertIn("FP_DEVICE_ERROR_DATA_INVALID", self.rocky_core)
+        self.assertIn("cls->enroll_processing_fail_closed", self.core)
+        self.assertIn("FP_DEVICE_ERROR_DATA_INVALID", self.core)
+        self.assertIn("cls->enroll_processing_fail_closed", self.build)
+        self.assertIn(
+            "production-enrollment-intermediate-extraction-terminal",
+            self.production_test)
+        for marker in (
+                "enroll_retry_callback_count, ==, 0u",
+                "await_finger_on_count_at_failure",
+                "goodix_fpi_usb_backend_is_drained",
+                "audit.usb_real_submit_count, ==, 0u"):
+            self.assertIn(marker, self.production_test)
+
+    def test_37_launcher_rejects_enrollment_retry_markers(self):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        enroll = live.index("fprintd-enroll -f right-index-finger")
+        marker = live.index("grep -c 'enroll-retry-'", enroll)
+        refusal = live.index("refuse ENROLLMENT_RETRY_MARKER_OBSERVED", marker)
+        restart = live.index("systemctl restart fprintd.service", refusal)
+        self.assertLess(enroll, marker)
+        self.assertLess(marker, refusal)
+        self.assertLess(refusal, restart)
+        for marker in (
+                "ENROLLMENT_RETRY_CALLBACK_COUNT=$enroll_retry_count",
+                "EXTRA_ENROLLMENT_CONTACT_REQUESTED=false",
+                "EXTRA_ENROLLMENT_REARM_COUNT=0"):
+            self.assertIn(marker, live)
+
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
         live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
         anchor = source_anchor or f"refuse {reason}"
@@ -285,6 +373,24 @@ class D282OfflineContract(unittest.TestCase):
         self.assertFalse(outcome.real_usb_enumeration_attempted)
         self.assertFalse(outcome.live_execution_performed)
         self.assertFalse(outcome.retry_authorized)
+
+    def _count_synthetic_targets(self, entries):
+        count_function = function_slice(
+            self.kit, "count_goodix_targets ()", "validate_grant ()")
+        with tempfile.TemporaryDirectory(prefix="goodix-d282-sysfs-") as td:
+            root = Path(td)
+            for name, vendor, product in entries:
+                device = root / name
+                device.mkdir()
+                (device / "idVendor").write_text(vendor + "\n")
+                (device / "idProduct").write_text(product + "\n")
+            result = subprocess.run(
+                ["bash", "-c",
+                 "set -euo pipefail\n" + count_function +
+                 '\ncount_goodix_targets "$1"',
+                 "d282-cardinality-test", str(root)],
+                check=True, capture_output=True, text=True)
+            return int(result.stdout.strip())
 
     def _exercise_staging(self, fail_after, seed=False):
         with tempfile.TemporaryDirectory(prefix="goodix-d282-model-") as td:

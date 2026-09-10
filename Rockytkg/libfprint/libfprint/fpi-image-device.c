@@ -246,6 +246,7 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
   GError *error = NULL;
   FpImageDevice *self = FP_IMAGE_DEVICE (user_data);
   FpDevice *device = FP_DEVICE (self);
+  FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (self);
   FpImageDevicePrivate *priv;
   FpiDeviceAction action;
 
@@ -295,6 +296,23 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
               return;
             }
         }
+    }
+
+  /* Some sensor protocols consume a bounded enrollment acquisition before
+   * host-side extraction runs.  Their production class may opt into a
+   * terminal policy so an extraction/template failure cannot silently ask
+   * the user for an additional, protocol-incompatible contact. */
+  if (action == FPI_DEVICE_ACTION_ENROLL &&
+      cls->enroll_processing_fail_closed && error != NULL)
+    {
+      g_clear_object (&print);
+      g_clear_error (&error);
+      error = fpi_device_error_new_msg (
+        FP_DEVICE_ERROR_DATA_INVALID,
+        "Enrollment sample processing failed after sensor acquisition");
+      fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
+      fpi_image_device_deactivate (self, TRUE);
+      return;
     }
 
   if (action == FPI_DEVICE_ACTION_ENROLL)
