@@ -174,7 +174,7 @@ class D282OfflineContract(unittest.TestCase):
         self.assertIn(".goodix-d282-01-", self.kit)
         self.assertNotIn("rm -rf /var/lib/fprint", self.kit)
         self.assertIn("TEMPLATE_INCLUDED_IN_EXPORT=false", self.kit)
-        self.assertIn("D282_01_RESULT=FAIL_ROLLBACK", self.kit)
+        self.assertIn("${result_prefix}_RESULT=FAIL_ROLLBACK", self.kit)
         self.assertIn("local exit_status=$?", self.kit)
         self.assertIn("live_run_return_code=$exit_status", self.kit)
 

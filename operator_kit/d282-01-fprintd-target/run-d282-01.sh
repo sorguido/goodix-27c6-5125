@@ -42,6 +42,7 @@ live_service_touched=false
 live_cleanup_armed=false
 live_cleanup_test_mode=false
 live_run_return_code=1
+live_result_prefix=D282_01
 live_critical=(libfprint-driver reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 Rockytkg analysis/D282
   operator_kit/d282-01-fprintd-target
@@ -90,6 +91,7 @@ state_value () {
 
 cleanup_live () {
   local exit_status=$?
+  local result_prefix=${live_result_prefix:-D282_01}
   local rollback=true service_rollback=true service_state_restored=true
   local staging_rollback=true
   local storage_rollback=true unit_rollback=true library_rollback=true
@@ -164,10 +166,10 @@ cleanup_live () {
   fi
   [[ $rollback == true ]] || recovery_required=true
   if [[ $rollback != true ]]; then
-    sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ROLLBACK/' \
+    sed -i "s/^${result_prefix}_RESULT=.*/${result_prefix}_RESULT=FAIL_ROLLBACK/" \
       "$live_result/summary.env"
   elif [[ $live_run_return_code -ne 0 ]]; then
-    sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ACTION_OR_AUDIT/' \
+    sed -i "s/^${result_prefix}_RESULT=.*/${result_prefix}_RESULT=FAIL_ACTION_OR_AUDIT/" \
       "$live_result/summary.env"
   elif [[ $staging_probe_execution_performed == true ]]; then
     sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=PASS_STAGING_PROBE/' \
@@ -620,8 +622,10 @@ validate_selinux_preconditions () {
 write_systemd_dropin () {
   local runtime=$1 owned=$2 dropin=$3 profile=$4 relative_state allowlist
 
-  [[ $runtime == /run/goodix-d282-01/* ]] || refuse RUNTIME_PATH_UNSAFE
-  [[ $owned == /var/lib/fprint/.goodix-d282-01-* ]] ||
+  [[ $runtime == /run/goodix-d282-01/* ||
+     $runtime == /run/goodix-d283-01/* ]] || refuse RUNTIME_PATH_UNSAFE
+  [[ $owned == /var/lib/fprint/.goodix-d282-01-* ||
+     $owned == /var/lib/fprint/.goodix-d283-01-* ]] ||
     refuse STORAGE_PATH_UNSAFE
   relative_state=${owned#/var/lib/}
   case $profile in
@@ -1314,6 +1318,10 @@ export_staging_probe_results () {
   echo BIOMETRIC_ACTION_COUNT=0
   echo REAL_SENSOR_ACCESSED=false
 }
+
+if [[ ${D282_LIBRARY_ONLY:-false} == true ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 case ${1:-} in
   --offline-preflight) [[ $# -eq 2 ]] || refuse USAGE; offline_preflight "$2" ;;
