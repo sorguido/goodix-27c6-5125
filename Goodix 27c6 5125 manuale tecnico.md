@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente D280/01 — riuso FP3 post-close e identify composti offline
+### Stato corrente — D280 chiuso live; prossimo boundary D281/01 fprintd
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -57,29 +57,53 @@ bitfield di contatto nonzero entro `0x003f`, zero esatto nei contesti
 no-touch e derivazione per-canale con fallback OEM. Non compare un nono
 `0x32` dopo lo stage 8.
 
-La run D279 non aveva serializzato o salvato il template. D280/01 chiude ora
-offline la composizione immediatamente successiva senza retroattribuire quel
-risultato al live: nel build esatto Fedora 44/libfprint 1.94.100, otto raster
-sintetici attraversano R2 e SIGFM reali, il template viene serializzato FP3,
-il print in memoria viene distrutto, il device virtuale viene chiuso e
-riaperto, e i soli byte deserializzati completano una identify a singola
-acquisizione (`score 1026/40`). Un header FP3 corrotto è rifiutato
-fail-closed. Il blob non è scritto su disco e fprintd non viene eseguito.
+D280/01 ha poi eseguito una sola Human Gate sulla baseline live
+`6cbcb9af88fa5401895208e9fd5217a6374ffb85`. Il grant è consumato; nessun
+retry o accesso live è autorizzato. Gli originali sanitizzati byte-identici,
+senza template, sono ora canonici in
+`captures/D280_01/D28001_20260910T082439Z_6cbcb9af/sanitized/`:
 
-In parallelo, il full harness production-shaped completa enrollment → close →
-open → identify attraverso context, backend, pre-session sync, secure-session
-e TLS nuovi. Match e no-match sono eseguiti in open epoch separati, ciascuno
-con una sola acquisizione, zero re-arm/retry e cleanup bilanciato. Questo
-harness usa materiale/backend sintetici e un test double SIGFM; la prova di
-serializzazione/match SIGFM reale appartiene al build target complementare.
-La suite secure-session passa 26/26 normale e 26/26 ASan/UBSan; la verifica
-strutturale D280 passa 10/10, inclusi sette scenari dei contatori runtime, e
-l'auditor D279 hash-pinned passa 2/2. USB reale e fprintd restano a zero.
+```text
+operator.log SHA-256 = 6b30227b831eb1f534a97afdff18a264985f93a587d030ea2016a62690bc7580
+summary.env SHA-256  = 8589963046c5c020158ab365032a6ba3d2565869fa4195e32ef3c263aae592a4
+TEMPLATE_INCLUDED_IN_EXPORT=false
+```
 
-**NON PROVATO:** nessun template biometrico autentico è stato persistito o
-riusato; identify Linux sul target, soglia FAR/FRR production,
-fprintd/D-Bus/PAM/login/sudo e assenza di persistenza sensor-side restano
-aperti. Zero famiglie persistenti note è telemetria di allowlist, non prova
+**OBSERVED:** enrollment autentico 8/8, scrittura FP3 su tmpfs, close del
+primo epoch, nuovo open, rilettura e rimozione del pathname prima dell'action,
+deserializzazione compatibile, una sola acquisizione identify e match dello
+stesso indice destro istruito all'operatore. I callback sono match/no-match/
+retry `1/0/0`; first-image/release-tail/single-acquisition-terminal sono
+`1/1/1`; re-arm è zero. Entrambi gli open e i close riescono, i backend sono
+drenati e retry/reopen transport/reset/clear-halt e famiglie persistenti note
+sono zero. Cleanup file e directory tmpfs è completo.
+
+L'eseguibile originale ha comunque restituito `1`, con audit identify e
+aggregate marker falsi. La review indipendente hash-pinned ha confrontato
+tutti i 23 predicati di `common_audit_pass()` e tutti i 9 predicati aggiunti da
+`identify_audit_pass()`. Ogni condizione era soddisfatta tranne la richiesta
+storica `post_tls.terminal == true`.
+
+**VERIFIED:** `lifecycle_fail()` è l'unico percorso che imposta
+`GOODIX_POST_TLS_PHASE_TERMINAL` e il flag `post_tls.terminal`. Il successo
+`GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION` termina invece in
+`GOODIX_POST_TLS_PHASE_STOP` e incrementa
+`single_acquisition_terminal_count`. Il close libera lifecycle, TLS e runtime
+material prima dello snapshot, provando per control-flow i campi cleanup non
+stampati dal vecchio client. Il gate corretto richiede quindi
+`!post_tls.terminal`; una regressione direttamente legata alla live verifica
+hash, codice baseline e predicati. Il protocollo sensor-reaching non cambia.
+
+La rivalutazione deterministica degli stessi dati, senza nuova run, è PASS.
+D280/01 e D280 sono chiusi. Sono `VERIFIED_LIVE`: serializzazione FP3
+autentica, riuso dei byte attraverso close/open, deserializzazione autentica,
+identify single-acquisition e match biometrico del dito istruito. Il return
+code originale resta `1` come outcome dell'eseguibile difettoso e non viene
+confuso con l'esito biometrico.
+
+**NON PROVATO:** soglia FAR/FRR, discriminazione fra dita diverse,
+fprintd/D-Bus/storage/PAM/login/sudo e assenza di persistenza sensor-side.
+Zero famiglie persistenti note resta telemetria di allowlist, non prova
 assoluta sulla NVM.
 
 La direzione biometrica D279/48 resta SIGFM: sul dataset autentico
@@ -89,32 +113,13 @@ Fedora 44/libfprint 1.94.100 con preprocessing R2 e SIGFM Rockytkg sotto
 licenze per-file e combined-work GPL-compatible. USB/TLS/PSK/FDT/lifecycle e
 guardrail factory-preserving rimangono invariati.
 
-Il boundary sostanziale è ora predisposto, senza frammentarlo in D280/02, in
-`operator_kit/d280-01-ephemeral-template-reuse/`: enrollment reale, FP3
-effimero in una directory root `0700` su `tmpfs` verificato, file `0600`,
-distruzione del print in memoria, close/open, rimozione del file prima
-dell'action e una sola identify. Il client verifica `TMPFS_MAGIC` dall'fd e il
-launcher rifiuta prima dell'USB se `/run` non è tmpfs. Il secondo epoch è
-subordinato all'audit completo del primo; grant, build, cleanup ed export sono
-fail-closed. Il preflight ricostruisce la libreria target e passa con baseline
-`UNAPPROVED_FOR_LIVE`, senza USB.
-
-La breve presenza host-side dell'FP3 autentico è trattamento di dato
-biometrico sensibile. Il percorso ordinario non scrive il blob su SSD; azzera
-i buffer posseduti e rimuove file e directory tmpfs. Restano rischi RAM,
-swap/ibernazione, core dump e crash non intercettabile. Il prossimo passo è
-quindi una Human Gate, non altro lavoro sensor-reaching autonomo. Solo un
-risultato autentico favorevole renderebbe sensato isolare poi fprintd/on-disk
-e l'integrazione end-user.
-
-Il gate D280 richiede per ogni epoch nominale handshake TLS `1`, terminal
-completion `0` e secret zeroized. La precedente richiesta `1` era una lettura
-errata del contatore: `goodix_tls_server.c` lo incrementa soltanto in
-`terminal()` per peer-close/error/fence, mentre il successo production libera
-il TLS già completato. Il live D279/57 conforme non viene quindi respinto.
-Il summary runtime distingue limiti `*_MAX` dai contatori osservati estratti
-dal blocco terminale del log; missing, duplicazione, malformazione o relazioni
-action/open/reopen/close impossibili rendono la run non-PASS.
+Il prossimo confine sostanziale è `D281/01`: integrare offline fprintd, storage
+e control plane end-user in un solo harness isolato. Deve usare bus D-Bus
+privato, `STATE_DIRECTORY` temporanea, dati sintetici e una device seam
+virtuale incapace di enumerare USB; deve attraversare daemon, FP3 on-disk,
+reload in un nuovo processo e identify/verify, includendo corruzione, delete,
+ownership, permessi, naming e ABI. Installazione di sistema, `/var/lib/fprint`,
+PAM/login/sudo, template autentici e hardware restano esclusi e gated.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -139,13 +144,26 @@ ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
 DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
 BIOMETRIC_TEMPLATE_SAVED=false
 POST_CLOSE_SYNTHETIC_FP3_REUSABILITY_PROVEN=true
-POST_CLOSE_AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=false
-D280_01_OUTCOME=HUMAN_REQUIRED
-D280_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_OPERATOR_KIT_PLUS_NORMAL_SANITIZER_AND_EXACT_FEDORA44_SIGFM
+POST_CLOSE_AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=true
+D280_OUTCOME=PASS_LIVE_CLOSED
+D280_01_OUTCOME=PASS_AFTER_DETERMINISTIC_CORRECTED_CONTRACT_RE_EVALUATION
+D280_01_EXECUTABLE_CLOSURE=PASS_LIVE_EVIDENCE_WITH_POST_HOC_CORRECTED_AUDIT
+D280_01_LIVE_BASELINE=6cbcb9af88fa5401895208e9fd5217a6374ffb85
+D280_01_ORIGINAL_RUN_RETURN_CODE=1
+D280_01_ORIGINAL_IDENTIFY_AUDIT_PASS=false
+D280_01_CORRECTED_IDENTIFY_AUDIT_PASS=true
+D280_01_ONLY_FAILED_OLD_PREDICATE=post_tls.terminal_expected_true_actual_false
+D280_01_GRANT_CONSUMED=true
+D280_01_RETRY_AUTHORIZED=false
 D280_01_PRODUCTION_SHAPED_MULTI_EPOCH_COMPOSITION=PASS
 D280_01_TRUE_SIGFM_FP3_CLOSE_OPEN_IDENTIFY=PASS
 D280_01_CORRUPT_FP3_REJECTED=PASS
-D280_01_TEMPLATE_PERSISTED_TO_DISK=false
+D280_01_AUTHENTIC_FP3_SERIALIZATION_VERIFIED_LIVE=true
+D280_01_AUTHENTIC_CLOSE_OPEN_REUSE_VERIFIED_LIVE=true
+D280_01_AUTHENTIC_FP3_DESERIALIZATION_VERIFIED_LIVE=true
+D280_01_SINGLE_ACQUISITION_IDENTIFY_VERIFIED_LIVE=true
+D280_01_SAME_INSTRUCTED_FINGER_MATCH_VERIFIED_LIVE=true
+D280_01_TEMPLATE_PERSISTED_TO_NONVOLATILE_DISK=false
 D280_01_FPRINTD_EXECUTION_COUNT=0
 D280_01_OPERATOR_KIT=operator_kit/d280-01-ephemeral-template-reuse
 D280_01_ACTION_ATTEMPT_MAX=2
@@ -154,21 +172,22 @@ D280_01_RUNTIME_COUNTERS_SOURCE=OBSERVED_TERMINAL_LOG_BLOCK_FAIL_CLOSED
 D280_01_TEMPLATE_STORAGE=VERIFIED_TMPFS_ROOT_0700_FILE_0600
 D280_01_OPERATOR_RETRY_COUNT=0
 D280_01_OPERATOR_PREFLIGHT=PASS_OFFLINE
-D280_01_OPERATOR_STRUCTURAL_TESTS=10/10_PASS
+D280_01_OPERATOR_STRUCTURAL_TESTS=11/11_PASS
 D280_01_RUNTIME_COUNTER_SCENARIOS=7/7_PASS
-D280_01_APPROVED_BASELINE=NONE
-D280_01_AUTHENTIC_TEMPLATE_RAM_SWAP_CRASH_RISK_ACCEPTED=false
-PRODUCTION_IDENTIFY_LIVE_PROVEN=false
+D280_01_APPROVED_BASELINE=6cbcb9af88fa5401895208e9fd5217a6374ffb85
+PRODUCTION_IDENTIFY_LIVE_PROVEN=true
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=NEW_HUMAN_GATE_FOR_D280_01_EPHEMERAL_TEMPLATE_REUSE
+NEXT_PRIMARY_BOUNDARY=D281_01_OFFLINE_FPRINTD_STORAGE_AND_END_USER_CONTROL_PLANE_INTEGRATION
 ```
 
 Report ed evidenze correnti:
 `analysis/D280/D280_01_two_open_epoch_template_reuse.md`,
+`analysis/D280/d280_01_authentic_live_reuse_audit.py`,
+`captures/D280_01/D28001_20260910T082439Z_6cbcb9af/sanitized/`,
 `analysis/D279/D279_57_stage8_early_terminal_live_boundary.md`,
 `analysis/D279/D279_57_STAGE8_SUCCESS_audit.json`,
 `analysis/D279/D279_59_full_irq_flags_audit_and_corrective.md` e i due
@@ -840,18 +859,19 @@ e i test production-shaped lo verificano dopo ogni close. I contatori runtime
 nel summary sono estratti dal blocco terminale emesso dal client e validati
 contro i massimi; non sono più costanti di scenario.
 
-Il preflight completo del kit è PASS: test strutturali 10/10, suite
-production-shaped 26/26 normale e sanitizer, build production e suite
-Fedora/SIGFM reale, client `UNAPPROVED_FOR_LIVE` rifiutato prima di
-`FpContext`. Nessun USB o materiale protetto è stato raggiunto. La possibile
-run creerebbe però per un intervallo un dato biometrico in RAM; swap,
-ibernazione, core dump e crash restano rischi residui. Baseline approvata,
-accettazione del rischio e Human Gate one-shot restano assenti.
+La successiva Human Gate one-shot è stata eseguita sulla baseline
+`6cbcb9af88fa5401895208e9fd5217a6374ffb85` e ha completato enrollment,
+FP3 tmpfs, close/open, deserialize e identify match autentici. Il gate finale
+ha prodotto return code `1` soltanto perché richiedeva erroneamente il flag
+d'errore `post_tls.terminal` sul successo STOP. L'audit hash-pinned di tutti i
+predicati dimostra che questo è l'unico failure; il contratto corretto passa
+senza nuova live. La regressione strutturale è ora 11/11 e quella derivata
+dall'evidenza autentica è 4/4. Il grant resta consumato.
 
 ```text
-D280_01_OUTCOME=HUMAN_REQUIRED
-D280_01_ADVANCEMENT=POST_CLOSE_FP3_REUSE_AND_PRODUCTION_SHAPED_IDENTIFY_COMPOSED
-D280_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_OPERATOR_KIT_PLUS_NORMAL_SANITIZER_AND_EXACT_FEDORA44_SIGFM
+D280_01_OUTCOME=PASS_AFTER_DETERMINISTIC_CORRECTED_CONTRACT_RE_EVALUATION
+D280_01_ADVANCEMENT=AUTHENTIC_FP3_CLOSE_OPEN_REUSE_AND_SINGLE_ACQUISITION_IDENTIFY_MATCH_VERIFIED_LIVE
+D280_01_EXECUTABLE_CLOSURE=PASS_LIVE_EVIDENCE_WITH_POST_HOC_CORRECTED_AUDIT
 SECURE_SESSION_TEST_COUNT=26
 SECURE_SESSION_NORMAL=PASS
 SECURE_SESSION_ASAN_UBSAN=PASS
@@ -860,17 +880,21 @@ TRUE_SIGFM_IDENTIFY_MATCH=PASS
 CORRUPT_FP3_REJECTED=PASS
 PRODUCTION_SHAPED_IDENTIFY_MATCH_AND_MISMATCH=PASS
 PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
-REAL_USB_ACCESS=0
+REAL_USB_ACCESS=1_CONSUMED_LIVE_RUN
 FPRINTD_EXECUTION_COUNT=0
-AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=false
+AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=true
 D280_01_OPERATOR_KIT_PREFLIGHT=PASS_OFFLINE
-D280_01_APPROVED_BASELINE=NONE
+D280_01_APPROVED_BASELINE=6cbcb9af88fa5401895208e9fd5217a6374ffb85
 D280_01_TLS_SUCCESS_CONTRACT=HANDSHAKE_1_TERMINAL_0_SECRET_ZEROIZED
 D280_01_RUNTIME_COUNTERS_SOURCE=OBSERVED_TERMINAL_LOG_BLOCK_FAIL_CLOSED
 D280_01_TEMPLATE_STORAGE=VERIFIED_TMPFS_ROOT_0700_FILE_0600
-D280_01_AUTHENTIC_TEMPLATE_RAM_SWAP_CRASH_RISK_ACCEPTED=false
+D280_01_ORIGINAL_RUN_RETURN_CODE=1
+D280_01_ONLY_FAILED_OLD_PREDICATE=post_tls.terminal_expected_true_actual_false
+D280_01_CORRECTED_CONTRACT_PASS=true
+D280_01_GRANT_CONSUMED=true
+D280_01_RETRY_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=NEW_HUMAN_GATE_FOR_D280_01_EPHEMERAL_TEMPLATE_REUSE
+NEXT_PRIMARY_BOUNDARY=D281_01_OFFLINE_FPRINTD_STORAGE_AND_END_USER_CONTROL_PLANE_INTEGRATION
 ```
 
 Report: `analysis/D280/D280_01_two_open_epoch_template_reuse.md`.

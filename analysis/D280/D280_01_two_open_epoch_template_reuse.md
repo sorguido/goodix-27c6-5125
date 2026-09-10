@@ -99,7 +99,7 @@ fprintd installata a 47 simboli e pacchetto
 validati contro il manifest hash-pinned ed estratti sotto `/tmp`; nessun
 pacchetto è stato installato e il sandbox Flatpak è stato eseguito senza rete.
 
-## Claim consentiti e non-claim
+## Claim consentiti e non-claim alla closure offline pre-live
 
 È provato offline che:
 
@@ -111,7 +111,8 @@ pacchetto è stato installato e il sandbox Flatpak è stato eseguito senza rete.
   retry o cleanup incompleto;
 - FP3 manifestamente corrotto viene rifiutato prima dell'action.
 
-Non è provato che:
+Alla closure offline non era ancora provato che (stato superseded dalla
+sezione live seguente dove applicabile):
 
 - un template biometrico autentico sia persistito o riusabile;
 - il target Linux reale completi identify o restituisca un match;
@@ -169,10 +170,11 @@ TLS_SECRET_ZEROIZED=true
 **OBSERVED:** questi tre valori provengono dal live D279/57 hash-pinned.
 **VERIFIED:** call-site e lifecycle spiegano `0` come assenza di terminale TLS
 anomalo; il test production-shaped verifica lo stesso contratto dopo il close
-di enrollment, identify match e identify no-match. **INFERRED:** il target
-reale dovrebbe applicare la stessa semantica al futuro epoch identify perché
-usa lo stesso lifecycle. **UNKNOWN:** esito e telemetria del futuro identify
-reale restano non provati senza nuova Human Gate.
+di enrollment, identify match e identify no-match. **INFERRED allo stato
+pre-live:** il target avrebbe dovuto applicare la stessa semantica all'epoch
+identify perché usa lo stesso lifecycle. La successiva run autentica,
+riesaminata sotto, ha confermato handshake `1` e terminal completion `0` anche
+nel secondo epoch.
 
 Il preflight completo ha ricostruito la libreria target esatta e il client con
 baseline `UNAPPROVED_FOR_LIVE`; il self-test ha rifiutato prima di
@@ -182,28 +184,156 @@ kit è 10/10 PASS, include i sette scenari dei contatori e riconcilia l'audit li
 D279/57; l'auditor hash-pinned è 2/2 PASS. Nessun USB è stato enumerato e
 nessuna esecuzione live è stata effettuata.
 
-La breve presenza host-side di un template autentico sarebbe nuova
-manipolazione di dato biometrico sensibile. Il percorso ordinario non lo
+La breve presenza host-side di un template autentico costituiva nuova
+manipolazione di dato biometrico sensibile, accettata nella Human Gate poi
+consumata. Il percorso ordinario non lo
 scrive su SSD: usa `tmpfs`, azzera i buffer posseduti, rimuove il file prima
 dell'identify e la directory nel cleanup. Restano residui possibili in RAM,
 swap/ibernazione, core dump e crash non intercettabile; non è dichiarata
 cancellazione fisica universale. Questo rischio deve essere accettato
 esplicitamente insieme alla nuova Human Gate.
 
+## Evidenza live autentica e review indipendente
+
+La Human Gate è stata eseguita una sola volta sulla baseline completa
+`6cbcb9af88fa5401895208e9fd5217a6374ffb85`; il grant è consumato e non
+autorizza retry. I soli due artefatti sanitizzati, senza FP3, sono importati
+byte-identici in
+`captures/D280_01/D28001_20260910T082439Z_6cbcb9af/sanitized/`:
+
+```text
+operator.log SHA-256 = 6b30227b831eb1f534a97afdff18a264985f93a587d030ea2016a62690bc7580
+summary.env SHA-256  = 8589963046c5c020158ab365032a6ba3d2565869fa4195e32ef3c263aae592a4
+TEMPLATE_INCLUDED_IN_EXPORT=false
+```
+
+L'auditor deterministico
+`analysis/D280/d280_01_authentic_live_reuse_audit.py` rilegge i due hash,
+l'esatto codice al commit live tramite Git e tutti i predicati del gate. Il
+log non stampava ogni campo della struct: perciò il report distingue i valori
+`OBSERVED` dai valori `VERIFIED_BY_*_CONTROL_FLOW`, senza promuovere questi
+ultimi a osservazioni wire.
+
+### Confronto completo di `common_audit_pass()`
+
+| Predicato | Valore autentico | Base | Esito |
+|---|---:|---|---|
+| `context_closed` | true | OBSERVED | PASS |
+| `production_action_consumed` | true | VERIFIED: identify production avviata | PASS |
+| `usb_backend_drained` | true | OBSERVED | PASS |
+| `usb_interface_claimed` | false | VERIFIED: release precede snapshot del close riuscito | PASS |
+| `usb_outstanding_count` | 0 | OBSERVED | PASS |
+| `usb_out_outstanding_count` | 0 | OBSERVED | PASS |
+| `runtime_material_present` | false | VERIFIED: owner liberato prima dello snapshot | PASS |
+| `runtime_handoff_views_cleared` | true | VERIFIED: secure graph completato | PASS |
+| `runtime_material.owner_free_count` | 1 | VERIFIED: singolo owner dell'open epoch | PASS |
+| `runtime_material.descriptor_cleansed` | true | VERIFIED: `goodix_runtime_material_free()` | PASS |
+| `runtime_material.fdt_seed_cleansed` | true | VERIFIED: `goodix_runtime_material_free()` | PASS |
+| `tls.handshake_count` | 1 | OBSERVED | PASS |
+| `tls.terminal_completion_count` | 0 | OBSERVED | PASS |
+| `tls.project_secret_zeroized` | true | VERIFIED: TLS free precede snapshot | PASS |
+| `secure.retry_count` | 0 | OBSERVED | PASS |
+| `secure.transport_reopen_count` | 0 | OBSERVED | PASS |
+| `secure.device_reset_count` | 0 | OBSERVED | PASS |
+| `secure.clear_halt_count` | 0 | OBSERVED | PASS |
+| `post_tls.retry_count` | 0 | OBSERVED | PASS |
+| `post_tls.reopen_count` | 0 | VERIFIED: zero-init, nessun increment path | PASS |
+| `post_tls.device_reset_count` | 0 | VERIFIED: zero-init, nessun increment path | PASS |
+| `post_tls.clear_halt_count` | 0 | VERIFIED: zero-init, nessun increment path | PASS |
+| somma famiglie persistenti note | 0 | OBSERVED | PASS |
+
+### Confronto completo di `identify_audit_pass()`
+
+| Predicato | Atteso dal gate live | Valore autentico | Base | Esito storico |
+|---|---:|---:|---|---|
+| `first_image_pipeline_count` | 1 | 1 | OBSERVED | PASS |
+| `release_tail_complete_count` | 1 | 1 | OBSERVED | PASS |
+| `single_acquisition_terminal_count` | 1 | 1 | OBSERVED | PASS |
+| `rearm_0x32_count` | 0 | 0 | OBSERVED | PASS |
+| `second_image_pipeline_count` | 0 | 0 | VERIFIED: single-acquisition → STOP | PASS |
+| `third_cycle_command_count` | 0 | 0 | VERIFIED: STOP non accetta altri comandi | PASS |
+| `terminal` | **true** | **false** | VERIFIED: è il flag d'errore TERMINAL | **FAIL** |
+| `backend_drained` | true | true | VERIFIED: lifecycle free su backend drenato | PASS |
+| `terminal_cleanup_completed` | true | true | VERIFIED: lifecycle free prima dello snapshot | PASS |
+
+L'unico predicato che ha causato
+`EPOCH2_IDENTIFY_AUDIT_PASS=false` è dunque `post_tls.terminal == true`.
+`lifecycle_fail()` porta lo state machine in
+`GOODIX_POST_TLS_PHASE_TERMINAL` e imposta quel flag. Il profilo nominale
+`GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION`, dopo il release NAV,
+porta invece a `GOODIX_POST_TLS_PHASE_STOP` e incrementa
+`single_acquisition_terminal_count`. La parola “terminal” nel nome del
+contatore significa conclusione della singola acquisizione, non errore.
+
+Il gate è corretto in `!audit->post_tls.terminal`; non cambia alcun comando,
+transizione o profilo sensor-reaching. La stampa audit futura espone inoltre
+tutti i campi prima impliciti. La regressione production-shaped verifica
+esplicitamente STOP/non-TERMINAL, backend drain, cleanup, assenza di seconda
+pipeline e di terzo ciclo. La regressione Python è legata direttamente ai due
+artefatti autentici e fallisce chiusa su una loro mutazione.
+
+### Rivalutazione della run consumata
+
+Il risultato originale non viene riscritto:
+
+```text
+ORIGINAL_RUN_RETURN_CODE=1
+ORIGINAL_EPOCH2_IDENTIFY_AUDIT_PASS=false
+ORIGINAL_D280_01_EPHEMERAL_TEMPLATE_REUSE_PASS=false
+```
+
+Applicando deterministicamente il contratto corretto agli stessi dati, tutti
+i predicati passano e non serve una nuova live:
+
+```text
+CORRECTED_CONTRACT_EPOCH2_IDENTIFY_AUDIT_PASS=true
+CORRECTED_CONTRACT_D280_01_EPHEMERAL_TEMPLATE_REUSE_PASS=true
+```
+
+La stessa evidenza è sufficiente per elevare a `VERIFIED_LIVE`:
+
+- serializzazione FP3 del print prodotto dall'enrollment autentico;
+- riuso dei soli byte FP3 attraverso close/open;
+- deserializzazione FP3 autentica e compatibilità col device riaperto;
+- identify con una sola acquisizione, senza re-arm o retry;
+- match biometrico del dito che l'operatore era istruito a riutilizzare, con
+  una callback match e zero no-match/retry.
+
+Questi claim non provano una soglia FAR/FRR, il comportamento con dita diverse,
+fprintd/storage/PAM/login/sudo o assenza assoluta di persistenza sensor-side.
+La telemetria osserva soltanto zero famiglie persistenti note.
+
 ## Closure e prossimo confine
 
 ```text
-OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=POST_CLOSE_FP3_REUSE_AND_PRODUCTION_SHAPED_IDENTIFY_COMPOSED
-EXECUTABLE_CLOSURE=PASS_OFFLINE_OPERATOR_KIT_PLUS_NORMAL_SANITIZER_AND_EXACT_FEDORA44_SIGFM
-RESIDUAL_BLOCKER_OR_RISK=AUTHENTIC_TEMPLATE_REUSE_REQUIRES_NEW_LIVE_AND_RAM_SWAP_CRASH_BIOMETRIC_RISK_ACCEPTANCE
+OUTCOME=PASS
+ADVANCEMENT=AUTHENTIC_FP3_SERIALIZE_CLOSE_OPEN_DESERIALIZE_SINGLE_ACQUISITION_IDENTIFY_MATCH_VERIFIED_LIVE
+EXECUTABLE_CLOSURE=PASS_AFTER_DETERMINISTIC_CORRECTED_CONTRACT_RE_EVALUATION
+ORIGINAL_RUN_RETURN_CODE=1
+AUDIT_BUG_ONLY_FAILED_PREDICATE=post_tls.terminal_expected_true_actual_false
+D280_01_LIVE_BASELINE=6cbcb9af88fa5401895208e9fd5217a6374ffb85
+D280_01_GRANT_CONSUMED=true
+D280_01_RETRY_AUTHORIZED=false
+D280_01_AUTHENTIC_EVIDENCE_TESTS=4/4_PASS
+D280_01_OPERATOR_STRUCTURAL_TESTS=11/11_PASS
+D280_01_SECURE_SESSION_NORMAL=26/26_PASS
+D280_01_SECURE_SESSION_ASAN_UBSAN=26/26_PASS
+D280_01_FEDORA44_SIGFM_ACTION=PASS
+D280_01_OFFLINE_PREFLIGHT=PASS_REFUSED_BEFORE_USB
+SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 CANONICAL_DOCUMENTATION=MANUAL_AND_THIS_REPORT
 REVIEW_SET=GIT_NATIVE
 CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=D281_01_OFFLINE_FPRINTD_STORAGE_AND_END_USER_CONTROL_PLANE_INTEGRATION
 ```
 
-Il prossimo confine autonomo è esaurito: il kit sostanziale è pronto ma non ha
-una baseline approvata. Eseguirlo, accedere USB o creare anche temporaneamente
-un template autentico richiede una nuova Human Gate specifica. Solo un PASS
-autentico renderebbe sensato isolare poi fprintd/on-disk e l'integrazione
-end-user; nessuna run è autorizzata da questo report.
+D280/01 e la milestone D280 sono chiusi. Il prossimo boundary sostanziale non
+è un altro test del protocollo Goodix: è D281/01, una integrazione fprintd
+offline e isolata che eserciti, in un unico slice, daemon/D-Bus, storage FP3,
+reload in un nuovo processo e identify/verify attraverso una device seam
+virtuale esplicitamente incapace di enumerare USB. Il test deve usare
+`STATE_DIRECTORY` temporanea, bus privato e dati sintetici; deve validare
+ownership, permessi, naming, load/corruption/delete e ABI della libreria
+costruita. Installazione di sistema, `/var/lib/fprint`, PAM/login/sudo,
+materiale biometrico autentico e sensore reale restano fuori scope e soggetti
+a Human Gate separati.

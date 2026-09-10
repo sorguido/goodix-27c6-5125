@@ -394,6 +394,10 @@ enroll_audit_pass (const GoodixProductionEnrollmentAudit *audit)
 static gboolean
 identify_audit_pass (const GoodixProductionEnrollmentAudit *audit)
 {
+  /* GOODIX_POST_TLS_PHASE_TERMINAL is the lifecycle failure state.  A
+   * successful single-acquisition profile reaches GOODIX_POST_TLS_PHASE_STOP
+   * and records that completion in single_acquisition_terminal_count without
+   * setting post_tls.terminal. */
   return common_audit_pass (audit) &&
          audit->post_tls.first_image_pipeline_count == 1u &&
          audit->post_tls.release_tail_complete_count == 1u &&
@@ -401,7 +405,7 @@ identify_audit_pass (const GoodixProductionEnrollmentAudit *audit)
          audit->post_tls.rearm_0x32_count == 0u &&
          audit->post_tls.second_image_pipeline_count == 0u &&
          audit->post_tls.third_cycle_command_count == 0u &&
-         audit->post_tls.terminal &&
+         !audit->post_tls.terminal &&
          audit->post_tls.backend_drained &&
          audit->post_tls.terminal_cleanup_completed;
 }
@@ -426,10 +430,26 @@ print_epoch_audit (const gchar *prefix,
            audit->usb_out_outstanding_count);
   g_print ("%s_USB_BACKEND_DRAINED=%s\n", prefix,
            bool_text (audit->usb_backend_drained));
+  g_print ("%s_PRODUCTION_ACTION_CONSUMED=%s\n", prefix,
+           bool_text (audit->production_action_consumed));
+  g_print ("%s_USB_INTERFACE_CLAIMED=%s\n", prefix,
+           bool_text (audit->usb_interface_claimed));
+  g_print ("%s_RUNTIME_MATERIAL_PRESENT=%s\n", prefix,
+           bool_text (audit->runtime_material_present));
+  g_print ("%s_RUNTIME_HANDOFF_VIEWS_CLEARED=%s\n", prefix,
+           bool_text (audit->runtime_handoff_views_cleared));
+  g_print ("%s_RUNTIME_OWNER_FREE_COUNT=%u\n", prefix,
+           audit->runtime_material.owner_free_count);
+  g_print ("%s_RUNTIME_DESCRIPTOR_CLEANSED=%s\n", prefix,
+           bool_text (audit->runtime_material.descriptor_cleansed));
+  g_print ("%s_RUNTIME_FDT_SEED_CLEANSED=%s\n", prefix,
+           bool_text (audit->runtime_material.fdt_seed_cleansed));
   g_print ("%s_TLS_HANDSHAKE_COUNT=%u\n", prefix,
            audit->tls.handshake_count);
   g_print ("%s_TLS_TERMINAL_COMPLETION_COUNT=%u\n", prefix,
            audit->tls.terminal_completion_count);
+  g_print ("%s_TLS_PROJECT_SECRET_ZEROIZED=%s\n", prefix,
+           bool_text (audit->tls.project_secret_zeroized));
   g_print ("%s_SECURE_RETRY_COUNT=%u\n", prefix, audit->secure.retry_count);
   g_print ("%s_SECURE_REOPEN_COUNT=%u\n", prefix,
            audit->secure.transport_reopen_count);
@@ -438,6 +458,12 @@ print_epoch_audit (const gchar *prefix,
   g_print ("%s_SECURE_CLEAR_HALT_COUNT=%u\n", prefix,
            audit->secure.clear_halt_count);
   g_print ("%s_POST_TLS_RETRY_COUNT=%u\n", prefix, audit->post_tls.retry_count);
+  g_print ("%s_POST_TLS_REOPEN_COUNT=%u\n", prefix,
+           audit->post_tls.reopen_count);
+  g_print ("%s_POST_TLS_DEVICE_RESET_COUNT=%u\n", prefix,
+           audit->post_tls.device_reset_count);
+  g_print ("%s_POST_TLS_CLEAR_HALT_COUNT=%u\n", prefix,
+           audit->post_tls.clear_halt_count);
   g_print ("%s_KNOWN_PERSISTENT_FAMILY_COUNT=%u\n", prefix,
            known_persistent_family_count (audit));
   g_print ("%s_FIRST_IMAGE_PIPELINE_COUNT=%u\n", prefix,
@@ -448,6 +474,16 @@ print_epoch_audit (const gchar *prefix,
            audit->post_tls.single_acquisition_terminal_count);
   g_print ("%s_REARM_0X32_COUNT=%u\n", prefix,
            audit->post_tls.rearm_0x32_count);
+  g_print ("%s_SECOND_IMAGE_PIPELINE_COUNT=%u\n", prefix,
+           audit->post_tls.second_image_pipeline_count);
+  g_print ("%s_THIRD_CYCLE_COMMAND_COUNT=%u\n", prefix,
+           audit->post_tls.third_cycle_command_count);
+  g_print ("%s_POST_TLS_ERROR_TERMINAL=%s\n", prefix,
+           bool_text (audit->post_tls.terminal));
+  g_print ("%s_POST_TLS_BACKEND_DRAINED=%s\n", prefix,
+           bool_text (audit->post_tls.backend_drained));
+  g_print ("%s_POST_TLS_CLEANUP_COMPLETED=%s\n", prefix,
+           bool_text (audit->post_tls.terminal_cleanup_completed));
   g_print ("%s_ENROLL_COMPLETED_STAGE_COUNT=%u\n", prefix,
            audit->enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count);
   g_print ("%s_ENROLL_TERMINAL_TRANSITION_COUNT=%u\n", prefix,

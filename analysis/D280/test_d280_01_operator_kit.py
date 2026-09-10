@@ -83,6 +83,22 @@ class D28001OperatorKitTests(unittest.TestCase):
         self.assertIn("single_acquisition_terminal_count == 1u", self.tool)
         self.assertIn("rearm_0x32_count == 0u", self.tool)
 
+    def test_live_derived_identify_success_uses_stop_not_error_terminal(self) -> None:
+        gate_start = self.tool.index("identify_audit_pass (")
+        gate_end = self.tool.index("static void\nprint_epoch_audit", gate_start)
+        gate = self.tool[gate_start:gate_end]
+        self.assertIn("!audit->post_tls.terminal", gate)
+        self.assertNotIn("\n         audit->post_tls.terminal &&", gate)
+        self.assertIn("audit->post_tls.backend_drained", gate)
+        self.assertIn("audit->post_tls.terminal_cleanup_completed", gate)
+        for diagnostic in (
+            "POST_TLS_ERROR_TERMINAL", "POST_TLS_BACKEND_DRAINED",
+            "POST_TLS_CLEANUP_COMPLETED", "SECOND_IMAGE_PIPELINE_COUNT",
+            "THIRD_CYCLE_COMMAND_COUNT", "TLS_PROJECT_SECRET_ZEROIZED",
+            "RUNTIME_OWNER_FREE_COUNT",
+        ):
+            self.assertIn(diagnostic, self.tool)
+
     def test_runner_consumes_grant_and_never_exports_template(self) -> None:
         consume = self.runner.index('mkdir -m 0700 "$claim"')
         execute = self.runner.index('"$runtime/d280_ephemeral_template_reuse" --run-once')

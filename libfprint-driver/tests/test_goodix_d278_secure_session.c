@@ -1714,6 +1714,19 @@ test_d280_01_production_two_epoch_template_reuse (void)
 
   production_close_epoch (fixture);
   assert_successful_epoch_tls_closed (fixture);
+  goodix_fpimage_device_get_production_enrollment_audit (
+    fixture->device, &audit);
+  /* Regression from the authentic D280/01 identify: nominal one-shot
+   * completion is STOP, while post_tls.terminal is reserved for failure. */
+  g_assert_false (audit.post_tls.terminal);
+  g_assert_true (audit.post_tls.backend_drained);
+  g_assert_true (audit.post_tls.terminal_cleanup_completed);
+  g_assert_cmpuint (audit.post_tls.first_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.release_tail_complete_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.single_acquisition_terminal_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.second_image_pipeline_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.third_cycle_command_count, ==, 0u);
   g_assert_cmpuint (fixture->interface_claim_count, ==, 2u);
   g_assert_cmpuint (fixture->interface_release_count, ==, 2u);
   g_assert_cmpuint (fixture->material_release_count, ==, 2u);
