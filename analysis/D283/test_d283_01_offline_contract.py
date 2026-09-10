@@ -79,6 +79,11 @@ class D283OfflineContract(unittest.TestCase):
                 "PAM_RUNNER_LINKAGE_INVALID", "TARGET_CARDINALITY_NOT_ONE"):
             self.assertLess(live.index(marker), staging, marker)
 
+        baseline = function_slice(
+            self.kit, "verify_d283_baseline ()", "build_pam_runner ()")
+        self.assertIn("-- \\\n", baseline)
+        self.assertIn('"${d283_critical[@]}"', baseline)
+
     def test_08_audit_requires_one_enroll_one_verify_and_delete_epoch(self):
         live = function_slice(self.kit, "run_d283_live ()", "export_d283_results ()")
         self.assertIn("$epoch_count -eq 3", live)
