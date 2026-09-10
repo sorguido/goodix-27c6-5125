@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
 from analysis.D282 import d282_01_grant_ordering_model as grant_ordering
+from analysis.D282 import d282_01_staging_probe_evidence_audit as probe_evidence
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +29,7 @@ PROBE_BUILD = ROOT / "operator_kit/d282-01-fprintd-target/build-staging-probe-in
 ATTEMPT_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_01_NORMALIZED.env"
 ATTEMPT_REPORT = ROOT / "analysis/D282/D282_01_attempt_01_host_staging_failure.md"
 OFFLINE_RESULT = ROOT / "analysis/D282/D282_01_OFFLINE_RESULT.env"
+PROBE_AUDIT_RESULT = ROOT / "analysis/D282/D282_01_STAGING_PROBE_AUDIT.json"
 
 spec = importlib.util.spec_from_file_location(
     "d282_staging", ROOT / "analysis/D282/d282_01_staging_model.py")
@@ -460,17 +463,16 @@ class D282OfflineContract(unittest.TestCase):
         self.assertIn("Nessuna proprietà biometrica", self.attempt_report)
         self.assertIn("USER_ATTESTED", self.attempt_report)
 
-    def test_41_selinux_runtime_start_remains_an_explicit_blocker(self):
+    def test_41_privileged_probe_closes_selinux_runtime_blocker(self):
         for marker in (
-                "D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST",
-                "FPRINTD_SYSTEMD_STAGING_START=NOT_RUN\n",
-                "SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED",
-                "D282_01_HUMAN_GATE_READINESS=NOT_READY"):
+                "D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST",
+                "D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED",
+                "FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST",
+                "SELINUX_EXEC_DENIAL=false",
+                "D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED",
+                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY"):
             self.assertIn(marker, self.offline_result)
-        self.assertNotIn(
-            "FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_",
-            self.offline_result)
-        self.assertIn("echo FPRINTD_SYSTEMD_STAGING_START=NOT_RUN", self.kit)
+            self.assertIn(f"echo {marker}", self.kit)
 
     def test_42_privileged_probe_is_a_distinct_non_live_mode(self):
         probe = function_slice(
@@ -483,9 +485,11 @@ class D282OfflineContract(unittest.TestCase):
         self.assertIn("real_usb_enumeration_attempted=false", probe)
         self.assertIn("real_sensor_accessed=false", probe)
         for marker in (
-                "D282_01_PRIVILEGED_STAGING_PROBE_READY=true",
-                "D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false",
-                "D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false"):
+                "D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED",
+                "D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=true",
+                "D282_01_PRIVILEGED_STAGING_PROBE_WAS_AUTHORIZED=true",
+                "D282_01_PRIVILEGED_STAGING_PROBE_CURRENTLY_AUTHORIZED=false",
+                "D282_01_PRIVILEGED_STAGING_PROBE_GRANT_CONSUMED=true"):
             self.assertIn(marker, self.offline_result)
 
     def test_43_probe_candidate_is_virtual_only_and_usb_compiled_out(self):
@@ -747,6 +751,33 @@ class D282OfflineContract(unittest.TestCase):
         self.assertIn("ROLLBACK_COMPLETE=false", summary)
         self.assertIn("RECOVERY_REQUIRED=true", summary)
         self.assertIn("D282_01_RESULT=FAIL_ROLLBACK", summary)
+
+    def test_59_authentic_staging_probe_evidence_is_hash_pinned(self):
+        audit = probe_evidence.build_audit()
+        self.assertEqual(audit["decision"], "ACCEPTED_CLOSED")
+        self.assertEqual(
+            audit["runtime"]["systemd_selinux_staging"],
+            "VERIFIED_PRIVILEGED_HOST",
+        )
+        self.assertTrue(audit["rollback"]["complete"])
+        self.assertFalse(audit["safety"]["real_usb_enumeration_attempted"])
+        self.assertFalse(audit["safety"]["real_sensor_accessed"])
+        self.assertEqual(audit["safety"]["biometric_action_count"], 0)
+        self.assertFalse(
+            audit["post_probe_inactive_dead"]["invalidates_recorded_rollback"]
+        )
+        committed = json.loads(PROBE_AUDIT_RESULT.read_text(encoding="utf-8"))
+        self.assertEqual(committed["decision"], audit["decision"])
+        self.assertEqual(
+            committed["evidence"]["summary_sha256"],
+            audit["evidence"]["sha256"],
+        )
+        with tempfile.TemporaryDirectory(
+                prefix="goodix-d282-probe-evidence.", dir="/tmp") as td:
+            mutated = Path(td) / "summary.env"
+            mutated.write_bytes(probe_evidence.EVIDENCE.read_bytes() + b"\n")
+            with self.assertRaisesRegex(ValueError, "evidence hash mismatch"):
+                probe_evidence.build_audit(mutated)
 
     def _exercise_real_cleanup(self, initial_state, action_outcome):
         cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")

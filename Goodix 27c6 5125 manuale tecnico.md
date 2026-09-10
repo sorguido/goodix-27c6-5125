@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — D282/01 probe staging privilegiato pronto, non eseguito
+### Stato corrente — D282/01 probe staging chiuso, gate biometrico pronto
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -249,15 +249,35 @@ active/inactive × successo/failure attraversano il vero cleanup in
 sottoprocessi Bash e preservano lo stato; una regressione aggiuntiva prova il
 fail-closed sul mismatch.
 
-La matrice D282 è 58/58; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+La matrice D282 è 59/59; regressioni D281 6/6 e daemon/D-Bus privato PASS;
 suite D278/D279/D280/D282 27/27 normal e 27/27 ASan/UBSan; build Fedora/SIGFM,
 registry e ABI fprintd PASS. La candidate probe virtual-only è stata costruita
 e auditata realmente offline. I due profili drop-in sono generati dal vero
-helper e accettati da `systemd-analyze verify`; questo non prova il vero start
-del servizio né l'assenza del denial SELinux. Il probe privilegiato è pronto
-ma non è stato eseguito né autorizzato; non esistono baseline approvata o
-grant. Finché la futura Human Gate probe e la relativa review non chiudono il
-blocker, `D282_01_HUMAN_GATE_READINESS=NOT_READY`.
+helper e accettati da `systemd-analyze verify`.
+
+La Human Gate privilegiata separata è stata poi eseguita realmente su Fedora
+44 con SELinux Enforcing, baseline
+`3d42daec016d1a2c3292ac35374ae117ef8d1611` e operation
+`D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE`. Il grant è consumato e non
+autorizza retry. Il daemon direct-exec è partito con status zero; exe, candidate
+libfprint, environment e storage isolato erano quelli esatti. Sono osservati
+zero fd USB, zero Goodix, zero accessi sensore, zero azioni biometriche e zero
+contatti. Cleanup, ripristino servizio `active → active`, system lib e storage
+preesistente sono PASS.
+
+Il transcript sanitizzato operator-supplied è hash-pinned a
+`988f992039b6cee1d0dcc64aef4bc53775f6fb5617ec1ec6ce7a93ac558e49ef`
+in `captures/D282_01/D28201_STAGING_PROBE_20260910T143838Z_3d42daec/`.
+Raw root-only, `operator.log` e `private/` non sono importati e non viene
+dichiarata byte-identità col raw. L'auditor deterministico lega valori e
+safety fence al sorgente della baseline. La successiva osservazione
+`inactive/dead` è il normale timeout/auto-exit di fprintd inutilizzato e non
+invalida lo snapshot sincrono del rollback; la sola directory padre vuota
+`/run/goodix-d282-01` è housekeeping non bloccante.
+
+Il blocker systemd/SELinux è pertanto chiuso. Non esistono una baseline
+biometrica approvata, candidate o grant live; tuttavia il kit supera la review
+pre-gate e `D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY`.
 
 PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
 sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
@@ -333,8 +353,9 @@ FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
-D282_01_OUTCOME=PRIVILEGED_STAGING_PROBE_READY_NOT_EXECUTED
-D282_01_HUMAN_GATE_READINESS=NOT_READY
+D282_01_OUTCOME=OFFLINE_CLOSURE_AND_PRIVILEGED_STAGING_PROBE_PASS
+D282_01_OFFLINE_CLOSURE=PASS
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
@@ -349,7 +370,7 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=58/58_PASS
+D282_01_REQUIRED_MATRIX=59/59_PASS
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
@@ -367,10 +388,17 @@ D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
 UNBOUND_VARIABLE_DURING_CLEANUP=false
 D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
-D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
-D282_01_PRIVILEGED_STAGING_PROBE_READY=true
-D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
-D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST
+D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED
+D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED
+D282_01_PRIVILEGED_STAGING_PROBE_RESULT=PASS
+D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=true
+D282_01_PRIVILEGED_STAGING_PROBE_WAS_AUTHORIZED=true
+D282_01_PRIVILEGED_STAGING_PROBE_CURRENTLY_AUTHORIZED=false
+D282_01_PRIVILEGED_STAGING_PROBE_GRANT_CONSUMED=true
+D282_01_PRIVILEGED_STAGING_PROBE_RETRY_AUTHORIZED=false
+D282_01_STAGING_PROBE_IMPORTED_SUMMARY_SHA256=988f992039b6cee1d0dcc64aef4bc53775f6fb5617ec1ec6ce7a93ac558e49ef
+D282_01_STAGING_PROBE_IMPORT_PROVENANCE=OPERATOR_SUPPLIED_VERBATIM_SUMMARY_TRANSCRIPT
 D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
@@ -384,8 +412,15 @@ D282_01_STAGING_PROBE_DRIVER=virtual_image
 D282_01_STAGING_PROBE_USB_CONTEXT_COMPILE_DISABLED=true
 D282_01_STAGING_PROBE_USB_CONTEXT_SYMBOL_PRESENT=false
 D282_01_STAGING_PROBE_GOODIX_DRIVER_PRESENT=false
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
-SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
+FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST
+SELINUX_EXEC_DENIAL=false
+EXACT_LIBRARY_MAP_VERIFIED=true
+CUSTOM_LIBFPRINT_LOADED=true
+D282_01_NEXT_HUMAN_GATE_OPERATION=D282_01_FPRINTD_TARGET_ENROLL_RESTART_VERIFY_SAME_DIFFERENT_DELETE
+ENROLL_ACTION_COUNT_MAX=1
+VERIFY_ACTION_COUNT_MAX=2
+AUTHORIZED_BIOMETRIC_ACTION_MAX=3
+EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10
 D282_01_PAM_IN_SCOPE=false
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
@@ -395,7 +430,7 @@ GRANT_CREATED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=SEPARATELY_AUTHORIZED_HOST_ONLY_REAL_SYSTEMD_SELINUX_STAGING_VALIDATION_THEN_INDEPENDENT_REVIEW
+NEXT_PRIMARY_BOUNDARY=NEW_D282_01_BIOMETRIC_HUMAN_GATE_WITH_FRESH_BASELINE_CANDIDATE_GRANT_AND_ID
 NEXT_BOUNDARY_AFTER_D282_PASS=D283_01_PAM_DEDICATED_MAX_TRIES_1_NO_REAL_LOGIN_OR_SUDO_INITIAL
 ```
 

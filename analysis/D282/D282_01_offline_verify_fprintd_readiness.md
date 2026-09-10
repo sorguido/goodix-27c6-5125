@@ -1,24 +1,23 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D282/01 — attempt 01 e correttivo staging fprintd target
+# D282/01 — attempt 01, probe staging chiuso e readiness biometrica
 
 ## Decisione
 
 ```text
-OUTCOME=PRIVILEGED_STAGING_PROBE_READY_NOT_EXECUTED
-ADVANCEMENT=USB_DISABLED_VIRTUAL_ONLY_SYSTEMD_SELINUX_STAGING_PROBE_WITH_EXACT_SERVICE_STATE_RESTORE
-EXECUTABLE_CLOSURE=PASS_OFFLINE_BUILD_ABI_AUDIT_SYSTEMD_PARSER_AND_REAL_BASH_TRAP_RUNTIME_START_NOT_RUN
-RESIDUAL_BLOCKER_OR_RISK=REAL_SYSTEMD_FPRINTD_START_WITH_SELINUX_ENFORCING_REQUIRES_SEPARATE_PRIVILEGED_HOST_ONLY_AUTHORIZATION
+OUTCOME=OFFLINE_CLOSURE_AND_PRIVILEGED_STAGING_PROBE_PASS
+ADVANCEMENT=DIRECT_SYSTEMD_SELINUX_STAGING_VERIFIED_ON_PRIVILEGED_REAL_HOST_WITH_ZERO_USB_OR_BIOMETRIC_REACHABILITY
+EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_PRIVILEGED_HOST_STAGING_PROBE
+RESIDUAL_BLOCKER_OR_RISK=BIOMETRIC_TARGET_RUN_REQUIRES_NEW_BASELINE_CANDIDATE_GRANT_AND_HUMAN_GATE
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE
-D282_01_HUMAN_GATE_READINESS=NOT_READY
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
 ```
 
-Il probe dedicato è implementato e verificato per quanto consentito offline,
-ma il blocker systemd/SELinux non può essere dichiarato chiuso senza avviare
-il vero servizio di sistema con il vero drop-in. Questa operazione richiede
-privilegi e una Human Gate propria; non è stata eseguita né autorizzata. Il kit
-non è quindi pronto per una nuova Human Gate biometrica, non approva una
-baseline e non crea grant.
+Il probe dedicato è stato autorizzato ed eseguito dall'operatore sulla baseline
+`3d42daec016d1a2c3292ac35374ae117ef8d1611`. La review indipendente accetta
+la prova e chiude il blocker systemd/SELinux. Il kit è pronto per una nuova e
+separata Human Gate biometrica; questa closure non approva una baseline, non
+prepara candidate e non crea grant.
 
 ## Attempt 01: esito autentico normalizzato
 
@@ -230,6 +229,28 @@ FINGER_CONTACT_COUNT=0
 LIVE_EXECUTION_PERFORMED=false
 ```
 
+La Human Gate separata è stata consumata con operation
+`D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE`. Sul vero host Fedora 44
+con SELinux Enforcing il daemon direct-exec è partito con
+`ExecMainStatus=0`; `/proc/<pid>/exe` era `/usr/libexec/fprintd` e
+`/proc/<pid>/maps` conteneva esclusivamente la libfprint candidate attesa.
+Il probe ha osservato zero fd USB, zero Goodix, zero accessi al sensore, zero
+azioni biometriche e zero contatti. System lib e storage preesistente sono
+rimasti invariati.
+
+Il cleanup ha registrato `active → active`, rimosso staging/drop-in/storage e
+concluso con rollback completo. La successiva osservazione manuale
+`inactive/dead` è coerente con il timeout normale di fprintd inutilizzato: il
+sorgente Fedora arma tale timeout, termina con status zero e offre
+`--no-timeout` per disabilitarlo. Non retroagisce sull'osservazione sincrona del
+cleanup. La sola `/run/goodix-d282-01` vuota è housekeeping non bloccante.
+
+Il transcript sanitizzato operator-supplied è importato in
+`captures/D282_01/D28201_STAGING_PROBE_20260910T143838Z_3d42daec/` e
+hash-pinned dall'auditor deterministico. Il raw `0600`, `operator.log` e
+`private/` non sono stati letti né importati senza privilegi; non viene quindi
+dichiarata byte-identità col raw root-only.
+
 ## Matrice obbligatoria e risultati
 
 | # | Contratto | Evidenza offline | Esito |
@@ -292,10 +313,11 @@ LIVE_EXECUTION_PERFORMED=false
 | 56 | inactive: successo e failure restano inactive | vero `cleanup_live()` in sottoprocesso | PASS |
 | 57 | stop active interno solo dopo il consumo | audit ordine launcher | PASS |
 | 58 | mismatch finale forza rollback failure e recovery | vero `cleanup_live()` in sottoprocesso | PASS |
+| 59 | evidenza probe autentica hash-pinned e source-bound | transcript importato + auditor deterministico | PASS |
 
 Esecuzioni di closure:
 
-- `analysis.D282.test_d282_01_offline_contract`: **58/58 PASS**;
+- `analysis.D282.test_d282_01_offline_contract`: **59/59 PASS**;
 - `analysis.D281.test_d281_01_fprintd_storage_integration`: **6/6 PASS**;
 - integrazione D281 con vero daemon/client, bus privato e USB compile-disabled:
   **PASS**;
@@ -308,15 +330,15 @@ Esecuzioni di closure:
   ABI fprintd e audit no-Goodix/TLS: **PASS offline**;
 - preflight aggregato del kit: **PASS offline**.
 
-I test 39 e 50 provano la generazione dei due veri profili drop-in e la loro
-accettazione dal parser systemd, non l'avvio del servizio. Non sono stati eseguiti
-`systemctl start`, installazioni in `/run/systemd/system`, accessi USB o driver
-target. Pertanto restano deliberatamente:
+I test 39 e 50 restano prove offline del parser. La distinta run privilegiata
+ha ora verificato realmente start, SELinux e mapping, mantenendo irraggiungibili
+USB e driver target. Ne consegue:
 
 ```text
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
-SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
-EXACT_LIBRARY_MAP_VERIFIED=NOT_OBSERVED_FOR_CORRECTIVE
+FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST
+SELINUX_EXEC_DENIAL=false
+EXACT_LIBRARY_MAP_VERIFIED=true
+CUSTOM_LIBFPRINT_LOADED=true
 ```
 
 Il different-finger è deliberatamente solo sintetico offline. Non viene
@@ -333,12 +355,13 @@ terminale già dopo l'acquisizione consumata. A e B sono auditati prima di avanz
 attiva rollback, senza ripetere enrollment. Stato preesistente e libreria di
 sistema sono confrontati dopo cleanup. Non compare alcuna modifica PAM.
 
-Il prossimo passo non è una nuova run biometrica: il probe host-only ora
-disponibile deve prima ricevere una Human Gate e una baseline/grant separati,
-essere eseguito sul vero systemd con SELinux Enforcing e poi essere sottoposto
-a review indipendente. Nessuna di queste autorizzazioni o esecuzioni è stata
-effettuata. Fino ad allora la readiness resta `NOT_READY`. D283/PAM non è
-preparato.
+Il blocker host staging è chiuso. Il prossimo passo è una nuova Human Gate
+biometrica sulla operation
+`D282_01_FPRINTD_TARGET_ENROLL_RESTART_VERIFY_SAME_DIFFERENT_DELETE`, con nuova
+baseline, nuova candidate, nuovo grant e nuovo grant ID. Sono autorizzabili al
+massimo una ENROLL e due VERIFY, per tre azioni biometriche e dieci contatti
+fisici previsti. Nessuna di queste autorizzazioni o preparazioni è corrente.
+D283/PAM resta fuori scope.
 
 ```text
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
@@ -347,14 +370,22 @@ D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
+D282_01_ATTEMPT_01_SENSOR_PROTOCOL_RESULT=NOT_REACHED
+D282_01_ATTEMPT_01_BIOMETRIC_RESULT=NOT_REACHED
 D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
 UNBOUND_VARIABLE_DURING_CLEANUP=false
 D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
-D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
-D282_01_PRIVILEGED_STAGING_PROBE_READY=true
-D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
-D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST
+D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED
+D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED
+D282_01_PRIVILEGED_STAGING_PROBE_RESULT=PASS
+D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=true
+D282_01_PRIVILEGED_STAGING_PROBE_WAS_AUTHORIZED=true
+D282_01_PRIVILEGED_STAGING_PROBE_CURRENTLY_AUTHORIZED=false
+D282_01_STAGING_PROBE_IMPORTED_SUMMARY_SHA256=988f992039b6cee1d0dcc64aef4bc53775f6fb5617ec1ec6ce7a93ac558e49ef
+D282_01_PRIVILEGED_STAGING_PROBE_GRANT_CONSUMED=true
+D282_01_PRIVILEGED_STAGING_PROBE_RETRY_AUTHORIZED=false
 D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
@@ -363,9 +394,23 @@ ACTIVE_SUCCESS_FINAL_ACTIVE=PASS
 ACTIVE_FAILURE_FINAL_ACTIVE=PASS
 INACTIVE_SUCCESS_FINAL_INACTIVE=PASS
 INACTIVE_FAILURE_FINAL_INACTIVE=PASS
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
-SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
-D282_01_HUMAN_GATE_READINESS=NOT_READY
+FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST
+SELINUX_EXEC_DENIAL=false
+EXACT_LIBRARY_MAP_VERIFIED=true
+CUSTOM_LIBFPRINT_LOADED=true
+ROLLBACK_COMPLETE=true
+PREEXISTING_STORAGE_UNCHANGED=true
+SYSTEM_LIBFPRINT_UNCHANGED=true
+SERVICE_INITIAL_STATE=active
+SERVICE_FINAL_STATE=active
+SERVICE_STATE_RESTORED=true
+D282_01_OFFLINE_CLOSURE=PASS
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
+D282_01_NEXT_HUMAN_GATE_OPERATION=D282_01_FPRINTD_TARGET_ENROLL_RESTART_VERIFY_SAME_DIFFERENT_DELETE
+ENROLL_ACTION_COUNT_MAX=1
+VERIFY_ACTION_COUNT_MAX=2
+AUTHORIZED_BIOMETRIC_ACTION_MAX=3
+EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
 PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
 POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
@@ -375,6 +420,8 @@ APPROVED_BASELINE=NONE
 GRANT_CREATED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
+BIOMETRIC_ACTION_COUNT=0
+FINGER_CONTACT_COUNT=0
 LIVE_EXECUTION_PERFORMED=false
 PAM_IN_SCOPE=false
 ```

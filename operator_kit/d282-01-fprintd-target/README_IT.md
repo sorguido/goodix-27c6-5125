@@ -7,11 +7,11 @@ La prima Human Gate D282/01 è chiusa come `FAIL_HOST_STAGING`: il grant è
 consumato senza retry autorizzato, `fprintd` ha fallito con status 126 prima di
 qualsiasi contatto o azione biometrica e il recovery manuale è stato attestato
 completo. Questo kit correttivo include ora un **privileged host staging
-probe** distinto dalla live biometrica. Il probe è pronto per una futura Human
-Gate separata, ma non è stato eseguito né autorizzato. Non esistono baseline
-approvata, nuovo grant o autorizzazione live. Il preflight è offline e non
-enumera USB; le modalità candidate/probe/live non devono essere avviate nello
-stato corrente.
+probe** distinto dalla live biometrica. Il probe è stato autorizzato, eseguito
+e chiuso PASS sulla baseline `3d42daec016d1a2c3292ac35374ae117ef8d1611`;
+il grant è consumato e il probe non deve essere ripetuto. Non esistono baseline
+biometrica approvata, nuova candidate, nuovo grant o autorizzazione live. Il
+preflight resta offline e non enumera USB.
 
 La futura run copre soltanto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
 driver Goodix `27c6:5125`: enrollment dell'indice destro, FP3 SIGFM nello
@@ -23,14 +23,19 @@ fattore di autenticazione sono fuori scope.
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
-D282_01_HUMAN_GATE_READINESS=NOT_READY
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
 D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
-D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
-SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
-D282_01_PRIVILEGED_STAGING_PROBE_READY=true
-D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
-D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST
+D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED
+FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST
+SELINUX_EXEC_DENIAL=false
+D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED
+D282_01_PRIVILEGED_STAGING_PROBE_RESULT=PASS
+D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=true
+D282_01_PRIVILEGED_STAGING_PROBE_WAS_AUTHORIZED=true
+D282_01_PRIVILEGED_STAGING_PROBE_CURRENTLY_AUTHORIZED=false
+D282_01_PRIVILEGED_STAGING_PROBE_GRANT_CONSUMED=true
+D282_01_PRIVILEGED_STAGING_PROBE_RETRY_AUTHORIZED=false
 D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
@@ -170,9 +175,8 @@ D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE
 
 La preparazione usa `--prepare-staging-probe-candidate <full-SHA>` e produce
 una candidate distinta, hash-pinned e ABI-compatible con il vero
-`/usr/libexec/fprintd`. Queste modalità sono documentate ma **non autorizzate
-ora**; non è stata preparata alcuna candidate approvata e non è stato creato
-alcun grant.
+`/usr/libexec/fprintd`. La run storica del probe è chiusa: candidate e grant
+consumati non autorizzano alcuna ripetizione né la live biometrica.
 
 Il probe riusa il meccanismo production-shaped che interessa il blocker:
 vero systemd, `ExecStart=/usr/libexec/fprintd`, drop-in sotto
@@ -228,6 +232,15 @@ reale e richiede uguaglianza esatta con quello iniziale. Il summary contiene
 `SERVICE_STATE_RESTORED`; una divergenza rende `ROLLBACK_COMPLETE=false` e
 `RECOVERY_REQUIRED=true`.
 
+La run privilegiata reale ha verificato con SELinux Enforcing start
+systemd, `ExecMainStatus=0`, exe e mapping libfprint esatti, storage isolato,
+zero fd USB, zero Goodix/sensore/biometria e rollback `active → active`.
+System lib e storage preesistente sono invariati. Il successivo stato
+`inactive/dead` è il normale auto-exit di fprintd inutilizzato, confermato dal
+sorgente Fedora e dall'opzione `--no-timeout`; non invalida il rollback già
+osservato. La directory padre vuota `/run/goodix-d282-01` è housekeeping non
+bloccante.
+
 ## Prerequisiti e comandi offline
 
 - branch `development`, worktree live-critical pulito per la preparazione;
@@ -236,8 +249,7 @@ reale e richiede uguaglianza esatta con quello iniziale. Il summary contiene
   `operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256`;
 - pacchetto esatto `fprintd-1.94.5-5.fc44.x86_64` per ABI/runtime.
 
-Solo il preflight seguente è eseguibile nello stato corrente e deve essere
-avviato come utente non privilegiato:
+Il preflight seguente resta eseguibile come utente non privilegiato:
 
 ```bash
 operator_kit/d282-01-fprintd-target/run-d282-01.sh \
@@ -247,14 +259,12 @@ operator_kit/d282-01-fprintd-target/run-d282-01.sh \
 Il preflight include un vero sottoprocesso Bash per il trap, costruisce e
 audita realmente anche la candidate virtual-only e verifica la sintassi di
 entrambi i profili drop-in con `systemd-analyze`; non avvia il servizio. La
-prova del vero start di sistema con SELinux Enforcing richiede una futura
-autorizzazione privilegiata separata. Fino ad allora
-`D282_01_HUMAN_GATE_READINESS=NOT_READY`.
+prova privilegiata del vero start è già chiusa separatamente e non deve essere
+ripetuta.
 
-Le modalità `--prepare-staging-probe-candidate`,
-`--run-authorized-staging-probe`, `--export-staging-probe-results`,
-`--prepare-candidate`, `--run-authorized-live` e `--export-results`
-documentano i percorsi futuri ma non sono autorizzate ora.
+Le modalità probe documentano il percorso storico consumato; non sono
+autorizzate ora. Le modalità `--prepare-candidate`, `--run-authorized-live` e
+`--export-results` descrivono la futura live, anch'essa non autorizzata ora.
 Il kit non crea grant. Un eventuale grant esterno one-shot dovrà contenere
 esattamente quattro righe (`D282_01_BASELINE_SHA`, `D282_01_OPERATION`,
 `D282_01_GRANT_ID`, `D282_01_USER`), avere permessi privati ed essere legato
