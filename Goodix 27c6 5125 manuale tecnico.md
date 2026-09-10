@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — D282/01 attempt 01 chiusa, correttivo host non ancora live-ready
+### Stato corrente — D282/01 probe staging privilegiato pronto, non eseguito
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -211,16 +211,43 @@ phase A/B; phase C o rollback lo eliminano. Non viene creata una copia in
 `private/` e l'export sanitizzato resta limitato a `operator.log` e
 `summary.env`.
 
-La matrice D282 è 41/41; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+Il kit include ora un privileged host staging probe dedicato, distinto dalla
+live, con mode `--run-authorized-staging-probe` e operation esclusiva
+`D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE`. La candidate usa l'esatto
+libfprint Fedora ma registra soltanto `virtual_image`; l'overlay già validato
+D281 elimina a compile time creazione ed enumerazione `GUsbContext`. Prima del
+consumo del grant vengono riauditati marker di build, assenza dei simboli USB
+context e assenza del driver/simboli Goodix-TLS. Il build/source tree non resta
+nella candidate runtime.
+
+Il probe attraversa la stessa infrastruttura host rilevante: vero systemd,
+direct `ExecStart=/usr/libexec/fprintd`, vero drop-in sotto
+`/run/systemd/system`, `LD_LIBRARY_PATH`, storage isolato sotto
+`/var/lib/fprint`, label SELinux Enforcing, `/proc/<pid>/exe` e mapping
+libfprint esatto. In aggiunta impone `PrivateDevices=yes`,
+`DevicePolicy=closed`, nessun `DeviceAllow`, rimuove `FP_VIRTUAL_IMAGE` e non
+chiama alcun client biometrico. Il daemon non può creare/enumerare un contesto
+USB, non contiene il driver target e non vede i device host; il probe richiede
+anche zero fd `/dev/bus/usb`. Goodix, TLS, PSK, PAM e azioni biometriche non
+sono raggiungibili da questo mode.
+
+Il grant probe è one-shot e separato per operation e ID; non può validare la
+modalità live. Tutti i gate host fallibili, inclusi servizio inizialmente
+inattivo, SELinux obbligatoriamente Enforcing, snapshot unit e inventario
+storage, precedono il claim atomico. Dopo il consumo un failure attraversa il
+medesimo `cleanup_live()` top-level e non autorizza retry. Il successo runtime
+dovrà provare start/ExecMainStatus, exe/maps/environment, hash system lib,
+storage vuoto e rollback completo.
+
+La matrice D282 è 53/53; regressioni D281 6/6 e daemon/D-Bus privato PASS;
 suite D278/D279/D280/D282 27/27 normal e 27/27 ASan/UBSan; build Fedora/SIGFM,
-registry e ABI fprintd PASS. Il drop-in direct-exec è generato dal vero helper
-e accettato da `systemd-analyze verify`; questo non prova il vero start del
-servizio né l'assenza del denial SELinux. Avviare il vero fprintd di sistema con
-drop-in sotto `/run/systemd/system` richiede una futura autorizzazione
-privilegiata separata e deve essere progettato host-only con il target USB non
-raggiungibile. Finché tale prova non esiste,
-`D282_01_HUMAN_GATE_READINESS=NOT_READY`: non esistono baseline approvata,
-nuovo grant, autorizzazione privilegiata o live.
+registry e ABI fprintd PASS. La candidate probe virtual-only è stata costruita
+e auditata realmente offline. I due profili drop-in sono generati dal vero
+helper e accettati da `systemd-analyze verify`; questo non prova il vero start
+del servizio né l'assenza del denial SELinux. Il probe privilegiato è pronto
+ma non è stato eseguito né autorizzato; non esistono baseline approvata o
+grant. Finché la futura Human Gate probe e la relativa review non chiudono il
+blocker, `D282_01_HUMAN_GATE_READINESS=NOT_READY`.
 
 PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
 sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
@@ -296,7 +323,7 @@ FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
-D282_01_OUTCOME=CORRECTIVE_IMPLEMENTED_OFFLINE_BLOCKED_ON_PRIVILEGED_SYSTEMD_SELINUX_TEST
+D282_01_OUTCOME=PRIVILEGED_STAGING_PROBE_READY_NOT_EXECUTED
 D282_01_HUMAN_GATE_READINESS=NOT_READY
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
@@ -312,7 +339,7 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=41/41_PASS
+D282_01_REQUIRED_MATRIX=53/53_PASS
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
@@ -331,7 +358,15 @@ EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
 UNBOUND_VARIABLE_DURING_CLEANUP=false
 D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
 D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+D282_01_PRIVILEGED_STAGING_PROBE_READY=true
+D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
+D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_STAGING_PROBE_OPERATION=D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE
+D282_01_STAGING_PROBE_DRIVER=virtual_image
+D282_01_STAGING_PROBE_USB_CONTEXT_COMPILE_DISABLED=true
+D282_01_STAGING_PROBE_USB_CONTEXT_SYMBOL_PRESENT=false
+D282_01_STAGING_PROBE_GOODIX_DRIVER_PRESENT=false
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
 SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 D282_01_PAM_IN_SCOPE=false
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
@@ -339,6 +374,9 @@ CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 APPROVED_BASELINE=NONE
 GRANT_CREATED=false
+REAL_USB_ENUMERATION_ATTEMPTED=false
+REAL_SENSOR_ACCESSED=false
+LIVE_EXECUTION_PERFORMED=false
 NEXT_PRIMARY_BOUNDARY=SEPARATELY_AUTHORIZED_HOST_ONLY_REAL_SYSTEMD_SELINUX_STAGING_VALIDATION_THEN_INDEPENDENT_REVIEW
 NEXT_BOUNDARY_AFTER_D282_PASS=D283_01_PAM_DEDICATED_MAX_TRIES_1_NO_REAL_LOGIN_OR_SUDO_INITIAL
 ```

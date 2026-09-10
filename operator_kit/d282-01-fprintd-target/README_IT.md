@@ -6,10 +6,12 @@
 La prima Human Gate D282/01 è chiusa come `FAIL_HOST_STAGING`: il grant è
 consumato senza retry autorizzato, `fprintd` ha fallito con status 126 prima di
 qualsiasi contatto o azione biometrica e il recovery manuale è stato attestato
-completo. Questo kit correttivo è **solo candidato per review host-side**. Non
-esistono baseline approvata, nuovo grant o autorizzazione live. Il preflight è
-offline e non enumera USB; le modalità candidate/live non devono essere
-avviate.
+completo. Questo kit correttivo include ora un **privileged host staging
+probe** distinto dalla live biometrica. Il probe è pronto per una futura Human
+Gate separata, ma non è stato eseguito né autorizzato. Non esistono baseline
+approvata, nuovo grant o autorizzazione live. Il preflight è offline e non
+enumera USB; le modalità candidate/probe/live non devono essere avviate nello
+stato corrente.
 
 La futura run copre soltanto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
 driver Goodix `27c6:5125`: enrollment dell'indice destro, FP3 SIGFM nello
@@ -24,8 +26,11 @@ D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
 D282_01_HUMAN_GATE_READINESS=NOT_READY
 D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
 SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
+D282_01_PRIVILEGED_STAGING_PROBE_READY=true
+D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
+D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
@@ -34,6 +39,8 @@ CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 APPROVED_BASELINE=NONE
 GRANT_CREATED=false
 LIVE_EXECUTION_PERFORMED=false
+REAL_USB_ENUMERATION_ATTEMPTED=false
+REAL_SENSOR_ACCESSED=false
 DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 SECOND_SENSOR_REACHING_ACTION_COUNT=0
 ```
@@ -144,6 +151,63 @@ e B. Viene eliminato dalla phase C o dal rollback e non viene copiato in
 `private/`; l'export contiene soltanto `operator.log` e `summary.env`,
 verificati byte per byte, quindi `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 
+## Probe privilegiato systemd/SELinux, separato dalla live
+
+La modalità dedicata è `--run-authorized-staging-probe` e accetta
+esclusivamente un grant one-shot con operation:
+
+```text
+D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE
+```
+
+La preparazione usa `--prepare-staging-probe-candidate <full-SHA>` e produce
+una candidate distinta, hash-pinned e ABI-compatible con il vero
+`/usr/libexec/fprintd`. Queste modalità sono documentate ma **non autorizzate
+ora**; non è stata preparata alcuna candidate approvata e non è stato creato
+alcun grant.
+
+Il probe riusa il meccanismo production-shaped che interessa il blocker:
+vero systemd, `ExecStart=/usr/libexec/fprintd`, drop-in sotto
+`/run/systemd/system`, `LD_LIBRARY_PATH` verso il runtime candidato,
+`StateDirectory` isolato sotto `/var/lib/fprint`, label SELinux e lo stesso
+`cleanup_live()` top-level. Richiede SELinux `Enforcing`, servizio inizialmente
+`inactive`, verifica `ExecMainStatus=0`, `/proc/<pid>/exe`, l'unico path
+libfprint mappato in `/proc/<pid>/maps`, le variabili effettive in
+`/proc/<pid>/environ`, hash della libreria di sistema, inventario storage e
+rollback completo.
+
+Il Goodix reale non è raggiungibile dal percorso del probe per difesa in
+profondità:
+
+- la libfprint probe è costruita con il solo driver `virtual_image`;
+- l'overlay D281 elimina a compile time creazione ed enumerazione del
+  `GUsbContext`, e l'artefatto è riauditato prima del consumo del grant;
+- il binario candidato non contiene il driver Goodix né simboli Goodix/TLS;
+- `FP_VIRTUAL_IMAGE` viene esplicitamente rimosso, quindi non esiste neppure
+  un endpoint virtuale su cui eseguire un'azione;
+- il servizio ha `PrivateDevices=yes`, `DevicePolicy=closed` e nessun
+  `DeviceAllow`; dopo lo start il probe richiede zero fd `/dev/bus/usb`;
+- il probe non chiama client enroll/verify/identify/delete, PAM, PSK o TLS.
+
+Ne consegue il contratto invariabile del probe:
+
+```text
+REAL_USB_ENUMERATION_ATTEMPTED=false
+REAL_SENSOR_ACCESSED=false
+BIOMETRIC_ACTION_COUNT=0
+FINGER_CONTACT_COUNT=0
+LIVE_EXECUTION_PERFORMED=false
+```
+
+Il grant probe conserva il formato a quattro righe del kit; `D282_01_USER`
+lega l'identità dell'operatore ma non viene passato ad alcuna azione
+biometrica. Operation e grant ID probe sono diversi da quelli live: un grant
+probe è respinto dalla modalità live e viceversa. Tutti i gate fallibili
+(baseline/manifest/artefatti, audit USB/Goodix, ABI, grant, collisioni,
+servizio inattivo, libreria/hash, SELinux Enforcing, result sink, snapshot
+unit e inventario storage) precedono il claim atomico. Dopo il consumo ogni
+failure attraversa il rollback e resta `RETRY_AUTHORIZED=false`.
+
 ## Prerequisiti e comandi offline
 
 - branch `development`, worktree live-critical pulito per la preparazione;
@@ -160,14 +224,17 @@ operator_kit/d282-01-fprintd-target/run-d282-01.sh \
   --offline-preflight /percorso/agli/opencv-rpms
 ```
 
-Il preflight include un vero sottoprocesso Bash per il trap e una verifica di
-sintassi del drop-in con `systemd-analyze`; non avvia il servizio. La prova del
-vero start di sistema con SELinux Enforcing richiede una futura autorizzazione
-privilegiata separata e deve avvenire senza rendere raggiungibile il Goodix.
-Fino ad allora `D282_01_HUMAN_GATE_READINESS=NOT_READY`.
+Il preflight include un vero sottoprocesso Bash per il trap, costruisce e
+audita realmente anche la candidate virtual-only e verifica la sintassi di
+entrambi i profili drop-in con `systemd-analyze`; non avvia il servizio. La
+prova del vero start di sistema con SELinux Enforcing richiede una futura
+autorizzazione privilegiata separata. Fino ad allora
+`D282_01_HUMAN_GATE_READINESS=NOT_READY`.
 
-Le modalità `--prepare-candidate`, `--run-authorized-live` e
-`--export-results` documentano il percorso futuro ma non sono autorizzate ora.
+Le modalità `--prepare-staging-probe-candidate`,
+`--run-authorized-staging-probe`, `--export-staging-probe-results`,
+`--prepare-candidate`, `--run-authorized-live` e `--export-results`
+documentano i percorsi futuri ma non sono autorizzate ora.
 Il kit non crea grant. Un eventuale grant esterno one-shot dovrà contenere
 esattamente quattro righe (`D282_01_BASELINE_SHA`, `D282_01_OPERATION`,
 `D282_01_GRANT_ID`, `D282_01_USER`), avere permessi privati ed essere legato

@@ -23,6 +23,7 @@ FEDORA_ACTION_TEST = ROOT / "libfprint-driver/tests/test_goodix_fedora44_nbis_ac
 KIT = ROOT / "operator_kit/d282-01-fprintd-target/run-d282-01.sh"
 README = ROOT / "operator_kit/d282-01-fprintd-target/README_IT.md"
 BUILD = ROOT / "operator_kit/d282-01-fprintd-target/build-inner.sh"
+PROBE_BUILD = ROOT / "operator_kit/d282-01-fprintd-target/build-staging-probe-inner.sh"
 ATTEMPT_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_01_NORMALIZED.env"
 ATTEMPT_REPORT = ROOT / "analysis/D282/D282_01_attempt_01_host_staging_failure.md"
 OFFLINE_RESULT = ROOT / "analysis/D282/D282_01_OFFLINE_RESULT.env"
@@ -55,6 +56,7 @@ class D282OfflineContract(unittest.TestCase):
         cls.kit = KIT.read_text()
         cls.readme = README.read_text()
         cls.build = BUILD.read_text()
+        cls.probe_build = PROBE_BUILD.read_text()
         cls.attempt_env = ATTEMPT_ENV.read_text()
         cls.attempt_report = ATTEMPT_REPORT.read_text()
         cls.offline_result = OFFLINE_RESULT.read_text()
@@ -412,7 +414,7 @@ class D282OfflineContract(unittest.TestCase):
             dropin = Path(td) / "dropin.conf"
             shell = ("set -euo pipefail\n" + helper +
                      '\nwrite_systemd_dropin /run/goodix-d282-01/test '
-                     '/var/lib/fprint/.goodix-d282-01-test "$1"\n')
+                     '/var/lib/fprint/.goodix-d282-01-test "$1" live\n')
             generated = subprocess.run(
                 ["bash", "-c", shell, "d282-dropin", str(dropin)],
                 capture_output=True, text=True)
@@ -461,10 +463,233 @@ class D282OfflineContract(unittest.TestCase):
     def test_41_selinux_runtime_start_remains_an_explicit_blocker(self):
         for marker in (
                 "D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST",
-                "FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION",
+                "FPRINTD_SYSTEMD_STAGING_START=NOT_RUN\n",
                 "SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED",
                 "D282_01_HUMAN_GATE_READINESS=NOT_READY"):
             self.assertIn(marker, self.offline_result)
+        self.assertNotIn(
+            "FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_",
+            self.offline_result)
+        self.assertIn("echo FPRINTD_SYSTEMD_STAGING_START=NOT_RUN", self.kit)
+
+    def test_42_privileged_probe_is_a_distinct_non_live_mode(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        self.assertIn("--run-authorized-staging-probe", self.kit)
+        self.assertNotIn("run_authorized_live", probe)
+        self.assertIn("staging_probe_execution_performed=true", probe)
+        self.assertIn("live_execution_performed=false", probe)
+        self.assertIn("real_usb_enumeration_attempted=false", probe)
+        self.assertIn("real_sensor_accessed=false", probe)
+        for marker in (
+                "D282_01_PRIVILEGED_STAGING_PROBE_READY=true",
+                "D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false",
+                "D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false"):
+            self.assertIn(marker, self.offline_result)
+
+    def test_43_probe_candidate_is_virtual_only_and_usb_compiled_out(self):
+        for marker in (
+                "-Ddrivers=virtual_image",
+                "-DD281_01_DISABLE_USB_CONTEXT",
+                "fpi_device_virtual_image_get_type",
+                "g_usb_context_(new|enumerate)",
+                "D282_01_STAGING_PROBE_USB_CONTEXT_COMPILE_DISABLED=true",
+                "D282_01_STAGING_PROBE_GOODIX_DRIVER_PRESENT=false"):
+            self.assertIn(marker, self.probe_build)
+        self.assertNotIn("-Ddrivers=goodix_27c6_5125", self.probe_build)
+
+    def test_44_probe_reaudits_binary_safety_before_grant_consumption(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        audit = function_slice(
+            self.kit, "audit_staging_probe_candidate ()", "abi_preflight ()")
+        consume = probe.index('consume_validated_grant "$grant"')
+        self.assertLess(probe.index(
+            'audit_staging_probe_candidate "$candidate"'), consume)
+        for marker in (
+                "STAGING_PROBE_USB_NOT_DISABLED",
+                "STAGING_PROBE_GOODIX_PRESENT",
+                "STAGING_PROBE_USB_CONTEXT_SYMBOL_PRESENT",
+                "STAGING_PROBE_GOODIX_TLS_SYMBOL_PRESENT",
+                "STAGING_PROBE_GOODIX_DRIVER_PRESENT"):
+            self.assertIn(marker, audit)
+
+    def test_45_probe_grant_is_bound_to_the_exclusive_operation(self):
+        exact = "D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE"
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        validate = function_slice(
+            self.kit, "validate_grant ()", "prepare_grant_claim ()")
+        self.assertIn(f"staging_probe_operation={exact}", self.kit)
+        self.assertIn(
+            'validate_grant "$grant" "$baseline" "$expected_id" \\\n    "$staging_probe_operation"', probe)
+        self.assertIn(
+            'validate_grant "$grant" "$baseline" "$expected_id" "$operation"',
+            live)
+        self.assertIn('D282_01_OPERATION) == "$expected_operation"', validate)
+
+    def test_46_probe_grant_claim_remains_atomic_and_one_shot(self):
+        probe_id = "d28201-staging-probe-baseline"
+        registry = grant_ordering.GrantRegistry()
+        first = grant_ordering.simulate(registry, probe_id)
+        second = grant_ordering.simulate(registry, probe_id)
+        self.assertTrue(first.grant_consumed)
+        self.assertEqual(second.refusal, "GRANT_ALREADY_CONSUMED")
+        self.assertFalse(second.grant_consumed)
+        consume = function_slice(
+            self.kit, "consume_validated_grant ()", "validate_live_tooling ()")
+        self.assertLess(consume.index('mkdir -m 0700 "$grant_claim"'),
+                        consume.index("grant_consumed=true"))
+
+    def test_47_probe_failures_before_consumption_leave_grant_unused(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        consume = probe.index('consume_validated_grant "$grant"')
+        for anchor in (
+                'audit_staging_probe_candidate "$candidate"',
+                'validate_grant "$grant" "$baseline" "$expected_id"',
+                "refuse STAGING_COLLISION",
+                "refuse STAGING_PROBE_FPRINTD_MUST_BE_INACTIVE",
+                "refuse SYSTEM_LIBFPRINT_MISSING",
+                "refuse STAGING_PROBE_SELINUX_NOT_ENFORCING",
+                "refuse UNIT_SNAPSHOT_FAILED",
+                "refuse STORAGE_INVENTORY_FAILED",
+                'prepare_grant_claim "$expected_id"'):
+            self.assertLess(probe.index(anchor), consume, anchor)
+        outcome = grant_ordering.simulate(
+            grant_ordering.GrantRegistry(), "probe",
+            preconsumption_refusal="SELINUX_PRECONDITION_FAILED")
+        self.assertFalse(outcome.grant_consumed)
+        self.assertFalse(outcome.real_usb_enumeration_attempted)
+        self.assertFalse(outcome.live_execution_performed)
+
+    def test_48_probe_postconsume_failure_rolls_back_without_retry(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        consume = probe.index('consume_validated_grant "$grant"')
+        self.assertLess(probe.index("trap cleanup_live EXIT"), consume)
+        self.assertLess(consume, probe.index("live_staging_started=true"))
+        self.assertIn('echo "RETRY_AUTHORIZED=false"', cleanup)
+        outcome = grant_ordering.simulate(
+            grant_ordering.GrantRegistry(), "probe",
+            fail_immediately_after_consumption=True)
+        self.assertTrue(outcome.grant_consumed)
+        self.assertTrue(outcome.rollback_complete)
+        self.assertFalse(outcome.retry_authorized)
+        self.assertFalse(outcome.real_usb_enumeration_attempted)
+        self.assertFalse(outcome.live_execution_performed)
+
+    def test_49_probe_reuses_real_subprocess_verified_exit_trap(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        self.assertIn("trap cleanup_live EXIT", probe)
+        with tempfile.TemporaryDirectory(
+                prefix="goodix-d282-exit-trap-test.", dir="/tmp") as td:
+            result = subprocess.run(
+                [str(KIT), "--self-test-exit-trap", td],
+                capture_output=True, text=True)
+            combined = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 41, combined)
+            self.assertIn("EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS", combined)
+            self.assertIn("ROLLBACK_COMPLETE=true", combined)
+            self.assertNotIn("unbound variable", combined.lower())
+
+    def test_50_probe_dropin_is_direct_exec_and_systemd_parser_valid(self):
+        helper = function_slice(
+            self.kit, "write_systemd_dropin ()",
+            "exit_trap_scope_regression ()")
+        with tempfile.TemporaryDirectory(
+                prefix="goodix-d282-probe-systemd-parser.", dir="/tmp") as td:
+            dropin = Path(td) / "dropin.conf"
+            shell = ("set -euo pipefail\n" + helper +
+                     '\nwrite_systemd_dropin /run/goodix-d282-01/probe '
+                     '/var/lib/fprint/.goodix-d282-01-probe "$1" '
+                     'staging-probe\n')
+            generated = subprocess.run(
+                ["bash", "-c", shell, "d282-probe-dropin", str(dropin)],
+                capture_output=True, text=True)
+            self.assertEqual(generated.returncode, 0,
+                             generated.stdout + generated.stderr)
+            text = dropin.read_text()
+            for marker in (
+                    "ExecStart=/usr/libexec/fprintd",
+                    'Environment="FP_DRIVERS_ALLOWLIST=virtual_image"',
+                    "UnsetEnvironment=FP_VIRTUAL_IMAGE",
+                    "DeviceAllow=",
+                    "DevicePolicy=closed",
+                    "PrivateDevices=yes",
+                    "ReadWritePaths="):
+                self.assertIn(marker, text)
+            self.assertNotIn(
+                'Environment="FP_DRIVERS_ALLOWLIST=goodix_27c6_5125"', text)
+            unit = Path(td) / "d282-probe-parser-test.service"
+            unit.write_text(
+                "[Unit]\nDescription=D282 probe parser test\n"
+                "[Service]\nType=simple\nExecStart=/usr/bin/false\n" + text)
+            verified = subprocess.run(
+                ["systemd-analyze", "verify", str(unit)],
+                capture_output=True, text=True)
+            self.assertEqual(verified.returncode, 0,
+                             verified.stdout + verified.stderr)
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        self.assertIn('LD_LIBRARY_PATH=$live_runtime', probe)
+        self.assertIn("DAEMON_LIBRARY_MAP_NOT_EXACT", probe)
+        self.assertIn("STAGING_PROBE_VIRTUAL_ENDPOINT_PRESENT", probe)
+
+    def test_51_probe_storage_is_isolated_and_preserved_by_cleanup(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        self.assertIn(".goodix-d282-01-staging-probe-", probe)
+        self.assertIn('d282_storage_inventory.py" "$live_storage_root"', probe)
+        self.assertIn("STAGING_PROBE_STORAGE_NOT_EMPTY", probe)
+        self.assertIn("DAEMON_STATE_DIRECTORY_DRIFT", probe)
+        self.assertIn("EXACT_STATE_DIRECTORY_VERIFIED=true", probe)
+        self.assertIn("storage.before.json", cleanup)
+        self.assertIn("storage.after.json", cleanup)
+        self.assertIn("PREEXISTING_STORAGE_UNCHANGED=$storage_rollback", cleanup)
+
+    def test_52_probe_system_library_is_never_replaced_and_is_rehashed(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        self.assertIn('readlink -f /usr/lib64/libfprint-2.so.2', probe)
+        self.assertIn("live_system_library_before", probe)
+        self.assertIn("SYSTEM_LIBFPRINT_DRIFT", probe)
+        self.assertNotIn("ldconfig", probe)
+        self.assertNotIn("/usr/lib64/libfprint-2.so.2.0.0", probe)
+        self.assertIn("SYSTEM_LIBFPRINT_UNCHANGED=$library_rollback", cleanup)
+
+    def test_53_probe_has_no_biometric_pam_goodix_tls_or_psk_path(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        for forbidden in (
+                "fprintd-enroll", "fprintd-verify", "fprintd-delete",
+                "fprintd-list", "fp_device_identify",
+                "goodix_27c6_5125", "get_tls_client_secret", "PSK",
+                "pam_"):
+            self.assertNotIn(forbidden, probe)
+        for marker in (
+                "BIOMETRIC_ACTION_COUNT=0",
+                "FINGER_CONTACT_COUNT=0",
+                "REAL_USB_ENUMERATION_ATTEMPTED=false",
+                "REAL_SENSOR_ACCESSED=false",
+                "LIVE_EXECUTION_PERFORMED=false",
+                "PAM_IN_SCOPE=false"):
+            self.assertIn(marker, probe)
 
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
         live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")

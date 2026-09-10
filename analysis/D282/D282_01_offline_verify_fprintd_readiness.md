@@ -4,20 +4,21 @@
 ## Decisione
 
 ```text
-OUTCOME=CORRECTIVE_IMPLEMENTED_OFFLINE_BLOCKED_ON_PRIVILEGED_SYSTEMD_SELINUX_TEST
-ADVANCEMENT=ATTEMPT_01_NORMALIZED_DIRECT_SYSTEMD_EXEC_DESIGNED_AND_EXIT_TRAP_SCOPE_FIXED
-EXECUTABLE_CLOSURE=PARTIAL_OFFLINE_SYSTEMD_PARSER_AND_REAL_BASH_TRAP_PASS_RUNTIME_START_NOT_RUN
+OUTCOME=PRIVILEGED_STAGING_PROBE_READY_NOT_EXECUTED
+ADVANCEMENT=USB_DISABLED_VIRTUAL_ONLY_SYSTEMD_SELINUX_STAGING_PROBE_IMPLEMENTED
+EXECUTABLE_CLOSURE=PASS_OFFLINE_BUILD_ABI_AUDIT_SYSTEMD_PARSER_AND_REAL_BASH_TRAP_RUNTIME_START_NOT_RUN
 RESIDUAL_BLOCKER_OR_RISK=REAL_SYSTEMD_FPRINTD_START_WITH_SELINUX_ENFORCING_REQUIRES_SEPARATE_PRIVILEGED_HOST_ONLY_AUTHORIZATION
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE
 D282_01_HUMAN_GATE_READINESS=NOT_READY
 ```
 
-Il correttivo è implementato e verificato per quanto consentito offline, ma il
-blocker systemd/SELinux non può essere dichiarato chiuso senza avviare il vero
-servizio di sistema con il vero drop-in. Questa operazione richiede privilegi
-e un'autorizzazione separata; non è stata eseguita. Il kit non è quindi pronto
-per una nuova Human Gate biometrica, non approva una baseline e non crea grant.
+Il probe dedicato è implementato e verificato per quanto consentito offline,
+ma il blocker systemd/SELinux non può essere dichiarato chiuso senza avviare
+il vero servizio di sistema con il vero drop-in. Questa operazione richiede
+privilegi e una Human Gate propria; non è stata eseguita né autorizzata. Il kit
+non è quindi pronto per una nuova Human Gate biometrica, non approva una
+baseline e non crea grant.
 
 ## Attempt 01: esito autentico normalizzato
 
@@ -175,6 +176,50 @@ inventari restano in `private/`; l'FP3 autentico rimane esclusivamente nello
 storage D282 isolato durante A/B, viene eliminato in C o dal rollback e non è
 copiato in `private/`. `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 
+## Privileged host staging probe
+
+Il kit espone ora `--run-authorized-staging-probe`, distinta da
+`--run-authorized-live`, con operation esclusiva
+`D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE`. La candidate probe è
+costruita dall'esatto source Fedora con il solo `virtual_image` e l'overlay
+D281 che elimina a compile time creazione ed enumerazione `GUsbContext`.
+L'audit binario pre-consumo rifiuta quei simboli, il driver Goodix e simboli
+Goodix/TLS; il build tree viene eliminato dalla candidate finale. ABI e
+mapping restano quelli del vero `/usr/libexec/fprintd`.
+
+Il drop-in usa la stessa infrastruttura rilevante della futura live: direct
+exec, `LD_LIBRARY_PATH`, `StateDirectory` isolato e label SELinux. Il profilo
+probe aggiunge `FP_DRIVERS_ALLOWLIST=virtual_image`, rimuove
+`FP_VIRTUAL_IMAGE`, imposta `PrivateDevices=yes`, `DevicePolicy=closed` e
+svuota `DeviceAllow`/`ReadWritePaths`. Non viene invocato alcun client
+biometrico. Il vero start, se autorizzato in futuro, deve provare daemon
+active/running, `ExecMainStatus=0`, exe esatto, unico mapping libfprint esatto,
+environment esatto, zero fd `/dev/bus/usb`, storage owned vuoto, nessun denial
+SELinux nel journal e hash system lib invariato; il trap completa poi unit,
+storage, service e runtime rollback.
+
+La separazione autorizzativa è fail-closed: candidate state, operation e grant
+ID probe sono distinti da quelli live; `validate_grant()` riceve l'operation
+attesa dal singolo mode. Un grant probe non può quindi passare il launcher
+live. Audit candidate, ABI, grant, collisioni, servizio obbligatoriamente
+inattivo, system lib/hash, SELinux obbligatoriamente Enforcing, result sink,
+snapshot unit e inventario storage precedono il claim atomico. Il riuso dello
+stesso ID è respinto; dopo il consumo ogni failure attraversa
+`cleanup_live()` con `RETRY_AUTHORIZED=false`.
+
+La garanzia di non raggiungibilità del target combina quattro fence
+indipendenti: nessun driver Goodix nel registry/binario, nessuna creazione o
+enumerazione USB in `FpContext`, nessun endpoint virtuale/action richiesto e
+namespace device systemd chiuso. Ne risultano per costruzione:
+
+```text
+REAL_USB_ENUMERATION_ATTEMPTED=false
+REAL_SENSOR_ACCESSED=false
+BIOMETRIC_ACTION_COUNT=0
+FINGER_CONTACT_COUNT=0
+LIVE_EXECUTION_PERFORMED=false
+```
+
 ## Matrice obbligatoria e risultati
 
 | # | Contratto | Evidenza offline | Esito |
@@ -220,10 +265,22 @@ copiato in `private/`. `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 | 39 | drop-in direct-exec production-shaped e sintassi systemd | helper reale + `systemd-analyze verify` | PASS_OFFLINE_PARSER |
 | 40 | attempt 01 normalizzata senza claim biometrici | env/report canonici + provenance | PASS |
 | 41 | assenza di prova runtime SELinux non mascherata | stato canonico fail-closed | PASS |
+| 42 | mode probe distinto dalla live | audit launcher | PASS |
+| 43 | candidate virtual-only, contesto USB compile-disabled | build reale + generated registry/symbol audit | PASS |
+| 44 | audit USB/Goodix ripetuto prima del consumo | ordine launcher | PASS |
+| 45 | grant legato all'operation esclusiva probe | audit parametrizzazione | PASS |
+| 46 | claim probe atomico one-shot | modello + `mkdir` atomica | PASS |
+| 47 | failure probe pre-consumo conserva grant | modello + ordine launcher | PASS |
+| 48 | failure probe post-consumo: rollback e no retry | modello + cleanup comune | PASS |
+| 49 | cleanup probe nel vero sottoprocesso | regression trap EXIT | PASS |
+| 50 | drop-in probe parser-valid, direct-exec e mapping/env exact gates | helper + `systemd-analyze verify` | PASS_OFFLINE_PARSER |
+| 51 | storage probe isolato e preesistente preservato | inventario + cleanup audit | PASS |
+| 52 | system lib mai sostituita e ri-hashata | audit launcher | PASS |
+| 53 | nessun PAM/biometria/Goodix/TLS/PSK richiamabile | structural reachability audit | PASS |
 
 Esecuzioni di closure:
 
-- `analysis.D282.test_d282_01_offline_contract`: **41/41 PASS**;
+- `analysis.D282.test_d282_01_offline_contract`: **53/53 PASS**;
 - `analysis.D281.test_d281_01_fprintd_storage_integration`: **6/6 PASS**;
 - integrazione D281 con vero daemon/client, bus privato e USB compile-disabled:
   **PASS**;
@@ -232,15 +289,17 @@ Esecuzioni di closure:
 - build Fedora 44/libfprint 1.94.100 con vero SIGFM/OpenCV, stage 8, FP3,
   identify e VERIFY same-template: **PASS**;
 - standard driver registry e ABI esatto fprintd: **PASS**;
+- build reale della candidate probe `virtual_image`, USB-context compile-out,
+  ABI fprintd e audit no-Goodix/TLS: **PASS offline**;
 - preflight aggregato del kit: **PASS offline**.
 
-Il test 39 prova la generazione del vero drop-in e la sua accettazione dal
-parser systemd, non l'avvio del servizio. Non sono stati eseguiti
+I test 39 e 50 provano la generazione dei due veri profili drop-in e la loro
+accettazione dal parser systemd, non l'avvio del servizio. Non sono stati eseguiti
 `systemctl start`, installazioni in `/run/systemd/system`, accessi USB o driver
 target. Pertanto restano deliberatamente:
 
 ```text
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
 SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 EXACT_LIBRARY_MAP_VERIFIED=NOT_OBSERVED_FOR_CORRECTIVE
 ```
@@ -259,10 +318,12 @@ terminale già dopo l'acquisizione consumata. A e B sono auditati prima di avanz
 attiva rollback, senza ripetere enrollment. Stato preesistente e libreria di
 sistema sono confrontati dopo cleanup. Non compare alcuna modifica PAM.
 
-Il prossimo passo non è una nuova run biometrica: serve prima una verifica
-host-only separatamente autorizzata del vero avvio systemd con SELinux
-Enforcing, USB target non raggiungibile, seguita da review indipendente. Fino a
-quel momento la readiness resta `NOT_READY`. D283/PAM non è preparato.
+Il prossimo passo non è una nuova run biometrica: il probe host-only ora
+disponibile deve prima ricevere una Human Gate e una baseline/grant separati,
+essere eseguito sul vero systemd con SELinux Enforcing e poi essere sottoposto
+a review indipendente. Nessuna di queste autorizzazioni o esecuzioni è stata
+effettuata. Fino ad allora la readiness resta `NOT_READY`. D283/PAM non è
+preparato.
 
 ```text
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
@@ -276,7 +337,10 @@ EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
 UNBOUND_VARIABLE_DURING_CLEANUP=false
 D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
 D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
-FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+D282_01_PRIVILEGED_STAGING_PROBE_READY=true
+D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
+D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
 SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 D282_01_HUMAN_GATE_READINESS=NOT_READY
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
@@ -287,6 +351,7 @@ CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 APPROVED_BASELINE=NONE
 GRANT_CREATED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
+REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
 PAM_IN_SCOPE=false
 ```
