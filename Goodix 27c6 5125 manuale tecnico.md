@@ -474,8 +474,29 @@ separatamente una caratterizzazione same/different bilanciata.
 
 Il preflight D282/02 è `PASS_OFFLINE`: candidate SIGFM reale e ABI fprintd
 passano; i marker sintetici match/no-match sono presenti; la matrice con le
-regressioni D282/01 e D283 è `95/95 PASS`, inclusi parser systemd e runner PAM
+regressioni D282/01 e D283 è `98/98 PASS`, inclusi parser systemd e runner PAM
 reale in confdir isolata. Nessun `sudo`, USB o sensore è stato usato dall'AI.
+
+Attempt 01 D282/02 sulla baseline
+`8490f41d2491ab1e1ce7f8922edce78d73edfc9c` è chiuso come
+`FAIL_PRE_SENSOR_STAGING` e non costituisce un esperimento matcher. Il wildcard
+`$candidate/*.so.*` includeva il symlink candidate `libfprint-2.so.2`;
+`install` lo dereferenziava in un file regolare runtime e il successivo
+`ln -s` falliva per collisione. Il failure precede `systemctl stop`,
+`daemon-reload`, i flag live e lo start staged di fprintd. Gli originali
+operator-supplied osservano zero contatti/action, flag USB/sensore/live falsi,
+rollback completo, staging rimosso e storage/libreria di sistema invariati.
+
+Il failure path storico produceva poi un errore secondario: `operator.log` e
+`trials.tsv` non esistevano ma l'export li richiedeva entrambi. Il correttivo
+host-only riusa lo staging D282/01: copia per nome i sei file runtime reali e
+crea soltanto dopo la catena symlink. Inizializza `summary.env` e
+`operator.log` prima dello staging, annuncia il result path dopo tale punto e
+tratta `trials.tsv` come opzionale quando zero trial sono iniziati. Le
+regressioni dinamiche passano sia sulla forma candidate con symlink sia su un
+export pre-action senza trial; il preflight esercita il medesimo helper sulla
+candidate realmente compilata. Esperimento, matcher, threshold, preprocessing,
+protocollo e standby D283 restano invariati.
 
 PAM resta fuori D282. D283/01 ha ora chiuso offline il percorso operatore per
 un servizio PAM dedicato `goodix-d283-01`, con regola esatta
@@ -699,13 +720,24 @@ D282_02_DAEMON_RESTART_COUNT=2
 D282_02_BIOMETRIC_ACTION_MAX=5
 D282_02_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=12
 D282_02_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-D282_02_OFFLINE_CONTRACT_MATRIX=14/14_PASS
-D282_02_COMBINED_REGRESSION_MATRIX=95/95_PASS
+D282_02_OFFLINE_CONTRACT_MATRIX=17/17_PASS
+D282_02_COMBINED_REGRESSION_MATRIX=98/98_PASS
+D282_02_ACTUAL_CANDIDATE_SYMLINK_STAGING_REGRESSION=PASS
+D282_02_PRE_ACTION_EXPORT_WITHOUT_TRIALS_REGRESSION=PASS
 D282_02_CANDIDATE_BUILD=PASS_OFFLINE
 D282_02_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
 D282_02_OPERATOR_KIT=operator_kit/d282-02-matcher-order
 D282_02_EXECUTABLE_CLOSURE=PASS_OFFLINE
 D282_02_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+D282_02_ATTEMPT_01=FAIL_PRE_SENSOR_STAGING_CLOSED
+D282_02_ATTEMPT_01_BASELINE_SHA=8490f41d2491ab1e1ce7f8922edce78d73edfc9c
+D282_02_ATTEMPT_01_MATCHER_EXPERIMENT_STARTED=false
+D282_02_ATTEMPT_01_PHYSICAL_CONTACT_COUNT=0
+D282_02_ATTEMPT_01_BIOMETRIC_ACTION_COUNT=0
+D282_02_ATTEMPT_01_REAL_SENSOR_ACCESSED=false
+D282_02_ATTEMPT_01_LIVE_EXECUTION_PERFORMED=false
+D282_02_ATTEMPT_01_ROLLBACK_COMPLETE=true
+D282_02_ATTEMPT_01_AUTONOMOUS_RETRY_ALLOWED=false
 D283_01_OUTCOME=READY_OFFLINE_STANDBY
 D283_01_D282_PREREQUISITE=PASS_LIVE_CLOSED
 D283_01_PAM_SERVICE=goodix-d283-01
@@ -772,8 +804,11 @@ NEXT_BOUNDARY_AFTER_D282_02_REVIEW=BALANCED_SAME_DIFFERENT_OR_LIFECYCLE_INVESTIG
 Report ed evidenze correnti:
 `analysis/D282/D282_02_replan_matcher_order_boundary.md`,
 `analysis/D282/D282_02_OFFLINE_RESULT.env`,
+`analysis/D282/D282_02_attempt_01_pre_sensor_staging_analysis.md`,
+`analysis/D282/D282_02_ATTEMPT_01_NORMALIZED.env`,
 `analysis/D282/d282_02_trial_audit.py`,
 `operator_kit/d282-02-matcher-order/`,
+`captures/D282_02/D28202_ATTEMPT_01_20260910T214945Z_8490f41d_PRE_SENSOR/sanitized/`,
 `analysis/D283/D283_01_pam_dedicated_boundary.md`,
 `analysis/D283/D283_01_OFFLINE_RESULT.env`,
 `operator_kit/d283-01-pam-dedicated/`,

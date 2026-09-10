@@ -64,6 +64,86 @@ prepare_d28202_candidate () {
   echo "D282_02_CANDIDATE_DIRECTORY=$prepared_candidate"
 }
 
+stage_d28202_runtime_libraries () {
+  local candidate=$1 runtime=$2 name
+
+  [[ -d $candidate && ! -L $candidate && -d $runtime && ! -L $runtime ]] ||
+    return 1
+  [[ $runtime == /run/goodix-d282-02/* ||
+     $runtime == /tmp/goodix-d282-02-staging-test.* ||
+     $runtime == /tmp/goodix-d282-02-offline.*/* ]] || return 1
+  [[ -z $(find "$runtime" -mindepth 1 -maxdepth 1 -print -quit) ]] || return 1
+  for name in libfprint-2.so.2.0.0 libgusb.so.2 \
+    libopencv_core.so.413 libopencv_features2d.so.413 \
+    libopencv_flann.so.413 libopencv_imgproc.so.413; do
+    [[ -f $candidate/$name && ! -L $candidate/$name ]] || return 1
+    install -m 0600 "$candidate/$name" "$runtime/$name" || return 1
+  done
+  ln -s libfprint-2.so.2.0.0 "$runtime/libfprint-2.so.2" || return 1
+  ln -s libfprint-2.so.2 "$runtime/libfprint-2.so" || return 1
+}
+
+copy_d28202_result_set () {
+  local result=$1 export=$2 owner=$3 group=$4 name source_sha copy_sha
+
+  [[ -d $result/private && -d $export && ! -L $result && ! -L $export ]] ||
+    return 1
+  for name in operator.log summary.env; do
+    [[ -f $result/$name && ! -L $result/$name ]] || return 1
+    source_sha=$(sha256sum "$result/$name" | awk '{print $1}') || return 1
+    install -m 0600 -o "$owner" -g "$group" \
+      "$result/$name" "$export/$name" || return 1
+    copy_sha=$(sha256sum "$export/$name" | awk '{print $1}') || return 1
+    [[ $source_sha == "$copy_sha" ]] || return 1
+    echo "${name}_SHA256=$source_sha"
+  done
+  if [[ -e $result/trials.tsv || -L $result/trials.tsv ]]; then
+    name=trials.tsv
+    [[ -f $result/$name && ! -L $result/$name ]] || return 1
+    source_sha=$(sha256sum "$result/$name" | awk '{print $1}') || return 1
+    install -m 0600 -o "$owner" -g "$group" \
+      "$result/$name" "$export/$name" || return 1
+    copy_sha=$(sha256sum "$export/$name" | awk '{print $1}') || return 1
+    [[ $source_sha == "$copy_sha" ]] || return 1
+    echo "${name}_SHA256=$source_sha"
+    echo D282_02_TRIALS_TSV_EXPORTED=true
+  else
+    echo D282_02_TRIALS_TSV_EXPORTED=false
+  fi
+}
+
+d28202_offline_staging_and_export_regressions () {
+  local candidate=$1 work=$2 runtime result export output
+
+  [[ -L $candidate/libfprint-2.so.2 &&
+     $(readlink "$candidate/libfprint-2.so.2") == libfprint-2.so.2.0.0 &&
+     -L $candidate/libfprint-2.so &&
+     $(readlink "$candidate/libfprint-2.so") == libfprint-2.so.2 ]] ||
+    return 1
+  runtime="$work/runtime"
+  install -d -m 0700 "$runtime"
+  stage_d28202_runtime_libraries "$candidate" "$runtime" || return 1
+  [[ -f $runtime/libfprint-2.so.2.0.0 &&
+     ! -L $runtime/libfprint-2.so.2.0.0 &&
+     -L $runtime/libfprint-2.so.2 &&
+     $(readlink "$runtime/libfprint-2.so.2") == libfprint-2.so.2.0.0 &&
+     -L $runtime/libfprint-2.so &&
+     $(readlink "$runtime/libfprint-2.so") == libfprint-2.so.2 ]] || return 1
+
+  result="$work/pre-action-result"
+  export="$work/pre-action-export"
+  install -d -m 0700 "$result/private" "$export"
+  printf 'D282_02_FAILURE_PHASE=PRE_SENSOR_STAGING\n' >"$result/operator.log"
+  printf 'D282_02_RESULT=FAIL_PRE_SENSOR_STAGING\n' >"$result/summary.env"
+  output=$(copy_d28202_result_set "$result" "$export" "$(id -u)" "$(id -g)") ||
+    return 1
+  [[ -f $export/operator.log && -f $export/summary.env &&
+     ! -e $export/trials.tsv &&
+     $output == *D282_02_TRIALS_TSV_EXPORTED=false* ]] || return 1
+  echo D282_02_ACTUAL_CANDIDATE_SYMLINK_STAGING_REGRESSION=PASS
+  echo D282_02_PRE_ACTION_EXPORT_WITHOUT_TRIALS_REGRESSION=PASS
+}
+
 capture_d28202_failure () {
   local phase=$1 return_code=$2 evidence=$3 since=$4 baseline=$5 stamp=$6
   local user=$7 journal_file="$live_private/failure-journal.raw"
@@ -233,7 +313,6 @@ run_d28202_live () {
 
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
   live_result="/var/tmp/goodix-d282-02-results/${stamp}-${baseline:0:12}"
-  echo "RISULTATI_PRIVATI=$live_result"
   live_runtime="/run/goodix-d282-02/${stamp}-${baseline:0:12}"
   live_owned="$live_storage_root/.goodix-d282-02-${stamp}-${baseline:0:12}"
   [[ ! -e $live_runtime && ! -e $live_owned && ! -e $live_dropin ]] ||
@@ -254,13 +333,16 @@ run_d28202_live () {
     echo D282_02_RESULT=FAIL_PENDING_AUDIT
     echo "D282_02_BASELINE_SHA=$baseline"
     echo D282_02_D283_LIVE_STANDBY=true
+    echo D282_02_FAILURE_PHASE=PRE_SENSOR_PREFLIGHT
     echo TEMPLATE_INCLUDED_IN_EXPORT=false
   } >"$live_result/summary.env" || refuse RESULT_SUMMARY_CREATE_FAILED
-  chmod 0600 "$live_result/summary.env"
+  : >"$live_result/operator.log" || refuse RESULT_OPERATOR_LOG_CREATE_FAILED
+  chmod 0600 "$live_result/operator.log" "$live_result/summary.env"
   live_cleanup_armed=true
   trap cleanup_live EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
+  echo "RISULTATI_PRIVATI=$live_result"
   since=$(date --iso-8601=seconds) || refuse HOST_CLOCK_FAILED
   systemctl cat fprintd.service >"$live_private/unit.before" ||
     refuse UNIT_SNAPSHOT_FAILED
@@ -279,10 +361,12 @@ run_d28202_live () {
     refuse TARGET_CARDINALITY_NOT_ONE
 
   live_staging_started=true
+  sed -i 's/^D282_02_FAILURE_PHASE=.*/D282_02_FAILURE_PHASE=PRE_SENSOR_STAGING/' \
+    "$live_result/summary.env"
+  echo D282_02_FAILURE_PHASE=PRE_SENSOR_STAGING >>"$live_result/operator.log"
   install -d -m 0700 "$live_runtime" "$live_owned" "$(dirname "$live_dropin")"
-  install -m 0600 "$candidate"/*.so.* "$live_runtime/"
-  ln -s libfprint-2.so.2.0.0 "$live_runtime/libfprint-2.so.2"
-  ln -s libfprint-2.so.2 "$live_runtime/libfprint-2.so"
+  stage_d28202_runtime_libraries "$candidate" "$live_runtime" ||
+    refuse RUNTIME_LIBRARY_STAGING_FAILED
   if [[ $validated_selinux_enforcement == Enforcing ]]; then
     for raw in "$live_runtime"/*.so.*; do
       chcon --reference=/usr/lib64/libfprint-2.so.2 "$raw"
@@ -294,14 +378,14 @@ run_d28202_live () {
   live_service_touched=true
   systemctl stop fprintd.service
   systemctl daemon-reload
+  sed -i 's/^D282_02_FAILURE_PHASE=.*/D282_02_FAILURE_PHASE=SENSOR_REACHING_DAEMON_START/' \
+    "$live_result/summary.env"
   real_usb_enumeration_attempted=true
   real_sensor_accessed=true
   live_execution_performed=true
   systemctl start fprintd.service
   target_count=$(count_goodix_targets /sys/bus/usb/devices)
   [[ $target_count -eq 1 ]] || refuse TARGET_CARDINALITY_NOT_ONE
-  : >"$live_result/operator.log"
-  chmod 0600 "$live_result/operator.log"
   verify_daemon_map INITIAL
 
   printf '\nENROLLMENT — 8 CONTATTI\n\nUSA SOLO:\n>>> INDICE DESTRO <<<\n\n'
@@ -481,21 +565,19 @@ run_d28202_live () {
 }
 
 export_d28202_results () {
-  local result=$1 export name source_sha copy_sha
+  local result=$1 export
   [[ $EUID -eq 0 && ${SUDO_UID:-} =~ ^[0-9]+$ &&
      ${SUDO_GID:-} =~ ^[0-9]+$ ]] || refuse EXPORT_CALLER
-  [[ $result == /var/tmp/goodix-d282-02-results/* && -d $result/private ]] ||
-    refuse EXPORT_SOURCE
+  [[ $result == /var/tmp/goodix-d282-02-results/* ]] || refuse EXPORT_SOURCE
+  if [[ ! -d $result/private ]]; then
+    echo D282_02_RESULTS_EXPORT=NOT_AVAILABLE_BEFORE_RESULT_INITIALIZATION
+    echo TEMPLATE_INCLUDED_IN_EXPORT=false
+    return 0
+  fi
   export=$(mktemp -d /tmp/goodix-d282-02-export.XXXXXX)
   chmod 0700 "$export"
-  for name in operator.log summary.env trials.tsv; do
-    source_sha=$(sha256sum "$result/$name" | awk '{print $1}')
-    install -m 0600 -o "$SUDO_UID" -g "$SUDO_GID" \
-      "$result/$name" "$export/$name"
-    copy_sha=$(sha256sum "$export/$name" | awk '{print $1}')
-    [[ $source_sha == "$copy_sha" ]] || refuse EXPORT_HASH
-    echo "${name}_SHA256=$source_sha"
-  done
+  copy_d28202_result_set "$result" "$export" "$SUDO_UID" "$SUDO_GID" ||
+    refuse EXPORT_RESULT_SET
   chown "$SUDO_UID:$SUDO_GID" "$export"
   echo D282_02_RESULTS_EXPORT=PASS_BYTE_IDENTICAL
   echo "EXPORT_DIRECTORY=$export"
@@ -557,6 +639,7 @@ offline_preflight () {
   install -d -m 0700 "$work/candidate"
   build_candidate "$root" "$work/candidate" "$rpm_dir"
   abi_preflight "$work/candidate"
+  d28202_offline_staging_and_export_regressions "$work/candidate" "$work"
   telemetry="$work/sigfm-print.log"
   "$root/libfprint-driver/tests/run_goodix_fedora44_sigfm_print_test.sh" \
     >"$telemetry" 2>&1
@@ -581,10 +664,12 @@ offline_preflight () {
   find "$work" -xdev -depth -delete
 }
 
-case ${1:-} in
-  --offline-preflight) [[ $# -eq 2 ]] || refuse USAGE; offline_preflight "$2" ;;
-  --operator-run) [[ $# -eq 2 ]] || refuse USAGE; operator_d28202_run "$2" ;;
-  --run-live) [[ $# -eq 4 && $3 == --user ]] || refuse USAGE; run_d28202_live "$2" "$4" ;;
-  --export-results) [[ $# -eq 2 ]] || refuse USAGE; export_d28202_results "$2" ;;
-  *) echo "Uso: $0 --offline-preflight <opencv-rpm-dir> | --operator-run <opencv-rpm-dir>" >&2; exit 2 ;;
-esac
+if [[ ${D28202_LIBRARY_ONLY:-false} != true ]]; then
+  case ${1:-} in
+    --offline-preflight) [[ $# -eq 2 ]] || refuse USAGE; offline_preflight "$2" ;;
+    --operator-run) [[ $# -eq 2 ]] || refuse USAGE; operator_d28202_run "$2" ;;
+    --run-live) [[ $# -eq 4 && $3 == --user ]] || refuse USAGE; run_d28202_live "$2" "$4" ;;
+    --export-results) [[ $# -eq 2 ]] || refuse USAGE; export_d28202_results "$2" ;;
+    *) echo "Uso: $0 --offline-preflight <opencv-rpm-dir> | --operator-run <opencv-rpm-dir>" >&2; exit 2 ;;
+  esac
+fi

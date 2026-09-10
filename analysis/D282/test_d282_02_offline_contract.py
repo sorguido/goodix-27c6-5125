@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 from pathlib import Path
+import hashlib
 import subprocess
 import tempfile
 import unittest
@@ -14,6 +15,9 @@ FPI_PRINT = ROOT / "reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-p
 FP_IMAGE = ROOT / "reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image.c"
 D282 = ROOT / "operator_kit/d282-01-fprintd-target/run-d282-01.sh"
 D283 = ROOT / "operator_kit/d283-01-pam-dedicated/run-d283-01.sh"
+ATTEMPT_01 = (ROOT / "captures/D282_02" /
+              "D28202_ATTEMPT_01_20260910T214945Z_8490f41d_PRE_SENSOR" /
+              "sanitized")
 
 
 def function_slice(text: str, start: str, end: str) -> str:
@@ -204,6 +208,81 @@ class D28202OfflineContract(unittest.TestCase):
         self.assertIn("REAL_SENSOR_ACCESSED=false", offline)
         self.assertIn("LIVE_EXECUTION_PERFORMED=false", offline)
         self.assertNotIn("run_d28202_live", offline)
+
+    def test_15_actual_candidate_symlink_shape_stages_without_collision(self):
+        names = (
+            "libfprint-2.so.2.0.0", "libgusb.so.2",
+            "libopencv_core.so.413", "libopencv_features2d.so.413",
+            "libopencv_flann.so.413", "libopencv_imgproc.so.413",
+        )
+        with tempfile.TemporaryDirectory(prefix="goodix-d282-02-candidate-") as cd, \
+             tempfile.TemporaryDirectory(prefix="goodix-d282-02-staging-test.") as rd:
+            candidate, runtime = Path(cd), Path(rd)
+            for name in names:
+                (candidate / name).write_bytes(f"fixture:{name}".encode())
+            (candidate / "libfprint-2.so.2").symlink_to("libfprint-2.so.2.0.0")
+            (candidate / "libfprint-2.so").symlink_to("libfprint-2.so.2")
+            subprocess.run(
+                ["bash", "-c",
+                 'D28202_LIBRARY_ONLY=true; source "$0"; '
+                 'stage_d28202_runtime_libraries "$1" "$2"',
+                 str(LAUNCHER), str(candidate), str(runtime)], check=True)
+            self.assertTrue((runtime / "libfprint-2.so.2.0.0").is_file())
+            self.assertFalse((runtime / "libfprint-2.so.2.0.0").is_symlink())
+            self.assertEqual(
+                (runtime / "libfprint-2.so.2").readlink(),
+                Path("libfprint-2.so.2.0.0"))
+            self.assertEqual(
+                (runtime / "libfprint-2.so").readlink(),
+                Path("libfprint-2.so.2"))
+
+    def test_16_preaction_result_exports_without_trials(self):
+        with tempfile.TemporaryDirectory(prefix="goodix-d282-02-export-test-") as td:
+            work = Path(td)
+            result, export = work / "result", work / "export"
+            (result / "private").mkdir(parents=True)
+            export.mkdir()
+            (result / "operator.log").write_text(
+                "D282_02_FAILURE_PHASE=PRE_SENSOR_STAGING\n")
+            (result / "summary.env").write_text(
+                "D282_02_RESULT=FAIL_PRE_SENSOR_STAGING\n")
+            completed = subprocess.run(
+                ["bash", "-c",
+                 'D28202_LIBRARY_ONLY=true; source "$0"; '
+                 'copy_d28202_result_set "$1" "$2" "$(id -u)" "$(id -g)"',
+                 str(LAUNCHER), str(result), str(export)],
+                check=True, capture_output=True, text=True)
+            self.assertIn("D282_02_TRIALS_TSV_EXPORTED=false", completed.stdout)
+            self.assertNotIn("sha256sum:", completed.stderr)
+            self.assertTrue((export / "operator.log").is_file())
+            self.assertTrue((export / "summary.env").is_file())
+            self.assertFalse((export / "trials.tsv").exists())
+
+    def test_17_attempt_01_evidence_is_hash_pinned_and_pre_sensor(self):
+        expected = {
+            "summary.env":
+                "12b9e43c447f925b6149df947041fc9c795c15008b52fae3412581bcb1172727",
+            "terminal-transcript.log":
+                "5cad08c472151598367e360814ade757cc3d4566ef64383e0a898641556d0edf",
+        }
+        for name, digest in expected.items():
+            self.assertEqual(
+                hashlib.sha256((ATTEMPT_01 / name).read_bytes()).hexdigest(),
+                digest)
+        summary = (ATTEMPT_01 / "summary.env").read_text()
+        transcript = (ATTEMPT_01 / "terminal-transcript.log").read_text()
+        for marker in (
+                "ROLLBACK_COMPLETE=true",
+                "PREEXISTING_STORAGE_UNCHANGED=true",
+                "SYSTEM_LIBFPRINT_UNCHANGED=true",
+                "STAGING_REMOVED=true",
+                "REAL_USB_ENUMERATION_ATTEMPTED=false",
+                "REAL_SENSOR_ACCESSED=false",
+                "LIVE_EXECUTION_PERFORMED=false"):
+            self.assertIn(marker, summary)
+        self.assertIn("libfprint-2.so.2", transcript)
+        self.assertIn("File già esistente", transcript)
+        self.assertNotIn("ENROLLMENT", transcript)
 
 
 if __name__ == "__main__":

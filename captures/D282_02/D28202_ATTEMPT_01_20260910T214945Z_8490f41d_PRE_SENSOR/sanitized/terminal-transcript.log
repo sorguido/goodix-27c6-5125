@@ -1,0 +1,8 @@
+libfprint-2.so.2.0.0: OK
+libgusb.so.2: OK
+libopencv_core.so.413: OK
+libopencv_features2d.so.413: OK
+libopencv_flann.so.413: OK
+libopencv_imgproc.so.413: OK
+RISULTATI_PRIVATI=/var/tmp/goodix-d282-02-results/20260910T214945Z-8490f41d2491
+ln: creazione del collegamento simbolico '/run/goodix-d282-02/20260910T214945Z-8490f41d2491/libfprint-2.so.2' non riuscita: File già esistente

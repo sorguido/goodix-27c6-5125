@@ -1,6 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D282/02 — caratterizzazione ordine e re-entry del matcher
 
+> **Attempt 01 chiuso pre-sensor:** la baseline `8490f41` si è fermata nello
+> staging prima di fprintd e di qualsiasi contatto. Il launcher corrente copia
+> ora esplicitamente i file runtime, crea i symlink senza collisione e rende
+> esportabili anche i risultati senza trial. Non riutilizzare script storici.
+
 ## Scopo e rischio
 
 Il kit verifica se il risultato o gli score SIGFM cambiano sistematicamente
@@ -62,6 +67,9 @@ Al termine allegare dalla `EXPORT_DIRECTORY`:
 - `operator.log`;
 - `summary.env`;
 - `trials.tsv`.
+
+Se la run si ferma prima dei trial, `trials.tsv` è correttamente assente e
+l'export riporta `D282_02_TRIALS_TSV_EXPORTED=false`; allegare i file prodotti.
 
 Allegare anche il file indicato da `TERMINAL_TRANSCRIPT`. In caso di fallimento
 non ripetere la run: conservare tutti gli output e attendere la review AI-PM.

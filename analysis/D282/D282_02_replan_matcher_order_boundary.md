@@ -71,6 +71,14 @@ ma i suoi entrypoint live rifiutano fail-closed finché D282/02 non è riesamina
 
 Il preflight finale ha costruito la candidate Fedora 44 con SIGFM reale,
 verificato l'ABI fprintd e i marker sintetici match/no-match. La matrice
-congiunta D282/02 + regressioni D282/01 + D283 è `95/95 PASS`, inclusi i
+congiunta D282/02 + regressioni D282/01 + D283 è `98/98 PASS`, inclusi i
 controlli host reali del parser systemd e di `pam_start_confdir()` eseguiti
 fuori sandbox. Nessun `sudo`, USB o sensore è stato usato.
+
+Attempt 01 sulla baseline `8490f41` non ha raggiunto questo esperimento: il
+wildcard dello staging ha dereferenziato il symlink SONAME della candidate e
+il successivo `ln -s` ha colliso. La run è classificata
+`FAIL_PRE_SENSOR_STAGING`, con zero contatti/action, flag sensore falsi e
+rollback completo. Il correttivo host-only copia i sei file runtime per nome,
+inizializza l'evidenza minima prima dello staging e rende `trials.tsv`
+opzionale per l'export pre-action. Disegno e parametri restano invariati.
