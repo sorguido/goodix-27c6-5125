@@ -16,6 +16,73 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
+### Governance live corrente — v2.7 (10 settembre 2026)
+
+Per una normale live factory-preserving il Human Gate è esclusivamente il
+confine operativo fra AI e Utente:
+
+```text
+AI: sviluppo, test e review offline
+→ HUMAN_REQUIRED e arresto dell'AI
+→ Kit Operatore direttamente eseguibile dall'Utente
+→ live eseguita manualmente dall'Utente
+```
+
+Non esiste un livello intermedio di approvazione manuale dello SHA,
+authorization file, grant, claim/consumo, token/ticket/nonce di consenso o
+autorizzazione della candidate. Lo SHA completo e gli hash del live-critical
+set restano registrati esclusivamente per provenance e integrità. I limiti di
+action/contatti e lo zero retry automatico o implicito sensor-reaching non
+provato sicuro restano guardrail tecnici fail-closed.
+
+Le ricostruzioni successive conservano fedelmente meccanismi realmente usati
+nelle run passate. Ogni occorrenza di grant, baseline approvata, authorization
+consumed, ticket/marker/nonce autorizzativo, candidate autorizzata o formula
+equivalente associata a una run o a un kit storico è quindi
+`HISTORICAL_ONLY`, non una prescrizione da replicare. Gli SHA e gli hash citati
+come identità di build/evidenza sono `PROVENANCE_ONLY`; le autorizzazioni
+relative a protected material, eccezioni factory-preserving, cambi materiali
+di rischio/scope/licensing o Git protetto restano
+`LEGITIMATE_NON_LIVE_AUTHORIZATION`.
+
+```text
+HISTORICAL_MECHANISM != CURRENT_GOVERNANCE_REQUIREMENT
+CURRENT_GRANT_REQUIREMENT=false
+CURRENT_AUTHORIZATION_FILE_REQUIREMENT=false
+CURRENT_GRANT_CLAIM_REQUIREMENT=false
+CURRENT_GRANT_CONSUMED_REQUIREMENT=false
+CURRENT_USER_APPROVED_BASELINE_REQUIREMENT=false
+CURRENT_CANDIDATE_AUTHORIZATION_REQUIREMENT=false
+CURRENT_RETRY_AUTHORIZATION_TOKEN_REQUIREMENT=false
+CODEX_LIVE_EXECUTION_ALLOWED=false
+AUTOMATIC_UNPROVEN_SENSOR_RETRY_ALLOWED=false
+SHA_RECORDED_FOR_PROVENANCE=true
+```
+
+### Consultazione del manuale al bootstrap
+
+Il manuale resta l'autorità narrativa tecnica primaria, ma non deve essere
+letto integralmente per default. Al bootstrap sono obbligatorie la sezione di
+stato corrente, l'ultimo avanzamento consolidato, il boundary/roadmap corrente
+e i blocker o le decisioni architetturali pertinenti. Per ogni claim tecnico
+storico l'agente deve cercare nel manuale e leggere la sezione rilevante prima
+di affidarsi a memoria, contesto o session summary.
+
+```text
+NO TECHNICAL CLAIM FROM MEMORY WHEN THE MANUAL CAN ANSWER IT
+FULL_MANUAL_READ_REQUIRED_BY_DEFAULT=false
+CURRENT_STATE_READ_REQUIRED=true
+CURRENT_BOUNDARY_READ_REQUIRED=true
+TARGETED_MANUAL_SEARCH_REQUIRED=true
+RELEVANT_SECTION_READ_REQUIRED=true
+MANUAL_PRIMARY_TECHNICAL_AUTHORITY=true
+SESSION_MEMORY_TECHNICAL_AUTHORITY=false
+```
+
+La lettura integrale resta eccezionale: si usa soltanto quando una decisione
+trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
+delle sezioni pertinenti.
+
 ### Stato corrente — D282/01 attempt 02 chiuso, correttivo direct-enroll offline
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
@@ -306,9 +373,11 @@ enrollment. La matrice D282 è `63/63`; il test della classe Goodix conferma
 e hash-pinned, lo stato normalizzato e il report causale sono in
 `captures/D282_01/D28201_ATTEMPT_02_cc2452e5/` e `analysis/D282/`.
 
-Non esistono ora baseline approvata, candidate approvata, grant o
-autorizzazione live. Qualunque futura run richiede un nuovo full SHA approvato
-esplicitamente, nuovo grant one-shot e nuova autorizzazione Human Gate.
+Il successivo passo sensor-reaching resta un Human Gate: l'AI non può
+eseguirlo. Dopo la closure offline il Kit Operatore deve però essere
+direttamente eseguibile manualmente dall'Utente, senza approvazione separata
+dello SHA, candidate autorizzata, grant o token. Il kit registra full SHA e
+hash pertinenti per provenance e conserva i limiti tecnici fail-closed.
 
 PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
 sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
@@ -386,7 +455,7 @@ SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
 D282_01_OUTCOME=ATTEMPT_02_FAIL_CLOSED_AND_DIRECT_ENROLL_CORRECTIVE_PASS_OFFLINE
 D282_01_OFFLINE_CLOSURE=PASS
-D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_MANUAL_OPERATOR_KIT
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
@@ -428,7 +497,7 @@ D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED
 D282_01_PRIVILEGED_STAGING_PROBE_RESULT=PASS
 D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=true
 D282_01_PRIVILEGED_STAGING_PROBE_WAS_AUTHORIZED=true
-D282_01_PRIVILEGED_STAGING_PROBE_CURRENTLY_AUTHORIZED=false
+D282_01_PRIVILEGED_STAGING_PROBE_HISTORICAL_AUTHORIZATION_STATE=false
 D282_01_PRIVILEGED_STAGING_PROBE_GRANT_CONSUMED=true
 D282_01_PRIVILEGED_STAGING_PROBE_RETRY_AUTHORIZED=false
 D282_01_STAGING_PROBE_IMPORTED_SUMMARY_SHA256=988f992039b6cee1d0dcc64aef4bc53775f6fb5617ec1ec6ce7a93ac558e49ef
@@ -465,18 +534,19 @@ CUSTOM_LIBFPRINT_LOADED=true
 D282_01_NEXT_HUMAN_GATE_OPERATION=D282_01_FPRINTD_TARGET_ENROLL_RESTART_VERIFY_SAME_DIFFERENT_DELETE
 ENROLL_ACTION_COUNT_MAX=1
 VERIFY_ACTION_COUNT_MAX=2
-AUTHORIZED_BIOMETRIC_ACTION_MAX=3
+HISTORICAL_AUTHORIZED_BIOMETRIC_ACTION_MAX=3
+BIOMETRIC_ACTION_MAX=3
 EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10
 D282_01_PAM_IN_SCOPE=false
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
-CURRENT_LIVE_AUTHORIZED=false
+CODEX_LIVE_EXECUTION_ALLOWED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
-APPROVED_BASELINE=NONE
-GRANT_CREATED=false
+USER_APPROVED_BASELINE_REQUIRED=false
+GRANT_REQUIRED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=NEW_D282_01_BIOMETRIC_HUMAN_GATE_WITH_FRESH_BASELINE_CANDIDATE_GRANT_AND_ID
+NEXT_PRIMARY_BOUNDARY=D282_01_BIOMETRIC_HUMAN_GATE_THEN_DIRECT_MANUAL_OPERATOR_KIT
 NEXT_BOUNDARY_AFTER_D282_PASS=D283_01_PAM_DEDICATED_MAX_TRIES_1_NO_REAL_LOGIN_OR_SUDO_INITIAL
 ```
 
@@ -1610,10 +1680,11 @@ numerici e il parser conta tutti i lifecycle esatti osservati. Il terzo B0 è
 una milestone metadata-only e non è più uno stop condition. Il default
 libfprint di cinque stage non entra nel criterio di closure.
 
-Il marker globale è stato rimosso. Ogni invocazione live futura usa un
-`authorized_attempt_id` distinto e crea directory/lock con protezione
-anti-riuso per-attempt; un failure non rende inutilizzabile il Kit e non genera
-retry automatici. Lo stato finale classifica se una nuova run pre-attach è
+Il marker globale era stato rimosso. Il kit storico usava un campo denominato
+`authorized_attempt_id`; nella governance corrente un eventuale identificatore
+di invocazione serve solo a provenance, namespace e protezione tecnica
+anti-riuso, non autentica l'Utente e non viene concesso o consumato. Un failure
+non genera retry automatici. Lo stato finale classifica se una nuova run pre-attach è
 ragionevole senza restore oppure se, dopo attach/wizard, lo snapshot VM deve
 essere ripristinato. La procedura preferita fotografa VM, repository e Kit già
 qualificato; prima del restore vanno esportate fuori dalla VM sia `raw/` sia
@@ -5992,9 +6063,11 @@ current HEAD che confronta il manifest frozen con file evoluti è
 `--terminal-boundary STOP_AFTER_SECOND_IMAGE`. La modalità fake attraversa lo
 stesso coordinator e chiude sinteticamente il secondo B0 con una sessione USB,
 un oggetto/handshake TLS, un handoff PSK, zero retry/reopen/write e un cleanup.
-Il live candidate richiede inoltre SHA completo approvato, worktree pulito,
-marker D275 single-use e la frase gate esatta che dichiara VID:PID, one-shot,
-no retry, factory-preserving, no enrollment e no third cycle. Il secondo B0 è
+Secondo la governance allora vigente, il candidate D275 richiedeva inoltre SHA
+completo approvato, worktree pulito, marker single-use e una frase gate esatta.
+Questi prerequisiti amministrativi sono `HISTORICAL_ONLY`; i limiti tecnici
+no-retry, factory-preserving, no-enrollment e no-third-cycle restano fatti del
+percorso eseguito. Il secondo B0 è
 lo stop wire/state-driven; il comando candidato non è stato eseguito e nessuna
 baseline D275 è auto-approvata.
 
@@ -9414,9 +9487,10 @@ l'autorizzazione e avviato TShark, poi ha prodotto
 `D255_FAIL_CLOSED: capture process is alive but output file was not created`
 al controllo fisso dei due secondi. Il Goodix non è stato collegato alla VM e
 non è avvenuta alcuna azione sul sensore. Il successivo pcapng zero-byte con
-timestamp di diversi secondi posteriore prova la race host-side del gate. La
-futura run richiede review AI-PM, approvazione di un nuovo SHA live-critical e
-una nuova autorizzazione esplicita; quella consumata non è riutilizzabile.
+timestamp di diversi secondi posteriore prova la race host-side del gate.
+Secondo la governance allora vigente, il tentativo successivo richiedeva review
+AI-PM, approvazione di un nuovo SHA live-critical e nuova autorizzazione. Tale
+meccanismo è `HISTORICAL_ONLY` e non costituisce requisito corrente.
 
 La run successiva sulla baseline approvata
 `f01b81d629ffe8af5eecb92ca93968045d5345ce` ha invece completato l'intero

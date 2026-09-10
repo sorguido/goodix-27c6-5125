@@ -27,10 +27,26 @@ In particolare, durante il bootstrap/recovery iniziale:
 
 - determina Git root, branch, HEAD e stato del worktree;
 - applica il Golden Branch Gate canonico (`development` è l'unico branch scrivibile dalla modalità autonoma);
-- leggi integralmente le fonti canoniche richieste da `AGENTS.md`;
+- leggi integralmente `START_PROMPT.md`, `AGENTS.md` e le Linee Guida;
+- nel manuale tecnico leggi obbligatoriamente, tramite indice e ricerca mirata,
+  la sezione di stato corrente, l'ultimo avanzamento consolidato, il
+  boundary/roadmap corrente e i blocker o le decisioni architetturali
+  pertinenti al task;
 - esamina storia Git recente, diff non committato e ultimi artefatti realmente pertinenti;
 - ricostruisci l'ultimo avanzamento tecnico dimostrato e il successivo confine aperto;
 - verifica se la sessione precedente ha lasciato lavoro incompleto o non committato.
+
+Il manuale tecnico non deve essere letto integralmente per default. Per ogni
+claim tecnico storico, cerca nel manuale e leggi la sezione pertinente prima
+di affidarti a memoria, contesto o session summary:
+
+```text
+NO TECHNICAL CLAIM FROM MEMORY WHEN THE MANUAL CAN ANSWER IT
+```
+
+La lettura integrale del manuale è eccezionale: usala soltanto quando una
+decisione trasversale o una contraddizione non è risolvibile con ricerca
+mirata e lettura delle sezioni rilevanti.
 
 Un worktree sporco non è automaticamente un errore: può essere lavoro lasciato da una sessione interrotta. Non cancellare, resettare, stashare o sovrascrivere lavoro preesistente. Se provenienza o intento restano materialmente ambigui e una scelta autonoma può distruggere lavoro o deviare il progetto, termina con `HUMAN_REQUIRED`.
 
@@ -248,8 +264,11 @@ Non fermarti soltanto perché hai completato un task locale, creato/pushato un c
 
 Per ridurre lavoro ridondante durante la stessa sessione:
 
-- non rileggere integralmente documenti canonici a ogni iterazione se `AGENTS.md` richiede soltanto le sezioni pertinenti dopo il bootstrap;
+- dopo il bootstrap non rileggere integralmente i documenti canonici a ogni
+  iterazione; rileggi le sezioni pertinenti e ogni parte modificata;
 - rileggi file/sezioni quando sono cambiati, quando servono alla decisione corrente o quando esiste rischio concreto di stato stale;
+- per ogni claim tecnico storico usa ricerca mirata nel manuale e leggi la
+  sezione pertinente; memoria e session summary non sono autorità tecniche;
 - usa repository e manuale come memoria persistente tra sessioni, non duplicarli nei `CURRENT_TASK`;
 - mantieni i task e i corrective append-only rispetto allo stato logico corrente: descrivi ciò che cambia, non ciò che resta uguale.
 
@@ -263,9 +282,20 @@ Le regole complete e vincolanti sono in `AGENTS.md` e nelle Linee Guida.
 
 Quando un'azione ricade in un Human Gate canonico, fermati prima dell'azione e usa `HUMAN_REQUIRED`.
 
-Non interpretare il silenzio, la disponibilità dell'hardware o una precedente autorizzazione one-shot come nuova autorizzazione.
+Per una normale live factory-preserving il Human Gate è il confine operativo,
+non un protocollo di autenticazione dell'Utente: l'AI prepara e verifica
+offline, dichiara `HUMAN_REQUIRED` e si ferma; l'Utente può quindi eseguire
+manualmente il Kit Operatore direttamente, senza approvare uno SHA, creare o
+consumare grant/file/token/ticket/nonce, autorizzare una candidate o compiere
+una seconda cerimonia autorizzativa.
 
-Se il progresso richiede un test live, USB reale o operazioni privilegiate dell'Utente, applica la procedura canonica dell'operator kit; non eseguire direttamente l'azione dal workflow Codex/VS Code.
+Se il progresso richiede un test live, USB reale o operazioni privilegiate
+dell'Utente, applica la procedura canonica dell'operator kit e non eseguire
+direttamente l'azione dal workflow Codex/VS Code. Il silenzio, la disponibilità
+dell'hardware e la consegna del kit non consentono mai all'AI di oltrepassare
+il gate. Retry automatici o impliciti sensor-reaching non provati sicuri
+restano vietati; il limite deve essere tecnico, non affidato a token di
+autorizzazione consumabili.
 
 ---
 

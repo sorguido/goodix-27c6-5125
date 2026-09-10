@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.6 — Revisione 1 settembre 2026
-> **Stato**: Attivo; sostituisce la v2.5 del 27 agosto 2026
-> **Motivazione**: la v2.6 introduce la modalità autonoma monostrumento PM↔Executor sul branch `development`. Il sistema deve poter riprendere il progetto dopo un'interruzione ricostruendo lo stato reale dal repository, alternare implementazione e review indipendente nella stessa sessione e continuare autonomamente fino a un vero Human Gate. Restano invariati i principi factory-preserving, evidence-first, executable closure, licensing/provenance, review Git-native e anti-frammentazione. La v2.6 rende inoltre `main` e `bakcup_pre_agentic_mode` read-only per l'agente autonomo, integra i Human Gate in `AGENTS.md`, definisce gli operator kit per i live manuali e rimuove dal repository qualunque prescrizione sul modello AI o sul livello di ragionamento.
+> **Versione**: 2.7 — Revisione 10 settembre 2026
+> **Stato**: Attivo; sostituisce la v2.6 del 1 settembre 2026
+> **Motivazione**: la v2.7 mantiene invariati Human Gate e safety tecnica, ma elimina la burocrazia autorizzativa per le normali live factory-preserving. Dopo la closure offline l'AI dichiara `HUMAN_REQUIRED` e si ferma; il Kit Operatore è direttamente eseguibile dall'Utente senza grant, file/token/ticket/nonce, claim/consumo, candidate authorization o approvazione rituale dello SHA. SHA e hash restano strumenti di provenance e integrità. Retry automatici o impliciti sensor-reaching non provati sicuri restano vietati e devono essere impediti tecnicamente. La v2.7 sostituisce inoltre la lettura integrale predefinita del manuale con stato/boundary obbligatori e consultazione mirata delle sezioni tecniche pertinenti.
 
 ---
 
@@ -145,7 +145,7 @@ Un task generato autonomamente può restringere lo scope, ma non può rilassare 
 Per affermazioni target-specific su `GF_ST411SEC_APP_12509`, safety, persistenza, PSK/factory state e comportamento del device, la priorità è:
 
 1. stato reale del repository e dell'ambiente host;
-2. evidenza locale prodotta da test ripetibili, capture canoniche, `gfusb.dll`, APP12509 e live autorizzati;
+2. evidenza locale prodotta da test ripetibili, capture canoniche, `gfusb.dll`, APP12509 e live eseguiti manualmente dall'Utente;
 3. manuale tecnico canonico;
 4. report e artefatti degli step precedenti;
 5. fonti esterne e implementazioni terze;
@@ -229,14 +229,30 @@ Prima di definire il primo `CURRENT_TASK` deve:
 1. individuare Git root;
 2. verificare branch, HEAD e `git status --short`;
 3. leggere integralmente:
+   - `START_PROMPT.md`;
    - `AGENTS.md`;
    - le presenti Linee Guida;
-   - `Goodix 27c6 5125 manuale tecnico.md`;
-4. esaminare storia recente e struttura pertinente del repository;
-5. identificare ultimo avanzamento tecnico reale e ultimo confine aperto;
-6. esaminare ultimi Dxxx pertinenti, codice, test, launcher e operator kit;
-7. verificare se esiste lavoro parziale o non committato;
-8. determinare se l'ultimo step è realmente chiuso o deve essere completato/corretto.
+4. leggere nel manuale tecnico, tramite indice e ricerca mirata:
+   - la sezione di stato corrente;
+   - l'ultimo avanzamento consolidato;
+   - il boundary/roadmap corrente;
+   - i blocker e le decisioni architetturali pertinenti;
+5. esaminare storia recente e struttura pertinente del repository;
+6. identificare ultimo avanzamento tecnico reale e ultimo confine aperto;
+7. esaminare ultimi Dxxx pertinenti, codice, test, launcher e operator kit;
+8. verificare se esiste lavoro parziale o non committato;
+9. determinare se l'ultimo step è realmente chiuso o deve essere completato/corretto.
+
+Per ogni claim tecnico storico l'agente deve cercare nel manuale e leggere la
+sezione pertinente prima di affidarsi a memoria, contesto o session summary:
+
+```text
+NO TECHNICAL CLAIM FROM MEMORY WHEN THE MANUAL CAN ANSWER IT
+```
+
+La lettura integrale del manuale non è richiesta per default. Resta eccezionale
+e si usa soltanto quando una decisione trasversale o una contraddizione non è
+risolvibile con ricerca mirata e lettura delle sezioni rilevanti.
 
 ### 6.1 Worktree sporco
 
@@ -336,21 +352,28 @@ Se esiste un ulteriore passo autonomamente consentito verso il target finale, la
 
 I dettagli operativi sono duplicati intenzionalmente in `AGENTS.md` perché devono essere immediatamente visibili all'agente.
 
-Una autorizzazione precedente non si riutilizza implicitamente. Hardware disponibile ≠ live autorizzato.
+Per una normale live factory-preserving il Human Gate è il confine fra lavoro
+autonomo dell'AI ed esecuzione fisica dell'Utente, non un protocollo di
+autenticazione. Dopo `HUMAN_REQUIRED` il Kit Operatore deve essere direttamente
+eseguibile dall'Utente: non servono approvazione manuale dello SHA, grant,
+authorization file, claim/consumo, token, ticket, nonce o autorizzazione della
+candidate. Hardware disponibile e kit consegnato non consentono invece
+all'AI di eseguire il live.
 
 ### 8.1 Hardware e live
 
-Richiedono intervento/autorizzazione umana:
+Richiedono intervento umano e arresto dell'AI:
 
 - nuova esecuzione live sul sensore;
 - accesso USB Goodix reale;
 - invio di comandi sensor-reaching;
-- retry live non autorizzato;
+- retry automatico o implicito sensor-reaching non provato sicuro;
 - installazione o attivazione runtime che possa raggiungere il device;
 - operazioni con possibile effetto persistente;
 - qualsiasi eccezione alle invarianti factory-preserving.
 
-Ogni autorizzazione live è one-shot salvo formulazione esplicita diversa dell'Utente.
+I limiti di action, contatti e retry pertinenti devono essere imposti dal
+percorso tecnico di ogni invocazione, non da token autorizzativi consumabili.
 
 ### 8.2 Privilegi e protected material
 
@@ -431,6 +454,9 @@ Regole:
 - non esegue il live;
 - non esegue `sudo` direttamente nel workflow attivo VS Code;
 - eventuale `sudo` necessario può essere presente nel percorso manualmente avviato dall'Utente e deve essere chiaramente documentato;
+- il kit chiuso offline deve essere direttamente eseguibile dall'Utente,
+  idealmente con un solo comando operativo normale e senza grant/token/file
+  autorizzativi o approvazione rituale dello SHA;
 - dopo la preparazione del kit il loop termina con `HUMAN_REQUIRED`;
 - non sostituire un kit dedicato con comandi USB/Python improvvisati quando il kit è praticabile.
 
@@ -454,7 +480,14 @@ La conclusione metodologica rilevante deve essere integrata nel manuale tecnico.
 
 ## 11. Sicurezza hardware, firmware e host
 
-### 11.1 Operazioni vietate senza autorizzazione esplicita
+### 11.1 Operazioni vietate e deroghe esplicite
+
+L'AI non esegue autonomamente accesso USB reale, comandi sensor-reaching o
+`sudo`/root: per una normale live factory-preserving prepara il Kit Operatore,
+dichiara `HUMAN_REQUIRED` e si ferma. Le operazioni seguenti restano vietate;
+eventuali deroghe a persistenza, factory state, protected material o profilo
+di rischio richiedono una decisione esplicita e specifica dell'Utente e non
+trasformano la normale live in un sistema di grant:
 
 - flash;
 - IAP;
@@ -477,21 +510,22 @@ La conclusione metodologica rilevante deve essere integrata nel manuale tecnico.
 
 Quando applicabili preservare:
 
-- autorizzazione esplicita della singola run;
-- single-shot;
-- zero retry implicito;
+- budget tecnico bounded di action/contatti per invocazione;
+- zero retry automatico o implicito sensor-reaching non provato sicuro;
 - fail-closed su comandi non compresi o potenzialmente persistenti;
 - cleanup/release/reseal anche su uscita anomala;
-- verifica del live-critical set contro baseline approvata;
+- verifica di integrità e provenance del live-critical set realmente eseguito;
 - diagnostica leggibile del failure.
 
 Questi sono guardrail hardware e non devono essere sostituiti da sola prosa.
 
-### 11.3 Baseline live
+### 11.3 Provenance live
 
-La baseline live revisionata è identificata da un **commit SHA completo approvato esplicitamente dall'Utente** per il percorso live interessato.
-
-L'agente non può inventare o auto-approvare tale SHA.
+La build e il percorso live realmente eseguiti sono identificati dal commit
+SHA completo e, quando necessario, dagli hash del live-critical set. Lo SHA è
+provenance, non autorizzazione: per una normale live factory-preserving non è
+richiesta un'approvazione manuale dello SHA né l'autorizzazione separata di una
+candidate.
 
 Il live-critical set comprende normalmente:
 
@@ -499,9 +533,10 @@ Il live-critical set comprende normalmente:
 - backend USB;
 - entrypoint reale;
 - moduli che possono inviare comandi USB;
-- guardrail software che implementano autorizzazione, single-shot, cleanup/reseal.
+- guardrail software sui limiti tecnici di action/retry e su cleanup/reseal.
 
-Modifiche a manuale, report o test offline non devono invalidare automaticamente una baseline live già approvata.
+Modifiche a manuale, report o test offline non devono rendere ambigua la
+provenance né invalidare automaticamente un live-critical set invariato.
 
 ---
 
@@ -580,6 +615,13 @@ Il manuale:
 - corregge o marca come superate formulazioni stale;
 - non lascia conoscenza nuova soltanto in sessione AI, report o commit message;
 - non duplica inutilmente contenuto ancora valido.
+
+Il bootstrap ne legge obbligatoriamente stato corrente, ultimo avanzamento
+consolidato, boundary/roadmap e blocker/decisioni architetturali pertinenti.
+Ogni altro claim tecnico storico richiede ricerca mirata e lettura della
+sezione rilevante; memoria e session summary non hanno autorità tecnica. La
+lettura integrale è riservata a decisioni trasversali o contraddizioni non
+risolvibili con consultazione mirata.
 
 Questo obbligo è parte della closure e permette a una futura sessione `START_PROMPT.md` di riprendere il progetto anche dopo un'interruzione brusca.
 
@@ -678,7 +720,7 @@ Difetti locali emersi durante la costruzione di un operator kit vanno chiusi nel
 
 Un nuovo Dxxx è giustificato da almeno uno tra:
 
-- nuova esecuzione reale autorizzata;
+- nuova esecuzione reale compiuta manualmente dall'Utente;
 - nuova evidenza tecnica;
 - nuovo confine protocollo/hardware;
 - decisione architetturale/licensing/repository che cambia realmente lo stato;
@@ -844,7 +886,7 @@ La qualità si misura in:
 
 ---
 
-## 25. Principio sintetico della v2.6
+## 25. Principio sintetico della v2.7
 
 ```text
 sicurezza hardware forte
@@ -861,7 +903,7 @@ alternanza disciplinata Executor/PM
 +
 Human Gate espliciti
 +
-operator kit per live manuali
+operator kit direttamente eseguibili per live manuali
 +
 review Git-native
 +

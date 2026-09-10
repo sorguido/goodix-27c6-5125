@@ -47,10 +47,25 @@ Prima di modificare qualunque file:
 1. identifica la Git root;
 2. verifica il branch corrente;
 3. verifica `git status --short`;
-4. leggi integralmente questo `AGENTS.md`;
-5. leggi integralmente le Linee Guida;
-6. leggi integralmente il manuale tecnico durante bootstrap/recovery e, negli step successivi, rileggi almeno le sezioni pertinenti mantenendo consapevolezza dello stato globale;
+4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
+   `AGENTS.md` e le Linee Guida;
+5. nel manuale tecnico leggi obbligatoriamente la sezione di stato corrente,
+   l'ultimo avanzamento consolidato, il boundary/roadmap corrente e i blocker o
+   le decisioni architetturali pertinenti;
+6. per ogni claim tecnico storico, cerca nel manuale e leggi la sezione
+   pertinente prima di usare quel claim;
 7. esamina storia, diff e artefatti necessari allo step.
+
+Il manuale tecnico non richiede lettura integrale per default. Memoria della
+sessione e session summary non sono autorità tecniche:
+
+```text
+NO TECHNICAL CLAIM FROM MEMORY WHEN THE MANUAL CAN ANSWER IT
+```
+
+La lettura integrale del manuale resta eccezionale ed è richiesta soltanto
+quando una decisione trasversale o una contraddizione non può essere risolta
+con ricerca mirata e lettura delle sezioni rilevanti.
 
 Se il branch corrente **non è `development`**:
 
@@ -136,7 +151,7 @@ Deve ricostruire lo stato reale del repository prima di scegliere il primo task:
 - worktree e diff non committato;
 - ultimo avanzamento tecnico documentato;
 - ultimo Dxxx pertinente;
-- manuale tecnico;
+- sezioni obbligatorie e pertinenti del manuale tecnico;
 - test, report, launcher e artefatti rilevanti;
 - eventuale lavoro interrotto.
 
@@ -181,19 +196,28 @@ Quando ricorre un Human Gate, l'agente deve fermarsi **prima** dell'azione sogge
 
 Non aggirare il gate, non degradarlo a semplice warning e non interpretare prudenza generica come autorizzazione.
 
-Sono sempre Human Gate, salvo autorizzazione esplicita e specifica già valida per quella singola azione/run:
+Per una normale live factory-preserving il Human Gate separa ciò che può fare
+autonomamente l'AI da ciò che deve eseguire fisicamente l'Utente. Dopo
+`HUMAN_REQUIRED` e la consegna del Kit Operatore non è richiesta una seconda
+cerimonia: niente approvazione manuale dello SHA, grant, authorization file,
+claim/consumo, token, ticket, nonce o autorizzazione della candidate. Il kit
+deve essere direttamente eseguibile dall'Utente. Questo non consente mai
+all'AI di eseguire live, USB o `sudo`.
+
+Sono sempre Human Gate per l'agente:
 
 ### 6.1 Hardware e live
 
 - nuova esecuzione live sul sensore;
 - accesso USB Goodix reale;
 - invio di comandi sensor-reaching;
-- retry live non esplicitamente autorizzato;
+- retry automatico o implicito sensor-reaching non provato sicuro;
 - installazione/attivazione runtime che possa raggiungere il sensore;
 - operazioni che possano modificare stato persistente;
 - qualunque eccezione alle invarianti factory-preserving.
 
-Una autorizzazione live è one-shot e non si riutilizza implicitamente.
+Ogni invocazione deve imporre tecnicamente i limiti di action, contatti e retry
+pertinenti; non deve delegare la safety a credenziali autorizzative consumabili.
 
 ### 6.2 Privilegi e protected material
 
@@ -309,6 +333,9 @@ Regole:
 - l'agente non esegue il live;
 - l'agente non esegue `sudo` nel workflow attivo VS Code;
 - eventuale `sudo` necessario deve trovarsi nel percorso manualmente avviato dall'Utente e deve essere chiaramente visibile nelle istruzioni;
+- il kit chiuso offline deve essere direttamente eseguibile dall'Utente,
+  idealmente con un solo comando operativo normale, senza prerequisiti di
+  grant/token/file autorizzativi o approvazione rituale dello SHA;
 - dopo la preparazione del kit, l'agente termina con `HUMAN_REQUIRED`;
 - niente comandi USB/Python improvvisati come sostituto del kit quando un kit dedicato è praticabile.
 
@@ -334,23 +361,24 @@ La conclusione metodologica rilevante va integrata nel manuale tecnico. Non crea
 
 Quando applicabili, preservare:
 
-- autorizzazione esplicita della singola run;
-- single-shot;
-- zero retry implicito;
+- budget tecnico bounded di action/contatti per invocazione;
+- zero retry automatico o implicito sensor-reaching non provato sicuro;
 - fail-closed su comandi non compresi o potenzialmente persistenti;
 - cleanup/release/reseal garantiti anche su uscita anomala;
-- verifica del live-critical set contro la baseline approvata;
+- verifica di integrità e provenance del live-critical set realmente eseguito;
 - diagnostica leggibile del failure.
 
 Questi sono guardrail hardware. Non sostituirli con sola prosa.
 
 ---
 
-## 11. Baseline live approvata
+## 11. Provenance live e live-critical set
 
-Una baseline live revisionata è identificata da un **commit SHA completo approvato esplicitamente dall'Utente** per il percorso live rilevante.
-
-L'agente non deve inventare o auto-approvare tale SHA.
+La build e il percorso live realmente eseguiti devono essere identificati con
+il commit SHA completo e, quando necessario, con hash del live-critical set.
+Lo SHA è provenance, non autorizzazione: una normale live factory-preserving
+non richiede uno SHA approvato manualmente dall'Utente né una candidate
+autorizzata come prerequisito separato.
 
 La verifica deve concentrarsi sul live-critical set, normalmente:
 
@@ -358,9 +386,10 @@ La verifica deve concentrarsi sul live-critical set, normalmente:
 - backend USB reale;
 - entrypoint reale;
 - moduli che possono inviare comandi USB;
-- guardrail software di autorizzazione, single-shot, cleanup/reseal.
+- guardrail software sui limiti tecnici di action/retry e su cleanup/reseal.
 
-Modifiche a manuale, report o test offline non devono invalidare automaticamente una baseline live già approvata.
+Modifiche a manuale, report o test offline non devono rendere ambigua la
+provenance né invalidare automaticamente un live-critical set invariato.
 
 ---
 
@@ -373,6 +402,12 @@ Goodix 27c6 5125 manuale tecnico.md
 ```
 
 Il manuale è la fonte narrativa canonica dello stato del progetto ed è essenziale per la ripresa autonoma dopo interruzione della sessione.
+
+È l'autorità narrativa tecnica primaria: ogni claim storico deve essere
+verificato tramite ricerca mirata e lettura della sezione pertinente. La
+memoria della sessione non può sostituirlo. La lettura integrale non è il
+default e si usa solo per decisioni trasversali o contraddizioni non risolvibili
+con consultazione mirata.
 
 La conoscenza nuova non deve restare soltanto:
 
