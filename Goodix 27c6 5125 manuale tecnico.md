@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — D280 chiuso live; prossimo boundary D281/01 fprintd
+### Stato corrente — D281/01 chiuso offline; D282/01 richiede Human Gate
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -101,10 +101,27 @@ identify single-acquisition e match biometrico del dito istruito. Il return
 code originale resta `1` come outcome dell'eseguibile difettoso e non viene
 confuso con l'esito biometrico.
 
-**NON PROVATO:** soglia FAR/FRR, discriminazione fra dita diverse,
+**NON PROVATO da D280:** soglia FAR/FRR, discriminazione fra dita diverse,
 fprintd/D-Bus/storage/PAM/login/sudo e assenza di persistenza sensor-side.
 Zero famiglie persistenti note resta telemetria di allowlist, non prova
 assoluta sulla NVM.
+
+D281/01 chiude ora offline il boundary fprintd/storage generico usando il vero
+daemon e i veri client Fedora 44, un bus D-Bus privato, `STATE_DIRECTORY`
+temporanea e il solo driver `virtual_image`. Enrollment sintetico, FP3 su
+filesystem, restart, list, deserialize, `verify-match`, rifiuto di header
+corrotto e delete sono tutti PASS. Il file upstream è `0644` sotto antenati
+`0700`; dopo delete restano zero file. Questo prova il control plane e la
+persistenza host generici, non ancora SIGFM target o autenticazione end-user.
+
+Una prima esplorazione è stata esclusa dal review set conforme: il solo
+allowlist virtuale non impedisce a `FpContext` di creare ed enumerare un
+`GUsbContext`. Non era presente alcun driver USB/Goodix e open, claim o
+transfer al sensore erano irraggiungibili, ma può essere avvenuta enumerazione
+host. La run canonica D281 usa invece una overlay test-only che esclude a
+compile time sia creazione sia enumerazione USB; il binario non importa i due
+simboli e fprintd viene verificato in `/proc/<pid>/maps` contro la libreria
+temporanea esatta.
 
 La direzione biometrica D279/48 resta SIGFM: sul dataset autentico
 single-session/same-finger SIGFM supera materialmente NBIS, senza provare
@@ -113,13 +130,13 @@ Fedora 44/libfprint 1.94.100 con preprocessing R2 e SIGFM Rockytkg sotto
 licenze per-file e combined-work GPL-compatible. USB/TLS/PSK/FDT/lifecycle e
 guardrail factory-preserving rimangono invariati.
 
-Il prossimo confine sostanziale è `D281/01`: integrare offline fprintd, storage
-e control plane end-user in un solo harness isolato. Deve usare bus D-Bus
-privato, `STATE_DIRECTORY` temporanea, dati sintetici e una device seam
-virtuale incapace di enumerare USB; deve attraversare daemon, FP3 on-disk,
-reload in un nuovo processo e identify/verify, includendo corruzione, delete,
-ownership, permessi, naming e ABI. Installazione di sistema, `/var/lib/fprint`,
-PAM/login/sudo, template autentici e hardware restano esclusi e gated.
+Il prossimo confine sostanziale è `D282/01`: staging production e prova
+end-to-end del driver target sotto il servizio fprintd, con storage SIGFM
+reale, restart, verify dello stesso dito, no-match controllato con dito diverso,
+delete/cleanup e integrazione PAM limitata e reversibile. Privilegi,
+installazione capace di raggiungere il sensore, biometria reale e nuove azioni
+live rendono questo boundary una nuova Human Gate. Nessuna build live, grant o
+operator kit D282 è stata preparata.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -176,15 +193,30 @@ D280_01_OPERATOR_STRUCTURAL_TESTS=11/11_PASS
 D280_01_RUNTIME_COUNTER_SCENARIOS=7/7_PASS
 D280_01_APPROVED_BASELINE=6cbcb9af88fa5401895208e9fd5217a6374ffb85
 PRODUCTION_IDENTIFY_LIVE_PROVEN=true
+D281_01_OUTCOME=PASS_HOST_ONLY
+D281_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_DAEMON_AND_CLI
+D281_01_INSTALLED_FPRINTD=fprintd-1.94.5-5.fc44.x86_64
+D281_01_FP3_WRITE_RELOAD_VERIFY_DELETE=PASS_SYNTHETIC_NBIS
+D281_01_CORRUPT_FP3_REJECTED=true
+D281_01_USB_CONTEXT_COMPILE_DISABLED=true
+D281_01_REAL_USB_ENUMERATION_ATTEMPTED=false
+D281_01_REAL_SENSOR_ACCESSED=false
+D281_01_PRECORRECTIVE_USB_ENUMERATION_POSSIBLE=true
+D281_01_PRECORRECTIVE_GOODIX_DRIVER_PRESENT=false
+FPRINTD_GENERIC_STORAGE_CONTROL_PLANE_PROVEN_HOST_ONLY=true
+FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=D281_01_OFFLINE_FPRINTD_STORAGE_AND_END_USER_CONTROL_PLANE_INTEGRATION
+CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY_AND_LIMITED_PAM
 ```
 
 Report ed evidenze correnti:
+`analysis/D281/D281_01_fprintd_storage_and_control_plane.md`,
+`analysis/D281/D281_01_OFFLINE_RESULT.env`,
 `analysis/D280/D280_01_two_open_epoch_template_reuse.md`,
 `analysis/D280/d280_01_authentic_live_reuse_audit.py`,
 `captures/D280_01/D28001_20260910T082439Z_6cbcb9af/sanitized/`,
@@ -894,10 +926,59 @@ D280_01_CORRECTED_CONTRACT_PASS=true
 D280_01_GRANT_CONSUMED=true
 D280_01_RETRY_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=D281_01_OFFLINE_FPRINTD_STORAGE_AND_END_USER_CONTROL_PLANE_INTEGRATION
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D280=D281_01_OFFLINE_FPRINTD_STORAGE_AND_END_USER_CONTROL_PLANE_INTEGRATION
 ```
 
 Report: `analysis/D280/D280_01_two_open_epoch_template_reuse.md`.
+
+### Stato D281/01 — fprintd storage e control plane offline
+
+D281/01 esegue il vero `fprintd-1.94.5-5.fc44.x86_64` e i quattro client
+installati su un bus privato, caricando via SONAME una build temporanea di
+libfprint 1.94.100 con il solo `virtual_image`. Il mock PolicyKit autorizza
+soltanto enroll, verify e setusername, rifiuta bus non temporanei e non tocca
+il servizio di sistema. La `STATE_DIRECTORY` è sotto `/tmp`, con antenati
+`0700`; nessun dato biometrico reale è usato.
+
+Una review del primo prototipo ha corretto un assunto importante: l'allowlist
+del driver non disabilita la discovery USB generica di `FpContext`. Quel
+prototipo senza driver USB/Goodix può quindi avere enumerato il bus host ed è
+escluso dalle prove conformi. La run finale applica a una copia temporanea una
+seam compilativa che elimina `g_usb_context_new()` e
+`g_usb_context_enumerate()`; l'audit rifiuta i relativi simboli, qualsiasi
+registrazione Goodix e qualsiasi `.so` diverso da quello osservato nelle maps
+del daemon.
+
+Il flusso conforme completa sei stage sintetici, salva un singolo FP3 da 5435
+byte (`56314914...09e5fc6`), riavvia il daemon, elenca il dito e ottiene
+`verify-match (done)`. Dopo corruzione del primo byte, un nuovo daemon emette
+`Data could not be parsed`, il client riceve `NoEnrolledPrints` e termina 1;
+nessun match è accettato. Ripristinato il file, `fprintd-delete` lascia zero
+file. Il mode del file è quello upstream `0644`, protetto dagli antenati
+`0700`; unit/service, ownership root e SELinux production sono stati soltanto
+riesaminati staticamente.
+
+```text
+D281_01_OUTCOME=PASS_HOST_ONLY
+D281_01_ADVANCEMENT=REAL_FPRINTD_DBUS_FP3_RELOAD_VERIFY_CORRUPTION_DELETE
+D281_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_DAEMON_AND_CLI
+D281_01_DRIVER=virtual_image
+D281_01_STORED_FP3_SIZE=5435
+D281_01_STORED_FP3_MODE=0644_UNDER_0700_ANCESTORS
+D281_01_RELOAD_VERIFY_MATCH_PASS=true
+D281_01_CORRUPT_VERIFY_REJECTED=true
+D281_01_DELETE_PASS=true
+D281_01_REMAINING_STATE_FILE_COUNT=0
+D281_01_REAL_USB_ENUMERATION_ATTEMPTED=false
+D281_01_REAL_SENSOR_ACCESSED=false
+TARGET_SIGFM_FPRINTD_STORAGE_PROVEN=false
+PAM_LOGIN_SUDO_INTEGRATION_PROVEN=false
+CURRENT_LIVE_AUTHORIZED=false
+CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY_AND_LIMITED_PAM
+```
+
+Report: `analysis/D281/D281_01_fprintd_storage_and_control_plane.md`.
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
 

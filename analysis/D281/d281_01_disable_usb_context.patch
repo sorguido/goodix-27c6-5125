@@ -1,0 +1,21 @@
+--- a/libfprint/fp-context.c
++++ b/libfprint/fp-context.c
+@@ -352,0 +353 @@
++#ifndef D281_01_DISABLE_USB_CONTEXT
+@@ -353,0 +355 @@
++#endif
+@@ -377,0 +380 @@
++#ifndef D281_01_DISABLE_USB_CONTEXT
+@@ -396,0 +400,5 @@
++#else
++  /* D281/01 test-only build: fail closed before USB context creation. */
++  priv->usb_ctx = NULL;
++  g_debug ("D281/01 test-only build: USB context disabled at compile time");
++#endif
+@@ -434 +442,3 @@
+-  /* USB devices are handled from callbacks */
++  /* USB devices are handled from callbacks.  The D281/01 test-only build
++   * deliberately has no USB discovery path at all. */
++#ifndef D281_01_DISABLE_USB_CONTEXT
+@@ -436,0 +447 @@
++#endif
