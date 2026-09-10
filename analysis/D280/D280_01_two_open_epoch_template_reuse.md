@@ -74,6 +74,10 @@ Risultati:
 ```text
 SECURE_SESSION_NORMAL_TESTS=26/26_PASS
 SECURE_SESSION_SANITIZER_TESTS=26/26_PASS
+D280_01_OPERATOR_STRUCTURAL_TESTS=10/10_PASS
+D279_57_HASH_PINNED_AUDIT_TESTS=2/2_PASS
+D280_01_TLS_SUCCESS_CONTRACT=HANDSHAKE_1_TERMINAL_0_SECRET_ZEROIZED
+D280_01_RUNTIME_COUNTER_SCENARIOS=7/7_PASS
 D280_01_PRODUCTION_SHAPED_ENROLL_CLOSE_OPEN_IDENTIFY=PASS
 D280_01_SUCCESSFUL_IDENTIFY_ACQUISITION_COUNT=1
 D280_01_MISMATCH_IDENTIFY_ACQUISITION_COUNT=1
@@ -126,27 +130,64 @@ micro-step D280/02, ha completato nello stesso D280/01
   open epoch; il secondo epoch è subordinato al PASS dell'audit del primo;
 - verificano baseline compilata/runtime, HEAD/origin, live-critical set,
   artefatti hash-bound e grant single-use prima dell'USB;
+- rifiutano prima dell'USB un host dove `/run` non sia `tmpfs`, creano una
+  directory dedicata root `0700` e verificano di nuovo `TMPFS_MAGIC` dall'fd;
 - creano FP3 soltanto con `O_EXCL|O_NOFOLLOW|O_CLOEXEC`, owner root, modo
-  `0600` e limite 16 MiB nella directory risultati privata;
+  `0600` e limite 16 MiB sotto `/run/goodix-d280-01/`;
 - cancellano i buffer host, distruggono il print enrollment prima del close e
   rimuovono il pathname FP3 prima dell'identify; client e trap tentano cleanup
   anche su errore o segnale;
-- rifiutano l'export se il template è ancora presente ed esportano soltanto
-  `operator.log` e `summary.env`, mai byte o hash del template;
+- rifiutano l'export se il template o la directory RAM correlata sono ancora
+  presenti ed esportano soltanto `operator.log` e `summary.env`, mai byte o
+  hash del template;
 - espongono audit separati per enrollment e identify, zero retry/reopen
-  transport/reset/clear-halt, backend drenato e famiglie persistenti note.
+  transport/reset/clear-halt, backend drenato e famiglie persistenti note;
+- estraggono dal blocco terminale del log i contatori osservati di action,
+  enrollment, identify, open, reopen e close. Valori mancanti, duplicati,
+  malformati o incoerenti rendono la run non-PASS; i limiti `*_MAX` restano
+  separati dai valori osservati.
+
+### Correttivo AI-PM: contratto TLS
+
+La prima versione del gate D280 richiedeva erroneamente
+`tls.terminal_completion_count == 1`. L'evidenza autentica D279/57 osserva
+invece handshake `1`, terminal completion `0` e secret zeroized `true`. La
+lettura del codice verifica che il contatore cresce soltanto nel percorso
+`terminal()` del TLS server (peer close, record/error/fence anomali); il
+normale successo production raggiunge `GOODIX_SECURE_PHASE_STOP` e libera il
+TLS già completato senza sintetizzare un evento terminale.
+
+La semantica corretta del successo nominale, ora applicata a entrambi gli
+epoch D280, è quindi:
+
+```text
+TLS_HANDSHAKE_COUNT=1
+TLS_TERMINAL_COMPLETION_COUNT=0
+TLS_SECRET_ZEROIZED=true
+```
+
+**OBSERVED:** questi tre valori provengono dal live D279/57 hash-pinned.
+**VERIFIED:** call-site e lifecycle spiegano `0` come assenza di terminale TLS
+anomalo; il test production-shaped verifica lo stesso contratto dopo il close
+di enrollment, identify match e identify no-match. **INFERRED:** il target
+reale dovrebbe applicare la stessa semantica al futuro epoch identify perché
+usa lo stesso lifecycle. **UNKNOWN:** esito e telemetria del futuro identify
+reale restano non provati senza nuova Human Gate.
 
 Il preflight completo ha ricostruito la libreria target esatta e il client con
 baseline `UNAPPROVED_FOR_LIVE`; il self-test ha rifiutato prima di
 `fp_context_new()`. Le suite production-shaped 26/26 normale e 26/26
 sanitizer e la suite Fedora/SIGFM reale sono PASS. La verifica strutturale del
-kit è 6/6 PASS. Nessun USB è stato enumerato e nessuna esecuzione live è stata
-effettuata.
+kit è 10/10 PASS, include i sette scenari dei contatori e riconcilia l'audit live
+D279/57; l'auditor hash-pinned è 2/2 PASS. Nessun USB è stato enumerato e
+nessuna esecuzione live è stata effettuata.
 
 La breve presenza host-side di un template autentico sarebbe nuova
-manipolazione di dato biometrico sensibile. `unlink` riduce durata e superficie
-ma non garantisce cancellazione fisica su SSD, CoW, journal o snapshot. Questo
-rischio è dichiarato nel manuale operatore e deve essere accettato
+manipolazione di dato biometrico sensibile. Il percorso ordinario non lo
+scrive su SSD: usa `tmpfs`, azzera i buffer posseduti, rimuove il file prima
+dell'identify e la directory nel cleanup. Restano residui possibili in RAM,
+swap/ibernazione, core dump e crash non intercettabile; non è dichiarata
+cancellazione fisica universale. Questo rischio deve essere accettato
 esplicitamente insieme alla nuova Human Gate.
 
 ## Closure e prossimo confine
@@ -155,7 +196,7 @@ esplicitamente insieme alla nuova Human Gate.
 OUTCOME=HUMAN_REQUIRED
 ADVANCEMENT=POST_CLOSE_FP3_REUSE_AND_PRODUCTION_SHAPED_IDENTIFY_COMPOSED
 EXECUTABLE_CLOSURE=PASS_OFFLINE_OPERATOR_KIT_PLUS_NORMAL_SANITIZER_AND_EXACT_FEDORA44_SIGFM
-RESIDUAL_BLOCKER_OR_RISK=AUTHENTIC_TEMPLATE_REUSE_REQUIRES_NEW_LIVE_AND_BIOMETRIC_HOST_STORAGE_HUMAN_GATE
+RESIDUAL_BLOCKER_OR_RISK=AUTHENTIC_TEMPLATE_REUSE_REQUIRES_NEW_LIVE_AND_RAM_SWAP_CRASH_BIOMETRIC_RISK_ACCEPTANCE
 CANONICAL_DOCUMENTATION=MANUAL_AND_THIS_REPORT
 REVIEW_SET=GIT_NATIVE
 CURRENT_LIVE_AUTHORIZED=false

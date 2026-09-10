@@ -32,7 +32,8 @@
     "rejected_inbound_count": 0,
     "target_driver_match_count": 1,
     "terminal_transition_count": 1,
-    "tls_handshake_count": 1
+    "tls_handshake_count": 1,
+    "tls_terminal_completion_count": 0
   },
   "rerun_authorized": false,
   "result": "PASS_STAGE8_EARLY_TERMINAL",

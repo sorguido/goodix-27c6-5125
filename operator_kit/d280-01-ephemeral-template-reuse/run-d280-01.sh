@@ -27,6 +27,16 @@ d280_offline_cleanup_root=
 d280_prepare_cleanup_root=
 d280_runtime_cleanup_root=
 d280_template_cleanup_path=
+d280_template_cleanup_dir=
+runtime_counters_complete=false
+action_attempt_count=UNKNOWN
+enroll_action_attempt_count=UNKNOWN
+identify_action_attempt_count=UNKNOWN
+open_attempt_count=UNKNOWN
+open_success_count=UNKNOWN
+reopen_count=UNKNOWN
+close_attempt_count=UNKNOWN
+close_success_count=UNKNOWN
 
 git_root () { git -C "$root" -c safe.directory="$root" "$@"; }
 is_full_sha () { [[ ${1:-} =~ ^[0-9a-fA-F]{40}$ ]]; }
@@ -35,6 +45,7 @@ usage ()
 {
   echo "Uso:" >&2
   echo "  $0 --offline-preflight" >&2
+  echo "  $0 --summarize-runtime-log <OPERATOR.LOG>" >&2
   echo "  $0 --prepare-approved-live <SHA_COMPLETO_APPROVATO>" >&2
   echo "  $0 --write-grant <SHA_COMPLETO_APPROVATO> <FILE_GRANT>" >&2
   echo "  sudo $0 --run-approved-live <BUILD_PREPARATO> --grant <FILE_GRANT>" >&2
@@ -59,6 +70,95 @@ state_value ()
   printf '%s\n' "$value"
 }
 
+verify_tmpfs_directory ()
+{
+  local directory=$1 required_mode=${2:-} owner filesystem mode
+  [[ -d $directory && ! -L $directory ]] || return 1
+  owner=$(stat -c %u "$directory") || return 1
+  filesystem=$(stat -f -c %T "$directory") || return 1
+  [[ $owner -eq 0 && $filesystem == tmpfs ]] || return 1
+  if [[ -n $required_mode ]]; then
+    mode=$(stat -c %a "$directory") || return 1
+    [[ $mode == "$required_mode" ]] || return 1
+  fi
+}
+
+collect_runtime_counters ()
+{
+  local log=$1 key variable value
+  local parsed_action=0 parsed_enroll=0 parsed_identify=0
+  local parsed_open=0 parsed_open_success=0 parsed_reopen=0
+  local parsed_close=0 parsed_close_success=0
+  runtime_counters_complete=false
+  action_attempt_count=UNKNOWN
+  enroll_action_attempt_count=UNKNOWN
+  identify_action_attempt_count=UNKNOWN
+  open_attempt_count=UNKNOWN
+  open_success_count=UNKNOWN
+  reopen_count=UNKNOWN
+  close_attempt_count=UNKNOWN
+  close_success_count=UNKNOWN
+  [[ -f $log && ! -L $log ]] || return 1
+  [[ $(grep -c '^D280_01_RUNTIME_COUNTERS_BEGIN=true$' "$log") -eq 1 &&
+     $(grep -c '^D280_01_RUNTIME_COUNTERS_END=true$' "$log") -eq 1 ]] ||
+    return 1
+  while read -r key variable; do
+    value=$(state_value "$log" "D280_01_OBSERVED_${key}") || return 1
+    [[ $value =~ ^(0|[1-9][0-9]{0,2})$ ]] || return 1
+    printf -v "$variable" '%s' "$value"
+  done <<'EOF'
+ACTION_ATTEMPT_COUNT parsed_action
+ENROLL_ACTION_ATTEMPT_COUNT parsed_enroll
+IDENTIFY_ACTION_ATTEMPT_COUNT parsed_identify
+OPEN_ATTEMPT_COUNT parsed_open
+OPEN_SUCCESS_COUNT parsed_open_success
+REOPEN_COUNT parsed_reopen
+CLOSE_ATTEMPT_COUNT parsed_close
+CLOSE_SUCCESS_COUNT parsed_close_success
+EOF
+  (( parsed_action <= 2 && parsed_enroll <= 1 && parsed_identify <= 1 &&
+     parsed_action == parsed_enroll + parsed_identify &&
+     parsed_open <= 2 && parsed_open_success <= parsed_open &&
+     parsed_reopen <= 1 &&
+     parsed_reopen == (parsed_open == 2 ? 1 : 0) &&
+     parsed_identify <= parsed_reopen &&
+     parsed_close <= 2 && parsed_close_success <= parsed_close )) ||
+    return 1
+  action_attempt_count=$parsed_action
+  enroll_action_attempt_count=$parsed_enroll
+  identify_action_attempt_count=$parsed_identify
+  open_attempt_count=$parsed_open
+  open_success_count=$parsed_open_success
+  reopen_count=$parsed_reopen
+  close_attempt_count=$parsed_close
+  close_success_count=$parsed_close_success
+  runtime_counters_complete=true
+}
+
+write_runtime_counter_summary ()
+{
+  echo "RUNTIME_COUNTERS_COMPLETE=$runtime_counters_complete"
+  echo "ACTION_ATTEMPT_COUNT=$action_attempt_count"
+  echo "ENROLL_ACTION_ATTEMPT_COUNT=$enroll_action_attempt_count"
+  echo "IDENTIFY_ACTION_ATTEMPT_COUNT=$identify_action_attempt_count"
+  echo "OPEN_ATTEMPT_COUNT=$open_attempt_count"
+  echo "OPEN_SUCCESS_COUNT=$open_success_count"
+  echo "REOPEN_COUNT=$reopen_count"
+  echo "CLOSE_ATTEMPT_COUNT=$close_attempt_count"
+  echo "CLOSE_SUCCESS_COUNT=$close_success_count"
+}
+
+summarize_runtime_log ()
+{
+  local log=$1
+  if collect_runtime_counters "$log"; then
+    write_runtime_counter_summary
+    return 0
+  fi
+  write_runtime_counter_summary
+  return 1
+}
+
 cleanup_offline_tree ()
 {
   if [[ ${d280_offline_cleanup_root:-} == /tmp/goodix-d280-01-offline.* ]]; then
@@ -76,9 +176,13 @@ cleanup_prepare_tree ()
 cleanup_runtime_tree ()
 {
   if [[ ${d280_template_cleanup_path:-} == \
-        /var/tmp/goodix-d280-01-results/*/template.fp3 ]]; then
-    find "$d280_template_cleanup_path" -maxdepth 0 -type f -delete \
+        /run/goodix-d280-01/*/template.fp3 ]]; then
+    find "$d280_template_cleanup_path" -maxdepth 0 \
+      \( -type f -o -type l \) -delete \
       2>/dev/null || true
+  fi
+  if [[ ${d280_template_cleanup_dir:-} == /run/goodix-d280-01/* ]]; then
+    rmdir "$d280_template_cleanup_dir" 2>/dev/null || true
   fi
   if [[ ${d280_runtime_cleanup_root:-} == /tmp/goodix-d280-01-runtime.* ]]; then
     find "$d280_runtime_cleanup_root" -depth -delete 2>/dev/null || true
@@ -222,6 +326,8 @@ source_guard_audit ()
   fi
   grep -F 'O_EXCL | O_NOFOLLOW | O_CLOEXEC' "$tool" >/dev/null ||
     refuse TEMPLATE_EXCLUSIVE_CREATE_GUARD_MISSING
+  grep -F 'fstatfs (fd, &filesystem)' "$tool" >/dev/null ||
+    refuse TEMPLATE_TMPFS_GUARD_MISSING
   grep -F 'FP3_REMOVED_BEFORE_IDENTIFY=true' "$tool" >/dev/null ||
     refuse TEMPLATE_PRE_IDENTIFY_REMOVAL_GUARD_MISSING
   grep -F 'OPERATOR_RETRY_COUNT=0' "$tool" >/dev/null ||
@@ -244,6 +350,7 @@ offline_preflight ()
 {
   local work binary
   [[ $EUID -ne 0 ]] || refuse OFFLINE_PREFLIGHT_REQUIRES_NORMAL_USER
+  verify_tmpfs_directory /run || refuse RUN_IS_NOT_ROOT_OWNED_TMPFS
   source_guard_audit "$root/tools/d280_ephemeral_template_reuse.c"
   "$root/libfprint-driver/tests/run_goodix_d278_secure_session_test.sh"
   work=$(mktemp -d /tmp/goodix-d280-01-offline.XXXXXX)
@@ -266,9 +373,10 @@ offline_preflight ()
   echo ENROLL_ACTION_ATTEMPT_MAX=1
   echo IDENTIFY_ACTION_ATTEMPT_MAX=1
   echo OPEN_ATTEMPT_MAX=2
-  echo REOPEN_COUNT=1
+  echo REOPEN_ATTEMPT_MAX=1
   echo OPERATOR_RETRY_COUNT=0
-  echo TEMPLATE_STORAGE=ROOT_0600_EPHEMERAL
+  echo TEMPLATE_STORAGE=ROOT_0700_DIRECTORY_AND_0600_FILE_ON_VERIFIED_TMPFS
+  echo TEMPLATE_STORAGE_FILESYSTEM=tmpfs
   echo TEMPLATE_REMOVAL_BOUNDARY=BEFORE_IDENTIFY
   echo TEMPLATE_INCLUDED_IN_EXPORT=false
   echo KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
@@ -368,7 +476,8 @@ run_approved_live ()
   local expected_manifest_sha expected_grant_id actual_sha grant_id
   local grant_baseline grant_operation mode owner accepted claim_root claim
   local runtime results_parent result_root stamp log rc template_path
-  local template_present_after_run
+  local template_parent template_dir
+  local template_present_after_run template_directory_present_after_run
 
   [[ $EUID -eq 0 ]] || refuse LIVE_REQUIRES_ROOT
   umask 077
@@ -423,6 +532,19 @@ run_approved_live ()
   [[ $grant_baseline == "$baseline" && $grant_operation == "$operation" &&
      $grant_id == "$expected_grant_id" ]] || refuse GRANT_BINDING_MISMATCH
 
+  template_parent=/run/goodix-d280-01
+  [[ -e $template_parent ]] || mkdir -m 0700 "$template_parent"
+  verify_tmpfs_directory "$template_parent" 700 ||
+    refuse TEMPLATE_RAM_ROOT_POLICY
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  template_dir="$template_parent/${stamp}-${baseline:0:12}"
+  mkdir -m 0700 "$template_dir" || refuse TEMPLATE_RAM_RUN_DIR_CREATE_FAILED
+  d280_template_cleanup_dir=$template_dir
+  template_path="$template_dir/template.fp3"
+  d280_template_cleanup_path=$template_path
+  trap cleanup_runtime_tree EXIT HUP INT TERM
+  verify_tmpfs_directory "$template_dir" 700 || refuse TEMPLATE_RAM_RUN_DIR_POLICY
+
   claim_root=/var/tmp/goodix-d280-01-consumed-grants
   [[ -e $claim_root ]] || mkdir -m 0700 "$claim_root"
   [[ -d $claim_root && ! -L $claim_root &&
@@ -440,7 +562,6 @@ run_approved_live ()
   runtime=$(mktemp -d /tmp/goodix-d280-01-runtime.XXXXXX)
   d280_runtime_cleanup_root=$runtime
   chmod 0700 "$runtime"
-  trap cleanup_runtime_tree EXIT HUP INT TERM
   cp "$prepared/d280_ephemeral_template_reuse" "$runtime/"
   cp "$prepared/libfprint-2.so.2.0.0" "$runtime/"
   cp "$prepared/libgusb.so.2" "$runtime/"
@@ -453,7 +574,6 @@ run_approved_live ()
     refuse RUNTIME_ARTIFACT_BUNDLE_HASH_MISMATCH
   verify_host_sigfm_runtime
 
-  stamp=$(date -u +%Y%m%dT%H%M%SZ)
   results_parent=/var/tmp/goodix-d280-01-results
   [[ -e $results_parent ]] || mkdir -m 0700 "$results_parent"
   [[ -d $results_parent && ! -L $results_parent &&
@@ -461,11 +581,9 @@ run_approved_live ()
      $(stat -c %a "$results_parent") == 700 ]] || refuse RESULT_ROOT_POLICY
   result_root="$results_parent/${stamp}-${baseline:0:12}"
   mkdir -m 0700 "$result_root"
-  template_path="$result_root/template.fp3"
-  d280_template_cleanup_path=$template_path
   log="$result_root/operator.log"
   echo "INIZIO RUN ONE-SHOT A DUE ACTION. Non rilanciare in caso di errore."
-  echo "DATI_BIOMETRICI=Un FP3 root 0600 esistera solo tra close e reopen; verra rimosso prima della identify."
+  echo "DATI_BIOMETRICI=Un FP3 root 0600 su tmpfs esistera solo tra close e reopen; verra azzerato in memoria e rimosso prima della identify."
   set +e
   env LD_LIBRARY_PATH="$runtime" \
     D280_01_APPROVED_LIVE_SHA="$baseline" \
@@ -477,16 +595,28 @@ run_approved_live ()
       "$runtime/d280_ephemeral_template_reuse" --run-once 2>&1 | tee "$log"
   rc=${PIPESTATUS[0]}
   set -e
-  if [[ -e $template_path ]]; then
-    find "$template_path" -maxdepth 0 -type f -delete || rc=1
+  if [[ -e $template_path || -L $template_path ]]; then
+    find "$template_path" -maxdepth 0 \( -type f -o -type l \) -delete || rc=1
   fi
   template_present_after_run=false
   if [[ -e $template_path || -L $template_path ]]; then
     template_present_after_run=true
     rc=1
   fi
-  d280_template_cleanup_path=
+  if [[ $template_present_after_run == false ]]; then
+    d280_template_cleanup_path=
+  fi
+  if rmdir "$template_dir"; then
+    d280_template_cleanup_dir=
+    template_directory_present_after_run=false
+  else
+    rc=1
+    template_directory_present_after_run=true
+  fi
   chmod 0600 "$log"
+  if ! collect_runtime_counters "$log"; then
+    rc=1
+  fi
   {
     echo "D280_01_BASELINE_SHA=$baseline"
     echo "D280_01_OPERATION=$operation"
@@ -496,9 +626,12 @@ run_approved_live ()
     echo "ENROLL_ACTION_ATTEMPT_MAX=1"
     echo "IDENTIFY_ACTION_ATTEMPT_MAX=1"
     echo "OPEN_ATTEMPT_MAX=2"
-    echo "REOPEN_COUNT=1"
+    echo "REOPEN_ATTEMPT_MAX=1"
     echo "OPERATOR_RETRY_COUNT=0"
+    write_runtime_counter_summary
     echo "TEMPLATE_FILE_PRESENT_AFTER_RUN=$template_present_after_run"
+    echo "TEMPLATE_RAM_DIRECTORY_PRESENT_AFTER_RUN=$template_directory_present_after_run"
+    echo "TEMPLATE_STORAGE_FILESYSTEM=tmpfs"
     echo "TEMPLATE_INCLUDED_IN_EXPORT=false"
     echo "KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0"
     echo "SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false"
@@ -516,7 +649,7 @@ run_approved_live ()
 
 export_results ()
 {
-  local result_root=$1 basename export_dir source_sha copied_sha name
+  local result_root=$1 basename export_dir source_sha copied_sha name ram_run
   [[ $EUID -eq 0 ]] || refuse EXPORT_REQUIRES_ROOT
   [[ ${SUDO_UID:-} =~ ^[0-9]+$ && ${SUDO_GID:-} =~ ^[0-9]+$ ]] ||
     refuse EXPORT_REQUIRES_SUDO_CALLER
@@ -525,6 +658,9 @@ export_results ()
   basename=${result_root##*/}
   [[ $basename =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$ ]] ||
     refuse EXPORT_SOURCE_INVALID
+  ram_run="/run/goodix-d280-01/$basename"
+  [[ ! -e $ram_run && ! -L $ram_run ]] ||
+    refuse BIOMETRIC_RAM_STATE_STILL_PRESENT
   [[ ! -e $result_root/template.fp3 && ! -L $result_root/template.fp3 ]] ||
     refuse BIOMETRIC_TEMPLATE_STILL_PRESENT
   export_dir=$(mktemp -d /tmp/goodix-d280-01-export.XXXXXX)
@@ -553,6 +689,10 @@ case ${1:-} in
   --offline-preflight)
     [[ $# -eq 1 ]] || usage
     offline_preflight
+    ;;
+  --summarize-runtime-log)
+    [[ $# -eq 2 ]] || usage
+    summarize_runtime_log "$2"
     ;;
   --prepare-approved-live)
     [[ $# -eq 2 ]] || usage

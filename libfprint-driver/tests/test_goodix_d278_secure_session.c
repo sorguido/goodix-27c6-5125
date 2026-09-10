@@ -597,6 +597,22 @@ production_close_epoch (Fixture *fixture)
 }
 
 static void
+assert_successful_epoch_tls_closed (Fixture *fixture)
+{
+  GoodixProductionEnrollmentAudit audit = { 0 };
+
+  goodix_fpimage_device_get_production_enrollment_audit (
+    fixture->device, &audit);
+  g_assert_true (audit.context_closed);
+  g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
+  /* terminal_completion_count records an abnormal/fenced TLS terminal event;
+   * the normal production close frees an already-completed TLS epoch without
+   * synthesizing that event. */
+  g_assert_cmpuint (audit.tls.terminal_completion_count, ==, 0u);
+  g_assert_true (audit.tls.project_secret_zeroized);
+}
+
+static void
 production_open_epoch (Fixture *fixture)
 {
   g_assert_true (g_queue_is_empty (fixture->out));
@@ -1649,6 +1665,7 @@ test_d280_01_production_two_epoch_template_reuse (void)
   client_clear (&client);
 
   production_close_epoch (fixture);
+  assert_successful_epoch_tls_closed (fixture);
   g_assert_cmpuint (fixture->interface_claim_count, ==, 1u);
   g_assert_cmpuint (fixture->interface_release_count, ==, 1u);
   g_assert_cmpuint (fixture->material_release_count, ==, 1u);
@@ -1696,6 +1713,7 @@ test_d280_01_production_two_epoch_template_reuse (void)
   client_clear (&client);
 
   production_close_epoch (fixture);
+  assert_successful_epoch_tls_closed (fixture);
   g_assert_cmpuint (fixture->interface_claim_count, ==, 2u);
   g_assert_cmpuint (fixture->interface_release_count, ==, 2u);
   g_assert_cmpuint (fixture->material_release_count, ==, 2u);
@@ -1728,6 +1746,7 @@ test_d280_01_production_two_epoch_template_reuse (void)
   g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
   client_clear (&client);
   production_close_epoch (fixture);
+  assert_successful_epoch_tls_closed (fixture);
   g_assert_cmpuint (fixture->interface_claim_count, ==, 3u);
   g_assert_cmpuint (fixture->interface_release_count, ==, 3u);
   g_assert_cmpuint (fixture->material_release_count, ==, 3u);

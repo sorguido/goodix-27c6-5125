@@ -15,10 +15,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <glib-unix.h>
+#include <linux/magic.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <unistd.h>
 
 #ifndef D280_01_APPROVED_BASELINE
@@ -32,7 +34,7 @@
 #define D280_01_DRIVER "goodix_27c6_5125"
 #define D280_01_ENROLL_STAGES 8u
 #define D280_01_HOST_DEADLINE_SECONDS 1000u
-#define D280_01_TEMPLATE_PREFIX "/var/tmp/goodix-d280-01-results/"
+#define D280_01_TEMPLATE_PREFIX "/run/goodix-d280-01/"
 #define D280_01_TEMPLATE_SUFFIX "/template.fp3"
 #define D280_01_TEMPLATE_MAX_BYTES (16u * 1024u * 1024u)
 
@@ -53,6 +55,14 @@ typedef struct
   guint identify_match_callback_count;
   guint identify_no_match_callback_count;
   guint identify_retry_callback_count;
+  guint action_attempt_count;
+  guint enroll_action_attempt_count;
+  guint identify_action_attempt_count;
+  guint open_attempt_count;
+  guint open_success_count;
+  guint reopen_count;
+  guint close_attempt_count;
+  guint close_success_count;
   FpFingerStatusFlags last_finger_status;
   gboolean deadline_expired;
   gboolean signal_received;
@@ -179,6 +189,26 @@ write_all (gint fd, const guint8 *bytes, gsize length, GError **error)
 }
 
 static gboolean
+fd_is_tmpfs (gint fd, GError **error)
+{
+  struct statfs filesystem = { 0 };
+
+  if (fstatfs (fd, &filesystem) != 0)
+    {
+      g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                   "verifica tmpfs fallita: %s", g_strerror (errno));
+      return FALSE;
+    }
+  if ((guint64) filesystem.f_type != (guint64) TMPFS_MAGIC)
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                           "il file FP3 non risiede su tmpfs");
+      return FALSE;
+    }
+  return TRUE;
+}
+
+static gboolean
 persist_template (const gchar  *path,
                   const guint8 *bytes,
                   gsize         length,
@@ -202,15 +232,18 @@ persist_template (const gchar  *path,
                    "creazione FP3 esclusiva fallita: %s", g_strerror (errno));
       return FALSE;
     }
-  if (fstat (fd, &st) != 0 || !S_ISREG (st.st_mode) || st.st_uid != 0 ||
-      (st.st_mode & 0777) != 0600)
-    g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
-                         "policy file FP3 non rispettata");
-  else if (write_all (fd, bytes, length, error) && fsync (fd) == 0)
-    ok = TRUE;
-  else if (error != NULL && *error == NULL)
-    g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
-                 "fsync FP3 fallita: %s", g_strerror (errno));
+  if (fd_is_tmpfs (fd, error))
+    {
+      if (fstat (fd, &st) != 0 || !S_ISREG (st.st_mode) || st.st_uid != 0 ||
+          (st.st_mode & 0777) != 0600)
+        g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                             "policy file FP3 non rispettata");
+      else if (write_all (fd, bytes, length, error) && fsync (fd) == 0)
+        ok = TRUE;
+      else if (error != NULL && *error == NULL)
+        g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
+                     "fsync FP3 fallita: %s", g_strerror (errno));
+    }
   if (close (fd) != 0 && ok)
     {
       g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno),
@@ -241,6 +274,8 @@ load_template (const gchar *path, guint8 **bytes, gsize *length,
                    "apertura FP3 fallita: %s", g_strerror (errno));
       return FALSE;
     }
+  if (!fd_is_tmpfs (fd, error))
+    goto out;
   if (fstat (fd, &st) != 0 || !S_ISREG (st.st_mode) || st.st_uid != 0 ||
       (st.st_mode & 0777) != 0600 || st.st_size <= 0 ||
       (guint64) st.st_size > D280_01_TEMPLATE_MAX_BYTES)
@@ -319,7 +354,7 @@ common_audit_pass (const GoodixProductionEnrollmentAudit *audit)
          audit->runtime_material.descriptor_cleansed &&
          audit->runtime_material.fdt_seed_cleansed &&
          audit->tls.handshake_count == 1u &&
-         audit->tls.terminal_completion_count == 1u &&
+         audit->tls.terminal_completion_count == 0u &&
          audit->tls.project_secret_zeroized &&
          audit->secure.retry_count == 0u &&
          audit->secure.transport_reopen_count == 0u &&
@@ -393,6 +428,8 @@ print_epoch_audit (const gchar *prefix,
            bool_text (audit->usb_backend_drained));
   g_print ("%s_TLS_HANDSHAKE_COUNT=%u\n", prefix,
            audit->tls.handshake_count);
+  g_print ("%s_TLS_TERMINAL_COMPLETION_COUNT=%u\n", prefix,
+           audit->tls.terminal_completion_count);
   g_print ("%s_SECURE_RETRY_COUNT=%u\n", prefix, audit->secure.retry_count);
   g_print ("%s_SECURE_REOPEN_COUNT=%u\n", prefix,
            audit->secure.transport_reopen_count);
@@ -599,12 +636,14 @@ run_once (void)
     }
 
   g_print ("OPEN_ATTEMPT_COUNT=1\n");
+  state.open_attempt_count++;
   if (!fp_device_open_sync (device, cancellable, &error))
     {
       g_printerr ("ERRORE_OPEN_EPOCH1=%s\n", error->message);
       goto out;
     }
   opened = TRUE;
+  state.open_success_count++;
   finger_status_handler = g_signal_connect (
     device, "notify::finger-status", G_CALLBACK (finger_status_changed), &state);
   template_print = fp_print_new (device);
@@ -612,6 +651,8 @@ run_once (void)
   state.last_finger_status = fp_device_get_finger_status (device);
   g_print ("AZIONE_OPERATORE=METTI L'INDICE DESTRO SUL SENSORE; usa sempre lo stesso dito.\n");
   g_print ("ENROLL_ACTION_ATTEMPT_COUNT=1\n");
+  state.action_attempt_count++;
+  state.enroll_action_attempt_count++;
   enrolled_print = fp_device_enroll_sync (
     device, g_steal_pointer (&template_print), cancellable,
     enroll_progress_cb, &state, &error);
@@ -643,6 +684,7 @@ run_once (void)
 
 close_epoch1:
   g_print ("CLOSE_EPOCH1_ATTEMPT_COUNT=1\n");
+  state.close_attempt_count++;
   if (!fp_device_close_sync (device, NULL, &close_error))
     {
       g_printerr ("CLOSE_EPOCH1_SUCCEEDED=false\n");
@@ -651,6 +693,7 @@ close_epoch1:
       goto out;
     }
   opened = FALSE;
+  state.close_success_count++;
   g_print ("CLOSE_EPOCH1_SUCCEEDED=true\n");
   goodix_fpimage_device_get_production_enrollment_audit (
     (GoodixFpImageDevice *) device, &epoch1);
@@ -662,12 +705,15 @@ close_epoch1:
   g_clear_error (&error);
   g_clear_error (&close_error);
   g_print ("OPEN_ATTEMPT_COUNT=2\n");
+  state.open_attempt_count++;
+  state.reopen_count++;
   if (!fp_device_open_sync (device, cancellable, &error))
     {
       g_printerr ("ERRORE_OPEN_EPOCH2=%s\n", error->message);
       goto out;
     }
   opened = TRUE;
+  state.open_success_count++;
   if (!load_template (template_path, &loaded, &loaded_length, &error))
     {
       g_printerr ("FP3_EPHEMERAL_READ_SUCCEEDED=false\n");
@@ -702,6 +748,8 @@ close_epoch1:
   state.last_finger_status = fp_device_get_finger_status (device);
   g_print ("AZIONE_OPERATORE=METTI DI NUOVO LO STESSO INDICE DESTRO per una sola identify.\n");
   g_print ("IDENTIFY_ACTION_ATTEMPT_COUNT=1\n");
+  state.action_attempt_count++;
+  state.identify_action_attempt_count++;
   identify_ok = fp_device_identify_sync (
     device, gallery, cancellable, identify_match_cb, &state,
     &identify_match, &identify_scan, &error);
@@ -720,6 +768,7 @@ close_epoch1:
 close_epoch2:
   g_clear_error (&close_error);
   g_print ("CLOSE_EPOCH2_ATTEMPT_COUNT=1\n");
+  state.close_attempt_count++;
   if (!fp_device_close_sync (device, NULL, &close_error))
     {
       g_printerr ("CLOSE_EPOCH2_SUCCEEDED=false\n");
@@ -728,6 +777,7 @@ close_epoch2:
       goto out;
     }
   opened = FALSE;
+  state.close_success_count++;
   g_print ("CLOSE_EPOCH2_SUCCEEDED=true\n");
   goodix_fpimage_device_get_production_enrollment_audit (
     (GoodixFpImageDevice *) device, &epoch2);
@@ -745,8 +795,11 @@ out:
     {
       g_clear_error (&close_error);
       g_print ("FAILURE_CLOSE_ATTEMPTED=true\n");
+      state.close_attempt_count++;
       if (!fp_device_close_sync (device, NULL, &close_error))
         g_printerr ("ERRORE_FAILURE_CLOSE=%s\n", close_error->message);
+      else
+        state.close_success_count++;
     }
   if (template_created)
     {
@@ -781,8 +834,24 @@ out:
            state.identify_no_match_callback_count);
   g_print ("IDENTIFY_RETRY_CALLBACK_COUNT=%u\n",
            state.identify_retry_callback_count);
+  g_print ("D280_01_RUNTIME_COUNTERS_BEGIN=true\n");
+  g_print ("D280_01_OBSERVED_ACTION_ATTEMPT_COUNT=%u\n",
+           state.action_attempt_count);
+  g_print ("D280_01_OBSERVED_ENROLL_ACTION_ATTEMPT_COUNT=%u\n",
+           state.enroll_action_attempt_count);
+  g_print ("D280_01_OBSERVED_IDENTIFY_ACTION_ATTEMPT_COUNT=%u\n",
+           state.identify_action_attempt_count);
+  g_print ("D280_01_OBSERVED_OPEN_ATTEMPT_COUNT=%u\n",
+           state.open_attempt_count);
+  g_print ("D280_01_OBSERVED_OPEN_SUCCESS_COUNT=%u\n",
+           state.open_success_count);
+  g_print ("D280_01_OBSERVED_REOPEN_COUNT=%u\n", state.reopen_count);
+  g_print ("D280_01_OBSERVED_CLOSE_ATTEMPT_COUNT=%u\n",
+           state.close_attempt_count);
+  g_print ("D280_01_OBSERVED_CLOSE_SUCCESS_COUNT=%u\n",
+           state.close_success_count);
+  g_print ("D280_01_RUNTIME_COUNTERS_END=true\n");
   g_print ("OPERATOR_RETRY_COUNT=0\n");
-  g_print ("REOPEN_COUNT=1\n");
   g_print ("KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0\n");
   g_print ("SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false\n");
   g_print ("HOST_DEADLINE_EXPIRED=%s\n", bool_text (state.deadline_expired));

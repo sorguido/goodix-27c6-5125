@@ -20,23 +20,29 @@ Non è un test fprintd/PAM/login/sudo e non installa il driver nel sistema.
 
 ## Trattamento del template biometrico
 
-L'FP3 autentico è dato sensibile. Il client lo crea con `O_EXCL`,
-`O_NOFOLLOW`, owner root e modo `0600`, nel solo percorso:
+L'FP3 autentico è dato sensibile. Il launcher rifiuta la run prima dell'USB se
+`/run` non è un `tmpfs` root-owned. Crea una directory dedicata root `0700` e
+il client verifica di nuovo il filesystem dall'fd aperto, quindi crea il file
+con `O_EXCL`, `O_NOFOLLOW`, `O_CLOEXEC`, owner root e modo `0600` nel solo
+percorso:
 
 ```text
-/var/tmp/goodix-d280-01-results/<UTC>-<SHA12>/template.fp3
+/run/goodix-d280-01/<UTC>-<SHA12>/template.fp3
 ```
 
 Il print in memoria viene distrutto prima del primo close. Nel secondo epoch
-il file viene letto, deserializzato, pulito dal buffer e rimosso **prima**
+il file viene letto, deserializzato, i buffer sono azzerati e il file è
+rimosso **prima**
 dell'identify. Trap host e cleanup del client tentano la rimozione su ogni
 errore o segnale. `operator.log`, `summary.env` e l'export non contengono il
 file, i byte FP3 o un loro hash.
 
-La rimozione del pathname non garantisce la cancellazione fisica dei blocchi
-su SSD, filesystem copy-on-write, journal o snapshot. Il kit riduce durata e
-superficie del dato, ma l'eventuale run richiede accettazione esplicita di
-questo rischio residuo. Non usare `shred` come falsa garanzia.
+Il percorso ordinario non scrive l'FP3 su SSD. Restano rischi propri della
+memoria: pagine RAM residue dopo `unlink`, swap o ibernazione configurati
+dall'host, core dump e crash/power loss non intercettabili. I buffer posseduti
+dal client sono azzerati, ma non viene dichiarata cancellazione fisica di ogni
+copia kernel/runtime. L'eventuale run richiede accettazione esplicita di
+questo rischio residuo RAM/swap/crash.
 
 ## Invarianti
 
@@ -46,7 +52,7 @@ ACTION_ATTEMPT_MAX=2
 ENROLL_ACTION_ATTEMPT_MAX=1
 IDENTIFY_ACTION_ATTEMPT_MAX=1
 OPEN_ATTEMPT_MAX=2
-REOPEN_COUNT=1
+REOPEN_ATTEMPT_MAX=1
 OPERATOR_RETRY_COUNT=0
 KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0
 TEMPLATE_REMOVAL_BOUNDARY=BEFORE_IDENTIFY
@@ -64,11 +70,12 @@ guardrail software, non prova l'assenza di persistence sensor-side ignota.
 - Freedesktop SDK 25.08 e accesso ai repository Fedora per gli RPM OpenCV
   4.13 hash-pinned;
 - runtime Fedora TBB/FlexiBLAS/libstdc++ nelle versioni verificate dal kit;
+- `/run` montato come `tmpfs`, con directory RAM-only verificabili;
 - esattamente un target gestito dal driver;
 - materiale production già disponibile nel layout protetto;
 - `fprintd` non attivo; il launcher lo verifica e non lo arresta;
-- accettazione esplicita della breve persistenza host-side del dato
-  biometrico e del rischio SSD descritto sopra.
+- accettazione esplicita della breve permanenza RAM del dato biometrico e dei
+  rischi swap/crash descritti sopra.
 
 L'AI non esegue `sudo`, non legge il materiale protetto e non avvia questo
 percorso live.
@@ -85,7 +92,8 @@ Come utente normale:
 Il preflight esegue le suite production-shaped e target-native, costruisce da
 sorgenti la libreria Fedora 44/libfprint 1.94.100 e il client con baseline
 `UNAPPROVED_FOR_LIVE`, controlla dipendenze e simboli e prova il rifiuto prima
-di `FpContext`. Non enumera o apre USB e non crea template.
+di `FpContext`. Verifica inoltre che `/run` sia un `tmpfs`; non enumera o apre
+USB e non crea template.
 
 ## Procedura soltanto dopo nuova approvazione
 
@@ -135,8 +143,9 @@ Gli unici output conservabili sono:
 /var/tmp/goodix-d280-01-results/<UTC>-<SHA12>/summary.env
 ```
 
-Dopo la run, `template.fp3` deve essere assente. L'export fail-closed rifiuta
-la directory se il template esiste:
+Dopo la run, `template.fp3` e la directory RAM dedicata devono essere assenti.
+L'export fail-closed rifiuta sia lo stato `/run` correlato al basename della
+run sia un template presente nel vecchio layout della directory risultati:
 
 ```bash
 sudo ./operator_kit/d280-01-ephemeral-template-reuse/run-d280-01.sh \
@@ -144,3 +153,9 @@ sudo ./operator_kit/d280-01-ephemeral-template-reuse/run-d280-01.sh \
 ```
 
 Anche un PASS consuma il grant e non autorizza altre action.
+
+`summary.env` separa i limiti di policy (`*_MAX`) dai contatori realmente
+osservati. Questi ultimi sono estratti dal blocco terminale autenticato per
+struttura nel log; se manca, è duplicato, malformato o viola le relazioni fra
+action/open/reopen/close, il summary usa `UNKNOWN`, marca
+`RUNTIME_COUNTERS_COMPLETE=false` e la run non può risultare PASS.

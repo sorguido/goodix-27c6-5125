@@ -45,8 +45,10 @@ l'esatto key set del summary e le invarianti incrociate. I 203 submit USB reali
 sono coerenti con 128 completion IN più 75 submit OUT; tutte le 75 OUT hanno
 completion, i massimi outstanding sono uno e lo snapshot finale è drenato.
 Interfaccia, runtime owner e view sono rilasciati; descriptor/FDT seed e secret
-TLS risultano cancellati. Retry, seconda action, reopen, reset e clear-halt
-sono zero. Nessuna famiglia persistente nota è osservata.
+TLS risultano cancellati. L'epoch nominale osserva un handshake e zero
+`TLS_TERMINAL_COMPLETION`: il contatore terminale non indica il successo, ma
+un percorso TLS anomalo/fenced. Retry, seconda action, reopen, reset e
+clear-halt sono zero. Nessuna famiglia persistente nota è osservata.
 
 La live valida sul target sia il contact boundary D279/57 — consegna del sample
 solo al release-ready, istruzione fisica derivata da `finger-status` e
@@ -70,8 +72,9 @@ e TLS nuovi. Match e no-match sono eseguiti in open epoch separati, ciascuno
 con una sola acquisizione, zero re-arm/retry e cleanup bilanciato. Questo
 harness usa materiale/backend sintetici e un test double SIGFM; la prova di
 serializzazione/match SIGFM reale appartiene al build target complementare.
-La suite secure-session passa 26/26 normale e 26/26 ASan/UBSan; USB reale e
-fprintd restano a zero.
+La suite secure-session passa 26/26 normale e 26/26 ASan/UBSan; la verifica
+strutturale D280 passa 10/10, inclusi sette scenari dei contatori runtime, e
+l'auditor D279 hash-pinned passa 2/2. USB reale e fprintd restano a zero.
 
 **NON PROVATO:** nessun template biometrico autentico è stato persistito o
 riusato; identify Linux sul target, soglia FAR/FRR production,
@@ -88,18 +91,30 @@ guardrail factory-preserving rimangono invariati.
 
 Il boundary sostanziale è ora predisposto, senza frammentarlo in D280/02, in
 `operator_kit/d280-01-ephemeral-template-reuse/`: enrollment reale, FP3
-effimero root `0600`, distruzione del print in memoria, close/open, rimozione
-del file prima dell'action e una sola identify. Il secondo epoch è subordinato
-all'audit completo del primo; grant, build, cleanup ed export sono fail-closed.
-Il preflight ricostruisce la libreria target e passa con baseline
+effimero in una directory root `0700` su `tmpfs` verificato, file `0600`,
+distruzione del print in memoria, close/open, rimozione del file prima
+dell'action e una sola identify. Il client verifica `TMPFS_MAGIC` dall'fd e il
+launcher rifiuta prima dell'USB se `/run` non è tmpfs. Il secondo epoch è
+subordinato all'audit completo del primo; grant, build, cleanup ed export sono
+fail-closed. Il preflight ricostruisce la libreria target e passa con baseline
 `UNAPPROVED_FOR_LIVE`, senza USB.
 
 La breve presenza host-side dell'FP3 autentico è trattamento di dato
-biometrico sensibile. `unlink` non garantisce cancellazione fisica su SSD,
-CoW, journal o snapshot; il rischio residuo è esplicito nel kit. Il prossimo
-passo è quindi una Human Gate, non altro lavoro sensor-reaching autonomo. Solo
-un risultato autentico favorevole renderebbe sensato isolare poi fprintd/
-on-disk e l'integrazione end-user.
+biometrico sensibile. Il percorso ordinario non scrive il blob su SSD; azzera
+i buffer posseduti e rimuove file e directory tmpfs. Restano rischi RAM,
+swap/ibernazione, core dump e crash non intercettabile. Il prossimo passo è
+quindi una Human Gate, non altro lavoro sensor-reaching autonomo. Solo un
+risultato autentico favorevole renderebbe sensato isolare poi fprintd/on-disk
+e l'integrazione end-user.
+
+Il gate D280 richiede per ogni epoch nominale handshake TLS `1`, terminal
+completion `0` e secret zeroized. La precedente richiesta `1` era una lettura
+errata del contatore: `goodix_tls_server.c` lo incrementa soltanto in
+`terminal()` per peer-close/error/fence, mentre il successo production libera
+il TLS già completato. Il live D279/57 conforme non viene quindi respinto.
+Il summary runtime distingue limiti `*_MAX` dai contatori osservati estratti
+dal blocco terminale del log; missing, duplicazione, malformazione o relazioni
+action/open/reopen/close impossibili rendono la run non-PASS.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -115,6 +130,8 @@ D279_FINAL_COMMAND_32_COUNT=8
 D279_FINAL_TERMINAL_TRANSITION_COUNT=1
 D279_FINAL_REJECTED_INBOUND_COUNT=0
 D279_FINAL_REAL_USB_SUBMIT_COUNT=203
+D279_FINAL_TLS_HANDSHAKE_COUNT=1
+D279_FINAL_TLS_TERMINAL_COMPLETION_COUNT=0
 D279_FINAL_RUN_RETURN_CODE=0
 D279_59_CONTEXTUAL_IRQ_POLICY_TARGET_VALIDATED=true
 D279_57_CONTACT_BOUNDARY_TARGET_VALIDATED=true
@@ -132,10 +149,15 @@ D280_01_TEMPLATE_PERSISTED_TO_DISK=false
 D280_01_FPRINTD_EXECUTION_COUNT=0
 D280_01_OPERATOR_KIT=operator_kit/d280-01-ephemeral-template-reuse
 D280_01_ACTION_ATTEMPT_MAX=2
+D280_01_REOPEN_ATTEMPT_MAX=1
+D280_01_RUNTIME_COUNTERS_SOURCE=OBSERVED_TERMINAL_LOG_BLOCK_FAIL_CLOSED
+D280_01_TEMPLATE_STORAGE=VERIFIED_TMPFS_ROOT_0700_FILE_0600
 D280_01_OPERATOR_RETRY_COUNT=0
 D280_01_OPERATOR_PREFLIGHT=PASS_OFFLINE
+D280_01_OPERATOR_STRUCTURAL_TESTS=10/10_PASS
+D280_01_RUNTIME_COUNTER_SCENARIOS=7/7_PASS
 D280_01_APPROVED_BASELINE=NONE
-D280_01_AUTHENTIC_TEMPLATE_HOST_STORAGE_RISK_ACCEPTED=false
+D280_01_AUTHENTIC_TEMPLATE_RAM_SWAP_CRASH_RISK_ACCEPTED=false
 PRODUCTION_IDENTIFY_LIVE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
@@ -805,19 +827,26 @@ libfprint già storico e il double esplicitamente marcato.
 
 Lo stesso D280/01 include ora il kit operatore per il corrispondente boundary
 autentico. Il client consente esattamente enrollment e identify in due open
-epoch, scrive l'FP3 solo nel result root privato con create esclusiva e modo
-root `0600`, pulisce i buffer e rimuove il file prima dell'identify. Un audit
-enrollment non conforme impedisce il reopen. Il launcher lega full SHA,
-snapshot, artefatti, grant consumabile e risultato; l'export rifiuta un
-template residuo e copia soltanto log e summary.
+epoch, scrive l'FP3 solo sotto `/run/goodix-d280-01/` in una directory root
+`0700` su tmpfs verificato, con create esclusiva e file root `0600`, pulisce i
+buffer e rimuove il file prima dell'identify. Un audit enrollment non conforme
+impedisce il reopen. Il launcher lega full SHA, snapshot, artefatti, grant
+consumabile e risultato; l'export copia soltanto log e summary.
 
-Il preflight completo del kit è PASS: test strutturali 6/6, suite
+Il contratto TLS nominale è handshake `1`, terminal completion `0`, secret
+zeroized `true`. Il contatore terminale misura il percorso TLS di errore/fence,
+non il completamento normale: il live D279/57 osserva precisamente `1/0/true`
+e i test production-shaped lo verificano dopo ogni close. I contatori runtime
+nel summary sono estratti dal blocco terminale emesso dal client e validati
+contro i massimi; non sono più costanti di scenario.
+
+Il preflight completo del kit è PASS: test strutturali 10/10, suite
 production-shaped 26/26 normale e sanitizer, build production e suite
 Fedora/SIGFM reale, client `UNAPPROVED_FOR_LIVE` rifiutato prima di
 `FpContext`. Nessun USB o materiale protetto è stato raggiunto. La possibile
-run creerebbe però per un intervallo un dato biometrico host-side; `unlink` non
-prova physical erasure. Baseline approvata, accettazione del rischio e Human
-Gate one-shot restano assenti.
+run creerebbe però per un intervallo un dato biometrico in RAM; swap,
+ibernazione, core dump e crash restano rischi residui. Baseline approvata,
+accettazione del rischio e Human Gate one-shot restano assenti.
 
 ```text
 D280_01_OUTCOME=HUMAN_REQUIRED
@@ -836,7 +865,10 @@ FPRINTD_EXECUTION_COUNT=0
 AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=false
 D280_01_OPERATOR_KIT_PREFLIGHT=PASS_OFFLINE
 D280_01_APPROVED_BASELINE=NONE
-D280_01_AUTHENTIC_TEMPLATE_HOST_STORAGE_RISK_ACCEPTED=false
+D280_01_TLS_SUCCESS_CONTRACT=HANDSHAKE_1_TERMINAL_0_SECRET_ZEROIZED
+D280_01_RUNTIME_COUNTERS_SOURCE=OBSERVED_TERMINAL_LOG_BLOCK_FAIL_CLOSED
+D280_01_TEMPLATE_STORAGE=VERIFIED_TMPFS_ROOT_0700_FILE_0600
+D280_01_AUTHENTIC_TEMPLATE_RAM_SWAP_CRASH_RISK_ACCEPTED=false
 CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=NEW_HUMAN_GATE_FOR_D280_01_EPHEMERAL_TEMPLATE_REUSE
 ```
