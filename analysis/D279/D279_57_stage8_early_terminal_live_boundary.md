@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D279/57 — stage-8 live attempt and contact-boundary corrective
+# D279/57 — stage-8 live boundary and final target closure
 
 ## Live attempt 01: operator-declared result
 
@@ -211,32 +211,89 @@ famiglia generale di mismatch, ma la classe esatta resta **INFERRED**, non
 osservata. Il report canonico corrente è
 `D279_59_full_irq_flags_audit_and_corrective.md`.
 
-## Human Gate
+## Final live closure after D279/59
 
-All three D279/57 attempts and their authorizations are consumed. The corrected
-`operator_kit/d279-57-stage8-early-terminal/` is live-capable but not live
-authorized. A new preparation, grant and single action require explicit
-approval of the new final full SHA and operation
-`D279_57_STAGE8_EARLY_TERMINAL_ENROLLMENT`. The AI does not run `sudo`, access
-protected material or execute USB.
+The operator executed the corrected production path once on the approved full
+SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1`. The raw result directory was
+exported through the kit's export-only operation, which reported byte-identical
+copies and no USB enumeration/live action during export. The two sanitized
+originals are preserved under
+`captures/D279_57/D27957_20260910T055810Z_38962cc/sanitized/`:
 
 ```text
-OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=LIVE_FAIL_CLOSED_NEW_CONTACT_BOUNDARY_AND_OFFLINE_CORRECTIVE
-EXECUTABLE_CLOSURE=PASS_OFFLINE
-PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_CANDIDATE_PENDING_LIVE_PROOF
+operator.log SHA-256 = 49c28b34d18cbad98a7711972a336c18a57cfd705fc40d2add77a65f39bacc18
+summary.env SHA-256  = a79fa72b1969358723582a8718939266c453d19e16e3f7259609cdaa02929211
+```
+
+The independent fail-closed auditor
+`analysis/D279/d279_57_stage8_success_audit.py` pins both digests, validates
+the exact summary key set and cross-checks progress, terminal, USB, lifecycle,
+retry and cleanup invariants. Its canonical output is
+`analysis/D279/D279_57_STAGE8_SUCCESS_audit.json`.
+
+The target completed all eight SIGFM enrollment stages. There were exactly
+eight release-ready transitions, seven reposition requests, seven inter-stage
+re-arms, eight `0x32` commands, one terminal transition and no ninth re-arm.
+All eight primary and eight auxiliary B0 records were consumed without a
+rejected inbound event. The terminal completion hold/release pair was exactly
+`1/1`, with no abort and no hold left at close.
+
+USB accounting is internally consistent: 128 IN completions plus 75 OUT
+submissions equal the 203 real submissions, and all 75 OUT submissions
+completed. Maximum IN and OUT outstanding were one; both were zero at the
+snapshot. Close, backend drain, interface release, runtime-owner cleanup and
+TLS secret zeroization passed. No retry, second action, reopen, reset or
+clear-halt occurred, and no known persistent command family was observed.
+
+This proves the fixed-eight APP12509 early terminal, the D279/57 physical
+contact boundary and the D279/59 contextual channel-mask corrective on the
+real target. It does not prove a reusable/persistent template, live identify,
+fprintd/PAM integration, production SIGFM match threshold or absence of
+sensor-side persistence. `BIOMETRIC_TEMPLATE_SAVED=false` is intentional.
+
+The grant is consumed. Reaching `LIVE_RUN_STARTED=true` is downstream of the
+launcher's atomic consumed-grant claim, and no retry is authorized. The three
+earlier failed D279/57 actions and this successful action are all consumed.
+The initial root-only attempt-01 originals remain unimported secondary
+evidence, but no longer block the terminal boundary because the final
+hash-pinned success directly supersedes that unresolved failure.
+
+## Final closure and next boundary
+
+D279 is closed at the Linux production enrollment boundary. The next distinct
+technical boundary opens as D280/01: offline construction and executable
+review of a two-open-epoch flow that retains an enrolled print through the
+public FP3 serialization boundary and then exercises the already implemented
+production single-acquisition identify path. Any real enrollment/identify,
+template retention or USB access remains a new Human Gate.
+
+```text
+OUTCOME=PASS_LIVE_D279_CLOSED
+ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL_CLOSED
+EXECUTABLE_CLOSURE=PASS_LIVE_PLUS_HASH_PINNED_EVIDENCE_AUDIT
+PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_TARGET_PROVEN
 ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
 DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
 SIGFM_APPEND_FAILURE_ADVANCES_STAGE=false
 CURRENT_LIVE_AUTHORIZED=false
 ATTEMPT01_GRANT_CONSUMED=true
 ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
+FINAL_SUCCESS_BASELINE=38962cc00b7707dc1bf56bc38cd4457d7d11b5e1
+FINAL_SUCCESS_GRANT_CONSUMED=true
+FINAL_SUCCESS_AUTHENTIC_FILES_IMPORTED=true
+FINAL_SUCCESS_COMPLETED_STAGE_COUNT=8
+FINAL_SUCCESS_INTER_STAGE_REARM_COUNT=7
+FINAL_SUCCESS_COMMAND_32_COUNT=8
+FINAL_SUCCESS_TERMINAL_TRANSITION_COUNT=1
+FINAL_SUCCESS_REJECTED_INBOUND_COUNT=0
+FINAL_SUCCESS_REAL_USB_SUBMIT_COUNT=203
+FINAL_SUCCESS_RUN_RETURN_CODE=0
 AI_REVIEW_REAL_USB_ENUMERATION_COUNT=0
 ATTEMPT01_LIVE_EXECUTION_PERFORMED=true
 AI_REVIEW_LIVE_EXECUTION_PERFORMED=false
 REUSABILITY_PROVEN=false
 CANONICAL_DOCUMENTATION=Goodix 27c6 5125 manuale tecnico.md
 REVIEW_SET=GIT_NATIVE
-RESIDUAL_BLOCKER_OR_RISK=AUTHENTIC_ATTEMPT01_FILES_PENDING_SAFE_EXPORT;CORRECTED_CONTACT_BOUNDARY_UNPROVEN_LIVE;APP12509_STAGE8_NO_REARM_TERMINAL_UNPROVEN;POST_CLOSE_REUSABILITY_SEPARATE
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_CORRECTED_D279_57_ACTION_NO_RETRY
+RESIDUAL_BLOCKER_OR_RISK=POST_CLOSE_TEMPLATE_REUSABILITY_AND_PERSISTENCE_UNPROVEN;PRODUCTION_IDENTIFY_LIVE_UNPROVEN;FPRINTD_END_USER_INTEGRATION_UNPROVEN;SENSOR_SIDE_PERSISTENCE_ABSENCE_UNPROVEN
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D280_01_POST_CLOSE_SERIALIZED_TEMPLATE_REUSE_AND_PRODUCTION_IDENTIFY_OPERATOR_BOUNDARY
 ```

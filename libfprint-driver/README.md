@@ -436,16 +436,19 @@ injects that failure and passes normal plus ASan/UBSan.
 The production Meson graph compiles the R2 component, the real Rockytkg SIGFM
 source and OpenCV4. The compatibility-named
 `tests/run_goodix_fedora44_nbis_action_test.sh` is now the D279/52 SIGFM action
-runner: given the pinned OpenCV RPM directory, it builds the production graph,
-checks the standard registry, and executes 21 real SIGFM enrollment stages on
-a deterministic non-biometric raster with zero USB access. The historical
+runner: given the pinned OpenCV RPM directory, it builds the production graph
+and checks the standard registry. At D279/52 it executed 21 real SIGFM
+enrollment stages. D279/57 subsequently moved the current production action
+to the target-proven fixed-eight policy; the same runner now executes eight
+stages on a deterministic non-biometric raster with zero USB access, while the
+21-stage transcript remains regression evidence. The historical
 filename avoids unnecessary test reorganization; its markers identify D279/52.
 The default score threshold remains plumbing only and is not a FAR/FRR or
 different-finger validation.
 
 ## D279/53 public FP3 and true SIGFM identify interoperability
 
-The same production-shaped build now proves that the 21-sample enrollment
+The same production-shaped build originally proved that the 21-sample enrollment
 template survives the public `fp_print_serialize()`/
 `fp_print_deserialize()` boundary with metadata intact and can be used as the
 gallery for a true host-only `fp_device_identify()` action. The deterministic
@@ -462,8 +465,35 @@ The runner also audits, without executing it, the exact installed
 `fprintd-1.94.5-5.fc44.x86_64` binary. Its `libfprint-2.so.2` dependency and
 all 47 required `LIBFPRINT_2.0.0` symbols are satisfied by the built library.
 This does not prove daemon execution, on-disk policy, D-Bus/SELinux behavior,
-production identify protocol safety or a biometric threshold. The production
-driver remains enrollment-only.
+production identify protocol safety or a biometric threshold. At this
+historical boundary the production driver remained enrollment-only; D279/55
+later enabled the separate target-derived single-acquisition identify profile.
+
+## D280/01 close/open template reuse composition
+
+The target Fedora build now carries only serialized FP3 bytes across a device
+close/open boundary: it destroys the eight-sample source print, opens a new
+host-only context, deserializes the bytes and completes a real SIGFM identify.
+It also rejects a corrupted FP3 header. The byte blob remains in memory and
+fprintd is not executed.
+
+A complementary full production-shaped test exercises enrollment, context
+teardown, a fresh open/secure-session/TLS epoch and single-acquisition identify
+through the fake USB backend. Successful match and legitimate no-match use
+separate open epochs and both end with zero re-arm, retry and outstanding
+transfer. This harness uses the historical deterministic SIGFM test double;
+real extraction, FP3 and matching are covered by the target Fedora test. The
+combination proves offline composition, not authentic biometric reuse, a
+production threshold, disk persistence or end-user integration.
+
+The accompanying D280/01 operator boundary is intentionally outside the
+installed driver. It can build a baseline-bound client for one eight-stage
+enrollment and one single-acquisition identify in distinct open epochs. An
+authentic FP3 would exist only as a root-owned 0600 file between those epochs
+and is unlinked before identify; logs and export exclude its bytes and hash.
+The offline preflight passes, but no baseline or live run is authorized.
+Unlinking is not a physical-erasure guarantee for SSD, CoW, journal or
+snapshot storage.
 
 ## D272/01 historical ephemeral SIGFM metric seam
 

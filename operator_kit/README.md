@@ -1,21 +1,35 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
-## D279/57 enrollment SIGFM stage-8 (tre attempt consumati; D279/59 hard-gated)
+## D280/01 riuso FP3 effimero close/open (offline-ready, Human Gate)
+
+`d280-01-ephemeral-template-reuse/` prepara una run a due action esplicite:
+enrollment fixed-eight, FP3 root `0600` effimero, distruzione del print,
+close/open, rimozione del file prima dell'action e una identify
+single-acquisition. Secondo epoch, export e cleanup sono fail-closed; il grant
+è single-use e non esiste retry. Il preflight production Fedora/SIGFM è PASS
+senza USB. Nessuna baseline è approvata e nessuna run live è autorizzata. La
+presenza anche breve del dato biometrico e il limite di `unlink` su SSD
+richiedono accettazione esplicita nella nuova Human Gate.
+
+## D279/57 enrollment SIGFM stage-8 (PASS finale; tutte le run consumate)
 
 `d279-57-stage8-early-terminal/` prepara una sola action enrollment production
 SIGFM a otto stage per verificare su APP12509 il terminale senza nono `0x32`.
 Il cap fisso isola il boundary sensor-side; non implementa ancora la selezione
-dinamica né prova la riutilizzabilità post-close. Le tre run sui full SHA
+dinamica né prova la riutilizzabilità post-close. Le prime tre run sui full SHA
 `1afe72e4...`, `d94c7af1...` e `4de9c342...` sono terminate fail-closed e i
 relativi grant sono consumati. Il correttivo separa progresso
 biometrico e finger-status fisico, differisce ogni consegna fino al
 release-ready dopo l'ACK finale `0x34` e trattiene la sola completion riuscita
 dello stage 8 fino all'IRQ `0x0200`; aggiunge inoltre telemetria mismatch
 sanitizzata. D279/59 sostituisce i magic flags con una policy canale FDT
-centralizzata e aggiunge al preflight il corpus autentico hash-gated. Una
-futura action richiede un nuovo full SHA e una nuova
-autorizzazione esplicita; nessun retry è autorizzato.
+centralizzata e aggiunge al preflight il corpus autentico hash-gated. La run
+successiva sul full SHA `38962cc0...` ha completato 8/8 stage, sette re-arm e
+il terminale senza nono `0x32`; il grant è consumato e gli output sanitizzati
+hash-pinned sono versionati in `captures/D279_57/`. D279 è chiuso. Il launcher
+resta storico/live-capable ma non autorizzato: nessun retry o nuovo live è
+implicito.
 
 ## D279/54 identify OEM passiva (pre-live, hard-gated)
 
@@ -111,10 +125,12 @@ richiede review, baseline e autorizzazione esplicite.
 | `d279-29-one-shot-enrollment/` | enrollment production one-shot concluso su `f4f0436…`; grant consumato, nessun retry autorizzato |
 | `d279-35-offline-protected-evaluation/` | current path offline aggregate-only; Human Gate per singola lettura protected pendente |
 | `d279-54-oem-passive-identify-observe/` | candidate passivo OEM identify hard-gated; authority chiusa, qualificazione Windows/full SHA/autorizzazione one-shot pendenti |
-| `d279-57-stage8-early-terminal/` | tre attempt su `1afe72e…`, `d94c7af…`, `4de9c34…` fail-closed e grant consumati; corrective contact-boundary + full IRQ flags D279/59 offline, nuovo full SHA/autorizzazione one-shot pendenti; nessun retry o test di reusability incluso |
+| `d279-57-stage8-early-terminal/` | tre attempt fail-closed consumati; run finale `38962cc…` PASS 8/8 e consumata; D279 chiuso, nessun retry o test di reusability incluso |
+| `d280-01-ephemeral-template-reuse/` | current boundary offline-ready; due action in due epoch, FP3 root 0600 rimosso prima di identify; full SHA e nuova Human Gate non ancora concessi |
 
-Non esiste un kit operativo corrente **autorizzato live**. La run D279/29 è
-consumata; tutte le run D279/57 sono consumate e il correttivo resta al
-Human Gate. D279/35 e D279/56 sono percorsi offline
+Non esiste un kit operativo corrente **autorizzato live**. D280/01 è il kit
+corrente ma ha soltanto executable closure offline. La run D279/29 è
+consumata; tutte le run D279/57 sono consumate e la finale ha chiuso PASS il
+boundary stage-8. D279/35 e D279/56 sono percorsi offline
 protetti e la loro presenza non autorizza operazioni live. I marker storici
 non devono essere cancellati o riutilizzati.

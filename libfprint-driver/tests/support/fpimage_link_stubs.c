@@ -2,9 +2,11 @@
 /*
  * Link-only seams for algorithms intentionally not executed by the host-only
  * libfprint shell tests.  NBIS paths abort because this slice deliberately
- * selects SIGFM and never reaches bozorth3.  SIGFM paths return a trivial
- * host-only double so that the real FpImageDevice enrollment state machine
- * can be exercised without a real biometric extractor.
+ * selects SIGFM and never reaches bozorth3.  SIGFM paths return a deterministic
+ * host-only double so that the real FpImageDevice enrollment and identify state
+ * machines can be exercised without a real biometric extractor.  Real SIGFM
+ * extraction/serialization/matching remains covered by the target-native
+ * Fedora/OpenCV test.
  */
 #include "test_sigfm_control.h"
 
@@ -27,6 +29,7 @@ static GCond  sigfm_cond;
 static gint   sigfm_extract_block = 0;
 static gint   sigfm_extract_blocked_count = 0;
 static gint   sigfm_extract_fail = 0;
+static gint   sigfm_match_score_value = 100;
 
 void
 goodix_test_sigfm_extract_set_block (gboolean block)
@@ -63,6 +66,14 @@ goodix_test_sigfm_extract_is_blocked (void)
   g_mutex_unlock (&sigfm_mutex);
 
   return blocked;
+}
+
+void
+goodix_test_sigfm_match_set_score (gint score)
+{
+  g_mutex_lock (&sigfm_mutex);
+  sigfm_match_score_value = score;
+  g_mutex_unlock (&sigfm_mutex);
 }
 
 gboolean
@@ -248,9 +259,14 @@ sigfm_keypoints_count (SigfmImgInfo *info)
 int
 sigfm_match_score (SigfmImgInfo *frame, SigfmImgInfo *enrolled)
 {
+  gint score;
+
   (void) frame;
   (void) enrolled;
-  return 0;
+  g_mutex_lock (&sigfm_mutex);
+  score = sigfm_match_score_value;
+  g_mutex_unlock (&sigfm_mutex);
+  return score;
 }
 
 unsigned char *

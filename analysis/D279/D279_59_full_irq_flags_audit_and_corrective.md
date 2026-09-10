@@ -274,3 +274,37 @@ PROTECTED_PAYLOAD_EXPORTED=false
 RESIDUAL_BLOCKER_OR_RISK=APP12509_STAGE8_NO_REARM_TERMINAL_UNPROVEN_LIVE;POST_CLOSE_REUSABILITY_SEPARATE
 NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
 ```
+
+## Post-corrective live validation and D279 closure
+
+The remaining live question was subsequently exercised once on approved full
+SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1`. The hash-pinned sanitized
+evidence is preserved in
+`captures/D279_57/D27957_20260910T055810Z_38962cc/sanitized/` and independently
+validated by `analysis/D279/d279_57_stage8_success_audit.py`.
+
+All eight stages completed with eight primary and eight auxiliary B0 records,
+seven inter-stage re-arms, eight `0x32` commands, one terminal transition and
+zero rejected inbound events. Thus the contextual six-channel flag policy and
+bit-aware FDT derivation survived the complete target-real enrollment path,
+including the stage-8 terminal with no ninth re-arm. The run used no retry,
+reopen, reset or clear-halt and completed host-side drain, release, runtime
+cleanup and TLS secret zeroization.
+
+This addendum promotes the D279/59 corrective from offline-ready to live-
+validated for this APP12509 enrollment path. It does not prove template
+reusability/persistence, identify/fprintd integration, SIGFM matching threshold
+or absence of sensor-side persistence. The successful grant and all preceding
+D279/57 grants are consumed; no new live action is authorized.
+
+```text
+D279_59_POST_LIVE_OUTCOME=PASS_TARGET_VALIDATED
+D279_59_POST_LIVE_BASELINE=38962cc00b7707dc1bf56bc38cd4457d7d11b5e1
+D279_59_CONTEXTUAL_IRQ_POLICY_TARGET_VALIDATED=true
+D279_59_STAGE8_NO_REARM_TARGET_VALIDATED=true
+D279_59_POST_LIVE_REJECTED_INBOUND_COUNT=0
+D279_59_POST_LIVE_AUTHORIZATION_CONSUMED=true
+D279_CLOSED=true
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D280_01_POST_CLOSE_SERIALIZED_TEMPLATE_REUSE_AND_PRODUCTION_IDENTIFY_OPERATOR_BOUNDARY
+```

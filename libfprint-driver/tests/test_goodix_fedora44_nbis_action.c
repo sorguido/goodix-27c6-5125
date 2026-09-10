@@ -197,9 +197,11 @@ test_true_sigfm_stage8_action (void)
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   g_autoptr(FpPrint) template = NULL;
   g_autoptr(FpPrint) restored = NULL;
+  g_autoptr(FpPrint) invalid = NULL;
   g_autoptr(GPtrArray) gallery = NULL;
   g_autoptr(GVariant) stored_blob = NULL;
   g_autofree guchar *serialized = NULL;
+  g_autofree guchar *corrupted = NULL;
   const guchar *stored_bytes;
   gsize serialized_size = 0u;
   gsize stored_size = 0u;
@@ -233,9 +235,9 @@ test_true_sigfm_stage8_action (void)
   fixture.completion_count = 0u;
   template = fp_print_new (FP_DEVICE (fixture.device));
   fp_print_set_finger (template, FP_FINGER_RIGHT_INDEX);
-  fp_print_set_username (template, "d279-53-offline");
-  fp_print_set_description (template, "D279/53 synthetic SIGFM");
-  enroll_date = g_date_new_dmy (8u, G_DATE_SEPTEMBER, 2026u);
+  fp_print_set_username (template, "d280-01-offline");
+  fp_print_set_description (template, "D280/01 synthetic SIGFM");
+  enroll_date = g_date_new_dmy (10u, G_DATE_SEPTEMBER, 2026u);
   fp_print_set_enroll_date (template, enroll_date);
   g_date_free (enroll_date);
   fp_device_enroll (FP_DEVICE (fixture.device),
@@ -299,21 +301,50 @@ test_true_sigfm_stage8_action (void)
     G_VARIANT_TYPE_BYTE, serialized, serialized_size, 1u));
   stored_bytes = g_variant_get_fixed_array (stored_blob, &stored_size, 1u);
   g_assert_cmpuint (stored_size, ==, serialized_size);
+
+  /* D280/01 deliberately crosses the same close/open boundary required by
+   * the production driver between enrollment and identify.  The only object
+   * carried across epochs is the public serialized FP3 byte sequence. */
+  fixture.done = FALSE;
+  fixture.success = FALSE;
+  fixture.completion_count = 0u;
+  fp_device_close (FP_DEVICE (fixture.device), NULL,
+                   (GAsyncReadyCallback) close_cb, &fixture);
+  wait_until (&fixture, &fixture.done);
+  g_assert_no_error (fixture.error);
+  g_assert_true (fixture.success);
+  g_assert_cmpuint (fixture.completion_count, ==, 1u);
+  g_assert_null (goodix_fpimage_device_get_context (fixture.device));
+  g_clear_object (&fixture.enroll_print);
+
+  fixture.done = FALSE;
+  fixture.success = FALSE;
+  fixture.completion_count = 0u;
+  fp_device_open (FP_DEVICE (fixture.device), NULL,
+                  (GAsyncReadyCallback) open_cb, &fixture);
+  wait_until (&fixture, &fixture.done);
+  g_assert_no_error (fixture.error);
+  g_assert_true (fixture.success);
+  g_assert_cmpuint (fixture.completion_count, ==, 1u);
+  fixture.ctx = goodix_fpimage_device_get_context (fixture.device);
+  g_assert_nonnull (fixture.ctx);
+  g_assert_cmpint (goodix_device_context_get_state (fixture.ctx), ==,
+                   GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+
   restored = fp_print_deserialize (stored_bytes, stored_size, &fixture.error);
   g_assert_no_error (fixture.error);
   g_assert_nonnull (restored);
-  g_assert_true (fp_print_equal (fixture.enroll_print, restored));
   g_assert_true (fp_print_compatible (restored,
                                      FP_DEVICE (fixture.device)));
   g_assert_cmpint (fp_print_get_finger (restored), ==,
                    FP_FINGER_RIGHT_INDEX);
   g_assert_cmpstr (fp_print_get_username (restored), ==,
-                   "d279-53-offline");
+                   "d280-01-offline");
   g_assert_cmpstr (fp_print_get_description (restored), ==,
-                   "D279/53 synthetic SIGFM");
+                   "D280/01 synthetic SIGFM");
   g_assert_nonnull (fp_print_get_enroll_date (restored));
   g_assert_cmpuint (g_date_get_day (fp_print_get_enroll_date (restored)), ==,
-                    8u);
+                    10u);
   g_assert_cmpint (g_date_get_month (fp_print_get_enroll_date (restored)), ==,
                    G_DATE_SEPTEMBER);
   g_assert_cmpuint (g_date_get_year (fp_print_get_enroll_date (restored)), ==,
@@ -349,6 +380,13 @@ test_true_sigfm_stage8_action (void)
                    FPI_PRINT_SIGFM);
   g_assert_cmpuint (fixture.identify_print->prints->len, ==, 1u);
 
+  corrupted = g_memdup2 (stored_bytes, stored_size);
+  corrupted[0] = (guchar) 'X';
+  invalid = fp_print_deserialize (corrupted, stored_size, &fixture.error);
+  g_assert_null (invalid);
+  g_assert_error (fixture.error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
+  g_clear_error (&fixture.error);
+
   fixture.done = FALSE;
   fixture.success = FALSE;
   fixture.completion_count = 0u;
@@ -366,6 +404,10 @@ test_true_sigfm_stage8_action (void)
   g_print ("D279_53_PUBLIC_FP3_STORAGE_ROUNDTRIP=PASS\n");
   g_print ("D279_53_TRUE_SIGFM_IDENTIFY_ACTION=PASS\n");
   g_print ("D279_55_PRODUCTION_IDENTIFY_ACTION_ENABLED=true\n");
+  g_print ("D280_01_FP3_SURVIVES_CLOSE_REOPEN=PASS\n");
+  g_print ("D280_01_TRUE_SIGFM_TWO_OPEN_EPOCH_REUSE=PASS\n");
+  g_print ("D280_01_CORRUPT_FP3_REJECTED=PASS\n");
+  g_print ("D280_01_TEMPLATE_PERSISTED_TO_DISK=false\n");
   g_clear_object (&fixture.identify_match);
   g_clear_object (&fixture.identify_print);
   g_clear_object (&fixture.enroll_print);

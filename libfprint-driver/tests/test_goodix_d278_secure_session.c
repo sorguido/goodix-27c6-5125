@@ -16,6 +16,7 @@
 
 void goodix_test_gusb_reset_counts (void);
 void goodix_test_gusb_set_open_close_success (gboolean value);
+void goodix_test_sigfm_match_set_score (gint score);
 
 /* ASSERT_CMPMEM in some GLib versions stores lengths in int, which trips
  * -Wsign-conversion under -Wconversion.  Use a size_t-safe local wrapper. */
@@ -70,6 +71,8 @@ typedef struct
   gboolean success;
   GError *action_error;
   FpPrint *enroll_print;
+  FpPrint *identify_match;
+  FpPrint *identify_print;
   guint enroll_progress_count;
   FpiImageDeviceState last_image_state;
   guint material_release_count;
@@ -493,6 +496,19 @@ production_enroll_complete (FpDevice     *device,
 }
 
 static void
+production_identify_complete (FpDevice     *device,
+                              GAsyncResult *result,
+                              gpointer      user_data)
+{
+  Fixture *fixture = user_data;
+
+  fixture->success = fp_device_identify_finish (
+    device, result, &fixture->identify_match, &fixture->identify_print,
+    &fixture->action_error);
+  production_action_complete (fixture);
+}
+
+static void
 production_enroll_progress (FpDevice *device,
                             gint      completed_stages,
                             FpPrint  *print,
@@ -517,6 +533,18 @@ production_wait (Fixture *fixture)
   while (!fixture->done && g_get_monotonic_time () < deadline)
     g_main_context_iteration (NULL, FALSE);
   g_assert_true (fixture->done);
+}
+
+static void
+production_bind_open_context (Fixture *fixture)
+{
+  fixture->context = goodix_fpimage_device_get_context (fixture->device);
+  g_assert_nonnull (fixture->context);
+  fixture->router = goodix_device_context_get_usb_router (fixture->context);
+  fixture->backend = goodix_device_context_get_fpi_usb_backend (
+    fixture->context);
+  goodix_device_context_set_async_usb_submit_seam (
+    fixture->context, submit_seam, fixture);
 }
 
 static Fixture *
@@ -545,14 +573,43 @@ fixture_new_production_action (void)
   production_wait (fixture);
   g_assert_true (fixture->success);
   g_assert_no_error (fixture->action_error);
-  fixture->context = goodix_fpimage_device_get_context (fixture->device);
-  fixture->router = goodix_device_context_get_usb_router (fixture->context);
-  fixture->backend = goodix_device_context_get_fpi_usb_backend (
-    fixture->context);
-  goodix_device_context_set_async_usb_submit_seam (
-    fixture->context, submit_seam, fixture);
+  production_bind_open_context (fixture);
   fixture->done = FALSE;
   return fixture;
+}
+
+static void
+production_close_epoch (Fixture *fixture)
+{
+  fixture->done = FALSE;
+  fixture->success = FALSE;
+  fp_device_close (FP_DEVICE (fixture->device), NULL,
+                   (GAsyncReadyCallback) production_close_complete, fixture);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  g_assert_null (goodix_fpimage_device_get_context (fixture->device));
+  fixture->context = NULL;
+  fixture->router = NULL;
+  fixture->backend = NULL;
+  fixture->session = NULL;
+  fixture->post_tls = NULL;
+}
+
+static void
+production_open_epoch (Fixture *fixture)
+{
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_cmpuint (fixture->server_record->len, ==, 0u);
+  fixture->done = FALSE;
+  fixture->success = FALSE;
+  fp_device_open (FP_DEVICE (fixture->device), NULL,
+                  (GAsyncReadyCallback) production_open_complete, fixture);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  production_bind_open_context (fixture);
+  fixture->done = FALSE;
 }
 
 static void
@@ -581,6 +638,8 @@ fixture_free (Fixture *fixture)
     {
       g_clear_error (&fixture->action_error);
       g_clear_object (&fixture->enroll_print);
+      g_clear_object (&fixture->identify_match);
+      g_clear_object (&fixture->identify_print);
       g_clear_object (&fixture->device);
       g_clear_pointer (&fixture->loop, g_main_loop_unref);
       g_queue_free (fixture->out);
@@ -1373,8 +1432,11 @@ drive_production_enrollment_bootstrap (Fixture   *fixture,
     }
   post_complete_command (fixture, 0x32);
   post_feed_ack (fixture, 0x32);
-  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
-                   GOODIX_POST_TLS_PHASE_STOP);
+  g_assert_cmpint (
+    goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+    goodix_post_tls_lifecycle_get_capture_profile (fixture->post_tls) ==
+      GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION ?
+        GOODIX_POST_TLS_PHASE_FIRST_IRQ2 : GOODIX_POST_TLS_PHASE_STOP);
 }
 
 static void
@@ -1484,6 +1546,193 @@ drive_production_enrollment_stages (Fixture   *fixture,
         }
       wait_for_enrollment_progress (fixture, stage);
     }
+}
+
+static void
+production_establish_tls_for_action (Fixture   *fixture,
+                                     TlsClient *client)
+{
+  g_assert_cmpuint (fixture->generation, >, 0u);
+  complete_pre_session_sync_timeout (fixture);
+  fixture->session = goodix_device_context_get_secure_session (
+    fixture->context);
+  g_assert_nonnull (fixture->session);
+  while (goodix_secure_session_get_phase (fixture->session) <
+         GOODIX_SECURE_PHASE_D1)
+    respond_valid (fixture, 0, 0x01);
+  respond_valid (fixture, 0, 0x01);
+  client_init (client, fixture);
+  g_assert_true (pump_tls (fixture, client, FALSE));
+  fixture->post_tls = goodix_device_context_get_post_tls_lifecycle (
+    fixture->context);
+  g_assert_nonnull (fixture->post_tls);
+}
+
+static void
+drive_production_single_acquisition (Fixture   *fixture,
+                                     TlsClient *client)
+{
+  static const guint8 auxiliary[4] = { 0x20, 0x01, 0x00, 0x88 };
+  guint8 nav[2409] = { 0x50, 0x01 };
+  g_autoptr(GBytes) image = post_zero_image ();
+  gsize image_length;
+  const guint8 *image_data = g_bytes_get_data (image, &image_length);
+
+  drive_production_enrollment_bootstrap (fixture, client);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_capture_profile (
+                     fixture->post_tls), ==,
+                   GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+
+  post_feed_event (fixture, 0x32, 0x0002, 0x003f, 0x0180);
+  post_complete_command (fixture, 0x22);
+  post_feed_ack (fixture, 0x22);
+  post_write_application_data (fixture, client, image_data, image_length);
+  g_assert_cmpint (fixture->last_image_state, ==,
+                   FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+  post_complete_command (fixture, 0x34);
+  post_feed_ack (fixture, 0x34);
+  g_assert_cmpint (fixture->last_image_state, ==,
+                   FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+  post_feed_event (fixture, 0x34, 0x0200, 0, 0x0120);
+  post_complete_command (fixture, 0x20);
+  post_feed_ack (fixture, 0x20);
+  post_write_application_data (fixture, client, auxiliary, sizeof auxiliary);
+  post_complete_command (fixture, 0x50);
+  post_feed_ack (fixture, 0x50);
+  post_feed_response (fixture, 0x50, nav, sizeof nav);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->post_tls), ==,
+                   GOODIX_POST_TLS_PHASE_STOP);
+}
+
+static void
+test_d280_01_production_two_epoch_template_reuse (void)
+{
+  Fixture *fixture = fixture_new_production_action ();
+  g_autoptr(FpPrint) template = fp_print_new (FP_DEVICE (fixture->device));
+  g_autoptr(FpPrint) enrolled = NULL;
+  g_autoptr(GPtrArray) gallery = NULL;
+  TlsClient client;
+  GoodixProductionEnrollmentAudit audit;
+
+  fp_print_set_finger (template, FP_FINGER_RIGHT_INDEX);
+  fp_print_set_username (template, "d280-01-production-shaped");
+  fp_device_enroll (FP_DEVICE (fixture->device),
+                    g_steal_pointer (&template), NULL,
+                    production_enroll_progress, fixture, NULL,
+                    (GAsyncReadyCallback) production_enroll_complete,
+                    fixture);
+  production_establish_tls_for_action (fixture, &client);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_capture_profile (
+                     fixture->post_tls), ==,
+                   GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION);
+  drive_production_enrollment_bootstrap (fixture, &client);
+  drive_production_enrollment_stages (fixture, &client);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  g_assert_nonnull (fixture->enroll_print);
+  g_assert_cmpuint (fixture->enroll_progress_count, ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_true (audit.production_action_consumed);
+  g_assert_cmpuint (audit.secure.persistent_write_count, ==, 0u);
+  g_assert_cmpuint (audit.secure.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.persistent_device_write_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.enrollment_binding.transaction.frame.persistent_family_count,
+                    ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  enrolled = g_steal_pointer (&fixture->enroll_print);
+  client_clear (&client);
+
+  production_close_epoch (fixture);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 1u);
+  g_assert_cmpuint (fixture->interface_release_count, ==, 1u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 1u);
+
+  production_open_epoch (fixture);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 2u);
+  g_assert_true (fp_print_compatible (enrolled,
+                                     FP_DEVICE (fixture->device)));
+  g_assert_cmpint (fp_print_get_finger (enrolled), ==,
+                   FP_FINGER_RIGHT_INDEX);
+  g_assert_cmpstr (fp_print_get_username (enrolled), ==,
+                   "d280-01-production-shaped");
+
+  gallery = g_ptr_array_new_with_free_func (g_object_unref);
+  g_ptr_array_add (gallery, g_object_ref (enrolled));
+  goodix_test_sigfm_match_set_score (100);
+  fixture->done = FALSE;
+  fixture->success = FALSE;
+  fp_device_identify (FP_DEVICE (fixture->device), gallery, NULL,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) production_identify_complete,
+                      fixture);
+  production_establish_tls_for_action (fixture, &client);
+  drive_production_single_acquisition (fixture, &client);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  g_assert_true (fixture->identify_match == enrolled);
+  g_assert_nonnull (fixture->identify_print);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_true (audit.production_action_consumed);
+  g_assert_cmpuint (audit.secure.persistent_write_count, ==, 0u);
+  g_assert_cmpuint (audit.secure.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.first_image_pipeline_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.release_tail_complete_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.single_acquisition_terminal_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.persistent_device_write_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  client_clear (&client);
+
+  production_close_epoch (fixture);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 2u);
+  g_assert_cmpuint (fixture->interface_release_count, ==, 2u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 2u);
+
+  /* A separate open epoch exercises the legitimate identify no-match result;
+   * no retry or second action reuses the successful identify epoch. */
+  production_open_epoch (fixture);
+  g_clear_object (&fixture->identify_match);
+  g_clear_object (&fixture->identify_print);
+  goodix_test_sigfm_match_set_score (0);
+  fp_device_identify (FP_DEVICE (fixture->device), gallery, NULL,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) production_identify_complete,
+                      fixture);
+  production_establish_tls_for_action (fixture, &client);
+  drive_production_single_acquisition (fixture, &client);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  g_assert_null (fixture->identify_match);
+  g_assert_nonnull (fixture->identify_print);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.single_acquisition_terminal_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.persistent_device_write_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  client_clear (&client);
+  production_close_epoch (fixture);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 3u);
+  g_assert_cmpuint (fixture->interface_release_count, ==, 3u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 3u);
+  goodix_test_sigfm_match_set_score (100);
+  fixture_free (fixture);
 }
 
 static void
@@ -3052,6 +3301,8 @@ main (int argc,
                    test_integrated_context_live_binding_host_only);
   g_test_add_func ("/goodix/d279/production-one-shot-enrollment-full-tls",
                    test_production_one_shot_enrollment_full_tls);
+  g_test_add_func ("/goodix/d280/production-two-epoch-template-reuse",
+                   test_d280_01_production_two_epoch_template_reuse);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",
                    test_integrated_context_cancel_secure);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-post-tls",

@@ -16,119 +16,141 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/59 — full IRQ flags corrective offline
+### Stato corrente D280/01 — riuso FP3 post-close e identify composti offline
 
-Le tre run live D279/57 sui full SHA `1afe72e4...`, `d94c7af1...` e
-`4de9c342...` sono tutte consumate; nessun grant o retry è riutilizzabile. La
-prima ha motivato la separazione tra progresso biometrico e reale release
-fisico. Le altre due hanno prodotto telemetria strutturale distinta ma una
-root cause comune: il parser D279/14 trattava i flags FDT come valori esatti.
-`d94c7af1...` ha respinto IRQ0100 enrollment `0x003f` perché attendeva zero;
-dopo il micro-corrective D279/58, `4de9c342...` ha respinto IRQ2 `0x002f`
-perché attendeva `0x003f`.
+D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
+sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
+target reale Goodix `27c6:5125` / `GF_ST411SEC_APP_12509` tutti gli otto
+stage SIGFM e il terminale anticipato senza nono re-arm. Il grant è consumato;
+nessun retry o nuova azione live è autorizzato.
 
-**OBSERVED:** la matrice autentica D279/10 ATTEMPT02 contiene tutti i 65 IRQ
-pertinenti: tre bootstrap `0x36/IRQ0100/0x0000`, 21 finger-down
-`0x32/IRQ2/0x003f`, 20 contact-sample
-`0x36/IRQ0100/0x003f` e 21 finger-up `0x34/IRQ0200/0x0000`. D255, D274/03,
-D279/10 ATTEMPT01 e D279/54 confermano la distinzione contatto/no-contatto.
-La live `4de9c342...` aggiunge il sottoinsieme di contatto `0x002f`.
-
-**VERIFIED:** i sei bit bassi sono indicatori dei sei canali FDT. Il verifier
-hash-gated legge dal PE OEM la lunghezza raw 12 a `0x180576df4` e verifica che
-il call-site IRQ2 mode-zero `0x180028815–839` raggiunga il handler
-`0x180029314–6d6`; il loop estrae indipendentemente il bit `i`. Il handler e
-l'implementazione indipendente Rockytkg applicano,
-per ciascun bit, `(raw>>1)+delta` sul canale attivo e `delta-2` sul canale
-inattivo. La policy production centralizzata accetta quindi soltanto un
-sottoinsieme nonzero di `0x003f` in contesti finger-down/contact-sample;
-richiede zero esatto in bootstrap/finger-up e rifiuta tutti i bit riservati.
-Control, IRQ, length e presenza dei 12 raw byte restano exact/fail-closed.
-
-**INFERRED:** il primo failure senza classificazione A0 potrebbe appartenere
-alla stessa famiglia di assunzioni stale, ma la sua classe esatta non è
-osservabile. **UNKNOWN:** il terminale APP12509 allo stage 8 senza nono re-arm
-resta non provato live; reusability e persistence sono confini separati.
-
-Il corrective mantiene il contact boundary D279/57: il sample arriva a
-`FpImageDevice` soltanto dopo l'ACK finale `0x34`, il prompt deriva da
-`finger-status` e la completion terminale resta in hold fino a IRQ0200. Il
-corpus metadata-only hash-gated, il test C indipendente e tutte le suite
-production-shaped sono verdi offline, incluso il preflight esatto del kit.
-Non restano nel percorso enrollment corrente gate exact-`0x003f` equivalenti
-eliminabili tramite le evidenze storiche disponibili.
-
-La valutazione protetta D279/48 è stata completata offline sulla baseline
-`36999004b9971f7004aaaa4da85d7c2d1afc79d1`, senza USB/live e senza export di
-PSK, plaintext, raster, feature o template. La prima autorizzazione era stata
-consumata da un failure di reduced-snapshot dependency closure prima della
-lettura PSK; i commit `286443207...` e `36999004...` hanno chiuso il difetto e
-la seconda autorizzazione ha prodotto l'aggregate autentico valido.
-
-Il summary primario, SHA-256
-`71ec1922eb97f4804d7e228b09ef3edede04cbc4b3799eff433a418c1efa1ff3`, passa il
-validator D279/48 ed è preservato byte-identico come
-`analysis/D279/D279_48_SUCCESS_summary.json` (37.475 byte). Il JSON
-`D279_48_authentic_aggregate_review.json` è un artefatto derivato, non una
-sostituzione della fonte primaria. Il campo decisionale del summary resta
-correttamente pending; la
-review successiva classifica l'esito:
+Gli originali sanitizzati esportati byte-identici sono preservati in
+`captures/D279_57/D27957_20260910T055810Z_38962cc/sanitized/`:
 
 ```text
-D279_48_AUTHENTIC_RUN=PASS
-D279_48_CLASS=B_SIGFM_MATERIALLY_OUTPERFORMS_NBIS_ON_SAME_INPUT
-LIVE_OR_USB_ACTION_COUNT=0
-NBIS_PIPELINE_COMPATIBLE=true
-NBIS_BIOMETRICALLY_VALIDATED=false
-NBIS_BIOMETRIC_DIRECTION=SUPERSEDED
-EXTRACTOR_DIRECTION=SIGFM
-NBIS_PARAMETER_SEARCH=STOP
+operator.log SHA-256 = 49c28b34d18cbad98a7711972a336c18a57cfd705fc40d2add77a65f39bacc18
+summary.env SHA-256  = a79fa72b1969358723582a8718939266c453d19e16e3f7259609cdaa02929211
 ```
 
-R1/R2 hanno consegnato byte-per-byte gli stessi raster nativi 80×64 a NBIS e
-SIGFM. NBIS non ha prodotto alcun frame Bozorth-computable su 42. SIGFM ha
-superato il gate di 25 keypoint su tutti i 42 frame; i confronti primary↔
-auxiliary paired-cycle hanno 40/42 score diretti nonzero e almeno 20, con
-mediana 238047 in R1 e 310975 in R2. Il dataset resta single-session/same-finger:
-non prova FAR/FRR, accuratezza, different-finger separation o soglia production.
-Il B0 iniziale ATTEMPT02 è un riferimento sperimentale, non una vera no-finger
-baseline Rockytkg provata equivalente.
+**OBSERVED:** open, una sola action enrollment e close hanno avuto successo.
+La run conta 8 primary B0, 8 auxiliary B0, 8 stage completati, 8
+release-ready, 7 riposizionamenti, 7 re-arm inter-stage, 8 comandi `0x32`,
+una transizione terminale e zero eventi inbound respinti. La completion
+terminale è stata trattenuta e rilasciata una volta (`1/1/0` hold/release/
+abort), senza hold residua.
 
-La decisione D279/02 resta storia architetturale ma è superseded sul piano
-biometrico. Non si esegue rollback Git. Si preservano USB/TLS/PSK/FDT/lifecycle
-e i guardrail factory-preserving; si sostituiscono soltanto build, preprocessing,
-extractor, print/storage e action binding dipendenti da NBIS.
+**VERIFIED:** l'auditor hash-pinned
+`analysis/D279/d279_57_stage8_success_audit.py` valida i due originali,
+l'esatto key set del summary e le invarianti incrociate. I 203 submit USB reali
+sono coerenti con 128 completion IN più 75 submit OUT; tutte le 75 OUT hanno
+completion, i massimi outstanding sono uno e lo snapshot finale è drenato.
+Interfaccia, runtime owner e view sono rilasciati; descriptor/FDT seed e secret
+TLS risultano cancellati. Retry, seconda action, reopen, reset e clear-halt
+sono zero. Nessuna famiglia persistente nota è osservata.
 
-L'architettura corrente è una fork minima Fedora 44/libfprint 1.94.100 con
-massimo riuso diretto sicuro della reference Rockytkg. La directory
-`libfprint-driver/` mantiene licenze per-file: LGPL resta il default dei file
-locali esistenti, ma non è più un vincolo assoluto sulla distribuzione della
-fork/combined work. `goodix_imgproc.c` GPL deve essere riusato direttamente o
-adattato minimamente sotto termini GPL-compatible, dopo audit e ledger; la
-reimplementazione indipendente è soltanto fallback a un blocker concreto.
+La live valida sul target sia il contact boundary D279/57 — consegna del sample
+solo al release-ready, istruzione fisica derivata da `finger-status` e
+completion finale dopo IRQ0200 — sia il modello D279/59 dei sei canali FDT:
+bitfield di contatto nonzero entro `0x003f`, zero esatto nei contesti
+no-touch e derivazione per-canale con fallback OEM. Non compare un nono
+`0x32` dopo lo stage 8.
+
+La run D279 non aveva serializzato o salvato il template. D280/01 chiude ora
+offline la composizione immediatamente successiva senza retroattribuire quel
+risultato al live: nel build esatto Fedora 44/libfprint 1.94.100, otto raster
+sintetici attraversano R2 e SIGFM reali, il template viene serializzato FP3,
+il print in memoria viene distrutto, il device virtuale viene chiuso e
+riaperto, e i soli byte deserializzati completano una identify a singola
+acquisizione (`score 1026/40`). Un header FP3 corrotto è rifiutato
+fail-closed. Il blob non è scritto su disco e fprintd non viene eseguito.
+
+In parallelo, il full harness production-shaped completa enrollment → close →
+open → identify attraverso context, backend, pre-session sync, secure-session
+e TLS nuovi. Match e no-match sono eseguiti in open epoch separati, ciascuno
+con una sola acquisizione, zero re-arm/retry e cleanup bilanciato. Questo
+harness usa materiale/backend sintetici e un test double SIGFM; la prova di
+serializzazione/match SIGFM reale appartiene al build target complementare.
+La suite secure-session passa 26/26 normale e 26/26 ASan/UBSan; USB reale e
+fprintd restano a zero.
+
+**NON PROVATO:** nessun template biometrico autentico è stato persistito o
+riusato; identify Linux sul target, soglia FAR/FRR production,
+fprintd/D-Bus/PAM/login/sudo e assenza di persistenza sensor-side restano
+aperti. Zero famiglie persistenti note è telemetria di allowlist, non prova
+assoluta sulla NVM.
+
+La direzione biometrica D279/48 resta SIGFM: sul dataset autentico
+single-session/same-finger SIGFM supera materialmente NBIS, senza provare
+FAR/FRR o una soglia production. L'architettura corrente resta la fork minima
+Fedora 44/libfprint 1.94.100 con preprocessing R2 e SIGFM Rockytkg sotto
+licenze per-file e combined-work GPL-compatible. USB/TLS/PSK/FDT/lifecycle e
+guardrail factory-preserving rimangono invariati.
+
+Il boundary sostanziale è ora predisposto, senza frammentarlo in D280/02, in
+`operator_kit/d280-01-ephemeral-template-reuse/`: enrollment reale, FP3
+effimero root `0600`, distruzione del print in memoria, close/open, rimozione
+del file prima dell'action e una sola identify. Il secondo epoch è subordinato
+all'audit completo del primo; grant, build, cleanup ed export sono fail-closed.
+Il preflight ricostruisce la libreria target e passa con baseline
+`UNAPPROVED_FOR_LIVE`, senza USB.
+
+La breve presenza host-side dell'FP3 autentico è trattamento di dato
+biometrico sensibile. `unlink` non garantisce cancellazione fisica su SSD,
+CoW, journal o snapshot; il rischio residuo è esplicito nel kit. Il prossimo
+passo è quindi una Human Gate, non altro lavoro sensor-reaching autonomo. Solo
+un risultato autentico favorevole renderebbe sensato isolare poi fprintd/
+on-disk e l'integrazione end-user.
 
 ```text
+D279_OUTCOME=PASS_LIVE_CLOSED
+D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
+D279_EXECUTABLE_CLOSURE=PASS_LIVE_PLUS_HASH_PINNED_EVIDENCE_AUDIT
+D279_FINAL_LIVE_BASELINE=38962cc00b7707dc1bf56bc38cd4457d7d11b5e1
+D279_FINAL_LIVE_GRANT_CONSUMED=true
+D279_FINAL_LIVE_RERUN_AUTHORIZED=false
+PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_TARGET_PROVEN
+D279_FINAL_COMPLETED_STAGE_COUNT=8
+D279_FINAL_INTER_STAGE_REARM_COUNT=7
+D279_FINAL_COMMAND_32_COUNT=8
+D279_FINAL_TERMINAL_TRANSITION_COUNT=1
+D279_FINAL_REJECTED_INBOUND_COUNT=0
+D279_FINAL_REAL_USB_SUBMIT_COUNT=203
+D279_FINAL_RUN_RETURN_CODE=0
+D279_59_CONTEXTUAL_IRQ_POLICY_TARGET_VALIDATED=true
+D279_57_CONTACT_BOUNDARY_TARGET_VALIDATED=true
+ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
+DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
+BIOMETRIC_TEMPLATE_SAVED=false
+POST_CLOSE_SYNTHETIC_FP3_REUSABILITY_PROVEN=true
+POST_CLOSE_AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=false
+D280_01_OUTCOME=HUMAN_REQUIRED
+D280_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_OPERATOR_KIT_PLUS_NORMAL_SANITIZER_AND_EXACT_FEDORA44_SIGFM
+D280_01_PRODUCTION_SHAPED_MULTI_EPOCH_COMPOSITION=PASS
+D280_01_TRUE_SIGFM_FP3_CLOSE_OPEN_IDENTIFY=PASS
+D280_01_CORRUPT_FP3_REJECTED=PASS
+D280_01_TEMPLATE_PERSISTED_TO_DISK=false
+D280_01_FPRINTD_EXECUTION_COUNT=0
+D280_01_OPERATOR_KIT=operator_kit/d280-01-ephemeral-template-reuse
+D280_01_ACTION_ATTEMPT_MAX=2
+D280_01_OPERATOR_RETRY_COUNT=0
+D280_01_OPERATOR_PREFLIGHT=PASS_OFFLINE
+D280_01_APPROVED_BASELINE=NONE
+D280_01_AUTHENTIC_TEMPLATE_HOST_STORAGE_RISK_ACCEPTED=false
+PRODUCTION_IDENTIFY_LIVE_PROVEN=false
+FPRINTD_END_USER_INTEGRATION_PROVEN=false
+SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
-ROCKYTKG_ROLE=PRIMARY_IMPLEMENTATION_REFERENCE
-IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
-D279_57_ATTEMPT01_GRANT_CONSUMED=true
-D279_57_D94_GRANT_CONSUMED=true
-D279_57_4DE9C34_GRANT_CONSUMED=true
-D279_57_ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
-D279_57_NEXT_LIVE_READINESS=READY
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
+NEXT_PRIMARY_BOUNDARY=NEW_HUMAN_GATE_FOR_D280_01_EPHEMERAL_TEMPLATE_REUSE
 ```
 
-Report e review machine-readable:
-`analysis/D279/D279_48_SUCCESS_summary.json`,
-`analysis/D279/D279_48_post_run_sigfm_pivot.md` e
-`analysis/D279/D279_48_authentic_aggregate_review.json`. Per la policy
-enrollment corrente vedere
-`analysis/D279/D279_56_dynamic_enrollment_policy_replay_boundary.md`, il
-summary autentico `analysis/D279/D279_56_SUCCESS_summary.json` e
-`analysis/D279/D279_57_stage8_early_terminal_live_boundary.md`.
+Report ed evidenze correnti:
+`analysis/D280/D280_01_two_open_epoch_template_reuse.md`,
+`analysis/D279/D279_57_stage8_early_terminal_live_boundary.md`,
+`analysis/D279/D279_57_STAGE8_SUCCESS_audit.json`,
+`analysis/D279/D279_59_full_irq_flags_audit_and_corrective.md` e i due
+originali sanitizzati sopra indicati.
 
 ### Stato D279/49 — preprocessing Rockytkg R2 production isolato
 
@@ -575,7 +597,7 @@ CURRENT_LIVE_AUTHORIZED=false
 NEXT_PRIMARY_BOUNDARY=OFFLINE_D279_57_STAGE8_EARLY_TERMINAL_LIVE_BOUNDARY_PREPARATION
 ```
 
-### Stato D279/57 — run consumata e correttivo contact boundary
+### Stato D279/57 — failure storici, correttivo e successiva closure live
 
 D279/57 traduce il risultato autentico D279/56 nel minimo esperimento
 sensor-side discriminante. La production SIGFM dichiara otto stage e il grafo
@@ -657,7 +679,7 @@ failure di extraction/copia non incrementa lo stage. La telemetria D279/57
 aggiunge l'ultimo mismatch strutturale sanitizzato senza payload, raster,
 template, secret o plaintext protetto.
 
-Riesame metodologico prima di una eventuale nuova run:
+Riesame metodologico applicato prima della successiva run finale:
 
 1. cambia realmente il boundary di contatto: ogni consegna avviene
    dopo l'ACK finale `0x34` e l'operatore segue `finger-status`, non il
@@ -666,15 +688,21 @@ Riesame metodologico prima di una eventuale nuova run:
 2. la nuova ipotesi è che mantenere il dito durante il ramo ausiliario e
    rimuoverlo soltanto al release-ready permetta di chiudere ogni ciclo
    ripetuto e raggiungere il terminale stage 8 senza nono `0x32`;
-3. un nuovo fallimento non autorizza retry: evento/control/IRQ sanitizzati
-   determinano il replan protocol-specifico. La riutilizzabilità resta uno
-   step distinto.
+3. un nuovo fallimento non avrebbe autorizzato retry: evento/control/IRQ
+   sanitizzati avrebbero determinato il replan protocol-specifico. La
+   riutilizzabilità resta uno step distinto.
+
+Dopo il full corrective D279/59, la run sul full SHA `38962cc00...` ha
+validato direttamente l'ipotesi: 8/8 stage, sette re-arm, otto comandi `0x32`,
+un terminale e zero reject. Gli originali e l'audit hash-pinned sono indicati
+nella sezione di stato corrente. I marker seguenti sostituiscono lo stato
+pre-live senza riscrivere i fatti delle tre run fallite.
 
 ```text
-D279_57_OUTCOME=SUPERSEDED_BY_D279_59_FULL_IRQ_FLAGS_CORRECTIVE
-D279_57_ADVANCEMENT=THREE_LIVE_FAIL_CLOSED_PLUS_CONTACT_AND_FLAGS_CORRECTIVES
-D279_57_EXECUTABLE_CLOSURE=PASS_OFFLINE
-PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_CANDIDATE_PENDING_LIVE_PROOF
+D279_57_OUTCOME=PASS_LIVE_AFTER_D279_59
+D279_57_ADVANCEMENT=THREE_LIVE_FAIL_CLOSED_PLUS_FINAL_TARGET_REAL_FIXED8_SUCCESS
+D279_57_EXECUTABLE_CLOSURE=PASS_LIVE_PLUS_HASH_PINNED_EVIDENCE_AUDIT
+PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_TARGET_PROVEN
 ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
 DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
 SIGFM_APPEND_FAILURE_ADVANCES_STAGE=false
@@ -685,9 +713,12 @@ ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
 EXPECTED_COMMAND_32_COUNT=8
 EXPECTED_INTER_STAGE_REARM_COUNT=7
 EXPECTED_POST_STAGE8_REARM_COUNT=0
+FINAL_SUCCESS_GRANT_CONSUMED=true
+FINAL_SUCCESS_COMPLETED_STAGE_COUNT=8
+FINAL_SUCCESS_REJECTED_INBOUND_COUNT=0
 REUSABILITY_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D280_01_POST_CLOSE_SERIALIZED_TEMPLATE_REUSE_AND_PRODUCTION_IDENTIFY_OPERATOR_BOUNDARY
 ```
 
 ### Stato D279/59 — modello canale FDT e closure D279/57
@@ -726,25 +757,91 @@ vecchio `core/fdt_lifecycle.py` resta storico e non è autorità production.
 La review end-to-end del kit classifica bootstrap, primo ciclo e cicli
 ripetuti come direttamente OEM-observed; il mapping release-ready/libfprint e
 la hold terminale sono Linux-specific ma coperti nelle due possibili
-ordinazioni. L'assenza del nono re-arm è verde offline ma resta la domanda
-sensor-side della futura singola live. Non esistono altre magic constants
-equivalenti note nel percorso corrente eliminabili con l'evidenza disponibile.
+ordinazioni. La successiva live `38962cc00...` ha poi provato sul target
+l'assenza del nono re-arm e attraversato l'intero percorso senza reject. Non
+esistono altre magic constants equivalenti note nel percorso corrente
+eliminabili con l'evidenza disponibile.
 
 ```text
-D279_59_OUTCOME=READY_OFFLINE_FULL_IRQ_POLICY_CORRECTIVE
-D279_59_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D279_59_OUTCOME=PASS_TARGET_VALIDATED
+D279_59_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_LIVE_D279_57_FINAL
 D279_10_AUTHENTIC_IRQ_MATRIX_ROWS=65
 D279_59_POLICY_CORPUS_ROWS=66
 CONTACT_FLAGS=NONZERO_SUBSET_OF_0X003F
 ZERO_TOUCH_FLAGS=EXACT_0X0000
 RESERVED_HIGH_BITS=FAIL_CLOSED
-D279_57_NEXT_LIVE_READINESS=READY
+D279_57_STAGE8_NO_REARM_TARGET_VALIDATED=true
+D279_59_CONTEXTUAL_IRQ_POLICY_TARGET_VALIDATED=true
 CURRENT_LIVE_AUTHORIZED=false
 ALL_PRIOR_D279_57_GRANTS_CONSUMED=true
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
+NEXT_PRIMARY_BOUNDARY=OFFLINE_D280_01_POST_CLOSE_SERIALIZED_TEMPLATE_REUSE_AND_PRODUCTION_IDENTIFY_OPERATOR_BOUNDARY
 ```
 
 Report: `analysis/D279/D279_59_full_irq_flags_audit_and_corrective.md`.
+
+### Stato D280/01 — riuso template fra open epoch e identify
+
+D280/01 compone i confini D279 precedentemente separati senza cambiare codice
+production sensor-reaching. Il test production-shaped completa il vero grafo
+host enrollment fixed-eight, distrugge il primo context con backend drenato,
+riapre lo stesso `FpDevice` e completa l'identify single-acquisition. Un match
+e un no-match sono eseguiti in epoch distinti; ogni epoch ha un solo handshake,
+una sola action, zero re-arm, zero retry e claim/release/material cleanup
+bilanciati. Il matcher in questo harness è un double deterministico: prova il
+control-flow completo, non qualità biometrica o storage FP3.
+
+Il test complementare nel build esatto Fedora 44/libfprint 1.94.100 usa invece
+preprocessing R2 e SIGFM Rockytkg reali. Serializza in FP3 il template a otto
+sample sintetici, elimina l'oggetto originale, attraversa close/open,
+deserializza i soli byte e ottiene match identify `1026/40`; un header FP3
+corrotto fallisce chiuso. Il blob resta in memoria. ABI fprintd a 47 simboli e
+registry unico `27c6:5125` restano verdi, ma fprintd non viene avviato.
+
+La vecchia snapshot `Rockytkg/libfprint` usata dal grande harness contiene una
+primitiva SIGFM storica non adatta alla serializzazione robusta; non è stata
+modificata o promossa. L'autorità storage è il delta target Fedora D279/50–53,
+mentre il production-shaped test usa la snapshot soltanto per lo shell
+libfprint già storico e il double esplicitamente marcato.
+
+Lo stesso D280/01 include ora il kit operatore per il corrispondente boundary
+autentico. Il client consente esattamente enrollment e identify in due open
+epoch, scrive l'FP3 solo nel result root privato con create esclusiva e modo
+root `0600`, pulisce i buffer e rimuove il file prima dell'identify. Un audit
+enrollment non conforme impedisce il reopen. Il launcher lega full SHA,
+snapshot, artefatti, grant consumabile e risultato; l'export rifiuta un
+template residuo e copia soltanto log e summary.
+
+Il preflight completo del kit è PASS: test strutturali 6/6, suite
+production-shaped 26/26 normale e sanitizer, build production e suite
+Fedora/SIGFM reale, client `UNAPPROVED_FOR_LIVE` rifiutato prima di
+`FpContext`. Nessun USB o materiale protetto è stato raggiunto. La possibile
+run creerebbe però per un intervallo un dato biometrico host-side; `unlink` non
+prova physical erasure. Baseline approvata, accettazione del rischio e Human
+Gate one-shot restano assenti.
+
+```text
+D280_01_OUTCOME=HUMAN_REQUIRED
+D280_01_ADVANCEMENT=POST_CLOSE_FP3_REUSE_AND_PRODUCTION_SHAPED_IDENTIFY_COMPOSED
+D280_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_OPERATOR_KIT_PLUS_NORMAL_SANITIZER_AND_EXACT_FEDORA44_SIGFM
+SECURE_SESSION_TEST_COUNT=26
+SECURE_SESSION_NORMAL=PASS
+SECURE_SESSION_ASAN_UBSAN=PASS
+TRUE_SIGFM_FP3_SURVIVES_CLOSE_REOPEN=PASS
+TRUE_SIGFM_IDENTIFY_MATCH=PASS
+CORRUPT_FP3_REJECTED=PASS
+PRODUCTION_SHAPED_IDENTIFY_MATCH_AND_MISMATCH=PASS
+PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
+REAL_USB_ACCESS=0
+FPRINTD_EXECUTION_COUNT=0
+AUTHENTIC_TEMPLATE_REUSABILITY_PROVEN=false
+D280_01_OPERATOR_KIT_PREFLIGHT=PASS_OFFLINE
+D280_01_APPROVED_BASELINE=NONE
+D280_01_AUTHENTIC_TEMPLATE_HOST_STORAGE_RISK_ACCEPTED=false
+CURRENT_LIVE_AUTHORIZED=false
+NEXT_PRIMARY_BOUNDARY=NEW_HUMAN_GATE_FOR_D280_01_EPHEMERAL_TEMPLATE_REUSE
+```
+
+Report: `analysis/D280/D280_01_two_open_epoch_template_reuse.md`.
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
 
