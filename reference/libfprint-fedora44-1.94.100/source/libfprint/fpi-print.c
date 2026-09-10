@@ -466,6 +466,8 @@ fpi_print_sigfm_match (FpPrint *print_template,
     }
 
   probe = g_ptr_array_index (print->prints, 0);
+  g_message ("GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=%u threshold=%d",
+             print_template->prints->len, score_threshold);
   for (guint i = 0; i < print_template->prints->len; i++)
     {
       GoodixSigfmSample *enrolled =
@@ -476,15 +478,24 @@ fpi_print_sigfm_match (FpPrint *print_template,
       result = goodix_sigfm_match_ephemeral (probe, enrolled, &score);
       if (result != GOODIX_SIGFM_OK)
         {
+          g_message ("GOODIX_SIGFM_MATCH_AUDIT event=error sample=%u result=%d",
+                     i + 1, result);
           g_set_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
                        "SIGFM matcher failed (result %d)", result);
           return FPI_MATCH_ERROR;
         }
-      fp_dbg ("SIGFM score %d/%d", score, score_threshold);
+      g_message ("GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=%u score=%d threshold=%d",
+                 i + 1, score, score_threshold);
       if (score >= score_threshold)
-        return FPI_MATCH_SUCCESS;
+        {
+          g_message ("GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=%u comparisons=%u threshold=%d",
+                     i + 1, i + 1, score_threshold);
+          return FPI_MATCH_SUCCESS;
+        }
     }
 
+  g_message ("GOODIX_SIGFM_MATCH_AUDIT event=outcome result=no_match matched_sample=0 comparisons=%u threshold=%d",
+             print_template->prints->len, score_threshold);
   return FPI_MATCH_FAIL;
 }
 #endif

@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D283/01 PAM dedicato pronto offline; Human Gate target
+### Stato corrente — D282/02 matcher ordine/re-entry pronto offline; Human Gate target
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -433,7 +433,49 @@ L'errore di stimulus Attempt 04 è stato favorito dalla stringa client
 dito da presentare. Il correttivo Poka-Yoke host-side spiega questa semantica e
 richiede la conferma testuale `INDICE SINISTRO` prima della Phase B. Non cambia
 driver, protocollo, matcher, budget di tre action o massimo dieci contatti.
-Non è necessaria una nuova live D282.
+Questo chiude correttamente il requisito storico D282/01, ma non risolve una
+successiva domanda metodologica sull'ordine delle due VERIFY.
+
+Una nuova review indipendente, richiesta prima della live PAM, ha infatti
+confrontato gli originali hash-pinned di Attempt 04 e 05 e il percorso matcher
+reale. Entrambe le run osservano `MATCH` alla prima VERIFY e `NO-MATCH` alla
+seconda. In Attempt 04 il secondo no-match same-finger ha lifecycle coerente
+con 82 submit, `release_tail=1`, backend drenato e context chiuso; in Attempt
+05 il no-match different-finger ha 76 submit e close pair `0/0`, anch'esso
+drenato e chiuso. I log non contengono score SIGFM. Il launcher invoca davvero
+`fprintd-verify` e il matcher confronta il probe con gli otto sample usando il
+threshold 40; non esiste un outcome Phase B hardcoded. Le evidenze disponibili
+non separano però identità, posizione nella coppia, qualità temporale e stato
+process-local. Il confondente
+`SECOND_VERIFY_POSITIONAL_OR_LIFECYCLE_EFFECT` non è quindi escluso.
+
+La decisione corrente è `REPLAN`: D282/02 mantiene dito, threshold, otto stage,
+preprocessing, algoritmo e protocollo invariati e aggiunge solo telemetria
+osservazionale `g_message()` per keypoint del probe, score per sample,
+threshold e outcome. Dopo un enrollment dell'indice destro esegue quattro
+VERIFY pianificate dello stesso dito: posizioni 1/2 nel blocco A, restart di
+fprintd, posizioni 1/2 nel blocco B. La sequenza non dipende dagli outcome;
+quattro prove sono il minimo che replica entrambe le posizioni in due processi
+e non stimano FAR/FRR.
+
+Il budget è cinque action — un enrollment e quattro VERIFY — e al massimo
+dodici contatti. Il kit rifiuta retry client, telemetria incompleta, parametri
+matcher diversi da otto sample/threshold 40, più di un'estrazione probe o più
+di un epoch per trial. PID e `InvocationID` sono verificati prima di ogni
+contatto: i trial 1/2 devono condividere l'istanza A, i trial 3/4 l'istanza B e
+le due invocation devono essere diverse; auto-exit o riattivazioni inattese
+fermano il percorso prima dell'action successiva. Esporta `trials.tsv` con ordine, blocco, posizione,
+keypoint e score senza pixel o template. Se la seconda posizione peggiora in
+entrambi i blocchi si investiga il lifecycle; se il comportamento recupera
+dopo restart si indaga stato process-local; un trend 1→4 non azzerato dal
+restart indica invece un candidato temporale/qualitativo. In assenza di pattern
+si esclude soltanto un effetto deterministico nella singola run e si progetta
+separatamente una caratterizzazione same/different bilanciata.
+
+Il preflight D282/02 è `PASS_OFFLINE`: candidate SIGFM reale e ABI fprintd
+passano; i marker sintetici match/no-match sono presenti; la matrice con le
+regressioni D282/01 e D283 è `95/95 PASS`, inclusi parser systemd e runner PAM
+reale in confdir isolata. Nessun `sudo`, USB o sensore è stato usato dall'AI.
 
 PAM resta fuori D282. D283/01 ha ora chiuso offline il percorso operatore per
 un servizio PAM dedicato `goodix-d283-01`, con regola esatta
@@ -459,7 +501,11 @@ e uno per PAM. Verifica manifest e provenance, NEVRA esatta, cardinalità,
 SELinux e mapping della candidate prima e dopo il restart; richiede zero
 retry/reopen/reset/clear-halt/famiglie persistenti note e rollback completo.
 Una verifica PAM sul target, l'accesso USB e lo staging con `sudo` restano
-Human Gate e non sono stati eseguiti dall'AI.
+Human Gate e non sono stati eseguiti dall'AI. Il disegno, l'implementazione e
+la closure offline D283 sono conservati, ma entrambi gli entrypoint live
+rifiutano ora fail-closed con
+`D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED`: la live PAM resta in
+standby finché l'evidenza D282/02 non è riesaminata.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -640,7 +686,27 @@ D282_01_PHASE_B_PHYSICAL_FINGER_POKA_YOKE=PASS_OFFLINE
 D282_01_CURRENT_LIVE_AUTHORIZATION_CREDENTIAL_REQUIRED=false
 D282_01_CURRENT_LIVE_GRANT_REQUIRED=false
 D282_01_FAILURE_EVIDENCE_CAPTURE_BEFORE_ROLLBACK=PASS_OFFLINE
-D283_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED
+D282_02_DECISION=REPLAN
+D282_02_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED
+D282_02_SECOND_VERIFY_POSITIONAL_OR_LIFECYCLE_EFFECT=UNRESOLVED
+D282_02_TELEMETRY_CHANGE_ONLY=true
+D282_02_ALGORITHM_CHANGE=false
+D282_02_PHYSICAL_FINGER=RIGHT_INDEX
+D282_02_VERIFY_TRIAL_COUNT=4
+D282_02_BLOCK_COUNT=2
+D282_02_TRIALS_PER_BLOCK=2
+D282_02_DAEMON_RESTART_COUNT=2
+D282_02_BIOMETRIC_ACTION_MAX=5
+D282_02_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=12
+D282_02_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D282_02_OFFLINE_CONTRACT_MATRIX=14/14_PASS
+D282_02_COMBINED_REGRESSION_MATRIX=95/95_PASS
+D282_02_CANDIDATE_BUILD=PASS_OFFLINE
+D282_02_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
+D282_02_OPERATOR_KIT=operator_kit/d282-02-matcher-order
+D282_02_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D282_02_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+D283_01_OUTCOME=READY_OFFLINE_STANDBY
 D283_01_D282_PREREQUISITE=PASS_LIVE_CLOSED
 D283_01_PAM_SERVICE=goodix-d283-01
 D283_01_PAM_MODULE=/usr/lib64/security/pam_fprintd.so
@@ -665,7 +731,8 @@ D283_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D283_01_TEMPLATE_INCLUDED_IN_EXPORT=false
 D283_01_OPERATOR_KIT=operator_kit/d283-01-pam-dedicated
 D283_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
-D283_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+D283_01_LIVE_READINESS=STANDBY_MATCHER_CHARACTERIZATION_REQUIRED
+D283_01_LIVE_ENTRYPOINT_FAIL_CLOSED=true
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -698,11 +765,15 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_D283_01_ONE_PAM_DEDICATED_TARGET_AUTHENTICATION
-NEXT_BOUNDARY_AFTER_D282_PASS=REACHED
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_D282_02_MATCHER_ORDER_REENTRY_CHARACTERIZATION
+NEXT_BOUNDARY_AFTER_D282_02_REVIEW=BALANCED_SAME_DIFFERENT_OR_LIFECYCLE_INVESTIGATION
 ```
 
 Report ed evidenze correnti:
+`analysis/D282/D282_02_replan_matcher_order_boundary.md`,
+`analysis/D282/D282_02_OFFLINE_RESULT.env`,
+`analysis/D282/d282_02_trial_audit.py`,
+`operator_kit/d282-02-matcher-order/`,
 `analysis/D283/D283_01_pam_dedicated_boundary.md`,
 `analysis/D283/D283_01_OFFLINE_RESULT.env`,
 `operator_kit/d283-01-pam-dedicated/`,

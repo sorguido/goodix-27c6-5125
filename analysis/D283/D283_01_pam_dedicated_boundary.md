@@ -2,10 +2,10 @@
 # D283/01 — servizio PAM dedicato, primo boundary target
 
 ```text
-OUTCOME=READY_OFFLINE_HUMAN_REQUIRED
+OUTCOME=READY_OFFLINE_STANDBY
 ADVANCEMENT=DEDICATED_PAM_CONFDIR_MAX_TRIES_1_OPERATOR_PATH
 EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_LIBPAM_AND_CANDIDATE_BUILD
-RESIDUAL_BLOCKER_OR_RISK=TARGET_PAM_AUTHENTICATION_UNPROVEN
+RESIDUAL_BLOCKER_OR_RISK=D282_02_MATCHER_ORDER_REENTRY_CHARACTERIZATION_REQUIRED_FIRST
 CANONICAL_DOCUMENTATION=GOODIX_TECHNICAL_MANUAL_UPDATED
 REVIEW_SET=GIT_NATIVE
 ```
@@ -50,4 +50,7 @@ SELinux, libreria e storage vengono verificati prima dello staging. Dopo il
 restart il mapping della candidate viene verificato una seconda volta.
 
 La live PAM target, l'uso di USB e lo staging privilegiato sono Human Gate.
-L'AI non li esegue.
+Una successiva Human Direction ha inoltre posto la live in standby fino al
+riesame D282/02 del possibile effetto ordine/re-entry: entrambi gli entrypoint
+live rifiutano fail-closed. Design, implementazione e closure offline restano
+preservati; l'AI non esegue la live.

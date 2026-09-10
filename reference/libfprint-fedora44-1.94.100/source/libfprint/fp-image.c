@@ -217,6 +217,7 @@ fp_image_detect_sigfm_thread_func (GTask        *task,
                                "SIGFM extraction failed: %d", result);
       return;
     }
+  g_message ("GOODIX_SIGFM_EXTRACT_AUDIT keypoints=%d", keypoints);
   if (g_task_return_error_if_cancelled (thread_task))
     {
       goodix_sigfm_sample_free (sample);

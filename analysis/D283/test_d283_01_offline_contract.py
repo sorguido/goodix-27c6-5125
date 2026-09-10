@@ -52,6 +52,10 @@ class D283OfflineContract(unittest.TestCase):
                       self.kit)
         self.assertNotIn("/etc/pam.d/login", self.kit)
         self.assertNotIn("/etc/pam.d/sudo", self.kit)
+        self.assertIn("d283_live_standby=true", self.kit)
+        self.assertEqual(
+            self.kit.count("D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED"),
+            2)
 
     def test_05_live_budget_is_two_actions_and_nine_contacts(self):
         self.assertIn("BIOMETRIC_ACTION_MAX=2", self.kit)

@@ -11,6 +11,7 @@ unset D282_LIBRARY_ONLY
 script_dir=$d282_script_dir
 
 live_result_prefix=D283_01
+d283_live_standby=true
 d283_critical=(libfprint-driver Rockytkg
   reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 analysis/D282 analysis/D283
@@ -103,6 +104,9 @@ run_d283_live () {
   local target_count epoch_count enroll_count verify_count cleanup_epoch_count
   local consumed_count attempts retry_count reopen_count reset_count clear_halt_count
   local persistent_count confirmation
+
+  [[ $d283_live_standby != true ]] ||
+    refuse D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED
 
   live_result=
   live_private=
@@ -424,6 +428,8 @@ export_d283_results () {
 operator_d283_run () {
   local rpm_dir=$1 user baseline transcript result output rc export_rc=1
   local confirmation
+  [[ $d283_live_standby != true ]] ||
+    refuse D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED
   [[ $EUID -ne 0 ]] || refuse OPERATOR_RUN_MUST_BE_UNPRIVILEGED
   command -v sudo >/dev/null || refuse HOST_TOOL_MISSING_sudo
   user=$(id -un) || refuse OPERATOR_USER_UNKNOWN
