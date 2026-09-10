@@ -10,6 +10,7 @@ real_usb_enumeration_attempted=false
 real_sensor_accessed=false
 live_execution_performed=false
 staging_probe_execution_performed=false
+staging_probe_mode=false
 grant_consumed=false
 target_preconsumption_match_count=UNSET
 d282_offline_work=
@@ -76,8 +77,10 @@ state_value () {
 
 cleanup_live () {
   local exit_status=$?
-  local rollback=true service_rollback=true staging_rollback=true
+  local rollback=true service_rollback=true service_state_restored=true
+  local staging_rollback=true
   local storage_rollback=true unit_rollback=true library_rollback=true
+  local recovery_required=false service_final_state=$live_service_before
   local unit_after= system_library_after=
 
   trap - EXIT INT TERM
@@ -133,9 +136,20 @@ cleanup_live () {
     [[ $system_library_after == "$live_system_library_before" ]] ||
       library_rollback=false
   fi
+  if [[ $staging_probe_mode == true ]]; then
+    service_final_state=$(systemctl is-active fprintd.service 2>/dev/null || true)
+    [[ $service_final_state == active || $service_final_state == inactive ]] ||
+      service_state_restored=false
+    [[ $service_final_state == "$live_service_before" ]] ||
+      service_state_restored=false
+  fi
   [[ $service_rollback == true && $staging_rollback == true &&
      $storage_rollback == true && $unit_rollback == true &&
      $library_rollback == true ]] || rollback=false
+  if [[ $staging_probe_mode == true && $service_state_restored != true ]]; then
+    rollback=false
+  fi
+  [[ $rollback == true ]] || recovery_required=true
   if [[ $rollback != true ]]; then
     sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ROLLBACK/' \
       "$live_result/summary.env"
@@ -146,7 +160,14 @@ cleanup_live () {
     sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=PASS_STAGING_PROBE/' \
       "$live_result/summary.env"
   fi
-  echo "SERVICE_STATE_RESTORED=$service_rollback" >>"$live_result/summary.env"
+  if [[ $staging_probe_mode == true ]]; then
+    echo "SERVICE_CLEANUP_COMMANDS_SUCCEEDED=$service_rollback" >>"$live_result/summary.env"
+    echo "SERVICE_STATE_RESTORED=$service_state_restored" >>"$live_result/summary.env"
+    echo "SERVICE_INITIAL_STATE=$live_service_before" >>"$live_result/summary.env"
+    echo "SERVICE_FINAL_STATE=$service_final_state" >>"$live_result/summary.env"
+  else
+    echo "SERVICE_STATE_RESTORED=$service_rollback" >>"$live_result/summary.env"
+  fi
   echo "STAGING_REMOVED=$staging_rollback" >>"$live_result/summary.env"
   echo "SYSTEM_LIBFPRINT_UNCHANGED=$library_rollback" >>"$live_result/summary.env"
   echo "RUN_RETURN_CODE=$live_run_return_code" >>"$live_result/summary.env"
@@ -158,6 +179,9 @@ cleanup_live () {
   echo "REAL_SENSOR_ACCESSED=$real_sensor_accessed" >>"$live_result/summary.env"
   echo "LIVE_EXECUTION_PERFORMED=$live_execution_performed" >>"$live_result/summary.env"
   echo "STAGING_PROBE_EXECUTION_PERFORMED=$staging_probe_execution_performed" >>"$live_result/summary.env"
+  if [[ $staging_probe_mode == true ]]; then
+    echo "RECOVERY_REQUIRED=$recovery_required" >>"$live_result/summary.env"
+  fi
   if [[ $rollback != true ]]; then
     echo "RECOVERY_REQUIRED=Non eseguire altre action; ripristinare fprintd e conservare private/." >&2
   fi
@@ -327,7 +351,7 @@ offline_preflight () {
   audit_staging_probe_candidate "$d282_offline_work/staging-probe"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=53
+  echo D282_01_TEST_MATRIX_COUNT=58
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
@@ -361,6 +385,14 @@ offline_preflight () {
   echo D282_01_PRIVILEGED_STAGING_PROBE_READY=true
   echo D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
   echo D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+  echo D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
+  echo MANUAL_PRESTOP_REQUIRED=false
+  echo PROBE_INITIAL_ACTIVE_ACCEPTED=true
+  echo PROBE_INITIAL_INACTIVE_ACCEPTED=true
+  echo ACTIVE_SUCCESS_FINAL_ACTIVE=PASS
+  echo ACTIVE_FAILURE_FINAL_ACTIVE=PASS
+  echo INACTIVE_SUCCESS_FINAL_INACTIVE=PASS
+  echo INACTIVE_FAILURE_FINAL_INACTIVE=PASS
   echo D282_01_STAGING_PROBE_OPERATION="$staging_probe_operation"
   echo D282_01_STAGING_PROBE_DRIVER=virtual_image
   echo D282_01_STAGING_PROBE_USB_CONTEXT_COMPILE_DISABLED=true
@@ -651,6 +683,7 @@ run_authorized_staging_probe () {
   real_sensor_accessed=false
   live_execution_performed=false
   staging_probe_execution_performed=false
+  staging_probe_mode=true
 
   [[ $EUID -eq 0 ]] || refuse STAGING_PROBE_REQUIRES_ROOT
   state="$candidate/d282-01-staging-probe-candidate.state"
@@ -697,8 +730,8 @@ run_authorized_staging_probe () {
   [[ ! -e $live_runtime && ! -e $live_owned && ! -e $live_dropin ]] ||
     refuse STAGING_COLLISION
   live_service_before=$(systemctl is-active fprintd.service 2>/dev/null || true)
-  [[ $live_service_before == inactive ]] ||
-    refuse STAGING_PROBE_FPRINTD_MUST_BE_INACTIVE
+  [[ $live_service_before == active || $live_service_before == inactive ]] ||
+    refuse STAGING_PROBE_FPRINTD_INITIAL_STATE_UNSAFE
   [[ -d $live_storage_root ]] && live_storage_existed=true
   live_system_library=$(readlink -f /usr/lib64/libfprint-2.so.2) ||
     refuse SYSTEM_LIBFPRINT_MISSING
@@ -758,6 +791,9 @@ run_authorized_staging_probe () {
     staging-probe
   chmod 0600 "$live_dropin"
   live_service_touched=true
+  if [[ $live_service_before == active ]]; then
+    systemctl stop fprintd.service
+  fi
   systemctl daemon-reload
   staging_probe_execution_performed=true
   systemctl start fprintd.service
@@ -889,6 +925,7 @@ run_authorized_live () {
   live_run_return_code=1
   real_sensor_accessed=false
   staging_probe_execution_performed=false
+  staging_probe_mode=false
   [[ $EUID -eq 0 ]] || refuse LIVE_REQUIRES_ROOT
   state="$candidate/d282-01-candidate.state"
   [[ $candidate == /tmp/goodix-d282-01-candidate.* && -f $state && ! -L $candidate ]] || refuse CANDIDATE_INVALID

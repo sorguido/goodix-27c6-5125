@@ -31,6 +31,14 @@ SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 D282_01_PRIVILEGED_STAGING_PROBE_READY=true
 D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
 D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
+MANUAL_PRESTOP_REQUIRED=false
+PROBE_INITIAL_ACTIVE_ACCEPTED=true
+PROBE_INITIAL_INACTIVE_ACCEPTED=true
+ACTIVE_SUCCESS_FINAL_ACTIVE=PASS
+ACTIVE_FAILURE_FINAL_ACTIVE=PASS
+INACTIVE_SUCCESS_FINAL_INACTIVE=PASS
+INACTIVE_FAILURE_FINAL_INACTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
@@ -170,8 +178,9 @@ Il probe riusa il meccanismo production-shaped che interessa il blocker:
 vero systemd, `ExecStart=/usr/libexec/fprintd`, drop-in sotto
 `/run/systemd/system`, `LD_LIBRARY_PATH` verso il runtime candidato,
 `StateDirectory` isolato sotto `/var/lib/fprint`, label SELinux e lo stesso
-`cleanup_live()` top-level. Richiede SELinux `Enforcing`, servizio inizialmente
-`inactive`, verifica `ExecMainStatus=0`, `/proc/<pid>/exe`, l'unico path
+`cleanup_live()` top-level. Richiede SELinux `Enforcing`, accetta e registra
+prima del consumo lo stato servizio `active` oppure `inactive`, verifica
+`ExecMainStatus=0`, `/proc/<pid>/exe`, l'unico path
 libfprint mappato in `/proc/<pid>/maps`, le variabili effettive in
 `/proc/<pid>/environ`, hash della libreria di sistema, inventario storage e
 rollback completo.
@@ -204,9 +213,20 @@ lega l'identità dell'operatore ma non viene passato ad alcuna azione
 biometrica. Operation e grant ID probe sono diversi da quelli live: un grant
 probe è respinto dalla modalità live e viceversa. Tutti i gate fallibili
 (baseline/manifest/artefatti, audit USB/Goodix, ABI, grant, collisioni,
-servizio inattivo, libreria/hash, SELinux Enforcing, result sink, snapshot
-unit e inventario storage) precedono il claim atomico. Dopo il consumo ogni
-failure attraversa il rollback e resta `RETRY_AUTHORIZED=false`.
+stato servizio `active|inactive`, libreria/hash, SELinux Enforcing, result
+sink, snapshot unit e inventario storage) precedono il claim atomico. Dopo il
+consumo ogni failure attraversa il rollback e resta `RETRY_AUTHORIZED=false`.
+
+Non è richiesto alcun pre-stop manuale. Se lo stato iniziale è `active`, solo
+dopo il consumo il launcher ferma internamente fprintd, ricarica systemd e
+avvia l'istanza staged; se è `inactive`, salta il primo stop e avvia
+direttamente l'istanza staged dopo il daemon-reload. Il cleanup ferma sempre
+l'istanza staged, rimuove drop-in/runtime/storage, ricarica systemd e riavvia
+il daemon normale soltanto nel caso iniziale `active`. Infine rilegge lo stato
+reale e richiede uguaglianza esatta con quello iniziale. Il summary contiene
+`SERVICE_INITIAL_STATE`, `SERVICE_FINAL_STATE` e
+`SERVICE_STATE_RESTORED`; una divergenza rende `ROLLBACK_COMPLETE=false` e
+`RECOVERY_REQUIRED=true`.
 
 ## Prerequisiti e comandi offline
 

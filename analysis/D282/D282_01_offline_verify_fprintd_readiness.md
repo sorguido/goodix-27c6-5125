@@ -5,7 +5,7 @@
 
 ```text
 OUTCOME=PRIVILEGED_STAGING_PROBE_READY_NOT_EXECUTED
-ADVANCEMENT=USB_DISABLED_VIRTUAL_ONLY_SYSTEMD_SELINUX_STAGING_PROBE_IMPLEMENTED
+ADVANCEMENT=USB_DISABLED_VIRTUAL_ONLY_SYSTEMD_SELINUX_STAGING_PROBE_WITH_EXACT_SERVICE_STATE_RESTORE
 EXECUTABLE_CLOSURE=PASS_OFFLINE_BUILD_ABI_AUDIT_SYSTEMD_PARSER_AND_REAL_BASH_TRAP_RUNTIME_START_NOT_RUN
 RESIDUAL_BLOCKER_OR_RISK=REAL_SYSTEMD_FPRINTD_START_WITH_SELINUX_ENFORCING_REQUIRES_SEPARATE_PRIVILEGED_HOST_ONLY_AUTHORIZATION
 CANONICAL_DOCUMENTATION=UPDATED
@@ -201,11 +201,21 @@ storage, service e runtime rollback.
 La separazione autorizzativa è fail-closed: candidate state, operation e grant
 ID probe sono distinti da quelli live; `validate_grant()` riceve l'operation
 attesa dal singolo mode. Un grant probe non può quindi passare il launcher
-live. Audit candidate, ABI, grant, collisioni, servizio obbligatoriamente
-inattivo, system lib/hash, SELinux obbligatoriamente Enforcing, result sink,
+live. Audit candidate, ABI, grant, collisioni, stato servizio obbligatoriamente
+`active` o `inactive`, system lib/hash, SELinux obbligatoriamente Enforcing, result sink,
 snapshot unit e inventario storage precedono il claim atomico. Il riuso dello
 stesso ID è respinto; dopo il consumo ogni failure attraversa
 `cleanup_live()` con `RETRY_AUTHORIZED=false`.
+
+Non serve un pre-stop manuale, che perderebbe lo stato reale da ripristinare.
+Il launcher registra lo stato prima del consumo. Dopo il consumo ferma
+internamente fprintd solo se era `active`, quindi ricarica systemd e avvia il
+daemon staged. Il cleanup ferma quest'ultimo, rimuove tutti gli oggetti D282,
+ricarica systemd e riavvia il daemon normale solo se lo stato iniziale era
+`active`. Una lettura finale deve coincidere esattamente con quella iniziale;
+il summary registra `SERVICE_INITIAL_STATE`, `SERVICE_FINAL_STATE` e
+`SERVICE_STATE_RESTORED`. Ogni mismatch forza `ROLLBACK_COMPLETE=false` e
+`RECOVERY_REQUIRED=true`.
 
 La garanzia di non raggiungibilità del target combina quattro fence
 indipendenti: nessun driver Goodix nel registry/binario, nessuna creazione o
@@ -277,10 +287,15 @@ LIVE_EXECUTION_PERFORMED=false
 | 51 | storage probe isolato e preesistente preservato | inventario + cleanup audit | PASS |
 | 52 | system lib mai sostituita e ri-hashata | audit launcher | PASS |
 | 53 | nessun PAM/biometria/Goodix/TLS/PSK richiamabile | structural reachability audit | PASS |
+| 54 | stato iniziale active/inactive accettato pre-consumo | audit launcher | PASS |
+| 55 | active: successo e failure tornano active | vero `cleanup_live()` in sottoprocesso | PASS |
+| 56 | inactive: successo e failure restano inactive | vero `cleanup_live()` in sottoprocesso | PASS |
+| 57 | stop active interno solo dopo il consumo | audit ordine launcher | PASS |
+| 58 | mismatch finale forza rollback failure e recovery | vero `cleanup_live()` in sottoprocesso | PASS |
 
 Esecuzioni di closure:
 
-- `analysis.D282.test_d282_01_offline_contract`: **53/53 PASS**;
+- `analysis.D282.test_d282_01_offline_contract`: **58/58 PASS**;
 - `analysis.D281.test_d281_01_fprintd_storage_integration`: **6/6 PASS**;
 - integrazione D281 con vero daemon/client, bus privato e USB compile-disabled:
   **PASS**;
@@ -340,6 +355,14 @@ D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_T
 D282_01_PRIVILEGED_STAGING_PROBE_READY=true
 D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
 D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
+MANUAL_PRESTOP_REQUIRED=false
+PROBE_INITIAL_ACTIVE_ACCEPTED=true
+PROBE_INITIAL_INACTIVE_ACCEPTED=true
+ACTIVE_SUCCESS_FINAL_ACTIVE=PASS
+ACTIVE_FAILURE_FINAL_ACTIVE=PASS
+INACTIVE_SUCCESS_FINAL_INACTIVE=PASS
+INACTIVE_FAILURE_FINAL_INACTIVE=PASS
 FPRINTD_SYSTEMD_STAGING_START=NOT_RUN
 SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 D282_01_HUMAN_GATE_READINESS=NOT_READY

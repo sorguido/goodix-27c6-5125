@@ -554,7 +554,7 @@ class D282OfflineContract(unittest.TestCase):
                 'audit_staging_probe_candidate "$candidate"',
                 'validate_grant "$grant" "$baseline" "$expected_id"',
                 "refuse STAGING_COLLISION",
-                "refuse STAGING_PROBE_FPRINTD_MUST_BE_INACTIVE",
+                "refuse STAGING_PROBE_FPRINTD_INITIAL_STATE_UNSAFE",
                 "refuse SYSTEM_LIBFPRINT_MISSING",
                 "refuse STAGING_PROBE_SELINUX_NOT_ENFORCING",
                 "refuse UNIT_SNAPSHOT_FAILED",
@@ -690,6 +690,134 @@ class D282OfflineContract(unittest.TestCase):
                 "LIVE_EXECUTION_PERFORMED=false",
                 "PAM_IN_SCOPE=false"):
             self.assertIn(marker, probe)
+
+    def test_54_probe_accepts_active_and_inactive_initial_service_state(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        accepted = (
+            '[[ $live_service_before == active || '
+            '$live_service_before == inactive ]]')
+        self.assertIn(accepted, probe)
+        self.assertNotIn("STAGING_PROBE_FPRINTD_MUST_BE_INACTIVE", probe)
+        self.assertIn("STAGING_PROBE_FPRINTD_INITIAL_STATE_UNSAFE", probe)
+        self.assertLess(probe.index("live_service_before=$(systemctl is-active"),
+                        probe.index('consume_validated_grant "$grant"'))
+
+    def test_55_active_probe_success_and_failure_restore_active(self):
+        for action_outcome in ("success", "failure"):
+            summary = self._exercise_real_cleanup("active", action_outcome)
+            self.assertIn("SERVICE_INITIAL_STATE=active", summary)
+            self.assertIn("SERVICE_FINAL_STATE=active", summary)
+            self.assertIn("SERVICE_STATE_RESTORED=true", summary)
+            self.assertIn("ROLLBACK_COMPLETE=true", summary)
+            self.assertIn("RECOVERY_REQUIRED=false", summary)
+
+    def test_56_inactive_probe_success_and_failure_restore_inactive(self):
+        for action_outcome in ("success", "failure"):
+            summary = self._exercise_real_cleanup("inactive", action_outcome)
+            self.assertIn("SERVICE_INITIAL_STATE=inactive", summary)
+            self.assertIn("SERVICE_FINAL_STATE=inactive", summary)
+            self.assertIn("SERVICE_STATE_RESTORED=true", summary)
+            self.assertIn("ROLLBACK_COMPLETE=true", summary)
+            self.assertIn("RECOVERY_REQUIRED=false", summary)
+
+    def test_57_probe_stops_active_service_only_after_consumption(self):
+        probe = function_slice(
+            self.kit, "run_authorized_staging_probe ()",
+            "run_authorized_live ()")
+        consume = probe.index('consume_validated_grant "$grant"')
+        conditional_stop = probe.index(
+            'if [[ $live_service_before == active ]]; then')
+        self.assertLess(consume, conditional_stop)
+        self.assertLess(conditional_stop,
+                        probe.index("systemctl daemon-reload", conditional_stop))
+        self.assertIn("systemctl stop fprintd.service", probe[conditional_stop:])
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        self.assertIn('service_final_state=$(systemctl is-active', cleanup)
+        self.assertIn(
+            '[[ $service_final_state == "$live_service_before" ]]', cleanup)
+        self.assertIn('echo "RECOVERY_REQUIRED=$recovery_required"', cleanup)
+
+    def test_58_service_restore_mismatch_fails_rollback(self):
+        summary = self._exercise_real_cleanup("active", "restore-mismatch")
+        self.assertIn("SERVICE_INITIAL_STATE=active", summary)
+        self.assertIn("SERVICE_FINAL_STATE=inactive", summary)
+        self.assertIn("SERVICE_STATE_RESTORED=false", summary)
+        self.assertIn("ROLLBACK_COMPLETE=false", summary)
+        self.assertIn("RECOVERY_REQUIRED=true", summary)
+        self.assertIn("D282_01_RESULT=FAIL_ROLLBACK", summary)
+
+    def _exercise_real_cleanup(self, initial_state, action_outcome):
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        with tempfile.TemporaryDirectory(
+                prefix="goodix-d282-service-cleanup.", dir="/tmp") as td:
+            shell = "set -u\n" + cleanup + r'''
+systemctl () {
+  local action=$1 state
+  case $action in
+    stop) printf 'inactive\n' >"$service_state_file" ;;
+    start)
+      if [[ $force_restore_mismatch != true ]]; then
+        printf 'active\n' >"$service_state_file"
+      fi
+      ;;
+    daemon-reload) return 0 ;;
+    is-active)
+      state=$(cat "$service_state_file")
+      printf '%s\n' "$state"
+      [[ $state == active ]]
+      ;;
+    *) return 1 ;;
+  esac
+}
+work=$1
+live_service_before=$2
+action_outcome=$3
+force_restore_mismatch=false
+[[ $action_outcome != restore-mismatch ]] || force_restore_mismatch=true
+service_state_file="$work/service.state"
+printf '%s\n' "$live_service_before" >"$service_state_file"
+live_result="$work/result"
+live_private="$live_result/private"
+live_runtime="$work/runtime"
+live_storage_root="$work/storage"
+live_owned="$live_storage_root/.goodix-d282-01-test"
+live_dropin="$work/systemd/fprintd.service.d/90-goodix-d282-01.conf"
+mkdir -p "$live_private" "$live_runtime" "$live_owned" "$(dirname "$live_dropin")"
+printf '[Service]\n' >"$live_dropin"
+printf 'D282_01_RESULT=PASS_STAGING_PROBE_PENDING_ROLLBACK\n' >"$live_result/summary.env"
+live_cleanup_armed=true
+live_cleanup_test_mode=true
+live_service_touched=true
+live_staging_started=true
+live_storage_existed=true
+live_before_inventory_ready=false
+live_unit_before_ready=false
+live_system_library_before_ready=false
+live_run_return_code=0
+grant_consumed=true
+real_usb_enumeration_attempted=false
+real_sensor_accessed=false
+live_execution_performed=false
+staging_probe_execution_performed=true
+staging_probe_mode=true
+if [[ $action_outcome == failure ]]; then
+  false
+  cleanup_live
+else
+  true
+  cleanup_live
+fi
+cat "$live_result/summary.env"
+'''
+            result = subprocess.run(
+                ["bash", "-c", shell, "d282-service-cleanup", td,
+                 initial_state, action_outcome],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0,
+                             result.stdout + result.stderr)
+            return result.stdout
 
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
         live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")

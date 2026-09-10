@@ -232,14 +232,24 @@ anche zero fd `/dev/bus/usb`. Goodix, TLS, PSK, PAM e azioni biometriche non
 sono raggiungibili da questo mode.
 
 Il grant probe è one-shot e separato per operation e ID; non può validare la
-modalità live. Tutti i gate host fallibili, inclusi servizio inizialmente
-inattivo, SELinux obbligatoriamente Enforcing, snapshot unit e inventario
-storage, precedono il claim atomico. Dopo il consumo un failure attraversa il
-medesimo `cleanup_live()` top-level e non autorizza retry. Il successo runtime
-dovrà provare start/ExecMainStatus, exe/maps/environment, hash system lib,
-storage vuoto e rollback completo.
+modalità live. Tutti i gate host fallibili, inclusi lettura e validazione dello
+stato servizio `active|inactive`, SELinux obbligatoriamente Enforcing, snapshot
+unit e inventario storage, precedono il claim atomico. Non è richiesto né
+ammesso un pre-stop manuale: cancellerebbe l'informazione sullo stato reale da
+ripristinare. Dopo il consumo il launcher ferma internamente fprintd solo se
+era `active`, quindi ricarica systemd e avvia il daemon staged.
 
-La matrice D282 è 53/53; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+Il medesimo `cleanup_live()` top-level gestisce successo e failure: ferma il
+daemon staged, rimuove drop-in/runtime/storage, ricarica systemd e riavvia il
+daemon normale soltanto se inizialmente `active`. Rilegge poi lo stato reale e
+lo confronta con quello iniziale. Il summary espone `SERVICE_INITIAL_STATE`,
+`SERVICE_FINAL_STATE` e `SERVICE_STATE_RESTORED`; una divergenza forza
+`ROLLBACK_COMPLETE=false` e `RECOVERY_REQUIRED=true`. I quattro casi
+active/inactive × successo/failure attraversano il vero cleanup in
+sottoprocessi Bash e preservano lo stato; una regressione aggiuntiva prova il
+fail-closed sul mismatch.
+
+La matrice D282 è 58/58; regressioni D281 6/6 e daemon/D-Bus privato PASS;
 suite D278/D279/D280/D282 27/27 normal e 27/27 ASan/UBSan; build Fedora/SIGFM,
 registry e ABI fprintd PASS. La candidate probe virtual-only è stata costruita
 e auditata realmente offline. I due profili drop-in sono generati dal vero
@@ -339,7 +349,7 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=53/53_PASS
+D282_01_REQUIRED_MATRIX=58/58_PASS
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
@@ -361,6 +371,14 @@ D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_T
 D282_01_PRIVILEGED_STAGING_PROBE_READY=true
 D282_01_PRIVILEGED_STAGING_PROBE_EXECUTED=false
 D282_01_PRIVILEGED_STAGING_PROBE_AUTHORIZED=false
+D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
+MANUAL_PRESTOP_REQUIRED=false
+PROBE_INITIAL_ACTIVE_ACCEPTED=true
+PROBE_INITIAL_INACTIVE_ACCEPTED=true
+ACTIVE_SUCCESS_FINAL_ACTIVE=PASS
+ACTIVE_FAILURE_FINAL_ACTIVE=PASS
+INACTIVE_SUCCESS_FINAL_INACTIVE=PASS
+INACTIVE_FAILURE_FINAL_INACTIVE=PASS
 D282_01_STAGING_PROBE_OPERATION=D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE
 D282_01_STAGING_PROBE_DRIVER=virtual_image
 D282_01_STAGING_PROBE_USB_CONTEXT_COMPILE_DISABLED=true
