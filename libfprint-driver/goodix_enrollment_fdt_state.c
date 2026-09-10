@@ -46,25 +46,6 @@ fail (GoodixEnrollmentFdtState *state,
   return FALSE;
 }
 
-static gboolean
-derive (const guint8 raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
-        gboolean     up,
-        guint8       table[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH])
-{
-  for (guint i = 0; i < 6u; i++)
-    {
-      guint16 word = (guint16) raw[i * 2u] |
-                     ((guint16) raw[i * 2u + 1u] << 8);
-      guint value = (guint) (word >> 1) + (up ? 0x1du : 0u);
-
-      if (value > G_MAXUINT8)
-        return FALSE;
-      table[i * 2u] = 0x80;
-      table[i * 2u + 1u] = (guint8) value;
-    }
-  return TRUE;
-}
-
 GoodixEnrollmentFdtState *
 goodix_enrollment_fdt_state_new (GoodixEnrollmentFdtStateAudit *audit)
 {
@@ -89,6 +70,7 @@ gboolean
 goodix_enrollment_fdt_state_observe_irq2 (
   GoodixEnrollmentFdtState *state,
   guint                     stage_index,
+  guint16                   touch_flags,
   const guint8              raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
   GError                  **error)
 {
@@ -98,9 +80,10 @@ goodix_enrollment_fdt_state_observe_irq2 (
   if (state->failed || stage_index != state->current_stage + 1u)
     return fail (state, GOODIX_ENROLLMENT_FDT_ERROR_ORDER,
                  "IRQ2 FDT stage is stale or non-consecutive", error);
-  if (!derive (raw, TRUE, state->up_table))
+  if (!goodix_fdt_derive_up_table (raw, touch_flags, 0x1du,
+                                   state->up_table))
     return fail (state, GOODIX_ENROLLMENT_FDT_ERROR_RANGE,
-                 "IRQ2 up-table derivation exceeds byte range", error);
+                 "IRQ2 flags or up-table material are invalid", error);
   state->current_stage = stage_index;
   state->up_stage = stage_index;
   state->audit->irq2_up_derivation_count++;
@@ -111,6 +94,7 @@ gboolean
 goodix_enrollment_fdt_state_observe_irq0200 (
   GoodixEnrollmentFdtState *state,
   guint                     stage_index,
+  guint16                   touch_flags,
   const guint8              raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
   GError                  **error)
 {
@@ -121,9 +105,9 @@ goodix_enrollment_fdt_state_observe_irq0200 (
       state->up_stage != stage_index || state->down_stage >= stage_index)
     return fail (state, GOODIX_ENROLLMENT_FDT_ERROR_ORDER,
                  "IRQ0200 FDT stage is stale or out of order", error);
-  if (!derive (raw, FALSE, state->down_table))
+  if (!goodix_fdt_derive_down_table (raw, touch_flags, state->down_table))
     return fail (state, GOODIX_ENROLLMENT_FDT_ERROR_RANGE,
-                 "IRQ0200 down-table derivation exceeds byte range", error);
+                 "IRQ0200 flags or down-table material are invalid", error);
   state->down_stage = stage_index;
   state->audit->irq0200_down_derivation_count++;
   return TRUE;

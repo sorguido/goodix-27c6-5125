@@ -3,10 +3,12 @@
 
 ## Stato e scopo
 
-La prima run autorizzata sul full SHA
-`1afe72e4d875daa60319cbbfb55d19a1e151de86` si è arrestata fail-closed
-dopo 2/8 stage; il grant è consumato e non è autorizzato alcun retry. Questa
-versione è il correttivo offline del boundary di contatto e richiede un nuovo
+Le tre run D279/57 autorizzate sui full SHA `1afe72e4...`, `d94c7af1...` e
+`4de9c342...` si sono arrestate fail-closed; tutti i grant sono consumati e
+non è autorizzato alcun retry. Le ultime due hanno esposto la stessa root
+cause di modellazione flags: prima IRQ0100 autentico `0x003f`, poi IRQ2
+`0x002f`, erano confrontati con magic constants. Questa versione include il
+corrective completo D279/59 oltre al boundary di contatto e richiede un nuovo
 full SHA e una nuova autorizzazione prima di qualsiasi action live.
 
 Il kit prepara una sola action enrollment sul Goodix USB `27c6:5125` per
@@ -27,6 +29,12 @@ composizione minima necessaria a isolare il boundary USB: D279/56 ha infatti
 classificato come distinti tutti i primi otto sample ATTEMPT02. La policy
 dinamica completa resta fuori scope finché il terminale anticipato APP12509
 non è provato.
+
+I flags IRQ di contatto sono ora validati come bitfield canale FDT: soltanto
+un sottoinsieme nonzero dei sei bit `0x003f` è ammesso, i bit riservati sono
+rifiutati e il sottoinsieme entra nella derivazione FDT-up. Bootstrap e
+finger-up richiedono ancora zero esatto. Questo non è un wildcard o un
+rilassamento generico.
 
 ## Invarianti
 
@@ -66,7 +74,8 @@ fprintd/PAM, installazione di sistema o convergenza dinamica.
 - materiale production già presente nel layout protetto
   `/var/lib/goodix-5125-poc`;
 - nessun `fprintd` concorrente;
-- approvazione one-shot dello SHA e dell'operazione D279/57.
+- nuova approvazione one-shot dello SHA e dell'operazione D279/57; nessuno dei
+  tre grant precedenti è riutilizzabile.
 
 L'AI non esegue `sudo`, non accede al materiale protetto e non avvia la run.
 
@@ -78,7 +87,10 @@ Prima del Human Gate è consentito soltanto:
 ./operator_kit/d279-57-stage8-early-terminal/run-d279-57.sh --offline-preflight
 ```
 
-Il comando scarica gli RPM OpenCV hash-pinned, compila in `/tmp` la libreria
+Il comando ricostruisce inoltre il corpus metadata-only hash-gated dei 65 IRQ
+ATTEMPT02, esegue il test C indipendente della policy e verifica che parser,
+FDT state e build production siano collegati al modulo canonico. Scarica poi
+gli RPM OpenCV hash-pinned, compila in `/tmp` la libreria
 production SIGFM e il client con baseline `UNAPPROVED_FOR_LIVE`, verifica che
 le seam di test non siano esportate e prova il rifiuto prima della creazione
 di `FpContext`. Non enumera né apre USB.

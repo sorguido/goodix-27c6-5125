@@ -80,7 +80,7 @@ observe_empty (GoodixEnrollmentLifecycleAdapter *adapter,
   g_autoptr(GError) error = NULL;
 
   g_assert_true (goodix_enrollment_lifecycle_adapter_observe (
-    adapter, event, NULL, 0u, NULL, 0u, &error));
+    adapter, event, NULL, 0u, NULL, 0u, 0u, &error));
   g_assert_no_error (error);
 }
 
@@ -93,7 +93,7 @@ observe_fdt (GoodixEnrollmentLifecycleAdapter *adapter,
 
   g_assert_true (goodix_enrollment_lifecycle_adapter_observe (
     adapter, event, NULL, 0u, raw, GOODIX_ENROLLMENT_FDT_TABLE_LENGTH,
-    &error));
+    event == GOODIX_ENROLLMENT_EVENT_IRQ2 ? 0x003fu : 0x0000u, &error));
   g_assert_no_error (error);
 }
 
@@ -108,7 +108,7 @@ observe_primary (GoodixEnrollmentLifecycleAdapter *adapter,
     samples[i] = (uint16_t) ((i + stage * 71u) & GOODIX_SENSOR_SAMPLE_MAX);
   g_assert_true (goodix_enrollment_lifecycle_adapter_observe (
     adapter, GOODIX_ENROLLMENT_EVENT_PRIMARY_B0, samples,
-    G_N_ELEMENTS (samples), NULL, 0u, &error));
+    G_N_ELEMENTS (samples), NULL, 0u, 0u, &error));
   g_assert_no_error (error);
 }
 
@@ -332,7 +332,7 @@ test_observe_with_pending_command_fails_closed (void)
   g_assert_true (goodix_enrollment_lifecycle_adapter_prepare (
     adapter, &prepared, &error));
   g_assert_false (goodix_enrollment_lifecycle_adapter_observe (
-    adapter, GOODIX_ENROLLMENT_EVENT_ACK_22, NULL, 0u, NULL, 0u, &error));
+    adapter, GOODIX_ENROLLMENT_EVENT_ACK_22, NULL, 0u, NULL, 0u, 0u, &error));
   g_assert_nonnull (error);
   g_assert_true (goodix_enrollment_lifecycle_adapter_is_failed (adapter));
   g_assert_cmpuint (audit.plan.committed_command_count, ==, 0u);

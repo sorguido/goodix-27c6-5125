@@ -186,7 +186,8 @@ static gboolean
 parse_irq (const GoodixA0Message *message,
            guint8                 expected_control,
            guint16                expected_irq,
-           guint16                expected_flags,
+           GoodixFdtFlagsContext  flags_context,
+           guint16               *touch_flags,
            const guint8         **raw)
 {
   const guint8 *body;
@@ -201,8 +202,10 @@ parse_irq (const GoodixA0Message *message,
     return FALSE;
   irq = (guint16) ((guint16) body[0] | ((guint16) body[1] << 8));
   flags = (guint16) ((guint16) body[2] | ((guint16) body[3] << 8));
-  if (irq != expected_irq || flags != expected_flags)
+  if (irq != expected_irq ||
+      !goodix_fdt_irq_flags_valid (flags_context, flags))
     return FALSE;
+  *touch_flags = flags;
   *raw = body + 4u;
   return TRUE;
 }
@@ -247,6 +250,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
   gsize frame_length;
   gsize body_length;
   guint8 echo = 0u;
+  guint16 touch_flags = 0u;
   gboolean accepted = FALSE;
   gboolean frame_matches_expected = FALSE;
 
@@ -265,7 +269,7 @@ goodix_enrollment_post_tls_events_handle_a0 (
                             "OEM NAV no-check frame mismatch", error);
       frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
-        events->lifecycle, expected, NULL, 0u, NULL, 0u, error);
+        events->lifecycle, expected, NULL, 0u, NULL, 0u, 0u, error);
       if (accepted)
         {
           events->audit->parsed_a0_count++;
@@ -289,16 +293,17 @@ goodix_enrollment_post_tls_events_handle_a0 (
         goto out;
       frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
-        events->lifecycle, expected, NULL, 0u, NULL, 0u, error);
+        events->lifecycle, expected, NULL, 0u, NULL, 0u, 0u, error);
       if (accepted)
         events->audit->ack_count++;
     }
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ2 &&
-           parse_irq (&message, 0x32, 0x0002, 0x003f, &raw))
+           parse_irq (&message, 0x32, 0x0002,
+                      GOODIX_FDT_FLAGS_FINGER_DOWN, &touch_flags, &raw))
     {
       frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
-        events->lifecycle, expected, NULL, 0u, raw, 12u, error);
+        events->lifecycle, expected, NULL, 0u, raw, 12u, touch_flags, error);
       if (accepted)
         {
           events->audit->irq2_count++;
@@ -311,20 +316,22 @@ goodix_enrollment_post_tls_events_handle_a0 (
         }
     }
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0100 &&
-           parse_irq (&message, 0x36, 0x0100, 0x003f, &raw))
+           parse_irq (&message, 0x36, 0x0100,
+                      GOODIX_FDT_FLAGS_CONTACT_SAMPLE, &touch_flags, &raw))
     {
       frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
-        events->lifecycle, expected, NULL, 0u, NULL, 0u, error);
+        events->lifecycle, expected, NULL, 0u, NULL, 0u, 0u, error);
       if (accepted)
         events->audit->irq0100_count++;
     }
   else if (expected == GOODIX_ENROLLMENT_EVENT_IRQ0200 &&
-           parse_irq (&message, 0x34, 0x0200, 0x0000, &raw))
+           parse_irq (&message, 0x34, 0x0200,
+                      GOODIX_FDT_FLAGS_FINGER_UP, &touch_flags, &raw))
     {
       frame_matches_expected = TRUE;
       accepted = goodix_enrollment_lifecycle_adapter_observe (
-        events->lifecycle, expected, NULL, 0u, raw, 12u, error);
+        events->lifecycle, expected, NULL, 0u, raw, 12u, touch_flags, error);
       if (accepted)
         {
           events->audit->irq0200_count++;
@@ -379,7 +386,7 @@ goodix_enrollment_post_tls_events_handle_primary_samples (
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, GOODIX_ENROLLMENT_EVENT_PRIMARY_B0,
-        samples, sample_count, NULL, 0u, error))
+        samples, sample_count, NULL, 0u, 0u, error))
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
                         "primary B0 samples are unexpected", error);
   events->audit->primary_b0_count++;
@@ -396,7 +403,7 @@ goodix_enrollment_post_tls_events_handle_auxiliary_b0 (
                         "post-TLS event adapter is absent or terminal", error);
   if (!goodix_enrollment_lifecycle_adapter_observe (
         events->lifecycle, GOODIX_ENROLLMENT_EVENT_AUXILIARY_B0,
-        NULL, 0u, NULL, 0u, error))
+        NULL, 0u, NULL, 0u, 0u, error))
     return events_fail (events, GOODIX_ENROLLMENT_POST_TLS_ERROR_EVENT,
                         "auxiliary B0 is unexpected", error);
   events->audit->auxiliary_b0_count++;

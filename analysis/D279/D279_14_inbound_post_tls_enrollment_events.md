@@ -8,8 +8,10 @@ già decifrati all'adapter iterativo, senza introdurre alcun percorso outbound.
 Il binding è guidato dall'evento atteso e accetta soltanto:
 
 - ACK B0 con echo esatto e status `0x01`;
-- IRQ2 come control `0x32`, IRQ `0x0002`, flags `0x003f`;
-- IRQ0100 come control `0x36`, IRQ `0x0100`, flags `0x003f`;
+- IRQ2 come control `0x32`, IRQ `0x0002`, flags nonzero limitati ai sei bit
+  canale FDT `0x003f`;
+- IRQ0100 enrollment come control `0x36`, IRQ `0x0100`, flags nonzero
+  limitati agli stessi sei bit canale;
 - IRQ0200 come control `0x34`, IRQ `0x0200`, flags zero;
 - NAV con la forma OEM no-check target-observed 2417/2410, control esatto
   `0x50`, prefisso body `0x50 0x01` e marker finale `0x88`.
@@ -18,6 +20,15 @@ Il raster primario già decodificato e l'osservazione del B0 ausiliario opaco
 entrano tramite API separate. Il B0 ausiliario resta protocol-internal nel
 modello iniziale, senza alcuna conclusione sul suo possibile ruolo in quality,
 template o NBIS.
+
+La formulazione originale di questo report richiedeva `0x003f` esatto per
+IRQ2 e `0x0000` per IRQ0100. D279/58 corresse soltanto IRQ0100 a `0x003f`;
+l'audit completo D279/59 ha poi dimostrato che entrambe erano istanze della
+stessa modellazione errata. `0x003f` significa sei canali attivi, mentre la
+live D279/57 su `4de9c342...` ha osservato il sottoinsieme valido `0x002f` al
+re-arm. La semantica corrente è centralizzata in
+`goodix_fdt_irq_policy.[ch]`; i bit alti, zero in un contesto di contatto e
+qualunque control/IRQ discordante restano terminali fail-closed.
 
 ```text
 OUTCOME=READY_OFFLINE_INBOUND_POST_TLS_EVENT_BINDING
@@ -35,8 +46,10 @@ REAL_USB_SUBMIT=0
 La regressione sintetizza frame A0 semanticamente equivalenti, percorre
 l'intero lifecycle per 2, 3 e 21 stage e verifica i conteggi target-local:
 125 ACK, 21 IRQ2, 20 IRQ0100, 21 IRQ0200, un NAV, 21 B0 primari e 21 B0
-ausiliari. Echo errato e flags IRQ errati falliscono chiuso. Test normal e
-ASan/UBSan passano; il sorgente inbound non dipende da builder, fixed64,
+ausiliari. Echo errato, control/IRQ errati, flag zero durante il contatto e
+bit riservati falliscono chiuso. Il corpus metadata-only D279/59 aggiunge la
+sequenza autentica completa ATTEMPT02 e la variante live `0x002f`. Test normal
+e ASan/UBSan passano; il sorgente inbound non dipende da builder, fixed64,
 backend o submit.
 
 ```text

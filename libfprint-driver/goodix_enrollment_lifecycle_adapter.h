@@ -47,9 +47,9 @@ GoodixEnrollmentLifecycleAdapter *goodix_enrollment_lifecycle_adapter_new (
 void goodix_enrollment_lifecycle_adapter_free (
   GoodixEnrollmentLifecycleAdapter *adapter);
 
-/* Observations are host-side inputs only.  IRQ2/IRQ0200 require exactly the
- * 12-byte FDT source; PRIMARY_B0 requires only canonical raster samples; all
- * other observations reject both payloads. */
+/* Observations are host-side inputs only.  IRQ2/IRQ0200 require the exact
+ * 12-byte FDT source plus validated touch flags; PRIMARY_B0 requires only
+ * canonical raster samples; all other observations reject both. */
 gboolean goodix_enrollment_lifecycle_adapter_observe (
   GoodixEnrollmentLifecycleAdapter *adapter,
   GoodixEnrollmentEvent             event,
@@ -57,6 +57,7 @@ gboolean goodix_enrollment_lifecycle_adapter_observe (
   size_t                            sample_count,
   const guint8                     *fdt_raw,
   gsize                             fdt_raw_length,
+  guint16                           fdt_touch_flags,
   GError                          **error);
 
 /* Resolves and caches the exact next typed intent plus inner body. Repeated

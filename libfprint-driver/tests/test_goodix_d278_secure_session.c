@@ -1404,7 +1404,7 @@ drive_production_enrollment_stages (Fixture   *fixture,
   for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES; stage++)
     {
       if (stage > 1u)
-        post_feed_event (fixture, 0x32, 0x0002, 0x003f,
+        post_feed_event (fixture, 0x32, 0x0002, 0x002f,
                          (guint16) (0x80u + stage * 8u));
       else
         post_feed_event (fixture, 0x32, 0x0002, 0x003f, 0x0180);
@@ -1444,7 +1444,7 @@ drive_production_enrollment_stages (Fixture   *fixture,
         {
           post_complete_command (fixture, 0x36);
           post_feed_ack (fixture, 0x36);
-          post_feed_event (fixture, 0x36, 0x0100, 0,
+          post_feed_event (fixture, 0x36, 0x0100, 0x003f,
                            (guint16) (0x80u + stage * 8u));
           post_complete_command (fixture, 0x20);
           post_feed_ack (fixture, 0x20);

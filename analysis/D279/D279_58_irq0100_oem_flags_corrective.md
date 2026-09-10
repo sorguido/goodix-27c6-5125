@@ -82,6 +82,20 @@ D279_28_PRODUCTION_OPEN_EPOCH_ACTION_MAX=1
 D279_20_REAL_USB_SUBMIT=0
 ```
 
+## Addendum D279/59 — claim superseded
+
+Il modello exact-value di questo correttivo è **superato** dall'audit completo
+D279/59. Il valore OEM `0x003f` osservato resta un fatto autentico, ma non è
+unico: i flags di contatto sono un bitfield a sei canali. La successiva live
+one-shot sul full SHA `4de9c342b4d2d59aa37cf333638f3f88350547ea`
+ha infatti osservato `IRQ2/control 0x32/flags 0x002f` dopo il primo re-arm.
+
+La correzione corrente non ignora i flags e non usa wildcard: accetta solo un
+sottoinsieme **non nullo** di `0x003f` per finger-down/contact-sample, richiede
+zero esatto per bootstrap baseline e finger-up, rifiuta tutti i bit riservati
+e usa il bitfield nella derivazione FDT-up. D279/58 resta quindi provenance del
+secondo failure live e del sintomo corretto, non autorità sulla policy attuale.
+
 ## Boundary
 
 Questa correzione non prova ancora:

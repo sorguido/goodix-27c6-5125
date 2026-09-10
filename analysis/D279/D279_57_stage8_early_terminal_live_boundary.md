@@ -185,9 +185,35 @@ mandatory. No production parser or failure rule was weakened.
    must drive a protocol-specific review; an equivalent third action is not
    prepared automatically.
 
+## Addendum D279/59 — altre due run consumate e full flags corrective
+
+Dopo il corrective contact-boundary sono state eseguite dall'operatore due
+ulteriori run one-shot, entrambe consumate e senza retry:
+
+- `d94c7af192bb3f0d0cb4ed7b411d099d73902e3b` ha raggiunto il secondo
+  ciclo e ha respinto `control 0x36 / IRQ 0x0100 / flags 0x003f`, perché il
+  parser ereditato da D279/14 richiedeva erroneamente flags zero;
+- `4de9c342b4d2d59aa37cf333638f3f88350547ea`, dopo il micro-corrective
+  D279/58, ha completato un sample e respinto il successivo re-arm
+  `control 0x32 / IRQ 0x0002 / flags 0x002f`, perché il parser richiedeva
+  ancora `0x003f` esatto.
+
+L'audit D279/59 riconduce entrambi i failure alla stessa root cause: D279/14
+aveva trasformato fixture sintetiche in autorità per magic constants che il
+precedente audit ATTEMPT02 non aveva estratto in modo esaustivo. La semantica
+OEM/Rockytkg indipendentemente corroborata è invece un bit per ciascuno dei
+sei canali FDT. La policy production corrente accetta soltanto bitfield di
+contatto nonzero entro `0x003f`, usa il sottoinsieme osservato per la
+derivazione FDT-up e conserva zero esatto per bootstrap e finger-up.
+
+La prima run senza telemetria strutturale potrebbe appartenere alla stessa
+famiglia generale di mismatch, ma la classe esatta resta **INFERRED**, non
+osservata. Il report canonico corrente è
+`D279_59_full_irq_flags_audit_and_corrective.md`.
+
 ## Human Gate
 
-Attempt 01 and its authorization are consumed. The corrected
+All three D279/57 attempts and their authorizations are consumed. The corrected
 `operator_kit/d279-57-stage8-early-terminal/` is live-capable but not live
 authorized. A new preparation, grant and single action require explicit
 approval of the new final full SHA and operation

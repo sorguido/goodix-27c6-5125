@@ -32,6 +32,10 @@ grep -F 'fpi_image_device_hold_enroll_completion' \
   "$source_root/libfprint/fpi-image-device.c" >/dev/null
 grep -F 'fpi_image_device_release_enroll_completion' \
   "$snapshot_root/libfprint-driver/goodix_fpimage_device.c" >/dev/null
+grep -F '../../../../libfprint-driver/goodix_fdt_irq_policy.c' \
+  "$source_root/libfprint/meson.build" >/dev/null
+grep -F 'GOODIX_FDT_FLAGS_FINGER_DOWN, &touch_flags, &raw' \
+  "$snapshot_root/libfprint-driver/goodix_enrollment_post_tls_events.c" >/dev/null
 
 meson setup "$build_dir" "$source_root" \
   -Ddrivers=goodix_27c6_5125 \
@@ -105,6 +109,8 @@ echo D279_57_STAGE8_EARLY_TERMINAL_CANDIDATE=true
 echo D279_57_INTERMEDIATE_DELIVERY_BOUNDARY=FINAL_ACK34_BEFORE_IRQ0200
 echo D279_57_TERMINAL_DELIVERY_BOUNDARY=FINAL_ACK34_BEFORE_IRQ0200
 echo D279_57_TERMINAL_COMPLETION_BOUNDARY=IRQ0200_AND_SIGFM_COMPLETE
+echo D279_57_IRQ_FLAGS_POLICY=SIX_CHANNEL_CONTEXTUAL_FAIL_CLOSED
+echo D279_57_PARTIAL_TOUCH_FDT_DERIVATION=OEM_BIT_AWARE
 echo HOST_ONLY_TRANSCRIPT_SEAMS_IN_PRODUCTION_LIBRARY=false
 echo SANITIZED_PRODUCTION_AUDIT_ACCESSOR_EXPORTED=true
 echo PRODUCTION_LIBRARY_BUILD_RPATH_PRESENT=false

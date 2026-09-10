@@ -106,17 +106,24 @@ payload_contract_valid (GoodixEnrollmentEvent event,
                         const uint16_t        *samples,
                         size_t                 sample_count,
                         const guint8          *fdt_raw,
-                        gsize                  fdt_raw_length)
+                        gsize                  fdt_raw_length,
+                        guint16                fdt_touch_flags)
 {
-  if (event == GOODIX_ENROLLMENT_EVENT_IRQ2 ||
-      event == GOODIX_ENROLLMENT_EVENT_IRQ0200)
+  if (event == GOODIX_ENROLLMENT_EVENT_IRQ2)
     return samples == NULL && sample_count == 0u && fdt_raw != NULL &&
-           fdt_raw_length == GOODIX_ENROLLMENT_FDT_TABLE_LENGTH;
+           fdt_raw_length == GOODIX_ENROLLMENT_FDT_TABLE_LENGTH &&
+           goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_FINGER_DOWN,
+                                       fdt_touch_flags);
+  if (event == GOODIX_ENROLLMENT_EVENT_IRQ0200)
+    return samples == NULL && sample_count == 0u && fdt_raw != NULL &&
+           fdt_raw_length == GOODIX_ENROLLMENT_FDT_TABLE_LENGTH &&
+           goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_FINGER_UP,
+                                       fdt_touch_flags);
   if (event == GOODIX_ENROLLMENT_EVENT_PRIMARY_B0)
     return samples != NULL && sample_count > 0u && fdt_raw == NULL &&
-           fdt_raw_length == 0u;
+           fdt_raw_length == 0u && fdt_touch_flags == 0u;
   return samples == NULL && sample_count == 0u && fdt_raw == NULL &&
-         fdt_raw_length == 0u;
+         fdt_raw_length == 0u && fdt_touch_flags == 0u;
 }
 
 gboolean
@@ -127,6 +134,7 @@ goodix_enrollment_lifecycle_adapter_observe (
   size_t                            sample_count,
   const guint8                     *fdt_raw,
   gsize                             fdt_raw_length,
+  guint16                           fdt_touch_flags,
   GError                          **error)
 {
   guint stage;
@@ -140,7 +148,7 @@ goodix_enrollment_lifecycle_adapter_observe (
                          "adapter is terminal or has an uncommitted command",
                          error);
   if (!payload_contract_valid (event, samples, sample_count,
-                               fdt_raw, fdt_raw_length))
+                               fdt_raw, fdt_raw_length, fdt_touch_flags))
     return adapter_fail (adapter, GOODIX_ENROLLMENT_ADAPTER_ERROR_PAYLOAD,
                          "observation payload does not match its event", error);
 
@@ -148,14 +156,14 @@ goodix_enrollment_lifecycle_adapter_observe (
   if (event == GOODIX_ENROLLMENT_EVENT_IRQ2)
     {
       if (!goodix_enrollment_fdt_state_observe_irq2 (
-            adapter->fdt, stage + 1u, fdt_raw, error))
+            adapter->fdt, stage + 1u, fdt_touch_flags, fdt_raw, error))
         return adapter_fail (adapter, GOODIX_ENROLLMENT_ADAPTER_ERROR_PROTOCOL,
                              "IRQ2 FDT state rejected the observation", error);
     }
   else if (event == GOODIX_ENROLLMENT_EVENT_IRQ0200)
     {
       if (!goodix_enrollment_fdt_state_observe_irq0200 (
-            adapter->fdt, stage, fdt_raw, error))
+            adapter->fdt, stage, fdt_touch_flags, fdt_raw, error))
         return adapter_fail (adapter, GOODIX_ENROLLMENT_ADAPTER_ERROR_PROTOCOL,
                              "IRQ0200 FDT state rejected the observation", error);
     }

@@ -306,7 +306,8 @@ handle_auxiliary (GoodixEnrollmentPostTlsEvents *events)
 }
 
 static void
-run_profile (guint stages)
+run_profile (guint    stages,
+             gboolean partial_rearm_touch)
 {
   GoodixEnrollmentModelConfig config = {
     .required_stage_count = stages,
@@ -332,7 +333,8 @@ run_profile (guint stages)
     {
       fill_raw (0x80u + stage * 8u, irq2_raw[stage - 1u]);
       fill_raw (0x40u + stage * 8u, irq0200_raw[stage - 1u]);
-      handle_irq (events, 0x32, 0x0002, 0x003f,
+      handle_irq (events, 0x32, 0x0002,
+                  partial_rearm_touch && stage > 1u ? 0x002fu : 0x003fu,
                   irq2_raw[stage - 1u]);
       command_ack (events, GOODIX_ENROLLMENT_EVENT_COMMAND_22, 0x22);
       handle_primary (events, stage);
@@ -461,9 +463,12 @@ test_repeated_primary_early_finger_up_is_diagnostic_fail_closed (void)
 static void
 test_profiles (void)
 {
-  run_profile (2u);
-  run_profile (3u);
-  run_profile (21u);
+  run_profile (2u, FALSE);
+  run_profile (3u, FALSE);
+  run_profile (21u, FALSE);
+  /* D279/57 observed 0x002f on the first inter-stage re-arm.  Exercise the
+   * complete terminal-stage graph with that evidence-backed partial mask. */
+  run_profile (8u, TRUE);
 }
 
 static void
@@ -529,6 +534,45 @@ test_bad_irq_flags_fail_closed (void)
   g_assert_cmphex (audit.last_mismatch_observed_irq, ==, 0x0002);
   g_assert_cmphex (audit.last_mismatch_observed_irq_flags, ==, 0x0000);
   goodix_enrollment_post_tls_events_free (events);
+}
+
+static void
+test_wrong_irq_or_control_fails_closed (void)
+{
+  const struct
+  {
+    guint8 control;
+    guint16 irq;
+  } cases[] = {
+    { 0x34u, 0x0002u },
+    { 0x32u, 0x0200u },
+  };
+
+  for (guint i = 0u; i < G_N_ELEMENTS (cases); i++)
+    {
+      GoodixEnrollmentModelConfig config = {
+        .required_stage_count = 2u,
+        .defer_terminal_stage_delivery = TRUE,
+      };
+      GoodixEnrollmentPostTlsEventsAudit audit;
+      Fixture fixture = { 0 };
+      guint8 raw[12];
+      g_autoptr(GBytes) frame = NULL;
+      g_autoptr(GError) error = NULL;
+      GoodixEnrollmentPostTlsEvents *events =
+        goodix_enrollment_post_tls_events_new (
+          &config, image_ready, timestamp_ready, auxiliary_ready,
+          &fixture, &audit, &error);
+
+      fill_raw (0x88u, raw);
+      frame = build_irq (cases[i].control, cases[i].irq, 0x003fu, raw);
+      g_assert_false (goodix_enrollment_post_tls_events_handle_a0 (
+        events, frame, &error));
+      g_assert_nonnull (error);
+      g_assert_true (goodix_enrollment_post_tls_events_is_failed (events));
+      g_assert_cmpuint (audit.rejected_inbound_count, ==, 1u);
+      goodix_enrollment_post_tls_events_free (events);
+    }
 }
 
 static void
@@ -932,6 +976,8 @@ main (int argc, char **argv)
                    test_wrong_ack_fails_closed);
   g_test_add_func ("/d279-14-post-tls-events/bad-irq-flags-fail-closed",
                    test_bad_irq_flags_fail_closed);
+  g_test_add_func ("/d279-59-post-tls-events/wrong-irq-or-control-fail-closed",
+                   test_wrong_irq_or_control_fails_closed);
   g_test_add_func ("/d279-57-contact/early-up-after-repeated-primary-diagnostic",
                    test_repeated_primary_early_finger_up_is_diagnostic_fail_closed);
   g_test_add_func ("/d279-22-contact/callback-failure-fails-closed",

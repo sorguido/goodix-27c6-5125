@@ -68,7 +68,7 @@ test_twenty_one_stage_dynamic_relations (void)
       raw_table (0x80u + stage * 8u, irq2[stage - 1u]);
       raw_table (0x40u + stage * 8u, irq200[stage - 1u]);
       g_assert_true (goodix_enrollment_fdt_state_observe_irq2 (
-        state, stage, irq2[stage - 1u], &error));
+        state, stage, 0x003fu, irq2[stage - 1u], &error));
       g_assert_true (goodix_enrollment_fdt_state_resolve (
         state, &i34, 0u, FALSE, &resolved, &error));
       assert_table (resolved.material.fdt_table, irq2[stage - 1u], TRUE);
@@ -82,7 +82,7 @@ test_twenty_one_stage_dynamic_relations (void)
           goodix_enrollment_resolved_material_clear (&resolved);
         }
       g_assert_true (goodix_enrollment_fdt_state_observe_irq0200 (
-        state, stage, irq200[stage - 1u], &error));
+        state, stage, 0x0000u, irq200[stage - 1u], &error));
       g_assert_true (goodix_enrollment_fdt_state_resolve (
         state, &i32, (guint16) (0x1200u + stage), TRUE, &resolved, &error));
       assert_table (resolved.material.fdt_table, irq200[stage - 1u], FALSE);
@@ -110,11 +110,66 @@ test_stale_stage_fails_closed (void)
   g_autoptr(GError) error = NULL;
 
   raw_table (0x80u, raw);
-  g_assert_true (goodix_enrollment_fdt_state_observe_irq2 (state, 1u, raw, &error));
-  g_assert_false (goodix_enrollment_fdt_state_observe_irq2 (state, 1u, raw, &error));
+  g_assert_true (goodix_enrollment_fdt_state_observe_irq2 (
+    state, 1u, 0x003fu, raw, &error));
+  g_assert_false (goodix_enrollment_fdt_state_observe_irq2 (
+    state, 1u, 0x003fu, raw, &error));
   g_assert_nonnull (error);
   g_assert_cmpuint (audit.rejected_resolution_count, ==, 1u);
   goodix_enrollment_fdt_state_free (state);
+}
+
+static void
+test_partial_touch_mask_uses_oem_fallback (void)
+{
+  GoodixEnrollmentFdtStateAudit audit;
+  GoodixEnrollmentFdtState *state = goodix_enrollment_fdt_state_new (&audit);
+  GoodixEnrollmentCommandIntent i34 = make_intent (
+    1u, GOODIX_ENROLLMENT_EVENT_COMMAND_34,
+    GOODIX_ENROLLMENT_COMMAND_PURPOSE_FINGER_UP,
+    GOODIX_ENROLLMENT_BODY_FDT_0A01, 0x34);
+  GoodixEnrollmentResolvedMaterial resolved;
+  guint8 raw[12];
+  g_autoptr(GError) error = NULL;
+
+  raw_table (0x80u, raw);
+  g_assert_true (goodix_enrollment_fdt_state_observe_irq2 (
+    state, 1u, 0x002fu, raw, &error));
+  g_assert_true (goodix_enrollment_fdt_state_resolve (
+    state, &i34, 0u, FALSE, &resolved, &error));
+  for (guint i = 0u; i < 6u; i++)
+    {
+      guint16 word = (guint16) ((guint16) raw[i * 2u] |
+                                ((guint16) raw[i * 2u + 1u] << 8));
+      guint expected = i == 4u ? 0x1bu : (guint) (word >> 1) + 0x1du;
+
+      g_assert_cmphex (resolved.material.fdt_table[i * 2u], ==, 0x80u);
+      g_assert_cmphex (resolved.material.fdt_table[i * 2u + 1u], ==, expected);
+    }
+  goodix_enrollment_resolved_material_clear (&resolved);
+  g_assert_no_error (error);
+  goodix_enrollment_fdt_state_free (state);
+}
+
+static void
+test_unbounded_touch_masks_fail_closed (void)
+{
+  const guint16 invalid[] = { 0x0000u, 0x0040u, 0x006fu, 0xffffu };
+
+  for (guint i = 0u; i < G_N_ELEMENTS (invalid); i++)
+    {
+      GoodixEnrollmentFdtStateAudit audit;
+      GoodixEnrollmentFdtState *state = goodix_enrollment_fdt_state_new (&audit);
+      guint8 raw[12];
+      g_autoptr(GError) error = NULL;
+
+      raw_table (0x80u, raw);
+      g_assert_false (goodix_enrollment_fdt_state_observe_irq2 (
+        state, 1u, invalid[i], raw, &error));
+      g_assert_nonnull (error);
+      g_assert_cmpuint (audit.rejected_resolution_count, ==, 1u);
+      goodix_enrollment_fdt_state_free (state);
+    }
 }
 
 int
@@ -125,5 +180,9 @@ main (int argc, char **argv)
                    test_twenty_one_stage_dynamic_relations);
   g_test_add_func ("/d279-12-fdt-state/stale-stage-fails-closed",
                    test_stale_stage_fails_closed);
+  g_test_add_func ("/d279-59-fdt-state/partial-touch-mask-oem-fallback",
+                   test_partial_touch_mask_uses_oem_fallback);
+  g_test_add_func ("/d279-59-fdt-state/unbounded-masks-fail-closed",
+                   test_unbounded_touch_masks_fail_closed);
   return g_test_run ();
 }

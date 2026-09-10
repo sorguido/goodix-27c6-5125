@@ -118,9 +118,10 @@ gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_f
 for source in \
   goodix_enrollment_model.c \
   goodix_enrollment_pipeline.c \
-  goodix_enrollment_command_plan.c \
-  goodix_enrollment_command_body.c \
-  goodix_enrollment_fdt_state.c \
+    goodix_enrollment_command_plan.c \
+    goodix_enrollment_command_body.c \
+    goodix_fdt_irq_policy.c \
+    goodix_enrollment_fdt_state.c \
   goodix_enrollment_lifecycle_adapter.c \
   goodix_enrollment_post_tls_events.c \
   goodix_enrollment_outbound_frame.c \
@@ -181,6 +182,7 @@ gcc -Wl,--gc-sections \
   "$build_dir/goodix_enrollment_pipeline.o" \
   "$build_dir/goodix_enrollment_command_plan.o" \
   "$build_dir/goodix_enrollment_command_body.o" \
+  "$build_dir/goodix_fdt_irq_policy.o" \
   "$build_dir/goodix_enrollment_fdt_state.o" \
   "$build_dir/goodix_enrollment_lifecycle_adapter.o" \
   "$build_dir/goodix_enrollment_post_tls_events.o" \
@@ -264,9 +266,10 @@ gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/good
 for source in \
   goodix_enrollment_model.c \
   goodix_enrollment_pipeline.c \
-  goodix_enrollment_command_plan.c \
-  goodix_enrollment_command_body.c \
-  goodix_enrollment_fdt_state.c \
+    goodix_enrollment_command_plan.c \
+    goodix_enrollment_command_body.c \
+    goodix_fdt_irq_policy.c \
+    goodix_enrollment_fdt_state.c \
   goodix_enrollment_lifecycle_adapter.c \
   goodix_enrollment_post_tls_events.c \
   goodix_enrollment_outbound_frame.c \
@@ -316,6 +319,7 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/goodix_enrollment_pipeline_san.o" \
   "$build_dir/goodix_enrollment_command_plan_san.o" \
   "$build_dir/goodix_enrollment_command_body_san.o" \
+  "$build_dir/goodix_fdt_irq_policy_san.o" \
   "$build_dir/goodix_enrollment_fdt_state_san.o" \
   "$build_dir/goodix_enrollment_lifecycle_adapter_san.o" \
   "$build_dir/goodix_enrollment_post_tls_events_san.o" \

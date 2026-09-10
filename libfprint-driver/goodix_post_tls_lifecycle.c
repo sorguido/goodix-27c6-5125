@@ -4,6 +4,7 @@
  * implementation from neutral protocol facts and project-owned test vectors.
  */
 #include "goodix_post_tls_lifecycle.h"
+#include "goodix_fdt_irq_policy.h"
 
 #include "goodix_a0_protocol.h"
 
@@ -185,43 +186,6 @@ submit_simple (GoodixPostTlsLifecycle *lifecycle,
   static const guint8 body[] = { 0x01, 0x00 };
   return submit_command (lifecycle, control, body, sizeof body, next_phase,
                          error);
-}
-
-static gboolean
-derive_fdt (const guint8 raw[12],
-            gboolean     finger_up,
-            guint8       table[12])
-{
-  for (guint i = 0; i < 6u; i++)
-    {
-      guint16 word = (guint16) raw[i * 2u] |
-                     ((guint16) raw[i * 2u + 1u] << 8);
-      guint value = (guint) (word >> 1) + (finger_up ? 0x1du : 0u);
-      if (value > G_MAXUINT8)
-        return FALSE;
-      table[i * 2u] = 0x80;
-      table[i * 2u + 1u] = (guint8) value;
-    }
-  return TRUE;
-}
-
-static gboolean
-derive_fdt_baseline (const guint8 raw[12],
-                     guint8       table[12])
-{
-  for (guint i = 0; i < 6u; i++)
-    {
-      guint16 word = (guint16) raw[i * 2u] |
-                     ((guint16) raw[i * 2u + 1u] << 8);
-      guint8 component = (guint8) ((word >> 1) & 0xffu);
-
-      if (component == 0x00 || component == 0xff)
-        return FALSE;
-
-      table[i * 2u] = 0x80;
-      table[i * 2u + 1u] = component;
-    }
-  return TRUE;
 }
 
 static gboolean
@@ -660,9 +624,12 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
     case GOODIX_POST_TLS_PHASE_FDT_IRQ100_3:
       if (message.control != 0x36 ||
           !event_fields (&message, &irq, &flags, &raw) ||
-          irq != 0x0100 || flags != 0 ||
+          irq != 0x0100 ||
+          !goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_BASELINE_SAMPLE,
+                                       flags) ||
           !record_fdt_raw (lifecycle, raw) ||
-          !derive_fdt_baseline (raw, lifecycle->current_fdt_table))
+          !goodix_fdt_derive_baseline_table (
+            raw, flags, lifecycle->current_fdt_table))
         goto unexpected;
       if (lifecycle->audit != NULL)
         lifecycle->audit->fdt_irq100_count++;
@@ -763,11 +730,13 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
     case GOODIX_POST_TLS_PHASE_SECOND_IRQ2:
       if (message.control != 0x32 ||
           !event_fields (&message, &irq, &flags, &raw) ||
-          irq != 0x0002 || flags != 0x003f)
+          irq != 0x0002 ||
+          !goodix_fdt_irq_flags_valid (GOODIX_FDT_FLAGS_FINGER_DOWN, flags))
         goto unexpected;
       if (lifecycle->phase == GOODIX_POST_TLS_PHASE_FIRST_IRQ2)
         {
-          if (!derive_fdt (raw, TRUE, lifecycle->first_up_table))
+          if (!goodix_fdt_derive_up_table (
+                raw, flags, 0x1du, lifecycle->first_up_table))
             goto unexpected;
           if (lifecycle->audit != NULL)
             lifecycle->audit->first_irq0002_count++;
@@ -808,8 +777,9 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
     case GOODIX_POST_TLS_PHASE_RELEASE_IRQ200:
       if (message.control != 0x34 ||
           !event_fields (&message, &irq, &flags, &raw) ||
-          irq != 0x0200 || flags != 0 ||
-          !derive_fdt (raw, FALSE, lifecycle->fresh_down_table))
+          irq != 0x0200 ||
+          !goodix_fdt_derive_down_table (
+            raw, flags, lifecycle->fresh_down_table))
         goto unexpected;
       lifecycle->fresh_down_valid = TRUE;
       if (lifecycle->audit != NULL)

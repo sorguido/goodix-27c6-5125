@@ -3,6 +3,7 @@
 #define GOODIX_ENROLLMENT_FDT_STATE_H
 
 #include "goodix_enrollment_command_body.h"
+#include "goodix_fdt_irq_policy.h"
 
 G_BEGIN_DECLS
 
@@ -33,11 +34,13 @@ void goodix_enrollment_fdt_state_free (GoodixEnrollmentFdtState *state);
 gboolean goodix_enrollment_fdt_state_observe_irq2 (
   GoodixEnrollmentFdtState *state,
   guint                     stage_index,
+  guint16                   touch_flags,
   const guint8              raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
   GError                  **error);
 gboolean goodix_enrollment_fdt_state_observe_irq0200 (
   GoodixEnrollmentFdtState *state,
   guint                     stage_index,
+  guint16                   touch_flags,
   const guint8              raw[GOODIX_ENROLLMENT_FDT_TABLE_LENGTH],
   GError                  **error);
 

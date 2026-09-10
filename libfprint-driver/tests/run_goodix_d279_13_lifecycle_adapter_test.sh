@@ -42,6 +42,7 @@ run_build () {
     goodix_enrollment_pipeline.c \
     goodix_enrollment_command_plan.c \
     goodix_enrollment_command_body.c \
+    goodix_fdt_irq_policy.c \
     goodix_enrollment_fdt_state.c \
     goodix_enrollment_lifecycle_adapter.c; do
     # shellcheck disable=SC2086

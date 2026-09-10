@@ -1,18 +1,20 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
-## D279/57 enrollment SIGFM stage-8 (attempt 01 consumato; corrective hard-gated)
+## D279/57 enrollment SIGFM stage-8 (tre attempt consumati; D279/59 hard-gated)
 
 `d279-57-stage8-early-terminal/` prepara una sola action enrollment production
 SIGFM a otto stage per verificare su APP12509 il terminale senza nono `0x32`.
 Il cap fisso isola il boundary sensor-side; non implementa ancora la selezione
-dinamica né prova la riutilizzabilità post-close. La prima run sul full SHA
-`1afe72e4d875daa60319cbbfb55d19a1e151de86` è terminata fail-closed dopo
-2/8 stage e il relativo grant è consumato. Il correttivo separa progresso
+dinamica né prova la riutilizzabilità post-close. Le tre run sui full SHA
+`1afe72e4...`, `d94c7af1...` e `4de9c342...` sono terminate fail-closed e i
+relativi grant sono consumati. Il correttivo separa progresso
 biometrico e finger-status fisico, differisce ogni consegna fino al
 release-ready dopo l'ACK finale `0x34` e trattiene la sola completion riuscita
 dello stage 8 fino all'IRQ `0x0200`; aggiunge inoltre telemetria mismatch
-sanitizzata. Una futura action richiede un nuovo full SHA e una nuova
+sanitizzata. D279/59 sostituisce i magic flags con una policy canale FDT
+centralizzata e aggiunge al preflight il corpus autentico hash-gated. Una
+futura action richiede un nuovo full SHA e una nuova
 autorizzazione esplicita; nessun retry è autorizzato.
 
 ## D279/54 identify OEM passiva (pre-live, hard-gated)
@@ -109,10 +111,10 @@ richiede review, baseline e autorizzazione esplicite.
 | `d279-29-one-shot-enrollment/` | enrollment production one-shot concluso su `f4f0436…`; grant consumato, nessun retry autorizzato |
 | `d279-35-offline-protected-evaluation/` | current path offline aggregate-only; Human Gate per singola lettura protected pendente |
 | `d279-54-oem-passive-identify-observe/` | candidate passivo OEM identify hard-gated; authority chiusa, qualificazione Windows/full SHA/autorizzazione one-shot pendenti |
-| `d279-57-stage8-early-terminal/` | attempt 01 su `1afe72e…` fail-closed e grant consumato; correttivo contact-boundary offline, nuovo full SHA/autorizzazione one-shot pendenti; nessun retry o test di reusability incluso |
+| `d279-57-stage8-early-terminal/` | tre attempt su `1afe72e…`, `d94c7af…`, `4de9c34…` fail-closed e grant consumati; corrective contact-boundary + full IRQ flags D279/59 offline, nuovo full SHA/autorizzazione one-shot pendenti; nessun retry o test di reusability incluso |
 
 Non esiste un kit operativo corrente **autorizzato live**. La run D279/29 è
-consumata; anche la prima run D279/57 è consumata e il correttivo resta al
+consumata; tutte le run D279/57 sono consumate e il correttivo resta al
 Human Gate. D279/35 e D279/56 sono percorsi offline
 protetti e la loro presenza non autorizza operazioni live. I marker storici
 non devono essere cancellati o riutilizzati.

@@ -2302,7 +2302,7 @@ test_d279_24_context_first_arm_enrollment_handoff (void)
       if (stage > 1u)
         {
           g_autoptr(GBytes) irq2 = d279_24_build_event (
-            0x32, 0x0002, 0x003f, (guint16) (0x80u + stage * 8u));
+            0x32, 0x0002, 0x002f, (guint16) (0x80u + stage * 8u));
           d279_25_feed_context_frame (f->ctx, generation, irq2);
           d279_25_complete_and_ack (f->ctx, generation, 0x22);
         }

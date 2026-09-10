@@ -231,6 +231,19 @@ source_guard_audit ()
     refuse TERMINAL_COMPLETION_HOLD_TELEMETRY_MISSING
   grep -F 'release_ready_prompt_count != D279_57_ENROLL_STAGES' "$tool" >/dev/null ||
     refuse ALL_STAGE_RELEASE_READY_GUARD_MISSING
+  grep -F '#define GOODIX_FDT_TOUCH_MASK 0x003fu' \
+    "$root/libfprint-driver/goodix_fdt_irq_policy.h" >/dev/null ||
+    refuse FDT_TOUCH_MASK_POLICY_MISSING
+  grep -F 'GOODIX_FDT_FLAGS_FINGER_DOWN, &touch_flags, &raw' \
+    "$root/libfprint-driver/goodix_enrollment_post_tls_events.c" >/dev/null ||
+    refuse ENROLLMENT_IRQ_POLICY_BINDING_MISSING
+  grep -F 'goodix_fdt_derive_up_table (raw, touch_flags, 0x1du' \
+    "$root/libfprint-driver/goodix_enrollment_fdt_state.c" >/dev/null ||
+    refuse PARTIAL_TOUCH_FDT_DERIVATION_MISSING
+  if grep -E 'parse_irq \(&message, 0x(32|34|36), 0x(0002|0100|0200), 0x' \
+       "$root/libfprint-driver/goodix_enrollment_post_tls_events.c" >/dev/null; then
+    refuse STALE_MAGIC_IRQ_FLAGS_PRESENT
+  fi
 }
 
 offline_preflight ()
@@ -239,6 +252,9 @@ offline_preflight ()
 
   [[ $EUID -ne 0 ]] || refuse OFFLINE_PREFLIGHT_REQUIRES_NORMAL_USER
   source_guard_audit "$root/tools/d279_stage8_enroll.c"
+  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v \
+    analysis/D279/test_d279_59_full_irq_flags_audit.py
+  "$root/libfprint-driver/tests/run_goodix_d279_59_irq_policy_test.sh"
   work=$(mktemp -d /tmp/goodix-d279-57-offline.XXXXXX)
   d279_57_offline_cleanup_root=$work
   trap cleanup_offline_tree EXIT HUP INT TERM

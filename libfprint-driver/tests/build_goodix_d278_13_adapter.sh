@@ -57,6 +57,8 @@ libfprint-driver/goodix_secure_session.c
 libfprint-driver/goodix_secure_session.h
 libfprint-driver/goodix_image_decoder.c
 libfprint-driver/goodix_image_decoder.h
+libfprint-driver/goodix_fdt_irq_policy.c
+libfprint-driver/goodix_fdt_irq_policy.h
 libfprint-driver/goodix_post_tls_lifecycle.c
 libfprint-driver/goodix_post_tls_lifecycle.h
 libfprint-driver/goodix_fpimage_device.c

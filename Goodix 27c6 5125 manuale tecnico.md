@@ -16,38 +16,47 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente post-D279/57 — live fail-closed e correttivo contact boundary
+### Stato corrente post-D279/59 — full IRQ flags corrective offline
 
-La singola run live D279/57 autorizzata sul full SHA
-`1afe72e4d875daa60319cbbfb55d19a1e151de86` è consumata e non è
-riutilizzabile. Ha completato 2/8 stage e si è arrestata fail-closed su un A0
-non conforme all'evento atteso, senza retry o seconda action. L'audit
-dichiarato dall'operatore riporta 2 B0 primari, 1 B0 ausiliario, 9 ACK, un
-re-arm e due comandi `0x32`; close, drain, release e rimozione del materiale
-runtime sono riusciti, con retry/reopen/persistent-family osservati pari a
-zero.
+Le tre run live D279/57 sui full SHA `1afe72e4...`, `d94c7af1...` e
+`4de9c342...` sono tutte consumate; nessun grant o retry è riutilizzabile. La
+prima ha motivato la separazione tra progresso biometrico e reale release
+fisico. Le altre due hanno prodotto telemetria strutturale distinta ma una
+root cause comune: il parser D279/14 trattava i flags FDT come valori esatti.
+`d94c7af1...` ha respinto IRQ0100 enrollment `0x003f` perché attendeva zero;
+dopo il micro-corrective D279/58, `4de9c342...` ha respinto IRQ2 `0x002f`
+perché attendeva `0x003f`.
 
-La combinazione dei conteggi è fortemente compatibile con un `IRQ0200`
-anticipato dopo che l'operatore ha rimosso il dito al progresso biometrico
-dello stage 2, mentre il ciclo ripetuto attendeva ancora `IRQ0100` e il B0
-ausiliario. È una inferenza, non una osservazione diretta: la vecchia
-telemetria non classificava il frame inatteso. Gli originali root-only
-`operator.log` e `summary.env` non sono ancora stati importati né hashati;
-restano separati dalla trascrizione dichiarata dall'operatore.
+**OBSERVED:** la matrice autentica D279/10 ATTEMPT02 contiene tutti i 65 IRQ
+pertinenti: tre bootstrap `0x36/IRQ0100/0x0000`, 21 finger-down
+`0x32/IRQ2/0x003f`, 20 contact-sample
+`0x36/IRQ0100/0x003f` e 21 finger-up `0x34/IRQ0200/0x0000`. D255, D274/03,
+D279/10 ATTEMPT01 e D279/54 confermano la distinzione contatto/no-contatto.
+La live `4de9c342...` aggiunge il sottoinsieme di contatto `0x002f`.
 
-Il correttivo offline separa ora i boundary: `PRIMARY_B0` conserva la
-provenance del sample, ma in tutti gli stage la consegna a `FpImageDevice`
-avviene soltanto dopo l'ACK finale `0x34`, quando è armato `IRQ0200`.
-L'istruzione fisica deriva da `finger-status`, non dal callback di progresso.
-Allo stage terminale una hold interna trattiene soltanto la completion
-biometrica riuscita fino al consumo di `IRQ0200`; errori e cancellazione non
-sono trattenuti. Una failure SIGFM retry-class dopo l'arm della hold diventa
-fatale `DATA_INVALID`, con zero progress: la cattura sensor-side finale è già
-consumata e non è lecito attendere un nono sample né lasciare l'action in
-deadlock. La nuova telemetria
-sanitizzata espone evento atteso, control A0 e, quando classificabile, IRQ e
-flags, senza payload. I test offline del boundary, della vera action full-TLS
-e della fixture storica D279/24 sono verdi normali e ASan/UBSan.
+**VERIFIED:** i sei bit bassi sono indicatori dei sei canali FDT. Il verifier
+hash-gated legge dal PE OEM la lunghezza raw 12 a `0x180576df4` e verifica che
+il call-site IRQ2 mode-zero `0x180028815–839` raggiunga il handler
+`0x180029314–6d6`; il loop estrae indipendentemente il bit `i`. Il handler e
+l'implementazione indipendente Rockytkg applicano,
+per ciascun bit, `(raw>>1)+delta` sul canale attivo e `delta-2` sul canale
+inattivo. La policy production centralizzata accetta quindi soltanto un
+sottoinsieme nonzero di `0x003f` in contesti finger-down/contact-sample;
+richiede zero esatto in bootstrap/finger-up e rifiuta tutti i bit riservati.
+Control, IRQ, length e presenza dei 12 raw byte restano exact/fail-closed.
+
+**INFERRED:** il primo failure senza classificazione A0 potrebbe appartenere
+alla stessa famiglia di assunzioni stale, ma la sua classe esatta non è
+osservabile. **UNKNOWN:** il terminale APP12509 allo stage 8 senza nono re-arm
+resta non provato live; reusability e persistence sono confini separati.
+
+Il corrective mantiene il contact boundary D279/57: il sample arriva a
+`FpImageDevice` soltanto dopo l'ACK finale `0x34`, il prompt deriva da
+`finger-status` e la completion terminale resta in hold fino a IRQ0200. Il
+corpus metadata-only hash-gated, il test C indipendente e tutte le suite
+production-shaped sono verdi offline, incluso il preflight esatto del kit.
+Non restano nel percorso enrollment corrente gate exact-`0x003f` equivalenti
+eliminabili tramite le evidenze storiche disponibili.
 
 La valutazione protetta D279/48 è stata completata offline sulla baseline
 `36999004b9971f7004aaaa4da85d7c2d1afc79d1`, senza USB/live e senza export di
@@ -105,8 +114,11 @@ IMPLEMENTATION_POLICY=MAXIMUM_SAFE_DIRECT_REUSE
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
 D279_57_ATTEMPT01_GRANT_CONSUMED=true
+D279_57_D94_GRANT_CONSUMED=true
+D279_57_4DE9C34_GRANT_CONSUMED=true
 D279_57_ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_CORRECTED_D279_57_ACTION_NO_RETRY
+D279_57_NEXT_LIVE_READINESS=READY
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
 ```
 
 Report e review machine-readable:
@@ -659,22 +671,80 @@ Riesame metodologico prima di una eventuale nuova run:
    step distinto.
 
 ```text
-D279_57_OUTCOME=HUMAN_REQUIRED
-D279_57_ADVANCEMENT=LIVE_FAIL_CLOSED_NEW_CONTACT_BOUNDARY_AND_OFFLINE_CORRECTIVE
+D279_57_OUTCOME=SUPERSEDED_BY_D279_59_FULL_IRQ_FLAGS_CORRECTIVE
+D279_57_ADVANCEMENT=THREE_LIVE_FAIL_CLOSED_PLUS_CONTACT_AND_FLAGS_CORRECTIVES
 D279_57_EXECUTABLE_CLOSURE=PASS_OFFLINE
 PRODUCTION_ENROLLMENT_STAGE_POLICY=FIXED_8_CANDIDATE_PENDING_LIVE_PROOF
 ATTEMPT02_21_STAGE_REGRESSION_PROFILE_RETAINED=true
 DYNAMIC_DUPLICATE_SELECTION_IMPLEMENTED=false
 SIGFM_APPEND_FAILURE_ADVANCES_STAGE=false
 ATTEMPT01_GRANT_CONSUMED=true
+D94_GRANT_CONSUMED=true
+4DE9C34_GRANT_CONSUMED=true
 ATTEMPT01_AUTHENTIC_FILES_IMPORTED=false
 EXPECTED_COMMAND_32_COUNT=8
 EXPECTED_INTER_STAGE_REARM_COUNT=7
 EXPECTED_POST_STAGE8_REARM_COUNT=0
 REUSABILITY_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_CORRECTED_D279_57_ACTION_NO_RETRY
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
 ```
+
+### Stato D279/59 — modello canale FDT e closure D279/57
+
+L'audit riparte dai PCAP autentici e non dalle fixture. Il generatore
+`analysis/D279/d279_59_full_irq_flags_audit.py` verifica gli SHA-256 di cinque
+capture APP12509 e produce una matrice metadata-only completa. Per ATTEMPT02
+sono presenti 65 righe IRQ, correlate a bootstrap, primo ciclo, cicli 2–20 e
+ciclo 21. Il corpus C aggiunge come regressione indipendente il solo evento
+sanitizzato Linux `0x32/IRQ2/0x002f`.
+
+La regola non è `IRQ2=0x003f` né `IRQ0100=0x003f`: è contestuale. In un
+contatto almeno uno dei sei bit bassi deve essere presente e nessun bit alto è
+ammesso. In bootstrap/finger-up i flags devono essere zero. L'accettazione dei
+63 subset nonzero deriva dall'algoritmo OEM per-bit verificato, non dalla loro
+osservazione fisica; nonzero e rifiuto high-bit sono guard conservativi legati
+ai contesti osservati e ai soli sei canali provati. Per IRQ2 il mask
+non viene solo validato: seleziona per canale la derivazione OEM
+`(raw>>1)+delta` oppure il fallback `delta-2`. Il modulo condiviso
+`goodix_fdt_irq_policy.[ch]` elimina duplicazioni tra grafo enrollment e
+lifecycle production legacy.
+
+La review conclusiva preserva inoltre i boundary di range preesistenti: un
+canale up attivo deve produrre un byte, un canale inattivo usa il fallback
+senza vincolare il raw ignorato, e finger-up accetta l'intero range byte.
+Soltanto il bootstrap conserva il proprio filtro storico sui componenti
+`0x00`/`0xff`; non viene generalizzato agli altri contesti.
+
+La root cause storica è D279/14: l'audit D279/10 originario non aveva censito
+ogni campo flags, mentre builder e parser sintetici copiarono gli stessi
+valori. D279/58 corresse il valore visibile di IRQ0100 senza riconoscere la
+semantica bitfield. Il census globale conserva i valori esatti soltanto nei
+corpus autentici, nei casi positivi espliciti e nei contesti zero-touch; il
+vecchio `core/fdt_lifecycle.py` resta storico e non è autorità production.
+
+La review end-to-end del kit classifica bootstrap, primo ciclo e cicli
+ripetuti come direttamente OEM-observed; il mapping release-ready/libfprint e
+la hold terminale sono Linux-specific ma coperti nelle due possibili
+ordinazioni. L'assenza del nono re-arm è verde offline ma resta la domanda
+sensor-side della futura singola live. Non esistono altre magic constants
+equivalenti note nel percorso corrente eliminabili con l'evidenza disponibile.
+
+```text
+D279_59_OUTCOME=READY_OFFLINE_FULL_IRQ_POLICY_CORRECTIVE
+D279_59_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D279_10_AUTHENTIC_IRQ_MATRIX_ROWS=65
+D279_59_POLICY_CORPUS_ROWS=66
+CONTACT_FLAGS=NONZERO_SUBSET_OF_0X003F
+ZERO_TOUCH_FLAGS=EXACT_0X0000
+RESERVED_HIGH_BITS=FAIL_CLOSED
+D279_57_NEXT_LIVE_READINESS=READY
+CURRENT_LIVE_AUTHORIZED=false
+ALL_PRIOR_D279_57_GRANTS_CONSUMED=true
+NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_NEW_FULL_SHA_ONE_D279_57_ACTION_NO_RETRY
+```
+
+Report: `analysis/D279/D279_59_full_irq_flags_audit_and_corrective.md`.
 
 ### Stato storico pre-run D279/48 — confronto pronto al gate protetto
 
@@ -1526,9 +1596,12 @@ incluso l'eventuale ruolo in quality, template o NBIS. Report:
 
 `goodix_enrollment_post_tls_events.[ch]` traduce frame A0 completi già
 decifrati nell'evento esatto atteso dall'adapter. Sono ammessi soltanto ACK con
-echo/status esatti, IRQ2/IRQ0100/IRQ0200 con control/id/flags target-local e il
-NAV OEM no-check 2417/2410 con control `0x50` e marker `0x88`. Raster primario
-già decodificato e B0 ausiliario opaco hanno API distinte.
+echo/status esatti, IRQ2/IRQ0100/IRQ0200 con control/id target-local e flags
+validati dalla policy contestuale D279/59, oltre al NAV OEM no-check 2417/2410
+con control `0x50` e marker `0x88`. Raster primario già decodificato e B0
+ausiliario opaco hanno API distinte. Il vecchio claim exact-`0x003f` per IRQ2
+e exact-value per IRQ0100 è superseded: il contatto richiede un sottoinsieme
+nonzero dei sei bit canale, mentre zero-touch richiede zero esatto.
 
 La sequenza completa passa per profili 2/3/21, normal e ASan/UBSan; il profilo
 ATTEMPT02 conta 188 A0 inbound, di cui 125 ACK, 62 IRQ e un NAV. Echo e flags
@@ -4762,10 +4835,12 @@ GoodixDeviceContext
      -> 0x32 -> second IRQ2 -> 0x22 -> second B0/image -> STOP
 ```
 
-Il lifecycle deriva la FDT-up esclusivamente dall'IRQ `0x0002`/flags `0x003f`
-del primo ciclo come coppie `0x80,((raw>>1)+0x1d)` e la down-table
-esclusivamente dall'IRQ `0x0200`/flags `0` dello stesso ciclo come coppie
-`0x80,(raw>>1)`. Overflow, shape/IRQ/flags errati, tabella stale, generation
+Il lifecycle deriva la FDT-up esclusivamente dall'IRQ `0x0002` con un bitfield
+di contatto nonzero entro `0x003f`: per ciascun canale attivo usa la coppia
+`0x80,((raw>>1)+0x1d)`, per ciascun canale inattivo il fallback
+`0x80,(0x1d-2)`. La down-table deriva esclusivamente dall'IRQ
+`0x0200`/flags zero dello stesso ciclo come coppie `0x80,(raw>>1)`.
+Overflow, shape/IRQ/flags errati, bit riservati, tabella stale, generation
 stale o cancel sono terminali. Il rearm viene emesso esattamente una volta
 solo dopo release completa, fresh down-table e stato framework
 `AWAIT_FINGER_ON`; il post-up B0 è consumato e scartato e non raggiunge il

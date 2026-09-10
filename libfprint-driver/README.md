@@ -185,8 +185,12 @@ layer.
 `goodix_enrollment_fdt_state.[ch]` implements the hash-gated ATTEMPT02 table
 relations without exporting authentic table bytes: `0x34` uses same-stage
 IRQ2-up, `0x36` uses previous-stage IRQ0200-down, and `0x32` uses same-stage
-IRQ0200-down plus a caller timestamp. Stage order and material availability
-are fail-closed. The module has no A0 serializer, backend or submit path.
+IRQ0200-down plus a caller timestamp. D279/59 centralizes the contextual flag
+contract in `goodix_fdt_irq_policy.[ch]`: contact requires a nonzero subset of
+the six FDT channel bits, zero-touch contexts require exact zero, and the
+actual bitfield selects active/fallback FDT-up channels. Stage order and
+material availability are fail-closed. The module has no A0 serializer,
+backend or submit path.
 
 ## D279/13 iterative enrollment lifecycle adapter
 
@@ -200,8 +204,11 @@ full sequence. The adapter still has no A0 serializer, backend or submit path.
 ## D279/14 inbound post-TLS enrollment events
 
 `goodix_enrollment_post_tls_events.[ch]` strictly maps complete decrypted A0
-ACK/IRQ/NAV frames to the lifecycle adapter. Echo/status, IRQ control/id/flags
-and the target-observed NAV no-check shape are state-bound and fail closed.
+ACK/IRQ/NAV frames to the lifecycle adapter. Echo/status and IRQ control/id
+remain exact; IRQ flags use the centralized D279/59 context policy rather
+than duplicated magic values. Zero contact, reserved bits and nonzero
+bootstrap/finger-up flags fail closed. The target-observed NAV no-check shape
+is likewise state-bound and fail closed.
 Primary samples and the opaque auxiliary B0 use separate typed calls. B0
 reassembly/decoding is added by the D279/15 layer below; A0 serialization,
 transport and submit remain outside.

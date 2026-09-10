@@ -59,6 +59,7 @@ build_run () {
     "$root/libfprint-driver/goodix_runtime_material.c" \
     "$root/libfprint-driver/goodix_secure_session.c" \
     "$root/libfprint-driver/goodix_image_decoder.c" \
+    "$root/libfprint-driver/goodix_fdt_irq_policy.c" \
     "$root/libfprint-driver/goodix_post_tls_lifecycle.c" \
     "$root/libfprint-driver/goodix_enrollment_model.c" \
     "$root/libfprint-driver/goodix_enrollment_pipeline.c" \

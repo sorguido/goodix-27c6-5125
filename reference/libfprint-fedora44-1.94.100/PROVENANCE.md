@@ -72,6 +72,13 @@ completion until the target-local terminal finger-up event. This is a local
 state-machine adaptation, not an upstream Fedora or Rockytkg historical fact;
 the source-package identity and digests below remain unchanged.
 
+D279/59 adds `goodix_fdt_irq_policy.c` to the local Goodix Meson source list
+and updates the downstream Goodix driver integration to validate contextual
+FDT channel flags. The new policy source itself lives outside this immutable
+upstream snapshot under `libfprint-driver/`; this paragraph documents only the
+local build overlay. It does not alter the historical provenance, license,
+copyright, source-package identity or recorded digests of Fedora/libfprint.
+
 The Goodix-enabled D279/52 build links the separately ledgered Rockytkg R2
 preprocessor under `GPL-2.0-or-later`; that combined build is therefore
 distributed under GPL-compatible terms.  This local build policy does not

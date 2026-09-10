@@ -37,6 +37,7 @@ strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wfor
 sources="
 $root/libfprint-driver/goodix_a0_protocol.c
 $root/libfprint-driver/goodix_image_decoder.c
+$root/libfprint-driver/goodix_fdt_irq_policy.c
 $root/libfprint-driver/goodix_post_tls_lifecycle.c
 $root/libfprint-driver/goodix_usb_router.c
 $root/libfprint-driver/goodix_fpi_usb_backend.c

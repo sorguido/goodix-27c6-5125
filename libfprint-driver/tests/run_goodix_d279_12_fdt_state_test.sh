@@ -36,6 +36,7 @@ run_build () {
   extra=$2
   # shellcheck disable=SC2086
   gcc $strict $extra $cflags $includes \
+    "$root/libfprint-driver/goodix_fdt_irq_policy.c" \
     "$root/libfprint-driver/goodix_enrollment_fdt_state.c" \
     "$script_dir/test_goodix_enrollment_fdt_state.c" $libs \
     -o "$build/$name"
