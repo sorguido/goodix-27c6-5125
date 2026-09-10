@@ -38,7 +38,8 @@ meson setup "$build_dir" "$source_root" \
   -Ddoc=false \
   -Dinstalled-tests=false \
   -Dudev_rules=disabled \
-  -Dudev_hwdb=disabled
+  -Dudev_hwdb=disabled \
+  -Dc_args=-DGOODIX_D282_DIRECT_ENROLL_PROFILE
 meson compile -C "$build_dir" fprint-2
 # Install only the runtime target.  Besides keeping the candidate surface to
 # the one shared object required by the wrapper, this lets Meson apply the
@@ -52,6 +53,8 @@ if [ -z "$library" ] || [ "$(printf '%s\n' "$library" | wc -l)" -ne 1 ]; then
 fi
 
 grep -F -- '-DGOODIX_LIBFPRINT_SIGFM' \
+  "$build_dir/compile_commands.json" >/dev/null
+grep -F -- '-DGOODIX_D282_DIRECT_ENROLL_PROFILE' \
   "$build_dir/compile_commands.json" >/dev/null
 nm "$library" | grep -F ' fpi_device_goodix_27c6_5125_get_type' >/dev/null
 for forbidden_test_symbol in \
@@ -88,6 +91,9 @@ chmod 0600 "$output_dir/libfprint-2.so.2.0.0"
 echo D282_01_EXACT_LIBFPRINT=1.94.100
 echo D282_01_GOODIX_VERIFY_BUILT=true
 echo D282_01_SIGFM_VERIFY_BUILT=true
+echo D282_01_DIRECT_ENROLL_PROFILE_BUILT=true
+echo D282_01_IDENTIFY_FEATURE_ADVERTISED=false
+echo D282_01_VERIFY_FEATURE_ADVERTISED=true
 echo D282_01_PRODUCTION_BUILD_RPATH_PRESENT=false
 echo D282_01_HOST_TEST_SEAMS_PRESENT=false
 echo REAL_USB_ENUMERATION_ATTEMPTED=false

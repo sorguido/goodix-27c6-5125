@@ -1969,6 +1969,29 @@ test_d278_14_non_null_usb_binding (void)
   g_print ("NON_NULL_GUSBDEVICE_FPDEVICE_BINDING_HOST_ONLY_PROVEN=true\n");
 }
 
+static void
+test_d282_direct_enroll_feature_profile (void)
+{
+  g_autoptr(GUsbDevice) usb_device = NULL;
+  g_autoptr(GoodixFpImageDevice) device = NULL;
+
+  usb_device = (GUsbDevice *) g_object_new (G_USB_TYPE_DEVICE, NULL);
+  device = goodix_fpimage_device_new_for_usb (usb_device);
+  g_assert_nonnull (device);
+
+#ifdef GOODIX_D282_DIRECT_ENROLL_PROFILE
+  g_assert_false (fp_device_has_feature (
+    FP_DEVICE (device), FP_DEVICE_FEATURE_IDENTIFY));
+  g_assert_true (fp_device_has_feature (
+    FP_DEVICE (device), FP_DEVICE_FEATURE_VERIFY));
+  g_print ("D282_01_IDENTIFY_FEATURE_ADVERTISED=false\n");
+  g_print ("D282_01_VERIFY_FEATURE_ADVERTISED=true\n");
+#else
+  g_assert_true (fp_device_has_feature (
+    FP_DEVICE (device), FP_DEVICE_FEATURE_IDENTIFY));
+#endif
+}
+
 static GBytes *
 d279_24_build_response (guint8        control,
                         const guint8 *body,
@@ -2536,6 +2559,8 @@ main (int argc, char **argv)
                    test_d278_12_post_tls_context_ownership);
   g_test_add_func ("/goodix-fpimage-device/d278-14-non-null-usb-binding",
                    test_d278_14_non_null_usb_binding);
+  g_test_add_func ("/goodix-fpimage-device/d282-direct-enroll-feature-profile",
+                   test_d282_direct_enroll_feature_profile);
   g_test_add_func ("/goodix-fpimage-device/d279-08-production-open-close-ownership",
                    test_d279_08_production_open_close_ownership);
   g_test_add_func ("/goodix-fpimage-device/d279-08-production-open-failures",

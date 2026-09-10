@@ -30,6 +30,10 @@ ATTEMPT_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_01_NORMALIZED.env"
 ATTEMPT_REPORT = ROOT / "analysis/D282/D282_01_attempt_01_host_staging_failure.md"
 OFFLINE_RESULT = ROOT / "analysis/D282/D282_01_OFFLINE_RESULT.env"
 PROBE_AUDIT_RESULT = ROOT / "analysis/D282/D282_01_STAGING_PROBE_AUDIT.json"
+ATTEMPT_02_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_02_NORMALIZED.env"
+ATTEMPT_02_REPORT = ROOT / "analysis/D282/D282_01_attempt_02_post_live_analysis.md"
+ATTEMPT_02_CAPTURE = (
+    ROOT / "captures/D282_01/D28201_ATTEMPT_02_cc2452e5/sanitized")
 
 spec = importlib.util.spec_from_file_location(
     "d282_staging", ROOT / "analysis/D282/d282_01_staging_model.py")
@@ -63,6 +67,8 @@ class D282OfflineContract(unittest.TestCase):
         cls.attempt_env = ATTEMPT_ENV.read_text()
         cls.attempt_report = ATTEMPT_REPORT.read_text()
         cls.offline_result = OFFLINE_RESULT.read_text()
+        cls.attempt_02_env = ATTEMPT_02_ENV.read_text()
+        cls.attempt_02_report = ATTEMPT_02_REPORT.read_text()
 
     def test_01_exact_fprintd_one_print_dispatches_verify(self):
         verify_start = function_slice(
@@ -470,7 +476,7 @@ class D282OfflineContract(unittest.TestCase):
                 "FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST",
                 "SELINUX_EXEC_DENIAL=false",
                 "D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED",
-                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY"):
+                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION"):
             self.assertIn(marker, self.offline_result)
             self.assertIn(f"echo {marker}", self.kit)
 
@@ -849,6 +855,112 @@ cat "$live_result/summary.env"
             self.assertEqual(result.returncode, 0,
                              result.stdout + result.stderr)
             return result.stdout
+
+    def test_60_attempt_02_exact_fprintd_identify_then_enroll_root_cause(self):
+        enroll_start = function_slice(
+            self.fprintd, "fprint_device_enroll_start (", "fprint_device_enroll_stop (")
+        identify_cb = function_slice(
+            self.fprintd, "enroll_identify_cb (", "is_first_enrollment (")
+        feature_gate = enroll_start.index("FP_DEVICE_FEATURE_IDENTIFY")
+        identify = enroll_start.index("fp_device_identify (", feature_gate)
+        direct = enroll_start.index("enroll_start (rdev);", identify)
+        self.assertLess(feature_gate, identify)
+        self.assertLess(identify, direct)
+        stage = identify_cb.index('"enroll-stage-passed"')
+        enroll = identify_cb.index("enroll_start (rdev);", stage)
+        self.assertLess(stage, enroll)
+        self.assertIn("production_action_consumed", self.driver)
+        self.assertIn("already consumed; close/reopen required", self.driver)
+        self.assertIn(
+            "FPRINTD_DUPLICATE_IDENTIFY_THEN_ENROLL_COLLIDES_WITH_GOODIX_ONE_ACTION_PER_OPEN_EPOCH_FENCE",
+            self.attempt_02_report)
+
+    def test_61_d282_build_only_direct_enroll_profile_preserves_verify(self):
+        usb_class = function_slice(
+            self.driver, "goodix_usb_fpimage_device_class_init (",
+            "goodix_usb_fpimage_device_init (")
+        self.assertIn("#ifdef GOODIX_D282_DIRECT_ENROLL_PROFILE", usb_class)
+        self.assertIn("~((guint) FP_DEVICE_FEATURE_IDENTIFY)", usb_class)
+        self.assertNotIn("FP_DEVICE_FEATURE_VERIFY", usb_class.split(
+            "#ifdef GOODIX_D282_DIRECT_ENROLL_PROFILE", 1)[1].split(
+                "#endif", 1)[0])
+        self.assertIn("-DGOODIX_D282_DIRECT_ENROLL_PROFILE", self.build)
+        self.assertIn("D282_01_IDENTIFY_FEATURE_ADVERTISED=false", self.build)
+        self.assertIn("D282_01_VERIFY_FEATURE_ADVERTISED=true", self.build)
+
+    def test_62_enrollment_failure_evidence_is_captured_before_return(self):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        capture = live.index("capture_enroll_failure_evidence")
+        failure_return = live.index("return 1", capture)
+        restart = live.index("systemctl restart fprintd.service", failure_return)
+        self.assertLess(capture, failure_return)
+        self.assertLess(failure_return, restart)
+        helper = function_slice(
+            self.kit, "capture_enroll_failure_evidence ()", "run_authorized_live ()")
+        for marker in (
+                "FPRINTD_ENROLL_RETURN_CODE",
+                "FPRINTD_ENROLL_STAGE_PASSED_COUNT",
+                "FPRINTD_ENROLL_UNKNOWN_ERROR_COUNT",
+                "GOODIX_D282_EPOCH_AUDIT_LINE_COUNT",
+                "D282_01_FAILURE_EVIDENCE_CAPTURED_BEFORE_ROLLBACK"):
+            self.assertIn(marker, helper)
+
+        with tempfile.TemporaryDirectory() as td:
+            shell = r'''set -eu
+journalctl () {
+  if [[ ${1:-} == -u ]]; then
+    printf '%s\n' \
+      'GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_IDENTIFY attempts=1 rejected=0' \
+      'Device reported an error during enroll: already consumed'
+  else
+    printf '%s\n' \
+      'avc: denied { read } comm="fprintd" scontext=system_u:system_r:fprintd_t:s0 name="nr_hugepages"' \
+      'avc: denied { read } comm="unrelated" name="private"'
+  fi
+}
+''' + helper + r'''
+work=$1
+live_private="$work/private"
+live_result="$work/result"
+mkdir -p "$live_private" "$live_result"
+raw="$work/enroll.raw"
+printf '%s\n' \
+  'Enroll result: enroll-stage-passed' \
+  'Enroll result: enroll-unknown-error' >"$raw"
+capture_enroll_failure_evidence \
+  "$raw" '2026-09-10 00:00:00' alice deadbeef runstamp 1
+cat "$live_result/summary.env"
+printf '%s\n' D282_TEST_OPERATOR_LOG
+cat "$live_result/operator.log"
+'''
+            result = subprocess.run(
+                ["bash", "-c", shell, "d282-failure-capture", td],
+                capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0,
+                             result.stdout + result.stderr)
+            self.assertIn("FPRINTD_ENROLL_RETURN_CODE=1", result.stdout)
+            self.assertIn("FPRINTD_ENROLL_STAGE_PASSED_COUNT=1", result.stdout)
+            self.assertIn("FPRINTD_ENROLL_UNKNOWN_ERROR_COUNT=1", result.stdout)
+            self.assertIn("GOODIX_D282_EPOCH_AUDIT_LINE_COUNT=1", result.stdout)
+            self.assertIn('comm="fprintd"', result.stdout)
+            self.assertNotIn('comm="unrelated"', result.stdout)
+
+    def test_63_attempt_02_sanitized_import_is_hash_pinned_and_bounded(self):
+        expected = {
+            "operator.log": "c6d680671af7bf6bb5b994980d5cd3f0131d7a3555caee4db301608e7ce4aa25",
+            "summary.env": "e6b41990bbfe82e2bb8bae70cd504f37e76a4957e91a133cb6204c369e1cca4e",
+        }
+        import hashlib
+        for name, digest in expected.items():
+            self.assertEqual(
+                hashlib.sha256((ATTEMPT_02_CAPTURE / name).read_bytes()).hexdigest(),
+                digest)
+        self.assertIn("D282_01_ATTEMPT_02_GRANT_CONSUMED=true",
+                      self.attempt_02_env)
+        self.assertIn("D282_01_ATTEMPT_02_RETRY_AUTHORIZED=false",
+                      self.attempt_02_env)
+        self.assertIn("D282_01_ATTEMPT_02_EXACT_EPOCH_AUDIT=UNOBSERVED_EXPORT_GAP",
+                      self.attempt_02_env)
 
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
         live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")

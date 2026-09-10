@@ -3,15 +3,22 @@
 
 ## Stato e scopo
 
-La prima Human Gate D282/01 è chiusa come `FAIL_HOST_STAGING`: il grant è
-consumato senza retry autorizzato, `fprintd` ha fallito con status 126 prima di
-qualsiasi contatto o azione biometrica e il recovery manuale è stato attestato
-completo. Questo kit correttivo include ora un **privileged host staging
-probe** distinto dalla live biometrica. Il probe è stato autorizzato, eseguito
-e chiuso PASS sulla baseline `3d42daec016d1a2c3292ac35374ae117ef8d1611`;
-il grant è consumato e il probe non deve essere ripetuto. Non esistono baseline
-biometrica approvata, nuova candidate, nuovo grant o autorizzazione live. Il
-preflight resta offline e non enumera USB.
+La seconda Human Gate D282/01 sulla baseline
+`cc2452e52809d2adeccce83a9fe493a241770832` è chiusa come
+`FAIL_FPRINTD_IDENTIFY_TO_ENROLL_SAME_EPOCH_FENCE`. Il primo e unico contatto
+è stato consumato dal controllo anti-duplicato IDENTIFY che fprintd antepone
+all'enrollment; l'ENROLL immediatamente successivo è stato respinto dal fence
+Goodix prima di generation, TLS o USB. Il grant è consumato e non autorizza
+retry. Cleanup, servizio, staging, libreria di sistema e storage preesistente
+risultano ripristinati. Non esistono baseline biometrica approvata, nuova
+candidate, nuovo grant o autorizzazione live.
+
+Il correttivo offline compila la sola candidate D282 senza pubblicizzare
+IDENTIFY, conservando VERIFY: fprintd entra così direttamente in ENROLL e la
+sequenza resta entro un enrollment e due verify. Il fence per open epoch non è
+stato allentato. Il launcher raccoglie inoltre journal, audit epoch, AVC e
+conteggi client prima di uscire da un enrollment fallito. Il preflight resta
+offline e non enumera USB.
 
 La futura run copre soltanto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
 driver Goodix `27c6:5125`: enrollment dell'indice destro, FP3 SIGFM nello
@@ -23,7 +30,7 @@ fattore di autenticazione sono fuori scope.
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
-D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION
 D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST
 D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED
@@ -37,6 +44,16 @@ D282_01_PRIVILEGED_STAGING_PROBE_CURRENTLY_AUTHORIZED=false
 D282_01_PRIVILEGED_STAGING_PROBE_GRANT_CONSUMED=true
 D282_01_PRIVILEGED_STAGING_PROBE_RETRY_AUTHORIZED=false
 D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
+D282_01_ATTEMPT_02=FAIL_FPRINTD_IDENTIFY_TO_ENROLL_SAME_EPOCH_FENCE
+D282_01_ATTEMPT_02_BASELINE_SHA=cc2452e52809d2adeccce83a9fe493a241770832
+D282_01_ATTEMPT_02_GRANT_CONSUMED=true
+D282_01_ATTEMPT_02_RETRY_AUTHORIZED=false
+D282_01_ATTEMPT_02_FIRST_CONTACT_ACTION=IDENTIFY
+D282_01_ATTEMPT_02_ACTUAL_ENROLL_SENSOR_ACQUISITION_COUNT=0
+D282_01_ATTEMPT_02_SECOND_SENSOR_REACHING_ACTION_COUNT=0
+D282_01_DIRECT_ENROLL_PROFILE=PASS_OFFLINE_NORMAL_AND_ASAN_UBSAN
+D282_01_IDENTIFY_FEATURE_ADVERTISED=false
+D282_01_VERIFY_FEATURE_ADVERTISED=true
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -59,6 +76,16 @@ SECOND_SENSOR_REACHING_ACTION_COUNT=0
 ```
 
 ## Perché VERIFY e politica anti-retry
+
+Nel flusso enrollment, diversamente da `fprintd-verify`, il sorgente esatto
+fprintd chiama prima `fp_device_identify()` se il device pubblicizza IDENTIFY.
+Il callback no-match emette `enroll-stage-passed` e chiama poi
+`fp_device_enroll()` senza chiudere il device. Questo comportamento ha causato
+l'attempt 02: il primo contatto era IDENTIFY e il successivo ENROLL è stato la
+seconda action dello stesso open epoch. Il profilo build-only
+`GOODIX_D282_DIRECT_ENROLL_PROFILE` rimuove esclusivamente il feature bit
+IDENTIFY dalla candidate del kit e conserva VERIFY; non cambia protocollo,
+limiti di contatto o fence production.
 
 Nel sorgente esatto Fedora, `fprintd-verify` carica la gallery. Se esiste un
 solo template ne seleziona il dito e chiama `fp_device_verify()`, non

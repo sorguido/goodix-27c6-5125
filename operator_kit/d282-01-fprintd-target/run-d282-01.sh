@@ -351,7 +351,7 @@ offline_preflight () {
   audit_staging_probe_candidate "$d282_offline_work/staging-probe"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=59
+  echo D282_01_TEST_MATRIX_COUNT=63
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
@@ -405,7 +405,7 @@ offline_preflight () {
   echo D282_01_STAGING_PROBE_GOODIX_DRIVER_PRESENT=false
   echo REAL_SENSOR_ACCESSED=false
   echo D282_01_OFFLINE_CLOSURE=PASS
-  echo D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
+  echo D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION
   echo CURRENT_LIVE_AUTHORIZED=false
   echo CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
   echo APPROVED_BASELINE=NONE
@@ -903,6 +903,48 @@ run_authorized_staging_probe () {
   return 0
 }
 
+capture_enroll_failure_evidence () {
+  local raw=$1 since=$2 user=$3 baseline=$4 stamp=$5 action_rc=$6
+  local stage_passed unknown_error completed retry_markers audit_lines
+  local journal="$live_private/enroll-failure-journal.raw"
+  local audit="$live_private/enroll-failure-audit.raw"
+  local avc="$live_private/enroll-failure-avc.raw"
+  local selected="$live_private/enroll-failure-selected.raw"
+
+  journalctl -u fprintd.service --since "$since" --no-pager >"$journal" || true
+  grep 'GOODIX_D282_EPOCH_AUDIT' "$journal" >"$audit" || true
+  journalctl --since "$since" --no-pager 2>/dev/null |
+    grep -Ei 'avc:.*denied' |
+    grep -Ei 'fprintd_t|comm="fprintd"|opencv|nr_hugepages|goodix-d282' \
+      >"$avc" || true
+  {
+    grep -E 'GOODIX_D282_EPOCH_AUDIT|Device reported an error during (identify for enroll|enroll):|Failed to detect minutiae:' \
+      "$journal" || true
+    grep -Ei 'avc:.*denied' "$avc" || true
+  } >"$selected"
+
+  stage_passed=$(grep -c '^Enroll result: enroll-stage-passed$' "$raw" || true)
+  unknown_error=$(grep -c '^Enroll result: enroll-unknown-error$' "$raw" || true)
+  completed=$(grep -c '^Enroll result: enroll-completed$' "$raw" || true)
+  retry_markers=$(grep -c 'enroll-retry-' "$raw" || true)
+  audit_lines=$(wc -l <"$audit")
+
+  {
+    echo "FPRINTD_ENROLL_RETURN_CODE=$action_rc"
+    echo "FPRINTD_ENROLL_STAGE_PASSED_COUNT=$stage_passed"
+    echo "FPRINTD_ENROLL_UNKNOWN_ERROR_COUNT=$unknown_error"
+    echo "FPRINTD_ENROLL_COMPLETED_COUNT=$completed"
+    echo "FPRINTD_ENROLL_RETRY_MARKER_COUNT=$retry_markers"
+    echo "GOODIX_D282_EPOCH_AUDIT_LINE_COUNT=$audit_lines"
+    echo D282_01_FAILURE_EVIDENCE_CAPTURED_BEFORE_ROLLBACK=true
+  } >>"$live_result/summary.env"
+  {
+    echo "D282_01_FAILURE_EVIDENCE_CAPTURED_BEFORE_ROLLBACK=true"
+    sed "s/$user/<USER>/g; s/${baseline}/<BASELINE>/g; s/${stamp}/<RUN>/g" \
+      "$raw" "$selected"
+  } >>"$live_result/operator.log"
+}
+
 run_authorized_live () {
   local candidate=$1 grant=$2 state baseline manifest expected_id user stamp
   local daemon_pid raw epoch_count enroll_count verify_count action_rc=1
@@ -1025,9 +1067,15 @@ run_authorized_live () {
   echo "PHASE_A=Enrollment indice destro: otto contatti, nessuna ripetizione extra."
   raw="$live_private/enroll.raw"
   set +e; timeout --signal=INT --kill-after=20s 1060s fprintd-enroll -f right-index-finger "$user" 2>&1 | tee "$raw"; action_rc=${PIPESTATUS[0]}; set -e
-  [[ $action_rc -eq 0 && $(grep -c '^Enroll result: enroll-completed$' "$raw") -eq 1 ]] || return 1
   enroll_retry_count=$(grep -c 'enroll-retry-' "$raw" || true)
-  [[ $enroll_retry_count -eq 0 ]] || refuse ENROLLMENT_RETRY_MARKER_OBSERVED
+  if [[ $action_rc -ne 0 ||
+        $(grep -c '^Enroll result: enroll-completed$' "$raw") -ne 1 ||
+        $enroll_retry_count -ne 0 ]]; then
+    capture_enroll_failure_evidence \
+      "$raw" "$since" "$user" "$baseline" "$stamp" "$action_rc"
+    [[ $enroll_retry_count -eq 0 ]] || refuse ENROLLMENT_RETRY_MARKER_OBSERVED
+    return 1
+  fi
   [[ $(find "$live_owned" -type l | wc -l) -eq 0 ]] || return 1
   [[ $(find "$live_owned" -type f | wc -l) -eq 1 ]] || return 1
   stored=$(find "$live_owned" -type f -print)

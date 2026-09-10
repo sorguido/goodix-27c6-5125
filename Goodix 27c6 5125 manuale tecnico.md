@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — D282/01 probe staging chiuso, gate biometrico pronto
+### Stato corrente — D282/01 attempt 02 chiuso, correttivo direct-enroll offline
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -249,7 +249,7 @@ active/inactive × successo/failure attraversano il vero cleanup in
 sottoprocessi Bash e preservano lo stato; una regressione aggiuntiva prova il
 fail-closed sul mismatch.
 
-La matrice D282 è 59/59; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+La matrice D282 pre-attempt 02 era 59/59; regressioni D281 6/6 e daemon/D-Bus privato PASS;
 suite D278/D279/D280/D282 27/27 normal e 27/27 ASan/UBSan; build Fedora/SIGFM,
 registry e ABI fprintd PASS. La candidate probe virtual-only è stata costruita
 e auditata realmente offline. I due profili drop-in sono generati dal vero
@@ -275,9 +275,40 @@ safety fence al sorgente della baseline. La successiva osservazione
 invalida lo snapshot sincrono del rollback; la sola directory padre vuota
 `/run/goodix-d282-01` è housekeeping non bloccante.
 
-Il blocker systemd/SELinux è pertanto chiuso. Non esistono una baseline
-biometrica approvata, candidate o grant live; tuttavia il kit supera la review
-pre-gate e `D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY`.
+Il blocker systemd/SELinux è pertanto chiuso. La successiva Human Gate
+biometrica è stata eseguita sulla baseline
+`cc2452e52809d2adeccce83a9fe493a241770832` ed è chiusa fail-closed. Il primo
+e unico contatto osservato non era enrollment: fprintd, vedendo IDENTIFY fra
+le feature del device, ha eseguito il controllo anti-duplicato
+`fp_device_identify()`. Il callback no-match ha emesso
+`enroll-stage-passed` e ha avviato subito `fp_device_enroll()` senza close.
+Il fence Goodix one-action-per-open-epoch ha quindi respinto ENROLL prima di
+generation, TLS o USB; fprintd ha tradotto `FP_DEVICE_ERROR_NOT_SUPPORTED` in
+`enroll-unknown-error`. L'assenza del secondo contatto è il comportamento
+fail-closed atteso. Il grant attempt 02 è consumato e non autorizza retry.
+
+L'AVC SELinux OpenCV su `nr_hugepages` non è la causa del terminale: dopo
+l'AVC, IDENTIFY è arrivato al callback no-match e alla transizione verso
+ENROLL. Non è richiesta né proposta alcuna modifica di policy SELinux. Gli
+allegati osservano rollback completo, servizio ripristinato, staging rimosso,
+libreria di sistema e storage preesistente invariati. L'export ha però perso
+journal e audit epoch perché il launcher ritornava prima della raccolta; i
+contatori esatti Goodix/TLS/USB restano non osservati. Nessun FP3 è stato
+creato perché ENROLL non ha raggiunto la generation.
+
+Il correttivo offline non allenta il fence e non aggiunge una quarta action o
+un undicesimo contatto. La sola candidate D282 usa
+`GOODIX_D282_DIRECT_ENROLL_PROFILE`: non pubblicizza IDENTIFY, conserva VERIFY
+e porta l'esatto fprintd nel ramo ENROLL diretto. Il launcher ora raccoglie
+journal, audit epoch, AVC e conteggi client prima di ogni return di failure
+enrollment. La matrice D282 è `63/63`; il test della classe Goodix conferma
+`IDENTIFY=false` e `VERIFY=true` normal e ASan/UBSan. Gli allegati byte-identici
+e hash-pinned, lo stato normalizzato e il report causale sono in
+`captures/D282_01/D28201_ATTEMPT_02_cc2452e5/` e `analysis/D282/`.
+
+Non esistono ora baseline approvata, candidate approvata, grant o
+autorizzazione live. Qualunque futura run richiede un nuovo full SHA approvato
+esplicitamente, nuovo grant one-shot e nuova autorizzazione Human Gate.
 
 PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
 sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
@@ -353,9 +384,9 @@ FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
-D282_01_OUTCOME=OFFLINE_CLOSURE_AND_PRIVILEGED_STAGING_PROBE_PASS
+D282_01_OUTCOME=ATTEMPT_02_FAIL_CLOSED_AND_DIRECT_ENROLL_CORRECTIVE_PASS_OFFLINE
 D282_01_OFFLINE_CLOSURE=PASS
-D282_01_BIOMETRIC_HUMAN_GATE_READINESS=READY
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
@@ -370,7 +401,10 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=59/59_PASS
+D282_01_REQUIRED_MATRIX=63/63_PASS
+D282_01_DIRECT_ENROLL_FEATURE_PROFILE=PASS_NORMAL_AND_ASAN_UBSAN
+D282_01_DIRECT_ENROLL_IDENTIFY_FEATURE_ADVERTISED=false
+D282_01_DIRECT_ENROLL_VERIFY_FEATURE_ADVERTISED=true
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
@@ -400,6 +434,18 @@ D282_01_PRIVILEGED_STAGING_PROBE_RETRY_AUTHORIZED=false
 D282_01_STAGING_PROBE_IMPORTED_SUMMARY_SHA256=988f992039b6cee1d0dcc64aef4bc53775f6fb5617ec1ec6ce7a93ac558e49ef
 D282_01_STAGING_PROBE_IMPORT_PROVENANCE=OPERATOR_SUPPLIED_VERBATIM_SUMMARY_TRANSCRIPT
 D282_01_PRIVILEGED_STAGING_PROBE_SERVICE_STATE_CORRECTIVE=PASS
+D282_01_ATTEMPT_02=FAIL_FPRINTD_IDENTIFY_TO_ENROLL_SAME_EPOCH_FENCE
+D282_01_ATTEMPT_02_BASELINE_SHA=cc2452e52809d2adeccce83a9fe493a241770832
+D282_01_ATTEMPT_02_GRANT_CONSUMED=true
+D282_01_ATTEMPT_02_RETRY_AUTHORIZED=false
+D282_01_ATTEMPT_02_FIRST_CONTACT_ACTION=IDENTIFY
+D282_01_ATTEMPT_02_ACTUAL_ENROLL_SENSOR_ACQUISITION_COUNT=0
+D282_01_ATTEMPT_02_SECOND_ACTION_ATTEMPT=ENROLL_REJECTED_PRE_GENERATION
+D282_01_ATTEMPT_02_SECOND_SENSOR_REACHING_ACTION_COUNT=0
+D282_01_ATTEMPT_02_EXACT_EPOCH_AUDIT=UNOBSERVED_EXPORT_GAP
+D282_01_ATTEMPT_02_OPERATOR_LOG_SHA256=c6d680671af7bf6bb5b994980d5cd3f0131d7a3555caee4db301608e7ce4aa25
+D282_01_ATTEMPT_02_SUMMARY_ENV_SHA256=e6b41990bbfe82e2bb8bae70cd504f37e76a4957e91a133cb6204c369e1cca4e
+D282_01_FAILURE_EVIDENCE_CAPTURE_BEFORE_ROLLBACK=PASS_OFFLINE
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true

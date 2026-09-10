@@ -1165,7 +1165,7 @@ goodix_fpimage_device_img_close (FpImageDevice *dev)
       const GoodixProductionEnrollmentAudit *audit =
         &priv->last_production_audit;
       g_autofree gchar *action_name = g_enum_to_string (
-        FPI_TYPE_DEVICE_ACTION, audit->production_action);
+        FPI_TYPE_DEVICE_ACTION, (gint) audit->production_action);
 
       g_message (
         "GOODIX_D282_EPOCH_AUDIT action=%s attempts=%u rejected=%u "
@@ -1437,6 +1437,19 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
   device_class->type      = FP_DEVICE_TYPE_USB;
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
   device_class->id_table  = goodix_usb_id_table;
+
+#ifdef GOODIX_D282_DIRECT_ENROLL_PROFILE
+  /* The exact Fedora fprintd enrollment flow performs an IDENTIFY action as
+   * a duplicate pre-check whenever the device advertises IDENTIFY, then
+   * starts ENROLL without closing the device.  D282 deliberately permits one
+   * enrollment action and two verify actions, while the production epoch
+   * fence permits only one sensor-reaching action per open epoch.  The
+   * D282-only build therefore keeps VERIFY but does not advertise IDENTIFY,
+   * making fprintd use its documented direct-enrollment branch. */
+  device_class->features = (FpDeviceFeature) (
+    (guint) device_class->features &
+    ~((guint) FP_DEVICE_FEATURE_IDENTIFY));
+#endif
 
   /* The production protocol permits exactly eight sensor acquisitions for
    * enrollment.  Once an image has been delivered, host-side SIGFM failure
