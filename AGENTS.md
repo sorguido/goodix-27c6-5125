@@ -6,15 +6,15 @@ Questo file è la costituzione operativa persistente per l'agente AI che lavora 
 
 Le fonti principali sono:
 
-1. decisione o autorizzazione esplicita corrente dell'Utente;
+1. decisione esplicita corrente dell'Utente;
 2. `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
 3. questo `AGENTS.md`;
 4. `Goodix 27c6 5125 manuale tecnico.md` per lo stato tecnico corrente;
 5. evidenze versionate nel repository.
 
-Una decisione esplicita corrente dell'Utente può autorizzare una deroga limitata. Nessuna deroga può essere inferita da un generico “procedi”, dalla disponibilità dell'hardware o dal fatto che una stessa operazione sia stata autorizzata in passato.
+Una decisione esplicita corrente dell'Utente può modificare o derogare in modo limitato la governance. L'avvio manuale di un operator kit live da parte dell'Utente costituisce di per sé scelta operativa sufficiente per quella esecuzione: non richiede frasi di autorizzazione, grant, token, file one-shot o approvazioni rituali.
 
-`START_PROMPT.md` definisce il bootstrap/recovery e il loop autonomo PM↔Executor. Non è una fonte autorizzativa per superare i gate di questo file.
+`START_PROMPT.md` definisce il bootstrap/recovery e il loop autonomo PM↔Executor.
 
 ---
 
@@ -175,69 +175,55 @@ PROJECT_STEP_COMPLETE
 
 ---
 
-## 6. Human Gate — regole ferree
+## 6. Gate umani — solo decisioni materiali e operazioni protette
 
-Quando ricorre un Human Gate, l'agente deve fermarsi **prima** dell'azione soggetta a gate.
+`HUMAN_REQUIRED` è riservato a decisioni realmente materiali o a operazioni che escono dalle invarianti del progetto. Non va usato come cerimonia per normali test live già confinati da un operator kit factory-preserving.
 
-Non aggirare il gate, non degradarlo a semplice warning e non interpretare prudenza generica come autorizzazione.
+### 6.1 Live ordinario
 
-Sono sempre Human Gate, salvo autorizzazione esplicita e specifica già valida per quella singola azione/run:
+NON richiedono una autorizzazione separata, un grant, un token one-shot o una baseline approvata dall'Utente:
 
-### 6.1 Hardware e live
+- avvio manuale di un operator kit live factory-preserving;
+- accesso USB Goodix reale previsto dal kit;
+- comandi sensor-reaching già compresi e confinati dal kit;
+- `sudo` digitato dall'Utente per avviare il kit;
+- riesecuzione manuale del kit dopo review del risultato, purché il kit non segnali `RECOVERY_REQUIRED` e non cambi scope/rischio.
 
-- nuova esecuzione live sul sensore;
-- accesso USB Goodix reale;
-- invio di comandi sensor-reaching;
-- retry live non esplicitamente autorizzato;
-- installazione/attivazione runtime che possa raggiungere il sensore;
-- operazioni che possano modificare stato persistente;
-- qualunque eccezione alle invarianti factory-preserving.
+L'atto di eseguire il comando del kit è sufficiente. Restano vietati retry automatici o impliciti dentro una singola action quando il protocollo non li prevede.
 
-Una autorizzazione live è one-shot e non si riutilizza implicitamente.
+### 6.2 Operazioni realmente protette
 
-### 6.2 Privilegi e protected material
+Richiedono decisione esplicita dell'Utente:
 
-- uso di `sudo`, root o privilegi equivalenti da parte dell'agente nel terminale/ambiente VS Code;
-- accesso o manipolazione di PSK, secret, chiavi o protected material non già specificamente autorizzati;
-- estrazione di materiale protetto fuori dallo scope approvato.
+- qualunque eccezione all'invariante factory-preserving;
+- flash, IAP, ClearApp, provisioning, sostituzione/reprovisioning PSK, OTP/factory/persistent writes o cambio persistente VID:PID/mode;
+- accesso o trasferimento di protected material fuori dallo scope già definito;
+- installazioni permanenti o modifiche persistenti del sistema non previste dal piano corrente;
+- qualunque comando wire non compreso con possibile effetto persistente.
 
 ### 6.3 Git protetto
 
+Richiedono decisione esplicita dell'Utente:
+
 - qualsiasi modifica di `main`;
-- commit su `main`;
-- push verso `main`;
-- merge in `main`;
-- rebase/cherry-pick/update-ref/reset che alteri `main`;
+- commit/push/merge/rebase/cherry-pick/update-ref/reset che alteri `main`;
 - qualsiasi modifica di `bakcup_pre_agentic_mode`;
-- force push;
-- amend di commit già condivisi;
-- history rewrite;
+- force push, amend di storia condivisa o history rewrite;
 - reset/stash distruttivo o cancellazione di modifiche preesistenti dell'Utente.
 
 ### 6.4 Governance, scope e licensing
 
-- cambiamento materiale dell'obiettivo;
-- ampliamento sostanziale dello scope;
-- cambio di strategia tecnica con nuovo profilo di rischio;
+Richiedono decisione esplicita dell'Utente:
+
+- cambiamento materiale dell'obiettivo o ampliamento sostanziale dello scope;
+- cambio di strategia con nuovo profilo di rischio;
 - modifica del licensing boundary;
-- modifica delle policy permanenti o dei guardrail;
-- operazioni sul repository pubblico;
-- pubblicazione di materiale privato o non auditato.
+- modifica delle policy permanenti;
+- operazioni sul repository pubblico o pubblicazione di materiale privato/non auditato.
 
-### 6.5 Ambiguità materiale
+### 6.5 Ambiguità materiale e blocker reale
 
-L'agente può e deve risolvere autonomamente le normali incertezze tecniche tramite repository, test e documentazione.
-
-Deve invece fermarsi con `HUMAN_REQUIRED` quando esiste una **ambiguità materiale** che:
-
-1. non può essere risolta affidabilmente con le fonti e le evidenze disponibili; **e**
-2. una scelta autonoma potrebbe alterare sicurezza, scope, strategia, licensing, stato Git protetto o distruggere/invalidare lavoro significativo.
-
-Non usare l'ambiguità come scappatoia per evitare normale lavoro investigativo.
-
-### 6.6 Blocker reale
-
-Fermarsi anche quando una capability, informazione o risorsa esterna indispensabile non è disponibile e non esiste un percorso autonomo sicuro equivalente.
+Le normali incertezze tecniche vanno risolte autonomamente. Usa `HUMAN_REQUIRED` solo se una scelta non risolvibile dalle fonti potrebbe alterare materialmente sicurezza, scope, strategia, licensing, Git protetto o distruggere lavoro significativo, oppure se manca una capability esterna indispensabile.
 
 ---
 
@@ -283,34 +269,31 @@ L'esistenza di branch, commit o PR non costituisce da sola prova di correttezza.
 
 ## 8. Test live e operator kit
 
-Se il progresso richiede un intervento live, USB reale o un'operazione privilegiata dell'Utente, l'agente **non deve eseguirla direttamente**.
-
-Deve preparare, quando tecnicamente possibile, un operator kit in:
+Se il progresso richiede live, USB reale o privilegi, l'agente prepara quando possibile un operator kit in:
 
 ```text
 <git-root>/operator_kit/<step-o-scopo>/
 ```
 
-Il kit deve includere almeno:
+Il kit deve essere **direttamente eseguibile dall'Utente** e partire al primo comando utile, senza flussi di attivazione separati. Deve includere almeno:
 
-- script `.sh` eseguibile dall'Utente quando appropriato;
-- istruzioni operative in italiano;
-- output interattivi dello script in italiano;
-- prerequisiti;
-- rischio e scopo della run;
-- conferme/stop condition necessarie;
-- percorso degli output prodotti;
+- script `.sh` eseguibile e istruzioni operative in italiano;
+- prerequisiti realmente necessari;
+- rischio, scopo e comportamento atteso;
+- output/evidenze e failure reporting leggibili;
 - cleanup/release/reseal quando applicabili;
-- comportamento fail-closed leggibile.
+- guardrail tecnici fail-closed.
 
-Regole:
+Regole permanenti:
 
-- l'agente può costruire e verificare offline il kit;
-- l'agente non esegue il live;
-- l'agente non esegue `sudo` nel workflow attivo VS Code;
-- eventuale `sudo` necessario deve trovarsi nel percorso manualmente avviato dall'Utente e deve essere chiaramente visibile nelle istruzioni;
-- dopo la preparazione del kit, l'agente termina con `HUMAN_REQUIRED`;
-- niente comandi USB/Python improvvisati come sostituto del kit quando un kit dedicato è praticabile.
+- niente grant, token, authorization file, claim one-shot o frasi rituali di autorizzazione;
+- niente step `prepare authorization` / `activate` separati dalla normale preparazione tecnica;
+- il kit registra automaticamente HEAD/build/provenance necessari alla review;
+- eventuale `sudo` deve essere visibile nel comando avviato dall'Utente, ma non richiede una seconda autorizzazione;
+- il kit può fare preflight tecnici automatici e deve fallire prima del sensor-reaching se l'ambiente è incompatibile;
+- retry **automatici/impliciti** sensor-reaching restano vietati salvo semantica protocollo già provata; una nuova invocazione manuale del kit non richiede un nuovo grant;
+- non sostituire un kit dedicato con comandi USB/Python improvvisati quando il kit è praticabile;
+- l'agente non deve trasformare hash, marker o audit host-side in cerimonie che impediscono l'avvio senza ridurre un rischio reale.
 
 ---
 
@@ -324,43 +307,35 @@ Prima di preparare una nuova run live dopo un fallimento, rispondi esplicitament
 
 Pacing, logging, packaging, hash, preflight o altre cautele host-side non costituiscono da soli una nuova ipotesi tecnica.
 
-Se non esiste una risposta sostanziale alle prime due domande, non preparare un terzo tentativo equivalente. Riesamina il metodo e, se il cambio richiesto è materiale, usa `HUMAN_REQUIRED`.
+Se non esiste una risposta sostanziale alle prime due domande, non preparare un tentativo equivalente: riesamina e correggi il metodo. Usa `HUMAN_REQUIRED` solo se il cambio richiesto modifica materialmente scope, rischio o invarianti.
 
 La conclusione metodologica rilevante va integrata nel manuale tecnico. Non creare per default un secondo diario canonico.
 
 ---
 
-## 10. Guardrail live da non semplificare
+## 10. Guardrail live tecnici
 
 Quando applicabili, preservare:
 
-- autorizzazione esplicita della singola run;
-- single-shot;
-- zero retry implicito;
+- zero retry automatico/implicito non provato;
+- limiti espliciti di action/contatti quando il protocollo li richiede;
 - fail-closed su comandi non compresi o potenzialmente persistenti;
 - cleanup/release/reseal garantiti anche su uscita anomala;
-- verifica del live-critical set contro la baseline approvata;
-- diagnostica leggibile del failure.
+- verifica automatica del live-critical set rispetto al commit/build effettivamente eseguito;
+- diagnostica ed evidenza raccolte prima del cleanup quando possibile;
+- distinzione tra failure protocollo/safety e failure di parser/audit host-side.
 
-Questi sono guardrail hardware. Non sostituirli con sola prosa.
+Non sono guardrail hardware e non vanno reintrodotti: autorizzazioni rituali, grant one-shot, token di consenso, approvazione manuale dello SHA o passaggi di attivazione separati.
 
 ---
 
-## 11. Baseline live approvata
+## 11. Provenance della live
 
-Una baseline live revisionata è identificata da un **commit SHA completo approvato esplicitamente dall'Utente** per il percorso live rilevante.
+Ogni kit live deve registrare automaticamente il commit SHA completo e gli hash del live-critical set/build effettivamente eseguito. Questo serve alla **provenance**, non come meccanismo autorizzativo.
 
-L'agente non deve inventare o auto-approvare tale SHA.
+Il launcher deve rifiutare worktree/live-critical drift non previsto quando tale drift rende ambigua la provenance; non deve richiedere che l'Utente “approvi” preventivamente lo SHA.
 
-La verifica deve concentrarsi sul live-critical set, normalmente:
-
-- launcher live corrente;
-- backend USB reale;
-- entrypoint reale;
-- moduli che possono inviare comandi USB;
-- guardrail software di autorizzazione, single-shot, cleanup/reseal.
-
-Modifiche a manuale, report o test offline non devono invalidare automaticamente una baseline live già approvata.
+La review successiva usa SHA, hash, log e artefatti per stabilire cosa è stato realmente eseguito.
 
 ---
 
@@ -408,7 +383,7 @@ Quando lo step crea, modifica, abilita o dichiara pronto un percorso eseguibile/
 - failure reporting leggibile;
 - differenze tra ambiente di test e ambiente operatore.
 
-Se il percorso reale richiede live, USB o privilegi, verificarne offline tutto ciò che è possibile e demandare l'esecuzione effettiva all'operator kit/Human Gate.
+Se il percorso reale richiede live, USB o privilegi, verificarne offline tutto ciò che è possibile e demandare l'esecuzione effettiva al relativo operator kit avviato direttamente dall'Utente.
 
 Per step puramente documentali o di repository hygiene, `EXECUTABLE_CLOSURE=NOT_APPLICABLE` è legittimo se motivato.
 
@@ -539,8 +514,8 @@ Se durante il loop emerge una discrasia nella procedura:
 
 - non autoriscrivere la costituzione per adattarla al comportamento corrente;
 - descrivi la discrasia;
-- usa `HUMAN_REQUIRED` se è materiale;
-- attendi la decisione dell'Utente.
+- usa `HUMAN_REQUIRED` solo se è materiale e richiede realmente una decisione dell'Utente;
+- altrimenti correggi autonomamente la procedura.
 
 Questo non impedisce modifiche ai documenti quando l'Utente le richiede esplicitamente, come nello step di governance che ha introdotto la modalità autonoma.
 
@@ -559,7 +534,7 @@ recovery evidence-first
 +
 alternanza disciplinata Executor/PM
 +
-Human Gate espliciti
+gate umani limitati alle sole decisioni materiali
 +
 review Git-native
 =
