@@ -103,6 +103,9 @@ struct _GoodixDeviceContext
   gboolean                   terminal_enroll_completion_held;
   gboolean                   terminal_delivery_at_release_ready;
   gboolean                   production_action_consumed;
+  FpiDeviceAction            production_action;
+  guint                      production_action_attempt_count;
+  guint                      production_rejected_action_count;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeMaterialReleaseSeam runtime_material_release;
   gpointer                   runtime_material_release_data;
@@ -340,7 +343,8 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   post_material.first_arm_timestamp = production_timestamp ();
   post_material.second_arm_timestamp = production_timestamp ();
   post_material.capture_profile =
-    action == FPI_DEVICE_ACTION_IDENTIFY ?
+    (action == FPI_DEVICE_ACTION_IDENTIFY ||
+     action == FPI_DEVICE_ACTION_VERIFY) ?
       GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION :
       GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION;
   if (!goodix_device_context_configure_post_tls_lifecycle (
@@ -661,6 +665,9 @@ goodix_device_context_collect_production_enrollment_audit (
   g_return_if_fail (audit != NULL);
 
   *audit = (GoodixProductionEnrollmentAudit) {
+    .production_action = (guint) ctx->production_action,
+    .production_action_attempt_count = ctx->production_action_attempt_count,
+    .production_rejected_action_count = ctx->production_rejected_action_count,
     .production_action_consumed = ctx->production_action_consumed,
     .auxiliary_b0_observed_count = ctx->runtime_enrollment_auxiliary_count,
     .terminal_enroll_completion_hold_count =
@@ -1136,6 +1143,8 @@ static void
 goodix_fpimage_device_img_close (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
+  GoodixFpImageDevicePrivate *priv =
+    goodix_fpimage_device_get_instance_private (self);
   GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
   g_autoptr(GError) error = NULL;
 
@@ -1149,6 +1158,48 @@ goodix_fpimage_device_img_close (FpImageDevice *dev)
   if (ctx->usb_interface_claimed)
     (void) goodix_fpimage_device_release_claim (self, &error);
   goodix_fpimage_device_discard_context (self);
+
+  if (goodix_fpimage_device_is_production_usb (self) &&
+      priv->last_production_audit_valid)
+    {
+      const GoodixProductionEnrollmentAudit *audit =
+        &priv->last_production_audit;
+      g_autofree gchar *action_name = g_enum_to_string (
+        FPI_TYPE_DEVICE_ACTION, audit->production_action);
+
+      g_message (
+        "GOODIX_D282_EPOCH_AUDIT action=%s attempts=%u rejected=%u "
+        "consumed=%u tls=%u "
+        "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
+        "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
+        "secure_retry=%u post_retry=%u reopen=%u reset=%u clear_halt=%u "
+        "persistent=%u real_submit=%" G_GUINT64_FORMAT " "
+        "outstanding=%u drained=%u context_closed=%u",
+        action_name != NULL ? action_name : "UNKNOWN",
+        audit->production_action_attempt_count,
+        audit->production_rejected_action_count,
+        audit->production_action_consumed,
+        audit->tls.handshake_count,
+        audit->post_tls.first_image_pipeline_count,
+        audit->post_tls.release_tail_complete_count,
+        audit->post_tls.single_acquisition_terminal_count,
+        audit->post_tls.rearm_0x32_count,
+        audit->enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
+        audit->enrollment_events.lifecycle.plan.inter_stage_rearm_count,
+        audit->enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
+        audit->secure.retry_count,
+        audit->post_tls.retry_count,
+        audit->secure.transport_reopen_count + audit->post_tls.reopen_count,
+        audit->secure.device_reset_count + audit->post_tls.device_reset_count,
+        audit->secure.clear_halt_count + audit->post_tls.clear_halt_count,
+        audit->secure.persistent_write_count +
+          audit->post_tls.persistent_device_write_count +
+          audit->enrollment_binding.transaction.frame.persistent_family_count,
+        audit->usb_real_submit_count,
+        audit->usb_outstanding_count,
+        audit->usb_backend_drained,
+        audit->context_closed);
+    }
 
   fpi_image_device_close_complete (dev, g_steal_pointer (&error));
 }
@@ -1185,11 +1236,13 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       fpi_device_get_current_action (FP_DEVICE (self)) !=
         FPI_DEVICE_ACTION_ENROLL &&
       fpi_device_get_current_action (FP_DEVICE (self)) !=
+        FPI_DEVICE_ACTION_VERIFY &&
+      fpi_device_get_current_action (FP_DEVICE (self)) !=
         FPI_DEVICE_ACTION_IDENTIFY)
     {
       error = g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-        "Goodix production boundary permits enrollment and identify only");
+        "Goodix production boundary permits enrollment, verify and identify only");
       fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
       return;
     }
@@ -1200,6 +1253,8 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
   if (goodix_fpimage_device_is_production_usb (self) &&
       ctx->production_action_consumed)
     {
+      ctx->production_action_attempt_count++;
+      ctx->production_rejected_action_count++;
       error = g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
         "Goodix production open epoch already consumed; close/reopen required");
@@ -1207,7 +1262,12 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       return;
     }
   if (goodix_fpimage_device_is_production_usb (self))
-    ctx->production_action_consumed = TRUE;
+    {
+      ctx->production_action_attempt_count++;
+      ctx->production_action_consumed = TRUE;
+      ctx->production_action = fpi_device_get_current_action (
+        FP_DEVICE (self));
+    }
 
   /* New activation -> new generation, reset per-activation gates. */
   ctx->generation_seq++;

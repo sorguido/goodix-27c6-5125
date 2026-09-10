@@ -79,6 +79,15 @@ upstream snapshot under `libfprint-driver/`; this paragraph documents only the
 local build overlay. It does not alter the historical provenance, license,
 copyright, source-package identity or recorded digests of Fedora/libfprint.
 
+D282/01 completes the bounded `FpImageDevice` action integration for
+`FPI_DEVICE_ACTION_VERIFY`. The forward-port follows the existing Rockytkg
+image-device mechanics, uses the already ledgered SIGFM matcher, and adapts
+Fedora 1.94.100's newer match-report validation so a matcher-backed SIGFM
+probe is treated like NBIS rather than requiring byte equality with its
+multi-sample enrollment template. The Goodix target maps VERIFY onto the same
+single-acquisition protocol graph already proven for IDENTIFY; no new wire
+protocol or persistent command family is introduced.
+
 The Goodix-enabled D279/52 build links the separately ledgered Rockytkg R2
 preprocessor under `GPL-2.0-or-later`; that combined build is therefore
 distributed under GPL-compatible terms.  This local build policy does not

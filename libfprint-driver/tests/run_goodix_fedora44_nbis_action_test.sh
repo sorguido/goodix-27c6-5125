@@ -32,10 +32,10 @@ trap cleanup EXIT HUP INT TERM
 
 manifest="$repo_root/operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256"
 grep -F 'FPI_DEVICE_ACTION_ENROLL &&' "$production_source" >/dev/null
-grep -F 'FPI_DEVICE_ACTION_IDENTIFY)' "$production_source" >/dev/null
+grep -F 'FPI_DEVICE_ACTION_VERIFY) ?' "$production_source" >/dev/null
 grep -F 'GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION' \
   "$production_source" >/dev/null
-grep -F 'Goodix production boundary permits enrollment and identify only' \
+grep -F 'Goodix production boundary permits enrollment, verify and identify only' \
   "$production_source" >/dev/null
 (cd "$rpm_dir" && sha256sum -c "$manifest")
 mkdir -p "$pkgconfig_dir" "$opencv_prefix" "$runtime"
@@ -91,8 +91,8 @@ if command -v flatpak >/dev/null 2>&1 &&
   test -x "$fprintd_binary"
   readelf -d "$fprintd_binary" | grep -F '[libfprint-2.so.2]' >/dev/null
   for abi_symbol in \
-    fp_print_serialize fp_print_deserialize fp_device_identify \
-    fp_device_identify_finish; do
+    fp_print_serialize fp_print_deserialize fp_device_verify \
+    fp_device_verify_finish fp_device_identify fp_device_identify_finish; do
     nm -D --undefined-only "$fprintd_binary" | \
       grep -F " $abi_symbol@LIBFPRINT_2.0.0" >/dev/null
   done
@@ -119,6 +119,9 @@ if command -v flatpak >/dev/null 2>&1 &&
   echo D279_55_PRODUCTION_IDENTIFY_ACTION_ENABLED=true
   echo D279_55_PRODUCTION_IDENTIFY_CAPTURE_COUNT=1
   echo D279_55_PRODUCTION_IDENTIFY_REARM_COUNT=0
+  echo D282_01_PRODUCTION_VERIFY_ACTION_ENABLED=true
+  echo D282_01_PRODUCTION_VERIFY_CAPTURE_COUNT=1
+  echo D282_01_PRODUCTION_VERIFY_REARM_COUNT=0
   echo D280_01_FP3_SURVIVES_CLOSE_REOPEN=PASS
   echo D280_01_TRUE_SIGFM_TWO_OPEN_EPOCH_REUSE=PASS
   echo D280_01_CORRUPT_FP3_REJECTED=PASS

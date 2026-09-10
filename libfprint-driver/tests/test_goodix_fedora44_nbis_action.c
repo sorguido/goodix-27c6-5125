@@ -34,6 +34,11 @@ typedef struct
   FpPrint             *enroll_print;
   FpPrint             *identify_match;
   FpPrint             *identify_print;
+  FpPrint             *verify_print;
+  gboolean             verify_match;
+  guint                verify_match_count;
+  guint                verify_no_match_count;
+  guint                verify_retry_count;
 } SigfmFixture;
 
 static gboolean
@@ -154,6 +159,40 @@ identify_cb (FpDevice     *device,
 }
 
 static void
+verify_cb (FpDevice     *device,
+           GAsyncResult *result,
+           gpointer      user_data)
+{
+  SigfmFixture *fixture = user_data;
+
+  fixture->success = fp_device_verify_finish (
+    device, result, &fixture->verify_match, &fixture->verify_print,
+    &fixture->error);
+  fixture->completion_count++;
+  fixture->done = TRUE;
+  g_main_loop_quit (fixture->loop);
+}
+
+static void
+verify_report_cb (FpDevice *device,
+                  FpPrint  *match,
+                  FpPrint  *print,
+                  gpointer  user_data,
+                  GError   *error)
+{
+  SigfmFixture *fixture = user_data;
+
+  (void) device;
+  (void) print;
+  if (error != NULL)
+    fixture->verify_retry_count++;
+  else if (match != NULL)
+    fixture->verify_match_count++;
+  else
+    fixture->verify_no_match_count++;
+}
+
+static void
 progress_cb (FpDevice *device,
              gint      completed_stages,
              FpPrint  *print,
@@ -191,10 +230,28 @@ fill_structured_sigfm_samples (
 }
 
 static void
+fill_distinct_structured_sigfm_samples (
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT])
+{
+  for (guint y = 0u; y < GOODIX_CANONICAL_IMAGE_HEIGHT; y++)
+    for (guint x = 0u; x < GOODIX_CANONICAL_IMAGE_WIDTH; x++)
+      {
+        guint gx = x % 10u;
+        guint gy = y % 6u;
+        guint value = ((gx < 5u) != (gy < 3u)) ? 4095u : 0u;
+
+        if (((x * 3u + y * 5u) % 7u) == 0u)
+          value = 1536u;
+        samples[y * GOODIX_CANONICAL_IMAGE_WIDTH + x] = (uint16_t) value;
+      }
+}
+
+static void
 test_true_sigfm_stage8_action (void)
 {
   uint16_t baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  uint16_t distinct_samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   g_autoptr(FpPrint) template = NULL;
   g_autoptr(FpPrint) restored = NULL;
   g_autoptr(FpPrint) invalid = NULL;
@@ -209,6 +266,7 @@ test_true_sigfm_stage8_action (void)
   SigfmFixture fixture = { 0 };
 
   fill_structured_sigfm_samples (samples);
+  fill_distinct_structured_sigfm_samples (distinct_samples);
   for (guint i = 0u; i < G_N_ELEMENTS (baseline); i++)
     baseline[i] = 2048u;
   fixture.loop = g_main_loop_new (NULL, FALSE);
@@ -380,6 +438,54 @@ test_true_sigfm_stage8_action (void)
                    FPI_PRINT_SIGFM);
   g_assert_cmpuint (fixture.identify_print->prints->len, ==, 1u);
 
+  /* Fedora 1.94.100 FpImageDevice VERIFY uses the specific FP3 template,
+   * SIGFM extraction and matcher-backed report/completion path. */
+  fixture.done = FALSE;
+  fixture.success = FALSE;
+  fixture.completion_count = 0u;
+  fp_device_verify (FP_DEVICE (fixture.device), restored, NULL,
+                    verify_report_cb, &fixture, NULL,
+                    (GAsyncReadyCallback) verify_cb, &fixture);
+  goodix_device_context_emit_arm_complete (fixture.ctx, NULL);
+  goodix_device_context_emit_finger_down (fixture.ctx);
+  goodix_device_context_emit_sigfm_image_ready (
+    fixture.ctx, baseline, samples, GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+  goodix_device_context_emit_release_tail_complete (fixture.ctx);
+  goodix_device_context_emit_finger_up_ready (fixture.ctx);
+  wait_until (&fixture, &fixture.done);
+  g_assert_no_error (fixture.error);
+  g_assert_true (fixture.success);
+  g_assert_true (fixture.verify_match);
+  g_assert_nonnull (fixture.verify_print);
+  g_assert_cmpuint (fixture.verify_match_count, ==, 1u);
+  g_assert_cmpuint (fixture.verify_no_match_count, ==, 0u);
+  g_assert_cmpuint (fixture.verify_retry_count, ==, 0u);
+
+  /* A second, structurally valid but distinct deterministic raster exercises
+   * the real SIGFM no-match path; this is not biometric or FAR/FRR evidence. */
+  fixture.done = FALSE;
+  fixture.success = FALSE;
+  fixture.completion_count = 0u;
+  g_clear_object (&fixture.verify_print);
+  fp_device_verify (FP_DEVICE (fixture.device), restored, NULL,
+                    verify_report_cb, &fixture, NULL,
+                    (GAsyncReadyCallback) verify_cb, &fixture);
+  goodix_device_context_emit_arm_complete (fixture.ctx, NULL);
+  goodix_device_context_emit_finger_down (fixture.ctx);
+  goodix_device_context_emit_sigfm_image_ready (
+    fixture.ctx, baseline, distinct_samples,
+    GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+  goodix_device_context_emit_release_tail_complete (fixture.ctx);
+  goodix_device_context_emit_finger_up_ready (fixture.ctx);
+  wait_until (&fixture, &fixture.done);
+  g_assert_no_error (fixture.error);
+  g_assert_true (fixture.success);
+  g_assert_false (fixture.verify_match);
+  g_assert_nonnull (fixture.verify_print);
+  g_assert_cmpuint (fixture.verify_match_count, ==, 1u);
+  g_assert_cmpuint (fixture.verify_no_match_count, ==, 1u);
+  g_assert_cmpuint (fixture.verify_retry_count, ==, 0u);
+
   corrupted = g_memdup2 (stored_bytes, stored_size);
   corrupted[0] = (guchar) 'X';
   invalid = fp_print_deserialize (corrupted, stored_size, &fixture.error);
@@ -408,8 +514,13 @@ test_true_sigfm_stage8_action (void)
   g_print ("D280_01_TRUE_SIGFM_TWO_OPEN_EPOCH_REUSE=PASS\n");
   g_print ("D280_01_CORRUPT_FP3_REJECTED=PASS\n");
   g_print ("D280_01_TEMPLATE_PERSISTED_TO_DISK=false\n");
+  g_print ("D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS\n");
+  g_print ("D282_01_FEDORA44_SIGFM_DISTINCT_TEMPLATE_NO_MATCH=PASS_SYNTHETIC\n");
+  g_print ("D282_01_VERIFY_RETRY_CALLBACK_COUNT=%u\n",
+           fixture.verify_retry_count);
   g_clear_object (&fixture.identify_match);
   g_clear_object (&fixture.identify_print);
+  g_clear_object (&fixture.verify_print);
   g_clear_object (&fixture.enroll_print);
   g_clear_error (&fixture.error);
   g_clear_object (&fixture.device);

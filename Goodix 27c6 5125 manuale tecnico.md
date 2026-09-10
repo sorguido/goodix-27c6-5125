@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — D281/01 chiuso offline; D282/01 richiede Human Gate
+### Stato corrente — D282/01 pre-live chiuso offline e pronto per review
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -130,13 +130,46 @@ Fedora 44/libfprint 1.94.100 con preprocessing R2 e SIGFM Rockytkg sotto
 licenze per-file e combined-work GPL-compatible. USB/TLS/PSK/FDT/lifecycle e
 guardrail factory-preserving rimangono invariati.
 
-Il prossimo confine sostanziale è `D282/01`: staging production e prova
-end-to-end del driver target sotto il servizio fprintd, con storage SIGFM
-reale, restart, verify dello stesso dito, no-match controllato con dito diverso,
-delete/cleanup e integrazione PAM limitata e reversibile. Privilegi,
-installazione capace di raggiungere il sensore, biometria reale e nuove azioni
-live rendono questo boundary una nuova Human Gate. Nessuna build live, grant o
-operator kit D282 è stata preparata.
+D282/01 chiude ora offline i blocker che impedivano persino la preparazione
+del boundary fprintd target. L'audit del sorgente esatto
+`fprintd-1.94.5-5.fc44.x86_64` prova che, con un solo template, `finger=any`
+seleziona quel dito e invoca `fp_device_verify()`, non identify. La fork Fedora
+44/libfprint 1.94.100 ora implementa VERIFY nel vero `FpImageDevice` SIGFM;
+il Goodix lo mappa sul medesimo profilo `SINGLE_ACQUISITION` già provato live
+per IDENTIFY, senza introdurre nuovo protocollo sensor-reaching.
+
+Il callback fprintd rilancia formalmente `fp_device_verify()` su
+`FP_DEVICE_RETRY`, senza open/close autonomi. La policy production mantiene
+`production_action_consumed` per l'intera open epoch: il secondo dispatch è
+contato e respinto prima di nuova generation, TLS o USB. Test
+production-shaped coprono same/no-match, extraction failure con richiamo
+formale, cancellazione post-TLS e cleanup drenato; la build Fedora con SIGFM
+reale prova lo specifico template VERIFY. Le regressioni D279/D280 restano
+verdi normal e ASan/UBSan.
+
+Il kit `operator_kit/d282-01-fprintd-target/` è preparato ma non eseguito. Usa
+snapshot e artefatti hash-pinned, staging sotto `/run` senza sostituire la
+libreria di sistema, mapping verificato in `/proc`, storage production-shaped
+isolato sotto `/var/lib/fprint`, inventario read-only del preesistente e trap
+di rollback installato prima della prima mutazione. Le phase future sono un
+enrollment, restart, same-finger verify, different-finger verify/no-match e
+delete. Le tre action biometriche sono distinte dal quarto open epoch
+Claim/Release di `fprintd-delete`: poiché il Goodix non espone storage, delete
+resta host-only e non invia una action al sensore. Il grant composto futuro
+evita di ripetere gli otto contatti per failure host-side tardive, ma non
+autorizza alcun retry.
+
+La matrice D282 è 20/20; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+suite D278/D279/D280 26/26 normal e 26/26 ASan/UBSan; build Fedora/SIGFM,
+registry e ABI fprintd PASS. Il different-finger autentico, l'esecuzione sotto
+servizio systemd target, storage FP3 SIGFM e rollback production restano
+necessariamente live. Il kit è quindi `READY` per review AI-PM indipendente e
+solo in seguito per una eventuale Human Gate: non esistono baseline approvata,
+grant, autorizzazione privilegiata o live.
+
+PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
+sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
+o sudo reali iniziali e rollback/Human Gate separati.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -208,13 +241,34 @@ FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
+D282_01_OUTCOME=READY_OFFLINE_PENDING_INDEPENDENT_AI_PM_REVIEW
+D282_01_HUMAN_GATE_READINESS=READY
+D282_01_EXACT_FPRINTD=fprintd-1.94.5-5.fc44.x86_64
+D282_01_FPRINTD_ONE_PRINT_ACTION=VERIFY
+D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
+D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
+D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
+D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
+D282_01_REQUIRED_MATRIX=20/20_PASS
+D282_01_D278_D279_D280_NORMAL=26/26_PASS
+D282_01_D278_D279_D280_ASAN_UBSAN=26/26_PASS
+D282_01_OPERATOR_KIT=operator_kit/d282-01-fprintd-target
+D282_01_OFFLINE_PREFLIGHT=PASS
+D282_01_PAM_IN_SCOPE=false
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY_AND_LIMITED_PAM
+APPROVED_BASELINE=NONE
+GRANT_CREATED=false
+NEXT_PRIMARY_BOUNDARY=INDEPENDENT_AI_PM_REVIEW_OF_D282_01_THEN_POSSIBLE_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D282_PASS=D283_01_PAM_DEDICATED_MAX_TRIES_1_NO_REAL_LOGIN_OR_SUDO_INITIAL
 ```
 
 Report ed evidenze correnti:
+`analysis/D282/D282_01_offline_verify_fprintd_readiness.md`,
+`analysis/D282/D282_01_OFFLINE_RESULT.env`,
+`reference/fprintd-fedora44-1.94.5/`,
+`operator_kit/d282-01-fprintd-target/`,
 `analysis/D281/D281_01_fprintd_storage_and_control_plane.md`,
 `analysis/D281/D281_01_OFFLINE_RESULT.env`,
 `analysis/D280/D280_01_two_open_epoch_template_reuse.md`,
@@ -975,7 +1029,7 @@ TARGET_SIGFM_FPRINTD_STORAGE_PROVEN=false
 PAM_LOGIN_SUDO_INTEGRATION_PROVEN=false
 CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
-NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY_AND_LIMITED_PAM
+HISTORICAL_NEXT_PRIMARY_BOUNDARY_AFTER_D281=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY
 ```
 
 Report: `analysis/D281/D281_01_fprintd_storage_and_control_plane.md`.

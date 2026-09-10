@@ -2171,6 +2171,9 @@ fpi_device_verify_report (FpDevice      *device,
 
           if (print &&
               fpi_print_get_type (print) != FPI_PRINT_NBIS &&
+#ifdef GOODIX_LIBFPRINT_SIGFM
+              fpi_print_get_type (print) != FPI_PRINT_SIGFM &&
+#endif
               !fp_print_equal (print, data->match))
             {
               g_warning ("Driver reported a match providing a scanned print that is not matching it.");

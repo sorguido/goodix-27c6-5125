@@ -123,13 +123,13 @@ bus sono verificati staticamente rispetto ai file installati, non eseguiti.
 Il successivo vero confine è `D282/01`: staging production e prova end-to-end
 del driver target sotto il servizio fprintd, includendo storage SIGFM reale,
 restart del daemon, verify dello stesso dito, no-match controllato con dito
-diverso, delete/cleanup e una integrazione PAM limitata e reversibile. Questo
+diverso e delete/cleanup. PAM resta il boundary separato D283. Questo
 richiede privilegi, installazione/attivazione capace di raggiungere il sensore,
 biometria reale e nuove azioni live; è quindi una nuova Human Gate. Non è stata
 preparata alcuna build o autorizzazione live in D281/01.
 
 ```text
-NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY_AND_LIMITED_PAM
+NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATED_TARGET_FPRINTD_STORAGE_VERIFY
 CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 ```

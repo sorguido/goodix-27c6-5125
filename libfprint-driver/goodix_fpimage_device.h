@@ -84,6 +84,9 @@ typedef struct
 
 typedef struct
 {
+  guint production_action;
+  guint production_action_attempt_count;
+  guint production_rejected_action_count;
   gboolean production_action_consumed;
   guint auxiliary_b0_observed_count;
   guint terminal_enroll_completion_hold_count;

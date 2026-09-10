@@ -1,6 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Operator kit inventory
 
+## D282/01 fprintd target (offline-ready, nessuna Human Gate)
+
+`d282-01-fprintd-target/` costruisce da snapshot la fork Fedora
+44/libfprint 1.94.100 con VERIFY SIGFM Goodix, verifica l'ABI contro l'esatto
+`fprintd-1.94.5-5.fc44.x86_64` e modella staging, storage isolato e rollback.
+La futura sequenza composta contiene un enrollment e due verify in tre action
+single-acquisition; il Claim/Release di delete è contato come quarto open epoch
+host-only, senza feature storage o comando sensor-side. Preflight e matrice
+offline sono disponibili, ma non esistono baseline approvata, grant o
+autorizzazione live/privilegiata. PAM è fuori scope.
+
 ## D280/01 riuso FP3 effimero close/open (offline-ready, Human Gate)
 
 `d280-01-ephemeral-template-reuse/` prepara una run a due action esplicite:
@@ -126,10 +137,11 @@ richiede review, baseline e autorizzazione esplicite.
 | `d279-35-offline-protected-evaluation/` | current path offline aggregate-only; Human Gate per singola lettura protected pendente |
 | `d279-54-oem-passive-identify-observe/` | candidate passivo OEM identify hard-gated; authority chiusa, qualificazione Windows/full SHA/autorizzazione one-shot pendenti |
 | `d279-57-stage8-early-terminal/` | tre attempt fail-closed consumati; run finale `38962cc…` PASS 8/8 e consumata; D279 chiuso, nessun retry o test di reusability incluso |
-| `d280-01-ephemeral-template-reuse/` | current boundary offline-ready; due action in due epoch, FP3 root 0600 rimosso prima di identify; full SHA e nuova Human Gate non ancora concessi |
+| `d280-01-ephemeral-template-reuse/` | boundary concluso live e grant consumato; FP3 autentico close/open e identify same-finger verificati |
+| `d282-01-fprintd-target/` | current candidate offline-ready per review; fprintd target enroll/restart/two verify/delete con staging e storage isolati; nessuna baseline/grant/live autorizzati |
 
-Non esiste un kit operativo corrente **autorizzato live**. D280/01 è il kit
-corrente ma ha soltanto executable closure offline. La run D279/29 è
+Non esiste un kit operativo corrente **autorizzato live**. D282/01 è il kit
+corrente ma ha soltanto executable closure offline e attende review indipendente. La run D279/29 è
 consumata; tutte le run D279/57 sono consumate e la finale ha chiuso PASS il
 boundary stage-8. D279/35 e D279/56 sono percorsi offline
 protetti e la loro presenza non autorizza operazioni live. I marker storici

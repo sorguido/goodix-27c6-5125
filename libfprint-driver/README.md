@@ -495,6 +495,32 @@ The offline preflight passes, but no baseline or live run is authorized.
 Unlinking is not a physical-erasure guarantee for SSD, CoW, journal or
 snapshot storage.
 
+## D282/01 VERIFY target e barriera anti-retry fprintd
+
+L'esatto fprintd Fedora 44 seleziona `fp_device_verify()` quando la gallery
+contiene un solo template. La fork 1.94.100 registra quindi VERIFY sulla
+medesima capture action di enroll/identify, estrae il probe con l'algoritmo
+della classe e confronta SIGFM contro il template specifico fornito dal
+caller. Match, no-match, retry, completion e cancellation attraversano le API
+standard; il controllo newer-core del scanned print comprende SIGFM come tipo
+matcher-backed.
+
+Nel Goodix production, VERIFY condivide senza duplicazioni il profilo
+`SINGLE_ACQUISITION` target-proven di IDENTIFY. La open epoch registra action,
+attempt e rejection: dopo la prima activation, ogni secondo dispatch è
+respinto prima di creare generation, secure session, TLS o submit USB. Questo
+contiene il richiamo automatico che fprintd esegue dopo `FP_DEVICE_RETRY`.
+La telemetria `GOODIX_D282_EPOCH_AUDIT` è emessa al close production con
+contatori protocollo e cleanup sanitizzati; non contiene immagini, template o
+secret.
+
+La suite production-shaped prova match, no-match, extraction failure più
+secondo dispatch formale, e cancellazione post-TLS. La build Fedora con SIGFM
+reale prova enrollment stage 8, FP3/identify preesistenti e VERIFY
+same-template. Il different-finger autentico, il servizio di sistema e lo
+storage target restano Human Gate; nessuna conclusione FAR/FRR è tratta dai
+test sintetici.
+
 ## D272/01 historical ephemeral SIGFM metric seam
 
 `goodix_sigfm_metrics.cpp` wraps the repository-local LGPL SIGFM C API without
