@@ -369,7 +369,7 @@ offline_preflight () {
   audit_staging_probe_candidate "$d282_offline_work/staging-probe"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=66
+  echo D282_01_TEST_MATRIX_COUNT=68
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
@@ -423,9 +423,9 @@ offline_preflight () {
   echo D282_01_STAGING_PROBE_GOODIX_DRIVER_PRESENT=false
   echo REAL_SENSOR_ACCESSED=false
   echo D282_01_OFFLINE_CLOSURE=PASS
-  echo D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN
+  echo D282_01_BIOMETRIC_HUMAN_GATE_READINESS=NOT_REQUIRED_D282_CLOSED
   echo CODEX_LIVE_EXECUTION_ALLOWED=false
-  echo OPERATOR_MANUAL_EXECUTION_REQUIRED=true
+  echo OPERATOR_MANUAL_EXECUTION_REQUIRED=false
   echo CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
   echo USER_APPROVED_BASELINE_REQUIRED=false
   echo GRANT_REQUIRED=false
@@ -997,6 +997,7 @@ verify_current_live_epoch_audit () {
 run_live () {
   local candidate=$1 user=$2 state baseline manifest stamp
   local daemon_pid raw epoch_count enroll_count verify_count action_rc=1
+  local physical_finger_confirmation
   local target_count since stored
   local observed_attempts consumed_action_count cleanup_epoch_count hidden_second_count
   local retry_count reopen_count reset_count clear_halt_count persistent_count
@@ -1143,6 +1144,13 @@ run_live () {
   [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*attempts=1 rejected=0 consumed=1 tls=1' "$live_private/phase-a-audit.raw") -eq 1 ]] || return 1
   verify_current_live_epoch_audit "$live_private/phase-a-audit.raw" 1 || return 1
   echo "PHASE_B=Verify dito diverso (indice sinistro): un solo contatto; atteso no-match."
+  echo "ATTENZIONE: 'Verifying: right-index-finger' indicherà il template registrato,"
+  echo "non il dito fisico da presentare. Ora usare esclusivamente l'indice SINISTRO."
+  printf 'Confermare il dito fisico digitando INDICE SINISTRO: '
+  read -r physical_finger_confirmation ||
+    refuse PHASE_B_PHYSICAL_FINGER_NOT_CONFIRMED
+  [[ $physical_finger_confirmation == "INDICE SINISTRO" ]] ||
+    refuse PHASE_B_PHYSICAL_FINGER_NOT_CONFIRMED
   raw="$live_private/verify-different.raw"
   set +e; timeout --signal=INT --kill-after=20s 180s fprintd-verify "$user" 2>&1 | tee "$raw"; action_rc=${PIPESTATUS[0]}; set -e
   [[ $action_rc -eq 1 && $(grep -c '^Verify result: verify-no-match (done)$' "$raw") -eq 1 ]] || return 1
@@ -1202,8 +1210,6 @@ run_live () {
     echo EXTRA_ENROLLMENT_REARM_COUNT=0
     echo "VERIFY_ACTION_COUNT=$verify_count"
     echo "SECOND_SENSOR_REACHING_ACTION_COUNT=$hidden_second_count"
-    echo AUTHORIZATION_CREDENTIAL_REQUIRED=false
-    echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
     echo "OBSERVED_RETRY_COUNT=$retry_count"
     echo "HIDDEN_REOPEN_COUNT=$reopen_count"
     echo "RESET_COUNT=$reset_count"

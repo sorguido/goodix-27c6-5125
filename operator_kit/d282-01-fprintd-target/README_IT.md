@@ -1,17 +1,20 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D282/01 — fprintd target con staging reversibile
 
-## Stato e scopo
+## Stato e scopo — D282/01 chiuso
 
-L'attempt 03 D282/01 sulla baseline
-`42903b70c89b2399bef35f4a4c7eb8c9dc5d04e5` ha completato l'enrollment
-fprintd/SIGFM dell'indice destro (otto stage) e ha ottenuto `verify-match`
-dello stesso indice dopo restart del daemon. La run si è fermata prima della
-Phase B per un assert host-side stale: il launcher pretendeva sempre
-`release_tail=1 single_terminal=1`, mentre il percorso `VerifyStop`/`Release`
-del client fprintd ha prodotto la coppia coerente `0/0`, con prima immagine
-acquisita, zero re-arm/retry e backend drenato/context chiuso. Cleanup, servizio,
-staging, libreria di sistema e storage preesistente risultano ripristinati.
+Attempt 05 sulla baseline
+`ed94d33e1cf6a2387135598c58a27d6c1573ba13` chiude D282/01: enrollment
+fprintd/SIGFM dell'indice destro (otto stage), restart del daemon, match dello
+stesso indice, no-match dell'indice sinistro attestato dall'operatore, delete
+host-only e rollback sono completi. Le quattro epoch hanno zero retry/reopen/
+reset/clear-halt e zero famiglie persistenti note; backend e context risultano
+chiusi e drenati.
+
+Attempt 04 ha completato lo stesso percorso software, ma nella Phase B
+l'operatore ha presentato di nuovo l'indice destro. Non prova il different-
+finger e conserva soltanto un singolo false non-match osservato sul secondo
+campione dello stesso dito, senza generalizzazioni statistiche.
 
 Il correttivo offline mantiene il profilo direct-enroll e sostituisce quel
 grep rigido con un validatore tipizzato. Per VERIFY sono accettate soltanto le
@@ -21,7 +24,7 @@ zero famiglie persistenti note, outstanding zero, backend drenato e context
 chiuso. Driver, protocollo, fence per open epoch e numero di contatti non
 cambiano.
 
-La futura run copre soltanto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
+La run chiusa ha coperto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
 driver Goodix `27c6:5125`: enrollment dell'indice destro, FP3 SIGFM nello
 storage isolato, restart del daemon, verify dello stesso dito, un verify con
 indice sinistro atteso no-match, delete e rollback. PAM, login e sudo come
@@ -31,7 +34,7 @@ fattore di autenticazione sono fuori scope.
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
-D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=NOT_REQUIRED_D282_CLOSED
 D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST
 D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED
@@ -60,6 +63,11 @@ D282_01_ATTEMPT_03_VERIFY_RELEASE_TAIL=0
 D282_01_ATTEMPT_03_VERIFY_SINGLE_TERMINAL=0
 D282_01_ATTEMPT_03_PHASE_B_STARTED=false
 D282_01_ATTEMPT_03_DIFFERENT_FINGER_SENSOR_ACQUISITION_COUNT=0
+D282_01_ATTEMPT_04=PASS_SOFTWARE_SEQUENCE_PHYSICAL_STIMULUS_MISMATCH
+D282_01_ATTEMPT_04_SAME_FINGER_SECOND_VERIFY_FALSE_NON_MATCH_OBSERVED=true
+D282_01_ATTEMPT_04_DIFFERENT_FINGER_CLAIM=NOT_APPLICABLE
+D282_01_ATTEMPT_05=PASS_LIVE_CLOSED
+D282_01_ATTEMPT_05_DIFFERENT_FINGER_LEFT_INDEX_VERIFY=NO_MATCH_OPERATOR_ATTESTED_STIMULUS
 D282_01_VERIFY_AUDIT_COHERENT_CLOSE_PAIR=ZERO_ZERO_OR_ONE_ONE
 D282_01_DIRECT_ENROLL_PROFILE=PASS_OFFLINE_NORMAL_AND_ASAN_UBSAN
 D282_01_IDENTIFY_FEATURE_ADVERTISED=false
@@ -82,7 +90,7 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 LIVE_EXECUTION_PERFORMED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
-DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
+DIFFERENT_FINGER_NO_MATCH=PASS_LIVE_OPERATOR_ATTESTED_STIMULUS
 SECOND_SENSOR_REACHING_ACTION_COUNT=0
 ```
 
@@ -124,7 +132,7 @@ nuovo `AWAIT_FINGER_ON` o rearm. Gli altri image driver conservano la
 semantica generica. Il launcher rifiuta inoltre qualunque apparente successo
 se l'output di `fprintd-enroll` contiene un marker `enroll-retry-*`.
 
-## Sequenza futura e contabilità
+## Sequenza validata e contabilità
 
 Le phase sono fail-closed e la successiva parte solo dopo l'audit della
 precedente:
@@ -159,7 +167,7 @@ un limite host. Un timeout/cancel non autorizza retry.
 
 La libreria di sistema non viene sostituita. Da uno snapshot Git del full SHA
 si costruisce `libfprint-2.so.2.0.0`, si hashano libreria e dipendenze e si
-verificano NEVRA, ABI, SONAME, assenza RPATH e simboli vietati. La futura run
+verificano NEVRA, ABI, SONAME, assenza RPATH e simboli vietati. La run D282
 crea una directory privata sotto `/run`, un drop-in runtime sotto
 `/run/systemd/system`, e fa avviare direttamente a systemd
 `/usr/libexec/fprintd` con il normale entrypoint SELinux `fprintd_exec_t`. Il
@@ -300,9 +308,10 @@ entrambi i profili drop-in con `systemd-analyze`; non avvia il servizio. La
 prova privilegiata del vero start è già chiusa separatamente e non deve essere
 ripetuta.
 
-La normale run factory-preserving è direttamente eseguibile dall'operatore,
-senza preparare candidate, grant, authorization file o approvare manualmente
-uno SHA:
+Il percorso di riproduzione factory-preserving resta direttamente eseguibile
+dall'operatore, senza grant o authorization file, ma D282/01 è chiuso e non
+richiede un'altra run. Va usato solo se un futuro task riapre esplicitamente
+questo boundary:
 
 ```bash
 operator_kit/d282-01-fprintd-target/run-d282-01.sh \
@@ -314,8 +323,10 @@ pulito e allineato a `origin/development`, mostra il budget fisico, chiede di
 digitare `ESEGUI`, invoca visibilmente `sudo` solo per staging/live/rollback e
 infine esporta automaticamente `operator.log` e `summary.env` in una directory
 `/tmp/goodix-d282-01-export.*` posseduta dall'operatore. Lo SHA e il manifest
-restano dati di provenance/integrità. Le modalità low-level e probe
-sono interne o storiche e non sono il percorso operativo corrente.
+restano dati di provenance/integrità. Prima della Phase B spiega che
+`Verifying: right-index-finger` identifica il template e richiede la conferma
+testuale `INDICE SINISTRO`. Le modalità low-level e probe sono interne o
+storiche.
 
 ## Stop condition
 

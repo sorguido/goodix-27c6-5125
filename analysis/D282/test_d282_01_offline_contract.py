@@ -40,6 +40,8 @@ ATTEMPT_03_REPORT = ROOT / "analysis/D282/D282_01_attempt_03_post_live_analysis.
 ATTEMPT_03_AUDITOR = ROOT / "analysis/D282/d282_01_attempt_03_evidence_audit.py"
 ATTEMPT_03_CAPTURE = (
     ROOT / "captures/D282_01/D28201_ATTEMPT_03_42903b70/sanitized")
+ATTEMPT_04_05_AUDITOR = (
+    ROOT / "analysis/D282/d282_01_attempt_04_05_evidence_audit.py")
 
 spec = importlib.util.spec_from_file_location(
     "d282_staging", ROOT / "analysis/D282/d282_01_staging_model.py")
@@ -108,7 +110,9 @@ class D282OfflineContract(unittest.TestCase):
                       self.fedora_action_test)
         self.assertIn("SIGFM_DISTINCT_TEMPLATE_NO_MATCH=PASS_SYNTHETIC",
                       self.fedora_action_test)
-        self.assertIn("DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE", self.readme)
+        self.assertIn(
+            "DIFFERENT_FINGER_NO_MATCH=PASS_LIVE_OPERATOR_ATTESTED_STIMULUS",
+            self.readme)
 
     def test_05_identify_regression_remains(self):
         self.assertIn("FPI_DEVICE_ACTION_IDENTIFY", self.core)
@@ -475,7 +479,7 @@ class D282OfflineContract(unittest.TestCase):
                 "FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST",
                 "SELINUX_EXEC_DENIAL=false",
                 "D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED",
-                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN"):
+                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=NOT_REQUIRED_D282_CLOSED"):
             self.assertIn(marker, self.offline_result)
             self.assertIn(f"echo {marker}", self.kit)
 
@@ -1026,6 +1030,44 @@ cat "$live_result/operator.log"
         self.assertIn("EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10", live)
         self.assertIn("AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false", live)
         self.assertNotIn("RETRY_AUTHORIZED=false", live)
+
+    def test_67_attempt_04_05_are_hash_pinned_and_distinctly_classified(self):
+        result = subprocess.run(
+            [sys.executable, str(ATTEMPT_04_05_AUDITOR)],
+            check=True, capture_output=True, text=True)
+        audited = json.loads(result.stdout)
+        self.assertEqual(audited["outcome"], "PASS_EVIDENCE_CLASSIFICATION")
+        self.assertEqual(
+            audited["runs"]["04"]["different_finger_claim"],
+            "NOT_APPLICABLE")
+        self.assertTrue(
+            audited["runs"]["04"]
+            ["same_finger_second_verify_false_non_match_observed"])
+        self.assertEqual(
+            audited["runs"]["05"]["different_finger_claim"],
+            "PASS_OPERATOR_ATTESTED_STIMULUS")
+        self.assertEqual(
+            audited["runs"]["05"]["audit_actions"], [
+                "FPI_DEVICE_ACTION_ENROLL", "FPI_DEVICE_ACTION_VERIFY",
+                "FPI_DEVICE_ACTION_VERIFY", "FPI_DEVICE_ACTION_NONE"])
+
+    def test_68_phase_b_poka_yoke_and_unique_current_summary_keys(self):
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
+        prompt = live.index("INDICE SINISTRO")
+        phase_b_action = live.index(
+            'fprintd-verify "$user"', live.index('verify-different.raw'))
+        self.assertLess(prompt, phase_b_action)
+        self.assertIn("indicherà il template registrato", live)
+        self.assertIn("PHASE_B_PHYSICAL_FINGER_NOT_CONFIRMED", live)
+        summary = live[live.index(
+            "echo D282_01_RESULT=PASS_LIVE_PENDING_INDEPENDENT_REVIEW"):]
+        summary = summary[:summary.index('} >"$live_result/summary.env"')]
+        self.assertNotIn("AUTHORIZATION_CREDENTIAL_REQUIRED", summary)
+        self.assertNotIn("AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED", summary)
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        self.assertEqual(
+            cleanup.count(
+                "AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false"), 1)
 
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
         live = function_slice(self.kit, "run_live ()", "operator_run ()")
