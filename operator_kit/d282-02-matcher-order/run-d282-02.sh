@@ -11,6 +11,7 @@ unset D282_LIBRARY_ONLY
 script_dir=$d28201_script_dir
 
 live_result_prefix=D282_02
+d28202_live_closed=true
 verified_daemon_pid=
 verified_daemon_invocation_id=
 d28202_critical=(libfprint-driver Rockytkg
@@ -70,8 +71,11 @@ stage_d28202_runtime_libraries () {
   [[ -d $candidate && ! -L $candidate && -d $runtime && ! -L $runtime ]] ||
     return 1
   [[ $runtime == /run/goodix-d282-02/* ||
+     $runtime == /run/goodix-d282-03/* ||
      $runtime == /tmp/goodix-d282-02-staging-test.* ||
-     $runtime == /tmp/goodix-d282-02-offline.*/* ]] || return 1
+     $runtime == /tmp/goodix-d282-03-staging-test.* ||
+     $runtime == /tmp/goodix-d282-02-offline.*/* ||
+     $runtime == /tmp/goodix-d282-03-offline.*/* ]] || return 1
   [[ -z $(find "$runtime" -mindepth 1 -maxdepth 1 -print -quit) ]] || return 1
   for name in libfprint-2.so.2.0.0 libgusb.so.2 \
     libopencv_core.so.413 libopencv_features2d.so.413 \
@@ -254,6 +258,7 @@ run_d28202_live () {
   local clear_halt_count persistent_count extract_count trial block position name
   local block_a_pid block_a_invocation_id block_b_pid block_b_invocation_id
 
+  [[ $d28202_live_closed == false ]] || refuse D282_02_LIVE_CLOSED_DO_NOT_RERUN
   live_result=
   live_private=
   live_runtime=
@@ -587,6 +592,7 @@ export_d28202_results () {
 operator_d28202_run () {
   local rpm_dir=$1 user baseline transcript result output rc export_rc=1
   local confirmation
+  [[ $d28202_live_closed == false ]] || refuse D282_02_LIVE_CLOSED_DO_NOT_RERUN
   [[ $EUID -ne 0 ]] || refuse OPERATOR_RUN_MUST_BE_UNPRIVILEGED
   command -v sudo >/dev/null || refuse HOST_TOOL_MISSING_sudo
   user=$(id -un) || refuse OPERATOR_USER_UNKNOWN

@@ -50,7 +50,7 @@ SELinux, libreria e storage vengono verificati prima dello staging. Dopo il
 restart il mapping della candidate viene verificato una seconda volta.
 
 La live PAM target, l'uso di USB e lo staging privilegiato sono Human Gate.
-Una successiva Human Direction ha inoltre posto la live in standby fino al
-riesame D282/02 del possibile effetto ordine/re-entry: entrambi gli entrypoint
+Una successiva Human Direction ha inoltre posto la live in standby fino alla
+review D282/03 same-finger/different-finger: entrambi gli entrypoint
 live rifiutano fail-closed. Design, implementazione e closure offline restano
 preservati; l'AI non esegue la live.

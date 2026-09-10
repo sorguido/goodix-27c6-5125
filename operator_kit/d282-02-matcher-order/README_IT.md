@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D282/02 — caratterizzazione ordine e re-entry del matcher
 
+> **CHIUSO — NON ESEGUIRE:** l’Attempt 02 è stato completato e riesaminato.
+> Entrambi gli entrypoint live rifiutano fail-closed; usare soltanto il nuovo
+> kit D282/03 indicato dal manuale.
+
 > **Attempt 01 chiuso pre-sensor:** la baseline `8490f41` si è fermata nello
 > staging prima di fprintd e di qualsiasi contatto. Il launcher corrente copia
 > ora esplicitamente i file runtime, crea i symlink senza collisione e rende

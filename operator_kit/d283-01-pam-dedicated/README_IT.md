@@ -1,10 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D283/01 — verifica PAM dedicata sul target
 
-> **STANDBY:** la live D283 è temporaneamente bloccata dal launcher finché
-> D282/02 non avrà caratterizzato il possibile effetto ordine/re-entry del
-> matcher. Conservare il kit e non eseguirlo in questa fase; design,
-> implementazione e closure offline D283 restano preservati.
+> **STANDBY:** la live D283 è bloccata dal launcher finché D282/03 non avrà
+> completato e superato la review same-finger/different-finger. Conservare il
+> kit e non eseguirlo; design, implementazione e closure offline restano
+> preservati.
 
 ## Scopo e rischio
 

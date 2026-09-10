@@ -1,0 +1,58 @@
+libfprint-2.so.2.0.0: OK
+libgusb.so.2: OK
+libopencv_core.so.413: OK
+libopencv_features2d.so.413: OK
+libopencv_flann.so.413: OK
+libopencv_imgproc.so.413: OK
+RISULTATI_PRIVATI=/var/tmp/goodix-d282-02-results/20260910T220312Z-f868ad127b30
+Warning: The unit file, source configuration file or drop-ins of fprintd.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+
+ENROLLMENT — 8 CONTATTI
+
+USA SOLO:
+>>> INDICE DESTRO <<<
+
+Digita DESTRO per iniziare: CONTATTO ENROLLMENT 01/08 — appoggia l’indice destro.
+CONTATTO COMPLETATO 01/08
+PROSSIMO: CONTATTO 02/08 — INDICE DESTRO
+CONTATTO COMPLETATO 02/08
+PROSSIMO: CONTATTO 03/08 — INDICE DESTRO
+CONTATTO COMPLETATO 03/08
+PROSSIMO: CONTATTO 04/08 — INDICE DESTRO
+CONTATTO COMPLETATO 04/08
+PROSSIMO: CONTATTO 05/08 — INDICE DESTRO
+CONTATTO COMPLETATO 05/08
+PROSSIMO: CONTATTO 06/08 — INDICE DESTRO
+CONTATTO COMPLETATO 06/08
+PROSSIMO: CONTATTO 07/08 — INDICE DESTRO
+CONTATTO COMPLETATO 07/08
+PROSSIMO: CONTATTO 08/08 — INDICE DESTRO
+ENROLLMENT COMPLETATO 08/08
+Preparazione BLOCCO A: restart controllato del daemon.
+
+TEST 01/04 — BLOCCO A, POSIZIONE 1/2
+
+PROSSIMO CONTATTO:
+>>> INDICE DESTRO <<<
+Premi INVIO, poi appoggia il dito: RISULTATO TEST 01: MATCH
+
+TEST 02/04 — BLOCCO A, POSIZIONE 2/2
+
+PROSSIMO CONTATTO:
+>>> INDICE DESTRO <<<
+Premi INVIO, poi appoggia il dito: RISULTATO TEST 02: MATCH
+Preparazione BLOCCO B: restart controllato del daemon.
+
+TEST 03/04 — BLOCCO B, POSIZIONE 1/2
+
+PROSSIMO CONTATTO:
+>>> INDICE DESTRO <<<
+Premi INVIO, poi appoggia il dito: RISULTATO TEST 03: MATCH
+
+TEST 04/04 — BLOCCO B, POSIZIONE 2/2
+
+PROSSIMO CONTATTO:
+>>> INDICE DESTRO <<<
+Premi INVIO, poi appoggia il dito: RISULTATO TEST 04: NO_MATCH
+CLEANUP: eliminazione del solo template D282/02 isolato.
+RISULTATI=/var/tmp/goodix-d282-02-results/20260910T220312Z-f868ad127b30

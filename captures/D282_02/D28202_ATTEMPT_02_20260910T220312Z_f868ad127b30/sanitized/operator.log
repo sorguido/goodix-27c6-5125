@@ -1,0 +1,154 @@
+D282_02_FAILURE_PHASE=PRE_SENSOR_STAGING
+EXACT_LIBRARY_MAP_INITIAL=true
+DAEMON_RESTART_AFTER_ENROLL=1
+EXACT_LIBRARY_MAP_BLOCK_A=true
+DAEMON_RESTART_BETWEEN_BLOCKS=1
+EXACT_LIBRARY_MAP_BLOCK_B=true
+BEGIN_trial-01_EVIDENCE
+TRIAL=1
+GLOBAL_ORDER=1
+BLOCK=A
+BLOCK_POSITION=1
+PHYSICAL_FINGER=RIGHT_INDEX
+DAEMON_PID=82679
+DAEMON_INVOCATION_ID=a96bb85725c2461db9b75b63ebbf70d5
+ACTION_RETURN_CODE=0
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-match (done)
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=137
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=941 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=2 comparisons=2 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+END_trial-01_EVIDENCE
+BEGIN_trial-02_EVIDENCE
+TRIAL=2
+GLOBAL_ORDER=2
+BLOCK=A
+BLOCK_POSITION=2
+PHYSICAL_FINGER=RIGHT_INDEX
+DAEMON_PID=82679
+DAEMON_INVOCATION_ID=a96bb85725c2461db9b75b63ebbf70d5
+ACTION_RETURN_CODE=0
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-match (done)
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=155
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=129 threshold=40
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 00:04:30 192.168.0.25 fprintd[82679]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=79 outstanding=0 drained=1 context_closed=1
+END_trial-02_EVIDENCE
+BEGIN_trial-03_EVIDENCE
+TRIAL=3
+GLOBAL_ORDER=3
+BLOCK=B
+BLOCK_POSITION=1
+PHYSICAL_FINGER=RIGHT_INDEX
+DAEMON_PID=82787
+DAEMON_INVOCATION_ID=34ca0e8529f34d4597211663400cedd4
+ACTION_RETURN_CODE=0
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-match (done)
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=136
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=2739 threshold=40
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 00:04:38 192.168.0.25 fprintd[82787]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=80 outstanding=0 drained=1 context_closed=1
+END_trial-03_EVIDENCE
+BEGIN_trial-04_EVIDENCE
+TRIAL=4
+GLOBAL_ORDER=4
+BLOCK=B
+BLOCK_POSITION=2
+PHYSICAL_FINGER=RIGHT_INDEX
+DAEMON_PID=82787
+DAEMON_INVOCATION_ID=34ca0e8529f34d4597211663400cedd4
+ACTION_RETURN_CODE=1
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-no-match (done)
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=123
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=1 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=3 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=4 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=5 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=6 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=7 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=8 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=no_match matched_sample=0 comparisons=8 threshold=40
+set 11 00:04:44 192.168.0.25 fprintd[82787]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=83 outstanding=0 drained=1 context_closed=1
+END_trial-04_EVIDENCE
+BEGIN_ENROLLMENT_EVIDENCE
+Using device /net/reactivated/Fprint/Device/0
+Enrolling right-index-finger finger.
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-completed
+END_ENROLLMENT_EVIDENCE
+BEGIN_FINAL_EPOCH_AUDIT
+set 11 00:03:51 192.168.0.25 fprintd[82593]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=204 outstanding=0 drained=1 context_closed=1
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 11 00:04:30 192.168.0.25 fprintd[82679]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=79 outstanding=0 drained=1 context_closed=1
+set 11 00:04:38 192.168.0.25 fprintd[82787]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=80 outstanding=0 drained=1 context_closed=1
+set 11 00:04:44 192.168.0.25 fprintd[82787]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=83 outstanding=0 drained=1 context_closed=1
+set 11 00:04:44 192.168.0.25 fprintd[82787]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_NONE attempts=0 rejected=0 consumed=0 tls=0 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=0 outstanding=0 drained=1 context_closed=1
+END_FINAL_EPOCH_AUDIT
+BEGIN_SIGFM_EXTRACT_AUDIT
+set 11 00:03:27 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=136
+set 11 00:03:31 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=126
+set 11 00:03:34 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=131
+set 11 00:03:36 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=142
+set 11 00:03:39 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=156
+set 11 00:03:42 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=136
+set 11 00:03:45 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=127
+set 11 00:03:50 192.168.0.25 fprintd[82593]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=129
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=137
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=155
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=136
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=123
+END_SIGFM_EXTRACT_AUDIT
+BEGIN_SIGFM_MATCH_AUDIT
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=941 threshold=40
+set 11 00:04:13 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=2 comparisons=2 threshold=40
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=129 threshold=40
+set 11 00:04:29 192.168.0.25 fprintd[82679]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=2739 threshold=40
+set 11 00:04:37 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=1 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=3 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=4 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=5 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=6 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=7 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=8 score=0 threshold=40
+set 11 00:04:42 192.168.0.25 fprintd[82787]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=no_match matched_sample=0 comparisons=8 threshold=40
+END_SIGFM_MATCH_AUDIT
