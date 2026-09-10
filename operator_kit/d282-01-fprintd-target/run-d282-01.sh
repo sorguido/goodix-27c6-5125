@@ -11,9 +11,11 @@ real_sensor_accessed=false
 live_execution_performed=false
 staging_probe_execution_performed=false
 staging_probe_mode=false
+live_current_direct_mode=false
 grant_consumed=false
 target_preconsumption_match_count=UNSET
 d282_offline_work=
+prepared_candidate=
 validated_grant_user=
 validated_grant_sha=
 validated_grant_owner=
@@ -53,8 +55,13 @@ staging_probe_critical=(reference/libfprint-fedora44-1.94.100/source
 refuse () {
   echo "D282_01_GATE_REFUSED=true" >&2
   echo "D282_01_REFUSAL_REASON=$1" >&2
-  echo "GRANT_CONSUMED=$grant_consumed" >&2
-  echo "RETRY_AUTHORIZED=false" >&2
+  if [[ ${live_current_direct_mode:-false} == true ]]; then
+    echo AUTHORIZATION_CREDENTIAL_REQUIRED=false >&2
+    echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false >&2
+  else
+    echo "GRANT_CONSUMED=$grant_consumed" >&2
+    echo "RETRY_AUTHORIZED=false" >&2
+  fi
   echo "TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count" >&2
   echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >&2
   echo "REAL_SENSOR_ACCESSED=$real_sensor_accessed" >&2
@@ -67,6 +74,12 @@ is_sha () { [[ ${1:-} =~ ^[0-9a-f]{40}$ ]]; }
 cleanup_offline_work () {
   [[ -z $d282_offline_work ]] ||
     find "$d282_offline_work" -depth -delete 2>/dev/null || true
+}
+cleanup_prepared_candidate () {
+  if [[ $prepared_candidate == /tmp/goodix-d282-01-candidate.* &&
+        -d $prepared_candidate && ! -L $prepared_candidate ]]; then
+    find "$prepared_candidate" -xdev -depth -delete 2>/dev/null || true
+  fi
 }
 state_value () {
   local file=$1 key=$2 value
@@ -171,8 +184,13 @@ cleanup_live () {
   echo "STAGING_REMOVED=$staging_rollback" >>"$live_result/summary.env"
   echo "SYSTEM_LIBFPRINT_UNCHANGED=$library_rollback" >>"$live_result/summary.env"
   echo "RUN_RETURN_CODE=$live_run_return_code" >>"$live_result/summary.env"
-  echo "GRANT_CONSUMED=$grant_consumed" >>"$live_result/summary.env"
-  echo "RETRY_AUTHORIZED=false" >>"$live_result/summary.env"
+  if [[ ${live_current_direct_mode:-false} == true ]]; then
+    echo AUTHORIZATION_CREDENTIAL_REQUIRED=false >>"$live_result/summary.env"
+    echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false >>"$live_result/summary.env"
+  else
+    echo "GRANT_CONSUMED=$grant_consumed" >>"$live_result/summary.env"
+    echo "RETRY_AUTHORIZED=false" >>"$live_result/summary.env"
+  fi
   echo "ROLLBACK_COMPLETE=$rollback" >>"$live_result/summary.env"
   echo "PREEXISTING_STORAGE_UNCHANGED=$storage_rollback" >>"$live_result/summary.env"
   echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >>"$live_result/summary.env"
@@ -351,19 +369,19 @@ offline_preflight () {
   audit_staging_probe_candidate "$d282_offline_work/staging-probe"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=63
+  echo D282_01_TEST_MATRIX_COUNT=66
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
-  echo D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+  echo D282_01_CURRENT_LIVE_AUTHORIZATION_CREDENTIAL_REQUIRED=false
   echo D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
   echo D282_01_TARGET_ABSENT_PRECONSUMPTION_REFUSAL=PASS
   echo D282_01_TARGET_MULTIPLE_PRECONSUMPTION_REFUSAL=PASS
   echo D282_01_TARGET_EXACT_ONE_PRECONSUMPTION_ACCEPTED=PASS
   echo D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
   echo ENROLLMENT_EXTRACTION_FAILURE=TERMINAL_FAIL_CLOSED
-  echo PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
-  echo POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
+  echo PRE_STAGING_REFUSALS_REMAIN_HOST_ONLY=true
+  echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
   echo EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
   echo EXTRA_ENROLLMENT_REARM_COUNT=0
   echo ENROLLMENT_RETRY_CALLBACK_COUNT=0
@@ -405,11 +423,12 @@ offline_preflight () {
   echo D282_01_STAGING_PROBE_GOODIX_DRIVER_PRESENT=false
   echo REAL_SENSOR_ACCESSED=false
   echo D282_01_OFFLINE_CLOSURE=PASS
-  echo D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION
-  echo CURRENT_LIVE_AUTHORIZED=false
+  echo D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN
+  echo CODEX_LIVE_EXECUTION_ALLOWED=false
+  echo OPERATOR_MANUAL_EXECUTION_REQUIRED=true
   echo CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
-  echo APPROVED_BASELINE=NONE
-  echo GRANT_CREATED=false
+  echo USER_APPROVED_BASELINE_REQUIRED=false
+  echo GRANT_REQUIRED=false
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo LIVE_EXECUTION_PERFORMED=false
   trap - EXIT
@@ -419,9 +438,11 @@ offline_preflight () {
 
 prepare_candidate () {
   local approved=$1 rpm_dir=$2 output snapshot manifest_sha
+  live_current_direct_mode=true
   [[ $EUID -ne 0 ]] || refuse PREPARE_MUST_BE_UNPRIVILEGED
   verify_baseline "$approved"
   output=$(mktemp -d /tmp/goodix-d282-01-candidate.XXXXXX)
+  prepared_candidate=$output
   chmod 0700 "$output"
   snapshot="$output/snapshot"
   mkdir -m 0700 "$snapshot"
@@ -437,14 +458,13 @@ prepare_candidate () {
     echo "D282_01_OPERATION=$operation"
     echo "D282_01_CANDIDATE_DIR=$output"
     echo "D282_01_MANIFEST_SHA256=$manifest_sha"
-    echo "D282_01_EXPECTED_GRANT_ID=d28201-$approved"
+    echo D282_01_AUTHORIZATION_CREDENTIAL_REQUIRED=false
   } >"$output/d282-01-candidate.state"
   chmod 0600 "$output/d282-01-candidate.state" "$output/d282-01-artifacts.sha256"
   echo D282_01_CANDIDATE_PREPARED=true
   echo "CANDIDATE_DIRECTORY=$output"
   echo "CANDIDATE_BASELINE=$approved"
-  echo AUTHORIZATION_CREATED=false
-  echo GRANT_CREATED=false
+  echo AUTHORIZATION_CREDENTIAL_REQUIRED=false
   echo LIVE_EXECUTION_PERFORMED=false
 }
 
@@ -945,8 +965,37 @@ capture_enroll_failure_evidence () {
   } >>"$live_result/operator.log"
 }
 
-run_authorized_live () {
-  local candidate=$1 grant=$2 state baseline manifest expected_id user stamp
+verify_current_live_epoch_audit () {
+  local audit=$1 expected_count=$2 count
+
+  count=$(awk '
+    /GOODIX_D282_EPOCH_AUDIT/ && /action=FPI_DEVICE_ACTION_VERIFY/ {
+      delete f
+      for (i = 1; i <= NF; i++) {
+        split($i, pair, "=")
+        if (length(pair[2]) > 0)
+          f[pair[1]] = pair[2]
+      }
+      if (f["attempts"] == 1 && f["rejected"] == 0 &&
+          f["consumed"] == 1 && f["tls"] == 1 &&
+          f["first_image"] == 1 && f["rearm32"] == 0 &&
+          f["enroll_stages"] == 0 && f["enroll_rearm32"] == 0 &&
+          f["enroll_terminal"] == 0 && f["secure_retry"] == 0 &&
+          f["post_retry"] == 0 && f["reopen"] == 0 &&
+          f["reset"] == 0 && f["clear_halt"] == 0 &&
+          f["persistent"] == 0 && f["outstanding"] == 0 &&
+          f["drained"] == 1 && f["context_closed"] == 1 &&
+          f["release_tail"] == f["single_terminal"] &&
+          (f["release_tail"] == 0 || f["release_tail"] == 1))
+        count++
+    }
+    END { print count + 0 }
+  ' "$audit")
+  [[ $count -eq $expected_count ]]
+}
+
+run_live () {
+  local candidate=$1 user=$2 state baseline manifest stamp
   local daemon_pid raw epoch_count enroll_count verify_count action_rc=1
   local target_count since stored
   local observed_attempts consumed_action_count cleanup_epoch_count hidden_second_count
@@ -975,20 +1024,22 @@ run_authorized_live () {
   real_sensor_accessed=false
   staging_probe_execution_performed=false
   staging_probe_mode=false
+  live_current_direct_mode=true
   [[ $EUID -eq 0 ]] || refuse LIVE_REQUIRES_ROOT
   state="$candidate/d282-01-candidate.state"
   [[ $candidate == /tmp/goodix-d282-01-candidate.* && -f $state && ! -L $candidate ]] || refuse CANDIDATE_INVALID
   baseline=$(state_value "$state" D282_01_BASELINE_SHA) || refuse CANDIDATE_STATE
   manifest=$(state_value "$state" D282_01_MANIFEST_SHA256) || refuse CANDIDATE_STATE
-  expected_id=$(state_value "$state" D282_01_EXPECTED_GRANT_ID) || refuse CANDIDATE_STATE
   verify_baseline "$baseline"
   [[ $(sha256sum "$candidate/d282-01-artifacts.sha256" | awk '{print $1}') == "$manifest" ]] || refuse MANIFEST_DRIFT
   (cd "$candidate" && sha256sum -c d282-01-artifacts.sha256) || refuse ARTIFACT_DRIFT
-  validate_grant "$grant" "$baseline" "$expected_id" "$operation"
-  user=$validated_grant_user
+  [[ $user =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || refuse OPERATOR_USER_INVALID
+  getent passwd "$user" >/dev/null || refuse OPERATOR_USER_UNKNOWN
+  [[ ${SUDO_USER:-$user} == "$user" ]] || refuse OPERATOR_USER_MISMATCH
   validate_live_tooling
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
   live_result="/var/tmp/goodix-d282-01-results/${stamp}-${baseline:0:12}"
+  echo "RISULTATI_PRIVATI=$live_result"
   live_runtime="/run/goodix-d282-01/${stamp}-${baseline:0:12}"
   live_owned="$live_storage_root/.goodix-d282-01-${stamp}-${baseline:0:12}"
   [[ ! -e $live_runtime && ! -e $live_owned && ! -e $live_dropin ]] ||
@@ -1027,8 +1078,6 @@ run_authorized_live () {
   echo "TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count" \
     >>"$live_result/summary.env"
   [[ $target_preconsumption_match_count -eq 1 ]] || refuse TARGET_CARDINALITY_NOT_ONE
-  prepare_grant_claim "$expected_id"
-  consume_validated_grant "$grant"
   live_staging_started=true
   install -d -m 0700 "$live_runtime" "$live_owned" \
     "$(dirname "$live_dropin")"
@@ -1092,7 +1141,7 @@ run_authorized_live () {
     >"$live_private/phase-a-audit.raw"
   [[ $(wc -l <"$live_private/phase-a-audit.raw") -eq 2 ]] || return 1
   [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*attempts=1 rejected=0 consumed=1 tls=1' "$live_private/phase-a-audit.raw") -eq 1 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*attempts=1 rejected=0 consumed=1 tls=1.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$live_private/phase-a-audit.raw") -eq 1 ]] || return 1
+  verify_current_live_epoch_audit "$live_private/phase-a-audit.raw" 1 || return 1
   echo "PHASE_B=Verify dito diverso (indice sinistro): un solo contatto; atteso no-match."
   raw="$live_private/verify-different.raw"
   set +e; timeout --signal=INT --kill-after=20s 180s fprintd-verify "$user" 2>&1 | tee "$raw"; action_rc=${PIPESTATUS[0]}; set -e
@@ -1102,7 +1151,7 @@ run_authorized_live () {
   grep 'GOODIX_D282_EPOCH_AUDIT' "$live_private/phase-b-journal.raw" \
     >"$live_private/phase-b-audit.raw"
   [[ $(wc -l <"$live_private/phase-b-audit.raw") -eq 3 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*attempts=1 rejected=0 consumed=1 tls=1.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$live_private/phase-b-audit.raw") -eq 2 ]] || return 1
+  verify_current_live_epoch_audit "$live_private/phase-b-audit.raw" 2 || return 1
   echo "PHASE_C=Delete del solo storage D282 isolato."
   fprintd-delete "$user" >"$live_private/delete.raw" 2>&1
   [[ $(find "$live_owned" -type f | wc -l) -eq 0 ]] || return 1
@@ -1134,14 +1183,15 @@ run_authorized_live () {
   [[ $(grep -c 'secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0' "$live_private/audit.raw") -eq 4 ]] || return 1
   [[ $(grep -c 'persistent=0' "$live_private/audit.raw") -eq 4 ]] || return 1
   [[ $(grep -c 'outstanding=0 drained=1 context_closed=1' "$live_private/audit.raw") -eq 4 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$live_private/audit.raw") -eq 2 ]] || return 1
+  verify_current_live_epoch_audit "$live_private/audit.raw" 2 || return 1
   [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*enroll_stages=8 enroll_rearm32=7 enroll_terminal=1' "$live_private/audit.raw") -eq 1 ]] || return 1
   sed "s/$user/<USER>/g; s/${baseline}/<BASELINE>/g; s/${stamp}/<RUN>/g" \
     "$live_private"/*.raw >>"$live_result/operator.log"
   {
     echo D282_01_RESULT=PASS_LIVE_PENDING_INDEPENDENT_REVIEW
     echo "D282_01_BASELINE_SHA=$baseline"
-    echo AUTHORIZED_BIOMETRIC_ACTION_MAX=3
+    echo BIOMETRIC_ACTION_MAX=3
+    echo EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10
     echo "OPEN_EPOCH_COUNT=$epoch_count"
     echo "ACTION_ATTEMPT_COUNT=$observed_attempts"
     echo "CONSUMED_BIOMETRIC_ACTION_COUNT=$consumed_action_count"
@@ -1152,7 +1202,8 @@ run_authorized_live () {
     echo EXTRA_ENROLLMENT_REARM_COUNT=0
     echo "VERIFY_ACTION_COUNT=$verify_count"
     echo "SECOND_SENSOR_REACHING_ACTION_COUNT=$hidden_second_count"
-    echo RETRY_AUTHORIZED=false
+    echo AUTHORIZATION_CREDENTIAL_REQUIRED=false
+    echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
     echo "OBSERVED_RETRY_COUNT=$retry_count"
     echo "HIDDEN_REOPEN_COUNT=$reopen_count"
     echo "RESET_COUNT=$reset_count"
@@ -1166,13 +1217,58 @@ run_authorized_live () {
   chmod 0600 "$live_result/operator.log" "$live_result/summary.env"
   live_run_return_code=0
   echo "RISULTATI=$live_result"
-  echo GRANT_CONSUMED=true
-  echo RETRY_AUTHORIZED=false
+  echo AUTHORIZATION_CREDENTIAL_REQUIRED=false
+  echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
   return 0
+}
+
+operator_run () {
+  local rpm_dir=$1 user baseline transcript rc result export_output
+  local confirmation export_rc=1
+
+  live_current_direct_mode=true
+  [[ $EUID -ne 0 ]] || refuse OPERATOR_RUN_MUST_BE_UNPRIVILEGED
+  command -v sudo >/dev/null || refuse HOST_TOOL_MISSING_sudo
+  user=$(id -un) || refuse OPERATOR_USER_UNKNOWN
+  baseline=$(git -C "$root" rev-parse HEAD) || refuse BASELINE_UNREADABLE
+  verify_baseline "$baseline"
+  trap cleanup_prepared_candidate EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  prepare_candidate "$baseline" "$rpm_dir"
+  echo
+  echo "D282/01 userà al massimo 10 contatti: 8 indice destro per enrollment,"
+  echo "1 indice destro per verify e 1 indice sinistro per no-match."
+  echo "Non esegue retry automatici o impliciti e ripristina servizio e storage."
+  echo "PAM, login e sudo come fattore biometrico sono fuori scope."
+  printf 'Digitare ESEGUI per avviare la singola run manuale: '
+  read -r confirmation
+  [[ $confirmation == ESEGUI ]] || refuse OPERATOR_CANCELLED
+  transcript=$(mktemp /tmp/goodix-d282-01-operator.XXXXXX)
+  set +e
+  sudo "$script_dir/run-d282-01.sh" --run-live "$prepared_candidate" \
+    --user "$user" 2>&1 | tee "$transcript"
+  rc=${PIPESTATUS[0]}
+  set -e
+  result=$(sed -n 's/^RISULTATI_PRIVATI=//p' "$transcript" | tail -n 1)
+  if [[ -n $result ]]; then
+    set +e
+    export_output=$(sudo "$script_dir/run-d282-01.sh" --export-results "$result" 2>&1)
+    export_rc=$?
+    set -e
+    printf '%s\n' "$export_output"
+    [[ $export_rc -eq 0 ]] || rc=$export_rc
+  fi
+  cleanup_prepared_candidate
+  prepared_candidate=
+  rm -f -- "$transcript"
+  trap - EXIT INT TERM
+  return "$rc"
 }
 
 export_results () {
   local result=$1 export name source_sha copy_sha
+  live_current_direct_mode=true
   [[ $EUID -eq 0 && ${SUDO_UID:-} =~ ^[0-9]+$ && ${SUDO_GID:-} =~ ^[0-9]+$ ]] || refuse EXPORT_CALLER
   [[ $result == /var/tmp/goodix-d282-01-results/* && -d $result/private ]] || refuse EXPORT_SOURCE
   export=$(mktemp -d /tmp/goodix-d282-01-export.XXXXXX); chmod 0700 "$export"
@@ -1215,12 +1311,13 @@ export_staging_probe_results () {
 
 case ${1:-} in
   --offline-preflight) [[ $# -eq 2 ]] || refuse USAGE; offline_preflight "$2" ;;
-  --prepare-candidate) [[ $# -eq 3 ]] || refuse USAGE; prepare_candidate "$2" "$3" ;;
+  --prepare-candidate) live_current_direct_mode=true; [[ $# -eq 3 ]] || refuse USAGE; prepare_candidate "$2" "$3" ;;
+  --operator-run) live_current_direct_mode=true; [[ $# -eq 2 ]] || refuse USAGE; operator_run "$2" ;;
   --prepare-staging-probe-candidate) [[ $# -eq 2 ]] || refuse USAGE; prepare_staging_probe_candidate "$2" ;;
-  --run-authorized-live) [[ $# -eq 4 && $3 == --grant ]] || refuse USAGE; run_authorized_live "$2" "$4" ;;
+  --run-live) live_current_direct_mode=true; [[ $# -eq 4 && $3 == --user ]] || refuse USAGE; run_live "$2" "$4" ;;
   --run-authorized-staging-probe) [[ $# -eq 4 && $3 == --grant ]] || refuse USAGE; run_authorized_staging_probe "$2" "$4" ;;
-  --export-results) [[ $# -eq 2 ]] || refuse USAGE; export_results "$2" ;;
+  --export-results) live_current_direct_mode=true; [[ $# -eq 2 ]] || refuse USAGE; export_results "$2" ;;
   --export-staging-probe-results) [[ $# -eq 2 ]] || refuse USAGE; export_staging_probe_results "$2" ;;
   --self-test-exit-trap) [[ $# -eq 2 ]] || refuse USAGE; exit_trap_scope_regression "$2" ;;
-  *) echo "Uso: $0 --offline-preflight <opencv-rpm-dir> | --prepare-staging-probe-candidate <SHA> | --run-authorized-staging-probe <candidate> --grant <grant> | --export-staging-probe-results <results> | --prepare-candidate <SHA> <opencv-rpm-dir> | --run-authorized-live <candidate> --grant <grant> | --export-results <results>" >&2; exit 2 ;;
+  *) echo "Uso corrente: $0 --operator-run <opencv-rpm-dir> | --offline-preflight <opencv-rpm-dir>. Modalita' interne/storiche: --prepare-candidate <SHA> <opencv-rpm-dir> | --run-live <candidate> --user <utente> | --export-results <results> | --prepare-staging-probe-candidate <SHA> | --run-authorized-staging-probe <candidate> --grant <grant> | --export-staging-probe-results <results>" >&2; exit 2 ;;
 esac

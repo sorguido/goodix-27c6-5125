@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D282/01 attempt 02 chiuso, correttivo direct-enroll offline
+### Stato corrente — D282/01 attempt 03 classificato, correttivo audit offline
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -373,11 +373,47 @@ enrollment. La matrice D282 è `63/63`; il test della classe Goodix conferma
 e hash-pinned, lo stato normalizzato e il report causale sono in
 `captures/D282_01/D28201_ATTEMPT_02_cc2452e5/` e `analysis/D282/`.
 
+La run manuale attempt 03 ha poi eseguito la baseline
+`42903b70c89b2399bef35f4a4c7eb8c9dc5d04e5`. Il contesto operatore attesta
+otto stage e `enroll-completed` per l'indice destro, poi, dopo restart fprintd,
+un `verify-match` dello stesso indice. L'audit raw hash-pinned conferma una
+epoch ENROLL con otto stage, sette re-arm e terminale e una epoch VERIFY con
+una prima immagine. Entrambe hanno un handshake TLS, zero retry/reopen/reset/
+clear-halt/famiglie persistenti note, outstanding zero, backend drenato e
+context chiuso. I submit reali osservati sono `203 + 76 = 279`.
+
+La run si è fermata dopo il match e prima di stampare `PHASE_B`. Il contatto
+successivo dell'indice sinistro, avvenuto dopo il ritorno al prompt, non è
+un'acquisizione D282. Il confronto con lo script esatto della baseline
+identifica univocamente l'assert fallito: il launcher richiedeva
+`first_image=1 release_tail=1 single_terminal=1 rearm32=0`, mentre l'epoch
+autentica riporta `1/0/0/0`. Numero righe e pattern ENROLL erano conformi.
+
+Ricevuto `VerifyStatus(done)`, il client chiama `VerifyStop` e poi `Release`;
+se l'action non è ancora terminata, il daemon attende per un intervallo
+limitato e può cancellarla prima della release tail. La coppia
+`release_tail/single_terminal` è quindi coerentemente `0/0` quando stop/close
+precedono la tail, oppure `1/1` se la tail termina prima dello stop. In
+entrambi i casi l'audit deve ancora imporre prima
+immagine singola, zero re-arm/retry/reopen/reset/clear-halt/persistenza,
+outstanding zero, backend drenato e context chiuso. Il correttivo sostituisce
+il grep rigido con questo validatore tipizzato; non cambia driver, protocollo,
+fence o budget fisico.
+
+L'evidenza e la classificazione vivono in
+`captures/D282_01/D28201_ATTEMPT_03_42903b70/`,
+`analysis/D282/D282_01_ATTEMPT_03_NORMALIZED.env` e
+`analysis/D282/D282_01_attempt_03_post_live_analysis.md`.
+
 Il successivo passo sensor-reaching resta un Human Gate: l'AI non può
 eseguirlo. Dopo la closure offline il Kit Operatore deve però essere
-direttamente eseguibile manualmente dall'Utente, senza approvazione separata
-dello SHA, candidate autorizzata, grant o token. Il kit registra full SHA e
-hash pertinenti per provenance e conserva i limiti tecnici fail-closed.
+direttamente eseguibile manualmente dall'Utente con un solo comando normale,
+senza approvazione separata dello SHA, candidate autorizzata, grant o token.
+Il launcher costruisce la candidate dal `HEAD` pulito/allineato, mostra il
+budget massimo di dieci contatti, richiede una conferma interattiva leggibile,
+invoca visibilmente `sudo` e riesporta automaticamente i due file sanitizzati.
+SHA e hash restano provenance; i limiti di tre action e lo zero retry sono
+imposti dal percorso tecnico.
 
 PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
 sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
@@ -453,9 +489,9 @@ FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
-D282_01_OUTCOME=ATTEMPT_02_FAIL_CLOSED_AND_DIRECT_ENROLL_CORRECTIVE_PASS_OFFLINE
+D282_01_OUTCOME=ATTEMPT_03_PHASE_A_BIOMETRIC_SUCCESS_AND_AUDIT_CORRECTIVE_PASS_OFFLINE
 D282_01_OFFLINE_CLOSURE=PASS
-D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_MANUAL_OPERATOR_KIT
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
@@ -470,7 +506,7 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=63/63_PASS
+D282_01_REQUIRED_MATRIX=66/66_PASS
 D282_01_DIRECT_ENROLL_FEATURE_PROFILE=PASS_NORMAL_AND_ASAN_UBSAN
 D282_01_DIRECT_ENROLL_IDENTIFY_FEATURE_ADVERTISED=false
 D282_01_DIRECT_ENROLL_VERIFY_FEATURE_ADVERTISED=true
@@ -514,6 +550,34 @@ D282_01_ATTEMPT_02_SECOND_SENSOR_REACHING_ACTION_COUNT=0
 D282_01_ATTEMPT_02_EXACT_EPOCH_AUDIT=UNOBSERVED_EXPORT_GAP
 D282_01_ATTEMPT_02_OPERATOR_LOG_SHA256=c6d680671af7bf6bb5b994980d5cd3f0131d7a3555caee4db301608e7ce4aa25
 D282_01_ATTEMPT_02_SUMMARY_ENV_SHA256=e6b41990bbfe82e2bb8bae70cd504f37e76a4957e91a133cb6204c369e1cca4e
+D282_01_ATTEMPT_03=FAIL_POST_PHASE_A_STALE_VERIFY_AUDIT_ASSERT
+D282_01_ATTEMPT_03_BASELINE_SHA=42903b70c89b2399bef35f4a4c7eb8c9dc5d04e5
+D282_01_ATTEMPT_03_EVIDENCE_AUDIT=PASS_HASH_PINNED
+D282_01_ATTEMPT_03_ENROLL_COMPLETED_STAGE_COUNT=8
+D282_01_ATTEMPT_03_ENROLL_INTER_STAGE_REARM_COUNT=7
+D282_01_ATTEMPT_03_ENROLL_TERMINAL_TRANSITION_COUNT=1
+D282_01_ATTEMPT_03_VERIFY_FIRST_IMAGE_COUNT=1
+D282_01_ATTEMPT_03_VERIFY_RELEASE_TAIL_COUNT=0
+D282_01_ATTEMPT_03_VERIFY_SINGLE_ACQUISITION_TERMINAL_COUNT=0
+D282_01_ATTEMPT_03_VERIFY_REARM_COUNT=0
+D282_01_ATTEMPT_03_TOTAL_REAL_SUBMIT_COUNT=279
+D282_01_ATTEMPT_03_TLS_HANDSHAKE_COUNT=2
+D282_01_ATTEMPT_03_RETRY_COUNT=0
+D282_01_ATTEMPT_03_REOPEN_COUNT=0
+D282_01_ATTEMPT_03_RESET_COUNT=0
+D282_01_ATTEMPT_03_CLEAR_HALT_COUNT=0
+D282_01_ATTEMPT_03_KNOWN_PERSISTENT_FAMILY_COUNT=0
+D282_01_ATTEMPT_03_BACKENDS_DRAINED_COUNT=2
+D282_01_ATTEMPT_03_CONTEXTS_CLOSED_COUNT=2
+D282_01_ATTEMPT_03_CLIENT_ENROLL_RESULT=COMPLETED_OPERATOR_CONTEXT_ATTESTED
+D282_01_ATTEMPT_03_CLIENT_SAME_FINGER_VERIFY_RESULT=MATCH_OPERATOR_CONTEXT_ATTESTED
+D282_01_ATTEMPT_03_PHASE_B_STARTED=false
+D282_01_ATTEMPT_03_DIFFERENT_FINGER_SENSOR_ACQUISITION_COUNT=0
+D282_01_ATTEMPT_03_EXACT_FAILED_ASSERT=VERIFY_RELEASE_TAIL_1_SINGLE_TERMINAL_1_EXPECTED_ACTUAL_0_0
+D282_01_ATTEMPT_03_ROLLBACK_COMPLETE=true
+D282_01_VERIFY_AUDIT_COHERENT_CLOSE_PAIR=ZERO_ZERO_OR_ONE_ONE
+D282_01_CURRENT_LIVE_AUTHORIZATION_CREDENTIAL_REQUIRED=false
+D282_01_CURRENT_LIVE_GRANT_REQUIRED=false
 D282_01_FAILURE_EVIDENCE_CAPTURE_BEFORE_ROLLBACK=PASS_OFFLINE
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
@@ -538,19 +602,23 @@ HISTORICAL_AUTHORIZED_BIOMETRIC_ACTION_MAX=3
 BIOMETRIC_ACTION_MAX=3
 EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10
 D282_01_PAM_IN_SCOPE=false
-CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CODEX_LIVE_EXECUTION_ALLOWED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 USER_APPROVED_BASELINE_REQUIRED=false
 GRANT_REQUIRED=false
+AUTHORIZATION_CREDENTIAL_REQUIRED=false
+AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D282_01_BIOMETRIC_HUMAN_GATE_THEN_DIRECT_MANUAL_OPERATOR_KIT
+NEXT_PRIMARY_BOUNDARY=D282_01_HUMAN_GATE_THEN_DIRECT_OPERATOR_RUN_FOR_DIFFERENT_FINGER_AND_DELETE_CLOSURE
 NEXT_BOUNDARY_AFTER_D282_PASS=D283_01_PAM_DEDICATED_MAX_TRIES_1_NO_REAL_LOGIN_OR_SUDO_INITIAL
 ```
 
 Report ed evidenze correnti:
+`analysis/D282/D282_01_attempt_03_post_live_analysis.md`,
+`analysis/D282/D282_01_ATTEMPT_03_NORMALIZED.env`,
+`captures/D282_01/D28201_ATTEMPT_03_42903b70/`,
 `analysis/D282/D282_01_offline_verify_fprintd_readiness.md`,
 `analysis/D282/D282_01_OFFLINE_RESULT.env`,
 `reference/fprintd-fedora44-1.94.5/`,

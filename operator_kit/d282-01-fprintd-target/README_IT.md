@@ -3,22 +3,23 @@
 
 ## Stato e scopo
 
-La seconda Human Gate D282/01 sulla baseline
-`cc2452e52809d2adeccce83a9fe493a241770832` è chiusa come
-`FAIL_FPRINTD_IDENTIFY_TO_ENROLL_SAME_EPOCH_FENCE`. Il primo e unico contatto
-è stato consumato dal controllo anti-duplicato IDENTIFY che fprintd antepone
-all'enrollment; l'ENROLL immediatamente successivo è stato respinto dal fence
-Goodix prima di generation, TLS o USB. Il grant è consumato e non autorizza
-retry. Cleanup, servizio, staging, libreria di sistema e storage preesistente
-risultano ripristinati. Non esistono baseline biometrica approvata, nuova
-candidate, nuovo grant o autorizzazione live.
+L'attempt 03 D282/01 sulla baseline
+`42903b70c89b2399bef35f4a4c7eb8c9dc5d04e5` ha completato l'enrollment
+fprintd/SIGFM dell'indice destro (otto stage) e ha ottenuto `verify-match`
+dello stesso indice dopo restart del daemon. La run si è fermata prima della
+Phase B per un assert host-side stale: il launcher pretendeva sempre
+`release_tail=1 single_terminal=1`, mentre il percorso `VerifyStop`/`Release`
+del client fprintd ha prodotto la coppia coerente `0/0`, con prima immagine
+acquisita, zero re-arm/retry e backend drenato/context chiuso. Cleanup, servizio,
+staging, libreria di sistema e storage preesistente risultano ripristinati.
 
-Il correttivo offline compila la sola candidate D282 senza pubblicizzare
-IDENTIFY, conservando VERIFY: fprintd entra così direttamente in ENROLL e la
-sequenza resta entro un enrollment e due verify. Il fence per open epoch non è
-stato allentato. Il launcher raccoglie inoltre journal, audit epoch, AVC e
-conteggi client prima di uscire da un enrollment fallito. Il preflight resta
-offline e non enumera USB.
+Il correttivo offline mantiene il profilo direct-enroll e sostituisce quel
+grep rigido con un validatore tipizzato. Per VERIFY sono accettate soltanto le
+coppie coerenti `release_tail/single_terminal` `0/0` oppure `1/1`; restano
+obbligatori prima immagine singola, zero re-arm/retry/reopen/reset/clear-halt,
+zero famiglie persistenti note, outstanding zero, backend drenato e context
+chiuso. Driver, protocollo, fence per open epoch e numero di contatti non
+cambiano.
 
 La futura run copre soltanto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
 driver Goodix `27c6:5125`: enrollment dell'indice destro, FP3 SIGFM nello
@@ -30,7 +31,7 @@ fattore di autenticazione sono fuori scope.
 D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
 D282_01_ATTEMPT_01_GRANT_CONSUMED=true
 D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
-D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION
+D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN
 D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=VERIFIED_PRIVILEGED_HOST
 D282_01_SELINUX_WRAPPER_FAILURE=RESOLVED
@@ -51,6 +52,15 @@ D282_01_ATTEMPT_02_RETRY_AUTHORIZED=false
 D282_01_ATTEMPT_02_FIRST_CONTACT_ACTION=IDENTIFY
 D282_01_ATTEMPT_02_ACTUAL_ENROLL_SENSOR_ACQUISITION_COUNT=0
 D282_01_ATTEMPT_02_SECOND_SENSOR_REACHING_ACTION_COUNT=0
+D282_01_ATTEMPT_03=FAIL_POST_PHASE_A_STALE_VERIFY_AUDIT_ASSERT
+D282_01_ATTEMPT_03_BASELINE_SHA=42903b70c89b2399bef35f4a4c7eb8c9dc5d04e5
+D282_01_ATTEMPT_03_ENROLLMENT_CLIENT_RESULT=COMPLETED_OPERATOR_CONTEXT_ATTESTED
+D282_01_ATTEMPT_03_SAME_FINGER_VERIFY_CLIENT_RESULT=MATCH_OPERATOR_CONTEXT_ATTESTED
+D282_01_ATTEMPT_03_VERIFY_RELEASE_TAIL=0
+D282_01_ATTEMPT_03_VERIFY_SINGLE_TERMINAL=0
+D282_01_ATTEMPT_03_PHASE_B_STARTED=false
+D282_01_ATTEMPT_03_DIFFERENT_FINGER_SENSOR_ACQUISITION_COUNT=0
+D282_01_VERIFY_AUDIT_COHERENT_CLOSE_PAIR=ZERO_ZERO_OR_ONE_ONE
 D282_01_DIRECT_ENROLL_PROFILE=PASS_OFFLINE_NORMAL_AND_ASAN_UBSAN
 D282_01_IDENTIFY_FEATURE_ADVERTISED=false
 D282_01_VERIFY_FEATURE_ADVERTISED=true
@@ -64,10 +74,11 @@ INACTIVE_FAILURE_FINAL_INACTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
-CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
-APPROVED_BASELINE=NONE
-GRANT_CREATED=false
+USER_APPROVED_BASELINE_REQUIRED=false
+GRANT_REQUIRED=false
+AUTHORIZATION_CREDENTIAL_REQUIRED=false
+AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 LIVE_EXECUTION_PERFORMED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
@@ -125,9 +136,9 @@ precedente:
    terzo epoch;
 3. **C:** delete del solo template D282, audit e rollback.
 
-Il grant composto minimizza il rischio di ripetere gli otto contatti per un
-errore host-side tardivo. Autorizza esattamente tre azioni biometriche: un
-enrollment e due verify. Non autorizza retry. `fprintd-delete` esegue comunque
+Il launcher impone tecnicamente esattamente tre azioni biometriche: un
+enrollment e due verify, senza loop o retry automatici/impliciti.
+`fprintd-delete` esegue comunque
 un `Claim/Release`: produce quindi un quarto open epoch esplicito, ma il
 Goodix image device non espone `FP_DEVICE_FEATURE_STORAGE`; il sorgente esatto
 fprintd elimina solo il file host, senza delete sensor-side, TLS o azione
@@ -135,8 +146,8 @@ biometrica. Il summary distingue `OPEN_EPOCH_COUNT=4` da
 `CONSUMED_BIOMETRIC_ACTION_COUNT=3` e ricava tutti i contatori dai log
 osservati.
 
-`AUTHORIZED_BIOMETRIC_ACTION_MAX=3` descrive il limite del grant composto; non
-è un contatore di esecuzione. `ACTION_ATTEMPT_COUNT`, gli epoch e tutti gli
+`BIOMETRIC_ACTION_MAX=3` descrive il limite tecnico dell'invocazione; non è un
+contatore di esecuzione. `ACTION_ATTEMPT_COUNT`, gli epoch e tutti gli
 altri contatori del risultato sono invece derivati esclusivamente dagli audit
 autentici raccolti.
 
@@ -166,21 +177,20 @@ nell'export. Lo storage usato da fprintd è una directory D282 univoca sotto
 preesistenti restano fuori da quel root. Collisioni e symlink falliscono
 chiusi.
 
-Il grant viene prima validato senza mutarlo. Collisioni, stato iniziale del
-servizio, libreria di sistema e relativo hash, precondizioni SELinux, snapshot
-della unit, inventario storage e cardinalità passiva esatta di un solo
-`27c6:5125` letta da `/sys/bus/usb/devices` devono passare mentre
-`GRANT_CONSUMED=false`. Il trap è già attivo per snapshot e inventario. Solo
-dopo questi gate viene preparato il namespace one-shot e il claim è acquisito
-con `mkdir` atomica; da `GRANT_CONSUMED=true` il launcher entra subito nello
-staging. Dopo lo start del daemon la stessa cardinalità viene verificata di
-nuovo come fence anti-TOCTOU. Un rifiuto precedente al consumo stampa anche il
-conteggio autentico `TARGET_PRECONSUMPTION_MATCH_COUNT` e
-`REAL_USB_ENUMERATION_ATTEMPTED=false` e `LIVE_EXECUTION_PERFORMED=false`.
+Collisioni, stato iniziale del servizio, libreria di sistema e relativo hash,
+precondizioni SELinux, snapshot della unit, inventario storage e cardinalità
+passiva esatta di un solo `27c6:5125` letta da `/sys/bus/usb/devices` devono
+passare prima dello staging. Il trap è già attivo per snapshot e inventario.
+Dopo lo start del daemon la stessa cardinalità viene verificata di nuovo come
+fence anti-TOCTOU. Un rifiuto precedente allo staging stampa il conteggio
+autentico `TARGET_PRECONSUMPTION_MATCH_COUNT`,
+`REAL_USB_ENUMERATION_ATTEMPTED=false` e
+`LIVE_EXECUTION_PERFORMED=false`. Nessun file/token/grant o approvazione dello
+SHA partecipa alla safety; lo SHA è registrato soltanto come provenance.
 
 Il trap di rollback è installato prima della prima mutazione di staging.
 `cleanup_live()` è top-level e usa solo stato globale `live_*`, che resta
-valido anche quando `run_authorized_live()` termina per `set -e`; non dipende
+valido anche quando il percorso live termina per `set -e`; non dipende
 più da variabili `local` fuori scope. Rimuove soltanto runtime, drop-in e
 storage con nomi D282 risolti in anticipo,
 ripristina lo stato active/inactive del servizio, confronta unit, libreria di
@@ -191,9 +201,9 @@ e B. Viene eliminato dalla phase C o dal rollback e non viene copiato in
 `private/`; l'export contiene soltanto `operator.log` e `summary.env`,
 verificati byte per byte, quindi `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 
-## Probe privilegiato systemd/SELinux, separato dalla live
+## Probe privilegiato systemd/SELinux storico, separato dalla live
 
-La modalità dedicata è `--run-authorized-staging-probe` e accetta
+La modalità storica è `--run-authorized-staging-probe` e accettava
 esclusivamente un grant one-shot con operation:
 
 ```text
@@ -239,10 +249,10 @@ FINGER_CONTACT_COUNT=0
 LIVE_EXECUTION_PERFORMED=false
 ```
 
-Il grant probe conserva il formato a quattro righe del kit; `D282_01_USER`
+La run storica conservava un grant a quattro righe; `D282_01_USER`
 lega l'identità dell'operatore ma non viene passato ad alcuna azione
-biometrica. Operation e grant ID probe sono diversi da quelli live: un grant
-probe è respinto dalla modalità live e viceversa. Tutti i gate fallibili
+biometrica. Operation e grant ID del probe erano distinti da quelli della live
+storica. Tutti i gate fallibili
 (baseline/manifest/artefatti, audit USB/Goodix, ABI, grant, collisioni,
 stato servizio `active|inactive`, libreria/hash, SELinux Enforcing, result
 sink, snapshot unit e inventario storage) precedono il claim atomico. Dopo il
@@ -268,7 +278,7 @@ sorgente Fedora e dall'opzione `--no-timeout`; non invalida il rollback già
 osservato. La directory padre vuota `/run/goodix-d282-01` è housekeeping non
 bloccante.
 
-## Prerequisiti e comandi offline
+## Prerequisiti e comando operativo corrente
 
 - branch `development`, worktree live-critical pulito per la preparazione;
 - Flatpak SDK `org.freedesktop.Sdk//25.08` già installato;
@@ -276,7 +286,8 @@ bloccante.
   `operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256`;
 - pacchetto esatto `fprintd-1.94.5-5.fc44.x86_64` per ABI/runtime.
 
-Il preflight seguente resta eseguibile come utente non privilegiato:
+Il preflight seguente resta eseguibile come utente non privilegiato e non
+raggiunge USB:
 
 ```bash
 operator_kit/d282-01-fprintd-target/run-d282-01.sh \
@@ -289,20 +300,28 @@ entrambi i profili drop-in con `systemd-analyze`; non avvia il servizio. La
 prova privilegiata del vero start è già chiusa separatamente e non deve essere
 ripetuta.
 
-Le modalità probe documentano il percorso storico consumato; non sono
-autorizzate ora. Le modalità `--prepare-candidate`, `--run-authorized-live` e
-`--export-results` descrivono la futura live, anch'essa non autorizzata ora.
-Il kit non crea grant. Un eventuale grant esterno one-shot dovrà contenere
-esattamente quattro righe (`D282_01_BASELINE_SHA`, `D282_01_OPERATION`,
-`D282_01_GRANT_ID`, `D282_01_USER`), avere permessi privati ed essere legato
-alla candidate hash-pinned. La directory di consumo rende impossibile il
-riuso dello stesso ID.
+La normale run factory-preserving è direttamente eseguibile dall'operatore,
+senza preparare candidate, grant, authorization file o approvare manualmente
+uno SHA:
+
+```bash
+operator_kit/d282-01-fprintd-target/run-d282-01.sh \
+  --operator-run /tmp/goodix-opencv-4.13-rpms
+```
+
+Il comando va avviato come utente normale. Costruisce la candidate dal `HEAD`
+pulito e allineato a `origin/development`, mostra il budget fisico, chiede di
+digitare `ESEGUI`, invoca visibilmente `sudo` solo per staging/live/rollback e
+infine esporta automaticamente `operator.log` e `summary.env` in una directory
+`/tmp/goodix-d282-01-export.*` posseduta dall'operatore. Lo SHA e il manifest
+restano dati di provenance/integrità. Le modalità low-level e probe
+sono interne o storiche e non sono il percorso operativo corrente.
 
 ## Stop condition
 
 Fermarsi senza eseguire alcuna azione se baseline/origin, pacchetto, ABI,
-manifest, unit, servizio, storage, SELinux, cardinalità target, mapping della
-libreria o grant non coincidono. I rifiuti host-only precedenti al claim non
-consumano il grant. Dopo il consumo, ogni failure provoca solo
-cleanup/rollback con `RETRY_AUTHORIZED=false`: non creare un altro grant e non
-ripetere la run. Non usare comandi USB improvvisati.
+manifest, unit, servizio, storage, SELinux, cardinalità target o mapping della
+libreria non coincidono. Dopo l'inizio dello staging, ogni failure provoca
+solo cleanup/rollback; non esiste alcun retry automatico o implicito. Se la
+run fallisce, non ripeterla: conservare ed allegare l'export prodotto. Non
+usare comandi USB improvvisati.

@@ -6,6 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -34,6 +35,11 @@ ATTEMPT_02_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_02_NORMALIZED.env"
 ATTEMPT_02_REPORT = ROOT / "analysis/D282/D282_01_attempt_02_post_live_analysis.md"
 ATTEMPT_02_CAPTURE = (
     ROOT / "captures/D282_01/D28201_ATTEMPT_02_cc2452e5/sanitized")
+ATTEMPT_03_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_03_NORMALIZED.env"
+ATTEMPT_03_REPORT = ROOT / "analysis/D282/D282_01_attempt_03_post_live_analysis.md"
+ATTEMPT_03_AUDITOR = ROOT / "analysis/D282/d282_01_attempt_03_evidence_audit.py"
+ATTEMPT_03_CAPTURE = (
+    ROOT / "captures/D282_01/D28201_ATTEMPT_03_42903b70/sanitized")
 
 spec = importlib.util.spec_from_file_location(
     "d282_staging", ROOT / "analysis/D282/d282_01_staging_model.py")
@@ -69,6 +75,8 @@ class D282OfflineContract(unittest.TestCase):
         cls.offline_result = OFFLINE_RESULT.read_text()
         cls.attempt_02_env = ATTEMPT_02_ENV.read_text()
         cls.attempt_02_report = ATTEMPT_02_REPORT.read_text()
+        cls.attempt_03_env = ATTEMPT_03_ENV.read_text()
+        cls.attempt_03_report = ATTEMPT_03_REPORT.read_text()
 
     def test_01_exact_fprintd_one_print_dispatches_verify(self):
         verify_start = function_slice(
@@ -181,7 +189,8 @@ class D282OfflineContract(unittest.TestCase):
     def test_19_no_hidden_retry_reopen_reset_or_clear_halt(self):
         for forbidden in ("g_usb_device_reset (", "g_usb_device_clear_halt ("):
             self.assertNotIn(forbidden, self.driver)
-        self.assertIn("AUTHORIZED_BIOMETRIC_ACTION_MAX=3", self.kit)
+        self.assertIn("BIOMETRIC_ACTION_MAX=3", self.kit)
+        self.assertIn("EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10", self.kit)
         self.assertIn("RETRY_AUTHORIZED=false", self.kit)
 
     def test_20_no_persistent_family_outside_empty_allowlist(self):
@@ -190,10 +199,10 @@ class D282OfflineContract(unittest.TestCase):
         self.assertIn("persistent=0", self.kit)
         self.assertIn("PAM_IN_SCOPE=false", self.kit)
 
-    def test_21_all_pre_live_gates_precede_atomic_consumption(self):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+    def test_21_all_pre_live_gates_precede_staging_without_credentials(self):
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         refusal = function_slice(self.kit, "refuse ()", "is_sha ()")
-        consume = live.index('consume_validated_grant "$grant"')
+        staging = live.index("live_staging_started=true")
         for anchor in (
                 "refuse STAGING_COLLISION",
                 "refuse FPRINTD_INITIAL_STATE_UNSAFE",
@@ -201,38 +210,38 @@ class D282OfflineContract(unittest.TestCase):
                 'validate_selinux_preconditions "$live_system_library" "$live_storage_root"',
                 "refuse UNIT_SNAPSHOT_FAILED",
                 "refuse STORAGE_INVENTORY_FAILED",
-                'prepare_grant_claim "$expected_id"'):
-            self.assertLess(live.index(anchor), consume, anchor)
-        self.assertLess(live.index("trap cleanup_live EXIT"), consume)
-        self.assertLess(consume, live.index("live_staging_started=true"))
-        self.assertLess(live.index("live_staging_started=true"),
+                "refuse TARGET_CARDINALITY_NOT_ONE"):
+            self.assertLess(live.index(anchor), staging, anchor)
+        self.assertLess(live.index("trap cleanup_live EXIT"), staging)
+        self.assertLess(staging,
                         live.index('install -d -m 0700 "$live_runtime"'))
-        after_consume = live[consume:]
-        self.assertNotIn("command -v", after_consume)
-        self.assertNotIn("$(getenforce)", after_consume)
-        self.assertIn("validated_selinux_enforcement == Enforcing", after_consume)
-        self.assertEqual(live.count('consume_validated_grant "$grant"'), 1)
-        for marker in ('GRANT_CONSUMED=$grant_consumed',
+        after_staging = live[staging:]
+        self.assertNotIn("command -v", after_staging)
+        self.assertNotIn("$(getenforce)", after_staging)
+        self.assertIn("validated_selinux_enforcement == Enforcing", after_staging)
+        self.assertNotIn("validate_grant", live)
+        self.assertNotIn("consume_validated_grant", live)
+        for marker in ('AUTHORIZATION_CREDENTIAL_REQUIRED=false',
                        'REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted',
                        'LIVE_EXECUTION_PERFORMED=$live_execution_performed'):
             self.assertIn(marker, refusal)
 
-    def test_22_staging_collision_does_not_consume_grant(self):
+    def test_22_staging_collision_precedes_staging(self):
         self._assert_preconsumption_refusal("STAGING_COLLISION")
 
-    def test_23_unsafe_fprintd_state_does_not_consume_grant(self):
+    def test_23_unsafe_fprintd_state_precedes_staging(self):
         self._assert_preconsumption_refusal("FPRINTD_INITIAL_STATE_UNSAFE")
 
-    def test_24_missing_system_libfprint_does_not_consume_grant(self):
+    def test_24_missing_system_libfprint_precedes_staging(self):
         self._assert_preconsumption_refusal("SYSTEM_LIBFPRINT_MISSING")
 
-    def test_25_unit_snapshot_failure_does_not_consume_grant(self):
+    def test_25_unit_snapshot_failure_precedes_staging(self):
         self._assert_preconsumption_refusal("UNIT_SNAPSHOT_FAILED")
 
-    def test_26_storage_inventory_failure_does_not_consume_grant(self):
+    def test_26_storage_inventory_failure_precedes_staging(self):
         self._assert_preconsumption_refusal("STORAGE_INVENTORY_FAILED")
 
-    def test_27_selinux_precondition_failure_does_not_consume_grant(self):
+    def test_27_selinux_precondition_failure_precedes_staging(self):
         self._assert_preconsumption_refusal(
             "SELINUX_PRECONDITION_FAILED",
             source_anchor='validate_selinux_preconditions "$live_system_library" "$live_storage_root"')
@@ -265,22 +274,15 @@ class D282OfflineContract(unittest.TestCase):
         self._assert_unused(second)
         self.assertEqual(registry.consumed_ids, {"grant-1"})
 
-    def test_30_postconsume_failure_rolls_back_without_retry_and_flow_is_unchanged(self):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+    def test_30_poststaging_failure_rolls_back_without_retry_and_flow_is_unchanged(self):
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
-        consume = live.index('consume_validated_grant "$grant"')
-        self.assertLess(live.index("trap cleanup_live EXIT"), consume)
-        self.assertLess(consume, live.index('install -d -m 0700 "$live_runtime"'))
-        self.assertIn('echo "GRANT_CONSUMED=$grant_consumed"', cleanup)
-        self.assertIn('echo "RETRY_AUTHORIZED=false"', cleanup)
-        outcome = grant_ordering.simulate(
-            grant_ordering.GrantRegistry(), "grant-1",
-            fail_immediately_after_consumption=True)
-        self.assertTrue(outcome.grant_consumed)
-        self.assertFalse(outcome.retry_authorized)
-        self.assertTrue(outcome.rollback_complete)
-        self.assertFalse(outcome.real_usb_enumeration_attempted)
-        self.assertFalse(outcome.live_execution_performed)
+        staging = live.index("live_staging_started=true")
+        self.assertLess(live.index("trap cleanup_live EXIT"), staging)
+        self.assertLess(staging, live.index('install -d -m 0700 "$live_runtime"'))
+        self.assertIn('echo AUTHORIZATION_CREDENTIAL_REQUIRED=false', cleanup)
+        self.assertIn('echo AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false', cleanup)
+        self.assertNotIn("consume_validated_grant", live)
 
         sequence = (
             "fprintd-enroll -f right-index-finger",
@@ -308,25 +310,22 @@ class D282OfflineContract(unittest.TestCase):
             ("2-1", "27c6", "0001"),
         ]), 1)
 
-    def test_34_target_cardinality_gate_precedes_atomic_claim(self):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+    def test_34_target_cardinality_gate_precedes_staging(self):
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         count = live.index(
             "target_preconsumption_match_count=$(count_goodix_targets")
         gate = live.index("refuse TARGET_CARDINALITY_NOT_ONE", count)
-        prepare = live.index('prepare_grant_claim "$expected_id"')
-        consume = live.index('consume_validated_grant "$grant"')
+        staging = live.index("live_staging_started=true")
         self.assertLess(count, gate)
-        self.assertLess(gate, prepare)
-        self.assertLess(prepare, consume)
+        self.assertLess(gate, staging)
         self.assertIn(
             'TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count',
             function_slice(self.kit, "refuse ()", "is_sha ()"))
         self._assert_preconsumption_refusal("TARGET_CARDINALITY_NOT_ONE")
 
     def test_35_post_start_cardinality_check_remains_as_anti_toctou(self):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
-        consume = live.index('consume_validated_grant "$grant"')
-        start = live.index("systemctl start fprintd.service", consume)
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
+        start = live.index("systemctl start fprintd.service")
         post_count = live.index(
             "target_count=$(count_goodix_targets /sys/bus/usb/devices)", start)
         post_gate = live.index("refuse TARGET_CARDINALITY_NOT_ONE", post_count)
@@ -362,7 +361,7 @@ class D282OfflineContract(unittest.TestCase):
             self.assertIn(marker, self.production_test)
 
     def test_37_launcher_rejects_enrollment_retry_markers(self):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         enroll = live.index("fprintd-enroll -f right-index-finger")
         marker = live.index("grep -c 'enroll-retry-'", enroll)
         refusal = live.index("refuse ENROLLMENT_RETRY_MARKER_OBSERVED", marker)
@@ -378,9 +377,9 @@ class D282OfflineContract(unittest.TestCase):
 
     def test_38_exit_trap_survives_function_scope_in_real_bash_process(self):
         cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
-        run = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        run = function_slice(self.kit, "run_live ()", "operator_run ()")
         self.assertLess(self.kit.index("cleanup_live ()"),
-                        self.kit.index("run_authorized_live ()"))
+                        self.kit.index("run_live ()"))
         self.assertNotIn("cleanup_live ()", run)
         for state_name in (
                 "live_result", "live_private", "live_runtime", "live_owned",
@@ -447,7 +446,7 @@ class D282OfflineContract(unittest.TestCase):
             self.assertEqual(verified.returncode, 0,
                              verified.stdout + verified.stderr)
 
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         self.assertIn(
             'grep -F "$live_runtime/libfprint-2.so.2.0.0" "/proc/$daemon_pid/maps"',
             live)
@@ -476,16 +475,16 @@ class D282OfflineContract(unittest.TestCase):
                 "FPRINTD_SYSTEMD_STAGING_START=VERIFIED_PRIVILEGED_HOST",
                 "SELINUX_EXEC_DENIAL=false",
                 "D282_01_PRIVILEGED_STAGING_PROBE=ACCEPTED_CLOSED",
-                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_NEW_BASELINE_GRANT_AND_AUTHORIZATION"):
+                "D282_01_BIOMETRIC_HUMAN_GATE_READINESS=HUMAN_REQUIRED_THEN_DIRECT_OPERATOR_RUN"):
             self.assertIn(marker, self.offline_result)
             self.assertIn(f"echo {marker}", self.kit)
 
     def test_42_privileged_probe_is_a_distinct_non_live_mode(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         self.assertIn("--run-authorized-staging-probe", self.kit)
-        self.assertNotIn("run_authorized_live", probe)
+        self.assertNotIn("run_live", probe)
         self.assertIn("staging_probe_execution_performed=true", probe)
         self.assertIn("live_execution_performed=false", probe)
         self.assertIn("real_usb_enumeration_attempted=false", probe)
@@ -512,7 +511,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_44_probe_reaudits_binary_safety_before_grant_consumption(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         audit = function_slice(
             self.kit, "audit_staging_probe_candidate ()", "abi_preflight ()")
         consume = probe.index('consume_validated_grant "$grant"')
@@ -530,16 +529,15 @@ class D282OfflineContract(unittest.TestCase):
         exact = "D282_01_PRIVILEGED_SYSTEMD_SELINUX_STAGING_PROBE"
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+            "run_live ()")
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         validate = function_slice(
             self.kit, "validate_grant ()", "prepare_grant_claim ()")
         self.assertIn(f"staging_probe_operation={exact}", self.kit)
         self.assertIn(
             'validate_grant "$grant" "$baseline" "$expected_id" \\\n    "$staging_probe_operation"', probe)
-        self.assertIn(
-            'validate_grant "$grant" "$baseline" "$expected_id" "$operation"',
-            live)
+        self.assertNotIn("validate_grant", live)
+        self.assertIn("AUTHORIZATION_CREDENTIAL_REQUIRED=false", live)
         self.assertIn('D282_01_OPERATION) == "$expected_operation"', validate)
 
     def test_46_probe_grant_claim_remains_atomic_and_one_shot(self):
@@ -558,7 +556,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_47_probe_failures_before_consumption_leave_grant_unused(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         consume = probe.index('consume_validated_grant "$grant"')
         for anchor in (
                 'audit_staging_probe_candidate "$candidate"',
@@ -581,7 +579,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_48_probe_postconsume_failure_rolls_back_without_retry(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
         consume = probe.index('consume_validated_grant "$grant"')
         self.assertLess(probe.index("trap cleanup_live EXIT"), consume)
@@ -599,7 +597,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_49_probe_reuses_real_subprocess_verified_exit_trap(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         self.assertIn("trap cleanup_live EXIT", probe)
         with tempfile.TemporaryDirectory(
                 prefix="goodix-d282-exit-trap-test.", dir="/tmp") as td:
@@ -651,7 +649,7 @@ class D282OfflineContract(unittest.TestCase):
                              verified.stdout + verified.stderr)
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         self.assertIn('LD_LIBRARY_PATH=$live_runtime', probe)
         self.assertIn("DAEMON_LIBRARY_MAP_NOT_EXACT", probe)
         self.assertIn("STAGING_PROBE_VIRTUAL_ENDPOINT_PRESENT", probe)
@@ -659,7 +657,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_51_probe_storage_is_isolated_and_preserved_by_cleanup(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
         self.assertIn(".goodix-d282-01-staging-probe-", probe)
         self.assertIn('d282_storage_inventory.py" "$live_storage_root"', probe)
@@ -673,7 +671,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_52_probe_system_library_is_never_replaced_and_is_rehashed(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
         self.assertIn('readlink -f /usr/lib64/libfprint-2.so.2', probe)
         self.assertIn("live_system_library_before", probe)
@@ -685,7 +683,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_53_probe_has_no_biometric_pam_goodix_tls_or_psk_path(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         for forbidden in (
                 "fprintd-enroll", "fprintd-verify", "fprintd-delete",
                 "fprintd-list", "fp_device_identify",
@@ -704,7 +702,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_54_probe_accepts_active_and_inactive_initial_service_state(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         accepted = (
             '[[ $live_service_before == active || '
             '$live_service_before == inactive ]]')
@@ -735,7 +733,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_57_probe_stops_active_service_only_after_consumption(self):
         probe = function_slice(
             self.kit, "run_authorized_staging_probe ()",
-            "run_authorized_live ()")
+            "run_live ()")
         consume = probe.index('consume_validated_grant "$grant"')
         conditional_stop = probe.index(
             'if [[ $live_service_before == active ]]; then')
@@ -889,14 +887,14 @@ cat "$live_result/summary.env"
         self.assertIn("D282_01_VERIFY_FEATURE_ADVERTISED=true", self.build)
 
     def test_62_enrollment_failure_evidence_is_captured_before_return(self):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         capture = live.index("capture_enroll_failure_evidence")
         failure_return = live.index("return 1", capture)
         restart = live.index("systemctl restart fprintd.service", failure_return)
         self.assertLess(capture, failure_return)
         self.assertLess(failure_return, restart)
         helper = function_slice(
-            self.kit, "capture_enroll_failure_evidence ()", "run_authorized_live ()")
+            self.kit, "capture_enroll_failure_evidence ()", "run_live ()")
         for marker in (
                 "FPRINTD_ENROLL_RETURN_CODE",
                 "FPRINTD_ENROLL_STAGE_PASSED_COUNT",
@@ -962,15 +960,78 @@ cat "$live_result/operator.log"
         self.assertIn("D282_01_ATTEMPT_02_EXACT_EPOCH_AUDIT=UNOBSERVED_EXPORT_GAP",
                       self.attempt_02_env)
 
+    def test_64_attempt_03_evidence_is_hash_pinned_and_classified(self):
+        result = subprocess.run(
+            [sys.executable, str(ATTEMPT_03_AUDITOR)],
+            check=True, capture_output=True, text=True)
+        audited = json.loads(result.stdout)
+        self.assertEqual(audited["outcome"], "PASS_EVIDENCE_CLASSIFICATION")
+        self.assertEqual(audited["phase_a_epoch_count"], 2)
+        self.assertEqual(audited["total_real_submit_count"], 279)
+        self.assertEqual(audited["verify_epoch"]["release_tail"], "0")
+        self.assertEqual(audited["verify_epoch"]["single_terminal"], "0")
+        self.assertFalse(audited["phase_b_started"])
+        self.assertIn(
+            "D282_01_ATTEMPT_03_EXACT_FAILED_ASSERT="
+            "VERIFY_RELEASE_TAIL_1_SINGLE_TERMINAL_1_EXPECTED_ACTUAL_0_0",
+            self.attempt_03_env)
+
+    def test_65_verify_epoch_audit_accepts_coherent_close_only(self):
+        helper = function_slice(
+            self.kit, "verify_current_live_epoch_audit ()",
+            "run_live ()")
+        raw = (ATTEMPT_03_CAPTURE / "phase-a-audit.raw").read_text()
+        with tempfile.TemporaryDirectory(prefix="goodix-d282-audit-") as td:
+            audit = Path(td) / "audit.raw"
+            audit.write_text(raw)
+            accepted = subprocess.run(
+                ["bash", "-c", "set -euo pipefail\n" + helper +
+                 '\nverify_current_live_epoch_audit "$1" 1',
+                 "d282-audit", str(audit)], capture_output=True, text=True)
+            self.assertEqual(accepted.returncode, 0,
+                             accepted.stdout + accepted.stderr)
+            audit.write_text(raw.replace(
+                "release_tail=0 single_terminal=0",
+                "release_tail=1 single_terminal=1"))
+            completed_tail = subprocess.run(
+                ["bash", "-c", "set -euo pipefail\n" + helper +
+                 '\nverify_current_live_epoch_audit "$1" 1',
+                 "d282-audit", str(audit)], capture_output=True, text=True)
+            self.assertEqual(completed_tail.returncode, 0,
+                             completed_tail.stdout + completed_tail.stderr)
+            audit.write_text(raw.replace(
+                "release_tail=0 single_terminal=0",
+                "release_tail=1 single_terminal=0"))
+            rejected = subprocess.run(
+                ["bash", "-c", "set -euo pipefail\n" + helper +
+                 '\nverify_current_live_epoch_audit "$1" 1',
+                 "d282-audit", str(audit)], capture_output=True, text=True)
+            self.assertNotEqual(rejected.returncode, 0)
+
+    def test_66_current_operator_path_is_direct_and_bounded(self):
+        operator = function_slice(self.kit, "operator_run ()", "export_results ()")
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
+        candidate = function_slice(
+            self.kit, "prepare_candidate ()", "prepare_staging_probe_candidate ()")
+        self.assertIn("--operator-run", self.kit)
+        self.assertIn("Digitare ESEGUI", operator)
+        self.assertIn("sudo", operator)
+        self.assertIn("--run-live", operator)
+        self.assertIn("--export-results", operator)
+        self.assertNotIn("grant", operator.lower())
+        self.assertNotIn("validate_grant", live)
+        self.assertNotIn("consume_validated_grant", live)
+        self.assertNotIn("EXPECTED_GRANT_ID", candidate)
+        self.assertIn("BIOMETRIC_ACTION_MAX=3", live)
+        self.assertIn("EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=10", live)
+        self.assertIn("AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false", live)
+        self.assertNotIn("RETRY_AUTHORIZED=false", live)
+
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
-        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        live = function_slice(self.kit, "run_live ()", "operator_run ()")
         anchor = source_anchor or f"refuse {reason}"
         self.assertLess(live.index(anchor),
-                        live.index('consume_validated_grant "$grant"'))
-        outcome = grant_ordering.simulate(
-            grant_ordering.GrantRegistry(), "grant-1",
-            preconsumption_refusal=reason)
-        self._assert_unused(outcome)
+                        live.index("live_staging_started=true"))
 
     def _assert_unused(self, outcome):
         self.assertFalse(outcome.grant_consumed)
