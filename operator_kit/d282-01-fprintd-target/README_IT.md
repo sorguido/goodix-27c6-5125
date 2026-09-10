@@ -3,11 +3,13 @@
 
 ## Stato e scopo
 
-Questo kit è **solo candidato per review**. Non esistono baseline approvata,
-grant o autorizzazione live D282/01. Il preflight è offline e non enumera USB;
-le modalità candidate/live non devono essere avviate finché una review
-AI-PM indipendente e una successiva Human Gate non abbiano autorizzato
-esplicitamente una singola run su un full SHA.
+La prima Human Gate D282/01 è chiusa come `FAIL_HOST_STAGING`: il grant è
+consumato senza retry autorizzato, `fprintd` ha fallito con status 126 prima di
+qualsiasi contatto o azione biometrica e il recovery manuale è stato attestato
+completo. Questo kit correttivo è **solo candidato per review host-side**. Non
+esistono baseline approvata, nuovo grant o autorizzazione live. Il preflight è
+offline e non enumera USB; le modalità candidate/live non devono essere
+avviate.
 
 La futura run copre soltanto il vero `fprintd-1.94.5-5.fc44.x86_64` con il
 driver Goodix `27c6:5125`: enrollment dell'indice destro, FP3 SIGFM nello
@@ -16,7 +18,14 @@ indice sinistro atteso no-match, delete e rollback. PAM, login e sudo come
 fattore di autenticazione sono fuori scope.
 
 ```text
-D282_01_HUMAN_GATE_READINESS=READY
+D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
+D282_01_ATTEMPT_01_GRANT_CONSUMED=true
+D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
+D282_01_HUMAN_GATE_READINESS=NOT_READY
+D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
+D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
@@ -94,9 +103,13 @@ La libreria di sistema non viene sostituita. Da uno snapshot Git del full SHA
 si costruisce `libfprint-2.so.2.0.0`, si hashano libreria e dipendenze e si
 verificano NEVRA, ABI, SONAME, assenza RPATH e simboli vietati. La futura run
 crea una directory privata sotto `/run`, un drop-in runtime sotto
-`/run/systemd/system`, e avvia `/usr/libexec/fprintd` con `LD_LIBRARY_PATH`
-puntato alla candidate. `/proc/<pid>/maps` deve mostrare esattamente quella
-libreria. Nessun `ldconfig` e nessun overwrite sotto `/usr/lib64`.
+`/run/systemd/system`, e fa avviare direttamente a systemd
+`/usr/libexec/fprintd` con il normale entrypoint SELinux `fprintd_exec_t`. Il
+wrapper `/run/.../launch-fprintd` dell'attempt 01 è stato rimosso. Il drop-in
+imposta `LD_LIBRARY_PATH`, `FP_DRIVERS_ALLOWLIST` e uno `StateDirectory`
+isolato, ma mantiene `ExecStart=/usr/libexec/fprintd`. `/proc/<pid>/exe` deve
+risolvere a quel path e `/proc/<pid>/maps` deve mostrare esattamente la
+candidate. Nessun `ldconfig` e nessun overwrite sotto `/usr/lib64`.
 
 Prima dello staging, `d282_storage_inventory.py` inventaria read-only
 `/var/lib/fprint`: esistenza, tipo, uid/gid, mode, dimensione, SHA-256 e label
@@ -119,7 +132,10 @@ conteggio autentico `TARGET_PRECONSUMPTION_MATCH_COUNT` e
 `REAL_USB_ENUMERATION_ATTEMPTED=false` e `LIVE_EXECUTION_PERFORMED=false`.
 
 Il trap di rollback è installato prima della prima mutazione di staging.
-Rimuove soltanto runtime, drop-in e storage con nomi D282 risolti in anticipo,
+`cleanup_live()` è top-level e usa solo stato globale `live_*`, che resta
+valido anche quando `run_authorized_live()` termina per `set -e`; non dipende
+più da variabili `local` fuori scope. Rimuove soltanto runtime, drop-in e
+storage con nomi D282 risolti in anticipo,
 ripristina lo stato active/inactive del servizio, confronta unit, libreria di
 sistema e inventario preesistente. Un confronto fallito imposta
 `ROLLBACK_COMPLETE=false`, stampa istruzioni di recovery e vieta altre action.
@@ -143,6 +159,12 @@ avviato come utente non privilegiato:
 operator_kit/d282-01-fprintd-target/run-d282-01.sh \
   --offline-preflight /percorso/agli/opencv-rpms
 ```
+
+Il preflight include un vero sottoprocesso Bash per il trap e una verifica di
+sintassi del drop-in con `systemd-analyze`; non avvia il servizio. La prova del
+vero start di sistema con SELinux Enforcing richiede una futura autorizzazione
+privilegiata separata e deve avvenire senza rendere raggiungibile il Goodix.
+Fino ad allora `D282_01_HUMAN_GATE_READINESS=NOT_READY`.
 
 Le modalità `--prepare-candidate`, `--run-authorized-live` e
 `--export-results` documentano il percorso futuro ma non sono autorizzate ora.

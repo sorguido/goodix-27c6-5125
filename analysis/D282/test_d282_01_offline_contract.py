@@ -23,6 +23,9 @@ FEDORA_ACTION_TEST = ROOT / "libfprint-driver/tests/test_goodix_fedora44_nbis_ac
 KIT = ROOT / "operator_kit/d282-01-fprintd-target/run-d282-01.sh"
 README = ROOT / "operator_kit/d282-01-fprintd-target/README_IT.md"
 BUILD = ROOT / "operator_kit/d282-01-fprintd-target/build-inner.sh"
+ATTEMPT_ENV = ROOT / "analysis/D282/D282_01_ATTEMPT_01_NORMALIZED.env"
+ATTEMPT_REPORT = ROOT / "analysis/D282/D282_01_attempt_01_host_staging_failure.md"
+OFFLINE_RESULT = ROOT / "analysis/D282/D282_01_OFFLINE_RESULT.env"
 
 spec = importlib.util.spec_from_file_location(
     "d282_staging", ROOT / "analysis/D282/d282_01_staging_model.py")
@@ -52,6 +55,9 @@ class D282OfflineContract(unittest.TestCase):
         cls.kit = KIT.read_text()
         cls.readme = README.read_text()
         cls.build = BUILD.read_text()
+        cls.attempt_env = ATTEMPT_ENV.read_text()
+        cls.attempt_report = ATTEMPT_REPORT.read_text()
+        cls.offline_result = OFFLINE_RESULT.read_text()
 
     def test_01_exact_fprintd_one_print_dispatches_verify(self):
         verify_start = function_slice(
@@ -147,7 +153,7 @@ class D282OfflineContract(unittest.TestCase):
         self.assertIn("TEMPLATE_INCLUDED_IN_EXPORT=false", self.kit)
         self.assertIn("D282_01_RESULT=FAIL_ROLLBACK", self.kit)
         self.assertIn("local exit_status=$?", self.kit)
-        self.assertIn("rc=$exit_status", self.kit)
+        self.assertIn("live_run_return_code=$exit_status", self.kit)
 
     def test_16_staging_rollback(self):
         self._exercise_staging(None)
@@ -181,15 +187,15 @@ class D282OfflineContract(unittest.TestCase):
                 "refuse STAGING_COLLISION",
                 "refuse FPRINTD_INITIAL_STATE_UNSAFE",
                 "refuse SYSTEM_LIBFPRINT_MISSING",
-                'validate_selinux_preconditions "$system_library" "$storage_root"',
+                'validate_selinux_preconditions "$live_system_library" "$live_storage_root"',
                 "refuse UNIT_SNAPSHOT_FAILED",
                 "refuse STORAGE_INVENTORY_FAILED",
                 'prepare_grant_claim "$expected_id"'):
             self.assertLess(live.index(anchor), consume, anchor)
         self.assertLess(live.index("trap cleanup_live EXIT"), consume)
-        self.assertLess(consume, live.index("staging_started=true"))
-        self.assertLess(live.index("staging_started=true"),
-                        live.index('install -d -m 0700 "$runtime"'))
+        self.assertLess(consume, live.index("live_staging_started=true"))
+        self.assertLess(live.index("live_staging_started=true"),
+                        live.index('install -d -m 0700 "$live_runtime"'))
         after_consume = live[consume:]
         self.assertNotIn("command -v", after_consume)
         self.assertNotIn("$(getenforce)", after_consume)
@@ -218,7 +224,7 @@ class D282OfflineContract(unittest.TestCase):
     def test_27_selinux_precondition_failure_does_not_consume_grant(self):
         self._assert_preconsumption_refusal(
             "SELINUX_PRECONDITION_FAILED",
-            source_anchor='validate_selinux_preconditions "$system_library" "$storage_root"')
+            source_anchor='validate_selinux_preconditions "$live_system_library" "$live_storage_root"')
         for refusal in ("SELINUX_STATE_UNREADABLE", "SELINUX_CHCON_MISSING",
                         "SELINUX_RESTORECON_MISSING", "SELINUX_REFERENCE_UNLABELED"):
             self.assertIn(refusal, self.kit)
@@ -250,11 +256,12 @@ class D282OfflineContract(unittest.TestCase):
 
     def test_30_postconsume_failure_rolls_back_without_retry_and_flow_is_unchanged(self):
         live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
         consume = live.index('consume_validated_grant "$grant"')
         self.assertLess(live.index("trap cleanup_live EXIT"), consume)
-        self.assertLess(consume, live.index('install -d -m 0700 "$runtime"'))
-        self.assertIn('echo "GRANT_CONSUMED=$grant_consumed"', live)
-        self.assertIn('echo "RETRY_AUTHORIZED=false"', live)
+        self.assertLess(consume, live.index('install -d -m 0700 "$live_runtime"'))
+        self.assertIn('echo "GRANT_CONSUMED=$grant_consumed"', cleanup)
+        self.assertIn('echo "RETRY_AUTHORIZED=false"', cleanup)
         outcome = grant_ordering.simulate(
             grant_ordering.GrantRegistry(), "grant-1",
             fail_immediately_after_consumption=True)
@@ -357,6 +364,107 @@ class D282OfflineContract(unittest.TestCase):
                 "EXTRA_ENROLLMENT_CONTACT_REQUESTED=false",
                 "EXTRA_ENROLLMENT_REARM_COUNT=0"):
             self.assertIn(marker, live)
+
+    def test_38_exit_trap_survives_function_scope_in_real_bash_process(self):
+        cleanup = function_slice(self.kit, "cleanup_live ()", "verify_baseline ()")
+        run = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        self.assertLess(self.kit.index("cleanup_live ()"),
+                        self.kit.index("run_authorized_live ()"))
+        self.assertNotIn("cleanup_live ()", run)
+        for state_name in (
+                "live_result", "live_private", "live_runtime", "live_owned",
+                "live_storage_root", "live_dropin", "live_service_before",
+                "live_staging_started", "live_service_touched",
+                "live_cleanup_armed", "live_run_return_code"):
+            self.assertIn(state_name, cleanup)
+
+        with tempfile.TemporaryDirectory(
+                prefix="goodix-d282-exit-trap-test.", dir="/tmp") as td:
+            root = Path(td)
+            result = subprocess.run(
+                [str(KIT), "--self-test-exit-trap", td],
+                capture_output=True, text=True)
+            combined = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 41, combined)
+            self.assertIn("EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS", combined)
+            self.assertIn("UNBOUND_VARIABLE_DURING_CLEANUP=false", combined)
+            self.assertNotIn("unbound variable", combined.lower())
+            self.assertFalse((root / "runtime").exists())
+            self.assertFalse(
+                (root / "storage-root/.goodix-d282-01-test").exists())
+            self.assertFalse(
+                (root / "systemd/fprintd.service.d/90-goodix-d282-01.conf").exists())
+            summary = (root / "result/summary.env").read_text()
+            for marker in (
+                    "D282_01_RESULT=FAIL_ACTION_OR_AUDIT",
+                    "RUN_RETURN_CODE=41",
+                    "ROLLBACK_COMPLETE=true",
+                    "GRANT_CONSUMED=false",
+                    "RETRY_AUTHORIZED=false"):
+                self.assertIn(marker, summary)
+
+    def test_39_direct_fprintd_dropin_is_production_shaped_and_parser_valid(self):
+        helper = function_slice(
+            self.kit, "write_systemd_dropin ()",
+            "exit_trap_scope_regression ()")
+        with tempfile.TemporaryDirectory(
+                prefix="goodix-d282-systemd-parser.", dir="/tmp") as td:
+            dropin = Path(td) / "dropin.conf"
+            shell = ("set -euo pipefail\n" + helper +
+                     '\nwrite_systemd_dropin /run/goodix-d282-01/test '
+                     '/var/lib/fprint/.goodix-d282-01-test "$1"\n')
+            generated = subprocess.run(
+                ["bash", "-c", shell, "d282-dropin", str(dropin)],
+                capture_output=True, text=True)
+            self.assertEqual(generated.returncode, 0,
+                             generated.stdout + generated.stderr)
+            text = dropin.read_text()
+            self.assertIn("ExecStart=/usr/libexec/fprintd", text)
+            self.assertNotIn("launch-fprintd", text)
+            self.assertIn(
+                'Environment="LD_LIBRARY_PATH=/run/goodix-d282-01/test"', text)
+            self.assertIn(
+                'Environment="FP_DRIVERS_ALLOWLIST=goodix_27c6_5125"', text)
+            self.assertIn("StateDirectory=fprint/.goodix-d282-01-test", text)
+            unit = Path(td) / "d282-parser-test.service"
+            unit.write_text(
+                "[Unit]\nDescription=D282 parser test\n"
+                "[Service]\nType=simple\nExecStart=/usr/bin/false\n" + text)
+            verified = subprocess.run(
+                ["systemd-analyze", "verify", str(unit)],
+                capture_output=True, text=True)
+            self.assertEqual(verified.returncode, 0,
+                             verified.stdout + verified.stderr)
+
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        self.assertIn(
+            'grep -F "$live_runtime/libfprint-2.so.2.0.0" "/proc/$daemon_pid/maps"',
+            live)
+        self.assertIn(
+            'readlink -f "/proc/$daemon_pid/exe") == /usr/libexec/fprintd', live)
+
+    def test_40_attempt_01_is_normalized_without_biometric_claims(self):
+        for marker in (
+                "D282_01_LIVE_ATTEMPT_01=FAIL_HOST_STAGING",
+                "D282_01_ATTEMPT_01_GRANT_CONSUMED=true",
+                "D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false",
+                "D282_01_ATTEMPT_01_ENROLLMENT_STARTED=false",
+                "D282_01_ATTEMPT_01_FINGER_CONTACT_COUNT=0",
+                "D282_01_ATTEMPT_01_SENSOR_REACHING_ACTION_COUNT=0",
+                "D282_01_ATTEMPT_01_ROOT_CAUSE_PRIMARY=SELINUX_WRAPPER_EXEC_DENIED",
+                "D282_01_ATTEMPT_01_ROOT_CAUSE_SECONDARY=EXIT_TRAP_SCOPE_FAILURE",
+                "D282_01_ATTEMPT_01_RAW_IMPORT=BLOCKED_ROOT_ONLY_NO_AUTHORIZATION"):
+            self.assertIn(marker, self.attempt_env)
+        self.assertIn("Nessuna proprietà biometrica", self.attempt_report)
+        self.assertIn("USER_ATTESTED", self.attempt_report)
+
+    def test_41_selinux_runtime_start_remains_an_explicit_blocker(self):
+        for marker in (
+                "D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST",
+                "FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION",
+                "SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED",
+                "D282_01_HUMAN_GATE_READINESS=NOT_READY"):
+            self.assertIn(marker, self.offline_result)
 
     def _assert_preconsumption_refusal(self, reason, source_anchor=None):
         live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")

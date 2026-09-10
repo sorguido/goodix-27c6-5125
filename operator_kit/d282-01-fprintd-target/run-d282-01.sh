@@ -17,6 +17,25 @@ validated_grant_mode=
 grant_claim_root=
 grant_claim=
 validated_selinux_enforcement=Unavailable
+live_result=
+live_private=
+live_runtime=
+live_owned=
+live_storage_root=/var/lib/fprint
+live_dropin=/run/systemd/system/fprintd.service.d/90-goodix-d282-01.conf
+live_service_before=unknown
+live_unit_before=
+live_system_library=
+live_system_library_before=
+live_storage_existed=false
+live_before_inventory_ready=false
+live_unit_before_ready=false
+live_system_library_before_ready=false
+live_staging_started=false
+live_service_touched=false
+live_cleanup_armed=false
+live_cleanup_test_mode=false
+live_run_return_code=1
 live_critical=(libfprint-driver reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 Rockytkg analysis/D282
   operator_kit/d282-01-fprintd-target
@@ -43,6 +62,96 @@ state_value () {
   value=$(sed -n "s/^${key}=//p" "$file")
   [[ -n $value && $(grep -c "^${key}=" "$file") -eq 1 ]] || return 1
   printf '%s\n' "$value"
+}
+
+cleanup_live () {
+  local exit_status=$?
+  local rollback=true service_rollback=true staging_rollback=true
+  local storage_rollback=true unit_rollback=true library_rollback=true
+  local unit_after= system_library_after=
+
+  trap - EXIT INT TERM
+  set +e
+  if [[ $live_cleanup_armed != true ]]; then
+    return 0
+  fi
+  live_cleanup_armed=false
+  if [[ $exit_status -ne 0 ]]; then
+    live_run_return_code=$exit_status
+  fi
+  if [[ $live_service_touched == true ]]; then
+    systemctl stop fprintd.service >/dev/null 2>&1 || service_rollback=false
+  fi
+  if [[ $live_staging_started == true ]]; then
+    if [[ -e $live_dropin || -L $live_dropin ]]; then
+      rm -f -- "$live_dropin" || staging_rollback=false
+    fi
+    rmdir "$(dirname "$live_dropin")" 2>/dev/null || true
+    if [[ $live_service_touched == true ]]; then
+      systemctl daemon-reload >/dev/null 2>&1 || service_rollback=false
+      if [[ $live_service_before == active ]]; then
+        systemctl start fprintd.service >/dev/null 2>&1 || service_rollback=false
+      fi
+    fi
+    if [[ -e $live_owned || -L $live_owned ]]; then
+      find "$live_owned" -xdev -depth -delete 2>/dev/null || storage_rollback=false
+    fi
+    if [[ $live_storage_existed == false ]]; then
+      rmdir "$live_storage_root" 2>/dev/null || storage_rollback=false
+    fi
+    if [[ -e $live_runtime || -L $live_runtime ]]; then
+      find "$live_runtime" -xdev -depth -delete 2>/dev/null || staging_rollback=false
+    fi
+  fi
+  if [[ $live_before_inventory_ready == true ]]; then
+    "$script_dir/d282_storage_inventory.py" "$live_storage_root" \
+      "$live_private/storage.after.json" \
+      --exclude-name "${live_owned##*/}" >"$live_private/storage.after.env" ||
+      storage_rollback=false
+    cmp -s "$live_private/storage.before.json" \
+      "$live_private/storage.after.json" || storage_rollback=false
+  fi
+  if [[ $live_unit_before_ready == true ]]; then
+    systemctl cat fprintd.service >"$live_private/unit.after" 2>/dev/null ||
+      unit_rollback=false
+    unit_after=$(sha256sum "$live_private/unit.after" 2>/dev/null | awk '{print $1}')
+    [[ $unit_after == "$live_unit_before" ]] || unit_rollback=false
+  fi
+  if [[ $live_system_library_before_ready == true ]]; then
+    system_library_after=$(sha256sum "$live_system_library" 2>/dev/null |
+      awk '{print $1}')
+    [[ $system_library_after == "$live_system_library_before" ]] ||
+      library_rollback=false
+  fi
+  [[ $service_rollback == true && $staging_rollback == true &&
+     $storage_rollback == true && $unit_rollback == true &&
+     $library_rollback == true ]] || rollback=false
+  if [[ $rollback != true ]]; then
+    sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ROLLBACK/' \
+      "$live_result/summary.env"
+  elif [[ $live_run_return_code -ne 0 ]]; then
+    sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ACTION_OR_AUDIT/' \
+      "$live_result/summary.env"
+  fi
+  echo "SERVICE_STATE_RESTORED=$service_rollback" >>"$live_result/summary.env"
+  echo "STAGING_REMOVED=$staging_rollback" >>"$live_result/summary.env"
+  echo "SYSTEM_LIBFPRINT_UNCHANGED=$library_rollback" >>"$live_result/summary.env"
+  echo "RUN_RETURN_CODE=$live_run_return_code" >>"$live_result/summary.env"
+  echo "GRANT_CONSUMED=$grant_consumed" >>"$live_result/summary.env"
+  echo "RETRY_AUTHORIZED=false" >>"$live_result/summary.env"
+  echo "ROLLBACK_COMPLETE=$rollback" >>"$live_result/summary.env"
+  echo "PREEXISTING_STORAGE_UNCHANGED=$storage_rollback" >>"$live_result/summary.env"
+  echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >>"$live_result/summary.env"
+  echo "LIVE_EXECUTION_PERFORMED=$live_execution_performed" >>"$live_result/summary.env"
+  if [[ $rollback != true ]]; then
+    echo "RECOVERY_REQUIRED=Non eseguire altre action; ripristinare fprintd e conservare private/." >&2
+  fi
+  if [[ $live_cleanup_test_mode == true ]]; then
+    echo EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
+    echo UNBOUND_VARIABLE_DURING_CLEANUP=false
+    echo "ROLLBACK_COMPLETE=$rollback"
+  fi
+  return 0
 }
 
 verify_baseline () {
@@ -130,7 +239,7 @@ offline_preflight () {
   abi_preflight "$d282_offline_work"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=37
+  echo D282_01_TEST_MATRIX_COUNT=41
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
@@ -149,6 +258,19 @@ offline_preflight () {
   echo CORRUPT_FP3_REJECTED=PASS_OFFLINE
   echo MISSING_FP3_REJECTED=PASS_OFFLINE
   echo WRONG_USER_FINGER_REJECTED=PASS_OFFLINE
+  echo D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
+  echo D282_01_ATTEMPT_01_GRANT_CONSUMED=true
+  echo D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
+  echo D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
+  echo EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
+  echo UNBOUND_VARIABLE_DURING_CLEANUP=false
+  echo D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
+  echo D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
+  echo FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+  echo SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
+  echo EXEC_MAIN_STATUS=NOT_OBSERVED_FOR_CORRECTIVE
+  echo EXACT_LIBRARY_MAP_VERIFIED=NOT_OBSERVED_FOR_CORRECTIVE
+  echo D282_01_HUMAN_GATE_READINESS=NOT_READY
   echo CURRENT_LIVE_AUTHORIZED=false
   echo CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
   echo APPROVED_BASELINE=NONE
@@ -286,17 +408,85 @@ validate_selinux_preconditions () {
   done
 }
 
+write_systemd_dropin () {
+  local runtime=$1 owned=$2 dropin=$3 relative_state
+
+  [[ $runtime == /run/goodix-d282-01/* ]] || refuse RUNTIME_PATH_UNSAFE
+  [[ $owned == /var/lib/fprint/.goodix-d282-01-* ]] ||
+    refuse STORAGE_PATH_UNSAFE
+  relative_state=${owned#/var/lib/}
+  printf '[Service]\nEnvironment="LD_LIBRARY_PATH=%s"\nEnvironment="FP_DRIVERS_ALLOWLIST=goodix_27c6_5125"\nStateDirectory=\nStateDirectory=%s\nStateDirectoryMode=0700\nExecStart=\nExecStart=/usr/libexec/fprintd\n' \
+    "$runtime" "$relative_state" >"$dropin"
+}
+
+exit_trap_scope_regression () {
+  local work=$1
+
+  [[ $EUID -ne 0 ]] || refuse EXIT_TRAP_TEST_MUST_BE_UNPRIVILEGED
+  [[ $work == /tmp/goodix-d282-exit-trap-test.* && -d $work &&
+     ! -L $work ]] || refuse EXIT_TRAP_TEST_ROOT_UNSAFE
+  live_result="$work/result"
+  live_private="$live_result/private"
+  live_runtime="$work/runtime"
+  live_storage_root="$work/storage-root"
+  live_owned="$live_storage_root/.goodix-d282-01-test"
+  live_dropin="$work/systemd/fprintd.service.d/90-goodix-d282-01.conf"
+  live_service_before=inactive
+  live_storage_existed=true
+  live_before_inventory_ready=false
+  live_unit_before_ready=false
+  live_system_library_before_ready=false
+  live_staging_started=true
+  live_service_touched=false
+  live_cleanup_test_mode=true
+  live_run_return_code=1
+  install -d -m 0700 "$live_private" "$live_runtime" "$live_owned" \
+    "$(dirname "$live_dropin")" "$live_storage_root"
+  printf 'D282_01_RESULT=FAIL_PENDING_AUDIT\n' >"$live_result/summary.env"
+  printf 'staged\n' >"$live_runtime/artifact"
+  printf 'synthetic\n' >"$live_owned/non-biometric-sentinel"
+  printf '[Service]\n' >"$live_dropin"
+  live_cleanup_armed=true
+  trap cleanup_live EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  echo "EXIT_TRAP_TEST_ROOT=$work"
+
+  exit_trap_failure_inside_function () {
+    local deliberately_out_of_scope=armed
+    [[ $deliberately_out_of_scope == armed ]]
+    return 41
+  }
+  exit_trap_failure_inside_function
+}
+
 run_authorized_live () {
-  local candidate=$1 grant=$2 state baseline manifest expected_id user stamp result private
-  local runtime owned storage_root=/var/lib/fprint dropin=/run/systemd/system/fprintd.service.d/90-goodix-d282-01.conf
-  local service_before unit_before unit_after daemon_pid raw audit_raw epoch_count enroll_count verify_count rc=1
-  local system_library system_library_before system_library_after target_count since stored
+  local candidate=$1 grant=$2 state baseline manifest expected_id user stamp
+  local daemon_pid raw epoch_count enroll_count verify_count action_rc=1
+  local target_count since stored
   local observed_attempts consumed_action_count cleanup_epoch_count hidden_second_count
   local retry_count reopen_count reset_count clear_halt_count persistent_count
   local same_match_count different_no_match_count enroll_retry_count
-  local storage_existed=false service_touched=false before_inventory_ready=false
-  local unit_before_ready=false system_library_before_ready=false
-  local staging_started=false
+
+  live_result=
+  live_private=
+  live_runtime=
+  live_owned=
+  live_storage_root=/var/lib/fprint
+  live_dropin=/run/systemd/system/fprintd.service.d/90-goodix-d282-01.conf
+  live_service_before=unknown
+  live_unit_before=
+  live_system_library=
+  live_system_library_before=
+  live_storage_existed=false
+  live_before_inventory_ready=false
+  live_unit_before_ready=false
+  live_system_library_before_ready=false
+  live_staging_started=false
+  live_service_touched=false
+  live_cleanup_armed=false
+  live_cleanup_test_mode=false
+  live_run_return_code=1
   [[ $EUID -eq 0 ]] || refuse LIVE_REQUIRES_ROOT
   state="$candidate/d282-01-candidate.state"
   [[ $candidate == /tmp/goodix-d282-01-candidate.* && -f $state && ! -L $candidate ]] || refuse CANDIDATE_INVALID
@@ -310,128 +500,67 @@ run_authorized_live () {
   user=$validated_grant_user
   validate_live_tooling
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  result="/var/tmp/goodix-d282-01-results/${stamp}-${baseline:0:12}"
-  runtime="/run/goodix-d282-01/${stamp}-${baseline:0:12}"
-  owned="$storage_root/.goodix-d282-01-${stamp}-${baseline:0:12}"
-  [[ ! -e $runtime && ! -e $owned && ! -e $dropin ]] || refuse STAGING_COLLISION
-  service_before=$(systemctl is-active fprintd.service 2>/dev/null || true)
-  [[ $service_before == active || $service_before == inactive ]] || refuse FPRINTD_INITIAL_STATE_UNSAFE
-  [[ -d $storage_root ]] && storage_existed=true
-  system_library=$(readlink -f /usr/lib64/libfprint-2.so.2) || refuse SYSTEM_LIBFPRINT_MISSING
-  [[ -f $system_library ]] || refuse SYSTEM_LIBFPRINT_MISSING
-  system_library_before=$(sha256sum "$system_library" | awk '{print $1}') || refuse SYSTEM_LIBFPRINT_HASH_FAILED
-  validate_selinux_preconditions "$system_library" "$storage_root"
-  private="$result/private"
-  install -d -m 0700 "$private" || refuse RESULT_DIRECTORY_CREATE_FAILED
-  { echo D282_01_RESULT=FAIL_PENDING_AUDIT; echo "D282_01_BASELINE_SHA=$baseline"; } >"$result/summary.env" || refuse RESULT_SUMMARY_CREATE_FAILED
-  chmod 0600 "$result/summary.env" || refuse RESULT_SUMMARY_MODE_FAILED
-  cleanup_live () {
-    local exit_status=$?
-    local rollback=true service_rollback=true staging_rollback=true
-    local storage_rollback=true unit_rollback=true library_rollback=true
-
-    trap - EXIT INT TERM
-    set +e
-    if [[ $exit_status -ne 0 ]]; then
-      rc=$exit_status
-    fi
-    if [[ $service_touched == true ]]; then
-      systemctl stop fprintd.service >/dev/null 2>&1 || service_rollback=false
-    fi
-    if [[ $staging_started == true ]]; then
-      if [[ -e $dropin || -L $dropin ]]; then
-        rm -f -- "$dropin" || staging_rollback=false
-      fi
-      rmdir "$(dirname "$dropin")" 2>/dev/null || true
-      if [[ $service_touched == true ]]; then
-        systemctl daemon-reload >/dev/null 2>&1 || service_rollback=false
-        if [[ $service_before == active ]]; then
-          systemctl start fprintd.service >/dev/null 2>&1 || service_rollback=false
-        fi
-      fi
-      if [[ -e $owned || -L $owned ]]; then
-        find "$owned" -xdev -depth -delete 2>/dev/null || storage_rollback=false
-      fi
-      if [[ $storage_existed == false ]]; then
-        rmdir "$storage_root" 2>/dev/null || storage_rollback=false
-      fi
-      if [[ -e $runtime || -L $runtime ]]; then
-        find "$runtime" -xdev -depth -delete 2>/dev/null || staging_rollback=false
-      fi
-    fi
-    if [[ $before_inventory_ready == true ]]; then
-      "$script_dir/d282_storage_inventory.py" "$storage_root" "$private/storage.after.json" \
-        --exclude-name "${owned##*/}" >"$private/storage.after.env" || storage_rollback=false
-      cmp -s "$private/storage.before.json" "$private/storage.after.json" || storage_rollback=false
-    fi
-    if [[ $unit_before_ready == true ]]; then
-      systemctl cat fprintd.service >"$private/unit.after" 2>/dev/null || unit_rollback=false
-      unit_after=$(sha256sum "$private/unit.after" 2>/dev/null | awk '{print $1}')
-      [[ $unit_after == "$unit_before" ]] || unit_rollback=false
-    fi
-    if [[ $system_library_before_ready == true ]]; then
-      system_library_after=$(sha256sum "$system_library" 2>/dev/null | awk '{print $1}')
-      [[ $system_library_after == "$system_library_before" ]] || library_rollback=false
-    fi
-    [[ $service_rollback == true && $staging_rollback == true &&
-       $storage_rollback == true && $unit_rollback == true &&
-       $library_rollback == true ]] || rollback=false
-    if [[ $rollback != true ]]; then
-      sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ROLLBACK/' \
-        "$result/summary.env"
-    elif [[ $rc -ne 0 ]]; then
-      sed -i 's/^D282_01_RESULT=.*/D282_01_RESULT=FAIL_ACTION_OR_AUDIT/' \
-        "$result/summary.env"
-    fi
-    echo "SERVICE_STATE_RESTORED=$service_rollback" >>"$result/summary.env"
-    echo "STAGING_REMOVED=$staging_rollback" >>"$result/summary.env"
-    echo "SYSTEM_LIBFPRINT_UNCHANGED=$library_rollback" >>"$result/summary.env"
-    echo "RUN_RETURN_CODE=$rc" >>"$result/summary.env"
-    echo "GRANT_CONSUMED=$grant_consumed" >>"$result/summary.env"
-    echo "RETRY_AUTHORIZED=false" >>"$result/summary.env"
-    echo "ROLLBACK_COMPLETE=$rollback" >>"$result/summary.env"
-    echo "PREEXISTING_STORAGE_UNCHANGED=$storage_rollback" >>"$result/summary.env"
-    echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >>"$result/summary.env"
-    echo "LIVE_EXECUTION_PERFORMED=$live_execution_performed" >>"$result/summary.env"
-    [[ $rollback == true ]] || echo "RECOVERY_REQUIRED=Non eseguire altre action; ripristinare fprintd e conservare private/." >&2
-  }
+  live_result="/var/tmp/goodix-d282-01-results/${stamp}-${baseline:0:12}"
+  live_runtime="/run/goodix-d282-01/${stamp}-${baseline:0:12}"
+  live_owned="$live_storage_root/.goodix-d282-01-${stamp}-${baseline:0:12}"
+  [[ ! -e $live_runtime && ! -e $live_owned && ! -e $live_dropin ]] ||
+    refuse STAGING_COLLISION
+  live_service_before=$(systemctl is-active fprintd.service 2>/dev/null || true)
+  [[ $live_service_before == active || $live_service_before == inactive ]] ||
+    refuse FPRINTD_INITIAL_STATE_UNSAFE
+  [[ -d $live_storage_root ]] && live_storage_existed=true
+  live_system_library=$(readlink -f /usr/lib64/libfprint-2.so.2) ||
+    refuse SYSTEM_LIBFPRINT_MISSING
+  [[ -f $live_system_library ]] || refuse SYSTEM_LIBFPRINT_MISSING
+  live_system_library_before=$(sha256sum "$live_system_library" |
+    awk '{print $1}') || refuse SYSTEM_LIBFPRINT_HASH_FAILED
+  validate_selinux_preconditions "$live_system_library" "$live_storage_root"
+  live_private="$live_result/private"
+  install -d -m 0700 "$live_private" || refuse RESULT_DIRECTORY_CREATE_FAILED
+  { echo D282_01_RESULT=FAIL_PENDING_AUDIT; echo "D282_01_BASELINE_SHA=$baseline"; } \
+    >"$live_result/summary.env" || refuse RESULT_SUMMARY_CREATE_FAILED
+  chmod 0600 "$live_result/summary.env" || refuse RESULT_SUMMARY_MODE_FAILED
+  live_cleanup_armed=true
   trap cleanup_live EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   since=$(date --iso-8601=seconds) || refuse HOST_CLOCK_FAILED
-  systemctl cat fprintd.service >"$private/unit.before" || refuse UNIT_SNAPSHOT_FAILED
-  unit_before=$(sha256sum "$private/unit.before" | awk '{print $1}') || refuse UNIT_SNAPSHOT_HASH_FAILED
-  unit_before_ready=true
-  "$script_dir/d282_storage_inventory.py" "$storage_root" "$private/storage.before.json" \
-    --exclude-name "${owned##*/}" >"$private/storage.before.env" || refuse STORAGE_INVENTORY_FAILED
-  before_inventory_ready=true
-  system_library_before_ready=true
+  systemctl cat fprintd.service >"$live_private/unit.before" ||
+    refuse UNIT_SNAPSHOT_FAILED
+  live_unit_before=$(sha256sum "$live_private/unit.before" |
+    awk '{print $1}') || refuse UNIT_SNAPSHOT_HASH_FAILED
+  live_unit_before_ready=true
+  "$script_dir/d282_storage_inventory.py" "$live_storage_root" \
+    "$live_private/storage.before.json" --exclude-name "${live_owned##*/}" \
+    >"$live_private/storage.before.env" || refuse STORAGE_INVENTORY_FAILED
+  live_before_inventory_ready=true
+  live_system_library_before_ready=true
   target_preconsumption_match_count=$(count_goodix_targets /sys/bus/usb/devices)
-  echo "TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count" >>"$result/summary.env"
+  echo "TARGET_PRECONSUMPTION_MATCH_COUNT=$target_preconsumption_match_count" \
+    >>"$live_result/summary.env"
   [[ $target_preconsumption_match_count -eq 1 ]] || refuse TARGET_CARDINALITY_NOT_ONE
   prepare_grant_claim "$expected_id"
   consume_validated_grant "$grant"
-  staging_started=true
-  install -d -m 0700 "$runtime" "$owned" "$(dirname "$dropin")"
+  live_staging_started=true
+  install -d -m 0700 "$live_runtime" "$live_owned" \
+    "$(dirname "$live_dropin")"
   install -m 0600 "$candidate/libfprint-2.so.2.0.0" \
     "$candidate/libgusb.so.2" \
     "$candidate/libopencv_core.so.413" \
     "$candidate/libopencv_features2d.so.413" \
     "$candidate/libopencv_flann.so.413" \
-    "$candidate/libopencv_imgproc.so.413" "$runtime/"
-  ln -s libfprint-2.so.2.0.0 "$runtime/libfprint-2.so.2"
-  ln -s libfprint-2.so.2 "$runtime/libfprint-2.so"
-  printf '#!/bin/sh\nexport LD_LIBRARY_PATH=%s\nexport STATE_DIRECTORY=%s\nexport FP_DRIVERS_ALLOWLIST=goodix_27c6_5125\nexec /usr/libexec/fprintd\n' \
-    "$runtime" "$owned" >"$runtime/launch-fprintd"
-  chmod 0700 "$runtime/launch-fprintd"
+    "$candidate/libopencv_imgproc.so.413" "$live_runtime/"
+  ln -s libfprint-2.so.2.0.0 "$live_runtime/libfprint-2.so.2"
+  ln -s libfprint-2.so.2 "$live_runtime/libfprint-2.so"
   if [[ $validated_selinux_enforcement == Enforcing ]]; then
-    chcon --reference=/usr/libexec/fprintd "$runtime/launch-fprintd"
-    for raw in "$runtime"/*.so.*; do chcon --reference=/usr/lib64/libfprint-2.so.2 "$raw"; done
-    restorecon -RF "$owned"
+    for raw in "$live_runtime"/*.so.*; do
+      chcon --reference=/usr/lib64/libfprint-2.so.2 "$raw"
+    done
+    restorecon -RF "$live_owned"
   fi
-  printf '[Service]\nExecStart=\nExecStart=%s/launch-fprintd\n' "$runtime" >"$dropin"
-  chmod 0600 "$dropin"
-  service_touched=true
+  write_systemd_dropin "$live_runtime" "$live_owned" "$live_dropin"
+  chmod 0600 "$live_dropin"
+  live_service_touched=true
   systemctl stop fprintd.service
   systemctl daemon-reload
   real_usb_enumeration_attempted=true
@@ -441,70 +570,79 @@ run_authorized_live () {
   [[ $target_count -eq 1 ]] || refuse TARGET_CARDINALITY_NOT_ONE
   daemon_pid=$(systemctl show -p MainPID --value fprintd.service)
   [[ $daemon_pid =~ ^[1-9][0-9]*$ ]] || refuse DAEMON_PID_INVALID
-  grep -F "$runtime/libfprint-2.so.2.0.0" "/proc/$daemon_pid/maps" >"$private/maps"
-  [[ $(readlink "/proc/$daemon_pid/exe") == /usr/libexec/fprintd ]] || refuse DAEMON_EXE_DRIFT
-  echo EXACT_LIBRARY_MAP_VERIFIED=true >"$result/operator.log"
+  grep -F "$live_runtime/libfprint-2.so.2.0.0" "/proc/$daemon_pid/maps" \
+    >"$live_private/maps" || refuse DAEMON_LIBRARY_MAP_MISSING
+  [[ $(readlink -f "/proc/$daemon_pid/exe") == /usr/libexec/fprintd ]] ||
+    refuse DAEMON_EXE_DRIFT
+  echo EXACT_LIBRARY_MAP_VERIFIED=true >"$live_result/operator.log"
   echo "PHASE_A=Enrollment indice destro: otto contatti, nessuna ripetizione extra."
-  raw="$private/enroll.raw"
-  set +e; timeout --signal=INT --kill-after=20s 1060s fprintd-enroll -f right-index-finger "$user" 2>&1 | tee "$raw"; rc=${PIPESTATUS[0]}; set -e
-  [[ $rc -eq 0 && $(grep -c '^Enroll result: enroll-completed$' "$raw") -eq 1 ]] || return 1
+  raw="$live_private/enroll.raw"
+  set +e; timeout --signal=INT --kill-after=20s 1060s fprintd-enroll -f right-index-finger "$user" 2>&1 | tee "$raw"; action_rc=${PIPESTATUS[0]}; set -e
+  [[ $action_rc -eq 0 && $(grep -c '^Enroll result: enroll-completed$' "$raw") -eq 1 ]] || return 1
   enroll_retry_count=$(grep -c 'enroll-retry-' "$raw" || true)
   [[ $enroll_retry_count -eq 0 ]] || refuse ENROLLMENT_RETRY_MARKER_OBSERVED
-  [[ $(find "$owned" -type l | wc -l) -eq 0 ]] || return 1
-  [[ $(find "$owned" -type f | wc -l) -eq 1 ]] || return 1
-  stored=$(find "$owned" -type f -print)
+  [[ $(find "$live_owned" -type l | wc -l) -eq 0 ]] || return 1
+  [[ $(find "$live_owned" -type f | wc -l) -eq 1 ]] || return 1
+  stored=$(find "$live_owned" -type f -print)
   [[ $(head -c 3 "$stored") == FP3 ]] || return 1
   systemctl restart fprintd.service
-  echo DAEMON_RESTART_COUNT=1 >>"$result/operator.log"
+  echo DAEMON_RESTART_COUNT=1 >>"$live_result/operator.log"
   echo "PHASE_A=Verify stesso indice destro: un solo contatto."
-  raw="$private/verify-same.raw"
-  set +e; timeout --signal=INT --kill-after=20s 180s fprintd-verify "$user" 2>&1 | tee "$raw"; rc=${PIPESTATUS[0]}; set -e
-  [[ $rc -eq 0 && $(grep -c '^Verify result: verify-match (done)$' "$raw") -eq 1 ]] || return 1
-  journalctl -u fprintd.service --since "$since" --no-pager >"$private/phase-a-journal.raw"
-  grep 'GOODIX_D282_EPOCH_AUDIT' "$private/phase-a-journal.raw" >"$private/phase-a-audit.raw"
-  [[ $(wc -l <"$private/phase-a-audit.raw") -eq 2 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*attempts=1 rejected=0 consumed=1 tls=1' "$private/phase-a-audit.raw") -eq 1 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*attempts=1 rejected=0 consumed=1 tls=1.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$private/phase-a-audit.raw") -eq 1 ]] || return 1
+  raw="$live_private/verify-same.raw"
+  set +e; timeout --signal=INT --kill-after=20s 180s fprintd-verify "$user" 2>&1 | tee "$raw"; action_rc=${PIPESTATUS[0]}; set -e
+  [[ $action_rc -eq 0 && $(grep -c '^Verify result: verify-match (done)$' "$raw") -eq 1 ]] || return 1
+  journalctl -u fprintd.service --since "$since" --no-pager \
+    >"$live_private/phase-a-journal.raw"
+  grep 'GOODIX_D282_EPOCH_AUDIT' "$live_private/phase-a-journal.raw" \
+    >"$live_private/phase-a-audit.raw"
+  [[ $(wc -l <"$live_private/phase-a-audit.raw") -eq 2 ]] || return 1
+  [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*attempts=1 rejected=0 consumed=1 tls=1' "$live_private/phase-a-audit.raw") -eq 1 ]] || return 1
+  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*attempts=1 rejected=0 consumed=1 tls=1.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$live_private/phase-a-audit.raw") -eq 1 ]] || return 1
   echo "PHASE_B=Verify dito diverso (indice sinistro): un solo contatto; atteso no-match."
-  raw="$private/verify-different.raw"
-  set +e; timeout --signal=INT --kill-after=20s 180s fprintd-verify "$user" 2>&1 | tee "$raw"; rc=${PIPESTATUS[0]}; set -e
-  [[ $rc -eq 1 && $(grep -c '^Verify result: verify-no-match (done)$' "$raw") -eq 1 ]] || return 1
-  journalctl -u fprintd.service --since "$since" --no-pager >"$private/phase-b-journal.raw"
-  grep 'GOODIX_D282_EPOCH_AUDIT' "$private/phase-b-journal.raw" >"$private/phase-b-audit.raw"
-  [[ $(wc -l <"$private/phase-b-audit.raw") -eq 3 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*attempts=1 rejected=0 consumed=1 tls=1.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$private/phase-b-audit.raw") -eq 2 ]] || return 1
+  raw="$live_private/verify-different.raw"
+  set +e; timeout --signal=INT --kill-after=20s 180s fprintd-verify "$user" 2>&1 | tee "$raw"; action_rc=${PIPESTATUS[0]}; set -e
+  [[ $action_rc -eq 1 && $(grep -c '^Verify result: verify-no-match (done)$' "$raw") -eq 1 ]] || return 1
+  journalctl -u fprintd.service --since "$since" --no-pager \
+    >"$live_private/phase-b-journal.raw"
+  grep 'GOODIX_D282_EPOCH_AUDIT' "$live_private/phase-b-journal.raw" \
+    >"$live_private/phase-b-audit.raw"
+  [[ $(wc -l <"$live_private/phase-b-audit.raw") -eq 3 ]] || return 1
+  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*attempts=1 rejected=0 consumed=1 tls=1.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$live_private/phase-b-audit.raw") -eq 2 ]] || return 1
   echo "PHASE_C=Delete del solo storage D282 isolato."
-  fprintd-delete "$user" >"$private/delete.raw" 2>&1
-  [[ $(find "$owned" -type f | wc -l) -eq 0 ]] || return 1
-  journalctl -u fprintd.service --since "$since" --no-pager >"$private/journal.raw"
-  grep 'GOODIX_D282_EPOCH_AUDIT' "$private/journal.raw" >"$private/audit.raw"
-  epoch_count=$(wc -l <"$private/audit.raw")
-  enroll_count=$(grep -c 'action=FPI_DEVICE_ACTION_ENROLL' "$private/audit.raw")
-  verify_count=$(grep -c 'action=FPI_DEVICE_ACTION_VERIFY' "$private/audit.raw")
-  cleanup_epoch_count=$(grep -c 'action=FPI_DEVICE_ACTION_NONE.*attempts=0 rejected=0 consumed=0 tls=0' "$private/audit.raw")
-  consumed_action_count=$(grep -c 'consumed=1' "$private/audit.raw")
-  observed_attempts=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^attempts=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  hidden_second_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^rejected=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  retry_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^(secure_retry|post_retry)=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  reopen_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^reopen=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  reset_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^reset=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  clear_halt_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^clear_halt=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  persistent_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^persistent=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$private/audit.raw")
-  same_match_count=$(grep -c '^Verify result: verify-match (done)$' "$private/verify-same.raw")
-  different_no_match_count=$(grep -c '^Verify result: verify-no-match (done)$' "$private/verify-different.raw")
+  fprintd-delete "$user" >"$live_private/delete.raw" 2>&1
+  [[ $(find "$live_owned" -type f | wc -l) -eq 0 ]] || return 1
+  journalctl -u fprintd.service --since "$since" --no-pager \
+    >"$live_private/journal.raw"
+  grep 'GOODIX_D282_EPOCH_AUDIT' "$live_private/journal.raw" \
+    >"$live_private/audit.raw"
+  epoch_count=$(wc -l <"$live_private/audit.raw")
+  enroll_count=$(grep -c 'action=FPI_DEVICE_ACTION_ENROLL' "$live_private/audit.raw")
+  verify_count=$(grep -c 'action=FPI_DEVICE_ACTION_VERIFY' "$live_private/audit.raw")
+  cleanup_epoch_count=$(grep -c 'action=FPI_DEVICE_ACTION_NONE.*attempts=0 rejected=0 consumed=0 tls=0' "$live_private/audit.raw")
+  consumed_action_count=$(grep -c 'consumed=1' "$live_private/audit.raw")
+  observed_attempts=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^attempts=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  hidden_second_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^rejected=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  retry_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^(secure_retry|post_retry)=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  reopen_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^reopen=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  reset_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^reset=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  clear_halt_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^clear_halt=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  persistent_count=$(awk '{for (i=1; i<=NF; i++) if ($i ~ /^persistent=/) {split($i,a,"="); sum+=a[2]}} END {print sum+0}' "$live_private/audit.raw")
+  same_match_count=$(grep -c '^Verify result: verify-match (done)$' "$live_private/verify-same.raw")
+  different_no_match_count=$(grep -c '^Verify result: verify-no-match (done)$' "$live_private/verify-different.raw")
   [[ $epoch_count -eq 4 && $enroll_count -eq 1 && $verify_count -eq 2 &&
      $cleanup_epoch_count -eq 1 && $consumed_action_count -eq 3 &&
      $observed_attempts -eq 3 && $hidden_second_count -eq 0 &&
      $retry_count -eq 0 && $reopen_count -eq 0 && $reset_count -eq 0 &&
      $clear_halt_count -eq 0 && $persistent_count -eq 0 &&
      $same_match_count -eq 1 && $different_no_match_count -eq 1 ]] || return 1
-  [[ $(grep -c 'attempts=1 rejected=0 consumed=1 tls=1' "$private/audit.raw") -eq 3 ]] || return 1
-  [[ $(grep -c 'secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0' "$private/audit.raw") -eq 4 ]] || return 1
-  [[ $(grep -c 'persistent=0' "$private/audit.raw") -eq 4 ]] || return 1
-  [[ $(grep -c 'outstanding=0 drained=1 context_closed=1' "$private/audit.raw") -eq 4 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$private/audit.raw") -eq 2 ]] || return 1
-  [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*enroll_stages=8 enroll_rearm32=7 enroll_terminal=1' "$private/audit.raw") -eq 1 ]] || return 1
-  sed "s/$user/<USER>/g; s/${baseline}/<BASELINE>/g; s/${stamp}/<RUN>/g" "$private"/*.raw >>"$result/operator.log"
+  [[ $(grep -c 'attempts=1 rejected=0 consumed=1 tls=1' "$live_private/audit.raw") -eq 3 ]] || return 1
+  [[ $(grep -c 'secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0' "$live_private/audit.raw") -eq 4 ]] || return 1
+  [[ $(grep -c 'persistent=0' "$live_private/audit.raw") -eq 4 ]] || return 1
+  [[ $(grep -c 'outstanding=0 drained=1 context_closed=1' "$live_private/audit.raw") -eq 4 ]] || return 1
+  [[ $(grep -c 'action=FPI_DEVICE_ACTION_VERIFY.*first_image=1 release_tail=1 single_terminal=1 rearm32=0' "$live_private/audit.raw") -eq 2 ]] || return 1
+  [[ $(grep -c 'action=FPI_DEVICE_ACTION_ENROLL.*enroll_stages=8 enroll_rearm32=7 enroll_terminal=1' "$live_private/audit.raw") -eq 1 ]] || return 1
+  sed "s/$user/<USER>/g; s/${baseline}/<BASELINE>/g; s/${stamp}/<RUN>/g" \
+    "$live_private"/*.raw >>"$live_result/operator.log"
   {
     echo D282_01_RESULT=PASS_LIVE_PENDING_INDEPENDENT_REVIEW
     echo "D282_01_BASELINE_SHA=$baseline"
@@ -529,10 +667,10 @@ run_authorized_live () {
     echo "DIFFERENT_FINGER_NO_MATCH_COUNT=$different_no_match_count"
     echo TEMPLATE_INCLUDED_IN_EXPORT=false
     echo PAM_IN_SCOPE=false
-  } >"$result/summary.env"
-  chmod 0600 "$result/operator.log" "$result/summary.env"
-  rc=0
-  echo "RISULTATI=$result"
+  } >"$live_result/summary.env"
+  chmod 0600 "$live_result/operator.log" "$live_result/summary.env"
+  live_run_return_code=0
+  echo "RISULTATI=$live_result"
   echo GRANT_CONSUMED=true
   echo RETRY_AUTHORIZED=false
   return 0
@@ -561,5 +699,6 @@ case ${1:-} in
   --prepare-candidate) [[ $# -eq 3 ]] || refuse USAGE; prepare_candidate "$2" "$3" ;;
   --run-authorized-live) [[ $# -eq 4 && $3 == --grant ]] || refuse USAGE; run_authorized_live "$2" "$4" ;;
   --export-results) [[ $# -eq 2 ]] || refuse USAGE; export_results "$2" ;;
+  --self-test-exit-trap) [[ $# -eq 2 ]] || refuse USAGE; exit_trap_scope_regression "$2" ;;
   *) echo "Uso: $0 --offline-preflight <opencv-rpm-dir> | --prepare-candidate <SHA> <opencv-rpm-dir> | --run-authorized-live <candidate> --grant <grant> | --export-results <results>" >&2; exit 2 ;;
 esac

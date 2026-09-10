@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — D282/01 pre-live chiuso offline e pronto per review
+### Stato corrente — D282/01 attempt 01 chiusa, correttivo host non ancora live-ready
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -130,7 +130,7 @@ Fedora 44/libfprint 1.94.100 con preprocessing R2 e SIGFM Rockytkg sotto
 licenze per-file e combined-work GPL-compatible. USB/TLS/PSK/FDT/lifecycle e
 guardrail factory-preserving rimangono invariati.
 
-D282/01 chiude ora offline i blocker che impedivano persino la preparazione
+D282/01 aveva chiuso offline i blocker che impedivano persino la preparazione
 del boundary fprintd target. L'audit del sorgente esatto
 `fprintd-1.94.5-5.fc44.x86_64` prova che, con un solo template, `finger=any`
 seleziona quel dito e invoca `fp_device_verify()`, non identify. La fork Fedora
@@ -147,17 +147,42 @@ formale, cancellazione post-TLS e cleanup drenato; la build Fedora con SIGFM
 reale prova lo specifico template VERIFY. Le regressioni D279/D280 restano
 verdi normal e ASan/UBSan.
 
-Il kit `operator_kit/d282-01-fprintd-target/` è preparato ma non eseguito. Usa
-snapshot e artefatti hash-pinned, staging sotto `/run` senza sostituire la
-libreria di sistema, mapping verificato in `/proc`, storage production-shaped
-isolato sotto `/var/lib/fprint`, inventario read-only del preesistente e trap
-di rollback installato prima della prima mutazione. Le phase future sono un
-enrollment, restart, same-finger verify, different-finger verify/no-match e
-delete. Le tre action biometriche sono distinte dal quarto open epoch
-Claim/Release di `fprintd-delete`: poiché il Goodix non espone storage, delete
-resta host-only e non invia una action al sensore. Il grant composto futuro
-evita di ripetere gli otto contatti per failure host-side tardive, ma non
-autorizza alcun retry.
+La prima Human Gate D282/01 è stata eseguita sulla baseline
+`54b6eb3002d1afacbb5331e0dbd33761f8865bca` ed è chiusa come
+`FAIL_HOST_STAGING`. Il grant one-shot è consumato e non è riutilizzabile.
+`fprintd` ha terminato con status 126: il wrapper temporaneo
+`/run/goodix-d282-01/.../launch-fprintd`, pur etichettato come entrypoint
+fprintd, non ha potuto eseguire `/usr/libexec/fprintd` sotto SELinux Enforcing
+(`Permission denied`). Nessun contatto, enrollment, azione biometrica o
+percorso protocollo sensore è stato raggiunto. Il cleanup automatico ha poi
+fallito perché il trap `EXIT`, eseguito dopo il ritorno della funzione sotto
+`set -e`, accedeva alla variabile locale `service_touched` ormai fuori scope.
+
+Il recovery manuale è `PASS_USER_ATTESTED`: servizio ripristinato e zero
+residui D282 runtime/drop-in/storage. La verifica read-only corrente conferma
+drop-in assente e unit recuperata. I raw originali sotto `/var/tmp` sono
+root-only e non sono stati importati, perché questo step vieta sudo/root; il
+report distingue quindi dati forniti dall'operatore, verifica sul codice della
+baseline e osservazioni host read-only. Lo stato normalizzato vive in
+`analysis/D282/D282_01_ATTEMPT_01_NORMALIZED.env` e nel report companion. Non
+viene elevata alcuna proprietà biometrica.
+
+Il correttivo mantiene invariati Goodix/TLS/SIGFM/VERIFY/enrollment e sequenza
+biometrica. Lo staging non usa più un wrapper: systemd mantiene
+`ExecStart=/usr/libexec/fprintd`, imposta `LD_LIBRARY_PATH` e
+`FP_DRIVERS_ALLOWLIST`, e produce il `STATE_DIRECTORY` isolato tramite
+`StateDirectory=fprint/.goodix-d282-01-*`. Il normale primo exec SELinux resta
+quindi `/usr/libexec/fprintd` (`fprintd_exec_t`); libreria di sistema e
+`ldconfig` restano intatti. Il gate runtime continua a richiedere path esatto
+in `/proc/<pid>/exe` e candidate esatta in `/proc/<pid>/maps`.
+
+Il cleanup è ora una funzione top-level e usa stato globale dedicato `live_*`
+per result/private, runtime, storage owned, drop-in, stato servizio, snapshot
+unit, hash libreria, inventario, grant e progressione staging. Tale stato
+sopravvive al ritorno da `run_authorized_live()`. Una regressione in un vero
+sottoprocesso Bash provoca `return 41` da una funzione sotto `set -e` e prova
+trap eseguito, zero `unbound variable`, cleanup degli oggetti sintetici e
+`ROLLBACK_COMPLETE=true`.
 
 Il correttivo grant-ordering D282/01 valida il grant senza consumarlo e porta
 prima del claim atomico tutti i gate host-only fallibili: collisioni,
@@ -186,13 +211,16 @@ phase A/B; phase C o rollback lo eliminano. Non viene creata una copia in
 `private/` e l'export sanitizzato resta limitato a `operator.log` e
 `summary.env`.
 
-La matrice D282 è 37/37; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+La matrice D282 è 41/41; regressioni D281 6/6 e daemon/D-Bus privato PASS;
 suite D278/D279/D280/D282 27/27 normal e 27/27 ASan/UBSan; build Fedora/SIGFM,
-registry e ABI fprintd PASS. Il different-finger autentico, l'esecuzione sotto
-servizio systemd target, storage FP3 SIGFM e rollback production restano
-necessariamente live. Il kit è quindi `READY` per review AI-PM indipendente e
-solo in seguito per una eventuale Human Gate: non esistono baseline approvata,
-grant, autorizzazione privilegiata o live.
+registry e ABI fprintd PASS. Il drop-in direct-exec è generato dal vero helper
+e accettato da `systemd-analyze verify`; questo non prova il vero start del
+servizio né l'assenza del denial SELinux. Avviare il vero fprintd di sistema con
+drop-in sotto `/run/systemd/system` richiede una futura autorizzazione
+privilegiata separata e deve essere progettato host-only con il target USB non
+raggiungibile. Finché tale prova non esiste,
+`D282_01_HUMAN_GATE_READINESS=NOT_READY`: non esistono baseline approvata,
+nuovo grant, autorizzazione privilegiata o live.
 
 PAM è esplicitamente fuori D282. Se D282 passerà live, il successivo boundary
 sostanziale sarà D283/01 con servizio PAM dedicato, `max-tries=1`, niente login
@@ -268,15 +296,23 @@ FPRINTD_TARGET_SIGFM_STORAGE_PROVEN=false
 FPRINTD_END_USER_INTEGRATION_PROVEN=false
 SENSOR_SIDE_PERSISTENCE_ABSENCE_PROVEN=false
 PRIMARY_ARCHITECTURE=FEDORA44_LIBFPRINT_1_94_100_MINIMAL_SIGFM_FORK
-D282_01_OUTCOME=READY_OFFLINE_PENDING_INDEPENDENT_AI_PM_REVIEW
-D282_01_HUMAN_GATE_READINESS=READY
+D282_01_OUTCOME=CORRECTIVE_IMPLEMENTED_OFFLINE_BLOCKED_ON_PRIVILEGED_SYSTEMD_SELINUX_TEST
+D282_01_HUMAN_GATE_READINESS=NOT_READY
+D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
+D282_01_ATTEMPT_01_GRANT_CONSUMED=true
+D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
+D282_01_ATTEMPT_01_SENSOR_PROTOCOL_RESULT=NOT_REACHED
+D282_01_ATTEMPT_01_BIOMETRIC_RESULT=NOT_REACHED
+D282_01_ATTEMPT_01_HOST_STAGING_RESULT=FAIL
+D282_01_ATTEMPT_01_ROOT_CAUSE_PRIMARY=SELINUX_WRAPPER_EXEC_DENIED
+D282_01_ATTEMPT_01_ROOT_CAUSE_SECONDARY=EXIT_TRAP_SCOPE_FAILURE
 D282_01_EXACT_FPRINTD=fprintd-1.94.5-5.fc44.x86_64
 D282_01_FPRINTD_ONE_PRINT_ACTION=VERIFY
 D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=37/37_PASS
+D282_01_REQUIRED_MATRIX=41/41_PASS
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
@@ -290,13 +326,20 @@ D282_01_D278_D279_D280_NORMAL=27/27_PASS
 D282_01_D278_D279_D280_ASAN_UBSAN=27/27_PASS
 D282_01_OPERATOR_KIT=operator_kit/d282-01-fprintd-target
 D282_01_OFFLINE_PREFLIGHT=PASS
+D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
+EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
+UNBOUND_VARIABLE_DURING_CLEANUP=false
+D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
+D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
 D282_01_PAM_IN_SCOPE=false
 CURRENT_PROTECTED_EVALUATION_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 APPROVED_BASELINE=NONE
 GRANT_CREATED=false
-NEXT_PRIMARY_BOUNDARY=INDEPENDENT_AI_PM_REVIEW_OF_D282_01_THEN_POSSIBLE_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=SEPARATELY_AUTHORIZED_HOST_ONLY_REAL_SYSTEMD_SELINUX_STAGING_VALIDATION_THEN_INDEPENDENT_REVIEW
 NEXT_BOUNDARY_AFTER_D282_PASS=D283_01_PAM_DEDICATED_MAX_TRIES_1_NO_REAL_LOGIN_OR_SUDO_INITIAL
 ```
 

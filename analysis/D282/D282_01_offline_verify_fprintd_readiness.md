@@ -1,21 +1,50 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D282/01 — closure offline VERIFY e readiness fprintd target
+# D282/01 — attempt 01 e correttivo staging fprintd target
 
 ## Decisione
 
 ```text
-OUTCOME=READY_OFFLINE_PENDING_INDEPENDENT_AI_PM_REVIEW
-ADVANCEMENT=REAL_FPRINTD_VERIFY_PATH_IMPLEMENTED_AND_TARGET_OPERATOR_BOUNDARY_PREPARED
-EXECUTABLE_CLOSURE=PASS_OFFLINE_EXACT_FPRINTD_ABI_REAL_SIGFM_AND_SANITIZERS
-RESIDUAL_BLOCKER_OR_RISK=TARGET_FPRINTD_STORAGE_SAME_DIFFERENT_FINGER_AND_SYSTEM_STAGING_REQUIRE_A_NEW_HUMAN_GATE
+OUTCOME=CORRECTIVE_IMPLEMENTED_OFFLINE_BLOCKED_ON_PRIVILEGED_SYSTEMD_SELINUX_TEST
+ADVANCEMENT=ATTEMPT_01_NORMALIZED_DIRECT_SYSTEMD_EXEC_DESIGNED_AND_EXIT_TRAP_SCOPE_FIXED
+EXECUTABLE_CLOSURE=PARTIAL_OFFLINE_SYSTEMD_PARSER_AND_REAL_BASH_TRAP_PASS_RUNTIME_START_NOT_RUN
+RESIDUAL_BLOCKER_OR_RISK=REAL_SYSTEMD_FPRINTD_START_WITH_SELINUX_ENFORCING_REQUIRES_SEPARATE_PRIVILEGED_HOST_ONLY_AUTHORIZATION
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE
-D282_01_HUMAN_GATE_READINESS=READY
+D282_01_HUMAN_GATE_READINESS=NOT_READY
 ```
 
-Questa decisione significa che i blocker pre-live sono chiusi offline e che il
-kit può essere sottoposto a review indipendente. Non approva una baseline, non
-crea un grant e non autorizza installazione privilegiata, USB o live.
+Il correttivo è implementato e verificato per quanto consentito offline, ma il
+blocker systemd/SELinux non può essere dichiarato chiuso senza avviare il vero
+servizio di sistema con il vero drop-in. Questa operazione richiede privilegi
+e un'autorizzazione separata; non è stata eseguita. Il kit non è quindi pronto
+per una nuova Human Gate biometrica, non approva una baseline e non crea grant.
+
+## Attempt 01: esito autentico normalizzato
+
+La prima Human Gate D282/01 sulla baseline
+`54b6eb3002d1afacbb5331e0dbd33761f8865bca` è chiusa come failure host-side:
+il grant one-shot è stato consumato, ma `fprintd` non ha superato l'exec del
+wrapper e nessuna azione biometrica o sensor-reaching è iniziata. Il journal
+fornito dall'operatore riporta `launch-fprintd: /usr/libexec/fprintd: Permesso
+negato` e `status=126`. Il trap `EXIT` ha poi dereferenziato
+`service_touched`, variabile locale già fuori scope.
+
+L'evidenza è normalizzata in
+`D282_01_ATTEMPT_01_NORMALIZED.env` e
+`D282_01_attempt_01_host_staging_failure.md`. Il result raw sotto `/var/tmp` è
+root-only e non è stato letto o copiato, coerentemente con il divieto corrente
+di sudo/root; i marker non direttamente leggibili sono quindi esplicitamente
+`USER_ATTESTED`. La verifica host read-only ha confermato l'assenza corrente
+del drop-in e lo stato systemd recuperato. Nessuna proprietà biometrica viene
+elevata:
+
+```text
+D282_01_ATTEMPT_01_SENSOR_PROTOCOL_RESULT=NOT_REACHED
+D282_01_ATTEMPT_01_BIOMETRIC_RESULT=NOT_REACHED
+D282_01_ATTEMPT_01_HOST_STAGING_RESULT=FAIL
+D282_01_ATTEMPT_01_GRANT_CONSUMED=true
+D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
+```
 
 ## Sorgente fprintd esatto e root cause VERIFY
 
@@ -93,10 +122,14 @@ Il kit `operator_kit/d282-01-fprintd-target/` costruisce da `git archive` del
 full SHA, con RPM OpenCV locali hash-pinned e network namespace disabilitato.
 Controlla la NEVRA fprintd, i 47 simboli ABI richiesti, SONAME, RPATH, driver
 registry e assenza di test seam/reset/clear-halt/persistent symbol. La libreria
-di sistema non viene modificata: una wrapper sotto `/run` imposta
-`LD_LIBRARY_PATH` e `STATE_DIRECTORY`; un drop-in sotto `/run/systemd/system`
-sostituisce temporaneamente soltanto `ExecStart`. `/proc/<pid>/maps` deve
-confermare la candidate esatta.
+di sistema non viene modificata. Il wrapper che ha fallito nell'attempt 01 è
+stato eliminato: il drop-in sotto `/run/systemd/system` mantiene
+`ExecStart=/usr/libexec/fprintd`, imposta `LD_LIBRARY_PATH` e
+`FP_DRIVERS_ALLOWLIST`, e usa `StateDirectory=fprint/.goodix-d282-01-*` per
+ottenere il `STATE_DIRECTORY` isolato tramite systemd. In questo modo il primo
+exec resta quello normale etichettato `fprintd_exec_t`; non esiste più il
+doppio exec dal wrapper sotto `/run`. `/proc/<pid>/exe` deve essere esattamente
+`/usr/libexec/fprintd` e `/proc/<pid>/maps` deve contenere la candidate esatta.
 
 Prima di ogni mutazione il kit registra unit, stato active/inactive, hash della
 libreria di sistema e inventario read-only di `/var/lib/fprint` con metadata,
@@ -106,6 +139,13 @@ confondere o sovrascrivere template personali. Il trap è installato prima
 della prima scrittura di staging; rimuove solo nomi D282 esatti, ripristina il
 servizio e confronta byte/metadata preesistenti. Ogni mismatch di rollback è
 FAIL con recovery esplicita e nessuna action ulteriore.
+
+Il trap non è più una funzione annidata che dipende dai `local` di
+`run_authorized_live()`: `cleanup_live()` è top-level e tutto lo stato di
+rollback ha nomi globali `live_*`, inizializzati fail-closed prima di armare il
+trap. Una regressione avvia un vero sottoprocesso Bash, entra in una funzione,
+arma `EXIT`, provoca `return 41` sotto `set -e` e verifica rimozione di runtime,
+drop-in e storage sintetico, summary di failure e assenza di `unbound variable`.
 
 Il correttivo pre-Human-Gate mantiene D282/01 e separa validazione da consumo
 del grant. Il launcher valida prima formato, baseline, operation, ID, owner,
@@ -176,10 +216,14 @@ copiato in `private/`. `TEMPLATE_INCLUDED_IN_EXPORT=false`.
 | 35 | controllo cardinalità post-start preservato | audit launcher anti-TOCTOU | PASS |
 | 36 | extraction enrollment intermedia terminale solo Goodix production | action-shaped stage 3 | PASS |
 | 37 | marker enrollment retry rifiutato prima del restart | audit launcher | PASS |
+| 38 | trap EXIT sopravvive all'uscita dallo scope funzione | vero sottoprocesso Bash, failure 41 e rollback | PASS |
+| 39 | drop-in direct-exec production-shaped e sintassi systemd | helper reale + `systemd-analyze verify` | PASS_OFFLINE_PARSER |
+| 40 | attempt 01 normalizzata senza claim biometrici | env/report canonici + provenance | PASS |
+| 41 | assenza di prova runtime SELinux non mascherata | stato canonico fail-closed | PASS |
 
 Esecuzioni di closure:
 
-- `analysis.D282.test_d282_01_offline_contract`: **37/37 PASS**;
+- `analysis.D282.test_d282_01_offline_contract`: **41/41 PASS**;
 - `analysis.D281.test_d281_01_fprintd_storage_integration`: **6/6 PASS**;
 - integrazione D281 con vero daemon/client, bus privato e USB compile-disabled:
   **PASS**;
@@ -188,7 +232,18 @@ Esecuzioni di closure:
 - build Fedora 44/libfprint 1.94.100 con vero SIGFM/OpenCV, stage 8, FP3,
   identify e VERIFY same-template: **PASS**;
 - standard driver registry e ABI esatto fprintd: **PASS**;
-- preflight aggregato del kit: **PASS**.
+- preflight aggregato del kit: **PASS offline**.
+
+Il test 39 prova la generazione del vero drop-in e la sua accettazione dal
+parser systemd, non l'avvio del servizio. Non sono stati eseguiti
+`systemctl start`, installazioni in `/run/systemd/system`, accessi USB o driver
+target. Pertanto restano deliberatamente:
+
+```text
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
+EXACT_LIBRARY_MAP_VERIFIED=NOT_OBSERVED_FOR_CORRECTIVE
+```
 
 Il different-finger è deliberatamente solo sintetico offline. Non viene
 dichiarata una soglia FAR/FRR. Soltanto una futura Human Gate può elevare
@@ -204,13 +259,26 @@ terminale già dopo l'acquisizione consumata. A e B sono auditati prima di avanz
 attiva rollback, senza ripetere enrollment. Stato preesistente e libreria di
 sistema sono confrontati dopo cleanup. Non compare alcuna modifica PAM.
 
-Resta necessaria una review AI-PM indipendente dell'esatto commit finale prima
-di una eventuale richiesta di Human Gate. D283/PAM non è preparato.
+Il prossimo passo non è una nuova run biometrica: serve prima una verifica
+host-only separatamente autorizzata del vero avvio systemd con SELinux
+Enforcing, USB target non raggiungibile, seguita da review indipendente. Fino a
+quel momento la readiness resta `NOT_READY`. D283/PAM non è preparato.
 
 ```text
 D282_01_GRANT_ORDERING_CORRECTIVE=PASS
 D282_01_TARGET_CARDINALITY_PRECONSUMPTION_GATE=PASS
 D282_01_ENROLLMENT_IMPLICIT_RETRY_FENCE=PASS
+D282_01_ATTEMPT_01=FAIL_HOST_STAGING_CLOSED
+D282_01_ATTEMPT_01_GRANT_CONSUMED=true
+D282_01_ATTEMPT_01_RETRY_AUTHORIZED=false
+D282_01_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
+EXIT_TRAP_LOCAL_SCOPE_REGRESSION=PASS
+UNBOUND_VARIABLE_DURING_CLEANUP=false
+D282_01_SYSTEMD_DIRECT_EXEC_DESIGN=PASS_OFFLINE_STATIC_AND_SYSTEMD_PARSER
+D282_01_SYSTEMD_SELINUX_STAGING_CORRECTIVE=IMPLEMENTED_PENDING_PRIVILEGED_HOST_TEST
+FPRINTD_SYSTEMD_STAGING_START=NOT_RUN_REQUIRES_SEPARATE_PRIVILEGED_AUTHORIZATION
+SELINUX_EXEC_DENIAL=NOT_PROVEN_CORRECTED
+D282_01_HUMAN_GATE_READINESS=NOT_READY
 EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
 PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
 POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
