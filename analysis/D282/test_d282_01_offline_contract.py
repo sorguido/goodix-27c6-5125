@@ -7,6 +7,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from analysis.D282 import d282_01_grant_ordering_model as grant_ordering
+
 
 ROOT = Path(__file__).resolve().parents[2]
 FPRINTD = ROOT / "reference/fprintd-fedora44-1.94.5/source/src/device.c"
@@ -166,6 +168,123 @@ class D282OfflineContract(unittest.TestCase):
                       self.kit)
         self.assertIn("persistent=0", self.kit)
         self.assertIn("PAM_IN_SCOPE=false", self.kit)
+
+    def test_21_all_pre_live_gates_precede_atomic_consumption(self):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        refusal = function_slice(self.kit, "refuse ()", "is_sha ()")
+        consume = live.index('consume_validated_grant "$grant"')
+        for anchor in (
+                "refuse STAGING_COLLISION",
+                "refuse FPRINTD_INITIAL_STATE_UNSAFE",
+                "refuse SYSTEM_LIBFPRINT_MISSING",
+                'validate_selinux_preconditions "$system_library" "$storage_root"',
+                "refuse UNIT_SNAPSHOT_FAILED",
+                "refuse STORAGE_INVENTORY_FAILED",
+                'prepare_grant_claim "$expected_id"'):
+            self.assertLess(live.index(anchor), consume, anchor)
+        self.assertLess(live.index("trap cleanup_live EXIT"), consume)
+        self.assertLess(consume, live.index("staging_started=true"))
+        self.assertLess(live.index("staging_started=true"),
+                        live.index('install -d -m 0700 "$runtime"'))
+        after_consume = live[consume:]
+        self.assertNotIn("command -v", after_consume)
+        self.assertNotIn("$(getenforce)", after_consume)
+        self.assertIn("validated_selinux_enforcement == Enforcing", after_consume)
+        self.assertEqual(live.count('consume_validated_grant "$grant"'), 1)
+        for marker in ('GRANT_CONSUMED=$grant_consumed',
+                       'REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted',
+                       'LIVE_EXECUTION_PERFORMED=$live_execution_performed'):
+            self.assertIn(marker, refusal)
+
+    def test_22_staging_collision_does_not_consume_grant(self):
+        self._assert_preconsumption_refusal("STAGING_COLLISION")
+
+    def test_23_unsafe_fprintd_state_does_not_consume_grant(self):
+        self._assert_preconsumption_refusal("FPRINTD_INITIAL_STATE_UNSAFE")
+
+    def test_24_missing_system_libfprint_does_not_consume_grant(self):
+        self._assert_preconsumption_refusal("SYSTEM_LIBFPRINT_MISSING")
+
+    def test_25_unit_snapshot_failure_does_not_consume_grant(self):
+        self._assert_preconsumption_refusal("UNIT_SNAPSHOT_FAILED")
+
+    def test_26_storage_inventory_failure_does_not_consume_grant(self):
+        self._assert_preconsumption_refusal("STORAGE_INVENTORY_FAILED")
+
+    def test_27_selinux_precondition_failure_does_not_consume_grant(self):
+        self._assert_preconsumption_refusal(
+            "SELINUX_PRECONDITION_FAILED",
+            source_anchor='validate_selinux_preconditions "$system_library" "$storage_root"')
+        for refusal in ("SELINUX_STATE_UNREADABLE", "SELINUX_CHCON_MISSING",
+                        "SELINUX_RESTORECON_MISSING", "SELINUX_REFERENCE_UNLABELED"):
+            self.assertIn(refusal, self.kit)
+
+    def test_28_invalid_grants_are_refused_before_consumption(self):
+        validate = function_slice(self.kit, "validate_grant ()", "prepare_grant_claim ()")
+        for reason in ("GRANT_FORMAT", "GRANT_BASELINE", "GRANT_OPERATION",
+                       "GRANT_ID", "GRANT_USER", "GRANT_USER_UNKNOWN"):
+            with self.subTest(reason=reason):
+                self.assertIn(reason, validate)
+                outcome = grant_ordering.simulate(
+                    grant_ordering.GrantRegistry(), "grant-1",
+                    invalid_grant_reason=reason)
+                self._assert_unused(outcome)
+
+    def test_29_atomic_one_shot_claim_blocks_reuse(self):
+        consume = function_slice(
+            self.kit, "consume_validated_grant ()", "validate_live_tooling ()")
+        self.assertLess(consume.index('mkdir -m 0700 "$grant_claim"'),
+                        consume.index("grant_consumed=true"))
+        self.assertIn("refuse GRANT_ALREADY_CONSUMED", self.kit)
+        registry = grant_ordering.GrantRegistry()
+        first = grant_ordering.simulate(registry, "grant-1")
+        second = grant_ordering.simulate(registry, "grant-1")
+        self.assertTrue(first.grant_consumed)
+        self.assertEqual(second.refusal, "GRANT_ALREADY_CONSUMED")
+        self._assert_unused(second)
+        self.assertEqual(registry.consumed_ids, {"grant-1"})
+
+    def test_30_postconsume_failure_rolls_back_without_retry_and_flow_is_unchanged(self):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        consume = live.index('consume_validated_grant "$grant"')
+        self.assertLess(live.index("trap cleanup_live EXIT"), consume)
+        self.assertLess(consume, live.index('install -d -m 0700 "$runtime"'))
+        self.assertIn('echo "GRANT_CONSUMED=$grant_consumed"', live)
+        self.assertIn('echo "RETRY_AUTHORIZED=false"', live)
+        outcome = grant_ordering.simulate(
+            grant_ordering.GrantRegistry(), "grant-1",
+            fail_immediately_after_consumption=True)
+        self.assertTrue(outcome.grant_consumed)
+        self.assertFalse(outcome.retry_authorized)
+        self.assertTrue(outcome.rollback_complete)
+        self.assertFalse(outcome.real_usb_enumeration_attempted)
+        self.assertFalse(outcome.live_execution_performed)
+
+        sequence = (
+            "fprintd-enroll -f right-index-finger",
+            "systemctl restart fprintd.service",
+            'fprintd-verify "$user"',
+            "PHASE_B=Verify dito diverso",
+            'fprintd-delete "$user"',
+        )
+        positions = [live.index(item) for item in sequence]
+        self.assertEqual(positions, sorted(positions))
+
+    def _assert_preconsumption_refusal(self, reason, source_anchor=None):
+        live = function_slice(self.kit, "run_authorized_live ()", "export_results ()")
+        anchor = source_anchor or f"refuse {reason}"
+        self.assertLess(live.index(anchor),
+                        live.index('consume_validated_grant "$grant"'))
+        outcome = grant_ordering.simulate(
+            grant_ordering.GrantRegistry(), "grant-1",
+            preconsumption_refusal=reason)
+        self._assert_unused(outcome)
+
+    def _assert_unused(self, outcome):
+        self.assertFalse(outcome.grant_consumed)
+        self.assertFalse(outcome.real_usb_enumeration_attempted)
+        self.assertFalse(outcome.live_execution_performed)
+        self.assertFalse(outcome.retry_authorized)
 
     def _exercise_staging(self, fail_after, seed=False):
         with tempfile.TemporaryDirectory(prefix="goodix-d282-model-") as td:

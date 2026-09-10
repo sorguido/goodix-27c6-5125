@@ -159,7 +159,17 @@ resta host-only e non invia una action al sensore. Il grant composto futuro
 evita di ripetere gli otto contatti per failure host-side tardive, ma non
 autorizza alcun retry.
 
-La matrice D282 è 20/20; regressioni D281 6/6 e daemon/D-Bus privato PASS;
+Il correttivo grant-ordering D282/01 valida il grant senza consumarlo e porta
+prima del claim atomico tutti i gate host-only fallibili: collisioni,
+stato iniziale fprintd, libreria/hash di sistema, precondizioni SELinux,
+snapshot unit e inventario storage. Il trap è già installato per gli ultimi
+due. Solo dopo il loro PASS viene acquisito il claim one-shot, impostato
+`GRANT_CONSUMED=true` ed eseguito immediatamente lo staging. Ogni rifiuto
+pre-consumo conserva grant, zero enumerazione USB e zero live; ogni failure
+post-consumo conserva invece il divieto assoluto di retry e attraversa il
+rollback.
+
+La matrice D282 è 30/30; regressioni D281 6/6 e daemon/D-Bus privato PASS;
 suite D278/D279/D280 26/26 normal e 26/26 ASan/UBSan; build Fedora/SIGFM,
 registry e ABI fprintd PASS. Il different-finger autentico, l'esecuzione sotto
 servizio systemd target, storage FP3 SIGFM e rollback production restano
@@ -249,7 +259,10 @@ D282_01_GOODIX_VERIFY_PROFILE=SINGLE_ACQUISITION
 D282_01_FEDORA44_SIGFM_VERIFY_MATCH=PASS
 D282_01_DIFFERENT_FINGER_NO_MATCH=UNPROVEN_LIVE
 D282_01_FPRINTD_RETRY_SECOND_SENSOR_REACHING_ACTION_COUNT=0
-D282_01_REQUIRED_MATRIX=20/20_PASS
+D282_01_REQUIRED_MATRIX=30/30_PASS
+D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
+POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
 D282_01_D278_D279_D280_NORMAL=26/26_PASS
 D282_01_D278_D279_D280_ASAN_UBSAN=26/26_PASS
 D282_01_OPERATOR_KIT=operator_kit/d282-01-fprintd-target

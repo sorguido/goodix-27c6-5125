@@ -94,6 +94,15 @@ della prima scrittura di staging; rimuove solo nomi D282 esatti, ripristina il
 servizio e confronta byte/metadata preesistenti. Ogni mismatch di rollback è
 FAIL con recovery esplicita e nessuna action ulteriore.
 
+Il correttivo pre-Human-Gate mantiene D282/01 e separa validazione da consumo
+del grant. Il launcher valida prima formato, baseline, operation, ID, owner,
+mode e utente; completa poi tooling, collisioni, stato fprintd, libreria/hash,
+precondizioni SELinux, creazione del result sink, snapshot della unit e
+inventario storage. Il trap è attivo prima degli ultimi due controlli. Solo
+dopo il PASS completo prepara il namespace one-shot e acquisisce con `mkdir`
+atomica il claim; imposta immediatamente `GRANT_CONSUMED=true` e passa allo
+staging. Non resta alcun probe `command -v`/`getenforce` dopo il consumo.
+
 La futura sequenza usa un grant composto per evitare che un errore host-side
 dopo enrollment obblighi a ripetere otto contatti. Le phase A/B/C sono gated
 in ordine. Sono autorizzabili al massimo tre azioni biometriche in tre open
@@ -132,10 +141,20 @@ inventari e ogni FP3 autentico restano in `private/` e
 | 18 | pre-existing storage | sentinel byte/metadata-preserved | PASS |
 | 19 | no retry/reopen/reset/clear-halt nascosti | audit + symbol/test | PASS |
 | 20 | no persistent family fuori allowlist vuota | audit + build gate | PASS |
+| 21 | ordine gate → claim atomico → staging | audit strutturale launcher | PASS |
+| 22 | collisione staging non consuma grant | modello + sorgente | PASS |
+| 23 | stato fprintd unsafe non consuma grant | modello + sorgente | PASS |
+| 24 | libfprint di sistema mancante non consuma grant | modello + sorgente | PASS |
+| 25 | snapshot unit fallito non consuma grant | modello + sorgente | PASS |
+| 26 | inventario storage fallito non consuma grant | modello + sorgente | PASS |
+| 27 | precondizione SELinux fallita non consuma grant | modello + sorgente | PASS |
+| 28 | grant malformed/baseline/operation/user errati pre-consumo | modello + sorgente | PASS |
+| 29 | claim one-shot impedisce riuso | modello + `mkdir` atomica | PASS |
+| 30 | failure post-consumo: rollback, zero retry; flow invariato | modello + sorgente | PASS |
 
 Esecuzioni di closure:
 
-- `analysis.D282.test_d282_01_offline_contract`: **20/20 PASS**;
+- `analysis.D282.test_d282_01_offline_contract`: **30/30 PASS**;
 - `analysis.D281.test_d281_01_fprintd_storage_integration`: **6/6 PASS**;
 - integrazione D281 con vero daemon/client, bus privato e USB compile-disabled:
   **PASS**;
@@ -163,6 +182,9 @@ Resta necessaria una review AI-PM indipendente dell'esatto commit finale prima
 di una eventuale richiesta di Human Gate. D283/PAM non è preparato.
 
 ```text
+D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
+POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
 CURRENT_LIVE_AUTHORIZED=false
 CURRENT_PRIVILEGED_INSTALL_AUTHORIZED=false
 APPROVED_BASELINE=NONE

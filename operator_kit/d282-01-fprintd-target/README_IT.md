@@ -95,6 +95,15 @@ nell'export. Lo storage usato da fprintd è una directory D282 univoca sotto
 preesistenti restano fuori da quel root. Collisioni e symlink falliscono
 chiusi.
 
+Il grant viene prima validato senza mutarlo. Collisioni, stato iniziale del
+servizio, libreria di sistema e relativo hash, precondizioni SELinux, snapshot
+della unit e inventario storage devono passare mentre
+`GRANT_CONSUMED=false`. Il trap è già attivo per snapshot e inventario. Solo
+dopo questi gate viene preparato il namespace one-shot e il claim è acquisito
+con `mkdir` atomica; da `GRANT_CONSUMED=true` il launcher entra subito nello
+staging. Un rifiuto precedente stampa anche
+`REAL_USB_ENUMERATION_ATTEMPTED=false` e `LIVE_EXECUTION_PERFORMED=false`.
+
 Il trap di rollback è installato prima della prima mutazione di staging.
 Rimuove soltanto runtime, drop-in e storage con nomi D282 risolti in anticipo,
 ripristina lo stato active/inactive del servizio, confronta unit, libreria di
@@ -131,6 +140,7 @@ riuso dello stesso ID.
 
 Fermarsi senza eseguire alcuna azione se baseline/origin, pacchetto, ABI,
 manifest, unit, servizio, storage, SELinux, cardinalità target, mapping della
-libreria o grant non coincidono. Dopo il consumo, ogni failure provoca solo
-cleanup/rollback. Non usare comandi USB improvvisati, non creare un altro
-grant e non ripetere la run.
+libreria o grant non coincidono. I rifiuti host-only precedenti al claim non
+consumano il grant. Dopo il consumo, ogni failure provoca solo
+cleanup/rollback con `RETRY_AUTHORIZED=false`: non creare un altro grant e non
+ripetere la run. Non usare comandi USB improvvisati.

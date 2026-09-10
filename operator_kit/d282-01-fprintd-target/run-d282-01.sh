@@ -7,7 +7,15 @@ root=$(git -C "$script_dir" rev-parse --show-toplevel)
 operation=D282_01_FPRINTD_TARGET_ENROLL_RESTART_VERIFY_SAME_DIFFERENT_DELETE
 real_usb_enumeration_attempted=false
 live_execution_performed=false
+grant_consumed=false
 d282_offline_work=
+validated_grant_user=
+validated_grant_sha=
+validated_grant_owner=
+validated_grant_mode=
+grant_claim_root=
+grant_claim=
+validated_selinux_enforcement=Unavailable
 live_critical=(libfprint-driver reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 Rockytkg analysis/D282
   operator_kit/d282-01-fprintd-target
@@ -16,6 +24,8 @@ live_critical=(libfprint-driver reference/libfprint-fedora44-1.94.100/source
 refuse () {
   echo "D282_01_GATE_REFUSED=true" >&2
   echo "D282_01_REFUSAL_REASON=$1" >&2
+  echo "GRANT_CONSUMED=$grant_consumed" >&2
+  echo "RETRY_AUTHORIZED=false" >&2
   echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >&2
   echo "LIVE_EXECUTION_PERFORMED=$live_execution_performed" >&2
   exit 3
@@ -118,10 +128,13 @@ offline_preflight () {
   abi_preflight "$d282_offline_work"
   echo D282_01_OFFLINE_PREFLIGHT=PASS
   echo D282_01_FPRINTD_EXACT_SOURCE_AUDIT=PASS
-  echo D282_01_TEST_MATRIX_COUNT=20
+  echo D282_01_TEST_MATRIX_COUNT=30
   echo D282_01_NORMAL_AND_ASAN_UBSAN=PASS
   echo D282_01_REVERSIBLE_STAGING_MODEL=PASS
   echo D282_01_PREEXISTING_STORAGE_MODEL=PASS
+  echo D282_01_GRANT_ORDERING_CORRECTIVE=PASS
+  echo PRECONSUMPTION_REFUSALS_LEAVE_GRANT_UNUSED=true
+  echo POSTCONSUMPTION_FAILURE_RETRY_AUTHORIZED=false
   echo CORRUPT_FP3_REJECTED=PASS_OFFLINE
   echo MISSING_FP3_REJECTED=PASS_OFFLINE
   echo WRONG_USER_FINGER_REJECTED=PASS_OFFLINE
@@ -167,23 +180,86 @@ prepare_candidate () {
   echo LIVE_EXECUTION_PERFORMED=false
 }
 
-consume_grant () {
-  local grant=$1 baseline=$2 expected_id=$3 owner mode grant_user claim_root claim
+validate_grant () {
+  local grant=$1 baseline=$2 expected_id=$3 owner mode
   [[ -f $grant && ! -L $grant && $(wc -l <"$grant") -eq 4 ]] || refuse GRANT_FORMAT
-  mode=$(stat -c %a "$grant"); owner=$(stat -c %u "$grant")
+  mode=$(stat -c %a "$grant") || refuse GRANT_STAT
+  owner=$(stat -c %u "$grant") || refuse GRANT_STAT
   [[ $((8#$mode & 0177)) -eq 0 ]] || refuse GRANT_MODE
   [[ $owner -eq 0 || (${SUDO_UID:-x} =~ ^[0-9]+$ && $owner -eq $SUDO_UID) ]] || refuse GRANT_OWNER
   [[ $(state_value "$grant" D282_01_BASELINE_SHA) == "$baseline" ]] || refuse GRANT_BASELINE
   [[ $(state_value "$grant" D282_01_OPERATION) == "$operation" ]] || refuse GRANT_OPERATION
   [[ $(state_value "$grant" D282_01_GRANT_ID) == "$expected_id" ]] || refuse GRANT_ID
-  grant_user=$(state_value "$grant" D282_01_USER) || refuse GRANT_USER
-  getent passwd "$grant_user" >/dev/null || refuse GRANT_USER_UNKNOWN
-  claim_root=/var/tmp/goodix-d282-01-consumed-grants
-  install -d -m 0700 "$claim_root"
-  claim="$claim_root/$expected_id"
-  mkdir -m 0700 "$claim" 2>/dev/null || refuse GRANT_ALREADY_CONSUMED
-  cp "$grant" "$claim/consumed.state"; chmod 0600 "$claim/consumed.state"
-  printf '%s\n' "$grant_user"
+  validated_grant_user=$(state_value "$grant" D282_01_USER) || refuse GRANT_USER
+  getent passwd "$validated_grant_user" >/dev/null || refuse GRANT_USER_UNKNOWN
+  validated_grant_sha=$(sha256sum "$grant" | awk '{print $1}') || refuse GRANT_HASH
+  validated_grant_owner=$owner
+  validated_grant_mode=$mode
+}
+
+prepare_grant_claim () {
+  local expected_id=$1 owner mode
+
+  grant_claim_root=/var/tmp/goodix-d282-01-consumed-grants
+  [[ ! -L $grant_claim_root ]] || refuse GRANT_CLAIM_ROOT_SYMLINK
+  if [[ -e $grant_claim_root ]]; then
+    [[ -d $grant_claim_root ]] || refuse GRANT_CLAIM_ROOT_UNSAFE
+  else
+    install -d -m 0700 "$grant_claim_root" || refuse GRANT_CLAIM_ROOT_CREATE
+  fi
+  owner=$(stat -c %u "$grant_claim_root") || refuse GRANT_CLAIM_ROOT_STAT
+  mode=$(stat -c %a "$grant_claim_root") || refuse GRANT_CLAIM_ROOT_STAT
+  [[ $owner -eq 0 && $mode == 700 ]] || refuse GRANT_CLAIM_ROOT_UNSAFE
+  grant_claim="$grant_claim_root/$expected_id"
+  [[ ! -e $grant_claim && ! -L $grant_claim ]] || refuse GRANT_ALREADY_CONSUMED
+}
+
+consume_validated_grant () {
+  local grant=$1 owner mode current_sha
+
+  [[ -f $grant && ! -L $grant ]] || refuse GRANT_CHANGED_AFTER_VALIDATION
+  owner=$(stat -c %u "$grant") || refuse GRANT_CHANGED_AFTER_VALIDATION
+  mode=$(stat -c %a "$grant") || refuse GRANT_CHANGED_AFTER_VALIDATION
+  current_sha=$(sha256sum "$grant" | awk '{print $1}') || refuse GRANT_CHANGED_AFTER_VALIDATION
+  [[ $owner == "$validated_grant_owner" && $mode == "$validated_grant_mode" &&
+     $current_sha == "$validated_grant_sha" ]] || refuse GRANT_CHANGED_AFTER_VALIDATION
+  mkdir -m 0700 "$grant_claim" 2>/dev/null || refuse GRANT_ALREADY_CONSUMED
+  grant_consumed=true
+  cp "$grant" "$grant_claim/consumed.state"
+  chmod 0600 "$grant_claim/consumed.state"
+}
+
+validate_live_tooling () {
+  local command_name
+
+  for command_name in systemctl journalctl timeout tee fprintd-enroll \
+    fprintd-verify fprintd-delete sha256sum stat getent sed cmp find \
+    install readlink grep awk wc date head ls cp chmod mkdir rmdir rm \
+    dirname ln; do
+    command -v "$command_name" >/dev/null || refuse "HOST_TOOL_MISSING_${command_name}"
+  done
+  [[ -x $script_dir/d282_storage_inventory.py ]] || refuse STORAGE_INVENTORY_TOOL_INVALID
+}
+
+validate_selinux_preconditions () {
+  local system_library=$1 storage_root=$2 enforcement reference label
+
+  command -v getenforce >/dev/null || return 0
+  enforcement=$(getenforce 2>/dev/null) || refuse SELINUX_STATE_UNREADABLE
+  validated_selinux_enforcement=$enforcement
+  case $enforcement in
+    Disabled|Permissive) return 0 ;;
+    Enforcing) ;;
+    *) refuse SELINUX_STATE_UNRECOGNIZED ;;
+  esac
+  command -v chcon >/dev/null || refuse SELINUX_CHCON_MISSING
+  command -v restorecon >/dev/null || refuse SELINUX_RESTORECON_MISSING
+  reference=$storage_root
+  [[ -e $reference ]] || reference=$(dirname "$storage_root")
+  for reference in /usr/libexec/fprintd "$system_library" /run "$reference"; do
+    label=$(ls -Zd -- "$reference" 2>/dev/null) || refuse SELINUX_REFERENCE_UNREADABLE
+    [[ $label != \?* ]] || refuse SELINUX_REFERENCE_UNLABELED
+  done
 }
 
 run_authorized_live () {
@@ -196,6 +272,7 @@ run_authorized_live () {
   local same_match_count different_no_match_count
   local storage_existed=false service_touched=false before_inventory_ready=false
   local unit_before_ready=false system_library_before_ready=false
+  local staging_started=false
   [[ $EUID -eq 0 ]] || refuse LIVE_REQUIRES_ROOT
   state="$candidate/d282-01-candidate.state"
   [[ $candidate == /tmp/goodix-d282-01-candidate.* && -f $state && ! -L $candidate ]] || refuse CANDIDATE_INVALID
@@ -205,29 +282,25 @@ run_authorized_live () {
   verify_baseline "$baseline"
   [[ $(sha256sum "$candidate/d282-01-artifacts.sha256" | awk '{print $1}') == "$manifest" ]] || refuse MANIFEST_DRIFT
   (cd "$candidate" && sha256sum -c d282-01-artifacts.sha256) || refuse ARTIFACT_DRIFT
-  user=$(consume_grant "$grant" "$baseline" "$expected_id")
+  validate_grant "$grant" "$baseline" "$expected_id"
+  user=$validated_grant_user
+  validate_live_tooling
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
   result="/var/tmp/goodix-d282-01-results/${stamp}-${baseline:0:12}"
-  private="$result/private"; install -d -m 0700 "$private"
-  { echo D282_01_RESULT=FAIL_PENDING_AUDIT; echo "D282_01_BASELINE_SHA=$baseline"; } >"$result/summary.env"
-  chmod 0600 "$result/summary.env"
   runtime="/run/goodix-d282-01/${stamp}-${baseline:0:12}"
   owned="$storage_root/.goodix-d282-01-${stamp}-${baseline:0:12}"
   [[ ! -e $runtime && ! -e $owned && ! -e $dropin ]] || refuse STAGING_COLLISION
   service_before=$(systemctl is-active fprintd.service 2>/dev/null || true)
   [[ $service_before == active || $service_before == inactive ]] || refuse FPRINTD_INITIAL_STATE_UNSAFE
   [[ -d $storage_root ]] && storage_existed=true
-  system_library=$(readlink -f /usr/lib64/libfprint-2.so.2)
+  system_library=$(readlink -f /usr/lib64/libfprint-2.so.2) || refuse SYSTEM_LIBFPRINT_MISSING
   [[ -f $system_library ]] || refuse SYSTEM_LIBFPRINT_MISSING
-  system_library_before=$(sha256sum "$system_library" | awk '{print $1}')
-  since=$(date --iso-8601=seconds)
-  systemctl cat fprintd.service >"$private/unit.before"
-  unit_before=$(sha256sum "$private/unit.before" | awk '{print $1}')
-  "$script_dir/d282_storage_inventory.py" "$storage_root" "$private/storage.before.json" \
-    --exclude-name "${owned##*/}" >"$private/storage.before.env"
-  before_inventory_ready=true
-  unit_before_ready=true
-  system_library_before_ready=true
+  system_library_before=$(sha256sum "$system_library" | awk '{print $1}') || refuse SYSTEM_LIBFPRINT_HASH_FAILED
+  validate_selinux_preconditions "$system_library" "$storage_root"
+  private="$result/private"
+  install -d -m 0700 "$private" || refuse RESULT_DIRECTORY_CREATE_FAILED
+  { echo D282_01_RESULT=FAIL_PENDING_AUDIT; echo "D282_01_BASELINE_SHA=$baseline"; } >"$result/summary.env" || refuse RESULT_SUMMARY_CREATE_FAILED
+  chmod 0600 "$result/summary.env" || refuse RESULT_SUMMARY_MODE_FAILED
   cleanup_live () {
     local exit_status=$?
     local rollback=true service_rollback=true staging_rollback=true
@@ -241,24 +314,26 @@ run_authorized_live () {
     if [[ $service_touched == true ]]; then
       systemctl stop fprintd.service >/dev/null 2>&1 || service_rollback=false
     fi
-    if [[ -e $dropin || -L $dropin ]]; then
-      rm -f -- "$dropin" || staging_rollback=false
-    fi
-    rmdir "$(dirname "$dropin")" 2>/dev/null || true
-    if [[ $service_touched == true ]]; then
-      systemctl daemon-reload >/dev/null 2>&1 || service_rollback=false
-      if [[ $service_before == active ]]; then
-        systemctl start fprintd.service >/dev/null 2>&1 || service_rollback=false
+    if [[ $staging_started == true ]]; then
+      if [[ -e $dropin || -L $dropin ]]; then
+        rm -f -- "$dropin" || staging_rollback=false
       fi
-    fi
-    if [[ -e $owned || -L $owned ]]; then
-      find "$owned" -xdev -depth -delete 2>/dev/null || storage_rollback=false
-    fi
-    if [[ $storage_existed == false ]]; then
-      rmdir "$storage_root" 2>/dev/null || storage_rollback=false
-    fi
-    if [[ -e $runtime || -L $runtime ]]; then
-      find "$runtime" -xdev -depth -delete 2>/dev/null || staging_rollback=false
+      rmdir "$(dirname "$dropin")" 2>/dev/null || true
+      if [[ $service_touched == true ]]; then
+        systemctl daemon-reload >/dev/null 2>&1 || service_rollback=false
+        if [[ $service_before == active ]]; then
+          systemctl start fprintd.service >/dev/null 2>&1 || service_rollback=false
+        fi
+      fi
+      if [[ -e $owned || -L $owned ]]; then
+        find "$owned" -xdev -depth -delete 2>/dev/null || storage_rollback=false
+      fi
+      if [[ $storage_existed == false ]]; then
+        rmdir "$storage_root" 2>/dev/null || storage_rollback=false
+      fi
+      if [[ -e $runtime || -L $runtime ]]; then
+        find "$runtime" -xdev -depth -delete 2>/dev/null || staging_rollback=false
+      fi
     fi
     if [[ $before_inventory_ready == true ]]; then
       "$script_dir/d282_storage_inventory.py" "$storage_root" "$private/storage.after.json" \
@@ -288,6 +363,8 @@ run_authorized_live () {
     echo "STAGING_REMOVED=$staging_rollback" >>"$result/summary.env"
     echo "SYSTEM_LIBFPRINT_UNCHANGED=$library_rollback" >>"$result/summary.env"
     echo "RUN_RETURN_CODE=$rc" >>"$result/summary.env"
+    echo "GRANT_CONSUMED=$grant_consumed" >>"$result/summary.env"
+    echo "RETRY_AUTHORIZED=false" >>"$result/summary.env"
     echo "ROLLBACK_COMPLETE=$rollback" >>"$result/summary.env"
     echo "PREEXISTING_STORAGE_UNCHANGED=$storage_rollback" >>"$result/summary.env"
     echo "REAL_USB_ENUMERATION_ATTEMPTED=$real_usb_enumeration_attempted" >>"$result/summary.env"
@@ -297,6 +374,17 @@ run_authorized_live () {
   trap cleanup_live EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
+  since=$(date --iso-8601=seconds) || refuse HOST_CLOCK_FAILED
+  systemctl cat fprintd.service >"$private/unit.before" || refuse UNIT_SNAPSHOT_FAILED
+  unit_before=$(sha256sum "$private/unit.before" | awk '{print $1}') || refuse UNIT_SNAPSHOT_HASH_FAILED
+  unit_before_ready=true
+  "$script_dir/d282_storage_inventory.py" "$storage_root" "$private/storage.before.json" \
+    --exclude-name "${owned##*/}" >"$private/storage.before.env" || refuse STORAGE_INVENTORY_FAILED
+  before_inventory_ready=true
+  system_library_before_ready=true
+  prepare_grant_claim "$expected_id"
+  consume_validated_grant "$grant"
+  staging_started=true
   install -d -m 0700 "$runtime" "$owned" "$(dirname "$dropin")"
   install -m 0600 "$candidate/libfprint-2.so.2.0.0" \
     "$candidate/libgusb.so.2" \
@@ -309,7 +397,7 @@ run_authorized_live () {
   printf '#!/bin/sh\nexport LD_LIBRARY_PATH=%s\nexport STATE_DIRECTORY=%s\nexport FP_DRIVERS_ALLOWLIST=goodix_27c6_5125\nexec /usr/libexec/fprintd\n' \
     "$runtime" "$owned" >"$runtime/launch-fprintd"
   chmod 0700 "$runtime/launch-fprintd"
-  if command -v getenforce >/dev/null && [[ $(getenforce) == Enforcing ]]; then
+  if [[ $validated_selinux_enforcement == Enforcing ]]; then
     chcon --reference=/usr/libexec/fprintd "$runtime/launch-fprintd"
     for raw in "$runtime"/*.so.*; do chcon --reference=/usr/lib64/libfprint-2.so.2 "$raw"; done
     restorecon -RF "$owned"
