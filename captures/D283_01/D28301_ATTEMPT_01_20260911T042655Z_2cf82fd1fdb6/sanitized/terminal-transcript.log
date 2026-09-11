@@ -1,0 +1,29 @@
+libfprint-2.so.2.0.0: OK
+libgusb.so.2: OK
+libopencv_core.so.413: OK
+libopencv_features2d.so.413: OK
+libopencv_flann.so.413: OK
+libopencv_imgproc.so.413: OK
+d283-pam-confdir-runner: OK
+pam.d/goodix-d283-01: OK
+RISULTATI_PRIVATI=/var/tmp/goodix-d283-01-results/20260911T042655Z-2cf82fd1fdb6
+Warning: The unit file, source configuration file or drop-ins of fprintd.service changed on disk. Run 'systemctl daemon-reload' to reload units.
+PHASE_A=Enrollment indice destro: otto contatti, nessuna ripetizione extra.
+Confermare il dito enrollment digitando DESTRO: Using device /net/reactivated/Fprint/Device/0
+Enrolling right-index-finger finger.
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-completed
+PHASE_B=PAM dedicato: un solo contatto dell'indice DESTRO registrato.
+Nessun login o comando sudo userà l'impronta; max-tries PAM è 1.
+Confermare il dito fisico digitando INDICE DESTRO: PAM: Place your right index finger on the fingerprint reader
+D283_01_PAM_START_CONFDIR_RETURN_CODE=0
+D283_01_PAM_AUTHENTICATE_RETURN_CODE=0
+D283_01_PAM_END_RETURN_CODE=0
+PHASE_C=Delete del solo template D283 isolato.
+RISULTATI=/var/tmp/goodix-d283-01-results/20260911T042655Z-2cf82fd1fdb6

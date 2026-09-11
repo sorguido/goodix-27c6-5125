@@ -170,10 +170,10 @@ class D28203OfflineContract(unittest.TestCase):
         self.assertIn("TEMPLATE_INCLUDED_IN_EXPORT=false", self.launcher)
         self.assertNotIn("rm -rf /var/lib/fprint", self.launcher)
 
-    def test_12_d28203_is_closed_and_d283_is_unlocked(self):
+    def test_12_d28203_and_completed_d283_are_closed(self):
         self.assertIn("d28203_live_closed=true", self.launcher)
         self.assertEqual(self.launcher.count("D282_03_LIVE_CLOSED_DO_NOT_RERUN"), 2)
-        self.assertIn("d283_live_standby=false", self.d283)
+        self.assertIn("d283_live_closed=true", self.d283)
 
     def test_13_operator_entrypoint_is_direct(self):
         operator = function_slice(self.launcher, "operator_d28203_run ()", "offline_preflight ()")

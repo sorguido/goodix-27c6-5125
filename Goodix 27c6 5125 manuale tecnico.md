@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D282/02 matcher ordine/re-entry pronto offline; Human Gate target
+### Stato corrente — D283/01 PAM dedicato chiuso live; decisione integrazione aperta
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -498,7 +498,7 @@ export pre-action senza trial; il preflight esercita il medesimo helper sulla
 candidate realmente compilata. Esperimento, matcher, threshold, preprocessing,
 protocollo e standby D283 restano invariati.
 
-PAM resta fuori D282. D283/01 ha ora chiuso offline il percorso operatore per
+PAM resta fuori D282. D283/01 aveva chiuso offline il percorso operatore per
 un servizio PAM dedicato `goodix-d283-01`, con regola esatta
 `auth required /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45`.
 Il runner chiama `pam_start_confdir()`, `pam_authenticate()` e `pam_end()`:
@@ -517,16 +517,41 @@ positiva dello stesso indice destro attraverso il driver target entro
 riesaminano `operator.log`, codici PAM e audit fprintd esportati e si cambia il
 metodo prima di una nuova run equivalente.
 
-La run è limitata a due action biometriche e nove contatti: otto per enrollment
-e uno per PAM. Verifica manifest e provenance, NEVRA esatta, cardinalità,
-SELinux e mapping della candidate prima e dopo il restart; richiede zero
-retry/reopen/reset/clear-halt/famiglie persistenti note e rollback completo.
-Una verifica PAM sul target, l'accesso USB e lo staging con `sudo` restano
-Human Gate e non sono stati eseguiti dall'AI. Il disegno, l'implementazione e
-la closure offline D283 sono conservati, ma entrambi gli entrypoint live
-rifiutano ora fail-closed con
-`D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED`: la live PAM resta in
-standby finché l'evidenza D282/02 non è riesaminata.
+Attempt 01 D283/01 è stata eseguita manualmente sulla baseline
+`2cf82fd1fdb613cc44c997c4f1df74f582dfc376`. Gli originali sanitizzati
+byte-identici sono preservati in
+`captures/D283_01/D28301_ATTEMPT_01_20260911T042655Z_2cf82fd1fdb6/sanitized/`.
+L'auditor hash-pinned ricalcola i digest e valida in modo indipendente summary,
+transcript, epoch, PAM e telemetria SIGFM.
+
+**OBSERVED:** l'enrollment dell'indice destro completa otto stage senza retry.
+Dopo un restart del daemon, il servizio dedicato `goodix-d283-01` restituisce
+zero da `pam_start_confdir()`, `pam_authenticate()` e `pam_end()`. La singola
+VERIFY estrae 142 keypoint e SIGFM fa match sul primo sample con score 1116,
+rispetto al threshold 40. Il delete rimuove il solo template isolato.
+
+**VERIFIED:** le tre epoch distinte sono ENROLL, VERIFY e NONE/delete; le prime
+due consumano esattamente due action e due handshake TLS, con 203 + 75 = 278
+submit reali. Retry, reopen, reset, clear-halt e famiglie persistenti note sono
+zero; tutte le epoch sono drenate e context-closed. Servizio e staging sono
+ripristinati, libreria di sistema e storage preesistente restano invariati,
+rollback e return code sono zero. Il template non è esportato.
+
+Il `D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING` rimasto nel solo `operator.log`
+storico è verificato dal control-flow come marker iniziale emesso
+incondizionatamente prima dello staging, non come outcome di failure. Il
+summary finale PASS non contiene una failure phase né un failure return code.
+La semantica è normalizzata come `INITIALIZATION_ONLY_NOT_RUN_OUTCOME`; il
+launcher corrente emette `D283_01_PROGRESS_PHASE` e riserva
+`D283_01_FAILURE_PHASE` ai failure path reali.
+
+D283/01 è `PASS_LIVE_CLOSED` e non va rieseguito. Prova il percorso PAM
+dedicato target, non login, sudo biometrico, affidabilità statistica o assenza
+assoluta di ogni effetto persistente sconosciuto. Il rischio
+`SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE` resta valido dalle osservazioni
+D282/01 e D282/02. Il prossimo boundary è `PROJECT_INTEGRATION_DECISION`: va
+scelto il passo reale meno invasivo, progressivo e reversibile, mantenendo un
+percorso di autenticazione alternativo.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -818,7 +843,12 @@ D282_03_ATTEMPT_02_TRIALS_TSV_SHA256=0eac5367ef03f2b0dbfcd949f82b9ca927ddbb9ddda
 D282_03_ATTEMPT_02_TERMINAL_TRANSCRIPT_SHA256=d93402647e80ebb5f17ec5cf15cbff2a99c90ff9366279dd7f5338c5039597b6
 D282_03_ATTEMPT_02_STATISTICAL_GENERALIZATION_ALLOWED=false
 SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE=RESIDUAL_RISK_FROM_D282_01_AND_D282_02
-D283_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED
+D283_01_OUTCOME=PASS_LIVE_CLOSED_BY_ATTEMPT_01
+D283_01_ATTEMPT_01_BASELINE_SHA=2cf82fd1fdb613cc44c997c4f1df74f582dfc376
+D283_01_ATTEMPT_01_EVIDENCE_AUDIT=PASS_HASH_PINNED
+D283_01_PAM_AUTHENTICATE=PASS_LIVE
+D283_01_SIGFM_MATCH_OBSERVED_MAX_SCORE=1116
+D283_01_ROLLBACK_COMPLETE=true
 D283_01_D282_PREREQUISITE=PASS_D282_03_LIVE_CLOSED
 D283_01_PAM_SERVICE=goodix-d283-01
 D283_01_PAM_MODULE=/usr/lib64/security/pam_fprintd.so
@@ -830,8 +860,8 @@ D283_01_REAL_LOGIN_IN_SCOPE=false
 D283_01_SUDO_BIOMETRIC_AUTHENTICATION_IN_SCOPE=false
 D283_01_ETC_PAM_D_WRITE_COUNT=0
 D283_01_SYSTEM_AUTH_WRITE_COUNT=0
-D283_01_OFFLINE_CONTRACT_MATRIX=16/16_PASS
-D283_01_COMBINED_REGRESSION_MATRIX=118/118_PASS
+D283_01_OFFLINE_CONTRACT_MATRIX=20/20_PASS
+D283_01_COMBINED_REGRESSION_MATRIX=122/122_PASS
 D283_01_REAL_LIBPAM_PERMIT_CONFDIR=PASS_HOST_ONLY
 D283_01_CANDIDATE_BUILD=PASS_OFFLINE
 D283_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
@@ -848,9 +878,12 @@ D283_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D283_01_TEMPLATE_INCLUDED_IN_EXPORT=false
 D283_01_OPERATOR_KIT=operator_kit/d283-01-pam-dedicated
 D283_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
-D283_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
-D283_01_LIVE_STANDBY=false
-D283_01_LIVE_ENTRYPOINT_ENABLED=true
+D283_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
+D283_01_LIVE_ENTRYPOINT_CLOSED=true
+D283_01_LIVE_ENTRYPOINT_ENABLED=false_DO_NOT_RERUN
+D283_01_LEGACY_FAILURE_PHASE_MARKER=INITIALIZATION_ONLY_NOT_RUN_OUTCOME
+D283_01_CURRENT_PROGRESS_MARKER_CORRECTIVE=PASS_OFFLINE
+D283_01_AUTONOMOUS_RERUN_ALLOWED=false
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -883,7 +916,7 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=HUMAN_GATE_D283_01_DEDICATED_PAM_SINGLE_VERIFY
+NEXT_PRIMARY_BOUNDARY=PROJECT_INTEGRATION_DECISION
 NEXT_BOUNDARY_AFTER_D283_01_REVIEW=PROJECT_INTEGRATION_DECISION
 ```
 
@@ -907,6 +940,10 @@ Report ed evidenze correnti:
 `captures/D282_03/D28203_ATTEMPT_02_20260910T222713Z_4a3ee4bb96f6/sanitized/`,
 `analysis/D283/D283_01_pam_dedicated_boundary.md`,
 `analysis/D283/D283_01_OFFLINE_RESULT.env`,
+`analysis/D283/D283_01_attempt_01_post_live_review.md`,
+`analysis/D283/D283_01_ATTEMPT_01_NORMALIZED.env`,
+`analysis/D283/d283_01_attempt_01_evidence_audit.py`,
+`captures/D283_01/D28301_ATTEMPT_01_20260911T042655Z_2cf82fd1fdb6/sanitized/`,
 `operator_kit/d283-01-pam-dedicated/`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,

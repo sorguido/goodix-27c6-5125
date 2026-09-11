@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "operator_kit/d283-01-pam-dedicated"
 D282 = ROOT / "operator_kit/d282-01-fprintd-target/run-d282-01.sh"
 PAM_SOURCE = ROOT / "reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c"
+CAPTURE = (ROOT / "captures/D283_01" /
+           "D28301_ATTEMPT_01_20260911T042655Z_2cf82fd1fdb6/sanitized")
 
 
 def function_slice(text: str, start: str, end: str) -> str:
@@ -52,9 +54,9 @@ class D283OfflineContract(unittest.TestCase):
                       self.kit)
         self.assertNotIn("/etc/pam.d/login", self.kit)
         self.assertNotIn("/etc/pam.d/sudo", self.kit)
-        self.assertIn("d283_live_standby=false", self.kit)
+        self.assertIn("d283_live_closed=true", self.kit)
         self.assertEqual(
-            self.kit.count("D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED"),
+            self.kit.count("D283_01_LIVE_CLOSED_DO_NOT_RERUN"),
             2)
 
     def test_05_live_budget_is_two_actions_and_nine_contacts(self):
@@ -192,6 +194,39 @@ class D283OfflineContract(unittest.TestCase):
         export = function_slice(self.kit, "export_d283_results ()", "operator_d283_run ()")
         self.assertIn("NOT_AVAILABLE_BEFORE_RESULT_INITIALIZATION", export)
         self.assertIn("copy_d283_result_set", export)
+
+    def test_17_progress_marker_is_not_a_failure_marker(self):
+        live = function_slice(self.kit, "run_d283_live ()", "export_d283_results ()")
+        staging = live.index("live_staging_started=true")
+        after_staging = live[staging:live.index("install -d -m 0700", staging)]
+        self.assertIn("D283_01_PROGRESS_PHASE=PRE_SENSOR_STAGING", after_staging)
+        self.assertNotIn("echo D283_01_FAILURE_PHASE", after_staging)
+
+    def test_17b_closed_live_entrypoints_refuse_before_candidate_or_staging(self):
+        live = function_slice(self.kit, "run_d283_live ()", "export_d283_results ()")
+        operator = function_slice(
+            self.kit, "operator_d283_run ()", "offline_preflight ()")
+        self.assertLess(live.index("D283_01_LIVE_CLOSED_DO_NOT_RERUN"),
+                        live.index("live_result="))
+        self.assertLess(operator.index("D283_01_LIVE_CLOSED_DO_NOT_RERUN"),
+                        operator.index("prepare_d283_candidate"))
+        self.assertIn("D283_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN", self.kit)
+
+    def test_18_hash_pinned_attempt_01_evidence(self):
+        from analysis.D283.d283_01_attempt_01_evidence_audit import audit_capture
+        audit_capture(CAPTURE)
+
+    def test_19_evidence_audit_rejects_semantic_tampering(self):
+        from analysis.D283.d283_01_attempt_01_evidence_audit import audit_capture
+        with tempfile.TemporaryDirectory(prefix="goodix-d283-evidence-") as td:
+            copy = Path(td)
+            for source in CAPTURE.iterdir():
+                (copy / source.name).write_bytes(source.read_bytes())
+            summary = copy / "summary.env"
+            summary.write_text(summary.read_text().replace(
+                "OBSERVED_RETRY_COUNT=0", "OBSERVED_RETRY_COUNT=1"))
+            with self.assertRaisesRegex(ValueError, "OBSERVED_RETRY_COUNT"):
+                audit_capture(copy, enforce_hashes=False)
 
 
 if __name__ == "__main__":

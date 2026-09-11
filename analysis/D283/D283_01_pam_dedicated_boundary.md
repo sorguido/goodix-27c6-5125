@@ -2,9 +2,9 @@
 # D283/01 — servizio PAM dedicato, primo boundary target
 
 ```text
-OUTCOME=READY_OFFLINE_HUMAN_REQUIRED
-ADVANCEMENT=DEDICATED_PAM_CONFDIR_MAX_TRIES_1_OPERATOR_PATH
-EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_LIBPAM_AND_CANDIDATE_BUILD
+OUTCOME=PASS_LIVE_CLOSED_BY_ATTEMPT_01
+ADVANCEMENT=REAL_DEDICATED_PAM_TARGET_AUTHENTICATION_COMPLETED
+EXECUTABLE_CLOSURE=PASS_LIVE_WITH_HASH_PINNED_REVIEW_AND_ROLLBACK
 RESIDUAL_BLOCKER_OR_RISK=SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE
 CANONICAL_DOCUMENTATION=GOODIX_TECHNICAL_MANUAL_UPDATED
 REVIEW_SET=GIT_NATIVE
@@ -30,9 +30,9 @@ temporaneo `pam_permit` e passa contro `libpam.so.0`; il simbolo
 fprintd Fedora 44 interpreta `max-tries=`, inizializza il contatore con tale
 valore, lo decrementa dopo un no-match e restituisce `PAM_MAXTRIES` a zero.
 
-La futura run non usa PAM per ottenere privilegi: `sudo` serve soltanto ad
-avviare manualmente staging e rollback. Nessun login o comando sudo viene
-autenticato biometricamente. Il percorso crea storage fprintd isolato,
+La run non ha usato PAM per ottenere privilegi: `sudo` è servito soltanto ad
+avviare manualmente staging e rollback. Nessun login o comando sudo è stato
+autenticato biometricamente. Il percorso ha creato storage fprintd isolato,
 esegue un enrollment da otto contatti, riavvia il daemon e chiama una sola
 conversazione PAM con l'indice destro. Poi elimina il template host-only e
 ripristina servizio, drop-in, runtime e storage.
@@ -43,7 +43,7 @@ clear-halt/persistenza nota, backend drenato e context chiuso. Il profilo
 production continua inoltre a respingere una seconda action nello stesso open
 epoch prima di generazione, TLS o submit USB.
 
-La candidate e il servizio PAM sono hash-pinned; full SHA, branch
+La candidate e il servizio PAM erano hash-pinned; full SHA, branch
 `development`, allineamento a `origin/development`, worktree live-critical,
 NEVRA `fprintd-pam-1.94.5-5.fc44.x86_64`, linkage, cardinalità target,
 SELinux, libreria e storage vengono verificati prima dello staging. Dopo il
@@ -61,8 +61,16 @@ verifica l'export pre-action. Enrollment e PAM hanno conferme fisiche separate.
 La closure positiva richiede inoltre nove estrazioni SIGFM, un solo outcome
 matcher `match`, score osservato almeno pari a threshold e un solo epoch VERIFY.
 
-Un eventuale fallimento PAM con il dito corretto resta ambiguo finché non si
-leggono return code PAM e telemetria SIGFM: D282/01 e D282/02 hanno già mostrato
-un false non-match same-finger occasionale. Il kit esporta entrambi e non
-autorizza retry. La live PAM target, USB e staging privilegiato sono ora il
-prossimo Human Gate; l'AI non li esegue.
+Un eventuale fallimento PAM con il dito corretto sarebbe rimasto ambiguo finché
+non si fossero letti return code PAM e telemetria SIGFM: D282/01 e D282/02
+hanno già mostrato un false non-match same-finger occasionale. Attempt 01 ha
+invece osservato `pam_authenticate()=0` e un match SIGFM al primo sample con
+score 1116 su threshold 40. Le tre epoch ENROLL/VERIFY/NONE rispettano budget
+e safety; delete e rollback sono completi. Hash, normalizzazione e limiti della
+prova sono verificati in `D283_01_attempt_01_post_live_review.md`.
+
+Il marker `D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING` nel vecchio
+`operator.log` era uno stato iniziale emesso incondizionatamente, non l'esito
+della run; il summary finale PASS non lo conserva. Il launcher corrente lo
+rinomina `D283_01_PROGRESS_PHASE` per evitare ambiguità. D283/01 non va
+rieseguito; il prossimo confine è la decisione di integrazione progressiva.

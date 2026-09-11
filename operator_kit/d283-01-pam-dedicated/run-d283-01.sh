@@ -11,7 +11,7 @@ unset D282_LIBRARY_ONLY
 script_dir=$d282_script_dir
 
 live_result_prefix=D283_01
-d283_live_standby=false
+d283_live_closed=true
 d283_critical=(libfprint-driver Rockytkg
   reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 analysis/D282 analysis/D283
@@ -175,8 +175,8 @@ run_d283_live () {
   local matcher_outcome_count matcher_match_count matcher_error_count
   local observed_max_score matched_sample comparison_count
 
-  [[ $d283_live_standby != true ]] ||
-    refuse D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED
+  [[ $d283_live_closed != true ]] ||
+    refuse D283_01_LIVE_CLOSED_DO_NOT_RERUN
 
   live_result=
   live_private=
@@ -300,7 +300,7 @@ run_d283_live () {
   live_staging_started=true
   sed -i 's/^D283_01_FAILURE_PHASE=.*/D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING/' \
     "$live_result/summary.env"
-  echo D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING >>"$live_result/operator.log"
+  echo D283_01_PROGRESS_PHASE=PRE_SENSOR_STAGING >>"$live_result/operator.log"
   install -d -m 0700 "$live_runtime" "$live_owned" "$(dirname "$live_dropin")"
   stage_d283_runtime "$candidate" "$live_runtime" ||
     refuse RUNTIME_LIBRARY_STAGING_FAILED
@@ -524,8 +524,8 @@ export_d283_results () {
 operator_d283_run () {
   local rpm_dir=$1 user baseline transcript result output rc export_rc=1
   local confirmation
-  [[ $d283_live_standby != true ]] ||
-    refuse D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED
+  [[ $d283_live_closed != true ]] ||
+    refuse D283_01_LIVE_CLOSED_DO_NOT_RERUN
   [[ $EUID -ne 0 ]] || refuse OPERATOR_RUN_MUST_BE_UNPRIVILEGED
   command -v sudo >/dev/null || refuse HOST_TOOL_MISSING_sudo
   user=$(id -un) || refuse OPERATOR_USER_UNKNOWN
@@ -597,7 +597,7 @@ offline_preflight () {
   echo D283_01_SUDO_BIOMETRIC_AUTHENTICATION_IN_SCOPE=false
   echo D283_01_BIOMETRIC_ACTION_MAX=2
   echo D283_01_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=9
-  echo D283_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+  echo D283_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo REAL_SENSOR_ACCESSED=false
   echo LIVE_EXECUTION_PERFORMED=false

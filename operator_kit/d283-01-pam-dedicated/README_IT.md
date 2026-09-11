@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D283/01 — verifica PAM dedicata sul target
+# D283/01 — verifica PAM dedicata sul target (chiusa)
 
-> **PRONTO — HUMAN REQUIRED:** D282/03 è stato chiuso dopo review indipendente.
-> Questo kit è il prossimo e unico percorso live consentito, da avviare
-> manualmente come descritto sotto. Non eseguire kit D282 storici.
+> **CHIUSO — NON RIESEGUIRE:** Attempt 01 ha completato la verifica e la review
+> indipendente l'ha classificata `PASS_LIVE_CLOSED`. Gli entrypoint live del kit
+> rifiutano ora fail-closed con `D283_01_LIVE_CLOSED_DO_NOT_RERUN`.
 
 ## Scopo e rischio
 
@@ -37,9 +37,9 @@ il più possibile failure PAM e false reject biometrico.
 - esattamente un Goodix USB `27c6:5125` collegato;
 - nessun altro utilizzo contemporaneo di fprintd.
 
-## Comando unico
+## Comando storico (non eseguire)
 
-Eseguire dalla root del repository come utente normale:
+Il comando usato dall'operatore è conservato soltanto per provenance:
 
 ```bash
 operator_kit/d283-01-pam-dedicated/run-d283-01.sh \
