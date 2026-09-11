@@ -2,10 +2,10 @@
 # D283/01 — servizio PAM dedicato, primo boundary target
 
 ```text
-OUTCOME=READY_OFFLINE_STANDBY
+OUTCOME=READY_OFFLINE_HUMAN_REQUIRED
 ADVANCEMENT=DEDICATED_PAM_CONFDIR_MAX_TRIES_1_OPERATOR_PATH
 EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_LIBPAM_AND_CANDIDATE_BUILD
-RESIDUAL_BLOCKER_OR_RISK=D282_02_MATCHER_ORDER_REENTRY_CHARACTERIZATION_REQUIRED_FIRST
+RESIDUAL_BLOCKER_OR_RISK=SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE
 CANONICAL_DOCUMENTATION=GOODIX_TECHNICAL_MANUAL_UPDATED
 REVIEW_SET=GIT_NATIVE
 ```
@@ -49,8 +49,20 @@ NEVRA `fprintd-pam-1.94.5-5.fc44.x86_64`, linkage, cardinalità target,
 SELinux, libreria e storage vengono verificati prima dello staging. Dopo il
 restart il mapping della candidate viene verificato una seconda volta.
 
-La live PAM target, l'uso di USB e lo staging privilegiato sono Human Gate.
-Una successiva Human Direction ha inoltre posto la live in standby fino alla
-review D282/03 same-finger/different-finger: entrambi gli entrypoint
-live rifiutano fail-closed. Design, implementazione e closure offline restano
-preservati; l'AI non esegue la live.
+La seconda run valida D282/03 ha prodotto 3/3 match same-finger e 3/3 no-match
+different-finger su due processi distinti, con audit safety puliti. La review
+indipendente chiude quel prerequisito preliminare e sblocca D283/01 senza
+attribuirgli significanza statistica.
+
+Prima dello sblocco il percorso è stato ricontrollato contro le failure di
+staging già note: ora copia esplicitamente i sei file runtime prima di creare i
+symlink SONAME, inizializza `operator.log` e `summary.env` prima dello staging e
+verifica l'export pre-action. Enrollment e PAM hanno conferme fisiche separate.
+La closure positiva richiede inoltre nove estrazioni SIGFM, un solo outcome
+matcher `match`, score osservato almeno pari a threshold e un solo epoch VERIFY.
+
+Un eventuale fallimento PAM con il dito corretto resta ambiguo finché non si
+leggono return code PAM e telemetria SIGFM: D282/01 e D282/02 hanno già mostrato
+un false non-match same-finger occasionale. Il kit esporta entrambi e non
+autorizza retry. La live PAM target, USB e staging privilegiato sono ora il
+prossimo Human Gate; l'AI non li esegue.

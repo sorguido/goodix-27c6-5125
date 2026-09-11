@@ -11,6 +11,7 @@ unset D28202_LIBRARY_ONLY
 script_dir=$d28201_script_dir
 
 live_result_prefix=D282_03
+d28203_live_closed=true
 d28203_critical=(libfprint-driver Rockytkg
   reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 analysis/D282
@@ -223,6 +224,7 @@ run_d28203_live () {
   local attempts retry_count reopen_count reset_count clear_halt_count persistent_count
   local extract_count trial position name block_a_pid block_a_invocation_id
   local block_b_pid block_b_invocation_id
+  [[ $d28203_live_closed == false ]] || refuse D282_03_LIVE_CLOSED_DO_NOT_RERUN
   live_result=; live_private=; live_runtime=; live_owned=
   live_storage_root=/var/lib/fprint
   live_dropin=/run/systemd/system/fprintd.service.d/90-goodix-d282-03.conf
@@ -449,6 +451,7 @@ export_d28203_results () {
 
 operator_d28203_run () {
   local rpm_dir=$1 user baseline transcript result output rc export_rc=1 confirmation
+  [[ $d28203_live_closed == false ]] || refuse D282_03_LIVE_CLOSED_DO_NOT_RERUN
   [[ $EUID -ne 0 ]] || refuse OPERATOR_RUN_MUST_BE_UNPRIVILEGED
   command -v sudo >/dev/null || refuse HOST_TOOL_MISSING_sudo
   user=$(id -un) || refuse OPERATOR_USER_UNKNOWN

@@ -1,10 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D283/01 — verifica PAM dedicata sul target
 
-> **STANDBY:** la live D283 è bloccata dal launcher finché D282/03 non avrà
-> completato e superato la review same-finger/different-finger. Conservare il
-> kit e non eseguirlo; design, implementazione e closure offline restano
-> preservati.
+> **PRONTO — HUMAN REQUIRED:** D282/03 è stato chiuso dopo review indipendente.
+> Questo kit è il prossimo e unico percorso live consentito, da avviare
+> manualmente come descritto sotto. Non eseguire kit D282 storici.
 
 ## Scopo e rischio
 
@@ -22,6 +21,11 @@ Sequenza massima:
 Limiti tecnici: due action biometriche, nove contatti, `max-tries=1`, nessun
 retry automatico o implicito autorizzato. Il template FP3 resta nello
 storage isolato durante la run, viene eliminato e non entra nell'export.
+
+Rischio residuo: è già stato osservato un falso non-match occasionale dello
+stesso dito. Se PAM non autentica, non ripetere: allegare l'evidenza. Il kit
+registra sia i return code PAM sia outcome, score e sample SIGFM per distinguere
+il più possibile failure PAM e false reject biometrico.
 
 ## Prerequisiti
 
@@ -44,8 +48,9 @@ operator_kit/d283-01-pam-dedicated/run-d283-01.sh \
 
 Il launcher costruisce e verifica la candidate, mostra il budget e chiede di
 digitare `ESEGUI`. `sudo` è visibile e serve solo al runtime transiente; non è
-autenticato tramite impronta. Prima della conversazione PAM bisogna digitare
-`INDICE DESTRO` e poi presentare esclusivamente l'indice destro registrato.
+autenticato tramite impronta. Prima dell'enrollment bisogna digitare `DESTRO`.
+Prima della conversazione PAM bisogna digitare `INDICE DESTRO` e poi presentare
+esclusivamente l'indice destro registrato.
 
 Al termine, allegare `operator.log` e `summary.env` dalla
 `EXPORT_DIRECTORY`. Il wrapper stampa anche `TERMINAL_TRANSCRIPT`: se la run

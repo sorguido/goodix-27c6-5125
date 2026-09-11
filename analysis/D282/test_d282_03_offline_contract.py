@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 from pathlib import Path
+import csv
 import hashlib
 import subprocess
 import tempfile
@@ -18,6 +19,9 @@ D283 = ROOT / "operator_kit/d283-01-pam-dedicated/run-d283-01.sh"
 ATTEMPT_02 = (ROOT / "captures/D282_02" /
               "D28202_ATTEMPT_02_20260910T220312Z_f868ad127b30" /
               "sanitized")
+D28203_ATTEMPT_02 = (ROOT / "captures/D282_03" /
+                     "D28203_ATTEMPT_02_20260910T222713Z_4a3ee4bb96f6" /
+                     "sanitized")
 FINGERS = ("RIGHT_INDEX", "LEFT_INDEX", "RIGHT_INDEX",
            "LEFT_INDEX", "RIGHT_INDEX", "LEFT_INDEX")
 
@@ -166,9 +170,10 @@ class D28203OfflineContract(unittest.TestCase):
         self.assertIn("TEMPLATE_INCLUDED_IN_EXPORT=false", self.launcher)
         self.assertNotIn("rm -rf /var/lib/fprint", self.launcher)
 
-    def test_12_d283_remains_fail_closed(self):
-        self.assertIn("D282_03_D283_LIVE_STANDBY=true", self.launcher)
-        self.assertIn("d283_live_standby=true", self.d283)
+    def test_12_d28203_is_closed_and_d283_is_unlocked(self):
+        self.assertIn("d28203_live_closed=true", self.launcher)
+        self.assertEqual(self.launcher.count("D282_03_LIVE_CLOSED_DO_NOT_RERUN"), 2)
+        self.assertIn("d283_live_standby=false", self.d283)
 
     def test_13_operator_entrypoint_is_direct(self):
         operator = function_slice(self.launcher, "operator_d28203_run ()", "offline_preflight ()")
@@ -203,6 +208,45 @@ class D28203OfflineContract(unittest.TestCase):
         self.assertIn("non deve essere ripetuto", self.readme)
         self.assertIn("score_vector_complete", self.readme)
         self.assertIn("non un verdetto statistico", self.readme)
+
+    def test_17_attempt_02_semantics_processes_and_safety(self):
+        expected = {
+            "operator.log": "0877ef2aa822107667a5161ce2aadb701a9f46cdf6604e7dd0ffe07674718916",
+            "summary.env": "5186b8bef974f95b661394915c9b1ea78f895be6ad3fa60156fcb571f71d8394",
+            "trials.tsv": "0eac5367ef03f2b0dbfcd949f82b9ca927ddbb9ddda1e3617100f1b2116bd026",
+            "terminal-transcript.log": "d93402647e80ebb5f17ec5cf15cbff2a99c90ff9366279dd7f5338c5039597b6",
+        }
+        for name, digest in expected.items():
+            self.assertEqual(
+                hashlib.sha256((D28203_ATTEMPT_02 / name).read_bytes()).hexdigest(),
+                digest)
+        with (D28203_ATTEMPT_02 / "trials.tsv").open(newline="") as stream:
+            rows = list(csv.DictReader(stream, delimiter="\t"))
+        self.assertEqual(
+            [(row["physical_finger"], row["identity_class"], row["result"])
+             for row in rows],
+            [("RIGHT_INDEX", "SAME", "match"),
+             ("LEFT_INDEX", "DIFFERENT", "no_match"),
+             ("RIGHT_INDEX", "SAME", "match"),
+             ("LEFT_INDEX", "DIFFERENT", "no_match"),
+             ("RIGHT_INDEX", "SAME", "match"),
+             ("LEFT_INDEX", "DIFFERENT", "no_match")])
+        self.assertEqual(len({row["daemon_invocation_id"] for row in rows[:3]}), 1)
+        self.assertEqual(len({row["daemon_invocation_id"] for row in rows[3:]}), 1)
+        self.assertNotEqual(rows[0]["daemon_invocation_id"], rows[3]["daemon_invocation_id"])
+        self.assertEqual([row["observed_max_score"] for row in rows],
+                         ["674", "0", "75", "0", "54", "0"])
+        self.assertTrue(all(row["score_vector_complete"] == "true"
+                            for row in rows if row["identity_class"] == "DIFFERENT"))
+        summary = (D28203_ATTEMPT_02 / "summary.env").read_text()
+        for marker in (
+                "OPEN_EPOCH_COUNT=8", "ACTION_ATTEMPT_COUNT=7",
+                "OBSERVED_RETRY_COUNT=0", "HIDDEN_REOPEN_COUNT=0",
+                "RESET_COUNT=0", "CLEAR_HALT_COUNT=0",
+                "KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=0",
+                "ROLLBACK_COMPLETE=true", "PREEXISTING_STORAGE_UNCHANGED=true",
+                "SYSTEM_LIBFPRINT_UNCHANGED=true", "STAGING_REMOVED=true"):
+            self.assertIn(marker, summary)
 
 
 if __name__ == "__main__":

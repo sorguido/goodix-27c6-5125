@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D282/03 — confronto bilanciato stesso dito / dito diverso
 
+> **CHIUSO — NON ESEGUIRE:** la seconda run valida è stata completata e
+> riesaminata. Gli entrypoint live rifiutano fail-closed. Il next step corrente
+> è il kit D283/01 indicato dal manuale tecnico.
+
 ## Scopo e differenza rispetto all’ultimo tentativo
 
 D282/02 è chiuso e non deve essere ripetuto. D282/03 risponde a una domanda

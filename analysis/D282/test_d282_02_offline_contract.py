@@ -187,8 +187,8 @@ class D28202OfflineContract(unittest.TestCase):
         self.assertIn("TEMPLATE_INCLUDED_IN_EXPORT=false", self.launcher)
         self.assertNotIn("rm -rf /var/lib/fprint", self.launcher)
 
-    def test_12_d283_live_is_fail_closed_in_standby(self):
-        self.assertIn("d283_live_standby=true", self.d283)
+    def test_12_d283_live_is_unlocked_after_d28203_review(self):
+        self.assertIn("d283_live_standby=false", self.d283)
         self.assertEqual(
             self.d283.count("D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED"),
             2)

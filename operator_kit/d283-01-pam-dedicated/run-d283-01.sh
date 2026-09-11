@@ -11,12 +11,14 @@ unset D282_LIBRARY_ONLY
 script_dir=$d282_script_dir
 
 live_result_prefix=D283_01
-d283_live_standby=true
+d283_live_standby=false
 d283_critical=(libfprint-driver Rockytkg
   reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5 analysis/D282 analysis/D283
   operator_kit/d282-01-fprintd-target
+  operator_kit/d282-03-balanced-same-different
   operator_kit/d283-01-pam-dedicated
+  captures/D282_03/D28203_ATTEMPT_02_20260910T222713Z_4a3ee4bb96f6/sanitized
   operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256
   "Goodix 27c6 5125 manuale tecnico.md")
 
@@ -75,6 +77,12 @@ capture_d283_failure () {
 
   journalctl -u fprintd.service --since "$since" --no-pager \
     >"$journal_file" 2>&1 || true
+  if [[ -f $live_result/summary.env ]]; then
+    sed -i "s/^D283_01_RESULT=.*/D283_01_RESULT=FAIL_${phase}/" \
+      "$live_result/summary.env"
+    sed -i "s/^D283_01_FAILURE_PHASE=.*/D283_01_FAILURE_PHASE=${phase}/" \
+      "$live_result/summary.env"
+  fi
   {
     echo "D283_01_FAILURE_PHASE=$phase"
     echo "D283_01_FAILURE_RETURN_CODE=$return_code"
@@ -97,13 +105,75 @@ prepare_d283_candidate () {
   echo "D283_01_CANDIDATE_DIRECTORY=$prepared_candidate"
 }
 
+stage_d283_runtime () {
+  local candidate=$1 runtime=$2 name
+  [[ -d $candidate && ! -L $candidate && -d $runtime && ! -L $runtime ]] ||
+    return 1
+  [[ $runtime == /run/goodix-d283-01/* ||
+     $runtime == /tmp/goodix-d283-01-offline.*/* ]] || return 1
+  [[ -z $(find "$runtime" -mindepth 1 -maxdepth 1 -print -quit) ]] || return 1
+  for name in libfprint-2.so.2.0.0 libgusb.so.2 \
+    libopencv_core.so.413 libopencv_features2d.so.413 \
+    libopencv_flann.so.413 libopencv_imgproc.so.413; do
+    [[ -f $candidate/$name && ! -L $candidate/$name ]] || return 1
+    install -m 0600 "$candidate/$name" "$runtime/$name" || return 1
+  done
+  install -d -m 0700 "$runtime/pam.d" || return 1
+  install -m 0700 "$candidate/d283-pam-confdir-runner" \
+    "$runtime/d283-pam-confdir-runner" || return 1
+  install -m 0600 "$candidate/pam.d/goodix-d283-01" \
+    "$runtime/pam.d/goodix-d283-01" || return 1
+  ln -s libfprint-2.so.2.0.0 "$runtime/libfprint-2.so.2" || return 1
+  ln -s libfprint-2.so.2 "$runtime/libfprint-2.so" || return 1
+}
+
+copy_d283_result_set () {
+  local result=$1 export=$2 owner=$3 group=$4 name source_sha copy_sha
+  [[ -d $result/private && -d $export && ! -L $result && ! -L $export ]] ||
+    return 1
+  for name in operator.log summary.env; do
+    [[ -f $result/$name && ! -L $result/$name ]] || return 1
+    source_sha=$(sha256sum "$result/$name" | awk '{print $1}') || return 1
+    install -m 0600 -o "$owner" -g "$group" "$result/$name" "$export/$name" ||
+      return 1
+    copy_sha=$(sha256sum "$export/$name" | awk '{print $1}') || return 1
+    [[ $source_sha == "$copy_sha" ]] || return 1
+    echo "${name}_SHA256=$source_sha"
+  done
+}
+
+d283_offline_staging_and_export_regressions () {
+  local candidate=$1 work=$2 runtime result export
+  runtime="$work/runtime"
+  install -d -m 0700 "$runtime"
+  stage_d283_runtime "$candidate" "$runtime" || return 1
+  [[ -f $runtime/libfprint-2.so.2.0.0 && ! -L $runtime/libfprint-2.so.2.0.0 &&
+     -L $runtime/libfprint-2.so.2 &&
+     $(readlink "$runtime/libfprint-2.so.2") == libfprint-2.so.2.0.0 &&
+     -L $runtime/libfprint-2.so &&
+     $(readlink "$runtime/libfprint-2.so") == libfprint-2.so.2 &&
+     -x $runtime/d283-pam-confdir-runner &&
+     -f $runtime/pam.d/goodix-d283-01 ]] || return 1
+  result="$work/pre-action-result"; export="$work/pre-action-export"
+  install -d -m 0700 "$result/private" "$export"
+  printf 'D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING\n' >"$result/operator.log"
+  printf 'D283_01_RESULT=FAIL_PRE_SENSOR_STAGING\n' >"$result/summary.env"
+  copy_d283_result_set "$result" "$export" "$(id -u)" "$(id -g)" >/dev/null ||
+    return 1
+  [[ -f $export/operator.log && -f $export/summary.env ]] || return 1
+  echo D283_01_ACTUAL_CANDIDATE_SYMLINK_STAGING_REGRESSION=PASS
+  echo D283_01_PRE_ACTION_RESULT_EXPORT_REGRESSION=PASS
+}
+
 run_d283_live () {
   local candidate=$1 user=$2 d282_state d283_state baseline manifest d283_manifest
   local observed_manifest observed_d283_manifest pam_service_line
   local stamp since daemon_pid raw action_rc enroll_retry_count stored
   local target_count epoch_count enroll_count verify_count cleanup_epoch_count
   local consumed_count attempts retry_count reopen_count reset_count clear_halt_count
-  local persistent_count confirmation
+  local persistent_count confirmation extract_count matcher_start_count
+  local matcher_outcome_count matcher_match_count matcher_error_count
+  local observed_max_score matched_sample comparison_count
 
   [[ $d283_live_standby != true ]] ||
     refuse D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED
@@ -182,6 +252,20 @@ run_d283_live () {
   live_owned="$live_storage_root/.goodix-d283-01-${stamp}-${baseline:0:12}"
   [[ ! -e $live_runtime && ! -e $live_owned && ! -e $live_dropin ]] ||
     refuse STAGING_COLLISION
+  live_private="$live_result/private"
+  install -d -m 0700 "$live_private" || refuse RESULT_DIRECTORY_CREATE_FAILED
+  {
+    echo D283_01_RESULT=FAIL_PENDING_AUDIT
+    echo "D283_01_BASELINE_SHA=$baseline"
+    echo D283_01_PAM_SERVICE=goodix-d283-01
+    echo D283_01_PAM_MAX_TRIES=1
+    echo D283_01_FAILURE_PHASE=PRE_SENSOR_PREFLIGHT
+    echo D283_01_REAL_LOGIN_IN_SCOPE=false
+    echo D283_01_SUDO_BIOMETRIC_AUTHENTICATION_IN_SCOPE=false
+    echo TEMPLATE_INCLUDED_IN_EXPORT=false
+  } >"$live_result/summary.env" || refuse RESULT_SUMMARY_CREATE_FAILED
+  : >"$live_result/operator.log" || refuse RESULT_OPERATOR_LOG_CREATE_FAILED
+  chmod 0600 "$live_result/operator.log" "$live_result/summary.env"
   live_service_before=$(systemctl is-active fprintd.service 2>/dev/null || true)
   [[ $live_service_before == active || $live_service_before == inactive ]] ||
     refuse FPRINTD_INITIAL_STATE_UNSAFE
@@ -192,18 +276,6 @@ run_d283_live () {
   live_system_library_before=$(sha256sum "$live_system_library" | awk '{print $1}') ||
     refuse SYSTEM_LIBFPRINT_HASH_FAILED
   validate_selinux_preconditions "$live_system_library" "$live_storage_root"
-  live_private="$live_result/private"
-  install -d -m 0700 "$live_private" || refuse RESULT_DIRECTORY_CREATE_FAILED
-  {
-    echo D283_01_RESULT=FAIL_PENDING_AUDIT
-    echo "D283_01_BASELINE_SHA=$baseline"
-    echo D283_01_PAM_SERVICE=goodix-d283-01
-    echo D283_01_PAM_MAX_TRIES=1
-    echo D283_01_REAL_LOGIN_IN_SCOPE=false
-    echo D283_01_SUDO_BIOMETRIC_AUTHENTICATION_IN_SCOPE=false
-    echo TEMPLATE_INCLUDED_IN_EXPORT=false
-  } >"$live_result/summary.env" || refuse RESULT_SUMMARY_CREATE_FAILED
-  chmod 0600 "$live_result/summary.env"
   live_cleanup_armed=true
   trap cleanup_live EXIT
   trap 'exit 130' INT
@@ -226,15 +298,12 @@ run_d283_live () {
     refuse TARGET_CARDINALITY_NOT_ONE
 
   live_staging_started=true
+  sed -i 's/^D283_01_FAILURE_PHASE=.*/D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING/' \
+    "$live_result/summary.env"
+  echo D283_01_FAILURE_PHASE=PRE_SENSOR_STAGING >>"$live_result/operator.log"
   install -d -m 0700 "$live_runtime" "$live_owned" "$(dirname "$live_dropin")"
-  install -m 0600 "$candidate"/*.so.* "$live_runtime/"
-  install -d -m 0700 "$live_runtime/pam.d"
-  install -m 0700 "$candidate/d283-pam-confdir-runner" \
-    "$live_runtime/d283-pam-confdir-runner"
-  install -m 0600 "$candidate/pam.d/goodix-d283-01" \
-    "$live_runtime/pam.d/goodix-d283-01"
-  ln -s libfprint-2.so.2.0.0 "$live_runtime/libfprint-2.so.2"
-  ln -s libfprint-2.so.2 "$live_runtime/libfprint-2.so"
+  stage_d283_runtime "$candidate" "$live_runtime" ||
+    refuse RUNTIME_LIBRARY_STAGING_FAILED
   if [[ $validated_selinux_enforcement == Enforcing ]]; then
     for raw in "$live_runtime"/*.so.*; do
       chcon --reference=/usr/lib64/libfprint-2.so.2 "$raw"
@@ -259,10 +328,17 @@ run_d283_live () {
     >"$live_private/maps" || refuse DAEMON_LIBRARY_MAP_MISSING
   [[ $(readlink -f /proc/"$daemon_pid"/exe) == /usr/libexec/fprintd ]] ||
     refuse DAEMON_EXE_DRIFT
-  echo EXACT_LIBRARY_MAP_VERIFIED=true >"$live_result/operator.log"
+  echo EXACT_LIBRARY_MAP_VERIFIED=true >>"$live_result/operator.log"
   chmod 0600 "$live_result/operator.log"
 
   echo "PHASE_A=Enrollment indice destro: otto contatti, nessuna ripetizione extra."
+  printf 'Confermare il dito enrollment digitando DESTRO: '
+  read -r confirmation || refuse ENROLL_PHYSICAL_FINGER_NOT_CONFIRMED
+  [[ $confirmation == DESTRO ]] || refuse ENROLL_PHYSICAL_FINGER_NOT_CONFIRMED
+  {
+    echo ENROLL_PHYSICAL_FINGER=RIGHT_INDEX
+    echo ENROLL_OPERATOR_CONFIRMATION=DESTRO
+  } >>"$live_result/operator.log"
   raw="$live_private/enroll.raw"
   set +e
   timeout --signal=INT --kill-after=20s 1060s \
@@ -351,6 +427,18 @@ run_d283_live () {
       "$since" "$baseline" "$stamp" "$user"
     return 1
   fi
+  grep GOODIX_SIGFM_EXTRACT_AUDIT "$live_private/journal.raw" \
+    >"$live_private/extract-audit.raw" || true
+  grep GOODIX_SIGFM_MATCH_AUDIT "$live_private/journal.raw" \
+    >"$live_private/matcher-audit.raw" || true
+  extract_count=$(wc -l <"$live_private/extract-audit.raw")
+  matcher_start_count=$(grep -c 'event=start' "$live_private/matcher-audit.raw" || true)
+  matcher_outcome_count=$(grep -c 'event=outcome' "$live_private/matcher-audit.raw" || true)
+  matcher_match_count=$(grep -c 'event=outcome result=match' "$live_private/matcher-audit.raw" || true)
+  matcher_error_count=$(grep -c 'event=error' "$live_private/matcher-audit.raw" || true)
+  observed_max_score=$(awk '{for(i=1;i<=NF;i++)if($i~/^score=/){split($i,a,"=");if(a[2]>m)m=a[2]}}END{print m+0}' "$live_private/matcher-audit.raw")
+  matched_sample=$(awk '/event=outcome/{for(i=1;i<=NF;i++)if($i~/^matched_sample=/){split($i,a,"=");print a[2]}}' "$live_private/matcher-audit.raw")
+  comparison_count=$(awk '/event=outcome/{for(i=1;i<=NF;i++)if($i~/^comparisons=/){split($i,a,"=");print a[2]}}' "$live_private/matcher-audit.raw")
   epoch_count=$(wc -l <"$live_private/audit.raw")
   enroll_count=$(grep -c 'action=FPI_DEVICE_ACTION_ENROLL' "$live_private/audit.raw" || true)
   verify_count=$(grep -c 'action=FPI_DEVICE_ACTION_VERIFY' "$live_private/audit.raw" || true)
@@ -365,7 +453,11 @@ run_d283_live () {
   if ! [[ $epoch_count -eq 3 && $enroll_count -eq 1 && $verify_count -eq 1 &&
           $cleanup_epoch_count -eq 1 && $consumed_count -eq 2 && $attempts -eq 2 &&
           $retry_count -eq 0 && $reopen_count -eq 0 && $reset_count -eq 0 &&
-          $clear_halt_count -eq 0 && $persistent_count -eq 0 ]] ||
+          $clear_halt_count -eq 0 && $persistent_count -eq 0 &&
+          $extract_count -eq 9 && $matcher_start_count -eq 1 &&
+          $matcher_outcome_count -eq 1 && $matcher_match_count -eq 1 &&
+          $matcher_error_count -eq 0 && $observed_max_score -ge 40 &&
+          $matched_sample =~ ^[1-8]$ && $comparison_count =~ ^[1-8]$ ]] ||
      [[ $(grep -c 'outstanding=0 drained=1 context_closed=1' "$live_private/audit.raw") -ne 3 ]] ||
      ! verify_current_live_epoch_audit "$live_private/audit.raw" 1; then
     capture_d283_failure FINAL_AUDIT 1 "$live_private/audit.raw" "$since" \
@@ -396,6 +488,12 @@ run_d283_live () {
     echo "RESET_COUNT=$reset_count"
     echo "CLEAR_HALT_COUNT=$clear_halt_count"
     echo "KNOWN_PERSISTENT_FAMILY_ALLOWLIST_COUNT=$persistent_count"
+    echo "SIGFM_EXTRACT_AUDIT_COUNT=$extract_count"
+    echo SIGFM_MATCH_OUTCOME=match
+    echo "SIGFM_MATCH_OBSERVED_MAX_SCORE=$observed_max_score"
+    echo "SIGFM_MATCHED_SAMPLE=$matched_sample"
+    echo "SIGFM_COMPARISON_COUNT=$comparison_count"
+    echo SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE=RESIDUAL_RISK
     echo TEMPLATE_INCLUDED_IN_EXPORT=false
   } >"$live_result/summary.env"
   chmod 0600 "$live_result/operator.log" "$live_result/summary.env"
@@ -404,21 +502,19 @@ run_d283_live () {
 }
 
 export_d283_results () {
-  local result=$1 export name source_sha copy_sha
+  local result=$1 export
   [[ $EUID -eq 0 && ${SUDO_UID:-} =~ ^[0-9]+$ &&
      ${SUDO_GID:-} =~ ^[0-9]+$ ]] || refuse EXPORT_CALLER
-  [[ $result == /var/tmp/goodix-d283-01-results/* && -d $result/private ]] ||
-    refuse EXPORT_SOURCE
+  [[ $result == /var/tmp/goodix-d283-01-results/* ]] || refuse EXPORT_SOURCE
+  if [[ ! -d $result/private ]]; then
+    echo D283_01_RESULTS_EXPORT=NOT_AVAILABLE_BEFORE_RESULT_INITIALIZATION
+    echo TEMPLATE_INCLUDED_IN_EXPORT=false
+    return 0
+  fi
   export=$(mktemp -d /tmp/goodix-d283-01-export.XXXXXX)
   chmod 0700 "$export"
-  for name in operator.log summary.env; do
-    source_sha=$(sha256sum "$result/$name" | awk '{print $1}')
-    install -m 0600 -o "$SUDO_UID" -g "$SUDO_GID" \
-      "$result/$name" "$export/$name"
-    copy_sha=$(sha256sum "$export/$name" | awk '{print $1}')
-    [[ $source_sha == "$copy_sha" ]] || refuse EXPORT_HASH
-    echo "${name}_SHA256=$source_sha"
-  done
+  copy_d283_result_set "$result" "$export" "$SUDO_UID" "$SUDO_GID" ||
+    refuse EXPORT_RESULT_SET
   chown "$SUDO_UID:$SUDO_GID" "$export"
   echo D283_01_RESULTS_EXPORT=PASS_BYTE_IDENTICAL
   echo "EXPORT_DIRECTORY=$export"
@@ -473,16 +569,18 @@ offline_preflight () {
   local rpm_dir=$1 work user result
   [[ $EUID -ne 0 ]] || refuse OFFLINE_PREFLIGHT_MUST_BE_UNPRIVILEGED
   bash -n "$d283_script_dir/run-d283-01.sh"
-  (cd "$root" &&
-    python3 -m unittest -v analysis.D283.test_d283_01_offline_contract)
-  (cd "$root" &&
-    python3 -m unittest analysis.D282.test_d282_01_offline_contract)
+  (cd "$root" && python3 -m unittest -v \
+    analysis.D283.test_d283_01_offline_contract \
+    analysis.D282.test_d282_03_offline_contract \
+    analysis.D282.test_d282_02_offline_contract \
+    analysis.D282.test_d282_01_offline_contract)
   work=$(mktemp -d /tmp/goodix-d283-01-offline.XXXXXX)
   trap 'find "$work" -xdev -depth -delete 2>/dev/null || true' EXIT
   install -d -m 0700 "$work/candidate"
   build_candidate "$root" "$work/candidate" "$rpm_dir"
   abi_preflight "$work/candidate"
   build_pam_runner "$work/candidate"
+  d283_offline_staging_and_export_regressions "$work/candidate" "$work"
   install -d -m 0700 "$work/permit"
   printf 'auth required /usr/lib64/security/pam_permit.so\n' \
     >"$work/permit/goodix-d283-01"
@@ -507,10 +605,12 @@ offline_preflight () {
   find "$work" -xdev -depth -delete
 }
 
-case ${1:-} in
-  --offline-preflight) [[ $# -eq 2 ]] || refuse USAGE; offline_preflight "$2" ;;
-  --operator-run) [[ $# -eq 2 ]] || refuse USAGE; operator_d283_run "$2" ;;
-  --run-live) [[ $# -eq 4 && $3 == --user ]] || refuse USAGE; run_d283_live "$2" "$4" ;;
-  --export-results) [[ $# -eq 2 ]] || refuse USAGE; export_d283_results "$2" ;;
-  *) echo "Uso: $0 --offline-preflight <opencv-rpm-dir> | --operator-run <opencv-rpm-dir>" >&2; exit 2 ;;
-esac
+if [[ ${D283_LIBRARY_ONLY:-false} != true ]]; then
+  case ${1:-} in
+    --offline-preflight) [[ $# -eq 2 ]] || refuse USAGE; offline_preflight "$2" ;;
+    --operator-run) [[ $# -eq 2 ]] || refuse USAGE; operator_d283_run "$2" ;;
+    --run-live) [[ $# -eq 4 && $3 == --user ]] || refuse USAGE; run_d283_live "$2" "$4" ;;
+    --export-results) [[ $# -eq 2 ]] || refuse USAGE; export_d283_results "$2" ;;
+    *) echo "Uso: $0 --offline-preflight <opencv-rpm-dir> | --operator-run <opencv-rpm-dir>" >&2; exit 2 ;;
+  esac
+fi

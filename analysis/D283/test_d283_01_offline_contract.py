@@ -52,7 +52,7 @@ class D283OfflineContract(unittest.TestCase):
                       self.kit)
         self.assertNotIn("/etc/pam.d/login", self.kit)
         self.assertNotIn("/etc/pam.d/sudo", self.kit)
-        self.assertIn("d283_live_standby=true", self.kit)
+        self.assertIn("d283_live_standby=false", self.kit)
         self.assertEqual(
             self.kit.count("D283_LIVE_STANDBY_MATCHER_CHARACTERIZATION_REQUIRED"),
             2)
@@ -144,7 +144,54 @@ class D283OfflineContract(unittest.TestCase):
         self.assertIn("capture_d283_failure PHASE_B_AUDIT", self.kit)
         self.assertIn("capture_d283_failure FINAL_AUDIT", self.kit)
         self.assertIn("D283_01_FAILURE_PHASE", self.kit)
+        self.assertIn('D283_01_RESULT=FAIL_${phase}', self.kit)
         self.assertIn("TEMPLATE_INCLUDED_IN_EXPORT=false", self.kit)
+
+    def test_14_runtime_staging_copies_real_files_before_symlinks(self):
+        names = (
+            "libfprint-2.so.2.0.0", "libgusb.so.2",
+            "libopencv_core.so.413", "libopencv_features2d.so.413",
+            "libopencv_flann.so.413", "libopencv_imgproc.so.413",
+        )
+        with tempfile.TemporaryDirectory(prefix="goodix-d283-candidate-") as cd, \
+             tempfile.TemporaryDirectory(prefix="goodix-d283-01-offline.") as td:
+            candidate, work = Path(cd), Path(td)
+            runtime = work / "runtime"
+            runtime.mkdir()
+            (candidate / "pam.d").mkdir()
+            for name in names:
+                (candidate / name).write_bytes(f"fixture:{name}".encode())
+            (candidate / "libfprint-2.so.2").symlink_to("libfprint-2.so.2.0.0")
+            (candidate / "libfprint-2.so").symlink_to("libfprint-2.so.2")
+            runner = candidate / "d283-pam-confdir-runner"
+            runner.write_text("fixture")
+            runner.chmod(0o700)
+            (candidate / "pam.d/goodix-d283-01").write_text(self.service + "\n")
+            subprocess.run(
+                ["bash", "-c", 'D283_LIBRARY_ONLY=true; source "$0"; stage_d283_runtime "$1" "$2"',
+                 str(KIT / "run-d283-01.sh"), str(candidate), str(runtime)],
+                check=True)
+            self.assertFalse((runtime / "libfprint-2.so.2.0.0").is_symlink())
+            self.assertEqual((runtime / "libfprint-2.so.2").readlink(),
+                             Path("libfprint-2.so.2.0.0"))
+
+    def test_15_success_audit_requires_match_telemetry(self):
+        live = function_slice(self.kit, "run_d283_live ()", "export_d283_results ()")
+        self.assertIn("$extract_count -eq 9", live)
+        self.assertIn("$matcher_start_count -eq 1", live)
+        self.assertIn("$matcher_match_count -eq 1", live)
+        self.assertIn("$observed_max_score -ge 40", live)
+        self.assertIn("SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE=RESIDUAL_RISK", live)
+
+    def test_16_enrollment_confirmation_and_preaction_export(self):
+        live = function_slice(self.kit, "run_d283_live ()", "export_d283_results ()")
+        self.assertLess(live.index("ENROLL_PHYSICAL_FINGER_NOT_CONFIRMED"),
+                        live.index("fprintd-enroll -f"))
+        self.assertIn('D283_01_FAILURE_PHASE=PRE_SENSOR_PREFLIGHT', live)
+        self.assertIn(': >"$live_result/operator.log"', live)
+        export = function_slice(self.kit, "export_d283_results ()", "operator_d283_run ()")
+        self.assertIn("NOT_AVAILABLE_BEFORE_RESULT_INITIALIZATION", export)
+        self.assertIn("copy_d283_result_set", export)
 
 
 if __name__ == "__main__":
