@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D284/01 `sudo` biometrico PASS_LIVE_CLOSED
+### Stato corrente — D285/01 installazione persistente pronta offline; Human Gate
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -632,6 +632,44 @@ prima di preparare una live occorre evitare che il template e il daemon
 condivisi espongano involontariamente il driver anche ai consumer
 `system-auth`/KDE già presenti.
 
+D285/01 chiude questa review architetturale offline. Il sorgente Fedora mostra
+che `pam_fprintd.so` usa sempre il servizio D-Bus globale
+`net.reactivated.Fprint`: non può scegliere un daemon o uno storage per
+servizio PAM. Rendere persistenti candidate e template lasciando
+`with-fingerprint` attivo esporrebbe quindi il percorso anche ai consumer
+`system-auth`, fra cui KScreenLocker, non provati da D284.
+
+La configurazione persistente proposta disabilita reversibilmente
+`with-fingerprint` con backup authselect e verifica che `system-auth` non abbia
+più pam_fprintd e che `fingerprint-auth` fallisca chiuso. Solo il nuovo servizio
+`goodix-d285-01-sudo`, selezionato da un override sudoers per il singolo utente,
+mantiene `pam_fprintd.so max-tries=1 timeout=45` seguito dal fallback password.
+Questo isola i consumer PAM osservati, non ogni client D-Bus autorizzato da
+polkit; riabilitare manualmente `with-fingerprint` durante D285 è vietato.
+
+Il runtime non sostituisce libfprint di sistema. Vive sotto `/usr/local/lib64`
+in un path legato al full SHA; un wrapper `bin_t` verifica a ogni start l'hash
+del daemon Fedora, il manifest dei sei oggetti, i symlink e l'allowlist del solo
+driver. Un update incompatibile rende fprintd fail-closed mentre il fallback
+password resta disponibile.
+
+Il kit richiede assenza totale di storage fprintd preesistente per l'utente,
+installa un solo FP3, ne conserva pathname relativo e hash soltanto nello state
+root-only e prova il percorso dopo restart del daemon con un solo `sudo -v`.
+La disinstallazione cancella il template solo se è ancora l'unico file e
+coincide con entrambi i pin; ogni drift si ferma prima del delete e richiede
+review umana. Anche il failure trap rifiuta delete ambigui e lascia lo stack
+recuperabile. Lo state fissa inoltre gli hash authselect/PAM sudo/libfprint
+originari e l'uninstall ne richiede il ripristino esatto. Il result privato in
+`/var/tmp` viene rimosso dopo un export sanitizzato riuscito.
+
+Il preflight completo ha costruito la candidate reale e verificato ABI,
+manifest, wrapper, drop-in systemd, sudoers e rendering authselect. D285 è
+`26/26 PASS`; la matrice combinata D282–D285 è `176/176 PASS` fuori sandbox.
+Zero enumerazione USB, zero accesso sensore e zero live. Il prossimo confine è
+la singola installazione manuale D285: modifica persistentemente host/PAM e
+raggiunge il sensore, quindi è `HUMAN_REQUIRED` e l'agente si arresta prima.
+
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
 D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
@@ -1009,6 +1047,34 @@ D284_01_REAL_SUBMIT_COUNT=279
 D284_01_ROLLBACK_COMPLETE=true
 D284_01_LIVE_ENTRYPOINT_CLOSED=true
 D284_01_AUTONOMOUS_RERUN_ALLOWED=false
+D285_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_OPERATOR_INSTALL
+D285_01_ARCHITECTURE=PERSISTENT_RUNTIME_SINGLE_USER_SUDO_PAM_SCOPE
+D285_01_PAM_FPRINTD_DBUS_SCOPE=GLOBAL_NET_REACTIVATED_FPRINT
+D285_01_ABSOLUTE_DBUS_CONSUMER_ISOLATION_PROVEN=false
+D285_01_OBSERVED_PAM_CONSUMER_ISOLATION=AUTHSELECT_WITH_FINGERPRINT_DISABLED
+D285_01_PAM_SERVICE=goodix-d285-01-sudo
+D285_01_PAM_MAX_TRIES=1
+D285_01_PASSWORD_FALLBACK_PRESENT=true
+D285_01_SYSTEM_LIBFPRINT_REPLACED=false
+D285_01_RUNTIME_LOCATION=USR_LOCAL_LIB64_SHA_PINNED
+D285_01_TEMPLATE_STATE_EXPORT_ALLOWED=false
+D285_01_UNINSTALL_TEMPLATE_OWNERSHIP=PATH_AND_SHA256_PINNED_EXACTLY_ONE
+D285_01_EXACT_HOST_CONFIG_RESTORE_GATE=SHA256_PINNED
+D285_01_PRIVATE_RESULT_AFTER_SUCCESS=REMOVED_AFTER_SANITIZED_EXPORT
+D285_01_INSTALL_BIOMETRIC_ACTION_MAX=2
+D285_01_INSTALL_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=9
+D285_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D285_01_DAEMON_RESTART_COUNT=1
+D285_01_OFFLINE_CONTRACT_MATRIX=26/26_PASS
+D285_01_COMBINED_REGRESSION_MATRIX=176/176_PASS
+D285_01_CANDIDATE_BUILD=PASS_OFFLINE
+D285_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
+D285_01_SYSTEMD_DROPIN_PARSER=PASS_OFFLINE
+D285_01_AUTHSELECT_RENDER_SCOPE_REDUCTION=PASS_OFFLINE
+D285_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D285_01_OPERATOR_KIT=operator_kit/d285-01-persistent-sudo
+D285_01_INSTALL_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+D285_01_AUTONOMOUS_LIVE_ALLOWED=false
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -1041,8 +1107,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=PERSISTENT_INTEGRATION_ARCHITECTURE_REVIEW
-NEXT_BOUNDARY_AFTER_D284_01_REVIEW=PERSISTENT_INTEGRATION_ARCHITECTURE_REVIEW
+NEXT_PRIMARY_BOUNDARY=D285_01_PERSISTENT_SUDO_INSTALL_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D284_01_REVIEW=D285_01_PERSISTENT_SUDO_INSTALL_HUMAN_GATE
 ```
 
 Report ed evidenze correnti:
@@ -1078,6 +1144,10 @@ Report ed evidenze correnti:
 `captures/D284_01/D28401_ATTEMPT_01_20260911T053552Z_bc478f480be8/sanitized/`,
 `analysis/D284/test_d284_01_offline_contract.py`,
 `operator_kit/d284-01-transient-sudo-pilot/`,
+`analysis/D285/D285_01_persistent_single_user_sudo_boundary.md`,
+`analysis/D285/D285_01_OFFLINE_RESULT.env`,
+`analysis/D285/test_d285_01_offline_contract.py`,
+`operator_kit/d285-01-persistent-sudo/`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,
 `analysis/D282/D282_01_ATTEMPT_05_NORMALIZED.env`,
