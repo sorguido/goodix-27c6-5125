@@ -12,6 +12,15 @@ Il pilot verifica il primo consumer desktop reale dopo la closure D286:
 standalone e non blocca la sessione. Usa però il vero binario KScreenLocker, il
 tema lockscreen installato e il servizio PAM hard-coded `kde-fingerprint`.
 
+La prima invocazione operatore sul commit `69b81c3f6fc4bdbfb86044581324637fd86df9ee`
+si è fermata nel gate pre-live, prima di Polkit, greeter, USB e sensore: nessun
+contatto biometrico D287 è stato consumato. Questo correttivo ripara il pathspec
+multilinea del gate Git e aggiorna il contract dopo un audit target-specific
+dell'aggiornamento Fedora a `kscreenlocker-6.7.5-1.fc44.x86_64` e
+`plasma-workspace-6.7.5-1.fc44.x86_64`. Il QML e i due PAM pertinenti sono
+rimasti byte-identici; i sorgenti greeter rilevanti sono invariati fra i tag
+upstream 6.7.4 e 6.7.5.
+
 Il rischio residuo è un processo grafico in primo piano che può catturare
 temporaneamente input e una VERIFY reale sul sensore. Non digitare la password
 nel form. Se la finestra non appare, non risponde o il sensore mostra un

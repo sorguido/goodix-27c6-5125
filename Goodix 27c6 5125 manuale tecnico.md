@@ -824,8 +824,18 @@ senza saltare direttamente al blocco della sessione: il binario Fedora
 `v6.7.4`, commit `28544d4910d5ea9be6708eb343804fa0018cb8e4`, mostra che il
 greeter istanzia separatamente il PAM password `kde` e il non-interattivo
 `kde-fingerprint`; ogni `tryUnlock()` chiama una sola `pam_authenticate()`.
-Il binario installato 6.7.4 contiene il service name esatto e binario, PAM
-Fedora e QML sono hash-pinned dal kit.
+L'aggiornamento host successivo installa `kscreenlocker-6.7.5-1.fc44.x86_64`
+e `plasma-workspace-6.7.5-1.fc44.x86_64`. Il confronto read-only con il tag
+upstream `v6.7.5`, commit `057b3774d9ad322cfccc2683ea057aed87e0f878`,
+mostra un diff di dodici file limitato a versione, metadata, notifiche e
+traduzioni: `main.cpp`, `greeterapp.cpp`, `pamauthenticator.cpp`,
+`pamauthenticators.cpp` e `greeter/CMakeLists.txt` sono byte-identici tra i due
+tag. La firma presente sul tag 6.7.5 non è dichiarata verificata perché la
+chiave pubblica non era disponibile localmente. Sul target il nuovo binario
+contiene ancora i service name esatti; PAM Fedora e QML sono byte-identici alla
+prima closure. Il contract è stato quindi repinnato solo dopo una verifica
+target-specific di modalità `--testing`, separazione PAM, autenticatore,
+semantica del failure non-interattivo e QML, non sulla sola NEVRA.
 
 Il QML installato avvia gli autenticatori quando il form diventa visibile, ma
 ignora nel proprio failure handler l'errore non-interattivo. Inoltre
@@ -860,6 +870,22 @@ avviata esclusivamente dall'operatore con:
 ```bash
 operator_kit/d287-01-kscreenlocker-testing/run-d287-01.sh --operator-run
 ```
+
+La prima invocazione manuale dell'operatore, sul commit
+`69b81c3f6fc4bdbfb86044581324637fd86df9ee`, si è arrestata nel pre-live gate
+con `KSCREENLOCKER_NEVRA_DRIFT`, prima di `pkexec`, greeter, USB e sensore.
+Nessun contatto biometrico D287 è stato consumato e non esiste nuova evidenza
+device-side. Il messaggio collaterale `analysis/D285: È una directory` ha
+rivelato che la command substitution del controllo Git terminava dopo `--` e
+tentava di eseguire il primo pathspec come comando; in tale forma il dirty gate
+poteva risultare inefficace. Il correttivo nello stesso D287 aggiunge la
+continuazione shell necessaria. Tre fixture con repository Git e remote reali
+provano ora critical set pulito, tracked/untracked dirty fail-closed e mancata
+esecuzione di un pathspec sentinella. La matrice D287 passa `35/35` e la
+regressione cumulativa D282–D287 conta 245 successi e le quattro failure
+host-only note nel sandbox, poi passa `249/249` nell'ambiente host consentito,
+senza `sudo`, greeter, USB o sensore. Lo stesso kit corretto è nuovamente al
+Human Gate; l'AI non ne esegue `--operator-run`.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -1344,8 +1370,21 @@ D287_01_STOP_ON_FIRST_MATCH=true
 D287_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D287_01_REAL_LOCK_SCREEN_IN_SCOPE=false
 D287_01_LOGIN_IN_SCOPE=false
-D287_01_OFFLINE_CONTRACT_MATRIX=32/32_PASS
-D287_01_COMBINED_REGRESSION_MATRIX=246/246_PASS_HOST_ENV
+D287_01_PRELIVE_OPERATOR_RUN=ABORTED_BEFORE_PRIVILEGE_AND_SENSOR
+D287_01_PRELIVE_OPERATOR_BASELINE=69b81c3f6fc4bdbfb86044581324637fd86df9ee
+D287_01_PRELIVE_REFUSAL_REASON=KSCREENLOCKER_NEVRA_DRIFT
+D287_01_SENSOR_CONTACTS_CONSUMED=0
+D287_01_NEW_DEVICE_SIDE_EVIDENCE=false
+D287_01_CORRECTIVE_REQUIRED=true
+D287_01_CORRECTIVE_STATUS=CLOSED_OFFLINE
+D287_01_KSCREENLOCKER_NEVRA=kscreenlocker-6.7.5-1.fc44.x86_64
+D287_01_PLASMA_WORKSPACE_NEVRA=plasma-workspace-6.7.5-1.fc44.x86_64
+D287_01_KSCREENLOCKER_COMPATIBILITY=PASS_OFFLINE_TARGET_SPECIFIC
+D287_01_RELEVANT_GREETER_SOURCE_DIFF=EMPTY
+D287_01_REPOSITORY_GATE_CORRECTED=true
+D287_01_REPOSITORY_GATE_BEHAVIOR_MATRIX=3/3_PASS
+D287_01_OFFLINE_CONTRACT_MATRIX=35/35_PASS
+D287_01_COMBINED_REGRESSION_MATRIX=249/249_PASS_HOST_ENV
 D287_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_HOST_HASHES_PLUS_SYNTHETIC_TELEMETRY
 D287_01_OPERATOR_KIT=operator_kit/d287-01-kscreenlocker-testing
 D287_01_LIVE_EXECUTION=HUMAN_REQUIRED

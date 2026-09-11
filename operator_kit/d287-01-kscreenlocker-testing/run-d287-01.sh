@@ -8,7 +8,7 @@ d287_d286_script="$d287_script_dir/../d286-01-reboot-survival/run-d286-01.sh"
 d287_pam="$d287_script_dir/goodix-d287-01-kde-fingerprint.pam"
 d287_capture_root="$d287_root/captures/D287_01"
 d287_expected_pam_sha=73bed123e2b863a82ea3608b346ba84088428e805bfdf1af1c999720f9851472
-d287_expected_greeter_sha=b9d7ad5798b549c9f9e8c991911f74cb75b4a3b298cbc88b12249151d0726e7c
+d287_expected_greeter_sha=45d5a60737ff966b93f60639a662396956b28d50122741261f4351fef941be48
 d287_expected_kde_pam_sha=7d91b3ad73a998e8b10f9edccd74ba04179a778c4a5e61d9176872f43c7bbac3
 d287_expected_kde_fingerprint_sha=8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437
 d287_expected_lock_qml_sha=328501780ab06cc0497a25ff48c6f027a1abed8506f0969f39a5f8bc6696181c
@@ -55,7 +55,7 @@ d287_verify_repo () {
     d287_refuse HEAD_MISMATCH
   [[ $(git -C "$d287_root" rev-parse origin/development) == "$baseline" ]] ||
     d287_refuse ORIGIN_DEVELOPMENT_MISMATCH
-  [[ -z $(git -C "$d287_root" status --porcelain --untracked-files=all --
+  [[ -z $(git -C "$d287_root" status --porcelain --untracked-files=all -- \
     "${d287_critical[@]}") ]] || d287_refuse LIVE_CRITICAL_DIRTY
 }
 
@@ -67,9 +67,9 @@ d287_verify_hash () {
 }
 
 d287_validate_host_contract () {
-  [[ $(rpm -q kscreenlocker) == kscreenlocker-6.7.4-1.fc44.x86_64 ]] ||
+  [[ $(rpm -q kscreenlocker) == kscreenlocker-6.7.5-1.fc44.x86_64 ]] ||
     d287_refuse KSCREENLOCKER_NEVRA_DRIFT
-  [[ $(rpm -q plasma-workspace) == plasma-workspace-6.7.4-2.fc44.x86_64 ]] ||
+  [[ $(rpm -q plasma-workspace) == plasma-workspace-6.7.5-1.fc44.x86_64 ]] ||
     d287_refuse PLASMA_WORKSPACE_NEVRA_DRIFT
   [[ $(rpm -q pam) == pam-1.7.2-2.fc44.x86_64 ]] || d287_refuse PAM_NEVRA_DRIFT
   [[ $(rpm -q fprintd-pam) == fprintd-pam-1.94.5-5.fc44.x86_64 ]] ||
