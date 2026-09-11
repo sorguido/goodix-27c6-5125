@@ -500,8 +500,8 @@ case ${1:-} in
     ;;
   --root-attempt-audit)
     [[ $# -eq 13 && $2 == --user && $4 == --cursor && $6 == --attempt &&
-       $8 == --sudo-rc && $10 == --fallback-blocked &&
-       $12 == --watchdog-timeout ]] || d286_refuse USAGE
+       $8 == --sudo-rc && ${10} == --fallback-blocked &&
+       ${12} == --watchdog-timeout ]] || d286_refuse USAGE
     d286_root_attempt_audit "$3" "$5" "$7" "$9" "$11" "$13"
     ;;
   *)
