@@ -10,6 +10,7 @@ source "$d284_script_dir/run-d284-01.sh"
 unset D284_LIBRARY_ONLY
 
 operation=D285_01_PERSISTENT_SINGLE_USER_SUDO_INSTALL
+d285_install_closed=true
 d285_state=/etc/goodix-27c6-5125/d285-01.state
 d285_state_dir=/etc/goodix-27c6-5125
 d285_runtime_parent=/usr/local/lib64/goodix-27c6-5125
@@ -403,6 +404,8 @@ d285_install () {
   local stamp since daemon_sha daemon_pid raw action_rc confirmation
   local authselect_now template_relative template_sha epoch_count retry_count
   local reopen_count reset_count clear_halt_count persistent_count match_count
+  [[ $d285_install_closed != true ]] ||
+    refuse D285_01_INSTALL_CLOSED_DO_NOT_RERUN
   [[ $EUID -eq 0 ]] || refuse INSTALL_REQUIRES_ROOT
   d285_safe_user "$user" || refuse OPERATOR_USER_INVALID
   [[ ${SUDO_USER:-} == "$user" ]] || refuse OPERATOR_USER_MISMATCH
@@ -766,6 +769,8 @@ d285_uninstall () {
 
 operator_install () {
   local rpm_dir=$1 baseline user confirmation transcript output rc export
+  [[ $d285_install_closed != true ]] ||
+    refuse D285_01_INSTALL_CLOSED_DO_NOT_RERUN
   [[ $EUID -ne 0 ]] || refuse OPERATOR_INSTALL_MUST_BE_UNPRIVILEGED
   user=$(id -un) || refuse OPERATOR_USER_UNKNOWN
   d285_safe_user "$user" || refuse OPERATOR_USER_INVALID
@@ -862,7 +867,7 @@ offline_preflight () {
   echo D285_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
   echo D285_01_AUTHSELECT_SCOPE_REDUCTION=PASS_OFFLINE_RENDERED
   echo D285_01_PASSWORD_FALLBACK_PRESENT=true
-  echo D285_01_INSTALL_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+  echo D285_01_INSTALL_LIVE_READINESS=CLOSED_DO_NOT_RERUN
   echo D285_01_UNINSTALL_PATH=OWNERSHIP_PINNED_FAIL_CLOSED
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo REAL_SENSOR_ACCESSED=false

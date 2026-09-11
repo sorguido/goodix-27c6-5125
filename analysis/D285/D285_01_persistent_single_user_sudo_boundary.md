@@ -1,6 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D285/01 — boundary persistente e reversibile per `sudo`
 
+> Stato storico pre-live: questa closure offline è stata superata dalla run
+> Attempt 02 e dalla review
+> `D285_01_attempt_02_post_live_review.md`, che classificano D285
+> `PASS_LIVE_CLOSED_ACTIVE_INSTALLATION`. I conteggi 27/177 sotto restano quelli
+> della baseline preparatoria e non descrivono la matrice post-live corrente.
+
 ## Esito architetturale
 
 Il semplice passaggio da staging transiente a installazione persistente è

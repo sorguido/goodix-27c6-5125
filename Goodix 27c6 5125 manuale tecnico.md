@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D285/01 installazione persistente pronta offline; Human Gate
+### Stato corrente — D285/01 installazione persistente attiva e PASS_LIVE_CLOSED
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -671,12 +671,46 @@ esattamente a `/usr/local/bin` e il target è una directory reale non-symlink;
 ogni altro link, target o percorso ambiguo resta fail-closed. Non è stato
 necessario alcun rollback device-side e nessun altro contratto D285 è cambiato.
 
-Il preflight completo ha costruito la candidate reale e verificato ABI,
-manifest, wrapper, drop-in systemd, sudoers e rendering authselect. D285 è
-`27/27 PASS`; la matrice combinata D282–D285 è `177/177 PASS` fuori sandbox.
-Zero enumerazione USB, zero accesso sensore e zero live. Il prossimo confine è
-la singola installazione manuale D285: modifica persistentemente host/PAM e
-raggiunge il sensore, quindi è `HUMAN_REQUIRED` e l'agente si arresta prima.
+Il preflight completo aveva costruito la candidate reale e verificato ABI,
+manifest, wrapper, drop-in systemd, sudoers e rendering authselect.
+
+Attempt 02 è stata quindi eseguita manualmente sulla baseline
+`a9e234e43d2bdf3e81630df143eb7a809a19bff5`. Gli originali sanitizzati
+hash-pinned sono preservati in
+`captures/D285_01/D28501_ATTEMPT_02_20260911T163528Z_a9e234e43d2b/sanitized/`.
+L'auditor ricalcola i tre digest, richiede l'esatto key set del summary e lega
+la capture al control-flow della baseline live.
+
+**OBSERVED:** l'enrollment persistente dell'indice destro completa otto stage;
+dopo un restart del daemon, il consumer `sudo -v` restituisce zero. La VERIFY
+estrae il sample live e SIGFM produce un solo match sul sample 1, score 584
+rispetto alla soglia 40. Le epoch ENROLL e VERIFY consumano due action, due
+handshake TLS e 203 + 75 = 278 submit reali. Entrambe sono drenate e
+context-closed; retry, reopen, reset, clear-halt e famiglie persistenti note
+sono zero. Il template non è esportato e l'installazione resta attiva.
+
+**VERIFIED:** la baseline seleziona per il solo utente sudo il PAM
+`goodix-d285-01-sudo` con `max-tries=1` e fallback password; disabilita prima
+`with-fingerprint`, richiede zero pam_fprintd in `system-auth`, carica tramite
+drop-in e wrapper integrity/provenance la candidate dal path full-SHA, pinna
+path/hash dell'unico FP3, prova il mapping dopo restart, invalida il timestamp
+ed esegue esattamente un `sudo -v`. Il successo richiede insieme return code
+zero, epoch VERIFY e outcome SIGFM match, poi scrive lo state root-only.
+
+Probe host read-only post-run osservano authselect ancora ridotto e valido,
+`fingerprint-auth` fail-closed, state `0600 root:root`, drop-in caricato,
+manifest runtime `6/6 PASS` e nessun drift RPM della libfprint di sistema. Il
+daemon corrente è inattivo, coerente con il servizio D-Bus on-demand dopo idle.
+Il contenuto root-protected di state, sudoers e template non è stato letto
+dall'AI: la sua coerenza alla fine della run è verificata dal control-flow e
+dai gate di successo; la verifica diretta corrente resta il boundary D286.
+
+D285/01 è `PASS_LIVE_CLOSED_ACTIVE_INSTALLATION`. Gli entrypoint di
+installazione rifiutano ora prima di build/staging, mentre l'uninstall
+ownership-pinned resta disponibile. Il rischio
+`SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE` non cambia. Il prossimo confine è
+D286: survival post-reboot e readiness del rollback, con nuovo Human Gate
+prima di privilegi, reboot o verifica biometrica.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -1055,7 +1089,11 @@ D284_01_REAL_SUBMIT_COUNT=279
 D284_01_ROLLBACK_COMPLETE=true
 D284_01_LIVE_ENTRYPOINT_CLOSED=true
 D284_01_AUTONOMOUS_RERUN_ALLOWED=false
-D285_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_OPERATOR_INSTALL
+D285_01_OUTCOME=PASS_LIVE_CLOSED_ACTIVE_INSTALLATION
+D285_01_ATTEMPT_02_BASELINE_SHA=a9e234e43d2bdf3e81630df143eb7a809a19bff5
+D285_01_ATTEMPT_02_EVIDENCE_AUDIT=PASS_HASH_PINNED
+D285_01_SUDO_BIOMETRIC_CAUSALITY=VERIFIED_BASELINE_AND_LIVE_MATCH
+D285_01_INSTALL_STATUS=ACTIVE
 D285_01_ARCHITECTURE=PERSISTENT_RUNTIME_SINGLE_USER_SUDO_PAM_SCOPE
 D285_01_PAM_FPRINTD_DBUS_SCOPE=GLOBAL_NET_REACTIVATED_FPRINT
 D285_01_ABSOLUTE_DBUS_CONSUMER_ISOLATION_PROVEN=false
@@ -1079,15 +1117,17 @@ D285_01_PREVIOUS_OPERATOR_ATTEMPT=REFUSED_PRE_LIVE_PARENT_PATH_UNSAFE
 D285_01_PREVIOUS_OPERATOR_USB_ENUMERATION=false
 D285_01_PREVIOUS_OPERATOR_SENSOR_ACCESSED=false
 D285_01_PREVIOUS_OPERATOR_LIVE_EXECUTION=false
-D285_01_OFFLINE_CONTRACT_MATRIX=27/27_PASS
-D285_01_COMBINED_REGRESSION_MATRIX=177/177_PASS
+D285_01_OFFLINE_CONTRACT_MATRIX=30/30_PASS
+D285_01_COMBINED_REGRESSION_MATRIX=180/180_PASS
 D285_01_CANDIDATE_BUILD=PASS_OFFLINE
 D285_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
 D285_01_SYSTEMD_DROPIN_PARSER=PASS_OFFLINE
 D285_01_AUTHSELECT_RENDER_SCOPE_REDUCTION=PASS_OFFLINE
-D285_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D285_01_EXECUTABLE_CLOSURE=PASS_LIVE_WITH_HASH_PINNED_REVIEW
 D285_01_OPERATOR_KIT=operator_kit/d285-01-persistent-sudo
-D285_01_INSTALL_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+D285_01_INSTALL_LIVE_READINESS=CLOSED_DO_NOT_RERUN
+D285_01_INSTALL_ENTRYPOINT_CLOSED=true
+D285_01_UNINSTALL_ENTRYPOINT_RETAINED=true
 D285_01_AUTONOMOUS_LIVE_ALLOWED=false
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
@@ -1121,8 +1161,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D285_01_PERSISTENT_SUDO_INSTALL_HUMAN_GATE
-NEXT_BOUNDARY_AFTER_D284_01_REVIEW=D285_01_PERSISTENT_SUDO_INSTALL_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=D286_PERSISTENT_SURVIVAL_AND_ROLLBACK_READINESS
+NEXT_BOUNDARY_AFTER_D285_01_REVIEW=D286_PERSISTENT_SURVIVAL_AND_ROLLBACK_READINESS
 ```
 
 Report ed evidenze correnti:
@@ -1161,6 +1201,10 @@ Report ed evidenze correnti:
 `analysis/D285/D285_01_persistent_single_user_sudo_boundary.md`,
 `analysis/D285/D285_01_OFFLINE_RESULT.env`,
 `analysis/D285/test_d285_01_offline_contract.py`,
+`analysis/D285/D285_01_attempt_02_post_live_review.md`,
+`analysis/D285/D285_01_ATTEMPT_02_NORMALIZED.env`,
+`analysis/D285/d285_01_attempt_02_evidence_audit.py`,
+`captures/D285_01/D28501_ATTEMPT_02_20260911T163528Z_a9e234e43d2b/sanitized/`,
 `operator_kit/d285-01-persistent-sudo/`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,

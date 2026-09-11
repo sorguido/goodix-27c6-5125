@@ -176,14 +176,28 @@ class D284OfflineContract(unittest.TestCase):
                 "fallback password"):
             self.assertIn(marker, self.readme)
 
-    def test_18_real_target_topology_matches_current_host(self):
+    def test_18_real_target_topology_matches_closed_d284_or_active_d285(self):
         raw = subprocess.run(["authselect", "current", "--raw"], check=True,
                              capture_output=True, text=True).stdout.strip()
-        self.assertEqual(raw, "local with-silent-lastlog with-mdns4 with-fingerprint")
         system_auth = Path("/etc/authselect/system-auth").read_text()
         password_auth = Path("/etc/authselect/password-auth").read_text()
-        self.assertIn("pam_fprintd.so", system_auth)
         self.assertNotIn("pam_fprintd.so", password_auth)
+        original = "local with-silent-lastlog with-mdns4 with-fingerprint"
+        d285_active = "local with-silent-lastlog with-mdns4"
+        self.assertIn(raw, (original, d285_active))
+        if raw == original:
+            self.assertIn("pam_fprintd.so", system_auth)
+            return
+        self.assertNotIn("pam_fprintd.so", system_auth)
+        self.assertIn(
+            "pam_debug.so auth=authinfo_unavail",
+            Path("/etc/authselect/fingerprint-auth").read_text())
+        for path in (
+                "/etc/goodix-27c6-5125/d285-01.state",
+                "/etc/pam.d/goodix-d285-01-sudo",
+                "/usr/local/sbin/goodix-d285-01-fprintd",
+                "/etc/systemd/system/fprintd.service.d/90-goodix-d285-01.conf"):
+            self.assertTrue(Path(path).is_file(), path)
 
     def test_19_sensor_reaching_failures_are_captured_before_return(self):
         live = function_slice(self.script, "run_d284_live ()", "export_d284_results ()")

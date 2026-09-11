@@ -1,9 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D285/01 — installazione persistente e reversibile per `sudo`
+# D285/01 — installazione persistente e reversibile per `sudo` (chiusa)
 
-> **HUMAN REQUIRED:** il kit è chiuso offline ma non è stato eseguito. Installa
-> file persistenti, modifica authselect/PAM/sudoers/systemd, raggiunge il sensore
-> e conserva su disco un template biometrico. L'agente AI non deve avviarlo.
+> **INSTALLAZIONE CHIUSA:** Attempt 02 ha completato con successo e
+> l'installazione è attiva. Gli entrypoint di installazione rifiutano ogni
+> rerun; resta disponibile soltanto la disinstallazione ownership-pinned.
+> La disinstallazione è **HUMAN REQUIRED**: usa `sudo`, accede al template e
+> non deve essere avviata dall'agente AI.
 
 ## Scelta architetturale
 
@@ -58,16 +60,16 @@ test non digitare la password: se compare un prompt password, premere
 output e richiedere review. Il trap root tenta rollback completo in ogni
 failure di installazione.
 
-## Installazione manuale
+## Installazione manuale — storico, non rieseguire
 
-Dalla root del repository, come utente normale:
+Il comando storico seguente è chiuso fail-closed e non deve essere rieseguito:
 
 ```bash
 operator_kit/d285-01-persistent-sudo/run-d285-01.sh \
   --operator-install /tmp/goodix-opencv-4.13-rpms
 ```
 
-La run richiede `INSTALLA D285`, poi `DESTRO` per otto contatti enrollment e
+La run completata richiedeva `INSTALLA D285`, poi `DESTRO` per otto contatti enrollment e
 `INDICE DESTRO` per un solo `sudo -v`. Budget di installazione: due action
 biometriche, massimo nove contatti, zero retry automatico o implicito. Al
 termine stampa `EXPORT_DIRECTORY` e `TERMINAL_TRANSCRIPT`; allegare i tre file

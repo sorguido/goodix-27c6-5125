@@ -341,6 +341,46 @@ class D285OfflineContract(unittest.TestCase):
             self.assertIn("D285_01_REFUSAL_REASON=PARENT_PATH_UNSAFE",
                           ambiguous.stderr)
 
+    def test_28_hash_pinned_attempt_02_evidence(self):
+        from analysis.D285.d285_01_attempt_02_evidence_audit import audit_capture
+        capture = ROOT / (
+            "captures/D285_01/"
+            "D28501_ATTEMPT_02_20260911T163528Z_a9e234e43d2b/sanitized")
+        audit_capture(capture)
+
+    def test_29_attempt_02_evidence_rejects_semantic_tampering(self):
+        from analysis.D285.d285_01_attempt_02_evidence_audit import audit_capture
+        capture = ROOT / (
+            "captures/D285_01/"
+            "D28501_ATTEMPT_02_20260911T163528Z_a9e234e43d2b/sanitized")
+        with tempfile.TemporaryDirectory(prefix="goodix-d285-evidence-") as td:
+            copy = Path(td)
+            for source in capture.iterdir():
+                (copy / source.name).write_bytes(source.read_bytes())
+            summary = copy / "summary.env"
+            summary.write_text(summary.read_text().replace(
+                "D285_01_OBSERVED_RETRY_COUNT=0",
+                "D285_01_OBSERVED_RETRY_COUNT=1"))
+            with self.assertRaises(ValueError):
+                audit_capture(copy, enforce_hashes=False)
+
+    def test_30_install_entrypoints_closed_but_uninstall_remains(self):
+        install = function_slice(self.script, "d285_install ()",
+                                 "d285_verify_installed_file ()")
+        operator = function_slice(self.script, "operator_install ()",
+                                  "operator_uninstall ()")
+        dispatch = self.script[self.script.index(
+            "if [[ ${D285_LIBRARY_ONLY") :]
+        self.assertIn("d285_install_closed=true", self.script)
+        for block in (install, operator):
+            self.assertLess(block.index("D285_01_INSTALL_CLOSED_DO_NOT_RERUN"),
+                            block.index("prepare_candidate") if block is operator
+                            else block.index("d285_verify_baseline"))
+        self.assertIn("--operator-uninstall)", dispatch)
+        self.assertIn("--uninstall)", dispatch)
+        self.assertIn("D285_01_INSTALL_LIVE_READINESS=CLOSED_DO_NOT_RERUN",
+                      self.script)
+
 
 if __name__ == "__main__":
     unittest.main()
