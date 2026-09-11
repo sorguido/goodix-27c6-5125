@@ -926,6 +926,53 @@ intrinsecamente non testabile prima del Human Gate è limitato al namespace
 mount e greeter effettivi, chiamata PAM reale verso fprintd, VERIFY/contatto e
 telemetry autentica. Non restano failure host-side note riproducibili offline.
 
+La terza invocazione manuale, sulla baseline
+`d0679cf9a725bf0f23a60f53eff0eafac9b0ed29`, raggiunge realmente namespace,
+PAM overlay e `kscreenlocker_greet --testing`. Readiness e UI lock-like sono
+osservate, ma nessuna VERIFY inizia: epoch, extract, confronti, match,
+no-match, retry, reopen, reset, clear-halt e famiglie persistenti sono tutti
+zero. Pre/post audit D285 restano PASS. Il marker `Unlocked` e l'exit zero non
+provano fingerprint perché upstream calcola lo stato come OR fra PAM `kde`
+interattivo e gli autenticatori non-interattivi; l'operatore ha usato la
+credenziale interattiva per uscire.
+
+Il journal read-only dello stesso boot chiude il boundary causale a monte del
+sensore. `pkexec` crea la sessione logind `c3` di root, classe
+`background-light`; il greeter, pur avendo UID 1000 dopo `runuser`, resta nel
+cgroup `/user.slice/user-0.slice/session-c3.scope`. Alle 23:34:06 fprintd parte
+tramite il wrapper D285 e alle 23:34:07 nega al client `ListEnrolledFingers`
+per `net.reactivated.fprint.device.verify`. La policy installata concede tale
+azione a subject attivi ma non inattivi. Nel flow Fedora 1.94.5,
+`pam_fprintd.so` chiama `GetDevices` e poi `ListEnrolledFingers`; la negazione
+fa terminare `open_device()` senza device, quindi `PAM_AUTHINFO_UNAVAIL` prima
+di `Claim` e `VerifyStart`. Il runtime Goodix di VERIFY non viene raggiunto e
+questo spiega direttamente `VERIFY_EPOCH_COUNT=0`.
+
+La capture hash-pinned è
+`captures/D287_01/D28701_ATTEMPT_20260911T213353Z_d0679cf9a725/sanitized/`.
+Il journal recuperato e la review sono rispettivamente
+`analysis/D287/D287_01_POST_LIVE_RECOVERED_JOURNAL.log` e
+`analysis/D287/D287_01_post_live_pam_fprintd_review.md`.
+
+La run evidenzia anche due difetti host. Primo, `greeter.log` e il journal
+per-attempt vivevano nel tmpfs privato e sono stati distrutti dal cleanup prima
+dell'export: il classificatore ha evitato il falso MATCH, ma
+`GREETER_EXITED_BEFORE_OUTCOME` non poteva spiegare il failure Polkit. Secondo,
+la descrizione “la sessione non viene bloccata” era fuorviante per la UX reale:
+`--testing` evita il lock orchestrato, ma su Wayland usa layer-shell top,
+fullscreen implicito, `setImmediateLock(true)` e keyboard interactivity
+exclusive. Il vecchio `--operator-run` è quindi chiuso fail-closed e non deve
+essere rieseguito.
+
+La decisione PM è `REPLAN`, nello stesso D287. Il greeter completo non è il
+prossimo esperimento più informativo. Il minimo discriminante è riusare il
+runner `pam_start_confdir()` già validato in D283, ma eseguirlo direttamente
+dalla sessione grafica attiva dell'utente, preceduto da un `pkcheck` non
+interattivo sul subject PID/start-time/UID. Una sola `pam_authenticate`, una
+sola epoch e `max-tries=1` separano il launch context da PAM/fprintd/runtime
+senza UI fullscreen. Tale prova è sensor-reaching e resta un nuovo Human Gate;
+non è autorizzata né preparata dalla sola review post-live.
+
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
 D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
@@ -1393,11 +1440,12 @@ D286_01_SHELLCHECK=UNAVAILABLE
 D286_01_EXECUTABLE_CLOSURE=PASS_LIVE_WITH_HASH_PINNED_REVIEW
 D286_01_OPERATOR_KIT=operator_kit/d286-01-reboot-survival
 D286_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
-D287_01_OUTCOME=READY_FOR_HUMAN_GATE
-D287_01_BOUNDARY=KSCREENLOCKER_GREETER_TESTING_MODE
+D287_01_OUTCOME=FAIL_HOST_POLKIT_CONTEXT_BEFORE_VERIFY
+D287_01_BOUNDARY=PAM_FPRINTD_LIST_ENROLLED_FINGERS_POLKIT_DENIED
 D287_01_CONSUMER=KSCREENLOCKER_GREETER
 D287_01_GREETER_MODE=TESTING_STANDALONE
 D287_01_REAL_SESSION_LOCKED=false
+D287_01_EFFECTIVE_WAYLAND_UX=FULLSCREEN_LAYER_SHELL_KEYBOARD_EXCLUSIVE
 D287_01_HOST_PAM_FILE_WRITE_COUNT=0
 D287_01_PAM_OVERLAY_SCOPE=PRIVATE_MOUNT_NAMESPACE_READ_ONLY
 D287_01_PAM_SERVICE=kde-fingerprint
@@ -1419,7 +1467,10 @@ D287_01_CORRECTIVE_STATUS=CLOSED_OFFLINE
 D287_01_SECOND_OPERATOR_RUN=ABORTED_AFTER_PKEXEC_BEFORE_GREETER_AND_VERIFY
 D287_01_SECOND_OPERATOR_BASELINE=dc09bad49913fd51529ad5d4cbe399bf2f04f04c
 D287_01_SECOND_REFUSAL_REASON=JOURNAL_CURSOR_AMBIGUOUS
-D287_01_GREETER_STARTED=false
+D287_01_SECOND_GREETER_STARTED=false
+D287_01_GREETER_STARTED=true
+D287_01_REAL_GREETER_REACHED=true
+D287_01_GREETER_TESTING_MODE_READY=true
 D287_01_VERIFY_STARTED=false
 D287_01_JOURNAL_CURSOR_ROOT_CAUSE=KNOWN
 D287_01_JOURNAL_CURSOR_ROOT_CAUSE_DETAIL=FILTERED_UNIT_HAS_ZERO_BOOT_ENTRIES
@@ -1430,7 +1481,7 @@ D287_01_HOST_PATH_HORIZONTAL_AUDIT=PASS
 D287_01_FULL_OPERATOR_PATH_SIMULATION=PASS
 D287_01_SHELL_FAILURE_PROPAGATION_AUDIT=PASS
 D287_01_TARGET_READ_ONLY_ASSUMPTIONS=PASS
-D287_01_RESIDUAL_HOST_SIDE_UNKNOWN_FAILURES=NONE_KNOWN
+D287_01_RESIDUAL_HOST_SIDE_UNKNOWN_FAILURES=SUPERSEDED_BY_POST_LIVE_POLKIT_CONTEXT_DEFECT
 D287_01_HOST_PATH_CORRECTIVE_STATUS=CLOSED_OFFLINE
 D287_01_KSCREENLOCKER_NEVRA=kscreenlocker-6.7.5-1.fc44.x86_64
 D287_01_PLASMA_WORKSPACE_NEVRA=plasma-workspace-6.7.5-1.fc44.x86_64
@@ -1440,9 +1491,29 @@ D287_01_REPOSITORY_GATE_CORRECTED=true
 D287_01_REPOSITORY_GATE_BEHAVIOR_MATRIX=3/3_PASS
 D287_01_OFFLINE_CONTRACT_MATRIX=65/65_PASS
 D287_01_COMBINED_REGRESSION_MATRIX=279/279_PASS_HOST_ENV
-D287_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_HORIZONTAL
+D287_01_EXECUTABLE_CLOSURE=FAIL_LIVE_LAUNCH_CONTEXT_AND_OBSERVABILITY
 D287_01_OPERATOR_KIT=operator_kit/d287-01-kscreenlocker-testing
-D287_01_LIVE_EXECUTION=HUMAN_REQUIRED
+D287_01_POST_LIVE_BASELINE=d0679cf9a725bf0f23a60f53eff0eafac9b0ed29
+D287_01_POST_LIVE_CAPTURE=captures/D287_01/D28701_ATTEMPT_20260911T213353Z_d0679cf9a725/sanitized
+D287_01_PAM_FPRINTD_INVOKED=true
+D287_01_FPRINTD_ACTIVATED=true
+D287_01_FPRINTD_LIST_ENROLLED_FINGERS=POLKIT_DENIED
+D287_01_FPRINTD_CLAIM_REACHED=false
+D287_01_FPRINTD_VERIFY_START_REACHED=false
+D287_01_GOODIX_WRAPPER_PROCESS_STARTED=true
+D287_01_GOODIX_VERIFY_RUNTIME_REACHED=false
+D287_01_SENSOR_ACTION_COUNT=0
+D287_01_GREETER_UNLOCK_MARKER_SOURCE=INTERACTIVE_OR_NONINTERACTIVE_PAM
+D287_01_FINGERPRINT_SUCCESS_NOT_PROVEN=true
+D287_01_FINGERPRINT_SUCCESS_EXCLUDED_FOR_THIS_ATTEMPT=true
+D287_01_ROOT_CAUSE=GREETER_RETAINED_PKEXEC_ROOT_BACKGROUND_LOGIND_CONTEXT
+D287_01_EXECUTABLE_OBSERVABILITY_DEFECT=true
+D287_01_ORIGINAL_GREETER_OPERATOR_RUN=CLOSED_DO_NOT_RERUN
+D287_01_NEXT_EXPERIMENT=ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_PROBE
+D287_01_PM_DECISION=REPLAN
+D287_01_POST_LIVE_OFFLINE_CONTRACT_MATRIX=68/68_PASS
+D287_01_POST_LIVE_COMBINED_REGRESSION_MATRIX=282/282_PASS_HOST_ENV
+D287_01_LIVE_EXECUTION=NOT_AUTHORIZED_BY_POST_LIVE_REVIEW
 INITIAL_FINGER_ATTEMPT=1
 MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2
 MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3
@@ -1482,8 +1553,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D287_01_KSCREENLOCKER_TESTING_MODE_HUMAN_GATE
-NEXT_BOUNDARY_AFTER_D286_01_REVIEW=D287_01_KSCREENLOCKER_TESTING_MODE_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=D287_01_ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_DESIGN
+NEXT_BOUNDARY_AFTER_D286_01_REVIEW=D287_01_ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_DESIGN
 ```
 
 Report ed evidenze correnti:
@@ -1549,6 +1620,10 @@ Report ed evidenze correnti:
 `analysis/D287/test_d287_01_offline_contract.py`,
 `operator_kit/d287-01-kscreenlocker-testing/`,
 `captures/D287_01/D28701_ATTEMPT_20260911T210420Z_dc09bad49913/sanitized/`,
+`captures/D287_01/D28701_ATTEMPT_20260911T213353Z_d0679cf9a725/sanitized/`,
+`analysis/D287/D287_01_post_live_pam_fprintd_review.md`,
+`analysis/D287/D287_01_POST_LIVE_NORMALIZED.env`,
+`analysis/D287/D287_01_POST_LIVE_RECOVERED_JOURNAL.log`,
 `GoodixArtifacts/opencv-4.13-rpms/README.md`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,

@@ -384,10 +384,11 @@ class D287OfflineContract(unittest.TestCase):
         self.assertEqual(operator.count("pkexec "), 1)
         self.assertIn("--root-series", operator)
 
-    def test_35_readme_has_human_gate_risk_stop_and_direct_command(self):
-        for marker in ("HUMAN REQUIRED", "Ctrl-C", "non blocca la sessione",
-                       "non rilanciare", "INDICE DESTRO", "TENTATIVO 2",
-                       "TENTATIVO 3", "senza un quarto", "--operator-run"):
+    def test_35_readme_closes_old_live_path_and_corrects_wayland_ux(self):
+        for marker in ("CHIUSO — NON RILANCIARE", "fullscreen layer-shell",
+                       "input tastiera esclusivo", "può non essere facilmente",
+                       "POST_LIVE_POLKIT_CONTEXT_DEFECT_CLOSED_DO_NOT_RERUN",
+                       "--operator-run"):
             self.assertIn(marker, self.readme)
 
     def test_36_methodological_review_answers_all_three_questions(self):
@@ -904,6 +905,50 @@ wait "$d287_greeter_pgid"
                 "D287_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_HORIZONTAL",
                 "D287_01_LIVE_EXECUTION=HUMAN_REQUIRED"):
             self.assertIn(marker, result)
+
+    def test_66_post_live_operator_entrypoint_is_closed(self):
+        result = subprocess.run(["bash", str(SCRIPT), "--operator-run"],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 3)
+        self.assertIn(
+            "D287_01_REFUSAL_REASON=POST_LIVE_POLKIT_CONTEXT_DEFECT_CLOSED_DO_NOT_RERUN",
+            result.stderr,
+        )
+
+    def test_67_post_live_capture_and_recovered_boundary_are_pinned(self):
+        capture = ROOT / "captures/D287_01/D28701_ATTEMPT_20260911T213353Z_d0679cf9a725/sanitized"
+        expected = {
+            "root-series.log": "0147fc61bece845a8fcb39be0cab249186f4149f8a07b05fcb675da664563019",
+            "summary.env": "46ef541179a979c38231cbb37224b08bf0d85b352b67a7d420f882c5bf33d938",
+        }
+        self.assertEqual({path.name for path in capture.iterdir()}, set(expected))
+        for name, digest in expected.items():
+            self.assertEqual(hashlib.sha256((capture / name).read_bytes()).hexdigest(), digest)
+        recovered = (ROOT / "analysis/D287/D287_01_POST_LIVE_RECOVERED_JOURNAL.log").read_text()
+        for marker in (
+            "New session 'c3' of user 'root' with class 'background-light'",
+            "D287_01_GREETER_PROCESS_CGROUP=/user.slice/user-0.slice/session-c3.scope",
+            "Authorization denied to :1.161 to call method 'ListEnrolledFingers'",
+            "Not Authorized: net.reactivated.fprint.device.verify",
+            "D287_01_FPRINTD_VERIFY_START_COUNT=0",
+            "D287_01_GOODIX_VERIFY_EPOCH_COUNT=0",
+        ):
+            self.assertIn(marker, recovered)
+
+    def test_68_post_live_normalization_records_replan_not_fingerprint_failure(self):
+        normalized = (ROOT / "analysis/D287/D287_01_POST_LIVE_NORMALIZED.env").read_text()
+        for marker in (
+            "D287_01_POST_LIVE_OUTCOME=FAIL_HOST_POLKIT_CONTEXT_BEFORE_VERIFY",
+            "D287_01_PAM_FPRINTD_INVOKED=true",
+            "D287_01_FPRINTD_ACTIVATED=true",
+            "D287_01_FPRINTD_LIST_ENROLLED_FINGERS=POLKIT_DENIED",
+            "D287_01_FPRINTD_VERIFY_START_REACHED=false",
+            "D287_01_SENSOR_ACTION_COUNT=0",
+            "D287_01_FINGERPRINT_SUCCESS_NOT_PROVEN=true",
+            "D287_01_EXECUTABLE_OBSERVABILITY_DEFECT=true",
+            "D287_01_PM_DECISION=REPLAN",
+        ):
+            self.assertIn(marker, normalized)
 
 
 if __name__ == "__main__":

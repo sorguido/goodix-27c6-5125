@@ -610,7 +610,7 @@ d287_offline_preflight () {
   echo D287_01_MAX_PHYSICAL_CONTACTS=3
   echo D287_01_STOP_ON_FIRST_MATCH=true
   echo D287_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-  echo D287_01_LIVE_EXECUTION=HUMAN_REQUIRED
+  echo D287_01_LIVE_EXECUTION=CLOSED_DO_NOT_RERUN
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo REAL_SENSOR_ACCESSED=false
   echo LIVE_EXECUTION_PERFORMED=false
@@ -627,7 +627,7 @@ case ${1:-} in
     ;;
   --operator-run)
     [[ $# -eq 1 ]] || d287_refuse USAGE
-    d287_operator_run
+    d287_refuse POST_LIVE_POLKIT_CONTEXT_DEFECT_CLOSED_DO_NOT_RERUN
     ;;
   --root-series)
     [[ $# -eq 7 ]] || d287_refuse USAGE

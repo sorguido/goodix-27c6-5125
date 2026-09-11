@@ -1,15 +1,19 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D287/01 — pilot KScreenLocker in modalità di test
+# D287/01 — pilot KScreenLocker in modalità di test (chiuso)
 
-> **HUMAN REQUIRED:** questo kit usa Polkit/root, avvia il greeter KDE reale e
-> può raggiungere il sensore Goodix. L’agente AI non deve eseguire
-> `--operator-run`.
+> **CHIUSO — NON RILANCIARE:** la run reale ha dimostrato un difetto di launch
+> context. `--operator-run` ora rifiuta sempre prima di Polkit, greeter, USB e
+> sensore. La review è in
+> `analysis/D287/D287_01_post_live_pam_fprintd_review.md`.
 
 ## Scopo e rischio
 
-Il pilot verifica il primo consumer desktop reale dopo la closure D286:
+Il pilot verificava il primo consumer desktop reale dopo la closure D286:
 `/usr/libexec/kscreenlocker_greet --testing`. La modalità di test è un processo
-standalone e non blocca la sessione. Usa però il vero binario KScreenLocker, il
+standalone e non attiva il vero lock orchestrato della sessione. Su Wayland usa
+però una superficie fullscreen layer-shell con input tastiera esclusivo: per
+l'operatore si comporta come una schermata di blocco e può non essere facilmente
+dismissibile. Usa il vero binario KScreenLocker, il
 tema lockscreen installato e il servizio PAM hard-coded `kde-fingerprint`.
 
 La prima invocazione operatore sul commit `69b81c3f6fc4bdbfb86044581324637fd86df9ee`
@@ -100,23 +104,14 @@ operator_kit/d287-01-kscreenlocker-testing/run-d287-01.sh --offline-preflight
 Il preflight verifica anche che il journal del boot corrente fornisca un cursor
 globale valido, senza creare entry fprintd né avviare il servizio.
 
-## Esecuzione manuale
+## Esecuzione manuale storica — vietata
 
-Dalla root del repository, nella sessione Plasma Wayland dell’utente:
+Il comando storico seguente è conservato solo per provenance e ora fallisce
+chiuso con `POST_LIVE_POLKIT_CONTEXT_DEFECT_CLOSED_DO_NOT_RERUN`:
 
 ```bash
 operator_kit/d287-01-kscreenlocker-testing/run-d287-01.sh --operator-run
 ```
 
-Autenticare Polkit con la password. Digitare `INDICE DESTRO` per il primo
-tentativo. Quando appare il greeter di test, muovere il puntatore per mostrare
-il form e appoggiare una sola volta l’indice destro. Non scrivere la password
-nel form KDE.
-
-Solo dopo un `NO_MATCH` il kit propone rispettivamente `TENTATIVO 2` e
-`TENTATIVO 3`. Accettare soltanto quando si è pronti a un nuovo contatto.
-`MATCH` chiude la finestra e impedisce gli slot rimanenti. Dopo tre `NO_MATCH`
-la serie termina senza un quarto contatto.
-
-Il comando stampa `D287_01_CAPTURE_DIRECTORY`. Consegnare l’intera directory
-`sanitized/`; non copiare state root-only o file sotto `/var/lib/fprint`.
+Non esiste più una procedura operativa valida in questa directory. Non
+aggirare il rifiuto chiamando direttamente le modalità interne dello script.
