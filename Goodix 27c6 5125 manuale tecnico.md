@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D283/01 PAM dedicato chiuso live; decisione integrazione aperta
+### Stato corrente — D284/01 pilot `sudo` transiente pronto offline; Human Gate
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -549,9 +549,52 @@ D283/01 è `PASS_LIVE_CLOSED` e non va rieseguito. Prova il percorso PAM
 dedicato target, non login, sudo biometrico, affidabilità statistica o assenza
 assoluta di ogni effetto persistente sconosciuto. Il rischio
 `SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE` resta valido dalle osservazioni
-D282/01 e D282/02. Il prossimo boundary è `PROJECT_INTEGRATION_DECISION`: va
-scelto il passo reale meno invasivo, progressivo e reversibile, mantenendo un
-percorso di autenticazione alternativo.
+D282/01 e D282/02.
+
+La `PROJECT_INTEGRATION_DECISION` è ora chiusa offline da D284/01. Il target
+reale Fedora 44 KDE ha authselect valido con `with-fingerprint`; `system-auth`
+contiene `pam_fprintd.so` senza `max-tries`, quindi mantiene il default di tre
+tentativi, ed è incluso da `sudo`, `kcheckpass` e `kscreensaver`. Plasma Login
+6.7.4 usa invece `plasmalogin` → `password-auth`, dove pam_fprintd non è
+presente. Attivare semplicemente la candidate su tutto il profilo corrente
+sarebbe quindi troppo ampio e non rispetterebbe il boundary one-shot; il login
+grafico non è nemmeno già cablato al medesimo percorso.
+
+Il primo consumer reale scelto è perciò un solo `sudo -v`, con configurazione
+transiente e limitata all'utente operatore. Il kit D284 avvia la candidate da
+`/run` con storage fprintd isolato e crea soltanto due nuovi file temporanei:
+il servizio PAM `goodix-d284-01-sudo`, che impone
+`pam_fprintd.so max-tries=1 timeout=45` e conserva `pam_unix.so` come fallback,
+e un frammento sudoers per-utente che seleziona quel `pam_service`. Non scrive
+authselect, PAM esistenti, login/KDE o libfprint di sistema. Dopo un enrollment
+di otto contatti consente una sola VERIFY via `sudo -v`; rimuove entrambi gli
+override prima del delete del template isolato. Il trap root invalida il
+timestamp sudo, ripete il cleanup e confronta hash e inventari pre/post.
+
+La review PM ha rafforzato i failure-path: ogni errore sensor-reaching salva
+phase, return code, raw e journal prima del rollback; un fallimento di
+`sudo -K` non può più essere dichiarato come timestamp invalidato. Un primo
+preflight ha inoltre rivelato una variabile locale `work` fuori scope nel trap
+offline e un path non conforme nella regressione cleanup. Lo stato è ora
+globale e il delete accetta soltanto il prefisso temporaneo D284; regressioni
+positive e negative provano sia cleanup sia rifiuto di path non posseduti.
+Inoltre `ROLLBACK_COMPLETE=false` forza un exit root nonzero, così l'export
+riuscito non può mascherare un ripristino fallito.
+
+La closure offline è PASS: sintassi Bash, `24/24` contratti D284 e `146/146`
+regressioni combinate D282–D284, build candidate SIGFM reale, ABI del vero
+fprintd, `visudo`, staging runtime e cleanup bounded. La run conclusiva ha
+return code zero e dichiara zero enumerazione USB, zero accesso al sensore e
+zero live. `shellcheck` non è installato e non viene elevato a requisito.
+La live verifica inoltre prima dello staging che l'utente operatore abbia già
+una policy sudo valida.
+
+Il prossimo boundary è `D284_01_TRANSIENT_SUDO_PILOT_HUMAN_GATE`. Richiede
+`sudo`, configurazione PAM/sudoers transiente e accesso reale al sensore:
+l'agente non lo esegue. Il kit è direttamente eseguibile manualmente una sola
+volta dall'Utente; un'anomalia vieta il retry equivalente. La run potrà provare
+solo il consumer `sudo`, non Plasma Login, lock screen, installazione
+permanente o affidabilità statistica.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -884,6 +927,41 @@ D283_01_LIVE_ENTRYPOINT_ENABLED=false_DO_NOT_RERUN
 D283_01_LEGACY_FAILURE_PHASE_MARKER=INITIALIZATION_ONLY_NOT_RUN_OUTCOME
 D283_01_CURRENT_PROGRESS_MARKER_CORRECTIVE=PASS_OFFLINE
 D283_01_AUTONOMOUS_RERUN_ALLOWED=false
+D284_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_OPERATOR_RUN
+D284_01_REAL_TARGET_COMPATIBILITY=PASS
+D284_01_CONSUMER=SUDO_VALIDATE
+D284_01_CONSUMER_SCOPE=SINGLE_OPERATOR_USER
+D284_01_PAM_SERVICE=goodix-d284-01-sudo
+D284_01_PAM_MAX_TRIES=1
+D284_01_PAM_TIMEOUT_SECONDS=45
+D284_01_PASSWORD_FALLBACK_PRESENT=true
+D284_01_AUTHSELECT_WRITE_COUNT=0
+D284_01_EXISTING_PAM_FILE_WRITE_COUNT=0
+D284_01_SYSTEM_LIBFPRINT_REPLACED=false
+D284_01_STORAGE=ISOLATED_TRANSIENT
+D284_01_BIOMETRIC_ACTION_MAX=2
+D284_01_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=9
+D284_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D284_01_REAL_LOGIN_IN_SCOPE=false
+D284_01_KDE_LOCK_SCREEN_IN_SCOPE=false
+D284_01_PERMANENT_INSTALL_IN_SCOPE=false
+D284_01_OFFLINE_CONTRACT_MATRIX=24/24_PASS
+D284_01_COMBINED_REGRESSION_MATRIX=146/146_PASS
+D284_01_CANDIDATE_BUILD=PASS_OFFLINE
+D284_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
+D284_01_SUDOERS_PARSER=PASS_OFFLINE
+D284_01_OPERATOR_SUDO_POLICY_GATE=PASS_OFFLINE_STATIC_PRE_STAGING
+D284_01_OVERRIDE_CLEANUP_REGRESSION=PASS
+D284_01_FAILURE_DIAGNOSTICS=PASS_OFFLINE_PHASE_TYPED
+D284_01_ROLLBACK_FAILURE_ROOT_EXIT=NONZERO_REGRESSION_PASS
+D284_01_OFFLINE_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
+D284_01_SHELL_SYNTAX=PASS
+D284_01_SHELLCHECK=UNAVAILABLE
+D284_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D284_01_OPERATOR_KIT=operator_kit/d284-01-transient-sudo-pilot
+D284_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+D284_01_LIVE_EXECUTED=false
+D284_01_AUTONOMOUS_LIVE_ALLOWED=false
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -916,8 +994,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=PROJECT_INTEGRATION_DECISION
-NEXT_BOUNDARY_AFTER_D283_01_REVIEW=PROJECT_INTEGRATION_DECISION
+NEXT_PRIMARY_BOUNDARY=D284_01_TRANSIENT_SUDO_PILOT_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D283_01_REVIEW=D284_01_TRANSIENT_SUDO_PILOT_HUMAN_GATE
 ```
 
 Report ed evidenze correnti:
@@ -945,6 +1023,10 @@ Report ed evidenze correnti:
 `analysis/D283/d283_01_attempt_01_evidence_audit.py`,
 `captures/D283_01/D28301_ATTEMPT_01_20260911T042655Z_2cf82fd1fdb6/sanitized/`,
 `operator_kit/d283-01-pam-dedicated/`,
+`analysis/D284/D284_01_project_integration_decision.md`,
+`analysis/D284/D284_01_OFFLINE_RESULT.env`,
+`analysis/D284/test_d284_01_offline_contract.py`,
+`operator_kit/d284-01-transient-sudo-pilot/`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,
 `analysis/D282/D282_01_ATTEMPT_05_NORMALIZED.env`,

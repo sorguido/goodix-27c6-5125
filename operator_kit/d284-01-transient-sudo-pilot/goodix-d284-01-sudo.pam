@@ -1,0 +1,11 @@
+auth        required                                     pam_env.so
+auth        required                                     pam_faildelay.so delay=2000000
+auth        sufficient                                   pam_fprintd.so max-tries=1 timeout=45
+auth        sufficient                                   pam_unix.so nullok
+auth        required                                     pam_deny.so
+
+account     include                                      system-auth
+password    include                                      system-auth
+session     optional                                     pam_keyinit.so revoke
+session     required                                     pam_limits.so
+session     include                                      system-auth

@@ -625,11 +625,13 @@ write_systemd_dropin () {
   [[ $runtime == /run/goodix-d282-01/* ||
      $runtime == /run/goodix-d282-02/* ||
      $runtime == /run/goodix-d282-03/* ||
-     $runtime == /run/goodix-d283-01/* ]] || refuse RUNTIME_PATH_UNSAFE
+     $runtime == /run/goodix-d283-01/* ||
+     $runtime == /run/goodix-d284-01/* ]] || refuse RUNTIME_PATH_UNSAFE
   [[ $owned == /var/lib/fprint/.goodix-d282-01-* ||
      $owned == /var/lib/fprint/.goodix-d282-02-* ||
      $owned == /var/lib/fprint/.goodix-d282-03-* ||
-     $owned == /var/lib/fprint/.goodix-d283-01-* ]] ||
+     $owned == /var/lib/fprint/.goodix-d283-01-* ||
+     $owned == /var/lib/fprint/.goodix-d284-01-* ]] ||
     refuse STORAGE_PATH_UNSAFE
   relative_state=${owned#/var/lib/}
   case $profile in
