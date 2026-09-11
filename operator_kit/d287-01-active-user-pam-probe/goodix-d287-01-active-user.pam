@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# D287/01: one explicit fingerprint attempt from the active graphical user session.
+auth required /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45 debug

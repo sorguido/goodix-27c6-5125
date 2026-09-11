@@ -971,7 +971,51 @@ dalla sessione grafica attiva dell'utente, preceduto da un `pkcheck` non
 interattivo sul subject PID/start-time/UID. Una sola `pam_authenticate`, una
 sola epoch e `max-tries=1` separano il launch context da PAM/fprintd/runtime
 senza UI fullscreen. Tale prova è sensor-reaching e resta un nuovo Human Gate;
-non è autorizzata né preparata dalla sola review post-live.
+non era autorizzata né preparata dalla sola review post-live.
+
+La successiva decisione esplicita dell'Utente approva il `REPLAN` e richiede la
+closure offline di quel singolo probe. Il design resta nello stesso D287/01 e
+non riapre il greeter. Il runner viene compilato in una directory privata e
+avviato direttamente come processo non privilegiato della sessione Plasma
+Wayland corrente. Prima di `pam_start_confdir()` costruisce il subject Polkit
+esatto `PID,start-time,UID` del proprio processo ed esegue un `pkcheck`
+non-interattivo per `net.reactivated.fprint.device.verify`: non abilita user
+interaction o agent interni. Solo un PASS permette la singola chiamata PAM;
+un failure emette `PAM_NOT_STARTED=true` e chiude prima di fprintd.
+
+Il PAM privato contiene solo `pam_fprintd.so max-tries=1 timeout=45 debug` e
+non modifica `/etc/pam.d`. L'eccezione a un solo contatto è esplicitamente
+limitata a questo probe diagnostico richiesto dall'Utente: non misura
+affidabilità biometrica e non sostituisce la policy D286 dei tre slot per un
+futuro consumer/autenticatore completo. Il timeout esterno è 60 secondi;
+VERIFY, contatto e `pam_authenticate()` hanno budget massimo uno, senza retry
+automatico o implicito.
+
+La nuova osservabilità usa un cursor globale unico. Conserva stdout/stderr e
+return code del runner, journal completo dell'unità fprintd e un journal
+globale filtrato nativamente sul campo MESSAGE a PAM/fprintd/Polkit/telemetria
+Goodix e sanitizzato in streaming dello username; nessuna riga globale
+estranea viene materializzata. Pre/post audit D286 sono processi `pkexec` separati
+e non avvolgono il runner PAM. Capture, classificazione, summary e manifest
+SHA-256 sopravvivono agli esiti negativi; dopo un'interruzione ricevuta durante
+l'azione il control flow prosegue a export e post-audit. Non vengono esportate
+risposte PAM, password/PIN, PSK, template, pixel o dati biometrici.
+
+La closure locale passa `42/42`, inclusa una `SIGINT` reale su fixture che
+prova export e post-audit dopo l'interruzione. La regressione D282-D287 produce
+nel sandbox `320/324`, con i quattro falsi negativi host già noti (tre parser systemd
+bloccati sui socket e il fixture PAM D283 rifiutato dall'ownership rimappata),
+e passa `324/324` nell'ambiente host consentito. Il preflight reale host-only
+compila warning-as-error e chiude `pam_start_confdir + pam_permit` senza
+`pkcheck`, PAM biometrico, fprintd, USB, sensore o privilegi. `shellcheck` non è
+installato. Design, evidenza e istruzioni sono in
+`analysis/D287/D287_01_active_user_pam_probe_boundary.md`,
+`analysis/D287/D287_01_ACTIVE_USER_PAM_PROBE_OFFLINE_RESULT.env` e
+`operator_kit/d287-01-active-user-pam-probe/`. La review PM indipendente
+riesamina direttamente il review set, corregge gate Git, propagazione di
+`SIGINT`, privacy journal e classificazione avversa, quindi decide
+`ACCEPT_AND_CONTINUE`. Il kit è rilasciato al solo Human Gate; nessuna live è
+stata eseguita dall'AI.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -1513,7 +1557,21 @@ D287_01_NEXT_EXPERIMENT=ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_PROBE
 D287_01_PM_DECISION=REPLAN
 D287_01_POST_LIVE_OFFLINE_CONTRACT_MATRIX=68/68_PASS
 D287_01_POST_LIVE_COMBINED_REGRESSION_MATRIX=282/282_PASS_HOST_ENV
-D287_01_LIVE_EXECUTION=NOT_AUTHORIZED_BY_POST_LIVE_REVIEW
+D287_01_ACTIVE_USER_PAM_PROBE_OUTCOME=PASS_OFFLINE
+D287_01_ACTIVE_USER_PAM_PROBE_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D287_01_ACTIVE_USER_PAM_PROBE_LOCAL_CONTRACT_MATRIX=42/42_PASS
+D287_01_ACTIVE_USER_PAM_PROBE_COMBINED_REGRESSION_MATRIX=324/324_PASS_HOST_ENV
+D287_01_ACTIVE_USER_PAM_PROBE_PKCHECK_SUBJECT=RUNNER_PID_START_TIME_UID
+D287_01_ACTIVE_USER_PAM_PROBE_PKCHECK_ALLOW_USER_INTERACTION=false
+D287_01_ACTIVE_USER_PAM_PROBE_PAM_START_CONDITION=PKCHECK_PASS
+D287_01_ACTIVE_USER_PAM_PROBE_MAX_VERIFY_ACTIONS=1
+D287_01_ACTIVE_USER_PAM_PROBE_MAX_PHYSICAL_CONTACTS=1
+D287_01_ACTIVE_USER_PAM_PROBE_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D287_01_ACTIVE_USER_PAM_PROBE_COMPLETE_OBSERVABILITY=PASS_OFFLINE
+D287_01_ACTIVE_USER_PAM_PROBE_PM_DECISION=ACCEPT_AND_CONTINUE
+D287_01_ACTIVE_USER_PAM_PROBE_OPERATOR_KIT_RELEASED=true
+D287_01_ACTIVE_USER_PAM_PROBE_OPERATOR_KIT=operator_kit/d287-01-active-user-pam-probe
+D287_01_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
 INITIAL_FINGER_ATTEMPT=1
 MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2
 MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3
@@ -1553,8 +1611,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D287_01_ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_DESIGN
-NEXT_BOUNDARY_AFTER_D286_01_REVIEW=D287_01_ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_DESIGN
+NEXT_PRIMARY_BOUNDARY=D287_01_ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D286_01_REVIEW=D287_01_ACTIVE_USER_SESSION_PAM_CONFDIR_SINGLE_VERIFY_HUMAN_GATE
 ```
 
 Report ed evidenze correnti:
@@ -1624,6 +1682,11 @@ Report ed evidenze correnti:
 `analysis/D287/D287_01_post_live_pam_fprintd_review.md`,
 `analysis/D287/D287_01_POST_LIVE_NORMALIZED.env`,
 `analysis/D287/D287_01_POST_LIVE_RECOVERED_JOURNAL.log`,
+`analysis/D287/D287_01_active_user_pam_probe_boundary.md`,
+`analysis/D287/D287_01_ACTIVE_USER_PAM_PROBE_OFFLINE_RESULT.env`,
+`analysis/D287/D287_01_active_user_pam_probe_pm_review.md`,
+`analysis/D287/test_d287_01_active_user_pam_probe.py`,
+`operator_kit/d287-01-active-user-pam-probe/`,
 `GoodixArtifacts/opencv-4.13-rpms/README.md`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,
