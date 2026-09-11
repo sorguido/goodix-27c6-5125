@@ -13,10 +13,19 @@ unset D285_LIBRARY_ONLY
 d286_installed_baseline=a9e234e43d2bdf3e81630df143eb7a809a19bff5
 d286_capture_root="$d286_root/captures/D286_01"
 d286_journal_tmp=
+d286_attempt_input_dir=
+d286_attempt_fifo=
+d286_attempt_fd=
+d286_attempt_pid=
+d286_attempt_rc=
+d286_attempt_fallback_blocked=false
+d286_attempt_watchdog_timeout=false
+d286_max_verify_attempts=3
 d286_critical=(analysis/D284 analysis/D285 analysis/D286
   operator_kit/d284-01-transient-sudo-pilot
   operator_kit/d285-01-persistent-sudo
   operator_kit/d286-01-reboot-survival
+  GoodixArtifacts .gitignore
   "Goodix 27c6 5125 manuale tecnico.md")
 
 d286_refuse () {
@@ -49,6 +58,39 @@ d286_cleanup_journal_tmp () {
      -f $d286_journal_tmp && ! -L $d286_journal_tmp ]] || return 1
   rm -f -- "$d286_journal_tmp"
   d286_journal_tmp=
+}
+
+d286_cleanup_attempt () {
+  local rc=0
+  if [[ -n $d286_attempt_pid ]]; then
+    if kill -0 "$d286_attempt_pid" 2>/dev/null; then
+      kill -KILL "$d286_attempt_pid" 2>/dev/null || rc=1
+    fi
+    wait "$d286_attempt_pid" 2>/dev/null || true
+    d286_attempt_pid=
+  fi
+  if [[ -n $d286_attempt_fd ]]; then
+    exec {d286_attempt_fd}>&- || rc=1
+    d286_attempt_fd=
+  fi
+  if [[ -n $d286_attempt_fifo ]]; then
+    [[ $d286_attempt_fifo == /tmp/goodix-d286-input.*/password-input &&
+       -p $d286_attempt_fifo && ! -L $d286_attempt_fifo ]] || return 1
+    rm -f -- "$d286_attempt_fifo" || rc=1
+    d286_attempt_fifo=
+  fi
+  if [[ -n $d286_attempt_input_dir ]]; then
+    [[ $d286_attempt_input_dir == /tmp/goodix-d286-input.* &&
+       -d $d286_attempt_input_dir && ! -L $d286_attempt_input_dir ]] || return 1
+    rmdir -- "$d286_attempt_input_dir" || rc=1
+    d286_attempt_input_dir=
+  fi
+  return "$rc"
+}
+
+d286_abort_attempt () {
+  d286_cleanup_attempt || true
+  d286_refuse OPERATOR_INTERRUPTED_NO_RETRY
 }
 
 d286_require_polkit_password_path () {
@@ -156,18 +198,46 @@ d286_root_audit_installed () {
   echo "D286_01_${phase}_ROOT_AUDIT_SENSOR_ACTION_COUNT=0"
 }
 
-d286_root_final_audit () {
-  local user=$1 since=$2 raw audit matcher total_epoch_count epoch_count retry_count reopen_count
-  local reset_count clear_halt_count persistent_count match_count
-  d286_root_audit_installed POST_REBOOT_POST_VERIFY "$user"
-  [[ $since =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]] || d286_refuse INVALID_SINCE
+d286_valid_cursor () {
+  local pattern='^[A-Za-z0-9_=.;:-]{20,512}$'
+  [[ $1 =~ $pattern ]]
+}
+
+d286_current_cursor () {
+  local output cursor
+  output=$(LC_ALL=C journalctl -b -u fprintd.service -n 0 --show-cursor --no-pager) ||
+    d286_refuse JOURNAL_CURSOR_READ_FAILED
+  cursor=$(printf '%s\n' "$output" | sed -n 's/^-- cursor: //p')
+  [[ $(printf '%s\n' "$cursor" | grep -c . || true) -eq 1 ]] ||
+    d286_refuse JOURNAL_CURSOR_AMBIGUOUS
+  d286_valid_cursor "$cursor" || d286_refuse JOURNAL_CURSOR_INVALID
+  printf '%s\n' "$cursor"
+}
+
+d286_root_attempt_audit () {
+  local user=$1 cursor=$2 attempt=$3 sudo_rc=$4 fallback_blocked=$5 watchdog_timeout=$6
+  local raw audit matcher extract total_epoch_count epoch_count retry_count reopen_count
+  local reset_count clear_halt_count persistent_count match_count no_match_count
+  local comparison_count extract_count consumed_tls_count drained_count outcome poll
+  [[ $EUID -eq 0 ]] || d286_refuse ROOT_AUDIT_REQUIRES_ROOT
+  d286_safe_user "$user" || d286_refuse OPERATOR_USER_INVALID
+  d286_valid_cursor "$cursor" || d286_refuse JOURNAL_CURSOR_INVALID
+  [[ $attempt =~ ^[123]$ && $sudo_rc =~ ^[0-9]{1,3}$ &&
+     $fallback_blocked =~ ^(true|false)$ && $watchdog_timeout =~ ^(true|false)$ ]] ||
+    d286_refuse ATTEMPT_AUDIT_ARGUMENT_INVALID
+  d286_root_audit_installed "ATTEMPT_${attempt}_POST" "$user"
   raw=$(mktemp /tmp/goodix-d286-journal.XXXXXX)
   d286_journal_tmp=$raw
   trap d286_cleanup_journal_tmp EXIT
-  journalctl -b -u fprintd.service --since "$since" --no-pager >"$raw" ||
-    d286_refuse JOURNAL_READ_FAILED
+  for poll in {1..50}; do
+    LC_ALL=C journalctl -b -u fprintd.service --after-cursor "$cursor" --no-pager >"$raw" ||
+      d286_refuse JOURNAL_READ_FAILED
+    grep -F GOODIX_D282_EPOCH_AUDIT "$raw" >/dev/null && break
+    sleep 0.1
+  done
   audit=$(grep GOODIX_D282_EPOCH_AUDIT "$raw" || true)
   matcher=$(grep GOODIX_SIGFM_MATCH_AUDIT "$raw" || true)
+  extract=$(grep GOODIX_SIGFM_EXTRACT_AUDIT "$raw" || true)
   total_epoch_count=$(grep -c GOODIX_D282_EPOCH_AUDIT "$raw" || true)
   epoch_count=$(grep -c 'GOODIX_D282_EPOCH_AUDIT .*action=FPI_DEVICE_ACTION_VERIFY' "$raw" || true)
   retry_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^(secure_retry|post_retry)=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
@@ -176,188 +246,214 @@ d286_root_final_audit () {
   clear_halt_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^clear_halt=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
   persistent_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^persistent=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
   match_count=$(printf '%s\n' "$matcher" | grep -c 'event=outcome result=match' || true)
-  [[ $total_epoch_count -eq 1 && $epoch_count -eq 1 &&
-     $(printf '%s\n' "$audit" | grep -c 'consumed=1.*tls=1' || true) -eq 1 &&
-     $(printf '%s\n' "$audit" | grep -c 'outstanding=0 drained=1 context_closed=1' || true) -eq 1 &&
-     $retry_count -eq 0 && $reopen_count -eq 0 && $reset_count -eq 0 &&
-     $clear_halt_count -eq 0 && $persistent_count -eq 0 && $match_count -eq 1 ]] ||
-    d286_refuse POST_REBOOT_LIVE_AUDIT_FAILED
+  no_match_count=$(printf '%s\n' "$matcher" | grep -c 'event=outcome result=no_match' || true)
+  comparison_count=$(printf '%s\n' "$matcher" | grep -c 'event=comparison' || true)
+  extract_count=$(printf '%s\n' "$extract" | grep -c GOODIX_SIGFM_EXTRACT_AUDIT || true)
+  consumed_tls_count=$(printf '%s\n' "$audit" | grep -c 'consumed=1.*tls=1' || true)
+  drained_count=$(printf '%s\n' "$audit" | grep -c 'outstanding=0 drained=1 context_closed=1' || true)
+  outcome=PAM_ERROR
+  if [[ $total_epoch_count -gt 1 || $epoch_count -gt 1 || $retry_count -ne 0 ||
+        $reopen_count -ne 0 || $reset_count -ne 0 || $clear_halt_count -ne 0 ||
+        $persistent_count -ne 0 ]]; then
+    outcome=SAFETY_VIOLATION
+  elif [[ $total_epoch_count -eq 1 && $epoch_count -eq 1 && $extract_count -eq 1 &&
+          $comparison_count -ge 1 && $consumed_tls_count -eq 1 && $drained_count -eq 1 &&
+          $match_count -eq 1 && $no_match_count -eq 0 && $sudo_rc -eq 0 &&
+          $fallback_blocked == false && $watchdog_timeout == false ]]; then
+    outcome=MATCH
+  elif [[ $total_epoch_count -eq 1 && $epoch_count -eq 1 && $extract_count -eq 1 &&
+          $comparison_count -ge 1 && $consumed_tls_count -eq 1 && $drained_count -eq 1 &&
+          $match_count -eq 0 && $no_match_count -eq 1 && $sudo_rc -ne 0 &&
+          $fallback_blocked == true && $watchdog_timeout == false ]]; then
+    outcome=NO_MATCH
+  fi
   sed -n 's/^.*\(GOODIX_D282_EPOCH_AUDIT .*$\)/\1/p; s/^.*\(GOODIX_SIGFM_.*$\)/\1/p' \
     "$raw" | sort -u
-  echo D286_01_POST_REBOOT_VERIFY_AUDIT=PASS_SINGLE_MATCH
+  echo "D286_01_ATTEMPT_INDEX=$attempt"
+  echo "D286_01_ATTEMPT_OUTCOME=$outcome"
+  echo "D286_01_ATTEMPT_SUDO_RETURN_CODE=$sudo_rc"
+  echo "D286_01_ATTEMPT_PASSWORD_FALLBACK_BLOCKED=$fallback_blocked"
+  echo "D286_01_ATTEMPT_WATCHDOG_TIMEOUT=$watchdog_timeout"
+  echo "D286_01_ATTEMPT_VERIFY_EPOCH_COUNT=$epoch_count"
+  echo "D286_01_ATTEMPT_PROBE_EXTRACT_COUNT=$extract_count"
+  echo "D286_01_ATTEMPT_COMPARISON_COUNT=$comparison_count"
+  echo "D286_01_ATTEMPT_MATCH_COUNT=$match_count"
+  echo "D286_01_ATTEMPT_NO_MATCH_COUNT=$no_match_count"
+  echo "D286_01_ATTEMPT_RETRY_COUNT=$retry_count"
+  echo "D286_01_ATTEMPT_REOPEN_COUNT=$reopen_count"
+  echo "D286_01_ATTEMPT_RESET_COUNT=$reset_count"
+  echo "D286_01_ATTEMPT_CLEAR_HALT_COUNT=$clear_halt_count"
+  echo "D286_01_ATTEMPT_PERSISTENT_WRITE_FAMILY_COUNT=$persistent_count"
   d286_cleanup_journal_tmp || d286_refuse JOURNAL_CLEANUP_FAILED
   trap - EXIT
 }
 
-d286_root_failure_audit () {
-  local user=$1 since=$2 raw audit matcher total_epoch_count epoch_count
-  local retry_count reopen_count reset_count clear_halt_count persistent_count match_count
-  d286_root_audit_installed POST_REBOOT_FAILED_VERIFY "$user"
-  [[ $since =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]] || d286_refuse INVALID_SINCE
-  raw=$(mktemp /tmp/goodix-d286-journal.XXXXXX)
-  d286_journal_tmp=$raw
-  trap d286_cleanup_journal_tmp EXIT
-  journalctl -b -u fprintd.service --since "$since" --no-pager >"$raw" ||
-    d286_refuse JOURNAL_READ_FAILED
-  audit=$(grep GOODIX_D282_EPOCH_AUDIT "$raw" || true)
-  matcher=$(grep GOODIX_SIGFM_MATCH_AUDIT "$raw" || true)
-  total_epoch_count=$(grep -c GOODIX_D282_EPOCH_AUDIT "$raw" || true)
-  epoch_count=$(grep -c 'GOODIX_D282_EPOCH_AUDIT .*action=FPI_DEVICE_ACTION_VERIFY' "$raw" || true)
-  retry_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^(secure_retry|post_retry)=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
-  reopen_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^reopen=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
-  reset_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^reset=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
-  clear_halt_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^clear_halt=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
-  persistent_count=$(printf '%s\n' "$audit" | awk '{for(i=1;i<=NF;i++)if($i~/^persistent=/){split($i,a,"=");s+=a[2]}}END{print s+0}')
-  match_count=$(printf '%s\n' "$matcher" | grep -c 'event=outcome result=match' || true)
-  sed -n 's/^.*\(GOODIX_D282_EPOCH_AUDIT .*$\)/\1/p; s/^.*\(GOODIX_SIGFM_.*$\)/\1/p' \
-    "$raw" | sort -u
-  echo D286_01_FAILURE_AUDIT=COLLECTED_NO_RETRY
-  echo "D286_01_FAILURE_TOTAL_EPOCH_COUNT=$total_epoch_count"
-  echo "D286_01_FAILURE_VERIFY_EPOCH_COUNT=$epoch_count"
-  echo "D286_01_FAILURE_RETRY_COUNT=$retry_count"
-  echo "D286_01_FAILURE_REOPEN_COUNT=$reopen_count"
-  echo "D286_01_FAILURE_RESET_COUNT=$reset_count"
-  echo "D286_01_FAILURE_CLEAR_HALT_COUNT=$clear_halt_count"
-  echo "D286_01_FAILURE_PERSISTENT_WRITE_FAMILY_COUNT=$persistent_count"
-  echo "D286_01_FAILURE_MATCH_COUNT=$match_count"
-  d286_cleanup_journal_tmp || d286_refuse JOURNAL_CLEANUP_FAILED
-  trap - EXIT
-}
-
-d286_capture_path () {
-  local path=$1 resolved
-  resolved=$(realpath -e -- "$path") || d286_refuse CAPTURE_PATH_INVALID
-  [[ $resolved == "$d286_capture_root"/D28601_CYCLE_*/sanitized &&
-     -d $resolved && ! -L $resolved ]] || d286_refuse CAPTURE_PATH_UNSAFE
-  printf '%s\n' "$resolved"
+d286_run_sudo_attempt () {
+  local attempt=$1 log=$2 marker=D286_PASSWORD_FALLBACK_BLOCKED deadline rc
+  [[ $attempt =~ ^[123]$ && $log == "$d286_capture_root"/D28601_RETRY_*/sanitized/attempt-*.sudo.log ]] ||
+    d286_refuse ATTEMPT_PATH_INVALID
+  d286_attempt_input_dir=$(mktemp -d /tmp/goodix-d286-input.XXXXXX)
+  [[ -d $d286_attempt_input_dir && ! -L $d286_attempt_input_dir ]] ||
+    d286_refuse ATTEMPT_INPUT_DIR_INVALID
+  chmod 0700 "$d286_attempt_input_dir"
+  d286_attempt_fifo="$d286_attempt_input_dir/password-input"
+  mkfifo -m 0600 "$d286_attempt_fifo"
+  exec {d286_attempt_fd}<>"$d286_attempt_fifo"
+  : >"$log"
+  chmod 0600 "$log"
+  trap d286_cleanup_attempt EXIT
+  trap d286_abort_attempt HUP INT TERM
+  LC_ALL=C /usr/bin/sudo -S -p "$marker" -v \
+    <"$d286_attempt_fifo" >"$log" 2>&1 &
+  d286_attempt_pid=$!
+  deadline=$((SECONDS + 70))
+  while kill -0 "$d286_attempt_pid" 2>/dev/null; do
+    if grep -Fq "$marker" "$log"; then
+      d286_attempt_fallback_blocked=true
+      kill -KILL "$d286_attempt_pid" 2>/dev/null || true
+      break
+    fi
+    if (( SECONDS >= deadline )); then
+      d286_attempt_watchdog_timeout=true
+      kill -KILL "$d286_attempt_pid" 2>/dev/null || true
+      break
+    fi
+    sleep 0.1
+  done
+  set +e
+  wait "$d286_attempt_pid"
+  rc=$?
+  set -e
+  d286_attempt_pid=
+  d286_attempt_rc=$rc
+  d286_cleanup_attempt || d286_refuse ATTEMPT_INPUT_CLEANUP_FAILED
+  trap - EXIT HUP INT TERM
 }
 
 operator_pre_reboot () {
-  local baseline user stamp capture rc confirmation boot_id
-  [[ $EUID -ne 0 ]] || d286_refuse OPERATOR_MUST_BE_UNPRIVILEGED
-  baseline=$(git -C "$d286_root" rev-parse HEAD)
-  d286_verify_repo "$baseline"
-  d286_require_polkit_password_path
-  user=$(id -un); d286_safe_user "$user" || d286_refuse OPERATOR_USER_INVALID
-  stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  capture="$d286_capture_root/D28601_CYCLE_${stamp}_${baseline:0:12}/sanitized"
-  [[ ! -e $capture && ! -L $capture ]] || d286_refuse CAPTURE_COLLISION
-  install -d -m 0700 "$capture"
-  set +e
-  pkexec "$d286_script_dir/run-d286-01.sh" --root-audit PRE_REBOOT --user "$user" \
-    2>&1 | tee "$capture/pre-reboot.log"
-  rc=${PIPESTATUS[0]}
-  set -e
-  [[ $rc -eq 0 ]] || d286_refuse PRE_REBOOT_ROOT_AUDIT_FAILED
-  grep -Fx D286_01_UNINSTALL_READINESS=PASS_ALL_PREDELETE_GATES \
-    "$capture/pre-reboot.log" >/dev/null || d286_refuse PRE_REBOOT_AUDIT_INCOMPLETE
-  boot_id=$(sed -n 's/^D286_01_BOOT_ID=//p' "$capture/pre-reboot.log")
-  [[ $boot_id =~ ^[0-9a-f-]{36}$ ]] || d286_refuse PRE_REBOOT_BOOT_ID_INVALID
-  {
-    echo D286_01_CYCLE_STATUS=PRE_REBOOT_PASS_PENDING_REBOOT
-    echo "D286_01_REPO_BASELINE=$baseline"
-    echo "D286_01_BOOT_ID_BEFORE=$boot_id"
-    echo D286_01_PRE_REBOOT_ROOT_AUDIT=PASS
-    echo D286_01_PRE_REBOOT_SENSOR_ACTION_COUNT=0
-  } >"$capture/cycle.env"
-  chmod 0600 "$capture/pre-reboot.log" "$capture/cycle.env"
-  echo "D286_01_CAPTURE_DIRECTORY=$capture"
-  echo "DOPO_IL_RIAVVIO=operator_kit/d286-01-reboot-survival/run-d286-01.sh --operator-post-reboot $capture"
-  echo 'Il computer verrà riavviato. Salvare il lavoro nelle altre applicazioni.'
-  printf 'Digitare RIAVVIA D286 per eseguire il reboot controllato: '
-  read -r confirmation
-  [[ $confirmation == 'RIAVVIA D286' ]] || d286_refuse REBOOT_CANCELLED
-  sync "$capture/pre-reboot.log" "$capture/cycle.env"
-  systemctl reboot || d286_refuse REBOOT_COMMAND_FAILED
+  d286_refuse FIRST_REBOOT_CYCLE_CLOSED_USE_OPERATOR_RETRY
 }
 
 operator_post_reboot () {
-  local capture=$1 baseline user before now since rc audit_rc confirmation
+  d286_refuse FIRST_REBOOT_CYCLE_CLOSED_USE_OPERATOR_RETRY
+}
+
+operator_retry () {
+  local baseline user stamp capture rc audit_rc attempt cursor confirmation outcome epoch_count
+  local final_outcome=FAIL_LIVE_PENDING_INDEPENDENT_REVIEW matched_attempt=0 verify_epoch_total=0
+  local -a outcomes=()
   [[ $EUID -ne 0 ]] || d286_refuse OPERATOR_MUST_BE_UNPRIVILEGED
   baseline=$(git -C "$d286_root" rev-parse HEAD)
   d286_verify_repo "$baseline"
   d286_require_polkit_password_path
+  [[ -x /usr/bin/sudo ]] || d286_refuse SUDO_NOT_FOUND
   user=$(id -un); d286_safe_user "$user" || d286_refuse OPERATOR_USER_INVALID
-  capture=$(d286_capture_path "$capture")
-  [[ $(state_value "$capture/cycle.env" D286_01_CYCLE_STATUS) == PRE_REBOOT_PASS_PENDING_REBOOT &&
-     $(state_value "$capture/cycle.env" D286_01_REPO_BASELINE) == "$baseline" ]] ||
-    d286_refuse CYCLE_STATE_INVALID
-  before=$(state_value "$capture/cycle.env" D286_01_BOOT_ID_BEFORE) ||
-    d286_refuse CYCLE_STATE_INVALID
-  now=$(cat /proc/sys/kernel/random/boot_id)
-  [[ $now != "$before" ]] || d286_refuse REBOOT_NOT_OBSERVED
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  capture="$d286_capture_root/D28601_RETRY_${stamp}_${baseline:0:12}/sanitized"
+  [[ ! -e $capture && ! -L $capture ]] || d286_refuse CAPTURE_COLLISION
+  install -d -m 0700 "$capture"
   set +e
-  pkexec "$d286_script_dir/run-d286-01.sh" --root-audit POST_REBOOT_PRE_VERIFY \
-    --user "$user" 2>&1 | tee "$capture/post-reboot-pre-verify.log"
+  pkexec "$d286_script_dir/run-d286-01.sh" --root-audit POST_REBOOT_RETRY_PRE \
+    --user "$user" 2>&1 | tee "$capture/pre-retry-root-audit.log"
   rc=${PIPESTATUS[0]}
   set -e
-  [[ $rc -eq 0 ]] || d286_refuse POST_REBOOT_ROOT_AUDIT_FAILED
+  [[ $rc -eq 0 ]] || d286_refuse PRE_RETRY_ROOT_AUDIT_FAILED
   grep -Fx D286_01_UNINSTALL_READINESS=PASS_ALL_PREDELETE_GATES \
-    "$capture/post-reboot-pre-verify.log" >/dev/null || d286_refuse POST_REBOOT_ROOT_AUDIT_FAILED
-  sudo -K || d286_refuse SUDO_TIMESTAMP_INVALIDATION_FAILED
-  echo 'Una sola verifica sudo post-reboot. Non digitare la password.'
-  printf 'Confermare il dito fisico digitando INDICE DESTRO: '
+    "$capture/pre-retry-root-audit.log" >/dev/null || d286_refuse PRE_RETRY_AUDIT_INCOMPLETE
+  [[ $(count_goodix_targets /sys/bus/usb/devices) -eq 1 ]] ||
+    d286_refuse REAL_TARGET_CARDINALITY_NOT_ONE
+  /usr/bin/sudo -K || d286_refuse SUDO_TIMESTAMP_INVALIDATION_FAILED
+  echo 'Massimo 3 tentativi sudo reali, ciascuno con un solo contatto esplicito.'
+  echo 'La password sudo è tecnicamente esclusa dal test; gli audit polkit restano password-only.'
+  printf 'Per il tentativo 1/3 digitare INDICE DESTRO: '
   read -r confirmation
   [[ $confirmation == 'INDICE DESTRO' ]] || d286_refuse PHYSICAL_FINGER_NOT_CONFIRMED
-  since=$(date --iso-8601=ns)
-  set +e
-  timeout --signal=INT --kill-after=20s 75s env -u SUDO_ASKPASS sudo -v \
-    2>&1 | tee "$capture/sudo-verify.log"
-  rc=${PIPESTATUS[0]}
-  set -e
-  sudo -K || d286_refuse SUDO_TIMESTAMP_FINAL_INVALIDATION_FAILED
-  if [[ $rc -ne 0 ]]; then
+  for attempt in 1 2 3; do
+    echo "TENTATIVO $attempt/$d286_max_verify_attempts — INDICE DESTRO"
+    cursor=$(d286_current_cursor)
+    d286_attempt_fallback_blocked=false
+    d286_attempt_watchdog_timeout=false
+    d286_run_sudo_attempt "$attempt" "$capture/attempt-${attempt}.sudo.log"
+    /usr/bin/sudo -K || d286_refuse SUDO_TIMESTAMP_FINAL_INVALIDATION_FAILED
     set +e
-    pkexec "$d286_script_dir/run-d286-01.sh" --root-failure-audit --user "$user" \
-      --since "$since" 2>&1 | tee "$capture/post-reboot-failure-audit.log"
+    pkexec "$d286_script_dir/run-d286-01.sh" --root-attempt-audit --user "$user" \
+      --cursor "$cursor" --attempt "$attempt" --sudo-rc "$d286_attempt_rc" \
+      --fallback-blocked "$d286_attempt_fallback_blocked" \
+      --watchdog-timeout "$d286_attempt_watchdog_timeout" \
+      2>&1 | tee "$capture/attempt-${attempt}.audit.log"
     audit_rc=${PIPESTATUS[0]}
     set -e
-    {
-      echo D286_01_RESULT=FAIL_LIVE_NO_RETRY_PENDING_INDEPENDENT_REVIEW
-      echo "D286_01_REPO_BASELINE=$baseline"
-      echo D286_01_REBOOT_OBSERVED=true
-      echo D286_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-      echo "D286_01_SUDO_VALIDATE_RETURN_CODE=$rc"
-      echo "D286_01_FAILURE_AUDIT_RETURN_CODE=$audit_rc"
-    } >"$capture/failure-summary.env"
-    chmod 0600 "$capture"/*
-    [[ $audit_rc -eq 0 ]] ||
-      d286_refuse SUDO_VALIDATE_FAILED_AND_FAILURE_AUDIT_FAILED_NO_RETRY
-    d286_refuse SUDO_VALIDATE_FAILED_NO_RETRY
-  fi
+    [[ $audit_rc -eq 0 ]] || d286_refuse ATTEMPT_AUDIT_FAILED
+    outcome=$(sed -n 's/^D286_01_ATTEMPT_OUTCOME=//p' \
+      "$capture/attempt-${attempt}.audit.log")
+    [[ $(printf '%s\n' "$outcome" | grep -c . || true) -eq 1 ]] ||
+      d286_refuse ATTEMPT_OUTCOME_AMBIGUOUS
+    epoch_count=$(sed -n 's/^D286_01_ATTEMPT_VERIFY_EPOCH_COUNT=//p' \
+      "$capture/attempt-${attempt}.audit.log")
+    [[ $epoch_count =~ ^[0-9]+$ ]] || d286_refuse ATTEMPT_EPOCH_COUNT_INVALID
+    verify_epoch_total=$((verify_epoch_total + epoch_count))
+    outcomes+=("$outcome")
+    case $outcome in
+      MATCH)
+        final_outcome=PASS_LIVE_PENDING_INDEPENDENT_REVIEW
+        matched_attempt=$attempt
+        break
+        ;;
+      NO_MATCH)
+        if [[ $attempt -lt $d286_max_verify_attempts ]]; then
+          echo "NO_MATCH osservato al tentativo $attempt/$d286_max_verify_attempts."
+          printf 'Per autorizzare esplicitamente il tentativo %d/3 digitare TENTATIVO %d: ' \
+            "$((attempt + 1))" "$((attempt + 1))"
+          read -r confirmation
+          [[ $confirmation == "TENTATIVO $((attempt + 1))" ]] ||
+            d286_refuse NEXT_ATTEMPT_NOT_CONFIRMED
+        fi
+        ;;
+      PAM_ERROR|SAFETY_VIOLATION)
+        break
+        ;;
+      *)
+        d286_refuse ATTEMPT_OUTCOME_INVALID
+        ;;
+    esac
+  done
   set +e
-  pkexec "$d286_script_dir/run-d286-01.sh" --root-final-audit --user "$user" \
-    --since "$since" 2>&1 | tee "$capture/post-reboot-final-audit.log"
+  pkexec "$d286_script_dir/run-d286-01.sh" --root-audit POST_REBOOT_RETRY_FINAL \
+    --user "$user" 2>&1 | tee "$capture/post-retry-root-audit.log"
   rc=${PIPESTATUS[0]}
   set -e
-  [[ $rc -eq 0 ]] || d286_refuse POST_REBOOT_FINAL_AUDIT_FAILED
-  grep -Fx D286_01_POST_REBOOT_VERIFY_AUDIT=PASS_SINGLE_MATCH \
-    "$capture/post-reboot-final-audit.log" >/dev/null || d286_refuse FINAL_AUDIT_INCOMPLETE
+  [[ $rc -eq 0 ]] || d286_refuse POST_RETRY_ROOT_AUDIT_FAILED
   {
-    echo D286_01_RESULT=PASS_LIVE_PENDING_INDEPENDENT_REVIEW
+    echo "D286_01_RESULT=$final_outcome"
     echo "D286_01_REPO_BASELINE=$baseline"
-    echo D286_01_REBOOT_OBSERVED=true
-    echo D286_01_POST_REBOOT_STATE_COHERENCE=true
-    echo D286_01_POST_REBOOT_RUNTIME_INTEGRITY=true
-    echo D286_01_POST_REBOOT_TEMPLATE_OWNERSHIP_PINNED=true
-    echo D286_01_POST_REBOOT_UNINSTALL_READINESS=true
-    echo D286_01_VERIFY_ACTION_COUNT=1
+    echo D286_01_POST_REBOOT_PERSISTENT_STATE_AUDIT=PASS
+    echo "D286_01_MAX_VERIFY_ATTEMPTS=$d286_max_verify_attempts"
+    echo "D286_01_VERIFY_ATTEMPTS_PERFORMED=${#outcomes[@]}"
+    echo "D286_01_VERIFY_EPOCH_COUNT=$verify_epoch_total"
+    echo "D286_01_MATCHED_ATTEMPT=$matched_attempt"
+    echo D286_01_PAM_MAX_TRIES_PER_ATTEMPT=1
+    echo D286_01_MAX_PHYSICAL_CONTACTS=3
     echo D286_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-    echo D286_01_SUDO_VALIDATE_RETURN_CODE=0
-    echo D286_01_SIGFM_MATCH_OUTCOME=match
+    echo D286_01_STOP_ON_FIRST_MATCH=true
+    echo D286_01_PASSWORD_INPUT_POSSIBLE_DURING_SUDO_TEST=false
+    echo D286_01_PASSWORD_FALLBACK_STRUCTURALLY_AVAILABLE=true
+    printf 'D286_01_ATTEMPT_OUTCOMES='
+    (IFS=,; echo "${outcomes[*]}")
     echo TEMPLATE_INCLUDED_IN_EXPORT=false
     echo REAL_USB_ENUMERATION_ATTEMPTED=true
-    echo REAL_SENSOR_ACCESSED=true
+    if [[ $verify_epoch_total -gt 0 ]]; then
+      echo REAL_SENSOR_ACCESSED=true
+    else
+      echo REAL_SENSOR_ACCESSED=false
+    fi
     echo LIVE_EXECUTION_PERFORMED=true
   } >"$capture/summary.env"
-  echo D286_01_CYCLE_STATUS=PASS_LIVE_PENDING_INDEPENDENT_REVIEW >"$capture/cycle.env"
-  echo "D286_01_REPO_BASELINE=$baseline" >>"$capture/cycle.env"
-  echo "D286_01_BOOT_ID_BEFORE=$before" >>"$capture/cycle.env"
-  echo "D286_01_BOOT_ID_AFTER=$now" >>"$capture/cycle.env"
   chmod 0600 "$capture"/*
   sha256sum "$capture"/*
-  echo D286_01_POST_REBOOT=PASS_LIVE_PENDING_INDEPENDENT_REVIEW
+  echo "D286_01_RETRY_RESULT=$final_outcome"
   echo "D286_01_CAPTURE_DIRECTORY=$capture"
+  [[ $final_outcome == PASS_LIVE_PENDING_INDEPENDENT_REVIEW ]] ||
+    d286_refuse RETRY_SERIES_FAILED_NO_FOURTH_ATTEMPT
 }
 
 offline_preflight () {
@@ -365,10 +461,16 @@ offline_preflight () {
   bash -n "$d286_script_dir/run-d286-01.sh"
   (cd "$d286_root" && python3 -m unittest -v analysis.D286.test_d286_01_offline_contract)
   d286_require_polkit_password_path
+  d286_current_cursor >/dev/null
   echo D286_01_OFFLINE_PREFLIGHT=PASS
   echo D286_01_PRIVILEGED_AUDIT_PATH=POLKIT_SYSTEM_AUTH_WITHOUT_FINGERPRINT
-  echo D286_01_REBOOT_EXECUTION=HUMAN_REQUIRED
-  echo D286_01_POST_REBOOT_VERIFY_ACTION_MAX=1
+  echo D286_01_FIRST_REBOOT_CYCLE=CLOSED_PRESERVED
+  echo D286_01_RETRY_EXECUTION=HUMAN_REQUIRED
+  echo D286_01_MAX_VERIFY_ATTEMPTS=3
+  echo D286_01_MAX_PHYSICAL_CONTACTS=3
+  echo D286_01_PAM_MAX_TRIES_PER_ATTEMPT=1
+  echo D286_01_STOP_ON_FIRST_MATCH=true
+  echo D286_01_PASSWORD_INPUT_POSSIBLE_DURING_SUDO_TEST=false
   echo D286_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo REAL_SENSOR_ACCESSED=false
@@ -388,20 +490,22 @@ case ${1:-} in
     [[ $# -eq 2 ]] || d286_refuse USAGE
     operator_post_reboot "$2"
     ;;
+  --operator-retry)
+    [[ $# -eq 1 ]] || d286_refuse USAGE
+    operator_retry
+    ;;
   --root-audit)
     [[ $# -eq 4 && $3 == --user ]] || d286_refuse USAGE
     d286_root_audit_installed "$2" "$4"
     ;;
-  --root-final-audit)
-    [[ $# -eq 5 && $2 == --user && $4 == --since ]] || d286_refuse USAGE
-    d286_root_final_audit "$3" "$5"
-    ;;
-  --root-failure-audit)
-    [[ $# -eq 5 && $2 == --user && $4 == --since ]] || d286_refuse USAGE
-    d286_root_failure_audit "$3" "$5"
+  --root-attempt-audit)
+    [[ $# -eq 13 && $2 == --user && $4 == --cursor && $6 == --attempt &&
+       $8 == --sudo-rc && $10 == --fallback-blocked &&
+       $12 == --watchdog-timeout ]] || d286_refuse USAGE
+    d286_root_attempt_audit "$3" "$5" "$7" "$9" "$11" "$13"
     ;;
   *)
-    echo "Uso: $0 --offline-preflight | --operator-pre-reboot | --operator-post-reboot <capture-dir>" >&2
+    echo "Uso: $0 --offline-preflight | --operator-retry" >&2
     exit 2
     ;;
 esac

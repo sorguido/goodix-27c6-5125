@@ -44,7 +44,7 @@ anomalia non ripetere il kit.
   dello staging;
 - branch `development`, HEAD allineato a `origin/development`, worktree
   live-critical pulito;
-- RPM OpenCV già presenti in `/tmp/goodix-opencv-4.13-rpms`;
+- RPM OpenCV già presenti in `/home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms`;
 - esattamente un Goodix USB `27c6:5125`;
 - nessun altro uso contemporaneo di fprintd, PAM biometrico o blocco schermo.
 
@@ -54,7 +54,7 @@ Dalla root del repository, come utente normale:
 
 ```bash
 operator_kit/d284-01-transient-sudo-pilot/run-d284-01.sh \
-  --operator-run /tmp/goodix-opencv-4.13-rpms
+  --operator-run /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il launcher rifiuta oggi il comando prima di costruire la candidate. Nella run
@@ -68,7 +68,7 @@ non allegare `private/`.
 
 ```bash
 operator_kit/d284-01-transient-sudo-pilot/run-d284-01.sh \
-  --offline-preflight /tmp/goodix-opencv-4.13-rpms
+  --offline-preflight /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il preflight non chiama modalità live, non usa `sudo`, non enumera USB e non

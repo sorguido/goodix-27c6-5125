@@ -39,7 +39,7 @@ Su `RETRY`, errore o telemetria incoerente il kit si ferma e fa rollback.
 
 - branch `development`, `HEAD` allineato a `origin/development` e worktree
   live-critical pulito;
-- RPM OpenCV presenti in `/tmp/goodix-opencv-4.13-rpms`;
+- RPM OpenCV presenti in `/home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms`;
 - esattamente un Goodix USB `27c6:5125` collegato;
 - nessun altro utilizzo contemporaneo di fprintd.
 
@@ -49,7 +49,7 @@ Eseguire dalla root del repository come utente normale:
 
 ```bash
 operator_kit/d282-02-matcher-order/run-d282-02.sh \
-  --operator-run /tmp/goodix-opencv-4.13-rpms
+  --operator-run /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il launcher costruisce e verifica la candidate, poi chiede `ESEGUI`. Durante
@@ -91,7 +91,7 @@ bilanciato; questa singola run non autorizza generalizzazioni statistiche.
 
 ```bash
 operator_kit/d282-02-matcher-order/run-d282-02.sh \
-  --offline-preflight /tmp/goodix-opencv-4.13-rpms
+  --offline-preflight /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il preflight compila e verifica la candidate e la telemetria con dati

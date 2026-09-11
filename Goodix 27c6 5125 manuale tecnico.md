@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D285/01 attivo e chiuso; D286/01 reboot survival pronto offline
+### Stato corrente — D285/01 attivo; D286/01 retry post-reboot pronto offline
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -712,33 +712,54 @@ ownership-pinned resta disponibile. Il rischio
 D286: survival post-reboot e readiness del rollback, con nuovo Human Gate
 prima di privilegi, reboot o verifica biometrica.
 
-D286/01 prepara quel boundary senza modificare l'installazione. Sul target
-Fedora `/usr/bin/pkexec` è disponibile e `/usr/lib/pam.d/polkit-1` include
-`system-auth`; poiché D285 ha rimosso pam_fprintd da `system-auth`, gli audit
-root-only pre/post reboot possono usare password/polkit senza consumare una
-azione sensore attraverso il PAM sudo D285.
+D286/01 ha eseguito il primo ciclo sulla baseline
+`f9bb4551a47704bb007f2877b6b112c5d9d39fed`. Il boot ID cambia da
+`b281de25-3fba-48c7-9ea3-e0021b8d1342` a
+`351d5424-2894-4d0c-ba9a-596c42481ab7`; gli audit root-only prima e dopo il
+reboot chiudono state, runtime, wrapper, drop-in, authselect ridotto, fallback
+password, unico template ownership-pinned, libfprint di sistema e tutti i gate
+pre-delete dell'uninstall. Il survival persistente è quindi PASS.
 
-Il kit lega le due fasi con il boot ID. Prima del reboot verifica direttamente
-state root-only, tutti i file/hash persistenti, authselect ridotto, fallback
-password, wrapper/drop-in, manifest runtime, unica ownership del template,
-libfprint di sistema e tutti i gate pre-delete dell'uninstall, senza cancellare
-o esportare valori protetti. Dopo un boot ID diverso ripete l'audit e consente
-una sola `sudo -v`; il successo richiede una sola epoch VERIFY, un solo SIGFM
-match, zero retry/reopen/reset/clear-halt/persistenza nota e chiusura drenata.
+La singola VERIFY post-reboot produce invece un autentico `NO_MATCH`. La
+telemetria recuperata read-only dallo stesso boot mostra 112 keypoint, otto
+confronti, score massimo 14 sul sample 1 contro soglia invariata 40, una sola
+epoch/azione, un TLS, 76 submit, zero retry/reopen/reset/clear-halt/famiglie
+persistenti e cleanup drenato. L'operatore attesta che il fallback password è
+comparso e che la password non è stata usata. `sudo` termina infine con 137;
+nessun retry automatico è stato eseguito.
 
-Se la verifica fallisce, non viene ripetuta: un audit polkit root-only raccoglie
-la telemetria sanitizzata della singola prova e il kit termina fail-closed.
+Il failure audit della prima run non riesce a rileggere il journal perché il
+timestamp `2026-09-11T20:51:25,647518798+02:00`, generato con virgola decimale
+dalla locale italiana, non è accettato da `journalctl`. La capture originale è
+preservata byte-identica e hash-pinned; la telemetria recuperata è marcata
+separatamente come same-boot read-only e non come parte della capture.
 
-La pre-fase ha budget sensore zero; la post-fase massimo una action e un
-contatto. Non sono in scope enrollment, delete, reinstallazione, uninstall,
-lock screen o login. In caso di non-match o password prompt non esiste retry;
-si preserva la capture per review, tenendo distinto il rischio biometrico
-occasionale da un drift della persistenza. Il preflight è `17/17 PASS`, non ha
-invocato pkexec/sudo/reboot/fprintd/USB e chiude l'executable path offline fino
-al nuovo `HUMAN_REQUIRED`. La regressione cumulativa D282–D286 è `197/197 PASS`
-nell'ambiente host. Quattro test host-side non sono eseguibili nel sandbox
-ristretto per i permessi socket systemd/PAM, ma passano fuori dal sandbox senza
-privilegi, USB o sensore. `shellcheck` non è disponibile; `bash -n` è incluso.
+Il vecchio ciclo reboot è chiuso fail-closed e non va ripetuto. Il correttivo
+D286 usa cursor systemd con `LC_ALL=C`, quindi elimina timestamp e parsing
+locale. Può eseguire al massimo tre processi reali `/usr/bin/sudo -v`, ognuno
+con PAM `max-tries=1`. Lo stdin sudo è un FIFO privato senza writer: nessuna
+password può entrare nel test. Se PAM raggiunge il fallback, un prompt
+sentinella causa il kill diretto dell'esatto processo sudo prima che inizi una
+nuova conversazione; il fallback password D285 resta invariato e disponibile
+per l'uso normale del sistema.
+
+Ogni tentativo è delimitato da un cursor e produce telemetry separata:
+keypoint, score, sample, confronti, epoch, return code e contatori di sicurezza.
+Solo `NO_MATCH` permette di proporre il contatto successivo, dopo una nuova
+conferma testuale dell'operatore; `MATCH` arresta immediatamente la serie,
+mentre `PAM_ERROR` o `SAFETY_VIOLATION` terminano fail-closed. Dopo tre
+`NO_MATCH` non esiste un quarto tentativo e non si generalizza FRR/FAR.
+
+Gli RPM OpenCV non dipendono più da `/tmp`. Il path locale persistente canonico
+è `GoodixArtifacts/opencv-4.13-rpms/` nella root di questo clone. I cinque
+payload RPM sono ignorati da Git, mentre README e manifest restano versionati;
+i cinque SHA-256 canonici non cambiano. Il kit D286 usa il runtime D285 già
+installato e non richiede gli RPM, reinstallazione o modifica della candidate.
+I cinque payload sono stati riscaricati nel nuovo path e verificati `5/5`; il
+preflight D285 completo ha consumato direttamente quel path, ricostruito la
+candidate e chiuso offline senza USB o sensore. Il contratto D286 è `30/30
+PASS` e la regressione cumulativa D282–D286 è `210/210 PASS` nell'ambiente
+host. `shellcheck` resta non disponibile; `bash -n` è incluso nel preflight.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -1157,26 +1178,43 @@ D285_01_INSTALL_LIVE_READINESS=CLOSED_DO_NOT_RERUN
 D285_01_INSTALL_ENTRYPOINT_CLOSED=true
 D285_01_UNINSTALL_ENTRYPOINT_RETAINED=true
 D285_01_AUTONOMOUS_LIVE_ALLOWED=false
-D286_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_REBOOT_CYCLE
-D286_01_BOUNDARY=PERSISTENT_SURVIVAL_AND_ROLLBACK_READINESS
+D286_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_EXPLICIT_RETRY_SERIES
+D286_01_BOUNDARY=POST_REBOOT_SUDO_MATCH_REPEATABILITY
 D286_01_PRIVILEGED_AUDIT_PATH=POLKIT_SYSTEM_AUTH_WITHOUT_FINGERPRINT
-D286_01_PRE_REBOOT_SENSOR_ACTION_MAX=0
-D286_01_REBOOT_REQUIRED=true
-D286_01_POST_REBOOT_VERIFY_ACTION_MAX=1
-D286_01_POST_REBOOT_EXPECTED_PHYSICAL_CONTACT_MAX=1
+D286_01_FIRST_CYCLE_BASELINE=f9bb4551a47704bb007f2877b6b112c5d9d39fed
+D286_01_POST_REBOOT_PERSISTENT_STATE_AUDIT=PASS
+D286_01_FIRST_POST_REBOOT_VERIFY=NO_MATCH
+D286_01_PASSWORD_FALLBACK_ENTERED=true
+D286_01_PASSWORD_USED_FOR_TEST=false
+D286_01_FAILURE_AUDIT_TIMESTAMP_BUG=true
+D286_01_FIRST_CYCLE_AUTOMATIC_RETRY_PERFORMED=false
+D286_01_FIRST_REBOOT_CYCLE=CLOSED_PRESERVED
+D286_01_JOURNAL_BOUNDARY=SYSTEMD_CURSOR_LC_ALL_C
+D286_01_SUDO_TEST_INPUT=PRIVATE_FIFO_NO_PASSWORD_WRITER
+D286_01_PASSWORD_FALLBACK_SENTINEL=KILL_EXACT_SUDO_PROCESS
+D286_01_PASSWORD_FALLBACK_STRUCTURALLY_AVAILABLE=true
+D286_01_PASSWORD_INPUT_POSSIBLE_DURING_SUDO_TEST=false
+D286_01_MAX_VERIFY_ATTEMPTS=3
+D286_01_MAX_PHYSICAL_CONTACTS=3
+D286_01_PAM_MAX_TRIES_PER_ATTEMPT=1
 D286_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D286_01_STOP_ON_FIRST_MATCH=true
 D286_01_ENROLL_IN_SCOPE=false
 D286_01_DELETE_IN_SCOPE=false
 D286_01_UNINSTALL_EXECUTION_IN_SCOPE=false
 D286_01_LOCK_SCREEN_IN_SCOPE=false
 D286_01_LOGIN_IN_SCOPE=false
 D286_01_PROTECTED_VALUES_EXPORTED=false
-D286_01_OFFLINE_CONTRACT_MATRIX=17/17_PASS
-D286_01_COMBINED_REGRESSION_MATRIX=197/197_PASS_HOST_ENV
+D286_01_OFFLINE_CONTRACT_MATRIX=30/30_PASS
+D286_01_COMBINED_REGRESSION_MATRIX=210/210_PASS_HOST_ENV
 D286_01_SHELLCHECK=UNAVAILABLE
 D286_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
 D286_01_OPERATOR_KIT=operator_kit/d286-01-reboot-survival
-D286_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_REBOOT_CYCLE
+D286_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_EXPLICIT_RETRY_SERIES
+OPENCV_RPM_DIRECTORY=GoodixArtifacts/opencv-4.13-rpms
+OPENCV_RPM_GIT_TREATMENT=PAYLOAD_IGNORED_DOCUMENTATION_TRACKED
+OPENCV_RPM_MANIFEST_VERIFICATION=5/5_PASS
+OPENCV_D285_BUILD_PREFLIGHT=PASS_OFFLINE
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -1209,8 +1247,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D286_01_OPERATOR_REBOOT_SURVIVAL_CYCLE_HUMAN_GATE
-NEXT_BOUNDARY_AFTER_D285_01_REVIEW=D286_01_OPERATOR_REBOOT_SURVIVAL_CYCLE_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=D286_01_OPERATOR_EXPLICIT_RETRY_SERIES_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D286_01_FIRST_CYCLE_REVIEW=D286_01_OPERATOR_EXPLICIT_RETRY_SERIES_HUMAN_GATE
 ```
 
 Report ed evidenze correnti:
@@ -1256,8 +1294,14 @@ Report ed evidenze correnti:
 `operator_kit/d285-01-persistent-sudo/`,
 `analysis/D286/D286_01_reboot_survival_boundary.md`,
 `analysis/D286/D286_01_OFFLINE_RESULT.env`,
+`analysis/D286/D286_01_first_cycle_post_live_review.md`,
+`analysis/D286/D286_01_FIRST_CYCLE_NORMALIZED.env`,
+`analysis/D286/D286_01_FIRST_CYCLE_RECOVERED_JOURNAL.log`,
+`analysis/D286/d286_01_first_cycle_evidence_audit.py`,
 `analysis/D286/test_d286_01_offline_contract.py`,
+`captures/D286_01/D28601_CYCLE_20260911T184820Z_f9bb4551a477/sanitized/`,
 `operator_kit/d286-01-reboot-survival/`,
+`GoodixArtifacts/opencv-4.13-rpms/README.md`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,
 `analysis/D282/D282_01_ATTEMPT_05_NORMALIZED.env`,

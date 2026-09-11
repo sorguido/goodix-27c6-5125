@@ -1,62 +1,81 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D286/01 — survival a reboot e rollback readiness
+# D286/01 — retry manuali post-reboot del consumer sudo
 
-> **HUMAN REQUIRED:** il kit esegue un reboot reale e, dopo il riavvio, una
-> sola autenticazione biometrica `sudo -v`. L'agente AI non deve avviarlo.
+> **HUMAN REQUIRED:** il kit può eseguire fino a tre autenticazioni
+> biometriche `sudo -v` sul sensore reale. L'agente AI non deve avviarlo.
 
-## Scopo
+## Stato del primo ciclo
 
-Il kit verifica prima e dopo il reboot la coerenza root-only dell'installazione
-D285: state, runtime, wrapper, drop-in, authselect, PAM, sudoers, unico template
-ownership-pinned, libfprint di sistema e tutti i pre-delete gate dell'uninstall.
-Non disinstalla nulla e non abilita lock screen o login.
+Il reboot D286 iniziale è già avvenuto ed è chiuso: gli audit root-only prima e
+dopo il riavvio hanno provato la sopravvivenza di state, runtime, wrapper,
+drop-in, authselect, PAM, sudoers, template ownership-pinned e libfprint di
+sistema. La sola VERIFY ha prodotto un autentico `NO_MATCH`; non è stato
+eseguito alcun retry automatico. Il vecchio percorso `--operator-pre-reboot` /
+`--operator-post-reboot` ora rifiuta fail-closed e non va rieseguito.
 
-Gli audit privilegiati usano `pkexec`, non `sudo`: su questo target polkit usa
-`system-auth`, dal quale D285 ha rimosso pam_fprintd. L'elevazione di audit
-richiede quindi la password amministrativa ma non deve raggiungere il sensore.
-Il solo contatto biometrico previsto è la `sudo -v` post-reboot.
+## Cosa cambia nel correttivo
 
-## Prima del reboot
+- il journal è delimitato con un cursor systemd, senza timestamp dipendenti
+  dalla locale;
+- ogni tentativo usa il vero consumer `/usr/bin/sudo -v` e il PAM D285
+  `max-tries=1`;
+- stdin di sudo è un FIFO privato che non riceve mai byte di password;
+- se PAM raggiunge il fallback, un prompt sentinella fa terminare direttamente
+  quel processo sudo prima di qualunque retry interno;
+- ogni nuovo contatto richiede una conferma esplicita dell'operatore;
+- l'audit per tentativo classifica `MATCH`, `NO_MATCH`, `PAM_ERROR` o
+  `SAFETY_VIOLATION` dal journal, preservando epoch, keypoint, score,
+  comparison, matched sample e contatori di sicurezza.
 
-Salvare ogni lavoro aperto, non usare contemporaneamente fprintd/sudo e
-lanciare dalla root del repository come utente normale:
+Il fallback password D285 resta disponibile per il normale uso del sistema;
+soltanto questo test non dispone di un canale attraverso cui fornirla.
+
+## Comando operatore
+
+Collegare esattamente un Goodix `27c6:5125` e non usare contemporaneamente
+fprintd, sudo biometrico, lock screen o login. Dalla root del repository, come
+utente normale, eseguire:
 
 ```bash
-operator_kit/d286-01-reboot-survival/run-d286-01.sh --operator-pre-reboot
+operator_kit/d286-01-reboot-survival/run-d286-01.sh --operator-retry
 ```
 
-Autenticare il dialogo polkit con la password. Il kit crea una capture
-sanitizzata persistente nel repository, stampa il comando post-reboot e chiede
-`RIAVVIA D286`. Non digitare la conferma se un gate fallisce.
+I dialoghi `pkexec` prima, durante e dopo la serie sono audit root-only e
+richiedono la password amministrativa attraverso `system-auth`, dove
+fingerprint è disabilitato. Non sono tentativi biometrici.
 
-## Dopo il reboot
+Per il primo contatto digitare `INDICE DESTRO`. Dopo un `NO_MATCH`, il kit
+chiede esplicitamente `TENTATIVO 2` o `TENTATIVO 3`. Non appoggiare nuovamente
+il dito senza quella richiesta. Il primo `MATCH` termina immediatamente la
+serie. Dopo tre `NO_MATCH`, oppure su `PAM_ERROR`/`SAFETY_VIOLATION`, il kit
+termina senza un quarto tentativo e conserva la capture per la review AI-PM.
 
-Accedere normalmente, non bloccare lo schermo e usare esattamente il comando
-stampato prima del riavvio:
+## Contratto e stop condition
 
-```bash
-operator_kit/d286-01-reboot-survival/run-d286-01.sh \
-  --operator-post-reboot <capture-directory-stampata>
+```text
+MAX_VERIFY_ATTEMPTS=3
+MAX_PHYSICAL_CONTACTS=3
+PAM_MAX_TRIES_PER_ATTEMPT=1
+AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+STOP_ON_FIRST_MATCH=true
+PASSWORD_INPUT_POSSIBLE_DURING_SUDO_TEST=false
 ```
 
-Il primo dialogo polkit esegue l'audit root-only senza sensore. Poi digitare
-`INDICE DESTRO` e appoggiare il dito una sola volta. Non digitare la password
-nel prompt sudo: se compare, premere `Ctrl-C`. Non ripetere automaticamente in
-caso di non-match o anomalia; il rischio noto
-`SAME_FINGER_FALSE_NON_MATCH_OCCASIONALE` rende un singolo non-match non
-conclusivo. In caso di fallimento il kit raccoglie una volta sola, via polkit e
-senza nuova verifica, la telemetria sanitizzata della prova fallita. Conservare
-la capture e richiedere review.
+Non modificare matcher, threshold, preprocessing o template dopo un
+`NO_MATCH`. Non disinstallare o reinstallare D285. Non estendere la prova a
+lock screen o login.
 
-## Guardrail
+## OpenCV per build future
 
-- una sola invocazione `sudo -v` post-reboot;
-- `pam_fprintd max-tries=1` e nessun retry del kit;
-- nessun enrollment, delete, reinstallazione o modifica PAM/authselect;
-- nessuna esportazione di state, pathname/hash template o FP3;
-- audit fail-closed prima del reboot e prima/dopo la verifica;
-- diagnostica post-fallimento root-only senza retry del sensore;
-- timestamp sudo invalidato prima e dopo la prova.
+Il path persistente canonico degli RPM è:
+
+```text
+/home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
+```
+
+Gli RPM sono locali e ignorati da Git; i cinque digest restano quelli del
+manifest versionato `operator_kit/d279-48-offline-protected-rocky-nbis-sigfm/opencv-rpms.sha256`.
+D286 usa il runtime già installato e non ricompila né reinstalla nulla.
 
 ## Preflight offline
 
@@ -64,4 +83,5 @@ la capture e richiedere review.
 operator_kit/d286-01-reboot-survival/run-d286-01.sh --offline-preflight
 ```
 
-Il preflight non invoca pkexec, sudo, systemctl reboot, fprintd o USB.
+Il preflight non invoca pkexec, sudo, fprintd o USB. Verifica anche che il
+journal cursor sia leggibile dall'utente corrente.

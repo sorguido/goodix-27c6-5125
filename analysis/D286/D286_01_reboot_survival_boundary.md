@@ -1,5 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D286/01 — survival a reboot e rollback readiness
+# D286/01 — survival a reboot e rollback readiness (design iniziale)
+
+> Il primo ciclo è stato eseguito sulla baseline `f9bb4551a477` ed è ora
+> chiuso. Il survival persistente è PASS, la VERIFY è `NO_MATCH` e il percorso
+> timestamp/fallback è superato dal correttivo cursor + FIFO documentato in
+> `D286_01_first_cycle_post_live_review.md`.
 
 ## Decisione e metodo
 
@@ -39,16 +44,17 @@ delete o uninstall. La pre-fase ha budget sensore zero, la post-fase una sola
 action/contatto. Le capture esportano soltanto booleani e telemetry
 sanitizzata, mai state, hash/path template o FP3.
 
-Il preflight D286 chiude `17/17` contratti. La matrice cumulativa D282–D286
-chiude `197/197` nell'ambiente host; l'esecuzione confinata fallisce invece su
+Il preflight del design iniziale chiudeva `17/17` contratti. La relativa
+matrice cumulativa D282–D286 chiudeva `197/197` nell'ambiente host;
+l'esecuzione confinata falliva invece su
 quattro controlli che richiedono socket systemd/PAM non concessi dal sandbox.
 `shellcheck` non è installato, mentre `bash -n` è incluso nel preflight.
 
 ```text
-OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_REBOOT_CYCLE
-ADVANCEMENT=NEW_CONTROLLED_REBOOT_AND_DIRECT_ROLLBACK_READINESS_OPERATOR_PATH
-EXECUTABLE_CLOSURE=PASS_OFFLINE
-RESIDUAL_BLOCKER_OR_RISK=REBOOT_AND_ONE_POST_REBOOT_SENSOR_ACTION_NOT_EXECUTED
+OUTCOME=SUPERSEDED_BY_POST_LIVE_REVIEW_AND_EXPLICIT_RETRY_CORRECTIVE
+ADVANCEMENT=HISTORICAL_INITIAL_REBOOT_OPERATOR_PATH
+EXECUTABLE_CLOSURE=SUPERSEDED_SEE_POST_LIVE_REVIEW
+RESIDUAL_BLOCKER_OR_RISK=SEE_CURRENT_EXPLICIT_RETRY_CORRECTIVE
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE
 ```

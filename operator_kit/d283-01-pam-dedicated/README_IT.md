@@ -31,7 +31,7 @@ il più possibile failure PAM e false reject biometrico.
 
 - branch `development`, `HEAD` allineato a `origin/development` e worktree
   live-critical pulito;
-- RPM OpenCV già presenti in `/tmp/goodix-opencv-4.13-rpms`;
+- RPM OpenCV già presenti in `/home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms`;
 - Fedora `fprintd-1.94.5-5.fc44.x86_64` e
   `fprintd-pam-1.94.5-5.fc44.x86_64`;
 - esattamente un Goodix USB `27c6:5125` collegato;
@@ -43,7 +43,7 @@ Il comando usato dall'operatore è conservato soltanto per provenance:
 
 ```bash
 operator_kit/d283-01-pam-dedicated/run-d283-01.sh \
-  --operator-run /tmp/goodix-opencv-4.13-rpms
+  --operator-run /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il launcher costruisce e verifica la candidate, mostra il budget e chiede di
@@ -62,7 +62,7 @@ creazione dell'export.
 
 ```bash
 operator_kit/d283-01-pam-dedicated/run-d283-01.sh \
-  --offline-preflight /tmp/goodix-opencv-4.13-rpms
+  --offline-preflight /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il preflight compila la candidate e prova `pam_start_confdir()` con

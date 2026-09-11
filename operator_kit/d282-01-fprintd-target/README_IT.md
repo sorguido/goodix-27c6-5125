@@ -315,7 +315,7 @@ questo boundary:
 
 ```bash
 operator_kit/d282-01-fprintd-target/run-d282-01.sh \
-  --operator-run /tmp/goodix-opencv-4.13-rpms
+  --operator-run /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il comando va avviato come utente normale. Costruisce la candidate dal `HEAD`

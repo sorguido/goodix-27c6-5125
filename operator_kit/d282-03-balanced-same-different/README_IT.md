@@ -38,7 +38,7 @@ l’early-return del matcher. `trials.tsv` espone quindi
 ## Prerequisiti
 
 - branch `development`, HEAD uguale a `origin/development`, review set pulito;
-- RPM OpenCV in `/tmp/goodix-opencv-4.13-rpms`;
+- RPM OpenCV in `/home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms`;
 - esattamente un Goodix USB `27c6:5125` collegato;
 - nessun altro uso contemporaneo di fprintd;
 - operatore pronto a usare soltanto gli indici destro e sinistro richiesti.
@@ -49,7 +49,7 @@ Da utente normale, nella root del repository:
 
 ```bash
 operator_kit/d282-03-balanced-same-different/run-d282-03.sh \
-  --operator-run /tmp/goodix-opencv-4.13-rpms
+  --operator-run /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il launcher compila e verifica la candidate, poi richiede `ESEGUI`. Per
@@ -78,7 +78,7 @@ attendere la review AI-PM prima di qualunque prova PAM.
 
 ```bash
 operator_kit/d282-03-balanced-same-different/run-d282-03.sh \
-  --offline-preflight /tmp/goodix-opencv-4.13-rpms
+  --offline-preflight /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Non enumera USB, non avvia fprintd e non raggiunge il sensore.

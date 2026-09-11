@@ -44,7 +44,7 @@ fallback password di sudo resta disponibile.
 
 - Fedora 44 x86_64 e versioni esatte validate dal preflight;
 - branch `development`, HEAD uguale a `origin/development`, review set pulito;
-- RPM OpenCV integri in `/tmp/goodix-opencv-4.13-rpms`;
+- RPM OpenCV integri in `/home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms`;
 - esattamente un Goodix USB `27c6:5125`;
 - nessun template fprintd preesistente per l'utente;
 - nessun file D285 già presente;
@@ -66,7 +66,7 @@ Il comando storico seguente è chiuso fail-closed e non deve essere rieseguito:
 
 ```bash
 operator_kit/d285-01-persistent-sudo/run-d285-01.sh \
-  --operator-install /tmp/goodix-opencv-4.13-rpms
+  --operator-install /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 La run completata richiedeva `INSTALLA D285`, poi `DESTRO` per otto contatti enrollment e
@@ -96,7 +96,7 @@ ripristina lo stato iniziale del servizio.
 
 ```bash
 operator_kit/d285-01-persistent-sudo/run-d285-01.sh \
-  --offline-preflight /tmp/goodix-opencv-4.13-rpms
+  --offline-preflight /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
 Il preflight costruisce la candidate e verifica ABI, manifest, wrapper,
