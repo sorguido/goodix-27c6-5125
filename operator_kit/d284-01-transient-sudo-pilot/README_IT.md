@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D284/01 — pilot transiente `sudo` con impronta
+# D284/01 — pilot transiente `sudo` con impronta (chiuso)
 
-> **HUMAN REQUIRED:** questo kit non è stato eseguito live. Raggiunge il
-> sensore, usa `sudo` e modifica temporaneamente configurazione PAM/sudoers.
-> Deve essere avviato manualmente dall'Utente soltanto dopo la closure offline.
+> **CHIUSO — NON RIESEGUIRE:** Attempt 01 è stata eseguita manualmente e la
+> review indipendente l'ha classificata `PASS_LIVE_CLOSED`. Gli entrypoint live
+> rifiutano ora fail-closed con `D284_01_LIVE_CLOSED_DO_NOT_RERUN`.
 
 ## Perché questo boundary
 
@@ -48,7 +48,7 @@ anomalia non ripetere il kit.
 - esattamente un Goodix USB `27c6:5125`;
 - nessun altro uso contemporaneo di fprintd, PAM biometrico o blocco schermo.
 
-## Comando operativo
+## Comando operativo storico, ora disabilitato
 
 Dalla root del repository, come utente normale:
 
@@ -57,7 +57,8 @@ operator_kit/d284-01-transient-sudo-pilot/run-d284-01.sh \
   --operator-run /tmp/goodix-opencv-4.13-rpms
 ```
 
-Il launcher costruisce la candidate, espone il budget e chiede `ESEGUI`.
+Il launcher rifiuta oggi il comando prima di costruire la candidate. Nella run
+storica costruiva la candidate, esponeva il budget e chiedeva `ESEGUI`.
 Richiede poi `DESTRO` prima dell'enrollment e `INDICE DESTRO` immediatamente
 prima di `sudo -v`. Al termine stampa `EXPORT_DIRECTORY` e
 `TERMINAL_TRANSCRIPT`. Allegare `operator.log`, `summary.env` e transcript;

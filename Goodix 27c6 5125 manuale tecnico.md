@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D284/01 pilot `sudo` transiente pronto offline; Human Gate
+### Stato corrente — D284/01 `sudo` biometrico PASS_LIVE_CLOSED
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -589,20 +589,48 @@ l'intero array pathspec nella singola invocazione Git e aggiunge un contratto
 specifico. `a0a1254` non è una baseline live valida; la provenance eseguibile
 parte dal commit correttivo successivo, verificato allineato a origin.
 
-La closure offline è PASS: sintassi Bash, `25/25` contratti D284 e `147/147`
-regressioni combinate D282–D284, build candidate SIGFM reale, ABI del vero
-fprintd, `visudo`, staging runtime e cleanup bounded. La run conclusiva ha
-return code zero e dichiara zero enumerazione USB, zero accesso al sensore e
-zero live. `shellcheck` non è installato e non viene elevato a requisito.
-La live verifica inoltre prima dello staging che l'utente operatore abbia già
-una policy sudo valida.
+La closure offline pre-live era PASS: sintassi Bash, `25/25` contratti D284 e
+`147/147` regressioni combinate D282–D284, build candidate SIGFM reale, ABI
+del vero fprintd, `visudo`, staging runtime e cleanup bounded. `shellcheck` non
+era installato e non è stato elevato a requisito.
 
-Il prossimo boundary è `D284_01_TRANSIENT_SUDO_PILOT_HUMAN_GATE`. Richiede
-`sudo`, configurazione PAM/sudoers transiente e accesso reale al sensore:
-l'agente non lo esegue. Il kit è direttamente eseguibile manualmente una sola
-volta dall'Utente; un'anomalia vieta il retry equivalente. La run potrà provare
-solo il consumer `sudo`, non Plasma Login, lock screen, installazione
-permanente o affidabilità statistica.
+Attempt 01 D284/01 è stata poi eseguita manualmente sulla baseline
+`bc478f480be822c04ffc44ec9e7cd46420712f72`. Gli originali sanitizzati
+byte-identici sono preservati in
+`captures/D284_01/D28401_ATTEMPT_01_20260911T053552Z_bc478f480be8/sanitized/`.
+L'auditor hash-pinned ricalcola i tre digest, valida summary, transcript, epoch
+e telemetria SIGFM e legge dal commit live il control-flow causale.
+
+**OBSERVED:** l'enrollment dell'indice destro completa otto stage. Il consumer
+`sudo -v` restituisce zero e il journal osserva nello stesso percorso una sola
+VERIFY, estrazione da 127 keypoint e outcome SIGFM `match` sul sample 1 con
+score 14858 rispetto alla soglia 40. Il delete rimuove il solo template
+isolato.
+
+**VERIFIED:** la baseline installa il servizio PAM D284 con
+`max-tries=1`, fallback `pam_unix.so` e override sudoers per il solo utente;
+invalida il timestamp, esegue il solo `sudo -v`, richiede il match live prima
+di proseguire, invalida di nuovo il timestamp e rimuove gli override prima del
+delete. Le tre epoch ENROLL, VERIFY e NONE/delete consumano due action e due
+handshake TLS, con 204 + 75 = 279 submit reali. Retry, reopen, reset,
+clear-halt e famiglie persistenti note sono zero; ogni epoch è drenata e
+context-closed. Servizio e staging sono ripristinati; authselect, PAM
+preesistenti, libreria di sistema e storage preesistente restano invariati;
+rollback e return code sono zero. Il template non è esportato.
+
+Il control-flow, il match e il return code provano che la password non ha
+causato il `sudo -v` della Phase B. L'inserimento password riferito
+dall'operatore dopo Phase C appartiene al secondo `sudo` di export e resta
+`USER_OPERATOR_ATTESTED_EXPORT_ONLY`, poiché il prompt diretto su TTY non è
+presente nel transcript acquisito.
+
+D284/01 è `PASS_LIVE_CLOSED` e non va rieseguito; gli entrypoint live del kit
+ora rifiutano fail-closed. Prova il consumer sudo transiente, non login, lock
+screen, installazione permanente o affidabilità statistica. Il prossimo
+boundary è una review architetturale offline dell'integrazione persistente:
+prima di preparare una live occorre evitare che il template e il daemon
+condivisi espongano involontariamente il driver anche ai consumer
+`system-auth`/KDE già presenti.
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
@@ -935,7 +963,7 @@ D283_01_LIVE_ENTRYPOINT_ENABLED=false_DO_NOT_RERUN
 D283_01_LEGACY_FAILURE_PHASE_MARKER=INITIALIZATION_ONLY_NOT_RUN_OUTCOME
 D283_01_CURRENT_PROGRESS_MARKER_CORRECTIVE=PASS_OFFLINE
 D283_01_AUTONOMOUS_RERUN_ALLOWED=false
-D284_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_OPERATOR_RUN
+D284_01_OUTCOME=PASS_LIVE_CLOSED_BY_ATTEMPT_01
 D284_01_REAL_TARGET_COMPATIBILITY=PASS
 D284_01_CONSUMER=SUDO_VALIDATE
 D284_01_CONSUMER_SCOPE=SINGLE_OPERATOR_USER
@@ -953,8 +981,8 @@ D284_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D284_01_REAL_LOGIN_IN_SCOPE=false
 D284_01_KDE_LOCK_SCREEN_IN_SCOPE=false
 D284_01_PERMANENT_INSTALL_IN_SCOPE=false
-D284_01_OFFLINE_CONTRACT_MATRIX=25/25_PASS
-D284_01_COMBINED_REGRESSION_MATRIX=147/147_PASS
+D284_01_OFFLINE_CONTRACT_MATRIX=28/28_PASS
+D284_01_COMBINED_REGRESSION_MATRIX=150/150_PASS
 D284_01_CANDIDATE_BUILD=PASS_OFFLINE
 D284_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
 D284_01_SUDOERS_PARSER=PASS_OFFLINE
@@ -966,11 +994,21 @@ D284_01_BASELINE_PATHSPEC_COMMAND_CORRECTIVE=PASS
 D284_01_OFFLINE_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 D284_01_SHELL_SYNTAX=PASS
 D284_01_SHELLCHECK=UNAVAILABLE
-D284_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D284_01_EXECUTABLE_CLOSURE=PASS_LIVE_WITH_HASH_PINNED_REVIEW_AND_ROLLBACK
 D284_01_OPERATOR_KIT=operator_kit/d284-01-transient-sudo-pilot
-D284_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
-D284_01_LIVE_EXECUTED=false
+D284_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
+D284_01_LIVE_EXECUTED=true
 D284_01_AUTONOMOUS_LIVE_ALLOWED=false
+D284_01_ATTEMPT_01_BASELINE_SHA=bc478f480be822c04ffc44ec9e7cd46420712f72
+D284_01_ATTEMPT_01_EVIDENCE_AUDIT=PASS_HASH_PINNED
+D284_01_SUDO_VALIDATE_RETURN_CODE=0
+D284_01_SUDO_BIOMETRIC_CAUSALITY=VERIFIED_BASELINE_AND_LIVE_MATCH
+D284_01_POST_PHASE_C_PASSWORD=USER_OPERATOR_ATTESTED_EXPORT_ONLY
+D284_01_SIGFM_MATCH_OBSERVED_MAX_SCORE=14858
+D284_01_REAL_SUBMIT_COUNT=279
+D284_01_ROLLBACK_COMPLETE=true
+D284_01_LIVE_ENTRYPOINT_CLOSED=true
+D284_01_AUTONOMOUS_RERUN_ALLOWED=false
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -1003,8 +1041,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D284_01_TRANSIENT_SUDO_PILOT_HUMAN_GATE
-NEXT_BOUNDARY_AFTER_D283_01_REVIEW=D284_01_TRANSIENT_SUDO_PILOT_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=PERSISTENT_INTEGRATION_ARCHITECTURE_REVIEW
+NEXT_BOUNDARY_AFTER_D284_01_REVIEW=PERSISTENT_INTEGRATION_ARCHITECTURE_REVIEW
 ```
 
 Report ed evidenze correnti:
@@ -1034,6 +1072,10 @@ Report ed evidenze correnti:
 `operator_kit/d283-01-pam-dedicated/`,
 `analysis/D284/D284_01_project_integration_decision.md`,
 `analysis/D284/D284_01_OFFLINE_RESULT.env`,
+`analysis/D284/D284_01_attempt_01_post_live_review.md`,
+`analysis/D284/D284_01_ATTEMPT_01_NORMALIZED.env`,
+`analysis/D284/d284_01_attempt_01_evidence_audit.py`,
+`captures/D284_01/D28401_ATTEMPT_01_20260911T053552Z_bc478f480be8/sanitized/`,
 `analysis/D284/test_d284_01_offline_contract.py`,
 `operator_kit/d284-01-transient-sudo-pilot/`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,

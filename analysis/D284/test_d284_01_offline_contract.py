@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "operator_kit/d284-01-transient-sudo-pilot"
 SCRIPT = KIT / "run-d284-01.sh"
 D282 = ROOT / "operator_kit/d282-01-fprintd-target/run-d282-01.sh"
+CAPTURE = (ROOT / "captures/D284_01" /
+           "D28401_ATTEMPT_01_20260911T053552Z_bc478f480be8/sanitized")
 
 
 def function_slice(text: str, start: str, end: str) -> str:
@@ -169,7 +171,7 @@ class D284OfflineContract(unittest.TestCase):
 
     def test_17_readme_has_human_gate_stop_conditions_and_outputs(self):
         for marker in (
-                "HUMAN REQUIRED", "Ctrl-C", "non ripetere", "EXPORT_DIRECTORY",
+                "CHIUSO — NON RIESEGUIRE", "Ctrl-C", "non ripetere", "EXPORT_DIRECTORY",
                 "TERMINAL_TRANSCRIPT", "non bloccare lo schermo",
                 "fallback password"):
             self.assertIn(marker, self.readme)
@@ -257,6 +259,33 @@ class D284OfflineContract(unittest.TestCase):
                                   "stage_d284_runtime ()")
         self.assertIn("status --porcelain --untracked-files=all -- \\\n"
                       '    "${d284_critical[@]}"', baseline)
+
+    def test_26_closed_live_entrypoints_refuse_before_candidate_or_staging(self):
+        live = function_slice(self.script, "run_d284_live ()", "export_d284_results ()")
+        operator = function_slice(
+            self.script, "operator_d284_run ()", "offline_cleanup_regression ()")
+        self.assertIn("d284_live_closed=true", self.script)
+        self.assertLess(live.index("D284_01_LIVE_CLOSED_DO_NOT_RERUN"),
+                        live.index("live_result="))
+        self.assertLess(operator.index("D284_01_LIVE_CLOSED_DO_NOT_RERUN"),
+                        operator.index("prepare_candidate"))
+        self.assertIn("D284_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN", self.script)
+
+    def test_27_hash_pinned_attempt_01_evidence(self):
+        from analysis.D284.d284_01_attempt_01_evidence_audit import audit_capture
+        audit_capture(CAPTURE)
+
+    def test_28_evidence_audit_rejects_semantic_tampering(self):
+        from analysis.D284.d284_01_attempt_01_evidence_audit import audit_capture
+        with tempfile.TemporaryDirectory(prefix="goodix-d284-evidence-") as td:
+            copy = Path(td)
+            for source in CAPTURE.iterdir():
+                (copy / source.name).write_bytes(source.read_bytes())
+            summary = copy / "summary.env"
+            summary.write_text(summary.read_text().replace(
+                "OBSERVED_RETRY_COUNT=0", "OBSERVED_RETRY_COUNT=1"))
+            with self.assertRaisesRegex(ValueError, "OBSERVED_RETRY_COUNT"):
+                audit_capture(copy, enforce_hashes=False)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ source "$d283_script_dir/run-d283-01.sh"
 unset D283_LIBRARY_ONLY
 
 live_result_prefix=D284_01
+d284_live_closed=true
 d284_critical=(libfprint-driver Rockytkg
   reference/libfprint-fedora44-1.94.100/source
   reference/fprintd-fedora44-1.94.5
@@ -222,6 +223,9 @@ run_d284_live () {
   local persistent_count extract_count matcher_start_count matcher_match_count
   local matcher_outcome_count matcher_error_count observed_max_score
   local matched_sample comparison_count stored authselect_raw
+
+  [[ $d284_live_closed != true ]] ||
+    refuse D284_01_LIVE_CLOSED_DO_NOT_RERUN
 
   live_result=
   live_private=
@@ -584,6 +588,8 @@ export_d284_results () {
 
 operator_d284_run () {
   local rpm_dir=$1 user baseline transcript result output rc export_rc=1 confirmation
+  [[ $d284_live_closed != true ]] ||
+    refuse D284_01_LIVE_CLOSED_DO_NOT_RERUN
   [[ $EUID -ne 0 ]] || refuse OPERATOR_RUN_MUST_BE_UNPRIVILEGED
   command -v sudo >/dev/null || refuse HOST_TOOL_MISSING_sudo
   user=$(id -un) || refuse OPERATOR_USER_UNKNOWN
@@ -677,7 +683,7 @@ offline_preflight () {
   echo D284_01_PASSWORD_FALLBACK_PRESENT=true
   echo D284_01_BIOMETRIC_ACTION_MAX=2
   echo D284_01_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=9
-  echo D284_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_RUN
+  echo D284_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
   echo REAL_USB_ENUMERATION_ATTEMPTED=false
   echo REAL_SENSOR_ACCESSED=false
   echo LIVE_EXECUTION_PERFORMED=false

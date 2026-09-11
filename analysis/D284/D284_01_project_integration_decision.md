@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D284/01 — decisione di integrazione e pilot `sudo` transiente
 
+> **Stato successivo:** Attempt 01 è `PASS_LIVE_CLOSED`. La review canonica è
+> `analysis/D284/D284_01_attempt_01_post_live_review.md`; questo documento
+> conserva la decisione e la closure offline che hanno preceduto la run.
+
 ## Real Target Compatibility Gate
 
 Il target letto direttamente è Fedora Linux 44 KDE, x86_64. Le versioni
