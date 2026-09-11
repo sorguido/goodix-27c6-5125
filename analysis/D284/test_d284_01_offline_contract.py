@@ -252,6 +252,12 @@ class D284OfflineContract(unittest.TestCase):
                                      str(result_dir), str(work)])
             self.assertNotEqual(result.returncode, 0)
 
+    def test_25_baseline_status_pathspec_array_is_one_command(self):
+        baseline = function_slice(self.script, "verify_d284_baseline ()",
+                                  "stage_d284_runtime ()")
+        self.assertIn("status --porcelain --untracked-files=all -- \\\n"
+                      '    "${d284_critical[@]}"', baseline)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -581,7 +581,15 @@ positive e negative provano sia cleanup sia rifiuto di path non posseduti.
 Inoltre `ROLLBACK_COMPLETE=false` forza un exit root nonzero, così l'export
 riuscito non può mascherare un ripristino fallito.
 
-La closure offline è PASS: sintassi Bash, `24/24` contratti D284 e `146/146`
+La prima verifica dopo il commit `a0a1254` ha individuato un ulteriore bug
+host-only nel gate baseline: mancava il continuatore di riga dopo
+`git status ... --`, quindi Bash tentava di eseguire il primo pathspec come
+comando e il controllo poteva risultare falsamente verde. Il correttivo porta
+l'intero array pathspec nella singola invocazione Git e aggiunge un contratto
+specifico. `a0a1254` non è una baseline live valida; la provenance eseguibile
+parte dal commit correttivo successivo, verificato allineato a origin.
+
+La closure offline è PASS: sintassi Bash, `25/25` contratti D284 e `147/147`
 regressioni combinate D282–D284, build candidate SIGFM reale, ABI del vero
 fprintd, `visudo`, staging runtime e cleanup bounded. La run conclusiva ha
 return code zero e dichiara zero enumerazione USB, zero accesso al sensore e
@@ -945,8 +953,8 @@ D284_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D284_01_REAL_LOGIN_IN_SCOPE=false
 D284_01_KDE_LOCK_SCREEN_IN_SCOPE=false
 D284_01_PERMANENT_INSTALL_IN_SCOPE=false
-D284_01_OFFLINE_CONTRACT_MATRIX=24/24_PASS
-D284_01_COMBINED_REGRESSION_MATRIX=146/146_PASS
+D284_01_OFFLINE_CONTRACT_MATRIX=25/25_PASS
+D284_01_COMBINED_REGRESSION_MATRIX=147/147_PASS
 D284_01_CANDIDATE_BUILD=PASS_OFFLINE
 D284_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
 D284_01_SUDOERS_PARSER=PASS_OFFLINE
@@ -954,6 +962,7 @@ D284_01_OPERATOR_SUDO_POLICY_GATE=PASS_OFFLINE_STATIC_PRE_STAGING
 D284_01_OVERRIDE_CLEANUP_REGRESSION=PASS
 D284_01_FAILURE_DIAGNOSTICS=PASS_OFFLINE_PHASE_TYPED
 D284_01_ROLLBACK_FAILURE_ROOT_EXIT=NONZERO_REGRESSION_PASS
+D284_01_BASELINE_PATHSPEC_COMMAND_CORRECTIVE=PASS
 D284_01_OFFLINE_EXIT_TRAP_SCOPE_CORRECTIVE=PASS
 D284_01_SHELL_SYNTAX=PASS
 D284_01_SHELLCHECK=UNAVAILABLE

@@ -62,7 +62,7 @@ verify_d284_baseline () {
     refuse HEAD_MISMATCH
   [[ $(git -C "$root" rev-parse origin/development) == "$baseline" ]] ||
     refuse ORIGIN_DEVELOPMENT_MISMATCH
-  [[ -z $(git -C "$root" status --porcelain --untracked-files=all --
+  [[ -z $(git -C "$root" status --porcelain --untracked-files=all -- \
     "${d284_critical[@]}") ]] || refuse LIVE_CRITICAL_DIRTY
 }
 

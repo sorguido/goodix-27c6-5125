@@ -66,7 +66,7 @@ valida con `visudo` l'override per-utente, esercita lo staging dei sei oggetti
 runtime e prova la rimozione bounded dei due soli file temporanei. Prima dello
 staging la live verifica inoltre, come root, che l'utente abbia già una policy
 sudo valida. La matrice
-D284 è `24/24 PASS`; la matrice combinata D282–D284 è `146/146 PASS` fuori dal
+D284 è `25/25 PASS`; la matrice combinata D282–D284 è `147/147 PASS` fuori dal
 sandbox, necessario soltanto per i test host-only PAM/systemd. Il preflight
 termina con return code zero e dichiara esplicitamente zero enumerazione USB,
 zero accesso al sensore e zero live.
@@ -86,6 +86,13 @@ regression. Il correttivo usa stato globale dedicato, rifiuta qualunque path
 fuori dal prefisso temporaneo D284 e ha regressioni positive e negative. I
 quattro workdir temporanei lasciati da quelle prove fallite sono stati rimossi
 esplicitamente; la run conclusiva non lascia residui.
+
+La verifica post-commit `a0a1254` ha infine trovato nel gate baseline un
+continuatore di riga mancante dopo `git status ... --`: Bash tentava di
+eseguire il primo pathspec come comando e poteva quindi ottenere un falso
+PASS. Il correttivo mantiene l'intero array nella singola invocazione Git e un
+contratto dedicato ne fissa la forma. La baseline eseguibile è pertanto il
+successivo commit correttivo, non `a0a1254`.
 
 Il review PM accetta quindi il kit offline. Non ne consegue autorizzazione per
 l'agente a eseguirlo: la prossima azione è la singola Human Gate manuale
