@@ -817,6 +817,50 @@ STOP_ON_FIRST_MATCH=true
 AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 ```
 
+D287/01 seleziona come successivo confine il primo consumer desktop reale,
+senza saltare direttamente al blocco della sessione: il binario Fedora
+`/usr/libexec/kscreenlocker_greet` in modalità ufficiale standalone
+`--testing`. La review read-only del sorgente upstream KScreenLocker tag
+`v6.7.4`, commit `28544d4910d5ea9be6708eb343804fa0018cb8e4`, mostra che il
+greeter istanzia separatamente il PAM password `kde` e il non-interattivo
+`kde-fingerprint`; ogni `tryUnlock()` chiama una sola `pam_authenticate()`.
+Il binario installato 6.7.4 contiene il service name esatto e binario, PAM
+Fedora e QML sono hash-pinned dal kit.
+
+Il QML installato avvia gli autenticatori quando il form diventa visibile, ma
+ignora nel proprio failure handler l'errore non-interattivo. Inoltre
+`PamAuthenticators` non torna a `Idle` sul solo failure fingerprint. Non è
+quindi provato né assunto un retry biometrico automatico della stessa finestra:
+la policy D286 viene realizzata con massimo tre nuovi processi `--testing`,
+ognuno con un solo `pam_fprintd.so max-tries=1 timeout=45`, nuovo cursor journal
+e conferma fisica esplicita. Un `MATCH` arresta subito; solo `NO_MATCH` consente
+di offrire lo slot seguente; ogni altra anomalia chiude fail-closed.
+
+Il pilot non modifica `/etc/pam.d/kde-fingerprint`. Per ogni processo, un
+helper root crea un mount namespace privato, monta un piccolo tmpfs privato su
+`/tmp`, vi copia il PAM D287 con il contesto SELinux del file Fedora e lo
+sovrappone read-only soltanto nella vista del greeter figlio. La morte del
+namespace rimuove overlay e tmpfs anche sotto terminazione anomala; prima e
+dopo ogni tentativo devono ancora passare sia gli hash host originali sia
+l'audit root-only completo dell'installazione D285. `with-fingerprint`,
+`system-auth`, runtime, template e libfprint di sistema non cambiano. Il
+password service `kde` resta originale e separato, ma la password non deve
+essere digitata durante il pilot: causalità e successo richiedono insieme un
+MATCH journal, il marker stdout `Unlocked` e l'exit zero del greeter.
+
+Il metodo cambia dunque consumer rispetto a D286 e testa se KScreenLocker
+propaga davvero il MATCH PAM non-interattivo fino all'uscita positiva del
+greeter standalone. Se fallisce, non si passa al lock reale e non esiste un
+quarto contatto: si revisionano namespace, cursor, exit e segnale PAM prima di
+cambiare metodo. La closure offline include hash reali del target, sintassi,
+fixture MATCH/NO_MATCH/safety e regressioni; non ha invocato greeter, Polkit,
+mount, USB o sensore. L'esecuzione reale è il nuovo Human Gate e deve essere
+avviata esclusivamente dall'operatore con:
+
+```bash
+operator_kit/d287-01-kscreenlocker-testing/run-d287-01.sh --operator-run
+```
+
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
 D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
@@ -1284,6 +1328,27 @@ D286_01_SHELLCHECK=UNAVAILABLE
 D286_01_EXECUTABLE_CLOSURE=PASS_LIVE_WITH_HASH_PINNED_REVIEW
 D286_01_OPERATOR_KIT=operator_kit/d286-01-reboot-survival
 D286_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
+D287_01_OUTCOME=READY_FOR_HUMAN_GATE
+D287_01_BOUNDARY=KSCREENLOCKER_GREETER_TESTING_MODE
+D287_01_CONSUMER=KSCREENLOCKER_GREETER
+D287_01_GREETER_MODE=TESTING_STANDALONE
+D287_01_REAL_SESSION_LOCKED=false
+D287_01_HOST_PAM_FILE_WRITE_COUNT=0
+D287_01_PAM_OVERLAY_SCOPE=PRIVATE_MOUNT_NAMESPACE_READ_ONLY
+D287_01_PAM_SERVICE=kde-fingerprint
+D287_01_PASSWORD_SERVICE=kde_UNCHANGED_SEPARATE
+D287_01_PAM_MAX_TRIES_PER_ATTEMPT=1
+D287_01_MAX_VERIFY_ATTEMPTS=3
+D287_01_MAX_PHYSICAL_CONTACTS=3
+D287_01_STOP_ON_FIRST_MATCH=true
+D287_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D287_01_REAL_LOCK_SCREEN_IN_SCOPE=false
+D287_01_LOGIN_IN_SCOPE=false
+D287_01_OFFLINE_CONTRACT_MATRIX=32/32_PASS
+D287_01_COMBINED_REGRESSION_MATRIX=246/246_PASS_HOST_ENV
+D287_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_HOST_HASHES_PLUS_SYNTHETIC_TELEMETRY
+D287_01_OPERATOR_KIT=operator_kit/d287-01-kscreenlocker-testing
+D287_01_LIVE_EXECUTION=HUMAN_REQUIRED
 INITIAL_FINGER_ATTEMPT=1
 MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2
 MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3
@@ -1323,8 +1388,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D286_01_CLOSURE
-NEXT_BOUNDARY_AFTER_D286_01_REVIEW=AI_PM_NEXT_STEP_SELECTION_AFTER_D286_01_CLOSURE
+NEXT_PRIMARY_BOUNDARY=D287_01_KSCREENLOCKER_TESTING_MODE_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D286_01_REVIEW=D287_01_KSCREENLOCKER_TESTING_MODE_HUMAN_GATE
 ```
 
 Report ed evidenze correnti:
@@ -1384,6 +1449,10 @@ Report ed evidenze correnti:
 `captures/D286_01/D28601_RETRY_20260911T193758Z_61c387b33b6f/sanitized/`,
 `captures/D286_01/D28601_RETRY_20260911T194718Z_62808112777a/sanitized/`,
 `operator_kit/d286-01-reboot-survival/`,
+`analysis/D287/D287_01_kscreenlocker_testing_boundary.md`,
+`analysis/D287/D287_01_OFFLINE_RESULT.env`,
+`analysis/D287/test_d287_01_offline_contract.py`,
+`operator_kit/d287-01-kscreenlocker-testing/`,
 `GoodixArtifacts/opencv-4.13-rpms/README.md`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,
