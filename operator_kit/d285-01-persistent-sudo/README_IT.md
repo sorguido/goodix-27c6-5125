@@ -48,6 +48,10 @@ fallback password di sudo resta disponibile.
 - nessun file D285 già presente;
 - nessun uso concorrente di fprintd, sudo biometrico o blocco schermo.
 
+Il layout Fedora `/usr/local/sbin -> bin` è accettato soltanto se il link è
+testualmente `bin`, risolve esattamente a `/usr/local/bin` e quest'ultimo è una
+directory reale non-symlink. Ogni altra topologia viene rifiutata fail-closed.
+
 Fermarsi con `Ctrl-C` prima della conferma se un prerequisito non è vero. Nel
 test non digitare la password: se compare un prompt password, premere
 `Ctrl-C`; non ripetere automaticamente la run dopo un'anomalia. Conservare gli

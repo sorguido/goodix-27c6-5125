@@ -663,9 +663,17 @@ recuperabile. Lo state fissa inoltre gli hash authselect/PAM sudo/libfprint
 originari e l'uninstall ne richiede il ripristino esatto. Il result privato in
 `/var/tmp` viene rimosso dopo un export sanitizzato riuscito.
 
+Il primo tentativo operatore dalla baseline `fd7f162024d0fb3ad33809456ed478d97133bd94`
+si è fermato pre-live con `PARENT_PATH_UNSAFE`, zero enumerazione USB, zero
+accesso sensore e zero live. La causa era il layout Fedora legittimo
+`/usr/local/sbin -> bin`. Il gate corretto accetta soltanto quel link se risolve
+esattamente a `/usr/local/bin` e il target è una directory reale non-symlink;
+ogni altro link, target o percorso ambiguo resta fail-closed. Non è stato
+necessario alcun rollback device-side e nessun altro contratto D285 è cambiato.
+
 Il preflight completo ha costruito la candidate reale e verificato ABI,
 manifest, wrapper, drop-in systemd, sudoers e rendering authselect. D285 è
-`26/26 PASS`; la matrice combinata D282–D285 è `176/176 PASS` fuori sandbox.
+`27/27 PASS`; la matrice combinata D282–D285 è `177/177 PASS` fuori sandbox.
 Zero enumerazione USB, zero accesso sensore e zero live. Il prossimo confine è
 la singola installazione manuale D285: modifica persistentemente host/PAM e
 raggiunge il sensore, quindi è `HUMAN_REQUIRED` e l'agente si arresta prima.
@@ -1065,8 +1073,14 @@ D285_01_INSTALL_BIOMETRIC_ACTION_MAX=2
 D285_01_INSTALL_EXPECTED_PHYSICAL_CONTACT_COUNT_MAX=9
 D285_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D285_01_DAEMON_RESTART_COUNT=1
-D285_01_OFFLINE_CONTRACT_MATRIX=26/26_PASS
-D285_01_COMBINED_REGRESSION_MATRIX=176/176_PASS
+D285_01_PARENT_PATH_FEDORA_USR_LOCAL_SBIN_TO_BIN=ACCEPT_EXACT_ONLY
+D285_01_PARENT_PATH_UNEXPECTED_SYMLINK_OR_TARGET=REFUSE_FAIL_CLOSED
+D285_01_PREVIOUS_OPERATOR_ATTEMPT=REFUSED_PRE_LIVE_PARENT_PATH_UNSAFE
+D285_01_PREVIOUS_OPERATOR_USB_ENUMERATION=false
+D285_01_PREVIOUS_OPERATOR_SENSOR_ACCESSED=false
+D285_01_PREVIOUS_OPERATOR_LIVE_EXECUTION=false
+D285_01_OFFLINE_CONTRACT_MATRIX=27/27_PASS
+D285_01_COMBINED_REGRESSION_MATRIX=177/177_PASS
 D285_01_CANDIDATE_BUILD=PASS_OFFLINE
 D285_01_FPRINTD_ABI_CLOSURE=PASS_OFFLINE
 D285_01_SYSTEMD_DROPIN_PARSER=PASS_OFFLINE

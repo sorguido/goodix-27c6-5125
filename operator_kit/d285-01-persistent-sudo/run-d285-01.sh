@@ -119,13 +119,27 @@ d285_paths_absent () {
   done
 }
 
+d285_validate_local_sbin_path () {
+  local path=$1 expected=$2 link_target resolved
+  if [[ -L $path ]]; then
+    link_target=$(readlink -- "$path") || refuse PARENT_PATH_UNSAFE
+    [[ $link_target == bin ]] || refuse PARENT_PATH_UNSAFE
+    resolved=$(readlink -f -- "$path") || refuse PARENT_PATH_UNSAFE
+    [[ $resolved == "$expected" ]] || refuse PARENT_PATH_UNSAFE
+    [[ -d $expected && ! -L $expected ]] || refuse PARENT_PATH_UNSAFE
+    return
+  fi
+  [[ -d $path ]] || refuse PARENT_PATH_UNSAFE
+}
+
 d285_validate_parent_paths () {
   local path
-  for path in /usr/local/lib64 /usr/local/sbin /etc /etc/pam.d \
+  for path in /usr/local/lib64 /etc /etc/pam.d \
       /etc/sudoers.d /etc/systemd/system /var/lib/fprint \
       /var/lib/authselect; do
     [[ -d $path && ! -L $path ]] || refuse PARENT_PATH_UNSAFE
   done
+  d285_validate_local_sbin_path /usr/local/sbin /usr/local/bin
   for path in "$d285_runtime_parent" "$d285_state_dir" \
       "$(dirname "$d285_dropin")" /var/lib/authselect/backups; do
     [[ ! -e $path && ! -L $path ]] ||

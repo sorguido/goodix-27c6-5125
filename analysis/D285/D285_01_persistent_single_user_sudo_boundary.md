@@ -88,10 +88,18 @@ usa mai un delete ampio quando pathname/hash sono ambigui.
 
 ## Closure offline
 
+Il primo avvio operatore dalla baseline `fd7f162024d0fb3ad33809456ed478d97133bd94`
+si è fermato correttamente pre-live con `PARENT_PATH_UNSAFE`: sul target Fedora
+`/usr/local/sbin` è il link distro-standard `bin`. Il correttivo non cambia il
+percorso persistente: ammette soltanto quel link se risolve esattamente a
+`/usr/local/bin` e il target è una directory reale non-symlink. Link diversi,
+risoluzioni diverse e target ambigui restano rifiutati. La run fallita non ha
+enumerato USB, raggiunto il sensore o richiesto rollback device-side.
+
 Il preflight reale costruisce la candidate SIGFM, chiude l'ABI verso fprintd,
 verifica il manifest persistente, genera wrapper e drop-in, valida sudoers e
-il rendering authselect senza `with-fingerprint`. La matrice D285 è `26/26
-PASS`; la matrice combinata D282–D285 è `176/176 PASS` fuori sandbox per i
+il rendering authselect senza `with-fingerprint`. La matrice D285 è `27/27
+PASS`; la matrice combinata D282–D285 è `177/177 PASS` fuori sandbox per i
 test host-only PAM/systemd. La run offline dichiara esplicitamente zero USB,
 zero accesso sensore e zero live.
 

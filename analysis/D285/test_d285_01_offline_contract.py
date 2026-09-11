@@ -289,6 +289,58 @@ class D285OfflineContract(unittest.TestCase):
         d284 = (ROOT / "operator_kit/d284-01-transient-sudo-pilot/run-d284-01.sh").read_text()
         self.assertIn("d284_live_closed=true", d284)
 
+    def test_27_fedora_usr_local_sbin_symlink_is_narrowly_accepted(self):
+        helper = function_slice(
+            self.script, "d285_validate_local_sbin_path ()",
+            "d285_validate_parent_paths ()")
+        for marker in (
+                '[[ $link_target == bin ]]', 'readlink -f -- "$path"',
+                '[[ $resolved == "$expected" ]]',
+                '[[ -d $expected && ! -L $expected ]]'):
+            self.assertIn(marker, helper)
+        parent_gate = function_slice(
+            self.script, "d285_validate_parent_paths ()",
+            "d285_write_sudoers ()")
+        self.assertIn(
+            "d285_validate_local_sbin_path /usr/local/sbin /usr/local/bin",
+            parent_gate)
+
+        with tempfile.TemporaryDirectory(prefix="goodix-d285-sbin-", dir="/tmp") as td:
+            root = Path(td)
+            (root / "bin").mkdir()
+            (root / "sbin").symlink_to("bin")
+            command = (
+                'D285_LIBRARY_ONLY=true; source "$0"; '
+                'd285_validate_local_sbin_path "$1" "$2"')
+            accepted = subprocess.run(
+                ["bash", "-c", command, str(SCRIPT),
+                 str(root / "sbin"), str(root / "bin")])
+            self.assertEqual(accepted.returncode, 0)
+
+            (root / "sbin").unlink()
+            (root / "other").mkdir()
+            (root / "sbin").symlink_to("other")
+            unexpected = subprocess.run(
+                ["bash", "-c", command, str(SCRIPT),
+                 str(root / "sbin"), str(root / "bin")],
+                capture_output=True, text=True)
+            self.assertNotEqual(unexpected.returncode, 0)
+            self.assertIn("D285_01_REFUSAL_REASON=PARENT_PATH_UNSAFE",
+                          unexpected.stderr)
+
+            (root / "sbin").unlink()
+            (root / "bin").rmdir()
+            (root / "real-bin").mkdir()
+            (root / "bin").symlink_to("real-bin")
+            (root / "sbin").symlink_to("bin")
+            ambiguous = subprocess.run(
+                ["bash", "-c", command, str(SCRIPT),
+                 str(root / "sbin"), str(root / "bin")],
+                capture_output=True, text=True)
+            self.assertNotEqual(ambiguous.returncode, 0)
+            self.assertIn("D285_01_REFUSAL_REASON=PARENT_PATH_UNSAFE",
+                          ambiguous.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
