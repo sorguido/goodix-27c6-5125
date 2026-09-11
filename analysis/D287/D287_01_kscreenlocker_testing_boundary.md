@@ -113,6 +113,53 @@ l'host era passato dalle build Plasma 6.7.4 alle 6.7.5. L'audit source/target
 sopra documentato ne ha dimostrato la compatibilità pertinente prima di
 aggiornare NEVRA e hash.
 
+## Seconda invocazione e corrective orizzontale host-path
+
+La seconda invocazione manuale usa la baseline
+`dc09bad49913fd51529ad5d4cbe399bf2f04f04c` e produce la capture hash-pinned
+`captures/D287_01/D28701_ATTEMPT_20260911T210420Z_dc09bad49913/sanitized/`.
+Supera repository/host gate, `pkexec`, root-series e pre-audit D285; quest'ultimo
+prova zero azioni sensore. Dopo la conferma testuale iniziale si arresta nella
+creazione del cursor, prima di inner log, `unshare`, namespace, greeter e
+VERIFY:
+
+```text
+D287_01_SECOND_OPERATOR_RUN=ABORTED_AFTER_PKEXEC_BEFORE_GREETER_AND_VERIFY
+D287_01_SECOND_OPERATOR_BASELINE=dc09bad49913fd51529ad5d4cbe399bf2f04f04c
+D287_01_SECOND_REFUSAL_REASON=JOURNAL_CURSOR_AMBIGUOUS
+D287_01_SENSOR_CONTACTS_CONSUMED=0
+D287_01_NEW_DEVICE_SIDE_EVIDENCE=false
+D287_01_GREETER_STARTED=false
+D287_01_VERIFY_STARTED=false
+```
+
+La riproduzione read-only su systemd 259 determina la causa precisa: il comando
+filtrato `journalctl -b -u fprintd.service -n 0 --show-cursor --no-pager`
+restituisce RC 0 e `-- No entries --`, ma nessun cursor perché l'unit non ha
+entry pregresse nel boot. Il nuovo boundary ottiene il cursor dalla coda
+globale del boot con `journalctl -b -n 0 --show-cursor --no-pager`; sul target
+restituisce esattamente un cursor valido. La collection successiva conserva
+sia `-u fprintd.service` sia `--after-cursor`, quindi non include eventi fprintd
+precedenti e non usa timestamp o `--since`. Missing, multiple, malformed e
+read failure hanno rifiuti distinti.
+
+Due abort host-side consecutivi impongono un cambio da correzione sintomatica a
+fix di classe. L'audit completo è in
+`analysis/D287/D287_01_HOST_PATH_AUDIT.md`: il vero control flow di
+`d287_operator_run`, `d287_root_series` e il supervisore inner viene esercitato
+con fixture soltanto ai boundary esterni. La matrice copre happy MATCH,
+NO_MATCH con conferma separata, repo dirty, host drift, tutte le classi cursor,
+greeter non pronto/exit inattesa, journal senza outcome, safety violation,
+cleanup failure e propagazione coerente di inner/root/`tee`/summary. Ha inoltre
+chiuso errori di lettura `git status`, risultati outcome/result multipli,
+perdita di `PIPESTATUS` e EOF silenzioso nelle conferme.
+
+Il residuo non simulabile è limitato a namespace mount e greeter reali, chiamata
+PAM reale a fprintd, VERIFY/contatto sensore e relativa telemetry autentica.
+L'enumerazione sysfs read-only ha contato un target `27c6:5125`, senza aprire
+USB. Nessun greeter, PAM, mount, VERIFY o sensore è stato avviato dal
+corrective.
+
 ## Guardrail ed executable closure offline
 
 Il launcher rifiuta versioni/hash/configurazioni diverse, un greeter già
@@ -128,17 +175,17 @@ code zero del greeter.
 La prova reale resta un Human Gate perché usa Polkit/root, interfaccia grafica,
 USB e sensore. Il preflight e i test offline non invocano il greeter, non
 eseguono `pkexec`, `unshare`, mount o comandi fprintd e non enumerano USB.
-La matrice D287 corretta passa `35/35`. La regressione cumulativa D282–D287,
-nel sandbox conta 245 successi e le quattro failure host-only già note dovute
+La matrice D287 corretta passa `65/65`. La regressione cumulativa D282–D287,
+nel sandbox conta 275 successi e le quattro failure host-only già note dovute
 alle restrizioni socket PAM/systemd; rieseguita nell'ambiente host consentito
-senza `sudo`, USB o sensore, passa `249/249`. `shellcheck` non è disponibile;
+senza `sudo`, USB o sensore, passa `279/279`. `shellcheck` non è disponibile;
 `bash -n` e il preflight host reale passano. Il corrective non ha invocato
 greeter, Polkit, mount, USB o sensore.
 
 ```text
 OUTCOME=READY_FOR_HUMAN_GATE
 ADVANCEMENT=KSCREENLOCKER_TARGET_CONSUMER_PATH_DESIGNED_AND_OFFLINE_CLOSED
-EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_HOST_HASHES_PLUS_SYNTHETIC_TELEMETRY
+EXECUTABLE_CLOSURE=PASS_OFFLINE_HORIZONTAL
 RESIDUAL_BLOCKER_OR_RISK=REAL_KSCREENLOCKER_TESTING_MODE_PAM_MATCH_NOT_YET_EXECUTED
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE

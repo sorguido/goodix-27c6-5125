@@ -21,6 +21,15 @@ dell'aggiornamento Fedora a `kscreenlocker-6.7.5-1.fc44.x86_64` e
 rimasti byte-identici; i sorgenti greeter rilevanti sono invariati fra i tag
 upstream 6.7.4 e 6.7.5.
 
+La seconda invocazione sulla baseline `dc09bad49913fd51529ad5d4cbe399bf2f04f04c`
+ha superato `pkexec` e il pre-audit D285, poi si è fermata prima di namespace,
+greeter e VERIFY perché il journal filtrato per `fprintd.service` non aveva
+entry pregresse e non restituiva un cursor. Anche questa run ha consumato zero
+contatti. Il kit corretto usa un cursor globale della coda del boot e continua
+a raccogliere soltanto eventi `fprintd.service` successivi a quel boundary.
+Prima di ripresentare il kit è stato simulato orizzontalmente l'intero percorso
+host, inclusi failure di greeter, journal, cleanup, parsing, pipeline e summary.
+
 Il rischio residuo è un processo grafico in primo piano che può catturare
 temporaneamente input e una VERIFY reale sul sensore. Non digitare la password
 nel form. Se la finestra non appare, non risponde o il sensore mostra un
@@ -87,6 +96,9 @@ Questo comando non usa privilegi, USB o sensore:
 ```bash
 operator_kit/d287-01-kscreenlocker-testing/run-d287-01.sh --offline-preflight
 ```
+
+Il preflight verifica anche che il journal del boot corrente fornisca un cursor
+globale valido, senza creare entry fprintd né avviare il servizio.
 
 ## Esecuzione manuale
 

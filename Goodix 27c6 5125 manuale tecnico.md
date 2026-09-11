@@ -887,6 +887,45 @@ host-only note nel sandbox, poi passa `249/249` nell'ambiente host consentito,
 senza `sudo`, greeter, USB o sensore. Lo stesso kit corretto è nuovamente al
 Human Gate; l'AI non ne esegue `--operator-run`.
 
+La seconda invocazione manuale, sulla baseline
+`dc09bad49913fd51529ad5d4cbe399bf2f04f04c`, supera repository e host contract,
+`pkexec`, root-series e pre-audit D285. Il pre-audit autentico è integralmente
+PASS e conta zero azioni sensore. Dopo la conferma testuale `INDICE DESTRO` la
+run si arresta con `JOURNAL_CURSOR_AMBIGUOUS`, prima di inner log, `unshare`,
+namespace, greeter e VERIFY. La capture sanitizzata e hash-pinned è
+`captures/D287_01/D28701_ATTEMPT_20260911T210420Z_dc09bad49913/sanitized/`.
+Anche questa run consuma zero contatti biometrici e non produce evidenza
+device-side.
+
+La riproduzione read-only su systemd 259 identifica la causa precisa: con zero
+entry pregresse dell'unit nel boot,
+`journalctl -b -u fprintd.service -n 0 --show-cursor --no-pager` restituisce RC
+0 e `-- No entries --`, ma nessun cursor. Il boundary corretto legge la coda
+globale del boot con `journalctl -b -n 0 --show-cursor --no-pager`, verificato
+sul target con un cursor valido, mentre la collection mantiene
+`-u fprintd.service --after-cursor`. Il confine non dipende più da attività
+pregressa di fprintd e non usa timestamp; missing, multiple, invalid e read
+failure sono distinti e fail-closed.
+
+Poiché due run consecutive hanno rivelato difetti host pre-VERIFY, il metodo
+passa dalla correzione del singolo sintomo a un audit orizzontale dell'intero
+percorso. Il vero control flow di operator-run, root-series e supervisore inner
+è ora attraversato con fixture ai soli boundary esterni. Copre MATCH, NO_MATCH
+con conferma separata, repo/host drift, cursor avversi, greeter non pronto o
+terminato, journal senza outcome, safety violation, cleanup e propagazione di
+return code, risultato, `PIPESTATUS`, `tee`, summary ed hash. L'audit chiude
+anche status Git illeggibile, outcome/result multipli ed EOF silenzioso nelle
+conferme. La matrice D287 passa `65/65`; la regressione cumulativa conta 275
+successi e le quattro failure host-only note nel sandbox, poi passa `279/279`
+nell'ambiente host consentito.
+
+Le verifiche target read-only confermano pacchetti/hash, tool `/usr/bin`, PAM,
+QML, journalctl, sessione Wayland, runtime e socket utente. La sola
+enumerazione sysfs conta un target `27c6:5125` senza aprire USB. Il residuo
+intrinsecamente non testabile prima del Human Gate è limitato al namespace
+mount e greeter effettivi, chiamata PAM reale verso fprintd, VERIFY/contatto e
+telemetry autentica. Non restano failure host-side note riproducibili offline.
+
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
 D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
@@ -1377,15 +1416,31 @@ D287_01_SENSOR_CONTACTS_CONSUMED=0
 D287_01_NEW_DEVICE_SIDE_EVIDENCE=false
 D287_01_CORRECTIVE_REQUIRED=true
 D287_01_CORRECTIVE_STATUS=CLOSED_OFFLINE
+D287_01_SECOND_OPERATOR_RUN=ABORTED_AFTER_PKEXEC_BEFORE_GREETER_AND_VERIFY
+D287_01_SECOND_OPERATOR_BASELINE=dc09bad49913fd51529ad5d4cbe399bf2f04f04c
+D287_01_SECOND_REFUSAL_REASON=JOURNAL_CURSOR_AMBIGUOUS
+D287_01_GREETER_STARTED=false
+D287_01_VERIFY_STARTED=false
+D287_01_JOURNAL_CURSOR_ROOT_CAUSE=KNOWN
+D287_01_JOURNAL_CURSOR_ROOT_CAUSE_DETAIL=FILTERED_UNIT_HAS_ZERO_BOOT_ENTRIES
+D287_01_JOURNAL_CURSOR_BOUNDARY=GLOBAL_BOOT_TAIL
+D287_01_JOURNAL_COLLECTION=FPRINTD_UNIT_AFTER_CURSOR
+D287_01_JOURNAL_CURSOR_BEHAVIORAL_TESTS=PASS
+D287_01_HOST_PATH_HORIZONTAL_AUDIT=PASS
+D287_01_FULL_OPERATOR_PATH_SIMULATION=PASS
+D287_01_SHELL_FAILURE_PROPAGATION_AUDIT=PASS
+D287_01_TARGET_READ_ONLY_ASSUMPTIONS=PASS
+D287_01_RESIDUAL_HOST_SIDE_UNKNOWN_FAILURES=NONE_KNOWN
+D287_01_HOST_PATH_CORRECTIVE_STATUS=CLOSED_OFFLINE
 D287_01_KSCREENLOCKER_NEVRA=kscreenlocker-6.7.5-1.fc44.x86_64
 D287_01_PLASMA_WORKSPACE_NEVRA=plasma-workspace-6.7.5-1.fc44.x86_64
 D287_01_KSCREENLOCKER_COMPATIBILITY=PASS_OFFLINE_TARGET_SPECIFIC
 D287_01_RELEVANT_GREETER_SOURCE_DIFF=EMPTY
 D287_01_REPOSITORY_GATE_CORRECTED=true
 D287_01_REPOSITORY_GATE_BEHAVIOR_MATRIX=3/3_PASS
-D287_01_OFFLINE_CONTRACT_MATRIX=35/35_PASS
-D287_01_COMBINED_REGRESSION_MATRIX=249/249_PASS_HOST_ENV
-D287_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_HOST_HASHES_PLUS_SYNTHETIC_TELEMETRY
+D287_01_OFFLINE_CONTRACT_MATRIX=65/65_PASS
+D287_01_COMBINED_REGRESSION_MATRIX=279/279_PASS_HOST_ENV
+D287_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_HORIZONTAL
 D287_01_OPERATOR_KIT=operator_kit/d287-01-kscreenlocker-testing
 D287_01_LIVE_EXECUTION=HUMAN_REQUIRED
 INITIAL_FINGER_ATTEMPT=1
@@ -1490,8 +1545,10 @@ Report ed evidenze correnti:
 `operator_kit/d286-01-reboot-survival/`,
 `analysis/D287/D287_01_kscreenlocker_testing_boundary.md`,
 `analysis/D287/D287_01_OFFLINE_RESULT.env`,
+`analysis/D287/D287_01_HOST_PATH_AUDIT.md`,
 `analysis/D287/test_d287_01_offline_contract.py`,
 `operator_kit/d287-01-kscreenlocker-testing/`,
+`captures/D287_01/D28701_ATTEMPT_20260911T210420Z_dc09bad49913/sanitized/`,
 `GoodixArtifacts/opencv-4.13-rpms/README.md`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,

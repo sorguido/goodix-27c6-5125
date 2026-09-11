@@ -13,6 +13,12 @@ d287_expected_kde_pam_sha=7d91b3ad73a998e8b10f9edccd74ba04179a778c4a5e61d9176872
 d287_expected_kde_fingerprint_sha=8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437
 d287_expected_lock_qml_sha=328501780ab06cc0497a25ff48c6f027a1abed8506f0969f39a5f8bc6696181c
 d287_max_attempts=3
+d287_ready_timeout=20
+d287_outcome_timeout=90
+d287_match_exit_timeout=10
+d287_termination_timeout=5
+d287_epoch_poll_count=50
+d287_namespace_tmp=/tmp/goodix-d287-01
 d287_critical=(analysis/D285 analysis/D286 analysis/D287
   operator_kit/d285-01-persistent-sudo
   operator_kit/d286-01-reboot-survival
@@ -41,13 +47,25 @@ d287_safe_user () {
   [[ ${1:-} =~ ^[a-z_][a-z0-9_-]*$ ]]
 }
 
+d287_is_root () {
+  [[ $EUID -eq 0 ]]
+}
+
+d287_require_root_context () {
+  d287_is_root
+}
+
+d287_require_operator_context () {
+  ! d287_is_root
+}
+
 d287_valid_cursor () {
   local pattern='^[A-Za-z0-9_=.;:-]{20,512}$'
   [[ ${1:-} =~ $pattern ]]
 }
 
 d287_verify_repo () {
-  local baseline=$1
+  local baseline=$1 dirty
   [[ $baseline =~ ^[0-9a-f]{40}$ ]] || d287_refuse INVALID_BASELINE
   [[ $(git -C "$d287_root" branch --show-current) == development ]] ||
     d287_refuse WRONG_BRANCH
@@ -55,8 +73,9 @@ d287_verify_repo () {
     d287_refuse HEAD_MISMATCH
   [[ $(git -C "$d287_root" rev-parse origin/development) == "$baseline" ]] ||
     d287_refuse ORIGIN_DEVELOPMENT_MISMATCH
-  [[ -z $(git -C "$d287_root" status --porcelain --untracked-files=all -- \
-    "${d287_critical[@]}") ]] || d287_refuse LIVE_CRITICAL_DIRTY
+  dirty=$(git -C "$d287_root" status --porcelain --untracked-files=all -- \
+    "${d287_critical[@]}") || d287_refuse REPOSITORY_STATUS_READ_FAILED
+  [[ -z $dirty ]] || d287_refuse LIVE_CRITICAL_DIRTY
 }
 
 d287_verify_hash () {
@@ -119,12 +138,13 @@ d287_count_goodix_targets () {
 }
 
 d287_current_cursor () {
-  local output cursor
-  output=$(LC_ALL=C journalctl -b -u fprintd.service -n 0 --show-cursor --no-pager) ||
+  local output cursor cursor_count
+  output=$(LC_ALL=C journalctl -b -n 0 --show-cursor --no-pager) ||
     d287_refuse JOURNAL_CURSOR_READ_FAILED
   cursor=$(printf '%s\n' "$output" | sed -n 's/^-- cursor: //p')
-  [[ $(printf '%s\n' "$cursor" | grep -c . || true) -eq 1 ]] ||
-    d287_refuse JOURNAL_CURSOR_AMBIGUOUS
+  cursor_count=$(printf '%s\n' "$cursor" | grep -c . || true)
+  [[ $cursor_count -ne 0 ]] || d287_refuse JOURNAL_CURSOR_MISSING
+  [[ $cursor_count -eq 1 ]] || d287_refuse JOURNAL_CURSOR_MULTIPLE
   d287_valid_cursor "$cursor" || d287_refuse JOURNAL_CURSOR_INVALID
   printf '%s\n' "$cursor"
 }
@@ -170,7 +190,7 @@ d287_inner_cleanup () {
     umount /etc/pam.d/kde-fingerprint || rc=1
   fi
   if [[ -n $d287_tmp ]]; then
-    [[ $d287_tmp == /tmp/goodix-d287-01 && -d $d287_tmp && ! -L $d287_tmp ]] ||
+    [[ $d287_tmp == "$d287_namespace_tmp" && -d $d287_tmp && ! -L $d287_tmp ]] ||
       return 1
     find "$d287_tmp" -xdev -depth -delete || rc=1
     d287_tmp=
@@ -184,8 +204,24 @@ d287_inner_cleanup () {
 
 d287_inner_abort () {
   trap - EXIT HUP INT TERM
-  d287_inner_cleanup || true
+  d287_inner_cleanup || {
+    echo D287_01_ATTEMPT_OUTCOME=PAM_ERROR >&2
+    echo D287_01_ATTEMPT_FAILURE=CLEANUP_FAILED_AFTER_SIGNAL >&2
+    exit 4
+  }
   exit 130
+}
+
+d287_inner_exit_cleanup () {
+  local original_rc=$? cleanup_rc=0
+  trap - EXIT HUP INT TERM
+  d287_inner_cleanup || cleanup_rc=$?
+  if [[ $cleanup_rc -ne 0 ]]; then
+    echo D287_01_ATTEMPT_OUTCOME=PAM_ERROR >&2
+    echo D287_01_ATTEMPT_FAILURE=CLEANUP_FAILED_ON_EXIT >&2
+    exit 4
+  fi
+  exit "$original_rc"
 }
 
 d287_series_cleanup () {
@@ -199,7 +235,8 @@ d287_series_cleanup () {
 d287_collect_journal () {
   local cursor=$1 output=$2
   d287_valid_cursor "$cursor" || return 1
-  [[ $output == /tmp/goodix-d287-01/journal.log ]] || return 1
+  [[ -n $d287_tmp && -d $d287_tmp && ! -L $d287_tmp &&
+     $output == "$d287_tmp/journal.log" ]] || return 1
   LC_ALL=C journalctl -b -u fprintd.service --after-cursor "$cursor" --no-pager >"$output"
 }
 
@@ -262,32 +299,30 @@ d287_classify_attempt () {
   [[ $outcome == MATCH || $outcome == NO_MATCH ]]
 }
 
-d287_root_namespace_attempt () {
-  local user=$1 uid=$2 runtime=$3 wayland=$4 dbus=$5 cursor=$6 attempt=$7
-  local staged_pam deadline outcome_seen=false supervisor_terminated=false
-  local greeter_unlocked=false rc=255 poll classify_rc
-  [[ $EUID -eq 0 ]] || d287_refuse ROOT_NAMESPACE_REQUIRES_ROOT
+d287_validate_namespace_context () {
+  local user=$1 uid=$2 runtime=$3 wayland=$4 dbus=$5
   d287_safe_user "$user" || d287_refuse OPERATOR_USER_INVALID
-  [[ $uid =~ ^[0-9]+$ && $(id -u "$user") == "$uid" ]] || d287_refuse OPERATOR_UID_INVALID
+  [[ $uid =~ ^[0-9]+$ && $(id -u "$user") == "$uid" ]] ||
+    d287_refuse OPERATOR_UID_INVALID
   [[ $runtime == "/run/user/$uid" && -d $runtime && ! -L $runtime &&
      $(stat -c %u "$runtime") == "$uid" ]] || d287_refuse XDG_RUNTIME_DIR_INVALID
   [[ $wayland =~ ^wayland-[0-9]+$ && -S $runtime/$wayland ]] ||
     d287_refuse WAYLAND_SOCKET_INVALID
   [[ $dbus == "unix:path=$runtime/bus" && -S $runtime/bus ]] ||
     d287_refuse DBUS_SESSION_BUS_INVALID
-  d287_valid_cursor "$cursor" || d287_refuse JOURNAL_CURSOR_INVALID
-  [[ $attempt =~ ^[123]$ ]] || d287_refuse ATTEMPT_INDEX_INVALID
   [[ $(readlink /proc/self/ns/mnt) != $(readlink /proc/1/ns/mnt) ]] ||
     d287_refuse PRIVATE_MOUNT_NAMESPACE_REQUIRED
   [[ $(findmnt -n -o PROPAGATION /) == private ]] ||
     d287_refuse PRIVATE_MOUNT_PROPAGATION_REQUIRED
   ! mountpoint -q /etc/pam.d/kde-fingerprint ||
     d287_refuse PREEXISTING_PAM_MOUNTPOINT
-  trap d287_inner_cleanup EXIT
-  trap d287_inner_abort HUP INT TERM
+}
+
+d287_prepare_namespace_overlay () {
+  local staged_pam
   mount -t tmpfs -o nodev,nosuid,noexec,size=4m,mode=1777 tmpfs /tmp
   d287_tmp_mount_active=true
-  d287_tmp=/tmp/goodix-d287-01
+  d287_tmp=$d287_namespace_tmp
   mkdir "$d287_tmp"
   [[ -d $d287_tmp && ! -L $d287_tmp ]] || d287_refuse TEMP_DIRECTORY_INVALID
   chmod 0700 "$d287_tmp"
@@ -300,6 +335,10 @@ d287_root_namespace_attempt () {
   mount -o remount,bind,ro /etc/pam.d/kde-fingerprint
   d287_verify_hash /etc/pam.d/kde-fingerprint "$d287_expected_pam_sha" ||
     d287_refuse NAMESPACE_PAM_OVERLAY_FAILED
+}
+
+d287_start_greeter () {
+  local user=$1 runtime=$2 wayland=$3 dbus=$4
   setsid --wait runuser -u "$user" -- env -i \
     HOME="$(getent passwd "$user" | cut -d: -f6)" USER="$user" LOGNAME="$user" \
     PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 XDG_SESSION_TYPE=wayland \
@@ -307,7 +346,22 @@ d287_root_namespace_attempt () {
     DBUS_SESSION_BUS_ADDRESS="$dbus" QT_QPA_PLATFORM=wayland \
     /usr/libexec/kscreenlocker_greet --testing >"$d287_greeter_log" 2>&1 &
   d287_greeter_pgid=$!
-  deadline=$((SECONDS + 20))
+}
+
+d287_root_namespace_attempt () {
+  local user=$1 uid=$2 runtime=$3 wayland=$4 dbus=$5 cursor=$6 attempt=$7
+  local deadline outcome_seen=false supervisor_terminated=false
+  local greeter_unlocked=false greeter_exited_before_outcome=false
+  local rc=255 poll classify_rc
+  d287_require_root_context || d287_refuse ROOT_NAMESPACE_REQUIRES_ROOT
+  d287_validate_namespace_context "$user" "$uid" "$runtime" "$wayland" "$dbus"
+  d287_valid_cursor "$cursor" || d287_refuse JOURNAL_CURSOR_INVALID
+  [[ $attempt =~ ^[123]$ ]] || d287_refuse ATTEMPT_INDEX_INVALID
+  trap d287_inner_exit_cleanup EXIT
+  trap d287_inner_abort HUP INT TERM
+  d287_prepare_namespace_overlay
+  d287_start_greeter "$user" "$runtime" "$wayland" "$dbus"
+  deadline=$((SECONDS + d287_ready_timeout))
   while d287_greeter_running; do
     grep -F 'Locked at ' "$d287_greeter_log" >/dev/null && break
     (( SECONDS < deadline )) || break
@@ -325,7 +379,7 @@ d287_root_namespace_attempt () {
   }
   echo D287_01_GREETER_TESTING_MODE_READY=true
   echo 'Muovere il puntatore per mostrare il form, quindi appoggiare una sola volta l’indice destro.'
-  deadline=$((SECONDS + 90))
+  deadline=$((SECONDS + d287_outcome_timeout))
   while (( SECONDS < deadline )); do
     d287_collect_journal "$cursor" "$d287_journal_log" ||
       d287_refuse JOURNAL_READ_FAILED
@@ -334,7 +388,10 @@ d287_root_namespace_attempt () {
       outcome_seen=true
       break
     fi
-    d287_greeter_running || break
+    if ! d287_greeter_running; then
+      greeter_exited_before_outcome=true
+      break
+    fi
     sleep 0.2
   done
   if [[ $outcome_seen == true ]] &&
@@ -344,11 +401,16 @@ d287_root_namespace_attempt () {
     d287_kill_greeter_group TERM
   fi
   if [[ $outcome_seen != true ]]; then
+    if [[ $greeter_exited_before_outcome == true ]]; then
+      echo D287_01_ATTEMPT_FAILURE=GREETER_EXITED_BEFORE_OUTCOME
+    else
+      echo D287_01_ATTEMPT_FAILURE=JOURNAL_OUTCOME_TIMEOUT
+    fi
     supervisor_terminated=true
     d287_kill_greeter_group TERM
   fi
   if [[ $outcome_seen == true && $supervisor_terminated == false ]]; then
-    deadline=$((SECONDS + 10))
+    deadline=$((SECONDS + d287_match_exit_timeout))
     while d287_greeter_running && (( SECONDS < deadline )); do
       sleep 0.1
     done
@@ -357,7 +419,7 @@ d287_root_namespace_attempt () {
       d287_kill_greeter_group TERM
     fi
   fi
-  deadline=$((SECONDS + 5))
+  deadline=$((SECONDS + d287_termination_timeout))
   while d287_greeter_running && (( SECONDS < deadline )); do
     sleep 0.1
   done
@@ -375,7 +437,7 @@ d287_root_namespace_attempt () {
   if grep -Fx Unlocked "$d287_greeter_log" >/dev/null; then
     greeter_unlocked=true
   fi
-  for poll in {1..50}; do
+  for ((poll = 1; poll <= d287_epoch_poll_count; poll++)); do
     d287_collect_journal "$cursor" "$d287_journal_log" ||
       d287_refuse JOURNAL_READ_FAILED
     grep -F GOODIX_D282_EPOCH_AUDIT "$d287_journal_log" >/dev/null && break
@@ -386,17 +448,21 @@ d287_root_namespace_attempt () {
     "$supervisor_terminated" "$greeter_unlocked"
   classify_rc=$?
   set -e
-  d287_inner_cleanup || return 4
+  if ! d287_inner_cleanup; then
+    echo D287_01_ATTEMPT_OUTCOME=PAM_ERROR >&2
+    echo D287_01_ATTEMPT_FAILURE=CLEANUP_FAILED >&2
+    return 4
+  fi
   trap - EXIT HUP INT TERM
   [[ $classify_rc -eq 0 ]] || return 4
 }
 
 d287_root_series () {
   local baseline=$1 user=$2 uid=$3 runtime=$4 wayland=$5 dbus=$6
-  local attempt cursor confirmation inner_log inner_rc outcome matched_attempt=0
+  local attempt cursor confirmation inner_log inner_rc outcome outcome_count matched_attempt=0
   local final=FAIL_LIVE_PENDING_INDEPENDENT_REVIEW
   local -a outcomes=()
-  [[ $EUID -eq 0 ]] || d287_refuse ROOT_SERIES_REQUIRES_ROOT
+  d287_require_root_context || d287_refuse ROOT_SERIES_REQUIRES_ROOT
   d287_verify_repo "$baseline"
   d287_validate_host_contract
   d287_require_polkit_password_path
@@ -408,7 +474,7 @@ d287_root_series () {
   echo 'Pilot del solo greeter KDE in modalità --testing: la sessione non viene bloccata.'
   echo 'Non digitare la password nel form. Ogni finestra ammette una sola VERIFY.'
   printf 'Per il tentativo 1/3 digitare INDICE DESTRO: '
-  read -r confirmation
+  read -r confirmation || d287_refuse OPERATOR_CONFIRMATION_READ_FAILED
   [[ $confirmation == 'INDICE DESTRO' ]] || d287_refuse PHYSICAL_FINGER_NOT_CONFIRMED
   for attempt in 1 2 3; do
     d287_check_no_existing_greeter
@@ -424,10 +490,11 @@ d287_root_series () {
     set -e
     cat "$inner_log"
     outcome=$(sed -n 's/^D287_01_ATTEMPT_OUTCOME=//p' "$inner_log" | tail -n 1)
-    d287_series_cleanup
+    outcome_count=$(grep -c '^D287_01_ATTEMPT_OUTCOME=' "$inner_log" || true)
+    d287_series_cleanup || d287_refuse SERIES_LOG_CLEANUP_FAILED
     d287_validate_host_contract
     d287_run_d285_audit "D287_ATTEMPT_${attempt}_POST" "$user"
-    [[ $inner_rc -eq 0 && $outcome =~ ^(MATCH|NO_MATCH)$ ]] ||
+    [[ $inner_rc -eq 0 && $outcome_count -eq 1 && $outcome =~ ^(MATCH|NO_MATCH)$ ]] ||
       d287_refuse ATTEMPT_FAILED_OR_AMBIGUOUS
     outcomes+=("$outcome")
     if [[ $outcome == MATCH ]]; then
@@ -439,7 +506,7 @@ d287_root_series () {
       echo "NO_MATCH osservato al tentativo $attempt/$d287_max_attempts."
       printf 'Per autorizzare il tentativo %d/3 digitare TENTATIVO %d: ' \
         "$((attempt + 1))" "$((attempt + 1))"
-      read -r confirmation
+      read -r confirmation || d287_refuse OPERATOR_CONFIRMATION_READ_FAILED
       [[ $confirmation == "TENTATIVO $((attempt + 1))" ]] ||
         d287_refuse NEXT_ATTEMPT_NOT_CONFIRMED
     fi
@@ -470,8 +537,9 @@ d287_root_series () {
 }
 
 d287_operator_run () {
-  local baseline user uid runtime wayland dbus stamp capture rc result
-  [[ $EUID -ne 0 ]] || d287_refuse OPERATOR_MUST_BE_UNPRIVILEGED
+  local baseline user uid runtime wayland dbus stamp capture rc tee_rc result result_count
+  local -a pipeline_status
+  d287_require_operator_context || d287_refuse OPERATOR_MUST_BE_UNPRIVILEGED
   baseline=$(git -C "$d287_root" rev-parse HEAD)
   d287_verify_repo "$baseline"
   d287_validate_host_contract
@@ -489,13 +557,21 @@ d287_operator_run () {
   set +e
   pkexec "$d287_script_dir/run-d287-01.sh" --root-series "$baseline" "$user" "$uid" \
     "$runtime" "$wayland" "$dbus" 2>&1 | tee "$capture/root-series.log"
-  rc=${PIPESTATUS[0]}
+  pipeline_status=("${PIPESTATUS[@]}")
+  rc=${pipeline_status[0]}
+  tee_rc=${pipeline_status[1]}
   set -e
   result=$(sed -n 's/^D287_01_SERIES_RESULT=//p' "$capture/root-series.log" | tail -n 1)
-  [[ -n $result ]] || result=ROOT_SERIES_NOT_COMPLETED
+  result_count=$(grep -c '^D287_01_SERIES_RESULT=' "$capture/root-series.log" || true)
+  if [[ $tee_rc -ne 0 ]]; then
+    result=CAPTURE_TEE_FAILED
+  elif [[ $result_count -ne 1 ]]; then
+    result=ROOT_SERIES_RESULT_MISSING_OR_MULTIPLE
+  fi
   {
     echo "D287_01_RESULT=$result"
     echo "D287_01_ROOT_SERIES_RETURN_CODE=$rc"
+    echo "D287_01_CAPTURE_TEE_RETURN_CODE=$tee_rc"
     echo "D287_01_REPO_BASELINE=$baseline"
     echo D287_01_CONSUMER=KSCREENLOCKER_GREETER_TESTING_MODE
     echo D287_01_REAL_SESSION_LOCKED=false
@@ -510,17 +586,22 @@ d287_operator_run () {
   chmod 0600 "$capture"/*
   sha256sum "$capture"/*
   echo "D287_01_CAPTURE_DIRECTORY=$capture"
-  [[ $rc -eq 0 && $result == PASS_LIVE_PENDING_INDEPENDENT_REVIEW ]] || exit 4
+  [[ $rc -eq 0 && $tee_rc -eq 0 &&
+     $result == PASS_LIVE_PENDING_INDEPENDENT_REVIEW ]] || exit 4
 }
 
 d287_offline_preflight () {
-  [[ $EUID -ne 0 ]] || d287_refuse OFFLINE_PREFLIGHT_MUST_BE_UNPRIVILEGED
+  local cursor
+  d287_require_operator_context || d287_refuse OFFLINE_PREFLIGHT_MUST_BE_UNPRIVILEGED
   bash -n "$d287_script_dir/run-d287-01.sh"
   d287_validate_host_contract
   d287_require_polkit_password_path
+  cursor=$(d287_current_cursor)
+  d287_valid_cursor "$cursor" || d287_refuse JOURNAL_CURSOR_INVALID
   d287_verify_hash /etc/pam.d/kde-fingerprint "$d287_expected_kde_fingerprint_sha" ||
     d287_refuse KDE_FINGERPRINT_PAM_DRIFT
   echo D287_01_OFFLINE_PREFLIGHT=PASS
+  echo D287_01_JOURNAL_CURSOR_PREFLIGHT=PASS
   echo D287_01_CONSUMER=KSCREENLOCKER_GREETER_TESTING_MODE
   echo D287_01_REAL_SESSION_LOCKED=false
   echo D287_01_HOST_PAM_FILE_WRITE_COUNT=0
