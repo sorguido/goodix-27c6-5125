@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D285/01 installazione persistente attiva e PASS_LIVE_CLOSED
+### Stato corrente — D285/01 attivo e chiuso; D286/01 reboot survival pronto offline
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -712,6 +712,34 @@ ownership-pinned resta disponibile. Il rischio
 D286: survival post-reboot e readiness del rollback, con nuovo Human Gate
 prima di privilegi, reboot o verifica biometrica.
 
+D286/01 prepara quel boundary senza modificare l'installazione. Sul target
+Fedora `/usr/bin/pkexec` è disponibile e `/usr/lib/pam.d/polkit-1` include
+`system-auth`; poiché D285 ha rimosso pam_fprintd da `system-auth`, gli audit
+root-only pre/post reboot possono usare password/polkit senza consumare una
+azione sensore attraverso il PAM sudo D285.
+
+Il kit lega le due fasi con il boot ID. Prima del reboot verifica direttamente
+state root-only, tutti i file/hash persistenti, authselect ridotto, fallback
+password, wrapper/drop-in, manifest runtime, unica ownership del template,
+libfprint di sistema e tutti i gate pre-delete dell'uninstall, senza cancellare
+o esportare valori protetti. Dopo un boot ID diverso ripete l'audit e consente
+una sola `sudo -v`; il successo richiede una sola epoch VERIFY, un solo SIGFM
+match, zero retry/reopen/reset/clear-halt/persistenza nota e chiusura drenata.
+
+Se la verifica fallisce, non viene ripetuta: un audit polkit root-only raccoglie
+la telemetria sanitizzata della singola prova e il kit termina fail-closed.
+
+La pre-fase ha budget sensore zero; la post-fase massimo una action e un
+contatto. Non sono in scope enrollment, delete, reinstallazione, uninstall,
+lock screen o login. In caso di non-match o password prompt non esiste retry;
+si preserva la capture per review, tenendo distinto il rischio biometrico
+occasionale da un drift della persistenza. Il preflight è `17/17 PASS`, non ha
+invocato pkexec/sudo/reboot/fprintd/USB e chiude l'executable path offline fino
+al nuovo `HUMAN_REQUIRED`. La regressione cumulativa D282–D286 è `197/197 PASS`
+nell'ambiente host. Quattro test host-side non sono eseguibili nel sandbox
+ristretto per i permessi socket systemd/PAM, ma passano fuori dal sandbox senza
+privilegi, USB o sensore. `shellcheck` non è disponibile; `bash -n` è incluso.
+
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
 D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
@@ -1129,6 +1157,26 @@ D285_01_INSTALL_LIVE_READINESS=CLOSED_DO_NOT_RERUN
 D285_01_INSTALL_ENTRYPOINT_CLOSED=true
 D285_01_UNINSTALL_ENTRYPOINT_RETAINED=true
 D285_01_AUTONOMOUS_LIVE_ALLOWED=false
+D286_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_REBOOT_CYCLE
+D286_01_BOUNDARY=PERSISTENT_SURVIVAL_AND_ROLLBACK_READINESS
+D286_01_PRIVILEGED_AUDIT_PATH=POLKIT_SYSTEM_AUTH_WITHOUT_FINGERPRINT
+D286_01_PRE_REBOOT_SENSOR_ACTION_MAX=0
+D286_01_REBOOT_REQUIRED=true
+D286_01_POST_REBOOT_VERIFY_ACTION_MAX=1
+D286_01_POST_REBOOT_EXPECTED_PHYSICAL_CONTACT_MAX=1
+D286_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D286_01_ENROLL_IN_SCOPE=false
+D286_01_DELETE_IN_SCOPE=false
+D286_01_UNINSTALL_EXECUTION_IN_SCOPE=false
+D286_01_LOCK_SCREEN_IN_SCOPE=false
+D286_01_LOGIN_IN_SCOPE=false
+D286_01_PROTECTED_VALUES_EXPORTED=false
+D286_01_OFFLINE_CONTRACT_MATRIX=17/17_PASS
+D286_01_COMBINED_REGRESSION_MATRIX=197/197_PASS_HOST_ENV
+D286_01_SHELLCHECK=UNAVAILABLE
+D286_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D286_01_OPERATOR_KIT=operator_kit/d286-01-reboot-survival
+D286_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_REBOOT_CYCLE
 MANUAL_PRESTOP_REQUIRED=false
 PROBE_INITIAL_ACTIVE_ACCEPTED=true
 PROBE_INITIAL_INACTIVE_ACCEPTED=true
@@ -1161,8 +1209,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D286_PERSISTENT_SURVIVAL_AND_ROLLBACK_READINESS
-NEXT_BOUNDARY_AFTER_D285_01_REVIEW=D286_PERSISTENT_SURVIVAL_AND_ROLLBACK_READINESS
+NEXT_PRIMARY_BOUNDARY=D286_01_OPERATOR_REBOOT_SURVIVAL_CYCLE_HUMAN_GATE
+NEXT_BOUNDARY_AFTER_D285_01_REVIEW=D286_01_OPERATOR_REBOOT_SURVIVAL_CYCLE_HUMAN_GATE
 ```
 
 Report ed evidenze correnti:
@@ -1206,6 +1254,10 @@ Report ed evidenze correnti:
 `analysis/D285/d285_01_attempt_02_evidence_audit.py`,
 `captures/D285_01/D28501_ATTEMPT_02_20260911T163528Z_a9e234e43d2b/sanitized/`,
 `operator_kit/d285-01-persistent-sudo/`,
+`analysis/D286/D286_01_reboot_survival_boundary.md`,
+`analysis/D286/D286_01_OFFLINE_RESULT.env`,
+`analysis/D286/test_d286_01_offline_contract.py`,
+`operator_kit/d286-01-reboot-survival/`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
 `analysis/D282/D282_01_ATTEMPT_04_NORMALIZED.env`,
 `analysis/D282/D282_01_ATTEMPT_05_NORMALIZED.env`,
