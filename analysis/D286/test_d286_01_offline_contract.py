@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -162,9 +163,10 @@ class D286OfflineContract(unittest.TestCase):
         self.assertIn("d286_current_cursor", offline)
         self.assertIn("REAL_SENSOR_ACCESSED=false", offline)
 
-    def test_19_readme_has_human_gate_and_operator_stop_conditions(self):
+    def test_19_closed_readme_preserves_historical_stop_conditions(self):
         for marker in (
-                "HUMAN REQUIRED", "--operator-retry", "INDICE DESTRO",
+                "CHIUSO", "D286_01_LIVE_CLOSED_DO_NOT_RERUN",
+                "--operator-retry", "INDICE DESTRO",
                 "TENTATIVO 2", "TENTATIVO 3", "senza un quarto tentativo",
                 "PAM_ERROR", "SAFETY_VIOLATION", "STOP_ON_FIRST_MATCH=true"):
             self.assertIn(marker, self.readme)
@@ -278,6 +280,35 @@ class D286OfflineContract(unittest.TestCase):
                         operator.index("d286_run_sudo_attempt"))
         self.assertIn("verify_epoch_total", operator)
         self.assertIn("REAL_SENSOR_ACCESSED=false", operator)
+
+    def test_31_all_positional_parameters_above_nine_are_braced(self):
+        dispatch = self.script[self.script.index("case ${1:-}"):]
+        for index in range(10, 14):
+            self.assertIn(f"${{{index}}}", dispatch)
+        self.assertIsNone(re.search(r"(?<!\{)\$(?:10|11|12|13)\b", dispatch))
+
+    def test_32_completed_live_entrypoint_is_closed_before_action(self):
+        operator = section(self.script, "operator_retry ()", "offline_preflight ()")
+        refusal = operator.index("D286_01_LIVE_CLOSED_DO_NOT_RERUN")
+        self.assertLess(refusal, operator.index("git -C"))
+        self.assertLess(refusal, operator.index("pkexec"))
+        self.assertIn("CHIUSO", self.readme)
+
+    def test_33_retry_evidence_is_hash_pinned_and_classified(self):
+        result = subprocess.run(
+            ["python3", str(ROOT / "analysis/D286/d286_01_retry_evidence_audit.py")],
+            check=True, capture_output=True, text=True)
+        self.assertIn("PASS_HASH_PINNED_HOST_FAILURES_AND_FINAL_MATCH", result.stdout)
+
+    def test_34_permanent_explicit_retry_policy_is_canonical(self):
+        manual = (ROOT / "Goodix 27c6 5125 manuale tecnico.md").read_text()
+        for marker in (
+                "INITIAL_FINGER_ATTEMPT=1",
+                "MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2",
+                "MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3",
+                "STOP_ON_FIRST_MATCH=true",
+                "AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false"):
+            self.assertIn(marker, manual)
 
 
 if __name__ == "__main__":

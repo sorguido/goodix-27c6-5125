@@ -339,6 +339,7 @@ operator_post_reboot () {
 }
 
 operator_retry () {
+  d286_refuse D286_01_LIVE_CLOSED_DO_NOT_RERUN
   local baseline user stamp capture rc audit_rc attempt cursor confirmation outcome epoch_count
   local final_outcome=FAIL_LIVE_PENDING_INDEPENDENT_REVIEW matched_attempt=0 verify_epoch_total=0
   local -a outcomes=()

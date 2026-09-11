@@ -1,8 +1,8 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D286/01 — retry manuali post-reboot del consumer sudo
+# D286/01 — retry manuali post-reboot del consumer sudo (chiuso)
 
-> **HUMAN REQUIRED:** il kit può eseguire fino a tre autenticazioni
-> biometriche `sudo -v` sul sensore reale. L'agente AI non deve avviarlo.
+> **CHIUSO:** la run finale è PASS. L'entrypoint `--operator-retry` rifiuta
+> prima di qualunque azione e non deve essere rieseguito.
 
 ## Stato del primo ciclo
 
@@ -30,25 +30,26 @@ eseguito alcun retry automatico. Il vecchio percorso `--operator-pre-reboot` /
 Il fallback password D285 resta disponibile per il normale uso del sistema;
 soltanto questo test non dispone di un canale attraverso cui fornirla.
 
-## Comando operatore
+## Comando storico, non rieseguire
 
-Collegare esattamente un Goodix `27c6:5125` e non usare contemporaneamente
-fprintd, sudo biometrico, lock screen o login. Dalla root del repository, come
-utente normale, eseguire:
+La run completata è stata avviata dalla root del repository, come utente
+normale, con:
 
 ```bash
 operator_kit/d286-01-reboot-survival/run-d286-01.sh --operator-retry
 ```
 
-I dialoghi `pkexec` prima, durante e dopo la serie sono audit root-only e
-richiedono la password amministrativa attraverso `system-auth`, dove
-fingerprint è disabilitato. Non sono tentativi biometrici.
+Il comando ora restituisce `D286_01_LIVE_CLOSED_DO_NOT_RERUN`. Nella run
+storica, i dialoghi `pkexec` prima, durante e dopo la serie erano audit
+root-only e richiedevano la password amministrativa attraverso `system-auth`,
+dove fingerprint era disabilitato. Non erano tentativi biometrici.
 
-Per il primo contatto digitare `INDICE DESTRO`. Dopo un `NO_MATCH`, il kit
-chiede esplicitamente `TENTATIVO 2` o `TENTATIVO 3`. Non appoggiare nuovamente
-il dito senza quella richiesta. Il primo `MATCH` termina immediatamente la
-serie. Dopo tre `NO_MATCH`, oppure su `PAM_ERROR`/`SAFETY_VIOLATION`, il kit
-termina senza un quarto tentativo e conserva la capture per la review AI-PM.
+Per il primo contatto veniva richiesto `INDICE DESTRO`. Dopo un `NO_MATCH`, il
+kit chiedeva esplicitamente `TENTATIVO 2` o `TENTATIVO 3`. Non andava
+appoggiato nuovamente il dito senza quella richiesta. Il primo `MATCH`
+terminava immediatamente la serie. Dopo tre `NO_MATCH`, oppure su
+`PAM_ERROR`/`SAFETY_VIOLATION`, il kit terminava senza un quarto tentativo e
+conservava la capture per la review AI-PM.
 
 ## Contratto e stop condition
 

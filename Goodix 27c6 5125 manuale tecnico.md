@@ -83,7 +83,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D285/01 attivo; D286/01 retry post-reboot pronto offline
+### Stato corrente — D285/01 attivo; D286/01 PASS live chiuso
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -761,6 +761,62 @@ candidate e chiuso offline senza USB o sensore. Il contratto D286 è `30/30
 PASS` e la regressione cumulativa D282–D286 è `210/210 PASS` nell'ambiente
 host. `shellcheck` resta non disponibile; `bash -n` è incluso nel preflight.
 
+Le prime due invocazioni del correttivo hanno raggiunto ciascuna una VERIFY,
+ma il successivo sottocomando root di audit è fallito host-side. Sulla baseline
+`d1463b41ed26c7ebe67e3d047a93ec44cd8ec042`, Bash interpretava `$10` e `$12`
+come `$1` seguito da carattere; il dispatcher terminava `USAGE`. Il commit
+`61c387b33b6fd6b71016e7479e74186d258d7be2` ha braced quei due argomenti, ma
+ha lasciato `$11` e `$13` non braced nella chiamata, causando
+`ATTEMPT_AUDIT_ARGUMENT_INVALID`. Il commit
+`62808112777a989fecf56c1924a36abbd474ad9f` chiude l'intera classe per i
+positional parameter 10–13.
+
+Le due capture parziali provano il pre-audit persistente PASS e il failure
+host, ma non catturano il return code sudo né completano gli audit root finali.
+Il journal read-only dello stesso boot permette tuttavia di classificare
+autenticamente le due VERIFY: la prima estrae 153 keypoint e fa `MATCH` sul
+sample 2 con score 527/40 dopo due confronti; la seconda estrae 148 keypoint e
+fa `MATCH` sul sample 2 con score 340/40 dopo due confronti. Entrambe hanno una
+sola epoch, un TLS, rispettivamente 76 e 77 submit, zero
+retry/reopen/reset/clear-halt/famiglie persistenti e cleanup drenato. Gli esiti
+complessivi delle invocazioni restano failure host-side, non failure
+biometrici; ciò che non fu catturato resta `NOT_CAPTURED`.
+
+La run finale sulla baseline
+`62808112777a989fecf56c1924a36abbd474ad9f` chiude D286. Pre-audit, audit
+post-attempt e final audit sono PASS. Il primo e unico tentativo restituisce
+zero da sudo e produce `MATCH`: 160 keypoint, sample 1, score 75/40 e un
+confronto. La singola epoch VERIFY ha un TLS, 76 submit, zero
+retry/reopen/reset/clear-halt/famiglie persistenti ed è drenata e
+context-closed. Il fallback password non viene raggiunto e lo stop sul primo
+match impedisce contatti ulteriori. Il successivo pre/final audit conferma
+anche che le due precedenti interruzioni host non hanno lasciato drift
+persistente noto. Tutte le capture sono preservate e hash-pinned; l'entrypoint
+live D286 è ora chiuso fail-closed.
+
+#### Policy target-specific per VERIFY/autenticazione di template già enrollati
+
+L'insieme D286 osserva sullo stesso dito/template un `NO_MATCH` 14/40 seguito
+da tre `MATCH` 527/40, 340/40 e 75/40. Non è una misura FAR/FRR, ma prova che
+un singolo `NO_MATCH` non è conclusivo nelle condizioni correnti del target.
+
+Ogni futuro Kit Operatore per riconoscimento/autenticazione analoga deve
+offrire una sequenza di almeno tre slot: un tentativo iniziale e almeno due
+retry fisici espliciti dopo il primo `NO_MATCH`. Ogni contatto è una nuova
+azione consapevole, separata e auditabile; non è un retry automatico del
+protocollo o del transport. `MATCH` arresta immediatamente la sequenza, quindi
+non forza i restanti contatti. `PAM_ERROR`, `SAFETY_VIOLATION` o failure non
+biometrica fermano fail-closed. Dopo i tre slot si classifica soltanto
+l'evidenza osservata, senza generalizzare FAR/FRR.
+
+```text
+INITIAL_FINGER_ATTEMPT=1
+MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2
+MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3
+STOP_ON_FIRST_MATCH=true
+AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+```
+
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED
 D279_ADVANCEMENT=TARGET_REAL_FIXED8_SIGFM_ENROLLMENT_AND_STAGE8_EARLY_TERMINAL
@@ -1178,8 +1234,8 @@ D285_01_INSTALL_LIVE_READINESS=CLOSED_DO_NOT_RERUN
 D285_01_INSTALL_ENTRYPOINT_CLOSED=true
 D285_01_UNINSTALL_ENTRYPOINT_RETAINED=true
 D285_01_AUTONOMOUS_LIVE_ALLOWED=false
-D286_01_OUTCOME=READY_OFFLINE_HUMAN_REQUIRED_EXPLICIT_RETRY_SERIES
-D286_01_BOUNDARY=POST_REBOOT_SUDO_MATCH_REPEATABILITY
+D286_01_OUTCOME=PASS_LIVE_CLOSED
+D286_01_BOUNDARY=POST_REBOOT_SUDO_MATCH_REPEATABILITY_CLOSED
 D286_01_PRIVILEGED_AUDIT_PATH=POLKIT_SYSTEM_AUTH_WITHOUT_FINGERPRINT
 D286_01_FIRST_CYCLE_BASELINE=f9bb4551a47704bb007f2877b6b112c5d9d39fed
 D286_01_POST_REBOOT_PERSISTENT_STATE_AUDIT=PASS
@@ -1199,18 +1255,38 @@ D286_01_MAX_PHYSICAL_CONTACTS=3
 D286_01_PAM_MAX_TRIES_PER_ATTEMPT=1
 D286_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 D286_01_STOP_ON_FIRST_MATCH=true
+D286_01_RETRY_INVOCATION_1_HOST_OUTCOME=FAIL_ROOT_AUDIT_USAGE_POSITIONAL_PARSE
+D286_01_RETRY_INVOCATION_1_BIOMETRIC_OUTCOME=MATCH_RECOVERED_SAME_BOOT_JOURNAL
+D286_01_RETRY_INVOCATION_1_SUDO_RETURN_CODE=NOT_CAPTURED
+D286_01_RETRY_INVOCATION_2_HOST_OUTCOME=FAIL_ROOT_AUDIT_ARGUMENT_INVALID_POSITIONAL_PARSE
+D286_01_RETRY_INVOCATION_2_BIOMETRIC_OUTCOME=MATCH_RECOVERED_SAME_BOOT_JOURNAL
+D286_01_RETRY_INVOCATION_2_SUDO_RETURN_CODE=NOT_CAPTURED
+D286_01_FINAL_RETRY_BASELINE=62808112777a989fecf56c1924a36abbd474ad9f
+D286_01_FINAL_RETRY_OUTCOME=PASS_LIVE
+D286_01_FINAL_RETRY_ATTEMPTS_PERFORMED=1
+D286_01_FINAL_RETRY_MATCHED_ATTEMPT=1
+D286_01_FINAL_RETRY_SCORE=75
+D286_01_FINAL_RETRY_THRESHOLD=40
+D286_01_FINAL_RETRY_ROOT_AUDITS=PASS_PRE_ATTEMPT_POST
+D286_01_TOTAL_VERIFY_EPOCHS_REVIEWED=4
+D286_01_TOTAL_NO_MATCH_OUTCOMES=1
+D286_01_TOTAL_MATCH_OUTCOMES=3
+D286_01_ENTRYPOINT_CLOSED_DO_NOT_RERUN=true
 D286_01_ENROLL_IN_SCOPE=false
 D286_01_DELETE_IN_SCOPE=false
 D286_01_UNINSTALL_EXECUTION_IN_SCOPE=false
 D286_01_LOCK_SCREEN_IN_SCOPE=false
 D286_01_LOGIN_IN_SCOPE=false
 D286_01_PROTECTED_VALUES_EXPORTED=false
-D286_01_OFFLINE_CONTRACT_MATRIX=30/30_PASS
-D286_01_COMBINED_REGRESSION_MATRIX=210/210_PASS_HOST_ENV
+D286_01_OFFLINE_CONTRACT_MATRIX=34/34_PASS
+D286_01_COMBINED_REGRESSION_MATRIX=214/214_PASS_HOST_ENV
 D286_01_SHELLCHECK=UNAVAILABLE
-D286_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D286_01_EXECUTABLE_CLOSURE=PASS_LIVE_WITH_HASH_PINNED_REVIEW
 D286_01_OPERATOR_KIT=operator_kit/d286-01-reboot-survival
-D286_01_LIVE_READINESS=HUMAN_REQUIRED_OPERATOR_EXPLICIT_RETRY_SERIES
+D286_01_LIVE_READINESS=CLOSED_DO_NOT_RERUN
+INITIAL_FINGER_ATTEMPT=1
+MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2
+MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3
 OPENCV_RPM_DIRECTORY=GoodixArtifacts/opencv-4.13-rpms
 OPENCV_RPM_GIT_TREATMENT=PAYLOAD_IGNORED_DOCUMENTATION_TRACKED
 OPENCV_RPM_MANIFEST_VERIFICATION=5/5_PASS
@@ -1247,8 +1323,8 @@ AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 REAL_USB_ENUMERATION_ATTEMPTED=false
 REAL_SENSOR_ACCESSED=false
 LIVE_EXECUTION_PERFORMED=false
-NEXT_PRIMARY_BOUNDARY=D286_01_OPERATOR_EXPLICIT_RETRY_SERIES_HUMAN_GATE
-NEXT_BOUNDARY_AFTER_D286_01_FIRST_CYCLE_REVIEW=D286_01_OPERATOR_EXPLICIT_RETRY_SERIES_HUMAN_GATE
+NEXT_PRIMARY_BOUNDARY=AI_PM_NEXT_STEP_SELECTION_AFTER_D286_01_CLOSURE
+NEXT_BOUNDARY_AFTER_D286_01_REVIEW=AI_PM_NEXT_STEP_SELECTION_AFTER_D286_01_CLOSURE
 ```
 
 Report ed evidenze correnti:
@@ -1298,8 +1374,15 @@ Report ed evidenze correnti:
 `analysis/D286/D286_01_FIRST_CYCLE_NORMALIZED.env`,
 `analysis/D286/D286_01_FIRST_CYCLE_RECOVERED_JOURNAL.log`,
 `analysis/D286/d286_01_first_cycle_evidence_audit.py`,
+`analysis/D286/D286_01_retry_post_live_review.md`,
+`analysis/D286/D286_01_RETRY_NORMALIZED.env`,
+`analysis/D286/D286_01_RETRY_RECOVERED_JOURNAL.log`,
+`analysis/D286/d286_01_retry_evidence_audit.py`,
 `analysis/D286/test_d286_01_offline_contract.py`,
 `captures/D286_01/D28601_CYCLE_20260911T184820Z_f9bb4551a477/sanitized/`,
+`captures/D286_01/D28601_RETRY_20260911T192824Z_d1463b41ed26/sanitized/`,
+`captures/D286_01/D28601_RETRY_20260911T193758Z_61c387b33b6f/sanitized/`,
+`captures/D286_01/D28601_RETRY_20260911T194718Z_62808112777a/sanitized/`,
 `operator_kit/d286-01-reboot-survival/`,
 `GoodixArtifacts/opencv-4.13-rpms/README.md`,
 `analysis/D282/D282_01_attempt_04_05_post_live_review.md`,
