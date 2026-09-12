@@ -111,12 +111,20 @@ class D291OperatorKitContract(unittest.TestCase):
         self.assertNotIn("while true", self.script)
         self.assertNotIn("for attempt", self.script)
 
-    def test_13_readme_declares_human_gate_and_output(self):
+    def test_13_readme_preserves_historical_gate_and_output(self):
         for marker in (
                 "Human Gate", "NO_MATCH", "MATCH", "Ctrl-C",
                 "RESULT_DIRECTORY", "/tmp/goodix-d291-01-result.*",
-                "non deve eseguirlo"):
+                "non costituisce"):
             self.assertIn(marker, self.readme)
+
+    def test_14_retired_kit_fails_before_any_operator_action(self):
+        completed = subprocess.run(
+            [str(SCRIPT), "--operator-run"], text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        self.assertEqual(completed.returncode, 4)
+        self.assertIn("HISTORICAL_ONLY_DO_NOT_RERUN", completed.stderr)
+        self.assertIn("BIOMETRIC_ROOT_CAUSE_NOT_IDENTIFIED", completed.stderr)
 
 
 if __name__ == "__main__":

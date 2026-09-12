@@ -18,6 +18,57 @@ clamp_u12 (int value)
   return (uint16_t) value;
 }
 
+static void
+test_session_coupled_baseline_variation (void)
+{
+  uint16_t baseline_a[N];
+  uint16_t baseline_b[N];
+  uint16_t frame_a[N];
+  uint16_t frame_b[N];
+  uint8_t paired_a[N];
+  uint8_t paired_b[N];
+  uint8_t stale_baseline[N];
+  size_t changed = 0u;
+
+  /* Model two independently opened sessions.  The same non-biometric local
+   * relief rides on the B0 measured in that session, while B0 itself changes
+   * spatially.  This is the physically coupled case that the former D291
+   * fixed-raw-frame fixture did not represent. */
+  for (size_t y = 0; y < GOODIX_CANONICAL_IMAGE_HEIGHT; y++)
+    for (size_t x = 0; x < GOODIX_CANONICAL_IMAGE_WIDTH; x++)
+      {
+        size_t index = y * GOODIX_CANONICAL_IMAGE_WIDTH + x;
+        int relief = (int) ((x * 41u + y * 67u + (x * y) % 53u) % 1001u) -
+                     500;
+        int spatial_drift =
+          ((x / 4u + y / 5u) % 2u == 0u ? 260 : -220) +
+          (int) ((3u * x + 5u * y) % 47u) - 23;
+
+        baseline_a[index] = (uint16_t) (1800u +
+          (x * 7u + y * 11u + (x * y) % 17u) % 301u);
+        baseline_b[index] = clamp_u12 ((int) baseline_a[index] +
+                                        spatial_drift);
+        frame_a[index] = clamp_u12 ((int) baseline_a[index] + relief);
+        frame_b[index] = clamp_u12 ((int) baseline_b[index] + relief);
+      }
+
+  assert (goodix_sigfm_preprocess_r2 (
+            baseline_a, N, frame_a, N, paired_a, sizeof paired_a) ==
+          GOODIX_SIGFM_PREPROCESS_OK);
+  assert (goodix_sigfm_preprocess_r2 (
+            baseline_b, N, frame_b, N, paired_b, sizeof paired_b) ==
+          GOODIX_SIGFM_PREPROCESS_OK);
+  assert (memcmp (paired_a, paired_b, sizeof paired_a) == 0);
+
+  assert (goodix_sigfm_preprocess_r2 (
+            baseline_a, N, frame_b, N, stale_baseline,
+            sizeof stale_baseline) == GOODIX_SIGFM_PREPROCESS_OK);
+  for (size_t i = 0; i < N; i++)
+    if (stale_baseline[i] != paired_b[i])
+      changed++;
+  assert (changed > N / 2u);
+}
+
 int
 main (void)
 {
@@ -56,6 +107,8 @@ main (void)
     assert (unchanged[i] == 0xa5);
   frame[17] = clamp_u12 ((int) baseline[17] +
                          (int) ((17u * 43u) % 401u) - 200);
+
+  test_session_coupled_baseline_variation ();
 
   assert (goodix_sigfm_preprocess_r2 (
             baseline, N, frame, N, output, sizeof output) ==

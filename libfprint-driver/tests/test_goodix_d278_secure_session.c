@@ -1941,7 +1941,7 @@ fill_d291_continuity_rasters (
 }
 
 static void
-test_d291_biometric_continuity_across_reopen (void)
+test_d291_fixed_raw_baseline_pinning_mechanics (void)
 {
   uint16_t baseline_a[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   uint16_t baseline_b[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
@@ -1976,9 +1976,10 @@ test_d291_biometric_continuity_across_reopen (void)
   g_assert_cmpuint (goodix_test_sigfm_match_get_probe_signature (0u), !=,
                     template_signature);
 
-  /* A reopened epoch supplies a deliberately different session B0.  The
-   * logical-open normalization baseline must remain pinned, so the enrolled
-   * raster still reaches the same feature identity and matches. */
+  /* This deliberately holds the raw raster fixed while changing session B0.
+   * It proves only the mechanics of logical-open pinning.  It is not a model
+   * of a fresh physical session, where the captured frame varies with B0; the
+   * session-coupled case is covered by test_goodix_sigfm_preprocess.c. */
   production_set_rasters (fixture, baseline_b, enrolled_raster);
   production_run_explicit_verify (fixture, enrolled, 0, TRUE, 1u);
   g_assert_cmpuint (goodix_test_sigfm_match_get_call_count (), ==,
@@ -4081,8 +4082,8 @@ main (int argc,
                    test_d280_01_production_two_epoch_template_reuse);
   g_test_add_func ("/goodix/d291/explicit-multi-verify-after-no-match",
                    test_d291_explicit_multi_verify_after_no_match);
-  g_test_add_func ("/goodix/d291/biometric-continuity-across-reopen",
-                   test_d291_biometric_continuity_across_reopen);
+  g_test_add_func ("/goodix/d291/fixed-raw-baseline-pinning-mechanics",
+                   test_d291_fixed_raw_baseline_pinning_mechanics);
   g_test_add_func ("/goodix/d282/production-enrollment-intermediate-extraction-terminal",
                    test_d282_01_production_intermediate_enrollment_extraction_failure);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",

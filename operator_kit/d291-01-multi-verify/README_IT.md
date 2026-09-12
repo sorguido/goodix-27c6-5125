@@ -1,11 +1,21 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D291/01 — aggiornamento runtime e prova multi-VERIFY
 
-Questo è il solo Human Gate residuo di D291. L'agente AI non deve eseguirlo:
-il comando usa `pkexec`, aggiorna il runtime D285 e raggiunge il sensore durante
-un unico `sudo ls` con PAM bounded a tre tentativi. Il launcher risolve il
-proprio percorso assoluto prima di `pkexec`, quindi funziona anche se invocato
-con il path relativo mostrato sotto.
+```text
+STATUS=HISTORICAL_ONLY_DO_NOT_RERUN
+D291_BIOMETRIC_ROOT_CAUSE=NOT_IDENTIFIED
+NEW_LIVE_REQUIRED_NOW=false
+```
+
+Questo kit non è più un Human Gate corrente. Il launcher si ferma subito,
+prima di build, `pkexec`, modifica runtime, PAM, fprintd, USB o sensore, con
+exit code 4 e il marker `HISTORICAL_ONLY_DO_NOT_RERUN`. Le evidenze aggregate
+successive hanno mostrato che il transport multi-VERIFY funziona ma la
+stabilità biometrica non è chiusa; ripetere la stessa live senza una nuova
+causa tecnica violerebbe il riesame metodologico pre-live.
+
+Quanto segue conserva il design storico per audit e provenance; non costituisce
+un'istruzione operativa.
 
 ## Scopo e rischio
 
@@ -38,15 +48,16 @@ deployment il percorso root esegue il root-audit D285, verifica state, runtime,
 manifest e PAM correnti e stampa `D291_01_HOST_RUNTIME_PREFLIGHT=PASS`. Ogni
 drift ferma il kit prima della sostituzione.
 
-## Unico comando operatore
+## Comando storico disabilitato
 
-Dalla root del repository, come utente normale:
+Dalla root del repository, una eventuale invocazione termina immediatamente:
 
 ```bash
 operator_kit/d291-01-multi-verify/run-d291-01.sh --operator-run
 ```
 
-Il primo dialogo `pkexec` usa il percorso password di `system-auth`, dove D285
+Nessun dialogo `pkexec` viene aperto nello stato corrente. Storicamente il
+primo dialogo usava il percorso password di `system-auth`, dove D285
 mantiene fingerprint disabilitato. Confermare `AGGIORNA D291`, poi
 `D291 PRONTO` soltanto quando si è pronti ai due contatti.
 

@@ -3,10 +3,12 @@
 
 Data review: 12 settembre 2026
 
-Baseline esaminata: `development` con D291 correttivo di continuità SIGFM
+Baseline esaminata: `development` con D291 transport provato e stabilità
+biometrica ancora aperta
 
-Decisione PM: transport multi-VERIFY D291 provato live; correttivo biometrico
-completato offline e fermo al solo Human Gate finale. Nessuna fase successiva
+Decisione PM: transport multi-VERIFY D291 provato live; la baseline pinned non
+è una root cause dimostrata e la closure biometrica non è consentita. Serve un
+replan evidence-first; nessuna live equivalente e nessuna fase successiva
 avviata
 
 ## Conclusione esecutiva
@@ -16,18 +18,22 @@ provati enrollment, template FP3, matching SIGFM, integrazione libfprint/fprintd
 e i consumer reali `sudo`, KDE lock/unlock e Plasma Login Manager. D290 chiude
 la catena fingerprint → nuova sessione Plasma/Wayland.
 
-Il divario residuo non è un altro esperimento Dxxx sul sensore. È trasformare
-la candidate target-proven, oggi distribuita tra fork Fedora, componenti locali
-e installazione D285, in un prodotto coerente, gestibile, aggiornabile e
+Il divario immediato è ora D291: comprendere la variabilità biometrica senza
+ripetere una live equivalente e senza scegliere una correzione speculativa.
+Una volta risolto quel boundary, il divario di prodotto resta trasformare la
+candidate target-proven, oggi distribuita tra fork Fedora, componenti locali e
+installazione D285, in un prodotto coerente, gestibile, aggiornabile e
 distribuibile. Le fasi sotto privilegiano lavoro offline e ambienti host
-isolati. Una nuova live ha senso soltanto se una modifica production cambia
-materialmente il percorso già provato o affronta un boundary lifecycle nuovo.
+isolati. Una nuova live ha senso soltanto dopo una nuova ipotesi causale e un
+delta production che cambi materialmente il percorso osservato.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
 D291_MULTI_VERIFY_TRANSPORT_LIVE=PROVEN
-D291_BIOMETRIC_CONTINUITY_OFFLINE=PASS
-D291_LIVE_VALIDATION_REQUIRED=true
+D291_BASELINE_PINNING=IMPLEMENTED_NOT_VALIDATED
+D291_BIOMETRIC_STABILITY=OPEN
+D291_CLOSURE=NOT_ALLOWED
+D291_NEW_LIVE_REQUIRED_NOW=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
@@ -64,10 +70,12 @@ NEW_D292_STARTED=false
 
 - D291 ha provato live che ogni nuovo `VerifyStart` esplicito dopo terminal
   NO_MATCH raggiunge una nuova epoch drained, senza retry o acquisizioni
-  nascoste. La prima live multi-VERIFY ha poi mostrato score zero sistematici
-  sui contatti corretti riaperti: il correttivo offline conserva la baseline
-  R2 nel logical open e aggiunge continuità wrong→NO_MATCH→enrolled→MATCH con
-  SIGFM reale. La singola conferma live resta Human Gate.
+  nascoste. Il pinning della baseline R2 ha prodotto un MATCH live a score 47,
+  seguito però da sei NO_MATCH consecutivi con il dito registrato, inclusi due
+  primi epoch con baseline appena acquisita. Il test precedente provava solo
+  la meccanica pinned su un frame grezzo artificialmente fisso; il nuovo test
+  session-coupled mostra che B0 e frame devono essere variati insieme. Senza
+  fixture reali decodificate, la root cause e la stabilità restano aperte.
 - Driver e integrazione SIGFM funzionano nella fork Fedora preservata, ma il
   delta production non è ancora presentato come una singola patch series o
   sorgente di build mantenibile rispetto a un upstream scelto.
@@ -295,17 +303,22 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
-## Decisione richiesta all'Utente
+## Decisione corrente
 
-Il piano raccomanda di iniziare, dopo validazione umana, dalla Phase A. Questa
-review non sceglie una nuova numerazione Dxxx, non implementa la Phase A e non
-autorizza alcuna live. L'Utente deve prima confermare o correggere priorità,
-scope di distribuzione, consumer desiderati e ambizione multi-user.
+Il piano non avvia la Phase A mentre D291 è aperto. Il precedente kit D291 è
+`HISTORICAL_ONLY_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
+dell'Utente. Il prossimo piano deve prima rendere osservabile la variabilità
+B0/raster/descrittori con dati reali già disponibili o con una futura
+strumentazione privacy-preserving motivata da una nuova ipotesi, quindi
+proporre soltanto il delta production minimo.
 
 ```text
-PM_DECISION=HUMAN_REQUIRED
+PM_DECISION=REPLAN
 D290_CLOSED_SUCCESSFULLY=true
+D291_CLOSURE=NOT_ALLOWED
+D291_BIOMETRIC_STABILITY=OPEN
+D291_OPERATOR_KIT=HISTORICAL_ONLY_DO_NOT_RERUN
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NO_NEXT_STEP_EXECUTION_STARTED=true
-AWAITING_USER_REVIEW_AND_VALIDATION=true
+NO_NEXT_PHASE_EXECUTION_STARTED=true
 ```

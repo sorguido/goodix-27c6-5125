@@ -113,88 +113,93 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D291 correttivo di continuità SIGFM pronto, Human Gate
+### Stato corrente — D291 transport provato, stabilità biometrica aperta
 
-La prima candidate D291 (`8ed02cc3467899c8b1e6f914cc5870e04b6ff4e0`)
-ha chiuso live il difetto transport originario. In una singola invocazione
-`sudo ls`, pam_fprintd ha eseguito tre `VerifyStart` espliciti e il sensore ha
-prodotto una acquisizione per epoch. Seconda e terza epoch riportano
-`reopen=1 explicit_verify_reopen=1`; tutte hanno TLS=1, drain completo, zero
-retry, reset, clear-halt e famiglie persistenti. Sono quindi PROVEN il reopen
-transport, il raggiungimento reale del sensore alle epoch 2/3, l'assenza di
-retry nascosti e il limite di tre acquisizioni.
+La candidate D291 `8ed02cc3467899c8b1e6f914cc5870e04b6ff4e0` ha
+chiuso live il difetto transport originario: tre `VerifyStart` espliciti hanno
+prodotto una acquisizione ciascuno, le epoch 2/3 hanno eseguito il reopen,
+TLS/drain sono rimasti corretti e non sono comparsi retry, reset, clear-halt o
+famiglie persistenti. Il controllo PAM `max-tries=3`, lo stop al MATCH e
+l'assenza di una quarta action restano validi.
 
-La stessa live ha però concluso tre NO_MATCH. Il primo contatto era
-deliberatamente con dito errato e non prova una regressione della prima epoch.
-I contatti 2/3 erano l'indice destro registrato; avevano 133/119 keypoint ma
-score zero contro tutti gli otto campioni FP3. A confronto, D289 aveva prodotto
-score 9, 14 e 376 con MATCH sul terzo campione. Il difetto residuo D291 era
-quindi ristretto alla continuità biometrica attraverso il reopen, non al
-transport né a una cattura vuota.
+La successiva candidate `6ccacbcd28b06db9a7f3174d3d5c0350f87b164f`
+mantiene la prima baseline R2 nel logical open. La live Human Gate ha prodotto
+NO_MATCH col dito deliberatamente errato e poi MATCH con l'indice destro:
+151 keypoint, score `0,0,0,0,47`, soglia 40. Due normali invocazioni `sudo`
+immediatamente successive hanno però prodotto sei NO_MATCH su sei contatti
+con lo stesso indice registrato; keypoint `129,145,122` e `124,112,106`, score
+zero contro tutti gli otto sample. Nel corpus post-correttivo consegnato
+risultano quindi otto VERIFY, un MATCH e sette NO_MATCH, dei quali il primo era
+il dito errato. Il campione è piccolo e non stima FRR, ma impedisce la closure
+di stabilità. Ulteriori match riferiti dall'operatore non sono conteggiati in
+assenza dei relativi log.
 
-L'audit del delta `02c0cd0..8ed02cc` ha individuato lo stato con lifetime
-errato: `goodix_device_context_release_epoch_objects()` distruggeva la baseline
-no-finger usata dalla normalizzazione R2, mentre il device libfprint rimaneva
-logicamente aperto. L'epoch riaperta acquisiva e consumava correttamente una
-nuova baseline di sessione, ma sostituiva così lo spazio di normalizzazione
-delle probe all'interno della stessa serie VERIFY. Transport, FDT seed/table e
-materiali TLS devono invece essere ricreati per epoch; il template FP3 resta
-ownership di libfprint/fprintd ed è passato invariato al matcher.
+Lo score 47 è una prova funzionale reale ma supera la soglia di soli sette
+punti; non costituisce un margine robusto paragonabile al 376 di D289. La
+precedente attribuzione causale alla lifetime della baseline deve pertanto
+essere ritirata: il pinning è implementato, non validato come correttivo.
 
-Il correttivo fissa la prima baseline R2 al lifetime del logical `img_open`, la
-riusa esclusivamente nelle successive epoch esplicite e la pulisce nel vero
-`goodix_device_context_free()`/`img_close`. Le nuove proprietà di audit sono:
+Il confronto `02c0cd0..6ccacbc` prova inoltre che il primo epoch di una nuova
+`img_open` segue lo stesso percorso R2 pre-D291: il context nasce con baseline
+invalida, copia la B0 della sessione corrente e passa quella B0 e il frame allo
+stesso `goodix_fpimage_pipeline_new_sigfm()`. Reopen, reset degli audit USB e
+`max-tries=3` agiscono solo dopo il primo risultato. Questa equivalenza vale a
+input B0/frame identici; i byte reali non sono disponibili come fixture e
+quindi non prova identità fra due contatti fisici. Gli audit `reopen=0` e
+`sigfm_baseline_pinned=1` sulle prime epoch delle nuove invocazioni escludono
+comunque una baseline mantenuta attraverso invocazioni `sudo` indipendenti.
+
+Il numero di keypoint non è uno score di identità. SIGFM estrae i punti SIFT,
+poi il matcher applica KNN, ratio test 0.75 e coerenza geometrica con almeno
+cinque corrispondenze. Se il gate sui descrittori o quello geometrico non è
+superato, il risultato è esattamente zero anche con 100–150 keypoint: la
+cattura non è vuota, ma non presenta abbastanza corrispondenze coerenti con
+quel template.
+
+Il riesame ha trovato anche un'assunzione circolare nel test precedente: la B0
+veniva cambiata lasciando fisso il frame grezzo costruito sopra la vecchia B0,
+rendendo il pinning favorevole per costruzione. Il caso è stato rinominato
+`fixed-raw-baseline-pinning-mechanics` e non dichiara più continuità
+biometrica. Una nuova regressione R2 modella due sessioni accoppiate
+`frame_A=B0_A+rilievo` e `frame_B=B0_B+stesso_rilievo`: usare la B0 propria
+produce raster byte-identici, mentre normalizzare `frame_B` con la vecchia
+`B0_A` cambia oltre metà dei pixel del fixture. È un modello non biometrico,
+non una riproduzione della live.
+
+Nel repository non esiste una coppia decodificata e riutilizzabile B0/frame
+delle VERIFY in esame. Le capture sanitizzate contengono audit e metriche, non
+il raster necessario a distinguere causalmente preprocessing, posa/pressione,
+coverage del template o matcher. Senza tale evidenza non è corretto scegliere
+speculativamente B0 per-sessione, B0 pinned o un altro delta production.
+
+Non viene preparata né richiesta una nuova live equivalente. D291 resta nello
+stesso boundary, con diagnosi comparativa offline completata fino al gap di
+evidenza reale. Il precedente kit `d291-01-multi-verify` è ora
+`HISTORICAL_ONLY_DO_NOT_RERUN` e termina con exit code 4 prima di build,
+privilegi, modifiche host, USB o sensore.
 
 ```text
-prima VERIFY:  sigfm_baseline_pinned=1 sigfm_baseline_reused=0
-epoch riaperte: sigfm_baseline_pinned=0 sigfm_baseline_reused=1
-```
-
-Non cambia alcun comando wire, parametro SIGFM, orientamento, dimensione o
-formato canonico; ogni sessione continua a eseguire il proprio percorso FDT e
-a validare la propria B0. Non sono stati aggiunti retry biometrici, reset,
-clear-halt o scritture persistenti.
-
-Il gap dei vecchi test era preciso: la suite D291 impostava direttamente uno
-score sintetico e il suo shell harness non compilava il ramo production
-`GOODIX_LIBFPRINT_SIGFM`; verificava lifecycle e contatori, non il raster R2 né
-l'identità del template. Ora la suite compila il ramo SIGFM production e guida
-decoder packed-12, baseline, preprocessing R2, estrazione e reale percorso di
-confronto. Il caso wrong→NO_MATCH→enrolled→MATCH attraversa un reopen con B0 di
-sessione deliberatamente diversa; controlla otto sample, identità logica del
-template, formato `80x64 U8`, estrazione non vuota e assenza di quarta action.
-Una seconda regressione usa l'implementazione reale Rocky/OpenCV/SIFT: 0/8
-score sul pattern differente, score 1504 e MATCH sul pattern iscritto, bytes
-FP3 serializzati invariati prima/dopo il matcher.
-
-Risultati offline correnti: driver normale e ASan/UBSan `29/29 PASS`, SIGFM
-reale/R2 PASS, contratti D285/D286 `64/64 PASS`, kit D291 `13/13 PASS`, zero
-USB e sensore reale. Il launcher D291 risolve ora il proprio path assoluto
-prima di `pkexec`. Lo stato runtime host dopo la live fallita resta
-`UNKNOWN_TO_AI`: il kit esegue quindi un preflight read-only D285/D286 prima
-del deployment e fallisce chiuso su qualunque drift.
-
-Il solo passo residuo dello stesso boundary D291 è una singola run operatore:
-primo contatto volutamente NO_MATCH, secondo con indice destro registrato e
-stop immediato sul MATCH; solo se il secondo è NO_MATCH pam_fprintd può offrire
-il terzo e ultimo contatto. L'agente non esegue live, USB o privilegi.
-
-```text
-PM_DECISION=HUMAN_REQUIRED
-D291_FIRST_EPOCH_REGRESSION=NOT_PROVEN
-D291_MULTI_VERIFY_TRANSPORT_LIVE=PROVEN
-D291_BIOMETRIC_CONTINUITY_OFFLINE=PASS
-HOST_RUNTIME_AFTER_FAILED_D291=UNKNOWN_TO_AI
-ONE_ACQUISITION_PER_VERIFY_START=true
-STOP_ON_MATCH=true
-NO_HIDDEN_RETRY=true
-NO_FOURTH_VERIFY_FROM_MAX_TRIES_3=true
+PM_DECISION=REPLAN
+D291_MULTI_VERIFY_TRANSPORT=PROVEN
+D291_MAX_TRIES_3_PAM_CONTROL=WORKING
+D291_FIRST_FRESH_EPOCH_R2_CODE_PATH_EQUIVALENT=true
+D291_BASELINE_LIFETIME_ROOT_CAUSE=NOT_PROVEN
+D291_BASELINE_PINNING=IMPLEMENTED_NOT_VALIDATED
+D291_BIOMETRIC_STABILITY=OPEN
+D291_CLOSURE=NOT_ALLOWED
+SESSION_COUPLED_BASELINE_MODEL_TEST=PASS
+D278_D291_FULL_NORMAL=29/29_PASS
+D278_D291_FULL_ASAN_UBSAN=29/29_PASS
+D291_REAL_ROCKY_OPENCV_SIGFM=PASS
+D291_OPERATOR_KIT_CONTRACT=14/14_PASS
+D291_OPERATOR_KIT=HISTORICAL_ONLY_DO_NOT_RERUN
+REAL_DECODED_B0_FRAME_FIXTURE_AVAILABLE=false
+NEW_LIVE_REQUIRED_NOW=false
+REPEAT_EQUIVALENT_LIVE_ALLOWED=false
 FACTORY_PRESERVING=true
-OFFLINE_REGRESSION=PASS
-LIVE_VALIDATION_REQUIRED=true
 ```
 
-Dettaglio della closure: `analysis/D291/D291_01_OFFLINE_CLOSURE.md`.
+Dettaglio del riesame: `analysis/D291/D291_01_OFFLINE_CLOSURE.md`.
 
 ### Stato precedente — D290/01 chiuso con login fingerprint Plasma/Wayland provato
 
@@ -292,7 +297,7 @@ VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
 MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
 tentativo, retry nascosto o illimitato.
 
-### Review complessiva e roadmap post-D291
+### Review complessiva e roadmap con D291 ancora aperto
 
 La chiusura D290 termina la sequenza di qualificazione dei consumer reali; D291
 è il successivo correttivo lifecycle esplicitamente richiesto dall'Utente.
@@ -302,8 +307,9 @@ Plasma verso una nuova sessione Wayland sono boundary chiusi e non vanno
 rieseguiti per sola maggiore confidenza. La fattibilità sul target APP12509 è
 provata; la production readiness no.
 
-Salvo la live breve D291 ora al Human Gate, il lavoro residuo è principalmente
-consolidamento della sorgente production,
+Prima di proseguire oltre D291 occorre una causa biometrica riproducibile; una
+nuova live equivalente non è ora giustificata. Il lavoro successivo al
+boundary D291 resta principalmente consolidamento della sorgente production,
 gestione utenti/template e materiali protetti, packaging/installazione gestita,
 lifecycle/recovery, qualificazione di release e pubblicazione auditata. Il
 piano completo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human Gate e
@@ -323,10 +329,12 @@ PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D290_CLOSED_BOUNDARIES
-PM_DECISION=HUMAN_REQUIRED
+PM_DECISION=REPLAN
+D291_CLOSURE=NOT_ALLOWED
+D291_BIOMETRIC_STABILITY=OPEN
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NO_NEXT_STEP_EXECUTION_STARTED=true
-AWAITING_USER_REVIEW_AND_VALIDATION=true
+NO_NEXT_PHASE_EXECUTION_STARTED=true
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

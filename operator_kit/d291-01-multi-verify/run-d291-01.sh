@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 set -euo pipefail
 
+echo "D291_01_STATUS=HISTORICAL_ONLY_DO_NOT_RERUN" >&2
+echo "D291_01_REFUSAL_REASON=BIOMETRIC_ROOT_CAUSE_NOT_IDENTIFIED" >&2
+exit 4
+
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 script_path="$script_dir/run-d291-01.sh"
 root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
