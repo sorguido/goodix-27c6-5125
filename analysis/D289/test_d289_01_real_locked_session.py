@@ -31,6 +31,7 @@ class D289RealLockedSessionContract(unittest.TestCase):
 
     def test_02_small_payload_reuses_common_harness(self):
         self.assertIn("EXPERIMENT_ID=d289-real-locked-session", self.config)
+        self.assertIn("LIVE_CAPABLE=false", self.config)
         self.assertIn("MAX_ACTIONS=3", self.config)
         self.assertIn("MAX_CONTACTS=3", self.config)
         self.assertIn("MAX_RETRIES=0", self.config)
@@ -119,8 +120,15 @@ class D289RealLockedSessionContract(unittest.TestCase):
         self.assertIn("D289_EXISTING_GREETER_COUNT=0", self.audit)
         self.assertIn("findmnt mount umount chcon", self.audit)
 
-    def test_13_operator_instructions_expose_lock_and_recovery(self):
-        for text in ("Human Gate", "Ctrl+Alt+F3", "BLOCCA SESSIONE", "TENTATIVO 2", "--recover", "non rilanciare"):
+    def test_13_closed_instructions_preserve_risk_recovery_and_provenance(self):
+        for text in (
+            "Human Gate",
+            "Ctrl+Alt+F3",
+            "--recover",
+            "Non rilanciare",
+            "LIVE_CAPABLE=false",
+            "comando storico",
+        ):
             self.assertIn(text, self.readme)
 
     def test_14_offline_harness_path(self):
@@ -143,6 +151,66 @@ class D289RealLockedSessionContract(unittest.TestCase):
         privileged = self.audit.index('audit_output=$(pkexec')
         self.assertLess(read_only, privileged)
         self.assertIn("D289_READ_ONLY_PREFLIGHT=PASS", self.audit)
+
+    def test_16_coproc_descriptors_survive_fast_helper_exit(self):
+        self.assertIn('exec {root_out_fd}<&"${D289_ROOT_HELPER[0]}"', self.payload)
+        self.assertIn('exec {root_in_fd}>&"${D289_ROOT_HELPER[1]}"', self.payload)
+        script = r'''
+set -euo pipefail
+coproc D289_TEST_HELPER {
+  IFS= read -r command
+  [[ $command == RELEASE ]]
+  printf '%s\n' \
+    D289_ROOT_OVERLAY_UNMOUNTED=true \
+    D289_ROOT_HOST_PAM_RESTORED=true \
+    D289_ROOT_RUNTIME_REMOVED=true
+}
+root_pid=$D289_TEST_HELPER_PID
+exec {root_out_fd}<&"${D289_TEST_HELPER[0]}"
+exec {root_in_fd}>&"${D289_TEST_HELPER[1]}"
+printf 'RELEASE\n' >&"$root_in_fd"
+exec {root_in_fd}>&-
+sleep 0.05
+while IFS= read -r line <&"$root_out_fd"; do printf '%s\n' "$line"; done
+exec {root_out_fd}>&-
+wait "$root_pid"
+'''
+        result = subprocess.run(
+            ["bash", "-c", script],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertNotIn("Descrittore di file errato", result.stdout)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            [
+                "D289_ROOT_OVERLAY_UNMOUNTED=true",
+                "D289_ROOT_HOST_PAM_RESTORED=true",
+                "D289_ROOT_RUNTIME_REMOVED=true",
+            ],
+        )
+
+    def test_17_closed_live_entrypoint_rejects_before_capture(self):
+        with tempfile.TemporaryDirectory() as td:
+            capture_root = Path(td) / "captures"
+            result = subprocess.run(
+                [
+                    str(HARNESS / "run.sh"),
+                    "d289-real-locked-session",
+                    "--operator-run",
+                    "--capture-root",
+                    str(capture_root),
+                ],
+                cwd="/tmp",
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("LIVE_PROBE_ERROR=EXPERIMENT_NOT_LIVE_CAPABLE", result.stderr)
+            self.assertFalse(capture_root.exists())
 
 
 class D289KWinCompositeIdentityTests(unittest.TestCase):

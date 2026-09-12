@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D288/01 PASS live; D289/01 corretto dopo abort pre-live e pronto al Human Gate
+### Stato corrente — D289/01 PASS live; login SDDM resta il boundary non provato
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1306,10 +1306,11 @@ active/unlocked, `GetActive=false`, owner `u 1802`, UID 1000,
 accettato dal composito, zero greeter/mount/runtime, PAM `root:root:644` e una
 entry sysfs `27c6:5125`.
 
-`bash -n`, i veri percorsi harness `--offline-test`, `23/23` contratti D289 e
-`13/13` test del common harness sono PASS; la regressione high-risk pertinente
-D286–D289 passa `189/189`. Nessuna live, lock, PAM fingerprint, USB, sensore,
-mount o operazione privilegiata è stata eseguita dall'AI.
+Prima della live, `bash -n`, i veri percorsi harness `--offline-test`, `23/23`
+contratti D289 e `13/13` test del common harness erano PASS; la regressione
+high-risk pertinente D286–D289 passava `189/189`. Nessuna live, lock, PAM
+fingerprint, USB, sensore, mount o operazione privilegiata è stata eseguita
+dall'AI.
 
 La review PM chiude i failure-path di mount preesistente non posseduto, mode
 del PAM leggibile dal greeter, finestra overlay fra cicli, race fra stato D-Bus
@@ -1317,43 +1318,90 @@ e morte del greeter, cleanup fallito con recovery hash-pinned, identità KWin
 target-compatible e failure comune prima del cursor. `shellcheck` non è
 installato.
 
+La successiva run manuale, sulla baseline completa
+`74d8e5d8fc7e0c91904c92725d3e5660def9ee72`, chiude D289/01 con PASS. Gli
+originali sanitizzati sono in
+`captures/live_probe/d289-real-locked-session_20260912T065056Z_74d8e5d8fc7e/sanitized/`;
+i sedici file elencati hanno digest valido e `capture.sha256` ha SHA-256
+`2130514674733dff6227e9aa23584c62baf0dfeda2d21e9bfdc96308e08de158`.
+
+**OBSERVED:** la sessione compie `GetActive false → true → false`; il greeter
+PID 103382 è figlio del KWin reale e appartiene al cgroup utente
+`user@1000.service/session.slice/plasma-kwin_wayland.service`. Esiste un solo
+ciclo reale, con tentativi/contatti/matched attempt `1/1/1`; non viene offerto
+un secondo slot. L'overlay è nello stesso mount namespace di KWin, read-only e
+limitato al service fingerprint; unmount, PAM host ripristinato, runtime
+rimosso e assenza di residui sono tutti confermati.
+
+**VERIFIED:** l'auditor hash-pinned
+`analysis/D289/d289_01_live_evidence_audit.py` valida manifest e file set,
+baseline, ordine causale del payload, stato, identità composita KWin/greeter,
+journal, telemetria, audit e cleanup. Esiste una sola epoch VERIFY:
+attempted/rejected/consumed `1/0/1`, TLS/first-image `1/1` e 76 submit USB
+reali. SIGFM estrae 129 keypoint, dichiara otto sample e confronta i sample 1,
+2 e 3 con score `9`, `14` e `376` alla soglia 40; l'unico outcome è MATCH sul
+sample 3. Retry/reopen/reset/clear-halt/famiglie persistenti note sono zero;
+outstanding è zero, drained e context-closed sono uno. Pre/post audit sono PASS
+nello stesso boot e confermano runtime, wrapper, scope authselect, fallback
+password, template, libfprint di sistema e uninstall readiness invariati.
+
+Il payload baseline prova il lock prima di contare action/contatto, verifica
+che il greeter appartenga al KWin reale e, sul ramo MATCH, richiede
+`GetActive=false` prima di dichiarare `REAL_LOCK_MATCH`; non contiene un
+comando di unlock forzato. Questo chiude causalmente il vero unlock KDE via
+fingerprint. La capture non registra eventi tastiera: l'assenza di password o
+PIN resta coerente con l'istruzione operatore, col percorso fingerprint
+completo e con `NON_FINGERPRINT_RECOVERY=false`, ma non è descritta come
+telemetria macchina autonoma. `persistent=0` resta limitato alle famiglie note.
+
+Il log payload presenta, dopo i marker di cleanup già completati, il rumore
+`"$root_out_fd": Descrittore di file errato`. La causa è il lifecycle Bash dei
+descriptor originali del `coproc`, che può terminarli prima del drain finale.
+Il correttivo host-only duplica subito entrambi i descriptor; la regressione
+forza un helper a uscita rapida e drena tutti i marker senza errore. Il difetto
+non cambia il PASS live né richiede un rerun. Il vecchio entrypoint D289 è ora
+chiuso tecnicamente con `LIVE_CAPABLE=false`; l'offline test resta disponibile.
+
 ```text
-D289_01_OUTCOME=READY_FOR_HUMAN_GATE
-D289_01_ADVANCEMENT=PRE_LIVE_HOST_FAILURE_CLASS_CORRECTED_ON_REUSABLE_HARNESS
-D289_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_PREFLIGHT
-D289_01_REAL_TARGET_COMPATIBILITY=PASS_WITH_PRIVILEGED_NAMESPACE_PREFLIGHT_AT_LIVE
-D289_01_FIRST_OPERATOR_RUN=ABORTED_BEFORE_LIVE
-D289_01_FIRST_OPERATOR_BASELINE=0568742e682b1bdb3b427da390a8aa4ed7f9b914
-D289_01_FIRST_OPERATOR_PRIMARY_FAILURE=PRE_AUDIT_BEFORE_OUTPUT
-D289_01_FIRST_OPERATOR_SECONDARY_FAILURE=UNBOUND_LP_JOURNAL_CURSOR
-D289_01_REAL_LOCK_STARTED=false
-D289_01_PAM_OVERLAY_STARTED=false
-D289_01_VERIFY_STARTED=false
-D289_01_SENSOR_ACTION_COUNT=0
-D289_01_PHYSICAL_CONTACTS_CONSUMED=0
-D289_01_NEW_DEVICE_SIDE_EVIDENCE=false
-D289_01_KWIN_COMPOSITE_IDENTITY_TARGET_READ_ONLY=PASS
-D289_01_KWIN_EXE_USER_READABILITY=UNREADABLE_ACCEPTED_WITH_COMPOSITE
-D289_01_PRE_AUDIT_FAILURE_PRESERVATION=PASS
-D289_01_MAX_REAL_LOCK_CYCLES=3
-D289_01_MAX_VERIFY_ACTIONS=3
-D289_01_MAX_PHYSICAL_CONTACTS=3
-D289_01_PAM_MAX_TRIES_PER_CYCLE=1
-D289_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-D289_01_HOST_PAM_PERSISTENT_WRITE_COUNT=0
-D289_01_MAX_TEMPORARY_READ_ONLY_BIND_MOUNTS=3
-D289_01_SIMULTANEOUS_BIND_MOUNT_COUNT=1
-D289_01_PASSWORD_SERVICE_MODIFIED=false
-D289_01_FORCED_UNLOCK_COMMAND_PRESENT=false
-D289_01_LIVE_EXECUTION_PERFORMED=false
-D289_01_NEXT_STATE=HUMAN_REQUIRED
-NEXT_PRIMARY_BOUNDARY=REAL_KDE_LOCKED_SESSION_UNLOCK_LIVE
-```
-
-Il comando direttamente eseguibile dall'operatore è:
-
-```bash
-operator_kit/live_probe/run.sh d289-real-locked-session --operator-run
+D289_01_LIVE_OUTCOME=PASS_MATCH
+D289_01_REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
+D289_01_REAL_KWIN_KSCREENLOCKER_CONSUMER_REACHED=true
+D289_01_LOCK_TRANSITION=false_true_false
+D289_01_KWIN_KSCREENLOCKER_IDENTITY=PROVEN_BY_COMPOSITE
+D289_01_ATTEMPTS_PERFORMED=1
+D289_01_PHYSICAL_CONTACTS_CONSUMED=1
+D289_01_MATCHED_ATTEMPT=1
+D289_01_VERIFY_EPOCH_COUNT=1
+D289_01_ACTION_CONSUMED_COUNT=1
+D289_01_TLS_COUNT=1
+D289_01_FIRST_IMAGE_COUNT=1
+D289_01_REAL_USB_SUBMIT_COUNT=76
+D289_01_SIGFM_EXTRACT_KEYPOINTS=129
+D289_01_SIGFM_TEMPLATE_SAMPLE_COUNT=8
+D289_01_SIGFM_COMPARISON_COUNT=3
+D289_01_SIGFM_MATCHED_SAMPLE=3
+D289_01_SIGFM_MATCH_SCORE=376
+D289_01_SIGFM_THRESHOLD=40
+D289_01_RETRY_COUNT=0
+D289_01_REOPEN_COUNT=0
+D289_01_RESET_COUNT=0
+D289_01_CLEAR_HALT_COUNT=0
+D289_01_PERSISTENT_WRITE_FAMILY_COUNT=0
+D289_01_OUTSTANDING_COUNT=0
+D289_01_DRAINED_COUNT=1
+D289_01_CONTEXT_CLOSED_COUNT=1
+D289_01_PRE_AUDIT=PASS
+D289_01_POST_AUDIT=PASS
+D289_01_ROOT_OVERLAY_UNMOUNTED=true
+D289_01_ROOT_HOST_PAM_RESTORED=true
+D289_01_ROOT_RUNTIME_REMOVED=true
+D289_01_FD_TEARDOWN_DIAGNOSTIC=CORRECTED_OFFLINE_OBSERVABILITY_ONLY
+D289_01_RERUN_REQUIRED=false
+D289_01_LIVE_ENTRYPOINT_CLOSED=true
+D289_01_ADVANCEMENT=REAL_KDE_LOCKED_SESSION_FINGERPRINT_MATCH_TO_UNLOCKED_PROVEN
+D289_01_EXECUTABLE_CLOSURE=PASS_LIVE_PLUS_HASH_PINNED_EVIDENCE_AUDIT
+SDDM_LOGIN_WITH_FINGERPRINT=NOT_PROVEN
+NEXT_PRIMARY_BOUNDARY=SDDM_LOGIN_WITH_FINGERPRINT
 ```
 
 ```text

@@ -119,8 +119,11 @@ start_overlay () {
   overlay_closed=false
   coproc D289_ROOT_HELPER { pkexec "$here/root-overlay.sh" --hold "$kwin_pid"; }
   root_pid=$D289_ROOT_HELPER_PID
-  root_out_fd=${D289_ROOT_HELPER[0]}
-  root_in_fd=${D289_ROOT_HELPER[1]}
+  # Bash chiude automaticamente i descriptor originali del coproc quando il
+  # processo termina. Duplichiamoli subito: il teardown deve poter drenare gli
+  # ultimi marker anche se l'helper esce immediatamente dopo RELEASE.
+  exec {root_out_fd}<&"${D289_ROOT_HELPER[0]}"
+  exec {root_in_fd}>&"${D289_ROOT_HELPER[1]}"
   overlay_started=true
   IFS= read -r -t 60 ready <&"$root_out_fd"
   [[ $ready == D289_ROOT_NAMESPACE_MATCH=true ]]

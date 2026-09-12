@@ -60,29 +60,25 @@ La recovery rifiuta un contenuto montato diverso dal PAM candidato, smonta
 soltanto quel mount atteso, verifica l'hash PAM host originale e rimuove il
 runtime posseduto. Non rilanciare la live.
 
-## Esecuzione manuale
+## Stato chiuso dopo la live
 
-Dalla Konsole della sessione grafica attiva:
+La run del 12 settembre 2026 sulla baseline completa
+`74d8e5d8fc7e0c91904c92725d3e5660def9ee72` è PASS ed è stata riesaminata
+indipendentemente. Il boundary del vero unlock KDE è chiuso; non è richiesto e
+non è consentito un rerun D289. `LIVE_CAPABLE=false` fa rifiutare il vecchio
+comando prima di audit, capture, `pkexec`, lock o payload.
+
+Il comando storico, riportato soltanto per provenance, era:
 
 ```bash
 operator_kit/live_probe/run.sh d289-real-locked-session --operator-run
 ```
 
-Autenticare gli audit e l'helper `pkexec`, leggere limiti e rischi, quindi
-digitare `BLOCCA SESSIONE`. Il kit annuncia le istruzioni prima che il terminale
-diventi invisibile. Quando compare il lock reale, appoggiare una sola volta
-l'indice destro e non digitare password/PIN mentre la verifica è in corso.
-
-Se l'impronta sblocca, non fare altro. Se viene rifiutata o dopo 70 secondi lo
-schermo è ancora bloccato, usare la password solo per recuperare la sessione.
-Tornati in Konsole, un ulteriore ciclo è possibile soltanto digitando
-`TENTATIVO 2` o `TENTATIVO 3`. Dopo errore, stato inatteso, timeout o recovery
-forzata non rilanciare: conservare la capture e sottoporla a review.
-
-Gli output sanitizzati sono in
-`captures/live_probe/d289-real-locked-session_<timestamp>_<sha>/sanitized/`.
+Gli originali sanitizzati sono in
+`captures/live_probe/d289-real-locked-session_20260912T065056Z_74d8e5d8fc7e/sanitized/`.
 Non includono password, risposte PAM, template, pixel, PSK o protected
-material. Qualunque esito non autorizza un rerun implicito.
+material. La procedura storica e la recovery restano documentate sopra per
+audit; non costituiscono istruzioni a ripetere la live.
 
 La prima invocazione del 12 settembre 2026 sul baseline `0568742e...` è
 abortita nel pre-audit prima di lock, overlay PAM, VERIFY o contatto. Il difetto
