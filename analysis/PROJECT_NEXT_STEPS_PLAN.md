@@ -1,8 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 — stato complessivo e piano delle prossime fasi
 
-Data review: 12 settembre 2026  
-Baseline esaminata: `development` / `31b0548a5613406b11e7311b8744ec25bca445c5` più il review set D290 non ancora consolidato  
+Data review: 12 settembre 2026
+
+Baseline esaminata: `development` / `31b0548a5613406b11e7311b8744ec25bca445c5` più il review set D290 non ancora consolidato
+
 Decisione PM: piano sottoposto all'Utente; nessuna fase successiva avviata
 
 ## Conclusione esecutiva
