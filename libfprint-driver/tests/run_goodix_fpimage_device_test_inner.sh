@@ -121,6 +121,7 @@ gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_t
 gcc $strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_fpi_usb_backend.c" -o "$build_dir/goodix_fpi_usb_backend.o"
 for source in \
   goodix_enrollment_model.c \
+  goodix_enrollment_diversity.c \
   goodix_enrollment_pipeline.c \
     goodix_enrollment_command_plan.c \
     goodix_enrollment_command_body.c \
@@ -183,6 +184,7 @@ gcc -Wl,--gc-sections \
   "$build_dir/goodix_tls_server.o" \
   "$build_dir/goodix_fpi_usb_backend.o" \
   "$build_dir/goodix_enrollment_model.o" \
+  "$build_dir/goodix_enrollment_diversity.o" \
   "$build_dir/goodix_enrollment_pipeline.o" \
   "$build_dir/goodix_enrollment_command_plan.o" \
   "$build_dir/goodix_enrollment_command_body.o" \
@@ -269,6 +271,7 @@ gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/good
 gcc $san_strict_flags $glib_cflags $includes -c "$git_root/libfprint-driver/goodix_fpi_usb_backend.c" -o "$build_dir/goodix_fpi_usb_backend_san.o"
 for source in \
   goodix_enrollment_model.c \
+  goodix_enrollment_diversity.c \
   goodix_enrollment_pipeline.c \
     goodix_enrollment_command_plan.c \
     goodix_enrollment_command_body.c \
@@ -320,6 +323,7 @@ gcc $san_common -Wl,--gc-sections \
   "$build_dir/goodix_tls_server_san.o" \
   "$build_dir/goodix_fpi_usb_backend_san.o" \
   "$build_dir/goodix_enrollment_model_san.o" \
+  "$build_dir/goodix_enrollment_diversity_san.o" \
   "$build_dir/goodix_enrollment_pipeline_san.o" \
   "$build_dir/goodix_enrollment_command_plan_san.o" \
   "$build_dir/goodix_enrollment_command_body_san.o" \

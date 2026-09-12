@@ -64,6 +64,7 @@ build_run () {
     "$root/libfprint-driver/goodix_fdt_irq_policy.c" \
     "$root/libfprint-driver/goodix_post_tls_lifecycle.c" \
     "$root/libfprint-driver/goodix_enrollment_model.c" \
+    "$root/libfprint-driver/goodix_enrollment_diversity.c" \
     "$root/libfprint-driver/goodix_enrollment_pipeline.c" \
     "$root/libfprint-driver/goodix_enrollment_command_plan.c" \
     "$root/libfprint-driver/goodix_enrollment_command_body.c" \

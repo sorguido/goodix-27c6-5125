@@ -495,6 +495,25 @@ The offline preflight passes, but no baseline or live run is authorized.
 Unlinking is not a physical-erasure guarantee for SSD, CoW, journal or
 snapshot storage.
 
+## D291 enrollment diversity Rocky-derived
+
+La build production SIGFM non usa più otto contatti come otto stage accettati
+incondizionatamente. `goodix_enrollment_diversity.[ch]` adatta direttamente la
+policy host-only di `Rockytkg/src/goodixgf.c`: minimo tre e massimo otto sample,
+MAD U8 strettamente minore di 8 per classificare un duplicato e convergenza
+dopo due duplicati consecutivi. Un duplicato non terminale chiama
+`fpi_image_device_retry_scan()` e ripete lo stesso stage senza aggiungere un
+sample; il terminale dinamico aggiorna `nr_enroll_stages` prima di consegnare
+l'ultimo sample. Il limite target-local di 20 contatti fisici rende la serie
+fail-closed e bounded anche quando non si raggiunge il minimo di copertura.
+L'audit di epoch espone separatamente `enroll_contacts` e
+`enroll_retry_scans`, senza pixel o template.
+
+La policy opera sull'esatto raster U8 R2 già usato da SIGFM e non modifica
+preprocessing, formato FP3, matcher o soglia 40. VERIFY/IDENTIFY non la
+attraversano: un NO_MATCH valido conclude sempre la singola VerifyStart e solo
+il consumer/PAM può richiederne un'altra, fino al limite esterno di tre.
+
 ## D282/01 VERIFY target e barriera anti-retry fprintd
 
 Per la candidate D282 il build-only profile

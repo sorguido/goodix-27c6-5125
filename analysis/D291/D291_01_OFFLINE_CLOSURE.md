@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D291/01 — riesame post-live della stabilità biometrica
+# D291/01 — recovery Rocky-first della stabilità biometrica
 
 > Il nome storico del file è conservato per evitare frammentazione. Questo
 > documento non dichiara più una closure D291.
@@ -7,10 +7,11 @@
 ## Decisione
 
 Le evidenze aggregate successive a `6ccacbcd28b06db9a7f3174d3d5c0350f87b164f`
-confermano il risultato transport di D291 ma smentiscono la precedente
-conclusione che la sola lifetime della baseline R2 fosse una root cause
-dimostrata. Il correttivo ha prodotto un MATCH reale, ma non stabilità
-biometrica ripetibile.
+confermano il risultato transport di D291 ma non la stabilità biometrica. Il
+riesame richiesto dall'Utente usa Rockytkg come fonte implementativa primaria,
+completa il differenziale e seleziona la divergenza utile già verificabile
+offline: coverage/diversity dell'enrollment. Il delta entra in production e il
+prossimo passo è un vero Human Gate di re-enrollment e VERIFY ripetute.
 
 ```text
 D291_MULTI_VERIFY_TRANSPORT=PROVEN
@@ -19,9 +20,80 @@ D291_BASELINE_PINNING=IMPLEMENTED_NOT_VALIDATED
 D291_BASELINE_LIFETIME_ROOT_CAUSE=NOT_PROVEN
 D291_BIOMETRIC_STABILITY=OPEN
 D291_CLOSURE=NOT_ALLOWED
-NEW_LIVE_REQUIRED_NOW=false
-PM_DECISION=REPLAN
+ROCKY_DIFFERENTIAL_COMPLETED=true
+MATERIAL_ROCKY_DERIVED_PRODUCTION_DELTA_IMPLEMENTED=true
+NEW_LIVE_REQUIRED_NOW=true
+PM_DECISION=HUMAN_REQUIRED
 ```
+
+## Differential Rocky-first e scelta production
+
+Sono stati letti e confrontati direttamente:
+
+- `Rockytkg/src/goodixgf.c`;
+- `Rockytkg/src/goodix_capture.c`;
+- `Rockytkg/src/goodix_imgproc.c`;
+- `Rockytkg/include/goodix.h`;
+- `Rockytkg/docs/libfprint-integration.md`;
+- `Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp`;
+- i rami image/enroll del fork libfprint materializzato nello snapshot.
+
+| Ordine | Differenza | Ragione target-specific provata per divergere? | Decisione |
+| --- | --- | --- | --- |
+| lifecycle VERIFY | Rocky conserva `goodix_dev` nel logical open; APP12509 locale chiude e ricostruisce il grafo fra `VerifyStart` espliciti | sì: transcript e live target-local provano cleanup/reopen e una acquisition per action; il worker Rocky dipende da transport/recovery differenti | `LIFECYCLE_DELTA=NONE` |
+| baseline/calibration | Rocky `img_base` è stato di device con gestione deriva e percorso di persistenza; la B0 locale è input di normalizzazione sessione | sì: non è provata equivalenza semantica e non è consentito importare persistenza/reset | `BASELINE_DELTA=NONE` |
+| preprocessing | Rocky usa subtraction, low-frequency/flat-field, percentile stretch e unsharp su 80x64 | no divergenza residua: D279/49 ha già adattato direttamente `gx_imgproc_to8bit()` e `GX_IMGPROC_SIGFM_PARAMS` | `PREPROCESSING_DELTA=NONE` |
+| enrollment diversity | locale fixed-eight accettava ogni pressione; Rocky separa contatti da sample utili con 3/8/2/MAD<8 | no | `ADAPT_FROM_ROCKY` |
+| retry | Rocky usa retry scan per duplicato enrollment ma termina un VERIFY valido NO_MATCH | no | stessa distinzione in production |
+| threshold | Rocky 20, locale 40 | il corpus target ha score diversi, ma nessun corpus calibrante sufficiente; abbassare non risolve score zero | conservare 40 |
+
+Questa scelta riusa la parte Rocky che agisce soltanto sul raster host e non
+importa provisioning, firmware, PSK, worker USB, reset, comandi persistenti o
+override ambientali.
+
+## Implementazione
+
+`libfprint-driver/goodix_enrollment_diversity.[ch]` è l'adattamento minimo di
+`gf_enroll_frame_dup()` e della relativa convergenza:
+
+```text
+MIN_ACCEPTED_SAMPLES=3
+MAX_ACCEPTED_SAMPLES=8
+DUPLICATE_STREAK_TO_CONVERGE=2
+DUPLICATE_IF_MAD_U8_STRICTLY_LT=8
+MAX_PHYSICAL_CONTACTS=20
+```
+
+Il limite 20 è l'unica estensione target-local alla policy: rende impossibile
+un enrollment illimitato se l'operatore continua a fornire duplicati prima di
+raggiungere il minimo. Il selector conserva e poi azzera le copie U8 accettate;
+non possiede API USB, TLS, sender o persistenza.
+
+Il modello, la pipeline e il command plan distinguono ora stage fisici
+osservati da stage consegnati. Il callback può:
+
+- richiedere un retry esplicito, liberando l'immagine pendente senza avanzare
+  il template;
+- richiedere convergenza, facendo diventare l'immagine corrente lo stage
+  finale e conservando il terminal hold fino al release-ready APP12509.
+
+`goodix_fpimage_device.c` classifica l'esatto raster R2 U8 usato per
+l'estrazione SIGFM. Sul duplicato chiama
+`fpi_image_device_retry_scan(FP_DEVICE_RETRY_GENERAL)`; su convergenza aggiorna
+`nr_enroll_stages` prima di consegnare l'ultimo sample. VERIFY e IDENTIFY non
+attraversano il selector. Un loro NO_MATCH valido resta terminale per la
+singola action; soltanto PAM può creare il secondo o terzo `VerifyStart`.
+
+La production build aggiunge il nuovo helper al Meson target. Licenza e
+provenance sono registrate in `docs/LICENSING_AND_PROVENANCE.md`.
+
+## Compatibilità template
+
+Preprocessing R2, `GSF1`/FP3, struttura SIGFM, matcher e soglia 40 sono
+invariati. Il template fixed-eight esistente resta quindi strutturalmente
+leggibile e confrontabile. Non è però rappresentativo della nuova policy di
+coverage: per validare questo correttivo serve un re-enrollment reale. Questa è
+una necessità sperimentale, non una migrazione di formato.
 
 ## Evidenza live aggregata
 
@@ -155,39 +227,61 @@ SIGFM_R2_KAT=PASS
 SESSION_COUPLED_BASELINE_MODEL=PASS
 SIGFM_PREPROCESS_FORBIDDEN_SYMBOL_AUDIT=PASS
 SIGFM_PREPROCESS_EXECUTABLE_CLOSURE=PASS_HOST_ONLY
-D278_D291_FULL_NORMAL=29/29_PASS
-D278_D291_FULL_ASAN_UBSAN=29/29_PASS
-D291_REAL_ROCKY_OPENCV_SIGFM=PASS
+D291_DIVERSITY_UNIT_NORMAL=4/4_PASS
+D291_DIVERSITY_UNIT_ASAN_UBSAN=4/4_PASS
+D291_DIVERSITY_FORBIDDEN_SENSOR_SYMBOL_AUDIT=PASS
+D291_DYNAMIC_PIPELINE_NORMAL_ASAN_UBSAN=PASS
+D291_PRODUCTION_SHAPED_DUPLICATE_CONVERGENCE=PASS
+D278_D291_FULL_NORMAL=30/30_PASS
+D278_D291_FULL_ASAN_UBSAN=30/30_PASS
+FPIMAGE_DEVICE_FULL_NORMAL=32/32_PASS
+FPIMAGE_DEVICE_FULL_ASAN_UBSAN=32/32_PASS
 D291_OPERATOR_KIT_CONTRACT=14/14_PASS
-D291_OPERATOR_KIT=HISTORICAL_ONLY_DO_NOT_RERUN
+D291_OPERATOR_KIT=HUMAN_GATE_READY
+FULL_RELEVANT_OFFLINE_REGRESSION=PASS
+PRODUCTION_BUILD=PASS
+ABI_PREFLIGHT=PASS
 REAL_USB_ACCESS=0
 REAL_SENSOR_ACCESS=0
 FACTORY_PRESERVING=true
 ```
 
-L'assenza di una fixture reale impedisce di trasformare questi PASS host-only
-in una closure biometrica.
+I test host-only provano la decisione strict-MAD, i limiti, il retry senza
+avanzamento, la convergenza dinamica, l'ownership e il terminal hold. Non
+provano che la nuova copertura migliori la stabilità su un dito reale.
+Il preflight finale è stato eseguito con
+`operator_kit/d282-01-fprintd-target/run-d282-01.sh --offline-preflight`
+e directory RPM OpenCV assoluta: build Meson/ninja della libfprint production,
+assenza di test seam/RPATH e ABI richiesta dall'esatto fprintd Fedora 44 sono
+PASS. Il processo ha riportato `REAL_SENSOR_ACCESSED=false` e
+`LIVE_EXECUTION_PERFORMED=false`.
 
 ## Boundary successivo
 
-Non viene implementata una nuova correzione production: scegliere fra B0
-per-sessione, B0 pinned o un'altra strategia senza una causa riproducibile
-sarebbe un cambio speculativo. Non viene preparata né richiesta una nuova live
-equivalente. Il passo metodologicamente corretto è prima acquisire o
-identificare evidenza già esistente che renda osservabili, per la stessa
-VERIFY, almeno l'identità/deriva non biometrica della B0 e metriche del raster
-R2/descrittori senza versionare immagini biometriche. Solo dopo una diagnosi
-causale si potrà proporre il delta production minimo e un eventuale Human
-Gate distinto.
+Il prossimo passo utile richiede sensore reale, privilegi, modifica del runtime
+host e re-enrollment. Il kit esistente
+`operator_kit/d291-01-multi-verify/` è stato adattato, non sostituito con un
+nuovo framework. Da un HEAD `development` pulito e pushato, un solo comando:
 
-Il precedente kit `d291-01-multi-verify` è stato reso fail-closed: ogni
-invocazione termina con exit code 4 prima di build, privilegi, runtime, PAM,
-USB o sensore. Il contenuto restante è conservato soltanto per audit.
+```bash
+operator_kit/d291-01-multi-verify/run-d291-01.sh --operator-run
+```
+
+costruisce la candidate tramite D282, verifica e sostituisce la sola libfprint,
+protegge il vecchio template con rollback root-only, re-enrolla l'indice destro
+con 3..8 sample e massimo 20 contatti, quindi esegue quattro serie indipendenti
+con PAM `max-tries=3`. La prima deve produrre NO_MATCH per un dito errato e poi
+MATCH per quello registrato; le tre successive devono fare MATCH entro tre
+contatti in normali pose quotidiane. Una quarta acquisizione nella stessa
+serie, retry VERIFY nascosti, errori di audit o mancato MATCH causano rollback.
+L'output non esporta template o raster.
 
 ```text
 ROOT_CAUSE_IDENTIFIED=false
-CORRECTIVE_PRODUCTION_CHANGE_AUTHORIZED=false
+SELECTED_TESTABLE_DIVERGENCE=ENROLLMENT_COVERAGE
+CORRECTIVE_PRODUCTION_CHANGE=ROCKY_DERIVED_DIVERSITY_SELECTOR
 REPEAT_EQUIVALENT_LIVE_ALLOWED=false
-OFFLINE_COMPARATIVE_DIAGNOSIS=COMPLETED_WITH_EVIDENCE_GAP
-RESIDUAL_BLOCKER=NO_REAL_DECODED_B0_FRAME_VARIABILITY_FIXTURE
+NEXT_LIVE_IS_EQUIVALENT=false
+HUMAN_GATE_PURPOSE=REAL_REENROLL_AND_MULTI_SERIES_STABILITY_VALIDATION
+RESIDUAL_BLOCKER=REAL_SENSOR_AND_OPERATOR_REQUIRED
 ```

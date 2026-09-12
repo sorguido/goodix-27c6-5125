@@ -10,6 +10,12 @@ typedef struct
   gboolean reject;
 } Fixture;
 
+typedef struct
+{
+  guint physical_count;
+  guint delivered_count;
+} DynamicFixture;
+
 static gboolean
 image_ready (GoodixEnrollmentPipeline *pipeline,
              guint                     stage_index,
@@ -48,8 +54,9 @@ feed_event (GoodixEnrollmentPipeline *pipeline,
 
   g_assert_cmpint (goodix_enrollment_pipeline_get_expected_event (pipeline),
                    ==, event);
-  g_assert_true (goodix_enrollment_pipeline_feed (pipeline, event, NULL, 0u,
-                                                  &error));
+  if (!goodix_enrollment_pipeline_feed (pipeline, event, NULL, 0u, &error))
+    g_error ("feed %s failed: %s", goodix_enrollment_event_name (event),
+             error != NULL ? error->message : "no error");
   g_assert_no_error (error);
 }
 
@@ -279,6 +286,64 @@ test_terminal_pending_image_released_on_mismatch (void)
   goodix_enrollment_pipeline_free (pipeline);
 }
 
+static gboolean
+dynamic_image_ready (GoodixEnrollmentPipeline *pipeline,
+                     guint                     stage_index,
+                     FpImage                  *image,
+                     gpointer                  user_data,
+                     GError                  **error)
+{
+  DynamicFixture *fixture = user_data;
+
+  g_assert_true (FP_IS_IMAGE (image));
+  fixture->physical_count++;
+  g_assert_cmpuint (stage_index, ==, fixture->physical_count);
+  if (stage_index == 4u)
+    return goodix_enrollment_pipeline_retry_current_stage (pipeline, error);
+  fixture->delivered_count++;
+  if (stage_index == 5u)
+    return goodix_enrollment_pipeline_finish_current_stage (pipeline, error);
+  return TRUE;
+}
+
+static void
+test_dynamic_retry_and_early_terminal (void)
+{
+  GoodixEnrollmentModelConfig config = {
+    .required_stage_count = 4u,
+    .max_physical_stage_count = 20u,
+    .defer_terminal_stage_delivery_until_release_ready = TRUE,
+    .defer_intermediate_stage_delivery_until_release_ready = TRUE,
+  };
+  GoodixEnrollmentPipelineAudit audit;
+  DynamicFixture fixture = { 0 };
+  g_autoptr(GError) error = NULL;
+  GoodixEnrollmentPipeline *pipeline = goodix_enrollment_pipeline_new (
+    &config, dynamic_image_ready, &fixture, &audit, &error);
+
+  g_assert_nonnull (pipeline);
+  for (guint physical = 1u; physical <= 5u; physical++)
+    {
+      Fixture primary_fixture = { 0 };
+
+      feed_primary (pipeline, physical, &primary_fixture);
+      if (physical == 1u)
+        feed_first_transition (pipeline);
+      else
+        feed_repeated_transition (pipeline, physical == 5u);
+    }
+  g_assert_true (goodix_enrollment_pipeline_is_complete (pipeline));
+  g_assert_cmpuint (fixture.physical_count, ==, 5u);
+  g_assert_cmpuint (fixture.delivered_count, ==, 4u);
+  g_assert_cmpuint (audit.protocol.observed_primary_stage_count, ==, 5u);
+  g_assert_cmpuint (audit.protocol.completed_stage_count, ==, 4u);
+  g_assert_cmpuint (audit.protocol.retry_stage_count, ==, 1u);
+  g_assert_cmpuint (audit.protocol.terminal_transition_count, ==, 1u);
+  g_assert_cmpuint (audit.fpimage_construct_count, ==, 5u);
+  g_assert_cmpuint (audit.fpimage_delivery_count, ==, 4u);
+  goodix_enrollment_pipeline_free (pipeline);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -293,5 +358,7 @@ main (int argc, char **argv)
                    test_out_of_order_primary_does_not_construct);
   g_test_add_func ("/d279-11-pipeline/terminal-pending-mismatch",
                    test_terminal_pending_image_released_on_mismatch);
+  g_test_add_func ("/d291-pipeline/dynamic-retry-early-terminal",
+                   test_dynamic_retry_and_early_terminal);
   return g_test_run ();
 }

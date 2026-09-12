@@ -91,6 +91,7 @@ typedef struct
   guint enroll_retry_callback_count;
   guint await_finger_on_count;
   guint enrollment_extraction_failure_stage;
+  gboolean enrollment_duplicate_convergence;
   guint await_finger_on_count_at_failure;
   FpiImageDeviceState last_image_state;
   guint material_release_count;
@@ -1613,19 +1614,59 @@ wait_for_enrollment_progress (Fixture *fixture,
   g_assert_cmpuint (fixture->enroll_progress_count, ==, stage);
 }
 
+static GBytes *
+enrollment_image_for_stage (GBytes *source,
+                            guint   stage)
+{
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  GoodixImageDecodeAudit audit = { 0 };
+  g_autoptr(GError) error = NULL;
+
+  if (stage == 1u)
+    return g_bytes_ref (source);
+  g_assert_true (goodix_image_decode_plaintext (source, samples, &audit,
+                                                &error));
+  g_assert_no_error (error);
+  for (guint y = 0u; y < GOODIX_CANONICAL_IMAGE_HEIGHT; y++)
+    for (guint x = 0u; x < GOODIX_CANONICAL_IMAGE_WIDTH; x++)
+      {
+        gsize index = (gsize) y * GOODIX_CANONICAL_IMAGE_WIDTH + x;
+        guint band = (x + stage * 7u + (y / 5u) * 3u) % 23u;
+        gint delta = band < 10u ? 700 : -350;
+        gint value = (gint) samples[index] + delta;
+
+        samples[index] = (uint16_t) CLAMP (value, 0,
+                                           GOODIX_SENSOR_SAMPLE_MAX);
+      }
+  return post_image_from_samples (samples);
+}
+
 static void
 drive_production_enrollment_stages (Fixture   *fixture,
                                     TlsClient *client)
 {
   const guint8 auxiliary[4] = { 0x20, 0x01, 0x00, 0x88 };
   guint8 nav[2409] = { 0x50, 0x01 };
-  g_autoptr(GBytes) image = fixture->production_image_plaintext != NULL ?
+  g_autoptr(GBytes) source_image = fixture->production_image_plaintext != NULL ?
     g_bytes_ref (fixture->production_image_plaintext) : post_zero_image ();
-  gsize image_length;
-  const guint8 *image_data = g_bytes_get_data (image, &image_length);
 
-  for (guint stage = 1u; stage <= GOODIX_SIGFM_ENROLL_MAX_STAGES; stage++)
+  guint terminal_contact = fixture->enrollment_duplicate_convergence ? 5u :
+    GOODIX_SIGFM_ENROLL_MAX_STAGES;
+
+  for (guint stage = 1u; stage <= terminal_contact; stage++)
     {
+      gboolean duplicate_retry = fixture->enrollment_duplicate_convergence &&
+                                 stage == 4u;
+      guint expected_before = fixture->enrollment_duplicate_convergence &&
+                              stage > 4u ? 3u : stage - 1u;
+      guint expected_after = duplicate_retry ? 3u : expected_before + 1u;
+      g_autoptr(GBytes) image =
+        fixture->enrollment_duplicate_convergence && stage >= 4u ?
+          g_bytes_ref (source_image) :
+          enrollment_image_for_stage (source_image, stage);
+      gsize image_length;
+      const guint8 *image_data = g_bytes_get_data (image, &image_length);
+
       if (stage > 1u)
         post_feed_event (fixture, 0x32, 0x0002, 0x002f,
                          (guint16) (0x80u + stage * 8u));
@@ -1640,7 +1681,7 @@ drive_production_enrollment_stages (Fixture   *fixture,
           goodix_test_sigfm_extract_set_block (TRUE);
         }
       post_write_application_data (fixture, client, image_data, image_length);
-      g_assert_cmpuint (fixture->enroll_progress_count, ==, stage - 1u);
+      g_assert_cmpuint (fixture->enroll_progress_count, ==, expected_before);
       g_assert_cmpint (fixture->last_image_state, ==,
                        FPI_IMAGE_DEVICE_STATE_CAPTURE);
       g_assert_cmpuint (fp_device_get_finger_status (
@@ -1686,13 +1727,13 @@ drive_production_enrollment_stages (Fixture   *fixture,
           g_assert_cmpuint (fp_device_get_finger_status (
                               FP_DEVICE (fixture->device)), ==,
                             FP_FINGER_STATUS_PRESENT);
-          if (stage == GOODIX_SIGFM_ENROLL_MAX_STAGES)
+          if (stage == terminal_contact)
             {
               GoodixProductionEnrollmentAudit held_audit;
 
               /* Exercise the harder ordering: SIGFM finishes before the
                * terminal IRQ, but action completion remains held. */
-              wait_for_enrollment_progress (fixture, stage);
+              wait_for_enrollment_progress (fixture, expected_after);
               g_assert_false (fixture->done);
               goodix_device_context_get_production_enrollment_audit (
                 fixture->context, &held_audit);
@@ -1712,13 +1753,13 @@ drive_production_enrollment_stages (Fixture   *fixture,
               goodix_test_sigfm_extract_unblock ();
               return;
             }
-          if (stage < GOODIX_SIGFM_ENROLL_MAX_STAGES)
+          if (stage < terminal_contact)
             {
               post_complete_command (fixture, 0x32);
               post_feed_ack (fixture, 0x32);
             }
         }
-      wait_for_enrollment_progress (fixture, stage);
+      wait_for_enrollment_progress (fixture, expected_after);
     }
 }
 
@@ -1970,9 +2011,9 @@ test_d291_fixed_raw_baseline_pinning_mechanics (void)
                     GOODIX_SIGFM_ENROLL_MAX_STAGES);
   template_signature = goodix_test_sigfm_match_get_enrolled_signature (0u);
   g_assert_cmpuint (template_signature, !=, 0u);
-  for (guint i = 1u; i < GOODIX_SIGFM_ENROLL_MAX_STAGES; i++)
-    g_assert_cmpuint (goodix_test_sigfm_match_get_enrolled_signature (i), ==,
-                      template_signature);
+  /* The first accepted sample retains the exact source raster. Remaining
+   * enrollment fixtures are intentionally spatially different so the
+   * production diversity selector is exercised rather than bypassed. */
   g_assert_cmpuint (goodix_test_sigfm_match_get_probe_signature (0u), !=,
                     template_signature);
 
@@ -2533,6 +2574,64 @@ test_production_one_shot_enrollment_full_tls (void)
   g_assert_cmpuint (fixture->material_release_count, ==, 1u);
   g_assert_null (goodix_fpimage_device_get_context (fixture->device));
   client_clear (&client);
+  fixture_free (fixture);
+}
+
+static void
+test_d291_production_enrollment_duplicate_convergence (void)
+{
+  Fixture *fixture = fixture_new_production_action ();
+  g_autoptr(FpPrint) template = fp_print_new (FP_DEVICE (fixture->device));
+  TlsClient client;
+  GoodixProductionEnrollmentAudit audit;
+
+  fixture->enrollment_duplicate_convergence = TRUE;
+  fp_device_enroll (FP_DEVICE (fixture->device),
+                    g_steal_pointer (&template), NULL,
+                    production_enroll_progress, fixture, NULL,
+                    (GAsyncReadyCallback) production_enroll_complete,
+                    fixture);
+  production_establish_tls_for_action (fixture, &client);
+  drive_production_enrollment_bootstrap (fixture, &client);
+  drive_production_enrollment_stages (fixture, &client);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  g_assert_nonnull (fixture->enroll_print);
+  g_assert_cmpuint (fixture->enroll_progress_count, ==, 4u);
+  g_assert_cmpuint (fixture->enroll_retry_callback_count, ==, 1u);
+  g_assert_cmpuint (fp_device_get_nr_enroll_stages (
+                      FP_DEVICE (fixture->device)), ==, 4u);
+  goodix_device_context_get_production_enrollment_audit (fixture->context,
+                                                         &audit);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.
+      configured_required_stage_count, ==, 8u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.
+      configured_max_physical_stage_count, ==, 20u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.
+      observed_primary_stage_count, ==, 5u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.
+      completed_stage_count, ==, 4u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.retry_stage_count,
+    ==, 1u);
+  g_assert_cmpuint (
+    audit.enrollment_events.lifecycle.plan.pipeline.protocol.
+      terminal_transition_count, ==, 1u);
+  g_assert_cmpuint (audit.terminal_enroll_completion_hold_count, ==, 1u);
+  g_assert_cmpuint (audit.terminal_enroll_completion_release_count, ==, 1u);
+  g_assert_cmpuint (audit.secure.persistent_write_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.persistent_device_write_count, ==, 0u);
+  g_assert_true (audit.usb_backend_drained);
+
+  client_clear (&client);
+  fixture->session = NULL;
+  fixture->post_tls = NULL;
+  production_close_epoch (fixture);
   fixture_free (fixture);
 }
 
@@ -4078,6 +4177,8 @@ main (int argc,
                    test_integrated_context_live_binding_host_only);
   g_test_add_func ("/goodix/d279/production-one-shot-enrollment-full-tls",
                    test_production_one_shot_enrollment_full_tls);
+  g_test_add_func ("/goodix/d291/production-enrollment-duplicate-convergence",
+                   test_d291_production_enrollment_duplicate_convergence);
   g_test_add_func ("/goodix/d280/production-two-epoch-template-reuse",
                    test_d280_01_production_two_epoch_template_reuse);
   g_test_add_func ("/goodix/d291/explicit-multi-verify-after-no-match",

@@ -15,6 +15,7 @@ typedef enum
 struct _GoodixEnrollmentModel
 {
   guint required_stage_count;
+  guint max_physical_stage_count;
   guint observed_stage_count;
   guint completed_stage_count;
   GoodixEnrollmentEvent expected;
@@ -30,6 +31,9 @@ struct _GoodixEnrollmentModel
   gboolean defer_terminal_stage_delivery_until_release_ready;
   gboolean defer_intermediate_stage_delivery_until_release_ready;
   gboolean stage_delivery_pending;
+  gboolean delivering_stage;
+  gboolean retry_current_stage;
+  gboolean finish_current_stage;
 };
 
 static GQuark
@@ -73,6 +77,8 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
    * repeated/terminal transition, so fewer than two stages cannot instantiate
    * this profile without inventing an unobserved single-stage shape. */
   if (config == NULL || config->required_stage_count < 2u ||
+      (config->max_physical_stage_count != 0u &&
+       config->max_physical_stage_count < config->required_stage_count) ||
       stage_ready == NULL ||
       (config->defer_terminal_stage_delivery &&
        config->defer_terminal_stage_delivery_until_release_ready))
@@ -85,6 +91,8 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
 
   model = g_new0 (GoodixEnrollmentModel, 1);
   model->required_stage_count = config->required_stage_count;
+  model->max_physical_stage_count = config->max_physical_stage_count != 0u ?
+    config->max_physical_stage_count : config->required_stage_count;
   model->defer_terminal_stage_delivery =
     config->defer_terminal_stage_delivery;
   model->defer_terminal_stage_delivery_until_release_ready =
@@ -99,6 +107,8 @@ goodix_enrollment_model_new (const GoodixEnrollmentModelConfig *config,
     {
       *audit = (GoodixEnrollmentModelAudit) { 0 };
       audit->configured_required_stage_count = config->required_stage_count;
+      audit->configured_max_physical_stage_count =
+        model->max_physical_stage_count;
       audit->configured_defer_terminal_stage_delivery =
         config->defer_terminal_stage_delivery;
       audit->configured_defer_terminal_stage_delivery_until_release_ready =
@@ -129,9 +139,13 @@ deliver_stage (GoodixEnrollmentModel *model,
 {
   g_autoptr(GError) callback_error = NULL;
 
+  model->delivering_stage = TRUE;
+  model->retry_current_stage = FALSE;
+  model->finish_current_stage = FALSE;
   if (!model->stage_ready (model, stage_index, model->user_data,
                            &callback_error))
     {
+      model->delivering_stage = FALSE;
       model->failed = TRUE;
       model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
       if (model->audit != NULL)
@@ -143,7 +157,38 @@ deliver_stage (GoodixEnrollmentModel *model,
       g_propagate_error (error, g_steal_pointer (&callback_error));
       return FALSE;
     }
+  model->delivering_stage = FALSE;
+  if (model->retry_current_stage)
+    {
+      if (model->observed_stage_count >= model->max_physical_stage_count)
+        {
+          model->failed = TRUE;
+          model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
+          if (model->audit != NULL)
+            model->audit->failed = TRUE;
+          g_set_error_literal (error, GOODIX_ENROLLMENT_ERROR,
+                               GOODIX_ENROLLMENT_ERROR_STAGE,
+                               "enrollment physical-contact bound exhausted");
+          return FALSE;
+        }
+      if (model->audit != NULL)
+        model->audit->retry_stage_count++;
+      return TRUE;
+    }
   model->completed_stage_count++;
+  if (model->completed_stage_count > model->required_stage_count)
+    {
+      model->failed = TRUE;
+      model->expected = GOODIX_ENROLLMENT_EVENT_NONE;
+      if (model->audit != NULL)
+        model->audit->failed = TRUE;
+      g_set_error_literal (error, GOODIX_ENROLLMENT_ERROR,
+                           GOODIX_ENROLLMENT_ERROR_STAGE,
+                           "enrollment delivered too many template stages");
+      return FALSE;
+    }
+  if (model->finish_current_stage)
+    model->transition = GOODIX_ENROLLMENT_TRANSITION_TERMINAL;
   if (model->audit != NULL)
     {
       model->audit->completed_stage_count = model->completed_stage_count;
@@ -218,7 +263,7 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
       expect (model, GOODIX_ENROLLMENT_EVENT_PRIMARY_B0);
       break;
     case GOODIX_ENROLLMENT_EVENT_PRIMARY_B0:
-      if (model->observed_stage_count >= model->required_stage_count)
+      if (model->observed_stage_count >= model->max_physical_stage_count)
         {
           return model_fail (model, GOODIX_ENROLLMENT_ERROR_PROTOCOL,
                              event, error);
@@ -232,7 +277,7 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
         }
       model->transition = model->observed_stage_count == 1u ?
         GOODIX_ENROLLMENT_TRANSITION_FIRST_NAV :
-        (model->observed_stage_count == model->required_stage_count ?
+        (model->observed_stage_count == model->max_physical_stage_count ?
          GOODIX_ENROLLMENT_TRANSITION_TERMINAL :
          GOODIX_ENROLLMENT_TRANSITION_REPEATED_REARM);
       if ((model->transition == GOODIX_ENROLLMENT_TRANSITION_TERMINAL &&
@@ -334,6 +379,46 @@ goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
                          event, error);
     }
   return TRUE;
+}
+
+static gboolean
+request_stage_decision (GoodixEnrollmentModel *model,
+                        gboolean               retry,
+                        GError               **error)
+{
+  if (model == NULL || !model->delivering_stage ||
+      model->retry_current_stage || model->finish_current_stage)
+    {
+      g_set_error_literal (error, GOODIX_ENROLLMENT_ERROR,
+                           GOODIX_ENROLLMENT_ERROR_STATE,
+                           "enrollment stage decision is not currently available");
+      return FALSE;
+    }
+  if (!retry && model->completed_stage_count + 1u >
+                model->required_stage_count)
+    {
+      g_set_error_literal (error, GOODIX_ENROLLMENT_ERROR,
+                           GOODIX_ENROLLMENT_ERROR_STAGE,
+                           "terminal enrollment stage exceeds template target");
+      return FALSE;
+    }
+  model->retry_current_stage = retry;
+  model->finish_current_stage = !retry;
+  return TRUE;
+}
+
+gboolean
+goodix_enrollment_model_retry_current_stage (GoodixEnrollmentModel *model,
+                                             GError               **error)
+{
+  return request_stage_decision (model, TRUE, error);
+}
+
+gboolean
+goodix_enrollment_model_finish_current_stage (GoodixEnrollmentModel *model,
+                                              GError               **error)
+{
+  return request_stage_decision (model, FALSE, error);
 }
 
 GoodixEnrollmentEvent

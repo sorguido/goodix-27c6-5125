@@ -142,6 +142,7 @@ driver_sources = {
         '../../../../libfprint-driver/goodix_sigfm_metrics.cpp',
         '../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp',
         '../../../../libfprint-driver/goodix_enrollment_model.c',
+        '../../../../libfprint-driver/goodix_enrollment_diversity.c',
         '../../../../libfprint-driver/goodix_enrollment_pipeline.c',
         '../../../../libfprint-driver/goodix_enrollment_command_plan.c',
         '../../../../libfprint-driver/goodix_enrollment_command_body.c',

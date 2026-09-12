@@ -18,6 +18,7 @@ struct _GoodixEnrollmentPipeline
   gpointer user_data;
   GoodixEnrollmentPipelineAudit *audit;
   GoodixFpImagePipeline *pending_image;
+  gboolean retry_current_stage;
   gboolean failed;
 };
 
@@ -45,11 +46,12 @@ pipeline_stage_ready (GoodixEnrollmentModel *model,
       return FALSE;
     }
   image = goodix_fpimage_pipeline_get_image (pipeline->pending_image);
+  pipeline->retry_current_stage = FALSE;
   if (image == NULL ||
       !pipeline->image_ready (pipeline, stage_index, image,
                               pipeline->user_data, error))
     return FALSE;
-  if (pipeline->audit != NULL)
+  if (pipeline->audit != NULL && !pipeline->retry_current_stage)
     pipeline->audit->fpimage_delivery_count++;
   return TRUE;
 }
@@ -151,6 +153,7 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
     }
   if (event == GOODIX_ENROLLMENT_EVENT_PRIMARY_B0)
     {
+      pipeline->retry_current_stage = FALSE;
       if (samples == NULL ||
           sample_count != GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT)
         return pipeline_fail (pipeline,
@@ -181,7 +184,7 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
   completed_before = goodix_enrollment_model_get_completed_stage_count (
     pipeline->model);
   accepted = goodix_enrollment_model_feed (pipeline->model, event, error);
-  if (!accepted ||
+  if (!accepted || pipeline->retry_current_stage ||
       goodix_enrollment_model_get_completed_stage_count (pipeline->model) >
         completed_before)
     {
@@ -195,6 +198,41 @@ goodix_enrollment_pipeline_feed (GoodixEnrollmentPipeline *pipeline,
         pipeline->audit->failed = TRUE;
     }
   return accepted;
+}
+
+gboolean
+goodix_enrollment_pipeline_retry_current_stage (
+  GoodixEnrollmentPipeline *pipeline,
+  GError                  **error)
+{
+  if (pipeline == NULL || pipeline->pending_image == NULL ||
+      pipeline->retry_current_stage)
+    {
+      g_set_error_literal (error, GOODIX_ENROLLMENT_PIPELINE_ERROR,
+                           GOODIX_ENROLLMENT_PIPELINE_ERROR_STATE,
+                           "enrollment image is not available for retry");
+      return FALSE;
+    }
+  if (!goodix_enrollment_model_retry_current_stage (pipeline->model, error))
+    return FALSE;
+  pipeline->retry_current_stage = TRUE;
+  return TRUE;
+}
+
+gboolean
+goodix_enrollment_pipeline_finish_current_stage (
+  GoodixEnrollmentPipeline *pipeline,
+  GError                  **error)
+{
+  if (pipeline == NULL || pipeline->pending_image == NULL ||
+      pipeline->retry_current_stage)
+    {
+      g_set_error_literal (error, GOODIX_ENROLLMENT_PIPELINE_ERROR,
+                           GOODIX_ENROLLMENT_PIPELINE_ERROR_STATE,
+                           "enrollment image is not available for terminal delivery");
+      return FALSE;
+    }
+  return goodix_enrollment_model_finish_current_stage (pipeline->model, error);
 }
 
 GoodixEnrollmentEvent

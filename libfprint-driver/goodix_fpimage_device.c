@@ -21,6 +21,7 @@
 #include "goodix_post_tls_lifecycle.h"
 #include "goodix_runtime_material.h"
 #include "goodix_enrollment_fpi_usb_binding.h"
+#include "goodix_enrollment_diversity.h"
 
 #include "fpi-device.h"
 #include "fpi-image-device.h"
@@ -72,6 +73,7 @@ struct _GoodixDeviceContext
   GoodixSecureSession       *secure_session;
   GoodixPostTlsLifecycle    *post_tls_lifecycle;
   GoodixEnrollmentFpiUsbBinding *enrollment_binding;
+  GoodixEnrollmentDiversity *enrollment_diversity;
   GoodixEnrollmentPostTlsEvents *pending_enrollment_events;
   GoodixEnrollmentAuxiliaryB0Func enrollment_auxiliary;
   gpointer                   enrollment_auxiliary_data;
@@ -332,6 +334,10 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   GoodixPostTlsMaterial post_material = { 0 };
   GoodixEnrollmentModelConfig enrollment_config = {
     .required_stage_count = GOODIX_SIGFM_ENROLL_MAX_STAGES,
+#ifdef GOODIX_LIBFPRINT_SIGFM
+    .max_physical_stage_count =
+      GOODIX_ENROLLMENT_DIVERSITY_MAX_PHYSICAL_ATTEMPTS,
+#endif
     .defer_terminal_stage_delivery_until_release_ready = TRUE,
     .defer_intermediate_stage_delivery_until_release_ready = TRUE,
   };
@@ -346,6 +352,22 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
 
   action = fpi_device_get_current_action (FP_DEVICE (ctx->device));
   enrollment_action = action == FPI_DEVICE_ACTION_ENROLL;
+
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  if (enrollment_action)
+    {
+      goodix_enrollment_diversity_free (ctx->enrollment_diversity);
+      ctx->enrollment_diversity = goodix_enrollment_diversity_new (
+        GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT);
+      if (ctx->enrollment_diversity == NULL)
+        {
+          context_protocol_failure (
+            ctx, g_error_new_literal (G_IO_ERROR, G_IO_ERROR_NO_SPACE,
+                                      "SIGFM enrollment diversity allocation failed"));
+          return;
+        }
+    }
+#endif
 
   memcpy (post_material.initial_fdt_table, ctx->runtime_fdt_seed,
           sizeof post_material.initial_fdt_table);
@@ -742,6 +764,7 @@ goodix_fpimage_device_log_production_audit (
     "consumed=%u tls=%u "
     "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
     "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
+    "enroll_contacts=%u enroll_retry_scans=%u "
     "secure_retry=%u post_retry=%u reopen=%u explicit_verify_reopen=%u "
     "reset=%u clear_halt=%u persistent=%u "
     "sigfm_baseline_pinned=%u sigfm_baseline_reused=%u "
@@ -759,6 +782,8 @@ goodix_fpimage_device_log_production_audit (
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
     audit->enrollment_events.lifecycle.plan.inter_stage_rearm_count,
     audit->enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
+    audit->enrollment_events.lifecycle.plan.pipeline.protocol.observed_primary_stage_count,
+    audit->enrollment_events.lifecycle.plan.pipeline.protocol.retry_stage_count,
     audit->secure.retry_count,
     audit->post_tls.retry_count,
     reopen_count,
@@ -798,6 +823,7 @@ goodix_device_context_free (GoodixDeviceContext              *ctx,
   goodix_tls_server_free (ctx->tls_server);
   goodix_enrollment_fpi_usb_binding_free (ctx->enrollment_binding);
   goodix_enrollment_post_tls_events_free (ctx->pending_enrollment_events);
+  goodix_enrollment_diversity_free (ctx->enrollment_diversity);
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
@@ -934,6 +960,8 @@ goodix_device_context_release_epoch_objects (GoodixDeviceContext *ctx)
   ctx->enrollment_binding = NULL;
   goodix_enrollment_post_tls_events_free (ctx->pending_enrollment_events);
   ctx->pending_enrollment_events = NULL;
+  goodix_enrollment_diversity_free (ctx->enrollment_diversity);
+  ctx->enrollment_diversity = NULL;
   ctx->tls_plaintext = NULL;
   ctx->tls_user_data = NULL;
   ctx->enrollment_auxiliary = NULL;
@@ -2033,6 +2061,10 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
 #ifdef GOODIX_LIBFPRINT_SIGFM
       GoodixFpImagePipeline *sigfm_pipeline = NULL;
       GoodixFpImagePipelineResult result;
+      GoodixEnrollmentDiversityDecision diversity_decision;
+      guint template_stage_target;
+      const guchar *image_data;
+      gsize image_data_length = 0u;
       const uint16_t *samples;
       size_t sample_count = 0u;
 
@@ -2053,13 +2085,68 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
                        "SIGFM enrollment preprocessing failed: %u", result);
           return FALSE;
         }
-      if (stage_index == GOODIX_SIGFM_ENROLL_MAX_STAGES &&
-          ctx->terminal_delivery_at_release_ready)
+      if (ctx->enrollment_diversity == NULL)
         {
-          fpi_image_device_hold_enroll_completion (
-            FP_IMAGE_DEVICE (ctx->device));
-          ctx->terminal_enroll_completion_held = TRUE;
-          ctx->terminal_enroll_completion_hold_count++;
+          goodix_fpimage_pipeline_free (sigfm_pipeline);
+          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                               "SIGFM enrollment diversity state is absent");
+          return FALSE;
+        }
+      image_data = fp_image_get_data (
+        goodix_fpimage_pipeline_get_image (sigfm_pipeline),
+        &image_data_length);
+      diversity_decision = goodix_enrollment_diversity_observe (
+        ctx->enrollment_diversity, image_data, image_data_length);
+      if (diversity_decision ==
+          GOODIX_ENROLLMENT_DIVERSITY_RETRY_DUPLICATE)
+        {
+          if (!goodix_enrollment_pipeline_retry_current_stage (pipeline,
+                                                                error))
+            {
+              goodix_fpimage_pipeline_free (sigfm_pipeline);
+              return FALSE;
+            }
+          g_debug ("enrollment contact %u duplicates accepted coverage; retry",
+                   stage_index);
+          fpi_image_device_retry_scan (FP_IMAGE_DEVICE (ctx->device),
+                                       FP_DEVICE_RETRY_GENERAL);
+          goodix_fpimage_pipeline_free (sigfm_pipeline);
+          return TRUE;
+        }
+      if (diversity_decision == GOODIX_ENROLLMENT_DIVERSITY_EXHAUSTED)
+        {
+          goodix_fpimage_pipeline_free (sigfm_pipeline);
+          g_set_error_literal (
+            error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
+            "SIGFM enrollment exhausted its 20-contact diversity bound");
+          return FALSE;
+        }
+      if (diversity_decision ==
+          GOODIX_ENROLLMENT_DIVERSITY_ACCEPT_TERMINAL)
+        {
+          template_stage_target =
+            goodix_enrollment_diversity_get_template_stage_target (
+              ctx->enrollment_diversity);
+          if (template_stage_target == 0u ||
+              !goodix_enrollment_pipeline_finish_current_stage (pipeline,
+                                                                  error))
+            {
+              goodix_fpimage_pipeline_free (sigfm_pipeline);
+              return FALSE;
+            }
+          fpi_device_set_nr_enroll_stages (FP_DEVICE (ctx->device),
+                                           template_stage_target);
+          if (ctx->terminal_delivery_at_release_ready)
+            {
+              fpi_image_device_hold_enroll_completion (
+                FP_IMAGE_DEVICE (ctx->device));
+              ctx->terminal_enroll_completion_held = TRUE;
+              ctx->terminal_enroll_completion_hold_count++;
+            }
+          g_debug ("enrollment diversity complete after %u contacts with %u template stages",
+                   goodix_enrollment_diversity_get_physical_attempt_count (
+                     ctx->enrollment_diversity),
+                   template_stage_target);
         }
       fpi_image_device_image_captured (
         FP_IMAGE_DEVICE (ctx->device),

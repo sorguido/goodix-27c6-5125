@@ -49,6 +49,13 @@ gboolean goodix_enrollment_pipeline_feed (
   size_t                    sample_count,
   GError                  **error);
 
+gboolean goodix_enrollment_pipeline_retry_current_stage (
+  GoodixEnrollmentPipeline *pipeline,
+  GError                  **error);
+gboolean goodix_enrollment_pipeline_finish_current_stage (
+  GoodixEnrollmentPipeline *pipeline,
+  GError                  **error);
+
 GoodixEnrollmentEvent goodix_enrollment_pipeline_get_expected_event (
   const GoodixEnrollmentPipeline *pipeline);
 gboolean goodix_enrollment_pipeline_is_complete (

@@ -45,9 +45,13 @@ typedef enum
 
 typedef struct
 {
-  /* Target/profile input, not a universal OEM constant.  The observed
-   * ATTEMPT02 value is 21; the model intentionally accepts other values. */
+  /* Target/profile input, not a universal OEM constant. This is the maximum
+   * number of images delivered to the libfprint template; a stage callback
+   * may explicitly converge earlier. */
   guint required_stage_count;
+  /* Hard bound for physical contacts. Zero retains the historical fixed
+   * profile where one contact is delivered for every required stage. */
+  guint max_physical_stage_count;
   /* FpImageDevice may complete enrollment as soon as final extraction ends.
    * Defer the final stage callback until terminal IRQ0200 so the caller can
    * immediately report finger-up before that asynchronous completion. */
@@ -67,6 +71,7 @@ typedef struct
 typedef struct
 {
   guint configured_required_stage_count;
+  guint configured_max_physical_stage_count;
   gboolean configured_defer_terminal_stage_delivery;
   gboolean configured_defer_terminal_stage_delivery_until_release_ready;
   gboolean configured_defer_intermediate_stage_delivery_until_release_ready;
@@ -75,6 +80,7 @@ typedef struct
   guint primary_b0_count;
   guint auxiliary_b0_count;
   guint libfprint_stage_report_count;
+  guint retry_stage_count;
   guint first_nav_transition_count;
   guint repeated_rearm_transition_count;
   guint terminal_transition_count;
@@ -102,6 +108,15 @@ void goodix_enrollment_model_free (GoodixEnrollmentModel *model);
 gboolean goodix_enrollment_model_feed (GoodixEnrollmentModel *model,
                                        GoodixEnrollmentEvent  event,
                                        GError               **error);
+/* These calls are valid only from the stage callback. A retry consumes the
+ * physical contact without advancing template progress. A terminal request
+ * makes the current accepted stage the last sensor-side contact. */
+gboolean goodix_enrollment_model_retry_current_stage (
+  GoodixEnrollmentModel *model,
+  GError               **error);
+gboolean goodix_enrollment_model_finish_current_stage (
+  GoodixEnrollmentModel *model,
+  GError               **error);
 GoodixEnrollmentEvent goodix_enrollment_model_get_expected_event (
   const GoodixEnrollmentModel *model);
 GoodixEnrollmentTransition goodix_enrollment_model_get_transition (

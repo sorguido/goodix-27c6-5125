@@ -17,7 +17,7 @@ struct _GoodixEnrollmentCommandPlan
   GoodixEnrollmentCommandPlanAudit internal_audit;
   GoodixEnrollmentCommandPlanAudit *audit;
   GoodixEnrollmentEvent last_event;
-  guint required_stage_count;
+  guint max_physical_stage_count;
   gboolean failed;
 };
 
@@ -72,7 +72,8 @@ goodix_enrollment_command_plan_new (
     }
   plan = g_new0 (GoodixEnrollmentCommandPlan, 1);
   plan->audit = audit != NULL ? audit : &plan->internal_audit;
-  plan->required_stage_count = config->required_stage_count;
+  plan->max_physical_stage_count = config->max_physical_stage_count != 0u ?
+    config->max_physical_stage_count : config->required_stage_count;
   *plan->audit = (GoodixEnrollmentCommandPlanAudit) { 0 };
   plan->pipeline = goodix_enrollment_pipeline_new (
     config, image_ready, user_data, &plan->audit->pipeline, error);
@@ -142,7 +143,7 @@ goodix_enrollment_command_plan_peek (const GoodixEnrollmentCommandPlan *plan,
   intent->stage_index = event == GOODIX_ENROLLMENT_EVENT_COMMAND_22 ?
     observed + 1u : observed;
   transition = observed == 1u ? GOODIX_ENROLLMENT_TRANSITION_FIRST_NAV :
-    (observed == plan->required_stage_count ?
+    (observed == plan->max_physical_stage_count ?
      GOODIX_ENROLLMENT_TRANSITION_TERMINAL :
      GOODIX_ENROLLMENT_TRANSITION_REPEATED_REARM);
 
