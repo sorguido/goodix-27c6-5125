@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D288/01 PASS live; primo percorso reale del Live Probe Harness
+### Stato corrente — D288/01 PASS live; D289/01 real lock pronto al Human Gate
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1237,6 +1237,81 @@ LIVE_PROBE_HARNESS_COMMON_ORCHESTRATION=PROVEN_LIVE_FOR_D288_PATH
 LIVE_PROBE_HARNESS_CAPTURE_PIPELINE=PASS
 LIVE_PROBE_HARNESS_PRE_POST_AUDIT=PASS
 LIVE_PROBE_HARNESS_REUSABLE_METHOD_VALIDATED_BY_REAL_RUN=true
+```
+
+D289/01 seleziona come successivo boundary il vero unlock di una sessione KDE
+realmente bloccata. È il delta più piccolo rispetto a D288: consumer,
+`kde-fingerprint`, PAM/fprintd, VERIFY e propagazione `Unlocked` sono già
+provati; manca la transizione orchestrata da KWin. SDDM resta successivo perché
+usa `plasmalogin → password-auth`, oggi privo di pam_fprintd, e aggiunge la
+creazione di sessione. Packaging o integrazione generale esporrebbero invece
+più consumer prima della prova del lock reale.
+
+L'audit upstream KScreenLocker `v6.7.5`, commit
+`057b3774d9ad322cfccc2683ea057aed87e0f878`, conferma che `KSldApp` avvia il
+greeter come `QProcess`, ne legge `Unlocked\n` e poi esegue `doUnlock()`. Il
+service `org.freedesktop.ScreenSaver` espone `Lock` e `GetActive`, ma non un
+setter D-Bus dell'environment del greeter. KWin è già in esecuzione e non può
+quindi ereditare il preload D288 senza riavvio o mutazione del processo.
+
+Il piccolo payload `d289-real-locked-session` riusa il common harness senza
+modificarlo. Dopo la conferma operatore, un helper `pkexec` verifica PID/exe/UID
+di KWin e uguaglianza del mount namespace; sovrappone poi temporaneamente e
+read-only il PAM candidato sul solo `/etc/pam.d/kde-fingerprint`. Il bind mount
+vive sotto un helper collegato via pipe: `RELEASE`, EOF, segnale o errore
+portano a unmount, verifica dell'hash host originale e rimozione del runtime
+root-only sotto `/run`. Un mount preesistente viene rifiutato senza essere
+smontato. Il service password `/etc/pam.d/kde` resta invariato.
+
+La nuova ipotesi è che una sola epoch SIGFM MATCH causi la transizione reale
+`GetActive false → true → false` del lock KWin. Il payload richiede inoltre un
+solo greeter, figlio diretto del PID KWin e nel cgroup utente. Dopo NO_MATCH la
+password serve esclusivamente a recuperare la sessione; solo a recovery
+completato e dopo `TENTATIVO 2/3` può iniziare un nuovo ciclo. Il payload non
+contiene alcun comando di unlock forzato. La finestra dell'overlay espone il
+PAM candidato a un eventuale altro processo che invocasse esattamente
+`kde-fingerprint`; per questo il gate richiede zero greeter preesistenti e la
+chiude dopo ogni singolo ciclo, prima di offrire il successivo.
+
+I limiti sono tre lock/action/contatti, `max-tries=1` per ciclo, zero retry
+automatico o implicito e timeout complessivo 900 s. Ogni epoch deve avere
+attempted/rejected/consumed `1/0/1`, TLS/first-image `1/1`, zero retry/reopen/
+reset/clear-halt/famiglie persistenti/outstanding e cleanup drenato/chiuso.
+Pre/post audit D286, hash PAM/greeter/KWin, stato unlocked finale e assenza di
+greeter, mount e runtime residui sono gate fail-closed. `bash -n`, il vero
+percorso harness `--offline-test` e `14/14` contratti D289 sono PASS; nessuna
+live, lock, PAM fingerprint, USB, sensore, mount o operazione privilegiata è
+stata eseguita dall'AI.
+
+La review PM chiude i failure-path di mount preesistente non posseduto, mode
+del PAM leggibile dal greeter, finestra overlay fra cicli, race fra stato D-Bus
+e morte del greeter e cleanup fallito con recovery hash-pinned. La regressione
+high-risk pertinente D286–D289 passa `176/176`; `shellcheck` non è installato.
+
+```text
+D289_01_OUTCOME=READY_FOR_HUMAN_GATE
+D289_01_ADVANCEMENT=REAL_LOCK_PAYLOAD_IMPLEMENTED_ON_REUSABLE_HARNESS
+D289_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D289_01_REAL_TARGET_COMPATIBILITY=PASS_WITH_PRIVILEGED_NAMESPACE_PREFLIGHT_AT_LIVE
+D289_01_MAX_REAL_LOCK_CYCLES=3
+D289_01_MAX_VERIFY_ACTIONS=3
+D289_01_MAX_PHYSICAL_CONTACTS=3
+D289_01_PAM_MAX_TRIES_PER_CYCLE=1
+D289_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D289_01_HOST_PAM_PERSISTENT_WRITE_COUNT=0
+D289_01_MAX_TEMPORARY_READ_ONLY_BIND_MOUNTS=3
+D289_01_SIMULTANEOUS_BIND_MOUNT_COUNT=1
+D289_01_PASSWORD_SERVICE_MODIFIED=false
+D289_01_FORCED_UNLOCK_COMMAND_PRESENT=false
+D289_01_LIVE_EXECUTION_PERFORMED=false
+D289_01_NEXT_STATE=HUMAN_REQUIRED
+NEXT_PRIMARY_BOUNDARY=REAL_KDE_LOCKED_SESSION_UNLOCK_LIVE
+```
+
+Il comando direttamente eseguibile dall'operatore è:
+
+```bash
+operator_kit/live_probe/run.sh d289-real-locked-session --operator-run
 ```
 
 ```text
