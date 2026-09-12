@@ -140,13 +140,18 @@ servizi, daemon, FIFO, socket, watchdog o mount runtime e non riabilita
 ARM verifica branch/provenance, critical set, hash/delta/metadata/contesto
 SELinux contro la policy, package ownership, fallback D285/D286, cardinalità
 Goodix e assenza di residui. Ogni failure pre-ARMED ripristina bytes,
-owner/mode/context. CLOSE raccoglie boot, sessione e journal correnti, ammette
-un'unica epoch bounded e tenta sempre il rollback; lo stato viene rimosso solo
-dopo hash, metadata, contesto, `rpm -V` pertinente e audit D286 PASS.
-ROLLBACK è utilizzabile anche dalla TTY e quando il PAM è già originale; drift
-inatteso resta fail-closed. La regressione D286–D290 più common harness è
-`248/248 PASS`, di cui `17/17` per il nuovo micro-kit. Restano live soltanto
-ARM privilegiato eseguito dall'Utente, reboot, submit vuoto, un contatto,
+owner/mode/context/mtime. ARM vincola la `mtime` originale e lo snapshot
+completo di `rpm -V plasma-login-manager`; il rollback deve ritrovare entrambi,
+così ogni nuovo drift package resta fail-closed senza scambiare per failure la
+modifica temporanea attribuibile al kit. CLOSE raccoglie boot, sessione e
+journal correnti, ammette un'unica epoch bounded e tenta sempre il rollback.
+`PASS_MATCH_NEW_SESSION` richiede una apertura PAM leader-bound e temporalmente
+immediata al MATCH, senza continuazione auth password; un login password
+successivo non può quindi produrre PASS. Se il fingerprint non entra
+direttamente nel desktop, l'operatore passa a TTY3 ed esegue CLOSE prima di
+qualunque recovery grafica. La regressione D286–D290 più common harness è
+`249/249 PASS`, di cui `18/18` per il nuovo micro-kit. Restano live soltanto ARM
+privilegiato eseguito dall'Utente, reboot, submit vuoto, un contatto,
 greeter/PAM/fprintd/USB e nuova sessione reale.
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
@@ -1655,22 +1660,36 @@ delta di una riga, owner/mode e contesto SELinux coerente con `matchpathcon`,
 package 6.7.5, D286/fallback PASS, un solo target e nessun residuo. Crea stato
 e backup root-only (`0700`/`0600`), installa direttamente il solo service PAM
 `plasmalogin` e verifica il candidato prima di dichiarare ARMED. Ogni failure
-precedente ripristina bytes, owner, mode e contesto. Non modifica authselect o
-gli stack PAM condivisi e non riabilita globalmente il fingerprint.
+precedente ripristina bytes, owner, mode, contesto e `mtime`. Lo stato versione
+2 conserva `mtime` originale e return code/hash dello snapshot completo ARM di
+`rpm -V plasma-login-manager`; il PAM target deve essere pulito nel baseline.
+Non modifica authselect o gli stack PAM condivisi e non riabilita globalmente
+il fingerprint.
 
 CLOSE usa boot ID differenti per attestare il reboot, raccoglie soltanto la
 sessione corrente e i journal `fprintd`/`plasmalogin` del boot corrente,
 richiede al massimo una epoch e classifica MATCH, NO_MATCH, no-VERIFY o
-ambiguità. Qualunque ramo tenta il rollback. Il backup/state viene rimosso
-solo dopo hash originale, `root:root:0644`, contesto SELinux, verifica
-package-owned pertinente e audit D286/fallback PASS. ROLLBACK applica lo
-stesso percorso indipendentemente dall'esito e rifiuta drift PAM o package
-inatteso conservando lo stato per review.
+ambiguità. PASS richiede inoltre che la sessione Wayland appartenga all'UID
+operatore, esponga leader e timestamp monotono, abbia esattamente una apertura
+PAM `plasmalogin:session` dello stesso leader dopo il MATCH ed entro due
+secondi, e non mostri la continuazione `pam_kwallet5(plasmalogin:auth)` del
+percorso password. Qualunque ramo tenta il rollback. Il backup/state viene
+rimosso solo dopo hash originale, `root:root:0644`, contesto SELinux, `mtime`,
+equivalenza esatta col baseline `rpm -V` e audit D286/fallback PASS. ROLLBACK
+applica lo stesso percorso indipendentemente dall'esito e rifiuta ogni nuovo
+drift PAM o package conservando lo stato per review.
+
+Il workflow operatore separa i due rami: se il fingerprint entra direttamente
+nel desktop, CLOSE viene eseguito da un terminale della nuova sessione; se non
+entra, la password grafica non viene usata e CLOSE viene eseguito da TTY3. Solo
+dopo `D290_ROLLBACK=PASS` è consentito tornare con `Ctrl+Alt+F2` ed effettuare
+l'eventuale login grafico con password. Restano una VERIFY, un contatto e zero
+retry.
 
 La simulazione usa una copia byte-identica dello script e una root virtuale
 sotto `/tmp`; non invoca il vero `pkexec`, PAM, reboot, USB o sensore. Il nuovo
-contratto è `17/17 PASS`; la regressione combinata common harness + D286–D290
-è `248/248 PASS`.
+contratto è `18/18 PASS`; la regressione combinata common harness + D286–D290
+è `249/249 PASS`.
 
 ```text
 D290_01_OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD
@@ -1688,7 +1707,10 @@ D290_01_PASSWORD_FALLBACK_PRESERVED=true
 D290_01_MAX_VERIFY_ACTIONS=1
 D290_01_MAX_PHYSICAL_CONTACTS=1
 D290_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D290_01_ROLLBACK_MTIME_AND_PACKAGE_BASELINE=PASS
+D290_01_DIRECT_LOGIN_CAUSALITY=PASS_OFFLINE
 D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_POST_REBOOT_READ_ONLY_ASSESSMENT
+D290_READY_FOR_FINAL_REAL_LOGIN_TEST=true
 D290_01_NEXT_STATE=HUMAN_REQUIRED
 NEXT_PRIMARY_BOUNDARY=PLASMALOGIN_ONE_SHOT_LIVE_AFTER_REBOOT
 ```

@@ -7,6 +7,7 @@ d290_original_hash=c6fc4a0bc2d89f88fa15ca7e9a6c5aaeccfbe66897755b5416ce9c5e35b4e
 d290_candidate_hash=89d389e6c2ee59dcee374029a5428a81dc9138c4f5e86068159b3d5a2c77ab2d
 d290_package=plasma-login-manager-6.7.5-1.fc44.x86_64
 d290_fingerprint_line='auth        sufficient    /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45 debug'
+d290_max_direct_session_delay_us=2000000
 d290_error=
 d290_arm_cleanup_needed=false
 d290_arm_committed=false
@@ -97,7 +98,7 @@ d290_require_tools () {
   local command
   for command in awk chmod chown cmp cp date dirname find getent grep id install \
       git journalctl loginctl matchpathcon mkdir mktemp mountpoint mv pgrep \
-      readlink restorecon rm rmdir rpm sed sha256sum sort stat wc xargs; do
+      readlink restorecon rm rmdir rpm sed sha256sum sort stat touch wc xargs; do
     command -v "$command" >/dev/null || d290_die "HOST_TOOL_MISSING_${command}"
   done
 }
@@ -156,6 +157,32 @@ d290_run_d286_audit () {
   printf '%s\n' "$output"
 }
 
+d290_package_verify_snapshot () {
+  local output errors verify_rc
+  output=$(mktemp "${TMPDIR:-/tmp}/goodix-d290-rpm-output.XXXXXX") || return 1
+  errors=$(mktemp "${TMPDIR:-/tmp}/goodix-d290-rpm-errors.XXXXXX") || {
+    rm -f -- "$output"
+    return 1
+  }
+  if rpm -V plasma-login-manager >"$output" 2>"$errors"; then
+    verify_rc=0
+  else
+    verify_rc=$?
+  fi
+  if [[ $verify_rc -gt 1 || -s $errors || ( $verify_rc -eq 1 && ! -s $output ) ]] ||
+      awk -v target="$d290_target" '$NF == target { found=1 } END { exit !found }' "$output"; then
+    rm -f -- "$output" "$errors"
+    return 1
+  fi
+  d290_package_verify_rc=$verify_rc
+  d290_package_verify_hash=$(d290_hash "$output") || {
+    rm -f -- "$output" "$errors"
+    return 1
+  }
+  rm -f -- "$output" "$errors"
+  d290_is_sha256 "$d290_package_verify_hash"
+}
+
 d290_validate_arm_preflight () {
   d290_verify_repo_for_arm
   [[ ! -e $d290_state_dir && ! -L $d290_state_dir ]] || d290_die PREEXISTING_ARM_STATE
@@ -177,6 +204,11 @@ d290_validate_arm_preflight () {
     d290_die GLOBAL_PASSWORD_AUTH_FINGERPRINT_ENABLED
   [[ $(rpm -q plasma-login-manager) == "$d290_package" ]] || d290_die PACKAGE_VERSION_DRIFT
   [[ $(rpm -qf "$d290_target") == "$d290_package" ]] || d290_die PACKAGE_OWNERSHIP_DRIFT
+  d290_original_mtime=$(stat -Lc %Y "$d290_target") || d290_die HOST_PAM_MTIME_UNREADABLE
+  [[ $d290_original_mtime =~ ^[0-9]+$ ]] || d290_die HOST_PAM_MTIME_INVALID
+  d290_package_verify_snapshot || d290_die PACKAGE_VERIFY_BASELINE_FAILED
+  d290_package_verify_baseline_rc=$d290_package_verify_rc
+  d290_package_verify_baseline_hash=$d290_package_verify_hash
   [[ $(d290_count_goodix) -eq 1 ]] || d290_die GOODIX_CARDINALITY_NOT_ONE
   d290_old_method_clean || d290_die OLD_D290_METHOD_RESIDUAL
   d290_original_context=$(d290_context "$d290_target") || d290_die HOST_PAM_CONTEXT_UNREADABLE
@@ -190,7 +222,7 @@ d290_write_state () {
   local status=$1 temporary=$d290_state_dir/.state.env.tmp
   [[ ! -e $temporary && ! -L $temporary ]] || return 1
   {
-    echo D290_01_STATE_VERSION=1
+    echo D290_01_STATE_VERSION=2
     echo "D290_01_ARM_STATUS=$status"
     echo "D290_01_BASELINE=$d290_baseline"
     echo "D290_01_OPERATOR_UID=$d290_operator_uid"
@@ -201,6 +233,9 @@ d290_write_state () {
     echo "D290_01_CANDIDATE_HASH=$d290_candidate_hash"
     echo D290_01_ORIGINAL_MODE=644
     echo "D290_01_ORIGINAL_CONTEXT=$d290_original_context"
+    echo "D290_01_ORIGINAL_MTIME=$d290_original_mtime"
+    echo "D290_01_PACKAGE_VERIFY_BASELINE_RC=$d290_package_verify_baseline_rc"
+    echo "D290_01_PACKAGE_VERIFY_BASELINE_HASH=$d290_package_verify_baseline_hash"
   } >"$temporary"
   chmod 0600 "$temporary"
   chown "$d290_expected_uid:$d290_expected_gid" "$temporary"
@@ -210,8 +245,11 @@ d290_write_state () {
 
 d290_force_arm_rollback () {
   local rc=0
-  if [[ -f $d290_backup && ! -L $d290_backup && $(d290_hash "$d290_backup") == "$d290_original_hash" ]]; then
+  if [[ -f $d290_backup && ! -L $d290_backup &&
+        $(d290_hash "$d290_backup") == "$d290_original_hash" &&
+        $(stat -Lc %Y "$d290_backup") == "$d290_original_mtime" ]]; then
     install -o "$d290_expected_uid" -g "$d290_expected_gid" -m 0644 "$d290_backup" "$d290_target" || rc=1
+    touch -r "$d290_backup" "$d290_target" || rc=1
   elif [[ ! -f $d290_target || -L $d290_target || $(d290_hash "$d290_target") != "$d290_original_hash" ]]; then
     return 1
   fi
@@ -222,6 +260,10 @@ d290_force_arm_rollback () {
   [[ $(d290_hash "$d290_target") == "$d290_original_hash" ]] || rc=1
   [[ $(stat -Lc '%u:%g:%a' "$d290_target") == "$d290_expected_uid:$d290_expected_gid:644" ]] || rc=1
   [[ $(d290_context "$d290_target") == "$d290_original_context" ]] || rc=1
+  [[ $(stat -Lc %Y "$d290_target") == "$d290_original_mtime" ]] || rc=1
+  d290_package_verify_snapshot || rc=1
+  [[ ${d290_package_verify_rc:-INVALID} == "$d290_package_verify_baseline_rc" &&
+     ${d290_package_verify_hash:-INVALID} == "$d290_package_verify_baseline_hash" ]] || rc=1
   if [[ $rc -eq 0 ]]; then
     if [[ -e $d290_state_dir/.state.env.tmp || -L $d290_state_dir/.state.env.tmp ]]; then
       [[ -f $d290_state_dir/.state.env.tmp && ! -L $d290_state_dir/.state.env.tmp ]] || return 1
@@ -260,11 +302,13 @@ d290_operator_arm () {
   trap d290_arm_exit EXIT
   trap 'exit 130' HUP INT
   trap 'exit 143' TERM
-  install -o "$d290_expected_uid" -g "$d290_expected_gid" -m 0600 "$d290_target" "$d290_backup" ||
-    d290_die BACKUP_CREATE_FAILED
+  cp -p -- "$d290_target" "$d290_backup" || d290_die BACKUP_CREATE_FAILED
+  chown "$d290_expected_uid:$d290_expected_gid" "$d290_backup" || d290_die BACKUP_OWNER_FAILED
+  chmod 0600 "$d290_backup" || d290_die BACKUP_MODE_FAILED
   restorecon -RF "$d290_state_dir" >/dev/null || d290_die BACKUP_SELINUX_CONTEXT_FAILED
   d290_write_state PREPARING || d290_die PREPARING_STATE_WRITE_FAILED
   [[ $(d290_hash "$d290_backup") == "$d290_original_hash" ]] || d290_die BACKUP_HASH_MISMATCH
+  [[ $(stat -Lc %Y "$d290_backup") == "$d290_original_mtime" ]] || d290_die BACKUP_MTIME_MISMATCH
   install -o "$d290_expected_uid" -g "$d290_expected_gid" -m 0644 "$d290_candidate" "$d290_target" ||
     d290_die CANDIDATE_INSTALL_FAILED
   restorecon "$d290_target" >/dev/null || d290_die CANDIDATE_SELINUX_CONTEXT_APPLY_FAILED
@@ -318,8 +362,11 @@ d290_load_state () {
   d290_baseline=$(d290_state_value D290_01_BASELINE) || { d290_error=STATE_INVALID; return 1; }
   d290_arm_boot_id=$(d290_state_value D290_01_ARM_BOOT_ID) || { d290_error=STATE_INVALID; return 1; }
   d290_original_context=$(d290_state_value D290_01_ORIGINAL_CONTEXT) || { d290_error=STATE_INVALID; return 1; }
+  d290_original_mtime=$(d290_state_value D290_01_ORIGINAL_MTIME) || { d290_error=STATE_INVALID; return 1; }
+  d290_package_verify_baseline_rc=$(d290_state_value D290_01_PACKAGE_VERIFY_BASELINE_RC) || { d290_error=STATE_INVALID; return 1; }
+  d290_package_verify_baseline_hash=$(d290_state_value D290_01_PACKAGE_VERIFY_BASELINE_HASH) || { d290_error=STATE_INVALID; return 1; }
   d290_arm_status=$(d290_state_value D290_01_ARM_STATUS) || { d290_error=STATE_INVALID; return 1; }
-  [[ $(d290_state_value D290_01_STATE_VERSION) == 1 &&
+  [[ $(d290_state_value D290_01_STATE_VERSION) == 2 &&
      $d290_arm_status =~ ^(ARMED|PREPARING)$ &&
      $(d290_state_value D290_01_OPERATOR_UID) == "$d290_operator_uid" &&
      $(d290_state_value D290_01_OPERATOR_USER) == "$d290_operator_user" &&
@@ -328,24 +375,11 @@ d290_load_state () {
      $(d290_state_value D290_01_CANDIDATE_HASH) == "$d290_candidate_hash" &&
      $(d290_state_value D290_01_ORIGINAL_MODE) == 644 &&
      $d290_baseline =~ ^[0-9a-f]{40}$ && $d290_arm_boot_id =~ ^[0-9a-f-]{36}$ &&
-     $d290_original_context =~ ^[A-Za-z0-9_:.-]+$ ]] || { d290_error=STATE_CONTENT_DRIFT; return 1; }
+     $d290_original_context =~ ^[A-Za-z0-9_:.-]+$ && $d290_original_mtime =~ ^[0-9]+$ &&
+     $d290_package_verify_baseline_rc =~ ^[01]$ ]] || { d290_error=STATE_CONTENT_DRIFT; return 1; }
+  d290_is_sha256 "$d290_package_verify_baseline_hash" || { d290_error=STATE_CONTENT_DRIFT; return 1; }
   [[ $(d290_hash "$d290_backup") == "$d290_original_hash" ]] || { d290_error=BACKUP_HASH_DRIFT; return 1; }
-}
-
-d290_package_target_clean () {
-  local verify verify_error verify_rc
-  verify_error=$(mktemp "${TMPDIR:-/tmp}/goodix-d290-rpm-verify.XXXXXX") || return 1
-  if verify=$(rpm -V plasma-login-manager 2>"$verify_error"); then
-    verify_rc=0
-  else
-    verify_rc=$?
-  fi
-  if [[ $verify_rc -gt 1 || -s $verify_error ]] ||
-      awk -v target="$d290_target" '$NF == target { found=1 } END { exit !found }' <<<"$verify"; then
-    rm -f -- "$verify_error"
-    return 1
-  fi
-  rm -f -- "$verify_error"
+  [[ $(stat -Lc %Y "$d290_backup") == "$d290_original_mtime" ]] || { d290_error=BACKUP_MTIME_DRIFT; return 1; }
 }
 
 d290_rollback_internal () {
@@ -360,16 +394,20 @@ d290_rollback_internal () {
     d290_error=UNKNOWN_HOST_PAM_DRIFT
     return 1
   fi
+  touch -r "$d290_backup" "$d290_target" || rc=1
   chown "$d290_expected_uid:$d290_expected_gid" "$d290_target" || rc=1
   chmod 0644 "$d290_target" || rc=1
   restorecon "$d290_target" >/dev/null || rc=1
   [[ $(d290_hash "$d290_target") == "$d290_original_hash" ]] || rc=1
   [[ $(stat -Lc '%u:%g:%a' "$d290_target") == "$d290_expected_uid:$d290_expected_gid:644" ]] || rc=1
   [[ $(d290_context "$d290_target") == "$d290_original_context" ]] || rc=1
+  [[ $(stat -Lc %Y "$d290_target") == "$d290_original_mtime" ]] || rc=1
   policy_context=$(d290_policy_context "$d290_target") || rc=1
   [[ $policy_context == "$d290_original_context" ]] || rc=1
   [[ $(rpm -qf "$d290_target") == "$d290_package" ]] || rc=1
-  d290_package_target_clean || rc=1
+  d290_package_verify_snapshot || rc=1
+  [[ ${d290_package_verify_rc:-INVALID} == "$d290_package_verify_baseline_rc" &&
+     ${d290_package_verify_hash:-INVALID} == "$d290_package_verify_baseline_hash" ]] || rc=1
   d290_run_d286_audit D290_PERSISTENT_ROLLBACK_POST >/dev/null || rc=1
   if [[ $rc -ne 0 ]]; then
     d290_error=ROLLBACK_VERIFICATION_FAILED
@@ -393,8 +431,22 @@ d290_field_sum () {
   } END { print s+0 }' "$file"
 }
 
+d290_log_monotonic_us () {
+  local file=$1 marker=$2
+  awk -v marker="$marker" '
+    index($0, marker) {
+      stamp=$0
+      if (!sub(/^\[[[:space:]]*/, "", stamp)) exit 2
+      sub(/\].*$/, "", stamp)
+      split(stamp, part, /[.]/)
+      if (part[1] !~ /^[0-9]+$/ || part[2] !~ /^[0-9]+$/ || length(part[2]) != 6) exit 2
+      printf "%.0f\n", (part[1] * 1000000) + part[2]
+    }
+  ' "$file"
+}
+
 d290_collect_session () {
-  local session_id session_uid service type class state tty count=0
+  local session_id session_uid user service type class state tty timestamp leader count=0
   while read -r session_id session_uid _; do
     [[ $session_uid == "$d290_operator_uid" ]] || continue
     service=$(loginctl show-session "$session_id" -p Service --value 2>/dev/null || true)
@@ -402,7 +454,12 @@ d290_collect_session () {
     class=$(loginctl show-session "$session_id" -p Class --value 2>/dev/null || true)
     state=$(loginctl show-session "$session_id" -p State --value 2>/dev/null || true)
     tty=$(loginctl show-session "$session_id" -p TTY --value 2>/dev/null || true)
-    if [[ $service == plasmalogin && $type == wayland && $class == user && $state =~ ^(active|online)$ ]]; then
+    user=$(loginctl show-session "$session_id" -p User --value 2>/dev/null || true)
+    timestamp=$(loginctl show-session "$session_id" -p TimestampMonotonic --value 2>/dev/null || true)
+    leader=$(loginctl show-session "$session_id" -p Leader --value 2>/dev/null || true)
+    if [[ $user == "$d290_operator_uid" && $service == plasmalogin && $type == wayland &&
+          $class == user && $state =~ ^(active|online)$ && $timestamp =~ ^[0-9]+$ &&
+          $leader =~ ^[1-9][0-9]*$ ]]; then
       count=$((count + 1))
       d290_session_id=$session_id
       d290_session_service=$service
@@ -410,6 +467,8 @@ d290_collect_session () {
       d290_session_class=$class
       d290_session_state=$state
       d290_session_tty=${tty:-NONE}
+      d290_session_timestamp_monotonic=$timestamp
+      d290_session_leader=$leader
     fi
   done < <(loginctl list-sessions --no-legend 2>/dev/null)
   d290_session_count=$count
@@ -418,7 +477,9 @@ d290_collect_session () {
 
 d290_collect_and_classify () {
   local capture=$1 current_hash epoch_count outcome_count result valid_epoch=false session_valid=false
-  local journal_ok=true fprint_status plasma_status
+  local journal_ok=true fprint_status plasma_status direct_login_causality=false
+  local match_time=NONE session_open_time=NONE match_to_session_delta=NONE match_to_open_delta=NONE
+  local session_open_count password_auth_continuation_count session_open_marker
   d290_close_boot_id=$(<"$d290_host/proc/sys/kernel/random/boot_id") || return 1
   current_hash=$(d290_hash "$d290_target") || current_hash=UNREADABLE
   {
@@ -442,6 +503,8 @@ d290_collect_and_classify () {
     echo "D290_CURRENT_GRAPHICAL_SESSION_CLASS=${d290_session_class:-NONE}"
     echo "D290_CURRENT_GRAPHICAL_SESSION_STATE=${d290_session_state:-NONE}"
     echo "D290_CURRENT_GRAPHICAL_SESSION_TTY=${d290_session_tty:-NONE}"
+    echo "D290_CURRENT_GRAPHICAL_SESSION_TIMESTAMP_MONOTONIC=${d290_session_timestamp_monotonic:-NONE}"
+    echo "D290_CURRENT_GRAPHICAL_SESSION_LEADER=${d290_session_leader:-NONE}"
   } >"$capture/session.env"
   journalctl -b -u fprintd.service --no-pager -o short-monotonic 2>/dev/null |
     awk '/GOODIX_/' | d290_sanitize >"$capture/fprintd-goodix.log"
@@ -462,6 +525,27 @@ d290_collect_and_classify () {
     "$capture/fprintd-goodix.log" || true)
   result=$(sed -n 's/.*GOODIX_SIGFM_MATCH_AUDIT .*event=outcome result=\(match\|no_match\).*/\1/p' \
     "$capture/fprintd-goodix.log")
+  session_open_marker="plasmalogin-helper[${d290_session_leader:-NONE}]: pam_unix(plasmalogin:session): session opened for user <USER>(uid=$d290_operator_uid)"
+  session_open_count=$(grep -Fc "$session_open_marker" "$capture/plasmalogin.log" || true)
+  password_auth_continuation_count=$(grep -Fc 'pam_kwallet5(plasmalogin:auth):' \
+    "$capture/plasmalogin.log" || true)
+  if [[ $result == match && $session_valid == true && $session_open_count -eq 1 &&
+        $password_auth_continuation_count -eq 0 ]]; then
+    match_time=$(d290_log_monotonic_us "$capture/fprintd-goodix.log" \
+      'GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match') || match_time=INVALID
+    session_open_time=$(d290_log_monotonic_us "$capture/plasmalogin.log" \
+      "$session_open_marker") || session_open_time=INVALID
+    if [[ $match_time =~ ^[0-9]+$ && $session_open_time =~ ^[0-9]+$ &&
+          ${d290_session_timestamp_monotonic:-NONE} =~ ^[0-9]+$ ]] &&
+        (( d290_session_timestamp_monotonic >= match_time && session_open_time >= match_time )); then
+      match_to_session_delta=$((d290_session_timestamp_monotonic - match_time))
+      match_to_open_delta=$((session_open_time - match_time))
+      if (( match_to_session_delta <= d290_max_direct_session_delay_us &&
+            match_to_open_delta <= d290_max_direct_session_delay_us )); then
+        direct_login_causality=true
+      fi
+    fi
+  fi
   if [[ $epoch_count -eq 1 && $outcome_count -eq 1 && $(grep -c . <<<"$result") -eq 1 &&
         $(d290_field_sum attempts "$capture/fprintd-goodix.log") -eq 1 &&
         $(d290_field_sum rejected "$capture/fprintd-goodix.log") -eq 0 &&
@@ -483,7 +567,8 @@ d290_collect_and_classify () {
   if [[ $journal_ok == true && $d290_close_repo_valid == true &&
         $d290_close_boot_id != "$d290_arm_boot_id" &&
         $current_hash == "$d290_candidate_hash" ]]; then
-    if [[ $valid_epoch == true && $result == match && $session_valid == true ]]; then
+    if [[ $valid_epoch == true && $result == match && $session_valid == true &&
+          $direct_login_causality == true ]]; then
       d290_classification=PASS_MATCH_NEW_SESSION
     elif [[ $valid_epoch == true && $result == no_match ]]; then
       d290_classification=NO_MATCH_PASSWORD_RECOVERY
@@ -498,6 +583,13 @@ d290_collect_and_classify () {
     echo "D290_01_SIGFM_RESULT=${result:-NONE}"
     echo "D290_01_EPOCH_INVARIANTS_VALID=$valid_epoch"
     echo "D290_01_NEW_PLASMALOGIN_WAYLAND_SESSION_VALID=$session_valid"
+    echo "D290_01_MATCH_TIMESTAMP_MONOTONIC_US=$match_time"
+    echo "D290_01_SESSION_OPEN_TIMESTAMP_MONOTONIC_US=$session_open_time"
+    echo "D290_01_MATCH_TO_SESSION_DELTA_US=$match_to_session_delta"
+    echo "D290_01_MATCH_TO_SESSION_OPEN_DELTA_US=$match_to_open_delta"
+    echo "D290_01_PLASMALOGIN_SESSION_OPEN_COUNT=$session_open_count"
+    echo "D290_01_PASSWORD_AUTH_CONTINUATION_COUNT=$password_auth_continuation_count"
+    echo "D290_01_DIRECT_LOGIN_CAUSALITY_VALID=$direct_login_causality"
   } >"$capture/classification.env"
   [[ $journal_ok == true ]]
 }
@@ -526,7 +618,8 @@ d290_close_exit () {
     if [[ $rollback_rc -ne 0 && ! -e $d290_state_dir && -f $d290_target && ! -L $d290_target &&
           $(d290_hash "$d290_target") == "$d290_original_hash" &&
           $(stat -Lc '%u:%g:%a' "$d290_target") == "$d290_expected_uid:$d290_expected_gid:644" &&
-          $(d290_context "$d290_target") == "$d290_original_context" ]]; then
+          $(d290_context "$d290_target") == "$d290_original_context" &&
+          $(stat -Lc %Y "$d290_target") == "$d290_original_mtime" ]]; then
       rollback_rc=0
     fi
     if [[ $rollback_rc -ne 0 ]]; then

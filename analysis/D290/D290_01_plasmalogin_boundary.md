@@ -53,16 +53,23 @@ ROLLBACK è il recovery indipendente, anche da TTY e anche se il test non è
 stato eseguito.
 
 Il file originale è rimosso dallo stato solo dopo SHA-256, owner/mode, contesto
-SELinux, `rpm -V` pertinente e audit D286/fallback PASS. Drift di package o PAM
-non attribuibile viene rifiutato senza cancellare il backup. `password-auth`
-resta dopo il modulo `sufficient`, quindi NO_MATCH conserva il login con
-password. Authselect e gli stack PAM condivisi non sono modificati.
+SELinux, `mtime`, equivalenza con lo snapshot ARM completo di `rpm -V` e audit
+D286/fallback PASS. Il PAM target deve essere privo di drift già ad ARM;
+qualunque nuovo drift di package o PAM viene rifiutato senza cancellare il
+backup. `password-auth` resta dopo il modulo `sufficient`, quindi NO_MATCH
+conserva il login con password. Authselect e gli stack PAM condivisi non sono
+modificati.
 
 La procedura live è: ARM dalla sessione grafica, reboot manuale, un solo submit
-con campo password vuoto, un solo contatto dell'indice destro, login con
-password in caso di failure, quindi CLOSE. PASS richiede una sola epoch VERIFY
-valida, SIGFM MATCH e una sessione corrente `Service=plasmalogin`,
-`Type=wayland`, `Class=user`, seguiti dal rollback verificato.
+con campo password vuoto e un solo contatto dell'indice destro. Se il
+fingerprint entra direttamente nel desktop, l'operatore esegue subito CLOSE;
+altrimenti non usa la password grafica, passa a TTY3, esegue CLOSE e attende il
+rollback PASS prima dell'eventuale recovery grafica. PASS richiede una sola
+epoch VERIFY valida, SIGFM MATCH e una sessione corrente
+`Service=plasmalogin`, `Type=wayland`, `Class=user`, la cui apertura PAM sia
+legata allo stesso leader e temporalmente immediata al MATCH, senza marker di
+continuazione password, seguiti dal rollback verificato. Un MATCH non
+causalmente correlato alla sessione è ambiguo e non è PASS.
 
 ## Metodo storico chiuso — audit soltanto
 
@@ -164,7 +171,10 @@ D290_01_REASON=HOST_ORCHESTRATION_COMPLEXITY_EXCEEDED_BOUNDARY_VALUE
 D290_01_NEW_METHOD=PERSISTENT_REVERSIBLE_SINGLE_SERVICE_PAM_TEST
 D290_01_GLOBAL_AUTHSELECT_FINGERPRINT_REENABLE=false
 D290_01_PASSWORD_FALLBACK_PRESERVED=true
-D290_01_PERSISTENT_KIT_TESTS=17_PASS
-D290_01_COMBINED_REGRESSION=248_PASS
+D290_01_ROLLBACK_MTIME_AND_PACKAGE_BASELINE=PASS
+D290_01_DIRECT_LOGIN_CAUSALITY=PASS_OFFLINE
+D290_01_PERSISTENT_KIT_TESTS=18_PASS
+D290_01_COMBINED_REGRESSION=249_PASS
+D290_READY_FOR_FINAL_REAL_LOGIN_TEST=true
 D290_01_NEXT_STATE=HUMAN_REQUIRED
 ```

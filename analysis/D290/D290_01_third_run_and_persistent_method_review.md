@@ -4,9 +4,10 @@
 ## Decisione
 
 ```text
-PM_DECISION=ACCEPT_AND_CONTINUE_TO_HUMAN_GATE
-OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD
-ADVANCEMENT=OLD_HOST_ORCHESTRATION_CLOSED_AND_MINIMAL_REVERSIBLE_PATH_READY
+PM_DECISION=HUMAN_REQUIRED
+D290_READY_FOR_FINAL_REAL_LOGIN_TEST=true
+OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD_AFTER_MICRO_CORRECTIVE
+ADVANCEMENT=MTIME_SAFE_ROLLBACK_AND_DIRECT_LOGIN_CAUSALITY_CLOSED_OFFLINE
 EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_POST_REBOOT_READ_ONLY_ASSESSMENT
 RESIDUAL_BLOCKER_OR_RISK=REAL_REBOOT_GREETER_PAM_FPRINTD_USB_AND_ONE_CONTACT
 CANONICAL_DOCUMENTATION=UPDATED
@@ -66,6 +67,35 @@ metadata, contesto SELinux, package-owned target e D286/fallback prima di
 rimuovere lo stato. ROLLBACK usa lo stesso percorso e resta disponibile da
 TTY; drift inatteso conserva backup e stato.
 
+## Micro-corrective finale: metadata e causalità
+
+Il backup conserva ora la `mtime` originale e lo stato ARM ne vincola il
+valore. Ogni percorso di ripristino applica la `mtime` del backup prima delle
+verifiche finali. ARM registra inoltre return code e hash dell'output completo
+di `rpm -V plasma-login-manager`; dopo il rollback la verifica deve coincidere
+esattamente con quel baseline. È quindi ammesso soltanto l'eventuale drift di
+package già presente prima di ARM, mentre qualunque nuovo drift, sul PAM target
+o su un altro file del package, fallisce chiuso e conserva stato e backup. Il
+target PAM non può avere drift già al baseline.
+
+La classificazione `PASS_MATCH_NEW_SESSION` richiede ora, oltre alla singola
+epoch valida e al SIGFM MATCH, una sessione logind dell'UID operatore con
+`Service=plasmalogin`, `Type=wayland`, `Class=user`, leader numerico e
+timestamp monotono. Nel journal dello stesso boot deve comparire esattamente
+una apertura PAM `plasmalogin:session` attribuita a quel leader, dopo il MATCH
+ed entro due secondi; non deve comparire la continuazione auth password
+`pam_kwallet5(plasmalogin:auth)`. Un MATCH con sessione successiva di recovery
+password o privo di questa correlazione è `AMBIGUOUS_REVIEW_REQUIRED`, mai
+PASS.
+
+La scelta dei marker è corroborata sul target da osservazione read-only:
+logind espone `TimestampMonotonic` e `Leader` per la sessione Wayland corrente;
+il journal `plasmalogin` lega l'apertura sessione al PID leader e, nel percorso
+password osservato, emette prima il marker `pam_kwallet5(plasmalogin:auth)`.
+L'operatore non deve comunque usare la password grafica prima di CLOSE: se il
+fingerprint non entra direttamente nel desktop, passa a TTY3, esegue CLOSE,
+attende il rollback PASS e soltanto dopo torna al greeter.
+
 ## Review e verifiche
 
 La review PM ha corretto due gap prima dell'accettazione: ARM confronta ora il
@@ -78,10 +108,10 @@ derivata dalla posizione dello script e ogni lettura Git usa un
 globale viene scritta.
 
 - `bash -n` del nuovo script: PASS;
-- contratto del micro-kit: `17/17 PASS`;
+- contratto del micro-kit: `18/18 PASS`;
 - cattura terza run e manifest: PASS;
 - vecchio D290 disarmato, ma test storico offline preservato: PASS;
-- regressione common harness + D286–D290: `248/248 PASS`;
+- regressione common harness + D286–D290: `249/249 PASS`;
 - nessuna invocazione reale di `pkexec`, PAM, reboot, USB o sensore da parte
   dell'AI.
 
@@ -92,6 +122,8 @@ D290_01_NEW_METHOD=PERSISTENT_REVERSIBLE_SINGLE_SERVICE_PAM_TEST
 D290_01_GLOBAL_AUTHSELECT_FINGERPRINT_REENABLE=false
 D290_01_PASSWORD_FALLBACK_PRESERVED=true
 D290_01_REBOOT_SAFETY=PINNED_PACKAGE_STATE_AND_TTY_ROLLBACK
+D290_01_ROLLBACK_MTIME_AND_PACKAGE_BASELINE=PASS
+D290_01_DIRECT_LOGIN_CAUSALITY=PASS_OFFLINE
 D290_01_PM_REVIEW=PASS
 D290_01_NEXT_STATE=HUMAN_REQUIRED
 ```

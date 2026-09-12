@@ -36,7 +36,9 @@ operator_kit/d290-01-plasmalogin-persistent-test/run-d290-01.sh --operator-arm
 
 Lo script richiede privilegi tramite `pkexec`, verifica backup, ownership,
 mode, contesto SELinux, fallback e stato D285/D286, quindi termina. Non esegue
-il reboot.
+il reboot. Registra inoltre la `mtime` originale e lo snapshot completo di
+`rpm -V plasma-login-manager`: il rollback deve ripristinare la `mtime` e
+ritrovare esattamente la stessa verifica package, senza accettare nuovo drift.
 
 Solo dopo i quattro marker finali `true` eseguire manualmente:
 
@@ -53,9 +55,22 @@ Al Plasma Login Manager:
 3. premere Invio una sola volta;
 4. appoggiare l'indice destro una sola volta.
 
-Su MATCH entrare nel desktop senza usare nel frattempo altri consumer
-biometrici. Su NO_MATCH o failure non ripetere il fingerprint: eseguire il
-login normale con password.
+Se il fingerprint porta **direttamente** nel desktop, senza altri consumer
+biometrici e senza digitare la password, aprire subito un terminale ed eseguire
+CLOSE.
+
+Se il fingerprint **non** porta direttamente nel desktop, non ripetere il
+fingerprint e **NON usare la password nel login grafico prima di CLOSE**:
+
+1. premere `Ctrl+Alt+F3`;
+2. eseguire il login testuale con la password;
+3. raggiungere la root del repository;
+4. eseguire CLOSE e attendere `D290_ROLLBACK=PASS`;
+5. premere `Ctrl+Alt+F2`;
+6. soltanto ora, se necessario, eseguire il normale login grafico con password.
+
+Questa sequenza vale anche se sul greeter è apparso un errore dopo il contatto.
+Il test ammette una sola VERIFY, un solo contatto e zero retry.
 
 ## CLOSE
 
@@ -66,7 +81,9 @@ operator_kit/d290-01-plasmalogin-persistent-test/run-d290-01.sh --operator-close
 ```
 
 CLOSE raccoglie soltanto sessione logind e journal pertinenti del boot
-corrente, classifica l'esito e tenta sempre il rollback. La chiusura è completa
+corrente, correla il MATCH alla sessione diretta del relativo helper e tenta
+sempre il rollback. Un MATCH seguito da una sessione non causalmente diretta o
+da recovery password è ambiguo e non può essere PASS. La chiusura è completa
 solo con:
 
 ```text

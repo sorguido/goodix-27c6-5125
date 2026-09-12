@@ -14,11 +14,14 @@ ROOT = Path(__file__).resolve().parents[2]
 KIT = ROOT / "operator_kit/d290-01-plasmalogin-persistent-test"
 OLD_EXP = ROOT / "operator_kit/live_probe/experiments/d290-plasmalogin"
 SCRIPT = KIT / "run-d290-01.sh"
+README = KIT / "README_IT.md"
 ORIGINAL = Path("/usr/lib/pam.d/plasmalogin").read_bytes()
 CANDIDATE = (OLD_EXP / "goodix-d290-plasmalogin.pam").read_bytes()
 BASELINE = "1" * 40
 ARM_BOOT = "11111111-1111-4111-8111-111111111111"
 CLOSE_BOOT = "22222222-2222-4222-8222-222222222222"
+ORIGINAL_MTIME_NS = 1_700_000_000_123_456_789
+DIRECT_SESSION_MONOTONIC_US = 10_200_000
 
 
 class PersistentFixture:
@@ -64,6 +67,7 @@ class PersistentFixture:
         self.target.parent.mkdir(parents=True)
         self.target.write_bytes(ORIGINAL)
         self.target.chmod(0o644)
+        os.utime(self.target, ns=(ORIGINAL_MTIME_NS, ORIGINAL_MTIME_NS))
         password_auth = self.host / "etc/authselect/password-auth"
         password_auth.parent.mkdir(parents=True)
         password_auth.write_text("auth sufficient pam_unix.so nullok\n")
@@ -82,7 +86,12 @@ class PersistentFixture:
         self.fake_bin.mkdir()
         self.fixtures.mkdir()
         (self.fixtures / "fprintd.log").write_text("")
-        (self.fixtures / "plasmalogin.log").write_text("plasmalogin: session for guido\n")
+        (self.fixtures / "plasmalogin.log").write_text(
+            f"[   10.300000] fixture plasmalogin-helper[700]: "
+            f"pam_unix(plasmalogin:session): session opened for user guido(uid={os.getuid()}) "
+            "by guido(uid=0)\n"
+            "[   10.400000] fixture plasmalogin-helper[700]: Starting Wayland user session\n"
+        )
 
         self.write_executable(
             "git",
@@ -106,10 +115,15 @@ case ${1:-} in
     if [[ ${D290_TEST_RPM_VERIFY_ERROR:-false} == true ]]; then
       echo 'rpm database error' >&2
       exit 2
-    elif [[ ${D290_TEST_RPM_TARGET_DRIFT:-false} == true ]]; then
-      echo "S.5....T.  $D290_TEST_TARGET"
-      exit 1
     fi
+    echo '......G..    /run/plasmalogin'
+    [[ $(stat -c %Y "$D290_TEST_TARGET") == "$D290_TEST_ORIGINAL_MTIME" ]] ||
+      echo ".......T.  $D290_TEST_TARGET"
+    [[ ${D290_TEST_RPM_TARGET_DRIFT:-false} != true ]] ||
+      echo "S.5......  $D290_TEST_TARGET"
+    [[ ${D290_TEST_RPM_GENERAL_DRIFT:-false} != true ]] ||
+      echo 'S.5......    /usr/bin/plasmalogin'
+    exit 1
     ;;
   *) exit 2 ;;
 esac
@@ -146,7 +160,7 @@ esac
             "loginctl",
             """
 if [[ ${1:-} == list-sessions ]]; then
-  echo "7 $(id -u) fixture seat0 1 user tty2 no -"
+  [[ ${D290_TEST_NO_SESSION:-false} == true ]] || echo "7 $(id -u) fixture seat0 1 user tty2 no -"
 elif [[ ${1:-} == show-session && ${3:-} == -p ]]; then
   case ${4:-} in
     Service) echo plasmalogin ;;
@@ -154,6 +168,9 @@ elif [[ ${1:-} == show-session && ${3:-} == -p ]]; then
     Class) echo user ;;
     State) echo active ;;
     TTY) echo tty2 ;;
+    User) echo "$(id -u)" ;;
+    TimestampMonotonic) echo "${D290_TEST_SESSION_TIMESTAMP_MONOTONIC:-10200000}" ;;
+    Leader) echo "${D290_TEST_SESSION_LEADER:-700}" ;;
     *) exit 2 ;;
   esac
 else
@@ -169,6 +186,7 @@ fi
                 "D290_TEST_FIXTURES": str(self.fixtures),
                 "D290_TEST_RESTORE_LOG": str(self.restore_log),
                 "D290_TEST_TARGET": str(self.target),
+                "D290_TEST_ORIGINAL_MTIME": str(ORIGINAL_MTIME_NS // 1_000_000_000),
             }
         )
         self.script = script_path
@@ -195,13 +213,30 @@ fi
 
     def set_outcome(self, result):
         epoch = (
-            "fprintd: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY "
+            "[   10.110000] fixture fprintd[600]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY "
             "attempts=1 rejected=0 consumed=1 tls=1 first_image=1 secure_retry=0 "
             "post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 outstanding=0 "
             "drained=1 context_closed=1\n"
         )
-        outcome = f"fprintd: GOODIX_SIGFM_MATCH_AUDIT event=outcome result={result}\n"
-        (self.fixtures / "fprintd.log").write_text(epoch + outcome)
+        outcome = (
+            "[   10.100000] fixture fprintd[600]: "
+            f"GOODIX_SIGFM_MATCH_AUDIT event=outcome result={result}\n"
+        )
+        (self.fixtures / "fprintd.log").write_text(outcome + epoch)
+
+    def set_password_recovery_session(self):
+        (self.fixtures / "plasmalogin.log").write_text(
+            "[   20.100000] fixture plasmalogin-helper[701]: "
+            "pam_kwallet5(plasmalogin:auth): pam_sm_authenticate\n"
+            f"[   20.300000] fixture plasmalogin-helper[701]: "
+            f"pam_unix(plasmalogin:session): session opened for user guido(uid={os.getuid()}) "
+            "by guido(uid=0)\n"
+        )
+
+    def set_no_session_journal(self):
+        (self.fixtures / "plasmalogin.log").write_text(
+            "[   10.300000] fixture plasmalogin[700]: Authentication error\n"
+        )
 
     def capture(self):
         return next((self.repo / "captures/D290_01").glob("*/sanitized"))
@@ -226,6 +261,15 @@ class D290PersistentKitTests(unittest.TestCase):
         self.assertIn('git -c "safe.directory=$d290_root"', source)
         self.assertNotIn("git config --global", source)
         self.assertIn("LIVE_CAPABLE=false", (OLD_EXP / "experiment.conf").read_text())
+        readme = README.read_text()
+        for operator_rule in (
+            "NON usare la password nel login grafico prima di CLOSE",
+            "Ctrl+Alt+F3",
+            "D290_ROLLBACK=PASS",
+            "Ctrl+Alt+F2",
+            "una sola VERIFY, un solo contatto e zero retry",
+        ):
+            self.assertIn(operator_rule, readme)
 
     def test_02_candidate_is_exact_single_line_delta_with_password_fallback(self):
         host = ORIGINAL.decode()
@@ -243,6 +287,10 @@ class D290PersistentKitTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE((self.fx.state_dir / "plasmalogin.original").stat().st_mode), 0o600)
         self.assertEqual(self.fx.state_dir.stat().st_uid, os.getuid())
         self.assertEqual((self.fx.state_dir / "state.env").stat().st_uid, os.getuid())
+        self.assertEqual((self.fx.state_dir / "plasmalogin.original").stat().st_mtime_ns, ORIGINAL_MTIME_NS)
+        self.assertNotEqual(self.fx.target.stat().st_mtime_ns, ORIGINAL_MTIME_NS)
+        self.assertIn("D290_01_ORIGINAL_MTIME=1700000000", (self.fx.state_dir / "state.env").read_text())
+        self.assertIn("D290_01_PACKAGE_VERIFY_BASELINE_HASH=", (self.fx.state_dir / "state.env").read_text())
         self.assertIn(str(self.fx.target), self.fx.restore_log.read_text())
 
     def test_04_arm_refuses_wrong_host_hash(self):
@@ -271,6 +319,7 @@ class D290PersistentKitTests(unittest.TestCase):
         result = self.fx.run("--operator-arm", D290_TEST_RESTORECON_FAIL_ONCE="true")
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.fx.target.read_bytes(), ORIGINAL)
+        self.assertEqual(self.fx.target.stat().st_mtime_ns, ORIGINAL_MTIME_NS)
         self.assertFalse(self.fx.state_dir.exists())
         self.assertIn("D290_ARM_FAILURE_ROLLBACK=PASS", result.stderr)
 
@@ -286,6 +335,7 @@ class D290PersistentKitTests(unittest.TestCase):
                 result = self.fx.run("--operator-rollback")
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(self.fx.target.read_bytes(), ORIGINAL)
+                self.assertEqual(self.fx.target.stat().st_mtime_ns, ORIGINAL_MTIME_NS)
                 self.assertFalse(self.fx.state_dir.exists())
                 self.assertIn("D290_ROLLBACK=PASS", result.stdout)
 
@@ -306,6 +356,7 @@ class D290PersistentKitTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         capture = self.fx.capture()
         self.assertIn("D290_01_CLASSIFICATION=PASS_MATCH_NEW_SESSION", (capture / "classification.env").read_text())
+        self.assertIn("D290_01_DIRECT_LOGIN_CAUSALITY_VALID=true", (capture / "classification.env").read_text())
         self.assertIn("D290_CURRENT_GRAPHICAL_SESSION_SERVICE=plasmalogin", (capture / "session.env").read_text())
         self.assertIn("D290_01_ROLLBACK_RETURN_CODE=0", (capture / "summary.env").read_text())
         self.assertNotIn("guido", (capture / "plasmalogin.log").read_text())
@@ -322,11 +373,32 @@ class D290PersistentKitTests(unittest.TestCase):
                 self.fx.set_close_boot()
                 if outcome:
                     self.fx.set_outcome(outcome)
-                result = self.fx.run("--operator-close")
+                self.fx.set_no_session_journal()
+                result = self.fx.run("--operator-close", D290_TEST_NO_SESSION="true")
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(f"D290_01_CLASSIFICATION={expected}", result.stdout)
                 self.assertEqual(self.fx.target.read_bytes(), ORIGINAL)
                 self.assertFalse(self.fx.state_dir.exists())
+
+    def test_10b_match_followed_by_password_recovery_session_is_not_pass(self):
+        self.fx.arm()
+        self.fx.set_close_boot()
+        self.fx.set_outcome("match")
+        self.fx.set_password_recovery_session()
+        result = self.fx.run(
+            "--operator-close",
+            D290_TEST_SESSION_TIMESTAMP_MONOTONIC="20200000",
+            D290_TEST_SESSION_LEADER="701",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        capture = self.fx.capture()
+        classification = (capture / "classification.env").read_text()
+        self.assertIn("D290_01_CLASSIFICATION=AMBIGUOUS_REVIEW_REQUIRED", classification)
+        self.assertIn("D290_01_PASSWORD_AUTH_CONTINUATION_COUNT=1", classification)
+        self.assertIn("D290_01_DIRECT_LOGIN_CAUSALITY_VALID=false", classification)
+        self.assertEqual(self.fx.target.read_bytes(), ORIGINAL)
+        self.assertEqual(self.fx.target.stat().st_mtime_ns, ORIGINAL_MTIME_NS)
+        self.assertFalse(self.fx.state_dir.exists())
 
     def test_11_close_journal_failure_still_rolls_back(self):
         self.fx.arm()
@@ -372,12 +444,18 @@ class D290PersistentKitTests(unittest.TestCase):
         self.assertFalse(self.fx.state_dir.exists())
 
     def test_15_rpm_verification_drift_retains_state_after_restoring_bytes(self):
-        self.fx.arm()
-        result = self.fx.run("--operator-rollback", D290_TEST_RPM_TARGET_DRIFT="true")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("ROLLBACK_VERIFICATION_FAILED", result.stderr)
-        self.assertEqual(self.fx.target.read_bytes(), ORIGINAL)
-        self.assertTrue(self.fx.state_dir.exists())
+        for drift in ("D290_TEST_RPM_TARGET_DRIFT", "D290_TEST_RPM_GENERAL_DRIFT"):
+            with self.subTest(drift=drift):
+                if self.fx.state_dir.exists():
+                    self.fx.close()
+                    self.fx = PersistentFixture()
+                self.fx.arm()
+                result = self.fx.run("--operator-rollback", **{drift: "true"})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ROLLBACK_VERIFICATION_FAILED", result.stderr)
+                self.assertEqual(self.fx.target.read_bytes(), ORIGINAL)
+                self.assertEqual(self.fx.target.stat().st_mtime_ns, ORIGINAL_MTIME_NS)
+                self.assertTrue(self.fx.state_dir.exists())
 
     def test_16_rpm_verification_error_retains_state(self):
         self.fx.arm()
