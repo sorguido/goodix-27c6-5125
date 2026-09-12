@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 import os
+import pty
+import select
 import shutil
 import signal
 import subprocess
@@ -141,6 +143,50 @@ class LiveProbeHarnessTests(unittest.TestCase):
         self.assertIn("MAX_ACTIONS_ENFORCED=1", telemetry)
         self.assertIn("MAX_CONTACTS_ENFORCED=1", telemetry)
         self.assertIn("MAX_RETRIES_ENFORCED=0", telemetry)
+
+    def test_foreground_tty_timeout_is_explicit_and_operator_only(self):
+        script = (
+            f"source '{HARNESS / 'safety.sh'}'; "
+            "PAYLOAD_REQUIRES_FOREGROUND_TTY=true; "
+            "lp_configure_timeout_options --operator-run; printf 'OP=%s\\n' \"${LP_TIMEOUT_OPTIONS[*]}\"; "
+            "lp_configure_timeout_options --offline-test; printf 'OFF=%s\\n' \"${LP_TIMEOUT_OPTIONS[*]}\""
+        )
+        result = subprocess.run(["bash", "-c", script], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("OP=--signal=TERM --kill-after=5s --foreground", result.stdout)
+        self.assertIn("OFF=--signal=TERM --kill-after=5s\n", result.stdout)
+
+        command = (
+            f"source '{HARNESS / 'safety.sh'}'; PAYLOAD_REQUIRES_FOREGROUND_TTY=true; "
+            "lp_configure_timeout_options --operator-run; "
+            "timeout \"${LP_TIMEOUT_OPTIONS[@]}\" 3s bash -c 'read -r pg fg < <(ps -o pgid=,tpgid= -p $$); "
+            "[[ $pg == $fg ]] && echo FOREGROUND_TTY_CONTRACT=PASS' 2>&1 | cat"
+        )
+        pid, master = pty.fork()
+        if pid == 0:
+            os.execvp("bash", ["bash", "-c", command])
+        chunks = bytearray()
+        status = None
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            ready, _, _ = select.select([master], [], [], 0.05)
+            if ready:
+                try:
+                    chunks.extend(os.read(master, 4096))
+                except OSError:
+                    pass
+            waited, candidate_status = os.waitpid(pid, os.WNOHANG)
+            if waited == pid:
+                status = candidate_status
+                break
+        if status is None:
+            os.kill(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)
+            self.fail("foreground timeout PTY contract timed out")
+        os.close(master)
+        output = chunks.decode(errors="replace")
+        self.assertEqual(os.waitstatus_to_exitcode(status), 0, output)
+        self.assertIn("FOREGROUND_TTY_CONTRACT=PASS", output)
 
     def test_common_classifier_rejects_action_contact_and_retry_over_budget(self):
         for key, value in (

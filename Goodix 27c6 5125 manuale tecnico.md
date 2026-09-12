@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D289/01 PASS live; D290/01 corretto e pronto al nuovo Human Gate
+### Stato corrente — D289/01 PASS live; D290/01 host-path corretto e pronto al Human Gate
 
 La prima invocazione D290/01 sulla baseline
 `1a8c5528a0b9f9d12c395f1a9804ee82fd076b94` si è fermata fail-closed nel
@@ -107,6 +107,25 @@ D290/01 usa identità e cardinalità della sessione loggata, separa il predicato
 della nuova sessione e sopprime la classificazione rumorosa di artefatti live
 inesistenti. Il common harness non cambia; dopo regressione offline il boundary
 resta il medesimo Human Gate one-shot.
+
+La seconda invocazione D290/01 sulla baseline
+`603a47cdf1c1b6672c6d26c589648aab973aeeaf` ha superato il pre-audit ma si è
+bloccata nell'autenticazione `pkexec` del vecchio `coproc`: stdin di controllo
+e autenticazione interattiva non erano separati, e il timeout collocava il
+payload fuori dal foreground process group della TTY. Non sono iniziati
+overlay, logout o VERIFY; contatti e nuova evidenza device-side sono zero. Il
+valore digitato è apparso in chiaro sulla TTY ma non è stato acquisito.
+
+Il correttivo di classe usa `timeout --foreground` solo per il payload opt-in
+D290, `/dev/tty` per autenticazione e una FIFO privata 0600 per `RELEASE`.
+Ownership, path canonico e assenza symlink sono verificati; PID e start-time
+del payload alimentano un watchdog di parent death; il `coproc` esegue
+direttamente `pkexec` e lo status è drenato con limiti temporali e di
+cardinalità. Il percorso production è esercitato con pseudo-TTY e host simulato
+fino ai classifier MATCH/NO_MATCH, inclusi segnali durante autenticazione,
+EOF, setup/release/recovery e invarianti sessione. Restano
+intrinsecamente live soltanto logout grafico, greeter reale, PAM/fprintd/USB e
+creazione reale della nuova sessione.
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1433,12 +1452,13 @@ la sessione. La nuova ipotesi richiede quindi la congiunzione di una sola
 epoch Goodix SIGFM MATCH e una nuova sessione logind Wayland
 `Service=plasmalogin`; il MATCH isolato non basta.
 
-Il common Live Probe Harness resta adatto senza modifiche. Il piccolo payload
-`d290-plasmalogin` viene avviato dall'operatore in una sessione testuale TTY 3,
-separata dal desktop iniziale su tty2: harness e helper root sopravvivono così
-al logout senza daemonizzazione o nuovo framework. Un helper pipe-bounded
-verifica identità del daemon e mount namespace, quindi sovrappone read-only il
-solo PAM `plasmalogin`. Il candidato è byte-identico allo stack Fedora salvo
+Il common Live Probe Harness resta adatto con la sola estensione foreground
+opt-in. Il piccolo payload `d290-plasmalogin` viene avviato dall'operatore in
+una sessione testuale TTY 3, separata dal desktop iniziale su tty2: harness e
+helper root sopravvivono così al logout senza daemonizzazione o nuovo
+framework. Un helper control-channel-bounded verifica identità del daemon e
+mount namespace, quindi sovrappone read-only il solo PAM `plasmalogin`. Il
+candidato è byte-identico allo stack Fedora salvo
 una riga `pam_fprintd.so` sufficient con `max-tries=1 timeout=45`; account,
 password, session e fallback `password-auth` restano invariati.
 
@@ -1460,6 +1480,33 @@ operatore, ID diverso dalla TTY 3, `Class=user`, `Type=wayland`,
 `Service=plasmalogin`, `TTY=tty2`, `State=active|online` e cardinalità uno;
 ignora il manager. Il predicato post-MATCH, distinto, richiede un nuovo ID
 Plasma Wayland loggato diverso dall'iniziale già scomparso al logout.
+
+La seconda invocazione sulla baseline `603a47cdf1c1b6672c6d26c589648aab973aeeaf`
+ha PASSATO il pre-audit corretto con sessione iniziale `2` online su tty2 e TTY
+operatore `4`, poi si è bloccata nel `coproc pkexec` subito dopo la conferma.
+La capture integra è
+`captures/live_probe/d290-plasmalogin_20260912T144942Z_603a47cdf1c1/sanitized/`:
+summary `INTERRUPTED`, payload rc 130, `payload.log` vuoto e cleanup PASS. Il
+post-audit ha fallito sullo stato della TTY operatore; il journal contiene due
+errori generici plasmalogin `Process crashed` ma nessun `GOODIX_`. Non esistono
+telemetria, login-state, payload-details o root-overlay log.
+
+Prima del riavvio e dopo il riavvio sono stati verificati read-only mount
+assente, runtime assente, PAM/binari originali, daemon integro, nessun processo
+residuo e nessun evento fprintd/Goodix dopo il cursor. L'overlay non è partito,
+logout e VERIFY non sono iniziati e i contatti sono zero. L'echo della stringa
+digitata è un safety failure osservato; il valore non è registrato nel
+repository, manuale, fixture o capture.
+
+Il design corretto separa i canali: D290 dichiara
+`PAYLOAD_REQUIRES_FOREGROUND_TTY=true`, che abilita `timeout --foreground` solo
+in operator-run; `pkexec` legge `/dev/tty`, mentre `RELEASE` viaggia su FIFO
+privata 0600. Il root helper valida FIFO/workdir e segue PID+start-time con un
+watchdog; il `coproc` usa `exec pkexec`, rendendo cancellabile il processo
+effettivo anche durante l'autenticazione, e il drain status è bounded. Chiude
+su release, EOF, parent death, signal o failure. L'audit
+orizzontale ha anche sostituito due asserzioni isolate `! command`, non coperte
+da `set -e`, con gate espliciti per mount preesistente e logout non avvenuto.
 
 Logout e ritorno alla TTY sono manuali. Al greeter reale l'operatore seleziona
 l'utente, lascia vuoto il campo password, preme Invio una volta e fa un solo
@@ -1486,18 +1533,19 @@ obbligatorie e un `FAIL_PRE_AUDIT` common-harness pulito. `bash -n` e il vero pe
 mount, USB o azione sensore è stata eseguita dall'AI. L'esecuzione reale
 factory-preserving è il successivo Human Gate.
 
-La regressione combinata common harness + D286–D290 è `215/215 PASS`; il
-common harness isolato resta `13/13 PASS` e non è stato modificato.
+La regressione combinata common harness + D286–D290 è `231/231 PASS`; il
+common harness isolato è `14/14 PASS`. D290 è `38/38 PASS`, inclusi pseudo-TTY,
+overlay lifecycle, signal/EOF/parent death, MATCH e NO_MATCH end-to-end host.
 
 ```text
-D290_01_OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FIRST_PRE_AUDIT_CORRECTIVE
+D290_01_OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FULL_HOST_PATH_CORRECTIVE
 D290_01_SELECTED_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
 D290_01_REAL_DISPLAY_MANAGER=plasmalogin.service
 D290_01_CLASSIC_SDDM_INSTALLED=false
 D290_01_REAL_PAM_SERVICE=plasmalogin
 D290_01_UPSTREAM_SOURCE_AUDIT=PASS_V6_7_5_E63894E
 D290_01_REUSABLE_HARNESS_FIRST=true
-D290_01_COMMON_HARNESS_CHANGED=false
+D290_01_COMMON_HARNESS_CHANGED=true_OPT_IN_FOREGROUND_TTY_ONLY
 D290_01_OPERATOR_LIFECYCLE=TTY3_SURVIVES_GRAPHICAL_LOGOUT
 D290_01_MAX_VERIFY_ACTIONS=1
 D290_01_MAX_PHYSICAL_CONTACTS=1
@@ -1512,6 +1560,16 @@ D290_01_FIRST_OPERATOR_RESULT=FAIL_PRE_AUDIT
 D290_01_FIRST_OPERATOR_PAYLOAD_STARTED=false
 D290_01_FIRST_OPERATOR_SENSOR_ACTION_COUNT=0
 D290_01_SESSION_STATE_MODEL=LOGGED_ACTIVE_OR_ONLINE
+D290_01_SECOND_OPERATOR_BASELINE=603a47cdf1c1b6672c6d26c589648aab973aeeaf
+D290_01_SECOND_OPERATOR_RESULT=ABORTED_PRE_LOGIN
+D290_01_SECOND_OPERATOR_OVERLAY_STARTED=false
+D290_01_SECOND_OPERATOR_LOGOUT_PERFORMED=false
+D290_01_SECOND_OPERATOR_VERIFY_STARTED=false
+D290_01_SECOND_OPERATOR_SENSOR_ACTION_COUNT=0
+D290_01_SECOND_OPERATOR_PHYSICAL_CONTACTS_CONSUMED=0
+D290_01_INTERACTIVE_AUTH_ECHO_SAFETY_FAILURE=OBSERVED
+D290_01_PASSWORD_VALUE_RECORDED=false
+D290_01_HOST_PATH_BEHAVIORAL_TESTS=PASS_MATCH_AND_NO_MATCH
 D290_01_LIVE_EXECUTION_PERFORMED=false
 D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_ASSESSMENT
 D290_01_NEXT_STATE=HUMAN_REQUIRED

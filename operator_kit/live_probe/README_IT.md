@@ -28,6 +28,9 @@ Il common harness:
 - invoca il payload una sola volta, passandogli esplicitamente max action,
   contatti, retry zero e timeout;
 - non effettua retry e usa un timeout bounded con propagazione dei segnali;
+- quando un payload dichiara `PAYLOAD_REQUIRES_FOREGROUND_TTY=true`, soltanto
+  l'operator-run usa `timeout --foreground`; ciò consente autenticazione
+  interattiva sulla controlling TTY senza cambiare gli altri esperimenti;
 - conserva stdout/stderr di payload e audit solo dopo il sanitizer, oppure richiede la
   dichiarazione esplicita che l'output è già sanitizzato;
 - esegue sempre cleanup e post-audit, poi valida telemetria, classificatori,

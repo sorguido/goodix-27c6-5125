@@ -14,6 +14,14 @@ lp_is_bool () {
   [[ ${1:-} == true || ${1:-} == false ]]
 }
 
+lp_configure_timeout_options () {
+  local mode=$1
+  LP_TIMEOUT_OPTIONS=(--signal=TERM --kill-after=5s)
+  if [[ ${PAYLOAD_REQUIRES_FOREGROUND_TTY:-false} == true && $mode == --operator-run ]]; then
+    LP_TIMEOUT_OPTIONS+=(--foreground)
+  fi
+}
+
 lp_validate_config () {
   local key
   for key in EXPERIMENT_ID GOAL ACTION PAYLOAD MAX_ACTIONS MAX_CONTACTS \
@@ -31,6 +39,10 @@ lp_validate_config () {
   for key in REQUIRES_ROOT REQUIRES_ACTIVE_USER_SESSION LIVE_CAPABLE OFFLINE_TEST_CAPABLE OUTPUT_IS_SANITIZED; do
     lp_is_bool "${!key}" || lp_fail "CONFIG_${key}_INVALID" || return
   done
+  if [[ -n ${PAYLOAD_REQUIRES_FOREGROUND_TTY:-} ]]; then
+    lp_is_bool "$PAYLOAD_REQUIRES_FOREGROUND_TTY" ||
+      lp_fail CONFIG_PAYLOAD_REQUIRES_FOREGROUND_TTY_INVALID || return
+  fi
   [[ $PAYLOAD != /* && $PAYLOAD != *..* ]] || lp_fail CONFIG_PAYLOAD_PATH_INVALID || return
   [[ -x $LP_EXPERIMENT_DIR/$PAYLOAD ]] || lp_fail PAYLOAD_NOT_EXECUTABLE || return
   if [[ -n ${SANITIZER:-} ]]; then

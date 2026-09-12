@@ -19,11 +19,17 @@ telemetry=${LIVE_PROBE_TELEMETRY_FILE:?}
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
 # shellcheck source=session-model.sh
 source "$here/session-model.sh"
+# shellcheck source=privileged-channel.sh
+source "$here/privileged-channel.sh"
 uid=$(id -u)
 attempts=0 contacts=0 outcome=D290_OFFLINE_COMPATIBILITY_PASS
-overlay_started=false overlay_closed=false
-root_pid= root_in_fd= root_out_fd=
+helper_started=false overlay_ready=false overlay_closed=false
+root_pid= root_control_fd= root_out_fd= root_unused_fd=
 root_log=$work/root-overlay.log
+control_fifo=$work/d290-root-control.fifo
+root_helper=$here/root-overlay.sh
+overlay_target=/usr/lib/pam.d/plasmalogin
+overlay_expected_hash=89d389e6c2ee59dcee374029a5428a81dc9138c4f5e86068159b3d5a2c77ab2d
 
 if [[ ${LIVE_PROBE_MODE:-} == offline-test ]]; then
   [[ -x $here/root-overlay.sh && -f $here/goodix-d290-plasmalogin.pam ]]
@@ -67,48 +73,11 @@ field_sum () {
   awk -v key="$key" '/GOODIX_D282_EPOCH_AUDIT / { for (i=1;i<=NF;i++) { split($i,a,"="); if (a[1]==key && a[2]~/^[0-9]+$/) s+=a[2] } } END { print s+0 }' "$file"
 }
 
-release_overlay () {
-  local line rc=0 wait_rc
-  [[ $overlay_started == true && $overlay_closed == false ]] || return 0
-  overlay_closed=true
-  printf 'RELEASE\n' >&"$root_in_fd" || rc=1
-  exec {root_in_fd}>&-
-  while IFS= read -r line <&"$root_out_fd"; do
-    printf '%s\n' "$line" | tee -a "$root_log"
-  done
-  exec {root_out_fd}>&-
-  set +e
-  wait "$root_pid"
-  wait_rc=$?
-  set -e
-  [[ $wait_rc -eq 0 ]] || rc=1
-  cp "$root_log" "$capture/root-overlay.log"
-  return "$rc"
-}
-
-start_overlay () {
-  local ready line expected
-  coproc D290_ROOT_HELPER { pkexec "$here/root-overlay.sh" --hold; }
-  root_pid=$D290_ROOT_HELPER_PID
-  exec {root_out_fd}<&"${D290_ROOT_HELPER[0]}"
-  exec {root_in_fd}>&"${D290_ROOT_HELPER[1]}"
-  overlay_started=true
-  IFS= read -r -t 60 ready <&"$root_out_fd"
-  [[ $ready == D290_ROOT_DAEMON_IDENTITY=true ]]
-  printf '%s\n' "$ready" | tee -a "$root_log"
-  for expected in D290_ROOT_NAMESPACE_MATCH=true D290_ROOT_OVERLAY_READ_ONLY=true D290_ROOT_OVERLAY_READY=true; do
-    IFS= read -r -t 10 line <&"$root_out_fd"
-    [[ $line == "$expected" ]]
-    printf '%s\n' "$line" | tee -a "$root_log"
-  done
-  [[ $(sha256sum /usr/lib/pam.d/plasmalogin | awk '{print $1}') == 89d389e6c2ee59dcee374029a5428a81dc9138c4f5e86068159b3d5a2c77ab2d ]]
-  echo D290_USER_OVERLAY_VISIBLE=true | tee -a "$root_log"
-}
-
 on_exit () {
   local rc=$? overlay_cleanup_ok=true
   trap - EXIT
-  release_overlay || { overlay_cleanup_ok=false; rc=1; }
+  d290_release_overlay || { overlay_cleanup_ok=false; rc=1; }
+  d290_close_unstarted_channel
   if [[ $rc -ne 0 ]]; then
     if [[ $overlay_cleanup_ok == true ]]; then
       echo 'D290 arrestato: l’overlay è stato rilasciato. Usare la password solo dopo il completamento del kit.' >&2
@@ -130,7 +99,7 @@ initial_sessions=()
 IFS='|' read -r initial_session initial_tty initial_service initial_type initial_class initial_state \
   <<<"${initial_sessions[0]}"
 cursor=$(current_cursor)
-start_overlay
+d290_start_overlay
 
 printf '%s\n' \
   "Sessione grafica iniziale: $initial_session. Questo terminale TTY resta attivo durante il logout." \
@@ -144,7 +113,9 @@ logout_deadline=$((SECONDS + 300))
 while loginctl show-session "$initial_session" -p State --value >/dev/null 2>&1 && (( SECONDS < logout_deadline )); do
   sleep 0.2
 done
-! loginctl show-session "$initial_session" -p State --value >/dev/null 2>&1
+if loginctl show-session "$initial_session" -p State --value >/dev/null 2>&1; then
+  exit 1
+fi
 echo D290_INITIAL_GRAPHICAL_LOGOUT_OBSERVED=true
 
 greeter_uid=$(id -u plasmalogin)
@@ -266,7 +237,7 @@ D290_NEW_GRAPHICAL_SESSION_STATE=$new_state
 D290_PASSWORD_OR_PIN_USED_DURING_FINGERPRINT=NOT_MACHINE_TELEMETERED
 EOF
 
-release_overlay
+d290_release_overlay
 printf '%s\n' \
   "D290_FINGERPRINT_OUTCOME=$result" \
   'D290_OVERLAY_RELEASED_BEFORE_PASSWORD_RECOVERY=true' \

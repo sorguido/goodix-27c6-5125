@@ -69,6 +69,10 @@ operator_kit/live_probe/run.sh d290-plasmalogin --operator-run
 3. Autenticare i prompt `pkexec`, leggere i limiti e digitare esattamente
    `PREPARA LOGIN D290`.
 
+L'autenticazione privilegiata successiva usa la controlling TTY in foreground;
+la password non deve comparire a schermo e non passa nel log o nella FIFO di
+controllo. Se appare in chiaro, interrompere e non proseguire al logout.
+
 Prima della conferma, il pre-audit identifica la sessione tty2 anche quando
 logind la marca `online` perché la TTY 3 è foreground. Mostra count, ID, TTY,
 service, type, class e state; cardinalità diversa da uno è uno stop.
@@ -91,6 +95,10 @@ service, type, class e state; cardinalità diversa da uno è uno stop.
 Qualunque errore, timeout, marker false, cardinalità inattesa o risultato
 diverso da PASS è uno stop: recuperare la sessione con password solo dopo il
 rilascio dell'overlay, conservare la capture e non rilanciare.
+
+`Ctrl+C`, EOF o morte del processo parent fanno chiudere il canale e attivano
+il cleanup del helper. Se i tre marker di ripristino non sono visibili, non
+usare il login grafico: applicare la recovery seguente dalla TTY.
 
 Gli output sanitizzati saranno in
 `captures/live_probe/d290-plasmalogin_<timestamp>_<sha>/sanitized/`.

@@ -48,7 +48,8 @@ d290_exact PAM_RPM pam-1.7.2-2.fc44.x86_64 rpm -q pam
 d290_exact FPRINTD_RPM fprintd-1.94.5-5.fc44.x86_64 rpm -q fprintd
 d290_exact FPRINTD_PAM_RPM fprintd-pam-1.94.5-5.fc44.x86_64 rpm -q fprintd-pam
 for command in loginctl systemctl pgrep pkexec journalctl sha256sum awk sed grep \
-  mountpoint findmnt mount umount chcon; do
+  mountpoint findmnt mount umount chcon ps mkfifo chmod stat readlink dirname \
+  basename install tr cp rm rmdir; do
   command -v "$command" >/dev/null || d290_fail "COMMAND_${command}_MISSING"
 done
 echo D290_TARGET_VERSIONS_AND_HASHES=PASS

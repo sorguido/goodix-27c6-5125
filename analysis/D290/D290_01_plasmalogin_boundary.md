@@ -5,7 +5,7 @@
 
 ```text
 SELECTED_NEXT_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
-OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FIRST_PRE_AUDIT_CORRECTIVE
+OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FULL_HOST_PATH_CORRECTIVE
 ADVANCEMENT=REAL_LOGIN_MANAGER_ONE_SHOT_PAYLOAD_IMPLEMENTED_ON_REUSABLE_HARNESS
 EXECUTABLE_CLOSURE=PASS_OFFLINE
 REAL_TARGET_COMPATIBILITY=PASS_READ_ONLY_PLUS_PRIVILEGED_NAMESPACE_GATE_AT_LIVE
@@ -38,11 +38,19 @@ sessione logind Wayland `Service=plasmalogin`.
 
 ## Metodo e compatibilità col common harness
 
-Il common harness resta utilizzabile senza modificarlo. Il delta necessario è
-un piccolo payload avviato manualmente dalla TTY 3, separata dalla sessione
+Il common harness resta utilizzabile con una minima estensione opt-in per la
+TTY foreground. Il delta principale è un piccolo payload avviato manualmente dalla TTY 3, separata dalla sessione
 grafica iniziale su tty2. Il processo harness e il helper root sopravvivono al
 logout; questo risolve il lifecycle senza daemonizzare nuovi componenti o
 creare un secondo framework.
+
+La seconda invocazione ha mostrato che il payload, eseguito sotto il process
+group separato del timeout, non poteva offrire a `pkexec` una controlling TTY
+foreground mentre il `coproc` usava stdin per il protocollo helper. Il common
+harness ha quindi ricevuto il solo supporto opt-in
+`PAYLOAD_REQUIRES_FOREGROUND_TTY`; D290 separa `/dev/tty` interattiva dalla
+FIFO 0600 di controllo e lega il helper a PID/start-time del payload con
+watchdog. Questa modifica non cambia boundary, budget o protocollo sensore.
 
 La prima invocazione operatore sulla baseline `1a8c5528a0b9f9d12c395f1a9804ee82fd076b94`
 si è fermata correttamente nel pre-audit, prima di conferma e payload. Il
@@ -54,7 +62,8 @@ e stato loggato `active|online`. Manager e TTY 3 non sono candidati.
 
 Il helper `pkexec` verifica daemon root, exe, cmdline, cgroup e uguaglianza del
 mount namespace. Monta read-only il PAM candidato sul solo file
-`/usr/lib/pam.d/plasmalogin` e resta pipe-bounded. `RELEASE`, EOF, segnale o
+`/usr/lib/pam.d/plasmalogin` e resta control-channel-bounded. `RELEASE`, EOF,
+segnale o
 errore smontano, verificano l'hash host e rimuovono il runtime root-only.
 
 Il candidato è byte-identico allo stack Fedora salvo una sola riga prima di
@@ -104,3 +113,9 @@ integrazione PAM permanente o assenza assoluta di side effect NVM sconosciuti.
 Nessuna live, logout, `pkexec`, mount, USB o azione sensore è stata eseguita
 dall'AI. La prima invocazione operatore non ha eseguito logout, overlay,
 `pam_fprintd` o VERIFY e non ha prodotto evidenza device-side.
+
+Anche la seconda invocazione operatore si è fermata prima di logout, overlay e
+VERIFY, con zero contatti. Il testo immesso al prompt inefficace è apparso in
+chiaro sulla TTY, ma non è presente in capture o repository. L'intero percorso
+host simulabile è ora esercitato per MATCH e NO_MATCH; restano live soltanto
+logout/greeter/PAM-fprintd/USB e creazione reale della sessione.

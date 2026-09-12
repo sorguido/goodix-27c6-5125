@@ -102,18 +102,19 @@ fi
 
 if [[ $pre_rc -eq 0 && $cursor_rc -eq 0 ]]; then
   LP_PAYLOAD_STARTED=true
+  lp_configure_timeout_options "$mode"
   payload_command=("$LP_EXPERIMENT_DIR/$PAYLOAD" --max-actions "$MAX_ACTIONS" \
     --max-contacts "$MAX_CONTACTS" --max-retries "$MAX_RETRIES" \
     --timeout-seconds "$TIMEOUT_SECONDS")
   set +e
   if [[ -n ${SANITIZER:-} ]]; then
-    timeout --signal=TERM --kill-after=5s "${TIMEOUT_SECONDS}s" \
+    timeout "${LP_TIMEOUT_OPTIONS[@]}" "${TIMEOUT_SECONDS}s" \
       "${payload_command[@]}" 2>&1 | lp_signal_safe_filter "$LP_EXPERIMENT_DIR/$SANITIZER" |
       lp_signal_safe_tee "$LP_CAPTURE_DIR/payload.log"
     pipeline_status=("${PIPESTATUS[@]}")
     payload_rc=${pipeline_status[0]}; sanitizer_rc=${pipeline_status[1]}; tee_rc=${pipeline_status[2]}
   else
-    timeout --signal=TERM --kill-after=5s "${TIMEOUT_SECONDS}s" \
+    timeout "${LP_TIMEOUT_OPTIONS[@]}" "${TIMEOUT_SECONDS}s" \
       "${payload_command[@]}" 2>&1 | lp_signal_safe_tee "$LP_CAPTURE_DIR/payload.log"
     pipeline_status=("${PIPESTATUS[@]}")
     payload_rc=${pipeline_status[0]}; tee_rc=${pipeline_status[1]}
