@@ -113,15 +113,16 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D291 diversity Rocky-derived pronta al Human Gate
+### Stato corrente — D291 chiuso live con enrollment diversity Rocky-derived
 
-Le live D291 precedenti restano valide per il transport: fino a tre
-`VerifyStart` espliciti raggiungono il sensore, ciascuno consuma una sola
-acquisizione, la serie termina al primo MATCH e non esiste una quarta action o
-un retry VERIFY nascosto. La candidate `6ccacbcd28b06db9a7f3174d3d5c0350f87b164f`
-ha però prodotto un solo MATCH a score 47/40 e poi sei NO_MATCH consecutivi
-con lo stesso dito registrato. La stabilità biometrica e la closure D291
-restano quindi aperte; la lifetime della baseline non è una root cause provata.
+La candidate `cbf582f4dcdb7eeb6c8381223c84d37363386870` è stata
+validata dall'Utente sul target reale dopo re-enrollment. La policy diversity
+ha generato un template di otto sample da otto contatti, senza retry scan. La
+prima serie ha respinto il dito non registrato e ha fatto MATCH con l'indice
+destro al secondo `VerifyStart`; le tre serie successive hanno fatto MATCH al
+primo. Sono quindi provati quattro MATCH su quattro serie, controllo PAM fino
+a tre tentativi, stop al primo MATCH, una sola acquisizione per `VerifyStart`,
+assenza di retry nascosti e assenza di un quarto tentativo.
 
 Il riesame Rocky-first ha confrontato direttamente `src/goodixgf.c`,
 `src/goodix_capture.c`, `src/goodix_imgproc.c`, `include/goodix.h`,
@@ -162,32 +163,50 @@ il percorso bounded e fail-closed.
 
 Il delta non introduce comandi, sender o retry transport, non modifica
 preprocessing, matcher, serializzazione FP3, PSK o stato persistente del
-sensore. Il formato dei template vecchi resta compatibile, ma il vecchio
-template fixed-eight non rappresenta la nuova selezione di copertura: il
-prossimo risultato utile richiede un re-enrollment reale. Il kit D291 esistente
-è stato riattivato, senza un nuovo framework: fa backup root-only di runtime,
-state e template, installa la sola libfprint candidate, re-enrolla l'indice
-destro, poi richiede quattro serie VERIFY indipendenti. La prima deve rigettare
-un dito errato e poi fare MATCH; tutte e quattro devono fare MATCH entro il
-limite PAM di tre. Ogni errore ripristina driver e vecchio template.
+sensore. Il formato dei template vecchi era compatibile, ma il re-enrollment
+richiesto per validare la nuova coverage è ora completato. Dopo il PASS il kit
+ha lasciato attivi il nuovo runtime e il nuovo template, ha aggiornato lo state
+D285 con i nuovi hash e ha eliminato il backup temporaneo, come previsto dal
+percorso di successo. Il kit D291 è ora storico e rifiuta nuove esecuzioni.
+
+L'audit enrollment riporta `enroll_stages=8`, `enroll_contacts=8`,
+`enroll_retry_scans=0`, TLS uno, zero retry secure/post-TLS, zero reset,
+clear-halt e famiglie persistenti, zero outstanding, drain e context close.
+I quattro score di MATCH osservati sono 7900, 7665, 488 e 91, tutti con soglia
+40; il dito errato ha confrontato tutti gli otto sample a score zero. Questo
+prova l'efficacia live del nuovo percorso e supera il gate funzionale D291, ma
+non dimostra che l'assenza di diversity fosse l'unica causa dei NO_MATCH
+precedenti: non esiste un A/B con pressioni identiche.
 
 ```text
-PM_DECISION=HUMAN_REQUIRED
+PM_DECISION=ACCEPT_AND_CONTINUE
 D291_MULTI_VERIFY_TRANSPORT=PROVEN
-D291_MAX_TRIES_3_PAM_CONTROL=WORKING
+D291_MAX_TRIES_3_PAM_CONTROL=PROVEN
+D291_SECOND_VERIFY_REACHES_SENSOR=PROVEN
+D291_THIRD_VERIFY_REACHES_SENSOR=PROVEN
+D291_ONE_ACQUISITION_PER_VERIFY_START=PROVEN
+D291_STOP_ON_MATCH=PROVEN
+D291_NO_HIDDEN_VERIFY_RETRY=PROVEN
+D291_NO_FOURTH_VERIFY=PROVEN
 D291_BASELINE_LIFETIME_ROOT_CAUSE=NOT_PROVEN
 D291_BASELINE_PINNING=IMPLEMENTED_NOT_VALIDATED
-D291_BIOMETRIC_STABILITY=OPEN
-D291_CLOSURE=NOT_ALLOWED
+D291_BIOMETRIC_STABILITY_GATE=PASS
+D291_CLOSURE=PROVEN_ON_TARGET
+D291_STATUS=CLOSED
 ROCKY_DIFFERENTIAL_COMPLETED=true
 ROCKY_PRIMARY_IMPLEMENTATION_PATH_SELECTED=true
 MATERIAL_CODE_DELTA_IMPLEMENTED=true
 ENROLLMENT_POLICY=ROCKY_3_8_2_STRICT_MAD_LT_8
 ENROLLMENT_MAX_PHYSICAL_CONTACTS=20
-NO_HIDDEN_BIOMETRIC_RETRY=true
-MAX_THREE_EXPLICIT_VERIFY=true
-STOP_ON_MATCH=true
-NO_FOURTH_VERIFY=true
+D291_ROCKY_DERIVED_ENROLLMENT_DIVERSITY=LIVE_VALIDATED
+D291_REENROLLMENT=PASS
+D291_WRONG_FINGER_REJECTION=PASS
+D291_REGISTERED_SERIES_MATCHED=4/4
+D291_REGISTERED_FIRST_TRY_SERIES=3/4
+D291_LIVE_RESULT=PASS_REENROLL_AND_4_MATCHED_SERIES
+D291_FACTORY_PRESERVING=PROVEN_FOR_THIS_LIVE
+ROOT_CAUSE_EXCLUSIVE_ATTRIBUTION=NOT_REQUIRED_FOR_CLOSURE
+OLD_ENROLLMENT_POLICY=SUPERSEDED
 D291_DIVERSITY_NORMAL_ASAN_UBSAN=PASS
 D278_D291_FULL_NORMAL=30/30_PASS
 D278_D291_FULL_ASAN_UBSAN=30/30_PASS
@@ -196,8 +215,9 @@ FULL_RELEVANT_OFFLINE_REGRESSION=PASS
 PRODUCTION_BUILD=PASS
 ABI_PREFLIGHT=PASS
 OLD_TEMPLATE_COMPATIBLE=true
-REENROLL_REQUIRED=true
-D291_OPERATOR_KIT=HUMAN_GATE_READY
+REENROLL_REQUIRED=false
+D291_REPEAT_LIVE_REQUIRED=false
+D291_OPERATOR_KIT=HISTORICAL_CLOSED_DO_NOT_RERUN
 FACTORY_PRESERVING=true
 ```
 
@@ -299,22 +319,20 @@ VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
 MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
 tentativo, retry nascosto o illimitato.
 
-### Review complessiva e roadmap con D291 al Human Gate diversity
+### Review complessiva e roadmap dopo la chiusura D291
 
-La chiusura D290 termina la sequenza di qualificazione dei consumer reali; D291
-è il successivo correttivo lifecycle esplicitamente richiesto dall'Utente.
-Enrollment fixed-eight, FP3 attraverso close/open, fprintd ENROLL/VERIFY/delete,
-PAM, `sudo`, KScreenLocker, unlock di una sessione realmente bloccata e login
-Plasma verso una nuova sessione Wayland sono boundary chiusi e non vanno
-rieseguiti per sola maggiore confidenza. La fattibilità sul target APP12509 è
-provata; la production readiness no.
+La chiusura D291 completa la sequenza di fattibilità e qualificazione dei
+consumer reali: enrollment diversity Rocky-derived, FP3 attraverso close/open,
+fprintd ENROLL/VERIFY/delete, PAM, `sudo`, KScreenLocker, unlock di una sessione
+realmente bloccata e login Plasma verso una nuova sessione Wayland sono
+boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
+fattibilità sul target APP12509 è provata; la production readiness no.
 
-Prima di proseguire oltre D291 occorre validare sul sensore il nuovo
-re-enrollment diversity Rocky-derived: non è la ripetizione della live
-precedente, perché cambia materialmente la selezione dei sample nel template.
-Il lavoro successivo al boundary D291 resta principalmente consolidamento della sorgente production,
-gestione utenti/template e materiali protetti, packaging/installazione gestita,
-lifecycle/recovery, qualificazione di release e pubblicazione auditata. Il
+Il boundary corrente passa al consolidamento della sorgente production
+(Phase A): scegliere una source-of-truth mantenibile, rendere riproducibile la
+patch/build production e separare con chiarezza seam di test e codice storico.
+Seguono gestione utenti/template e materiali protetti, packaging/installazione
+gestita, lifecycle/recovery, qualificazione di release e pubblicazione. Il
 piano completo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human Gate e
 `WHAT_NOT_TO_TEST_AGAIN` è:
 
@@ -331,14 +349,14 @@ qualificazione Windows esaustiva dopo ogni run.
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
-WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D290_CLOSED_BOUNDARIES
-PM_DECISION=HUMAN_REQUIRED
-D291_CLOSURE=NOT_ALLOWED
-D291_BIOMETRIC_STABILITY=OPEN
-D291_ROCKY_DIVERSITY_IMPLEMENTED=true
-NEW_LIVE_REQUIRED_NOW=true
+WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D291_CLOSED_BOUNDARIES
+PM_DECISION=ACCEPT_AND_CONTINUE
+D291_CLOSURE=PROVEN_ON_TARGET
+D291_BIOMETRIC_STABILITY_GATE=PASS
+D291_ROCKY_DIVERSITY_LIVE=PASS
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NO_NEXT_PHASE_EXECUTION_STARTED=true
+NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

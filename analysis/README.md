@@ -6,10 +6,10 @@ Dxxx, incluso bundle e checksum, appartiene a `analysis/Dxxx/`; la root non è
 usata per output di step. Lo stato qui riassunto descrive l'esito storico e non
 costituisce autorizzazione live.
 
-La review complessiva successiva alla chiusura D290 e la roadmap per le fasi
+La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Non costituiscono un nuovo Dxxx né
-autorizzano l'esecuzione della prima fase.
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase A è il boundary offline corrente;
+nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

@@ -1,29 +1,33 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D291/01 — recovery Rocky-first della stabilità biometrica
+# D291/01 — closure live Rocky-first della stabilità biometrica
 
-> Il nome storico del file è conservato per evitare frammentazione. Questo
-> documento non dichiara più una closure D291.
+> Il nome storico del file è conservato per evitare frammentazione. La closure
+> è stata riesaminata sui risultati sanitizzati prodotti dalla live Utente.
 
 ## Decisione
 
 Le evidenze aggregate successive a `6ccacbcd28b06db9a7f3174d3d5c0350f87b164f`
-confermano il risultato transport di D291 ma non la stabilità biometrica. Il
-riesame richiesto dall'Utente usa Rockytkg come fonte implementativa primaria,
-completa il differenziale e seleziona la divergenza utile già verificabile
-offline: coverage/diversity dell'enrollment. Il delta entra in production e il
-prossimo passo è un vero Human Gate di re-enrollment e VERIFY ripetute.
+avevano confermato il transport ma non la stabilità biometrica. Il riesame
+Rocky-first ha quindi selezionato e implementato la coverage/diversity
+dell'enrollment. La candidate
+`cbf582f4dcdb7eeb6c8381223c84d37363386870` ha ora superato il gate reale:
+re-enrollment completato, dito errato respinto e quattro serie registrate su
+quattro concluse con MATCH. Il boundary funzionale D291 è chiuso.
 
 ```text
 D291_MULTI_VERIFY_TRANSPORT=PROVEN
-D291_MAX_TRIES_3_PAM_CONTROL=WORKING
+D291_MAX_TRIES_3_PAM_CONTROL=PROVEN
 D291_BASELINE_PINNING=IMPLEMENTED_NOT_VALIDATED
 D291_BASELINE_LIFETIME_ROOT_CAUSE=NOT_PROVEN
-D291_BIOMETRIC_STABILITY=OPEN
-D291_CLOSURE=NOT_ALLOWED
+D291_BIOMETRIC_STABILITY_GATE=PASS
+D291_CLOSURE=PROVEN_ON_TARGET
+D291_STATUS=CLOSED
 ROCKY_DIFFERENTIAL_COMPLETED=true
 MATERIAL_ROCKY_DERIVED_PRODUCTION_DELTA_IMPLEMENTED=true
-NEW_LIVE_REQUIRED_NOW=true
-PM_DECISION=HUMAN_REQUIRED
+ROOT_CAUSE_EXCLUSIVE_ATTRIBUTION=NOT_REQUIRED_FOR_CLOSURE
+OLD_ENROLLMENT_POLICY=SUPERSEDED
+NEW_LIVE_REQUIRED_NOW=false
+PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
 ## Differential Rocky-first e scelta production
@@ -95,7 +99,65 @@ leggibile e confrontabile. Non è però rappresentativo della nuova policy di
 coverage: per validare questo correttivo serve un re-enrollment reale. Questa è
 una necessità sperimentale, non una migrazione di formato.
 
-## Evidenza live aggregata
+## Evidenza live finale e decisione PM
+
+L'Utente ha eseguito il kit dalla candidate completa `cbf582f4...`. Il
+`summary.env` e i cinque audit sanitizzati presenti nella directory risultato
+sono internamente coerenti:
+
+```text
+D291_01_LIVE_RESULT=PASS_REENROLL_AND_4_MATCHED_SERIES
+ENROLL_ACCEPTED_SAMPLE_COUNT=8
+ENROLL_PHYSICAL_CONTACT_COUNT=8
+ENROLL_RETRY_COUNT=0
+SERIES_1=WRONG_FINGER_NO_MATCH_THEN_REGISTERED_MATCH
+SERIES_2=REGISTERED_MATCH_FIRST_TRY
+SERIES_3=REGISTERED_MATCH_FIRST_TRY
+SERIES_4=REGISTERED_MATCH_FIRST_TRY
+REGISTERED_FINGER_MATCH_SERIES=4/4
+REGISTERED_FINGER_FIRST_TRY_MATCH_SERIES=3/4
+PAM_MAX_TRIES=3
+STOP_ON_FIRST_MATCH=true
+NO_FOURTH_ATTEMPT=true
+HIDDEN_VERIFY_RETRY_COUNT=0
+TEMPLATE_INCLUDED=false
+```
+
+L'enrollment reale ha riportato una sola action, otto stage e otto contatti,
+TLS uno, 204 submit reali, zero retry secure/post-TLS, reset, clear-halt e
+famiglie persistenti, zero outstanding, drain e context close. L'assenza di
+retry scan non rende inattiva la policy: gli otto contatti sono stati giudicati
+distinti dal criterio Rocky-derived e il template risultante ha superato il
+gate multi-serie.
+
+Il dito errato ha prodotto 111 keypoint e otto score zero. I MATCH registrati
+hanno score 7900, 7665, 488 e 91 con soglia invariata a 40. Nel secondo epoch
+della prima serie il MATCH termina l'action prima del release-tail, ma l'audit
+prova una sola acquisition, zero retry, zero outstanding, drain e chiusura del
+contesto: è coerente con lo stop immediato al MATCH.
+
+```text
+D291_SECOND_VERIFY_REACHES_SENSOR=PROVEN
+D291_THIRD_VERIFY_REACHES_SENSOR=PROVEN
+D291_ONE_ACQUISITION_PER_VERIFY_START=PROVEN
+D291_STOP_ON_MATCH=PROVEN
+D291_NO_HIDDEN_VERIFY_RETRY=PROVEN
+D291_NO_FOURTH_VERIFY=PROVEN
+D291_ROCKY_DERIVED_ENROLLMENT_DIVERSITY=LIVE_VALIDATED
+D291_REENROLLMENT=PASS
+D291_WRONG_FINGER_REJECTION=PASS
+D291_REGISTERED_SERIES_MATCHED=4/4
+D291_BIOMETRIC_STABILITY_GATE=PASS
+D291_FACTORY_PRESERVING=PROVEN_FOR_THIS_LIVE
+```
+
+Il risultato prova che il percorso diversity Rocky-derived ha prodotto un
+template reale stabile secondo il gate D291 e sostituisce la policy
+fixed-eight precedente. Non prova che l'assenza di diversity fosse l'unica
+causa dei NO_MATCH storici: non esiste un confronto A/B controllato con le
+stesse pressioni, e l'operatore ha variato deliberatamente centro, lati e punta.
+
+## Evidenza live aggregata precedente
 
 La candidate `8ed02cc3467899c8b1e6f914cc5870e04b6ff4e0` aveva già
 provato tre `VerifyStart` espliciti, una acquisizione per epoch, reopen reale
@@ -237,7 +299,7 @@ D278_D291_FULL_ASAN_UBSAN=30/30_PASS
 FPIMAGE_DEVICE_FULL_NORMAL=32/32_PASS
 FPIMAGE_DEVICE_FULL_ASAN_UBSAN=32/32_PASS
 D291_OPERATOR_KIT_CONTRACT=14/14_PASS
-D291_OPERATOR_KIT=HUMAN_GATE_READY
+D291_OPERATOR_KIT=HISTORICAL_CLOSED_DO_NOT_RERUN
 FULL_RELEVANT_OFFLINE_REGRESSION=PASS
 PRODUCTION_BUILD=PASS
 ABI_PREFLIGHT=PASS
@@ -256,32 +318,24 @@ assenza di test seam/RPATH e ABI richiesta dall'esatto fprintd Fedora 44 sono
 PASS. Il processo ha riportato `REAL_SENSOR_ACCESSED=false` e
 `LIVE_EXECUTION_PERFORMED=false`.
 
-## Boundary successivo
+## Stato runtime e boundary successivo
 
-Il prossimo passo utile richiede sensore reale, privilegi, modifica del runtime
-host e re-enrollment. Il kit esistente
-`operator_kit/d291-01-multi-verify/` è stato adattato, non sostituito con un
-nuovo framework. Da un HEAD `development` pulito e pushato, un solo comando:
+Il ramo success del kit non invoca `rollback`: lascia installati runtime e
+template nuovi, aggiorna nello state D285 manifest, path e hash del template,
+elimina il backup root-only e disarma le trap. Questo comportamento è confermato
+sia dal sorgente riesaminato sia dal marker PASS prodotto. Il kit è ora
+`HISTORICAL_CLOSED_DO_NOT_RERUN` e conserva il contenuto soltanto per audit.
 
-```bash
-operator_kit/d291-01-multi-verify/run-d291-01.sh --operator-run
-```
-
-costruisce la candidate tramite D282, verifica e sostituisce la sola libfprint,
-protegge il vecchio template con rollback root-only, re-enrolla l'indice destro
-con 3..8 sample e massimo 20 contatti, quindi esegue quattro serie indipendenti
-con PAM `max-tries=3`. La prima deve produrre NO_MATCH per un dito errato e poi
-MATCH per quello registrato; le tre successive devono fare MATCH entro tre
-contatti in normali pose quotidiane. Una quarta acquisizione nella stessa
-serie, retry VERIFY nascosti, errori di audit o mancato MATCH causano rollback.
-L'output non esporta template o raster.
+Il prossimo boundary è Phase A della roadmap: consolidare una sola
+source-of-truth production e una build/patch series mantenibile, separando
+codice distribuibile, reference tree e seam di test. Non richiede una nuova
+live D291.
 
 ```text
-ROOT_CAUSE_IDENTIFIED=false
-SELECTED_TESTABLE_DIVERGENCE=ENROLLMENT_COVERAGE
-CORRECTIVE_PRODUCTION_CHANGE=ROCKY_DERIVED_DIVERSITY_SELECTOR
-REPEAT_EQUIVALENT_LIVE_ALLOWED=false
-NEXT_LIVE_IS_EQUIVALENT=false
-HUMAN_GATE_PURPOSE=REAL_REENROLL_AND_MULTI_SERIES_STABILITY_VALIDATION
-RESIDUAL_BLOCKER=REAL_SENSOR_AND_OPERATOR_REQUIRED
+ROOT_CAUSE_EXCLUSIVE_ATTRIBUTION=NOT_REQUIRED_FOR_CLOSURE
+ROCKY_DERIVED_DIVERSITY_PATH=LIVE_PROVEN_EFFECTIVE
+OLD_ENROLLMENT_POLICY=SUPERSEDED
+D291_REPEAT_LIVE_REQUIRED=false
+D291_REENROLL_REQUIRED=false
+NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
 ```

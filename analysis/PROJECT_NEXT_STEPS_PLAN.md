@@ -1,15 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 — stato complessivo e piano delle prossime fasi
 
-Data review: 12 settembre 2026
+Data review: 13 settembre 2026
 
-Baseline esaminata: `development` con D291 transport provato e stabilità
-biometrica ancora aperta
+Baseline esaminata: `development` con D291 chiuso live sulla candidate
+`cbf582f4dcdb7eeb6c8381223c84d37363386870`
 
-Decisione PM: transport multi-VERIFY D291 provato live; la baseline pinned non
-è una root cause dimostrata e la closure biometrica non è consentita. Serve un
-replan evidence-first; nessuna live equivalente e nessuna fase successiva
-avviata
+Decisione PM: `D291_CLOSURE=PROVEN_ON_TARGET`; il percorso enrollment diversity
+Rocky-derived ha superato re-enrollment, discriminazione wrong-finger e quattro
+serie registrate su quattro. Nessuna attribuzione causale esclusiva è richiesta.
+Il boundary corrente è Phase A, consolidamento della sorgente production.
 
 ## Conclusione esecutiva
 
@@ -18,26 +18,25 @@ provati enrollment, template FP3, matching SIGFM, integrazione libfprint/fprintd
 e i consumer reali `sudo`, KDE lock/unlock e Plasma Login Manager. D290 chiude
 la catena fingerprint → nuova sessione Plasma/Wayland.
 
-Il divario immediato è ora D291: comprendere la variabilità biometrica senza
-ripetere una live equivalente e senza scegliere una correzione speculativa.
-Una volta risolto quel boundary, il divario di prodotto resta trasformare la
-candidate target-proven, oggi distribuita tra fork Fedora, componenti locali e
-installazione D285, in un prodotto coerente, gestibile, aggiornabile e
-distribuibile. Le fasi sotto privilegiano lavoro offline e ambienti host
-isolati. Una nuova live ha senso soltanto dopo una nuova ipotesi causale e un
-delta production che cambi materialmente il percorso osservato.
+Il divario immediato è ora trasformare la candidate target-proven, distribuita
+tra fork Fedora, componenti locali e installazione D285, in un prodotto
+coerente, gestibile, aggiornabile e distribuibile. Le fasi sotto privilegiano
+lavoro offline e ambienti host isolati. I boundary D279–D291 sono chiusi e non
+vanno ripetuti per sola maggiore confidenza.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
 D291_MULTI_VERIFY_TRANSPORT_LIVE=PROVEN
 D291_BASELINE_PINNING=IMPLEMENTED_NOT_VALIDATED
-D291_BIOMETRIC_STABILITY=OPEN
-D291_CLOSURE=NOT_ALLOWED
+D291_BIOMETRIC_STABILITY_GATE=PASS
+D291_CLOSURE=PROVEN_ON_TARGET
+D291_ROCKY_DIVERSITY_LIVE=PASS
+D291_REGISTERED_SERIES_MATCHED=4/4
 D291_NEW_LIVE_REQUIRED_NOW=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEW_D292_STARTED=false
+NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
 ```
 
 ## Stato verificato del progetto
@@ -50,7 +49,9 @@ NEW_D292_STARTED=false
   transport e senza famiglie di scrittura persistente note.
 - Enrollment e template: enrollment SIGFM production a otto campioni; FP3
   serializzato, riletto dopo close/open e usato per identify/verify; storage,
-  restart, list e delete fprintd sono stati attraversati.
+  restart, list e delete fprintd sono stati attraversati. La policy diversity
+  Rocky-derived ha inoltre prodotto live un nuovo template da otto contatti
+  distinti, poi validato con dito errato e quattro serie registrate.
 - Matcher: stesso dito `MATCH` e dito differente `NO_MATCH` sono provati sul
   target con threshold 40; la telemetria per-sample è reale. Questo non è uno
   studio statistico FAR/FRR e non qualifica da solo una soglia universale.
@@ -68,14 +69,10 @@ NEW_D292_STARTED=false
 
 ### IMPLEMENTED, ma non production-ready
 
-- D291 ha provato live che ogni nuovo `VerifyStart` esplicito dopo terminal
-  NO_MATCH raggiunge una nuova epoch drained, senza retry o acquisizioni
-  nascoste. Il pinning della baseline R2 ha prodotto un MATCH live a score 47,
-  seguito però da sei NO_MATCH consecutivi con il dito registrato, inclusi due
-  primi epoch con baseline appena acquisita. Il test precedente provava solo
-  la meccanica pinned su un frame grezzo artificialmente fisso; il nuovo test
-  session-coupled mostra che B0 e frame devono essere variati insieme. Senza
-  fixture reali decodificate, la root cause e la stabilità restano aperte.
+- D291 è chiuso funzionalmente: multi-VERIFY, max tre tentativi, stop al MATCH,
+  assenza di retry nascosti e stabilità del nuovo template nel gate a quattro
+  serie sono provati. Il pinning baseline resta implementato ma non isolato
+  causalmente; questa attribuzione non è necessaria alla closure.
 - Driver e integrazione SIGFM funzionano nella fork Fedora preservata, ma il
   delta production non è ancora presentato come una singola patch series o
   sorgente di build mantenibile rispetto a un upstream scelto.
@@ -154,7 +151,7 @@ qualificano i boundary lifecycle realmente nuovi.
 - **PERCHÉ SERVE:** oggi la funzione è provata, ma la sorgente autorevole è
   distribuita fra `libfprint-driver/`, la fork Fedora preservata e componenti
   SIGFM/R2 con licenze diverse.
-- **PREREQUISITI:** evidenze D279–D290, `Rockytkg/PROVENANCE.md`, ledger
+- **PREREQUISITI:** evidenze D279–D291, `Rockytkg/PROVENANCE.md`, ledger
   `docs/LICENSING_AND_PROVENANCE.md`, versioni Fedora attualmente pin-nate.
 - **OUTPUT ATTESO:** architecture decision record; inventario source-of-truth;
   patch series o tree integrato; build normal e sanitizer riproducibile;
@@ -286,12 +283,14 @@ Non riaprire o ripetere per sola “maggiore confidenza”:
 - D288: consumer KScreenLocker e propagazione `Unlocked`;
 - D289: fingerprint → sblocco di una sessione KDE realmente bloccata;
 - D290: fingerprint passwordless → login Plasma → nuova sessione Wayland.
+- D291: enrollment diversity Rocky-derived, discriminazione wrong-finger e
+  quattro serie registrate concluse con MATCH.
 
 Una regressione mirata è giustificata soltanto se cambia codice/configurazione
 nel percorso rilevante, cambia materialmente la piattaforma supportata, emerge
 un difetto riproducibile oppure l'Utente richiede esplicitamente una nuova
 qualificazione. In quel caso si testa il delta più piccolo; non si ripete
-l'intera storia D279–D290 e si applica sempre la serie bounded:
+l'intera storia D279–D291 e si applica sempre la serie bounded:
 
 ```text
 MAX_PHYSICAL_ATTEMPTS=3
@@ -305,20 +304,19 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 
 ## Decisione corrente
 
-Il piano non avvia la Phase A mentre D291 è aperto. Il precedente kit D291 è
-`HISTORICAL_ONLY_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
-dell'Utente. Il prossimo piano deve prima rendere osservabile la variabilità
-B0/raster/descrittori con dati reali già disponibili o con una futura
-strumentazione privacy-preserving motivata da una nuova ipotesi, quindi
-proporre soltanto il delta production minimo.
+La Phase A è ora il boundary corrente. Il kit D291 è
+`HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
+dell'Utente. Il primo task è consolidare la source-of-truth production e una
+build riproducibile, preservando il percorso target-proven e separando seam di
+test, reference tree e materiale storico.
 
 ```text
-PM_DECISION=REPLAN
+PM_DECISION=ACCEPT_AND_CONTINUE
 D290_CLOSED_SUCCESSFULLY=true
-D291_CLOSURE=NOT_ALLOWED
-D291_BIOMETRIC_STABILITY=OPEN
-D291_OPERATOR_KIT=HISTORICAL_ONLY_DO_NOT_RERUN
+D291_CLOSURE=PROVEN_ON_TARGET
+D291_BIOMETRIC_STABILITY_GATE=PASS
+D291_OPERATOR_KIT=HISTORICAL_CLOSED_DO_NOT_RERUN
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NO_NEXT_PHASE_EXECUTION_STARTED=true
+NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
 ```

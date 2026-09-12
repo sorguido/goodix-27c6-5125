@@ -1,18 +1,26 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D291/01 — re-enrollment diversificato e verifica di stabilità
+# D291/01 — evidenza storica del re-enrollment diversificato
 
 ```text
-STATUS=HUMAN_GATE_READY
-PURPOSE=VALIDATE_ROCKY_DERIVED_ENROLLMENT_DIVERSITY
+STATUS=HISTORICAL_CLOSED_DO_NOT_RERUN
+EXECUTION_DISABLED=true
+LIVE_RESULT=PASS_REENROLL_AND_4_MATCHED_SERIES
+PURPOSE=AUDIT_ROCKY_DERIVED_ENROLLMENT_DIVERSITY
 FACTORY_PRESERVING=true
 ```
 
+La live è stata completata con successo dall'Utente sulla candidate
+`cbf582f4dcdb7eeb6c8381223c84d37363386870`. Il launcher rifiuta ora sia
+`--operator-run` sia `--root-run` prima di qualsiasi azione. Il contenuto
+sottostante descrive il percorso eseguito ed è conservato esclusivamente per
+audit; non costituisce un'istruzione a ripetere la live.
+
 ## Cosa fa
 
-Con un solo comando il kit costruisce la candidate dal `development` già
-pushato, aggiorna soltanto la `libfprint` del runtime D285, sostituisce il
-template host dell'indice destro con un enrollment governato dalla policy
-Rocky 3/8/2/MAD<8 e prova quattro serie VERIFY indipendenti.
+Il kit ha costruito la candidate dal `development` già pushato, aggiornato
+soltanto la `libfprint` del runtime D285, sostituito il template host
+dell'indice destro con un enrollment governato dalla policy Rocky 3/8/2/MAD<8
+e provato quattro serie VERIFY indipendenti.
 
 La prima serie richiede deliberatamente un dito non registrato (`NO_MATCH`) e poi l'indice
 destro. Le altre tre usano l'indice destro in normali posizioni quotidiane.
@@ -49,7 +57,7 @@ limitato tecnicamente a 20. Due duplicati consecutivi dopo almeno tre campioni
 chiudono la copertura accettando il contatto finale, come nel riferimento
 Rocky. Un errore o il superamento del limite attiva il rollback.
 
-## Prerequisiti e stop condition
+## Prerequisiti e stop condition della live chiusa
 
 - branch `development`, HEAD uguale a `origin/development`, worktree pulito;
 - installazione persistente D285/D286 integra;
@@ -61,17 +69,18 @@ Rocky. Un errore o il superamento del limite attiva il rollback.
 - se compare la password durante una serie, premere `Ctrl-C` senza digitarla;
 - non rilanciare automaticamente una run fallita.
 
-## Comando operatore
+## Esecuzione disabilitata
 
-Dalla root del repository:
+Il comando storico era:
 
 ```bash
 operator_kit/d291-01-multi-verify/run-d291-01.sh --operator-run
 ```
 
-Confermare nell'ordine `AGGIORNA D291`, `REENROLL DESTRO` e, prima di ogni
-serie, `SERIE N PRONTA`. Il dialogo `pkexec` usa il percorso password separato
-di `system-auth`, sul quale D285 mantiene fingerprint disabilitato.
+Non deve essere rilanciato: termina con
+`D291_01_STATUS=HISTORICAL_CLOSED_DO_NOT_RERUN` prima di build, `pkexec`, sudo,
+USB o modifica del runtime. Durante la live chiusa le conferme erano, in ordine,
+`AGGIORNA D291`, `REENROLL DESTRO` e `SERIE N PRONTA`.
 
 Il risultato sanitizzato è scritto in una directory
 `/tmp/goodix-d291-01-result.*` riportata come `RESULT_DIRECTORY`. Contiene
@@ -82,6 +91,6 @@ PSK o materiale protetto. Il successo termina con:
 D291_01_LIVE_RESULT=PASS_REENROLL_AND_4_MATCHED_SERIES
 ```
 
-Il nuovo runtime e il nuovo template restano attivi soltanto dopo il successo;
-lo state root-only D285 viene aggiornato con i nuovi hash per mantenere audit e
-uninstall readiness.
+Il nuovo runtime e il nuovo template sono rimasti attivi dopo il successo; lo
+state root-only D285 è stato aggiornato con i nuovi hash e il backup temporaneo
+è stato eliminato. Non è stato eseguito rollback.

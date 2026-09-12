@@ -363,7 +363,10 @@ operator_run () {
 }
 
 case ${1:-} in
-  --operator-run) [[ $# -le 2 ]] || refuse USAGE; operator_run "${2:-}" ;;
-  --root-run) [[ $# -eq 3 ]] || refuse USAGE; root_run "$2" "$3" ;;
+  --operator-run|--root-run)
+    echo D291_01_STATUS=HISTORICAL_CLOSED_DO_NOT_RERUN >&2
+    echo D291_01_LIVE_RESULT=PASS_REENROLL_AND_4_MATCHED_SERIES >&2
+    exit 4
+    ;;
   *) echo "Uso: $0 --operator-run [directory-rpm-opencv]" >&2; exit 2 ;;
 esac

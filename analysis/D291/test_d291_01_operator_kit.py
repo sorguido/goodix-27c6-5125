@@ -126,19 +126,20 @@ class D291OperatorKitContract(unittest.TestCase):
         self.assertIn('"$script_path"', self.script)
         self.assertIn('--root-run "$candidate" "$baseline"', self.script)
 
-    def test_13_readme_discloses_gate_reenroll_and_result(self):
-        for marker in ("HUMAN_GATE_READY", "re-enrollment", "3 a 8", "20",
+    def test_13_readme_discloses_closed_gate_and_result(self):
+        for marker in ("HISTORICAL_CLOSED_DO_NOT_RERUN", "re-enrollment", "3 a 8", "20",
                        "quattro serie VERIFY", "NO_MATCH", "MATCH", "Ctrl-C",
                        "rollback", "RESULT_DIRECTORY",
                        "template biometrico host", "FACTORY_PRESERVING"):
             self.assertIn(marker, self.readme)
 
-    def test_14_unknown_mode_stops_before_privileged_action(self):
+    def test_14_closed_kit_stops_before_privileged_action(self):
         completed = subprocess.run(
-            [str(SCRIPT), "--not-a-mode"], text=True,
+            [str(SCRIPT), "--operator-run"], text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-        self.assertEqual(completed.returncode, 2)
-        self.assertIn("Uso:", completed.stderr)
+        self.assertEqual(completed.returncode, 4)
+        self.assertIn("HISTORICAL_CLOSED_DO_NOT_RERUN", completed.stderr)
+        self.assertIn("PASS_REENROLL_AND_4_MATCHED_SERIES", completed.stderr)
 
 
 if __name__ == "__main__":
