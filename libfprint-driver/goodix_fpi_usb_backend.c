@@ -448,6 +448,34 @@ gboolean goodix_fpi_usb_backend_is_drained (GoodixFpiUsbBackend *backend)
 { return backend != NULL && backend_is_drained (backend); }
 gboolean goodix_fpi_usb_backend_can_free (GoodixFpiUsbBackend *backend)
 { return backend != NULL && backend_is_drained (backend); }
+gboolean
+goodix_fpi_usb_backend_reset_epoch_audit (GoodixFpiUsbBackend *backend,
+                                          GError              **error)
+{
+  if (backend == NULL || !backend->terminal_fence ||
+      !backend_is_drained (backend) || backend->pre_session_sync_active)
+    {
+      g_set_error_literal (error, backend_error_quark (), 7,
+                           "cannot reset USB audit before terminal drain");
+      return FALSE;
+    }
+
+  backend->generation = 0;
+  backend->in_generation = 0;
+  backend->out_generation = 0;
+  backend->in_purpose = GOODIX_USB_RECEIVE_NONE;
+  backend->in_timeout_ms = 0;
+  backend->max_outstanding = 0;
+  backend->max_out_outstanding = 0;
+  backend->delivery_count = 0;
+  backend->real_submit_count = 0;
+  backend->out_submit_count = 0;
+  backend->in_completion_count = 0;
+  backend->out_completion_count = 0;
+  backend->drain_notified = FALSE;
+  g_clear_object (&backend->cancellable);
+  return TRUE;
+}
 guint goodix_fpi_usb_backend_get_outstanding (GoodixFpiUsbBackend *backend)
 { return backend != NULL ? backend->in_outstanding : 0; }
 guint goodix_fpi_usb_backend_get_out_outstanding (GoodixFpiUsbBackend *backend)

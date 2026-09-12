@@ -23,9 +23,9 @@ class D285OfflineContract(unittest.TestCase):
         cls.readme = (KIT / "README_IT.md").read_text()
         cls.pam_source = (ROOT / "reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c").read_text()
 
-    def test_01_pam_has_one_try_password_fallback_and_deny(self):
+    def test_01_pam_has_three_tries_password_fallback_and_deny(self):
         self.assertEqual(self.pam.count("pam_fprintd.so"), 1)
-        self.assertIn("pam_fprintd.so max-tries=1 timeout=45", self.pam)
+        self.assertIn("pam_fprintd.so max-tries=3 timeout=45", self.pam)
         self.assertIn("pam_unix.so nullok", self.pam)
         self.assertIn("pam_deny.so", self.pam)
         self.assertLess(self.pam.index("pam_fprintd.so"), self.pam.index("pam_unix.so"))

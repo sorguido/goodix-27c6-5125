@@ -61,6 +61,7 @@ struct _GoodixDeviceContext
   gboolean                 deactivation_held;
   gboolean                 deactivation_pending;
   gboolean                 deactivation_nonquiescent;
+  gboolean                 deactivation_completion_scheduled;
 
   const GoodixBackendVTable *backend_vtable;
   gpointer                   backend_user_data;
@@ -106,6 +107,8 @@ struct _GoodixDeviceContext
   FpiDeviceAction            production_action;
   guint                      production_action_attempt_count;
   guint                      production_rejected_action_count;
+  guint                      production_explicit_verify_reopen_count;
+  gboolean                   production_verify_epoch_closed;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeMaterialReleaseSeam runtime_material_release;
   gpointer                   runtime_material_release_data;
@@ -127,6 +130,7 @@ typedef struct
   GoodixDeviceContext *ctx;
   GoodixProductionEnrollmentAudit last_production_audit;
   gboolean last_production_audit_valid;
+  gboolean last_production_audit_logged;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
   GoodixRuntimeMaterialAcquireSeam acquire_material;
   GoodixRuntimeMaterialReleaseSeam release_material;
@@ -669,6 +673,8 @@ goodix_device_context_collect_production_enrollment_audit (
     .production_action_attempt_count = ctx->production_action_attempt_count,
     .production_rejected_action_count = ctx->production_rejected_action_count,
     .production_action_consumed = ctx->production_action_consumed,
+    .production_explicit_verify_reopen_count =
+      ctx->production_explicit_verify_reopen_count,
     .auxiliary_b0_observed_count = ctx->runtime_enrollment_auxiliary_count,
     .terminal_enroll_completion_hold_count =
       ctx->terminal_enroll_completion_hold_count,
@@ -708,6 +714,54 @@ goodix_device_context_collect_production_enrollment_audit (
     .runtime_handoff_views_cleared = ctx->runtime_handoff_views_cleared,
     .context_closed = context_closed,
   };
+}
+
+static void
+goodix_fpimage_device_log_production_audit (
+  const GoodixProductionEnrollmentAudit *audit)
+{
+  g_autofree gchar *action_name = NULL;
+  guint reopen_count;
+
+  g_return_if_fail (audit != NULL);
+  action_name = g_enum_to_string (FPI_TYPE_DEVICE_ACTION,
+                                  (gint) audit->production_action);
+  reopen_count = audit->secure.transport_reopen_count +
+                 audit->post_tls.reopen_count +
+                 audit->production_explicit_verify_reopen_count;
+  g_message (
+    "GOODIX_D282_EPOCH_AUDIT action=%s attempts=%u rejected=%u "
+    "consumed=%u tls=%u "
+    "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
+    "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
+    "secure_retry=%u post_retry=%u reopen=%u explicit_verify_reopen=%u "
+    "reset=%u clear_halt=%u persistent=%u real_submit=%" G_GUINT64_FORMAT " "
+    "outstanding=%u drained=%u context_closed=%u",
+    action_name != NULL ? action_name : "UNKNOWN",
+    audit->production_action_attempt_count,
+    audit->production_rejected_action_count,
+    audit->production_action_consumed,
+    audit->tls.handshake_count,
+    audit->post_tls.first_image_pipeline_count,
+    audit->post_tls.release_tail_complete_count,
+    audit->post_tls.single_acquisition_terminal_count,
+    audit->post_tls.rearm_0x32_count,
+    audit->enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
+    audit->enrollment_events.lifecycle.plan.inter_stage_rearm_count,
+    audit->enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
+    audit->secure.retry_count,
+    audit->post_tls.retry_count,
+    reopen_count,
+    audit->production_explicit_verify_reopen_count,
+    audit->secure.device_reset_count + audit->post_tls.device_reset_count,
+    audit->secure.clear_halt_count + audit->post_tls.clear_halt_count,
+    audit->secure.persistent_write_count +
+      audit->post_tls.persistent_device_write_count +
+      audit->enrollment_binding.transaction.frame.persistent_family_count,
+    audit->usb_real_submit_count,
+    audit->usb_outstanding_count,
+    audit->usb_backend_drained,
+    audit->context_closed);
 }
 
 static void
@@ -853,6 +907,202 @@ goodix_fpimage_device_release_claim (GoodixFpImageDevice *self,
 }
 
 static void
+goodix_device_context_release_epoch_objects (GoodixDeviceContext *ctx)
+{
+  g_clear_object (&ctx->activation_cancellable);
+  g_clear_object (&ctx->usb_cancellable);
+  g_clear_error (&ctx->terminal_error);
+  goodix_post_tls_lifecycle_free (ctx->post_tls_lifecycle);
+  ctx->post_tls_lifecycle = NULL;
+  goodix_secure_session_free (ctx->secure_session);
+  ctx->secure_session = NULL;
+  goodix_tls_server_free (ctx->tls_server);
+  ctx->tls_server = NULL;
+  goodix_enrollment_fpi_usb_binding_free (ctx->enrollment_binding);
+  ctx->enrollment_binding = NULL;
+  goodix_enrollment_post_tls_events_free (ctx->pending_enrollment_events);
+  ctx->pending_enrollment_events = NULL;
+  ctx->tls_plaintext = NULL;
+  ctx->tls_user_data = NULL;
+  ctx->enrollment_auxiliary = NULL;
+  ctx->enrollment_auxiliary_data = NULL;
+  ctx->enrollment_binding_audit = NULL;
+  OPENSSL_cleanse (&ctx->runtime_secure_view,
+                   sizeof ctx->runtime_secure_view);
+  OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  OPENSSL_cleanse (ctx->sigfm_baseline, sizeof ctx->sigfm_baseline);
+  ctx->sigfm_baseline_valid = FALSE;
+#endif
+  if (ctx->runtime_material != NULL)
+    {
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+      g_assert (ctx->runtime_material_release != NULL);
+      ctx->runtime_material_release (ctx->runtime_material,
+                                     ctx->runtime_material_release_data);
+#else
+      default_release_runtime_material (ctx->runtime_material, NULL);
+#endif
+      ctx->runtime_material = NULL;
+    }
+}
+
+static gboolean
+goodix_fpimage_device_close_completed_verify_epoch (
+  GoodixFpImageDevice *self,
+  GError             **error)
+{
+  GoodixFpImageDevicePrivate *priv =
+    goodix_fpimage_device_get_instance_private (self);
+  GoodixDeviceContext *ctx = priv->ctx;
+
+  if (ctx == NULL || ctx->production_action != FPI_DEVICE_ACTION_VERIFY ||
+      !ctx->production_action_consumed || ctx->poisoned ||
+      !goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend) ||
+      ctx->post_tls_lifecycle == NULL ||
+      goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) !=
+        GOODIX_POST_TLS_PHASE_STOP ||
+      ctx->enrollment_binding != NULL ||
+      ctx->pending_enrollment_events != NULL)
+    {
+      g_set_error_literal (
+        error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_PROTO,
+        "Goodix VERIFY epoch did not reach a clean terminal drain");
+      return FALSE;
+    }
+  if (!goodix_fpimage_device_release_claim (self, error))
+    return FALSE;
+
+  goodix_device_context_release_epoch_objects (ctx);
+  ctx->generation = 0;
+  ctx->production_verify_epoch_closed = TRUE;
+  goodix_device_context_collect_production_enrollment_audit (
+    ctx, &priv->last_production_audit, TRUE);
+  priv->last_production_audit_valid = TRUE;
+  priv->last_production_audit_logged = FALSE;
+  return TRUE;
+}
+
+static void
+goodix_device_context_reset_for_explicit_verify_reopen (
+  GoodixDeviceContext *ctx)
+{
+  ctx->production_action_consumed = FALSE;
+  ctx->production_action = FPI_DEVICE_ACTION_NONE;
+  ctx->production_action_attempt_count = 0;
+  ctx->production_rejected_action_count = 0;
+  ctx->production_explicit_verify_reopen_count = 1;
+  ctx->production_verify_epoch_closed = FALSE;
+  ctx->release_tail_complete = FALSE;
+  ctx->fresh_down_table = FALSE;
+  ctx->rearm_issued_generation = 0;
+  ctx->terminal_fence = TRUE;
+  ctx->poisoned = FALSE;
+  ctx->activation_completed = FALSE;
+  ctx->deactivation_held = FALSE;
+  ctx->deactivation_pending = FALSE;
+  ctx->deactivation_nonquiescent = FALSE;
+  ctx->runtime_handoff_views_cleared = FALSE;
+  ctx->runtime_enrollment_auxiliary_count = 0;
+  ctx->terminal_enroll_completion_hold_count = 0;
+  ctx->terminal_enroll_completion_release_count = 0;
+  ctx->terminal_enroll_completion_abort_count = 0;
+  ctx->terminal_enroll_completion_held = FALSE;
+  ctx->terminal_delivery_at_release_ready = FALSE;
+  memset (&ctx->pre_session_rx_sync_audit, 0,
+          sizeof ctx->pre_session_rx_sync_audit);
+  ctx->pre_session_rx_sync_started_us = 0;
+  ctx->pre_session_rx_sync_out_count_at_pass = 0;
+  memset (&ctx->runtime_material_audit, 0,
+          sizeof ctx->runtime_material_audit);
+  memset (&ctx->runtime_secure_audit, 0,
+          sizeof ctx->runtime_secure_audit);
+  memset (&ctx->runtime_tls_audit, 0,
+          sizeof ctx->runtime_tls_audit);
+  memset (&ctx->runtime_post_tls_audit, 0,
+          sizeof ctx->runtime_post_tls_audit);
+  memset (&ctx->runtime_enrollment_events_audit, 0,
+          sizeof ctx->runtime_enrollment_events_audit);
+  memset (&ctx->runtime_enrollment_binding_audit, 0,
+          sizeof ctx->runtime_enrollment_binding_audit);
+}
+
+static gboolean
+goodix_fpimage_device_reopen_for_explicit_verify (
+  GoodixFpImageDevice *self,
+  GError             **error)
+{
+  GoodixFpImageDevicePrivate *priv =
+    goodix_fpimage_device_get_instance_private (self);
+  GoodixDeviceContext *ctx = priv->ctx;
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  GoodixRuntimeMaterialAcquireSeam acquire_material;
+  GoodixUsbInterfaceSeam claim_interface;
+#endif
+
+  if (ctx == NULL || !ctx->production_verify_epoch_closed || ctx->poisoned ||
+      ctx->state != GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
+      ctx->runtime_material != NULL || ctx->usb_interface_claimed ||
+      ctx->secure_session != NULL || ctx->post_tls_lifecycle != NULL ||
+      !goodix_fpi_usb_backend_reset_epoch_audit (ctx->fpi_usb_backend, error))
+    return FALSE;
+
+  if (priv->last_production_audit_valid &&
+      !priv->last_production_audit_logged)
+    {
+      goodix_fpimage_device_log_production_audit (
+        &priv->last_production_audit);
+      priv->last_production_audit_logged = TRUE;
+    }
+
+  goodix_device_context_reset_for_explicit_verify_reopen (ctx);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  acquire_material = priv->acquire_material != NULL ?
+    priv->acquire_material : default_acquire_runtime_material;
+  ctx->runtime_material_release = priv->release_material != NULL ?
+    priv->release_material : default_release_runtime_material;
+  ctx->runtime_material_release_data = priv->production_seam_data;
+  if (!acquire_material (&ctx->runtime_material,
+                         &ctx->runtime_secure_view,
+                         ctx->runtime_fdt_seed,
+                         &ctx->runtime_material_audit,
+                         priv->production_seam_data, error) ||
+      ctx->runtime_material == NULL)
+#else
+  if (!default_acquire_runtime_material (&ctx->runtime_material,
+                                         &ctx->runtime_secure_view,
+                                         ctx->runtime_fdt_seed,
+                                         &ctx->runtime_material_audit,
+                                         NULL, error) ||
+      ctx->runtime_material == NULL)
+#endif
+    goto fail;
+
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+  claim_interface = priv->claim_interface != NULL ?
+    priv->claim_interface : default_claim_interface;
+  if (!claim_interface (fpi_device_get_usb_device (FP_DEVICE (self)), 0,
+                        priv->production_seam_data, error))
+    goto fail;
+#else
+  if (!default_claim_interface (
+        fpi_device_get_usb_device (FP_DEVICE (self)), 0, NULL, error))
+    goto fail;
+#endif
+  ctx->usb_interface_claimed = TRUE;
+  return TRUE;
+
+fail:
+  if (error != NULL && *error == NULL)
+    g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                         "Goodix explicit VERIFY epoch reopen failed");
+  goodix_device_context_release_epoch_objects (ctx);
+  ctx->production_verify_epoch_closed = TRUE;
+  ctx->poisoned = TRUE;
+  return FALSE;
+}
+
+static void
 goodix_fpimage_device_discard_context (GoodixFpImageDevice *self)
 {
   GoodixFpImageDevicePrivate *priv =
@@ -863,6 +1113,7 @@ goodix_fpimage_device_discard_context (GoodixFpImageDevice *self)
     {
       goodix_device_context_free (ctx, &priv->last_production_audit);
       priv->last_production_audit_valid = TRUE;
+      priv->last_production_audit_logged = FALSE;
     }
   goodix_fpimage_device_set_context (self, NULL);
 }
@@ -1160,45 +1411,12 @@ goodix_fpimage_device_img_close (FpImageDevice *dev)
   goodix_fpimage_device_discard_context (self);
 
   if (goodix_fpimage_device_is_production_usb (self) &&
-      priv->last_production_audit_valid)
+      priv->last_production_audit_valid &&
+      !priv->last_production_audit_logged)
     {
-      const GoodixProductionEnrollmentAudit *audit =
-        &priv->last_production_audit;
-      g_autofree gchar *action_name = g_enum_to_string (
-        FPI_TYPE_DEVICE_ACTION, (gint) audit->production_action);
-
-      g_message (
-        "GOODIX_D282_EPOCH_AUDIT action=%s attempts=%u rejected=%u "
-        "consumed=%u tls=%u "
-        "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
-        "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
-        "secure_retry=%u post_retry=%u reopen=%u reset=%u clear_halt=%u "
-        "persistent=%u real_submit=%" G_GUINT64_FORMAT " "
-        "outstanding=%u drained=%u context_closed=%u",
-        action_name != NULL ? action_name : "UNKNOWN",
-        audit->production_action_attempt_count,
-        audit->production_rejected_action_count,
-        audit->production_action_consumed,
-        audit->tls.handshake_count,
-        audit->post_tls.first_image_pipeline_count,
-        audit->post_tls.release_tail_complete_count,
-        audit->post_tls.single_acquisition_terminal_count,
-        audit->post_tls.rearm_0x32_count,
-        audit->enrollment_events.lifecycle.plan.pipeline.protocol.completed_stage_count,
-        audit->enrollment_events.lifecycle.plan.inter_stage_rearm_count,
-        audit->enrollment_events.lifecycle.plan.pipeline.protocol.terminal_transition_count,
-        audit->secure.retry_count,
-        audit->post_tls.retry_count,
-        audit->secure.transport_reopen_count + audit->post_tls.reopen_count,
-        audit->secure.device_reset_count + audit->post_tls.device_reset_count,
-        audit->secure.clear_halt_count + audit->post_tls.clear_halt_count,
-        audit->secure.persistent_write_count +
-          audit->post_tls.persistent_device_write_count +
-          audit->enrollment_binding.transaction.frame.persistent_family_count,
-        audit->usb_real_submit_count,
-        audit->usb_outstanding_count,
-        audit->usb_backend_drained,
-        audit->context_closed);
+      goodix_fpimage_device_log_production_audit (
+        &priv->last_production_audit);
+      priv->last_production_audit_logged = TRUE;
     }
 
   fpi_image_device_close_complete (dev, g_steal_pointer (&error));
@@ -1209,6 +1427,7 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
 {
   GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (dev);
   GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
+  FpiDeviceAction action = fpi_device_get_current_action (FP_DEVICE (self));
 
   g_assert (ctx != NULL);
   g_assert (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_INACTIVE ||
@@ -1233,18 +1452,40 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
     }
 
   if (goodix_fpimage_device_is_production_usb (self) &&
-      fpi_device_get_current_action (FP_DEVICE (self)) !=
-        FPI_DEVICE_ACTION_ENROLL &&
-      fpi_device_get_current_action (FP_DEVICE (self)) !=
-        FPI_DEVICE_ACTION_VERIFY &&
-      fpi_device_get_current_action (FP_DEVICE (self)) !=
-        FPI_DEVICE_ACTION_IDENTIFY)
+      action != FPI_DEVICE_ACTION_ENROLL &&
+      action != FPI_DEVICE_ACTION_VERIFY &&
+      action != FPI_DEVICE_ACTION_IDENTIFY)
     {
       error = g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
         "Goodix production boundary permits enrollment, verify and identify only");
       fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
       return;
+    }
+
+  /* A completed VERIFY closes its internal production epoch while the
+   * libfprint device remains logically open.  Only a later, explicit
+   * VerifyStart may reopen it; no acquisition or retry is initiated here. */
+  if (goodix_fpimage_device_is_production_usb (self) &&
+      ctx->production_verify_epoch_closed)
+    {
+      if (action != FPI_DEVICE_ACTION_VERIFY)
+        {
+          error = g_error_new_literal (
+            FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
+            "Goodix completed VERIFY epoch accepts only a new explicit VerifyStart");
+          fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+          return;
+        }
+      if (!goodix_fpimage_device_reopen_for_explicit_verify (self, &error))
+        {
+          if (error == NULL)
+            error = g_error_new_literal (
+              FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_OPEN,
+              "Goodix explicit VERIFY epoch reopen failed");
+          fpi_image_device_activate_complete (dev, g_steal_pointer (&error));
+          return;
+        }
     }
 
   /* The first production action consumes this complete open epoch, including
@@ -1265,8 +1506,7 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
     {
       ctx->production_action_attempt_count++;
       ctx->production_action_consumed = TRUE;
-      ctx->production_action = fpi_device_get_current_action (
-        FP_DEVICE (self));
+      ctx->production_action = action;
     }
 
   /* New activation -> new generation, reset per-activation gates. */
@@ -1555,7 +1795,7 @@ goodix_device_context_get_production_enrollment_audit (
   g_return_if_fail (audit != NULL);
 
   goodix_device_context_collect_production_enrollment_audit (
-    ctx, audit, FALSE);
+    ctx, audit, ctx->production_verify_epoch_closed);
 }
 
 void
@@ -1572,7 +1812,7 @@ goodix_fpimage_device_get_production_enrollment_audit (
   if (priv->ctx != NULL)
     {
       goodix_device_context_collect_production_enrollment_audit (
-        priv->ctx, audit, FALSE);
+        priv->ctx, audit, priv->ctx->production_verify_epoch_closed);
       return;
     }
   if (priv->last_production_audit_valid)
@@ -2391,9 +2631,11 @@ goodix_device_context_set_deactivation_held (GoodixDeviceContext *ctx,
   ctx->deactivation_held = !!held;
 }
 
-void
-goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
+static void
+goodix_device_context_finish_deactivation (GoodixDeviceContext *ctx)
 {
+  g_autoptr(GError) error = NULL;
+
   g_return_if_fail (ctx != NULL);
   g_return_if_fail (ctx->deactivation_pending);
   g_return_if_fail (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
@@ -2408,9 +2650,71 @@ goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
                                        GOODIX_DEVICE_CONTEXT_STATE_POISONED);
     }
   else
-    goodix_device_context_set_state (ctx,
-                                     GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
-  fpi_image_device_deactivate_complete (FP_IMAGE_DEVICE (ctx->device), NULL);
+    {
+      goodix_device_context_set_state (ctx,
+                                       GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+      if (goodix_fpimage_device_is_production_usb (ctx->device) &&
+          ctx->production_action == FPI_DEVICE_ACTION_VERIFY &&
+          !goodix_fpimage_device_close_completed_verify_epoch (
+            ctx->device, &error))
+        {
+          goodix_device_context_set_poisoned (ctx, error);
+          goodix_device_context_set_state (
+            ctx, GOODIX_DEVICE_CONTEXT_STATE_POISONED);
+        }
+    }
+  fpi_image_device_deactivate_complete (FP_IMAGE_DEVICE (ctx->device),
+                                        g_steal_pointer (&error));
+}
+
+static gboolean
+goodix_device_context_complete_deactivation_idle (gpointer user_data)
+{
+  GoodixFpImageDevice *self = GOODIX_FPIMAGE_DEVICE (user_data);
+  GoodixDeviceContext *ctx = goodix_fpimage_device_peek_context (self);
+
+  if (ctx == NULL)
+    return G_SOURCE_REMOVE;
+
+  ctx->deactivation_completion_scheduled = FALSE;
+  if (ctx->deactivation_pending &&
+      ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING &&
+      goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
+    goodix_device_context_finish_deactivation (ctx);
+
+  return G_SOURCE_REMOVE;
+}
+
+void
+goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
+{
+  g_return_if_fail (ctx != NULL);
+  g_return_if_fail (ctx->deactivation_pending);
+  g_return_if_fail (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
+  if (!goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
+    return;
+
+  /* Finger-off may synchronously enter deactivation from inside the post-TLS
+   * lifecycle.  A clean VERIFY completion frees that lifecycle, so finish it
+   * from the next main-loop turn after the emitting stack has unwound.  This
+   * also guarantees that a consumer callback can request the next explicit
+   * VerifyStart only after the previous epoch is fully released. */
+  if (!ctx->deactivation_nonquiescent &&
+      goodix_fpimage_device_is_production_usb (ctx->device) &&
+      ctx->production_action == FPI_DEVICE_ACTION_VERIFY)
+    {
+      if (!ctx->deactivation_completion_scheduled)
+        {
+          ctx->deactivation_completion_scheduled = TRUE;
+          g_idle_add_full (
+            G_PRIORITY_DEFAULT_IDLE,
+            goodix_device_context_complete_deactivation_idle,
+            g_object_ref (ctx->device), g_object_unref);
+        }
+      return;
+    }
+
+  goodix_device_context_finish_deactivation (ctx);
 }
 
 /* --- Fake backend event injection --- */

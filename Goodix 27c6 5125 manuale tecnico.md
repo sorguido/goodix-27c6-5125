@@ -113,7 +113,83 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D290/01 chiuso con login fingerprint Plasma/Wayland provato
+### Stato corrente — D291 multi-VERIFY implementato offline, live Human Gate
+
+L'evidenza reale che apre D291 proviene dal consumer quotidiano `sudo`, dopo
+che l'Utente ha portato il PAM D285 attivo a
+`pam_fprintd.so max-tries=3 timeout=45` aggiornandone coerentemente l'hash nello
+state root-only. Con primo contatto deliberatamente errato, pam_fprintd ha
+emesso il secondo prompt ma il driver ha rifiutato il nuovo `VerifyStart`:
+
+```text
+Goodix production open epoch already consumed; close/reopen required
+attempts=2 rejected=1 consumed=1 tls=1 first_image=1
+```
+
+La diagnosi è driver-side. pam_fprintd chiude la VERIFY conclusa NO_MATCH e
+inizia una nuova richiesta esplicita; `production_action_consumed` era invece
+sticky per tutto il device open e impediva la seconda action. D291 applica un
+fix di lifecycle locale e consumer-agnostic: dopo una VERIFY normale arrivata
+a STOP post-TLS con backend drained, rilascia claim USB e oggetti
+runtime/secure/post-TLS senza avviare altro traffico. Soltanto un successivo
+`VerifyStart` esplicito ricrea material view, claim e generazione puliti.
+Cancellazioni/non-quiescenza restano poisoned/fail-closed e una richiesta
+concorrente resta `FP_DEVICE_ERROR_BUSY`.
+
+Il teardown finale è differito al successivo giro del main loop perché
+finger-off può entrare nella deactivation mentre lo stack del lifecycle
+post-TLS è ancora attivo. La callback del consumer viene completata solo dopo
+la release dell'epoch: ciò evita use-after-free e impedisce che un nuovo
+VerifyStart osservi risorse parzialmente chiuse.
+
+Ogni audit resta per singola acquisizione. `reopen` conserva il valore
+aggregato e il nuovo campo `explicit_verify_reopen` distingue il rollover
+legittimo richiesto dal consumer da retry/reopen interni:
+
+```text
+prima VERIFY:       reopen=0 explicit_verify_reopen=0
+seconda/terza:      reopen=1 explicit_verify_reopen=1
+per ogni VERIFY:    attempts=1 rejected=0 consumed=1 tls=1 first_image=1
+                    secure_retry=0 post_retry=0 reset=0 clear_halt=0
+                    persistent=0 outstanding=0 drained=1 context_closed=1
+```
+
+La regressione host-only copre MATCH al primo tentativo,
+NO_MATCH→MATCH, NO_MATCH→NO_MATCH→MATCH, tre NO_MATCH senza quarta
+acquisizione, assenza di acquisizioni nascoste e rifiuto del secondo
+VerifyStart concorrente. Risultati: suite driver normale e ASan/UBSan
+`28/28 PASS`, contratti D285/D286 `64/64 PASS`, kit D291 `12/12 PASS`, zero
+USB/sensore reale. Anche build production senza test seam e preflight ABI
+contro fprintd Fedora sono PASS. La sorgente operativa D285 e i suoi audit
+correnti ora riconoscono `max-tries=3`; il vecchio D286 a tre processi
+separati resta
+evidenza storica chiusa, non procedura da riaprire. Il PAM `plasmalogin`
+modificato direttamente dall'Utente non viene toccato.
+
+Il solo passo residuo D291 è privilegiato e sensor-reaching. Il micro-kit
+reversibile `operator_kit/d291-01-multi-verify/` costruisce dal commit pushato,
+sostituisce soltanto libfprint nel runtime D285, mantiene rollback e consente
+un unico `sudo ls`: primo contatto NO_MATCH volontario, secondo contatto MATCH.
+L'agente non lo esegue.
+
+```text
+PM_DECISION=HUMAN_REQUIRED
+D291_MULTI_VERIFY_IMPLEMENTED_OFFLINE=true
+UPSTREAM_PAM_MAX_TRIES_3_SUPPORTED_OFFLINE=true
+GOODIX_EXPLICIT_SECOND_VERIFY_SUPPORTED_OFFLINE=true
+GOODIX_EXPLICIT_THIRD_VERIFY_SUPPORTED_OFFLINE=true
+ONE_ACQUISITION_PER_VERIFY_START=true
+STOP_ON_MATCH=true
+NO_HIDDEN_RETRY=true
+NO_FOURTH_VERIFY_FROM_MAX_TRIES_3=true
+FACTORY_PRESERVING=true
+OFFLINE_REGRESSION=PASS
+LIVE_VALIDATION_REQUIRED=true
+```
+
+Dettaglio della closure: `analysis/D291/D291_01_OFFLINE_CLOSURE.md`.
+
+### Stato precedente — D290/01 chiuso con login fingerprint Plasma/Wayland provato
 
 La prima invocazione D290/01 sulla baseline
 `1a8c5528a0b9f9d12c395f1a9804ee82fd076b94` si è fermata fail-closed nel
@@ -209,16 +285,18 @@ VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
 MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
 tentativo, retry nascosto o illimitato.
 
-### Review complessiva e roadmap post-D290
+### Review complessiva e roadmap post-D291
 
-La chiusura D290 termina la sequenza di qualificazione dei consumer reali.
+La chiusura D290 termina la sequenza di qualificazione dei consumer reali; D291
+è il successivo correttivo lifecycle esplicitamente richiesto dall'Utente.
 Enrollment fixed-eight, FP3 attraverso close/open, fprintd ENROLL/VERIFY/delete,
 PAM, `sudo`, KScreenLocker, unlock di una sessione realmente bloccata e login
 Plasma verso una nuova sessione Wayland sono boundary chiusi e non vanno
 rieseguiti per sola maggiore confidenza. La fattibilità sul target APP12509 è
 provata; la production readiness no.
 
-Il lavoro residuo è principalmente consolidamento della sorgente production,
+Salvo la live breve D291 ora al Human Gate, il lavoro residuo è principalmente
+consolidamento della sorgente production,
 gestione utenti/template e materiali protetti, packaging/installazione gestita,
 lifecycle/recovery, qualificazione di release e pubblicazione auditata. Il
 piano completo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human Gate e

@@ -19,7 +19,9 @@ Il kit disabilita reversibilmente `with-fingerprint` e verifica che
 `system-auth` non contenga più pam_fprintd e che `fingerprint-auth` fallisca
 chiuso. Installa poi un servizio PAM nuovo, `goodix-d285-01-sudo`, e un override
 sudoers limitato al solo utente operatore. Il fallback `pam_unix.so` resta
-sempre dopo `pam_fprintd.so max-tries=1 timeout=45`.
+sempre dopo `pam_fprintd.so max-tries=3 timeout=45`. D291 ha sostituito il
+precedente limite one-shot: ogni tentativo PAM genera un `VerifyStart`
+esplicito e il driver non esegue acquisizioni o retry nascosti.
 
 Questo isola i consumer PAM osservati; non è isolamento assoluto del servizio
 D-Bus. Programmi autorizzati da polkit possono ancora parlare direttamente con
@@ -69,9 +71,10 @@ operator_kit/d285-01-persistent-sudo/run-d285-01.sh \
   --operator-install /home/guido/Repository/goodix-27c6-5125_private/GoodixArtifacts/opencv-4.13-rpms
 ```
 
-La run completata richiedeva `INSTALLA D285`, poi `DESTRO` per otto contatti enrollment e
-`INDICE DESTRO` per un solo `sudo -v`. Budget di installazione: due action
-biometriche, massimo nove contatti, zero retry automatico o implicito. Al
+La run storica completata, precedente a D291, richiedeva `INSTALLA D285`, poi
+`DESTRO` per otto contatti enrollment e `INDICE DESTRO` per un solo `sudo -v`.
+Budget storico di installazione: due action biometriche, massimo nove contatti,
+zero retry automatico o implicito. Al
 termine stampa `EXPORT_DIRECTORY` e `TERMINAL_TRANSCRIPT`; allegare i tre file
 esportati, mai lo state root-only o il template. Dopo la copia byte-identica,
 il result privato sotto `/var/tmp` viene rimosso; resta soltanto l'export

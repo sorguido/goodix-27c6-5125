@@ -161,7 +161,7 @@ d286_root_audit_installed () {
   d286_verify_installed_file "$d285_sudoers" "$sudoers_sha" || d286_refuse SUDOERS_FILE_DRIFT
   d286_verify_installed_file "$d285_wrapper" "$wrapper_sha" || d286_refuse WRAPPER_FILE_DRIFT
   d286_verify_installed_file "$d285_dropin" "$dropin_sha" || d286_refuse DROPIN_FILE_DRIFT
-  grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_fprintd\.so max-tries=1 timeout=45[[:space:]]*$' \
+  grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_fprintd\.so max-tries=3 timeout=45[[:space:]]*$' \
     "$d285_pam" || d286_refuse PAM_FINGERPRINT_DRIFT
   grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_unix\.so nullok[[:space:]]*$' \
     "$d285_pam" || d286_refuse PASSWORD_FALLBACK_MISSING

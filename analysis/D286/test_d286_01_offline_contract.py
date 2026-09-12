@@ -46,6 +46,7 @@ class D286OfflineContract(unittest.TestCase):
                 "SYSTEM_LIBFPRINT_DRIFT", "TEMPLATE_OWNERSHIP_DRIFT",
                 "UNINSTALL_READINESS=PASS_ALL_PREDELETE_GATES"):
             self.assertIn(marker, audit)
+        self.assertIn("pam_fprintd\\.so max-tries=3 timeout=45", audit)
 
     def test_04_root_audit_exports_no_protected_values(self):
         audit = section(self.script, "d286_root_audit_installed ()", "d286_valid_cursor ()")

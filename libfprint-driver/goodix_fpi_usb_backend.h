@@ -104,6 +104,11 @@ void goodix_fpi_usb_backend_complete_out (GoodixFpiUsbBackend *backend,
 void goodix_fpi_usb_backend_cancel (GoodixFpiUsbBackend *backend);
 gboolean goodix_fpi_usb_backend_is_drained (GoodixFpiUsbBackend *backend);
 gboolean goodix_fpi_usb_backend_can_free (GoodixFpiUsbBackend *backend);
+/* Clear per-epoch counters only after a terminal generation has drained.
+ * Test seams and the physical backend identity remain installed. */
+gboolean goodix_fpi_usb_backend_reset_epoch_audit (
+  GoodixFpiUsbBackend *backend,
+  GError              **error);
 guint goodix_fpi_usb_backend_get_outstanding (GoodixFpiUsbBackend *backend);
 guint goodix_fpi_usb_backend_get_out_outstanding (GoodixFpiUsbBackend *backend);
 guint goodix_fpi_usb_backend_get_max_outstanding (GoodixFpiUsbBackend *backend);

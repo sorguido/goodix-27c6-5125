@@ -507,7 +507,7 @@ d285_install () {
   grep -Fx 'auth required pam_debug.so auth=authinfo_unavail' \
     /etc/authselect/fingerprint-auth >/dev/null ||
     refuse FINGERPRINT_AUTH_NOT_FAIL_CLOSED
-  grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_fprintd\.so max-tries=1 timeout=45[[:space:]]*$' \
+  grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_fprintd\.so max-tries=3 timeout=45[[:space:]]*$' \
     "$d285_pam" || refuse D285_PAM_FINGERPRINT_DRIFT
   grep -Eq '^auth[[:space:]]+sufficient[[:space:]]+pam_unix\.so nullok[[:space:]]*$' \
     "$d285_pam" || refuse D285_PAM_PASSWORD_FALLBACK_MISSING
@@ -615,7 +615,7 @@ d285_install () {
     echo D285_01_INSTALL_STATUS=ACTIVE
     echo D285_01_CONSUMER=SUDO_VALIDATE_PERSISTENT
     echo D285_01_PAM_SERVICE=goodix-d285-01-sudo
-    echo D285_01_PAM_MAX_TRIES=1
+    echo D285_01_PAM_MAX_TRIES=3
     echo D285_01_PASSWORD_FALLBACK_PRESENT=true
     echo D285_01_GLOBAL_AUTHSELECT_FINGERPRINT_DISABLED=true
     echo D285_01_SYSTEM_AUTH_PAM_FPRINTD_COUNT=0

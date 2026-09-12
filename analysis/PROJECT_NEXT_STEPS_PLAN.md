@@ -3,9 +3,10 @@
 
 Data review: 12 settembre 2026
 
-Baseline esaminata: `development` / `31b0548a5613406b11e7311b8744ec25bca445c5` più il review set D290 non ancora consolidato
+Baseline esaminata: `development` con D290 consolidato più il review set D291
 
-Decisione PM: piano sottoposto all'Utente; nessuna fase successiva avviata
+Decisione PM: D291 autorizzato separatamente e implementato offline; nessuna
+altra fase successiva avviata
 
 ## Conclusione esecutiva
 
@@ -23,10 +24,12 @@ materialmente il percorso già provato o affronta un boundary lifecycle nuovo.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
+D291_MULTI_VERIFY_IMPLEMENTED_OFFLINE=true
+D291_LIVE_VALIDATION_REQUIRED=true
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEW_D291_STARTED=false
+NEW_D292_STARTED=false
 ```
 
 ## Stato verificato del progetto
@@ -57,6 +60,11 @@ NEW_D291_STARTED=false
 
 ### IMPLEMENTED, ma non production-ready
 
+- D291 corregge offline il lifecycle multi-VERIFY: ogni nuovo `VerifyStart`
+  esplicito dopo terminal NO_MATCH ottiene una nuova epoch drained, senza retry
+  o acquisizioni nascoste. Secondo e terzo tentativo, stop al MATCH, tre
+  NO_MATCH senza quarta action e factory guard sono coperti da regressione;
+  deployment e singola validazione reale restano Human Gate.
 - Driver e integrazione SIGFM funzionano nella fork Fedora preservata, ma il
   delta production non è ancora presentato come una singola patch series o
   sorgente di build mantenibile rispetto a un upstream scelto.

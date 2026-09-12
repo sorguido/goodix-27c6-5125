@@ -88,6 +88,9 @@ typedef struct
   guint production_action_attempt_count;
   guint production_rejected_action_count;
   gboolean production_action_consumed;
+  /* Host lifecycle rollover performed for a new explicit VerifyStart.  This
+   * is not a secure-session retry or a sensor-side automatic acquisition. */
+  guint production_explicit_verify_reopen_count;
   guint auxiliary_b0_observed_count;
   guint terminal_enroll_completion_hold_count;
   guint terminal_enroll_completion_release_count;

@@ -4,6 +4,11 @@
 > **CHIUSO:** la run finale è PASS. L'entrypoint `--operator-retry` rifiuta
 > prima di qualunque azione e non deve essere rieseguito.
 
+> **SUPERATO DA D291:** il PAM D285 operativo usa ora `max-tries=3`. La serie
+> descritta qui sotto resta evidenza storica di tre processi `sudo` separati e
+> non è un modello operativo da riaprire. Il solo root audit conservato nel kit
+> riconosce la configurazione D285 corrente a tre tentativi.
+
 ## Stato del primo ciclo
 
 Il reboot D286 iniziale è già avvenuto ed è chiuso: gli audit root-only prima e
