@@ -11,6 +11,8 @@ else
 fi
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
 root=$(git -C "$here" rev-parse --show-toplevel)
+# shellcheck source=session-model.sh
+source "$here/session-model.sh"
 
 d290_fail () {
   printf 'D290_%s_AUDIT=FAIL\nD290_AUDIT_FAILURE=%s\n' "${phase^^}" "$1" >&2
@@ -76,25 +78,41 @@ if [[ ${LIVE_PROBE_MODE:-} == operator-run ]]; then
   [[ $daemon_uid == 0 && $daemon_comm == plasmalogin && $daemon_cgroup == /system.slice/plasmalogin.service ]] ||
     d290_fail DAEMON_COMPOSITE_IDENTITY
 
-  graphical=0
-  graphical_ids=()
-  while read -r session_id session_uid _; do
-    [[ $session_uid == "$uid" && $session_id != "$XDG_SESSION_ID" ]] || continue
-    service=$(loginctl show-session "$session_id" -p Service --value 2>/dev/null || true)
-    type=$(loginctl show-session "$session_id" -p Type --value 2>/dev/null || true)
-    class=$(loginctl show-session "$session_id" -p Class --value 2>/dev/null || true)
-    state=$(loginctl show-session "$session_id" -p State --value 2>/dev/null || true)
-    if [[ $service == plasmalogin && $type == wayland && $class == user && $state == active ]]; then
-      tty=$(loginctl show-session "$session_id" -p TTY --value 2>/dev/null || true)
-      [[ $tty =~ ^tty[0-9]+$ && $tty != tty3 ]] || d290_fail GRAPHICAL_SESSION_TTY_INVALID
-      if [[ $phase == pre ]]; then
-        [[ $tty == tty2 ]] || d290_fail INITIAL_GRAPHICAL_SESSION_NOT_TTY2
-      fi
-      graphical=$((graphical + 1))
-      graphical_ids+=("$session_id")
-    fi
-  done < <(loginctl list-sessions --no-legend 2>/dev/null)
+  graphical_records=
   if [[ $phase == pre ]]; then
+    graphical_records=$(d290_initial_graphical_session_records "$uid" "$XDG_SESSION_ID") ||
+      d290_fail INITIAL_GRAPHICAL_SESSION_ENUMERATION_FAILED
+  else
+    graphical_records=$(d290_current_graphical_session_records "$uid" "$XDG_SESSION_ID") ||
+      d290_fail POST_GRAPHICAL_SESSION_ENUMERATION_FAILED
+  fi
+  graphical_rows=()
+  [[ -z $graphical_records ]] || mapfile -t graphical_rows <<<"$graphical_records"
+  graphical=${#graphical_rows[@]}
+  graphical_ids=()
+  for record in "${graphical_rows[@]}"; do
+    IFS='|' read -r session_id tty service type class state <<<"$record"
+    graphical_ids+=("$session_id")
+  done
+
+  if [[ $phase == pre ]]; then
+    initial_id=NONE initial_tty=NONE initial_service=NONE
+    initial_type=NONE initial_class=NONE initial_state=NONE
+    if [[ $graphical -eq 1 ]]; then
+      IFS='|' read -r initial_id initial_tty initial_service initial_type initial_class initial_state \
+        <<<"${graphical_rows[0]}"
+    elif [[ $graphical -gt 1 ]]; then
+      initial_id=AMBIGUOUS
+    fi
+    printf '%s\n' \
+      "D290_OPERATOR_TTY_SESSION=$XDG_SESSION_ID" \
+      "D290_INITIAL_GRAPHICAL_SESSION_COUNT=$graphical" \
+      "D290_INITIAL_GRAPHICAL_SESSION_ID=$initial_id" \
+      "D290_INITIAL_GRAPHICAL_SESSION_TTY=$initial_tty" \
+      "D290_INITIAL_GRAPHICAL_SESSION_SERVICE=$initial_service" \
+      "D290_INITIAL_GRAPHICAL_SESSION_TYPE=$initial_type" \
+      "D290_INITIAL_GRAPHICAL_SESSION_CLASS=$initial_class" \
+      "D290_INITIAL_GRAPHICAL_SESSION_STATE=$initial_state"
     [[ $graphical -eq 1 ]] || d290_fail INITIAL_GRAPHICAL_SESSION_CARDINALITY_NOT_ONE
     greeter_uid=$(id -u plasmalogin) || d290_fail GREETER_UID_UNREADABLE
     pgrep -u "$greeter_uid" -f '^/usr/libexec/plasma-login-greeter([[:space:]]|$)' >/dev/null &&
@@ -112,11 +130,10 @@ if [[ ${LIVE_PROBE_MODE:-} == operator-run ]]; then
   done
   [[ $count -eq 1 ]] || d290_fail GOODIX_SYSFS_CARDINALITY_NOT_ONE
   printf '%s\n' \
-    "D290_OPERATOR_TTY_SESSION=$XDG_SESSION_ID" \
     "D290_PLASMALOGIN_DAEMON_PID=$daemon_pid" \
     'D290_PLASMALOGIN_DAEMON_IDENTITY=PASS_COMPOSITE' \
-    "D290_ACTIVE_GRAPHICAL_SESSION_COUNT=$graphical" \
-    "D290_ACTIVE_GRAPHICAL_SESSION_IDS=${graphical_ids[*]:-NONE}" \
+    "D290_${phase^^}_GRAPHICAL_SESSION_COUNT=$graphical" \
+    "D290_${phase^^}_GRAPHICAL_SESSION_IDS=${graphical_ids[*]:-NONE}" \
     'D290_PLASMALOGIN_PAM_MOUNTPOINT=false' \
     'D290_RUNTIME_PRESENT=false' \
     'D290_TARGET_SYSFS_CARDINALITY=1'

@@ -68,6 +68,10 @@ operator_kit/live_probe/run.sh d290-plasmalogin --operator-run
 
 3. Autenticare i prompt `pkexec`, leggere i limiti e digitare esattamente
    `PREPARA LOGIN D290`.
+
+Prima della conferma, il pre-audit identifica la sessione tty2 anche quando
+logind la marca `online` perché la TTY 3 è foreground. Mostra count, ID, TTY,
+service, type, class e state; cardinalità diversa da uno è uno stop.
 4. Quando compaiono le istruzioni numerate, premere `Ctrl+Alt+F2`, fare logout
    dal menu Plasma e attendere il login manager.
 5. Selezionare l'utente, cancellare completamente il campo password, premere

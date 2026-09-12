@@ -17,6 +17,8 @@ work=${LIVE_PROBE_WORK_DIR:?}
 capture=${LIVE_PROBE_CAPTURE_DIR:?}
 telemetry=${LIVE_PROBE_TELEMETRY_FILE:?}
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
+# shellcheck source=session-model.sh
+source "$here/session-model.sh"
 uid=$(id -u)
 attempts=0 contacts=0 outcome=D290_OFFLINE_COMPATIBILITY_PASS
 overlay_started=false overlay_closed=false
@@ -41,20 +43,6 @@ EOF
   echo D290_OFFLINE_PAYLOAD_COMPATIBILITY=PASS
   exit 0
 fi
-
-active_graphical_sessions () {
-  local session_id session_uid rest service type class state
-  while read -r session_id session_uid rest; do
-    [[ $session_uid == "$uid" && $session_id != "${XDG_SESSION_ID:-}" ]] || continue
-    service=$(loginctl show-session "$session_id" -p Service --value 2>/dev/null || true)
-    type=$(loginctl show-session "$session_id" -p Type --value 2>/dev/null || true)
-    class=$(loginctl show-session "$session_id" -p Class --value 2>/dev/null || true)
-    state=$(loginctl show-session "$session_id" -p State --value 2>/dev/null || true)
-    if [[ $service == plasmalogin && $type == wayland && $class == user && $state == active ]]; then
-      printf '%s\n' "$session_id"
-    fi
-  done < <(loginctl list-sessions --no-legend 2>/dev/null)
-}
 
 current_cursor () {
   local output cursor
@@ -135,10 +123,12 @@ trap on_exit EXIT
 
 [[ ${LIVE_PROBE_MODE:-} == operator-run && $uid -ne 0 ]]
 [[ ${XDG_SESSION_TYPE:-} == tty && ${XDG_SESSION_ID:-} =~ ^[0-9]+$ && ${XDG_VTNR:-} == 3 ]]
-mapfile -t initial_sessions < <(active_graphical_sessions)
+initial_records=$(d290_initial_graphical_session_records "$uid" "$XDG_SESSION_ID")
+initial_sessions=()
+[[ -z $initial_records ]] || mapfile -t initial_sessions <<<"$initial_records"
 [[ ${#initial_sessions[@]} -eq 1 ]]
-initial_session=${initial_sessions[0]}
-[[ $(loginctl show-session "$initial_session" -p TTY --value) == tty2 ]]
+IFS='|' read -r initial_session initial_tty initial_service initial_type initial_class initial_state \
+  <<<"${initial_sessions[0]}"
 cursor=$(current_cursor)
 start_overlay
 
@@ -221,15 +211,19 @@ done
    $(field_sum drained "$finger_log") -eq 1 && $(field_sum context_closed "$finger_log") -eq 1 ]]
 attempts=1 contacts=1
 
-new_session=NONE
+new_session=NONE new_tty=NONE new_service=NONE
+new_type=NONE new_class=NONE new_state=NONE
 session_created=false
 if [[ $result == match ]]; then
   [[ $(grep -c 'GOODIX_SIGFM_MATCH_AUDIT .*event=outcome result=match' "$finger_log" || true) -eq 1 ]]
   session_deadline=$((SECONDS + 90))
   while (( SECONDS < session_deadline )); do
-    mapfile -t new_sessions < <(active_graphical_sessions)
-    if [[ ${#new_sessions[@]} -eq 1 && ${new_sessions[0]} != "$initial_session" ]]; then
-      new_session=${new_sessions[0]}
+    new_records=$(d290_new_graphical_session_records "$uid" "$XDG_SESSION_ID" "$initial_session")
+    new_sessions=()
+    [[ -z $new_records ]] || mapfile -t new_sessions <<<"$new_records"
+    if [[ ${#new_sessions[@]} -eq 1 ]]; then
+      IFS='|' read -r new_session new_tty new_service new_type new_class new_state \
+        <<<"${new_sessions[0]}"
       session_created=true
       break
     fi
@@ -240,7 +234,9 @@ if [[ $result == match ]]; then
   outcome=PLASMALOGIN_MATCH_NEW_SESSION
 else
   [[ $(grep -c 'GOODIX_SIGFM_MATCH_AUDIT .*event=outcome result=no_match' "$finger_log" || true) -eq 1 ]]
-  mapfile -t new_sessions < <(active_graphical_sessions)
+  new_records=$(d290_new_graphical_session_records "$uid" "$XDG_SESSION_ID" "$initial_session")
+  new_sessions=()
+  [[ -z $new_records ]] || mapfile -t new_sessions <<<"$new_records"
   [[ ${#new_sessions[@]} -eq 0 ]]
   outcome=PLASMALOGIN_NO_MATCH_PASSWORD_RECOVERY_READY
 fi
@@ -250,6 +246,11 @@ cp "$finger_log" "$capture/fprintd-attempt.log"
 cp "$plasma_log" "$capture/plasmalogin-attempt.log"
 cat >"$capture/login-state.env" <<EOF
 D290_INITIAL_GRAPHICAL_SESSION=$initial_session
+D290_INITIAL_GRAPHICAL_SESSION_TTY=$initial_tty
+D290_INITIAL_GRAPHICAL_SESSION_SERVICE=$initial_service
+D290_INITIAL_GRAPHICAL_SESSION_TYPE=$initial_type
+D290_INITIAL_GRAPHICAL_SESSION_CLASS=$initial_class
+D290_INITIAL_GRAPHICAL_SESSION_STATE=$initial_state
 D290_INITIAL_GRAPHICAL_LOGOUT_OBSERVED=true
 D290_REAL_GREETER_PID=$greeter_pid
 D290_REAL_GREETER_SESSION=$greeter_session
@@ -257,6 +258,11 @@ D290_REAL_GREETER_CGROUP=$greeter_cgroup
 D290_FINGERPRINT_RESULT=$result
 D290_NEW_GRAPHICAL_SESSION=$new_session
 D290_NEW_GRAPHICAL_SESSION_CREATED=$session_created
+D290_NEW_GRAPHICAL_SESSION_TTY=$new_tty
+D290_NEW_GRAPHICAL_SESSION_SERVICE=$new_service
+D290_NEW_GRAPHICAL_SESSION_TYPE=$new_type
+D290_NEW_GRAPHICAL_SESSION_CLASS=$new_class
+D290_NEW_GRAPHICAL_SESSION_STATE=$new_state
 D290_PASSWORD_OR_PIN_USED_DURING_FINGERPRINT=NOT_MACHINE_TELEMETERED
 EOF
 

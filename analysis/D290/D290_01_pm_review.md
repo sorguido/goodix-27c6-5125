@@ -5,7 +5,7 @@
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE_TO_HUMAN_GATE
-OUTCOME=READY_FOR_HUMAN_GATE
+OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FIRST_PRE_AUDIT_CORRECTIVE
 ADVANCEMENT=PLASMALOGIN_ONE_SHOT_LIVE_BOUNDARY_CLOSED_OFFLINE
 EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_ASSESSMENT
 RESIDUAL_BLOCKER_OR_RISK=MANUAL_LOGOUT_REAL_GREETER_AND_ONE_SENSOR_VERIFY
@@ -17,6 +17,15 @@ LIVE_EXECUTION_PERFORMED=false
 ## Riesame indipendente
 
 La review ha verificato direttamente:
+
+- capture integra della prima invocazione su baseline `1a8c5528...`, chiusa
+  `FAIL_PRE_AUDIT` con payload non avviato, post-audit/cleanup PASS e zero
+  azioni sensore;
+- root cause del vecchio filtro `State=active` e predicati distinti per il
+  desktop tty2 ancora loggato (`active|online`) e per la nuova sessione con ID
+  causalmente diverso;
+- classificazione pulita del pre-audit fallito senza richiedere artefatti del
+  payload mai avviato;
 
 - target Fedora 44: `display-manager.service=plasmalogin.service`, daemon root
   nel cgroup system, pacchetto 6.7.5, service PAM effettivo e hash di PAM,
@@ -53,11 +62,11 @@ TTY.
 
 ## Verifiche
 
-- `bash -n`: PASS per tutti i sei script D290;
+- `bash -n`: PASS per i sei eseguibili e la libreria session-model D290;
 - vero `run.sh d290-plasmalogin --offline-test` da cwd esterna: PASS;
-- contratti D290: `15/15 PASS`;
+- contratti D290: `23/23 PASS`;
 - common harness: `13/13 PASS`;
-- regressione combinata D286–D290: `207/207 PASS`;
+- regressione combinata common harness + D286–D290: `215/215 PASS`;
 - `git diff --check`: PASS;
 - `shellcheck`: non disponibile sul target.
 

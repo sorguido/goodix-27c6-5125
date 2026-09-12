@@ -5,14 +5,14 @@
 
 ```text
 SELECTED_NEXT_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
-OUTCOME=READY_FOR_HUMAN_GATE
+OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FIRST_PRE_AUDIT_CORRECTIVE
 ADVANCEMENT=REAL_LOGIN_MANAGER_ONE_SHOT_PAYLOAD_IMPLEMENTED_ON_REUSABLE_HARNESS
 EXECUTABLE_CLOSURE=PASS_OFFLINE
 REAL_TARGET_COMPATIBILITY=PASS_READ_ONLY_PLUS_PRIVILEGED_NAMESPACE_GATE_AT_LIVE
 RESIDUAL_BLOCKER_OR_RISK=ONE_MANUAL_LOGOUT_AND_REAL_LOGIN_FACTORY_PRESERVING_VERIFY
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE
-LIVE_EXECUTION_PERFORMED=false
+SENSOR_REACHING_LIVE_EXECUTION_PERFORMED=false
 ```
 
 ## Target e sorgente
@@ -44,6 +44,14 @@ grafica iniziale su tty2. Il processo harness e il helper root sopravvivono al
 logout; questo risolve il lifecycle senza daemonizzare nuovi componenti o
 creare un secondo framework.
 
+La prima invocazione operatore sulla baseline `1a8c5528a0b9f9d12c395f1a9804ee82fd076b94`
+si è fermata correttamente nel pre-audit, prima di conferma e payload. Il
+predicato iniziale richiedeva erroneamente `State=active`: logind può invece
+marcare `online` il desktop tty2 ancora loggato mentre la TTY 3 è foreground.
+Il modello corretto identifica il desktop iniziale con UID, ID distinto dalla
+TTY operatore, `Class=user`, `Type=wayland`, `Service=plasmalogin`, `TTY=tty2`
+e stato loggato `active|online`. Manager e TTY 3 non sono candidati.
+
 Il helper `pkexec` verifica daemon root, exe, cmdline, cgroup e uguaglianza del
 mount namespace. Monta read-only il PAM candidato sul solo file
 `/usr/lib/pam.d/plasmalogin` e resta pipe-bounded. `RELEASE`, EOF, segnale o
@@ -61,8 +69,8 @@ campo password, preme Invio una sola volta e fa un solo contatto. Il payload
 richiede un greeter reale nella sessione logind `plasmalogin-greeter`, una sola
 epoch VERIFY e poi:
 
-- su MATCH, una nuova sessione Wayland attiva `Service=plasmalogin` diversa
-  dalla sessione iniziale;
+- su MATCH, una nuova sessione Wayland loggata `Service=plasmalogin`, con ID
+  diverso dalla sessione iniziale già scomparsa dopo il logout;
 - su NO_MATCH, nessuna nuova sessione e recovery password soltanto dopo
   unmount/ripristino/runtime removal e post-audit.
 
@@ -94,4 +102,5 @@ integrazione PAM permanente o assenza assoluta di side effect NVM sconosciuti.
    capture viene riesaminata prima di qualunque nuovo metodo.
 
 Nessuna live, logout, `pkexec`, mount, USB o azione sensore è stata eseguita
-dall'AI.
+dall'AI. La prima invocazione operatore non ha eseguito logout, overlay,
+`pam_fprintd` o VERIFY e non ha prodotto evidenza device-side.

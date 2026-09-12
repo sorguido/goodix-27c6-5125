@@ -95,7 +95,18 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D289/01 PASS live; D290/01 Plasma Login pronto al Human Gate
+### Stato corrente — D289/01 PASS live; D290/01 corretto e pronto al nuovo Human Gate
+
+La prima invocazione D290/01 sulla baseline
+`1a8c5528a0b9f9d12c395f1a9804ee82fd076b94` si è fermata fail-closed nel
+pre-audit: payload non avviato, logout/overlay/pam_fprintd/VERIFY non iniziati,
+zero action e contatti, post-audit e cleanup PASS. Il filtro iniziale
+confondeva l'esistenza del desktop tty2 con `State=active`, proprietà di
+foreground che può diventare `online` passando alla TTY 3. Il correttivo
+D290/01 usa identità e cardinalità della sessione loggata, separa il predicato
+della nuova sessione e sopprime la classificazione rumorosa di artefatti live
+inesistenti. Il common harness non cambia; dopo regressione offline il boundary
+resta il medesimo Human Gate one-shot.
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1431,9 +1442,28 @@ solo PAM `plasmalogin`. Il candidato è byte-identico allo stack Fedora salvo
 una riga `pam_fprintd.so` sufficient con `max-tries=1 timeout=45`; account,
 password, session e fallback `password-auth` restano invariati.
 
+La prima invocazione operatore sulla baseline completa
+`1a8c5528a0b9f9d12c395f1a9804ee82fd076b94` ha prodotto la capture integra
+`captures/live_probe/d290-plasmalogin_20260912T142615Z_1a8c5528a0b9/sanitized/`.
+`D290_TARGET_VERSIONS_AND_HASHES=PASS` è seguito da
+`D290_PRE_AUDIT=FAIL` / `INITIAL_GRAPHICAL_SESSION_CARDINALITY_NOT_ONE`;
+summary `FAIL_PRE_AUDIT`, payload non avviato e journal senza cursor. Il
+post-audit è PASS con mount/runtime false, cardinalità sysfs uno e zero azioni
+sensore; cleanup è PASS con overlay residuo false. Non sono iniziati logout,
+overlay, pam_fprintd o VERIFY e non esiste nuova evidenza device-side.
+
+La fotografia logind dalla stessa TTY comprendeva la sessione grafica `2`
+dell'utente su tty2, il manager `3` e la sessione utente TTY `4` su tty3. La
+causa è il requisito errato `State=active`: `active`/`online` possono migrare
+fra desktop e TTY col foreground. Il predicato iniziale corretto richiede UID
+operatore, ID diverso dalla TTY 3, `Class=user`, `Type=wayland`,
+`Service=plasmalogin`, `TTY=tty2`, `State=active|online` e cardinalità uno;
+ignora il manager. Il predicato post-MATCH, distinto, richiede un nuovo ID
+Plasma Wayland loggato diverso dall'iniziale già scomparso al logout.
+
 Logout e ritorno alla TTY sono manuali. Al greeter reale l'operatore seleziona
 l'utente, lascia vuoto il campo password, preme Invio una volta e fa un solo
-contatto. Su MATCH il payload richiede una nuova sessione Wayland attiva e
+contatto. Su MATCH il payload richiede una nuova sessione Wayland loggata e
 diversa dall'iniziale; su NO_MATCH richiede zero nuove sessioni. In entrambi i
 casi rilascia e verifica l'overlay prima di consentire il post-audit e, nel
 ramo NO_MATCH, prima del recupero password. Non esegue autonomamente logout,
@@ -1447,13 +1477,20 @@ recovery separata accetta soltanto il candidato hash-pinned. La capture non
 telemetra la tastiera: l'assenza di password/PIN durante la verifica resta
 procedura operatore, non claim macchina.
 
-La matrice locale D290 è `15/15 PASS`; `bash -n` e il vero percorso common
+Il pre-audit emette ora sempre sessione TTY operatore e count/ID/TTY/service/
+type/class/state del candidato iniziale prima del gate. Se fallisce, il
+classifier dichiara il payload non applicabile e non cerca file che non possono
+esistere. La matrice locale D290 è `23/23 PASS`; include le sette topologie
+obbligatorie e un `FAIL_PRE_AUDIT` common-harness pulito. `bash -n` e il vero percorso common
 `--offline-test` sono PASS da cwd esterna. Nessuna live, logout, `pkexec`,
 mount, USB o azione sensore è stata eseguita dall'AI. L'esecuzione reale
 factory-preserving è il successivo Human Gate.
 
+La regressione combinata common harness + D286–D290 è `215/215 PASS`; il
+common harness isolato resta `13/13 PASS` e non è stato modificato.
+
 ```text
-D290_01_OUTCOME=READY_FOR_HUMAN_GATE
+D290_01_OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FIRST_PRE_AUDIT_CORRECTIVE
 D290_01_SELECTED_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
 D290_01_REAL_DISPLAY_MANAGER=plasmalogin.service
 D290_01_CLASSIC_SDDM_INSTALLED=false
@@ -1470,6 +1507,11 @@ D290_01_HOST_PAM_PERSISTENT_WRITE_COUNT=0
 D290_01_MAX_TEMPORARY_READ_ONLY_BIND_MOUNTS=1
 D290_01_PASSWORD_FALLBACK_PRESERVED=true
 D290_01_LOGOUT_COMMAND_PRESENT=false
+D290_01_FIRST_OPERATOR_BASELINE=1a8c5528a0b9f9d12c395f1a9804ee82fd076b94
+D290_01_FIRST_OPERATOR_RESULT=FAIL_PRE_AUDIT
+D290_01_FIRST_OPERATOR_PAYLOAD_STARTED=false
+D290_01_FIRST_OPERATOR_SENSOR_ACTION_COUNT=0
+D290_01_SESSION_STATE_MODEL=LOGGED_ACTIVE_OR_ONLINE
 D290_01_LIVE_EXECUTION_PERFORMED=false
 D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_ASSESSMENT
 D290_01_NEXT_STATE=HUMAN_REQUIRED
