@@ -6,6 +6,11 @@ Dxxx, incluso bundle e checksum, appartiene a `analysis/Dxxx/`; la root non è
 usata per output di step. Lo stato qui riassunto descrive l'esito storico e non
 costituisce autorizzazione live.
 
+La review complessiva successiva alla chiusura D290 e la roadmap per le fasi
+di integrazione, packaging e release sono in
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Non costituiscono un nuovo Dxxx né
+autorizzano l'esecuzione della prima fase.
+
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |
 | D230 | Audit readback resident | READY / corpus esaurito | `analysis/D230/D230_definitive_arbitrary_resident_read_audit.md` | `D230_definitive_arbitrary_resident_memory_read_audit_bundle.zip` (temporaneamente in root) |

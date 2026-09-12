@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.8 — Revisione 12 settembre 2026
-> **Stato**: Attivo; sostituisce la v2.7 del 10 settembre 2026
-> **Motivazione**: la v2.8 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving e protezioni Git della v2.7, ma rende `REUSABLE_HARNESS_FIRST` il default per i futuri probe live compatibili. Safety/orchestration comune e payload specifico vengono separati per ridurre duplicazione, difetti host-side e costo di review; un kit autonomo resta ammesso quando il common harness non copre correttamente il boundary o il profilo di rischio.
+> **Versione**: 2.9 — Revisione 12 settembre 2026
+> **Stato**: Attivo; sostituisce la v2.8 del 12 settembre 2026
+> **Motivazione**: la v2.9 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving e protezioni Git della v2.8. Aggiunge `Pragmatism First`, riconosce il tempo dell'Utente come risorsa progettuale e rende permanente una serie VERIFY/MATCH di massimo tre tentativi fisici, con stop al primo match e nessun retry nascosto o illimitato. `REUSABLE_HARNESS_FIRST` resta il default per i probe compatibili, ma l'infrastruttura deve essere proporzionata alla domanda tecnica.
 
 ---
 
@@ -122,6 +122,32 @@ L'Utente mantiene sempre la decisione finale su:
 - licensing boundary;
 - modifiche alle policy permanenti;
 - pubblicazione.
+
+### 3.9 Pragmatism First — il tempo dell'Utente è una risorsa di progetto
+
+Quando la domanda tecnica è semplice e il rischio è basso, preferire il
+percorso più diretto, reversibile e osservabile che risponde alla domanda. Non
+costruire operator kit, harness, classifier, state machine, capture framework o
+altra infrastruttura quando una modifica locale reversibile e uno smoke test
+manuale rispondono già in modo affidabile al boundary.
+
+L'infrastruttura di test deve essere proporzionata al valore del boundary. Se
+il costo di progettazione/review del test supera materialmente costo e rischio
+del test stesso, fermarsi e rivalutare il metodo: il tempo dell'Utente è una
+risorsa progettuale primaria.
+
+Prima di creare un nuovo kit il PM deve chiedersi:
+
+1. la domanda può essere risposta con una modifica diretta e reversibile?
+2. il test può essere eseguito manualmente in pochi minuti senza ridurre la
+   safety?
+3. la telemetria aggiuntiva cambierà davvero la decisione tecnica?
+
+Se 1 e 2 sono sì e 3 è no, preferire il test diretto:
+
+```text
+TEST_THE_TARGET, NOT_THE_TEST_HARNESS
+```
 
 ---
 
@@ -552,6 +578,40 @@ Quando applicabili preservare:
 
 Questi sono guardrail hardware e non devono essere sostituiti da sola prosa.
 
+#### Regola permanente — serie bounded VERIFY/MATCH
+
+Per ogni test live il cui obiettivo include riconoscimento fingerprint,
+VERIFY/MATCH o validazione di un consumer biometrico reale, il percorso
+operatore deve consentire una serie bounded di fino a tre tentativi fisici
+indipendenti, salvo diversa decisione esplicita dell'Utente.
+
+- capacità minima della serie: tre tentativi;
+- stop immediato al primo MATCH;
+- un singolo MATCH è sufficiente per il successo della serie;
+- un NO_MATCH al tentativo 1 o 2 non è terminale;
+- tre NO_MATCH consecutivi chiudono la serie come `NO_MATCH_SERIES`;
+- nessun quarto tentativo implicito;
+- nessun retry illimitato;
+- nessun retry nascosto o non osservabile;
+- i tentativi devono restare tecnicamente bounded e telemetrati;
+- eventuali retry automatici interni devono essere evitati oppure
+  esplicitamente compresi, bounded e autorizzati dal design del test.
+
+```text
+MAX_PHYSICAL_ATTEMPTS=3
+STOP_ON_FIRST_MATCH=true
+NO_MATCH_1_CONTINUE=true
+NO_MATCH_2_CONTINUE=true
+NO_MATCH_3_TERMINAL=true
+FOURTH_ATTEMPT_ALLOWED=false
+HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
+```
+
+Questa regola prevale sui default one-shot dei singoli Dxxx. Un test a singolo
+tentativo è ammesso solo quando l'Utente lo richiede esplicitamente oppure il
+boundary tecnico richiede realmente one-shot e l'eccezione viene motivata
+prima del live.
+
 ### 11.3 Provenance live
 
 La build e il percorso live realmente eseguiti sono identificati dal commit
@@ -919,7 +979,7 @@ La qualità si misura in:
 
 ---
 
-## 25. Principio sintetico della v2.8
+## 25. Principio sintetico della v2.9
 
 ```text
 sicurezza hardware forte
@@ -939,6 +999,10 @@ Human Gate espliciti
 operator kit direttamente eseguibili per live manuali
 +
 reusable harness first per probe compatibili
++
+pragmatism first e tempo operatore protetto
++
+serie VERIFY/MATCH max-3 stop-on-first-match
 +
 review Git-native
 +

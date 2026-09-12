@@ -1,6 +1,12 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D290/01 — test persistente reversibile del login Plasma
 
+> **HISTORICAL_ONLY — DO_NOT_RERUN.** D290 è chiuso con successo dalla prova
+> manuale diretta `max-tries=3` del 12 settembre 2026. ARM e CLOSE sono
+> disarmati nel percorso reale; lo script conserva soltanto ROLLBACK per
+> recovery di un eventuale vecchio stato e resta eseguibile nelle fixture
+> offline di audit.
+
 Questo micro-kit sostituisce definitivamente, per D290/01, il precedente
 percorso TTY3/FIFO/overlay. Installa soltanto il PAM `plasmalogin` già
 revisionato, lascia un backup root-only, sopravvive al reboot e ripristina il
@@ -26,7 +32,7 @@ Qualunque rifiuto è uno stop. Non eseguire ARM due volte. Dopo ARM non
 modificare il PAM o il repository, non aggiornare il pacchetto e non riavviare
 più volte: una seconda accensione perderebbe l'evidenza del boot del test.
 
-## ARM
+## ARM storico — non eseguire
 
 Dalla root del repository, nella normale sessione grafica:
 
@@ -46,7 +52,7 @@ Solo dopo i quattro marker finali `true` eseguire manualmente:
 sudo reboot
 ```
 
-## LOGIN
+## LOGIN storico — non ripetere
 
 Al Plasma Login Manager:
 
@@ -72,7 +78,7 @@ fingerprint e **NON usare la password nel login grafico prima di CLOSE**:
 Questa sequenza vale anche se sul greeter è apparso un errore dopo il contatto.
 Il test ammette una sola VERIFY, un solo contatto e zero retry.
 
-## CLOSE
+## CLOSE storico — non eseguire
 
 Subito dopo il login, dalla root del repository:
 

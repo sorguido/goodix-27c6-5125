@@ -3,6 +3,8 @@
 set -euo pipefail
 umask 077
 
+d290_historical_only=true
+d290_live_capable=false
 d290_original_hash=c6fc4a0bc2d89f88fa15ca7e9a6c5aaeccfbe66897755b5416ce9c5e35b4e40b
 d290_candidate_hash=89d389e6c2ee59dcee374029a5428a81dc9138c4f5e86068159b3d5a2c77ab2d
 d290_package=plasma-login-manager-6.7.5-1.fc44.x86_64
@@ -27,6 +29,11 @@ d290_hash () { sha256sum "$1" | awk '{print $1}'; }
 d290_script=$(readlink -f -- "$0") || exit 2
 d290_script_dir=$(CDPATH= cd -- "$(dirname -- "$d290_script")" && pwd -P)
 d290_test_root=${D290_TEST_ROOT:-}
+if [[ -z $d290_test_root && ${1:-} != --operator-rollback ]]; then
+  echo D290_01_HISTORICAL_ONLY=true >&2
+  echo D290_01_LIVE_CAPABLE=false >&2
+  d290_die HISTORICAL_ONLY_DO_NOT_RERUN
+fi
 if [[ -n $d290_test_root ]]; then
   [[ $d290_test_root == /tmp/goodix-d290-test.* && -d $d290_test_root && ! -L $d290_test_root ]] ||
     d290_die TEST_ROOT_INVALID

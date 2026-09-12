@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance live corrente — v2.8 (12 settembre 2026)
+### Governance live corrente — v2.9 (12 settembre 2026)
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -59,7 +59,7 @@ AUTOMATIC_UNPROVEN_SENSOR_RETRY_ALLOWED=false
 SHA_RECORDED_FOR_PROVENANCE=true
 ```
 
-La v2.8 aggiunge un'ottimizzazione di metodo senza modificare il gate:
+La v2.8 ha aggiunto un'ottimizzazione di metodo senza modificare il gate:
 `operator_kit/live_probe/` è il common harness stabile per i futuri probe
 factory-preserving compatibili. Nuove ipotesi vivono normalmente in piccoli
 payload; un kit completo separato richiede una incompatibilità concreta.
@@ -69,6 +69,24 @@ REUSABLE_HARNESS_FIRST=true
 NEW_EXPERIMENT_NEEDS_NEW_OPERATOR_FRAMEWORK=false
 HUMAN_GATE_UNCHANGED=true
 FACTORY_PRESERVING_POLICY_UNCHANGED=true
+```
+
+La v2.9 aggiunge `Pragmatism First` e rende il tempo dell'Utente una risorsa
+progettuale esplicita: un test diretto, reversibile e osservabile prevale su
+nuova infrastruttura quando offre la stessa risposta e safety. Per ogni futuro
+VERIFY/MATCH vale inoltre la serie bounded fino a tre tentativi fisici, stop al
+primo match, terminale dopo il terzo no-match e nessun quarto tentativo o retry
+nascosto/illimitato.
+
+```text
+TEST_THE_TARGET, NOT_THE_TEST_HARNESS
+MAX_PHYSICAL_ATTEMPTS=3
+STOP_ON_FIRST_MATCH=true
+NO_MATCH_1_CONTINUE=true
+NO_MATCH_2_CONTINUE=true
+NO_MATCH_3_TERMINAL=true
+FOURTH_ATTEMPT_ALLOWED=false
+HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
 ### Consultazione del manuale al bootstrap
@@ -95,7 +113,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D289/01 PASS live; D290/01 micro-kit persistente pronto al Human Gate
+### Stato corrente — D290/01 chiuso con login fingerprint Plasma/Wayland provato
 
 La prima invocazione D290/01 sulla baseline
 `1a8c5528a0b9f9d12c395f1a9804ee82fd076b94` si è fermata fail-closed nel
@@ -150,9 +168,81 @@ immediata al MATCH, senza continuazione auth password; un login password
 successivo non può quindi produrre PASS. Se il fingerprint non entra
 direttamente nel desktop, l'operatore passa a TTY3 ed esegue CLOSE prima di
 qualunque recovery grafica. La regressione D286–D290 più common harness è
-`249/249 PASS`, di cui `18/18` per il nuovo micro-kit. Restano live soltanto ARM
-privilegiato eseguito dall'Utente, reboot, submit vuoto, un contatto,
-greeter/PAM/fprintd/USB e nuova sessione reale.
+`249/249 PASS`, di cui `18/18` per il micro-kit.
+
+La successiva live one-shot sulla baseline
+`31b0548a5613406b11e7311b8744ec25bca445c5` ha raggiunto il vero service PAM
+`plasmalogin` e una epoch VERIFY integra, ma SIGFM ha restituito `no_match`.
+Non è stata aperta alcuna nuova sessione grafica; CLOSE ha ripristinato il PAM,
+rimosso lo stato e concluso con rollback PASS. Questa run prova il percorso
+autentico fino alla VERIFY, non il login fingerprint.
+
+L'Utente ha poi applicato direttamente e soltanto al PAM package-owned
+`/usr/lib/pam.d/plasmalogin` la riga `pam_fprintd.so` sufficient con
+`max-tries=3 timeout=45 debug`, senza riabilitare globalmente
+`authselect with-fingerprint`, e ha riavviato dal menu KDE. Al greeter reale,
+campo password vuoto, Invio e indice destro hanno prodotto MATCH e ingresso
+diretto nella nuova sessione grafica.
+
+La corroborazione read-only dello stesso boot osserva SIGFM `result=match` a
+20.191353 s, una sessione logind attiva `Service=plasmalogin`,
+`Type=wayland`, `Class=user`, leader 1550 e timestamp 20.210696 s, quindi
+`pam_unix(plasmalogin:session): session opened` dallo stesso helper 1550 a
+20.362600 s. La catena è coerente con l'osservazione diretta dell'Utente e
+chiude D290. La capture sanitizzata e hash-pinned è in
+`captures/D290_01/D290_01_MANUAL_SUCCESS_20260912T193632Z/sanitized/`.
+
+```text
+D290_REAL_PLASMALOGIN_FINGERPRINT_LOGIN=PROVEN
+D290_REAL_NEW_WAYLAND_SESSION_AFTER_FINGERPRINT=PROVEN
+D290_PASSWORDLESS_FINGERPRINT_LOGIN=PROVEN
+D290_DIRECT_OPERATOR_OBSERVATION=PASS
+D290_FINGERPRINT_SERIES_POLICY=max_3_stop_on_first_match
+D290_01=PROVEN
+D290_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
+D290_STATUS=CLOSED_SUCCESSFULLY
+```
+
+Non sono previsti altri test D290. Overlay e micro-kit persistente sono
+`HISTORICAL_ONLY` / `DO_NOT_RERUN`. La policy permanente per futuri boundary
+VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
+MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
+tentativo, retry nascosto o illimitato.
+
+### Review complessiva e roadmap post-D290
+
+La chiusura D290 termina la sequenza di qualificazione dei consumer reali.
+Enrollment fixed-eight, FP3 attraverso close/open, fprintd ENROLL/VERIFY/delete,
+PAM, `sudo`, KScreenLocker, unlock di una sessione realmente bloccata e login
+Plasma verso una nuova sessione Wayland sono boundary chiusi e non vanno
+rieseguiti per sola maggiore confidenza. La fattibilità sul target APP12509 è
+provata; la production readiness no.
+
+Il lavoro residuo è principalmente consolidamento della sorgente production,
+gestione utenti/template e materiali protetti, packaging/installazione gestita,
+lifecycle/recovery, qualificazione di release e pubblicazione auditata. Il
+piano completo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human Gate e
+`WHAT_NOT_TO_TEST_AGAIN` è:
+
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`
+
+La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
+soluzione di packaging. Analogamente, l'installazione D285 `/usr/local`
+single-user resta attiva e recuperabile ma non è un prodotto distribuibile.
+Le live osservate riportano zero famiglie di scrittura persistente note; ciò
+non prova assolutamente la nonmutazione NVM interna e non equivale a una
+qualificazione Windows esaustiva dopo ogni run.
+
+```text
+PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
+PROJECT_PRODUCTION_READY=false
+PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
+WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D290_CLOSED_BOUNDARIES
+PM_DECISION=HUMAN_REQUIRED
+PROJECT_NEXT_STEPS_PLAN_READY=true
+NO_NEXT_STEP_EXECUTION_STARTED=true
+AWAITING_USER_REVIEW_AND_VALIDATION=true
+```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1616,7 +1706,7 @@ Il comando storico seguente è preservato solo per audit ed è ora rifiutato da
 operator_kit/live_probe/run.sh d290-plasmalogin --operator-run
 ```
 
-#### D290/01 — metodo persistente reversibile corrente
+#### D290/01 — metodo persistente storico e chiusura pragmatica
 
 La terza invocazione operatore, baseline completa
 `4d6fb16350bb3bbe7a7908b4b611b294825ca00d`, è preservata in
@@ -1691,28 +1781,59 @@ sotto `/tmp`; non invoca il vero `pkexec`, PAM, reboot, USB o sensore. Il nuovo
 contratto è `18/18 PASS`; la regressione combinata common harness + D286–D290
 è `249/249 PASS`.
 
+La live one-shot eseguita dall'Utente sulla baseline
+`31b0548a5613406b11e7311b8744ec25bca445c5` ha prodotto una sola epoch VERIFY
+valida e un autentico SIGFM `no_match`. Non esisteva una sessione grafica
+utente nuova, l'apertura sessione `plasmalogin` era zero e la causalità diretta
+era falsa. CLOSE ha comunque ripristinato il PAM originale, rimosso lo stato e
+concluso con `D290_ROLLBACK=PASS`. Questa evidenza supporta il raggiungimento
+del vero percorso `plasmalogin → pam_fprintd → fprintd → Goodix VERIFY`, ma non
+prova il login.
+
+La successiva prova pragmatica non ha riusato il kit. L'Utente ha applicato
+direttamente al solo `/usr/lib/pam.d/plasmalogin` la stessa riga sufficient con
+`max-tries=3 timeout=45 debug`, ha riavviato dal menu KDE e ha osservato che
+campo vuoto, Invio e indice destro aprivano direttamente il desktop. Nessuna
+feature authselect globale è stata riabilitata.
+
+La raccolta read-only dello stesso boot, senza nuova azione fingerprint,
+corrobora l'osservazione: il journal fprintd contiene una sola epoch integra e
+SIGFM MATCH; il journal plasmalogin lega `pam_fprintd` e l'apertura sessione al
+helper PID 1550; logind espone la medesima sessione come `plasmalogin`, Wayland,
+classe user e active. MATCH, registrazione logind e apertura PAM distano
+rispettivamente 19.343 e 171.247 microsecondi. La capture ridotta, sanitizzata
+e hash-pinned è
+`captures/D290_01/D290_01_MANUAL_SUCCESS_20260912T193632Z/sanitized/`.
+
+Il boundary è chiuso e non va ripetuto. Overlay e micro-kit persistente sono
+ora `HISTORICAL_ONLY` / `DO_NOT_RERUN`; ARM/CLOSE reali del micro-kit sono
+disarmati, mentre ROLLBACK resta disponibile solo per recuperare un eventuale
+vecchio stato. La configurazione PAM diretta osservata è prova funzionale, non
+packaging production-ready: il file vendor package-owned risulta intenzionalmente
+modificato e dovrà essere sostituito da una strategia di installazione gestita
+nella fase successiva, senza richiedere un nuovo test D290.
+
 ```text
-D290_01_OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD
+D290_01_OUTCOME=PASS_LIVE_CLOSED
 D290_01_SELECTED_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
 D290_01_EPHEMERAL_OVERLAY_METHOD=ABANDONED_DO_NOT_RERUN
-D290_01_REASON=HOST_ORCHESTRATION_COMPLEXITY_EXCEEDED_BOUNDARY_VALUE
-D290_01_NEW_METHOD=PERSISTENT_REVERSIBLE_SINGLE_SERVICE_PAM_TEST
+D290_01_PERSISTENT_KIT=HISTORICAL_ONLY_DO_NOT_RERUN
 D290_01_OLD_LIVE_CAPABLE=false
-D290_01_NO_TTY3_ORCHESTRATION=true
-D290_01_NO_LONG_LIVED_ROOT_HELPER=true
-D290_01_NO_FIFO_OR_COPROC=true
-D290_01_NO_RUNTIME_BIND_MOUNT_DURING_LOGIN=true
 D290_01_GLOBAL_AUTHSELECT_FINGERPRINT_REENABLE=false
 D290_01_PASSWORD_FALLBACK_PRESERVED=true
-D290_01_MAX_VERIFY_ACTIONS=1
-D290_01_MAX_PHYSICAL_CONTACTS=1
-D290_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-D290_01_ROLLBACK_MTIME_AND_PACKAGE_BASELINE=PASS
-D290_01_DIRECT_LOGIN_CAUSALITY=PASS_OFFLINE
-D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_POST_REBOOT_READ_ONLY_ASSESSMENT
-D290_READY_FOR_FINAL_REAL_LOGIN_TEST=true
-D290_01_NEXT_STATE=HUMAN_REQUIRED
-NEXT_PRIMARY_BOUNDARY=PLASMALOGIN_ONE_SHOT_LIVE_AFTER_REBOOT
+D290_01_ONE_SHOT_VERIFY_EPOCH_COUNT=1
+D290_01_ONE_SHOT_SIGFM_RESULT=no_match
+D290_01_ONE_SHOT_NEW_GRAPHICAL_SESSION=false
+D290_01_ONE_SHOT_ROLLBACK=PASS
+D290_REAL_PLASMALOGIN_FINGERPRINT_LOGIN=PROVEN
+D290_REAL_NEW_WAYLAND_SESSION_AFTER_FINGERPRINT=PROVEN
+D290_PASSWORDLESS_FINGERPRINT_LOGIN=PROVEN
+D290_DIRECT_OPERATOR_OBSERVATION=PASS
+D290_FINGERPRINT_SERIES_POLICY=max_3_stop_on_first_match
+D290_01=PROVEN
+D290_STATUS=CLOSED_SUCCESSFULLY
+D290_RERUN_REQUIRED=false
+NEXT_PRIMARY_BOUNDARY=PROJECT_LEVEL_CONSOLIDATION_PLAN_REQUIRES_USER_VALIDATION
 ```
 
 ```text

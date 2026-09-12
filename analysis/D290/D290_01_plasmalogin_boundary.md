@@ -4,15 +4,15 @@
 ## Decisione
 
 ```text
-SELECTED_NEXT_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
-OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD
-ADVANCEMENT=MINIMAL_SINGLE_SERVICE_PAM_ARM_CLOSE_ROLLBACK_CLOSED_OFFLINE
-EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_POST_REBOOT_READ_ONLY_ASSESSMENT
-REAL_TARGET_COMPATIBILITY=PASS_READ_ONLY
-RESIDUAL_BLOCKER_OR_RISK=ONE_REAL_REBOOT_AND_PLASMALOGIN_FACTORY_PRESERVING_VERIFY
+BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
+OUTCOME=PASS_LIVE_CLOSED
+ADVANCEMENT=REAL_PLASMALOGIN_FINGERPRINT_MATCH_TO_NEW_WAYLAND_SESSION_PROVEN
+EXECUTABLE_CLOSURE=PASS_LIVE_OPERATOR_OBSERVATION_PLUS_READ_ONLY_HOST_CORROBORATION
+REAL_TARGET_BOUNDARY=PASS_LIVE
+RESIDUAL_BLOCKER_OR_RISK=NONE_WITHIN_D290
 CANONICAL_DOCUMENTATION=UPDATED
-REVIEW_SET=GIT_NATIVE
-SENSOR_REACHING_LIVE_EXECUTION_PERFORMED=false
+REVIEW_SET=GIT_NATIVE_PLUS_HASH_PINNED_SANITIZED_CAPTURE
+AI_PRIVILEGED_OR_SENSOR_REACHING_EXECUTION_PERFORMED=false
 ```
 
 ## Target e sorgente
@@ -36,13 +36,17 @@ esatto `plasmalogin`, il helper verifica con effective UID 0 e, dopo
 solo MATCH fprintd non prova quindi il login: serve osservare anche una nuova
 sessione logind Wayland `Service=plasmalogin`.
 
-## Metodo corrente
+## Metodo persistente storico — non rieseguire
 
 Il boundary resta `PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION`, ma per
 decisione metodologica dell'Utente il metodo TTY3/FIFO/`coproc`/helper root
 long-lived/overlay non è più una via live D290. L'esperimento storico è
 preservato con `LIVE_CAPABLE=false`; il common harness non viene ulteriormente
 esteso per questo test.
+
+Anche il successivo micro-kit è ora `HISTORICAL_ONLY` / `DO_NOT_RERUN`: la
+prova diretta descritta nella sezione di chiusura ha risposto al boundary e non
+sono previsti altri test D290.
 
 Il micro-kit `operator_kit/d290-01-plasmalogin-persistent-test/` ha un solo
 script e tre modalità. ARM verifica host, provenance, D286/fallback, target,
@@ -71,7 +75,7 @@ legata allo stesso leader e temporalmente immediata al MATCH, senza marker di
 continuazione password, seguiti dal rollback verificato. Un MATCH non
 causalmente correlato alla sessione è ambiguo e non è PASS.
 
-## Metodo storico chiuso — audit soltanto
+## Metodo overlay storico chiuso — audit soltanto
 
 Il common harness resta utilizzabile con una minima estensione opt-in per la
 TTY foreground. Il delta principale è un piccolo payload avviato manualmente dalla TTY 3, separata dalla sessione
@@ -168,13 +172,19 @@ residuo, daemon attivo e zero VERIFY successivi al cursor.
 ```text
 D290_01_EPHEMERAL_OVERLAY_METHOD=ABANDONED_DO_NOT_RERUN
 D290_01_REASON=HOST_ORCHESTRATION_COMPLEXITY_EXCEEDED_BOUNDARY_VALUE
-D290_01_NEW_METHOD=PERSISTENT_REVERSIBLE_SINGLE_SERVICE_PAM_TEST
+D290_01_PERSISTENT_KIT=HISTORICAL_ONLY_DO_NOT_RERUN
 D290_01_GLOBAL_AUTHSELECT_FINGERPRINT_REENABLE=false
 D290_01_PASSWORD_FALLBACK_PRESERVED=true
 D290_01_ROLLBACK_MTIME_AND_PACKAGE_BASELINE=PASS
-D290_01_DIRECT_LOGIN_CAUSALITY=PASS_OFFLINE
+D290_01_ONE_SHOT_SIGFM_RESULT=no_match
+D290_01_ONE_SHOT_NEW_GRAPHICAL_SESSION=false
+D290_01_ONE_SHOT_ROLLBACK=PASS
+D290_REAL_PLASMALOGIN_FINGERPRINT_LOGIN=PROVEN
+D290_REAL_NEW_WAYLAND_SESSION_AFTER_FINGERPRINT=PROVEN
+D290_PASSWORDLESS_FINGERPRINT_LOGIN=PROVEN
+D290_DIRECT_OPERATOR_OBSERVATION=PASS
+D290_FINGERPRINT_SERIES_POLICY=max_3_stop_on_first_match
 D290_01_PERSISTENT_KIT_TESTS=18_PASS
 D290_01_COMBINED_REGRESSION=249_PASS
-D290_READY_FOR_FINAL_REAL_LOGIN_TEST=true
-D290_01_NEXT_STATE=HUMAN_REQUIRED
+D290_01_NEXT_STATE=CLOSED_SUCCESSFULLY
 ```

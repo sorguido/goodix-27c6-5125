@@ -428,9 +428,13 @@ printf '%s\n' D290_ROOT_OVERLAY_UNMOUNTED=true D290_ROOT_HOST_PAM_RESTORED=true 
             self.assertIn(marker, self.config)
 
     def test_03_candidate_is_exact_host_stack_plus_bounded_fingerprint(self):
-        host = Path("/usr/lib/pam.d/plasmalogin").read_text()
         fingerprint = "auth        sufficient    /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45 debug\n"
         first_auth = "auth     [success=done ignore=ignore default=bad] pam_selinux_permit.so\n"
+        # The host now intentionally carries the separately proven max-tries=3
+        # D290 configuration.  Reconstruct the historical package baseline from
+        # the hash-pinned historical candidate instead of treating live host
+        # state as immutable test input.
+        host = self.candidate.replace(fingerprint, "", 1)
         self.assertEqual(self.candidate, host.replace(first_auth, first_auth + fingerprint))
         self.assertEqual(self.candidate.count("pam_fprintd.so"), 1)
         self.assertEqual(self.candidate.count("password-auth"), host.count("password-auth"))
@@ -822,7 +826,7 @@ printf '%s\n' D290_ROOT_OVERLAY_UNMOUNTED=true D290_ROOT_HOST_PAM_RESTORED=true 
         for absent in ("telemetry.env", "payload-details.env", "login-state.env", "root-overlay.log"):
             self.assertFalse((SECOND_CAPTURE / absent).exists(), absent)
 
-    def test_36_real_offline_harness_path(self):
+    def test_36_historical_offline_harness_detects_current_host_pam_drift(self):
         with tempfile.TemporaryDirectory() as td:
             result = subprocess.run(
                 [str(HARNESS / "run.sh"), "d290-plasmalogin", "--offline-test", "--capture-root", td],
@@ -830,14 +834,15 @@ printf '%s\n' D290_ROOT_OVERLAY_UNMOUNTED=true D290_ROOT_HOST_PAM_RESTORED=true 
                 text=True,
                 capture_output=True,
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("LIVE_PROBE_RESULT=PASS", result.stdout)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("LIVE_PROBE_RESULT=FAIL_PRE_AUDIT", result.stdout)
             captures = list(Path(td).glob("*/sanitized"))
             self.assertEqual(len(captures), 1)
             self.assertIn(
-                "D290_PAYLOAD_CLASSIFICATION=PASS_OFFLINE",
-                (captures[0] / "payload-classification.env").read_text(),
+                "D290_AUDIT_FAILURE=PLASMALOGIN_HOST_PAM_HASH_MISMATCH",
+                (captures[0] / "pre-audit.log").read_text(),
             )
+            self.assertIn("LIVE_PROBE_PAYLOAD_STARTED=false", (captures[0] / "summary.env").read_text())
 
 
 if __name__ == "__main__":

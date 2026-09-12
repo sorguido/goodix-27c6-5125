@@ -1,9 +1,9 @@
 # D290/01 — login Plasma reale con fingerprint one-shot
 
-> **METODO CHIUSO — NON RILANCIARE.** Questo esperimento è preservato per
-> audit e test offline, ma `LIVE_CAPABLE=false`. Il boundary D290/01 usa ora
-> esclusivamente il micro-kit persistente reversibile in
-> `operator_kit/d290-01-plasmalogin-persistent-test/`.
+> **HISTORICAL_ONLY — DO_NOT_RERUN.** Questo esperimento è preservato per
+> audit e test offline, ma `LIVE_CAPABLE=false`. Anche il successivo micro-kit
+> persistente è ora storico: D290/01 è chiuso dalla prova manuale diretta
+> riuscita del 12 settembre 2026 e non richiede ulteriori test.
 
 ## Cosa prova e cosa cambia
 

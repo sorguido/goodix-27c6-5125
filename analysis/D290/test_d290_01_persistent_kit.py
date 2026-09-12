@@ -15,8 +15,17 @@ KIT = ROOT / "operator_kit/d290-01-plasmalogin-persistent-test"
 OLD_EXP = ROOT / "operator_kit/live_probe/experiments/d290-plasmalogin"
 SCRIPT = KIT / "run-d290-01.sh"
 README = KIT / "README_IT.md"
-ORIGINAL = Path("/usr/lib/pam.d/plasmalogin").read_bytes()
+GUIDELINES = ROOT / "Linee Guida di Progetto Goodix 27c6 5125 per AI.md"
+AGENTS = ROOT / "AGENTS.md"
 CANDIDATE = (OLD_EXP / "goodix-d290-plasmalogin.pam").read_bytes()
+FINGERPRINT_LINE = (
+    b"auth        sufficient    /usr/lib64/security/pam_fprintd.so "
+    b"max-tries=1 timeout=45 debug\n"
+)
+ORIGINAL = CANDIDATE.replace(FINGERPRINT_LINE, b"", 1)
+MANUAL_SUCCESS_CAPTURE = (
+    ROOT / "captures/D290_01/D290_01_MANUAL_SUCCESS_20260912T193632Z/sanitized"
+)
 BASELINE = "1" * 40
 ARM_BOOT = "11111111-1111-4111-8111-111111111111"
 CLOSE_BOOT = "22222222-2222-4222-8222-222222222222"
@@ -260,16 +269,32 @@ class D290PersistentKitTests(unittest.TestCase):
         self.assertNotIn("\nsudo reboot", source)
         self.assertIn('git -c "safe.directory=$d290_root"', source)
         self.assertNotIn("git config --global", source)
+        self.assertIn("d290_historical_only=true", source)
+        self.assertIn("d290_live_capable=false", source)
+        refused = subprocess.run(
+            [str(SCRIPT), "--operator-arm"], text=True, capture_output=True
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("HISTORICAL_ONLY_DO_NOT_RERUN", refused.stderr)
         self.assertIn("LIVE_CAPABLE=false", (OLD_EXP / "experiment.conf").read_text())
         readme = README.read_text()
-        for operator_rule in (
-            "NON usare la password nel login grafico prima di CLOSE",
-            "Ctrl+Alt+F3",
-            "D290_ROLLBACK=PASS",
-            "Ctrl+Alt+F2",
-            "una sola VERIFY, un solo contatto e zero retry",
+        for historical_marker in (
+            "HISTORICAL_ONLY",
+            "DO_NOT_RERUN",
         ):
-            self.assertIn(operator_rule, readme)
+            self.assertIn(historical_marker, readme)
+
+        for governance in (GUIDELINES.read_text(), AGENTS.read_text()):
+            for policy in (
+                "MAX_PHYSICAL_ATTEMPTS=3",
+                "STOP_ON_FIRST_MATCH=true",
+                "NO_MATCH_1_CONTINUE=true",
+                "NO_MATCH_2_CONTINUE=true",
+                "NO_MATCH_3_TERMINAL=true",
+                "HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false",
+                "TEST_THE_TARGET, NOT_THE_TEST_HARNESS",
+            ):
+                self.assertIn(policy, governance)
 
     def test_02_candidate_is_exact_single_line_delta_with_password_fallback(self):
         host = ORIGINAL.decode()
@@ -431,6 +456,22 @@ class D290PersistentKitTests(unittest.TestCase):
         self.assertIn("D290_01_PAM_MOUNTPOINT=false", assessment)
         self.assertIn("D290_01_OLD_RESIDUAL_PROCESS_COUNT=0", assessment)
         self.assertIn("D290_01_GOODIX_OR_VERIFY_MARKERS_AFTER_CAPTURE_CURSOR=0", assessment)
+
+        success_check = subprocess.run(
+            ["sha256sum", "-c", "capture.sha256"],
+            cwd=MANUAL_SUCCESS_CAPTURE,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(success_check.returncode, 0, success_check.stdout + success_check.stderr)
+        claims = (MANUAL_SUCCESS_CAPTURE / "claims.env").read_text()
+        self.assertIn("D290_REAL_PLASMALOGIN_FINGERPRINT_LOGIN=PROVEN", claims)
+        self.assertIn("D290_REAL_NEW_WAYLAND_SESSION_AFTER_FINGERPRINT=PROVEN", claims)
+        self.assertIn("D290_01_SAME_PLASMALOGIN_HELPER_AS_SESSION_LEADER=true", claims)
+        self.assertIn(
+            "event=outcome result=match",
+            (MANUAL_SUCCESS_CAPTURE / "fprintd-goodix.log").read_text(),
+        )
 
     def test_14_close_capture_setup_failure_uses_emergency_rollback(self):
         self.fx.arm()

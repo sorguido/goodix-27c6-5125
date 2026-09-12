@@ -127,6 +127,24 @@ Principi permanenti:
 6. un commit o una suite verde non provano da soli correttezza o closure;
 7. nessuna conoscenza tecnica rilevante deve restare confinata nella sessione AI.
 
+### Pragmatism First / Operator Time Is a Project Resource
+
+Per domande tecniche semplici e a basso rischio, preferire il percorso più
+diretto, reversibile e osservabile. Non costruire kit, harness, classifier,
+state machine o capture framework quando una modifica locale reversibile e uno
+smoke test manuale di pochi minuti rispondono affidabilmente al boundary senza
+ridurre la safety.
+
+Prima di creare nuova infrastruttura il PM verifica: se la domanda ammette una
+modifica diretta reversibile, il test manuale è breve e sicuro, e la telemetria
+aggiuntiva non cambierebbe la decisione, usare il test diretto. Se costo e
+review del test superano materialmente costo e rischio del test stesso,
+rivalutare il metodo. Il tempo dell'Utente è una risorsa progettuale primaria.
+
+```text
+TEST_THE_TARGET, NOT_THE_TEST_HARNESS
+```
+
 Avanzamento reale significa almeno uno tra:
 
 ```text
@@ -364,6 +382,29 @@ Questa regola non riduce Human Gate, guardrail live, factory-preserving,
 provenance o Git protections. Il common harness non deve diventare un framework
 generico, una DSL o un plugin system.
 
+### 8.2 Serie bounded VERIFY/MATCH
+
+Ogni operator kit live che testa riconoscimento fingerprint, VERIFY/MATCH o un
+consumer biometrico reale deve offrire, salvo diversa decisione esplicita
+dell'Utente, una serie tecnicamente bounded e telemetrata di fino a tre
+tentativi fisici indipendenti:
+
+```text
+MAX_PHYSICAL_ATTEMPTS=3
+STOP_ON_FIRST_MATCH=true
+NO_MATCH_1_CONTINUE=true
+NO_MATCH_2_CONTINUE=true
+NO_MATCH_3_TERMINAL=true
+FOURTH_ATTEMPT_ALLOWED=false
+HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
+```
+
+Un solo MATCH chiude con successo la serie. Retry automatici interni vanno
+evitati oppure devono essere esplicitamente compresi, bounded e autorizzati
+dal design. Un test one-shot è ammesso soltanto su richiesta esplicita
+dell'Utente o per un boundary realmente one-shot, con eccezione motivata prima
+del live. Questa regola prevale sui default one-shot dei singoli Dxxx.
+
 ---
 
 ## 9. Riesame metodologico pre-live
@@ -387,7 +428,11 @@ La conclusione metodologica rilevante va integrata nel manuale tecnico. Non crea
 Quando applicabili, preservare:
 
 - budget tecnico bounded di action/contatti per invocazione;
+- per VERIFY/MATCH o consumer biometrici reali, capacità di tre tentativi
+  fisici espliciti, stop al primo MATCH e `NO_MATCH_SERIES` soltanto dopo tre
+  NO_MATCH consecutivi, salvo eccezione esplicita/motivata secondo §8.2;
 - zero retry automatico o implicito sensor-reaching non provato sicuro;
+- nessun quarto tentativo, retry illimitato, nascosto o non telemetrato;
 - fail-closed su comandi non compresi o potenzialmente persistenti;
 - cleanup/release/reseal garantiti anche su uscita anomala;
 - verifica di integrità e provenance del live-critical set realmente eseguito;
