@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D290/01 — prima invocazione operatore fermata dal pre-audit e correttivo
 
+> **STORICO.** Il correttivo descritto qui appartiene al metodo
+> TTY3/FIFO/overlay, ora abbandonato e disarmato. L'evidenza della run resta
+> valida; non usare questo documento come procedura operatore corrente.
+
 ## Evidenza autentica
 
 L'operatore ha invocato manualmente il common harness sulla baseline completa

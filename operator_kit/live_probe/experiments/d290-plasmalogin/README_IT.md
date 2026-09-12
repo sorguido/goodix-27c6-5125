@@ -1,5 +1,10 @@
 # D290/01 — login Plasma reale con fingerprint one-shot
 
+> **METODO CHIUSO — NON RILANCIARE.** Questo esperimento è preservato per
+> audit e test offline, ma `LIVE_CAPABLE=false`. Il boundary D290/01 usa ora
+> esclusivamente il micro-kit persistente reversibile in
+> `operator_kit/d290-01-plasmalogin-persistent-test/`.
+
 ## Cosa prova e cosa cambia
 
 D289 ha provato il MATCH fino allo sblocco di una sessione KDE già esistente.
@@ -56,7 +61,7 @@ protected material non vengono acquisiti nella capture.
 - target Goodix `27c6:5125` presente una sola volta;
 - password dell'utente conosciuta e salvato tutto il lavoro aperto.
 
-## Esecuzione manuale
+## Procedura storica — non eseguire
 
 1. Dalla sessione grafica premere `Ctrl+Alt+F3` ed eseguire il login testuale
    dello stesso utente. Verificare che il prompt sia sulla TTY 3.

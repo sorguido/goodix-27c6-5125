@@ -415,7 +415,7 @@ printf '%s\n' D290_ROOT_OVERLAY_UNMOUNTED=true D290_ROOT_HOST_PAM_RESTORED=true 
                 self.assertTrue(path.stat().st_mode & 0o111, name)
             subprocess.run(["bash", "-n", str(path)], check=True)
 
-    def test_02_reuses_common_harness_with_one_shot_budget(self):
+    def test_02_old_common_harness_path_is_disarmed_but_keeps_one_shot_budget(self):
         for marker in (
             "EXPERIMENT_ID=d290-plasmalogin",
             "ACTION=PLASMALOGIN_ONE_SHOT_VERIFY",
@@ -423,7 +423,7 @@ printf '%s\n' D290_ROOT_OVERLAY_UNMOUNTED=true D290_ROOT_HOST_PAM_RESTORED=true 
             "MAX_CONTACTS=1",
             "MAX_RETRIES=0",
             "REQUIRES_ACTIVE_USER_SESSION=false",
-            "LIVE_CAPABLE=true",
+            "LIVE_CAPABLE=false",
         ):
             self.assertIn(marker, self.config)
 

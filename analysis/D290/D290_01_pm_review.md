@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D290/01 — review PM pre-live
 
+> **SUPERATA.** Questa review chiudeva il metodo TTY3/FIFO/overlay, ora
+> abbandonato e disarmato. La review PM corrente è in
+> `D290_01_third_run_and_persistent_method_review.md`.
+
 ## Decisione
 
 ```text

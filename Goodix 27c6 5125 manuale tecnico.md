@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D289/01 PASS live; D290/01 host-path corretto e pronto al Human Gate
+### Stato corrente — D289/01 PASS live; D290/01 micro-kit persistente pronto al Human Gate
 
 La prima invocazione D290/01 sulla baseline
 `1a8c5528a0b9f9d12c395f1a9804ee82fd076b94` si è fermata fail-closed nel
@@ -116,16 +116,38 @@ payload fuori dal foreground process group della TTY. Non sono iniziati
 overlay, logout o VERIFY; contatti e nuova evidenza device-side sono zero. Il
 valore digitato è apparso in chiaro sulla TTY ma non è stato acquisito.
 
-Il correttivo di classe usa `timeout --foreground` solo per il payload opt-in
-D290, `/dev/tty` per autenticazione e una FIFO privata 0600 per `RELEASE`.
-Ownership, path canonico e assenza symlink sono verificati; PID e start-time
-del payload alimentano un watchdog di parent death; il `coproc` esegue
-direttamente `pkexec` e lo status è drenato con limiti temporali e di
-cardinalità. Il percorso production è esercitato con pseudo-TTY e host simulato
-fino ai classifier MATCH/NO_MATCH, inclusi segnali durante autenticazione,
-EOF, setup/release/recovery e invarianti sessione. Restano
-intrinsecamente live soltanto logout grafico, greeter reale, PAM/fprintd/USB e
-creazione reale della nuova sessione.
+La terza invocazione, baseline
+`4d6fb16350bb3bbe7a7908b4b611b294825ca00d`, contraddice il resoconto
+preliminare che la collocava prima dei marker READY: la capture integra mostra
+identità daemon, namespace, overlay read-only e visibilità utente tutti `true`.
+L'Utente non ha però fatto logout né contatto; l'interruzione ha prodotto
+cleanup, unmount, ripristino PAM, rimozione runtime e post-audit PASS, con zero
+azioni sensore e nessun marker `GOODIX_`. Dopo il riavvio, una verifica
+read-only ha confermato PAM originale non montato (`root:root:0644`, contesto
+`system_u:object_r:lib_t:s0`), runtime/processi residui assenti,
+`plasmalogin.service` attivo e zero VERIFY dopo il cursor della run.
+
+Per decisione metodologica esplicita dell'Utente, il percorso TTY3 + helper
+root long-lived + FIFO/`coproc` + bind overlay è abbandonato per D290/01 e
+disarmato con `LIVE_CAPABLE=false`; resta versionato soltanto per audit. Il
+boundary non cambia. Il nuovo micro-kit
+`operator_kit/d290-01-plasmalogin-persistent-test/` installa direttamente il
+solo PAM candidato già revisionato, salva backup e stato persistenti root-only,
+sopravvive a un reboot e offre tre sole modalità ARM/CLOSE/ROLLBACK. Non crea
+servizi, daemon, FIFO, socket, watchdog o mount runtime e non riabilita
+`authselect with-fingerprint`.
+
+ARM verifica branch/provenance, critical set, hash/delta/metadata/contesto
+SELinux contro la policy, package ownership, fallback D285/D286, cardinalità
+Goodix e assenza di residui. Ogni failure pre-ARMED ripristina bytes,
+owner/mode/context. CLOSE raccoglie boot, sessione e journal correnti, ammette
+un'unica epoch bounded e tenta sempre il rollback; lo stato viene rimosso solo
+dopo hash, metadata, contesto, `rpm -V` pertinente e audit D286 PASS.
+ROLLBACK è utilizzabile anche dalla TTY e quando il PAM è già originale; drift
+inatteso resta fail-closed. La regressione D286–D290 più common harness è
+`248/248 PASS`, di cui `17/17` per il nuovo micro-kit. Restano live soltanto
+ARM privilegiato eseguito dall'Utente, reboot, submit vuoto, un contatto,
+greeter/PAM/fprintd/USB e nuova sessione reale.
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1434,6 +1456,12 @@ SDDM_LOGIN_WITH_FINGERPRINT=NOT_PROVEN
 NEXT_PRIMARY_BOUNDARY=SDDM_LOGIN_WITH_FINGERPRINT
 ```
 
+#### D290/01 — percorso ephemeral storico, chiuso
+
+Il blocco seguente preserva la storia dei primi tre tentativi e del metodo
+TTY3/overlay. Non descrive più il percorso operatore corrente e non deve essere
+usato per una nuova live.
+
 D290/01 ha risolto offline il nome e la topologia effettivi del boundary. Sul
 target non è installato SDDM classico: `display-manager.service` è
 `plasmalogin.service`, attivo col daemon root `/usr/bin/plasmalogin` nel
@@ -1538,7 +1566,7 @@ common harness isolato è `14/14 PASS`. D290 è `38/38 PASS`, inclusi pseudo-TTY
 overlay lifecycle, signal/EOF/parent death, MATCH e NO_MATCH end-to-end host.
 
 ```text
-D290_01_OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FULL_HOST_PATH_CORRECTIVE
+D290_01_HISTORICAL_OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FULL_HOST_PATH_CORRECTIVE
 D290_01_SELECTED_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
 D290_01_REAL_DISPLAY_MANAGER=plasmalogin.service
 D290_01_CLASSIC_SDDM_INSTALLED=false
@@ -1572,15 +1600,97 @@ D290_01_PASSWORD_VALUE_RECORDED=false
 D290_01_HOST_PATH_BEHAVIORAL_TESTS=PASS_MATCH_AND_NO_MATCH
 D290_01_LIVE_EXECUTION_PERFORMED=false
 D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_ASSESSMENT
-D290_01_NEXT_STATE=HUMAN_REQUIRED
-NEXT_PRIMARY_BOUNDARY=PLASMALOGIN_ONE_SHOT_LIVE
+D290_01_HISTORICAL_NEXT_STATE=HUMAN_REQUIRED
+D290_01_HISTORICAL_METHOD_CLOSED=true
 ```
 
-Il comando direttamente eseguibile dall'operatore, esclusivamente dalla TTY 3
-come descritto nel kit, è:
+Il comando storico seguente è preservato solo per audit ed è ora rifiutato da
+`LIVE_CAPABLE=false`; non deve essere eseguito:
 
 ```bash
 operator_kit/live_probe/run.sh d290-plasmalogin --operator-run
+```
+
+#### D290/01 — metodo persistente reversibile corrente
+
+La terza invocazione operatore, baseline completa
+`4d6fb16350bb3bbe7a7908b4b611b294825ca00d`, è preservata in
+`captures/live_probe/d290-plasmalogin_20260912T155916Z_4d6fb16350bb/sanitized/`.
+Il manifest è integro. Diversamente dal resoconto preliminare, pre-audit,
+identità daemon, namespace, overlay read-only e visibilità del candidato erano
+tutti PASS/`true`. L'Utente non ha però eseguito logout o contatto. Il segnale
+ha chiuso l'helper con rc 130; unmount, ripristino PAM, rimozione runtime,
+cleanup e post-audit sono PASS, con zero azioni sensore e nessun marker
+`GOODIX_` nel journal diagnostico.
+
+La verifica read-only post-riavvio del 12 settembre 2026 conferma:
+
+```text
+D290_01_THIRD_OPERATOR_RESULT=INTERRUPTED_AFTER_OVERLAY_READY_BEFORE_LOGOUT
+D290_01_THIRD_OPERATOR_BASELINE=4d6fb16350bb3bbe7a7908b4b611b294825ca00d
+D290_01_THIRD_OPERATOR_LOGOUT_PERFORMED=false
+D290_01_THIRD_OPERATOR_VERIFY_STARTED=false
+D290_01_THIRD_OPERATOR_SENSOR_ACTION_COUNT=0
+D290_01_THIRD_OPERATOR_PHYSICAL_CONTACTS_CONSUMED=0
+D290_01_THIRD_OPERATOR_CLEANUP=PASS
+D290_01_POST_REBOOT_PAM_MOUNTPOINT=false
+D290_01_POST_REBOOT_PAM_SHA256=c6fc4a0bc2d89f88fa15ca7e9a6c5aaeccfbe66897755b5416ce9c5e35b4e40b
+D290_01_POST_REBOOT_PAM_METADATA=root:root:644
+D290_01_POST_REBOOT_PAM_SELINUX_CONTEXT=system_u:object_r:lib_t:s0
+D290_01_POST_REBOOT_OLD_RUNTIME_PRESENT=false
+D290_01_POST_REBOOT_OLD_PROCESS_COUNT=0
+D290_01_POST_REBOOT_PLASMALOGIN=active_running
+D290_01_POST_REBOOT_GOODIX_VERIFY_SINCE_CAPTURE=0
+```
+
+La decisione metodologica mantiene il boundary
+`PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION`, ma abbandona il costo host
+del helper root long-lived, FIFO/`coproc`, TTY3 e bind overlay. Il vecchio
+esperimento resta versionato e testabile offline, ma è disarmato. Il nuovo
+micro-kit `operator_kit/d290-01-plasmalogin-persistent-test/` espone solo
+`--operator-arm`, `--operator-close` e `--operator-rollback`.
+
+ARM richiede PAM originale package-owned e hash-pinned, candidato come esatto
+delta di una riga, owner/mode e contesto SELinux coerente con `matchpathcon`,
+package 6.7.5, D286/fallback PASS, un solo target e nessun residuo. Crea stato
+e backup root-only (`0700`/`0600`), installa direttamente il solo service PAM
+`plasmalogin` e verifica il candidato prima di dichiarare ARMED. Ogni failure
+precedente ripristina bytes, owner, mode e contesto. Non modifica authselect o
+gli stack PAM condivisi e non riabilita globalmente il fingerprint.
+
+CLOSE usa boot ID differenti per attestare il reboot, raccoglie soltanto la
+sessione corrente e i journal `fprintd`/`plasmalogin` del boot corrente,
+richiede al massimo una epoch e classifica MATCH, NO_MATCH, no-VERIFY o
+ambiguità. Qualunque ramo tenta il rollback. Il backup/state viene rimosso
+solo dopo hash originale, `root:root:0644`, contesto SELinux, verifica
+package-owned pertinente e audit D286/fallback PASS. ROLLBACK applica lo
+stesso percorso indipendentemente dall'esito e rifiuta drift PAM o package
+inatteso conservando lo stato per review.
+
+La simulazione usa una copia byte-identica dello script e una root virtuale
+sotto `/tmp`; non invoca il vero `pkexec`, PAM, reboot, USB o sensore. Il nuovo
+contratto è `17/17 PASS`; la regressione combinata common harness + D286–D290
+è `248/248 PASS`.
+
+```text
+D290_01_OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD
+D290_01_SELECTED_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
+D290_01_EPHEMERAL_OVERLAY_METHOD=ABANDONED_DO_NOT_RERUN
+D290_01_REASON=HOST_ORCHESTRATION_COMPLEXITY_EXCEEDED_BOUNDARY_VALUE
+D290_01_NEW_METHOD=PERSISTENT_REVERSIBLE_SINGLE_SERVICE_PAM_TEST
+D290_01_OLD_LIVE_CAPABLE=false
+D290_01_NO_TTY3_ORCHESTRATION=true
+D290_01_NO_LONG_LIVED_ROOT_HELPER=true
+D290_01_NO_FIFO_OR_COPROC=true
+D290_01_NO_RUNTIME_BIND_MOUNT_DURING_LOGIN=true
+D290_01_GLOBAL_AUTHSELECT_FINGERPRINT_REENABLE=false
+D290_01_PASSWORD_FALLBACK_PRESERVED=true
+D290_01_MAX_VERIFY_ACTIONS=1
+D290_01_MAX_PHYSICAL_CONTACTS=1
+D290_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_POST_REBOOT_READ_ONLY_ASSESSMENT
+D290_01_NEXT_STATE=HUMAN_REQUIRED
+NEXT_PRIMARY_BOUNDARY=PLASMALOGIN_ONE_SHOT_LIVE_AFTER_REBOOT
 ```
 
 ```text

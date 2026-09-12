@@ -5,11 +5,11 @@
 
 ```text
 SELECTED_NEXT_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
-OUTCOME=READY_FOR_HUMAN_GATE_AFTER_FULL_HOST_PATH_CORRECTIVE
-ADVANCEMENT=REAL_LOGIN_MANAGER_ONE_SHOT_PAYLOAD_IMPLEMENTED_ON_REUSABLE_HARNESS
-EXECUTABLE_CLOSURE=PASS_OFFLINE
-REAL_TARGET_COMPATIBILITY=PASS_READ_ONLY_PLUS_PRIVILEGED_NAMESPACE_GATE_AT_LIVE
-RESIDUAL_BLOCKER_OR_RISK=ONE_MANUAL_LOGOUT_AND_REAL_LOGIN_FACTORY_PRESERVING_VERIFY
+OUTCOME=READY_FOR_HUMAN_GATE_PERSISTENT_REVERSIBLE_METHOD
+ADVANCEMENT=MINIMAL_SINGLE_SERVICE_PAM_ARM_CLOSE_ROLLBACK_CLOSED_OFFLINE
+EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_POST_REBOOT_READ_ONLY_ASSESSMENT
+REAL_TARGET_COMPATIBILITY=PASS_READ_ONLY
+RESIDUAL_BLOCKER_OR_RISK=ONE_REAL_REBOOT_AND_PLASMALOGIN_FACTORY_PRESERVING_VERIFY
 CANONICAL_DOCUMENTATION=UPDATED
 REVIEW_SET=GIT_NATIVE
 SENSOR_REACHING_LIVE_EXECUTION_PERFORMED=false
@@ -36,7 +36,35 @@ esatto `plasmalogin`, il helper verifica con effective UID 0 e, dopo
 solo MATCH fprintd non prova quindi il login: serve osservare anche una nuova
 sessione logind Wayland `Service=plasmalogin`.
 
-## Metodo e compatibilità col common harness
+## Metodo corrente
+
+Il boundary resta `PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION`, ma per
+decisione metodologica dell'Utente il metodo TTY3/FIFO/`coproc`/helper root
+long-lived/overlay non è più una via live D290. L'esperimento storico è
+preservato con `LIVE_CAPABLE=false`; il common harness non viene ulteriormente
+esteso per questo test.
+
+Il micro-kit `operator_kit/d290-01-plasmalogin-persistent-test/` ha un solo
+script e tre modalità. ARM verifica host, provenance, D286/fallback, target,
+package e contesto SELinux; crea backup/stato root-only e installa direttamente
+il solo candidato `plasmalogin`. Nessun processo operatore sopravvive al
+reboot. CLOSE raccoglie evidenza del boot e tenta sempre il ripristino.
+ROLLBACK è il recovery indipendente, anche da TTY e anche se il test non è
+stato eseguito.
+
+Il file originale è rimosso dallo stato solo dopo SHA-256, owner/mode, contesto
+SELinux, `rpm -V` pertinente e audit D286/fallback PASS. Drift di package o PAM
+non attribuibile viene rifiutato senza cancellare il backup. `password-auth`
+resta dopo il modulo `sufficient`, quindi NO_MATCH conserva il login con
+password. Authselect e gli stack PAM condivisi non sono modificati.
+
+La procedura live è: ARM dalla sessione grafica, reboot manuale, un solo submit
+con campo password vuoto, un solo contatto dell'indice destro, login con
+password in caso di failure, quindi CLOSE. PASS richiede una sola epoch VERIFY
+valida, SIGFM MATCH e una sessione corrente `Service=plasmalogin`,
+`Type=wayland`, `Class=user`, seguiti dal rollback verificato.
+
+## Metodo storico chiuso — audit soltanto
 
 Il common harness resta utilizzabile con una minima estensione opt-in per la
 TTY foreground. Il delta principale è un piccolo payload avviato manualmente dalla TTY 3, separata dalla sessione
@@ -87,7 +115,7 @@ Il ritorno manuale alla TTY dopo MATCH o `Login Failed` rende visibili cleanup,
 conferma conclusiva e possibile prompt del post-audit. Il payload non esegue
 logout, terminate-session, unlock o recovery password autonomi.
 
-## Safety e non-claim
+### Safety e non-claim del metodo storico
 
 Budget tecnico: una action, un contatto, `max-tries=1`, zero retry. Ogni epoch
 deve avere attempted/rejected/consumed `1/0/1`, TLS/first-image `1/1`, zero
@@ -99,7 +127,7 @@ durante il fingerprint resta una procedura operatore e non un claim macchina.
 Il risultato non proverà affidabilità statistica, login dopo reboot multipli,
 integrazione PAM permanente o assenza assoluta di side effect NVM sconosciuti.
 
-## Riesame metodologico pre-live
+### Riesame metodologico del metodo storico
 
 1. Cambia il consumer: vero Plasma Login Manager e creazione sessione, non
    lock/unlock della sessione esistente. Cambia anche il punto di avvio in una
@@ -119,3 +147,24 @@ VERIFY, con zero contatti. Il testo immesso al prompt inefficace è apparso in
 chiaro sulla TTY, ma non è presente in capture o repository. L'intero percorso
 host simulabile è ora esercitato per MATCH e NO_MATCH; restano live soltanto
 logout/greeter/PAM-fprintd/USB e creazione reale della sessione.
+
+La terza invocazione sulla baseline `4d6fb16350bb3bbe7a7908b4b611b294825ca00d`
+ha invece raggiunto tutti i marker READY dell'overlay; il resoconto preliminare
+che li dava assenti era inesatto. L'Utente non ha eseguito logout o contatto.
+L'interruzione ha chiuso overlay/runtime e ripristinato il PAM; cleanup e
+post-audit sono PASS, azioni sensore e marker Goodix sono zero. Il riavvio
+successivo conferma read-only PAM originale, nessun mount/runtime/processo
+residuo, daemon attivo e zero VERIFY successivi al cursor.
+
+## Stato corrente
+
+```text
+D290_01_EPHEMERAL_OVERLAY_METHOD=ABANDONED_DO_NOT_RERUN
+D290_01_REASON=HOST_ORCHESTRATION_COMPLEXITY_EXCEEDED_BOUNDARY_VALUE
+D290_01_NEW_METHOD=PERSISTENT_REVERSIBLE_SINGLE_SERVICE_PAM_TEST
+D290_01_GLOBAL_AUTHSELECT_FINGERPRINT_REENABLE=false
+D290_01_PASSWORD_FALLBACK_PRESERVED=true
+D290_01_PERSISTENT_KIT_TESTS=17_PASS
+D290_01_COMBINED_REGRESSION=248_PASS
+D290_01_NEXT_STATE=HUMAN_REQUIRED
+```

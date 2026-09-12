@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D290/01 — seconda invocazione abortita e closure del percorso host
 
+> **STORICO.** Il correttivo descritto qui appartiene al metodo
+> TTY3/FIFO/overlay, ora abbandonato e disarmato. L'evidenza della run resta
+> valida; non usare questo documento come procedura operatore corrente.
+
 ## Evidenza della seconda invocazione
 
 La seconda invocazione operatore è partita dalla baseline completa
