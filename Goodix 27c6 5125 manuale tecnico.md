@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D287/01 PASS live; common Live Probe Harness chiuso offline
+### Stato corrente — D288/01 PASS live; primo percorso reale del Live Probe Harness
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1107,7 +1107,7 @@ LIVE_PROBE_HARNESS_FACTORY_PRESERVING_POLICY_UNCHANGED=true
 LIVE_PROBE_HARNESS_STABILITY_POLICY=COMMON_CHANGE_FULL_REGRESSION_PAYLOAD_CHANGE_LOCAL_PLUS_COMPATIBILITY
 ```
 
-D288/01 applica immediatamente il nuovo metodo al successivo boundary reale:
+D288/01 applica il nuovo metodo al successivo boundary reale:
 KScreenLocker 6.7.5 deve propagare il MATCH dell'autenticatore non-interattivo
 fino a `Unlocked`. Ripetere il vecchio namespace root ricreerebbe la causa
 Polkit già chiusa. Il nuovo greeter è invece figlio diretto della sessione
@@ -1132,25 +1132,111 @@ richiede insieme epoch Goodix, SIGFM MATCH, marker preload fingerprint,
 fermano fail-closed. Il greeter `--testing` resta fullscreen/focus-exclusive:
 durante il probe non devono essere digitati password o PIN.
 
-```text
-D288_01_OUTCOME=READY_FOR_HUMAN_GATE
-D288_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_TARGET_PREFLIGHT
-D288_01_REAL_TARGET_COMPATIBILITY=PASS
-D288_01_MAX_VERIFY_ACTIONS=3
-D288_01_MAX_PHYSICAL_CONTACTS=3
-D288_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
-D288_01_HOST_PAM_FILE_WRITE_COUNT=0
-D288_01_HOST_PAM_MOUNT_COUNT=0
-D288_01_LIVE_EXECUTION_PERFORMED=false
-D288_01_NEXT_STATE=HUMAN_REQUIRED
-NEXT_PRIMARY_BOUNDARY=ACTIVE_USER_KSCREENLOCKER_MATCH_PROPAGATION_LIVE
-```
-
-Il percorso operatore usa il common harness e, dopo commit/push pulito su
-`development`, è direttamente eseguibile con:
+Prima della live lo stato chiuso offline era
+`READY_FOR_HUMAN_GATE`, con compatibilità target e preflight reali PASS. Il
+percorso operatore usava il common harness con:
 
 ```bash
 operator_kit/live_probe/run.sh d288-active-user-kscreenlocker --operator-run
+```
+
+La run manuale sulla baseline
+`4b819a566f39abec6bf3e88c8c89743880388b1a` chiude ora D288/01. Gli
+originali sanitizzati sono in
+`captures/live_probe/d288-active-user-kscreenlocker_20260912T053427Z_4b819a566f39/sanitized/`;
+tutti i quattordici digest del manifest sono validi e `capture.sha256` ha
+SHA-256 `fbbf34b4706ce3d872e8473917b229adb4c5c4b0f53dd0a8e1814f48d1ecf5ae`.
+
+**OBSERVED:** il greeter è un processo della sessione utente UID 1000 sotto
+`user@1000.service/app.slice`, non sotto il precedente cgroup root/background.
+Il log contiene una sola interposizione esatta `kde-fingerprint`, un solo
+`Unlocked` e il payload termina zero. Tentativi, contatti e matched attempt
+sono `1/1/1`; la serie si arresta senza secondo slot. Il sorgente baseline
+redirige esclusivamente `kde-fingerprint` al confdir privato e inoltra `kde`,
+`kde-smartcard` e ogni altro service al vero `pam_start()`.
+
+**VERIFIED:** il journal contiene una sola epoch VERIFY con action
+attempted/rejected/consumed `1/0/1`, TLS/first-image `1/1` e 75 submit reali.
+SIGFM estrae 133 keypoint, dichiara otto sample e confronta i sample 1, 2 e 3
+con score `0`, `38` e `146` alla soglia 40; l'unico outcome è MATCH sul sample
+3. Retry/reopen/reset/clear-halt/famiglie persistenti note sono tutti zero;
+outstanding è zero, drained e context-closed sono uno. Pre/post root audit,
+cleanup, journal, capture, classificazioni e hash sono PASS. Il payload usa un
+confdir effimero e non esegue mount o scritture sotto `/etc/pam.d`; non risulta
+drift host noto.
+
+Il classifier della baseline accetta il successo soltanto con la congiunzione
+di epoch Goodix valida, SIGFM MATCH, marker fingerprint, `Unlocked` ed exit
+zero. La capture non registra eventi tastiera: l'assenza di password/PIN
+digitati resta quindi attestazione dell'operatore, coerente con l'istruzione
+catturata e col percorso fingerprint completo, ma non viene descritta come
+telemetria macchina autonoma. Non risultano redirect del service password o
+evidenze del suo uso.
+
+Il boundary dimostrato è precisamente:
+
+```text
+KScreenLocker --testing
+→ kde-fingerprint
+→ pam_fprintd
+→ fprintd
+→ Goodix VERIFY
+→ SIGFM MATCH
+→ KScreenLocker Unlocked
+```
+
+`--testing` non equivale a un lock orchestrato della sessione e non attraversa
+SDDM. `REAL_LOCKED_SESSION_UNLOCK` e `SDDM_LOGIN_WITH_FINGERPRINT` restano non
+provati. `persistent=0` resta telemetria sulle famiglie note, non prova
+assoluta della NVM.
+
+D288 è anche la prima live reale del common Live Probe Harness. Sul percorso
+esercitato sono provati gate/provenance, budget handoff, invocazione singola,
+pre/post audit, capture/sanitizzazione, journal, cleanup, summary/hash e
+classificazione comune. Il risultato valida il metodo riusabile col payload
+D288, non ogni possibile payload futuro.
+
+```text
+D288_01_LIVE_OUTCOME=PASS_MATCH
+D288_01_REAL_KSCREENLOCKER_CONSUMER_REACHED=true
+D288_01_REAL_VERIFY_REACHED=true
+D288_01_REAL_MATCH_REACHED=true
+D288_01_KSCREENLOCKER_UNLOCKED_PROPAGATION_PROVEN=true
+D288_01_ATTEMPTS_PERFORMED=1
+D288_01_PHYSICAL_CONTACTS_CONSUMED=1
+D288_01_MATCHED_ATTEMPT=1
+D288_01_VERIFY_EPOCH_COUNT=1
+D288_01_ACTION_CONSUMED_COUNT=1
+D288_01_TLS_COUNT=1
+D288_01_FIRST_IMAGE_COUNT=1
+D288_01_REAL_USB_SUBMIT_COUNT=75
+D288_01_SIGFM_EXTRACT_KEYPOINTS=133
+D288_01_SIGFM_TEMPLATE_SAMPLE_COUNT=8
+D288_01_SIGFM_COMPARISON_COUNT=3
+D288_01_SIGFM_MATCHED_SAMPLE=3
+D288_01_SIGFM_MATCH_SCORE=146
+D288_01_SIGFM_THRESHOLD=40
+D288_01_RETRY_COUNT=0
+D288_01_REOPEN_COUNT=0
+D288_01_RESET_COUNT=0
+D288_01_CLEAR_HALT_COUNT=0
+D288_01_PERSISTENT_WRITE_FAMILY_COUNT=0
+D288_01_OUTSTANDING_COUNT=0
+D288_01_DRAINED_COUNT=1
+D288_01_CONTEXT_CLOSED_COUNT=1
+D288_01_PRE_AUDIT=PASS
+D288_01_POST_AUDIT=PASS
+D288_01_HOST_PAM_FILE_WRITE_COUNT=0
+D288_01_HOST_PAM_MOUNT_COUNT=0
+D288_01_ADVANCEMENT=KSCREENLOCKER_ACTIVE_USER_FINGERPRINT_MATCH_TO_UNLOCKED_PROVEN
+REAL_LOCKED_SESSION_UNLOCK=NOT_PROVEN
+SDDM_LOGIN_WITH_FINGERPRINT=NOT_PROVEN
+LIVE_PROBE_HARNESS_FIRST_REAL_LIVE=PASS
+LIVE_PROBE_HARNESS_FIRST_REAL_PAYLOAD=d288-active-user-kscreenlocker
+LIVE_PROBE_HARNESS_COMMON_ORCHESTRATION=PROVEN_LIVE_FOR_D288_PATH
+LIVE_PROBE_HARNESS_CAPTURE_PIPELINE=PASS
+LIVE_PROBE_HARNESS_PRE_POST_AUDIT=PASS
+LIVE_PROBE_HARNESS_REUSABLE_METHOD_VALIDATED_BY_REAL_RUN=true
 ```
 
 ```text
