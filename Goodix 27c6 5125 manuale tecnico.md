@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance live corrente — v2.7 (10 settembre 2026)
+### Governance live corrente — v2.8 (12 settembre 2026)
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -59,6 +59,18 @@ AUTOMATIC_UNPROVEN_SENSOR_RETRY_ALLOWED=false
 SHA_RECORDED_FOR_PROVENANCE=true
 ```
 
+La v2.8 aggiunge un'ottimizzazione di metodo senza modificare il gate:
+`operator_kit/live_probe/` è il common harness stabile per i futuri probe
+factory-preserving compatibili. Nuove ipotesi vivono normalmente in piccoli
+payload; un kit completo separato richiede una incompatibilità concreta.
+
+```text
+REUSABLE_HARNESS_FIRST=true
+NEW_EXPERIMENT_NEEDS_NEW_OPERATOR_FRAMEWORK=false
+HUMAN_GATE_UNCHANGED=true
+FACTORY_PRESERVING_POLICY_UNCHANGED=true
+```
+
 ### Consultazione del manuale al bootstrap
 
 Il manuale resta l'autorità narrativa tecnica primaria, ma non deve essere
@@ -83,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D285/01 attivo; D286/01 PASS live chiuso
+### Stato corrente — D287/01 PASS live; common Live Probe Harness chiuso offline
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1016,6 +1028,83 @@ riesamina direttamente il review set, corregge gate Git, propagazione di
 `SIGINT`, privacy journal e classificazione avversa, quindi decide
 `ACCEPT_AND_CONTINUE`. Il kit è rilasciato al solo Human Gate; nessuna live è
 stata eseguita dall'AI.
+
+La run manuale successiva, sulla baseline
+`e77f6dc1b4c9bbad54eedfa13bfd672de7e05317`, chiude il probe. Gli originali
+sanitizzati e il manifest hash-pinned sono in
+`captures/D287_01/D28701_ACTIVE_USER_PAM_20260911T224657Z_e77f6dc1b4c9/sanitized/`.
+La review indipendente ricalcola tutti i digest e legge runner, journal,
+classificazione e pre/post audit, senza affidarsi al transcript fornito.
+
+**OBSERVED:** il runner non privilegiato UID 1000 appartiene al cgroup Plasma
+attivo `user-1000/user@1000/app.slice`. Il suo `pkcheck` non interattivo sul
+subject esatto PID/start-time/UID ritorna zero. `pam_start_confdir()`,
+`pam_authenticate()` e `pam_end()` ritornano tutti zero; `pam_fprintd` enumera
+un print, seleziona il device, completa `VerifyStart` e osserva
+`verify-match`.
+
+**VERIFIED:** il journal contiene una sola epoch VERIFY, una action tentata e
+consumata, un TLS, una prima immagine e 75 submit reali. SIGFM estrae 157
+keypoint, dichiara otto sample, confronta il sample 1 una sola volta con score
+128/40 e produce MATCH sul medesimo sample. Match/no-match sono `1/0`;
+retry/reopen/reset/clear-halt e famiglie persistenti note sono zero;
+outstanding è zero, drained e context-closed sono uno. Non compare la
+precedente negazione `ListEnrolledFingers`. Pre e post root audit sono
+integralmente PASS, con runtime/wrapper/authselect/fallback/template/system
+libfprint e uninstall readiness coerenti; nessun file PAM host è scritto.
+
+Il confronto fra le due run dimostra causalmente, per questo host e policy,
+che il contesto logind root/background del vecchio greeter causava la
+negazione pre-VERIFY e che il processo nella sessione utente attiva risolve
+l'autorizzazione VERIFY. Non prova FAR/FRR né assenza assoluta di ogni side
+effect NVM sconosciuto: `persistent=0` resta telemetria sulle famiglie note.
+
+```text
+D287_01_ACTIVE_USER_PAM_PROBE_LIVE_OUTCOME=PASS_MATCH
+D287_01_REAL_VERIFY_REACHED=true
+D287_01_REAL_MATCH_REACHED=true
+D287_01_VERIFY_EPOCH_COUNT=1
+D287_01_PHYSICAL_CONTACTS_CONSUMED=1
+D287_01_TLS_COUNT=1
+D287_01_FIRST_IMAGE_COUNT=1
+D287_01_RETRY_COUNT=0
+D287_01_PERSISTENT_WRITE_FAMILY_COUNT=0
+D287_01_ACTIVE_USER_POLKIT_PREFLIGHT=PASS
+D287_01_FPRINTD_LIST_ENROLLED_FINGERS=AUTHORIZED
+D287_01_FPRINTD_VERIFY_START_REACHED=true
+D287_01_CLEANUP=PASS
+D287_01_POST_AUDIT=PASS
+D287_01_ADVANCEMENT=ACTIVE_USER_SESSION_PAM_TO_REAL_GOODIX_MATCH_PROVEN
+ROOT_BACKGROUND_LOGIND_CONTEXT_CAUSED_PREVERIFY_POLKIT_DENIAL=true
+ACTIVE_USER_SESSION_CONTEXT_RESOLVES_POLKIT_VERIFY_AUTHORIZATION=true
+```
+
+La decisione metodologica esplicita dell'Utente viene implementata subito
+dopo la closure: `operator_kit/live_probe/` separa common safety/orchestration
+e piccoli payload. Il common core copre gate Git/provenance, conferma,
+passaggio esplicito dei budget, invocazione singola senza retry, timeout e
+segnali, pre/post audit, cursor/journal opzionale, capture sanitizzata,
+cleanup, summary/hash e classificazione comune. Il payload resta responsabile
+di imporre prima dell'azione i budget ricevuti e dei cleanup device-specific.
+
+La fixture `experiments/offline-reference` è `TEST-ONLY` e
+`LIVE_CAPABLE=false`; prova il contratto senza USB, fprintd, sensore o
+privilegi. La full harness regression copre path resolution da cwd esterna,
+rifiuto operator-run, budget exact e over-budget, una sola invocazione, zero
+retry, timeout, `SIGINT`, cleanup/post-audit, classificazione e manifest.
+Nessuna live è stata eseguita per validare il refactoring.
+
+```text
+LIVE_PROBE_HARNESS_DESIGN=APPROVED
+LIVE_PROBE_HARNESS_IMPLEMENTED=true
+LIVE_PROBE_HARNESS_COMMON_SAFETY_TESTS=PASS
+LIVE_PROBE_HARNESS_OFFLINE_REFERENCE_EXPERIMENT=PASS
+LIVE_PROBE_HARNESS_NO_LIVE_EXECUTION=true
+LIVE_PROBE_HARNESS_DOCUMENTED_CANONICALLY=true
+LIVE_PROBE_HARNESS_HUMAN_GATE_UNCHANGED=true
+LIVE_PROBE_HARNESS_FACTORY_PRESERVING_POLICY_UNCHANGED=true
+LIVE_PROBE_HARNESS_STABILITY_POLICY=COMMON_CHANGE_FULL_REGRESSION_PAYLOAD_CHANGE_LOCAL_PLUS_COMPATIBILITY
+```
 
 ```text
 D279_OUTCOME=PASS_LIVE_CLOSED

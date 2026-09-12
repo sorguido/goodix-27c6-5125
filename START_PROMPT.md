@@ -297,6 +297,14 @@ il gate. Retry automatici o impliciti sensor-reaching non provati sicuri
 restano vietati; il limite deve essere tecnico, non affidato a token di
 autorizzazione consumabili.
 
+Per un nuovo probe compatibile applica prima `REUSABLE_HARNESS_FIRST`: mantieni
+stabile `operator_kit/live_probe/` e aggiungi normalmente soltanto il piccolo
+payload dell'esperimento. Modifiche al common harness richiedono la sua
+regressione completa; modifiche payload richiedono test locali più compatibility
+test common. Un kit autonomo completo richiede una incompatibilità concreta e
+documentata del boundary o del profilo di rischio. Questa scelta riduce
+duplicazione, non modifica il Human Gate né autorizza alcuna live.
+
 ---
 
 ## 7. Git e documentazione

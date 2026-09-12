@@ -339,6 +339,31 @@ Regole:
 - dopo la preparazione del kit, l'agente termina con `HUMAN_REQUIRED`;
 - niente comandi USB/Python improvvisati come sostituto del kit quando un kit dedicato è praticabile.
 
+### 8.1 Reusable Live Probe Harness
+
+Per ogni futuro probe factory-preserving compatibile, usare come default il
+common harness versionato in `operator_kit/live_probe/` e aggiungere un piccolo
+payload sotto `operator_kit/live_probe/experiments/<experiment-id>/`:
+
+```text
+REUSABLE_HARNESS_FIRST=true
+COMMON_HARNESS=stable
+EXPERIMENT_PAYLOAD=small_delta
+NEW_EXPERIMENT != NEW_OPERATOR_FRAMEWORK
+```
+
+Il common harness centralizza i gate e l'orchestrazione condivisa; il payload
+deve imporre tecnicamente i propri limiti sensor-reaching e contenere soltanto
+il delta dell'ipotesi. Un cambio payload richiede test locali e compatibility
+test common. Ogni modifica al common harness richiede review più forte e full
+harness regression. Un nuovo kit autonomo è ammesso soltanto quando il
+boundary o il profilo di rischio è concretamente incompatibile, con motivazione
+documentata.
+
+Questa regola non riduce Human Gate, guardrail live, factory-preserving,
+provenance o Git protections. Il common harness non deve diventare un framework
+generico, una DSL o un plugin system.
+
 ---
 
 ## 9. Riesame metodologico pre-live

@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.7 — Revisione 10 settembre 2026
-> **Stato**: Attivo; sostituisce la v2.6 del 1 settembre 2026
-> **Motivazione**: la v2.7 mantiene invariati Human Gate e safety tecnica, ma elimina la burocrazia autorizzativa per le normali live factory-preserving. Dopo la closure offline l'AI dichiara `HUMAN_REQUIRED` e si ferma; il Kit Operatore è direttamente eseguibile dall'Utente senza grant, file/token/ticket/nonce, claim/consumo, candidate authorization o approvazione rituale dello SHA. SHA e hash restano strumenti di provenance e integrità. Retry automatici o impliciti sensor-reaching non provati sicuri restano vietati e devono essere impediti tecnicamente. La v2.7 sostituisce inoltre la lettura integrale predefinita del manuale con stato/boundary obbligatori e consultazione mirata delle sezioni tecniche pertinenti.
+> **Versione**: 2.8 — Revisione 12 settembre 2026
+> **Stato**: Attivo; sostituisce la v2.7 del 10 settembre 2026
+> **Motivazione**: la v2.8 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving e protezioni Git della v2.7, ma rende `REUSABLE_HARNESS_FIRST` il default per i futuri probe live compatibili. Safety/orchestration comune e payload specifico vengono separati per ridurre duplicazione, difetti host-side e costo di review; un kit autonomo resta ammesso quando il common harness non copre correttamente il boundary o il profilo di rischio.
 
 ---
 
@@ -460,6 +460,39 @@ Regole:
 - dopo la preparazione del kit il loop termina con `HUMAN_REQUIRED`;
 - non sostituire un kit dedicato con comandi USB/Python improvvisati quando il kit è praticabile.
 
+### 9.1 Reusable harness first
+
+Per i futuri probe live factory-preserving compatibili con la threat model del
+common Live Probe Harness vale il default:
+
+```text
+REUSABLE_HARNESS_FIRST=true
+COMMON_HARNESS=stable_safety_and_orchestration
+EXPERIMENT_PAYLOAD=small_boundary_specific_delta
+NEW_EXPERIMENT != NEW_OPERATOR_FRAMEWORK
+```
+
+Il common harness centralizza, quando applicabile, gate Git/provenance,
+semantica del Human Gate, conferma operatore, budget action/contatti/retry,
+timeout e segnali, pre/post audit, cursor/journal, capture e sanitizzazione,
+cleanup, summary/hash, failure propagation e validazione della telemetria
+comune. Ogni invocazione continua a imporre tecnicamente nel payload i budget
+sensor-reaching pertinenti; il common harness non converte controlli post-hoc
+in una falsa garanzia hardware.
+
+Un nuovo esperimento dichiara obiettivo, action, limiti, requisiti, telemetria
+attesa e stop conditions e contiene soltanto il payload e gli hook specifici
+necessari. Non modifica normalmente il common harness. Una modifica al common
+harness richiede review più forte e la sua regressione completa; un cambio
+payload usa test locali più compatibility test common. A milestone o prima di
+una live ad alto rischio si esegue la regressione completa pertinente,
+preservando sempre le suite safety-critical.
+
+Un kit autonomo completo deve motivare una incompatibilità concreta del
+boundary, dell'orchestrazione o del profilo di rischio. Il reusable harness è
+un'ottimizzazione di metodo: non autorizza live, privilegi, USB o persistenza,
+non riduce il Human Gate e non modifica alcuna invariante factory-preserving.
+
 ---
 
 ## 10. Riesame metodologico pre-live
@@ -886,7 +919,7 @@ La qualità si misura in:
 
 ---
 
-## 25. Principio sintetico della v2.7
+## 25. Principio sintetico della v2.8
 
 ```text
 sicurezza hardware forte
@@ -904,6 +937,8 @@ alternanza disciplinata Executor/PM
 Human Gate espliciti
 +
 operator kit direttamente eseguibili per live manuali
++
+reusable harness first per probe compatibili
 +
 review Git-native
 +
