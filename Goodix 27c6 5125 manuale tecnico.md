@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D289/01 PASS live; login SDDM resta il boundary non provato
+### Stato corrente — D289/01 PASS live; D290/01 Plasma Login pronto al Human Gate
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1402,6 +1402,85 @@ D289_01_ADVANCEMENT=REAL_KDE_LOCKED_SESSION_FINGERPRINT_MATCH_TO_UNLOCKED_PROVEN
 D289_01_EXECUTABLE_CLOSURE=PASS_LIVE_PLUS_HASH_PINNED_EVIDENCE_AUDIT
 SDDM_LOGIN_WITH_FINGERPRINT=NOT_PROVEN
 NEXT_PRIMARY_BOUNDARY=SDDM_LOGIN_WITH_FINGERPRINT
+```
+
+D290/01 ha risolto offline il nome e la topologia effettivi del boundary. Sul
+target non è installato SDDM classico: `display-manager.service` è
+`plasmalogin.service`, attivo col daemon root `/usr/bin/plasmalogin` nel
+cgroup `/system.slice/plasmalogin.service`; il pacchetto è Plasma Login
+Manager 6.7.5. Il service PAM reale è `/usr/lib/pam.d/plasmalogin`, mode
+`root:root:644`, SHA-256
+`c6fc4a0bc2d89f88fa15ca7e9a6c5aaeccfbe66897755b5416ce9c5e35b4e40b`.
+Include `password-auth`, che non contiene pam_fprintd.
+
+L'audit del sorgente upstream KDE tag `v6.7.5`, commit
+`e63894e7923db053413915ea582db2757303ca8f`, conferma il percorso: il greeter
+invia username e campo password solo dopo un submit esplicito; il daemon avvia
+`plasmalogin-helper`, che come root seleziona il service PAM esatto
+`plasmalogin`, chiama authenticate/account e, solo al successo, apre e avvia
+la sessione. La nuova ipotesi richiede quindi la congiunzione di una sola
+epoch Goodix SIGFM MATCH e una nuova sessione logind Wayland
+`Service=plasmalogin`; il MATCH isolato non basta.
+
+Il common Live Probe Harness resta adatto senza modifiche. Il piccolo payload
+`d290-plasmalogin` viene avviato dall'operatore in una sessione testuale TTY 3,
+separata dal desktop iniziale su tty2: harness e helper root sopravvivono così
+al logout senza daemonizzazione o nuovo framework. Un helper pipe-bounded
+verifica identità del daemon e mount namespace, quindi sovrappone read-only il
+solo PAM `plasmalogin`. Il candidato è byte-identico allo stack Fedora salvo
+una riga `pam_fprintd.so` sufficient con `max-tries=1 timeout=45`; account,
+password, session e fallback `password-auth` restano invariati.
+
+Logout e ritorno alla TTY sono manuali. Al greeter reale l'operatore seleziona
+l'utente, lascia vuoto il campo password, preme Invio una volta e fa un solo
+contatto. Su MATCH il payload richiede una nuova sessione Wayland attiva e
+diversa dall'iniziale; su NO_MATCH richiede zero nuove sessioni. In entrambi i
+casi rilascia e verifica l'overlay prima di consentire il post-audit e, nel
+ramo NO_MATCH, prima del recupero password. Non esegue autonomamente logout,
+terminate-session, unlock o password recovery.
+
+Il budget è una action, un contatto, `max-tries=1`, zero retry. Ogni epoch deve
+mostrare attempted/rejected/consumed `1/0/1`, TLS/first-image `1/1`, zero
+retry/reopen/reset/clear-halt/famiglie persistenti/outstanding e
+drained/context-closed uno. EOF, segnale ed errore rilasciano l'overlay;
+recovery separata accetta soltanto il candidato hash-pinned. La capture non
+telemetra la tastiera: l'assenza di password/PIN durante la verifica resta
+procedura operatore, non claim macchina.
+
+La matrice locale D290 è `15/15 PASS`; `bash -n` e il vero percorso common
+`--offline-test` sono PASS da cwd esterna. Nessuna live, logout, `pkexec`,
+mount, USB o azione sensore è stata eseguita dall'AI. L'esecuzione reale
+factory-preserving è il successivo Human Gate.
+
+```text
+D290_01_OUTCOME=READY_FOR_HUMAN_GATE
+D290_01_SELECTED_BOUNDARY=PLASMALOGIN_FINGERPRINT_TO_NEW_WAYLAND_SESSION
+D290_01_REAL_DISPLAY_MANAGER=plasmalogin.service
+D290_01_CLASSIC_SDDM_INSTALLED=false
+D290_01_REAL_PAM_SERVICE=plasmalogin
+D290_01_UPSTREAM_SOURCE_AUDIT=PASS_V6_7_5_E63894E
+D290_01_REUSABLE_HARNESS_FIRST=true
+D290_01_COMMON_HARNESS_CHANGED=false
+D290_01_OPERATOR_LIFECYCLE=TTY3_SURVIVES_GRAPHICAL_LOGOUT
+D290_01_MAX_VERIFY_ACTIONS=1
+D290_01_MAX_PHYSICAL_CONTACTS=1
+D290_01_PAM_MAX_TRIES=1
+D290_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D290_01_HOST_PAM_PERSISTENT_WRITE_COUNT=0
+D290_01_MAX_TEMPORARY_READ_ONLY_BIND_MOUNTS=1
+D290_01_PASSWORD_FALLBACK_PRESERVED=true
+D290_01_LOGOUT_COMMAND_PRESENT=false
+D290_01_LIVE_EXECUTION_PERFORMED=false
+D290_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_ASSESSMENT
+D290_01_NEXT_STATE=HUMAN_REQUIRED
+NEXT_PRIMARY_BOUNDARY=PLASMALOGIN_ONE_SHOT_LIVE
+```
+
+Il comando direttamente eseguibile dall'operatore, esclusivamente dalla TTY 3
+come descritto nel kit, è:
+
+```bash
+operator_kit/live_probe/run.sh d290-plasmalogin --operator-run
 ```
 
 ```text
