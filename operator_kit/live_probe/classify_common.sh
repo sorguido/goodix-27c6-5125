@@ -46,11 +46,17 @@ elif [[ $result == PASS &&
 elif [[ $result == PASS && $PERSISTENT_WRITE_FAMILY_COUNT -ne 0 ]]; then
   result=FAIL; reason=PERSISTENT_WRITE_FAMILY_OBSERVED
 elif [[ $result == PASS &&
-        ( $OUTSTANDING_COUNT -ne 0 || $DRAINED_COUNT -ne 1 ||
-          $CONTEXT_CLOSED_COUNT -ne 1 ) ]]; then
+        ( $OUTSTANDING_COUNT -ne 0 || $DRAINED_COUNT -lt 1 ||
+          $CONTEXT_CLOSED_COUNT -lt 1 ) ]]; then
   result=FAIL; reason=CLEANUP_TELEMETRY_INCOMPLETE
-elif [[ $result == PASS && $PAYLOAD_OUTCOME != "$expected" ]]; then
-  result=FAIL; reason=UNEXPECTED_PAYLOAD_OUTCOME
+elif [[ $result == PASS ]]; then
+  expected_match=false
+  for expected_value in $expected; do
+    [[ $PAYLOAD_OUTCOME != "$expected_value" ]] || expected_match=true
+  done
+  if [[ $expected_match != true ]]; then
+    result=FAIL; reason=UNEXPECTED_PAYLOAD_OUTCOME
+  fi
 fi
 
 echo "LIVE_PROBE_COMMON_CLASSIFICATION=$result"

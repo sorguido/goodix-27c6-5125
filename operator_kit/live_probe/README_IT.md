@@ -50,7 +50,9 @@ Fixture offline, eseguibile anche da cwd diverso:
 operator_kit/live_probe/run.sh offline-reference --offline-test
 ```
 
-Un futuro esperimento live viene avviato esclusivamente dall'operatore:
+Un futuro esperimento live viene provato offline solo se dichiara e implementa
+`OFFLINE_TEST_CAPABLE=true`, quindi viene avviato live esclusivamente
+dall'operatore:
 
 ```bash
 operator_kit/live_probe/run.sh <experiment-id> --operator-run

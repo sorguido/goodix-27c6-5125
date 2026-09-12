@@ -18,7 +18,7 @@ lp_validate_config () {
   local key
   for key in EXPERIMENT_ID GOAL ACTION PAYLOAD MAX_ACTIONS MAX_CONTACTS \
     MAX_RETRIES TIMEOUT_SECONDS REQUIRES_ROOT REQUIRES_ACTIVE_USER_SESSION \
-    LIVE_CAPABLE OUTPUT_IS_SANITIZED EXPECTED_TELEMETRY STOP_CONDITIONS; do
+    LIVE_CAPABLE OFFLINE_TEST_CAPABLE OUTPUT_IS_SANITIZED EXPECTED_TELEMETRY STOP_CONDITIONS; do
     [[ -n ${!key:-} ]] || lp_fail "CONFIG_MISSING_${key}" || return
   done
   [[ $EXPERIMENT_ID =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||
@@ -28,7 +28,7 @@ lp_validate_config () {
   done
   [[ $MAX_ACTIONS -ge 0 && $MAX_CONTACTS -ge 0 && $MAX_RETRIES -eq 0 &&
      $TIMEOUT_SECONDS -ge 1 ]] || lp_fail CONFIG_BUDGET_INVALID || return
-  for key in REQUIRES_ROOT REQUIRES_ACTIVE_USER_SESSION LIVE_CAPABLE OUTPUT_IS_SANITIZED; do
+  for key in REQUIRES_ROOT REQUIRES_ACTIVE_USER_SESSION LIVE_CAPABLE OFFLINE_TEST_CAPABLE OUTPUT_IS_SANITIZED; do
     lp_is_bool "${!key}" || lp_fail "CONFIG_${key}_INVALID" || return
   done
   [[ $PAYLOAD != /* && $PAYLOAD != *..* ]] || lp_fail CONFIG_PAYLOAD_PATH_INVALID || return
@@ -48,13 +48,17 @@ lp_validate_config () {
 
 lp_git_gate () {
   local branch head origin dirty
+  local -a critical=(operator_kit/live_probe)
   branch=$(git -C "$LP_GIT_ROOT" branch --show-current) || return 1
   [[ $branch == development ]] || lp_fail GIT_BRANCH_NOT_DEVELOPMENT || return
   head=$(git -C "$LP_GIT_ROOT" rev-parse HEAD) || return 1
   origin=$(git -C "$LP_GIT_ROOT" rev-parse origin/development) || return 1
   [[ $head == "$origin" ]] || lp_fail GIT_HEAD_ORIGIN_MISMATCH || return
+  if declare -p LIVE_CRITICAL_PATHS 2>/dev/null | grep -q 'declare -a'; then
+    critical+=("${LIVE_CRITICAL_PATHS[@]}")
+  fi
   dirty=$(git -C "$LP_GIT_ROOT" status --porcelain=v1 --untracked-files=all -- \
-    operator_kit/live_probe ${LIVE_CRITICAL_PATHS:-} 2>/dev/null) ||
+    "${critical[@]}" 2>/dev/null) ||
     lp_fail GIT_CRITICAL_STATUS_UNREADABLE || return
   [[ -z $dirty ]] || {
     printf '%s\n' "$dirty" >&2

@@ -1089,9 +1089,10 @@ di imporre prima dell'azione i budget ricevuti e dei cleanup device-specific.
 
 La fixture `experiments/offline-reference` è `TEST-ONLY` e
 `LIVE_CAPABLE=false`; prova il contratto senza USB, fprintd, sensore o
-privilegi. La full harness regression copre path resolution da cwd esterna,
+privilegi. La full harness regression aggiornata (`9/9`) copre path resolution da cwd esterna,
 rifiuto operator-run, budget exact e over-budget, una sola invocazione, zero
-retry, timeout, `SIGINT`, cleanup/post-audit, classificazione e manifest.
+retry, timeout, `SIGINT`, cleanup/post-audit, classificazione, outcome/context
+multipli, pathspec Git con spazi e manifest.
 Nessuna live è stata eseguita per validare il refactoring.
 
 ```text
@@ -1104,6 +1105,52 @@ LIVE_PROBE_HARNESS_DOCUMENTED_CANONICALLY=true
 LIVE_PROBE_HARNESS_HUMAN_GATE_UNCHANGED=true
 LIVE_PROBE_HARNESS_FACTORY_PRESERVING_POLICY_UNCHANGED=true
 LIVE_PROBE_HARNESS_STABILITY_POLICY=COMMON_CHANGE_FULL_REGRESSION_PAYLOAD_CHANGE_LOCAL_PLUS_COMPATIBILITY
+```
+
+D288/01 applica immediatamente il nuovo metodo al successivo boundary reale:
+KScreenLocker 6.7.5 deve propagare il MATCH dell'autenticatore non-interattivo
+fino a `Unlocked`. Ripetere il vecchio namespace root ricreerebbe la causa
+Polkit già chiusa. Il nuovo greeter è invece figlio diretto della sessione
+Plasma attiva. Una libreria preload minimale intercetta il solo simbolo
+versionato `pam_start@LIBPAM_1.0` quando il service è esattamente
+`kde-fingerprint` e lo inoltra a `pam_start_confdir()` su un PAM privato;
+`kde`/password e `kde-smartcard` passano invariati al vero `pam_start()`.
+Non esistono scritture o mount sotto `/etc/pam.d`, `runuser` o greeter root.
+
+Il preflight target-specific verifica RPM e hash Fedora correnti, riferimento
+dinamico del greeter e simbolo esportato `pam_start@@LIBPAM_1.0`. Shim e smoke
+runner compilano warning-as-error senza `pam-devel`; la prova reale host-only
+su `pam_permit` privato osserva start/auth/end `0/0/0`. Non avvia greeter,
+fprintd, pam_fprintd, USB, sensore, `pkcheck` o privilegi. I test sono `9/9`
+common harness, `9/9` payload D288 e `162/162` regressione pertinente D286–D288.
+
+La live è bounded a tre nuovi processi greeter, tre action e tre contatti,
+ognuno con `max-tries=1`; ogni slot dopo un NO_MATCH richiede conferma testuale,
+MATCH arresta subito e non esiste retry automatico/implicito. Il successo
+richiede insieme epoch Goodix, SIGFM MATCH, marker preload fingerprint,
+`Unlocked` ed exit zero. PAM/Polkit/host/safety/timeout o cleanup anomali
+fermano fail-closed. Il greeter `--testing` resta fullscreen/focus-exclusive:
+durante il probe non devono essere digitati password o PIN.
+
+```text
+D288_01_OUTCOME=READY_FOR_HUMAN_GATE
+D288_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_REAL_TARGET_PREFLIGHT
+D288_01_REAL_TARGET_COMPATIBILITY=PASS
+D288_01_MAX_VERIFY_ACTIONS=3
+D288_01_MAX_PHYSICAL_CONTACTS=3
+D288_01_AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
+D288_01_HOST_PAM_FILE_WRITE_COUNT=0
+D288_01_HOST_PAM_MOUNT_COUNT=0
+D288_01_LIVE_EXECUTION_PERFORMED=false
+D288_01_NEXT_STATE=HUMAN_REQUIRED
+NEXT_PRIMARY_BOUNDARY=ACTIVE_USER_KSCREENLOCKER_MATCH_PROPAGATION_LIVE
+```
+
+Il percorso operatore usa il common harness e, dopo commit/push pulito su
+`development`, è direttamente eseguibile con:
+
+```bash
+operator_kit/live_probe/run.sh d288-active-user-kscreenlocker --operator-run
 ```
 
 ```text

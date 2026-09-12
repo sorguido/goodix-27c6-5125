@@ -136,6 +136,52 @@ class LiveProbeHarnessTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("PAYLOAD_BUDGET_EXCEEDED", result.stdout)
 
+    def test_common_classifier_accepts_multiple_expected_outcomes_and_contexts(self):
+        telemetry = self.base / "multi.env"
+        telemetry.write_text(
+            "PAYLOAD_OUTCOME=MATCH\nACTION_ATTEMPT_COUNT=2\nCONTACT_COUNT=2\nRETRY_COUNT=0\n"
+            "MAX_ACTIONS_ENFORCED=3\nMAX_CONTACTS_ENFORCED=3\nMAX_RETRIES_ENFORCED=0\n"
+            "PERSISTENT_WRITE_FAMILY_COUNT=0\nOUTSTANDING_COUNT=0\n"
+            "DRAINED_COUNT=2\nCONTEXT_CLOSED_COUNT=2\n"
+        )
+        result = subprocess.run(
+            [str(HARNESS / "classify_common.sh"), str(telemetry), "3", "3", "0", "MATCH NO_MATCH"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("LIVE_PROBE_COMMON_CLASSIFICATION=PASS", result.stdout)
+
+    def test_git_gate_preserves_path_with_spaces_as_one_pathspec(self):
+        repo = self.base / "repo"
+        repo.mkdir()
+        subprocess.run(["git", "init", "-b", "development"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "Live Probe Test"], cwd=repo, check=True)
+        (repo / "operator_kit/live_probe").mkdir(parents=True)
+        (repo / "operator_kit/live_probe/tracked").write_text("ok\n")
+        (repo / "path with spaces").mkdir()
+        (repo / "path with spaces/tracked").write_text("ok\n")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "fixture"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(["git", "update-ref", "refs/remotes/origin/development", "HEAD"], cwd=repo, check=True)
+        (repo / "path with spaces/untracked").write_text("dirty\n")
+        script = (
+            f"source {HARNESS / 'safety.sh'}; "
+            f"LP_GIT_ROOT={repo}; LIVE_CRITICAL_PATHS=('path with spaces'); lp_git_gate"
+        )
+        result = subprocess.run(
+            ["bash", "-c", script],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("GIT_LIVE_CRITICAL_SET_DIRTY", result.stdout)
+
     def test_timeout_runs_cleanup_and_post_audit_without_retry(self):
         experiment = self.copied_experiment()
         payload = experiment / "payload.sh"
@@ -167,6 +213,13 @@ class LiveProbeHarnessTests(unittest.TestCase):
             "sleep 20\n"
         )
         payload.chmod(0o755)
+        sanitizer = experiment / "sanitize.sh"
+        sanitizer.write_text("#!/usr/bin/env bash\nsed 's/SECRET/<REDACTED>/g'\n")
+        sanitizer.chmod(0o755)
+        conf = experiment / "experiment.conf"
+        conf.write_text(
+            conf.read_text().replace("OUTPUT_IS_SANITIZED=true", "OUTPUT_IS_SANITIZED=false\nSANITIZER=sanitize.sh")
+        )
         command = [
             str(HARNESS / "run.sh"),
             "offline-reference",

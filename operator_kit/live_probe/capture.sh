@@ -6,6 +6,16 @@ lp_signal_safe_tee () (
   exec tee "$1"
 )
 
+lp_signal_safe_filter () (
+  trap '' HUP INT TERM
+  exec "$@"
+)
+
+lp_journal_enabled () {
+  [[ ${COLLECT_JOURNAL:-false} == true ]] || return 1
+  [[ ${LIVE_PROBE_MODE:-} == operator-run || ${COLLECT_JOURNAL_OFFLINE:-false} == true ]]
+}
+
 lp_make_capture () {
   local stamp short
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
@@ -17,7 +27,7 @@ lp_make_capture () {
 
 lp_capture_cursor () {
   local output cursor
-  [[ ${COLLECT_JOURNAL:-false} == true ]] || return 0
+  lp_journal_enabled || return 0
   output=$(LC_ALL=C journalctl -b -n 0 --show-cursor --no-pager 2>&1) || return 1
   cursor=$(printf '%s\n' "$output" | sed -n 's/^-- cursor: //p')
   [[ $(printf '%s\n' "$cursor" | sed '/^$/d' | wc -l) -eq 1 ]] || return 1
@@ -27,14 +37,14 @@ lp_capture_cursor () {
 
 lp_collect_journal () {
   local -a command units
-  [[ ${COLLECT_JOURNAL:-false} == true ]] || return 0
+  lp_journal_enabled || return 0
   command=(journalctl -b --after-cursor "$LP_JOURNAL_CURSOR" --no-pager -o short-iso-precise)
   read -r -a units <<<"${JOURNAL_UNITS:-}"
   local unit
   for unit in "${units[@]}"; do command+=(-u "$unit"); done
   [[ -z ${JOURNAL_GREP_REGEX:-} ]] || command+=(--grep "$JOURNAL_GREP_REGEX")
   if [[ -n ${SANITIZER:-} ]]; then
-    "${command[@]}" 2>&1 | "$LP_EXPERIMENT_DIR/$SANITIZER" |
+    "${command[@]}" 2>&1 | lp_signal_safe_filter "$LP_EXPERIMENT_DIR/$SANITIZER" |
       lp_signal_safe_tee "$LP_CAPTURE_DIR/diagnostic-journal.log"
     local status=("${PIPESTATUS[@]}")
     [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 && ${status[2]} -eq 0 ]]
@@ -50,7 +60,7 @@ lp_run_hook () {
   [[ -n $hook ]] || return 0
   if [[ -n ${SANITIZER:-} ]]; then
     "$LP_EXPERIMENT_DIR/$hook" --phase "$phase" 2>&1 |
-      "$LP_EXPERIMENT_DIR/$SANITIZER" | lp_signal_safe_tee "$output"
+      lp_signal_safe_filter "$LP_EXPERIMENT_DIR/$SANITIZER" | lp_signal_safe_tee "$output"
     local status=("${PIPESTATUS[@]}")
     [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 && ${status[2]} -eq 0 ]]
   else

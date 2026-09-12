@@ -36,8 +36,12 @@ COMMON_HARNESS_CHANGE=FULL_HARNESS_REGRESSION
 MILESTONE_OR_HIGH_RISK_PRELIVE=FULL_RELEVANT_SAFETY_REGRESSION
 ```
 
-La suite completa contiene sette test: reference da cwd esterna, rifiuto live
-della fixture, budget exact/superati, invocazione unica, timeout senza retry,
-`SIGINT` con cleanup/post-audit/capture e cleanup telemetry fail-closed. Tutti
-passano; `bash -n`, manifest SHA della reference e `git diff --check` passano.
-Nessuna dipendenza nuova e nessuna live sono state introdotte.
+La prima suite completa conteneva sette test; il primo payload reale ha poi
+richiesto due estensioni comuni non isolabili localmente: offline compatibility
+test anche per esperimenti live e cardinalità cleanup multi-epoch. La full
+regression aggiornata contiene nove test, aggiungendo outcome multipli/context
+drained multipli e pathspec Git con spazi. Reference da cwd esterna, rifiuto
+live della fixture, budget exact/superati, invocazione unica, timeout senza
+retry, `SIGINT`, cleanup/post-audit/capture e manifest restano PASS.
+`bash -n` e `git diff --check` passano. Nessuna dipendenza nuova e nessuna live
+sono state introdotte.

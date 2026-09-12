@@ -48,7 +48,7 @@ if [[ $mode == --operator-run ]]; then
   lp_runtime_gate || exit 2
   LP_CAPTURE_ROOT=${capture_override:-$LP_GIT_ROOT/captures/live_probe}
 else
-  [[ $LIVE_CAPABLE == false ]] || { echo LIVE_PROBE_ERROR=LIVE_EXPERIMENT_FORBIDS_OFFLINE_PAYLOAD_EXECUTION >&2; exit 2; }
+  [[ $OFFLINE_TEST_CAPABLE == true ]] || { echo LIVE_PROBE_ERROR=EXPERIMENT_NOT_OFFLINE_TEST_CAPABLE >&2; exit 2; }
   LP_CAPTURE_ROOT=${capture_override:-${TMPDIR:-/tmp}/goodix-live-probe-offline}
 fi
 mkdir -p "$LP_CAPTURE_ROOT" || exit 2
@@ -103,7 +103,7 @@ if [[ $pre_rc -eq 0 && $cursor_rc -eq 0 ]]; then
   set +e
   if [[ -n ${SANITIZER:-} ]]; then
     timeout --signal=TERM --kill-after=5s "${TIMEOUT_SECONDS}s" \
-      "${payload_command[@]}" 2>&1 | "$LP_EXPERIMENT_DIR/$SANITIZER" |
+      "${payload_command[@]}" 2>&1 | lp_signal_safe_filter "$LP_EXPERIMENT_DIR/$SANITIZER" |
       lp_signal_safe_tee "$LP_CAPTURE_DIR/payload.log"
     pipeline_status=("${PIPESTATUS[@]}")
     payload_rc=${pipeline_status[0]}; sanitizer_rc=${pipeline_status[1]}; tee_rc=${pipeline_status[2]}
