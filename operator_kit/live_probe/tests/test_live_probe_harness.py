@@ -23,7 +23,7 @@ class LiveProbeHarnessTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_reference(self, experiment_dir=None, cwd=None):
+    def run_reference(self, experiment_dir=None, cwd=None, extra_env=None):
         command = [
             str(HARNESS / "run.sh"),
             "offline-reference",
@@ -34,6 +34,8 @@ class LiveProbeHarnessTests(unittest.TestCase):
         env = os.environ.copy()
         if experiment_dir is not None:
             env["LIVE_PROBE_TEST_EXPERIMENT_DIR"] = str(experiment_dir)
+        if extra_env is not None:
+            env.update(extra_env)
         return subprocess.run(
             command,
             cwd=cwd or self.base,
@@ -54,6 +56,44 @@ class LiveProbeHarnessTests(unittest.TestCase):
         target = self.base / "offline-reference"
         shutil.copytree(HARNESS / "experiments" / "offline-reference", target)
         return target
+
+    def journal_enabled_experiment(self, pre_exit=0):
+        experiment = self.copied_experiment()
+        audit = experiment / "audit.sh"
+        audit.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "[[ $# -eq 2 && $1 == --phase ]]\n"
+            f"if [[ $2 == pre ]]; then echo SYNTHETIC_PRE_AUDIT=true; exit {pre_exit}; fi\n"
+            "echo SYNTHETIC_POST_AUDIT=PASS\n"
+        )
+        audit.chmod(0o755)
+        payload = experiment / "payload.sh"
+        payload.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "touch \"$LIVE_PROBE_CAPTURE_DIR/payload-started\"\n"
+            "exit 99\n"
+        )
+        payload.chmod(0o755)
+        sanitizer = experiment / "sanitize.sh"
+        sanitizer.write_text("#!/usr/bin/env bash\nset -euo pipefail\nsed 's/SECRET/<REDACTED>/g'\n")
+        sanitizer.chmod(0o755)
+        conf = experiment / "experiment.conf"
+        conf.write_text(
+            conf.read_text()
+            + "\nCOLLECT_JOURNAL=true\nCOLLECT_JOURNAL_OFFLINE=true\nCLASSIFIER=\n"
+            "OUTPUT_IS_SANITIZED=false\nSANITIZER=sanitize.sh\n"
+        )
+        return experiment
+
+    def fake_journalctl(self, body):
+        fake_bin = self.base / "fake-bin"
+        fake_bin.mkdir(exist_ok=True)
+        script = fake_bin / "journalctl"
+        script.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + body)
+        script.chmod(0o755)
+        return fake_bin
 
     def test_offline_reference_end_to_end_from_foreign_cwd(self):
         result = self.run_reference(cwd=Path("/tmp"))
@@ -247,7 +287,9 @@ class LiveProbeHarnessTests(unittest.TestCase):
         output, _ = process.communicate(timeout=10)
         self.assertNotEqual(process.returncode, 0, output)
         capture = self.capture()
-        self.assertIn("LIVE_PROBE_RESULT=INTERRUPTED", (capture / "summary.env").read_text())
+        summary = (capture / "summary.env").read_text()
+        self.assertIn("LIVE_PROBE_RESULT=INTERRUPTED", summary)
+        self.assertIn("LIVE_PROBE_PRIMARY_FAILURE=SIGNAL", summary)
         self.assertTrue((capture / "capture.sha256").is_file())
         self.assertIn("LIVE_PROBE_OFFLINE_CLEANUP=PASS", (capture / "cleanup.log").read_text())
         self.assertIn("LIVE_PROBE_OFFLINE_POST_AUDIT=PASS", (capture / "post-audit.log").read_text())
@@ -261,6 +303,121 @@ class LiveProbeHarnessTests(unittest.TestCase):
         capture = self.capture()
         self.assertIn("FAIL_COMMON_CLASSIFICATION", (capture / "summary.env").read_text())
         self.assertIn("CLEANUP_TELEMETRY_INCOMPLETE", (capture / "common-classification.env").read_text())
+
+    def test_pre_audit_failure_preserves_primary_cause_and_skips_payload_and_journal(self):
+        experiment = self.journal_enabled_experiment(pre_exit=23)
+        calls = self.base / "journal-calls.log"
+        fake_bin = self.fake_journalctl('echo called >>"$JOURNAL_CALL_LOG"\nexit 91\n')
+        result = self.run_reference(
+            experiment_dir=experiment,
+            extra_env={
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "JOURNAL_CALL_LOG": str(calls),
+            },
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        capture = self.capture()
+        summary = (capture / "summary.env").read_text()
+        self.assertIn("LIVE_PROBE_RESULT=FAIL_PRE_AUDIT", summary)
+        self.assertIn("LIVE_PROBE_PRIMARY_FAILURE=PRE_AUDIT", summary)
+        self.assertIn("LIVE_PROBE_PRE_AUDIT_RETURN_CODE=23", summary)
+        self.assertIn("LIVE_PROBE_PAYLOAD_STARTED=false", summary)
+        self.assertIn("LIVE_PROBE_JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR", summary)
+        self.assertIn("SYNTHETIC_PRE_AUDIT=true", (capture / "pre-audit.log").read_text())
+        self.assertIn(
+            "JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR",
+            (capture / "journal-status.env").read_text(),
+        )
+        self.assertFalse((capture / "payload-started").exists())
+        self.assertFalse(calls.exists())
+        self.assertNotIn("variabile non assegnata", result.stdout)
+        hash_check = subprocess.run(
+            ["sha256sum", "-c", "capture.sha256"],
+            cwd=capture,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(hash_check.returncode, 0, hash_check.stdout)
+
+    def test_cursor_failure_is_distinct_and_never_collects_with_invalid_cursor(self):
+        experiment = self.journal_enabled_experiment(pre_exit=0)
+        calls = self.base / "journal-calls.log"
+        fake_bin = self.fake_journalctl(
+            'echo "$*" >>"$JOURNAL_CALL_LOG"\n'
+            'if [[ " $* " == *" --show-cursor "* ]]; then exit 77; fi\n'
+            'exit 92\n'
+        )
+        result = self.run_reference(
+            experiment_dir=experiment,
+            extra_env={
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "JOURNAL_CALL_LOG": str(calls),
+            },
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        capture = self.capture()
+        summary = (capture / "summary.env").read_text()
+        self.assertIn("LIVE_PROBE_RESULT=FAIL_JOURNAL_CURSOR", summary)
+        self.assertIn("LIVE_PROBE_PRIMARY_FAILURE=JOURNAL_CURSOR_ACQUISITION", summary)
+        self.assertIn("LIVE_PROBE_JOURNAL_CURSOR_RETURN_CODE=1", summary)
+        self.assertIn("LIVE_PROBE_PAYLOAD_STARTED=false", summary)
+        self.assertIn("LIVE_PROBE_JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR", summary)
+        self.assertEqual(len(calls.read_text().splitlines()), 1)
+        self.assertIn("--show-cursor", calls.read_text())
+        self.assertFalse((capture / "payload-started").exists())
+
+    def test_unset_or_empty_cursor_under_set_u_is_a_classified_skip(self):
+        capture = self.base / "direct-capture"
+        capture.mkdir()
+        script = (
+            "set -u; "
+            f"source '{HARNESS / 'capture.sh'}'; "
+            f"LP_CAPTURE_DIR='{capture}'; "
+            "LIVE_PROBE_MODE=offline-test; COLLECT_JOURNAL=true; "
+            "COLLECT_JOURNAL_OFFLINE=true; lp_collect_journal; "
+            "printf 'STATUS=%s\\n' \"$LP_JOURNAL_COLLECTION\""
+        )
+        result = subprocess.run(
+            ["bash", "-c", script],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("STATUS=NOT_APPLICABLE_NO_CURSOR", result.stdout)
+        self.assertIn(
+            "JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR",
+            (capture / "journal-status.env").read_text(),
+        )
+
+    def test_valid_cursor_happy_path_collects_once_and_remains_green(self):
+        experiment = self.copied_experiment()
+        conf = experiment / "experiment.conf"
+        conf.write_text(
+            conf.read_text() + "\nCOLLECT_JOURNAL=true\nCOLLECT_JOURNAL_OFFLINE=true\n"
+        )
+        calls = self.base / "journal-calls.log"
+        fake_bin = self.fake_journalctl(
+            'echo "$*" >>"$JOURNAL_CALL_LOG"\n'
+            'if [[ " $* " == *" --show-cursor "* ]]; then echo "-- cursor: s=synthetic"; fi\n'
+        )
+        result = self.run_reference(
+            experiment_dir=experiment,
+            extra_env={
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "JOURNAL_CALL_LOG": str(calls),
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        capture = self.capture()
+        summary = (capture / "summary.env").read_text()
+        self.assertIn("LIVE_PROBE_RESULT=PASS", summary)
+        self.assertIn("LIVE_PROBE_JOURNAL_COLLECTION=COLLECTED", summary)
+        self.assertIn("JOURNAL_COLLECTION=COLLECTED", (capture / "journal-status.env").read_text())
+        self.assertEqual(len(calls.read_text().splitlines()), 2)
 
 
 if __name__ == "__main__":

@@ -35,7 +35,12 @@ nuovo figlio senza riavviare o mutare il processo KWin.
 
 Le query target read-only osservano Fedora 44, KWin/KScreenLocker/Plasma
 6.7.5, sessione Wayland logind attiva e non bloccata, e
-`org.freedesktop.ScreenSaver` posseduto da `/usr/bin/kwin_wayland`. Hash di
+`org.freedesktop.ScreenSaver` posseduto dal PID KWin 1802. L'identità è
+confermata da UID 1000, `comm=kwin_wayland`, cmdline
+`/usr/bin/kwin_wayland ...` e cgroup
+`user@1000.service/.../plasma-kwin_wayland.service`. Il link
+`/proc/1802/exe` non è leggibile dal processo utente: resta un controllo forte
+e vincolante quando leggibile, ma non è più l'unico gate. Hash di
 KWin, `libKScreenLocker`, greeter, QML e PAM sono pin nel pre/post audit. Il
 PAM di sistema `kde-fingerprint` include `fingerprint-auth`, che D285 mantiene
 fail-closed mentre `with-fingerprint` è disabilitato; `kde` password resta una
@@ -43,9 +48,10 @@ stack separata e integra.
 
 ## Metodo minimo
 
-Il payload `d289-real-locked-session` riusa senza modifiche il common Live
-Probe Harness. Dopo la conferma operatore, un helper `pkexec` verifica il PID
-KWin, UID e uguaglianza del mount namespace, copia il PAM a un path root-only
+Il payload `d289-real-locked-session` riusa il common Live Probe Harness. Dopo
+la prima invocazione abortita è stato necessario un correttivo comune limitato
+alla gestione fail-closed del cursor journal. Dopo la conferma operatore, un
+helper `pkexec` verifica l'identità composita KWin e l'uguaglianza del mount namespace, copia il PAM a un path root-only
 sotto `/run` e crea un bind mount read-only sul solo
 `/etc/pam.d/kde-fingerprint`. L'helper rimane collegato al payload tramite
 pipe: `RELEASE`, EOF, segnale o errore portano sempre a unmount, verifica
@@ -79,8 +85,20 @@ esplicite. Nessuna live, lock, USB, PAM fingerprint o operazione privilegiata
 
 ## Verifiche offline e comando
 
-`bash -n`, il percorso harness `--offline-test` e i 14 contratti D289 sono
-PASS; la regressione high-risk pertinente D286–D289 è `176/176 PASS`.
+La prima invocazione operatore sul baseline
+`0568742e682b1bdb3b427da390a8aa4ed7f9b914` è terminata prima di produrre
+output dal pre-audit; il teardown ha poi generato l'errore secondario
+`LP_JOURNAL_CURSOR: variabile non assegnata`. Non sono iniziati lock reale,
+overlay PAM o VERIFY e sono stati consumati zero contatti. Il correttivo
+inizializza esplicitamente lo stato cursor, non raccoglie journal senza un
+cursor valido, preserva log/return code/causa primaria e distingue il failure
+di acquisizione cursor.
+
+`bash -n`, i percorsi harness `--offline-test`, i 23 contratti D289 e i 13
+test completi del common harness sono PASS; la regressione high-risk pertinente
+D286–D289 è `189/189 PASS`. Il preflight target read-only completo è PASS con
+`D289_KWIN_IDENTITY_EXE=UNREADABLE_ACCEPTED_WITH_COMPOSITE` e non invoca
+`pkexec`.
 L'offline path non invoca D-Bus Lock, `pkexec`, mount, pam_fprintd,
 fprintd, USB o sensore. La verifica residua di namespace/mount e il vero lock
 sono intrinsecamente privilegiati/live e costituiscono il prossimo Human Gate.

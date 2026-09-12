@@ -17,6 +17,8 @@ work=${LIVE_PROBE_WORK_DIR:?}
 capture=${LIVE_PROBE_CAPTURE_DIR:?}
 telemetry=${LIVE_PROBE_TELEMETRY_FILE:?}
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
+# shellcheck source=kwin-identity.sh
+source "$here/kwin-identity.sh"
 attempts=0 contacts=0 matched=0 outcome=D289_OFFLINE_COMPATIBILITY_PASS
 overlay_started=false overlay_closed=false
 root_pid= root_in_fd= root_out_fd=
@@ -53,8 +55,7 @@ get_kwin_owner () {
   local owner
   owner=$(busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
     org.freedesktop.DBus GetConnectionUnixProcessID s org.freedesktop.ScreenSaver)
-  [[ $owner =~ ^u\ ([1-9][0-9]*)$ ]]
-  printf '%s\n' "${BASH_REMATCH[1]}"
+  d289_parse_dbus_owner "$owner"
 }
 
 wait_active () {
@@ -165,8 +166,7 @@ trap on_exit EXIT
 [[ ${XDG_SESSION_TYPE:-} == wayland && -n ${WAYLAND_DISPLAY:-} ]]
 [[ $(get_active) == false ]]
 kwin_pid=$(get_kwin_owner)
-[[ $(readlink -f "/proc/$kwin_pid/exe") == /usr/bin/kwin_wayland ]]
-[[ $(awk '/^Uid:/ {print $2}' "/proc/$kwin_pid/status") == "$(id -u)" ]]
+D289_PROC_ROOT=/proc d289_verify_kwin_identity "$kwin_pid" "$(id -u)"
 
 for attempt in 1 2 3; do
   (( attempts < max_actions && contacts < max_contacts ))
@@ -177,6 +177,7 @@ for attempt in 1 2 3; do
   fi
   [[ $(get_active) == false ]]
   [[ $(get_kwin_owner) == "$kwin_pid" ]]
+  D289_PROC_ROOT=/proc d289_verify_kwin_identity "$kwin_pid" "$(id -u)" >/dev/null
   ! pgrep -u "$(id -u)" -f '^/usr/libexec/kscreenlocker_greet([[:space:]]|$)' >/dev/null
   start_overlay
   cursor=$(current_cursor)

@@ -57,6 +57,10 @@ LP_WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/goodix-live-probe.XXXXXX") || exit 2
 LP_TELEMETRY_FILE=$LP_WORK_DIR/telemetry.env
 LP_INTERRUPTED=false
 LP_CLEANUP_DONE=false
+LP_JOURNAL_CURSOR=
+LP_JOURNAL_CURSOR_VALID=false
+LP_JOURNAL_COLLECTION=NOT_REQUESTED
+LP_PAYLOAD_STARTED=false
 export LIVE_PROBE_WORK_DIR=$LP_WORK_DIR LIVE_PROBE_CAPTURE_DIR=$LP_CAPTURE_DIR
 export LIVE_PROBE_TELEMETRY_FILE=$LP_TELEMETRY_FILE LIVE_PROBE_MODE=${mode#--}
 
@@ -97,6 +101,7 @@ if [[ $pre_rc -eq 0 && $cursor_rc -eq 0 && $mode == --operator-run ]]; then
 fi
 
 if [[ $pre_rc -eq 0 && $cursor_rc -eq 0 ]]; then
+  LP_PAYLOAD_STARTED=true
   payload_command=("$LP_EXPERIMENT_DIR/$PAYLOAD" --max-actions "$MAX_ACTIONS" \
     --max-contacts "$MAX_CONTACTS" --max-retries "$MAX_RETRIES" \
     --timeout-seconds "$TIMEOUT_SECONDS")
@@ -138,27 +143,34 @@ for accepted_rc in ${PAYLOAD_ACCEPTED_RETURN_CODES:-0}; do
   [[ $payload_rc -ne $accepted_rc ]] || accepted=true
 done
 result=PASS
-if [[ $LP_INTERRUPTED == true ]]; then result=INTERRUPTED
-elif [[ $pre_rc -ne 0 || $cursor_rc -ne 0 ]]; then result=FAIL_PRE_AUDIT
-elif [[ $payload_rc -eq 124 || $payload_rc -eq 137 ]]; then result=FAIL_TIMEOUT
-elif [[ $accepted != true ]]; then result=FAIL_PAYLOAD
-elif [[ $sanitizer_rc -ne 0 || $tee_rc -ne 0 ]]; then result=FAIL_CAPTURE_PIPELINE
-elif [[ $cleanup_rc -ne 0 ]]; then result=FAIL_CLEANUP
-elif [[ $journal_rc -ne 0 ]]; then result=FAIL_JOURNAL
-elif [[ $post_rc -ne 0 ]]; then result=FAIL_POST_AUDIT
-elif [[ $common_rc -ne 0 ]]; then result=FAIL_COMMON_CLASSIFICATION
-elif [[ $custom_rc -ne 0 ]]; then result=FAIL_PAYLOAD_CLASSIFICATION
+primary_failure=NONE
+if [[ $LP_INTERRUPTED == true ]]; then result=INTERRUPTED; primary_failure=SIGNAL
+elif [[ $pre_rc -ne 0 ]]; then result=FAIL_PRE_AUDIT; primary_failure=PRE_AUDIT
+elif [[ $cursor_rc -ne 0 ]]; then result=FAIL_JOURNAL_CURSOR; primary_failure=JOURNAL_CURSOR_ACQUISITION
+elif [[ $payload_rc -eq 124 || $payload_rc -eq 137 ]]; then result=FAIL_TIMEOUT; primary_failure=PAYLOAD_TIMEOUT
+elif [[ $accepted != true ]]; then result=FAIL_PAYLOAD; primary_failure=PAYLOAD
+elif [[ $sanitizer_rc -ne 0 || $tee_rc -ne 0 ]]; then result=FAIL_CAPTURE_PIPELINE; primary_failure=CAPTURE_PIPELINE
+elif [[ $cleanup_rc -ne 0 ]]; then result=FAIL_CLEANUP; primary_failure=CLEANUP
+elif [[ $journal_rc -ne 0 ]]; then result=FAIL_JOURNAL; primary_failure=JOURNAL_COLLECTION
+elif [[ $post_rc -ne 0 ]]; then result=FAIL_POST_AUDIT; primary_failure=POST_AUDIT
+elif [[ $common_rc -ne 0 ]]; then result=FAIL_COMMON_CLASSIFICATION; primary_failure=COMMON_CLASSIFICATION
+elif [[ $custom_rc -ne 0 ]]; then result=FAIL_PAYLOAD_CLASSIFICATION; primary_failure=PAYLOAD_CLASSIFICATION
 fi
 
 {
   echo "LIVE_PROBE_RESULT=$result"
   echo "LIVE_PROBE_EXPERIMENT_ID=$EXPERIMENT_ID"
   echo "LIVE_PROBE_BASELINE=$baseline"
+  echo "LIVE_PROBE_PRIMARY_FAILURE=$primary_failure"
+  echo "LIVE_PROBE_PRE_AUDIT_RETURN_CODE=$pre_rc"
+  echo "LIVE_PROBE_JOURNAL_CURSOR_RETURN_CODE=$cursor_rc"
+  echo "LIVE_PROBE_PAYLOAD_STARTED=$LP_PAYLOAD_STARTED"
   echo "LIVE_PROBE_PAYLOAD_RETURN_CODE=$payload_rc"
   echo "LIVE_PROBE_SANITIZER_RETURN_CODE=$sanitizer_rc"
   echo "LIVE_PROBE_CAPTURE_TEE_RETURN_CODE=$tee_rc"
   echo "LIVE_PROBE_CLEANUP_RETURN_CODE=$cleanup_rc"
   echo "LIVE_PROBE_JOURNAL_RETURN_CODE=$journal_rc"
+  echo "LIVE_PROBE_JOURNAL_COLLECTION=$LP_JOURNAL_COLLECTION"
   echo "LIVE_PROBE_POST_AUDIT_RETURN_CODE=$post_rc"
   echo "LIVE_PROBE_COMMON_CLASSIFIER_RETURN_CODE=$common_rc"
   echo "LIVE_PROBE_PAYLOAD_CLASSIFIER_RETURN_CODE=$custom_rc"

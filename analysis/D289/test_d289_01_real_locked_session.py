@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "operator_kit/live_probe"
 EXP = HARNESS / "experiments/d289-real-locked-session"
+IDENTITY = EXP / "kwin-identity.sh"
 
 
 class D289RealLockedSessionContract(unittest.TestCase):
@@ -26,6 +27,7 @@ class D289RealLockedSessionContract(unittest.TestCase):
             path = EXP / name
             self.assertTrue(path.stat().st_mode & 0o111, name)
             subprocess.run(["bash", "-n", str(path)], check=True)
+        subprocess.run(["bash", "-n", str(IDENTITY)], check=True)
 
     def test_02_small_payload_reuses_common_harness(self):
         self.assertIn("EXPERIMENT_ID=d289-real-locked-session", self.config)
@@ -54,7 +56,20 @@ class D289RealLockedSessionContract(unittest.TestCase):
         namespace = self.helper.index('stat -Lc %i "/proc/$kwin_pid/ns/mnt"')
         bind = self.helper.index('mount --bind "$runtime/kde-fingerprint" "$target"')
         self.assertLess(namespace, bind)
-        self.assertLess(self.helper.index("/usr/bin/kwin_wayland"), bind)
+        self.assertLess(self.helper.index('d289_verify_kwin_identity "$kwin_pid"'), bind)
+        self.assertIn(
+            'D289_PROC_ROOT=/proc d289_verify_kwin_identity "$kwin_pid" "$operator_uid" >/dev/null',
+            self.helper,
+        )
+        self.assertIn(
+            'D289_PROC_ROOT=/proc d289_verify_kwin_identity "$kwin_pid" "$(id -u)"',
+            self.payload,
+        )
+        self.assertIn(
+            'D289_PROC_ROOT=/proc d289_verify_kwin_identity "$kwin_pid" "$uid"',
+            self.audit,
+        )
+        self.assertIn('source "$here/kwin-identity.sh"', self.helper)
         self.assertIn("PKEXEC_UID", self.helper)
 
     def test_06_helper_lifetime_is_pipe_bounded(self):
@@ -121,6 +136,118 @@ class D289RealLockedSessionContract(unittest.TestCase):
             captures = list(Path(td).glob("*/sanitized"))
             self.assertEqual(len(captures), 1)
             self.assertIn("D289_PAYLOAD_CLASSIFICATION=PASS_OFFLINE", (captures[0] / "payload-classification.env").read_text())
+
+    def test_15_read_only_preflight_mode_never_invokes_pkexec(self):
+        self.assertIn("--read-only-preflight", self.audit)
+        read_only = self.audit.index("if [[ $mode == read-only-preflight ]]")
+        privileged = self.audit.index('audit_output=$(pkexec')
+        self.assertLess(read_only, privileged)
+        self.assertIn("D289_READ_ONLY_PREFLIGHT=PASS", self.audit)
+
+
+class D289KWinCompositeIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="d289-kwin-identity-")
+        self.proc = Path(self.tmp.name) / "proc"
+        self.pid = "4242"
+        self.entry = self.proc / self.pid
+        self.entry.mkdir(parents=True)
+        self.write_valid_fixture(with_exe=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write_valid_fixture(self, with_exe):
+        self.entry.joinpath("status").write_text(
+            "Name:\tkwin_wayland\nUid:\t1000\t1000\t1000\t1000\n"
+        )
+        self.entry.joinpath("comm").write_text("kwin_wayland\n")
+        self.entry.joinpath("cmdline").write_bytes(
+            b"/usr/bin/kwin_wayland\0--wayland-fd\0" b"7\0"
+        )
+        self.entry.joinpath("cgroup").write_text(
+            "0::/user.slice/user-1000.slice/user@1000.service/session.slice/plasma-kwin_wayland.service\n"
+        )
+        exe = self.entry / "exe"
+        if exe.exists() or exe.is_symlink():
+            exe.unlink()
+        if with_exe:
+            exe.symlink_to("/usr/bin/kwin_wayland")
+
+    def run_identity(self, owner="u 4242"):
+        script = (
+            f"source '{IDENTITY}'; "
+            f"D289_PROC_ROOT='{self.proc}'; "
+            "pid=$(d289_parse_dbus_owner \"$D289_TEST_OWNER\") && "
+            "d289_verify_kwin_identity \"$pid\" 1000"
+        )
+        return subprocess.run(
+            ["bash", "-c", script],
+            env={"PATH": "/usr/bin:/bin", "D289_TEST_OWNER": owner},
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+
+    def test_valid_owner_uid_comm_cmdline_cgroup_and_readable_exe_pass(self):
+        result = self.run_identity()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("D289_KWIN_IDENTITY_RESULT=PASS", result.stdout)
+        self.assertIn("D289_KWIN_IDENTITY_EXE=COHERENT", result.stdout)
+
+    def test_wrong_process_fails(self):
+        self.entry.joinpath("comm").write_text("bash\n")
+        result = self.run_identity()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("COMM_MISMATCH", result.stdout)
+
+    def test_readable_but_empty_cmdline_fails(self):
+        self.entry.joinpath("cmdline").write_bytes(b"")
+        result = self.run_identity()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CMDLINE_EMPTY", result.stdout)
+
+    def test_wrong_uid_fails(self):
+        self.entry.joinpath("status").write_text("Uid:\t1001\t1001\t1001\t1001\n")
+        result = self.run_identity()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("UID_MISMATCH", result.stdout)
+
+    def test_ambiguous_or_unparsable_owner_fails(self):
+        for owner in ("u 4242\nu 4243", "s 4242", "u 0", ""):
+            with self.subTest(owner=owner):
+                result = self.run_identity(owner)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("D289_KWIN_OWNER_PARSE=FAIL", result.stdout)
+
+    def test_root_or_system_cgroup_fails(self):
+        for cgroup in (
+            "0::/user.slice/user-0.slice/user@0.service/app.slice/kwin.scope\n",
+            "0::/system.slice/kwin.service\n",
+        ):
+            with self.subTest(cgroup=cgroup):
+                self.entry.joinpath("cgroup").write_text(cgroup)
+                result = self.run_identity()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("ROOT_OR_SYSTEM_CGROUP", result.stdout)
+
+    def test_readable_but_inconsistent_exe_fails(self):
+        exe = self.entry / "exe"
+        exe.unlink()
+        exe.symlink_to("/bin/sh")
+        result = self.run_identity()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("EXE_MISMATCH", result.stdout)
+
+    def test_unreadable_exe_with_other_strong_signals_passes(self):
+        self.write_valid_fixture(with_exe=False)
+        result = self.run_identity()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn(
+            "D289_KWIN_IDENTITY_EXE=UNREADABLE_ACCEPTED_WITH_COMPOSITE",
+            result.stdout,
+        )
 
 
 if __name__ == "__main__":

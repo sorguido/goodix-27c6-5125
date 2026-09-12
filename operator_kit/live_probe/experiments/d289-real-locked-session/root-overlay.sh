@@ -13,6 +13,8 @@ else
   exit 2
 fi
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
+# shellcheck source=kwin-identity.sh
+source "$here/kwin-identity.sh"
 target=/etc/pam.d/kde-fingerprint
 candidate=$here/goodix-d289-kde-fingerprint.pam
 expected_host=8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437
@@ -83,9 +85,7 @@ fi
 ! mountpoint -q "$target"
 [[ $(digest "$target") == "$expected_host" ]]
 [[ -f $candidate && ! -L $candidate && $(digest "$candidate") == "$expected_candidate" ]]
-[[ -e /proc/$kwin_pid/exe ]]
-[[ $(readlink -f "/proc/$kwin_pid/exe") == /usr/bin/kwin_wayland ]]
-[[ $(awk '/^Uid:/ {print $2}' "/proc/$kwin_pid/status") == "$operator_uid" ]]
+D289_PROC_ROOT=/proc d289_verify_kwin_identity "$kwin_pid" "$operator_uid" >/dev/null
 [[ $(stat -Lc %i /proc/self/ns/mnt) == $(stat -Lc %i "/proc/$kwin_pid/ns/mnt") ]]
 
 install -d -o root -g root -m 0700 "$runtime"

@@ -95,7 +95,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D288/01 PASS live; D289/01 real lock pronto al Human Gate
+### Stato corrente — D288/01 PASS live; D289/01 corretto dopo abort pre-live e pronto al Human Gate
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
 sul full SHA `38962cc00b7707dc1bf56bc38cd4457d7d11b5e1` ha completato sul
@@ -1254,9 +1254,14 @@ service `org.freedesktop.ScreenSaver` espone `Lock` e `GetActive`, ma non un
 setter D-Bus dell'environment del greeter. KWin è già in esecuzione e non può
 quindi ereditare il preload D288 senza riavvio o mutazione del processo.
 
-Il piccolo payload `d289-real-locked-session` riusa il common harness senza
-modificarlo. Dopo la conferma operatore, un helper `pkexec` verifica PID/exe/UID
-di KWin e uguaglianza del mount namespace; sovrappone poi temporaneamente e
+Il piccolo payload `d289-real-locked-session` riusa il common harness. Dopo la
+prima invocazione operatore è stato necessario correggere nel common il solo
+failure-path journal precedente al cursor. Dopo la conferma operatore, un
+helper `pkexec` verifica identità composita e mount namespace di KWin:
+owner PID D-Bus, UID, `comm`, cmdline e cgroup utente devono concordare;
+`/proc/<pid>/exe`, quando leggibile, deve essere esattamente
+`/usr/bin/kwin_wayland`, ma sul target non è leggibile dal processo utente e
+non costituisce più da solo un falso rifiuto. L'helper sovrappone temporaneamente e
 read-only il PAM candidato sul solo `/etc/pam.d/kde-fingerprint`. Il bind mount
 vive sotto un helper collegato via pipe: `RELEASE`, EOF, segnale o errore
 portano a unmount, verifica dell'hash host originale e rimozione del runtime
@@ -1278,21 +1283,58 @@ automatico o implicito e timeout complessivo 900 s. Ogni epoch deve avere
 attempted/rejected/consumed `1/0/1`, TLS/first-image `1/1`, zero retry/reopen/
 reset/clear-halt/famiglie persistenti/outstanding e cleanup drenato/chiuso.
 Pre/post audit D286, hash PAM/greeter/KWin, stato unlocked finale e assenza di
-greeter, mount e runtime residui sono gate fail-closed. `bash -n`, il vero
-percorso harness `--offline-test` e `14/14` contratti D289 sono PASS; nessuna
-live, lock, PAM fingerprint, USB, sensore, mount o operazione privilegiata è
-stata eseguita dall'AI.
+greeter, mount e runtime residui sono gate fail-closed.
+
+La prima invocazione manuale dell'operatore sulla baseline
+`0568742e682b1bdb3b427da390a8aa4ed7f9b914` è abortita prima della live. Il
+pre-audit è uscito prima di produrre output; poiché non era stato acquisito un
+cursor, il teardown comune ha poi mascherato il failure primario con
+`LP_JOURNAL_CURSOR: variabile non assegnata`. Il control-flow e la capture
+incompleta provano che payload, lock, overlay PAM e VERIFY non sono iniziati:
+zero action sensore e zero contatti fisici. Non è nuova evidenza device-side.
+
+Il correttivo comune inizializza esplicitamente cursor/validità/stato, non
+invoca la raccolta senza un cursor valido e registra
+`JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR`; preserva log, return code e
+classificazione primaria del pre-audit e distingue un successivo failure di
+acquisizione cursor come `FAIL_JOURNAL_CURSOR`. Il preflight D289 espone ora
+una causa nominata per ogni gate e offre `--read-only-preflight`, che non chiama
+`pkexec`. Sul target reale questo preflight è PASS: sessione 2 Wayland
+active/unlocked, `GetActive=false`, owner `u 1802`, UID 1000,
+`comm=kwin_wayland`, cmdline coerente, cgroup
+`user@1000.service/.../plasma-kwin_wayland.service`, exe non leggibile ma
+accettato dal composito, zero greeter/mount/runtime, PAM `root:root:644` e una
+entry sysfs `27c6:5125`.
+
+`bash -n`, i veri percorsi harness `--offline-test`, `23/23` contratti D289 e
+`13/13` test del common harness sono PASS; la regressione high-risk pertinente
+D286–D289 passa `189/189`. Nessuna live, lock, PAM fingerprint, USB, sensore,
+mount o operazione privilegiata è stata eseguita dall'AI.
 
 La review PM chiude i failure-path di mount preesistente non posseduto, mode
 del PAM leggibile dal greeter, finestra overlay fra cicli, race fra stato D-Bus
-e morte del greeter e cleanup fallito con recovery hash-pinned. La regressione
-high-risk pertinente D286–D289 passa `176/176`; `shellcheck` non è installato.
+e morte del greeter, cleanup fallito con recovery hash-pinned, identità KWin
+target-compatible e failure comune prima del cursor. `shellcheck` non è
+installato.
 
 ```text
 D289_01_OUTCOME=READY_FOR_HUMAN_GATE
-D289_01_ADVANCEMENT=REAL_LOCK_PAYLOAD_IMPLEMENTED_ON_REUSABLE_HARNESS
-D289_01_EXECUTABLE_CLOSURE=PASS_OFFLINE
+D289_01_ADVANCEMENT=PRE_LIVE_HOST_FAILURE_CLASS_CORRECTED_ON_REUSABLE_HARNESS
+D289_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_PLUS_TARGET_READ_ONLY_PREFLIGHT
 D289_01_REAL_TARGET_COMPATIBILITY=PASS_WITH_PRIVILEGED_NAMESPACE_PREFLIGHT_AT_LIVE
+D289_01_FIRST_OPERATOR_RUN=ABORTED_BEFORE_LIVE
+D289_01_FIRST_OPERATOR_BASELINE=0568742e682b1bdb3b427da390a8aa4ed7f9b914
+D289_01_FIRST_OPERATOR_PRIMARY_FAILURE=PRE_AUDIT_BEFORE_OUTPUT
+D289_01_FIRST_OPERATOR_SECONDARY_FAILURE=UNBOUND_LP_JOURNAL_CURSOR
+D289_01_REAL_LOCK_STARTED=false
+D289_01_PAM_OVERLAY_STARTED=false
+D289_01_VERIFY_STARTED=false
+D289_01_SENSOR_ACTION_COUNT=0
+D289_01_PHYSICAL_CONTACTS_CONSUMED=0
+D289_01_NEW_DEVICE_SIDE_EVIDENCE=false
+D289_01_KWIN_COMPOSITE_IDENTITY_TARGET_READ_ONLY=PASS
+D289_01_KWIN_EXE_USER_READABILITY=UNREADABLE_ACCEPTED_WITH_COMPOSITE
+D289_01_PRE_AUDIT_FAILURE_PRESERVATION=PASS
 D289_01_MAX_REAL_LOCK_CYCLES=3
 D289_01_MAX_VERIFY_ACTIONS=3
 D289_01_MAX_PHYSICAL_CONTACTS=3

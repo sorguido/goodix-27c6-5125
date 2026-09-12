@@ -27,17 +27,53 @@ lp_make_capture () {
 
 lp_capture_cursor () {
   local output cursor
-  lp_journal_enabled || return 0
-  output=$(LC_ALL=C journalctl -b -n 0 --show-cursor --no-pager 2>&1) || return 1
+  LP_JOURNAL_CURSOR=
+  LP_JOURNAL_CURSOR_VALID=false
+  if ! lp_journal_enabled; then
+    LP_JOURNAL_COLLECTION=NOT_APPLICABLE_DISABLED
+    return 0
+  fi
+  if ! output=$(LC_ALL=C journalctl -b -n 0 --show-cursor --no-pager 2>&1); then
+    LP_JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR
+    printf '%s\n' \
+      'LIVE_PROBE_JOURNAL_CURSOR_STATUS=FAILED_ACQUISITION' \
+      'JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR' \
+      >"$LP_CAPTURE_DIR/journal-status.env"
+    return 1
+  fi
   cursor=$(printf '%s\n' "$output" | sed -n 's/^-- cursor: //p')
-  [[ $(printf '%s\n' "$cursor" | sed '/^$/d' | wc -l) -eq 1 ]] || return 1
+  if [[ $(printf '%s\n' "$cursor" | sed '/^$/d' | wc -l) -ne 1 ]]; then
+    LP_JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR
+    printf '%s\n' \
+      'LIVE_PROBE_JOURNAL_CURSOR_STATUS=FAILED_PARSE' \
+      'JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR' \
+      >"$LP_CAPTURE_DIR/journal-status.env"
+    return 1
+  fi
   LP_JOURNAL_CURSOR=$cursor
+  LP_JOURNAL_CURSOR_VALID=true
+  LP_JOURNAL_COLLECTION=PENDING
   printf 'LIVE_PROBE_JOURNAL_CURSOR=%s\n' "$cursor" >"$LP_CAPTURE_DIR/journal-context.env"
 }
 
 lp_collect_journal () {
   local -a command units
-  lp_journal_enabled || return 0
+  if ! lp_journal_enabled; then
+    LP_JOURNAL_COLLECTION=NOT_APPLICABLE_DISABLED
+    printf '%s\n' 'JOURNAL_COLLECTION=NOT_APPLICABLE_DISABLED' \
+      >"$LP_CAPTURE_DIR/journal-status.env"
+    return 0
+  fi
+  if [[ ${LP_JOURNAL_CURSOR_VALID:-false} != true || -z ${LP_JOURNAL_CURSOR:-} ]]; then
+    LP_JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR
+    if [[ ! -f $LP_CAPTURE_DIR/journal-status.env ]]; then
+      printf '%s\n' \
+        'LIVE_PROBE_JOURNAL_CURSOR_STATUS=NOT_CAPTURED' \
+        'JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR' \
+        >"$LP_CAPTURE_DIR/journal-status.env"
+    fi
+    return 0
+  fi
   command=(journalctl -b --after-cursor "$LP_JOURNAL_CURSOR" --no-pager -o short-iso-precise)
   read -r -a units <<<"${JOURNAL_UNITS:-}"
   local unit
@@ -47,11 +83,25 @@ lp_collect_journal () {
     "${command[@]}" 2>&1 | lp_signal_safe_filter "$LP_EXPERIMENT_DIR/$SANITIZER" |
       lp_signal_safe_tee "$LP_CAPTURE_DIR/diagnostic-journal.log"
     local status=("${PIPESTATUS[@]}")
-    [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 && ${status[2]} -eq 0 ]]
+    if [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 && ${status[2]} -eq 0 ]]; then
+      LP_JOURNAL_COLLECTION=COLLECTED
+      printf '%s\n' 'JOURNAL_COLLECTION=COLLECTED' >"$LP_CAPTURE_DIR/journal-status.env"
+      return 0
+    fi
+    LP_JOURNAL_COLLECTION=FAILED
+    printf '%s\n' 'JOURNAL_COLLECTION=FAILED' >"$LP_CAPTURE_DIR/journal-status.env"
+    return 1
   else
     "${command[@]}" 2>&1 | lp_signal_safe_tee "$LP_CAPTURE_DIR/diagnostic-journal.log"
     local status=("${PIPESTATUS[@]}")
-    [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 ]]
+    if [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 ]]; then
+      LP_JOURNAL_COLLECTION=COLLECTED
+      printf '%s\n' 'JOURNAL_COLLECTION=COLLECTED' >"$LP_CAPTURE_DIR/journal-status.env"
+      return 0
+    fi
+    LP_JOURNAL_COLLECTION=FAILED
+    printf '%s\n' 'JOURNAL_COLLECTION=FAILED' >"$LP_CAPTURE_DIR/journal-status.env"
+    return 1
   fi
 }
 
@@ -62,12 +112,15 @@ lp_run_hook () {
     "$LP_EXPERIMENT_DIR/$hook" --phase "$phase" 2>&1 |
       lp_signal_safe_filter "$LP_EXPERIMENT_DIR/$SANITIZER" | lp_signal_safe_tee "$output"
     local status=("${PIPESTATUS[@]}")
-    [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 && ${status[2]} -eq 0 ]]
+    [[ ${status[0]} -eq 0 ]] || return "${status[0]}"
+    [[ ${status[1]} -eq 0 ]] || return "${status[1]}"
+    [[ ${status[2]} -eq 0 ]] || return "${status[2]}"
   else
     "$LP_EXPERIMENT_DIR/$hook" --phase "$phase" 2>&1 |
       lp_signal_safe_tee "$output"
     local status=("${PIPESTATUS[@]}")
-    [[ ${status[0]} -eq 0 && ${status[1]} -eq 0 ]]
+    [[ ${status[0]} -eq 0 ]] || return "${status[0]}"
+    [[ ${status[1]} -eq 0 ]] || return "${status[1]}"
   fi
 }
 

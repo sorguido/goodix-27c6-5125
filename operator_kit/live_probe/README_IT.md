@@ -35,6 +35,13 @@ Il common harness:
 - può delimitare e raccogliere journal per cursor/units/grep senza
   materializzare un journal globale raw.
 
+Se il pre-audit fallisce, il payload non parte e il summary conserva sia il
+return code sia `LIVE_PROBE_PRIMARY_FAILURE=PRE_AUDIT`. Se il cursor journal
+non è disponibile, la raccolta non viene invocata con un cursor vuoto: il
+capture registra `JOURNAL_COLLECTION=NOT_APPLICABLE_NO_CURSOR`. Un fallimento
+di acquisizione cursor successivo a un pre-audit valido è distinto come
+`FAIL_JOURNAL_CURSOR`. Questi percorsi sono sicuri anche con `set -u`.
+
 Il payload deve imporre tecnicamente i budget ricevuti prima di qualsiasi
 azione sensor-reaching e deve gestire nel proprio failure/signal path gli
 obblighi device-specific di release/reseal. Il common classifier richiede

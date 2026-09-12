@@ -12,7 +12,10 @@ di una sessione davvero bloccata, non soltanto l'uscita del greeter standalone.
 KWin è già in esecuzione e non può ereditare il preload D288. Un helper
 `pkexec`, limitato a questo probe, sovrappone temporaneamente e read-only il PAM
 privato al solo `/etc/pam.d/kde-fingerprint` nel medesimo mount namespace di
-KWin. Prima del mount verifica PID/exe/UID e namespace; su release, EOF,
+KWin. Prima del mount verifica PID/UID, `comm`, `cmdline`, cgroup utente e
+namespace. Se `/proc/<pid>/exe` è leggibile deve coincidere esattamente con
+`/usr/bin/kwin_wayland`; sul target può non esserlo, nel qual caso sono
+obbligatori tutti gli altri segnali indipendenti. Su release, EOF,
 segnale o errore smonta, verifica l'hash originale e rimuove `/run`.
 `/etc/pam.d/kde` e il fallback password non vengono modificati. Non viene
 scritto alcun file PAM persistente e un reboot elimina comunque il bind mount.
@@ -80,3 +83,8 @@ Gli output sanitizzati sono in
 `captures/live_probe/d289-real-locked-session_<timestamp>_<sha>/sanitized/`.
 Non includono password, risposte PAM, template, pixel, PSK o protected
 material. Qualunque esito non autorizza un rerun implicito.
+
+La prima invocazione del 12 settembre 2026 sul baseline `0568742e...` è
+abortita nel pre-audit prima di lock, overlay PAM, VERIFY o contatto. Il difetto
+host-side del cursor journal e il gate identità KWin sono stati corretti
+offline; quella invocazione non ha consumato alcun tentativo live.
