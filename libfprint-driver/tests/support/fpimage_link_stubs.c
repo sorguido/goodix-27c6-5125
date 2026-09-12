@@ -14,6 +14,7 @@
 #include <sigfm/sigfm.h>
 
 #include <glib.h>
+#include <string.h>
 
 /* NBIS global required by fp-image.c when compiled into the test harness. */
 LFSPARMS g_lfsparms_V2;
@@ -21,7 +22,7 @@ LFSPARMS g_lfsparms_V2;
 /* Opaque SIGFM object used only by these stubs. */
 struct SigfmImgInfo
 {
-  gint dummy;
+  guint64 pixel_signature;
 };
 
 static GMutex sigfm_mutex;
@@ -30,6 +31,24 @@ static gint   sigfm_extract_block = 0;
 static gint   sigfm_extract_blocked_count = 0;
 static gint   sigfm_extract_fail = 0;
 static gint   sigfm_match_score_value = 100;
+static gint   sigfm_content_match = 0;
+static guint  sigfm_match_call_count = 0;
+static guint64 sigfm_enrolled_signatures[64];
+static guint64 sigfm_probe_signatures[64];
+
+static guint64
+pixel_signature (const SigfmPix *pixels,
+                 gsize           count)
+{
+  guint64 hash = G_GUINT64_CONSTANT (1469598103934665603);
+
+  for (gsize i = 0; i < count; i++)
+    {
+      hash ^= pixels[i];
+      hash *= G_GUINT64_CONSTANT (1099511628211);
+    }
+  return hash;
+}
 
 void
 goodix_test_sigfm_extract_set_block (gboolean block)
@@ -74,6 +93,61 @@ goodix_test_sigfm_match_set_score (gint score)
   g_mutex_lock (&sigfm_mutex);
   sigfm_match_score_value = score;
   g_mutex_unlock (&sigfm_mutex);
+}
+
+void
+goodix_test_sigfm_match_use_content (gboolean enabled)
+{
+  g_mutex_lock (&sigfm_mutex);
+  sigfm_content_match = enabled ? 1 : 0;
+  g_mutex_unlock (&sigfm_mutex);
+}
+
+void
+goodix_test_sigfm_match_reset_audit (void)
+{
+  g_mutex_lock (&sigfm_mutex);
+  sigfm_match_call_count = 0;
+  memset (sigfm_enrolled_signatures, 0, sizeof sigfm_enrolled_signatures);
+  memset (sigfm_probe_signatures, 0, sizeof sigfm_probe_signatures);
+  g_mutex_unlock (&sigfm_mutex);
+}
+
+guint
+goodix_test_sigfm_match_get_call_count (void)
+{
+  guint count;
+
+  g_mutex_lock (&sigfm_mutex);
+  count = sigfm_match_call_count;
+  g_mutex_unlock (&sigfm_mutex);
+  return count;
+}
+
+guint64
+goodix_test_sigfm_match_get_enrolled_signature (guint index)
+{
+  guint64 signature = 0;
+
+  g_mutex_lock (&sigfm_mutex);
+  if (index < sigfm_match_call_count &&
+      index < G_N_ELEMENTS (sigfm_enrolled_signatures))
+    signature = sigfm_enrolled_signatures[index];
+  g_mutex_unlock (&sigfm_mutex);
+  return signature;
+}
+
+guint64
+goodix_test_sigfm_match_get_probe_signature (guint index)
+{
+  guint64 signature = 0;
+
+  g_mutex_lock (&sigfm_mutex);
+  if (index < sigfm_match_call_count &&
+      index < G_N_ELEMENTS (sigfm_probe_signatures))
+    signature = sigfm_probe_signatures[index];
+  g_mutex_unlock (&sigfm_mutex);
+  return signature;
 }
 
 gboolean
@@ -201,10 +275,6 @@ sigfm_extract (const SigfmPix *pix, int width, int height)
 {
   SigfmImgInfo *info;
 
-  (void) pix;
-  (void) width;
-  (void) height;
-
   g_mutex_lock (&sigfm_mutex);
   if (sigfm_extract_block)
     {
@@ -217,7 +287,9 @@ sigfm_extract (const SigfmPix *pix, int width, int height)
   g_mutex_unlock (&sigfm_mutex);
 
   info = g_new0 (SigfmImgInfo, 1);
-  info->dummy = 1;
+  g_assert_cmpint (width, ==, 80);
+  g_assert_cmpint (height, ==, 64);
+  info->pixel_signature = pixel_signature (pix, (gsize) width * (gsize) height);
   return info;
 }
 
@@ -236,7 +308,7 @@ sigfm_copy_info (SigfmImgInfo *info)
     return NULL;
 
   copy = g_new0 (SigfmImgInfo, 1);
-  copy->dummy = info->dummy;
+  copy->pixel_signature = info->pixel_signature;
   return copy;
 }
 
@@ -261,10 +333,20 @@ sigfm_match_score (SigfmImgInfo *frame, SigfmImgInfo *enrolled)
 {
   gint score;
 
-  (void) frame;
-  (void) enrolled;
   g_mutex_lock (&sigfm_mutex);
-  score = sigfm_match_score_value;
+  if (sigfm_match_call_count < G_N_ELEMENTS (sigfm_enrolled_signatures))
+    {
+      /* fpi-print passes the stored template first and the current probe
+       * second; keep both identities visible to the continuity tests. */
+      sigfm_enrolled_signatures[sigfm_match_call_count] =
+        frame->pixel_signature;
+      sigfm_probe_signatures[sigfm_match_call_count] =
+        enrolled->pixel_signature;
+    }
+  sigfm_match_call_count++;
+  score = sigfm_content_match ?
+    (frame->pixel_signature == enrolled->pixel_signature ? 100 : 0) :
+    sigfm_match_score_value;
   g_mutex_unlock (&sigfm_mutex);
   return score;
 }

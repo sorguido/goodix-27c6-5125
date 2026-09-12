@@ -70,14 +70,16 @@ class D291OperatorKitContract(unittest.TestCase):
     def test_07_one_real_sudo_consumer_action(self):
         root = section(self.script, "root_run ()", "operator_run ()")
         self.assertEqual(root.count('env -u SUDO_ASKPASS sudo ls'), 1)
+        self.assertEqual(root.count('runuser -u "$operator" -- sudo -k'), 2)
         self.assertIn("Tentativo 1", root)
         self.assertIn("Tentativo 2", root)
         self.assertIn("premere Ctrl-C", root)
 
-    def test_08_exact_no_match_then_match_and_two_epochs(self):
+    def test_08_no_match_then_match_in_two_or_three_epochs(self):
         root = section(self.script, "root_run ()", "operator_run ()")
         for marker in (
-                "${#epochs[@]} -eq 2", "${#outcomes[@]} -eq 2",
+                "${#epochs[@]} -ge 2", "${#epochs[@]} -le 3",
+                "${outcomes[-1]}", "THIRD_ATTEMPT_WITHOUT_SECOND_NO_MATCH",
                 "result=no_match", "result=match",
                 "LIVE_OUTCOME_NOT_NO_MATCH_THEN_MATCH"):
             self.assertIn(marker, root)
@@ -94,14 +96,22 @@ class D291OperatorKitContract(unittest.TestCase):
         root = section(self.script, "root_run ()", "operator_run ()")
         self.assertIn("reopen=0 explicit_verify_reopen=0", root)
         self.assertIn("reopen=1 explicit_verify_reopen=1", root)
+        self.assertIn("sigfm_baseline_pinned=1 sigfm_baseline_reused=0", root)
+        self.assertIn("sigfm_baseline_pinned=0 sigfm_baseline_reused=1", root)
 
-    def test_11_no_authorization_credential_or_unbounded_loop(self):
+    def test_11_relative_launcher_becomes_absolute_before_pkexec(self):
+        operator = section(self.script, "operator_run ()", "case ${1:-}")
+        self.assertIn('script_path="$script_dir/run-d291-01.sh"', self.script)
+        self.assertIn('"$script_path" --root-run', operator)
+        self.assertNotIn('"$0" --root-run', operator)
+
+    def test_12_no_authorization_credential_or_unbounded_loop(self):
         self.assertNotIn("grant", self.script.lower())
         self.assertNotIn("token", self.script.lower())
         self.assertNotIn("while true", self.script)
         self.assertNotIn("for attempt", self.script)
 
-    def test_12_readme_declares_human_gate_and_output(self):
+    def test_13_readme_declares_human_gate_and_output(self):
         for marker in (
                 "Human Gate", "NO_MATCH", "MATCH", "Ctrl-C",
                 "RESULT_DIRECTORY", "/tmp/goodix-d291-01-result.*",

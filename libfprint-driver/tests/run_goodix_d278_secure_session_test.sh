@@ -33,7 +33,7 @@ python3 "$script_dir/support/generate_libfprint_enums.py" \
   "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
 includes="-I$script_dir/support/d277 -I$build -I$root/libfprint-driver -I$local_fp -I$local_fp/nbis/include -I$local_fp/nbis/libfprint-include -I$root/Rockytkg/libfprint -I$script_dir/support"
-strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
+strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -DGOODIX_LIBFPRINT_SIGFM -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 local_relax="-Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -Wno-conversion -Wno-sign-conversion -Wno-float-conversion"
 
 build_run () {
@@ -51,6 +51,8 @@ build_run () {
     "$build/fp-enums.c" \
     "$build/fpi-enums.c" \
     "$root/libfprint-driver/goodix_u16_to_fpimage.c" \
+    "$root/libfprint-driver/goodix_sigfm_preprocess.c" \
+    "$root/libfprint-driver/rockytkg-imgproc/goodix_imgproc.c" \
     "$root/libfprint-driver/goodix_fpimage_pipeline.c" \
     "$root/libfprint-driver/goodix_a0_protocol.c" \
     "$root/libfprint-driver/goodix_d190_binder.c" \
@@ -142,6 +144,8 @@ echo EXTRA_ENROLLMENT_CONTACT_REQUESTED=false
 echo EXTRA_ENROLLMENT_REARM_COUNT=0
 echo ENROLLMENT_RETRY_CALLBACK_COUNT=0
 echo D291_EXPLICIT_MULTI_VERIFY_OFFLINE=PASS
+echo D291_BIOMETRIC_CONTINUITY_PIPELINE=PASS
+echo D291_LOGICAL_OPEN_SIGFM_BASELINE_PINNING=PASS
 echo D291_EXPLICIT_SECOND_VERIFY_SUPPORTED=true
 echo D291_EXPLICIT_THIRD_VERIFY_SUPPORTED=true
 echo D291_ONE_ACQUISITION_PER_VERIFY_START=true

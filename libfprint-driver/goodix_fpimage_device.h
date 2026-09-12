@@ -115,6 +115,8 @@ typedef struct
   gboolean usb_backend_drained;
   gboolean runtime_material_present;
   gboolean runtime_handoff_views_cleared;
+  gboolean sigfm_normalization_baseline_pinned;
+  gboolean sigfm_normalization_baseline_reused;
   gboolean context_closed;
 } GoodixProductionEnrollmentAudit;
 

@@ -160,7 +160,8 @@ goodix_fpimage_pipeline_new_sigfm (const uint16_t          *baseline,
         GOODIX_FPIMAGE_PIPELINE_SAMPLE_OUT_OF_RANGE :
         GOODIX_FPIMAGE_PIPELINE_CONTRACT_VIOLATION;
     }
-  pipeline->image->flags = FPI_IMAGE_NONE;
+  pipeline->image->flags =
+    (FpiImageFlags) GOODIX_LIBFPRINT_IMAGE_FLAGS_NONE;
   pipeline->physical_ppmm_state = GOODIX_FPIMAGE_PHYSICAL_PPMM_UNKNOWN;
   *pipeline_out = pipeline;
   return GOODIX_FPIMAGE_PIPELINE_OK;

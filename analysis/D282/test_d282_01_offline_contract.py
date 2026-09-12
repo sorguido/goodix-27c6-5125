@@ -125,9 +125,11 @@ class D282OfflineContract(unittest.TestCase):
     def test_07_retry_extraction_has_no_second_sensor_action(self):
         self.assertIn("goodix_test_sigfm_extract_set_failure (TRUE)",
                       self.production_test)
-        self.assertIn("production_action_attempt_count, ==, 2u",
+        self.assertIn("production_action_attempt_count, ==, 1u",
                       self.production_test)
-        self.assertIn("production_rejected_action_count, ==, 1u",
+        self.assertIn("production_rejected_action_count, ==, 0u",
+                      self.production_test)
+        self.assertIn("production_explicit_verify_reopen_count, ==, 1u",
                       self.production_test)
 
     def test_08_fprintd_retry_does_not_open_or_start_usb_itself(self):

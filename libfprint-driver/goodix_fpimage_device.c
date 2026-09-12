@@ -116,8 +116,14 @@ struct _GoodixDeviceContext
   gboolean                   runtime_handoff_views_cleared;
   gboolean                   usb_interface_claimed;
 #ifdef GOODIX_LIBFPRINT_SIGFM
+  /* The no-finger normalization baseline belongs to the logical libfprint
+   * open, not to one explicit VERIFY epoch.  D291 may recreate the transport
+   * graph for a later VerifyStart, but every probe in that bounded series must
+   * remain in the same R2/SIGFM image space. */
   uint16_t                   sigfm_baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   gboolean                   sigfm_baseline_valid;
+  gboolean                   sigfm_baseline_pinned_this_epoch;
+  gboolean                   sigfm_baseline_reused_this_epoch;
 #endif
 
   FpiImageDeviceState        last_framework_state;
@@ -377,10 +383,6 @@ production_activation_start_secure_graph (GoodixDeviceContext *ctx)
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
-#ifdef GOODIX_LIBFPRINT_SIGFM
-  OPENSSL_cleanse (ctx->sigfm_baseline, sizeof ctx->sigfm_baseline);
-  ctx->sigfm_baseline_valid = FALSE;
-#endif
   ctx->runtime_handoff_views_cleared = TRUE;
   goodix_device_context_emit_arm_complete (ctx, NULL);
 }
@@ -712,6 +714,12 @@ goodix_device_context_collect_production_enrollment_audit (
       ctx->fpi_usb_backend),
     .runtime_material_present = ctx->runtime_material != NULL,
     .runtime_handoff_views_cleared = ctx->runtime_handoff_views_cleared,
+#ifdef GOODIX_LIBFPRINT_SIGFM
+    .sigfm_normalization_baseline_pinned =
+      ctx->sigfm_baseline_pinned_this_epoch,
+    .sigfm_normalization_baseline_reused =
+      ctx->sigfm_baseline_reused_this_epoch,
+#endif
     .context_closed = context_closed,
   };
 }
@@ -735,7 +743,9 @@ goodix_fpimage_device_log_production_audit (
     "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
     "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
     "secure_retry=%u post_retry=%u reopen=%u explicit_verify_reopen=%u "
-    "reset=%u clear_halt=%u persistent=%u real_submit=%" G_GUINT64_FORMAT " "
+    "reset=%u clear_halt=%u persistent=%u "
+    "sigfm_baseline_pinned=%u sigfm_baseline_reused=%u "
+    "real_submit=%" G_GUINT64_FORMAT " "
     "outstanding=%u drained=%u context_closed=%u",
     action_name != NULL ? action_name : "UNKNOWN",
     audit->production_action_attempt_count,
@@ -758,6 +768,8 @@ goodix_fpimage_device_log_production_audit (
     audit->secure.persistent_write_count +
       audit->post_tls.persistent_device_write_count +
       audit->enrollment_binding.transaction.frame.persistent_family_count,
+    audit->sigfm_normalization_baseline_pinned,
+    audit->sigfm_normalization_baseline_reused,
     audit->usb_real_submit_count,
     audit->usb_outstanding_count,
     audit->usb_backend_drained,
@@ -930,10 +942,8 @@ goodix_device_context_release_epoch_objects (GoodixDeviceContext *ctx)
   OPENSSL_cleanse (&ctx->runtime_secure_view,
                    sizeof ctx->runtime_secure_view);
   OPENSSL_cleanse (ctx->runtime_fdt_seed, sizeof ctx->runtime_fdt_seed);
-#ifdef GOODIX_LIBFPRINT_SIGFM
-  OPENSSL_cleanse (ctx->sigfm_baseline, sizeof ctx->sigfm_baseline);
-  ctx->sigfm_baseline_valid = FALSE;
-#endif
+  /* Keep the normalization baseline pinned across an explicit VERIFY reopen.
+   * goodix_device_context_free() performs the final cleanse at img_close. */
   if (ctx->runtime_material != NULL)
     {
 #ifdef GOODIX_ENABLE_TEST_SEAMS
@@ -1003,6 +1013,10 @@ goodix_device_context_reset_for_explicit_verify_reopen (
   ctx->deactivation_pending = FALSE;
   ctx->deactivation_nonquiescent = FALSE;
   ctx->runtime_handoff_views_cleared = FALSE;
+#ifdef GOODIX_LIBFPRINT_SIGFM
+  ctx->sigfm_baseline_pinned_this_epoch = FALSE;
+  ctx->sigfm_baseline_reused_this_epoch = FALSE;
+#endif
   ctx->runtime_enrollment_auxiliary_count = 0;
   ctx->terminal_enroll_completion_hold_count = 0;
   ctx->terminal_enroll_completion_release_count = 0;
@@ -1882,21 +1896,31 @@ context_post_tls_image (GoodixPostTlsLifecycle *lifecycle,
     }
 #ifdef GOODIX_LIBFPRINT_SIGFM
   {
-    uint16_t baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+    uint16_t session_baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
     GoodixFpImagePipeline *pipeline = NULL;
     GoodixFpImagePipelineResult result;
     FpImage *image;
 
-    if (!goodix_post_tls_lifecycle_copy_baseline (lifecycle, baseline))
+    if (!goodix_post_tls_lifecycle_copy_baseline (lifecycle,
+                                                  session_baseline))
       {
         g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
                              "SIGFM capture has no session baseline");
         return FALSE;
       }
+    if (!ctx->sigfm_baseline_valid)
+      {
+        memcpy (ctx->sigfm_baseline, session_baseline,
+                sizeof ctx->sigfm_baseline);
+        ctx->sigfm_baseline_valid = TRUE;
+        ctx->sigfm_baseline_pinned_this_epoch = TRUE;
+      }
+    else
+      ctx->sigfm_baseline_reused_this_epoch = TRUE;
     result = goodix_fpimage_pipeline_new_sigfm (
-      baseline, G_N_ELEMENTS (baseline), samples,
+      ctx->sigfm_baseline, G_N_ELEMENTS (ctx->sigfm_baseline), samples,
       GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT, &pipeline);
-    OPENSSL_cleanse (baseline, sizeof baseline);
+    OPENSSL_cleanse (session_baseline, sizeof session_baseline);
     if (result != GOODIX_FPIMAGE_PIPELINE_OK)
       {
         g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
@@ -2171,6 +2195,7 @@ context_enrollment_first_arm_handoff (GoodixPostTlsLifecycle *lifecycle,
       return FALSE;
     }
   ctx->sigfm_baseline_valid = TRUE;
+  ctx->sigfm_baseline_pinned_this_epoch = TRUE;
 #endif
   binding = goodix_enrollment_fpi_usb_binding_new (
     ctx->pending_enrollment_events, backend, generation,

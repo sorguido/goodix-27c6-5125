@@ -17,6 +17,11 @@
 void goodix_test_gusb_reset_counts (void);
 void goodix_test_gusb_set_open_close_success (gboolean value);
 void goodix_test_sigfm_match_set_score (gint score);
+void goodix_test_sigfm_match_use_content (gboolean enabled);
+void goodix_test_sigfm_match_reset_audit (void);
+guint goodix_test_sigfm_match_get_call_count (void);
+guint64 goodix_test_sigfm_match_get_enrolled_signature (guint index);
+guint64 goodix_test_sigfm_match_get_probe_signature (guint index);
 void goodix_test_sigfm_extract_set_failure (gboolean fail);
 void goodix_test_sigfm_extract_set_block (gboolean block);
 void goodix_test_sigfm_extract_unblock (void);
@@ -91,6 +96,8 @@ typedef struct
   guint material_release_count;
   guint interface_claim_count;
   guint interface_release_count;
+  GBytes *production_baseline_plaintext;
+  GBytes *production_image_plaintext;
 } Fixture;
 
 typedef struct
@@ -742,6 +749,8 @@ fixture_free (Fixture *fixture)
       g_queue_free (fixture->out);
       g_byte_array_unref (fixture->server_record);
       g_clear_pointer (&fixture->post_tls_plaintext, g_bytes_unref);
+      g_clear_pointer (&fixture->production_baseline_plaintext, g_bytes_unref);
+      g_clear_pointer (&fixture->production_image_plaintext, g_bytes_unref);
       g_free (fixture);
       return;
     }
@@ -1287,6 +1296,57 @@ post_zero_image (void)
   return g_byte_array_free_to_bytes (g_steal_pointer (&bytes));
 }
 
+static GBytes *
+post_image_from_samples (
+  const uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT])
+{
+  g_autoptr(GByteArray) bytes = g_byte_array_sized_new (
+    GOODIX_IMAGE_PLAINTEXT_LENGTH);
+  static const guint8 header[] = { 0x20, 0x0a, 0x1e };
+  static const guint8 prefix[5] = { 0 };
+  guint8 packed[GOODIX_IMAGE_PACKED_LENGTH] = { 0 };
+  guint32 crc;
+  guint8 trailer[4];
+  guint8 no_check = 0x88;
+
+  for (gsize group = 0; group < GOODIX_IMAGE_PACKED_LENGTH; group += 6u)
+    {
+      uint16_t values[4];
+      gsize wire_base = (group / 6u) * 4u;
+
+      for (gsize item = 0; item < 4u; item++)
+        {
+          gsize wire_index = wire_base + item;
+          gsize raster_index =
+            (wire_index % GOODIX_CANONICAL_IMAGE_HEIGHT) *
+              GOODIX_CANONICAL_IMAGE_WIDTH +
+            wire_index / GOODIX_CANONICAL_IMAGE_HEIGHT;
+          values[item] = samples[raster_index];
+          g_assert_cmpuint (values[item], <=, 0x0fffu);
+        }
+      packed[group] = (guint8) (((values[1] & 0x0fu) << 4) |
+                                (values[0] >> 8));
+      packed[group + 1u] = (guint8) values[0];
+      packed[group + 2u] = (guint8) values[2];
+      packed[group + 3u] = (guint8) (values[1] >> 4);
+      packed[group + 4u] = (guint8) (values[3] >> 4);
+      packed[group + 5u] = (guint8) (((values[3] & 0x0fu) << 4) |
+                                     (values[2] >> 8));
+    }
+  crc = post_crc32_mpeg2 (packed, sizeof packed);
+  trailer[0] = (guint8) (crc >> 8);
+  trailer[1] = (guint8) crc;
+  trailer[2] = (guint8) (crc >> 24);
+  trailer[3] = (guint8) (crc >> 16);
+  g_byte_array_append (bytes, header, sizeof header);
+  g_byte_array_append (bytes, prefix, sizeof prefix);
+  g_byte_array_append (bytes, packed, sizeof packed);
+  g_byte_array_append (bytes, trailer, sizeof trailer);
+  g_byte_array_append (bytes, &no_check, 1u);
+  g_assert_cmpuint (bytes->len, ==, GOODIX_IMAGE_PLAINTEXT_LENGTH);
+  return g_byte_array_free_to_bytes (g_steal_pointer (&bytes));
+}
+
 static gboolean
 post_image_seam (GoodixPostTlsLifecycle *lifecycle,
                  guint                   acquisition_index,
@@ -1494,7 +1554,10 @@ drive_production_enrollment_bootstrap (Fixture   *fixture,
   guint8 af[16] = { 0 };
   guint8 nav[2409] = { 0x50, 0x01 };
   const guint8 typed82[2] = { 0, 0x20 };
-  g_autoptr(GBytes) baseline = post_zero_image ();
+  g_autoptr(GBytes) baseline =
+    fixture->production_baseline_plaintext != NULL ?
+      g_bytes_ref (fixture->production_baseline_plaintext) :
+      post_zero_image ();
   gsize baseline_length;
   const guint8 *baseline_data = g_bytes_get_data (baseline,
                                                    &baseline_length);
@@ -1556,7 +1619,8 @@ drive_production_enrollment_stages (Fixture   *fixture,
 {
   const guint8 auxiliary[4] = { 0x20, 0x01, 0x00, 0x88 };
   guint8 nav[2409] = { 0x50, 0x01 };
-  g_autoptr(GBytes) image = post_zero_image ();
+  g_autoptr(GBytes) image = fixture->production_image_plaintext != NULL ?
+    g_bytes_ref (fixture->production_image_plaintext) : post_zero_image ();
   gsize image_length;
   const guint8 *image_data = g_bytes_get_data (image, &image_length);
 
@@ -1684,7 +1748,8 @@ drive_production_single_acquisition (Fixture   *fixture,
 {
   static const guint8 auxiliary[4] = { 0x20, 0x01, 0x00, 0x88 };
   guint8 nav[2409] = { 0x50, 0x01 };
-  g_autoptr(GBytes) image = post_zero_image ();
+  g_autoptr(GBytes) image = fixture->production_image_plaintext != NULL ?
+    g_bytes_ref (fixture->production_image_plaintext) : post_zero_image ();
   gsize image_length;
   const guint8 *image_data = g_bytes_get_data (image, &image_length);
 
@@ -1810,6 +1875,10 @@ production_run_explicit_verify (Fixture *fixture,
   g_assert_cmpuint (audit.usb_outstanding_count, ==, 0u);
   g_assert_true (audit.usb_backend_drained);
   g_assert_true (audit.context_closed);
+  g_assert_cmpint (audit.sigfm_normalization_baseline_pinned, ==,
+                   expected_explicit_reopen == 0u);
+  g_assert_cmpint (audit.sigfm_normalization_baseline_reused, ==,
+                   expected_explicit_reopen != 0u);
   g_assert_cmpuint (fixture->interface_claim_count, ==,
                     claim_before + expected_explicit_reopen);
   g_assert_cmpuint (fixture->interface_release_count, ==,
@@ -1830,6 +1899,113 @@ production_run_explicit_verify (Fixture *fixture,
   g_assert_cmpuint (fixture->in_submit_count, ==, in_after);
   g_assert_cmpuint (fixture->interface_claim_count, ==, claim_after);
   g_assert_true (g_queue_is_empty (fixture->out));
+}
+
+static void
+production_set_rasters (
+  Fixture        *fixture,
+  const uint16_t  baseline[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT],
+  const uint16_t  image[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT])
+{
+  g_clear_pointer (&fixture->production_baseline_plaintext, g_bytes_unref);
+  g_clear_pointer (&fixture->production_image_plaintext, g_bytes_unref);
+  fixture->production_baseline_plaintext = post_image_from_samples (baseline);
+  fixture->production_image_plaintext = post_image_from_samples (image);
+}
+
+static void
+fill_d291_continuity_rasters (
+  uint16_t baseline_a[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT],
+  uint16_t baseline_b[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT],
+  uint16_t baseline_c[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT],
+  uint16_t enrolled[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT],
+  uint16_t wrong[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT])
+{
+  for (guint y = 0u; y < GOODIX_CANONICAL_IMAGE_HEIGHT; y++)
+    for (guint x = 0u; x < GOODIX_CANONICAL_IMAGE_WIDTH; x++)
+      {
+        gsize index = (gsize) y * GOODIX_CANONICAL_IMAGE_WIDTH + x;
+        guint enrolled_relief =
+          ((x % 10u) < 5u ? 900u : 120u) +
+          (((x + 2u * y) % 7u) == 0u ? 500u : 0u);
+        guint wrong_relief =
+          ((y % 12u) < 6u ? 700u : 80u) +
+          (((3u * x + y) % 11u) == 0u ? 650u : 0u);
+
+        baseline_a[index] = (uint16_t) (900u + (x % 5u));
+        baseline_b[index] = (uint16_t) (1450u + (y % 9u));
+        baseline_c[index] = (uint16_t) (1800u + ((x + y) % 13u));
+        enrolled[index] = (uint16_t) (baseline_a[index] + enrolled_relief);
+        wrong[index] = (uint16_t) (baseline_a[index] + wrong_relief);
+      }
+}
+
+static void
+test_d291_biometric_continuity_across_reopen (void)
+{
+  uint16_t baseline_a[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  uint16_t baseline_b[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  uint16_t baseline_c[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  uint16_t enrolled_raster[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  uint16_t wrong_raster[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  Fixture *fixture = fixture_new_production_action ();
+  g_autoptr(FpPrint) enrolled = NULL;
+  guint64 template_signature;
+
+  fill_d291_continuity_rasters (baseline_a, baseline_b, baseline_c,
+                                enrolled_raster, wrong_raster);
+  goodix_test_sigfm_match_use_content (TRUE);
+  goodix_test_sigfm_match_reset_audit ();
+
+  /* Build the eight-sample logical template through the real decoder and R2
+   * image path.  Only the final feature metric is content-aware test code. */
+  production_set_rasters (fixture, baseline_a, enrolled_raster);
+  enrolled = production_enroll_verify_template (fixture);
+
+  production_close_epoch (fixture);
+  production_open_epoch (fixture);
+  production_set_rasters (fixture, baseline_a, wrong_raster);
+  production_run_explicit_verify (fixture, enrolled, 100, FALSE, 0u);
+  g_assert_cmpuint (goodix_test_sigfm_match_get_call_count (), ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES);
+  template_signature = goodix_test_sigfm_match_get_enrolled_signature (0u);
+  g_assert_cmpuint (template_signature, !=, 0u);
+  for (guint i = 1u; i < GOODIX_SIGFM_ENROLL_MAX_STAGES; i++)
+    g_assert_cmpuint (goodix_test_sigfm_match_get_enrolled_signature (i), ==,
+                      template_signature);
+  g_assert_cmpuint (goodix_test_sigfm_match_get_probe_signature (0u), !=,
+                    template_signature);
+
+  /* A reopened epoch supplies a deliberately different session B0.  The
+   * logical-open normalization baseline must remain pinned, so the enrolled
+   * raster still reaches the same feature identity and matches. */
+  production_set_rasters (fixture, baseline_b, enrolled_raster);
+  production_run_explicit_verify (fixture, enrolled, 0, TRUE, 1u);
+  g_assert_cmpuint (goodix_test_sigfm_match_get_call_count (), ==,
+                    GOODIX_SIGFM_ENROLL_MAX_STAGES + 1u);
+  g_assert_cmpuint (goodix_test_sigfm_match_get_enrolled_signature (
+                      GOODIX_SIGFM_ENROLL_MAX_STAGES), ==,
+                    template_signature);
+  g_assert_cmpuint (goodix_test_sigfm_match_get_probe_signature (
+                      GOODIX_SIGFM_ENROLL_MAX_STAGES), ==,
+                    template_signature);
+
+  production_close_epoch (fixture);
+  production_open_epoch (fixture);
+  goodix_test_sigfm_match_reset_audit ();
+  production_set_rasters (fixture, baseline_a, wrong_raster);
+  production_run_explicit_verify (fixture, enrolled, 100, FALSE, 0u);
+  production_set_rasters (fixture, baseline_b, wrong_raster);
+  production_run_explicit_verify (fixture, enrolled, 100, FALSE, 1u);
+  production_set_rasters (fixture, baseline_c, enrolled_raster);
+  production_run_explicit_verify (fixture, enrolled, 0, TRUE, 1u);
+  g_assert_cmpuint (goodix_test_sigfm_match_get_call_count (), ==,
+                    2u * GOODIX_SIGFM_ENROLL_MAX_STAGES + 1u);
+
+  production_close_epoch (fixture);
+  goodix_test_sigfm_match_use_content (FALSE);
+  goodix_test_sigfm_match_set_score (100);
+  fixture_free (fixture);
 }
 
 static void
@@ -3905,6 +4081,8 @@ main (int argc,
                    test_d280_01_production_two_epoch_template_reuse);
   g_test_add_func ("/goodix/d291/explicit-multi-verify-after-no-match",
                    test_d291_explicit_multi_verify_after_no_match);
+  g_test_add_func ("/goodix/d291/biometric-continuity-across-reopen",
+                   test_d291_biometric_continuity_across_reopen);
   g_test_add_func ("/goodix/d282/production-enrollment-intermediate-extraction-terminal",
                    test_d282_01_production_intermediate_enrollment_extraction_failure);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",

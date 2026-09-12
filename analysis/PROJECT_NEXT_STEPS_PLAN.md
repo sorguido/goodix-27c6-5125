@@ -3,10 +3,11 @@
 
 Data review: 12 settembre 2026
 
-Baseline esaminata: `development` con D290 consolidato più il review set D291
+Baseline esaminata: `development` con D291 correttivo di continuità SIGFM
 
-Decisione PM: D291 autorizzato separatamente e implementato offline; nessuna
-altra fase successiva avviata
+Decisione PM: transport multi-VERIFY D291 provato live; correttivo biometrico
+completato offline e fermo al solo Human Gate finale. Nessuna fase successiva
+avviata
 
 ## Conclusione esecutiva
 
@@ -24,7 +25,8 @@ materialmente il percorso già provato o affronta un boundary lifecycle nuovo.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
-D291_MULTI_VERIFY_IMPLEMENTED_OFFLINE=true
+D291_MULTI_VERIFY_TRANSPORT_LIVE=PROVEN
+D291_BIOMETRIC_CONTINUITY_OFFLINE=PASS
 D291_LIVE_VALIDATION_REQUIRED=true
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
@@ -60,11 +62,12 @@ NEW_D292_STARTED=false
 
 ### IMPLEMENTED, ma non production-ready
 
-- D291 corregge offline il lifecycle multi-VERIFY: ogni nuovo `VerifyStart`
-  esplicito dopo terminal NO_MATCH ottiene una nuova epoch drained, senza retry
-  o acquisizioni nascoste. Secondo e terzo tentativo, stop al MATCH, tre
-  NO_MATCH senza quarta action e factory guard sono coperti da regressione;
-  deployment e singola validazione reale restano Human Gate.
+- D291 ha provato live che ogni nuovo `VerifyStart` esplicito dopo terminal
+  NO_MATCH raggiunge una nuova epoch drained, senza retry o acquisizioni
+  nascoste. La prima live multi-VERIFY ha poi mostrato score zero sistematici
+  sui contatti corretti riaperti: il correttivo offline conserva la baseline
+  R2 nel logical open e aggiunge continuità wrong→NO_MATCH→enrolled→MATCH con
+  SIGFM reale. La singola conferma live resta Human Gate.
 - Driver e integrazione SIGFM funzionano nella fork Fedora preservata, ma il
   delta production non è ancora presentato come una singola patch series o
   sorgente di build mantenibile rispetto a un upstream scelto.

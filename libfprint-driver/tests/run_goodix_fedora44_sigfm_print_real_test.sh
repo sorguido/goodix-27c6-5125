@@ -56,7 +56,8 @@ test "$(rpm -q flexiblas)" = flexiblas-3.5.0-2.fc44.x86_64
 test "$(rpm -q flexiblas-netlib)" = flexiblas-netlib-3.5.0-2.fc44.x86_64
 
 gcc "$objects/fp-print.o" "$objects/fpi-print.o" "$objects/fpi-enums.o" \
-  "$objects/adapter.o" "$objects/metrics.o" "$objects/sigfm.o" \
+  "$objects/adapter.o" "$objects/preprocess.o" "$objects/imgproc.o" \
+  "$objects/metrics.o" "$objects/sigfm.o" \
   "$objects/test.o" -Wl,--gc-sections -Wl,--no-undefined \
   '-Wl,-rpath,$ORIGIN/meson/libfprint:$ORIGIN/runtime:$ORIGIN/pkgconfig' \
   -L"$meson_build/libfprint" -l:libfprint-2.so.2.0.0 \

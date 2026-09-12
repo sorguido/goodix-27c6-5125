@@ -3,7 +3,9 @@
 
 Questo è il solo Human Gate residuo di D291. L'agente AI non deve eseguirlo:
 il comando usa `pkexec`, aggiorna il runtime D285 e raggiunge il sensore durante
-un unico `sudo ls` con PAM bounded a tre tentativi.
+un unico `sudo ls` con PAM bounded a tre tentativi. Il launcher risolve il
+proprio percorso assoluto prima di `pkexec`, quindi funziona anche se invocato
+con il path relativo mostrato sotto.
 
 ## Scopo e rischio
 
@@ -31,6 +33,11 @@ manifest e state precedenti e riavvia il runtime precedente.
 - se compare una richiesta password, premere `Ctrl-C` senza digitarla;
 - non ripetere automaticamente una run fallita.
 
+Lo stato host dopo la precedente run fallita non è assunto: prima di qualunque
+deployment il percorso root esegue il root-audit D285, verifica state, runtime,
+manifest e PAM correnti e stampa `D291_01_HOST_RUNTIME_PREFLIGHT=PASS`. Ogni
+drift ferma il kit prima della sostituzione.
+
 ## Unico comando operatore
 
 Dalla root del repository, come utente normale:
@@ -52,9 +59,12 @@ tentativo 1 NO_MATCH
 → sudo autorizzato senza password
 ```
 
-Il kit richiede esattamente due epoch VERIFY negli audit, ciascuna con una sola
-acquisizione, e ammette sul secondo audit soltanto
-`reopen=1 explicit_verify_reopen=1`. Retry transport/post-TLS, reset,
-clear-halt, famiglie persistenti, outstanding o una terza/quarta epoch fanno
-fallire e attivano il rollback. L'output sanitizzato viene scritto in una
-directory `/tmp/goodix-d291-01-result.*` stampata come `RESULT_DIRECTORY`.
+Il kit richiede due epoch se il secondo contatto fa MATCH. Se il secondo
+contatto è NO_MATCH, la policy PAM può offrire la terza e ultima acquisizione;
+solo un MATCH al terzo contatto è accettato. Ogni epoch ha una sola
+acquisizione; dalla seconda in poi l'audit deve riportare
+`reopen=1 explicit_verify_reopen=1` e riuso della baseline SIGFM del primo
+open logico. Retry transport/post-TLS, reset, clear-halt, famiglie persistenti,
+outstanding, un esito senza MATCH o una quarta epoch fanno fallire e attivano
+il rollback. L'output sanitizzato viene scritto in una directory
+`/tmp/goodix-d291-01-result.*` stampata come `RESULT_DIRECTORY`.

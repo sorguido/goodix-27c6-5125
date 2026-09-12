@@ -3,6 +3,7 @@
 set -euo pipefail
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+script_path="$script_dir/run-d291-01.sh"
 root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 d282="$root/operator_kit/d282-01-fprintd-target/run-d282-01.sh"
 d286="$root/operator_kit/d286-01-reboot-survival/run-d286-01.sh"
@@ -55,7 +56,7 @@ rollback () {
 
 root_run () {
   local source=$1 baseline=$2 operator=${D291_OPERATOR_USER:-} manifest old_manifest
-  local cursor journal audit first second result sudo_rc poll name
+  local cursor journal audit first second result sudo_rc poll name epoch_count outcome_count matched_attempt
   local -a epochs outcomes
   [[ $EUID -eq 0 && $baseline =~ ^[0-9a-f]{40}$ &&
      $operator =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || refuse ROOT_ARGUMENT_INVALID
@@ -90,6 +91,7 @@ root_run () {
     [[ $(sha256sum "$candidate/$name" | awk '{print $1}') == $(sha256sum "$runtime/$name" | awk '{print $1}') ]] ||
       refuse NON_DRIVER_RUNTIME_DELTA
   done
+  echo D291_01_HOST_RUNTIME_PREFLIGHT=PASS
 
   backup=$(mktemp -d /var/tmp/goodix-d291-01-backup.XXXXXX)
   chmod 0700 "$backup"
@@ -121,7 +123,7 @@ root_run () {
   cursor=$(LC_ALL=C journalctl -u fprintd.service -n 0 --show-cursor --no-pager |
     sed -n 's/^-- cursor: //p')
   [[ -n $cursor ]] || refuse JOURNAL_CURSOR_UNAVAILABLE
-  runuser -u "$operator" -- sudo -K
+  runuser -u "$operator" -- sudo -k
   echo 'Tentativo 1: dito errato. Tentativo 2: indice destro registrato.'
   echo 'Se compare la password, premere Ctrl-C senza digitarla.'
   printf 'Digitare D291 PRONTO: '
@@ -131,31 +133,54 @@ root_run () {
   runuser -u "$operator" -- env -u SUDO_ASKPASS sudo ls
   sudo_rc=$?
   set -e
-  runuser -u "$operator" -- sudo -K
+  runuser -u "$operator" -- sudo -k
   journal="$backup/journal.filtered"
   for poll in {1..50}; do
     LC_ALL=C journalctl -u fprintd.service --after-cursor "$cursor" --no-pager |
       sed -n 's/^.*\(GOODIX_D282_EPOCH_AUDIT .*\)$/\1/p; s/^.*\(GOODIX_SIGFM_.*\)$/\1/p' \
       >"$journal"
-    [[ $(grep -c GOODIX_D282_EPOCH_AUDIT "$journal" || true) -ge 2 ]] && break
+    epoch_count=$(grep -c GOODIX_D282_EPOCH_AUDIT "$journal" || true)
+    outcome_count=$(grep -c 'GOODIX_SIGFM_MATCH_AUDIT event=outcome' "$journal" || true)
+    if [[ $epoch_count -eq 3 && $outcome_count -eq 3 ]] ||
+       [[ $epoch_count -ge 2 && $epoch_count -eq $outcome_count ]] &&
+       grep -q 'GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match' "$journal"; then
+      break
+    fi
     sleep 0.1
   done
   mapfile -t epochs < <(grep 'GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY' "$journal" || true)
   mapfile -t outcomes < <(grep 'GOODIX_SIGFM_MATCH_AUDIT event=outcome' "$journal" || true)
-  [[ $sudo_rc -eq 0 && ${#epochs[@]} -eq 2 && ${#outcomes[@]} -eq 2 &&
-     ${outcomes[0]} == *result=no_match* && ${outcomes[1]} == *result=match* ]] ||
+  [[ $sudo_rc -eq 0 && ${#epochs[@]} -ge 2 && ${#epochs[@]} -le 3 &&
+     ${#outcomes[@]} -eq ${#epochs[@]} &&
+     ${outcomes[0]} == *result=no_match* &&
+     ${outcomes[-1]} == *result=match* ]] ||
     refuse LIVE_OUTCOME_NOT_NO_MATCH_THEN_MATCH
+  if [[ ${#outcomes[@]} -eq 3 ]]; then
+    [[ ${outcomes[1]} == *result=no_match* ]] ||
+      refuse THIRD_ATTEMPT_WITHOUT_SECOND_NO_MATCH
+    matched_attempt=3
+  else
+    matched_attempt=2
+  fi
   audit='attempts=1 rejected=0 consumed=1 tls=1 first_image=1.*secure_retry=0 post_retry=0 reopen=[01] explicit_verify_reopen=[01] reset=0 clear_halt=0 persistent=0.*outstanding=0 drained=1 context_closed=1'
-  [[ $(printf '%s\n' "${epochs[@]}" | grep -Ec "$audit") -eq 2 &&
+  [[ $(printf '%s\n' "${epochs[@]}" | grep -Ec "$audit") -eq ${#epochs[@]} &&
      ${epochs[0]} == *'reopen=0 explicit_verify_reopen=0'* &&
-     ${epochs[1]} == *'reopen=1 explicit_verify_reopen=1'* ]] ||
+     ${epochs[0]} == *'sigfm_baseline_pinned=1 sigfm_baseline_reused=0'* ]] ||
     refuse LIVE_EPOCH_AUDIT_FAILED
+  for ((poll = 1; poll < ${#epochs[@]}; poll++)); do
+    [[ ${epochs[$poll]} == *'reopen=1 explicit_verify_reopen=1'* &&
+       ${epochs[$poll]} == *'sigfm_baseline_pinned=0 sigfm_baseline_reused=1'* ]] ||
+      refuse LIVE_REOPEN_BASELINE_CONTINUITY_AUDIT_FAILED
+  done
 
   result=$(mktemp -d /tmp/goodix-d291-01-result.XXXXXX)
   install -m 0600 -o "$(id -u "$operator")" -g "$(id -g "$operator")" "$journal" "$result/audit.log"
   printf '%s\n' D291_01_LIVE_RESULT=PASS_NO_MATCH_THEN_MATCH \
-    D291_01_VERIFY_EPOCH_COUNT=2 D291_01_EXPLICIT_REOPEN_COUNT=1 \
+    "D291_01_VERIFY_EPOCH_COUNT=${#epochs[@]}" \
+    "D291_01_MATCHED_ATTEMPT=$matched_attempt" \
+    "D291_01_EXPLICIT_REOPEN_COUNT=$((${#epochs[@]} - 1))" \
     D291_01_HIDDEN_RETRY_COUNT=0 D291_01_NO_FOURTH_ATTEMPT=true \
+    D291_01_SIGFM_BASELINE_CONTINUITY=PASS \
     TEMPLATE_INCLUDED=false >"$result/summary.env"
   chown -R "$(id -u "$operator"):$(id -g "$operator")" "$result"
   chmod 0700 "$result"
@@ -184,7 +209,7 @@ operator_run () {
   printf 'Digitare AGGIORNA D291 per il Human Gate: '
   read -r confirm
   [[ $confirm == 'AGGIORNA D291' ]] || refuse OPERATOR_CANCELLED
-  pkexec env D291_OPERATOR_USER="$(id -un)" "$0" --root-run "$candidate" "$baseline"
+  pkexec env D291_OPERATOR_USER="$(id -un)" "$script_path" --root-run "$candidate" "$baseline"
 }
 
 case ${1:-} in

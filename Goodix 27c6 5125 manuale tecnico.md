@@ -113,71 +113,78 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — D291 multi-VERIFY implementato offline, live Human Gate
+### Stato corrente — D291 correttivo di continuità SIGFM pronto, Human Gate
 
-L'evidenza reale che apre D291 proviene dal consumer quotidiano `sudo`, dopo
-che l'Utente ha portato il PAM D285 attivo a
-`pam_fprintd.so max-tries=3 timeout=45` aggiornandone coerentemente l'hash nello
-state root-only. Con primo contatto deliberatamente errato, pam_fprintd ha
-emesso il secondo prompt ma il driver ha rifiutato il nuovo `VerifyStart`:
+La prima candidate D291 (`8ed02cc3467899c8b1e6f914cc5870e04b6ff4e0`)
+ha chiuso live il difetto transport originario. In una singola invocazione
+`sudo ls`, pam_fprintd ha eseguito tre `VerifyStart` espliciti e il sensore ha
+prodotto una acquisizione per epoch. Seconda e terza epoch riportano
+`reopen=1 explicit_verify_reopen=1`; tutte hanno TLS=1, drain completo, zero
+retry, reset, clear-halt e famiglie persistenti. Sono quindi PROVEN il reopen
+transport, il raggiungimento reale del sensore alle epoch 2/3, l'assenza di
+retry nascosti e il limite di tre acquisizioni.
+
+La stessa live ha però concluso tre NO_MATCH. Il primo contatto era
+deliberatamente con dito errato e non prova una regressione della prima epoch.
+I contatti 2/3 erano l'indice destro registrato; avevano 133/119 keypoint ma
+score zero contro tutti gli otto campioni FP3. A confronto, D289 aveva prodotto
+score 9, 14 e 376 con MATCH sul terzo campione. Il difetto residuo D291 era
+quindi ristretto alla continuità biometrica attraverso il reopen, non al
+transport né a una cattura vuota.
+
+L'audit del delta `02c0cd0..8ed02cc` ha individuato lo stato con lifetime
+errato: `goodix_device_context_release_epoch_objects()` distruggeva la baseline
+no-finger usata dalla normalizzazione R2, mentre il device libfprint rimaneva
+logicamente aperto. L'epoch riaperta acquisiva e consumava correttamente una
+nuova baseline di sessione, ma sostituiva così lo spazio di normalizzazione
+delle probe all'interno della stessa serie VERIFY. Transport, FDT seed/table e
+materiali TLS devono invece essere ricreati per epoch; il template FP3 resta
+ownership di libfprint/fprintd ed è passato invariato al matcher.
+
+Il correttivo fissa la prima baseline R2 al lifetime del logical `img_open`, la
+riusa esclusivamente nelle successive epoch esplicite e la pulisce nel vero
+`goodix_device_context_free()`/`img_close`. Le nuove proprietà di audit sono:
 
 ```text
-Goodix production open epoch already consumed; close/reopen required
-attempts=2 rejected=1 consumed=1 tls=1 first_image=1
+prima VERIFY:  sigfm_baseline_pinned=1 sigfm_baseline_reused=0
+epoch riaperte: sigfm_baseline_pinned=0 sigfm_baseline_reused=1
 ```
 
-La diagnosi è driver-side. pam_fprintd chiude la VERIFY conclusa NO_MATCH e
-inizia una nuova richiesta esplicita; `production_action_consumed` era invece
-sticky per tutto il device open e impediva la seconda action. D291 applica un
-fix di lifecycle locale e consumer-agnostic: dopo una VERIFY normale arrivata
-a STOP post-TLS con backend drained, rilascia claim USB e oggetti
-runtime/secure/post-TLS senza avviare altro traffico. Soltanto un successivo
-`VerifyStart` esplicito ricrea material view, claim e generazione puliti.
-Cancellazioni/non-quiescenza restano poisoned/fail-closed e una richiesta
-concorrente resta `FP_DEVICE_ERROR_BUSY`.
+Non cambia alcun comando wire, parametro SIGFM, orientamento, dimensione o
+formato canonico; ogni sessione continua a eseguire il proprio percorso FDT e
+a validare la propria B0. Non sono stati aggiunti retry biometrici, reset,
+clear-halt o scritture persistenti.
 
-Il teardown finale è differito al successivo giro del main loop perché
-finger-off può entrare nella deactivation mentre lo stack del lifecycle
-post-TLS è ancora attivo. La callback del consumer viene completata solo dopo
-la release dell'epoch: ciò evita use-after-free e impedisce che un nuovo
-VerifyStart osservi risorse parzialmente chiuse.
+Il gap dei vecchi test era preciso: la suite D291 impostava direttamente uno
+score sintetico e il suo shell harness non compilava il ramo production
+`GOODIX_LIBFPRINT_SIGFM`; verificava lifecycle e contatori, non il raster R2 né
+l'identità del template. Ora la suite compila il ramo SIGFM production e guida
+decoder packed-12, baseline, preprocessing R2, estrazione e reale percorso di
+confronto. Il caso wrong→NO_MATCH→enrolled→MATCH attraversa un reopen con B0 di
+sessione deliberatamente diversa; controlla otto sample, identità logica del
+template, formato `80x64 U8`, estrazione non vuota e assenza di quarta action.
+Una seconda regressione usa l'implementazione reale Rocky/OpenCV/SIFT: 0/8
+score sul pattern differente, score 1504 e MATCH sul pattern iscritto, bytes
+FP3 serializzati invariati prima/dopo il matcher.
 
-Ogni audit resta per singola acquisizione. `reopen` conserva il valore
-aggregato e il nuovo campo `explicit_verify_reopen` distingue il rollover
-legittimo richiesto dal consumer da retry/reopen interni:
+Risultati offline correnti: driver normale e ASan/UBSan `29/29 PASS`, SIGFM
+reale/R2 PASS, contratti D285/D286 `64/64 PASS`, kit D291 `13/13 PASS`, zero
+USB e sensore reale. Il launcher D291 risolve ora il proprio path assoluto
+prima di `pkexec`. Lo stato runtime host dopo la live fallita resta
+`UNKNOWN_TO_AI`: il kit esegue quindi un preflight read-only D285/D286 prima
+del deployment e fallisce chiuso su qualunque drift.
 
-```text
-prima VERIFY:       reopen=0 explicit_verify_reopen=0
-seconda/terza:      reopen=1 explicit_verify_reopen=1
-per ogni VERIFY:    attempts=1 rejected=0 consumed=1 tls=1 first_image=1
-                    secure_retry=0 post_retry=0 reset=0 clear_halt=0
-                    persistent=0 outstanding=0 drained=1 context_closed=1
-```
-
-La regressione host-only copre MATCH al primo tentativo,
-NO_MATCH→MATCH, NO_MATCH→NO_MATCH→MATCH, tre NO_MATCH senza quarta
-acquisizione, assenza di acquisizioni nascoste e rifiuto del secondo
-VerifyStart concorrente. Risultati: suite driver normale e ASan/UBSan
-`28/28 PASS`, contratti D285/D286 `64/64 PASS`, kit D291 `12/12 PASS`, zero
-USB/sensore reale. Anche build production senza test seam e preflight ABI
-contro fprintd Fedora sono PASS. La sorgente operativa D285 e i suoi audit
-correnti ora riconoscono `max-tries=3`; il vecchio D286 a tre processi
-separati resta
-evidenza storica chiusa, non procedura da riaprire. Il PAM `plasmalogin`
-modificato direttamente dall'Utente non viene toccato.
-
-Il solo passo residuo D291 è privilegiato e sensor-reaching. Il micro-kit
-reversibile `operator_kit/d291-01-multi-verify/` costruisce dal commit pushato,
-sostituisce soltanto libfprint nel runtime D285, mantiene rollback e consente
-un unico `sudo ls`: primo contatto NO_MATCH volontario, secondo contatto MATCH.
-L'agente non lo esegue.
+Il solo passo residuo dello stesso boundary D291 è una singola run operatore:
+primo contatto volutamente NO_MATCH, secondo con indice destro registrato e
+stop immediato sul MATCH; solo se il secondo è NO_MATCH pam_fprintd può offrire
+il terzo e ultimo contatto. L'agente non esegue live, USB o privilegi.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
-D291_MULTI_VERIFY_IMPLEMENTED_OFFLINE=true
-UPSTREAM_PAM_MAX_TRIES_3_SUPPORTED_OFFLINE=true
-GOODIX_EXPLICIT_SECOND_VERIFY_SUPPORTED_OFFLINE=true
-GOODIX_EXPLICIT_THIRD_VERIFY_SUPPORTED_OFFLINE=true
+D291_FIRST_EPOCH_REGRESSION=NOT_PROVEN
+D291_MULTI_VERIFY_TRANSPORT_LIVE=PROVEN
+D291_BIOMETRIC_CONTINUITY_OFFLINE=PASS
+HOST_RUNTIME_AFTER_FAILED_D291=UNKNOWN_TO_AI
 ONE_ACQUISITION_PER_VERIFY_START=true
 STOP_ON_MATCH=true
 NO_HIDDEN_RETRY=true

@@ -36,6 +36,8 @@ cc $cflags $includes $dep_cflags -c "$source_root/libfprint/fp-print.c" -o "$obj
 cc $cflags $includes $dep_cflags -c "$source_root/libfprint/fpi-print.c" -o "$objects/fpi-print.o"
 cc $cflags $includes $dep_cflags -c "$meson_build/libfprint/fpi-enums.c" -o "$objects/fpi-enums.o"
 cc $cflags $includes -c "$repo_root/libfprint-driver/goodix_u16_to_fpimage.c" -o "$objects/adapter.o"
+cc $cflags $includes -c "$repo_root/libfprint-driver/goodix_sigfm_preprocess.c" -o "$objects/preprocess.o"
+cc $cflags $includes -c "$repo_root/libfprint-driver/rockytkg-imgproc/goodix_imgproc.c" -o "$objects/imgproc.o"
 c++ $cxxflags $includes -c "$repo_root/libfprint-driver/goodix_sigfm_metrics.cpp" -o "$objects/metrics.o"
 c++ -std=c++17 -O2 -g -fPIC -ffunction-sections -fdata-sections $includes \
   -c "$repo_root/Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp" -o "$objects/sigfm.o"
