@@ -3,14 +3,16 @@
 
 Data review: 13 settembre 2026
 
-Baseline D293/02: `development` a
-`61c8ff33b13d977120a6faa45dea2ac0860bcbcc`, con Phase A chiusa.
+Baseline D293/03: `development` a
+`cb918c6114f518d10d386d2b639eb3c8e5dd5f20`, con Phase A chiusa.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
 canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
 target-proven. D293/01 completa offline B1, senza auto-approvare la review PM,
 e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
-`VerifyStart(any)` e il solo handoff fprintd IDENTIFY→ENROLL sicuro.
+`VerifyStart(any)` e il solo handoff fprintd IDENTIFY→ENROLL sicuro. D293/03
+attraversa il vero daemon fprintd con più nomi principal e fissa il contratto
+statico del KCM Users Plasma 6.7.5; il successivo boundary è Human Gate.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -49,6 +51,9 @@ Non restano dipendenze build da Dxxx o `tests/`. D292/03 chiude A5 e Phase A
 dopo review PM diretta. D293/01 deriva dal codice il contratto multi-user e
 materiali protetti e chiude B1 offline. D293/02 chiude B2 offline con IDENTIFY
 su gallery completa, handoff ENROLL bounded e modello storage multi-principal.
+D293/03 esaurisce i prerequisiti offline di B3/B4: due nomi principal, ma un
+solo UID Unix, sul vero fprintd e storage temporaneo, più il contratto statico
+del KCM KDE.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -70,10 +75,15 @@ D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
 PHASE_B_B2=COMPLETED_OFFLINE
+D293_03_OUTCOME=PASS_HOST_ONLY
+PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
+KDE_KCM_STATIC_CONTRACT=PASS
+PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
+NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
 ```
 
 ## Stato verificato del progetto
@@ -274,6 +284,14 @@ sessione; match, errore, cancellazione e action diverse non abilitano il
 passaggio. Il modello content-free copre due principal, più dita, restart,
 replace, delete e name reuse; l'hook account-delete resta integrazione host.
 
+D293/03 esercita il vero daemon Fedora su bus privato: due nomi principal
+autorizzati via `setusername`, tre template sintetici, restart/list,
+`VerifyStart(any)`, isolamento, replace e delete singolo/completo sono PASS.
+Il sender/UID Unix resta uno, quindi non è una prova multi-account. L'audit
+hash-pinned del KCM Users Plasma 6.7.5 conferma discovery, list, enroll/
+re-enroll e delete tramite le API fprintd standard, senza UI Goodix; il KCM
+non è stato avviato.
+
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
 lecita, provisioning amministrativo no-overwrite e compatibilità con una
@@ -412,12 +430,13 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ## Decisione corrente
 
 La Phase B è ora il boundary corrente. Il kit D291 è
-`HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
-dell'Utente. D292/01 ha chiuso A1, D292/02 ha chiuso A3/A4 e la review PM
+`HISTORICAL_CLOSED_DO_NOT_RERUN` e non deve essere riusato. D292/01 ha chiuso
+A1, D292/02 ha chiuso A3/A4 e la review PM
 D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
 validator statico, senza accesso ai secret. D293/02 chiude B2 offline con
-implementazione e test. Il prossimo B3 integra offline il daemon fprintd reale
-con più principal prima del primo Human Gate target.
+implementazione e test. D293/03 esaurisce i prerequisiti offline di B3/B4 e
+il contratto statico KDE installato. Il prossimo boundary richiede il vero scenario KDE con un nuovo
+utente locale ed è soggetto a Human Gate.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -436,9 +455,14 @@ D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
 PHASE_B_B2=COMPLETED_OFFLINE
-NEW_LIVE_REQUIRED_NOW=false
+D293_03_OUTCOME=PASS_HOST_ONLY
+PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
+KDE_KCM_STATIC_CONTRACT=PASS
+PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+PHASE_B_CLOSED=false
+NEW_LIVE_REQUIRED_NOW=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
+NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
 ```

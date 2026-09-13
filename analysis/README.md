@@ -8,7 +8,8 @@ costituisce autorizzazione live.
 
 La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B/B3 è il boundary offline corrente;
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B resta corrente; dopo D293/03 il
+prossimo boundary è la vera prova KDE/new-user soggetta a Human Gate;
 nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
 
 D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
@@ -20,8 +21,7 @@ review PM diretta. Report correnti:
 in `analysis/D292/D292_03_PHASE_A_CLOSURE.md`; manifest e validator sono
 `D292_01_PRODUCTION_FILE_SET.json` e
 `validate_d292_01_inventory.py`. Nessun file storico è stato spostato o
-cancellato. Prossimo boundary:
-`PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE`.
+cancellato.
 
 D293/01 chiude B1 offline derivando dal vero fprintd 1.94.5 il contratto
 utente/claim/PolicyKit/storage e separandolo dai cinque input runtime
@@ -38,8 +38,19 @@ transport fresche. Il test integrato passa normal e ASan/UBSan; il modello
 storage content-free copre due principal, più dita, restart, replace, delete e
 name reuse. Report, validator e modello sono rispettivamente
 `D293_02_MULTI_FINGER_IDENTIFY_ENROLL_AND_STORAGE_MODEL.md`,
-`validate_d293_02.py` e `test_d293_02_storage_model.py`. Prossimo boundary:
-`PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE`.
+`validate_d293_02.py` e `test_d293_02_storage_model.py`.
+
+D293/03 esaurisce i prerequisiti offline di B3/B4: il vero fprintd 1.94.5 su bus
+privato e storage temporaneo gestisce due nomi principal, più dita,
+restart/list, `VerifyStart(any)`, isolamento, replace e delete. I due nomi sono
+autorizzati via `setusername` dallo stesso sender/UID Unix e non equivalgono a
+due account reali. L'audit statico hash-pinned del KCM Users Plasma 6.7.5
+conferma l'uso delle API fprintd standard senza GUI Goodix. Report, result,
+runner e validator sono `D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md`,
+`D293_03_OFFLINE_RESULT.env`, `d293_03_fprintd_integration.sh` e
+`validate_d293_03.py`. I veri B3/B4 non sono stati eseguiti e Phase B non è
+chiusa. Prossimo boundary:
+`HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET`.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

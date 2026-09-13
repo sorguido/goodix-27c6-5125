@@ -149,9 +149,11 @@ chiuso il follow-up funzionale con enrollment diversity Rocky-derived,
 re-enrollment, discriminazione wrong-finger e quattro serie registrate concluse
 con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
 Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
-production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1 e D293/02
-chiude offline B2 con IDENTIFY multi-finger, handoff ENROLL bounded e modello
-storage. La fase corrente resta **Phase B**, con B3 offline come boundary.
+production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
+chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
+vero fprintd host-only e il contratto statico KDE installato. La fase corrente
+resta **Phase B**: il prossimo boundary è la vera
+prova KDE con nuovo utente locale, soggetta a Human Gate.
 
 Principi trasversali della roadmap:
 
@@ -283,7 +285,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — D292/03 closure Phase A
+### Stato corrente Phase B — D293/03 boundary offline massimo
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -327,7 +329,8 @@ Il solo standalone ASan preprocess resta
 `BLOCKED_ENVIRONMENT_LIBASAN_ABSENT`, non blocker perché build canonica e suite
 integrate sanitizer sono verdi. La compatibilità target combina D291
 target-proven con il delta D292 limitato a composizione/build/test-surface e
-l'evidenza ABI Fedora corrente: nessun nuovo test live è richiesto o autorizzato.
+l'evidenza ABI Fedora corrente: nessun nuovo test live era richiesto per
+chiudere Phase A.
 
 ```text
 CURRENT_PHASE=B
@@ -354,9 +357,14 @@ PHASE_A_CLOSED=true
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
 PHASE_B_B2=COMPLETED_OFFLINE
+D293_03_OUTCOME=PASS_HOST_ONLY
+PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
+KDE_KCM_STATIC_CONTRACT=PASS
+PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
-NEW_LIVE_REQUIRED_NOW=false
+NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+NEW_LIVE_REQUIRED_NOW=true
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -463,13 +471,52 @@ REAL_USB_ACCESS=0
 PROTECTED_FILE_CONTENT_READ=false
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
+NEXT_BOUNDARY=SUPERSEDED_BY_D293_03
 ```
 
 Report, validator e modello:
 `analysis/D293/D293_02_MULTI_FINGER_IDENTIFY_ENROLL_AND_STORAGE_MODEL.md`,
 `analysis/D293/validate_d293_02.py` e
 `analysis/D293/test_d293_02_storage_model.py`.
+
+### Stato D293/03 — vero fprintd multi-principal e contratto KDE
+
+Il vero `fprintd-1.94.5-5.fc44.x86_64` ha completato sul bus D-Bus privato e
+su `STATE_DIRECTORY` temporaneo enrollment, restart/list, multi-finger
+`VerifyStart(any)`, isolamento, replace, delete singolo e delete completo. La
+libfprint host-only abilita soltanto `virtual_image`, compila fuori il contesto
+USB e non registra Goodix; sono state usate solo immagini sintetiche pubbliche.
+Nessun daemon di sistema, `/var/lib/fprint`, sensore o materiale protetto è
+stato raggiunto.
+
+I principal `d293-alpha` e `d293-beta` sono due nomi distinti autorizzati da
+`setusername`, ma provengono dallo stesso sender/UID Unix sul bus privato. La
+run prova il vero namespace per username fprintd, non due account Unix reali
+né la policy della sessione KDE. L'audit hash-pinned di `kcm_users.so` e del
+metadata Plasma 6.7.5 rileva le sole interfacce standard fprintd per discovery,
+claim/release, list, enroll/re-enroll e delete; non esiste una dipendenza UI
+Goodix. Il KCM non è stato avviato.
+
+```text
+D293_03_OUTCOME=PASS_HOST_ONLY
+PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
+KDE_KCM_STATIC_CONTRACT=PASS
+PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+D293_03_PRINCIPAL_NAME_COUNT=2
+D293_03_UNIX_UID_COUNT=1
+D293_03_VERIFY_ANY_MULTI_FINGER=PASS
+D293_03_PRINCIPAL_NAMESPACE_ISOLATION=PASS
+REAL_USB_ACCESS=0
+PROTECTED_FILE_CONTENT_READ=false
+CURRENT_PHASE=B
+PHASE_B_CLOSED=false
+PRODUCTION_READY=false
+NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+```
+
+Report e validator:
+`analysis/D293/D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md` e
+`analysis/D293/validate_d293_03.py`.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -686,10 +733,10 @@ realmente bloccata e login Plasma verso una nuova sessione Wayland sono
 boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
 fattibilità sul target APP12509 è provata; la production readiness no.
 
-La review D292/03 ha chiuso A5 e Phase A dopo il consolidamento A1/A3/A4. Il
-boundary corrente è Phase B/B1: analisi offline del contratto multi-user,
-storage standard fprintd e requisiti separati dei materiali protetti runtime.
-La roadmap
+La review D292/03 ha chiuso A5 e Phase A dopo il consolidamento A1/A3/A4.
+D293/01–03 hanno esaurito il boundary offline B1–B3 e il contratto statico
+del KCM Users installato. Il prossimo boundary è la prova reale KDE con un
+nuovo utente locale, soggetta a Human Gate. La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
 Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
@@ -712,7 +759,7 @@ PM_DECISION=ACCEPT_AND_CONTINUE
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
@@ -729,8 +776,13 @@ D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
 PHASE_B_B2=COMPLETED_OFFLINE
+D293_03_OUTCOME=PASS_HOST_ONLY
+PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
+KDE_KCM_STATIC_CONTRACT=PASS
+PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
+NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
