@@ -253,17 +253,27 @@ class D293B5LifecycleTest(unittest.TestCase):
                 capture_output=True,
             ).stdout
             allow_lines = [
-                line.strip() for line in policy_dump.splitlines() if line.strip().startswith("allow")
+                line.strip()
+                for line in policy_dump.splitlines()
+                if line.strip().startswith("allow  ")
             ]
             self.assertEqual(
                 allow_lines,
                 [
-                    "allow  [useradd_t]  goodix_fprint_account_delete_exec_t : [file] { execute execute_no_trans getattr open read };",
+                    "allow  [useradd_t]  goodix_fprint_account_delete_exec_t : [file] { execute execute_no_trans getattr ioctl open read };",
                     "allow  [useradd_t]  [fprintd_var_lib_t] : [dir] { getattr open read search };",
                     "allow  [useradd_t]  [fprintd_var_lib_t] : [file] { getattr };",
                     "allow  [useradd_t]  [fprintd_var_lib_t] : [lnk_file] { getattr };",
                 ],
             )
+            policy_source = POLICY.read_text()
+            exact_xperm = (
+                "allowxperm useradd_t goodix_fprint_account_delete_exec_t:file "
+                "ioctl 0x542a;"
+            )
+            self.assertEqual(policy_source.count("allowxperm"), 1)
+            self.assertIn(exact_xperm, policy_source)
+            self.assertNotIn("allowxperm useradd_t fprintd_var_lib_t", policy_source)
             subprocess.run(
                 ["semodule_unpackage", package, unpacked_module, unpacked_context],
                 check=True,
