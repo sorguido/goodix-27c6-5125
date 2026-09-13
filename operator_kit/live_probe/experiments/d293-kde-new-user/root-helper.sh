@@ -8,6 +8,7 @@ repo=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null || true)
 private=/run/goodix-d293-04
 public=/run/goodix-d293-04-public
 mountpoint_path=$public/repo
+capture_root=/var/tmp/goodix-d293-04-captures
 dropin=/run/systemd/system/fprintd.service.d/99-goodix-d293-04.conf
 unit=goodix-d293-04-supervisor.service
 test_user=d293-phase-b-test
@@ -95,7 +96,7 @@ supervisor_signal() {
 supervise() {
   trap 'rollback_runtime || true' EXIT
   trap supervisor_signal INT TERM
-  local deadline=$((SECONDS + 900)) uid original original_uid
+  local deadline=$((SECONDS + 900)) uid gid original original_uid
   repo=$(state_value REPO_ROOT)
   original=$(state_value ORIGINAL_USER)
   original_uid=$(id -u "$original")
@@ -105,14 +106,17 @@ supervise() {
   done
   getent passwd "$test_user" >/dev/null || fail test_account_not_created
   uid=$(id -u "$test_user")
+  gid=$(id -g "$test_user")
   [[ $uid -ge 1000 && $(getent passwd "$test_user" | cut -d: -f6) == /home/$test_user ]] || fail test_account_invalid
   deadline=$((SECONDS + 300))
   while pgrep -u "$original_uid" -x systemsettings >/dev/null && (( SECONDS < deadline )); do sleep 1; done
   ! pgrep -u "$original_uid" -x systemsettings >/dev/null || fail original_kcm_still_running
   systemctl stop fprintd.service >/dev/null 2>&1 || true
   ! systemctl is-active --quiet fprintd.service || fail fprintd_not_quiescent_before_ready
+  [[ ! -e $capture_root && ! -L $capture_root ]] || fail capture_root_collision
+  install -d -m 0700 -o "$uid" -g "$gid" "$capture_root"
   mkdir -p "$public/control" "$mountpoint_path"
-  chown "$uid:$uid" "$public/control"; chmod 0700 "$public/control"
+  chown "$uid:$gid" "$public/control"; chmod 0700 "$public/control"
   chmod 0755 "$mountpoint_path"
   mount --bind "$(state_value REPO_ROOT)" "$mountpoint_path"
   mount -o remount,bind,ro,nodev,nosuid "$mountpoint_path"
@@ -131,7 +135,9 @@ deploy() {
   [[ $caller =~ ^[1-9][0-9]*$ && $(stat -c %u "$candidate") == "$caller" ]] || fail candidate_owner
   [[ $(id -u "$original") == "$caller" ]] || fail original_user_caller_mismatch
   [[ -d $candidate && ! -L $candidate && -f $candidate/deploy.sha256 && ! -L $candidate/deploy.sha256 ]] || fail candidate_type
-  [[ ! -e $private && ! -e $public && ! -e $dropin ]] || fail deployment_collision
+  [[ ! -e $private && ! -e $public && ! -e $dropin &&
+     ! -e $capture_root && ! -L $capture_root ]] ||
+    fail deployment_collision
   getent passwd "$test_user" >/dev/null && fail test_account_exists_before_deploy
   repo=$(git -C "$here" rev-parse --show-toplevel)
   [[ $(git -C "$repo" rev-parse HEAD) == "$head" ]] || fail head_mismatch
@@ -197,7 +203,7 @@ recover() {
     for _ in $(seq 1 100); do [[ ! -f $private/wrapper ]] && break; sleep 0.1; done
   fi
   rollback_runtime || true
-  local original= result=PASS uid caller=${PKEXEC_UID:-}
+  local original= original_gid= result=PASS uid capture_retained=ABSENT caller=${PKEXEC_UID:-}
   if [[ -f $private/state.env ]]; then
     original=$(state_value ORIGINAL_USER)
   elif [[ $caller =~ ^[1-9][0-9]*$ ]]; then
@@ -207,18 +213,31 @@ recover() {
   else
     fail recovery_caller_missing
   fi
+  original_gid=$(id -g "$original") || fail recovery_original_group_missing
   if mountpoint -q "$mountpoint_path"; then umount "$mountpoint_path" || result=FAIL; fi
   if getent passwd "$test_user" >/dev/null; then
     uid=$(id -u "$test_user")
     ! pgrep -u "$uid" >/dev/null || fail test_user_still_logged_in
     [[ ! -d /var/lib/fprint/$test_user ]] || ! find "/var/lib/fprint/$test_user" -type f -print -quit | grep -q . || fail test_storage_remains_use_kcm
     [[ $(getent passwd "$test_user" | cut -d: -f6) == /home/$test_user ]] || fail test_home_unexpected
+    if [[ -e $capture_root || -L $capture_root ]]; then
+      [[ -d $capture_root && ! -L $capture_root ]] || fail capture_root_invalid
+      [[ -z $(find "$capture_root" -xdev ! -type d ! -type f -print -quit) ]] ||
+        fail capture_special_file
+      [[ -z $(find "$capture_root" -xdev ! -user "$test_user" -print -quit) ]] ||
+        fail capture_owner_drift
+      chown -R "$original:$original_gid" "$capture_root"
+      capture_retained=$capture_root
+    fi
     userdel -r "$test_user"
+  elif [[ -e $capture_root || -L $capture_root ]]; then
+    fail capture_without_test_account
   fi
   if [[ -n $original ]]; then audit_d285 D293_04_FINAL_RECOVERY "$original" || result=FAIL; fi
   if [[ -d $public && ! -L $public ]]; then remove_tree "$public" "$public" || result=FAIL; fi
   if [[ -d $private && ! -L $private ]]; then remove_tree "$private" "$private" || result=FAIL; fi
   systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+  echo "D293_04_CAPTURE_RETAINED=$capture_retained"
   echo "D293_04_FINAL_RECOVERY=$result"
   [[ $result == PASS ]]
 }

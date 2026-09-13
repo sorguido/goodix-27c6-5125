@@ -83,6 +83,13 @@ def main() -> int:
             "post-deployment account creation boundary missing")
     require("mount -o remount,bind,ro,nodev,nosuid" in helper,
             "new-user repository mount is not read-only/nodev/nosuid")
+    require("capture_root=/var/tmp/goodix-d293-04-captures" in helper,
+            "capture root is not preserved outside the disposable test home")
+    require('chown -R "$original:$original_gid" "$capture_root"' in helper and
+            "capture_special_file" in helper and "capture_owner_drift" in helper,
+            "recovery does not validate and transfer the retained capture")
+    require("D293_04_CAPTURE_RETAINED=" in helper,
+            "recovery does not report the retained capture path")
     require("trap supervisor_signal INT TERM" in helper and
             "trap - EXIT INT TERM" in helper and "exit 143" in helper,
             "supervisor signal path does not terminate after rollback")
@@ -100,6 +107,8 @@ def main() -> int:
     readme = text("README_IT.md")
     require("GIT_CONFIG_COUNT=1" in readme and "safe.directory" in readme,
             "non-persistent Git dubious-ownership handling missing")
+    require("--capture-root /var/tmp/goodix-d293-04-captures" in readme,
+            "operator command would lose capture with the disposable test home")
     require("MAX_ACTIONS=5" in readme and "MAX_CONTACTS=24" in readme,
             "documented technical budgets are stale")
     require("Nessun conteggio" in readme and "delegato all'operatore" in readme,

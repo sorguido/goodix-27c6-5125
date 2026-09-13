@@ -46,8 +46,11 @@ uguaglianza. Cleanup e recovery richiedono cancellazione KCM del template del
 test user, rollback runtime, logout, rimozione dell'account/home esatto e audit
 D285/D286 finale. Il supervisore termina esplicitamente dopo il rollback anche
 su signal; la recovery post-reboot ricava l'identità originale dal chiamante
-`pkexec`. Capture e journal sono sanitizzati e non contengono password,
-template, immagini, hash template o materiale protetto.
+`pkexec`. La capture vive sotto `/var/tmp`, non nella home eliminabile del test
+user; al recovery vengono rifiutati file speciali/ownership inattesa e il tree
+viene trasferito all'utente originale prima di `userdel -r`. Capture e journal
+sono sanitizzati e non contengono password, template, immagini, hash template
+o materiale protetto.
 
 ## Riesame metodologico
 

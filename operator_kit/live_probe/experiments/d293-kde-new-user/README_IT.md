@@ -83,7 +83,7 @@ Aprire Konsole nella nuova sessione ed eseguire:
     GIT_CONFIG_VALUE_0=/run/goodix-d293-04-public/repo \
     /run/goodix-d293-04-public/repo/operator_kit/live_probe/run.sh \
       d293-kde-new-user --operator-run \
-      --capture-root "$HOME/D293-04-captures"
+      --capture-root /var/tmp/goodix-d293-04-captures
 
 La configurazione Git è solo nell'environment del comando e non scrive
 ~/.gitconfig; evita dubious ownership sul bind mount read-only. Il common
@@ -122,8 +122,11 @@ preesistente ed eseguire:
 
 La recovery rifiuta account ancora attivi o template residui: in quel caso
 rientrare nel nuovo utente, cancellare l'impronta dal KCM e ripetere la sola
-recovery. Su successo smonta il repository read-only, elimina esattamente
-l'account/home di test e riesegue l'audit D285/D286.
+recovery. Su successo verifica che la capture contenga soltanto file/directory
+del test user, ne trasferisce ricorsivamente l'ownership all'utente originale,
+smonta il repository read-only, elimina esattamente l'account/home di test e
+riesegue l'audit D285/D286. La capture sopravvive quindi alla cancellazione
+della home di test.
 
 ## Recovery d'emergenza
 
@@ -135,7 +138,9 @@ finale.
 
 La capture sanitizzata è salvata sotto:
 
-    $HOME/D293-04-captures/d293-kde-new-user_<timestamp>_<sha>/sanitized/
+    /var/tmp/goodix-d293-04-captures/d293-kde-new-user_<timestamp>_<sha>/sanitized/
 
 Non contiene password, immagini, template o hash dei template; conserva
-provenance candidate, contatori, telemetria e soli booleani di isolamento.
+provenance candidate, contatori, telemetria e soli booleani di isolamento. Dopo
+`recover.sh` appartiene all'utente originale e può essere consegnata alla review
+AI senza privilegi.

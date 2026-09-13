@@ -22,6 +22,8 @@ critical=(production libfprint-driver Rockytkg reference/libfprint-fedora44-1.94
 [[ $(rpm -q plasma-workspace-libs) == plasma-workspace-libs-6.7.5-1.fc44.x86_64 ]] || fail plasma_nevra
 getent passwd "$test_user" >/dev/null && fail test_account_already_exists
 [[ ! -e /run/goodix-d293-04 && ! -e /run/goodix-d293-04-public ]] || fail prior_runtime_present
+[[ ! -e /var/tmp/goodix-d293-04-captures &&
+   ! -L /var/tmp/goodix-d293-04-captures ]] || fail prior_capture_root_present
 
 count=0
 for device in /sys/bus/usb/devices/*; do

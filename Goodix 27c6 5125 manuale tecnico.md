@@ -546,9 +546,11 @@ dell'account/home esatto e audit D285/D286 finale sono fail-closed. Il signal
 handler del supervisore termina esplicitamente il loop dopo il rollback; il
 deploy lega il principal originale al chiamante `pkexec` e la recovery
 post-reboot ricava da quel chiamante l'identità da sottoporre all'audit finale.
-Nessun template, immagine, password, hash template o materiale protetto entra
-nella capture. L'AI ha eseguito soltanto validator e percorso
-`--offline-test`: la live, USB e `pkexec` non sono stati eseguiti.
+La capture sanitizzata risiede fuori dalla home eliminabile del test user;
+prima di `userdel -r` la recovery ne valida tipo e ownership e la trasferisce
+all'utente originale. Nessun template, immagine, password, hash template o
+materiale protetto entra nella capture. L'AI ha eseguito soltanto validator e
+percorso `--offline-test`: la live, USB e `pkexec` non sono stati eseguiti.
 
 ```text
 D293_04_OPERATOR_KIT=READY_OFFLINE
