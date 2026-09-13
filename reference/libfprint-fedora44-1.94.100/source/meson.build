@@ -16,6 +16,8 @@ python3 = find_program('python3')
 
 libfprint_conf = configuration_data()
 libfprint_conf.set_quoted('LIBFPRINT_VERSION', meson.project_version())
+libfprint_conf.set10('GOODIX_PRODUCTION_MINIMAL',
+                     get_option('goodix_production_minimal'))
 
 prefix = get_option('prefix')
 libdir = prefix / get_option('libdir')
@@ -332,9 +334,12 @@ if get_option('gtk-examples')
 endif
 
 subdir('data')
-subdir('tests')
-
-subdir('examples')
+if not get_option('goodix_production_minimal')
+    subdir('tests')
+    subdir('examples')
+else
+    installed_tests = false
+endif
 
 meson.add_dist_script(sync_unsupported_files, '--check', udev_hwdb_list_file)
 

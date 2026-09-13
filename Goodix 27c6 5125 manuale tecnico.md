@@ -281,60 +281,71 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase A — D292/01 inventario production
+### Stato corrente Phase A — D292/02 source-of-truth e build riproducibile
 
-D292/01 chiude A1 con un inventario evidence-based del percorso production
-attuale. Il Meson reale seleziona 77 translation unit versionate e ne genera
-tre; il file set copre inoltre 32 header locali/Rocky, il tree baseline Fedora
-e il delta Git downstream completo di 15 file. Nessuna unità compilata proviene
-da `analysis/`, `operator_kit/`, `tests/`, fake backend o launcher Dxxx. La
-source-of-truth non è tuttavia ancora
-consolidata: è distribuita fra la fork Fedora 44/libfprint 1.94.100 sotto
-`reference/`, `libfprint-driver/` e il subset SIGFM/R2 di `Rockytkg/`.
+D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
+di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
+`f609c865f760768edb6a9e404b863ccd0569e1c8`, applica una patch rigenerabile di
+15 file production e copia il subset Goodix/SIGFM/R2 manifestato (30 TU e 32
+header). Il tree upstream pristine copre senza duplicazione massiva i restanti
+47 TU versionati; Meson genera altri tre TU.
 
-Il delta Fedora comprende tre input build/ABI, inclusi `libfprint.ver`, undici
-file core production, incluso `fpi-image.c`, e il solo delta test
-`tests/meson.build`. Il grafo corrente è orchestrato dal builder storico D282, usa due template
-pkg-config sotto `libfprint-driver/tests/support/d279/`, produce
-`libfprint-2.so.2.0.0` e viene caricato dal binario Fedora `/usr/libexec/fprintd`
-attraverso il wrapper runtime D285. L'audit completo trova 52 prototipi espliciti
-non protetti più due GType generati: 1 registry/runtime, 12 shared/internal
-production e 39 test/host-only, con zero call-site production per questi ultimi
-e zero ambigui. Le sezioni header etichettate test contengono anche sette
-simboli realmente usati dal runtime, perciò A3 deve separare per call-site e non
-per etichetta. La policy production conserva inoltre il nome storico
-`GOODIX_D282_DIRECT_ENROLL_PROFILE`. Questi sono confini espliciti per A3/A4,
-non claim di production readiness.
+Il delta Git completo dalla baseline pristine è 16 file: quattro input
+build/ABI (`meson.build`, `meson_options.txt`, `libfprint/meson.build`,
+`libfprint.ver`), undici core e `tests/meson.build`, che resta storico ed è
+escluso dalla patch prodotto. Il builder canonico è non privilegiato,
+network-unshared e indipendente da `analysis/`, `operator_kit/`, `tests/`, fake
+backend e launcher Dxxx. I supporti GUsb/OpenCV e i 5 RPM Fedora locali sono
+digest-verified; nessun material loader, USB, install o deploy viene eseguito.
 
-La scelta minima proposta preserva Fedora 44/libfprint 1.94.100 e l'attuale
-regime GPL-compatible, trasformando il delta in una sola patch series/tree
-downstream riproducibile, con builder non-Dxxx, subset SIGFM/R2 ledgered e
-nessuna dipendenza da `tests/`. Nessun move, cancellazione, red tag o modifica
-del licensing boundary è autorizzato finché le dipendenze restano attive.
+La policy production usa il nome stabile
+`GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE`. Le 39 API classificate D292/01 come
+host/test-only sono ora sotto `GOODIX_ENABLE_TEST_SEAMS`; i 12 simboli
+shared/internal necessari restano production. La modalità Meson production non
+configura test/examples e compila fuori l'emulazione test core. Build normal
+da root e da `/tmp` sono byte-identiche (SHA-256
+`11f829bd8aa912aef92a00eb68a15b4b5ab430fafd948fec944da33f9c1482a2`);
+anche la build ASan/UBSan passa. L'artefatto non esporta i 39 simboli, conserva
+SONAME `libfprint-2.so.2`, soddisfa tutti i 47 simboli `LIBFPRINT_2.0.0`
+richiesti dal fprintd Fedora installato e non ha RPATH/RUNPATH.
+
+Il target read-only verificato è Fedora 44 KDE x86_64 con libfprint
+1.94.100-1.fc44, fprintd 1.94.5-5.fc44 e dipendenze compatibili; il Flatpak SDK
+25.08 pinned fornisce la toolchain. Licensing e regime GPL-compatible non
+cambiano. D285 resta evidenza/runtime storico e un problema successivo di
+multi-user/packaging, non una dipendenza build. Nessun move, cancellazione o
+red tag è autorizzato. Phase A resta corrente fino alla review A5 della
+superficie distribuibile e della provenance.
 
 ```text
 CURRENT_PHASE=A
 D292_01_OUTCOME=PASS_ARCHITECTURAL_INVENTORY
 PHASE_A_A1=COMPLETED
+PHASE_A_A3=COMPLETED
+PHASE_A_A4=COMPLETED
+D292_02_OUTCOME=PASS_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD
 PRODUCTION_TRANSLATION_UNITS=77
 GENERATED_TRANSLATION_UNITS=3
 LOCAL_AND_ROCKY_HEADER_INPUTS=32
-FEDORA_DOWNSTREAM_DELTA_FILES=15
+FEDORA_DOWNSTREAM_DELTA_FILES=16
+PRODUCT_PATCH_FILES=15
 PRODUCTION_COMPILED_FORBIDDEN_PREFIX_COUNT=0
-BUILD_TEST_AREA_DEPENDENCY_COUNT=2
-UNPROTECTED_EXPLICIT_SYMBOLS=52
+BUILD_TEST_AREA_DEPENDENCY_COUNT=0
+UNPROTECTED_EXPLICIT_SYMBOLS=13
 SHARED_INTERNAL_PRODUCTION_SYMBOLS=12
-TEST_HOST_ONLY_UNPROTECTED_SYMBOLS=39
+TEST_HOST_ONLY_GUARDED_SYMBOLS=39
 TEST_HOST_ONLY_PRODUCTION_CALL_SITE_COUNT=0
 AMBIGUOUS_SYMBOLS=0
-SOURCE_OF_TRUTH_CONSOLIDATED=false
-NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
+SOURCE_OF_TRUTH_CONSOLIDATED=true
+PHASE_A_CLOSED=false
+NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
 NEW_LIVE_REQUIRED_NOW=false
 ```
 
 Inventario, classificazione, blocker e validator sono in
 `analysis/D292/D292_01_PRODUCTION_SOURCE_INVENTORY.md` e
-`analysis/D292/D292_01_PRODUCTION_FILE_SET.json`.
+`analysis/D292/D292_01_PRODUCTION_FILE_SET.json`; la closure A3/A4 è in
+`analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md`.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -552,9 +563,10 @@ boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
 fattibilità sul target APP12509 è provata; la production readiness no.
 
 Il boundary corrente resta il consolidamento della sorgente production
-(Phase A). D292/01 ha chiuso l'inventario A1; il passo successivo A3 è scegliere
-una source-of-truth mantenibile, seguito dalla patch/build riproducibile A4 e
-dalla separazione dei seam di test e del tooling storico. La roadmap
+(Phase A). D292/01 ha chiuso A1 e D292/02 ha chiuso A3/A4 con source-of-truth
+canonica, patch/build riproducibile, ABI e separazione seam. Il passo successivo
+è la review A5 della superficie distribuibile/provenance prima di dichiarare
+la closure Phase A. La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
 Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
@@ -585,7 +597,10 @@ CURRENT_PHASE=A
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
-NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
+PHASE_A_A3=COMPLETED
+PHASE_A_A4=COMPLETED
+D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
+NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

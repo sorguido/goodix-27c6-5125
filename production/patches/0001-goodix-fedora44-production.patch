@@ -1,0 +1,1436 @@
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device-private.h b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device-private.h
+index b075634a671cb7c0a738a60224880cdf473421ba..7b2c80a83cc992137e058847610ba868b9caac60 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device-private.h
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device-private.h
+@@ -33,10 +33,17 @@ typedef struct
+   gint                enroll_stage;
+ 
+   gboolean            minutiae_scan_active;
++  /* A driver may need the successful final enrollment result to remain
++   * active until a device-side release boundary has been observed. */
++  gboolean            enroll_completion_held;
++  /* Persists after release until action teardown so a late biometric failure
++   * cannot fall back to a retry after the final sensor acquisition. */
++  gboolean            enroll_terminal_sample_committed;
+   GError             *action_error;
+   FpImage            *capture_image;
+ 
+   gint                bz3_threshold;
++  FpiPrintType        algorithm;
+ } FpImageDevicePrivate;
+ 
+ 
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device.c
+index ac88ffd9eaeeb5f993ddb86750ce193a012fec20..dbc556ccf67f66750f0d1f6caff71a6ac305bc45 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image-device.c
+@@ -89,6 +89,7 @@ fp_image_device_cancel_action (FpDevice *device)
+   /* We can only cancel capture operations, in that case, deactivate and return
+    * an error immediately. */
+   if (action == FPI_DEVICE_ACTION_ENROLL ||
++      action == FPI_DEVICE_ACTION_VERIFY ||
+       action == FPI_DEVICE_ACTION_IDENTIFY ||
+       action == FPI_DEVICE_ACTION_CAPTURE)
+     fpi_image_device_deactivate (self, TRUE);
+@@ -125,11 +126,13 @@ fp_image_device_start_capture_action (FpDevice *device)
+ 
+       fpi_device_get_enroll_data (device, &enroll_print);
+       g_object_get (enroll_print, "fpi-type", &print_type, NULL);
+-      if (print_type != FPI_PRINT_NBIS)
+-        fpi_print_set_type (enroll_print, FPI_PRINT_NBIS);
++      if (print_type != (FpiPrintType) priv->algorithm)
++        fpi_print_set_type (enroll_print, (FpiPrintType) priv->algorithm);
+     }
+ 
+   priv->enroll_stage = 0;
++  priv->enroll_completion_held = FALSE;
++  priv->enroll_terminal_sample_committed = FALSE;
+   /* The internal state machine guarantees both of these. */
+   g_assert (!priv->finger_present);
+   g_assert (!priv->minutiae_scan_active);
+@@ -194,8 +197,11 @@ fp_image_device_constructed (GObject *obj)
+ 
+   /* Set default threshold. */
+   priv->bz3_threshold = BOZORTH3_DEFAULT_THRESHOLD;
++  priv->algorithm = FPI_PRINT_NBIS;
+   if (cls->bz3_threshold > 0)
+     priv->bz3_threshold = cls->bz3_threshold;
++  if (cls->algorithm == FPI_DEVICE_ALGO_SIGFM)
++    priv->algorithm = FPI_PRINT_SIGFM;
+ 
+   G_OBJECT_CLASS (fp_image_device_parent_class)->constructed (obj);
+ }
+@@ -216,6 +222,7 @@ fp_image_device_class_init (FpImageDeviceClass *klass)
+   fp_device_class->open = fp_image_device_open;
+   fp_device_class->close = fp_image_device_close;
+   fp_device_class->enroll = fp_image_device_start_capture_action;
++  fp_device_class->verify = fp_image_device_start_capture_action;
+   fp_device_class->identify = fp_image_device_start_capture_action;
+   fp_device_class->capture = fp_image_device_start_capture_action;
+ 
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image.c
+index f9c60b3705e6f11a246c89c6ed77c788b8b3d10c..a16e7b217d337a15c1d345857fffeb36caf33986 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-image.c
+@@ -64,6 +64,9 @@ fp_image_finalize (GObject *object)
+   g_clear_pointer (&self->data, g_free);
+   g_clear_pointer (&self->binarized, g_free);
+   g_clear_pointer (&self->minutiae, g_ptr_array_unref);
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  g_clear_pointer (&self->sigfm_sample, goodix_sigfm_sample_free);
++#endif
+ 
+   G_OBJECT_CLASS (fp_image_parent_class)->finalize (object);
+ }
+@@ -181,6 +184,50 @@ fp_image_detect_minutiae_free (DetectMinutiaeNbisData *data)
+ 
+ G_DEFINE_AUTOPTR_CLEANUP_FUNC (DetectMinutiaeNbisData, fp_image_detect_minutiae_free)
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++static void
++fp_image_detect_sigfm_thread_func (GTask        *task,
++                                   gpointer      source_object,
++                                   gpointer      task_data,
++                                   GCancellable *cancellable)
++{
++  g_autoptr(GTask) thread_task = g_steal_pointer (&task);
++  FpImage *self = FP_IMAGE (source_object);
++  GoodixSigfmSample *sample = NULL;
++  GoodixSigfmResult result;
++  gint keypoints = 0;
++
++  (void) task_data;
++  (void) cancellable;
++  if (g_task_return_error_if_cancelled (thread_task))
++    return;
++  if (self->flags != FPI_IMAGE_NONE)
++    {
++      g_task_return_new_error (thread_task, G_IO_ERROR,
++                               G_IO_ERROR_INVALID_DATA,
++                               "SIGFM requires a normalized image");
++      return;
++    }
++  result = goodix_sigfm_extract_pixels (self->data,
++                                        self->width * self->height,
++                                        &sample, &keypoints);
++  if (result != GOODIX_SIGFM_OK)
++    {
++      g_task_return_new_error (thread_task, G_IO_ERROR, G_IO_ERROR_FAILED,
++                               "SIGFM extraction failed: %d", result);
++      return;
++    }
++  g_message ("GOODIX_SIGFM_EXTRACT_AUDIT keypoints=%d", keypoints);
++  if (g_task_return_error_if_cancelled (thread_task))
++    {
++      goodix_sigfm_sample_free (sample);
++      return;
++    }
++  g_task_return_pointer (thread_task, sample,
++                         (GDestroyNotify) goodix_sigfm_sample_free);
++}
++#endif
++
+ 
+ static gboolean
+ fp_image_detect_minutiae_nbis_finish (FpImage *self,
+@@ -522,6 +569,56 @@ fp_image_detect_minutiae_finish (FpImage      *self,
+   return fp_image_detect_minutiae_nbis_finish (self, task, error);
+ }
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++void
++fp_image_detect_sigfm (FpImage            *self,
++                       GCancellable       *cancellable,
++                       GAsyncReadyCallback callback,
++                       gpointer            user_data)
++{
++  g_autoptr(GTask) task = NULL;
++
++  g_return_if_fail (FP_IS_IMAGE (self));
++  g_return_if_fail (callback != NULL);
++  task = g_task_new (self, cancellable, callback, user_data);
++  g_task_set_source_tag (task, fp_image_detect_sigfm);
++  g_task_set_check_cancellable (task, TRUE);
++  if (!g_atomic_int_compare_and_exchange (&self->detection_in_progress,
++                                          FALSE, TRUE))
++    {
++      g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_ADDRESS_IN_USE,
++                               "Image feature detection is already in progress");
++      return;
++    }
++  g_task_run_in_thread (g_steal_pointer (&task),
++                        fp_image_detect_sigfm_thread_func);
++}
++
++gboolean
++fp_image_detect_sigfm_finish (FpImage      *self,
++                              GAsyncResult *result,
++                              GError      **error)
++{
++  GoodixSigfmSample *sample;
++  gboolean changed;
++
++  g_return_val_if_fail (FP_IS_IMAGE (self), FALSE);
++  g_return_val_if_fail (g_task_is_valid (result, self), FALSE);
++  g_return_val_if_fail (g_task_get_source_tag (G_TASK (result)) ==
++                        fp_image_detect_sigfm, FALSE);
++  changed = g_atomic_int_compare_and_exchange (&self->detection_in_progress,
++                                               TRUE, FALSE);
++  g_assert (changed);
++  sample = g_task_propagate_pointer (G_TASK (result), error);
++  if (sample == NULL)
++    return FALSE;
++  g_clear_pointer (&self->sigfm_sample, goodix_sigfm_sample_free);
++  self->sigfm_sample = sample;
++  return TRUE;
++}
++
++#endif
++
+ /**
+  * fp_minutia_get_coords:
+  * @min: A #FpMinutia
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-print.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-print.c
+index d541437c126ecb1b920f547dd11697d599c71d81..7543b2812345465aafc41caac14e10fc689241dc 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-print.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fp-print.c
+@@ -24,6 +24,10 @@
+ #include "fpi-compat.h"
+ #include "fpi-log.h"
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++#include "goodix_sigfm_metrics.h"
++#endif
++
+ /**
+  * SECTION: fp-print
+  * @title: FpPrint
+@@ -628,6 +632,40 @@ fp_print_equal (FpPrint *self, FpPrint *other)
+ 
+       return TRUE;
+ 
++    case FPI_PRINT_SIGFM:
++#ifdef GOODIX_LIBFPRINT_SIGFM
++      if (!self->prints || !other->prints ||
++          self->prints->len != other->prints->len)
++        return FALSE;
++
++      for (guint i = 0; i < self->prints->len; i++)
++        {
++          GoodixSigfmSample *a = g_ptr_array_index (self->prints, i);
++          GoodixSigfmSample *b = g_ptr_array_index (other->prints, i);
++          guint8 *a_data = NULL;
++          guint8 *b_data = NULL;
++          gsize a_size = 0;
++          gsize b_size = 0;
++          GoodixSigfmResult a_result;
++          GoodixSigfmResult b_result;
++          gboolean equal;
++
++          a_result = goodix_sigfm_sample_serialize (a, &a_data, &a_size);
++          b_result = goodix_sigfm_sample_serialize (b, &b_data, &b_size);
++          equal = a_result == GOODIX_SIGFM_OK &&
++                  b_result == GOODIX_SIGFM_OK &&
++                  a_size == b_size &&
++                  memcmp (a_data, b_data, a_size) == 0;
++          goodix_sigfm_serialized_free (a_data, a_size);
++          goodix_sigfm_serialized_free (b_data, b_size);
++          if (!equal)
++            return FALSE;
++        }
++      return TRUE;
++#else
++      return FALSE;
++#endif
++
+     case FPI_PRINT_UNDEFINED:
+       g_assert_not_reached ();
+     }
+@@ -682,7 +720,7 @@ fp_print_serialize (FpPrint *print,
+   g_variant_builder_open (&builder, G_VARIANT_TYPE_VARDICT);
+   g_variant_builder_close (&builder);
+ 
+-  /* Insert NBIS print data for type NBIS, otherwise the GVariant directly */
++  /* Insert matcher-specific print data, otherwise the GVariant directly. */
+   if (print->type == FPI_PRINT_NBIS)
+     {
+       GVariantBuilder nested = G_VARIANT_BUILDER_INIT (G_VARIANT_TYPE ("(a(aiaiai))"));
+@@ -716,6 +754,63 @@ fp_print_serialize (FpPrint *print,
+       g_variant_builder_close (&nested);
+       g_variant_builder_add (&builder, "v", g_variant_builder_end (&nested));
+     }
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  else if (print->type == FPI_PRINT_SIGFM)
++    {
++      GVariantBuilder nested =
++        G_VARIANT_BUILDER_INIT (G_VARIANT_TYPE ("(a(ay))"));
++
++      if (!print->prints || print->prints->len == 0 ||
++          print->prints->len > GOODIX_SIGFM_MAX_PRINT_SAMPLES)
++        {
++          g_variant_builder_clear (&builder);
++          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                               "SIGFM print has an invalid sample count");
++          return FALSE;
++        }
++
++      g_variant_builder_open (&nested, G_VARIANT_TYPE ("a(ay)"));
++      for (guint i = 0; i < print->prints->len; i++)
++        {
++          GoodixSigfmSample *sample = g_ptr_array_index (print->prints, i);
++          guint8 *serialized = NULL;
++          gsize serialized_size = 0;
++          GoodixSigfmResult sigfm_result;
++
++          sigfm_result = goodix_sigfm_sample_serialize (
++            sample, &serialized, &serialized_size);
++          if (sigfm_result != GOODIX_SIGFM_OK ||
++              serialized_size > GOODIX_SIGFM_MAX_SERIALIZED_SIZE)
++            {
++              goodix_sigfm_serialized_free (serialized, serialized_size);
++              g_variant_builder_clear (&nested);
++              g_variant_builder_clear (&builder);
++              g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "Could not serialize SIGFM sample (result %d)",
++                           sigfm_result);
++              return FALSE;
++            }
++
++          g_variant_builder_open (&nested, G_VARIANT_TYPE ("(ay)"));
++          g_variant_builder_add_value (
++            &nested,
++            g_variant_new_fixed_array (G_VARIANT_TYPE_BYTE,
++                                       serialized, serialized_size, 1));
++          g_variant_builder_close (&nested);
++          goodix_sigfm_serialized_free (serialized, serialized_size);
++        }
++      g_variant_builder_close (&nested);
++      g_variant_builder_add (&builder, "v", g_variant_builder_end (&nested));
++    }
++#else
++  else if (print->type == FPI_PRINT_SIGFM)
++    {
++      g_variant_builder_clear (&builder);
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
++                           "SIGFM support is not enabled in this build");
++      return FALSE;
++    }
++#endif
+   else
+     {
+       g_variant_builder_add (&builder, "v", g_variant_new_variant (print->data));
+@@ -778,8 +873,8 @@ fp_print_deserialize (const guchar *data,
+   const gchar *device_id;
+   gboolean device_stored;
+ 
+-  g_assert (data);
+-  g_assert (length > 3);
++  if (!data || length <= 3)
++    goto invalid_format;
+ 
+   if (memcmp (data, "FP3", 3) != 0)
+     goto invalid_format;
+@@ -872,6 +967,65 @@ fp_print_deserialize (const guchar *data,
+       }
+       break;
+ 
++    case FPI_PRINT_SIGFM:
++#ifdef GOODIX_LIBFPRINT_SIGFM
++      {
++        g_autoptr(GVariant) prints = NULL;
++        guint sample_count;
++
++        if (!g_variant_is_of_type (print_data,
++                                   G_VARIANT_TYPE ("(a(ay))")))
++          goto invalid_format;
++        prints = g_variant_get_child_value (print_data, 0);
++        sample_count = g_variant_n_children (prints);
++        if (sample_count == 0 ||
++            sample_count > GOODIX_SIGFM_MAX_PRINT_SAMPLES)
++          goto invalid_format;
++
++        result = g_object_new (FP_TYPE_PRINT,
++                               "driver", driver,
++                               "device-id", device_id,
++                               "device-stored", device_stored,
++                               NULL);
++        g_object_ref_sink (result);
++        fpi_print_set_type (result, FPI_PRINT_SIGFM);
++        for (guint i = 0; i < sample_count; i++)
++          {
++            g_autoptr(GVariant) sample_tuple = NULL;
++            g_autoptr(GVariant) sample_bytes = NULL;
++            const guint8 *serialized;
++            gsize serialized_size;
++            GoodixSigfmSample *sample = NULL;
++            GoodixSigfmResult sigfm_result;
++            gint keypoints = 0;
++
++            sample_tuple = g_variant_get_child_value (prints, i);
++            if (!g_variant_is_of_type (sample_tuple,
++                                       G_VARIANT_TYPE ("(ay)")))
++              goto invalid_format;
++            sample_bytes = g_variant_get_child_value (sample_tuple, 0);
++            serialized = g_variant_get_fixed_array (sample_bytes,
++                                                     &serialized_size, 1);
++            if (!serialized ||
++                serialized_size > GOODIX_SIGFM_MAX_SERIALIZED_SIZE)
++              goto invalid_format;
++
++            sigfm_result = goodix_sigfm_sample_deserialize (
++              serialized, serialized_size, &sample, &keypoints);
++            if (sigfm_result != GOODIX_SIGFM_OK || !sample ||
++                keypoints < GOODIX_SIGFM_MIN_KEYPOINTS)
++              {
++                goodix_sigfm_sample_free (sample);
++                goto invalid_format;
++              }
++            g_ptr_array_add (result->prints, sample);
++          }
++      }
++      break;
++#else
++      goto invalid_format;
++#endif
++
+     case FPI_PRINT_RAW:
+       {
+         g_autoptr(GVariant) fp_data = g_variant_get_child_value (print_data, 0);
+@@ -894,6 +1048,10 @@ fp_print_deserialize (const guchar *data,
+ 
+         goto invalid_format;
+       }
++
++    default:
++      g_warning ("Invalid print type: 0x%X", type);
++      goto invalid_format;
+     }
+ 
+   date = g_date_new_julian (julian_date);
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-device.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-device.c
+index 9500b3acb2c498c1f3ac41494833000d01d038c7..9f90d8c512546dda0d5c9677b49184bcadb163fa 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-device.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-device.c
+@@ -24,10 +24,13 @@
+ #include <errno.h>
+ #include <gmodule.h>
+ 
++#include "config.h"
+ #include "fpi-log.h"
+ 
+ #include "fp-device-private.h"
++#if !GOODIX_PRODUCTION_MINIMAL
+ #include "tests/fpi-test-emulation.h"
++#endif
+ 
+ /**
+  * SECTION: fpi-device
+@@ -91,6 +94,10 @@ error_to_string (GError * error)
+ gboolean
+   (fpi_device_emulation_mode_enabled) (FpDevice *device)
+ {
++#if GOODIX_PRODUCTION_MINIMAL
++  (void) device;
++  return FALSE;
++#else
+   static gboolean (*real_fn)(FpDevice *) = NULL;
+   static gsize emulation_mode = 0;
+ 
+@@ -129,6 +136,7 @@ gboolean
+     return real_fn (device);
+ 
+   return FALSE;
++#endif
+ }
+ 
+ /**
+@@ -2171,6 +2179,9 @@ fpi_device_verify_report (FpDevice      *device,
+ 
+           if (print &&
+               fpi_print_get_type (print) != FPI_PRINT_NBIS &&
++#ifdef GOODIX_LIBFPRINT_SIGFM
++              fpi_print_get_type (print) != FPI_PRINT_SIGFM &&
++#endif
+               !fp_print_equal (print, data->match))
+             {
+               g_warning ("Driver reported a match providing a scanned print that is not matching it.");
+@@ -2271,6 +2282,9 @@ fpi_device_identify_report (FpDevice *device,
+   else
+     {
+       if (match && print && fpi_print_get_type (print) != FPI_PRINT_NBIS &&
++#ifdef GOODIX_LIBFPRINT_SIGFM
++          fpi_print_get_type (print) != FPI_PRINT_SIGFM &&
++#endif
+           !g_ptr_array_find_with_equal_func (data->gallery, print,
+                                              (GEqualFunc) fp_print_equal, NULL))
+         {
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c
+index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..f847f009fbe472b78325c7999c995f2d289f5fc1 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c
+@@ -22,6 +22,7 @@
+ 
+ #include "fp-image-device-private.h"
+ #include "fp-image-device.h"
++#include "fpi-image.h"
+ 
+ /**
+  * SECTION: fpi-image-device
+@@ -66,6 +67,10 @@ fpi_image_device_deactivate (FpImageDevice *self, gboolean cancelling)
+   FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
+   FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (device);
+ 
++  if (cancelling)
++    priv->enroll_completion_held = FALSE;
++  priv->enroll_terminal_sample_committed = FALSE;
++
+   if (!priv->active || priv->state == FPI_IMAGE_DEVICE_STATE_DEACTIVATING)
+     {
+       /* XXX: We currently deactivate both from minutiae scan result
+@@ -172,7 +177,8 @@ fp_image_device_enroll_maybe_await_finger_on (FpImageDevice *self)
+ 
+   /* We wait for both the minutiae scan to complete and the finger to
+    * be removed before we switch to AWAIT_FINGER_ON. */
+-  if (priv->minutiae_scan_active || priv->finger_present)
++  if (priv->minutiae_scan_active || priv->finger_present ||
++      priv->enroll_completion_held)
+     return;
+ 
+   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_ON);
+@@ -224,6 +230,10 @@ fp_image_device_maybe_complete_action (FpImageDevice *self, GError *error)
+ 
+       fpi_device_enroll_complete (device, g_object_ref (enroll_print), NULL);
+     }
++  else if (action == FPI_DEVICE_ACTION_VERIFY)
++    {
++      fpi_device_verify_complete (device, NULL);
++    }
+   else if (action == FPI_DEVICE_ACTION_IDENTIFY)
+     {
+       fpi_device_identify_complete (device, NULL);
+@@ -246,6 +256,7 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+   GError *error = NULL;
+   FpImageDevice *self = FP_IMAGE_DEVICE (user_data);
+   FpDevice *device = FP_DEVICE (self);
++  FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (self);
+   FpImageDevicePrivate *priv;
+   FpiDeviceAction action;
+ 
+@@ -253,7 +264,17 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+   priv = fp_image_device_get_instance_private (FP_IMAGE_DEVICE (device));
+   priv->minutiae_scan_active = FALSE;
+ 
+-  if (!fp_image_detect_minutiae_finish (image, res, &error))
++  if (
++#ifdef GOODIX_LIBFPRINT_SIGFM
++      (priv->algorithm == FPI_PRINT_SIGFM &&
++       !fp_image_detect_sigfm_finish (image, res, &error)) ||
++      (priv->algorithm != FPI_PRINT_SIGFM &&
++#endif
++       !fp_image_detect_minutiae_finish (image, res, &error)
++#ifdef GOODIX_LIBFPRINT_SIGFM
++      )
++#endif
++      )
+     {
+       /* Cancel operation . */
+       if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+@@ -282,7 +303,7 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+   if (!error)
+     {
+       print = fp_print_new (device);
+-      fpi_print_set_type (print, FPI_PRINT_NBIS);
++      fpi_print_set_type (print, priv->algorithm);
+       if (!fpi_print_add_from_image (print, image, &error))
+         {
+           g_clear_object (&print);
+@@ -297,6 +318,23 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+         }
+     }
+ 
++  /* Some sensor protocols consume a bounded enrollment acquisition before
++   * host-side extraction runs.  Their production class may opt into a
++   * terminal policy so an extraction/template failure cannot silently ask
++   * the user for an additional, protocol-incompatible contact. */
++  if (action == FPI_DEVICE_ACTION_ENROLL &&
++      cls->enroll_processing_fail_closed && error != NULL)
++    {
++      g_clear_object (&print);
++      g_clear_error (&error);
++      error = fpi_device_error_new_msg (
++        FP_DEVICE_ERROR_DATA_INVALID,
++        "Enrollment sample processing failed after sensor acquisition");
++      fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
++      fpi_image_device_deactivate (self, TRUE);
++      return;
++    }
++
+   if (action == FPI_DEVICE_ACTION_ENROLL)
+     {
+       FpPrint *enroll_print;
+@@ -304,8 +342,30 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+ 
+       if (print)
+         {
+-          fpi_print_add_print (enroll_print, print);
+-          priv->enroll_stage += 1;
++          if (!fpi_image_device_add_enroll_sample_checked (
++                enroll_print, print, &priv->enroll_stage, &error))
++            {
++              g_clear_object (&print);
++              fp_image_device_maybe_complete_action (
++                self, g_steal_pointer (&error));
++              fpi_image_device_deactivate (self, TRUE);
++              return;
++            }
++        }
++
++      /* A retryable extraction failure cannot be retried after a driver marks
++       * the sensor-side final acquisition. Abort instead of leaving the action
++       * pending or advancing enrollment without a template sample. */
++      if (priv->enroll_terminal_sample_committed && !print)
++        {
++          g_clear_error (&error);
++          error = fpi_device_error_new_msg (
++            FP_DEVICE_ERROR_DATA_INVALID,
++            "Final enrollment sample processing failed after terminal acquisition");
++          fp_image_device_maybe_complete_action (
++            self, g_steal_pointer (&error));
++          fpi_image_device_deactivate (self, TRUE);
++          return;
+         }
+ 
+       fpi_device_enroll_progress (device, priv->enroll_stage,
+@@ -314,14 +374,41 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+       /* Start another scan or deactivate. */
+       if (priv->enroll_stage == fp_device_get_nr_enroll_stages (device))
+         {
+-          fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
+-          fpi_image_device_deactivate (self, FALSE);
++          if (!priv->enroll_completion_held)
++            {
++              fp_image_device_maybe_complete_action (
++                self, g_steal_pointer (&error));
++              fpi_image_device_deactivate (self, FALSE);
++            }
+         }
+       else
+         {
+           fp_image_device_enroll_maybe_await_finger_on (FP_IMAGE_DEVICE (device));
+         }
+     }
++  else if (action == FPI_DEVICE_ACTION_VERIFY)
++    {
++      FpPrint *template;
++      FpiMatchResult result = FPI_MATCH_ERROR;
++
++      fpi_device_get_verify_data (device, &template);
++      if (print)
++        {
++#ifdef GOODIX_LIBFPRINT_SIGFM
++          if (priv->algorithm == FPI_PRINT_SIGFM)
++            result = fpi_print_sigfm_match (
++              template, print, priv->bz3_threshold, &error);
++          else
++#endif
++            result = fpi_print_bz3_match (
++              template, print, priv->bz3_threshold, &error);
++        }
++
++      if (!error || error->domain == FP_DEVICE_RETRY)
++        fpi_device_verify_report (device, result, g_steal_pointer (&print), g_steal_pointer (&error));
++
++      fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
++    }
+   else if (action == FPI_DEVICE_ACTION_IDENTIFY)
+     {
+       gint i;
+@@ -333,7 +420,17 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+         {
+           FpPrint *template = g_ptr_array_index (templates, i);
+ 
+-          if (fpi_print_bz3_match (template, print, priv->bz3_threshold, &error) == FPI_MATCH_SUCCESS)
++          FpiMatchResult match_result;
++
++#ifdef GOODIX_LIBFPRINT_SIGFM
++          if (priv->algorithm == FPI_PRINT_SIGFM)
++            match_result = fpi_print_sigfm_match (
++              template, print, priv->bz3_threshold, &error);
++          else
++#endif
++            match_result = fpi_print_bz3_match (
++              template, print, priv->bz3_threshold, &error);
++          if (match_result == FPI_MATCH_SUCCESS)
+             {
+               result = template;
+               break;
+@@ -476,6 +573,7 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
+   g_return_if_fail (image != NULL);
+   g_return_if_fail (priv->state == FPI_IMAGE_DEVICE_STATE_CAPTURE);
+   g_return_if_fail (action == FPI_DEVICE_ACTION_ENROLL ||
++                    action == FPI_DEVICE_ACTION_VERIFY ||
+                     action == FPI_DEVICE_ACTION_IDENTIFY ||
+                     action == FPI_DEVICE_ACTION_CAPTURE);
+ 
+@@ -483,17 +581,77 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
+ 
+   priv->minutiae_scan_active = TRUE;
+ 
+-  /* XXX: We also detect minutiae in capture mode, we solely do this
+-   *      to normalize the image which will happen as a by-product. */
+-  fp_image_detect_minutiae (image,
+-                            fpi_device_get_cancellable (FP_DEVICE (self)),
+-                            fpi_image_device_minutiae_detected,
+-                            self);
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  if (priv->algorithm == FPI_PRINT_SIGFM)
++    fp_image_detect_sigfm (image,
++                           fpi_device_get_cancellable (FP_DEVICE (self)),
++                           fpi_image_device_minutiae_detected, self);
++  else
++#endif
++    {
++      /* Capture mode also uses NBIS normalization as a by-product. */
++      fp_image_detect_minutiae (image,
++                                fpi_device_get_cancellable (FP_DEVICE (self)),
++                                fpi_image_device_minutiae_detected, self);
++    }
+ 
+   /* XXX: This is wrong if we add support for raw capture mode. */
+   fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+ }
+ 
++/**
++ * fpi_image_device_hold_enroll_completion:
++ * @self: a #FpImageDevice imaging fingerprint device
++ *
++ * Marks the next image as the final sensor-side acquisition and holds only a
++ * successful enrollment completion. Fatal processing errors and cancellation
++ * remain fail-closed. The driver must pair this with
++ * fpi_image_device_release_enroll_completion().
++ */
++void
++fpi_image_device_hold_enroll_completion (FpImageDevice *self)
++{
++  FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
++
++  g_return_if_fail (FP_IS_IMAGE_DEVICE (self));
++  g_return_if_fail (fpi_device_get_current_action (FP_DEVICE (self)) ==
++                    FPI_DEVICE_ACTION_ENROLL);
++  g_return_if_fail (priv->active);
++  g_return_if_fail (!priv->enroll_completion_held);
++
++  priv->enroll_completion_held = TRUE;
++  priv->enroll_terminal_sample_committed = TRUE;
++}
++
++/**
++ * fpi_image_device_release_enroll_completion:
++ * @self: a #FpImageDevice imaging fingerprint device
++ *
++ * Releases a driver-owned final enrollment hold. If biometric processing has
++ * already completed, deactivation starts now; otherwise its completion will
++ * observe the cleared hold and perform the normal terminal path.
++ */
++void
++fpi_image_device_release_enroll_completion (FpImageDevice *self)
++{
++  FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
++
++  g_return_if_fail (FP_IS_IMAGE_DEVICE (self));
++  g_return_if_fail (fpi_device_get_current_action (FP_DEVICE (self)) ==
++                    FPI_DEVICE_ACTION_ENROLL);
++  g_return_if_fail (priv->enroll_completion_held);
++  g_return_if_fail (priv->enroll_terminal_sample_committed);
++
++  priv->enroll_completion_held = FALSE;
++  if (priv->active &&
++      !priv->minutiae_scan_active &&
++      priv->enroll_stage == fp_device_get_nr_enroll_stages (FP_DEVICE (self)))
++    {
++      fp_image_device_maybe_complete_action (self, NULL);
++      fpi_image_device_deactivate (self, FALSE);
++    }
++}
++
+ /**
+  * fpi_image_device_retry_scan:
+  * @self: a #FpImageDevice imaging fingerprint device
+@@ -516,6 +674,7 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
+    * all but INACTIVE */
+   g_return_if_fail (priv->state != FPI_IMAGE_DEVICE_STATE_INACTIVE);
+   g_return_if_fail (action == FPI_DEVICE_ACTION_ENROLL ||
++                    action == FPI_DEVICE_ACTION_VERIFY ||
+                     action == FPI_DEVICE_ACTION_IDENTIFY ||
+                     action == FPI_DEVICE_ACTION_CAPTURE);
+ 
+@@ -528,6 +687,12 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
+ 
+       fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
+     }
++  else if (action == FPI_DEVICE_ACTION_VERIFY)
++    {
++      fpi_device_verify_report (FP_DEVICE (self), FPI_MATCH_ERROR, NULL, error);
++      fp_image_device_maybe_complete_action (self, NULL);
++      fpi_image_device_deactivate (self, TRUE);
++    }
+   else if (action == FPI_DEVICE_ACTION_IDENTIFY)
+     {
+       fpi_device_identify_report (FP_DEVICE (self), NULL, NULL, error);
+@@ -620,6 +785,7 @@ fpi_image_device_activate_complete (FpImageDevice *self, GError *error)
+   g_return_if_fail (priv->active == FALSE);
+   g_return_if_fail (priv->state == FPI_IMAGE_DEVICE_STATE_ACTIVATING);
+   g_return_if_fail (action == FPI_DEVICE_ACTION_ENROLL ||
++                    action == FPI_DEVICE_ACTION_VERIFY ||
+                     action == FPI_DEVICE_ACTION_IDENTIFY ||
+                     action == FPI_DEVICE_ACTION_CAPTURE);
+ 
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h
+index 71472dbb73c3985993a2a489985177fa6399758f..66c1fc49c8c6eeb336a246fe49b5e115136d5a5a 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h
+@@ -20,8 +20,14 @@
+ #pragma once
+ 
+ #include "fpi-device.h"
++#include "fpi-print.h"
+ #include "fp-image-device.h"
+ 
++typedef enum {
++  FPI_DEVICE_ALGO_NBIS = FPI_PRINT_NBIS,
++  FPI_DEVICE_ALGO_SIGFM = FPI_PRINT_SIGFM,
++} FpiImageDeviceAlgorithm;
++
+ /**
+  * FpiImageDeviceState:
+  * @FPI_IMAGE_DEVICE_STATE_INACTIVE: inactive
+@@ -75,6 +81,8 @@ typedef enum {
+  * @bz3_threshold: Threshold to consider bozorth3 score a match, default: 40
+  * @img_width: Width of the image, only provide if constant
+  * @img_height: Height of the image, only provide if constant
++ * @enroll_processing_fail_closed: Whether an enrollment image-processing
++ *   failure after capture is terminal instead of retryable
+  * @img_open: Open the device and do basic initialization
+  *   (use this instead of the #FpDeviceClass open vfunc)
+  * @img_close: Close the device
+@@ -105,8 +113,10 @@ struct _FpImageDeviceClass
+   FpDeviceClass parent_class;
+ 
+   gint          bz3_threshold;
++  FpiImageDeviceAlgorithm algorithm;
+   gint          img_width;
+   gint          img_height;
++  gboolean      enroll_processing_fail_closed;
+ 
+   void          (*img_open)     (FpImageDevice *dev);
+   void          (*img_close)    (FpImageDevice *dev);
+@@ -116,6 +126,19 @@ struct _FpImageDeviceClass
+   void          (*deactivate)   (FpImageDevice *dev);
+ };
+ 
++static inline gboolean
++fpi_image_device_add_enroll_sample_checked (FpPrint  *enroll_print,
++                                            FpPrint  *sample_print,
++                                            gint     *enroll_stage,
++                                            GError  **error)
++{
++  g_return_val_if_fail (enroll_stage != NULL, FALSE);
++  if (!fpi_print_add_print_checked (enroll_print, sample_print, error))
++    return FALSE;
++  *enroll_stage += 1;
++  return TRUE;
++}
++
+ void fpi_image_device_set_bz3_threshold (FpImageDevice *self,
+                                          gint           bz3_threshold);
+ 
+@@ -135,5 +158,7 @@ void fpi_image_device_report_finger_status (FpImageDevice *self,
+                                             gboolean       present);
+ void fpi_image_device_image_captured (FpImageDevice *self,
+                                       FpImage       *image);
++void fpi_image_device_hold_enroll_completion (FpImageDevice *self);
++void fpi_image_device_release_enroll_completion (FpImageDevice *self);
+ void fpi_image_device_retry_scan (FpImageDevice *self,
+                                   FpDeviceRetry  retry);
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.c
+index 98f412a35db7f499e8a2c8cf19f4ff9f11251186..063fcb4af4da68adeb9363740c6811e8101e1e66 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.c
+@@ -152,3 +152,12 @@ fpi_image_resize (FpImage *orig_img,
+   return g_object_ref (orig_img);
+ #endif
+ }
++
++#ifdef GOODIX_LIBFPRINT_SIGFM
++GoodixSigfmSample *
++fpi_image_get_sigfm_sample (FpImage *self)
++{
++  g_return_val_if_fail (FP_IS_IMAGE (self), NULL);
++  return self->sigfm_sample;
++}
++#endif
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.h b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.h
+index fdc376c84b1233dfc9ddb80c567c2eed90a4a5bb..7bdbf3f105545be038f4bd7929e5a2be123d5e20 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.h
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image.h
+@@ -21,6 +21,9 @@
+ #pragma once
+ 
+ #include "fp-image.h"
++#ifdef GOODIX_LIBFPRINT_SIGFM
++#include "goodix_sigfm_metrics.h"
++#endif
+ 
+ /**
+  * FpiImageFlags:
+@@ -70,6 +73,10 @@ struct _FpImage
+ 
+   GPtrArray *minutiae;
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  GoodixSigfmSample *sigfm_sample;
++#endif
++
+   gboolean   detection_in_progress;
+ };
+ 
+@@ -82,3 +89,14 @@ gint fpi_mean_sq_diff_norm (const guint8 *buf1,
+ FpImage *fpi_image_resize (FpImage *orig,
+                            guint    w_factor,
+                            guint    h_factor);
++
++#ifdef GOODIX_LIBFPRINT_SIGFM
++void fp_image_detect_sigfm (FpImage            *self,
++                            GCancellable       *cancellable,
++                            GAsyncReadyCallback callback,
++                            gpointer            user_data);
++gboolean fp_image_detect_sigfm_finish (FpImage      *self,
++                                       GAsyncResult *result,
++                                       GError      **error);
++GoodixSigfmSample *fpi_image_get_sigfm_sample (FpImage *self);
++#endif
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.c
+index 6c5e20dbb1d06fbfa3904cf009398253e9c2cf7c..a80a77b7e4c750c0d6b44c57ab49c2919431b4e5 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.c
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.c
+@@ -25,6 +25,10 @@
+ #include "fpi-device.h"
+ #include "fpi-compat.h"
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++#include "goodix_sigfm_metrics.h"
++#endif
++
+ /**
+  * SECTION: fpi-print
+  * @title: Internal FpPrint
+@@ -39,18 +43,88 @@
+  * @print: A #FpPrint
+  * @add: Print to append to @print
+  *
+- * Appends the single #FPI_PRINT_NBIS print from @add to the collection of
+- * prints in @print. Both print objects need to be of type #FPI_PRINT_NBIS
+- * for this to work.
++ * Appends the single NBIS or SIGFM sample from @add to the collection in
++ * @print. Both print objects must have the same supported type.
+  */
+ void
+ fpi_print_add_print (FpPrint *print, FpPrint *add)
+ {
+-  g_return_if_fail (print->type == FPI_PRINT_NBIS);
+-  g_return_if_fail (add->type == FPI_PRINT_NBIS);
++  g_autoptr(GError) error = NULL;
+ 
+-  g_assert (add->prints->len == 1);
+-  g_ptr_array_add (print->prints, g_memdup2 (add->prints->pdata[0], sizeof (struct xyt_struct)));
++  if (!fpi_print_add_print_checked (print, add, &error))
++    fp_warn ("Could not append print sample: %s",
++             error != NULL ? error->message : "invalid print sample");
++}
++
++/**
++ * fpi_print_add_print_checked:
++ * @print: A template #FpPrint
++ * @add: A single-sample #FpPrint to append
++ * @error: Return location for an error
++ *
++ * Checked and atomic variant of fpi_print_add_print(). The destination is
++ * changed only after the sample has been copied successfully.
++ *
++ * Returns: %TRUE if one sample was appended
++ */
++gboolean
++fpi_print_add_print_checked (FpPrint  *print,
++                             FpPrint  *add,
++                             GError  **error)
++{
++  gpointer copy = NULL;
++
++  if (!FP_IS_PRINT (print) || !FP_IS_PRINT (add) ||
++      !(print->type == FPI_PRINT_NBIS ||
++#ifdef GOODIX_LIBFPRINT_SIGFM
++        print->type == FPI_PRINT_SIGFM
++#else
++        FALSE
++#endif
++        ) || add->type != print->type || print->prints == NULL ||
++      add->prints == NULL || add->prints->len != 1 ||
++      add->prints->pdata[0] == NULL)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
++                           "Print append requires matching supported types and exactly one source sample");
++      return FALSE;
++    }
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  if (print->type == FPI_PRINT_SIGFM &&
++      print->prints->len >= GOODIX_SIGFM_MAX_PRINT_SAMPLES)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
++                           "SIGFM template already has the maximum sample count");
++      return FALSE;
++    }
++#endif
++  if (print->type == FPI_PRINT_NBIS)
++    copy = g_memdup2 (add->prints->pdata[0], sizeof (struct xyt_struct));
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  else
++    {
++      GoodixSigfmSample *sigfm_copy = NULL;
++      GoodixSigfmResult result;
++
++      result = goodix_sigfm_sample_copy (add->prints->pdata[0], &sigfm_copy);
++      if (result != GOODIX_SIGFM_OK)
++        {
++          g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
++                       "Could not copy SIGFM print sample: %d", result);
++          return FALSE;
++        }
++      copy = sigfm_copy;
++    }
++#endif
++
++  if (copy == NULL)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
++                           "Could not allocate print sample copy");
++      return FALSE;
++    }
++  g_ptr_array_add (print->prints, copy);
++  return TRUE;
+ }
+ 
+ /**
+@@ -70,11 +144,27 @@ fpi_print_set_type (FpPrint     *print,
+   /* We only allow setting this once! */
+   g_return_if_fail (print->type == FPI_PRINT_UNDEFINED);
+ 
++  if (type == FPI_PRINT_SIGFM)
++    {
++#ifndef GOODIX_LIBFPRINT_SIGFM
++      g_return_if_reached ();
++#endif
++    }
++
+   print->type = type;
+-  if (print->type == FPI_PRINT_NBIS)
++  if (print->type == FPI_PRINT_NBIS
++#ifdef GOODIX_LIBFPRINT_SIGFM
++      || print->type == FPI_PRINT_SIGFM
++#endif
++      )
+     {
+       g_assert_null (print->prints);
+-      print->prints = g_ptr_array_new_with_free_func (g_free);
++      print->prints = g_ptr_array_new_with_free_func (
++#ifdef GOODIX_LIBFPRINT_SIGFM
++        print->type == FPI_PRINT_SIGFM ?
++        (GDestroyNotify) goodix_sigfm_sample_free :
++#endif
++        g_free);
+     }
+   g_object_notify (G_OBJECT (print), "fpi-type");
+ }
+@@ -176,7 +266,7 @@ fpi_print_add_from_image (FpPrint *print,
+   struct fp_minutiae _minutiae;
+   struct xyt_struct *xyt;
+ 
+-  if (print->type != FPI_PRINT_NBIS || !image)
++  if (!image)
+     {
+       g_set_error (error,
+                    G_IO_ERROR,
+@@ -185,6 +275,32 @@ fpi_print_add_from_image (FpPrint *print,
+       return FALSE;
+     }
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++  if (print->type == FPI_PRINT_SIGFM)
++    {
++      GoodixSigfmSample *sample = fpi_image_get_sigfm_sample (image);
++
++      if (sample == NULL)
++        {
++          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                               "No SIGFM sample found in image or not yet extracted");
++          return FALSE;
++        }
++      if (!fpi_print_add_sigfm_sample (print, sample, error))
++        return FALSE;
++      g_clear_object (&print->image);
++      print->image = g_object_ref (image);
++      g_object_notify (G_OBJECT (print), "image");
++      return TRUE;
++    }
++#endif
++  if (print->type != FPI_PRINT_NBIS)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "Cannot add print data from image");
++      return FALSE;
++    }
++
+   minutiae = fp_image_get_minutiae (image);
+   if (!minutiae || minutiae->len == 0)
+     {
+@@ -268,6 +384,122 @@ fpi_print_bz3_match (FpPrint *print_template,
+   return FPI_MATCH_FAIL;
+ }
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++/**
++ * fpi_print_add_sigfm_sample:
++ * @print: A #FPI_PRINT_SIGFM print
++ * @sample: A validated SIGFM sample
++ * @error: Return location for error
++ *
++ * Copies @sample into @print. The caller retains ownership of @sample.
++ *
++ * Returns: %TRUE on success
++ */
++gboolean
++fpi_print_add_sigfm_sample (FpPrint                 *print,
++                            const GoodixSigfmSample *sample,
++                            GError                 **error)
++{
++  GoodixSigfmSample *copy = NULL;
++  GoodixSigfmResult result;
++
++  if (!FP_IS_PRINT (print) || print->type != FPI_PRINT_SIGFM || !sample ||
++      print->prints == NULL)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
++                           "Cannot add a SIGFM sample to this print");
++      return FALSE;
++    }
++  if (print->prints->len >= GOODIX_SIGFM_MAX_PRINT_SAMPLES)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NO_SPACE,
++                           "SIGFM template already has the maximum sample count");
++      return FALSE;
++    }
++
++  result = goodix_sigfm_sample_copy (sample, &copy);
++  if (result != GOODIX_SIGFM_OK)
++    {
++      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
++                   "Could not copy SIGFM sample (result %d)", result);
++      return FALSE;
++    }
++
++  g_ptr_array_add (print->prints, copy);
++  return TRUE;
++}
++
++/**
++ * fpi_print_sigfm_match:
++ * @print_template: A SIGFM print containing one or more enrollment samples
++ * @print: A SIGFM print containing exactly one probe sample
++ * @score_threshold: The SIGFM score threshold
++ * @error: Return location for error
++ *
++ * Returns: Whether any enrollment sample matches, or #FPI_MATCH_ERROR
++ */
++FpiMatchResult
++fpi_print_sigfm_match (FpPrint *print_template,
++                       FpPrint *print,
++                       gint     score_threshold,
++                       GError **error)
++{
++  GoodixSigfmSample *probe;
++
++  if (!FP_IS_PRINT (print_template) || !FP_IS_PRINT (print) ||
++      print_template->type != FPI_PRINT_SIGFM ||
++      print->type != FPI_PRINT_SIGFM)
++    {
++      g_set_error_literal (error, FP_DEVICE_ERROR,
++                           FP_DEVICE_ERROR_NOT_SUPPORTED,
++                           "SIGFM matching requires two SIGFM prints");
++      return FPI_MATCH_ERROR;
++    }
++  if (!print_template->prints || print_template->prints->len == 0 ||
++      print_template->prints->len > GOODIX_SIGFM_MAX_PRINT_SAMPLES ||
++      !print->prints || print->prints->len != 1 || score_threshold <= 0)
++    {
++      g_set_error_literal (error, FP_DEVICE_ERROR,
++                           FP_DEVICE_ERROR_DATA_INVALID,
++                           "Invalid SIGFM template, probe, or threshold");
++      return FPI_MATCH_ERROR;
++    }
++
++  probe = g_ptr_array_index (print->prints, 0);
++  g_message ("GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=%u threshold=%d",
++             print_template->prints->len, score_threshold);
++  for (guint i = 0; i < print_template->prints->len; i++)
++    {
++      GoodixSigfmSample *enrolled =
++        g_ptr_array_index (print_template->prints, i);
++      GoodixSigfmResult result;
++      gint score = 0;
++
++      result = goodix_sigfm_match_ephemeral (probe, enrolled, &score);
++      if (result != GOODIX_SIGFM_OK)
++        {
++          g_message ("GOODIX_SIGFM_MATCH_AUDIT event=error sample=%u result=%d",
++                     i + 1, result);
++          g_set_error (error, FP_DEVICE_ERROR, FP_DEVICE_ERROR_DATA_INVALID,
++                       "SIGFM matcher failed (result %d)", result);
++          return FPI_MATCH_ERROR;
++        }
++      g_message ("GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=%u score=%d threshold=%d",
++                 i + 1, score, score_threshold);
++      if (score >= score_threshold)
++        {
++          g_message ("GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=%u comparisons=%u threshold=%d",
++                     i + 1, i + 1, score_threshold);
++          return FPI_MATCH_SUCCESS;
++        }
++    }
++
++  g_message ("GOODIX_SIGFM_MATCH_AUDIT event=outcome result=no_match matched_sample=0 comparisons=%u threshold=%d",
++             print_template->prints->len, score_threshold);
++  return FPI_MATCH_FAIL;
++}
++#endif
++
+ /**
+  * fpi_print_generate_user_id:
+  * @print: #FpPrint to generate the ID for
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.h b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.h
+index 773407d836ec556f2a11134883188cd94698ed01..92560af48ef609f541f66a73dda3fb55559a5d08 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.h
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-print.h
+@@ -1,5 +1,7 @@
+ #pragma once
+ 
++#define GOODIX_SIGFM_MAX_PRINT_SAMPLES 21u
++
+ #include "fpi-enums.h"
+ #include "fp-device.h"
+ #include "fp-print.h"
+@@ -11,11 +13,13 @@ G_BEGIN_DECLS
+  * @FPI_PRINT_UNDEFINED: Undefined type, this happens prior to enrollment
+  * @FPI_PRINT_RAW: A raw print where the data is directly compared
+  * @FPI_PRINT_NBIS: NBIS minutiae comparison
++ * @FPI_PRINT_SIGFM: SIGFM feature comparison
+  */
+ typedef enum {
+   FPI_PRINT_UNDEFINED = 0,
+   FPI_PRINT_RAW,
+   FPI_PRINT_NBIS,
++  FPI_PRINT_SIGFM,
+ } FpiPrintType;
+ 
+ /**
+@@ -32,6 +36,9 @@ typedef enum {
+ 
+ void     fpi_print_add_print (FpPrint *print,
+                               FpPrint *add);
++gboolean fpi_print_add_print_checked (FpPrint  *print,
++                                      FpPrint  *add,
++                                      GError  **error);
+ 
+ void     fpi_print_set_type (FpPrint     *print,
+                              FpiPrintType type);
+@@ -50,6 +57,19 @@ FpiMatchResult fpi_print_bz3_match (FpPrint *print_template,
+                                     gint     bz3_threshold,
+                                     GError **error);
+ 
++#ifdef GOODIX_LIBFPRINT_SIGFM
++typedef struct GoodixSigfmSample GoodixSigfmSample;
++
++gboolean fpi_print_add_sigfm_sample (FpPrint                 *print,
++                                     const GoodixSigfmSample *sample,
++                                     GError                 **error);
++
++FpiMatchResult fpi_print_sigfm_match (FpPrint *print_template,
++                                      FpPrint *print,
++                                      gint     score_threshold,
++                                      GError **error);
++#endif
++
+ /* Helpers to encode metadata into user ID strings. */
+ gchar *  fpi_print_generate_user_id (FpPrint *print);
+ gboolean fpi_print_fill_from_user_id (FpPrint    *print,
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/libfprint.ver b/reference/libfprint-fedora44-1.94.100/source/libfprint/libfprint.ver
+index d99a456ab610dc4659741420eb1174a92733ade8..6f94d4953e93228ebe94bac6b0e07acfe49241c5 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/libfprint.ver
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/libfprint.ver
+@@ -1,6 +1,7 @@
+ LIBFPRINT_2.0.0 {
+ global:
+ 	fp_*;
++	goodix_fpimage_device_get_production_enrollment_audit;
+ local:
+ 	*;
+ };
+diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/meson.build b/reference/libfprint-fedora44-1.94.100/source/libfprint/meson.build
+index f11533caba900b634b1581e20be6ee923e52ab04..5df6b5b8017a06e479c3288009fdd705ca11bb6c 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/libfprint/meson.build
++++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/meson.build
+@@ -134,6 +134,38 @@ driver_sources = {
+         'drivers/goodixmoc/goodix.c',
+         'drivers/goodixmoc/goodix_proto.c',
+     ),
++    'goodix_27c6_5125' : files(
++        '../../../../libfprint-driver/goodix_u16_to_fpimage.c',
++        '../../../../libfprint-driver/goodix_fpimage_pipeline.c',
++        '../../../../libfprint-driver/goodix_sigfm_preprocess.c',
++        '../../../../libfprint-driver/rockytkg-imgproc/goodix_imgproc.c',
++        '../../../../libfprint-driver/goodix_sigfm_metrics.cpp',
++        '../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp',
++        '../../../../libfprint-driver/goodix_enrollment_model.c',
++        '../../../../libfprint-driver/goodix_enrollment_diversity.c',
++        '../../../../libfprint-driver/goodix_enrollment_pipeline.c',
++        '../../../../libfprint-driver/goodix_enrollment_command_plan.c',
++        '../../../../libfprint-driver/goodix_enrollment_command_body.c',
++        '../../../../libfprint-driver/goodix_fdt_irq_policy.c',
++        '../../../../libfprint-driver/goodix_enrollment_fdt_state.c',
++        '../../../../libfprint-driver/goodix_enrollment_lifecycle_adapter.c',
++        '../../../../libfprint-driver/goodix_enrollment_post_tls_events.c',
++        '../../../../libfprint-driver/goodix_enrollment_outbound_frame.c',
++        '../../../../libfprint-driver/goodix_enrollment_outbound_transaction.c',
++        '../../../../libfprint-driver/goodix_enrollment_fpi_usb_binding.c',
++        '../../../../libfprint-driver/goodix_usb_router.c',
++        '../../../../libfprint-driver/goodix_a0_protocol.c',
++        '../../../../libfprint-driver/goodix_d190_binder.c',
++        '../../../../libfprint-driver/goodix_target_material.c',
++        '../../../../libfprint-driver/goodix_runtime_inputs.c',
++        '../../../../libfprint-driver/goodix_runtime_material.c',
++        '../../../../libfprint-driver/goodix_secure_session.c',
++        '../../../../libfprint-driver/goodix_image_decoder.c',
++        '../../../../libfprint-driver/goodix_post_tls_lifecycle.c',
++        '../../../../libfprint-driver/goodix_fpimage_device.c',
++        '../../../../libfprint-driver/goodix_tls_server.c',
++        '../../../../libfprint-driver/goodix_fpi_usb_backend.c',
++    ),
+     'fpcmoc' : files('drivers/fpcmoc/fpc.c'),
+     'realtek' : files('drivers/realtek/realtek.c'),
+     'focaltech_moc' : files('drivers/focaltech_moc/focaltech_moc.c'),
+@@ -153,6 +185,19 @@ helper_sources = {
+ 
+ drivers_sources = []
+ drivers_cflags = []
++drivers_cppflags = []
++libfprint_goodix_cflags = []
++goodix_sigfm_deps = []
++if 'goodix_27c6_5125' in drivers
++    drivers_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
++    drivers_cppflags += '-DGOODIX_LIBFPRINT_SIGFM'
++    libfprint_goodix_cflags += '-DGOODIX_LIBFPRINT_SIGFM'
++    goodix_sigfm_deps += dependency('opencv4', required: true)
++    goodix_sigfm_deps += declare_dependency(include_directories: [
++        include_directories('../../../../libfprint-driver'),
++        include_directories('../../../../Rockytkg/libfprint/libfprint/sigfm'),
++    ])
++endif
+ foreach driver: drivers
+     drivers_sources += driver_sources[driver]
+ endforeach
+@@ -217,6 +262,7 @@ deps = [
+     gusb_dep,
+     mathlib_dep,
+ ] + optional_deps
++deps += goodix_sigfm_deps
+ 
+ # These are empty and only exist so that the include directories are created
+ # in the build tree. This silences a build time warning.
+@@ -247,12 +293,14 @@ libfprint_private = static_library('fprint-private',
+         libfprint_private_sources,
+     ],
+     dependencies: deps,
++    c_args: libfprint_goodix_cflags,
+     link_with: libnbis,
+     install: false)
+ 
+ libfprint_drivers = static_library('fprint-drivers',
+     sources: drivers_sources,
+     c_args: drivers_cflags,
++    cpp_args: drivers_cppflags,
+     dependencies: deps,
+     link_with: libfprint_private,
+     install: false)
+@@ -276,6 +324,7 @@ libfprint = shared_library(versioned_libname.split('lib')[1],
+     link_depends : mapfile,
+     link_with: [libfprint_drivers, libfprint_private],
+     dependencies: deps,
++    c_args: libfprint_goodix_cflags,
+     install: true)
+ 
+ libfprint_dep = declare_dependency(link_with: libfprint,
+diff --git a/reference/libfprint-fedora44-1.94.100/source/meson.build b/reference/libfprint-fedora44-1.94.100/source/meson.build
+index ab09dc1d87c3706aed35d114cf5e9a794db19aa3..2df8ff9236ea92eff7962d602768e00353cd07b7 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/meson.build
++++ b/reference/libfprint-fedora44-1.94.100/source/meson.build
+@@ -5,6 +5,7 @@ project('libfprint', [ 'c', 'cpp' ],
+         'buildtype=debugoptimized',
+         'warning_level=1',
+         'c_std=gnu99',
++        'cpp_std=c++17',
+     ],
+     meson_version: '>= 0.62.0')
+ 
+@@ -15,6 +16,8 @@ python3 = find_program('python3')
+ 
+ libfprint_conf = configuration_data()
+ libfprint_conf.set_quoted('LIBFPRINT_VERSION', meson.project_version())
++libfprint_conf.set10('GOODIX_PRODUCTION_MINIMAL',
++                     get_option('goodix_production_minimal'))
+ 
+ prefix = get_option('prefix')
+ libdir = prefix / get_option('libdir')
+@@ -141,6 +144,7 @@ drivers_info = {
+     'upeksonly': {},
+     'upekts': {},
+     'goodixmoc': {},
++    'goodix_27c6_5125': { 'helper': ['openssl'] },
+     'nb1010': {},
+     'fpcmoc': {},
+     'realtek': {},
+@@ -330,9 +334,12 @@ if get_option('gtk-examples')
+ endif
+ 
+ subdir('data')
+-subdir('tests')
+-
+-subdir('examples')
++if not get_option('goodix_production_minimal')
++    subdir('tests')
++    subdir('examples')
++else
++    installed_tests = false
++endif
+ 
+ meson.add_dist_script(sync_unsupported_files, '--check', udev_hwdb_list_file)
+ 
+diff --git a/reference/libfprint-fedora44-1.94.100/source/meson_options.txt b/reference/libfprint-fedora44-1.94.100/source/meson_options.txt
+index 3c4cd269315b686406d07e45e9d960dd8c9776c8..6dceace072f533fb68f3ea3941f053210f01a8a2 100644
+--- a/reference/libfprint-fedora44-1.94.100/source/meson_options.txt
++++ b/reference/libfprint-fedora44-1.94.100/source/meson_options.txt
+@@ -34,3 +34,7 @@ option('installed-tests',
+        description: 'Whether to install the installed tests',
+        type: 'boolean',
+        value: true)
++option('goodix_production_minimal',
++       type: 'boolean',
++       value: false,
++       description: 'Build the Goodix production library without configuring test targets')

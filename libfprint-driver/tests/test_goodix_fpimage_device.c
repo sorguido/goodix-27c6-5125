@@ -1979,7 +1979,7 @@ test_d282_direct_enroll_feature_profile (void)
   device = goodix_fpimage_device_new_for_usb (usb_device);
   g_assert_nonnull (device);
 
-#ifdef GOODIX_D282_DIRECT_ENROLL_PROFILE
+#ifdef GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE
   g_assert_false (fp_device_has_feature (
     FP_DEVICE (device), FP_DEVICE_FEATURE_IDENTIFY));
   g_assert_true (fp_device_has_feature (

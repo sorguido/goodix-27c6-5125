@@ -24,10 +24,13 @@
 #include <errno.h>
 #include <gmodule.h>
 
+#include "config.h"
 #include "fpi-log.h"
 
 #include "fp-device-private.h"
+#if !GOODIX_PRODUCTION_MINIMAL
 #include "tests/fpi-test-emulation.h"
+#endif
 
 /**
  * SECTION: fpi-device
@@ -91,6 +94,10 @@ error_to_string (GError * error)
 gboolean
   (fpi_device_emulation_mode_enabled) (FpDevice *device)
 {
+#if GOODIX_PRODUCTION_MINIMAL
+  (void) device;
+  return FALSE;
+#else
   static gboolean (*real_fn)(FpDevice *) = NULL;
   static gsize emulation_mode = 0;
 
@@ -129,6 +136,7 @@ gboolean
     return real_fn (device);
 
   return FALSE;
+#endif
 }
 
 /**

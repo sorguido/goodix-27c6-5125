@@ -516,13 +516,17 @@ il consumer/PAM può richiederne un'altra, fino al limite esterno di tre.
 
 ## D282/01 VERIFY target e barriera anti-retry fprintd
 
-Per la candidate D282 il build-only profile
-`GOODIX_D282_DIRECT_ENROLL_PROFILE` non pubblicizza IDENTIFY ma conserva
-VERIFY. È necessario perché l'esatto flusso enrollment di fprintd antepone un
+La candidate storica D282 introduceva questo build-only profile con il nome
+`GOODIX_D282_DIRECT_ENROLL_PROFILE`. D292/02 ne conserva la semantica sotto il
+nome canonico stabile `GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE`: non pubblicizza
+IDENTIFY ma conserva VERIFY. È necessario perché l'esatto flusso enrollment di
+fprintd antepone un
 IDENTIFY anti-duplicato e poi avvia ENROLL nello stesso open epoch: senza il
 profilo, il fence Goodix one-action-per-epoch respinge correttamente la seconda
 action prima di generation, TLS e USB. Il profilo fa entrare fprintd nel ramo
-ENROLL diretto; non allenta il fence e non modifica le build non-D282.
+ENROLL diretto; non allenta il fence. Le build che non selezionano la policy
+production restano invariate; builder e output canonici non usano identificatori
+di milestone Dxxx.
 
 L'esatto fprintd Fedora 44 seleziona `fp_device_verify()` quando la gallery
 contiene un solo template. La fork 1.94.100 registra quindi VERIFY sulla

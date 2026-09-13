@@ -501,6 +501,7 @@ context_pre_session_sync_completed (GoodixFpiUsbBackend *backend,
     pre_session_rx_sync_fail (ctx, local_error);
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixUsbRouter *
 goodix_device_context_get_usb_router (GoodixDeviceContext *ctx)
 {
@@ -548,6 +549,7 @@ goodix_device_context_has_dormant_enrollment_binding (
 {
   return ctx != NULL && ctx->enrollment_binding != NULL;
 }
+#endif
 
 static void context_a0_consumer (guint8 type, GBytes *frame, gpointer user_data)
 {
@@ -605,6 +607,7 @@ static void context_b0_consumer (guint8 type, GBytes *frame, gpointer user_data)
   if(n<=4||!goodix_tls_server_push(ctx->tls_server,p+4,n-4,&error))
     { goodix_device_context_set_terminal_fence(ctx); goodix_device_context_set_poisoned(ctx,error); }
 }
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 static void context_tls_output (GBytes *record, gpointer user_data)
 {
   GoodixDeviceContext *ctx=user_data; gsize n; const guint8 *p=g_bytes_get_data(record,&n); g_autoptr(GByteArray) frame=NULL; g_autoptr(GBytes) bytes=NULL; g_autoptr(GError) error=NULL; guint8 h[4];
@@ -615,6 +618,7 @@ static void context_tls_output (GBytes *record, gpointer user_data)
 }
 static void context_tls_plaintext (GBytes *bytes, gpointer user_data)
 { GoodixDeviceContext *ctx=user_data; if(!ctx->terminal_fence&&ctx->tls_plaintext)ctx->tls_plaintext(bytes,ctx->tls_user_data); }
+#endif
 
 /* --- Backend command recording --- */
 
@@ -1720,14 +1724,15 @@ goodix_usb_fpimage_device_class_init (GoodixUsbFpImageDeviceClass *klass)
   device_class->scan_type = FP_SCAN_TYPE_PRESS;
   device_class->id_table  = goodix_usb_id_table;
 
-#ifdef GOODIX_D282_DIRECT_ENROLL_PROFILE
+#ifdef GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE
   /* The exact Fedora fprintd enrollment flow performs an IDENTIFY action as
    * a duplicate pre-check whenever the device advertises IDENTIFY, then
-   * starts ENROLL without closing the device.  D282 deliberately permits one
-   * enrollment action and two verify actions, while the production epoch
-   * fence permits only one sensor-reaching action per open epoch.  The
-   * D282-only build therefore keeps VERIFY but does not advertise IDENTIFY,
-   * making fprintd use its documented direct-enrollment branch. */
+   * starts ENROLL without closing the device.  The historical D282 candidate
+   * established the need for direct enrollment; the stable production policy
+   * permits one enrollment action and two verify actions, while the epoch
+   * fence still permits only one sensor-reaching action per open epoch.  The
+   * canonical build keeps VERIFY but does not advertise IDENTIFY, making
+   * fprintd use its documented direct-enrollment branch. */
   device_class->features = (FpDeviceFeature) (
     (guint) device_class->features &
     ~((guint) FP_DEVICE_FEATURE_IDENTIFY));
@@ -1754,8 +1759,9 @@ fpi_device_goodix_27c6_5125_get_type (void)
   return goodix_usb_fpimage_device_get_type ();
 }
 
-/* --- Public constructor --- */
+/* --- Host/test constructors and context access --- */
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixFpImageDevice *
 goodix_fpimage_device_new (void)
 {
@@ -1779,7 +1785,6 @@ goodix_fpimage_device_get_context (GoodixFpImageDevice *dev)
   return goodix_fpimage_device_peek_context (dev);
 }
 
-#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
@@ -1808,7 +1813,6 @@ goodix_fpimage_device_set_production_open_seams (
   priv->release_interface = release_interface;
   priv->production_seam_data = user_data;
 }
-#endif
 
 gboolean
 goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx)
@@ -1883,6 +1887,7 @@ goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
                                            error);
   return ctx->tls_server != NULL;
 }
+#endif
 
 static void
 context_secure_terminal (GoodixSecureSession *session,
@@ -2384,11 +2389,13 @@ goodix_device_context_configure_enrollment_graph (
   return TRUE;
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 gboolean
 goodix_device_context_has_pending_enrollment_graph (GoodixDeviceContext *ctx)
 {
   return ctx != NULL && ctx->pending_enrollment_events != NULL;
 }
+#endif
 
 gboolean
 goodix_device_context_start_secure_session (
@@ -2429,6 +2436,7 @@ goodix_device_context_start_secure_session (
   return TRUE;
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixSecureSession *
 goodix_device_context_get_secure_session (GoodixDeviceContext *ctx)
 {
@@ -2440,6 +2448,7 @@ goodix_device_context_get_post_tls_lifecycle (GoodixDeviceContext *ctx)
 {
   return ctx != NULL ? ctx->post_tls_lifecycle : NULL;
 }
+#endif
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 void
@@ -2487,6 +2496,7 @@ goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
 }
 #endif
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_device_context_set_post_tls_await_finger_on (GoodixDeviceContext *ctx,
                                                     gboolean             awaiting)
@@ -2507,6 +2517,7 @@ goodix_device_context_set_secure_phase_observer (
   ctx->phase_observer = observer;
   ctx->phase_observer_data = user_data;
 }
+#endif
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 gboolean
@@ -2588,6 +2599,7 @@ goodix_device_context_begin_pre_session_rx_sync (GoodixDeviceContext *ctx,
   return TRUE;
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixPreSessionRxSyncResult
 goodix_device_context_get_pre_session_rx_sync_result (GoodixDeviceContext *ctx)
 {
@@ -2617,6 +2629,7 @@ goodix_pre_session_rx_sync_result_name (GoodixPreSessionRxSyncResult result)
 
   return (guint) result < G_N_ELEMENTS (names) ? names[result] : "INVALID";
 }
+#endif
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 void
@@ -2652,8 +2665,9 @@ goodix_device_context_operator_epoch_is_drained (GoodixDeviceContext *ctx)
 }
 #endif
 
-/* --- Context accessors --- */
+/* --- Test/host-only context accessors and backend assertions --- */
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixDeviceContextState
 goodix_device_context_get_state (GoodixDeviceContext *ctx)
 {
@@ -2742,6 +2756,7 @@ goodix_device_context_set_deactivation_held (GoodixDeviceContext *ctx,
   g_return_if_fail (ctx != NULL);
   ctx->deactivation_held = !!held;
 }
+#endif
 
 static void
 goodix_device_context_finish_deactivation (GoodixDeviceContext *ctx)
@@ -2829,7 +2844,7 @@ goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
   goodix_device_context_finish_deactivation (ctx);
 }
 
-/* --- Fake backend event injection --- */
+/* --- Shared production event delivery and test injection --- */
 
 static void
 emit_terminal (GoodixDeviceContext *ctx, GError *error)
@@ -2931,7 +2946,7 @@ goodix_device_context_emit_image_ready (GoodixDeviceContext *ctx,
   goodix_fpimage_pipeline_free (pipeline);
 }
 
-#ifdef GOODIX_LIBFPRINT_SIGFM
+#if defined(GOODIX_LIBFPRINT_SIGFM) && defined(GOODIX_ENABLE_TEST_SEAMS)
 void
 goodix_device_context_emit_sigfm_image_ready (GoodixDeviceContext *ctx,
                                               const uint16_t      *baseline,
@@ -2986,6 +3001,7 @@ goodix_device_context_emit_finger_up_ready (GoodixDeviceContext *ctx)
   fpi_image_device_report_finger_status (FP_IMAGE_DEVICE (ctx->device), FALSE);
 }
 
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void
 goodix_device_context_emit_cancelled (GoodixDeviceContext *ctx)
 {
@@ -3011,3 +3027,4 @@ goodix_device_context_emit_terminal_error (GoodixDeviceContext *ctx,
 
   emit_terminal (ctx, g_error_copy (error));
 }
+#endif

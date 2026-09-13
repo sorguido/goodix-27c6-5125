@@ -1,6 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D292/01 — inventario della sorgente production
 
+> Snapshot storico dell'input a D292/02. Lo stato canonico corrente, inclusi
+> source-of-truth, delta a 16 file e separazione delle seam, è in
+> `D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md`; il JSON/validator D292
+> sono stati avanzati allo schema corrente.
+
 Baseline: `420894d093c04b2dc31980cf9292389362dfc6f0`  
 Target: Fedora KDE, Goodix USB `27c6:5125` / APP12509  
 Scope: audit host-only; nessun file spostato/cancellato, nessun codice o licensing boundary modificato.

@@ -14,11 +14,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY = ROOT / "analysis/D292/D292_01_PRODUCTION_FILE_SET.json"
 MESON = ROOT / "reference/libfprint-fedora44-1.94.100/source/libfprint/meson.build"
-BUILDER = ROOT / "operator_kit/d282-01-fprintd-target/build-inner.sh"
+BUILDER = ROOT / "production/build-inner.sh"
 FEDORA_PROVENANCE = ROOT / "reference/libfprint-fedora44-1.94.100/PROVENANCE.md"
 LICENSING_LEDGER = ROOT / "docs/LICENSING_AND_PROVENANCE.md"
 DEVICE_HEADER = ROOT / "libfprint-driver/goodix_fpimage_device.h"
 DEVICE_SOURCE = ROOT / "libfprint-driver/goodix_fpimage_device.c"
+DOWNSTREAM_PATHS = ROOT / "production/downstream-paths.txt"
 
 
 def require(condition: bool, message: str) -> None:
@@ -74,7 +75,9 @@ def without_test_seams(text: str) -> str:
     output: list[str] = []
     depth = 0
     for line in text.splitlines(keepends=True):
-        if re.match(r"\s*#\s*ifdef\s+GOODIX_ENABLE_TEST_SEAMS\b", line):
+        if (re.match(r"\s*#\s*ifdef\s+GOODIX_ENABLE_TEST_SEAMS\b", line) or
+                (re.match(r"\s*#\s*if\b", line) and
+                 "GOODIX_ENABLE_TEST_SEAMS" in line)):
             depth += 1
             continue
         if depth:
@@ -173,8 +176,12 @@ def local_header_closure(starts: set[str]) -> set[str]:
 
 def main() -> None:
     data = json.loads(INVENTORY.read_text())
-    require(data["baseline"] == "420894d093c04b2dc31980cf9292389362dfc6f0",
-            "baseline_mismatch")
+    require(data["d292_02_task_baseline"] ==
+            "0bda0dc239cad9c5d62cbb906f1c1fc7183c753b",
+            "d292_02_task_baseline_mismatch")
+    require(data["d292_01_inventory_baseline"] ==
+            "420894d093c04b2dc31980cf9292389362dfc6f0",
+            "d292_01_inventory_baseline_mismatch")
     require("Fedora KDE" in data["target"] and "APP12509" in data["target"],
             "target_mismatch")
     meson_text = MESON.read_text()
@@ -213,6 +220,13 @@ def main() -> None:
     require(delta_manifest == delta_actual, "downstream_delta_diff_mismatch")
     require(not (set(delta["build_files"]) & set(delta["modified_core_files"])) and not (set(delta["test_only_files"]) & (set(delta["build_files"]) | set(delta["modified_core_files"]))), "downstream_delta_categories_overlap")
     require(delta["test_only_files"] == ["reference/libfprint-fedora44-1.94.100/source/tests/meson.build"], "test_only_downstream_delta_mismatch")
+    production_delta = delta_actual - set(delta["test_only_files"])
+    downstream_lines = DOWNSTREAM_PATHS.read_text().splitlines()
+    require(len(downstream_lines) == len(set(downstream_lines)) == 15,
+            "downstream_path_count_or_duplicate")
+    require(set(downstream_lines) == production_delta ==
+            set(delta["build_files"]) | set(delta["modified_core_files"]),
+            "downstream_path_set_mismatch")
     for relative in delta_manifest:
         require((ROOT / relative).is_file(), f"delta_path_missing:{relative}")
     provenance_text = FEDORA_PROVENANCE.read_text() + LICENSING_LEDGER.read_text()
@@ -233,17 +247,37 @@ def main() -> None:
     surface = data["external_symbol_surface"]
     header_text = DEVICE_HEADER.read_text()
     explicit = explicit_prototypes(without_test_seams(header_text))
-    category_keys = ("registry_runtime_production", "shared_internal_production", "test_or_host_only_unprotected", "potentially_mixed_or_ambiguous")
+    category_keys = ("registry_runtime_production", "shared_internal_production", "potentially_mixed_or_ambiguous")
     categories = set().union(*(set(surface[key]) for key in category_keys))
     require(explicit == categories, "unprotected_explicit_symbol_inventory_mismatch")
     require(sum(len(surface[key]) for key in category_keys) == len(categories), "external_symbol_categories_overlap")
+    newly_guarded = set(surface["test_or_host_only_guarded"])
+    preexisting_guarded = set(surface["preexisting_guarded_test_seams"])
+    guarded = newly_guarded | preexisting_guarded
+    all_header_explicit = explicit_prototypes(header_text)
+    require(all_header_explicit == explicit | guarded,
+            "guarded_explicit_symbol_inventory_mismatch")
+    require(not (explicit & guarded), "guarded_and_production_symbol_overlap")
     source_text = remove_comments_and_strings(DEVICE_SOURCE.read_text())
     for symbol in explicit:
         require(re.search(r"\b" + re.escape(symbol) + r"\s*\([^;{}]*\)\s*\{", source_text, flags=re.DOTALL) is not None, "external_symbol_definition_missing:" + symbol)
         expected = set().union(*(set(surface[key].get(symbol, [])) for key in category_keys))
         actual = symbol_call_classes(symbol, set(all_paths))
         require(expected == actual, "call_site_class_mismatch:" + symbol + ":" + ",".join(sorted(actual)))
-    test_only_production_calls = {symbol: sorted(symbol_call_classes(symbol, set(all_paths))) for symbol in surface["test_or_host_only_unprotected"] if symbol_call_classes(symbol, set(all_paths)) & {"production_internal", "production_other_tu", "generated_registry"}}
+    source_without_seams = remove_comments_and_strings(
+        without_test_seams(DEVICE_SOURCE.read_text()))
+    guarded_classes = (surface["test_or_host_only_guarded"] |
+                       surface["preexisting_guarded_test_seams"])
+    for symbol, expected_classes in guarded_classes.items():
+        require(re.search(r"\b" + re.escape(symbol) + r"\s*\([^;{}]*\)\s*\{",
+                          source_text, flags=re.DOTALL) is not None,
+                "guarded_symbol_definition_missing:" + symbol)
+        require(re.search(r"\b" + re.escape(symbol) + r"\s*\([^;{}]*\)\s*\{",
+                          source_without_seams, flags=re.DOTALL) is None,
+                "guarded_symbol_definition_leaks_production:" + symbol)
+        require(set(expected_classes) == symbol_call_classes(symbol, set(all_paths)),
+                "guarded_call_site_class_mismatch:" + symbol)
+    test_only_production_calls = {symbol: sorted(symbol_call_classes(symbol, set(all_paths))) for symbol in guarded if symbol_call_classes(symbol, set(all_paths)) & {"production_internal", "production_other_tu", "generated_registry"}}
     require(not test_only_production_calls, "test_only_symbol_has_production_call_site")
     for label, expected in surface["header_labeled_sections"].items():
         require(section_prototypes(header_text, label) == set(expected), "header_labeled_section_changed:" + label)
@@ -256,11 +290,14 @@ def main() -> None:
             require((ROOT / dependency["path"]).exists(), f"build_dependency_missing:{dependency['path']}")
     builder_text = BUILDER.read_text()
     require("-Ddrivers=goodix_27c6_5125" in builder_text, "target_driver_option_missing")
-    require("-DGOODIX_D282_DIRECT_ENROLL_PROFILE" in builder_text, "historical_production_flag_missing")
+    require("-DGOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE" in builder_text,
+            "stable_production_flag_missing")
+    require("GOODIX_D282_DIRECT_ENROLL_PROFILE" not in builder_text,
+            "historical_production_flag_present")
     require("GOODIX_ENABLE_TEST_SEAMS" not in builder_text, "test_seams_enabled_by_builder")
     require("GOODIX_LIBFPRINT_SIGFM" in meson_text, "sigfm_define_missing_from_meson")
     test_area_build_dependencies = [item["path"] for item in data["current_build_pipeline_dependencies"] if "path" in item and "/tests/" in item["path"]]
-    require(len(test_area_build_dependencies) == 2, "test_area_build_dependency_inventory_changed")
+    require(not test_area_build_dependencies, "test_area_build_dependency_present")
 
     print("D292_01_INVENTORY_CHECK=PASS")
     print(f"D292_01_COMPILED_TRANSLATION_UNIT_COUNT={len(all_paths)}")
@@ -270,17 +307,19 @@ def main() -> None:
     print(f"D292_01_DOWNSTREAM_PRODUCTION_BUILD_INPUT_COUNT={len(delta['build_files'])}")
     print(f"D292_01_DOWNSTREAM_PRODUCTION_CORE_COUNT={len(delta['modified_core_files'])}")
     print(f"D292_01_DOWNSTREAM_TEST_ONLY_COUNT={len(delta['test_only_files'])}")
+    print(f"D292_02_PRODUCT_PATCH_PATH_COUNT={len(downstream_lines)}")
     print(f"D292_01_UNPROTECTED_EXPLICIT_SYMBOL_COUNT={len(explicit)}")
     print(f"D292_01_REGISTRY_RUNTIME_SYMBOL_COUNT={len(surface['registry_runtime_production'])}")
     print(f"D292_01_SHARED_INTERNAL_PRODUCTION_SYMBOL_COUNT={len(surface['shared_internal_production'])}")
-    print(f"D292_01_TEST_HOST_ONLY_UNPROTECTED_SYMBOL_COUNT={len(surface['test_or_host_only_unprotected'])}")
+    print(f"D292_02_NEWLY_GUARDED_TEST_HOST_ONLY_SYMBOL_COUNT={len(newly_guarded)}")
+    print(f"D292_02_TOTAL_TEST_SEAM_SYMBOL_COUNT={len(guarded)}")
     print(f"D292_01_AMBIGUOUS_SYMBOL_COUNT={len(surface['potentially_mixed_or_ambiguous'])}")
     print("D292_01_TEST_HOST_ONLY_PRODUCTION_CALL_SITE_COUNT=0")
     print(f"D292_01_HEADER_LABELED_SYMBOL_COUNT={sum(len(v) for v in surface['header_labeled_sections'].values())}")
     print("D292_01_PRODUCTION_COMPILED_FORBIDDEN_PREFIX_COUNT=0")
-    print(f"D292_01_BUILD_TEST_AREA_DEPENDENCY_COUNT={len(test_area_build_dependencies)}")
+    print(f"D292_02_BUILD_TEST_AREA_DEPENDENCY_COUNT={len(test_area_build_dependencies)}")
     print("D292_01_GOODIX_ENABLE_TEST_SEAMS=false")
-    print("D292_01_HISTORICAL_PRODUCTION_FLAG=GOODIX_D282_DIRECT_ENROLL_PROFILE")
+    print("D292_02_PRODUCTION_FLAG=GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE")
     print("D292_01_TARGET=FEDORA_KDE_APP12509")
 
 

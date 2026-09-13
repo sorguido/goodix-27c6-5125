@@ -11,13 +11,15 @@ di integrazione, packaging e release sono in
 `analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase A è il boundary offline corrente;
 nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
 
-D292/01 chiude l'inventario A1 della sorgente production: file set
-machine-readable, grafo source→build→libfprint→fprintd, classificazione delle
-superfici e blocker A3/A4 sono in
-`analysis/D292/D292_01_PRODUCTION_SOURCE_INVENTORY.md`; il validator minimale è
-`analysis/D292/validate_d292_01_inventory.py`. Nessun file storico è stato
-spostato o cancellato. Il prossimo boundary è
-`PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY`.
+D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
+`production/` come autorità di composizione e provando clean build normale,
+ASan/UBSan e riproducibilità byte-for-byte. Report correnti:
+`analysis/D292/D292_01_PRODUCTION_SOURCE_INVENTORY.md` e
+`analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md`; manifest e
+validator sono `D292_01_PRODUCTION_FILE_SET.json` e
+`validate_d292_01_inventory.py`. Nessun file storico è stato spostato o
+cancellato. Prossimo boundary:
+`PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW`.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

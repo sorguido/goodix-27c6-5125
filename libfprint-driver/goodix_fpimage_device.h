@@ -156,18 +156,20 @@ typedef struct
  * Host-only instantiation.  The returned device is the virtual base type and
  * is never selected by the production USB registry.
  */
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixFpImageDevice * goodix_fpimage_device_new (void);
 /* Physical construction over an already selected GUsbDevice.  A thin
  * transport-typing subclass supplies FP_DEVICE_TYPE_USB while reusing the
  * exact same GoodixDeviceContext implementation.  Construction submits no USB
  * traffic. */
 GoodixFpImageDevice * goodix_fpimage_device_new_for_usb (GUsbDevice *usb_device);
+#endif
 
 /* Entry point consumed by libfprint's generated standard driver registry. */
 GType fpi_device_goodix_27c6_5125_get_type (void) G_GNUC_CONST;
 
-GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 #ifdef GOODIX_ENABLE_TEST_SEAMS
+GoodixDeviceContext * goodix_fpimage_device_get_context (GoodixFpImageDevice *dev);
 void goodix_fpimage_device_set_production_open_seams (
   GoodixFpImageDevice               *dev,
   GoodixRuntimeMaterialAcquireSeam   acquire_material,
@@ -175,7 +177,6 @@ void goodix_fpimage_device_set_production_open_seams (
   GoodixUsbInterfaceSeam             claim_interface,
   GoodixUsbInterfaceSeam             release_interface,
   gpointer                           user_data);
-#endif
 gboolean goodix_device_context_has_runtime_material (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_has_usb_claim (GoodixDeviceContext *ctx);
 gboolean goodix_device_context_runtime_handoff_views_cleared (
@@ -204,6 +205,7 @@ gboolean goodix_device_context_configure_tls (GoodixDeviceContext *ctx,
                                                         gpointer user_data,
                                                         GoodixTlsAudit *audit,
                                                         GError **error);
+#endif
 gboolean goodix_device_context_start_secure_session (
   GoodixDeviceContext                  *ctx,
   const GoodixSecureSessionMaterial    *material,
@@ -227,11 +229,13 @@ gboolean goodix_device_context_configure_enrollment_graph (
   GoodixEnrollmentPostTlsEventsAudit     *events_audit,
   GoodixEnrollmentFpiUsbBindingAudit     *binding_audit,
   GError                                **error);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 gboolean goodix_device_context_has_pending_enrollment_graph (
   GoodixDeviceContext *ctx);
 GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
 GoodixPostTlsLifecycle *goodix_device_context_get_post_tls_lifecycle (
   GoodixDeviceContext *ctx);
+#endif
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,
                                                  GoodixUsbSubmitSeam seam,
@@ -247,6 +251,7 @@ void goodix_device_context_complete_receive (GoodixDeviceContext *ctx,
                                               const guint8 *data, gsize length,
                                               const GError *error);
 #endif
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_set_post_tls_await_finger_on (
   GoodixDeviceContext *ctx,
   gboolean             awaiting);
@@ -254,6 +259,7 @@ void goodix_device_context_set_secure_phase_observer (
   GoodixDeviceContext                    *ctx,
   GoodixDeviceContextSecurePhaseObserver  observer,
   gpointer                                user_data);
+#endif
 
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 /* Bounded host-only operator-harness epoch.  This API is absent from the
@@ -266,6 +272,7 @@ gboolean goodix_device_context_begin_operator_epoch (
 gboolean goodix_device_context_begin_pre_session_rx_sync (
   GoodixDeviceContext *ctx,
   GError             **error);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixPreSessionRxSyncResult goodix_device_context_get_pre_session_rx_sync_result (
   GoodixDeviceContext *ctx);
 void goodix_device_context_get_pre_session_rx_sync_audit (
@@ -273,6 +280,7 @@ void goodix_device_context_get_pre_session_rx_sync_audit (
   GoodixPreSessionRxSyncAudit  *audit);
 const gchar *goodix_pre_session_rx_sync_result_name (
   GoodixPreSessionRxSyncResult result);
+#endif
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 /* Deterministic host-only bound testing; set only while no sync is active. */
 void goodix_device_context_set_pre_session_rx_sync_clock (
@@ -285,6 +293,7 @@ gboolean goodix_device_context_operator_epoch_is_drained (
 #endif
 
 /* --- Context read-only accessors (test instrumentation) --- */
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 GoodixDeviceContextState goodix_device_context_get_state (GoodixDeviceContext *ctx);
 guint64                  goodix_device_context_get_generation (GoodixDeviceContext *ctx);
 gboolean                 goodix_device_context_get_terminal_fence (GoodixDeviceContext *ctx);
@@ -305,9 +314,11 @@ void goodix_device_context_set_fresh_down_table (GoodixDeviceContext *ctx,
                                                  gboolean             fresh);
 void goodix_device_context_set_deactivation_held (GoodixDeviceContext *ctx,
                                                   gboolean             held);
+#endif
+/* Shared production completion; tests may also drive it explicitly. */
 void goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx);
 
-/* --- Host-only fake backend event injection --- */
+/* --- Shared production event delivery; tests also inject these events. --- */
 void goodix_device_context_emit_arm_complete         (GoodixDeviceContext *ctx,
                                                       GError              *error);
 void goodix_device_context_emit_finger_down          (GoodixDeviceContext *ctx);
@@ -315,16 +326,20 @@ void goodix_device_context_emit_image_ready          (GoodixDeviceContext *ctx,
                                                       const uint16_t      *samples,
                                                       size_t               sample_count);
 #ifdef GOODIX_LIBFPRINT_SIGFM
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_emit_sigfm_image_ready    (GoodixDeviceContext *ctx,
                                                       const uint16_t      *baseline,
                                                       const uint16_t      *samples,
                                                       size_t               sample_count);
 #endif
+#endif
 void goodix_device_context_emit_release_tail_complete (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_finger_up_ready      (GoodixDeviceContext *ctx);
+#ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_emit_cancelled            (GoodixDeviceContext *ctx);
 void goodix_device_context_emit_terminal_error       (GoodixDeviceContext *ctx,
                                                       GError              *error);
+#endif
 void goodix_device_context_emit_finger_down_for_generation (GoodixDeviceContext *ctx,
                                                             guint64 generation);
 

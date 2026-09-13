@@ -34,3 +34,7 @@ option('installed-tests',
        description: 'Whether to install the installed tests',
        type: 'boolean',
        value: true)
+option('goodix_production_minimal',
+       type: 'boolean',
+       value: false,
+       description: 'Build the Goodix production library without configuring test targets')

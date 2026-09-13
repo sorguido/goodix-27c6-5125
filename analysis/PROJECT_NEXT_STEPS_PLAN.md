@@ -37,16 +37,15 @@ coerente, gestibile, aggiornabile e distribuibile. Le fasi sotto privilegiano
 lavoro offline e ambienti host isolati. I boundary D279–D291 sono chiusi e non
 vanno ripetuti per sola maggiore confidenza.
 
-D292/01 ha chiuso l'inventario A1: il file set production è derivato dal Meson
-reale (77 translation unit versionate più tre generate), comprende 32 header
-locali/Rocky e riconcilia il delta Fedora di 15 file con Git (3 build/ABI, 11
-core production, 1 test-only). Nessuna TU production proviene da aree vietate.
-L'audit dei 52 prototipi espliciti non protetti distingue 1 entrypoint registry,
-12 simboli shared/internal production e 39 test/host-only con zero call-site
-production; restano dipendenze di build da D282 e da due template sotto
-`tests/`, oltre alla superficie non protetta e a una policy dal nome storico.
-Il boundary successivo è quindi A3, definizione della topologia
-source-of-truth, seguito dalla clean build/ABI A4.
+D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
+l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
+1.94.100 e applica una patch production di 15 file più il subset locale
+hashato. Il delta Git completo è 16 file (4 build/ABI, 11 core, 1 test-only
+escluso dal prodotto). Le 39 API host/test-only sono protette da seam, le 12
+shared/internal restano production; build normal e ASan/UBSan passano, due
+build da cwd diverse sono byte-identiche e ABI fprintd/no-RPATH sono verificate.
+Non restano dipendenze build da Dxxx o `tests/`. Il boundary successivo è la
+review A5 di distribuzione/provenance e closure Phase A.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -59,10 +58,13 @@ D291_REGISTERED_SERIES_MATCHED=4/4
 D291_NEW_LIVE_REQUIRED_NOW=false
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
+PHASE_A_A3=COMPLETED
+PHASE_A_A4=COMPLETED
+D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
+NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
 ```
 
 ## Stato verificato del progetto
@@ -382,11 +384,10 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 
 La Phase A è ora il boundary corrente. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
-dell'Utente. D292/01 ha chiuso A1; il prossimo task è fissare in A3 una singola
-topologia source-of-truth production mantenibile, preservando il percorso
-target-proven e il licensing boundary esistente. A4 dovrà poi provarne clean
-build normal/sanitizer e ABI, separando seam di test, reference tree e tooling
-storico dalla pipeline production.
+dell'Utente. D292/01 ha chiuso A1 e D292/02 ha chiuso A3/A4 con composizione
+canonica sotto `production/`, clean build riproducibile normal/sanitizer, ABI e
+seam separation. Phase A resta corrente e non è ancora dichiarata chiusa: il
+prossimo task è la review A5 della superficie distribuibile e della provenance.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -396,7 +397,10 @@ D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_OPERATOR_KIT=HISTORICAL_CLOSED_DO_NOT_RERUN
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
+PHASE_A_A3=COMPLETED
+PHASE_A_A4=COMPLETED
+D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
+NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
 ```

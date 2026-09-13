@@ -19,8 +19,8 @@ includes="-I$test_dir/support/d277 -I$test_dir/support -I$git_root/libfprint-dri
 strict_flags="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
 
-if [ "${GOODIX_D282_DIRECT_ENROLL_PROFILE_TEST:-0}" = 1 ]; then
-  strict_flags="$strict_flags -DGOODIX_D282_DIRECT_ENROLL_PROFILE"
+if [ "${GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE_TEST:-0}" = 1 ]; then
+  strict_flags="$strict_flags -DGOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE"
 fi
 
 adoption_mentions=$(find "$git_root/libfprint-driver" \
