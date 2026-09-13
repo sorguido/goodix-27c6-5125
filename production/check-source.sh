@@ -112,21 +112,21 @@ cmp "$generated" "$patch_file"
 
 legacy_policy=GOODIX_D
 legacy_policy="${legacy_policy}282_DIRECT_ENROLL_PROFILE"
-if rg -n "$legacy_policy" \
+if grep -n -F -- "$legacy_policy" \
      "$root/libfprint-driver/goodix_fpimage_device.c" \
      "$root/libfprint-driver/goodix_fpimage_device.h" \
      "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
   echo "historical build-policy identifier remains canonical" >&2
   exit 1
 fi
-if rg -n 'GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE' \
+if grep -n -F -- 'GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE' \
      "$root/libfprint-driver/goodix_fpimage_device.c" \
      "$root/libfprint-driver/goodix_fpimage_device.h" \
      "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
   echo "superseded direct-enroll policy remains canonical" >&2
   exit 1
 fi
-rg -n 'GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE' \
+grep -n -F -- 'GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE' \
   "$root/libfprint-driver/goodix_fpimage_device.c" \
   "$script_dir/build-inner.sh" >/dev/null
 
