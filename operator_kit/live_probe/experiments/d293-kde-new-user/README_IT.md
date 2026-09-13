@@ -1,146 +1,122 @@
-# D293/04 — nuovo utente KDE e fprintd standard
+# D293/04 — corrective KDE/new-user, live bloccata su R7
 
-Questo kit prepara il vero Human Gate della Phase B. Non modifica PAM o file
-package-owned e non installa un package. Costruisce la candidate con
-production/build.sh, la espone transitoriamente a fprintd sotto /run, richiede
-la creazione successiva di un normale utente locale e usa soltanto
-**Impostazioni di sistema → Utenti** per enrollment e cancellazione.
+## Stato corrente
 
-Il test live è eseguito fisicamente dall'Utente. L'AI non deve eseguire questi
-comandi.
+```text
+D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
+D293_04_LIVE_CAPABLE=false
+D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
+```
 
-## Riesame metodologico
+**Non eseguire `prepare.sh` né tentare l’operator-run.** Il launcher e lo
+stesso `prepare.sh` rifiutano la live prima di build, `pkexec`, deployment,
+account, mount o accesso al sensore.
 
-1. D291 verificava più serie sul principal già installato tramite un kit CLI.
-   D293/04 costruisce la source-of-truth corrente, la attiva senza persistenza,
-   crea un account dopo il deployment e attraversa il KCM Users in una vera
-   sessione Plasma di quel nuovo account.
-2. La nuova ipotesi è che il driver resti device-wide mentre fprintd/KDE
-   risolvono correttamente il nuovo principal, mantengono separato il template
-   preesistente e usano VerifyStart(any) senza configurazione per-utente.
-3. Se il test fallisce, non si ripete automaticamente: il kit ripristina il
-   runtime, conserva la capture sanitizzata e il passo successivo dipende dalla
-   fase precisa (discovery/KCM, PolicyKit, IDENTIFY→ENROLL, storage, verify o
-   cleanup). Un fallimento ripetuto nello stesso punto richiede replan.
+Il corrective ha chiuso offline i difetti R1–R6 e la parte fail-closed di R7,
+ma ha confermato un limite strutturale: il KCM Users standard non offre al kit
+un hook con cui autorizzare esattamente un solo `EnrollStart` prima che
+l’action raggiunga libfprint. Chiudere il KCM dopo la prima enrollment e
+contare le epoch nel journal rileva un’action UI extra soltanto dopo il suo
+avvio. Questo è accounting retrospettivo, non un fence tecnico preventivo.
+Non viene mascherato come enforcement.
 
-## Scope deliberatamente minimo
+Non si introducono un proxy fprintd, una policy driver specifica del test, un
+monitor race-based o un contatore globale del daemon: cambierebbero metodo e
+profilo di rischio e interferirebbero con le normali action native che D293
+deve supportare. Serve una decisione separata prima di riabilitare la live.
 
-- un nuovo utente locale standard: d293-phase-b-test;
-- una sola impronta gestita esclusivamente dal KCM;
-- enrollment con fino a 20 contatti biometrici più l'eventuale contatto
-  IDENTIFY di duplicate-check;
-- VerifyStart(any) con massimo tre invocazioni/contatti, stop al primo MATCH;
-- cancellazione della sola impronta dal KCM;
-- confronto root-only aggregato di contenuto e metadata del namespace fprintd
-  dell'utente preesistente; viene esportato soltanto il booleano;
-- rollback del runtime anche su signal, failure o timeout.
+## Correttivi chiusi offline
 
-Due dita, delete singolo/re-enroll, rename/name-reuse e reboot restano B5.
+- R1: il flusso richiede un dito fisico consapevolmente non registrato su altri
+  account; il nome del dito nella GUI non prova l’identità fisica. Un duplicato
+  è classificato separatamente, chiude il KCM, conserva IDENTIFY e arresta senza
+  retry o enrollment nascosta.
+- R2: il nuovo account resta standard. Non esegue `journalctl` o `systemctl`.
+  Il supervisore root raccoglie soltanto marker `GOODIX_PRODUCTION_EPOCH_AUDIT`
+  per step fissi e pubblica record normalizzati; stato e materiali privati
+  restano non leggibili dal test user.
+- R3: il formato macchina è una riga MESSAGE normalizzata e univoca. La capture
+  contiene `runtime-audit.env` e `runtime-provenance.env`; il classifier non
+  legge `/run` e continua a funzionare dopo recovery o reboot.
+- R4: ogni domanda termina con newline ed è flushata dal sanitizer prima del
+  `read`. Errori e telemetria parziale riportano fase, motivo, codice e cleanup
+  pending senza password o materiale protetto.
+- R5: dopo enrollment l’operatore preme il controllo finale della UI, chiude
+  normalmente System Settings e il payload attende l’uscita del processo prima
+  di VERIFY. Per il delete il KCM viene aperto di nuovo e chiuso di nuovo. Non
+  si usa restart del daemon come scorciatoia.
+- R6: rollback serializzato con lock e risultato atomico; la recovery propaga
+  il fallimento, aspetta la fine reale del supervisore, verifica l’identità
+  UID/GID/home attribuita alla run, non rimuove un contenitore montato, conserva
+  capture per-run ed è idempotente dopo successo.
+- R7 parziale: output `fprintd-list`, marker e campi audit sono validati con
+  cardinalità e tipo; errore comando non equivale a zero; la telemetria parziale
+  contiene solo conteggi osservati e dichiara `OBSERVATION_COMPLETE=false`.
+  Ogni VERIFY è precontrollata contro action/contact budget e non esiste un
+  quarto tentativo. Rimane il blocker preventivo sull’action UI extra.
 
-## Prerequisiti e stop immediati
+## Sequenza progettata, non autorizzata alla live
 
-- Fedora 44 KDE/Plasma 6.7.5, branch development;
-- HEAD uguale a origin/development e live-critical set pulito;
-- esattamente un Goodix 27c6:5125 in sysfs;
-- runtime D285/D286 integro e nessun consumer fprintd concorrente;
-- sessione Plasma/Wayland dell'utente preesistente per la preparazione;
-- possibilità per l'operatore di autorizzare pkexec;
-- nessun account o storage preesistente chiamato d293-phase-b-test.
+La sequenza corretta resta documentata per review e test comportamentale:
 
-Fermarsi su drift, password/template mostrati nel terminale, quarto tentativo,
-consumer concorrente, timeout o cleanup non PASS. Il kit non legge né esporta
-PSK/materiali runtime; il daemon usa il set protetto già installato.
+1. l’utente preesistente predisporrebbe il runtime transiente e solo dopo
+   creerebbe il normale account `d293-phase-b-test` tramite KDE;
+2. si attenderebbe il valore esatto
+   `D293_04_PHASE=READY_FOR_NEW_USER`, non la sola presenza di `public.env`;
+3. il nuovo utente sceglierebbe un solo dito fisico non già registrato;
+4. il duplicate-check IDENTIFY resterebbe abilitato; un duplicato causerebbe
+   stop distinto e nessun retry;
+5. dopo una enrollment riuscita si userebbe il pulsante finale e si chiuderebbe
+   il KCM; solo dopo si avvierebbero fino a tre VERIFY, stop al primo MATCH;
+6. il KCM sarebbe riaperto solo per cancellare l’impronta e poi richiuso;
+7. dopo logout, `recover.sh` trasferirebbe la sola capture per-run all’utente
+   originale e rimuoverebbe l’account soltanto con identità, storage, processi e
+   mount verificati.
 
-## Procedura
+Budget rimasti invariati come limite di progetto del gate:
 
-### 1. Preparazione dall'utente preesistente
+```text
+MAX_ACTIONS=5
+MAX_CONTACTS=24
+MAX_RETRIES_TRANSPORT=0
+MAX_VERIFY_START=3
+STOP_ON_FIRST_MATCH=true
+FOURTH_ATTEMPT_ALLOWED=false
+ENROLLMENT_BIOMETRIC_REPEAT_BUDGET_MAX=20
+```
 
-Dalla root del repository:
+Questi valori non rendono la live pronta finché manca il fence pre-action R7.
 
-    operator_kit/live_probe/experiments/d293-kde-new-user/prepare.sh
+## Capture e recovery
 
-La build è unprivileged e network-unshared. pkexec serve soltanto a creare
-runtime/drop-in transitori sotto /run e ad avviare un supervisore bounded. Il
-preflight D285/D286 avviene prima dell'override.
+Il design usa una directory distinta per ogni run:
 
-Solo dopo D293_04_PREPARE=PASS, aprire **Impostazioni di sistema → Utenti** e
-creare il normale utente d293-phase-b-test. La password viene inserita nella
-UI KDE e non nel kit. Non registrare ancora impronte; chiudere completamente
-System Settings dopo la creazione. Il supervisore arresta l'eventuale fprintd
-socket-attivato e pubblica READY solo a daemon inattivo. Attendere che esista:
+```text
+/var/tmp/goodix-d293-04-captures/<run-id>/capture/
+```
 
-    /run/goodix-d293-04-public/public.env
+`run.env` resta root-only perché contiene il digest interno usato per provare
+la conservazione del principal; non fa parte della capture consegnabile. La
+capture sanitizzata contiene solo provenance pubblica, contatori, marker
+whitelistati e booleani di isolamento, mai password, immagini o template.
 
-Entrare quindi in una vera sessione Plasma/Wayland del nuovo utente. La
-sessione precedente può restare aperta; non avviare altri consumer fingerprint.
+`recover.sh` resta disponibile esclusivamente per recuperare una precedente
+run già predisposta prima del blocco o una recovery interrotta. Va avviato
+dall’utente originale dopo il logout del test user:
 
-### 2. Unico operator-run dal nuovo utente
+```bash
+operator_kit/live_probe/experiments/d293-kde-new-user/recover.sh
+```
 
-Aprire Konsole nella nuova sessione ed eseguire:
+Non indovina l’identità dal solo nome: richiede un unico metadata record
+root-owned attribuito al chiamante. Una seconda recovery dopo successo
+restituisce PASS idempotente e non cancella la capture.
 
-    GIT_CONFIG_COUNT=1 \
-    GIT_CONFIG_KEY_0=safe.directory \
-    GIT_CONFIG_VALUE_0=/run/goodix-d293-04-public/repo \
-    /run/goodix-d293-04-public/repo/operator_kit/live_probe/run.sh \
-      d293-kde-new-user --operator-run \
-      --capture-root /var/tmp/goodix-d293-04-captures
+## Scope delle prove offline
 
-La configurazione Git è solo nell'environment del comando e non scrive
-~/.gitconfig; evita dubious ownership sul bind mount read-only. Il common
-harness verifica branch, HEAD/origin, critical set, budget e conferma. Il kit
-apre il KCM, mentre enrollment e delete restano operazioni manuali della UI.
-fprintd-list viene usato soltanto per contare e fprintd-verify soltanto per
-VerifyStart(any); non sono usati CLI di enrollment/delete.
-
-Budget tecnici:
-
-    MAX_ACTIONS=5
-    MAX_CONTACTS=24
-    MAX_RETRIES_TRANSPORT=0
-    MAX_VERIFY_START=3
-    STOP_ON_FIRST_MATCH=true
-    FOURTH_ATTEMPT_ALLOWED=false
-    ENROLLMENT_BIOMETRIC_REPEAT_BUDGET_MAX=20
-
-Le ripetizioni biometriche richieste esplicitamente dalla UI durante
-enrollment rientrano nel limite dichiarato; non sono retry automatici di
-transport. I contatti sono derivati dalla telemetria production: un first-image
-IDENTIFY, enroll_contacts fino a 20 e fino a tre epoch VERIFY. Nessun conteggio
-viene delegato all'operatore.
-
-Il cleanup invia sempre release al supervisore. Il runtime D285 viene
-ripristinato e l'integrità byte+metadata del principal preesistente viene
-confrontata internamente. Bind mount e account restano fino al logout per non
-togliere il codice sotto il processo del common harness.
-
-### 3. Cleanup account dopo il logout
-
-Uscire completamente dalla sessione d293-phase-b-test, tornare all'utente
-preesistente ed eseguire:
-
-    operator_kit/live_probe/experiments/d293-kde-new-user/recover.sh
-
-La recovery rifiuta account ancora attivi o template residui: in quel caso
-rientrare nel nuovo utente, cancellare l'impronta dal KCM e ripetere la sola
-recovery. Su successo verifica che la capture contenga soltanto file/directory
-del test user, ne trasferisce ricorsivamente l'ownership all'utente originale,
-smonta il repository read-only, elimina esattamente l'account/home di test e
-riesegue l'audit D285/D286. La capture sopravvive quindi alla cancellazione
-della home di test.
-
-## Recovery d'emergenza
-
-Se il terminale o la sessione si chiudono, il supervisore ripristina comunque
-il runtime su signal o al timeout e termina il proprio loop. Un reboot rimuove
-runtime, drop-in e mount sotto /run, ma non elimina l'account: recover.sh resta
-necessario e ricava dall'invocazione pkexec l'utente originale per l'audit
-finale.
-
-La capture sanitizzata è salvata sotto:
-
-    /var/tmp/goodix-d293-04-captures/d293-kde-new-user_<timestamp>_<sha>/sanitized/
-
-Non contiene password, immagini, template o hash dei template; conserva
-provenance candidate, contatori, telemetria e soli booleani di isolamento. Dopo
-`recover.sh` appartiene all'utente originale e può essere consegnata alla review
-AI senza privilegi.
+I test comportamentali usano directory temporanee e comandi mock isolati per
+attraversare gli script reali: prompt prima dell’input, duplicate stop,
+MATCH/NO_MATCH, parser di `fprintd-list`, marker, telemetria parziale e recovery
+failure/idempotenza. Non creano account, non montano filesystem, non avviano
+systemd/fprintd, non leggono journal o template autentici e non raggiungono USB.
+Non provano ACL/SELinux o comportamento KDE/PolicyKit del laptop reale.

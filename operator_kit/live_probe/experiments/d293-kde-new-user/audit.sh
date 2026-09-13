@@ -18,7 +18,7 @@ require_hash /usr/lib64/qt6/plugins/plasma/kcms/systemsettings/kcm_users.so \
   764b86abb81f4be9ee38c836a558955bca192546dc77158e2ace72e8bb2cf2d9
 require_hash /usr/share/applications/kcm_users.desktop \
   c27ab075c4e07d07631ae584695bc62376d3e3f1db258f20e622d6fda9e6c4be
-for command in fprintd-list fprintd-verify systemsettings journalctl findmnt pgrep; do
+for command in fprintd-list fprintd-verify systemsettings findmnt pgrep; do
   command -v "$command" >/dev/null || fail "command_$command"
 done
 
@@ -32,7 +32,14 @@ fi
 [[ ${XDG_SESSION_TYPE:-} == wayland && -n ${WAYLAND_DISPLAY:-} ]] || fail not_wayland_session
 [[ $(getent passwd "$test_user" | cut -d: -f6) == /home/$test_user ]] || fail home_mismatch
 [[ -f $public/public.env && ! -L $public/public.env ]] || fail public_state_missing
-head=$(sed -n 's/^D293_04_PRODUCTION_HEAD=//p' "$public/public.env")
+one() {
+  local key=$1 values
+  values=$(sed -n "s/^${key}=//p" "$public/public.env")
+  [[ $(printf '%s\n' "$values" | sed '/^$/d' | wc -l) -eq 1 && -n $values ]] ||
+    fail "public_${key}"
+  printf '%s\n' "$values"
+}
+head=$(one D293_04_PRODUCTION_HEAD)
 [[ $head =~ ^[0-9a-f]{40}$ && $head == "$(git -C "$root" rev-parse HEAD)" ]] || fail provenance_mismatch
 [[ $(git -C "$root" rev-parse HEAD) == "$(git -C "$root" rev-parse origin/development)" ]] || fail head_origin_mismatch
 options=$(findmnt -n -o OPTIONS --target "$root") || fail repo_mount_missing
@@ -40,9 +47,13 @@ options=$(findmnt -n -o OPTIONS --target "$root") || fail repo_mount_missing
 
 if [[ $phase == pre ]]; then
   grep -Fx D293_04_PHASE=READY_FOR_NEW_USER "$public/public.env" >/dev/null || fail runtime_not_ready
-  systemctl cat fprintd.service 2>/dev/null |
-    grep -Fx 'ExecStart=/run/goodix-d293-04/wrapper' >/dev/null || fail transient_dropin_not_loaded
-  ! systemctl is-active --quiet fprintd.service || fail fprintd_already_active
+  grep -Fx D293_04_SERVICE_OVERRIDE_VERIFIED=true "$public/public.env" >/dev/null || fail transient_dropin_not_verified
+  grep -Fx D293_04_DAEMON_QUIESCENT_BEFORE_READY=true "$public/public.env" >/dev/null || fail fprintd_not_quiescent_before_ready
+  grep -Fx D293_04_PRIVATE_MATERIAL_INACCESSIBLE=true "$public/public.env" >/dev/null || fail private_material_accessible
+  grep -Fx D293_04_PUBLIC_PATH_ACCESS=PASS "$public/public.env" >/dev/null || fail public_path_access
+  capture_root=$(one D293_04_CAPTURE_ROOT)
+  [[ $capture_root == /var/tmp/goodix-d293-04-captures/d293-04-*/capture &&
+     -d $capture_root && -O $capture_root ]] || fail capture_root_invalid
   for process in fprintd-enroll fprintd-verify fprintd-delete systemsettings; do
     ! pgrep -u "$(id -u)" -x "$process" >/dev/null || fail concurrent_consumer
   done

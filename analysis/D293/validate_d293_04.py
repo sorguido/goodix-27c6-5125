@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Static closure check for the D293/04 Human-Gate experiment."""
+"""Static closure check for the blocked D293/04 corrective experiment."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ SCRIPTS = (
     "payload.sh",
     "cleanup.sh",
     "sanitize.sh",
+    "normalize-journal.sh",
     "classify.sh",
 )
 
@@ -49,7 +50,8 @@ def main() -> int:
         "MAX_ACTIONS=5",
         "MAX_CONTACTS=24",
         "MAX_RETRIES=0",
-        "LIVE_CAPABLE=true",
+        "LIVE_CAPABLE=false",
+        "COLLECT_JOURNAL=false",
     ):
         require(marker in config, f"config marker missing: {marker}")
 
@@ -58,7 +60,8 @@ def main() -> int:
     require("GOODIX_PRODUCTION_EPOCH_AUDIT" in text("payload.sh"), "production epoch audit missing")
 
     payload = text("payload.sh")
-    require("/usr/bin/systemsettings kcm_users" in payload, "KCM Users is not the enrollment UI")
+    require('systemsettings_command=/usr/bin/systemsettings' in payload,
+            "KCM Users is not the enrollment UI")
     executable_payload = re.sub(r"'.*?'", "", payload)
     require(not re.search(r"^\s*fprintd-enroll(?:\s|$)", executable_payload, re.MULTILINE),
             "payload invokes fprintd-enroll")
@@ -67,10 +70,21 @@ def main() -> int:
     require("for attempt in 1 2 3" in payload, "verify series is not statically bounded to three")
     require("action_field FPI_DEVICE_ACTION_ENROLL enroll_contacts" in payload,
             "enrollment contacts are not derived from the ENROLL audit")
-    require('"$((1 + enroll_contacts + attempts))"' in payload,
+    require('contacts_observed=$((contacts_observed + 1))' in payload,
             "contact telemetry does not derive IDENTIFY+ENROLL+VERIFY")
-    require("enroll_stages" in payload and "-eq 8" in payload, "eight production stages not enforced")
+    require("'enroll_stages 8'" in payload, "eight production stages not enforced")
     require("D293_04_RUNTIME_AUDIT head=" in payload, "runtime provenance is not checked")
+    require("D293_04_EXTRA_UI_PREACTION_FENCE=BLOCKED" in payload,
+            "R7 pre-action blocker is not explicit")
+    require("D293_04_VERIFY_ACTION_BUDGET_PRECHECKED=true" in payload and
+            "D293_04_ACTION_BUDGET_PRECHECKED=true" not in payload,
+            "verify-only pre-action budget is overstated")
+
+    prepare = text("prepare.sh")
+    require("D293_04_PREPARE=BLOCKED" in prepare and "exit 3" in prepare,
+            "prepare is not blocked")
+    for forbidden in ("pkexec", "sysfs", "build.sh", "systemctl", "mount "):
+        require(forbidden not in prepare, f"prepare retains dead live path: {forbidden}")
 
     helper = text("root-helper.sh")
     require("sha256sum \"$file\"" in helper and "CONTENT|%s|" in helper,
@@ -83,8 +97,9 @@ def main() -> int:
             "post-deployment account creation boundary missing")
     require("mount -o remount,bind,ro,nodev,nosuid" in helper,
             "new-user repository mount is not read-only/nodev/nosuid")
-    require("capture_root=/var/tmp/goodix-d293-04-captures" in helper,
-            "capture root is not preserved outside the disposable test home")
+    require("capture_base=/var/tmp/goodix-d293-04-captures" in helper and
+            "RUN_ID=" in helper,
+            "per-run capture root is missing")
     require('chown -R "$original:$original_gid" "$capture_root"' in helper and
             "capture_special_file" in helper and "capture_owner_drift" in helper,
             "recovery does not validate and transfer the retained capture")
@@ -97,6 +112,13 @@ def main() -> int:
             "deploy does not bind the original principal to the pkexec caller")
     require("recovery_caller_missing" in helper and "recovery_caller_invalid" in helper,
             "post-reboot recovery cannot recover the original caller identity")
+    require("flock 9" in helper and "rollback_runtime || true" not in helper,
+            "rollback is not serialized/propagated")
+    require("account-removal.intent" in helper and
+            "D293_04_FINAL_RECOVERY_IDEMPOTENT" in helper,
+            "account recovery is not attributable/idempotent")
+    require("--deploy) fail deployment_blocked_r7_gui_session_budget" in helper,
+            "direct helper deployment is not blocked")
 
     diversity = (ROOT / "libfprint-driver/goodix_enrollment_diversity.h").read_text(
         encoding="utf-8"
@@ -105,14 +127,15 @@ def main() -> int:
             "production enrollment contact ceiling is not statically enforced at twenty")
 
     readme = text("README_IT.md")
-    require("GIT_CONFIG_COUNT=1" in readme and "safe.directory" in readme,
-            "non-persistent Git dubious-ownership handling missing")
-    require("--capture-root /var/tmp/goodix-d293-04-captures" in readme,
-            "operator command would lose capture with the disposable test home")
+    require("/var/tmp/goodix-d293-04-captures/<run-id>/capture/" in readme,
+            "per-run capture path is not documented")
     require("MAX_ACTIONS=5" in readme and "MAX_CONTACTS=24" in readme,
             "documented technical budgets are stale")
-    require("Nessun conteggio" in readme and "delegato all'operatore" in readme,
-            "contact accounting is still delegated to the operator")
+    require("D293_04_OPERATOR_KIT=BLOCKED_OFFLINE" in readme,
+            "R7 blocker is not documented")
+
+    behavior = ROOT / "analysis/D293/test_d293_04_operator_scripts.py"
+    require(behavior.is_file(), "behavioral script regression missing")
 
     for rel in (
         "operator_kit/live_probe/run.sh",
@@ -128,19 +151,20 @@ def main() -> int:
     manual = (ROOT / "Goodix 27c6 5125 manuale tecnico.md").read_text(encoding="utf-8")
     plan = (ROOT / "analysis/PROJECT_NEXT_STEPS_PLAN.md").read_text(encoding="utf-8")
     for document, name in ((manual, "manual"), (plan, "plan")):
-        require("D293_04_OPERATOR_KIT=READY_OFFLINE" in document, f"{name}: kit marker missing")
-        require("D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED" in document,
-                f"{name}: Human Gate marker missing")
+        require("D293_04_OPERATOR_KIT=BLOCKED_OFFLINE" in document, f"{name}: blocker marker missing")
+        require("D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED" in document,
+                f"{name}: blocked-live marker missing")
         require("PHASE_B_CLOSED=false" in document, f"{name}: Phase B closure marker missing")
         require("PRODUCTION_READY=false" in document, f"{name}: readiness marker missing")
 
-    print("D293_04_VALIDATOR=PASS")
+    print("D293_04_VALIDATOR=PASS_BLOCKED")
     print("COMMON_HARNESS_MODIFIED=false")
     print("MAX_ACTIONS=5")
     print("MAX_CONTACTS=24")
     print("MAX_TRANSPORT_RETRIES=0")
     print("VERIFY_ATTEMPT_LIMIT=3")
     print("REAL_USB_EXECUTED=0")
+    print("LIVE_CAPABLE=false")
     return 0
 
 
