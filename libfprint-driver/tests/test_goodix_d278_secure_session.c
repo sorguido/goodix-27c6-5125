@@ -2369,6 +2369,104 @@ test_d293_r9_host_outcome_orders_capture_release (void)
 }
 
 static void
+test_d293_r9_fatal_host_processing_is_terminal (void)
+{
+  Fixture *fixture = fixture_new_production_action ();
+  g_autoptr(FpPrint) enrolled = production_enroll_verify_template (fixture);
+  g_autoptr(GPtrArray) gallery = g_ptr_array_new_with_free_func (
+    g_object_unref);
+  TlsClient client;
+  GoodixProductionEnrollmentAudit audit = { 0 };
+  guint material_release_before;
+  guint claim_before;
+  guint in_before;
+  guint out_before;
+
+  g_ptr_array_add (gallery, g_object_ref (enrolled));
+  production_close_epoch (fixture);
+  production_open_epoch (fixture);
+
+  /* A negative score is the existing host-test seam for a fatal SIGFM
+   * matcher result.  The image still crosses the real FpImageDevice
+   * extraction, fpi_print_sigfm_match(), identify_result(), deactivation and
+   * Goodix completion callbacks; no adapter state is injected by this test. */
+  goodix_test_sigfm_match_set_score (-1);
+  fixture->done = FALSE;
+  fixture->success = TRUE;
+  fp_device_identify (FP_DEVICE (fixture->device), gallery, NULL,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) production_identify_complete,
+                      fixture);
+  production_establish_tls_for_action (fixture, &client);
+  drive_production_single_acquisition (fixture, &client);
+  production_wait (fixture);
+
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, FP_DEVICE_ERROR,
+                  FP_DEVICE_ERROR_DATA_INVALID);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_true (goodix_device_context_get_poisoned (fixture->context));
+  g_assert_false (goodix_device_context_has_runtime_material (
+                    fixture->context));
+  g_assert_false (goodix_device_context_has_usb_claim (fixture->context));
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_false (audit.production_identify_enroll_handoff_armed);
+  g_assert_cmpuint (audit.production_identify_enroll_handoff_count, ==, 0u);
+  g_assert_cmpuint (audit.production_logical_action_attempt_count, ==, 1u);
+  g_assert_cmpuint (audit.production_transport_epoch_count, ==, 1u);
+  g_assert_cmpuint (audit.production_explicit_identify_reopen_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.single_acquisition_terminal_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (audit.secure.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  client_clear (&client);
+
+  /* A subsequent call has the shape of a consumer restart after the fatal
+   * result.  The poisoned logical open must reject it before material/claim
+   * reacquisition, transport submission, or an implicit capture reopen. */
+  material_release_before = fixture->material_release_count;
+  claim_before = fixture->interface_claim_count;
+  in_before = fixture->in_submit_count;
+  out_before = g_queue_get_length (fixture->out);
+  goodix_test_sigfm_match_set_score (100);
+  g_clear_error (&fixture->action_error);
+  g_clear_object (&fixture->identify_match);
+  g_clear_object (&fixture->identify_print);
+  fixture->done = FALSE;
+  fixture->success = TRUE;
+  fp_device_identify (FP_DEVICE (fixture->device), gallery, NULL,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) production_identify_complete,
+                      fixture);
+  production_wait (fixture);
+
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, FP_DEVICE_ERROR,
+                  FP_DEVICE_ERROR_PROTO);
+  g_assert_cmpuint (fixture->material_release_count, ==,
+                    material_release_before);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
+  g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_false (goodix_device_context_has_runtime_material (
+                    fixture->context));
+  g_assert_false (goodix_device_context_has_usb_claim (fixture->context));
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_cmpuint (audit.production_logical_action_attempt_count, ==, 1u);
+  g_assert_cmpuint (audit.production_transport_epoch_count, ==, 1u);
+  g_assert_cmpuint (audit.production_explicit_identify_reopen_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+
+  g_clear_error (&fixture->action_error);
+  production_close_epoch (fixture);
+  fixture_free (fixture);
+}
+
+static void
 test_d280_01_production_two_epoch_template_reuse (void)
 {
   Fixture *fixture = fixture_new_production_action ();
@@ -4639,6 +4737,8 @@ main (int argc,
                    test_d293_r9_explicit_multi_identify_same_open);
   g_test_add_func ("/goodix/d293/r9-host-outcome-orders-capture-release",
                    test_d293_r9_host_outcome_orders_capture_release);
+  g_test_add_func ("/goodix/d293/r9-fatal-host-processing-terminal",
+                   test_d293_r9_fatal_host_processing_is_terminal);
   g_test_add_func ("/goodix/d291/fixed-raw-baseline-pinning-mechanics",
                    test_d291_fixed_raw_baseline_pinning_mechanics);
   g_test_add_func ("/goodix/d293/identify-failure-cancel-no-handoff",

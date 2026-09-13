@@ -71,6 +71,13 @@ class FakeCollector(threading.Thread):
                         lines += epoch("FPI_DEVICE_ACTION_ENROLL", stages=8, contacts=8)
                         if self.journal_mode == "extra-enroll":
                             lines += epoch("FPI_DEVICE_ACTION_ENROLL", stages=8, contacts=8)
+                    if self.journal_mode == "duplicate-action-field":
+                        lines = lines.replace(
+                            "action=FPI_DEVICE_ACTION_ENROLL",
+                            "action=FPI_DEVICE_ACTION_ENROLL "
+                            "action=FPI_DEVICE_ACTION_IDENTIFY",
+                            1,
+                        )
                     (self.results / "enroll-journal.log").write_text(lines, encoding="utf-8")
                 elif name.startswith("finish-verify-"):
                     number = name.rsplit("-", 1)[1]
@@ -80,6 +87,8 @@ class FakeCollector(threading.Thread):
                     (self.results / f"verify-{number}-journal.log").write_text(
                         line, encoding="utf-8"
                     )
+                elif name == "finish-delete":
+                    (self.results / "delete-journal.log").write_text("", encoding="utf-8")
                 (self.results / f"{name}.env").write_text(
                     f"D293_04_CONTROL={name}\nD293_04_CONTROL_RESULT=PASS\n",
                     encoding="utf-8",
@@ -459,7 +468,15 @@ class D293OperatorScriptsTest(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, tail)
             self.assertEqual(
                 fixture.collector.requests,
-                ["arm-enroll", "finish-enroll", "arm-verify-1", "finish-verify-1", "complete-verify"],
+                [
+                    "arm-enroll",
+                    "finish-enroll",
+                    "arm-verify-1",
+                    "finish-verify-1",
+                    "complete-verify",
+                    "arm-delete",
+                    "finish-delete",
+                ],
             )
             telemetry = fixture.telemetry.read_text(encoding="utf-8")
             self.assertIn("ACTION_ATTEMPT_COUNT=3\n", telemetry)
@@ -565,7 +582,9 @@ class D293OperatorScriptsTest(unittest.TestCase):
             proc.stdout.close()
             proc.wait(timeout=5)
             self.assertIn("reason=terminal_input_closed", output)
-            self.assertIn("D293_04_OBSERVATION_COMPLETE=false", fixture.telemetry.read_text())
+            telemetry = fixture.telemetry.read_text(encoding="utf-8")
+            self.assertIn("D293_04_OBSERVATION_COMPLETE=false", telemetry)
+            self.assertIn("ACTION_ATTEMPT_COUNT=UNKNOWN", telemetry)
         finally:
             fixture.cleanup()
 
@@ -592,6 +611,33 @@ class D293OperatorScriptsTest(unittest.TestCase):
             self.assertIn("reason=enrollment_action_cardinality", output)
             self.assertNotIn("arm-verify-1", fixture.collector.requests)
             self.assertIn("LIVE_CAPABLE=false", (EXP / "experiment.conf").read_text())
+            telemetry = fixture.telemetry.read_text(encoding="utf-8")
+            for field in (
+                "ACTION_ATTEMPT_COUNT=UNKNOWN",
+                "CONTACT_COUNT=UNKNOWN",
+                "DRAINED_COUNT=UNKNOWN",
+                "CONTEXT_CLOSED_COUNT=UNKNOWN",
+            ):
+                self.assertIn(field, telemetry)
+        finally:
+            fixture.cleanup()
+
+    def test_duplicate_action_field_fails_payload_closed(self) -> None:
+        fixture = PayloadRun(journal_mode="duplicate-action-field")
+        proc = self.drive_enrollment_closed(fixture)
+        try:
+            assert proc.stdin is not None
+            proc.stdin.close()
+            assert proc.stdout is not None
+            output = proc.stdout.read()
+            proc.stdout.close()
+            proc.wait(timeout=5)
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("reason=enrollment_action_cardinality", output)
+            self.assertNotIn("arm-verify-1", fixture.collector.requests)
+            telemetry = fixture.telemetry.read_text(encoding="utf-8")
+            self.assertIn("ACTION_ATTEMPT_COUNT=UNKNOWN", telemetry)
+            self.assertIn("CONTACT_COUNT=UNKNOWN", telemetry)
         finally:
             fixture.cleanup()
 
@@ -606,7 +652,15 @@ class D293OperatorScriptsTest(unittest.TestCase):
             proc.stdout.close()
             proc.wait(timeout=5)
             self.assertIn("reason=verify_epoch_invalid", output)
-            self.assertIn("D293_04_OBSERVATION_COMPLETE=false", fixture.telemetry.read_text())
+            telemetry = fixture.telemetry.read_text(encoding="utf-8")
+            self.assertIn("D293_04_OBSERVATION_COMPLETE=false", telemetry)
+            for field in (
+                "ACTION_ATTEMPT_COUNT=UNKNOWN",
+                "CONTACT_COUNT=UNKNOWN",
+                "DRAINED_COUNT=UNKNOWN",
+                "CONTEXT_CLOSED_COUNT=UNKNOWN",
+            ):
+                self.assertIn(field, telemetry)
         finally:
             fixture.cleanup()
 
@@ -648,6 +702,10 @@ class D293OperatorScriptsTest(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0)
             self.assertIn("reason=kcm_process_still_holds_session", output)
             self.assertNotIn("arm-verify-1", fixture.collector.requests)
+            self.assertIn(
+                "ACTION_ATTEMPT_COUNT=UNKNOWN",
+                fixture.telemetry.read_text(encoding="utf-8"),
+            )
         finally:
             fixture.cleanup()
 
@@ -706,6 +764,17 @@ class D293OperatorScriptsTest(unittest.TestCase):
                     encoding="utf-8",
                 ),
                 "missing-telemetry": lambda path: (path / "telemetry.env").unlink(),
+                "duplicate-action-field": lambda path: (path / "enroll-journal.log").write_text(
+                    (path / "enroll-journal.log")
+                    .read_text(encoding="utf-8")
+                    .replace(
+                        "action=FPI_DEVICE_ACTION_ENROLL",
+                        "action=FPI_DEVICE_ACTION_ENROLL "
+                        "action=FPI_DEVICE_ACTION_IDENTIFY",
+                        1,
+                    ),
+                    encoding="utf-8",
+                ),
             }
             for name, corrupt in cases.items():
                 with self.subTest(name=name):

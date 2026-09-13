@@ -12,19 +12,23 @@ one() {
 }
 require_exact() { [[ $(grep -Fxc "$1" "$2") -eq 1 ]]; }
 audit_count() { grep -c '^GOODIX_PRODUCTION_EPOCH_AUDIT ' "$1" || true; }
-action_count() {
+strict_action_count() {
   local action=$1 file=$2
-  awk -v action="$action" '
+  local output rc=0
+  output=$(awk -v action="$action" '
+    BEGIN { invalid=0 }
     /^GOODIX_PRODUCTION_EPOCH_AUDIT / {
       action_hits=0
       for (i=1; i<=NF; i++) {
         split($i, a, "=")
         if (a[1] == "action") { action_hits++; if (a[2] == action) count++ }
       }
-      if (action_hits != 1) exit 2
+      if (action_hits != 1) invalid=1
     }
-    END { print count+0 }
-  ' "$file"
+    END { if (invalid) exit 2; print count+0 }
+  ' "$file") || rc=$?
+  [[ $rc -eq 0 && $output =~ ^[0-9]+$ ]] || return 1
+  action_count_result=$output
 }
 
 if grep -Fx LIVE_PROBE_MODE=offline-test "$capture/context.env" >/dev/null; then
@@ -41,14 +45,16 @@ if [[ -f $details ]] && grep -Fx D293_04_OUTCOME=DUPLICATE_RECOGNIZED_STOP "$det
   require_exact D293_04_DUPLICATE_CHECK_PRESERVED=true "$details"
   require_exact D293_04_KCM_ENROLLMENT_COUNT=0 "$details"
   [[ -f $capture/enroll-journal.log && $(audit_count "$capture/enroll-journal.log") -eq 1 ]]
-  [[ $(action_count FPI_DEVICE_ACTION_IDENTIFY "$capture/enroll-journal.log") -eq 1 ]]
-  [[ $(action_count FPI_DEVICE_ACTION_ENROLL "$capture/enroll-journal.log") -eq 0 ]]
+  strict_action_count FPI_DEVICE_ACTION_IDENTIFY "$capture/enroll-journal.log"
+  [[ $action_count_result -eq 1 ]]
+  strict_action_count FPI_DEVICE_ACTION_ENROLL "$capture/enroll-journal.log"
+  [[ $action_count_result -eq 0 ]]
   echo D293_04_PAYLOAD_CLASSIFICATION=DUPLICATE_RECOGNIZED_STOP
   exit 1
 fi
 
 grep -Fx LIVE_PROBE_COMMON_CLASSIFICATION=PASS "$capture/common-classification.env" >/dev/null
-for file in "$details" "$capture/enroll-journal.log" "$capture/runtime-audit.env" \
+for file in "$details" "$capture/enroll-journal.log" "$capture/delete-journal.log" "$capture/runtime-audit.env" \
     "$capture/runtime-provenance.env" "$capture/telemetry.env"; do
   [[ -f $file && ! -L $file ]]
 done
@@ -87,13 +93,17 @@ runtime_marker="D293_04_RUNTIME_AUDIT head=$head library_sha=$library_sha manife
 require_exact "$runtime_marker" "$capture/runtime-audit.env"
 [[ $(wc -l <"$capture/runtime-audit.env") -eq 1 ]]
 [[ $(audit_count "$capture/enroll-journal.log") -eq 2 ]]
-[[ $(action_count FPI_DEVICE_ACTION_IDENTIFY "$capture/enroll-journal.log") -eq 1 ]]
-[[ $(action_count FPI_DEVICE_ACTION_ENROLL "$capture/enroll-journal.log") -eq 1 ]]
+strict_action_count FPI_DEVICE_ACTION_IDENTIFY "$capture/enroll-journal.log"
+[[ $action_count_result -eq 1 ]]
+strict_action_count FPI_DEVICE_ACTION_ENROLL "$capture/enroll-journal.log"
+[[ $action_count_result -eq 1 ]]
 for (( attempt=1; attempt<=attempts; attempt++ )); do
   file=$capture/verify-$attempt-journal.log
   [[ -f $file && ! -L $file && $(audit_count "$file") -eq 1 ]]
-  [[ $(action_count FPI_DEVICE_ACTION_VERIFY "$file") -eq 1 ]]
+  strict_action_count FPI_DEVICE_ACTION_VERIFY "$file"
+  [[ $action_count_result -eq 1 ]]
 done
+[[ $(audit_count "$capture/delete-journal.log") -eq 0 ]]
 grep -Fx D293_04_RUNTIME_ROLLBACK=PASS "$capture/cleanup.log" >/dev/null
 grep -Fx D293_04_PREEXISTING_PRINCIPAL_CONTENT_AND_METADATA_PRESERVED=true "$capture/cleanup.log" >/dev/null
 grep -Fx D293_04_TEST_STORAGE_CLEAN=true "$capture/cleanup.log" >/dev/null

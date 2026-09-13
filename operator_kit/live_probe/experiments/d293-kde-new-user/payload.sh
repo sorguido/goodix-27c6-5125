@@ -61,23 +61,31 @@ telemetry_final=false
 actions_observed=0
 contacts_observed=0
 drained_observed=0
+counts_known=true
 
 write_telemetry() {
   local outcome=$1 complete=$2 outstanding=$3
   local tmp=$telemetry.tmp retry=UNKNOWN persistent=UNKNOWN
+  local actions=$actions_observed contacts=$contacts_observed drained=$drained_observed
+  if [[ $counts_known != true ]]; then
+    actions=UNKNOWN
+    contacts=UNKNOWN
+    drained=UNKNOWN
+    outstanding=UNKNOWN
+  fi
   if [[ $complete == true ]]; then retry=0; persistent=0; fi
   {
     printf 'PAYLOAD_OUTCOME=%s\n' "$outcome"
-    printf 'ACTION_ATTEMPT_COUNT=%s\n' "$actions_observed"
-    printf 'CONTACT_COUNT=%s\n' "$contacts_observed"
+    printf 'ACTION_ATTEMPT_COUNT=%s\n' "$actions"
+    printf 'CONTACT_COUNT=%s\n' "$contacts"
     printf 'RETRY_COUNT=%s\n' "$retry"
     printf 'MAX_ACTIONS_ENFORCED=%s\n' "$max_actions"
     printf 'MAX_CONTACTS_ENFORCED=%s\n' "$max_contacts"
     printf 'MAX_RETRIES_ENFORCED=%s\n' "$max_retries"
     printf 'PERSISTENT_WRITE_FAMILY_COUNT=%s\n' "$persistent"
     printf 'OUTSTANDING_COUNT=%s\n' "$outstanding"
-    printf 'DRAINED_COUNT=%s\n' "$drained_observed"
-    printf 'CONTEXT_CLOSED_COUNT=%s\n' "$drained_observed"
+    printf 'DRAINED_COUNT=%s\n' "$drained"
+    printf 'CONTEXT_CLOSED_COUNT=%s\n' "$drained"
     printf 'D293_04_OBSERVATION_COMPLETE=%s\n' "$complete"
     printf 'D293_04_FAILURE_PHASE=%s\n' "$phase"
     printf 'D293_04_FAILURE_REASON=%s\n' "$failure_reason"
@@ -143,7 +151,7 @@ wait_regular_file() {
 control_request() {
   local request=$1 ack
   ack=$results/$request.env
-  [[ $request =~ ^(arm-enroll|finish-enroll|arm-verify-[123]|finish-verify-[123]|complete-verify)$ ]] ||
+  [[ $request =~ ^(arm-enroll|finish-enroll|arm-verify-[123]|finish-verify-[123]|complete-verify|arm-delete|finish-delete)$ ]] ||
     fail control_request_invalid
   [[ -d $control && -O $control && ! -e $control/$request && ! -L $control/$request ]] ||
     fail control_channel_invalid
@@ -192,19 +200,23 @@ strict_finger_count() {
 
 audit_count() { grep -c '^GOODIX_PRODUCTION_EPOCH_AUDIT ' "$1" || true; }
 
-action_count() {
+strict_action_count() {
   local action=$1 file=$2
-  awk -v action="$action" '
+  local output rc=0
+  output=$(awk -v action="$action" '
+    BEGIN { invalid=0 }
     /^GOODIX_PRODUCTION_EPOCH_AUDIT / {
       hits=0
       for (i=1; i<=NF; i++) {
         split($i, a, "=")
         if (a[1] == "action") { hits++; if (a[2] == action) count++ }
       }
-      if (hits != 1) exit 2
+      if (hits != 1) invalid=1
     }
-    END { print count+0 }
-  ' "$file"
+    END { if (invalid) exit 2; print count+0 }
+  ' "$file") || rc=$?
+  [[ $rc -eq 0 && $output =~ ^[0-9]+$ ]] || return 1
+  action_count_result=$output
 }
 
 audit_sum() {
@@ -254,8 +266,9 @@ action_field() {
 
 verify_epoch() {
   local file=$1 key value
-  [[ $(audit_count "$file") -eq 1 &&
-     $(action_count FPI_DEVICE_ACTION_VERIFY "$file") -eq 1 ]] || return 1
+  [[ $(audit_count "$file") -eq 1 ]] || return 1
+  strict_action_count FPI_DEVICE_ACTION_VERIFY "$file" || return 1
+  [[ $action_count_result -eq 1 ]] || return 1
   for key in attempts consumed tls first_image drained context_closed; do
     value=$(audit_sum "$key" 1 "$file") || return 1
     [[ $value -eq 1 ]] || return 1
@@ -318,6 +331,7 @@ EOF
 
 phase=enrollment_arm
 control_request arm-enroll
+counts_known=false
 "$systemsettings_command" kcm_users >/dev/null 2>&1 &
 kcm_pid=$!
 printf '%s\n' "$kcm_pid" >"$work/kcm.pid"
@@ -343,10 +357,11 @@ copy_result enroll-journal.log enroll-journal.log
 enroll_log=$capture/enroll-journal.log
 
 if [[ $enrollment_result == 'DUPLICATO RILEVATO' ]]; then
-  [[ $(audit_count "$enroll_log") -eq 1 &&
-     $(action_count FPI_DEVICE_ACTION_IDENTIFY "$enroll_log") -eq 1 &&
-     $(action_count FPI_DEVICE_ACTION_ENROLL "$enroll_log") -eq 0 ]] ||
-    fail duplicate_audit_inconsistent
+  [[ $(audit_count "$enroll_log") -eq 1 ]] || fail duplicate_audit_inconsistent
+  strict_action_count FPI_DEVICE_ACTION_IDENTIFY "$enroll_log" || fail duplicate_audit_inconsistent
+  [[ $action_count_result -eq 1 ]] || fail duplicate_audit_inconsistent
+  strict_action_count FPI_DEVICE_ACTION_ENROLL "$enroll_log" || fail duplicate_audit_inconsistent
+  [[ $action_count_result -eq 0 ]] || fail duplicate_audit_inconsistent
   actions_observed=1
   contacts_observed=$(audit_sum first_image 1 "$enroll_log") || fail duplicate_contact_missing
   drained_observed=$(audit_sum drained 1 "$enroll_log") || fail duplicate_drain_missing
@@ -354,6 +369,7 @@ if [[ $enrollment_result == 'DUPLICATO RILEVATO' ]]; then
     value=$(audit_sum "$key" 1 "$enroll_log") || fail "duplicate_${key}_missing"
     [[ $value -eq 0 ]] || fail "duplicate_${key}_invalid"
   done
+  counts_known=true
   cat >"$capture/payload-details.env" <<EOF
 D293_04_OUTCOME=DUPLICATE_RECOGNIZED_STOP
 D293_04_DUPLICATE_CHECK_PRESERVED=true
@@ -370,10 +386,11 @@ fi
 strict_finger_count enrolled || fail "$failure_reason"
 enrolled_finger_count=$finger_count_result
 [[ $enrolled_finger_count -eq 1 ]] || fail enrolled_finger_count_not_one
-[[ $(audit_count "$enroll_log") -eq 2 &&
-   $(action_count FPI_DEVICE_ACTION_IDENTIFY "$enroll_log") -eq 1 &&
-   $(action_count FPI_DEVICE_ACTION_ENROLL "$enroll_log") -eq 1 ]] ||
-  fail enrollment_action_cardinality
+[[ $(audit_count "$enroll_log") -eq 2 ]] || fail enrollment_action_cardinality
+strict_action_count FPI_DEVICE_ACTION_IDENTIFY "$enroll_log" || fail enrollment_action_cardinality
+[[ $action_count_result -eq 1 ]] || fail enrollment_action_cardinality
+strict_action_count FPI_DEVICE_ACTION_ENROLL "$enroll_log" || fail enrollment_action_cardinality
+[[ $action_count_result -eq 1 ]] || fail enrollment_action_cardinality
 enroll_contacts=$(action_field FPI_DEVICE_ACTION_ENROLL enroll_contacts "$enroll_log") ||
   fail enrollment_contacts_missing
 enroll_retry_scans=$(action_field FPI_DEVICE_ACTION_ENROLL enroll_retry_scans "$enroll_log") ||
@@ -391,6 +408,7 @@ done
 actions_observed=2
 contacts_observed=$((1 + enroll_contacts))
 drained_observed=2
+counts_known=true
 (( actions_observed <= max_actions && contacts_observed <= max_contacts )) ||
   fail enrollment_session_budget_exceeded
 
@@ -406,6 +424,7 @@ for attempt in 1 2 3; do
   fi
   control_request "arm-verify-$attempt"
   printf 'Tentativo %d/3: appoggiare una sola volta l’impronta registrata.\n' "$attempt"
+  counts_known=false
   rc=0
   LC_ALL=C "$fprintd_verify_command" "$user" >"$work/verify-$attempt.out" 2>&1 || rc=$?
   control_request "finish-verify-$attempt"
@@ -415,6 +434,7 @@ for attempt in 1 2 3; do
   actions_observed=$((actions_observed + 1))
   contacts_observed=$((contacts_observed + 1))
   drained_observed=$((drained_observed + 1))
+  counts_known=true
   if grep -Fx 'Verify result: verify-match (done)' "$work/verify-$attempt.out" >/dev/null; then
     [[ $rc -eq 0 ]] || fail verify_match_return_code
     matched=$attempt
@@ -433,6 +453,8 @@ done
 control_request complete-verify
 
 phase=delete_ui
+control_request arm-delete
+counts_known=false
 "$systemsettings_command" kcm_users >/dev/null 2>&1 &
 kcm_pid=$!
 printf '%s\n' "$kcm_pid" >"$work/kcm.pid"
@@ -445,9 +467,13 @@ printf '%s\n' \
 prompt_confirmation 'IMPRONTA KCM CANCELLATA'
 close_kcm DELETE
 phase=delete_check
+control_request finish-delete
+copy_result delete-journal.log delete-journal.log
+[[ $(audit_count "$capture/delete-journal.log") -eq 0 ]] || fail unexpected_action_during_delete
 strict_finger_count final || fail "$failure_reason"
 final_finger_count=$finger_count_result
 [[ $final_finger_count -eq 0 ]] || fail final_finger_count_not_zero
+counts_known=true
 
 outcome=KDE_NEW_USER_NO_MATCH_SERIES
 [[ $matched -eq 0 ]] || outcome=KDE_NEW_USER_MATCH

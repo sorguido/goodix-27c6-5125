@@ -105,7 +105,7 @@ journal_cursor() {
 
 collect_epoch_journal() {
   local step=$1 cursor=$2 raw normalized destination
-  [[ $step == enroll || $step =~ ^verify-[123]$ ]] || return 1
+  [[ $step == enroll || $step == delete || $step =~ ^verify-[123]$ ]] || return 1
   raw=$(mktemp "$private/.journal-raw.XXXXXX") || return 1
   normalized=$(mktemp "$private/.journal-normalized.XXXXXX") || {
     rm -f -- "$raw"; return 1;
@@ -115,7 +115,9 @@ collect_epoch_journal() {
     rm -f -- "$raw" "$normalized"
     return 1
   fi
-  if ! "$private/normalize-journal.sh" <"$raw" >"$normalized"; then
+  if [[ $step == delete && ! -s $raw ]]; then
+    : >"$normalized"
+  elif ! "$private/normalize-journal.sh" <"$raw" >"$normalized"; then
     rm -f -- "$raw" "$normalized"
     return 1
   fi
@@ -267,13 +269,13 @@ supervise() {
       if [[ $request == complete-verify && $expected =~ ^(arm-verify-[23]|complete-verify)$ ]]; then
         rm -f -- "$public/control/$request"
         write_control_ack "$request"
-        expected=complete
-      elif [[ $request == "$expected" && $request =~ ^arm-(enroll|verify-[123])$ ]]; then
+        expected=arm-delete
+      elif [[ $request == "$expected" && $request =~ ^arm-(enroll|verify-[123]|delete)$ ]]; then
         armed_cursor=$(journal_cursor) || fail journal_cursor_failed
         rm -f -- "$public/control/$request"
         write_control_ack "$request"
         expected=${request/arm-/finish-}
-      elif [[ $request == "$expected" && $request =~ ^finish-(enroll|verify-[123])$ ]]; then
+      elif [[ $request == "$expected" && $request =~ ^finish-(enroll|verify-[123]|delete)$ ]]; then
         next=${request#finish-}
         collect_epoch_journal "$next" "$armed_cursor" || fail journal_collection_failed
         rm -f -- "$public/control/$request"
@@ -283,6 +285,7 @@ supervise() {
           verify-1) expected=arm-verify-2 ;;
           verify-2) expected=arm-verify-3 ;;
           verify-3) expected=complete-verify ;;
+          delete) expected=complete ;;
         esac
       else
         fail "unexpected_control_${request}_expected_${expected}"
