@@ -37,6 +37,17 @@ coerente, gestibile, aggiornabile e distribuibile. Le fasi sotto privilegiano
 lavoro offline e ambienti host isolati. I boundary D279–D291 sono chiusi e non
 vanno ripetuti per sola maggiore confidenza.
 
+D292/01 ha chiuso l'inventario A1: il file set production è derivato dal Meson
+reale (77 translation unit versionate più tre generate), comprende 32 header
+locali/Rocky e riconcilia il delta Fedora di 15 file con Git (3 build/ABI, 11
+core production, 1 test-only). Nessuna TU production proviene da aree vietate.
+L'audit dei 52 prototipi espliciti non protetti distingue 1 entrypoint registry,
+12 simboli shared/internal production e 39 test/host-only con zero call-site
+production; restano dipendenze di build da D282 e da due template sotto
+`tests/`, oltre alla superficie non protetta e a una policy dal nome storico.
+Il boundary successivo è quindi A3, definizione della topologia
+source-of-truth, seguito dalla clean build/ABI A4.
+
 ```text
 D290_CLOSED_SUCCESSFULLY=true
 D291_MULTI_VERIFY_TRANSPORT_LIVE=PROVEN
@@ -46,10 +57,12 @@ D291_CLOSURE=PROVEN_ON_TARGET
 D291_ROCKY_DIVERSITY_LIVE=PASS
 D291_REGISTERED_SERIES_MATCHED=4/4
 D291_NEW_LIVE_REQUIRED_NOW=false
+D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
+PHASE_A_A1=COMPLETED
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
+NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
 ```
 
 ## Stato verificato del progetto
@@ -369,9 +382,11 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 
 La Phase A è ora il boundary corrente. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
-dell'Utente. Il primo task è consolidare la source-of-truth production e una
-build riproducibile, preservando il percorso target-proven e separando seam di
-test, reference tree e materiale storico.
+dell'Utente. D292/01 ha chiuso A1; il prossimo task è fissare in A3 una singola
+topologia source-of-truth production mantenibile, preservando il percorso
+target-proven e il licensing boundary esistente. A4 dovrà poi provarne clean
+build normal/sanitizer e ABI, separando seam di test, reference tree e tooling
+storico dalla pipeline production.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -379,7 +394,9 @@ D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_OPERATOR_KIT=HISTORICAL_CLOSED_DO_NOT_RERUN
+D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
+PHASE_A_A1=COMPLETED
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
+NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
 ```

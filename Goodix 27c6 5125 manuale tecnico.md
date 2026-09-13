@@ -281,7 +281,62 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente — D291 chiuso live con enrollment diversity Rocky-derived
+### Stato corrente Phase A — D292/01 inventario production
+
+D292/01 chiude A1 con un inventario evidence-based del percorso production
+attuale. Il Meson reale seleziona 77 translation unit versionate e ne genera
+tre; il file set copre inoltre 32 header locali/Rocky, il tree baseline Fedora
+e il delta Git downstream completo di 15 file. Nessuna unità compilata proviene
+da `analysis/`, `operator_kit/`, `tests/`, fake backend o launcher Dxxx. La
+source-of-truth non è tuttavia ancora
+consolidata: è distribuita fra la fork Fedora 44/libfprint 1.94.100 sotto
+`reference/`, `libfprint-driver/` e il subset SIGFM/R2 di `Rockytkg/`.
+
+Il delta Fedora comprende tre input build/ABI, inclusi `libfprint.ver`, undici
+file core production, incluso `fpi-image.c`, e il solo delta test
+`tests/meson.build`. Il grafo corrente è orchestrato dal builder storico D282, usa due template
+pkg-config sotto `libfprint-driver/tests/support/d279/`, produce
+`libfprint-2.so.2.0.0` e viene caricato dal binario Fedora `/usr/libexec/fprintd`
+attraverso il wrapper runtime D285. L'audit completo trova 52 prototipi espliciti
+non protetti più due GType generati: 1 registry/runtime, 12 shared/internal
+production e 39 test/host-only, con zero call-site production per questi ultimi
+e zero ambigui. Le sezioni header etichettate test contengono anche sette
+simboli realmente usati dal runtime, perciò A3 deve separare per call-site e non
+per etichetta. La policy production conserva inoltre il nome storico
+`GOODIX_D282_DIRECT_ENROLL_PROFILE`. Questi sono confini espliciti per A3/A4,
+non claim di production readiness.
+
+La scelta minima proposta preserva Fedora 44/libfprint 1.94.100 e l'attuale
+regime GPL-compatible, trasformando il delta in una sola patch series/tree
+downstream riproducibile, con builder non-Dxxx, subset SIGFM/R2 ledgered e
+nessuna dipendenza da `tests/`. Nessun move, cancellazione, red tag o modifica
+del licensing boundary è autorizzato finché le dipendenze restano attive.
+
+```text
+CURRENT_PHASE=A
+D292_01_OUTCOME=PASS_ARCHITECTURAL_INVENTORY
+PHASE_A_A1=COMPLETED
+PRODUCTION_TRANSLATION_UNITS=77
+GENERATED_TRANSLATION_UNITS=3
+LOCAL_AND_ROCKY_HEADER_INPUTS=32
+FEDORA_DOWNSTREAM_DELTA_FILES=15
+PRODUCTION_COMPILED_FORBIDDEN_PREFIX_COUNT=0
+BUILD_TEST_AREA_DEPENDENCY_COUNT=2
+UNPROTECTED_EXPLICIT_SYMBOLS=52
+SHARED_INTERNAL_PRODUCTION_SYMBOLS=12
+TEST_HOST_ONLY_UNPROTECTED_SYMBOLS=39
+TEST_HOST_ONLY_PRODUCTION_CALL_SITE_COUNT=0
+AMBIGUOUS_SYMBOLS=0
+SOURCE_OF_TRUTH_CONSOLIDATED=false
+NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
+NEW_LIVE_REQUIRED_NOW=false
+```
+
+Inventario, classificazione, blocker e validator sono in
+`analysis/D292/D292_01_PRODUCTION_SOURCE_INVENTORY.md` e
+`analysis/D292/D292_01_PRODUCTION_FILE_SET.json`.
+
+### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
 La candidate `cbf582f4dcdb7eeb6c8381223c84d37363386870` è stata
 validata dall'Utente sul target reale dopo re-enrollment. La policy diversity
@@ -496,9 +551,10 @@ realmente bloccata e login Plasma verso una nuova sessione Wayland sono
 boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
 fattibilità sul target APP12509 è provata; la production readiness no.
 
-Il boundary corrente è il consolidamento della sorgente production (Phase A):
-scegliere una source-of-truth mantenibile, rendere riproducibile la patch/build
-production e separare con chiarezza seam di test e codice storico. La roadmap
+Il boundary corrente resta il consolidamento della sorgente production
+(Phase A). D292/01 ha chiuso l'inventario A1; il passo successivo A3 è scegliere
+una source-of-truth mantenibile, seguito dalla patch/build riproducibile A4 e
+dalla separazione dei seam di test e del tooling storico. La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
 Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
@@ -527,7 +583,9 @@ USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
 CURRENT_PHASE=A
 PHASE_ORDER=A>B>C>D>E>F
-NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
+D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
+PHASE_A_A1=COMPLETED
+NEXT_BOUNDARY=PHASE_A_A3_SOURCE_OF_TRUTH_TOPOLOGY
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
