@@ -97,7 +97,7 @@ policy_installed_exact() {
     -v name="$policy_name" '$1 == priority && $2 == name { count++ } END { print count + 0 }')
   [[ $priority_matches -eq 1 ]] || fail policy_module_priority_drift
   checksum=$(policy_checksum)
-  [[ $checksum == "$expected" ]] || fail policy_module_drift
+  [[ $checksum == "sha256:$expected" ]] || fail policy_module_drift
 }
 
 validate_selinux_boundary() {
