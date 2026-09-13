@@ -153,10 +153,12 @@ production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. La fase corrente
 resta **Phase B**. Il corrective D293 ha risolto R9 nel driver e R1–R6 nel
-percorso operatore, ma D293/04 è ora `BLOCKED_OFFLINE`: il KCM standard non
-espone un fence pre-`EnrollStart` sul budget cumulativo della sessione GUI.
-L'operator-run precedente non deve essere eseguita; serve una decisione umana
-sul metodo R7.
+percorso operatore. Il 13 settembre 2026 l'Utente ha deciso R7 per D293/04: una
+sola enrollment nella GUI KDE nativa è protocollo operatore, senza introdurre
+nel driver production una policy sui clic. F1–F4 sono chiusi offline, il
+percorso completo di preparazione e recovery è stato ripristinato e il kit è
+`READY_OFFLINE_HUMAN_GATE_PENDING`. Questo non è un PASS live: il prossimo
+boundary è l'esecuzione manuale dell'Utente.
 
 Principi trasversali della roadmap:
 
@@ -288,7 +290,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — D293 corrective chiuso offline, gate R7 bloccato
+### Stato corrente Phase B — D293/04 pronto offline, Human Gate pendente
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -365,13 +367,18 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
-D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
-D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
+D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
+D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
+D293_04_PER_ACTION_TECHNICAL_FENCES=UNCHANGED
+D293_04_VERIFY_SERIES=SCRIPT_BOUNDED_MAX_3_STOP_FIRST_MATCH
+D293_04_RUN_TOTALS=OBSERVED_PROTOCOL_BOUNDS_ACTIONS_5_CONTACTS_24
+D293_04_F1_TO_F4=CORRECTED_OFFLINE
+D293_04_LIVE_EXECUTION=NOT_PERFORMED
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
-NEW_LIVE_REQUIRED_NOW=false
+NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
+NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -548,7 +555,7 @@ Report e validator:
 `analysis/D293/D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md` e
 `analysis/D293/validate_d293_03.py`.
 
-### Stato D293/04 — corrective operatore, live bloccata su R7
+### Stato D293/04 — corrective V3 chiuso offline, Human Gate pendente
 
 Il corrective ha riesaminato direttamente gli script del piccolo experiment
 `d293-kde-new-user`, mantenendo invariato il common harness. R1–R6 sono chiusi
@@ -561,57 +568,61 @@ cardinalità e un solo `action=` per record; durante una finestra post-action
 non ancora validata la telemetria parziale usa `UNKNOWN`, senza trasformare
 errori o dati mancanti in zero.
 
-R7 resta parzialmente bloccato. Il payload precontrolla ciascuna delle tre
-VERIFY e non genera un quarto tentativo, ma il KCM Plasma 6.7.5 non espone al
-kit un hook prima di ogni `EnrollStart`. Una seconda enrollment inattesa nella
-stessa sessione GUI può essere rilevata nel journal solo dopo l'avvio; il tetto
-driver di venti contatti limita la singola ENROLL ma non il numero cumulativo
-di action UI. Questo non è un fence preventivo e non viene presentato come
-tale.
+La decisione esplicita dell'Utente del 13 settembre 2026 chiude R7 per questo
+gate: una sola enrollment avviata nel KCM è protocollo manuale e non richiede
+un freno click-specific nel driver. Una action UI extra è deviazione
+terminale osservata, non una operazione dichiarata impossibile. I fence della
+singola action restano invariati; la serie VERIFY è imposta dallo script a un
+massimo di tre tentativi con stop al primo MATCH. I totali di cinque action e
+24 contatti sono bound di accettazione del protocollo osservato.
 
-Per evitare una live priva del guardrail richiesto, l'experiment imposta
-`LIVE_CAPABLE=false`; il common launcher respinge `--operator-run` prima della
-capture/runtime gate, `prepare.sh` esce 3 senza build/sysfs/`pkexec`/deploy e
-`root-helper.sh --deploy` è bloccato. Non sono stati introdotti proxy fprintd,
-monitor race-based, contatori globali o policy driver test-specific. La
-recovery resta disponibile soltanto per un'eventuale predisposizione
-precedente/interrotta e conserva una capture per-run.
+F1–F4 sono corretti. Il wrapper compatibile con `ProtectSystem=strict` emette
+il marker al journal senza scrivere nel path pubblico; il supervisore attesta
+marker, servizio, MainPID stabile, executable e mapping/hash della candidate
+prima della pubblicazione sanitizzata. La raccolta journal separa lettura e
+filtro, quindi zero marker al delete non è un errore. Solo rollback PASS è
+terminale; cleanup recuperabile e anomalie d'integrità sticky restano distinti
+e storicizzati. `FINAL_RECOVERY=PASS` viene pubblicato soltanto dopo unmount,
+account cleanup e rimozione dei contenitori; intent PENDING/COMPLETE e resolver
+mantengono riprendibili i fallimenti temporanei. La capture base per-run è
+validata `root:root` `0711` senza rifiutare le run storiche.
 
-Le prove comportamentali attraversano i veri payload, sanitizer, classifier e
-`recover()` con soli esterni mock in `/tmp`: 24/24 PASS, inclusi prompt prima
-dell'input, MATCH/NO_MATCH/duplicato, claim KCM trattenuto, errori distinti,
-marker/campi mancanti o duplicati, telemetria post-action `UNKNOWN`, action UI
-extra, rollback/supervisor/template/unmount/
-identity failure e seconda recovery. Common harness 14/14 PASS e
-`--offline-test` da cwd esterna PASS. Il validator è
-`PASS_BLOCKED`; nessuna ACL/PolicyKit/KCM/account/mount/journal/USB reale è
-stata esercitata.
+`prepare.sh` ricostruisce la candidate production, applica i preflight target
+e invoca il deploy corrente con run-id; gli ingressi manuali sono riabilitati.
+Le regressioni attraversano gli script e le funzioni reali con soli effetti
+esterni simulati in `/tmp`: D293 33/33 PASS, common harness invariato 14/14
+PASS, validator `PASS_READY_OFFLINE` e common `--offline-test` da cwd esterna
+PASS con zero action sensor-reaching. Sandbox systemd, PolicyKit/KCM, ACL,
+account, mount, journal e USB reali restano target-only e Human Gate.
 
 ```text
-D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
+D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
 D293_04_COMMON_HARNESS_MODIFIED=false
 D293_04_MAX_ACTIONS=5
 D293_04_MAX_CONTACTS=24
 D293_04_MAX_TRANSPORT_RETRIES=0
 D293_04_VERIFY_ATTEMPT_LIMIT=3
 D293_04_R1_TO_R6=CORRECTED_OFFLINE
-D293_04_R7=PARTIAL_CORRECTED_BLOCKED_PREACTION_GUI_BUDGET
-D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
-D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
+D293_04_R7=APPLIED_USER_NATIVE_GUI_OPERATOR_PROTOCOL
+D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
+D293_04_F1_TO_F4=CORRECTED_OFFLINE
+D293_04_PREPARATION_ENTRYPOINT=IMPLEMENTED_VERIFIED_OFFLINE
+D293_04_LIVE_EXECUTION=NOT_PERFORMED
 CURRENT_PHASE=B
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
+NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
 ```
 
-La precedente formulazione `READY_OFFLINE` è superata senza invalidare D291 o
-D293/03 nel loro scope. Due dita, delete singolo/re-enroll, rename/name-reuse e
-reboot restano B5. Report, sintesi e test sono
+Il precedente blocker V2 sul fence pre-action resta storia, ma è superato
+dalla decisione R7 corrente senza invalidare D291 o D293/03 nel loro scope.
+Due dita, delete singolo/re-enroll, rename/name-reuse e reboot restano B5.
+Report, sintesi e test sono
 `analysis/D293/D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md`,
 `analysis/D293/D293_CORRECTIVE_V2_ROCKY_NATIVE_ACTIONS.md`,
 `analysis/D293/validate_d293_04.py` e
 `analysis/D293/test_d293_04_operator_scripts.py`. Phase B potrà avanzare solo
-dopo la decisione R7 e un successivo Human Gate nuovamente verificato.
+dopo il nuovo Human Gate e l'evidenza live, non dai mock offline.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -835,14 +846,13 @@ chiuso il difetto di lifecycle che impediva IDENTIFY ripetute nello stesso
 logical open: ogni azione pulita usa ora un fresh resource rollover, mentre
 retry, cancel, drain incompleto e poison restano fail-closed.
 
-D293/04 non è però eseguibile. Il KCM Users standard non offre un punto di
-controllo prima di ciascun `EnrollStart`; quindi il requisito R7 di un budget
-tecnico pre-azione non può essere imposto dal solo kit senza introdurre un
-meccanismo diverso e materialmente più invasivo. I correttivi R1–R6 e la
-telemetria/parsing R7 sono chiusi offline, ma launcher, common harness e helper
-root rifiutano la live prima di build, deploy, capture o mutazioni host. La
-precedente dichiarazione `READY_OFFLINE` è superata. Serve una decisione
-esplicita dell'Utente sul boundary/metodo prima di qualsiasi nuovo kit live.
+D293/04 è ora pronto offline per il solo Human Gate dell'Utente. La decisione
+R7 usa il protocollo manuale nel KCM nativo e non introduce un contatore
+click-specific nel driver production. F1–F4, preparazione, runtime audit,
+journal e recovery sono chiusi da regressioni composizionali; il common
+harness resta invariato. La readiness offline non anticipa l'esito target:
+sandbox systemd, KDE/PolicyKit, nuovo UID, ACL, mount, journal e USB saranno
+provati soltanto dalla run manuale.
 La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
@@ -866,7 +876,7 @@ PM_DECISION=HUMAN_REQUIRED
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
@@ -888,12 +898,14 @@ PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
 D293_R9_REPEATED_IDENTIFY_SAME_OPEN=PASS_OFFLINE
-D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
-D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
-D293_04_PREACTION_KCM_ENROLL_BUDGET=UNENFORCEABLE_WITH_CURRENT_METHOD
+D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
+D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_LIVE_EXECUTION=NOT_PERFORMED
+D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
+D293_04_F1_TO_F4=CORRECTED_OFFLINE
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=USER_DECISION_ON_D293_04_R7_METHOD_OR_TEST_BOUNDARY
+NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

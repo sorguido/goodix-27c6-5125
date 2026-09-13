@@ -1,5 +1,46 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D293 corrective v2 — Rocky, action native e gate KDE
+# D293 corrective — Rocky, action native e gate KDE
+
+## Addendum V3 corrente — R7 deciso e F1–F4 chiusi offline
+
+Il 13 settembre 2026 l'Utente ha deciso che, limitatamente al gate D293/04,
+una sola enrollment nel KCM nativo è protocollo operatore e non richiede una
+policy sui clic nel driver production. Il corrective V3 conserva integralmente
+R9 e i risultati R1–R8 pertinenti, corregge F1–F4 e ripristina preparazione,
+`--deploy` e `--operator-run` per la futura esecuzione manuale.
+
+```text
+CURRENT_PHASE=B
+R7_METHOD_DECISION=APPLIED_USER_NATIVE_GUI_OPERATOR_PROTOCOL
+PRODUCTION_DRIVER_CHANGED_FOR_TEST_CLICKS=false
+R9_EXISTING_BEHAVIOR=PRESERVED
+F1=CORRECTED_OFFLINE_WRAPPER_JOURNAL_PLUS_MAINPID_EXE_CANDIDATE_MAP_ATTESTATION
+F2=CORRECTED_READ_THEN_FILTER_ZERO_DELETE_DISTINCT_FROM_ERROR
+F3=CORRECTED_RETRYABLE_CLEANUP_STICKY_INTEGRITY_HISTORY_PRESERVED
+F4=CORRECTED_FINAL_PASS_AFTER_ALL_CLEANUP
+GUI_SESSION_HARD_CAP_REQUIRED=false
+VERIFY_SERIES=MAX_3_STOP_FIRST_MATCH
+RUN_TOTALS_SEMANTICS=OBSERVED_PROTOCOL_BOUNDS
+COMMON_HARNESS_CHANGED=false
+PREPARATION_ENTRYPOINT=IMPLEMENTED_VERIFIED_OFFLINE
+RECOVERY_COMPOSITION_TESTS=PASS
+OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+LIVE_EXECUTED_BY_AI=false
+PROTECTED_MATERIAL_READ_BY_AI=false
+PHASE_B_CLOSED=false
+PM_DECISION=HUMAN_REQUIRED
+```
+
+Le prove correnti sono D293 33/33 e common harness 14/14 PASS, validator
+`PASS_READY_OFFLINE`, sintassi/diff-check PASS e common `--offline-test`
+PASS da cwd esterna con zero action sensor-reaching. F1 verifica marker,
+servizio, MainPID stabile, executable e mapping/hash della candidate senza
+esportare raw o `/proc`; F2 separa lettura journal e filtro; F3/F4 attraversano
+le funzioni reali di rollback, resolver, recovery e rimozione con soli effetti
+esterni simulati in `/tmp`. Restano target-only sandbox systemd, KDE/PolicyKit,
+nuovo UID, ACL, mount, journal e USB reali.
+
+## Stato V2 storico alla baseline 09184691
 
 Questo report sintetizza il corrective integrato D293/02–04. La matrice
 architetturale completa e le regressioni del driver sono in

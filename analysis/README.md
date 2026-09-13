@@ -9,10 +9,11 @@ costituisce autorizzazione live.
 La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
 `analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B resta corrente. Il corrective
-D293 ha risolto R9 nel driver e R1–R6 nel percorso operatore, ma D293/04 è
-`BLOCKED_OFFLINE`: il KCM standard non espone il fence pre-`EnrollStart`
-richiesto per il budget cumulativo R7. Nessuna operator-run è pronta e nessuna
-fase autorizza implicitamente live o modifiche del repository pubblico.
+D293 ha risolto R9 nel driver e R1–R6 nel percorso operatore. La decisione
+Utente R7 del 13 settembre 2026 adotta il protocollo KDE nativo, senza policy
+click-specific nel driver production. D293/04 chiude F1–F4 offline ed è
+`READY_OFFLINE_HUMAN_GATE_PENDING`; nessuna fase autorizza implicitamente live
+da parte dell'AI o modifiche del repository pubblico.
 
 D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
 `production/` come autorità di composizione e provando clean build normale,
@@ -54,21 +55,25 @@ conferma l'uso delle API fprintd standard senza GUI Goodix. Report, result,
 runner e validator sono `D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md`,
 `D293_03_OFFLINE_RESULT.env`, `d293_03_fprintd_integration.sh` e
 `validate_d293_03.py`. I veri B3/B4 non sono stati eseguiti e Phase B non è
-chiusa. Il successivo boundary è una decisione umana sul fence R7, non
-l'operator-run del kit precedente.
+chiusa. Il successivo boundary è il Human Gate operatore D293/04, non una nuova
+decisione sul metodo R7 già definito.
 
 D293/04 mantiene
 `operator_kit/live_probe/experiments/d293-kde-new-user/` sul common harness
 invariato. Le regressioni dei veri script chiudono offline dito/duplicato,
 separazione privilegiata del journal, marker/provenance, streaming, rilascio
-KCM, conteggi fail-closed e recovery attribuita/idempotente. Il precheck vale
-per le tre VERIFY; un'eventuale ENROLL UI extra è rilevabile solo dopo l'avvio.
-Per questo `LIVE_CAPABLE=false`, `prepare.sh`, `--operator-run` e `--deploy`
-sono bloccati prima di azioni privilegiate o sensor-reaching. Report,
+KCM, conteggi fail-closed e recovery attribuita/idempotente. Una ENROLL nel KCM
+è regola del protocollo operatore; un'eventuale action UI extra è deviazione
+terminale osservata, non un boundary sui clic nel driver. VERIFY resta bounded
+dallo script a tre tentativi con stop al primo MATCH. F1–F4 chiudono inoltre
+pubblicazione runtime sotto `ProtectSystem=strict`, zero-event journal e
+rollback/recovery composizionale. `prepare.sh`, `--operator-run` e `--deploy`
+sono ripristinati e verificati offline. Report,
 correttivo sintetico, validator e test sono
 `D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md`,
 `D293_CORRECTIVE_V2_ROCKY_NATIVE_ACTIONS.md`, `validate_d293_04.py` e
-`test_d293_04_operator_scripts.py`. Phase B non è chiusa.
+`test_d293_04_operator_scripts.py`. Il kit è pronto per il Human Gate
+dell'Utente; Phase B non è chiusa e non si inferisce alcun PASS live.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

@@ -1,7 +1,77 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D293/04 — corrective KDE/new-user e blocker R7
+# D293/04 — gate KDE/new-user nativo e corrective F1–F4
 
-## Decisione PM
+## Stato corrente V3 — decisione Utente R7 applicata
+
+La decisione esplicita del 13 settembre 2026 approva per questo gate il
+protocollo operatore nella GUI KDE nativa e rifiuta una policy di click nel
+driver production. Non è richiesto un hard-cap preventivo della sessione GUI;
+una action manuale extra è una deviazione osservata che rende la run non PASS.
+I fence tecnici per singola action restano invariati e la serie VERIFY resta
+bounded a tre con stop al primo MATCH.
+
+```text
+REVIEW_BASELINE=423bc051e9acb6b3e1bc1bb8824e93d63e28adfe
+CURRENT_PHASE=B
+R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
+PRODUCTION_DRIVER_CHANGED_FOR_TEST_CLICKS=false
+GUI_SESSION_HARD_CAP_REQUIRED=false
+PER_ACTION_TECHNICAL_FENCES=UNCHANGED
+VERIFY_SERIES_CONTROL=SCRIPT_BOUNDED
+RUN_TOTALS_CHECK=OBSERVED_PROTOCOL_BOUNDS
+COMMON_HARNESS_CHANGED=false
+PREPARATION_ENTRYPOINT=IMPLEMENTED_VERIFIED_OFFLINE
+D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_LIVE_EXECUTION=NOT_PERFORMED
+PHASE_B_CLOSED=false
+PRODUCTION_READY=false
+```
+
+### F1–F4
+
+- **F1 CORRECTED_OFFLINE:** il wrapper non scrive più in
+  `/run/goodix-d293-04-public`. Verifica il manifest, emette su stdout un marker
+  esatto HEAD/hash/run ed esegue fprintd; il supervisore root legge la finestra
+  journal, richiede il servizio attivo e attesta `MainPID`, executable atteso e
+  l’unico mapping `libfprint-2.so*` sulla candidate per-run prima di pubblicare
+  solo il marker sanitizzato. PID, maps e raw journal non vengono esportati.
+  La unit reference e la configurazione effettiva osservata read-only usano
+  `ProtectSystem=strict` senza write exception per quel path. Il test attraversa
+  wrapper e funzione di pubblicazione reali con daemon/journal simulati; la
+  sandbox systemd reale resta target-only.
+- **F2 CORRECTED:** `collect_epoch_journal()` legge la finestra fprintd senza
+  `--grep`, controlla il return code e filtra localmente in storage privato.
+  Delete accetta zero marker anche con output vuoto, `-- No entries --` o sole
+  righe non pertinenti; ENROLL/VERIFY vuoti ed errori reali falliscono. Un
+  marker durante delete viene conservato e rende il payload non PASS.
+- **F3 CORRECTED:** solo un rollback PASS è terminale. Runtime ripristinato,
+  cleanup recuperabile e failure d’integrità sono distinti; retry di solo
+  cleanup non ripete rimozioni/daemon-reload, ma rinormalizza il servizio allo
+  stato iniziale. Digest/identità incoerenti sono sticky, la baseline non viene
+  aggiornata e la history append-only conserva anche i FAIL legacy.
+- **F4 CORRECTED:** `FINAL_RECOVERY=PASS` viene scritto atomicamente dopo
+  unmount, trasferimento capture, rimozione account, cleanup pubblico/privato e
+  audit finale. L’intent PENDING/COMPLETE rende ripetibile un failure atomico
+  dopo chown; il resolver non salta una run con contenitori residui e la
+  recovery senza `run.env` pulisce un deploy fallito soltanto dopo rollback
+  PASS, account assente e mount assente.
+- **CAPTURE BASE CORRECTED:** il deploy crea o valida la base storica prima
+  della collisione per-run come directory reale `root:root` `0711`; supervisor
+  e resolver la rivalidano senza cancellare le run precedenti. Digest recovery
+  mancante/malformato e GID originale mancante/incoerente diventano failure
+  d’integrità sticky.
+
+Le regressioni D293 (33/33 PASS) eseguono le funzioni reali con soli confini
+esterni simulati in `/tmp`: publication e journal, PID/executable/maps,
+capture-base, residual template→retry, stop temporaneo,
+failure public/private/final publication, intent interrotto, sticky
+identity/digest/GID, import FAIL legacy, cleanup deploy senza run e idempotenza.
+Non sono stati usati USB, root, pkexec, account, mount, systemd o journal reali.
+
+La procedura operatore corrente è in
+`operator_kit/live_probe/experiments/d293-kde-new-user/README_IT.md`.
+
+## Decisione V2 storica, superata limitatamente al metodo R7
 
 La readiness del kit precedente è superata. Il corrective R1–R7 è stato
 implementato e verificato offline, ma il gate non è pronto per l'operatore:

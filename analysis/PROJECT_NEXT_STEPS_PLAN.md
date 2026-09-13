@@ -13,10 +13,11 @@ e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
 `VerifyStart(any)`, l'handoff fprintd IDENTIFY→ENROLL sicuro e, col corrective
 R9, le IDENTIFY esplicite ripetute nello stesso open. D293/03
 attraversa il vero daemon fprintd con più nomi principal e fissa il contratto
-statico del KCM Users Plasma 6.7.5. D293/04 chiude offline R1–R6 e i parser R7,
-ma il relativo experiment resta disabilitato: il KCM non espone un fence
-pre-`EnrollStart` per il budget cumulativo della sessione GUI. Il successivo
-boundary è la decisione umana su R7, non l'operator-run precedente.
+statico del KCM Users Plasma 6.7.5. La decisione Utente R7 del 13 settembre
+2026 fissa per D293/04 il protocollo operatore nella GUI nativa, senza policy
+click-specific nel driver. Il corrective F1–F4 ripristina preparazione,
+attestazione runtime e recovery e chiude offline con 33/33 regressioni D293.
+Il successivo boundary è l'operator-run Human Gate, non un'altra decisione R7.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -85,14 +86,16 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
-D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
-D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
+D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
+D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_F1_TO_F4=CORRECTED_OFFLINE
+D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
+D293_04_LIVE_EXECUTION=NOT_PERFORMED
 PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
-NEXT_WORK_CLASS=D293_LOCAL_REPLAN_AND_CORRECTIVE
-NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
+NEXT_WORK_CLASS=D293_04_OPERATOR_HUMAN_GATE
+NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
 ```
 
 ## Stato verificato del progetto
@@ -304,15 +307,16 @@ hash-pinned del KCM Users Plasma 6.7.5 conferma discovery, list, enroll/
 re-enroll e delete tramite le API fprintd standard, senza UI Goodix; il KCM
 non è stato avviato.
 
-D293/04 riusa il common harness invariato e corregge offline dito/duplicato,
-separazione dei privilegi journal, marker/provenance, prompt streaming,
-rilascio KCM, conteggi e recovery attribuita/idempotente. I precheck impongono
-fino a tre VERIFY e nessun quarto tentativo. Tuttavia una seconda ENROLL
-avviata dalla stessa sessione KCM può essere soltanto rilevata a posteriori:
-il kit non può impedirla prima che raggiunga fprintd. `LIVE_CAPABLE=false` e
-gli entrypoint di prepare/operator-run/deploy sono quindi bloccati prima di
-build, privilegio o sensore. Riabilitarli richiede una decisione sul metodo di
-enforcement R7; Phase B e B3/B4 reali restano aperti.
+D293/04 riusa il common harness invariato. La decisione Utente R7 tratta una
+sola ENROLL nel KCM come protocollo operatore: un'azione extra è deviazione
+terminale osservata, non un evento che il driver production deve intercettare.
+I fence della singola action restano invariati e lo script impone fino a tre
+VERIFY, stop al primo MATCH e nessun quarto tentativo. F1–F4 correggono la
+pubblicazione sotto `ProtectSystem=strict`, distinguono zero eventi delete da
+errore journal, rendono riprendibili i rollback temporanei e pubblicano il PASS
+recovery solo dopo il cleanup finale. Preparazione, operator-run e deploy sono
+nuovamente implementati e pronti offline; Phase B e B3/B4 reali restano aperti
+fino all'evidenza del Human Gate.
 
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
@@ -458,8 +462,8 @@ D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
 validator statico, senza accesso ai secret. D293/02 chiude B2 offline con
 implementazione e test, incluso il corrective R9 same-open IDENTIFY. D293/03
 esaurisce i prerequisiti offline di B3/B4 e il contratto statico KDE
-installato. D293/04 non è eseguibile: il prossimo boundary è la decisione
-dell'Utente sul fence preventivo R7 per la sessione GUI.
+installato. D293/04 è pronto offline, ma non ancora provato sul target: il
+prossimo boundary è l'esecuzione manuale dell'Utente secondo il README corrente.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
@@ -483,13 +487,14 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
-D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
-D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
+D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
+D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_F1_TO_F4=CORRECTED_OFFLINE
+D293_04_LIVE_EXECUTION=NOT_PERFORMED
 PHASE_B_CLOSED=false
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
+NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
 ```
