@@ -1,96 +1,116 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D293/04 — kit Human Gate KDE/new-user
+# D293/04 — corrective KDE/new-user e blocker R7
 
-## Esito offline
+## Decisione PM
 
-`operator_kit/live_probe/experiments/d293-kde-new-user/` materializza il primo
-discriminante live rimasto per B3/B4 sul common harness esistente, che non è
-stato modificato. Il kit è pronto offline ma non è stato eseguito: ogni accesso
-USB, uso di privilegi e azione sensor-reaching resta dell'Utente.
+La readiness del kit precedente è superata. Il corrective R1–R7 è stato
+implementato e verificato offline, ma il gate non è pronto per l'operatore:
+il KCM Users Plasma 6.7.5 non espone al kit un hook prima di ogni
+`EnrollStart`. Chiudere la GUI dopo la prima enrollment e verificare il
+journal rileva un'ulteriore action soltanto dopo che può avere raggiunto il
+driver; è accounting retrospettivo, non un fence tecnico sul budget cumulativo
+della sessione GUI.
+
+Non è stato introdotto un proxy fprintd, un monitor race-based, un contatore
+globale del daemon o una policy driver specifica del test. Sarebbero un cambio
+materiale del metodo e interferirebbero con le normali action native appena
+corrette in R9. `LIVE_CAPABLE=false`, `prepare.sh` termina con codice 3 prima
+di build o privilegio, il common launcher respinge `--operator-run` prima di
+creare la capture e `root-helper.sh --deploy` è disabilitato.
 
 ```text
-D293_04_OPERATOR_KIT=READY_OFFLINE
-D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
+HEAD=091846914d02f461d4af659ad5de17c0ba4c5363
 CURRENT_PHASE=B
+WORK_CLASS=D293_LOCAL_REPLAN_AND_CORRECTIVE
+D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
+D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
+D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
 ```
 
-## Confine provato dal futuro operator-run
+## Esito R1–R8
 
-La preparazione richiede `development`, `HEAD=origin/development`, critical set
-pulito, un solo `27c6:5125`, target Fedora 44/Plasma 6.7.5 esatto e runtime
-D285/D286 integro. Costruisce la candidate dalla source-of-truth `production/`
-e la rende disponibile a fprintd esclusivamente sotto `/run`, con manifest
-SHA-256, drop-in systemd transiente e rollback. Non modifica PAM né file
-package-owned.
+| Rilievo | Esito | Evidenza offline |
+| --- | --- | --- |
+| R1 dito/duplicate-check | CORRECTED | Payload e README richiedono un dito fisico consapevolmente non registrato; duplicato è distinto, terminale e senza ENROLL/retry. |
+| R2 privilegi/path | CORRECTED_OFFLINE | Il nuovo UID non usa journal/systemctl; il supervisor root pubblica soltanto marker whitelistati. Path pubblico e privato hanno modi distinti e la capture è per-run. ACL/PolicyKit autentiche restano target-only. |
+| R3 marker/provenance | CORRECTED | Normalizzazione MESSAGE esatta, cardinalità, marker mancante/duplicato/SHA errato e classifier self-contained senza `/run` sono provati. |
+| R4 interazione | CORRECTED | Tutti i prompt hanno newline; sanitizer fa flush; test streaming vede la domanda prima dell'input e copre EOF/timeout. |
+| R5 rilascio KCM | CORRECTED_OFFLINE | Pulsante finale + chiusura normale, attesa della fine del processo prima di VERIFY, riapertura separata per delete; claim trattenuto blocca il flusso. Il binario target non è stato avviato. |
+| R6 recovery | CORRECTED_OFFLINE | Rollback propagato e serializzato, fine reale supervisor, identità UID/GID/home, unmount fail-closed, intent atomico, seconda recovery idempotente e capture preservata sono attraversati sulla funzione `recover()` reale con soli comandi esterni mock. |
+| R7 conteggi/budget | CORRECTED_PARTIAL_BLOCKED | `fprintd-list`, campi audit e cardinalità `action=` sono fail-closed; durante una finestra post-action non ancora validata i conteggi parziali sono `UNKNOWN`, mai zero inventati. VERIFY ha precheck e massimo tre tentativi. L'action UI extra viene rilevata post hoc ma non impedita prima di `EnrollStart`: blocker unico. |
+| R8 provenance | CORRECTED | Callback privati Fedora, copia Rocky di sola parità, origine pristine, consumer Goodix e decisione R9 sono registrati nei tre ledger canonici; patch e hash production sono coerenti. |
 
-Solo dopo il deployment l'operatore crea da KCM Users il principal locale
-fisso `d293-phase-b-test`. Il supervisore attende la chiusura del KCM della
-sessione originale, arresta l'eventuale fprintd socket-activated e pubblica
-`READY_FOR_NEW_USER` soltanto a daemon inattivo. Il nuovo UID usa una vera
-sessione Plasma/Wayland e il solo KCM standard per registrare e cancellare una
-impronta. `fprintd-verify <utente>` esercita `VerifyStart(any)` fino a tre volte,
-con stop al primo MATCH e nessun quarto tentativo.
+La sequenza simulata mantiene una IDENTIFY di duplicate-check, una ENROLL a
+otto stage/fino a venti contatti e fino a tre VERIFY, con `MAX_ACTIONS=5`,
+`MAX_CONTACTS=24` e retry transport/secure/post zero. Gli audit autentici
+confermano che il campo `first_image` vale uno per IDENTIFY e zero per ENROLL;
+la regressione usa questa forma reale. Il totale contatti resta
+`1 + enroll_contacts + verify_attempts`.
 
-Il budget tecnico deriva dagli audit production, non da un conteggio manuale:
-una epoch IDENTIFY, una ENROLL con otto stage e fino a venti contatti, più una,
-due o tre epoch VERIFY. Sono quindi imposti `MAX_ACTIONS=5`,
-`MAX_CONTACTS=24` e retry transport/secure/post pari a zero. Le eventuali
-ripetizioni biometriche richieste esplicitamente dall'enrollment KCM restano
-distinte dai retry automatici.
+## Verifiche eseguite
 
-Il namespace fprintd dell'utente preesistente è digestato internamente su
-contenuto e metadata prima e dopo; viene esportato soltanto il booleano di
-uguaglianza. Cleanup e recovery richiedono cancellazione KCM del template del
-test user, rollback runtime, logout, rimozione dell'account/home esatto e audit
-D285/D286 finale. Il supervisore termina esplicitamente dopo il rollback anche
-su signal; la recovery post-reboot ricava l'identità originale dal chiamante
-`pkexec`. La capture vive sotto `/var/tmp`, non nella home eliminabile del test
-user; al recovery vengono rifiutati file speciali/ownership inattesa e il tree
-viene trasferito all'utente originale prima di `userdel -r`. Capture e journal
-sono sanitizzati e non contengono password, template, immagini, hash template
-o materiale protetto.
+- `analysis/D293/test_d293_04_operator_scripts.py`: 24/24 PASS. Attraversa
+  payload, sanitizer, classifier e `recover()` reali con esterni mock in
+  `/tmp`: MATCH al primo, NO_MATCH→MATCH, tre NO_MATCH senza quarto,
+  duplicato, errori list/DBus/PolicyKit/device busy/tecnici, claim KCM
+  trattenuto, marker/campi errati o duplicati, telemetria post-action `UNKNOWN`,
+  action UI extra, rollback/supervisor/
+  template/unmount/identity failure e recovery ripetuta.
+- common harness: 14/14 PASS; i quattro file comuni restano invariati.
+- common `--offline-test` da cwd `/tmp`: PASS con capture autocontenuta.
+- common `--operator-run`: rifiuto `EXPERIMENT_NOT_LIVE_CAPABLE` prima della
+  capture; `prepare.sh`: `BLOCKED`, rc 3.
+- sintassi di tutti gli script experiment e `git diff --check`: PASS.
+- R9 sul vero adattatore: secure-session 34/34 normal e 34/34 ASan/UBSan,
+  incluso il fatal host-processing con poison e zero reacquire;
+  FpImageDevice 32/32 normal e 32/32 ASan/UBSan.
+- clean build production normal e sanitizer: PASS; ABI
+  `LIBFPRINT_2.0.0`, SONAME `libfprint-2.so.2`, zero RPATH e zero simboli
+  host/test-only.
+- D293/03 vero fprintd su bus privato/virtual image: PASS, due nomi principal
+  ma un solo UID Unix; non è prova del lifecycle Goodix o multi-account reale.
 
-## Riesame metodologico
+## Real Target Compatibility Gate
 
-1. D291 usava il principal già esistente e un percorso CLI; D293/04 usa la
-   source production corrente, crea il principal dopo il deployment e passa
-   dalla UI KDE realmente installata in una nuova sessione.
-2. L'ipotesi è che driver device-wide e materiale runtime globale si integrino
-   con risoluzione, storage e isolamento per un UID creato post-deployment,
-   mantenendo invariato il principal preesistente.
-3. Un fallimento non abilita retry live automatici: rollback e capture
-   identificano il boundary discovery/PolicyKit/handoff/storage/verify/cleanup;
-   la decisione successiva sarà specifica a quel boundary oppure `REPLAN`.
+Query read-only confermano Fedora 44 KDE x86_64, fprintd
+`1.94.5-5.fc44`, libfprint `1.94.100-1.fc44`, Plasma 6.7.5, systemd 259.8,
+polkit 127, SONAME `libfprint-2.so.2` e SELinux disabilitato. Il Flatpak SDK
+Freedesktop 25.08 locale chiude le build senza rete; i pacchetti `-devel` host
+non sono installati e non sono necessari al builder canonico.
 
-Due dita, delete singolo/re-enroll, rename/name-reuse e reboot non sono inclusi
-in questo primo gate e restano B5. Phase B non può chiudersi senza l'esecuzione
-umana e la review della relativa capture.
+Non sono stati verificati con un vero nuovo UID/KCM: ACL effettive del laptop,
+decisioni PolicyKit, rilascio della GUI installata, journal del servizio,
+creazione/rimozione account, mount, storage autentico e comportamento USB.
+Questi limiti non possono trasformare i mock in `PASS_LIVE`.
 
-## Verifiche offline
+## Sequenza e recovery preservate, ma non eseguibili
 
-Il validator statico è `analysis/D293/validate_d293_04.py`. Verifica sintassi ed
-eseguibilità degli hook, budget, marker audit production, derivazione dei
-contatti, stage enrollment, digest del principal, quiescenza prima di READY,
-mount read-only, Git `safe.directory` solo via environment e assenza di
-modifiche al common harness. Il percorso `--offline-test` prova inoltre la
-compatibilità executable del payload col common harness senza USB o privilegi.
+Il percorso progettato resta descritto in
+`operator_kit/live_probe/experiments/d293-kde-new-user/README_IT.md`: utente
+originale, deployment transiente, creazione KDE post-deploy, attesa del valore
+`READY_FOR_NEW_USER`, sessione del nuovo UID, dito non già registrato,
+duplicate-check, enrollment, chiusura KCM, fino a tre VERIFY, riapertura per
+delete, logout e recovery dall'utente originale. La sessione originale può
+restare aperta senza altri consumer fingerprint; password e richieste Polkit
+restano nella UI e mai nei log.
 
-Risultati Executor:
-
-- `python3 analysis/D293/validate_d293_04.py`: PASS;
-- operator-run simulata con `--offline-test` da cwd `/tmp`: PASS;
-- common harness regression: 14/14 PASS;
-- clean build production `normal`: PASS, ABI `LIBFPRINT_2.0.0`, nessun
-  RPATH/host-test symbol, rete non condivisa e zero enumerazione USB;
-- `production/check-source.sh`: PASS, inclusi source/digest/patch/path set;
-- `analysis/D293/validate_d293_03.py`: PASS;
-- `git diff --check`: PASS.
+La capture progettata vive in
+`/var/tmp/goodix-d293-04-captures/<run-id>/capture/`. `recover.sh` resta
+utilizzabile solo per un'eventuale predisposizione precedente/interrotta:
+propaga rollback, non elimina account o contenitori su identità/mount/template
+ambigui e conserva la capture. Non è un comando per avviare una nuova run.
 
 ```text
-EXECUTABLE_CLOSURE=READY_OFFLINE_HUMAN_GATE_PENDING
+EXECUTABLE_CLOSURE=PASS_OFFLINE_LIVE_ENTRYPOINTS_BLOCKED
+R1_TO_R6=CORRECTED_OFFLINE
+R7=PARTIAL_CORRECTED_BLOCKED_PREACTION_GUI_BUDGET
+R8=CORRECTED
 REAL_USB=0
-SUDO_OR_PKEXEC_EXECUTED_BY_AI=0
-PROTECTED_MATERIAL_READ=0
+SUDO_ROOT_OR_PKEXEC_EXECUTED_BY_AI=0
+PROTECTED_MATERIAL_READ_BY_AI=false
+LIVE_EXECUTED_BY_AI=false
+PM_DECISION=HUMAN_REQUIRED
+NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
 ```

@@ -8,10 +8,11 @@ costituisce autorizzazione live.
 
 La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B resta corrente; D293/04 rende
-pronto offline il kit per la vera prova KDE/new-user, la cui operator-run è il
-prossimo Human Gate;
-nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B resta corrente. Il corrective
+D293 ha risolto R9 nel driver e R1–R6 nel percorso operatore, ma D293/04 è
+`BLOCKED_OFFLINE`: il KCM standard non espone il fence pre-`EnrollStart`
+richiesto per il budget cumulativo R7. Nessuna operator-run è pronta e nessuna
+fase autorizza implicitamente live o modifiche del repository pubblico.
 
 D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
 `production/` come autorità di composizione e provando clean build normale,
@@ -34,8 +35,11 @@ disabilitato. Report e validator sono
 live è stato raggiunto.
 
 D293/02 chiude B2 offline: la production annuncia IDENTIFY, preserva VERIFY e
-permette unicamente il passaggio clean/no-match IDENTIFY→ENROLL con risorse di
-transport fresche. Il test integrato passa normal e ASan/UBSan; il modello
+permette il passaggio clean/no-match IDENTIFY→ENROLL con risorse di transport
+fresche. Il corrective R9 aggiunge il rollover fresh-resource per una nuova
+IDENTIFY esplicita dopo outcome host pulito nello stesso open, necessario alla
+serie PAM multi-dito; retry/error/cancel restano fenced. Il test integrato
+passa normal e ASan/UBSan; il modello
 storage content-free copre due principal, più dita, restart, replace, delete e
 name reuse. Report, validator e modello sono rispettivamente
 `D293_02_MULTI_FINGER_IDENTIFY_ENROLL_AND_STORAGE_MODEL.md`,
@@ -50,21 +54,21 @@ conferma l'uso delle API fprintd standard senza GUI Goodix. Report, result,
 runner e validator sono `D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md`,
 `D293_03_OFFLINE_RESULT.env`, `d293_03_fprintd_integration.sh` e
 `validate_d293_03.py`. I veri B3/B4 non sono stati eseguiti e Phase B non è
-chiusa. Prossimo boundary:
-`D293_04_OPERATOR_RUN_HUMAN_GATE`.
+chiusa. Il successivo boundary è una decisione umana sul fence R7, non
+l'operator-run del kit precedente.
 
-D293/04 materializza
+D293/04 mantiene
 `operator_kit/live_probe/experiments/d293-kde-new-user/` sul common harness
-invariato. Il futuro operator-run usa la build production corrente e un
-runtime transiente, crea l'account dal KCM dopo il deployment, attraversa una
-vera sessione Plasma del nuovo UID, gestisce una sola impronta esclusivamente
-dal KCM e prova `VerifyStart(any)` fino a tre volte. Budget e accounting sono
-derivati dagli audit production (`5` action, `24` contatti, retry transport
-zero); il namespace preesistente è confrontato internamente su contenuto e
-metadata e viene esportato soltanto un booleano. Report e validator sono
-`D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md` e `validate_d293_04.py`. Il kit è
-`READY_OFFLINE`; live, USB e privilegi restano `HUMAN_REQUIRED` e Phase B non
-è chiusa.
+invariato. Le regressioni dei veri script chiudono offline dito/duplicato,
+separazione privilegiata del journal, marker/provenance, streaming, rilascio
+KCM, conteggi fail-closed e recovery attribuita/idempotente. Il precheck vale
+per le tre VERIFY; un'eventuale ENROLL UI extra è rilevabile solo dopo l'avvio.
+Per questo `LIVE_CAPABLE=false`, `prepare.sh`, `--operator-run` e `--deploy`
+sono bloccati prima di azioni privilegiate o sensor-reaching. Report,
+correttivo sintetico, validator e test sono
+`D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md`,
+`D293_CORRECTIVE_V2_ROCKY_NATIVE_ACTIONS.md`, `validate_d293_04.py` e
+`test_d293_04_operator_scripts.py`. Phase B non è chiusa.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

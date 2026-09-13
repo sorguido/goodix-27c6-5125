@@ -37,13 +37,21 @@ def main() -> None:
         "device_class->features |= FP_DEVICE_FEATURE_IDENTIFY",
         "production_identify_enroll_handoff_armed",
         "production_identify_result_success",
+        "production_explicit_identify_reopen_count",
+        "production_verify_result_success",
         "!ctx->production_identify_result_match",
         "goodix_fpimage_device_reopen_for_capture_action",
         "goodix_fpimage_device_release_claim",
+        "action != FPI_DEVICE_ACTION_IDENTIFY",
+        "goodix_fpimage_device_verify_result",
     ):
         require(driver, needle)
     require(core, "cls->identify_result (self, error == NULL, result != NULL)")
+    require(core, "cls->verify_result (self, error == NULL")
+    require(core, "cls->verify_result (self, FALSE, FALSE)")
+    require(core, "cls->identify_result (self, FALSE, FALSE)")
     require(header, "(*identify_result) (FpImageDevice *dev")
+    require(header, "(*verify_result)   (FpImageDevice *dev")
     require(builder, "-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE")
     assert "GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE" not in builder
 
@@ -51,6 +59,8 @@ def main() -> None:
     print("FPRINTD_ANY_MULTI_PRINT_USES_IDENTIFY=true")
     print("FPRINTD_ENROLL_DUPLICATE_CHECK_PRECEDES_ENROLL=true")
     print("GOODIX_IDENTIFY_NO_MATCH_ENROLL_HANDOFF_BOUNDED=true")
+    print("GOODIX_R9_SAME_OPEN_IDENTIFY_ROLLOVER=true")
+    print("GOODIX_PROCESSING_RETRY_REOPEN=false")
     print("GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE_COUNT=0")
 
 

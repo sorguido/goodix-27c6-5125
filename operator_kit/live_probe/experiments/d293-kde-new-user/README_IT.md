@@ -50,8 +50,9 @@ deve supportare. Serve una decisione separata prima di riabilitare la live.
   UID/GID/home attribuita alla run, non rimuove un contenitore montato, conserva
   capture per-run ed è idempotente dopo successo.
 - R7 parziale: output `fprintd-list`, marker e campi audit sono validati con
-  cardinalità e tipo; errore comando non equivale a zero; la telemetria parziale
-  contiene solo conteggi osservati e dichiara `OBSERVATION_COMPLETE=false`.
+  cardinalità e tipo, incluso un solo campo `action=` per record; errore comando
+  non equivale a zero. Dopo una possibile action ancora non validata, la
+  telemetria parziale usa `UNKNOWN` e dichiara `OBSERVATION_COMPLETE=false`.
   Ogni VERIFY è precontrollata contro action/contact budget e non esiste un
   quarto tentativo. Rimane il blocker preventivo sull’action UI extra.
 

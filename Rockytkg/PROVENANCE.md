@@ -107,6 +107,21 @@ production fork. This is local LGPL-2.1-or-later adaptation and does not alter
 the preserved upstream commit/tree, original licensing, copyright, or the
 historical facts of the materialized libfprint submodule.
 
+D293/02 added the private optional callback `identify_result` to
+`libfprint/libfprint/{fpi-image-device.c,fpi-image-device.h}`. The D293 R9
+corrective at local commit `c540d676ef619e3e1f1667778fd902c59566b917`
+also adds the symmetric private `verify_result` callback and makes processing
+retry/fatal paths report an unsuccessful host outcome. Both changes are test
+parity with the Fedora production fork: neither callback is present in the
+materialized original at outer import commit
+`0b03b3af6ff9ad2d40ad606bf190ff033c4a34f0`, and neither is original Rocky
+behavior. The local callbacks carry only `success` and `match`, before the
+standard libfprint result report, so the APP12509 adapter can distinguish a
+clean explicit action boundary from fprintd's in-action retry path while
+waiting for asynchronous matching to finish. `src/goodixgf.c` remains
+byte-identical to the imported snapshot and does not register these callbacks.
+The upstream identities, licenses and copyright recorded above are unchanged.
+
 ## Snapshot maintenance rule
 
 Do not silently replace this directory with a newer upstream state.

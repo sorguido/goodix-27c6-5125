@@ -88,6 +88,23 @@ multi-sample enrollment template. The Goodix target maps VERIFY onto the same
 single-acquisition protocol graph already proven for IDENTIFY; no new wire
 protocol or persistent command family is introduced.
 
+D293/02 adds the private optional `identify_result` callback in
+`source/libfprint/{fpi-image-device.c,fpi-image-device.h}`. The D293 R9
+corrective at local commit `c540d676ef619e3e1f1667778fd902c59566b917`
+adds the corresponding private `verify_result` callback and unsuccessful
+notifications for processing retry/fatal paths. The core invokes each outcome
+callback after host matching and before the standard result report. This lets
+the local Goodix adapter defer per-action release until the asynchronous
+matcher is finished and prevents an automatic fprintd retry after an ambiguous
+outcome from being accepted as a new explicit action. Both callbacks are absent
+from the pristine Fedora anchor
+`f609c865f760768edb6a9e404b863ccd0569e1c8`; `identify_result` first entered
+the local tree at `cb918c6114f518d10d386d2b639eb3c8e5dd5f20` and
+`verify_result` at the corrective commit above. The copy under
+`Rockytkg/libfprint/` is test parity, not a source of either callback. No public
+symbol or public ABI is added; origin, LGPL-2.1-or-later license and upstream
+copyright remain unchanged.
+
 The Goodix-enabled D279/52 build links the separately ledgered Rockytkg R2
 preprocessor under `GPL-2.0-or-later`; that combined build is therefore
 distributed under GPL-compatible terms.  This local build policy does not

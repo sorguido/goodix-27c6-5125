@@ -3,18 +3,20 @@
 
 Data review: 13 settembre 2026
 
-Baseline D293/04: `development` a
-`e01cd6454c46919f818423085f50331d9e30b6ff`, con Phase A chiusa.
+Baseline del corrective D293: `development` a
+`091846914d02f461d4af659ad5de17c0ba4c5363`, con Phase A chiusa.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
 canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
 target-proven. D293/01 completa offline B1, senza auto-approvare la review PM,
 e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
-`VerifyStart(any)` e il solo handoff fprintd IDENTIFY→ENROLL sicuro. D293/03
+`VerifyStart(any)`, l'handoff fprintd IDENTIFY→ENROLL sicuro e, col corrective
+R9, le IDENTIFY esplicite ripetute nello stesso open. D293/03
 attraversa il vero daemon fprintd con più nomi principal e fissa il contratto
-statico del KCM Users Plasma 6.7.5. D293/04 rende pronto offline il relativo
-experiment sul common harness; il successivo boundary è la sua operator-run
-Human Gate, non ancora eseguita.
+statico del KCM Users Plasma 6.7.5. D293/04 chiude offline R1–R6 e i parser R7,
+ma il relativo experiment resta disabilitato: il KCM non espone un fence
+pre-`EnrollStart` per il budget cumulativo della sessione GUI. Il successivo
+boundary è la decisione umana su R7, non l'operator-run precedente.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -55,7 +57,8 @@ materiali protetti e chiude B1 offline. D293/02 chiude B2 offline con IDENTIFY
 su gallery completa, handoff ENROLL bounded e modello storage multi-principal.
 D293/03 esaurisce i prerequisiti offline di B3/B4: due nomi principal, ma un
 solo UID Unix, sul vero fprintd e storage temporaneo, più il contratto statico
-del KCM KDE.
+del KCM KDE. Il corrective del kit non sostituisce queste evidenze e non
+produce alcun risultato live.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -77,17 +80,19 @@ D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
 PHASE_B_B2=COMPLETED_OFFLINE
+R9_SAME_OPEN_IDENTIFY=CONFIRMED_AND_CORRECTED
 D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_OPERATOR_KIT=READY_OFFLINE
-D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
+D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
+D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
+D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
 PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
-NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
+NEXT_WORK_CLASS=D293_LOCAL_REPLAN_AND_CORRECTIVE
+NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
 ```
 
 ## Stato verificato del progetto
@@ -284,9 +289,12 @@ e il name reuse può ereditare dati stale. Con il driver corrente
 limite `VerifyStart(any)`: la policy `GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE`
 annuncia IDENTIFY e un callback core interno arma soltanto il passaggio
 clean/no-match a ENROLL. Il driver rilascia e riacquisisce claim, materiale e
-sessione; match, errore, cancellazione e action diverse non abilitano il
-passaggio. Il modello content-free copre due principal, più dita, restart,
-replace, delete e name reuse; l'hook account-delete resta integrazione host.
+sessione. Il corrective R9 consente inoltre una nuova IDENTIFY esplicita dopo
+un outcome host pulito nello stesso claim/open, necessario alla normale serie
+PAM con gallery multi-dito; match/no-match puliti restano distinti da processing
+retry, errore, cancellazione, non-drain e poison, che non riaprono risorse. Il
+modello content-free copre due principal, più dita, restart, replace, delete e
+name reuse; l'hook account-delete resta integrazione host.
 
 D293/03 esercita il vero daemon Fedora su bus privato: due nomi principal
 autorizzati via `setusername`, tre template sintetici, restart/list,
@@ -296,15 +304,15 @@ hash-pinned del KCM Users Plasma 6.7.5 conferma discovery, list, enroll/
 re-enroll e delete tramite le API fprintd standard, senza UI Goodix; il KCM
 non è stato avviato.
 
-D293/04 riusa il common harness invariato per il primo discriminante live
-B3/B4: deployment transiente della build production corrente, account creato
-dal KCM dopo il deploy, vera sessione Plasma/Wayland del nuovo UID, una
-impronta enroll/delete solo da KCM e `VerifyStart(any)` bounded a tre. Gli
-audit impongono IDENTIFY + ENROLL a otto stage/fino a venti contatti + fino a
-tre VERIFY (`MAX_ACTIONS=5`, `MAX_CONTACTS=24`, retry transport zero). Il
-principal preesistente è confrontato internamente su contenuto e metadata; il
-supervisore rende READY soltanto dopo aver fermato fprintd. Il kit è pronto
-offline, ma live/USB/pkexec non sono stati eseguiti dall'AI.
+D293/04 riusa il common harness invariato e corregge offline dito/duplicato,
+separazione dei privilegi journal, marker/provenance, prompt streaming,
+rilascio KCM, conteggi e recovery attribuita/idempotente. I precheck impongono
+fino a tre VERIFY e nessun quarto tentativo. Tuttavia una seconda ENROLL
+avviata dalla stessa sessione KCM può essere soltanto rilevata a posteriori:
+il kit non può impedirla prima che raggiunga fprintd. `LIVE_CAPABLE=false` e
+gli entrypoint di prepare/operator-run/deploy sono quindi bloccati prima di
+build, privilegio o sensore. Riabilitarli richiede una decisione sul metodo di
+enforcement R7; Phase B e B3/B4 reali restano aperti.
 
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
@@ -448,12 +456,13 @@ La Phase B è ora il boundary corrente. Il kit D291 è
 A1, D292/02 ha chiuso A3/A4 e la review PM
 D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
 validator statico, senza accesso ai secret. D293/02 chiude B2 offline con
-implementazione e test. D293/03 esaurisce i prerequisiti offline di B3/B4 e
-il contratto statico KDE installato. Il prossimo boundary richiede il vero scenario KDE con un nuovo
-utente locale ed è soggetto a Human Gate.
+implementazione e test, incluso il corrective R9 same-open IDENTIFY. D293/03
+esaurisce i prerequisiti offline di B3/B4 e il contratto statico KDE
+installato. D293/04 non è eseguibile: il prossimo boundary è la decisione
+dell'Utente sul fence preventivo R7 per la sessione GUI.
 
 ```text
-PM_DECISION=ACCEPT_AND_CONTINUE
+PM_DECISION=HUMAN_REQUIRED
 D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -469,16 +478,18 @@ D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
 PHASE_B_B2=COMPLETED_OFFLINE
+R9_SAME_OPEN_IDENTIFY=CONFIRMED_AND_CORRECTED
 D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_OPERATOR_KIT=READY_OFFLINE
-D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
+D293_04_OPERATOR_KIT=BLOCKED_OFFLINE
+D293_04_BLOCKER=R7_GUI_SESSION_BUDGET_NOT_ENFORCED_BEFORE_EXTRA_ENROLLSTART
+D293_04_LIVE_EXECUTION=BLOCKED_NOT_PERFORMED
 PHASE_B_CLOSED=false
-NEW_LIVE_REQUIRED_NOW=true
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
+NEXT_BOUNDARY=USER_DECISION_ON_R7_PREACTION_ENFORCEMENT
 ```
