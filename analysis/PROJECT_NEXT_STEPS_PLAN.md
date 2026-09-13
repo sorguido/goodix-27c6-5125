@@ -3,13 +3,14 @@
 
 Data review: 13 settembre 2026
 
-Baseline esaminata: `development` a
-`9f86fa8984f3188a6de74593d1eb814b26f07291`, con D292/02 accettato.
+Baseline D293/01 esaminata: `development` a
+`77268753ba6d787defb5c96ca9f96c7ecc513227`, con Phase A chiusa.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
 canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
-target-proven. La review ha avanzato il boundary a Phase B/B1,
-contratto multi-user e materiali runtime protetti, inizialmente offline.
+target-proven. D293/01 completa offline B1, senza auto-approvare la review PM,
+e porta il boundary a B2: modello multi-user e risoluzione del caso
+multi-finger `VerifyStart(any)`.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -45,8 +46,9 @@ escluso dal prodotto). Le 39 API host/test-only sono protette da seam, le 12
 shared/internal restano production; build normal e ASan/UBSan passano, due
 build da cwd diverse sono byte-identiche e ABI fprintd/no-RPATH sono verificate.
 Non restano dipendenze build da Dxxx o `tests/`. D292/03 chiude A5 e Phase A
-dopo review PM diretta; il boundary successivo è B1 offline sul contratto
-multi-user/fprintd storage e sui requisiti dei materiali runtime protetti.
+dopo review PM diretta. D293/01 deriva dal codice il contratto multi-user e
+materiali protetti e chiude B1 offline; B2 deve ora provarne il modello e
+risolvere il limite `any` con più dita senza riaprire il lifecycle live.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -65,10 +67,12 @@ PHASE_A_A5=COMPLETED
 PHASE_A_CLOSED=true
 D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 D292_03_PHASE_A_CLOSURE=PASS
+D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
+PHASE_B_B1=COMPLETED
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
 ```
 
 ## Stato verificato del progetto
@@ -255,6 +259,23 @@ MOVE_ONLY_AFTER_REFERENCE_AUDIT=true
   configurazioni user-specific; lifecycle multi-user deterministico,
   isolamento/ownership corretti e zero segreti/template negli artefatti.
 
+D293/01 chiude B1 offline. Il contratto standard usa il nome utente risolto
+dal sender D-Bus e il layout fprintd
+`<state>/<username>/<driver>/<device-id>/<finger>`; il nuovo utente locale non
+richiede configurazione driver e crea lo storage al primo enrollment. Rename e
+delete OS non gestiscono però i template perché la chiave è il nome, non l'UID,
+e il name reuse può ereditare dati stale. Con il driver corrente
+`goodix_27c6_5125/0`, più dita sono archiviabili ma `VerifyStart(any)` senza
+IDENTIFY seleziona un solo elemento non ordinato; IDENTIFY è disabilitato per
+preservare il direct-enroll target-proven. Questo è il gap B2, non una ragione
+per un database Goodix.
+
+I cinque input runtime sono un prerequisito di sistema unico, root-only e
+target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
+lecita, provisioning amministrativo no-overwrite e compatibilità con una
+macchina/unità diversa restano requisiti. L'unicità effettiva per device/lotti
+è `UNKNOWN` e l'accesso autentico resta Human Gate.
+
 La Phase B deve essere chiusa prima di iniziare la Phase C.
 
 ### Phase C — packaging e integrazione host gestita
@@ -389,9 +410,9 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 La Phase B è ora il boundary corrente. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
 dell'Utente. D292/01 ha chiuso A1, D292/02 ha chiuso A3/A4 e la review PM
-D292/03 ha chiuso A5/Phase A. Il prossimo task B1 analizza offline ownership e
-storage fprintd multi-user e i requisiti distinti dei materiali runtime
-protetti, senza accedere a secret o preparare una live.
+D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
+validator statico, senza accesso ai secret. Il prossimo task B2 resta offline:
+modello/test multi-user e scelta tecnica per `VerifyStart(any)` multi-finger.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -407,9 +428,11 @@ PHASE_A_A5=COMPLETED
 PHASE_A_CLOSED=true
 D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 D292_03_PHASE_A_CLOSURE=PASS
+D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
+PHASE_B_B1=COMPLETED
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
 ```

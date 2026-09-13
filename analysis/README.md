@@ -8,7 +8,7 @@ costituisce autorizzazione live.
 
 La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B/B1 è il boundary offline corrente;
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B/B2 è il boundary offline corrente;
 nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
 
 D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
@@ -21,7 +21,16 @@ in `analysis/D292/D292_03_PHASE_A_CLOSURE.md`; manifest e validator sono
 `D292_01_PRODUCTION_FILE_SET.json` e
 `validate_d292_01_inventory.py`. Nessun file storico è stato spostato o
 cancellato. Prossimo boundary:
-`PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE`.
+`PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE`.
+
+D293/01 chiude B1 offline derivando dal vero fprintd 1.94.5 il contratto
+utente/claim/PolicyKit/storage e separandolo dai cinque input runtime
+system-wide protetti. Identifica come gap B2 il lifecycle rename/delete/name
+reuse e la selezione `VerifyStart(any)` con più dita quando IDENTIFY è
+disabilitato. Report e validator sono
+`analysis/D293/D293_01_MULTI_USER_AND_RUNTIME_MATERIAL_CONTRACT.md` e
+`analysis/D293/validate_d293_01_contract.py`; nessun contenuto protetto, USB o
+live è stato raggiunto.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

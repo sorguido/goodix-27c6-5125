@@ -149,7 +149,9 @@ chiuso il follow-up funzionale con enrollment diversity Rocky-derived,
 re-enrollment, discriminazione wrong-finger e quattro serie registrate concluse
 con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
 Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
-production readiness. D292/03 ha chiuso Phase A; la fase corrente è **Phase B**.
+production readiness. D292/03 ha chiuso Phase A; D293/01 chiude l'analisi B1
+del contratto utenti/storage e del confine materiali protetti. La fase corrente
+resta **Phase B**, con B2 offline come boundary successivo.
 
 Principi trasversali della roadmap:
 
@@ -348,8 +350,10 @@ TEST_HOST_ONLY_PRODUCTION_CALL_SITE_COUNT=0
 AMBIGUOUS_SYMBOLS=0
 SOURCE_OF_TRUTH_CONSOLIDATED=true
 PHASE_A_CLOSED=true
+D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
+PHASE_B_B1=COMPLETED
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
 NEW_LIVE_REQUIRED_NOW=false
 ```
 
@@ -358,6 +362,66 @@ Inventario, classificazione, blocker e validator sono in
 `analysis/D292/D292_01_PRODUCTION_FILE_SET.json`; la closure A3/A4 è in
 `analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md` e la closure
 A5/Phase A è in `analysis/D292/D292_03_PHASE_A_CLOSURE.md`.
+
+### Stato D293/01 — contratto multi-user/storage e materiali runtime
+
+L'audit sul sorgente esatto fprintd 1.94.5 stabilisce che il sender D-Bus è
+risolto da UID a nome tramite NSS; il percorso normale usa username vuoto e
+PolicyKit, mentre la gestione di un altro nome richiede `setusername`. Claim e
+action sono legati allo stesso unique bus sender. Lo storage standard è:
+
+```text
+/var/lib/fprint/<username>/<driver>/<device-id>/<finger-hex>
+```
+
+oppure lo stesso layout sotto `STATE_DIRECTORY`. Directory `0700`, daemon root
+e PolicyKit costituiscono il confine di isolamento; ogni FP3 incorpora
+username, finger, driver e device-id ed è accettato soltanto se questi ultimi
+due sono compatibili col device corrente. Il driver locale non contiene
+username/home hard-coded, espone `DRIVER_ID=goodix_27c6_5125` e, non avendo
+probe, conserva il `DEVICE_ID=0` libfprint. Un utente locale creato dopo
+l'installazione è quindi risolto senza reinstallazione e ottiene lo storage
+lazy al primo enrollment.
+
+Il lifecycle account non è invece automatico: la chiave è il nome, non l'UID;
+rename/delete non migrano o eliminano la directory e il riuso del nome può
+riassociare FP3 stale. Re-enrollment dello stesso dito elimina il template
+precedente prima della nuova action. Questi casi richiedono modello e cleanup
+esatto, mai delete ampio o database Goodix parallelo.
+
+Esiste inoltre un limite concreto multi-finger: fprintd può conservare e
+listare fino a dieci dita, ma con l'IDENTIFY production disabilitato per
+preservare il direct-enroll target-proven, `VerifyStart("any")` su più print
+sceglie soltanto il primo elemento non ordinato della gallery. Riabilitare
+IDENTIFY riaprirebbe il duplicate-check sensor-reaching prima di ENROLL e non
+è una modifica meccanica. B2 deve risolvere offline questo conflitto e la
+semantica duplicate cross-user preservando i fence APP12509.
+
+I cinque input sotto `/var/lib/goodix-5125-poc` sono completamente separati
+dai template: costituiscono un set system-wide caricato a ogni open, senza
+parametri utente. Directory e file devono essere root:root `0700`/`0600`,
+regular/no-symlink e hash/size/binding exact. `transport-material.bin` contiene
+la PSK; CONFIG90, DLL OEM e cache FDT sono target-pinned/protetti. Il set è
+operativamente globale sul sistema, ma non è noto se la sua unicità sia per
+unità, lotto o modello. Non può entrare in repository, package, log o storage
+utente; provisioning e accesso autentico restano amministrativi e Human Gate.
+Nel namespace AI sono stati letti soltanto i metadata della directory, mai i
+contenuti protetti.
+
+```text
+D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
+PHASE_B_B1=COMPLETED
+PRODUCTION_USER_HOME_HARDCODE_COUNT=0
+PROTECTED_FILE_CONTENT_READ=false
+REAL_USB_ACCESS=0
+CURRENT_PHASE=B
+PRODUCTION_READY=false
+NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
+```
+
+Report e validator:
+`analysis/D293/D293_01_MULTI_USER_AND_RUNTIME_MATERIAL_CONTRACT.md` e
+`analysis/D293/validate_d293_01_contract.py`.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -614,8 +678,10 @@ PHASE_A_A5=COMPLETED
 PHASE_A_CLOSED=true
 D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 D292_03_PHASE_A_CLOSURE=PASS
+D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
+PHASE_B_B1=COMPLETED
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
