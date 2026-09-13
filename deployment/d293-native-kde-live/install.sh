@@ -7,6 +7,7 @@ here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 root=$(git -C "$here" rev-parse --show-toplevel)
 runtime_names=(libfprint-2.so.2.0.0 libgusb.so.2 libopencv_core.so.413
   libopencv_features2d.so.413 libopencv_flann.so.413 libopencv_imgproc.so.413)
+operator_work=
 
 fail() {
   printf 'D293_NATIVE_PATCH=FAIL reason=%s\n' "$1" >&2
@@ -354,8 +355,21 @@ root_uninstall() {
     "D293_NATIVE_SERVICE_STATE=$service_before"
 }
 
+cleanup_operator_work() {
+  local rc=$?
+  trap - EXIT INT TERM
+  if [[ -n ${operator_work:-} ]]; then
+    if [[ $operator_work == /tmp/goodix-d293-native-build.* && -d $operator_work && ! -L $operator_work ]]; then
+      find "$operator_work" -xdev -depth -delete || true
+    else
+      printf 'D293_NATIVE_PATCH=WARNING reason=operator_cleanup_path_refused\n' >&2
+    fi
+  fi
+  exit "$rc"
+}
+
 operator_install() {
-  local head user work output
+  local head user output
   [[ $EUID -ne 0 ]] || fail operator_entrypoint_must_be_unprivileged
   [[ $(git -C "$root" branch --show-current) == development ]] || fail wrong_branch
   head=$(git -C "$root" rev-parse HEAD) || fail head_unreadable
@@ -365,21 +379,17 @@ operator_install() {
   [[ $(rpm -q libfprint) == libfprint-1.94.100-1.fc44.x86_64 ]] || fail libfprint_nevra_drift
   user=$(id -un)
   [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] || fail operator_user_invalid
-  work=$(mktemp -d /tmp/goodix-d293-native-build.XXXXXX)
-  cleanup_work() {
-    local rc=$?
-    if [[ $work == /tmp/goodix-d293-native-build.* && -d $work && ! -L $work ]]; then
-      find "$work" -xdev -depth -delete
-    fi
-    exit "$rc"
-  }
-  trap cleanup_work EXIT INT TERM
-  output=$work/output
+  operator_work=$(mktemp -d /tmp/goodix-d293-native-build.XXXXXX)
+  trap cleanup_operator_work EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  output=$operator_work/output
   "$root/production/build.sh" normal "$output"
   (cd "$output" && sha256sum "${runtime_names[@]}" >deploy.sha256)
   sudo -- "$here/install.sh" --root-install "$output" "$head" "$user"
+  find "$operator_work" -xdev -depth -delete
+  operator_work=
   trap - EXIT INT TERM
-  find "$work" -xdev -depth -delete
 }
 
 case ${1:-} in
