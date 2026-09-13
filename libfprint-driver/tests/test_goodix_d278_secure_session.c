@@ -2137,6 +2137,7 @@ test_d280_01_production_two_epoch_template_reuse (void)
 {
   Fixture *fixture = fixture_new_production_action ();
   g_autoptr(FpPrint) template = fp_print_new (FP_DEVICE (fixture->device));
+  g_autoptr(FpPrint) handoff_template = NULL;
   g_autoptr(FpPrint) enrolled = NULL;
   g_autoptr(GPtrArray) gallery = NULL;
   TlsClient client;
@@ -2226,6 +2227,8 @@ test_d280_01_production_two_epoch_template_reuse (void)
   g_assert_cmpuint (audit.post_tls.persistent_device_write_count, ==, 0u);
   g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
   g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  g_assert_false (audit.production_identify_enroll_handoff_armed);
+  g_assert_cmpuint (audit.production_identify_enroll_handoff_count, ==, 0u);
   client_clear (&client);
 
   production_close_epoch (fixture);
@@ -2247,8 +2250,9 @@ test_d280_01_production_two_epoch_template_reuse (void)
   g_assert_cmpuint (fixture->interface_release_count, ==, 2u);
   g_assert_cmpuint (fixture->material_release_count, ==, 2u);
 
-  /* A separate open epoch exercises the legitimate identify no-match result;
-   * no retry or second action reuses the successful identify epoch. */
+  /* A separate logical open exercises fprintd's duplicate-check sequence:
+   * a clean IDENTIFY no-match may hand off once to ENROLL, but only after the
+   * driver has released the first transport epoch completely. */
   production_open_epoch (fixture);
   g_clear_object (&fixture->identify_match);
   g_clear_object (&fixture->identify_print);
@@ -2276,12 +2280,57 @@ test_d280_01_production_two_epoch_template_reuse (void)
   g_assert_cmpuint (audit.post_tls.persistent_device_write_count, ==, 0u);
   g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
   g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  g_assert_true (audit.production_identify_enroll_handoff_armed);
+  g_assert_cmpuint (audit.production_identify_enroll_handoff_count, ==, 0u);
+  g_assert_cmpuint (audit.production_logical_action_attempt_count, ==, 1u);
+  g_assert_cmpuint (audit.production_transport_epoch_count, ==, 1u);
+  g_assert_false (goodix_device_context_has_runtime_material (
+                    fixture->context));
+  g_assert_false (goodix_device_context_has_usb_claim (fixture->context));
+  g_assert_cmpuint (fixture->interface_release_count, ==, 3u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 3u);
+  client_clear (&client);
+
+  handoff_template = fp_print_new (FP_DEVICE (fixture->device));
+  fp_print_set_finger (handoff_template, FP_FINGER_LEFT_INDEX);
+  fp_print_set_username (handoff_template, "d293-02-handoff");
+  fixture->done = FALSE;
+  fixture->success = FALSE;
+  fixture->generation = 0u;
+  fixture->enroll_progress_count = 0u;
+  g_clear_object (&fixture->enroll_print);
+  fp_device_enroll (FP_DEVICE (fixture->device),
+                    g_steal_pointer (&handoff_template), NULL,
+                    production_enroll_progress, fixture, NULL,
+                    (GAsyncReadyCallback) production_enroll_complete,
+                    fixture);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 4u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 3u);
+  production_establish_tls_for_action (fixture, &client);
+  drive_production_enrollment_bootstrap (fixture, &client);
+  drive_production_enrollment_stages (fixture, &client);
+  production_wait (fixture);
+  g_assert_true (fixture->success);
+  g_assert_no_error (fixture->action_error);
+  g_assert_nonnull (fixture->enroll_print);
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_cmpuint (audit.production_action, ==, FPI_DEVICE_ACTION_ENROLL);
+  g_assert_cmpuint (audit.production_identify_enroll_handoff_count, ==, 1u);
+  g_assert_cmpuint (audit.production_logical_action_attempt_count, ==, 2u);
+  g_assert_cmpuint (audit.production_transport_epoch_count, ==, 2u);
+  g_assert_false (audit.production_identify_enroll_handoff_armed);
+  g_assert_cmpuint (audit.production_rejected_action_count, ==, 0u);
+  g_assert_cmpuint (audit.secure.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.enrollment_binding.transaction.frame.persistent_family_count,
+                    ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
   client_clear (&client);
   production_close_epoch (fixture);
   assert_successful_epoch_tls_closed (fixture);
-  g_assert_cmpuint (fixture->interface_claim_count, ==, 3u);
-  g_assert_cmpuint (fixture->interface_release_count, ==, 3u);
-  g_assert_cmpuint (fixture->material_release_count, ==, 3u);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 4u);
+  g_assert_cmpuint (fixture->interface_release_count, ==, 4u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 4u);
 
   /* D282/01: fprintd selects VERIFY for its one-print case.  VERIFY reuses
    * exactly the already target-proven IDENTIFY single-acquisition graph. */
@@ -2450,13 +2499,158 @@ test_d280_01_production_two_epoch_template_reuse (void)
   production_close_epoch (fixture);
   g_clear_object (&verify_cancellable);
 
-  /* Seven full libfprint open epochs plus the D291 explicit second VERIFY
-   * epoch each acquire and release exactly once. */
-  g_assert_cmpuint (fixture->interface_claim_count, ==, 8u);
-  g_assert_cmpuint (fixture->interface_release_count, ==, 8u);
-  g_assert_cmpuint (fixture->material_release_count, ==, 8u);
+  /* Seven full libfprint opens plus the D293 IDENTIFY->ENROLL handoff and the
+   * D291 explicit second VERIFY each acquire and release exactly once. */
+  g_assert_cmpuint (fixture->interface_claim_count, ==, 9u);
+  g_assert_cmpuint (fixture->interface_release_count, ==, 9u);
+  g_assert_cmpuint (fixture->material_release_count, ==, 9u);
   goodix_test_sigfm_match_set_score (100);
   fixture_free (fixture);
+}
+
+static void
+test_d293_02_identify_failure_cancel_no_handoff (void)
+{
+  Fixture *fixture = fixture_new_production_action ();
+  g_autoptr(FpPrint) enrolled = production_enroll_verify_template (fixture);
+  g_autoptr(GPtrArray) gallery = g_ptr_array_new_with_free_func (
+    g_object_unref);
+  g_autoptr(GCancellable) cancellable = NULL;
+  g_autoptr(FpPrint) template = NULL;
+  TlsClient client;
+  GoodixProductionEnrollmentAudit audit;
+  guint acquire_before;
+  guint claim_before;
+  guint in_before;
+  guint out_before;
+
+  g_ptr_array_add (gallery, g_object_ref (enrolled));
+
+  /* Retryable host-side processing failure is terminal for this transport
+   * epoch and must never authorize the duplicate-check handoff. */
+  production_close_epoch (fixture);
+  production_open_epoch (fixture);
+  fixture->done = FALSE;
+  fixture->success = TRUE;
+  fixture->generation = 0u;
+  goodix_test_sigfm_extract_set_failure (TRUE);
+  fp_device_identify (FP_DEVICE (fixture->device), gallery, NULL,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) production_identify_complete,
+                      fixture);
+  production_establish_tls_for_action (fixture, &client);
+  g_test_expect_message ("libfprint-image_device", G_LOG_LEVEL_WARNING,
+                         "Failed to detect minutiae:*");
+  drive_production_single_acquisition (fixture, &client);
+  production_wait (fixture);
+  g_test_assert_expected_messages ();
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, FP_DEVICE_RETRY,
+                  FP_DEVICE_RETRY_GENERAL);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_true (goodix_device_context_get_poisoned (fixture->context));
+  g_assert_false (goodix_device_context_has_runtime_material (
+                    fixture->context));
+  g_assert_false (goodix_device_context_has_usb_claim (fixture->context));
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_false (audit.production_identify_enroll_handoff_armed);
+  g_assert_cmpuint (audit.production_identify_enroll_handoff_count, ==, 0u);
+  g_assert_cmpuint (audit.production_logical_action_attempt_count, ==, 1u);
+  g_assert_cmpuint (audit.production_transport_epoch_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.single_acquisition_terminal_count, ==, 1u);
+  g_assert_cmpuint (audit.post_tls.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  client_clear (&client);
+  goodix_test_sigfm_extract_set_failure (FALSE);
+
+  acquire_before = fixture->material_release_count;
+  claim_before = fixture->interface_claim_count;
+  in_before = fixture->in_submit_count;
+  out_before = g_queue_get_length (fixture->out);
+  g_clear_error (&fixture->action_error);
+  template = fp_print_new (FP_DEVICE (fixture->device));
+  fixture->done = FALSE;
+  fixture->success = TRUE;
+  fp_device_enroll (FP_DEVICE (fixture->device),
+                    g_steal_pointer (&template), NULL,
+                    production_enroll_progress, fixture, NULL,
+                    (GAsyncReadyCallback) production_enroll_complete,
+                    fixture);
+  production_wait (fixture);
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, FP_DEVICE_ERROR,
+                  FP_DEVICE_ERROR_PROTO);
+  g_assert_cmpuint (fixture->material_release_count, ==, acquire_before);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
+  g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_clear_error (&fixture->action_error);
+  production_close_epoch (fixture);
+
+  /* Cancellation after TLS is non-quiescent and poisons the logical open.
+   * ENROLL must fail before any resource reacquire or protocol submission. */
+  production_open_epoch (fixture);
+  cancellable = g_cancellable_new ();
+  g_clear_error (&fixture->action_error);
+  fixture->done = FALSE;
+  fixture->success = TRUE;
+  fixture->generation = 0u;
+  fp_device_identify (FP_DEVICE (fixture->device), gallery, cancellable,
+                      NULL, NULL, NULL,
+                      (GAsyncReadyCallback) production_identify_complete,
+                      fixture);
+  production_establish_tls_for_action (fixture, &client);
+  g_cancellable_cancel (cancellable);
+  {
+    g_autoptr(GError) cancelled = g_error_new_literal (
+      G_IO_ERROR, G_IO_ERROR_CANCELLED, "D293 identify cancellation");
+
+    while (!g_queue_is_empty (fixture->out))
+      complete_submission (fixture, pop_out (fixture), cancelled);
+    if (goodix_fpi_usb_backend_get_outstanding (fixture->backend) != 0u)
+      goodix_device_context_complete_receive (
+        fixture->context, fixture->generation, NULL, 0, cancelled);
+  }
+  production_wait (fixture);
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_true (goodix_device_context_get_poisoned (fixture->context));
+  goodix_device_context_get_production_enrollment_audit (
+    fixture->context, &audit);
+  g_assert_false (audit.production_identify_enroll_handoff_armed);
+  g_assert_cmpuint (audit.production_identify_enroll_handoff_count, ==, 0u);
+  g_assert_cmpuint (audit.post_tls.retry_count, ==, 0u);
+  g_assert_cmpuint (audit.usb_real_submit_count, ==, 0u);
+  client_clear (&client);
+
+  acquire_before = fixture->material_release_count;
+  claim_before = fixture->interface_claim_count;
+  in_before = fixture->in_submit_count;
+  out_before = g_queue_get_length (fixture->out);
+  g_clear_error (&fixture->action_error);
+  template = fp_print_new (FP_DEVICE (fixture->device));
+  fixture->done = FALSE;
+  fixture->success = TRUE;
+  fp_device_enroll (FP_DEVICE (fixture->device),
+                    g_steal_pointer (&template), NULL,
+                    production_enroll_progress, fixture, NULL,
+                    (GAsyncReadyCallback) production_enroll_complete,
+                    fixture);
+  production_wait (fixture);
+  g_assert_false (fixture->success);
+  g_assert_error (fixture->action_error, G_IO_ERROR,
+                  G_IO_ERROR_CANCELLED);
+  g_assert_cmpuint (fixture->material_release_count, ==, acquire_before);
+  g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
+  g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
+  g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_clear_error (&fixture->action_error);
+  production_close_epoch (fixture);
+
+  fixture_free (fixture);
+  g_print ("D293_02_IDENTIFY_FAILURE_CANCEL_NO_HANDOFF=PASS\n");
 }
 
 static void
@@ -4185,6 +4379,8 @@ main (int argc,
                    test_d291_explicit_multi_verify_after_no_match);
   g_test_add_func ("/goodix/d291/fixed-raw-baseline-pinning-mechanics",
                    test_d291_fixed_raw_baseline_pinning_mechanics);
+  g_test_add_func ("/goodix/d293/identify-failure-cancel-no-handoff",
+                   test_d293_02_identify_failure_cancel_no_handoff);
   g_test_add_func ("/goodix/d282/production-enrollment-intermediate-extraction-terminal",
                    test_d282_01_production_intermediate_enrollment_extraction_failure);
   g_test_add_func ("/goodix/d278/integrated-context-cancel-secure",

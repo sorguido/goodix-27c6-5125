@@ -8,7 +8,7 @@ costituisce autorizzazione live.
 
 La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B/B2 è il boundary offline corrente;
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B/B3 è il boundary offline corrente;
 nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
 
 D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
@@ -31,6 +31,15 @@ disabilitato. Report e validator sono
 `analysis/D293/D293_01_MULTI_USER_AND_RUNTIME_MATERIAL_CONTRACT.md` e
 `analysis/D293/validate_d293_01_contract.py`; nessun contenuto protetto, USB o
 live è stato raggiunto.
+
+D293/02 chiude B2 offline: la production annuncia IDENTIFY, preserva VERIFY e
+permette unicamente il passaggio clean/no-match IDENTIFY→ENROLL con risorse di
+transport fresche. Il test integrato passa normal e ASan/UBSan; il modello
+storage content-free copre due principal, più dita, restart, replace, delete e
+name reuse. Report, validator e modello sono rispettivamente
+`D293_02_MULTI_FINGER_IDENTIFY_ENROLL_AND_STORAGE_MODEL.md`,
+`validate_d293_02.py` e `test_d293_02_storage_model.py`. Prossimo boundary:
+`PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE`.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

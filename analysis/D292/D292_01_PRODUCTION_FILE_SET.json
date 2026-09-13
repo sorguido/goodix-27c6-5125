@@ -407,7 +407,7 @@
       "-Dgoodix_production_minimal=true",
       "-Dudev_rules=disabled",
       "-Dudev_hwdb=disabled",
-      "-Dc_args=-DGOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE"
+      "-Dc_args=-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
     ],
     "meson_injected_defines": [
       "GOODIX_LIBFPRINT_SIGFM"

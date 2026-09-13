@@ -1979,13 +1979,13 @@ test_d282_direct_enroll_feature_profile (void)
   device = goodix_fpimage_device_new_for_usb (usb_device);
   g_assert_nonnull (device);
 
-#ifdef GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE
-  g_assert_false (fp_device_has_feature (
+#ifdef GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE
+  g_assert_true (fp_device_has_feature (
     FP_DEVICE (device), FP_DEVICE_FEATURE_IDENTIFY));
   g_assert_true (fp_device_has_feature (
     FP_DEVICE (device), FP_DEVICE_FEATURE_VERIFY));
-  g_print ("D282_01_IDENTIFY_FEATURE_ADVERTISED=false\n");
-  g_print ("D282_01_VERIFY_FEATURE_ADVERTISED=true\n");
+  g_print ("D293_02_IDENTIFY_FEATURE_ADVERTISED=true\n");
+  g_print ("D293_02_VERIFY_FEATURE_ADVERTISED=true\n");
 #else
   g_assert_true (fp_device_has_feature (
     FP_DEVICE (device), FP_DEVICE_FEATURE_IDENTIFY));

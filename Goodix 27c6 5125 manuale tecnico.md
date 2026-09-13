@@ -149,9 +149,9 @@ chiuso il follow-up funzionale con enrollment diversity Rocky-derived,
 re-enrollment, discriminazione wrong-finger e quattro serie registrate concluse
 con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
 Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
-production readiness. D292/03 ha chiuso Phase A; D293/01 chiude l'analisi B1
-del contratto utenti/storage e del confine materiali protetti. La fase corrente
-resta **Phase B**, con B2 offline come boundary successivo.
+production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1 e D293/02
+chiude offline B2 con IDENTIFY multi-finger, handoff ENROLL bounded e modello
+storage. La fase corrente resta **Phase B**, con B3 offline come boundary.
 
 Principi trasversali della roadmap:
 
@@ -300,8 +300,9 @@ network-unshared e indipendente da `analysis/`, `operator_kit/`, `tests/`, fake
 backend e launcher Dxxx. I supporti GUsb/OpenCV e i 5 RPM Fedora locali sono
 digest-verified; nessun material loader, USB, install o deploy viene eseguito.
 
-La policy production usa il nome stabile
-`GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE`. Le 39 API classificate D292/01 come
+La policy production corrente usa il nome stabile
+`GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE`. D293/02 ha superato il precedente
+profilo direct-enroll per supportare IDENTIFY multi-finger. Le 39 API classificate D292/01 come
 host/test-only sono ora sotto `GOODIX_ENABLE_TEST_SEAMS`; i 12 simboli
 shared/internal necessari restano production. La modalità Meson production non
 configura test/examples e compila fuori l'emulazione test core. Build normal
@@ -352,8 +353,9 @@ SOURCE_OF_TRUTH_CONSOLIDATED=true
 PHASE_A_CLOSED=true
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
+PHASE_B_B2=COMPLETED_OFFLINE
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
 NEW_LIVE_REQUIRED_NOW=false
 ```
 
@@ -389,13 +391,13 @@ riassociare FP3 stale. Re-enrollment dello stesso dito elimina il template
 precedente prima della nuova action. Questi casi richiedono modello e cleanup
 esatto, mai delete ampio o database Goodix parallelo.
 
-Esiste inoltre un limite concreto multi-finger: fprintd può conservare e
+Al boundary storico D293/01 esisteva inoltre un limite concreto multi-finger: fprintd può conservare e
 listare fino a dieci dita, ma con l'IDENTIFY production disabilitato per
 preservare il direct-enroll target-proven, `VerifyStart("any")` su più print
 sceglie soltanto il primo elemento non ordinato della gallery. Riabilitare
 IDENTIFY riaprirebbe il duplicate-check sensor-reaching prima di ENROLL e non
-è una modifica meccanica. B2 deve risolvere offline questo conflitto e la
-semantica duplicate cross-user preservando i fence APP12509.
+non era una modifica meccanica. D293/02, descritto sotto, ha risolto offline
+questo conflitto preservando i fence APP12509.
 
 I cinque input sotto `/var/lib/goodix-5125-poc` sono completamente separati
 dai template: costituiscono un set system-wide caricato a ogni open, senza
@@ -416,12 +418,58 @@ PROTECTED_FILE_CONTENT_READ=false
 REAL_USB_ACCESS=0
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
+NEXT_BOUNDARY=SUPERSEDED_BY_D293_02
 ```
 
 Report e validator:
 `analysis/D293/D293_01_MULTI_USER_AND_RUNTIME_MATERIAL_CONTRACT.md` e
 `analysis/D293/validate_d293_01_contract.py`.
+
+### Stato D293/02 — IDENTIFY multi-finger, handoff ENROLL e storage
+
+L'audit sul vero fprintd 1.94.5 conferma due scelte: `VerifyStart("any")` con
+più template usa IDENTIFY sull'intera gallery, mentre con un solo template usa
+VERIFY; `EnrollStart` carica tutte le print e usa IDENTIFY come duplicate-check
+prima di ENROLL. La production annuncia quindi entrambe le feature sotto la
+policy stabile `GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE`.
+
+Per non trasformare la sequenza fprintd in un generico secondo action, il core
+image-device notifica al driver l'esito host-side dell'identify. Soltanto
+successo senza match, STOP terminale e backend drenato armano una singola
+transizione a ENROLL. Prima dell'handoff il driver rilascia claim, materiale,
+TLS e lifecycle; ENROLL esegue una fresh acquire/claim e apre un nuovo transport
+epoch. Match, failure, cancellation, non-quiescenza, poison, VERIFY/IDENTIFY o
+altre action non abilitano l'handoff. Non esistono retry o contatti impliciti
+aggiunti; i tre `VerifyStart` esterni D291 restano il solo budget della serie.
+
+Il test integrato ha attraversato IDENTIFY no-match → ENROLL a otto stage con
+risorse fresche, zero submit USB reale e PASS normal/ASan/UBSan. Il test feature
+conferma IDENTIFY+VERIFY. Un secondo test production-shaped normal/sanitizer
+prova che extraction retryable e cancellation post-TLS lasciano l'handoff
+disarmato e che ENROLL fallisce senza nuova acquire, claim, TLS o USB. Il match
+positivo mantiene anch'esso l'handoff disarmato. Il modello storage content-free copre due principal,
+due dita, restart, replace, delete e name reuse. Non esiste ancora un hook
+fprintd per account delete/rename: il cleanup esatto resta integrazione host
+futura, senza database Goodix parallelo.
+
+```text
+D293_02_OUTCOME=PASS_OFFLINE_IMPLEMENTATION
+PHASE_B_B2=COMPLETED_OFFLINE
+FPRINTD_ANY_MULTI_PRINT_USES_IDENTIFY=true
+IDENTIFY_NO_MATCH_ENROLL_HANDOFF_MAX=1
+IDENTIFY_FAILURE_CANCEL_HANDOFF_COUNT=0
+AUTOMATIC_RETRY_ADDED=false
+REAL_USB_ACCESS=0
+PROTECTED_FILE_CONTENT_READ=false
+CURRENT_PHASE=B
+PRODUCTION_READY=false
+NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
+```
+
+Report, validator e modello:
+`analysis/D293/D293_02_MULTI_FINGER_IDENTIFY_ENROLL_AND_STORAGE_MODEL.md`,
+`analysis/D293/validate_d293_02.py` e
+`analysis/D293/test_d293_02_storage_model.py`.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -680,8 +728,9 @@ D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
+PHASE_B_B2=COMPLETED_OFFLINE
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

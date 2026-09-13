@@ -410,6 +410,9 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
             }
         }
 
+      if (cls->identify_result != NULL)
+        cls->identify_result (self, error == NULL, result != NULL);
+
       if (!error || error->domain == FP_DEVICE_RETRY)
         fpi_device_identify_report (device, result, g_steal_pointer (&print), g_steal_pointer (&error));
 

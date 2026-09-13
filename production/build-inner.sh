@@ -16,7 +16,7 @@ source_root="$assembly/reference/libfprint-fedora44-1.94.100/source"
 support_dir=$(CDPATH= cd -- "$(dirname -- "$0")/build-support" && pwd)
 relative_assembly=$(realpath --relative-to="$build_dir" "$assembly")
 sanitize_args=
-c_args="-DGOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE"
+c_args="-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
 
 case "$mode" in
   normal) ;;
@@ -59,7 +59,7 @@ cp "$library" "$output_dir/libfprint-2.so.2.0.0"
 ln -s libfprint-2.so.2.0.0 "$output_dir/libfprint-2.so.2"
 ln -s libfprint-2.so.2 "$output_dir/libfprint-2.so"
 
-grep -F -- -DGOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE \
+grep -F -- -DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE \
   "$build_dir/compile_commands.json" >/dev/null
 legacy_policy=GOODIX_D
 legacy_policy="${legacy_policy}282_DIRECT_ENROLL_PROFILE"

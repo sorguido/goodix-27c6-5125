@@ -92,7 +92,8 @@ def main() -> int:
     require(fp_print, "self->driver, fp_device_get_driver (device)", "driver compatibility")
     require(fp_print, "self->device_id, fp_device_get_device_id (device)", "device compatibility")
     require(goodix, 'device_class->id        = "goodix_27c6_5125"', "Goodix driver ID")
-    require(goodix, "~((guint) FP_DEVICE_FEATURE_IDENTIFY)", "production IDENTIFY mask")
+    require(goodix, "GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE", "production action profile")
+    require(goodix, "device_class->features |= FP_DEVICE_FEATURE_IDENTIFY", "production IDENTIFY support")
     if re.search(r"device_class->probe\s*=", goodix):
         raise AssertionError("Goodix device-id contract changed: probe vfunc added")
 

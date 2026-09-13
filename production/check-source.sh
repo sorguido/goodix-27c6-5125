@@ -102,6 +102,10 @@ cmp <(sort "$documented_paths") <(sort "$actual_production_delta") || {
 }
 git -C "$root" diff --full-index --binary --no-ext-diff --no-renames \
   "$baseline" -- "${paths[@]}" >"$generated"
+# Git preserves whitespace on context lines; normalize the generated artifact
+# so the versioned patch itself remains diff-check clean without changing what
+# `patch` applies.
+sed -i 's/[[:space:]]$//' "$generated"
 cmp "$generated" "$patch_file"
 (cd "$root" && sha256sum -c production/source-files.sha256)
 (cd "$script_dir/build-support" && sha256sum -c SHA256SUMS)
@@ -115,6 +119,16 @@ if rg -n "$legacy_policy" \
   echo "historical build-policy identifier remains canonical" >&2
   exit 1
 fi
+if rg -n 'GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE' \
+     "$root/libfprint-driver/goodix_fpimage_device.c" \
+     "$root/libfprint-driver/goodix_fpimage_device.h" \
+     "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
+  echo "superseded direct-enroll policy remains canonical" >&2
+  exit 1
+fi
+rg -n 'GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE' \
+  "$root/libfprint-driver/goodix_fpimage_device.c" \
+  "$script_dir/build-inner.sh" >/dev/null
 
 echo PRODUCTION_PATCH_REGENERATION_CHECK=PASS
 echo PRODUCTION_SOURCE_DIGEST_CHECK=PASS

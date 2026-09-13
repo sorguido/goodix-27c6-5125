@@ -3,14 +3,14 @@
 
 Data review: 13 settembre 2026
 
-Baseline D293/01 esaminata: `development` a
-`77268753ba6d787defb5c96ca9f96c7ecc513227`, con Phase A chiusa.
+Baseline D293/02: `development` a
+`61c8ff33b13d977120a6faa45dea2ac0860bcbcc`, con Phase A chiusa.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
 canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
 target-proven. D293/01 completa offline B1, senza auto-approvare la review PM,
-e porta il boundary a B2: modello multi-user e risoluzione del caso
-multi-finger `VerifyStart(any)`.
+e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
+`VerifyStart(any)` e il solo handoff fprintd IDENTIFY→ENROLL sicuro.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -47,8 +47,8 @@ shared/internal restano production; build normal e ASan/UBSan passano, due
 build da cwd diverse sono byte-identiche e ABI fprintd/no-RPATH sono verificate.
 Non restano dipendenze build da Dxxx o `tests/`. D292/03 chiude A5 e Phase A
 dopo review PM diretta. D293/01 deriva dal codice il contratto multi-user e
-materiali protetti e chiude B1 offline; B2 deve ora provarne il modello e
-risolvere il limite `any` con più dita senza riaprire il lifecycle live.
+materiali protetti e chiude B1 offline. D293/02 chiude B2 offline con IDENTIFY
+su gallery completa, handoff ENROLL bounded e modello storage multi-principal.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -69,10 +69,11 @@ D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
+PHASE_B_B2=COMPLETED_OFFLINE
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
 ```
 
 ## Stato verificato del progetto
@@ -265,10 +266,13 @@ dal sender D-Bus e il layout fprintd
 richiede configurazione driver e crea lo storage al primo enrollment. Rename e
 delete OS non gestiscono però i template perché la chiave è il nome, non l'UID,
 e il name reuse può ereditare dati stale. Con il driver corrente
-`goodix_27c6_5125/0`, più dita sono archiviabili ma `VerifyStart(any)` senza
-IDENTIFY seleziona un solo elemento non ordinato; IDENTIFY è disabilitato per
-preservare il direct-enroll target-proven. Questo è il gap B2, non una ragione
-per un database Goodix.
+`goodix_27c6_5125/0`, più dita sono archiviabili. D293/02 supera il precedente
+limite `VerifyStart(any)`: la policy `GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE`
+annuncia IDENTIFY e un callback core interno arma soltanto il passaggio
+clean/no-match a ENROLL. Il driver rilascia e riacquisisce claim, materiale e
+sessione; match, errore, cancellazione e action diverse non abilitano il
+passaggio. Il modello content-free copre due principal, più dita, restart,
+replace, delete e name reuse; l'hook account-delete resta integrazione host.
 
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
@@ -411,8 +415,9 @@ La Phase B è ora il boundary corrente. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
 dell'Utente. D292/01 ha chiuso A1, D292/02 ha chiuso A3/A4 e la review PM
 D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
-validator statico, senza accesso ai secret. Il prossimo task B2 resta offline:
-modello/test multi-user e scelta tecnica per `VerifyStart(any)` multi-finger.
+validator statico, senza accesso ai secret. D293/02 chiude B2 offline con
+implementazione e test. Il prossimo B3 integra offline il daemon fprintd reale
+con più principal prima del primo Human Gate target.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -430,9 +435,10 @@ D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
 D292_03_PHASE_A_CLOSURE=PASS
 D293_01_OUTCOME=PASS_OFFLINE_CONTRACT
 PHASE_B_B1=COMPLETED
+PHASE_B_B2=COMPLETED_OFFLINE
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_B2_MULTI_USER_STORAGE_MODEL_AND_MULTI_FINGER_ANY_OFFLINE
+NEXT_BOUNDARY=PHASE_B_B3_FPRINTD_MULTI_PRINCIPAL_INTEGRATION_OFFLINE
 ```

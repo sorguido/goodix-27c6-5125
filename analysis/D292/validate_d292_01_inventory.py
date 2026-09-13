@@ -290,7 +290,7 @@ def main() -> None:
             require((ROOT / dependency["path"]).exists(), f"build_dependency_missing:{dependency['path']}")
     builder_text = BUILDER.read_text()
     require("-Ddrivers=goodix_27c6_5125" in builder_text, "target_driver_option_missing")
-    require("-DGOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE" in builder_text,
+    require("-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE" in builder_text,
             "stable_production_flag_missing")
     require("GOODIX_D282_DIRECT_ENROLL_PROFILE" not in builder_text,
             "historical_production_flag_present")
@@ -319,7 +319,7 @@ def main() -> None:
     print("D292_01_PRODUCTION_COMPILED_FORBIDDEN_PREFIX_COUNT=0")
     print(f"D292_02_BUILD_TEST_AREA_DEPENDENCY_COUNT={len(test_area_build_dependencies)}")
     print("D292_01_GOODIX_ENABLE_TEST_SEAMS=false")
-    print("D292_02_PRODUCTION_FLAG=GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE")
+    print("D292_02_PRODUCTION_FLAG=GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE")
     print("D292_01_TARGET=FEDORA_KDE_APP12509")
 
 

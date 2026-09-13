@@ -91,6 +91,10 @@ typedef struct
   /* Host lifecycle rollover performed for a new explicit VerifyStart.  This
    * is not a secure-session retry or a sensor-side automatic acquisition. */
   guint production_explicit_verify_reopen_count;
+  guint production_identify_enroll_handoff_count;
+  guint production_logical_action_attempt_count;
+  guint production_transport_epoch_count;
+  gboolean production_identify_enroll_handoff_armed;
   guint auxiliary_b0_observed_count;
   guint terminal_enroll_completion_hold_count;
   guint terminal_enroll_completion_release_count;

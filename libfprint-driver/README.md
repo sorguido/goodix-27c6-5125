@@ -514,19 +514,19 @@ preprocessing, formato FP3, matcher o soglia 40. VERIFY/IDENTIFY non la
 attraversano: un NO_MATCH valido conclude sempre la singola VerifyStart e solo
 il consumer/PAM può richiederne un'altra, fino al limite esterno di tre.
 
-## D282/01 VERIFY target e barriera anti-retry fprintd
+## D282/01 origine storica, policy fprintd production corrente
 
-La candidate storica D282 introduceva questo build-only profile con il nome
-`GOODIX_D282_DIRECT_ENROLL_PROFILE`. D292/02 ne conserva la semantica sotto il
-nome canonico stabile `GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE`: non pubblicizza
-IDENTIFY ma conserva VERIFY. È necessario perché l'esatto flusso enrollment di
-fprintd antepone un
-IDENTIFY anti-duplicato e poi avvia ENROLL nello stesso open epoch: senza il
-profilo, il fence Goodix one-action-per-epoch respinge correttamente la seconda
-action prima di generation, TLS e USB. Il profilo fa entrare fprintd nel ramo
-ENROLL diretto; non allenta il fence. Le build che non selezionano la policy
-production restano invariate; builder e output canonici non usano identificatori
-di milestone Dxxx.
+La candidate storica D282 introduceva un profilo build-only chiamato
+`GOODIX_D282_DIRECT_ENROLL_PROFILE`, poi stabilizzato in D292/02 come profilo
+direct-enroll. D293/02 supera quella semantica: la macro canonica corrente è
+`GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE`, pubblicizza sia IDENTIFY sia VERIFY
+e supporta l'esatto flusso fprintd di duplicate-check. Solo un IDENTIFY
+terminato senza match, senza errore e con backend drenato può passare una volta
+a ENROLL nello stesso logical open; tra le due action il driver rilascia claim,
+materiale e oggetti di sessione e li riacquisisce da zero. Match, failure,
+cancellation, stato non quiescente o ogni action diversa non abilitano il
+passaggio. Le build che non selezionano la policy production restano invariate;
+builder e output canonici non usano identificatori di milestone Dxxx.
 
 L'esatto fprintd Fedora 44 seleziona `fp_device_verify()` quando la gallery
 contiene un solo template. La fork 1.94.100 registra quindi VERIFY sulla
@@ -541,9 +541,9 @@ Nel Goodix production, VERIFY condivide senza duplicazioni il profilo
 attempt e rejection: dopo la prima activation, ogni secondo dispatch è
 respinto prima di creare generation, secure session, TLS o submit USB. Questo
 contiene il richiamo automatico che fprintd esegue dopo `FP_DEVICE_RETRY`.
-La telemetria `GOODIX_D282_EPOCH_AUDIT` è emessa al close production con
-contatori protocollo e cleanup sanitizzati; non contiene immagini, template o
-secret.
+La telemetria `GOODIX_PRODUCTION_EPOCH_AUDIT` è emessa al close production con
+contatori protocollo e cleanup sanitizzati, inclusi logical action, transport
+epoch e handoff IDENTIFY→ENROLL; non contiene immagini, template o secret.
 
 La suite production-shaped prova match, no-match, extraction failure più
 secondo dispatch formale, e cancellazione post-TLS. La build Fedora con SIGFM
