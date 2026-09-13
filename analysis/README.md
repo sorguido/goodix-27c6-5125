@@ -46,7 +46,7 @@ name reuse. Report, validator e modello sono rispettivamente
 `D293_02_MULTI_FINGER_IDENTIFY_ENROLL_AND_STORAGE_MODEL.md`,
 `validate_d293_02.py` e `test_d293_02_storage_model.py`.
 
-D293/03 esaurisce i prerequisiti offline di B3/B4: il vero fprintd 1.94.5 su bus
+D293/03 ha esaurito i prerequisiti offline di B3/B4: il vero fprintd 1.94.5 su bus
 privato e storage temporaneo gestisce due nomi principal, più dita,
 restart/list, `VerifyStart(any)`, isolamento, replace e delete. I due nomi sono
 autorizzati via `setusername` dallo stesso sender/UID Unix e non equivalgono a
@@ -54,11 +54,13 @@ due account reali. L'audit statico hash-pinned del KCM Users Plasma 6.7.5
 conferma l'uso delle API fprintd standard senza GUI Goodix. Report, result,
 runner e validator sono `D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md`,
 `D293_03_OFFLINE_RESULT.env`, `d293_03_fprintd_integration.sh` e
-`validate_d293_03.py`. I veri B3/B4 non sono stati eseguiti e Phase B non è
-chiusa. Il successivo boundary è il Human Gate operatore D293/04, non una nuova
-decisione sul metodo R7 già definito.
+`validate_d293_03.py`. Il successivo test patch-first D293 sul target reale ha
+poi dato PASS per installazione, reader sul nuovo utente, enrollment, MATCH,
+delete e isolamento osservato del principal preesistente; il tentativo MATCH è
+`NOT_REPORTED`. La candidate reinstallata allo SHA
+`e61fce313794922a2dab156a1b38a8ddc5837f19` è la baseline software configurata.
 
-D293/04 mantiene
+D293/04 mantiene come sola evidenza storica
 `operator_kit/live_probe/experiments/d293-kde-new-user/` sul common harness
 invariato. Le regressioni dei veri script chiudono offline dito/duplicato,
 separazione privilegiata del journal, marker/provenance, streaming, rilascio
@@ -72,8 +74,19 @@ sono ripristinati e verificati offline. Report,
 correttivo sintetico, validator e test sono
 `D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md`,
 `D293_CORRECTIVE_V2_ROCKY_NATIVE_ACTIONS.md`, `validate_d293_04.py` e
-`test_d293_04_operator_scripts.py`. Il kit è pronto per il Human Gate
-dell'Utente; Phase B non è chiusa e non si inferisce alcun PASS live.
+`test_d293_04_operator_scripts.py`. Il kit non è mai stato eseguito live ed è
+superato dalla decisione metodologica patch-first: non è il prossimo Human
+Gate e non va ulteriormente adattato.
+
+D293/05 implementa offline la guard account-lifecycle rimasta necessaria alla
+closure Phase B. Un pre-hook nativo `userdel` blocca fail-closed la rimozione
+di un account se il suo namespace fprint contiene dati, senza cancellare
+template e senza raggiungere fprintd o USB; il normale workflow KDE/fprintd
+deve eliminare prima le impronte. Installazione, rollback e nove scenari
+offline sono nella patch `deployment/d293-phase-b-account-lifecycle/`; il
+report è `D293_05_PHASE_B_ACCOUNT_LIFECYCLE_GUARD.md`. La review PM è
+`ACCEPT_AND_CONTINUE`; la candidate è `READY_OFFLINE_HUMAN_GATE_PENDING` e
+Phase B non è ancora chiusa.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

@@ -29,7 +29,11 @@ rollback eseguito dopo il PASS seguiva un'istruzione poi superata e non è un
 rigetto della candidate. La candidate è stata quindi reinstallata: runtime,
 wrapper e drop-in D293 allo SHA `e61fce313794922a2dab156a1b38a8ddc5837f19`
 sono osservabili read-only; D293 è la baseline software configurata e D285 il
-predecessore di rollback.
+predecessore di rollback. Il riesame dei lifecycle residui ha individuato come
+ultimo gap Phase B la relazione fra template e account deletion/name reuse.
+D293/05 implementa una guard host-only `userdel` e una singola live patch-first
+che copre anche multi-finger, re-enroll, delete, logout/login e reboot; la
+review PM della candidate è `ACCEPT_AND_CONTINUE`.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -70,8 +74,11 @@ materiali protetti e chiude B1 offline. D293/02 chiude B2 offline con IDENTIFY
 su gallery completa, handoff ENROLL bounded e modello storage multi-principal.
 D293/03 esaurisce i prerequisiti offline di B3/B4: due nomi principal, ma un
 solo UID Unix, sul vero fprintd e storage temporaneo, più il contratto statico
-del KCM KDE. Il corrective del kit non sostituisce queste evidenze e non
-produce alcun risultato live.
+del KCM KDE. D293 ha poi prodotto il PASS target del workflow nativo minimo.
+D293/05 affronta il gap residuo account deletion/name reuse con una guard
+fail-closed che non chiama fprintd e non accede al sensore; installazione,
+rollback e test offline sono pronti; la review PM è positiva e resta pendente
+la sola live dell'Utente.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -133,8 +140,10 @@ LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
-NEXT_WORK_CLASS=PHASE_B_CLOSURE_REVIEW
-NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
+PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+NEXT_WORK_CLASS=HUMAN_GATE
+NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
 ```
 
 ## Stato verificato del progetto
@@ -515,8 +524,11 @@ implementazione e test, incluso il corrective R9 same-open IDENTIFY. D293/03
 esaurisce i prerequisiti offline di B3/B4 e il contratto statico KDE
 installato. Il precedente D293/04 resta evidenza offline storica non eseguita,
 ora superata come metodo. La patch-first D293 è invece PASS sul target reale.
-La Phase B non viene chiusa automaticamente: il prossimo boundary è la review
-evidence-based dei lifecycle residui richiesti dalla sua closure.
+La review evidence-based dei lifecycle residui ha isolato il gap account
+deletion/name reuse e D293/05 ne implementa offline una guard fail-closed più
+la live patch-first aggregata. La review PM è `ACCEPT_AND_CONTINUE`; la Phase B
+non viene chiusa automaticamente e il prossimo boundary è la live D293/05
+eseguita dall'Utente.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -565,9 +577,11 @@ ROLLBACK_ON_PASS=false
 KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
-NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
+PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+NEW_LIVE_REQUIRED_NOW=true
+NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
 ```

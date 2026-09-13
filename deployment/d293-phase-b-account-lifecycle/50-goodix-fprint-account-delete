@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+set -euo pipefail
+
+fail() {
+  printf 'D293_B5_ACCOUNT_DELETE=FAIL reason=%s\n' "$1" >&2
+  exit 1
+}
+
+[[ ${ACTION:-} == userdel ]] || fail unexpected_action
+subject=${SUBJECT:-}
+[[ -n $subject && $subject != . && $subject != .. && $subject != */* ]] ||
+  fail invalid_subject
+
+test_mode=${D293_B5_TEST_MODE:-false}
+fsroot=
+if [[ $test_mode == true ]]; then
+  fsroot=${D293_B5_TEST_ROOT:?}
+  [[ $fsroot == /tmp/d293-b5-test.* && -d $fsroot && -O $fsroot && ! -L $fsroot ]] ||
+    fail unsafe_test_root
+elif [[ $test_mode != false ]]; then
+  fail invalid_test_mode
+fi
+
+state_root=$fsroot/var/lib/fprint
+user_root=$state_root/$subject
+first_entry=
+
+if [[ ! -e $state_root && ! -L $state_root ]]; then
+  printf 'D293_B5_ACCOUNT_DELETE=PASS_NO_FPRINT_STATE username=%s\n' "$subject"
+  exit 0
+fi
+[[ -d $state_root && ! -L $state_root ]] || fail fprint_state_root_unsafe
+
+if [[ ! -e $user_root && ! -L $user_root ]]; then
+  printf 'D293_B5_ACCOUNT_DELETE=PASS_NO_USER_NAMESPACE username=%s\n' "$subject"
+  exit 0
+fi
+[[ -d $user_root && ! -L $user_root ]] || fail user_namespace_unsafe
+
+if ! first_entry=$(find "$user_root" -mindepth 1 -print -quit); then
+  fail user_namespace_unreadable
+fi
+
+if [[ -n $first_entry ]]; then
+  printf '%s\n' \
+    "D293_B5_ACCOUNT_DELETE=BLOCKED_FINGERPRINTS_PRESENT username=$subject" \
+    'Eliminare prima tutte le impronte del profilo tramite KDE/fprintd; l account non e stato modificato.' >&2
+  exit 1
+fi
+
+printf 'D293_B5_ACCOUNT_DELETE=PASS_EMPTY_USER_NAMESPACE username=%s\n' "$subject"

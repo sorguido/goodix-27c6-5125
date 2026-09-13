@@ -184,7 +184,11 @@ complesso percorso D293/04: non va eseguito né ulteriormente raffinato. La
 successiva patch minimale della production candidate D293 è stata invece
 eseguita manualmente dall'Utente nel workflow KDE nativo ed è PASS. Il numero
 esatto del tentativo VERIFY che ha prodotto MATCH non è stato riportato. La
-Phase B resta aperta fino al riesame evidence-based dei lifecycle residui.
+review evidence-based dei lifecycle residui ha isolato account deletion/name
+reuse come gap host ancora aperto. D293/05 implementa la relativa guard
+fail-closed e una live patch-first aggregata. La review PM è
+`ACCEPT_AND_CONTINUE`; l'esecuzione reale resta pendente, quindi Phase B non è
+chiusa.
 
 Principi trasversali della roadmap:
 
@@ -439,8 +443,10 @@ KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
-NEW_LIVE_REQUIRED_NOW=false
+PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
+NEW_LIVE_REQUIRED_NOW=true
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -789,8 +795,59 @@ ROLLBACK_ON_PASS=false
 KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
-NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
+PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
 PM_DECISION=ACCEPT_AND_CONTINUE
+```
+
+### Stato D293/05 — guard account lifecycle e candidate di closure Phase B
+
+Il riesame dei boundary residui dopo il PASS D293 ha separato ciò che è già
+provato sul target da ciò che manca per chiudere Phase B. Restano da esercitare
+sulla baseline corrente una gallery reale multi-finger, re-enroll/delete,
+logout/login, reboot e account deletion/name reuse. L'evidenza D293/02–03 copre
+questi contratti offline ma non li sostituisce sul target reale.
+
+Per account deletion/name reuse D293/05 introduce il minimo confine host
+necessario: un pre-hook nativo `userdel` in
+`/etc/shadow-maint/userdel-pre.d/` controlla soltanto se
+`/var/lib/fprint/<username>` contiene dati. Se sì, blocca fail-closed la
+cancellazione e richiede di eliminare prima tutte le impronte tramite il
+workflow KDE/fprintd; se il namespace è assente o vuoto, permette `userdel`.
+Non cancella template, non chiama fprintd, non raggiunge USB e non modifica la
+baseline D293. Il rename con impronte resta non supportato e richiede delete
+preventivo; non viene installata una policy generica per `usermod`.
+
+Il boundary è fondato sul target Fedora osservato con
+`shadow-utils-4.19.0-7.fc44.x86_64`, AccountsService
+`23.13.9-16.fc44.x86_64` e Plasma workspace `6.7.5-1.fc44.x86_64`. La man page
+installata e il sorgente upstream shadow 4.19.0 confermano che un pre-hook
+nonzero precede e abortisce la mutazione anche con `userdel -f`; l'ispezione
+locale mostra AccountsService `DeleteUser` verso `/usr/sbin/userdel -f` e il
+KCM Users verso AccountsService. Il dettaglio, gli hash host e i riferimenti
+sono nel report
+`analysis/D293/D293_05_PHASE_B_ACCOUNT_LIFECYCLE_GUARD.md`.
+
+La patch `deployment/d293-phase-b-account-lifecycle/` contiene hook,
+installazione, rollback, test offline e README live. Nove scenari offline e
+la sintassi shell passano. La live aggrega il delta utile: due dita reali,
+replace/delete, logout/login, reboot, blocco account con template, delete delle
+impronte, account deletion e name reuse. VERIFY è bounded a massimo tre
+tentativi fisici con stop al primo MATCH. PASS conserva sia baseline D293 sia
+guard; FAIL rimuove la sola guard salvo motivazione separata per il rollback
+D293.
+
+```text
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_05_SENSOR_ACCESS=0
+D293_05_PRIVILEGED_EXECUTION_BY_AI=false
+D293_05_OFFLINE_TESTS=9/9_PASS
+D293_05_ACCOUNT_DELETE_POLICY=BLOCK_IF_FPRINT_DATA_PRESENT
+D293_05_TEMPLATE_DELETION=KDE_FPRINTD_ONLY
+D293_05_LIVE=NOT_EXECUTED
+PM_DECISION=ACCEPT_AND_CONTINUE
+PHASE_B_CLOSED=false
 ```
 
 ### Ultimo avanzamento live consolidato — D293 workflow KDE nativo multi-user
@@ -1061,7 +1118,7 @@ PM_DECISION=ACCEPT_AND_CONTINUE
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
@@ -1101,7 +1158,10 @@ ROLLBACK_ON_PASS=false
 KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
+PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+NEW_LIVE_REQUIRED_NOW=true
+NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
