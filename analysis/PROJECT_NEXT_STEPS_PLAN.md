@@ -3,8 +3,9 @@
 
 Data review: 13 settembre 2026
 
-Baseline del corrective D293: `development` a
-`091846914d02f461d4af659ad5de17c0ba4c5363`, con Phase A chiusa.
+Baseline di ingresso del corrective metodologico patch-first: `development` a
+`5db8a868fb539254a481edea4c1443d15dfebb6e`, con Phase A chiusa e il
+precedente corrective D293/04 concluso offline ma mai eseguito live.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
 canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
@@ -14,10 +15,12 @@ e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
 R9, le IDENTIFY esplicite ripetute nello stesso open. D293/03
 attraversa il vero daemon fprintd con più nomi principal e fissa il contratto
 statico del KCM Users Plasma 6.7.5. La decisione Utente R7 del 13 settembre
-2026 fissa per D293/04 il protocollo operatore nella GUI nativa, senza policy
-click-specific nel driver. Il corrective F1–F4 ripristina preparazione,
-attestazione runtime e recovery e chiude offline con 33/33 regressioni D293.
-Il successivo boundary è l'operator-run Human Gate, non un'altra decisione R7.
+2026 resta evidenza storica valida per il protocollo GUI nativo, ma una
+successiva decisione esplicita dello stesso giorno supera il complesso kit
+D293/04 come metodo corrente. Il nuovo boundary è
+`PATCH_FIRST_LIVE_VALIDATION`: installazione minimale della corrente production
+candidate, rollback simmetrico, README completo e osservazione manuale del
+workflow KDE reale dopo il Human Gate.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -86,16 +89,25 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
-D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
-D293_04_F1_TO_F4=CORRECTED_OFFLINE
-D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
+D293_04_HISTORICAL_RESULT=READY_OFFLINE_NOT_EXECUTED
+D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
+TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
+OPERATOR_KIT_DEFAULT=false
+D293_INSTALL_PATCH=READY
+D293_ROLLBACK_PATCH=READY
+D293_LIVE_INSTRUCTIONS=READY
+D293_TEST_PURPOSE_DOCUMENTED=true
+D293_PASS_FAIL_STOP_CRITERIA=READY
+D293_ROLLBACK_INSTRUCTIONS=READY
+D293_INSTALLS_OPERATOR_KIT=false
+D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
-NEXT_WORK_CLASS=D293_04_OPERATOR_HUMAN_GATE
-NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
+NEXT_WORK_CLASS=D293_NATIVE_KDE_LIVE_OBSERVATION
+NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
 ```
 
 ## Stato verificato del progetto
@@ -307,16 +319,18 @@ hash-pinned del KCM Users Plasma 6.7.5 conferma discovery, list, enroll/
 re-enroll e delete tramite le API fprintd standard, senza UI Goodix; il KCM
 non è stato avviato.
 
-D293/04 riusa il common harness invariato. La decisione Utente R7 tratta una
-sola ENROLL nel KCM come protocollo operatore: un'azione extra è deviazione
-terminale osservata, non un evento che il driver production deve intercettare.
-I fence della singola action restano invariati e lo script impone fino a tre
-VERIFY, stop al primo MATCH e nessun quarto tentativo. F1–F4 correggono la
-pubblicazione sotto `ProtectSystem=strict`, distinguono zero eventi delete da
-errore journal, rendono riprendibili i rollback temporanei e pubblicano il PASS
-recovery solo dopo il cleanup finale. Preparazione, operator-run e deploy sono
-nuovamente implementati e pronti offline; Phase B e B3/B4 reali restano aperti
-fino all'evidenza del Human Gate.
+D293/04 conserva come storia il common harness, la decisione R7, i fence della
+singola action, la serie VERIFY massima di tre tentativi e i correttivi F1–F4.
+Il risultato offline resta valido nel proprio scope, ma il kit non è mai stato
+eseguito live ed è ora `SUPERSEDED_BY_METHOD_DECISION`: non va raffinato,
+adattato, installato o usato come metodo corrente. La validazione attuale usa
+`deployment/d293-native-kde-live/`: installa la corrente production candidate
+D293 con una patch minimale e reversibile, conserva D285 intatta e dispone di
+rollback simmetrico e README completo; install/rollback sintetici sono 7/7
+PASS, inclusa la preservazione dei metadati parent, e la build production
+offline è PASS. L'Utente osserverà direttamente il
+normale workflow KDE. La Phase B e B3/B4 reali restano aperti fino all'evidenza
+del Human Gate.
 
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
@@ -462,8 +476,9 @@ D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
 validator statico, senza accesso ai secret. D293/02 chiude B2 offline con
 implementazione e test, incluso il corrective R9 same-open IDENTIFY. D293/03
 esaurisce i prerequisiti offline di B3/B4 e il contratto statico KDE
-installato. D293/04 è pronto offline, ma non ancora provato sul target: il
-prossimo boundary è l'esecuzione manuale dell'Utente secondo il README corrente.
+installato. Il precedente D293/04 resta evidenza offline storica non eseguita,
+ora superata come metodo. Il prossimo boundary è l'applicazione manuale della
+patch D293 e l'osservazione del workflow KDE nativo secondo il nuovo README.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
@@ -487,14 +502,24 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
-D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
-D293_04_F1_TO_F4=CORRECTED_OFFLINE
+D293_04_HISTORICAL_RESULT=READY_OFFLINE_NOT_EXECUTED
+D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
+TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
+OPERATOR_KIT_DEFAULT=false
+D293_INSTALL_PATCH=READY
+D293_ROLLBACK_PATCH=READY
+D293_LIVE_INSTRUCTIONS=READY
+D293_TEST_PURPOSE_DOCUMENTED=true
+D293_PASS_FAIL_STOP_CRITERIA=READY
+D293_ROLLBACK_INSTRUCTIONS=READY
+D293_INSTALLS_OPERATOR_KIT=false
+D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
+NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
 ```

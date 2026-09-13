@@ -32,7 +32,9 @@ In particolare, durante il bootstrap/recovery iniziale:
   la sezione di stato corrente, l'ultimo avanzamento consolidato, la roadmap
   A→F approvata, la fase corrente e i blocker o le decisioni architetturali
   pertinenti al task;
-- esamina storia Git recente, diff non committato e ultimi artefatti realmente pertinenti;
+- esamina storia Git recente, diff non committato e ultimi artefatti realmente
+  pertinenti, incluse patch install/rollback correnti e gli Operator Kit
+  esistenti soltanto quando servono a ricostruire evidenza storica;
 - ricostruisci l'ultimo avanzamento tecnico dimostrato e il successivo confine aperto;
 - verifica se la sessione precedente ha lasciato lavoro incompleto o non committato.
 
@@ -176,13 +178,12 @@ Se manca una informazione target-specific necessaria e non può essere ottenuta 
 
 Quando serve l'Utente per ottenere una informazione production-specific, riduci la richiesta al minimo necessario.
 
-Se utile, prepara un probe riproducibile e read-only in:
-
-```text
-<git-root>/operator_kit/target_compatibility/<scopo>/
-```
-
-Preferisci uno script `.sh` con istruzioni/output in italiano. Il probe non deve modificare pacchetti, configurazioni, servizi o stato hardware. Se una verifica richiede `sudo`, live hardware, USB Goodix, secret o altra capability soggetta a Human Gate, dichiaralo e non eseguirla autonomamente.
+Preferisci il più piccolo elenco riproducibile di comandi read-only, oppure un
+singolo script one-shot solo quando riduce concretamente errori operativi. Non
+creare un Operator Kit, harness, collector o framework per la query. Il probe
+non deve modificare pacchetti, configurazioni, servizi o stato hardware. Se una
+verifica richiede `sudo`, live hardware, USB Goodix, secret o altra capability
+soggetta a Human Gate, dichiaralo e non eseguirla autonomamente.
 
 ### 3.4 Riesame continuo
 
@@ -253,7 +254,7 @@ Ferma il loop prima dell'azione soggetta a gate e riporta in modo compatto:
 - punto tecnico raggiunto;
 - motivo esatto del gate;
 - decisione/evidenza richiesta all'Utente;
-- eventuale probe/operator kit preparato;
+- eventuale probe read-only oppure coppia install/rollback e README preparati;
 - passo previsto dopo l'intervento umano.
 
 Non ricopiare nel report l'intero elenco dei Human Gate: cita il gate concreto che si è attivato.
@@ -294,26 +295,43 @@ Quando un'azione ricade in un Human Gate canonico, fermati prima dell'azione e u
 
 Per una normale live factory-preserving il Human Gate è il confine operativo,
 non un protocollo di autenticazione dell'Utente: l'AI prepara e verifica
-offline, dichiara `HUMAN_REQUIRED` e si ferma; l'Utente può quindi eseguire
-manualmente il Kit Operatore direttamente, senza approvare uno SHA, creare o
-consumare grant/file/token/ticket/nonce, autorizzare una candidate o compiere
-una seconda cerimonia autorizzativa.
+offline la coppia install/rollback e le istruzioni, dichiara `HUMAN_REQUIRED` e
+si ferma; l'Utente può quindi applicare manualmente la patch ed esercitare il
+workflow reale, senza approvare uno SHA, creare o consumare
+grant/file/token/ticket/nonce, autorizzare una candidate o compiere una seconda
+cerimonia autorizzativa.
 
 Se il progresso richiede un test live, USB reale o operazioni privilegiate
-dell'Utente, applica la procedura canonica dell'operator kit e non eseguire
-direttamente l'azione dal workflow Codex/VS Code. Il silenzio, la disponibilità
-dell'hardware e la consegna del kit non consentono mai all'AI di oltrepassare
-il gate. Retry automatici o impliciti sensor-reaching non provati sicuri
-restano vietati; il limite deve essere tecnico, non affidato a token di
-autorizzazione consumabili.
+dell'Utente, applica la procedura canonica patch-first e non eseguire
+direttamente installazione o live dal workflow Codex/VS Code. Il silenzio, la
+disponibilità dell'hardware e la consegna della patch non consentono mai all'AI
+di oltrepassare il gate. Retry automatici o impliciti sensor-reaching non
+provati sicuri restano vietati; il limite deve essere tecnico, non affidato a
+token di autorizzazione consumabili.
 
-Per un nuovo probe compatibile applica prima `REUSABLE_HARNESS_FIRST`: mantieni
-stabile `operator_kit/live_probe/` e aggiungi normalmente soltanto il piccolo
-payload dell'esperimento. Modifiche al common harness richiedono la sua
-regressione completa; modifiche payload richiedono test locali più compatibility
-test common. Un kit autonomo completo richiede una incompatibilità concreta e
-documentata del boundary o del profilo di rischio. Questa scelta riduce
-duplicazione, non modifica il Human Gate né autorizza alcuna live.
+Per ogni candidate da validare sul target, l'AI deve consegnare una
+installazione minimale e reversibile, un rollback simmetrico e un README breve
+che includa obbligatoriamente scopo, prerequisiti, installazione, normale
+workflow operatore, criteri osservabili `PASS_IF`/`FAIL_IF`/`STOP_IF`, rollback,
+stato finale atteso e cosa riportare all'AI. Preferire `install.sh` e
+`uninstall.sh`. La diagnostica aggiuntiva viene definita soltanto dopo un
+failure reale ed è ad hoc e proporzionata.
+
+```text
+PATCH_FIRST_LIVE_VALIDATION=true
+LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
+INSTALL_PATCH_REQUIRED=true
+ROLLBACK_PATCH_REQUIRED=true
+OPERATOR_KIT_AS_DEFAULT_TEST_METHOD=false
+REUSABLE_LIVE_HARNESS_AS_DEFAULT=false
+```
+
+Non creare un nuovo Operator Kit, common harness, orchestratore, collector,
+classifier, sanitizer, state machine, budget engine, simulatore o automazione
+sensor-reaching senza nuova autorizzazione esplicita dell'Utente. Gli Operator
+Kit esistenti restano evidenza storica; il complesso kit D293/04 è superato come
+metodo corrente e non va ulteriormente raffinato o adattato. Questa scelta non
+modifica il Human Gate né autorizza live, privilegi, USB o persistenza.
 
 ---
 

@@ -160,14 +160,18 @@ state machine o capture framework quando una modifica locale reversibile e uno
 smoke test manuale di pochi minuti rispondono affidabilmente al boundary senza
 ridurre la safety.
 
-Prima di creare nuova infrastruttura il PM verifica: se la domanda ammette una
-modifica diretta reversibile, il test manuale è breve e sicuro, e la telemetria
-aggiuntiva non cambierebbe la decisione, usare il test diretto. Se costo e
-review del test superano materialmente costo e rischio del test stesso,
+Per ogni modifica software che richiede validazione reale, il default è una
+patch installabile minimale, il rollback simmetrico e l'osservazione diretta
+del normale workflow target da parte dell'Utente. La diagnostica aggiuntiva
+nasce da un failure realmente osservato e resta ad hoc e proporzionata. Se
+costo e review del test superano materialmente costo e rischio del test stesso,
 rivalutare il metodo. Il tempo dell'Utente è una risorsa progettuale primaria.
 
 ```text
 TEST_THE_TARGET, NOT_THE_TEST_HARNESS
+PATCH_FIRST_LIVE_VALIDATION=true
+OPERATOR_KIT_AS_DEFAULT_TEST_METHOD=false
+REUSABLE_LIVE_HARNESS_AS_DEFAULT=false
 ```
 
 Avanzamento reale significa almeno uno tra:
@@ -241,11 +245,11 @@ Non aggirare il gate, non degradarlo a semplice warning e non interpretare prude
 
 Per una normale live factory-preserving il Human Gate separa ciò che può fare
 autonomamente l'AI da ciò che deve eseguire fisicamente l'Utente. Dopo
-`HUMAN_REQUIRED` e la consegna del Kit Operatore non è richiesta una seconda
-cerimonia: niente approvazione manuale dello SHA, grant, authorization file,
-claim/consumo, token, ticket, nonce o autorizzazione della candidate. Il kit
-deve essere direttamente eseguibile dall'Utente. Questo non consente mai
-all'AI di eseguire live, USB o `sudo`.
+`HUMAN_REQUIRED` e la consegna di installazione, rollback e istruzioni non è
+richiesta una seconda cerimonia: niente approvazione manuale dello SHA, grant,
+authorization file, claim/consumo, token, ticket, nonce o autorizzazione della
+candidate. La patch deve essere direttamente applicabile dall'Utente. Questo
+non consente mai all'AI di installarla né di eseguire live, USB o `sudo`.
 
 Sono sempre Human Gate per l'agente:
 
@@ -348,69 +352,77 @@ L'esistenza di branch, commit o PR non costituisce da sola prova di correttezza.
 
 ---
 
-## 8. Test live e operator kit
+## 8. Validazione live patch-first
 
-Se il progresso richiede un intervento live, USB reale o un'operazione privilegiata dell'Utente, l'agente **non deve eseguirla direttamente**.
+Se il progresso richiede un intervento live, USB reale o un'operazione
+privilegiata dell'Utente, l'agente **non deve eseguirla direttamente**. Prima
+del Human Gate deve:
 
-Deve preparare, quando tecnicamente possibile, un operator kit in:
+1. implementare e testare offline la modifica;
+2. produrre una patch/installazione minimale e reversibile, preferibilmente
+   `install.sh`;
+3. produrre una patch/disinstallazione o rollback corrispondente e simmetrica,
+   preferibilmente `uninstall.sh`;
+4. consegnare un README operativo breve e completo;
+5. verificare offline i percorsi nel massimo grado consentito;
+6. terminare con `HUMAN_REQUIRED` prima di installazione, privilegi, USB o live.
 
-```text
-<git-root>/operator_kit/<step-o-scopo>/
-```
+La coppia install/rollback deve essere leggibile, auditabile, limitata al
+boundary corrente, fail-closed sui prerequisiti, idempotente quando
+ragionevolmente possibile ed esplicita su file, symlink, drop-in, servizi e
+configurazioni modificati. Non deve contenere segreti, introdurre dipendenze
+permanenti non necessarie o modificare firmware e stato persistente del
+sensore. Il rollback deve ripristinare esattamente lo stato precedente previsto
+per gli elementi toccati dalla patch.
 
-Il kit deve includere almeno:
+Il README è obbligatorio e deve contenere:
 
-- script `.sh` eseguibile dall'Utente quando appropriato;
-- istruzioni operative in italiano;
-- output interattivi dello script in italiano;
-- prerequisiti;
-- rischio e scopo della run;
-- conferme/stop condition necessarie;
-- percorso degli output prodotti;
-- cleanup/release/reseal quando applicabili;
-- comportamento fail-closed leggibile.
-
-Regole:
-
-- l'agente può costruire e verificare offline il kit;
-- l'agente non esegue il live;
-- l'agente non esegue `sudo` nel workflow attivo VS Code;
-- eventuale `sudo` necessario deve trovarsi nel percorso manualmente avviato dall'Utente e deve essere chiaramente visibile nelle istruzioni;
-- il kit chiuso offline deve essere direttamente eseguibile dall'Utente,
-  idealmente con un solo comando operativo normale, senza prerequisiti di
-  grant/token/file autorizzativi o approvazione rituale dello SHA;
-- dopo la preparazione del kit, l'agente termina con `HUMAN_REQUIRED`;
-- niente comandi USB/Python improvvisati come sostituto del kit quando un kit dedicato è praticabile.
-
-### 8.1 Reusable Live Probe Harness
-
-Per ogni futuro probe factory-preserving compatibile, usare come default il
-common harness versionato in `operator_kit/live_probe/` e aggiungere un piccolo
-payload sotto `operator_kit/live_probe/experiments/<experiment-id>/`:
+- scopo della live, modifica/requisito validato e non-oggetto della prova;
+- branch/commit/candidate attesa, prerequisiti e condizioni di STOP;
+- directory e comandi esatti di installazione, `sudo`/PolicyKit previsto,
+  effetti e verifica dell'attivazione;
+- soltanto il normale workflow reale da esercitare;
+- criteri direttamente osservabili `PASS_IF`, `FAIL_IF` e `STOP_IF`;
+- comando e condizioni di rollback, effetti annullati, verifiche successive e
+  stato finale atteso;
+- cosa riportare all'AI: comportamento osservato, messaggio d'errore e punto
+  preciso del failure; log o query read-only vengono richiesti solo dopo un
+  failure reale quando necessari.
 
 ```text
-REUSABLE_HARNESS_FIRST=true
-COMMON_HARNESS=stable
-EXPERIMENT_PAYLOAD=small_delta
-NEW_EXPERIMENT != NEW_OPERATOR_FRAMEWORK
+PATCH_FIRST_LIVE_VALIDATION=true
+LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
+INSTALL_PATCH_REQUIRED=true
+ROLLBACK_PATCH_REQUIRED=true
+PATCH + README OPERATIVO != OPERATOR KIT
 ```
 
-Il common harness centralizza i gate e l'orchestrazione condivisa; il payload
-deve imporre tecnicamente i propri limiti sensor-reaching e contenere soltanto
-il delta dell'ipotesi. Un cambio payload richiede test locali e compatibility
-test common. Ogni modifica al common harness richiede review più forte e full
-harness regression. Un nuovo kit autonomo è ammesso soltanto quando il
-boundary o il profilo di rischio è concretamente incompatibile, con motivazione
-documentata.
+Non costruire un nuovo Operator Kit, common harness, collector, classifier,
+sanitizer, orchestratore, protocollo interattivo artificiale, state machine,
+budget engine, simulatore del test o automazione sensor-reaching senza una
+nuova autorizzazione esplicita dell'Utente. Dopo un failure reale sono ammessi
+comandi read-only mirati, journal/log, query di stato, piccoli comandi one-shot
+e test offline proporzionati a spiegare quel failure.
 
-Questa regola non riduce Human Gate, guardrail live, factory-preserving,
-provenance o Git protections. Il common harness non deve diventare un framework
-generico, una DSL o un plugin system.
+### 8.1 Materiale storico
+
+Gli Operator Kit e `operator_kit/live_probe/` esistenti sono preservati come
+evidenza e diagnostica storica, senza essere il default o una dipendenza per le
+nuove patch-first live. Non vengono cancellati o spostati automaticamente. Il
+complesso kit D293/04 è superato dalla decisione metodologica e non deve essere
+ulteriormente raffinato, adattato o ricreato sotto altro nome.
+
+```text
+DELETE_HISTORICAL_OPERATOR_KITS=false
+EXISTING_OPERATOR_KITS=HISTORICAL_EVIDENCE_ONLY
+NEW_OPERATOR_KIT_DEFAULT=false
+D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
+```
 
 ### 8.2 Serie bounded VERIFY/MATCH
 
-Ogni operator kit live che testa riconoscimento fingerprint, VERIFY/MATCH o un
-consumer biometrico reale deve offrire, salvo diversa decisione esplicita
+Ogni validazione live che testa riconoscimento fingerprint, VERIFY/MATCH o un
+consumer biometrico reale deve prevedere, salvo diversa decisione esplicita
 dell'Utente, una serie tecnicamente bounded e telemetrata di fino a tre
 tentativi fisici indipendenti:
 
@@ -424,11 +436,14 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
-Un solo MATCH chiude con successo la serie. Retry automatici interni vanno
-evitati oppure devono essere esplicitamente compresi, bounded e autorizzati
-dal design. Un test one-shot è ammesso soltanto su richiesta esplicita
-dell'Utente o per un boundary realmente one-shot, con eccezione motivata prima
-del live. Questa regola prevale sui default one-shot dei singoli Dxxx.
+Un solo MATCH chiude con successo la serie. Il production path e il workflow
+nativo devono preservare i limiti tecnici e l'osservabilità pertinenti; le
+istruzioni operatore rendono inoltre esplicito lo stop senza introdurre un
+orchestratore di test. Retry automatici interni vanno evitati oppure devono
+essere esplicitamente compresi, bounded e autorizzati dal design. Un test
+one-shot è ammesso soltanto su richiesta esplicita dell'Utente o per un boundary
+realmente one-shot, con eccezione motivata prima del live. Questa regola
+prevale sui default one-shot dei singoli Dxxx.
 
 ---
 
@@ -538,7 +553,9 @@ Quando lo step crea, modifica, abilita o dichiara pronto un percorso eseguibile/
 - failure reporting leggibile;
 - differenze tra ambiente di test e ambiente operatore.
 
-Se il percorso reale richiede live, USB o privilegi, verificarne offline tutto ciò che è possibile e demandare l'esecuzione effettiva all'operator kit/Human Gate.
+Se il percorso reale richiede live, USB o privilegi, verificarne offline tutto
+ciò che è possibile e demandare installazione ed esecuzione effettive alla
+coppia patch-first e al Human Gate.
 
 Per step puramente documentali o di repository hygiene, `EXECUTABLE_CLOSURE=NOT_APPLICABLE` è legittimo se motivato.
 

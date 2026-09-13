@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance corrente — v3.0 (13 settembre 2026)
+### Governance corrente — v3.1 (13 settembre 2026)
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -24,8 +24,8 @@ confine operativo fra AI e Utente:
 ```text
 AI: sviluppo, test e review offline
 → HUMAN_REQUIRED e arresto dell'AI
-→ Kit Operatore direttamente eseguibile dall'Utente
-→ live eseguita manualmente dall'Utente
+→ installazione minimale + rollback + README operativo
+→ patch applicata e workflow reale esercitato manualmente dall'Utente
 ```
 
 Non esiste un livello intermedio di approvazione manuale dello SHA,
@@ -59,17 +59,30 @@ AUTOMATIC_UNPROVEN_SENSOR_RETRY_ALLOWED=false
 SHA_RECORDED_FOR_PROVENANCE=true
 ```
 
-La v2.8 ha aggiunto un'ottimizzazione di metodo senza modificare il gate:
-`operator_kit/live_probe/` è il common harness stabile per i futuri probe
-factory-preserving compatibili. Nuove ipotesi vivono normalmente in piccoli
-payload; un kit completo separato richiede una incompatibilità concreta.
+La v3.1 sostituisce il default storico Operator Kit/reusable harness con la
+validazione live patch-first. Per ogni candidate che richiede il target reale,
+l'AI implementa e verifica offline, consegna una installazione minimale e
+reversibile, il rollback simmetrico e istruzioni complete; poi si ferma al
+Human Gate. L'Utente applica la patch ed esercita il normale workflow reale.
+La diagnostica aggiuntiva nasce soltanto da un failure osservato e resta ad hoc
+e proporzionata.
 
 ```text
-REUSABLE_HARNESS_FIRST=true
-NEW_EXPERIMENT_NEEDS_NEW_OPERATOR_FRAMEWORK=false
+PATCH_FIRST_LIVE_VALIDATION=true
+LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
+INSTALL_PATCH_REQUIRED=true
+ROLLBACK_PATCH_REQUIRED=true
+OPERATOR_KIT_AS_DEFAULT_TEST_METHOD=false
+REUSABLE_LIVE_HARNESS_AS_DEFAULT=false
 HUMAN_GATE_UNCHANGED=true
 FACTORY_PRESERVING_POLICY_UNCHANGED=true
 ```
+
+Gli Operator Kit e `operator_kit/live_probe/` esistenti restano evidenza e
+diagnostica storica: non vengono cancellati o spostati, ma non governano più
+il flusso corrente e non sono dipendenze ammesse per nuove patch-first live. Il
+complesso kit D293/04 è superato come metodo corrente e non va ulteriormente
+raffinato o adattato.
 
 La v2.9 ha aggiunto `Pragmatism First` e ha reso il tempo dell'Utente una risorsa
 progettuale esplicita: un test diretto, reversibile e osservabile prevale su
@@ -89,10 +102,10 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
-La v3.0 recepisce la roadmap A→F approvata dall'Utente il 13 settembre 2026.
-Non modifica Human Gate, safety, factory-preserving, protezioni Git o licensing:
-fissa target production iniziale, ordine delle fasi e phase gate descritti
-nella sezione narrativa seguente.
+La v3.0 ha recepito la roadmap A→F approvata dall'Utente il 13 settembre 2026.
+La v3.1 non la modifica e mantiene invariati Human Gate, safety,
+factory-preserving, protezioni Git, licensing, target production iniziale,
+ordine delle fasi e phase gate descritti nella sezione narrativa seguente.
 
 ### Consultazione del manuale al bootstrap
 
@@ -152,13 +165,14 @@ Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
 production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. La fase corrente
-resta **Phase B**. Il corrective D293 ha risolto R9 nel driver e R1–R6 nel
-percorso operatore. Il 13 settembre 2026 l'Utente ha deciso R7 per D293/04: una
-sola enrollment nella GUI KDE nativa è protocollo operatore, senza introdurre
-nel driver production una policy sui clic. F1–F4 sono chiusi offline, il
-percorso completo di preparazione e recovery è stato ripristinato e il kit è
-`READY_OFFLINE_HUMAN_GATE_PENDING`. Questo non è un PASS live: il prossimo
-boundary è l'esecuzione manuale dell'Utente.
+resta **Phase B**. Il corrective D293 ha risolto R9 nel driver; D293/01–03 e le
+evidenze offline già acquisite restano validi. La successiva decisione
+esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
+complesso percorso D293/04: non va eseguito né ulteriormente raffinato. Il
+boundary corrente richiede invece la patch minimale della production candidate
+D293, il rollback simmetrico e l'osservazione manuale del workflow KDE nativo.
+Questo non è un PASS live: il prossimo boundary resta l'esecuzione manuale
+dell'Utente.
 
 Principi trasversali della roadmap:
 
@@ -167,9 +181,9 @@ Principi trasversali della roadmap:
   della Phase B prima di iniziare packaging e integrazione host della Phase C;
 - mantenere fprintd proprietario di utenti e template, senza database Goodix
   parallelo salvo blocker tecnico concreto e riesame della strategia;
-- trattare operator kit e terminale come strumenti developer/diagnostici, non
-  come UX production, e non creare una GUI Goodix custom senza blocker reale e
-  nuova decisione dell'Utente;
+- trattare gli Operator Kit esistenti come evidenza/diagnostica storica, non
+  come metodo di validazione corrente o UX production, e non creare una GUI
+  Goodix custom senza blocker reale e nuova decisione dell'Utente;
 - non cancellare materiale storico o deprecato. L'eventuale archivio privato
   `red tag/` è ammesso solo dopo audit di import, build, test, script,
   riferimenti documentali, provenance, licensing e dipendenze production;
@@ -290,7 +304,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — D293/04 pronto offline, Human Gate pendente
+### Stato corrente Phase B — D293 patch-first pronta offline, Human Gate pendente
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -367,17 +381,23 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
-D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
-D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
-D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
-D293_04_PER_ACTION_TECHNICAL_FENCES=UNCHANGED
-D293_04_VERIFY_SERIES=SCRIPT_BOUNDED_MAX_3_STOP_FIRST_MATCH
-D293_04_RUN_TOTALS=OBSERVED_PROTOCOL_BOUNDS_ACTIONS_5_CONTACTS_24
-D293_04_F1_TO_F4=CORRECTED_OFFLINE
+D293_04_HISTORICAL_RESULT=READY_OFFLINE_NOT_EXECUTED
+D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
+TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
+OPERATOR_KIT_DEFAULT=false
+D293_INSTALL_PATCH=READY
+D293_ROLLBACK_PATCH=READY
+D293_LIVE_INSTRUCTIONS=READY
+D293_TEST_PURPOSE_DOCUMENTED=true
+D293_PASS_FAIL_STOP_CRITERIA=READY
+D293_ROLLBACK_INSTRUCTIONS=READY
+D293_INSTALLS_OPERATOR_KIT=false
+D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
+NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
 NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
 ```
 
@@ -555,7 +575,7 @@ Report e validator:
 `analysis/D293/D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md` e
 `analysis/D293/validate_d293_03.py`.
 
-### Stato D293/04 — corrective V3 chiuso offline, Human Gate pendente
+### Stato storico D293/04 — corrective V3 chiuso offline e poi superato
 
 Il corrective ha riesaminato direttamente gli script del piccolo experiment
 `d293-kde-new-user`, mantenendo invariato il common harness. R1–R6 sono chiusi
@@ -587,8 +607,9 @@ account cleanup e rimozione dei contenitori; intent PENDING/COMPLETE e resolver
 mantengono riprendibili i fallimenti temporanei. La capture base per-run è
 validata `root:root` `0711` senza rifiutare le run storiche.
 
-`prepare.sh` ricostruisce la candidate production, applica i preflight target
-e invoca il deploy corrente con run-id; gli ingressi manuali sono riabilitati.
+Nel metodo in vigore in quel momento, `prepare.sh` ricostruiva la candidate
+production, applicava i preflight target e invocava il deploy corrente con
+run-id; gli ingressi manuali erano riabilitati.
 Le regressioni attraversano gli script e le funzioni reali con soli effetti
 esterni simulati in `/tmp`: D293 33/33 PASS, common harness invariato 14/14
 PASS, validator `PASS_READY_OFFLINE` e common `--offline-test` da cwd esterna
@@ -596,7 +617,7 @@ PASS con zero action sensor-reaching. Sandbox systemd, PolicyKit/KCM, ACL,
 account, mount, journal e USB reali restano target-only e Human Gate.
 
 ```text
-D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_HISTORICAL_RESULT=READY_OFFLINE_HUMAN_GATE_PENDING_NOT_EXECUTED
 D293_04_COMMON_HARNESS_MODIFIED=false
 D293_04_MAX_ACTIONS=5
 D293_04_MAX_CONTACTS=24
@@ -608,10 +629,11 @@ D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
 D293_04_F1_TO_F4=CORRECTED_OFFLINE
 D293_04_PREPARATION_ENTRYPOINT=IMPLEMENTED_VERIFIED_OFFLINE
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
 CURRENT_PHASE=B
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
+NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
 ```
 
 Il precedente blocker V2 sul fence pre-action resta storia, ma è superato
@@ -621,8 +643,72 @@ Report, sintesi e test sono
 `analysis/D293/D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md`,
 `analysis/D293/D293_CORRECTIVE_V2_ROCKY_NATIVE_ACTIONS.md`,
 `analysis/D293/validate_d293_04.py` e
-`analysis/D293/test_d293_04_operator_scripts.py`. Phase B potrà avanzare solo
-dopo il nuovo Human Gate e l'evidenza live, non dai mock offline.
+`analysis/D293/test_d293_04_operator_scripts.py`. La successiva decisione
+metodologica dell'Utente non modifica il significato di questi risultati:
+preserva kit, report e test come evidenza storica, ma vieta di raffinare,
+adattare, installare o usare il kit D293/04 come metodo corrente.
+
+Il boundary attuale è `PATCH_FIRST_LIVE_VALIDATION`: installazione minimale
+della corrente production candidate D293, rollback simmetrico limitato ai file
+e al servizio toccati, README operativo e osservazione diretta da parte
+dell'Utente della creazione di un nuovo account, della sua vera sessione KDE,
+del lettore in KDE Users, di enrollment/verify/delete nativi e dell'isolamento
+dal principal preesistente. Nessuna live, installazione, USB o operazione
+privilegiata è stata eseguita dall'AI. Phase B potrà avanzare soltanto dopo il
+Human Gate e l'evidenza live, non dai mock offline.
+
+### Stato D293 patch-first — installazione e rollback pronti offline
+
+Il nuovo artefatto corrente è `deployment/d293-native-kde-live/`. Non contiene
+né installa l'Operator Kit D293/04. `install.sh`, eseguito dall'Utente normale,
+richiede `development` pulito e allineato a `origin/development`, verifica le
+versioni Fedora attese e costruisce unprivileged la corrente production
+candidate tramite `production/build.sh`. Soltanto la fase finale manuale usa
+`sudo`: dopo aver verificato l'installazione D285 precedente e il servizio,
+copia i sei artefatti runtime in una directory versionata con lo SHA completo,
+aggiunge un wrapper hash-checking e il solo drop-in systemd
+`95-goodix-d293-native.conf`, quindi ripristina lo stato `active`/`inactive`
+iniziale di fprintd. I parent D285 esistenti vengono soltanto validati, senza
+`chmod`; il percorso wrapper accetta la topologia Fedora osservata
+`/usr/local/sbin -> bin` solo se `/usr/local/bin` è una directory reale.
+
+La patch non sostituisce file RPM e non modifica PAM, sudoers, account,
+template, storage fprintd o file D285. Lo state root-only registra candidate,
+hash e definizione systemd precedente. `uninstall.sh` verifica candidate,
+script e D285, rimuove esclusivamente runtime/wrapper/drop-in/state D293 e
+accetta la closure solo se la definizione fprintd precedente e lo stato del
+servizio sono ripristinati. Un mismatch della snapshot durante il rollback
+rimette in vigore il drop-in D293 e fallisce chiuso, evitando uno stato
+intermedio ambiguo.
+
+`README_TEST_LIVE.md` descrive scopo e non-scope, prerequisiti e STOP,
+installazione, normale workflow KDE/fprintd con nuovo utente e vera sessione
+Plasma, `fprintd-verify` bounded fino a tre tentativi con stop al primo MATCH,
+delete nativo, isolamento del principal preesistente, criteri
+`PASS_IF`/`FAIL_IF`/`STOP_IF`, rollback, stato finale e informazioni da
+riportare. Il test sintetico install/rollback copre stato fprintd attivo e
+inattivo, drift candidate e D285, preservazione dei metadati delle directory
+parent, ripristino transazionale su mismatch unit e assenza di dipendenze da
+`operator_kit/`: 7/7 PASS. Sintassi Bash, source check
+e build production reale offline sono PASS; zero live, root o USB sono stati
+eseguiti dall'AI.
+
+```text
+CURRENT_PHASE=B
+TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
+OPERATOR_KIT_DEFAULT=false
+D293_INSTALL_PATCH=READY
+D293_ROLLBACK_PATCH=READY
+D293_LIVE_INSTRUCTIONS=READY
+D293_TEST_PURPOSE_DOCUMENTED=true
+D293_PASS_FAIL_STOP_CRITERIA=READY
+D293_ROLLBACK_INSTRUCTIONS=READY
+D293_INSTALLS_OPERATOR_KIT=false
+D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
+LIVE_EXECUTED_BY_AI=false
+NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
+PM_DECISION=HUMAN_REQUIRED
+```
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -846,13 +932,13 @@ chiuso il difetto di lifecycle che impediva IDENTIFY ripetute nello stesso
 logical open: ogni azione pulita usa ora un fresh resource rollover, mentre
 retry, cancel, drain incompleto e poison restano fail-closed.
 
-D293/04 è ora pronto offline per il solo Human Gate dell'Utente. La decisione
-R7 usa il protocollo manuale nel KCM nativo e non introduce un contatore
-click-specific nel driver production. F1–F4, preparazione, runtime audit,
-journal e recovery sono chiusi da regressioni composizionali; il common
-harness resta invariato. La readiness offline non anticipa l'esito target:
-sandbox systemd, KDE/PolicyKit, nuovo UID, ACL, mount, journal e USB saranno
-provati soltanto dalla run manuale.
+D293/04 resta un risultato offline storico mai eseguito live. La decisione R7
+e i correttivi F1–F4 conservano il proprio significato, ma il complesso kit è
+ora superato come metodo corrente. Il nuovo boundary patch-first installa la
+corrente production candidate D293 senza dipendere dal kit e demanda
+all'Utente l'osservazione diretta di KDE/fprintd. La readiness offline non
+anticipa l'esito target: systemd, KDE/PolicyKit, nuovo UID e USB saranno
+attraversati soltanto dal normale workflow manuale dopo il Human Gate.
 La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
@@ -898,14 +984,15 @@ PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
 D293_R9_REPEATED_IDENTIFY_SAME_OPEN=PASS_OFFLINE
-D293_04_R7_METHOD_DECISION=USER_APPROVED_NATIVE_GUI_OPERATOR_PROTOCOL
-D293_04_OPERATOR_KIT=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_04_HISTORICAL_RESULT=READY_OFFLINE_NOT_EXECUTED
+D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
+D293_TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
+OPERATOR_KIT_DEFAULT=false
+D293_INSTALLS_OPERATOR_KIT=false
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
-D293_04_GUI_SESSION_HARD_CAP_REQUIRED=false
-D293_04_F1_TO_F4=CORRECTED_OFFLINE
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_04_OPERATOR_HUMAN_GATE
+NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
@@ -1623,19 +1710,18 @@ L'insieme D286 osserva sullo stesso dito/template un `NO_MATCH` 14/40 seguito
 da tre `MATCH` 527/40, 340/40 e 75/40. Non è una misura FAR/FRR, ma prova che
 un singolo `NO_MATCH` non è conclusivo nelle condizioni correnti del target.
 
-Ogni futuro Kit Operatore per riconoscimento/autenticazione analoga deve
-offrire una sequenza di almeno tre slot: un tentativo iniziale e almeno due
-retry fisici espliciti dopo il primo `NO_MATCH`. Ogni contatto è una nuova
-azione consapevole, separata e auditabile; non è un retry automatico del
-protocollo o del transport. `MATCH` arresta immediatamente la sequenza, quindi
-non forza i restanti contatti. `PAM_ERROR`, `SAFETY_VIOLATION` o failure non
-biometrica fermano fail-closed. Dopo i tre slot si classifica soltanto
-l'evidenza osservata, senza generalizzare FAR/FRR.
+Ogni futura validazione live per riconoscimento/autenticazione analoga deve
+offrire fino a tre tentativi fisici: dopo `NO_MATCH` si può proseguire fino al
+terzo, senza quarto tentativo. Ogni contatto è una nuova azione consapevole e
+separata; non è un retry automatico del protocollo o del transport. `MATCH`
+arresta immediatamente la sequenza, quindi non forza i restanti contatti.
+`PAM_ERROR`, `SAFETY_VIOLATION` o failure non biometrica fermano fail-closed.
+Dopo i tre slot si classifica soltanto l'evidenza osservata, senza
+generalizzare FAR/FRR.
 
 ```text
 INITIAL_FINGER_ATTEMPT=1
-MINIMUM_EXPLICIT_FINGER_RETRIES_AFTER_NO_MATCH=2
-MINIMUM_TOTAL_OPERATOR_FINGER_ATTEMPTS=3
+MAXIMUM_PHYSICAL_FINGER_ATTEMPTS=3
 STOP_ON_FIRST_MATCH=true
 AUTOMATIC_OR_IMPLICIT_SENSOR_RETRY_ALLOWED=false
 ```
@@ -16348,8 +16434,9 @@ consumata.
 - niente erase, IAP, ClearApp, F0/F4, cambio boot-mode o provisioning sostitutivo;
 - niente payload privati, secret o materiale biometrico nei log/bundle;
 - nessun comando live senza autorizzazione esplicita e step separato;
-- qualunque test hardware/live esclusivamente tramite Kit Operatore dedicato,
-  senza Python o comandi USB manuali, con interazione e messaggi in italiano;
+- qualunque test hardware/live soltanto dopo installazione/rollback patch-first
+  e Human Gate, eseguito manualmente dall'Utente nel normale workflow; nessun
+  nuovo harness o comando USB improvvisato senza decisione esplicita;
 - fonti di modelli Goodix correlati sono atlanti strutturali, non prova target;
 - ogni promozione di safety richiede sorgente, control flow, dataflow, lifetime
   ed effetto persistente chiusi sul target.
