@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 3.1 — Revisione 13 settembre 2026
-> **Stato**: Attivo; sostituisce la v3.0 del 13 settembre 2026
-> **Motivazione**: la v3.1 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving, protezioni Git, licensing, roadmap A→F e target Fedora KDE della v3.0. Sostituisce invece Operator Kit e reusable live harness come metodo predefinito con la validazione live patch-first: installazione minimale e reversibile della candidate, rollback simmetrico, istruzioni obbligatorie e osservazione empirica del workflow nativo da parte dell'Utente.
+> **Versione**: 3.2 — Revisione 13 settembre 2026
+> **Stato**: Attivo; sostituisce la v3.1 del 13 settembre 2026
+> **Motivazione**: la v3.2 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving, protezioni Git, licensing, roadmap A→F, target Fedora KDE e validazione patch-first della v3.1. Chiarisce che il rollback simmetrico è un antidoto obbligatorio da fornire e conservare, non un rituale post-PASS: una candidate validata resta installata per default; FAIL, instabilità o regressione richiedono invece rollback.
 
 ---
 
@@ -493,9 +493,28 @@ PATCH_FIRST_LIVE_VALIDATION=true
 LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
 INSTALL_PATCH_REQUIRED=true
 ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 OPERATOR_KIT_AS_DEFAULT_TEST_METHOD=false
 REUSABLE_LIVE_HARNESS_AS_DEFAULT=false
 ```
+
+Il rollback resta obbligatorio come implementazione, documentazione e
+capacità di recovery, ma non come azione automatica dopo il test. Il default
+operativo è:
+
+```text
+PASS -> KEEP INSTALLED
+FAIL_OR_INSTABILITY_OR_REGRESSION -> ROLLBACK
+```
+
+Dopo PASS la candidate validata diventa la baseline software corrente del
+target. Un rollback post-PASS è ammesso soltanto se il boundary richiede
+esplicitamente un deployment temporaneo o un confronto A/B, se emerge una
+regressione successiva, se serve recovery oppure se lo richiede l'Utente. Il
+repository deve conservare in forma auditabile la versione dell'antidoto
+corrispondente a ogni baseline installata.
 
 Prima del Human Gate l'AI:
 
@@ -1027,7 +1046,7 @@ La qualità si misura in:
 
 ---
 
-## 25. Principio sintetico della v3.1
+## 25. Principio sintetico della v3.2
 
 ```text
 sicurezza hardware forte

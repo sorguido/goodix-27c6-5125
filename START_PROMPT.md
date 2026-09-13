@@ -322,9 +322,20 @@ PATCH_FIRST_LIVE_VALIDATION=true
 LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
 INSTALL_PATCH_REQUIRED=true
 ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 OPERATOR_KIT_AS_DEFAULT_TEST_METHOD=false
 REUSABLE_LIVE_HARNESS_AS_DEFAULT=false
 ```
+
+La patch di rollback è sempre pronta e auditabile, ma non si esegue per
+default dopo un PASS: una candidate validata resta installata come baseline
+software corrente. Si torna alla baseline precedente dopo FAIL, instabilità o
+regressione, quando il boundary richiede esplicitamente un deployment
+temporaneo/A-B/recovery, oppure su richiesta dell'Utente. Il loop successivo
+deve partire dalla baseline validata rimasta installata e preservare la
+possibilità di ricostruirne l'antidoto corrispondente.
 
 Non creare un nuovo Operator Kit, common harness, orchestratore, collector,
 classifier, sanitizer, state machine, budget engine, simulatore o automazione

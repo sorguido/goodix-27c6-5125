@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance corrente — v3.1 (13 settembre 2026)
+### Governance corrente — v3.2 (13 settembre 2026)
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -72,11 +72,23 @@ PATCH_FIRST_LIVE_VALIDATION=true
 LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
 INSTALL_PATCH_REQUIRED=true
 ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 OPERATOR_KIT_AS_DEFAULT_TEST_METHOD=false
 REUSABLE_LIVE_HARNESS_AS_DEFAULT=false
 HUMAN_GATE_UNCHANGED=true
 FACTORY_PRESERVING_POLICY_UNCHANGED=true
 ```
+
+Il rollback simmetrico è l'antidoto obbligatorio da fornire e conservare, non
+una cerimonia automatica dopo un successo. Dopo PASS senza instabilità o
+regressioni la candidate resta installata e diventa la baseline software
+corrente; dopo FAIL, instabilità o regressione si esegue il rollback. Il
+ritorno post-PASS resta ammesso per deployment esplicitamente temporaneo,
+confronto A/B, recovery, regressione successiva o richiesta dell'Utente. La
+versione dell'uninstall corrispondente alla baseline installata deve restare
+recuperabile e auditabile.
 
 Gli Operator Kit e `operator_kit/live_probe/` esistenti restano evidenza e
 diagnostica storica: non vengono cancellati o spostati, ma non governano più
@@ -103,7 +115,7 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
 La v3.0 ha recepito la roadmap A→F approvata dall'Utente il 13 settembre 2026.
-La v3.1 non la modifica e mantiene invariati Human Gate, safety,
+Le v3.1 e v3.2 non la modificano e mantengono invariati Human Gate, safety,
 factory-preserving, protezioni Git, licensing, target production iniziale,
 ordine delle fasi e phase gate descritti nella sezione narrativa seguente.
 
@@ -168,11 +180,11 @@ vero fprintd host-only e il contratto statico KDE installato. La fase corrente
 resta **Phase B**. Il corrective D293 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
-complesso percorso D293/04: non va eseguito né ulteriormente raffinato. Il
-boundary corrente richiede invece la patch minimale della production candidate
-D293, il rollback simmetrico e l'osservazione manuale del workflow KDE nativo.
-Questo non è un PASS live: il prossimo boundary resta l'esecuzione manuale
-dell'Utente.
+complesso percorso D293/04: non va eseguito né ulteriormente raffinato. La
+successiva patch minimale della production candidate D293 è stata invece
+eseguita manualmente dall'Utente nel workflow KDE nativo ed è PASS. Il numero
+esatto del tentativo VERIFY che ha prodotto MATCH non è stato riportato. La
+Phase B resta aperta fino al riesame evidence-based dei lifecycle residui.
 
 Principi trasversali della roadmap:
 
@@ -304,7 +316,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — D293 patch-first pronta offline, Human Gate pendente
+### Stato corrente Phase B — D293 patch-first PASS, lifecycle residui in review
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -351,6 +363,18 @@ target-proven con il delta D292 limitato a composizione/build/test-surface e
 l'evidenza ABI Fedora corrente: nessun nuovo test live era richiesto per
 chiudere Phase A.
 
+La successiva D293 patch-first è stata installata ed eseguita manualmente
+dall'Utente sul target reale. Il nuovo normale utente `d239live0913` ha visto
+il reader in una vera sessione Plasma; enrollment KDE, VERIFY con MATCH e
+delete KDE sono PASS, e il principal Guido è rimasto invariato per osservazione
+dell'Utente. Il numero del tentativo MATCH non è stato riportato. Il rollback
+è stato esercitato con successo sotto una precedente istruzione poi superata;
+D293 non è stato rigettato. La candidate allo SHA
+`e61fce313794922a2dab156a1b38a8ddc5837f19` è stata reinstallata e i relativi
+runtime, wrapper e drop-in sono osservabili read-only come baseline software
+configurata. Questo chiude lo scenario discriminante D293, non automaticamente
+l'intera Phase B.
+
 ```text
 CURRENT_PHASE=B
 D292_01_OUTCOME=PASS_ARCHITECTURAL_INVENTORY
@@ -394,11 +418,29 @@ D293_ROLLBACK_INSTRUCTIONS=READY
 D293_INSTALLS_OPERATOR_KIT=false
 D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+D293_NATIVE_KDE_LIVE=PASS
+D293_NATIVE_INSTALL=PASS
+D293_NEW_LOCAL_USER_READER_VISIBLE=true
+D293_NATIVE_KDE_ENROLL=PASS
+D293_NATIVE_VERIFY=MATCH
+D293_NATIVE_VERIFY_ATTEMPT=NOT_REPORTED
+D293_NATIVE_KDE_DELETE=PASS
+D293_PREEXISTING_PRINCIPAL_UNCHANGED=true
+D293_NATIVE_ROLLBACK=PASS
+D293_TEST_ACCOUNT=d239live0913
+D293_TARGET_EVIDENCE=HUMAN_OBSERVED_ON_REAL_FEDORA_KDE_TARGET
+D293_VALIDATED_FEATURE=ACTIVE_BASELINE
+D293_ACTIVE_BASELINE_SHA=e61fce313794922a2dab156a1b38a8ddc5837f19
+D285=ROLLBACK_PREDECESSOR
+ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
-NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
+NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
+NEW_LIVE_REQUIRED_NOW=false
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -630,10 +672,10 @@ D293_04_F1_TO_F4=CORRECTED_OFFLINE
 D293_04_PREPARATION_ENTRYPOINT=IMPLEMENTED_VERIFIED_OFFLINE
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
 D293_04_COMPLEX_KIT=SUPERSEDED_BY_METHOD_DECISION
-CURRENT_PHASE=B
-PHASE_B_CLOSED=false
-PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
+HISTORICAL_PHASE_AT_D293_04=B
+HISTORICAL_PHASE_B_CLOSED_AT_D293_04=false
+HISTORICAL_PRODUCTION_READY_AT_D293_04=false
+HISTORICAL_NEXT_BOUNDARY_AFTER_D293_04=D293_NATIVE_KDE_LIVE_OBSERVATION
 ```
 
 Il precedente blocker V2 sul fence pre-action resta storia, ma è superato
@@ -648,16 +690,17 @@ metodologica dell'Utente non modifica il significato di questi risultati:
 preserva kit, report e test come evidenza storica, ma vieta di raffinare,
 adattare, installare o usare il kit D293/04 come metodo corrente.
 
-Il boundary attuale è `PATCH_FIRST_LIVE_VALIDATION`: installazione minimale
+Il boundary successivo era `PATCH_FIRST_LIVE_VALIDATION`: installazione minimale
 della corrente production candidate D293, rollback simmetrico limitato ai file
 e al servizio toccati, README operativo e osservazione diretta da parte
 dell'Utente della creazione di un nuovo account, della sua vera sessione KDE,
 del lettore in KDE Users, di enrollment/verify/delete nativi e dell'isolamento
 dal principal preesistente. Nessuna live, installazione, USB o operazione
-privilegiata è stata eseguita dall'AI. Phase B potrà avanzare soltanto dopo il
-Human Gate e l'evidenza live, non dai mock offline.
+privilegiata è stata eseguita dall'AI. L'Utente ha poi attraversato quel Human
+Gate e il workflow nativo è risultato PASS; D293/04 resta comunque non
+eseguito e storico.
 
-### Stato D293 patch-first — installazione e rollback pronti offline
+### Stato D293 patch-first — PASS KDE nativo e baseline validata attiva
 
 Il nuovo artefatto corrente è `deployment/d293-native-kde-live/`. Non contiene
 né installa l'Operator Kit D293/04. `install.sh`, eseguito dall'Utente normale,
@@ -693,6 +736,25 @@ parent, ripristino transazionale su mismatch unit e assenza di dipendenze da
 e build production reale offline sono PASS; zero live, root o USB sono stati
 eseguiti dall'AI.
 
+L'Utente ha eseguito la live sul target Fedora KDE reale con il nuovo account
+`d239live0913`. Ha osservato installazione PASS, reader visibile nella vera
+sessione del nuovo utente, enrollment KDE PASS, un risultato MATCH da
+`fprintd-verify`, delete KDE PASS e principal Guido invariato. Il numero esatto
+del tentativo MATCH non è stato riportato e non è inferibile. Il primo tentativo
+precedente, fermato da `rg: command not found` e `work: unbound variable`, era
+un difetto installer/preflight prima dell'installazione, non un failure
+biometrico, del driver, del sensore o di KDE/fprintd.
+
+Il rollback post-PASS è stato esercitato con successo una volta perché il
+README allora vigente lo richiedeva anche dopo un successo. Quella istruzione
+è superata e non implica rigetto di D293. La candidate è stata poi reinstallata
+e lasciata presente: ispezione read-only non privilegiata osserva runtime
+versionato, wrapper e drop-in D293 per lo SHA
+`e61fce313794922a2dab156a1b38a8ddc5837f19`. Lo state root-only non è stato
+letto e la sandbox non ha consentito la query del bus systemd; il claim è
+quindi limitato alla baseline software configurata osservabile. D285 è il
+predecessore di rollback.
+
 ```text
 CURRENT_PHASE=B
 TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
@@ -705,12 +767,48 @@ D293_PASS_FAIL_STOP_CRITERIA=READY
 D293_ROLLBACK_INSTRUCTIONS=READY
 D293_INSTALLS_OPERATOR_KIT=false
 D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
+D293_NATIVE_KDE_LIVE=PASS
+D293_NATIVE_INSTALL=PASS
+D293_NEW_LOCAL_USER_READER_VISIBLE=true
+D293_NATIVE_KDE_ENROLL=PASS
+D293_NATIVE_VERIFY=MATCH
+D293_NATIVE_VERIFY_ATTEMPT=NOT_REPORTED
+D293_NATIVE_KDE_DELETE=PASS
+D293_PREEXISTING_PRINCIPAL_UNCHANGED=true
+D293_NATIVE_ROLLBACK=PASS
+D293_HISTORICAL_POST_PASS_ROLLBACK=PERFORMED_UNDER_SUPERSEDED_INSTRUCTION
+D293_REJECTED=false
+D293_TEST_ACCOUNT=d239live0913
+D293_TARGET_EVIDENCE=HUMAN_OBSERVED_ON_REAL_FEDORA_KDE_TARGET
+D293_VALIDATED_FEATURE=ACTIVE_BASELINE
+D293_ACTIVE_BASELINE_SHA=e61fce313794922a2dab156a1b38a8ddc5837f19
+D285=ROLLBACK_PREDECESSOR
+ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
-NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
-PM_DECISION=HUMAN_REQUIRED
+PHASE_B_CLOSED=false
+NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
+PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
+### Ultimo avanzamento live consolidato — D293 workflow KDE nativo multi-user
+
+La live D293 descritta sopra è il più recente avanzamento target: patch-first
+installata dall'Utente, nuovo normale utente locale con reader visibile,
+enrollment e delete dalla UI KDE nativa, MATCH da `fprintd-verify`, principal
+preesistente invariato e rollback storico PASS. È evidenza osservata
+dall'Utente, non telemetria macchina; il tentativo MATCH è `NOT_REPORTED`.
+Non prova account deletion/name reuse, lifecycle esaustivo, AD/LDAP, altri
+target, suspend/hotplug, concorrenza, FAR/FRR o regressione Windows esaustiva.
+
+La candidate D293 è stata reinstallata e i suoi effetti host leggibili allo
+SHA `e61fce313794922a2dab156a1b38a8ddc5837f19` sono presenti; è la baseline
+software configurata del target. Il rollback resta disponibile e non va
+eseguito dopo PASS senza una delle motivazioni definite dalla governance v3.2.
+
+### Avanzamento live precedente — D291 enrollment diversity Rocky-derived
 
 La candidate `cbf582f4dcdb7eeb6c8381223c84d37363386870` è stata
 validata dall'Utente sul target reale dopo re-enrollment. La policy diversity
@@ -936,9 +1034,9 @@ D293/04 resta un risultato offline storico mai eseguito live. La decisione R7
 e i correttivi F1–F4 conservano il proprio significato, ma il complesso kit è
 ora superato come metodo corrente. Il nuovo boundary patch-first installa la
 corrente production candidate D293 senza dipendere dal kit e demanda
-all'Utente l'osservazione diretta di KDE/fprintd. La readiness offline non
-anticipa l'esito target: systemd, KDE/PolicyKit, nuovo UID e USB saranno
-attraversati soltanto dal normale workflow manuale dopo il Human Gate.
+all'Utente l'osservazione diretta di KDE/fprintd. Tale osservazione è ora PASS:
+systemd, KDE/PolicyKit, nuovo UID e USB sono stati attraversati dal normale
+workflow manuale, senza usare il kit D293/04.
 La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
@@ -947,8 +1045,9 @@ Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
 `analysis/PROJECT_NEXT_STEPS_PLAN.md`
 
 La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
-soluzione di packaging. Analogamente, l'installazione D285 `/usr/local`
-single-user resta attiva e recuperabile ma non è un prodotto distribuibile.
+soluzione di packaging. Analogamente, D285 `/usr/local` resta il predecessore
+di rollback recuperabile; la baseline software configurata è ora D293 e non è
+ancora un prodotto distribuibile.
 Le live osservate riportano zero famiglie di scrittura persistente note; ciò
 non prova assolutamente la nonmutazione NVM interna e non equivale a una
 qualificazione Windows esaustiva dopo ogni run.
@@ -958,11 +1057,11 @@ PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D291_CLOSED_BOUNDARIES
-PM_DECISION=HUMAN_REQUIRED
+PM_DECISION=ACCEPT_AND_CONTINUE
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
@@ -990,9 +1089,19 @@ D293_TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
 OPERATOR_KIT_DEFAULT=false
 D293_INSTALLS_OPERATOR_KIT=false
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+D293_NATIVE_KDE_LIVE=PASS
+D293_NATIVE_VERIFY=MATCH
+D293_NATIVE_VERIFY_ATTEMPT=NOT_REPORTED
+D293_VALIDATED_FEATURE=ACTIVE_BASELINE
+D293_ACTIVE_BASELINE_SHA=e61fce313794922a2dab156a1b38a8ddc5837f19
+D285=ROLLBACK_PREDECESSOR
+ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
+NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

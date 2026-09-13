@@ -394,8 +394,20 @@ PATCH_FIRST_LIVE_VALIDATION=true
 LIVE_DEBUGGING_METHOD=EMPIRICAL_TARGET_OBSERVATION
 INSTALL_PATCH_REQUIRED=true
 ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 PATCH + README OPERATIVO != OPERATOR KIT
 ```
+
+Il rollback è l'antidoto obbligatorio da fornire, non una cerimonia
+post-successo. Se la candidate supera la live prevista senza instabilità o
+regressioni, resta installata e diventa la baseline software del target per il
+passo successivo. Il rollback si esegue dopo FAIL, instabilità o regressione,
+quando il test richiede esplicitamente un deployment temporaneo o un ritorno
+per confronto/recovery, oppure su richiesta dell'Utente. L'implementazione
+dell'uninstall corrispondente a ogni baseline installata deve restare
+recuperabile e auditabile nel versionamento.
 
 Non costruire un nuovo Operator Kit, common harness, collector, classifier,
 sanitizer, orchestratore, protocollo interattivo artificiale, state machine,

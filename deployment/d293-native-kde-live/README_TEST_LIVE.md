@@ -13,6 +13,24 @@ Non valida login, lock screen, `sudo`, firmware o scritture persistenti sul
 sensore. Non installa, adatta né usa l'Operator Kit D293/04; non contiene
 collector, classifier, orchestratore o logica di conteggio delle azioni.
 
+## Stato della validazione
+
+Il 13 settembre 2026 l'Utente ha eseguito questo boundary sul target Fedora
+KDE reale con l'account di prova `d239live0913`: installazione, visibilità del
+reader nel nuovo utente, enrollment KDE, un MATCH con `fprintd-verify`, delete
+KDE, isolamento del principal Guido e rollback sono stati osservati come PASS.
+Il numero esatto del tentativo che ha prodotto MATCH non è stato riportato. Il
+rollback storico fu eseguito perché la precedente revisione di questo README
+lo prescriveva anche dopo PASS; non indica un rigetto della candidate.
+
+Una successiva ispezione read-only e non privilegiata ha osservato la
+reinstallazione della candidate `e61fce313794922a2dab156a1b38a8ddc5837f19`
+nei tre elementi pubblicamente leggibili del deployment: runtime versionato,
+wrapper e drop-in systemd. Lo state root-only non è stato letto e lo stato
+runtime del servizio non è stato interrogabile dalla sandbox. La candidate
+validata è quindi la baseline software configurata del target; D285 resta il
+predecessore di rollback.
+
 ## Prerequisiti e STOP
 
 - branch `development`, HEAD pubblicato su `origin/development` e worktree

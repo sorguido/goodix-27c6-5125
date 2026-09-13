@@ -5,11 +5,14 @@ Data review: 13 settembre 2026
 
 Baseline di ingresso del corrective metodologico patch-first: `development` a
 `5db8a868fb539254a481edea4c1443d15dfebb6e`, con Phase A chiusa e il
-precedente corrective D293/04 concluso offline ma mai eseguito live.
+precedente corrective D293/04 concluso offline ma mai eseguito live. Il 13
+settembre 2026 la successiva patch-first D293 è stata eseguita manualmente
+dall'Utente sul target reale e ha dato PASS nel workflow KDE nativo.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
-canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
-target-proven. D293/01 completa offline B1, senza auto-approvare la review PM,
+canonica, della build/ABI e delle suite integrate; D291 resta evidenza live
+target-proven precedente e D293 aggiunge il workflow KDE multi-user nativo.
+D293/01 completa offline B1, senza auto-approvare la review PM,
 e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
 `VerifyStart(any)`, l'handoff fprintd IDENTIFY→ENROLL sicuro e, col corrective
 R9, le IDENTIFY esplicite ripetute nello stesso open. D293/03
@@ -20,7 +23,13 @@ successiva decisione esplicita dello stesso giorno supera il complesso kit
 D293/04 come metodo corrente. Il nuovo boundary è
 `PATCH_FIRST_LIVE_VALIDATION`: installazione minimale della corrente production
 candidate, rollback simmetrico, README completo e osservazione manuale del
-workflow KDE reale dopo il Human Gate.
+workflow KDE reale dopo il Human Gate. Quel boundary è ora PASS. Il MATCH è
+stato osservato, ma il numero esatto del tentativo non è stato riportato. Il
+rollback eseguito dopo il PASS seguiva un'istruzione poi superata e non è un
+rigetto della candidate. La candidate è stata quindi reinstallata: runtime,
+wrapper e drop-in D293 allo SHA `e61fce313794922a2dab156a1b38a8ddc5837f19`
+sono osservabili read-only; D293 è la baseline software configurata e D285 il
+predecessore di rollback.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -102,12 +111,30 @@ D293_ROLLBACK_INSTRUCTIONS=READY
 D293_INSTALLS_OPERATOR_KIT=false
 D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+D293_NATIVE_KDE_LIVE=PASS
+D293_NATIVE_INSTALL=PASS
+D293_NEW_LOCAL_USER_READER_VISIBLE=true
+D293_NATIVE_KDE_ENROLL=PASS
+D293_NATIVE_VERIFY=MATCH
+D293_NATIVE_VERIFY_ATTEMPT=NOT_REPORTED
+D293_NATIVE_KDE_DELETE=PASS
+D293_PREEXISTING_PRINCIPAL_UNCHANGED=true
+D293_NATIVE_ROLLBACK=PASS
+D293_TEST_ACCOUNT=d239live0913
+D293_TARGET_EVIDENCE=HUMAN_OBSERVED_ON_REAL_FEDORA_KDE_TARGET
+D293_VALIDATED_FEATURE=ACTIVE_BASELINE
+D293_ACTIVE_BASELINE_SHA=e61fce313794922a2dab156a1b38a8ddc5837f19
+D285=ROLLBACK_PREDECESSOR
+ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
-NEXT_WORK_CLASS=D293_NATIVE_KDE_LIVE_OBSERVATION
-NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
+NEXT_WORK_CLASS=PHASE_B_CLOSURE_REVIEW
+NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
 ```
 
 ## Stato verificato del progetto
@@ -137,6 +164,10 @@ NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
 - Persistenza host D285/D286: runtime hash-pinned, template single-user,
   restart e sopravvivenza al reboot sono provati; fallback password e
   readiness dell'uninstall sono stati auditati nello scope D285/D286.
+- D293 patch-first sul target: un nuovo utente locale creato dopo
+  l'installazione vede il reader, completa enrollment, VERIFY con MATCH e
+  delete nel workflow KDE/fprintd nativo; il principal preesistente resta
+  invariato per osservazione dell'Utente. Il tentativo MATCH non è riportato.
 
 ### IMPLEMENTED, ma non production-ready
 
@@ -144,12 +175,12 @@ NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
   assenza di retry nascosti e stabilità del nuovo template nel gate a quattro
   serie sono provati. Il pinning baseline resta implementato ma non isolato
   causalmente; questa attribuzione non è necessaria alla closure.
-- Driver e integrazione SIGFM funzionano nella fork Fedora preservata, ma il
-  delta production non è ancora presentato come una singola patch series o
-  sorgente di build mantenibile rispetto a un upstream scelto.
-- L'installazione attiva D285 sotto `/usr/local` è single-host, single-user e
-  legata a SHA/versioni esatte. È un'installazione sperimentale recuperabile,
-  non un package di distribuzione.
+- Driver e integrazione SIGFM funzionano nella fork Fedora preservata; Phase A
+  ha consolidato il delta come patch production rigenerabile e source-of-truth
+  mantenibile. Restano da trasformare in package Fedora gestito nella Phase C.
+- L'installazione D285 sotto `/usr/local` resta il predecessore di rollback.
+  La baseline software configurata D293 è ancora single-host e legata a
+  SHA/versioni esatte: è recuperabile ma non è un package di distribuzione.
 - La riga `pam_fprintd.so max-tries=3 timeout=45 debug` nel PAM package-owned
   `plasmalogin` è funzionalmente provata, ma è una modifica manuale che un
   aggiornamento RPM può sovrascrivere. Non è la strategia di configurazione
@@ -190,11 +221,10 @@ CURRENT_WINDOWS_REGRESSION_QUALIFICATION=NOT_EXHAUSTIVE
 
 Blocker di produzione:
 
-- manca una topologia sorgente/build unica e mantenibile;
 - mancano package, install/upgrade/uninstall transazionali e una policy per
   dipendenze OpenCV, systemd, SELinux e PAM;
-- mancano modello multi-user, lifecycle amministrativo dei template e
-  provisioning lecito dei materiali runtime protetti su una macchina nuova;
+- restano lifecycle amministrativo account deletion/name reuse e provisioning
+  lecito dei materiali runtime protetti su una macchina nuova;
 - restano da chiudere cancellazione/quiescenza device-side arbitraria,
   suspend/resume, hotplug e concorrenza fra consumer;
 - prima di distribuire serve chiudere regime del combined work, attribution e
@@ -267,9 +297,9 @@ MOVE_ONLY_AFTER_REFERENCE_AUDIT=true
   Goodix salvo blocker tecnico concreto e riesame della strategia. Operator kit
   e terminale restano strumenti developer/diagnostici, non UX finale; nessuna
   GUI Goodix custom senza blocker dimostrato e nuova decisione dell'Utente.
-- **PERCHÉ SERVE:** il percorso corrente prova un utente e un FP3, ma non
-  definisce comportamento per utenti multipli o creati dopo l'installazione,
-  re-enrollment, delete, template drift o macchina nuova.
+- **PERCHÉ SERVE:** D293 prova ora il nuovo utente creato dopo l'installazione
+  nel workflow KDE reale, ma non chiude da solo account deletion/name reuse,
+  tutti i lifecycle richiesti o il provisioning su macchina nuova.
 - **PREREQUISITI:** source-of-truth Phase A; policy esplicita su origine,
   installazione e protezione dei materiali PE/FDT/PSK senza pubblicarli.
 - **OUTPUT ATTESO:** contratto zero/uno/più template e più dita secondo le
@@ -328,9 +358,13 @@ adattato, installato o usato come metodo corrente. La validazione attuale usa
 D293 con una patch minimale e reversibile, conserva D285 intatta e dispone di
 rollback simmetrico e README completo; install/rollback sintetici sono 7/7
 PASS, inclusa la preservazione dei metadati parent, e la build production
-offline è PASS. L'Utente osserverà direttamente il
-normale workflow KDE. La Phase B e B3/B4 reali restano aperti fino all'evidenza
-del Human Gate.
+offline è PASS. La live patch-first successiva è PASS: il nuovo account locale
+ha visto il reader, enrollment/verify MATCH/delete nativi sono riusciti e il
+principal preesistente è rimasto invariato secondo osservazione dell'Utente.
+Il tentativo esatto del MATCH non è noto. Questo chiude lo scenario
+discriminante, ma non prova da solo tutti i lifecycle richiesti dalla closure
+Phase B; account deletion/name reuse e gli altri casi non attraversati restano
+da riesaminare contro le evidenze già esistenti.
 
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
@@ -450,6 +484,9 @@ Non riaprire o ripetere per sola “maggiore confidenza”:
 - D290: fingerprint passwordless → login Plasma → nuova sessione Wayland.
 - D291: enrollment diversity Rocky-derived, discriminazione wrong-finger e
   quattro serie registrate concluse con MATCH.
+- D293: installazione patch-first, visibilità reader per il nuovo utente,
+  enrollment/VERIFY MATCH/delete KDE nativi e isolamento osservato del
+  principal preesistente.
 
 Una regressione mirata è giustificata soltanto se cambia codice/configurazione
 nel percorso rilevante, cambia materialmente la piattaforma supportata, emerge
@@ -477,11 +514,12 @@ validator statico, senza accesso ai secret. D293/02 chiude B2 offline con
 implementazione e test, incluso il corrective R9 same-open IDENTIFY. D293/03
 esaurisce i prerequisiti offline di B3/B4 e il contratto statico KDE
 installato. Il precedente D293/04 resta evidenza offline storica non eseguita,
-ora superata come metodo. Il prossimo boundary è l'applicazione manuale della
-patch D293 e l'osservazione del workflow KDE nativo secondo il nuovo README.
+ora superata come metodo. La patch-first D293 è invece PASS sul target reale.
+La Phase B non viene chiusa automaticamente: il prossimo boundary è la review
+evidence-based dei lifecycle residui richiesti dalla sua closure.
 
 ```text
-PM_DECISION=HUMAN_REQUIRED
+PM_DECISION=ACCEPT_AND_CONTINUE
 D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -515,11 +553,21 @@ D293_ROLLBACK_INSTRUCTIONS=READY
 D293_INSTALLS_OPERATOR_KIT=false
 D293_INSTALLS_CURRENT_PRODUCTION_CANDIDATE=true
 D293_04_LIVE_EXECUTION=NOT_PERFORMED
+D293_NATIVE_KDE_LIVE=PASS
+D293_NATIVE_VERIFY=MATCH
+D293_NATIVE_VERIFY_ATTEMPT=NOT_REPORTED
+D293_VALIDATED_FEATURE=ACTIVE_BASELINE
+D293_ACTIVE_BASELINE_SHA=e61fce313794922a2dab156a1b38a8ddc5837f19
+D285=ROLLBACK_PREDECESSOR
+ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
-NEW_LIVE_REQUIRED_NOW=USER_EXECUTION_ONLY
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=D293_NATIVE_KDE_LIVE_OBSERVATION
+NEXT_BOUNDARY=PHASE_B_REMAINING_LIFECYCLE_BOUNDARY
 ```
