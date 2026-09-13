@@ -1,2 +1,2 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-/etc/shadow-maint/userdel-pre\.d/50-goodix-fprint-account-delete -- gen_context(system_u:object_r:goodix_fprint_account_delete_exec_t,s0)
+/etc/shadow-maint/userdel-pre\.d/50-goodix-fprint-account-delete -- system_u:object_r:goodix_fprint_account_delete_exec_t:s0
