@@ -33,7 +33,10 @@ predecessore di rollback. Il riesame dei lifecycle residui ha individuato come
 ultimo gap Phase B la relazione fra template e account deletion/name reuse.
 D293/05 implementa una guard host-only `userdel` e una singola live patch-first
 che copre anche multi-finger, re-enroll, delete, logout/login e reboot; la
-review PM della candidate è `ACCEPT_AND_CONTINUE`.
+review PM della candidate era `ACCEPT_AND_CONTINUE`. La live reale ha però
+fallito sull'esecuzione SELinux del pre-hook (`useradd_t` → `shadow_t:file
+execute`) dopo il delete completo delle impronte. Rollback B5 e successiva
+cancellazione account sono PASS; D293 resta attiva e validata.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -76,9 +79,11 @@ D293/03 esaurisce i prerequisiti offline di B3/B4: due nomi principal, ma un
 solo UID Unix, sul vero fprintd e storage temporaneo, più il contratto statico
 del KCM KDE. D293 ha poi prodotto il PASS target del workflow nativo minimo.
 D293/05 affronta il gap residuo account deletion/name reuse con una guard
-fail-closed che non chiama fprintd e non accede al sensore; installazione,
-rollback e test offline sono pronti; la review PM è positiva e resta pendente
-la sola live dell'Utente.
+fail-closed che non chiama fprintd e non accede al sensore. La prima
+installazione live è PASS, ma SELinux Enforcing ha impedito a `userdel` di
+eseguire il hook; rollback B5 e cancellazione account post-rollback sono PASS.
+Lo studio Fedora esatto ha prodotto una policy stretta pronta offline; il
+prossimo Human Gate ripete soltanto il boundary SELinux fallito.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -141,9 +146,19 @@ PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_FIRST_INSTALL=PASS
+D293_05_FIRST_LIVE=FAIL
+D293_05_FAILURE_CLASS=HOST_SELINUX_EXECUTION_POLICY
+D293_05_FAILURE_POINT=USERDEL_PRE_HOOK_EXEC
+D293_05_DRIVER_REGRESSION=false
+D293_05_SENSOR_FAILURE=false
+D293_05_ROLLBACK=PASS
+D293_05_ACCOUNT_DELETE_AFTER_ROLLBACK=PASS
+D293_05_SELINUX_CORRECTIVE=READY_OFFLINE
+D293_05_CORRECTIVE_LIVE=NOT_EXECUTED
 D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
 NEXT_WORK_CLASS=HUMAN_GATE
-NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
+NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 ```
 
 ## Stato verificato del progetto
@@ -526,9 +541,12 @@ installato. Il precedente D293/04 resta evidenza offline storica non eseguita,
 ora superata come metodo. La patch-first D293 è invece PASS sul target reale.
 La review evidence-based dei lifecycle residui ha isolato il gap account
 deletion/name reuse e D293/05 ne implementa offline una guard fail-closed più
-la live patch-first aggregata. La review PM è `ACCEPT_AND_CONTINUE`; la Phase B
-non viene chiusa automaticamente e il prossimo boundary è la live D293/05
-eseguita dall'Utente.
+la live patch-first aggregata. La live ha prodotto nuova evidenza: SELinux
+Enforcing blocca `userdel` prima che il hook decida sul namespace. Il rollback
+B5 e la cancellazione account successiva sono PASS; la baseline D293 resta
+validata. Lo studio sul package Fedora 44 esatto ha isolato il mapping
+`shadow_t` e prodotto una policy locale stretta con tipo dedicato. Dodici test
+offline passano; il prossimo boundary è la live focalizzata dell'Utente.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -581,7 +599,15 @@ PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
 PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_FIRST_INSTALL=PASS
+D293_05_FIRST_LIVE=FAIL
+D293_05_FAILURE_CLASS=HOST_SELINUX_EXECUTION_POLICY
+D293_05_FAILURE_POINT=USERDEL_PRE_HOOK_EXEC
+D293_05_ROLLBACK=PASS
+D293_05_ACCOUNT_DELETE_AFTER_ROLLBACK=PASS
+D293_05_SELINUX_CORRECTIVE=READY_OFFLINE
+D293_05_CORRECTIVE_LIVE=NOT_EXECUTED
 D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
 NEW_LIVE_REQUIRED_NOW=true
-NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
+NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 ```

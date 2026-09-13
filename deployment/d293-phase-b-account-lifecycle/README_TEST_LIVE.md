@@ -1,35 +1,48 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# D293/B5 — account lifecycle e chiusura multi-user KDE
+# D293/B5 correttiva — account deletion con SELinux Enforcing
 
-## Scopo
+## Scopo della live
 
-Questa patch aggiunge un solo pre-hook Fedora `shadow-utils` per impedire che
-un account locale venga cancellato mentre `/var/lib/fprint/<username>` contiene
-ancora dati. Il hook non cancella template, non chiama fprintd, non apre USB e
-non modifica la candidate D293: chiede di eliminare prima le impronte tramite
-il normale workflow KDE/fprintd. Dopo il cleanup fprintd, la cancellazione
-account procede e il riuso futuro dello stesso nome non eredita template stale.
+Questa patch conserva invariati driver, runtime e configurazione D293 e
+corregge soltanto l'integrazione SELinux del pre-hook `userdel` già validato
+offline. Installa un tipo eseguibile dedicato per l'esatto hook B5 e concede a
+`useradd_t` i soli permessi necessari per eseguirlo e ispezionare nomi e
+metadati sotto `/var/lib/fprint`; non concede lettura dei template né alcuna
+scrittura.
 
-La live completa inoltre i lifecycle Phase B ancora non attraversati sulla
-baseline D293: gallery a due dita, re-enrollment, delete singolo/completo,
-logout/login, reboot e account deletion/name reuse. Non valida packaging RPM,
-suspend/hotplug, concorrenza, FAR/FRR, AD/LDAP, altri sensori o regressione
-Windows esaustiva.
+La prova risponde a un unico boundary: con SELinux `Enforcing`, la cancellazione
+di `d293b5live` viene bloccata quando resta una fingerprint e riesce dopo il
+delete completo tramite KDE/fprintd. Non ripete gallery, reboot, verify/match o
+gli altri lifecycle già attraversati. Non valida RPM, suspend/hotplug,
+concorrenza, FAR/FRR, AD/LDAP, altri sensori o Windows.
+
+```text
+VERIFY_MATCH_IN_SCOPE=false
+SENSOR_PERSISTENT_WRITE=0
+FIRMWARE_CHANGE=0
+PSK_ACCESS=0
+```
 
 ## Prerequisiti e STOP
 
 - branch `development`, HEAD pubblicato su `origin/development`, worktree pulito;
-- D293 validata ancora installata come baseline software configurata;
-- Fedora 44 x86_64 e `shadow-utils-4.19.0-7.fc44.x86_64`;
-- nessuna UI biometrica o azione fprintd in corso durante install/rollback;
-- nome account usa-e-getta `d293b5live` assente e disponibile per creazione, cancellazione e
-  ricreazione; non usare un account con dati da conservare;
-- due dita fisiche distinte disponibili per la prova.
+- D293 validata ancora installata e funzionante come baseline;
+- Fedora 44 x86_64 con `shadow-utils-4.19.0-7.fc44.x86_64` e
+  `selinux-policy-targeted-44.8-1.fc44.noarch`;
+- SELinux `Enforcing` con policy `targeted`;
+- comandi `checkmodule`, `semodule_package`, `semodule`, `matchpathcon` e
+  `restorecon` presenti;
+- nessuna UI biometrica o azione fprintd in corso durante installazione e
+  rollback;
+- account usa-e-getta `d293b5live` assente; non usare un account con dati da
+  conservare.
 
-`STOP_IF=` un prerequisito fallisce, esiste già il path del hook o lo state
-B5, la baseline D293 mostra drift, compare una richiesta di cancellare dati
-fuori dal solo account di prova, oppure il principal Guido cambia. Non
-aggirare il hook e non cancellare manualmente `/var/lib/fprint`.
+`STOP_IF=` un prerequisito fallisce; esiste già il modulo SELinux
+`goodix_fprint_account_delete`, il path del hook o lo state B5; la baseline D293
+mostra drift; compare una richiesta di cancellare dati fuori dall'account di
+prova; oppure cambia il principal Guido. Non usare `audit2allow`, non impostare
+permissive, non disabilitare SELinux, non applicare `chcon` e non cancellare
+manualmente `/var/lib/fprint`.
 
 ## Installazione
 
@@ -39,52 +52,48 @@ Dalla root del repository, come utente normale:
 deployment/d293-phase-b-account-lifecycle/install.sh
 ```
 
-Solo la copia del hook e dello state richiede `sudo`. La patch crea, se
-assenti, `/etc/shadow-maint/userdel-pre.d/` e installa:
+Lo script invoca `sudo` una sola volta per installare:
 
-- `/etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete`;
+- modulo locale SELinux `goodix_fprint_account_delete` a priorità `400`;
+- `/etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete`, con tipo
+  `goodix_fprint_account_delete_exec_t`;
 - `/etc/goodix-27c6-5125/d293-phase-b-account-lifecycle.state`.
 
-Non modifica servizi, PAM, package, account, template o runtime D293. È attiva
-quando termina con `D293_B5_INSTALL=PASS`.
+Compila la policy dai sorgenti versionati, verifica collisioni, checksum,
+contesti e baseline D293 e termina con `D293_B5_INSTALL=PASS`. Non modifica
+servizi, PAM, package, account, template o runtime D293.
 
-## Workflow reale
+## Workflow reale focalizzato
 
-1. Da Impostazioni di sistema → Utenti creare il normale account locale
+1. Da Impostazioni di sistema → Utenti creare l'account locale usa-e-getta
    `d293b5live` e aprirne una vera sessione Plasma.
-2. Nel KCM Utenti registrare due dita distinte. Da terminale eseguire
-   `fprintd-verify` usando la seconda: dopo `verify-no-match` ripetere fino a un
-   massimo complessivo di tre tentativi fisici, fermandosi al primo MATCH o al
-   terzo NO_MATCH. Nessun quarto tentativo.
-3. Dal KCM eseguire re-enrollment di una delle due dita, quindi cancellare
-   soltanto l'altra. Verificare che la re-enrolled resti elencata.
-4. Fare logout/login dell'account di prova, quindi riavviare il laptop dal menu
-   KDE. Dopo il reboot rientrare in `d293b5live` e ripetere una sola serie
-   `fprintd-verify` max-3 stop-on-first-MATCH.
-5. Chiudere la sessione di `d293b5live`. Dal principal Guido tentare di
-   cancellare l'account dal KCM mentre la re-enrolled è ancora presente. La
+2. Nel KCM Utenti registrare una sola impronta, verificare che sia elencata,
+   quindi chiudere la sessione. Non eseguire `fprintd-verify`.
+3. Dal principal Guido tentare di cancellare `d293b5live` dal KCM. La
    cancellazione deve essere rifiutata e l'account deve restare presente.
-6. Rientrare in `d293b5live`, cancellare dal KCM tutte le impronte e chiudere
-   la sessione. Dal principal Guido cancellare di nuovo l'account: ora deve
+4. Rientrare in `d293b5live`, cancellare l'impronta dal KCM, verificare che non
+   sia più elencata e chiudere la sessione.
+5. Dal principal Guido cancellare di nuovo l'account. Questa volta deve
    riuscire.
-7. Ricreare dal KCM lo stesso nome `d293b5live`, aprirne la sessione e
-   verificare che il reader sia visibile ma non compaiano impronte già
-   registrate. Chiudere la sessione e cancellare nuovamente l'account vuoto.
-8. Confermare nel principal Guido che il proprio stato biometrico è invariato.
+6. Ricreare una sola volta `d293b5live`, aprirne la sessione e verificare che il
+   reader sia visibile ma che non compaiano impronte già registrate. Chiudere
+   la sessione e cancellare l'account vuoto.
+7. Confermare nel principal Guido che il proprio stato biometrico è invariato.
 
-`PASS_IF=` due dita e re-enrollment funzionano; delete singolo preserva l'altra
-impronta; logout/login e reboot preservano il MATCH; la prima cancellazione
-account viene bloccata finché esiste una print; dopo delete completo l'account
-si cancella; il nome ricreato non eredita print; Guido resta invariato.
+`PASS_IF=` la prima cancellazione è bloccata con l'impronta presente; il delete
+KDE/fprintd riesce; la seconda cancellazione riesce con namespace vuoto; il
+nome ricreato non eredita impronte; Guido e la baseline D293 restano invariati;
+non compare alcun alert SELinux.
 
-`FAIL_IF=` uno dei lifecycle fallisce, il hook consente la cancellazione con
-print presenti, la cancellazione resta bloccata dopo delete completo, il nome
-ricreato eredita dati, compare un quarto tentativo/retry nascosto o cambia il
-principal preesistente.
+`FAIL_IF=` il hook non viene eseguito; una cancellazione passa con l'impronta
+presente; resta bloccata dopo il delete completo; il nome ricreato eredita
+dati; compare un alert SELinux; oppure si osserva una regressione D293 o del
+principal Guido.
 
-Al primo FAIL fermarsi e riportare punto e messaggio visibile. Non aggiungere
-diagnostica improvvisata e non inviare template, dati biometrici, secret o
-state root-only.
+`STOP_IF=` al primo FAIL, instabilità, richiesta inattesa o comportamento fuori
+scope. Annotare soltanto step e messaggio visibile. Se il failure è ancora
+SELinux, dopo il rollback riportare l'alert/AVC esatto; non generare una policy
+con `audit2allow` e non ripetere una terza live equivalente.
 
 ## Permanenza e rollback
 
@@ -95,24 +104,36 @@ ROLLBACK_ON_PASS=false
 KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 ```
 
-Dopo PASS lasciare il hook installato. Dopo FAIL, instabilità o regressione,
-chiudere le UI e dalla root del repository eseguire come lo stesso utente:
+Dopo PASS lasciare la patch installata: diventa parte della baseline per il
+passo successivo. Dopo FAIL, instabilità o regressione, chiudere le UI e dalla
+root del repository eseguire come lo stesso utente:
 
 ```bash
 deployment/d293-phase-b-account-lifecycle/uninstall.sh
 ```
 
-L'installazione è transazionale: un errore intermedio rimuove hook, state e le
-sole directory appena create prima di terminare con
-`reason=partial_install_rolled_back`. Il rollback verifica hash e baseline
-D293, rimuove soltanto hook e state e
-rimuove le directory parent solo se erano state create dalla patch e sono
-ancora esattamente vuote. Non rimuove account, template o D293. È completo al
-marker `D293_B5_ROLLBACK=PASS`.
+Il rollback verifica state, hash, modulo, label e baseline D293; rimuove
+soltanto modulo SELinux B5, hook e state, e rimuove le directory parent solo se
+erano state create dalla patch e non hanno acquisito contenuto esterno. La
+rimozione del modulo ripristina per quel path il mapping Fedora precedente
+`shadow_t`. Non rimuove account, template, package o D293. È completo soltanto
+ai marker:
+
+```text
+D293_B5_ROLLBACK=PASS
+D293_B5_SELINUX_POLICY_REMOVED=true
+D293_B5_D293_BASELINE=PRESERVED
+```
+
+Anche l'installazione è transazionale: dopo un errore rimuove modulo, hook,
+state e le sole directory create dalla patch. Dichiara
+`reason=partial_install_rolled_back` soltanto se il cleanup è completo; con
+`reason=partial_install_cleanup_incomplete` fermarsi e riportare il marker
+senza tentare la live.
 
 ## Cosa riportare
 
-Riportare PASS oppure il primo step fallito e il messaggio visibile; indicare
-il tentativo del MATCH post-reboot, se avvenuto; confermare esito delle due
-cancellazioni account, assenza di print dopo name reuse, stato Guido invariato
-e se la patch è rimasta installata oppure è stato necessario il rollback.
+Riportare `PASS` oppure il primo step fallito e il messaggio visibile;
+confermare gli esiti delle due cancellazioni, l'assenza di impronte dopo il
+name reuse, lo stato Guido invariato e se la patch è rimasta installata oppure
+è stato eseguito il rollback.

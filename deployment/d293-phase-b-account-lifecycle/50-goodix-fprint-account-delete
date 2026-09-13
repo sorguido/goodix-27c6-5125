@@ -14,10 +14,16 @@ subject=${SUBJECT:-}
 
 test_mode=${D293_B5_TEST_MODE:-false}
 fsroot=
+find_command=/usr/bin/find
 if [[ $test_mode == true ]]; then
+  [[ $EUID -ne 0 ]] || fail test_mode_forbidden_as_root
   fsroot=${D293_B5_TEST_ROOT:?}
   [[ $fsroot == /tmp/d293-b5-test.* && -d $fsroot && -O $fsroot && ! -L $fsroot ]] ||
     fail unsafe_test_root
+  find_command=${D293_B5_TEST_FIND:-$find_command}
+  [[ $find_command == /usr/bin/find ||
+     ( $find_command == "$fsroot"/* && -f $find_command && -O $find_command &&
+       -x $find_command && ! -L $find_command ) ]] || fail unsafe_test_find
 elif [[ $test_mode != false ]]; then
   fail invalid_test_mode
 fi
@@ -38,7 +44,7 @@ if [[ ! -e $user_root && ! -L $user_root ]]; then
 fi
 [[ -d $user_root && ! -L $user_root ]] || fail user_namespace_unsafe
 
-if ! first_entry=$(find "$user_root" -mindepth 1 -print -quit); then
+if ! first_entry=$("$find_command" "$user_root" -mindepth 1 -print -quit); then
   fail user_namespace_unreadable
 fi
 

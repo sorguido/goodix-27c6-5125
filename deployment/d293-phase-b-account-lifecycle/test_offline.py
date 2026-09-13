@@ -12,6 +12,8 @@ import unittest
 HERE = Path(__file__).resolve().parent
 INSTALL = HERE / "install.sh"
 HOOK = HERE / "50-goodix-fprint-account-delete"
+POLICY = HERE / "goodix_fprint_account_delete.te"
+FILE_CONTEXT = HERE / "goodix_fprint_account_delete.fc"
 
 
 def sha(path: Path) -> str:
@@ -101,7 +103,7 @@ class D293B5LifecycleTest(unittest.TestCase):
         failing_find.chmod(0o755)
         cp = self.run_hook(
             expect=1,
-            extra_env={"PATH": f"{test_bin}:{self.env['PATH']}"},
+            extra_env={"D293_B5_TEST_FIND": str(failing_find)},
         )
         self.assertIn("user_namespace_unreadable", cp.stderr)
 
@@ -115,19 +117,36 @@ class D293B5LifecycleTest(unittest.TestCase):
         state.parent.mkdir(parents=True)
         state.symlink_to(target, target_is_directory=True)
         self.assertIn("fprint_state_root_unsafe", self.run_hook(expect=1).stderr)
+        self.assertIn(
+            "unsafe_test_find",
+            self.run_hook(
+                expect=1,
+                extra_env={"D293_B5_TEST_FIND": "/bin/true"},
+            ).stderr,
+        )
 
     def test_install_and_exact_rollback(self):
         cp = self.run_install()
         self.assertIn("D293_B5_INSTALL=PASS", cp.stdout)
         hook = self.base / "etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete"
         state = self.base / "etc/goodix-27c6-5125/d293-phase-b-account-lifecycle.state"
+        marker = self.base / "etc/goodix-27c6-5125/d293-b5-selinux-policy.test-state"
         self.assertEqual(sha(hook), sha(HOOK))
         self.assertEqual(hook.stat().st_mode & 0o777, 0o755)
         self.assertEqual(state.stat().st_mode & 0o777, 0o600)
+        self.assertRegex(marker.read_text().strip(), r"^[0-9a-f]{64}$")
+        state_text = state.read_text()
+        self.assertIn("D293_B5_POLICY_NAME=goodix_fprint_account_delete\n", state_text)
+        self.assertIn("D293_B5_POLICY_PRIORITY=400\n", state_text)
+        self.assertIn(
+            "D293_B5_PREVIOUS_HOOK_CONTEXT=system_u:object_r:shadow_t:s0\n",
+            state_text,
+        )
         cp = self.run_uninstall()
         self.assertIn("D293_B5_ROLLBACK=PASS", cp.stdout)
         self.assertFalse(hook.exists())
         self.assertFalse(state.exists())
+        self.assertFalse(marker.exists())
         self.assertFalse((self.base / "etc/shadow-maint").exists())
 
     def test_partial_install_failure_is_rolled_back(self):
@@ -146,8 +165,28 @@ class D293B5LifecycleTest(unittest.TestCase):
             self.assertFalse(
                 (state_parent / "d293-phase-b-account-lifecycle.state").exists()
             )
+            self.assertFalse(
+                (state_parent / "d293-b5-selinux-policy.test-state").exists()
+            )
         finally:
             state_parent.chmod(0o700)
+
+    def test_policy_is_removed_after_post_install_failure(self):
+        self.env["D293_B5_TEST_FAIL_AFTER_POLICY"] = "true"
+        cp = self.run_install(expect=1)
+        self.assertIn("partial_install_rolled_back", cp.stderr)
+        self.assertFalse(
+            (
+                self.base
+                / "etc/goodix-27c6-5125/d293-b5-selinux-policy.test-state"
+            ).exists()
+        )
+        self.assertFalse(
+            (
+                self.base
+                / "etc/goodix-27c6-5125/d293-phase-b-account-lifecycle.state"
+            ).exists()
+        )
 
     def test_existing_parent_is_preserved(self):
         parent = self.base / "etc/shadow-maint/userdel-pre.d"
@@ -168,6 +207,70 @@ class D293B5LifecycleTest(unittest.TestCase):
         hook.write_text("drift")
         self.assertIn("hook_drift", self.run_uninstall(expect=1).stderr)
         self.assertTrue(hook.exists())
+
+    def test_policy_collision_and_drift_fail_closed(self):
+        marker = self.base / "etc/goodix-27c6-5125/d293-b5-selinux-policy.test-state"
+        marker.write_text("external-policy\n")
+        self.assertIn("policy_module_collision", self.run_install(expect=1).stderr)
+        marker.unlink()
+        self.run_install()
+        marker.write_text("0" * 64 + "\n")
+        self.assertIn("policy_module_drift", self.run_uninstall(expect=1).stderr)
+        self.assertTrue(marker.exists())
+
+    def test_policy_compiles_with_exact_minimal_allow_surface(self):
+        with tempfile.TemporaryDirectory(prefix="d293-b5-policy.", dir="/tmp") as temp:
+            temp_path = Path(temp)
+            module = temp_path / "goodix_fprint_account_delete.mod"
+            package = temp_path / "goodix_fprint_account_delete.pp"
+            unpacked_module = temp_path / "unpacked.mod"
+            unpacked_context = temp_path / "unpacked.fc"
+            subprocess.run(
+                ["checkmodule", "-M", "-m", "-E", "-o", module, POLICY],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [
+                    "semodule_package",
+                    "-o",
+                    package,
+                    "-m",
+                    module,
+                    "-f",
+                    FILE_CONTEXT,
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            policy_dump = subprocess.run(
+                ["sedismod", module],
+                input="1\nq\n",
+                check=True,
+                text=True,
+                capture_output=True,
+            ).stdout
+            allow_lines = [
+                line.strip() for line in policy_dump.splitlines() if line.strip().startswith("allow")
+            ]
+            self.assertEqual(
+                allow_lines,
+                [
+                    "allow  [useradd_t]  goodix_fprint_account_delete_exec_t : [file] { execute execute_no_trans getattr open read };",
+                    "allow  [useradd_t]  [fprintd_var_lib_t] : [dir] { getattr open read search };",
+                    "allow  [useradd_t]  [fprintd_var_lib_t] : [file] { getattr };",
+                    "allow  [useradd_t]  [fprintd_var_lib_t] : [lnk_file] { getattr };",
+                ],
+            )
+            subprocess.run(
+                ["semodule_unpackage", package, unpacked_module, unpacked_context],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(unpacked_context.read_bytes(), FILE_CONTEXT.read_bytes())
 
     def test_rollback_refuses_new_entries_in_created_parent(self):
         self.run_install()

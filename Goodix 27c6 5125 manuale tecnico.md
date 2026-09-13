@@ -186,9 +186,11 @@ eseguita manualmente dall'Utente nel workflow KDE nativo ed è PASS. Il numero
 esatto del tentativo VERIFY che ha prodotto MATCH non è stato riportato. La
 review evidence-based dei lifecycle residui ha isolato account deletion/name
 reuse come gap host ancora aperto. D293/05 implementa la relativa guard
-fail-closed e una live patch-first aggregata. La review PM è
-`ACCEPT_AND_CONTINUE`; l'esecuzione reale resta pendente, quindi Phase B non è
-chiusa.
+fail-closed e una live patch-first aggregata. La live reale ha installato la
+guard ma SELinux Enforcing ha negato a `userdel` l'esecuzione del pre-hook. Il
+rollback B5 e la successiva cancellazione account sono PASS; D293 resta attiva
+e validata. La correttiva SELinux stretta è ora pronta offline; Phase B non è
+chiusa e il boundary corrente è la live focalizzata dell'Utente.
 
 Principi trasversali della roadmap:
 
@@ -320,7 +322,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — D293 patch-first PASS, lifecycle residui in review
+### Stato corrente Phase B — correttiva SELinux D293/05 pronta offline
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -445,7 +447,7 @@ PHASE_B_CLOSED=false
 PRODUCTION_READY=false
 PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
 D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
-NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
+NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 NEW_LIVE_REQUIRED_NOW=true
 ```
 
@@ -797,11 +799,11 @@ LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=false
 PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
 D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
-NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
+NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Stato D293/05 — guard account lifecycle e candidate di closure Phase B
+### Stato D293/05 — live FAIL nel boundary SELinux host e rollback PASS
 
 Il riesame dei boundary residui dopo il PASS D293 ha separato ciò che è già
 provato sul target da ciò che manca per chiudere Phase B. Restano da esercitare
@@ -829,23 +831,72 @@ KCM Users verso AccountsService. Il dettaglio, gli hash host e i riferimenti
 sono nel report
 `analysis/D293/D293_05_PHASE_B_ACCOUNT_LIFECYCLE_GUARD.md`.
 
-La patch `deployment/d293-phase-b-account-lifecycle/` contiene hook,
-installazione, rollback, test offline e README live. Nove scenari offline e
-la sintassi shell passano. La live aggrega il delta utile: due dita reali,
-replace/delete, logout/login, reboot, blocco account con template, delete delle
-impronte, account deletion e name reuse. VERIFY è bounded a massimo tre
-tentativi fisici con stop al primo MATCH. PASS conserva sia baseline D293 sia
-guard; FAIL rimuove la sola guard salvo motivazione separata per il rollback
-D293.
+La patch originaria `deployment/d293-phase-b-account-lifecycle/` conteneva hook,
+installazione, rollback, nove test offline e una live aggregata. La live reale
+ha installato correttamente la patch e ha attraversato i lifecycle precedenti.
+Dopo il delete completo delle impronte, KDE Users non ha però potuto cancellare
+l'account: l'AVC fornito dall'Utente mostra
+`useradd_t` negato su `shadow_t:file execute` per il pre-hook. Il hook non ha
+quindi raggiunto la propria decisione namespace-empty/nonempty.
+
+Il rollback D293/05 è PASS; la cancellazione di `d293b5live` subito dopo il
+rollback è PASS. La guard è rimossa, l'account di prova è cancellato e la
+baseline D293 resta attiva e validata. Il failure è classificato come
+integrazione SELinux host, non come regressione driver/sensore o prova di
+template stale.
+
+Lo studio correttivo sul package esatto
+`selinux-policy-targeted-44.8-1.fc44.noarch` mostra che la regex Fedora
+`/etc/shadow.*` assegna deterministicamente `shadow_t` al nuovo hook, mentre
+non esiste una policy upstream per `shadow-maint/userdel-pre.d` né un allow da
+`useradd_t` verso `fprintd_var_lib_t`. `usermanage.te` concede già
+l'esecuzione di shell e binari standard al dominio. Il SELinux `Disabled`
+osservato nella sessione AI corrente è esplicitamente distinto dalla live
+Enforcing: l'AI ha potuto verificare source policy, compiled policy e modulo,
+ma non eseguire il boundary enforcing.
+
+La correttiva aggiunge un modulo locale a priorità 400 con tipo
+`goodix_fprint_account_delete_exec_t` applicato soltanto all'esatto hook. Gli
+allow sono limitati a esecuzione/read del hook, list/search delle directory
+`fprintd_var_lib_t` e `getattr` sulle entry; non concedono lettura contenuti o
+alcuna mutazione. Sono esclusi `audit2allow`, permissive, `chcon`, allow su
+`shadow_t` e mapping a tipi eseguibili generici. Installer e rollback
+verificano collisioni, hash CIL, label e baseline D293; la rimozione del modulo
+ripristina il mapping Fedora `shadow_t`.
+
+Dodici test passano, inclusi compile/package/unpackage, confronto esatto dei
+quattro allow, collision/drift e cleanup transazionale del modulo. La nuova
+live è focalizzata: una print, blocco account, delete KDE/fprintd, cancellazione
+riuscita e name reuse; non ripete multi-finger, VERIFY/MATCH o reboot. Se
+fallisce ancora su SELinux si esegue rollback e si raccoglie il solo AVC esatto,
+senza terzo tentativo equivalente.
+
+La review PM ha corretto anche il seam ambientale del hook: test mode è
+fail-closed quando l'EUID è root e il percorso production usa
+`/usr/bin/find` assoluto. Un caller di `userdel` non può quindi deviare il
+controllo verso una root o un comando di test tramite variabili ereditate.
 
 ```text
-D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+D293_05_INSTALL=PASS
+D293_05_FIRST_LIVE_OUTCOME=FAIL_HOST_SELINUX_EXEC_ROLLED_BACK
 D293_05_SENSOR_ACCESS=0
 D293_05_PRIVILEGED_EXECUTION_BY_AI=false
-D293_05_OFFLINE_TESTS=9/9_PASS
+D293_05_OFFLINE_TESTS=12/12_PASS
 D293_05_ACCOUNT_DELETE_POLICY=BLOCK_IF_FPRINT_DATA_PRESENT
 D293_05_TEMPLATE_DELETION=KDE_FPRINTD_ONLY
-D293_05_LIVE=NOT_EXECUTED
+D293_05_FIRST_LIVE=FAIL
+D293_05_FAILURE_CLASS=HOST_SELINUX_EXECUTION_POLICY
+D293_05_FAILURE_POINT=USERDEL_PRE_HOOK_EXEC
+D293_05_DRIVER_REGRESSION=false
+D293_05_SENSOR_FAILURE=false
+D293_05_ROLLBACK=PASS
+D293_05_ACCOUNT_DELETE_AFTER_ROLLBACK=PASS
+D293_05_GUARD=REMOVED_AFTER_FAIL
+TEST_ACCOUNT_d293b5live=DELETED
+D293_05_SELINUX_CORRECTIVE=READY_OFFLINE
+D293_05_CORRECTIVE_LIVE=NOT_EXECUTED
+D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 PM_DECISION=ACCEPT_AND_CONTINUE
 PHASE_B_CLOSED=false
 ```
@@ -1159,9 +1210,12 @@ KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
 PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+D293_05_FIRST_LIVE_OUTCOME=FAIL_HOST_SELINUX_EXEC_ROLLED_BACK
+D293_05_SELINUX_CORRECTIVE=READY_OFFLINE
+D293_05_CORRECTIVE_LIVE=NOT_EXECUTED
 D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
 NEW_LIVE_REQUIRED_NOW=true
-NEXT_BOUNDARY=D293_05_PHASE_B_LIVE
+NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
