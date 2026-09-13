@@ -60,8 +60,11 @@ daemon e runtime a ogni avvio. L'installazione è effettiva quando termina con
 viene preservato; se era attivo, l'installazione lo riavvia sulla candidate, e
 se era inattivo partirà normalmente su richiesta di KDE. Da quel momento il
 driver può enumerare il target e le azioni KDE/fprintd raggiungono il sensore:
-questa è la ragione del Human Gate. Non cambiare branch o modificare gli script
-prima del rollback.
+questa è la ragione del Human Gate.
+
+Se la validazione termina con PASS, la candidate resta installata per default e
+diventa la baseline software corrente del target. Il rollback resta disponibile
+come antidoto e non è una cerimonia obbligatoria dopo un successo.
 
 ## Validazione live nativa
 
@@ -94,10 +97,31 @@ Al primo FAIL fermarsi: non aggiungere tentativi o comandi diagnostici
 improvvisati. Non includere nei messaggi template, dati biometrici, secret o
 file root-only.
 
-## Rollback
+## Permanenza dopo PASS e rollback
 
-Dopo la prova, riuscita o fallita, chiudere le UI biometriche e dalla root del
-repository eseguire come lo stesso utente che ha installato:
+La rollback patch è sempre fornita e mantenuta come rete di sicurezza, ma non
+viene eseguita automaticamente dopo un PASS.
+
+```text
+ROLLBACK_PATCH_REQUIRED=true
+ROLLBACK_ON_FAIL=true
+ROLLBACK_ON_PASS=false
+KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
+```
+
+Se la live termina con PASS, lasciare la candidate installata: essa diventa la
+baseline software corrente del target per i boundary successivi.
+
+Eseguire il rollback quando ricorre almeno una delle seguenti condizioni:
+
+- FAIL funzionale del boundary appena provato;
+- instabilità o regressione osservata dopo l'installazione;
+- rollback esplicitamente richiesto dal test corrente;
+- necessità motivata di tornare alla baseline precedente per confronto o
+  recovery.
+
+In tali casi, chiudere le UI biometriche e dalla root del repository eseguire
+come lo stesso utente che ha installato:
 
 ```bash
 deployment/d293-native-kde-live/uninstall.sh
@@ -120,12 +144,14 @@ di sistema → Utenti, se desiderato.
 
 Se il rollback segnala drift dello script o della definizione systemd, non
 aggirare il controllo e non cancellare file a mano: riportare il messaggio
-all'AI. La patch resta o viene rimessa in vigore in modo fail-closed.
+all'AI. Conservare sempre nel repository/versionamento la possibilità di
+ricostruire l'antidoto corrispondente alla baseline installata.
 
 ## Cosa riportare all'AI
 
 Riportare `PASS` oppure il primo punto preciso di failure, il comportamento e
-il messaggio visibile, se presente; confermare inoltre se rollback e isolamento
-del principal preesistente sono riusciti. Journal o query read-only mirate
-saranno richiesti soltanto dopo un failure reale. Non inviare lo state
-root-only né contenuti sotto `/var/lib/fprint`.
+il messaggio visibile, se presente; confermare inoltre l'isolamento del
+principal preesistente e indicare se la candidate è rimasta installata oppure
+se è stato necessario il rollback. Journal o query read-only mirate saranno
+richiesti soltanto dopo un failure reale. Non inviare lo state root-only né
+contenuti sotto `/var/lib/fprint`.
