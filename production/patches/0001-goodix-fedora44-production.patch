@@ -465,7 +465,7 @@ index 9500b3acb2c498c1f3ac41494833000d01d038c7..9f90d8c512546dda0d5c9677b49184bc
                                               (GEqualFunc) fp_print_equal, NULL))
          {
 diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c
-index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603d51453dd 100644
+index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..fb628bca98ef976dd0f01c5cbb3893f0058d23e3 100644
 --- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c
 +++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c
 @@ -22,6 +22,7 @@
@@ -535,7 +535,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
      {
        /* Cancel operation . */
        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
-@@ -282,7 +303,7 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+@@ -282,13 +303,19 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
    if (!error)
      {
        print = fp_print_new (device);
@@ -544,7 +544,19 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
        if (!fpi_print_add_from_image (print, image, &error))
          {
            g_clear_object (&print);
-@@ -297,6 +318,23 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+
+           if (error->domain != FP_DEVICE_RETRY)
+             {
++              if (action == FPI_DEVICE_ACTION_VERIFY &&
++                  cls->verify_result != NULL)
++                cls->verify_result (self, FALSE, FALSE);
++              else if (action == FPI_DEVICE_ACTION_IDENTIFY &&
++                       cls->identify_result != NULL)
++                cls->identify_result (self, FALSE, FALSE);
+               fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
+               /* We might not yet be deactivating, if we are enrolling. */
+               fpi_image_device_deactivate (self, TRUE);
+@@ -297,6 +324,23 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
          }
      }
 
@@ -568,7 +580,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
    if (action == FPI_DEVICE_ACTION_ENROLL)
      {
        FpPrint *enroll_print;
-@@ -304,8 +342,30 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+@@ -304,8 +348,30 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
 
        if (print)
          {
@@ -601,7 +613,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
          }
 
        fpi_device_enroll_progress (device, priv->enroll_stage,
-@@ -314,14 +374,41 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+@@ -314,14 +380,45 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
        /* Start another scan or deactivate. */
        if (priv->enroll_stage == fp_device_get_nr_enroll_stages (device))
          {
@@ -637,6 +649,10 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
 +              template, print, priv->bz3_threshold, &error);
 +        }
 +
++      if (cls->verify_result != NULL)
++        cls->verify_result (self, error == NULL,
++                            result == FPI_MATCH_SUCCESS);
++
 +      if (!error || error->domain == FP_DEVICE_RETRY)
 +        fpi_device_verify_report (device, result, g_steal_pointer (&print), g_steal_pointer (&error));
 +
@@ -645,7 +661,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
    else if (action == FPI_DEVICE_ACTION_IDENTIFY)
      {
        gint i;
-@@ -333,13 +420,26 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
+@@ -333,13 +430,26 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
          {
            FpPrint *template = g_ptr_array_index (templates, i);
 
@@ -673,7 +689,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
        if (!error || error->domain == FP_DEVICE_RETRY)
          fpi_device_identify_report (device, result, g_steal_pointer (&print), g_steal_pointer (&error));
 
-@@ -476,6 +576,7 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
+@@ -476,6 +586,7 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
    g_return_if_fail (image != NULL);
    g_return_if_fail (priv->state == FPI_IMAGE_DEVICE_STATE_CAPTURE);
    g_return_if_fail (action == FPI_DEVICE_ACTION_ENROLL ||
@@ -681,7 +697,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
                      action == FPI_DEVICE_ACTION_IDENTIFY ||
                      action == FPI_DEVICE_ACTION_CAPTURE);
 
-@@ -483,17 +584,77 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
+@@ -483,17 +594,77 @@ fpi_image_device_image_captured (FpImageDevice *self, FpImage *image)
 
    priv->minutiae_scan_active = TRUE;
 
@@ -765,7 +781,15 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
  /**
   * fpi_image_device_retry_scan:
   * @self: a #FpImageDevice imaging fingerprint device
-@@ -516,6 +677,7 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
+@@ -507,6 +678,7 @@ void
+ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
+ {
+   FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
++  FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (self);
+   FpiDeviceAction action;
+   GError *error;
+
+@@ -516,6 +688,7 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
     * all but INACTIVE */
    g_return_if_fail (priv->state != FPI_IMAGE_DEVICE_STATE_INACTIVE);
    g_return_if_fail (action == FPI_DEVICE_ACTION_ENROLL ||
@@ -773,20 +797,26 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
                      action == FPI_DEVICE_ACTION_IDENTIFY ||
                      action == FPI_DEVICE_ACTION_CAPTURE);
 
-@@ -528,6 +690,12 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
+@@ -528,8 +701,18 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
 
        fp_image_device_change_state (self, FPI_IMAGE_DEVICE_STATE_AWAIT_FINGER_OFF);
      }
 +  else if (action == FPI_DEVICE_ACTION_VERIFY)
 +    {
++      if (cls->verify_result != NULL)
++        cls->verify_result (self, FALSE, FALSE);
 +      fpi_device_verify_report (FP_DEVICE (self), FPI_MATCH_ERROR, NULL, error);
 +      fp_image_device_maybe_complete_action (self, NULL);
 +      fpi_image_device_deactivate (self, TRUE);
 +    }
    else if (action == FPI_DEVICE_ACTION_IDENTIFY)
      {
++      if (cls->identify_result != NULL)
++        cls->identify_result (self, FALSE, FALSE);
        fpi_device_identify_report (FP_DEVICE (self), NULL, NULL, error);
-@@ -620,6 +788,7 @@ fpi_image_device_activate_complete (FpImageDevice *self, GError *error)
+       fp_image_device_maybe_complete_action (self, NULL);
+       fpi_image_device_deactivate (self, TRUE);
+@@ -620,6 +803,7 @@ fpi_image_device_activate_complete (FpImageDevice *self, GError *error)
    g_return_if_fail (priv->active == FALSE);
    g_return_if_fail (priv->state == FPI_IMAGE_DEVICE_STATE_ACTIVATING);
    g_return_if_fail (action == FPI_DEVICE_ACTION_ENROLL ||
@@ -795,7 +825,7 @@ index 87bdc6009d4bd877efa04c0f59e3c59aff550f21..6d5c3c8834cf9ca106f2dc9f428be603
                      action == FPI_DEVICE_ACTION_CAPTURE);
 
 diff --git a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h
-index 71472dbb73c3985993a2a489985177fa6399758f..4f931a5ea4d5554b95344e5fdcb5dd93d4afeece 100644
+index 71472dbb73c3985993a2a489985177fa6399758f..44f0b7202f96e0a13d26778cfb4a546092d3425d 100644
 --- a/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h
 +++ b/reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.h
 @@ -20,8 +20,14 @@
@@ -822,17 +852,20 @@ index 71472dbb73c3985993a2a489985177fa6399758f..4f931a5ea4d5554b95344e5fdcb5dd93
   * @img_open: Open the device and do basic initialization
   *   (use this instead of the #FpDeviceClass open vfunc)
   * @img_close: Close the device
-@@ -84,6 +92,9 @@ typedef enum {
+@@ -84,6 +92,12 @@ typedef enum {
   * @change_state: Notification about the current device state (i.e. waiting for
   *   finger or image capture). Implementing this is optional, it can e.g. be
   *   used to flash an LED when waiting for a finger.
 + * @identify_result: Optional notification that host-side identify processing
 + *   completed; @success excludes retry/fatal processing errors and @match
 + *   reports whether the gallery contained the scanned print.
++ * @verify_result: Optional notification that host-side verify processing
++ *   completed; @success excludes retry/fatal processing errors and @match
++ *   reports whether the scanned print matched the verification template.
   *
   * These are the main entry points for drivers to implement. Drivers may not
   * implement all of these entry points if they do not support the operation
-@@ -105,17 +116,35 @@ struct _FpImageDeviceClass
+@@ -105,17 +119,38 @@ struct _FpImageDeviceClass
    FpDeviceClass parent_class;
 
    gint          bz3_threshold;
@@ -847,6 +880,9 @@ index 71472dbb73c3985993a2a489985177fa6399758f..4f931a5ea4d5554b95344e5fdcb5dd93
    void          (*change_state) (FpImageDevice      *dev,
                                   FpiImageDeviceState state);
 +  void          (*identify_result) (FpImageDevice *dev,
++                                    gboolean       success,
++                                    gboolean       match);
++  void          (*verify_result)   (FpImageDevice *dev,
 +                                    gboolean       success,
 +                                    gboolean       match);
    void          (*deactivate)   (FpImageDevice *dev);
@@ -868,7 +904,7 @@ index 71472dbb73c3985993a2a489985177fa6399758f..4f931a5ea4d5554b95344e5fdcb5dd93
  void fpi_image_device_set_bz3_threshold (FpImageDevice *self,
                                           gint           bz3_threshold);
 
-@@ -135,5 +164,7 @@ void fpi_image_device_report_finger_status (FpImageDevice *self,
+@@ -135,5 +170,7 @@ void fpi_image_device_report_finger_status (FpImageDevice *self,
                                              gboolean       present);
  void fpi_image_device_image_captured (FpImageDevice *self,
                                        FpImage       *image);
