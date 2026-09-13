@@ -3,8 +3,8 @@
 
 Data review: 13 settembre 2026
 
-Baseline D293/03: `development` a
-`cb918c6114f518d10d386d2b639eb3c8e5dd5f20`, con Phase A chiusa.
+Baseline D293/04: `development` a
+`e01cd6454c46919f818423085f50331d9e30b6ff`, con Phase A chiusa.
 
 Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
 canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
@@ -12,7 +12,9 @@ target-proven. D293/01 completa offline B1, senza auto-approvare la review PM,
 e porta il boundary a B2. D293/02 implementa offline il caso multi-finger
 `VerifyStart(any)` e il solo handoff fprintd IDENTIFY→ENROLL sicuro. D293/03
 attraversa il vero daemon fprintd con più nomi principal e fissa il contratto
-statico del KCM Users Plasma 6.7.5; il successivo boundary è Human Gate.
+statico del KCM Users Plasma 6.7.5. D293/04 rende pronto offline il relativo
+experiment sul common harness; il successivo boundary è la sua operator-run
+Human Gate, non ancora eseguita.
 
 ```text
 USER_APPROVED_ROADMAP=true
@@ -79,11 +81,13 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+D293_04_OPERATOR_KIT=READY_OFFLINE
+D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
 PHASE_B_CLOSED=false
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
 ```
 
 ## Stato verificato del progetto
@@ -292,6 +296,16 @@ hash-pinned del KCM Users Plasma 6.7.5 conferma discovery, list, enroll/
 re-enroll e delete tramite le API fprintd standard, senza UI Goodix; il KCM
 non è stato avviato.
 
+D293/04 riusa il common harness invariato per il primo discriminante live
+B3/B4: deployment transiente della build production corrente, account creato
+dal KCM dopo il deploy, vera sessione Plasma/Wayland del nuovo UID, una
+impronta enroll/delete solo da KCM e `VerifyStart(any)` bounded a tre. Gli
+audit impongono IDENTIFY + ENROLL a otto stage/fino a venti contatti + fino a
+tre VERIFY (`MAX_ACTIONS=5`, `MAX_CONTACTS=24`, retry transport zero). Il
+principal preesistente è confrontato internamente su contenuto e metadata; il
+supervisore rende READY soltanto dopo aver fermato fprintd. Il kit è pronto
+offline, ma live/USB/pkexec non sono stati eseguiti dall'AI.
+
 I cinque input runtime sono un prerequisito di sistema unico, root-only e
 target-pinned, separato da utenti e FP3. Il package non può contenerli; origine
 lecita, provisioning amministrativo no-overwrite e compatibilità con una
@@ -459,10 +473,12 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+D293_04_OPERATOR_KIT=READY_OFFLINE
+D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
 PHASE_B_CLOSED=false
 NEW_LIVE_REQUIRED_NOW=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=B
 PRODUCTION_READY=false
-NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
 ```

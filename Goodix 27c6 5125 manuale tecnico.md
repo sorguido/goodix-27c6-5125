@@ -152,8 +152,9 @@ Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
 production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. La fase corrente
-resta **Phase B**: il prossimo boundary è la vera
-prova KDE con nuovo utente locale, soggetta a Human Gate.
+resta **Phase B**. D293/04 prepara offline il common-harness experiment per la
+vera prova KDE con nuovo utente locale; la sua esecuzione è il prossimo Human
+Gate e non è stata svolta dall'AI.
 
 Principi trasversali della roadmap:
 
@@ -285,7 +286,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — D293/03 boundary offline massimo
+### Stato corrente Phase B — D293/04 kit Human Gate pronto offline
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -361,9 +362,11 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+D293_04_OPERATOR_KIT=READY_OFFLINE
+D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
 NEW_LIVE_REQUIRED_NOW=true
 ```
 
@@ -511,12 +514,61 @@ PROTECTED_FILE_CONTENT_READ=false
 CURRENT_PHASE=B
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+NEXT_BOUNDARY=SUPERSEDED_BY_D293_04_KIT_READY
 ```
 
 Report e validator:
 `analysis/D293/D293_03_FPRINTD_MULTI_PRINCIPAL_AND_KDE_CONTRACT.md` e
 `analysis/D293/validate_d293_03.py`.
+
+### Stato D293/04 — kit Human Gate KDE/new-user
+
+Il piccolo experiment `d293-kde-new-user` riusa senza modifiche il common
+harness `operator_kit/live_probe/`. La futura operator-run costruisce la
+candidate dalla source-of-truth `production/`, la attiva con drop-in/runtime
+transienti sotto `/run`, richiede che il normale account di test venga creato
+dal KCM Users **dopo** il deployment e attraversa una vera sessione
+Plasma/Wayland del nuovo UID. Enrollment e cancellazione della singola
+impronta restano esclusivamente nel KCM standard; `fprintd-verify <utente>`
+esercita `VerifyStart(any)` fino a tre volte con stop al primo MATCH.
+
+Il supervisore attende la chiusura del KCM dell'utente originale, arresta
+l'eventuale fprintd socket-activated e pubblica READY soltanto a daemon
+inattivo. Gli audit production impongono una epoch IDENTIFY, una ENROLL a otto
+stage con massimo venti contatti e fino a tre epoch VERIFY: budget complessivo
+`MAX_ACTIONS=5`, `MAX_CONTACTS=24`, retry transport/secure/post zero. Il
+conteggio contatti è derivato tecnicamente, non affidato all'operatore.
+
+Il namespace fprintd del principal preesistente è confrontato prima/dopo con
+digest interno di contenuto e metadata; all'esterno compare solo il booleano.
+Rollback runtime, cancellazione KCM del template di test, logout, rimozione
+dell'account/home esatto e audit D285/D286 finale sono fail-closed. Il signal
+handler del supervisore termina esplicitamente il loop dopo il rollback; il
+deploy lega il principal originale al chiamante `pkexec` e la recovery
+post-reboot ricava da quel chiamante l'identità da sottoporre all'audit finale.
+Nessun template, immagine, password, hash template o materiale protetto entra
+nella capture. L'AI ha eseguito soltanto validator e percorso
+`--offline-test`: la live, USB e `pkexec` non sono stati eseguiti.
+
+```text
+D293_04_OPERATOR_KIT=READY_OFFLINE
+D293_04_COMMON_HARNESS_MODIFIED=false
+D293_04_MAX_ACTIONS=5
+D293_04_MAX_CONTACTS=24
+D293_04_MAX_TRANSPORT_RETRIES=0
+D293_04_VERIFY_ATTEMPT_LIMIT=3
+D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
+CURRENT_PHASE=B
+PHASE_B_CLOSED=false
+PRODUCTION_READY=false
+NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
+```
+
+Due dita, delete singolo/re-enroll, rename/name-reuse e reboot restano B5. Il
+report e il validator sono
+`analysis/D293/D293_04_KDE_NEW_USER_HUMAN_GATE_KIT.md` e
+`analysis/D293/validate_d293_04.py`; Phase B potrà avanzare soltanto dopo la
+run manuale e la review della relativa capture.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -734,9 +786,10 @@ boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
 fattibilità sul target APP12509 è provata; la production readiness no.
 
 La review D292/03 ha chiuso A5 e Phase A dopo il consolidamento A1/A3/A4.
-D293/01–03 hanno esaurito il boundary offline B1–B3 e il contratto statico
-del KCM Users installato. Il prossimo boundary è la prova reale KDE con un
-nuovo utente locale, soggetta a Human Gate. La roadmap
+D293/01–03 hanno chiuso B1/B2 ed esaurito i prerequisiti offline B3/B4 con il
+contratto statico del KCM Users installato. D293/04 ha reso pronto offline il
+kit per la prova reale KDE con un nuovo utente locale, soggetta a Human Gate.
+La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
 Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
@@ -780,9 +833,11 @@ D293_03_OUTCOME=PASS_HOST_ONLY
 PHASE_B_B3_OFFLINE_PREREQUISITES=COMPLETED
 KDE_KCM_STATIC_CONTRACT=PASS
 PHASE_B_B4_OFFLINE_PREREQUISITES=COMPLETED
+D293_04_OPERATOR_KIT=READY_OFFLINE
+D293_04_LIVE_EXECUTION=HUMAN_REQUIRED_NOT_PERFORMED
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
-NEXT_BOUNDARY=HUMAN_GATE_PHASE_B_KDE_NEW_USER_LIFECYCLE_TARGET
+NEXT_BOUNDARY=D293_04_OPERATOR_RUN_HUMAN_GATE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
