@@ -15,7 +15,7 @@ typeattribute goodix_fprint_account_delete_exec_t file_type;
 
 # Execute only the dedicated account-delete hook, without a domain transition.
 # ioctl is the base permission required for extended-permission filtering;
-# allowxperm below restricts it to the single observed TCGETS2 request (0x542a).
+# the rule below restricts it to the single observed TCGETS2 request (0x542a).
 allow useradd_t goodix_fprint_account_delete_exec_t:file {
     execute execute_no_trans getattr ioctl open read
 };
