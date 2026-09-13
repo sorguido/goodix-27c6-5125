@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance live corrente — v2.9 (12 settembre 2026)
+### Governance corrente — v3.0 (13 settembre 2026)
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -71,7 +71,7 @@ HUMAN_GATE_UNCHANGED=true
 FACTORY_PRESERVING_POLICY_UNCHANGED=true
 ```
 
-La v2.9 aggiunge `Pragmatism First` e rende il tempo dell'Utente una risorsa
+La v2.9 ha aggiunto `Pragmatism First` e ha reso il tempo dell'Utente una risorsa
 progettuale esplicita: un test diretto, reversibile e osservabile prevale su
 nuova infrastruttura quando offre la stessa risposta e safety. Per ogni futuro
 VERIFY/MATCH vale inoltre la serie bounded fino a tre tentativi fisici, stop al
@@ -89,14 +89,19 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
+La v3.0 recepisce la roadmap A→F approvata dall'Utente il 13 settembre 2026.
+Non modifica Human Gate, safety, factory-preserving, protezioni Git o licensing:
+fissa target production iniziale, ordine delle fasi e phase gate descritti
+nella sezione narrativa seguente.
+
 ### Consultazione del manuale al bootstrap
 
 Il manuale resta l'autorità narrativa tecnica primaria, ma non deve essere
 letto integralmente per default. Al bootstrap sono obbligatorie la sezione di
-stato corrente, l'ultimo avanzamento consolidato, il boundary/roadmap corrente
-e i blocker o le decisioni architetturali pertinenti. Per ogni claim tecnico
-storico l'agente deve cercare nel manuale e leggere la sezione rilevante prima
-di affidarsi a memoria, contesto o session summary.
+stato corrente, l'ultimo avanzamento consolidato, la roadmap A→F approvata, la
+fase corrente e i blocker o le decisioni architetturali pertinenti. Per ogni
+claim tecnico storico l'agente deve cercare nel manuale e leggere la sezione
+rilevante prima di affidarsi a memoria, contesto o session summary.
 
 ```text
 NO TECHNICAL CLAIM FROM MEMORY WHEN THE MANUAL CAN ANSWER IT
@@ -112,6 +117,169 @@ SESSION_MEMORY_TECHNICAL_AUTHORITY=false
 La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
+
+### Roadmap production A→F approvata e fase corrente
+
+L'Utente ha approvato il 13 settembre 2026 la roadmap production seguente come
+sentiero operativo predefinito fino alla fine del progetto:
+
+```text
+USER_APPROVED_ROADMAP=true
+APPROVAL_DATE=2026-09-13
+CURRENT_PHASE=A
+PHASE_ORDER=A>B>C>D>E>F
+```
+
+Il target production iniziale resta deliberatamente ristretto a:
+
+```text
+Goodix USB 27c6:5125 / GF_ST411SEC_APP_12509
++ Fedora KDE
++ stack standard libfprint -> fprintd -> PAM/KDE
+```
+
+Altre distribuzioni, desktop environment, famiglie Goodix, firmware/target,
+utenti AD/LDAP/network e un upstream generalizzato oltre quanto necessario al
+target corrente sono fuori scope. Un ampliamento richiede una nuova decisione
+esplicita dell'Utente.
+
+D290 ha chiuso la fattibilità dei consumer reali con login fingerprint
+passwordless da Plasma Login Manager a una nuova sessione Wayland. D291 ha
+chiuso il follow-up funzionale con enrollment diversity Rocky-derived,
+re-enrollment, discriminazione wrong-finger e quattro serie registrate concluse
+con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
+Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
+production readiness; la fase corrente è **Phase A**.
+
+Principi trasversali della roadmap:
+
+- rispettare l'ordine A→B→C→D→E→F e chiudere ogni fase prima della successiva;
+- in particolare, chiudere il comportamento nativo multi-user KDE/fprintd
+  della Phase B prima di iniziare packaging e integrazione host della Phase C;
+- mantenere fprintd proprietario di utenti e template, senza database Goodix
+  parallelo salvo blocker tecnico concreto e riesame della strategia;
+- trattare operator kit e terminale come strumenti developer/diagnostici, non
+  come UX production, e non creare una GUI Goodix custom senza blocker reale e
+  nuova decisione dell'Utente;
+- non cancellare materiale storico o deprecato. L'eventuale archivio privato
+  `red tag/` è ammesso solo dopo audit di import, build, test, script,
+  riferimenti documentali, provenance, licensing e dipendenze production;
+- non confondere closure funzionale, packaging, lifecycle e qualificazione di
+  release: ogni fase chiude il proprio confine con evidenza proporzionata;
+- applicare sempre Human Gate, factory-preserving, Git protections, licensing e
+  safety vigenti. La roadmap non introduce deroghe.
+
+#### Phase A — consolidare e classificare il codice
+
+**Obiettivo.** Identificare senza ambiguità la sorgente production e separarla
+da test, reference, evidenze, storico/deprecato, tooling sviluppatore e
+documentazione, preservando il patrimonio tecnico. Dichiarare il percorso
+`sorgente production -> build -> libfprint -> fprintd` e impedire che runtime
+production dipenda da operator kit storici, launcher one-shot, fake backend o
+struttura investigativa Dxxx.
+
+Il lavoro comprende inventario e classificazione evidence-based; scelta di una
+baseline libfprint unica e mantenibile; patch series o tree integrato
+identificabile; clean build dalla source-of-truth; ABI coerente con fprintd;
+build normal e sanitizer riproducibili quando pertinenti; provenance/licenza
+dei file distribuiti; esclusione di seam, fake e override test dal runtime.
+
+```text
+DELETE_HISTORICAL_MATERIAL=false
+RED_TAG_ARCHIVE_ALLOWED=true
+MOVE_ONLY_AFTER_REFERENCE_AUDIT=true
+```
+
+**Closure A.** Sono documentati sorgente production, file che costruiscono il
+driver, classificazione di test/reference/storico, componenti realmente
+distribuiti e relativa provenance/licenza; clean build, ABI fprintd e
+compatibilità col target reale risultano riproducibili e verificate. Solo dopo
+questa closure si passa alla Phase B.
+
+#### Phase B — driver multi-user e workflow KDE/fprintd nativo
+
+**Obiettivo.** Fare sì che ogni normale utente locale, presente o creato dopo
+l'installazione, possa registrare e gestire autonomamente le proprie impronte
+tramite il workflow standard KDE Plasma / Impostazioni di sistema → Utenti e
+fprintd, senza script Goodix, username/path hard-coded o configurazione
+user-specific. Goodix implementa il dispositivo; fprintd gestisce utenti,
+ownership e template nel proprio storage standard.
+
+Il contratto copre zero/uno/più template secondo le capacità standard, più dita,
+primo enrollment, re-enrollment, delete singolo e completo, cancellazione di un
+utente, isolamento tra utenti, restart fprintd, logout/login e reboot. Lo
+scenario discriminante parte da driver già installato, crea un nuovo utente
+locale, esegue enrollment dalla UI KDE senza reinstallare il driver e verifica
+che template nuovi e preesistenti restino correttamente separati. Il lifecycle
+dei template biometrici resta distinto da quello dei materiali protetti di
+runtime; per questi ultimi vanno definiti necessità, origine, natura per-device,
+permessi, ownership e provisioning lecito senza secret in repository, package,
+log o artefatti pubblici. AD/LDAP/network users restano fuori scope.
+
+**Closure B.** È provabile che, una volta installato il driver, qualsiasi
+normale utente locale presente o creato successivamente può fare enrollment e
+gestire le proprie impronte nel normale workflow KDE/fprintd, senza strumenti
+Goodix o configurazioni per utente. La Phase C non inizia prima di questa
+closure.
+
+#### Phase C — packaging e integrazione PAM/systemd/SELinux
+
+**Obiettivo.** Trasformare il driver multi-user in software installabile,
+aggiornabile e reversibile su Fedora KDE. Produrre RPM/spec o formato Fedora
+equivalente; dichiarare OpenCV e dipendenze effettive; sostituire la soluzione
+sperimentale hash-pinned in `/usr/local`; integrare in modo idempotente e
+reversibile fprintd, PAM, `sudo`, KScreenLocker, Plasma Login Manager e Polkit
+solo quando pertinente; adottare systemd, SELinux, permessi e ownership Fedora.
+La modifica manuale di file package-owned come `/usr/lib/pam.d/plasmalogin`
+resta prova storica, non soluzione production.
+
+**Closure C.** Package riproducibile; install, upgrade, downgrade quando
+supportato, uninstall, rollback e recovery verificati in ambiente pulito;
+fallback password preservato; nessun file vendor modificato manualmente fuori
+dal package manager; aggiornamenti Fedora rilevanti hanno un percorso di
+diagnosi e recovery.
+
+#### Phase D — lifecycle, recovery, suspend/hotplug e concorrenza
+
+**Obiettivo.** Qualificare soltanto boundary realmente nuovi: suspend/resume,
+hotplug, rimozione durante action, crash/restart fprintd, cancellazione in fasi
+diverse, richieste e consumer concorrenti, late bytes/cross-generation se
+pertinenti, stato `POISONED` e recovery bounded. Prima si definiscono
+contratti/stati offline, fault injection host-only e una matrice ridotta ai casi
+che possono cambiare una decisione; ogni live resta soggetta a Human Gate.
+
+**Closure D.** Ogni evento termina in recupero nominale oppure in failure
+bounded, leggibile e diagnosticabile, con fallback disponibile, cleanup
+definito e zero loop o retry nascosti.
+
+#### Phase E — qualificazione release, sicurezza e licenze
+
+**Obiettivo.** Su un prodotto sostanzialmente completo, chiudere test matrix,
+threat/privacy review, SBOM, attribution, audit licenze/combined work, criteri
+di affidabilità, compatibilità Fedora dichiarata e release candidate
+riproducibile e firmabile. Eventuali FAR/FRR richiedono metodo definito prima
+della raccolta dati; MATCH/NO_MATCH funzionali non giustificano claim
+statistici universali. Una verifica Windows viene eseguita quando necessaria.
+
+**Closure E.** I claim restano limitati a Fedora KDE e Goodix
+`27c6:5125`/APP12509 e alle versioni effettivamente provate; nessun dato
+biometrico o secret entra nel package; licensing e pass/fail della release sono
+espliciti. Non si rivendica ancora supporto per altri sistemi, desktop, sensori
+o firmware.
+
+#### Phase F — documentazione, handoff e pubblicazione
+
+**Obiettivo.** Allineare guide di installazione, uso, gestione impronte KDE,
+amministrazione, troubleshooting, recovery e sviluppo; architettura, limiti,
+README, evidence matrix, privacy/secret audit, licensing/attribution e
+ringraziamenti. Prima di ogni export pubblico si auditano contenuto e Git
+history e si produce un export sanitizzato.
+
+**Closure F.** Documentazione e artefatto verificato sono coerenti; audit di
+contenuto/history, privacy, secret e licenze sono chiusi; ogni pubblicazione o
+modifica del repository pubblico resta separata, soggetta a Human Gate e a
+decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
+dall'export pubblico viene decisa soltanto qui dopo audit.
 
 ### Stato corrente — D291 chiuso live con enrollment diversity Rocky-derived
 
@@ -319,7 +487,7 @@ VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
 MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
 tentativo, retry nascosto o illimitato.
 
-### Review complessiva e roadmap dopo la chiusura D291
+### Review complessiva post-D291 e applicazione della roadmap approvata
 
 La chiusura D291 completa la sequenza di fattibilità e qualificazione dei
 consumer reali: enrollment diversity Rocky-derived, FP3 attraverso close/open,
@@ -328,13 +496,12 @@ realmente bloccata e login Plasma verso una nuova sessione Wayland sono
 boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
 fattibilità sul target APP12509 è provata; la production readiness no.
 
-Il boundary corrente passa al consolidamento della sorgente production
-(Phase A): scegliere una source-of-truth mantenibile, rendere riproducibile la
-patch/build production e separare con chiarezza seam di test e codice storico.
-Seguono gestione utenti/template e materiali protetti, packaging/installazione
-gestita, lifecycle/recovery, qualificazione di release e pubblicazione. Il
-piano completo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human Gate e
-`WHAT_NOT_TO_TEST_AGAIN` è:
+Il boundary corrente è il consolidamento della sorgente production (Phase A):
+scegliere una source-of-truth mantenibile, rendere riproducibile la patch/build
+production e separare con chiarezza seam di test e codice storico. La roadmap
+A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
+manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
+Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
 
 `analysis/PROJECT_NEXT_STEPS_PLAN.md`
 
@@ -356,6 +523,10 @@ D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
+USER_APPROVED_ROADMAP=true
+APPROVAL_DATE=2026-09-13
+CURRENT_PHASE=A
+PHASE_ORDER=A>B>C>D>E>F
 NEXT_BOUNDARY=PHASE_A_PRODUCTION_SOURCE_CONSOLIDATION
 ```
 

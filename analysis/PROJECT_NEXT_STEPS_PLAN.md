@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Goodix 27c6:5125 — stato complessivo e piano delle prossime fasi
+# Goodix 27c6:5125 — stato complessivo e roadmap A→F approvata
 
 Data review: 13 settembre 2026
 
@@ -10,6 +10,19 @@ Decisione PM: `D291_CLOSURE=PROVEN_ON_TARGET`; il percorso enrollment diversity
 Rocky-derived ha superato re-enrollment, discriminazione wrong-finger e quattro
 serie registrate su quattro. Nessuna attribuzione causale esclusiva è richiesta.
 Il boundary corrente è Phase A, consolidamento della sorgente production.
+
+```text
+USER_APPROVED_ROADMAP=true
+APPROVAL_DATE=2026-09-13
+CURRENT_PHASE=A
+PHASE_ORDER=A>B>C>D>E>F
+```
+
+Target production iniziale approvato: Goodix USB `27c6:5125` / APP12509 su
+Fedora KDE, attraverso lo stack standard `libfprint -> fprintd -> PAM/KDE`.
+Altre distribuzioni, desktop, sensori, firmware/target e utenti
+AD/LDAP/network restano fuori scope senza una nuova decisione esplicita
+dell'Utente.
 
 ## Conclusione esecutiva
 
@@ -137,17 +150,21 @@ Debiti non bloccanti per la fattibilità già provata:
 - nomenclatura e suite storiche sono frammentate in molti Dxxx;
 - supporto oltre Fedora 44, oltre questo host e oltre APP12509 non è provato.
 
-## Roadmap proposta
+## Roadmap approvata dall'Utente
 
-L'ordine è intenzionale: prima si definisce e consolida ciò che verrà
-distribuito; poi si costruiscono gestione utenti e packaging; soltanto dopo si
-qualificano i boundary lifecycle realmente nuovi.
+L'ordine A→B→C→D→E→F è vincolante: prima si definisce e consolida ciò che verrà
+distribuito; poi il driver viene chiuso come multi-user e nativo KDE/fprintd;
+soltanto dopo iniziano packaging e integrazione host, quindi i boundary
+lifecycle realmente nuovi. AI PM può fare corrective e replan locali dentro la
+fase corrente, ma non saltare o invertire fasi né ampliare il target senza una
+nuova decisione esplicita dell'Utente.
 
 ### Phase A — consolidamento della sorgente production
 
 - **OBIETTIVO:** scegliere una sola baseline libfprint mantenibile e trasformare
   i delta target-proven in una patch series/build production riproducibile,
-  separando nettamente test seam, reference tree e codice storico.
+  classificando senza ambiguità production, test, reference, evidenza,
+  storico/deprecato, tooling sviluppatore e documentazione.
 - **PERCHÉ SERVE:** oggi la funzione è provata, ma la sorgente autorevole è
   distribuita fra `libfprint-driver/`, la fork Fedora preservata e componenti
   SIGFM/R2 con licenze diverse.
@@ -155,35 +172,71 @@ qualificano i boundary lifecycle realmente nuovi.
   `docs/LICENSING_AND_PROVENANCE.md`, versioni Fedora attualmente pin-nate.
 - **OUTPUT ATTESO:** architecture decision record; inventario source-of-truth;
   patch series o tree integrato; build normal e sanitizer riproducibile;
-  profilo production senza seam/test override raggiungibili.
+  profilo production senza seam/test override raggiungibili; percorso dichiarato
+  `sorgente production -> build -> libfprint -> fprintd`, indipendente da
+  operator kit storici, launcher one-shot, fake backend e struttura Dxxx.
+- **REGOLA STORICO/RED TAG:** nessun materiale storico o deprecato viene
+  cancellato. Un eventuale spostamento nell'archivio privato `red tag/` è
+  ammesso soltanto dopo audit di import, build, test, script, riferimenti
+  documentali, provenance, licensing e dipendenze production; ciò che è ancora
+  referenziato va prima disaccoppiato correttamente. Lo spostamento non è
+  obbligatorio e `red tag/` non è un cestino.
+
+```text
+DELETE_HISTORICAL_MATERIAL=false
+RED_TAG_ARCHIVE_ALLOWED=true
+MOVE_ONLY_AFTER_REFERENCE_AUDIT=true
+```
+
 - **RISCHIO:** medio; regressioni ABI/lifecycle e scelta del regime GPL-compatible.
 - **HUMAN GATE:** nessuno per audit, build e test offline. È richiesta decisione
   dell'Utente prima di un cambio materiale del licensing boundary o della
   strategia di distribuzione.
-- **CRITERIO DI CHIUSURA:** clean build dalla sola sorgente dichiarata, ABI
-  fprintd verificata, suite production pertinenti verdi e mapping completo da
-  ogni file distribuito a provenance/licenza.
+- **CRITERIO DI CHIUSURA:** sono documentati sorgente production, file che
+  costruiscono il driver, classificazione test/reference/storico, componenti
+  realmente distribuiti e relativa provenance/licenza; clean build dalla sola
+  sorgente dichiarata, ABI fprintd, suite production e compatibilità col target
+  reale sono verificati e riproducibili.
 
-### Phase B — modello utenti, enrollment e dati protetti
+### Phase B — driver multi-user e workflow Linux/KDE nativo
 
-- **OBIETTIVO:** sostituire assunzioni single-user/hard-coded con un lifecycle
-  amministrativo definito per enroll/list/verify/delete, ownership e accesso
-  concorrente, mantenendo i template nello storage standard fprintd.
-- **PERCHÉ SERVE:** il percorso corrente prova un utente e un FP3; non definisce
-  comportamento per più utenti, re-enrollment, template drift o macchina nuova.
+- **OBIETTIVO:** fare sì che ogni normale utente locale, presente o creato dopo
+  l'installazione, possa registrare e gestire autonomamente le proprie impronte
+  nel workflow standard KDE Plasma / Impostazioni di sistema → Utenti e fprintd,
+  senza script Goodix, username/path hard-coded o configurazione user-specific.
+- **PRINCIPIO:** Goodix implementa il dispositivo; fprintd gestisce utenti,
+  ownership e template nel proprio storage standard. Nessun database parallelo
+  Goodix salvo blocker tecnico concreto e riesame della strategia. Operator kit
+  e terminale restano strumenti developer/diagnostici, non UX finale; nessuna
+  GUI Goodix custom senza blocker dimostrato e nuova decisione dell'Utente.
+- **PERCHÉ SERVE:** il percorso corrente prova un utente e un FP3, ma non
+  definisce comportamento per utenti multipli o creati dopo l'installazione,
+  re-enrollment, delete, template drift o macchina nuova.
 - **PREREQUISITI:** source-of-truth Phase A; policy esplicita su origine,
   installazione e protezione dei materiali PE/FDT/PSK senza pubblicarli.
-- **OUTPUT ATTESO:** specifica del data model; comandi amministrativi e policy
-  Polkit/PAM; casi zero/uno/più template; backup/migrazione/delete ownership-pinned;
-  test con utenti e template sintetici.
+- **OUTPUT ATTESO:** contratto zero/uno/più template e più dita secondo le
+  capacità standard; primo enrollment, re-enrollment, delete singolo/completo,
+  comportamento alla cancellazione dell'utente, isolamento fra utenti, restart
+  fprintd, logout/login e reboot; policy lecita per materiali runtime protetti,
+  separata dal lifecycle dei template biometrici, che ne definisca necessità,
+  origine/provenance, natura per-device, permessi, ownership e provisioning su
+  una macchina nuova senza secret in repository, package, log o artefatti.
+- **SCENARIO OBBLIGATORIO:** driver già installato; creazione di un nuovo utente
+  locale; nessuna reinstallazione o modifica del driver; enrollment dalla UI
+  KDE standard; template nuovo salvato da fprintd senza contaminare quelli
+  preesistenti. AD/LDAP/network users restano fuori scope.
 - **RISCHIO:** alto per privacy, autorizzazioni e cancellazione dati; nessun
   delete ampio o implicito.
 - **HUMAN GATE:** necessario per accesso a materiale protetto e, più avanti,
   per enrollment/cancellazione reale o prova multi-user sul target. Nessun gate
   per modello e fixture offline.
-- **CRITERIO DI CHIUSURA:** lifecycle multi-user deterministico e fail-closed,
-  zero segreti/template negli artefatti, rollback testato e nessun utente
-  hard-coded nel percorso production.
+- **CRITERIO DI CHIUSURA:** installato il driver, qualsiasi normale utente
+  locale presente o creato successivamente può registrare e gestire le proprie
+  impronte tramite il normale workflow KDE/fprintd, senza script Goodix o
+  configurazioni user-specific; lifecycle multi-user deterministico,
+  isolamento/ownership corretti e zero segreti/template negli artefatti.
+
+La Phase B deve essere chiusa prima di iniziare la Phase C.
 
 ### Phase C — packaging e integrazione host gestita
 
@@ -193,19 +246,24 @@ qualificano i boundary lifecycle realmente nuovi.
 - **PERCHÉ SERVE:** `/usr/local` hash-pinned e la modifica diretta di
   `plasmalogin` dimostrano funzione, non manutenzione, upgrade safety o
   distribuzione.
-- **PREREQUISITI:** Phase A chiusa; contratto utenti/dati della Phase B; scelta
-  esplicita dei consumer supportati e del fallback password.
+- **PREREQUISITI:** Phase A e Phase B chiuse; contratto utenti/dati multi-user
+  nativo KDE/fprintd provato; scelta esplicita dei consumer supportati e del
+  fallback password.
 - **OUTPUT ATTESO:** sorgenti RPM/spec o formato equivalente; dipendenze OpenCV
-  dichiarate; integrazione systemd/SELinux/PAM idempotente; install,
-  upgrade/downgrade e uninstall transazionali; recovery documentata.
+  dichiarate; integrazione systemd/SELinux/PAM idempotente e reversibile per
+  `sudo`, KScreenLocker, Plasma Login Manager e Polkit quando pertinente;
+  install, upgrade/downgrade e uninstall transazionali; recovery documentata;
+  verifica che aggiornamenti Fedora rilevanti non rompano configurazione,
+  fallback password o template senza diagnosi/recovery.
 - **RISCHIO:** alto sullo stato host; un errore può impedire login o lasciare
   template/runtime incompatibili.
 - **HUMAN GATE:** nessuno per build e installazione in rootfs/VM usa-e-getta;
   obbligatorio prima di installazione privilegiata o modifica PAM/systemd sul
   laptop reale.
-- **CRITERIO DI CHIUSURA:** package reproducibile; install/upgrade/uninstall e
-  rollback verdi in ambiente pulito; fallback password preservato; nessun file
-  vendor modificato fuori dal package manager.
+- **CRITERIO DI CHIUSURA:** package riproducibile; install, upgrade, downgrade
+  quando supportato, uninstall, rollback e recovery verdi in ambiente pulito;
+  fallback password preservato; nessun file vendor modificato manualmente fuori
+  dal package manager.
 
 ### Phase D — lifecycle, recovery e concorrenza
 
@@ -248,7 +306,9 @@ qualificano i boundary lifecycle realmente nuovi.
   materiale. Analisi statica e fixture sintetiche restano offline.
 - **CRITERIO DI CHIUSURA:** claim limitati ai dati; nessun dato biometrico o
   secret nel package; licenze soddisfatte; pass/fail release esplicito per
-  piattaforme e versioni dichiarate.
+  piattaforme e versioni dichiarate. I claim iniziali coprono soltanto Fedora
+  KDE + Goodix `27c6:5125`/APP12509; altri sistemi, desktop, sensori e firmware
+  restano non rivendicati.
 
 ### Phase F — documentazione, handoff e pubblicazione
 
@@ -258,15 +318,18 @@ qualificano i boundary lifecycle realmente nuovi.
   rimasto al vecchio stato “nessun driver”; la history privata non è sicura da
   pubblicare automaticamente.
 - **PREREQUISITI:** artefatto e claim di release delle fasi precedenti.
-- **OUTPUT ATTESO:** guida utente/amministratore; troubleshooting e recovery;
-  documentazione sviluppatore; evidence matrix aggiornata; export pulito e
-  auditato senza capture, firmware, secret o dati biometrici.
+- **OUTPUT ATTESO:** guide di installazione, uso, gestione impronte KDE,
+  amministrazione, troubleshooting e recovery; documentazione sviluppatore,
+  architettura, limiti noti, README, evidence matrix, audit privacy/secret,
+  licensing/attribution e ringraziamenti; export pulito e auditato senza
+  capture, firmware, secret o dati biometrici.
 - **RISCHIO:** alto per disclosure accidentale; basso per codice runtime.
 - **HUMAN GATE:** obbligatorio prima di modificare repository pubblico,
   pubblicare release o esporre materiale privato.
 - **CRITERIO DI CHIUSURA:** documentazione coerente con il package verificato,
   export/content/history audit PASS e pubblicazione approvata esplicitamente
-  dall'Utente.
+  dall'Utente. L'eventuale inclusione di `red tag/` nell'export pubblico è una
+  decisione separata della Phase F dopo audit.
 
 ## WHAT_NOT_TO_TEST_AGAIN
 

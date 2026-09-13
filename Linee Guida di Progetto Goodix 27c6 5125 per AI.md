@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 2.9 — Revisione 12 settembre 2026
-> **Stato**: Attivo; sostituisce la v2.8 del 12 settembre 2026
-> **Motivazione**: la v2.9 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving e protezioni Git della v2.8. Aggiunge `Pragmatism First`, riconosce il tempo dell'Utente come risorsa progettuale e rende permanente una serie VERIFY/MATCH di massimo tre tentativi fisici, con stop al primo match e nessun retry nascosto o illimitato. `REUSABLE_HARNESS_FIRST` resta il default per i probe compatibili, ma l'infrastruttura deve essere proporzionata alla domanda tecnica.
+> **Versione**: 3.0 — Revisione 13 settembre 2026
+> **Stato**: Attivo; sostituisce la v2.9 del 12 settembre 2026
+> **Motivazione**: la v3.0 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving, protezioni Git e licensing della v2.9. Recepisce come normativa la roadmap A→F approvata dall'Utente, fissa il target production iniziale Fedora KDE + Goodix `27c6:5125` / APP12509, l'ordine e i phase gate, e introduce la regola conservativa per materiale storico e archivio `red tag/`.
 
 ---
 
@@ -261,7 +261,7 @@ Prima di definire il primo `CURRENT_TASK` deve:
 4. leggere nel manuale tecnico, tramite indice e ricerca mirata:
    - la sezione di stato corrente;
    - l'ultimo avanzamento consolidato;
-   - il boundary/roadmap corrente;
+   - la roadmap A→F approvata e la fase corrente;
    - i blocker e le decisioni architetturali pertinenti;
 5. esaminare storia recente e struttura pertinente del repository;
 6. identificare ultimo avanzamento tecnico reale e ultimo confine aperto;
@@ -297,6 +297,39 @@ Una sessione precedente può essersi interrotta dopo avere modificato file e pri
 Solo dopo la recovery review, l'AI PM determina `CURRENT_TASK`.
 
 Se esiste un task precedente incompleto ma recuperabile, il primo compito deve completare o correggere quello prima di saltare a una nuova milestone.
+
+### 6.3 Roadmap production approvata e phase gate
+
+La roadmap A→F approvata dall'Utente il 13 settembre 2026 è il sentiero
+operativo predefinito fino alla fine del progetto:
+
+```text
+USER_APPROVED_ROADMAP=true
+APPROVAL_DATE=2026-09-13
+PHASE_ORDER=A>B>C>D>E>F
+```
+
+Il target production iniziale è Fedora KDE con Goodix USB `27c6:5125` /
+APP12509 attraverso lo stack standard `libfprint -> fprintd -> PAM/KDE`. Altre
+distribuzioni, desktop environment, sensori, firmware/target, utenti
+AD/LDAP/network o un upstream generalizzato oltre quanto necessario sono fuori
+scope salvo nuova decisione esplicita dell'Utente.
+
+Il dettaglio tecnico, gli obiettivi e i criteri di closure delle fasi vivono
+nel manuale tecnico canonico. Durante bootstrap/recovery l'AI PM deve leggere
+la roadmap approvata e individuare la fase corrente dal manuale prima di
+selezionare il primo task. Può scomporre e riordinare i sottotask, applicare
+`CORRECTIVE` o fare `REPLAN` locale dentro la fase corrente; non può saltare o
+invertire A→F, iniziare Phase C prima della closure della Phase B, ampliare il
+target o modificare materialmente la roadmap senza nuova decisione esplicita
+dell'Utente.
+
+Il materiale storico o deprecato non viene cancellato. Può essere conservato
+nell'archivio privato `red tag/` soltanto dopo audit di import, build, test,
+script, riferimenti documentali, provenance, licensing e dipendenze production;
+gli elementi ancora referenziati devono essere prima disaccoppiati
+correttamente. `red tag/` è un archivio controllato, non un cestino, e lo
+spostamento non è obbligatorio.
 
 ---
 
@@ -979,7 +1012,7 @@ La qualità si misura in:
 
 ---
 
-## 25. Principio sintetico della v2.9
+## 25. Principio sintetico della v3.0
 
 ```text
 sicurezza hardware forte
@@ -1003,6 +1036,12 @@ reusable harness first per probe compatibili
 pragmatism first e tempo operatore protetto
 +
 serie VERIFY/MATCH max-3 stop-on-first-match
++
+roadmap production A→F approvata con phase gate
++
+target iniziale Fedora KDE + APP12509
++
+storia preservata e red tag solo dopo reference audit
 +
 review Git-native
 +

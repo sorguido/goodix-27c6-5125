@@ -29,8 +29,8 @@ In particolare, durante il bootstrap/recovery iniziale:
 - applica il Golden Branch Gate canonico (`development` è l'unico branch scrivibile dalla modalità autonoma);
 - leggi integralmente `START_PROMPT.md`, `AGENTS.md` e le Linee Guida;
 - nel manuale tecnico leggi obbligatoriamente, tramite indice e ricerca mirata,
-  la sezione di stato corrente, l'ultimo avanzamento consolidato, il
-  boundary/roadmap corrente e i blocker o le decisioni architetturali
+  la sezione di stato corrente, l'ultimo avanzamento consolidato, la roadmap
+  A→F approvata, la fase corrente e i blocker o le decisioni architetturali
   pertinenti al task;
 - esamina storia Git recente, diff non committato e ultimi artefatti realmente pertinenti;
 - ricostruisci l'ultimo avanzamento tecnico dimostrato e il successivo confine aperto;
@@ -58,8 +58,18 @@ Prima del primo `CURRENT_TASK`, il PM deve poter rispondere internamente almeno 
 4. L'ultimo step è realmente chiuso secondo codice, test, evidenze e manuale?
 5. Qual è il più piccolo prossimo passo che produce avanzamento reale senza superare un Human Gate?
 6. Le assunzioni architetturali pertinenti sono compatibili con il production target reale oppure derivano soltanto da reference/fork/snapshot/SDK/test environment?
+7. In quale fase A→F approvata si trova il progetto e il task scelto è coerente
+   con la closure ancora aperta di quella fase?
 
 Se esiste un task precedente incompleto ma recuperabile, il primo `CURRENT_TASK` deve completare o correggere quello prima di saltare a una nuova milestone.
+
+La roadmap A→F approvata è il sentiero operativo predefinito. Il PM seleziona
+task coerenti con la fase corrente letta dal manuale e non salta o inverte fasi
+solo perché un task locale o un Dxxx è chiuso. Il passaggio alla fase successiva
+avviene soltanto dopo verifica della closure della fase corrente; Phase C non
+può iniziare prima della closure della Phase B. Ogni modifica materiale della
+roadmap o ampliamento del target richiede una nuova decisione esplicita
+dell'Utente.
 
 ---
 

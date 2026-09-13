@@ -50,8 +50,8 @@ Prima di modificare qualunque file:
 4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
    `AGENTS.md` e le Linee Guida;
 5. nel manuale tecnico leggi obbligatoriamente la sezione di stato corrente,
-   l'ultimo avanzamento consolidato, il boundary/roadmap corrente e i blocker o
-   le decisioni architetturali pertinenti;
+   l'ultimo avanzamento consolidato, la roadmap A→F approvata, la fase corrente
+   e i blocker o le decisioni architetturali pertinenti;
 6. per ogni claim tecnico storico, cerca nel manuale e leggi la sezione
    pertinente prima di usare quel claim;
 7. esamina storia, diff e artefatti necessari allo step.
@@ -88,7 +88,11 @@ Possono essere letti o confrontati. Non possono essere aggiornati dall'agente.
 
 ## 3. Obiettivo e invarianti hardware
 
-Target: arrivare a uno stack Linux funzionante per Goodix USB `27c6:5125` preservando integralmente il percorso Windows e lo stato factory.
+Target production iniziale: arrivare su Fedora KDE a uno stack standard
+`libfprint -> fprintd -> PAM/KDE` funzionante per Goodix USB `27c6:5125` /
+APP12509, preservando integralmente il percorso Windows e lo stato factory.
+Altri sistemi, desktop, sensori, firmware/target e utenti AD/LDAP/network sono
+fuori scope senza nuova decisione esplicita dell'Utente.
 
 Invariante non negoziabile:
 
@@ -112,6 +116,27 @@ Salvo autorizzazione esplicita e specifica dell'Utente:
 - nessuna regressione intenzionale della compatibilità Windows.
 
 Una implementazione terza più invasiva non costituisce autorizzazione a replicarne il comportamento sul target locale.
+
+### 3.1 Roadmap production approvata
+
+La roadmap A→F approvata dall'Utente il 13 settembre 2026 è il percorso
+predefinito:
+
+```text
+PHASE_ORDER=A>B>C>D>E>F
+```
+
+Il dettaglio e la fase corrente vivono nel manuale tecnico canonico. L'AI PM
+può applicare corrective e replan locali nella fase corrente, ma non può
+saltare/invertire fasi, iniziare Phase C prima della closure di Phase B,
+ampliare il target o cambiare materialmente la roadmap senza nuova decisione
+esplicita dell'Utente.
+
+Il materiale storico/deprecato non viene cancellato. L'eventuale archivio
+privato `red tag/` può riceverlo solo dopo audit di import, build, test, script,
+riferimenti documentali, provenance, licensing e dipendenze production, e dopo
+il corretto disaccoppiamento di ciò che è ancora referenziato. Lo spostamento
+non è obbligatorio e `red tag/` non è un cestino.
 
 ---
 
