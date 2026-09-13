@@ -8,18 +8,20 @@ costituisce autorizzazione live.
 
 La review complessiva successiva alla chiusura D291 e la roadmap per le fasi
 di integrazione, packaging e release sono in
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase A è il boundary offline corrente;
+`analysis/PROJECT_NEXT_STEPS_PLAN.md`. Phase B/B1 è il boundary offline corrente;
 nessuna fase autorizza implicitamente live o modifiche del repository pubblico.
 
 D292/01 chiude l'inventario A1; D292/02 chiude A3/A4 materializzando
 `production/` come autorità di composizione e provando clean build normale,
-ASan/UBSan e riproducibilità byte-for-byte. Report correnti:
+ASan/UBSan e riproducibilità byte-for-byte; D292/03 chiude A5 e Phase A dopo
+review PM diretta. Report correnti:
 `analysis/D292/D292_01_PRODUCTION_SOURCE_INVENTORY.md` e
-`analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md`; manifest e
-validator sono `D292_01_PRODUCTION_FILE_SET.json` e
+`analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md`, con closure
+in `analysis/D292/D292_03_PHASE_A_CLOSURE.md`; manifest e validator sono
+`D292_01_PRODUCTION_FILE_SET.json` e
 `validate_d292_01_inventory.py`. Nessun file storico è stato spostato o
 cancellato. Prossimo boundary:
-`PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW`.
+`PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE`.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |

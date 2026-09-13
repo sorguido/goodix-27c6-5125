@@ -3,18 +3,18 @@
 
 Data review: 13 settembre 2026
 
-Baseline esaminata: `development` con D291 chiuso live sulla candidate
-`cbf582f4dcdb7eeb6c8381223c84d37363386870`
+Baseline esaminata: `development` a
+`9f86fa8984f3188a6de74593d1eb814b26f07291`, con D292/02 accettato.
 
-Decisione PM: `D291_CLOSURE=PROVEN_ON_TARGET`; il percorso enrollment diversity
-Rocky-derived ha superato re-enrollment, discriminazione wrong-finger e quattro
-serie registrate su quattro. Nessuna attribuzione causale esclusiva è richiesta.
-Il boundary corrente è Phase A, consolidamento della sorgente production.
+Decisione PM: D292/03 chiude A5/Phase A sulla base della source-of-truth
+canonica, della build/ABI e delle suite integrate; D291 resta l'evidenza live
+target-proven. La review ha avanzato il boundary a Phase B/B1,
+contratto multi-user e materiali runtime protetti, inizialmente offline.
 
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=A
+CURRENT_PHASE=B
 PHASE_ORDER=A>B>C>D>E>F
 ```
 
@@ -31,11 +31,11 @@ provati enrollment, template FP3, matching SIGFM, integrazione libfprint/fprintd
 e i consumer reali `sudo`, KDE lock/unlock e Plasma Login Manager. D290 chiude
 la catena fingerprint → nuova sessione Plasma/Wayland.
 
-Il divario immediato è ora trasformare la candidate target-proven, distribuita
-tra fork Fedora, componenti locali e installazione D285, in un prodotto
-coerente, gestibile, aggiornabile e distribuibile. Le fasi sotto privilegiano
-lavoro offline e ambienti host isolati. I boundary D279–D291 sono chiusi e non
-vanno ripetuti per sola maggiore confidenza.
+La sorgente production è ora consolidata; il divario immediato è il contratto
+multi-user nativo KDE/fprintd e la separazione fra storage template e materiali
+runtime protetti. Gestibilità, packaging, lifecycle e release restano nelle
+fasi successive. Le fasi privilegiano lavoro offline e ambienti host isolati;
+i boundary D279–D291 non vanno ripetuti per sola maggiore confidenza.
 
 D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
 l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
@@ -44,8 +44,9 @@ hashato. Il delta Git completo è 16 file (4 build/ABI, 11 core, 1 test-only
 escluso dal prodotto). Le 39 API host/test-only sono protette da seam, le 12
 shared/internal restano production; build normal e ASan/UBSan passano, due
 build da cwd diverse sono byte-identiche e ABI fprintd/no-RPATH sono verificate.
-Non restano dipendenze build da Dxxx o `tests/`. Il boundary successivo è la
-review A5 di distribuzione/provenance e closure Phase A.
+Non restano dipendenze build da Dxxx o `tests/`. D292/03 chiude A5 e Phase A
+dopo review PM diretta; il boundary successivo è B1 offline sul contratto
+multi-user/fprintd storage e sui requisiti dei materiali runtime protetti.
 
 ```text
 D290_CLOSED_SUCCESSFULLY=true
@@ -60,11 +61,14 @@ D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
 PHASE_A_A4=COMPLETED
+PHASE_A_A5=COMPLETED
+PHASE_A_CLOSED=true
 D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
+D292_03_PHASE_A_CLOSURE=PASS
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PRODUCTION_READY=false
 NEXT_WORK_CLASS=INTEGRATION_PACKAGING_LIFECYCLE_RELEASE
-NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
+NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
 ```
 
 ## Stato verificato del progetto
@@ -174,15 +178,15 @@ lifecycle realmente nuovi. AI PM può fare corrective e replan locali dentro la
 fase corrente, ma non saltare o invertire fasi né ampliare il target senza una
 nuova decisione esplicita dell'Utente.
 
-### Phase A — consolidamento della sorgente production
+### Phase A — consolidamento della sorgente production — CLOSED
 
 - **OBIETTIVO:** scegliere una sola baseline libfprint mantenibile e trasformare
   i delta target-proven in una patch series/build production riproducibile,
   classificando senza ambiguità production, test, reference, evidenza,
   storico/deprecato, tooling sviluppatore e documentazione.
-- **PERCHÉ SERVE:** oggi la funzione è provata, ma la sorgente autorevole è
-  distribuita fra `libfprint-driver/`, la fork Fedora preservata e componenti
-  SIGFM/R2 con licenze diverse.
+- **PERCHÉ SERVIVA:** all'ingresso della fase la funzione era provata, ma la
+  sorgente autorevole era distribuita fra `libfprint-driver/`, fork Fedora e
+  componenti SIGFM/R2 con licenze diverse.
 - **PREREQUISITI:** evidenze D279–D291, `Rockytkg/PROVENANCE.md`, ledger
   `docs/LICENSING_AND_PROVENANCE.md`, versioni Fedora attualmente pin-nate.
 - **OUTPUT ATTESO:** architecture decision record; inventario source-of-truth;
@@ -213,7 +217,7 @@ MOVE_ONLY_AFTER_REFERENCE_AUDIT=true
   sorgente dichiarata, ABI fprintd, suite production e compatibilità col target
   reale sono verificati e riproducibili.
 
-### Phase B — driver multi-user e workflow Linux/KDE nativo
+### Phase B — driver multi-user e workflow Linux/KDE nativo — CURRENT
 
 - **OBIETTIVO:** fare sì che ogni normale utente locale, presente o creato dopo
   l'installazione, possa registrare e gestire autonomamente le proprie impronte
@@ -382,12 +386,12 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 
 ## Decisione corrente
 
-La Phase A è ora il boundary corrente. Il kit D291 è
+La Phase B è ora il boundary corrente. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN`; non è richiesta alcuna azione live immediata
-dell'Utente. D292/01 ha chiuso A1 e D292/02 ha chiuso A3/A4 con composizione
-canonica sotto `production/`, clean build riproducibile normal/sanitizer, ABI e
-seam separation. Phase A resta corrente e non è ancora dichiarata chiusa: il
-prossimo task è la review A5 della superficie distribuibile e della provenance.
+dell'Utente. D292/01 ha chiuso A1, D292/02 ha chiuso A3/A4 e la review PM
+D292/03 ha chiuso A5/Phase A. Il prossimo task B1 analizza offline ownership e
+storage fprintd multi-user e i requisiti distinti dei materiali runtime
+protetti, senza accedere a secret o preparare una live.
 
 ```text
 PM_DECISION=ACCEPT_AND_CONTINUE
@@ -399,8 +403,13 @@ D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
 PHASE_A_A4=COMPLETED
+PHASE_A_A5=COMPLETED
+PHASE_A_CLOSED=true
 D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
+D292_03_PHASE_A_CLOSURE=PASS
 NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
-NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
+CURRENT_PHASE=B
+PRODUCTION_READY=false
+NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
 ```

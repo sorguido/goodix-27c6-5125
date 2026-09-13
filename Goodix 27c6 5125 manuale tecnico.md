@@ -126,7 +126,7 @@ sentiero operativo predefinito fino alla fine del progetto:
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=A
+CURRENT_PHASE=B
 PHASE_ORDER=A>B>C>D>E>F
 ```
 
@@ -149,7 +149,7 @@ chiuso il follow-up funzionale con enrollment diversity Rocky-derived,
 re-enrollment, discriminazione wrong-finger e quattro serie registrate concluse
 con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
 Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
-production readiness; la fase corrente è **Phase A**.
+production readiness. D292/03 ha chiuso Phase A; la fase corrente è **Phase B**.
 
 Principi trasversali della roadmap:
 
@@ -281,7 +281,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase A — D292/02 source-of-truth e build riproducibile
+### Stato corrente Phase B — D292/03 closure Phase A
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -314,15 +314,25 @@ Il target read-only verificato è Fedora 44 KDE x86_64 con libfprint
 25.08 pinned fornisce la toolchain. Licensing e regime GPL-compatible non
 cambiano. D285 resta evidenza/runtime storico e un problema successivo di
 multi-user/packaging, non una dipendenza build. Nessun move, cancellazione o
-red tag è autorizzato. Phase A resta corrente fino alla review A5 della
-superficie distribuibile e della provenance.
+red tag è autorizzato.
+
+La review PM diretta D292/03 chiude A5 e Phase A: check-source/validator,
+canonical normal build, ABI fprintd 47/47, SONAME, no-RPATH e separazione 0/39
+sono PASS. Le suite integrate D291 diversity (4/4), secure-session (30/30) e
+FpImageDevice (32/32) passano normal e sanitizer; preprocess KAT/audit passa.
+Il solo standalone ASan preprocess resta
+`BLOCKED_ENVIRONMENT_LIBASAN_ABSENT`, non blocker perché build canonica e suite
+integrate sanitizer sono verdi. La compatibilità target combina D291
+target-proven con il delta D292 limitato a composizione/build/test-surface e
+l'evidenza ABI Fedora corrente: nessun nuovo test live è richiesto o autorizzato.
 
 ```text
-CURRENT_PHASE=A
+CURRENT_PHASE=B
 D292_01_OUTCOME=PASS_ARCHITECTURAL_INVENTORY
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
 PHASE_A_A4=COMPLETED
+PHASE_A_A5=COMPLETED
 D292_02_OUTCOME=PASS_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD
 PRODUCTION_TRANSLATION_UNITS=77
 GENERATED_TRANSLATION_UNITS=3
@@ -337,15 +347,17 @@ TEST_HOST_ONLY_GUARDED_SYMBOLS=39
 TEST_HOST_ONLY_PRODUCTION_CALL_SITE_COUNT=0
 AMBIGUOUS_SYMBOLS=0
 SOURCE_OF_TRUTH_CONSOLIDATED=true
-PHASE_A_CLOSED=false
-NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
+PHASE_A_CLOSED=true
+PRODUCTION_READY=false
+NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
 NEW_LIVE_REQUIRED_NOW=false
 ```
 
 Inventario, classificazione, blocker e validator sono in
 `analysis/D292/D292_01_PRODUCTION_SOURCE_INVENTORY.md` e
 `analysis/D292/D292_01_PRODUCTION_FILE_SET.json`; la closure A3/A4 è in
-`analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md`.
+`analysis/D292/D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD.md` e la closure
+A5/Phase A è in `analysis/D292/D292_03_PHASE_A_CLOSURE.md`.
 
 ### Ultimo avanzamento live consolidato — D291 enrollment diversity Rocky-derived
 
@@ -562,11 +574,10 @@ realmente bloccata e login Plasma verso una nuova sessione Wayland sono
 boundary chiusi e non vanno rieseguiti per sola maggiore confidenza. La
 fattibilità sul target APP12509 è provata; la production readiness no.
 
-Il boundary corrente resta il consolidamento della sorgente production
-(Phase A). D292/01 ha chiuso A1 e D292/02 ha chiuso A3/A4 con source-of-truth
-canonica, patch/build riproducibile, ABI e separazione seam. Il passo successivo
-è la review A5 della superficie distribuibile/provenance prima di dichiarare
-la closure Phase A. La roadmap
+La review D292/03 ha chiuso A5 e Phase A dopo il consolidamento A1/A3/A4. Il
+boundary corrente è Phase B/B1: analisi offline del contratto multi-user,
+storage standard fprintd e requisiti separati dei materiali protetti runtime.
+La roadmap
 A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
 manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
 Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
@@ -593,14 +604,18 @@ NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=A
+CURRENT_PHASE=B
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
 PHASE_A_A4=COMPLETED
+PHASE_A_A5=COMPLETED
+PHASE_A_CLOSED=true
 D292_02_SOURCE_OF_TRUTH_AND_REPRODUCIBLE_BUILD=PASS
-NEXT_BOUNDARY=PHASE_A_A5_DISTRIBUTION_PROVENANCE_CLOSURE_REVIEW
+D292_03_PHASE_A_CLOSURE=PASS
+PRODUCTION_READY=false
+NEXT_BOUNDARY=PHASE_B_B1_MULTI_USER_FPRINTD_STORAGE_AND_PROTECTED_RUNTIME_MATERIAL_CONTRACT_OFFLINE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

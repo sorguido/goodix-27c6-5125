@@ -162,7 +162,12 @@ dipendenze da `tests/`. Nessuna reimplementazione SIGFM, cambio di licensing o
 move storico è necessario. Il prossimo boundary è definire/validare questa
 topologia A3 e poi provarne clean build normal/sanitizer e ABI in A4.
 
-## Verifica
+## Verifica storica D292/01
+
+Il blocco seguente è l'output registrato alla chiusura A1, prima della
+separazione D292/02. Non rappresenta l'output corrente del validator, che ora
+verifica lo schema 2 e la superficie production consolidata; per lo stato
+corrente vedere D292/02 e D292/03.
 
 ```text
 python3 analysis/D292/validate_d292_01_inventory.py
