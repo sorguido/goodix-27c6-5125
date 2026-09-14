@@ -39,7 +39,10 @@ Lo script usa l'RPM già preparato e verificato per l'HEAD corrente; se manca,
 lo ricostruisce offline dalla source-of-truth `production/`. Usa `sudo` per una
 sola installazione `dnf5`. Installa anche gli RPM locali
 `opencv-features2d`/`opencv-flann` solo se mancanti, registrandone lo stato per
-il rollback. Ferma e ripristina fprintd secondo lo stato iniziale.
+il rollback. Dopo `sudo` ricontrolla branch, HEAD, origin e worktree, congela
+la candidate in un file root-only, impedisce l'accesso ai repository durante
+la transazione e registra gli hash della baseline D293/B5 e della unit systemd.
+Ferma e ripristina fprintd secondo lo stato iniziale.
 
 Attendere i marker:
 
@@ -53,12 +56,13 @@ D294_01_D293_B5_FALLBACK=PRESERVED
 
 1. Aprire Impostazioni di sistema → Utenti e verificare che il reader sia
    visibile e che le impronte già registrate siano elencate.
-2. Da terminale eseguire `fprintd-verify`. Effettuare fino a tre tentativi
-   fisici indipendenti, fermandosi immediatamente al primo MATCH. Non eseguire
-   un quarto tentativo.
-3. Verificare un normale login fingerprint Plasma. Non testare deliberatamente
-   il fallback password lento: il limite UX è già accettato e non cambia.
-4. Confermare che il principal Guido e le print esistenti siano invariati.
+2. Eseguire un normale login fingerprint Plasma. La serie è limitata a tre
+   tentativi fisici indipendenti: fermarsi immediatamente al primo MATCH;
+   continuare dopo NO_MATCH 1 e 2, chiudere con NO_MATCH_SERIES dopo il terzo.
+   Non eseguire un quarto tentativo, una seconda serie o `fprintd-verify`.
+   Non testare deliberatamente il fallback password lento: il limite UX è già
+   accettato e non cambia.
+3. Confermare che il principal Guido e le print esistenti siano invariati.
 
 `PASS_IF=` reader e template restano visibili, almeno un MATCH avviene entro
 tre tentativi, il login fingerprint riesce e non compaiono regressioni.
@@ -79,9 +83,11 @@ regressione, dalla root del repository eseguire come utente normale:
 packaging/d294-phase-c-runtime/uninstall.sh
 ```
 
-Il rollback rimuove l'RPM e soltanto le due dipendenze OpenCV che non erano
-presenti prima, ricarica systemd e riattiva D293. Non rimuove B5, template,
-materiali protetti o configurazione PAM. È completo solo con:
+Il rollback verifica prima integrità RPM e hash D293/B5, rimuove con `rpm -e`
+soltanto l'RPM e le due dipendenze OpenCV che non erano presenti prima, quindi
+prova il ripristino byte-identico della unit precedente e riattiva D293. Non
+rimuove B5, template, materiali protetti o configurazione PAM. È completo solo
+con:
 
 ```text
 D294_01_ROLLBACK=PASS

@@ -169,7 +169,7 @@ PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
 NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
 CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-NEXT_BOUNDARY=D294_01_RPM_BUILD_OFFLINE
+NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
 ```
 
 ## Stato verificato del progetto
@@ -580,11 +580,15 @@ non lascia dati al name reuse e non produce alert SELinux. La baseline D293,
 la guard B5 e il modulo locale restano attivi e validati. Il password fallback
 di un utente enrolled conserva un ritardo osservato di circa 30 secondi per
 l'ordine seriale PAM; l'Utente lo accetta come limite UX non bloccante e non
-autorizza un corrective PAM in questo step. Il prossimo boundary è la prima
-candidate package-managed offline della Phase C.
+autorizza un corrective PAM in questo step. La prima candidate package-managed
+D294/01 è costruita e chiusa nel massimo grado offline: RPM, payload, digest,
+byte identity e 12 controlli sono PASS. La review PM ha rafforzato
+freeze/provenance dopo `sudo`, collision check e rollback esatto D293/B5. Il
+prossimo boundary è la sua installazione e il normale login Plasma sul target
+reale, quindi richiede Human Gate.
 
 ```text
-PM_DECISION=ACCEPT_AND_CONTINUE
+PM_DECISION=HUMAN_REQUIRED
 D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -651,9 +655,16 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 NEXT_PHASE=C
 NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
 CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-NEXT_BOUNDARY=D294_01_RPM_BUILD_OFFLINE
+NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
+D294_01_RPM_BUILD=PASS
+D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
+D294_01_OFFLINE_TESTS=12_PASS
+D294_01_PAM_FILE_COUNT=0
+D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
+D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
+D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 ```

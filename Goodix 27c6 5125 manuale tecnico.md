@@ -403,6 +403,25 @@ l'assenza di secret/template negli artefatti; e come `DOCUMENTED_POLICY` la
 separazione dei materiali runtime e il limite UX PAM. Il provisioning gestito
 dei materiali e l'integrazione package-owned appartengono alla Phase C.
 
+D294/01 apre Phase C con il primo slice package-managed: un RPM Fedora contiene
+la libreria production privata, wrapper fprintd e drop-in systemd `99`, mentre
+D293 e B5 restano intatti come baseline di rollback. Il package non possiede
+PAM, `/usr/local`, template, firmware o materiali protetti; richiede le versioni
+target di fprintd/libfprint/libgusb/OpenCV. La build reale offline è PASS, la
+libreria nel payload è byte-identica all'output production e i 12 controlli
+statici/metadata sono verdi. Il tentativo non privilegiato `rpm --root` è stato
+negato dal requisito di cambio root: non è un failure del package e la
+transazione host reale resta correttamente oltre il Human Gate.
+
+La review PM ha imposto ricontrollo Git dopo `sudo`, freeze root-only dell'RPM,
+repository disabilitati, collision check, pin delle dipendenze preesistenti e
+rollback atomico limitato ai package esatti. Lo state registra inoltre gli hash
+della unit e della baseline D293/B5; il rollback deve provarne il ripristino
+byte-identico. La live usa soltanto il normale login Plasma con una serie
+bounded di massimo tre tentativi, stop al primo MATCH e nessun comando
+diagnostico aggiuntivo. Installazione, attivazione del servizio e accesso al
+sensore richiedono ora l'esecuzione fisica dell'Utente.
+
 ```text
 CURRENT_PHASE=C
 D292_01_OUTCOME=PASS_ARCHITECTURAL_INVENTORY
@@ -477,11 +496,19 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
+D294_01_RPM_BUILD=PASS
+D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
+D294_01_OFFLINE_TESTS=12_PASS
+D294_01_PAM_FILE_COUNT=0
+D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
+D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
+D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 NEXT_PHASE=C
 NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
 CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-NEXT_BOUNDARY=D294_01_RPM_BUILD_OFFLINE
-NEW_LIVE_REQUIRED_NOW=false
+NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
+NEW_LIVE_REQUIRED_NOW=true
+PM_DECISION=HUMAN_REQUIRED
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -1284,11 +1311,11 @@ PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D291_CLOSED_BOUNDARIES
-PM_DECISION=ACCEPT_AND_CONTINUE
+PM_DECISION=HUMAN_REQUIRED
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
@@ -1341,11 +1368,19 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 NEXT_PHASE=C
 NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
 CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-NEXT_BOUNDARY=D294_01_RPM_BUILD_OFFLINE
+NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
+D294_01_RPM_BUILD=PASS
+D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
+D294_01_OFFLINE_TESTS=12_PASS
+D294_01_PAM_FILE_COUNT=0
+D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
+D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
+D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
+PM_DECISION=HUMAN_REQUIRED
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

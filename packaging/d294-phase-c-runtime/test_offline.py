@@ -56,6 +56,28 @@ class StaticContract(unittest.TestCase):
             self.assertIn("50-goodix-fprint-account-delete", text)
         self.assertNotIn("dnf5 remove -y goodix-d293", uninstall)
 
+    def test_privileged_install_rechecks_provenance_and_freezes_rpm(self):
+        install = self.read("install.sh")
+        self.assertGreaterEqual(install.count("branch --show-current"), 2)
+        self.assertIn("/var/tmp/goodix-d294-root.", install)
+        self.assertIn('install -m 0600 "$rpm_path" "$root_work/candidate.rpm"', install)
+        self.assertIn("--disablerepo='*'", install)
+
+    def test_rollback_is_exact_and_narrow(self):
+        install = self.read("install.sh")
+        uninstall = self.read("uninstall.sh")
+        for key in (
+            "D294_01_UNIT_BEFORE_SHA256",
+            "D294_01_D293_WRAPPER_SHA256",
+            "D294_01_D293_DROPIN_SHA256",
+            "D294_01_B5_HOOK_SHA256",
+        ):
+            self.assertIn(key, install)
+            self.assertIn(key, uninstall)
+        self.assertIn('rpm -V "$package"', uninstall)
+        self.assertIn('rpm -e "${remove_packages[@]}"', uninstall)
+        self.assertNotIn('dnf5 remove', uninstall)
+
     def test_dependency_cleanup_is_stateful(self):
         install = self.read("install.sh")
         uninstall = self.read("uninstall.sh")

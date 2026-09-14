@@ -1,7 +1,7 @@
 # D294/01 — prima candidate RPM runtime Phase C
 
 Data: 14 settembre 2026
-Stato: `IMPLEMENTED_STATIC_REVIEW_PASS_RPM_BUILD_PENDING`
+Stato: `READY_FOR_HUMAN_GATE`
 Live/USB/sudo eseguiti dall'AI: `false`
 
 ## Boundary
@@ -47,35 +47,55 @@ L'RPM possiede soltanto `/usr/lib64/goodix-27c6-5125`, il wrapper sotto
 Build e install entrypoint richiedono branch `development` pulito e allineato
 a `origin/development`; l'installer usa la candidate ignorata `dist/` se
 corrisponde all'HEAD oppure la ricostruisce quando `rpmbuild` è disponibile.
-Il package espone il commit sorgente completo come
-capability RPM. L'installazione conserva in uno state root-only il precedente
-stato del servizio e la preesistenza delle due dipendenze aggiunte. Failure
-post-mutazione attiva cleanup e ripristino del servizio; il rollback riattiva
-D293 anche se fallisce la pulizia di una dipendenza.
+Il package espone il commit sorgente completo come capability RPM.
+L'installazione conserva in uno state root-only il precedente stato del
+servizio, l'hash della unit effettiva, gli hash D293/B5 e la preesistenza delle
+due dipendenze aggiunte. La sezione privilegiata ricontrolla Git e provenance,
+congela l'RPM in un file root-only e disabilita i repository nella transazione
+locale. Failure post-mutazione attiva cleanup e ripristino del servizio; il
+rollback usa una singola transazione `rpm -e` limitata ai package esatti e
+prova il ripristino byte-identico della baseline D293/B5 e della unit.
 
-## Verifica prima del build reale
+## Build RPM e verifica offline
 
 ```text
-python3 packaging/d294-phase-c-runtime/test_offline.py = 8 PASS + 2 SKIP_RPM_NOT_BUILT
+FIRST_RPM_BUILD_SOURCE_COMMIT=c013f02d09c9e1c5625684b9880b9e389dae2248
+D294_01_RPM_BUILD=PASS
+D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
+D294_01_PAM_FILE_COUNT=0
+D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
+python3 packaging/d294-phase-c-runtime/test_offline.py --rpm <rpm> = 12 PASS
 bash -n build/install/uninstall/wrapper = PASS
 git diff --check = PASS
-RPM_BUILD=NOT_YET_EXECUTED
-RPM_INSTALL_ROOTFS=NOT_YET_EXECUTED
+RPM_DIGEST_VERIFY=PASS
+RPM_PAYLOAD_QUERY=PASS
+RPM_INSTALL_ROOTFS=NOT_EXECUTED_UNPRIVILEGED_CHROOT_DENIED
 REAL_USB_ACCESS=0
 SUDO_BY_AI=0
 PAM_FILE_CHANGE_COUNT=0
 ```
 
-Il build reale deve essere eseguito dopo il commit di questi sorgenti, perché
-la provenance rifiuta worktree sporco o HEAD non pubblicato. Dopo build e test
-del payload, la review PM decide eventuali corrective prima del Human Gate.
+La prima esecuzione RPM ha esposto soltanto un helper `rpmuncompress` assente
+nel toolchain temporaneo estratto; completato il toolchain, la sandbox annidata
+ha negato `bwrap`. La stessa build è quindi stata ripetuta offline nel contesto
+consentito ed è PASS. Questi sono limiti dell'ambiente di build, non failure
+del package o del runtime. Una transazione `rpm --root` non è eseguibile dal
+namespace non privilegiato perché RPM richiede il cambio root; payload,
+metadata, digest e byte identity sono invece verificati senza privilegi.
+
+La review PM ha richiesto e riesaminato nello stesso D294/01 i controlli
+privilegiati duplicati, il freeze root-only, le collision check, il pin delle
+dipendenze preesistenti, il rollback atomico e l'hash della baseline. La live è
+stata ridotta al normale login Plasma: una sola serie telemetrata e bounded di
+massimo tre tentativi, stop al primo MATCH e nessun `fprintd-verify` aggiuntivo.
+Non esiste altro avanzamento offline necessario prima dell'installazione reale.
 
 ```text
 CURRENT_PHASE=C
 CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-OUTCOME=IMPLEMENTED_STATIC_REVIEW_PASS_RPM_BUILD_PENDING
-EXECUTABLE_CLOSURE=PARTIAL_RPM_BUILD_PENDING
-RESIDUAL_BLOCKER_OR_RISK=REAL_RPM_BUILD_AND_ROOTFS_TRANSACTION_NOT_YET_PROVEN
-NEXT_BOUNDARY=D294_01_RPM_BUILD_OFFLINE
-PM_DECISION=ACCEPT_AND_CONTINUE
+OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
+EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
+RESIDUAL_BLOCKER_OR_RISK=PACKAGE_INSTALLATION_AND_TARGET_WORKFLOW_REQUIRE_SUDO_AND_REAL_SENSOR
+NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
+PM_DECISION=HUMAN_REQUIRED
 ```

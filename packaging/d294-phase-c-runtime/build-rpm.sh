@@ -36,7 +36,9 @@ cleanup() {
     find "$work" -xdev -depth -delete
   fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 production_output=$work/production
 "$root/production/build.sh" normal "$production_output"
 
