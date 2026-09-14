@@ -306,6 +306,7 @@ verify_active() {
     [[ $previous_pam == ACTIVE || $previous_pam == ABSENT ]] || fail previous_pam_status_invalid
   fi
   if [[ $(digest "$vendor_pam") == "$vendor_sha" ]]; then
+    [[ $allow_vendor_drift == true ]] || verify_vendor_pam
     verify_saved_pam "$vendor_sha" "$override_sha"
     ACTIVE_PAM_VENDOR_DRIFT=false
   else
@@ -562,6 +563,7 @@ case ${1:-} in
     [[ $# -eq 1 ]] || fail status_usage
     verify_active true
     if [[ $ACTIVE_PAM_STATE == LEGACY ]]; then
+      verify_vendor_pam
       pam_status=ABSENT
       pam_managed=false
     else
