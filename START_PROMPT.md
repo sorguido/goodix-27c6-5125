@@ -73,6 +73,17 @@ può iniziare prima della closure della Phase B. Ogni modifica materiale della
 roadmap o ampliamento del target richiede una nuova decisione esplicita
 dell'Utente.
 
+La closure formale di una fase è inoltre uno stop assoluto del loop:
+
+```text
+PHASE_CLOSED => DOCUMENTATION + COMMIT + PUSH => PROJECT_STEP_COMPLETE => STOP
+```
+
+Dopo aver formalizzato e pubblicato su `origin/development` la closure, non
+iniziare, progettare o preparare la fase successiva nella stessa sessione,
+anche se esisterebbe un task autonomamente eseguibile. La fase successiva
+richiede una nuova interazione dell'Utente.
+
 ---
 
 ## 2. CURRENT_TASK — handoff compatto PM → Executor
@@ -265,6 +276,10 @@ Usalo solo quando l'obiettivo complessivo attualmente perseguibile senza nuovo H
 
 Non usarlo semplicemente perché un Dxxx è chiuso, un commit esiste, i test sono verdi o una review è positiva. Se esiste un ulteriore passo autonomamente consentito verso il target finale, la decisione ordinaria è `ACCEPT_AND_CONTINUE`.
 
+Eccezione vincolante: quando la fase corrente è formalmente chiusa,
+`PROJECT_STEP_COMPLETE` è obbligatorio dopo documentazione, commit e push,
+anche se la roadmap identifica già lavoro nella fase successiva.
+
 ---
 
 ## 5. Continuità e uso del contesto
@@ -358,7 +373,11 @@ Non modificare `AGENTS.md`, `START_PROMPT.md` o le Linee Guida come normale atti
 
 ## 8. Stop conditions
 
-Interrompi il loop soltanto quando ricorre una stop condition canonica, un blocker tecnico reale non risolvibile autonomamente, un Human Gate, l'indisponibilità delle capability necessarie oppure il raggiungimento dell'obiettivo complessivo attualmente perseguibile.
+Interrompi il loop soltanto quando ricorre una stop condition canonica, un blocker tecnico reale non risolvibile autonomamente, un Human Gate, l'indisponibilità delle capability necessarie, il raggiungimento dell'obiettivo complessivo attualmente perseguibile oppure la closure formale della fase corrente.
+
+```text
+PHASE_CLOSED => STOP
+```
 
 In ogni altro caso continua autonomamente con il successivo `CURRENT_TASK` minimo e probante.
 

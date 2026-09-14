@@ -133,10 +133,13 @@ ampliare il target o cambiare materialmente la roadmap senza nuova decisione
 esplicita dell'Utente.
 
 Il materiale storico/deprecato non viene cancellato. L'eventuale archivio
-privato `red tag/` può riceverlo solo dopo audit di import, build, test, script,
-riferimenti documentali, provenance, licensing e dipendenze production, e dopo
-il corretto disaccoppiamento di ciò che è ancora referenziato. Lo spostamento
-non è obbligatorio e `red tag/` non è un cestino.
+privato canonico è `red_tag/`. Non spostare materiale durante le fasi A–E.
+Prima di qualsiasi pubblicazione in Phase F è obbligatorio auditare import,
+build, test, script, riferimenti documentali, provenance, licensing e
+dipendenze production, disaccoppiare ciò che è ancora referenziato, spostare in
+`red_tag/` tutto il materiale non pubblico e inserire la directory in
+`.gitignore`. Nessuna build, release o test pubblico può dipendere da
+`red_tag/`; non è un cestino.
 
 ---
 
@@ -234,6 +237,15 @@ PROJECT_STEP_COMPLETE
 ```
 
 `PROJECT_STEP_COMPLETE` non significa “ho finito un singolo task”. Va usato solo quando non esiste più un successivo passo autonomamente consentito verso l'obiettivo complessivo corrente.
+
+Eccezione vincolante: la closure formale della fase corrente impone
+`PROJECT_STEP_COMPLETE` dopo aggiornamento documentale, commit e push su
+`origin/development`, quindi stop assoluto. Non iniziare né preparare la fase
+successiva nella stessa sessione:
+
+```text
+PHASE_CLOSED => STOP
+```
 
 ---
 
@@ -549,6 +561,12 @@ Quando cambia lo stato:
 - correggi o marca come superate formulazioni stale;
 - non duplicare inutilmente contenuto ancora valido.
 
+In Phase F il manuale destinato alla pubblicazione deve essere rieditato e
+ristrutturato in inglese come vero manuale tecnico; non deve essere una
+traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione
+pubblica di Phase F è in inglese. `AGENTS.md`, `START_PROMPT.md` e le Linee
+Guida restano governance interna e non richiedono traduzione.
+
 ---
 
 ## 13. Executable Closure
@@ -599,6 +617,11 @@ Non aggiungere a review set o materiale destinato alla pubblicazione:
 - artefatti storici non modificati senza ragione.
 
 Le evidenze raw private autentiche possono vivere in `<git-root>/captures/` secondo la policy del repository privato e devono essere escluse da futuri export pubblici salvo audit specifico.
+
+Prima di ogni pubblicazione Phase F, l'audit completo deve spostare in
+`red_tag/` il materiale non pubblico, aggiungere `red_tag/` a `.gitignore` e
+provare che build, test e release non dipendono da tale directory. Lo
+spostamento non va anticipato alle fasi precedenti.
 
 ---
 

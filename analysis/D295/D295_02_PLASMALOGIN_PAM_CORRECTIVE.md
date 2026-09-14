@@ -5,7 +5,7 @@
 
 **Boundary:** Fedora 44 KDE clean-room Human Gate
 
-**Esito offline:** READY; nuova esecuzione live richiesta all'Utente
+**Esito finale:** PASS live su Fedora 44 KDE; boundary chiuso
 
 ## Evidenza ricevuta e diagnosi
 
@@ -29,6 +29,23 @@ D295_GENERIC_PAM_FPRINT=PASS
 D295_PLASMALOGIN_FINGERPRINT=FAIL
 D295_PLASMALOGIN_PAM_DOES_NOT_REACH_PAM_FPRINTD=true
 ```
+
+La successiva migrazione gestita ha prodotto:
+
+```text
+PHASE_C_UPDATE=PASS
+CURRENT_COMMIT=b51b4c6f6141e0651e251291745d9b48b08d8da6
+PREVIOUS_COMMIT=4c9cd74cc02890080851c1dca0a5889c58981f77
+PLASMALOGIN_VENDOR_MODIFIED=false
+PASSWORD_LOGIN=PASS
+FINGERPRINT_LOGIN=PASS
+SUDO_FINGERPRINT=PASS
+```
+
+Il PAM vendor è rimasto byte-identico e l'override gestito ha presentato
+`pam_fprintd.so` prima di `password-auth`. D295/02 è quindi PASS sul boundary
+causale che aveva fallito: password, login fingerprint Plasma e regressione
+`sudo` sono tutti verdi.
 
 ## Review del meccanismo Fedora/PAM
 
@@ -88,12 +105,28 @@ mai il vendor. Drift del vendor dopo un update Fedora blocca status, update e
 rollback; uninstall resta possibile se l'override D295 è integro, così viene
 esposto il nuovo vendor package-owned.
 
-## Evidenza offline
+## Review dei due hotfix diretti
+
+Il commit `bd1b53b` ha diagnosticato correttamente un difetto di accessibilità:
+con `umask 077`, il primo `mkdir -p` creava
+`/usr/lib64/goodix-27c6-5125` in modo `0700`, impedendo al frontend non root di
+attraversare `current` e causando un falso `current_link_drift`. La riparazione
+nel frontend era però nel livello sbagliato. Il corrective corrente crea
+esplicitamente la root runtime `0755` e normalizza in modo fail-closed il solo
+legacy `0700 -> 0755` dentro `root-transaction.sh`, prima di verificare lo
+state. Ownership non root, symlink e modi inattesi restano errori.
+
+Il commit `2d8a9c0` è corretto nel principio: lo status accurato dei cinque
+materiali `0700/0600` non può essere calcolato dal frontend non privilegiato.
+`manage.sh status` continua quindi a delegare con `sudo` alla transazione root;
+non legge né stampa contenuto o digest dei materiali.
+
+## Evidenza offline post-review
 
 `python3 deployment/phase-c-source-first-managed/test_offline.py`:
 
 ```text
-Ran 9 tests
+Ran 10 tests
 OK
 ```
 
@@ -101,20 +134,24 @@ Copertura: pristine sintetico; install; install ripetuto; update; rollback;
 uninstall; migrazione dallo state D295/01; vendor byte-identico; collisione;
 drift vendor; password fallback strutturale; nessun dato user-specific; tamper
 candidate; cleanup parziale; import/preservazione materiali; safety e sintassi.
+La regressione aggiunta verifica inoltre root runtime `0755` alla prima
+installazione, migrazione sicura del legacy `0700`, status privilegiato e
+`PROTECTED_MATERIAL_READY=true` con fixture root-only sintetiche.
 
 Non sono stati eseguiti `sudo`, PAM live, fprintd live, USB, sensore, enrollment
 o lettura di materiale protetto. Il repository pubblico non è stato modificato.
 
-## Decisione e Human Gate
+## Decisione e prossimo boundary
 
-Il correttivo è pronto per il solo test manuale descritto in
-`docs/PHASE_C_SOURCE_FIRST_INSTALL.md`: pull, nuova build, verifica hash, update
-gestito, prova che il vendor è invariato, status/ordine PAM, password login,
-fingerprint login e infine regressione `sudo`. In caso di failure si raccolgono
-solo journal PAM/fprintd/plasmalogin sanitizzati; nessun operator kit o edit PAM.
+D295/02 è chiuso. Il più piccolo gap residuo della closure C non è biometrico:
+installazione, update e consumer sono già provati, mentre rollback, uninstall e
+recovery restano provati soltanto su root sintetica. Il successivo Human Gate è
+quindi D295/03, una sequenza amministrativa con sensore scollegato: rollback
+andata/ritorno, uninstall e reinstallazione della candidate finale, verificando
+state, PAM vendor, preservazione di materiali/template e runtime root `0755`.
 
 ```text
-D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
 PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
 MANAGED_PAM_INTEGRATION=true
 INSTALL_IDEMPOTENT=true
@@ -123,7 +160,12 @@ UNINSTALL_RESTORES_PREVIOUS_STATE=true
 PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
 USER_SPECIFIC_CONFIGURATION=false
 SENSOR_REACHING_EXECUTED_BY_AI=false
-D295_02_OFFLINE_TESTS=9_PASS
-D295_02_LIVE_EXECUTION=NOT_PERFORMED
+D295_02_OFFLINE_TESTS=10_PASS_POST_REVIEW
+D295_02_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_02_PASSWORD_LOGIN=PASS
+D295_02_FINGERPRINT_LOGIN=PASS
+D295_02_SUDO_FINGERPRINT=PASS
+D295_02_VENDOR_PAM_UNCHANGED=true
+D295_02_BOUNDARY_CLOSED=true
 PM_DECISION=HUMAN_REQUIRED
 ```

@@ -91,6 +91,8 @@ class ManagedInstallContract(unittest.TestCase):
         second = self.candidate(b)
         result = self.run_tx("--root-install", self.caller, str(first))
         self.assertIn("PHASE_C_INSTALL=PASS", result.stdout)
+        runtime_root = self.root / "usr/lib64/goodix-27c6-5125"
+        self.assertEqual(runtime_root.stat().st_mode & 0o777, 0o755)
         managed = self.root / "etc/pam.d/plasmalogin"
         self.assertTrue(managed.is_file())
         self.assertEqual(self.vendor_pam.read_bytes(), self.vendor_bytes)
@@ -194,6 +196,27 @@ class ManagedInstallContract(unittest.TestCase):
         self.run_tx("--root-uninstall", self.caller)
         self.assertTrue((self.root / "var/lib/goodix-5125-poc/transport-material.bin").is_file())
 
+    def test_status_repairs_legacy_runtime_root_and_reports_material_readiness(self):
+        candidate = self.candidate("f" * 40)
+        self.run_tx("--root-install", self.caller, str(candidate))
+        runtime_root = self.root / "usr/lib64/goodix-27c6-5125"
+        runtime_root.chmod(0o700)
+
+        material = self.root / "var/lib/goodix-5125-poc"
+        material.mkdir(mode=0o700)
+        for name in (
+            "target-material-manifest.json", "transport-material.bin",
+            "target-config-90.bin", "gfusb.dll", "fdt-cache.bin",
+        ):
+            path = material / name
+            path.write_bytes(f"synthetic-{name}".encode())
+            path.chmod(0o600)
+
+        status = self.run_tx("--status").stdout
+        self.assertEqual(runtime_root.stat().st_mode & 0o777, 0o755)
+        self.assertIn("PROTECTED_MATERIAL_READY=true", status)
+        self.assertIn("MANAGED_PAM_INTEGRATION=true", status)
+
     def test_static_safety_and_distribution_contract(self):
         combined = "\n".join(
             (HERE / name).read_text(encoding="utf-8")
@@ -208,6 +231,9 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertNotIn("random PSK", combined)
         self.assertNotIn("/usr/lib/pam.d/plasmalogin\" >", combined)
         self.assertIn("MANAGED_ETC_OVERRIDE_FROM_VENDOR", combined)
+        manage = (HERE / "manage.sh").read_text(encoding="utf-8")
+        self.assertIn('exec sudo -- "$here/root-transaction.sh" --status', manage)
+        self.assertNotIn("ensure_runtime_root_mode", manage)
 
     def test_shell_syntax(self):
         for name in ("prepare.sh", "manage.sh", "root-transaction.sh", "fprintd-wrapper", "50-goodix-fprint-account-delete"):

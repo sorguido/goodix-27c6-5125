@@ -171,8 +171,8 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
-NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
+CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
+NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
 ```
 
 ## Stato verificato del progetto
@@ -219,10 +219,10 @@ NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
 - L'installazione D285 sotto `/usr/local` resta il predecessore di rollback.
   La baseline software configurata D293 è ancora single-host e legata a
   SHA/versioni esatte: è recuperabile ma non è un package di distribuzione.
-- La riga `pam_fprintd.so max-tries=3 timeout=45 debug` nel PAM package-owned
-  `plasmalogin` è funzionalmente provata, ma è una modifica manuale che un
-  aggiornamento RPM può sovrascrivere. Non è la strategia di configurazione
-  definitiva.
+- D295/02 ha sostituito la modifica PAM manuale con l'override amministrativo
+  gestito `/etc/pam.d/plasmalogin`, derivato dal vendor verificato e provato
+  live per password, fingerprint Plasma e `sudo`. Resta da attraversare sul
+  sistema reale il solo lifecycle rollback/uninstall/recovery.
 - Guardrail, audit e test host-only sono estesi e utili, ma molti sono legati a
   operator kit storici. Devono restare evidenza/regressione, non diventare il
   framework di installazione del prodotto.
@@ -302,11 +302,11 @@ nuova decisione esplicita dell'Utente.
   `sorgente production -> build -> libfprint -> fprintd`, indipendente da
   operator kit storici, launcher one-shot, fake backend e struttura Dxxx.
 - **REGOLA STORICO/RED TAG:** nessun materiale storico o deprecato viene
-  cancellato. Un eventuale spostamento nell'archivio privato `red tag/` è
-  ammesso soltanto dopo audit di import, build, test, script, riferimenti
-  documentali, provenance, licensing e dipendenze production; ciò che è ancora
-  referenziato va prima disaccoppiato correttamente. Lo spostamento non è
-  obbligatorio e `red tag/` non è un cestino.
+  cancellato. Prima della pubblicazione Phase F un audit completo deve
+  disaccoppiare ciò che è ancora referenziato, spostare tutto il materiale non
+  pubblico nell'archivio privato `red_tag/`, aggiungerlo a `.gitignore` e
+  provare che build, test e release non ne dipendono. Non anticipare lo
+  spostamento nelle fasi A–E; `red_tag/` non è un cestino.
 
 ```text
 DELETE_HISTORICAL_MATERIAL=false
@@ -442,8 +442,8 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 - **OBIETTIVO:** rendere build e installazione da sorgente idempotenti,
   diagnosticabili e reversibili, con runtime immutabile per commit, dipendenze
   esplicite, systemd/SELinux, guard account-lifecycle, update, rollback,
-  uninstall e recovery; PAM resta invariato finché una VM pulita non ne prova
-  il contratto Fedora/KDE corrente.
+  uninstall e recovery; l'override PAM amministrativo resta derivato dal vendor
+  verificato e fail-closed rispetto a drift Fedora.
 - **PERCHÉ SERVE:** `/usr/local` hash-pinned, la modifica diretta di
   `plasmalogin` e l'overlay RPM dipendente da D293 dimostrano funzione, non una
   installazione clean-room autonoma.
@@ -520,15 +520,27 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 - **PREREQUISITI:** artefatto e claim di release delle fasi precedenti.
 - **OUTPUT ATTESO:** completamento delle guide di uso, amministrazione e
   sviluppo; architettura, limiti noti, evidence matrix, audit privacy/secret,
-  licensing/attribution e ringraziamenti; export pulito e auditato senza
-  capture, firmware, secret o dati biometrici.
+  licensing/attribution e ringraziamenti; tutta la documentazione pubblica in
+  inglese; manuale rieditato e ristrutturato come vero manuale tecnico, non
+  traduzione letterale o diario Dxxx; export pulito e auditato senza capture,
+  firmware, secret o dati biometrici. La governance interna non richiede
+  traduzione.
 - **RISCHIO:** alto per disclosure accidentale; basso per codice runtime.
 - **HUMAN GATE:** obbligatorio prima di modificare repository pubblico,
   pubblicare release o esporre materiale privato.
 - **CRITERIO DI CHIUSURA:** documentazione coerente con l'installazione verificata,
   export/content/history audit PASS e pubblicazione approvata esplicitamente
-  dall'Utente. L'eventuale inclusione di `red tag/` nell'export pubblico è una
-  decisione separata della Phase F dopo audit.
+  dall'Utente. Prima della pubblicazione tutto il materiale non pubblico è
+  isolato in `red_tag/`, la directory è in `.gitignore`, nessuna build/release
+  ne dipende e l'export pubblico la esclude.
+
+La closure formale di qualunque fase richiede aggiornamento documentale,
+commit e push su `origin/development`, quindi stop assoluto prima della fase
+successiva:
+
+```text
+PHASE_CLOSED => STOP
+```
 
 ## WHAT_NOT_TO_TEST_AGAIN
 
@@ -607,12 +619,16 @@ non raggiunge `pam_fprintd`, mentre `system-auth` lo contiene e `sudo` funziona.
 D295/02 implementa il correttivo nello stesso confine: override amministrativo
 `/etc/pam.d/plasmalogin` generato dalla copia package-owned verificata, una sola
 regola `auth sufficient pam_fprintd.so` prima del substack `password-auth`,
-vendor `/usr/lib` intatto e stack password/session/KWallet preservato. State e
-hash coprono migrazione dal D295/01 installato, idempotenza, update, rollback
-bidirezionale, uninstall e drift da update Fedora. Nove test offline sono PASS.
-Nessun `sudo`, PAM live, USB o sensore è stato raggiunto dall'AI. Il prossimo
-boundary è il test manuale password/fingerprint Plasma e successiva regressione
-`sudo` nella stessa VM.
+vendor `/usr/lib` intatto e stack password/session/KWallet preservato. La Human
+Gate è PASS: update su `b51b4c6...`, vendor byte-identico, password login,
+fingerprint login Plasma e `sudo` fingerprint sono verdi.
+
+La review post-live conserva `status` privilegiato per i materiali root-only e
+sposta la normalizzazione della runtime root nel livello privilegiato: fresh
+`0755`, solo legacy `0700 -> 0755`, altri modi/ownership fail-closed. Dieci test
+offline sono PASS. Il prossimo e unico boundary residuo di Phase C è D295/03:
+rollback bidirezionale, uninstall e recovery/reinstall su Fedora con sensore
+scollegato, senza ripetere prove biometriche.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
@@ -689,8 +705,8 @@ PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
-NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
+CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
+NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -711,7 +727,7 @@ D295_01_CLEAN_VM_BUILD_INSTALL=PASS_HUMAN_OBSERVED
 D295_01_CLEAN_VM_ENROLLMENT=PASS_HUMAN_OBSERVED
 D295_01_GENERIC_PAM_FINGERPRINT=PASS_HUMAN_OBSERVED
 D295_01_PLASMALOGIN_FINGERPRINT=FAIL_HUMAN_OBSERVED
-D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
 PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
 MANAGED_PAM_INTEGRATION=true
 INSTALL_IDEMPOTENT=true
@@ -720,6 +736,13 @@ UNINSTALL_RESTORES_PREVIOUS_STATE=true
 PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
 USER_SPECIFIC_CONFIGURATION=false
 SENSOR_REACHING_EXECUTED_BY_AI=false
-D295_02_OFFLINE_TESTS=9_PASS
+D295_02_OFFLINE_TESTS=10_PASS_POST_REVIEW
+D295_02_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_02_PASSWORD_LOGIN=PASS
+D295_02_FINGERPRINT_LOGIN=PASS
+D295_02_SUDO_FINGERPRINT=PASS
+D295_02_VENDOR_PAM_UNCHANGED=true
+D295_03_LIVE_EXECUTION=NOT_PERFORMED
+PHASE_C_CLOSED=false
 PM_DECISION=HUMAN_REQUIRED
 ```

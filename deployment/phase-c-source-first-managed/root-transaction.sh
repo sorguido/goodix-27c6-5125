@@ -135,7 +135,7 @@ remove_frozen_candidate() {
 install_runtime_tree() {
   local candidate=$1 commit=$2 destination=$runtime_root/$commit library
   [[ ! -e $destination && ! -L $destination ]] || fail runtime_commit_collision
-  mkdir -p -- "$runtime_root"
+  install -d -m 0755 -- "$runtime_root"
   install -d -m 0755 -- "$destination"
   for library in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_core.so.413 \
     libopencv_features2d.so.413 libopencv_flann.so.413 libopencv_imgproc.so.413; do
@@ -268,7 +268,26 @@ write_state() {
   chmod 0644 "$pending"
   mv -f -- "$pending" "$state"
 }
+ensure_runtime_root_mode() {
+  local mode
+  [[ -e $runtime_root || -L $runtime_root ]] || return 0
+  [[ -d $runtime_root && ! -L $runtime_root ]] || fail runtime_root_invalid
+  if [[ -z $test_root ]]; then
+    [[ $(stat -c '%u:%g' "$runtime_root") == 0:0 ]] || fail runtime_root_owner_invalid
+  fi
+  mode=$(stat -c '%a' "$runtime_root")
+  case $mode in
+    755) ;;
+    700)
+      chmod 0755 "$runtime_root" || fail runtime_root_mode_fix_failed
+      [[ $(stat -c '%a' "$runtime_root") == 755 ]] || fail runtime_root_mode_fix_failed
+      ;;
+    *) fail runtime_root_mode_unexpected ;;
+  esac
+}
+
 verify_active() {
+  ensure_runtime_root_mode
   local allow_legacy=${1:-false}
   local allow_vendor_drift=${2:-false}
   [[ -f $state && ! -L $state ]] || fail state_missing

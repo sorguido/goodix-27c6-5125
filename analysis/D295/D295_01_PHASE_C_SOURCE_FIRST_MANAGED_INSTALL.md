@@ -129,3 +129,21 @@ D295_01_PAM_CHANGED=false
 NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
 PM_DECISION=HUMAN_REQUIRED
 ```
+
+## Aggiornamento post-gate
+
+La Human Gate è stata eseguita dall'Utente sulla Fedora 44 KDE pulita. Build,
+candidate, import, install/idempotenza, reader, enrollment, template, SIGFM
+MATCH e `sudo` fingerprint sono PASS. Il solo failure iniziale, login
+fingerprint Plasma, è stato isolato al service PAM e chiuso live da D295/02;
+password, fingerprint Plasma e regressione `sudo` sono ora tutti PASS. I
+marker originari sopra restano la fotografia pre-live di D295/01.
+
+```text
+D295_01_LIVE_EXECUTION=PASS_WITH_PLASMALOGIN_CORRECTIVE_D295_02
+D295_01_INSTALL_IDEMPOTENT=PASS_HUMAN_OBSERVED
+D295_01_PROTECTED_MATERIAL_IMPORT=PASS_HUMAN_OBSERVED
+D295_01_SENSOR_AND_FPRINTD=PASS_HUMAN_OBSERVED
+D295_01_BOUNDARY_CLOSED=true
+NEXT_BOUNDARY=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
+```

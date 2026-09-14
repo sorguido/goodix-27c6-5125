@@ -190,11 +190,14 @@ dopo i failure intermedi preservati nella lineage Git, la live finale ha dato
 PASS pieno sotto SELinux Enforcing: blocco con print, pass dopo delete
 KDE/fprintd, name reuse pulito, zero alert SELinux e principal Guido invariato.
 Guard e modulo restano installati. La prima installazione source-first D295 in
-una Fedora 44 KDE VM pulita è ora PASS fino a enrollment, template, `sudo` e
-SIGFM MATCH. Il solo boundary aperto è il correttivo PAM gestito per il login
-fingerprint di Plasma Login Manager; il login password è già PASS. La candidate
-RPM D294 è preservata come prototipo storico/evidenza e non è più il percorso
-di distribuzione ufficiale.
+una Fedora 44 KDE VM pulita è PASS per build, import, installazione, enrollment,
+template, `sudo` e SIGFM MATCH. D295/02 ha poi chiuso live il correttivo PAM:
+update gestito, PAM vendor invariato, login password, login fingerprint Plasma
+e regressione `sudo` sono PASS. Il solo boundary ancora aperto in Phase C è il
+lifecycle amministrativo reale D295/03: rollback bidirezionale, uninstall e
+recovery/reinstall con sensore scollegato. La candidate RPM D294 è preservata
+come prototipo storico/evidenza e non è più il percorso di distribuzione
+ufficiale.
 
 Principi trasversali della roadmap:
 
@@ -206,9 +209,10 @@ Principi trasversali della roadmap:
 - trattare gli Operator Kit esistenti come evidenza/diagnostica storica, non
   come metodo di validazione corrente o UX production, e non creare una GUI
   Goodix custom senza blocker reale e nuova decisione dell'Utente;
-- non cancellare materiale storico o deprecato. L'eventuale archivio privato
-  `red tag/` è ammesso solo dopo audit di import, build, test, script,
-  riferimenti documentali, provenance, licensing e dipendenze production;
+- non cancellare materiale storico o deprecato. In Phase F, prima della
+  pubblicazione, un audit completo deve spostare tutto il materiale non
+  pubblico in `red_tag/`, aggiungere la directory a `.gitignore` e provare che
+  build, test e release non ne dipendono; non anticipare lo spostamento;
 - non confondere closure funzionale, packaging, lifecycle e qualificazione di
   release: ogni fase chiude il proprio confine con evidenza proporzionata;
 - applicare sempre Human Gate, factory-preserving, Git protections, licensing e
@@ -318,16 +322,28 @@ o firmware.
 **Obiettivo.** Allineare guide di installazione, uso, gestione impronte KDE,
 amministrazione, troubleshooting, recovery e sviluppo; architettura, limiti,
 README, evidence matrix, privacy/secret audit, licensing/attribution e
-ringraziamenti. Prima di ogni export pubblico si auditano contenuto e Git
-history e si produce un export sanitizzato.
+ringraziamenti. Tutta la documentazione pubblica deve essere in inglese. Il
+manuale viene rieditato e ristrutturato come vero manuale tecnico, non tradotto
+letteralmente né pubblicato come diario Dxxx. Prima di ogni export pubblico si
+auditano contenuto e Git history, si sposta tutto il materiale non pubblico in
+`red_tag/`, si aggiunge la directory a `.gitignore`, si dimostra che
+build/release non ne dipendono e si produce un export sanitizzato. La governance
+interna (`AGENTS.md`, `START_PROMPT.md`, Linee Guida) non richiede traduzione.
 
 **Closure F.** Documentazione e artefatto verificato sono coerenti; audit di
 contenuto/history, privacy, secret e licenze sono chiusi; ogni pubblicazione o
 modifica del repository pubblico resta separata, soggetta a Human Gate e a
-decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
-dall'export pubblico viene decisa soltanto qui dopo audit.
+decisione esplicita dell'Utente. `red_tag/` resta escluso dall'export pubblico.
 
-### Stato corrente Phase C — source-first gestito, clean VM al Human Gate
+Alla closure formale di ogni fase si aggiornano documentazione e stato, si
+eseguono commit e push su `origin/development`, quindi il loop si arresta senza
+iniziare la fase successiva:
+
+```text
+PHASE_CLOSED => STOP
+```
+
+### Stato corrente Phase C — D295/02 PASS, lifecycle amministrativo al Human Gate
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -361,7 +377,7 @@ Il target read-only verificato è Fedora 44 KDE x86_64 con libfprint
 25.08 pinned fornisce la toolchain. Licensing e regime GPL-compatible non
 cambiano. D285 resta evidenza/runtime storico e un problema successivo di
 multi-user/packaging, non una dipendenza build. Nessun move, cancellazione o
-red tag è autorizzato.
+popolamento di `red_tag/` è autorizzato prima dell'audit Phase F.
 
 La review PM diretta D292/03 chiude A5 e Phase A: check-source/validator,
 canonical normal build, ABI fprintd 47/47, SONAME, no-RPATH e separazione 0/39
@@ -462,10 +478,21 @@ mai scritto. State e hash governano override, migrazione da D295/01, update,
 rollback bidirezionale e uninstall; drift di un futuro vendor Fedora è
 fail-closed, mentre uninstall può esporre in sicurezza il vendor aggiornato.
 
-Nove test offline sono PASS, inclusi vendor invariato, collisione, drift,
-migrazione legacy e simmetria PAM. L'AI non ha eseguito sudo, PAM live, USB,
-sensore o lettura di materiale protetto. Il nuovo boundary è la sola Human Gate
-manuale password → fingerprint Plasma → regressione `sudo`.
+La Human Gate D295/02 è PASS: la migrazione ha attivato `b51b4c6...` con
+`4c9cd74...` come rollback, il vendor `/usr/lib/pam.d/plasmalogin` è rimasto
+byte-identico e l'override ha collocato `pam_fprintd` prima di `password-auth`.
+Login password, login fingerprint Plasma e `sudo` fingerprint sono PASS.
+
+La review dei due hotfix ha confermato che `status` deve essere privilegiato per
+valutare materiali root-only. Ha invece spostato la riparazione della root
+runtime dal frontend alla transazione privilegiata: le nuove installazioni
+creano `0755`, il solo legacy `0700` viene normalizzato prima della verifica e
+ownership/symlink/modi inattesi falliscono chiuso. Dieci test offline sono PASS,
+inclusi modo fresh, migrazione legacy e material readiness sintetica.
+
+Il solo boundary residuo di Phase C è D295/03: rollback bidirezionale,
+uninstall e recovery/reinstall su Fedora con sensore scollegato. Non vanno
+ripetuti enrollment, login o MATCH già chiusi.
 
 ```text
 CURRENT_PHASE=C
@@ -554,11 +581,11 @@ D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 NEXT_PHASE=C
 NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
-CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
-NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
+CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
+NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
 NEW_LIVE_REQUIRED_NOW=true
 PM_DECISION=HUMAN_REQUIRED
-D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
 PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
 MANAGED_PAM_INTEGRATION=true
 INSTALL_IDEMPOTENT=true
@@ -567,7 +594,14 @@ UNINSTALL_RESTORES_PREVIOUS_STATE=true
 PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
 USER_SPECIFIC_CONFIGURATION=false
 SENSOR_REACHING_EXECUTED_BY_AI=false
-D295_02_OFFLINE_TESTS=9_PASS
+D295_02_OFFLINE_TESTS=10_PASS_POST_REVIEW
+D295_02_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_02_PASSWORD_LOGIN=PASS
+D295_02_FINGERPRINT_LOGIN=PASS
+D295_02_SUDO_FINGERPRINT=PASS
+D295_02_VENDOR_PAM_UNCHANGED=true
+D295_03_LIVE_EXECUTION=NOT_PERFORMED
+PHASE_C_CLOSED=false
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -1353,14 +1387,15 @@ Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
 `analysis/PROJECT_NEXT_STEPS_PLAN.md`
 
 La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
-soluzione di packaging. Analogamente, D285 `/usr/local` resta il predecessore
-di rollback recuperabile; la baseline software configurata è ora D293 e non è
-ancora un prodotto distribuibile.
+soluzione di packaging. Analogamente, D285 `/usr/local` e D293 restano
+predecessori storici recuperabili; la baseline corrente nella VM è la
+distribuzione source-first D295/02, ora PASS sui consumer reali.
 La live finale D293/05 ha chiuso account deletion/name reuse sotto SELinux
 Enforcing senza alert; guard e modulo restano installati. Phase B è quindi
 chiusa e Phase C è corrente. Il fallback password per utenti enrolled ha un
-ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale; non è
-autorizzato un corrective PAM in questo step.
+ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale. D295/02 ha
+poi risolto il distinto gap del service PAM `plasmalogin` senza modificare il
+vendor Fedora.
 Le live osservate riportano zero famiglie di scrittura persistente note; ciò
 non prova assolutamente la nonmutazione NVM interna e non equivale a una
 qualificazione Windows esaustiva dopo ogni run.
@@ -1433,8 +1468,8 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
-NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
+CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
+NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -1442,7 +1477,7 @@ D294_01_PAM_FILE_COUNT=0
 D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
 D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
-D295_01_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
+D295_01_OUTCOME=PASS_LIVE_WITH_PLASMALOGIN_CORRECTIVE_D295_02
 D295_01_OFFLINE_TESTS=6_PASS
 D295_01_SOURCE_FIRST_BUILD=PASS
 D295_01_CANDIDATE_DIGESTS=PASS
@@ -1455,7 +1490,7 @@ D295_01_CLEAN_VM_BUILD_INSTALL=PASS_HUMAN_OBSERVED
 D295_01_CLEAN_VM_ENROLLMENT=PASS_HUMAN_OBSERVED
 D295_01_GENERIC_PAM_FINGERPRINT=PASS_HUMAN_OBSERVED
 D295_01_PLASMALOGIN_FINGERPRINT=FAIL_HUMAN_OBSERVED
-D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
 PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
 MANAGED_PAM_INTEGRATION=true
 INSTALL_IDEMPOTENT=true
@@ -1464,7 +1499,14 @@ UNINSTALL_RESTORES_PREVIOUS_STATE=true
 PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
 USER_SPECIFIC_CONFIGURATION=false
 SENSOR_REACHING_EXECUTED_BY_AI=false
-D295_02_OFFLINE_TESTS=9_PASS
+D295_02_OFFLINE_TESTS=10_PASS_POST_REVIEW
+D295_02_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_02_PASSWORD_LOGIN=PASS
+D295_02_FINGERPRINT_LOGIN=PASS
+D295_02_SUDO_FINGERPRINT=PASS
+D295_02_VENDOR_PAM_UNCHANGED=true
+D295_03_LIVE_EXECUTION=NOT_PERFORMED
+PHASE_C_CLOSED=false
 PM_DECISION=HUMAN_REQUIRED
 ```
 

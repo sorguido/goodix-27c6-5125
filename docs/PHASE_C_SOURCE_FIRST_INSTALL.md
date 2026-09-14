@@ -21,9 +21,17 @@ impronta di Plasma Login Manager: `plasmalogin` usa `password-auth`, mentre
 `with-fingerprint` della profile `local` inserisce `pam_fprintd` soltanto in
 `system-auth`. Il login password resta PASS.
 
-Il correttivo è chiuso offline ma la sua mutazione privilegiata e il nuovo login
-restano azioni dell'Utente dopo Human Gate. Nessun comando live di questa guida
-è stato eseguito dall'AI.
+Il correttivo D295/02 è poi PASS live: update gestito, PAM vendor byte-identico,
+ordine dell'override, login password, login fingerprint Plasma e regressione
+`sudo` sono tutti verdi. I due hotfix emersi durante la migrazione sono stati
+riesaminati: la root runtime viene ora creata `0755` e il solo legacy `0700`
+viene normalizzato dalla transazione privilegiata; `status` resta privilegiato
+per verificare correttamente i materiali root-only.
+
+Il solo boundary ancora aperto per la closure C è il lifecycle amministrativo
+reale: rollback bidirezionale, uninstall e recovery/reinstall. Non richiede USB
+o azioni biometriche. Nessun comando live della nuova sezione 8 è stato
+eseguito dall'AI.
 
 Il gestore installa una runtime immutabile per commit sotto
 `/usr/lib64/goodix-27c6-5125/`, un wrapper fprintd, un drop-in systemd e la guard
@@ -224,7 +232,7 @@ fprintd.service --no-pager`, `journalctl -b -u fprintd.service --no-pager` e
 `getenforce`. Non allegare `/var/lib/goodix-5125-poc`, `/var/lib/fprint`,
 capture USB, template o secret.
 
-## 7. Sequenza minima per la Human Gate correttiva
+## 7. Sequenza D295/02 già eseguita — evidenza storica
 
 ```bash
 cd "$HOME/goodix-27c6-5125-private"
@@ -250,3 +258,107 @@ l'impronta. Se il login fingerprint fallisce, non fare altre modifiche:
 conservare l'output sanitizzato di `manage.sh status`, le due sole righe PAM
 mostrate sopra e il journal del boot filtrato a `plasmalogin`, `pam_fprintd` e
 `fprintd`, redigendo username, seriali e qualsiasi dato non necessario.
+
+Questa sequenza ha prodotto PASS e non va ripetuta per maggiore confidenza.
+
+## 8. Human Gate D295/03 — lifecycle amministrativo di closure Phase C
+
+Spegnere o scollegare il sensore Goodix. Non eseguire enrollment, verify, login
+fingerprint o altri test biometrici. Partire dalla VM D295/02 con:
+
+```text
+CURRENT_COMMIT=b51b4c6f6141e0651e251291745d9b48b08d8da6
+PREVIOUS_COMMIT=4c9cd74cc02890080851c1dca0a5889c58981f77
+MANAGED_PAM_STATUS=ACTIVE
+PROTECTED_MATERIAL_READY=true
+```
+
+Aggiornare il clone e costruire prima la candidate finale, perché l'uninstall
+rimuoverà lo state gestito:
+
+```bash
+cd "$HOME/goodix-27c6-5125-private"
+git switch development
+git pull --ff-only origin development
+git status --short
+candidate_root=$(mktemp -d "$HOME/goodix-d295-phase-c-closure.XXXXXX")
+deployment/phase-c-source-first-managed/manage.sh prepare \
+  "$candidate_root"
+(cd "$candidate_root/candidate" && sha256sum -c SHA256SUMS)
+grep '^SOURCE_COMMIT=' "$candidate_root/candidate/MANIFEST"
+```
+
+`git status --short` deve essere vuoto. Prima del rollback registrare solo
+metadata non sensibili:
+
+```bash
+deployment/phase-c-source-first-managed/manage.sh status
+sha256sum /usr/lib/pam.d/plasmalogin > "$HOME/plasmalogin.vendor.lifecycle.sha256"
+template_count_before=$(sudo find /var/lib/fprint -xdev -type f -printf . | wc -c)
+printf 'TEMPLATE_FILE_COUNT_BEFORE=%s\n' "$template_count_before"
+```
+
+Eseguire rollback andata/ritorno e fermarsi al primo errore:
+
+```bash
+deployment/phase-c-source-first-managed/manage.sh rollback
+deployment/phase-c-source-first-managed/manage.sh status
+test ! -e /etc/pam.d/plasmalogin
+sha256sum -c "$HOME/plasmalogin.vendor.lifecycle.sha256"
+
+deployment/phase-c-source-first-managed/manage.sh rollback
+deployment/phase-c-source-first-managed/manage.sh status
+test -f /etc/pam.d/plasmalogin
+sha256sum -c "$HOME/plasmalogin.vendor.lifecycle.sha256"
+```
+
+Il primo rollback deve riportare `CURRENT_COMMIT=4c9cd74...` e
+`MANAGED_PAM_STATUS=ABSENT`; il secondo `CURRENT_COMMIT=b51b4c6...` e
+`MANAGED_PAM_STATUS=ACTIVE`.
+
+Eseguire uninstall e verificare la baseline senza leggere materiali o template:
+
+```bash
+deployment/phase-c-source-first-managed/manage.sh uninstall
+test ! -e /etc/pam.d/plasmalogin
+test ! -e /usr/lib64/goodix-27c6-5125
+test ! -e /usr/libexec/goodix-27c6-5125/fprintd-wrapper
+sha256sum -c "$HOME/plasmalogin.vendor.lifecycle.sha256"
+sudo test -d /var/lib/goodix-5125-poc
+for name in target-material-manifest.json transport-material.bin \
+  target-config-90.bin gfusb.dll fdt-cache.bin; do
+  sudo test -f "/var/lib/goodix-5125-poc/$name" || exit 1
+done
+template_count_after=$(sudo find /var/lib/fprint -xdev -type f -printf . | wc -c)
+printf 'TEMPLATE_FILE_COUNT_AFTER=%s\n' "$template_count_after"
+test "$template_count_after" = "$template_count_before"
+if deployment/phase-c-source-first-managed/manage.sh status; then
+  echo 'UNEXPECTED_STATUS_SUCCESS_AFTER_UNINSTALL' >&2
+  false
+else
+  echo 'EXPECTED_STATUS_FAILURE_AFTER_UNINSTALL'
+fi
+```
+
+Infine reinstallare la candidate finale e lasciare la VM sul nuovo baseline:
+
+```bash
+deployment/phase-c-source-first-managed/manage.sh install \
+  "$candidate_root/candidate"
+deployment/phase-c-source-first-managed/manage.sh status
+test "$(stat -c '%a' /usr/lib64/goodix-27c6-5125)" = 755
+test -f /etc/pam.d/plasmalogin
+sha256sum -c "$HOME/plasmalogin.vendor.lifecycle.sha256"
+```
+
+Il commit corrente finale deve coincidere con `SOURCE_COMMIT` della candidate;
+attesi inoltre `PROTECTED_MATERIAL_READY=true`,
+`MANAGED_PAM_INTEGRATION=true` e `MANAGED_PAM_STATUS=ACTIVE`. Il conteggio dei
+template deve essere invariato. Non allegare contenuti o hash dei materiali e
+dei template.
+
+```text
+PASS_IF=ROLLBACK_OUT_PASS_AND_ROLLBACK_BACK_PASS_AND_UNINSTALL_PASS_AND_REINSTALL_PASS
+FAIL_IF=ANY_COMMAND_OR_INVARIANT_FAILS
+STOP_IF=FIRST_FAILURE
+```

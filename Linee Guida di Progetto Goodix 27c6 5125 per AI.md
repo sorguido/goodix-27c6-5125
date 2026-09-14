@@ -1,8 +1,8 @@
 # Linee Guida di Progetto Goodix 27c6:5125 per AI
 
-> **Versione**: 3.2 — Revisione 13 settembre 2026
-> **Stato**: Attivo; sostituisce la v3.1 del 13 settembre 2026
-> **Motivazione**: la v3.2 mantiene integralmente Human Gate, safety tecnica, invarianti factory-preserving, protezioni Git, licensing, roadmap A→F, target Fedora KDE e validazione patch-first della v3.1. Chiarisce che il rollback simmetrico è un antidoto obbligatorio da fornire e conservare, non un rituale post-PASS: una candidate validata resta installata per default; FAIL, instabilità o regressione richiedono invece rollback.
+> **Versione**: 3.3 — Revisione 14 settembre 2026
+> **Stato**: Attivo; sostituisce la v3.2 del 13 settembre 2026
+> **Motivazione**: la v3.3 mantiene Human Gate, safety, invarianti factory-preserving, protezioni Git, licensing, roadmap A→F, target Fedora KDE e rollback simmetrico. Introduce lo stop assoluto dopo la closure formale di ogni fase; rende obbligatori in Phase F l'inglese per tutta la documentazione pubblica, la riedizione del manuale come manuale tecnico non cronologico e l'audit con isolamento del materiale non pubblico in `red_tag/`, senza dipendenze build/release.
 
 ---
 
@@ -322,12 +322,14 @@ invertire A→F, iniziare Phase C prima della closure della Phase B, ampliare il
 target o modificare materialmente la roadmap senza nuova decisione esplicita
 dell'Utente.
 
-Il materiale storico o deprecato non viene cancellato. Può essere conservato
-nell'archivio privato `red tag/` soltanto dopo audit di import, build, test,
+Il materiale storico o deprecato non viene cancellato. L'archivio privato
+canonico è `red_tag/` e non viene popolato durante le fasi A–E. Prima di
+qualsiasi pubblicazione in Phase F è obbligatorio auditare import, build, test,
 script, riferimenti documentali, provenance, licensing e dipendenze production;
-gli elementi ancora referenziati devono essere prima disaccoppiati
-correttamente. `red tag/` è un archivio controllato, non un cestino, e lo
-spostamento non è obbligatorio.
+gli elementi ancora referenziati devono essere disaccoppiati, tutto il
+materiale non pubblico va spostato in `red_tag/` e la directory va aggiunta a
+`.gitignore`. Build, test e release non devono dipenderne. `red_tag/` è un
+archivio controllato, non un cestino.
 
 ---
 
@@ -402,6 +404,15 @@ Non usare `PROJECT_STEP_COMPLETE` solo perché:
 - il prossimo task è stato identificato.
 
 Se esiste un ulteriore passo autonomamente consentito verso il target finale, la decisione ordinaria è `ACCEPT_AND_CONTINUE`.
+
+Eccezione vincolante: la closure formale della fase corrente richiede
+aggiornamento documentale, commit e push su `origin/development`, poi
+`PROJECT_STEP_COMPLETE` e stop assoluto. La fase successiva non viene iniziata
+o preparata nella stessa sessione:
+
+```text
+PHASE_CLOSED => STOP
+```
 
 ---
 
@@ -775,6 +786,12 @@ Il manuale:
 - non lascia conoscenza nuova soltanto in sessione AI, report o commit message;
 - non duplica inutilmente contenuto ancora valido.
 
+In Phase F il manuale destinato alla pubblicazione deve essere rieditato e
+ristrutturato in inglese come vero manuale tecnico, non tradotto letteralmente
+né mantenuto come diario Dxxx. Tutta la documentazione pubblica di Phase F è in
+inglese. I file interni `AGENTS.md`, `START_PROMPT.md` e queste Linee Guida non
+richiedono traduzione.
+
 Il bootstrap ne legge obbligatoriamente stato corrente, ultimo avanzamento
 consolidato, boundary/roadmap e blocker/decisioni architetturali pertinenti.
 Ogni altro claim tecnico storico richiede ricerca mirata e lettura della
@@ -979,6 +996,11 @@ Il repository privato è il workspace canonico di sviluppo.
 
 Il repository pubblico resta congelato finché uno step separato non esegue sanitizzazione e audit di **contenuto e history**.
 
+Prima di qualsiasi pubblicazione Phase F, l'audit deve spostare tutto il
+materiale non pubblico in `red_tag/`, aggiungere `red_tag/` a `.gitignore` e
+dimostrare che build, test e release non dipendono dalla directory. Questo
+spostamento non va anticipato nelle fasi A–E.
+
 L'uguaglianza del working tree non dimostra che la history privata sia pubblicabile.
 
 Nessuna operazione sul repository pubblico è implicita nelle attività su `development`.
@@ -1075,7 +1097,7 @@ roadmap production A→F approvata con phase gate
 +
 target iniziale Fedora KDE + APP12509
 +
-storia preservata e red tag solo dopo reference audit
+storia preservata e `red_tag/` obbligatorio in Phase F dopo audit completo
 +
 review Git-native
 +

@@ -11,6 +11,12 @@ fprintd Fedora, verifica metadata root-only dei cinque input protetti e non ne
 stampa contenuto o digest. La guard account-deletion e la policy SELinux sono la
 copia production del comportamento D293/B5 già provato sul target.
 
+La root runtime è creata esplicitamente root-owned `0755`. La transazione
+privilegiata normalizza soltanto installazioni legacy root-owned `0700` prima
+della verifica; symlink, ownership o modi diversi falliscono chiuso. `status`
+passa per la stessa transazione privilegiata perché la readiness dei materiali
+`0700/0600` non è osservabile correttamente dal frontend non root.
+
 Il correttivo Plasma Login Manager include soltanto la regola dichiarativa
 `plasmalogin-pam.rule`. La transazione verifica il file PAM package-owned,
 genera `/etc/pam.d/plasmalogin` preservando tutte le righe vendor e inserisce
@@ -26,3 +32,7 @@ python3 deployment/phase-c-source-first-managed/test_offline.py
 ```
 
 Guida utente: `docs/PHASE_C_SOURCE_FIRST_INSTALL.md`.
+
+D295/02 è PASS live per update, vendor PAM invariato, password, login
+fingerprint Plasma e `sudo`. Il boundary corrente D295/03 è il solo lifecycle
+amministrativo rollback/uninstall/recovery con sensore scollegato.
