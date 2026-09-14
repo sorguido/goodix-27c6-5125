@@ -46,6 +46,10 @@ install -m 0644 "$here/goodix_fprint_account_delete.fc" \
 install -m 0644 "$here/99-goodix-27c6-5125-managed.conf" \
   "$candidate/99-goodix-27c6-5125-managed.conf"
 install -m 0644 "$root/LICENSE" "$candidate/LICENSE"
+install -m 0644 "$root/LICENSES/GPL-2.0-or-later.txt" \
+  "$candidate/GPL-2.0-or-later.txt"
+install -m 0644 "$root/LICENSES/LGPL-2.1-or-later.txt" \
+  "$candidate/LGPL-2.1-or-later.txt"
 
 printf '%s\n' \
   'PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL' \

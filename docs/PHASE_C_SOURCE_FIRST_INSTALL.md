@@ -31,7 +31,8 @@ snapshot a macchina spenta. Non collegare ancora il sensore.
 
 ```bash
 sudo dnf5 install git flatpak cpio patch binutils rpm-build dnf5-plugins \
-  fprintd libfprint libgusb selinux-policy-targeted policycoreutils-devel
+  fprintd libfprint libgusb selinux-policy-targeted checkpolicy \
+  policycoreutils policycoreutils-devel
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user flathub org.freedesktop.Sdk//25.08
 git clone https://github.com/sorguido/goodix-27c6-5125-private.git

@@ -11,7 +11,8 @@ import unittest
 HERE = pathlib.Path(__file__).resolve().parent
 TRANSACTION = HERE / "root-transaction.sh"
 FILES = (
-    "MANIFEST", "SHA256SUMS", "LICENSE", "libfprint-2.so.2.0.0",
+    "MANIFEST", "SHA256SUMS", "LICENSE", "GPL-2.0-or-later.txt",
+    "LGPL-2.1-or-later.txt", "libfprint-2.so.2.0.0",
     "libgusb.so.2", "libopencv_core.so.413", "libopencv_features2d.so.413",
     "libopencv_flann.so.413", "libopencv_imgproc.so.413", "fprintd-wrapper",
     "50-goodix-fprint-account-delete", "goodix_fprint_account_delete.te",
