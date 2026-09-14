@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Production copy of the D293/B5 target-proven account deletion guard.
+set -euo pipefail
+fail() { printf 'GOODIX_ACCOUNT_DELETE=FAIL reason=%s\n' "$1" >&2; exit 1; }
+[[ ${ACTION:-} == userdel ]] || fail unexpected_action
+subject=${SUBJECT:-}
+[[ -n $subject && $subject != . && $subject != .. && $subject != */* ]] || fail invalid_subject
+state_root=/var/lib/fprint
+user_root=$state_root/$subject
+if [[ ! -e $state_root && ! -L $state_root ]]; then
+  printf 'GOODIX_ACCOUNT_DELETE=PASS_NO_FPRINT_STATE username=%s\n' "$subject"; exit 0
+fi
+[[ -d $state_root && ! -L $state_root ]] || fail fprint_state_root_unsafe
+if [[ ! -e $user_root && ! -L $user_root ]]; then
+  printf 'GOODIX_ACCOUNT_DELETE=PASS_NO_USER_NAMESPACE username=%s\n' "$subject"; exit 0
+fi
+[[ -d $user_root && ! -L $user_root ]] || fail user_namespace_unsafe
+first_entry=$(/usr/bin/find "$user_root" -mindepth 1 -print -quit) || fail user_namespace_unreadable
+if [[ -n $first_entry ]]; then
+  printf '%s\n' "GOODIX_ACCOUNT_DELETE=BLOCKED_FINGERPRINTS_PRESENT username=$subject" \
+    'Eliminare prima tutte le impronte del profilo tramite KDE/fprintd; l account non e stato modificato.' >&2
+  exit 1
+fi
+printf 'GOODIX_ACCOUNT_DELETE=PASS_EMPTY_USER_NAMESPACE username=%s\n' "$subject"

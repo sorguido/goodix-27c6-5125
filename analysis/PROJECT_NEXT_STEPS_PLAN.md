@@ -167,9 +167,12 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
-CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
+NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
+PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
+RPM_OFFICIAL_DISTRIBUTION=false
+D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
+CURRENT_TASK=D295_01_SOURCE_FIRST_MANAGED_INSTALL
+NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
 ```
 
 ## Stato verificato del progetto
@@ -428,33 +431,37 @@ Phase C e non vengono promossi retroattivamente a prove Phase B.
 ```text
 PHASE_B_CLOSED=true
 NEXT_PHASE=C
-NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
+NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 ```
 
-### Phase C — packaging e integrazione host gestita
+### Phase C — distribuzione source-first e integrazione host gestita
 
-- **OBIETTIVO:** produrre package installabili e reversibili per driver/runtime,
-  dipendenze, systemd/SELinux e configurazione PAM, senza edit manuale di file
-  package-owned.
-- **PERCHÉ SERVE:** `/usr/local` hash-pinned e la modifica diretta di
-  `plasmalogin` dimostrano funzione, non manutenzione, upgrade safety o
-  distribuzione.
+- **DECISIONE ARCHITETTURALE:** il percorso ufficiale è clone del repository →
+  build da `production/` → installer gestito → stack Fedora. L'RPM D294 resta
+  prototipo storico/evidenza e non è una distribuzione ufficiale.
+- **OBIETTIVO:** rendere build e installazione da sorgente idempotenti,
+  diagnosticabili e reversibili, con runtime immutabile per commit, dipendenze
+  esplicite, systemd/SELinux, guard account-lifecycle, update, rollback,
+  uninstall e recovery; PAM resta invariato finché una VM pulita non ne prova
+  il contratto Fedora/KDE corrente.
+- **PERCHÉ SERVE:** `/usr/local` hash-pinned, la modifica diretta di
+  `plasmalogin` e l'overlay RPM dipendente da D293 dimostrano funzione, non una
+  installazione clean-room autonoma.
 - **PREREQUISITI:** Phase A e Phase B chiuse; contratto utenti/dati multi-user
   nativo KDE/fprintd provato; scelta esplicita dei consumer supportati e del
   fallback password.
-- **OUTPUT ATTESO:** sorgenti RPM/spec o formato equivalente; dipendenze OpenCV
-  dichiarate; integrazione systemd/SELinux/PAM idempotente e reversibile per
-  `sudo`, KScreenLocker, Plasma Login Manager e Polkit quando pertinente;
-  install, upgrade/downgrade e uninstall transazionali; recovery documentata;
-  verifica che aggiornamenti Fedora rilevanti non rompano configurazione,
-  fallback password o template senza diagnosi/recovery.
+- **OUTPUT ATTESO:** gestore source-first e manifest di provenance; dipendenze
+  OpenCV hash-pinned; integrazione systemd/SELinux idempotente e reversibile;
+  materiali protetti importati separatamente e mai nel repository; install,
+  update, rollback e uninstall con state verificabile; guida Phase C dedicata;
+  verifica clean-room di PAM/KDE, fallback password e aggiornamenti Fedora.
 - **RISCHIO:** alto sullo stato host; un errore può impedire login o lasciare
   template/runtime incompatibili.
-- **HUMAN GATE:** nessuno per build e installazione in rootfs/VM usa-e-getta;
-  obbligatorio prima di installazione privilegiata o modifica PAM/systemd sul
-  laptop reale.
-- **CRITERIO DI CHIUSURA:** package riproducibile; install, upgrade, downgrade
-  quando supportato, uninstall, rollback e recovery verdi in ambiente pulito;
+- **HUMAN GATE:** nessuno per build e simulazioni su filesystem temporaneo;
+  obbligatorio prima di qualunque `sudo`, import di materiale protetto, modifica
+  systemd/SELinux/PAM o accesso al sensore, anche nella VM.
+- **CRITERIO DI CHIUSURA:** candidate source-first riproducibile; install,
+  update, rollback, uninstall e recovery verdi in Fedora 44 KDE pulita;
   fallback password preservato; nessun file vendor modificato manualmente fuori
   dal package manager.
 
@@ -466,7 +473,7 @@ NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
 - **PERCHÉ SERVE:** open/action/close nominale e reboot sono provati, ma non
   coprono byte tardivi cross-generation, rimozione del device o interruzioni
   arbitrarie.
-- **PREREQUISITI:** candidate package-managed della Phase C; matrice di stato e
+- **PREREQUISITI:** installazione source-first gestita chiusa in Phase C; matrice di stato e
   stop condition progettata offline; nessun comando recovery device-side non
   compreso.
 - **OUTPUT ATTESO:** lifecycle contract; test fault-injection host-only;
@@ -487,11 +494,11 @@ NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
   distribuzione, senza confondere un test funzionale con una stima FAR/FRR.
 - **PERCHÉ SERVE:** i match/no-match provano correttezza del percorso, non tassi
   biometrici, robustezza generale o completezza dell'audit di supply chain.
-- **PREREQUISITI:** package candidate e lifecycle chiusi; popolazione e criteri
+- **PREREQUISITI:** candidate source-first e lifecycle chiusi; popolazione e criteri
   di accettazione definiti prima di raccogliere dati.
 - **OUTPUT ATTESO:** threat/privacy review; SBOM/licenze/attribution; test
   matrix supportata; criteri di affidabilità e compatibilità; release candidate
-  riproducibile e firmabile.
+  source-first riproducibile e attestabile.
 - **RISCHIO:** alto per privacy biometrica e rischio di overclaim statistico;
   medio per incompatibilità licenze/dipendenze.
 - **HUMAN GATE:** necessario per raccolta biometrica reale, prove Windows
@@ -511,15 +518,14 @@ NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
   rimasto al vecchio stato “nessun driver”; la history privata non è sicura da
   pubblicare automaticamente.
 - **PREREQUISITI:** artefatto e claim di release delle fasi precedenti.
-- **OUTPUT ATTESO:** guide di installazione, uso, gestione impronte KDE,
-  amministrazione, troubleshooting e recovery; documentazione sviluppatore,
-  architettura, limiti noti, README, evidence matrix, audit privacy/secret,
+- **OUTPUT ATTESO:** completamento delle guide di uso, amministrazione e
+  sviluppo; architettura, limiti noti, evidence matrix, audit privacy/secret,
   licensing/attribution e ringraziamenti; export pulito e auditato senza
   capture, firmware, secret o dati biometrici.
 - **RISCHIO:** alto per disclosure accidentale; basso per codice runtime.
 - **HUMAN GATE:** obbligatorio prima di modificare repository pubblico,
   pubblicare release o esporre materiale privato.
-- **CRITERIO DI CHIUSURA:** documentazione coerente con il package verificato,
+- **CRITERIO DI CHIUSURA:** documentazione coerente con l'installazione verificata,
   export/content/history audit PASS e pubblicazione approvata esplicitamente
   dall'Utente. L'eventuale inclusione di `red tag/` nell'export pubblico è una
   decisione separata della Phase F dopo audit.
@@ -579,13 +585,19 @@ blocca l'account con print, consente la cancellazione dopo delete KDE/fprintd,
 non lascia dati al name reuse e non produce alert SELinux. La baseline D293,
 la guard B5 e il modulo locale restano attivi e validati. Il password fallback
 di un utente enrolled conserva un ritardo osservato di circa 30 secondi per
-l'ordine seriale PAM; l'Utente lo accetta come limite UX non bloccante e non
-autorizza un corrective PAM in questo step. La prima candidate package-managed
-D294/01 è costruita e chiusa nel massimo grado offline: RPM, payload, digest,
-byte identity e 12 controlli sono PASS. La review PM ha rafforzato
-freeze/provenance dopo `sudo`, collision check e rollback esatto D293/B5. Il
-prossimo boundary è la sua installazione e il normale login Plasma sul target
-reale, quindi richiede Human Gate.
+l'ordine seriale PAM; l'Utente lo accetta come limite UX non bloccante. D294/01
+resta una candidate RPM costruita e verificata offline, ma la decisione Utente
+del 14 settembre 2026 la riclassifica come prototipo storico/evidenza: non è la
+distribuzione ufficiale e non va installata nella nuova VM.
+
+D295/01 apre il percorso ufficiale source-first. Il gestore costruisce da
+`production/`, genera una candidate content-addressed senza secret e installa
+una runtime immutabile per commit con systemd, SELinux e guard B5 indipendenti
+dalle baseline Dxxx. Le simulazioni offline coprono install idempotente, update
+con singolo slot, rollback, uninstall fail-closed e import separato dei cinque
+materiali. README e guida Phase C sono allineati. Nessun `sudo`, USB, contenuto
+protetto o PAM reale è stato toccato. Il prossimo boundary è build e
+installazione nella Fedora 44 KDE VM pulita, quindi richiede Human Gate.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
@@ -657,9 +669,13 @@ PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
 NEW_LIVE_REQUIRED_NOW=true
 NEXT_PHASE=C
-NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
-CURRENT_TASK=D294_01_PHASE_C_RUNTIME_PACKAGE
-NEXT_BOUNDARY=D294_01_PACKAGE_LIVE_VALIDATION
+NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
+PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
+RPM_OFFICIAL_DISTRIBUTION=false
+D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
+D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
+CURRENT_TASK=D295_01_SOURCE_FIRST_MANAGED_INSTALL
+NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -667,4 +683,11 @@ D294_01_PAM_FILE_COUNT=0
 D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
 D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
+D295_01_OFFLINE_TESTS=6_PASS
+D295_01_INSTALL_IDEMPOTENT=PASS_SYNTHETIC_ROOT
+D295_01_UPDATE_ROLLBACK_UNINSTALL=PASS_SYNTHETIC_ROOT
+D295_01_PROTECTED_MATERIAL_IMPORT=PASS_SYNTHETIC_CONTENT_ONLY
+D295_01_REAL_SUDO_EXECUTED=false
+D295_01_REAL_USB_ACCESS=0
+D295_01_PAM_CHANGED=false
 ```

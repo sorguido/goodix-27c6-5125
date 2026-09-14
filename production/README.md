@@ -13,6 +13,11 @@ commit non è sufficiente: `build.sh` fallisce prima della build. Il tree già
 patchato sotto `reference/` viene usato solo per verificare la rigenerazione
 della patch, mai come sorgente dell'assembly.
 
+Il consumatore di distribuzione ufficiale è
+`deployment/phase-c-source-first-managed/`: prepara da questa directory una
+candidate content-addressed e la installa senza dipendere da RPM D294 o
+baseline Dxxx. La guida operativa è `docs/PHASE_C_SOURCE_FIRST_INSTALL.md`.
+
 Invocazione unprivileged e offline:
 
 ```text
@@ -31,4 +36,3 @@ locali conservano la licenza per-file; SIGFM Rocky è LGPL e il subset R2
 preprocessor/imgproc è GPL-2.0-or-later. Il combined work resta nel medesimo
 regime GPL-compatible già documentato in `docs/LICENSING_AND_PROVENANCE.md`.
 Nessun relicensing è introdotto.
-

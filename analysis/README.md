@@ -85,8 +85,17 @@ template e senza raggiungere fprintd o USB; il normale workflow KDE/fprintd
 deve eliminare prima le impronte. Installazione, rollback e nove scenari
 offline sono nella patch `deployment/d293-phase-b-account-lifecycle/`; il
 report è `D293_05_PHASE_B_ACCOUNT_LIFECYCLE_GUARD.md`. La review PM è
-`ACCEPT_AND_CONTINUE`; la candidate è `READY_OFFLINE_HUMAN_GATE_PENDING` e
-Phase B non è ancora chiusa.
+`ACCEPT_AND_CONTINUE`; la successiva live finale sotto SELinux Enforcing è PASS
+e chiude Phase B.
+
+D294/01 resta la prima candidate RPM Phase C costruita e verificata offline,
+ma la decisione Utente del 14 settembre 2026 la riclassifica come prototipo
+storico/evidenza e ne supera la live. D295/01 introduce il percorso ufficiale
+source-first gestito, indipendente dalle baseline Dxxx, con build da
+`production/`, installazione idempotente, update a singolo slot, rollback,
+uninstall e import separato dei materiali. Sei test su root sintetica sono
+PASS; il prossimo boundary è la Fedora 44 KDE clean VM al Human Gate. Report:
+`analysis/D295/D295_01_PHASE_C_SOURCE_FIRST_MANAGED_INSTALL.md`.
 
 | Step | Sintesi | Stato storico | Report principale | Bundle |
 | --- | --- | --- | --- | --- |
