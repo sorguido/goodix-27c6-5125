@@ -1,6 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # D293/B5 correttiva — account deletion con SELinux Enforcing
 
+> Stato: `PASS_FULL_ON_TARGET` il 14 settembre 2026. La guard e il modulo
+> SELinux sono rimasti installati come baseline validata. Le istruzioni sotto
+> restano il riferimento auditabile per installazione e rollback; non ripetere
+> la live senza un nuovo boundary concreto.
+
 ## Scopo della live
 
 Questa patch conserva invariati driver, runtime e configurazione D293 e
@@ -137,3 +142,25 @@ Riportare `PASS` oppure il primo step fallito e il messaggio visibile;
 confermare gli esiti delle due cancellazioni, l'assenza di impronte dopo il
 name reuse, lo stato Guido invariato e se la patch è rimasta installata oppure
 è stato eseguito il rollback.
+
+## Esito registrato
+
+```text
+D293_B5_OFFLINE_TESTS=12/12_PASS
+D293_B5_INSTALL=PASS
+D293_B5_DELETE_WITH_PRINT=BLOCKED
+D293_B5_DELETE_WITHOUT_PRINT=PASS
+D293_B5_SELINUX_ALERTS=0
+D293_B5_SELINUX_ENFORCING=PASS
+D293_B5_ACCOUNT_LIFECYCLE=PASS
+D293_B5_FUNCTIONAL_LIVE=PASS
+D293_B5_SELINUX_CLEAN_LIVE=PASS
+D293_B5_PRINCIPAL_GUIDO_UNCHANGED=true
+ROLLBACK_ON_PASS=false
+PATCH_LEFT_INSTALLED=true
+```
+
+I failure precedenti su esecuzione `shadow_t`, sintassi `.fc`, confronto del
+checksum e AVC `TCGETS2` restano documentati nel report D293/05 e non cambiano
+questo esito finale. L'eventuale rollback resta riservato a failure,
+instabilità, regressione, recovery o richiesta esplicita dell'Utente.

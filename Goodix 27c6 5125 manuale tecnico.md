@@ -151,7 +151,7 @@ sentiero operativo predefinito fino alla fine del progetto:
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=B
+CURRENT_PHASE=C
 PHASE_ORDER=A>B>C>D>E>F
 ```
 
@@ -176,8 +176,8 @@ con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
 Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
 production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
-vero fprintd host-only e il contratto statico KDE installato. La fase corrente
-resta **Phase B**. Il corrective D293 ha risolto R9 nel driver; D293/01–03 e le
+vero fprintd host-only e il contratto statico KDE installato. La Phase B è ora
+chiusa e la fase corrente è **Phase C**. Il corrective D293 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
 complesso percorso D293/04: non va eseguito né ulteriormente raffinato. La
@@ -185,12 +185,12 @@ successiva patch minimale della production candidate D293 è stata invece
 eseguita manualmente dall'Utente nel workflow KDE nativo ed è PASS. Il numero
 esatto del tentativo VERIFY che ha prodotto MATCH non è stato riportato. La
 review evidence-based dei lifecycle residui ha isolato account deletion/name
-reuse come gap host ancora aperto. D293/05 implementa la relativa guard
-fail-closed e una live patch-first aggregata. La live reale ha installato la
-guard ma SELinux Enforcing ha negato a `userdel` l'esecuzione del pre-hook. Il
-rollback B5 e la successiva cancellazione account sono PASS; D293 resta attiva
-e validata. La correttiva SELinux stretta è ora pronta offline; Phase B non è
-chiusa e il boundary corrente è la live focalizzata dell'Utente.
+reuse come ultimo gap host. D293/05 ha implementato la guard fail-closed e,
+dopo i failure intermedi preservati nella lineage Git, la live finale ha dato
+PASS pieno sotto SELinux Enforcing: blocco con print, pass dopo delete
+KDE/fprintd, name reuse pulito, zero alert SELinux e principal Guido invariato.
+Guard e modulo restano installati. Il boundary corrente è ora la prima
+candidate package-managed offline della Phase C.
 
 Principi trasversali della roadmap:
 
@@ -237,7 +237,7 @@ distribuiti e relativa provenance/licenza; clean build, ABI fprintd e
 compatibilità col target reale risultano riproducibili e verificate. Solo dopo
 questa closure si passa alla Phase B.
 
-#### Phase B — driver multi-user e workflow KDE/fprintd nativo
+#### Phase B — driver multi-user e workflow KDE/fprintd nativo — CLOSED
 
 **Obiettivo.** Fare sì che ogni normale utente locale, presente o creato dopo
 l'installazione, possa registrare e gestire autonomamente le proprie impronte
@@ -322,7 +322,7 @@ modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. L'inclusione o esclusione di `red tag/`
 dall'export pubblico viene decisa soltanto qui dopo audit.
 
-### Stato corrente Phase B — correttiva SELinux D293/05 pronta offline
+### Stato corrente Phase C — Phase B chiusa dopo PASS pieno D293/05
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -381,8 +381,30 @@ runtime, wrapper e drop-in sono osservabili read-only come baseline software
 configurata. Questo chiude lo scenario discriminante D293, non automaticamente
 l'intera Phase B.
 
+D293/05 ha poi chiuso il lifecycle account/name reuse. Il primo AVC sul hook,
+i failure di sintassi file-context e confronto checksum e l'AVC accessorio
+`TCGETS2` restano failure host intermedi distinti. I correttivi manuali
+autorizzati sono tracciati dai commit `c875462`, `6ab1d65`, `81a3a2c`,
+`ddd13b5`, `42ab582` e `232e940`, senza riscrittura della history. La live
+finale ha dato PASS pieno sotto SELinux Enforcing con zero alert; guard e
+modulo B5 restano installati e validati.
+
+Sul login Plasma è inoltre osservato un limite UX accettato: password immediata
+per utenti senza print; per utenti enrolled che scelgono la password senza usare
+il sensore, `pam_fprintd` precede serialmente `password-auth`, attende circa 30
+secondi e poi `pam_unix` concede l'accesso. La configurazione vendor osservata
+è `pam_fprintd.so max-tries=3 timeout=45 debug`. Per decisione dell'Utente non
+si applica ora un corrective PAM e il comportamento non blocca Phase B.
+
+La review formale classifica come `PROVEN_ON_TARGET` il nuovo utente KDE,
+zero/uno/più template, multi-finger, re-enroll/delete, isolamento, restart,
+logout/login, reboot e account deletion/name reuse; come `PROVEN_OFFLINE`
+l'assenza di secret/template negli artefatti; e come `DOCUMENTED_POLICY` la
+separazione dei materiali runtime e il limite UX PAM. Il provisioning gestito
+dei materiali e l'integrazione package-owned appartengono alla Phase C.
+
 ```text
-CURRENT_PHASE=B
+CURRENT_PHASE=C
 D292_01_OUTCOME=PASS_ARCHITECTURAL_INVENTORY
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
@@ -443,12 +465,22 @@ ROLLBACK_ON_FAIL=true
 ROLLBACK_ON_PASS=false
 KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
-PHASE_B_CLOSED=false
+PHASE_B_CLOSED=true
 PRODUCTION_READY=false
-PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
-D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
-NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
-NEW_LIVE_REQUIRED_NOW=true
+PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
+D293_05_OUTCOME=PASS_FULL_ON_TARGET
+D293_B5_SELINUX_ENFORCING=PASS
+D293_B5_SELINUX_ALERTS=0
+D293_B5_PATCH_LEFT_INSTALLED=true
+FINGERPRINT_LOGIN=PASS
+PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
+PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
+PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
+PHASE_B_BLOCKER=false
+NEXT_PHASE=C
+NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
+NEXT_BOUNDARY=PHASE_C_PACKAGE_CANDIDATE_OFFLINE
+NEW_LIVE_REQUIRED_NOW=false
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -708,7 +740,7 @@ privilegiata è stata eseguita dall'AI. L'Utente ha poi attraversato quel Human
 Gate e il workflow nativo è risultato PASS; D293/04 resta comunque non
 eseguito e storico.
 
-### Stato D293 patch-first — PASS KDE nativo e baseline validata attiva
+### Stato storico pre-B5 D293 patch-first — PASS KDE nativo e baseline validata attiva
 
 Il nuovo artefatto corrente è `deployment/d293-native-kde-live/`. Non contiene
 né installa l'Operator Kit D293/04. `install.sh`, eseguito dall'Utente normale,
@@ -803,10 +835,10 @@ NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Stato D293/05 — live FAIL nel boundary SELinux host e rollback PASS
+### Stato D293/05 — PASS pieno, guard e SELinux Enforcing validati
 
-Il riesame dei boundary residui dopo il PASS D293 ha separato ciò che è già
-provato sul target da ciò che manca per chiudere Phase B. Restano da esercitare
+Il riesame dei boundary residui dopo il PASS D293 ha separato ciò che era già
+provato sul target da ciò che mancava allora per chiudere Phase B. Restavano da esercitare
 sulla baseline corrente una gallery reale multi-finger, re-enroll/delete,
 logout/login, reboot e account deletion/name reuse. L'evidenza D293/02–03 copre
 questi contratti offline ma non li sostituisce sul target reale.
@@ -876,6 +908,8 @@ fail-closed quando l'EUID è root e il percorso production usa
 `/usr/bin/find` assoluto. Un caller di `userdel` non può quindi deviare il
 controllo verso una root o un comando di test tramite variabili ereditate.
 
+Il blocco seguente conserva lo stato intermedio precedente alla live finale:
+
 ```text
 D293_05_INSTALL=PASS
 D293_05_FIRST_LIVE_OUTCOME=FAIL_HOST_SELINUX_EXEC_ROLLED_BACK
@@ -901,20 +935,99 @@ PM_DECISION=ACCEPT_AND_CONTINUE
 PHASE_B_CLOSED=false
 ```
 
-### Ultimo avanzamento live consolidato — D293 workflow KDE nativo multi-user
+La failure lineage sopra resta storica. Durante il Human Gate l'Utente ha
+applicato correttivi manuali autorizzati sul branch `development`:
+`c875462915550d386dbad758d01dc7c73ed16d2e` (integrazione SELinux),
+`6ab1d65310cfa17be4c7d80e90b5a1270bba391a` (contesto `.fc` espanso),
+`81a3a2ce75d8eab01355f84fc7214e88c7b3de55` (prefisso checksum `sha256:`),
+`ddd13b5830113f1db3aacffa7e6416756ebfef88` (solo ioctl base e
+`allowxperm 0x542a`), `42ab5824187e8a5a359ad73bb196f257742c70af`
+(test della superficie esatta) e
+`232e9401ca3ce72a0f9f08448deb46c6251aaa2a` (falso positivo nel commento).
+Questa sequenza non è drift e non va squashata retroattivamente.
 
-La live D293 descritta sopra è il più recente avanzamento target: patch-first
-installata dall'Utente, nuovo normale utente locale con reader visibile,
-enrollment e delete dalla UI KDE nativa, MATCH da `fprintd-verify`, principal
-preesistente invariato e rollback storico PASS. È evidenza osservata
-dall'Utente, non telemetria macchina; il tentativo MATCH è `NOT_REPORTED`.
-Non prova account deletion/name reuse, lifecycle esaustivo, AD/LDAP, altri
-target, suspend/hotplug, concorrenza, FAR/FRR o regressione Windows esaustiva.
+La live finale sul target Fedora 44 KDE è `PASS_FULL_ON_TARGET`. Con account
+enrolled, `userdel` è stato bloccato; dopo delete KDE/fprintd l'account è stato
+cancellato; il name reuse non ha ereditato print; Guido è rimasto invariato.
+SELinux era `Enforcing` e non ha prodotto alert. Guard e modulo restano
+installati; il rollback non si esegue dopo PASS.
 
-La candidate D293 è stata reinstallata e i suoi effetti host leggibili allo
-SHA `e61fce313794922a2dab156a1b38a8ddc5837f19` sono presenti; è la baseline
-software configurata del target. Il rollback resta disponibile e non va
-eseguito dopo PASS senza una delle motivazioni definite dalla governance v3.2.
+```text
+D293_B5_OFFLINE_TESTS=12/12_PASS
+D293_B5_INSTALL=PASS
+D293_B5_DELETE_WITH_PRINT=BLOCKED
+D293_B5_DELETE_WITHOUT_PRINT=PASS
+D293_B5_SELINUX_ALERTS=0
+D293_B5_SELINUX_ENFORCING=PASS
+D293_B5_ACCOUNT_LIFECYCLE=PASS
+D293_B5_FUNCTIONAL_LIVE=PASS
+D293_B5_SELINUX_CLEAN_LIVE=PASS
+D293_B5_PRINCIPAL_GUIDO_UNCHANGED=true
+D293_BASELINE=ACTIVE_VALIDATED
+D293_B5_GUARD=ACTIVE_VALIDATED
+D293_B5_SELINUX_MODULE=ACTIVE_VALIDATED
+D293_B5_PATCH_LEFT_INSTALLED=true
+ROLLBACK_ON_PASS=false
+PHASE_B_CLOSED=true
+```
+
+#### Limite UX PAM/fingerprint accettato
+
+Sul target reale il password login di un account senza impronte è immediato.
+Per un account con almeno una print, se l'utente sceglie la password senza
+usare il sensore, il journal mostra `pam_fprintd(plasmalogin:auth): Waiting for
+30 seconds`, poi `Verification timed out` e infine successo `pam_unix`.
+L'origine è l'ordine seriale `pam_fprintd` prima di `password-auth`; la riga
+vendor corrente contiene `max-tries=3 timeout=45 debug`. L'Utente accetta il
+ritardo come limite UX per gli utenti enrolled e ha deciso di non modificare
+PAM, `plasmalogin`, authselect o timeout in questo step.
+
+```text
+FINGERPRINT_LOGIN=PASS
+PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
+PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
+ROOT_CAUSE=PAM_SERIAL_ORDER_PAM_FPRINTD_BEFORE_PASSWORD_AUTH
+SEVERITY=ACCEPTED_UX_LIMITATION
+PHASE_B_BLOCKER=false
+```
+
+#### Review formale Phase B
+
+| Criterio | Classificazione | Evidenza |
+|---|---|---|
+| nuovo utente locale, reader, enrollment/delete KDE | `PROVEN_ON_TARGET` | D293 |
+| zero/uno/più template, multi-finger e re-enroll | `PROVEN_ON_TARGET` | D291 e prima run D293/05 |
+| isolamento/ownership e principal preesistente | `PROVEN_ON_TARGET` | D293/D293/05; D293/01–03 offline |
+| restart fprintd, logout/login e reboot | `PROVEN_ON_TARGET` | prima run D293/05 |
+| account deletion/name reuse sotto Enforcing | `PROVEN_ON_TARGET` | live finale D293/05 |
+| policy materiali runtime separata dai template | `DOCUMENTED_POLICY` | D293/01 |
+| zero secret/template negli artefatti | `PROVEN_OFFLINE` | validator e review Git-native |
+| ritardo password fallback enrolled | `DOCUMENTED_POLICY` | limite UX accettato, non blocker |
+
+Tutti i criteri richiesti dalla closure B sono soddisfatti. Packaging,
+provisioning amministrativo e gestione package-owned di PAM/systemd/SELinux
+sono il confine deliberato della Phase C.
+
+```text
+PHASE_B_CLOSED=true
+NEXT_PHASE=C
+NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
+PM_DECISION=ACCEPT_AND_CONTINUE
+```
+
+### Ultimo avanzamento live consolidato — D293/05 account lifecycle sotto SELinux Enforcing
+
+La live D293/05 finale descritta sopra è il più recente avanzamento target:
+guard account-lifecycle e modulo SELinux dedicato hanno dato PASS pieno con
+SELinux Enforcing e zero alert. Completa la precedente evidenza D293 sul nuovo
+utente KDE, enrollment/delete nativi e MATCH; il tentativo MATCH resta
+`NOT_REPORTED`. Non prova AD/LDAP, altri target, suspend/hotplug, concorrenza,
+FAR/FRR o regressione Windows esaustiva, che appartengono ad altri scope/fasi.
+
+La candidate D293 e la patch B5 finale a
+`232e9401ca3ce72a0f9f08448deb46c6251aaa2a` sono la baseline software
+configurata del target. I rollback restano disponibili e non vanno eseguiti
+dopo PASS senza una delle motivazioni definite dalla governance v3.2.
 
 ### Avanzamento live precedente — D291 enrollment diversity Rocky-derived
 
@@ -1156,6 +1269,11 @@ La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
 soluzione di packaging. Analogamente, D285 `/usr/local` resta il predecessore
 di rollback recuperabile; la baseline software configurata è ora D293 e non è
 ancora un prodotto distribuibile.
+La live finale D293/05 ha chiuso account deletion/name reuse sotto SELinux
+Enforcing senza alert; guard e modulo restano installati. Phase B è quindi
+chiusa e Phase C è corrente. Il fallback password per utenti enrolled ha un
+ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale; non è
+autorizzato un corrective PAM in questo step.
 Le live osservate riportano zero famiglie di scrittura persistente note; ciò
 non prova assolutamente la nonmutazione NVM interna e non equivale a una
 qualificazione Windows esaustiva dopo ogni run.
@@ -1169,11 +1287,11 @@ PM_DECISION=ACCEPT_AND_CONTINUE
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=true
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=B
+CURRENT_PHASE=C
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
@@ -1207,15 +1325,25 @@ ROLLBACK_PATCH_REQUIRED=true
 ROLLBACK_ON_FAIL=true
 ROLLBACK_ON_PASS=false
 KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
-PHASE_B_CLOSED=false
+PHASE_B_CLOSED=true
 PRODUCTION_READY=false
-PHASE_B_CLOSURE_REVIEW=COMPLETED_GAP_IDENTIFIED
+PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
 D293_05_FIRST_LIVE_OUTCOME=FAIL_HOST_SELINUX_EXEC_ROLLED_BACK
-D293_05_SELINUX_CORRECTIVE=READY_OFFLINE
-D293_05_CORRECTIVE_LIVE=NOT_EXECUTED
-D293_05_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
-NEW_LIVE_REQUIRED_NOW=true
-NEXT_BOUNDARY=D293_05_FOCUSED_SELINUX_LIVE
+D293_05_SELINUX_CORRECTIVE=PASS_ON_TARGET
+D293_05_CORRECTIVE_LIVE=PASS
+D293_05_OUTCOME=PASS_FULL_ON_TARGET
+D293_B5_SELINUX_ENFORCING=PASS
+D293_B5_SELINUX_ALERTS=0
+D293_B5_PATCH_LEFT_INSTALLED=true
+FINGERPRINT_LOGIN=PASS
+PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
+PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
+PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
+PHASE_B_BLOCKER=false
+NEW_LIVE_REQUIRED_NOW=false
+NEXT_PHASE=C
+NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
+NEXT_BOUNDARY=PHASE_C_PACKAGE_CANDIDATE_OFFLINE
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

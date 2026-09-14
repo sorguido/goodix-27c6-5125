@@ -2,8 +2,8 @@
 
 Data: 13 settembre 2026
 Data correttiva SELinux: 14 settembre 2026
-Stato live: `FAIL_HOST_SELINUX_EXEC_ROLLED_BACK`
-Stato correttiva: `READY_OFFLINE_HUMAN_GATE_PENDING`
+Stato live finale: `PASS_FULL_ON_TARGET`
+Stato correttiva: `ACTIVE_VALIDATED_LEFT_INSTALLED`
 Live/USB/sudo eseguiti dall'AI: `false`
 
 ## Obiettivo
@@ -118,7 +118,100 @@ PRE_LIVE_PM_DECISION=ACCEPT_AND_CONTINUE
 PHASE_B_CLOSED=false
 ```
 
-## Esito live reale e recovery
+## Sintesi canonica finale e correttivi manuali autorizzati
+
+Dopo il primo commit della correttiva SELinux, l'Utente ha applicato sul branch
+`development` una serie di correttivi manuali autorizzati in risposta a failure
+reali. Questa lineage è intenzionale e non è drift da riscrivere o squashing:
+
+1. `c875462915550d386dbad758d01dc7c73ed16d2e` introduce la policy SELinux
+   dedicata;
+2. `6ab1d65310cfa17be4c7d80e90b5a1270bba391a` sostituisce nel `.fc`
+   `gen_context(...)`, non preprocessato dal percorso `semodule_package -f`,
+   con il contesto espanso dopo `Bad filecon declaration`;
+3. `81a3a2ce75d8eab01355f84fc7214e88c7b3de55` confronta il checksum restituito
+   da `semodule -l -m` nel formato reale `sha256:<hex>`;
+4. `ddd13b5830113f1db3aacffa7e6416756ebfef88` aggiunge il permesso base
+   `ioctl` e il solo `allowxperm ... ioctl 0x542a` osservato
+   (`TCGETS2`), senza concederlo a `fprintd_var_lib_t`;
+5. `42ab5824187e8a5a359ad73bb196f257742c70af` verifica offline l'esatta
+   superficie `allowxperm`;
+6. `232e9401ca3ce72a0f9f08448deb46c6251aaa2a` corregge il falso positivo del
+   test che contava `allowxperm` anche in un commento, senza cambiare la policy.
+
+I failure intermedi restano evidenza utile ma non sono regressioni D293,
+fprintd o sensore: prima l'AVC `useradd_t -> shadow_t:file execute`, poi la
+sintassi file-context, quindi il confronto checksum. La successiva live
+funzionale ha provato blocco con print, pass senza print, name reuse pulito e
+principal Guido invariato; restava soltanto l'AVC accessorio
+`ioctl 0x542a / TCGETS2`.
+
+## Esito live finale e closure Phase B
+
+L'Utente ha infine eseguito sul target reale Fedora 44 KDE la candidate a
+`232e9401ca3ce72a0f9f08448deb46c6251aaa2a`. La suite offline era `12/12 PASS`.
+Sotto SELinux `Enforcing`, `userdel` ha eseguito il hook con il tipo dedicato:
+un account con impronta è stato bloccato, dopo il delete KDE/fprintd dello
+stesso dato la cancellazione è riuscita, il name reuse non ha ereditato dati e
+il principal Guido è rimasto invariato. Non sono comparsi AVC o alert SELinux.
+Guard e modulo restano installati come baseline validata; non è stato eseguito
+rollback post-PASS.
+
+L'evidenza empirica aggiuntiva sul login Plasma/PAM è classificata come limite
+UX accettato, non come blocker: gli utenti senza impronte hanno password login
+immediato; per un utente enrolled, se viene scelta la password senza usare il
+sensore, l'ordine seriale `pam_fprintd` prima di `password-auth` attende circa
+30 secondi prima del successo `pam_unix`. La configurazione osservata contiene
+`pam_fprintd.so max-tries=3 timeout=45 debug`. Per decisione esplicita
+dell'Utente non viene introdotto alcun corrective PAM in questo step.
+
+La review formale dei criteri approvati classifica:
+
+| Criterio Phase B | Stato | Evidenza |
+|---|---|---|
+| nuovo utente locale, reader ed enrollment KDE nativo | `PROVEN_ON_TARGET` | live D293 |
+| zero/uno/più template, multi-finger, re-enroll e delete | `PROVEN_ON_TARGET` | D291 e prima run D293/05; modello/test D293/02–03 |
+| isolamento fra principal e storage/ownership fprintd | `PROVEN_ON_TARGET` | principal Guido invariato e name reuse pulito; contratto offline D293/01–03 |
+| restart fprintd, logout/login e reboot | `PROVEN_ON_TARGET` | prima run D293/05 |
+| account deletion/name reuse fail-closed sotto Enforcing | `PROVEN_ON_TARGET` | live finale D293/05 |
+| policy materiali runtime separata dai template | `DOCUMENTED_POLICY` | D293/01; provisioning concreto appartiene a Phase C |
+| zero secret/template negli artefatti | `PROVEN_OFFLINE` | review set Git-native e validator pertinenti |
+| UX password fallback enrolled con ritardo ~30 s | `DOCUMENTED_POLICY` | limite accettato, `PHASE_B_BLOCKER=false` |
+
+```text
+D293_B5_OFFLINE_TESTS=12/12_PASS
+D293_B5_INSTALL=PASS
+D293_B5_DELETE_WITH_PRINT=BLOCKED
+D293_B5_DELETE_WITHOUT_PRINT=PASS
+D293_B5_SELINUX_ALERTS=0
+D293_B5_SELINUX_ENFORCING=PASS
+D293_B5_ACCOUNT_LIFECYCLE=PASS
+D293_B5_FUNCTIONAL_LIVE=PASS
+D293_B5_SELINUX_CLEAN_LIVE=PASS
+D293_B5_PRINCIPAL_GUIDO_UNCHANGED=true
+D293_BASELINE=ACTIVE_VALIDATED
+D293_B5_GUARD=ACTIVE_VALIDATED
+D293_B5_SELINUX_MODULE=ACTIVE_VALIDATED
+D293_B5_PATCH_LEFT_INSTALLED=true
+FINGERPRINT_LOGIN=PASS
+PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
+PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
+ROOT_CAUSE=PAM_SERIAL_ORDER_PAM_FPRINTD_BEFORE_PASSWORD_AUTH
+SEVERITY=ACCEPTED_UX_LIMITATION
+PHASE_B_BLOCKER=false
+PHASE_B_CLOSED=true
+NEXT_PHASE=C
+NEXT_WORK_CLASS=PACKAGING_AND_MANAGED_HOST_INTEGRATION
+OUTCOME=PASS_FULL_ON_TARGET
+ADVANCEMENT=PHASE_B_CLOSED_ON_TARGET
+EXECUTABLE_CLOSURE=PASS_ON_TARGET
+RESIDUAL_BLOCKER_OR_RISK=ACCEPTED_PAM_PASSWORD_FALLBACK_DELAY_FOR_ENROLLED_USERS
+CANONICAL_DOCUMENTATION=UPDATED
+REVIEW_SET=GIT_NATIVE
+PM_DECISION=ACCEPT_AND_CONTINUE
+```
+
+## Dettaglio storico — prima live e recovery
 
 L'Utente ha eseguito sul target Fedora 44 KDE la candidate
 `a8d274a22a5b43b4eaf2aeba4a42bf4a617422c3`. L'installazione D293/05 è
