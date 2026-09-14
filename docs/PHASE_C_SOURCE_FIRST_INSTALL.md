@@ -12,7 +12,7 @@ TARGET=Fedora-44-KDE-x86_64
 PROTECTED_MATERIAL_IN_REPOSITORY=false
 ```
 
-## Confine attuale
+## Stato validato — Phase C chiusa
 
 La Human Gate nella VM Fedora 44 KDE pulita ha confermato build, candidate,
 import dei materiali, install/idempotenza, reader, enrollment, template, MATCH
@@ -28,10 +28,11 @@ riesaminati: la root runtime viene ora creata `0755` e il solo legacy `0700`
 viene normalizzato dalla transazione privilegiata; `status` resta privilegiato
 per verificare correttamente i materiali root-only.
 
-Il solo boundary ancora aperto per la closure C è il lifecycle amministrativo
-reale: rollback bidirezionale, uninstall e recovery/reinstall. Non richiede USB
-o azioni biometriche. Nessun comando live della nuova sezione 8 è stato
-eseguito dall'AI.
+D295/03 ha infine chiuso il lifecycle amministrativo reale: rollback
+bidirezionale, uninstall e recovery/reinstall sono PASS con sensore scollegato.
+Materiali protetti e conteggio dei template sono rimasti invariati, il PAM
+vendor non è stato modificato e la root runtime finale è `0755`. La VM resta
+sulla fresh reinstall gestita del commit `448f5c8...`.
 
 Il gestore installa una runtime immutabile per commit sotto
 `/usr/lib64/goodix-27c6-5125/`, un wrapper fprintd, un drop-in systemd e la guard
@@ -261,10 +262,11 @@ mostrate sopra e il journal del boot filtrato a `plasmalogin`, `pam_fprintd` e
 
 Questa sequenza ha prodotto PASS e non va ripetuta per maggiore confidenza.
 
-## 8. Human Gate D295/03 — lifecycle amministrativo di closure Phase C
+## 8. D295/03 — lifecycle amministrativo eseguito con PASS
 
-Spegnere o scollegare il sensore Goodix. Non eseguire enrollment, verify, login
-fingerprint o altri test biometrici. Partire dalla VM D295/02 con:
+La sequenza seguente è stata eseguita dall'Utente con il sensore Goodix
+scollegato, senza enrollment, verify, login fingerprint o altre azioni
+biometriche. Lo stato iniziale era:
 
 ```text
 CURRENT_COMMIT=b51b4c6f6141e0651e251291745d9b48b08d8da6
@@ -361,4 +363,18 @@ dei template.
 PASS_IF=ROLLBACK_OUT_PASS_AND_ROLLBACK_BACK_PASS_AND_UNINSTALL_PASS_AND_REINSTALL_PASS
 FAIL_IF=ANY_COMMAND_OR_INVARIANT_FAILS
 STOP_IF=FIRST_FAILURE
+```
+
+Risultato osservato:
+
+```text
+D295_03_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_03_ROLLBACK_BIDIRECTIONAL=PASS
+D295_03_UNINSTALL=PASS
+D295_03_PROTECTED_MATERIAL_PRESERVATION=PASS
+D295_03_TEMPLATE_PRESERVATION=PASS
+D295_03_RECOVERY_REINSTALL=PASS
+D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
+PHASE_C_CLOSURE_CRITERIA=PASS
+PHASE_C_CLOSED=true
 ```

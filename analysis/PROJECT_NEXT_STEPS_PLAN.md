@@ -43,8 +43,10 @@ chiude Phase B e porta il boundary a Phase C.
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=C
+CURRENT_PHASE=C_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
+PHASE_C_CLOSED=true
+NEXT_PHASE=D
 ```
 
 Target production iniziale approvato: Goodix USB `27c6:5125` / APP12509 su
@@ -60,11 +62,14 @@ provati enrollment, template FP3, matching SIGFM, integrazione libfprint/fprintd
 e i consumer reali `sudo`, KDE lock/unlock e Plasma Login Manager. D290 chiude
 la catena fingerprint → nuova sessione Plasma/Wayland.
 
-La sorgente production è ora consolidata; il divario immediato è il contratto
-multi-user nativo KDE/fprintd e la separazione fra storage template e materiali
-runtime protetti. Gestibilità, packaging, lifecycle e release restano nelle
-fasi successive. Le fasi privilegiano lavoro offline e ambienti host isolati;
-i boundary D279–D291 non vanno ripetuti per sola maggiore confidenza.
+La sorgente production e il contratto multi-user sono consolidati. Phase C ha
+ora provato su Fedora 44 KDE il percorso source-first gestito completo: build,
+import separato, install/idempotenza, update, PAM e consumer, rollback
+bidirezionale, uninstall, preservazione dati e recovery/reinstall. La baseline
+finale della VM è `448f5c8...`; il PAM vendor resta invariato. Lifecycle
+avversariali e qualificazione release appartengono alle fasi successive, che
+non vengono avviate in questa sessione. I boundary D279–D295 chiusi non vanno
+ripetuti per sola maggiore confidenza.
 
 D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
 l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
@@ -167,12 +172,12 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
+NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
-NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
+CURRENT_TASK=NONE_PHASE_C_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
 ```
 
 ## Stato verificato del progetto
@@ -434,7 +439,7 @@ NEXT_PHASE=C
 NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 ```
 
-### Phase C — distribuzione source-first e integrazione host gestita
+### Phase C — distribuzione source-first e integrazione host gestita — CLOSED
 
 - **DECISIONE ARCHITETTURALE:** il percorso ufficiale è clone del repository →
   build da `production/` → installer gestito → stack Fedora. L'RPM D294 resta
@@ -464,6 +469,12 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
   update, rollback, uninstall e recovery verdi in Fedora 44 KDE pulita;
   fallback password preservato; nessun file vendor modificato manualmente fuori
   dal package manager.
+
+**Closure:** PASS. D295/01 ha provato build, candidate, import, installazione e
+idempotenza; D295/02 update, PAM gestito, password, login Plasma e `sudo`;
+D295/03 rollback bidirezionale, uninstall, preservazione di materiali/template
+e recovery/reinstall. La baseline finale nella VM è `448f5c8...`, con runtime
+root `0755` e PAM vendor Fedora invariato.
 
 ### Phase D — lifecycle, recovery e concorrenza
 
@@ -562,6 +573,8 @@ Non riaprire o ripetere per sola “maggiore confidenza”:
 - D293: installazione patch-first, visibilità reader per il nuovo utente,
   enrollment/VERIFY MATCH/delete KDE nativi e isolamento osservato del
   principal preesistente.
+- D295: build/install source-first, PAM gestito e consumer, rollback
+  bidirezionale, uninstall, preservazione materiali/template e recovery.
 
 Una regressione mirata è giustificata soltanto se cambia codice/configurazione
 nel percorso rilevante, cambia materialmente la piattaforma supportata, emerge
@@ -581,7 +594,7 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 
 ## Decisione corrente
 
-La Phase B è chiusa e Phase C è ora il boundary corrente. Il kit D291 è
+Le Phase A, B e C sono chiuse. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN` e non deve essere riusato. D292/01 ha chiuso
 A1, D292/02 ha chiuso A3/A4 e la review PM
 D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
@@ -626,12 +639,18 @@ fingerprint login Plasma e `sudo` fingerprint sono verdi.
 La review post-live conserva `status` privilegiato per i materiali root-only e
 sposta la normalizzazione della runtime root nel livello privilegiato: fresh
 `0755`, solo legacy `0700 -> 0755`, altri modi/ownership fail-closed. Dieci test
-offline sono PASS. Il prossimo e unico boundary residuo di Phase C è D295/03:
-rollback bidirezionale, uninstall e recovery/reinstall su Fedora con sensore
-scollegato, senza ripetere prove biometriche.
+offline sono PASS.
+
+D295/03 è PASS umano con sensore scollegato: rollback verso `4c9cd74...` e
+ritorno a `b51b4c6...`, uninstall e fresh reinstall di `448f5c8...` hanno
+preservato PAM vendor, materiali protetti e conteggio template. La baseline
+finale è `ACTIVE`, material-ready, PAM gestito attivo e runtime root `0755`.
+Tutti i criteri di closure C sono soddisfatti. `NEXT_PHASE=D` è soltanto stato
+di roadmap: nessuna attività Phase D viene iniziata o preparata in questa
+sessione.
 
 ```text
-PM_DECISION=HUMAN_REQUIRED
+PM_DECISION=PROJECT_STEP_COMPLETE
 D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -678,7 +697,7 @@ KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
-CURRENT_PHASE=C
+CURRENT_PHASE=C_CLOSED
 PRODUCTION_READY=false
 PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
 D293_05_FIRST_INSTALL=PASS
@@ -698,15 +717,15 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEW_LIVE_REQUIRED_NOW=true
-NEXT_PHASE=C
-NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
+NEW_LIVE_REQUIRED_NOW=false
+NEXT_PHASE=D
+NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
-NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
+CURRENT_TASK=NONE_PHASE_C_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -742,7 +761,15 @@ D295_02_PASSWORD_LOGIN=PASS
 D295_02_FINGERPRINT_LOGIN=PASS
 D295_02_SUDO_FINGERPRINT=PASS
 D295_02_VENDOR_PAM_UNCHANGED=true
-D295_03_LIVE_EXECUTION=NOT_PERFORMED
-PHASE_C_CLOSED=false
-PM_DECISION=HUMAN_REQUIRED
+D295_03_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_03_ROLLBACK_BIDIRECTIONAL=PASS
+D295_03_UNINSTALL=PASS
+D295_03_PROTECTED_MATERIAL_PRESERVATION=PASS
+D295_03_TEMPLATE_PRESERVATION=PASS
+D295_03_RECOVERY_REINSTALL=PASS
+D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
+PHASE_C_CLOSURE_CRITERIA=PASS
+PHASE_C_CLOSED=true
+PM_DECISION=PROJECT_STEP_COMPLETE
+PHASE_CLOSED => STOP
 ```

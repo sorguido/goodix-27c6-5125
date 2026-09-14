@@ -151,8 +151,10 @@ sentiero operativo predefinito fino alla fine del progetto:
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=C
+CURRENT_PHASE=C_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
+PHASE_C_CLOSED=true
+NEXT_PHASE=D
 ```
 
 Il target production iniziale resta deliberatamente ristretto a:
@@ -193,11 +195,11 @@ Guard e modulo restano installati. La prima installazione source-first D295 in
 una Fedora 44 KDE VM pulita è PASS per build, import, installazione, enrollment,
 template, `sudo` e SIGFM MATCH. D295/02 ha poi chiuso live il correttivo PAM:
 update gestito, PAM vendor invariato, login password, login fingerprint Plasma
-e regressione `sudo` sono PASS. Il solo boundary ancora aperto in Phase C è il
-lifecycle amministrativo reale D295/03: rollback bidirezionale, uninstall e
-recovery/reinstall con sensore scollegato. La candidate RPM D294 è preservata
-come prototipo storico/evidenza e non è più il percorso di distribuzione
-ufficiale.
+e regressione `sudo` sono PASS. D295/03 ha infine provato con sensore scollegato
+rollback bidirezionale, uninstall, preservazione di materiali e template e
+recovery/reinstall. Phase C è chiusa e la VM resta sulla baseline gestita
+`448f5c8...`. La candidate RPM D294 è preservata come prototipo
+storico/evidenza e non è più il percorso di distribuzione ufficiale.
 
 Principi trasversali della roadmap:
 
@@ -271,7 +273,7 @@ gestire le proprie impronte nel normale workflow KDE/fprintd, senza strumenti
 Goodix o configurazioni per utente. La Phase C non inizia prima di questa
 closure.
 
-#### Phase C — distribuzione source-first e integrazione PAM/systemd/SELinux
+#### Phase C — distribuzione source-first e integrazione PAM/systemd/SELinux — CLOSED
 
 **Obiettivo.** Trasformare il driver multi-user in software installabile,
 aggiornabile e reversibile su Fedora KDE tramite clone del repository, build
@@ -288,6 +290,10 @@ uninstall e recovery verificati in ambiente pulito;
 fallback password preservato; nessun file vendor modificato manualmente fuori
 dal package manager; aggiornamenti Fedora rilevanti hanno un percorso di
 diagnosi e recovery.
+
+**Esito.** PASS: D295/01–03 provano tutti i criteri sul target o nella build
+canonica pertinente. La baseline finale è `448f5c8...`, `ACTIVE`, con materiali
+ready, PAM gestito attivo, vendor Fedora invariato e root runtime `0755`.
 
 #### Phase D — lifecycle, recovery, suspend/hotplug e concorrenza
 
@@ -343,7 +349,7 @@ iniziare la fase successiva:
 PHASE_CLOSED => STOP
 ```
 
-### Stato corrente Phase C — D295/02 PASS, lifecycle amministrativo al Human Gate
+### Stato corrente — Phase C chiusa, baseline source-first gestita
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -490,12 +496,21 @@ creano `0755`, il solo legacy `0700` viene normalizzato prima della verifica e
 ownership/symlink/modi inattesi falliscono chiuso. Dieci test offline sono PASS,
 inclusi modo fresh, migrazione legacy e material readiness sintetica.
 
-Il solo boundary residuo di Phase C è D295/03: rollback bidirezionale,
-uninstall e recovery/reinstall su Fedora con sensore scollegato. Non vanno
-ripetuti enrollment, login o MATCH già chiusi.
+D295/03 completa il lifecycle amministrativo sulla Fedora 44 KDE pulita con
+sensore scollegato. Il rollback verso `4c9cd74...` ha rimosso l'override PAM e
+quello inverso verso `b51b4c6...` lo ha ripristinato; il vendor è rimasto
+invariato. Uninstall ha rimosso runtime, wrapper e PAM gestito preservando i
+cinque materiali e il conteggio dei template; `status` ha fallito come atteso
+in assenza dello state. La fresh reinstall della candidate `448f5c8...` ha
+lasciato state `ACTIVE`, materiali ready, PAM gestito attivo e root runtime
+`0755`. Non sono stati usati USB o azioni biometriche né letti contenuti
+protetti/template.
+
+Phase C soddisfa quindi tutti i criteri di closure. La fase successiva in
+roadmap è D, ma non viene iniziata o preparata in questa sessione.
 
 ```text
-CURRENT_PHASE=C
+CURRENT_PHASE=C_CLOSED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
@@ -579,12 +594,12 @@ D294_01_PAM_FILE_COUNT=0
 D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
 D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
-NEXT_PHASE=C
-NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
-CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
-NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
-NEW_LIVE_REQUIRED_NOW=true
-PM_DECISION=HUMAN_REQUIRED
+NEXT_PHASE=D
+NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
+CURRENT_TASK=NONE_PHASE_C_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
+NEW_LIVE_REQUIRED_NOW=false
+PM_DECISION=PROJECT_STEP_COMPLETE
 D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
 PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
 MANAGED_PAM_INTEGRATION=true
@@ -600,8 +615,16 @@ D295_02_PASSWORD_LOGIN=PASS
 D295_02_FINGERPRINT_LOGIN=PASS
 D295_02_SUDO_FINGERPRINT=PASS
 D295_02_VENDOR_PAM_UNCHANGED=true
-D295_03_LIVE_EXECUTION=NOT_PERFORMED
-PHASE_C_CLOSED=false
+D295_03_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_03_ROLLBACK_BIDIRECTIONAL=PASS
+D295_03_UNINSTALL=PASS
+D295_03_PROTECTED_MATERIAL_PRESERVATION=PASS
+D295_03_TEMPLATE_PRESERVATION=PASS
+D295_03_RECOVERY_REINSTALL=PASS
+D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
+PHASE_C_CLOSURE_CRITERIA=PASS
+PHASE_C_CLOSED=true
+PHASE_CLOSED => STOP
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -1389,13 +1412,16 @@ Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
 La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
 soluzione di packaging. Analogamente, D285 `/usr/local` e D293 restano
 predecessori storici recuperabili; la baseline corrente nella VM è la
-distribuzione source-first D295/02, ora PASS sui consumer reali.
+distribuzione source-first D295 al commit `448f5c8...`, ora PASS sui consumer e
+sul lifecycle amministrativo.
 La live finale D293/05 ha chiuso account deletion/name reuse sotto SELinux
-Enforcing senza alert; guard e modulo restano installati. Phase B è quindi
-chiusa e Phase C è corrente. Il fallback password per utenti enrolled ha un
+Enforcing senza alert; guard e modulo restano installati. Phase B e Phase C
+sono chiuse. Il fallback password per utenti enrolled ha un
 ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale. D295/02 ha
 poi risolto il distinto gap del service PAM `plasmalogin` senza modificare il
-vendor Fedora.
+vendor Fedora. D295/03 ha chiuso rollback bidirezionale, uninstall e recovery
+preservando materiali, template e PAM vendor; la VM resta sulla fresh reinstall
+`448f5c8...`.
 Le live osservate riportano zero famiglie di scrittura persistente note; ciò
 non prova assolutamente la nonmutazione NVM interna e non equivale a una
 qualificazione Windows esaustiva dopo ogni run.
@@ -1404,16 +1430,16 @@ qualificazione Windows esaustiva dopo ogni run.
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
-WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D291_CLOSED_BOUNDARIES
-PM_DECISION=HUMAN_REQUIRED
+WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D295_CLOSED_BOUNDARIES
+PM_DECISION=PROJECT_STEP_COMPLETE
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=true
+NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=C
+CURRENT_PHASE=C_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
@@ -1462,14 +1488,14 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEW_LIVE_REQUIRED_NOW=true
-NEXT_PHASE=C
-NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
+NEW_LIVE_REQUIRED_NOW=false
+NEXT_PHASE=D
+NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
-NEXT_BOUNDARY=FEDORA_44_KDE_PHASE_C_ADMIN_LIFECYCLE_HUMAN_GATE
+CURRENT_TASK=NONE_PHASE_C_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -1505,9 +1531,17 @@ D295_02_PASSWORD_LOGIN=PASS
 D295_02_FINGERPRINT_LOGIN=PASS
 D295_02_SUDO_FINGERPRINT=PASS
 D295_02_VENDOR_PAM_UNCHANGED=true
-D295_03_LIVE_EXECUTION=NOT_PERFORMED
-PHASE_C_CLOSED=false
-PM_DECISION=HUMAN_REQUIRED
+D295_03_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_03_ROLLBACK_BIDIRECTIONAL=PASS
+D295_03_UNINSTALL=PASS
+D295_03_PROTECTED_MATERIAL_PRESERVATION=PASS
+D295_03_TEMPLATE_PRESERVATION=PASS
+D295_03_RECOVERY_REINSTALL=PASS
+D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
+PHASE_C_CLOSURE_CRITERIA=PASS
+PHASE_C_CLOSED=true
+PM_DECISION=PROJECT_STEP_COMPLETE
+PHASE_CLOSED => STOP
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata

@@ -7,17 +7,21 @@ Driver Linux sperimentale ma funzionante sul target ristretto Goodix USB
 
 Lo stato attuale non è una release pubblica. Enrollment, verifica, login Plasma,
 sblocco KDE, `sudo`, multi-utente e cancellazione account sono stati provati sul
-target reale. La Phase C sta trasformando quella prova in un'installazione
-gestita, ripetibile e reversibile su una Fedora pulita.
+target reale. Phase C ha inoltre chiuso l'installazione source-first gestita,
+ripetibile e reversibile su una Fedora 44 KDE pulita, incluso il lifecycle
+rollback/uninstall/recovery.
 
 ```text
-CURRENT_PHASE=C
+CURRENT_PHASE=C_CLOSED
+PHASE_C_CLOSED=true
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 PRODUCTION_READY=false
-NEXT_GATE=D295_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
-PM_DECISION=HUMAN_REQUIRED
+FINAL_PHASE_C_BASELINE=448f5c8cc6099032a23115a96e90428d75b74a7b
+NEXT_PHASE=D
+NEXT_GATE=NONE_PHASE_C_CLOSED
+PM_DECISION=PROJECT_STEP_COMPLETE
 ```
 
 ## Percorso supportato

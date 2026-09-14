@@ -34,5 +34,7 @@ python3 deployment/phase-c-source-first-managed/test_offline.py
 Guida utente: `docs/PHASE_C_SOURCE_FIRST_INSTALL.md`.
 
 D295/02 è PASS live per update, vendor PAM invariato, password, login
-fingerprint Plasma e `sudo`. Il boundary corrente D295/03 è il solo lifecycle
-amministrativo rollback/uninstall/recovery con sensore scollegato.
+fingerprint Plasma e `sudo`. D295/03 è PASS live con sensore scollegato per
+rollback bidirezionale, uninstall, preservazione di materiali/template e
+recovery/reinstall. Phase C è chiusa e la baseline finale nella VM è
+`448f5c8cc6099032a23115a96e90428d75b74a7b`.

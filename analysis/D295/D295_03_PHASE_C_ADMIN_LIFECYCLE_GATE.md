@@ -6,19 +6,19 @@
 **Boundary:** rollback bidirezionale, uninstall e recovery/reinstall su Fedora
 44 KDE pulita
 
-**Stato:** READY OFFLINE; Human Gate richiesta
+**Stato:** PASS live osservato dall'Utente; Phase C chiusa
 
 ## Perché questo è il delta minimo
 
 D295/01 ha provato live build, import, install e idempotenza. D295/02 ha poi
 provato live update, PAM vendor invariato, login password, login fingerprint e
-regressione `sudo`. Rollback, uninstall e recovery sono verdi su root sintetica
-ma non sono ancora stati attraversati sul sistema Fedora reale. Sono l'unico
-delta residuo esplicito della closure C.
+regressione `sudo`. D295/03 ha ora attraversato sul sistema Fedora reale anche
+rollback, uninstall e recovery, completando l'ultimo delta della closure C.
 
-La prova non ripete enrollment, MATCH, login o USB. Il sensore resta scollegato.
-I materiali protetti e i template vengono verificati soltanto per presenza e
-conteggio, senza leggerne o stamparne il contenuto.
+La prova non ha ripetuto enrollment, MATCH o login e non ha usato USB: il
+sensore è rimasto scollegato. I materiali protetti sono stati verificati
+soltanto per presenza e i template soltanto per conteggio, senza leggerne o
+stamparne il contenuto.
 
 ## Stato di ingresso atteso
 
@@ -33,36 +33,101 @@ Prima della transazione si costruisce una candidate dal nuovo HEAD finale e si
 verificano `SHA256SUMS` e `SOURCE_COMMIT`. La candidate resta fuori dal
 repository.
 
-## Sequenza e criteri
+## Evidenza live ricevuta
 
-La sequenza canonica è in `docs/PHASE_C_SOURCE_FIRST_INSTALL.md`, sezione 8.
-In sintesi:
+La candidate finale è stata costruita dal commit
+`448f5c8cc6099032a23115a96e90428d75b74a7b`; verifica `SHA256SUMS` e
+`SOURCE_COMMIT` sono PASS.
 
-1. rollback verso `4c9cd74...`: PAM gestito `ABSENT`, vendor invariato;
-2. rollback inverso verso `b51b4c6...`: PAM gestito `ACTIVE`;
-3. uninstall: baseline fprintd Fedora ripristinata, override PAM assente,
-   materiali e template preservati;
-4. fresh install della candidate finale: state `ACTIVE`, commit uguale al
-   `SOURCE_COMMIT`, root runtime `0755`, PAM gestito attivo e materiali ready.
+### 1. Rollback verso il precedente
+
+```text
+D295_03_ROLLBACK_TO_PREVIOUS=PASS
+CURRENT_COMMIT=4c9cd74cc02890080851c1dca0a5889c58981f77
+MANAGED_PAM_STATUS=ABSENT
+PLASMALOGIN_VENDOR_MODIFIED=false
+PLASMALOGIN_VENDOR_HASH_UNCHANGED=true
+```
+
+L'override `/etc/pam.d/plasmalogin` era assente come previsto.
+
+### 2. Rollback inverso
+
+```text
+D295_03_ROLLBACK_BACK_TO_CURRENT=PASS
+CURRENT_COMMIT=b51b4c6f6141e0651e251291745d9b48b08d8da6
+MANAGED_PAM_STATUS=ACTIVE
+PLASMALOGIN_VENDOR_MODIFIED=false
+PLASMALOGIN_VENDOR_HASH_UNCHANGED=true
+```
+
+L'override PAM gestito è stato ripristinato come previsto.
+
+### 3. Uninstall
+
+```text
+D295_03_UNINSTALL=PASS
+MANAGED_PAM_REMOVED=true
+RUNTIME_REMOVED=true
+WRAPPER_REMOVED=true
+PLASMALOGIN_VENDOR_HASH_UNCHANGED=true
+PROTECTED_MATERIAL_DIR_PRESERVED=true
+PROTECTED_MATERIAL_FILES_PRESERVED=true
+TEMPLATE_COUNT_PRESERVED=true
+STATUS_AFTER_UNINSTALL=EXPECTED_FAILURE
+```
+
+### 4. Recovery mediante fresh reinstall
+
+```text
+D295_03_FRESH_REINSTALL=PASS
+CURRENT_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
+PHASE_C_STATUS=ACTIVE
+PROTECTED_MATERIAL_READY=true
+MANAGED_PAM_INTEGRATION=true
+MANAGED_PAM_STATUS=ACTIVE
+PLASMALOGIN_VENDOR_MODIFIED=false
+RUNTIME_ROOT_MODE=0755
+PLASMALOGIN_VENDOR_HASH_UNCHANGED=true
+```
+
+La VM resta intenzionalmente sulla nuova baseline gestita `448f5c8...`.
+
+## Review PM e closure
+
+La sequenza ha provato sul target reale:
+
+- rollback simmetrico in entrambe le direzioni;
+- uninstall completo del runtime gestito e dell'override PAM;
+- preservazione di materiali protetti e template fprintd;
+- recovery con reinstallazione fresca della candidate finale;
+- PAM vendor Fedora invariato e root runtime `0755`.
 
 ```text
 PASS_IF=ALL_FOUR_TRANSACTIONS_PASS_AND_INVARIANTS_MATCH
-FAIL_IF=ANY_TRANSACTION_OR_INVARIANT_FAILS
-STOP_IF=FIRST_FAILURE
-USB_REQUIRED=false
-BIOMETRIC_ACTION_REQUIRED=false
-PROTECTED_CONTENT_READ_REQUIRED=false
+RESULT=PASS
+USB_USED=false
+BIOMETRIC_ACTION_USED=false
+PROTECTED_CONTENT_READ=false
+TEMPLATE_CONTENT_READ=false
 ```
 
-In caso di PASS questa evidenza soddisfa l'ultimo lifecycle richiesto dalla
-closure C. Il passo seguente deve essere soltanto la formalizzazione della
-closure Phase C in manuale/piano/report, commit e push su `development`, quindi
-stop assoluto prima di Phase D secondo `PHASE_CLOSED => STOP`.
+L'evidenza soddisfa l'ultimo lifecycle richiesto dalla closure C. Phase C è
+formalmente chiusa; dopo documentazione, commit e push il progetto si arresta
+prima di qualunque preparazione di Phase D.
 
 ```text
-CURRENT_TASK=D295_03_PHASE_C_ADMIN_LIFECYCLE_GATE
 D295_03_OFFLINE_TESTS=10_PASS
-D295_03_LIVE_EXECUTION=NOT_PERFORMED
-PHASE_C_CLOSED=false
-PM_DECISION=HUMAN_REQUIRED
+D295_03_LIVE_EXECUTION=PASS_HUMAN_OBSERVED
+D295_03_ROLLBACK_BIDIRECTIONAL=PASS
+D295_03_UNINSTALL=PASS
+D295_03_PROTECTED_MATERIAL_PRESERVATION=PASS
+D295_03_TEMPLATE_PRESERVATION=PASS
+D295_03_RECOVERY_REINSTALL=PASS
+D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
+PHASE_C_CLOSURE_CRITERIA=PASS
+PHASE_C_CLOSED=true
+NEXT_PHASE=D
+PM_DECISION=PROJECT_STEP_COMPLETE
+PHASE_CLOSED => STOP
 ```
