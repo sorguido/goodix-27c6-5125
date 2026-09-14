@@ -97,21 +97,33 @@ grep -E '^(PHASE_C_DISTRIBUTION_MODEL|RPM_OFFICIAL_DISTRIBUTION|SOURCE_COMMIT|PR
 
 Il runtime richiede `target-material-manifest.json`, `transport-material.bin`,
 `target-config-90.bin`, `gfusb.dll` e `fdt-cache.bin`, tutti root-only.
+`transport-material.bin` contiene la PSK TLS usata dal runtime: non esiste un
+file PSK separato da fornire oltre a questo set.
 
-La sola origine già provata è un export legittimo dall'installazione Windows
-originale associata allo stesso dispositivo. Il plaintext DPAPI recuperato
-alimenta direttamente la PSK TLS; la portabilità è provata soltanto per quel
-dispositivo e quel materiale machine-bound legittimamente esportato.
+Il percorso empiricamente dimostrato nel progetto è una **VM Windows** a cui
+viene passato lo stesso sensore Goodix, con installazione del driver OEM. Nel
+test riuscito è stato sufficiente configurare Windows con PIN e installare il
+driver OEM; non è stato necessario completare un enrollment fingerprint
+Windows. Da quella VM è stato esportato il materiale protetto del dispositivo e
+la PSK così recuperata è stata successivamente validata sul sensore dal percorso
+Linux.
 
-La storia prova che una VM Windows con driver OEM può osservare il normale
-bootstrap, ma non documenta una procedura generale per estrarre un set nuovo;
-nella VM studiata l'enrollment Windows non era completato. Questa guida quindi
-non inventa un extractor e non promette che installare il driver OEM in una VM
-nuova produca materiale esportabile.
+Per un utente Linux-only, quindi, la VM Windows + driver OEM è il percorso di
+riferimento già provato per ottenere il proprio materiale. Un'installazione
+Windows reale/dual boot sullo stesso computer e con lo stesso sensore viene
+trattata come percorso operativo equivalente: cambia l'ambiente di esecuzione
+di Windows, non il dispositivo né il ruolo del driver OEM. Il materiale resta
+comunque specifico dello stesso sensore; il riuso cross-device non è supportato.
+
+Questa guida non autorizza extractor improvvisati, provisioning alternativo o
+la generazione/sostituzione della PSK. Le procedure di recupero/esportazione
+devono restare aderenti alle evidenze Windows/VM già validate dal progetto e
+non devono mai stampare o versionare secret.
 
 Sono vietati PSK nulle, casuali o sostitutive, provisioning, riuso cross-device,
-ClearApp, firmware/IAP e lettura OTP. Se non si possiede già il set legittimo,
-fermarsi con `HUMAN_REQUIRED_PROTECTED_MATERIAL`.
+ClearApp, firmware/IAP e lettura OTP. Se non si possiede ancora il set legittimo,
+va prima ottenuto dal proprio ambiente Windows/VM Windows con driver OEM per lo
+stesso sensore.
 
 ```bash
 deployment/phase-c-source-first-managed/manage.sh import-materials \
