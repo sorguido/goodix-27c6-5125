@@ -87,11 +87,13 @@ Copertura:
 5. safety wall statico: nessun enrollment/verify/PAM/provisioning PSK;
 6. sintassi shell di tutti gli entrypoint.
 
-Sono inoltre PASS `git diff --check` e la sintassi shell. La build reale della
-candidate D295 verrà rieseguita da HEAD pulito dopo il commit, perché il builder
-canonico rifiuta correttamente un worktree sporco. D292 e D294 hanno già provato
-il medesimo artefatto production e i pin OpenCV; questo non sostituisce la build
-D295 da HEAD finale.
+Sono inoltre PASS `git diff --check`, la sintassi shell e la build reale
+unprivileged da tree D295 pulito. Il builder ha verificato i cinque RPM OpenCV,
+la source-of-truth e la patch, ha prodotto ABI fprintd/SONAME validi, zero
+RPATH/RUNPATH e zero simboli host/test. La candidate contiene manifest e
+SHA256SUMS coerenti, senza materiale protetto; il run ha dichiarato zero USB e
+zero live. La build finale va sempre rieseguita dal commit HEAD effettivamente
+usato nella VM.
 
 ## Documentazione canonica aggiornata
 
@@ -117,6 +119,9 @@ Il gate successivo è quindi la VM Fedora 44 KDE pulita. Fermarsi prima di ogni
 ```text
 D295_01_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
 D295_01_OFFLINE_TESTS=6_PASS
+D295_01_SOURCE_FIRST_BUILD=PASS
+D295_01_CANDIDATE_DIGESTS=PASS
+D295_01_PRODUCTION_ABI=PASS
 D295_01_REAL_SUDO_EXECUTED=false
 D295_01_REAL_USB_ACCESS=0
 D295_01_PROTECTED_CONTENT_READ=false

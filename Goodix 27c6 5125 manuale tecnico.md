@@ -438,8 +438,9 @@ protetti. L'uninstall preserva materiali e template.
 Sei scenari offline su root sintetica sono PASS: tamper della candidate
 respinto, rollback di installazione parziale, install/idempotenza,
 update/rollback/uninstall, import e preservazione materiali, safety/statica e
-sintassi. README, piano e guida Phase C dedicata
-sono allineati. Nessun `sudo`, USB, servizio reale, PAM o contenuto protetto è
+sintassi. La build reale source-first è PASS con digest OpenCV/source, ABI
+fprintd, SONAME, no-RPATH e candidate content-addressed verificati. README,
+piano e guida Phase C dedicata sono allineati. Nessun `sudo`, USB, servizio reale, PAM o contenuto protetto è
 stato raggiunto. La prima build/installazione su Fedora 44 KDE pulita e la
 successiva osservazione PAM/KDE sono quindi il nuovo Human Gate.
 
@@ -1410,6 +1411,8 @@ D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 D295_01_OUTCOME=READY_OFFLINE_HUMAN_GATE_PENDING
 D295_01_OFFLINE_TESTS=6_PASS
+D295_01_SOURCE_FIRST_BUILD=PASS
+D295_01_CANDIDATE_DIGESTS=PASS
 D295_01_INSTALL_IDEMPOTENT=PASS_SYNTHETIC_ROOT
 D295_01_UPDATE_ROLLBACK_UNINSTALL=PASS_SYNTHETIC_ROOT
 D295_01_REAL_SUDO_EXECUTED=false
