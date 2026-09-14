@@ -66,10 +66,11 @@ La sorgente production e il contratto multi-user sono consolidati. Phase C ha
 ora provato su Fedora 44 KDE il percorso source-first gestito completo: build,
 import separato, install/idempotenza, update, PAM e consumer, rollback
 bidirezionale, uninstall, preservazione dati e recovery/reinstall. La baseline
-finale della VM è `448f5c8...`; il PAM vendor resta invariato. Lifecycle
-avversariali e qualificazione release appartengono alle fasi successive, che
-non vengono avviate in questa sessione. I boundary D279–D295 chiusi non vanno
-ripetuti per sola maggiore confidenza.
+finale della VM è `448f5c8...`; il PAM vendor resta invariato. I due lifecycle
+operativi residui della Phase D — suspend/resume e cancellation/recovery — e
+la qualificazione release appartengono alle fasi successive, che non vengono
+avviate in questa sessione. I boundary D279–D295 chiusi non vanno ripetuti per
+sola maggiore confidenza.
 
 D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
 l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
@@ -268,8 +269,10 @@ Blocker di produzione:
   dipendenze OpenCV, systemd, SELinux e PAM;
 - restano lifecycle amministrativo account deletion/name reuse e provisioning
   lecito dei materiali runtime protetti su una macchina nuova;
-- restano da chiudere cancellazione/quiescenza device-side arbitraria,
-  suspend/resume, hotplug e concorrenza fra consumer;
+- restano da chiudere i due boundary Phase D esplicitamente approvati:
+  suspend/resume e cancellation/recovery di un'action; hotplug, device removal,
+  concorrenza e gli altri fault scenario non sono requisiti dedicati salvo un
+  boundary reale nel codice o un bug osservato;
 - prima di distribuire serve chiudere regime del combined work, attribution e
   audit dei contenuti/history pubblicabili.
 
@@ -476,28 +479,48 @@ D295/03 rollback bidirezionale, uninstall, preservazione di materiali/template
 e recovery/reinstall. La baseline finale nella VM è `448f5c8...`, con runtime
 root `0755` e PAM vendor Fedora invariato.
 
-### Phase D — lifecycle, recovery e concorrenza
+### Phase D — lifecycle e recovery operativa minima
 
-- **OBIETTIVO:** chiudere i soli boundary operativi non ancora provati:
-  cancellazione in fasi diverse, quiescenza, suspend/resume, hotplug,
-  crash/restart e richieste concorrenti dei consumer.
-- **PERCHÉ SERVE:** open/action/close nominale e reboot sono provati, ma non
-  coprono byte tardivi cross-generation, rimozione del device o interruzioni
-  arbitrarie.
-- **PREREQUISITI:** installazione source-first gestita chiusa in Phase C; matrice di stato e
-  stop condition progettata offline; nessun comando recovery device-side non
-  compreso.
-- **OUTPUT ATTESO:** lifecycle contract; test fault-injection host-only;
-  comportamento `POISONED`/recovery leggibile; matrice suspend/hotplug/concurrency
-  ridotta ai casi che cambiano una decisione.
-- **RISCHIO:** alto sul device e medio sull'host; evitare reset, clear-halt e
-  retry impliciti non provati.
-- **HUMAN GATE:** obbligatorio per ogni prova che raggiunge il sensore, sospende
-  il laptop o scollega/riattiva il target. Prepararlo solo dopo closure offline
-  e soltanto per una nuova ipotesi reale.
-- **CRITERIO DI CHIUSURA:** ogni evento termina in recupero nominale oppure in
-  failure bounded e diagnosticabile con fallback disponibile, zero loop/retry
-  nascosti e cleanup definito.
+- **DECISIONE DI SCOPE (14 settembre 2026):** la fase prosegue esclusivamente
+  con suspend/resume e cancellation/recovery. Non è una campagna generale di
+  fault injection né una ricerca preventiva di casistiche esotiche.
+- **OBIETTIVO:** verificare soltanto i due boundary operativi realistici che
+  possono lasciare il sensore o il driver inutilizzabili nell'uso quotidiano:
+  1. suspend/resume;
+  2. cancellazione di un'action con successivo recovery/riutilizzo.
+- **SUSPEND/RESUME:** dopo sospensione e riattivazione del sistema il sensore
+  deve tornare utilizzabile attraverso il normale stack
+  `libfprint -> fprintd -> PAM/KDE`. Un'action in corso può fallire o essere
+  annullata; il requisito è convergere in stato pulito e consentire una nuova
+  action.
+- **CANCELLATION/RECOVERY:** una action cancellata deve terminare con cleanup
+  definito, ritorno a uno stato riutilizzabile e possibilità di avviare la
+  successiva senza reboot o workaround Goodix-specifici. Testare soltanto i
+  punti realmente significativi del ciclo se il codice converge sullo stesso
+  percorso di cleanup.
+- **FUORI SCOPE SALVO EVIDENZA CONCRETA:** hotplug; device removal durante
+  action; crash di componenti esterni come fprintd oltre ai normali restart già
+  coperti; richieste concorrenti; consumer simultanei; late bytes/
+  cross-generation; introduzione preventiva di uno stato `POISONED` o di
+  meccanismi speciali di recovery. Questi casi vengono riaperti soltanto se il
+  codice espone concretamente il relativo boundary o se un bug osservato ne
+  dimostra la rilevanza. Una eventuale scomparsa/riapparizione logica del device
+  causata dal power management viene trattata dentro suspend/resume, non come
+  campagna hotplug separata.
+- **PREREQUISITI:** Phase C chiusa; prima progettazione e test host-only quando
+  sufficienti; nessun comando recovery device-side non compreso.
+- **OUTPUT ATTESO:** contratto minimo di suspend/resume e cancellation/cleanup;
+  test host-only mirati dove bastano; live sul sensore reale soltanto quando
+  necessarie a chiudere uno dei due boundary.
+- **RISCHIO:** medio; evitare reset, clear-halt, retry impliciti o nuove
+  primitive device-side non provate.
+- **HUMAN GATE:** obbligatorio per ogni prova che raggiunge il sensore reale o
+  sospende il laptop. Nessun gate per progettazione e test host-only.
+- **CRITERIO DI CHIUSURA:** dopo suspend/resume il sensore torna utilizzabile;
+  una action cancellata termina con cleanup definito e non impedisce l'action
+  successiva; i failure esercitati terminano in tempo finito con diagnostica
+  leggibile e senza loop/retry nascosti; nessun fault scenario aggiuntivo viene
+  investigato senza un boundary reale nel codice o un bug osservato.
 
 ### Phase E — qualificazione release, sicurezza e licenze
 
@@ -649,6 +672,12 @@ Tutti i criteri di closure C sono soddisfatti. `NEXT_PHASE=D` è soltanto stato
 di roadmap: nessuna attività Phase D viene iniziata o preparata in questa
 sessione.
 
+Decisione Utente del 14 settembre 2026: la Phase D è ridotta ai soli
+`suspend/resume` e `cancellation/recovery`. Hotplug, device removal,
+concorrenza/consumer simultanei, late bytes/cross-generation e stato `POISONED`
+non sono requisiti di test dedicati e verranno riaperti soltanto davanti a un
+boundary concreto nel codice o a un bug osservato.
+
 ```text
 PM_DECISION=PROJECT_STEP_COMPLETE
 D290_CLOSED_SUCCESSFULLY=true
@@ -720,6 +749,7 @@ PHASE_B_BLOCKER=false
 NEW_LIVE_REQUIRED_NOW=false
 NEXT_PHASE=D
 NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
+PHASE_D_SCOPE=MINIMAL_SUSPEND_RESUME_AND_CANCELLATION_RECOVERY
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
