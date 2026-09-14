@@ -9,8 +9,9 @@ Le fonti principali sono:
 1. decisione o autorizzazione esplicita corrente dell'Utente;
 2. `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
 3. questo `AGENTS.md`;
-4. `Goodix 27c6 5125 manuale tecnico.md` per lo stato tecnico corrente;
-5. evidenze versionate nel repository.
+4. `analysis/PROJECT_NEXT_STEPS_PLAN.md` per fase corrente, lavoro residuo, sequencing e obiettivi ancora da portare a termine;
+5. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
+6. evidenze versionate nel repository.
 
 Una decisione esplicita corrente dell'Utente può autorizzare una deroga limitata. Nessuna deroga può essere inferita da un generico “procedi”, dalla disponibilità dell'hardware o dal fatto che una stessa operazione sia stata autorizzata in passato.
 
@@ -34,6 +35,12 @@ Manuale tecnico canonico:
 <git-root>/Goodix 27c6 5125 manuale tecnico.md
 ```
 
+Piano operativo canonico:
+
+```text
+<git-root>/analysis/PROJECT_NEXT_STEPS_PLAN.md
+```
+
 ### Golden branch rule
 
 La modalità autonoma opera **esclusivamente** sul branch:
@@ -49,12 +56,22 @@ Prima di modificare qualunque file:
 3. verifica `git status --short`;
 4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
    `AGENTS.md` e le Linee Guida;
-5. nel manuale tecnico leggi obbligatoriamente la sezione di stato corrente,
-   l'ultimo avanzamento consolidato, la roadmap A→F approvata, la fase corrente
-   e i blocker o le decisioni architetturali pertinenti;
-6. per ogni claim tecnico storico, cerca nel manuale e leggi la sezione
+5. leggi in `analysis/PROJECT_NEXT_STEPS_PLAN.md` almeno la fase corrente, la
+   closure appena raggiunta, il prossimo boundary aperto e i task/criteri
+   residui pertinenti; la ripartenza orchestrativa deve essere guidata da quel
+   piano e non da un task inventato ex novo o da sola memoria della sessione;
+6. nel manuale tecnico leggi obbligatoriamente la sezione di stato corrente,
+   l'ultimo avanzamento consolidato e i blocker o le decisioni architetturali
+   pertinenti al task;
+7. per ogni claim tecnico storico, cerca nel manuale e leggi la sezione
    pertinente prima di usare quel claim;
-7. esamina storia, diff e artefatti necessari allo step.
+8. esamina storia, diff e artefatti necessari allo step.
+
+`analysis/PROJECT_NEXT_STEPS_PLAN.md` non richiede lettura integrale a ogni
+ripartenza: usa lettura mirata delle sezioni necessarie per ricostruire fase,
+sequencing, boundary e lavoro residuo. Tuttavia nessuna ripartenza orchestrata
+può ignorarlo o deviare dal lavoro ancora aperto che vi è registrato senza una
+nuova decisione esplicita dell'Utente o un `REPLAN` tecnicamente giustificato.
 
 Il manuale tecnico non richiede lettura integrale per default. Memoria della
 sessione e session summary non sono autorità tecniche:
@@ -126,11 +143,13 @@ predefinito:
 PHASE_ORDER=A>B>C>D>E>F
 ```
 
-Il dettaglio e la fase corrente vivono nel manuale tecnico canonico. L'AI PM
-può applicare corrective e replan locali nella fase corrente, ma non può
-saltare/invertire fasi, iniziare Phase C prima della closure di Phase B,
-ampliare il target o cambiare materialmente la roadmap senza nuova decisione
-esplicita dell'Utente.
+La fase corrente, il sequencing, i boundary aperti e il lavoro residuo da
+portare a termine sono governati da `analysis/PROJECT_NEXT_STEPS_PLAN.md`; il
+manuale tecnico resta l'autorità per conoscenza e stato tecnico. L'AI PM può
+applicare corrective e replan locali nella fase corrente, ma non può ignorare
+il piano, saltare/invertire fasi, iniziare la fase successiva prima della
+closure di quella corrente, ampliare il target o cambiare materialmente la
+roadmap senza nuova decisione esplicita dell'Utente.
 
 Il materiale storico/deprecato non viene cancellato. L'eventuale archivio
 privato canonico è `red_tag/`. Non spostare materiale durante le fasi A–E.
@@ -199,11 +218,19 @@ Deve ricostruire lo stato reale del repository prima di scegliere il primo task:
 - branch e HEAD;
 - storia recente;
 - worktree e diff non committato;
+- fase corrente, sequencing, boundary aperto e lavoro residuo da `analysis/PROJECT_NEXT_STEPS_PLAN.md`;
 - ultimo avanzamento tecnico documentato;
 - ultimo Dxxx pertinente;
 - sezioni obbligatorie e pertinenti del manuale tecnico;
 - test, report, launcher e artefatti rilevanti;
 - eventuale lavoro interrotto.
+
+Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere coerente con
+il successivo lavoro ancora aperto registrato nel piano. Non inventare una nuova
+direzione perché una milestone locale è chiusa o perché esiste un'alternativa
+tecnicamente interessante. Deviazioni reali dal piano richiedono `REPLAN` entro
+scope autorizzato oppure `HUMAN_REQUIRED` quando cambiano strategia, scope o
+rischio.
 
 Un worktree sporco non è automaticamente un errore. Può essere lavoro lasciato da una sessione interrotta. Non cancellarlo, resettarlo, stasharlo o sovrascriverlo senza averne ricostruito provenienza e intento.
 
@@ -734,6 +761,8 @@ Questo non impedisce modifiche ai documenti quando l'Utente le richiede esplicit
 sicurezza hardware forte
 +
 branch development isolato e recuperabile
++
+piano operativo canonico per sequencing e lavoro residuo
 +
 manuale canonico vivo
 +
