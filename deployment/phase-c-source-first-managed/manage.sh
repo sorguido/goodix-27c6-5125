@@ -38,7 +38,7 @@ case ${1:-} in
   status)
     [[ $# -eq 1 ]] || fail usage_status
     ensure_runtime_root_mode
-    exec "$here/root-transaction.sh" --status
+    exec sudo -- "$here/root-transaction.sh" --status
     ;;
   rollback|uninstall)
     [[ $# -eq 1 ]] || fail usage_rollback_or_uninstall
