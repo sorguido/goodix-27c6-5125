@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+%global source_commit @SOURCE_COMMIT@
+%global debug_package %{nil}
+%global __strip /usr/bin/true
+
+Name:           goodix-27c6-5125-runtime
+Version:        0.1.0
+Release:        1%{?dist}
+Summary:        Private libfprint runtime for Goodix USB 27c6:5125
+License:        GPL-2.0-or-later AND LGPL-2.1-or-later
+URL:            https://github.com/sorguido/goodix-27c6-5125-private
+Source0:        %{name}-%{version}.tar.gz
+BuildArch:      x86_64
+
+Requires:       bash
+Requires:       coreutils
+Requires:       fprintd = 1.94.5-5.fc44
+Requires:       libfprint = 1.94.100-1.fc44
+Requires:       libgusb = 0.4.9-5.fc44
+Requires:       opencv-core = 4.13.0-1.fc44
+Requires:       opencv-features2d = 4.13.0-1.fc44
+Requires:       opencv-flann = 4.13.0-1.fc44
+Requires:       opencv-imgproc = 4.13.0-1.fc44
+Provides:       goodix-27c6-5125-runtime-commit(%{source_commit})
+
+%description
+Package-managed private libfprint runtime for the Goodix USB 27c6:5125 /
+APP12509 production candidate on Fedora 44 KDE. It does not contain protected
+runtime material, fingerprint templates, firmware or PAM configuration.
+
+%prep
+%setup -q
+
+%build
+
+%install
+install -D -m 0644 libfprint-2.so.2.0.0 \
+  %{buildroot}%{_libdir}/goodix-27c6-5125/libfprint-2.so.2.0.0
+ln -s libfprint-2.so.2.0.0 \
+  %{buildroot}%{_libdir}/goodix-27c6-5125/libfprint-2.so.2
+ln -s libfprint-2.so.2 \
+  %{buildroot}%{_libdir}/goodix-27c6-5125/libfprint-2.so
+install -D -m 0755 goodix-27c6-5125-fprintd-wrapper \
+  %{buildroot}%{_libexecdir}/goodix-27c6-5125/fprintd-wrapper
+install -D -m 0644 99-goodix-27c6-5125-runtime.conf \
+  %{buildroot}%{_sysconfdir}/systemd/system/fprintd.service.d/99-goodix-27c6-5125-runtime.conf
+install -D -m 0644 BUILD_COMMIT \
+  %{buildroot}%{_docdir}/%{name}/BUILD_COMMIT
+install -D -m 0644 ARTIFACT.sha256 \
+  %{buildroot}%{_docdir}/%{name}/ARTIFACT.sha256
+install -D -m 0644 COPYING.GPL-2.0-or-later \
+  %{buildroot}%{_licensedir}/%{name}/COPYING.GPL-2.0-or-later
+install -D -m 0644 COPYING.LGPL-2.1-or-later \
+  %{buildroot}%{_licensedir}/%{name}/COPYING.LGPL-2.1-or-later
+
+%check
+bash -n goodix-27c6-5125-fprintd-wrapper
+grep -Fx '%{source_commit}' BUILD_COMMIT
+sha256sum -c ARTIFACT.sha256
+
+%files
+%license %{_licensedir}/%{name}/COPYING.GPL-2.0-or-later
+%license %{_licensedir}/%{name}/COPYING.LGPL-2.1-or-later
+%doc %{_docdir}/%{name}/BUILD_COMMIT
+%doc %{_docdir}/%{name}/ARTIFACT.sha256
+%dir %{_libdir}/goodix-27c6-5125
+%{_libdir}/goodix-27c6-5125/libfprint-2.so.2.0.0
+%{_libdir}/goodix-27c6-5125/libfprint-2.so.2
+%{_libdir}/goodix-27c6-5125/libfprint-2.so
+%dir %{_libexecdir}/goodix-27c6-5125
+%{_libexecdir}/goodix-27c6-5125/fprintd-wrapper
+%dir %{_sysconfdir}/systemd/system/fprintd.service.d
+%{_sysconfdir}/systemd/system/fprintd.service.d/99-goodix-27c6-5125-runtime.conf
+
+%changelog
+* Mon Sep 14 2026 Goodix 27c6:5125 project <noreply@example.invalid> - 0.1.0-1
+- Initial Phase C private-runtime package candidate.

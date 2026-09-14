@@ -12,3 +12,6 @@ __pycache__/
 
 # Host-local, hash-verified build inputs. Keep documentation, not RPM payloads.
 GoodixArtifacts/opencv-4.13-rpms/*.rpm
+
+# Rebuildable local Phase C package outputs.
+packaging/**/dist/
