@@ -16,7 +16,7 @@ PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 PRODUCTION_READY=false
-NEXT_GATE=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
+NEXT_GATE=D295_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
 PM_DECISION=HUMAN_REQUIRED
 ```
 
@@ -45,8 +45,9 @@ La composizione riproducibile è descritta in
   nella candidate o nei log.
 - Il materiale autentico è riutilizzabile solo se recuperato legittimamente
   dall'installazione Windows originale e per lo stesso dispositivo.
-- Il gestore non modifica PAM: la configurazione Fedora/KDE viene prima
-  osservata nella VM pulita, evitando edit manuali di file vendor.
+- Il gestore non modifica il PAM vendor in `/usr/lib`: genera e governa un
+  override `/etc/pam.d/plasmalogin` dalla copia vendor verificata, con una sola
+  regola Fedora-style `pam_fprintd` e fallback password invariato.
 - L'RPM D294 resta conservato come prototipo storico; non è il formato ufficiale
   di distribuzione e non va installato sul nuovo ambiente di prova.
 - Altri sensori, firmware, distribuzioni e desktop non sono supportati.

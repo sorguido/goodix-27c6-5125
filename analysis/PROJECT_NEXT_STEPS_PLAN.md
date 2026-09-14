@@ -171,8 +171,8 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D295_01_SOURCE_FIRST_MANAGED_INSTALL
-NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
+CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
+NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
 ```
 
 ## Stato verificato del progetto
@@ -595,9 +595,24 @@ D295/01 apre il percorso ufficiale source-first. Il gestore costruisce da
 una runtime immutabile per commit con systemd, SELinux e guard B5 indipendenti
 dalle baseline Dxxx. Le simulazioni offline coprono install idempotente, update
 con singolo slot, rollback, uninstall fail-closed e import separato dei cinque
-materiali. README e guida Phase C sono allineati. Nessun `sudo`, USB, contenuto
-protetto o PAM reale è stato toccato. Il prossimo boundary è build e
-installazione nella Fedora 44 KDE VM pulita, quindi richiede Human Gate.
+materiali. README e guida Phase C sono allineati.
+
+La Human Gate D295/01 nella Fedora 44 KDE pulita è PASS per build, hash,
+materiali, install/idempotenza, USB, discovery, enrollment KDE, template,
+`sudo` fingerprint e SIGFM MATCH via `pam_fprintd`. Il solo FAIL è il login
+fingerprint Plasma; il login password è PASS. La causa è isolata al service
+PAM `plasmalogin`: include `password-auth`, che nella profile authselect locale
+non raggiunge `pam_fprintd`, mentre `system-auth` lo contiene e `sudo` funziona.
+
+D295/02 implementa il correttivo nello stesso confine: override amministrativo
+`/etc/pam.d/plasmalogin` generato dalla copia package-owned verificata, una sola
+regola `auth sufficient pam_fprintd.so` prima del substack `password-auth`,
+vendor `/usr/lib` intatto e stack password/session/KWallet preservato. State e
+hash coprono migrazione dal D295/01 installato, idempotenza, update, rollback
+bidirezionale, uninstall e drift da update Fedora. Nove test offline sono PASS.
+Nessun `sudo`, PAM live, USB o sensore è stato raggiunto dall'AI. Il prossimo
+boundary è il test manuale password/fingerprint Plasma e successiva regressione
+`sudo` nella stessa VM.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
@@ -674,8 +689,8 @@ PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=D295_01_SOURCE_FIRST_MANAGED_INSTALL
-NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
+CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
+NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -692,4 +707,19 @@ D295_01_PROTECTED_MATERIAL_IMPORT=PASS_SYNTHETIC_CONTENT_ONLY
 D295_01_REAL_SUDO_EXECUTED=false
 D295_01_REAL_USB_ACCESS=0
 D295_01_PAM_CHANGED=false
+D295_01_CLEAN_VM_BUILD_INSTALL=PASS_HUMAN_OBSERVED
+D295_01_CLEAN_VM_ENROLLMENT=PASS_HUMAN_OBSERVED
+D295_01_GENERIC_PAM_FINGERPRINT=PASS_HUMAN_OBSERVED
+D295_01_PLASMALOGIN_FINGERPRINT=FAIL_HUMAN_OBSERVED
+D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
+MANAGED_PAM_INTEGRATION=true
+INSTALL_IDEMPOTENT=true
+ROLLBACK_SUPPORTED=true
+UNINSTALL_RESTORES_PREVIOUS_STATE=true
+PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
+USER_SPECIFIC_CONFIGURATION=false
+SENSOR_REACHING_EXECUTED_BY_AI=false
+D295_02_OFFLINE_TESTS=9_PASS
+PM_DECISION=HUMAN_REQUIRED
 ```

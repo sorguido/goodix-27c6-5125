@@ -189,10 +189,12 @@ reuse come ultimo gap host. D293/05 ha implementato la guard fail-closed e,
 dopo i failure intermedi preservati nella lineage Git, la live finale ha dato
 PASS pieno sotto SELinux Enforcing: blocco con print, pass dopo delete
 KDE/fprintd, name reuse pulito, zero alert SELinux e principal Guido invariato.
-Guard e modulo restano installati. Il boundary corrente è ora la prima
-installazione source-first gestita della Phase C in una Fedora 44 KDE VM
-pulita. La candidate RPM D294 è preservata come prototipo storico/evidenza e
-non è più il percorso di distribuzione ufficiale.
+Guard e modulo restano installati. La prima installazione source-first D295 in
+una Fedora 44 KDE VM pulita è ora PASS fino a enrollment, template, `sudo` e
+SIGFM MATCH. Il solo boundary aperto è il correttivo PAM gestito per il login
+fingerprint di Plasma Login Manager; il login password è già PASS. La candidate
+RPM D294 è preservata come prototipo storico/evidenza e non è più il percorso
+di distribuzione ufficiale.
 
 Principi trasversali della roadmap:
 
@@ -435,14 +437,35 @@ Espone installazione idempotente, update con un solo slot precedente, rollback,
 uninstall fail-closed, status e import separato/no-overwrite dei cinque input
 protetti. L'uninstall preserva materiali e template.
 
-Sei scenari offline su root sintetica sono PASS: tamper della candidate
+I sei scenari offline originari su root sintetica sono PASS: tamper della candidate
 respinto, rollback di installazione parziale, install/idempotenza,
 update/rollback/uninstall, import e preservazione materiali, safety/statica e
 sintassi. La build reale source-first è PASS con digest OpenCV/source, ABI
 fprintd, SONAME, no-RPATH e candidate content-addressed verificati. README,
-piano e guida Phase C dedicata sono allineati. Nessun `sudo`, USB, servizio reale, PAM o contenuto protetto è
-stato raggiunto. La prima build/installazione su Fedora 44 KDE pulita e la
-successiva osservazione PAM/KDE sono quindi il nuovo Human Gate.
+piano e guida Phase C dedicata sono allineati.
+
+La successiva Human Gate dell'Utente sulla Fedora 44 KDE pulita ha confermato
+build, hash candidate, import materiali, install/idempotenza, reader, enrollment
+KDE, template, `sudo` fingerprint e SIGFM MATCH attraverso `pam_fprintd`. È
+fallito soltanto il fingerprint login Plasma; la password funziona. L'evidenza
+mostra che `plasmalogin` entra in `password-auth`, dove il profilo authselect
+`local with-fingerprint` non contiene `pam_fprintd`, mentre `system-auth` sì.
+Driver, sensore, fprintd, matcher e PAM fingerprint generico non sono pertanto
+il blocker.
+
+D295/02 aggiunge il delta minimo: il manager verifica il PAM package-owned
+`/usr/lib/pam.d/plasmalogin` e ne genera un override omonimo in `/etc/pam.d`,
+che per regola Linux-PAM ha precedenza. Inserisce soltanto
+`auth sufficient pam_fprintd.so` prima del substack `password-auth`, preservando
+byte-per-byte account/password/session, KWallet e fallback. Il vendor non viene
+mai scritto. State e hash governano override, migrazione da D295/01, update,
+rollback bidirezionale e uninstall; drift di un futuro vendor Fedora è
+fail-closed, mentre uninstall può esporre in sicurezza il vendor aggiornato.
+
+Nove test offline sono PASS, inclusi vendor invariato, collisione, drift,
+migrazione legacy e simmetria PAM. L'AI non ha eseguito sudo, PAM live, USB,
+sensore o lettura di materiale protetto. Il nuovo boundary è la sola Human Gate
+manuale password → fingerprint Plasma → regressione `sudo`.
 
 ```text
 CURRENT_PHASE=C
@@ -531,10 +554,20 @@ D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 NEXT_PHASE=C
 NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
-CURRENT_TASK=D295_01_SOURCE_FIRST_MANAGED_INSTALL
-NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
+CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
+NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
 NEW_LIVE_REQUIRED_NOW=true
 PM_DECISION=HUMAN_REQUIRED
+D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
+MANAGED_PAM_INTEGRATION=true
+INSTALL_IDEMPOTENT=true
+ROLLBACK_SUPPORTED=true
+UNINSTALL_RESTORES_PREVIOUS_STATE=true
+PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
+USER_SPECIFIC_CONFIGURATION=false
+SENSOR_REACHING_EXECUTED_BY_AI=false
+D295_02_OFFLINE_TESTS=9_PASS
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -1400,8 +1433,8 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D295_01_SOURCE_FIRST_MANAGED_INSTALL
-NEXT_BOUNDARY=FEDORA_44_KDE_CLEAN_VM_MANAGED_INSTALL
+CURRENT_TASK=D295_02_PLASMALOGIN_PAM_CORRECTIVE
+NEXT_BOUNDARY=FEDORA_44_KDE_PLASMALOGIN_PAM_CORRECTIVE_HUMAN_GATE
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
@@ -1418,6 +1451,20 @@ D295_01_UPDATE_ROLLBACK_UNINSTALL=PASS_SYNTHETIC_ROOT
 D295_01_REAL_SUDO_EXECUTED=false
 D295_01_REAL_USB_ACCESS=0
 D295_01_PAM_CHANGED=false
+D295_01_CLEAN_VM_BUILD_INSTALL=PASS_HUMAN_OBSERVED
+D295_01_CLEAN_VM_ENROLLMENT=PASS_HUMAN_OBSERVED
+D295_01_GENERIC_PAM_FINGERPRINT=PASS_HUMAN_OBSERVED
+D295_01_PLASMALOGIN_FINGERPRINT=FAIL_HUMAN_OBSERVED
+D295_PLASMALOGIN_PAM_CORRECTIVE=READY
+PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
+MANAGED_PAM_INTEGRATION=true
+INSTALL_IDEMPOTENT=true
+ROLLBACK_SUPPORTED=true
+UNINSTALL_RESTORES_PREVIOUS_STATE=true
+PASSWORD_FALLBACK_PRESERVED_BY_DESIGN=true
+USER_SPECIFIC_CONFIGURATION=false
+SENSOR_REACHING_EXECUTED_BY_AI=false
+D295_02_OFFLINE_TESTS=9_PASS
 PM_DECISION=HUMAN_REQUIRED
 ```
 

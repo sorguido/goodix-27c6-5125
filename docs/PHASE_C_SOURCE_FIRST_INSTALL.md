@@ -14,15 +14,23 @@ PROTECTED_MATERIAL_IN_REPOSITORY=false
 
 ## Confine attuale
 
-La logica è chiusa offline, ma l'installazione privilegiata in una VM pulita non
-è ancora stata eseguita. Tutti i comandi con `sudo`, l'import dei materiali e
-l'accesso al sensore sono azioni dell'Utente dopo Human Gate. Il primo test va
-fatto nella VM Fedora 44 KDE, non sul laptop già validato.
+La Human Gate nella VM Fedora 44 KDE pulita ha confermato build, candidate,
+import dei materiali, install/idempotenza, reader, enrollment, template, MATCH
+SIGFM, `pam_fprintd` e autenticazione `sudo`. Il solo failure è il login con
+impronta di Plasma Login Manager: `plasmalogin` usa `password-auth`, mentre
+`with-fingerprint` della profile `local` inserisce `pam_fprintd` soltanto in
+`system-auth`. Il login password resta PASS.
+
+Il correttivo è chiuso offline ma la sua mutazione privilegiata e il nuovo login
+restano azioni dell'Utente dopo Human Gate. Nessun comando live di questa guida
+è stato eseguito dall'AI.
 
 Il gestore installa una runtime immutabile per commit sotto
 `/usr/lib64/goodix-27c6-5125/`, un wrapper fprintd, un drop-in systemd e la guard
 account-deletion B5 con policy SELinux. Non usa `/usr/local`, RPM D294, operator
-kit Dxxx, firmware o configurazioni per singolo utente. Non modifica PAM.
+kit Dxxx, firmware o configurazioni per singolo utente. Per `plasmalogin`
+genera inoltre un override gestito in `/etc/pam.d` dalla copia vendor verificata:
+non modifica mai `/usr/lib/pam.d/plasmalogin`.
 
 ## 1. Preparazione della VM
 
@@ -31,7 +39,7 @@ snapshot a macchina spenta. Non collegare ancora il sensore.
 
 ```bash
 sudo dnf5 install git flatpak cpio patch binutils rpm-build dnf5-plugins \
-  fprintd libfprint libgusb selinux-policy-targeted checkpolicy \
+  fprintd fprintd-pam libfprint libgusb selinux-policy-targeted checkpolicy \
   policycoreutils policycoreutils-devel
 flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install --user flathub org.freedesktop.Sdk//25.08
@@ -81,7 +89,7 @@ LIVE_EXECUTION_PERFORMED=false
 
 ```bash
 (cd "$HOME/goodix-phase-c-candidate/candidate" && sha256sum -c SHA256SUMS)
-grep -E '^(PHASE_C_DISTRIBUTION_MODEL|RPM_OFFICIAL_DISTRIBUTION|SOURCE_COMMIT|PROTECTED_MATERIAL_INCLUDED)=' \
+grep -E '^(PHASE_C_DISTRIBUTION_MODEL|RPM_OFFICIAL_DISTRIBUTION|SOURCE_COMMIT|PROTECTED_MATERIAL_INCLUDED|PAM_FILES_INCLUDED|PAM_INTEGRATION)=' \
   "$HOME/goodix-phase-c-candidate/candidate/MANIFEST"
 ```
 
@@ -112,21 +120,52 @@ deployment/phase-c-source-first-managed/manage.sh import-materials \
 
 Output atteso: `PHASE_C_MATERIAL_IMPORT=PASS`. La sorgente non viene cancellata.
 
-## 4. Installazione gestita — Human Gate
+## 4. Installazione o migrazione gestita — Human Gate
 
-Questo è il primo comando che modifica systemd/SELinux e richiede `sudo`:
+Su una VM senza D295 installato usare `install`. Sulla VM che ha prodotto la
+Human Gate descritta sopra, conservare prima l'hash vendor e usare `update` con
+la nuova candidate:
+
+```bash
+sha256sum /usr/lib/pam.d/plasmalogin > "$HOME/plasmalogin.vendor.before.sha256"
+```
+
+VM senza alcuna installazione D295:
 
 ```bash
 deployment/phase-c-source-first-managed/manage.sh install \
   "$HOME/goodix-phase-c-candidate/candidate"
+```
+
+VM con D295/01 già `ACTIVE`:
+
+```bash
+deployment/phase-c-source-first-managed/manage.sh update \
+  "$HOME/goodix-phase-c-candidate/candidate"
+```
+
+In entrambi i casi:
+
+```bash
 deployment/phase-c-source-first-managed/manage.sh status
 systemctl cat fprintd.service
+sha256sum -c "$HOME/plasmalogin.vendor.before.sha256"
+grep -nE 'pam_fprintd\.so|auth[[:space:]]+substack[[:space:]]+password-auth' \
+  /etc/pam.d/plasmalogin
 ```
 
 Attesi: `PHASE_C_INSTALL=PASS`, commit corrente,
-`PROTECTED_MATERIAL_READY=true`, `PHASE_C_STATUS=ACTIVE` e wrapper
+`PROTECTED_MATERIAL_READY=true`, `PHASE_C_STATUS=ACTIVE`,
+`MANAGED_PAM_INTEGRATION=true`, `MANAGED_PAM_STATUS=ACTIVE` e wrapper
 `/usr/libexec/goodix-27c6-5125/fprintd-wrapper`. Una seconda installazione della
 stessa candidate risponde `PHASE_C_INSTALL=PASS_ALREADY_CURRENT`.
+
+La regola `auth sufficient pam_fprintd.so` deve precedere il substack
+`password-auth`; quest'ultimo e tutte le righe account/password/session/kwallet
+restano presenti. Perciò un MATCH conclude l'auth, mentre mancata impronta,
+timeout o utente non enrolled continuano verso la password. Un accesso solo
+biometrico non fornisce la password a KWallet: l'eventuale richiesta separata
+del wallet non è un failure del login PAM.
 
 ## 5. Validazione KDE/fprintd col sensore
 
@@ -141,10 +180,9 @@ eseguire operator kit Dxxx.
 5. delete dell'impronta dal KCM.
 
 Per il login biometrico: massimo tre tentativi, stop al primo MATCH, nessun
-quarto tentativo. La configurazione PAM della Fedora pulita va prima osservata.
-Se il login fingerprint non è offerto, fermarsi e raccogliere solo configurazione
-e journal sanitizzati: non editare manualmente `/usr/lib/pam.d/plasmalogin` e
-non abilitare authselect per tentativi.
+quarto tentativo. Provare prima il login password e poi il login fingerprint.
+Se quest'ultimo fallisce, fermarsi e raccogliere solo configurazione e journal
+sanitizzati: non editare manualmente alcun PAM e non cambiare authselect.
 
 ## 6. Update, rollback, uninstall e recovery
 
@@ -156,8 +194,16 @@ deployment/phase-c-source-first-managed/manage.sh uninstall
 
 Il gestore conserva un solo commit precedente. Un secondo update fallisce con
 `rollback_slot_occupied`, senza eliminare versioni. Rollback scambia i due
-commit. Uninstall ripristina fprintd Fedora e preserva deliberatamente materiali
-protetti e template fprintd; non esiste un purge implicito.
+commit e anche lo stato PAM: il rollback della migrazione dal D295 precedente
+rimuove `/etc/pam.d/plasmalogin`; il rollback inverso lo ripristina dall'oggetto
+root-owned e hash-pinned. Uninstall rimuove l'override, espone il PAM vendor Fedora,
+ripristina fprintd Fedora e preserva deliberatamente materiali protetti e
+template fprintd; non esiste un purge implicito.
+
+Se un update Fedora cambia il PAM vendor, status/update/rollback falliscono con
+`plasmalogin_vendor_pam_drift`: riesaminare il nuovo file e costruire una nuova
+installazione. L'uninstall resta consentito solo se l'override gestito è ancora
+byte-identico allo state e non modifica il nuovo vendor.
 
 Se il login grafico non è raggiungibile, usare una console testuale o lo
 snapshot e lanciare `manage.sh uninstall`. In caso di drift, il gestore fallisce
@@ -165,3 +211,30 @@ chiuso. Raccogliere soltanto `manage.sh status`, `systemctl status
 fprintd.service --no-pager`, `journalctl -b -u fprintd.service --no-pager` e
 `getenforce`. Non allegare `/var/lib/goodix-5125-poc`, `/var/lib/fprint`,
 capture USB, template o secret.
+
+## 7. Sequenza minima per la Human Gate correttiva
+
+```bash
+cd "$HOME/goodix-27c6-5125-private"
+git switch development
+git pull --ff-only origin development
+git status --short
+mkdir -m 700 "$HOME/goodix-d295-pam-corrective"
+deployment/phase-c-source-first-managed/manage.sh prepare \
+  "$HOME/goodix-d295-pam-corrective"
+(cd "$HOME/goodix-d295-pam-corrective/candidate" && sha256sum -c SHA256SUMS)
+sha256sum /usr/lib/pam.d/plasmalogin > "$HOME/plasmalogin.vendor.before.sha256"
+deployment/phase-c-source-first-managed/manage.sh update \
+  "$HOME/goodix-d295-pam-corrective/candidate"
+deployment/phase-c-source-first-managed/manage.sh status
+sha256sum -c "$HOME/plasmalogin.vendor.before.sha256"
+grep -nE 'pam_fprintd\.so|auth[[:space:]]+substack[[:space:]]+password-auth' \
+  /etc/pam.d/plasmalogin
+```
+
+Poi, dal normale greeter Plasma: password PASS, logout, fingerprint PASS entro
+tre tentativi; solo dopo il PASS verificare che `sudo` continui a usare
+l'impronta. Se il login fingerprint fallisce, non fare altre modifiche:
+conservare l'output sanitizzato di `manage.sh status`, le due sole righe PAM
+mostrate sopra e il journal del boot filtrato a `plasmalogin`, `pam_fprintd` e
+`fprintd`, redigendo username, seriali e qualsiasi dato non necessario.

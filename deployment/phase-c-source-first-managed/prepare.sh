@@ -45,6 +45,7 @@ install -m 0644 "$here/goodix_fprint_account_delete.fc" \
   "$candidate/goodix_fprint_account_delete.fc"
 install -m 0644 "$here/99-goodix-27c6-5125-managed.conf" \
   "$candidate/99-goodix-27c6-5125-managed.conf"
+install -m 0644 "$here/plasmalogin-pam.rule" "$candidate/plasmalogin-pam.rule"
 install -m 0644 "$root/LICENSE" "$candidate/LICENSE"
 install -m 0644 "$root/LICENSES/GPL-2.0-or-later.txt" \
   "$candidate/GPL-2.0-or-later.txt"
@@ -57,7 +58,8 @@ printf '%s\n' \
   "SOURCE_COMMIT=$head" \
   'TARGET_OS=Fedora-44-KDE-x86_64' \
   'PROTECTED_MATERIAL_INCLUDED=false' \
-  'PAM_FILES_INCLUDED=false' \
+  'PAM_FILES_INCLUDED=true' \
+  'PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR' \
   >"$candidate/MANIFEST"
 (cd "$candidate" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' | \
   LC_ALL=C sort | xargs -r sha256sum >SHA256SUMS)

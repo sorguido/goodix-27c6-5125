@@ -11,6 +11,14 @@ fprintd Fedora, verifica metadata root-only dei cinque input protetti e non ne
 stampa contenuto o digest. La guard account-deletion e la policy SELinux sono la
 copia production del comportamento D293/B5 già provato sul target.
 
+Il correttivo Plasma Login Manager include soltanto la regola dichiarativa
+`plasmalogin-pam.rule`. La transazione verifica il file PAM package-owned,
+genera `/etc/pam.d/plasmalogin` preservando tutte le righe vendor e inserisce
+`pam_fprintd.so` come `sufficient` immediatamente prima di `password-auth`.
+Hash vendor/override, stato corrente e precedente rendono install, migrazione,
+rollback e uninstall simmetrici. Un drift vendor blocca status/update/rollback;
+uninstall può comunque rimuovere l'override integro ed esporre il nuovo vendor.
+
 Test offline:
 
 ```bash
