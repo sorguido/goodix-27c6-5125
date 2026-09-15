@@ -25,6 +25,17 @@ Hash vendor/override, stato corrente e precedente rendono install, migrazione,
 rollback e uninstall simmetrici. Un drift vendor blocca status/update/rollback;
 uninstall può comunque rimuovere l'override integro ed esporre il nuovo vendor.
 
+Il correttivo pre-Phase-F KScreenLocker mantiene separato il diverso modello
+Fedora: `kde-fingerprint` è già `/etc/pam.d/kde-fingerprint`, posseduto da
+`plasma-workspace` come `%config(noreplace)`, e non ha una copia sotto
+`/usr/lib/pam.d`. La transazione verifica package owner, flag RPM, digest,
+layout e metadata; salva l'originale e sostituisce soltanto la riga auth
+`substack fingerprint-auth` con `pam_fprintd.so max-tries=3 timeout=45`.
+Install/update/rollback/uninstall conservano copie root-owned hash-pinned e
+ripristinano byte-per-byte il file precedente. Customizzazioni preesistenti,
+drift RPM/PAM e `.rpmnew`/`.rpmsave` falliscono chiuso; `fingerprint-auth` e
+authselect non vengono modificati.
+
 Test offline:
 
 ```bash
@@ -43,4 +54,5 @@ D295/02 è PASS live per update, vendor PAM invariato, password, login
 fingerprint Plasma e `sudo`. D295/03 è PASS live con sensore scollegato per
 rollback bidirezionale, uninstall, preservazione di materiali/template e
 recovery/reinstall. Phase C è chiusa e la baseline finale nella VM è
-`448f5c8cc6099032a23115a96e90428d75b74a7b`.
+`448f5c8cc6099032a23115a96e90428d75b74a7b`. Il correttivo KScreenLocker è
+coperto offline ma richiede ancora la Human Gate sulla sessione KDE reale.

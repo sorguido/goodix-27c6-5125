@@ -22,7 +22,7 @@ FILES = (
     "libopencv_flann.so.413", "libopencv_imgproc.so.413", "fprintd-wrapper",
     "50-goodix-fprint-account-delete", "goodix_fprint_account_delete.te",
     "goodix_fprint_account_delete.fc", "99-goodix-27c6-5125-managed.conf",
-    "plasmalogin-pam.rule",
+    "plasmalogin-pam.rule", "kde-fingerprint-pam.rule",
 )
 
 
@@ -49,7 +49,28 @@ class ManagedInstallContract(unittest.TestCase):
             encoding="utf-8",
         )
         self.vendor_bytes = self.vendor_pam.read_bytes()
-        self.env = os.environ | {"GOODIX_MANAGED_TEST_ROOT": str(self.root)}
+        self.kde_fingerprint_pam = self.root / "etc/pam.d/kde-fingerprint"
+        self.kde_fingerprint_pam.parent.mkdir(parents=True)
+        self.kde_fingerprint_pam.write_text(
+            "auth        substack      fingerprint-auth\n"
+            "auth        include       postlogin\n\n"
+            "account     required      pam_nologin.so\n"
+            "account     include       fingerprint-auth\n\n"
+            "password    include       fingerprint-auth\n\n"
+            "session     required      pam_selinux.so close\n"
+            "session     required      pam_loginuid.so\n"
+            "session     required      pam_selinux.so open\n"
+            "session     optional      pam_keyinit.so force revoke\n"
+            "session     required      pam_namespace.so\n"
+            "session     include       fingerprint-auth\n"
+            "session     include       postlogin\n",
+            encoding="utf-8",
+        )
+        self.kde_vendor_bytes = self.kde_fingerprint_pam.read_bytes()
+        self.env = os.environ | {
+            "GOODIX_MANAGED_TEST_ROOT": str(self.root),
+            "GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256": sha(self.kde_fingerprint_pam),
+        }
         self.caller = os.environ.get("USER", "tester")
 
     def tearDown(self):
@@ -74,6 +95,7 @@ class ManagedInstallContract(unittest.TestCase):
             "PROTECTED_MATERIAL_INCLUDED=false\n"
             "PAM_FILES_INCLUDED=true\n"
             "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n"
+            "KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM\n"
             "SBOM_FORMAT=SPDX-2.3-JSON\n"
             "COMBINED_BINARY_LICENSE=GPL-3.0-or-later\n"
             "FAR_FRR_CLAIM=NOT_MADE\n",
@@ -110,6 +132,12 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertLess(managed_text.index(rule), managed_text.index("auth       substack     password-auth"))
         self.assertIn("auth       substack     password-auth", managed_text)
         self.assertNotIn(self.caller, managed_text)
+        kde_managed_text = self.kde_fingerprint_pam.read_text(encoding="utf-8")
+        kde_rule = (HERE / "kde-fingerprint-pam.rule").read_text(encoding="utf-8").strip()
+        self.assertEqual(kde_managed_text.count(kde_rule), 1)
+        self.assertNotIn("auth        substack      fingerprint-auth", kde_managed_text)
+        self.assertIn("account     include       fingerprint-auth", kde_managed_text)
+        self.assertIn("session     include       fingerprint-auth", kde_managed_text)
         result = self.run_tx("--root-install", self.caller, str(first))
         self.assertIn("PASS_ALREADY_CURRENT", result.stdout)
         result = self.run_tx("--root-update", self.caller, str(second))
@@ -125,6 +153,7 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertFalse((self.root / "var/lib/goodix-27c6-5125-managed/state").exists())
         self.assertFalse(managed.exists())
         self.assertEqual(self.vendor_pam.read_bytes(), self.vendor_bytes)
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
 
     def test_legacy_update_adds_pam_and_rollback_restores_absence(self):
         first = self.candidate("1" * 40)
@@ -133,11 +162,18 @@ class ManagedInstallContract(unittest.TestCase):
         state = self.root / "var/lib/goodix-27c6-5125-managed/state"
         legacy = "\n".join(
             line for line in state.read_text(encoding="utf-8").splitlines()
-            if not line.startswith(("CURRENT_PAM_STATUS=", "PREVIOUS_PAM_STATUS=", "PAM_VENDOR_SHA256=", "PAM_OVERRIDE_SHA256="))
+            if not line.startswith((
+                "CURRENT_PAM_STATUS=", "PREVIOUS_PAM_STATUS=", "PAM_VENDOR_SHA256=", "PAM_OVERRIDE_SHA256=",
+                "CURRENT_KSCREENLOCKER_PAM_STATUS=", "PREVIOUS_KSCREENLOCKER_PAM_STATUS=",
+                "KSCREENLOCKER_VENDOR_SHA256=", "KSCREENLOCKER_OVERRIDE_SHA256=",
+            ))
         ) + "\n"
         state.write_text(legacy, encoding="utf-8")
         (self.root / "etc/pam.d/plasmalogin").unlink()
         (self.root / "var/lib/goodix-27c6-5125-managed/plasmalogin.managed").unlink()
+        self.kde_fingerprint_pam.write_bytes(self.kde_vendor_bytes)
+        (self.root / "var/lib/goodix-27c6-5125-managed/kde-fingerprint.vendor").unlink()
+        (self.root / "var/lib/goodix-27c6-5125-managed/kde-fingerprint.managed").unlink()
         status = self.run_tx("--status").stdout
         self.assertIn("MANAGED_PAM_INTEGRATION=false", status)
         result = self.run_tx("--root-update", self.caller, str(second))
@@ -150,6 +186,37 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertIn("MANAGED_PAM_STATUS=ACTIVE", result.stdout)
         self.assertTrue((self.root / "etc/pam.d/plasmalogin").is_file())
         self.assertEqual(self.vendor_pam.read_bytes(), self.vendor_bytes)
+
+    def test_previous_candidate_update_adds_kscreenlocker_and_rollback_is_symmetric(self):
+        first = self.candidate("5" * 40)
+        second = self.candidate("6" * 40)
+        self.run_tx("--root-install", self.caller, str(first))
+        state = self.root / "var/lib/goodix-27c6-5125-managed/state"
+        old_state = "\n".join(
+            line for line in state.read_text(encoding="utf-8").splitlines()
+            if not line.startswith((
+                "CURRENT_KSCREENLOCKER_PAM_STATUS=", "PREVIOUS_KSCREENLOCKER_PAM_STATUS=",
+                "KSCREENLOCKER_VENDOR_SHA256=", "KSCREENLOCKER_OVERRIDE_SHA256=",
+            ))
+        ) + "\n"
+        state.write_text(old_state, encoding="utf-8")
+        state_dir = state.parent
+        self.kde_fingerprint_pam.write_bytes(self.kde_vendor_bytes)
+        (state_dir / "kde-fingerprint.vendor").unlink()
+        (state_dir / "kde-fingerprint.managed").unlink()
+
+        status = self.run_tx("--status").stdout
+        self.assertIn("KSCREENLOCKER_MANAGED_PAM_INTEGRATION=false", status)
+        result = self.run_tx("--root-update", self.caller, str(second))
+        self.assertIn("PHASE_C_UPDATE=PASS", result.stdout)
+        self.assertIn("pam_fprintd.so max-tries=3 timeout=45", self.kde_fingerprint_pam.read_text())
+
+        result = self.run_tx("--root-rollback", self.caller)
+        self.assertIn("KSCREENLOCKER_MANAGED_PAM_STATUS=ABSENT", result.stdout)
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+        result = self.run_tx("--root-rollback", self.caller)
+        self.assertIn("KSCREENLOCKER_MANAGED_PAM_STATUS=ACTIVE", result.stdout)
+        self.assertIn("pam_fprintd.so max-tries=3 timeout=45", self.kde_fingerprint_pam.read_text())
 
     def test_vendor_pam_drift_fails_closed(self):
         candidate = self.candidate("3" * 40)
@@ -164,13 +231,44 @@ class ManagedInstallContract(unittest.TestCase):
 
     def test_preexisting_managed_pam_collision_fails_closed(self):
         managed = self.root / "etc/pam.d/plasmalogin"
-        managed.parent.mkdir(parents=True)
+        managed.parent.mkdir(parents=True, exist_ok=True)
         managed.write_text("preexisting\n", encoding="utf-8")
         candidate = self.candidate("4" * 40)
         result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("managed_path_collision", result.stderr)
         self.assertEqual(managed.read_text(encoding="utf-8"), "preexisting\n")
+
+    def test_preexisting_kde_fingerprint_customization_fails_closed(self):
+        self.kde_fingerprint_pam.write_text("auth required pam_permit.so\n", encoding="utf-8")
+        candidate = self.candidate("7" * 40)
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("kde_fingerprint_vendor_auth_boundary_invalid", result.stderr)
+        self.assertEqual(self.kde_fingerprint_pam.read_text(), "auth required pam_permit.so\n")
+
+    def test_kde_fingerprint_package_and_override_drift_fail_closed(self):
+        candidate = self.candidate("8" * 40)
+        self.run_tx("--root-install", self.caller, str(candidate))
+        self.env["GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256"] = "0" * 64
+        result = self.run_tx("--status", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("kde_fingerprint_vendor_package_drift", result.stderr)
+        self.env["GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256"] = sha(
+            self.root / "var/lib/goodix-27c6-5125-managed/kde-fingerprint.vendor"
+        )
+        self.kde_fingerprint_pam.write_text("auth required pam_permit.so\n", encoding="utf-8")
+        result = self.run_tx("--status", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("kde_fingerprint_managed_override_drift", result.stderr)
+
+    def test_kde_fingerprint_metadata_drift_fails_closed(self):
+        candidate = self.candidate("0" * 40)
+        self.run_tx("--root-install", self.caller, str(candidate))
+        self.kde_fingerprint_pam.chmod(0o600)
+        result = self.run_tx("--status", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("kde_fingerprint_pam_mode_drift", result.stderr)
 
     def test_candidate_digest_tamper_fails_closed(self):
         candidate = self.candidate("c" * 40)
@@ -211,6 +309,16 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertFalse((self.root / "var/lib/goodix-27c6-5125-managed").exists())
         self.assertFalse((self.root / "usr/lib64/goodix-27c6-5125").exists())
         self.assertFalse((self.root / "etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete").exists())
+
+    def test_partial_install_after_kscreenlocker_pam_restores_vendor(self):
+        candidate = self.candidate("4" * 40)
+        self.env["GOODIX_MANAGED_TEST_FAIL_AFTER_KSCREENLOCKER_PAM"] = "true"
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("injected_failure_after_kscreenlocker_pam", result.stderr)
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+        self.assertFalse((self.root / "var/lib/goodix-27c6-5125-managed").exists())
+        self.assertFalse((self.root / "etc/pam.d/plasmalogin").exists())
 
     def test_material_import_is_separate_and_preserved(self):
         source = self.temp / "material-source"
@@ -261,7 +369,10 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertNotIn("PSK=000", combined)
         self.assertNotIn("random PSK", combined)
         self.assertNotIn("/usr/lib/pam.d/plasmalogin\" >", combined)
+        self.assertNotIn("authselect opt-out", combined)
+        self.assertNotIn("/etc/pam.d/fingerprint-auth\" >", combined)
         self.assertIn("MANAGED_ETC_OVERRIDE_FROM_VENDOR", combined)
+        self.assertIn("MANAGED_PACKAGE_CONFIG_TRANSFORM", combined)
         manage = (HERE / "manage.sh").read_text(encoding="utf-8")
         self.assertIn('exec sudo -- "$here/root-transaction.sh" --status', manage)
         self.assertNotIn("ensure_runtime_root_mode", manage)

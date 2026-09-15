@@ -151,12 +151,12 @@ sentiero operativo predefinito fino alla fine del progetto:
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=E_CLOSED
+CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
 PHASE_E_CLOSED=true
-NEXT_PHASE=F
+NEXT_PHASE=F_AFTER_KSCREENLOCKER_CORRECTIVE
 ```
 
 Il target production iniziale resta deliberatamente ristretto a:
@@ -182,8 +182,10 @@ production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. Le Phase B e C
 sono chiuse; le prove lifecycle riportate dall'Utente hanno chiuso anche Phase
-D. D296 ha qualificato la release candidate privata e chiuso Phase E; la fase
-successiva è **Phase F**, non ancora iniziata. Il corrective D293
+D. D296 ha qualificato la release candidate privata e chiuso Phase E. Prima
+di iniziare Phase F, l'Utente ha aperto il correttivo bounded D297/01 perché il
+deployment qualificato gestiva `plasmalogin` ma non rendeva persistente il
+percorso KScreenLocker già provato da D289; Phase F resta non iniziata. Il corrective D293
 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
@@ -382,7 +384,7 @@ iniziare la fase successiva:
 PHASE_CLOSED => STOP
 ```
 
-### Stato corrente — Phase E chiusa, release candidate privata qualificata
+### Stato corrente — correttivo KScreenLocker pre-Phase-F aperto
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -547,10 +549,11 @@ reboot o workaround Goodix-specifici. La seconda action D2/02 termina con
 `verify-no-match (done)`, che è PASS di recovery ma non MATCH biometrico.
 Nessun cambio al codice è stato richiesto. La successiva Phase E è stata
 autorizzata il 15 settembre 2026 e D296 l'ha chiusa con una candidate privata
-qualificata; Phase F non viene iniziata o preparata in questa sessione.
+qualificata. La decisione corrente apre il corrective D297/01 KScreenLocker
+prima di Phase F; la pubblicazione non è iniziata.
 
 ```text
-CURRENT_PHASE=E_CLOSED
+CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
@@ -645,17 +648,17 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=F
+NEXT_PHASE=F_AFTER_KSCREENLOCKER_CORRECTIVE
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
 RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
 RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
-RELEASE_QUALIFICATION=PASS
+RELEASE_QUALIFICATION=D296_PRIOR_CANDIDATE_ONLY
 NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
-CURRENT_TASK=NONE_PHASE_E_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
-NEW_LIVE_REQUIRED_NOW=false
-PM_DECISION=PROJECT_STEP_COMPLETE
+CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
+NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
+NEW_LIVE_REQUIRED_NOW=true
+PM_DECISION=HUMAN_REQUIRED
 D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
 PACKAGE_OWNED_PLASMALOGIN_MODIFIED=false
 MANAGED_PAM_INTEGRATION=true
@@ -1215,7 +1218,7 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Ultimo avanzamento consolidato — D296/01 closure Phase E
+### Ultimo avanzamento consolidato precedente — D296/01 closure Phase E
 
 La decisione esplicita dell'Utente del 15 settembre 2026 ha aperto Phase E.
 Il lavoro ha qualificato una release candidate privata senza nuove azioni live,
@@ -1300,6 +1303,108 @@ LIVE_EXECUTION_PERFORMED=false
 PHASE_E_CLOSED=true
 NEXT_PHASE=F
 PM_DECISION=PROJECT_STEP_COMPLETE
+```
+
+### Ultimo avanzamento corrente — D297/01 persistenza KScreenLocker e dual deployment
+
+La verifica richiesta dall'Utente prima della pubblicazione ha individuato un
+gap reale nel deployment, non nel driver. D289/01 aveva già provato sul target
+la catena completa di una sessione KDE realmente bloccata:
+
+```text
+KWin/KScreenLocker reale
+→ kde-fingerprint
+→ pam_fprintd
+→ fprintd
+→ Goodix VERIFY/SIGFM MATCH
+→ GetActive false -> true -> false
+```
+
+Quella prova usava però un overlay temporaneo: il file
+`operator_kit/live_probe/experiments/d289-real-locked-session/goodix-d289-kde-fingerprint.pam`
+conteneva una singola regola `pam_fprintd` one-shot; `root-overlay.sh` la
+copiava root-owned sotto `/run`, ne replicava il contesto SELinux e applicava un
+bind mount read-only sul solo `/etc/pam.d/kde-fingerprint` nel mount namespace
+di KWin. `RELEASE`, EOF, segnale o errore eseguivano unmount, verifica
+dell'hash originale e rimozione del runtime. La live PASS ha verificato
+`ROOT_OVERLAY_UNMOUNTED`, `ROOT_HOST_PAM_RESTORED` e `ROOT_RUNTIME_REMOVED`.
+Era quindi una proof path bounded, non una configurazione production
+persistente.
+
+Il deployment source-first successivo gestiva soltanto `plasmalogin`: derivava
+`/etc/pam.d/plasmalogin` dal vendor `/usr/lib/pam.d/plasmalogin` e inseriva
+`pam_fprintd` prima di `password-auth`. `kde-fingerprint` restava completamente
+fuori da candidate, state, install/update/rollback/uninstall e status. Con
+authselect `local` senza `with-fingerprint`, il suo `auth substack
+fingerprint-auth` raggiungeva perciò `pam_debug auth=authinfo_unavail` e il
+sensore non veniva interrogato.
+
+Il layout Fedora 44 corrente richiede un modello distinto da plasmalogin.
+`/etc/pam.d/kde-fingerprint` è posseduto da
+`plasma-workspace-6.7.5-1.fc44.x86_64`, digest RPM
+`8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437`,
+mode package `root:root:0644` e flag RPM `17` (`%config(noreplace)`); non esiste
+`/usr/lib/pam.d/kde-fingerprint`. Il contenuto coincide col package e con gli
+hash D288/D289. Il correttivo managed salva quindi l'originale e una copia
+trasformata sotto lo state root-owned, sostituendo soltanto la riga auth con:
+
+```text
+auth        required      pam_fprintd.so max-tries=3 timeout=45
+```
+
+Le righe account/password/session restano byte-per-byte derivate dal file
+package-owned. I tre tentativi sono bounded dal modulo, senza quarto tentativo;
+authselect e `/etc/pam.d/fingerprint-auth` non vengono modificati. Candidate e
+manifest includono la regola dichiarativa. Installazione fresh, migrazione da
+candidate precedente, update, rollback bidirezionale, uninstall e status
+registrano separatamente stato e hash KScreenLocker. Customizzazione
+amministrativa preesistente, drift di contenuto/metadata/digest RPM e presenza
+di `.rpmnew`/`.rpmsave` falliscono chiuso. L'uninstall ripristina esattamente
+l'originale solo in assenza di drift package, evitando di sovrascrivere alla
+cieca un futuro aggiornamento Fedora.
+
+Il probe read-only sul laptop reale ha inoltre determinato che non è installato
+il deployment Phase C: state, current link, wrapper e drop-in managed sono
+assenti. Restano invece attivi il drop-in storico D293 `95`, il wrapper
+`goodix-d293-native-fprintd`, la runtime `/usr/local` e il `plasmalogin`
+package-owned storicamente modificato con la regola fingerprint. Il corrective
+live non deve quindi migrare il laptop alla candidate. La patch transitoria
+`operator_kit/d297-01-kscreenlocker-historical-runtime/` applica soltanto lo
+stesso delta a `kde-fingerprint`, salva l'originale root-only e offre rollback
+simmetrico; non riavvia servizi e non cambia runtime, driver, fprintd,
+authselect, `fingerprint-auth`, materiali o template. Prima della futura
+migrazione si rimuove prima questa patch, poi si ripristina il deployment
+storico D293, e soltanto dopo il manager ufficiale prende ownership.
+
+La suite synthetic-root copre diciassette scenari e passa integralmente:
+fresh/idempotenza/update/rollback/uninstall, due migrazioni legacy, collisioni,
+drift package/override/metadata, candidate tamper/file-set, rollback di install
+parziali anche dopo la sostituzione KScreenLocker, preservazione materiali,
+status e safety statica. Sintassi Bash/Python e `status.sh` del kit sono PASS.
+Il probe read-only corrente restituisce
+`ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME` e
+`KSCREENLOCKER_PAM_STATUS=VENDOR_UNPATCHED`. Nessuna installazione, USB, azione
+biometrica o lettura di materiale protetto è stata eseguita dall'AI.
+
+La closure resta al Human Gate: l'Utente deve applicare la patch sul runtime
+storico e osservare il normale workflow `Meta+L`, con massimo tre contatti e
+stop al primo MATCH, oltre alle regressioni login e `sudo`. Un PASS prova il
+feature path sul runtime storico, non una migrazione live completa alla
+candidate managed.
+
+```text
+D289_PATH_RECOVERED_AND_UNDERSTOOD=true
+PRODUCTION_DEPLOYMENT_GAP_CONFIRMED=true
+AUTHSELECT_GLOBAL_FINGERPRINT_UNCHANGED=true
+FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true
+KDE_FINGERPRINT_MANAGED_INTEGRATION_PRESENT=true
+DRIVER_LIBFPRINT_FPRINTD_CORE_CHANGED=false
+ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME
+HISTORICAL_RUNTIME_REPLACED_AS_SIDE_EFFECT=false
+CANDIDATE_MANAGED_KSCREENLOCKER_FIX=IMPLEMENTED_AND_OFFLINE_TESTED
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=AWAITING_HUMAN_GATE
+CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
+PM_DECISION=HUMAN_REQUIRED
 ```
 
 ### Avanzamento live precedente — closure Phase D lifecycle

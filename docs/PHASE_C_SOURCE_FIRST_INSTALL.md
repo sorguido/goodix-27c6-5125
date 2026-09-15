@@ -41,6 +41,15 @@ kit Dxxx, firmware o configurazioni per singolo utente. Per `plasmalogin`
 genera inoltre un override gestito in `/etc/pam.d` dalla copia vendor verificata:
 non modifica mai `/usr/lib/pam.d/plasmalogin`.
 
+Per KScreenLocker Fedora usa invece direttamente il file package-owned
+`/etc/pam.d/kde-fingerprint` (`plasma-workspace`, `%config(noreplace)`), senza
+una sorgente parallela in `/usr/lib/pam.d`. Il gestore ne salva quindi la copia
+originale hash-pinned e genera una versione che sostituisce soltanto il
+substack auth `fingerprint-auth` con `pam_fprintd.so max-tries=3 timeout=45`.
+Rollback e uninstall ripristinano esattamente l'originale; drift, collisioni e
+artefatti `.rpmnew`/`.rpmsave` bloccano la transazione. Authselect e il file
+globale `fingerprint-auth` restano invariati.
+
 ## 1. Preparazione della VM
 
 Installare Fedora 44 KDE x86_64, applicare gli aggiornamenti e creare uno
@@ -179,12 +188,16 @@ systemctl cat fprintd.service
 sha256sum -c "$HOME/plasmalogin.vendor.before.sha256"
 grep -nE 'pam_fprintd\.so|auth[[:space:]]+substack[[:space:]]+password-auth' \
   /etc/pam.d/plasmalogin
+grep -nE 'pam_fprintd\.so|auth[[:space:]]+substack[[:space:]]+fingerprint-auth' \
+  /etc/pam.d/kde-fingerprint
 ```
 
 Attesi: `PHASE_C_INSTALL=PASS`, commit corrente,
 `PROTECTED_MATERIAL_READY=true`, `PHASE_C_STATUS=ACTIVE`,
 `MANAGED_PAM_INTEGRATION=true`, `MANAGED_PAM_STATUS=ACTIVE` e wrapper
-`/usr/libexec/goodix-27c6-5125/fprintd-wrapper`. Una seconda installazione della
+`/usr/libexec/goodix-27c6-5125/fprintd-wrapper`, più
+`KSCREENLOCKER_MANAGED_PAM_INTEGRATION=true` e
+`KSCREENLOCKER_MANAGED_PAM_STATUS=ACTIVE`. Una seconda installazione della
 stessa candidate risponde `PHASE_C_INSTALL=PASS_ALREADY_CURRENT`.
 
 La regola `auth sufficient pam_fprintd.so` deve precedere il substack
@@ -203,8 +216,9 @@ eseguire operator kit Dxxx.
 1. reader visibile nel KCM KDE;
 2. enrollment di un normale utente locale;
 3. logout e login Plasma con impronta;
-4. password fallback;
-5. delete dell'impronta dal KCM.
+4. blocco della sessione reale con `Meta+L` e sblocco con impronta;
+5. password fallback;
+6. delete dell'impronta dal KCM.
 
 Per il login biometrico: massimo tre tentativi, stop al primo MATCH, nessun
 quarto tentativo. Provare prima il login password e poi il login fingerprint.
@@ -221,16 +235,23 @@ deployment/phase-c-source-first-managed/manage.sh uninstall
 
 Il gestore conserva un solo commit precedente. Un secondo update fallisce con
 `rollback_slot_occupied`, senza eliminare versioni. Rollback scambia i due
-commit e anche lo stato PAM: il rollback della migrazione dal D295 precedente
-rimuove `/etc/pam.d/plasmalogin`; il rollback inverso lo ripristina dall'oggetto
-root-owned e hash-pinned. Uninstall rimuove l'override, espone il PAM vendor Fedora,
-ripristina fprintd Fedora e preserva deliberatamente materiali protetti e
-template fprintd; non esiste un purge implicito.
+commit e anche entrambi gli stati PAM: il rollback della migrazione dal D295
+precedente rimuove `/etc/pam.d/plasmalogin` e ripristina byte-per-byte il
+`kde-fingerprint` package-owned; il rollback inverso ripristina entrambe le
+integrazioni dagli oggetti root-owned e hash-pinned. Uninstall rimuove
+l'override plasmalogin, ripristina il `kde-fingerprint` originale, espone il PAM
+vendor Fedora, ripristina fprintd Fedora e preserva deliberatamente materiali
+protetti e template fprintd; non esiste un purge implicito.
 
 Se un update Fedora cambia il PAM vendor, status/update/rollback falliscono con
 `plasmalogin_vendor_pam_drift`: riesaminare il nuovo file e costruire una nuova
 installazione. L'uninstall resta consentito solo se l'override gestito è ancora
 byte-identico allo state e non modifica il nuovo vendor.
+
+Per `kde-fingerprint`, un cambio del digest RPM o la presenza di `.rpmnew` o
+`.rpmsave` fa fallire chiuso status/update/rollback/uninstall: non ripristinare
+alla cieca una configurazione precedente sopra un nuovo package. Riesaminare il
+nuovo layout Fedora e produrre un correttivo compatibile prima di procedere.
 
 Se il login grafico non è raggiungibile, usare una console testuale o lo
 snapshot e lanciare `manage.sh uninstall`. In caso di drift, il gestore fallisce

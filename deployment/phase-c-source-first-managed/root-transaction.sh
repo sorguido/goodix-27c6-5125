@@ -23,10 +23,14 @@ hook=$(p /etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete)
 vendor_pam=$(p /usr/lib/pam.d/plasmalogin)
 managed_pam=$(p /etc/pam.d/plasmalogin)
 pam_saved=$state_dir/plasmalogin.managed
+kde_fingerprint_pam=$(p /etc/pam.d/kde-fingerprint)
+kde_fingerprint_vendor_saved=$state_dir/kde-fingerprint.vendor
+kde_fingerprint_managed_saved=$state_dir/kde-fingerprint.managed
 material=$(p /var/lib/goodix-5125-poc)
 policy_name=goodix_fprint_account_delete
 policy_priority=400
 expected_pam_rule='auth        sufficient                                   pam_fprintd.so'
+expected_kde_fingerprint_pam_rule='auth        required      pam_fprintd.so max-tries=3 timeout=45'
 required_candidate=(
   MANIFEST SHA256SUMS SBOM.spdx.json THIRD_PARTY_NOTICES.md LICENSE
   GPL-2.0-or-later.txt LGPL-2.1-or-later.txt GPL-3.0-or-later.txt
@@ -35,7 +39,7 @@ required_candidate=(
   libopencv_core.so.413 libopencv_features2d.so.413 libopencv_flann.so.413
   libopencv_imgproc.so.413 fprintd-wrapper 50-goodix-fprint-account-delete
   goodix_fprint_account_delete.te goodix_fprint_account_delete.fc
-  99-goodix-27c6-5125-managed.conf plasmalogin-pam.rule
+  99-goodix-27c6-5125-managed.conf plasmalogin-pam.rule kde-fingerprint-pam.rule
 )
 required_material=(target-material-manifest.json transport-material.bin target-config-90.bin gfusb.dll fdt-cache.bin)
 
@@ -103,6 +107,8 @@ verify_candidate() {
   [[ $(manifest_value "$candidate" PROTECTED_MATERIAL_INCLUDED) == false ]] || fail candidate_contains_material
   [[ $(manifest_value "$candidate" PAM_FILES_INCLUDED) == true ]] || fail managed_pam_rule_missing
   [[ $(manifest_value "$candidate" PAM_INTEGRATION) == MANAGED_ETC_OVERRIDE_FROM_VENDOR ]] || fail pam_integration_model_invalid
+  [[ $(manifest_value "$candidate" KSCREENLOCKER_PAM_INTEGRATION) == MANAGED_PACKAGE_CONFIG_TRANSFORM ]] ||
+    fail kscreenlocker_pam_integration_model_invalid
   [[ $(manifest_value "$candidate" SBOM_FORMAT) == SPDX-2.3-JSON ]] || fail sbom_format_invalid
   [[ $(manifest_value "$candidate" COMBINED_BINARY_LICENSE) == GPL-3.0-or-later ]] || fail combined_binary_license_invalid
   [[ $(manifest_value "$candidate" FAR_FRR_CLAIM) == NOT_MADE ]] || fail far_frr_claim_invalid
@@ -176,6 +182,75 @@ verify_pam_rule() {
   [[ $(wc -l <"$candidate/plasmalogin-pam.rule") -eq 1 && \
      $(<"$candidate/plasmalogin-pam.rule") == "$expected_pam_rule" ]] || fail pam_rule_invalid
 }
+verify_kde_fingerprint_pam_rule() {
+  local candidate=$1
+  [[ $(wc -l <"$candidate/kde-fingerprint-pam.rule") -eq 1 && \
+     $(<"$candidate/kde-fingerprint-pam.rule") == "$expected_kde_fingerprint_pam_rule" ]] ||
+    fail kde_fingerprint_pam_rule_invalid
+}
+kde_fingerprint_rpm_digest() {
+  if [[ -n $test_root ]]; then
+    printf '%s\n' "${GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256:-}"
+    return
+  fi
+  local output count
+  output=$(rpm -q --dump plasma-workspace | awk -v path=/etc/pam.d/kde-fingerprint '$1 == path { print $4 }') ||
+    fail kde_fingerprint_vendor_rpm_query_failed
+  count=$(wc -l <<<"$output")
+  [[ $count -eq 1 ]] || fail kde_fingerprint_vendor_rpm_metadata_invalid
+  printf '%s\n' "$output"
+}
+verify_kde_fingerprint_vendor_layout() {
+  local source=$1
+  [[ -f $source && ! -L $source ]] || fail kde_fingerprint_vendor_pam_invalid
+  [[ -z $(grep -F 'pam_fprintd.so' "$source" || true) ]] ||
+    fail kde_fingerprint_vendor_pam_already_modified
+  [[ $(grep -Ec '^[[:space:]]*auth[[:space:]]+substack[[:space:]]+fingerprint-auth[[:space:]]*$' "$source") -eq 1 ]] ||
+    fail kde_fingerprint_vendor_auth_boundary_invalid
+  [[ $(tail -c 1 "$source" | od -An -tuC | tr -d ' ') == 10 ]] ||
+    fail kde_fingerprint_vendor_pam_no_final_newline
+}
+verify_kde_fingerprint_target_metadata() {
+  [[ $(stat -c '%a' "$kde_fingerprint_pam") == 644 ]] || fail kde_fingerprint_pam_mode_drift
+  [[ -n $test_root || $(stat -c '%u:%g' "$kde_fingerprint_pam") == 0:0 ]] ||
+    fail kde_fingerprint_pam_owner_drift
+}
+verify_kde_fingerprint_vendor() {
+  local rpm_digest flags
+  verify_kde_fingerprint_vendor_layout "$kde_fingerprint_pam"
+  verify_kde_fingerprint_target_metadata
+  rpm_digest=$(kde_fingerprint_rpm_digest)
+  is_sha "$rpm_digest" || fail kde_fingerprint_vendor_rpm_digest_invalid
+  [[ $(digest "$kde_fingerprint_pam") == "$rpm_digest" ]] || fail kde_fingerprint_vendor_package_drift
+  if [[ -z $test_root ]]; then
+    [[ $(stat -c '%u:%g:%a' "$kde_fingerprint_pam") == 0:0:644 ]] ||
+      fail kde_fingerprint_vendor_pam_metadata_invalid
+    [[ $(. /etc/os-release; printf '%s' "${VERSION_ID:-}") == 44 ]] || fail unsupported_target_os
+    [[ $(rpm -q --whatprovides --qf '%{NAME}\n' "$kde_fingerprint_pam") == plasma-workspace ]] ||
+      fail kde_fingerprint_vendor_owner_invalid
+    flags=$(rpm -q --qf '[%{FILENAMES}\t%{FILEFLAGS}\n]' plasma-workspace |
+      awk -F '\t' '$1 == "/etc/pam.d/kde-fingerprint" { print $2 }')
+    [[ $flags == 17 ]] || fail kde_fingerprint_vendor_not_config_noreplace
+    rpm -q fprintd-pam >/dev/null || fail fprintd_pam_package_missing
+    [[ -f /usr/lib64/security/pam_fprintd.so && ! -L /usr/lib64/security/pam_fprintd.so ]] ||
+      fail pam_fprintd_module_missing
+  fi
+  [[ ! -e $kde_fingerprint_pam.rpmnew && ! -L $kde_fingerprint_pam.rpmnew && \
+     ! -e $kde_fingerprint_pam.rpmsave && ! -L $kde_fingerprint_pam.rpmsave ]] ||
+    fail kde_fingerprint_package_upgrade_artifact_present
+}
+generate_kde_fingerprint_pam() {
+  local candidate=$1 source=$2 output=$3
+  verify_kde_fingerprint_pam_rule "$candidate"
+  verify_kde_fingerprint_vendor_layout "$source"
+  awk -v rule="$expected_kde_fingerprint_pam_rule" '
+    /^[[:space:]]*auth[[:space:]]+substack[[:space:]]+fingerprint-auth[[:space:]]*$/ && !replaced {
+      print rule; replaced=1; next
+    }
+    { print }
+    END { if (!replaced) exit 1 }
+  ' "$source" >"$output" || fail kde_fingerprint_pam_generation_failed
+}
 verify_vendor_pam() {
   local verification
   [[ -f $vendor_pam && ! -L $vendor_pam ]] || fail plasmalogin_vendor_pam_invalid
@@ -248,9 +323,79 @@ restore_managed_pam() {
   install -D -m 0644 "$pam_saved" "$managed_pam"
   host_action restorecon -F "$managed_pam"
 }
+verify_saved_kde_fingerprint_pam() {
+  local expected_vendor=$1 expected_override=$2 rpm_digest rendered=$state_dir/kde-fingerprint.verify.$$
+  is_sha "$expected_vendor" && is_sha "$expected_override" || fail kscreenlocker_pam_state_hash_invalid
+  rpm_digest=$(kde_fingerprint_rpm_digest)
+  [[ $rpm_digest == "$expected_vendor" ]] || fail kde_fingerprint_vendor_package_drift
+  [[ -f $kde_fingerprint_vendor_saved && ! -L $kde_fingerprint_vendor_saved && \
+     $(digest "$kde_fingerprint_vendor_saved") == "$expected_vendor" ]] ||
+    fail kde_fingerprint_vendor_saved_drift
+  [[ -f $kde_fingerprint_managed_saved && ! -L $kde_fingerprint_managed_saved && \
+     $(digest "$kde_fingerprint_managed_saved") == "$expected_override" ]] ||
+    fail kde_fingerprint_managed_saved_drift
+  [[ -n $test_root || $(stat -c '%u:%g:%a' "$kde_fingerprint_vendor_saved") == 0:0:644 ]] ||
+    fail kde_fingerprint_vendor_saved_metadata_invalid
+  [[ -n $test_root || $(stat -c '%u:%g:%a' "$kde_fingerprint_managed_saved") == 0:0:644 ]] ||
+    fail kde_fingerprint_managed_saved_metadata_invalid
+  verify_kde_fingerprint_vendor_layout "$kde_fingerprint_vendor_saved"
+  awk -v rule="$expected_kde_fingerprint_pam_rule" '
+    /^[[:space:]]*auth[[:space:]]+substack[[:space:]]+fingerprint-auth[[:space:]]*$/ && !replaced {
+      print rule; replaced=1; next
+    }
+    { print }
+    END { if (!replaced) exit 1 }
+  ' "$kde_fingerprint_vendor_saved" >"$rendered" || fail kde_fingerprint_saved_render_failed
+  if ! cmp -s "$rendered" "$kde_fingerprint_managed_saved"; then
+    rm -f -- "$rendered"
+    fail kde_fingerprint_managed_not_vendor_derived
+  fi
+  rm -f -- "$rendered"
+  [[ ! -e $kde_fingerprint_pam.rpmnew && ! -L $kde_fingerprint_pam.rpmnew && \
+     ! -e $kde_fingerprint_pam.rpmsave && ! -L $kde_fingerprint_pam.rpmsave ]] ||
+    fail kde_fingerprint_package_upgrade_artifact_present
+}
+install_managed_kde_fingerprint_pam() {
+  local candidate=$1 generated=$state_dir/kde-fingerprint.pending.$$
+  [[ ! -e $kde_fingerprint_vendor_saved && ! -L $kde_fingerprint_vendor_saved && \
+     ! -e $kde_fingerprint_managed_saved && ! -L $kde_fingerprint_managed_saved ]] ||
+    fail kde_fingerprint_managed_state_collision
+  verify_kde_fingerprint_vendor
+  generate_kde_fingerprint_pam "$candidate" "$kde_fingerprint_pam" "$generated"
+  install -m 0644 "$kde_fingerprint_pam" "$kde_fingerprint_vendor_saved"
+  install -m 0644 "$generated" "$kde_fingerprint_managed_saved"
+  rm -f -- "$generated"
+  installed_kde_fingerprint_vendor_sha=$(digest "$kde_fingerprint_vendor_saved")
+  installed_kde_fingerprint_override_sha=$(digest "$kde_fingerprint_managed_saved")
+  verify_saved_kde_fingerprint_pam "$installed_kde_fingerprint_vendor_sha" \
+    "$installed_kde_fingerprint_override_sha"
+  install -m 0644 "$kde_fingerprint_managed_saved" "$kde_fingerprint_pam"
+  host_action restorecon -F "$kde_fingerprint_pam"
+  [[ $(digest "$kde_fingerprint_pam") == "$installed_kde_fingerprint_override_sha" ]] ||
+    fail kde_fingerprint_managed_activation_failed
+}
+activate_managed_kde_fingerprint_pam() {
+  local expected_vendor=$1 expected_override=$2
+  verify_saved_kde_fingerprint_pam "$expected_vendor" "$expected_override"
+  [[ -f $kde_fingerprint_pam && ! -L $kde_fingerprint_pam && \
+     $(digest "$kde_fingerprint_pam") == "$expected_vendor" ]] ||
+    fail kde_fingerprint_vendor_restore_drift
+  install -m 0644 "$kde_fingerprint_managed_saved" "$kde_fingerprint_pam"
+  host_action restorecon -F "$kde_fingerprint_pam"
+}
+deactivate_managed_kde_fingerprint_pam() {
+  local expected_vendor=$1 expected_override=$2
+  verify_saved_kde_fingerprint_pam "$expected_vendor" "$expected_override"
+  [[ -f $kde_fingerprint_pam && ! -L $kde_fingerprint_pam && \
+     $(digest "$kde_fingerprint_pam") == "$expected_override" ]] ||
+    fail kde_fingerprint_managed_override_drift
+  install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
+  host_action restorecon -F "$kde_fingerprint_pam"
+}
 write_state() {
   local current=$1 previous=$2 installer=$3 service_before=$4 current_digest=$5 previous_digest=$6
   local current_pam=$7 previous_pam=$8 pam_vendor_sha=$9 pam_override_sha=${10}
+  local current_kde_pam=${11} previous_kde_pam=${12} kde_vendor_sha=${13} kde_override_sha=${14}
   local pending=$state.pending.$$
   {
     echo PHASE_C_STATUS=ACTIVE
@@ -269,6 +414,10 @@ write_state() {
     echo "PREVIOUS_PAM_STATUS=$previous_pam"
     echo "PAM_VENDOR_SHA256=$pam_vendor_sha"
     echo "PAM_OVERRIDE_SHA256=$pam_override_sha"
+    echo "CURRENT_KSCREENLOCKER_PAM_STATUS=$current_kde_pam"
+    echo "PREVIOUS_KSCREENLOCKER_PAM_STATUS=$previous_kde_pam"
+    echo "KSCREENLOCKER_VENDOR_SHA256=$kde_vendor_sha"
+    echo "KSCREENLOCKER_OVERRIDE_SHA256=$kde_override_sha"
   } >"$pending"
   chmod 0644 "$pending"
   mv -f -- "$pending" "$state"
@@ -316,7 +465,12 @@ verify_active() {
     [[ $allow_legacy == true ]] || fail legacy_state_requires_pam_corrective_update
     [[ ! -e $managed_pam && ! -L $managed_pam && ! -e $pam_saved && ! -L $pam_saved ]] ||
       fail legacy_state_managed_pam_collision
+    [[ ! -e $kde_fingerprint_vendor_saved && ! -L $kde_fingerprint_vendor_saved && \
+       ! -e $kde_fingerprint_managed_saved && ! -L $kde_fingerprint_managed_saved ]] ||
+      fail legacy_state_kscreenlocker_pam_collision
+    verify_kde_fingerprint_vendor
     ACTIVE_PAM_STATE=LEGACY
+    ACTIVE_KSCREENLOCKER_PAM_STATE=LEGACY
     return
   fi
   local current_pam previous_pam vendor_sha override_sha
@@ -351,11 +505,47 @@ verify_active() {
     [[ ! -e $managed_pam && ! -L $managed_pam ]] || fail managed_pam_expected_absent
   fi
   ACTIVE_PAM_STATE=MANAGED
+  if ! awk -F= '$1 == "CURRENT_KSCREENLOCKER_PAM_STATUS" { found=1 } END { exit !found }' "$state"; then
+    [[ $allow_legacy == true ]] || fail legacy_state_requires_kscreenlocker_pam_corrective_update
+    [[ ! -e $kde_fingerprint_vendor_saved && ! -L $kde_fingerprint_vendor_saved && \
+       ! -e $kde_fingerprint_managed_saved && ! -L $kde_fingerprint_managed_saved ]] ||
+      fail legacy_state_kscreenlocker_pam_collision
+    verify_kde_fingerprint_vendor
+    ACTIVE_KSCREENLOCKER_PAM_STATE=LEGACY
+    return
+  fi
+  local current_kde_pam previous_kde_pam kde_vendor_sha kde_override_sha
+  current_kde_pam=$(state_value CURRENT_KSCREENLOCKER_PAM_STATUS)
+  previous_kde_pam=$(state_value PREVIOUS_KSCREENLOCKER_PAM_STATUS)
+  kde_vendor_sha=$(state_value KSCREENLOCKER_VENDOR_SHA256)
+  kde_override_sha=$(state_value KSCREENLOCKER_OVERRIDE_SHA256)
+  [[ $current_kde_pam == ACTIVE || $current_kde_pam == ABSENT ]] ||
+    fail current_kscreenlocker_pam_status_invalid
+  if [[ $previous == NONE ]]; then
+    [[ $previous_kde_pam == NONE && $current_kde_pam == ACTIVE ]] ||
+      fail previous_kscreenlocker_pam_status_invalid
+  else
+    [[ $previous_kde_pam == ACTIVE || $previous_kde_pam == ABSENT ]] ||
+      fail previous_kscreenlocker_pam_status_invalid
+  fi
+  verify_saved_kde_fingerprint_pam "$kde_vendor_sha" "$kde_override_sha"
+  if [[ $current_kde_pam == ACTIVE ]]; then
+    [[ -f $kde_fingerprint_pam && ! -L $kde_fingerprint_pam && \
+       $(digest "$kde_fingerprint_pam") == "$kde_override_sha" ]] ||
+      fail kde_fingerprint_managed_override_drift
+  else
+    [[ -f $kde_fingerprint_pam && ! -L $kde_fingerprint_pam && \
+       $(digest "$kde_fingerprint_pam") == "$kde_vendor_sha" ]] ||
+      fail kde_fingerprint_vendor_restore_drift
+  fi
+  verify_kde_fingerprint_target_metadata
+  ACTIVE_KSCREENLOCKER_PAM_STATE=MANAGED
 }
 
 root_install_or_update() {
   local mode=$1 caller=$2 source_candidate=$3 candidate commit current previous service_before installer
   local current_pam pam_vendor_sha pam_override_sha
+  local current_kde_pam kde_vendor_sha kde_override_sha
   [[ -n $test_root || ${SUDO_USER:-} == "$caller" ]] || fail caller_identity_mismatch
   candidate=$(freeze_candidate "$source_candidate" "$caller")
   cleanup_kind=none
@@ -365,6 +555,7 @@ root_install_or_update() {
   cleanup_link_switched=false
   cleanup_service_before=inactive
   cleanup_pam_installed=false
+  cleanup_kde_pam_installed=false
   cleanup_transaction() {
     local rc=$?
     set +e
@@ -375,10 +566,20 @@ root_install_or_update() {
       fi
       [[ -z $cleanup_runtime || ! -d $cleanup_runtime ]] || find "$cleanup_runtime" -xdev -depth -delete
       if [[ $cleanup_pam_installed == true ]]; then rm -f -- "$managed_pam" "$pam_saved"; fi
+      if [[ $cleanup_kde_pam_installed == true && -f $kde_fingerprint_vendor_saved ]]; then
+        install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
+        host_action restorecon -F "$kde_fingerprint_pam"
+        rm -f -- "$kde_fingerprint_vendor_saved" "$kde_fingerprint_managed_saved"
+      fi
       host_action systemctl daemon-reload
       [[ $cleanup_service_before != active ]] || host_action systemctl start fprintd.service
     elif [[ $rc -ne 0 && $cleanup_kind == fresh ]]; then
-      rm -f -- "$current_link" "$wrapper" "$dropin" "$hook" "$managed_pam" "$pam_saved" "$state"
+      if [[ $cleanup_kde_pam_installed == true && -f $kde_fingerprint_vendor_saved ]]; then
+        install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
+        host_action restorecon -F "$kde_fingerprint_pam"
+      fi
+      rm -f -- "$current_link" "$wrapper" "$dropin" "$hook" "$managed_pam" "$pam_saved" \
+        "$kde_fingerprint_vendor_saved" "$kde_fingerprint_managed_saved" "$state"
       [[ -z $cleanup_runtime || ! -d $cleanup_runtime ]] || find "$cleanup_runtime" -xdev -depth -delete
       rmdir -- "$runtime_root" 2>/dev/null
       [[ $cleanup_policy != true ]] || remove_policy
@@ -392,11 +593,13 @@ root_install_or_update() {
   trap cleanup_transaction EXIT
   commit=$(verify_candidate "$candidate" "$caller" true)
   verify_pam_rule "$candidate"
+  verify_kde_fingerprint_pam_rule "$candidate"
   if [[ -f $state ]]; then
     verify_active true
     current=$(state_value CURRENT_COMMIT); previous=$(state_value PREVIOUS_COMMIT)
     if [[ $commit == "$current" ]]; then
-      [[ $ACTIVE_PAM_STATE != LEGACY ]] || fail same_commit_requires_pam_corrective_update
+      [[ $ACTIVE_PAM_STATE != LEGACY && $ACTIVE_KSCREENLOCKER_PAM_STATE != LEGACY ]] ||
+        fail same_commit_requires_pam_corrective_update
       printf '%s\n' 'PHASE_C_INSTALL=PASS_ALREADY_CURRENT' "CURRENT_COMMIT=$current"
       remove_frozen_candidate "$candidate"; trap - EXIT; return
     fi
@@ -422,6 +625,17 @@ root_install_or_update() {
       pam_vendor_sha=$(state_value PAM_VENDOR_SHA256)
       pam_override_sha=$(state_value PAM_OVERRIDE_SHA256)
     fi
+    if [[ $ACTIVE_KSCREENLOCKER_PAM_STATE == LEGACY ]]; then
+      current_kde_pam=ABSENT
+      cleanup_kde_pam_installed=true
+      install_managed_kde_fingerprint_pam "$candidate"
+      kde_vendor_sha=$installed_kde_fingerprint_vendor_sha
+      kde_override_sha=$installed_kde_fingerprint_override_sha
+    else
+      current_kde_pam=$(state_value CURRENT_KSCREENLOCKER_PAM_STATUS)
+      kde_vendor_sha=$(state_value KSCREENLOCKER_VENDOR_SHA256)
+      kde_override_sha=$(state_value KSCREENLOCKER_OVERRIDE_SHA256)
+    fi
     install_runtime_tree "$candidate" "$commit"
     ln -s "$commit" "$runtime_root/current.next"
     mv -Tf -- "$runtime_root/current.next" "$current_link"
@@ -429,7 +643,8 @@ root_install_or_update() {
     host_action systemctl restart fprintd.service
     write_state "$commit" "$current" "$installer" "$cleanup_service_before" \
       "$(tree_digest "$runtime_root/$commit")" "$(tree_digest "$runtime_root/$current")" \
-      ACTIVE "$current_pam" "$pam_vendor_sha" "$pam_override_sha"
+      ACTIVE "$current_pam" "$pam_vendor_sha" "$pam_override_sha" \
+      ACTIVE "$current_kde_pam" "$kde_vendor_sha" "$kde_override_sha"
     cleanup_kind=none
     printf '%s\n' 'PHASE_C_UPDATE=PASS' "CURRENT_COMMIT=$commit" "ROLLBACK_COMMIT=$current"
     remove_frozen_candidate "$candidate"; trap - EXIT; return
@@ -440,6 +655,7 @@ root_install_or_update() {
      ! -e $managed_pam && ! -L $managed_pam ]] ||
     fail managed_path_collision
   verify_vendor_pam
+  verify_kde_fingerprint_vendor
   service_before=$(service_state)
   [[ $service_before == active || $service_before == inactive ]] || fail unsupported_service_state
   cleanup_kind=fresh
@@ -456,16 +672,23 @@ root_install_or_update() {
   host_action restorecon -F "$hook"
   install_managed_pam "$candidate"
   cleanup_pam_installed=true
+  cleanup_kde_pam_installed=true
+  install_managed_kde_fingerprint_pam "$candidate"
+  if [[ ${GOODIX_MANAGED_TEST_FAIL_AFTER_KSCREENLOCKER_PAM:-false} == true ]]; then
+    fail injected_failure_after_kscreenlocker_pam
+  fi
   install_runtime_tree "$candidate" "$commit"
   ln -s "$commit" "$current_link"
   write_state "$commit" NONE "$caller" "$service_before" "$(tree_digest "$runtime_root/$commit")" NONE \
-    ACTIVE NONE "$installed_pam_vendor_sha" "$installed_pam_override_sha"
+    ACTIVE NONE "$installed_pam_vendor_sha" "$installed_pam_override_sha" \
+    ACTIVE NONE "$installed_kde_fingerprint_vendor_sha" "$installed_kde_fingerprint_override_sha"
   host_action systemctl daemon-reload
   if material_ready && [[ $service_before == active ]]; then host_action systemctl start fprintd.service; fi
   cleanup_kind=none
   printf '%s\n' 'PHASE_C_INSTALL=PASS' "CURRENT_COMMIT=$commit" \
     "PROTECTED_MATERIAL_READY=$(material_ready && echo true || echo false)" \
-    'MANAGED_PAM_INTEGRATION=true' 'PLASMALOGIN_VENDOR_MODIFIED=false'
+    'MANAGED_PAM_INTEGRATION=true' 'PLASMALOGIN_VENDOR_MODIFIED=false' \
+    'KSCREENLOCKER_MANAGED_PAM_INTEGRATION=true' 'FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true'
   remove_frozen_candidate "$candidate"
   trap - EXIT
 }
@@ -473,6 +696,7 @@ root_install_or_update() {
 root_rollback() {
   local caller=$1 current previous current_digest previous_digest service_before
   local current_pam previous_pam vendor_sha override_sha
+  local current_kde_pam previous_kde_pam kde_vendor_sha kde_override_sha
   [[ -n $test_root || ${SUDO_USER:-} == "$caller" ]] || fail caller_identity_mismatch
   verify_active
   [[ $(state_value INSTALLER) == "$caller" ]] || fail installer_mismatch
@@ -482,7 +706,12 @@ root_rollback() {
   service_before=$(state_value SERVICE_BEFORE)
   current_pam=$(state_value CURRENT_PAM_STATUS); previous_pam=$(state_value PREVIOUS_PAM_STATUS)
   vendor_sha=$(state_value PAM_VENDOR_SHA256); override_sha=$(state_value PAM_OVERRIDE_SHA256)
+  current_kde_pam=$(state_value CURRENT_KSCREENLOCKER_PAM_STATUS)
+  previous_kde_pam=$(state_value PREVIOUS_KSCREENLOCKER_PAM_STATUS)
+  kde_vendor_sha=$(state_value KSCREENLOCKER_VENDOR_SHA256)
+  kde_override_sha=$(state_value KSCREENLOCKER_OVERRIDE_SHA256)
   rollback_pam_changed=false
+  rollback_kde_pam_changed=false
   rollback_link_switched=false
   rollback_cleanup() {
     local rc=$?
@@ -500,6 +729,14 @@ root_rollback() {
           rm -f -- "$managed_pam"
         fi
       fi
+      if [[ $rollback_kde_pam_changed == true ]]; then
+        if [[ $current_kde_pam == ACTIVE ]]; then
+          install -m 0644 "$kde_fingerprint_managed_saved" "$kde_fingerprint_pam"
+        else
+          install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
+        fi
+        host_action restorecon -F "$kde_fingerprint_pam"
+      fi
       host_action systemctl daemon-reload
       [[ $service_before != active ]] || host_action systemctl start fprintd.service
     fi
@@ -509,22 +746,32 @@ root_rollback() {
   trap rollback_cleanup EXIT
   host_action systemctl stop fprintd.service
   if [[ $current_pam != "$previous_pam" ]]; then
+    rollback_pam_changed=true
     if [[ $previous_pam == ACTIVE ]]; then
       restore_managed_pam "$vendor_sha" "$override_sha"
     else
       remove_managed_pam "$vendor_sha" "$override_sha"
     fi
-    rollback_pam_changed=true
+  fi
+  if [[ $current_kde_pam != "$previous_kde_pam" ]]; then
+    rollback_kde_pam_changed=true
+    if [[ $previous_kde_pam == ACTIVE ]]; then
+      activate_managed_kde_fingerprint_pam "$kde_vendor_sha" "$kde_override_sha"
+    else
+      deactivate_managed_kde_fingerprint_pam "$kde_vendor_sha" "$kde_override_sha"
+    fi
   fi
   ln -s "$previous" "$runtime_root/current.next"
   mv -Tf -- "$runtime_root/current.next" "$current_link"
   rollback_link_switched=true
   write_state "$previous" "$current" "$caller" "$service_before" "$previous_digest" "$current_digest" \
-    "$previous_pam" "$current_pam" "$vendor_sha" "$override_sha"
+    "$previous_pam" "$current_pam" "$vendor_sha" "$override_sha" \
+    "$previous_kde_pam" "$current_kde_pam" "$kde_vendor_sha" "$kde_override_sha"
   host_action systemctl daemon-reload
   if material_ready && [[ $service_before == active ]]; then host_action systemctl start fprintd.service; fi
   printf '%s\n' 'PHASE_C_ROLLBACK=PASS' "CURRENT_COMMIT=$previous" "ROLLBACK_COMMIT=$current" \
-    "MANAGED_PAM_STATUS=$previous_pam" 'PLASMALOGIN_VENDOR_MODIFIED=false'
+    "MANAGED_PAM_STATUS=$previous_pam" "KSCREENLOCKER_MANAGED_PAM_STATUS=$previous_kde_pam" \
+    'PLASMALOGIN_VENDOR_MODIFIED=false' 'FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true'
   trap - EXIT
 }
 
@@ -540,17 +787,30 @@ root_uninstall() {
        $(digest "$managed_pam") == $(state_value PAM_OVERRIDE_SHA256) ]] || fail managed_pam_override_drift
     rm -f -- "$managed_pam"
   fi
+  if [[ $ACTIVE_KSCREENLOCKER_PAM_STATE == MANAGED ]]; then
+    if [[ $(state_value CURRENT_KSCREENLOCKER_PAM_STATUS) == ACTIVE ]]; then
+      deactivate_managed_kde_fingerprint_pam \
+        "$(state_value KSCREENLOCKER_VENDOR_SHA256)" "$(state_value KSCREENLOCKER_OVERRIDE_SHA256)"
+    else
+      verify_saved_kde_fingerprint_pam \
+        "$(state_value KSCREENLOCKER_VENDOR_SHA256)" "$(state_value KSCREENLOCKER_OVERRIDE_SHA256)"
+      [[ $(digest "$kde_fingerprint_pam") == $(state_value KSCREENLOCKER_VENDOR_SHA256) ]] ||
+        fail kde_fingerprint_vendor_restore_drift
+    fi
+  fi
   remove_policy
   rm -f -- "$current_link" "$wrapper" "$dropin" "$hook"
   find "$runtime_root/$current" -xdev -depth -delete
   if [[ $previous != NONE ]]; then find "$runtime_root/$previous" -xdev -depth -delete; fi
   rmdir -- "$runtime_root" 2>/dev/null || true
-  rm -f -- "$pam_saved" "$state"
+  rm -f -- "$pam_saved" "$kde_fingerprint_vendor_saved" "$kde_fingerprint_managed_saved" "$state"
   rmdir -- "$state_dir" 2>/dev/null || true
   host_action systemctl daemon-reload
   [[ $service_before != active ]] || host_action systemctl start fprintd.service
   printf '%s\n' 'PHASE_C_UNINSTALL=PASS' 'PROTECTED_MATERIAL_PRESERVED=true' \
-    'FEDORA_FPRINTD_BASELINE=RESTORED' 'MANAGED_PAM_REMOVED=true' 'PLASMALOGIN_VENDOR_MODIFIED=false'
+    'FEDORA_FPRINTD_BASELINE=RESTORED' 'MANAGED_PAM_REMOVED=true' \
+    'KSCREENLOCKER_VENDOR_PAM_RESTORED=true' 'PLASMALOGIN_VENDOR_MODIFIED=false' \
+    'FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true'
 }
 
 root_import_materials() {
@@ -594,11 +854,21 @@ case ${1:-} in
       pam_status=$(state_value CURRENT_PAM_STATUS)
       pam_managed=true
     fi
+    if [[ $ACTIVE_KSCREENLOCKER_PAM_STATE == LEGACY ]]; then
+      kde_pam_status=ABSENT
+      kde_pam_managed=false
+    else
+      kde_pam_status=$(state_value CURRENT_KSCREENLOCKER_PAM_STATUS)
+      kde_pam_managed=true
+    fi
     printf '%s\n' 'PHASE_C_STATUS=ACTIVE' "CURRENT_COMMIT=$(state_value CURRENT_COMMIT)" \
       "PREVIOUS_COMMIT=$(state_value PREVIOUS_COMMIT)" \
       "PROTECTED_MATERIAL_READY=$(material_ready && echo true || echo false)" \
       'RPM_OFFICIAL_DISTRIBUTION=false' "MANAGED_PAM_INTEGRATION=$pam_managed" \
-      "MANAGED_PAM_STATUS=$pam_status" 'PLASMALOGIN_VENDOR_MODIFIED=false'
+      "MANAGED_PAM_STATUS=$pam_status" \
+      "KSCREENLOCKER_MANAGED_PAM_INTEGRATION=$kde_pam_managed" \
+      "KSCREENLOCKER_MANAGED_PAM_STATUS=$kde_pam_status" \
+      'PLASMALOGIN_VENDOR_MODIFIED=false' 'FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true'
     ;;
   *) fail internal_usage ;;
 esac

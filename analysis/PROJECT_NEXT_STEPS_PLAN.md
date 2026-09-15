@@ -43,12 +43,12 @@ chiude Phase B e porta il boundary a Phase C.
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=E_CLOSED
+CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
 PHASE_E_CLOSED=true
-NEXT_PHASE=F
+NEXT_PHASE=F_AFTER_KSCREENLOCKER_CORRECTIVE
 ```
 
 Target production iniziale approvato: Goodix USB `27c6:5125` / APP12509 su
@@ -75,9 +75,13 @@ di una verify, senza restart, reboot o workaround Goodix-specifici. Nel caso
 precoce la seconda action è terminata con `verify-no-match (done)`: è prova di
 recovery del percorso, non un MATCH biometrico. D296 qualifica una release
 candidate privata riproducibile, chiude threat/privacy, SBOM,
-licensing/attribution e test matrix e porta Phase E a closure. Phase F è la
-fase successiva ma resta non iniziata. I boundary D279–D296 chiusi non vanno
-ripetuti per sola maggiore confidenza.
+licensing/attribution e test matrix e porta Phase E a closure. Prima dell'avvio
+di Phase F, l'Utente ha però aperto il corrective bounded D297/01: il deployment
+ufficiale gestiva `plasmalogin` ma non rendeva persistente `kde-fingerprint`,
+nonostante D289 avesse già provato il vero unlock KDE tramite overlay
+temporaneo. Phase F resta non iniziata. I boundary D279–D296 chiusi non vanno
+ripetuti salvo il delta release/deployment direttamente invalidato da questo
+correttivo.
 
 D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
 l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
@@ -197,8 +201,8 @@ NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=NONE_PHASE_E_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
+CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
+NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
 ```
 
 ## Stato verificato del progetto
@@ -585,6 +589,36 @@ alcun claim FAR/FRR. Una nuova regressione Windows non è richiesta dal delta
 solo metadata/licenze/SBOM e dal runtime byte-identico. La candidate è
 content-addressed e firmabile, ma resta unsigned. Phase F non è iniziata.
 
+#### Corrective pre-Phase-F D297/01 — KScreenLocker dual deployment
+
+La decisione corrente dell'Utente inserisce un correttivo bounded prima di
+Phase F. D289 prova il vero unlock KScreenLocker ma con overlay PAM temporaneo;
+il deployment source-first gestisce persistentemente `plasmalogin` e omette
+`kde-fingerprint`. Il delta autorizzato aggiunge alla candidate gestione
+install/update/rollback/uninstall/status del PAM KScreenLocker senza modificare
+authselect o `fingerprint-auth` e senza toccare runtime biometrici.
+
+Il target Fedora possiede `/etc/pam.d/kde-fingerprint` direttamente tramite
+`plasma-workspace` come `%config(noreplace)`; non esiste una copia vendor sotto
+`/usr/lib`. Il manager deve quindi salvare e ripristinare byte-per-byte il file
+package-owned, pinneare digest/metadata/flag RPM e fallire chiuso su collisione,
+drift o `.rpmnew`/`.rpmsave`.
+
+Il laptop reale è stato classificato read-only come
+`HISTORICAL_D293_RUNTIME`, non managed candidate. La live corrente applica
+quindi soltanto una patch PAM D289-derived reversibile; non migra runtime,
+driver, libfprint o fprintd. Il PASS dimostrerà il percorso KScreenLocker sul
+runtime storico, mentre la migrazione completa alla candidate resta separata.
+
+```text
+D297_01_OFFLINE_MANAGER_TESTS=17_PASS
+ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME
+KSCREENLOCKER_PAM_STATUS=VENDOR_UNPATCHED
+CANDIDATE_MANAGED_KSCREENLOCKER_FIX=IMPLEMENTED_AND_OFFLINE_TESTED
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=AWAITING_HUMAN_GATE
+CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
+```
+
 ### Phase F — documentazione, handoff e pubblicazione
 
 - **OBIETTIVO:** rendere installazione, uso, recovery e limiti comprensibili e
@@ -725,10 +759,15 @@ e non MATCH biometrico. Nessuna modifica al codice è risultata necessaria.
 Phase D è chiusa; hotplug, device removal, concorrenza/consumer simultanei,
 late bytes/cross-generation e stato `POISONED` non vengono riaperti. La
 decisione Utente del 15 settembre 2026 ha aperto Phase E e D296 l'ha chiusa con
-release qualification PASS. Phase F resta non iniziata.
+release qualification PASS. Phase F resta non iniziata. La successiva decisione
+dell'Utente apre D297/01 come corrective pre-pubblicazione: repository e
+candidate sono chiusi offline per il delta KScreenLocker, mentre il laptop è
+stato classificato come runtime storico D293. Il prossimo boundary è la patch
+PAM transitoria e il vero `Meta+L` eseguiti dall'Utente; nessuna migrazione alla
+candidate è implicita.
 
 ```text
-PM_DECISION=PROJECT_STEP_COMPLETE
+PM_DECISION=HUMAN_REQUIRED
 D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -775,10 +814,10 @@ KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
-CURRENT_PHASE=E_CLOSED
+CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
 PRODUCTION_READY=false
-RELEASE_CANDIDATE_READY=true
-RELEASE_QUALIFICATION=PASS
+RELEASE_CANDIDATE_READY=PENDING_D297_REQUALIFICATION
+RELEASE_QUALIFICATION=D296_PRIOR_CANDIDATE_ONLY
 PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
 D293_05_FIRST_INSTALL=PASS
 D293_05_FIRST_LIVE=FAIL
@@ -797,7 +836,7 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 PHASE_D_CLOSED=true
 D1_SUSPEND_RESUME=PASS
 D2_01_NORMAL_CANCELLATION_RECOVERY=PASS
@@ -809,7 +848,7 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=F
+NEXT_PHASE=F_AFTER_KSCREENLOCKER_CORRECTIVE
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
 NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
@@ -818,8 +857,8 @@ PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=NONE_PHASE_E_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
+CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
+NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
 D296_01_OUTCOME=PASS_RELEASE_QUALIFICATION
 D296_01_RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
 D296_01_RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584

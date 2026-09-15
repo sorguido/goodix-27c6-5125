@@ -46,6 +46,7 @@ install -m 0644 "$here/goodix_fprint_account_delete.fc" \
 install -m 0644 "$here/99-goodix-27c6-5125-managed.conf" \
   "$candidate/99-goodix-27c6-5125-managed.conf"
 install -m 0644 "$here/plasmalogin-pam.rule" "$candidate/plasmalogin-pam.rule"
+install -m 0644 "$here/kde-fingerprint-pam.rule" "$candidate/kde-fingerprint-pam.rule"
 install -m 0644 "$root/LICENSE" "$candidate/LICENSE"
 install -m 0644 "$root/LICENSES/GPL-2.0-or-later.txt" \
   "$candidate/GPL-2.0-or-later.txt"
@@ -68,6 +69,7 @@ printf '%s\n' \
   'PROTECTED_MATERIAL_INCLUDED=false' \
   'PAM_FILES_INCLUDED=true' \
   'PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR' \
+  'KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM' \
   'SBOM_FORMAT=SPDX-2.3-JSON' \
   'COMBINED_BINARY_LICENSE=GPL-3.0-or-later' \
   'FAR_FRR_CLAIM=NOT_MADE' \
