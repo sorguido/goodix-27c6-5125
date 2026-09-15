@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 — stato complessivo e roadmap A→F approvata
 
-Data review: 14 settembre 2026
+Data review: 15 settembre 2026
 
 Baseline di ingresso del corrective metodologico patch-first: `development` a
 `5db8a868fb539254a481edea4c1443d15dfebb6e`, con Phase A chiusa e il
@@ -43,10 +43,11 @@ chiude Phase B e porta il boundary a Phase C.
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=C_CLOSED
+CURRENT_PHASE=D_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
-NEXT_PHASE=D
+PHASE_D_CLOSED=true
+NEXT_PHASE=E
 ```
 
 Target production iniziale approvato: Goodix USB `27c6:5125` / APP12509 su
@@ -63,14 +64,17 @@ e i consumer reali `sudo`, KDE lock/unlock e Plasma Login Manager. D290 chiude
 la catena fingerprint → nuova sessione Plasma/Wayland.
 
 La sorgente production e il contratto multi-user sono consolidati. Phase C ha
-ora provato su Fedora 44 KDE il percorso source-first gestito completo: build,
+provato su Fedora 44 KDE il percorso source-first gestito completo: build,
 import separato, install/idempotenza, update, PAM e consumer, rollback
 bidirezionale, uninstall, preservazione dati e recovery/reinstall. La baseline
-finale della VM è `448f5c8...`; il PAM vendor resta invariato. I due lifecycle
-operativi residui della Phase D — suspend/resume e cancellation/recovery — e
-la qualificazione release appartengono alle fasi successive, che non vengono
-avviate in questa sessione. I boundary D279–D295 chiusi non vanno ripetuti per
-sola maggiore confidenza.
+finale della VM è `448f5c8...`; il PAM vendor resta invariato. Phase D è ora
+chiusa sulla base delle prove live eseguite dall'Utente: il sensore è tornato
+utilizzabile dopo suspend/resume e dopo cancellazione normale e molto precoce
+di una verify, senza restart, reboot o workaround Goodix-specifici. Nel caso
+precoce la seconda action è terminata con `verify-no-match (done)`: è prova di
+recovery del percorso, non un MATCH biometrico. Phase E è la fase successiva ma
+resta non iniziata. I boundary D279–D295 chiusi non vanno ripetuti per sola
+maggiore confidenza.
 
 D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
 l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
@@ -173,12 +177,21 @@ PASSWORD_LOGIN_NON_ENROLLED_USERS=PASS_NO_DELAY
 PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
-NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
+PHASE_D_CLOSED=true
+D1_SUSPEND_RESUME=PASS
+D2_01_NORMAL_CANCELLATION_RECOVERY=PASS
+D2_02_EARLY_CANCELLATION_RECOVERY=PASS
+D2_02_BIOMETRIC_MATCH=false
+PHASE_D_CODE_CHANGE_REQUIRED=false
+CODE_CHANGE_REQUIRED=NO
+PHASE_D_STATUS=CLOSED
+PHASE_E_STATUS=NOT_STARTED
+NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=NONE_PHASE_C_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
+CURRENT_TASK=NONE_PHASE_D_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
 ```
 
 ## Stato verificato del progetto
@@ -269,10 +282,6 @@ Blocker di produzione:
   dipendenze OpenCV, systemd, SELinux e PAM;
 - restano lifecycle amministrativo account deletion/name reuse e provisioning
   lecito dei materiali runtime protetti su una macchina nuova;
-- restano da chiudere i due boundary Phase D esplicitamente approvati:
-  suspend/resume e cancellation/recovery di un'action; hotplug, device removal,
-  concorrenza e gli altri fault scenario non sono requisiti dedicati salvo un
-  boundary reale nel codice o un bug osservato;
 - prima di distribuire serve chiudere regime del combined work, attribution e
   audit dei contenuti/history pubblicabili.
 
@@ -479,7 +488,7 @@ D295/03 rollback bidirezionale, uninstall, preservazione di materiali/template
 e recovery/reinstall. La baseline finale nella VM è `448f5c8...`, con runtime
 root `0755` e PAM vendor Fedora invariato.
 
-### Phase D — lifecycle e recovery operativa minima
+### Phase D — lifecycle e recovery operativa minima — CLOSED
 
 - **DECISIONE DI SCOPE (14 settembre 2026):** la fase prosegue esclusivamente
   con suspend/resume e cancellation/recovery. Non è una campagna generale di
@@ -521,6 +530,19 @@ root `0755` e PAM vendor Fedora invariato.
   successiva; i failure esercitati terminano in tempo finito con diagnostica
   leggibile e senza loop/retry nascosti; nessun fault scenario aggiuntivo viene
   investigato senza un boundary reale nel codice o un bug osservato.
+
+**Closure:** PASS. Nella live eseguita dall'Utente sul target Fedora 44, D1 ha
+verificato presenza e verify riuscita prima della sospensione e una nuova
+verify riuscita dopo resume. D2/01 ha cancellato con `Ctrl+C` una verify in
+attesa e la verify immediatamente successiva ha prodotto MATCH. D2/02 ha
+cancellato durante l'attivazione iniziale; la successiva action ha riacquisito
+lo stesso device, avviato la verify, processato un'acquisizione e terminato
+normalmente con `verify-no-match (done)`. Quest'ultimo esito non è un MATCH,
+ma soddisfa il criterio lifecycle perché prova il riutilizzo bounded del
+percorso. Nessuna delle tre prove ha richiesto restart di fprintd, reboot o
+workaround Goodix-specifici. Non è stata necessaria alcuna modifica al codice.
+I criteri ridotti di Phase D sono soddisfatti; gli scenari esclusi restano fuori
+scope in assenza di un boundary concreto o bug osservato.
 
 ### Phase E — qualificazione release, sicurezza e licenze
 
@@ -617,7 +639,7 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 
 ## Decisione corrente
 
-Le Phase A, B e C sono chiuse. Il kit D291 è
+Le Phase A, B, C e D sono chiuse. Il kit D291 è
 `HISTORICAL_CLOSED_DO_NOT_RERUN` e non deve essere riusato. D292/01 ha chiuso
 A1, D292/02 ha chiuso A3/A4 e la review PM
 D292/03 ha chiuso A5/Phase A. D293/01 chiude B1 offline con contratto e
@@ -668,15 +690,20 @@ D295/03 è PASS umano con sensore scollegato: rollback verso `4c9cd74...` e
 ritorno a `b51b4c6...`, uninstall e fresh reinstall di `448f5c8...` hanno
 preservato PAM vendor, materiali protetti e conteggio template. La baseline
 finale è `ACTIVE`, material-ready, PAM gestito attivo e runtime root `0755`.
-Tutti i criteri di closure C sono soddisfatti. `NEXT_PHASE=D` è soltanto stato
-di roadmap: nessuna attività Phase D viene iniziata o preparata in questa
-sessione.
+Tutti i criteri di closure C sono soddisfatti. Al momento di quella closure,
+`NEXT_PHASE=D` indicava il successivo stato di roadmap; Phase D è stata avviata
+soltanto dalla successiva decisione dell'Utente.
 
-Decisione Utente del 14 settembre 2026: la Phase D è ridotta ai soli
-`suspend/resume` e `cancellation/recovery`. Hotplug, device removal,
-concorrenza/consumer simultanei, late bytes/cross-generation e stato `POISONED`
-non sono requisiti di test dedicati e verranno riaperti soltanto davanti a un
-boundary concreto nel codice o a un bug osservato.
+La decisione Utente del 14 settembre 2026 ha ridotto Phase D ai soli
+`suspend/resume` e `cancellation/recovery`. Il 15 settembre l'Utente ha
+riportato PASS live per suspend/resume, cancellazione durante la normale attesa
+e cancellazione molto precoce durante l'attivazione. Dopo ogni evento il
+percorso è tornato utilizzabile senza restart, reboot o workaround
+Goodix-specifici. D2/02 è terminata con `verify-no-match (done)`: prova recovery
+e non MATCH biometrico. Nessuna modifica al codice è risultata necessaria.
+Phase D è chiusa; hotplug, device removal, concorrenza/consumer simultanei,
+late bytes/cross-generation e stato `POISONED` non vengono riaperti. Phase E è
+la fase successiva e resta non iniziata in attesa della decisione dell'Utente.
 
 ```text
 PM_DECISION=PROJECT_STEP_COMPLETE
@@ -726,7 +753,7 @@ KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
-CURRENT_PHASE=C_CLOSED
+CURRENT_PHASE=D_CLOSED
 PRODUCTION_READY=false
 PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
 D293_05_FIRST_INSTALL=PASS
@@ -747,15 +774,27 @@ PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
 NEW_LIVE_REQUIRED_NOW=false
-NEXT_PHASE=D
-NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
+PHASE_D_CLOSED=true
+D1_SUSPEND_RESUME=PASS
+D2_01_NORMAL_CANCELLATION_RECOVERY=PASS
+D2_01_RECOVERY_VERIFY=MATCH
+D2_02_EARLY_CANCELLATION_RECOVERY=PASS
+D2_02_RECOVERY_VERIFY=VERIFY_NO_MATCH_DONE
+D2_02_BIOMETRIC_MATCH=false
+PHASE_D_CODE_CHANGE_REQUIRED=false
+CODE_CHANGE_REQUIRED=NO
+PHASE_D_STATUS=CLOSED
+PHASE_D_CLOSURE_CRITERIA=PASS
+NEXT_PHASE=E
+PHASE_E_STATUS=NOT_STARTED
+NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
 PHASE_D_SCOPE=MINIMAL_SUSPEND_RESUME_AND_CANCELLATION_RECOVERY
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=NONE_PHASE_C_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
+CURRENT_TASK=NONE_PHASE_D_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS

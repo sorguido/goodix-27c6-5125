@@ -151,10 +151,11 @@ sentiero operativo predefinito fino alla fine del progetto:
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=C_CLOSED
+CURRENT_PHASE=D_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
-NEXT_PHASE=D
+PHASE_D_CLOSED=true
+NEXT_PHASE=E
 ```
 
 Il target production iniziale resta deliberatamente ristretto a:
@@ -178,8 +179,10 @@ con MATCH. I boundary D279–D291 non si riaprono per sola maggiore confidenza.
 Il progetto ha quindi provato la fattibilità sul target APP12509, non ancora la
 production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
-vero fprintd host-only e il contratto statico KDE installato. La Phase B è ora
-chiusa e la fase corrente è **Phase C**. Il corrective D293 ha risolto R9 nel driver; D293/01–03 e le
+vero fprintd host-only e il contratto statico KDE installato. Le Phase B e C
+sono chiuse; le prove lifecycle riportate dall'Utente hanno chiuso anche Phase
+D e la fase successiva è **Phase E**, non ancora iniziata. Il corrective D293
+ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
 complesso percorso D293/04: non va eseguito né ulteriormente raffinato. La
@@ -199,7 +202,15 @@ e regressione `sudo` sono PASS. D295/03 ha infine provato con sensore scollegato
 rollback bidirezionale, uninstall, preservazione di materiali e template e
 recovery/reinstall. Phase C è chiusa e la VM resta sulla baseline gestita
 `448f5c8...`. La candidate RPM D294 è preservata come prototipo
-storico/evidenza e non è più il percorso di distribuzione ufficiale.
+storico/evidenza e non è più il percorso di distribuzione ufficiale. Le prove
+live Phase D eseguite dall'Utente hanno poi chiuso suspend/resume e
+cancellation/recovery senza richiedere cambi al codice: dopo sospensione il
+sensore ha completato una nuova verify; dopo una cancellazione durante l'attesa
+una seconda verify ha prodotto MATCH; dopo una cancellazione molto precoce una
+nuova action ha riacquisito il device e si è conclusa normalmente con
+`verify-no-match (done)`. Quest'ultimo risultato prova il recovery operativo,
+non un MATCH biometrico. Phase D è chiusa; Phase E è la prossima fase e resta
+non iniziata in attesa della decisione dell'Utente.
 
 Principi trasversali della roadmap:
 
@@ -295,18 +306,27 @@ diagnosi e recovery.
 canonica pertinente. La baseline finale è `448f5c8...`, `ACTIVE`, con materiali
 ready, PAM gestito attivo, vendor Fedora invariato e root runtime `0755`.
 
-#### Phase D — lifecycle, recovery, suspend/hotplug e concorrenza
+#### Phase D — lifecycle e recovery operativa minima — CLOSED
 
-**Obiettivo.** Qualificare soltanto boundary realmente nuovi: suspend/resume,
-hotplug, rimozione durante action, crash/restart fprintd, cancellazione in fasi
-diverse, richieste e consumer concorrenti, late bytes/cross-generation se
-pertinenti, stato `POISONED` e recovery bounded. Prima si definiscono
-contratti/stati offline, fault injection host-only e una matrice ridotta ai casi
-che possono cambiare una decisione; ogni live resta soggetta a Human Gate.
+**Obiettivo.** Per decisione dell'Utente del 14 settembre 2026, qualificare
+soltanto suspend/resume e cancellation/recovery di un'action. Hotplug, rimozione
+fisica, concorrenza, crash/fault injection, late bytes/cross-generation e uno
+stato `POISONED` preventivo restano fuori scope salvo un boundary concreto nel
+codice o un bug osservato.
 
-**Closure D.** Ogni evento termina in recupero nominale oppure in failure
-bounded, leggibile e diagnosticabile, con fallback disponibile, cleanup
-definito e zero loop o retry nascosti.
+**Evidenza live osservata dall'Utente.** Sul target Fedora 44, D1 ha completato
+una verify prima della sospensione e una nuova verify dopo il resume. D2/01 ha
+cancellato con `Ctrl+C` una verify durante l'attesa; la verify immediatamente
+successiva ha prodotto MATCH. D2/02 ha cancellato durante l'attivazione
+iniziale; la nuova action ha riacquisito lo stesso device, avviato la verify,
+processato l'acquisizione e terminato con `verify-no-match (done)`.
+
+**Interpretazione.** D1, D2/01 e D2/02 sono PASS per i rispettivi criteri di
+lifecycle: il percorso è tornato utilizzabile senza restart di fprintd, reboot
+o workaround Goodix-specifici. `verify-no-match (done)` di D2/02 è un normale
+risultato biometrico terminale bounded e non deve essere interpretato come
+MATCH. Non è stata necessaria alcuna modifica al codice. I criteri ridotti di
+Phase D sono soddisfatti e la fase è chiusa.
 
 #### Phase E — qualificazione release, sicurezza e licenze
 
@@ -506,11 +526,17 @@ lasciato state `ACTIVE`, materiali ready, PAM gestito attivo e root runtime
 `0755`. Non sono stati usati USB o azioni biometriche né letti contenuti
 protetti/template.
 
-Phase C soddisfa quindi tutti i criteri di closure. La fase successiva in
-roadmap è D, ma non viene iniziata o preparata in questa sessione.
+Phase C soddisfa quindi tutti i criteri di closure. Le successive prove live
+eseguite dall'Utente chiudono anche Phase D nel suo scope ridotto:
+suspend/resume, cancellazione durante la normale attesa e cancellazione molto
+precoce convergono tutte in un percorso nuovamente utilizzabile senza restart,
+reboot o workaround Goodix-specifici. La seconda action D2/02 termina con
+`verify-no-match (done)`, che è PASS di recovery ma non MATCH biometrico.
+Nessun cambio al codice è stato richiesto. Phase E è la fase successiva, ma non
+viene iniziata o preparata in questa sessione.
 
 ```text
-CURRENT_PHASE=C_CLOSED
+CURRENT_PHASE=D_CLOSED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
@@ -594,10 +620,22 @@ D294_01_PAM_FILE_COUNT=0
 D294_01_PROTECTED_MATERIAL_FILE_COUNT=0
 D294_01_OUTCOME=READY_FOR_FACTORY_PRESERVING_LIVE
 D294_01_EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
-NEXT_PHASE=D
-NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
-CURRENT_TASK=NONE_PHASE_C_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
+PHASE_D_CLOSED=true
+D1_SUSPEND_RESUME=PASS
+D2_01_NORMAL_CANCELLATION_RECOVERY=PASS
+D2_01_RECOVERY_VERIFY=MATCH
+D2_02_EARLY_CANCELLATION_RECOVERY=PASS
+D2_02_RECOVERY_VERIFY=VERIFY_NO_MATCH_DONE
+D2_02_BIOMETRIC_MATCH=false
+PHASE_D_CODE_CHANGE_REQUIRED=false
+CODE_CHANGE_REQUIRED=NO
+PHASE_D_STATUS=CLOSED
+PHASE_D_CLOSURE_CRITERIA=PASS
+NEXT_PHASE=E
+PHASE_E_STATUS=NOT_STARTED
+NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
+CURRENT_TASK=NONE_PHASE_D_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
 NEW_LIVE_REQUIRED_NOW=false
 PM_DECISION=PROJECT_STEP_COMPLETE
 D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
@@ -1159,7 +1197,21 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Ultimo avanzamento live consolidato — D293/05 account lifecycle sotto SELinux Enforcing
+### Ultimo avanzamento live consolidato — closure Phase D lifecycle
+
+L'Utente ha eseguito sul target Fedora 44 le prove dello scope Phase D ridotto.
+D1 ha verificato il sensore e concluso una verify prima della sospensione, poi
+ha osservato resume normale, presenza del sensore e nuova verify riuscita.
+D2/01 ha cancellato con `Ctrl+C` durante la normale attesa e la verify avviata
+subito dopo ha prodotto MATCH. D2/02 ha cancellato molto presto durante
+l'attivazione; la nuova action ha riacquisito il device, processato una
+acquisizione e terminato normalmente con `verify-no-match (done)`. D2/02 prova
+quindi recovery e riutilizzo bounded, non un MATCH biometrico. Nessuna prova ha
+richiesto restart di fprintd, reboot o workaround Goodix-specifici; nessuna
+modifica al codice è stata necessaria. Phase D è chiusa e Phase E resta non
+iniziata.
+
+### Avanzamento live precedente — D293/05 account lifecycle sotto SELinux Enforcing
 
 La live D293/05 finale descritta sopra è il più recente avanzamento target:
 guard account-lifecycle e modulo SELinux dedicato hanno dato PASS pieno con
@@ -1416,7 +1468,9 @@ distribuzione source-first D295 al commit `448f5c8...`, ora PASS sui consumer e
 sul lifecycle amministrativo.
 La live finale D293/05 ha chiuso account deletion/name reuse sotto SELinux
 Enforcing senza alert; guard e modulo restano installati. Phase B e Phase C
-sono chiuse. Il fallback password per utenti enrolled ha un
+sono chiuse. Le successive prove live Phase D hanno chiuso suspend/resume e
+cancellation/recovery senza modifiche al codice; Phase E resta non iniziata.
+Il fallback password per utenti enrolled ha un
 ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale. D295/02 ha
 poi risolto il distinto gap del service PAM `plasmalogin` senza modificare il
 vendor Fedora. D295/03 ha chiuso rollback bidirezionale, uninstall e recovery
@@ -1439,7 +1493,7 @@ NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=C_CLOSED
+CURRENT_PHASE=D_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
@@ -1489,13 +1543,25 @@ PASSWORD_FALLBACK_ENROLLED_USERS=PASS_WITH_APPROX_30S_DELAY
 PAM_ENROLLED_PASSWORD_DELAY_SEVERITY=ACCEPTED_UX_LIMITATION
 PHASE_B_BLOCKER=false
 NEW_LIVE_REQUIRED_NOW=false
-NEXT_PHASE=D
-NEXT_WORK_CLASS=PHASE_D_NOT_STARTED
+PHASE_D_CLOSED=true
+D1_SUSPEND_RESUME=PASS
+D2_01_NORMAL_CANCELLATION_RECOVERY=PASS
+D2_01_RECOVERY_VERIFY=MATCH
+D2_02_EARLY_CANCELLATION_RECOVERY=PASS
+D2_02_RECOVERY_VERIFY=VERIFY_NO_MATCH_DONE
+D2_02_BIOMETRIC_MATCH=false
+PHASE_D_CODE_CHANGE_REQUIRED=false
+CODE_CHANGE_REQUIRED=NO
+PHASE_D_STATUS=CLOSED
+PHASE_D_CLOSURE_CRITERIA=PASS
+NEXT_PHASE=E
+PHASE_E_STATUS=NOT_STARTED
+NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=NONE_PHASE_C_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_D_DECISION
+CURRENT_TASK=NONE_PHASE_D_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
