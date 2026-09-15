@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
@@ -8,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 TRANSACTION = HERE / "root-transaction.sh"
@@ -183,6 +185,22 @@ class ManagedInstallContract(unittest.TestCase):
         result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("candidate_SBOM.spdx.json_invalid", result.stderr)
+
+    def test_sbom_installed_package_queries_the_package_not_a_shared_path(self):
+        script = HERE / "generate-sbom.py"
+        spec = importlib.util.spec_from_file_location("goodix_generate_sbom", script)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        query = "%{NAME}\t%{EVR}\t%{ARCH}\t%{LICENSE}"
+        with mock.patch.object(
+            module, "run", return_value="libgusb\t0.4.9-5.fc44\tx86_64\tLGPL-2.1-or-later"
+        ) as rpm_run:
+            package = module.installed_package("libgusb")
+        rpm_run.assert_called_once_with("rpm", "-q", "--qf", query, "libgusb")
+        self.assertEqual(package["name"], "libgusb")
+        self.assertEqual(package["versionInfo"], "0.4.9-5.fc44")
 
     def test_partial_install_is_rolled_back(self):
         candidate = self.candidate("e" * 40)

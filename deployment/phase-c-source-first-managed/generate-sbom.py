@@ -117,11 +117,9 @@ def spdx_id(value: str) -> str:
     return "SPDXRef-" + re.sub(r"[^A-Za-z0-9.-]", "-", value).strip("-")
 
 
-def package_for_path(path: pathlib.Path) -> dict[str, object]:
-    query = "%{NAME}\t%{EVR}\t%{ARCH}\t%{LICENSE}"
-    fields = run("rpm", "-qf", "--qf", query, str(path)).strip().split("\t", 3)
+def package_from_fields(fields: list[str]) -> dict[str, object]:
     if len(fields) != 4:
-        raise RuntimeError(f"invalid rpm metadata for {path}")
+        raise RuntimeError("invalid rpm metadata")
     name, version, arch, license_expression = fields
     return {
         "SPDXID": spdx_id(f"Package-host-{name}-{arch}"),
@@ -143,9 +141,16 @@ def package_for_path(path: pathlib.Path) -> dict[str, object]:
     }
 
 
+def package_for_path(path: pathlib.Path) -> dict[str, object]:
+    query = "%{NAME}\t%{EVR}\t%{ARCH}\t%{LICENSE}"
+    fields = run("rpm", "-qf", "--qf", query, str(path)).strip().split("\t", 3)
+    return package_from_fields(fields)
+
+
 def installed_package(name: str) -> dict[str, object]:
-    path = run("rpm", "-ql", name).splitlines()[0]
-    return package_for_path(pathlib.Path(path))
+    query = "%{NAME}\t%{EVR}\t%{ARCH}\t%{LICENSE}"
+    fields = run("rpm", "-q", "--qf", query, name).strip().split("\t", 3)
+    return package_from_fields(fields)
 
 
 def dynamic_package_paths(candidate: pathlib.Path) -> set[pathlib.Path]:
