@@ -4,7 +4,7 @@ set -euo pipefail
 umask 077
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-repo=$(git -C "$here" rev-parse --show-toplevel)
+repo=$(CDPATH= cd -- "$here/../.." && pwd -P)
 target=/etc/pam.d/kde-fingerprint
 state=/var/lib/goodix-d297-01-kscreenlocker
 expected_vendor=8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437
@@ -18,11 +18,13 @@ mode=${1:-}
 
 fail() { printf 'D297_01_KSCREENLOCKER_INSTALL=FAIL reason=%s\n' "$1" >&2; exit 1; }
 digest() { sha256sum "$1" | awk '{print $1}'; }
+repo_git() { git -c "safe.directory=$repo" -C "$repo" "$@"; }
 [[ $mode == --check || -z $mode ]] || fail usage_install_or_check
-[[ $(git -C "$repo" branch --show-current) == development ]] || fail wrong_branch
-head=$(git -C "$repo" rev-parse HEAD)
-[[ $head == "$(git -C "$repo" rev-parse origin/development)" ]] || fail origin_head_mismatch
-[[ -z $(git -C "$repo" status --porcelain --untracked-files=all) ]] || fail worktree_dirty
+[[ $(repo_git rev-parse --show-toplevel) == "$repo" ]] || fail repository_layout_invalid
+[[ $(repo_git branch --show-current) == development ]] || fail wrong_branch
+head=$(repo_git rev-parse HEAD)
+[[ $head == "$(repo_git rev-parse origin/development)" ]] || fail origin_head_mismatch
+[[ -z $(repo_git status --porcelain --untracked-files=all) ]] || fail worktree_dirty
 [[ $(. /etc/os-release; printf '%s' "${VERSION_ID:-}") == 44 ]] || fail unsupported_target_os
 [[ $(rpm -q plasma-workspace) == plasma-workspace-6.7.5-1.fc44.x86_64 ]] || fail plasma_workspace_nevra_drift
 [[ $(rpm -q kscreenlocker) == kscreenlocker-6.7.5-1.fc44.x86_64 ]] || fail kscreenlocker_nevra_drift

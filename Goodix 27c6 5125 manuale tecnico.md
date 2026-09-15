@@ -651,9 +651,9 @@ PHASE_D_CLOSURE_CRITERIA=PASS
 NEXT_PHASE=F_AFTER_KSCREENLOCKER_CORRECTIVE
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
-RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
-RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
-RELEASE_QUALIFICATION=D296_PRIOR_CANDIDATE_ONLY
+RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
+RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1
+RELEASE_QUALIFICATION=D297_OFFLINE_DELTA_PASS_LIVE_PENDING
 NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
 CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
 NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
@@ -1386,6 +1386,20 @@ Il probe read-only corrente restituisce
 `KSCREENLOCKER_PAM_STATUS=VENDOR_UNPATCHED`. Nessuna installazione, USB, azione
 biometrica o lettura di materiale protetto è stata eseguita dall'AI.
 
+La requalification offline della candidate al source commit
+`df2b8331c260ef3b26bd5483ee88b92d5c88bca5` è PASS. Due build pulite sono
+byte-identiche e condividono il digest dell'indice `SHA256SUMS`
+`2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1`.
+L'allowlist è di 23 file, include `kde-fingerprint-pam.rule`, tutti i digest
+interni verificano e lo SBOM deterministico SPDX 2.3 contiene 38 package, 21
+file e 59 relazioni. Il binario `libfprint-2.so.2.0.0` conserva lo SHA-256
+`115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20`
+della candidate D296: driver, libfprint e comportamento sensor-reaching non
+sono cambiati. Le closure D296 per runtime, ABI, licensing, privacy e
+factory-preserving restano quindi applicabili; la nuova superficie PAM è stata
+riesaminata e testata separatamente. Questo è un PASS offline del delta, non la
+prova di unlock reale né una migrazione live completa alla candidate.
+
 La closure resta al Human Gate: l'Utente deve applicare la patch sul runtime
 storico e osservare il normale workflow `Meta+L`, con massimo tre contatti e
 stop al primo MATCH, oltre alle regressioni login e `sudo`. Un PASS prova il
@@ -1402,6 +1416,10 @@ DRIVER_LIBFPRINT_FPRINTD_CORE_CHANGED=false
 ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME
 HISTORICAL_RUNTIME_REPLACED_AS_SIDE_EFFECT=false
 CANDIDATE_MANAGED_KSCREENLOCKER_FIX=IMPLEMENTED_AND_OFFLINE_TESTED
+D297_01_RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
+D297_01_RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1
+D297_01_REPRODUCIBLE_RC=PASS
+D297_01_RUNTIME_BINARY_IDENTICAL_TO_D296=true
 HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=AWAITING_HUMAN_GATE
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 PM_DECISION=HUMAN_REQUIRED
@@ -1680,7 +1698,9 @@ La live finale D293/05 ha chiuso account deletion/name reuse sotto SELinux
 Enforcing senza alert; guard e modulo restano installati. Phase B e Phase C
 sono chiuse. Le successive prove live Phase D hanno chiuso suspend/resume e
 cancellation/recovery senza modifiche al codice. D296 ha qualificato la
-release candidate privata e chiuso Phase E; Phase F resta non iniziata.
+release candidate privata e chiuso Phase E. Il successivo corrective D297/01
+ha requalificato offline il delta KScreenLocker e attende la Human Gate sul
+runtime storico; Phase F resta non iniziata.
 Il fallback password per utenti enrolled ha un
 ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale. D295/02 ha
 poi risolto il distinto gap del service PAM `plasmalogin` senza modificare il
@@ -1694,19 +1714,19 @@ qualificazione Windows esaustiva dopo ogni run.
 ```text
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
-PROJECT_RELEASE_CANDIDATE_READY=true
-RELEASE_QUALIFICATION=PASS
+PROJECT_RELEASE_CANDIDATE_READY=READY_FOR_D297_HUMAN_GATE
+RELEASE_QUALIFICATION=D297_OFFLINE_DELTA_PASS_LIVE_PENDING
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D296_CLOSED_BOUNDARIES
-PM_DECISION=PROJECT_STEP_COMPLETE
+PM_DECISION=HUMAN_REQUIRED
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
-NEW_LIVE_REQUIRED_NOW=false
+NEW_LIVE_REQUIRED_NOW=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=E_CLOSED
+CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
