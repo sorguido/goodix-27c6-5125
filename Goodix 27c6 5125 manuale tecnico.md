@@ -152,6 +152,14 @@ sentiero operativo predefinito fino alla fine del progetto:
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
 CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
+D297_KSCREENLOCKER_LIVE_GATE=PASS
+REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
+SUDO_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_PASSWORD_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+D297_FULL_CLOSURE=PENDING_MINIMAL_REGRESSION_CHECK
+CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
@@ -185,7 +193,10 @@ sono chiuse; le prove lifecycle riportate dall'Utente hanno chiuso anche Phase
 D. D296 ha qualificato la release candidate privata e chiuso Phase E. Prima
 di iniziare Phase F, l'Utente ha aperto il correttivo bounded D297/01 perché il
 deployment qualificato gestiva `plasmalogin` ma non rendeva persistente il
-percorso KScreenLocker già provato da D289; Phase F resta non iniziata. Il corrective D293
+percorso KScreenLocker già provato da D289. D297 ha aggiunto la persistenza
+managed e l'Utente ha ora confermato sul runtime storico D293 il vero percorso
+`Meta+L → fingerprint → MATCH → unlock`; restano pendenti soltanto le verifiche
+di regressione `sudo` e login Plasma. Phase F resta non iniziata. Il corrective D293
 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
@@ -653,10 +664,10 @@ PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
 RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
 RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1
-RELEASE_QUALIFICATION=D297_OFFLINE_DELTA_PASS_LIVE_PENDING
+RELEASE_QUALIFICATION=D297_KSCREENLOCKER_LIVE_PASS_REGRESSIONS_PENDING
 NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
-CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
-NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
+CURRENT_TASK=D297_01_MINIMAL_POST_KSCREENLOCKER_REGRESSION_GATE
+NEXT_BOUNDARY=HUMAN_GATE_SUDO_AND_PLASMA_LOGIN_REGRESSIONS
 NEW_LIVE_REQUIRED_NOW=true
 PM_DECISION=HUMAN_REQUIRED
 D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
@@ -1383,8 +1394,9 @@ parziali anche dopo la sostituzione KScreenLocker, preservazione materiali,
 status e safety statica. Sintassi Bash/Python e `status.sh` del kit sono PASS.
 Il probe read-only corrente restituisce
 `ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME` e
-`KSCREENLOCKER_PAM_STATUS=VENDOR_UNPATCHED`. Nessuna installazione, USB, azione
-biometrica o lettura di materiale protetto è stata eseguita dall'AI.
+`KSCREENLOCKER_PAM_STATUS=TRANSIENT_CORRECTIVE_ACTIVE`; `fingerprint-auth`
+conserva l'hash precedente. L'installazione e la prova biometrica sono state
+eseguite dall'Utente, non dall'AI.
 
 La requalification offline della candidate al source commit
 `df2b8331c260ef3b26bd5483ee88b92d5c88bca5` è PASS. Due build pulite sono
@@ -1400,11 +1412,15 @@ factory-preserving restano quindi applicabili; la nuova superficie PAM è stata
 riesaminata e testata separatamente. Questo è un PASS offline del delta, non la
 prova di unlock reale né una migrazione live completa alla candidate.
 
-La closure resta al Human Gate: l'Utente deve applicare la patch sul runtime
-storico e osservare il normale workflow `Meta+L`, con massimo tre contatti e
-stop al primo MATCH, oltre alle regressioni login e `sudo`. Un PASS prova il
-feature path sul runtime storico, non una migrazione live completa alla
-candidate managed.
+L'Utente ha ora osservato sul production host reale la sequenza `Meta+L →
+KScreenLocker → kde-fingerprint → pam_fprintd → Goodix → MATCH → sessione
+sbloccata`. Il feature path KScreenLocker sul runtime storico D293 è quindi
+PROVEN. Questo PASS conferma il medesimo delta PAM implementato nella candidate,
+ma non prova una migrazione live completa alla candidate managed. Poiché non
+sono stati riportati risultati successivi e specifici per `sudo`, login Plasma
+con password e login Plasma con fingerprint, la closure D297 resta al Human
+Gate minimo per queste tre sole regressioni, senza nuove modifiche PAM e senza
+richiedere nuovi log o una ripetizione del PASS KScreenLocker.
 
 ```text
 D289_PATH_RECOVERED_AND_UNDERSTOOD=true
@@ -1420,7 +1436,14 @@ D297_01_RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
 D297_01_RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1
 D297_01_REPRODUCIBLE_RC=PASS
 D297_01_RUNTIME_BINARY_IDENTICAL_TO_D296=true
-HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=AWAITING_HUMAN_GATE
+REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
+KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
+D297_KSCREENLOCKER_LIVE_GATE=PASS
+SUDO_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_PASSWORD_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+D297_FULL_CLOSURE=PENDING_MINIMAL_REGRESSION_CHECK
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 PM_DECISION=HUMAN_REQUIRED
 ```
@@ -1699,8 +1722,9 @@ Enforcing senza alert; guard e modulo restano installati. Phase B e Phase C
 sono chiuse. Le successive prove live Phase D hanno chiuso suspend/resume e
 cancellation/recovery senza modifiche al codice. D296 ha qualificato la
 release candidate privata e chiuso Phase E. Il successivo corrective D297/01
-ha requalificato offline il delta KScreenLocker e attende la Human Gate sul
-runtime storico; Phase F resta non iniziata.
+ha requalificato offline il delta KScreenLocker; l'Utente ha poi provato con
+MATCH lo sblocco reale sul runtime storico. Restano le sole regressioni `sudo`
+e login Plasma; Phase F resta non iniziata.
 Il fallback password per utenti enrolled ha un
 ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale. D295/02 ha
 poi risolto il distinto gap del service PAM `plasmalogin` senza modificare il
@@ -1714,8 +1738,8 @@ qualificazione Windows esaustiva dopo ogni run.
 ```text
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
-PROJECT_RELEASE_CANDIDATE_READY=READY_FOR_D297_HUMAN_GATE
-RELEASE_QUALIFICATION=D297_OFFLINE_DELTA_PASS_LIVE_PENDING
+PROJECT_RELEASE_CANDIDATE_READY=READY_FOR_D297_MINIMAL_REGRESSION_GATE
+RELEASE_QUALIFICATION=D297_KSCREENLOCKER_LIVE_PASS_REGRESSIONS_PENDING
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D296_CLOSED_BOUNDARIES
 PM_DECISION=HUMAN_REQUIRED

@@ -79,7 +79,10 @@ licensing/attribution e test matrix e porta Phase E a closure. Prima dell'avvio
 di Phase F, l'Utente ha però aperto il corrective bounded D297/01: il deployment
 ufficiale gestiva `plasmalogin` ma non rendeva persistente `kde-fingerprint`,
 nonostante D289 avesse già provato il vero unlock KDE tramite overlay
-temporaneo. Phase F resta non iniziata. I boundary D279–D296 chiusi non vanno
+temporaneo. D297 ha ora sia il delta managed offline sia il PASS live
+`Meta+L → fingerprint → MATCH → unlock` sul runtime storico D293; restano da
+riportare soltanto le regressioni `sudo` e login Plasma. Phase F resta non
+iniziata. I boundary D279–D296 chiusi non vanno
 ripetuti salvo il delta release/deployment direttamente invalidato da questo
 correttivo.
 
@@ -201,8 +204,8 @@ NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
-NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
+CURRENT_TASK=D297_01_MINIMAL_POST_KSCREENLOCKER_REGRESSION_GATE
+NEXT_BOUNDARY=HUMAN_GATE_SUDO_AND_PLASMA_LOGIN_REGRESSIONS
 ```
 
 ## Stato verificato del progetto
@@ -607,8 +610,11 @@ drift o `.rpmnew`/`.rpmsave`.
 Il laptop reale è stato classificato read-only come
 `HISTORICAL_D293_RUNTIME`, non managed candidate. La live corrente applica
 quindi soltanto una patch PAM D289-derived reversibile; non migra runtime,
-driver, libfprint o fprintd. Il PASS dimostrerà il percorso KScreenLocker sul
-runtime storico, mentre la migrazione completa alla candidate resta separata.
+driver, libfprint o fprintd. L'Utente ha eseguito la patch e osservato sul
+production host reale `Meta+L → fingerprint → MATCH → unlock`; il percorso
+KScreenLocker sul runtime storico è quindi PROVEN. La migrazione completa alla
+candidate resta separata e non provata. `sudo` e i due login Plasma non vengono
+inferiti da questo esito e restano il solo Human Gate minimo.
 
 ```text
 D297_01_OFFLINE_MANAGER_TESTS=17_PASS
@@ -617,9 +623,16 @@ D297_01_RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3
 D297_01_REPRODUCIBLE_RC=PASS
 D297_01_RUNTIME_BINARY_IDENTICAL_TO_D296=true
 ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME
-KSCREENLOCKER_PAM_STATUS=VENDOR_UNPATCHED
+KSCREENLOCKER_PAM_STATUS=TRANSIENT_CORRECTIVE_ACTIVE
 CANDIDATE_MANAGED_KSCREENLOCKER_FIX=IMPLEMENTED_AND_OFFLINE_TESTED
-HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=AWAITING_HUMAN_GATE
+REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
+KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
+D297_KSCREENLOCKER_LIVE_GATE=PASS
+SUDO_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_PASSWORD_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+D297_FULL_CLOSURE=PENDING_MINIMAL_REGRESSION_CHECK
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 ```
 
@@ -766,9 +779,10 @@ decisione Utente del 15 settembre 2026 ha aperto Phase E e D296 l'ha chiusa con
 release qualification PASS. Phase F resta non iniziata. La successiva decisione
 dell'Utente apre D297/01 come corrective pre-pubblicazione: repository e
 candidate sono chiusi offline per il delta KScreenLocker, mentre il laptop è
-stato classificato come runtime storico D293. Il prossimo boundary è la patch
-PAM transitoria e il vero `Meta+L` eseguiti dall'Utente; nessuna migrazione alla
-candidate è implicita.
+stato classificato come runtime storico D293. L'Utente ha applicato la patch
+PAM transitoria e il vero `Meta+L` ha prodotto MATCH e unlock. Il prossimo
+boundary contiene soltanto le regressioni `sudo` e login Plasma, senza nuove
+modifiche PAM; nessuna migrazione alla candidate è implicita.
 
 ```text
 PM_DECISION=HUMAN_REQUIRED
@@ -820,8 +834,8 @@ PHASE_B_CLOSED=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
 CURRENT_PHASE=PRE_PHASE_F_KSCREENLOCKER_CORRECTIVE
 PRODUCTION_READY=false
-RELEASE_CANDIDATE_READY=READY_FOR_D297_HUMAN_GATE
-RELEASE_QUALIFICATION=D297_OFFLINE_DELTA_PASS_LIVE_PENDING
+RELEASE_CANDIDATE_READY=READY_FOR_D297_MINIMAL_REGRESSION_GATE
+RELEASE_QUALIFICATION=D297_KSCREENLOCKER_LIVE_PASS_REGRESSIONS_PENDING
 PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
 D293_05_FIRST_INSTALL=PASS
 D293_05_FIRST_LIVE=FAIL
@@ -861,8 +875,8 @@ PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=D297_01_KSCREENLOCKER_DUAL_DEPLOYMENT_CORRECTIVE
-NEXT_BOUNDARY=HUMAN_GATE_HISTORICAL_RUNTIME_META_L_UNLOCK
+CURRENT_TASK=D297_01_MINIMAL_POST_KSCREENLOCKER_REGRESSION_GATE
+NEXT_BOUNDARY=HUMAN_GATE_SUDO_AND_PLASMA_LOGIN_REGRESSIONS
 D296_01_OUTCOME=PASS_RELEASE_QUALIFICATION
 D296_01_RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
 D296_01_RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
@@ -879,6 +893,15 @@ D297_01_RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3
 D297_01_OFFLINE_MANAGER_TESTS=17_PASS
 D297_01_REPRODUCIBLE_RC=PASS
 D297_01_RUNTIME_BINARY_IDENTICAL_TO_D296=true
+D297_KSCREENLOCKER_LIVE_GATE=PASS
+REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
+KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
+SUDO_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_PASSWORD_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+D297_FULL_CLOSURE=PENDING_MINIMAL_REGRESSION_CHECK
+CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS

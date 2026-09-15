@@ -21,7 +21,7 @@ La patch sostituisce in modo gestito la sola riga auth
 l'originale root-only. Nessun servizio viene riavviato e nessun comando dello
 script raggiunge il sensore.
 
-## Prerequisiti e STOP
+## Prerequisiti e STOP dell'applicazione iniziale
 
 Dalla root del clone, sul branch `development`, eseguire prima:
 
@@ -36,7 +36,10 @@ se il deployment non è `HISTORICAL_D293_RUNTIME`, se esiste già lo state Phase
 C, se un hash/NEVRA differisce, se compaiono `.rpmnew`/`.rpmsave`, o se PAM è
 già personalizzato. Non correggere manualmente i gate.
 
-## Installazione — Human Gate
+## Installazione — Human Gate già eseguita
+
+I comandi restano documentati per provenance e recovery. Non rieseguire
+l'installazione mentre lo status è `TRANSIENT_CORRECTIVE_ACTIVE`.
 
 ```bash
 sudo operator_kit/d297-01-kscreenlocker-historical-runtime/install.sh
@@ -46,28 +49,43 @@ operator_kit/d297-01-kscreenlocker-historical-runtime/status.sh
 Attesi `D297_01_KSCREENLOCKER_INSTALL=PASS`, deployment storico invariato e
 `KSCREENLOCKER_PAM_STATUS=TRANSIENT_CORRECTIVE_ACTIVE`.
 
-## Workflow reale
+## Esito KScreenLocker registrato
 
-1. Nella normale sessione Plasma premere `Meta+L`.
-2. Non digitare password o PIN. Presentare l'impronta.
-3. Fermarsi immediatamente al primo unlock/MATCH.
-4. Dopo un NO_MATCH sono ammessi al massimo altri due contatti; dopo il terzo
-   NO_MATCH non presentare più il dito e recuperare con la password.
-5. Dopo il PASS KScreenLocker verificare che `sudo -k true` continui a
-   completare con impronta, sempre massimo tre contatti e stop al primo MATCH.
-6. Eseguire un normale logout/login Plasma, prima con password e poi con
-   impronta, senza modificare PAM. Questa prova controlla che il percorso login
-   storico preesistente non sia regredito.
+L'Utente ha eseguito il workflow reale `Meta+L`; KScreenLocker ha raggiunto il
+sensore, Goodix ha prodotto MATCH e la sessione reale è stata sbloccata.
 
 ```text
-PASS_IF=Meta+L raggiunge il sensore e la sessione reale passa locked->unlocked con MATCH
-FAIL_IF=il sensore non parte, tre contatti producono NO_MATCH, compare errore PAM o login/sudo regrediscono
-STOP_IF=quarto contatto richiesto, retry non osservabile, instabilità, drift o richiesta di modifica ulteriore
+D297_KSCREENLOCKER_LIVE_GATE=PASS
+REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
+KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
 ```
 
-Riportare: esito `status.sh`, unlock osservato sì/no, numero del contatto che ha
-prodotto MATCH (1–3), ed eventuale messaggio e punto preciso del failure. Log e
-journal verranno richiesti solo dopo un failure reale, se necessari.
+Non ripetere questa prova per sola maggiore confidenza e non reinstallare o
+modificare ulteriormente PAM. La patch resta attiva sul runtime storico.
+
+## Verifiche residue minimali — Human Gate
+
+Restano soltanto questi tre controlli nel normale workflow del sistema:
+
+1. eseguire `sudo -k true` e completare con impronta, con massimo tre contatti
+   e stop immediato al primo MATCH;
+2. eseguire un normale logout/login Plasma con password;
+3. eseguire un normale logout/login Plasma con fingerprint, con massimo tre
+   contatti e stop immediato al primo MATCH.
+
+Non eseguire installazioni, modifiche PAM o una migrazione alla candidate
+durante questi controlli.
+
+```text
+PASS_IF=sudo, login Plasma password e login Plasma fingerprint completano normalmente
+FAIL_IF=uno dei tre workflow non completa o mostra una regressione PAM/fingerprint
+STOP_IF=quarto contatto richiesto, retry non osservabile, instabilità o richiesta di modifica host
+```
+
+Riportare soltanto PASS/FAIL per ciascuno dei tre controlli ed eventuale
+messaggio e punto preciso del failure. Log e journal verranno richiesti solo
+dopo un failure reale, se necessari.
 
 ## Rollback
 

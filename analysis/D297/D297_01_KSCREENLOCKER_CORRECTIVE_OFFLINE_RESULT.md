@@ -12,8 +12,11 @@ in modo reversibile anche `/etc/pam.d/kde-fingerprint`; il laptop reale è stato
 classificato read-only come `HISTORICAL_D293_RUNTIME` e dispone di una patch
 transitoria D289-derived che non sostituisce quel runtime.
 
-Resta obbligatoria la Human Gate per installazione e vero unlock `Meta+L`.
-Nessuna azione privilegiata, USB o biometrica è stata eseguita dall'AI.
+L'Utente ha successivamente applicato la patch ed eseguito il vero unlock
+`Meta+L`: KScreenLocker ha attivato il fingerprint, Goodix ha prodotto MATCH e
+la sessione reale si è sbloccata. Nessuna azione privilegiata, USB o biometrica
+è stata eseguita dall'AI. Restano da riportare soltanto le regressioni minimali
+`sudo`, login Plasma con password e login Plasma con fingerprint.
 
 ## Evidence recovery e root cause
 
@@ -51,7 +54,7 @@ Non esiste un corrispondente file vendor sotto `/usr/lib/pam.d`.
 | failure safety | collisioni, drift, tamper e due rollback parziali | PASS fail-closed |
 | regressioni | `plasmalogin` preservato; authselect e `fingerprint-auth` non modificati | PASS offline |
 | kit storico | sintassi Bash e status read-only sul target | PASS |
-| host mode | `HISTORICAL_D293_RUNTIME`, PAM KScreenLocker vendor non patchato | DETERMINED |
+| host mode pre-live | `HISTORICAL_D293_RUNTIME`, PAM KScreenLocker vendor non patchato | DETERMINED |
 | build | due build pulite complete | PASS |
 | riproducibilità | candidate byte-identiche | PASS |
 | integrità | allowlist esatta di 23 file e `sha256sum -c` completo | PASS |
@@ -67,12 +70,35 @@ runtime/ABI/licensing/privacy D296 restano valide perché il binario e il
 licensing boundary non cambiano; il nuovo delta host PAM è coperto dalla
 review e dalla suite sopra riportata.
 
+## Esito live comunicato dall'Utente
+
+L'Utente ha osservato sul production host reale la sequenza:
+
+```text
+Meta+L
+→ KScreenLocker
+→ kde-fingerprint
+→ pam_fprintd
+→ Goodix
+→ MATCH
+→ sessione sbloccata
+```
+
+Questo prova il feature path KScreenLocker con il runtime storico D293 e il
+medesimo delta PAM introdotto nella candidate. Il probe read-only successivo
+mostra `ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME`,
+`KSCREENLOCKER_PAM_STATUS=TRANSIENT_CORRECTIVE_ACTIVE` e l'hash invariato di
+`fingerprint-auth`. Non prova una migrazione live completa alla candidate.
+L'Utente non ha ancora riportato risultati successivi e specifici per `sudo`,
+login Plasma con password o login Plasma con fingerprint; tali regressioni non
+vengono inferite dal PASS KScreenLocker.
+
 ## Confine della prova e decisione
 
 La candidate è implementata, riproducibile e testata offline. La prova live
-corrente deve restare sul runtime storico e dimostrare soltanto che il medesimo
-delta PAM sblocca una sessione KDE realmente locked, senza migrare il laptop.
-Un eventuale PASS non proverà la migrazione live completa alla candidate.
+del medesimo delta PAM sul runtime storico è PASS. La closure D297 resta però
+pendente fino alle tre verifiche di regressione minimali, senza ulteriori
+modifiche PAM; la migrazione live completa alla candidate resta separata.
 
 ```text
 D289_PATH_RECOVERED_AND_UNDERSTOOD=true
@@ -81,16 +107,21 @@ AUTHSELECT_GLOBAL_FINGERPRINT_UNCHANGED=true
 FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true
 KDE_FINGERPRINT_MANAGED_INTEGRATION_PRESENT=true
 INSTALL_UPDATE_REMOVE_ROLLBACK_TESTED=true
-PLASMALOGIN_REGRESSION=false
+PLASMALOGIN_OFFLINE_REGRESSION=false
 DRIVER_LIBFPRINT_FPRINTD_CORE_CHANGED=false
 ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME
 HISTORICAL_RUNTIME_REPLACED_AS_SIDE_EFFECT=false
 CANDIDATE_MANAGED_FIX_OFFLINE_TESTED=true
 LIVE_PROOF_SCOPE_EXPLICIT=true
-REAL_KDE_LOCKED_SESSION_UNLOCK=AWAITING_HUMAN_GATE
+REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
 SUDO_REGRESSION=AWAITING_HUMAN_GATE
-HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=AWAITING_HUMAN_GATE
+PLASMA_PASSWORD_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
+KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
+D297_KSCREENLOCKER_LIVE_GATE=PASS
+D297_FULL_CLOSURE=PENDING_MINIMAL_REGRESSION_CHECK
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
-EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
+EXECUTABLE_CLOSURE=PASS_KSCREENLOCKER_LIVE_REGRESSIONS_PENDING
 PM_DECISION=HUMAN_REQUIRED
 ```
