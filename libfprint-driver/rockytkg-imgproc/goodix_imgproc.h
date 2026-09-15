@@ -21,7 +21,7 @@
 
 /*
  * ADAPTED_FROM_ROCKY:
- *   Rockytkg/include/goodix_imgproc.h
+ *   upstream Rockytkg path include/goodix_imgproc.h
  *   commit 227eba219fa9e3fbac5bd59aca79f624f67cd11b
  *
  * The project-local adaptation replaces the full sensor-reaching goodix_dev

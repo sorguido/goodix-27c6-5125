@@ -10,8 +10,9 @@ __pycache__/
 *.tmp
 *~
 
+# Private history, evidence, protected material, and superseded artifacts.
+# This directory is intentionally preserved only in the private workspace.
+red_tag/
+
 # Host-local, hash-verified build inputs. Keep documentation, not RPM payloads.
 GoodixArtifacts/opencv-4.13-rpms/*.rpm
-
-# Rebuildable local Phase C package outputs.
-packaging/**/dist/

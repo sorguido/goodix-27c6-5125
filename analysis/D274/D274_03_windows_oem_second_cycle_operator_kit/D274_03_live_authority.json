@@ -1,9 +1,0 @@
-{
-  "schema": "D274_03_LIVE_AUTHORITY_V1",
-  "baseline_approved": false,
-  "approved_for_capture": false,
-  "live_authorized": false,
-  "approved_full_commit_sha": null,
-  "one_shot_authorization_id": null,
-  "authority_note": "TEMPLATE_NON_APPROVATO: deve essere sostituito solo dopo review AI-PM e autorizzazione esplicita separata."
-}

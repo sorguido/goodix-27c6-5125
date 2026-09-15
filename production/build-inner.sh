@@ -3,18 +3,18 @@
 set -eu
 
 if [ "$#" -ne 5 ]; then
-  echo "usage: $0 <assembly> <build-dir> <pkgconfig-dir> <output-dir> <mode>" >&2
+  echo "usage: $0 <source-root> <build-dir> <pkgconfig-dir> <output-dir> <mode>" >&2
   exit 2
 fi
 
-assembly=$1
+source_root=$1
 build_dir=$2
 pkgconfig_dir=$3
 output_dir=$4
 mode=$5
-source_root="$assembly/reference/libfprint-fedora44-1.94.100/source"
 support_dir=$(CDPATH= cd -- "$(dirname -- "$0")/build-support" && pwd)
-relative_assembly=$(realpath --relative-to="$build_dir" "$assembly")
+source_parent=$(CDPATH= cd -- "$source_root/../../.." && pwd -P)
+relative_source_parent=$(realpath --relative-to="$build_dir" "$source_parent")
 sanitize_args=
 c_args="-DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
 
@@ -33,8 +33,8 @@ opencv_libdir=$(pkg-config --variable=libdir opencv4)
 relative_opencv=$(realpath --relative-to="$build_dir" "$(dirname "$(dirname "$opencv_include")")")
 export LIBRARY_PATH="$pkgconfig_dir:$opencv_libdir"
 export LDFLAGS=-Wl,--allow-shlib-undefined
-c_args="$c_args -ffile-prefix-map=$assembly=/usr/src/goodix-production"
-c_args="$c_args -ffile-prefix-map=$relative_assembly=/usr/src/goodix-production"
+c_args="$c_args -ffile-prefix-map=$source_parent=/usr/src/goodix-production"
+c_args="$c_args -ffile-prefix-map=$relative_source_parent=/usr/src/goodix-production"
 c_args="$c_args -ffile-prefix-map=$build_dir=/usr/src/goodix-build"
 c_args="$c_args -ffile-prefix-map=$opencv_include=/usr/include/opencv4"
 c_args="$c_args -ffile-prefix-map=$relative_opencv=/usr"

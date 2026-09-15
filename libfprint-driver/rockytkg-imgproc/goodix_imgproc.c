@@ -27,7 +27,7 @@
 
 /*
  * ADAPTED_FROM_ROCKY:
- *   Rockytkg/src/goodix_imgproc.c
+ *   upstream Rockytkg path src/goodix_imgproc.c
  *   commit 227eba219fa9e3fbac5bd59aca79f624f67cd11b
  *
  * Adaptation boundary: detach the pure image pipeline from goodix_dev and

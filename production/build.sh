@@ -4,27 +4,26 @@ set -euo pipefail
 umask 077
 
 if [[ $# -ne 2 ]]; then
-  echo "uso: $0 <normal|sanitizer> <output-assoluto>" >&2
+  echo "usage: $0 <normal|sanitizer> <absolute-output-directory>" >&2
   exit 2
 fi
 mode=$1
 output=$2
-case "$mode" in normal|sanitizer) ;; *) echo "modalità non valida" >&2; exit 2 ;; esac
-[[ $EUID -ne 0 ]] || { echo "la build deve essere unprivileged" >&2; exit 1; }
+case "$mode" in normal|sanitizer) ;; *) echo "invalid build mode" >&2; exit 2 ;; esac
+[[ $EUID -ne 0 ]] || { echo "the build must run unprivileged" >&2; exit 1; }
 [[ $output == /* && $output != / && ! -L $output ]] || {
-  echo "output non assoluto o non sicuro" >&2; exit 2;
+  echo "unsafe output path" >&2; exit 2;
 }
 if [[ -e $output ]]; then
   [[ -d $output && -z $(find "$output" -mindepth 1 -maxdepth 1 -print -quit) ]] || {
-    echo "output esistente non vuoto" >&2; exit 2;
+    echo "output directory is not empty" >&2; exit 2;
   }
 else
   mkdir -m 0700 -- "$output"
 fi
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-root=$(git -C "$script_dir" rev-parse --show-toplevel)
-baseline=f609c865f760768edb6a9e404b863ccd0569e1c8
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
 work=$(mktemp -d /tmp/goodix-production-build.XXXXXX)
 cleanup () {
   if [[ $work == /tmp/goodix-production-build.* && -d $work && ! -L $work ]]; then
@@ -32,32 +31,20 @@ cleanup () {
   fi
 }
 trap cleanup EXIT INT TERM
-assembly="$work/assembly"
 build_dir="$output/build"
 pkgconfig="$output/pkgconfig"
 opencv_prefix="$work/opencv-prefix"
 rpm_dir="$root/GoodixArtifacts/opencv-4.13-rpms"
-mkdir -p "$assembly" "$build_dir" "$pkgconfig" "$opencv_prefix"
+mkdir -p "$build_dir" "$pkgconfig" "$opencv_prefix"
 
 "$script_dir/check-source.sh"
-git -C "$root" archive "$baseline" -- \
-  reference/libfprint-fedora44-1.94.100/source | tar -x -C "$assembly"
-while IFS=$'\t' read -r path license provenance; do
-  [[ -n $path && -n $license && -n $provenance ]] || {
-    echo "manifest source non valido" >&2; exit 1;
-  }
-  install -D -m 0644 "$root/$path" "$assembly/$path"
-done <"$script_dir/source-files.tsv"
-patch --batch --forward -p1 -d "$assembly" \
-  <"$script_dir/patches/0001-goodix-fedora44-production.patch"
-
 (cd "$rpm_dir" && sha256sum -c "$script_dir/build-support/opencv-rpms.sha256")
 for package in "$rpm_dir"/*.rpm; do
   (cd "$opencv_prefix" && rpm2cpio "$package" | cpio -idm --quiet)
 done
 gusb=$(ldconfig -p | awk \
   '/libgusb[.]so[.]2 .*x86-64/ && !found {value=$NF; found=1} END {print value}')
-[[ -n $gusb && -f $gusb ]] || { echo "libgusb.so.2 non trovata" >&2; exit 1; }
+[[ -n $gusb && -f $gusb ]] || { echo "libgusb.so.2 not found" >&2; exit 1; }
 cp "$gusb" "$pkgconfig/libgusb.so.2"
 sed -e "s|@PREFIX@|$pkgconfig|g" \
     -e "s|@INCLUDEDIR@|$script_dir/build-support|g" \
@@ -66,10 +53,11 @@ sed -e "s|@PREFIX@|$opencv_prefix/usr|g" \
     "$script_dir/build-support/opencv4.pc.in" >"$pkgconfig/opencv4.pc"
 
 flatpak run --user --unshare=network \
-  --filesystem="$assembly:ro" --filesystem="$opencv_prefix:ro" \
-  --filesystem="$output" \
-  --filesystem="$script_dir:ro" --command=sh org.freedesktop.Sdk//25.08 \
-  "$script_dir/build-inner.sh" "$assembly" "$build_dir" "$pkgconfig" \
+  --filesystem="$root:ro" --filesystem="$opencv_prefix:ro" \
+  --filesystem="$output" --command=sh org.freedesktop.Sdk//25.08 \
+  "$script_dir/build-inner.sh" \
+  "$root/reference/libfprint-fedora44-1.94.100/source" \
+  "$build_dir" "$pkgconfig" \
   "$output" "$mode" | tee "$output/build.env"
 
 cp "$pkgconfig/libgusb.so.2" "$output/libgusb.so.2"
@@ -79,7 +67,7 @@ for component in core features2d flann imgproc; do
 done
 license_root="$opencv_prefix/usr/share/licenses"
 [[ -d $license_root/opencv-core && -d $license_root/opencv4 ]] || {
-  echo "license OpenCV estratte non trovate" >&2; exit 1;
+  echo "OpenCV license corpus not found" >&2; exit 1;
 }
 {
   while IFS= read -r license_file; do
@@ -94,7 +82,7 @@ library="$output/libfprint-2.so.2.0.0"
 nm "$library" >"$output/library.nm"
 while read -r symbol; do
   ! grep -Eq " [A-Za-z] ${symbol}$" "$output/library.nm" || {
-    echo "simbolo host/test presente: $symbol" >&2; exit 1;
+    echo "host/test symbol present: $symbol" >&2; exit 1;
   }
 done <"$script_dir/host-test-only-symbols.txt"
 legacy_policy=GOODIX_D
@@ -124,5 +112,6 @@ echo "PRODUCTION_BUILD_MODE=$mode"
 echo PRODUCTION_HOST_TEST_ONLY_SYMBOL_COUNT=0
 echo PRODUCTION_ABI_LIBFPRINT_2_0_0=PASS
 echo PRODUCTION_RPATH_PRESENT=false
+echo PRODUCTION_PRIVATE_TREE_DEPENDENCY_COUNT=0
 echo REAL_USB_ENUMERATION_ATTEMPTED=false
 echo LIVE_EXECUTION_PERFORMED=false

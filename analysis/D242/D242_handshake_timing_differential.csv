@@ -1,9 +1,0 @@
-source,interval,delta_ms,evidence_class,assessment
-D43,all,NOT_ASSESSABLE,UNKNOWN,primary capture absent
-D175,ClientHello_complete_to_ServerHello_first,0.219,VERIFIED_PRIMARY_CAPTURE,server responds promptly
-D175,ServerHello_complete_to_ServerHelloDone_first,21.933,VERIFIED_PRIMARY_CAPTURE,distinct paced B0 emissions
-D175,ServerHelloDone_complete_to_ClientKeyExchange_first,13.338,VERIFIED_PRIMARY_CAPTURE,far below 3000 ms
-D241_before_fix,ServerHello_to_ServerHelloDone,back_to_back_no_explicit_delay,VERIFIED_STATIC_CODE,D241_TOO_FAST_VS_WINDOWS_PROVEN
-D241,ServerHelloDone_to_timeout,3000_budget_total,OBSERVED_LIVE_D241,timeout too short falsified by D175 response time
-D242_corrected,delay_after_each_TLS_record,10,VERIFIED_OFFLINE,matches explicit Windows callback minimum pacing policy
-

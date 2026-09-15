@@ -7,8 +7,8 @@
  * TLS server, USB backend, secure-session and one-shot enrollment integration.
  * It contains no fprintd or persistent-write path.
  *
- * Architecture source: analysis/D276/D276_01_libfprint_device_architecture.md
- * API source: repository-local libfprint 1.94.5 (LGPL).
+ * Architecture: see TECHNICAL_MANUAL.md.
+ * API source: the repository-local Fedora libfprint 1.94.100 tree (LGPL).
  */
 #include "goodix_fpimage_device.h"
 

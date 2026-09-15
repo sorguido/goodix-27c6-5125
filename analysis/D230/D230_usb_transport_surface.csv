@@ -1,8 +1,0 @@
-surface,host_to_device,capture_count,address_capable,memory_read,classification
-bulk OUT 0x01 / IN 0x81 A0,yes,56 OUT submissions / 59 IN submissions,payload is generic but inventoried builders expose no arbitrary 32-bit MCU read,bounded typed reads only,fully inventoried core command transport
-bulk OUT 0x01 / IN 0x81 B0,yes,4 host B0 frames,"TLS application data, not an APP command escape in classified gfusb paths",no memory-read builder/dispatcher found,TLS record transport
-interrupt IN 0x82,no,2 submissions + 2 completions,no OUT direction,no command payload observed,zero-length/polling only in recovered capture
-standard control EP0,descriptor/configuration only,4 OUT + 7 IN submissions,USB setup values only,no vendor/class memory request,enumeration surface
-vendor/class control transfer,not found,0,no,no,absent from capture and classified UMDF send paths
-alternate interface/CDC/raw non-A0 bulk,not found,0,no evidence,no,"no descriptor, capture, import or send-path evidence"
-UMDF IOCTL to USB indirection 0x18005ddcc,yes via the above pipes,covered by A0/B0 counts,does not synthesize a separate USB request type,no alternate backend found,"transport indirection, not extra wire surface"

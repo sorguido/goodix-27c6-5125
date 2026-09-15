@@ -1,1 +1,0 @@
-auth required /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45

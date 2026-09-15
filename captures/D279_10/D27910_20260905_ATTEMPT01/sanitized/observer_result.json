@@ -1,6 +1,0 @@
-{
-  "schema": "D279_10_WIRE_OBSERVER_FAILURE_V2",
-  "status": "FAIL_CLOSED",
-  "failure_class": "MALFORMED_A0",
-  "automatic_retry_count": 0
-}

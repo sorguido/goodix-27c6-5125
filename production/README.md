@@ -1,42 +1,45 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Production source-of-truth
+# Reproducible production build
 
-Questa directory è l'autorità di **composizione** del build production per
-Fedora KDE x86_64 e Goodix `27c6:5125` / APP12509. Non duplica il tree
-libfprint completo: ricostruisce il baseline Fedora/libfprint 1.94.100 dal
-commit Git pristine `f609c865f760768edb6a9e404b863ccd0569e1c8`, applica
-`patches/0001-goodix-fedora44-production.patch` e aggiunge soltanto il subset
-Goodix/SIGFM/R2 elencato in `source-files.tsv`.
+This directory is the build authority for Fedora 44 KDE x86_64 and Goodix
+`27c6:5125` / APP12509. It builds directly from the publishable source tree and
+does not require private Git history or any excluded directory.
 
-Il requisito del commit pristine implica che un clone shallow privo di quel
-commit non è sufficiente: `build.sh` fallisce prima della build. Il tree già
-patchato sotto `reference/` viene usato solo per verificare la rigenerazione
-della patch, mai come sorgente dell'assembly.
+The build combines:
 
-Il consumatore di distribuzione ufficiale è
-`deployment/phase-c-source-first-managed/`: prepara da questa directory una
-candidate content-addressed e la installa senza dipendere da RPM D294 o
-baseline Dxxx. La guida operativa è `docs/PHASE_C_SOURCE_FIRST_INSTALL.md`.
+- `reference/libfprint-fedora44-1.94.100/source/`;
+- the 62 hash-pinned files listed in `source-files.tsv`;
+- the fixed build support under `build-support/`;
+- five pinned Fedora 44 OpenCV RPMs under
+  `GoodixArtifacts/opencv-4.13-rpms/`.
 
-Invocazione unprivileged e offline:
+Run the source audit:
 
-```text
-production/build.sh normal /percorso/assoluto/output
-production/build.sh sanitizer /percorso/assoluto/output
+```bash
+production/check-source.sh
 ```
 
-L'output deve essere nuovo o vuoto. La build usa il Flatpak SDK 25.08 già
-installato con rete disabilitata, verifica i cinque RPM OpenCV locali e non
-esegue installazione host, enumeration USB, material loader o deploy. Il solo
-artefatto principale è `libfprint-2.so.2.0.0`, accompagnato dalle dipendenze
-runtime staging e dai report di build/ABI.
+Build into a new or empty absolute directory:
 
-Licensing/provenance: baseline Fedora e delta core conservano LGPL; sorgenti
-locali conservano la licenza per-file; SIGFM Rocky è LGPL e il subset R2
-preprocessor/imgproc è GPL-2.0-or-later. Il combined work resta nel medesimo
-regime GPL-compatible già documentato in `docs/LICENSING_AND_PROVENANCE.md`.
-Poiché il binario collega anche componenti Apache-2.0 (OpenSSL 3/OpenCV), la
-candidate lo distribuisce sotto GPL-3.0-or-later, opzione già consentita dai
-termini “or later”; ogni sorgente conserva la propria licenza e non viene
-relicenziata. La build preserva inoltre in output il corpus notice/licenze
-OpenCV estratto dagli RPM pin-nati, usato dal packaging della release.
+```bash
+production/build.sh normal /absolute/path/to/output
+production/build.sh sanitizer /absolute/path/to/output
+```
+
+The build must run unprivileged. It uses the user-installed Flatpak SDK
+`org.freedesktop.Sdk//25.08` with network access disabled. It does not enumerate
+USB, load device material, install host files, or start fprintd.
+
+The normal output contains `libfprint-2.so.2.0.0`, staged runtime libraries,
+OpenCV notices, ABI reports, and `artifact.sha256`. The script verifies the
+Fedora fprintd symbol set, rejects RPATH/RUNPATH, rejects host-only symbols, and
+reports a zero dependency count for excluded private content.
+
+The expected qualified library digest is:
+
+```text
+115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20
+```
+
+Use `deployment/managed-install/manage.sh prepare` to turn a normal build into
+an installable, content-addressed candidate with licenses, notices, and SBOM.
