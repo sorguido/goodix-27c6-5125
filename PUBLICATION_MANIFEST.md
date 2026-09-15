@@ -5,6 +5,7 @@ The publishable source surface consists of these paths:
 
 ```text
 .gitignore
+ACKNOWLEDGEMENTS.md
 LICENSE
 LICENSES/
 README.md

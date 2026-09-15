@@ -38,6 +38,7 @@ cross-device material migration path.
 - [Validation scope](docs/VALIDATION.md)
 - [Licensing and provenance](docs/LICENSING_AND_PROVENANCE.md)
 - [Upstream references](docs/REFERENCES.md)
+- [Acknowledgements and development-tool disclosure](ACKNOWLEDGEMENTS.md)
 - [Reproducible build](production/README.md)
 
 ## Build and test
