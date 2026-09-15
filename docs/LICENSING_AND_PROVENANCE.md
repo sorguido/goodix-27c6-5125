@@ -122,6 +122,28 @@ resulting set. Independent LGPL implementation is a fallback only for a
 concrete licensing or integration blocker, not the default response to a GPL
 source file.
 
+### Phase E combined-binary determination
+
+The managed release candidate statically incorporates the R2 preprocessing
+component under `GPL-2.0-or-later` and dynamically links OpenSSL 3 and OpenCV
+components under Apache-2.0 terms. Apache-2.0 is compatible with GPLv3, while
+the “or later” grants on the GPL and LGPL inputs permit selecting GPLv3 for
+the combination. The distributed `libfprint-2.so.2.0.0` is therefore conveyed
+under `GPL-3.0-or-later`; this is a determination within the already approved
+GPL-compatible boundary, not a relicensing of any individual source file.
+
+The source-first candidate now carries GPLv3 and Apache-2.0 license texts,
+the exact OpenCV license/notice corpus extracted from the hash-pinned Fedora
+RPMs, `THIRD_PARTY_NOTICES.md`, and an SPDX 2.3 JSON SBOM. The SBOM records
+bundled components and the exact Fedora packages resolving the dynamic and
+host-integration dependencies at build time. Complete corresponding source is
+identified by the candidate `SOURCE_COMMIT`.
+
+Primary compatibility references used for this determination are the GNU
+license compatibility list and GPL FAQ, the OpenSSL 3 license page, and the
+OpenCV license page. This project audit records the distribution decision and
+its evidence; it is not a general legal opinion beyond this candidate.
+
 ## Publication boundary
 
 ```text

@@ -28,7 +28,9 @@ policy_name=goodix_fprint_account_delete
 policy_priority=400
 expected_pam_rule='auth        sufficient                                   pam_fprintd.so'
 required_candidate=(
-  MANIFEST SHA256SUMS LICENSE GPL-2.0-or-later.txt LGPL-2.1-or-later.txt
+  MANIFEST SHA256SUMS SBOM.spdx.json THIRD_PARTY_NOTICES.md LICENSE
+  GPL-2.0-or-later.txt LGPL-2.1-or-later.txt GPL-3.0-or-later.txt
+  Apache-2.0.txt OpenCV-LICENSES.txt
   libfprint-2.so.2.0.0 libgusb.so.2
   libopencv_core.so.413 libopencv_features2d.so.413 libopencv_flann.so.413
   libopencv_imgproc.so.413 fprintd-wrapper 50-goodix-fprint-account-delete
@@ -101,6 +103,9 @@ verify_candidate() {
   [[ $(manifest_value "$candidate" PROTECTED_MATERIAL_INCLUDED) == false ]] || fail candidate_contains_material
   [[ $(manifest_value "$candidate" PAM_FILES_INCLUDED) == true ]] || fail managed_pam_rule_missing
   [[ $(manifest_value "$candidate" PAM_INTEGRATION) == MANAGED_ETC_OVERRIDE_FROM_VENDOR ]] || fail pam_integration_model_invalid
+  [[ $(manifest_value "$candidate" SBOM_FORMAT) == SPDX-2.3-JSON ]] || fail sbom_format_invalid
+  [[ $(manifest_value "$candidate" COMBINED_BINARY_LICENSE) == GPL-3.0-or-later ]] || fail combined_binary_license_invalid
+  [[ $(manifest_value "$candidate" FAR_FRR_CLAIM) == NOT_MADE ]] || fail far_frr_claim_invalid
   commit=$(manifest_value "$candidate" SOURCE_COMMIT) || fail candidate_commit_missing
   is_commit "$commit" || fail candidate_commit_invalid
   verify_repo_provenance "$commit"

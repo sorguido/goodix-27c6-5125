@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 import hashlib
+import json
 import os
 import pathlib
 import shutil
@@ -11,8 +12,10 @@ import unittest
 HERE = pathlib.Path(__file__).resolve().parent
 TRANSACTION = HERE / "root-transaction.sh"
 FILES = (
-    "MANIFEST", "SHA256SUMS", "LICENSE", "GPL-2.0-or-later.txt",
-    "LGPL-2.1-or-later.txt", "libfprint-2.so.2.0.0",
+    "MANIFEST", "SHA256SUMS", "SBOM.spdx.json", "THIRD_PARTY_NOTICES.md",
+    "LICENSE", "GPL-2.0-or-later.txt", "LGPL-2.1-or-later.txt",
+    "GPL-3.0-or-later.txt", "Apache-2.0.txt", "OpenCV-LICENSES.txt",
+    "libfprint-2.so.2.0.0",
     "libgusb.so.2", "libopencv_core.so.413", "libopencv_features2d.so.413",
     "libopencv_flann.so.413", "libopencv_imgproc.so.413", "fprintd-wrapper",
     "50-goodix-fprint-account-delete", "goodix_fprint_account_delete.te",
@@ -68,7 +71,10 @@ class ManagedInstallContract(unittest.TestCase):
             "TARGET_OS=Fedora-44-KDE-x86_64\n"
             "PROTECTED_MATERIAL_INCLUDED=false\n"
             "PAM_FILES_INCLUDED=true\n"
-            "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n",
+            "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n"
+            "SBOM_FORMAT=SPDX-2.3-JSON\n"
+            "COMBINED_BINARY_LICENSE=GPL-3.0-or-later\n"
+            "FAR_FRR_CLAIM=NOT_MADE\n",
             encoding="utf-8",
         )
         rows = []
@@ -171,6 +177,13 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("candidate_digest_mismatch", result.stderr)
 
+    def test_release_metadata_is_mandatory(self):
+        candidate = self.candidate("9" * 40)
+        (candidate / "SBOM.spdx.json").unlink()
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("candidate_SBOM.spdx.json_invalid", result.stderr)
+
     def test_partial_install_is_rolled_back(self):
         candidate = self.candidate("e" * 40)
         self.env["GOODIX_MANAGED_TEST_FAIL_AFTER_POLICY"] = "true"
@@ -238,6 +251,10 @@ class ManagedInstallContract(unittest.TestCase):
     def test_shell_syntax(self):
         for name in ("prepare.sh", "manage.sh", "root-transaction.sh", "fprintd-wrapper", "50-goodix-fprint-account-delete"):
             subprocess.run(["bash", "-n", str(HERE / name)], check=True)
+        subprocess.run(
+            ["python3", "-m", "py_compile", str(HERE / "generate-sbom.py")],
+            check=True,
+        )
 
 
 if __name__ == "__main__":

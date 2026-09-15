@@ -31,6 +31,12 @@ Test offline:
 python3 deployment/phase-c-source-first-managed/test_offline.py
 ```
 
+Ogni candidate include inoltre `SBOM.spdx.json` (SPDX 2.3 JSON), i notice
+terzi, i testi GPL-3.0/Apache-2.0 e il corpus licenze OpenCV estratto dai
+cinque RPM hash-pinned. `MANIFEST` dichiara il regime del combined binary e
+`SHA256SUMS` copre anche questi metadati di release; nessuno di essi contiene
+materiale protetto o dati biometrici.
+
 Guida utente: `docs/PHASE_C_SOURCE_FIRST_INSTALL.md`.
 
 D295/02 è PASS live per update, vendor PAM invariato, password, login

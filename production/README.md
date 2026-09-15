@@ -35,4 +35,8 @@ Licensing/provenance: baseline Fedora e delta core conservano LGPL; sorgenti
 locali conservano la licenza per-file; SIGFM Rocky è LGPL e il subset R2
 preprocessor/imgproc è GPL-2.0-or-later. Il combined work resta nel medesimo
 regime GPL-compatible già documentato in `docs/LICENSING_AND_PROVENANCE.md`.
-Nessun relicensing è introdotto.
+Poiché il binario collega anche componenti Apache-2.0 (OpenSSL 3/OpenCV), la
+candidate lo distribuisce sotto GPL-3.0-or-later, opzione già consentita dai
+termini “or later”; ogni sorgente conserva la propria licenza e non viene
+relicenziata. La build preserva inoltre in output il corpus notice/licenze
+OpenCV estratto dagli RPM pin-nati, usato dal packaging della release.

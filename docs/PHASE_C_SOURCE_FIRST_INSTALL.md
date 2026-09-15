@@ -102,6 +102,12 @@ grep -E '^(PHASE_C_DISTRIBUTION_MODEL|RPM_OFFICIAL_DISTRIBUTION|SOURCE_COMMIT|PR
   "$HOME/goodix-phase-c-candidate/candidate/MANIFEST"
 ```
 
+La candidate qualificata include anche `SBOM.spdx.json`,
+`THIRD_PARTY_NOTICES.md`, i testi GPLv3/Apache-2.0 e il corpus notice OpenCV.
+`SHA256SUMS` li copre insieme al payload. Il digest stampato come
+`RELEASE_CANDIDATE_SHA256` identifica l'intero indice della candidate; lo
+`SOURCE_COMMIT` identifica il corrispondente sorgente completo.
+
 ## 3. Materiale protetto: origine consentita
 
 Il runtime richiede `target-material-manifest.json`, `transport-material.bin`,

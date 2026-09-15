@@ -77,6 +77,19 @@ for component in core features2d flann imgproc; do
   cp -L "$opencv_prefix/usr/lib64/libopencv_${component}.so.4.13.0" \
     "$output/libopencv_${component}.so.413"
 done
+license_root="$opencv_prefix/usr/share/licenses"
+[[ -d $license_root/opencv-core && -d $license_root/opencv4 ]] || {
+  echo "license OpenCV estratte non trovate" >&2; exit 1;
+}
+{
+  while IFS= read -r license_file; do
+    relative=${license_file#"$license_root"/}
+    printf '%s\n' "===== $relative ====="
+    cat "$license_file"
+    printf '\n'
+  done < <(find "$license_root/opencv-core" "$license_root/opencv4" \
+    -type f -print | LC_ALL=C sort)
+} >"$output/OpenCV-LICENSES.txt"
 library="$output/libfprint-2.so.2.0.0"
 nm "$library" >"$output/library.nm"
 while read -r symbol; do
