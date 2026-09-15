@@ -43,11 +43,12 @@ chiude Phase B e porta il boundary a Phase C.
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=D_CLOSED
+CURRENT_PHASE=E_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
-NEXT_PHASE=E
+PHASE_E_CLOSED=true
+NEXT_PHASE=F
 ```
 
 Target production iniziale approvato: Goodix USB `27c6:5125` / APP12509 su
@@ -72,9 +73,11 @@ chiusa sulla base delle prove live eseguite dall'Utente: il sensore è tornato
 utilizzabile dopo suspend/resume e dopo cancellazione normale e molto precoce
 di una verify, senza restart, reboot o workaround Goodix-specifici. Nel caso
 precoce la seconda action è terminata con `verify-no-match (done)`: è prova di
-recovery del percorso, non un MATCH biometrico. Phase E è la fase successiva ma
-resta non iniziata. I boundary D279–D295 chiusi non vanno ripetuti per sola
-maggiore confidenza.
+recovery del percorso, non un MATCH biometrico. D296 qualifica una release
+candidate privata riproducibile, chiude threat/privacy, SBOM,
+licensing/attribution e test matrix e porta Phase E a closure. Phase F è la
+fase successiva ma resta non iniziata. I boundary D279–D296 chiusi non vanno
+ripetuti per sola maggiore confidenza.
 
 D292/01 ha chiuso l'inventario A1. D292/02 chiude A3/A4: `production/` è ora
 l'unica autorità di composizione, ricostruisce il pristine Fedora 44/libfprint
@@ -185,13 +188,17 @@ D2_02_BIOMETRIC_MATCH=false
 PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
-PHASE_E_STATUS=NOT_STARTED
-NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
+PHASE_E_STATUS=CLOSED
+PHASE_E_CLOSURE_CRITERIA=PASS
+D296_01_RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
+D296_01_RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
+D296_01_OUTCOME=PASS_RELEASE_QUALIFICATION
+NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=NONE_PHASE_D_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
+CURRENT_TASK=NONE_PHASE_E_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
 ```
 
 ## Stato verificato del progetto
@@ -544,7 +551,7 @@ workaround Goodix-specifici. Non è stata necessaria alcuna modifica al codice.
 I criteri ridotti di Phase D sono soddisfatti; gli scenari esclusi restano fuori
 scope in assenza di un boundary concreto o bug osservato.
 
-### Phase E — qualificazione release, sicurezza e licenze
+### Phase E — qualificazione release, sicurezza e licenze — CLOSED
 
 - **OBIETTIVO:** definire la qualità supportata e auditare l'intero artefatto di
   distribuzione, senza confondere un test funzionale con una stima FAR/FRR.
@@ -565,6 +572,18 @@ scope in assenza di un boundary concreto o bug osservato.
   piattaforme e versioni dichiarate. I claim iniziali coprono soltanto Fedora
   KDE + Goodix `27c6:5125`/APP12509; altri sistemi, desktop, sensori e firmware
   restano non rivendicati.
+
+**Closure:** PASS. D296/01 qualifica la candidate privata al source commit
+`3feabcfb7918375ce0e04def0605c2389f95d932`, digest dell'indice
+`SHA256SUMS`
+`151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584`.
+Due build pulite sono byte-identiche; test matrix, threat/privacy review,
+licensing/attribution, corpus licenze e SBOM SPDX 2.3 sono PASS. Il target
+qualificato è soltanto Fedora 44 KDE x86_64 con Goodix
+`27c6:5125`/APP12509; gli altri target sono `NOT_YET_CLAIMED`. Non viene fatto
+alcun claim FAR/FRR. Una nuova regressione Windows non è richiesta dal delta
+solo metadata/licenze/SBOM e dal runtime byte-identico. La candidate è
+content-addressed e firmabile, ma resta unsigned. Phase F non è iniziata.
 
 ### Phase F — documentazione, handoff e pubblicazione
 
@@ -620,6 +639,8 @@ Non riaprire o ripetere per sola “maggiore confidenza”:
   principal preesistente.
 - D295: build/install source-first, PAM gestito e consumer, rollback
   bidirezionale, uninstall, preservazione materiali/template e recovery.
+- D296: candidate release byte-identica, SBOM/licensing corpus e qualificazione
+  offline; non rigenerare una nuova RC senza un delta reale.
 
 Una regressione mirata è giustificata soltanto se cambia codice/configurazione
 nel percorso rilevante, cambia materialmente la piattaforma supportata, emerge
@@ -702,8 +723,9 @@ percorso è tornato utilizzabile senza restart, reboot o workaround
 Goodix-specifici. D2/02 è terminata con `verify-no-match (done)`: prova recovery
 e non MATCH biometrico. Nessuna modifica al codice è risultata necessaria.
 Phase D è chiusa; hotplug, device removal, concorrenza/consumer simultanei,
-late bytes/cross-generation e stato `POISONED` non vengono riaperti. Phase E è
-la fase successiva e resta non iniziata in attesa della decisione dell'Utente.
+late bytes/cross-generation e stato `POISONED` non vengono riaperti. La
+decisione Utente del 15 settembre 2026 ha aperto Phase E e D296 l'ha chiusa con
+release qualification PASS. Phase F resta non iniziata.
 
 ```text
 PM_DECISION=PROJECT_STEP_COMPLETE
@@ -753,8 +775,10 @@ KEEP_VALIDATED_ADVANCEMENT_BY_DEFAULT=true
 LIVE_EXECUTED_BY_AI=false
 PHASE_B_CLOSED=true
 PROJECT_NEXT_STEPS_PLAN_READY=true
-CURRENT_PHASE=D_CLOSED
+CURRENT_PHASE=E_CLOSED
 PRODUCTION_READY=false
+RELEASE_CANDIDATE_READY=true
+RELEASE_QUALIFICATION=PASS
 PHASE_B_CLOSURE_REVIEW=PASS_ALL_REQUIRED_CRITERIA
 D293_05_FIRST_INSTALL=PASS
 D293_05_FIRST_LIVE=FAIL
@@ -785,16 +809,28 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=E
-PHASE_E_STATUS=NOT_STARTED
-NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
+NEXT_PHASE=F
+PHASE_E_STATUS=CLOSED
+PHASE_E_CLOSURE_CRITERIA=PASS
+NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
 PHASE_D_SCOPE=MINIMAL_SUSPEND_RESUME_AND_CANCELLATION_RECOVERY
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=NONE_PHASE_D_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
+CURRENT_TASK=NONE_PHASE_E_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
+D296_01_OUTCOME=PASS_RELEASE_QUALIFICATION
+D296_01_RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
+D296_01_RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
+D296_01_TEST_MATRIX=PASS
+D296_01_THREAT_PRIVACY_REVIEW=PASS_SCOPED_TO_CANDIDATE
+D296_01_LICENSING_REVIEW=PASS
+D296_01_SBOM=PASS_SPDX_2_3_JSON
+D296_01_FAR_FRR_CLAIM=NOT_MADE
+D296_01_WINDOWS_REGRESSION=NOT_REQUIRED_FOR_METADATA_ONLY_DELTA
+D296_01_REPRODUCIBLE_RC=PASS
+D296_01_SIGNABLE_RC=PASS_UNSIGNED
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS

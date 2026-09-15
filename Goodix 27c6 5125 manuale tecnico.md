@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance corrente — v3.2 (13 settembre 2026)
+### Governance corrente — v3.3 (14 settembre 2026)
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -115,7 +115,7 @@ HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
 La v3.0 ha recepito la roadmap A→F approvata dall'Utente il 13 settembre 2026.
-Le v3.1 e v3.2 non la modificano e mantengono invariati Human Gate, safety,
+Le v3.1–v3.3 non la modificano e mantengono invariati Human Gate, safety,
 factory-preserving, protezioni Git, licensing, target production iniziale,
 ordine delle fasi e phase gate descritti nella sezione narrativa seguente.
 
@@ -151,11 +151,12 @@ sentiero operativo predefinito fino alla fine del progetto:
 ```text
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=D_CLOSED
+CURRENT_PHASE=E_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
-NEXT_PHASE=E
+PHASE_E_CLOSED=true
+NEXT_PHASE=F
 ```
 
 Il target production iniziale resta deliberatamente ristretto a:
@@ -181,7 +182,8 @@ production readiness. D292/03 ha chiuso Phase A; D293/01 chiude B1, D293/02
 chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. Le Phase B e C
 sono chiuse; le prove lifecycle riportate dall'Utente hanno chiuso anche Phase
-D e la fase successiva è **Phase E**, non ancora iniziata. Il corrective D293
+D. D296 ha qualificato la release candidate privata e chiuso Phase E; la fase
+successiva è **Phase F**, non ancora iniziata. Il corrective D293
 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
@@ -209,8 +211,9 @@ sensore ha completato una nuova verify; dopo una cancellazione durante l'attesa
 una seconda verify ha prodotto MATCH; dopo una cancellazione molto precoce una
 nuova action ha riacquisito il device e si è conclusa normalmente con
 `verify-no-match (done)`. Quest'ultimo risultato prova il recovery operativo,
-non un MATCH biometrico. Phase D è chiusa; Phase E è la prossima fase e resta
-non iniziata in attesa della decisione dell'Utente.
+non un MATCH biometrico. Phase D è chiusa. Phase E è stata successivamente
+aperta dalla decisione esplicita dell'Utente del 15 settembre 2026 e chiusa da
+D296; Phase F resta non iniziata.
 
 Principi trasversali della roadmap:
 
@@ -328,7 +331,7 @@ risultato biometrico terminale bounded e non deve essere interpretato come
 MATCH. Non è stata necessaria alcuna modifica al codice. I criteri ridotti di
 Phase D sono soddisfatti e la fase è chiusa.
 
-#### Phase E — qualificazione release, sicurezza e licenze
+#### Phase E — qualificazione release, sicurezza e licenze — CLOSED
 
 **Obiettivo.** Su un prodotto sostanzialmente completo, chiudere test matrix,
 threat/privacy review, SBOM, attribution, audit licenze/combined work, criteri
@@ -342,6 +345,16 @@ statistici universali. Una verifica Windows viene eseguita quando necessaria.
 biometrico o secret entra nel package; licensing e pass/fail della release sono
 espliciti. Non si rivendica ancora supporto per altri sistemi, desktop, sensori
 o firmware.
+
+**Esito.** PASS. D296 identifica la candidate con il commit
+`3feabcfb7918375ce0e04def0605c2389f95d932` e con il digest del suo indice
+`SHA256SUMS`
+`151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584`.
+Due build pulite producono candidate byte-identiche; build, ABI, allowlist,
+checksum, 12 test dell'installer, threat/privacy review, licensing/attribution
+e SBOM SPDX 2.3 sono PASS. La candidate è content-addressed e firmabile, ma non
+è stata firmata. I claim coprono solo Fedora 44 KDE x86_64 e Goodix
+`27c6:5125`/APP12509; tutto il resto è `NOT_YET_CLAIMED`.
 
 #### Phase F — documentazione, handoff e pubblicazione
 
@@ -369,7 +382,7 @@ iniziare la fase successiva:
 PHASE_CLOSED => STOP
 ```
 
-### Stato corrente — Phase C chiusa, baseline source-first gestita
+### Stato corrente — Phase E chiusa, release candidate privata qualificata
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -532,11 +545,12 @@ suspend/resume, cancellazione durante la normale attesa e cancellazione molto
 precoce convergono tutte in un percorso nuovamente utilizzabile senza restart,
 reboot o workaround Goodix-specifici. La seconda action D2/02 termina con
 `verify-no-match (done)`, che è PASS di recovery ma non MATCH biometrico.
-Nessun cambio al codice è stato richiesto. Phase E è la fase successiva, ma non
-viene iniziata o preparata in questa sessione.
+Nessun cambio al codice è stato richiesto. La successiva Phase E è stata
+autorizzata il 15 settembre 2026 e D296 l'ha chiusa con una candidate privata
+qualificata; Phase F non viene iniziata o preparata in questa sessione.
 
 ```text
-CURRENT_PHASE=D_CLOSED
+CURRENT_PHASE=E_CLOSED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
@@ -631,11 +645,15 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=E
-PHASE_E_STATUS=NOT_STARTED
-NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
-CURRENT_TASK=NONE_PHASE_D_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
+NEXT_PHASE=F
+PHASE_E_STATUS=CLOSED
+PHASE_E_CLOSURE_CRITERIA=PASS
+RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
+RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
+RELEASE_QUALIFICATION=PASS
+NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
+CURRENT_TASK=NONE_PHASE_E_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
 NEW_LIVE_REQUIRED_NOW=false
 PM_DECISION=PROJECT_STEP_COMPLETE
 D295_PLASMALOGIN_PAM_CORRECTIVE=PASS_LIVE
@@ -1197,7 +1215,94 @@ NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Ultimo avanzamento live consolidato — closure Phase D lifecycle
+### Ultimo avanzamento consolidato — D296/01 closure Phase E
+
+La decisione esplicita dell'Utente del 15 settembre 2026 ha aperto Phase E.
+Il lavoro ha qualificato una release candidate privata senza nuove azioni live,
+accesso USB, privilegi o lettura di materiali protetti. La candidate canonica è
+identificata dal source commit
+`3feabcfb7918375ce0e04def0605c2389f95d932`; il digest SHA-256 del suo indice
+`SHA256SUMS` è
+`151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584`.
+
+La matrice di qualificazione è PASS: rigenerazione della patch e digest della
+source-of-truth, build normale, ABI libfprint 2.0.0, assenza di RPATH/RUNPATH e
+seam host/test-only, 12 test offline dell'installer e verifica di ogni file
+della candidate. Due build pulite da directory diverse producono candidate
+byte-identiche. In entrambe, `libfprint-2.so.2.0.0` ha SHA-256
+`115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20`,
+identico anche alla build di ingresso D296: le modifiche di qualificazione non
+hanno alterato il runtime sensor-reaching.
+
+Il supporto qualificato è deliberatamente ristretto a Fedora Linux 44 KDE
+x86_64 e Goodix USB `27c6:5125` / APP12509. La baseline comprende libfprint
+`1.94.100-1.fc44`, fprintd/fprintd-pam `1.94.5-5.fc44`, libgusb
+`0.4.9-5.fc44`, OpenSSL `1:3.5.8-1.fc44`, GLib `2.88.3-1.fc44`, OpenCV
+`4.13.0-1.fc44`, Plasma Login Manager `6.7.5-1.fc44`, PAM `1.7.2-2.fc44`,
+systemd `259.8-1.fc44` e SELinux policy `44.8-1.fc44`. La build usa
+Freedesktop SDK 25.08.16 al commit
+`b90ed309cc1d505dea48b6a2121c5dcfac22868120eee643b0596d31f96b9bb8`.
+Altre versioni Fedora, distribuzioni, desktop, architetture, sensori e firmware
+sono `NOT_YET_CLAIMED`: non sono dichiarati incompatibili.
+
+La threat/privacy review della candidate è PASS nello scope. L'allowlist non
+contiene secret, PSK, template, immagini o capture; i materiali per-device
+restano fuori da Git e dalla candidate e conservano import amministrativo
+separato, directory `0700`, file `0600`, controlli fail-closed di
+tipo/ownership/symlink e nessun log di contenuto o digest. Integrità
+content-addressed, runtime immutabile, PAM vendor intatto, SELinux e rollback
+limitano il confine host. Restano esplicitamente fuori dalla closure l'audit
+della history/export pubblico di Phase F e una prova assoluta di nonmutazione
+NVM interna.
+
+L'audit licensing e attribution è PASS entro il boundary approvato. Le licenze
+per-file restano invariate; R2 è GPL-2.0-or-later, SIGFM conserva
+LGPL-2.1-or-later, libgusb è LGPL-2.1-or-later, OpenCV Fedora dichiara
+`BSD-3-Clause AND Apache-2.0 AND ISC` e OpenSSL 3 è Apache-2.0. Poiché il
+combined binary incorpora espressione GPL-2.0-or-later e collega componenti
+Apache-2.0, viene distribuito sotto GPL-3.0-or-later usando l'opzione “or
+later”; non avviene alcun relicensing dei file sorgente. La candidate include
+notice, corpus licenze OpenCV e testi GPL/LGPL/Apache. Il ledger canonico è
+`docs/LICENSING_AND_PROVENANCE.md`.
+
+`SBOM.spdx.json` è SPDX 2.3 JSON deterministico e descrive 38 package, 20 file
+e 58 relazioni. Deriva dal commit, dagli hash dei file, dalle dipendenze
+dinamiche risolte e dai pacchetti Fedora d'integrazione. La review PM ha
+individuato e corretto una query che poteva attribuire a `libgusb` la versione
+di un package proprietario di una directory condivisa; il test di regressione
+e le due candidate finali verificano `libgusb=0.4.9-5.fc44`.
+
+Non viene formulato alcun claim FAR/FRR: le evidenze esistenti provano
+funzionalità, non tassi statistici. Non è necessaria una nuova regressione
+Windows perché D296 modifica solo metadati/licenze/SBOM e il binario runtime è
+byte-identico; questo non introduce un claim di supporto Windows. Commit,
+manifest, allowlist e checksum rendono la candidate firmabile in modo non
+ambiguo, ma nessuna firma è stata prodotta o rivendicata. Phase E è chiusa;
+Phase F resta non iniziata e richiede una successiva interazione dell'Utente.
+
+```text
+RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
+RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
+SUPPORTED=FEDORA_44_KDE_X86_64_PLUS_GOODIX_27C6_5125_APP12509
+NOT_YET_CLAIMED=OTHER_OS_DESKTOP_ARCH_SENSOR_FIRMWARE_OR_FEDORA_VERSION
+TEST_MATRIX=PASS
+THREAT_PRIVACY_REVIEW=PASS_SCOPED_TO_CANDIDATE
+LICENSING_REVIEW=PASS_GPL_3_0_OR_LATER_COMBINED_BINARY
+SBOM=PASS_SPDX_2_3_JSON
+WINDOWS_REGRESSION=NOT_REQUIRED_FOR_D296_METADATA_ONLY_DELTA
+FAR_FRR_CLAIM=NOT_MADE
+REPRODUCIBLE_RC=PASS
+SIGNABLE_RC=PASS_UNSIGNED
+RELEASE_QUALIFICATION=PASS
+EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
+REAL_USB_ACCESS=0
+LIVE_EXECUTION_PERFORMED=false
+PHASE_E_CLOSED=true
+NEXT_PHASE=F
+PM_DECISION=PROJECT_STEP_COMPLETE
+```
+
+### Avanzamento live precedente — closure Phase D lifecycle
 
 L'Utente ha eseguito sul target Fedora 44 le prove dello scope Phase D ridotto.
 D1 ha verificato il sensore e concluso una verify prima della sospensione, poi
@@ -1208,8 +1313,8 @@ l'attivazione; la nuova action ha riacquisito il device, processato una
 acquisizione e terminato normalmente con `verify-no-match (done)`. D2/02 prova
 quindi recovery e riutilizzo bounded, non un MATCH biometrico. Nessuna prova ha
 richiesto restart di fprintd, reboot o workaround Goodix-specifici; nessuna
-modifica al codice è stata necessaria. Phase D è chiusa e Phase E resta non
-iniziata.
+modifica al codice è stata necessaria. Questo era lo stato alla closure Phase
+D; la successiva Phase E è ora chiusa da D296.
 
 ### Avanzamento live precedente — D293/05 account lifecycle sotto SELinux Enforcing
 
@@ -1469,7 +1574,8 @@ sul lifecycle amministrativo.
 La live finale D293/05 ha chiuso account deletion/name reuse sotto SELinux
 Enforcing senza alert; guard e modulo restano installati. Phase B e Phase C
 sono chiuse. Le successive prove live Phase D hanno chiuso suspend/resume e
-cancellation/recovery senza modifiche al codice; Phase E resta non iniziata.
+cancellation/recovery senza modifiche al codice. D296 ha qualificato la
+release candidate privata e chiuso Phase E; Phase F resta non iniziata.
 Il fallback password per utenti enrolled ha un
 ritardo accettato di circa 30 secondi dovuto all'ordine PAM seriale. D295/02 ha
 poi risolto il distinto gap del service PAM `plasmalogin` senza modificare il
@@ -1483,8 +1589,10 @@ qualificazione Windows esaustiva dopo ogni run.
 ```text
 PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=false
+PROJECT_RELEASE_CANDIDATE_READY=true
+RELEASE_QUALIFICATION=PASS
 PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
-WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D295_CLOSED_BOUNDARIES
+WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D296_CLOSED_BOUNDARIES
 PM_DECISION=PROJECT_STEP_COMPLETE
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -1493,7 +1601,7 @@ NEW_LIVE_REQUIRED_NOW=false
 PROJECT_NEXT_STEPS_PLAN_READY=true
 USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=D_CLOSED
+CURRENT_PHASE=E_CLOSED
 PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
@@ -1554,14 +1662,15 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=E
-PHASE_E_STATUS=NOT_STARTED
-NEXT_WORK_CLASS=PHASE_E_NOT_STARTED
+NEXT_PHASE=F
+PHASE_E_STATUS=CLOSED
+PHASE_E_CLOSURE_CRITERIA=PASS
+NEXT_WORK_CLASS=PHASE_F_NOT_STARTED
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=NONE_PHASE_D_CLOSED
-NEXT_BOUNDARY=USER_INITIATED_PHASE_E_DECISION
+CURRENT_TASK=NONE_PHASE_E_CLOSED
+NEXT_BOUNDARY=USER_INITIATED_PHASE_F_DECISION
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
 D294_01_OFFLINE_TESTS=12_PASS
