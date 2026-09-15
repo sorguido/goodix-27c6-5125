@@ -205,8 +205,8 @@ NEXT_WORK_CLASS=PHASE_F_PUBLICATION_AUDIT
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=PHASE_F_PUBLICATION_INVENTORY_AND_CLASSIFICATION
-NEXT_BOUNDARY=PUBLIC_PRIVATE_DEPENDENCY_AUDIT
+CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
 ```
 
 ## Stato verificato del progetto
@@ -669,6 +669,33 @@ successiva:
 PHASE_CLOSED => STOP
 ```
 
+#### Stato Phase F — D298/01 history gate
+
+L'inventario iniziale Phase F ha confermato che il tree e la history privata
+contengono materiale protetto, privato o non redistribuibile: corpus OEM
+Windows e DLL, binario APP12509, capture target e firmware vendor preservato
+nello snapshot Rockytkg. Lo spostamento futuro sotto `red_tag/` separa il tree
+corrente ma non rimuove i blob dai commit storici. Il report canonico è
+`analysis/D298/D298_01_PHASE_F_HISTORY_GATE.md`.
+
+Nessun repository pubblico è stato letto o modificato e nessuna history è
+stata riscritta. La strategia raccomandata è completare nel repository privato
+un export allowlist standalone, validarlo senza `red_tag/` e senza history
+privata, quindi inizializzare la superficie pubblica da un nuovo root pulito
+dopo approvazione editoriale. La scelta della lineage Git pubblica richiede la
+decisione dell'Utente prima di proseguire con spostamenti e ristrutturazione.
+
+```text
+D298_01_OUTCOME=HUMAN_REQUIRED
+PRIVATE_HISTORY_PUBLISHABLE=false
+WORKTREE_RED_TAG_MOVE_SUFFICIENT=false
+PUBLIC_REPOSITORY_ACCESSED=false
+HISTORY_REWRITE_PERFORMED=false
+RECOMMENDED_PUBLICATION_LINEAGE=FRESH_SANITIZED_PUBLIC_ROOT
+CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
+```
+
 ## WHAT_NOT_TO_TEST_AGAIN
 
 Non riaprire o ripetere per sola “maggiore confidenza”:
@@ -787,7 +814,7 @@ fingerprint. D297 è chiuso; la decisione corrente avvia Phase F senza implicare
 alcuna migrazione alla candidate.
 
 ```text
-PM_DECISION=ACCEPT_AND_CONTINUE
+PM_DECISION=HUMAN_REQUIRED
 D290_CLOSED_SUCCESSFULLY=true
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
@@ -877,8 +904,8 @@ PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
 D294_01_LIVE_VALIDATION=SUPERSEDED_NOT_TO_RUN
-CURRENT_TASK=PHASE_F_PUBLICATION_INVENTORY_AND_CLASSIFICATION
-NEXT_BOUNDARY=PUBLIC_PRIVATE_DEPENDENCY_AUDIT
+CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
 D296_01_OUTCOME=PASS_RELEASE_QUALIFICATION
 D296_01_RELEASE_CANDIDATE=3feabcfb7918375ce0e04def0605c2389f95d932
 D296_01_RELEASE_CANDIDATE_SHA256=151e0092ddbc1e4751628c1e338efbf29259f3ce9fd79d093f1630f30f5f0584
