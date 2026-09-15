@@ -14,9 +14,9 @@ transitoria D289-derived che non sostituisce quel runtime.
 
 L'Utente ha successivamente applicato la patch ed eseguito il vero unlock
 `Meta+L`: KScreenLocker ha attivato il fingerprint, Goodix ha prodotto MATCH e
-la sessione reale si è sbloccata. Nessuna azione privilegiata, USB o biometrica
-è stata eseguita dall'AI. Restano da riportare soltanto le regressioni minimali
-`sudo`, login Plasma con password e login Plasma con fingerprint.
+la sessione reale si è sbloccata. Ha poi riportato PASS anche per `sudo` con
+fingerprint, login Plasma con password e login Plasma con fingerprint. Nessuna
+azione privilegiata, USB o biometrica è stata eseguita dall'AI.
 
 ## Evidence recovery e root cause
 
@@ -89,16 +89,16 @@ medesimo delta PAM introdotto nella candidate. Il probe read-only successivo
 mostra `ACTIVE_HOST_DEPLOYMENT_MODE=HISTORICAL_D293_RUNTIME`,
 `KSCREENLOCKER_PAM_STATUS=TRANSIENT_CORRECTIVE_ACTIVE` e l'hash invariato di
 `fingerprint-auth`. Non prova una migrazione live completa alla candidate.
-L'Utente non ha ancora riportato risultati successivi e specifici per `sudo`,
-login Plasma con password o login Plasma con fingerprint; tali regressioni non
-vengono inferite dal PASS KScreenLocker.
+L'Utente ha riportato separatamente PASS per `sudo` con fingerprint, login
+Plasma con password e login Plasma con fingerprint. Le tre regressioni minime
+sono quindi chiuse sulla patch transitoria attiva e sul runtime storico D293.
 
 ## Confine della prova e decisione
 
 La candidate è implementata, riproducibile e testata offline. La prova live
-del medesimo delta PAM sul runtime storico è PASS. La closure D297 resta però
-pendente fino alle tre verifiche di regressione minimali, senza ulteriori
-modifiche PAM; la migrazione live completa alla candidate resta separata.
+del medesimo delta PAM sul runtime storico e le tre regressioni minime sono
+PASS. D297 è chiuso. La migrazione live completa alla candidate resta separata
+e non è un prerequisito della preparazione editoriale Phase F.
 
 ```text
 D289_PATH_RECOVERED_AND_UNDERSTOOD=true
@@ -114,14 +114,14 @@ HISTORICAL_RUNTIME_REPLACED_AS_SIDE_EFFECT=false
 CANDIDATE_MANAGED_FIX_OFFLINE_TESTED=true
 LIVE_PROOF_SCOPE_EXPLICIT=true
 REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
-SUDO_REGRESSION=AWAITING_HUMAN_GATE
-PLASMA_PASSWORD_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
-PLASMA_FINGERPRINT_LOGIN_REGRESSION=AWAITING_HUMAN_GATE
+SUDO_REGRESSION=PASS_HUMAN_OBSERVED
+PLASMA_PASSWORD_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
 HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
 KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
 D297_KSCREENLOCKER_LIVE_GATE=PASS
-D297_FULL_CLOSURE=PENDING_MINIMAL_REGRESSION_CHECK
+D297_FULL_CLOSURE=PASS
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
-EXECUTABLE_CLOSURE=PASS_KSCREENLOCKER_LIVE_REGRESSIONS_PENDING
-PM_DECISION=HUMAN_REQUIRED
+EXECUTABLE_CLOSURE=PASS_HUMAN_OBSERVED
+PM_DECISION=ACCEPT_AND_CONTINUE
 ```

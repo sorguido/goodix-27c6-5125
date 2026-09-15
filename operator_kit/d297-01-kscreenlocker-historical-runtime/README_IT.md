@@ -64,9 +64,9 @@ KSCREENLOCKER_LIVE_RESULT=PASS_MATCH
 Non ripetere questa prova per sola maggiore confidenza e non reinstallare o
 modificare ulteriormente PAM. La patch resta attiva sul runtime storico.
 
-## Verifiche residue minimali — Human Gate
+## Verifiche residue minimali — esito registrato
 
-Restano soltanto questi tre controlli nel normale workflow del sistema:
+L'Utente ha eseguito questi tre controlli nel normale workflow del sistema:
 
 1. eseguire `sudo -k true` e completare con impronta, con massimo tre contatti
    e stop immediato al primo MATCH;
@@ -83,9 +83,15 @@ FAIL_IF=uno dei tre workflow non completa o mostra una regressione PAM/fingerpri
 STOP_IF=quarto contatto richiesto, retry non osservabile, instabilità o richiesta di modifica host
 ```
 
-Riportare soltanto PASS/FAIL per ciascuno dei tre controlli ed eventuale
-messaggio e punto preciso del failure. Log e journal verranno richiesti solo
-dopo un failure reale, se necessari.
+Tutti e tre i controlli sono PASS. D297 è chiuso; non ripetere le prove per
+sola maggiore confidenza.
+
+```text
+SUDO_REGRESSION=PASS_HUMAN_OBSERVED
+PLASMA_PASSWORD_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
+PLASMA_FINGERPRINT_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
+D297_FULL_CLOSURE=PASS
+```
 
 ## Rollback
 
