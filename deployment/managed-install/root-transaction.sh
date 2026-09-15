@@ -4,12 +4,14 @@ set -euo pipefail
 umask 077
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-repo=$(git -C "$here" rev-parse --show-toplevel)
 test_root=${GOODIX_MANAGED_TEST_ROOT:-}
 if [[ -n $test_root ]]; then
   [[ $test_root == /tmp/goodix-managed-test.* && -d $test_root && -O $test_root && ! -L $test_root ]] || {
     echo 'GOODIX_MANAGED_TRANSACTION=FAIL reason=unsafe_test_root' >&2; exit 1;
   }
+  repo=
+else
+  repo=$(git -C "$here" rev-parse --show-toplevel)
 fi
 p() { printf '%s%s\n' "$test_root" "$1"; }
 
