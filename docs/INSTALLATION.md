@@ -23,6 +23,24 @@ flatpak remote-add --user --if-not-exists flathub \
 flatpak install --user flathub org.freedesktop.Sdk//25.08
 ```
 
+## Clone the repository
+
+Clone the project and enter its source directory:
+
+```bash
+git clone https://github.com/sorguido/goodix-27c6-5125.git
+cd goodix-27c6-5125
+```
+
+Verify that the checkout is clean:
+
+```bash
+git status --short
+```
+
+The command should produce no output. All commands in the following sections
+are intended to be run from the repository root unless stated otherwise.
+
 ## Pinned OpenCV build inputs
 
 Download, but do not install, the five Fedora RPMs expected by the build:

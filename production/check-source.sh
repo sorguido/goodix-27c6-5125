@@ -34,7 +34,7 @@ cmp <(sort "$manifest_paths") <(sort "$digest_paths") || {
 }
 while IFS= read -r path; do
   case "$path" in
-    ""|/*|.|..|../*|*/../*|*/..|red_tag/*|analysis/*|captures/*|operator_kit/*)
+    ""|/*|.|..|../*|*/../*|*/..|red_tag/*|development/*|analysis/*|captures/*|operator_kit/*)
       echo "unsafe or private source path: $path" >&2; exit 1 ;;
   esac
   [[ -f "$root/$path" && ! -L "$root/$path" ]] || {
@@ -64,9 +64,9 @@ done
 meson_file="$root/reference/libfprint-fedora44-1.94.100/source/libfprint/meson.build"
 grep -F "../../../../libfprint-driver/goodix_fpimage_device.c" "$meson_file" >/dev/null
 grep -F "../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp" "$meson_file" >/dev/null
-if grep -E '(^|[/.])red_tag(/|$)' \
+if grep -E '(^|[/.])(red_tag|development)(/|$)' \
     "$meson_file" "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
-  echo "production path depends on a private or superseded tree" >&2; exit 1;
+  echo "production path depends on a private or superseded tree" >&2; exit 1
 fi
 
 legacy_policy=GOODIX_D
@@ -75,13 +75,13 @@ if grep -F "$legacy_policy" \
      "$root/libfprint-driver/goodix_fpimage_device.c" \
      "$root/libfprint-driver/goodix_fpimage_device.h" \
      "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
-  echo "historical build-policy identifier remains canonical" >&2; exit 1;
+  echo "historical build-policy identifier remains canonical" >&2; exit 1
 fi
 if grep -F 'GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE' \
      "$root/libfprint-driver/goodix_fpimage_device.c" \
      "$root/libfprint-driver/goodix_fpimage_device.h" \
      "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
-  echo "superseded direct-enroll policy remains canonical" >&2; exit 1;
+  echo "superseded direct-enroll policy remains canonical" >&2; exit 1
 fi
 grep -F 'GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE' \
   "$root/libfprint-driver/goodix_fpimage_device.c" \

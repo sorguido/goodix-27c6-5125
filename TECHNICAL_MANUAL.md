@@ -66,6 +66,11 @@ files, rejects symlinks, and validates fixed sizes and digests before use.
 Their individual origins, transformations, formats, and handling rules are
 documented in [Device-specific material](docs/DEVICE_MATERIALS.md).
 
+The public helper tools under `tools/device-materials/` cover the Windows DPAPI
+transport export, Linux `G5125XFR` → `G5125POC` finalization, and offline
+CONFIG90 extraction from a user-supplied USBPcap `.pcapng` capture. These tools
+never provision a new PSK and the CONFIG90 extractor has no USB/device access.
+
 ## Image and biometric pipeline
 
 An acquisition yields a 7,684-byte image record: 7,680 bytes of packed 12-bit
@@ -124,10 +129,14 @@ closed. The Windows factory path is expected to remain usable.
 ## Known limitations
 
 - Only the target configuration listed above is supported.
-- The public source surface does not ship OEM files or the operator-controlled
-  acquisition utilities. The validated acquisition and conversion path is
-  documented, but users must lawfully prepare the qualified material set for
-  their own reader before installation.
+- The repository ships helper tooling for preparing transport material and for
+  extracting CONFIG90 from a local OEM USB capture, but it does not ship OEM
+  binaries, caches, captures, secrets or factory material. Users must lawfully
+  obtain those inputs from their own reader/environment.
+- The public repository form is substantially tested but has not yet been
+  exercised completely across every acquisition, installation and recovery
+  path on independent hardware. In particular, reader-to-reader portability of
+  newly extracted CONFIG90 material remains a separate qualification boundary.
 - No universal FAR or FRR claim is made.
 - Passwordless biometric login does not unlock a password-encrypted KWallet;
   a separate wallet prompt can therefore be expected.
