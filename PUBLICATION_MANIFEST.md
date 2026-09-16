@@ -41,6 +41,7 @@ Before transferring an updated tree, run:
 production/check-source.sh
 python3 deployment/managed-install/test_offline.py
 python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
+python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
 ```
 
 The Windows exporter also provides a native secret-free self-test:
