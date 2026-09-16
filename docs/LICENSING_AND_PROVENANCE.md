@@ -10,7 +10,7 @@ the source it contains.
 | --- | --- | --- | --- | --- |
 | libfprint base | Fedora 44 source package / upstream libfprint | 1.94.100 | Per-file upstream terms, predominantly `LGPL-2.1-or-later` | Patched base and public ABI |
 | Goodix driver sources | This project | current source tree | Per-file SPDX; predominantly `LGPL-2.1-or-later` | USB, TLS, image, lifecycle, enrollment, and matching integration |
-| Device-material exporter wrapper and finalizer | This project | current source tree | `GPL-2.0-or-later` | Local DPAPI export orchestration and offline `G5125XFR` → `G5125POC` finalization |
+| Device-material exporter wrapper, finalizer and CONFIG90 extractor | This project | current source tree | `GPL-2.0-or-later` | Local DPAPI export orchestration, offline `G5125XFR` → `G5125POC` finalization, and offline USBPcap CONFIG90 extraction |
 | Device-material exporter core | Historical project-authored D191 source recovered from preserved project/Codex development material | historical pre-D246 source | `BSD-2-Clause` | Windows DPAPI/entropy implementation used by the public wrapper |
 | SIGFM | Rockytkg materialized libfprint fork | `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | `LGPL-2.1-or-later` | Feature extraction and matching |
 | R2 preprocessing | Adapted from Rockytkg `goodix_imgproc` | `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | `GPL-2.0-or-later` | Image preprocessing |
@@ -50,8 +50,16 @@ only the caller's final local runtime material. The OEM DLL is supplied by the
 user at runtime, parsed as inert bytes, and is neither shipped nor executed by
 the helper.
 
-No generated `Goodix_Cache.bin`, `G5125XFR`, `G5125POC`, OEM DLL, secret, or
-capture belongs in the public repository.
+`tools/device-materials/Extract-Goodix5125Config90.py` is current
+GPL-2.0-or-later project code. It is based on neutral protocol facts and
+project-authored pcapng/USBPcap parsing and Goodix A0 framing knowledge already
+recorded in the private development evidence and the current clean-room A0
+codec. It ships no capture bytes and performs no USB/device access. Its only
+runtime input is a user-supplied local `.pcapng` file and its only persistent
+output is the caller-selected 224-byte `target-config-90.bin` file.
+
+No generated `Goodix_Cache.bin`, `G5125XFR`, `G5125POC`, OEM DLL, secret,
+`target-config-90.bin` or capture belongs in the public repository.
 
 ## Combined binary
 
