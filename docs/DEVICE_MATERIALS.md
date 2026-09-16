@@ -45,18 +45,35 @@ The five files do not all come directly from Windows.
 The OEM Windows environment is therefore used to obtain the raw inputs. Some
 of the final Linux files are project-generated outputs.
 
-### Current release limitation
+### Public helper tools
 
-The public source tree now contains the complete helper path for
-`transport-material.bin` under:
+The public source tree contains the helper path for both
+`transport-material.bin` and `target-config-90.bin` under:
 
 ```text
 tools/device-materials/
 ```
 
-The public release does **not yet** contain the reviewed utility that extracts
-`target-config-90.bin` from a fresh `.pcapng` capture. Part 4 therefore still
-stops at that boundary.
+For transport material, use:
+
+```text
+Export-Goodix5125TransportMaterial.ps1
+Finalize-Goodix5125TransportMaterial.py
+```
+
+For CONFIG90 extraction from a Windows USBPcap capture, use:
+
+```text
+Extract-Goodix5125Config90.py
+```
+
+The CONFIG90 extractor is offline-only and has a synthetic self-test. It does
+not open or write the fingerprint reader. The project's qualified reference
+CONFIG90 came from a private Windows capture, while a newly extracted file may
+be reader-specific and may not match the reference SHA-256. The current runtime
+is still qualified against the complete reference material set; accepting a
+different otherwise-valid CONFIG90 is a separate portability/qualification
+boundary and must not be forced by disabling validation.
 
 Do not try to recreate CONFIG90 by cutting arbitrary bytes out of Wireshark and
 do not invent or provision a replacement PSK.
@@ -221,10 +238,10 @@ is not expecting that DLL.
 
 ---
 
-## Part 4 — Capture the OEM initialization traffic
+## Part 4 — Capture the OEM initialization traffic and extract CONFIG90
 
 `target-config-90.bin` is not a Windows file. It is the 224-byte body of the
-single outbound Goodix A0 control command `0x90` observed while the OEM stack
+outbound Goodix A0 logical control command `0x90` observed while the OEM stack
 initializes this reader.
 
 The project used Wireshark/TShark with USBPcap on Windows.
@@ -258,28 +275,84 @@ stop the capture and keep the `.pcapng` file private.
 Do not commit or publish the capture. USB captures can contain device-specific
 or otherwise private protocol material.
 
-### 4.3 Produce `target-config-90.bin`
+Move the completed `.pcapng` to a private local Linux working directory, for
+example:
 
-The final file must contain **only** the 224-byte body of the single outbound
-Goodix A0 control command `0x90` selected from that capture.
+```text
+/home/you/goodix-material-work/oem-init.pcapng
+```
 
-For the project's currently qualified reference material:
+### 4.3 Run the CONFIG90 extractor self-test
+
+From the root of the cloned repository:
+
+```bash
+python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
+```
+
+Expected result:
+
+```text
+GOODIX_CONFIG90_SELFTEST=PASS
+```
+
+The self-test is synthetic and offline. It checks fragmented USBPcap frames,
+repeated identical CONFIG90 frames, rejection of multiple distinct CONFIG90
+bodies, invalid CONFIG90 finalizers, and atomic mode-`0600` output.
+
+### 4.4 Produce `target-config-90.bin`
+
+Run:
+
+```bash
+python3 tools/device-materials/Extract-Goodix5125Config90.py \
+  --pcap "$HOME/goodix-material-work/oem-init.pcapng" \
+  --output "$HOME/goodix-material/target-config-90.bin"
+```
+
+The extractor:
+
+1. reads only the supplied local pcapng file;
+2. decodes USBPcap records offline using the Python standard library;
+3. reconstructs host-to-device bulk traffic on the Goodix OUT endpoint;
+4. validates Goodix A0 framing and checksum;
+5. selects logical control `0x90`;
+6. requires a 224-byte body;
+7. validates the CONFIG90 internal finalizer;
+8. accepts repeated candidates only if they are byte-identical;
+9. fails closed if more than one distinct valid CONFIG90 body is present;
+10. writes the output atomically with mode `0600` and never overwrites an
+    existing output file.
+
+Successful completion prints:
+
+```text
+GOODIX_CONFIG90_EXTRACTION=PASS
+output=/home/you/goodix-material/target-config-90.bin
+size=224
+sha256=<captured CONFIG90 SHA-256>
+```
+
+For the project's currently qualified **reference** material:
 
 ```text
 size:    224 bytes
 SHA-256: e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82
 ```
 
-The public release does not currently ship the reviewed extraction utility
-used for this step. Do not copy arbitrary 224 bytes from Wireshark and do not
-construct this file manually. Keep the `.pcapng`; the extraction helper is a
-separate remaining publication task.
+Do not assume that a fresh reader-specific capture must have that exact hash.
+The extractor validates structure and internal consistency rather than forcing
+the reference bytes. The current runtime, however, remains qualified against
+its complete reference material set, so a different otherwise-valid CONFIG90
+may still be rejected by the present runtime policy. Do not disable or patch
+runtime validation to force it through; that portability boundary is separate
+from extraction itself.
 
 ---
 
 ## Part 5 — Generate `transport-material.bin`
 
-This part is now fully covered by public source tools.
+This part is covered by public source tools.
 
 There are two stages:
 
@@ -543,7 +616,8 @@ reference file merely to make a hash match.
 
 The currently qualified runtime policy is pinned to its corresponding complete
 material set. A fresh reader-specific set must remain internally consistent;
-creating `transport-material.bin` is only one part of that set.
+creating `transport-material.bin` and extracting CONFIG90 are only parts of
+that set.
 
 ---
 
@@ -652,9 +726,30 @@ skip this validation.
 
 ### I have a PCAP but no `target-config-90.bin`
 
-The PCAP is only the capture source. The reviewed extractor must select and
-validate the single outbound A0 control-`0x90` body. That public helper is the
-remaining gap addressed separately from the transport-material tooling.
+Run the public offline extractor from the repository root:
+
+```bash
+python3 tools/device-materials/Extract-Goodix5125Config90.py \
+  --pcap /absolute/path/to/capture.pcapng \
+  --output /absolute/path/to/target-config-90.bin
+```
+
+If it reports that no valid CONFIG90 was found, confirm that the capture was
+started before OEM initialization and contains the reader's host-to-device USB
+traffic. Do not manually cut 224 bytes from Wireshark.
+
+If it reports multiple distinct valid CONFIG90 bodies, treat the capture as
+ambiguous and repeat a clean bounded initialization capture instead of choosing
+one manually.
+
+### The CONFIG90 extractor succeeds but the runtime later rejects the material
+
+Extraction and runtime qualification are separate checks. The extractor proves
+that the capture contains a structurally valid CONFIG90 body. The current
+runtime remains qualified against its complete reference material set and may
+reject a different reader-specific CONFIG90 hash. Do not disable the runtime
+validation; this is a portability/qualification issue rather than an extraction
+failure.
 
 ### Can I use another reader's five files?
 
