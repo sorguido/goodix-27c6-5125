@@ -142,3 +142,11 @@ closed. The Windows factory path is expected to remain usable.
   a separate wallet prompt can therefore be expected.
 - Fedora package changes to PAM layout or pinned build dependencies require a
   reviewed update rather than an automatic bypass.
+
+## Per-reader material portability
+
+Production material policy is device-dynamic. The protected v1 manifest binds
+the user's transport, CONFIG90 and FDT cache digests plus A2/chip82/OTP response
+digests. E4 and DAC values are derived from the validated bundle. Universal
+format, finalizer, CRC, OEM-DLL compatibility and filesystem controls remain
+fixed. See `docs/DEVICE_MATERIAL_PIN_AUDIT.md`.

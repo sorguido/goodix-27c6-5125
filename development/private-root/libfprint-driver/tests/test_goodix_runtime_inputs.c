@@ -502,6 +502,8 @@ test_runtime_material_owner (void)
     transport + 24u, 32u, seed_a, sizeof seed_a, seed_b, sizeof seed_b,
     validator, &error));
   g_assert_no_error (error);
+  memcpy (transport + 56u, validator, 32u);
+  digest (transport, sizeof transport, policy.target.transport_sha256);
   digest (validator, sizeof validator, policy.target.e4_validator_sha256);
 
   directory = g_dir_make_tmp ("goodix-runtime-owner.XXXXXX", &error);

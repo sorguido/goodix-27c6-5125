@@ -68,12 +68,9 @@ Extract-Goodix5125Config90.py
 ```
 
 The CONFIG90 extractor is offline-only and has a synthetic self-test. It does
-not open or write the fingerprint reader. The project's qualified reference
-CONFIG90 came from a private Windows capture, while a newly extracted file may
-be reader-specific and may not match the reference SHA-256. The current runtime
-is still qualified against the complete reference material set; accepting a
-different otherwise-valid CONFIG90 is a separate portability/qualification
-boundary and must not be forced by disabling validation.
+not open or write the fingerprint reader. A newly extracted file is
+reader-specific. The runtime accepts it when its protocol finalizer is valid
+and its digest matches the manifest generated for the same user bundle.
 
 Do not try to recreate CONFIG90 by cutting arbitrary bytes out of Wireshark and
 do not invent or provision a replacement PSK.
@@ -333,20 +330,9 @@ size=224
 sha256=<captured CONFIG90 SHA-256>
 ```
 
-For the project's currently qualified **reference** material:
-
-```text
-size:    224 bytes
-SHA-256: e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82
-```
-
-Do not assume that a fresh reader-specific capture must have that exact hash.
-The extractor validates structure and internal consistency rather than forcing
-the reference bytes. The current runtime, however, remains qualified against
-its complete reference material set, so a different otherwise-valid CONFIG90
-may still be rejected by the present runtime policy. Do not disable or patch
-runtime validation to force it through; that portability boundary is separate
-from extraction itself.
+The digest printed here is specific to the user's reader and is consumed by the
+manifest generator. No development-reader CONFIG90 digest is an acceptance
+criterion.
 
 ---
 
@@ -589,37 +575,11 @@ sha256sum \
   fdt-cache.bin
 ```
 
-For the **project's single qualified reference material set**, the recorded
-values are:
-
-```text
-target-material-manifest.json  1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15
-transport-material.bin         eb47bbed40e079ca780cd9cd4b2324520a67584ad3d576674914152fd6080a75
-target-config-90.bin           e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82
-gfusb.dll                      904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2
-fdt-cache.bin                  9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2
-```
-
-Reference sizes:
-
-```text
-target-material-manifest.json  2,305 bytes
-transport-material.bin            88 bytes
-target-config-90.bin             224 bytes
-gfusb.dll                   5,771,496 bytes
-fdt-cache.bin                  13,520 bytes
-```
-
-The hash printed by the Linux finalizer is the hash of **your generated
-`transport-material.bin`**. Do not replace your device material with the
-reference file merely to make a hash match.
-
-The currently qualified runtime policy is pinned to its corresponding complete
-material set. A fresh reader-specific set must remain internally consistent;
-creating `transport-material.bin` and extracting CONFIG90 are only parts of
-that set.
-
----
+The manifest is generated from the files in this directory. Run the public
+generator described in `tools/device-materials/README.md`; never copy digest
+values from project history. The runtime recomputes every listed digest and
+fails closed on disagreement. File sizes remain protocol invariants: transport
+88 bytes, CONFIG90 224 bytes, and FDT cache 13,520 bytes.
 
 ## Part 7 — Import the material on Linux
 

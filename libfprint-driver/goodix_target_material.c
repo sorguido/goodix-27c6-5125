@@ -31,6 +31,7 @@ struct _GoodixTargetMaterial
   GoodixTargetMaterialPolicy policy;
   GoodixTargetMaterialAudit *audit;
   guint8 *psk;
+  guint8 transport_validator[32];
   guint8 *config90;
   guint8 *validator;
   gboolean bound;
@@ -112,52 +113,7 @@ cleanse_free (const GoodixTargetMaterialPolicy *policy,
 void
 goodix_target_material_policy_production (GoodixTargetMaterialPolicy *policy)
 {
-  static const guint8 manifest_hash[32] = {
-    0x1b,0x5c,0x38,0x91,0xc9,0x9b,0x4e,0xe7,
-    0x1d,0x37,0xa6,0x99,0x42,0xe0,0x8d,0xcf,
-    0x9d,0x39,0x85,0x74,0x09,0x58,0x68,0x7a,
-    0xc4,0xb0,0xd6,0xeb,0x7c,0xcd,0xcf,0x15
-  };
-  static const guint8 transport_hash[32] = {
-    0xeb,0x47,0xbb,0xed,0x40,0xe0,0x79,0xca,
-    0x78,0x0c,0xd9,0xcd,0x4b,0x23,0x24,0x52,
-    0x0a,0x67,0x58,0x4a,0xd3,0xd5,0x76,0x67,
-    0x49,0x14,0x15,0x2f,0xd6,0x08,0x0a,0x75
-  };
-  static const guint8 config_hash[32] = {
-    0xe1,0x98,0x8b,0x11,0x15,0xad,0xe7,0x48,
-    0xf6,0xcf,0x5d,0xca,0x8d,0x31,0xaa,0xdf,
-    0x99,0x87,0x1a,0x78,0x65,0xb9,0x7d,0x7e,
-    0xc0,0x97,0x1d,0x0d,0xa2,0x1d,0x4d,0x82
-  };
-  static const guint8 e4_hash[32] = {
-    0x1f,0xa6,0x42,0xd3,0xf1,0x90,0xe7,0x07,
-    0x4d,0x1d,0xb2,0x01,0xaa,0x32,0xee,0x8f,
-    0x34,0xe4,0x1d,0x69,0xd5,0x57,0x97,0x15,
-    0x8b,0x94,0x80,0xaf,0xfb,0x3d,0x0b,0x87
-  };
-  static const guint8 a2_hash[32] = {
-    0x39,0xe4,0x69,0xce,0x5a,0x5b,0xa3,0x13,
-    0x6c,0x4a,0x44,0x38,0x1f,0x2e,0x41,0x83,
-    0xdc,0xa2,0x75,0x25,0x7a,0xdf,0xcf,0x3c,
-    0x00,0x25,0x09,0x4f,0x05,0xc0,0x22,0xf5
-  };
-  static const guint8 chip_hash[32] = {
-    0x82,0x53,0x7d,0x2c,0x10,0x88,0x87,0xba,
-    0xef,0x12,0x8b,0x47,0xad,0x40,0x1f,0xc8,
-    0x88,0xd5,0x4b,0x18,0x46,0x73,0xb1,0xfc,
-    0x23,0x81,0x1d,0x79,0xab,0x6d,0x57,0x03
-  };
-  static const guint8 otp_hash[32] = {
-    0xd7,0xe8,0x1a,0x41,0x5a,0xa5,0xe7,0xb0,
-    0x16,0x8c,0x9a,0x63,0x27,0x56,0xd1,0xdc,
-    0x8b,0x7b,0x47,0x34,0x6c,0xc0,0xa4,0x4d,
-    0xc6,0x87,0x96,0xf8,0x54,0xc2,0xb9,0x2b
-  };
   static const guint16 registers[4] = { 0x0220, 0x0236, 0x0238, 0x023a };
-  static const guint8 values[4][2] = {
-    { 0xd8, 0x0b }, { 0xbe, 0x00 }, { 0xbd, 0x00 }, { 0xbc, 0x00 }
-  };
   static const guint offsets[4] = { 117, 121, 125, 129 };
 
   g_return_if_fail (policy != NULL);
@@ -165,20 +121,10 @@ goodix_target_material_policy_production (GoodixTargetMaterialPolicy *policy)
   policy->owner_uid = 0;
   policy->owner_gid = 0;
   policy->mode = 0600;
-  policy->manifest_length = GOODIX_TARGET_MANIFEST_LENGTH;
+  policy->manifest_length = 0;
   policy->transport_length = GOODIX_TARGET_TRANSPORT_LENGTH;
   policy->config90_length = GOODIX_SECURE_SESSION_CONFIG90_LENGTH;
-  memcpy (policy->manifest_sha256, manifest_hash, 32);
-  memcpy (policy->transport_sha256, transport_hash, 32);
-  memcpy (policy->config90_sha256, config_hash, 32);
-  policy->config90_finalizer[0] = 0x51;
-  policy->config90_finalizer[1] = 0x9a;
-  memcpy (policy->e4_validator_sha256, e4_hash, 32);
-  memcpy (policy->a2_response_sha256, a2_hash, 32);
-  memcpy (policy->chip82_response_sha256, chip_hash, 32);
-  memcpy (policy->otp_a6_response_sha256, otp_hash, 32);
   memcpy (policy->dac_registers, registers, sizeof registers);
-  memcpy (policy->dac_values, values, sizeof values);
   memcpy (policy->dac_offsets, offsets, sizeof offsets);
 }
 
@@ -189,7 +135,7 @@ policy_shape_valid (const GoodixTargetMaterialPolicy *policy)
   static const guint offsets[4] = { 117, 121, 125, 129 };
 
   return policy != NULL && policy->mode == 0600 &&
-         policy->manifest_length > 0 && policy->manifest_length <= 16384 &&
+         policy->manifest_length <= GOODIX_TARGET_MANIFEST_MAX_LENGTH &&
          policy->transport_length == GOODIX_TARGET_TRANSPORT_LENGTH &&
          policy->config90_length == GOODIX_SECURE_SESSION_CONFIG90_LENGTH &&
          memcmp (policy->dac_registers, registers, sizeof registers) == 0 &&
@@ -204,7 +150,10 @@ metadata_valid (const struct stat                 *status,
   return S_ISREG (status->st_mode) && status->st_uid == policy->owner_uid &&
          status->st_gid == policy->owner_gid &&
          (status->st_mode & 07777) == policy->mode &&
-         status->st_size >= 0 && (guint64) status->st_size == expected_length;
+         status->st_size > 0 &&
+         (expected_length == 0 ?
+          (guint64) status->st_size <= GOODIX_TARGET_MANIFEST_MAX_LENGTH :
+          (guint64) status->st_size == expected_length);
 }
 
 static guint8 *
@@ -213,6 +162,7 @@ read_exact_protected (const gchar                      *path,
                       gboolean                          sensitive,
                       const GoodixTargetMaterialPolicy *policy,
                       GoodixTargetMaterialAudit        *audit,
+                      gsize                            *actual_length,
                       GError                          **error)
 {
   struct stat before;
@@ -239,7 +189,9 @@ read_exact_protected (const gchar                      *path,
                            "protected file type/uid/gid/mode/size mismatch");
       goto fail;
     }
-  buffer = g_malloc0 (expected_length);
+  if (expected_length == 0)
+    expected_length = (gsize) before.st_size;
+  buffer = g_malloc0 (expected_length + 1u);
   while (offset < expected_length)
     {
       ssize_t count = read (fd, buffer + offset, expected_length - offset);
@@ -268,6 +220,8 @@ read_exact_protected (const gchar                      *path,
     }
   if (audit != NULL)
     audit->protected_read_count++;
+  if (actual_length != NULL)
+    *actual_length = expected_length;
   close (fd);
   return buffer;
 
@@ -292,6 +246,90 @@ fail:
 }
 
 static gboolean
+hex_digest (const gchar *value,
+            guint8       output[32])
+{
+  if (value == NULL || strlen (value) != 64u)
+    return FALSE;
+  for (guint i = 0; i < 32u; i++)
+    {
+      gint high = g_ascii_xdigit_value (value[i * 2u]);
+      gint low = g_ascii_xdigit_value (value[i * 2u + 1u]);
+      if (high < 0 || low < 0)
+        return FALSE;
+      output[i] = (guint8) ((high << 4) | low);
+    }
+  return TRUE;
+}
+
+static gchar *
+manifest_string (const gchar *json,
+                 const gchar *key)
+{
+  g_autofree gchar *needle = g_strdup_printf ("\"%s\"", key);
+  const gchar *found = strstr (json, needle);
+  const gchar *colon;
+  const gchar *start;
+  const gchar *end;
+
+  if (found == NULL || strstr (found + strlen (needle), needle) != NULL)
+    return NULL;
+  colon = found + strlen (needle);
+  while (g_ascii_isspace (*colon)) colon++;
+  if (*colon++ != ':') return NULL;
+  while (g_ascii_isspace (*colon)) colon++;
+  if (*colon++ != '"') return NULL;
+  start = colon;
+  end = strchr (start, '"');
+  if (end == NULL || memchr (start, '\\', (gsize) (end - start)) != NULL)
+    return NULL;
+  return g_strndup (start, (gsize) (end - start));
+}
+
+static gboolean
+parse_manifest (const guint8               *bytes,
+                gsize                       length,
+                GoodixTargetMaterialPolicy *policy)
+{
+  static const gchar *const hash_keys[] = {
+    "transport_sha256", "config90_sha256", "fdt_cache_sha256",
+    "a2_response_sha256", "chip82_response_sha256", "otp_a6_response_sha256"
+  };
+  guint8 *outputs[] = {
+    policy->transport_sha256, policy->config90_sha256,
+    policy->fdt_cache_sha256, policy->a2_response_sha256,
+    policy->chip82_response_sha256, policy->otp_a6_response_sha256
+  };
+  g_autofree gchar *json = NULL;
+  g_autofree gchar *schema = NULL;
+  g_autofree gchar *vid = NULL;
+  g_autofree gchar *pid = NULL;
+  g_autofree gchar *app = NULL;
+
+  if (bytes == NULL || length == 0u || memchr (bytes, 0, length) != NULL)
+    return FALSE;
+  json = g_strndup ((const gchar *) bytes, length);
+  g_strstrip (json);
+  if (json[0] != '{' || json[strlen (json) - 1u] != '}')
+    return FALSE;
+  schema = manifest_string (json, "schema");
+  vid = manifest_string (json, "vid");
+  pid = manifest_string (json, "pid");
+  app = manifest_string (json, "app");
+  if (g_strcmp0 (schema, "goodix-5125-device-materials-v1") != 0 ||
+      g_strcmp0 (vid, "27c6") != 0 || g_strcmp0 (pid, "5125") != 0 ||
+      g_strcmp0 (app, "GF_ST411SEC_APP_12509") != 0)
+    return FALSE;
+  for (guint i = 0; i < G_N_ELEMENTS (hash_keys); i++)
+    {
+      g_autofree gchar *value = manifest_string (json, hash_keys[i]);
+      if (!hex_digest (value, outputs[i]))
+        return FALSE;
+    }
+  return TRUE;
+}
+
+static gboolean
 config_finalizer_valid (const guint8                     *config,
                         const GoodixTargetMaterialPolicy *policy)
 {
@@ -305,7 +343,9 @@ config_finalizer_valid (const guint8                     *config,
   expected = (guint16) (0u - 0xa5a5u - sum);
   actual = (guint16) config[222] | ((guint16) config[223] << 8);
   return actual == expected &&
-         CRYPTO_memcmp (config + 222, policy->config90_finalizer, 2) == 0;
+         ((policy->config90_finalizer[0] == 0u &&
+           policy->config90_finalizer[1] == 0u) ||
+          CRYPTO_memcmp (config + 222, policy->config90_finalizer, 2u) == 0);
 }
 
 static gboolean
@@ -339,6 +379,7 @@ goodix_target_material_load (const gchar                      *manifest_path,
   guint8 *transport = NULL;
   guint8 *config = NULL;
   guint8 actual[32] = { 0 };
+  gsize manifest_length = 0;
 
   if (audit != NULL)
     memset (audit, 0, sizeof *audit);
@@ -351,24 +392,38 @@ goodix_target_material_load (const gchar                      *manifest_path,
       goto out;
     }
   manifest = read_exact_protected (manifest_path, policy->manifest_length,
-                                   FALSE, policy, audit, error);
+                                   FALSE, policy, audit, &manifest_length,
+                                   error);
   if (manifest == NULL)
     goto out;
-  if (!digest (manifest, policy->manifest_length, actual) ||
-      CRYPTO_memcmp (actual, policy->manifest_sha256, 32) != 0)
+  material = g_new0 (GoodixTargetMaterial, 1);
+  material->policy = *policy;
+  material->audit = audit;
+  if (policy->manifest_length != 0u ?
+      (!digest (manifest, manifest_length, actual) ||
+       CRYPTO_memcmp (actual, policy->manifest_sha256, 32u) != 0) :
+      !parse_manifest (manifest, manifest_length, &material->policy))
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_CONTENT,
-                           "target manifest SHA-256 mismatch");
+                           "target manifest schema or field rejected");
       goto out;
     }
   g_clear_pointer (&manifest, g_free);
 
   transport = read_exact_protected (transport_path, policy->transport_length,
-                                    TRUE, policy, audit, error);
+                                    TRUE, policy, audit, NULL, error);
   if (transport == NULL)
     goto out;
-  if (memcmp (transport, "G5125POC", 8) != 0)
+  if (memcmp (transport, "G5125POC", 8) != 0 ||
+      transport[8] != 1u || transport[9] != 0u ||
+      transport[10] != 24u || transport[11] != 0u ||
+      transport[12] != 0xc6u || transport[13] != 0x27u ||
+      transport[14] != 0x25u || transport[15] != 0x51u ||
+      transport[16] != 1u || transport[17] != 0u ||
+      transport[18] != 32u || transport[19] != 0u ||
+      transport[20] != 32u || transport[21] != 0u ||
+      transport[22] != 0u || transport[23] != 0u)
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_CONTENT,
@@ -376,17 +431,15 @@ goodix_target_material_load (const gchar                      *manifest_path,
       goto out;
     }
   if (!digest (transport, policy->transport_length, actual) ||
-      CRYPTO_memcmp (actual, policy->transport_sha256, 32) != 0)
+      CRYPTO_memcmp (actual, material->policy.transport_sha256, 32) != 0)
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_CONTENT,
                            "transport material SHA-256 mismatch");
       goto out;
     }
-  material = g_new0 (GoodixTargetMaterial, 1);
-  material->policy = *policy;
-  material->audit = audit;
   material->psk = g_memdup2 (transport + 24, GOODIX_SECURE_SESSION_PSK_LENGTH);
+  memcpy (material->transport_validator, transport + 56u, 32u);
   OPENSSL_cleanse (transport, policy->transport_length);
   observe_cleansed (policy, "psk-scratch", transport,
                     policy->transport_length);
@@ -398,11 +451,11 @@ goodix_target_material_load (const gchar                      *manifest_path,
   g_clear_pointer (&transport, g_free);
 
   config = read_exact_protected (config90_path, policy->config90_length,
-                                 FALSE, policy, audit, error);
+                                 FALSE, policy, audit, NULL, error);
   if (config == NULL)
     goto out;
   if (!digest (config, policy->config90_length, actual) ||
-      CRYPTO_memcmp (actual, policy->config90_sha256, 32) != 0)
+      CRYPTO_memcmp (actual, material->policy.config90_sha256, 32) != 0)
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_CONTENT,
@@ -416,7 +469,11 @@ goodix_target_material_load (const gchar                      *manifest_path,
                            "CONFIG90 finalizer mismatch");
       goto out;
     }
-  if (!config_correlations_valid (config, policy))
+  if (policy->manifest_length == 0u)
+    for (guint i = 0; i < 4u; i++)
+      memcpy (material->policy.dac_values[i],
+              config + material->policy.dac_offsets[i] + 2u, 2u);
+  if (!config_correlations_valid (config, &material->policy))
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_CONTENT,
@@ -478,14 +535,19 @@ goodix_target_material_bind (GoodixTargetMaterial *material,
                                    validator, error))
     goto out;
   if (!digest (validator, sizeof validator, actual) ||
-      CRYPTO_memcmp (actual, material->policy.e4_validator_sha256, 32) != 0)
+      CRYPTO_memcmp (validator, material->transport_validator, 32u) != 0 ||
+      ((material->policy.e4_validator_sha256[0] != 0u) &&
+       CRYPTO_memcmp (actual, material->policy.e4_validator_sha256, 32u) != 0))
     {
       g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
                            GOODIX_TARGET_MATERIAL_ERROR_BINDING,
-                           "derived E4 validator target pin mismatch");
+                           "derived E4 validator digest failed");
       goto out;
     }
+  memcpy (material->policy.e4_validator_sha256, actual, sizeof actual);
   material->validator = g_memdup2 (validator, sizeof validator);
+  OPENSSL_cleanse (material->transport_validator,
+                   sizeof material->transport_validator);
   material->bound = TRUE;
   if (material->audit != NULL)
     material->audit->e4_binding_match = TRUE;
@@ -494,6 +556,24 @@ out:
   OPENSSL_cleanse (validator, sizeof validator);
   OPENSSL_cleanse (actual, sizeof actual);
   return ok;
+}
+
+gboolean
+goodix_target_material_get_fdt_hashes (GoodixTargetMaterial *material,
+                                       guint8 cache_sha256[32],
+                                       guint8 otp_sha256[32],
+                                       GError **error)
+{
+  if (material == NULL || cache_sha256 == NULL || otp_sha256 == NULL)
+    {
+      g_set_error_literal (error, GOODIX_TARGET_MATERIAL_ERROR,
+                           GOODIX_TARGET_MATERIAL_ERROR_STATE,
+                           "target manifest hashes are unavailable");
+      return FALSE;
+    }
+  memcpy (cache_sha256, material->policy.fdt_cache_sha256, 32u);
+  memcpy (otp_sha256, material->policy.otp_a6_response_sha256, 32u);
+  return TRUE;
 }
 
 gboolean

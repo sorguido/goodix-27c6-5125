@@ -89,3 +89,7 @@ Licensing is per file. The distributed Goodix-enabled libfprint binary combines
 GPL-compatible components and is conveyed under `GPL-3.0-or-later`; individual
 source files keep their stated licenses. See the licensing and provenance
 document and the texts in `LICENSES/`.
+
+Device-specific runtime material is validated against a manifest generated for
+the user's own reader; development-reader hashes are not release acceptance
+criteria. See `docs/DEVICE_MATERIALS.md`.

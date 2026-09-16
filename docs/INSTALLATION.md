@@ -166,3 +166,11 @@ Never attach `/var/lib/goodix-5125-poc`, `/var/lib/fprint`, a fingerprint
 image, a template, an OEM binary, or a capture. If the manager reports PAM or
 package drift, do not edit around the check; uninstall when permitted or wait
 for a reviewed compatibility update.
+
+## Reader-specific material prerequisite
+
+Before installation, generate `target-material-manifest.json` from the same
+reader's transport, CONFIG90, FDT cache and typed OEM responses as documented
+in `docs/DEVICE_MATERIALS.md`. Do not substitute published/example hashes.
+Installation preserves the root-owned `0700` directory and regular `0600`
+files required by the runtime.

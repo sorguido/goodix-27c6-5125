@@ -134,6 +134,7 @@ goodix_runtime_material_load (const GoodixRuntimeMaterialPaths  *paths,
   guint8 seed_a[GOODIX_RUNTIME_PRODUCER_SEED_LENGTH] = { 0 };
   guint8 seed_b[GOODIX_RUNTIME_PRODUCER_SEED_LENGTH] = { 0 };
   guint8 fdt_seed[GOODIX_RUNTIME_FDT_SEED_LENGTH] = { 0 };
+  GoodixRuntimeFdtPolicy device_fdt;
   struct stat directory_before;
   gint directory_fd = -1;
 
@@ -168,18 +169,22 @@ goodix_runtime_material_load (const GoodixRuntimeMaterialPaths  *paths,
       goto fail;
     }
 
-  if (!goodix_runtime_extract_inputs_from_files (
-        paths->pe_path, paths->fdt_cache_path, &policy->pe, &policy->fdt,
-        &policy->private_files, seed_a, seed_b, fdt_seed,
-        audit != NULL ? &audit->private_files : NULL, error))
-    goto fail;
-
   material = g_new0 (GoodixRuntimeMaterial, 1);
   material->audit = audit;
   material->target_owner = goodix_target_material_load (
     paths->manifest_path, paths->transport_path, paths->config90_path,
     &policy->target, audit != NULL ? &audit->target : NULL, error);
-  if (material->target_owner == NULL ||
+  if (material->target_owner == NULL)
+    goto fail;
+  device_fdt = policy->fdt;
+  if ((policy->target.manifest_length == 0u &&
+       !goodix_target_material_get_fdt_hashes (
+         material->target_owner, device_fdt.expected_sha256,
+         device_fdt.expected_otp_sha256, error)) ||
+      !goodix_runtime_extract_inputs_from_files (
+        paths->pe_path, paths->fdt_cache_path, &policy->pe, &device_fdt,
+        &policy->private_files, seed_a, seed_b, fdt_seed,
+        audit != NULL ? &audit->private_files : NULL, error) ||
       !goodix_target_material_bind (material->target_owner, seed_a, seed_b,
                                     error) ||
       !goodix_target_material_get_secure_session_material (
