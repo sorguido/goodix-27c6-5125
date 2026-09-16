@@ -1,0 +1,62 @@
+{
+  "artifact": "D271_01_bundle_manifest",
+  "step": "D271/01",
+  "execution_mode": "OFFLINE_ONLY_DOCUMENTAL",
+  "generated_at": "2026-08-25T12:48:43+02:00",
+  "bundle_type": "STEP_LOCAL_NON_CUMULATIVE",
+  "reference_head": "3e9a2a5b71669ffba12889f65a06fa2a2f6aa096",
+  "review_set": [
+    "analysis/D271/D271_01_libfprint_feature_extraction_policy_report.md",
+    "analysis/D271/D271_01_feature_extraction_evidence.json",
+    "analysis/D271/D271_01_extractor_policy_matrix.json",
+    "analysis/D271/D271_01_audit_results.json",
+    "analysis/D271/D271_01_execution_manifest.json",
+    "analysis/D271/D271_01_bundle_manifest.json",
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "implementation_files_added_or_modified": [],
+  "test_files_added_or_modified": [],
+  "canonical_files_modified": [
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "referenced_unchanged_files_not_bundled": [
+    "AGENTS.md",
+    "Linee Guida di Progetto Goodix 27c6 5125 per AI.md",
+    "Rockytkg/PROVENANCE.md",
+    "Rockytkg/libfprint/libfprint/fp-image.c",
+    "Rockytkg/libfprint/libfprint/fpi-image-device.c",
+    "Rockytkg/libfprint/libfprint/fpi-print.c",
+    "Rockytkg/libfprint/libfprint/fp-print.c",
+    "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp",
+    "Rockytkg/libfprint/libfprint/nbis/mindtct/getmin.c",
+    "Rockytkg/libfprint/libfprint/nbis/mindtct/quality.c",
+    "Rockytkg/libfprint/libfprint/nbis/mindtct/block.c",
+    "Rockytkg/libfprint/libfprint/nbis/bozorth3/bozorth3.c",
+    "Rockytkg/src/goodixgf.c",
+    "analysis/D269/D269_01_linux_u16_libfprint_contract_report.md",
+    "analysis/D270/D270_01_fpimage_pipeline_report.md",
+    "docs/EVIDENCE.md"
+  ],
+  "excluded": [
+    "previous bundles and historical artifacts",
+    "captures and real biometric pixels",
+    "PSK, TLS plaintext and secrets",
+    "firmware and proprietary DLLs",
+    "complete Rockytkg snapshot",
+    "build cache, binaries, temporary files and backups"
+  ],
+  "biometric_data_in_bundle": false,
+  "raw_image_in_bundle": false,
+  "pixel_fixture_in_bundle": false,
+  "secret_in_bundle": false,
+  "firmware_in_bundle": false,
+  "dll_in_bundle": false,
+  "capture_raw_in_bundle": false,
+  "sha256_sidecar": "analysis/D271/D271_01_libfprint_feature_extraction_policy_bundle.zip.sha256",
+  "bundle_sha256": "SEE_EXTERNAL_SIDECAR",
+  "outcome": "READY_D271_01_FEATURE_EXTRACTION_POLICY_CLOSED_OFFLINE",
+  "feature_extractor_policy": "CLOSED_OFFLINE",
+  "full_fpimage_pipeline_contract": "PARTIALLY_CLOSED",
+  "live_authorized": false,
+  "ready_for_live": false
+}

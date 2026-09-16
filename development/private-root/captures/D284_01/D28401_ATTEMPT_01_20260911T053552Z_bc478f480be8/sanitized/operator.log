@@ -1,0 +1,89 @@
+D284_01_PROGRESS_PHASE=PRE_SENSOR_STAGING
+ENROLL_OPERATOR_CONFIRMATION=DESTRO
+SUDO_OPERATOR_CONFIRMATION=INDICE_DESTRO
+D284_01_PAM_SUDOERS_REMOVED_BEFORE_DELETE=true
+set 11 07:36:22 192.168.0.26 fprintd[46667]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=204 outstanding=0 drained=1 context_closed=1
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1
+set 11 07:36:34 192.168.0.26 fprintd[46746]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_NONE attempts=0 rejected=0 consumed=0 tls=0 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=0 outstanding=0 drained=1 context_closed=1
+found 1 devices
+Device at /net/reactivated/Fprint/Device/0
+Using device /net/reactivated/Fprint/Device/0
+Fingerprints of user <USER> deleted on Goodix 27c6:5125 Fingerprint Sensor
+Using device /net/reactivated/Fprint/Device/0
+Enrolling right-index-finger finger.
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-completed
+set 11 07:36:03 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=137
+set 11 07:36:06 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=147
+set 11 07:36:08 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=150
+set 11 07:36:11 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=139
+set 11 07:36:13 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=151
+set 11 07:36:15 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+set 11 07:36:18 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=135
+set 11 07:36:21 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=127
+set 11 07:35:52 192.168.0.26 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:35:52 192.168.0.26 systemd[1]: fprintd.service: Deactivated successfully.
+set 11 07:35:52 192.168.0.26 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:35:53 192.168.0.26 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:35:53 192.168.0.26 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:35:58 192.168.0.26 fprintd[46667]: Device Goodix 27c6:5125 Fingerprint Sensor does not support duplicate identification and so fprintd duplicate detection won't work
+set 11 07:36:03 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=137
+set 11 07:36:06 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=147
+set 11 07:36:08 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=150
+set 11 07:36:11 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=139
+set 11 07:36:13 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=151
+set 11 07:36:15 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+set 11 07:36:18 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=135
+set 11 07:36:21 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+set 11 07:36:22 192.168.0.26 fprintd[46667]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=204 outstanding=0 drained=1 context_closed=1
+set 11 07:36:22 192.168.0.26 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:36:22 192.168.0.26 systemd[1]: fprintd.service: Deactivated successfully.
+set 11 07:36:22 192.168.0.26 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:36:22 192.168.0.26 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:36:22 192.168.0.26 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=127
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=14858 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1
+set 11 07:36:34 192.168.0.26 fprintd[46746]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_NONE attempts=0 rejected=0 consumed=0 tls=0 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=0 outstanding=0 drained=1 context_closed=1
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=14858 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 07:36:22 192.168.0.26 fprintd[46667]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=204 outstanding=0 drained=1 context_closed=1
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1
+set 11 07:35:52 192.168.0.26 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:35:52 192.168.0.26 systemd[1]: fprintd.service: Deactivated successfully.
+set 11 07:35:52 192.168.0.26 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:35:53 192.168.0.26 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:35:53 192.168.0.26 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:35:58 192.168.0.26 fprintd[46667]: Device Goodix 27c6:5125 Fingerprint Sensor does not support duplicate identification and so fprintd duplicate detection won't work
+set 11 07:36:03 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=137
+set 11 07:36:06 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=147
+set 11 07:36:08 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=150
+set 11 07:36:11 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=139
+set 11 07:36:13 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=151
+set 11 07:36:15 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+set 11 07:36:18 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=135
+set 11 07:36:21 192.168.0.26 fprintd[46667]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+set 11 07:36:22 192.168.0.26 fprintd[46667]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=204 outstanding=0 drained=1 context_closed=1
+set 11 07:36:22 192.168.0.26 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:36:22 192.168.0.26 systemd[1]: fprintd.service: Deactivated successfully.
+set 11 07:36:22 192.168.0.26 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:36:22 192.168.0.26 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 11 07:36:22 192.168.0.26 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=127
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=14858 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=14858 threshold=40
+set 11 07:36:33 192.168.0.26 fprintd[46746]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40

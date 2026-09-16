@@ -1,0 +1,48 @@
+{
+  "artifact": "D273_01_sigfm_build_evidence",
+  "OPENCV4_DEV_ENVIRONMENT": "NOT_AVAILABLE",
+  "REAL_SIGFM_BUILD": "BLOCKED_OPENCV4_DEV_NOT_AVAILABLE",
+  "REAL_SIGFM_EXECUTABLE_CLOSURE": "FAIL_NOT_AVAILABLE",
+  "SIGFM_STATUS": "OFFLINE_METRIC_SEAM_SYNTHETIC_PASS_REAL_BUILD_BLOCKED_OPENCV4_DEV",
+  "host": {
+    "pkg_config": "/usr/bin/pkg-config",
+    "opencv4_modversion": "NOT_AVAILABLE",
+    "opencv4_cflags": "NOT_AVAILABLE",
+    "opencv4_libs": "NOT_AVAILABLE",
+    "gcc": "/usr/lib64/ccache/gcc",
+    "gcc_version": "gcc (GCC) 16.2.1 20260819 (Red Hat 16.2.1-2)",
+    "gxx": "NOT_AVAILABLE",
+    "clangxx": "NOT_AVAILABLE"
+  },
+  "installed_flatpak_sdk_25_08": {
+    "network": "UNSHARED",
+    "gcc": "/usr/bin/gcc",
+    "gxx": "/usr/bin/g++",
+    "pkg_config": "/usr/bin/pkg-config",
+    "opencv4_modversion": "NOT_AVAILABLE",
+    "opencv4_cflags": "NOT_AVAILABLE",
+    "opencv4_libs": "NOT_AVAILABLE"
+  },
+  "compile_probe": {
+    "adapter": "PASS",
+    "goodix_sigfm_wrapper": "PASS",
+    "real_synthetic_harness": "PASS",
+    "real_sigfm_cpp": "NOT_AVAILABLE",
+    "exact_failure": "binary.hpp:24:10: fatal error: opencv2/core/mat.hpp: No such file or directory",
+    "link": "NOT_AVAILABLE",
+    "runtime": "NOT_AVAILABLE"
+  },
+  "real_build_recipe": {
+    "temporary_directory": "/tmp/goodix-d273-real-sigfm.XXXXXX",
+    "compiler_c": "gcc -std=c11 -O2 -g -Wall -Wextra -Werror -Wconversion",
+    "compiler_cxx": "g++ -std=c++17 -O2 -g -Wall -Wextra -Werror -Wconversion -Wshadow -Wold-style-cast",
+    "includes": ["libfprint-driver", "Rockytkg/libfprint/libfprint/sigfm", "pkg-config --cflags opencv4"],
+    "sources": ["libfprint-driver/goodix_u16_to_fpimage.c", "libfprint-driver/goodix_sigfm_metrics.cpp", "Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp", "libfprint-driver/tests/test_goodix_sigfm_metrics_real.cpp"],
+    "link_flags": "pkg-config --libs opencv4",
+    "output": "$temporary_directory/test-goodix-sigfm-real",
+    "runtime": "$temporary_directory/test-goodix-sigfm-real",
+    "sanitizers": "repeat with -O1 -fno-omit-frame-pointer -fsanitize=address,undefined when the selected OpenCV build is sanitizer-compatible"
+  },
+  "installation_or_download": "NOT_PERFORMED",
+  "quality_claim": "NONE_SYNTHETIC_FIXTURE_CANNOT_PROVE_TARGET_BIOMETRIC_QUALITY_OR_THRESHOLDS"
+}

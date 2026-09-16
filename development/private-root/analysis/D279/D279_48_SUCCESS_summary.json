@@ -1,0 +1,1093 @@
+{
+  "aggregate": {
+    "baseline_semantics": "ATTEMPT02_B0_EXPERIMENTAL_REFERENCE_NOT_PROVEN_ROCKY_NO_FINGER_EQUIVALENT",
+    "checkpoint_count": 2,
+    "checkpoints": [
+      {
+        "checkpoint": "R1_ROCKY_COMMON_NATIVE_80X64",
+        "native_shape": "80x64",
+        "nbis": {
+          "groups": {
+            "auxiliary": {
+              "bozorth_computable_frame_count": 0,
+              "frame_count": 21,
+              "metrics": {
+                "minutiae_a_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_ab_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_025": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_050": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_total": {
+                  "frames_nonzero": 11,
+                  "maximum": 2,
+                  "median": 1,
+                  "minimum": 0
+                },
+                "quality_blocks_a": {
+                  "frames_nonzero": 20,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 0
+                },
+                "quality_blocks_a_per_mille": {
+                  "frames_nonzero": 20,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 0
+                },
+                "quality_blocks_ab": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 4
+                },
+                "quality_blocks_ab_per_mille": {
+                  "frames_nonzero": 21,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 50
+                },
+                "quality_blocks_level_0": {
+                  "frames_nonzero": 21,
+                  "maximum": 35,
+                  "median": 32,
+                  "minimum": 32
+                },
+                "quality_blocks_level_1": {
+                  "frames_nonzero": 21,
+                  "maximum": 24,
+                  "median": 24,
+                  "minimum": 22
+                },
+                "quality_blocks_level_2": {
+                  "frames_nonzero": 21,
+                  "maximum": 19,
+                  "median": 16,
+                  "minimum": 16
+                },
+                "quality_blocks_level_3": {
+                  "frames_nonzero": 1,
+                  "maximum": 4,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_4": {
+                  "frames_nonzero": 20,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 0
+                },
+                "quality_blocks_total": {
+                  "frames_nonzero": 21,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                }
+              }
+            },
+            "baseline": {
+              "bozorth_computable_frame_count": 0,
+              "frame_count": 1,
+              "metrics": {
+                "minutiae_a_fraction_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_ab_fraction_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_025": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_050": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_total": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_a": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_a_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_ab": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_ab_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_0": {
+                  "frames_nonzero": 1,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                },
+                "quality_blocks_level_1": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_2": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_3": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_4": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_total": {
+                  "frames_nonzero": 1,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                }
+              }
+            },
+            "primary": {
+              "bozorth_computable_frame_count": 0,
+              "frame_count": 21,
+              "metrics": {
+                "minutiae_a_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_ab_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_025": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_050": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_total": {
+                  "frames_nonzero": 11,
+                  "maximum": 2,
+                  "median": 1,
+                  "minimum": 0
+                },
+                "quality_blocks_a": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 8
+                },
+                "quality_blocks_a_per_mille": {
+                  "frames_nonzero": 21,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 100
+                },
+                "quality_blocks_ab": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 8
+                },
+                "quality_blocks_ab_per_mille": {
+                  "frames_nonzero": 21,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 100
+                },
+                "quality_blocks_level_0": {
+                  "frames_nonzero": 21,
+                  "maximum": 32,
+                  "median": 32,
+                  "minimum": 32
+                },
+                "quality_blocks_level_1": {
+                  "frames_nonzero": 21,
+                  "maximum": 24,
+                  "median": 24,
+                  "minimum": 24
+                },
+                "quality_blocks_level_2": {
+                  "frames_nonzero": 21,
+                  "maximum": 16,
+                  "median": 16,
+                  "minimum": 16
+                },
+                "quality_blocks_level_3": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_4": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 8
+                },
+                "quality_blocks_total": {
+                  "frames_nonzero": 21,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                }
+              }
+            }
+          },
+          "same_session_pairs": {
+            "all_cross_role_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 882,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 882,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 441,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            },
+            "paired_cycle_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 42,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 42,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 21,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            },
+            "within_auxiliary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            },
+            "within_primary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            }
+          }
+        },
+        "resize_applied": false,
+        "same_preprocessed_raster_delivered_to_both_extractors": true,
+        "sigfm": {
+          "groups": {
+            "auxiliary": {
+              "frame_count": 21,
+              "frames_passing_fork_operational_gate_ge_25": 21,
+              "frames_with_keypoints_nonzero": 21,
+              "keypoint_count": {
+                "count": 21,
+                "maximum": 133,
+                "median": 117,
+                "minimum": 39,
+                "nonzero": 21
+              }
+            },
+            "baseline": {
+              "frame_count": 1,
+              "frames_passing_fork_operational_gate_ge_25": 0,
+              "frames_with_keypoints_nonzero": 0,
+              "keypoint_count": {
+                "count": 1,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0,
+                "nonzero": 0
+              }
+            },
+            "primary": {
+              "frame_count": 21,
+              "frames_passing_fork_operational_gate_ge_25": 21,
+              "frames_with_keypoints_nonzero": 21,
+              "keypoint_count": {
+                "count": 21,
+                "maximum": 132,
+                "median": 120,
+                "minimum": 87,
+                "nonzero": 21
+              }
+            }
+          },
+          "same_session_pairs": {
+            "all_cross_role_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 882,
+                "maximum": 418769,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 315
+              },
+              "directed_score_count": 882,
+              "feature_eligible_directed_score_count": 882,
+              "feature_eligible_pair_scores": {
+                "count": 882,
+                "maximum": 418769,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 315
+              },
+              "logical_pair_count": 441,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 249,
+              "score_nonzero_directed_count": 315
+            },
+            "paired_cycle_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 42,
+                "maximum": 418769,
+                "median": 238047.0,
+                "minimum": 0,
+                "nonzero": 40
+              },
+              "directed_score_count": 42,
+              "feature_eligible_directed_score_count": 42,
+              "feature_eligible_pair_scores": {
+                "count": 42,
+                "maximum": 418769,
+                "median": 238047.0,
+                "minimum": 0,
+                "nonzero": 40
+              },
+              "logical_pair_count": 21,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 40,
+              "score_nonzero_directed_count": 40
+            },
+            "within_auxiliary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 92372,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 126
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 420,
+              "feature_eligible_pair_scores": {
+                "count": 420,
+                "maximum": 92372,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 126
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 87,
+              "score_nonzero_directed_count": 126
+            },
+            "within_primary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 191283,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 180
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 420,
+              "feature_eligible_pair_scores": {
+                "count": 420,
+                "maximum": 191283,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 180
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 146,
+              "score_nonzero_directed_count": 180
+            }
+          }
+        }
+      },
+      {
+        "checkpoint": "R2_ROCKY_SIGFM_CHAIN_NATIVE_80X64",
+        "native_shape": "80x64",
+        "nbis": {
+          "groups": {
+            "auxiliary": {
+              "bozorth_computable_frame_count": 0,
+              "frame_count": 21,
+              "metrics": {
+                "minutiae_a_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_ab_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_025": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_050": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_total": {
+                  "frames_nonzero": 11,
+                  "maximum": 1,
+                  "median": 1,
+                  "minimum": 0
+                },
+                "quality_blocks_a": {
+                  "frames_nonzero": 20,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 0
+                },
+                "quality_blocks_a_per_mille": {
+                  "frames_nonzero": 20,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 0
+                },
+                "quality_blocks_ab": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 1
+                },
+                "quality_blocks_ab_per_mille": {
+                  "frames_nonzero": 21,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 13
+                },
+                "quality_blocks_level_0": {
+                  "frames_nonzero": 21,
+                  "maximum": 35,
+                  "median": 32,
+                  "minimum": 32
+                },
+                "quality_blocks_level_1": {
+                  "frames_nonzero": 21,
+                  "maximum": 31,
+                  "median": 24,
+                  "minimum": 24
+                },
+                "quality_blocks_level_2": {
+                  "frames_nonzero": 21,
+                  "maximum": 16,
+                  "median": 16,
+                  "minimum": 13
+                },
+                "quality_blocks_level_3": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_4": {
+                  "frames_nonzero": 20,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 0
+                },
+                "quality_blocks_total": {
+                  "frames_nonzero": 21,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                }
+              }
+            },
+            "baseline": {
+              "bozorth_computable_frame_count": 0,
+              "frame_count": 1,
+              "metrics": {
+                "minutiae_a_fraction_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_ab_fraction_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_025": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_050": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_total": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_a": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_a_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_ab": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_ab_per_mille": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_0": {
+                  "frames_nonzero": 1,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                },
+                "quality_blocks_level_1": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_2": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_3": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_4": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_total": {
+                  "frames_nonzero": 1,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                }
+              }
+            },
+            "primary": {
+              "bozorth_computable_frame_count": 0,
+              "frame_count": 21,
+              "metrics": {
+                "minutiae_a_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_ab_fraction_per_mille": {
+                  "frames_nonzero": 1,
+                  "maximum": 1000,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_025": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_reliability_ge_050": {
+                  "frames_nonzero": 1,
+                  "maximum": 1,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "minutiae_total": {
+                  "frames_nonzero": 11,
+                  "maximum": 2,
+                  "median": 1,
+                  "minimum": 0
+                },
+                "quality_blocks_a": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 8
+                },
+                "quality_blocks_a_per_mille": {
+                  "frames_nonzero": 21,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 100
+                },
+                "quality_blocks_ab": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 8
+                },
+                "quality_blocks_ab_per_mille": {
+                  "frames_nonzero": 21,
+                  "maximum": 100,
+                  "median": 100,
+                  "minimum": 100
+                },
+                "quality_blocks_level_0": {
+                  "frames_nonzero": 21,
+                  "maximum": 32,
+                  "median": 32,
+                  "minimum": 32
+                },
+                "quality_blocks_level_1": {
+                  "frames_nonzero": 21,
+                  "maximum": 24,
+                  "median": 24,
+                  "minimum": 24
+                },
+                "quality_blocks_level_2": {
+                  "frames_nonzero": 21,
+                  "maximum": 16,
+                  "median": 16,
+                  "minimum": 16
+                },
+                "quality_blocks_level_3": {
+                  "frames_nonzero": 0,
+                  "maximum": 0,
+                  "median": 0,
+                  "minimum": 0
+                },
+                "quality_blocks_level_4": {
+                  "frames_nonzero": 21,
+                  "maximum": 8,
+                  "median": 8,
+                  "minimum": 8
+                },
+                "quality_blocks_total": {
+                  "frames_nonzero": 21,
+                  "maximum": 80,
+                  "median": 80,
+                  "minimum": 80
+                }
+              }
+            }
+          },
+          "same_session_pairs": {
+            "all_cross_role_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 882,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 882,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 441,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            },
+            "paired_cycle_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 42,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 42,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 21,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            },
+            "within_auxiliary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            },
+            "within_primary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 0,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 0
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 0,
+              "feature_eligible_pair_scores": {
+                "count": 0,
+                "maximum": null,
+                "median": null,
+                "minimum": null,
+                "nonzero": 0
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 40,
+              "score_at_or_above_reference_threshold_directed_count": 0,
+              "score_nonzero_directed_count": 0
+            }
+          }
+        },
+        "resize_applied": false,
+        "same_preprocessed_raster_delivered_to_both_extractors": true,
+        "sigfm": {
+          "groups": {
+            "auxiliary": {
+              "frame_count": 21,
+              "frames_passing_fork_operational_gate_ge_25": 21,
+              "frames_with_keypoints_nonzero": 21,
+              "keypoint_count": {
+                "count": 21,
+                "maximum": 153,
+                "median": 132,
+                "minimum": 40,
+                "nonzero": 21
+              }
+            },
+            "baseline": {
+              "frame_count": 1,
+              "frames_passing_fork_operational_gate_ge_25": 0,
+              "frames_with_keypoints_nonzero": 0,
+              "keypoint_count": {
+                "count": 1,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0,
+                "nonzero": 0
+              }
+            },
+            "primary": {
+              "frame_count": 21,
+              "frames_passing_fork_operational_gate_ge_25": 21,
+              "frames_with_keypoints_nonzero": 21,
+              "keypoint_count": {
+                "count": 21,
+                "maximum": 153,
+                "median": 128,
+                "minimum": 101,
+                "nonzero": 21
+              }
+            }
+          },
+          "same_session_pairs": {
+            "all_cross_role_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 882,
+                "maximum": 624104,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 335
+              },
+              "directed_score_count": 882,
+              "feature_eligible_directed_score_count": 882,
+              "feature_eligible_pair_scores": {
+                "count": 882,
+                "maximum": 624104,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 335
+              },
+              "logical_pair_count": 441,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 258,
+              "score_nonzero_directed_count": 335
+            },
+            "paired_cycle_primary_to_auxiliary": {
+              "all_pair_scores": {
+                "count": 42,
+                "maximum": 624104,
+                "median": 310975.0,
+                "minimum": 0,
+                "nonzero": 40
+              },
+              "directed_score_count": 42,
+              "feature_eligible_directed_score_count": 42,
+              "feature_eligible_pair_scores": {
+                "count": 42,
+                "maximum": 624104,
+                "median": 310975.0,
+                "minimum": 0,
+                "nonzero": 40
+              },
+              "logical_pair_count": 21,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 40,
+              "score_nonzero_directed_count": 40
+            },
+            "within_auxiliary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 139391,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 138
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 420,
+              "feature_eligible_pair_scores": {
+                "count": 420,
+                "maximum": 139391,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 138
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 98,
+              "score_nonzero_directed_count": 138
+            },
+            "within_primary": {
+              "all_pair_scores": {
+                "count": 420,
+                "maximum": 227738,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 182
+              },
+              "directed_score_count": 420,
+              "feature_eligible_directed_score_count": 420,
+              "feature_eligible_pair_scores": {
+                "count": 420,
+                "maximum": 227738,
+                "median": 0.0,
+                "minimum": 0,
+                "nonzero": 182
+              },
+              "logical_pair_count": 210,
+              "reference_threshold_not_target_validated": 20,
+              "score_at_or_above_reference_threshold_directed_count": 155,
+              "score_nonzero_directed_count": 182
+            }
+          }
+        }
+      }
+    ],
+    "dataset_limitations": {
+      "different_finger_control_available": false,
+      "far_frr_or_accuracy_claim_permitted": false,
+      "production_threshold_validation_permitted": false,
+      "single_session_finger_context_only": true
+    },
+    "decision_classification": "PENDING_AUTHENTIC_AGGREGATE_REVIEW_A_B_C_OR_D",
+    "fixed_parameters": {
+      "baseline_offset": 2048,
+      "flatfield_radius": 12,
+      "percentile_high": 99,
+      "percentile_low": 1,
+      "r2_unsharp_boost": "0.8f",
+      "r2_unsharp_sigma": "1.5f"
+    },
+    "frame_roles": {
+      "auxiliary": 21,
+      "baseline": 1,
+      "primary": 21
+    },
+    "historical_r0": {
+      "bozorth_computable_not_reported_by_r0": true,
+      "fingerprint_frames_with_minutiae_nonzero": 34,
+      "fingerprint_frames_with_quality_tier_a_minutiae": 2,
+      "fingerprint_frames_with_quality_tier_b_or_a_minutiae": 10,
+      "pairwise_scores_not_reported_by_r0": true,
+      "source_summary_sha256": "7dfb2feab05a11b01830903c773211d811f5b9a55aac35bd478fd57e4707f90b"
+    },
+    "minutiae_exported": false,
+    "per_frame_metrics_exported": false,
+    "question": "PREPROCESSING_LIMIT_VS_SMALL_AREA_FEATURE_EXTRACTOR_LIMIT",
+    "rasters_exported": false,
+    "rocky_source_commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b",
+    "schema": "D279_48_ROCKY_NBIS_SIGFM_COMPARISON_AGGREGATE_V1",
+    "sigfm_keypoints_or_descriptors_exported": false,
+    "sigfm_source_commit": "7ebe0c809b4d1df3400e84299a4ec4acdea84590",
+    "target_raster_role_order": "baseline,(primary,auxiliary)*21",
+    "templates_exported": false
+  },
+  "baseline_sha": "36999004b9971f7004aaaa4da85d7c2d1afc79d1",
+  "biometric_feature_or_template_exported": false,
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "live_or_usb_action_count": 0,
+  "operation": "D279_48_ONE_OFFLINE_PROTECTED_ROCKY_NBIS_SIGFM_COMPARISON",
+  "outcome": "AUTHENTIC_ROCKY_NBIS_SIGFM_AGGREGATE_READY",
+  "plaintext_or_raster_exported": false,
+  "r0_summary_sha256": "7dfb2feab05a11b01830903c773211d811f5b9a55aac35bd478fd57e4707f90b",
+  "schema": "D279_48_ONE_OFFLINE_PROTECTED_ROCKY_NBIS_SIGFM_COMPARISON_V1",
+  "transport_input_verified": true,
+  "transport_or_psk_exported": false
+}

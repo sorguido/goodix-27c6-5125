@@ -1,0 +1,13 @@
+{
+  "D261_OPERATOR_KIT_LIVE_EXECUTED": false,
+  "FPRINTD_MUTATION_COUNT": 0,
+  "LIVE_CAPABILITY_DEFAULT": 0,
+  "LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG": false,
+  "REAL_SECRET_READ_COUNT": 0,
+  "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
+  "REAL_USB_OPEN_COUNT": 0,
+  "operator_launcher_syntax": "PASS",
+  "preflight_report": "analysis/D261/D261_preflight_dry_run.json",
+  "schema": "D261_OPERATOR_KIT_DRY_RUN_RESULT_V1",
+  "status": "PASS"
+}

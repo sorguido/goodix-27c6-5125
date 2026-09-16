@@ -1,0 +1,37 @@
+{
+  "artifact": "D273_01_nav_exact_control_corrective_bundle_manifest",
+  "bundle": "D273_01_nav_exact_control_corrective_bundle.zip",
+  "bundle_class": "STEP_LOCAL_NON_CUMULATIVE_SANITIZED",
+  "step": "D273/01 corrective 2",
+  "baseline_commit": "7c991143e3670f6262f23e6159edde9e240c4287",
+  "rocky_canonical_commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b",
+  "review_set": [
+    "analysis/D273/D273_01_nav_exact_control_corrective_report.md",
+    "analysis/D273/D273_01_nav_exact_control_corrective_test_results.json",
+    "analysis/D273/D273_01_nav_exact_control_corrective_execution_manifest.json",
+    "analysis/D273/D273_01_nav_exact_control_corrective_bundle_manifest.json",
+    "analysis/D273/d273_01_offline_capture_audit.py",
+    "analysis/D273/d273_01_evidence_metadata_corrective_test.py",
+    "analysis/D273/D273_01_capture_census.json",
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "excluded": [
+    "raw capture pcapng",
+    "B0 TLS content",
+    "plaintext TLS",
+    "raster/pixel data",
+    "biometric payloads",
+    "secret/PSK",
+    "DLL/firmware binaries",
+    "D273_01_post_first_image_multiframe_sigfm_bundle.zip (historical, preserved unchanged)",
+    "D273_01_evidence_metadata_corrective_bundle.zip (corrective 1, preserved unchanged)"
+  ],
+  "sanitized": true,
+  "cumulative": false,
+  "real_usb_open_count": 0,
+  "real_command_send_count": 0,
+  "real_secret_materialization_count": 0,
+  "real_fprintd_mutation_count": 0,
+  "real_biometric_capture_count": 0,
+  "persistent_device_write_count": 0
+}

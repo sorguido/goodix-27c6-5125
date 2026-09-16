@@ -1,0 +1,137 @@
+D255 TSHARK PRE-ATTACH READINESS CORRECTIVE OFFLINE VERIFICATION RESULTS
+Date: 2026-08-22 Europe/Rome
+Corrective initial HEAD: 999483362af23f67790eb6e54f4c02bb48bd6cd5
+Execution mode: OFFLINE_PREPARATION_ONLY
+
+1. Python compilation
+   Command:
+     python3 -m compileall -q core tests analysis/D252 analysis/D253 analysis/D254 analysis/D255
+   Result: PASS
+
+2. D252/D253 audit regressions
+   Commands:
+     python3 analysis/D252/d252_fdt_capture_audit.py
+     python3 analysis/D253/d253_offline_audit.py --repo .
+   Result: PASS / PASS
+   Safety counters reported by both audits: USB/command/persistent writes zero.
+
+3. D254 external-evidence suite
+   Command:
+     python3 -m unittest -q analysis/D254/test_d254_external_audit.py
+   Result: PASS
+   Tests run: 5
+
+4. D255 corrective suite
+   Command:
+     python3 -m unittest -q analysis/D255/test_d255_postprocess_windows_evidence.py
+   Result: PASS
+   Tests run: 54
+   Failures: 0
+   Errors: 0
+
+   New corrective coverage:
+   - horizontal audit of every array/list contract used before authorization;
+   - empty OEM candidates accepted by mandatory snapshot/shared-setup bindings;
+   - empty cache roots accepted and serialized as a JSON array;
+   - capture interfaces remain semantically non-empty with explicit D255 failure;
+   - live and synthetic pre-authorization branches invoke the same setup function;
+   - ABSENT and PRESENT synthetic OEM-log simulation contracts;
+   - simulation rejects authorization, TShark, real interfaces and real paths,
+     and cannot call Start-Process/Get-PnpDevice;
+   - zero OEM-log candidates plus present Goodix cache is accepted and
+     reported without inventing log evidence;
+   - present OEM log plus absent Goodix cache is classified independently;
+   - empty log/cache snapshots serialize as valid JSON arrays;
+   - the zero-log failure is absent while explicitly configured unreadable
+     paths remain fail-closed before authorization;
+   - fingerprint setup UI is not required with the target absent;
+   - account-only confirmation and explicit four-state PIN model;
+   - NOT_CONFIGURED + REQUIRED policy fails before authorization;
+   - structured post-attach READY/UI_UNAVAILABLE/NEW_PIN_REQUIRED/
+     UNEXPECTED_PREREQUISITE gate;
+   - partial bootstrap consumes no cancel/re-entry markers and preserves first
+     0x36/cache/A8 processing;
+   - full re-entry plus ACKed new arm proves re-entry but never FDT disarm or
+     RESTORE_CLOSED;
+   - authorization ordering retains interface/account/path/runtime gates.
+   - live TShark plus missing pre-attach pcapng is accepted by the readiness
+     state contract;
+   - live TShark plus zero-byte pre-attach pcapng is accepted by the readiness
+     state contract;
+   - an exited TShark process remains fail-closed;
+   - Goodix presence before the authorized attach remains fail-closed;
+   - pcapng materialization is required after attach/passive bootstrap;
+   - final capture validation still requires exit zero, file present/nonempty
+     and at least one readable frame;
+   - TShark failures include redacted command/output state and captured
+     stdout/stderr diagnostics.
+
+   Existing coverage retained:
+   - guest-before absence, guest-after presence, capture-before-attach and one
+     descriptor/attach episode;
+   - exact APP12509 A8 distinct from VID/PID;
+   - USBPcap single/capture-all selection;
+   - zero-finger invalidation by IRQ2, exact 0x22 and image path;
+   - PowerShell 5.1 static API contracts and self-test construction;
+   - ISO and Goodix MMDD, midnight/year rollover, offset ambiguity;
+   - OEM log unchanged/growth/truncate/replace handling.
+
+5. Full supported repository suite
+   Command:
+     python3 -m unittest discover -s tests -q
+   Result: PASS
+   Tests run: 172
+
+6. Real postprocessor CLI executable closure with synthetic APP12509 fixture
+   Commands:
+     python3 analysis/D255/d255_postprocess_windows_evidence.py --create-synthetic-fixture ...
+     python3 analysis/D255/d255_postprocess_windows_evidence.py --run-dir ... --manifest ... --manifest-sha256 ... --output-dir ...
+   Result: PASS
+   Firmware: GF_ST411SEC_APP_12509
+   Run class: FULL_ZERO_FINGER_CANCEL_REENTRY
+   Restore class: REENTRY_ACCEPTS_NEW_ARM_PRIOR_ARM_STATUS_UNKNOWN
+   OEM_CANCEL_REENTRY_PROVEN=true
+   NEW_FDT_ARM_ACCEPTED_ON_REENTRY=true
+   DEVICE_FDT_DISARM_PROVEN=false
+   RESTORE_CLOSED=false
+   Raw output exported: no
+
+7. PowerShell 5.1 / 7 compatibility audit
+   pwsh/powershell available on D255 Linux host: no
+   Native PowerShell parser/self-test: NOT_AVAILABLE
+   Fallback static lexer/delimiter/API/ordering contract: PASS
+   Forbidden modern API occurrences: 0
+   -SelfTestOnly: IMPLEMENTED_NOT_EXECUTED
+   pre-correction VM self-test reported by operator: PASS
+   corrected -SelfTestOnly/-PreflightOnly: NOT_EXECUTED_ON_NATIVE_WINDOWS
+   D255_CAPTURE_READINESS_SELFTEST: IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS
+   -PreAuthorizationSimulationOnly ABSENT/PRESENT: IMPLEMENTED_NOT_EXECUTED_ON_NATIVE_WINDOWS
+   shared live-path setup and authorization ordering: PASS_STATIC_CONTRACT
+   empty-array binding/JSON contract: PASS_STATIC_AND_SYNTHETIC_CONTRACT
+   TShark pre-attach process-only readiness: PASS_STATIC_AND_SYNTHETIC_CONTRACT
+   real Windows TShark delayed-file behavior after correction: NOT_EXECUTED
+   -SelfTestOnly hardware action count by construction: 0
+
+8. Structured output and patch hygiene
+   D255_decision.json: valid JSON
+   obsolete sensor-dependent pre-attach confirmation: absent
+   git diff --check: PASS
+   bundle manifest/ZIP/checksum: verified after final regeneration
+
+Safety counters for every D255 corrective command:
+REAL_CAPTURE_COUNT=0
+REAL_WINDOWS_CAPTURE_COUNT=0
+REAL_USB_OPEN_COUNT=0
+REAL_TLS_HANDSHAKE_COUNT=0
+REAL_D4_SEND_COUNT=0
+REAL_AF_SEND_COUNT=0
+REAL_FDT_SEND_COUNT=0
+REAL_IMAGE_COMMAND_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+REAL_PERSISTENT_WRITE_FAMILY_COUNT=0
+
+No sudo, VM start, Windows OEM execution, TShark live capture, local USB/libusb,
+TLS, D4, AF, FDT, image command, finger interaction, provisioning, firmware
+operation, network access, retry, account/PIN mutation, or persistent write
+occurred.

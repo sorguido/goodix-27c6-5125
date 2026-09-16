@@ -1,0 +1,52 @@
+{
+  "attempt_id": "D27954_20260908_ATTEMPT01",
+  "attempt_status_sha256": "20b45b1a07d0843a55e9314fe0d20668331258ba0a722b48126ed7d298f039bc",
+  "capture_sha256": "6875b2d784d11cd4b3a8b68bd02af249f4b318883441a26068ef894767985c9b",
+  "identify_action": {
+    "finger_on_count": 1,
+    "post_touch_rearm_0x32_count": 0,
+    "post_up_b0_count": 1,
+    "primary_image_count": 1,
+    "second_finger_on_count": 0,
+    "second_primary_image_count": 0,
+    "single_touch_single_acquisition": true,
+    "terminal_protocol_event": "NAV",
+    "trace": "C32,K32:01,I0002,C22,K22:01,BF,C34,K34:01,I0200,C20,K20:01,BF,C50,K50:01,NAV"
+  },
+  "operator_events_sha256": "bb258a20f00f01efe271ca282e3dd6d0cba1ac6a4d6747da67e16417b2ddf555",
+  "operator_outcome": {
+    "automatic_retry_count": 0,
+    "terminal_tail_seconds": 5.048,
+    "verification_attempt_count": 1,
+    "verification_result": "WINDOWS_UI_FINGERPRINT_SUCCESS"
+  },
+  "privacy": {
+    "biometric_feature_or_template_exported": false,
+    "payload_exported": false,
+    "plaintext_exported": false,
+    "raster_exported": false,
+    "secret_exported": false
+  },
+  "safety": {
+    "adaptive_template_persistence_excluded": false,
+    "automatic_retry_count": 0,
+    "capture_was_passive": true,
+    "known_persistent_command_family_count": 0,
+    "linux_sender_action_count": 0
+  },
+  "schema": "D279_54_OEM_IDENTIFY_CAPTURE_AUDIT_V1",
+  "source_integrity": {
+    "firmware_identity": "GF_ST411SEC_APP_12509",
+    "pcapng_packet_count": 228,
+    "strict_finalized_parse": "PASS",
+    "target_packet_count": 216,
+    "target_protocol_frame_count": 95
+  },
+  "terminal_observation": {
+    "last_protocol_frame": 225,
+    "last_target_packet": 227,
+    "nonempty_target_packets_after_ui_completion": 0,
+    "protocol_frames_after_ui_completion": 0,
+    "target_packets_after_ui_completion": 1
+  }
+}

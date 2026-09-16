@@ -1,0 +1,9 @@
+{
+  "schema": "d244-d243-host-boot-baseline-v1",
+  "d243_boot_id": "bc1ec5816f8044528be0e1feeafcc4c7",
+  "d243_report_path": "analysis/D243/D243_operator_live_stdout.json",
+  "d243_report_mtime_local": "2026-08-17T23:05:17+02:00",
+  "journal_boot_interval_local": "2026-08-17T21:40:05+02:00 through current session",
+  "basis": "D243 report mtime falls inside journal boot 0; host boot evidence only",
+  "sensor_power_cycle_electrically_proven": false
+}

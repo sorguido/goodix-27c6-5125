@@ -1,0 +1,65 @@
+{
+  "exclusions": [
+    "raw captures",
+    "B0/TLS plaintext",
+    "biometric raster/images/hashes",
+    "PIN/PSK/keys/credentials",
+    "firmware/OEM cache",
+    "prior bundles"
+  ],
+  "files": [
+    {
+      "path": "core/fdt_lifecycle.py",
+      "sha256": "ea3c9454ef0cbbe1c06aea4fa5e5e8f4b47a9eafe40fe19dc483313fcc5a1377",
+      "size": 30539
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "sha256": "83fc447bb758cbfb96f72608d85659c170d83e95a51631113a12324557394780",
+      "size": 32070
+    },
+    {
+      "path": "core/runtime_transport.py",
+      "sha256": "aa1975f5c67cd54ce59f69422bff50b8159a3e8bbb5f3b0a3bdfd879b9cbffc0",
+      "size": 4498
+    },
+    {
+      "path": "tools/d264_first_image_offline.py",
+      "sha256": "d7b831ad303a4c648e35eb8476976e0841b3b66c03878af159ecca45f6c8a423",
+      "size": 4629
+    },
+    {
+      "path": "tests/test_d275_01_production_multiframe.py",
+      "sha256": "8a15b7769903782d2e84ce73f86283957a58f423372c436e6d6994956d094206",
+      "size": 3697
+    },
+    {
+      "path": "Goodix 27c6 5125 manuale tecnico.md",
+      "sha256": "e46bb9bac70d7314fcc22c4448eeb4a284814d23e6958afdb9a353961fd3b41a",
+      "size": 478588
+    },
+    {
+      "path": "analysis/D275/D275_01_offline_linux_multiframe_bridge_report.md",
+      "sha256": "968e8ea945bb42e8386c0f286da03ef615353bdc8726e33e7c7293b6aff25db9",
+      "size": 3366
+    },
+    {
+      "path": "analysis/D275/D275_01_offline_linux_multiframe_bridge_execution_manifest.json",
+      "sha256": "4f1504cd93a769f68b959f5f80ab676b2bd7af0a91597be527a1665650b9213e",
+      "size": 803
+    }
+  ],
+  "members": [
+    "core/fdt_lifecycle.py",
+    "core/persistent_runtime.py",
+    "core/runtime_transport.py",
+    "tools/d264_first_image_offline.py",
+    "tests/test_d275_01_production_multiframe.py",
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "analysis/D275/D275_01_offline_linux_multiframe_bridge_report.md",
+    "analysis/D275/D275_01_offline_linux_multiframe_bridge_execution_manifest.json",
+    "analysis/D275/D275_01_offline_linux_multiframe_bridge_bundle_manifest.json"
+  ],
+  "schema": "D275_01_STEP_LOCAL_BUNDLE_V1",
+  "starting_head": "fc1a368a8abeec120996b26b70050b98a87547f5"
+}

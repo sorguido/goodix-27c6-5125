@@ -1,0 +1,2416 @@
+  90840 c:\fingerprintlog\WbioUXLog.log
+  90890 %02d:%02d:%02d.%03d [%s]
+  908c8 at+,ccs=UTF-8
+  908e8 wrong input
+  90900 fail to create dir %s, errno %d
+  90940 process ret 0x%x length before %d, length after:%d
+  909b0 [FAILED] encryption failed with 0x%x.
+  90a00 fail
+  90a10 MatchRetryMaxCount
+  90a38 Software\Goodix\FP\
+  90a60 CONFIG DATA: match_retry_max_count %d
+  90ab0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\common\dynamic_config.c
+  90b40 MinImageCoverage
+  90b70 CONFIG DATA: min_image_coverage %d
+  90bb8 SamplesNumPerTemplate
+  90bf0 CONFIG DATA: samples_num_per_template %d
+  90c48 EnrollOverlayTipStart
+  90c80 CONFIG DATA: enroll_overlay_tip_start %d
+  90cd8 EnrollOverlayTipEnd
+  90d00 CONFIG DATA: enroll_overlay_tip_end %d
+  90d50 MaxEnrollOverlayTipCount
+  90d90 CONFIG DATA: max_enroll_overlay_tip_count %d
+  90df0 EnrollOverlayTipStep
+  90e20 CONFIG DATA: enroll_overlay_tip_step %d
+  90e70 EnrollOverlayTipInfo
+  90ea0 CONFIG DATA: enroll_overlay_tip_info, reg size %d
+  90f08 SamplesNumPerTemplateCoating
+  90f48 SamplesNumPerTemplateHV
+  90f78 LogLevel
+  90f90 Software\Goodix\FP\LogOutput\
+  90fd0 LogTarget
+  90fe8 LogPath
+  90ff8 DumpSwitch
+  91010 Software\Goodix\FP\DataDump\
+  91050 DumpPath
+  91068 CONFIG DATA: enter
+  91090 init_config
+  910a8 CONFIG DATA: DumpSwitch %d
+  910e0 CONFIG DATA: DumpPath %s
+  91118 DumpTotalSizeLimit
+  91140 CONFIG DATA: DumpTotalSizeLimit %d
+  91188 CONFIG DATA: LogLevel %d
+  911c0 TLSLogLevel
+  911d8 CONFIG DATA: TLSLogLevel %d
+  91210 CONFIG DATA: LogTarget %d
+  91248 CONFIG DATA: LogPath %s
+  91278 LogFileLimit
+  912a0 CONFIG DATA: reg value %d, LogFileLimit %d
+  912f8 LogFileCacheSwitch
+  91320 CONFIG DATA: LogFileCacheSwitch %d
+  91370 CONFIG DATA: samples_num_per_template_coating %d
+  913e0 CONFIG DATA: samples_num_per_template_HV %d
+  91438 MinImageQuality
+  91460 CONFIG DATA: min_image_quality %d
+  914a8 MaxOverlayRatio
+  914d0 CONFIG DATA: max_overlay_ratio %d
+  91518 MaxPreoverlayRatio
+  91540 CONFIG DATA: max_preoverlay_ratio %d
+  91590 S0IdleSupportSwitch
+  915c0 CONFIG DATA: s0idle_support_switch %d
+  91610 LivenessSwitch
+  91630 CONFIG DATA: liveness_switch %d
+  91670 SensorBrokenCheckSwitch
+  916a0 CONFIG DATA: sensor_broken_check_switch %d
+  916f8 HVDacAdjustSwitch
+  91720 CONFIG DATA: hv_dac_adjust_switch %d
+  91770 ChangeSpiSpeedSwitch
+  917a0 CONFIG DATA: change_spi_speed_switch %d
+  917f0 FirmwareUpdateSwitch
+  91820 CONFIG DATA: firmware_update_switch %d
+  91870 PSKSimulationSwitch
+  918a0 CONFIG DATA: psk_simulation_switch %d
+  918f0 PSKCacheSwitch
+  91910 CONFIG DATA: psk_cache_switch %d
+  91958 TimeKeepReset
+  91980 CONFIG DATA: time_keep_reset %d
+  919c0 TimeWaitAfterReset
+  919f0 CONFIG DATA: time_wait_after_reset %d
+  91a40 TimeWaitForTls
+  91a60 CONFIG DATA: reg value %d, time_wait_for_tls %d
+  91ac0 TimeWaitForPov
+  91ae0 CONFIG DATA: reg value %d, time_wait_for_pov %d
+  91b40 TimeScreenOffImageValid
+  91b70 CONFIG DATA: time_screenoff_image_valid %d
+  91bc8 TimeOnekeyimageValidAfterLogon
+  91c10 CONFIG DATA: time_onekeyimage_valid_after_logon %d
+  91c78 TimeS4OnekeyimageValid
+  91cb0 CONFIG DATA: time_s4_onekeyimage_valid %d
+  91d08 TimeGeneralOnekeyimageValid
+  91d40 CONFIG DATA: time_general_onekeyimage_valid %d
+  91da0 TestTimeConsumingSwitch
+  91dd0 CONFIG DATA: test_time_consuming_switch %d
+  91e28 SecurityReviewSwitch
+  91e60 CONFIG DATA: security_review_switch %d
+  91eb0 RetryCountForComminInit
+  91ee0 CONFIG DATA: reg value %d, retry_count_for_common_init %d
+  91f58 TouchRichTipSwitch
+  91f80 CONFIG DATA: touch_rich_tip_switch %d
+  91fd0 MaxEventLogNum
+  91ff0 CONFIG DATA: max_event_log_num %d
+  92038 HardCodedChipIdSwitch
+  92070 CONFIG DATA: hard_coded_chipid_switch %d
+  920c8 HardCodedChipId
+  920f0 CONFIG DATA: hard_coded_chipid %d
+  92138 CommTestSwitch
+  92160 CONFIG DATA: comm_test_switch %d
+  921a8 CommTestPackSize
+  921d0 CONFIG DATA: comm_test_pack_size %d
+  92218 CommTestTimeInterval
+  92250 CONFIG DATA: comm_test_time_interval %d
+  922a0 HlkTestSwitch
+  922c0 CONFIG DATA: hlk_test_switch %d
+  92300 TempUpdateBackupRecoverySwitch
+  92340 CONFIG DATA: temp_update_backup_recovery_switch %d
+  923a8 MatchRetrySwitch
+  923d0 CONFIG DATA: match_retry_switch %d
+  92418 MatchRetryMaxTime
+  92440 CONFIG DATA: match_retry_max_time %d
+  92490 OneKeyBootRetrySwitch
+  924c0 CONFIG DATA: one_key_boot_retry_switch %d
+  92518 OneKeyBootRetryMaxCnt
+  92550 CONFIG DATA: one_key_boot_retry_max_count %d
+  925b0 MatchCacheListSwitch
+  925e0 CONFIG DATA: match_cache_list_switch %d
+  92630 IdentifyStudyMaxNum
+  92660 CONFIG DATA: identify_study_max_num %d
+  926b0 ChooseEnrollImgSwitch
+  926e0 CONFIG DATA: choose_enroll_img_switch %d
+  92738 ChooseLessOverlaySwitch
+  92770 CONFIG DATA: choose_less_overlay_switch %d
+  927c8 ChooseEnrollImgNum
+  927f0 CONFIG DATA: choose_enroll_img_num %d
+  92840 ChooseEnrollImgQualityThre
+  92880 CONFIG DATA: choose_enroll_img_quality_threshold %d
+  928e8 DelEnrollImgOverlay
+  92910 CONFIG DATA: del_enroll_img_overlay_threshold %d
+  92978 DelEnrollImgPreoverlay
+  929b0 CONFIG DATA: del_enroll_img_preoverlay_threshold %d
+  92a18 NavAppSwitch
+  92a38 CONFIG DATA: nav_app_switch %d
+  92a78 NavAppFrameCount
+  92aa0 CONFIG DATA: nav_app_frame_count %d
+  92ae8 NavAppParameters
+  92b10 CONFIG DATA: nav_app_parameters %d
+  92b58 SupportSubmitDelaySwitch
+  92b90 CONFIG DATA: support_submit_delay_switch %d
+  92be8 SubmitDelayTime
+  92c10 CONFIG DATA: submit_delay_time %d
+  92c60 %c:\Windows\System32
+  92c90 %c:\Windows\System32\WinBioPlugIns
+  92cd8 %c:\ProgramData
+  92cf8 %c:\ProgramData\Goodix
+  92d28 %c:\%s
+  92d38 %c:\Windows\System32\%s
+  92d70 %c:\Windows\System32\WinBioPlugIns\%s
+  92dc0 %c:\ProgramData\%s
+  92de8 %c:\ProgramData\Goodix\%s
+  92e20 gf_seal_data
+  92e40 f:\git\huawei_win\winfpcode\milan_watt\milanspi\common\gf_win_crypt_helper.c
+  92ee0 inbuf_len %d, entropy_len %d, len_out %d
+  92f40 This is the description string.
+  92f80 The encryption phase worked, %d, %d
+  92fd0 Buffer for encrypted data is not big enough
+  93028 CryptProtectData
+  93050 !!!!%s failed, error: 0x%x
+  93088 gf_unseal_data
+  930b0 The decryption phase worked, %d, %d
+  93100 Buffer for decrypted data is not big enough
+  93158 CryptUnprotectData
+  93180 generate_rand
+  931a0 CryptAcquireContext succeeded
+  931e0 CryptAcquireContext
+  93208 CryptAcquireContext succeeded2
+  93248 CryptAcquireContext succeeded3
+  93288 Random sequence generated: %d
+  932c8 CryptGenRandom
+  932e8 fatal
+  932f8 alert
+  93308 critical
+  93320 error
+  93330 warn
+  93340 notice
+  93350 info
+  93360 debug
+  93370 trace
+  93380 %02x
+  93390 [%02d%02d-%02d:%02d:%02d:%03d][PID:%04d][TID:%05d][%s][%s][%s:%05d] Goodix>>> 
+  93430 %s.bak
+  93440 %s:WRONG DATA
+  93460 %s:0x%s
+  93470 dumping '%s' (%u bytes)
+  934a0 %04x: 
+  934b0  %02x
+  934f0 obtain system power capabilities failed!!!
+  93548 GetPowerInformation
+  93570 f:\git\huawei_win\winfpcode\milan_watt\milanspi\common\notifypower.c
+  93600 PowerCapability:
+  93638 supports Modern Standby: %s
+  93670 display state 0x%x(0x2-dim/0x1-on/0x0-off)
+  936c8 PowerNotificationCallback
+  93700 keep in D0
+  93718 not Monitor state
+  93740 error 0x%x
+  93758 RegisterPowerNotification
+  93790 UnRegisterPowerNotification
+  cf950 f:\git\huawei_win\winfpcode\milan_watt\milanspi\common\peripheral.c
+  cf9d8 entry
+  cf9e8 EvaluateASLMethod
+  cfa10 Start to create the target
+  cfa48 Start to open IO target
+  cfa78 Open the target success
+  cfaa8 WdfRequestCreate
+  cfad0 !!!!%s failed, status: 0x%x
+  cfb10 Start to generate the arguments for _DSM method
+  cfb70 Input buffer total size:%u
+  cfba8 to create input memory
+  cfbd8 WdfMemoryCreatePreallocated
+  cfc10 to create output memory
+  cfc40 WdfMemoryCreatePreallocated 2
+  cfc80 to format request
+  cfcb0 WdfIoTargetFormatRequestForIoctl
+  cfcf8 to set send options
+  cfd20 WdfRequestAllocateTimer
+  cfd50 sent request return 0x%x
+  cfd90 to check results Signature %d Count %d Length %d
+  cfe00 to check results Type %d pdata 0x%p, DataLength %d
+  cfe70 SUCCESS copied the returned data of ACPI method
+  cfed0 Device is NULL.
+  cfef0 EvaluateASLMethod_ResetMCU
+  cff28 The device target is NULL
+  cff60 WdfIoTargetSendIoctlSynchronously
+  cffa8 Success
+  cffb8 spb WdfRequestSend failed
+  cfff0 WdfRequestSendWithSynchronousOption
+  d0038 spb fail to send request 0x%x
+  d0078 reset mcu
+  d0090 HardResetMcu
+  d00b0 DSM Method
+  d00c8 Returned data length:%u
+  d0100 Hard-reset MCU via DSM Failed 0x%x, try soft way
+  d0168 Hard-reset MCU Done
+  d0190 not support hard reset for EC projects %d
+  d01f0 trigger soft reset for KB projects
+  d0240 trigger soft reset for USB projects
+  d0288 not supported
+  d02a8 invalid parameter.
+  d02d0 enter
+  d02e0 g_stop_session_detection:%d
+  d0318 SetSessionThreadStopFlag
+  d0350 f:\git\huawei_win\winfpcode\milan_watt\milanspi\common\sessiondetection.c
+  d03e8 SessionDetection
+  d0410 Software\Goodix\FP\SessionDetection
+  d0460 UNLOCK to clear pov data right away
+  d04a8 sessionThread
+  d04c8 SESSION_LOGON
+  d04e8 system is locked
+  d0510 system is logoff
+  d0538 system shut down
+  d0560 system pre shut down
+  d0590 session thread enter
+  d05c0 StartSessionDetection
+  d05f0 TerminateSessionThread
+  d0620 session detection released
+  d0660 session detection not released, terminate it
+  d06c0 close hkey
+  d06e0 Driver
+  d06f0 Engine
+  d0700 16:05:06
+  d0718 Sep 13 2021
+  d0730 PID %d Build %s %s start logging for %s
+  d0780 NoFile
+  d0790 NoFunc
+  d07a0 NoFormat
+  d07c0 !!!!bad package (flags.type not exist)
+  d0810 CheckPackageHead
+  d0840 f:\git\huawei_win\winfpcode\milan_watt\milanspi\private.c
+  d08c0 !!!!bad package (checkSum not match)
+  d0910 !!!!bad package (length too long)
+ 10caf0 InitOneKeyImgBuffer error, malloc buffer for index %d buffer for one key image failed.
+ 10cba0 InitOneKeyImgBuffer
+ 10cbd0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\cmddataproc.c
+ 10cc60 Index %d buffer address:0x%p
+ 148e08 wrong input %d
+ 148e28 modify_sensor_config
+ 148e60 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\config.c
+ 148ef0 reg 0x%04x, before update: 0x%04x, after update:0x%04x (0x%04x: 0x%x|0x%x)
+ 1851f8 Entry
+ 185208 NotifyAllThreadsToStop
+ 185240 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\device.c
+ 1852c8 TerminateAllThreads
+ 1852f0 nav_app released
+ 185320 nav_app not released, terminate it
+ 185368 test process released
+ 1853a0 test process not released, terminate it
+ 1853f0 init process released
+ 185420 init process not released,though not to terminate it
+ 185490 data process released
+ 1854c0 data process not released, terminate it
+ 185510 data2 process released
+ 185540 data2 process not released, terminate it
+ 185598 Exit
+ 1855a8 suspend all
+ 1855c0 SuspendAllThreads
+ 1855e8 suspended %d
+ 185608 ResumemAllThreads
+ 185630 entry, retry switch %d, max retry %d
+ 185680 GetMoreOneKeyImg
+ 1856b0 Init: wait for index %d pov image...
+ 185700 Init: wait for index %d pov image timeout (%dms)
+ 185768 Init: got index %d pov image
+ 1857a8 exit
+ 1857b8 enter %d
+ 1857d0 _init_global_hal_context
+ 185808 !!!!wrong input parameter!!!!
+ 185848 !!already initied
+ 185870 !!!!Error, CreateEvent
+ 1858a0 exit %d
+ 1858b0 wrong input for comm test
+ 1858f0 SendSPICommunicationTestPackage
+ 185930 sending for comm test
+ 185960 success to send for comm test
+ 1859a0 fail to send for comm test
+ 1859e0 TLS Init Success, Set tls inited to TRUE
+ 185a38 TLSServerInit
+ 185a58 TLS Init Success
+ 185a80 !!!!tls init failed
+ 185aa8 !!!!Fail to init tls
+ 185ad8 ActiveDevice
+ 185b48 status:0x%x 
+ 185b68 Exit 0x%x
+ 185b88 DriverState:Install
+ 185bb0 _QucikCheckMCU
+ 185bd0 _DeviceInit
+ 185be8 ---- enter
+ 185c00 [BEGIN] _DeviceInit
+ 185c28 !!!!fail to init with MCU 0x%x
+ 185c68 Init MCU Failed 0x%x
+ 185c98 !!!!fail to init FP
+ 185cc0 Init FP Failed
+ 185ce0 Init Device Done Successfully
+ 185d20 _TlsInitAndHandShake
+ 185d50 tls already inited
+ 185d80 CONFIG DATA: time_wait_for_tls %d, time_wait_for_pov %d
+ 185df0 already tls inited, un-init it
+ 185e30 tls init...
+ 185e48 TLS Init Failed
+ 185e70 system is slow, tls init time: %dms, system slow index: %d, time for hand-shake %dms
+ 185f20 tls init...done within %dms, system slow index %d, time for checking tls-hand-shake %dms, time_tls_handshake:%d
+ 186000 tls handshake already started
+ 186040 TLS handshake not started yet in %dms
+ 186090 TLS Handshake Started
+ 1860c0 TLS Handshake Started, waif for TLS handshake done(%d-%d)...
+ 186140 WaitForSingleObject
+ 186170 TLS handshake not done in time %dms(since start of tls init), state: %d
+ 186200 tls handshake done (server side), %dms(since start of tls init)
+ 186280 Get MCU State Failed
+ 1862b0 TLS not connected yet in client/mcu side
+ 186310 tls connected success confirmed
+ 186350 mcu is still locked, unlock it
+ 186390 Fail to get MCU state or TLS not get connected in MCU side
+ 186410 tls handshake done (client/mcu side)
+ 186460 exit, ret %d, bResetMCU %d, tls inited %d
+ 1864b8 nav_app exit
+ 1864d8 nav_app_thread
+ 1864f8 nav_app exit flag
+ 186520 nav_app stop event
+ 186548 nav_app stop event done
+ 186578 nav_app data event
+ 1865a0 nav_app data event done
+ 1865d0 nav_app start event
+ 1865f8 nav_app start event done
+ 186630 nav_app exit2
+ 186650 CONFIG DATA for comm test: comm_test_switch %d, comm_test_pack_size %d, comm_test_time_interval %d
+ 186718 CommTestThread
+ 186738 comm test exit
+ 186760 fail for comm test: %lld in %lld
+ 1867a8 d0exit happened
+ 1867c8 comm test exit2
+ 1867e8 force unlock it
+ 186808 UnlockTlsForce
+ 186828 UnlockTls
+ 186840 unlock tls.
+ 186858 --- Init: start
+ 186878 InitThread
+ 186890 !!!!Init: wrong thread parameter!!!!
+ 1868e0 Init: pov %d, pba %d, tls-client-server-rebuild-session %d-%d-%d-%d-%d, have config %d, device inited %d, base inited %d
+ 1869d8 tls not alive
+ 1869f8 tls alive.
+ 186a10 ensure tls handshake will be done %d
+ 186a60 not to do tls handshake here
+ 186aa0 !!!!Init: _DeviceInit failed in %d try
+ 186af0 Init Device Success
+ 186b18 Init Device Failed
+ 186b40 Init Device Already Done Successfully
+ 186b90 Init Device Failed -- not expected
+ 186be0 mark tls handshake flag to false
+ 186c30 Init: TLS Handshake Failed in %d try
+ 186c80 TLS Handshake Success
+ 186cb0 TLS Handshake Failed
+ 186ce0 Init tls already done or not necessary
+ 186d30 Fail
+ 186d40 Config data lost, download config...%s
+ 186d90 power not lost
+ 186db0 Init:wait for PBA key...
+ 186df0 Init: wait for PBA key timeout (%dms), use the default key.
+ 186e68 Get PBA key.
+ 186e88 Get pba data failed.
+ 186eb8 Init:wait for PBA result...
+ 186ef0 Init: wait for PBA result timeout (%dms)
+ 186f48 Init:got PBA information!
+ 186f80 get ec bios log.
+ 186fb0 Init: wait for pov image...%dms
+ 186ff0 Init: wait for pov image timeout (%dms)
+ 187040 Init: got pov image
+ 187068 Init: update all base...
+ 1870a0 Init: update all base have done
+ 1870e0 Init: Use POV data for pending request
+ 187130 Use POV data for pending request
+ 187180 Init: no pending request there, not to Use POV data here
+ 1871f8 to start nav-app thread
+ 187228 to start comm test thread
+ 187260 Init thread complete, to fdt down for pending request
+ 1872d0 nav_app trigger start1
+ 187300 !!Init: Initialization done successfully
+ 187358 --- Init: end
+ 187378 !!!!wrong input parameter
+ 1873b0 TlsServerReconn
+ 1873d0 enter, re_init_device: %d
+ 187408 reinit device
+ 187428 not to reinit device
+ 187458 Start TLS Reconnect, %s
+ 187488 UNKNOWN\UNKNOWN
+ 1874b0 GetCurrentFingerprintHardwareID
+ 1874f0 fail to get HardwareID 0x%x
+ 187530 fail to get HardwareID data 0x%p, buffer size %d
+ 187598 HardwareID: %s
+ 1875b8 ACPI\GXFP5120
+ 1875d8 ACPI\GXFP5130
+ 1875f8 USB\VID_27C6&PID_5120
+ 187628 USB\VID_27C6&PID_5135
+ 187658 USB\VID_27C6&PID_5125
+ 187688 USB\VID_27C6&PID_5115
+ 1876b8 USB\VID_27C6&PID_5105
+ 1876e8 USB\VID_27C6&PID_5111
+ 187718 USB\VID_27C6&PID_5117
+ 187748 USB\VID_27C6&PID_5110
+ 187778 USB\VID_27C6&PID_5130
+ 1877a8 HardwareID not match
+ 1877e0 HardwareID match for product %d, %s
+ 187828 milanFusbCreateDevice
+ 187858 power policy owner.
+ 187880 WdfDeviceCreate
+ 1878a0 WdfDeviceCreate Failed 0x%x
+ 1878e0 GetCurrentFingerprintHardwareID Failed 0x%x
+ 187938 to support disable and enable
+ 187978 support S0Idle
+ 187998 selective suspend.
+ 1879c0 can not wake from S0.
+ 1879f0 support DFx on MS system
+ 187a28 S0Idle: %ds, switch %d
+ 187a58 WdfDeviceAssignS0IdleSettings
+ 187aa0 WdfDeviceAssignS0IdleSettings Failed 0x%x
+ 187af8 WdfDeviceAssignSxWakeSettings
+ 187b40 WdfDeviceAssignSxWakeSettings Failed 0x%x
+ 187ba0 ---- WdfDeviceAssignSxWakeSettings successed
+ 187c00 NOTE: not supported S0 idle
+ 187c38 ring buffer init Failed
+ 187c68 ring buffer init Failed2
+ 187ca0 milanFusbQueueInitialize
+ 187ce0 milanFusbQueueInitialize Failed 0x%x
+ 187d30 WdfDeviceCreateDeviceInterface
+ 187d70 WdfDeviceCreateDeviceInterface Failed 0x%x
+ 187dc8 exit, status: 0x%x
+ 187df0 OnGetAttributes
+ 187e10 outputBufferSize:0x%x, struct size:0x%x
+ 187e60 Goodix
+ 187e70 Biometric Sample Model
+ 187ea0 000-000-000
+ 187eb8 OnReset
+ 187ed0 CompletePendingRequest STATUS_CANCELLED
+ 187f20 OnCalibrate
+ 187f38 entry, request:%p
+ 187f60 OnCaptureData
+ 187f80 got OnCaptureData request
+ 187fc0 !!!!STATUS_INVALID_PARAMETER, exit
+ 188008 receive request
+ 188030 !!!!pending request in progress, exit
+ 188080 !!!!CompletePendingRequest STATUS_INVALID_PARAMETER
+ 1880f0 !!!!invalid param, output buffer too small, exit
+ 188160 !!!!CompletePendingRequest outputbuffer size: 0x%x
+ 1881d0 Purpose=%u, Type=%u, Owner=%u, Flags=0x%.2x
+ 188230  ******** Test skip - CompletePendingRequest NOT CAPTURE********
+ 1882b8 enter OneKeyImageLock
+ 1882e8 Submit POV data
+ 188308 return %d
+ 188320 leave OneKeyImageLock and exit
+ 188360 leave OneKeyImageLock
+ 188390 to wait init done
+ 1883b8 init not ready, do it later
+ 1883f0 wait init done
+ 188410 OnActivate time out.
+ 188440 OnActivate done.
+ 188468 activate %d, fdt_is_down %d
+ 1884a0 Capture request: invoke call to FDT DOWN
+ 188500 Capture request: invoke call to FDT DOWN 2
+ 188560 ******** to Register CaptureFramedone for capture a frame ********
+ 1885f0 invalid param, Complete capture data request directly
+ 188660 gfOnCancel
+ 188680 !!!!WdfRequestComplete STATUS_INVALID_PARAMETER for Device NULL
+ 188700 !!!!WdfRequestComplete STATUS_INVALID_PARAMETER for deviceContext NULL
+ 188790 cancel request
+ 1887b0 no pendingRequest
+ 1887e0 pending request differs from current request: 0x%x, request: 0x%x
+ 188870 Entry: need update %d, pov %d, MonitorOff:%d, data size:%d, touchflag: 0x%x
+ 188908 CaptureFramedone
+ 188930 PBA IsBIOSSupportPBA %d, PBAResultTotalLength %d
+ 188998 Not support PBA.
+ 1889c0 ******** CompletePendingRequest ********
+ 188a18 no pending request, do nothing
+ 188a58 !!!!deviceContext == NULL
+ 188a90 CompletePendingRequest
+ 188ac0 status:0x%x
+ 188ad8 complete request
+ 188b00 OnGetSensorInfo
+ 188b20 outputbuffer == NULL
+ 188b50 outputBufferSize(%x) < sizeof(gf_sensor_info)(%x)
+ 188bb8 FP Info not ready
+ 188be0 FP Info ready
+ 188c00 FP Info ready now, chipid:0x%x, sensorType:%d, col:%d, row:%d
+ 188c80 OnGetDeviceInfo
+ 188ca0 outputBufferSize(%x) < sizeof(%x)
+ 188ce8 %d == %d ? 
+ 188d00 1.1.125.14
+ 188d20 got device info, size %d project_type:%d, driver_version:%s,  firmware_version: %S
+ 188dc8 OnGetPBAInfo
+ 188df0 outputBufferSize(%x) < sizeof(BOOL)(%x)
+ 188e40 OnGetImageBase
+ 188e60 outputBufferSize(%x) < ImageBaseSize(%x)
+ 188eb8 OnGetPBAKey
+ 188ed0 outputBufferSize(%x) < NeedSize(%x)
+ 188f20 enter switch %d, delay time %d, submit delay %d
+ 188f80 OnIdentifyFinished
+ 188fa8 invalid param
+ 188fc8 set submit delay
+ 188ff0 MilanEvtDeviceReleaseHardware
+ 189030 !!!!Device NULL
+ 189050 !!!!Device context NULL
+ 189080 !!Cancel pending request
+ 1890b8 OnActivate
+ 1890d0 activate %d
+ 1890e8 nav_app trigger stop
+ 189118 nav_app trigger start2
+ 189148 last OnActivate time out.
+ 189180 last OnActivate done.
+ 1891b0 Init thread not done.
+ 1891e0 OnPBAOperation
+ 189200 inputbuffer==NULL
+ 189228 Get data from engine len=%d
+ 189260 malloc buffer error!
+ 189290 Previous PBA thread stopped.
+ 1892d0 Wait PBA thread time out.
+ 189310 Init thread not done, not start pba operation.
+ 189370 PBA start a new thread
+ 1893a0 OnRetryCaptureIMG
+ 1893d0 outputBufferSize(%x) < sizeof(RETRY_CAPTURE_IMG)(%x)
+ 189440 retry type:%d(0:general,1:pov), img index:%d, purpose:%d
+ 1894c0 GF3256 or ITE GF3658 set FDT MANUAL befor retry, sensor type %d, TouchFlag:0x%x touched count %d, fdt_is_down %d
+ 1895b0 !!!!fail to get frame data for retry.
+ 189600 Retyimageret 0x%x
+ 189628 fdt_is_down %d
+ 189650 exit return result %d, bfingerdown %d %d, 
+ 1896a8 !!!!update firmware Failed
+ 1896e0 UpdateMCUFirmwareWithLenInfo
+ 189720 --- tls reconnect
+ 189748 => OnProductionProcess
+ 189778 OnProductionProcess
+ 1897a0 !!!!deviceContext NULL
+ 1897d0 inputBuffer=0x%p, inputBufferSize=%u, outputBuffer=0x%p, outputBufferSize=%u
+ 189870 !!!!Error, bad input parameters, inputbuffer=0x%p, inputBufferSize=%u less-than sizeof(ST_PRODUCTION_DATA_HEADER)
+ 189960 !!!!Error, output parameter error, outputBuffer=0x%p, outputBufferSize=%u
+ 189a00 pProductionData->tag=%u, pProductionData->length=%u
+ 189a70 Get data from WinBIO pResult->length:%u. outputBufferSize:%u.
+ 189af0 On production process, set the flag true
+ 189b50 Will try to Write customer pkey.
+ 189ba0 Got data from lowwer layer. pResult data(be truncated)
+ 189c10 Will try to Read customer pkey hash value from MCU.
+ 189c78 Will try to write PMK to MCU.
+ 189cc0 Will try to Read PMK hash value from MCU.
+ 189d20 Will try to Reset PMK or Reset Challenge.
+ 189d78 Will try to wake up MCU
+ 189db0 Will try to update APP firmware
+ 189df0 Will try to erase APP.
+ 189e20 Will try to read MCU data state
+ 189e60 Will try to read firmware version.
+ 189ea8 Will try to get otp data
+ 189ee0 Will try to Get TLS Connection state of THE Driver.
+ 189f48 Will try to check a IMAGE crc.
+ 189f88 Will try to Reset sensor.
+ 189fc0 Will try to compare the hash values of the IntelME and MCU.
+ 18a040 NOT SUPPORTED Will try to read the hash value of the IntelME
+ 18a0c0 NOT SUPPORTED Will try to read the hash value of the MCU
+ 18a140 unknown pProductionData->tag: 0x%x
+ 18a188 pResult
+ 18a1a0 [SUCCESSFULLY] pResult->len_all %u bytes, pResult->ret:%d.
+ 18a220 [FAILED] pResult->len_all %u bytes, pResult->ret:%d.
+ 18a290 Production process end, set the flag false
+ 18a2f0 ******** DeviceD0Entry entry ********
+ 18a340 MilanEvtDeviceD0Entry
+ 18a370 deviceContext is NULL
+ 18a3a0 entry, prev state: %d(4-D3,5-D3Final), power action: %d, driver version %s
+ 18a440 Resume working state, PowerAction: %d, PID:%4d, driver version %s
+ 18a4c8 start readpipe!!!
+ 18a4f0 start readpipe failed 0x%x, stop readpipe!!!
+ 18a550 ReadPipe Start Failed
+ 18a580 resume from S0 idle
+ 18a5b0 target state: %d, power action: %d
+ 18a5f8 MilanEvtDeviceD0Exit
+ 18a628 stop readpipe!!!
+ 18a650 TargetPowerState: %d
+ 18a680 No Need Send PowerState to MCU, mcuPowerState is %d, device_state is %d
+ 18a710 Send PowerState to MCU mcuPowerState is %d
+ 18a768 enter S0 idle
+ 18a788 TargetPowerState: Sleep
+ 18a7c0 TargetPowerState: Hibernate or Hybrid Sleep
+ 18a818 TargetPowerState: Shutdown
+ 18a850 TargetPowerState: Restart
+ 18a888 QueryRemove called
+ 18a8b0 MilanEvtDeviceSurpriseRemoval
+ 18a8f0 MilanEvtDeviceQueryRemove
+ 18a928 Device NULL
+ 18a940 Device context NULL
+ 18a968 Cancel pending request
+ 18a998 Set bQueryRemoveCalled true.
+ 18a9d8 DriverState:Uninstall
+ 18aa08 MilanEvtDeviceQueryStop
+ 18aa38 MilanEvtDeviceContextCleanup
+ 18aa78 process_tls_data
+ 18aaa0 tls handshake package, state: %d
+ 18aaf0 TLS break after Initialization, retry it
+ 18ab48 ---- tls %d bytes recv
+ 18ab78 !!!!tls recv failed
+ 18aba0 numInterfaces:0x%x
+ 18abc8 SelectInterfaces
+ 18abf0 numberConfiguredPipes:0x%x
+ 18ac30 PipeType:0x%x, EndpointAddress:0x%x, MaximumPacketSize:%d, MaximumTransferSize:%d
+ 18acd8 interrupt pipe
+ 18acf8 bulk read pipe
+ 18ad18 bulk write pipe
+ 18ad38 unknown pipe
+ 18ad58 Exit, status:0x%x
+ 18ad80 Device Context NULL or 0 length data
+ 18add0 EvtUsbReadPipeReadComplete
+ 18ae10 recv-ed null buff or first byte 0 data
+ 18ae60 Usb read failed, Status:0x%x, UsbdStatus:0x%x
+ 18aec0 EvtReadFailed
+ 18aee0 enter, driver version:%s
+ 18af18 MilanEvtDevicePrepareHardware
+ 18af58 WdfUsbTargetDeviceCreate
+ 18af90 WdfUsbTargetDeviceCreate Failed 0x%x
+ 18afe0 waitWakeEnable: %d, deviceInfo.Traits:0x%x
+ 18b040 WdfUsbTargetDeviceRetrieveInformation fail, deviceInfo.Traits:0x%x
+ 18b0c8 SelectInterfaces Failed 0x%x
+ 18b108 to support wakeup
+ 18b130 milanFConfigContReaderForReadEndPoint
+ 18b180 milanFConfigContReaderForReadEndPoint Failed 0x%x
+ 18b1e8 WdfDeviceGetIoTarget failed.
+ 18b228 WdfDeviceGetIoTarget success.
+ 18b268 Init HAL Data Failed
+ 18b2a0 MilanEvtDevicePrepareHardware Failed 0x%x
+ 18b2f8 exit, status: 0x%x, bret:%d 
+ 18b338 _StopInitThread
+ 18b360 to wait for init thread to complete
+ 18b3a8 init thread completed
+ 18b3d8 init thread not completed
+ 18b410 _StartInitThread
+ 18b438 not to start new thread
+ 18b468 New Thread not started
+ 18b498 to create init thread
+ 18b4c8 !!!!fail to create init thread
+ 1c7678 16:05:09
+ 1c7690 PID %d TID %d WBDI Build %s %s, WBDI unhandled exception, Code: 0x%x, Flags: 0x%x, Addr: 0x%p
+ 1c7750 ExceptionHandler
+ 1c7780 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\driver.c
+ 1c7810 WBDI Build %s %s, WBDI unhandled exception, Code: 0x%x, Flags: 0x%x, Addr: 0x%p
+ 1c78b0 Morndern Standby
+ 1c78d8 Traditional S3
+ 1c78f8 Driver Entry %s
+ 1c7918 DriverEntry
+ 1c7930 before WdfDriverCreate
+ 1c7960 WdfDriverCreate
+ 1c7980 WdfDriverCreate Failed 0x%x
+ 1c79b8 exit WBVer %d
+ 1c79d8 milanFusbEvtDeviceAdd
+ 1c7a08 Build %s %s Driver Cleanup
+ 1c7a40 milanFusbEvtDriverContextCleanup
+ 1c7a90 PID %d WBDI Build %s %s Driver Cleanup
+ 203c88 TTTTTTTT
+ 203ca0 FDT_InitParameter
+ 203cd0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\fdt_istouchbyfinger.c
+ 23fef8 !!!!wrong devcontext
+ 23ff28 ChicagoHU_Open
+ 23ff50 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\gf_chicagoh.c
+ 23ffe0 OTP CRC check failed
+ 240010 ChicagoHU_check_otp
+ 240038 OTP DAC check failed
+ 240070 from otp dac 0x%x, dac1 0x%x, dac2 0x%x, dac3 0x%x
+ 2400e0 check failed, dac 0x%0x:0x%0x, dac1 0x%0x:0x%0x, dac2 0x%0x:0x%0x, dac3 0x%0x:0x%0x, tcode 0x%0x:0x%0x
+ 2401b0 CheckDacTcode
+ 2401d0 devcontext is NULL.
+ 240200 ChicagoHU_check_important_sensor_info
+ 240250 before read: DAC 0x%0x, DAC1 0x%0x, DAC2 0x%0x, DAC3 0x%0x, Tcode 0x%0x.
+ 2402e8 dac1 read fail
+ 240308 dac2 read fail
+ 240328 dac3 read fail
+ 240348 dac4 read fail
+ 240368 tcode read fail
+ 240390 after read: DAC[0]: 0x%0x, DAC[1]: 0x%0x, DAC[2]: 0x%0x, DAC[3]: 0x%0x, Tcode: 0x%0x.
+ 240440 verify tcode and dac fail
+ 240478 verify tcode and dac success
+ 2404b8 ChicagoHUGetDac
+ 2404d8 use stored tcode, 0x%0x
+ 240508 Dac sent:
+ 240520 ChicagoHUsetDac
+ 240540 ChicagoH set dac failed.
+ 240578 Set dac Fail!!!!
+ 2405a0 Set dac1 Fail!!!!
+ 2405c8 Set dac2 Fail!!!!
+ 2405f0 Set dac3 Fail!!!!
+ 240620 wrote down dac 0x%x, dac1 0x%x,dac2 0x%x, dac3 0x%x
+ 240688 Regroup pixels:%d
+ 2406b0 ChicagoHUDataRegroup
+ 2406e0 enter, Mode %d, Type %d, base_type %d
+ 240730 ChicagoHUSetMode
+ 240758 setmode: Image
+ 240778 !!!! -->failed
+ 240798 setmode: Fdt down
+ 2407c0 fdt-down TIMESTAMP 0x%x
+ 2407f0 setmode: Fdt up
+ 240810 setmode: Fdt manual
+ 240838 setmode: nav down
+ 240860 nav-down TIMESTAMP 0x%x
+ 240890 unknown fdt type: %d
+ 2408c0 !!!!len(%d) > buf size(%d)
+ 2408f8 switch to FDT mode %d
+ 240928 data sent:
+ 240940 setmode: idle
+ 240960 setmode: sleep
+ 240980 setmode: ff
+ 240998 setmode: nav
+ 2409b8 Set PC State
+ 2409d8 down base sent:
+ 2409f8 unknown mode value: %d
+ 240a28 %d %d %d
+ 240a40 chicagoHUget_rawdata
+ 240a70 !!!!crc check failed
+ 240aa0 chicagoHUget_navdata
+ 240ad0 IrqStatus:0x%x cmd1 %d
+ 240b00 chicagoHUget_fdtdata
+ 240b30 IRQ for timeout of being idle
+ 240b70 IRQ for fdt-down, get fdt-up base, current mode is fdt-down, touchflag 0x%x
+ 240c08 received fdt base:
+ 240c30 IRQ for nav down
+ 240c58 IRQ for data
+ 240c78 IRQ for ESD
+ 240c90 IRQ for reverse, get fdt-down base, current mode is reverse
+ 240d10 IRQ for fdt-manual, get fdt-up base, current mode is fdt-manual, touchflag 0x%x
+ 240db0 get fdt-up base, current mode is fdt-manual
+ 240e10 get fdt-down base, current mode is fdt-manual
+ 240e70 IRQ for fdt-up, get fdt-down base, current mode is fdt-up, touchflag 0x%x
+ 240f08 Get temper IRQ.
+ 240f30 IRQ for fp reset mode, current mode is fp reset
+ 240f90 IRQ for fdt unknown mode.
+ 240fc8 fdt base
+ 240fe0 gfCheckFDTBase
+ 241000 base is invalid.
+ 241028 fdt_downbase[%d]:0x%x
+ 241058 gfFDTDownbase
+ 241080 iSecondFlag %d, need_fdt_up_twice %d, diff_use %d, touchflag 0x%x
+ 241108 gfFDTUPbase
+ 241120 fdt_upbase[%d]:0x%x, original 0x%x
+ 241168 ChicagoHU_OTP_CRC_Check
+ 2411a0 cp check CRC=%d, chip cp CRC=%d
+ 2411e0 cp crc check failed
+ 241210 ft check CRC=%d, chip ft CRC=%d
+ 241250 ft crc check failed!
+ 241280 mt check CRC=%d, chip mt CRC=%d
+ 2412c0 mt crc check failed!
+ 2412f0 ChicagoHU_OTP_DAC_Check
+ 241320 ft dac all 0
+ 241340 ft dac crc check CRC=%d, otp CRC=%d
+ 241388 ft dac crc check failed
+ 2413b8 mt dac all 0
+ 2413e0 mt dac crc check CRC=%d, otp CRC=%d
+ 241428 mt dac crc check failed
+ 241460 ft/mt dac match num check failed
+ 2414a8 not expected to run here
+ 2414e0 enter, OTP size %d, default tcode %d, default fdt delta %d
+ 241558 ChicagoHU_check_and_parse_otp
+ 2415a0 goodix.dat
+ 2415b8 read %d bytes from %s
+ 2415e8 got file OTP:
+ 241610 the same OTP in file and from FP
+ 241660 NOT the same OTP in file(not in file) and from FP, use data from FP
+ 2416e8 USED OTP:
+ 241700 wrong OTP tcode_diff
+ 241730 OTP tcode %d, fdt delta %d
+ 241768 fdtOffset:0x%x
+ 241790 !!!!check failed ...sensor maybe not work fine
+ 2417f0 OTP not correct
+ 27d978 ChicagoT_Open
+ 27d9a0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\gf_chicagot.c
+ 27da30 ChicagoT_check_otp
+ 27da60 ChicagoT_check_important_sensor_info
+ 27dab0 ChicagoTGetDac
+ 27dad0 ChicagoTsetDac
+ 27daf0 ChicagoTDataRegroup
+ 27db18 Base Regroup pixels:%d
+ 27db50 ChicagoTBaseDataRegroupWithRescan
+ 27db98 g_chicago_rescan_time = %d
+ 27dbd0 ChicagoT_base_rescan_data_avg
+ 27dc10 ChicagoTSetMode
+ 27dc30 chicagoTget_rawdata
+ 27dc60 Normal Imag NoRescan RevRawlen=%d, DummyColLen=%d, ExpectImgRawLen=%d, diff=%d
+ 27dd00 Base Imag Rescan RevRawlen=%d, DummyColLen=%d, ExpectImgRawLen=%d, diff=%d
+ 27dd98 unexpected image len!!
+ 27ddc8 chicagoTget_navdata
+ 27ddf0 chicagoTget_fdtdata
+ 27de18 ChicagoT_OTP_CRC_Check
+ 27de48 ChicagoT_OTP_DAC_Check
+ 27de78 ChicagoT_check_and_parse_otp
+ 2ba030 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\gf_milang.c
+ 2ba0c0 touchflag 0x%x
+ 2ba0e0 fdt_upbase[%d]:0x%x
+ 2ba110 fail to alloc memory
+ 2ba140 MilanGDataRegroup
+ 2ba168 milanGget_rawdata
+ 2ba190 GF3206 Milan_RawdataColConvertRow
+ 2ba1d8 milanGSetMode
+ 2ba1f8 milanGget_fdtdata
+ 2ba220 only get touch flag, current mode is fdt-manual
+ 2ba280 IRQ for fdt-up, get fdt-down base, current mode is fdt-up
+ 2ba300 DAC 0x%0x:0x%0x, tocde 0x%0x:0x%0x
+ 2ba350 MilanG_check_important_sensor_info
+ 2ba3a0 before read: DAC: 0x%0x, Tcode: 0x%0x.
+ 2ba3f0 dac read fail
+ 2ba410 read: DAC: 0x%0x, Tcode: 0x%0x.
+ 2ba450 MilanGGetDac
+ 2ba470 wrote down dac 0x%x
+ 2ba498 milanGsetDac
+ 2ba4b8 milanGget_navdata
+ 2ba4e0 MilanG_Open
+ 2ba500 Tcode aOTPData[0x16]=0x%02x,~aOTPData[0x17]=0x%02x,aOTPData[0x19]=0x%02x
+ 2ba598 MilanG_TcodeCheck
+ 2ba5c0 Tcode step1 pass: (aOTPData[0x16] != 0) && (aOTPData[0x16] == ~aOTPData[0x17])
+ 2ba660 Tcode step2 pass: (aOTPData[0x16] != 0) && (aOTPData[0x16] == aOTPData[0x19])
+ 2ba700 Tcode step3 pass: (aOTPData[0x19] != 0) && (aOTPData[0x19] == ~aOTPData[0x17])
+ 2ba7a0 Tcode Check All Fail, aOTPData[0x16]=0x%x, ~aOTPData[0x17]=0x%x, aOTPData[0x19]=0x%x
+ 2ba850 Dac aOTPData[0x1F]=0x%02x,~aOTPData[0x1B]=0x%02x,aOTPData[0x1A]=0x%02x
+ 2ba8e0 MilanG_DacCheck
+ 2ba900 Dac step1 pass: (aOTPData[0x1F] != 0) && (aOTPData[0x1F] == ~aOTPData[0x1B])
+ 2ba9a0 Dac step2 pass: (aOTPData[0x1F] != 0) && (aOTPData[0x1F] == aOTPData[0x1A])
+ 2baa40 Dac step3 pass: (aOTPData[0x1A] != 0) && (aOTPData[0x1A] == ~aOTPData[0x1B])
+ 2baae0 Dac Check All Fail, aOTPData[0x1F]=0x%x, ~aOTPData[0x1B]=0x%x, aOTPData[0x1A]=0x%x
+ 2bab90 otp CP checksum:0x%02x, calc CP checksum + otp CP checksum:0x%02x.
+ 2bac18 MilanG_CPCheckSum
+ 2bac40 otp CP check pass
+ 2bac70 calc ft CRC8:0x%02x, otp ft CRC8:0x%02x.
+ 2bacc8 MilanG_FTCheckSum
+ 2bacf0 otp FT check pass
+ 2bad18 milanG_check_and_parse_otp
+ 2bad50 dacvalue=0x%x,dacvalue_bak=0x%x,dacvalue_neg_bak=0x%x
+ 2badc0 DAC step1: dacvalue_bak == dacvalue
+ 2bae10 DAC step2: dacvalue_neg_bak == dacvalue
+ 2bae60 DAC step3: dacvalue_neg_bak == dacvalue_bak
+ 2baeb8 OTP dac 0x%x
+ 2baee0 Check OK but using default dac calulate method
+ 2baf40 tcodevalue=0x%x,tcodevalue_bak=0x%x,tcodevalue_neg_bak=0x%x
+ 2bafc0 Tcode step1: tcodevalue == tcodevalue_bak
+ 2bb020 Tcode step2: tcodevalue == tcodevalue_neg_bak
+ 2bb080 Tcode step3: tcodevalue_bak == tcodevalue_neg_bak
+ 2f7260 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\gf_milanl.c
+ 2f72f0 milanLget_rawdata
+ 2f7318 milanLSetMode
+ 2f7338 milanLget_fdtdata
+ 2f7360 IRQ for fdt-manual, get fdt-up base, current mode is fdt-manual
+ 2f73e0 MilanL_check_important_sensor_info
+ 2f7428 MilanLGetDac
+ 2f7448 milanLsetDac
+ 2f7468 milanLget_navdata
+ 2f7490 MilanL_Open
+ 2f74a8 milanL_check_and_parse_otp
+ 2f74e0 Check OK using default tcode and diff
+ 3336a0 => ProductionReadPkeyCustomerString
+ 3336f0 ProductionReadPkeyCustomerString
+ 333740 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\gf_production.c
+ 3337e0 GOODIX_ERROR_ALLOC_NO_ENOUGH_MEM
+ 333830 ProductionReadPkeyCustomer FAILED with p_result->ret:%d.
+ 3338b0 ProductionReadPkeyCustomer got %u bytes data from mcu with ret:%d.
+ 333940 Got %u bytes pkt data from mcu with iret:%d.
+ 3339a0 GOODIX_ERROR_OUTBUF_TOO_SMALL, only %u , need %u
+ 333a08 Got %u bytes data from mcu.
+ 333a40 SUCCESS
+ 333a50 FAILED
+ 333a60 <= ProductionReadPkeyCustomerString %s with ret:%d.
+ 333ad0 => ProductionReadPkeyRsaBnFromMcu
+ 333b18 ProductionReadPkeyRsaBnFromMcu
+ 333b60 Get public key from mcu failed with ret:%d.
+ 333bc0 Get public key from MCU successfully.
+ 333c10 pLoad->type:0x%x. pLoad->len:0x%x.
+ 333c60 <= ProductionReadPkeyRsaBnFromMcu %s with ret:%d.
+ 333cc8 => gdx_aesData_rsa_verify
+ 333d00 ProductionVerifyAesDataRsaSign
+ 333d40 invalid parameters pData:0x%p, pDataSig:0x%p, pPlainLen:0x%p, pPlainBuf:0x%p.
+ 333de0 invalid parameters sigdata length invalid, dataSigLength:%u.
+ 333e60 gdx_aes_decrypt cipher dataLength:%d bytes.
+ 333ec0 AES decrypting data failed, ret:%d.
+ 333f10 Aes decypted OK but plain data too small len:%d.
+ 333f80 gdx_aes_decrypt result *pPlainLen:%d bytes.
+ 333fd8 Init rsabn failed.
+ 334000 [FAILED] ProductionReadPkeyRsaBnFromMcu FAILED.
+ 334060 RSA sign verify failed. ret:%d.
+ 3340a0 AES data RSA verify pass.
+ 3340e0 <= gdx_aesData_rsa_verify %s with ret:%d.
+ 334140 => _ProductionWritePkey operateType:%d, pkey_buf=0x%p, pkey_len=%u
+ 3341c8 _ProductionWritePkey
+ 334200 invalid parameters.pkey_buf:0x%p, pkey_len:%u, buf_result:0x%p.
+ 334280 invalid parameters. too little result buffer. buf_result->length:%u.
+ 334310 [FAILED] alloc mem
+ 334340 Reset T_G_PK pkg, will reset the public key.
+ 3343a0 Will clear the public key.
+ 3343e0 <= _ProductionWritePkey exit with iret:%d.
+ 334440 => ProductionWritePkeyCustomer pkey_buf=0x%p, pkey_len=%u, buf_result:0x%p
+ 3344d8 ProductionWritePkeyCustomer
+ 334510 <= ProductionWritePkeyCustomer with bool bret :%d.
+ 334580 => _ProductionWritePmk  emOperationType:%d, pPmkBuffer=0x%p, luiPmkLen=%u
+ 334618 _ProductionWritePmk
+ 334640 Malloc %u bytes pSend2MCU buff FAILED.
+ 334690 Malloc %u bytes plain buff FAILED.
+ 3346e0 Invalid parameter, input data length only %d bytes less-than 2048bit signature.
+ 334780 gdx_aesData_rsa_verify FAILED with iret:%d.
+ 3347e0 gdx_aesData_rsa_verify SUCCESSFULLY with iret:%d. len_plain:%u.
+ 334860 operate_type:%d, data type :%u.
+ 3348a0 WRONG data type :%u.
+ 3348d0 [FAILED] ProductionOperateKey with iret:%d.
+ 334930 <= _ProductionWritePmk exit with iret:%d.
+ 334990 => ProductionResetPmkOrClearPMK 
+ 3349d8 ProductionResetPmkOrClearPMK
+ 334a20 <= ProductionResetPmkOrClearPMK 
+ 334a68 => _ProductionReadPkeyHash
+ 334aa0 _ProductionReadPkeyHash
+ 334ad0 !!!! Invalid parameter pResult equal NULL.
+ 334b30 Invalid parameter, input data length only %d bytes less-than 2048bits signature.
+ 334be0 [FAILED] ProductionVerifyAesDataRsaSign FAILED with iret:%d.
+ 334c60 ProductionVerifyAesDataRsaSign SUCCESSFULLY with iret:%d. len_plain:%u.
+ 334cf0 !!!!Malloc MEM FAILED.
+ 334d20 [FAILED] device_action_production get customer's Public key failed. operate_type:%d, sub_type:%d.
+ 334df0 [FAILED] Operate_type:%d, sub_type:%d, Calculate SHA256 FAILED with iret:%d.
+ 334e90 !!!! [FAILED]  Result back buffer too small. Needed %u bytes, outbuf only %u bytes.
+ 334f40 Succeed! buf_result->length:%u, buf_result->ret:%u.
+ 334fb0 <= _ProductionReadPkeyHash Exit with iret:%d.
+ 335010 => ProductionGetPmkHash
+ 335040 ProductionGetPmkHash
+ 335070 !!!! Invalid parameter buf_result equal NULL.
+ 3350d0 Malloc mem FAILED.
+ 335100 ProductionOperateKey got data failed.
+ 335150 Data type got from mcu pload->type:%u, pload->len:%u.
+ 3351c0 Output buffer too small. need at least:%d.buf only:%d.
+ 335230 <= ProductionReadPmkHash EXIT with iret:%d.
+ 335288 => ProductionReadPmkHash 
+ 3352c0 ProductionReadPmkHash
+ 3352f0 buf_result=0x%p, buf_result->length=%u
+ 335340 ProductionVerifyAesDataRsaSign FAILED with iret:%d.
+ 3353a8 Got data too little.
+ 3353d8 Suceed.
+ 3353e8 => _ProductionReadPkey
+ 335418 _ProductionReadPkey
+ 335440 [FAILED] Invalid parameter buf_result equal NULL.
+ 3354b0 Before operate MCU buf_result=0x%p, buf_result->len_all=%u
+ 335530 !!!! ProductionOperateKey get Public key failed.
+ 335598 <= _ProductionReadPkey EXIT.
+ 3355d8 => ProductionReadPkeyCustomer
+ 335618 ProductionReadPkeyCustomer
+ 335650 <= ProductionReadPkeyCustomer
+ 335690 ProductionReadPkeyHashCustomer
+ 3356d0 pmkRcvBuffer=0x%p, pResult->length=%u
+ 335720 => ProductionReadMcuState 
+ 335758 ProductionReadMcuState
+ 335790 device_action_production got data failed.
+ 3357f0 Got %u bytes data, with ret:%d.
+ 335830 MCU returned data
+ 335860 <= ProductionReadMcuState EXIT with iret:%d.
+ 3358c0 => ProductionReadFirmwareVersion 
+ 335908 ProductionReadFirmwareVersion
+ 335950 ProductionReadFirmwareVersion got %u bytes data with ret:%d.
+ 3359d0 ProductionReadFirmwareVersion return data
+ 335a30 <= ProductionReadFirmwareVersion EXIT with iret:%d.
+ 335a98 => ProductionWakeupMCU entry
+ 335ad8 ProductionWakeupMCU
+ 335b00 => ProductionVerifyFirmwareSign
+ 335b40 ProductionVerifyFirmwareSign
+ 335b80 Verify firmware signature failed. with iret:%d.
+ 335be0 Verify firmware signature  PASSED. Plain data length:%u.
+ 335c60 Firmware->type:%d, Firmware->length : %u.
+ 335cc0 out buffer too little needed at least %u bytes.
+ 335d20 copy %u bytes firmware data to out buffer.
+ 335d80 <= ProductionVerifyFirmwareSign %s with iret:%d.
+ 335de8 => ProductionUpdateApp
+ 335e18 ProductionUpdateApp
+ 335e40 [FAILED] Malloc memory failed.
+ 335e80 [FAILED] RSA signature verify failed, with iret:%d.
+ 335ee8 Update Firmware successfully.
+ 335f30 [FAILED] Update Firmware failed
+ 335f70 <= ProductionUpdateApp with iret:%d.
+ 335fc0 =>entry
+ 335fd0 ProductionEraseApp
+ 335ff8 %d time try to erase MCU APP.
+ 336038 <= exit with bret:%d.
+ 336068 => ProductionGetOTP
+ 336090 ProductionReadOtp
+ 3360b8 Input invalid parameters.
+ 3360f0 pResult:0x%p, pResult->length:%u
+ 336138 !!!!Failed to get OTP
+ 336170 [FAILED] Get or Check otp data failed iret:0x%x.
+ 3361d8 Copy otp to output buffer
+ 336220 !!!!Fail to Copy otp to output buffer
+ 336270 <= ProductionReadOtp EXIT with iret:%d.
+ 3362c0 => ProductionReadTlsState
+ 3362f8 ProductionReadTlsState
+ 336330 <= ProductionReadTlsState EXIT with iret:%d.
+ 336390 => ProductionCheckImageCrc
+ 3363c8 ProductionCheckImageCrc
+ 3363f8 [FAILED] Malloc mem failed.
+ 336430 [FAILED] Failed to get Image from MCU
+ 336480 Sucessfully got one image from MCU.
+ 3364d0 <= ProductionCheckImageCrc EXIT with iret:%d.
+ 336530 => ProductionResetSensor
+ 336568 ProductionResetSensor
+ 336598 !!!!Failed to reset sensor
+ 3365d0 Reset sensor sucessfully.
+ 336610 <= ProductionResetSensor EXIT with iret:%d.
+ 336668 => ProductionCheckPmkHash
+ 3366a0 ProductionCheckPmkHash
+ 3366d0 Input parameters: pResult:0x%p, pResult->len_all:%u
+ 336740 [FAILED] GetHostPmkHash with iret:%d.
+ 336790 [FAILED] Get pmk hash from mcu failed.ret=%d.
+ 3367f0 [FAILED] Memcmp IntelME pmk hash value with mcu pmk hash value failed.
+ 336880 [Successfully] Mcu Pmk Hash equal IntelMe Pmk Hash.
+ 3368f0 <= ProductionCheckPmkHash EXIT with iret:%d.
+ 336950 production_psk_process
+ 336980 Input invalide parameters p_version_now:0x%p.
+ 3369e0 . check psk if valid (total times:%d)
+ 336a30 check psk times: %d
+ 336a60 check psk failed with ret:0x%x.
+ 336aa0 check psk: psk is valid!
+ 336ae0 . write psk to mcu (total times:%d)
+ 336b28 write psk to mcu (times:%d)
+ 336b60 update key failed with ret:0x%x.
+ 336ba8 update key failed
+ 336bd0 update key success, check psk again
+ 336c18 update key success
+ 336c40 Exit ret:0x%x
+ 336c60 generate_entropy2
+ 336c90 random not exist or invalid, generate new data
+ 336cf0 generate rand failed with 0x%x
+ 336d30 generate rootkey
+ 336d58 hash failed with 0x%x
+ 336d90 generate entropy failed with error code 0x%x
+ 336df0 production_write_key
+ 336e20 0.generate random psk
+ 336e50 generate_rand failed with error code 0x%x
+ 336ea8 1.seal psk 
+ 336ec0 malloc memory failed
+ 336ef0 seal psk, ret 0x%x length before %d, length after:%d
+ 336f60 gf_sgx_seal_data failed with error 0x%x
+ 336fb0 2.process encrypted psk
+ 336fe0 p_tlv_psk_wb malloc failed!
+ 337018 3.write to mcu
+ 337040 data_to_mcu_len %d bytes, remainder4 is %d bytes
+ 3370b0 remainder4 is not 0, add %d bytes then finally data_to_mcu_len %d bytes
+ 337140 p_data_to_mcu malloc failed
+ 337180 [FAILED] production_write_mcu failed with 0x%x.
+ 3371e0 Goodix_Cache.bin
+ 337208 written %d:%d bytes to file
+ 337240 production_read_mcu
+ 337268 Input invalid parameters input
+ 3372a8 1.SpiSendDataToDeviceLock
+ 3372e0 [FAILED] Read from MCU failed.
+ 337320 2.parse return data
+ 337350 return data, len_payload_mcu  %d bytes, passed %d bytes, result %d.
+ 3373e0 Output buffer too small. should at least %d bytes, but only %d bytes.
+ 337470 MCU return execution failed error num: %d.
+ 3374d0 read from mcu done, copy %d bytes back 
+ 337520 Exit ret:0x%x.
+ 337540 Entry, length %d
+ 337568 production_write_mcu
+ 3375a0 [FAILED] Input invalid parameters input:0x%p, len_input:%d.
+ 337620 1.1. First writing failed, retry to write again
+ 337680 [FAILED] Write to MCU failed.
+ 3376c0 2.data parse
+ 3376e0 [FAILED] MCU return execution failed:%d.
+ 337738 exit 0x%x
+ 337750 Will Clear the cache buffer.
+ 337790 clean_psk_cache
+ 3377b0 production_get_host_psk_data
+ 3377f0 input ERROR
+ 337808 .get seal data
+ 337828 read %d bytes
+ 337850 generate entropy failed with 0x%x
+ 3378a0 unseal return 0x%x length before %d, length after:%d
+ 337910 fail to unseal file data %d
+ 337950 get from mcu, return 0x%x, len %d
+ 337998 get from mcu ERROR
+ 3379c0 unseal return 0x%x
+ 3379e8 .wb data 
+ 337a00 wb return 0x%x length before %d, length after:%d 
+ 337a68 wb failed with 0x%x.
+ 337a98 .hash
+ 337ab0 hash return 0x%x length before %d, length after:%d
+ 337b18 hash failed with 0x%x.
+ 337b48 exit with 0x%x
+ 337b68 production_check_psk_is_valid
+ 337ba8 1.get host hash
+ 337bd0 ret 0x%x, psk len %d, hash len %d, seal len %d, data from file flag %d 
+ 337c60 get host hash failed with 0x%x.
+ 337ca0 2.get mcu hash
+ 337cc0 get mcu hash, ret 0x%x, len %d
+ 337d00 get mcu hash ERROR
+ 337d28 3.verify
+ 337d40 !!!hash NOT match !!! 
+ 337d70 hash NOT match
+ 337d90 !!!hash equal !!! 
+ 337db8 Entry 
+ 337dc8 production_read_specific_data
+ 337e08 invalid input parameter
+ 337e40 0.read specific data_type 0x%x 
+ 337e80 2.read data from mcu
+ 337eb0 read data from mcu ret:0x%x, length: %d
+ 337f00 [FAILED] production_read_mcu failed with ret:0x%x
+ 337f70 passed in buffer is too small: data len:%d, passed in len:%d
+ 337ff0 Exit with 0x%x
+ 374180 calc top crc8:0x%02x, otp top crc8:0x%02x.
+ 3741d8 MilanL_OTPCRCCheckForTOP
+ 374210 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\gx_otp.c
+ 3742a0 calc exp crc8:0x%02x, otp exp crc8:0x%02x.
+ 3742f8 MilanL_OTPCRCCheckForExp
+ 374330 calc ft checksum:0x%02x, otp ft checksum:0x%02x.
+ 374398 MilanL_FTCheckSum
+ 3ec698 not power managed queue.
+ 3ec6d0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\queue.c
+ 3ec758 power managed queue.
+ 3ec788 TRUE
+ 3ec798 FALSE
+ 3ec7a8 PowerManaged:%s
+ 3ec7c8 Request 0x%p
+ 3ec7e8 milanFusbEvtIoStop
+ 3ec810 Exit device NULL
+ 3ec838 Exit deviceContext NULL
+ 3ec870 -------> already canceled, exit
+ 3ec8b0 requeue request
+ 3ec8d0 re-queued the request
+ 3ec900 Cancelled sent request
+ 42c09e eIt is Invlaid MAC ERROR. means invalid mac when decrypt msg.
+ 42c120 tlslib_is_invalid_mac
+ 42c150 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\tls\tls_error.c
+ 42c1f0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\tls\tls_lib.c
+ 42c290 => tlslib_server_init
+ 42c2c0 tlslib_server_init
+ 42c2f0  <= tlslib_server_init mbedtls_ctr_drbg_seed [FAILED] ret:%d
+ 42c370  <= tlslib_server_init mbedtls_ssl_config_defaults [FAILED] ret:%d
+ 42c410 [FAILED] mbedtls_ssl_conf_psk with ret:%d.
+ 42c470 [FAILED] mbedtls_ssl_setup with ret:%d.
+ 42c4c0 [FAILED] mbedtls_ssl_session_reset with ret:%d.
+ 42c520  <= tlslib_server_init [Successfully] ret:%d
+ 42c580  <= tlslib_server_init [FAILED] ret:%d
+ 42c5d0 => tlslib_server_exit.
+ 42c600 tlslib_server_exit
+ 42c628 <= tlslib_server_exit.
+ 42c660 TLS handshake over successfully.
+ 42c6a8 tlslib_read
+ 42c6c0 <= tlslib_read exit with ret:%d tls server state:%d.
+ 42c730 tlslib_read error ret(abs): 0x%X, meaning:%S.
+ 42c790 TLS LOG: %S
+ 42c7a8 tlslib_mbedtls_debug_print
+ 42c7e0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\tls\tls_log.c
+ 4689d8 TLS now IN handshake state:%d.
+ 468a18 tlsapp_set_tls_state
+ 468a50 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\tls_app.c
+ 468ae0 !!!TLS now handshake OVER. state:%d.
+ 468b30 Invalid MAC
+ 468b48 tlsapp_trig_invalidmac
+ 468b78 TLS Connection Ready
+ 468ba8 tlsapp_trig_tlsconnected
+ 468be0 tlsapp_init_tls_state
+ 468c10 tlsapp_tls_server_exit
+ 468c40 enter, tls inited %d
+ 468c70 tls_callback_recv
+ 468c98 recv ret:%d.
+ 468cb8 tls_callback_send
+ 468ce0 sent ret:%d.
+ 468d00 Tls break after InitThread success
+ 468d48 trigger_invalid_mac
+ 468d70 set_tls_state
+ 468d90 tlsapp_tls_server_init
+ 468dc0 exit with ret:%d
+ 468de8 GetHostPmkHash
+ 468e08 exit with iret:%d.
+ 4e1108 SendNopCmd
+ 4e1120 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\usbhal.c
+ 4e11b0 not to send nop for ITE EC projects
+ 4e11f8 driver type win spi
+ 4e1220 SetDriverState
+ 4e1240 driver type win usb
+ 4e1268 DriverState timeout in 1 try
+ 4e12a8 DriverState timeout in 2 try
+ 4e12f0 Send driver state failed, hard reset MCU
+ 4e1348 UsbSendDataToDeviceLock
+ 4e1380 d0exit happened, only send PC State
+ 4e13c8 send failed
+ 4e13e0 timeout, d0exit start = %d
+ 4e1420 D0exit happened, Cmd0-Cmd1: %x-%x
+ 4e1468 ReadPipe %d, WritePipe %d
+ 4e14a0 timeout, try again for cmds wait for data (whether or not ack)
+ 4e1520 exit, ret %d
+ 4e1540 power state: %d
+ 4e1560 _NotifyPowerState
+ 4e1590 set power state failed, index: %d
+ 4e15d8 set power state failed
+ 4e1608 set power state success
+ 4e1638 TEST not to read ack
+ 4e1668 !!!!device context NULL
+ 4e1698 SetOnekeyImageFlag
+ 4e16c0 oneKeyFlag:%d
+ 4e16e0 to set state from %d to %d
+ 4e1718 set_state
+ 4e1730 !!to set state failed: not supported
+ 4e1780 !!to set state failed: current state is DEVICE_IDLE
+ 4e17f0 !!to set state failed: from DEVICE_ENABLE to DEVICE_IDLE
+ 4e1870 !!to set state failed: DEVICE_DATING/DEVICE_CONFIG/DEVICE_UPDATE can not change to each other
+ 4e1930 !!!! fail to set state
+ 4e1960 !!timeout
+ 4e1978 ChipRegRead
+ 4e1990 ChipRegWrite
+ 4e19b0 !!!!one key image not set
+ 4e19e8 gf_submit_one_key_image
+ 4e1a18 !!!!Error, callback fail
+ 4e1a50 image base not ready.
+ 4e1a80 Start capture data for identify
+ 4e1ac0 cleared up onekeyImage
+ 4e1af0 init_FPSensor
+ 4e1b10 !!!!Error, pDeviceContext NULL
+ 4e1b50 !!!!already initied, chipid: 0x%x
+ 4e1ba0 CONFIG DATA: retry_count_for_common_init %d, hard_coded_chipid_switch %d
+ 4e1c38 --- to get CHIP ID
+ 4e1c60 --- SetIdle
+ 4e1c80 !!!!switch to idle state failed
+ 4e1cc0 --- MILAN_CHIPID
+ 4e1cf0 read chipid failed, try again, reset sensor 0x%x
+ 4e1d58 read chipid failed, try again
+ 4e1d98 Get Chip ID: 0x%x
+ 4e1dc0 Init by FP Failed, , Chip ID: 0x%x, reset sensor 0x%x
+ 4e1e30 Get Chip ID: 0x%x in %d try
+ 4e1e68 Get Chip ID Failed
+ 4e1e90 Got sensor OTP:
+ 4e1eb0 fail to get OTP data, reset sensor
+ 4e1ef8 Success to get OTP data
+ 4e1f30 FDT_Init, sensortype: %d, fdt_delta:%d, tcode:%d
+ 4e1fa0 OTP data valid, download config %d
+ 4e1fe8 parse otp failed
+ 4e2010 otp_valid %d, have config %d
+ 4e2050 exit return %d, inited %d
+ 4e2090 Get Evk Version...retry count %d
+ 4e20d8 GetEvkVersionWithRetry
+ 4e2110 !!get evk version failed in %d try, Hard reset mcu and try again
+ 4e2198 Get MCU Version Failed
+ 4e21c8 enter, project %d
+ 4e21f0 init_MCU
+ 4e2210 !!!!already initied, evk version: %S
+ 4e2260 CONFIG DATA: retry_count_for_common_init %d
+ 4e22c0 no firmware update for EC projects: one dac write %d
+ 4e2330 production process...
+ 4e2360 Production Process...Failed!
+ 4e23a0 Production Process...Success!
+ 4e23e0 !!!HC32 3626:Update firmware
+ 4e2420 !!!ST32 3626:Update firmware
+ 4e2460 return 0x%x after firmware update
+ 4e24b0 Fail to update APP, version is %S
+ 4e24f8 soft reset done
+ 4e2518 Unknown projects %d
+ 4e2540 exit return 0x%x, inited %d
+ 4e2578 timeout
+ 4e2590 gdx_UpdateFirmware_LockState
+ 4e25d0 current state is %d, to set state to DEVICE_UPDATE
+ 4e2640 [FAILED] to DEVICE_UPDATE state failed.
+ 4e2690 to restore, to set state to %d
+ 4e26d0 [FAILED] to original state failed, state_old:%d.
+ 4e2738 <= with 0x%x.
+ 4e2760 CONFIG DATA: firmware_update_switch %d, retry_count_for_common_init %d
+ 4e27f0 gfUpdatefirmware
+ 4e2820 invalid param Nowversion:0x%p, firmware:0x%p.
+ 4e2880 not configured to update firmware
+ 4e28d0 Nowversion len%d :%S, firmwareLen=%u, UpdateByDriver=%u
+ 4e2940 Current MCU Version: %S
+ 4e2978 MCU not runs IAP
+ 4e29a0 Driver auto update firmware
+ 4e29e0 the same version, no need to update firmware
+ 4e2a40 Tool to update firmware, no matter it's the same or not
+ 4e2ab0 Clear App
+ 4e2ac8 !!Clear App returns FALSE
+ 4e2b00 return 0x%x after clearup app
+ 4e2b40 reset mcu after erase APP
+ 4e2b80 !!!!Error to get evk version after clearup APP
+ 4e2be0 MCU runs IAP
+ 4e2c00 Driver to update firmware...
+ 4e2c40 Tool to update firmware...
+ 4e2c78 Fail to Clear APP
+ 4e2ca0 Fail to Clear APP, version is %S
+ 4e2ce8 updatefirmware
+ 4e2d08 insufficient resource
+ 4e2d40 Begin to update firmware ...slice length %d, %d framaes
+ 4e2db0 slice_len_of_app_data %d, frame num %d
+ 4e2e00 Update Firmware Frame %d firmware offset: %ld, frame len:%ld return %d
+ 4e2e90 Update Firmware Failed, frame number: %d
+ 4e2ee8 Update Firmware Success
+ 4e2f18 !!!!timeout
+ 4e2f30 Check firmware success and Reset MCU to run to APP...
+ 4e2fa0 firmware len is too long to exceed limit! cmd_data[0] is 0x%x
+ 4e3020 CRC and LEN write in FLASH are not correct! cmd_data[0] is 0x%x
+ 4e30a0 !!!!firmware update not fully success., data[0]=0x%x
+ 4e3110 !!!!check firmware failed
+ 4e3148 ResetUsbPort
+ 4e3168 stop read pipe.
+ 4e3188 stop write pipe.
+ 4e31b0 Reset Port ok
+ 4e31d0 ****Reset Port Failed status:0x%x****
+ 4e3220 Start UsbReadPipe failed
+ 4e3258 Start UsbReadPipe ok
+ 4e3288 Start UsbWritePipe failed
+ 4e32c0 Start UsbWritePipe ok
+ 4e32f0 device_enable_init_by_chip
+ 4e3330 !!!!already initied, sensorType: %d==%d
+ 4e3380 to init device by chipid 0x%x
+ 4e33c0 !!!! to Open MilanL, sensor type: %d
+ 4e3410 !!!! to Open ChicagoHS, sensor type: %d
+ 4e3460 !!!! to Open ChicagoT, sensor type: %d
+ 4e34b0 !!!! to Open MilanG, sensor type: %d
+ 4e3500 !!!!##############unknown chipid###########
+ 4e3560 sensor info ready, chipid:0x%x, sensorType:%d, col:%d, row:%d
+ 4e35e0 !!!!##############memory error###########
+ 4e3638 !!!!Set state disable failed
+ 4e3678 device_disable
+ 4e3698 gethandle released index:%d
+ 4e36d0 temperature timer released
+ 4e3708 onekey timer released
+ 4e3738 submit delay timer released
+ 4e3770 Critical sections deleted
+ 4e37a8 localMemory deleted
+ 4e37d0 after tls server exit
+ 4e3800 nav_app data released
+ 4e3830 nav_app cache released
+ 4e3860 frame candidate released
+ 4e3898 frame cache released
+ 4e38c8 frame released
+ 4e38e8 imagebase released
+ 4e3910 nav_data released
+ 4e3938 filenavbase released
+ 4e3968 !!!!to close MilanL
+ 4e3990 !!!!to close ChicagoH
+ 4e39c0 !!!!to close ChicagoT
+ 4e39f0 !!!!to close MilanG
+ 4e3a18 wrong senseor type kept
+ 4e3a48 --- start
+ 4e3a60 device_data_analyze
+ 4e3a88 !!!!Error, Device NULL
+ 4e3ab8 !!!!Error, DeviceContext NULL
+ 4e3b00 fingerprint ESD......IRQ:0x%x, reset IRQ: 0x%x
+ 4e3b60 IRQ:0x%x
+ 4e3b78 retry >= 10
+ 4e3b90 stop temperature timer......
+ 4e3bd0 --- end
+ 4e3be0 Fail to start data processing
+ 4e3c20 startDataAnalyzeMonitoring
+ 4e3c60 Resume Thread device_fdtdata_analyze
+ 4e3cb0 cmd0-cmd1-Len-ackt-ec:0x%x-%d-0x%x-%d-%d
+ 4e3d08 !!!!fail to allocate buffer
+ 4e3d40 cont cmd 0x%x 0x%x
+ 4e3d68 !!not to wait for ack
+ 4e3da0 !!!!wait for ack timeout, try again
+ 4e3de8 !!!!ack timeout second time
+ 4e3e20 sent: ret %d
+ 4e3e40 UsbSendDataToDevice
+ 4e3e68 Send data:
+ 4e3e80 bytes to send: %d
+ 4e3ea8 !!!!pipe invalid
+ 4e3ed0 InitAndSendCMDbuffer
+ 4e3f00 Usb write error!! status:0x%x
+ 4e3f40 => IsMCUIAP
+ 4e3f58 IsMCUIAP
+ 4e3f70 <= IsMCUIAP version=%S, ren=%d
+ 4e3fb0 => device_action_erase_app
+ 4e3fe8 device_action_erase_app
+ 4e4020 g_halcontext.pDeviceContext is NULL
+ 4e4068 MCU is running IAP
+ 4e4090 MCU is not running IAP, retry
+ 4e40d0 <= device_action_erase_app
+ 4e4108 mcu state:
+ 4e4120 PrintMcuState
+ 4e4140 mcu state: version:%d, isPOVImageValid:%d, isTlsConnected:%d, isLocked:%d, captured_num:%d(%d), EC_Falling_Cnt:%d, WakeupToPovTime:%dms, WakeupSrc:0x%02x, OneKeyProcedure:0x%02x, FdtTxFailUsbSuspend:%d
+ 4e42d8 mcu-state TIMESTAMP 0x%04x
+ 4e4310 GetMcuState
+ 4e4330 pov %d, pba %d, tls-client-server-lock %d-%d-%d-%d, have config %d, pov valid %d
+ 4e43d8 to set state to DEVICE_ACTION
+ 4e4418 device_action
+ 4e4438 !!!!set state failed
+ 4e4470 Set powerdown fdt scan frequence
+ 4e44b8 !!!!arg NULL or SetMode NULL
+ 4e44f8 SetMode ACT_SET_PC_PWRSTATE
+ 4e4530 temperature not occure, to FDT DOWN
+ 4e4578 besdenable:%d
+ 4e4598 firmware update not supported
+ 4e45d8 case ACT_WAKEUP_MCU
+ 4e4600 => ACT_ERASE_FIRMWARE
+ 4e4630 <= ACT_ERASE_FIRMWARE
+ 4e4660 !!!!Unkown action
+ 4e4688 to set state to DEVICE_ENABLE
+ 4e46d0 !!!!fail to set device to enable state
+ 4e47d0 => ProductionOperateKey operateType=%d.
+ 4e4820 ProductionOperateKey
+ 4e4850 [FAILED] result buf NULL.outbuf:0x%p, plen_outbuf:0x%p
+ 4e48c0 output buffer length = %u)
+ 4e48f8 NOT SUPPORTED %d)
+ 4e4920 Read MCU PMK HASH or MCU state
+ 4e4960 Read MCU Pkey
+ 4e4980 !!!!Invalid operateType=%d
+ 4e49b8 !!!!time out
+ 4e49d8 MCU Return result(Truncated)
+ 4e4a20 Got MCU mcu_ret = %d. Got %u bytes from mcu.
+ 4e4a80 MCU returned %S.
+ 4e4ab0 !!!!output buffer not enough, outbuf len:%d, needed:%d.
+ 4e4b20 [FAILED] set state(DEVICE_ENABLE).
+ 4e4b70 SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x\0e796bdb-100d-47d6-a2d5-f7d2daa51f51
+ 4e4c90 ACSettingIndex
+ 4e4cb0 DCSettingIndex
+ 4e4cd0 _GetAcDcSettingIndex
+ 4e4d00 !!!!Fail to get active power scheme
+ 4e4d48 got active power scheme: %s
+ 4e4d80 !!!!Fail to get active power scheme2
+ 4e4dd0 ACSettingIndex fail
+ 4e4df8 DCSettingIndex fail
+ 4e4e20 ACSetingIndex != DCSettingIndex
+ 4e4e60 RequireSignin: false, Never configed
+ 4e4eb0 GetRequireSignIn
+ 4e4ee0 RequireSignin: true, Never not configed
+ 4e4f30 SYSTEM\CurrentControlSet\Control\Session Manager\Power
+ 4e4fa0 HiberbootEnabled
+ 4e4fc8 _GetFastStartupEnabled
+ 4e4ff8 exit, FastStartupEnabled: %d
+ 4e5038 process_pba_result
+ 4e5060 process_pba_key
+ 4e5080 ec bios log count:%d.
+ 4e50b0 ProcessECBiosLog
+ 4e50d8 EC log: [%d]%S
+ 4e50f8 process_onekey_image
+ 4e5130 CONFIG DATA: time_s4_onekeyimage_valid %d, time_general_onekeyimage_valid %d
+ 4e51d0 wake from sleep with no sign-in, clear pov data
+ 4e5230 Never & fast startup, start timer...timeout in %d sec
+ 4e52a0 Never but not fast startup, drop clear pov data
+ 4e5300 start timer...timeout in %d sec
+ 4e5340 !!!!invalid data: buf:0x%p, nLen=%d
+ 4e5388 data_from_device
+ 4e53b0 !!!!wrong data, len: %d, cmd:0x%x, cmd0:0x%x, cmd1:0x%x, cmd2:0x%x
+ 4e5438 recvd data cmd-len: 0x%x-%d
+ 4e5470 !!!!wrong data len: %d, DataLength:%d
+ 4e54c0 fail to recv data
+ 4e54e8 !!!!check sum error
+ 4e5510 not expected data for cmd 0x%x
+ 4e5550 --- cmd: image
+ 4e5570 not process POV here
+ 4e55a0 receive non-POV image, length:%d
+ 4e55e8 image crc check Ok
+ 4e5610 image crc check failed
+ 4e5640 Image data CRC Error
+ 4e5670 --- cmd: fdt
+ 4e5690 --- cmd: regrw
+ 4e56b0 wrong config data
+ 4e56e0 --- recv nav data......length:%u
+ 4e5728 nav crc check ok
+ 4e5750 nav crc check failed
+ 4e5780 --- cmd: other
+ 4e57a0 --- cmd: update fw
+ 4e57c8 --- cmd: notice
+ 4e57e8 Get POV data, length: %d
+ 4e5820 Get POV data, index:%d.
+ 4e5850 pov crc check Ok
+ 4e5878 pov crc check failed
+ 4e58a8 POV Image CRC Error
+ 4e58d0 Set oneKeyImageEvent no matter CRC pass or not
+ 4e5930 not to process non-POV here
+ 4e5968 ---test pov image ready
+ 4e5998 PBA result
+ 4e59b0 pba_result_data_length=%d
+ 4e59f0 --- Received production response
+ 4e5a40 production response pure data length=%u
+ 4e5a90 guiPBAKeyLen=%d
+ 4e5ab0 --- !!unknown command!!
+ 4e5ae0 not expected type %d, data length %d, input len %d
+ 4e5b48 data_from_USB
+ 4e5b68 wrong head in data:
+ 4e5b90 Incorrect pack header, input len %d
+ 4e5bd8 Incorrect pack header
+ 4e5c10 Incorrect pack header, should but not %d
+ 4e5c68 length %d %d %d
+ 4e5c88 split pack, length %d %d %d
+ 4e5cc0 test:
+ 4e5cd0 data:
+ 4e5ce0 pack :type: 0x%x, len: %d, checksum: 0x%x and first 5 bytes: 0x%x 0x%x 0x%x 0x%x 0x%x
+ 4e5d90 not tls inited
+ 4e5db0 incorrect pack, length %d %d %d
+ 4e5df0 no pov data
+ 4e5e08 ClearPOVImage
+ 4e5e28 Cleared POV Image
+ 4e5e50 cleared pba result.
+ 4e5e78 ChangeSystemUnlockEventState
+ 4e5eb8 not support PBA.
+ 4e5ee0 UpdateTmplToBiosWrapper
+ 4e5f10 !!!!get image timeout, restart timer 2 seconds
+ 4e5f70 OnTimertemperature
+ 4e5f98 imageret 0x%x
+ 4e5fb8 temperature
+ 4e5fd8 void
+ 4e5fe8 finger down
+ 4e6000 void or bad, to FDT DOWN
+ 4e6038 gf_onekeyImage_valid_timer
+ 4e6070 WdfTimerCreate failed, status: 0x%x
+ 4e60b8 timeout value %d to %d seconds
+ 4e60f8 clear_submit_delay
+ 4e6120 on_submit_delay_timeout
+ 4e6150 gf_submit_delay_timer
+ 4e6180 BioEnrollmentHost.exe
+ 4e61b0 Find pid: %d
+ 4e61d0 FindBioEnrollProcess
+ 4e6200 !!!!wrong input buf
+ 4e6228 CheckSum
+ 4e6240 GetCheckSum
+ 4e6258 GetEvkVersion
+ 4e6278 got evk version: %S
+ 4e62a0 CHIP_RESET:
+ 4e62b8 get_other_data
+ 4e62d8 --- ESD happened
+ 4e6300 get_notice_data
+ 4e6320 --- wakeup.....
+ 4e6340 not expected ack for cmd 0x%x
+ 4e6380 get_msg_data
+ 4e63a0 not supported ack for cmd 0x%x
+ 4e63e0 get ack for cmd 0x%x, cfg flag 0x%x
+ 4e6428 MCU has no config
+ 4e6450 is restored
+ 4e6468 lost
+ 4e6478 Config data %s in MCU
+ 4e64a8 setup
+ 4e64b8 Client TLS connection %s 
+ 4e64f0 Client TLS connection %s
+ 4e6528 --- tls connection ack: %d
+ 4e6560 reset device, reset_flag %d
+ 4e6598 HardResetMCUWithCmd
+ 4e65c0 reset Mcu
+ 4e65d8 gfresetMCUAndfingerprint
+ 4e6610 soft reset MCU
+ 4e6630 reset sensor
+ 4e6650 !!!!timeout, ret:%d
+ 4e6678 irqstatus:0x%x
+ 4e6698 gfsetAndGetSPICLK
+ 4e66c0 gf_download_config
+ 4e66e8 no config data
+ 4e6708 gf_set_pwrdown_fdt_scanfreq
+ 4e6740 gf_do_communication_test
+ 4e6778 !!!! wrong input data
+ 4e67a8 SendTLSPackage
+ 4e67c8 !!!! fail to allocate buffer
+ 4e6808 SENT DATA LEN: %d, %d
+ 4e6838  --- write failed, status 0x%x
+ 4e6878 tls state:%d.
+ 4e6898 exit len %d
+ 4e68b0 bytes to read: %d, bytes left: %d
+ 4e68f8 RecvTLSPackage
+ 4e6918 data not enough
+ 4e6938 bytes read: %d, bytes left: %d
+ 4e6978 !!!!error malloc baseframe
+ 4e69b0 device_check_imagebase_exist
+ 4e69f0 read data from file %d bytes
+ 4e6a30 read %d-%d bytes from %s
+ 4e6a70 check crc :Crchost:0x%x----crcchip:0x%x
+ 4e6ac0 got file otp:
+ 4e6ae0 get nav base and image base from from file
+ 4e6b40 different otp, not to use base in file
+ 4e6b90 imagebase exist: %d
+ 4e6bc0 update all base failed, Use FDT default configuration to FDT DOWN
+ 4e6c50 update all base suc, Set FDT normal base and to FDT DOWN
+ 4e6cc8 gf_get_fdtbase
+ 4e6ce8 exit wrong input parameter
+ 4e6d20 exit fail to set mode
+ 4e6d50 enter, tls-client-server %d-%d-%d
+ 4e6d98 gf_get_oneframe
+ 4e6dc0 g_halcontext.sensor_ops.SetMode:0x%p.
+ 4e6e10 <= with ret(BOOL):%d.
+ 4e6e40 gf_update_all_base
+ 4e6e68 gf_get_fdtbase 0
+ 4e6e90 !!!!gf_get_fdtbase 0 timeout
+ 4e6ed0 gf_get_navbase
+ 4e6ef0 !!!!gf_get_navbase timeout
+ 4e6f28 gf_get_fdtbase 1
+ 4e6f50 !!!!gf_get_fdtbase 1 timeout
+ 4e6f90 fdt_base1:
+ 4e6fa8 !!!!Get FDT Delta timeout
+ 4e6fe0 fdt_delta 0x%x
+ 4e7000 first detect wrong, use fdt base from file
+ 4e7060 ChicagoT use BaseCMD1 to get base img.
+ 4e70b0 !!!!get image failed
+ 4e70e0 gf_get_fdtbase 2
+ 4e7108 !!!!gf_get_fdtbase timeout
+ 4e7140 gf_get_fdtbase 2 finshed
+ 4e7180 second detect fdt wrong, use fdt base from file
+ 4e71e0 navret = 0x%x
+ 4e7200 --- base exist, update imagebase
+ 4e7250 --- base not exist, update imagebase
+ 4e72a0 exit, ren = %d
+ 4e72c0 gf_savebaseTofile
+ 4e72f0 nav buffer size:%d buffer size:%d
+ 4e7338 save imagebase 
+ 4e7358 write %d-%d bytes to %s
+ 4e7388 exit size:%d(dec)
+ 4e73b0 gf_check_baseisvalid
+ 4e73e0 base_is_valid:%d
+ 4e7408 get image timeout
+ 4e7430 :temperature
+ 4e7450 :bad
+ 4e7460 :void
+ 4e7470 :finger down
+ 4e7490 update imagebase
+ 4e74b8 gf_get_navbase timeout
+ 4e74f0 after Nav_isTouchedByFinger navret = 0x%x
+ 4e7548 update navbase
+ 4e7568 exit, base_is_valid:%d
+ 4e75a0 s0-screen-off no pending request
+ 4e75e8 MonitorOffDataSubmitThread
+ 4e7620 s0-screen-off stop
+ 4e7650 s0-screen-off cache available %d, cache count %d, start tick %lld
+ 4e76e0 s0-screen-off start tick %d, elapsed time %d: %d
+ 4e7750 s0-screen-off ***********to complete capture request, display turned on***********
+ 4e7800 s0-screen-off time out,clear data buffer
+ 4e7858 s0-screen-off, completed
+ 4e7890 s0-screen-off, time out
+ 4e78c0 gf_captureFingerdata
+ 4e78f0 [BEGIN]to capture image
+ 4e7920 malloc failed
+ 4e7940 imageret 0x%x, dac valid %d
+ 4e7980 got image, but submit delay pending request
+ 4e79e0 delay complete request after got image
+ 4e7a30 ***********to complete capture request, display on***********
+ 4e7ab0 s0-screen-off cached count %d, start tick %lld
+ 4e7b10 s0-screen-off previous thread stopped
+ 4e7b60 s0-screen-off previous thread NOT stopped
+ 4e7bb8 s0-screen-off start new thread
+ 4e7c00 !!!! complete callback not registered
+ 4e7c50 to get upbase and to set FDT UP
+ 4e7c90 not finger nor temp: to FDT DOWN
+ 4e7cd8 device_fdtdata_analyze
+ 4e7d10 receive fdt up or reset... 0x%x, 2UP,9Reset
+ 4e7d68 write vendorId(0x%x) to:0x%x
+ 4e7da8 Stop temperature timer......
+ 4e7df0 request pending after check: to FDT DOWN
+ 4e7e48 nav_app trigger start3
+ 4e7e80 receive fdt down......fdt_is_down:%d
+ 4e7ed0 receive fdt down......
+ 4e7f00 submit delay %d, monitor state %d, sesssion state %d
+ 4e7f70 receive fdt down, but submit delay pending request
+ 4e7fe0 delay complete request after touch down
+ 4e8030 wait image timeout error: to FDT DOWN
+ 4e8080 receive fdt down, but no pending request
+ 4e80d8 start temperature timer......
+ 4e8120 nav_app receive down......fdt_is_down:%d
+ 4e8178 nav_app receive down......
+ 4e81b0 nav_app pending request
+ 4e81e0 nav_app get data timeout
+ 4e8220 nav_app frame %d finger up 0x%x
+ 4e8260 nav_app data count and size %d, %d
+ 4e82a8 nav_app trigger data %d
+ 4e82d8 reverse mode: fdt_is_down %d
+ 4e8318 fdt wrong mode, fdt_is_down %d
+ 4e8360 base wrong mode, fdt_is_down %d
+ 4e83a0 communication error mode, fdt_is_down %d
+ 4e83f8 Fail to start fdt analyzing
+ 4e8430 startfdtDataAnalyzeMonitoring
+ 4e8470 Resume fdtdata analyze
+ 4e84a0 gf_temperatureoccure
+ 4e84d0 restart timer 2 seconds
+ 4e8500 !!Unexpected, temperaturetimer NULL ################
+ 4e8570 temperature occure: to FDT DOWN
+ 4e85b0 base is not valid, not down dac now
+ 4e85f8 gf_getdowndacframe
+ 4e8620 get dac:0x%x down dac:0x%x
+ 4e8658 get image for downdac timeout
+ 4e8698 get dac:0x%x back dac:0x%x
+ 4e86d0 Find :%S
+ 4e86e8 gf_findAPPOrIAP
+ 4e8708 Not Find :%S
+ 4e8728 !!!!version buffer NULL
+ 4e8758 gf_compareVersionNum
+ 4e8788 NOT IMPLEMENTED
+ 4e87a8 dummy_set_mode
+ 4e87c8 dummy_set_dac
+ 4e87e8 dummy_get_dac
+ 4e8808 dummy_get_rawdata
+ 4e8830 dummy_get_navdata
+ 4e8858 dummy_get_navbase
+ 4e8880 dummy_get_fdtdata
+ 4e88a8 dummy_set_fdtbase
+ 4e88d0 dummy_cal_fdt_base
+ 4e88f8 dummy_check_and_parse_otp
+ 4e8930 dummy_check_important_sensor_info
+ 4e8978 dummy_check_otp
+ 524b10 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\wbditest.c
+ 524ba0 get reset value 0x%x, 0x%x
+ 524be0 Local_milan_get_reset_reg_value
+ 524c20 !!!!fail to get frame data
+ 524c58 Local_milan_read_image
+ 524c88 to reset sensor
+ 524ca8 GF_Reset
+ 524cc0 to reset MCU
+ 524ce0 to reset sensor and MCU
+ 524d10 wrong input parameter
+ 524d40 Local_test_original_psk
+ 524d70 tls %d, current tls handshake status %d
+ 524dc0 Original PSK data match the other part for not support reasons
+ 524e40 not tls supported, simply return OK
+ 524e88 Unknown
+ 524ea0 default: psk_status:%d, message: %s
+ 524ef0 Original PSK data NOT match the other part
+ 524f50 check if psk match: psk_status:%d, message: %s
+ 524fb0 Original PSK data match the other part
+ 525000 _wbdi_.log
+ 525018 WBDITest
+ 525030 WBDI.log
+ 525048 %s\%s
+ 525058 GFDrv
+ 525068 16:05:23
+ 525080 WBDI Build %s %s, LogTarget %d, LogLevel %d, LogPath %s
+ 5250f0 InitLogOutput
+ 525110 Entry control code not supported any more
+ 525168 OnForGeneralControl
+ 525190 OnForGeneralControl2
+ 5251c0 !!!!Error, Device context NULL
+ 525200 !!!!Error, bad input parameters, inputBuffer=0x%p, inputBufferSize=%u
+ 525290 !!!!Error, outputBuffer NULL or outputBufferSize not enough=0x%x <(0x%x)
+ 525330 TEST-keep pass-in data:control_type: %d
+ 525380 TEST-Change data_dump to: %d folder: %s
+ 5253d0 TEST-Change LogLevel to: %d LogTarget to: %d, path:%s
+ 525440 Wrong: not to run to here
+ 525480 TEST-get log info LogLevel: %d LogTarget: %d, path:%s
+ 5254f0 Get firmware Version=%s
+ 525520 TEST-get sensor info chipId: %lu sensor_type: %d
+ 525590 exit with error,control type=%u
+ 5255d0 OnForTlsTest
+ 5255f0 TEST-TLS pass-in data:tls_match_operation: %d
+ 525650 TEST-TLS HandshakeResult:result: %d
+ 5256a0 TLS init and handshake done, %dms(since start of tls init)
+ 525718 TLS init and handshake failed
+ 525758 OnForCommunicationTest
+ 525788 pass-in data len %d
+ 5257b0 fail to alloc buffer for len %d
+ 5257f0 test passed
+ 525808 test failed
+ 525820 OnForFRRFARTest
+ 525840 !!!!Error, outputBuffer NULL or outputBufferSize not enough=0x%x
+ 5258d0 TEST-kept data: control_type=%d
+ 525910 clearup: control_type=%d
+ 525948 OnForMPTest
+ 525960 !!!!Error, bad input parameters
+ 5259a0 TEST-test_type=%d
+ 5259c8 MPTest OFF: to FDT DOWN
+ 525a00 clearup MP test data and restore FDT down mode
+ 525a60 PASS
+ 525a70 FAIL
+ 525a80 MP test for check OTP: sensor_type:%d, otp size: %d, check_result:%s
+ 525b10 MP test for SPI: after operation_status:%d, test_progress:%d, PChipId:0x%lx
+ 525ba8 to trigger reset
+ 525bd0 RESET not supported yet: done resetting fingerprint IC ValueOfIntReg:0x%04x
+ 525c68 update DAC
+ 525c80 restore DAC
+ 525ca0 OPEN_SHORT test:unkown sensortype
+ 525cf0 MP test for DEAD_PIXEL:DeadPixelTest_Stage =%d
+ 525d50 ENUM_TEST_DeadPixelTest_STAGE_Base: not suppose to run here
+ 525dc8 MPTest DeadPixel: to FDT DOWN
+ 525e10 ENUM_TEST_DeadPixelTest_STAGE_WaitForFlat change to FDT down mode
+ 525ea0 ENUM_TEST_DeadPixelTest_STAGE_ImageFDTdown: not suppose to run here
+ 525f30 MP test for Signal Noise Ratio:SNR_Stage =%d
+ 525f90 ENUM_TEST_SNR_STAGE_Base: not suppose to run here
+ 525ff8 MPTest SNR: to FDT DOWN
+ 526030 ENUM_TEST_SNR_STAGE_WaitForPress change to FDT down mode
+ 5260b0 ENUM_TEST_SNR_STAGE_ImageFDTdown: not suppose to run here
+ 526130 MPTest Performance: to FDT DOWN
+ 526170 ENUM_TEST_Perf_STAGE_Start change to FDT down mode
+ 5261e0 MP test for PERFORMANCE:capture begin Time %lu.%lu
+ 526248 not supported MP test type=%d
+ 526290 Exit operation_status=%d test_progress=%d
+ 5262e8 OnCaptureDataTest
+ 526310 !!!!fail to check output parameters
+ 526360 !!!!fail when reading image: gfErrCode:%d, pframe:0x%p, framelen:%lu, outputBufferSize:%lu
+ 526420 expected frame size not equal to captured size: %d != %d
+ 526498 got one frame exit
+ 5264c0 MP test capture the begin time %lu.%lu
+ 526510 _ForTestPerformanceCaptureBeginTime
+ 526558 _ForFRRFARTestSkipCaptureData
+ 5265a0 frrfar control_type: %d== no capture, to skip some processing
+ 562788 HwWriteUpdateConfig
+ 5627b0 f:\git\huawei_win\winfpcode\milan_watt\milanspi\milanfusb\wbdi_pba\wbdi_pba.c
+ 562850 PBAPseudoBaseAddress==NULL
+ 562890 write config to flash complete!
+ 5628d0 write config to flash error
+ 562910 Fp invalid flag in memory--->write config
+ 562970 write to flash error------------>write config timeout
+ 5629e0 lpstConfig is NULL.
+ 562a08 PBASendConfigData
+ 562a30 Calloc buffer for lpubPBAData failed.
+ 562a80 Calc hash occur error! 0x%x.
+ 562ac0 C:\ProgramData\Goodix\CipherConfigure.dat
+ 562b20 WriteConfigureDataToFile(cipher)=%d
+ 562b68 exit, %d
+ 562b80 HwGetTemplateCountAndHandle
+ 562bb8 PBAPseudoBaseAddress == NULL
+ 562c00 flash to memory complete! get template count and handle marry, FP.PFMLength:%d.
+ 562ca0 flash to memory error  %x
+ 562cd8 flash invalid flag  %x
+ 562d10 write to flash error------------>get template count timeout
+ 562d90 PBA got FP.PMLength %d, current enrolled template count %d
+ 562e08 entry, input buffer len: %d
+ 562e40 HwAddOrUpdateTemplate
+ 562e78 update
+ 562e88 %s template to bios, cmd:0x%x.
+ 562ec8 PBAPseudoBaseAddress
+ 562ef8 Send template handle ID:%d
+ 562f30 write to flash complete!--------------->write a template to flash
+ 562fc0 write to flash complete!--------------->update a template to flash
+ 563050 write to flash error---------------->write a template to flash
+ 5630d0 Fp invalid flag in memory------------>write a template to flash
+ 563150 write to flash error------------>write a template to flash timeout
+ 5631d8 Delete %s OK.
+ 5631f8 DeleteUpdateTmplFile
+ 563230 Delete %s failed, with GetLastError:0x%x. Will Try to trunc the file.
+ 5632c0 open %s failed, with errno:0x%x.
+ 563308 success
+ 563318 invalid input parameter.
+ 563350 LocateTheTemplate
+ 563378 tlv type:0x%x, tlv len:%d.
+ 5633b0 uiCurHandleID:%d, uiTmplHandleID:%d
+ 5633f8 UpdateTemplateToFile
+ 563428 calloc buffer error.
+ 563458 UpdateTmpl.dat
+ 563480 read none data, update directly.
+ 5634d0 read update template file failed:%d.
+ 563520 file data len:%d.
+ 563548 calloc buffer failed:0x%x.
+ 563580 tmpl file data crc checked failed.
+ 5635c8 tmpls num in the file:%d.
+ 563600 locate the template failed:0x%x.
+ 563648 locate the template failed.
+ 563680 not find the template.
+ 5636b0 before data len:%d, after data len:%d.
+ 563700 cur update tmpl data len:%d.
+ 563740 the tmpl num in the file is max.
+ 563788 calloc buffer failed.
+ 5637c0 update template to file failed.
+ 563800 write %d bytes to template file.
+ 563848 delete the template file.
+ 563880 DeleteCacheTemplateFromFile
+ 5638c0 read none data, not need to delete cached data.
+ 563920 current ID:%d.
+ 563940 malloc buffer failed:0x%x.
+ 563978 file tmpl num:%d.
+ 5639a0 UpdateTemplateFileToBIOS
+ 5639d8 wait for init thread timeout.
+ 563a18 file data size:%d.
+ 563a40 tlvs len:%d.
+ 563a60 type:0x%x, len:%d.
+ 563a88 template file hash failed.
+ 563ac0 update template to BIOS error:0x%x!
+ 563b08 has checked len:%d.
+ 563b30 HwDeleteTemplate
+ 563b60 Delete the specified handle template success!
+ 563bc0 write to flash error---->delete template
+ 563c20 Fp invalid flag in memory----->delete template
+ 563c80 write to flash error------------>delete template timeout
+ 563d00 flash to memory complete!----->read template data
+ 563d68 FP.PFMLength=%d
+ 563d90 flash to memory error!------>read template data 
+ 563e00 flash invalid flag!------>read template data
+ 563e60 FP.PFMLength from bios=%d
+ 563e98 calc hash occur error! 0x%x
+ 563ed0 calculate Hash success!
+ 563f00 HwReadAllTemplateHeads
+ 563f30 write to flash error------------>read template heads timeout
+ 563fb0 exit, read data len: %d, return data len: %d
+ 564010 Pointer lpstTmlTable is invalid.
+ 564058 VerifyBiosTmlTable
+ 564080 Get luiValidNodeNum:%d, m_uiBIOSTmlCnt:%d.
+ 5640d8 =>Entry.
+ 5640f0 GetUUIDAndTmlSizeFromHead
+ 564128 Wrong input parameter.
+ 564160 SecAes256CbcPKCS7padDecrypt failed with error code:0x%x.
+ 5641e0 SecAes256CbcPKCS7padDecrypt done, ludPlainLen:%d.
+ 564248 Found template size:%d.
+ 564278 Found TID:
+ 564290 Found this template study num:%d.
+ 5642e0 Wrong data, not found the template size or TID or study num.
+ 564360 RetrieveBiosTmlTable
+ 564390 Pointer lpubTmlHead is invalid.
+ 5643d0 Invalid parameter.
+ 564400 The template head len is wrong:%d.
+ 564448 The template table is invalid.
+ 564490 GetUUIDAndTmlSizeFromHead failed with error code:0x%x.
+ 564500 UUID of this tempalte:
+ 564530 This template size:%d, study num:%d.
+ 564580 Current node UUID
+ 5645b0 Current study step:%d, bios template size:%d.
+ 564610 <=Exit with lemResult:%d.
+ 564648 AddItemToBiosTmlTable
+ 564680 luiCnt:%d, luiTmlSize:%d, luiTmlStudyNum:%d, m_uiBIOSTmlCnt:%d.
+ 564700 This template UUID
+ 564730 Add item to bios template table failed.
+ 564780 DeleteItemFromBiosTmlTable
+ 5647b8 m_uiBIOSTmlCnt:%d.
+ 5647e0 Delete item from bios table failed.
+ 564828 GetSIDFromHead
+ 564848 Found template SID.
+ 564870 Wrong data, not found the template SID.
+ 5648c0 GetSubfactorFromHead
+ 5648f0 Found template subfactor:0x%x.
+ 564930 Wrong data, not found the template subfactor.
+ 564990 CheckSIDFromTemplateHeadCipher
+ 5649d0 Wrong data, not found the SID.
+ 564a10 SID matches.
+ 564a30 Found the SID, but not match.
+ 564a70 <=Exit with lsiRet:%d.
+ 564aa0 entry, data length %d.
+ 564ad0 PBADeleteTemplate
+ 564af8 get config failed!
+ 564b20 Current Sid
+ 564b38 malloc for pba error!
+ 564b68 malloc for PBA error!
+ 564ba0 read HwReadTemplateHandles error.
+ 564be8 PBA current enrolled handles
+ 564c30 Calloc buffer for lpubAllTemplateHeads failed:0x%x.
+ 564ca0 read HwReadAllTemplateHeads error.
+ 564cf0 Template num error, %d is not %d
+ 564d40 Template handID error, %d is not %d
+ 564d88 pba_template_len:%d.
+ 564db8 .dat
+ 564dd0 C:\ProgramData\Goodix\BIOSTemplate_
+ 564e18 %s%04d%s
+ 564e30 Template from BIOS=%d.
+ 564e60 CheckSIDFromTemplateHeadCipher done but return 0x%x.
+ 564ed0 CheckSIDFromTemplateHeadCipher success.
+ 564f20 Delete item from bios template table failed.
+ 564f80 DeleteItemFromBiosTmlTable success.
+ 564fd0 PBA %d enrolled templates to be deleted.
+ 565028 Calc hash error! 0x%x
+ 565058 Delete tml
+ 565070 Delete template from bios fail!!!!!
+ 5650b8 Exit, %d
+ 5650d0 Entry, data length:%d, badd:%d.
+ 565110 PBAAddOrUpdatTemplate
+ 565140 Get template count and handle error lsiRet=%d.
+ 5651a0 PBA already enrolled %d fingers(maximum allow %d).
+ 565210 Malloc buffer for lpubPBAData error.
+ 565260 New template handle ID:%d.
+ 5652a0 Update bios template table failed.
+ 5652f0 Not need to update template, lsiUpdate:%d.
+ 565350 GetSIDFromHead failed with error code:0x%x.
+ 5653a8 Current template SID
+ 5653e0 GetSubfactorFromHead failed with error code:0x%x.
+ 565450 Current template subfactor:0x%x.
+ 5654a0 Malloc buffer for lpubPBATemplate error!
+ 565500 PBA current enrolled handles(through HwReadAllTemplateHeads)
+ 565580 Read template subfactor:0x%x.
+ 5655c0 Find the template.
+ 5655e8 Current handle ID:%d
+ 565618 %s template to BIOS error!
+ 565650 %s template to BIOS success!
+ 565690 update ret:%d, CurTmplSize:%d, UpdateTmplSize:%d, CurTmplNum:%d, UpdateStep:%d
+ 565730 C:\ProgramData\Goodix\CipherTemplate_
+ 565780 WriteTemplateDataToFile(cipher)=%d
+ 5657c8 PBASyncTemplate
+ 5657f0 calloc buffer for lpubToBeDeletedTemplateData failed.
+ 565860 system tmpls cnt:%d.
+ 565890 system tmpl UUID
+ 5658c0 get template UUID failed from head.
+ 565908 bios tmpl UUID
+ 565928 find this template.
+ 565950 not find this template.
+ 565980 bios table tmpl UUID
+ 5659b0 VerifyBiosTmlTable failed:0x%x.
+ 5659f0 update table to file.
+ 565a20 WriteBiosTmlTableToFile
+ 565a50 Encrypt failed with error code:0x%x.
+ 565aa0 cipher BIOS tmpl table len:%d.
+ 565ae0 BiosTmlTable.dat
+ 565b10 CrcRes=0x%x, ludWriteDataLen=%d.
+ 565b58 ReadBiosTmlTableFromFile
+ 565b90 Read bios template file failed.
+ 565bd0 Decrypt failed with error code:0x%x.
+ 565c20 Crc check failed, CrcRes:0x%x, CrcRead:0x%x.
+ 565c80 =>entry.
+ 565c98 PBAThread
+ 565cb0 data is null from wbdi to bios
+ 565cf0 operation_type:0x%x, pstPBAInfo->len:%d, PBAPseudoMemoryMapped:%d, pba_simulation_switch:%d
+ 565da8 Write config to bios.
+ 565dd8 Write config success.
+ 565e08 Write config occur error!
+ 565e40 Write template to bios.
+ 565e70 Write template success.
+ 565ea0 Write template occur error!
+ 565ed8 Update template to bios.
+ 565f10 Update template success.
+ 565f48 Update template occur error!
+ 565f90 wait for system unlock timeout.
+ 565fd0 Delete templates.
+ 565ff8 Delete template success
+ 566028 Delete template occur error!
+ 566068 Sync templates.
+ 566088 nothing to do
+ 5660b0 driver not support PBA, do nothing here.
+ 566108 <=exit.
+ 566118 WUDFx02000
+ 566e50 (null)
+ 5670b8 mscoree.dll
+ 5671e8 UTF-8
+ 5671f8 UTF-16LEUNICODE
+ 5676c0 Sunday
+ 5676d0 Monday
+ 5676e0 Tuesday
+ 5676f0 Wednesday
+ 567708 Thursday
+ 567720 Friday
+ 567730 Saturday
+ 5677a8 January
+ 5677b8 February
+ 5677d0 March
+ 5677e0 April
+ 5677f0 June
+ 567800 July
+ 567810 August
+ 567820 September
+ 567838 October
+ 567848 November
+ 567860 December
+ 567888 MM/dd/yy
+ 5678a0 dddd, MMMM dd, yyyy
+ 5678c8 HH:mm:ss
+ 5678e0 en-US
+ 567990 api-ms-win-core-datetime-l1-1-1
+ 5679d0 api-ms-win-core-fibers-l1-1-1
+ 567a10 api-ms-win-core-file-l1-2-2
+ 567a50 api-ms-win-core-localization-l1-2-1
+ 567aa0 api-ms-win-core-localization-obsolete-l1-2-0
+ 567b00 api-ms-win-core-processthreads-l1-1-2
+ 567b50 api-ms-win-core-string-l1-1-0
+ 567b90 api-ms-win-core-synch-l1-2-0
+ 567bd0 api-ms-win-core-sysinfo-l1-2-1
+ 567c10 api-ms-win-core-winrt-l1-1-0
+ 567c50 api-ms-win-core-xstate-l2-1-0
+ 567c90 api-ms-win-rtcore-ntuser-window-l1-1-0
+ 567ce0 api-ms-win-security-systemfunctions-l1-1-0
+ 567d40 ext-ms-win-ntuser-dialogbox-l1-1-0
+ 567d90 ext-ms-win-ntuser-windowstation-l1-1-0
+ 567de0 advapi32
+ 567df8 kernel32
+ 567e10 ntdll
+ 567e20 api-ms-win-appmodel-runtime-l1-1-2
+ 567e68 user32
+ 567e78 api-ms-
+ 567e88 ext-ms-
+ 568010 ja-JP
+ 568020 zh-CN
+ 568030 ko-KR
+ 568040 zh-TW
+ 568150          (((((                  H
+ 568652          (((((                  H
+ 568750       (                          
+ 56a0b8 zh-CHS
+ 56a2b0 ar-SA
+ 56a2c0 bg-BG
+ 56a2d0 ca-ES
+ 56a2e0 cs-CZ
+ 56a2f0 da-DK
+ 56a300 de-DE
+ 56a310 el-GR
+ 56a320 fi-FI
+ 56a330 fr-FR
+ 56a340 he-IL
+ 56a350 hu-HU
+ 56a360 is-IS
+ 56a370 it-IT
+ 56a380 nl-NL
+ 56a390 nb-NO
+ 56a3a0 pl-PL
+ 56a3b0 pt-BR
+ 56a3c0 ro-RO
+ 56a3d0 ru-RU
+ 56a3e0 hr-HR
+ 56a3f0 sk-SK
+ 56a400 sq-AL
+ 56a410 sv-SE
+ 56a420 th-TH
+ 56a430 tr-TR
+ 56a440 ur-PK
+ 56a450 id-ID
+ 56a460 uk-UA
+ 56a470 be-BY
+ 56a480 sl-SI
+ 56a490 et-EE
+ 56a4a0 lv-LV
+ 56a4b0 lt-LT
+ 56a4c0 fa-IR
+ 56a4d0 vi-VN
+ 56a4e0 hy-AM
+ 56a4f0 az-AZ-Latn
+ 56a508 eu-ES
+ 56a518 mk-MK
+ 56a528 tn-ZA
+ 56a538 xh-ZA
+ 56a548 zu-ZA
+ 56a558 af-ZA
+ 56a568 ka-GE
+ 56a578 fo-FO
+ 56a588 hi-IN
+ 56a598 mt-MT
+ 56a5a8 se-NO
+ 56a5b8 ms-MY
+ 56a5c8 kk-KZ
+ 56a5d8 ky-KG
+ 56a5e8 sw-KE
+ 56a5f8 uz-UZ-Latn
+ 56a610 tt-RU
+ 56a620 bn-IN
+ 56a630 pa-IN
+ 56a640 gu-IN
+ 56a650 ta-IN
+ 56a660 te-IN
+ 56a670 kn-IN
+ 56a680 ml-IN
+ 56a690 mr-IN
+ 56a6a0 sa-IN
+ 56a6b0 mn-MN
+ 56a6c0 cy-GB
+ 56a6d0 gl-ES
+ 56a6e0 kok-IN
+ 56a6f0 syr-SY
+ 56a700 div-MV
+ 56a710 quz-BO
+ 56a720 ns-ZA
+ 56a730 mi-NZ
+ 56a740 ar-IQ
+ 56a750 de-CH
+ 56a760 en-GB
+ 56a770 es-MX
+ 56a780 fr-BE
+ 56a790 it-CH
+ 56a7a0 nl-BE
+ 56a7b0 nn-NO
+ 56a7c0 pt-PT
+ 56a7d0 sr-SP-Latn
+ 56a7e8 sv-FI
+ 56a7f8 az-AZ-Cyrl
+ 56a810 se-SE
+ 56a820 ms-BN
+ 56a830 uz-UZ-Cyrl
+ 56a848 quz-EC
+ 56a858 ar-EG
+ 56a868 zh-HK
+ 56a878 de-AT
+ 56a888 en-AU
+ 56a898 es-ES
+ 56a8a8 fr-CA
+ 56a8b8 sr-SP-Cyrl
+ 56a8d0 se-FI
+ 56a8e0 quz-PE
+ 56a8f0 ar-LY
+ 56a900 zh-SG
+ 56a910 de-LU
+ 56a920 en-CA
+ 56a930 es-GT
+ 56a940 fr-CH
+ 56a950 hr-BA
+ 56a960 smj-NO
+ 56a970 ar-DZ
+ 56a980 zh-MO
+ 56a990 de-LI
+ 56a9a0 en-NZ
+ 56a9b0 es-CR
+ 56a9c0 fr-LU
+ 56a9d0 bs-BA-Latn
+ 56a9e8 smj-SE
+ 56a9f8 ar-MA
+ 56aa08 en-IE
+ 56aa18 es-PA
+ 56aa28 fr-MC
+ 56aa38 sr-BA-Latn
+ 56aa50 sma-NO
+ 56aa60 ar-TN
+ 56aa70 en-ZA
+ 56aa80 es-DO
+ 56aa90 sr-BA-Cyrl
+ 56aaa8 sma-SE
+ 56aab8 ar-OM
+ 56aac8 en-JM
+ 56aad8 es-VE
+ 56aae8 sms-FI
+ 56aaf8 ar-YE
+ 56ab08 en-CB
+ 56ab18 es-CO
+ 56ab28 smn-FI
+ 56ab38 ar-SY
+ 56ab48 en-BZ
+ 56ab58 es-PE
+ 56ab68 ar-JO
+ 56ab78 en-TT
+ 56ab88 es-AR
+ 56ab98 ar-LB
+ 56aba8 en-ZW
+ 56abb8 es-EC
+ 56abc8 ar-KW
+ 56abd8 en-PH
+ 56abe8 es-CL
+ 56abf8 ar-AE
+ 56ac08 es-UY
+ 56ac18 ar-BH
+ 56ac28 es-PY
+ 56ac38 ar-QA
+ 56ac48 es-BO
+ 56ac58 es-SV
+ 56ac68 es-HN
+ 56ac78 es-NI
+ 56ac88 es-PR
+ 56ac98 zh-CHT
+ 56baf0 af-za
+ 56bb00 ar-ae
+ 56bb10 ar-bh
+ 56bb20 ar-dz
+ 56bb30 ar-eg
+ 56bb40 ar-iq
+ 56bb50 ar-jo
+ 56bb60 ar-kw
+ 56bb70 ar-lb
+ 56bb80 ar-ly
+ 56bb90 ar-ma
+ 56bba0 ar-om
+ 56bbb0 ar-qa
+ 56bbc0 ar-sa
+ 56bbd0 ar-sy
+ 56bbe0 ar-tn
+ 56bbf0 ar-ye
+ 56bc00 az-az-cyrl
+ 56bc18 az-az-latn
+ 56bc30 be-by
+ 56bc40 bg-bg
+ 56bc50 bn-in
+ 56bc60 bs-ba-latn
+ 56bc78 ca-es
+ 56bc88 cs-cz
+ 56bc98 cy-gb
+ 56bca8 da-dk
+ 56bcb8 de-at
+ 56bcc8 de-ch
+ 56bcd8 de-de
+ 56bce8 de-li
+ 56bcf8 de-lu
+ 56bd08 div-mv
+ 56bd18 el-gr
+ 56bd28 en-au
+ 56bd38 en-bz
+ 56bd48 en-ca
+ 56bd58 en-cb
+ 56bd68 en-gb
+ 56bd78 en-ie
+ 56bd88 en-jm
+ 56bd98 en-nz
+ 56bda8 en-ph
+ 56bdb8 en-tt
+ 56bdc8 en-us
+ 56bdd8 en-za
+ 56bde8 en-zw
+ 56bdf8 es-ar
+ 56be08 es-bo
+ 56be18 es-cl
+ 56be28 es-co
+ 56be38 es-cr
+ 56be48 es-do
+ 56be58 es-ec
+ 56be68 es-es
+ 56be78 es-gt
+ 56be88 es-hn
+ 56be98 es-mx
+ 56bea8 es-ni
+ 56beb8 es-pa
+ 56bec8 es-pe
+ 56bed8 es-pr
+ 56bee8 es-py
+ 56bef8 es-sv
+ 56bf08 es-uy
+ 56bf18 es-ve
+ 56bf28 et-ee
+ 56bf38 eu-es
+ 56bf48 fa-ir
+ 56bf58 fi-fi
+ 56bf68 fo-fo
+ 56bf78 fr-be
+ 56bf88 fr-ca
+ 56bf98 fr-ch
+ 56bfa8 fr-fr
+ 56bfb8 fr-lu
+ 56bfc8 fr-mc
+ 56bfd8 gl-es
+ 56bfe8 gu-in
+ 56bff8 he-il
+ 56c008 hi-in
+ 56c018 hr-ba
+ 56c028 hr-hr
+ 56c038 hu-hu
+ 56c048 hy-am
+ 56c058 id-id
+ 56c068 is-is
+ 56c078 it-ch
+ 56c088 it-it
+ 56c098 ja-jp
+ 56c0a8 ka-ge
+ 56c0b8 kk-kz
+ 56c0c8 kn-in
+ 56c0d8 kok-in
+ 56c0e8 ko-kr
+ 56c0f8 ky-kg
+ 56c108 lt-lt
+ 56c118 lv-lv
+ 56c128 mi-nz
+ 56c138 mk-mk
+ 56c148 ml-in
+ 56c158 mn-mn
+ 56c168 mr-in
+ 56c178 ms-bn
+ 56c188 ms-my
+ 56c198 mt-mt
+ 56c1a8 nb-no
+ 56c1b8 nl-be
+ 56c1c8 nl-nl
+ 56c1d8 nn-no
+ 56c1e8 ns-za
+ 56c1f8 pa-in
+ 56c208 pl-pl
+ 56c218 pt-br
+ 56c228 pt-pt
+ 56c238 quz-bo
+ 56c248 quz-ec
+ 56c258 quz-pe
+ 56c268 ro-ro
+ 56c278 ru-ru
+ 56c288 sa-in
+ 56c298 se-fi
+ 56c2a8 se-no
+ 56c2b8 se-se
+ 56c2c8 sk-sk
+ 56c2d8 sl-si
+ 56c2e8 sma-no
+ 56c2f8 sma-se
+ 56c308 smj-no
+ 56c318 smj-se
+ 56c328 smn-fi
+ 56c338 sms-fi
+ 56c348 sq-al
+ 56c358 sr-ba-cyrl
+ 56c370 sr-ba-latn
+ 56c388 sr-sp-cyrl
+ 56c3a0 sr-sp-latn
+ 56c3b8 sv-fi
+ 56c3c8 sv-se
+ 56c3d8 sw-ke
+ 56c3e8 syr-sy
+ 56c3f8 ta-in
+ 56c408 te-in
+ 56c418 th-th
+ 56c428 tn-za
+ 56c438 tr-tr
+ 56c448 tt-ru
+ 56c458 uk-ua
+ 56c468 ur-pk
+ 56c478 uz-uz-cyrl
+ 56c490 uz-uz-latn
+ 56c4a8 vi-vn
+ 56c4b8 xh-za
+ 56c4c8 zh-chs
+ 56c4d8 zh-cht
+ 56c4e8 zh-cn
+ 56c4f8 zh-hk
+ 56c508 zh-mo
+ 56c518 zh-sg
+ 56c528 zh-tw
+ 56c538 zu-za
+ 56c7a0 CONOUT$
+ 573fc2 C:\ProgramData\Goodix
+ 5741dc C:\ProgramData\Goodix
+ 5744f0 TestTime
+ 57d644 SubC
+ 57daae HShenzhen Huiding Technology Co.,Ltd
+ 57e589 SubC
+ 57e6f9 Legal_Policy_Statement
+ 57f800 SubC
+ 57fc6a HShenzhen Huiding Technology Co.,Ltd
+ 58074d SubC
+ 5808bd Legal_Policy_Statement

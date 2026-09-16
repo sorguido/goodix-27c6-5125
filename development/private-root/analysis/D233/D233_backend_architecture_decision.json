@@ -1,0 +1,26 @@
+{
+  "decision": "PYTHON_CTYPES_LIBUSB_PLUS_SYSTEM_OPENSSL_MEMORYBIO",
+  "date": "2026-08-14",
+  "usb": {
+    "implementation": "minimal ctypes libusb-1.0 ABI",
+    "reason": "runtime library exists but development headers/pkg-config do not; injected ABI seam is small and mockable",
+    "target": "27c6:5125",
+    "interface": 0,
+    "bulk_out": "0x01",
+    "bulk_in": "0x81",
+    "max_packet": 64,
+    "real_init_during_d233": false
+  },
+  "tls": {
+    "implementation": "Python ssl.MemoryBIO backed by OpenSSL 3.5.7",
+    "version": "TLSv1.2-only",
+    "cipher": "PSK-AES128-GCM-SHA256",
+    "iana_suite": "0x00a8",
+    "identity": "Client_identity",
+    "certificate_fallback": false,
+    "application_data_api": false
+  },
+  "shared_contract": "src/goodix5125_d232_offline.py::_run_exact_oem_core",
+  "new_dependencies": [],
+  "live_source_sealed": true
+}

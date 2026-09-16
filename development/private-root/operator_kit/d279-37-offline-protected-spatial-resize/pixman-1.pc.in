@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+prefix=@PREFIX@
+libdir=${prefix}
+includedir=@INCLUDEDIR@
+
+Name: Pixman
+Description: Pinned host pixman runtime for the D279/37 offline helper
+Version: @VERSION@
+Libs: -L${libdir} -lpixman-1
+Cflags: -I${includedir}

@@ -1,0 +1,78 @@
+{
+  "artifact": "D269_01_test_results",
+  "step": "D269/01",
+  "execution_mode": "OFFLINE_ONLY",
+  "original_generated_at": "2026-08-25T10:37:59+02:00",
+  "corrective_generated_at": "2026-08-25T11:38:32+02:00",
+  "generated_at": "2026-08-25T11:38:32+02:00",
+  "results": [
+    {
+      "name": "gcc_c11_strict_compile",
+      "status": "PASS",
+      "detail": "-std=c11 -Wall -Wextra -Werror -pedantic"
+    },
+    {
+      "name": "bounded_adapter_unit_kat_root_cwd",
+      "status": "PASS",
+      "detail": "synthetic-only C test binary printed goodix_u16_to_fpimage: PASS"
+    },
+    {
+      "name": "bounded_adapter_external_cwd",
+      "status": "PASS",
+      "detail": "same compiled binary executed from /tmp"
+    },
+    {
+      "name": "adapter_undefined_symbol_audit",
+      "status": "PASS",
+      "detail": "nm -u on adapter object returned no symbols"
+    },
+    {
+      "name": "pertinent_python_regressions",
+      "status": "FAIL_NON_HERMETIC_PRE_EXISTING_TEST",
+      "detail": "29_PASS_1_FAIL: tests.test_cleanroom, tests.test_d267_04_image_no_check, tests.test_d268_01_operator_kit; test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed fails in this environment (pre-existing, non-hermetic worktree-state dependency); unrelated to ppmm corrective and to byte-identical adapter"
+    },
+    {
+      "name": "diff_whitespace_check",
+      "status": "PASS",
+      "detail": "git diff --check"
+    },
+    {
+      "name": "asan_ubsan",
+      "status": "SKIP",
+      "detail": "libasan.so.8 and libubsan.so.1 linker runtimes are not installed; optional and non-blocking"
+    }
+  ],
+  "coverage": {
+    "valid_80x64_5120": true,
+    "wrong_sample_count": true,
+    "negative_source_representability": "NOT_REPRESENTABLE_BY_UINT16; CAST_REPRESENTATION_REJECTED_AS_OUT_OF_RANGE",
+    "sample_above_12bit": true,
+    "minimum": true,
+    "maximum": true,
+    "intermediate_kat": true,
+    "monotonic_all_4096_values": true,
+    "determinism": true,
+    "frame_content_independence": true,
+    "input_unchanged": true,
+    "output_dimensions": true,
+    "orientation_unchanged_unresolved": true,
+    "null_arguments": true,
+    "output_capacity": true,
+    "no_io_or_external_runtime_dependency": true,
+    "no_real_biometric_fixture": true
+  },
+  "executable_closure": "PASS",
+  "adapter_bytes_unchanged": true,
+  "runtime_code_change_required": false,
+  "PERTINENT_PYTHON_REGRESSIONS": "29_PASS_1_FAIL",
+  "PERTINENT_PYTHON_REGRESSIONS_STATUS": "FAIL_NON_HERMETIC_PRE_EXISTING_TEST",
+  "FAILED_TEST": "test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed",
+  "FAILED_TEST_CLASS": "PRE_EXISTING_NON_HERMETIC_WORKTREE_STATE_DEPENDENCY",
+  "D269_ADAPTER_REGRESSION_INDICATED": false,
+  "residual_observation": "test_d268_01_operator_kit::test_full_lowercase_sha_is_mandatory_and_dirty_tree_fails_closed fails pre-existing in this environment; it appears to be a non-hermetic test that expects a dirty worktree without making it dirty internally, not a verifier bug; out of ppmm corrective scope; adapter KAT still PASS, nm -u clean",
+  "usb_real_access": false,
+  "secret_real_materialized": false,
+  "fprintd_contacted": false,
+  "raw_or_raster_written": false,
+  "live_authorized": false
+}

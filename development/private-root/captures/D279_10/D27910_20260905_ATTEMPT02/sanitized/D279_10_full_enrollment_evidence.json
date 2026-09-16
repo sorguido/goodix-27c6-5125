@@ -1,0 +1,1043 @@
+{
+  "schema": "D279_10_FULL_ENROLLMENT_EVIDENCE_V2",
+  "attempt_id": "D27910_20260905_ATTEMPT02",
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "target_vid": "27c6",
+  "target_pid": "5125",
+  "firmware_identity_status": "TARGET_CAPTURE_OBSERVED_APP12509",
+  "workflow_class": "WINDOWS_HELLO_FIRST_OEM_ENROLLMENT_COMPLETE_UI_CONFIRMED",
+  "boundary_status": "OBSERVED_COMPLETE_UI_CONFIRMED",
+  "completion_authority": "WINDOWS_UI_OPERATOR_NUMERIC_CONFIRMATION",
+  "stop_reason": "WINDOWS_UI_ENROLLMENT_CONFIRMED_PLUS_TERMINAL_TAIL",
+  "operator_contact_count": 22,
+  "wire_acquisition_cycle_count": 21,
+  "operator_wire_count_equal": false,
+  "acquisition_cycles": [
+    {
+      "cycle_number": 1,
+      "frames": {
+        "irq2": {
+          "frame": 213,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 97093.574,
+          "event_class": "ACQUISITION_1_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 214,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 97094.889,
+          "event_class": "ACQUISITION_1_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 217,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 97095.905,
+          "event_class": "ACQUISITION_1_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 219,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 97143.283,
+          "event_class": "ACQUISITION_1_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 2,
+      "frames": {
+        "irq2": {
+          "frame": 247,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 105964.292,
+          "event_class": "ACQUISITION_2_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 248,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 105965.476,
+          "event_class": "ACQUISITION_2_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 251,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 105966.625,
+          "event_class": "ACQUISITION_2_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 253,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 106013.742,
+          "event_class": "ACQUISITION_2_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 3,
+      "frames": {
+        "irq2": {
+          "frame": 281,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 113950.581,
+          "event_class": "ACQUISITION_3_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 282,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 113951.678,
+          "event_class": "ACQUISITION_3_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 285,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 113952.969,
+          "event_class": "ACQUISITION_3_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 287,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 113999.962,
+          "event_class": "ACQUISITION_3_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 4,
+      "frames": {
+        "irq2": {
+          "frame": 315,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 120611.357,
+          "event_class": "ACQUISITION_4_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 316,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 120611.896,
+          "event_class": "ACQUISITION_4_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 319,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 120612.31,
+          "event_class": "ACQUISITION_4_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 321,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 120659.327,
+          "event_class": "ACQUISITION_4_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 5,
+      "frames": {
+        "irq2": {
+          "frame": 349,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 127752.708,
+          "event_class": "ACQUISITION_5_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 350,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 127753.446,
+          "event_class": "ACQUISITION_5_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 353,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 127753.895,
+          "event_class": "ACQUISITION_5_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 355,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 127801.057,
+          "event_class": "ACQUISITION_5_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 6,
+      "frames": {
+        "irq2": {
+          "frame": 383,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 134366.458,
+          "event_class": "ACQUISITION_6_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 384,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 134366.881,
+          "event_class": "ACQUISITION_6_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 387,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 134367.286,
+          "event_class": "ACQUISITION_6_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 389,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 134414.453,
+          "event_class": "ACQUISITION_6_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 7,
+      "frames": {
+        "irq2": {
+          "frame": 417,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 142655.64,
+          "event_class": "ACQUISITION_7_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 418,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 142656.295,
+          "event_class": "ACQUISITION_7_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 421,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 142656.777,
+          "event_class": "ACQUISITION_7_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 423,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 142703.84,
+          "event_class": "ACQUISITION_7_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 8,
+      "frames": {
+        "irq2": {
+          "frame": 451,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 152161.381,
+          "event_class": "ACQUISITION_8_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 452,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 152161.954,
+          "event_class": "ACQUISITION_8_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 455,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 152162.429,
+          "event_class": "ACQUISITION_8_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 457,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 152209.612,
+          "event_class": "ACQUISITION_8_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 9,
+      "frames": {
+        "irq2": {
+          "frame": 485,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 158815.498,
+          "event_class": "ACQUISITION_9_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 486,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 158827.619,
+          "event_class": "ACQUISITION_9_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 489,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 158828.53,
+          "event_class": "ACQUISITION_9_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 491,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 158875.12,
+          "event_class": "ACQUISITION_9_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 10,
+      "frames": {
+        "irq2": {
+          "frame": 519,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 175658.404,
+          "event_class": "ACQUISITION_10_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 520,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 175661.703,
+          "event_class": "ACQUISITION_10_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 523,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 175662.147,
+          "event_class": "ACQUISITION_10_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 525,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 175709.314,
+          "event_class": "ACQUISITION_10_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 11,
+      "frames": {
+        "irq2": {
+          "frame": 553,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 182742.982,
+          "event_class": "ACQUISITION_11_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 554,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 182746.285,
+          "event_class": "ACQUISITION_11_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 557,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 182746.641,
+          "event_class": "ACQUISITION_11_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 559,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 182793.987,
+          "event_class": "ACQUISITION_11_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 12,
+      "frames": {
+        "irq2": {
+          "frame": 587,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 188378.314,
+          "event_class": "ACQUISITION_12_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 588,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 188379.316,
+          "event_class": "ACQUISITION_12_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 591,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 188380.419,
+          "event_class": "ACQUISITION_12_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 593,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 188427.251,
+          "event_class": "ACQUISITION_12_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 13,
+      "frames": {
+        "irq2": {
+          "frame": 621,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 194145.3,
+          "event_class": "ACQUISITION_13_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 622,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 194149.279,
+          "event_class": "ACQUISITION_13_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 625,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 194149.884,
+          "event_class": "ACQUISITION_13_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 627,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 194197.037,
+          "event_class": "ACQUISITION_13_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 14,
+      "frames": {
+        "irq2": {
+          "frame": 655,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 199255.777,
+          "event_class": "ACQUISITION_14_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 656,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 199258.395,
+          "event_class": "ACQUISITION_14_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 659,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 199259.053,
+          "event_class": "ACQUISITION_14_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 661,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 199305.918,
+          "event_class": "ACQUISITION_14_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 15,
+      "frames": {
+        "irq2": {
+          "frame": 689,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 204643.065,
+          "event_class": "ACQUISITION_15_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 690,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 204643.566,
+          "event_class": "ACQUISITION_15_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 693,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 204649.184,
+          "event_class": "ACQUISITION_15_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 695,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 204691.085,
+          "event_class": "ACQUISITION_15_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 16,
+      "frames": {
+        "irq2": {
+          "frame": 723,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 209970.043,
+          "event_class": "ACQUISITION_16_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 724,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 209970.487,
+          "event_class": "ACQUISITION_16_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 727,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 209971.039,
+          "event_class": "ACQUISITION_16_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 729,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 210018.001,
+          "event_class": "ACQUISITION_16_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 17,
+      "frames": {
+        "irq2": {
+          "frame": 757,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 215301.229,
+          "event_class": "ACQUISITION_17_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 758,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 215303.432,
+          "event_class": "ACQUISITION_17_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 761,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 215303.898,
+          "event_class": "ACQUISITION_17_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 763,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 215350.99,
+          "event_class": "ACQUISITION_17_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 18,
+      "frames": {
+        "irq2": {
+          "frame": 791,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 220751.257,
+          "event_class": "ACQUISITION_18_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 792,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 220755.314,
+          "event_class": "ACQUISITION_18_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 795,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 220756.144,
+          "event_class": "ACQUISITION_18_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 797,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 220803.204,
+          "event_class": "ACQUISITION_18_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 19,
+      "frames": {
+        "irq2": {
+          "frame": 825,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 226139.119,
+          "event_class": "ACQUISITION_19_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 826,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 226140.319,
+          "event_class": "ACQUISITION_19_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 829,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 226141.589,
+          "event_class": "ACQUISITION_19_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 831,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 226187.835,
+          "event_class": "ACQUISITION_19_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 20,
+      "frames": {
+        "irq2": {
+          "frame": 859,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 231606.214,
+          "event_class": "ACQUISITION_20_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 860,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 231606.734,
+          "event_class": "ACQUISITION_20_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 863,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 231607.331,
+          "event_class": "ACQUISITION_20_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 865,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 231654.259,
+          "event_class": "ACQUISITION_20_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    },
+    {
+      "cycle_number": 21,
+      "frames": {
+        "irq2": {
+          "frame": 893,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 24,
+          "declared_outer_length": 24,
+          "relative_timestamp_ms": 236968.629,
+          "event_class": "ACQUISITION_21_IRQ2",
+          "irq_code": 2
+        },
+        "command_0x22": {
+          "frame": 894,
+          "direction": "host_to_device",
+          "outer_wrapper": "0xa0",
+          "physical_length": 64,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 236969.463,
+          "event_class": "ACQUISITION_21_COMMAND_0X22",
+          "control": 34
+        },
+        "ack_0x22": {
+          "frame": 897,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xa0",
+          "physical_length": 10,
+          "declared_outer_length": 10,
+          "relative_timestamp_ms": 236970.34,
+          "event_class": "ACQUISITION_21_ACK_0X22",
+          "ack_echo": 34,
+          "ack_status": 1
+        },
+        "fingerprint_b0": {
+          "frame": 899,
+          "direction": "device_to_host",
+          "outer_wrapper": "0xb0",
+          "physical_length": 7726,
+          "declared_outer_length": 7726,
+          "relative_timestamp_ms": 237017.105,
+          "event_class": "ACQUISITION_21_FINGERPRINT_B0",
+          "declared_b0_length": 7722,
+          "tls_record_type_class": "TLS_APPLICATION_DATA"
+        }
+      }
+    }
+  ],
+  "third_b0_milestone_observed": true,
+  "third_b0_milestone_frame": 287,
+  "protocol_contradiction_count": 0,
+  "terminal_tail_host_seconds": 5.167,
+  "terminal_tail_target_frame_count": 0,
+  "host_capture_deadline_seconds": 1200,
+  "host_deadline_policy": "EVIDENCE_BOUNDED_NOT_DEVICE_TIMEOUT_CLAIM",
+  "device_timeout_claim": "UNKNOWN",
+  "command_family_counts": {
+    "0x20": 22,
+    "0x22": 21,
+    "0x32": 23,
+    "0x34": 41,
+    "0x36": 23,
+    "0x50": 2,
+    "0x70": 1,
+    "0x80": 4,
+    "0x82": 2,
+    "0x90": 1,
+    "0x97": 1,
+    "0xa2": 2,
+    "0xa6": 1,
+    "0xa8": 2,
+    "0xaf": 4,
+    "0xd1": 1,
+    "0xd4": 1,
+    "0xd5": 3,
+    "0xe4": 1
+  },
+  "known_persistent_command_families_observed": [],
+  "sensor_side_risk_assessment": "NO_KNOWN_PERSISTENT_FAMILY_OBSERVED_BUT_ENCRYPTED_TEMPLATE_PERSISTENCE_NOT_EXCLUDED",
+  "automatic_retry_count": 0,
+  "observer_is_passive": true,
+  "goodix_sender_present": false,
+  "privacy_payload_exported": false,
+  "biometric_plaintext_exported": false,
+  "biometric_hash_exported": false,
+  "secret_material_exported": false,
+  "pin_value_exported": false
+}

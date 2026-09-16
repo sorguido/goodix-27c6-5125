@@ -1,0 +1,270 @@
+{
+  "audit": {
+    "0x70_special_recovery_count": 0,
+    "a2_special_recovery_count": 0,
+    "af_attempt_count": 1,
+    "af_retry_count": 0,
+    "af_send_count": 1,
+    "baseline_b0_consumed_before_stage2": true,
+    "baseline_b0_tls_consumed": true,
+    "classifier_call_count": 0,
+    "d4_attempt_count": 1,
+    "d4_send_count": 1,
+    "d4_tls_application_record_count": 0,
+    "exact_fdt_command_trace": [
+      "0x36",
+      "0x50",
+      "0x36",
+      "0x82",
+      "0x20",
+      "0x36",
+      "0x32"
+    ],
+    "failure_reason": null,
+    "host_cache_write_count": 0,
+    "persistent_device_write_count": 0,
+    "raster_decode_count": 0,
+    "retry_count": 0,
+    "runtime_state": "CLOSED",
+    "second_native_delta_passed": true,
+    "second_psk_provisioning": false,
+    "second_server_session_created": false,
+    "secret_boundary_handoff_count": 1,
+    "secret_boundary_zeroized": true,
+    "tls_close_count": 1,
+    "tls_server_handshake_count": 1,
+    "tls_server_session_object_count": 1,
+    "tls_uses_same_secret_boundary_object": true,
+    "transport_cleanup_count": 1,
+    "transport_reopen_after_tls": false,
+    "usb_transport_session_count": 1
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "result": {
+    "baseline_b0_consumed_before_stage2": true,
+    "command_trace": [
+      "0x36",
+      "0x50",
+      "0x36",
+      "0x82",
+      "0x20",
+      "0x36",
+      "0x32"
+    ],
+    "second_native_delta_passed": true,
+    "tls_state_before_cleanup": "APPLICATION_ACTIVE"
+  },
+  "safety": {
+    "FINGER_INTERACTION_COUNT": 0,
+    "HOST_CACHE_WRITE_COUNT": 0,
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "REAL_E4_VALIDATED_SECRET_USED": false,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_TLS_TARGET_HANDSHAKE_COUNT": 0,
+    "REAL_USB_OPEN_COUNT": 0
+  },
+  "schema": "D260_END_TO_END_REHEARSAL_V1",
+  "single_runtime_object": true,
+  "status": "PASS",
+  "submissions": [
+    {
+      "control": "0xd1",
+      "kind": "A0",
+      "logical_length": 10,
+      "mode": "SHORT_FINAL",
+      "physical_chunk_lengths": [
+        10
+      ],
+      "policy": "D1_A0_D241_SHORT_FINAL",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 3000,
+      "zero_tail": false
+    },
+    {
+      "control": null,
+      "kind": "B0",
+      "logical_length": 94,
+      "mode": "FIXED64_ZERO_TAIL",
+      "physical_chunk_lengths": [
+        64,
+        64
+      ],
+      "policy": "B0_TLS_FIXED64_STAGING_D242_D245",
+      "post_submit_pacing_ms": 10,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 3000,
+      "zero_tail": true
+    },
+    {
+      "control": null,
+      "kind": "B0",
+      "logical_length": 13,
+      "mode": "FIXED64_ZERO_TAIL",
+      "physical_chunk_lengths": [
+        64
+      ],
+      "policy": "B0_TLS_FIXED64_STAGING_D242_D245",
+      "post_submit_pacing_ms": 10,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 3000,
+      "zero_tail": true
+    },
+    {
+      "control": null,
+      "kind": "B0",
+      "logical_length": 10,
+      "mode": "FIXED64_ZERO_TAIL",
+      "physical_chunk_lengths": [
+        64
+      ],
+      "policy": "B0_TLS_FIXED64_STAGING_D242_D245",
+      "post_submit_pacing_ms": 10,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 3000,
+      "zero_tail": true
+    },
+    {
+      "control": null,
+      "kind": "B0",
+      "logical_length": 49,
+      "mode": "FIXED64_ZERO_TAIL",
+      "physical_chunk_lengths": [
+        64
+      ],
+      "policy": "B0_TLS_FIXED64_STAGING_D242_D245",
+      "post_submit_pacing_ms": 10,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 3000,
+      "zero_tail": true
+    },
+    {
+      "control": "0xd4",
+      "kind": "A0",
+      "logical_length": 10,
+      "mode": "FIXED64_ZERO_TAIL",
+      "physical_chunk_lengths": [
+        64
+      ],
+      "policy": "D4_A0_FIXED64_ZERO_TAIL_POST_TLS_20MS",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 20,
+      "timeout_ms": 200,
+      "zero_tail": true
+    },
+    {
+      "control": "0xaf",
+      "kind": "A0",
+      "logical_length": 13,
+      "mode": "FIXED64_ZERO_TAIL",
+      "physical_chunk_lengths": [
+        64
+      ],
+      "policy": "AF_A0_FIXED64_ZERO_TAIL_D251",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 500,
+      "zero_tail": true
+    },
+    {
+      "control": "0x36",
+      "kind": "A0",
+      "logical_length": 22,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        22
+      ],
+      "policy": "FDT_A0_0x36_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 500,
+      "zero_tail": false
+    },
+    {
+      "control": "0x50",
+      "kind": "A0",
+      "logical_length": 10,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        10
+      ],
+      "policy": "FDT_A0_0x50_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 500,
+      "zero_tail": false
+    },
+    {
+      "control": "0x36",
+      "kind": "A0",
+      "logical_length": 22,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        22
+      ],
+      "policy": "FDT_A0_0x36_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 500,
+      "zero_tail": false
+    },
+    {
+      "control": "0x82",
+      "kind": "A0",
+      "logical_length": 13,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        13
+      ],
+      "policy": "FDT_A0_0x82_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 500,
+      "zero_tail": false
+    },
+    {
+      "control": "0x20",
+      "kind": "A0",
+      "logical_length": 10,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        10
+      ],
+      "policy": "FDT_A0_0x20_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 2000,
+      "zero_tail": false
+    },
+    {
+      "control": "0x36",
+      "kind": "A0",
+      "logical_length": 22,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        22
+      ],
+      "policy": "FDT_A0_0x36_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 500,
+      "zero_tail": false
+    },
+    {
+      "control": "0x32",
+      "kind": "A0",
+      "logical_length": 24,
+      "mode": "ABSTRACT_LOGICAL_ONLY",
+      "physical_chunk_lengths": [
+        24
+      ],
+      "policy": "FDT_A0_0x32_ABSTRACT_OFFLINE",
+      "post_submit_pacing_ms": 0,
+      "pre_submit_pacing_ms": 0,
+      "timeout_ms": 100,
+      "zero_tail": false
+    }
+  ]
+}

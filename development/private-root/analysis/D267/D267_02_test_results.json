@@ -1,0 +1,67 @@
+{
+  "schema": "D267_02_TEST_RESULTS_V1",
+  "execution_mode": "OFFLINE_ONLY",
+  "protected_report_read_gate": {
+    "command": "test -r /var/lib/goodix-5125-poc/d261-results/d267-first-image-final.json",
+    "exit_code": 1,
+    "PROTECTED_D267_REPORT_READ_STATUS": "UNAVAILABLE_WITH_CURRENT_PERMISSIONS",
+    "status": "EXPECTED_NON_BLOCKING"
+  },
+  "d267_operator_dry_run": {
+    "command": "/home/guido/Repository/goodix-27c6-5125_private/operator_kit/d267-first-image-once.sh --dry-run",
+    "cwd": "/tmp",
+    "exit_code": 0,
+    "status": "PASS",
+    "D267_OPERATOR_DRY_RUN": "PASS",
+    "REAL_USB_ACCESS_COUNT": 0,
+    "REAL_SECRET_READ_COUNT": 0,
+    "REAL_DEVICE_COMMAND_COUNT": 0,
+    "MARKER_MUTATION_COUNT": 0,
+    "FPRINTD_MUTATION_COUNT": 0,
+    "PERSISTENT_DEVICE_WRITE_COUNT": 0,
+    "LIVE_TLS_HANDSHAKE_COUNT": 0
+  },
+  "d266_router_regression": {
+    "command": "python3 -m unittest -v tests.test_d266_irq_event_router",
+    "tests_run": 8,
+    "passed": 8,
+    "failed": 0,
+    "errors": 0,
+    "status": "PASS"
+  },
+  "decoder_first_image_regression": {
+    "command": "python3 -m unittest -v tests.test_d263_phase2_first_image_terminal tests.test_d249_post_d4 tests.test_cleanroom",
+    "tests_run": 30,
+    "passed": 30,
+    "failed": 0,
+    "errors": 0,
+    "status": "PASS"
+  },
+  "synthetic_decoder_boundary_probe": {
+    "kind": "TEMPORARY_NON_VERSIONED_MICRO_SCRIPT",
+    "uses_biometric_or_live_data": false,
+    "valid_plaintext_length": 7693,
+    "declared_v19": 7690,
+    "image_data_length": 7689,
+    "image_record_length": 7684,
+    "valid_raster_samples": 5120,
+    "valid_fixture": "PASS",
+    "forced_no_check_0x88": "ChecksumMismatch:payload_checksum",
+    "raw_record_only": "LengthMismatch:payload_length",
+    "whole_synthetic_b0": "LengthMismatch:payload_length",
+    "truncated_payload": "LengthMismatch:payload_length",
+    "status": "PASS_BOUNDARIES_REPRODUCED"
+  },
+  "pytest": {
+    "command": "python3 -m pytest --version",
+    "exit_code": 1,
+    "status": "UNAVAILABLE_NOT_INSTALLED",
+    "installed_by_step": false
+  },
+  "repository_test_files_modified": false,
+  "live_critical_code_modified": false,
+  "OUTCOME": "PASS_OFFLINE_ANALYSIS_TESTS",
+  "EXECUTABLE_CLOSURE": "PASS_FOR_POST_LIVE_ANALYSIS",
+  "LIVE_AUTHORIZED": false,
+  "READY_FOR_LIVE": false
+}

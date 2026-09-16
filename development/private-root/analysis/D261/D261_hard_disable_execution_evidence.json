@@ -1,0 +1,60 @@
+{
+  "BACKEND_ONLY_LIVE_ENABLEMENT": false,
+  "DIRECT_PYTHON_LIVE_CALL_WITHOUT_CAPABILITY_FAILS_CLOSED": true,
+  "ENVIRONMENT_ONLY_LIVE_ENABLEMENT": false,
+  "LIVE_CAPABILITY_DEFAULT": 0,
+  "LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG": false,
+  "REAL_SECRET_READ_COUNT": 0,
+  "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
+  "REAL_USB_OPEN_COUNT": 0,
+  "SUPPORTED_LIVE_ENTRYPOINT_COUNT": 1,
+  "SUPPORTED_PATH_FENCE_THREAT_MODEL": "ACCIDENTAL_AND_UNSUPPORTED_INVOCATION_FENCE_NOT_SAME_INTERPRETER_MALICIOUS_CODE_SECURITY_BOUNDARY",
+  "rows": [
+    {
+      "result": {
+        "LIVE_CAPABILITY_DEFAULT": 0,
+        "LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG": false,
+        "required_live_flag": "--i-authorize-one-d261-fdt-arm-live-attempt",
+        "status": "HARD_DISABLED_DEFAULT"
+      },
+      "returncode": 2,
+      "scenario": "default_cli"
+    },
+    {
+      "result": {
+        "LIVE_CAPABILITY_DEFAULT": 0,
+        "LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG": false,
+        "required_live_flag": "--i-authorize-one-d261-fdt-arm-live-attempt",
+        "status": "HARD_DISABLED_DEFAULT"
+      },
+      "returncode": 2,
+      "scenario": "environment_alone"
+    },
+    {
+      "observed_failure_class": "ProtectedRuntimeFailure:valid_cli_intent_capability_required",
+      "scenario": "direct_python_without_capability"
+    },
+    {
+      "ctypes_loaded": false,
+      "observed_failure_class": "ProtectedRuntimeFailure:live_io_capability_required",
+      "scenario": "backend_without_live_io_capability"
+    },
+    {
+      "observed_counters": {
+        "fprintd": 0,
+        "marker": 0,
+        "secret": 0,
+        "usb": 0
+      },
+      "result": {
+        "failure_class": "OperationalFailure:git_rev-parse_failed:fatal: argomento '0000000000000000000000000000000000000000^{commit}' ambiguo: revisione sconosciuta o percorso non nell'albero di lavoro.\nUsa '--' per separare i percorsi dalle revisioni, come segue:\n'git <comando> [<revisione>...] -- [<file>...]'",
+        "report": "NOT_DURABLY_PUBLISHED",
+        "result": "FAIL_CLOSED"
+      },
+      "returncode": 1,
+      "scenario": "exact_flag_bad_baseline"
+    }
+  ],
+  "schema": "D261_HARD_DISABLE_EXECUTION_EVIDENCE_V2",
+  "status": "PASS"
+}

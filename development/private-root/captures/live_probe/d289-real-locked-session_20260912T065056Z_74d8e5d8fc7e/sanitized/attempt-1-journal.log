@@ -1,0 +1,9 @@
+2026-09-12T08:51:12.868457+02:00 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+2026-09-12T08:51:13.211737+02:00 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+2026-09-12T08:51:16.312955+02:00 192.168.0.25 fprintd[103436]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=129
+2026-09-12T08:51:16.313721+02:00 192.168.0.25 fprintd[103436]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+2026-09-12T08:51:16.314251+02:00 192.168.0.25 fprintd[103436]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=9 threshold=40
+2026-09-12T08:51:16.314423+02:00 192.168.0.25 fprintd[103436]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=14 threshold=40
+2026-09-12T08:51:16.314689+02:00 192.168.0.25 fprintd[103436]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=3 score=376 threshold=40
+2026-09-12T08:51:16.314693+02:00 192.168.0.25 fprintd[103436]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=3 comparisons=3 threshold=40
+2026-09-12T08:51:16.319344+02:00 192.168.0.25 fprintd[103436]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=76 outstanding=0 drained=1 context_closed=1

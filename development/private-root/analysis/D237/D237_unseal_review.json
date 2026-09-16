@@ -1,0 +1,17 @@
+{
+  "schema": "d237-unseal-review-v1",
+  "status": "not_reached",
+  "decision": "D237_BLOCKED_BY_SUDO_AUTH_NOT_PRIMED",
+  "sudo_auth_primed": "no",
+  "unseal_patch_scope": "not_applied",
+  "source_files_changed": [],
+  "source_seals_changed": 0,
+  "compile_time_authorization_declarations_changed": 0,
+  "new_protocol_logic": "no",
+  "new_command_builder": "no",
+  "new_backend_logic": "no",
+  "state_machine_changed": "no",
+  "runtime_live_enablement_added": "no",
+  "exit_code_normalization_applied": "no",
+  "review": "not_reached"
+}

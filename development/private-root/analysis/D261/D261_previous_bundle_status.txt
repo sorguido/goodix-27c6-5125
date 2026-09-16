@@ -1,0 +1,5 @@
+D261_operational_live_readiness_bundle.zip
+STATUS=SUPERSEDED_BY_D261_OPERATIONAL_EVIDENCE_HARDENING_CORRECTIVE
+D261_operational_evidence_hardening_corrective_bundle.zip
+STATUS=SUPERSEDED_BY_D261_IMPORT_PURITY_PRESECRET_CORRECTIVE
+NOTE=Both prior bundles are preserved byte-for-byte for provenance; use the import-purity bundle for baseline-approval review.

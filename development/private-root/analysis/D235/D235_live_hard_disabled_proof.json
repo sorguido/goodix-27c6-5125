@@ -1,0 +1,37 @@
+{
+  "schema": "d235-live-hard-disabled-proof-v1",
+  "d235_live_capability": 0,
+  "d235_live_hard_disabled": true,
+  "shipped_entrypoint": "src.goodix5125_d235_entrypoint:main",
+  "source_seals": [
+    "_d235_source_seal before sysfs/protected inputs/services/libusb",
+    "_d233_usb_source_seal before every real libusb ABI operation"
+  ],
+  "usb_open_reachable_from_shipped_entrypoint": false,
+  "runtime_enablement_exists": false,
+  "real_libusb_init_reached_in_d235": false,
+  "real_usb_enumeration_reached_in_d235": false,
+  "real_usb_open_reached_in_d235": false,
+  "attempts": {
+    "normal_empty_argv": {"usb_open_count": 0, "result": "source_sealed"},
+    "--live": {"usb_open_count": 0, "result": "argument_rejected"},
+    "--force": {"usb_open_count": 0, "result": "argument_rejected"},
+    "unexpected_argv": {"usb_open_count": 0, "result": "argument_rejected"},
+    "environment_LIVE": {"usb_open_count": 0, "result": "source_sealed"},
+    "environment_D235_LIVE": {"usb_open_count": 0, "result": "source_sealed"},
+    "environment_HOME_confusion": {"usb_open_count": 0, "result": "source_sealed"},
+    "config_enable_live": {"usb_open_count": 0, "result": "config_rejected"},
+    "alternate_backend": {"usb_open_count": 0, "result": "backend_rejected"},
+    "python_module_invocation": {"usb_open_count": 0, "result": "source_sealed"},
+    "direct_main_import": {"usb_open_count": 0, "result": "source_sealed"},
+    "direct_LibusbSystemApi_init": {"usb_open_count": 0, "result": "d233_source_sealed"}
+  },
+  "offline_review_guard": {
+    "system_os_facade_rejected": true,
+    "system_libusb_api_rejected": true,
+    "root_protected_provider_rejected": true,
+    "temporary_root_confinement_required": true
+  },
+  "d236_operator_risk_acceptance": "not_granted",
+  "live_authorization": "no"
+}

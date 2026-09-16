@@ -1,0 +1,23 @@
+{
+  "schema": "d232-synthetic-oracle-v1",
+  "classification": "EXCLUSIVELY_SYNTHETIC_NO_TARGET_BYTES_NO_SECRET",
+  "config_recipe": {
+    "length": 224,
+    "base_formula": "byte[i]=(17*i+3) mod 256",
+    "dac": [
+      {"order": 1, "register": "0x0220", "value_le_hex": "3412", "config_tuple_offset": 117},
+      {"order": 2, "register": "0x0236", "value_le_hex": "7856", "config_tuple_offset": 121},
+      {"order": 3, "register": "0x0238", "value_le_hex": "bc9a", "config_tuple_offset": 125},
+      {"order": 4, "register": "0x023a", "value_le_hex": "f0de", "config_tuple_offset": 129}
+    ],
+    "finalizer_rule": "D232 checksum over offsets 0..221"
+  },
+  "response_recipes": {
+    "e4_validator": "byte[i]=(5*i+7) mod 256, length 32",
+    "a2_irq_hex": "010203",
+    "chip82_hex": "10203040",
+    "otp_a6": "byte[i]=(9*i+11) mod 256, length 64",
+    "tls_random": "byte[i]=(13*i+1) mod 256, length 32"
+  },
+  "secret_recipe": "byte[i]=i+1, length 32; constructed only in test memory"
+}

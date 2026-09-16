@@ -1,0 +1,10 @@
+{
+  "EVENT_SOURCE_CONTRACT_REQUIRED": true,
+  "IRQ100_EVENT_SEPARATE_FROM_ACK_REQUIRED": true,
+  "IRQ100_STAGE0_EXACTLY_ONCE": true,
+  "IRQ100_STAGE1_EXACTLY_ONCE": true,
+  "IRQ100_STAGE2_EXACTLY_ONCE": true,
+  "ack_receive_path": "RuntimeTransport.receive",
+  "event_receive_path": "EventSource.wait_event",
+  "schema": "D260_EVENTSOURCE_IRQ_EVIDENCE_V1"
+}

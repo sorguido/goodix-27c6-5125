@@ -1,0 +1,137 @@
+include:
+  - project: 'libfprint/libfprint'
+    ref: master
+    file: '/.gitlab-ci/libfprint-templates.yaml'
+  - project: 'freedesktop/ci-templates'
+    ref: master
+    file: '/templates/fedora.yml'
+
+variables:
+  extends: .libfprint_common_variables
+  FDO_DISTRIBUTION_TAG: latest
+  FDO_DISTRIBUTION_VERSION: rawhide
+  FDO_UPSTREAM_REPO: "libfprint/$CI_PROJECT_NAME"
+  FEDORA_IMAGE: "$CI_REGISTRY/libfprint/$CI_PROJECT_NAME/fedora/$FDO_DISTRIBUTION_VERSION:$FDO_DISTRIBUTION_TAG"
+  DEPENDENCIES: dbus-glib-devel
+                gcc
+                gcovr
+                gettext
+                git
+                glibc-devel
+                gtk-doc
+                libasan
+                libfprint-devel
+                meson
+                patch
+                pam-devel
+                polkit-devel
+                python3-dbusmock
+                python3-libpamtest
+                systemd-devel
+
+image: "$FEDORA_IMAGE"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'push'
+
+stages:
+  - check-source
+  - build
+  - test
+
+.fprintd_build_preconditions:
+  except:
+    variables:
+      - $FPRINT_CRON_TASK == "BUILD_CI_IMAGES"
+
+.install_libfprint_dev:
+  before_script:
+    # Make sure we don't build or link against the system libfprint
+    - dnf remove -y libfprint-devel
+    - git clone https://gitlab.freedesktop.org/libfprint/libfprint.git
+    - cd libfprint
+    - meson . _build --prefix=/usr -Ddrivers=virtual_image,virtual_device,virtual_device_storage -Ddoc=false
+    - ninja -C _build
+    - ninja -C _build install
+    - cd ..
+    # So we don't get error about this libfprint file
+    - echo "libfprint/demo/gtk-libfprint-test.ui" >> po/POTFILES.skip
+
+test_indent:
+  stage: check-source
+  extends: .fprintd_build_preconditions
+  script:
+    - scripts/uncrustify.sh
+    - git diff
+    - "! git status -s | grep -q ."
+
+build_stable:
+  extends: .fprintd_build_preconditions
+  stage: build
+  allow_failure: true
+  script:
+    - meson _build
+    - ninja -C _build -v
+    - ninja -C _build -v install
+
+build_dev:
+  extends:
+    - .fprintd_build_preconditions
+    - .install_libfprint_dev
+  stage: build
+  script:
+    - meson _build --werror -Dgtk_doc=true
+    - ninja -C _build -v
+    - ninja -C _build -v install
+  artifacts:
+    name: log
+    when: on_failure
+    paths:
+      - _build/meson-logs/*.txt
+
+test_dev:
+  extends:
+    - .fprintd_build_preconditions
+    - .install_libfprint_dev
+  stage: test
+  script:
+    - meson _build -Db_coverage=true
+    - meson test -C _build --print-errorlogs --no-stdsplit --timeout-multiplier 3
+    - ninja -C _build coverage || true
+    - cat _build/meson-logs/coverage.txt || true
+  artifacts:
+    expose_as: 'Coverage Report'
+    paths:
+      - _build/meson-logs
+      - _build/meson-logs/coveragereport/index.html
+    expire_in: 1 week
+
+test_dev_with_sanitizer:
+  extends:
+    - .fprintd_build_preconditions
+    - .install_libfprint_dev
+  stage: test
+  script:
+    - meson _build -Db_sanitize=address
+    - meson test -C _build --print-errorlogs --no-stdsplit --timeout-multiplier 5
+  artifacts:
+    name: meson-logs
+    when: on_failure
+    paths:
+      - _build/meson-logs
+
+# CONTAINERS creation stage
+container_fedora_build:
+  extends: .fdo.container-build@fedora
+  only:
+    variables:
+      - $FPRINT_CRON_TASK == "BUILD_CI_IMAGES"
+  variables:
+    GIT_STRATEGY: none # no need to pull the whole tree for rebuilding the image
+    FDO_FORCE_REBUILD: 1
+    # a list of packages to install
+    FDO_DISTRIBUTION_PACKAGES:
+      $DEPENDENCIES
+      $LIBFPRINT_DEPENDENCIES

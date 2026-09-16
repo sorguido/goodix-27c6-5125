@@ -1,0 +1,2 @@
+# D237 unseal diff intentionally absent.
+# sudo -n true failed before source unseal or review; no source file changed.

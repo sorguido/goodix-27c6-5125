@@ -1,0 +1,16 @@
+ENROLL_OPERATOR_CONFIRMATION=DESTRO
+SUDO_OPERATOR_CONFIRMATION=INDICE_DESTRO
+GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=130
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=133
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=134
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=137
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=141
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=144
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=145
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=150
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=160
+GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=584 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40

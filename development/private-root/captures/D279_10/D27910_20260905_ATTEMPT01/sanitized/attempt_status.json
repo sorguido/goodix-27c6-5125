@@ -1,0 +1,17 @@
+{
+    "schema":  "D279_10_ATTEMPT_STATUS_V2",
+    "attempt_id":  "D27910_20260905_ATTEMPT01",
+    "result":  "FAIL",
+    "failure_class":  "D279_10_FAIL_CLOSED: observer terminato prima della conclusione UI",
+    "target_attached":  true,
+    "wizard_started":  false,
+    "contact_count":  0,
+    "enrollment_completed":  false,
+    "capture_started":  true,
+    "capture_stopped":  true,
+    "capture_sha256":  "557ff136e5a1d383f7413ca24d731eeae32d2b377e61003846b034ecda991743",
+    "automatic_retry_count":  0,
+    "rerun_classification":  "RESTORE_SNAPSHOT_REQUIRED_STATE_UNCERTAIN",
+    "export_before_snapshot_restore_raw":  "C:\\Users\\sorgu\\Documents\\goodix-27c6-5125-private\\captures\\D279_10\\D27910_20260905_ATTEMPT01\\raw",
+    "export_before_snapshot_restore_sanitized":  "C:\\Users\\sorgu\\Documents\\goodix-27c6-5125-private\\captures\\D279_10\\D27910_20260905_ATTEMPT01\\sanitized"
+}

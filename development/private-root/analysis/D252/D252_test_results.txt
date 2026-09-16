@@ -1,0 +1,65 @@
+D252 offline verification results
+=================================
+
+Environment
+-----------
+Repository: /home/guido/Repository/goodix-27c6-5125_private
+Initial HEAD: f07352ce085651568a9aedbf04b097df91d7c0bb
+Hardware/network/sudo used: no
+
+1. D252 capture audit, JSON validation, bytecode compile, external cwd
+---------------------------------------------------------------------
+Command set:
+  python3 analysis/D252/d252_fdt_capture_audit.py
+  python3 -m json.tool <audit-output>
+  python3 -m json.tool analysis/D252/D252_decision.json
+  python3 -m py_compile analysis/D252/d252_fdt_capture_audit.py
+  cd /tmp && python3 <absolute-path>/analysis/D252/d252_fdt_capture_audit.py
+  cmp <root-output> <external-cwd-output>
+
+Result: PASS
+Audit result field: PASS
+Capture SHA-256 gate: PASS
+Root/external-cwd output equality: PASS
+USB opens/commands/persistent writes: 0/0/0
+
+2. Focused D249/D250/D251 regression suite
+-------------------------------------------
+Command:
+  python3 -m unittest -v tests.test_d249_post_d4 tests.test_d250_af_boundary tests.test_d251_af_boundary
+
+Result: PASS, 35 tests
+
+This includes serializer/checksum KATs, malformed and wrong ACK handling,
+duplicate ACK/event and mixed-framing adversarial cases, timeout/re-entry
+fences, unreachable post-AF commands, and D251 offline launcher closure.
+These remain historical/offline tests; they do not make the D249 0x20 model
+target-exact and do not supply the missing D252 restore proof.
+
+3. Full repository regression suite
+-----------------------------------
+The default `python3 -m unittest discover -v` selected zero tests because this
+repository's `tests/` directory is not an importable discovery start directory.
+The explicit repository-supported file selection was then used:
+
+  python3 -m unittest -v tests/test_*.py
+
+Result: PASS, 170 tests
+
+4. Static/document checks
+-------------------------
+  python3 -m json.tool analysis/D252/D252_decision.json: PASS
+  git diff --check: PASS
+  D251 user-owned untracked artifacts preserved: PASS
+  D252 live launcher/operator kit absent by BLOCKED decision: PASS
+
+Safety counters
+---------------
+REAL_USB_OPEN_COUNT=0
+REAL_TLS_HANDSHAKE_COUNT=0
+REAL_D4_SEND_COUNT=0
+REAL_AF_SEND_COUNT=0
+REAL_FDT_SEND_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+RETRY_COUNT=0
+PERSISTENT_WRITE_FAMILY_COUNT=0

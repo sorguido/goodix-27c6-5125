@@ -1,0 +1,82 @@
+{
+  "schema": "d235-production-path-contract-v1",
+  "repository_root": "/home/guido/Repository/goodix-27c6-5125",
+  "resolution": "absolute_compile_time_and_module_relative_only",
+  "home_relative_resolution": false,
+  "fallback_paths": [],
+  "secret_store_scan": false,
+  "paths": {
+    "psk_store": {
+      "path": "/var/lib/goodix-5125-poc/transport-material.bin",
+      "type": "regular_non_symlink",
+      "owner_uid": 0,
+      "mode": "0600",
+      "length": 32,
+      "read_count_max": 1
+    },
+    "target_material_manifest": {
+      "path": "/var/lib/goodix-5125-poc/target-material-manifest.json",
+      "type": "regular_non_symlink",
+      "owner_uid": 0,
+      "mode": "0600",
+      "sha256": "1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15"
+    },
+    "config90_store": {
+      "path": "/var/lib/goodix-5125-poc/target-config-90.bin",
+      "type": "regular_non_symlink",
+      "owner_uid": 0,
+      "mode": "0600",
+      "length": 224,
+      "sha256": "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82"
+    },
+    "canonical_gfusb": {
+      "path": "/home/guido/Repository/goodix-27c6-5125/analysis/D230/work/GoodixExport/gfusb.dll",
+      "type": "regular_non_symlink",
+      "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+      "execution_allowed": false
+    },
+    "report_directory": {
+      "path": "/var/lib/goodix-5125-poc/d236-results",
+      "type": "preexisting_directory_non_symlink",
+      "owner_uid": 0,
+      "mode": "0700"
+    },
+    "checkpoint_report": {
+      "path": "/var/lib/goodix-5125-poc/d236-results/d236-live-pre-restore.json",
+      "mode": "0600",
+      "atomic": true
+    },
+    "final_report": {
+      "path": "/var/lib/goodix-5125-poc/d236-results/d236-live-result.json",
+      "mode": "0600",
+      "atomic": true,
+      "must_be_absent_before_run": true
+    },
+    "single_use_marker": {
+      "path": "/var/lib/goodix-5125-poc/d236-live-single-use.marker",
+      "mode": "0600",
+      "creation": "O_EXCL",
+      "must_be_absent_before_run": true
+    }
+  },
+  "operator_identity": {
+    "euid": 0,
+    "source": "os.geteuid",
+    "operator_uid_source": "SUDO_UID",
+    "home_used": false
+  },
+  "fprintd_state_provider": "SystemOsFacade.systemctl_exact_service",
+  "usb_target_selector": {
+    "source": "/sys/bus/usb/devices",
+    "vid": "27c6",
+    "pid": "5125",
+    "candidate_count_required": 1,
+    "stable_identity": ["bus", "address", "port_path"],
+    "device_node": "/dev/bus/usb/BBB/DDD",
+    "wildcard_open": false,
+    "fallback_device": false
+  },
+  "libusb_backend_factory": "LibusbSystemApi -> ProductionUsbTransport",
+  "tls_backend_factory": "Tls12PskServer -> B0TlsBridge",
+  "d235_real_store_reads": 0
+}

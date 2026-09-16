@@ -1,0 +1,76 @@
+{
+  "artifact": "D272_01_exact_ack_corrective_bundle_manifest",
+  "step": "D272/01",
+  "corrective": "EXACT_ACK_STATUS_FAIL_CLOSED",
+  "execution_mode": "OFFLINE_ONLY",
+  "generated_at": "2026-08-25T14:19:57+02:00",
+  "bundle_type": "STEP_LOCAL_NON_CUMULATIVE_SANITIZED",
+  "reference_head": "8d016e2de476d910b358249e0cd1c255121d5ad2",
+  "scope": "ACK status policy of the D272 multi-frame seam only",
+  "review_set": [
+    "analysis/D272/D272_01_exact_ack_corrective_report.md",
+    "analysis/D272/D272_01_exact_ack_corrective_test_results.json",
+    "analysis/D272/D272_01_exact_ack_corrective_execution_manifest.json",
+    "analysis/D272/D272_01_exact_ack_corrective_bundle_manifest.json",
+    "core/multiframe_validation.py",
+    "tests/test_d272_multiframe_validation.py",
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "implementation_files_modified": [
+    "core/multiframe_validation.py"
+  ],
+  "test_files_modified": [
+    "tests/test_d272_multiframe_validation.py"
+  ],
+  "canonical_files_modified": [
+    "Goodix 27c6 5125 manuale tecnico.md"
+  ],
+  "referenced_unchanged_files_not_bundled": [
+    "AGENTS.md",
+    "Linee Guida di Progetto Goodix 27c6 5125 per AI.md",
+    "analysis/D263/D263_01_post_arm_order.json",
+    "analysis/D272/D272_01_multiframe_contract.json",
+    "analysis/D272/D272_01_test_results.json",
+    "analysis/D272/D272_01_execution_manifest.json",
+    "analysis/D241/D241_operator_live_stdout.json",
+    "core/cold_start.py",
+    "core/post_d4.py",
+    "tools/d272_sigfm_validation.py"
+  ],
+  "historical_artifacts_not_modified_and_not_bundled": [
+    "analysis/D272/D272_01_sigfm_target_validation_prelive_offline_bundle.zip",
+    "analysis/D272/D272_01_sigfm_target_validation_prelive_offline_bundle.zip.sha256",
+    "analysis/D272/D272_01_sigfm_target_validation_prelive_offline_report.md"
+  ],
+  "excluded": [
+    "the original D272/01 bundle and its sidecar",
+    "previous bundles and unmodified historical artifacts",
+    "captures and real biometric material",
+    "PSK, TLS plaintext and secrets",
+    "firmware and proprietary DLLs",
+    "SIGFM templates, descriptors and FP3",
+    "build cache, binaries, temporary files and backups"
+  ],
+  "step_local": true,
+  "non_cumulative": true,
+  "sanitized": true,
+  "raw_biometric_in_bundle": false,
+  "secret_in_bundle": false,
+  "psk_in_bundle": false,
+  "tls_plaintext_in_bundle": false,
+  "capture_raw_in_bundle": false,
+  "firmware_in_bundle": false,
+  "dll_in_bundle": false,
+  "sigfm_template_or_descriptor_in_bundle": false,
+  "sha256_sidecar": "analysis/D272/D272_01_exact_ack_corrective_bundle.zip.sha256",
+  "bundle_sha256": "SEE_EXTERNAL_SIDECAR",
+  "ack_policy_corrective": "PASS",
+  "ack_status_contract": "CLOSED_OFFLINE_EXACT_0X01",
+  "ack_0x07_accepted": false,
+  "corrective_executable_closure": "PASS",
+  "d272_primary_executable_closure": "FAIL",
+  "outcome": "ACK_STATUS_POLICY_REALIGNED_TO_TARGET_EVIDENCE_D272_PRIMARY_BLOCKERS_UNCHANGED",
+  "baseline_approved": false,
+  "live_authorized": false,
+  "ready_for_live": false
+}

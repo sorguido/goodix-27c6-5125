@@ -1,0 +1,229 @@
+{
+  "baseline_head": "44f7af8cd98be3072c32f53f814b4851cf20911f",
+  "bootstrap": {
+    "BOOTSTRAP_CACHE_FDT12_EQUALS_FIRST_WIRE_SEED": true,
+    "BOOTSTRAP_CACHE_LAYOUT_TARGET_VALID": true,
+    "BOOTSTRAP_CACHE_OTP_BOUND": true,
+    "BOOTSTRAP_SEED_DATAFLOW_CAUSALITY_PROVEN": false,
+    "BOOTSTRAP_SEED_FRESHNESS_SCOPE": "FIRST_0x36_IN_THIS_D255_COLD_ATTACH_ONLY; GENERAL_LIFETIME_UNPROVEN",
+    "BOOTSTRAP_SEED_SOURCE_CORRELATED": true,
+    "BOOTSTRAP_SEED_SOURCE_STATUS": "TARGET_CACHE_WIRE_CORRELATION_PROVEN_CAUSALITY_UNPROVEN_FRESHNESS_NOT_GENERALIZED"
+  },
+  "controls": {
+    "0x50": {
+      "bounded_static_builder": "NO_DEDICATED_0x50_BUILDER_IN_D230; bounded dynamic ChicagoHUSetMode family only",
+      "classification": "KNOWN_D230_SENSOR_MODE_FAMILY_EXACT_SEMANTICS_UNRESOLVED_NOT_LIFECYCLE_RESTORE",
+      "control": "0x50",
+      "corpus_status": "D230 records two historical requests; D255 contains one during FDT bootstrap after first 0x36",
+      "occurrence_count": 1,
+      "occurrences": [
+        {
+          "ack": "frame 152 B0/50/01",
+          "direction": "OUT",
+          "frame": 150,
+          "immediate_following_non_ack_in": "frame 154 A0/50 logical_length=2417 physical_length=2417",
+          "logical_length": 10,
+          "payload_length": 2,
+          "physical_length": 64,
+          "wrapper": "0xa0"
+        }
+      ],
+      "timeline_position": "POST_FIRST_0x36_IRQ100_BEFORE_SECOND_0x36; OUTSIDE_CANCEL_REENTRY"
+    },
+    "0x97": {
+      "bounded_static_builder": "SetDriverState 0x18005c724 with immediate A0 builder callsites 0x18005c83e and 0x18005c8d0",
+      "classification": "KNOWN_D230_SETDRIVERSTATE_WIRE_COORDINATE_NOT_LIFECYCLE_RESTORE",
+      "control": "0x97",
+      "corpus_status": "D230 maps wire 0x97 to logical/builder 0x96 and records one historical request",
+      "occurrence_count": 1,
+      "occurrences": [
+        {
+          "ack": "NONE_OBSERVED",
+          "direction": "OUT",
+          "frame": 40,
+          "immediate_following_non_ack_in": "NONE_OBSERVED",
+          "logical_length": 10,
+          "payload_length": 2,
+          "physical_length": 64,
+          "wrapper": "0xa0"
+        }
+      ],
+      "timeline_position": "PRE_TLS_INITIAL_QUERY_SEQUENCE_BEFORE_FIRST_AF; OUTSIDE_FDT_CANCEL_REENTRY"
+    }
+  },
+  "corpus_decision": {
+    "CURRENT_CORPUS_EXHAUSTED_FOR_INTERNAL_ARM_LIFETIME_QUESTION": true,
+    "CURRENT_CORPUS_EXHAUSTED_FOR_REENTRY_RESTORE_QUESTION": true,
+    "fdt_live_authorized": false,
+    "future_ai_pm_review_separation": [
+      "factory-preserving_and_Windows_compatibility_requirement",
+      "device_internal_disarm_requirement",
+      "FDT_live_readiness_requirement"
+    ],
+    "new_equivalent_capture_requested": false,
+    "strategic_blocker": "DEVICE_INTERNAL_FDT_STATE_AND_PRIOR_ARM_LIFETIME_REMAIN_UNOBSERVED; NO_OBSERVABLE_HOST_BUS_TERMINAL_STOP_COMPONENT_IS_MISSING",
+    "terminal_stop_case": "CASE_A_HOST_BUS_CONTRACT_CLOSED_INTERNAL_STATE_UNOBSERVED"
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "lifecycle_contract": {
+    "decision": {
+      "ABORT_OR_RESET_OBSERVED": false,
+      "CANCEL_TO_REENTRY_DEVICE_CONTINUITY": "SAME_BUS_DEVICE_AND_BULK_ENDPOINTS",
+      "EXPLICIT_USB_RESTORE_OBSERVED": false,
+      "HOST_SIDE_PENDING_BULK_IN_CANCELLATION_OBSERVED": true,
+      "NEW_FDT_ARM_ACCEPTED_ON_REENTRY": true,
+      "PRIOR_ARM_DISARM_PROVEN": false,
+      "PRIOR_ARM_LIFETIME_AFTER_CANCEL": "UNOBSERVED",
+      "REENTRY_WITHOUT_EXPLICIT_USB_RESTORE_PROVEN": true,
+      "REENUMERATION_OBSERVED": false,
+      "RESTORE_REQUIRED_FOR_REENTRY": false,
+      "USBPCAP_LIFECYCLE_AUDIT": "PASS_COMPLETE_TARGET_PACKET_TIMELINE"
+    },
+    "observations": {
+      "abort_or_reset_observed": false,
+      "abort_pipe_observed": false,
+      "bus_device": "1:2",
+      "bus_device_change_observed": false,
+      "canceled_bulk_in_completion_count": 1,
+      "canceled_bulk_in_completion_frames": [
+        202
+      ],
+      "close_or_release_observation": "NO_TEARDOWN_URB_OBSERVED; GENERIC_HANDLE_CLOSE_NOT_DIRECTLY_ENCODED",
+      "control_transfer_observed": false,
+      "descriptor_replay_observed": false,
+      "device_reset_observed": false,
+      "endpoint_set": [
+        "0x01",
+        "0x81"
+      ],
+      "explicit_configuration_control_or_descriptor_transition": false,
+      "pipe_teardown_or_recreate_observed": false,
+      "reenumeration_observed": false,
+      "reset_pipe_or_clear_stall_observed": false,
+      "same_bulk_endpoints": true,
+      "same_bus_device": true,
+      "select_configuration_or_interface_observed": false,
+      "usbpcap_function_counts": {
+        "0x0009": 19
+      }
+    },
+    "window": {
+      "cancel_begin_utc": "2026-08-22T20:57:37.641447Z",
+      "cancel_end_utc": "2026-08-22T20:57:49.720641Z",
+      "cancel_interval_target_packet_count": 0,
+      "last_pre_cancel_arm_frame": 198,
+      "new_arm_ack_frame": 216,
+      "new_arm_frame": 214,
+      "post_cancel_pre_new_arm_target_packet_count": 12,
+      "reentry_begin_utc": "2026-08-22T20:57:49.720641Z",
+      "target_usbpcap_packet_count": 19
+    }
+  },
+  "primary_evidence": {
+    "D255_RAW_HASH_VERIFIED": true,
+    "D255_RAW_MODIFIED": false,
+    "bytes": 27684,
+    "first_frame": 1,
+    "path": "captures/D255_20260822T205631772Z_85c8c41f/raw/wire.pcapng",
+    "readable_frame_count": 218,
+    "sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+    "target": "27c6:5125 / GF_ST411SEC_APP_12509",
+    "target_packet_count": 206
+  },
+  "safety": {
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_USB_OPEN_COUNT": 0,
+    "otp_raw_exported": false,
+    "psk_or_secret_exported": false,
+    "raw_biometric_exported": false,
+    "raw_payload_exported": false
+  },
+  "schema": "D256_OFFLINE_USB_LIFECYCLE_CONTRACT_DECISION_V2",
+  "static_corroboration": {
+    "STATIC_LIFECYCLE_CORROBORATION": "EXHAUSTED_NO_NEW_DATAFLOW",
+    "bounded_conclusion": "gfOnCancel remains host-request cancellation; D0 strings alone do not prove execution in D255",
+    "gfOnCancel_direct_a0_builder_call": false,
+    "lifecycle_strings_present": true,
+    "new_direct_usb_restore_dataflow": false,
+    "scope": "existing D252/D253 gfOnCancel slice plus already-indexed lifecycle strings only"
+  },
+  "terminal_cancel_contract": {
+    "decision": {
+      "DEVICE_INTERNAL_FDT_STATE_AFTER_CANCEL": "UNOBSERVED",
+      "EXPLICIT_USB_TERMINAL_RESTORE_OBSERVED": false,
+      "FACTORY_PERSISTENCE_IMPLICATION": "NO_NEW_DEVICE_SIDE_FACTORY_PERSISTENCE_CLAIM_FROM_USB_SILENCE",
+      "HOST_BUS_TERMINAL_STOP_CONTRACT": "CLOSED_OBSERVED_PATH_BOUNDED_USB_QUIESCENCE",
+      "OEM_TERMINAL_CANCEL_USB_QUIESCENCE_PROVEN": true,
+      "PRIOR_ARM_DISARM_PROVEN": false,
+      "PRIOR_ARM_LIFETIME_AFTER_CANCEL": "UNOBSERVED",
+      "TERMINAL_CANCEL_ABORT_OR_RESET_OBSERVED": false,
+      "TERMINAL_CANCEL_PENDING_BULK_IN_CANCELED": true,
+      "TERMINAL_CANCEL_REENUMERATION_OBSERVED": false
+    },
+    "observations": {
+      "POST_TERMINAL_CANCEL_TARGET_USB_PACKET_COUNT": 0,
+      "POST_TERMINAL_CANCEL_TOTAL_PACKET_COUNT": 0,
+      "TERMINAL_CANCEL_TARGET_PACKET_COUNT_DURING_OPERATOR_INTERVAL": 0,
+      "completion_is_last_raw_frame": true,
+      "exact_capture_process_exit_timestamp": "UNOBSERVED",
+      "packet_count_after_cancel_end_before_completion": 0,
+      "packet_count_after_cancel_end_through_completion": 1,
+      "pending_bulk_in_canceled": true,
+      "terminal_abort_or_reset_count": 0,
+      "terminal_bus_device": "1:2",
+      "terminal_cancel_marker_order_valid": true,
+      "terminal_cancel_total_packet_count_during_operator_interval": 0,
+      "terminal_descriptor_replay_observed": false,
+      "terminal_endpoint_set": [
+        "0x01",
+        "0x81"
+      ],
+      "terminal_non_bulk_urb_count": 0,
+      "terminal_reconfiguration_control_or_descriptor_count": 0,
+      "terminal_same_bulk_endpoints": true,
+      "terminal_same_bus_device": true,
+      "terminal_target_usbpcap_function_counts": {
+        "0x0009": 5
+      },
+      "tshark_duration_boundary_evidence": true,
+      "tshark_final_packet_count": 218
+    },
+    "window": {
+      "POST_TERMINAL_CANCEL_CAPTURE_WINDOW_SECONDS": 491.125998,
+      "ack_to_terminal_cancel_begin_seconds": 7.007266,
+      "canceled_completion_frame": 218,
+      "canceled_completion_to_host_finalization_marker_seconds": 491.125998,
+      "canceled_completion_utc": "2026-08-22T20:58:26.117654Z",
+      "capture_process_started_to_host_finalization_marker_seconds": 602.54379,
+      "configured_capture_duration_seconds": 600,
+      "new_arm_ack_frame": 216,
+      "new_arm_ack_utc": "2026-08-22T20:58:04.379960Z",
+      "new_arm_frame": 214,
+      "new_arm_utc": "2026-08-22T20:58:04.344844Z",
+      "operator_phases_complete_utc": "2026-08-22T20:58:18.575601Z",
+      "pending_bulk_in_frame": 217,
+      "pending_bulk_in_utc": "2026-08-22T20:58:04.380538Z",
+      "post_terminal_cancel_capture_window_definition": "LAST_RAW_FRAME_TO_RUN_FAILED_HOST_FINALIZATION_MARKER_AFTER_DURATION_BOUNDARY; EXACT_PROCESS_EXIT_TIMESTAMP_UNOBSERVED",
+      "reentry_end_utc": "2026-08-22T20:58:18.559717Z",
+      "reentry_waiting_no_finger_utc": "2026-08-22T20:58:11.387226Z",
+      "run_failed_host_finalization_utc": "2026-08-22T21:06:37.243652Z",
+      "terminal_cancel_begin_to_end_seconds": 7.170485,
+      "terminal_cancel_begin_utc": "2026-08-22T20:58:11.387226Z",
+      "terminal_cancel_end_to_canceled_completion_seconds": 7.559943,
+      "terminal_cancel_end_utc": "2026-08-22T20:58:18.557711Z"
+    }
+  },
+  "urb_function_classification": {
+    "corrective_required_mapping_implemented": {
+      "0x0002": "URB_FUNCTION_ABORT_PIPE",
+      "0x001e": "URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL",
+      "0x0030": "URB_FUNCTION_SYNC_RESET_PIPE",
+      "0x0031": "URB_FUNCTION_SYNC_CLEAR_STALL"
+    },
+    "empirical_result_changed_by_mapping_correction": false,
+    "local_wdk_or_wireshark_source_status": "UNAVAILABLE_ON_OFFLINE_LINUX_HOST",
+    "mapped_codes_observed_in_terminal_window": [],
+    "mapping_scope": "Windows WDK URB_FUNCTION numeric ABI used by USBPcap"
+  }
+}

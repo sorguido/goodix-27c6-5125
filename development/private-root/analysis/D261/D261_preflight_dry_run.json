@@ -1,0 +1,126 @@
+{
+  "D260_architecture_critical_reference": {
+    "mismatches": [],
+    "reference_commit": "ef2aa95c0b7261638a70cdf26a91ea00dd60eb41",
+    "status": "PASS_HISTORICAL_REFERENCE"
+  },
+  "D261_operational_fileset_digest": "39d162077156b2af5fdb4b43d4382923006aa44f75e1e44c0fff741709761418",
+  "D261_operational_worktree_mismatches": [],
+  "FPRINTD_MUTATION_COUNT": 0,
+  "LIVE_CAPABILITY_DEFAULT": 0,
+  "LIVE_PATH_REACHABLE_WITHOUT_EXPLICIT_FLAG": false,
+  "PROTECTED_METADATA_DRYRUN_STATUS_MODEL": [
+    "PASS_METADATA",
+    "ABSENT",
+    "INACCESSIBLE_UNPRIVILEGED",
+    "ERROR_<errno>"
+  ],
+  "PROTECTED_ROOT_SAFETY_CHECKED_PRE_SIDE_EFFECT": true,
+  "PROTECTED_ROOT_STATUS": "ERROR_METADATA_UNSAFE",
+  "REAL_SECRET_READ_COUNT": 0,
+  "REAL_SINGLE_USE_MARKER_CREATE_COUNT": 0,
+  "REAL_USB_OPEN_COUNT": 0,
+  "REPORT_DIRECTORY_SAFETY_CHECKED_PRE_SIDE_EFFECT": true,
+  "REPORT_DIRECTORY_STATUS": "INACCESSIBLE_UNPRIVILEGED",
+  "cache_seed_source": {
+    "expected_sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+    "layout_crc_status": "PASS",
+    "mtime_is_generation_time": false,
+    "path": "captures/D255_20260822T205631772Z_85c8c41f/raw/cache_before/9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2.bin",
+    "sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+    "size": 13520,
+    "status": "PASS",
+    "write_count": 0
+  },
+  "cwd_independent": true,
+  "dependencies": {
+    "bash": true,
+    "git": true,
+    "libusb_1_0": true,
+    "python": "3.14.7",
+    "ssl_psk_server_callback": true
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "fake_marker_fixture_absent": true,
+  "live_baseline_approval": "PENDING_USER_AI_PM_FULL_SHA_APPROVAL",
+  "operator_launcher_syntax": "PASS",
+  "protected_material_metadata": {
+    "REAL_SECRET_READ_COUNT": 0,
+    "canonical_gfusb": {
+      "exists": true,
+      "expected_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+      "path": "analysis/D230/work/GoodixExport/gfusb.dll",
+      "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+    },
+    "config90_store": {
+      "content_read": false,
+      "errno": 13,
+      "exists": false,
+      "expected_size": 224,
+      "metadata_pass": false,
+      "mode": null,
+      "path": "/var/lib/goodix-5125-poc/target-config-90.bin",
+      "regular": false,
+      "size": null,
+      "status": "INACCESSIBLE_UNPRIVILEGED",
+      "symlink": false,
+      "uid": null
+    },
+    "material_manifest": {
+      "content_read": false,
+      "errno": 13,
+      "exists": false,
+      "expected_size": null,
+      "metadata_pass": false,
+      "mode": null,
+      "path": "/var/lib/goodix-5125-poc/target-material-manifest.json",
+      "regular": false,
+      "size": null,
+      "status": "INACCESSIBLE_UNPRIVILEGED",
+      "symlink": false,
+      "uid": null
+    },
+    "protected_root": {
+      "content_read": false,
+      "directory": true,
+      "errno": null,
+      "exists": true,
+      "metadata_pass": false,
+      "mode": "0o700",
+      "path": "/var/lib/goodix-5125-poc",
+      "status": "ERROR_METADATA_UNSAFE",
+      "symlink": false,
+      "uid": 65534
+    },
+    "report_directory": {
+      "content_read": false,
+      "directory": false,
+      "errno": 13,
+      "exists": false,
+      "metadata_pass": false,
+      "mode": null,
+      "path": "/var/lib/goodix-5125-poc/d261-results",
+      "status": "INACCESSIBLE_UNPRIVILEGED",
+      "symlink": false,
+      "uid": null
+    },
+    "secret_store": {
+      "content_read": false,
+      "errno": 13,
+      "exists": false,
+      "expected_size": 88,
+      "metadata_pass": false,
+      "mode": null,
+      "path": "/var/lib/goodix-5125-poc/transport-material.bin",
+      "regular": false,
+      "size": null,
+      "status": "INACCESSIBLE_UNPRIVILEGED",
+      "symlink": false,
+      "uid": null
+    }
+  },
+  "report_destination_model": "/var/lib/goodix-5125-poc/d261-results/d261-final.json",
+  "repository_root": "/home/guido/Repository/goodix-27c6-5125_private",
+  "schema": "D261_PREFLIGHT_DRY_RUN_V1",
+  "status": "PASS"
+}

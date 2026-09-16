@@ -1,0 +1,150 @@
+{
+  "D244_FRESH_HOST_BOOT_SUFFICIENCY": "FALSIFIED_AS_SUFFICIENT_RECOVERY_CONDITION",
+  "D244_FRESH_STATE_HOST_CONTROL_RESULT": "E4_TIMEOUT_PERSISTS",
+  "D244_SENSOR_ELECTRICAL_POWER_CYCLE_STATUS": "NOT_PROVEN",
+  "D245_A8_CURRENT_LOCAL_CORPUS_CORROBORATION": "PASS",
+  "D245_A8_READ_ONLY_CLASSIFICATION": "CURRENT_LOCAL_CORPUS_CONFIRMED",
+  "D245_A8_WIRE_CONTRACT_CURRENT_CORPUS": "CONFIRMED",
+  "D245_D244_E4_IN_TIMEOUT": true,
+  "D245_D244_E4_OUT_COMPLETED": true,
+  "D245_D244_LIVE_RESULT_INGESTED": true,
+  "D245_EXECUTABLE_CLOSURE_GATE": "PASS",
+  "D245_FPRINTD_INITIAL_STATE_CAUSAL_STATUS": "NOT_SUFFICIENT_EXPLANATION",
+  "D245_HISTORICAL_LAUNCHER_INTEGRITY": "RESTORED",
+  "D245_HISTORICAL_LAUNCHER_MUTATION_COUNT": 0,
+  "D245_LIVE_BASELINE_APPROVAL_STATUS": "LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW",
+  "application_data_count": 0,
+  "artifact_sha256": {
+    "analysis/D245/D245_A8_E4_contract.json": "7174411e997c774ebd5e1ab6c39335310d13719d9d51806cccaf81af4013067e",
+    "analysis/D245/D245_A8_E4_primary_evidence_audit.md": "3fcec26b5bef5ce8596337a2ffe11045d3025f2f937f8455b306d0f425589885",
+    "analysis/D245/D245_live_unseal.patch": "107cbc06b7ac9d3ebebe10b4ac0e7888e1f3d1a61b23a43643657c6a0d99b4ff",
+    "analysis/D245/d245_runtime_matrix.py": "8180f4c26117fb42ef6edbbad814309f81ee21aa68eda452a8c50275909f9c8e"
+  },
+  "d4_count": 0,
+  "historical_launcher_integrity": {
+    "D245_HISTORICAL_LAUNCHER_INTEGRITY": "RESTORED",
+    "D245_HISTORICAL_LAUNCHER_MUTATION_COUNT": 0,
+    "files": [
+      {
+        "canonical_bundle": "D239_operator_kit_executability_gate_bundle.zip",
+        "canonical_sha256": "74bfd0a556d947eaa1bca600e832521c4018fb9dfd923a502ea000e2bb3aad15",
+        "path": "operator_kit/d239-live-pre-d1-tls-once.sh",
+        "root_sha256": "74bfd0a556d947eaa1bca600e832521c4018fb9dfd923a502ea000e2bb3aad15",
+        "status": "MATCH"
+      },
+      {
+        "canonical_bundle": "analysis/D241/D241_d1_direct_b0_tls_transition_bundle.zip",
+        "canonical_sha256": "e30bcfa9e2962c5947a93013d6312c2c01bf1f2d5a20a4f20d110ac1610611f9",
+        "path": "operator_kit/d241-live-tls-once.sh",
+        "root_sha256": "e30bcfa9e2962c5947a93013d6312c2c01bf1f2d5a20a4f20d110ac1610611f9",
+        "status": "MATCH"
+      },
+      {
+        "canonical_bundle": "analysis/D242/D242_post_server_flight_causal_differential_bundle.zip",
+        "canonical_sha256": "0e52c549725d02663d06a24f90c55a1f6dbd7e1accf4f5cf251558c94fa8906e",
+        "path": "operator_kit/d242-live-tls-once.sh",
+        "root_sha256": "0e52c549725d02663d06a24f90c55a1f6dbd7e1accf4f5cf251558c94fa8906e",
+        "status": "MATCH"
+      },
+      {
+        "canonical_bundle": "analysis/D243/D243_a0_b0_transport_split_regression_bundle.zip",
+        "canonical_sha256": "cc5a077bb2cb001618d5acb3312305107ffb2fd82c4de874e2f4b8f17bc13713",
+        "path": "operator_kit/d243-live-tls-once.sh",
+        "root_sha256": "cc5a077bb2cb001618d5acb3312305107ffb2fd82c4de874e2f4b8f17bc13713",
+        "status": "MATCH"
+      },
+      {
+        "canonical_bundle": "analysis/D244/D244_e4_timeout_forensic_fresh_state_control_bundle.zip",
+        "canonical_sha256": "bd2701c27c5f2ed61a450bcd964d9ccd6d993c466759ed4da1e6e52b3a41bc10",
+        "path": "operator_kit/d244-live-tls-once.sh",
+        "root_sha256": "bd2701c27c5f2ed61a450bcd964d9ccd6d993c466759ed4da1e6e52b3a41bc10",
+        "status": "MATCH"
+      }
+    ]
+  },
+  "live_usb_execution": "NOT_PERFORMED",
+  "persistent_write_family_count": 0,
+  "real_tls_handshake": 0,
+  "real_usb_access": 0,
+  "repository_root": "/home/guido/Repository/goodix-27c6-5125_private",
+  "retry_count": 0,
+  "schema": "d245-executable-closure-v2",
+  "sealed_baseline": {
+    "D245_SEALED_BASELINE_AFTER_RENAME_STATUS": "MATCH",
+    "files": [
+      {
+        "actual_sha256": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+        "behavior_relevant": true,
+        "expected_sha256": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+        "path": "src/goodix5125_d233_backend.py",
+        "status": "MATCH"
+      },
+      {
+        "actual_sha256": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69",
+        "behavior_relevant": true,
+        "expected_sha256": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69",
+        "path": "src/goodix5125_d235_entrypoint.py",
+        "status": "MATCH"
+      }
+    ]
+  },
+  "status": "PASS",
+  "unseal_runtime_reseal": {
+    "final_sealed_sha256": {
+      "src/goodix5125_d233_backend.py": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+      "src/goodix5125_d235_entrypoint.py": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69"
+    },
+    "patch_apply": "PASS_WITHOUT_OFFSET",
+    "runtime_matrix": {
+      "a8_ack01_fw_mismatch_e4_count": 0,
+      "a8_ack01_valid_response_e4_count": 1,
+      "a8_ack07_fw12508_e4_count": 0,
+      "a8_ack07_fw12510_e4_count": 0,
+      "a8_ack07_response_malformed_e4_count": 0,
+      "a8_ack07_response_timeout_e4_count": 0,
+      "a8_ack07_valid_response_e4_count": 1,
+      "a8_ack07_valid_response_extra_frame_e4_count": 0,
+      "a8_ack07_wrong_control_e4_count": 0,
+      "a8_in_timeout_e4_count": 0,
+      "a8_out_timeout_e4_count": 0,
+      "a8_request_hex": "a00600a6a803000000ff",
+      "application_data_count": 0,
+      "d4_count": 0,
+      "e4_timeout_direction": "IN_AFTER_COMPLETED_OUT",
+      "firmware_mismatch_cases": [
+        "ACK07_GF_ST411SEC_APP_12508",
+        "ACK07_GF_ST411SEC_APP_12510",
+        "ACK01_GF_ST411SEC_APP_12508"
+      ],
+      "full_command_count": 13,
+      "happy_cases": [
+        "A8_ACK_01_VALID_RESPONSE_PASS",
+        "A8_ACK_07_VALID_RESPONSE_PASS"
+      ],
+      "other_ack_status_e4_count": 0,
+      "other_ack_status_second_in_count": 0,
+      "persistent_write_family_count": 0,
+      "real_usb_access": 0,
+      "retry_count": 0,
+      "schema": "d245-runtime-matrix-v2",
+      "server_flight_pacing_count": 2,
+      "server_flight_usb_chunk_lengths": [
+        64,
+        64,
+        64
+      ],
+      "status": "PASS",
+      "tls_success_stop_before_d4": true,
+      "tls_timeout_durable": true
+    },
+    "sealed_sha256": {
+      "src/goodix5125_d233_backend.py": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+      "src/goodix5125_d235_entrypoint.py": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69"
+    },
+    "source_reseal": "PASS_WITHOUT_OFFSET",
+    "unsealed_sha256": {
+      "src/goodix5125_d233_backend.py": "0fddd2bc3f3819325d9f4133c62b92a669e30f32e2ff8c9e5f1e29533e4918ae",
+      "src/goodix5125_d235_entrypoint.py": "93712447029b273a00d70a9d630af6e7b0680388927598a607ad5b7ee846db83"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "schema": "D259_MECHANICAL_CLASSA_TLS_INTEGRATION_CORRECTIVE_BUNDLE_MANIFEST_V2",
+  "step": "D259_CORRECTIVE",
+  "reference_head_not_live_approved": "778ec020452de880bb673f81558e6f9ce2d915bf",
+  "bundle": "analysis/D259/D259_mechanical_classA_tls_integration_corrective_bundle.zip",
+  "scope": "STEP_LOCAL_NON_CUMULATIVE_REVIEW_BY_REFERENCE",
+  "outcome": "BLOCKED_LIVE_TLS_RUNTIME_ADAPTER_GAP",
+  "files": {
+    "Goodix 27c6 5125 manuale tecnico.md": "9bcc72ff895b412aad7534d470caf7ca09f40e4ed512f01b1da202eec78210dc",
+    "core/README.md": "c98cd28ae1b756c3a0ab58f078b42fcd28244d4be86971222f84b1277bf260a5",
+    "core/fdt_lifecycle.py": "9dd6440af7baf510da18b0c77a8ea3dffa3f0869ce9ad0d9616f5aba79868112",
+    "core/tls_b0.py": "7ece79c76658bc0562ad493b0ec24f437a287769c021e4d26fadb91ca7286e67",
+    "tests/test_d259_minimal_device_contract.py": "b52a81ab538ed62004466c2d653669474d4a771be0fcbdf0ab08f39fa47948f9",
+    "tests/test_d259_post_classifier_closure.py": "8a64ba63896c6ee16b246e628cb252ed63511e84b170f27714612f577d2b3841",
+    "analysis/D259/d259_post_classifier_audit.py": "b08d1f455a69f97b1b74c01c75e12227526529dd2513eb303da4df0f6f48594a",
+    "analysis/D259/d259_minimal_replay.py": "aa5672c0e1f0a466b19ab0777d71cf44c19fe6fddfc64863868cf32ea7c885ce",
+    "analysis/D259/D259_post_classifier_disasm_excerpt.txt": "a7b42be50e11c263f2e370cf80d32979987dda3817867823c9cb4a40b149a09b",
+    "analysis/D259/D259_post_classifier_cfg.json": "e1c2db5971488a03faf847406ff02bde0778ea8d4721a050f6b6e9e184ae603b",
+    "analysis/D259/D259_post_classifier_audit.json": "06659ae850fecfb5bdbe09babdf49b60295576f3ef75707054515e7fbd998025",
+    "analysis/D259/D259_post_classifier_wire_effect_matrix.csv": "f481d4955e5640137c70d3dd92d90d4c5f4e26e0ded229b462bf2fb3a1c352aa",
+    "analysis/D259/D259_post_classifier_wire_effect_matrix.md": "919babe24a400f2b0e5f0a78b828a0aac956fd897fa158c0788461dfa8e83a35",
+    "analysis/D259/D259_error_recovery_matrix.csv": "a99558df6d804f2a5690eee33bd952de362b866ae689707bfa65138b36763c02",
+    "analysis/D259/D259_error_recovery_matrix.md": "1d2ebd5cd494ff3edea1f43ce5048e24ff12586544071619440a06d4694da795",
+    "analysis/D259/D259_cache_effect_matrix.csv": "94b4039e00c76d63ebc6f919dc6ce9ecb5ddb34db5d3552e954405b4a77c4c7a",
+    "analysis/D259/D259_cache_effect_matrix.md": "4e6bd63f138875826b37fda2f95ea535bcf53ce33939e8d1bc94eb694a535a74",
+    "analysis/D259/D259_minimal_replay.json": "c66ad5e1043a679ea2a19f9a9c713c45a6cae1457f384ff9004cbf820fd30edb",
+    "analysis/D259/D259_tls_runtime_adapter_evidence.json": "df0fccbf6b95094ed5fbd92cff96de766856949e1110a1521811437a4f78a584",
+    "analysis/D259/D259_same_session_tls_test_result.json": "ef5a84b07853d3ce9c9c06007638f28aa3ba7cb10b2ba104ddf9069aed85bf65",
+    "analysis/D259/D259_readiness_decision.json": "db3e2976433bd392b22ec0fddf5b124d3da0dbc8228e752044af5af3aba9cd9a",
+    "analysis/D259/D259_minimal_device_contract_closure_report.md": "6f511e99ead71a9f287703e1b36313a9100e013b45d13f277cef532cddc23db8",
+    "analysis/D259/D259_test_results.txt": "1cd32d586eeb850b6b80aa2fba36f9a308ab0e0723ce4f1cc0870cd66b0175a9",
+    "analysis/D259/D259_previous_bundle_status.txt": "49f978efbe8aeb187213c38113b03654705a14ca5bb4fb758a30930cce3c0ee9"
+  },
+  "external_private_evidence_by_reference": {
+    "gfusb.dll_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+    "d255_capture_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+    "d245_live_tls_result": "analysis/D245/D245_operator_live_stdout.json"
+  },
+  "live_critical_integrity": {
+    "src_sealed_unchanged": true,
+    "live_launchers_unchanged": true,
+    "baseline_live_approval": "NOT_INVENTED_OR_AUTO_APPROVED"
+  },
+  "previous_bundle": {
+    "path": "analysis/D259/D259_minimal_device_contract_closure_bundle.zip",
+    "status": "SUPERSEDED_BY_D259_MECHANICAL_PROOF_CORRECTIVE",
+    "blob_preserved": true
+  },
+  "excluded": [
+    "raw pcapng and captures",
+    "raw cache and OTP",
+    "OEM DLL and full disassembly",
+    "firmware, PSK, TLS keys and other secrets",
+    "NAV payloads, B0 plaintext/raster and biometric material",
+    "historical bundles and unmodified historical artifacts",
+    "cache and temporary files"
+  ],
+  "safety": {
+    "REAL_USB_OPEN_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "FINGER_INTERACTION_COUNT": 0,
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0,
+    "HOST_CACHE_WRITE_COUNT": 0
+  }
+}

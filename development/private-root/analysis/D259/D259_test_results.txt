@@ -1,0 +1,48 @@
+D259 MECHANICAL CLASS-A / TLS INTEGRATION CORRECTIVE TEST RESULTS
+
+PASS  python3 -m unittest discover -s tests -v
+      208 tests; D253-D259 regressions included; 10 D259 tests
+
+PASS  python3 -m py_compile core/tls_b0.py core/fdt_lifecycle.py
+      analysis/D259/d259_post_classifier_audit.py
+      analysis/D259/d259_minimal_replay.py
+      tests/test_d259_minimal_device_contract.py
+      tests/test_d259_post_classifier_closure.py
+
+PASS  python3 analysis/D259/d259_post_classifier_audit.py
+      gfusb.dll and D255 raw hash gates; bounded range extraction;
+      compare/jump/default/merge/call derivation for 10 NAV/IMAGE rows;
+      result flag, FDT global, final caller branch and cache effects derived
+
+PASS  python3 analysis/D259/d259_minimal_replay.py
+      request trace 36,50,36,82,20,36,32 byte-exact to D255;
+      B0 consumed immediately after 0x20 and before stage2;
+      one TLS server object, one client fixture, one server handshake;
+      same SSLObject consumes B0 and a second application record
+
+PASS  POST_CLASSIFIER_BRANCH_PROOF=PASS_MECHANICALLY_DERIVED
+PASS  SAME_TLS_SESSION_B0_CONSUMPTION=PASS_OFFLINE_ARCHITECTURAL
+PASS  POST_B0_TLS_SESSION_CONTINUITY=PASS_OFFLINE_ARCHITECTURAL
+PASS  PLAINTEXT_MUTABLE_BUFFER_BEST_EFFORT_ZEROIZED=true
+PASS  OPENSSL_INTERNAL_COPY_ZEROIZATION=NOT_PROVEN wording
+PASS  PYTHON_IMMUTABLE_TEMP_COPY_ZEROIZATION=NOT_PROVEN wording
+PASS  zero classifier/raster/cache/retry/recovery/persistent family
+PASS  src/ sealed and D245/D246/D251 launchers byte-unchanged
+PASS  previous D259 bundle SHA-256 sidecar verification
+PASS  JSON parse validation for CFG, replay, TLS evidence and decision
+PASS  git diff --check
+
+FAIL-CLOSED RESULT
+LIVE_TLS_TO_B0_ADAPTER_STATUS=UNIMPLEMENTED
+BLOCKER=SEALED_D245_RUNTIME_CLOSES_AND_DOES_NOT_EXPOSE_THE_HANDSHAKED_ENGINE
+READY_FOR_FDT_LIVE_REVIEW=false
+READY_FOR_FDT_LIVE=false
+
+SAFETY
+REAL_USB_OPEN_COUNT=0
+REAL_CAPTURE_COUNT=0
+REAL_HARDWARE_ACTION_COUNT=0
+REAL_COMMAND_SEND_COUNT=0
+FINGER_INTERACTION_COUNT=0
+PERSISTENT_WRITE_FAMILY_COUNT=0
+HOST_CACHE_WRITE_COUNT=0

@@ -1,0 +1,21 @@
+{
+  "schema": "D263_06_TEST_RESULTS_V1",
+  "generated_utc": "2026-08-24T07:38:00Z",
+  "runner": "python3 -m unittest tests.test_d263_phase2_first_image_terminal",
+  "framework": "unittest (pytest not installed)",
+  "data": "SYNTHETIC_TLS_AND_TRANSPORTS",
+  "tests_run": 8,
+  "failures": 0,
+  "errors": 0,
+  "cases": [
+    "test_happy_path_decode_and_terminal_stop",
+    "test_wrong_irq_fails_closed",
+    "test_event_timeout_fails_closed",
+    "test_wrong_ack_fails_closed",
+    "test_malformed_b0_fails_closed",
+    "test_crc_image_failure_wipes_and_fails_closed",
+    "test_second_command_prevention",
+    "test_no_sensitive_pixels_persisted"
+  ],
+  "coverage": "happy-path completo (IRQ2->0x22->retained TLS B0->canonical decode 80x64->FIRST_IMAGE_RECEIVED->host/TLS/USB cleanup->stop); wrong IRQ; timeout; wrong ACK; malformed B0; CRC/image failure (plaintext wiped); second 0x22 prevention (one-shot); no sensitive pixels persisted; one-session/one-handshake/no-reopen assertions."
+}

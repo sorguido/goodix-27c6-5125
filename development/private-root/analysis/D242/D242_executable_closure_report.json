@@ -1,0 +1,133 @@
+{
+  "application_data_count": 0,
+  "artifact_sha256": {
+    "analysis/D242/D242_live_unseal.patch": "14b68374080675e81e63148647da80124ac675d43313d956b3951c75c4ff17fd",
+    "analysis/D242/d242_capture_forensics.py": "cb87b61f7392a06b1a983b8470aaabf5465590d68fd294323e6695602e9fe965",
+    "analysis/D242/d242_dependency_gate.py": "591d9962a7ca5209341000fe28ed690a5774f25e4f5bc325129adf2727379006",
+    "analysis/D242/d242_operator_dry_run.py": "89d79bd1fa27e4a33905cc231c089d2fb0c21d950ddc278a7b6dd2ad45e393ea",
+    "analysis/D242/d242_preflight.py": "7d7f0569ce1cbf351c82ba1634ab911b489934bb4db7055926a88c3f809f0e9d",
+    "analysis/D242/d242_preflight_observability.py": "74ac5ac2a4a6ab084f1302e411b5a70a13b0195e249aa9594d16f4273fb85d5b",
+    "operator_kit/d242-live-tls-once.sh": "0e52c549725d02663d06a24f90c55a1f6dbd7e1accf4f5cf251558c94fa8906e",
+    "src/goodix5125_d232_offline.py": "2875a0c4f3b166906d30c4648f0d965e8b18614299be46a7a24fb1d6a9079726",
+    "src/goodix5125_d233_backend.py": "c072db52c29a9e22dc597e53743820217077e5373bafb48cadc69cbb0e90fcef",
+    "src/goodix5125_d235_entrypoint.py": "6cd9fd3796ded831b0c70877282807c6a423d39f4ee42b8fd2593fe1b4908993",
+    "tests/test_d242_operator_kit.py": "7f94940a4fc7a876403daeff2ff50b35754aa758e1d20b2039299af7e7a798c1",
+    "tests/test_d242_transport_fix.py": "91147477612da8a7c21ce5c5e0255ebce72c0c4271f8edf5596ebc5984263664"
+  },
+  "classification": "D242_EXECUTABLE_CLOSURE_GATE_PASS",
+  "d241_dependency_integrity": {
+    "behavior_relevant_dependency_count": 2,
+    "modules": [
+      {
+        "actual_sha256": "0bf0921435624ef64b57328af8c2a669be1b1da51dc8b4caeece2f5d35e2944f",
+        "behavior_relevant": true,
+        "imported_directly_or_indirectly": "directly_by_d242_operator_dry_run",
+        "module_path": "analysis/D241/d241_operator_dry_run.py",
+        "pinned": true,
+        "sha256": "0bf0921435624ef64b57328af8c2a669be1b1da51dc8b4caeece2f5d35e2944f"
+      },
+      {
+        "actual_sha256": "6cc7ddd62fe1dffedd71abfb05ba0a4ef5788d155ddd288782b2b222d25c5cf7",
+        "behavior_relevant": true,
+        "imported_directly_or_indirectly": "directly_by_d242_preflight_and_indirectly_via_d241_operator_dry_run",
+        "module_path": "analysis/D241/d241_preflight.py",
+        "pinned": true,
+        "sha256": "6cc7ddd62fe1dffedd71abfb05ba0a4ef5788d155ddd288782b2b222d25c5cf7"
+      }
+    ],
+    "pinned_dependency_count": 2,
+    "status": "PASS",
+    "unpinned_closure_dependency_count": 0
+  },
+  "d4_count": 0,
+  "live_usb_execution": "NOT_PERFORMED",
+  "persistent_write_family_count": 0,
+  "preflight_fixture": {
+    "consumed_d242_marker_case": {
+      "d242_marker_absent": false,
+      "historical_markers_blocking": false,
+      "historical_markers_present_benign": [
+        "d236-live-single-use.marker",
+        "d238-live-single-use.marker",
+        "d238-operator-invocation.marker",
+        "d239-operator-invocation.marker",
+        "d241-operator-invocation.marker"
+      ],
+      "namespace": "/tmp/d242-closure-yq9_31f5/preflight/var/lib/goodix-5125-poc/d242-operator-invocation.marker"
+    },
+    "goodix_command_count": 0,
+    "historical_markers_case": {
+      "d242_marker_absent": true,
+      "historical_markers_blocking": false,
+      "historical_markers_present_benign": [
+        "d236-live-single-use.marker",
+        "d238-live-single-use.marker",
+        "d238-operator-invocation.marker",
+        "d239-operator-invocation.marker",
+        "d241-operator-invocation.marker"
+      ],
+      "namespace": "/tmp/d242-closure-yq9_31f5/preflight/var/lib/goodix-5125-poc/d242-operator-invocation.marker"
+    },
+    "libusb_init_count": 0,
+    "report_directory": {
+      "directory": "/tmp/d242-closure-yq9_31f5/preflight/var/lib/goodix-5125-poc/d242-results",
+      "mode": "0700",
+      "owner_uid": 1000,
+      "pass": true,
+      "symlink": false
+    },
+    "schema": "d242-offline-preflight-fixture-v1",
+    "status": "PASS",
+    "usb_open_count": 0
+  },
+  "real_secret_read_count": 0,
+  "repository": "/home/guido/Repository/goodix-27c6-5125",
+  "retry_count": 0,
+  "schema": "d242-executable-closure-report-v1",
+  "seal_coherence": {
+    "final_sealed_sha256": {
+      "src/goodix5125_d233_backend.py": "c072db52c29a9e22dc597e53743820217077e5373bafb48cadc69cbb0e90fcef",
+      "src/goodix5125_d235_entrypoint.py": "6cd9fd3796ded831b0c70877282807c6a423d39f4ee42b8fd2593fe1b4908993"
+    },
+    "patch_apply": "PASS",
+    "reseal_rollback": "PASS",
+    "sealed_sha256": {
+      "src/goodix5125_d233_backend.py": "c072db52c29a9e22dc597e53743820217077e5373bafb48cadc69cbb0e90fcef",
+      "src/goodix5125_d235_entrypoint.py": "6cd9fd3796ded831b0c70877282807c6a423d39f4ee42b8fd2593fe1b4908993"
+    },
+    "unseal_patch_sha256": "14b68374080675e81e63148647da80124ac675d43313d956b3951c75c4ff17fd",
+    "unsealed_sha256": {
+      "src/goodix5125_d233_backend.py": "7d857a6ff46fb52de85df76911b21eb3552b4051dcdf36fe505d76c019156e67",
+      "src/goodix5125_d235_entrypoint.py": "a987afd2997ff19ca1e2dc555ac9ac9831b914403403e66b1d5c6ee5958acffa"
+    }
+  },
+  "server_flight_timeout": {
+    "abort_class": "tls_timeout",
+    "cleanup_count": 1,
+    "failure_class": "TLS_HANDSHAKE_TIMEOUT_AFTER_SERVER_FLIGHT",
+    "marker_claim_count": 1,
+    "openssl_fatal_error_observed": false,
+    "post_server_flight_bulk_in_call_count": 1,
+    "post_server_flight_bulk_in_error_count": 0,
+    "post_server_flight_bulk_in_timeout_count": 1,
+    "post_server_flight_first_rx_class": "POST_FLIGHT_BULK_IN_ATTEMPTED_NO_DATA",
+    "post_server_flight_nonzero_rx_count": 0,
+    "server_flight_b0_frame_count": 2,
+    "server_flight_chunk_size_buckets": {
+      "64": 3
+    },
+    "server_flight_pacing_count": 2,
+    "server_flight_pacing_ms": 10,
+    "server_flight_tls_record_count": 2,
+    "server_flight_usb_bulk_out_count": 3
+  },
+  "status": "PASS",
+  "success": {
+    "cleanup_count": 1,
+    "client_complete": true,
+    "first_tls_record_handoff_count": 1,
+    "marker_claim_count": 1,
+    "result": "pass",
+    "same_validated_psk_used_by_tls": true
+  }
+}

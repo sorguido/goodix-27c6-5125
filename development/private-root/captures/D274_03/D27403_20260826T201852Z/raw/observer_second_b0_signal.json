@@ -1,0 +1,14 @@
+{
+  "schema": "D274_03_WIRE_OBSERVER_SIGNAL_V1",
+  "status": "SECOND_FINGERPRINT_B0_OBSERVED",
+  "failure_class": null,
+  "terminal_frame": 249,
+  "terminal_event_class": "FINGERPRINT_B0",
+  "privacy_payload_exported": false,
+  "biometric_plaintext_exported": false,
+  "biometric_hash_exported": false,
+  "secret_material_exported": false,
+  "pin_value_exported": false,
+  "stop_trigger": "WIRE_DRIVEN",
+  "automatic_retry_count": 0
+}

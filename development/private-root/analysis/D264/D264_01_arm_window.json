@@ -1,0 +1,25 @@
+{
+  "schema":"D264_01_ARM_WINDOW_V1",
+  "primary_source":"analysis/D230/work/GoodixExport/rilevamento.pcapng sha256 50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b",
+  "timestamp_unit":"pcapng interface ticks; deltas below converted at 1,000,000 ticks/s",
+  "frame_event_order":[
+    {"event":"final 0x32 OUT","index_zero_based":220,"ticks":1783772415801145,"delta_from_ack32_ms":-0.433},
+    {"event":"ACK 0x32","index_zero_based":223,"ticks":1783772415801578,"delta_from_ack32_ms":0.0},
+    {"event":"IRQ finger-down 0x0002","index_zero_based":225,"ticks":1783772422909790,"delta_from_ack32_ms":7108.212},
+    {"event":"0x22 OUT","index_zero_based":227,"ticks":1783772422912194,"delta_from_irq2_ms":2.404},
+    {"event":"ACK 0x22","index_zero_based":229,"ticks":1783772422912742,"delta_from_irq2_ms":2.952},
+    {"event":"first image B0/TLS","index_zero_based":231,"ticks":1783772422960007,"delta_from_irq2_ms":50.217}
+  ],
+  "ARM_WAIT_MODEL":"one absolute monotonic host deadline beginning after validated final 0x32 ACK; wait exactly once for IRQ 0x0002; do not renew deadline on unmatched input; fail closed and perform host-only cleanup at expiration",
+  "ARM_WAIT_TIMEOUT_RECOMMENDATION_MS":15000,
+  "ARM_WAIT_TIMEOUT_EVIDENCE": {
+    "primary_target_observed_delay_ms":7108.212,
+    "positive_target_observation_count":1,
+    "recommendation_basis":"15 s covers the sole primary-target positive delay with bounded margin; Rockytkg uses 15 s for finger-up waits only as corroborative scale, not target proof",
+    "device_lifetime_claim":"NONE; 15 s is a host deadline, not a device arm TTL"
+  },
+  "ALLOWED_INTERMEDIATE_EVENTS":["USB transfer completion/wrapper frames that assemble the expected IRQ2 frame and do not represent a second semantic event"],
+  "UNEXPECTED_INTERMEDIATE_EVENTS":"any complete semantic A0 event other than IRQ 0x0002, any B0/TLS application record before 0x22, malformed frame, disconnect, or duplicate; fail closed without retry or device command",
+  "UNOBSERVED_BEHAVIOR":["finger presented immediately after ACK","finger presented later than 7.108212 s","no finger before deadline","whether arm remains internally active after host timeout/close","maximum device arm lifetime"],
+  "proof_limits":"one positive APP12509 trace cannot establish a lifetime distribution or internal TTL; D255/D256 no-finger traces establish re-entry/quiescence but not post-first-image state"
+}

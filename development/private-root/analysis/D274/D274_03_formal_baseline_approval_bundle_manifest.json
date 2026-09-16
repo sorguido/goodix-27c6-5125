@@ -1,0 +1,47 @@
+{
+  "schema": "D274_03_FORMAL_BASELINE_APPROVAL_BUNDLE_MANIFEST_V1",
+  "artifact": "D274_03_formal_baseline_approval_bundle",
+  "bundle": "analysis/D274/D274_03_formal_baseline_approval_bundle.zip",
+  "sidecar": "analysis/D274/D274_03_formal_baseline_approval_bundle.zip.sha256",
+  "sidecar_is_external_to_zip": true,
+  "reference_full_head": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+  "nature": "STEP_LOCAL_NON_CUMULATIVE_SANITIZED_AUDITABLE_BY_REFERENCE",
+  "review_set": [
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "analysis/D274/D274_03_baseline_approval.json",
+    "analysis/D274/D274_03_formal_baseline_approval_report.md",
+    "analysis/D274/D274_03_formal_baseline_approval_test_results.json",
+    "analysis/D274/D274_03_formal_baseline_approval_execution_manifest.json",
+    "analysis/D274/D274_03_formal_baseline_approval_bundle_manifest.json",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/D274_03_kit_manifest.json",
+    "analysis/D274/D274_03_windows_oem_second_cycle_operator_kit/D274_03_OPERATOR_README_IT.md",
+    "analysis/D274/test_d274_03_second_cycle_operator_kit.py"
+  ],
+  "excluded": [
+    "raw capture and pcapng",
+    "operator Windows result package not present on Linux host",
+    "PSK, TLS keys, PIN, credentials and secrets",
+    "biometric raw, plaintext, images, raster and pixels",
+    "OEM firmware, DLL and proprietary caches",
+    "historical unmodified artifacts and previous bundles",
+    "runtime and live-critical files because they are unchanged",
+    "cache and temporary files",
+    "this bundle external sidecar"
+  ],
+  "expected_checks": {
+    "zip_crc": "PASS",
+    "duplicate_paths": 0,
+    "path_traversal": 0,
+    "unexpected_symlinks": 0,
+    "privacy_scan": "PASS",
+    "sidecar_external_and_coherent": true
+  },
+  "authority": {
+    "baseline_approved": true,
+    "approved_full_commit_sha": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+    "approved_for_capture": false,
+    "live_authorized": false,
+    "ready_for_live": false,
+    "one_shot_authorization_id": null
+  }
+}

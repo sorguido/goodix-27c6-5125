@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+prefix=/nonexistent-d277-compile-seam
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: gusb
+Description: D277 host-only compile seam; no runtime USB symbols
+Version: 0.4.9
+Libs:
+Cflags: -I${pcfiledir}

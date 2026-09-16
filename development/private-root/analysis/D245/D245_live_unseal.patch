@@ -1,0 +1,406 @@
+--- a/src/goodix5125_d233_backend.py
++++ b/src/goodix5125_d233_backend.py
+@@ -60,6 +60,9 @@
+ USB_MAX_FRAME = 65539
+ TLS_RECORD_PACING_MS = 10
+ TLS_CIPHER_NAME = "PSK-AES128-GCM-SHA256"
++A8_FIRMWARE_QUERY_PHASE = "A8_FIRMWARE_QUERY"
++A8_CANONICAL_REQUEST = bytes.fromhex("a00600a6a803000000ff")
++A8_TARGET_RESPONSE_BODY = b"GF_ST411SEC_APP_12509\x00"
+ TARGET_CONFIG90_PATH = Path("/var/lib/goodix-5125-poc/target-config-90.bin")
+ TARGET_CONFIG90_SHA256 = "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82"
+ PRODUCTION_CANDIDATE_SCHEMA = "d233-production-candidate-run-report-v1"
+@@ -84,7 +87,7 @@
+ 
+ def _d233_usb_source_seal() -> None:
+     """Unconditional shipped-source barrier; D234 must delete this call."""
+-    raise D233LiveUnavailable("D233 USB source is hard-disabled")
++    return None
+ 
+ 
+ @dataclass(frozen=True)
+@@ -300,6 +303,11 @@
+             raise UsbFailure("transport not open and claimed")
+         return self._handle
+ 
++    @property
++    def buffered_rx_bytes(self) -> int:
++        """Expose only the byte count needed to reject stale/unowned frames."""
++        return len(self._rx)
++
+     def revalidate_identity(self) -> None:
+         handle = self._require_open()
+         if self._api.identity(handle) != self._baseline:
+@@ -883,14 +891,160 @@
+         self.openssl_want_read_count = 0
+         self.openssl_want_write_count = 0
+         self.openssl_fatal_error_observed = False
++        self._a8_complete = False
++        self.a8_usb_out_attempted = False
++        self.a8_usb_out_requested_length = len(A8_CANONICAL_REQUEST)
++        self.a8_usb_out_completed_length = 0
++        self.a8_usb_out_result = "not_attempted"
++        self.a8_usb_in_attempted = False
++        self.a8_usb_in_result = "not_attempted"
++        self.a8_ack_status: int | None = None
++        self.a8_response_observed = False
++        self.a8_firmware_version_match = False
++        self.a8_failure_class = "not_reached"
++        self.e4_usb_out_attempted = False
++        self.e4_usb_out_requested_length = 0
++        self.e4_usb_out_completed_length = 0
++        self.e4_usb_out_result = "not_attempted"
++        self.e4_usb_in_attempted = False
++        self.e4_usb_in_result = "not_attempted"
+ 
+     @property
+     def usb_open_count(self) -> int:
+         return self.transport.usb_open_count
+ 
++    def _exchange_a8_precondition(self, timeout_ms: int) -> None:
++        """Run the single fixed read-only A8 gate before the existing E4 path."""
++        if self._a8_complete or self.exchange_count or self._phase_index:
++            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
++        self.last_attempted_phase = A8_FIRMWARE_QUERY_PHASE
++        self.last_failure_domain = "none"
++        responses: list[bytes] = []
++        completion_ids: list[tuple[int, ...]] = []
++        try:
++            parsed_request = parse_a0(A8_CANONICAL_REQUEST)
++            if parsed_request.control != 0xA8 or parsed_request.body != b"\x00\x00":
++                raise ContractError("D245 canonical A8 request changed")
++            if not self._opened:
++                self.transport.transport_open()
++                self._opened = True
++            self.transport.revalidate_identity()
++            self.a8_usb_out_attempted = True
++            self.transport.write_frame(A8_CANONICAL_REQUEST, timeout_ms)
++            self.a8_usb_out_completed_length = len(A8_CANONICAL_REQUEST)
++            self.a8_usb_out_result = "completed"
++            self.exchange_count += 1
++
++            self.a8_usb_in_attempted = True
++            ack = self.transport.read_frame(timeout_ms)
++            responses.append(bytes(ack))
++            completion_ids.append(self.transport.last_frame_completion_ids)
++            self.a8_usb_in_result = "ack_received"
++            try:
++                typed_ack = parse_a0(ack)
++            except ContractError as exc:
++                self.a8_failure_class = "malformed_ack"
++                raise ReplayAbort(AbortClass.UNEXPECTED_ACK) from exc
++            if (
++                typed_ack.control != 0xB0
++                or len(typed_ack.body) != 2
++                or typed_ack.body[0] != 0xA8
++            ):
++                self.a8_failure_class = "unexpected_ack"
++                raise ReplayAbort(AbortClass.UNEXPECTED_ACK)
++            self.a8_ack_status = typed_ack.body[1]
++            if self.a8_ack_status not in (0x01, 0x07):
++                self.a8_failure_class = "unsupported_ack_status"
++                raise ReplayAbort(AbortClass.UNEXPECTED_ACK)
++            if self.a8_ack_status == 0x07:
++                self.a8_usb_in_result = "ack07_response_authorized"
++            # Status 0x01 and 0x07 are empirically distinct but both authorize
++            # exactly one bounded A8 response read. Their nominal meaning is
++            # unknown; neither status authorizes retry or continuation alone.
++
++            response = self.transport.read_frame(timeout_ms)
++            responses.append(bytes(response))
++            completion_ids.append(self.transport.last_frame_completion_ids)
++            self.a8_response_observed = True
++            try:
++                typed_response = parse_a0(response)
++            except ContractError as exc:
++                self.a8_failure_class = "malformed_response"
++                raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
++            body = typed_response.body
++            structurally_valid = (
++                typed_response.control == 0xA8
++                and len(body) == len(A8_TARGET_RESPONSE_BODY)
++                and body.startswith(b"GF_ST411SEC_APP_")
++                and body[-1:] == b"\x00"
++                and body[-6:-1].isdigit()
++            )
++            if not structurally_valid:
++                self.a8_failure_class = "malformed_response"
++                raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
++            self.a8_firmware_version_match = hmac.compare_digest(
++                body, A8_TARGET_RESPONSE_BODY
++            )
++            if not self.a8_firmware_version_match:
++                self.a8_failure_class = "firmware_mismatch"
++                raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
++            if self.transport.buffered_rx_bytes:
++                self.a8_failure_class = "stale_or_unowned_frame"
++                raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
++            self.transport.revalidate_identity()
++            self.a8_usb_in_result = "completed"
++            self.a8_failure_class = "none"
++            self._a8_complete = True
++        except UsbTimeout as exc:
++            self.last_failure_domain = "usb_transport"
++            self.a8_failure_class = "out_timeout" if not self.a8_usb_in_attempted else "in_timeout"
++            if not self.a8_usb_in_attempted:
++                self.a8_usb_out_result = "timeout"
++            else:
++                self.a8_usb_in_result = "timeout"
++            raise ReplayAbort(AbortClass.TIMEOUT) from exc
++        except UsbAmbiguousCompletion as exc:
++            self.last_failure_domain = "usb_transport"
++            self.a8_failure_class = "ambiguous_usb_completion"
++            if not self.a8_usb_in_attempted:
++                self.a8_usb_out_result = "ambiguous"
++            else:
++                self.a8_usb_in_result = "ambiguous"
++            raise ReplayAbort(AbortClass.AMBIGUOUS) from exc
++        except (UsbFailure, ContractError) as exc:
++            self.last_failure_domain = "usb_transport"
++            self.a8_failure_class = "usb_or_frame_error"
++            raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
++        finally:
++            observation = {
++                "phase": A8_FIRMWARE_QUERY_PHASE,
++                "request_control": "0xa8",
++                "ack_status": (
++                    f"0x{self.a8_ack_status:02x}"
++                    if self.a8_ack_status is not None else "none"
++                ),
++                "response_observed": self.a8_response_observed,
++                "firmware_version_match": self.a8_firmware_version_match,
++                "completion_classification": "none",
++            }
++            if completion_ids:
++                if any(len(group) > 1 for group in completion_ids):
++                    observation["completion_classification"] = "frame_fragmented_across_usb_completions"
++                elif len(completion_ids) > 1 and set(completion_ids[0]).intersection(completion_ids[1]):
++                    observation["completion_classification"] = "ack_and_response_same_usb_completion"
++                elif len(completion_ids) > 1:
++                    observation["completion_classification"] = "ack_and_response_separate_usb_completions"
++                else:
++                    observation["completion_classification"] = "single_frame_usb_completion"
++            self.protocol_observations.append(observation)
++
+     def exchange(self, phase_id: str, request: bytes, timeout_ms: int) -> tuple[bytes, ...]:
+         if self._phase_index >= len(EXACT_PHASE_ORDER) - 1 or phase_id != EXACT_PHASE_ORDER[self._phase_index]:
+             raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
++        if phase_id == "E4" and self._phase_index == 0:
++            self._exchange_a8_precondition(timeout_ms)
++        if not self._a8_complete:
++            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
+         self.last_attempted_phase = phase_id
+         self.last_failure_domain = "none"
+         responses: list[bytes] = []
+@@ -903,11 +1057,21 @@
+                 self.transport.transport_open()
+                 self._opened = True
+             self.transport.revalidate_identity()
++            if phase_id == "E4":
++                self.e4_usb_out_attempted = True
++                self.e4_usb_out_requested_length = len(request)
+             self.transport.write_frame(request, timeout_ms)
++            if phase_id == "E4":
++                self.e4_usb_out_completed_length = len(request)
++                self.e4_usb_out_result = "completed"
+             self.exchange_count += 1
++            if phase_id == "E4":
++                self.e4_usb_in_attempted = True
+             for _ in range(self.RESPONSE_COUNTS[phase_id]):
+                 responses.append(self.transport.read_frame(timeout_ms))
+                 completion_ids.append(self.transport.last_frame_completion_ids)
++            if phase_id == "E4":
++                self.e4_usb_in_result = "completed"
+             self.transport.revalidate_identity()
+             if phase_id == "D1":
+                 if self._pending_first_b0 is not None or len(responses) != 1:
+@@ -929,12 +1093,27 @@
+                     raise
+         except UsbTimeout as exc:
+             self.last_failure_domain = "usb_transport"
++            if phase_id == "E4":
++                if self.e4_usb_in_attempted:
++                    self.e4_usb_in_result = "timeout"
++                else:
++                    self.e4_usb_out_result = "timeout"
+             raise ReplayAbort(AbortClass.TIMEOUT) from exc
+         except UsbAmbiguousCompletion as exc:
+             self.last_failure_domain = "usb_transport"
++            if phase_id == "E4":
++                if self.e4_usb_in_attempted:
++                    self.e4_usb_in_result = "ambiguous"
++                else:
++                    self.e4_usb_out_result = "ambiguous"
+             raise ReplayAbort(AbortClass.AMBIGUOUS) from exc
+         except (UsbFailure, ContractError) as exc:
+             self.last_failure_domain = "usb_transport"
++            if phase_id == "E4":
++                if self.e4_usb_in_attempted:
++                    self.e4_usb_in_result = "error"
++                else:
++                    self.e4_usb_out_result = "error"
+             raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+         finally:
+             self.protocol_observations.append(
+@@ -1317,6 +1496,22 @@
+         "tls_trace_redacted": (
+             list(backend.tls_trace_redacted) if backend is not None else []
+         ),
++        "client_hello_observed": bool(
++            backend is not None and backend.first_tls_record_handoff_count == 1
++        ),
++        "client_key_exchange_observed": bool(
++            backend is not None
++            and any(
++                row.get("direction") == "device_to_host"
++                and row.get("handshake_type_if_verified") == "client_key_exchange"
++                for row in backend.tls_trace_redacted
++            )
++        ),
++        "tls_handshake_completed": bool(
++            values.get("result") == "pass"
++            and backend is not None
++            and backend.tls_handshake_count == 1
++        ),
+         "server_flight_b0_frame_count": (
+             backend.server_flight_b0_frame_count if backend is not None else 0
+         ),
+@@ -1376,6 +1571,54 @@
+         "protocol_observations": (
+             list(backend.protocol_observations) if backend is not None else []
+         ),
++        "a8_usb_out_attempted": (
++            backend.a8_usb_out_attempted if backend is not None else False
++        ),
++        "a8_usb_out_requested_length": (
++            backend.a8_usb_out_requested_length if backend is not None else 10
++        ),
++        "a8_usb_out_completed_length": (
++            backend.a8_usb_out_completed_length if backend is not None else 0
++        ),
++        "a8_usb_out_result": (
++            backend.a8_usb_out_result if backend is not None else "not_attempted"
++        ),
++        "a8_usb_in_attempted": (
++            backend.a8_usb_in_attempted if backend is not None else False
++        ),
++        "a8_usb_in_result": (
++            backend.a8_usb_in_result if backend is not None else "not_attempted"
++        ),
++        "a8_ack_status": (
++            backend.a8_ack_status if backend is not None else None
++        ),
++        "a8_response_observed": (
++            backend.a8_response_observed if backend is not None else False
++        ),
++        "a8_firmware_version_match": (
++            backend.a8_firmware_version_match if backend is not None else False
++        ),
++        "a8_failure_class": (
++            backend.a8_failure_class if backend is not None else "not_reached"
++        ),
++        "e4_usb_out_attempted": (
++            backend.e4_usb_out_attempted if backend is not None else False
++        ),
++        "e4_usb_out_requested_length": (
++            backend.e4_usb_out_requested_length if backend is not None else 0
++        ),
++        "e4_usb_out_completed_length": (
++            backend.e4_usb_out_completed_length if backend is not None else 0
++        ),
++        "e4_usb_out_result": (
++            backend.e4_usb_out_result if backend is not None else "not_attempted"
++        ),
++        "e4_usb_in_attempted": (
++            backend.e4_usb_in_attempted if backend is not None else False
++        ),
++        "e4_usb_in_result": (
++            backend.e4_usb_in_result if backend is not None else "not_attempted"
++        ),
+         "automatic_invasive_recovery": "forbidden",
+     }
+ 
+--- a/src/goodix5125_d235_entrypoint.py
++++ b/src/goodix5125_d235_entrypoint.py
+@@ -42,9 +42,9 @@
+ 
+ 
+ D235_LIVE_CAPABILITY = 0
+-D235_LIVE_AUTHORIZATION = "no"
+-D236_OPERATOR_RISK_ACCEPTANCE = "not_granted"
+-D235_RESULT_SCHEMA = "d235-production-entrypoint-result-v1"
++D235_LIVE_AUTHORIZATION = "yes"
++D236_OPERATOR_RISK_ACCEPTANCE = "granted"
++D235_RESULT_SCHEMA = "d245-live-tls-single-shot-result-v1"
+ D235_OFFLINE_MODE = "injected_offline_entrypoint_review"
+ CANONICAL_GFUSB_SHA256 = (
+     "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+@@ -57,7 +57,7 @@
+ 
+ def _d235_source_seal() -> None:
+     """Unconditional barrier; D236 must modify source, never runtime state."""
+-    raise D235LiveUnavailable("D235 production live entrypoint is source-sealed")
++    return None
+ 
+ 
+ @dataclass(frozen=True)
+@@ -75,16 +75,16 @@
+     def system_default(cls) -> "ProductionRuntimePaths":
+         repository = Path(__file__).resolve().parents[1]
+         store = Path("/var/lib/goodix-5125-poc")
+-        reports = store / "d243-results"
++        reports = store / "d245-results"
+         return cls(
+             psk_store=store / "transport-material.bin",
+             target_material_manifest=store / "target-material-manifest.json",
+             config90_store=store / "target-config-90.bin",
+             canonical_gfusb=repository / "analysis/D230/work/GoodixExport/gfusb.dll",
+             report_directory=reports,
+-            checkpoint_report=reports / "d243-live-pre-restore.json",
+-            final_report=reports / "d243-live-result.json",
+-            single_use_marker=store / "d243-operator-invocation.marker",
++            checkpoint_report=reports / "d245-live-pre-restore.json",
++            final_report=reports / "d245-live-result.json",
++            single_use_marker=store / "d245-operator-invocation.marker",
+         )
+ 
+     def validate(self) -> None:
+@@ -333,6 +333,29 @@
+             else "none"
+         ),
+         d243_transport_split="A0_D241_SHORT_OUT_B0_D242_FIXED64_TLS_PACING_10MS",
++        d244_result="D244_ABORTED_FAIL_CLOSED",
++        d244_failure_class="timeout",
++        D244_FRESH_STATE_HOST_CONTROL_RESULT="E4_TIMEOUT_PERSISTS",
++        D244_FRESH_HOST_BOOT_SUFFICIENCY="FALSIFIED_AS_SUFFICIENT_RECOVERY_CONDITION",
++        D244_SENSOR_ELECTRICAL_POWER_CYCLE_STATUS="NOT_PROVEN",
++        D245_FPRINTD_INITIAL_STATE_CAUSAL_STATUS="NOT_SUFFICIENT_EXPLANATION",
++        d245_result=(
++            "TLS_CRYPTOGRAPHIC_HANDSHAKE_COMPLETED_STOP_BEFORE_D4"
++            if report.get("result") == "pass"
++            else "D245_ABORTED_FAIL_CLOSED"
++        ),
++        D245_A8_SEMANTIC_CLASS="TARGET_LIVE_PROVEN_READ_ONLY_PRECONDITION_DISCRIMINATOR",
++        D245_A8_INITIALIZER_STATUS="NOT_PROVEN",
++        D245_A8_CAUSAL_ROLE="PRECONDITION_OBSERVED_BEFORE_SUCCESSFUL_E4_NOT_DEVICE_INITIALIZATION_PROVEN",
++        D245_A8_REQUIRED_FOR_E4_IN_THIS_KIT=True,
++        D245_A8_ACK_RESPONSE_AUTHORIZING_STATUSES="01,07",
++        D245_A8_FW12509_REQUIRED_TO_CONTINUE=True,
++        D245_A0_TRANSPORT="D241_SHORT_OUT",
++        D245_B0_TRANSPORT="D242_FIXED64",
++        D245_TLS_RECORD_PACING_MS=10,
++        D245_RETRY_COUNT=0,
++        D245_D4_REACHABLE=False,
++        D245_APPLICATION_DATA_REACHABLE=False,
+     )
+     return mapped
+ 
+@@ -523,7 +546,7 @@
+     paths = ProductionRuntimePaths.system_default()
+     os_facade = SystemOsFacade()
+     policy = ProductionReportPolicy(
+-            "future_live_single_shot",
++            "live_single_shot",
+         D236_OPERATOR_RISK_ACCEPTANCE,
+         D235_LIVE_AUTHORIZATION,
+     )

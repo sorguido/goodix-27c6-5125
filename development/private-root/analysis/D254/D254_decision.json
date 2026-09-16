@@ -1,0 +1,45 @@
+{
+  "schema": "D254_EXTERNAL_FDT_EVIDENCE_DECISION_V1",
+  "initial_head": "dcfb6c00839e746454f729fa631d8cb2fe9e9fba",
+  "execution_mode": "EXTERNAL_PUBLIC_READ_ONLY_AND_OFFLINE_PARSE",
+  "bootstrap": {
+    "blocker_reduced": true,
+    "closed": false,
+    "new_evidence": "The 5110/APP12117 OEM log exposes an OTP-bound 13520-byte cache and a fixed observed three-stage learned-table lifecycle; Source A exposes a different static claimed-12509 seed; neither derives or validates the local APP12509 seed.",
+    "remaining_blocker": "No independent APP12509 primary source establishes the origin, validity, freshness, or replaceability of the first current-target 0x36 seed."
+  },
+  "restore": {
+    "blocker_reduced": false,
+    "closed": false,
+    "new_evidence": "Issue63 contains repeated successful positive cycles and later re-entry, while both third-party implementations expose only host-side cancellation/cleanup.",
+    "remaining_blocker": "No no-finger cancel, timeout, close, suspend, failure, device-side restore command, or deterministic arm-lifetime evidence is present."
+  },
+  "post_irq2": {
+    "local_target_authority": "0x22_DATA_0100",
+    "external_corroboration": "Issue63 27c6:5125 capture uses 0x22 [01 00] after all 21 observed IRQ2 events.",
+    "issue63_firmware": "UNKNOWN",
+    "variant_model": "Rocky APP12508 and WBDI 5110/APP12117 use 0x20; keep firmware/device dependence explicit and do not add unproved autodetection."
+  },
+  "physical_fdt36": {
+    "blocker_reduced": true,
+    "closed": false,
+    "external_corroboration": "Issue63 independently has logical A0 length 22 in physical 64-byte OUTs with nonzero residue only at offsets 40-45, but the six bytes differ from the local target.",
+    "zero_tail_equivalence": "NOT_PROVEN"
+  },
+  "best_next_primary_evidence": "ONE_SANITIZED_WINDOWS_27C6_5125_APP12509_TRACE_FROM_COLD_START_BASEFILE_VALIDATION_AND_FIRST_0x36_SEED_SOURCE_THROUGH_0x32_ARM_THEN_OPERATOR_CANCEL_WITHOUT_FINGER_AND_DETERMINISTIC_REENTRY",
+  "d254_outcome": "BLOCKED",
+  "next_minimum_live_boundary": "NONE",
+  "d254_live_boundary": "BLOCKED",
+  "d254_live_execution": "NOT_PERFORMED",
+  "requires_more_primary_evidence": true,
+  "safety": {
+    "local_usb_open_count": 0,
+    "local_tls_handshake_count": 0,
+    "local_d4_send_count": 0,
+    "local_af_send_count": 0,
+    "local_fdt_send_count": 0,
+    "local_image_command_count": 0,
+    "local_finger_interaction_count": 0,
+    "local_persistent_write_family_count": 0
+  }
+}

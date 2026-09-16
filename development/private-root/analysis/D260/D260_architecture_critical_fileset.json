@@ -1,0 +1,31 @@
+{
+  "files": [
+    {
+      "path": "core/tls_b0.py",
+      "sha256": "135dc8a4a9d5c753fec38fc638d530d86f53dadbde004d9d5248200ecd1b7f56"
+    },
+    {
+      "path": "core/runtime_transport.py",
+      "sha256": "1b8ce1f1b3f8f3d86e51fd80a333941fd241dc8ed932fdff9256ba1941ea813a"
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "sha256": "30b9302d833f99e7f30361cb771c25a83b95d14223efd596b3bad3421d311c01"
+    },
+    {
+      "path": "core/post_d4.py",
+      "sha256": "f4f52031319b21f4ae4b5841e91f91966d9b11df8a626fcef339b080fee1daf2"
+    },
+    {
+      "path": "core/fdt_lifecycle.py",
+      "sha256": "2edbec9e6651c63f23830985ac7e6bd80160780b6186bb00446480019575e1c8"
+    },
+    {
+      "path": "core/fdt_seed.py",
+      "sha256": "6b6ba63bab6332186d215f52df3eed8b8e2c91f6de4c36951e4a819f51087c14"
+    }
+  ],
+  "operational_live_critical_fileset_approved": false,
+  "operational_live_critical_fileset_created": false,
+  "schema": "D260_ARCHITECTURE_CRITICAL_FILESET_V1"
+}

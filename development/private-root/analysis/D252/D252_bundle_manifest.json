@@ -1,0 +1,59 @@
+{
+  "schema": "d252-step-local-bundle-manifest-v1",
+  "step": "D252",
+  "initial_head": "f07352ce085651568a9aedbf04b097df91d7c0bb",
+  "decision": "D252_LIVE_BOUNDARY=BLOCKED",
+  "operator_kit_included": false,
+  "members": [
+    {
+      "path": "D252_fdt_precondition_restore_audit.md",
+      "sha256": "d11c64b9cf4c95486c9eaffe877cf819d42209ed0eb7dc9ee23f8b0a131e2fed"
+    },
+    {
+      "path": "D252_decision.json",
+      "sha256": "1927766d2c1662db0edf0028aab3210cc95abd57d211682bddaee19bb8b92c7e"
+    },
+    {
+      "path": "d252_fdt_capture_audit.py",
+      "sha256": "143bda65c9f9c250f002967be7f26f9db63282631f446764fe9298567f73c2a6"
+    },
+    {
+      "path": "D252_test_results.txt",
+      "sha256": "e7560d7bd8cd9c6a70b1ebf54051911b924ce702ceb8d9c1c736d64165079092"
+    }
+  ],
+  "canonical_documentation_reference": {
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "sha256_at_bundle_creation": "7d68bccd5fa3ccce0eec4d93b547d9d4c45bc029575abc9b9ccd1a18c0bcd56d",
+    "included": false,
+    "reason": "canonical repository document referenced rather than duplicated"
+  },
+  "primary_sources_referenced_not_included": [
+    {
+      "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+      "sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+    },
+    {
+      "path": "analysis/D230/work/GoodixExport/gfusb.dll",
+      "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+    },
+    {
+      "path": "analysis/D230/work/app/GF_ST411SEC_APP_12509_mapped_code.bin",
+      "sha256": "8305b1c43ab092d3e55d353c5cd0a01675c1f4d47980557b084decfd53877079"
+    },
+    {
+      "path": "Rockytkg/",
+      "upstream_commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b"
+    }
+  ],
+  "excluded": [
+    "raw capture",
+    "raw DLL",
+    "firmware/APP binary",
+    "PSK or secrets",
+    "biometric data",
+    "Rocky snapshot",
+    "historical bundles",
+    "D251 operator artifacts"
+  ]
+}

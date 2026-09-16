@@ -1,0 +1,11 @@
+claim_id,stage,claim,evidence_source,location_or_hash,confidence,residual_limit,falsifier
+PSK-001,cache,Windows cache is under ProgramData Goodix,gfusb.dll strings,"Goodix_Cache.bin; ProgramData\\Goodix",high,path construction not dynamically executed in D231,different target consumer path
+PSK-002,protection,Cache protection uses Windows DPAPI,gfusb.dll imports and wrappers,"CryptProtectData 0x18000be03; CryptUnprotectData 0x18000c11c",high,machine-scope flag relies also on canonical SEC-001,user-scope flag proven in actual call
+PSK-003,publication,Recovered plaintext is published to runtime PSK area,gfusb.dll 1.1.125.14,0x18003b942..0x18003b964 -> 0x180576e50/0x180576e70,high,plaintext source provenance follows successful consumer,intervening transform before copy
+PSK-004,TLS consumer,TLS receives same runtime pointer and length,gfusb.dll 1.1.125.14,0x180059020..0x180059038,high,callee internals summarized by conf_psk path,second OEM KDF in callee
+PSK-005,relationship,PSK_TLS equals out A,SEC-001 plus local direct dataflow,gfusb hash 904eab1d...c7e2,high,no live D231 secret inspection,second KDF or different pointer
+PSK-006,validator,validator equals KDF_OEM(out A) and is not PSK,README and SEC-001,E4 selector bb020003,high,prior private derivation artifacts absent from checkout,canonical evidence invalidated
+PSK-007,portability,Legitimate original material was imported to root-only Linux store and E4 matched,SEC-002,result SHA-256 504cdcfc4b0e622f54e833506c5ba8a811a2fc5ef8c083abd4d636867fd66841,high for original pair,not general reproducibility,result hash/device mismatch
+PSK-008,profile,TLS 1.2 pure PSK suite 0x00a8 identity Client_identity device client,SEC-003 plus DLL strings/setup,gfusb hash 904eab1d...c7e2,high,real Linux/device handshake not completed,target negotiates different profile
+PSK-009,post-recovery binding,No second machine/TPM binding in publication-to-TLS path,PE imports and dataflow,0x18003b946 -> 0x180059023,medium-high,corpus-bounded static negative,new indirect transform or external hardware callback
+PSK-010,secret handling,D231 did not access or disclose secret,D231 procedure,artifacts contain addresses/hashes only,high,cannot independently revalidate old private blob,secret material found in bundle

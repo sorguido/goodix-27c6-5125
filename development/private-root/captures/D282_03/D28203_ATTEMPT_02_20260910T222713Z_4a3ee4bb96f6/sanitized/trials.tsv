@@ -1,0 +1,7 @@
+trial	block	block_position	global_order	physical_finger	identity_class	daemon_pid	daemon_invocation_id	result	action_return_code	probe_keypoints	threshold	template_samples	comparison_count	score_vector_complete	observed_max_score	matched_sample	scores_by_enrolled_sample	real_submit
+1	A	1	1	RIGHT_INDEX	SAME	94915	4259de9f292845f2857c4b79ca9ac29b	match	0	155	40	8	1	false	674	1	1:674	79
+2	A	2	2	LEFT_INDEX	DIFFERENT	94915	4259de9f292845f2857c4b79ca9ac29b	no_match	1	115	40	8	8	true	0	0	1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0	77
+3	A	3	3	RIGHT_INDEX	SAME	94915	4259de9f292845f2857c4b79ca9ac29b	match	0	148	40	8	1	false	75	1	1:75	80
+4	B	1	4	LEFT_INDEX	DIFFERENT	95050	5b49fdaa12a74ad8b2bfb98391cb3bf7	no_match	1	117	40	8	8	true	0	0	1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0	77
+5	B	2	5	RIGHT_INDEX	SAME	95050	5b49fdaa12a74ad8b2bfb98391cb3bf7	match	0	139	40	8	5	false	54	5	1:0,2:0,3:0,4:0,5:54	83
+6	B	3	6	LEFT_INDEX	DIFFERENT	95050	5b49fdaa12a74ad8b2bfb98391cb3bf7	no_match	1	111	40	8	8	true	0	0	1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0	79

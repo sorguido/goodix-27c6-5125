@@ -1,0 +1,10 @@
+[   18.444195] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): debug on
+[   18.619049] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): /net/reactivated/Fprint/Device/0 prints registered: 1
+[   18.619053] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): Using device /net/reactivated/Fprint/Device/0 (out of 1 devices)
+[   18.757639] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): scan-type for /net/reactivated/Fprint/Device/0: press
+[   18.757868] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): About to call VerifyStart
+[   18.777874] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): VerifyStart completed successfully
+[   18.777883] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): verify_finger_selected Place your right index finger on the fingerprint reader
+[   20.191665] <HOST> plasmalogin-helper[1550]: pam_fprintd(plasmalogin:auth): Verify result: verify-match (done: 1)
+[   20.362600] <HOST> plasmalogin-helper[1550]: pam_unix(plasmalogin:session): session opened for user <USER>(uid=1000) by <USER>(uid=0)
+[   20.375418] <HOST> plasmalogin-helper[1550]: Starting Wayland user session: "/etc/plasmalogin/wayland-session" "/usr/libexec/plasma-dbus-run-session-if-needed /usr/bin/startplasma-wayland"

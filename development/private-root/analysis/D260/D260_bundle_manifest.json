@@ -1,0 +1,119 @@
+{
+  "bundle_path": "analysis/D260/D260_persistent_runtime_architecture_readiness_bundle.zip",
+  "bundle_sha256": "RECORDED_IN_EXTERNAL_SIDECAR",
+  "canonical_manual": {
+    "included": false,
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "reason": "CANONICAL_REPOSITORY_REFERENCE_NOT_DUPLICATED",
+    "sha256": "5641496cb1a282c22c0fd9cbfc637ba2f39dd8bb3fc89221a94d65fbc66a8e17"
+  },
+  "exclusions": [
+    "historical unchanged files",
+    "raw captures",
+    "real secret/PSK",
+    "biometric plaintext/raster",
+    "firmware and OEM DLL/disassembly",
+    "cache/OTP",
+    "operator kit and live launcher"
+  ],
+  "files": [
+    {
+      "path": "core/README.md",
+      "sha256": "c68472072e6fe6274c784b444401f05f3737710788399e3f58c13f4037dcb1f7",
+      "size": 2793
+    },
+    {
+      "path": "core/tls_b0.py",
+      "sha256": "135dc8a4a9d5c753fec38fc638d530d86f53dadbde004d9d5248200ecd1b7f56",
+      "size": 12823
+    },
+    {
+      "path": "core/runtime_transport.py",
+      "sha256": "1b8ce1f1b3f8f3d86e51fd80a333941fd241dc8ed932fdff9256ba1941ea813a",
+      "size": 3571
+    },
+    {
+      "path": "core/persistent_runtime.py",
+      "sha256": "30b9302d833f99e7f30361cb771c25a83b95d14223efd596b3bad3421d311c01",
+      "size": 11770
+    },
+    {
+      "path": "core/fdt_lifecycle.py",
+      "sha256": "2edbec9e6651c63f23830985ac7e6bd80160780b6186bb00446480019575e1c8",
+      "size": 29531
+    },
+    {
+      "path": "tests/test_d260_persistent_runtime.py",
+      "sha256": "2d59f77f632f5eb5a15409befd0c4dc0e02d2a1be6f6c61240389b9ee79ea782",
+      "size": 7293
+    },
+    {
+      "path": "analysis/D260/d260_offline_rehearsal.py",
+      "sha256": "342e35ebb9f74ee1508bb47f35ee3951f9c9b99a17da961522d4a2b694593056",
+      "size": 29515
+    },
+    {
+      "path": "analysis/D260/D260_architecture_runtime_report.md",
+      "sha256": "c1ca5cd40b18bb2dc430d59a2a4a203fdd085a5000704cf688b69d84a6ffcffa",
+      "size": 3457
+    },
+    {
+      "path": "analysis/D260/D260_persistent_tls_evidence.json",
+      "sha256": "a8514396615b2c9fb676d76d756b3907f3830fd762501c4f928bacff07101224",
+      "size": 667
+    },
+    {
+      "path": "analysis/D260/D260_b0_handshake_bridge_evidence.json",
+      "sha256": "30e25d2741a0d981e9bb3bffad623948e41dd188af76b67edc4ac1bf532a1976",
+      "size": 316
+    },
+    {
+      "path": "analysis/D260/D260_d4_plaintext_continuity_evidence.json",
+      "sha256": "ec338cf48ee2af69044ccb38dbeffa685d1e5e94a42c0b6ea9fccd5fa229b9ca",
+      "size": 272
+    },
+    {
+      "path": "analysis/D260/D260_mixed_a0_b0_evidence.json",
+      "sha256": "9191b3a1e12e4fe3e72b56ea70d77fa98a39f2d8158c206c214bd0520b76adb0",
+      "size": 328
+    },
+    {
+      "path": "analysis/D260/D260_eventsource_irq_evidence.json",
+      "sha256": "4e1485f64beebdffc62127dbd2fecbfab0c739dcc991ccde636bb810897b2b8e",
+      "size": 358
+    },
+    {
+      "path": "analysis/D260/D260_end_to_end_rehearsal.json",
+      "sha256": "073f1d93fd5e44fc16f9abb7a7e9e564ea133f90853423fa593602e955baeb86",
+      "size": 6765
+    },
+    {
+      "path": "analysis/D260/D260_failure_containment_matrix.json",
+      "sha256": "8fb7995ed19bf44066e47f5168f80605e38750b7fa20cc76d0c074a0b0ca830e",
+      "size": 5921
+    },
+    {
+      "path": "analysis/D260/D260_physical_submission_policy_matrix.json",
+      "sha256": "4efc6ce36171ba387c7ba524ec5f6a71f22e57651a40ec13523dcd36f63d7d65",
+      "size": 4441
+    },
+    {
+      "path": "analysis/D260/D260_architecture_critical_fileset.json",
+      "sha256": "f7b1eb43d6c43c292775eb7b79b6900669b7cd27035ece07b59e025e7c025c8a",
+      "size": 983
+    },
+    {
+      "path": "analysis/D260/D260_readiness_decision.json",
+      "sha256": "7f684171c69a64848a68342a57ddb3ec90db789d04b2cd9ae41c888b3515d384",
+      "size": 5893
+    },
+    {
+      "path": "analysis/D260/D260_test_results.txt",
+      "sha256": "c3f60c482ba329237d96450b98bd5cdc1e217a29fe1a6ffcb0aa11c4cc3137b8",
+      "size": 696
+    }
+  ],
+  "reference_head": "52aecb4cf7980af4261ec6a1c345770ea759c961",
+  "schema": "D260_BUNDLE_MANIFEST_V1",
+  "step": "D260"
+}

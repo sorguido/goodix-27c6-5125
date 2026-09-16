@@ -1,0 +1,43 @@
+{
+  "schema": "d245-step-local-bundle-manifest-v2",
+  "step": "D245",
+  "cumulative": false,
+  "repository_reference_commit": "3b1b2abca09922b8a4c93dbe14368bc387ec56de",
+  "repository_reference_is_approved_live_baseline": false,
+  "live_baseline_approval_status": "LIVE_BASELINE_APPROVAL_PENDING_USER_REVIEW",
+  "supersedes_bundle_sha256": "9813878a256a9b5afa9631c064fd8cc21486376a8bba327881b1d7dae0ce569f",
+  "contains_historical_live_reports": false,
+  "contains_secret_or_raw_usb_payload": false,
+  "file_count": 19,
+  "files": [
+    "Goodix 27c6 5125 manuale tecnico.md",
+    "operator_kit/d245-live-tls-once.sh",
+    "tests/test_d239_operator_kit.py",
+    "tests/test_d241_operator_kit.py",
+    "tests/test_d242_operator_kit.py",
+    "tests/test_d243_operator_kit.py",
+    "tests/test_d244_fresh_state_control.py",
+    "tests/test_d245_precondition.py",
+    "analysis/D245/D245_A8_E4_primary_evidence_audit.md",
+    "analysis/D245/D245_A8_E4_contract.json",
+    "analysis/D245/D245_live_unseal.patch",
+    "analysis/D245/d245_runtime_matrix.py",
+    "analysis/D245/d245_operator_dry_run.py",
+    "analysis/D245/D245_executable_closure_report.json",
+    "analysis/D245/D245_technical_report.md",
+    "analysis/D245/D245_test_results.md",
+    "analysis/D245/D245_decision.json",
+    "analysis/D245/D245_final_report.md",
+    "analysis/D245/D245_bundle_manifest.json"
+  ],
+  "excluded_by_design": [
+    "analysis/D179/** (purged/unavailable)",
+    "analysis/D230/** proprietary binaries/capture",
+    "analysis/D241/** through analysis/D244/** historical reports",
+    "operator_kit/d239*.sh through d244*.sh (restored byte-for-byte; referenced by canonical bundles)",
+    "unchanged sealed source and helper dependencies (referenced by repository commit and closure hashes)",
+    "real secrets and raw config90",
+    "raw USB/TLS payloads and biometric data",
+    "bundle ZIP and external SHA-256 sidecar"
+  ]
+}

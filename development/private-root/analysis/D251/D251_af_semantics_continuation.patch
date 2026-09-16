@@ -1,0 +1,197 @@
+--- a/src/goodix5125_d233_backend.py
++++ b/src/goodix5125_d233_backend.py
+@@ -25,7 +25,6 @@
+ from core.post_d4 import (
+     ProtocolError as PostD4ProtocolError,
+     UnexpectedAck as AfUnexpectedAck,
+-    UnexpectedStateVersion,
+     build_af,
+     parse_af_response,
+     parse_outer as parse_post_d4_outer,
+@@ -953,11 +952,15 @@
+         self.af_attempt_count = 0
+         self.af_send_count = 0
+         self.af_response_count = 0
++        self.af_response_class = "no_response"
+         self.af_failure_class = "not_reached"
+         self.af_pacing_count = 0
+-        self.af_state_version: int | None = None
++        self.af_state_byte0: int | None = None
+         self.af_state_flags: int | None = None
+         self.af_unknown_flag_bits: int | None = None
++        self.af_pov_valid: bool | None = None
++        self.af_tls_connected: bool | None = None
++        self.af_locked: bool | None = None
+ 
+     @property
+     def usb_open_count(self) -> int:
+@@ -1285,9 +1288,17 @@
+             completion_ids = self.transport.last_frame_completion_ids
+             state = parse_af_response(response)
+             self.af_response_count = 1
+-            self.af_state_version = state.version
++            self.af_state_byte0 = state.byte0
+             self.af_state_flags = state.flags
+             self.af_unknown_flag_bits = state.unknown_flag_bits
++            self.af_pov_valid = state.pov_valid
++            self.af_tls_connected = state.tls_connected
++            self.af_locked = state.locked
++            self.af_response_class = (
++                "valid_ae_accepted"
++                if state.byte0 == 1
++                else "valid_ae_with_unusual_state_fields"
++            )
+             if self.transport.buffered_rx_bytes:
+                 self.af_failure_class = "unexpected_trailing_frame"
+                 raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
+@@ -1296,6 +1307,7 @@
+             self.af_failure_class = "none"
+         except UsbTimeout as exc:
+             self.last_failure_domain = "usb_transport"
++            self.af_response_class = "no_response"
+             self.af_failure_class = (
+                 "response_timeout" if self.af_send_count else "out_timeout"
+             )
+@@ -1306,14 +1318,12 @@
+             raise ReplayAbort(AbortClass.AMBIGUOUS) from exc
+         except AfUnexpectedAck as exc:
+             self.last_failure_domain = "af_validator"
++            self.af_response_class = "unexpected_ack"
+             self.af_failure_class = "unexpected_ack"
+             raise ReplayAbort(AbortClass.UNEXPECTED_ACK) from exc
+-        except UnexpectedStateVersion as exc:
+-            self.last_failure_domain = "af_validator"
+-            self.af_failure_class = "semantic_state_version_mismatch"
+-            raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+         except PostD4ProtocolError as exc:
+             self.last_failure_domain = "af_validator"
++            self.af_response_class = "malformed_response"
+             self.af_failure_class = "malformed_ae_response"
+             raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+         except UsbFailure as exc:
+@@ -1330,6 +1340,7 @@
+                     "response_control": "0xae" if self.af_response_count else "none",
+                     "response_body_length": 16 if self.af_response_count else 0,
+                     "response_frame_count": self.af_response_count,
++                    "response_class": self.af_response_class,
+                     "completion_classification": (
+                         "single_frame_usb_completion" if completion_ids else "none"
+                     ),
+@@ -1866,11 +1877,14 @@
+         "af_failure_class": (
+             backend.af_failure_class if backend is not None else "not_reached"
+         ),
++        "af_response_class": (
++            backend.af_response_class if backend is not None else "no_response"
++        ),
+         "af_pacing_count": (
+             backend.af_pacing_count if backend is not None else 0
+         ),
+-        "af_state_version": (
+-            backend.af_state_version if backend is not None else None
++        "af_state_byte0": (
++            backend.af_state_byte0 if backend is not None else None
+         ),
+         "af_state_flags": (
+             backend.af_state_flags if backend is not None else None
+@@ -1878,6 +1892,15 @@
+         "af_unknown_flag_bits": (
+             backend.af_unknown_flag_bits if backend is not None else None
+         ),
++        "af_pov_valid": (
++            backend.af_pov_valid if backend is not None else None
++        ),
++        "af_tls_connected": (
++            backend.af_tls_connected if backend is not None else None
++        ),
++        "af_locked": (
++            backend.af_locked if backend is not None else None
++        ),
+         "af_completed": bool(backend is not None and backend._af_complete),
+         "automatic_invasive_recovery": "forbidden",
+     }
+--- a/src/goodix5125_d235_entrypoint.py
++++ b/src/goodix5125_d235_entrypoint.py
+@@ -44,7 +44,7 @@
+ D235_LIVE_CAPABILITY = 0
+ D235_LIVE_AUTHORIZATION = "yes"
+ D236_OPERATOR_RISK_ACCEPTANCE = "granted"
+-D235_RESULT_SCHEMA = "d250-live-af-single-shot-result-v1"
++D235_RESULT_SCHEMA = "d251-live-af-single-shot-result-v1"
+ D235_OFFLINE_MODE = "injected_offline_entrypoint_review"
+ CANONICAL_GFUSB_SHA256 = (
+     "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+@@ -75,16 +75,16 @@
+     def system_default(cls) -> "ProductionRuntimePaths":
+         repository = Path(__file__).resolve().parents[1]
+         store = Path("/var/lib/goodix-5125-poc")
+-        reports = store / "d250-results"
++        reports = store / "d251-results"
+         return cls(
+             psk_store=store / "transport-material.bin",
+             target_material_manifest=store / "target-material-manifest.json",
+             config90_store=store / "target-config-90.bin",
+             canonical_gfusb=repository / "analysis/D230/work/GoodixExport/gfusb.dll",
+             report_directory=reports,
+-            checkpoint_report=reports / "d250-live-pre-restore.json",
+-            final_report=reports / "d250-live-result.json",
+-            single_use_marker=store / "d250-operator-invocation.marker",
++            checkpoint_report=reports / "d251-live-pre-restore.json",
++            final_report=reports / "d251-live-result.json",
++            single_use_marker=store / "d251-operator-invocation.marker",
+         )
+ 
+     def validate(self) -> None:
+@@ -226,7 +226,7 @@
+     "D1": "D236_ABORTED_D1",
+     "TLS": "D236_ABORTED_TLS",
+     "D4": "D246_ABORTED_D4",
+-    "AF": "D250_ABORTED_AF",
++    "AF": "D251_ABORTED_AF",
+ }
+ 
+ 
+@@ -277,7 +277,7 @@
+         operator_risk_acceptance=policy.operator_risk_acceptance,
+         live_authorization=policy.live_authorization,
+         decision=(
+-            "D250_AF_RESPONSE_VALIDATED_STOP_AFTER_AF"
++            "D251_AF_RESPONSE_VALIDATED_STOP_AFTER_AF"
+             if report.get("result") == "pass"
+             and report.get("af_completed") is True
+             else map_future_live_decision(report)
+@@ -375,17 +375,17 @@
+         D246_D4_ACK_POLICY="EXACT_D4_STATUS_01_ONLY",
+         D246_STOP_BOUNDARY="STOP_AFTER_D4",
+         D246_NEXT_APPLICATION_ACTION_REACHABLE=False,
+-        d250_result=(
++        d251_result=(
+             "AF_EXACTLY_ONCE_RESPONSE_VALIDATED_STOP_AFTER_AF"
+             if report.get("result") == "pass"
+             and report.get("af_completed") is True
+-            else "D250_ABORTED_FAIL_CLOSED"
++            else "D251_ABORTED_FAIL_CLOSED"
+         ),
+-        D250_AF_ACK_POLICY="FORBIDDEN_DIRECT_AE_ONLY",
+-        D250_AF_PHYSICAL_OUT="FIXED64_ZERO_TAIL",
+-        D250_AF_RESPONSE_POLICY="EXACT_ONE_AE_WITH_16_STATE_BYTES",
+-        D250_STOP_BOUNDARY="STOP_AFTER_AF",
+-        D250_NEXT_SENSOR_ACTION_REACHABLE=False,
++        D251_AF_ACK_POLICY="FORBIDDEN_DIRECT_AE_ONLY",
++        D251_AF_PHYSICAL_OUT="FIXED64_ZERO_TAIL",
++        D251_AF_RESPONSE_POLICY="EXACT_ONE_STRUCTURALLY_VALID_AE_WITH_16_STATE_BYTES",
++        D251_STOP_BOUNDARY="STOP_AFTER_AF",
++        D251_NEXT_SENSOR_ACTION_REACHABLE=False,
+         LIVE_BASELINE_APPROVAL="PENDING_USER_REVIEW",
+     )
+     return mapped
+@@ -637,7 +637,7 @@
+ def main(argv: Sequence[str] | None = None) -> int:
+     result = d235_entrypoint(tuple(sys.argv[1:] if argv is None else argv), os.environ)
+     print(json.dumps(result, sort_keys=True))
+-    return 0 if result.get("decision") == "D250_AF_RESPONSE_VALIDATED_STOP_AFTER_AF" else 1
++    return 0 if result.get("decision") == "D251_AF_RESPONSE_VALIDATED_STOP_AFTER_AF" else 1
+ 
+ 
+ if __name__ == "__main__":
+

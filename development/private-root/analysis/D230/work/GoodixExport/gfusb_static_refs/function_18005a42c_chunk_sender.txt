@@ -1,0 +1,183 @@
+   18005a42c:	44 88 44 24 18       	mov    BYTE PTR [rsp+0x18],r8b
+   18005a431:	48 89 54 24 10       	mov    QWORD PTR [rsp+0x10],rdx
+   18005a436:	48 89 4c 24 08       	mov    QWORD PTR [rsp+0x8],rcx
+   18005a43b:	48 81 ec 98 00 00 00 	sub    rsp,0x98
+   18005a442:	48 8b 05 c7 ca 51 00 	mov    rax,QWORD PTR [rip+0x51cac7]        # 0x180576f10
+   18005a449:	48 33 c4             	xor    rax,rsp
+   18005a44c:	48 89 84 24 80 00 00 	mov    QWORD PTR [rsp+0x80],rax
+   18005a453:	00 
+   18005a454:	c7 44 24 40 00 00 00 	mov    DWORD PTR [rsp+0x40],0x0
+   18005a45b:	00 
+   18005a45c:	c7 44 24 44 00 00 00 	mov    DWORD PTR [rsp+0x44],0x0
+   18005a463:	00 
+   18005a464:	48 c7 44 24 48 00 00 	mov    QWORD PTR [rsp+0x48],0x0
+   18005a46b:	00 00 
+   18005a46d:	48 8b 84 24 a0 00 00 	mov    rax,QWORD PTR [rsp+0xa0]
+   18005a474:	00 
+   18005a475:	48 89 44 24 50       	mov    QWORD PTR [rsp+0x50],rax
+   18005a47a:	48 83 7c 24 50 00    	cmp    QWORD PTR [rsp+0x50],0x0
+   18005a480:	75 41                	jne    0x18005a4c3
+   18005a482:	48 8d 05 1f aa 48 00 	lea    rax,[rip+0x48aa1f]        # 0x1804e4ea8
+   18005a489:	48 89 44 24 30       	mov    QWORD PTR [rsp+0x30],rax
+   18005a48e:	48 c7 44 24 28 00 00 	mov    QWORD PTR [rsp+0x28],0x0
+   18005a495:	00 00 
+   18005a497:	c7 44 24 20 2b 0d 00 	mov    DWORD PTR [rsp+0x20],0xd2b
+   18005a49e:	00 
+   18005a49f:	4c 8d 0d 2a aa 48 00 	lea    r9,[rip+0x48aa2a]        # 0x1804e4ed0
+   18005a4a6:	4c 8d 05 73 7c 48 00 	lea    r8,[rip+0x487c73]        # 0x1804e2120
+   18005a4ad:	ba 04 00 00 00       	mov    edx,0x4
+   18005a4b2:	48 8b 0d 3f b9 51 00 	mov    rcx,QWORD PTR [rip+0x51b93f]        # 0x180575df8
+   18005a4b9:	e8 1a 2a fb ff       	call   0x18000ced8
+   18005a4be:	e9 f9 00 00 00       	jmp    0x18005a5bc
+   18005a4c3:	48 8d 0d 3e 6a 53 00 	lea    rcx,[rip+0x536a3e]        # 0x180590f08
+   18005a4ca:	ff 15 18 6c 03 00    	call   QWORD PTR [rip+0x36c18]        # 0x1800910e8
+   18005a4d0:	33 d2                	xor    edx,edx
+   18005a4d2:	48 8b 0d 7f 6a 53 00 	mov    rcx,QWORD PTR [rip+0x536a7f]        # 0x180590f58
+   18005a4d9:	e8 12 34 fc ff       	call   0x18001d8f0
+   18005a4de:	48 89 44 24 48       	mov    QWORD PTR [rsp+0x48],rax
+   18005a4e3:	0f b6 84 24 b0 00 00 	movzx  eax,BYTE PTR [rsp+0xb0]
+   18005a4ea:	00 
+   18005a4eb:	44 8b c0             	mov    r8d,eax
+   18005a4ee:	48 8b 94 24 a8 00 00 	mov    rdx,QWORD PTR [rsp+0xa8]
+   18005a4f5:	00 
+   18005a4f6:	48 8b 4c 24 48       	mov    rcx,QWORD PTR [rsp+0x48]
+   18005a4fb:	e8 f0 0c 02 00       	call   0x18007b1f0
+   18005a500:	0f b6 84 24 b0 00 00 	movzx  eax,BYTE PTR [rsp+0xb0]
+   18005a507:	00 
+   18005a508:	44 8b c0             	mov    r8d,eax
+   18005a50b:	48 8b 54 24 48       	mov    rdx,QWORD PTR [rsp+0x48]
+   18005a510:	48 8d 4c 24 58       	lea    rcx,[rsp+0x58]
+   18005a515:	e8 aa 36 00 00       	call   0x18005dbc4
+   18005a51a:	ba 01 00 00 00       	mov    edx,0x1
+   18005a51f:	48 8d 4c 24 70       	lea    rcx,[rsp+0x70]
+   18005a524:	e8 ef 59 fb ff       	call   0x18000ff18
+   18005a529:	b9 e8 03 00 00       	mov    ecx,0x3e8
+   18005a52e:	e8 d1 59 fb ff       	call   0x18000ff04
+   18005a533:	48 8b d0             	mov    rdx,rax
+   18005a536:	48 8d 4c 24 70       	lea    rcx,[rsp+0x70]
+   18005a53b:	e8 14 5a fb ff       	call   0x18000ff54
+   18005a540:	48 8d 44 24 44       	lea    rax,[rsp+0x44]
+   18005a545:	48 89 44 24 20       	mov    QWORD PTR [rsp+0x20],rax
+   18005a54a:	4c 8d 4c 24 58       	lea    r9,[rsp+0x58]
+   18005a54f:	4c 8d 44 24 70       	lea    r8,[rsp+0x70]
+   18005a554:	33 d2                	xor    edx,edx
+   18005a556:	48 8b 4c 24 50       	mov    rcx,QWORD PTR [rsp+0x50]
+   18005a55b:	e8 6c 38 00 00       	call   0x18005ddcc
+   18005a560:	89 44 24 40          	mov    DWORD PTR [rsp+0x40],eax
+   18005a564:	83 7c 24 40 00       	cmp    DWORD PTR [rsp+0x40],0x0
+   18005a569:	7d 44                	jge    0x18005a5af
+   18005a56b:	8b 44 24 40          	mov    eax,DWORD PTR [rsp+0x40]
+   18005a56f:	89 44 24 38          	mov    DWORD PTR [rsp+0x38],eax
+   18005a573:	48 8d 05 86 a9 48 00 	lea    rax,[rip+0x48a986]        # 0x1804e4f00
+   18005a57a:	48 89 44 24 30       	mov    QWORD PTR [rsp+0x30],rax
+   18005a57f:	48 c7 44 24 28 00 00 	mov    QWORD PTR [rsp+0x28],0x0
+   18005a586:	00 00 
+   18005a588:	c7 44 24 20 53 0d 00 	mov    DWORD PTR [rsp+0x20],0xd53
+   18005a58f:	00 
+   18005a590:	4c 8d 0d 39 a9 48 00 	lea    r9,[rip+0x48a939]        # 0x1804e4ed0
+   18005a597:	4c 8d 05 82 7b 48 00 	lea    r8,[rip+0x487b82]        # 0x1804e2120
+   18005a59e:	ba 04 00 00 00       	mov    edx,0x4
+   18005a5a3:	48 8b 0d 4e b8 51 00 	mov    rcx,QWORD PTR [rip+0x51b84e]        # 0x180575df8
+   18005a5aa:	e8 29 29 fb ff       	call   0x18000ced8
+   18005a5af:	48 8d 0d 52 69 53 00 	lea    rcx,[rip+0x536952]        # 0x180590f08
+   18005a5b6:	ff 15 34 6b 03 00    	call   QWORD PTR [rip+0x36b34]        # 0x1800910f0
+   18005a5bc:	8a 44 24 44          	mov    al,BYTE PTR [rsp+0x44]
+   18005a5c0:	48 8b 8c 24 80 00 00 	mov    rcx,QWORD PTR [rsp+0x80]
+   18005a5c7:	00 
+   18005a5c8:	48 33 cc             	xor    rcx,rsp
+   18005a5cb:	e8 50 fd 01 00       	call   0x18007a320
+   18005a5d0:	48 81 c4 98 00 00 00 	add    rsp,0x98
+   18005a5d7:	c3                   	ret
+   18005a5d8:	40 57                	rex push rdi
+   18005a5da:	48 81 ec b0 00 00 00 	sub    rsp,0xb0
+   18005a5e1:	48 8b 05 28 c9 51 00 	mov    rax,QWORD PTR [rip+0x51c928]        # 0x180576f10
+   18005a5e8:	48 33 c4             	xor    rax,rsp
+   18005a5eb:	48 89 84 24 a0 00 00 	mov    QWORD PTR [rsp+0xa0],rax
+   18005a5f2:	00 
+   18005a5f3:	c7 44 24 50 00 00 00 	mov    DWORD PTR [rsp+0x50],0x0
+   18005a5fa:	00 
+   18005a5fb:	48 8d 44 24 60       	lea    rax,[rsp+0x60]
+   18005a600:	48 8b f8             	mov    rdi,rax
+   18005a603:	33 c0                	xor    eax,eax
+   18005a605:	b9 40 00 00 00       	mov    ecx,0x40
+   18005a60a:	f3 aa                	rep stos BYTE PTR [rdi],al
+   18005a60c:	48 8d 05 2d a9 48 00 	lea    rax,[rip+0x48a92d]        # 0x1804e4f40
+   18005a613:	48 89 44 24 30       	mov    QWORD PTR [rsp+0x30],rax
+   18005a618:	48 c7 44 24 28 00 00 	mov    QWORD PTR [rsp+0x28],0x0
+   18005a61f:	00 00 
+   18005a621:	c7 44 24 20 64 0d 00 	mov    DWORD PTR [rsp+0x20],0xd64
+   18005a628:	00 
+   18005a629:	4c 8d 0d 28 a9 48 00 	lea    r9,[rip+0x48a928]        # 0x1804e4f58
+   18005a630:	4c 8d 05 e9 7a 48 00 	lea    r8,[rip+0x487ae9]        # 0x1804e2120
+   18005a637:	ba 07 00 00 00       	mov    edx,0x7
+   18005a63c:	48 8b 0d b5 b7 51 00 	mov    rcx,QWORD PTR [rip+0x51b7b5]        # 0x180575df8
+   18005a643:	e8 90 28 fb ff       	call   0x18000ced8
+   18005a648:	41 b8 40 00 00 00    	mov    r8d,0x40
+   18005a64e:	33 d2                	xor    edx,edx
+   18005a650:	48 8d 4c 24 60       	lea    rcx,[rsp+0x60]
+   18005a655:	e8 f6 0f 02 00       	call   0x18007b650
+   18005a65a:	66 ba f4 01          	mov    dx,0x1f4
+   18005a65e:	48 8d 4c 24 60       	lea    rcx,[rsp+0x60]
+   18005a663:	e8 d0 f4 ff ff       	call   0x180059b38
+   18005a668:	89 44 24 50          	mov    DWORD PTR [rsp+0x50],eax
+   18005a66c:	83 7c 24 50 01       	cmp    DWORD PTR [rsp+0x50],0x1
+   18005a671:	75 22                	jne    0x18005a695
+   18005a673:	48 8d 15 f6 92 48 00 	lea    rdx,[rip+0x4892f6]        # 0x1804e3970
+   18005a67a:	48 8d 4c 24 60       	lea    rcx,[rsp+0x60]
+   18005a67f:	e8 30 ce 00 00       	call   0x1800674b4
+   18005a684:	83 f8 01             	cmp    eax,0x1
+   18005a687:	75 0c                	jne    0x18005a695
+   18005a689:	c7 44 24 50 01 00 00 	mov    DWORD PTR [rsp+0x50],0x1
+   18005a690:	00 
+   18005a691:	eb 0a                	jmp    0x18005a69d
+   18005a693:	eb 08                	jmp    0x18005a69d
+   18005a695:	c7 44 24 50 00 00 00 	mov    DWORD PTR [rsp+0x50],0x0
+   18005a69c:	00 
+   18005a69d:	8b 44 24 50          	mov    eax,DWORD PTR [rsp+0x50]
+   18005a6a1:	89 44 24 40          	mov    DWORD PTR [rsp+0x40],eax
+   18005a6a5:	48 8d 44 24 60       	lea    rax,[rsp+0x60]
+   18005a6aa:	48 89 44 24 38       	mov    QWORD PTR [rsp+0x38],rax
+   18005a6af:	48 8d 05 ba a8 48 00 	lea    rax,[rip+0x48a8ba]        # 0x1804e4f70
+   18005a6b6:	48 89 44 24 30       	mov    QWORD PTR [rsp+0x30],rax
+   18005a6bb:	48 c7 44 24 28 00 00 	mov    QWORD PTR [rsp+0x28],0x0
+   18005a6c2:	00 00 
+   18005a6c4:	c7 44 24 20 77 0d 00 	mov    DWORD PTR [rsp+0x20],0xd77
+   18005a6cb:	00 
+   18005a6cc:	4c 8d 0d 85 a8 48 00 	lea    r9,[rip+0x48a885]        # 0x1804e4f58
+   18005a6d3:	4c 8d 05 46 7a 48 00 	lea    r8,[rip+0x487a46]        # 0x1804e2120
+   18005a6da:	ba 07 00 00 00       	mov    edx,0x7
+   18005a6df:	48 8b 0d 12 b7 51 00 	mov    rcx,QWORD PTR [rip+0x51b712]        # 0x180575df8
+   18005a6e6:	e8 ed 27 fb ff       	call   0x18000ced8
+   18005a6eb:	8b 44 24 50          	mov    eax,DWORD PTR [rsp+0x50]
+   18005a6ef:	48 8b 8c 24 a0 00 00 	mov    rcx,QWORD PTR [rsp+0xa0]
+   18005a6f6:	00 
+   18005a6f7:	48 33 cc             	xor    rcx,rsp
+   18005a6fa:	e8 21 fc 01 00       	call   0x18007a320
+   18005a6ff:	48 81 c4 b0 00 00 00 	add    rsp,0xb0
+   18005a706:	5f                   	pop    rdi
+   18005a707:	c3                   	ret
+   18005a708:	88 54 24 10          	mov    BYTE PTR [rsp+0x10],dl
+   18005a70c:	88 4c 24 08          	mov    BYTE PTR [rsp+0x8],cl
+   18005a710:	48 83 ec 18          	sub    rsp,0x18
+   18005a714:	0f b6 44 24 20       	movzx  eax,BYTE PTR [rsp+0x20]
+   18005a719:	0f b6 4c 24 28       	movzx  ecx,BYTE PTR [rsp+0x28]
+   18005a71e:	8d 04 c1             	lea    eax,[rcx+rax*8]
+   18005a721:	88 04 24             	mov    BYTE PTR [rsp],al
+   18005a724:	0f b6 04 24          	movzx  eax,BYTE PTR [rsp]
+   18005a728:	48 6b c0 18          	imul   rax,rax,0x18
+   18005a72c:	48 8d 0d 3d 54 54 00 	lea    rcx,[rip+0x54543d]        # 0x18059fb70
+   18005a733:	0f b6 44 01 10       	movzx  eax,BYTE PTR [rcx+rax*1+0x10]
+   18005a738:	83 f8 01             	cmp    eax,0x1
+   18005a73b:	75 09                	jne    0x18005a746
+   18005a73d:	b8 01 00 00 00       	mov    eax,0x1
+   18005a742:	eb 04                	jmp    0x18005a748
+   18005a744:	eb 02                	jmp    0x18005a748
+   18005a746:	33 c0                	xor    eax,eax
+   18005a748:	48 83 c4 18          	add    rsp,0x18
+   18005a74c:	c3                   	ret
+   18005a74d:	cc                   	int3
+   18005a74e:	cc                   	int3
+   18005a74f:	cc                   	int3
+   18005a750:	48 89 4c 24 08       	mov    QWORD PTR [rsp+0x8],rcx
+   18005a755:	48 81 ec c8 00 00 00 	sub    rsp,0xc8
+   18005a75c:	48 8b 84 24 d0 00 00 	mov    rax,QWORD PTR [rsp+0xd0]

@@ -1,0 +1,35 @@
+{
+  "classification": "recovered_local_clean_room_source",
+  "recovery_stage": "A3_bounded_local_session_metadata",
+  "a1_current_tree": "absent",
+  "a2_git_objects": "absent",
+  "a3_result": "original source and KAT patch records recovered",
+  "a4_reconstruction": "not_used",
+  "d190_session": {
+    "path": "/home/guido/.codex/sessions/2026/07/28/rollout-2026-07-28T21-08-41-019faa21-0ebb-7e02-97fe-d3cd7acba420.jsonl",
+    "sha256": "86dabfdd2fb5091945b15abb84f306393c30cbc29c06f9c21b00905e3f92dd05",
+    "source_record_line": 1984,
+    "vectors_record_line": 1979,
+    "tests_record_line": 1993,
+    "oracle_evidence_record_line": 2038,
+    "test_results_record_line": 2048
+  },
+  "d191_session": {
+    "path": "/home/guido/.codex/sessions/2026/07/29/rollout-2026-07-29T07-43-40-019fac66-698c-7362-9b50-96b4bc1bb1a6.jsonl",
+    "sha256": "c14d8b1389634f645048b46a9bf9ab447a60de214fe42d8a2efc0cb5f6e9fb78",
+    "bounded_parser_patch_line": 321
+  },
+  "canonical_pe": {
+    "local_path": "analysis/D230/work/GoodixExport/gfusb.dll",
+    "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+    "executed": false,
+    "included_in_bundle": false
+  },
+  "historical_claims": {
+    "oem_oracle_status": "INDEPENDENT_OEM_MACHINE_CODE_ORACLE_VERIFIED",
+    "binding_verification": "BINDING_BYTE_EXACT_OEM_ORACLE_VERIFIED",
+    "reference_status": "LOCAL_BINDING_REFERENCE_IMPLEMENTED_AND_VERIFIED",
+    "static_material_handling": "LOCAL_VOLATILE_DERIVATION_HASH_ONLY"
+  },
+  "provenance_valid": true
+}

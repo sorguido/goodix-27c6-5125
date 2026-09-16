@@ -1,0 +1,74 @@
+{
+  "artifact": "D270_01_test_results",
+  "step": "D270/01",
+  "execution_mode": "OFFLINE_ONLY_SYNTHETIC_ONLY",
+  "generated_at": "2026-08-25T12:31:21+02:00",
+  "toolchain": "org.freedesktop.Sdk//25.08 flatpak, network unshared",
+  "results": [
+    {
+      "name": "strict_build_real_local_fpimage_root_cwd",
+      "status": "PASS",
+      "detail": "compiled exact repository-local fp-image.c plus strict D269/D270 sources; test printed PASS"
+    },
+    {
+      "name": "asan_ubsan_root_cwd",
+      "status": "PASS",
+      "detail": "address and undefined behavior sanitized binary printed PASS"
+    },
+    {
+      "name": "executable_closure_external_cwd_tmp",
+      "status": "PASS",
+      "detail": "same runner resolved Git root and passed strict plus sanitized execution from /tmp"
+    },
+    {
+      "name": "production_helper_forbidden_symbol_audit",
+      "status": "PASS",
+      "detail": "nm -u found no libusb, USB, filesystem I/O, socket or TLS symbol family"
+    },
+    {
+      "name": "d269_adapter_regression_strict",
+      "status": "PASS",
+      "detail": "existing standalone D269 test printed goodix_u16_to_fpimage: PASS"
+    },
+    {
+      "name": "diff_whitespace_check",
+      "status": "PASS",
+      "detail": "git diff --check"
+    },
+    {
+      "name": "fp_image_new_allocation_fault_injection",
+      "status": "NOT_AVAILABLE",
+      "detail": "local GLib object data allocation is abort-on-OOM; wrapper uses g_try_new0 and handles NULL, but no global allocator seam was introduced solely for testing"
+    }
+  ],
+  "coverage": {
+    "real_fpimage_object": true,
+    "width_80": true,
+    "height_64": true,
+    "packed_bytes_5120": true,
+    "d269_mapping_kat": true,
+    "input_u16_unchanged": true,
+    "object_owned_buffer": true,
+    "getter_transfer_none": true,
+    "weak_finalization": true,
+    "flags_zero_no_transform": true,
+    "ppmm_unknown_separate_state": true,
+    "stored_zero_not_promoted": true,
+    "no_500dpi_default": true,
+    "nbis_unknown_ppmm_fail_closed": true,
+    "sigfm_ppmm_independence_gate_only": true,
+    "invalid_sample_count": true,
+    "sample_above_4095": true,
+    "null_arguments": true,
+    "output_owner_unchanged_on_failure": true,
+    "determinism": true,
+    "frame_content_independence": true,
+    "no_real_biometric_fixture": true,
+    "no_usb_tls_fprintd_filesystem_dependency": true
+  },
+  "executable_closure": "PASS",
+  "real_usb_open_count": 0,
+  "real_secret_materialization_count": 0,
+  "real_fprintd_mutation_count": 0,
+  "persistent_device_write_count": 0
+}

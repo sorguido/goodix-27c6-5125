@@ -1,0 +1,74 @@
+{
+  "schema": "d245-a8-e4-contract-v2",
+  "repository_root": "/home/guido/Repository/goodix-27c6-5125_private",
+  "provenance": {
+    "D245_D179_PRIMARY_RUNTIME_ARTIFACTS_STATUS": "PURGED_UNAVAILABLE_IN_CURRENT_REPOSITORY",
+    "D245_D179_HISTORICAL_RECORD_STATUS": "CANONICAL_HISTORICAL_LIVE_RECORD_PRIMARY_RUNTIME_ARTIFACTS_PURGED",
+    "D245_A8_CURRENT_LOCAL_CORPUS_CORROBORATION": "PASS",
+    "D245_A8_READ_ONLY_CLASSIFICATION": "CURRENT_LOCAL_CORPUS_CONFIRMED",
+    "D245_A8_WIRE_CONTRACT_CURRENT_CORPUS": "CONFIRMED",
+    "D245_A8_E4_PRECONDITION_EVIDENCE": "HISTORICAL_LIVE_RECORD_CANONICALLY_PRESERVED_AND_CURRENT_CORPUS_CORROBORATED"
+  },
+  "epistemic_classification": {
+    "D245_A8_SEMANTIC_CLASS": "TARGET_LIVE_PROVEN_READ_ONLY_PRECONDITION_DISCRIMINATOR",
+    "D245_A8_INITIALIZER_STATUS": "NOT_PROVEN",
+    "D245_A8_CAUSAL_ROLE": "PRECONDITION_OBSERVED_BEFORE_SUCCESSFUL_E4_NOT_DEVICE_INITIALIZATION_PROVEN"
+  },
+  "a8": {
+    "phase": "A8_FIRMWARE_QUERY",
+    "request_hex": "a00600a6a803000000ff",
+    "logical_length": 10,
+    "transport": "A0_D241_SHORT_OUT",
+    "ack_control": 176,
+    "ack_echo": 168,
+    "response_authorizing_statuses": [1, 7],
+    "response_reads_after_authorized_ack": 1,
+    "other_status_policy": "FAIL_CLOSED_WITHOUT_SECOND_RESPONSE_READ",
+    "status_classification": {
+      "1": "UNKNOWN_STATUS_CLASS_01_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE",
+      "7": "UNKNOWN_STATUS_CLASS_EMPIRICALLY_COMPATIBLE_WITH_RESPONSE"
+    },
+    "response_control": 168,
+    "response_body_hex": "47465f53543431315345435f4150505f313235303900",
+    "response_text": "GF_ST411SEC_APP_12509",
+    "trailing_frame_policy": "FORBIDDEN",
+    "retry_count": 0
+  },
+  "final_state": {
+    "D245_A8_ACK_RESPONSE_AUTHORIZING_STATUSES": "01,07",
+    "D245_A8_RESPONSE_REQUIRED_TO_CONTINUE": true,
+    "D245_A8_FW12509_REQUIRED_TO_CONTINUE": true,
+    "D245_A8_INITIALIZER_STATUS": "NOT_PROVEN"
+  },
+  "e4": {
+    "request_hex": "a00c00ace40900030002bb00000000fd",
+    "transport": "A0_D241_SHORT_OUT",
+    "binding_required": "MATCH"
+  },
+  "continuation": ["A2", "82", "A6", "A2", "70", "80", "80", "80", "80", "90", "D1", "TLS"],
+  "tls": {
+    "b0_physical_submission_length": 64,
+    "staging_tail": "ZERO_INITIALIZED",
+    "record_pacing_ms": 10,
+    "timeout_ms": 3000,
+    "stop_before_d4": true
+  },
+  "forbidden": ["D4", "application_data", "retry", "USB_reset", "device_reset", "A2_pre_E4", "01", "d5", "97", "af"],
+  "sealed_baseline": {
+    "status": "MATCH",
+    "files": [
+      {
+        "path": "src/goodix5125_d233_backend.py",
+        "expected_sha256": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+        "actual_sha256": "e537f33d47d49d47b0fc451c80b08fbafdc185e884d519cb603e22baf458c982",
+        "behavior_relevant": true
+      },
+      {
+        "path": "src/goodix5125_d235_entrypoint.py",
+        "expected_sha256": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69",
+        "actual_sha256": "d87b11d0f2de608f05c232fa83d4e03ce4d248fe37839808f42f6ea577143b69",
+        "behavior_relevant": true
+      }
+    ]
+  }
+}

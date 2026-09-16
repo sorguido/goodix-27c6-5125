@@ -1,0 +1,60 @@
+{
+  "schema": "D264_01_TERMINAL_STATE_EVIDENCE_V1",
+  "scope": "OFFLINE_READ_ONLY_EVIDENCE_AUDIT_PLUS_MINIMAL_TIMEOUT_CORRECTIVE",
+  "repository_start": {"expected_branch": "codex-cloud", "observed_branch": "work", "branch_switched": false, "expected_head": "4db9058a3235b82c8777f306a89bab10eb863337", "observed_head": "4db9058a3235b82c8777f306a89bab10eb863337", "content_baseline_coherent": true, "live_baseline_approval": false},
+  "post_image_observed_sequence": {
+    "classification": "OBSERVED",
+    "primary_source": "analysis/D230/work/GoodixExport/rilevamento.pcapng sha256 50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b",
+    "sequence": ["first image B0/TLS @231", "0x34 OUT @233", "IRQ finger-up 0x0200 @237", "post-image 0x20 OUT @238", "second image B0/TLS @243", "0x50 OUT @244", "later 0x32 OUT @251 / ACK @253"],
+    "interpretation": "HOST_WORKFLOW_CONTINUATION",
+    "device_side_requirement_for_safe_stop": "NOT_DEMONSTRATED"
+  },
+  "command_requirements_for_safe_stop": [
+    {"item":"0x34","classification":"UNKNOWN","observed_role":"arm finger-up / continuation primitive","required_before_disconnect":false,"requirement_evidence":"NONE"},
+    {"item":"IRQ 0x0200","classification":"OBSERVED","observed_role":"result of the positive finger-up continuation","required_before_disconnect":false,"requirement_evidence":"NONE"},
+    {"item":"post-image 0x20","classification":"OBSERVED","observed_role":"continuation image acquisition","required_before_disconnect":false,"requirement_evidence":"NONE"},
+    {"item":"new 0x32","classification":"OBSERVED","observed_role":"re-arm later in positive workflow","required_before_disconnect":false,"requirement_evidence":"NONE"},
+    {"item":"A2","classification":"VERIFIED","observed_role":"volatile sensor reset in live-proven cold-start","required_before_disconnect":false,"requirement_evidence":"NOT OBSERVED POST-IMAGE"},
+    {"item":"0x70","classification":"VERIFIED","observed_role":"exact OEM idle-mode path in live-proven cold-start","required_before_disconnect":false,"requirement_evidence":"NOT OBSERVED POST-IMAGE"},
+    {"item":"reset or other command","classification":"UNKNOWN","required_before_disconnect":false,"requirement_evidence":"NONE"}
+  ],
+  "command_0x34": {
+    "arm_finger_up_continuation_primitive": "VERIFIED_FROM_TARGET_CAPTURE_PLUS_LOCAL_GFUSB_ANALYSIS",
+    "cancel_disarm_restore_required_before_disconnect": "NOT_SUPPORTED_BY_EVIDENCE",
+    "primary_target": "0x34 follows first image and precedes IRQ 0x0200 in a continuing positive loop",
+    "gfusb_1_1_125_14": "SetMode selector and prior local analysis identify finger-up arming; gfOnCancel is host-request cancellation and sends no direct A0",
+    "rockytkg": "CORROBORATION_ONLY: capture code sends 0x34 after a successful image to arm finger-up; not APP12509 primary proof"
+  },
+  "restore_cancel_disarm_evidence": {
+    "explicit_device_restore_after_first_image": "NONE",
+    "host_cancel_without_device_command": "VERIFIED_PATH_BOUNDED_BY_D255_D256",
+    "terminal_usb_quiescence": "VERIFIED_PATH_BOUNDED_BY_D256",
+    "device_internal_disarm": "UNKNOWN"
+  },
+  "recoverability_evidence": [
+    {"classification":"OBSERVED","claim":"D256 re-entry remained on the same bus/device/endpoints and a new 0x32 was accepted without reset, re-enumeration, abort, or explicit USB restore."},
+    {"classification":"LIVE_PROVEN","claim":"D262 later completed the exact fresh-FDT bootstrap and final 0x32 ACK on APP12509; the cold-start includes the exact OEM A2 volatile sensor-reset path."},
+    {"classification":"INFERRED","claim":"Any unobserved post-image FDT mode is more plausibly volatile and recoverable on a later cold-start than persistent or unrecoverable."}
+  ],
+  "persistent_state_evidence": {
+    "post_image_nvm_write_observed": false,
+    "persistent_write_family_in_candidate": 0,
+    "known_commands_after_first_image_before_host_stop": [],
+    "classification": "NO_EVIDENCE_OF_PERSISTENT_MUTATION; ABSOLUTE_NVM_NONMUTATION_NOT_DIRECTLY_OBSERVED",
+    "persistent_or_unrecoverable_state_plausibility": "NOT_SUPPORTED_BY_CURRENT_EVIDENCE"
+  },
+  "runtime_audit": {
+    "default_terminal_boundary":"STOP_AFTER_FDT_ARM_ACK",
+    "first_image_boundary":"EXPLICIT_OPT_IN_ONLY",
+    "exactly_one_irq2_wait":true,"exactly_one_0x22":true,"exactly_one_ack_validation":true,
+    "first_b0_on_retained_tls":true,"second_secret_handoff":false,"usb_reopen":false,"retry":false,
+    "0x34":false,"post_image_0x20":false,"rearm":false,"A2":false,"0x70":false,
+    "persistent_writes":false,"biometric_persistence":false,"cleanup_exactly_once":true,
+    "corrective":"FIRST_IMAGE_IRQ2_TIMEOUT_MS changed 5000 -> 15000 because the primary APP12509 trace reaches IRQ2 7108.212 ms after ACK 0x32; 5000 ms contradicted the declared target-oriented candidate"
+  },
+  "unknowns": ["device internal FDT/finger state immediately after host disconnect", "device arm lifetime and behavior after a no-finger deadline", "live acceptance of 0x22 fixed64 zero-tail", "live first-image decode", "absolute NVM nonmutation beyond absence of a write path"],
+  "external_issue_1": "UNAVAILABLE: web access returned HTTP 401; no content reconstructed from memory",
+  "FIRST_IMAGE_TERMINAL_RISK": "ACCEPTABLY_BOUNDED",
+  "D264_01_READY_FOR_OFFLINE_OPERATIONALIZATION_REVIEW": true,
+  "READY_FOR_LIVE": false,"LIVE_AUTHORIZED":false,"BASELINE_APPROVED":false
+}

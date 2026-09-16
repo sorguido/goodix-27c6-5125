@@ -1,0 +1,50 @@
+D253 OFFLINE VERIFICATION RESULTS
+Date: 2026-08-22 Europe/Rome
+Initial HEAD: 1b97774d792a674d9edbedd29f54c4509ec06ac8
+
+1. Reproducible target/static audit
+   Command: python3 analysis/D253/d253_offline_audit.py --repo .
+   Result: PASS (schema D253_OFFLINE_AUDIT_V1)
+   Pinned source hashes: PASS
+   Complete 0x36 census: 3 occurrences, 1 tail profile, no target zero-tail
+   0x20/0x22 census: packets 167/227/238, exact ACK and next-RX checks PASS
+   Seed global writer/reader/callback checks: PASS
+   goodix.dat OTP-path and absence checks: PASS
+   gfOnCancel/A2/0x70 restore non-occurrence checks: PASS
+   Current core IRQ2 -> 0x22 and offline-backend reachability checks: PASS
+
+2. Python compilation
+   Command: python3 -m compileall -q core tests analysis/D253
+   Result: PASS
+
+3. Full supported unit suite / D249-D252 regression
+   Command: python3 -m unittest discover -s tests -v
+   Result: PASS
+   Tests run: 172
+   Failures: 0
+   Errors: 0
+   Includes exact 0x20/0x22 serializer KATs, positive/negative ACK and
+   allowlist cases, duplicate/out-of-order inputs, post-IRQ2 second-command
+   fence, parser/CRC/codec tests, hard-disable tests and historical regressions.
+
+4. Patch hygiene
+   Command: git diff --check
+   Result: PASS
+
+5. Structured output validation
+   D253_decision.json: valid JSON
+   Bundle manifest: valid JSON after creation
+
+Safety counters for all D253 commands above:
+REAL_USB_OPEN_COUNT=0
+REAL_TLS_HANDSHAKE_COUNT=0
+REAL_D4_SEND_COUNT=0
+REAL_AF_SEND_COUNT=0
+REAL_FDT_SEND_COUNT=0
+REAL_IMAGE_COMMAND_COUNT=0
+REAL_FINGER_INTERACTION_COUNT=0
+RETRY_COUNT=0
+PERSISTENT_WRITE_FAMILY_COUNT=0
+
+No sudo, hardware, USB/libusb, TLS, D4, AF, FDT, image command, finger
+interaction, network access, retry, provisioning or persistent write was used.

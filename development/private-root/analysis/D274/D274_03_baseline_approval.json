@@ -1,0 +1,20 @@
+{
+  "schema": "D274_03_BASELINE_APPROVAL_V1",
+  "baseline_approved": true,
+  "approved_full_commit_sha": "ed87646fe54e01baaffe0b12fd4ec73ba3e20fd5",
+  "windows_native_qualification": "PASS_OPERATOR_SUPPLIED",
+  "windows_native_package_sha256": "5a498239c9988445deedd0732009a2766a5ac564756c7c581461708faa9eca87",
+  "freeze_review": "PASS_AI_PM",
+  "freeze_bundle_sha256": "d7e5db36a0efec05ab33c82c221beb42c91aea4772a059764930ead5d8ed1d6b",
+  "approved_for_capture": false,
+  "live_authorized": false,
+  "ready_for_live": false,
+  "one_shot_authorization_id": null,
+  "real_capture_count": 0,
+  "real_usb_open_count": 0,
+  "real_finger_interaction_count": 0,
+  "real_goodix_command_count": 0,
+  "automatic_retry_count": 0,
+  "persistent_device_write_count": 0,
+  "next_boundary": "SEPARATE_CAPTURE_LIVE_AUTHORIZATION_DECISION"
+}

@@ -1,0 +1,32 @@
+diff --git "a/Goodix 27c6 5125 manuale tecnico.md" "b/Goodix 27c6 5125 manuale tecnico.md"
+--- "a/Goodix 27c6 5125 manuale tecnico.md"
++++ "b/Goodix 27c6 5125 manuale tecnico.md"
+@@ -307,4 +307,28 @@ review umana e autorizzazione separata. La suite riproducibile corrente comprende
+ happy/failure path D232, boundary, USB mock, TLS loopback reale, B0, restore,
+ report, KAT D190 e tentativi di enablement. Nessun test enumera o apre il sensore.
+ 
++## Esito D234: blocker dell'unseal
++
++L'operatore ha concesso l'accettazione del rischio D234, ma la review dell'unseal
++ha stabilito che una patch minima al solo sigillo non rende raggiungibile il live
++revisionato. L'entrypoint D233 resta esclusivamente offline e
++`run_production_candidate_offline()` richiede ancora facade, loader, factory e
++publisher iniettati; inoltre emette lo schema D233 offline e dichiara il live non
++autorizzato. Collegare in modo production i path root del PSK/config, l'identità
++USB, libusb reale e i report D234 richiederebbe nuova logica e nuovi parametri,
++oltre il solo unseal consentito.
++
++La decisione è `D234_BLOCKED_BY_UNSEAL_SCOPE_EXPANSION`. Il gate è avvenuto
++prima del preflight operativo e prima di qualunque `libusb_init`: live run, open
++USB, E4, comandi e handshake TLS sono tutti zero. Non sono stati caricati secret
++o config protetti, non è stato fermato `fprintd`, non è stato necessario alcun
++cleanup/restore e non vi sono stati retry. Benché nessun run live sia iniziato,
++la decisione terminale consuma l'autorizzazione D234 secondo la regola finale
++dello step; resta vietato avviare un altro tentativo nell'ambito di D234.
++
++Il prossimo step è subordinato a review umana separata di un vero entrypoint
++live production, dei suoi path operativi e del relativo diff ampliato, seguita
++da una nuova autorizzazione esplicita. Nessun secondo tentativo è autorizzato da
++D234.
++
+ ## Operazioni read note e limiti

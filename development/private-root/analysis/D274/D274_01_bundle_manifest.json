@@ -1,0 +1,67 @@
+{
+  "artifact": "D274_01_bundle_manifest",
+  "step": "D274/01",
+  "policy": ["STEP_LOCAL", "NON_CUMULATIVE", "SANITIZED", "AUDITABLE_BY_REFERENCE"],
+  "reference_commit": "3b2fef1bbf196c8c0fc5122521997fbb953016ea",
+  "digest_location": "external sidecar only",
+  "files": [
+    {
+      "path": "Goodix 27c6 5125 manuale tecnico.md",
+      "size": 395623,
+      "sha256": "b60dc80ba5577515b8681db8d3b4fb6bc2fff9c8ebad475ca869321af4a33745"
+    },
+    {
+      "path": "operator_kit/d274-windows-multiframe-evidence.ps1",
+      "size": 7707,
+      "sha256": "db78561d16ee457ce64c14b7be7d9f79f24d0a4e05eba90e6efa04eabbcfbdc8"
+    },
+    {
+      "path": "analysis/D274/D274_01_windows_multiframe_prelive_report.md",
+      "size": 5990,
+      "sha256": "9c39307f67c094903b7c21c0c544e47fe55caf7d8006473bd9ff45301a874b21"
+    },
+    {
+      "path": "analysis/D274/D274_01_workflow_provenance_audit.json",
+      "size": 2366,
+      "sha256": "254255f115adb75830f905f8bc32bc8ba1ff6d68b77cf11406f2d5be1241ec62"
+    },
+    {
+      "path": "analysis/D274/D274_01_evidence_schema.json",
+      "size": 2804,
+      "sha256": "2af2e17e00aba5abc641d41b3beb899d2b5cb1ecb014e2aece30812a4e4038c6"
+    },
+    {
+      "path": "analysis/D274/D274_01_test_results.json",
+      "size": 2444,
+      "sha256": "01ceadc81aaac636e0b7ba094b4215b88b3657ad46ac2e4b672f2cf0f817c11d"
+    },
+    {
+      "path": "analysis/D274/D274_01_execution_manifest.json",
+      "size": 2430,
+      "sha256": "04b2fbfd4625f3f75e8fec846d504a1fee82f51bf841390e5cd5fe73fe468b83"
+    },
+    {
+      "path": "analysis/D274/d274_postprocess_multiframe_evidence.py",
+      "size": 23236,
+      "sha256": "78e7fcdc38e8cf8db8f99e1aec498a901ec0527b1ace4f4610d6e164cc005974"
+    },
+    {
+      "path": "analysis/D274/test_d274_postprocess_multiframe_evidence.py",
+      "size": 12209,
+      "sha256": "0b3d6b83f4064d970c2f465f51df5e0c0c56847a6f0e524ffcef34f62e10951e"
+    }
+  ],
+  "self_entry_omitted_to_avoid_recursive_digest": true,
+  "excluded": [
+    "raw pcapng and private captures",
+    "B0 or TLS payload/plaintext",
+    "image, raster, pixel, fingerprint, keypoint, descriptor and template data",
+    "PSK, secret, OTP raw and cache raw",
+    "OEM DLL and firmware",
+    "temporary files and caches",
+    "historical unmodified artifacts"
+  ],
+  "real_capture_count": 0,
+  "persistent_device_write_count": 0,
+  "live_execution": "NOT_PERFORMED"
+}

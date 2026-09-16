@@ -1,0 +1,34 @@
+{
+  "schema": "d232-live-hard-disabled-proof-v1",
+  "verdict": "LIVE_HARD_DISABLED",
+  "d232_live_capability": 0,
+  "source_sha256": "682fee6b404842e71cb24bad6cf9441ab3b52476a3930678be376a7bdf86a270",
+  "test_sha256": "102977b2b3ff608c17527c2c9878b0fb115a028469ca16bb11fed6940fb886e3",
+  "synthetic_fixture_sha256": "d0e856db134d02dc6206bda2cce3cf635d883832213b64e9ac66f509d9300985",
+  "architecture": {
+    "live_entrypoint_present": false,
+    "live_backend_present": false,
+    "usb_backend_present": false,
+    "libusb_import_present": false,
+    "usb_device_path_present": false,
+    "runtime_live_enablement_present": false,
+    "accepted_backend_type": "exact ScriptedSyntheticBackend only",
+    "subclasses_accepted": false,
+    "future_enablement_requires_source_patch": true
+  },
+  "runtime_inputs": {
+    "cli_can_enable_live": false,
+    "environment_can_enable_live": false,
+    "config_can_enable_live": false,
+    "live_attempt_raises_before_backend_construction": true
+  },
+  "static_forbidden_transport_symbols_found": [],
+  "live_attempt_test": {
+    "cases": ["--live", "D232_LIVE=1", "enable_live=yes", "request_live_mode"],
+    "result": "pass",
+    "usb_open_count": 0
+  },
+  "hardware_actions_performed_during_d232": 0,
+  "real_secret_store_open_count": 0,
+  "live_authorization": "no"
+}

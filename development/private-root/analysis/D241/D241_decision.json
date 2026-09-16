@@ -1,0 +1,18 @@
+{
+  "schema": "d241-decision-v1",
+  "decision": "D241_OPERATOR_READY_FOR_ONE_LIVE_TLS_ATTEMPT",
+  "failure_class": "none",
+  "executable_closure_gate": "PASS",
+  "d239_first_b0_classification": "D239_FIRST_B0_TLS_BYTES_NOT_LOCALLY_AVAILABLE",
+  "direct_b0_handoff": "exactly_once",
+  "same_e4_validated_psk_object_used_by_tls": true,
+  "handshake_timeout_ms": 3000,
+  "tls_trace_redacted": true,
+  "marker_namespace": "/var/lib/goodix-5125-poc/d241-operator-invocation.marker",
+  "d4_count": 0,
+  "application_data_count": 0,
+  "persistent_write_family_count": 0,
+  "retry_count": 0,
+  "live_usb_execution": "NOT_PERFORMED",
+  "next_live_scope": "D1 once -> TLS cryptographic handshake -> immediate close; D4 forbidden"
+}

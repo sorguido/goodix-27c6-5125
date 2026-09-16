@@ -1,0 +1,15 @@
+{
+  "schema": "D279_56_PROTECTED_OFFLINE_AUTHORITY_V1",
+  "authorization_status": "GRANTED_AT_ORIGIN",
+  "source_document": "D279_ENROLLMENT_POLICY_21_VS_ROCKY_DYNAMIC_REVIEW.md",
+  "source_document_sha256": "9b93693a27eaa6456b1d72a13d0d61e9bd01a3cd0842ae6f9e5c530ec9c631f6",
+  "authorized_scope": "ATTEMPT02_PROTECTED_OFFLINE_READ_RECONSTRUCTION_PREPROCESSING_ANALYSIS_AND_AGGREGATE_REPLAY_ONLY",
+  "further_per_run_user_authorization_required": false,
+  "technical_retries_within_same_study_authorized": true,
+  "new_capture_or_live_usb_authorized": false,
+  "persistent_device_change_authorized": false,
+  "provisioning_or_psk_change_authorized": false,
+  "system_installation_authorized": false,
+  "agent_sudo_authorized": false,
+  "raw_or_biometric_export_authorized": false
+}

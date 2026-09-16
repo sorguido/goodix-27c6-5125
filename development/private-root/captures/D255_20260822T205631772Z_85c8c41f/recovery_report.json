@@ -1,0 +1,70 @@
+{
+  "artifact_status": {
+    "cache_after_metadata.json": "NOT_RECOVERABLE",
+    "guest_topology_after_capture.json": "NOT_RECOVERABLE",
+    "input_manifest.json": "NOT_RECOVERABLE",
+    "input_manifest.json.sha256": "NOT_RECOVERABLE",
+    "oem_logs_after_metadata.json": "NOT_RECOVERABLE",
+    "recovery_manifest.json": "RECOVERED_ARTIFACT",
+    "recovery_report.json": "RECOVERED_ARTIFACT",
+    "run_clock_end.json": "NOT_RECOVERABLE"
+  },
+  "capture_acquisition": "SUCCEEDED",
+  "markers": {
+    "present_once_and_ordered": true,
+    "required": [
+      "CAPTURE_PROCESS_STARTED",
+      "CAPTURE_STARTED",
+      "VM_USB_ATTACH_BEGIN",
+      "VM_USB_ATTACH_END",
+      "GUEST_27C6_5125_PRESENT",
+      "CAPTURE_OUTPUT_MATERIALIZED",
+      "PASSIVE_BOOTSTRAP_SETTLED",
+      "HELLO_SETUP_UI_CHECK_BEGIN",
+      "HELLO_SETUP_UI_READY",
+      "OEM_SESSION_BEGIN",
+      "OEM_WAITING_NO_FINGER",
+      "CANCEL_NO_FINGER_BEGIN",
+      "CANCEL_NO_FINGER_END",
+      "REENTRY_BEGIN",
+      "REENTRY_WAITING_NO_FINGER",
+      "REENTRY_CANCEL_BEGIN",
+      "REENTRY_CANCEL_END",
+      "REENTRY_END",
+      "OPERATOR_PHASES_COMPLETE"
+    ],
+    "zero_finger_phases_complete": true
+  },
+  "operator_phases": "COMPLETED_ZERO_FINGER",
+  "pcap": {
+    "bytes": 27684,
+    "first_frame": 1,
+    "frame_count": 218,
+    "modified": false,
+    "path": "raw/wire.pcapng",
+    "readable": true,
+    "sha256_after": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+    "sha256_before": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c"
+  },
+  "post_capture_state_snapshot": "NOT_RECOVERABLE_RETROACTIVELY",
+  "postprocess": {
+    "manifest": "recovery_manifest.json",
+    "manifest_sha256": "deb08f42b3fe4d3991f1e9bf9283e77fcf4f4c6f42383aa3c0efc82750dcedaa",
+    "status": "READY"
+  },
+  "process_state": "EXITED",
+  "result": "PASS_RECOVERED_READY_FOR_OFFLINE_POSTPROCESSING",
+  "run": "D255_20260822T205631772Z_85c8c41f",
+  "safety": {
+    "offline": true,
+    "raw_pcap_modified": false,
+    "real_capture_count": 0,
+    "real_hardware_action_count": 0,
+    "real_usb_open_count": 0,
+    "sensor_required": false,
+    "usb_access": false,
+    "windows_hello_access": false
+  },
+  "schema": "D255_OFFLINE_RECOVERY_REPORT_V1",
+  "tshark_exit_code": "UNAVAILABLE"
+}

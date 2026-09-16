@@ -1,0 +1,79 @@
+EXACT_LIBRARY_MAP_VERIFIED=true
+DAEMON_RESTART_COUNT=1
+set 10 22:35:36 192.168.0.25 fprintd[39253]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+set 10 22:35:41 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 10 22:35:45 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=76 outstanding=0 drained=1 context_closed=1
+set 10 22:35:45 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_NONE attempts=0 rejected=0 consumed=0 tls=0 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=0 outstanding=0 drained=1 context_closed=1
+found 1 devices
+Device at /net/reactivated/Fprint/Device/0
+Using device /net/reactivated/Fprint/Device/0
+Fingerprints of user <USER> deleted on Goodix 27c6:5125 Fingerprint Sensor
+Using device /net/reactivated/Fprint/Device/0
+Enrolling right-index-finger finger.
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-stage-passed
+Enroll result: enroll-completed
+set 10 22:35:11 192.168.0.25 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:11 192.168.0.25 systemd[1]: fprintd.service: Deactivated successfully.
+set 10 22:35:11 192.168.0.25 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:11 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:11 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:11 192.168.0.25 fprintd[39253]: Device Goodix 27c6:5125 Fingerprint Sensor does not support duplicate identification and so fprintd duplicate detection won't work
+set 10 22:35:36 192.168.0.25 fprintd[39253]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+set 10 22:35:36 192.168.0.25 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:36 192.168.0.25 systemd[1]: fprintd.service: Deactivated successfully.
+set 10 22:35:36 192.168.0.25 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:36 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:36 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:41 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 10 22:35:45 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=76 outstanding=0 drained=1 context_closed=1
+set 10 22:35:45 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_NONE attempts=0 rejected=0 consumed=0 tls=0 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=0 outstanding=0 drained=1 context_closed=1
+set 10 22:35:36 192.168.0.25 fprintd[39253]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+set 10 22:35:41 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 10 22:35:11 192.168.0.25 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:11 192.168.0.25 systemd[1]: fprintd.service: Deactivated successfully.
+set 10 22:35:11 192.168.0.25 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:11 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:11 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:11 192.168.0.25 fprintd[39253]: Device Goodix 27c6:5125 Fingerprint Sensor does not support duplicate identification and so fprintd duplicate detection won't work
+set 10 22:35:36 192.168.0.25 fprintd[39253]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+set 10 22:35:36 192.168.0.25 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:36 192.168.0.25 systemd[1]: fprintd.service: Deactivated successfully.
+set 10 22:35:36 192.168.0.25 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:36 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:36 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:41 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 10 22:35:36 192.168.0.25 fprintd[39253]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+set 10 22:35:41 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 10 22:35:45 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=76 outstanding=0 drained=1 context_closed=1
+set 10 22:35:11 192.168.0.25 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:11 192.168.0.25 systemd[1]: fprintd.service: Deactivated successfully.
+set 10 22:35:11 192.168.0.25 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:11 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:11 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:11 192.168.0.25 fprintd[39253]: Device Goodix 27c6:5125 Fingerprint Sensor does not support duplicate identification and so fprintd duplicate detection won't work
+set 10 22:35:36 192.168.0.25 fprintd[39253]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+set 10 22:35:36 192.168.0.25 systemd[1]: Stopping fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:36 192.168.0.25 systemd[1]: fprintd.service: Deactivated successfully.
+set 10 22:35:36 192.168.0.25 systemd[1]: Stopped fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:36 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+set 10 22:35:36 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+set 10 22:35:41 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+set 10 22:35:45 192.168.0.25 fprintd[39325]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=76 outstanding=0 drained=1 context_closed=1
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-no-match (done)
+Using device /net/reactivated/Fprint/Device/0
+Listing enrolled fingers:
+ - #0: right-index-finger
+Verify started!
+Verifying: right-index-finger
+Verify result: verify-match (done)

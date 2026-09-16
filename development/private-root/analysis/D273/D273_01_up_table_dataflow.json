@@ -1,0 +1,61 @@
+{
+  "artifact": "D273_01_up_table_dataflow",
+  "evidence_class": "VERIFIED_STATICALLY_WITH_TARGET_SEQUENCE_CORRELATION",
+  "oem_binary": {
+    "path": "analysis/D230/work/GoodixExport/gfusb.dll",
+    "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2",
+    "execution": "NOT_PERFORMED"
+  },
+  "UP_TABLE12_SOURCE": "OEM_SESSION_GLOBAL_GF_FDT_UP_BASE_VA_0X180580838",
+  "UP_TABLE12_DERIVATION": "IRQ_0X0002_RAW_BASE_VALIDATION_THEN_PER_WORD_HALF_PLUS_CONTEXT_OFFSET_ENCODING_AND_MODE_DEPENDENT_COMMIT_BY_0X180029314",
+  "UP_TABLE12_LIFETIME": "VOLATILE_OEM_PROCESS_SESSION_GLOBAL_INITIALIZABLE_BY_CALLBACK_0X180028480_AND_UPDATED_BY_FDT_IRQ_HANDLING",
+  "UP_TABLE12_FRESHNESS_REQUIREMENT": "0X34_MUST_CONSUME_THE_MOST_RECENT_VALID_IRQ_0X0002_DERIVED_TABLE_FROM_THE_SAME_FINGER_DOWN_CYCLE",
+  "captured_value_classification": "SESSION_INSTANCE_NOT_TARGET_CONSTANT",
+  "dataflow": [
+    {
+      "stage": "initialization_or_external_update",
+      "address": "0x180028480",
+      "finding": "selector 0 copies the caller buffer to both globals 0x180580818 and 0x180580838; selector 1 copies down only; other nonzero selectors copy up only",
+      "class": "VERIFIED_STATICALLY"
+    },
+    {
+      "stage": "finger_down_irq_dispatch",
+      "address": "0x1800286da-0x180028870",
+      "finding": "IRQ 0x0002 takes the event raw-base region and calls 0x180029314; the OEM log identifies this as obtaining the fdt-up base while in fdt-down mode",
+      "class": "VERIFIED_STATICALLY"
+    },
+    {
+      "stage": "up_table_derivation",
+      "address": "0x180029314-0x1800296d6",
+      "finding": "validates the raw table, derives six encoded words using raw_word/2 plus context offset (or fallback 0x15), applies touchflag/mode-dependent replacement, and commits to 0x180580838",
+      "class": "VERIFIED_STATICALLY"
+    },
+    {
+      "stage": "0x34_builder",
+      "address": "0x1800250d0-0x1800251b5",
+      "finding": "the Fdt-up branch builds 0a || variant and copies the configured table length directly from 0x180580838 into the command body",
+      "class": "VERIFIED_STATICALLY"
+    },
+    {
+      "stage": "finger_up_irq_updates_down_table",
+      "address": "0x180028ba9 and 0x180029210",
+      "finding": "IRQ 0x0200 is dispatched as fdt-up and the normal branch derives/commits the down table at 0x180580818; a mode-dependent branch can instead refresh up",
+      "class": "VERIFIED_STATICALLY"
+    },
+    {
+      "stage": "0x32_builder",
+      "address": "0x180025000-0x1800250cb",
+      "finding": "the Fdt-down branch copies the current 0x180580818 table and appends a timestamp",
+      "class": "VERIFIED_STATICALLY"
+    }
+  ],
+  "target_correlation": {
+    "finger_down_irq_packet": 225,
+    "subsequent_0x34_packet": 233,
+    "captured_up_table12": "808780948081807a807f8086",
+    "finger_up_irq_packet": 237,
+    "subsequent_rearm_0x32_packet": 251,
+    "classification": "STRONG_CAUSAL_INFERENCE_FOR_SAME_CYCLE_FRESHNESS"
+  },
+  "model_consequence": "tables are IRQ-owned generation-tagged inputs; a fixed up/down table reused across cycles is rejected"
+}

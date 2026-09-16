@@ -1,0 +1,920 @@
+{
+  "aggregate": {
+    "d279_44_matrix_relation": "SIGNED_CONTROL_PLUS_TWO_PREVIOUSLY_UNMEASURED_HALFWAVE_COMPLEMENTS",
+    "frame_roles": {
+      "auxiliary": 21,
+      "baseline": 1,
+      "primary": 21
+    },
+    "hypothesis": "COMPLEMENTARY_OUTPUT_POLARITY_CAN_DISCRIMINATE_HALFWAVE_SIGN_SUPPORT_EFFECT",
+    "per_frame_metrics_exported": false,
+    "ppmm_zero_reliability_scope": "QUALITY_MAP_TIER_ONLY_NOT_PHYSICAL_GRAYSCALE_RELIABILITY",
+    "quality_maps_exported": false,
+    "raster_exported": false,
+    "schema": "D279_46_HALFWAVE_OUTPUT_POLARITY_NBIS_AGGREGATE_V1",
+    "target_raster_role_order": "baseline,(primary,auxiliary)*21",
+    "template_exported": false,
+    "variant_count": 3,
+    "variants": [
+      {
+        "baseline_preprocessing": "frame_minus_baseline_signed_control",
+        "groups": {
+          "auxiliary": {
+            "frame_count": 21,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 2,
+                "maximum": 500,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 6,
+                "maximum": 1000,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 6,
+                "maximum": 3,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 2,
+                "maximum": 1,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 17,
+                "maximum": 13,
+                "median": 1,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 18,
+                "maximum": 85,
+                "median": 47,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 18,
+                "maximum": 266,
+                "median": 147,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 21,
+                "maximum": 139,
+                "median": 119,
+                "minimum": 6
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 21,
+                "maximum": 434,
+                "median": 372,
+                "minimum": 19
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 21,
+                "maximum": 79,
+                "median": 68,
+                "minimum": 68
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 21,
+                "maximum": 128,
+                "median": 74,
+                "minimum": 63
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 21,
+                "maximum": 107,
+                "median": 54,
+                "minimum": 41
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 21,
+                "maximum": 99,
+                "median": 69,
+                "minimum": 6
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 18,
+                "maximum": 85,
+                "median": 47,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          },
+          "baseline": {
+            "frame_count": 1,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 1,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 1,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          },
+          "primary": {
+            "frame_count": 21,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 4,
+                "maximum": 1000,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 4,
+                "maximum": 3,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 17,
+                "maximum": 3,
+                "median": 1,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 19,
+                "maximum": 69,
+                "median": 54,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 19,
+                "maximum": 216,
+                "median": 169,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 21,
+                "maximum": 135,
+                "median": 121,
+                "minimum": 57
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 21,
+                "maximum": 422,
+                "median": 378,
+                "minimum": 178
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 21,
+                "maximum": 68,
+                "median": 68,
+                "minimum": 68
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 21,
+                "maximum": 99,
+                "median": 77,
+                "minimum": 62
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 21,
+                "maximum": 110,
+                "median": 57,
+                "minimum": 37
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 21,
+                "maximum": 93,
+                "median": 69,
+                "minimum": 55
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 19,
+                "maximum": 69,
+                "median": 54,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          }
+        },
+        "intensity_scale": "post_delta_minmax",
+        "orientation": "identity",
+        "output_polarity": "signed_frame_minus_baseline_minmax",
+        "retained_delta_sign": "both",
+        "spatial_factor": 2,
+        "variant": "frame_minus_baseline_signed_control/identity/spatial_x2"
+      },
+      {
+        "baseline_preprocessing": "frame_above_baseline_halfwave_dark_on_white",
+        "groups": {
+          "auxiliary": {
+            "frame_count": 21,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 1,
+                "maximum": 333,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 1,
+                "maximum": 1,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 1,
+                "maximum": 3,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 1,
+                "maximum": 4,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 1,
+                "maximum": 13,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 135
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 1,
+                "maximum": 144,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 1,
+                "maximum": 37,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 1,
+                "maximum": 4,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          },
+          "baseline": {
+            "frame_count": 1,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 1,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 1,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          },
+          "primary": {
+            "frame_count": 21,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          }
+        },
+        "intensity_scale": "post_delta_minmax",
+        "orientation": "identity",
+        "output_polarity": "retained_deviation_dark_on_white",
+        "retained_delta_sign": "frame_above_baseline",
+        "spatial_factor": 2,
+        "variant": "frame_above_baseline_halfwave_dark_on_white/identity/spatial_x2"
+      },
+      {
+        "baseline_preprocessing": "baseline_above_frame_halfwave_dark_on_white",
+        "groups": {
+          "auxiliary": {
+            "frame_count": 21,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 2,
+                "maximum": 500,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 5,
+                "maximum": 1000,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 5,
+                "maximum": 3,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 2,
+                "maximum": 1,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 17,
+                "maximum": 4,
+                "median": 1,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 18,
+                "maximum": 85,
+                "median": 47,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 18,
+                "maximum": 266,
+                "median": 147,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 20,
+                "maximum": 139,
+                "median": 119,
+                "minimum": 0
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 20,
+                "maximum": 434,
+                "median": 372,
+                "minimum": 0
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 21,
+                "maximum": 273,
+                "median": 68,
+                "minimum": 68
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 21,
+                "maximum": 99,
+                "median": 74,
+                "minimum": 46
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 21,
+                "maximum": 99,
+                "median": 52,
+                "minimum": 1
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 20,
+                "maximum": 99,
+                "median": 69,
+                "minimum": 0
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 18,
+                "maximum": 85,
+                "median": 47,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          },
+          "baseline": {
+            "frame_count": 1,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 1,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 1,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          },
+          "primary": {
+            "frame_count": 21,
+            "metrics": {
+              "minutiae_a_fraction_per_mille": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_ab_fraction_per_mille": {
+                "frames_nonzero": 4,
+                "maximum": 1000,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_025": {
+                "frames_nonzero": 4,
+                "maximum": 3,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_reliability_ge_050": {
+                "frames_nonzero": 0,
+                "maximum": 0,
+                "median": 0,
+                "minimum": 0
+              },
+              "minutiae_total": {
+                "frames_nonzero": 17,
+                "maximum": 3,
+                "median": 1,
+                "minimum": 0
+              },
+              "quality_blocks_a": {
+                "frames_nonzero": 19,
+                "maximum": 69,
+                "median": 54,
+                "minimum": 0
+              },
+              "quality_blocks_a_per_mille": {
+                "frames_nonzero": 19,
+                "maximum": 216,
+                "median": 169,
+                "minimum": 0
+              },
+              "quality_blocks_ab": {
+                "frames_nonzero": 21,
+                "maximum": 135,
+                "median": 121,
+                "minimum": 57
+              },
+              "quality_blocks_ab_per_mille": {
+                "frames_nonzero": 21,
+                "maximum": 422,
+                "median": 378,
+                "minimum": 178
+              },
+              "quality_blocks_level_0": {
+                "frames_nonzero": 21,
+                "maximum": 68,
+                "median": 68,
+                "minimum": 68
+              },
+              "quality_blocks_level_1": {
+                "frames_nonzero": 21,
+                "maximum": 99,
+                "median": 77,
+                "minimum": 62
+              },
+              "quality_blocks_level_2": {
+                "frames_nonzero": 21,
+                "maximum": 110,
+                "median": 57,
+                "minimum": 37
+              },
+              "quality_blocks_level_3": {
+                "frames_nonzero": 21,
+                "maximum": 93,
+                "median": 69,
+                "minimum": 55
+              },
+              "quality_blocks_level_4": {
+                "frames_nonzero": 19,
+                "maximum": 69,
+                "median": 54,
+                "minimum": 0
+              },
+              "quality_blocks_total": {
+                "frames_nonzero": 21,
+                "maximum": 320,
+                "median": 320,
+                "minimum": 320
+              }
+            }
+          }
+        },
+        "intensity_scale": "post_delta_minmax",
+        "orientation": "identity",
+        "output_polarity": "retained_deviation_dark_on_white",
+        "retained_delta_sign": "baseline_above_frame",
+        "spatial_factor": 2,
+        "variant": "baseline_above_frame_halfwave_dark_on_white/identity/spatial_x2"
+      }
+    ]
+  },
+  "baseline_sha": "9a7162879ffc656197daa2fa54dea0670f45be74",
+  "capture_sha256": "3575ca810b969f1f248684d105c679e408ef88a0c83370387e9e90d541d10eab",
+  "d279_44_signed_control_reproduced": true,
+  "live_or_usb_action_count": 0,
+  "operation": "D279_46_ONE_OFFLINE_PROTECTED_HALFWAVE_POLARITY_COMPLETION_EVALUATION",
+  "outcome": "AUTHENTIC_HALFWAVE_OUTPUT_POLARITY_NBIS_AGGREGATE_READY",
+  "plaintext_or_raster_exported": false,
+  "schema": "D279_46_ONE_OFFLINE_PROTECTED_HALFWAVE_POLARITY_COMPLETION_EVALUATION_V1",
+  "template_exported": false,
+  "transport_input_verified": true,
+  "transport_or_psk_exported": false
+}

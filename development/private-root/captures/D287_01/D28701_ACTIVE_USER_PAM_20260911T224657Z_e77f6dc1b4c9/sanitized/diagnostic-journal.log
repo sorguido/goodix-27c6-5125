@@ -1,0 +1,18 @@
+2026-09-12T00:47:17.964293+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): debug on
+2026-09-12T00:47:17.970455+02:00 192.168.0.25 systemd[1]: Starting fprintd.service - Fingerprint Authentication Daemon...
+2026-09-12T00:47:18.075595+02:00 192.168.0.25 systemd[1]: Started fprintd.service - Fingerprint Authentication Daemon.
+2026-09-12T00:47:18.075000+02:00 192.168.0.25 audit[1]: SERVICE_START pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 msg='unit=fprintd comm="systemd" exe="/usr/lib/systemd/systemd" hostname=? addr=? terminal=? res=success'
+2026-09-12T00:47:18.110288+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): /net/reactivated/Fprint/Device/0 prints registered: 1
+2026-09-12T00:47:18.110296+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): Using device /net/reactivated/Fprint/Device/0 (out of 1 devices)
+2026-09-12T00:47:18.270456+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): scan-type for /net/reactivated/Fprint/Device/0: press
+2026-09-12T00:47:18.270612+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): About to call VerifyStart
+2026-09-12T00:47:18.303460+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): VerifyStart completed successfully
+2026-09-12T00:47:18.303473+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): verify_finger_selected Place your right index finger on the fingerprint reader
+2026-09-12T00:47:18.303488+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): Waiting for 44 seconds (44967121 usecs)
+2026-09-12T00:47:18.303667+02:00 192.168.0.25 kernel: usb 1-7: usbfs: process 121971 (fprintd) did not claim interface 1 before use
+2026-09-12T00:47:24.008260+02:00 192.168.0.25 fprintd[121971]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=157
+2026-09-12T00:47:24.009123+02:00 192.168.0.25 fprintd[121971]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+2026-09-12T00:47:24.009628+02:00 192.168.0.25 fprintd[121971]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=128 threshold=40
+2026-09-12T00:47:24.009636+02:00 192.168.0.25 fprintd[121971]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=1 comparisons=1 threshold=40
+2026-09-12T00:47:24.009968+02:00 192.168.0.25 pam-confdir-runner[121963]: pam_fprintd(goodix-d287-01-active-user:auth): Verify result: verify-match (done: 1)
+2026-09-12T00:47:24.012640+02:00 192.168.0.25 fprintd[121971]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1

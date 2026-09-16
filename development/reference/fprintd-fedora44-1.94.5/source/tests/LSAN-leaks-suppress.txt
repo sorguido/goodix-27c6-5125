@@ -1,0 +1,4 @@
+leak:initialize_device
+leak:usbi_alloc_device
+leak:libusb-1.0.so.*
+leak:PyMem_RawMalloc

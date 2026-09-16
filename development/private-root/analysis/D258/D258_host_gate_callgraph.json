@@ -1,0 +1,49 @@
+{
+  "gates": {
+    "0x20": {
+      "EVIDENCE_CLASS": "TARGET_OEM_STATIC_HASH_GATED; D255 B0 PLAINTEXT_UNAVAILABLE",
+      "INPUT": "decrypted baseline image plus cached image base and runtime classifier configuration",
+      "NEXT_STAGE_BRANCH": "acquisition success permits stage2; post-stage2 enum selects keep/update image base",
+      "OUTPUT": "classifier enum 0..3 after stage2",
+      "OWNER_FUNCTION_OR_OFFSET": "acquire 0x180067914; consume 0x180069531 -> 0x180023fa8 -> 0x180022654",
+      "OWNER_MODULE": "gfusb.dll"
+    },
+    "0x50": {
+      "EVIDENCE_CLASS": "TARGET_OEM_STATIC_HASH_GATED_PLUS_D255_TARGET_CAPTURE",
+      "INPUT": "A0/0x50 dynamic NAV body (2409 bytes) plus cached NAV base and runtime classifier configuration",
+      "NEXT_STAGE_BRANCH": "acquisition success always permits stage1; post-stage2 enum selects keep/update NAV base, not stage2 admission",
+      "OUTPUT": "stored NAV buffer, then classifier enum 0..3 after stage2",
+      "OWNER_FUNCTION_OR_OFFSET": "acquire 0x180067874; consume 0x180069377 -> 0x180023fdc -> 0x180022654",
+      "OWNER_MODULE": "gfusb.dll"
+    },
+    "0x82": {
+      "EVIDENCE_CLASS": "TARGET_OEM_STATIC_HASH_GATED_PLUS_D255_TARGET_CAPTURE",
+      "INPUT": "ChipRegRead register 0x0082 quantity 2; unsigned raw FDT base0/base1 words",
+      "NEXT_STAGE_BRANCH": "all abs(base0[i]-base1[i]) <= threshold -> baseline image; violation -> cached-base fallback or rebuild loop",
+      "OUTPUT": "threshold = zero_extend(response[1]); response[0] ignored on this path",
+      "OWNER_FUNCTION_OR_OFFSET": "gf_update_all_base 0x180068e26..0x180068ffe",
+      "OWNER_MODULE": "gfusb.dll"
+    }
+  },
+  "orchestrator": {
+    "EVIDENCE_CLASS": "TARGET_OEM_STATIC_HASH_GATED",
+    "INPUT": "loaded target base/cache state plus sensor callbacks",
+    "NEXT_STAGE_BRANCH": "success -> ChicagoHUSetMode(3,1,1) final 0x32",
+    "OUTPUT": "base update/reuse result consumed by caller 0x180068940",
+    "OWNER_FUNCTION_OR_OFFSET": "gf_update_all_base 0x180068adc..0x18006987d",
+    "OWNER_MODULE": "gfusb.dll"
+  },
+  "schema": "D258_HOST_GATE_CALLGRAPH_V1",
+  "sequence": [
+    "0x1800676f8 FDT stage0 (500 ms)",
+    "0x180067874 NAV acquire/store via mode5 (500 ms)",
+    "0x1800676f8 FDT stage1 (500 ms)",
+    "0x180059488 ChipRegRead(0x0082,2,500 ms)",
+    "0x180067914 baseline image via mode2 (2000 ms)",
+    "0x1800676f8 FDT stage2 (500 ms)",
+    "0x180023fdc NAV classifier wrapper mode=1",
+    "0x180023fa8 image classifier wrapper mode=0",
+    "0x180068abe final ChicagoHUSetMode(3,1,1)"
+  ],
+  "target_module": "gfusb.dll"
+}

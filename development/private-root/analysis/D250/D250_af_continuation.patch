@@ -1,0 +1,323 @@
+--- a/src/goodix5125_d233_backend.py
++++ b/src/goodix5125_d233_backend.py
+@@ -22,6 +22,16 @@
+ from pathlib import Path
+ from typing import Callable, Mapping, Protocol, Sequence
+ 
++from core.post_d4 import (
++    ProtocolError as PostD4ProtocolError,
++    UnexpectedAck as AfUnexpectedAck,
++    UnexpectedStateVersion,
++    build_af,
++    parse_af_response,
++    parse_outer as parse_post_d4_outer,
++    parse_payload as parse_post_d4_payload,
++)
++
+ from poc.goodix5125.tools.binding_reference.runtime import (
+     derive_validator_from_canonical_pe,
+     verify_canonical_pe,
+@@ -67,6 +77,9 @@
+ D4_CANONICAL_REQUEST = bytes.fromhex("a00600a6d403000000d3")
+ D4_POST_TLS_PACING_MS = 20
+ D4_TIMEOUT_MS = 200
++AF_PHASE = "AF"
++AF_POST_D4_PACING_MS = 20
++AF_TIMEOUT_MS = 500
+ TARGET_CONFIG90_PATH = Path("/var/lib/goodix-5125-poc/target-config-90.bin")
+ TARGET_CONFIG90_SHA256 = "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82"
+ PRODUCTION_CANDIDATE_SCHEMA = "d233-production-candidate-run-report-v1"
+@@ -325,7 +338,7 @@
+         return remaining
+ 
+     def write_frame(
+-        self, frame: bytes, timeout_ms: int, *, fixed64_a0_d4: bool = False
++        self, frame: bytes, timeout_ms: int, *, fixed64_a0_boundary: bool = False
+     ) -> None:
+         handle = self._require_open()
+         frame = bytes(frame)
+@@ -338,8 +351,14 @@
+             raise UsbFailure("A0/B0 declared length mismatch")
+         if frame[3] != (frame[0] + frame[1] + frame[2]) & 0xFF:
+             raise UsbFailure("malformed A0/B0 tag")
+-        if fixed64_a0_d4 and frame != D4_CANONICAL_REQUEST:
+-            raise UsbFailure("fixed-64 A0 is restricted to canonical D4")
++        if fixed64_a0_boundary and frame != D4_CANONICAL_REQUEST:
++            try:
++                kind, payload = parse_post_d4_outer(frame)
++                control, data = parse_post_d4_payload(payload)
++            except PostD4ProtocolError as exc:
++                raise UsbFailure("invalid fixed-64 AF boundary frame") from exc
++            if kind != 0xA0 or control != 0xAF or len(data) != 5 or data[:1] != b"\x55" or data[3:] != b"\x00\x00":
++                raise UsbFailure("fixed-64 A0 is restricted to canonical D4/AF")
+         deadline = time.monotonic() + timeout_ms / 1000
+         for offset in range(0, len(frame), USB_MAX_PACKET):
+             chunk = frame[offset : offset + USB_MAX_PACKET]
+@@ -349,7 +368,7 @@
+             # result awaiting live confirmation.
+             wire_chunk = (
+                 chunk.ljust(USB_MAX_PACKET, b"\x00")
+-                if frame[0] == 0xB0 or fixed64_a0_d4
++                if frame[0] == 0xB0 or fixed64_a0_boundary
+                 else chunk
+             )
+             self.bulk_out_submit_count += 1
+@@ -868,6 +887,8 @@
+         tls_factory: Callable[[SecretBuffer], Tls12PskServer] = Tls12PskServer,
+         tls_pacer: Callable[[float], None] = time.sleep,
+         d4_pacer: Callable[[float], None] = time.sleep,
++        af_pacer: Callable[[float], None] = time.sleep,
++        af_timestamp_factory: Callable[[], int] = lambda: int(time.time() * 1000) % 60000,
+     ):
+         self.transport = transport
+         self.secret = secret
+@@ -875,6 +896,8 @@
+         self.tls_factory = tls_factory
+         self.tls_pacer = tls_pacer
+         self.d4_pacer = d4_pacer
++        self.af_pacer = af_pacer
++        self.af_timestamp_factory = af_timestamp_factory
+         self.exchange_count = 0
+         self.tls_handshake_count = 0
+         self.tls_cryptographic_handshake_completed = False
+@@ -926,6 +949,15 @@
+         self.d4_failure_class = "not_reached"
+         self.d4_pacing_count = 0
+         self.d4_response_count = 0
++        self._af_complete = False
++        self.af_attempt_count = 0
++        self.af_send_count = 0
++        self.af_response_count = 0
++        self.af_failure_class = "not_reached"
++        self.af_pacing_count = 0
++        self.af_state_version: int | None = None
++        self.af_state_flags: int | None = None
++        self.af_unknown_flag_bits: int | None = None
+ 
+     @property
+     def usb_open_count(self) -> int:
+@@ -1166,7 +1198,7 @@
+             self.transport.write_frame(
+                 D4_CANONICAL_REQUEST,
+                 D4_TIMEOUT_MS,
+-                fixed64_a0_d4=True,
++                fixed64_a0_boundary=True,
+             )
+             self.d4_send_count = 1
+             self.exchange_count += 1
+@@ -1216,7 +1248,92 @@
+                         "single_frame_usb_completion"
+                         if completion_ids else "none"
+                     ),
+-                    "terminal_action": "STOP_AFTER_D4",
++                    "terminal_action": "CONTINUE_TO_EXACTLY_ONE_AF",
++                }
++            )
++        self._exchange_af_after_d4()
++
++    def _exchange_af_after_d4(self) -> None:
++        """Issue one bounded GetMcuState query and stop after direct AE."""
++        if (
++            not self._d4_complete
++            or self._af_complete
++            or self.af_attempt_count != 0
++            or self.d4_attempt_count != 1
++            or self.d4_send_count != 1
++            or self.d4_ack_status != 0x01
++            or self.transport.buffered_rx_bytes
++        ):
++            raise ReplayAbort(AbortClass.EXTRA_OR_REORDERED)
++        self.last_attempted_phase = AF_PHASE
++        self.last_failure_domain = "none"
++        request = build_af(self.af_timestamp_factory())
++        completion_ids: tuple[int, ...] = ()
++        try:
++            self.af_pacer(AF_POST_D4_PACING_MS / 1000)
++            self.af_pacing_count = 1
++            self.transport.revalidate_identity()
++            self.af_attempt_count = 1
++            self.transport.write_frame(
++                request,
++                AF_TIMEOUT_MS,
++                fixed64_a0_boundary=True,
++            )
++            self.af_send_count = 1
++            self.exchange_count += 1
++            response = self.transport.read_frame(AF_TIMEOUT_MS)
++            completion_ids = self.transport.last_frame_completion_ids
++            state = parse_af_response(response)
++            self.af_response_count = 1
++            self.af_state_version = state.version
++            self.af_state_flags = state.flags
++            self.af_unknown_flag_bits = state.unknown_flag_bits
++            if self.transport.buffered_rx_bytes:
++                self.af_failure_class = "unexpected_trailing_frame"
++                raise ReplayAbort(AbortClass.UNEXPECTED_DATA)
++            self.transport.revalidate_identity()
++            self._af_complete = True
++            self.af_failure_class = "none"
++        except UsbTimeout as exc:
++            self.last_failure_domain = "usb_transport"
++            self.af_failure_class = (
++                "response_timeout" if self.af_send_count else "out_timeout"
++            )
++            raise ReplayAbort(AbortClass.TIMEOUT) from exc
++        except UsbAmbiguousCompletion as exc:
++            self.last_failure_domain = "usb_transport"
++            self.af_failure_class = "ambiguous_usb_completion"
++            raise ReplayAbort(AbortClass.AMBIGUOUS) from exc
++        except AfUnexpectedAck as exc:
++            self.last_failure_domain = "af_validator"
++            self.af_failure_class = "unexpected_ack"
++            raise ReplayAbort(AbortClass.UNEXPECTED_ACK) from exc
++        except UnexpectedStateVersion as exc:
++            self.last_failure_domain = "af_validator"
++            self.af_failure_class = "semantic_state_version_mismatch"
++            raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
++        except PostD4ProtocolError as exc:
++            self.last_failure_domain = "af_validator"
++            self.af_failure_class = "malformed_ae_response"
++            raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
++        except UsbFailure as exc:
++            self.last_failure_domain = "usb_transport"
++            self.af_failure_class = "usb_or_frame_error"
++            raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
++        finally:
++            self.protocol_observations.append(
++                {
++                    "phase": AF_PHASE,
++                    "request_control": "0xaf",
++                    "request_logical_length": len(request),
++                    "request_physical_length": USB_MAX_PACKET,
++                    "response_control": "0xae" if self.af_response_count else "none",
++                    "response_body_length": 16 if self.af_response_count else 0,
++                    "response_frame_count": self.af_response_count,
++                    "completion_classification": (
++                        "single_frame_usb_completion" if completion_ids else "none"
++                    ),
++                    "terminal_action": "STOP_AFTER_AF",
+                 }
+             )
+ 
+@@ -1289,7 +1406,7 @@
+             self.last_failure_domain = "usb_transport"
+             raise ReplayAbort(AbortClass.UNEXPECTED_DATA) from exc
+         except ReplayAbort as exc:
+-            if self.last_attempted_phase != D4_PHASE:
++            if self.last_attempted_phase not in (D4_PHASE, AF_PHASE):
+                 self.last_failure_domain = "tls_engine"
+             if exc.abort_class == AbortClass.TLS_TIMEOUT:
+                 self.tls_failure_class = self._timeout_failure_class(bridge)
+@@ -1737,6 +1854,31 @@
+             backend.d4_response_count if backend is not None else 0
+         ),
+         "d4_completed": bool(backend is not None and backend._d4_complete),
++        "af_attempt_count": (
++            backend.af_attempt_count if backend is not None else 0
++        ),
++        "af_send_count": (
++            backend.af_send_count if backend is not None else 0
++        ),
++        "af_response_count": (
++            backend.af_response_count if backend is not None else 0
++        ),
++        "af_failure_class": (
++            backend.af_failure_class if backend is not None else "not_reached"
++        ),
++        "af_pacing_count": (
++            backend.af_pacing_count if backend is not None else 0
++        ),
++        "af_state_version": (
++            backend.af_state_version if backend is not None else None
++        ),
++        "af_state_flags": (
++            backend.af_state_flags if backend is not None else None
++        ),
++        "af_unknown_flag_bits": (
++            backend.af_unknown_flag_bits if backend is not None else None
++        ),
++        "af_completed": bool(backend is not None and backend._af_complete),
+         "automatic_invasive_recovery": "forbidden",
+     }
+ 
+--- a/src/goodix5125_d235_entrypoint.py
++++ b/src/goodix5125_d235_entrypoint.py
+@@ -44,7 +44,7 @@
+ D235_LIVE_CAPABILITY = 0
+ D235_LIVE_AUTHORIZATION = "yes"
+ D236_OPERATOR_RISK_ACCEPTANCE = "granted"
+-D235_RESULT_SCHEMA = "d246-live-d4-single-shot-result-v1"
++D235_RESULT_SCHEMA = "d250-live-af-single-shot-result-v1"
+ D235_OFFLINE_MODE = "injected_offline_entrypoint_review"
+ CANONICAL_GFUSB_SHA256 = (
+     "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+@@ -75,16 +75,16 @@
+     def system_default(cls) -> "ProductionRuntimePaths":
+         repository = Path(__file__).resolve().parents[1]
+         store = Path("/var/lib/goodix-5125-poc")
+-        reports = store / "d246-results"
++        reports = store / "d250-results"
+         return cls(
+             psk_store=store / "transport-material.bin",
+             target_material_manifest=store / "target-material-manifest.json",
+             config90_store=store / "target-config-90.bin",
+             canonical_gfusb=repository / "analysis/D230/work/GoodixExport/gfusb.dll",
+             report_directory=reports,
+-            checkpoint_report=reports / "d246-live-pre-restore.json",
+-            final_report=reports / "d246-live-result.json",
+-            single_use_marker=store / "d246-operator-invocation.marker",
++            checkpoint_report=reports / "d250-live-pre-restore.json",
++            final_report=reports / "d250-live-result.json",
++            single_use_marker=store / "d250-operator-invocation.marker",
+         )
+ 
+     def validate(self) -> None:
+@@ -226,6 +226,7 @@
+     "D1": "D236_ABORTED_D1",
+     "TLS": "D236_ABORTED_TLS",
+     "D4": "D246_ABORTED_D4",
++    "AF": "D250_ABORTED_AF",
+ }
+ 
+ 
+@@ -275,7 +276,12 @@
+         execution_mode=policy.execution_mode,
+         operator_risk_acceptance=policy.operator_risk_acceptance,
+         live_authorization=policy.live_authorization,
+-        decision=map_future_live_decision(report),
++        decision=(
++            "D250_AF_RESPONSE_VALIDATED_STOP_AFTER_AF"
++            if report.get("result") == "pass"
++            and report.get("af_completed") is True
++            else map_future_live_decision(report)
++        ),
+         d4_count=int(report.get("d4_send_count", 0)),
+         application_data_count=0,
+         persistent_write_family_count=0,
+@@ -369,6 +375,17 @@
+         D246_D4_ACK_POLICY="EXACT_D4_STATUS_01_ONLY",
+         D246_STOP_BOUNDARY="STOP_AFTER_D4",
+         D246_NEXT_APPLICATION_ACTION_REACHABLE=False,
++        d250_result=(
++            "AF_EXACTLY_ONCE_RESPONSE_VALIDATED_STOP_AFTER_AF"
++            if report.get("result") == "pass"
++            and report.get("af_completed") is True
++            else "D250_ABORTED_FAIL_CLOSED"
++        ),
++        D250_AF_ACK_POLICY="FORBIDDEN_DIRECT_AE_ONLY",
++        D250_AF_PHYSICAL_OUT="FIXED64_ZERO_TAIL",
++        D250_AF_RESPONSE_POLICY="EXACT_ONE_AE_WITH_16_STATE_BYTES",
++        D250_STOP_BOUNDARY="STOP_AFTER_AF",
++        D250_NEXT_SENSOR_ACTION_REACHABLE=False,
+         LIVE_BASELINE_APPROVAL="PENDING_USER_REVIEW",
+     )
+     return mapped
+@@ -620,7 +637,7 @@
+ def main(argv: Sequence[str] | None = None) -> int:
+     result = d235_entrypoint(tuple(sys.argv[1:] if argv is None else argv), os.environ)
+     print(json.dumps(result, sort_keys=True))
+-    return 0 if result.get("decision") == "D236_LIVE_TLS_HANDSHAKE_SUCCESS" else 1
++    return 0 if result.get("decision") == "D250_AF_RESPONSE_VALIDATED_STOP_AFTER_AF" else 1
+ 
+ 
+ if __name__ == "__main__":

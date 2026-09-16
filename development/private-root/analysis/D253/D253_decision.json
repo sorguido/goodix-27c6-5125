@@ -1,0 +1,68 @@
+{
+  "schema": "d253-fdt-seed-restore-cmd22-decision-v1",
+  "execution_mode": "offline_only",
+  "initial_head": "1b97774d792a674d9edbedd29f54c4509ec06ac8",
+  "initial_fdt36_seed": {
+    "source": "HOST_SUPPLIED_VIA_GFUSB_CALLBACK_CONTEXT+0x13d68_TO_GLOBAL_0x180580818; ULTIMATE_SOURCE_UNRESOLVED",
+    "derivation": "OPAQUE_12_BYTE_CALLER_INPUT_MEMCPY; NO_SIX_SCALAR_OR_SENSOR_TYPE_12_DEFAULT_DERIVATION_PROVEN",
+    "validity_check": "NONE_FOUND_BEFORE_COPY; IRQ100_RESPONSE_HAS_SEPARATE_VALIDATOR_0x1800290f4",
+    "target_dependence": "NOT_PROVEN; DEVICE_SESSION_ENVIRONMENT_BINDING_UNRESOLVED",
+    "required_semantically": "TRANSMITTED_AND_CHAINED_BUT_NONZERO_OR_FRESH_SEED_NECESSITY_NOT_PROVEN",
+    "fresh_baseline_bootstrap_closed": false
+  },
+  "goodix_dat": {
+    "available_for_audit": false,
+    "fdt_seed_role": "UNRESOLVED; OEM_GFUSB_PATH_PROVES_ONLY_OTP_PREFIX_LOAD_COMPARE; ROCKY_FDT_LAYOUT_IS_CORROBORATION_ONLY",
+    "otp_binding": "OEM_FILE_OTP_PREFIX_COMPARED_WITH_LIVE_SENSOR_OTP; BINDING_OF_ANY_FDT_FIELD_NOT_PROVEN",
+    "freshness_model": "NO_OEM_TIMESTAMP_TEMPERATURE_VERSION_OR_FDT_FRESHNESS_CHECK_PROVEN",
+    "reuse_safety": "NOT_PROVEN_FOR_LINUX_OR_CURRENT_TARGET_COLD_START"
+  },
+  "fdt36_physical": {
+    "target_occurrence_count": 3,
+    "tail_profile_count": 1,
+    "tail_identical_across_occurrences": true,
+    "zero_tail_observed_on_target": false,
+    "physical_out_observed": "LOGICAL_A0_22_BYTES; PHYSICAL_USB_OUT_64_BYTES; OUT_OF_FRAME_TAIL_42_BYTES",
+    "oem_opaque_tail": "NONZERO_ONLY_AT_PHYSICAL_OFFSETS_40_45:CBF2E2BEFB7F; TRANSPORT_STAGING_RESIDUE_INFERRED",
+    "zero_tail_corroboration": "ROCKY_EXPLICIT_64_BYTE_ZERO_PADDING; NON_TARGET",
+    "zero_tail_target_equivalence": "NOT_PROVEN",
+    "physical_contract_live_ready": false
+  },
+  "post_fdt_restore": {
+    "model": "NO_EXPLICIT_RESTORE_OBSERVED; SUCCESS_PATH_USES_EVENT_CONSUMPTION_FINGER_UP_CYCLE_AND_LATER_REARM; FAILURE_AND_STOP_MODEL_UNKNOWN",
+    "device_side_cancel_command": "NOT_FOUND_OR_PROVEN",
+    "device_side_cancel_evidence": "NONE; GFONCANCEL_IS_HOST_REQUEST_CANCELLATION; 0x34_IS_FINGER_UP_ARM; NO_POST_FDT_A2_OR_0x70",
+    "arm_lifetime": "OBSERVED_UNTIL_EVENT_OR_LATER_REARM_OR_CAPTURE_END; INTERNAL_DECAY_UNKNOWN",
+    "arm_survives_usb_close": "UNKNOWN",
+    "arm_survives_tls_close": "UNKNOWN",
+    "arm_reentry_behavior": "LATER_0x32_ACCEPTED_WITHOUT_OBSERVED_RESTORE; OVERWRITE_VERSUS_EXPIRED_PRIOR_STATE_UNRESOLVED",
+    "safe_stop_after_fdt_arm": false
+  },
+  "image_command": {
+    "cmd20_target_semantics": "SETMODE_IMAGE_CMD0_2_CMD1_0_MORE_0; OBSERVED_ONLY_IN_BASELINE_NO_FINGER_CONTEXTS_IN_THIS_CAPTURE",
+    "cmd22_target_semantics": "SETMODE_IMAGE_CMD0_2_CMD1_1_MORE_0; OBSERVED_POST_IRQ2_FINGER_DOWN_WITH_ACK22_AND_B0_TLS_IMAGE",
+    "cmd20_22_relation": "SAME_BODY_AND_IMAGE_MODE; CMD1_SELECTOR_0_VERSUS_1; NOT_MORE_BIT",
+    "post_irq2_image_command": "0x22_DATA_0100",
+    "d249_first_image_model_status": "HISTORICAL_0x20_MODEL_CORRECTED_IN_CURRENT_CORE_TO_TARGET_EXACT_0x22; STILL_OFFLINE_AND_NOT_LIVE_SAFE"
+  },
+  "decision": {
+    "outcome": "BLOCKED",
+    "next_minimum_live_boundary": "NONE",
+    "d253_live_boundary": "BLOCKED",
+    "d253_live_execution": "NOT_PERFORMED",
+    "requires_external_evidence": true,
+    "required_external_evidence": "SANITIZED_TARGET_OEM_COLD_START_TRACE_OF_CONTEXT+0x13d68_INPUT/CACHE/LOOP_CRITERION PLUS TARGET_OEM_CANCEL_TIMEOUT_SERVICE_STOP_OR_CLOSE_TRACE_WITH_POST_ARM_STATE_CHECK; OR PROVENANCE_VALID_RECEIVER_LIFECYCLE_BODY",
+    "operator_kit_created": false
+  },
+  "safety_counts": {
+    "usb_open_count": 0,
+    "tls_handshake_count": 0,
+    "d4_send_count": 0,
+    "af_send_count": 0,
+    "fdt_send_count": 0,
+    "image_command_count": 0,
+    "finger_interaction_count": 0,
+    "retry_count": 0,
+    "persistent_write_family_count": 0
+  }
+}

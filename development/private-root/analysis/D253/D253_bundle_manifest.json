@@ -1,0 +1,73 @@
+{
+  "schema": "d253-step-local-bundle-manifest-v1",
+  "step": "D253",
+  "initial_head": "1b97774d792a674d9edbedd29f54c4509ec06ac8",
+  "decision": "D253_LIVE_BOUNDARY=BLOCKED",
+  "operator_kit_included": false,
+  "members": [
+    {
+      "path": "D253_fdt_seed_restore_cmd22_audit.md",
+      "sha256": "d25ca09edc9ae502e839a8fec056a1405d30a3b059fad5a00ec8ccd554ac9558"
+    },
+    {
+      "path": "D253_decision.json",
+      "sha256": "6988fb75d24125fec4540096330f1a7bf9aade5f59a96a3bdcd662e1a5364d4b"
+    },
+    {
+      "path": "d253_offline_audit.py",
+      "sha256": "be1e9da6cd83f7f3652c3011c976e6fa81b5c1fbfbb47b3c0297ac9243ca5dfc"
+    },
+    {
+      "path": "D253_test_results.txt",
+      "sha256": "7d1668d485ea410c7ba99c1dac531985f65f6d13a1f7e4451e22b22338c8eb23"
+    },
+    {
+      "path": "core/post_d4.py",
+      "sha256": "ee15986d92a181234dd26bc97f41729c5c098ba2bf686f69860ae0df4f04b8ae"
+    },
+    {
+      "path": "tests/test_d249_post_d4.py",
+      "sha256": "b3a8d0a3c056b190b765877eec19d73839985f4da0b796dd7eabab83c51ef200"
+    }
+  ],
+  "canonical_documentation_reference": {
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "sha256_at_bundle_creation": "f115b42309a5ee299e2b5e106795af678822ec7d4b1369e61c887c3f6332f025",
+    "included": false,
+    "reason": "canonical repository document referenced rather than duplicated"
+  },
+  "analysis_index_reference": {
+    "path": "analysis/README.md",
+    "sha256_at_bundle_creation": "49e0184278b8dd44ce605376f03d09aba3d6feddf6b3f7536cdaae172c9dac0b",
+    "included": false
+  },
+  "primary_sources_referenced_not_included": [
+    {
+      "path": "analysis/D230/work/GoodixExport/rilevamento.pcapng",
+      "sha256": "50071c0f97fa12d8f3201be015cb632c83687006e2d703c5d3f2a7d9719c184b"
+    },
+    {
+      "path": "analysis/D230/work/GoodixExport/gfusb.dll",
+      "sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+    },
+    {
+      "path": "analysis/D230/work/app/GF_ST411SEC_APP_12509_mapped_code.bin",
+      "sha256": "8305b1c43ab092d3e55d353c5cd0a01675c1f4d47980557b084decfd53877079"
+    },
+    {
+      "path": "Rockytkg/",
+      "upstream_commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b"
+    }
+  ],
+  "excluded": [
+    "raw capture",
+    "raw DLL and algorithm binaries",
+    "firmware/APP binary",
+    "raw goodix.dat",
+    "PSK or secrets",
+    "biometric data",
+    "Rocky snapshot",
+    "historical bundles",
+    "operator artifacts"
+  ]
+}

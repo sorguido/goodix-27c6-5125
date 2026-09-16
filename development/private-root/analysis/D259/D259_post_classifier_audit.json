@@ -1,0 +1,1324 @@
+{
+  "cache_fields": [
+    "phase",
+    "condition",
+    "oem_effect",
+    "linux_first_live_policy",
+    "required_for_final_0x32",
+    "required_for_device_progress",
+    "host_cache_write_count_in_minimal_candidate",
+    "derivation"
+  ],
+  "cache_rows": [
+    {
+      "condition": "parsed_dirty_flag_nonzero",
+      "derivation": "0x1800697d8 test -> 0x1800697e1 host cache call; caller arm later",
+      "host_cache_write_count_in_minimal_candidate": 0,
+      "linux_first_live_policy": "DISABLED",
+      "oem_effect": "HOST_CACHE_SAVE_GOODIX_DAT_CONDITIONAL",
+      "phase": "before_final_0x32",
+      "required_for_device_progress": false,
+      "required_for_final_0x32": false
+    }
+  ],
+  "cfg": {
+    "caller": {
+      "final_call": "0x180068abe INDIRECT ChicagoHUSetMode(3,1,1)",
+      "gf_update_all_base_call": "0x18006898a->0x180068adc",
+      "success_branch": "0x180068991 jne 0x180068a40"
+    },
+    "derivation_mode": "BOUNDED_PARSED_OBJDUMP_TEXT_HASH_GATED",
+    "device_or_usb_calls": [],
+    "fdt_table": {
+      "classifier_region_references": [],
+      "final_mode3_builder_reads": [
+        "0x1800252c0"
+      ],
+      "global": "0x180580818"
+    },
+    "post_classifier_calls": [
+      {
+        "address": "0x180069438",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x180069479",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x1800694b7",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x1800694f5",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x180069527",
+        "classification": "HOST_RAM_COPY",
+        "target": "0x18007b1f0"
+      },
+      {
+        "address": "0x18006953d",
+        "classification": "HOST_IMAGE_CLASSIFIER_WRAPPER",
+        "target": "0x180023fa8"
+      },
+      {
+        "address": "0x180069585",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x1800695f2",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x180069633",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x180069671",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x1800696af",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x1800696f2",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x18006971d",
+        "classification": "HOST_RAM_COPY",
+        "target": "0x18007b1f0"
+      },
+      {
+        "address": "0x180069737",
+        "classification": "HOST_RESULT_STATE_HELPER",
+        "target": "0x1800225e8"
+      },
+      {
+        "address": "0x180069778",
+        "classification": "HOST_LOGGING",
+        "target": "0x18000ced8"
+      },
+      {
+        "address": "0x1800697a3",
+        "classification": "HOST_RAM_COPY",
+        "target": "0x18007b1f0"
+      },
+      {
+        "address": "0x1800697ce",
+        "classification": "HOST_RAM_COPY",
+        "target": "0x18007b1f0"
+      },
+      {
+        "address": "0x1800697e1",
+        "classification": "HOST_CACHE_SAVE_GOODIX_DAT",
+        "target": "0x180067f44"
+      }
+    ],
+    "post_classifier_cfg_forward_only": true,
+    "ranges": {
+      "caller_update_then_final_arm": {
+        "calls": [
+          {
+            "address": "0x180068985",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x18006898a",
+            "classification": "UNRESOLVED",
+            "target": "0x180068adc"
+          },
+          {
+            "address": "0x1800689ce",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800689d8",
+            "classification": "UNRESOLVED",
+            "target": "0x18005dc14"
+          },
+          {
+            "address": "0x1800689f8",
+            "classification": "UNRESOLVED",
+            "target": "0x18005dce4"
+          },
+          {
+            "address": "0x180068a36",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180068a51",
+            "classification": "UNRESOLVED",
+            "target": "INDIRECT"
+          },
+          {
+            "address": "0x180068a60",
+            "classification": "UNRESOLVED",
+            "target": "INDIRECT"
+          },
+          {
+            "address": "0x180068a9b",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180068ab1",
+            "classification": "UNRESOLVED",
+            "target": "INDIRECT"
+          },
+          {
+            "address": "0x180068abe",
+            "classification": "UNRESOLVED",
+            "target": "INDIRECT"
+          }
+        ],
+        "end": "0x180068ada",
+        "instruction_count": 70,
+        "jump_edges": [
+          {
+            "kind": "jne",
+            "source": "0x180068991",
+            "target": "0x180068a40"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800689ea",
+            "target": "0x1800689ff"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x1800689fd",
+            "target": "0x180068a3b"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180068a3b",
+            "target": "0x180068ad6"
+          }
+        ],
+        "start": "0x180068940"
+      },
+      "classifier_nav_and_image_wrappers": {
+        "calls": [
+          {
+            "address": "0x180023fd1",
+            "classification": "HOST_COMMON_CLASSIFIER",
+            "target": "0x180022654"
+          },
+          {
+            "address": "0x180024005",
+            "classification": "HOST_COMMON_CLASSIFIER",
+            "target": "0x180022654"
+          }
+        ],
+        "end": "0x18002400e",
+        "instruction_count": 21,
+        "jump_edges": [],
+        "start": "0x180023fa8"
+      },
+      "classifier_result_host_state_helper": {
+        "calls": [
+          {
+            "address": "0x180022602",
+            "classification": "PURE_RESULT_MAPPER_NO_CALLS",
+            "target": "0x180021b54"
+          }
+        ],
+        "end": "0x180022653",
+        "instruction_count": 25,
+        "jump_edges": [
+          {
+            "kind": "jne",
+            "source": "0x180022610",
+            "target": "0x18002263a"
+          },
+          {
+            "kind": "je",
+            "source": "0x180022619",
+            "target": "0x18002262d"
+          },
+          {
+            "kind": "je",
+            "source": "0x180022622",
+            "target": "0x18002262d"
+          },
+          {
+            "kind": "jne",
+            "source": "0x18002262b",
+            "target": "0x18002263a"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180022638",
+            "target": "0x18002264f"
+          }
+        ],
+        "start": "0x1800225e8"
+      },
+      "classifier_result_pure_mapper": {
+        "calls": [],
+        "end": "0x180021c5d",
+        "instruction_count": 70,
+        "jump_edges": [
+          {
+            "kind": "je",
+            "source": "0x180021b74",
+            "target": "0x180021b94"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021b7b",
+            "target": "0x180021bde"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021b82",
+            "target": "0x180021bff"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021b89",
+            "target": "0x180021c20"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021b8f",
+            "target": "0x180021c56"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021ba1",
+            "target": "0x180021bba"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021ba8",
+            "target": "0x180021bc3"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021baf",
+            "target": "0x180021bcc"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021bb6",
+            "target": "0x180021bd5"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bb8",
+            "target": "0x180021bdc"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bc1",
+            "target": "0x180021bdc"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bca",
+            "target": "0x180021bdc"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bd3",
+            "target": "0x180021bdc"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bdc",
+            "target": "0x180021c56"
+          },
+          {
+            "kind": "jl",
+            "source": "0x180021beb",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jle",
+            "source": "0x180021bf2",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bf4",
+            "target": "0x180021bfd"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021bfd",
+            "target": "0x180021c56"
+          },
+          {
+            "kind": "jl",
+            "source": "0x180021c0c",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jle",
+            "source": "0x180021c13",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021c15",
+            "target": "0x180021c1e"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021c1e",
+            "target": "0x180021c56"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021c2d",
+            "target": "0x180021c4f"
+          },
+          {
+            "kind": "je",
+            "source": "0x180021c34",
+            "target": "0x180021c46"
+          },
+          {
+            "kind": "jle",
+            "source": "0x180021c3b",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jle",
+            "source": "0x180021c42",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021c44",
+            "target": "0x180021c56"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180021c4d",
+            "target": "0x180021c56"
+          }
+        ],
+        "start": "0x180021b54"
+      },
+      "final_0x32_mode3_fdt_table_builder": {
+        "calls": [
+          {
+            "address": "0x180025202",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800252ff",
+            "classification": "HOST_RAM_COPY",
+            "target": "0x18007b1f0"
+          }
+        ],
+        "end": "0x180025304",
+        "instruction_count": 66,
+        "jump_edges": [
+          {
+            "kind": "jne",
+            "source": "0x1800251c5",
+            "target": "0x180025309"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x18002528a",
+            "target": "0x180025296"
+          },
+          {
+            "kind": "jge",
+            "source": "0x1800252b9",
+            "target": "UNRESOLVED"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x1800252db",
+            "target": "0x18002528c"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180025304",
+            "target": "0x1800254b1"
+          }
+        ],
+        "start": "0x1800251ba"
+      },
+      "gf_update_all_base_initialization": {
+        "calls": [],
+        "end": "0x180068b35",
+        "instruction_count": 17,
+        "jump_edges": [],
+        "start": "0x180068adc"
+      },
+      "post_classifier_switches_and_return": {
+        "calls": [
+          {
+            "address": "0x180069383",
+            "classification": "HOST_NAV_CLASSIFIER_WRAPPER",
+            "target": "0x180023fdc"
+          },
+          {
+            "address": "0x1800693cb",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180069438",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180069479",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800694b7",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800694f5",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180069527",
+            "classification": "HOST_RAM_COPY",
+            "target": "0x18007b1f0"
+          },
+          {
+            "address": "0x18006953d",
+            "classification": "HOST_IMAGE_CLASSIFIER_WRAPPER",
+            "target": "0x180023fa8"
+          },
+          {
+            "address": "0x180069585",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800695f2",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180069633",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x180069671",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800696af",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800696f2",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x18006971d",
+            "classification": "HOST_RAM_COPY",
+            "target": "0x18007b1f0"
+          },
+          {
+            "address": "0x180069737",
+            "classification": "HOST_RESULT_STATE_HELPER",
+            "target": "0x1800225e8"
+          },
+          {
+            "address": "0x180069778",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x1800697a3",
+            "classification": "HOST_RAM_COPY",
+            "target": "0x18007b1f0"
+          },
+          {
+            "address": "0x1800697ce",
+            "classification": "HOST_RAM_COPY",
+            "target": "0x18007b1f0"
+          },
+          {
+            "address": "0x1800697e1",
+            "classification": "HOST_CACHE_SAVE_GOODIX_DAT",
+            "target": "0x180067f44"
+          },
+          {
+            "address": "0x1800697f3",
+            "classification": "UNRESOLVED",
+            "target": "0x180080ed0"
+          },
+          {
+            "address": "0x18006980e",
+            "classification": "UNRESOLVED",
+            "target": "0x180080ed0"
+          },
+          {
+            "address": "0x18006985b",
+            "classification": "HOST_LOGGING",
+            "target": "0x18000ced8"
+          },
+          {
+            "address": "0x18006986f",
+            "classification": "HOST_STACK_COOKIE_CHECK",
+            "target": "0x18007a320"
+          }
+        ],
+        "end": "0x18006987c",
+        "instruction_count": 228,
+        "jump_edges": [
+          {
+            "kind": "jne",
+            "source": "0x180069371",
+            "target": "0x180069741"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800693dd",
+            "target": "0x180069401"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800693e4",
+            "target": "0x1800694be"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800693ef",
+            "target": "0x180069480"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800693fa",
+            "target": "0x180069442"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x1800693fc",
+            "target": "0x1800694fa"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x18006943d",
+            "target": "0x1800694fa"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x18006947e",
+            "target": "0x1800694fa"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x1800694bc",
+            "target": "0x1800694fa"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800694ff",
+            "target": "0x180069531"
+          },
+          {
+            "kind": "je",
+            "source": "0x180069597",
+            "target": "0x1800695bb"
+          },
+          {
+            "kind": "je",
+            "source": "0x18006959e",
+            "target": "0x180069678"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800695a9",
+            "target": "0x18006963a"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800695b4",
+            "target": "0x1800695fc"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x1800695b6",
+            "target": "0x1800696b4"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x1800695f7",
+            "target": "0x1800696b4"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180069638",
+            "target": "0x1800696b4"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x180069676",
+            "target": "0x1800696b4"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800696b9",
+            "target": "0x180069727"
+          },
+          {
+            "kind": "jmp",
+            "source": "0x18006973c",
+            "target": "0x1800697d8"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800697df",
+            "target": "0x1800697e6"
+          },
+          {
+            "kind": "je",
+            "source": "0x1800697ec",
+            "target": "0x180069801"
+          },
+          {
+            "kind": "je",
+            "source": "0x180069807",
+            "target": "0x18006981c"
+          }
+        ],
+        "start": "0x18006935d"
+      }
+    },
+    "result_flag": {
+      "initialized_success_at": "0x180068b21",
+      "post_classifier_writes": [],
+      "return_reads": [
+        "0x18006981c",
+        "0x180069860"
+      ],
+      "slot": "[rsp+0x44]"
+    },
+    "schema": "D259_POST_CLASSIFIER_CFG_V2",
+    "switches": {
+      "IMAGE": {
+        "cases": [
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x1800695f2",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [
+              {
+                "kind": "jmp",
+                "source": "0x1800695f7",
+                "target": "0x1800696b4"
+              }
+            ],
+            "case_target": "0x1800695bb",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x1800696f2",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              },
+              {
+                "address": "0x18006971d",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800696b4",
+            "return": "0"
+          },
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x1800696af",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [],
+            "case_target": "0x180069678",
+            "dirty_flag_effect": "UNCHANGED_BY_CLASSIFIER",
+            "effect_path_calls": [],
+            "host_ram_effect": "KEEP_EXISTING_BASE",
+            "merge_point": "0x1800696b4",
+            "return": "1"
+          },
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x180069671",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [
+              {
+                "kind": "jmp",
+                "source": "0x180069676",
+                "target": "0x1800696b4"
+              }
+            ],
+            "case_target": "0x18006963a",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x1800696f2",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              },
+              {
+                "address": "0x18006971d",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800696b4",
+            "return": "2"
+          },
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x180069633",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [
+              {
+                "kind": "jmp",
+                "source": "0x180069638",
+                "target": "0x1800696b4"
+              }
+            ],
+            "case_target": "0x1800695fc",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x1800696f2",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              },
+              {
+                "address": "0x18006971d",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800696b4",
+            "return": "3"
+          },
+          {
+            "case_arm_calls": [],
+            "case_arm_jump_edges": [],
+            "case_target": "0x1800696b4",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x1800696f2",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              },
+              {
+                "address": "0x18006971d",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800696b4",
+            "return": "negative_or_other"
+          }
+        ],
+        "classifier": "IMAGE",
+        "classifier_call": "0x18006953d",
+        "compare_jump_derivation": [
+          {
+            "compare": "0x180069592",
+            "jump": "0x180069597",
+            "return": 0,
+            "target": "0x1800695bb"
+          },
+          {
+            "compare": "0x180069599",
+            "jump": "0x18006959e",
+            "return": 1,
+            "target": "0x180069678"
+          },
+          {
+            "compare": "0x1800695a4",
+            "jump": "0x1800695a9",
+            "return": 2,
+            "target": "0x18006963a"
+          },
+          {
+            "compare": "0x1800695af",
+            "jump": "0x1800695b4",
+            "return": 3,
+            "target": "0x1800695fc"
+          }
+        ],
+        "default_jump": "0x1800695b6",
+        "default_target": "0x1800696b4",
+        "merge_point": "0x1800696b4",
+        "post_merge_keep_jump": "0x1800696b9",
+        "post_merge_keep_target": "0x180069727",
+        "post_merge_keep_value": 1,
+        "return_slot": "[rsp+0x58]",
+        "switch_slot": "[rsp+0x6c]",
+        "switch_start": "0x180069592"
+      },
+      "NAV": {
+        "cases": [
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x180069438",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [
+              {
+                "kind": "jmp",
+                "source": "0x18006943d",
+                "target": "0x1800694fa"
+              }
+            ],
+            "case_target": "0x180069401",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x180069527",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800694fa",
+            "return": "0"
+          },
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x1800694f5",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [],
+            "case_target": "0x1800694be",
+            "dirty_flag_effect": "UNCHANGED_BY_CLASSIFIER",
+            "effect_path_calls": [],
+            "host_ram_effect": "KEEP_EXISTING_BASE",
+            "merge_point": "0x1800694fa",
+            "return": "1"
+          },
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x1800694b7",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [
+              {
+                "kind": "jmp",
+                "source": "0x1800694bc",
+                "target": "0x1800694fa"
+              }
+            ],
+            "case_target": "0x180069480",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x180069527",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800694fa",
+            "return": "2"
+          },
+          {
+            "case_arm_calls": [
+              {
+                "address": "0x180069479",
+                "classification": "HOST_LOGGING",
+                "target": "0x18000ced8"
+              }
+            ],
+            "case_arm_jump_edges": [
+              {
+                "kind": "jmp",
+                "source": "0x18006947e",
+                "target": "0x1800694fa"
+              }
+            ],
+            "case_target": "0x180069442",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x180069527",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800694fa",
+            "return": "3"
+          },
+          {
+            "case_arm_calls": [],
+            "case_arm_jump_edges": [],
+            "case_target": "0x1800694fa",
+            "dirty_flag_effect": "SETS_SHARED_DIRTY_FLAG",
+            "effect_path_calls": [
+              {
+                "address": "0x180069527",
+                "classification": "HOST_RAM_COPY",
+                "target": "0x18007b1f0"
+              }
+            ],
+            "host_ram_effect": "COPY_ACQUIRED_BASE",
+            "merge_point": "0x1800694fa",
+            "return": "negative_or_other"
+          }
+        ],
+        "classifier": "NAV",
+        "classifier_call": "0x180069383",
+        "compare_jump_derivation": [
+          {
+            "compare": "0x1800693d8",
+            "jump": "0x1800693dd",
+            "return": 0,
+            "target": "0x180069401"
+          },
+          {
+            "compare": "0x1800693df",
+            "jump": "0x1800693e4",
+            "return": 1,
+            "target": "0x1800694be"
+          },
+          {
+            "compare": "0x1800693ea",
+            "jump": "0x1800693ef",
+            "return": 2,
+            "target": "0x180069480"
+          },
+          {
+            "compare": "0x1800693f5",
+            "jump": "0x1800693fa",
+            "return": 3,
+            "target": "0x180069442"
+          }
+        ],
+        "default_jump": "0x1800693fc",
+        "default_target": "0x1800694fa",
+        "merge_point": "0x1800694fa",
+        "post_merge_keep_jump": "0x1800694ff",
+        "post_merge_keep_target": "0x180069531",
+        "post_merge_keep_value": 1,
+        "return_slot": "[rsp+0x54]",
+        "switch_slot": "[rsp+0x68]",
+        "switch_start": "0x1800693d8"
+      }
+    },
+    "unresolved_post_classifier_calls": []
+  },
+  "decisions": {
+    "BRANCH_MATRIX_DERIVATION_MODE": "PARSED_DISASSEMBLY_CFG",
+    "CLASSIFIER_BLOCKS_FINAL_0x32": false,
+    "CLASSIFIER_CAUSES_RECOVERY": false,
+    "CLASSIFIER_CAUSES_RETRY_OR_REBUILD": false,
+    "CLASSIFIER_CHANGES_FDT_TABLE": false,
+    "CLASSIFIER_CHANGES_FINAL_0x32_PAYLOAD": false,
+    "CLASSIFIER_CHANGES_GF_UPDATE_ALL_BASE_SUCCESS": false,
+    "CLASSIFIER_CHANGES_HOST_BASE_RAM": true,
+    "CLASSIFIER_CHANGES_HOST_CACHE_DIRTY_STATE": true,
+    "CLASSIFIER_EMITS_ADDITIONAL_DEVICE_COMMAND": false,
+    "CLASS_A_CLASSIFIER_HOST_ONLY_FOR_FIRST_ARM": true,
+    "IMAGE_RETURN_CFG_PROVEN": true,
+    "LINUX_FIRST_LIVE_CACHE_WRITE_POLICY": "DISABLED",
+    "NAV_RETURN_CFG_PROVEN": true,
+    "OEM_CACHE_WRITE_AFTER_FINAL_0x32": false,
+    "OEM_CACHE_WRITE_BEFORE_FINAL_0x32": "CONDITIONAL",
+    "OEM_CACHE_WRITE_CONDITIONAL": true,
+    "OEM_CACHE_WRITE_REQUIRED_FOR_DEVICE_PROGRESS": false,
+    "OEM_CACHE_WRITE_REQUIRED_FOR_FINAL_0x32": false,
+    "POST_CLASSIFIER_BRANCH_PROOF": "PASS_MECHANICALLY_DERIVED"
+  },
+  "execution_mode": "OFFLINE_ONLY",
+  "hash_gates": {
+    "d255_capture_sha256": "802370d618dc94effc2ca7401076b71a2425857d59daa27b99cd5a00cc63337c",
+    "disassembly_sha256": "d661afb78f60bd1ae45a5ca7bf708abd0e2a3fdd7e3cd5805bb2a3883fb7c743",
+    "gfusb_sha256": "904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2"
+  },
+  "recovery_fields": [
+    "condition",
+    "gf_update_all_base_result",
+    "final_0x32",
+    "retry_or_rebuild",
+    "a2_reentry",
+    "0x70_reentry",
+    "other_recovery_command",
+    "derivation"
+  ],
+  "recovery_rows": [
+    {
+      "0x70_reentry": 0,
+      "a2_reentry": 0,
+      "condition": "all_mechanically_enumerated_NAV_and_IMAGE_returns",
+      "derivation": "parsed_switch_edges+no_result_write+classified_call_targets",
+      "final_0x32": "REACHABLE_VIA_CALLER_JNE_0x180068a40",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "other_recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FORWARD_ONLY_POST_CLASSIFIER_CFG"
+    }
+  ],
+  "safety": {
+    "PERSISTENT_WRITE_FAMILY_COUNT": 0,
+    "REAL_CAPTURE_COUNT": 0,
+    "REAL_COMMAND_SEND_COUNT": 0,
+    "REAL_HARDWARE_ACTION_COUNT": 0,
+    "REAL_USB_OPEN_COUNT": 0
+  },
+  "schema": "D259_POST_CLASSIFIER_AUDIT_V2",
+  "wire_fields": [
+    "classifier",
+    "return",
+    "case_target",
+    "merge_point",
+    "branch_jump_targets",
+    "branch_calls",
+    "gf_update_all_base_result",
+    "host_ram_effect",
+    "fdt_table_effect",
+    "final_0x32_payload_effect",
+    "additional_usb_commands",
+    "retry_or_rebuild",
+    "recovery_command",
+    "cache_write_effect",
+    "final_0x32_reachable",
+    "derivation_mode"
+  ],
+  "wire_rows": [
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x180069438->0x18000ced8:HOST_LOGGING;0x180069527->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "0x1800694fa",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x180069401",
+      "classifier": "NAV",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800694fa",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "0"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x1800694f5->0x18000ced8:HOST_LOGGING",
+      "branch_jump_targets": "FALLTHROUGH_TO_MERGE",
+      "cache_write_effect": "UNCHANGED_BY_CLASSIFIER",
+      "case_target": "0x1800694be",
+      "classifier": "NAV",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "KEEP_EXISTING_BASE",
+      "merge_point": "0x1800694fa",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "1"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x1800694b7->0x18000ced8:HOST_LOGGING;0x180069527->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "0x1800694fa",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x180069480",
+      "classifier": "NAV",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800694fa",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "2"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x180069479->0x18000ced8:HOST_LOGGING;0x180069527->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "0x1800694fa",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x180069442",
+      "classifier": "NAV",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800694fa",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "3"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x180069527->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "FALLTHROUGH_TO_MERGE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x1800694fa",
+      "classifier": "NAV",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800694fa",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "negative_or_other"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x1800695f2->0x18000ced8:HOST_LOGGING;0x1800696f2->0x18000ced8:HOST_LOGGING;0x18006971d->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "0x1800696b4",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x1800695bb",
+      "classifier": "IMAGE",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800696b4",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "0"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x1800696af->0x18000ced8:HOST_LOGGING",
+      "branch_jump_targets": "FALLTHROUGH_TO_MERGE",
+      "cache_write_effect": "UNCHANGED_BY_CLASSIFIER",
+      "case_target": "0x180069678",
+      "classifier": "IMAGE",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "KEEP_EXISTING_BASE",
+      "merge_point": "0x1800696b4",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "1"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x180069671->0x18000ced8:HOST_LOGGING;0x1800696f2->0x18000ced8:HOST_LOGGING;0x18006971d->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "0x1800696b4",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x18006963a",
+      "classifier": "IMAGE",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800696b4",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "2"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x180069633->0x18000ced8:HOST_LOGGING;0x1800696f2->0x18000ced8:HOST_LOGGING;0x18006971d->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "0x1800696b4",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x1800695fc",
+      "classifier": "IMAGE",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800696b4",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "3"
+    },
+    {
+      "additional_usb_commands": "NONE",
+      "branch_calls": "0x1800696f2->0x18000ced8:HOST_LOGGING;0x18006971d->0x18007b1f0:HOST_RAM_COPY",
+      "branch_jump_targets": "FALLTHROUGH_TO_MERGE",
+      "cache_write_effect": "SETS_SHARED_DIRTY_FLAG",
+      "case_target": "0x1800696b4",
+      "classifier": "IMAGE",
+      "derivation_mode": "PARSED_DISASSEMBLY_CFG",
+      "fdt_table_effect": "NONE",
+      "final_0x32_payload_effect": "NONE",
+      "final_0x32_reachable": "YES_VIA_CALLER_NONZERO_BRANCH",
+      "gf_update_all_base_result": "1_SUCCESS_UNCHANGED",
+      "host_ram_effect": "COPY_ACQUIRED_BASE",
+      "merge_point": "0x1800696b4",
+      "recovery_command": "NONE",
+      "retry_or_rebuild": "NONE_FROM_FORWARD_ONLY_CFG",
+      "return": "negative_or_other"
+    }
+  ]
+}

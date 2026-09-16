@@ -1,0 +1,22 @@
+D286_01_RECOVERY_SOURCE=READ_ONLY_SAME_BOOT_JOURNAL_FOR_HOST_FAILED_INVOCATIONS
+D286_01_RECOVERY_BOOT_ID=351d5424-2894-4d0c-ba9a-596c42481ab7
+D286_01_RECOVERED_INVOCATION=1
+D286_01_RECOVERED_CAPTURE=D28601_RETRY_20260911T192824Z_d1463b41ed26
+D286_01_RECOVERED_EVENT_UTC=2026-09-11T19:28:39Z
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=153
+GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=527 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=2 comparisons=2 threshold=40
+GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=76 outstanding=0 drained=1 context_closed=1
+D286_01_RECOVERED_INVOCATION_END=1
+D286_01_RECOVERED_INVOCATION=2
+D286_01_RECOVERED_CAPTURE=D28601_RETRY_20260911T193758Z_61c387b33b6f
+D286_01_RECOVERED_EVENT_UTC=2026-09-11T19:38:14Z
+GOODIX_SIGFM_EXTRACT_AUDIT keypoints=148
+GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=340 threshold=40
+GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=2 comparisons=2 threshold=40
+GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=77 outstanding=0 drained=1 context_closed=1
+D286_01_RECOVERED_INVOCATION_END=2

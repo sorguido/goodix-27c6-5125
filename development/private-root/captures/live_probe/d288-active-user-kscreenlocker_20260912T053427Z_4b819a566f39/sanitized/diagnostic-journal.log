@@ -1,0 +1,7 @@
+2026-09-12T07:34:45.077202+02:00 192.168.0.25 fprintd[39112]: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=133
+2026-09-12T07:34:45.077377+02:00 192.168.0.25 fprintd[39112]: GOODIX_SIGFM_MATCH_AUDIT event=start template_samples=8 threshold=40
+2026-09-12T07:34:45.079000+02:00 192.168.0.25 fprintd[39112]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=1 score=0 threshold=40
+2026-09-12T07:34:45.079290+02:00 192.168.0.25 fprintd[39112]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=2 score=38 threshold=40
+2026-09-12T07:34:45.079552+02:00 192.168.0.25 fprintd[39112]: GOODIX_SIGFM_MATCH_AUDIT event=comparison sample=3 score=146 threshold=40
+2026-09-12T07:34:45.079562+02:00 192.168.0.25 fprintd[39112]: GOODIX_SIGFM_MATCH_AUDIT event=outcome result=match matched_sample=3 comparisons=3 threshold=40
+2026-09-12T07:34:45.081564+02:00 192.168.0.25 fprintd[39112]: GOODIX_D282_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 consumed=1 tls=1 first_image=1 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 secure_retry=0 post_retry=0 reopen=0 reset=0 clear_halt=0 persistent=0 real_submit=75 outstanding=0 drained=1 context_closed=1

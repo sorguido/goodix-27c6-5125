@@ -1,0 +1,143 @@
+{
+  "artifact": "D271_01_feature_extraction_evidence",
+  "step": "D271/01",
+  "execution_mode": "OFFLINE_ONLY_DOCUMENTAL",
+  "generated_at": "2026-08-25T12:48:43+02:00",
+  "libfprint_source": {
+    "path": "Rockytkg/libfprint",
+    "declared_version": "1.94.5",
+    "materialized_upstream_gitlink": "7ebe0c809b4d1df3400e84299a4ec4acdea84590",
+    "snapshot_commit": "227eba219fa9e3fbac5bd59aca79f624f67cd11b",
+    "provenance_path": "Rockytkg/PROVENANCE.md"
+  },
+  "call_flow": [
+    {
+      "stage": "IMAGE_CAPTURE_HANDOFF_AND_EXTRACTOR_SELECTION",
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fpi-image-device.c:497-528; fp-image-device.c:183-195",
+      "finding": "FpImageDevice defaults to NBIS, permits a class override to SIGFM, and dispatches each captured image to exactly one asynchronous extractor."
+    },
+    {
+      "stage": "SIGFM_EXTRACTION",
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:307-328,521-538; sigfm/sigfm.cpp:117-130",
+      "finding": "SIGFM copies width*height u8 bytes, consumes only pixels/width/height, creates CV_8UC1, runs OpenCV SIFT, and fails the libfprint task below 25 keypoints."
+    },
+    {
+      "stage": "NBIS_EXTRACTION",
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:331-395,550-569",
+      "finding": "NBIS copies pixels, flags, dimensions and ppmm; applies H/V/color normalization, invokes get_minutiae at depth 8, and fails if no minutiae are found."
+    },
+    {
+      "stage": "PRINT_REPRESENTATION",
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fpi-print.c:46-90,153-212",
+      "finding": "NBIS becomes an owned XYT struct; SIGFM keypoints/descriptors are inserted into a print-owned array with sigfm_free_info destructor."
+    },
+    {
+      "stage": "SIGFM_LIFETIME",
+      "classification": "OBSERVED_WITH_BOUND",
+      "source": "Rockytkg/libfprint/libfprint/fp-image.c:60-69,200-215; fpi-print.c:46-64,202-210",
+      "finding": "Main-path one-image/one-print lifetime is coherent, but the SIGFM pointer transfer is implicit: FpImage finalize does not free sigfm_info while the print array does; reuse in multiple prints is not a supported contract."
+    },
+    {
+      "stage": "MATCH_AND_ENROLLMENT",
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fpi-image-device.c:295-375; fpi-print.c:230-313",
+      "finding": "Enrollment appends one feature representation per successful stage; verify/identify use Bozorth3 for NBIS or sigfm_match_score for SIGFM against each template stage."
+    },
+    {
+      "stage": "TEMPLATE_SERIALIZATION",
+      "classification": "VERIFIED",
+      "source": "Rockytkg/libfprint/libfprint/fp-print.c:637-770,773-958",
+      "finding": "FP3 serialization stores NBIS XYT arrays or a binary SIGFM keypoint/descriptor blob per stage and reconstructs them during deserialization."
+    }
+  ],
+  "sigfm": {
+    "input_representation": "PACKED_U8_WIDTH_X_HEIGHT_COPIED_TO_CV_8UC1",
+    "algorithm": "OPENCV_SIFT_DETECT_AND_COMPUTE_PLUS_CUSTOM_GEOMETRIC_VOTING_MATCHER",
+    "ppmm_consumed": false,
+    "fpimage_flags_consumed": false,
+    "internal_normalization": "NONE_OBSERVED_BEYOND_COPY_AND_ALL_ONES_MASK",
+    "minimum_keypoints_gate": 25,
+    "explicit_dimension_minimum": "NONE_IN_LOCAL_SIGFM_GLUE",
+    "width_80_height_64_status": "ARCHITECTURALLY_SUPPORTED_CONTENT_DEPENDENT_GATE_TARGET_QUALITY_UNPROVEN",
+    "descriptor_ratio": 0.75,
+    "minimum_descriptor_matches": 5,
+    "pair_length_relative_tolerance": 0.05,
+    "angle_consistency_relative_tolerance": 0.05,
+    "generic_image_device_score_threshold": 40,
+    "rockytkg_goodix_score_threshold": 20,
+    "rockytkg_threshold_evidence_class": "THIRD_PARTY_IMPLEMENTATION_CHOICE_NOT_TARGET_LOCAL_CALIBRATION",
+    "rotation_invariance": "CODE_INTENDED_GEOMETRIC_TOLERANCE_NOT_VERIFIED_BY_LOCAL_TRANSFORM_TESTS",
+    "scale_invariance": "NOT_PROVEN_MATCHER_PAIR_LENGTH_TOLERANCE_APPROXIMATELY_5_PERCENT",
+    "polarity_invariance": "NOT_PROVEN_NO_INVERSION_OR_FLAG_APPLICATION_IN_SIGFM_PATH",
+    "orientation_contract": "UNRESOLVED",
+    "extraction_exception_containment": "MISSING_IN_SIGFM_EXTRACT_OPENCV_EXCEPTIONS_NOT_CAUGHT_LOCALLY",
+    "matcher_exception_containment": "CATCH_ALL_RETURNS_MINUS_1_AND_LIBFPRINT_MAPS_TO_DATA_INVALID",
+    "print_equal_support": "NOT_IMPLEMENTED_FOR_SIGFM_ASSERT_PATH",
+    "template": "VECTOR_OF_KEYPOINTS_PLUS_DESCRIPTOR_MATRIX_PER_ENROLLMENT_STAGE",
+    "serialization": "SIGFM_BINARY_BLOB_EMBEDDED_IN_FP3_GVARIANT",
+    "status": "CANDIDATE_FOR_VALIDATION"
+  },
+  "nbis": {
+    "input_representation": "PACKED_U8_WIDTH_X_HEIGHT_DEPTH_8",
+    "algorithm": "MINDTCT_LFSV2_PLUS_BOZORTH3",
+    "ppmm_consumed": true,
+    "ppmm_callsite": "get_minutiae -> combined_minutia_quality -> radius_pix=sround(RADIUS_MM*ppmm)",
+    "fpimage_flags_consumed": true,
+    "map_blocksize_v2": 8,
+    "map_windowsize_v2": 24,
+    "map_windowoffset_v2": 8,
+    "width_80_height_64_structural_status": "ACCEPTED_BY_MINIMUM_BLOCKSIZE_NOMINAL_10_X_8_BLOCK_MAP",
+    "max_template_minutiae": 200,
+    "minimum_bozorth_minutiae_for_nonzero_score": 10,
+    "physical_ppmm_sufficient_by_itself": false,
+    "additional_target_requirement": "AT_LEAST_10_STABLE_MINUTIAE_AND_SEPARABLE_MATCH_SCORES_FROM_80_X_64_FIXED_D269_MAPPING",
+    "status": "BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN"
+  },
+  "target_specific_audit": {
+    "sources_reviewed": [
+      "Goodix 27c6 5125 manuale tecnico.md D218-D220 and D268-D270 sections",
+      "docs/EVIDENCE.md WIN-001",
+      "analysis/D268 D269 D270 pertinent artifacts",
+      "local gfusb.dll and AlgoChicago/EngineAdapter textual/static evidence",
+      "canonical decoder and local libfprint adapter contracts"
+    ],
+    "physical_ppmm": "UNKNOWN",
+    "physical_dpi": "UNKNOWN",
+    "natural_orientation": "UNRESOLVED",
+    "polarity": "UNRESOLVED",
+    "observed_algochicago_t_rotation_strings": "NOT_PROMOTED_WRONG_OEM_CONSUMER_VARIANT_FOR_TARGET_PATH",
+    "real_biometric_data_processed_in_d271": false
+  },
+  "third_party": {
+    "rockytkg_goodix_80x64_sigfm_pipeline": "EXTERNAL_THIRD_PARTY_IMPLEMENTATION_CORROBORATION",
+    "rockytkg_500_dpi": "THIRD_PARTY_CORROBORATION_NOT_TARGET_APP12509_FACT",
+    "github_issue_1_complete_linux_pipeline": "EXTERNAL_THIRD_PARTY_LIVE_CORROBORATION",
+    "target_primary_evidence": false
+  },
+  "licensing": {
+    "local_libfprint": "LGPL-2.1-or-later",
+    "sigfm": "LGPL-2.1-or-later_WITH_OPENCV4_DEPENDENCY",
+    "nbis": "NIST_PUBLIC_DOMAIN_EMBEDDED_IN_LIBFPRINT",
+    "rockytkg_goodixgf": "LGPL-2.1-or-later_REFERENCE_ONLY",
+    "rockytkg_goodix_imgproc": "GPL-2.0-or-later_NO_EXPRESSION_TRANSFERRED_TO_LGPL",
+    "external_code_imported_or_adapted": false,
+    "licensing_boundary_status": "PASS"
+  },
+  "decision": {
+    "FEATURE_EXTRACTOR_POLICY": "CLOSED_OFFLINE",
+    "SIGFM_STATUS": "CANDIDATE_FOR_VALIDATION",
+    "NBIS_STATUS": "BLOCKED_UNKNOWN_PHYSICAL_PPMM_AND_TARGET_LOCAL_MINUTIA_DENSITY_UNPROVEN",
+    "BIOMETRIC_QUALITY_STATUS": "UNPROVEN_TARGET_REAL_EVIDENCE_REQUIRED",
+    "TARGET_APP12509_PHYSICAL_PPMM": "UNKNOWN",
+    "TARGET_APP12509_PHYSICAL_DPI": "UNKNOWN",
+    "ORIENTATION_CONTRACT": "UNRESOLVED",
+    "POLARITY_CONTRACT": "UNRESOLVED",
+    "FULL_FPIMAGE_PIPELINE_CONTRACT": "PARTIALLY_CLOSED",
+    "NEXT_PRIMARY_BOUNDARY": "SIGFM_TARGET_LOCAL_BIOMETRIC_VALIDATION",
+    "NEXT_BOUNDARY_PREREQUISITE": "AUTHORIZED_PRIVACY_PRESERVING_TARGET_REAL_KEYPOINT_AND_MATCH_METRICS_WITH_D269_FIXED_MAPPING"
+  }
+}

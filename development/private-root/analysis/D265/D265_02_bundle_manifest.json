@@ -1,0 +1,52 @@
+{
+  "schema": "D265_02_BUNDLE_MANIFEST_V2",
+  "step_local": true,
+  "non_cumulative": true,
+  "packaging_only_migration": true,
+  "technical_state_changed": false,
+  "executed_baseline_sha": "2e57aa95cbe7d5eb468c12882cfa3a1a4d457e6d",
+  "source_transport": {
+    "path": "analysis/D265/D265_02_live_fail_closed_bundle.zip.b64",
+    "git_blob": "706553a767b0f57ef4148bb1870695cadc7d2027",
+    "decoded_zip_sha256": "f59b7205a73665ff52c61618a79674d2f190209f1550a9b2efb485098578ca12",
+    "decoded_zip_size": 113660,
+    "verification": "BYTE_EXACT_RECONSTRUCTION_AND_SHA256_MATCH"
+  },
+  "canonical_manual": {
+    "path": "Goodix 27c6 5125 manuale tecnico.md",
+    "sha256": "c25290f256b797c4e60561e0b449cea9664594ab14d8d78a97f89e9aff4dfd59",
+    "bundle_inclusion": false,
+    "reason": "Canonical root document; referenced by hash to keep the transport bundle strictly step-local."
+  },
+  "contains_secret": false,
+  "contains_tls_plaintext": false,
+  "contains_biometric_or_image_data": false,
+  "contains_raw_usb_capture": false,
+  "contains_protected_cache_or_marker_content": false,
+  "bundle_members": [
+    {
+      "path": "analysis/D265/D265_02_live_fail_closed_report.md",
+      "sha256": "386f94e504d86a0cffe523966f657793f404aa8f9f9229cf62e11a6c3ac67a5b"
+    },
+    {
+      "path": "analysis/D265/D265_02_live_result.json",
+      "sha256": "f8e11dadb8bbf4af8e6aed112874347c9c1522c37983d0573d2fa1ab676a0ab5"
+    },
+    {
+      "path": "analysis/D265/D265_02_router_defect_analysis.md",
+      "sha256": "e0a49227a9a94e506cec4d0fb868c349e61fc5a3508fceb9231c523d26f62c1a"
+    },
+    {
+      "path": "analysis/D265/D265_02_execution_manifest.json",
+      "sha256": "59af228d7691be47d6a6e7306ac3e8ac82932e5d2e5d8bacfe199e0c0dd294c5"
+    },
+    {
+      "path": "analysis/D265/D265_02_bundle_manifest.json",
+      "sha256": null,
+      "integrity": "COVERED_BY_OUTER_BUNDLE_SHA256"
+    }
+  ],
+  "self_hash_policy": "The manifest is a bundle member; its byte integrity is covered by the outer bundle SHA-256, avoiding a recursive self-hash.",
+  "path_set_exact": true,
+  "roundtrip_verified": true
+}

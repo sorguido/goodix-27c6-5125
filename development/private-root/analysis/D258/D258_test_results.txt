@@ -1,0 +1,25 @@
+D258 OFFLINE TEST RESULTS
+
+PASS  python -m unittest discover -s tests -v
+      198 tests; includes D257 regressions and 11 D258 gate/replay tests
+
+PASS  python -m unittest -v analysis/D255/test_d255_postprocess_windows_evidence.py
+      56 tests
+
+PASS  (cwd analysis/D256) python -m unittest -v test_d256_usb_lifecycle_contract_audit.py
+      13 tests
+
+PASS  python analysis/D253/d253_offline_audit.py --repo .
+      reproducible offline audit completed
+
+PASS  D255 raw SHA-256 gate and exact frame census
+PASS  0x50 parser/store and malformed response rejection
+PASS  0x82 parser/native unsigned absolute-delta predicate and rejection
+PASS  0x20 B0 envelope, missing decryptor/classifier and decrypt failure containment
+PASS  per-command timeout policy 500/500/500/2000/100 ms
+PASS  no retry, no D255 dynamic blob literal, no A2/0x70, persistent families unreachable
+PASS  projected and exact replay remain distinct
+PASS  git diff --check
+
+Execution was offline only. USB opens, captures, hardware actions, command sends,
+finger interactions and persistent-write-family operations were all zero.
