@@ -23,11 +23,12 @@ The supported release **validates and consumes** an already prepared bundle. It
 does not ship acquisition, extraction, DPAPI-recovery, USBPcap parsing, or
 manifest-generation tools.
 
-The technical reference later in this document records how the project derived
-the five artifacts during development so that an experienced user can reproduce
-the process with independent tooling or automation. That acquisition procedure
-is informational and outside the supported release surface: the runtime and the
-managed importer remain the final authority on whether a bundle is acceptable.
+The technical reference later in this document describes the formats,
+source locations, protocol evidence and validation rules needed to derive the
+five artifacts with independent tooling or automation. That acquisition
+procedure is informational and outside the supported release surface: the
+runtime and the managed importer remain the final authority on whether a bundle
+is acceptable.
 
 Use only material lawfully obtained from your own reader/OEM environment. Do
 not guess missing values, reuse another reader's material, generate a
@@ -151,6 +152,24 @@ size:    5,771,496 bytes
 SHA-256: 904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2
 ```
 
+The qualified package installs the UMDF binary under the INF destination
+`%12%\UMDF\gfusb.dll`. On a standard Windows installation the installed copy is
+typically available as:
+
+```text
+C:\Windows\System32\drivers\UMDF\gfusb.dll
+```
+
+A package copy may also be present below:
+
+```text
+C:\Windows\System32\DriverStore\FileRepository\<Goodix-driver-package>\...
+```
+
+The DriverStore subdirectory is package/version-specific and must not be
+hardcoded. If more than one copy is found, use the one whose size and SHA-256
+match the qualified values above.
+
 The Linux driver does not execute the DLL. A bounded parser reads qualified
 producer data required for the E4 binding. This fixed DLL identity qualifies the
 producer implementation; it is not a per-reader identity pin.
@@ -159,8 +178,13 @@ The OEM DLL is not distributed by this project. Users must obtain it lawfully.
 
 ## `fdt-cache.bin`
 
-The FDT cache is exactly 13,520 bytes. During development this file was obtained
-from the OEM `goodix.dat` file without modifying its contents.
+The FDT cache is exactly 13,520 bytes. Its OEM source is normally:
+
+```text
+C:\ProgramData\Goodix\goodix.dat
+```
+
+Create `fdt-cache.bin` by copying those bytes unchanged.
 
 The runtime validates its manifest digest, layout and CRC-32/MPEG-2. The last
 four bytes contain the little-endian CRC value calculated over all preceding
@@ -205,9 +229,9 @@ bug reports, logs, screenshots and public archives.
 
 # Part II — Informational acquisition reference
 
-This section documents the development procedure closely enough that an
-independent implementation can be written without relying on deleted project
-helper tools. It is **not** an additional supported component of the release.
+This section documents the acquisition procedure closely enough that an
+independent implementation can be written from the formats and validation rules
+recorded here. It is **not** an additional supported component of the release.
 
 The recommended model is:
 
@@ -250,16 +274,32 @@ Get-PnpDevice -PresentOnly | Select-String 'VID_27C6&PID_5125'
 
 ## Step 2 — Preserve the OEM inputs
 
-The development workflow used these OEM-side inputs:
+The normally relevant OEM-side files are:
 
 ```text
 C:\ProgramData\Goodix\Goodix_Cache.bin
 C:\ProgramData\Goodix\goodix.dat
-qualified gfusb.dll from the OEM driver package
+C:\Windows\System32\drivers\UMDF\gfusb.dll
 OEM initialization USBPcap capture (.pcapng)
 ```
 
-Copy them into a private working location. Do not place them in the repository.
+`C:\ProgramData\Goodix` is the location observed with the qualified OEM stack.
+The DLL path is the normal installed location for the package's
+`%12%\UMDF\gfusb.dll` INF destination. If the installed DLL is not present
+there, search the matching Goodix package below
+`C:\Windows\System32\DriverStore\FileRepository\` and verify the candidate by
+size and SHA-256 rather than by directory name.
+
+For example, an administrator can locate candidate copies with:
+
+```powershell
+Get-Item 'C:\Windows\System32\drivers\UMDF\gfusb.dll' -ErrorAction SilentlyContinue
+Get-ChildItem 'C:\Windows\System32\DriverStore\FileRepository' `
+  -Filter gfusb.dll -Recurse -ErrorAction SilentlyContinue
+```
+
+Copy the required inputs into a private working location. Do not place them in
+the repository.
 
 `goodix.dat` becomes `fdt-cache.bin` by copying the bytes unchanged. Before
 using it, require:
@@ -276,8 +316,7 @@ Require the qualified DLL size and SHA-256 listed earlier.
 Use Wireshark/TShark with USBPcap support. Capture must begin before the reader
 is initialized so that CONFIG90 and the typed A2/82/A6 responses are present.
 
-The extraction logic established by the project uses USBPcap link type `249`
-and bulk endpoints:
+The extraction logic uses USBPcap link type `249` and bulk endpoints:
 
 ```text
 host -> device : endpoint 0x01
@@ -303,7 +342,7 @@ offset 7..   : body
 last byte     : inner checksum
 ```
 
-Validation rules used by the project:
+Validation rules:
 
 ```text
 frame_length = 4 + outer_payload_length
@@ -325,7 +364,7 @@ The required frame is:
 ```text
 Goodix outer type: A0
 logical control:   0x90
-qualified wire control observed by the project: 0x91
+qualified wire control: 0x91
 body length:       224 bytes
 ```
 
@@ -374,15 +413,20 @@ If that fails, the cache and capture do not describe the same qualified state.
 
 ## Step 6 — Recover the existing 32-byte PSK from `Goodix_Cache.bin`
 
-This step belongs on the same Windows installation/environment that owns the OEM
-cache. The project established the following file structure:
+Use the cache from the same Windows OEM environment:
+
+```text
+C:\ProgramData\Goodix\Goodix_Cache.bin
+```
+
+The file structure used for recovery is:
 
 ```text
 Goodix_Cache.bin = DPAPI_blob || trailer[8]
 ```
 
-Require a non-empty bounded file larger than eight bytes; the historical helper
-accepted at most 1 MiB. The final 8-byte trailer must not be all zero.
+Require a regular file larger than eight bytes and reject obviously implausible
+or unbounded inputs. The final 8-byte trailer must not be all zero.
 
 Derive DPAPI optional entropy as follows:
 
@@ -414,10 +458,11 @@ The validator stored in `transport-material.bin` is not merely a hash of the
 PSK. It binds the reader PSK to producer data from the exact qualified
 `gfusb.dll`.
 
-First verify the DLL size and SHA-256 from Part I, then parse it as a PE file
-without executing it.
+Use the qualified DLL copied from the installed UMDF location or the matching
+DriverStore package, verify the size and SHA-256 from Part I, then parse it as a
+PE file without executing it.
 
-The qualified producer locations established by the project are:
+The qualified producer locations are:
 
 ```text
 seed A RVA:               0x56f030, 6 file-backed bytes
@@ -442,7 +487,7 @@ Reject missing, zero, ambiguous, out-of-range, or non-file-backed seed data.
 
 ## Step 8 — Derive the 32-byte transport validator
 
-The canonical binding implementation remains in the public source tree:
+The canonical binding implementation is in the source tree:
 
 ```text
 libfprint-driver/goodix_d190_binder.c
@@ -487,12 +532,6 @@ psk_length        = 32
 validator_length  = 32
 reserved          = 0
 ```
-
-Historically the project used an intermediate `G5125XFR` envelope to transfer
-the DPAPI-recovered PSK from Windows to Linux. That envelope was an
-implementation convenience, **not** a required sixth runtime artifact. An
-independent implementation may construct `G5125POC` directly once the PSK and
-validator are available.
 
 Save the resulting 88 bytes as:
 
@@ -580,6 +619,13 @@ enrollment and lifecycle operations.
 ## OEM cache files are absent
 
 The OEM driver may not have initialized the reader in that Windows environment.
+Check:
+
+```text
+C:\ProgramData\Goodix\Goodix_Cache.bin
+C:\ProgramData\Goodix\goodix.dat
+```
+
 Confirm the exact `VID_27C6&PID_5125` device and the qualified OEM stack. Do not
 create placeholder files.
 
@@ -608,7 +654,17 @@ recovery, that the last 8 bytes were treated as the entropy trailer rather than
 part of the DPAPI blob, and that the optional entropy was derived exactly as
 shown. Do not substitute a random PSK.
 
-## `gfusb.dll` does not match
+## `gfusb.dll` cannot be found or does not match
+
+Check the normal installed path first:
+
+```text
+C:\Windows\System32\drivers\UMDF\gfusb.dll
+```
+
+If it is absent, locate `gfusb.dll` under the matching Goodix package in
+`C:\Windows\System32\DriverStore\FileRepository\`. Do not select by filename
+alone: require the qualified size and SHA-256 from Part I.
 
 Do not bypass the compatibility boundary. The qualified producer offsets and
 binding are defined for the exact DLL size/hash listed in this document.
