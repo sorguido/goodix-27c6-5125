@@ -20,16 +20,18 @@ Verified product behavior includes:
 - preservation of protected material and templates across uninstall;
 - restoration of Fedora PAM and fprintd state.
 
-Offline validation commands:
+Offline validation commands for the distributed release surface are:
 
 ```bash
 production/check-source.sh
 python3 deployment/managed-install/test_offline.py
-python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
-python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
-python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py --self-test
-python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test
 ```
+
+Per-reader runtime material handling is device-dynamic and has host-only
+regression coverage, including distinct synthetic valid bundles and fail-closed
+manifest cases. That validates runtime acceptance logic; it is **not** a claim
+that this release provides or qualifies acquisition of a fresh five-file bundle.
+Device-material acquisition is outside the supported release scope.
 
 The qualified library hash is:
 

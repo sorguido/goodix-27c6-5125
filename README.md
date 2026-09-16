@@ -22,12 +22,7 @@ The software and intended fingerprint workflows have been demonstrated working
 on the qualified development system. The source, build, lifecycle and managed
 integration paths have been tested extensively, including clean-system testing,
 but the public repository form has **not yet been exercised completely across
-every acquisition, installation and recovery path on independent hardware**.
-
-In particular, some public helper workflows used to prepare reader-specific
-material are newer than the core driver qualification and currently include
-synthetic/offline tests plus bounded development evidence rather than broad
-field validation.
+every installation and recovery path on independent hardware**.
 
 If you encounter a reproducible problem, please open a GitHub issue with the
 software version/commit, Fedora version, hardware identity, command used and
@@ -38,12 +33,11 @@ material to an issue.
 ## Start here
 
 1. Read [Installation](docs/INSTALLATION.md).
-2. Read how the five [device-specific materials](docs/DEVICE_MATERIALS.md)
-   originate and are validated.
+2. Read the contract for the five [device-specific materials](docs/DEVICE_MATERIALS.md).
 3. Prepare the five pinned OpenCV RPMs used by the offline build.
 4. Build a content-addressed candidate without privileges.
-5. Import protected material that you legally obtained for the same physical
-   reader.
+5. Import a valid protected-material bundle that you legally obtained for the
+   same physical reader.
 6. Install the candidate through the managed installer.
 
 The repository does not contain firmware, OEM DLLs, transport secrets,
@@ -51,10 +45,17 @@ fingerprint images, templates, private captures, or factory data. It does not
 provide firmware flashing, IAP, ClearApp, OTP access, PSK provisioning, or a
 cross-device material migration path.
 
+**Device-material acquisition is outside the supported release scope.** The
+project validates and consumes a pre-existing reader-specific five-file bundle,
+but does not provide tooling for recovering OEM secrets, extracting USB
+captures, or constructing a fresh bundle from a Windows installation. If you
+do not already have a valid bundle for your reader, the supported installation
+cannot proceed.
+
 ## Documentation
 
 - [Installation, update, rollback, and recovery](docs/INSTALLATION.md)
-- [Device-specific material](docs/DEVICE_MATERIALS.md)
+- [Device-specific material contract](docs/DEVICE_MATERIALS.md)
 - [Technical manual](TECHNICAL_MANUAL.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Validation scope](docs/VALIDATION.md)
@@ -70,10 +71,6 @@ The supported checks do not access USB hardware:
 ```bash
 production/check-source.sh
 python3 deployment/managed-install/test_offline.py
-python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
-python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
-python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py --self-test
-python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test
 ```
 
 Build a candidate from a clean committed checkout:
@@ -92,6 +89,6 @@ GPL-compatible components and is conveyed under `GPL-3.0-or-later`; individual
 source files keep their stated licenses. See the licensing and provenance
 document and the texts in `LICENSES/`.
 
-Device-specific runtime material is validated against a manifest generated for
-the user's own reader; development-reader hashes are not release acceptance
+Device-specific runtime material is validated against a manifest for the
+user's own reader; development-reader hashes are not release acceptance
 criteria. See `docs/DEVICE_MATERIALS.md`.

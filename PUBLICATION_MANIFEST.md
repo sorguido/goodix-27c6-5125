@@ -18,7 +18,6 @@ libfprint-driver/                       (source files only)
 production/
 reference/libfprint-fedora44-1.94.100/
 Rockytkg/libfprint/libfprint/sigfm/     (four production source files only)
-tools/device-materials/
 ```
 
 The following local entries are not part of that surface:
@@ -27,35 +26,26 @@ The following local entries are not part of that surface:
 - `development/`, which contains private historical/recovered project material;
 - downloaded OpenCV RPM payloads, which are host-local build inputs and are
   retrieved from Fedora using the documented command;
-- generated device material, OEM caches, private captures, fingerprint images,
-  templates, intermediate `device-response-pins.json`, and other protected
-  input/output files.
+- generated or acquired device material, OEM caches, private captures,
+  fingerprint images, templates, secrets, and other protected input/output
+  files.
 
-The source build, offline tests, installer, documentation, and public helper
-tools do not depend on anything under `development/`. The private Git history
-is not an input to the public source transfer. Copy only the paths in the
-allowlist above.
+The source build, offline tests, installer, and documentation do not depend on
+anything under `development/`. The private Git history is not an input to the
+public source transfer. Copy only the paths in the allowlist above.
+
+Device-material acquisition, extraction, recovery, and generation tooling is
+outside the supported public release scope. The public runtime consumes a
+pre-existing, valid five-file material bundle for the user's reader and does
+not provide tools for constructing that bundle from OEM Windows artifacts.
 
 Before transferring an updated tree, run:
 
 ```bash
 production/check-source.sh
 python3 deployment/managed-install/test_offline.py
-python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
-python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
-python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py --self-test
-python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test
 ```
-
-The Windows exporter also provides a native secret-free self-test:
-
-```powershell
-.\tools\device-materials\Export-Goodix5125TransportMaterial.ps1 -SelfTest
-```
-
-Run that Windows-only check on native Windows before a release that changes the
-exporter or its wrapper.
 
 Then confirm that no unexpected binary, capture, key, firmware, protected
-material, fingerprint image, or template has been added to the allowlisted
-paths.
+material, fingerprint image, template, acquisition helper, or OEM payload has
+been added to the allowlisted paths.

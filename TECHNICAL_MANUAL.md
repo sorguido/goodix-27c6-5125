@@ -59,20 +59,17 @@ The runtime requires five root-owned files in `/var/lib/goodix-5125-poc/`:
 - `gfusb.dll`;
 - `fdt-cache.bin`.
 
-They must belong to the same physical device and be obtained lawfully from its
-OEM Windows environment. The repository never embeds or logs their contents.
-The loader requires a root-owned mode-0700 directory and regular mode-0600
-files, rejects symlinks, and validates fixed sizes and digests before use.
-Their individual origins, transformations, formats, and handling rules are
-documented in [Device-specific material](docs/DEVICE_MATERIALS.md).
+The reader-specific values must describe the same physical device, and the OEM
+DLL must match the qualified compatibility boundary. The repository never
+embeds or logs protected material. The loader requires a root-owned mode-0700
+directory and regular mode-0600 files, rejects symlinks, and validates format,
+fixed sizes, digests and cross-material bindings before use. The material
+contract is documented in [Device-specific material](docs/DEVICE_MATERIALS.md).
 
-The public helper tools under `tools/device-materials/` cover the Windows DPAPI
-transport export, Linux `G5125XFR` → `G5125POC` finalization, and offline
-CONFIG90 and A2/chip82/OTP response-pin extraction from a user-supplied USBPcap
-`.pcapng` capture. The extractors share one pcapng/USBPcap/A0 parser and have no
-USB/device access. The response extractor emits only digests to an intermediate
-JSON file; that file feeds the manifest generator and is not a sixth runtime
-material. These tools never provision a new PSK.
+Acquisition, extraction, recovery and generation of a fresh five-file material
+bundle are outside the supported release scope. The public source consumes a
+pre-existing valid bundle; it does not provide tooling for recovering OEM
+secrets or deriving the bundle from Windows caches or USB captures.
 
 ## Image and biometric pipeline
 
@@ -132,16 +129,11 @@ closed. The Windows factory path is expected to remain usable.
 ## Known limitations
 
 - Only the target configuration listed above is supported.
-- The repository ships helper tooling for preparing transport material and for
-  extracting CONFIG90 plus A2/chip82/OTP response pins from a local OEM USB
-  capture, but it does not ship OEM binaries, caches, captures, secrets or
-  factory material. Users must lawfully obtain those inputs from their own
-  reader/environment.
-- The public repository form is substantially tested but has not yet been
-  exercised completely across every acquisition, installation and recovery
-  path on independent hardware. Reader-to-reader portability of newly
-  extracted material remains a qualification boundary requiring a real
-  second-reader workflow.
+- A valid five-file protected-material bundle is a prerequisite. Acquisition or
+  construction of that bundle is not provided or supported by this release.
+- Reader-to-reader portability of independently prepared valid bundles remains
+  a qualification boundary; the runtime is device-dynamic but broad field
+  validation on independent hardware has not been completed.
 - No universal FAR or FRR claim is made.
 - Passwordless biometric login does not unlock a password-encrypted KWallet;
   a separate wallet prompt can therefore be expected.

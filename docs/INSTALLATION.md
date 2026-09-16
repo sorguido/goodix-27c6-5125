@@ -10,7 +10,7 @@
   `fprintd-pam`, `libfprint`, `libgusb`, `selinux-policy-targeted`,
   `checkpolicy`, `policycoreutils`, and `policycoreutils-devel`;
 - Flatpak SDK `org.freedesktop.Sdk//25.08` installed for the current user;
-- the legitimate protected-material set for the same physical reader.
+- a valid five-file protected-material bundle for the same physical reader.
 
 Install host prerequisites:
 
@@ -77,15 +77,16 @@ USB, and does not load protected material. A successful run prints
 ## Import device-specific material
 
 The material directory supplied to the importer must contain exactly the five
-files listed in [Device-specific material](DEVICE_MATERIALS.md). That document
-explains which files come from the OEM Windows environment, which are
-project-derived, and how the historical transfer envelope differs from the
-runtime record. The response-pin JSON used to generate the manifest is an
-intermediate and must not be added as a sixth bundle file. Every final file
-must belong to the same physical reader and must
-have been obtained lawfully. Do not use a random, null, replacement, or
-cross-device PSK. Do not commit, upload, print, or attach this material to bug
-reports.
+files listed in [Device-specific material](DEVICE_MATERIALS.md). Every
+reader-specific value must describe the same physical reader, and the OEM DLL
+must match the qualified compatibility boundary. The files must have been
+obtained lawfully. Do not use a random, null, replacement, or cross-device PSK.
+Do not commit, upload, print, or attach this material to bug reports.
+
+Acquisition, extraction, recovery and generation of a fresh five-file bundle
+are outside the supported scope of this release. The repository does not
+provide tooling for constructing the bundle from OEM Windows caches or USB
+captures. If you do not already have a valid bundle, stop here.
 
 ```bash
 deployment/managed-install/manage.sh import-materials \
@@ -171,8 +172,8 @@ for a reviewed compatibility update.
 
 ## Reader-specific material prerequisite
 
-Before installation, generate `target-material-manifest.json` from the same
-reader's transport, CONFIG90, FDT cache and typed OEM responses as documented
-in `docs/DEVICE_MATERIALS.md`. Do not substitute published/example hashes.
-Installation preserves the root-owned `0700` directory and regular `0600`
-files required by the runtime.
+Installation requires a pre-existing valid five-file bundle for the same
+reader. The runtime remains device-dynamic and validates the supplied manifest,
+material digests and live typed-response pins; published/example development
+hashes are not accepted as a substitute. Installation preserves the root-owned
+`0700` directory and regular `0600` files required by the runtime.
