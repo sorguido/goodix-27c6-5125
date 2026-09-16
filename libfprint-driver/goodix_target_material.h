@@ -10,7 +10,7 @@
 
 G_BEGIN_DECLS
 
-#define GOODIX_TARGET_MANIFEST_LENGTH 2305u
+#define GOODIX_TARGET_MANIFEST_MAX_LENGTH 4096u
 #define GOODIX_TARGET_TRANSPORT_LENGTH 88u
 
 typedef struct _GoodixTargetMaterial GoodixTargetMaterial;
@@ -39,6 +39,7 @@ typedef struct
   guint8 a2_response_sha256[32];
   guint8 chip82_response_sha256[32];
   guint8 otp_a6_response_sha256[32];
+  guint8 fdt_cache_sha256[32];
   guint16 dac_registers[4];
   guint8 dac_values[4][2];
   guint dac_offsets[4];
@@ -84,6 +85,12 @@ gboolean goodix_target_material_bind (GoodixTargetMaterial *material,
                                       const guint8          seed_a[6],
                                       const guint8          seed_b[6],
                                       GError              **error);
+
+gboolean goodix_target_material_get_fdt_hashes (
+  GoodixTargetMaterial *material,
+  guint8                 cache_sha256[32],
+  guint8                 otp_sha256[32],
+  GError                **error);
 
 gboolean goodix_target_material_get_secure_session_material (
   GoodixTargetMaterial        *material,

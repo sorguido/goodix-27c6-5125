@@ -100,3 +100,10 @@ source tree or candidate.
 
 This project records its compatibility determination and source provenance; it
 does not provide legal advice for unrelated distributions or modifications.
+
+### Device-material manifest generator
+
+`tools/device-materials/Generate-Goodix5125MaterialManifest.py` is an original
+project implementation under GPL-2.0-or-later. It uses only Python standard
+library APIs and the documented local material formats; it contains no OEM
+code, capture, secret, or development-reader bytes.

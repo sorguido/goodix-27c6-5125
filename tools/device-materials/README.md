@@ -17,6 +17,8 @@ write OTP, or modify persistent reader state.
 - `Extract-Goodix5125Config90.py` — offline Linux extractor that reads a Windows
   USBPcap `.pcapng` capture and writes the validated 224-byte
   `target-config-90.bin` body.
+- `Generate-Goodix5125MaterialManifest.py` — validates the three reader-specific
+  files and creates their integrity/binding manifest.
 
 ## Transport material: Windows
 
@@ -115,16 +117,34 @@ sha256=<captured CONFIG90 SHA-256>
 The output is written atomically with mode `0600` and an existing output file is
 never overwritten.
 
-The project's qualified reference CONFIG90 has SHA-256:
+The printed digest identifies *your* extracted CONFIG90. It is recorded in the
+bundle manifest; it is not compared with a development-reader digest.
 
-```text
-e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82
+## Generate the per-reader manifest
+
+After obtaining the three response bodies (A2: 3 bytes, chip82: 4 bytes, OTP
+A6: 64 bytes) from the same OEM initialization trace, run:
+
+```bash
+python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py \
+  --transport /home/you/goodix-material/transport-material.bin \
+  --config90 /home/you/goodix-material/target-config-90.bin \
+  --fdt-cache /home/you/goodix-material/fdt-cache.bin \
+  --a2-response-hex <6-hex-digits> \
+  --chip82-response-hex <8-hex-digits> \
+  --otp-a6-response-hex <128-hex-digits> \
+  --output /home/you/goodix-material/target-material-manifest.json
 ```
 
-A newly extracted reader-specific CONFIG90 may differ. The current runtime is
-still qualified against the complete reference material set; acceptance of a
-different otherwise-valid CONFIG90 is a separate portability/qualification
-boundary and must not be bypassed by disabling validation.
+The generator checks record headers, sizes, CONFIG90 finalizer, cache CRC, and
+OTP/cache agreement, then hashes the user's actual files. The repository does
+not yet include a supported semantic extractor for the three inbound response
+bodies; obtain them with a reviewed protocol decoder. Do not guess them. This
+is an explicit remaining acquisition limitation, not a reason to reuse the
+development reader's values.
+
+Self-test it with
+`python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test`.
 
 ## Validation status
 
