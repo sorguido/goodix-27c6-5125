@@ -16,6 +16,25 @@ The supported configuration is intentionally narrow:
 Other Goodix devices, firmware revisions, distributions, desktop environments,
 and network identities have not been qualified.
 
+## Validation status
+
+The software and intended fingerprint workflows have been demonstrated working
+on the qualified development system. The source, build, lifecycle and managed
+integration paths have been tested extensively, including clean-system testing,
+but the public repository form has **not yet been exercised completely across
+every acquisition, installation and recovery path on independent hardware**.
+
+In particular, some public helper workflows used to prepare reader-specific
+material are newer than the core driver qualification and currently include
+synthetic/offline tests plus bounded development evidence rather than broad
+field validation.
+
+If you encounter a reproducible problem, please open a GitHub issue with the
+software version/commit, Fedora version, hardware identity, command used and
+non-secret error output. Do **not** attach device secrets, OEM cache files,
+private USB captures, fingerprint images, templates or other protected
+material to an issue.
+
 ## Start here
 
 1. Read [Installation](docs/INSTALLATION.md).
@@ -51,6 +70,8 @@ The supported checks do not access USB hardware:
 ```bash
 production/check-source.sh
 python3 deployment/managed-install/test_offline.py
+python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
+python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
 ```
 
 Build a candidate from a clean committed checkout:
