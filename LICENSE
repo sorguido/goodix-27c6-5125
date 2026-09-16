@@ -13,5 +13,11 @@ file or to the private development history.
 * Third-party works retain their stated licenses. Proprietary/OEM material,
   captures, secrets and biometric data are not relicensed.
 
+The Goodix-enabled `libfprint-2.so.2.0.0` release candidate combines source
+available under LGPL-2.1-or-later and GPL-2.0-or-later and links to
+Apache-2.0 components. That combined binary is conveyed under
+GPL-3.0-or-later, an option permitted by the existing “or later” grants;
+individual source files retain their stated licenses.
+
 Canonical license texts are in `LICENSES/`. The operational directory map,
 provenance rules and exclusions are in `docs/LICENSING_AND_PROVENANCE.md`.

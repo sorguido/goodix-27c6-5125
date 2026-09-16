@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 /*
  * Minimal host-only adaptation of the enrollment selector in
- * Rockytkg/src/goodixgf.c at upstream snapshot
+ * upstream Rockytkg path src/goodixgf.c at commit
  * 227eba219fa9e3fbac5bd59aca79f624f67cd11b.
  *
  * The Rocky MAD<8 duplicate test, 3/8 accepted-stage bounds and two-duplicate

@@ -92,6 +92,12 @@ typedef enum {
  * @change_state: Notification about the current device state (i.e. waiting for
  *   finger or image capture). Implementing this is optional, it can e.g. be
  *   used to flash an LED when waiting for a finger.
+ * @identify_result: Optional notification that host-side identify processing
+ *   completed; @success excludes retry/fatal processing errors and @match
+ *   reports whether the gallery contained the scanned print.
+ * @verify_result: Optional notification that host-side verify processing
+ *   completed; @success excludes retry/fatal processing errors and @match
+ *   reports whether the scanned print matched the verification template.
  *
  * These are the main entry points for drivers to implement. Drivers may not
  * implement all of these entry points if they do not support the operation
@@ -123,6 +129,12 @@ struct _FpImageDeviceClass
   void          (*activate)     (FpImageDevice *dev);
   void          (*change_state) (FpImageDevice      *dev,
                                  FpiImageDeviceState state);
+  void          (*identify_result) (FpImageDevice *dev,
+                                    gboolean       success,
+                                    gboolean       match);
+  void          (*verify_result)   (FpImageDevice *dev,
+                                    gboolean       success,
+                                    gboolean       match);
   void          (*deactivate)   (FpImageDevice *dev);
 };
 

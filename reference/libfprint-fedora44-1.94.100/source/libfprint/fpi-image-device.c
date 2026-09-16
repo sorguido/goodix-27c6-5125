@@ -310,6 +310,12 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
 
           if (error->domain != FP_DEVICE_RETRY)
             {
+              if (action == FPI_DEVICE_ACTION_VERIFY &&
+                  cls->verify_result != NULL)
+                cls->verify_result (self, FALSE, FALSE);
+              else if (action == FPI_DEVICE_ACTION_IDENTIFY &&
+                       cls->identify_result != NULL)
+                cls->identify_result (self, FALSE, FALSE);
               fp_image_device_maybe_complete_action (self, g_steal_pointer (&error));
               /* We might not yet be deactivating, if we are enrolling. */
               fpi_image_device_deactivate (self, TRUE);
@@ -404,6 +410,10 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
               template, print, priv->bz3_threshold, &error);
         }
 
+      if (cls->verify_result != NULL)
+        cls->verify_result (self, error == NULL,
+                            result == FPI_MATCH_SUCCESS);
+
       if (!error || error->domain == FP_DEVICE_RETRY)
         fpi_device_verify_report (device, result, g_steal_pointer (&print), g_steal_pointer (&error));
 
@@ -436,6 +446,9 @@ fpi_image_device_minutiae_detected (GObject *source_object, GAsyncResult *res, g
               break;
             }
         }
+
+      if (cls->identify_result != NULL)
+        cls->identify_result (self, error == NULL, result != NULL);
 
       if (!error || error->domain == FP_DEVICE_RETRY)
         fpi_device_identify_report (device, result, g_steal_pointer (&print), g_steal_pointer (&error));
@@ -665,6 +678,7 @@ void
 fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
 {
   FpImageDevicePrivate *priv = fp_image_device_get_instance_private (self);
+  FpImageDeviceClass *cls = FP_IMAGE_DEVICE_GET_CLASS (self);
   FpiDeviceAction action;
   GError *error;
 
@@ -689,12 +703,16 @@ fpi_image_device_retry_scan (FpImageDevice *self, FpDeviceRetry retry)
     }
   else if (action == FPI_DEVICE_ACTION_VERIFY)
     {
+      if (cls->verify_result != NULL)
+        cls->verify_result (self, FALSE, FALSE);
       fpi_device_verify_report (FP_DEVICE (self), FPI_MATCH_ERROR, NULL, error);
       fp_image_device_maybe_complete_action (self, NULL);
       fpi_image_device_deactivate (self, TRUE);
     }
   else if (action == FPI_DEVICE_ACTION_IDENTIFY)
     {
+      if (cls->identify_result != NULL)
+        cls->identify_result (self, FALSE, FALSE);
       fpi_device_identify_report (FP_DEVICE (self), NULL, NULL, error);
       fp_image_device_maybe_complete_action (self, NULL);
       fpi_image_device_deactivate (self, TRUE);
