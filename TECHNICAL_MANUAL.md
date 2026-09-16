@@ -63,6 +63,8 @@ They must belong to the same physical device and be obtained lawfully from its
 OEM Windows environment. The repository never embeds or logs their contents.
 The loader requires a root-owned mode-0700 directory and regular mode-0600
 files, rejects symlinks, and validates fixed sizes and digests before use.
+Their individual origins, transformations, formats, and handling rules are
+documented in [Device-specific material](docs/DEVICE_MATERIALS.md).
 
 ## Image and biometric pipeline
 
@@ -122,8 +124,10 @@ closed. The Windows factory path is expected to remain usable.
 ## Known limitations
 
 - Only the target configuration listed above is supported.
-- Users must already possess the legitimate device-specific material set; this
-  repository does not include an extractor or provisioning workflow.
+- The public source surface does not ship OEM files or the operator-controlled
+  acquisition utilities. The validated acquisition and conversion path is
+  documented, but users must lawfully prepare the qualified material set for
+  their own reader before installation.
 - No universal FAR or FRR claim is made.
 - Passwordless biometric login does not unlock a password-encrypted KWallet;
   a separate wallet prompt can therefore be expected.

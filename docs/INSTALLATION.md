@@ -59,10 +59,13 @@ USB, and does not load protected material. A successful run prints
 ## Import device-specific material
 
 The material directory supplied to the importer must contain exactly the five
-files listed in the technical manual. They must have been obtained lawfully
-from the OEM Windows environment for the same physical reader. Do not use a
-random, null, replacement, or cross-device PSK. Do not commit, upload, print,
-or attach this material to bug reports.
+files listed in [Device-specific material](DEVICE_MATERIALS.md). That document
+explains which files come from the OEM Windows environment, which are
+project-derived, and how the historical transfer envelope differs from the
+runtime record. Every file must belong to the same physical reader and must
+have been obtained lawfully. Do not use a random, null, replacement, or
+cross-device PSK. Do not commit, upload, print, or attach this material to bug
+reports.
 
 ```bash
 deployment/managed-install/manage.sh import-materials \

@@ -19,11 +19,13 @@ and network identities have not been qualified.
 ## Start here
 
 1. Read [Installation](docs/INSTALLATION.md).
-2. Prepare the five pinned OpenCV RPMs used by the offline build.
-3. Build a content-addressed candidate without privileges.
-4. Import the device-specific protected material that you legally obtained for
-   the same physical reader.
-5. Install the candidate through the managed installer.
+2. Read how the five [device-specific materials](docs/DEVICE_MATERIALS.md)
+   originate and are validated.
+3. Prepare the five pinned OpenCV RPMs used by the offline build.
+4. Build a content-addressed candidate without privileges.
+5. Import protected material that you legally obtained for the same physical
+   reader.
+6. Install the candidate through the managed installer.
 
 The repository does not contain firmware, OEM DLLs, transport secrets,
 fingerprint images, templates, private captures, or factory data. It does not
@@ -33,6 +35,7 @@ cross-device material migration path.
 ## Documentation
 
 - [Installation, update, rollback, and recovery](docs/INSTALLATION.md)
+- [Device-specific material](docs/DEVICE_MATERIALS.md)
 - [Technical manual](TECHNICAL_MANUAL.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Validation scope](docs/VALIDATION.md)
