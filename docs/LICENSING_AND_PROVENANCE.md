@@ -10,7 +10,8 @@ the source it contains.
 | --- | --- | --- | --- | --- |
 | libfprint base | Fedora 44 source package / upstream libfprint | 1.94.100 | Per-file upstream terms, predominantly `LGPL-2.1-or-later` | Patched base and public ABI |
 | Goodix driver sources | This project | current source tree | Per-file SPDX; predominantly `LGPL-2.1-or-later` | USB, TLS, image, lifecycle, enrollment, and matching integration |
-| Device-material helper tools | This project; Windows exporter core recovered from preserved project/Codex development material and wrapped for public use | current source tree | `GPL-2.0-or-later` | Local DPAPI export and offline `G5125XFR` → `G5125POC` finalization |
+| Device-material exporter wrapper and finalizer | This project | current source tree | `GPL-2.0-or-later` | Local DPAPI export orchestration and offline `G5125XFR` → `G5125POC` finalization |
+| Device-material exporter core | Historical project-authored D191 source recovered from preserved project/Codex development material | historical pre-D246 source | `BSD-2-Clause` | Windows DPAPI/entropy implementation used by the public wrapper |
 | SIGFM | Rockytkg materialized libfprint fork | `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | `LGPL-2.1-or-later` | Feature extraction and matching |
 | R2 preprocessing | Adapted from Rockytkg `goodix_imgproc` | `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | `GPL-2.0-or-later` | Image preprocessing |
 | OpenCV | Fedora 44 packages | 4.13.0-1.fc44 | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC` | Bundled runtime libraries |
@@ -25,27 +26,36 @@ digests are recorded in
 
 ## Device-material helper details
 
-`tools/device-materials/Export-Goodix5125TransportMaterial.ps1` is the
-user-facing wrapper. Its sibling
+`tools/device-materials/Export-Goodix5125TransportMaterial.ps1` is a new
+user-facing GPL-2.0-or-later wrapper. Its sibling
 `_Export-Goodix5125TransportMaterial.Core.ps1` is the byte-preserved recovered
 Windows exporter implementation previously kept under private historical
-material. The core contains the project's local DPAPI/entropy logic and
-fail-closed file handling; it does not embed the target secret, an OEM payload,
-or a private capture.
+material. Because that source belongs to the historical pre-D246 project
+revisions, its existing BSD-2-Clause grant is retained; the adjacent `.license`
+file records that license explicitly.
+
+The recovered core contains the project's local DPAPI/entropy logic and
+fail-closed file handling. It does not embed the target secret, an OEM payload,
+or a private capture, and it performs no USB/device write operation.
 
 `tools/device-materials/Finalize-Goodix5125TransportMaterial.py` is a current,
-self-contained project adaptation of the recovered transfer parser/finalizer
-and D190 binding reference. It carries the current bounded `gfusb.dll` parser
-policy and writes only the caller's final local runtime material. The OEM DLL
-is supplied by the user at runtime, parsed as inert bytes, and is neither
-shipped nor executed by the helper.
+GPL-2.0-or-later self-contained project adaptation of the recovered transfer
+parser/finalizer and D190 binding reference. The adapted historical reference
+material was available under the project's BSD-2-Clause grant; that provenance
+and prior grant are not revoked by the current GPL distribution of the new
+combined tool.
+
+The finalizer carries the current bounded `gfusb.dll` parser policy and writes
+only the caller's final local runtime material. The OEM DLL is supplied by the
+user at runtime, parsed as inert bytes, and is neither shipped nor executed by
+the helper.
 
 No generated `Goodix_Cache.bin`, `G5125XFR`, `G5125POC`, OEM DLL, secret, or
 capture belongs in the public repository.
 
 ## Combined binary
 
-The Goodix-enabled `libfprint-2.so.2.0` statically incorporates the GPL R2
+The Goodix-enabled `libfprint-2.so.2.0.0` statically incorporates the GPL R2
 component and dynamically links Apache-2.0 components. The applicable “or
 later” grants permit the combined binary to be conveyed under
 `GPL-3.0-or-later`. This does not relicense individual files: every source file
