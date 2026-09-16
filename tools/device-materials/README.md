@@ -17,8 +17,14 @@ write OTP, or modify persistent reader state.
 - `Extract-Goodix5125Config90.py` — offline Linux extractor that reads a Windows
   USBPcap `.pcapng` capture and writes the validated 224-byte
   `target-config-90.bin` body.
+- `Extract-Goodix5125DeviceResponses.py` — offline Linux extractor that reads
+  the same capture and writes only the A2/chip82/OTP response digests to the
+  intermediate `device-response-pins.json` file.
 - `Generate-Goodix5125MaterialManifest.py` — validates the three reader-specific
   files and creates their integrity/binding manifest.
+- `_goodix5125_usbpcap.py` — internal shared parser and atomic-output helper
+  used by the public extractors and manifest generator; it is not invoked
+  directly.
 
 ## Transport material: Windows
 
@@ -120,28 +126,52 @@ never overwritten.
 The printed digest identifies *your* extracted CONFIG90. It is recorded in the
 bundle manifest; it is not compared with a development-reader digest.
 
+## Device-response digest extraction
+
+Run the synthetic offline self-test:
+
+```bash
+python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py --self-test
+```
+
+Then use the same private OEM initialization capture used for CONFIG90:
+
+```bash
+python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py \
+  --pcap /home/you/goodix-material-work/oem-init.pcapng \
+  --output /home/you/goodix-material-work/device-response-pins.json
+```
+
+The extractor reconstructs device-to-host bulk traffic, validates Goodix A0
+framing and checksums, and selects exact typed responses: A2/control `0xa2`
+with 3 bytes, chip82/control `0x82` with 4 bytes, and OTP A6/control `0xa6`
+with 64 bytes. Repeated byte-identical responses are accepted; zero candidates
+or multiple distinct valid bodies in any class fail closed. Raw response bodies
+are neither printed nor stored.
+
+`device-response-pins.json` is mode `0600`, contains only SHA-256 digests and
+occurrence counts, and is never overwritten. It is an intermediate input to
+the manifest generator, **not a sixth runtime bundle file**.
+
 ## Generate the per-reader manifest
 
-After obtaining the three response bodies (A2: 3 bytes, chip82: 4 bytes, OTP
-A6: 64 bytes) from the same OEM initialization trace, run:
+After producing `device-response-pins.json`, run:
 
 ```bash
 python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py \
   --transport /home/you/goodix-material/transport-material.bin \
   --config90 /home/you/goodix-material/target-config-90.bin \
   --fdt-cache /home/you/goodix-material/fdt-cache.bin \
-  --a2-response-hex <6-hex-digits> \
-  --chip82-response-hex <8-hex-digits> \
-  --otp-a6-response-hex <128-hex-digits> \
+  --response-pins /home/you/goodix-material-work/device-response-pins.json \
   --output /home/you/goodix-material/target-material-manifest.json
 ```
 
 The generator checks record headers, sizes, CONFIG90 finalizer, cache CRC, and
-OTP/cache agreement, then hashes the user's actual files. The repository does
-not yet include a supported semantic extractor for the three inbound response
-bodies; obtain them with a reviewed protocol decoder. Do not guess them. This
-is an explicit remaining acquisition limitation, not a reason to reuse the
-development reader's values.
+OTP/cache agreement, then hashes the user's actual files. It rejects malformed
+or duplicate-key response-pin JSON and refuses a mixture of `--response-pins`
+with the legacy raw response arguments. Those manual arguments remain available
+for reviewed backward-compatible workflows, but the extractor output is the
+supported path.
 
 Self-test it with
 `python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test`.
@@ -156,8 +186,12 @@ installation path has been exercised on independent hardware.
 `Extract-Goodix5125Config90.py` currently has a passing synthetic self-test for
 fragmented USBPcap frames, repeated identical CONFIG90 frames, ambiguous
 distinct frames, invalid CONFIG90 finalizers, and atomic mode-`0600` output. A
-real historical capture exists in the private development archive, but the
-public extractor has not yet been independently exercised against a second
+shared parser is used by the response extractor, whose synthetic self-test also
+covers fragmented frames, identical duplicates, distinct-response ambiguity,
+missing candidates, invalid checksum/length/direction, no-overwrite and private
+atomic output. A real historical capture exists in the private development
+archive, but the
+public extractors have not yet been independently exercised against a second
 reader's fresh capture.
 
 If you encounter a reproducible problem, open a GitHub issue with the tool
@@ -168,7 +202,8 @@ protected material to an issue.**
 ## Security notes
 
 - Never commit `Goodix_Cache.bin`, `transport-material.xfr`,
-  `transport-material.bin`, `.pcapng` captures or `target-config-90.bin`.
+  `transport-material.bin`, `.pcapng` captures, `target-config-90.bin` or
+  `device-response-pins.json`.
 - Never paste the recovered 32-byte secret into a terminal, issue, chat, log,
   or documentation.
 - Keep all generated material outside the repository and outside cloud-sync
@@ -176,3 +211,5 @@ protected material to an issue.**
 - The transport finalizer accepts only the pinned OEM `gfusb.dll` size and
   SHA-256 and parses it with bounded PE reads; it does not execute OEM code.
 - The CONFIG90 extractor is offline-only and contains no USB/device access.
+- The response extractor is also offline-only and emits digests, never raw
+  A2/chip82/OTP bodies.

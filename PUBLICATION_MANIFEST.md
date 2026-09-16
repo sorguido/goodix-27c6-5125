@@ -28,7 +28,8 @@ The following local entries are not part of that surface:
 - downloaded OpenCV RPM payloads, which are host-local build inputs and are
   retrieved from Fedora using the documented command;
 - generated device material, OEM caches, private captures, fingerprint images,
-  templates, and other protected input/output files.
+  templates, intermediate `device-response-pins.json`, and other protected
+  input/output files.
 
 The source build, offline tests, installer, documentation, and public helper
 tools do not depend on anything under `development/`. The private Git history
@@ -42,6 +43,7 @@ production/check-source.sh
 python3 deployment/managed-install/test_offline.py
 python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
 python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
+python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py --self-test
 python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test
 ```
 

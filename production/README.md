@@ -38,7 +38,7 @@ reports a zero dependency count for excluded private content.
 The expected qualified library digest is:
 
 ```text
-115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20
+acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
 ```
 
 Use `deployment/managed-install/manage.sh prepare` to turn a normal build into

@@ -9,13 +9,14 @@ fi
 root=$1
 build=$2
 host_gusb=$3
-test_dir="$root/libfprint-driver/tests"
-local_fp="$root/Rockytkg/libfprint/libfprint"
+test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+private_root=$(CDPATH= cd -- "$test_dir/../.." && pwd)
+local_fp="$root/development/Rockytkg/snapshot/libfprint/libfprint"
 
 cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 openssl)
 libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 openssl)
 strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
-includes="-I$test_dir/support/d277 -I$test_dir/support -I$build -I$root/libfprint-driver -I$root/tools -I$local_fp -I$root/Rockytkg/libfprint"
+includes="-I$test_dir/support/d277 -I$test_dir/support -I$build -I$root/libfprint-driver -I$private_root/tools -I$local_fp -I$root/development/Rockytkg/snapshot/libfprint -I$root/Rockytkg/libfprint/libfprint"
 
 python3 "$test_dir/support/generate_libfprint_enums.py" \
   --identifier-prefix Fp --symbol-prefix fp \
@@ -40,8 +41,8 @@ build_run_tests () {
     "$root/libfprint-driver/goodix_tls_server.c" \
     "$root/libfprint-driver/goodix_usb_router.c" \
     "$root/libfprint-driver/goodix_fpi_usb_backend.c" \
-    "$root/tools/goodix_d190_pe.c" \
-    "$root/tools/goodix_d278_harness.c" \
+    "$private_root/tools/goodix_d190_pe.c" \
+    "$private_root/tools/goodix_d278_harness.c" \
     "$test_dir/test_goodix_d278_02.c" \
     "$test_dir/support/fpi_usb_transfer_compile_stub.c" \
     $libs -Wl,--gc-sections -o "$build/$name"
@@ -76,9 +77,9 @@ compile_strict "$root/libfprint-driver/goodix_secure_session.c" "$build/goodix_s
 compile_strict "$root/libfprint-driver/goodix_tls_server.c" "$build/goodix_tls_server.o"
 compile_strict "$root/libfprint-driver/goodix_usb_router.c" "$build/goodix_usb_router.o"
 compile_strict "$root/libfprint-driver/goodix_fpi_usb_backend.c" "$build/goodix_fpi_usb_backend.o"
-compile_strict "$root/tools/goodix_d190_pe.c" "$build/goodix_d190_pe.o"
-compile_strict "$root/tools/goodix_d278_harness.c" "$build/goodix_d278_harness.o"
-compile_strict "$root/tools/d278_native_secure_session_once.c" "$build/d278_native_secure_session_once.o"
+compile_strict "$private_root/tools/goodix_d190_pe.c" "$build/goodix_d190_pe.o"
+compile_strict "$private_root/tools/goodix_d278_harness.c" "$build/goodix_d278_harness.o"
+compile_strict "$private_root/tools/d278_native_secure_session_once.c" "$build/d278_native_secure_session_once.o"
 
 gcc -Wl,--gc-sections \
   "$build/fp-device.o" "$build/fpi-device.o" "$build/fpi-usb-transfer.o" \
@@ -118,7 +119,7 @@ echo D278_02_SELF_TEST=PASS
     'LIVE_NOT_AUTHORIZED_OR_BASELINE_UNAPPROVED' >/dev/null
 )
 echo D278_11_UNAPPROVED_LIVE_GATE=PASS_BEFORE_MATERIAL_AND_USB_CONTEXT
-runtime_sources="$root/libfprint-driver/goodix_secure_session.c $root/tools/goodix_d278_harness.c $root/tools/d278_native_secure_session_once.c"
+runtime_sources="$root/libfprint-driver/goodix_secure_session.c $private_root/tools/goodix_d278_harness.c $private_root/tools/d278_native_secure_session_once.c"
 if grep -En '0x[eE]0|0x[aA]4|production_write_key|ClearApp|IAP|firmware[ _-]*update|g_usb_device_reset|g_usb_device_clear_halt|libusb_reset_device|libusb_clear_halt|0x02[[:space:]]*,[[:space:]]*0x14' $runtime_sources; then
   echo D278_11_FORBIDDEN_PERSISTENT_RECOVERY_SOURCE_AUDIT=FAIL >&2
   exit 1

@@ -1484,6 +1484,48 @@ NEXT_BOUNDARY=PUBLIC_SURFACE_CONTENT_AND_DEPENDENCY_AUDIT
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
+### Corrective Phase F — device materials e response extractor
+
+Il corrective device-material successivo al merge `12884ae6...` chiude i
+residui offline della generalizzazione per-reader. Il parser runtime del
+manifest v1 è ora deterministico e specifico ai dieci campi stringa richiesti:
+rifiuta chiavi duplicate o sconosciute, campi mancanti, sintassi/separatori
+malformati, NUL embedded, trailing data, digest non esadecimali o di lunghezza
+errata e manifest oltre il limite. Due bundle sintetici differenti attraversano
+il vero percorso production `manifest_length == 0`, inclusi transport,
+CONFIG90, cache FDT, pin A2/82/A6, DAC, finalizer e validator E4 derivato.
+
+La superficie pubblica contiene ora
+`Extract-Goodix5125DeviceResponses.py`. Il tool riusa il parser condiviso
+`_goodix5125_usbpcap.py`, legge offline la stessa cattura USBPcap usata per
+CONFIG90 e seleziona risposte device→host A0 tipizzate esatte: A2/3 byte,
+chip82/4 byte e OTP A6/64 byte. Duplicati identici sono ammessi; candidati
+distinti, mancanti, con checksum/length/direzione errati falliscono chiusi.
+L'output `device-response-pins.json` contiene soltanto digest e occurrence
+count, è intermedio e non modifica il bundle runtime finale di cinque file.
+Il generator consuma direttamente quel JSON, preserva il binding OTP↔cache ed
+è short-write safe con file e directory `fsync`, no-overwrite e cleanup del
+temporaneo.
+
+Le suite host-only normal e ASan/UBSan passano; i self-test degli extractor e
+del generator sono sintetici e non hanno usato USB, DPAPI o secret reali. La
+qualifica su una nuova cattura OEM di un secondo lettore resta Human Gate. Dopo
+questo corrective il sequencing Phase F ritorna a D298/02.
+
+```text
+DEVICE_DYNAMIC_PRODUCTION_BUNDLES_SYNTHETIC=2_PASS
+MANIFEST_V1_NEGATIVE_CASES=17_PASS_NORMAL_AND_ASAN_UBSAN
+DEVICE_RESPONSE_EXTRACTOR_SELFTEST=PASS
+CONFIG90_SHARED_PARSER_REGRESSION=PASS
+MANIFEST_GENERATOR_SHORT_WRITE_SELFTEST=PASS
+PRODUCTION_BUILD_NORMAL=PASS
+PRODUCTION_BUILD_SANITIZER=PASS
+PRODUCTION_LIBRARY_SHA256=acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
+FINAL_RUNTIME_BUNDLE_FILE_COUNT=5
+REAL_CAPTURE_SECOND_READER=HUMAN_REQUIRED
+NEXT_PHASE_F_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
+```
+
 ### Avanzamento live precedente — closure Phase D lifecycle
 
 L'Utente ha eseguito sul target Fedora 44 le prove dello scope Phase D ridotto.

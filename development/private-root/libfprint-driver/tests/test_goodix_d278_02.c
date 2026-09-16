@@ -16,7 +16,8 @@
 
 #include <glib/gstdio.h>
 
-#define CANONICAL_DLL "analysis/D230/work/GoodixExport/gfusb.dll"
+#define CANONICAL_DLL \
+  "development/private-root/analysis/D230/work/GoodixExport/gfusb.dll"
 
 /* ASSERT_CMPMEM in some GLib versions stores lengths in int, which trips
  * -Wsign-conversion under -Wconversion.  Use a size_t-safe local wrapper. */
@@ -138,6 +139,9 @@ material_fixture_init (MaterialFixture *fixture)
 
   memset (fixture->transport_bytes, 0x5a, sizeof fixture->transport_bytes);
   memcpy (fixture->transport_bytes, "G5125POC", 8);
+  memcpy (fixture->transport_bytes + 8u,
+          "\x01\x00\x18\x00\xc6\x27\x25\x51"
+          "\x01\x00\x20\x00\x20\x00\x00\x00", 16u);
   memset (fixture->transport_bytes + 24, 0, 32); /* synthetic KAT V0 PSK */
   memset (fixture->config_bytes, 0, sizeof fixture->config_bytes);
   for (guint i = 0; i < 4; i++)
@@ -1786,7 +1790,8 @@ test_harness_live_mode_build_only (void)
   gsize length = 0;
 
   g_assert_true (g_file_get_contents (
-    "tools/d278_native_secure_session_once.c", &source, &length, NULL));
+    "development/private-root/tools/d278_native_secure_session_once.c",
+    &source, &length, NULL));
   g_assert_cmpuint (length, >, 0);
   g_assert_nonnull (strstr (source, "#ifdef D278_LIVE_BINDING"));
   g_assert_nonnull (strstr (source, "--live-exact-secure-session"));

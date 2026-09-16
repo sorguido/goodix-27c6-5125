@@ -702,6 +702,23 @@ CURRENT_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
 NEXT_BOUNDARY=PUBLIC_SURFACE_CONTENT_AND_DEPENDENCY_AUDIT
 ```
 
+Il corrective bounded sui device materials richiesto dopo il merge
+`12884ae6...` è chiuso offline prima di riprendere D298/02: due bundle sintetici
+diversi attraversano il parser production del manifest v1; il parser fallisce
+chiuso su sintassi e semantica ambigue; il generator è short-write safe; il
+nuovo extractor pubblico A2/chip82/OTP riusa il parser USBPcap/A0 condiviso e
+produce soltanto un JSON intermedio di digest. Il bundle runtime resta di
+cinque file. La prova su capture OEM reale di un secondo lettore è Human Gate e
+non è stata simulata.
+
+```text
+DEVICE_MATERIAL_CORRECTIVE_OFFLINE=PASS
+DEVICE_RESPONSE_PINS_INTERMEDIATE_ONLY=true
+RUNTIME_MATERIAL_COUNT=5
+REAL_SECOND_READER_CAPTURE_TEST=HUMAN_REQUIRED
+CURRENT_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
+```
+
 ## WHAT_NOT_TO_TEST_AGAIN
 
 Non riaprire o ripetere per sola “maggiore confidenza”:

@@ -68,8 +68,11 @@ documented in [Device-specific material](docs/DEVICE_MATERIALS.md).
 
 The public helper tools under `tools/device-materials/` cover the Windows DPAPI
 transport export, Linux `G5125XFR` → `G5125POC` finalization, and offline
-CONFIG90 extraction from a user-supplied USBPcap `.pcapng` capture. These tools
-never provision a new PSK and the CONFIG90 extractor has no USB/device access.
+CONFIG90 and A2/chip82/OTP response-pin extraction from a user-supplied USBPcap
+`.pcapng` capture. The extractors share one pcapng/USBPcap/A0 parser and have no
+USB/device access. The response extractor emits only digests to an intermediate
+JSON file; that file feeds the manifest generator and is not a sixth runtime
+material. These tools never provision a new PSK.
 
 ## Image and biometric pipeline
 
@@ -130,13 +133,15 @@ closed. The Windows factory path is expected to remain usable.
 
 - Only the target configuration listed above is supported.
 - The repository ships helper tooling for preparing transport material and for
-  extracting CONFIG90 from a local OEM USB capture, but it does not ship OEM
-  binaries, caches, captures, secrets or factory material. Users must lawfully
-  obtain those inputs from their own reader/environment.
+  extracting CONFIG90 plus A2/chip82/OTP response pins from a local OEM USB
+  capture, but it does not ship OEM binaries, caches, captures, secrets or
+  factory material. Users must lawfully obtain those inputs from their own
+  reader/environment.
 - The public repository form is substantially tested but has not yet been
   exercised completely across every acquisition, installation and recovery
-  path on independent hardware. In particular, reader-to-reader portability of
-  newly extracted CONFIG90 material remains a separate qualification boundary.
+  path on independent hardware. Reader-to-reader portability of newly
+  extracted material remains a qualification boundary requiring a real
+  second-reader workflow.
 - No universal FAR or FRR claim is made.
 - Passwordless biometric login does not unlock a password-encrypted KWallet;
   a separate wallet prompt can therefore be expected.
@@ -149,4 +154,6 @@ Production material policy is device-dynamic. The protected v1 manifest binds
 the user's transport, CONFIG90 and FDT cache digests plus A2/chip82/OTP response
 digests. E4 and DAC values are derived from the validated bundle. Universal
 format, finalizer, CRC, OEM-DLL compatibility and filesystem controls remain
-fixed. See `docs/DEVICE_MATERIAL_PIN_AUDIT.md`.
+fixed. The v1 parser accepts only the ten required string fields, rejects
+unknown or duplicate keys, embedded NUL, malformed separators, missing fields
+and trailing data. See `docs/DEVICE_MATERIAL_PIN_AUDIT.md`.

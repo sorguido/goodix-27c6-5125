@@ -262,28 +262,36 @@ hex_digest (const gchar *value,
   return TRUE;
 }
 
-static gchar *
-manifest_string (const gchar *json,
-                 const gchar *key)
+static void
+manifest_skip_whitespace (const gchar **cursor,
+                          const gchar  *end)
 {
-  g_autofree gchar *needle = g_strdup_printf ("\"%s\"", key);
-  const gchar *found = strstr (json, needle);
-  const gchar *colon;
-  const gchar *start;
-  const gchar *end;
+  while (*cursor < end &&
+         (**cursor == ' ' || **cursor == '\t' ||
+          **cursor == '\r' || **cursor == '\n'))
+    (*cursor)++;
+}
 
-  if (found == NULL || strstr (found + strlen (needle), needle) != NULL)
+static gchar *
+manifest_parse_string (const gchar **cursor,
+                       const gchar  *end)
+{
+  const gchar *start;
+
+  if (*cursor >= end || **cursor != '"')
     return NULL;
-  colon = found + strlen (needle);
-  while (g_ascii_isspace (*colon)) colon++;
-  if (*colon++ != ':') return NULL;
-  while (g_ascii_isspace (*colon)) colon++;
-  if (*colon++ != '"') return NULL;
-  start = colon;
-  end = strchr (start, '"');
-  if (end == NULL || memchr (start, '\\', (gsize) (end - start)) != NULL)
+  (*cursor)++;
+  start = *cursor;
+  while (*cursor < end && **cursor != '"')
+    {
+      if (**cursor == '\\' || (guchar) **cursor < 0x20u)
+        return NULL;
+      (*cursor)++;
+    }
+  if (*cursor >= end)
     return NULL;
-  return g_strndup (start, (gsize) (end - start));
+  (*cursor)++;
+  return g_strndup (start, (gsize) ((*cursor - 1) - start));
 }
 
 static gboolean
@@ -291,42 +299,87 @@ parse_manifest (const guint8               *bytes,
                 gsize                       length,
                 GoodixTargetMaterialPolicy *policy)
 {
-  static const gchar *const hash_keys[] = {
+  static const gchar *const keys[] = {
+    "schema", "vid", "pid", "app",
     "transport_sha256", "config90_sha256", "fdt_cache_sha256",
     "a2_response_sha256", "chip82_response_sha256", "otp_a6_response_sha256"
   };
-  guint8 *outputs[] = {
+  guint8 *hash_outputs[] = {
     policy->transport_sha256, policy->config90_sha256,
     policy->fdt_cache_sha256, policy->a2_response_sha256,
     policy->chip82_response_sha256, policy->otp_a6_response_sha256
   };
-  g_autofree gchar *json = NULL;
-  g_autofree gchar *schema = NULL;
-  g_autofree gchar *vid = NULL;
-  g_autofree gchar *pid = NULL;
-  g_autofree gchar *app = NULL;
+  gchar *values[G_N_ELEMENTS (keys)] = { NULL };
+  const gchar *cursor;
+  const gchar *end;
+  gboolean ok = FALSE;
 
   if (bytes == NULL || length == 0u || memchr (bytes, 0, length) != NULL)
     return FALSE;
-  json = g_strndup ((const gchar *) bytes, length);
-  g_strstrip (json);
-  if (json[0] != '{' || json[strlen (json) - 1u] != '}')
-    return FALSE;
-  schema = manifest_string (json, "schema");
-  vid = manifest_string (json, "vid");
-  pid = manifest_string (json, "pid");
-  app = manifest_string (json, "app");
-  if (g_strcmp0 (schema, "goodix-5125-device-materials-v1") != 0 ||
-      g_strcmp0 (vid, "27c6") != 0 || g_strcmp0 (pid, "5125") != 0 ||
-      g_strcmp0 (app, "GF_ST411SEC_APP_12509") != 0)
-    return FALSE;
-  for (guint i = 0; i < G_N_ELEMENTS (hash_keys); i++)
+  cursor = (const gchar *) bytes;
+  end = cursor + length;
+  manifest_skip_whitespace (&cursor, end);
+  if (cursor >= end || *cursor++ != '{')
+    goto out;
+  manifest_skip_whitespace (&cursor, end);
+  if (cursor >= end || *cursor == '}')
+    goto out;
+
+  while (cursor < end)
     {
-      g_autofree gchar *value = manifest_string (json, hash_keys[i]);
-      if (!hex_digest (value, outputs[i]))
-        return FALSE;
+      g_autofree gchar *key = NULL;
+      g_autofree gchar *value = NULL;
+      guint index;
+
+      key = manifest_parse_string (&cursor, end);
+      if (key == NULL)
+        goto out;
+      for (index = 0; index < G_N_ELEMENTS (keys); index++)
+        if (g_str_equal (key, keys[index]))
+          break;
+      if (index == G_N_ELEMENTS (keys) || values[index] != NULL)
+        goto out;
+      manifest_skip_whitespace (&cursor, end);
+      if (cursor >= end || *cursor++ != ':')
+        goto out;
+      manifest_skip_whitespace (&cursor, end);
+      value = manifest_parse_string (&cursor, end);
+      if (value == NULL)
+        goto out;
+      values[index] = g_steal_pointer (&value);
+      manifest_skip_whitespace (&cursor, end);
+      if (cursor >= end)
+        goto out;
+      if (*cursor == '}')
+        {
+          cursor++;
+          break;
+        }
+      if (*cursor++ != ',')
+        goto out;
+      manifest_skip_whitespace (&cursor, end);
     }
-  return TRUE;
+
+  manifest_skip_whitespace (&cursor, end);
+  if (cursor != end)
+    goto out;
+  for (guint i = 0; i < G_N_ELEMENTS (keys); i++)
+    if (values[i] == NULL)
+      goto out;
+  if (g_strcmp0 (values[0], "goodix-5125-device-materials-v1") != 0 ||
+      g_strcmp0 (values[1], "27c6") != 0 ||
+      g_strcmp0 (values[2], "5125") != 0 ||
+      g_strcmp0 (values[3], "GF_ST411SEC_APP_12509") != 0)
+    goto out;
+  for (guint i = 0; i < G_N_ELEMENTS (hash_outputs); i++)
+    if (!hex_digest (values[i + 4u], hash_outputs[i]))
+      goto out;
+  ok = TRUE;
+
+out:
+  for (guint i = 0; i < G_N_ELEMENTS (values); i++)
+    g_free (values[i]);
+  return ok;
 }
 
 static gboolean

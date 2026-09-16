@@ -10,6 +10,7 @@
 
 #define SYNTHETIC_PE_LENGTH 1024u
 #define SYNTHETIC_CACHE_LENGTH 128u
+#define PRODUCTION_CACHE_LENGTH 13520u
 
 static void
 write_le16 (guint8 *bytes,
@@ -427,6 +428,402 @@ set_config_finalizer (guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH])
 }
 
 static void
+set_transport_header (guint8 transport[GOODIX_TARGET_TRANSPORT_LENGTH])
+{
+  memset (transport, 0, GOODIX_TARGET_TRANSPORT_LENGTH);
+  memcpy (transport, "G5125POC", 8u);
+  write_le16 (transport + 8u, 1u);
+  write_le16 (transport + 10u, 24u);
+  write_le16 (transport + 12u, 0x27c6u);
+  write_le16 (transport + 14u, 0x5125u);
+  write_le16 (transport + 16u, 1u);
+  write_le16 (transport + 18u, 32u);
+  write_le16 (transport + 20u, 32u);
+  write_le16 (transport + 22u, 0u);
+}
+
+typedef struct
+{
+  gchar *directory;
+  gchar *manifest_path;
+  gchar *transport_path;
+  gchar *config_path;
+  gchar *pe_path;
+  gchar *cache_path;
+  gchar *manifest;
+  GoodixRuntimeMaterialPolicy policy;
+  GoodixRuntimeMaterialPaths paths;
+  guint8 transport[GOODIX_TARGET_TRANSPORT_LENGTH];
+  guint8 config[GOODIX_SECURE_SESSION_CONFIG90_LENGTH];
+  guint8 pe[SYNTHETIC_PE_LENGTH];
+  guint8 cache[PRODUCTION_CACHE_LENGTH];
+  guint8 a2[3];
+  guint8 chip82[4];
+} DynamicBundleFixture;
+
+typedef struct
+{
+  guint8 transport_sha256[32];
+  guint8 config90_sha256[32];
+  guint8 cache_sha256[32];
+  guint8 a2_sha256[32];
+  guint8 chip82_sha256[32];
+  guint8 otp_sha256[32];
+  guint8 validator_sha256[32];
+  guint8 dac_values[4][2];
+  guint8 config90_finalizer[2];
+} DynamicBundleSummary;
+
+static gchar *
+sha256_string (const guint8 *bytes,
+               gsize length)
+{
+  return g_compute_checksum_for_data (G_CHECKSUM_SHA256, bytes, length);
+}
+
+static gchar *
+build_dynamic_manifest (const DynamicBundleFixture *fixture)
+{
+  g_autofree gchar *transport = sha256_string (
+    fixture->transport, sizeof fixture->transport);
+  g_autofree gchar *config = sha256_string (
+    fixture->config, sizeof fixture->config);
+  g_autofree gchar *cache = sha256_string (
+    fixture->cache, sizeof fixture->cache);
+  g_autofree gchar *a2 = sha256_string (fixture->a2, sizeof fixture->a2);
+  g_autofree gchar *chip82 = sha256_string (
+    fixture->chip82, sizeof fixture->chip82);
+  g_autofree gchar *otp = sha256_string (fixture->cache, 64u);
+
+  return g_strdup_printf (
+    "{\"schema\":\"goodix-5125-device-materials-v1\","
+    "\"vid\":\"27c6\",\"pid\":\"5125\","
+    "\"app\":\"GF_ST411SEC_APP_12509\","
+    "\"transport_sha256\":\"%s\",\"config90_sha256\":\"%s\","
+    "\"fdt_cache_sha256\":\"%s\",\"a2_response_sha256\":\"%s\","
+    "\"chip82_response_sha256\":\"%s\","
+    "\"otp_a6_response_sha256\":\"%s\"}\n",
+    transport, config, cache, a2, chip82, otp);
+}
+
+static void
+dynamic_bundle_init (DynamicBundleFixture *fixture,
+                     guint variant)
+{
+  static const guint8 seed_a[6] = { 1u, 2u, 3u, 4u, 5u, 6u };
+  static const guint8 seed_b[6] = { 0x11u, 0x22u, 0x33u,
+                                    0x44u, 0x55u, 0x66u };
+  guint8 validator[32] = { 0 };
+  g_autoptr(GError) error = NULL;
+
+  memset (fixture, 0, sizeof *fixture);
+  goodix_runtime_material_policy_production (&fixture->policy);
+  build_pe (fixture->pe, &fixture->policy.pe);
+  fixture->policy.private_files.owner_uid = getuid ();
+  fixture->policy.private_files.owner_gid = getgid ();
+  fixture->policy.target.owner_uid = getuid ();
+  fixture->policy.target.owner_gid = getgid ();
+  fixture->policy.directory_owner_uid = getuid ();
+  fixture->policy.directory_owner_gid = getgid ();
+  g_assert_cmpuint (fixture->policy.target.manifest_length, ==, 0u);
+
+  set_transport_header (fixture->transport);
+  for (guint i = 0; i < 32u; i++)
+    fixture->transport[24u + i] = (guint8) (variant * 41u + i * 3u + 1u);
+  g_assert_true (goodix_d190_bind_validator (
+    fixture->transport + 24u, 32u, seed_a, sizeof seed_a,
+    seed_b, sizeof seed_b, validator, &error));
+  g_assert_no_error (error);
+  memcpy (fixture->transport + 56u, validator, sizeof validator);
+
+  for (guint i = 0; i < 222u; i++)
+    fixture->config[i] = (guint8) (variant * 29u + i * 7u + 3u);
+  for (guint i = 0; i < 4u; i++)
+    {
+      guint offset = fixture->policy.target.dac_offsets[i];
+      guint16 reg = fixture->policy.target.dac_registers[i];
+      fixture->config[offset] = (guint8) reg;
+      fixture->config[offset + 1u] = (guint8) (reg >> 8);
+      fixture->config[offset + 2u] = (guint8) (variant * 17u + i * 2u + 1u);
+      fixture->config[offset + 3u] = (guint8) (variant * 19u + i * 3u + 2u);
+    }
+  set_config_finalizer (fixture->config);
+
+  for (guint i = 0; i < sizeof fixture->cache - 4u; i++)
+    fixture->cache[i] = (guint8) (variant * 23u + i * 5u + 7u);
+  for (guint i = 0; i < 12u; i++)
+    fixture->cache[64u + i] = (guint8) (variant * 31u + i + 1u);
+  write_le32 (fixture->cache + sizeof fixture->cache - 4u,
+              crc32_mpeg2 (fixture->cache, sizeof fixture->cache - 4u));
+  fixture->a2[0] = (guint8) (variant + 1u);
+  fixture->a2[1] = (guint8) (variant + 11u);
+  fixture->a2[2] = (guint8) (variant + 21u);
+  for (guint i = 0; i < sizeof fixture->chip82; i++)
+    fixture->chip82[i] = (guint8) (variant * 13u + i + 1u);
+  fixture->manifest = build_dynamic_manifest (fixture);
+
+  fixture->directory = g_dir_make_tmp ("goodix-dynamic-bundle.XXXXXX", &error);
+  g_assert_no_error (error);
+  fixture->manifest_path = g_build_filename (
+    fixture->directory, "target-material-manifest.json", NULL);
+  fixture->transport_path = g_build_filename (
+    fixture->directory, "transport-material.bin", NULL);
+  fixture->config_path = g_build_filename (
+    fixture->directory, "target-config-90.bin", NULL);
+  fixture->pe_path = g_build_filename (fixture->directory, "gfusb.dll", NULL);
+  fixture->cache_path = g_build_filename (
+    fixture->directory, "fdt-cache.bin", NULL);
+  write_private_fixture (fixture->manifest_path,
+                         (const guint8 *) fixture->manifest,
+                         strlen (fixture->manifest));
+  write_private_fixture (fixture->transport_path, fixture->transport,
+                         sizeof fixture->transport);
+  write_private_fixture (fixture->config_path, fixture->config,
+                         sizeof fixture->config);
+  write_private_fixture (fixture->pe_path, fixture->pe, sizeof fixture->pe);
+  write_private_fixture (fixture->cache_path, fixture->cache,
+                         sizeof fixture->cache);
+  fixture->paths = (GoodixRuntimeMaterialPaths) {
+    .directory_path = fixture->directory,
+    .manifest_path = fixture->manifest_path,
+    .transport_path = fixture->transport_path,
+    .config90_path = fixture->config_path,
+    .pe_path = fixture->pe_path,
+    .fdt_cache_path = fixture->cache_path,
+  };
+  OPENSSL_cleanse (validator, sizeof validator);
+}
+
+static void
+dynamic_bundle_clear (DynamicBundleFixture *fixture)
+{
+  g_remove (fixture->manifest_path);
+  g_remove (fixture->transport_path);
+  g_remove (fixture->config_path);
+  g_remove (fixture->pe_path);
+  g_remove (fixture->cache_path);
+  g_rmdir (fixture->directory);
+  g_free (fixture->manifest_path);
+  g_free (fixture->transport_path);
+  g_free (fixture->config_path);
+  g_free (fixture->pe_path);
+  g_free (fixture->cache_path);
+  g_free (fixture->directory);
+  g_free (fixture->manifest);
+  OPENSSL_cleanse (fixture, sizeof *fixture);
+}
+
+static void
+load_dynamic_bundle (DynamicBundleFixture *fixture,
+                     DynamicBundleSummary *summary)
+{
+  GoodixRuntimeMaterialAudit audit;
+  GoodixSecureSessionMaterial view;
+  GoodixRuntimeMaterial *owner;
+  guint8 fdt[GOODIX_RUNTIME_FDT_SEED_LENGTH] = { 0 };
+  g_autoptr(GError) error = NULL;
+
+  owner = goodix_runtime_material_load (&fixture->paths, &fixture->policy,
+                                        &audit, &error);
+  g_assert_no_error (error);
+  g_assert_nonnull (owner);
+  g_assert_true (goodix_runtime_material_get_secure_view (owner, &view, &error));
+  g_assert_no_error (error);
+  g_assert_true (goodix_runtime_material_get_fdt_seed (owner, fdt, &error));
+  g_assert_no_error (error);
+  g_assert_cmpmem (fdt, sizeof fdt, fixture->cache + 64u, sizeof fdt);
+  g_assert_true (audit.target.e4_binding_match);
+  digest (fixture->transport, sizeof fixture->transport,
+          summary->transport_sha256);
+  digest (fixture->config, sizeof fixture->config, summary->config90_sha256);
+  digest (fixture->cache, sizeof fixture->cache, summary->cache_sha256);
+  memcpy (summary->a2_sha256, view.a2_response_sha256, 32u);
+  memcpy (summary->chip82_sha256, view.chip82_response_sha256, 32u);
+  memcpy (summary->otp_sha256, view.otp_a6_response_sha256, 32u);
+  memcpy (summary->validator_sha256, view.e4_validator_sha256, 32u);
+  memcpy (summary->dac_values, view.dac_values, sizeof summary->dac_values);
+  memcpy (summary->config90_finalizer, fixture->config + 222u, 2u);
+  goodix_runtime_material_free (owner);
+}
+
+static void
+test_runtime_material_device_dynamic_bundles (void)
+{
+  DynamicBundleFixture first;
+  DynamicBundleFixture second;
+  DynamicBundleSummary first_summary = { 0 };
+  DynamicBundleSummary second_summary = { 0 };
+
+  dynamic_bundle_init (&first, 1u);
+  dynamic_bundle_init (&second, 2u);
+  load_dynamic_bundle (&first, &first_summary);
+  load_dynamic_bundle (&second, &second_summary);
+  g_assert_true (memcmp (first_summary.transport_sha256,
+                         second_summary.transport_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.config90_sha256,
+                         second_summary.config90_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.cache_sha256,
+                         second_summary.cache_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.a2_sha256,
+                         second_summary.a2_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.chip82_sha256,
+                         second_summary.chip82_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.otp_sha256,
+                         second_summary.otp_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.validator_sha256,
+                         second_summary.validator_sha256, 32u) != 0);
+  g_assert_true (memcmp (first_summary.dac_values,
+                         second_summary.dac_values,
+                         sizeof first_summary.dac_values) != 0);
+  g_assert_true (memcmp (first_summary.config90_finalizer,
+                         second_summary.config90_finalizer, 2u) != 0);
+  dynamic_bundle_clear (&first);
+  dynamic_bundle_clear (&second);
+}
+
+typedef enum
+{
+  MANIFEST_MISSING_OPEN,
+  MANIFEST_MISSING_CLOSE,
+  MANIFEST_MISSING_COMMA,
+  MANIFEST_MISSING_COLON,
+  MANIFEST_NON_JSON_WHITESPACE,
+  MANIFEST_DUPLICATE_KEY,
+  MANIFEST_UNKNOWN_KEY,
+  MANIFEST_MISSING_KEY,
+  MANIFEST_NON_HEX_DIGEST,
+  MANIFEST_SHORT_DIGEST,
+  MANIFEST_WRONG_SCHEMA,
+  MANIFEST_WRONG_VID,
+  MANIFEST_WRONG_PID,
+  MANIFEST_WRONG_APP,
+  MANIFEST_EMBEDDED_NUL,
+  MANIFEST_TRAILING_GARBAGE,
+  MANIFEST_OVERSIZED,
+} ManifestMutation;
+
+static GBytes *
+mutated_manifest (const gchar *valid,
+                  ManifestMutation mutation)
+{
+  GString *text = g_string_new (valid);
+  gchar *found;
+  gchar *result;
+  gsize result_length;
+
+  switch (mutation)
+    {
+    case MANIFEST_MISSING_OPEN:
+      g_string_erase (text, 0, 1);
+      break;
+    case MANIFEST_MISSING_CLOSE:
+      found = strrchr (text->str, '}');
+      g_assert_nonnull (found);
+      g_string_erase (text, (gssize) (found - text->str), 1);
+      break;
+    case MANIFEST_MISSING_COMMA:
+      found = strchr (text->str, ',');
+      g_assert_nonnull (found);
+      *found = ' ';
+      break;
+    case MANIFEST_MISSING_COLON:
+      found = strchr (text->str, ':');
+      g_assert_nonnull (found);
+      *found = ' ';
+      break;
+    case MANIFEST_NON_JSON_WHITESPACE:
+      g_string_insert_c (text, 1, '\v');
+      break;
+    case MANIFEST_DUPLICATE_KEY:
+      found = strrchr (text->str, '}');
+      g_assert_nonnull (found);
+      g_string_insert (text, (gssize) (found - text->str),
+                       ",\"vid\":\"27c6\"");
+      break;
+    case MANIFEST_UNKNOWN_KEY:
+      found = strrchr (text->str, '}');
+      g_assert_nonnull (found);
+      g_string_insert (text, (gssize) (found - text->str),
+                       ",\"unrecognized\":\"value\"");
+      break;
+    case MANIFEST_MISSING_KEY:
+      found = strstr (text->str, "\"app\":\"GF_ST411SEC_APP_12509\",");
+      g_assert_nonnull (found);
+      g_string_erase (text, (gssize) (found - text->str),
+                      (gssize) strlen ("\"app\":\"GF_ST411SEC_APP_12509\","));
+      break;
+    case MANIFEST_NON_HEX_DIGEST:
+      found = strstr (text->str, "\"transport_sha256\":\"");
+      g_assert_nonnull (found);
+      found += strlen ("\"transport_sha256\":\"");
+      *found = 'z';
+      break;
+    case MANIFEST_SHORT_DIGEST:
+      found = strstr (text->str, "\"transport_sha256\":\"");
+      g_assert_nonnull (found);
+      found += strlen ("\"transport_sha256\":\"");
+      g_string_erase (text, (gssize) (found - text->str), 1);
+      break;
+    case MANIFEST_WRONG_SCHEMA:
+      found = strstr (text->str, "goodix-5125-device-materials-v1");
+      g_assert_nonnull (found);
+      found[0] = 'x';
+      break;
+    case MANIFEST_WRONG_VID:
+      found = strstr (text->str, "\"vid\":\"27c6\"");
+      g_assert_nonnull (found);
+      found[strlen ("\"vid\":\"")] = '3';
+      break;
+    case MANIFEST_WRONG_PID:
+      found = strstr (text->str, "\"pid\":\"5125\"");
+      g_assert_nonnull (found);
+      found[strlen ("\"pid\":\"")] = '6';
+      break;
+    case MANIFEST_WRONG_APP:
+      found = strstr (text->str, "GF_ST411SEC_APP_12509");
+      g_assert_nonnull (found);
+      found[0] = 'X';
+      break;
+    case MANIFEST_EMBEDDED_NUL:
+      found = strstr (text->str, "GF_ST411SEC_APP_12509");
+      g_assert_nonnull (found);
+      *found = '\0';
+      break;
+    case MANIFEST_TRAILING_GARBAGE:
+      g_string_append (text, "garbage");
+      break;
+    case MANIFEST_OVERSIZED:
+      g_string_set_size (text, GOODIX_TARGET_MANIFEST_MAX_LENGTH + 1u);
+      memset (text->str, 'x', text->len);
+      break;
+    }
+  result_length = text->len;
+  result = g_string_free (text, FALSE);
+  return g_bytes_new_take (result, result_length);
+}
+
+static void
+test_manifest_mutation_rejected (gconstpointer user_data)
+{
+  DynamicBundleFixture fixture;
+  g_autoptr(GBytes) bytes = NULL;
+  g_autoptr(GError) error = NULL;
+  gsize length;
+  const guint8 *data;
+
+  dynamic_bundle_init (&fixture, 3u);
+  bytes = mutated_manifest (fixture.manifest,
+                            (ManifestMutation) GPOINTER_TO_UINT (user_data));
+  data = g_bytes_get_data (bytes, &length);
+  write_private_fixture (fixture.manifest_path, data, length);
+  g_assert_null (goodix_target_material_load (
+    fixture.manifest_path, fixture.transport_path, fixture.config_path,
+    &fixture.policy.target, NULL, &error));
+  g_assert_nonnull (error);
+  dynamic_bundle_clear (&fixture);
+}
+
+static void
 observe_target_cleanse (const gchar *label,
                         const guint8 *bytes,
                         gsize length,
@@ -480,8 +877,7 @@ test_runtime_material_owner (void)
   policy.target.cleanse_observer = observe_target_cleanse;
   policy.target.cleanse_observer_data = &target_observation;
 
-  memset (transport, 0x5au, sizeof transport);
-  memcpy (transport, "G5125POC", 8u);
+  set_transport_header (transport);
   memset (transport + 24u, 0x3cu, 32u);
   memset (config, 0, sizeof config);
   for (guint i = 0; i < 4u; i++)
@@ -609,6 +1005,14 @@ test_production_layout (void)
 int
 main (int argc, char **argv)
 {
+  static const gchar *const manifest_mutation_names[] = {
+    "missing-open", "missing-close", "missing-comma", "missing-colon",
+    "non-json-whitespace", "duplicate-key", "unknown-key", "missing-key",
+    "non-hex-digest", "short-digest", "wrong-schema", "wrong-vid",
+    "wrong-pid", "wrong-app", "embedded-nul", "trailing-garbage",
+    "oversized",
+  };
+
   g_test_init (&argc, &argv, NULL);
   g_test_add_func ("/goodix/runtime-inputs/pe-extract-cleanse",
                    test_pe_extract_and_cleanse);
@@ -625,6 +1029,16 @@ main (int argc, char **argv)
                    test_file_provider_changed_fail_closed);
   g_test_add_func ("/goodix/runtime-material/owner-composition",
                    test_runtime_material_owner);
+  g_test_add_func ("/goodix/runtime-material/device-dynamic-bundles",
+                   test_runtime_material_device_dynamic_bundles);
+  for (guint i = 0; i < G_N_ELEMENTS (manifest_mutation_names); i++)
+    {
+      g_autofree gchar *path = g_strdup_printf (
+        "/goodix/runtime-material/manifest-rejects/%s",
+        manifest_mutation_names[i]);
+      g_test_add_data_func (path, GUINT_TO_POINTER (i),
+                            test_manifest_mutation_rejected);
+    }
   g_test_add_func ("/goodix/runtime-material/production-layout",
                    test_production_layout);
   return g_test_run ();

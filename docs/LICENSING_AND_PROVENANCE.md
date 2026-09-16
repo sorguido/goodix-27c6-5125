@@ -10,7 +10,7 @@ the source it contains.
 | --- | --- | --- | --- | --- |
 | libfprint base | Fedora 44 source package / upstream libfprint | 1.94.100 | Per-file upstream terms, predominantly `LGPL-2.1-or-later` | Patched base and public ABI |
 | Goodix driver sources | This project | current source tree | Per-file SPDX; predominantly `LGPL-2.1-or-later` | USB, TLS, image, lifecycle, enrollment, and matching integration |
-| Device-material exporter wrapper, finalizer and CONFIG90 extractor | This project | current source tree | `GPL-2.0-or-later` | Local DPAPI export orchestration, offline `G5125XFR` → `G5125POC` finalization, and offline USBPcap CONFIG90 extraction |
+| Device-material exporter wrapper, finalizer and USBPcap extractors | This project | current source tree | `GPL-2.0-or-later` | Local DPAPI export orchestration, offline `G5125XFR` → `G5125POC` finalization, and offline CONFIG90/A2/chip82/OTP extraction |
 | Device-material exporter core | Historical project-authored D191 source recovered from preserved project/Codex development material | historical pre-D246 source | `BSD-2-Clause` | Windows DPAPI/entropy implementation used by the public wrapper |
 | SIGFM | Rockytkg materialized libfprint fork | `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | `LGPL-2.1-or-later` | Feature extraction and matching |
 | R2 preprocessing | Adapted from Rockytkg `goodix_imgproc` | `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | `GPL-2.0-or-later` | Image preprocessing |
@@ -58,8 +58,16 @@ codec. It ships no capture bytes and performs no USB/device access. Its only
 runtime input is a user-supplied local `.pcapng` file and its only persistent
 output is the caller-selected 224-byte `target-config-90.bin` file.
 
+`tools/device-materials/Extract-Goodix5125DeviceResponses.py` and the shared
+`_goodix5125_usbpcap.py` helper are original GPL-2.0-or-later project code built
+from the same neutral framing facts. They perform offline semantic selection of
+typed A2, chip82 and OTP A6 responses and persist only their SHA-256 digests and
+occurrence counts. They contain no capture, OEM payload, secret, fingerprint
+image or device access implementation.
+
 No generated `Goodix_Cache.bin`, `G5125XFR`, `G5125POC`, OEM DLL, secret,
-`target-config-90.bin` or capture belongs in the public repository.
+`target-config-90.bin`, `device-response-pins.json` or capture belongs in the
+public repository.
 
 ## Combined binary
 
@@ -106,4 +114,6 @@ does not provide legal advice for unrelated distributions or modifications.
 `tools/device-materials/Generate-Goodix5125MaterialManifest.py` is an original
 project implementation under GPL-2.0-or-later. It uses only Python standard
 library APIs and the documented local material formats; it contains no OEM
-code, capture, secret, or development-reader bytes.
+code, capture, secret, or development-reader bytes. It consumes the response
+extractor's digest-only intermediate format and retains the reviewed legacy raw
+arguments solely as a mutually exclusive compatibility path.

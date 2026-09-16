@@ -80,7 +80,9 @@ The material directory supplied to the importer must contain exactly the five
 files listed in [Device-specific material](DEVICE_MATERIALS.md). That document
 explains which files come from the OEM Windows environment, which are
 project-derived, and how the historical transfer envelope differs from the
-runtime record. Every file must belong to the same physical reader and must
+runtime record. The response-pin JSON used to generate the manifest is an
+intermediate and must not be added as a sixth bundle file. Every final file
+must belong to the same physical reader and must
 have been obtained lawfully. Do not use a random, null, replacement, or
 cross-device PSK. Do not commit, upload, print, or attach this material to bug
 reports.

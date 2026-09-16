@@ -25,12 +25,16 @@ Offline validation commands:
 ```bash
 production/check-source.sh
 python3 deployment/managed-install/test_offline.py
+python3 tools/device-materials/Finalize-Goodix5125TransportMaterial.py --self-test
+python3 tools/device-materials/Extract-Goodix5125Config90.py --self-test
+python3 tools/device-materials/Extract-Goodix5125DeviceResponses.py --self-test
+python3 tools/device-materials/Generate-Goodix5125MaterialManifest.py --self-test
 ```
 
 The qualified library hash is:
 
 ```text
-115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20
+acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
 ```
 
 This digest applies to the normal production build with the pinned Fedora 44
