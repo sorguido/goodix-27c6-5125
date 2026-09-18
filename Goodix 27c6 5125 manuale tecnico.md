@@ -229,12 +229,12 @@ Principi trasversali di progetto:
 - trattare gli Operator Kit esistenti come evidenza/diagnostica storica, non
   come metodo di validazione corrente o UX production, e non creare una GUI
   Goodix custom senza blocker reale e nuova decisione dell'Utente;
-- non cancellare materiale storico o deprecato. In Phase F, prima della
+- non cancellare materiale storico o deprecato. Prima della
   pubblicazione, un audit completo deve spostare tutto il materiale non
   pubblico in `red_tag/`, aggiungere la directory a `.gitignore` e provare che
   build, test e release non ne dipendono; non anticipare lo spostamento;
 - non confondere closure funzionale, packaging, lifecycle e qualificazione di
-  release: ogni fase chiude il proprio confine con evidenza proporzionata;
+  release: ogni area di qualificazione conserva la propria evidenza proporzionata;
 - applicare sempre Human Gate, factory-preserving, Git protections, licensing e
   safety vigenti.
 
