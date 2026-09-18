@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance corrente — v3.3 (14 settembre 2026)
+### Governance corrente
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -182,13 +182,13 @@ chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. Le Phase B e C
 sono chiuse; le prove lifecycle riportate dall'Utente hanno chiuso anche Phase
 D. D296 ha qualificato la release candidate privata e chiuso Phase E. Prima
-di iniziare Phase F, l'Utente ha aperto il correttivo bounded D297/01 perché il
+prima dell'attività di pubblicazione, l'Utente ha aperto il correttivo bounded D297/01 perché il
 deployment qualificato gestiva `plasmalogin` ma non rendeva persistente il
 percorso KScreenLocker già provato da D289. D297 ha aggiunto la persistenza
 managed e l'Utente ha ora confermato sul runtime storico D293 il vero percorso
 `Meta+L → fingerprint → MATCH → unlock`, seguito da PASS per `sudo` con
 fingerprint e per i login Plasma con password e fingerprint. D297 è chiuso e
-la decisione corrente dell'Utente avvia Phase F. Il corrective D293
+la decisione corrente dell'Utente avvia l'attività di documentazione e pubblicazione. Il corrective D293
 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
@@ -378,15 +378,9 @@ contenuto/history, privacy, secret e licenze sono chiusi; ogni pubblicazione o
 modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. `red_tag/` resta escluso dall'export pubblico.
 
-Alla closure formale di ogni fase si aggiornano documentazione e stato, si
-eseguono commit e push su `origin/development`, quindi il loop si arresta senza
-iniziare la fase successiva:
 
-```text
-HISTORICAL_PHASE_CLOSED=true
-```
 
-### Stato corrente — correttivo KScreenLocker pre-Phase-F aperto
+### Stato corrente — correttivo KScreenLocker
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -1431,7 +1425,7 @@ CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Stato corrente Phase F — D298/01 decisione history privata
+### Stato corrente documentazione e pubblicazione — D298/01 decisione history privata
 
 L'inventario iniziale della superficie ha confermato materiale protetto,
 privato o non redistribuibile sia nel tree corrente sia nella history Git
