@@ -142,6 +142,15 @@ Principi permanenti:
 6. un commit o una suite verde non provano da soli correttezza o closure;
 7. nessuna conoscenza tecnica rilevante deve restare confinata nella sessione AI.
 
+### Autorità probatoria tecnica
+
+Per claim target-specific su APP12509, safety, persistenza e factory state, usa
+questa priorità: stato reale di repository/host → evidenza locale sul target →
+manuale tecnico → evidenze versionate → fonti/reference esterne → contesto della
+sessione → inferenza del modello. Una reference esterna può guidare
+l'implementazione o corroborare un risultato, ma non prova da sola il
+comportamento del target locale.
+
 ### Pragmatism First / Operator Time Is a Project Resource
 
 Per domande tecniche semplici e a basso rischio, preferire il percorso più
@@ -174,6 +183,14 @@ MATERIAL_ARCHITECTURAL_OR_REPOSITORY_ADVANCEMENT
 ```
 
 La numerazione Dxxx non è avanzamento.
+
+### Criterio di qualità
+
+La qualità non si misura nel numero di file, test, commit, report o Dxxx
+prodotti. Si misura nella riduzione di un'incertezza reale, nella
+riproducibilità, nella chiarezza di noto/non noto, nella riduzione dei rischi
+nascosti e nell'avanzamento concreto verso il target. Negli step device-oriented
+deve inoltre emergere evidenza o apprendimento reale al confine device-side.
 
 ---
 
