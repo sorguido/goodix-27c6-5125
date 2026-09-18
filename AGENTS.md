@@ -7,11 +7,9 @@ Questo file è la costituzione operativa persistente per l'agente AI che lavora 
 Le fonti principali sono:
 
 1. decisione o autorizzazione esplicita corrente dell'Utente;
-2. `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
-3. questo `AGENTS.md`;
-4. `analysis/PROJECT_NEXT_STEPS_PLAN.md` per fase corrente, lavoro residuo, sequencing e obiettivi ancora da portare a termine;
-5. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
-6. evidenze versionate nel repository.
+2. questo `AGENTS.md`;
+3. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
+4. evidenze versionate nel repository.
 
 Una decisione esplicita corrente dell'Utente può autorizzare una deroga limitata. Nessuna deroga può essere inferita da un generico “procedi”, dalla disponibilità dell'hardware o dal fatto che una stessa operazione sia stata autorizzata in passato.
 
@@ -35,12 +33,6 @@ Manuale tecnico canonico:
 <git-root>/Goodix 27c6 5125 manuale tecnico.md
 ```
 
-Piano operativo canonico:
-
-```text
-<git-root>/analysis/PROJECT_NEXT_STEPS_PLAN.md
-```
-
 ### Golden branch rule
 
 La modalità autonoma opera **esclusivamente** sul branch:
@@ -54,24 +46,17 @@ Prima di modificare qualunque file:
 1. identifica la Git root;
 2. verifica il branch corrente;
 3. verifica `git status --short`;
-4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
-   `AGENTS.md` e le Linee Guida;
-5. leggi in `analysis/PROJECT_NEXT_STEPS_PLAN.md` almeno la fase corrente, la
-   closure appena raggiunta, il prossimo boundary aperto e i task/criteri
-   residui pertinenti; la ripartenza orchestrativa deve essere guidata da quel
-   piano e non da un task inventato ex novo o da sola memoria della sessione;
+4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md` e questo
+   `AGENTS.md`;
+5. per la ripartenza ricostruisci lo stato dal task esplicito dell'Utente o, in
+   sua assenza, dal più piccolo task tecnicamente giustificato tra i temi/confini
+   realmente aperti nel repository e nel manuale;
 6. nel manuale tecnico leggi obbligatoriamente la sezione di stato corrente,
    l'ultimo avanzamento consolidato e i blocker o le decisioni architetturali
    pertinenti al task;
 7. per ogni claim tecnico storico, cerca nel manuale e leggi la sezione
    pertinente prima di usare quel claim;
 8. esamina storia, diff e artefatti necessari allo step.
-
-`analysis/PROJECT_NEXT_STEPS_PLAN.md` non richiede lettura integrale a ogni
-ripartenza: usa lettura mirata delle sezioni necessarie per ricostruire fase,
-sequencing, boundary e lavoro residuo. Tuttavia nessuna ripartenza orchestrata
-può ignorarlo o deviare dal lavoro ancora aperto che vi è registrato senza una
-nuova decisione esplicita dell'Utente o un `REPLAN` tecnicamente giustificato.
 
 Il manuale tecnico non richiede lettura integrale per default. Memoria della
 sessione e session summary non sono autorità tecniche:
@@ -134,26 +119,9 @@ Salvo autorizzazione esplicita e specifica dell'Utente:
 
 Una implementazione terza più invasiva non costituisce autorizzazione a replicarne il comportamento sul target locale.
 
-### 3.1 Roadmap production approvata
-
-La roadmap A→F approvata dall'Utente il 13 settembre 2026 è il percorso
-predefinito:
-
-```text
-PHASE_ORDER=A>B>C>D>E>F
-```
-
-La fase corrente, il sequencing, i boundary aperti e il lavoro residuo da
-portare a termine sono governati da `analysis/PROJECT_NEXT_STEPS_PLAN.md`; il
-manuale tecnico resta l'autorità per conoscenza e stato tecnico. L'AI PM può
-applicare corrective e replan locali nella fase corrente, ma non può ignorare
-il piano, saltare/invertire fasi, iniziare la fase successiva prima della
-closure di quella corrente, ampliare il target o cambiare materialmente la
-roadmap senza nuova decisione esplicita dell'Utente.
-
 Il materiale storico/deprecato non viene cancellato. L'eventuale archivio
-privato canonico è `red_tag/`. Non spostare materiale durante le fasi A–E.
-Prima di qualsiasi pubblicazione in Phase F è obbligatorio auditare import,
+privato canonico è `red_tag/`.
+Prima di qualsiasi pubblicazione pubblica è obbligatorio auditare import,
 build, test, script, riferimenti documentali, provenance, licensing e
 dipendenze production, disaccoppiare ciò che è ancora referenziato, spostare in
 `red_tag/` tutto il materiale non pubblico e inserire la directory in
@@ -173,6 +141,15 @@ Principi permanenti:
 5. una correzione locale resta nello stesso Dxxx quando non cambia il confine tecnico;
 6. un commit o una suite verde non provano da soli correttezza o closure;
 7. nessuna conoscenza tecnica rilevante deve restare confinata nella sessione AI.
+
+### Autorità probatoria tecnica
+
+Per claim target-specific su APP12509, safety, persistenza e factory state, usa
+questa priorità: stato reale di repository/host → evidenza locale sul target →
+manuale tecnico → evidenze versionate → fonti/reference esterne → contesto della
+sessione → inferenza del modello. Una reference esterna può guidare
+l'implementazione o corroborare un risultato, ma non prova da sola il
+comportamento del target locale.
 
 ### Pragmatism First / Operator Time Is a Project Resource
 
@@ -207,6 +184,14 @@ MATERIAL_ARCHITECTURAL_OR_REPOSITORY_ADVANCEMENT
 
 La numerazione Dxxx non è avanzamento.
 
+### Criterio di qualità
+
+La qualità non si misura nel numero di file, test, commit, report o Dxxx
+prodotti. Si misura nella riduzione di un'incertezza reale, nella
+riproducibilità, nella chiarezza di noto/non noto, nella riduzione dei rischi
+nascosti e nell'avanzamento concreto verso il target. Negli step device-oriented
+deve inoltre emergere evidenza o apprendimento reale al confine device-side.
+
 ---
 
 ## 5. Modalità autonoma PM ↔ Executor
@@ -218,19 +203,14 @@ Deve ricostruire lo stato reale del repository prima di scegliere il primo task:
 - branch e HEAD;
 - storia recente;
 - worktree e diff non committato;
-- fase corrente, sequencing, boundary aperto e lavoro residuo da `analysis/PROJECT_NEXT_STEPS_PLAN.md`;
+- task Utente corrente, se presente;
 - ultimo avanzamento tecnico documentato;
-- ultimo Dxxx pertinente;
-- sezioni obbligatorie e pertinenti del manuale tecnico;
-- test, report, launcher e artefatti rilevanti;
-- eventuale lavoro interrotto.
+- eventuale lavoro incompleto;
+- blocker;
+- task/temi/confini tecnici ancora aperti pertinenti dal repository e dal manuale;
+- test, report, launcher e artefatti rilevanti.
 
-Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere coerente con
-il successivo lavoro ancora aperto registrato nel piano. Non inventare una nuova
-direzione perché una milestone locale è chiusa o perché esiste un'alternativa
-tecnicamente interessante. Deviazioni reali dal piano richiedono `REPLAN` entro
-scope autorizzato oppure `HUMAN_REQUIRED` quando cambiano strategia, scope o
-rischio.
+Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere scelto dal task esplicito dell'Utente o dal più piccolo task tecnicamente giustificato ricostruito da stato reale, manuale, evidenze e blocker. Non inventare una nuova direzione senza giustificazione tecnica o richiesta Utente.
 
 Un worktree sporco non è automaticamente un errore. Può essere lavoro lasciato da una sessione interrotta. Non cancellarlo, resettarlo, stasharlo o sovrascriverlo senza averne ricostruito provenienza e intento.
 
@@ -264,15 +244,6 @@ PROJECT_STEP_COMPLETE
 ```
 
 `PROJECT_STEP_COMPLETE` non significa “ho finito un singolo task”. Va usato solo quando non esiste più un successivo passo autonomamente consentito verso l'obiettivo complessivo corrente.
-
-Eccezione vincolante: la closure formale della fase corrente impone
-`PROJECT_STEP_COMPLETE` dopo aggiornamento documentale, commit e push su
-`origin/development`, quindi stop assoluto. Non iniziare né preparare la fase
-successiva nella stessa sessione:
-
-```text
-PHASE_CLOSED => STOP
-```
 
 ---
 
@@ -583,16 +554,12 @@ Il manuale non è un log append-only.
 Quando cambia lo stato:
 
 - aggiorna le sezioni alte/canoniche interessate;
-- aggiorna indice, tabelle, roadmap/stato quando necessario;
+- aggiorna indice, tabelle, stato quando necessario;
 - aggiungi una sezione Dxxx solo se utile alla provenance;
 - correggi o marca come superate formulazioni stale;
 - non duplicare inutilmente contenuto ancora valido.
 
-In Phase F il manuale destinato alla pubblicazione deve essere rieditato e
-ristrutturato in inglese come vero manuale tecnico; non deve essere una
-traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione
-pubblica di Phase F è in inglese. `AGENTS.md`, `START_PROMPT.md` e le Linee
-Guida restano governance interna e non richiedono traduzione.
+Nel percorso verso la pubblicazione pubblica, il manuale destinato alla pubblicazione deve essere rieditato e ristrutturato in inglese come vero manuale tecnico; non deve essere una traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione pubblica è in inglese. `AGENTS.md` e `START_PROMPT.md` restano governance interna e non richiedono traduzione.
 
 ---
 
@@ -645,10 +612,10 @@ Non aggiungere a review set o materiale destinato alla pubblicazione:
 
 Le evidenze raw private autentiche possono vivere in `<git-root>/captures/` secondo la policy del repository privato e devono essere escluse da futuri export pubblici salvo audit specifico.
 
-Prima di ogni pubblicazione Phase F, l'audit completo deve spostare in
+Prima di ogni pubblicazione pubblica, l'audit completo deve spostare in
 `red_tag/` il materiale non pubblico, aggiungere `red_tag/` a `.gitignore` e
 provare che build, test e release non dipendono da tale directory. Lo
-spostamento non va anticipato alle fasi precedenti.
+spostamento non va anticipato senza ragione.
 
 ---
 
@@ -740,7 +707,7 @@ La scelta del modello e della relativa configurazione appartiene all'Utente e al
 
 ## 19. Modifica delle policy
 
-L'agente autonomo non modifica `AGENTS.md`, `START_PROMPT.md` o le Linee Guida come normale attività tecnica.
+L'agente autonomo non modifica `AGENTS.md` o `START_PROMPT.md` come normale attività tecnica.
 
 Una modifica a questi file di governance richiede una decisione esplicita dell'Utente.
 
@@ -762,7 +729,7 @@ sicurezza hardware forte
 +
 branch development isolato e recuperabile
 +
-piano operativo canonico per sequencing e lavoro residuo
+selezione del lavoro task e theme-driven
 +
 manuale canonico vivo
 +

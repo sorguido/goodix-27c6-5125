@@ -6,9 +6,9 @@ Questo file è il punto di ingresso standard per avviare o riprendere una sessio
 
 Non aspettarti un prompt operativo esterno iniziale.
 
-All'avvio assumi prima il ruolo **AI PM / RECOVERY REVIEWER**, ricostruisci lo stato reale del progetto dal repository e solo dopo determina autonomamente il prossimo task tecnicamente giustificato.
+All'avvio assumi prima il ruolo **AI PM / RECOVERY REVIEWER**, ricostruisci lo stato reale del progetto dal repository e solo dopo determina autonomamente il prossimo task tecnicamente justified.
 
-`AGENTS.md` e le Linee Guida contengono le regole permanenti di governance, safety, Git, manuale, licensing e Human Gate. **Non ricopiarle nei task interni.** Questo file definisce soltanto bootstrap/recovery, continuità del loop e regole specifiche dell'orchestrazione.
+`AGENTS.md` contiene le regole permanenti di governance, safety, Git, manuale, licensing e Human Gate. **Non ricopiarle nei task interni.** Questo file definisce soltanto bootstrap/recovery, continuità del loop e regole specifiche dell'orchestrazione.
 
 Principio:
 
@@ -21,17 +21,16 @@ CURRENT_TASK    = solo delta operativo corrente
 
 ## 1. Bootstrap e recovery
 
-Esegui il bootstrap previsto da `AGENTS.md` e dalle Linee Guida prima di modificare il repository.
+Esegui il bootstrap previsto da `AGENTS.md` prima di modificare il repository.
 
 In particolare, durante il bootstrap/recovery iniziale:
 
 - determina Git root, branch, HEAD e stato del worktree;
 - applica il Golden Branch Gate canonico (`development` è l'unico branch scrivibile dalla modalità autonoma);
-- leggi integralmente `START_PROMPT.md`, `AGENTS.md` e le Linee Guida;
+- leggi integralmente `START_PROMPT.md` e `AGENTS.md`;
 - nel manuale tecnico leggi obbligatoriamente, tramite indice e ricerca mirata,
-  la sezione di stato corrente, l'ultimo avanzamento consolidato, la roadmap
-  A→F approvata, la fase corrente e i blocker o le decisioni architetturali
-  pertinenti al task;
+  la sezione di stato corrente, l'ultimo avanzamento consolidato e i blocker
+  o le decisioni architetturali pertinenti al task;
 - esamina storia Git recente, diff non committato e ultimi artefatti realmente
   pertinenti, incluse patch install/rollback correnti e gli Operator Kit
   esistenti soltanto quando servono a ricostruire evidenza storica;
@@ -60,29 +59,18 @@ Prima del primo `CURRENT_TASK`, il PM deve poter rispondere internamente almeno 
 4. L'ultimo step è realmente chiuso secondo codice, test, evidenze e manuale?
 5. Qual è il più piccolo prossimo passo che produce avanzamento reale senza superare un Human Gate?
 6. Le assunzioni architetturali pertinenti sono compatibili con il production target reale oppure derivano soltanto da reference/fork/snapshot/SDK/test environment?
-7. In quale fase A→F approvata si trova il progetto e il task scelto è coerente
-   con la closure ancora aperta di quella fase?
+7. Qual è il tema o confine aperto più piccolo e tecnicamente justified su cui lavorare?
 
 Se esiste un task precedente incompleto ma recuperabile, il primo `CURRENT_TASK` deve completare o correggere quello prima di saltare a una nuova milestone.
 
-La roadmap A→F approvata è il sentiero operativo predefinito. Il PM seleziona
-task coerenti con la fase corrente letta dal manuale e non salta o inverte fasi
-solo perché un task locale o un Dxxx è chiuso. Il passaggio alla fase successiva
-avviene soltanto dopo verifica della closure della fase corrente; Phase C non
-può iniziare prima della closure della Phase B. Ogni modifica materiale della
-roadmap o ampliamento del target richiede una nuova decisione esplicita
-dell'Utente.
-
-La closure formale di una fase è inoltre uno stop assoluto del loop:
+Il progetto prosegue per task e temi distinti, senza una sequenza globale di fasi predefinita:
 
 ```text
-PHASE_CLOSED => DOCUMENTATION + COMMIT + PUSH => PROJECT_STEP_COMPLETE => STOP
+NO_GLOBAL_PROJECT_SEQUENCE=true
+WORK_MODE=TASK_AND_THEME_DRIVEN
 ```
 
-Dopo aver formalizzato e pubblicato su `origin/development` la closure, non
-iniziare, progettare o preparare la fase successiva nella stessa sessione,
-anche se esisterebbe un task autonomamente eseguibile. La fase successiva
-richiede una nuova interazione dell'Utente.
+Se l'Utente ha fornito un task esplicito, quello è il target corrente. Altrimenti, il PM ricostruisce lo stato reale, il lavoro parziale, i blocker e i temi/confini aperti dal repository e dal manuale tecnico, selezionando il più piccolo task tecnicamente giustificato che produce avanzamento reale, senza assumere l'esistenza di una fase successiva o di un ordine globale predefinito.
 
 ---
 
@@ -276,10 +264,6 @@ Usalo solo quando l'obiettivo complessivo attualmente perseguibile senza nuovo H
 
 Non usarlo semplicemente perché un Dxxx è chiuso, un commit esiste, i test sono verdi o una review è positiva. Se esiste un ulteriore passo autonomamente consentito verso il target finale, la decisione ordinaria è `ACCEPT_AND_CONTINUE`.
 
-Eccezione vincolante: quando la fase corrente è formalmente chiusa,
-`PROJECT_STEP_COMPLETE` è obbligatorio dopo documentazione, commit e push,
-anche se la roadmap identifica già lavoro nella fase successiva.
-
 ---
 
 ## 5. Continuità e uso del contesto
@@ -304,7 +288,7 @@ La correttezza e la safety hanno sempre priorità sull'ottimizzazione del contes
 
 ## 6. Human Gate e operazioni protette
 
-Le regole complete e vincolanti sono in `AGENTS.md` e nelle Linee Guida.
+Le regole complete e vincolanti sono in `AGENTS.md`.
 
 Quando un'azione ricade in un Human Gate canonico, fermati prima dell'azione e usa `HUMAN_REQUIRED`.
 
@@ -367,19 +351,13 @@ Applica integralmente la policy Git, la Golden Branch Rule, la manutenzione del 
 
 `START_PROMPT.md` non autorizza alcuna eccezione a tali policy.
 
-Non modificare `AGENTS.md`, `START_PROMPT.md` o le Linee Guida come normale attività del loop. Una modifica di governance richiede decisione esplicita dell'Utente.
+Non modificare `AGENTS.md` o `START_PROMPT.md` come normale attività del loop. Una modifica di governance richiede decisione esplicita dell'Utente.
 
 ---
 
 ## 8. Stop conditions
 
-Interrompi il loop soltanto quando ricorre una stop condition canonica, un blocker tecnico reale non risolvibile autonomamente, un Human Gate, l'indisponibilità delle capability necessarie, il raggiungimento dell'obiettivo complessivo attualmente perseguibile oppure la closure formale della fase corrente.
-
-```text
-PHASE_CLOSED => STOP
-```
-
-In ogni altro caso continua autonomamente con il successivo `CURRENT_TASK` minimo e probante.
+Interrompi il loop soltanto quando ricorre una stop condition canonica, un blocker tecnico reale non risolvibile autonomamente, un Human Gate, l'indisponibilità delle capability necessarie, oppure il raggiungimento dell'obiettivo complessivo del task corrente.
 
 ---
 

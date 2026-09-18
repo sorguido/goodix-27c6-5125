@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Governance corrente — v3.3 (14 settembre 2026)
+### Governance corrente
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
 confine operativo fra AI e Utente:
@@ -114,17 +114,14 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
-La v3.0 ha recepito la roadmap A→F approvata dall'Utente il 13 settembre 2026.
-Le v3.1–v3.3 non la modificano e mantengono invariati Human Gate, safety,
-factory-preserving, protezioni Git, licensing, target production iniziale,
-ordine delle fasi e phase gate descritti nella sezione narrativa seguente.
+Il 17 settembre 2026 l'Utente ha stabilito che la roadmap sequenziale A→F è sostanzialmente chiusa e non governa più il progetto. Il lavoro prosegue per task e temi distinti. Si mantengono invariati Human Gate, safety, factory-preserving, protezioni Git, licensing e target production iniziale.
 
 ### Consultazione del manuale al bootstrap
 
 Il manuale resta l'autorità narrativa tecnica primaria, ma non deve essere
 letto integralmente per default. Al bootstrap sono obbligatorie la sezione di
-stato corrente, l'ultimo avanzamento consolidato, la roadmap A→F approvata, la
-fase corrente e i blocker o le decisioni architetturali pertinenti. Per ogni
+stato corrente, l'ultimo avanzamento consolidato, i temi/confini aperti e i
+blocker o le decisioni architetturali pertinenti. Per ogni
 claim tecnico storico l'agente deve cercare nel manuale e leggere la sezione
 rilevante prima di affidarsi a memoria, contesto o session summary.
 
@@ -143,15 +140,11 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Roadmap production A→F approvata e fase corrente
+### Stato del progetto e qualificazione dello stack
 
-L'Utente ha approvato il 13 settembre 2026 la roadmap production seguente come
-sentiero operativo predefinito fino alla fine del progetto:
+Lo stato consolidato del progetto e la qualificazione dello stack sono riassunti di seguito:
 
 ```text
-USER_APPROVED_ROADMAP=true
-APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=PHASE_F
 D297_KSCREENLOCKER_LIVE_GATE=PASS
 REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
 HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
@@ -160,11 +153,9 @@ PLASMA_PASSWORD_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
 PLASMA_FINGERPRINT_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
 D297_FULL_CLOSURE=PASS
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
-PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
 PHASE_E_CLOSED=true
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 ```
 
 Il target production iniziale resta deliberatamente ristretto a:
@@ -191,13 +182,13 @@ chiude offline B2 e D293/03 esaurisce i prerequisiti offline per B3/B4 con il
 vero fprintd host-only e il contratto statico KDE installato. Le Phase B e C
 sono chiuse; le prove lifecycle riportate dall'Utente hanno chiuso anche Phase
 D. D296 ha qualificato la release candidate privata e chiuso Phase E. Prima
-di iniziare Phase F, l'Utente ha aperto il correttivo bounded D297/01 perché il
+prima dell'attività di pubblicazione, l'Utente ha aperto il correttivo bounded D297/01 perché il
 deployment qualificato gestiva `plasmalogin` ma non rendeva persistente il
 percorso KScreenLocker già provato da D289. D297 ha aggiunto la persistenza
 managed e l'Utente ha ora confermato sul runtime storico D293 il vero percorso
 `Meta+L → fingerprint → MATCH → unlock`, seguito da PASS per `sudo` con
 fingerprint e per i login Plasma con password e fingerprint. D297 è chiuso e
-la decisione corrente dell'Utente avvia Phase F. Il corrective D293
+la decisione corrente dell'Utente avvia l'attività di documentazione e pubblicazione. Il corrective D293
 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il
@@ -230,26 +221,24 @@ aperta dalla decisione esplicita dell'Utente del 15 settembre 2026 e chiusa da
 D296. D297 ha poi chiuso il correttivo KScreenLocker e la decisione corrente
 dell'Utente ha avviato Phase F.
 
-Principi trasversali della roadmap:
+Principi trasversali di progetto:
 
-- rispettare l'ordine A→B→C→D→E→F e chiudere ogni fase prima della successiva;
-- in particolare, chiudere il comportamento nativo multi-user KDE/fprintd
-  della Phase B prima di iniziare packaging e integrazione host della Phase C;
+- chiudere il comportamento nativo multi-user KDE/fprintd prima di avanzare con packaging e integrazione host;
 - mantenere fprintd proprietario di utenti e template, senza database Goodix
   parallelo salvo blocker tecnico concreto e riesame della strategia;
 - trattare gli Operator Kit esistenti come evidenza/diagnostica storica, non
   come metodo di validazione corrente o UX production, e non creare una GUI
   Goodix custom senza blocker reale e nuova decisione dell'Utente;
-- non cancellare materiale storico o deprecato. In Phase F, prima della
+- non cancellare materiale storico o deprecato. Prima della
   pubblicazione, un audit completo deve spostare tutto il materiale non
   pubblico in `red_tag/`, aggiungere la directory a `.gitignore` e provare che
   build, test e release non ne dipendono; non anticipare lo spostamento;
 - non confondere closure funzionale, packaging, lifecycle e qualificazione di
-  release: ogni fase chiude il proprio confine con evidenza proporzionata;
+  release: ogni area di qualificazione conserva la propria evidenza proporzionata;
 - applicare sempre Human Gate, factory-preserving, Git protections, licensing e
-  safety vigenti. La roadmap non introduce deroghe.
+  safety vigenti.
 
-#### Phase A — consolidare e classificare il codice
+#### Qualificazione sorgente e classificazione del codice
 
 **Obiettivo.** Identificare senza ambiguità la sorgente production e separarla
 da test, reference, evidenze, storico/deprecato, tooling sviluppatore e
@@ -276,7 +265,7 @@ distribuiti e relativa provenance/licenza; clean build, ABI fprintd e
 compatibilità col target reale risultano riproducibili e verificate. Solo dopo
 questa closure si passa alla Phase B.
 
-#### Phase B — driver multi-user e workflow KDE/fprintd nativo — CLOSED
+#### Qualificazione multi-user e workflow KDE/fprintd nativo — CLOSED
 
 **Obiettivo.** Fare sì che ogni normale utente locale, presente o creato dopo
 l'installazione, possa registrare e gestire autonomamente le proprie impronte
@@ -302,7 +291,7 @@ gestire le proprie impronte nel normale workflow KDE/fprintd, senza strumenti
 Goodix o configurazioni per utente. La Phase C non inizia prima di questa
 closure.
 
-#### Phase C — distribuzione source-first e integrazione PAM/systemd/SELinux — CLOSED
+#### Qualificazione distribuzione source-first e integrazione host — CLOSED
 
 **Obiettivo.** Trasformare il driver multi-user in software installabile,
 aggiornabile e reversibile su Fedora KDE tramite clone del repository, build
@@ -324,7 +313,7 @@ diagnosi e recovery.
 canonica pertinente. La baseline finale è `448f5c8...`, `ACTIVE`, con materiali
 ready, PAM gestito attivo, vendor Fedora invariato e root runtime `0755`.
 
-#### Phase D — lifecycle e recovery operativa minima — CLOSED
+#### Qualificazione lifecycle e recovery operativa — CLOSED
 
 **Obiettivo.** Per decisione dell'Utente del 14 settembre 2026, qualificare
 soltanto suspend/resume e cancellation/recovery di un'action. Hotplug, rimozione
@@ -346,7 +335,7 @@ risultato biometrico terminale bounded e non deve essere interpretato come
 MATCH. Non è stata necessaria alcuna modifica al codice. I criteri ridotti di
 Phase D sono soddisfatti e la fase è chiusa.
 
-#### Phase E — qualificazione release, sicurezza e licenze — CLOSED
+#### Qualificazione release, sicurezza e licenze — CLOSED
 
 **Obiettivo.** Su un prodotto sostanzialmente completo, chiudere test matrix,
 threat/privacy review, SBOM, attribution, audit licenze/combined work, criteri
@@ -371,7 +360,7 @@ e SBOM SPDX 2.3 sono PASS. La candidate è content-addressed e firmabile, ma non
 è stata firmata. I claim coprono solo Fedora 44 KDE x86_64 e Goodix
 `27c6:5125`/APP12509; tutto il resto è `NOT_YET_CLAIMED`.
 
-#### Phase F — documentazione, handoff e pubblicazione
+#### Qualificazione documentazione, handoff e pubblicazione
 
 **Obiettivo.** Allineare guide di installazione, uso, gestione impronte KDE,
 amministrazione, troubleshooting, recovery e sviluppo; architettura, limiti,
@@ -382,22 +371,16 @@ letteralmente né pubblicato come diario Dxxx. Prima di ogni export pubblico si
 auditano contenuto e Git history, si sposta tutto il materiale non pubblico in
 `red_tag/`, si aggiunge la directory a `.gitignore`, si dimostra che
 build/release non ne dipendono e si produce un export sanitizzato. La governance
-interna (`AGENTS.md`, `START_PROMPT.md`, Linee Guida) non richiede traduzione.
+interna (`AGENTS.md`, `START_PROMPT.md`) non richiede traduzione.
 
 **Closure F.** Documentazione e artefatto verificato sono coerenti; audit di
 contenuto/history, privacy, secret e licenze sono chiusi; ogni pubblicazione o
 modifica del repository pubblico resta separata, soggetta a Human Gate e a
 decisione esplicita dell'Utente. `red_tag/` resta escluso dall'export pubblico.
 
-Alla closure formale di ogni fase si aggiornano documentazione e stato, si
-eseguono commit e push su `origin/development`, quindi il loop si arresta senza
-iniziare la fase successiva:
 
-```text
-PHASE_CLOSED => STOP
-```
 
-### Stato corrente — correttivo KScreenLocker pre-Phase-F aperto
+### Stato corrente — correttivo KScreenLocker
 
 D292/01 ha chiuso A1; D292/02 chiude A3/A4. `production/` è l'unica autorità
 di composizione: ricostruisce Fedora 44/libfprint 1.94.100 dal commit pristine
@@ -567,7 +550,6 @@ KScreenLocker con tre regressioni finali PASS e avvia Phase F; la pubblicazione
 non è iniziata.
 
 ```text
-CURRENT_PHASE=PHASE_F
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
@@ -662,14 +644,13 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
 RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
 RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1
 RELEASE_QUALIFICATION=PASS_WITH_D297_CORRECTIVE
-NEXT_WORK_CLASS=PHASE_F_PUBLICATION_AUDIT
-CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+NEXT_WORK_CLASS=PUBLICATION_PREPARATION_AND_AUDIT
+HISTORICAL_TASK_AT_D298_01=PUBLIC_HISTORY_STRATEGY_DECISION
 NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
 NEW_LIVE_REQUIRED_NOW=false
 PM_DECISION=HUMAN_REQUIRED
@@ -697,7 +678,7 @@ D295_03_RECOVERY_REINSTALL=PASS
 D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
 PHASE_C_CLOSURE_CRITERIA=PASS
 PHASE_C_CLOSED=true
-PHASE_CLOSED => STOP
+HISTORICAL_PHASE_CLOSED=true
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -757,7 +738,6 @@ PHASE_B_B1=COMPLETED
 PRODUCTION_USER_HOME_HARDCODE_COUNT=0
 PROTECTED_FILE_CONTENT_READ=false
 REAL_USB_ACCESS=0
-CURRENT_PHASE=B
 PRODUCTION_READY=false
 NEXT_BOUNDARY=SUPERSEDED_BY_D293_02
 ```
@@ -825,7 +805,6 @@ VERIFY_RESULT_CALLBACK=ADDED_MINIMAL
 AUTOMATIC_RETRY_ADDED=false
 REAL_USB_ACCESS=0
 PROTECTED_FILE_CONTENT_READ=false
-CURRENT_PHASE=B
 PRODUCTION_READY=false
 NEXT_BOUNDARY=SUPERSEDED_BY_D293_04_R7_DECISION
 ```
@@ -864,7 +843,6 @@ D293_03_VERIFY_ANY_MULTI_FINGER=PASS
 D293_03_PRINCIPAL_NAMESPACE_ISOLATION=PASS
 REAL_USB_ACCESS=0
 PROTECTED_FILE_CONTENT_READ=false
-CURRENT_PHASE=B
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
 NEXT_BOUNDARY=SUPERSEDED_BY_D293_04_R7_DECISION
@@ -1013,7 +991,6 @@ quindi limitato alla baseline software configurata osservabile. D285 è il
 predecessore di rollback.
 
 ```text
-CURRENT_PHASE=B
 TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
 OPERATOR_KIT_DEFAULT=false
 D293_INSTALL_PATCH=READY
@@ -1227,7 +1204,6 @@ sono il confine deliberato della Phase C.
 
 ```text
 PHASE_B_CLOSED=true
-NEXT_PHASE=C
 NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
@@ -1315,7 +1291,6 @@ EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 REAL_USB_ACCESS=0
 LIVE_EXECUTION_PERFORMED=false
 PHASE_E_CLOSED=true
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 PM_DECISION=PROJECT_STEP_COMPLETE
 ```
 
@@ -1450,7 +1425,7 @@ CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
 
-### Stato corrente Phase F — D298/01 decisione history privata
+### Stato corrente documentazione e pubblicazione — D298/01 decisione history privata
 
 L'inventario iniziale della superficie ha confermato materiale protetto,
 privato o non redistribuibile sia nel tree corrente sia nella history Git
@@ -1479,7 +1454,7 @@ PUBLIC_REPOSITORY_ACCESSED=false
 HISTORY_REWRITE_PERFORMED=false
 PUBLIC_ROOT_HISTORY_CREATED=false
 PUBLICATION_TRANSFER=USER_MANUAL_COPY
-CURRENT_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
+OPEN_THEME=PUBLIC_WORKING_TREE_SEPARATION
 NEXT_BOUNDARY=PUBLIC_SURFACE_CONTENT_AND_DEPENDENCY_AUDIT
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
@@ -1523,7 +1498,7 @@ PRODUCTION_BUILD_SANITIZER=PASS
 PRODUCTION_LIBRARY_SHA256=acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
 FINAL_RUNTIME_BUNDLE_FILE_COUNT=5
 REAL_CAPTURE_SECOND_READER=HUMAN_REQUIRED
-NEXT_PHASE_F_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
+NEXT_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
 ```
 
 ### Avanzamento live precedente — closure Phase D lifecycle
@@ -1760,7 +1735,7 @@ VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
 MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
 tentativo, retry nascosto o illimitato.
 
-### Review complessiva post-D291 e applicazione della roadmap approvata
+### Review complessiva post-D291 e qualificazione dello stack
 
 La chiusura D291 completa la sequenza di fattibilità e qualificazione dei
 consumer reali: enrollment diversity Rocky-derived, FP3 attraverso close/open,
@@ -1783,12 +1758,7 @@ corrente production candidate D293 senza dipendere dal kit e demanda
 all'Utente l'osservazione diretta di KDE/fprintd. Tale osservazione è ora PASS:
 systemd, KDE/PolicyKit, nuovo UID e USB sono stati attraversati dal normale
 workflow manuale, senza usare il kit D293/04.
-La roadmap
-A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
-manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
-Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
-
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`
+Lo stato e le qualificazioni dello stack sono descritti in dettaglio nella sezione alta canonica di questo manuale.
 
 La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
 soluzione di packaging. Analogamente, D285 `/usr/local` e D293 restano
@@ -1819,18 +1789,13 @@ PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=READY_FOR_PUBLICATION_PREPARATION
 PROJECT_RELEASE_CANDIDATE_READY=READY_FOR_PHASE_F_PUBLICATION_PREPARATION
 RELEASE_QUALIFICATION=PASS_WITH_D297_CORRECTIVE
-PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D297_CLOSED_BOUNDARIES
 PM_DECISION=HUMAN_REQUIRED
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
 NEW_LIVE_REQUIRED_NOW=false
-PROJECT_NEXT_STEPS_PLAN_READY=true
-USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=PHASE_F
-PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
@@ -1890,14 +1855,13 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
-NEXT_WORK_CLASS=PHASE_F_PUBLICATION_AUDIT
+NEXT_WORK_CLASS=PUBLICATION_PREPARATION_AND_AUDIT
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+HISTORICAL_TASK_AT_D298_01=PUBLIC_HISTORY_STRATEGY_DECISION
 NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
@@ -1944,7 +1908,7 @@ D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
 PHASE_C_CLOSURE_CRITERIA=PASS
 PHASE_C_CLOSED=true
 PM_DECISION=PROJECT_STEP_COMPLETE
-PHASE_CLOSED => STOP
+HISTORICAL_PHASE_CLOSED=true
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
@@ -11090,7 +11054,7 @@ strumenti autorizzati sul remoto privato. Bundle ed export pubblici escludono il
 raw; la futura pubblicazione richiede sanitizzazione esplicita di contenuto e
 history. Non esiste sincronizzazione automatica privato→pubblico.
 
-La root contiene soltanto fonti canoniche, licenze, linee guida e directory di
+La root contiene soltanto fonti canoniche, licenze e directory di
 progetto. Gli output Dxxx sono step-local e non cumulativi in
 `analysis/Dxxx/`, inclusi bundle e checksum; `analysis/README.md` è il solo
 indice sintetico e non sostituisce questo manuale. Il manifest
@@ -11354,7 +11318,7 @@ DIRECT_ROCKYTKG_REUSE=PREFERRED_WHEN_PER_FILE_COMPATIBLE
 INDEPENDENT_LGPL_REIMPLEMENTATION=FALLBACK_ONLY
 ```
 
-Roadmap corrente:
+Avanzamento D276-D277:
 
 ```text
 D276/01 -> architettura production e ownership CLOSED_OFFLINE
