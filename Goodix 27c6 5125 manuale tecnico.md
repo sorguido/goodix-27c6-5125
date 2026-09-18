@@ -114,17 +114,14 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
-La v3.0 ha recepito la roadmap A→F approvata dall'Utente il 13 settembre 2026.
-Le v3.1–v3.3 non la modificano e mantengono invariati Human Gate, safety,
-factory-preserving, protezioni Git, licensing, target production iniziale,
-ordine delle fasi e phase gate descritti nella sezione narrativa seguente.
+Il 17 settembre 2026 l'Utente ha stabilito che la roadmap sequenziale A→F è sostanzialmente chiusa e non governa più il progetto. Il lavoro prosegue per task e temi distinti. Si mantengono invariati Human Gate, safety, factory-preserving, protezioni Git, licensing e target production iniziale.
 
 ### Consultazione del manuale al bootstrap
 
 Il manuale resta l'autorità narrativa tecnica primaria, ma non deve essere
 letto integralmente per default. Al bootstrap sono obbligatorie la sezione di
-stato corrente, l'ultimo avanzamento consolidato, la roadmap A→F approvata, la
-fase corrente e i blocker o le decisioni architetturali pertinenti. Per ogni
+stato corrente, l'ultimo avanzamento consolidato, i temi/confini aperti e i
+blocker o le decisioni architetturali pertinenti. Per ogni
 claim tecnico storico l'agente deve cercare nel manuale e leggere la sezione
 rilevante prima di affidarsi a memoria, contesto o session summary.
 
@@ -143,15 +140,11 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Roadmap production A→F approvata e fase corrente
+### Stato del progetto e qualificazione dello stack
 
-L'Utente ha approvato il 13 settembre 2026 la roadmap production seguente come
-sentiero operativo predefinito fino alla fine del progetto:
+Lo stato consolidato del progetto e la qualificazione dello stack sono riassunti di seguito:
 
 ```text
-USER_APPROVED_ROADMAP=true
-APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=PHASE_F
 D297_KSCREENLOCKER_LIVE_GATE=PASS
 REAL_KDE_LOCKED_SESSION_UNLOCK=PROVEN
 HISTORICAL_RUNTIME_KSCREENLOCKER_LIVE_UNLOCK=PROVEN
@@ -160,11 +153,9 @@ PLASMA_PASSWORD_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
 PLASMA_FINGERPRINT_LOGIN_REGRESSION=PASS_HUMAN_OBSERVED
 D297_FULL_CLOSURE=PASS
 CANDIDATE_FULL_LIVE_MIGRATION_TEST=DEFERRED_UNTIL_USER_MIGRATION
-PHASE_ORDER=A>B>C>D>E>F
 PHASE_C_CLOSED=true
 PHASE_D_CLOSED=true
 PHASE_E_CLOSED=true
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 ```
 
 Il target production iniziale resta deliberatamente ristretto a:
@@ -230,11 +221,9 @@ aperta dalla decisione esplicita dell'Utente del 15 settembre 2026 e chiusa da
 D296. D297 ha poi chiuso il correttivo KScreenLocker e la decisione corrente
 dell'Utente ha avviato Phase F.
 
-Principi trasversali della roadmap:
+Principi trasversali di progetto:
 
-- rispettare l'ordine A→B→C→D→E→F e chiudere ogni fase prima della successiva;
-- in particolare, chiudere il comportamento nativo multi-user KDE/fprintd
-  della Phase B prima di iniziare packaging e integrazione host della Phase C;
+- chiudere il comportamento nativo multi-user KDE/fprintd prima di avanzare con packaging e integrazione host;
 - mantenere fprintd proprietario di utenti e template, senza database Goodix
   parallelo salvo blocker tecnico concreto e riesame della strategia;
 - trattare gli Operator Kit esistenti come evidenza/diagnostica storica, non
@@ -247,7 +236,7 @@ Principi trasversali della roadmap:
 - non confondere closure funzionale, packaging, lifecycle e qualificazione di
   release: ogni fase chiude il proprio confine con evidenza proporzionata;
 - applicare sempre Human Gate, factory-preserving, Git protections, licensing e
-  safety vigenti. La roadmap non introduce deroghe.
+  safety vigenti.
 
 #### Phase A — consolidare e classificare il codice
 
@@ -567,7 +556,6 @@ KScreenLocker con tre regressioni finali PASS e avvia Phase F; la pubblicazione
 non è iniziata.
 
 ```text
-CURRENT_PHASE=PHASE_F
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
@@ -662,7 +650,6 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
 RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
@@ -757,7 +744,6 @@ PHASE_B_B1=COMPLETED
 PRODUCTION_USER_HOME_HARDCODE_COUNT=0
 PROTECTED_FILE_CONTENT_READ=false
 REAL_USB_ACCESS=0
-CURRENT_PHASE=B
 PRODUCTION_READY=false
 NEXT_BOUNDARY=SUPERSEDED_BY_D293_02
 ```
@@ -825,7 +811,6 @@ VERIFY_RESULT_CALLBACK=ADDED_MINIMAL
 AUTOMATIC_RETRY_ADDED=false
 REAL_USB_ACCESS=0
 PROTECTED_FILE_CONTENT_READ=false
-CURRENT_PHASE=B
 PRODUCTION_READY=false
 NEXT_BOUNDARY=SUPERSEDED_BY_D293_04_R7_DECISION
 ```
@@ -864,7 +849,6 @@ D293_03_VERIFY_ANY_MULTI_FINGER=PASS
 D293_03_PRINCIPAL_NAMESPACE_ISOLATION=PASS
 REAL_USB_ACCESS=0
 PROTECTED_FILE_CONTENT_READ=false
-CURRENT_PHASE=B
 PHASE_B_CLOSED=false
 PRODUCTION_READY=false
 NEXT_BOUNDARY=SUPERSEDED_BY_D293_04_R7_DECISION
@@ -1013,7 +997,6 @@ quindi limitato alla baseline software configurata osservabile. D285 è il
 predecessore di rollback.
 
 ```text
-CURRENT_PHASE=B
 TEST_METHOD=PATCH_FIRST_LIVE_VALIDATION
 OPERATOR_KIT_DEFAULT=false
 D293_INSTALL_PATCH=READY
@@ -1227,7 +1210,6 @@ sono il confine deliberato della Phase C.
 
 ```text
 PHASE_B_CLOSED=true
-NEXT_PHASE=C
 NEXT_WORK_CLASS=SOURCE_FIRST_MANAGED_HOST_INTEGRATION
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
@@ -1315,7 +1297,6 @@ EXECUTABLE_CLOSURE=PASS_OFFLINE_MAXIMUM
 REAL_USB_ACCESS=0
 LIVE_EXECUTION_PERFORMED=false
 PHASE_E_CLOSED=true
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 PM_DECISION=PROJECT_STEP_COMPLETE
 ```
 
@@ -1523,7 +1504,7 @@ PRODUCTION_BUILD_SANITIZER=PASS
 PRODUCTION_LIBRARY_SHA256=acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
 FINAL_RUNTIME_BUNDLE_FILE_COUNT=5
 REAL_CAPTURE_SECOND_READER=HUMAN_REQUIRED
-NEXT_PHASE_F_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
+NEXT_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
 ```
 
 ### Avanzamento live precedente — closure Phase D lifecycle
@@ -1760,7 +1741,7 @@ VERIFY/MATCH offre fino a tre tentativi fisici espliciti, termina al primo
 MATCH, chiude come `NO_MATCH_SERIES` dopo tre NO_MATCH e vieta quarto
 tentativo, retry nascosto o illimitato.
 
-### Review complessiva post-D291 e applicazione della roadmap approvata
+### Review complessiva post-D291 e qualificazione dello stack
 
 La chiusura D291 completa la sequenza di fattibilità e qualificazione dei
 consumer reali: enrollment diversity Rocky-derived, FP3 attraverso close/open,
@@ -1783,12 +1764,7 @@ corrente production candidate D293 senza dipendere dal kit e demanda
 all'Utente l'osservazione diretta di KDE/fprintd. Tale osservazione è ora PASS:
 systemd, KDE/PolicyKit, nuovo UID e USB sono stati attraversati dal normale
 workflow manuale, senza usare il kit D293/04.
-La roadmap
-A→F approvata è descritta in dettaglio nella sezione alta canonica di questo
-manuale. Il piano operativo con stato PROVEN/IMPLEMENTED/PoC, rischi, Human
-Gate e `WHAT_NOT_TO_TEST_AGAIN` è:
-
-`analysis/PROJECT_NEXT_STEPS_PLAN.md`
+Lo stato e le qualificazioni dello stack sono descritti in dettaglio nella sezione alta canonica di questo manuale.
 
 La modifica PAM diretta che ha chiuso D290 resta evidenza funzionale, non una
 soluzione di packaging. Analogamente, D285 `/usr/local` e D293 restano
@@ -1819,18 +1795,13 @@ PROJECT_FEASIBILITY=PROVEN_ON_TARGET_APP12509
 PROJECT_PRODUCTION_READY=READY_FOR_PUBLICATION_PREPARATION
 PROJECT_RELEASE_CANDIDATE_READY=READY_FOR_PHASE_F_PUBLICATION_PREPARATION
 RELEASE_QUALIFICATION=PASS_WITH_D297_CORRECTIVE
-PROJECT_NEXT_STEPS_PLAN=analysis/PROJECT_NEXT_STEPS_PLAN.md
 WHAT_NOT_TO_TEST_AGAIN=D279_THROUGH_D297_CLOSED_BOUNDARIES
 PM_DECISION=HUMAN_REQUIRED
 D291_CLOSURE=PROVEN_ON_TARGET
 D291_BIOMETRIC_STABILITY_GATE=PASS
 D291_ROCKY_DIVERSITY_LIVE=PASS
 NEW_LIVE_REQUIRED_NOW=false
-PROJECT_NEXT_STEPS_PLAN_READY=true
-USER_APPROVED_ROADMAP=true
 APPROVAL_DATE=2026-09-13
-CURRENT_PHASE=PHASE_F
-PHASE_ORDER=A>B>C>D>E>F
 D292_01_PRODUCTION_SOURCE_INVENTORY=PASS
 PHASE_A_A1=COMPLETED
 PHASE_A_A3=COMPLETED
@@ -1890,7 +1861,6 @@ PHASE_D_CODE_CHANGE_REQUIRED=false
 CODE_CHANGE_REQUIRED=NO
 PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
-NEXT_PHASE=NONE_CURRENT_PHASE_F
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
 NEXT_WORK_CLASS=PHASE_F_PUBLICATION_AUDIT
@@ -11354,7 +11324,7 @@ DIRECT_ROCKYTKG_REUSE=PREFERRED_WHEN_PER_FILE_COMPATIBLE
 INDEPENDENT_LGPL_REIMPLEMENTATION=FALLBACK_ONLY
 ```
 
-Roadmap corrente:
+Avanzamento D276-D277:
 
 ```text
 D276/01 -> architettura production e ownership CLOSED_OFFLINE
