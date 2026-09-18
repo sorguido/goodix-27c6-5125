@@ -8,7 +8,7 @@ Non aspettarti un prompt operativo esterno iniziale.
 
 All'avvio assumi prima il ruolo **AI PM / RECOVERY REVIEWER**, ricostruisci lo stato reale del progetto dal repository e solo dopo determina autonomamente il prossimo task tecnicamente justified.
 
-`AGENTS.md` e le Linee Guida contengono le regole permanenti di governance, safety, Git, manuale, licensing e Human Gate. **Non ricopiarle nei task interni.** Questo file definisce soltanto bootstrap/recovery, continuità del loop e regole specifiche dell'orchestrazione.
+`AGENTS.md` contiene le regole permanenti di governance, safety, Git, manuale, licensing e Human Gate. **Non ricopiarle nei task interni.** Questo file definisce soltanto bootstrap/recovery, continuità del loop e regole specifiche dell'orchestrazione.
 
 Principio:
 
@@ -21,13 +21,13 @@ CURRENT_TASK    = solo delta operativo corrente
 
 ## 1. Bootstrap e recovery
 
-Esegui il bootstrap previsto da `AGENTS.md` e dalle Linee Guida prima di modificare il repository.
+Esegui il bootstrap previsto da `AGENTS.md` prima di modificare il repository.
 
 In particolare, durante il bootstrap/recovery iniziale:
 
 - determina Git root, branch, HEAD e stato del worktree;
 - applica il Golden Branch Gate canonico (`development` è l'unico branch scrivibile dalla modalità autonoma);
-- leggi integralmente `START_PROMPT.md`, `AGENTS.md` e le Linee Guida;
+- leggi integralmente `START_PROMPT.md` e `AGENTS.md`;
 - nel manuale tecnico leggi obbligatoriamente, tramite indice e ricerca mirata,
   la sezione di stato corrente, l'ultimo avanzamento consolidato e i blocker
   o le decisioni architetturali pertinenti al task;
@@ -288,7 +288,7 @@ La correttezza e la safety hanno sempre priorità sull'ottimizzazione del contes
 
 ## 6. Human Gate e operazioni protette
 
-Le regole complete e vincolanti sono in `AGENTS.md` e nelle Linee Guida.
+Le regole complete e vincolanti sono in `AGENTS.md`.
 
 Quando un'azione ricade in un Human Gate canonico, fermati prima dell'azione e usa `HUMAN_REQUIRED`.
 
@@ -351,7 +351,7 @@ Applica integralmente la policy Git, la Golden Branch Rule, la manutenzione del 
 
 `START_PROMPT.md` non autorizza alcuna eccezione a tali policy.
 
-Non modificare `AGENTS.md`, `START_PROMPT.md` o le Linee Guida come normale attività del loop. Una modifica di governance richiede decisione esplicita dell'Utente.
+Non modificare `AGENTS.md` o `START_PROMPT.md` come normale attività del loop. Una modifica di governance richiede decisione esplicita dell'Utente.
 
 ---
 

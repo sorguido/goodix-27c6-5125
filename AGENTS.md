@@ -7,10 +7,9 @@ Questo file è la costituzione operativa persistente per l'agente AI che lavora 
 Le fonti principali sono:
 
 1. decisione o autorizzazione esplicita corrente dell'Utente;
-2. `Linee Guida di Progetto Goodix 27c6 5125 per AI.md`;
-3. questo `AGENTS.md`;
-4. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
-5. evidenze versionate nel repository.
+2. questo `AGENTS.md`;
+3. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
+4. evidenze versionate nel repository.
 
 Una decisione esplicita corrente dell'Utente può autorizzare una deroga limitata. Nessuna deroga può essere inferita da un generico “procedi”, dalla disponibilità dell'hardware o dal fatto che una stessa operazione sia stata autorizzata in passato.
 
@@ -47,8 +46,8 @@ Prima di modificare qualunque file:
 1. identifica la Git root;
 2. verifica il branch corrente;
 3. verifica `git status --short`;
-4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
-   `AGENTS.md` e le Linee Guida;
+4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md` e questo
+   `AGENTS.md`;
 5. per la ripartenza ricostruisci lo stato dal task esplicito dell'Utente o, in
    sua assenza, dal più piccolo task tecnicamente giustificato tra i temi/confini
    realmente aperti nel repository e nel manuale;
@@ -543,7 +542,7 @@ Quando cambia lo stato:
 - correggi o marca come superate formulazioni stale;
 - non duplicare inutilmente contenuto ancora valido.
 
-Nel percorso verso la pubblicazione pubblica, il manuale destinato alla pubblicazione deve essere rieditato e ristrutturato in inglese come vero manuale tecnico; non deve essere una traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione pubblica è in inglese. `AGENTS.md`, `START_PROMPT.md` e le Linee Guida restano governance interna e non richiedono traduzione.
+Nel percorso verso la pubblicazione pubblica, il manuale destinato alla pubblicazione deve essere rieditato e ristrutturato in inglese come vero manuale tecnico; non deve essere una traduzione letterale né un diario cronologico Dxxx. Tutta la documentazione pubblica è in inglese. `AGENTS.md` e `START_PROMPT.md` restano governance interna e non richiedono traduzione.
 
 ---
 
@@ -691,7 +690,7 @@ La scelta del modello e della relativa configurazione appartiene all'Utente e al
 
 ## 19. Modifica delle policy
 
-L'agente autonomo non modifica `AGENTS.md`, `START_PROMPT.md` o le Linee Guida come normale attività tecnica.
+L'agente autonomo non modifica `AGENTS.md` o `START_PROMPT.md` come normale attività tecnica.
 
 Una modifica a questi file di governance richiede una decisione esplicita dell'Utente.
 

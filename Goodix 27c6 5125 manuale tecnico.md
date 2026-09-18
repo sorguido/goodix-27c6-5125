@@ -238,7 +238,7 @@ Principi trasversali di progetto:
 - applicare sempre Human Gate, factory-preserving, Git protections, licensing e
   safety vigenti.
 
-#### Phase A — consolidare e classificare il codice
+#### Qualificazione sorgente e classificazione del codice
 
 **Obiettivo.** Identificare senza ambiguità la sorgente production e separarla
 da test, reference, evidenze, storico/deprecato, tooling sviluppatore e
@@ -265,7 +265,7 @@ distribuiti e relativa provenance/licenza; clean build, ABI fprintd e
 compatibilità col target reale risultano riproducibili e verificate. Solo dopo
 questa closure si passa alla Phase B.
 
-#### Phase B — driver multi-user e workflow KDE/fprintd nativo — CLOSED
+#### Qualificazione multi-user e workflow KDE/fprintd nativo — CLOSED
 
 **Obiettivo.** Fare sì che ogni normale utente locale, presente o creato dopo
 l'installazione, possa registrare e gestire autonomamente le proprie impronte
@@ -291,7 +291,7 @@ gestire le proprie impronte nel normale workflow KDE/fprintd, senza strumenti
 Goodix o configurazioni per utente. La Phase C non inizia prima di questa
 closure.
 
-#### Phase C — distribuzione source-first e integrazione PAM/systemd/SELinux — CLOSED
+#### Qualificazione distribuzione source-first e integrazione host — CLOSED
 
 **Obiettivo.** Trasformare il driver multi-user in software installabile,
 aggiornabile e reversibile su Fedora KDE tramite clone del repository, build
@@ -313,7 +313,7 @@ diagnosi e recovery.
 canonica pertinente. La baseline finale è `448f5c8...`, `ACTIVE`, con materiali
 ready, PAM gestito attivo, vendor Fedora invariato e root runtime `0755`.
 
-#### Phase D — lifecycle e recovery operativa minima — CLOSED
+#### Qualificazione lifecycle e recovery operativa — CLOSED
 
 **Obiettivo.** Per decisione dell'Utente del 14 settembre 2026, qualificare
 soltanto suspend/resume e cancellation/recovery di un'action. Hotplug, rimozione
@@ -335,7 +335,7 @@ risultato biometrico terminale bounded e non deve essere interpretato come
 MATCH. Non è stata necessaria alcuna modifica al codice. I criteri ridotti di
 Phase D sono soddisfatti e la fase è chiusa.
 
-#### Phase E — qualificazione release, sicurezza e licenze — CLOSED
+#### Qualificazione release, sicurezza e licenze — CLOSED
 
 **Obiettivo.** Su un prodotto sostanzialmente completo, chiudere test matrix,
 threat/privacy review, SBOM, attribution, audit licenze/combined work, criteri
@@ -360,7 +360,7 @@ e SBOM SPDX 2.3 sono PASS. La candidate è content-addressed e firmabile, ma non
 è stata firmata. I claim coprono solo Fedora 44 KDE x86_64 e Goodix
 `27c6:5125`/APP12509; tutto il resto è `NOT_YET_CLAIMED`.
 
-#### Phase F — documentazione, handoff e pubblicazione
+#### Qualificazione documentazione, handoff e pubblicazione
 
 **Obiettivo.** Allineare guide di installazione, uso, gestione impronte KDE,
 amministrazione, troubleshooting, recovery e sviluppo; architettura, limiti,
@@ -371,7 +371,7 @@ letteralmente né pubblicato come diario Dxxx. Prima di ogni export pubblico si
 auditano contenuto e Git history, si sposta tutto il materiale non pubblico in
 `red_tag/`, si aggiunge la directory a `.gitignore`, si dimostra che
 build/release non ne dipendono e si produce un export sanitizzato. La governance
-interna (`AGENTS.md`, `START_PROMPT.md`, Linee Guida) non richiede traduzione.
+interna (`AGENTS.md`, `START_PROMPT.md`) non richiede traduzione.
 
 **Closure F.** Documentazione e artefatto verificato sono coerenti; audit di
 contenuto/history, privacy, secret e licenze sono chiusi; ogni pubblicazione o
@@ -383,7 +383,7 @@ eseguono commit e push su `origin/development`, quindi il loop si arresta senza
 iniziare la fase successiva:
 
 ```text
-PHASE_CLOSED => STOP
+HISTORICAL_PHASE_CLOSED=true
 ```
 
 ### Stato corrente — correttivo KScreenLocker pre-Phase-F aperto
@@ -655,8 +655,8 @@ PHASE_E_CLOSURE_CRITERIA=PASS
 RELEASE_CANDIDATE=df2b8331c260ef3b26bd5483ee88b92d5c88bca5
 RELEASE_CANDIDATE_SHA256=2eef7a406f61b03b838562f68eb6531e986129231dd56a3a653f79749272c6a1
 RELEASE_QUALIFICATION=PASS_WITH_D297_CORRECTIVE
-NEXT_WORK_CLASS=PHASE_F_PUBLICATION_AUDIT
-CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+NEXT_WORK_CLASS=PUBLICATION_PREPARATION_AND_AUDIT
+HISTORICAL_TASK_AT_D298_01=PUBLIC_HISTORY_STRATEGY_DECISION
 NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
 NEW_LIVE_REQUIRED_NOW=false
 PM_DECISION=HUMAN_REQUIRED
@@ -684,7 +684,7 @@ D295_03_RECOVERY_REINSTALL=PASS
 D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
 PHASE_C_CLOSURE_CRITERIA=PASS
 PHASE_C_CLOSED=true
-PHASE_CLOSED => STOP
+HISTORICAL_PHASE_CLOSED=true
 ```
 
 Inventario, classificazione, blocker e validator sono in
@@ -1460,7 +1460,7 @@ PUBLIC_REPOSITORY_ACCESSED=false
 HISTORY_REWRITE_PERFORMED=false
 PUBLIC_ROOT_HISTORY_CREATED=false
 PUBLICATION_TRANSFER=USER_MANUAL_COPY
-CURRENT_TASK=D298_02_PUBLIC_WORKING_TREE_SEPARATION
+OPEN_THEME=PUBLIC_WORKING_TREE_SEPARATION
 NEXT_BOUNDARY=PUBLIC_SURFACE_CONTENT_AND_DEPENDENCY_AUDIT
 PM_DECISION=ACCEPT_AND_CONTINUE
 ```
@@ -1863,11 +1863,11 @@ PHASE_D_STATUS=CLOSED
 PHASE_D_CLOSURE_CRITERIA=PASS
 PHASE_E_STATUS=CLOSED
 PHASE_E_CLOSURE_CRITERIA=PASS
-NEXT_WORK_CLASS=PHASE_F_PUBLICATION_AUDIT
+NEXT_WORK_CLASS=PUBLICATION_PREPARATION_AND_AUDIT
 PHASE_C_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
 RPM_OFFICIAL_DISTRIBUTION=false
 D294_RPM_ROLE=HISTORICAL_PROTOTYPE_AND_EVIDENCE
-CURRENT_TASK=D298_01_PUBLIC_HISTORY_STRATEGY_DECISION
+HISTORICAL_TASK_AT_D298_01=PUBLIC_HISTORY_STRATEGY_DECISION
 NEXT_BOUNDARY=HUMAN_GATE_PUBLIC_GIT_LINEAGE
 D294_01_RPM_BUILD=PASS
 D294_01_PACKAGED_LIBRARY_BYTE_IDENTICAL=true
@@ -1914,7 +1914,7 @@ D295_03_FINAL_BASELINE_COMMIT=448f5c8cc6099032a23115a96e90428d75b74a7b
 PHASE_C_CLOSURE_CRITERIA=PASS
 PHASE_C_CLOSED=true
 PM_DECISION=PROJECT_STEP_COMPLETE
-PHASE_CLOSED => STOP
+HISTORICAL_PHASE_CLOSED=true
 ```
 
 D279 è chiuso sul boundary enrollment production. La run one-shot autorizzata
@@ -11060,7 +11060,7 @@ strumenti autorizzati sul remoto privato. Bundle ed export pubblici escludono il
 raw; la futura pubblicazione richiede sanitizzazione esplicita di contenuto e
 history. Non esiste sincronizzazione automatica privato→pubblico.
 
-La root contiene soltanto fonti canoniche, licenze, linee guida e directory di
+La root contiene soltanto fonti canoniche, licenze e directory di
 progetto. Gli output Dxxx sono step-local e non cumulativi in
 `analysis/Dxxx/`, inclusi bundle e checksum; `analysis/README.md` è il solo
 indice sintetico e non sostituisce questo manuale. Il manifest
