@@ -1,5 +1,13 @@
 # Cold-login immediate contact: resolution review, 2026-09-19
 
+Historical review of the initial investigation. The User subsequently chose
+the bounded same-action lift/recontact experiment. Its temporary patch and
+current operational instructions are in `development/patches/login-same-action/`
+at the repository root and the current state is in the technical manual.
+No earlier-initialization strategy was authorized. The evidence below remains
+valid; statements that no experimental deployment is prepared describe the
+initial review, not the subsequent task.
+
 Baseline: `development`, `9f8dcb8eb6c652c8b511284f33e64b5be2dac7cb`.
 The worktree was clean at entry. This is a topic review, not a new D-number.
 The Italian technical manual remains the canonical narrative.

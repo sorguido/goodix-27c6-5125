@@ -30,6 +30,10 @@ typedef struct
   guint new_owner_completion_count;
   gboolean handoff_should_fail;
   gboolean stop_before_finger;
+  guint16 baseline_flags;
+  gboolean response_before_ack;
+  gboolean stop_before_82;
+  guint reverse_events;
   guint64 generation;
   uint16_t expected[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   guint8 expected_up[12];
@@ -521,7 +525,7 @@ run_full_trace (Fixture *fixture,
       ack = build_ack (0x36);
       feed_frame (fixture, ack, fragmentation);
       g_clear_pointer (&event, g_bytes_unref);
-      event = build_event (0x36, 0x0100, 0x0000,
+      event = build_event (0x36, 0x0100, fixture->baseline_flags,
                            (guint16) (0x0300u + fdt_index * 0x20u));
       feed_frame (fixture, event, fragmentation);
       if (fdt_index == 0)
@@ -536,11 +540,16 @@ run_full_trace (Fixture *fixture,
       else if (fdt_index == 1)
         {
           complete_command (fixture, 0x82, NULL, 0);
+          if (fixture->stop_before_82)
+            return;
           g_clear_pointer (&ack, g_bytes_unref);
           ack = build_ack (0x82);
           g_clear_pointer (&typed, g_bytes_unref);
           typed = build_response (0x82, typed82, sizeof typed82);
-          feed_pair (fixture, ack, typed, fragmentation);
+          if (fixture->response_before_ack)
+            feed_pair (fixture, typed, ack, fragmentation);
+          else
+            feed_pair (fixture, ack, typed, fragmentation);
           complete_command (fixture, 0x20, cmd01, sizeof cmd01);
           g_clear_pointer (&ack, g_bytes_unref);
           ack = build_ack (0x20);
@@ -558,6 +567,12 @@ run_full_trace (Fixture *fixture,
     {
       g_assert_true (g_queue_is_empty (fixture->out));
       return;
+    }
+  for (guint i = 0; i < fixture->reverse_events; i++)
+    {
+      g_clear_pointer (&event, g_bytes_unref);
+      event = build_event (0x32, 0x0080, 0x0000, 0x0180);
+      feed_frame (fixture, event, fragmentation);
     }
   if (fixture->stop_before_finger)
     return;
@@ -963,6 +978,14 @@ test_login_baseline_contact_rejected (void)
   feed_frame (fixture, ack_fdt, 0);
   feed_frame (fixture, event, 0);
 
+#ifdef GOODIX_SAME_ACTION_TEST
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FDT_NAV_1);
+  g_assert_false (fixture->audit.rejected_a0_observed);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 4u);
+  complete_command (fixture, 0x50, NULL, 0);
+  goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test cancellation");
+#else
   g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
                    ==, GOODIX_POST_TLS_PHASE_TERMINAL);
   g_assert_true (fixture->audit.rejected_a0_observed);
@@ -972,6 +995,7 @@ test_login_baseline_contact_rejected (void)
   g_assert_cmpint (fixture->audit.rejected_a0_irq, ==, 0x0100);
   g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x003f);
   g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
+#endif
   g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
   g_assert_cmpuint (fixture->terminal_count, ==, 1u);
   g_assert_true (g_queue_is_empty (fixture->out));
@@ -1010,6 +1034,107 @@ test_login_readiness_without_irq2_does_not_capture (void)
                      fixture->backend), ==, 0u);
   fixture_free (fixture);
 }
+
+#ifdef GOODIX_SAME_ACTION_TEST
+static void
+test_same_action_baseline_scope (void)
+{
+  for (guint i = 0; i < 3u; i++)
+    {
+      Fixture *fixture = fixture_new_for_profile (
+        i == 2u ? GOODIX_POST_TLS_CAPTURE_PROFILE_TWO_ACQUISITION :
+                  GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+      guint8 state[16] = { 0, 2 };
+      const guint16 flags[] = { 0x0040, 0x0001, 0x003f };
+      g_autoptr(GBytes) ack_d4 = build_ack (0xd4);
+      g_autoptr(GBytes) ack36 = build_ack (0x36);
+      g_autoptr(GBytes) ae = build_response (0xae, state, sizeof state);
+      g_autoptr(GBytes) event = build_event (0x36, 0x0100, flags[i], 0x0300);
+      g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
+      complete_command (fixture, 0xd4, NULL, 0);
+      feed_frame (fixture, ack_d4, 1u);
+      complete_command (fixture, 0xaf, NULL, 0);
+      feed_frame (fixture, ae, 1u);
+      complete_command (fixture, 0x36, NULL, 0);
+      feed_frame (fixture, ack36, 1u);
+      feed_frame (fixture, event, 1u);
+      g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+      g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
+      g_assert_true (fixture->audit.rejected_a0_observed);
+      g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+      fixture_free (fixture);
+    }
+}
+
+static void
+test_same_action_known_prefix_then_irq (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  fixture->baseline_flags = 0x003f;
+  fixture->response_before_ack = TRUE;
+  fixture->reverse_events = 2;
+  run_full_trace (fixture, 1u);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_STOP);
+  g_assert_cmpuint (fixture->image_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 13u);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 12u);
+  g_assert_cmpuint (fixture->audit.rearm_0x32_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.release_tail_complete_count, ==, 1u);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
+  fixture_free (fixture);
+}
+
+static void
+test_same_action_missing_irq_and_reverse_limit (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  g_autoptr(GBytes) reverse = build_event (0x32, 0x0080, 0, 0x0180);
+  fixture->baseline_flags = 0x003f;
+  fixture->response_before_ack = TRUE;
+  fixture->reverse_events = 2;
+  fixture->stop_before_finger = TRUE;
+  run_full_trace (fixture, 1u);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
+  g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  feed_frame (fixture, reverse, 1u);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_TERMINAL);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  fixture_free (fixture);
+}
+
+static void
+test_same_action_duplicate_response_fails (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  const guint8 data[] = { 0, 32 };
+  g_autoptr(GBytes) response = build_response (0x82, data, sizeof data);
+  fixture->stop_before_82 = TRUE;
+  run_full_trace (fixture, 1u);
+  feed_frame (fixture, response, 1u);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FDT_82);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_cmpuint (fixture->audit.command_count, ==, 6u);
+  feed_frame (fixture, response, 1u);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 6u);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  fixture_free (fixture);
+}
+#endif
 
 static void
 test_first_arm_backend_handoff (void)
@@ -1108,5 +1233,11 @@ main (int argc, char **argv)
                    test_login_baseline_contact_rejected);
   g_test_add_func ("/login-latency/readiness-without-irq2-does-not-capture",
                    test_login_readiness_without_irq2_does_not_capture);
+#ifdef GOODIX_SAME_ACTION_TEST
+  g_test_add_func ("/same-action/baseline-scope", test_same_action_baseline_scope);
+  g_test_add_func ("/same-action/known-prefix-conditional-irq", test_same_action_known_prefix_then_irq);
+  g_test_add_func ("/same-action/missing-irq-reverse-limit", test_same_action_missing_irq_and_reverse_limit);
+  g_test_add_func ("/same-action/duplicate-response-fails", test_same_action_duplicate_response_fails);
+#endif
   return g_test_run ();
 }

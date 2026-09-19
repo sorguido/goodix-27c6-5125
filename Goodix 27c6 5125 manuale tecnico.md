@@ -144,9 +144,10 @@ delle sezioni pertinenti.
 
 Il task esplicito dell'Utente riguarda il primo login Plasma dopo cold boot:
 `Invio → dito appoggiato subito`, senza attendere deliberatamente circa due
-secondi. **Il difetto resta aperto; non esiste una nuova candidate production
-pronta per la live.** I PASS funzionali riportati sotto non qualificano questo
-specifico timing. La review parte da `development` a
+secondi. **Il difetto resta aperto. È preparata soltanto la patch temporanea
+per il test lift/recontact nella stessa action, non una soluzione production.**
+I PASS funzionali riportati sotto non qualificano questo specifico timing.
+La review iniziale parte da `development` a
 `9f8dcb8eb6c652c8b511284f33e64b5be2dac7cb`, con worktree inizialmente pulito.
 
 Le undici fonti originali del tema sono state riesaminate integralmente. La
@@ -221,16 +222,83 @@ autorizza a reinstallare D299. Un nuovo contatto senza IRQ2 smentirebbe il
 semplice edge perso e imporrebbe di riesaminare calibrazione/arm, non ripetere
 un altro tentativo con pacing o logging diverso.
 
-Verifiche offline: runner lifecycle riallineato agli header Fedora già pin;
+Verifiche della review iniziale: runner lifecycle riallineato agli header Fedora già pin;
 due casi di caratterizzazione nel test esistente; 13/13 PASS normale e 13/13
 ASan/UBSan; `production/check-source.sh` e build production reale PASS, ABI
 verificata, nessuna dipendenza production dal tree privato, zero accesso USB.
 I nuovi test passano con il difetto ancora presente: verificano il rifiuto
 osservato e che la readiness senza IRQ2 non generi immagini/retry. Non provano
-una correzione hardware. Install/rollback non vengono presentati per una
-candidate inesistente. Stato: `HUMAN_REQUIRED`, avanzamento probatorio e
-closure eseguibile soltanto offline; login immediato e recovery PRE-HELD
-restano non qualificati.
+una correzione hardware. Quella review si fermava senza install/rollback per
+una candidate inesistente. La successiva decisione esplicita dell'Utente,
+descritta di seguito, autorizza la sola prova temporanea. Login immediato e
+recovery PRE-HELD restano non qualificati.
+
+#### Patch temporanea autorizzata — stessa action, lift/recontact
+
+L'Utente ha scelto esplicitamente la strada 1: Invio, contatto immediato, poi
+sollevamento completo e riappoggio se la medesima verifica è ancora attiva.
+Non ha autorizzato la strategia più ampia di inizializzazione anticipata.
+Implementazione e istruzioni operative sono in
+`development/patches/login-same-action/`; non è stato creato un Operator Kit,
+un collector o un nuovo D-number. Il precedente report resta la review storica
+dei dati e non è più l'autorità sullo stato di preparazione della patch.
+
+Il preparatore applica un solo diff a una copia dei sorgenti production
+`c0e13ff5f78ac32403a753446dcbc44aa7f30556`; il driver canonico non cambia.
+Nei soli profili single-acquisition VERIFY/IDENTIFY:
+
+- accetta nei tre sample FDT il flag aggiuntivo target-observed `0x003f`,
+  mantenendo trasformazione, soglie, limiti sui valori e numero di sample;
+- gestisce `82 data → ACK` attendendo entrambi, una volta ciascuno, prima
+  di proseguire; non invia comandi con ACK ancora atteso;
+- consuma al massimo due eventi `32/IRQ0080/flags0` fra primo arm e attesa,
+  senza OUT, riarmo o retry; un terzo evento o frame non ammesso è terminale;
+- registra marker sanitizzati per sample, attesa IRQ2, IRQ2 e fase terminale.
+
+Il percorso ENROLL conserva le regole precedenti. Non si ripristinano D299,
+resample D298, D2, reset, reopen, reconnect o nuovi comandi. Un delta fuori
+soglia resta terminale e rende la prova inconclusiva se non raggiunge l'attesa.
+L'ACK resta evidenza di accettazione, non prova di readiness analogica.
+
+La compatibilità con il deployment osservato richiede conservare i quattro
+sorgenti del loader materiali D293 al commit
+`e61fce313794922a2dab156a1b38a8ddc5837f19`: target material C/header, runtime
+material e runtime inputs. La variante attuale usa un altro formato manifest;
+il test non migra il deposito protetto. La build recupera solo codice Git già
+versionato, senza leggere secret, cache o materiali installati. Il preparatore
+registra commit completo della ricetta, basi sorgenti e hash del set compilato.
+
+Installazione utente: nuovo runtime, wrapper e drop-in dedicati, stato di
+rollback e override `/etc/pam.d/plasmalogin` da PAM vendor pin. La baseline
+D293 resta intatta. PAM viene limitato a `max-tries=1 timeout=20`: evita il
+secondo VerifyStart automatico dopo NO_MATCH; il driver conserva massimo una
+acquisizione da IRQ2 e zero riarmo nella action. I due contatti fisici, senza
+terzo contatto o nuovo Invio, sono il singolo esperimento espressamente
+richiesto dall'Utente: eccezione circoscritta alla serie ordinaria di §8.2,
+non modifica della policy. Un contatto privo di IRQ non è misurabile dal driver.
+
+Il README chiede contatto immediato, circa 3 s nella stessa attesa, sollevamento
+di circa 1 s e riappoggio. Qualunque risultato, anche durante il sollevamento,
+chiude la prova; niente nuova action per recuperarla. Un MATCH dopo riappoggio
+supporta la transizione persa, senza escludere cambi interni al firmware.
+Un timeout è discriminante soltanto se i marker confermano FIRST_IRQ2; un
+errore precedente è inconclusivo. Se manca ancora IRQ2, si riesamina
+calibrazione/arming, non si prepara un terzo tentativo equivalente con pacing.
+
+Il rollback è **obbligatorio anche dopo PASS**, perché il deployment è
+esplicitamente temporaneo. Rimuove i soli elementi creati, ripristina il PAM
+vendor, ExecStart D293 e lo stato attivo/inattivo iniziale del servizio.
+Verifica integrità e rifiuta di cancellare file modificati. Stato di ripristino
+e hash sono dati transazionali/provenance, non grant o credenziali autorizzative.
+
+Verifica offline: 17/17 test della variante e 13/13 della baseline, ciascuno
+sia normale sia ASan/UBSan; sei test di transazione su filesystem fittizio,
+inclusi failure di copia/label, ripresa rollback e preservazione dei file
+modificati; build reale con ABI fprintd, SONAME e audit simboli PASS. I replay
+con IRQ2 sintetico provano esclusivamente il comportamento host condizionato
+alla sua ricezione, non il risultato fisico. Stato: `HUMAN_REQUIRED` prima di
+installazione, sudo e nuova live; nessuna USB reale o attivazione servizio
+eseguita dall'AI.
 
 ### Stato consolidato precedente e qualificazione dello stack
 
