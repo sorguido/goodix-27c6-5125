@@ -1,3 +1,10 @@
+> HISTORICAL / SUPERSEDED: live-validation evidence for commit
+> `9671e02e19504e20e0097f598fa960f2c13e7a1e`. The user confirmed immediate cold
+> login, password, sudo fingerprint and rollback PASS. Production now uses
+> `production/login/` and `deployment/managed-install/`; do not maintain or
+> deploy this historical overlay for new releases. The original recipe is
+> preserved to explain the evidence. No sub-second timing was measured.
+
 # Login Goodix: preparazione prima della schermata
 
 Candidate **development**, ricetta identificata dallo SHA completo di `git rev-parse HEAD`,

@@ -1,2 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 /etc/shadow-maint/userdel-pre\.d/50-goodix-fprint-account-delete -- system_u:object_r:goodix_fprint_account_delete_exec_t:s0
+# Paired runtime binaries use the existing Fedora domains, including after relabel.
+/usr/lib64/goodix-27c6-5125/[0-9a-f]{40}/fprintd -- system_u:object_r:fprintd_exec_t:s0
+/usr/lib64/goodix-27c6-5125/[0-9a-f]{40}/greeter -- system_u:object_r:xdm_exec_t:s0
+/usr/lib64/goodix-27c6-5125/[0-9a-f]{40}/pam_fprintd\.so -- system_u:object_r:lib_t:s0

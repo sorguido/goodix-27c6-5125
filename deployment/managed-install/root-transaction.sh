@@ -21,6 +21,8 @@ runtime_root=$(p /usr/lib64/goodix-27c6-5125)
 current_link=$runtime_root/current
 wrapper=$(p /usr/libexec/goodix-27c6-5125/fprintd-wrapper)
 dropin=$(p /etc/systemd/system/fprintd.service.d/99-goodix-27c6-5125-managed.conf)
+greeter_dropin=$(p /etc/systemd/user/plasma-login.service.d/99-goodix-login-greeter.conf)
+greeter_directory_created=false
 hook=$(p /etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete)
 vendor_pam=$(p /usr/lib/pam.d/plasmalogin)
 managed_pam=$(p /etc/pam.d/plasmalogin)
@@ -31,12 +33,15 @@ kde_fingerprint_managed_saved=$state_dir/kde-fingerprint.managed
 material=$(p /var/lib/goodix-5125-poc)
 policy_name=goodix_fprint_account_delete
 policy_priority=400
-expected_pam_rule='auth        sufficient                                   pam_fprintd.so'
+expected_pam_rule='auth        sufficient    /usr/lib64/goodix-27c6-5125/current/pam_fprintd.so max-tries=1 timeout=8'
+legacy_pam_rule='auth        sufficient                                   pam_fprintd.so'
 expected_kde_fingerprint_pam_rule='auth        required      pam_fprintd.so max-tries=3 timeout=45'
 required_candidate=(
   MANIFEST SHA256SUMS SBOM.spdx.json THIRD_PARTY_NOTICES.md LICENSE
   GPL-2.0-or-later.txt LGPL-2.1-or-later.txt GPL-3.0-or-later.txt
   Apache-2.0.txt OpenCV-LICENSES.txt
+  fprintd greeter pam_fprintd.so 99-goodix-login-greeter.conf login-source.sha256
+  fprintd-COPYING fprintd-AUTHORS production-source.sha256 fprintd-source.sha256
   libfprint-2.so.2.0.0 libgusb.so.2
   libopencv_core.so.413 libopencv_features2d.so.413 libopencv_flann.so.413
   libopencv_imgproc.so.413 fprintd-wrapper 50-goodix-fprint-account-delete
@@ -71,7 +76,10 @@ material_ready() {
   done
 }
 host_action() {
-  [[ -n $test_root ]] && return 0
+  if [[ -n $test_root ]]; then
+    [[ ${GOODIX_MANAGED_TEST_FAIL_ACTION:-} != "$1:${2:-}" ]] || return 1
+    return 0
+  fi
   "$@"
 }
 service_state() {
@@ -101,6 +109,9 @@ verify_candidate() {
   count=$(find "$candidate" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | wc -l)
   [[ $count -eq ${#required_candidate[@]} ]] || fail candidate_file_set_invalid
   [[ -z $(find "$candidate" -mindepth 1 -maxdepth 1 ! -type f -print -quit) ]] || fail candidate_nonregular_entry
+  awk 'NF != 2 || $1 !~ /^[0-9a-f]{64}$/ || $2 ~ /[^A-Za-z0-9_.-]/ { exit 1 }' "$candidate/SHA256SUMS" || fail candidate_checksum_grammar
+  cmp -s <(printf '%s\n' "${required_candidate[@]}" | grep -vx SHA256SUMS | LC_ALL=C sort) \
+    <(awk '{print $2}' "$candidate/SHA256SUMS" | LC_ALL=C sort) || fail candidate_checksum_file_set
   (cd "$candidate" && sha256sum -c SHA256SUMS >/dev/null) || fail candidate_digest_mismatch
   [[ $(manifest_value "$candidate" GOODIX_MANAGED_DISTRIBUTION_MODEL) == SOURCE_FIRST_MANAGED_INSTALL ]] || fail distribution_model_invalid
   [[ $(manifest_value "$candidate" RPM_OFFICIAL_DISTRIBUTION) == false ]] || fail rpm_policy_invalid
@@ -109,6 +120,7 @@ verify_candidate() {
   [[ $(manifest_value "$candidate" PAM_INTEGRATION) == MANAGED_ETC_OVERRIDE_FROM_VENDOR ]] || fail pam_integration_model_invalid
   [[ $(manifest_value "$candidate" KSCREENLOCKER_PAM_INTEGRATION) == MANAGED_PACKAGE_CONFIG_TRANSFORM ]] ||
     fail kscreenlocker_pam_integration_model_invalid
+  [[ $(manifest_value "$candidate" EARLY_LOGIN_INTEGRATION) == PAIRED_FPRINTD_PAM_GREETER_V1 ]] || fail early_login_integration_missing
   [[ $(manifest_value "$candidate" SBOM_FORMAT) == SPDX-2.3-JSON ]] || fail sbom_format_invalid
   [[ $(manifest_value "$candidate" COMBINED_BINARY_LICENSE) == GPL-3.0-or-later ]] || fail combined_binary_license_invalid
   [[ $(manifest_value "$candidate" FAR_FRR_CLAIM) == NOT_MADE ]] || fail far_frr_claim_invalid
@@ -124,6 +136,7 @@ freeze_candidate() {
   for name in "${required_candidate[@]}"; do
     [[ -f $source/$name && ! -L $source/$name ]] || fail "candidate_${name}_invalid"
   done
+  [[ $(find "$source" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq ${#required_candidate[@]} ]] || fail candidate_file_set_invalid
   if [[ -n $test_root ]]; then
     freeze=$(mktemp -d "$test_root/goodix-managed-candidate.XXXXXX")
   else
@@ -152,8 +165,31 @@ install_runtime_tree() {
     libopencv_features2d.so.413 libopencv_flann.so.413 libopencv_imgproc.so.413; do
     install -m 0644 -- "$candidate/$library" "$destination/$library"
   done
+  install -m 0755 "$candidate/fprintd" "$candidate/greeter" "$destination/"
+  install -m 0644 "$candidate/pam_fprintd.so" "$destination/"
+  host_action restorecon -RF "$destination"
+  host_action chcon --reference=/usr/libexec/fprintd "$destination/fprintd"
+  host_action chcon --reference=/usr/libexec/plasma-login-greeter "$destination/greeter"
+  host_action chcon --reference=/usr/lib64/security/pam_fprintd.so "$destination/pam_fprintd.so"
+  if [[ -n $test_root && ${GOODIX_MANAGED_TEST_FAIL_AFTER_LOGIN_RUNTIME:-false} == true ]]; then
+    fail injected_failure_after_login_runtime
+  fi
   ln -s libfprint-2.so.2.0.0 "$destination/libfprint-2.so.2"
   ln -s libfprint-2.so.2 "$destination/libfprint-2.so"
+}
+verify_runtime_layout() {
+  local directory=$1 file mode
+  [[ -d $directory && ! -L $directory ]] || fail runtime_directory_invalid
+  [[ $(readlink "$directory/libfprint-2.so.2") == libfprint-2.so.2.0.0 && \
+     $(readlink "$directory/libfprint-2.so") == libfprint-2.so.2 ]] || fail runtime_symlink_drift
+  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 11 ]] || fail runtime_file_set_drift
+  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter pam_fprintd.so; do
+    [[ -f $directory/$file && ! -L $directory/$file ]] || fail runtime_file_invalid
+    mode=644
+    [[ $file != fprintd && $file != greeter ]] || mode=755
+    [[ $(stat -c %a "$directory/$file") == "$mode" ]] || fail runtime_mode_drift
+    [[ -n $test_root || $(stat -c '%u:%g' "$directory/$file") == 0:0 ]] || fail runtime_owner_drift
+  done
 }
 tree_digest() {
   local directory=$1
@@ -410,6 +446,11 @@ write_state() {
     echo "WRAPPER_SHA256=$(digest "$wrapper")"
     echo "DROPIN_SHA256=$(digest "$dropin")"
     echo "HOOK_SHA256=$(digest "$hook")"
+    echo EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1
+    echo "GREETER_DROPIN_SHA256=$(digest "$greeter_dropin")"
+    echo "GREETER_DIRECTORY_CREATED=$greeter_directory_created"
+    echo "POLICY_SOURCE_SHA256=$policy_source_sha"
+    echo "POLICY_CONTEXTS_SHA256=$policy_contexts_sha"
     echo "CURRENT_PAM_STATUS=$current_pam"
     echo "PREVIOUS_PAM_STATUS=$previous_pam"
     echo "PAM_VENDOR_SHA256=$pam_vendor_sha"
@@ -447,6 +488,19 @@ verify_active() {
   [[ -f $state && ! -L $state ]] || fail state_missing
   [[ $(state_value GOODIX_MANAGED_STATUS) == ACTIVE ]] || fail state_inactive
   local current previous expected
+  if [[ $(state_value EARLY_LOGIN_INTEGRATION || true) == PAIRED_FPRINTD_PAM_GREETER_V1 ]]; then
+    [[ -f $greeter_dropin && ! -L $greeter_dropin && $(digest "$greeter_dropin") == $(state_value GREETER_DROPIN_SHA256) ]] || fail greeter_dropin_drift
+    greeter_directory_created=$(state_value GREETER_DIRECTORY_CREATED)
+    [[ $greeter_directory_created == true || $greeter_directory_created == false ]] || fail greeter_directory_state_invalid
+    policy_source_sha=$(state_value POLICY_SOURCE_SHA256)
+    policy_contexts_sha=$(state_value POLICY_CONTEXTS_SHA256)
+    is_sha "$policy_source_sha" && is_sha "$policy_contexts_sha" || fail policy_source_state_invalid
+    ACTIVE_LOGIN_STATE=MANAGED
+  else
+    [[ $allow_legacy == true ]] || fail legacy_login_requires_fresh_install
+    expected_pam_rule=$legacy_pam_rule
+    ACTIVE_LOGIN_STATE=LEGACY
+  fi
   current=$(state_value CURRENT_COMMIT); previous=$(state_value PREVIOUS_COMMIT)
   is_commit "$current" || fail current_commit_invalid
   [[ $previous == NONE ]] || is_commit "$previous" || fail previous_commit_invalid
@@ -455,6 +509,10 @@ verify_active() {
   if [[ $previous != NONE ]]; then
     [[ -d $runtime_root/$previous && ! -L $runtime_root/$previous ]] || fail previous_tree_missing
     [[ $(tree_digest "$runtime_root/$previous") == $(state_value PREVIOUS_TREE_SHA256) ]] || fail previous_tree_drift
+  fi
+  if [[ $ACTIVE_LOGIN_STATE == MANAGED ]]; then
+    verify_runtime_layout "$runtime_root/$current"
+    [[ $previous == NONE ]] || verify_runtime_layout "$runtime_root/$previous"
   fi
   for pair in "$wrapper:WRAPPER_SHA256" "$dropin:DROPIN_SHA256" "$hook:HOOK_SHA256"; do
     expected=$(state_value "${pair#*:}")
@@ -542,12 +600,45 @@ verify_active() {
   ACTIVE_KSCREENLOCKER_PAM_STATE=MANAGED
 }
 
+verify_login_host() {
+  local directory file unit
+  unit=$(p /usr/lib/systemd/user/plasma-login.service)
+  [[ -f $unit && ! -L $unit ]] || fail greeter_unit_missing
+  if [[ -z $test_root ]]; then
+    [[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' plasma-login-manager) == 6.7.5-1.fc44 ]] || fail unsupported_plasma_login_version
+    [[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' fprintd) == 1.94.5-5.fc44 ]] || fail unsupported_fprintd_version
+    [[ $(digest "$unit") == 97d00cf76a68583453ecee781c2bc8e9b2411d842464290698a2ad978f70f8f0 ]] || fail greeter_unit_drift
+    getent passwd plasmalogin >/dev/null || fail greeter_user_missing
+    [[ -x /usr/libexec/plasma-login-greeter ]] || fail greeter_missing
+  fi
+  # Do not layer this deployment over a development daemon or another UI wrapper.
+  for directory in /etc/systemd/user /usr/local/lib/systemd/user /run/systemd/user \
+      /var/lib/plasmalogin/.config/systemd/user; do
+    [[ ! -e $(p "$directory/plasma-login.service") && ! -L $(p "$directory/plasma-login.service") ]] || fail greeter_unit_override
+  done
+  for directory in /etc/systemd/user /usr/local/lib/systemd/user /usr/lib/systemd/user \
+      /run/systemd/user /var/lib/plasmalogin/.config/systemd/user; do
+    for file in "$(p "$directory")"/plasma-login.service.d/*.conf; do
+      [[ -e $file || -L $file ]] || continue
+      [[ $file == "$greeter_dropin" && -f $state ]] || fail greeter_dropin_collision
+    done
+  done
+  for directory in /etc/systemd/system /usr/local/lib/systemd/system /run/systemd/system; do
+    [[ ! -e $(p "$directory/fprintd.service") && ! -L $(p "$directory/fprintd.service") ]] || fail fprintd_unit_override
+    for file in "$(p "$directory")"/fprintd.service.d/*.conf; do
+      [[ -e $file || -L $file ]] || continue
+      [[ $file == "$dropin" && -f $state ]] || fail fprintd_dropin_collision
+    done
+  done
+}
+
 root_install_or_update() {
   local mode=$1 caller=$2 source_candidate=$3 candidate commit current previous service_before installer
   local current_pam pam_vendor_sha pam_override_sha
   local current_kde_pam kde_vendor_sha kde_override_sha
   [[ -n $test_root || ${SUDO_USER:-} == "$caller" ]] || fail caller_identity_mismatch
   candidate=$(freeze_candidate "$source_candidate" "$caller")
+  cleanup_candidate=$candidate
   cleanup_kind=none
   cleanup_runtime=
   cleanup_policy=false
@@ -555,6 +646,7 @@ root_install_or_update() {
   cleanup_link_switched=false
   cleanup_service_before=inactive
   cleanup_pam_installed=false
+  cleanup_greeter_installed=false
   cleanup_kde_pam_installed=false
   cleanup_transaction() {
     local rc=$?
@@ -578,6 +670,8 @@ root_install_or_update() {
         install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
         host_action restorecon -F "$kde_fingerprint_pam"
       fi
+      if [[ $cleanup_greeter_installed == true ]]; then rm -f -- "$greeter_dropin"; fi
+      if [[ $greeter_directory_created == true ]]; then rmdir -- "$(dirname "$greeter_dropin")" 2>/dev/null; fi
       rm -f -- "$current_link" "$wrapper" "$dropin" "$hook" "$managed_pam" "$pam_saved" \
         "$kde_fingerprint_vendor_saved" "$kde_fingerprint_managed_saved" "$state"
       [[ -z $cleanup_runtime || ! -d $cleanup_runtime ]] || find "$cleanup_runtime" -xdev -depth -delete
@@ -587,7 +681,7 @@ root_install_or_update() {
       host_action systemctl daemon-reload
       [[ $cleanup_service_before != active ]] || host_action systemctl start fprintd.service
     fi
-    remove_frozen_candidate "$candidate"
+    remove_frozen_candidate "$cleanup_candidate"
     exit "$rc"
   }
   trap cleanup_transaction EXIT
@@ -596,6 +690,8 @@ root_install_or_update() {
   verify_kde_fingerprint_pam_rule "$candidate"
   if [[ -f $state ]]; then
     verify_active true
+    [[ $ACTIVE_LOGIN_STATE == MANAGED ]] || fail legacy_login_requires_uninstall_then_fresh_install
+    verify_login_host
     current=$(state_value CURRENT_COMMIT); previous=$(state_value PREVIOUS_COMMIT)
     if [[ $commit == "$current" ]]; then
       [[ $ACTIVE_PAM_STATE != LEGACY && $ACTIVE_KSCREENLOCKER_PAM_STATE != LEGACY ]] ||
@@ -607,7 +703,10 @@ root_install_or_update() {
     [[ $previous == NONE ]] || fail rollback_slot_occupied
     [[ $(digest "$candidate/fprintd-wrapper") == $(state_value WRAPPER_SHA256) && \
        $(digest "$candidate/99-goodix-27c6-5125-managed.conf") == $(state_value DROPIN_SHA256) && \
-       $(digest "$candidate/50-goodix-fprint-account-delete") == $(state_value HOOK_SHA256) ]] ||
+       $(digest "$candidate/50-goodix-fprint-account-delete") == $(state_value HOOK_SHA256) && \
+       $(digest "$candidate/99-goodix-login-greeter.conf") == $(state_value GREETER_DROPIN_SHA256) && \
+       $(digest "$candidate/goodix_fprint_account_delete.te") == "$policy_source_sha" && \
+       $(digest "$candidate/goodix_fprint_account_delete.fc") == "$policy_contexts_sha" ]] ||
       fail managed_host_assets_changed_requires_fresh_install
     cleanup_kind=update
     cleanup_runtime=$runtime_root/$commit
@@ -636,6 +735,7 @@ root_install_or_update() {
       kde_vendor_sha=$(state_value KSCREENLOCKER_VENDOR_SHA256)
       kde_override_sha=$(state_value KSCREENLOCKER_OVERRIDE_SHA256)
     fi
+    host_action systemctl stop fprintd.service
     install_runtime_tree "$candidate" "$commit"
     ln -s "$commit" "$runtime_root/current.next"
     mv -Tf -- "$runtime_root/current.next" "$current_link"
@@ -656,6 +756,9 @@ root_install_or_update() {
     fail managed_path_collision
   verify_vendor_pam
   verify_kde_fingerprint_vendor
+  verify_login_host
+  [[ ! -e $greeter_dropin && ! -L $greeter_dropin ]] || fail greeter_dropin_collision
+  [[ -d $(dirname "$greeter_dropin") ]] || greeter_directory_created=true
   service_before=$(service_state)
   [[ $service_before == active || $service_before == inactive ]] || fail unsupported_service_state
   cleanup_kind=fresh
@@ -665,6 +768,8 @@ root_install_or_update() {
   install -d -m 0755 "$state_dir" "$(dirname "$wrapper")" "$(dirname "$dropin")" "$(dirname "$hook")"
   install_policy "$candidate"
   cleanup_policy=true
+  policy_source_sha=$(digest "$candidate/goodix_fprint_account_delete.te")
+  policy_contexts_sha=$(digest "$candidate/goodix_fprint_account_delete.fc")
   if [[ ${GOODIX_MANAGED_TEST_FAIL_AFTER_POLICY:-false} == true ]]; then fail injected_failure_after_policy; fi
   install -m 0755 "$candidate/fprintd-wrapper" "$wrapper"
   install -m 0755 "$candidate/50-goodix-fprint-account-delete" "$hook"
@@ -678,6 +783,9 @@ root_install_or_update() {
     fail injected_failure_after_kscreenlocker_pam
   fi
   install_runtime_tree "$candidate" "$commit"
+  cleanup_greeter_installed=true
+  install -D -m 0644 "$candidate/99-goodix-login-greeter.conf" "$greeter_dropin"
+  host_action restorecon -F "$greeter_dropin"
   ln -s "$commit" "$current_link"
   write_state "$commit" NONE "$caller" "$service_before" "$(tree_digest "$runtime_root/$commit")" NONE \
     ACTIVE NONE "$installed_pam_vendor_sha" "$installed_pam_override_sha" \
@@ -710,6 +818,10 @@ root_rollback() {
   previous_kde_pam=$(state_value PREVIOUS_KSCREENLOCKER_PAM_STATUS)
   kde_vendor_sha=$(state_value KSCREENLOCKER_VENDOR_SHA256)
   kde_override_sha=$(state_value KSCREENLOCKER_OVERRIDE_SHA256)
+  rollback_saved_current=$current
+  rollback_saved_pam=$current_pam
+  rollback_saved_kde_pam=$current_kde_pam
+  rollback_saved_service=$service_before
   rollback_pam_changed=false
   rollback_kde_pam_changed=false
   rollback_link_switched=false
@@ -718,11 +830,11 @@ root_rollback() {
     set +e
     if [[ $rc -ne 0 ]]; then
       if [[ $rollback_link_switched == true ]]; then
-        ln -s "$current" "$runtime_root/current.recovery"
+        ln -s "$rollback_saved_current" "$runtime_root/current.recovery"
         mv -Tf -- "$runtime_root/current.recovery" "$current_link"
       fi
       if [[ $rollback_pam_changed == true ]]; then
-        if [[ $current_pam == ACTIVE ]]; then
+        if [[ $rollback_saved_pam == ACTIVE ]]; then
           install -D -m 0644 "$pam_saved" "$managed_pam"
           host_action restorecon -F "$managed_pam"
         else
@@ -730,7 +842,7 @@ root_rollback() {
         fi
       fi
       if [[ $rollback_kde_pam_changed == true ]]; then
-        if [[ $current_kde_pam == ACTIVE ]]; then
+        if [[ $rollback_saved_kde_pam == ACTIVE ]]; then
           install -m 0644 "$kde_fingerprint_managed_saved" "$kde_fingerprint_pam"
         else
           install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
@@ -738,7 +850,7 @@ root_rollback() {
         host_action restorecon -F "$kde_fingerprint_pam"
       fi
       host_action systemctl daemon-reload
-      [[ $service_before != active ]] || host_action systemctl start fprintd.service
+      [[ $rollback_saved_service != active ]] || host_action systemctl start fprintd.service
     fi
     trap - EXIT
     exit "$rc"
@@ -764,11 +876,11 @@ root_rollback() {
   ln -s "$previous" "$runtime_root/current.next"
   mv -Tf -- "$runtime_root/current.next" "$current_link"
   rollback_link_switched=true
+  host_action systemctl daemon-reload
+  if material_ready && [[ $service_before == active ]]; then host_action systemctl start fprintd.service; fi
   write_state "$previous" "$current" "$caller" "$service_before" "$previous_digest" "$current_digest" \
     "$previous_pam" "$current_pam" "$vendor_sha" "$override_sha" \
     "$previous_kde_pam" "$current_kde_pam" "$kde_vendor_sha" "$kde_override_sha"
-  host_action systemctl daemon-reload
-  if material_ready && [[ $service_before == active ]]; then host_action systemctl start fprintd.service; fi
   printf '%s\n' 'GOODIX_MANAGED_ROLLBACK=PASS' "CURRENT_COMMIT=$previous" "ROLLBACK_COMMIT=$current" \
     "MANAGED_PAM_STATUS=$previous_pam" "KSCREENLOCKER_MANAGED_PAM_STATUS=$previous_kde_pam" \
     'PLASMALOGIN_VENDOR_MODIFIED=false' 'FINGERPRINT_AUTH_GLOBAL_STACK_UNCHANGED=true'
@@ -799,6 +911,10 @@ root_uninstall() {
     fi
   fi
   remove_policy
+  if [[ $ACTIVE_LOGIN_STATE == MANAGED ]]; then
+    rm -f -- "$greeter_dropin"
+    if [[ $greeter_directory_created == true ]]; then rmdir -- "$(dirname "$greeter_dropin")" 2>/dev/null || true; fi
+  fi
   rm -f -- "$current_link" "$wrapper" "$dropin" "$hook"
   find "$runtime_root/$current" -xdev -depth -delete
   if [[ $previous != NONE ]]; then find "$runtime_root/$previous" -xdev -depth -delete; fi
@@ -861,7 +977,7 @@ case ${1:-} in
       kde_pam_status=$(state_value CURRENT_KSCREENLOCKER_PAM_STATUS)
       kde_pam_managed=true
     fi
-    printf '%s\n' 'GOODIX_MANAGED_STATUS=ACTIVE' "CURRENT_COMMIT=$(state_value CURRENT_COMMIT)" \
+    printf '%s\n' 'GOODIX_MANAGED_STATUS=ACTIVE' "EARLY_LOGIN_STATUS=$ACTIVE_LOGIN_STATE" "CURRENT_COMMIT=$(state_value CURRENT_COMMIT)" \
       "PREVIOUS_COMMIT=$(state_value PREVIOUS_COMMIT)" \
       "PROTECTED_MATERIAL_READY=$(material_ready && echo true || echo false)" \
       'RPM_OFFICIAL_DISTRIBUTION=false' "MANAGED_PAM_INTEGRATION=$pam_managed" \

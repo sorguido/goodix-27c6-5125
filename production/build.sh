@@ -106,6 +106,7 @@ if [[ $mode == normal ]]; then
   grep -F "$output/libfprint-2.so.2" "$output/fprintd.ldd" >/dev/null
   ! grep -F 'not found' "$output/fprintd.ldd" >/dev/null
 fi
+"$script_dir/login/build.sh" "$output" "$mode"
 sha256sum "$library" >"$output/artifact.sha256"
 echo PRODUCTION_BUILD=PASS
 echo "PRODUCTION_BUILD_MODE=$mode"

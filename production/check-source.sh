@@ -93,3 +93,30 @@ echo PRODUCTION_SOURCE_MANIFEST_PATH_SET_CHECK=PASS
 echo PRODUCTION_SOURCE_TU_COUNT=30
 echo PRODUCTION_SOURCE_HEADER_COUNT=32
 echo PRODUCTION_PRIVATE_TREE_DEPENDENCY_COUNT=0
+
+(cd "$root/reference/fprintd-fedora44-1.94.5" && sha256sum -c SOURCE_SHA256SUMS >/dev/null)
+(cd "$root" && sha256sum -c production/login/source.sha256 >/dev/null)
+(cd "$root" && sha256sum -c production/login/prototype-equivalence.sha256)
+echo PRODUCTION_LOGIN_SOURCE_AND_PROTOTYPE_EQUIVALENCE=PASS
+
+python3 - "$root" <<'PY_AUDIT'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+for base, manifest, expected in (
+    (root, root / 'production/login/source.sha256',
+     {str(p.relative_to(root)) for p in (root / 'production/login').iterdir()
+      if p.is_file() and p.name != 'source.sha256'}),
+    (root / 'reference/fprintd-fedora44-1.94.5',
+     root / 'reference/fprintd-fedora44-1.94.5/SOURCE_SHA256SUMS',
+     {str(p.relative_to(root / 'reference/fprintd-fedora44-1.94.5'))
+      for p in (root / 'reference/fprintd-fedora44-1.94.5/source').rglob('*') if p.is_file()}),
+):
+    paths = [line.split('  ', 1)[1] for line in manifest.read_text().splitlines()]
+    assert len(paths) == len(set(paths)) and set(paths) == expected, manifest
+    assert all(not (base / name).is_symlink() for name in paths)
+for file in [*(root / 'production/login').glob('*.sh'), root / 'production/build.sh']:
+    text = file.read_text()
+    assert not any(s in text for s in ('development/', 'red_tag/', 'git archive', 'git show')), file
+print('PRODUCTION_LOGIN_EXACT_SOURCE_SET=PASS')
+PY_AUDIT

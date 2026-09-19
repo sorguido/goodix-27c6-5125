@@ -32,3 +32,14 @@ Run the host-only transaction tests with:
 ```bash
 python3 deployment/managed-install/test_offline.py
 ```
+
+The complete candidate includes libfprint, the paired fprintd/PAM extension,
+greeter parent/drop-in, both PAM integrations and account-delete protection.
+Login is the validated single prepared action (8 s), followed by password on
+failure; ordinary sudo/KScreenLocker retain their existing paths. Runtime
+versions switch together on update/rollback. The greeter integration applies
+on its next normal startup; the manager never restarts Plasma.
+
+Pre-early-login releases require uninstall followed by a fresh install, with
+materials/templates preserved. Development overlays and custom unit overrides
+are rejected. See the installation guide for exact prerequisites and recovery.

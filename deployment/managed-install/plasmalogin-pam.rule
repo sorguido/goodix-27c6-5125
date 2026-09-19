@@ -1,1 +1,1 @@
-auth        sufficient                                   pam_fprintd.so
+auth        sufficient    /usr/lib64/goodix-27c6-5125/current/pam_fprintd.so max-tries=1 timeout=8

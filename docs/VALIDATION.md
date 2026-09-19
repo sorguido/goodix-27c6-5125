@@ -1,24 +1,27 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Validation scope
 
-The current source and managed installer were qualified on Fedora 44 KDE
-x86_64 with Goodix USB `27c6:5125` / APP12509.
+The supported evidence boundary is Fedora 44 KDE x86_64 with Goodix USB
+`27c6:5125` / APP12509.
 
-Verified product behavior includes:
+The user physically tested the early-login prototype at
+`9671e02e19504e20e0097f598fa960f2c13e7a1e` after cold boot and reported:
 
-- reproducible network-isolated source build;
-- libfprint ABI compatibility with Fedora's fprintd;
-- reader discovery through fprintd and KDE;
-- bounded eight-sample enrollment;
-- serialized template persistence across fprintd restart;
-- same-finger match and different-finger no-match;
-- Plasma login, real locked-session unlock, and `sudo` authentication;
-- password fallback;
-- multiple local users and multiple enrolled fingers;
-- account deletion blocked while fingerprints remain;
-- update, single-slot rollback, uninstall, and reinstall;
-- preservation of protected material and templates across uninstall;
-- restoration of Fedora PAM and fprintd state.
+- immediate successful login with immediate finger placement after Enter;
+- password login PASS;
+- sudo fingerprint authentication PASS;
+- temporary overlay rollback PASS.
+
+No deliberate delay was used. No sub-second timing was instrumented or claimed.
+That evidence validates the architecture. Its canonical promotion is an offline
+source/build/deployment integration; the promoted managed candidate has not been
+installed or tested live in this task.
+
+Earlier target evidence covers reader discovery, bounded enrollment, template
+persistence, same/different-finger outcomes, local users, session unlock and
+account-delete protection. Those results are retained, but are not presented as
+a new full live qualification of this promoted managed candidate. Migration,
+recovery across the complete release path and independent hardware remain open.
 
 Offline validation commands for the distributed release surface are:
 
@@ -33,15 +36,24 @@ manifest cases. That validates runtime acceptance logic; it is **not** a claim
 that this release provides or qualifies acquisition of a fresh five-file bundle.
 Device-material acquisition is outside the supported release scope.
 
-The qualified library hash is:
+The normal and sanitizer builds cover all paired runtime components. Protocol
+and driver shell suites use synthetic I/O; private-bus tests exercise actual
+patched fprintd handlers, including a reproduced pending-open/suspend race.
+Greeter tests execute the actual helper with a marker child. Managed transaction
+tests cover complete payload, cleanup failures, update/rollback and drift.
+Source checks preserve prototype hashes while separately identifying the cleanup
+correction and canonical loader differences. See `production/login/README.md`
+for the precise seams and limits of these tests.
 
-```text
-acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
+After building both modes, run:
+
+```bash
+production/login/check-offline.sh /absolute/normal /absolute/sanitizer
 ```
 
-This digest applies to the normal production build with the pinned Fedora 44
-inputs. It is not a support claim for another compiler, SDK, package set,
-distribution, sensor, firmware revision, or desktop environment.
+Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual
+source commit and output identity. A build digest is provenance, not a claim of
+live deployment or portability beyond the stated target.
 
 No statistically meaningful false-acceptance or false-rejection rate is
 claimed. Functional match/no-match observations are not a substitute for a

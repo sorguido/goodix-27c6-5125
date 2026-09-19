@@ -3,7 +3,7 @@
 set -euo pipefail
 
 runtime=/usr/lib64/goodix-27c6-5125/current
-daemon=/usr/libexec/fprintd
+daemon=$runtime/fprintd
 material=/var/lib/goodix-5125-poc
 required_material=(target-material-manifest.json transport-material.bin target-config-90.bin gfusb.dll fdt-cache.bin)
 fail() { printf 'GOODIX_MANAGED_RUNTIME=FAIL reason=%s\n' "$1" >&2; exit 126; }

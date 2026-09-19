@@ -6,7 +6,7 @@
 - Fedora 44 KDE x86_64;
 - Goodix USB reader `27c6:5125` running APP12509;
 - a clean committed checkout of this source tree;
-- `git`, `flatpak`, `cpio`, `binutils`, `rpm-build`, `dnf5-plugins`, `fprintd`,
+- `gcc`, `git`, `patch`, `flatpak`, `cpio`, `binutils`, `rpm-build`, `dnf5-plugins`, `fprintd`,
   `fprintd-pam`, `libfprint`, `libgusb`, `selinux-policy-targeted`,
   `checkpolicy`, `policycoreutils`, and `policycoreutils-devel`;
 - Flatpak SDK `org.freedesktop.Sdk//25.08` installed for the current user;
@@ -15,7 +15,7 @@
 Install host prerequisites:
 
 ```bash
-sudo dnf5 install git flatpak cpio binutils rpm-build dnf5-plugins \
+sudo dnf5 install gcc patch git flatpak cpio binutils rpm-build dnf5-plugins \
   fprintd fprintd-pam libfprint libgusb selinux-policy-targeted checkpolicy \
   policycoreutils policycoreutils-devel
 flatpak remote-add --user --if-not-exists flathub \
@@ -58,6 +58,23 @@ dnf5 download --destdir GoodixArtifacts/opencv-4.13-rpms \
 ```
 
 Stop if a pinned package is unavailable or a digest differs.
+
+## Paired login build inputs
+
+Download the two header packages without installing them:
+
+```bash
+mkdir -p GoodixArtifacts/login-header-rpms
+dnf5 download --destdir GoodixArtifacts/login-header-rpms \
+  pam-devel-1.7.2-2.fc44.x86_64 polkit-devel-127-2.fc44.2.x86_64
+(cd GoodixArtifacts/login-header-rpms && \
+  sha256sum -c ../../production/login/headers.sha256)
+```
+
+The qualified login integration requires `plasma-login-manager-6.7.5-1.fc44`
+and `fprintd-1.94.5-5.fc44`, their unmodified vendor units/PAM and the existing
+`plasmalogin` account. Header files are extracted only inside the build output.
+No previous development runtime is required or accepted as a prerequisite.
 
 ## Build a candidate
 
@@ -111,7 +128,8 @@ The transaction verifies the candidate, source commit, Fedora version, PAM
 package ownership, SELinux prerequisites, file metadata, and protected-material
 readiness. It fails closed on drift or collision.
 
-After installation, connect the reader and use KDE System Settings > Users to
+The greeter drop-in takes effect on the next normal greeter startup (normally
+the next boot); installation does not restart the desktop. After installation, connect the reader and use KDE System Settings > Users to
 enroll a fingerprint. Exercise the normal workflows in this order:
 
 1. password login;
@@ -121,7 +139,10 @@ enroll a fingerprint. Exercise the normal workflows in this order:
 5. `sudo` with fingerprint;
 6. password fallback.
 
-For a verification series, allow at most three physical attempts and stop on
+For the prepared cold login, press Enter once and place the finger naturally
+immediately; this path has one attempt and an 8-second PAM bound. On failure
+use password; do not try to warm up or rearm the sensor. For an ordinary
+verification series, allow at most three physical attempts and stop on
 the first match. Do not create a fourth attempt or an unbounded retry loop.
 
 ## Update and rollback
@@ -141,7 +162,11 @@ current and previous versions:
 deployment/managed-install/manage.sh rollback
 ```
 
-Rollback includes the managed PAM state. It does not delete protected material
+Rollback switches driver, paired daemon, PAM and greeter together and includes
+the managed PAM state. Older managed releases without early login must first
+be removed using their documented uninstall, then installed fresh; an in-place
+update is rejected before mutation. Historical development overlays must also
+be rolled back first. It does not delete protected material
 or fingerprint templates.
 
 ## Uninstall and recovery
@@ -152,7 +177,9 @@ deployment/managed-install/manage.sh uninstall
 
 Uninstall restores Fedora's fprintd runtime, removes the managed Plasma Login
 override, restores the original KDE fingerprint PAM file, and removes the
-managed SELinux policy and account hook. Protected material and fprintd
+managed SELinux policy and account hook, and removes the greeter drop-in and
+paired components. Original daemon, PAM module and greeter binaries are never
+overwritten. Protected material and fprintd
 templates are preserved deliberately.
 
 If graphical login is unavailable, use a text console and run the same
@@ -169,6 +196,19 @@ Never attach `/var/lib/goodix-5125-poc`, `/var/lib/fprint`, a fingerprint
 image, a template, an OEM binary, or a capture. If the manager reports PAM or
 package drift, do not edit around the check; uninstall when permitted or wait
 for a reviewed compatibility update.
+
+## Observable acceptance and recovery
+
+`PASS_IF`: immediate natural cold login succeeds after Enter; password, ordinary
+sudo and session unlock remain usable. Keep a successful candidate installed.
+`FAIL_IF`: login preparation fails, fingerprint login regresses or any ordinary
+workflow stops working; use password and uninstall (or rollback an update).
+`STOP_IF`: missing prerequisites, package/owned-file drift, unknown overrides,
+missing valid material, or repeated unexpected failures. Do not bypass checks.
+Report the observed workflow, exact error and failure point; logs are needed
+only when a failure requires them. Uninstall should leave vendor PAM/daemon/UI
+in use and preserve templates/material. This promotion task itself performs
+no installation, reboot or live acceptance run.
 
 ## Reader-specific material prerequisite
 

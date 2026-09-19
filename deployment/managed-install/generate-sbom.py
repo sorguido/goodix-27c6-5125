@@ -12,6 +12,7 @@ import os
 import pathlib
 import re
 import subprocess
+import tempfile
 
 
 SHIPPED_COMPONENTS = (
@@ -29,6 +30,28 @@ SHIPPED_COMPONENTS = (
             "combined binary is conveyed under GPL-3.0-or-later while every "
             "source file retains its own license."
         ),
+    },
+    {
+        "SPDXID": "SPDXRef-Package-fprintd-goodix-login",
+        "name": "fprintd-goodix-login",
+        "versionInfo": "1.94.5",
+        "downloadLocation": "https://gitlab.freedesktop.org/libfprint/fprintd",
+        "filesAnalyzed": False,
+        "licenseConcluded": "GPL-3.0-or-later",
+        "licenseDeclared": "GPL-2.0-or-later",
+        "copyrightText": "See fprintd-AUTHORS and corresponding source notices",
+        "sourceInfo": "reference/fprintd-fedora44-1.94.5/source + production/login/fprintd.patch + fprintd-cleanup.patch; daemon and PAM module, paired with the GPL-3.0-or-later libfprint combined work.",
+    },
+    {
+        "SPDXID": "SPDXRef-Package-Goodix-greeter",
+        "name": "goodix-plasma-login-barrier",
+        "versionInfo": "1",
+        "downloadLocation": "NOASSERTION",
+        "filesAnalyzed": False,
+        "licenseConcluded": "GPL-2.0-or-later",
+        "licenseDeclared": "GPL-2.0-or-later",
+        "copyrightText": "Goodix 27c6:5125 project contributors",
+        "sourceInfo": "production/login/greeter.c; no Plasma code is incorporated.",
     },
     {
         "SPDXID": "SPDXRef-Package-Rockytkg-R2",
@@ -155,18 +178,22 @@ def installed_package(name: str) -> dict[str, object]:
 
 def dynamic_package_paths(candidate: pathlib.Path) -> set[pathlib.Path]:
     paths: set[pathlib.Path] = set()
-    env = os.environ | {"LD_LIBRARY_PATH": str(candidate)}
-    for binary in sorted(candidate.glob("lib*.so*")):
-        for line in run("ldd", str(binary), env=env).splitlines():
-            match = re.search(r"=>\s+(/\S+)\s+\(", line)
-            if not match and line.lstrip().startswith("/"):
-                match = re.match(r"\s*(/\S+)\s+\(", line)
-            if match:
-                resolved = pathlib.Path(match.group(1)).resolve()
-                if candidate not in resolved.parents:
-                    paths.add(resolved)
-            elif "not found" in line:
-                raise RuntimeError(f"unresolved dynamic dependency: {line.strip()}")
+    # Candidates intentionally contain regular files only. Resolve the libfprint
+    # SONAME through a temporary link, matching the installed runtime layout.
+    with tempfile.TemporaryDirectory(prefix="goodix-sbom-") as directory:
+        (pathlib.Path(directory) / "libfprint-2.so.2").symlink_to(candidate / "libfprint-2.so.2.0.0")
+        env = os.environ | {"LD_LIBRARY_PATH": f"{directory}:{candidate}"}
+        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "pam_fprintd.so"]):
+            for line in run("ldd", str(binary), env=env).splitlines():
+                match = re.search(r"=>\s+(/\S+)\s+\(", line)
+                if not match and line.lstrip().startswith("/"):
+                    match = re.match(r"\s*(/\S+)\s+\(", line)
+                if match:
+                    resolved = pathlib.Path(match.group(1)).resolve()
+                    if candidate not in resolved.parents:
+                        paths.add(resolved)
+                elif "not found" in line:
+                    raise RuntimeError(f"unresolved dynamic dependency: {line.strip()}")
     return paths
 
 

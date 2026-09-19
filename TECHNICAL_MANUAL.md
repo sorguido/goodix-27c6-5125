@@ -4,9 +4,10 @@
 ## Product boundary
 
 The driver supports one qualified target: Goodix USB `27c6:5125` with
-`GF_ST411SEC_APP_12509`, on Fedora 44 KDE x86_64. The runtime replaces only the
-libfprint library used by Fedora's existing fprintd daemon. Applications and
-PAM consumers continue to use standard fprintd interfaces.
+`GF_ST411SEC_APP_12509`, on Fedora 44 KDE x86_64. The runtime supplies a paired libfprint, fprintd and Plasma-login PAM module.
+Fedora's service, D-Bus policy, storage and ordinary consumer interfaces remain
+in use; the greeter/login pair additionally uses private PrepareLogin and
+ClaimLogin methods.
 
 ```text
 KDE / PAM / sudo
@@ -30,20 +31,59 @@ under `Rockytkg/libfprint/libfprint/sigfm/` provide the qualified matcher.
 
 `production/` is the build authority. It verifies the hash-pinned 62-file
 target-specific source set and builds the library in a network-isolated Flatpak
-SDK. `deployment/managed-install/` prepares, installs, updates, rolls back, and
+SDK. It also stages the pinned upstream fprintd 1.94.5 source, applies the
+reviewable `production/login/fprintd.patch` and bounded cleanup correction, and builds the daemon, PAM module
+and greeter parent. Those sources are independent of private history and
+development overlays. `deployment/managed-install/` prepares, installs, updates, rolls back, and
 removes immutable runtime versions.
 
 ## Runtime lifecycle
 
 The fprintd systemd drop-in starts a small wrapper. The wrapper validates the
-active runtime link and root-only protected-material set, then launches Fedora's
-`/usr/libexec/fprintd` with an `LD_LIBRARY_PATH` limited to the selected runtime
+active runtime link and root-only protected-material set, then launches the paired
+`current/fprintd` with an `LD_LIBRARY_PATH` limited to the selected runtime
 and `FP_DRIVERS_ALLOWLIST=goodix_27c6_5125`.
 
 The driver uses bounded asynchronous USB transfers through libfprint. It owns a
 single action at a time, prevents implicit sensor-reaching retries, and releases
-the device on cancellation or terminal completion. Verification permits up to
+the device on cancellation or terminal completion. Ordinary verification permits up to
 three physical attempts at the PAM/KDE layer and stops on the first match.
+The prepared login is the validated one-action exception: one attempt with
+an 8-second PAM bound, then password fallback. No automatic re-preparation.
+
+
+## Preparation before interactive login
+
+The user service `plasma-login.service` starts the small GIO parent instead of
+starting the Qt greeter directly. It requests PrepareLogin and retains its
+D-Bus connection while the unchanged vendor greeter runs. Only the Fedora
+`plasmalogin` UID may prepare; root PAM uses ClaimLogin with the ordinary
+username/PolicyKit checks. Login preparation opens the reader once and executes
+the existing secure/TLS/FDT sequence. READY requires decoded baseline `20` and
+the first acknowledged `0x32`, with the receiver and session still alive.
+
+After Enter, Verify/Identify attaches to that same session without another
+bootstrap, calibration or reopen. Image command `0x22`, feature extraction and
+matching remain behind the explicit authentication action. A contact before
+Verify invalidates readiness without an image. Preparation is bounded to 10 s,
+READY to 120 s; the helper waits at most 2 s for device lookup plus 12 s for
+preparation before exposing password login. Timeout, cancellation, suspend,
+removal and greeter exit drain/close the preparation. Daemon restart, resume
+and hotplug do not silently prepare again.
+
+Ordinary Claim (including sudo) remains separate and can run once the previous
+open is closed, even during Plasma's delayed greeter exit. Enrollment remains
+on its ordinary path; ClaimLogin cannot enroll. KScreenLocker continues to use
+Fedora's ordinary PAM module and the existing managed three-attempt rule.
+
+The architecture was physically validated in the historical prototype; the
+canonical candidate is validated offline here. Loader policy remains the
+canonical per-reader manifest contract, not the prototype's old fixed loader.
+Source equivalence covers the driver login/lifecycle sources, greeter and
+base fprintd patch. A separately reviewable two-line guard prevents preparation
+from starting after suspend/abandon while an asynchronous open was pending;
+the private-bus regression fails on the prototype and passes with this guard.
+The successful READY-to-Verify path is unchanged; it is not a byte-identity claim for the complete runtime.
 
 ## Secure session and protected material
 
@@ -94,7 +134,7 @@ not delete templates or protected material.
 The installer preserves Fedora package ownership and password fallback:
 
 - Plasma Login Manager receives an `/etc/pam.d/plasmalogin` override generated
-  from the verified vendor file; `/usr/lib/pam.d/plasmalogin` is unchanged.
+  from the verified vendor file, using the paired absolute-path PAM module; `/usr/lib/pam.d/plasmalogin` is unchanged.
 - `/etc/pam.d/kde-fingerprint`, a `plasma-workspace` configuration file, is
   transformed by replacing only its authentication substack with a bounded
   `pam_fprintd` rule.
@@ -111,11 +151,18 @@ cause the transaction to fail closed.
 /usr/lib64/goodix-27c6-5125/current           active symlink
 /usr/libexec/goodix-27c6-5125/fprintd-wrapper
 /etc/systemd/system/fprintd.service.d/99-goodix-27c6-5125-managed.conf
+/etc/systemd/user/plasma-login.service.d/99-goodix-login-greeter.conf
 /var/lib/goodix-27c6-5125-managed/            state and PAM recovery copies
 /var/lib/goodix-5125-poc/                     protected device material
 ```
 
-The installer retains at most one previous runtime for rollback. Uninstall
+Each runtime version includes the driver libraries, fprintd, PAM and greeter.
+SELinux labels of the new daemon, greeter and PAM are copied from their Fedora
+equivalents. The existing owned SELinux module also records these exact
+versioned-path labels so a full relabel preserves them; no new permission
+grants are introduced. The existing
+account-delete hook/policy remains included. The installer retains at most one
+previous runtime for rollback. Uninstall
 restores the Fedora fprintd and PAM configuration while deliberately preserving
 protected material and fprintd templates.
 

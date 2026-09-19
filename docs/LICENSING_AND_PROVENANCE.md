@@ -67,20 +67,29 @@ source tree or candidate.
 This project records its compatibility determination and source provenance; it
 does not provide legal advice for unrelated distributions or modifications.
 
-## Private early-login candidate
+## Canonical early-login integration
 
-`development/patches/login-early/fprintd.patch` modifies the preserved Fedora
-fprintd 1.94.5 reference only in build staging. Provenance and source RPM hashes:
-`development/reference/fprintd-fedora44-1.94.5/PROVENANCE.md`. Upstream
-`src/device.c`, `src/manager.c`, `src/fprintd.h`, Device XML and `pam/pam_fprintd.c`
-retain their existing notices and GPL-2.0-or-later terms. New login integration,
-greeter barrier, build/deployment scripts and tests are GPL-2.0-or-later; driver
-changes retain LGPL-2.1-or-later per-file terms. No upstream file is relicensed.
-The snapshot is unchanged; the diff and its new include file are versioned.
+`reference/fprintd-fedora44-1.94.5/source/` is the immutable upstream GPL-2.0-or-later
+source corresponding to Fedora fprintd 1.94.5-5.fc44. Source RPM/tar/spec hashes
+are in its `PROVENANCE.md`; `SOURCE_SHA256SUMS` covers all 138 retained upstream files (eight biometric test images are excluded).
+`production/login/fprintd.patch` is the sole maintained downstream delta,
+mechanically promoted byte-for-byte from the live-tested prototype. The
+separate `fprintd-cleanup.patch` adds a GPL-2.0-or-later guard for a reproduced
+pending-open/suspend race; it preserves the successful preparation/attach path. Upstream
+`src/device.c`, `src/manager.c`, `src/fprintd.h`, Device XML and
+`pam/pam_fprintd.c` retain their original notices and grants. The new private
+login include, GIO greeter, build scripts and daemon/greeter tests are
+GPL-2.0-or-later. Driver changes and promoted synthetic driver tests retain
+LGPL-2.1-or-later per-file terms.
 
-Plasma source RPM 6.7.5-1.fc44 was inspected only for service and greeter lifecycle;
-no Plasma source was copied into the candidate. Its hashes, exact paths and the
-unchanged D293 loader source pins are recorded in the candidate IMPLEMENTATION.md.
-PAM/polkit devel RPMs provide compile-time headers only (pinned hashes in
-`headers.sha256`); they are not installed or included in the runtime payload.
-This candidate is private; it does not alter the publication/export boundary.
+The daemon paired with the GPL-3.0-or-later libfprint combined work is conveyed
+under the compatible later grant; the PAM and greeter source retain GPL-2.0-or-later.
+The candidate includes upstream `fprintd-COPYING`, `fprintd-AUTHORS`, existing
+license texts/notices, source digest manifests and an expanded SPDX SBOM.
+PAM/polkit devel RPMs are hash-pinned compile-time inputs only, not runtime
+payload. No Plasma source is imported or relicensed.
+
+Historical `development/patches/login-early/` is frozen evidence of the physical
+validation at `9671e02e19504e20e0097f598fa960f2c13e7a1e`, not a build dependency.
+The canonical loader and per-reader material contract are retained. Promotion
+does not change the public export/audit boundary or publish private history.

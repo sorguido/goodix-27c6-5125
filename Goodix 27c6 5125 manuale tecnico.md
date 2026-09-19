@@ -140,83 +140,102 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — candidate early-login implementata offline (19 settembre 2026)
+### Stato corrente — early-login validato e promozione canonica (19 settembre 2026)
 
-L'Utente ha autorizzato esplicitamente l'architettura B nel prompt
-`GOODIX_IMPLEMENT_EARLY_LOGIN_PREPARATION.md`, con entry HEAD
-`7c0f83b53ca2b8452a1c5ed5bc1f00d1314bc9aa`, verificato su `development` pulito.
-Il precedente gate di strategia è chiuso. La candidate in
-`development/patches/login-early/` implementa il confine; **il difetto sul target
-resta aperto fino alla prova cold-login**. Nessuna installazione/live è stata
-eseguita dall'AI. La baseline installata prevista resta D293; gli script
-verificano gli hash prima di applicare l'overlay.
+Il prompt corrente `GOODIX_PROMOTE_EARLY_LOGIN_TO_CANONICAL_RELEASE_CORRECTED.md`
+conferma la prova fisica dell'Utente sul prototipo `login-early` al commit
+`9671e02e19504e20e0097f598fa960f2c13e7a1e`, verificato come entry HEAD su
+`development` pulito. Esiti **osservati e riferiti dall'Utente**:
 
-Il servizio utente Fedora `plasma-login.service`, già successivo a KWin, avvia
-un piccolo parent GIO. Questo mantiene la connessione D-Bus a fprintd, richiede
-PrepareLogin e avvia il greeter Qt originale soltanto dopo la risposta READY
-o il fallback bounded a password. La preparazione effettiva è nel driver:
-open una volta → RX sync → secure/TLS/FDT → baseline `20` decodificata → ACK
-primo `32`. Solo quel callback emette READY; il ricevitore e la generation
-restano vivi. Il PAM del solo `plasmalogin` usa ClaimLogin; fprintd trasferisce
-l'open esistente, e la successiva VerifyStart/Identify autorizza l'acquisizione
-nella stessa sessione. Il ramo di attach ritorna prima del codice ordinario
-di bootstrap, incremento generation e reopen. Nessun `22`, matching o enrollment
-avviene prima dell'action. Le normali Claim e PAM sudo restano sul percorso
-precedente; ENROLL non è ammesso tramite ClaimLogin.
+```text
+COLD_LOGIN_IMMEDIATE=PASS
+BEHAVIOR_AFTER_ENTER=immediate successful login with immediate finger placement
+PASSWORD_LOGIN=PASS
+SUDO_FINGERPRINT=PASS
+ROLLBACK=PASS
+```
 
-IRQ2 prima di Verify invalida READY, cancella RX e termina senza `22` o retry.
-Limiti: preparazione driver 10 s, richiesta greeter 12 s più al massimo 2 s
-per il manager; READY 120 s; Verify PAM login un tentativo / 8 s. Scadenza,
-uscita del greeter, rimozione e suspend chiudono dopo il drain; suspend prosegue
-asincrono dopo close, senza attesa annidata. Nessuna nuova preparazione su
-resume/hotplug/restart del daemon: ClaimLogin senza READY fallisce rapidamente
-con messaggio per usare password. Il greeter rimane disponibile anche se
-PrepareLogin fallisce. Plasma 6.7.5 conserva il greeter per 5 s dopo l'avvio
-della sessione: la normale Claim è ammessa appena il precedente open è chiuso,
-senza portare poison o aspettare l'uscita tardiva del greeter.
+Non è stato usato un ritardo deliberato fra Invio e dito. Non esiste una
+misura strumentale sub-secondo: non viene dedotta. Il difetto del contatto
+immediato è risolto nel perimetro della prova; l'architettura B è validata sul
+target Fedora 44 KDE / 27c6:5125 / APP12509. Il rollback confermato riguarda
+l'overlay temporaneo, non una migrazione alla candidate gestita.
 
-La build usa il core già integrato a `c0e13ff5f78ac32403a753446dcbc44aa7f30556`,
-i sorgenti driver correnti e i quattro loader D293 da
-`e61fce313794922a2dab156a1b38a8ddc5837f19`, senza leggere materiali protetti.
-fprintd 1.94.5 è patchato solo nello staging dal reference Fedora invariato.
-ABI pubblica libfprint invariata: interfaccia privata GObject accoppiata al
-daemon della candidate. Header PAM/polkit scaricati e verificati, mai installati;
-compilazione SDK senza rete, link contro le librerie Fedora già presenti.
-Provenance tecnica, riproduzione build/test e review sono in `IMPLEMENTATION.md`;
-il manuale resta l'autorità narrativa canonica.
+Il task corrente promuove quell'architettura nel percorso canonico. Non
+comprende installazione, sudo, mutazioni host, USB, nuova prova cold-boot o
+pubblicazione. La chiusura riguarda soltanto questa promozione; il progetto
+rimane aperto. Nessuna richiesta di installazione costituisce la closure.
 
-**Verifica completata offline:** build completa normale e ASan/UBSan;
-protocollo 16/16 e driver 34/34 in entrambi i modi; handler fprintd sul bus
-privato e barriera greeter in entrambi i modi; transazione install/rollback
-6/6. PASS source/manifest canonico e staging, ABI `LIBFPRINT_2.0.0`, assenza di
-simboli test/RPATH e risoluzione librerie. La review PM del diff effettivo
-accetta la candidate offline, con `EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_PENDING`.
-Timeout reale di preparazione, chiusura dopo RX pending, fallback, singola
-Verify, normale Claim successiva e cleanup suspend sono coperti. PolicyKit
-host/SELinux e MATCH fisico non sono stati eseguiti. Hash degli artefatti
-verificati in `IMPLEMENTATION.md`; install registra lo SHA completo della
-ricetta committata e gli hash del payload. Audit read-only della baseline D293
-PASS, overlay assente. Nessun protected material o dispositivo aperto dall'AI.
+**Sorgenti e build:** driver/lifecycle già canonici invariati; helper GIO e
+patch fprintd/PAM promossi meccanicamente in `production/login/`. Il reference
+fprintd 1.94.5 è in `reference/fprintd-fedora44-1.94.5/`, con provenance RPM,
+licenze e manifest completo dei 138 file mantenuti. Otto immagini NIST dei
+test upstream sono escluse; non servono alla build o ai test sintetici.
+`production/build.sh` produce libfprint, fprintd, PAM e greeter, senza Git
+storico, directory development, runtime installate o materiali protetti.
+Header PAM/polkit e OpenCV sono input RPM pin scaricati senza installazione;
+compilazione SDK senza rete e link contro librerie Fedora. Rimane il loader
+canonico per-reader: non si reintroducono i quattro loader storici del
+prototipo. Core libfprint e SIGFM coincidono con quelli usati da quella build;
+nessuna equivalenza binaria dell'intero runtime viene dichiarata.
 
-**Riesame pre-live:** cambia il punto reale di calibrazione, ora prima della
-finestra interattiva. L'ipotesi è che rimuovere la race setup/dito risolva il
-contatto immediato mantenendo la sessione armata. Se fallisce ancora a FIRST_IRQ2
-con READY/attach documentati, si esamina soltanto quel failure e il timing
-fisico; niente terza ripetizione equivalente, attese estese o recuperi inventati.
-Il dito già presente prima della schermata non è un blocker: è fuori dai
-criteri iniziali espliciti. La prima prova è un solo Invio/contatto, eccezione
-Utente al default serie §8.2; poi password, una autenticazione sudo e verifica
-del rollback D293 richiesta dall'Utente. Nessun nuovo Operator Kit.
+**Semantica preservata:** servizio utente Plasma → PrepareLogin → secure/TLS/FDT
+→ baseline `20` decodificata → ACK primo `32` → READY → greeter Qt originale
+→ Invio → ClaimLogin/Verify sulla stessa sessione, senza secondo bootstrap,
+calibrazione o reopen. Prima della Verify/Identify non vengono emessi `22` né
+eseguiti matcher o autenticazione biometrica. Il contatto anticipato invalida
+READY senza immagine. Limiti invariati: prepare driver 10 s; lookup helper 2 s
+più prepare 12 s; READY 120 s; PAM login una action / 8 s, poi password.
+Nessun retry nascosto o nuova preparazione su resume/restart/hotplug. Claim
+ordinaria/sudo ed ENROLL restano separati; ClaimLogin non può fare enrollment.
 
-**HUMAN_REQUIRED** soltanto prima di installazione/sudo/USB/live, secondo
-`AGENTS.md §6.1–6.2`. `install.sh`, `rollback.sh` e README breve sono nella
-stessa directory. La verifica offline prova l'ordine software e i guardrail;
-non prova riconoscimento fisico, deployment SELinux o compatibilità Windows
-post-candidate. Questi esiti non vengono anticipati come PASS.
+La promozione ha riprodotto offline una race concreta: suspend durante open
+asincrona completava negativamente PrepareLogin, ma il callback tardivo
+avviava ugualmente la preparazione lasciando suspend in attesa. Il solo delta
+runtime aggiuntivo, `fprintd-cleanup.patch`, richiede anche una richiesta ancora
+attiva e nessuna suspend pendente prima di preparare; altrimenti chiude e
+completa suspend. Il test con open trattenuta fallisce sul prototipo e passa
+con la guardia. Il percorso di successo non cambia. Gli hash del driver,
+lifecycle, helper e patch originale restano confrontabili tramite
+`prototype-equivalence.sha256`; il correttivo è separato e auditabile.
+
+**Deployment:** `manage.sh prepare` include tutti i runtime, PAM login assoluto,
+drop-in greeter, KScreenLocker e protezione account-delete esistenti, licenze,
+notices, source manifest e SBOM. Il current link seleziona l'insieme completo;
+rollback di update scambia tutte le componenti. Il greeter non viene
+riavviato: la barriera si applica al successivo avvio normale. I contesti
+SELinux equivalenti Fedora sono applicati alle nuove copie e registrati
+nell'FC del modulo già posseduto, senza nuovi permessi. Collisioni con overlay
+storici o altri override falliscono chiuse. Le versioni managed precedenti a
+early-login richiedono uninstall e installazione fresh; non esiste migrazione
+implicita dei loader D293. Materiali e template restano preservati.
+
+I test di failure della transazione hanno inoltre rilevato che una EXIT trap
+poteva perdere le variabili locali durante errore di un comando, e che lo
+state rollback era scritto prima del successo del reload. Il correttivo salva
+le sole informazioni di recovery necessarie fuori dallo scope locale e
+pubblica lo state dopo i passaggi reversibili. Sono verificati errori di
+label, runtime parziale, reload, checksum/file-set, drift e simmetria rollback.
+
+**Closure corrente:** sorgenti/provenance, build normale e sanitizer,
+protocollo 16 casi, shell driver 34 casi, handler fprintd e ordine del greeter
+sono verificati offline; la suite transazioni corrente conta 25 casi. I test
+shell conservano il binding in-memory con matcher sintetico, usando il core
+Fedora canonico e l'adapter SIGFM: non sostituiscono una bootstrap fisica.
+La verifica `manage.sh prepare` su checkout committato e la review finale
+sono il completamento autonomo ancora in corso di questo stesso task.
+Nessuna installazione/live della candidate promossa è avvenuta qui.
+`development/patches/login-early/` è preservato e marcato storico/superato,
+fuori dalle dipendenze release. Documentazione pubblica e SBOM distinguono
+prototipo validato, promozione sorgenti e qualifica offline della candidate.
+
+Il prossimo confine di progetto resta la qualifica completa della candidate
+gestita e l'audit separato della superficie pubblicabile/portabilità per-reader;
+non viene intrapreso automaticamente da questo task di promozione.
 
 #### Decisione B ed evidenze pre-IRQ2 consolidate prima dell'implementazione
 
-Il difetto `Invio → dito immediato` resta aperto. La prova temporanea
+Al momento di quell’audit il difetto `Invio → dito immediato` era aperto. La prova temporanea
 lift/recontact è stata **eseguita**, senza acquisizione per il matcher nella
 prima action; non è una candidate production. Il successivo audit mirato parte
 da `development` pulito, `8a01d703a179789abfbdfbb3cd8ea6114d0dea9c`, e verifica

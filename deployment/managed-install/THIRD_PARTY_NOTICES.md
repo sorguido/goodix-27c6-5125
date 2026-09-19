@@ -35,6 +35,15 @@ other contributors recorded in `docs/LICENSING_AND_PROVENANCE.md`.
   notice files shipped by those RPMs are preserved in
   `OpenCV-LICENSES.txt`.
 
+## Paired login components
+
+The candidate includes fprintd 1.94.5 and its PAM module, built from the pinned
+upstream source plus the reviewable project login patch. Original copyright
+notices remain in the corresponding source; see `fprintd-AUTHORS` and
+`fprintd-COPYING`. The source grant is GPL-2.0-or-later, with the daemon's paired
+libfprint combined distribution using GPL-3.0-or-later. The small GIO greeter
+parent is project GPL-2.0-or-later code and incorporates no Plasma source.
+
 ## System dependencies
 
 GLib, OpenSSL 3, libusb, JSON-GLib, the C/C++ runtime and the remaining

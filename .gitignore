@@ -16,3 +16,5 @@ red_tag/
 
 # Host-local, hash-verified build inputs. Keep documentation, not RPM payloads.
 GoodixArtifacts/opencv-4.13-rpms/*.rpm
+
+GoodixArtifacts/login-header-rpms/*.rpm

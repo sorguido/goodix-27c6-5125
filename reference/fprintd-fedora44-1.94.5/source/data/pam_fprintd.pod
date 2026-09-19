@@ -1,0 +1,69 @@
+=head1 NAME
+
+pam_fprintd - PAM module to authenticate against fprintd, the fingerprint daemon
+
+=head1 SYNOPSIS
+
+B<pam_fprintd.so> [debug|debug=[I<on>|I<off>|I<true>|I<false>|I<1>|I<0>]] [max-tries=I<MAX_TRIES>] [timeout=I<TIMEOUT>]
+
+=head1 DESCRIPTION
+
+The pam_fprintd module is used to verify a user's fingerprints against fingerprints
+enrolled using fprintd, the fingerprint management daemon.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<debug>
+
+=item B<debug=[I<on>|I<off>|I<true>|I<false>|I<1>|I<0>]>
+
+Whether debug should be turned on or off. Debug messages will be generated using
+pam_syslog which means that they will be saved in the systemd journal by default.
+
+=item B<max-tries=I<MAX_TRIES>>
+
+The number of attempts at fingerprint authentication to try before returning an
+authentication failure. The minimum number of tries is 1 while the default is 3.
+
+Use a negative value to set no limit at all, so that the module won't ever error on multiple
+retries, but in such case it's suggested for the module loader to handle this.
+
+=item B<timeout=I<TIMEOUT>>
+
+The amount of time before returning an authentication failure. The default timeout
+is 30 seconds, with 1 second being the minimum.
+
+Use a negative value to set no limit at all, so that fingerprint authentication will
+be always active while this module is loaded.
+
+=back
+
+=head1 LIMITATIONS
+
+=over 8
+
+=back
+
+The PAM stack is by design a serialised authentication, so it is not
+possible for pam_fprintd to allow authentication through passwords and
+fingerprints at the same time.
+
+It is up to the application using the PAM services to implement separate
+PAM processes and run separate authentication stacks separately. This
+is the way multiple authentication methods are made available to users
+of gdm for example.
+
+=head1 AUTHOR
+
+B<fprintd> was written by Bastien Nocera.
+
+=head1 SEE ALSO
+
+=over 8
+
+=item B<fprintd>, B<PAM>
+
+=back
+

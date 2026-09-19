@@ -36,6 +36,16 @@ for component in core features2d flann imgproc; do
   install -m 0644 "$build/libopencv_${component}.so.413" \
     "$candidate/libopencv_${component}.so.413"
 done
+for component in fprintd greeter; do
+  install -m 0755 "$build/$component" "$candidate/$component"
+done
+install -m 0644 "$build/pam_fprintd.so" "$candidate/pam_fprintd.so"
+install -m 0644 "$here/99-goodix-login-greeter.conf" "$candidate/99-goodix-login-greeter.conf"
+install -m 0644 "$root/production/source-files.sha256" "$candidate/production-source.sha256"
+install -m 0644 "$root/reference/fprintd-fedora44-1.94.5/SOURCE_SHA256SUMS" "$candidate/fprintd-source.sha256"
+install -m 0644 "$root/production/login/source.sha256" "$candidate/login-source.sha256"
+install -m 0644 "$root/reference/fprintd-fedora44-1.94.5/source/COPYING" "$candidate/fprintd-COPYING"
+install -m 0644 "$root/reference/fprintd-fedora44-1.94.5/source/AUTHORS" "$candidate/fprintd-AUTHORS"
 install -m 0755 "$here/fprintd-wrapper" "$candidate/fprintd-wrapper"
 install -m 0755 "$here/50-goodix-fprint-account-delete" \
   "$candidate/50-goodix-fprint-account-delete"
@@ -70,6 +80,7 @@ printf '%s\n' \
   'PAM_FILES_INCLUDED=true' \
   'PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR' \
   'KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM' \
+  'EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1' \
   'SBOM_FORMAT=SPDX-2.3-JSON' \
   'COMBINED_BINARY_LICENSE=GPL-3.0-or-later' \
   'FAR_FRR_CLAIM=NOT_MADE' \

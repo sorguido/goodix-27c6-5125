@@ -11,7 +11,11 @@ The build combines:
 - the 62 hash-pinned files listed in `source-files.tsv`;
 - the fixed build support under `build-support/`;
 - five pinned Fedora 44 OpenCV RPMs under
-  `GoodixArtifacts/opencv-4.13-rpms/`.
+  `GoodixArtifacts/opencv-4.13-rpms/`;
+- immutable upstream fprintd 1.94.5 under `reference/`, its canonical patch
+  and the GIO greeter in `login/`;
+- two pinned PAM/polkit header RPMs under `GoodixArtifacts/login-header-rpms/`
+  (or the directory set by `GOODIX_HEADER_RPMS`).
 
 Run the source audit:
 
@@ -35,11 +39,25 @@ OpenCV notices, ABI reports, and `artifact.sha256`. The script verifies the
 Fedora fprintd symbol set, rejects RPATH/RUNPATH, rejects host-only symbols, and
 reports a zero dependency count for excluded private content.
 
-The expected qualified library digest is:
+The output also contains `fprintd`, `pam_fprintd.so` and `greeter`. SDK objects
+are linked with the host Fedora libraries because Fedora PAM requires the host
+GLIBC ABI. No host headers/packages are installed by the build. The upstream
+fprintd source and downstream login inputs have separate complete digest
+manifests; the original prototype's driver/patch/greeter hashes remain checked
+by `login/prototype-equivalence.sha256`. The subsequent
+`fprintd-cleanup.patch` blocks late preparation if suspend/abandon invalidated
+the request during open; the original patch remains independently verifiable. Build outputs are not claimed identical
+to the historical overlay, which used different material loaders.
 
-```text
-acf6d19af4e22a364390c61485259fa7fb3bcd10126a03ded53d4acd7e90593e
+Run the focused offline closure after both builds:
+
+```bash
+production/login/check-offline.sh /absolute/normal /absolute/sanitizer
 ```
+
+It compiles the actual canonical Fedora core with synthetic USB and matching
+seams, exercises private-bus fprintd and real greeter ordering, and runs managed
+filesystem transaction tests. It never opens the host system bus or hardware.
 
 Use `deployment/managed-install/manage.sh prepare` to turn a normal build into
 an installable, content-addressed candidate with licenses, notices, and SBOM.

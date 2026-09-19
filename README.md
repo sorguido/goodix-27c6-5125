@@ -9,7 +9,7 @@ The supported configuration is intentionally narrow:
 
 - Fedora 44 KDE on x86_64;
 - Goodix USB `27c6:5125` / APP12509;
-- local users and the Fedora-provided fprintd service;
+- local users and the Fedora fprintd service with a source-built paired daemon/PAM extension;
 - enrollment, verification, Plasma login, Plasma session unlock, `sudo`, and
   account-deletion protection.
 
@@ -18,11 +18,17 @@ and network identities have not been qualified.
 
 ## Validation status
 
-The software and intended fingerprint workflows have been demonstrated working
-on the qualified development system. The source, build, lifecycle and managed
-integration paths have been tested extensively, including clean-system testing,
-but the public repository form has **not yet been exercised completely across
-every installation and recovery path on independent hardware**.
+The early-login architecture was tested on the qualified target through the
+prototype at `9671e02e19504e20e0097f598fa960f2c13e7a1e`: the user reported
+successful cold login with immediate finger placement after Enter, password
+login, sudo fingerprint authentication, and temporary-overlay rollback. No
+deliberate delay was used; no sub-second timing measurement is claimed.
+
+That behavior is now integrated into the canonical source/build/managed
+candidate. This promotion is validated offline; the promoted managed candidate
+has not been installed or exercised live as part of this task. Independent
+hardware, full release migration/recovery qualification and publication remain
+separate project boundaries. See [Validation](docs/VALIDATION.md).
 
 If you encounter a reproducible problem, please open a GitHub issue with the
 software version/commit, Fedora version, hardware identity, command used and
@@ -34,7 +40,7 @@ material to an issue.
 
 1. Read [Installation](docs/INSTALLATION.md).
 2. Read the contract for the five [device-specific materials](docs/DEVICE_MATERIALS.md).
-3. Prepare the five pinned OpenCV RPMs used by the offline build.
+3. Prepare the pinned OpenCV and PAM/polkit header RPMs used by the offline build.
 4. Build a content-addressed candidate without privileges.
 5. Import a valid protected-material bundle that you legally obtained for the
    same physical reader.

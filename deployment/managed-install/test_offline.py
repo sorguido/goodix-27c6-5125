@@ -17,6 +17,9 @@ FILES = (
     "MANIFEST", "SHA256SUMS", "SBOM.spdx.json", "THIRD_PARTY_NOTICES.md",
     "LICENSE", "GPL-2.0-or-later.txt", "LGPL-2.1-or-later.txt",
     "GPL-3.0-or-later.txt", "Apache-2.0.txt", "OpenCV-LICENSES.txt",
+    "fprintd", "greeter", "pam_fprintd.so", "99-goodix-login-greeter.conf",
+    "login-source.sha256", "fprintd-COPYING", "fprintd-AUTHORS",
+    "production-source.sha256", "fprintd-source.sha256",
     "libfprint-2.so.2.0.0",
     "libgusb.so.2", "libopencv_core.so.413", "libopencv_features2d.so.413",
     "libopencv_flann.so.413", "libopencv_imgproc.so.413", "fprintd-wrapper",
@@ -48,6 +51,9 @@ class ManagedInstallContract(unittest.TestCase):
             "session    optional     pam_kwallet5.so auto_start\n",
             encoding="utf-8",
         )
+        unit = self.root / "usr/lib/systemd/user/plasma-login.service"
+        unit.parent.mkdir(parents=True)
+        unit.write_text("[Service]\nExecStart=/usr/libexec/plasma-login-greeter\n")
         self.vendor_bytes = self.vendor_pam.read_bytes()
         self.kde_fingerprint_pam = self.root / "etc/pam.d/kde-fingerprint"
         self.kde_fingerprint_pam.parent.mkdir(parents=True)
@@ -96,6 +102,7 @@ class ManagedInstallContract(unittest.TestCase):
             "PAM_FILES_INCLUDED=true\n"
             "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n"
             "KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM\n"
+            "EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1\n"
             "SBOM_FORMAT=SPDX-2.3-JSON\n"
             "COMBINED_BINARY_LICENSE=GPL-3.0-or-later\n"
             "FAR_FRR_CLAIM=NOT_MADE\n",
@@ -379,6 +386,117 @@ class ManagedInstallContract(unittest.TestCase):
         manage = (HERE / "manage.sh").read_text(encoding="utf-8")
         self.assertIn('exec sudo -- "$here/root-transaction.sh" --status', manage)
         self.assertNotIn("ensure_runtime_root_mode", manage)
+
+    def test_early_login_payload_and_rollback_ownership(self):
+        candidate = self.candidate("a" * 40)
+        self.run_tx("--root-install", self.caller, str(candidate))
+        runtime = self.root / ("usr/lib64/goodix-27c6-5125/" + "a" * 40)
+        for name in ("fprintd", "greeter", "pam_fprintd.so"):
+            self.assertEqual((runtime / name).read_bytes(), (candidate / name).read_bytes())
+        dropin = self.root / "etc/systemd/user/plasma-login.service.d/99-goodix-login-greeter.conf"
+        self.assertEqual(dropin.read_bytes(), (HERE / dropin.name).read_bytes())
+        self.assertIn("EARLY_LOGIN_STATUS=MANAGED", self.run_tx("--status").stdout)
+        self.run_tx("--root-uninstall", self.caller)
+        self.assertFalse(dropin.exists())
+        self.assertFalse(dropin.parent.exists())
+        self.assertEqual(self.vendor_pam.read_bytes(), self.vendor_bytes)
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+
+    def test_missing_paired_component_is_rejected(self):
+        candidate = self.candidate("b" * 40)
+        (candidate / "pam_fprintd.so").unlink()
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("candidate_pam_fprintd.so_invalid", result.stderr)
+        self.assertFalse((self.root / "var/lib/goodix-27c6-5125-managed/state").exists())
+
+    def test_greeter_override_collision_and_drift(self):
+        candidate = self.candidate("c" * 40)
+        directory = self.root / "etc/systemd/user/plasma-login.service.d"
+        directory.mkdir(parents=True)
+        override = directory / "custom.conf"
+        override.write_text("custom")
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertIn("greeter_dropin_collision", result.stderr)
+        self.assertEqual(override.read_text(), "custom")
+        override.unlink()
+        self.run_tx("--root-install", self.caller, str(candidate))
+        owned = directory / "99-goodix-login-greeter.conf"
+        original = owned.read_bytes()
+        owned.write_text("drift")
+        self.assertIn("greeter_dropin_drift", self.run_tx("--status", check=False).stderr)
+        owned.write_bytes(original)
+        self.run_tx("--root-uninstall", self.caller)
+        self.assertTrue(directory.is_dir())  # Preexisting directory is not ours.
+
+    def test_partial_login_payload_rolls_back_fresh_and_update(self):
+        first = self.candidate("d" * 40)
+        second = self.candidate("e" * 40)
+        self.env["GOODIX_MANAGED_TEST_FAIL_AFTER_LOGIN_RUNTIME"] = "true"
+        result = self.run_tx("--root-install", self.caller, str(first), check=False)
+        self.assertIn("injected_failure_after_login_runtime", result.stderr)
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+        self.assertFalse((self.root / "etc/pam.d/plasmalogin").exists())
+        self.env.pop("GOODIX_MANAGED_TEST_FAIL_AFTER_LOGIN_RUNTIME")
+        self.run_tx("--root-install", self.caller, str(first))
+        state = self.root / "var/lib/goodix-27c6-5125-managed/state"
+        before = state.read_bytes()
+        self.env["GOODIX_MANAGED_TEST_FAIL_AFTER_LOGIN_RUNTIME"] = "true"
+        result = self.run_tx("--root-update", self.caller, str(second), check=False)
+        self.assertIn("injected_failure_after_login_runtime", result.stderr)
+        self.assertEqual(state.read_bytes(), before)
+        self.assertIn("CURRENT_COMMIT=" + "d" * 40, self.run_tx("--status").stdout)
+        self.assertFalse((self.root / ("usr/lib64/goodix-27c6-5125/" + "e" * 40)).exists())
+
+    def test_manifest_must_cover_exact_candidate_file_set(self):
+        candidate = self.candidate("1" * 40)
+        sums = candidate / "SHA256SUMS"
+        sums.write_text("".join(line for line in sums.read_text().splitlines(True)
+                                if not line.endswith("  greeter\n")))
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertIn("candidate_checksum_file_set", result.stderr)
+
+    def test_label_failure_and_rollback_service_failure_are_reversible(self):
+        first = self.candidate("2" * 40)
+        second = self.candidate("3" * 40)
+        self.env["GOODIX_MANAGED_TEST_FAIL_ACTION"] = "chcon:--reference=/usr/libexec/fprintd"
+        result = self.run_tx("--root-install", self.caller, str(first), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / "etc/pam.d/plasmalogin").exists())
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+        self.env.pop("GOODIX_MANAGED_TEST_FAIL_ACTION")
+        self.run_tx("--root-install", self.caller, str(first))
+        self.run_tx("--root-update", self.caller, str(second))
+        state = self.root / "var/lib/goodix-27c6-5125-managed/state"
+        before = state.read_bytes()
+        self.env["GOODIX_MANAGED_TEST_FAIL_ACTION"] = "systemctl:daemon-reload"
+        result = self.run_tx("--root-rollback", self.caller, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state.read_bytes(), before)
+        self.env.pop("GOODIX_MANAGED_TEST_FAIL_ACTION")
+        self.assertIn("CURRENT_COMMIT=" + "3" * 40, self.run_tx("--status").stdout)
+        self.run_tx("--root-rollback", self.caller)
+        self.assertIn("CURRENT_COMMIT=" + "2" * 40, self.run_tx("--status").stdout)
+
+    def test_runtime_symlink_drift_is_rejected(self):
+        candidate = self.candidate("4" * 40)
+        self.run_tx("--root-install", self.caller, str(candidate))
+        link = self.root / ("usr/lib64/goodix-27c6-5125/" + "4" * 40 + "/libfprint-2.so.2")
+        link.unlink(); link.symlink_to("/unrelated/library")
+        self.assertIn("runtime_symlink_drift", self.run_tx("--status", check=False).stderr)
+
+    def test_policy_change_requires_fresh_install_instead_of_silent_omission(self):
+        first = self.candidate("5" * 40)
+        second = self.candidate("6" * 40)
+        policy = second / "goodix_fprint_account_delete.fc"
+        policy.write_text(policy.read_text() + "# different policy\n")
+        sums = second / "SHA256SUMS"
+        sums.write_text("".join(f"{sha(path)}  {path.name}\n" for path in sorted(second.iterdir())
+                                if path.name != "SHA256SUMS"))
+        self.run_tx("--root-install", self.caller, str(first))
+        result = self.run_tx("--root-update", self.caller, str(second), check=False)
+        self.assertIn("managed_host_assets_changed_requires_fresh_install", result.stderr)
+        self.assertIn("CURRENT_COMMIT=" + "5" * 40, self.run_tx("--status").stdout)
 
     def test_shell_syntax(self):
         for name in ("prepare.sh", "manage.sh", "root-transaction.sh", "fprintd-wrapper", "50-goodix-fprint-account-delete"):
