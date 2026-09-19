@@ -106,16 +106,66 @@ nine runtime binaries/libraries match both the exported normal build and the
 pre-correction build byte-for-byte. Prototype equivalence checks pass and the
 cleanup patch is unchanged. No executable source or login behavior changed.
 
-Prepared-login three-attempt follow-up: physical recovery after NO MATCH is
-pending human validation. Source changes preserve the original patch/greeter
-hashes and introduce a separately pinned driver/lifecycle and daemon/PAM delta.
-The focused offline suite includes matching at attempts two/three, three NO
-MATCH and refusal of attempt four, hard failure/cancel on attempts one/two,
-physical-release gating, same-generation rearm, and cleanup/ordinary consumer
-regressions. Driver fixtures use a synthetic post-secure-session entry and
-matcher; daemon fixtures use a private bus. These tests do not establish new
-hardware evidence. Development overlay transaction tests restore exact previous
-files and modes after partial writes, label/reload failures and explicit rollback.
+## Prepared-login three-attempt follow-up
+
+Implementation commit `62eca6aa331e980683c09fc961042bc2631f6fe1` and recipe
+correction `cde01e3e3e8e7dad1f6dc00e10ef303634d4f913` were exported using the
+committed publication allowlist. All 505 source files, including dotfiles,
+match Git blobs byte-for-byte. The local source-only checkout at
+`eb9972e14e6bdc21b62d5d5a6b8283c4451186e6` contains only export commits, no private
+ancestors. Seven documented external RPM prerequisites were copied after
+checking their committed hashes; no ignored/untracked source supplied a build.
+The recipe now extracts RPMs through a temporary archive, avoiding the observed
+SIGPIPE when cpio finishes before rpm2cpio writes archive padding.
+
+From `/tmp`, these complete paths passed:
+
+```bash
+/tmp/goodix-three-committed/production/check-source.sh
+/tmp/goodix-three-committed/production/build.sh normal /tmp/goodix-three-final-normal
+/tmp/goodix-three-committed/production/build.sh sanitizer /tmp/goodix-three-final-sanitizer
+/tmp/goodix-three-committed/production/login/check-offline.sh /tmp/goodix-three-final-normal /tmp/goodix-three-final-sanitizer
+/tmp/goodix-three-committed/deployment/managed-install/manage.sh prepare /tmp/goodix-three-final-managed
+git -C /tmp/goodix-three-committed diff --check
+```
+
+Results: 17 protocol and 45 driver tests in **each** normal/sanitizer mode;
+paired daemon and greeter tests in both modes; 26 managed transaction tests.
+The suite covers second/third MATCH, three NO MATCH, refusal of attempt four,
+hard error/retry/cancel on attempts one/two, complete physical-release gating,
+same-generation rearm, cancellation during deferred completion, close between
+attempts, cleanup and existing ordinary-consumer/enrollment regressions.
+Daemon tests observe 15 synthetic opens and 15 closes per executable, with
+no reopen within a claim. MATCH remains immediate, while NO MATCH waits for
+release. These tests use synthetic protocol images/matching and a post-secure
+session seam; they do not qualify a physical handshake or target rearm.
+
+The actual managed candidate has 32 files. Its SPDX SBOM has 45 packages,
+30 files and 75 relationships; hashes, references, package verification code
+and byte-identical regeneration pass. The SBOM includes the attempts patch.
+SHA256SUMS digest:
+`59ab21d9c41ff51694fc6f52316dd9bc0faf4ef09b09ce7b4557caa3d6ee4100`.
+All nine runtime components match the independent normal build byte-for-byte;
+there is no RPATH or test-only symbol in the production driver. The real
+candidate passes the existing mock install/status/uninstall path, restoring
+password/PAM files. A managed candidate with the old one-attempt PAM rule is
+rejected before update changes; it requires its original uninstall before a
+fresh install. Update/rollback within the three-attempt rule still passes.
+
+The separate development delta was also built from `cde01e3...`. Its fprintd
+and PAM binaries match the canonical candidate byte-for-byte; its driver
+sources differ only in the four explicitly retained historical loaders. Its
+SHA256SUMS digest is
+`bbc5f1e4d8e0d47cceaf12421183842b1356cc8a1fb7b461cec47f3a11af8792`.
+Nine delta transaction tests and the real candidate's mock install/rollback
+pass, including exact prior bytes/modes and failure recovery. The frozen
+historical overlay is unchanged and is not a canonical build dependency.
+
+Physical second/third-attempt recovery, password/sudo behavior on the target
+and timing remain subject to human validation. No host install, sudo, real USB
+access or live biometric test was performed. Original prototype patch/greeter
+hashes remain intact; none of the new offline results extend the old live
+qualification to the new physical attempts.
 
 Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual
 source commit and output identity. A build digest is provenance, not a claim of

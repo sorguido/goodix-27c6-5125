@@ -207,9 +207,46 @@ delta di sviluppo. La prima riproduzione ha inoltre rilevato exit 141 (SIGPIPE) 
 l'estrazione header PAM: `cpio` completa l'archivio prima che `rpm2cpio` termini
 il padding. L'estrazione RPM usa ora un archivio temporaneo verificando entrambi
 gli exit status, senza pipeline; stesso correttivo per OpenCV. SBOM e guida
-installazione includono esplicitamente il nuovo delta. La riproduzione completa
-da sorgenti committati e le due candidate restano da consolidare prima della
-consegna. La validazione fisica resta
+installazione includono esplicitamente il nuovo delta.
+
+**Closure offline verificata:** implementazione `62eca6aa331e980683c09fc961042bc2631f6fe1`,
+ricetta/provenance corretta `cde01e3e3e8e7dad1f6dc00e10ef303634d4f913`.
+Export dei soli 505 file committati nell'allowlist pubblica, confrontati byte per
+byte con Git, inclusi dotfile; nessun sorgente ignored/untracked o antenato
+privato usato dal build. L'export locale ha HEAD
+`eb9972e14e6bdc21b62d5d5a6b8283c4451186e6` e soli commit di trasferimento;
+non è un commit release del progetto. I sette RPM esterni già disponibili sono
+stati riverificati con i manifest committati, senza installarli.
+
+Dall'export, con cwd `/tmp`: check-source, build normal/sanitizer, check-offline
+e manage.sh prepare sono PASS. Suite completa: 17 protocollo e 45 driver in
+ciascun modo; daemon e greeter in entrambi (15 open/15 close sintetici per
+eseguibile daemon), 26 transazioni managed. I 9 test del delta sono PASS.
+Nessun accesso USB reale, nessun sudo, installazione host o test biometrico.
+I doppi test iniziano dopo l'handoff secure sintetico: non qualificano un nuovo
+handshake fisico, riarmo target, latenza, né FAR/FRR. Claim ordinaria, enrollment,
+cleanup e password fallback sono coperti nelle regressioni offline esistenti;
+sudo/password reali restano nella breve osservazione dell'Utente.
+
+La candidate canonica contiene esattamente 32 file, SBOM con 45 package, 30 file,
+75 relazioni: hash, riferimenti, verification code e rigenerazione deterministica
+PASS. SHA256SUMS digest
+`59ab21d9c41ff51694fc6f52316dd9bc0faf4ef09b09ce7b4557caa3d6ee4100`.
+Le nove componenti runtime sono byte-identiche fra build normal indipendente e
+build del prepare; nessun RPATH o simbolo host/test nel driver production.
+La candidate del delta development deriva dal commit `cde01e3...`, con digest
+SHA256SUMS `bbc5f1e4d8e0d47cceaf12421183842b1356cc8a1fb7b461cec47f3a11af8792`:
+fprintd/PAM identici byte alla candidate canonica, sorgenti driver differenti
+soltanto nei quattro loader storici dichiarati. Entrambe le candidate reali
+superano il percorso simulato install/rollback, incluso ripristino password/PAM.
+Il delta non altera `login-early/`, governance, snapshot upstream, patch fprintd
+originale/cleanup o greeter storico. Il review set è il diff Git rispetto a
+`2e098804...`, sorgenti/test, manuale e README del delta; nessun archivio aggiunto.
+Le successive correzioni solo documentali non cambiano il live-critical set.
+
+`OUTCOME=OFFLINE_READY`, `ADVANCEMENT=THREE_ATTEMPT_PREPARED_LIFECYCLE`,
+`EXECUTABLE_CLOSURE=OFFLINE_PASS`, `RESIDUAL_BLOCKER_OR_RISK=PHYSICAL_REARM_NOT_YET_VALIDATED`.
+La validazione fisica resta
 `HUMAN_REQUIRED` prima di installazione, sudo o USB (§6/§8 AGENTS.md). Il README
 privato contiene tre autenticazioni separate, ciascuna con massimo tre contatti,
 stop al MATCH, fallback dopo tre NO MATCH e rollback su FAIL. L'evidenza precedente

@@ -6,6 +6,13 @@ codice canonico attuale, conservando soltanto i quattro loader storici necessari
 al deployment D293. La candidate gestita usa invece i loader canonici: i due
 workflow non vanno sovrapposti. Nessuna migrazione dei materiali in questa prova.
 
+Sorgente verificato offline: `cde01e3e3e8e7dad1f6dc00e10ef303634d4f913`
+(implementazione `62eca6aa331e980683c09fc961042bc2631f6fe1`). I commit successivi
+solo documentali conservano il codice verificato; `prepare.sh` registra sempre
+lo SHA completo realmente usato. Build, 9 test transazionali e applicazione del
+pacchetto reale su filesystem simulato sono PASS. I contatti reali sono ancora
+da validare: **HUMAN_REQUIRED**, AGENTS.md §6/§8.
+
 ## Installazione (Utente)
 
 Prerequisiti: Fedora 44 KDE già qualificata, overlay `login-early` ACTIVE e
