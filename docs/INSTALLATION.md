@@ -140,8 +140,11 @@ enroll a fingerprint. Exercise the normal workflows in this order:
 6. password fallback.
 
 For the prepared cold login, press Enter once and place the finger naturally
-immediately; this path has one attempt and an 8-second PAM bound. On failure
-use password; do not try to warm up or rearm the sensor. For an ordinary
+immediately. This path permits at most three physical attempts, each bounded
+by 8 seconds. After a normal NO MATCH, fully release the finger and wait for
+the result before making a new contact. Stop immediately on MATCH. After
+three NO MATCH, or any error/timeout, use password. Do not press Enter again
+within the same authentication. For an ordinary
 verification series, allow at most three physical attempts and stop on
 the first match. Do not create a fourth attempt or an unbounded retry loop.
 
@@ -163,9 +166,11 @@ deployment/managed-install/manage.sh rollback
 ```
 
 Rollback switches driver, paired daemon, PAM and greeter together and includes
-the managed PAM state. Older managed releases without early login must first
-be removed using their documented uninstall, then installed fresh; an in-place
-update is rejected before mutation. Historical development overlays must also
+the managed PAM state. Older managed releases without early login, or with
+the previous one-attempt PAM rule, must first be removed using their original
+version of the manager and documented uninstall, then installed fresh; an
+in-place update is rejected before mutation. Update/rollback within the new
+three-attempt rule remains supported. Historical development overlays must also
 be rolled back first. It does not delete protected material
 or fingerprint templates.
 

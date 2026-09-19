@@ -40,7 +40,11 @@ mkdir -p "$build_dir" "$pkgconfig" "$opencv_prefix"
 "$script_dir/check-source.sh"
 (cd "$rpm_dir" && sha256sum -c "$script_dir/build-support/opencv-rpms.sha256")
 for package in "$rpm_dir"/*.rpm; do
-  (cd "$opencv_prefix" && rpm2cpio "$package" | cpio -idm --quiet)
+  # cpio may stop at the archive trailer before rpm2cpio writes its padding.
+  # A file keeps pipefail from turning that benign SIGPIPE into a build failure.
+  rpm2cpio "$package" >"$work/package.cpio"
+  (cd "$opencv_prefix" && cpio -idm --quiet <"$work/package.cpio")
+  rm -- "$work/package.cpio"
 done
 gusb=$(ldconfig -p | awk \
   '/libgusb[.]so[.]2 .*x86-64/ && !found {value=$NF; found=1} END {print value}')

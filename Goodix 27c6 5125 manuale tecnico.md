@@ -203,8 +203,13 @@ equivalente o retry diagnostici automatici.
 
 Test mirati PASS: protocollo 17 e driver 45 casi in entrambi i modi normal e
 sanitizer, daemon/greeter in entrambi i modi, 26 transazioni managed e 9 del
-delta di sviluppo. La riproduzione completa da sorgenti committati e le due
-candidate restano da consolidare prima della consegna. La validazione fisica resta
+delta di sviluppo. La prima riproduzione ha inoltre rilevato exit 141 (SIGPIPE) durante
+l'estrazione header PAM: `cpio` completa l'archivio prima che `rpm2cpio` termini
+il padding. L'estrazione RPM usa ora un archivio temporaneo verificando entrambi
+gli exit status, senza pipeline; stesso correttivo per OpenCV. SBOM e guida
+installazione includono esplicitamente il nuovo delta. La riproduzione completa
+da sorgenti committati e le due candidate restano da consolidare prima della
+consegna. La validazione fisica resta
 `HUMAN_REQUIRED` prima di installazione, sudo o USB (§6/§8 AGENTS.md). Il README
 privato contiene tre autenticazioni separate, ciascuna con massimo tre contatti,
 stop al MATCH, fallback dopo tre NO MATCH e rollback su FAIL. L'evidenza precedente

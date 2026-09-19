@@ -19,7 +19,10 @@ rpm_dir=${GOODIX_HEADER_RPMS:-$root/GoodixArtifacts/login-header-rpms}
 cp "$rpm_dir"/{pam-devel-1.7.2-2.fc44.x86_64,polkit-devel-127-2.fc44.2.x86_64}.rpm "$output/deps/rpms/"
 (cd "$output/deps/rpms" && sha256sum -c "$here/headers.sha256")
 for rpm in "$output/deps/rpms"/*.rpm; do
-  (cd "$output/deps/prefix" && rpm2cpio "$rpm" | cpio -idm --quiet)
+  # Avoid rpm2cpio SIGPIPE when cpio finishes before archive padding is read.
+  rpm2cpio "$rpm" >"$output/deps/package.cpio"
+  (cd "$output/deps/prefix" && cpio -idm --quiet <"$output/deps/package.cpio")
+  rm -- "$output/deps/package.cpio"
 done
 cp -L /usr/lib64/libpam.so.0 "$output/deps/lib/libpam.so"
 cp -L /usr/lib64/libpolkit-gobject-1.so.0 "$output/deps/lib/libpolkit-gobject-1.so"

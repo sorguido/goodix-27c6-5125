@@ -32,7 +32,8 @@ under `Rockytkg/libfprint/libfprint/sigfm/` provide the qualified matcher.
 `production/` is the build authority. It verifies the hash-pinned 62-file
 target-specific source set and builds the library in a network-isolated Flatpak
 SDK. It also stages the pinned upstream fprintd 1.94.5 source, applies the
-reviewable `production/login/fprintd.patch` and bounded cleanup correction, and builds the daemon, PAM module
+reviewable `production/login/fprintd.patch`, cleanup correction and
+`fprintd-attempts.patch`, then builds the daemon, PAM module
 and greeter parent. Those sources are independent of private history and
 development overlays. `deployment/managed-install/` prepares, installs, updates, rolls back, and
 removes immutable runtime versions.

@@ -40,7 +40,7 @@ SHIPPED_COMPONENTS = (
         "licenseConcluded": "GPL-3.0-or-later",
         "licenseDeclared": "GPL-2.0-or-later",
         "copyrightText": "See fprintd-AUTHORS and corresponding source notices",
-        "sourceInfo": "reference/fprintd-fedora44-1.94.5/source + production/login/fprintd.patch + fprintd-cleanup.patch; daemon and PAM module, paired with the GPL-3.0-or-later libfprint combined work.",
+        "sourceInfo": "reference/fprintd-fedora44-1.94.5/source + production/login/fprintd.patch + fprintd-cleanup.patch + fprintd-attempts.patch; daemon and PAM module, paired with the GPL-3.0-or-later libfprint combined work.",
     },
     {
         "SPDXID": "SPDXRef-Package-Goodix-greeter",
