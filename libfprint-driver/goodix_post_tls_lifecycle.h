@@ -179,6 +179,12 @@ gboolean goodix_post_tls_lifecycle_copy_baseline (
   const GoodixPostTlsLifecycle *lifecycle,
   uint16_t                      samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT]);
 
+/* Login-only gate. Configure before start; authorize only at first arm ACK.
+ * All ordinary capture/enrollment callers retain their existing behavior. */
+void goodix_post_tls_lifecycle_prepare_login (GoodixPostTlsLifecycle *lifecycle,
+                                              GoodixPostTlsEventFunc ready);
+gboolean goodix_post_tls_lifecycle_authorize_login (GoodixPostTlsLifecycle *lifecycle);
+
 G_END_DECLS
 
 #endif

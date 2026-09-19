@@ -22,6 +22,8 @@ typedef struct
   GQueue *out;
   guint in_submit_count;
   guint terminal_count;
+  guint login_ready_count;
+  gboolean authorize_on_ready;
   guint finger_down_count;
   guint release_tail_count;
   guint finger_up_count;
@@ -1260,10 +1262,82 @@ test_first_arm_backend_handoff_failure (void)
   fixture_free (fixture);
 }
 
+static void
+login_ready_callback (GoodixPostTlsLifecycle *lifecycle, gpointer data)
+{
+  Fixture *f = data;
+  f->login_ready_count++;
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (lifecycle), ==,
+                   GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  g_assert_cmpuint (f->audit.baseline_decode_count, ==, 1);
+  g_assert_cmpuint (f->audit.first_image_command_count, ==, 0);
+  g_assert_cmpuint (f->finger_down_count, ==, 0);
+  g_assert_cmpuint (f->image_count, ==, 0);
+  if (f->authorize_on_ready)
+    g_assert_true (goodix_post_tls_lifecycle_authorize_login (lifecycle));
+}
+
+static void
+test_login_ready_handoff (void)
+{
+  Fixture *f = fixture_new_for_profile (GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  goodix_post_tls_lifecycle_prepare_login (f->lifecycle, login_ready_callback);
+  g_assert_false (goodix_post_tls_lifecycle_authorize_login (f->lifecycle));
+  f->authorize_on_ready = TRUE;
+  run_full_trace (f, 3);
+  g_assert_cmpuint (f->login_ready_count, ==, 1);
+  g_assert_cmpuint (f->audit.baseline_decode_count, ==, 1);
+  g_assert_cmpuint (f->audit.fdt36_submit_count, ==, 3);
+  g_assert_cmpuint (f->audit.first_image_command_count, ==, 1);
+  g_assert_cmpuint (f->audit.reopen_count, ==, 0);
+  g_assert_cmpuint (f->audit.rearm_0x32_count, ==, 0);
+  g_assert_cmpuint (f->image_count, ==, 1);
+  g_assert_cmpuint (f->terminal_count, ==, 0);
+  g_assert_false (goodix_post_tls_lifecycle_authorize_login (f->lifecycle));
+  fixture_free (f);
+}
+
+static void
+test_login_early_contact (void)
+{
+  Fixture *f = fixture_new_for_profile (GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  g_autoptr(GBytes) irq = build_event (0x32, 0x0002, 0x003f, 0x0180);
+  goodix_post_tls_lifecycle_prepare_login (f->lifecycle, login_ready_callback);
+  f->stop_before_finger = TRUE;
+  run_full_trace (f, 0);
+  g_assert_cmpuint (f->login_ready_count, ==, 1);
+  feed_frame (f, irq, 0);
+  g_assert_cmpuint (f->terminal_count, ==, 1);
+  g_assert_cmpuint (f->audit.first_image_command_count, ==, 0);
+  g_assert_cmpuint (f->image_count, ==, 0);
+  g_assert_cmpuint (f->finger_down_count, ==, 0);
+  g_assert_true (g_queue_is_empty (f->out));
+  g_assert_false (goodix_post_tls_lifecycle_authorize_login (f->lifecycle));
+  fixture_free (f);
+}
+
+static void
+test_login_cancel_ready (void)
+{
+  Fixture *f = fixture_new_for_profile (GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  goodix_post_tls_lifecycle_prepare_login (f->lifecycle, login_ready_callback);
+  f->stop_before_finger = TRUE;
+  run_full_trace (f, 0);
+  goodix_post_tls_lifecycle_cancel (f->lifecycle, "expired or greeter exited");
+  g_assert_cmpuint (f->terminal_count, ==, 1);
+  g_assert_cmpuint (f->audit.first_image_command_count, ==, 0);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (f->backend));
+  g_assert_false (goodix_post_tls_lifecycle_authorize_login (f->lifecycle));
+  fixture_free (f);
+}
+
 int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+  g_test_add_func ("/login/ready-same-session-handoff", test_login_ready_handoff);
+  g_test_add_func ("/login/early-contact-no-22", test_login_early_contact);
+  g_test_add_func ("/login/cancel-ready-no-22", test_login_cancel_ready);
   g_test_add_func ("/d278-12/full-unfragmented",
                    test_full_trace_unfragmented);
   g_test_add_func ("/d278-12/full-fragmented",

@@ -140,7 +140,81 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — contratto pre-IRQ2 e decisione B sul login (19 settembre 2026)
+### Stato corrente — candidate early-login implementata offline (19 settembre 2026)
+
+L'Utente ha autorizzato esplicitamente l'architettura B nel prompt
+`GOODIX_IMPLEMENT_EARLY_LOGIN_PREPARATION.md`, con entry HEAD
+`7c0f83b53ca2b8452a1c5ed5bc1f00d1314bc9aa`, verificato su `development` pulito.
+Il precedente gate di strategia è chiuso. La candidate in
+`development/patches/login-early/` implementa il confine; **il difetto sul target
+resta aperto fino alla prova cold-login**. Nessuna installazione/live è stata
+eseguita dall'AI. La baseline installata prevista resta D293; gli script
+verificano gli hash prima di applicare l'overlay.
+
+Il servizio utente Fedora `plasma-login.service`, già successivo a KWin, avvia
+un piccolo parent GIO. Questo mantiene la connessione D-Bus a fprintd, richiede
+PrepareLogin e avvia il greeter Qt originale soltanto dopo la risposta READY
+o il fallback bounded a password. La preparazione effettiva è nel driver:
+open una volta → RX sync → secure/TLS/FDT → baseline `20` decodificata → ACK
+primo `32`. Solo quel callback emette READY; il ricevitore e la generation
+restano vivi. Il PAM del solo `plasmalogin` usa ClaimLogin; fprintd trasferisce
+l'open esistente, e la successiva VerifyStart/Identify autorizza l'acquisizione
+nella stessa sessione. Il ramo di attach ritorna prima del codice ordinario
+di bootstrap, incremento generation e reopen. Nessun `22`, matching o enrollment
+avviene prima dell'action. Le normali Claim e PAM sudo restano sul percorso
+precedente; ENROLL non è ammesso tramite ClaimLogin.
+
+IRQ2 prima di Verify invalida READY, cancella RX e termina senza `22` o retry.
+Limiti: preparazione driver 10 s, richiesta greeter 12 s più al massimo 2 s
+per il manager; READY 120 s; Verify PAM login un tentativo / 8 s. Scadenza,
+uscita del greeter, rimozione e suspend chiudono dopo il drain; suspend prosegue
+asincrono dopo close, senza attesa annidata. Nessuna nuova preparazione su
+resume/hotplug/restart del daemon: ClaimLogin senza READY fallisce rapidamente
+con messaggio per usare password. Il greeter rimane disponibile anche se
+PrepareLogin fallisce. Plasma 6.7.5 conserva il greeter per 5 s dopo l'avvio
+della sessione: la normale Claim è ammessa appena il precedente open è chiuso,
+senza portare poison o aspettare l'uscita tardiva del greeter.
+
+La build usa il core già integrato a `c0e13ff5f78ac32403a753446dcbc44aa7f30556`,
+i sorgenti driver correnti e i quattro loader D293 da
+`e61fce313794922a2dab156a1b38a8ddc5837f19`, senza leggere materiali protetti.
+fprintd 1.94.5 è patchato solo nello staging dal reference Fedora invariato.
+ABI pubblica libfprint invariata: interfaccia privata GObject accoppiata al
+daemon della candidate. Header PAM/polkit scaricati e verificati, mai installati;
+compilazione SDK senza rete, link contro le librerie Fedora già presenti.
+Provenance tecnica, riproduzione build/test e review sono in `IMPLEMENTATION.md`;
+il manuale resta l'autorità narrativa canonica.
+
+**Verifica completata offline:** build completa normale e ASan/UBSan;
+protocollo 16/16 e driver 34/34 in entrambi i modi; handler fprintd sul bus
+privato e barriera greeter in entrambi i modi; transazione install/rollback
+6/6. PASS source/manifest canonico e staging, ABI `LIBFPRINT_2.0.0`, assenza di
+simboli test/RPATH e risoluzione librerie. La review PM del diff effettivo
+accetta la candidate offline, con `EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_PENDING`.
+Timeout reale di preparazione, chiusura dopo RX pending, fallback, singola
+Verify, normale Claim successiva e cleanup suspend sono coperti. PolicyKit
+host/SELinux e MATCH fisico non sono stati eseguiti. Hash degli artefatti
+verificati in `IMPLEMENTATION.md`; install registra lo SHA completo della
+ricetta committata e gli hash del payload. Audit read-only della baseline D293
+PASS, overlay assente. Nessun protected material o dispositivo aperto dall'AI.
+
+**Riesame pre-live:** cambia il punto reale di calibrazione, ora prima della
+finestra interattiva. L'ipotesi è che rimuovere la race setup/dito risolva il
+contatto immediato mantenendo la sessione armata. Se fallisce ancora a FIRST_IRQ2
+con READY/attach documentati, si esamina soltanto quel failure e il timing
+fisico; niente terza ripetizione equivalente, attese estese o recuperi inventati.
+Il dito già presente prima della schermata non è un blocker: è fuori dai
+criteri iniziali espliciti. La prima prova è un solo Invio/contatto, eccezione
+Utente al default serie §8.2; poi password, una autenticazione sudo e verifica
+del rollback D293 richiesta dall'Utente. Nessun nuovo Operator Kit.
+
+**HUMAN_REQUIRED** soltanto prima di installazione/sudo/USB/live, secondo
+`AGENTS.md §6.1–6.2`. `install.sh`, `rollback.sh` e README breve sono nella
+stessa directory. La verifica offline prova l'ordine software e i guardrail;
+non prova riconoscimento fisico, deployment SELinux o compatibilità Windows
+post-candidate. Questi esiti non vengono anticipati come PASS.
+
+#### Decisione B ed evidenze pre-IRQ2 consolidate prima dell'implementazione
 
 Il difetto `Invio → dito immediato` resta aperto. La prova temporanea
 lift/recontact è stata **eseguita**, senza acquisizione per il matcher nella
@@ -149,8 +223,8 @@ da `development` pulito, `8a01d703a179789abfbdfbb3cd8ea6114d0dea9c`, e verifica
 il solo contratto finger-off prima del primo IRQ2. **Esito B: il corpus non
 chiude un recupero locale sicuro in quel punto.** Nessun early `34` viene
 implementato; il singolo passo selezionato è il confine architetturale minimo
-di preparazione prima di Invio descritto sotto. Il task chiede di identificarlo,
-non di installarlo o eseguirlo.
+di preparazione prima di Invio descritto sotto. Quel task chiedeva di identificarlo; il successivo task esplicito autorizza
+l'implementazione offline descritta nello stato corrente.
 
 Fonti: `development/open issues/latenza_impronta_al_login/goodix-same-action-live.txt`,
 testimonianza fisica esplicita dell'Utente, codice production e patch diagnostica
@@ -245,7 +319,7 @@ carica materiali e reclama l'interfaccia; non esegue calibrazione. fprintd
 risponde a VerifyStart e notifica il dito senza attendere activate-complete.
 Spostare FDT in open cambia l'ordine rispetto al prompt, ma resta dopo Invio:
 non soddisfa il contatto immediato. Avviare prima il daemon non esegue Claim.
-**Unico prossimo passo selezionato:** una preparazione/readiness greeter →
+**Confine selezionato dalla precedente review, ora implementato:** una preparazione/readiness greeter →
 fprintd con sessione libfprint mantenuta, fprintd unico owner. Completare
 secure/TLS/FDT, incluso `20` di baseline e ACK del `32`, prima di abilitare il
 workflow fingerprint con Invio; conservare reader e sessione; collegare la
@@ -255,16 +329,13 @@ readiness e termina senza acquisizione o retry automatico. Scadenza bounded,
 cancel, suspend e uscita dal greeter devono invalidare readiness e fare cleanup;
 sudo ordinario ed ENROLL conservano il lifecycle corrente.
 
-Questo confine **non è ancora una soluzione validata o installabile**. La
-prima prova richiederebbe dito completamente assente durante la preparazione,
-poi contatto immediato dopo readiness/Invio; non risolve il dito già presente
-all'avvio. Anticipare `20` può acquisire contenuto biometrico se tale precondizione
-fisica è violata, quindi il confine pre-autenticazione richiede decisione
-esplicita prima di implementare il prototipo. Nessuna immagine verrebbe
-persistita o passata al matcher nella preparazione proposta. Non esiste nelle
-evidenze attuali un singolo esperimento early-34 giustificato che chiuda il
-contratto senza prima inventare provenienza della tabella e semantica di vuoto.
-La selezione è dunque architetturale; niente campagna USB o nuovo test A/B.
+Alla chiusura della precedente review il confine non era implementato:
+richiedeva una decisione esplicita per anticipare `20` all'autenticazione.
+La decisione è ora stata fornita dall'Utente e l'implementazione è quella
+riportata sopra. Resta valida la distinzione tecnica: la baseline può contenere
+il dito se già presente, senza per questo diventare un'immagine autorizzata al
+matcher. La candidate non persiste immagini; il dito presente prima della
+schermata resta escluso dalla prima accettazione. Nessun early `34` è introdotto.
 
 La comparazione read-only usa `goodix-fp-linux-dev/libfprint` al commit
 `eebdacff358c90e3f909ae4f5526fff194fe3f7c`: Goodix MOC, FPC MOC, Elan MOC,
@@ -283,13 +354,10 @@ baseline **13/13**, entrambe normali e ASan/UBSan; `production/check-source.sh`
 PASS. Codice production e relativa ABI invariati; nessuna nuova build installabile è richiesta per questi soli
 test/documenti. L'audit attuale verifica hash DLL/disassembly, callsite e branch
 mirati, ordinamento metadata-only D255/D273 e coerenza con enrollment e fonti
-D279/12, /54, /59; `git diff --check`. Nessun eseguibile modificato:
-`EXECUTABLE_CLOSURE=NOT_APPLICABLE` per questa decisione documentale, nessuna
-nuova esecuzione build/sanitizer/ABI. **HUMAN_REQUIRED** prima del nuovo confine
-pre-autenticazione e, separatamente, prima di installazione/sudo/USB/live;
-la prima decisione ricade in `AGENTS.md §6.4` per il nuovo profilo di rischio
-dell'immagine di baseline prima dell'autenticazione, la live in `§6.1–6.2`.
-Nessuna candidate install/rollback viene presentata come soluzione.
+D279/12, /54, /59; `git diff --check`. Quella review era solo documentale (`EXECUTABLE_CLOSURE=NOT_APPLICABLE`);
+la candidate corrente modifica invece eseguibili e richiede le build e i test
+riportati sopra. Il gate di strategia di quella review è superato dalla decisione
+Utente; rimane quello operativo prima di installazione/sudo/USB/live.
 
 Verifica host read-only: overlay diagnostico, relativo wrapper, drop-in,
 override PAM e stato di rollback assenti; ExecStart D293 e servizio inattivo;
@@ -1519,7 +1587,7 @@ PHASE_E_CLOSED=true
 PM_DECISION=PROJECT_STEP_COMPLETE
 ```
 
-### Ultimo avanzamento corrente — D297/01 persistenza KScreenLocker e dual deployment
+### Avanzamento D297/01 precedente — persistenza KScreenLocker e dual deployment
 
 La verifica richiesta dall'Utente prima della pubblicazione ha individuato un
 gap reale nel deployment, non nel driver. D289/01 aveva già provato sul target

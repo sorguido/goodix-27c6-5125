@@ -66,3 +66,21 @@ source tree or candidate.
 
 This project records its compatibility determination and source provenance; it
 does not provide legal advice for unrelated distributions or modifications.
+
+## Private early-login candidate
+
+`development/patches/login-early/fprintd.patch` modifies the preserved Fedora
+fprintd 1.94.5 reference only in build staging. Provenance and source RPM hashes:
+`development/reference/fprintd-fedora44-1.94.5/PROVENANCE.md`. Upstream
+`src/device.c`, `src/manager.c`, `src/fprintd.h`, Device XML and `pam/pam_fprintd.c`
+retain their existing notices and GPL-2.0-or-later terms. New login integration,
+greeter barrier, build/deployment scripts and tests are GPL-2.0-or-later; driver
+changes retain LGPL-2.1-or-later per-file terms. No upstream file is relicensed.
+The snapshot is unchanged; the diff and its new include file are versioned.
+
+Plasma source RPM 6.7.5-1.fc44 was inspected only for service and greeter lifecycle;
+no Plasma source was copied into the candidate. Its hashes, exact paths and the
+unchanged D293 loader source pins are recorded in the candidate IMPLEMENTATION.md.
+PAM/polkit devel RPMs provide compile-time headers only (pinned hashes in
+`headers.sha256`); they are not installed or included in the runtime payload.
+This candidate is private; it does not alter the publication/export boundary.

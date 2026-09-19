@@ -31,6 +31,9 @@ struct _GoodixPostTlsLifecycle
   GoodixPostTlsPhase phase;
   GoodixPostTlsImageFunc image;
   GoodixPostTlsEventFunc finger_down;
+  GoodixPostTlsEventFunc login_ready;
+  gboolean login_gate;
+  gboolean login_authorized;
   GoodixPostTlsEventFunc release_tail;
   GoodixPostTlsEventFunc finger_up;
   GoodixPostTlsTerminalFunc terminal;
@@ -725,9 +728,19 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
           break;
         }
       lifecycle->phase = GOODIX_POST_TLS_PHASE_FIRST_IRQ2;
+      if (lifecycle->login_ready != NULL)
+        lifecycle->login_ready (lifecycle, lifecycle->user_data);
       break;
     case GOODIX_POST_TLS_PHASE_FIRST_IRQ2:
     case GOODIX_POST_TLS_PHASE_SECOND_IRQ2:
+      /* Fence BEFORE finger delivery, up-table derivation and image command. */
+      if (lifecycle->login_gate && !lifecycle->login_authorized)
+        {
+          lifecycle_fail (lifecycle, g_error_new_literal (
+            G_IO_ERROR, G_IO_ERROR_CANCELLED,
+            "Goodix login: contact before Verify; password required"));
+          break;
+        }
       if (message.control != 0x32 ||
           !event_fields (&message, &irq, &flags, &raw) ||
           irq != 0x0002 ||
@@ -1144,5 +1157,27 @@ goodix_post_tls_lifecycle_copy_baseline (
     return FALSE;
   memcpy (samples, lifecycle->baseline_samples,
           sizeof lifecycle->baseline_samples);
+  return TRUE;
+}
+
+void
+goodix_post_tls_lifecycle_prepare_login (GoodixPostTlsLifecycle *lifecycle,
+                                          GoodixPostTlsEventFunc ready)
+{
+  g_return_if_fail (lifecycle != NULL);
+  g_return_if_fail (lifecycle->phase == GOODIX_POST_TLS_PHASE_NOT_STARTED);
+  g_return_if_fail (ready != NULL);
+  lifecycle->login_gate = TRUE;
+  lifecycle->login_ready = ready;
+}
+
+gboolean
+goodix_post_tls_lifecycle_authorize_login (GoodixPostTlsLifecycle *lifecycle)
+{
+  if (lifecycle == NULL || !lifecycle->login_gate ||
+      lifecycle->login_authorized ||
+      lifecycle->phase != GOODIX_POST_TLS_PHASE_FIRST_IRQ2)
+    return FALSE;
+  lifecycle->login_authorized = TRUE;
   return TRUE;
 }

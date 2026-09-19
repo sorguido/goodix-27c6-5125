@@ -1,5 +1,12 @@
 # Cold-login immediate contact: resolution review, 2026-09-19
 
+Current implementation follow-up: the User explicitly authorized B after this
+review. The offline candidate, build recipe, focused tests and reversible
+installation are in `development/patches/login-early/`; current canonical status
+is in the manual. Strategy authorization below is historical; installation,
+sudo and USB/live remain Human-Gated. The pre-IRQ2 evidence conclusions below
+remain unchanged.
+
 ## Pre-image finger-off contract: decision B
 
 Entry: `development`, clean, `8a01d703a179789abfbdfbb3cd8ea6114d0dea9c`.
