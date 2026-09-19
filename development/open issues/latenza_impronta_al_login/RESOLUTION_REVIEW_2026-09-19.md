@@ -1,8 +1,163 @@
 # Cold-login immediate contact: resolution review, 2026-09-19
 
+## Pre-image finger-off contract: decision B
+
+Entry: `development`, clean, `8a01d703a179789abfbdfbb3cd8ea6114d0dea9c`.
+This narrow review supersedes the unresolved-fact handoff below. **The corpus
+does not establish safe recovery before the first IRQ2.** It does establish
+two qualifications missing from the earlier reasoning: OEM manual IRQ0100 can
+update an existing up-table, and an OEM branch can arm up after IRQ2 without
+taking a primary image. Neither supplies the missing pre-IRQ2 contract.
+
+### 1. Meaning of 0x34 and IRQ0200
+
+`0x34` selects FDT-up detection with body `0a01 || up_table12`; it is a mode
+command using a reference table, not an unconditional read of physical absence.
+The APP12509 positive sequence is IRQ2 → `22` → primary B0 → `34` → ACK01 →
+IRQ0200, then `20`/B0, `50`/NAV and, where applicable, re-arm. In the D263/D273
+source these are **zero-based packet indices** 225, 227, 231, 233, 235, 237,
+238/243, 244/249, 251. D279/54 independently records the same identify tail.
+
+In that context IRQ0200 reports the release transition, with zero active
+FDT-channel flags and raw data from which the host derives the next down-table.
+It supports normal post-contact release handling; it does not certify arbitrary
+table correctness, remove a finger, reset calibration or replace the subsequent
+baseline image acquisition. D275/03 reached ACK01 with an incorrect up-table
+but never IRQ0200; D275/04 validated the corrected path. ACK alone proves no
+physical release. These are corpus-bounded statements, not a firmware-wide
+specification of every possible IRQ0200.
+
+### 2. Up-table provenance, including the OEM exceptions
+
+Static authority is the preserved `gfusb.dll` SHA-256
+`904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2` and
+`gfusb_static_refs/gfusb_disasm.txt` SHA-256
+`d661afb78f60bd1ae45a5ca7bf708abd0e2a3fdd7e3cd5805bb2a3883fb7c743`, under
+`development/private-root/analysis/D230/work/GoodixExport/`. Both hashes were
+rechecked; the DLL was not executed.
+
+| Writer / consumer | Exact static evidence | Consequence |
+| --- | --- | --- |
+| IRQ2 → up | `0x180028831` calls `0x180029314`; per-channel transform and mask, then writes `0x180580838` | Validated target provenance; D279/12 found all 41 enrollment `34` bodies equal to the same-cycle IRQ2-derived table |
+| Manual IRQ0100 → up | Dispatcher `0x1800289a0`; `0x180028ac8` tests `context+0x51c0 == 1`, then `0x180028b29` calls **the same** `0x180029314`; otherwise `0x180028b86` learns down | IRQ0100-to-up is present in OEM code; it is not universally an invented transform |
+| Conditional up update | `0x1800295ec–0x18002964e`: in that state, replace each old encoded word only when the candidate is smaller; otherwise ordinary replacement | Manual refinement depends on an existing up-table; it is not a fresh-table constructor independent of prior state |
+| Initializer | `0x180028480`, registered at `context+0x13d68` (`0x180026c71`): selector 0 copies one buffer to both globals; 1 only down; other nonzero only up | A populated up buffer does not imply a valid contact-derived release reference |
+| Bootstrap caller | `0x180068a40–0x180068a60` invokes that callback, selector 0, source `0x18059fa90`; then `0x180068abe` selects **down** `(3,1,1)` | The OEM can populate up before IRQ2, but this caller does not validate it by selecting up |
+
+The context is based at `0x18058bdb0`: `+0x51c0` aliases `0x180590f70`,
+and `+0x13d68` aliases callback slot `0x18059fb18`. This resolves the indirect
+call, rather than assuming the initializer has no caller. Its source is the
+FDT base buffer: the cache load copies into it at `0x180061b20`; fresh-base
+update copies the base getter output there at `0x180069330`. The fresh path
+follows the three-stage bootstrap, including `20`/B0. Copying this down/base
+reference into up is not the IRQ2 half-plus-delta derivation.
+
+The only literal write of 1 to the refinement flag in this disassembly is
+`0x180066849`. It wraps manual sample `0x18006685f`, then up arm
+`0x1800668c4`, and clears at `0x180066913`. This is `gf_captureFingerdata`:
+image acquisition at `0x1800661a6` or `0x180066206` precedes the refinement.
+It does not establish cold-bootstrap contact → release recovery.
+
+Rockytkg snapshot `227eba219fa9e3fbac5bd59aca79f624f67cd11b`, after reading
+its provenance, corroborates the normal transform only: `goodix_capture.c`
+handles IRQ2→up and IRQ0200→down at lines 321–338, manual→down at 576–582,
+and sends `34` after capture at 807–815. `goodix_base.c:114–135` is the sole
+up-table writer found in snapshot `src/`; cache load at 171 initializes down.
+No equivalent pre-IRQ2 release reference is established there.
+
+### 3. Ordering: before image is different from before IRQ2
+
+The D255 zero-finger timeline has `36` requests at frames 143/155/173,
+baseline `20` at 168 and `32` at 179/198/214; **no `34` or `22`**. Frame
+numbers here are one-based, unlike the D273 census. Preserved positive
+D263, D274/03, D279/10 and D279/54 analyses place the release path after
+contact/acquisition; none provides the requested early-34 transcript.
+
+The OEM does contain a **pre-primary-image, post-IRQ2** branch:
+`0x180028850` publishes event state 1 after successful up derivation;
+`0x1800637c2–0x1800637d1` dispatches state 1 to `0x180063acf`. With no pending
+request, `0x180063dbb–0x180063e6b` selects `(3,2,1)` without calling the image
+getter. The delayed-request branch at `0x180063ccd` does likewise. Thus an
+image is not a universal host prerequisite for `34`; a known contact-derived
+table is still present in these paths. Target live behavior of this no-image
+branch is not established by the preserved captures.
+
+The generic mode forwarder at `0x180060f5b–0x180060f89` can also request up;
+its existence is not a demonstrated bootstrap lifecycle or a physical-empty
+predicate. D258/D259 close the normal bootstrap and post-classifier control
+flow, not all possible OEM callers. No universal claim that firmware forbids
+early `34` follows from this negative result.
+
+### 4. Other pre-image empty signals
+
+None is established in the inspected target evidence. D251's AF/AE state has
+known POV-valid, TLS-connected and locked bits; byte 0 and other bits remain
+opaque, with no physical-finger-free meaning established. IRQ0100 is a manual
+sample: D279/59 records both zero bootstrap masks and contact masks `0x003f`.
+Reverse80 is temporally associated with the reported lift in the same-action
+test, but its static handler learns down (`0x18002895c`); it supplies no proven
+absolute absence or clean image baseline. USB silence after D255 cancellation
+proves host/bus quiescence, not sensor emptiness. No speculative status query,
+new mode, classifier threshold or polling loop is selected.
+
+### 5. Can 63 → 0 → 0 certify empty?
+
+No. Each accepted sample replaces the reference used for the next comparison;
+the temporary patch explicitly learns the first contact-bearing sample. Zero
+flags and stable raw deltas after that update are not independent absence
+measurements. This is verified host dataflow; the firmware's exact comparator
+and the actual contamination remain unproven. The existing synthetic test
+establishes the table updates, not the physical predicate.
+
+### Selected next move: earlier preparation with a retained session
+
+**B; no recovery implementation and no early-34 live candidate.** A test using
+an invented seed/up-table would first assume the contract it claims to test.
+An ACK, timeout or even a single release event would not establish correct
+empty/nonempty discrimination. Within the current evidence and constraints
+there is no justified one-shot sensor experiment that closes all of this.
+
+The smallest architecture change is one **greeter → fprintd preparation and
+readiness handoff**, retaining the same libfprint session. Before enabling the
+fingerprint Enter workflow, fprintd remains sole owner and completes the
+existing secure/TLS/FDT preparation **including `20` baseline and acknowledged
+`32` arm**. The receiver stays active; the subsequent PAM Claim/Verify attaches
+to that prepared session without repeating calibration or closing/reopening.
+Primary `22` and matching require the explicit authentication action. An
+IRQ2 received before that action invalidates readiness and ends the preparation
+without acquisition or automatic retry. Expiry, cancel, suspend and greeter
+exit must also invalidate readiness and run the existing bounded cleanup;
+ordinary sudo and ENROLL keep their current lifecycle. Starting fprintd early,
+moving work only to Claim, or sending `32` only after Enter leaves the race.
+
+This is a minimum architecture boundary, **not a validated fix or an installable
+candidate**. It requires an explicit physical precondition for initial testing:
+finger completely away throughout preparation, then immediate contact only
+after readiness/Enter. The software has not gained an absolute finger-free
+detector; a finger already present before preparation remains outside that
+claim. In particular, early `20` can contain biometric data if that precondition
+is violated, so pre-authentication preparation needs an explicit decision on
+this boundary; it cannot be silently enabled. No image is persisted or sent to
+matching during the proposed preparation. The exact next task is this one
+bounded login preparation/handoff prototype, after that decision, with offline
+validation and reversible deployment before a separate live gate. No capture
+campaign or additional A/B timing experiment is selected.
+The decision boundary is `AGENTS.md §6.4` (a strategy change with a new risk
+profile: baseline acquisition before authentication); installation, privileges
+and real hardware remain gated separately by `§6.1–6.2`.
+
+Offline verification for this review: both static-source hashes; initializer
+and manual-refinement callsites/branches; metadata-only D255/D273 ordering
+census; cross-checks against D279/12, /54, /59 and current production/enrollment
+sources; `git diff --check`. No executable path changes, so build/sanitizer/ABI
+reruns and install/rollback are not applicable to this documentation-only
+decision. Prior test results below remain historical, not new runs.
+
 ## Post-live decision: same-action result
 
-This section supersedes the initial decision below. Entry HEAD was
+This section records the preceding review; the protocol decision above
+supersedes its missing-fact handoff and qualifies its up-table discussion.
+It superseded the initial decision further below. Entry HEAD was
 `a27259194de10a706837f4259d774f5d91a47e8c`, branch `development`, clean.
 The diagnostic runtime was recipe `c7238d00ae618edbdffc423cdb21ec77fb7a3a5a`,
 patch SHA-256 `b0fa8d3dade95bf13b1b59295709583ae95b84f859b9ec44296c7d3c209a0936`.

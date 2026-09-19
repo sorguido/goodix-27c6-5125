@@ -140,23 +140,25 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — esito same-action e decisione sul login (19 settembre 2026)
+### Stato corrente — contratto pre-IRQ2 e decisione B sul login (19 settembre 2026)
 
 Il difetto `Invio → dito immediato` resta aperto. La prova temporanea
 lift/recontact è stata **eseguita**, senza acquisizione per il matcher nella
-prima action; non è una candidate production. La ripartenza parte da
-`development` pulito, `a27259194de10a706837f4259d774f5d91a47e8c`. Il task
-corrente chiede prima una correzione locale anti-contaminazione della baseline
-(A), poi, solo se A non è giustificata, una preparazione realmente anticipata
-(B). È autorizzata la preparazione offline della soluzione se giustificata,
-non una nuova live autonoma.
+prima action; non è una candidate production. Il successivo audit mirato parte
+da `development` pulito, `8a01d703a179789abfbdfbb3cd8ea6114d0dea9c`, e verifica
+il solo contratto finger-off prima del primo IRQ2. **Esito B: il corpus non
+chiude un recupero locale sicuro in quel punto.** Nessun early `34` viene
+implementato; il singolo passo selezionato è il confine architetturale minimo
+di preparazione prima di Invio descritto sotto. Il task chiede di identificarlo,
+non di installarlo o eseguirlo.
 
 Fonti: `development/open issues/latenza_impronta_al_login/goodix-same-action-live.txt`,
 testimonianza fisica esplicita dell'Utente, codice production e patch diagnostica
-`c7238d00ae618edbdffc423cdb21ec77fb7a3a5a`. Il confronto community e la
-valutazione A/B sono nella nuova sezione iniziale del report esistente
-`RESOLUTION_REVIEW_2026-09-19.md` nella stessa directory. La review precedente
-resta evidenza storica: il suo esperimento mancante è ora stato eseguito.
+`c7238d00ae618edbdffc423cdb21ec77fb7a3a5a`. La sezione iniziale del report
+esistente `RESOLUTION_REVIEW_2026-09-19.md`, nella stessa directory, risponde
+in ordine alle cinque domande del contratto con VA OEM e provenance esatte.
+La precedente valutazione A/B e il confronto community restano evidenza
+storica; il confronto non è stato ripetuto.
 
 **Osservato, prima action:** Invio una sola volta, dito continuamente appoggiato
 per poco più di 4 s, sollevato completamente per poco più di 1 s, riappoggiato
@@ -194,19 +196,48 @@ sample. Questo è dedotto dal call-flow, senza leggere dati biometrici. Anche
 quel riferimento può essere stato acquisito col dito presente; il suo contenuto
 non è noto. Non si attribuisce una decisione al matcher, che non è stato chiamato.
 
-**A, recupero locale:** la prima maschera nonzero permette di rifiutare il
-sample sospetto prima di apprenderlo (la produzione lo fa già). Non abbiamo
-però un contratto target per attendere un vero finger-off a quel punto:
-`36` produce un sample, non una sottoscrizione finger-off; il solo `reverse80`
-non certifica livello fisico o una baseline pulita. Il percorso validato
-`34 → IRQ0200` usa una up-table derivata da un precedente IRQ2 e segue la
-prima immagine. Nell'enrollment l'IRQ0100 a contatto è accettato ma non genera
-la up-table: anch'essa proviene da IRQ2. Applicare la trasformazione IRQ2 al
-raw IRQ0100, o usare `34` prima della prima acquisizione, sarebbe un nuovo
-contratto, non un semplice riuso già verificato. Polling/resampling cieco,
-allargamento soglie e promozione della patch temporanea non risolvono questo
-vuoto. Se il dito rimane appoggiato, una attesa finger-off da sola non può
-farlo sparire; non si promette un recupero invisibile al workflow.
+**A, recupero locale non giustificato:** la produzione già rifiuta una maschera
+baseline nonzero. `34` arma il rilevamento up con una tabella, non legge
+incondizionatamente l'assenza fisica. L'IRQ0200 con flags zero è validato come
+rilascio nel ciclo con precedente IRQ2, tabella corretta e acquisizione;
+fornisce raw per la nuova down-table, non una certificazione di calibrazione
+pulita per qualunque tabella. D275 mostra che anche una tabella errata può
+ricevere ACK01 senza IRQ0200. Il successivo `20` resta distinto e necessario
+nel percorso baseline corrente.
+
+**Correzioni statiche nuove, senza estensione live:** nel DLL OEM hash
+`904eab1d9dbfab2609da361aa6ddba549a9d503f85b4e439b0294908f4cbc7e2`, l'IRQ0100
+può effettivamente chiamare il derivatore up `0x180029314` a `0x180028b29`,
+quando `context+0x51c0 == 1`. In quel ramo ogni word candidata sostituisce la
+precedente solo se minore: è affinamento di una tabella già esistente. Il
+callsite che abilita tale stato (`0x180066849`) esegue manual sample e `34`
+nella coda di `gf_captureFingerdata`, dopo il getter immagine. Non è prova
+di inizializzazione up valida da un primo sample contaminato.
+
+L'inizializzatore `0x180028480`, selector 0, copia invece la stessa base in
+down e up. Il callback `context+0x13d68` è lo slot globale `0x18059fb18`;
+`0x180068a40–0x180068a60` lo alimenta dal buffer base `0x18059fa90` dopo il
+bootstrap, quindi arma **down**, non up, a `0x180068abe`. Il buffer può venire
+da cache o aggiornamento fresco: non è una base di rilascio derivata da contatto.
+Quindi «up sempre e soltanto da IRQ2» sarebbe un claim OEM troppo forte;
+resta corretto come contratto del percorso production validato e dei 41 `34`
+enrollment verificati in D279/12. Rocky conferma IRQ2→up, manual→down e up
+post-capture; non chiude un equivalente pre-IRQ2.
+
+Inoltre `0x180063dbb–0x180063e6b` arma up senza immagine primaria quando riceve
+finger-down senza richiesta pendente. È un percorso statico **post-IRQ2**:
+la derivazione up ha già preceduto il dispatch dello stato 1. «Prima
+dell'immagine» e «prima di IRQ2» non sono lo stesso confine. Nessuna capture
+target letta dimostra early `34` senza IRQ2; D255 zero-finger non contiene
+alcun `34` o `22`. Non si deduce da ciò che il firmware lo vieti universalmente.
+
+**Nessun altro predicato empty provato:** AF/AE espone POV-valid, TLS-connected
+e locked, senza semantica finger-free verificata; IRQ0100 è un sample e può
+portare flags di contatto; reverse80 aggiorna down nel dispatcher ma non prova
+assenza assoluta o pulizia della baseline immagine. `63 → 0 → 0` e i delta
+stabili restano dipendenti dal riferimento appreso, non una misura indipendente
+di vuoto. Copiare una tabella, applicare una formula nota a un contesto nuovo
+o osservare un ACK non chiude questi requisiti.
 
 **B, preparazione anticipata:** il percorso reale è Invio → PAM → Claim →
 `fp_device_open` → VerifyStart → activate → secure/TLS/FDT. `img_open` corrente
@@ -214,25 +245,26 @@ carica materiali e reclama l'interfaccia; non esegue calibrazione. fprintd
 risponde a VerifyStart e notifica il dito senza attendere activate-complete.
 Spostare FDT in open cambia l'ordine rispetto al prompt, ma resta dopo Invio:
 non soddisfa il contatto immediato. Avviare prima il daemon non esegue Claim.
-Il minimo confine realmente anticipato richiederebbe fprintd come unico owner,
-una preparazione completata prima che il greeter accetti Invio e una sessione
-mantenuta fino all'action autorizzata. Non viene spacciato per un drop-in di
-boot: servono lifetime/cancel/suspend e gestione di un contatto durante tale
-attesa. Anticipare anche `20` non garantisce, senza un controllo affidabile di
-sensore libero, che il frame sia non biometrico; rinviarlo lascia la relativa
-baseline esposta al dito dopo Invio. Nessuna implementazione B viene promossa
-senza chiudere questo contratto.
+**Unico prossimo passo selezionato:** una preparazione/readiness greeter →
+fprintd con sessione libfprint mantenuta, fprintd unico owner. Completare
+secure/TLS/FDT, incluso `20` di baseline e ACK del `32`, prima di abilitare il
+workflow fingerprint con Invio; conservare reader e sessione; collegare la
+successiva Claim/Verify senza ricalibrare o chiudere/riaprire. `22` e matching
+restano subordinati all'action esplicita. Un IRQ2 prima dell'action invalida
+readiness e termina senza acquisizione o retry automatico. Scadenza bounded,
+cancel, suspend e uscita dal greeter devono invalidare readiness e fare cleanup;
+sudo ordinario ed ENROLL conservano il lifecycle corrente.
 
-**Singolo fatto device-side mancante:** esiste su APP12509 una transizione
-bounded, volatile, prima di qualunque immagine, da `36/IRQ0100` con contatto a
-un evento che certifichi sensore libero e permetta una calibrazione pulita
-nella stessa sessione? Il caso concreto da chiarire è l'ammissibilità di
-`34/IRQ0200` in quel punto e la provenienza valida della sua up-table senza
-un precedente IRQ2. Non basta il nome finger-up del comando. Il log same-action
-non contiene tale transizione e gli altri chip non ne dimostrano la semantica.
-Questo è il boundary esatto per evidenza/protocollo OEM mirato, non una
-richiesta di campagna capture o di ripetere immediate-vs-delayed. Nessuna
-nuova sequenza wire di prova è dichiarata pronta.
+Questo confine **non è ancora una soluzione validata o installabile**. La
+prima prova richiederebbe dito completamente assente durante la preparazione,
+poi contatto immediato dopo readiness/Invio; non risolve il dito già presente
+all'avvio. Anticipare `20` può acquisire contenuto biometrico se tale precondizione
+fisica è violata, quindi il confine pre-autenticazione richiede decisione
+esplicita prima di implementare il prototipo. Nessuna immagine verrebbe
+persistita o passata al matcher nella preparazione proposta. Non esiste nelle
+evidenze attuali un singolo esperimento early-34 giustificato che chiuda il
+contratto senza prima inventare provenienza della tabella e semantica di vuoto.
+La selezione è dunque architetturale; niente campagna USB o nuovo test A/B.
 
 La comparazione read-only usa `goodix-fp-linux-dev/libfprint` al commit
 `eebdacff358c90e3f909ae4f5526fff194fe3f7c`: Goodix MOC, FPC MOC, Elan MOC,
@@ -242,14 +274,22 @@ prima del prompt. Elan image calibra in AWAIT_FINGER_ON e contempla esplicitamen
 il problema del dito durante calibrazione. Nessun codice è stato copiato.
 Flash/delete/reset dei driver esterni non sono pratiche autorizzate qui.
 
-Verifiche nuove: il test host della sequenza maschere `63/0/0` controlla i byte
+Verifiche della precedente review post-live: il test host della sequenza
+maschere `63/0/0` controlla i byte
 delle tabelle nei tre `36` e nel primo `32`, poi un solo reverse80 e cancel,
 senza aggiungere un IRQ2 sintetico risolutivo. Raw e frame restano sintetici:
 prova il dataflow host, non la fisica del firmware. Suite variante **18/18**,
 baseline **13/13**, entrambe normali e ASan/UBSan; `production/check-source.sh`
 PASS. Codice production e relativa ABI invariati; nessuna nuova build installabile è richiesta per questi soli
-test/documenti. Stato **HUMAN_REQUIRED** sul contratto di recovery mancante;
-nessuna candidate install/rollback nuova viene presentata come soluzione.
+test/documenti. L'audit attuale verifica hash DLL/disassembly, callsite e branch
+mirati, ordinamento metadata-only D255/D273 e coerenza con enrollment e fonti
+D279/12, /54, /59; `git diff --check`. Nessun eseguibile modificato:
+`EXECUTABLE_CLOSURE=NOT_APPLICABLE` per questa decisione documentale, nessuna
+nuova esecuzione build/sanitizer/ABI. **HUMAN_REQUIRED** prima del nuovo confine
+pre-autenticazione e, separatamente, prima di installazione/sudo/USB/live;
+la prima decisione ricade in `AGENTS.md §6.4` per il nuovo profilo di rischio
+dell'immagine di baseline prima dell'autenticazione, la live in `§6.1–6.2`.
+Nessuna candidate install/rollback viene presentata come soluzione.
 
 Verifica host read-only: overlay diagnostico, relativo wrapper, drop-in,
 override PAM e stato di rollback assenti; ExecStart D293 e servizio inattivo;
@@ -14706,6 +14746,11 @@ chiude il dataflow FDT:
   `0x180580818`, poi consumata dal builder `0x32` con timestamp;
 - il valore up osservato a packet 233 è quindi session data, non una costante
   APP12509.
+
+Qualifica dell'audit login del 19 settembre: questo dataflow descrive il ciclo
+validato, non tutti i writer OEM. Lo stato corrente sopra documenta anche il
+ramo IRQ0100 di affinamento up, i caller dell'inizializzatore e l'arm up
+post-IRQ2 senza immagine. Nessuno chiude il recupero prima del primo IRQ2.
 
 La freshness è classificata `STRONG_CAUSAL_INFERENCE`: IRQ2 packet 225 precede
 il builder `0x34` packet 233 nello stesso ciclo e il dataflow statico collega
