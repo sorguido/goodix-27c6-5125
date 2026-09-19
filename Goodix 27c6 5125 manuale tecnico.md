@@ -140,7 +140,99 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato del progetto e qualificazione dello stack
+### Stato corrente — login a freddo con contatto immediato (19 settembre 2026)
+
+Il task esplicito dell'Utente riguarda il primo login Plasma dopo cold boot:
+`Invio → dito appoggiato subito`, senza attendere deliberatamente circa due
+secondi. **Il difetto resta aperto; non esiste una nuova candidate production
+pronta per la live.** I PASS funzionali riportati sotto non qualificano questo
+specifico timing. La review parte da `development` a
+`9f8dcb8eb6c652c8b511284f33e64b5be2dac7cb`, con worktree inizialmente pulito.
+
+Le undici fonti originali del tema sono state riesaminate integralmente. La
+timeline normalizzata, il confronto codice/storia/OEM e la decisione sono in
+`development/open issues/latenza_impronta_al_login/RESOLUTION_REVIEW_2026-09-19.md`;
+il journal storico recuperato in sola lettura è preservato accanto come
+`journal-evidence-2026-09-15.tsv`. Non sono state eseguite nuove live.
+
+La coppia controllata PRE-HELD/DELAYED mostra reply e prompt circa 16–18 ms
+dopo VerifyStart in entrambi i casi, ma il primo termina con errore A0 a
+`+0.492938 s`, senza immagine, mentre il secondo produce MATCH a `+2.980607 s`.
+Nei sei log A/B la prima divergenza osservabile è analogamente il rifiuto
+protocollo entro 0–1 s, non il matcher. I timestamp non misurano direttamente
+il contatto fisico; il successo sudo successivo non prova il login.
+
+Due boundary distinti devono restare separati:
+
+- Il parser corrente richiede flag zero nei sample FDT `36/IRQ0100`. Il
+  journal del D297/01 sperimentale osserva invece `flags=0x003f`, rifiutati
+  prima della prima immagine. Il frame esatto dei nuovi log generici non è
+  registrato: l'identificazione di ogni failure con quel frame resta inferenza.
+- I correttivi sperimentali successivi superavano quel rifiuto ma D299/D300
+  potevano restare in `FIRST_IRQ2`, con otto ACK, nessun IRQ2 accettato,
+  nessun `22/B0/decode/pipeline`, fino a cancel. Il journal corregge la sintesi
+  storica: i due timeout D299 appartengono allo **stesso boot**
+  `89f8f25b8fa2472aa8cbbec2f97ecf17`. D300 è un altro boot e conferma POV=0;
+  D2 non è giustificato. Questi numeri D297/D298 identificano esperimenti di
+  login storici, distinti dai milestone KScreenLocker/pubblicazione qui sotto.
+
+Il codice Fedora di fprintd risponde a VerifyStart ed emette
+VerifyFingerSelected subito dopo aver avviato l'operazione asincrona: non
+attende `fpi_image_device_activate_complete`. La callback modifica lo stato
+interno libfprint. Il D301 storico che la ritardava fino all'ACK di FIRST_ARM
+non impedisce quindi né il prompt precoce né il contatto fisico. L'ACK prova
+accettazione del comando, non una latenza analogica FDT conosciuta.
+
+È inoltre **non provato** che i delta FDT validi di D299 escludano una
+calibrazione col dito appoggiato: tre sample stabili possono incorporare lo
+stesso contatto. Il codice apprende la tabella dai sample; la reference
+richiede sensore libero per creare la baseline. Restano concorrenti un edge
+mancato e una baseline/arm non più sensibile a quel contatto. La capture D255
+mostra bootstrap prima della UI e reentry senza ripetere i tre sample, ma non
+è una traccia Windows pre-login e non prova il comportamento del firmware
+con dito già presente. Avviare prima il solo servizio fprintd non equivale a
+inizializzare il sensore.
+
+Nessun correttivo al solo callback/parser supera questa review causale.
+Anticipare realmente calibrazione e arm a prima di Invio richiederebbe un
+nuovo contratto di lifetime, ownership, attesa e cancellazione: è una direzione
+architetturale da decidere esplicitamente secondo `AGENTS.md` §6.4, non un
+servizio di boot da aggiungere autonomamente. Non sono stati modificati wire,
+threshold, retry, materiali protetti o runtime installato.
+
+La proposta circoscritta per tale decisione conserva fprintd/libfprint come
+unico owner, anticipa la calibrazione pulita a prima di Invio e trattiene la
+sessione preparata con lifetime esplicito; l'acquisizione dell'impronta resta
+legata alla verifica richiesta. Cleanup di idle/cancel/suspend, limiti finiti,
+fallback password e preservazione ENROLL devono essere chiusi offline prima
+di consegnare install/rollback. Non è autorizzata né implementata; nessuna
+deroga alle invarianti hardware viene proposta.
+
+Il fatto mancante più circoscritto è se, durante **la stessa action** D299/D300
+già in attesa di IRQ2, un sollevamento completo e nuovo contatto senza
+VerifyStart/rearm produca IRQ2. L'Utente ha precisato il 19 settembre che nei
+test ricordati ogni nuovo contatto seguiva la chiusura della verifica e un
+nuovo Invio; non ha sollevato e riappoggiato il dito nella stessa verifica
+attiva. Questa testimonianza conferma il vuoto sperimentale, non il risultato
+del test mancante. Il report definisce il singolo esperimento discriminante e
+ne esplicita il prerequisito non chiuso: la produzione corrente può terminare
+prima di raggiungere quell'attesa. Non è un'istruzione di live pronta né
+autorizza a reinstallare D299. Un nuovo contatto senza IRQ2 smentirebbe il
+semplice edge perso e imporrebbe di riesaminare calibrazione/arm, non ripetere
+un altro tentativo con pacing o logging diverso.
+
+Verifiche offline: runner lifecycle riallineato agli header Fedora già pin;
+due casi di caratterizzazione nel test esistente; 13/13 PASS normale e 13/13
+ASan/UBSan; `production/check-source.sh` e build production reale PASS, ABI
+verificata, nessuna dipendenza production dal tree privato, zero accesso USB.
+I nuovi test passano con il difetto ancora presente: verificano il rifiuto
+osservato e che la readiness senza IRQ2 non generi immagini/retry. Non provano
+una correzione hardware. Install/rollback non vengono presentati per una
+candidate inesistente. Stato: `HUMAN_REQUIRED`, avanzamento probatorio e
+closure eseguibile soltanto offline; login immediato e recovery PRE-HELD
+restano non qualificati.
+
+### Stato consolidato precedente e qualificazione dello stack
 
 Lo stato consolidato del progetto e la qualificazione dello stack sono riassunti di seguito:
 
@@ -188,7 +280,7 @@ percorso KScreenLocker già provato da D289. D297 ha aggiunto la persistenza
 managed e l'Utente ha ora confermato sul runtime storico D293 il vero percorso
 `Meta+L → fingerprint → MATCH → unlock`, seguito da PASS per `sudo` con
 fingerprint e per i login Plasma con password e fingerprint. D297 è chiuso e
-la decisione corrente dell'Utente avvia l'attività di documentazione e pubblicazione. Il corrective D293
+la decisione dell'Utente di allora avviava l'attività di documentazione e pubblicazione. Il corrective D293
 ha risolto R9 nel driver; D293/01–03 e le
 evidenze offline già acquisite restano validi. La successiva decisione
 esplicita dell'Utente del 13 settembre 2026 ha superato come metodo corrente il

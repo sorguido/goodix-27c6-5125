@@ -29,6 +29,7 @@ typedef struct
   guint handoff_count;
   guint new_owner_completion_count;
   gboolean handoff_should_fail;
+  gboolean stop_before_finger;
   guint64 generation;
   uint16_t expected[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   guint8 expected_up[12];
@@ -558,6 +559,8 @@ run_full_trace (Fixture *fixture,
       g_assert_true (g_queue_is_empty (fixture->out));
       return;
     }
+  if (fixture->stop_before_finger)
+    return;
   g_clear_pointer (&event, g_bytes_unref);
   event = build_event (0x32, 0x0002, 0x003f, 0x0180);
   feed_frame (fixture, event, fragmentation);
@@ -934,6 +937,80 @@ test_rejected_a0_sanitized_telemetry (void)
   fixture_free (fixture);
 }
 
+/* Characterization, not a fix or a simulation of firmware contact detection.
+ * The metadata is target-observed in the 2026-09-15 D297 journal; the raw
+ * channel values are synthetic. Do not append an invented IRQ2 to make the
+ * missing-event case pass as an authentication. */
+static void
+test_login_baseline_contact_rejected (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  guint8 state[16] = { 0 };
+  g_autoptr(GBytes) ack_d4 = build_ack (0xd4);
+  g_autoptr(GBytes) ack_fdt = build_ack (0x36);
+  g_autoptr(GBytes) event = build_event (0x36, 0x0100, 0x003f, 0x0300);
+  g_autoptr(GBytes) ae = NULL;
+
+  state[1] = 0x02;
+  ae = build_response (0xae, state, sizeof state);
+  g_assert_true (goodix_post_tls_lifecycle_start (fixture->lifecycle, NULL));
+  complete_command (fixture, 0xd4, NULL, 0);
+  feed_frame (fixture, ack_d4, 0);
+  complete_command (fixture, 0xaf, NULL, 0);
+  feed_frame (fixture, ae, 0);
+  complete_command (fixture, 0x36, NULL, 0);
+  feed_frame (fixture, ack_fdt, 0);
+  feed_frame (fixture, event, 0);
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_TERMINAL);
+  g_assert_true (fixture->audit.rejected_a0_observed);
+  g_assert_cmpint (fixture->audit.rejected_a0_phase,
+                   ==, GOODIX_POST_TLS_PHASE_FDT_IRQ100_1);
+  g_assert_cmpint (fixture->audit.rejected_a0_control, ==, 0x36);
+  g_assert_cmpint (fixture->audit.rejected_a0_irq, ==, 0x0100);
+  g_assert_cmpint (fixture->audit.rejected_a0_flags, ==, 0x003f);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 3u);
+  g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
+  fixture_free (fixture);
+}
+
+static void
+test_login_readiness_without_irq2_does_not_capture (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+
+  fixture->stop_before_finger = TRUE;
+  run_full_trace (fixture, 1u);
+  g_assert_cmpuint (fixture->audit.ack_count, ==, 8u);
+  for (guint i = 0; i < 3u; i++)
+    goodix_post_tls_lifecycle_set_framework_await_finger_on (
+      fixture->lifecycle, fixture->generation, i != 0u);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
+  g_assert_cmpuint (fixture->audit.first_irq0002_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+
+  goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test cancellation");
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (
+                     fixture->backend), ==, 0u);
+  fixture_free (fixture);
+}
+
 static void
 test_first_arm_backend_handoff (void)
 {
@@ -1027,5 +1104,9 @@ main (int argc, char **argv)
                    test_first_arm_backend_handoff);
   g_test_add_func ("/d279-21/first-arm-backend-handoff-failure",
                    test_first_arm_backend_handoff_failure);
+  g_test_add_func ("/login-latency/baseline-contact-rejected",
+                   test_login_baseline_contact_rejected);
+  g_test_add_func ("/login-latency/readiness-without-irq2-does-not-capture",
+                   test_login_readiness_without_irq2_does_not_capture);
   return g_test_run ();
 }

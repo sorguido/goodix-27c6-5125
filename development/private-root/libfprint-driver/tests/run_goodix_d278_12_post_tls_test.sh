@@ -20,7 +20,7 @@ trap 'find "$build" -maxdepth 1 -type f -delete 2>/dev/null || true; rmdir "$bui
 
 cflags=$(pkg-config --cflags glib-2.0 gio-2.0)
 libs=$(pkg-config --libs glib-2.0 gio-2.0)
-local_fp="$root/Rockytkg/libfprint/libfprint"
+local_fp="$root/reference/libfprint-fedora44-1.94.100/source/libfprint"
 python3 "$script_dir/support/generate_libfprint_enums.py" \
   --identifier-prefix Fp --symbol-prefix fp \
   --header-guard FP_ENUMS_H --header-name fp-enums.h \
@@ -32,7 +32,7 @@ python3 "$script_dir/support/generate_libfprint_enums.py" \
   --output-header "$build/fpi-enums.h" --output-source "$build/fpi-enums.c" \
   "$local_fp/fpi-device.h" "$local_fp/fpi-image-device.h" "$local_fp/fpi-print.h"
 cp "$script_dir/support/config.h" "$build/config.h"
-includes="-I$build -I$root/libfprint-driver -I$local_fp -I$root/Rockytkg/libfprint -I$script_dir/support"
+includes="-I$build -I$root/libfprint-driver -I$local_fp -I$local_fp/.. -I$script_dir/support"
 strict="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion"
 sources="
 $root/libfprint-driver/goodix_a0_protocol.c
