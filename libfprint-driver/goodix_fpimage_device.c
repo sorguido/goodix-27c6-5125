@@ -82,6 +82,9 @@ struct _GoodixDeviceContext
   gpointer                   tls_user_data;
   guint                      a0_delivery_count;
   gboolean                   login_preparing;
+  gboolean                   login_series;
+  gboolean                   login_reusable;
+  guint                      login_attempts;
   gboolean                   login_ready;
   gboolean                   login_close_pending;
   guint                      login_deadline;
@@ -214,6 +217,7 @@ static void goodix_device_context_set_state (GoodixDeviceContext *ctx, GoodixDev
 static void login_ready (GoodixPostTlsLifecycle *lifecycle, gpointer data);
 static gboolean login_close_idle (gpointer data);
 static gboolean login_deadline (gpointer data);
+static void login_maybe_report_release (GoodixDeviceContext *ctx);
 
 static gboolean
 goodix_fpimage_device_is_production_usb (GoodixFpImageDevice *self);
@@ -236,7 +240,7 @@ context_protocol_failure (GoodixDeviceContext *ctx,
                          "Goodix production protocol failed closed");
   goodix_device_context_set_terminal_fence (ctx);
   goodix_device_context_set_poisoned (ctx, local_error);
-  if (ctx->login_preparing)
+  if (ctx->login_preparing || ctx->login_reusable)
     {
       ctx->login_ready = FALSE;
       g_clear_handle_id (&ctx->login_deadline, g_source_remove);
@@ -1546,7 +1550,7 @@ goodix_fpimage_device_img_close (FpImageDevice *dev)
   g_autoptr(GError) error = NULL;
 
   g_assert (ctx != NULL);
-  if (ctx->login_preparing)
+  if (ctx->login_preparing || ctx->login_series)
     {
       g_clear_handle_id (&ctx->login_deadline, g_source_remove);
       goodix_device_context_set_terminal_fence (ctx);
@@ -1593,11 +1597,13 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
 
   g_autoptr(GError) error = NULL;
 
-  if (ctx->login_preparing)
+  if (ctx->login_preparing || ctx->login_series)
     {
-      if (!ctx->login_ready || ctx->terminal_fence || ctx->poisoned ||
+      gboolean first = ctx->login_preparing;
+      if (ctx->terminal_fence || ctx->poisoned || ctx->login_attempts >= 3 ||
+          (first ? !ctx->login_ready : !ctx->login_reusable) ||
           (action != FPI_DEVICE_ACTION_VERIFY && action != FPI_DEVICE_ACTION_IDENTIFY) ||
-          !goodix_post_tls_lifecycle_authorize_login (ctx->post_tls_lifecycle))
+          (first && !goodix_post_tls_lifecycle_authorize_login (ctx->post_tls_lifecycle)))
         {
           fpi_image_device_activate_complete (dev, g_error_new_literal (
             FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
@@ -1607,6 +1613,13 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       g_clear_handle_id (&ctx->login_deadline, g_source_remove);
       ctx->login_preparing = FALSE;
       ctx->login_ready = FALSE;
+      ctx->login_series = TRUE;
+      ctx->login_reusable = FALSE;
+      ctx->login_attempts++;
+      ctx->release_tail_complete = FALSE;
+      ctx->fresh_down_table = FALSE;
+      ctx->production_verify_result_known = FALSE;
+      ctx->production_identify_result_known = FALSE;
       ctx->production_logical_action_attempt_count++;
       ctx->production_action_attempt_count++;
       ctx->production_action_consumed = TRUE;
@@ -1614,8 +1627,14 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       ctx->activation_completed = TRUE;
       goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVE);
       g_message ("GOODIX_LOGIN_ATTACH generation=%" G_GUINT64_FORMAT
-                 " bootstrap=0 reopen=0 calibration=0", ctx->generation);
+                 " attempt=%u limit=3 bootstrap=0 reopen=0 calibration=0",
+                 ctx->generation, ctx->login_attempts);
       fpi_image_device_activate_complete (dev, NULL);
+      if (!first &&
+          (!goodix_post_tls_lifecycle_next_login (ctx->post_tls_lifecycle,
+                                                   production_timestamp (), &error) ||
+           !goodix_device_context_arm_receive (ctx, &error)))
+        context_protocol_failure (ctx, error);
       return;
     }
 
@@ -1811,6 +1830,7 @@ goodix_fpimage_device_identify_result (FpImageDevice *dev,
   ctx->production_identify_result_known = TRUE;
   ctx->production_identify_result_success = success;
   ctx->production_identify_result_match = match;
+  login_maybe_report_release (ctx);
   if (ctx->deactivation_pending && !ctx->deactivation_held &&
       goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
     goodix_device_context_complete_deactivation (ctx);
@@ -1832,6 +1852,7 @@ goodix_fpimage_device_verify_result (FpImageDevice *dev,
   ctx->production_verify_result_known = TRUE;
   ctx->production_verify_result_success = success;
   ctx->production_verify_result_match = match;
+  login_maybe_report_release (ctx);
   if (ctx->deactivation_pending && !ctx->deactivation_held &&
       goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
     goodix_device_context_complete_deactivation (ctx);
@@ -1858,6 +1879,24 @@ goodix_fpimage_device_deactivate (FpImageDevice *dev)
                                    GOODIX_DEVICE_CONTEXT_STATE_DEACTIVATING);
   ctx->deactivation_pending = TRUE;
   goodix_device_context_disconnect_cancel_handler (ctx);
+  ctx->login_reusable = ctx->login_series && ctx->login_attempts < 3 &&
+    !ctx->poisoned && !ctx->terminal_fence && ctx->release_tail_complete &&
+    goodix_post_tls_lifecycle_get_phase (ctx->post_tls_lifecycle) == GOODIX_POST_TLS_PHASE_STOP &&
+    !fpi_device_action_is_cancelled (FP_DEVICE (self)) &&
+    ((ctx->production_action == FPI_DEVICE_ACTION_VERIFY &&
+      ctx->production_verify_result_known && ctx->production_verify_result_success &&
+      !ctx->production_verify_result_match) ||
+     (ctx->production_action == FPI_DEVICE_ACTION_IDENTIFY &&
+      ctx->production_identify_result_known && ctx->production_identify_result_success &&
+      !ctx->production_identify_result_match));
+  if (ctx->login_reusable)
+    {
+      /* The physical release and host NO MATCH are both complete. Keep the
+       * drained TLS/session context; only another explicit action may arm. */
+      if (goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
+        goodix_device_context_complete_deactivation (ctx);
+      return;
+    }
   goodix_device_context_set_terminal_fence (ctx);
   ctx->backend_vtable->disarm (ctx, ctx->backend_user_data);
 
@@ -2298,7 +2337,19 @@ context_post_tls_finger_up (GoodixPostTlsLifecycle *lifecycle,
   GoodixDeviceContext *ctx = user_data;
 
   (void) lifecycle;
-  if (!ctx->operator_epoch)
+  if (ctx->login_series)
+    login_maybe_report_release (ctx);
+  else if (!ctx->operator_epoch)
+    goodix_device_context_emit_finger_up_ready (ctx);
+}
+
+static void
+login_maybe_report_release (GoodixDeviceContext *ctx)
+{
+  if (ctx->login_series && ctx->release_tail_complete &&
+      ctx->state == GOODIX_DEVICE_CONTEXT_STATE_ACTIVE &&
+      ((ctx->production_action == FPI_DEVICE_ACTION_VERIFY && ctx->production_verify_result_known) ||
+       (ctx->production_action == FPI_DEVICE_ACTION_IDENTIFY && ctx->production_identify_result_known)))
     goodix_device_context_emit_finger_up_ready (ctx);
 }
 
@@ -2632,6 +2683,26 @@ goodix_device_context_configure_post_tls_lifecycle (
     goodix_post_tls_lifecycle_prepare_login (ctx->post_tls_lifecycle, login_ready);
   return ctx->post_tls_lifecycle != NULL;
 }
+
+#ifdef GOODIX_ENABLE_TEST_SEAMS
+gboolean
+goodix_device_context_test_login_post_tls (GoodixDeviceContext *ctx,
+  const GoodixPostTlsMaterial *material, GoodixPostTlsAudit *audit, GError **error)
+{
+  g_return_val_if_fail (ctx->state == GOODIX_DEVICE_CONTEXT_STATE_INACTIVE, FALSE);
+  ctx->login_preparing = TRUE;
+  ctx->generation = ++ctx->generation_seq;
+  g_clear_object (&ctx->usb_cancellable);
+  ctx->usb_cancellable = g_cancellable_new ();
+  if (!goodix_fpi_usb_backend_begin_generation (ctx->fpi_usb_backend,
+       ctx->generation, ctx->usb_cancellable, error))
+    return FALSE;
+  goodix_usb_router_begin_generation (ctx->usb_router, ctx->generation);
+  goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_ACTIVATING);
+  return goodix_device_context_configure_post_tls_lifecycle (ctx, material, audit, error) &&
+         goodix_post_tls_lifecycle_start (ctx->post_tls_lifecycle, error);
+}
+#endif
 
 gboolean
 goodix_device_context_configure_enrollment_graph (
@@ -3059,7 +3130,28 @@ goodix_device_context_finish_deactivation (GoodixDeviceContext *ctx)
   if (!goodix_fpi_usb_backend_is_drained (ctx->fpi_usb_backend))
     return;
 
+  /* Cancellation/owner loss can arrive between physical release and this
+   * deferred completion. Never carry that invalidated context forward. */
+  if (ctx->login_reusable &&
+      (ctx->poisoned || ctx->terminal_fence ||
+       fpi_device_action_is_cancelled (FP_DEVICE (ctx->device))))
+    {
+      ctx->login_reusable = FALSE;
+      goodix_device_context_set_terminal_fence (ctx);
+      ctx->backend_vtable->disarm (ctx, ctx->backend_user_data);
+      ctx->generation = 0;
+      ctx->deactivation_nonquiescent = TRUE;
+    }
   ctx->deactivation_pending = FALSE;
+  if (ctx->login_reusable)
+    {
+      goodix_device_context_set_state (ctx, GOODIX_DEVICE_CONTEXT_STATE_INACTIVE);
+      ctx->login_deadline = g_timeout_add_seconds (8, login_deadline, ctx);
+      g_message ("GOODIX_LOGIN_NO_MATCH attempt=%u limit=3 release=1 next_explicit_verify_required=1",
+                 ctx->login_attempts);
+      fpi_image_device_deactivate_complete (FP_IMAGE_DEVICE (ctx->device), NULL);
+      return;
+    }
   if (ctx->deactivation_nonquiescent)
     {
       ctx->poisoned = TRUE;
@@ -3144,7 +3236,7 @@ goodix_device_context_complete_deactivation (GoodixDeviceContext *ctx)
    * A protocol/backend poison may happen before any host matcher exists, so
    * that path must complete from drain without waiting for an outcome. */
   if (!ctx->deactivation_nonquiescent && !ctx->poisoned &&
-      goodix_fpimage_device_is_production_usb (ctx->device) &&
+      (goodix_fpimage_device_is_production_usb (ctx->device) || ctx->login_series) &&
       (ctx->production_action == FPI_DEVICE_ACTION_VERIFY ||
        ctx->production_action == FPI_DEVICE_ACTION_IDENTIFY))
     {

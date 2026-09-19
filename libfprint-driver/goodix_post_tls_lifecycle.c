@@ -34,6 +34,7 @@ struct _GoodixPostTlsLifecycle
   GoodixPostTlsEventFunc login_ready;
   gboolean login_gate;
   gboolean login_authorized;
+  guint login_attempts;
   GoodixPostTlsEventFunc release_tail;
   GoodixPostTlsEventFunc finger_up;
   GoodixPostTlsTerminalFunc terminal;
@@ -728,7 +729,7 @@ goodix_post_tls_lifecycle_handle_a0 (GoodixPostTlsLifecycle *lifecycle,
           break;
         }
       lifecycle->phase = GOODIX_POST_TLS_PHASE_FIRST_IRQ2;
-      if (lifecycle->login_ready != NULL)
+      if (lifecycle->login_ready != NULL && !lifecycle->login_authorized)
         lifecycle->login_ready (lifecycle, lifecycle->user_data);
       break;
     case GOODIX_POST_TLS_PHASE_FIRST_IRQ2:
@@ -987,7 +988,8 @@ goodix_post_tls_lifecycle_handle_plaintext (GoodixPostTlsLifecycle *lifecycle,
           lifecycle->audit->first_image_b0_count++;
           lifecycle->audit->first_image_decode_count++;
         }
-      if (!lifecycle->image (lifecycle, 1u, samples, lifecycle->user_data,
+      if (!lifecycle->image (lifecycle, lifecycle->login_gate ? lifecycle->login_attempts : 1u,
+                             samples, lifecycle->user_data,
                              &error))
         {
           lifecycle_fail (lifecycle, g_steal_pointer (&error));
@@ -1179,5 +1181,32 @@ goodix_post_tls_lifecycle_authorize_login (GoodixPostTlsLifecycle *lifecycle)
       lifecycle->phase != GOODIX_POST_TLS_PHASE_FIRST_IRQ2)
     return FALSE;
   lifecycle->login_authorized = TRUE;
+  lifecycle->login_attempts = 1;
   return TRUE;
+}
+
+gboolean
+goodix_post_tls_lifecycle_next_login (GoodixPostTlsLifecycle *lifecycle,
+                                      guint16 timestamp, GError **error)
+{
+  if (lifecycle == NULL || !lifecycle->login_gate ||
+      !lifecycle->login_authorized || lifecycle->login_attempts >= 3 ||
+      lifecycle->phase != GOODIX_POST_TLS_PHASE_STOP ||
+      !lifecycle->fresh_down_valid ||
+      lifecycle->material.capture_profile != GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION ||
+      !goodix_fpi_usb_backend_is_drained (lifecycle->backend))
+    {
+      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_CLOSED,
+                           "Prepared login requires a completed release and remaining attempt");
+      return FALSE;
+    }
+  lifecycle->login_attempts++;
+  memcpy (lifecycle->current_fdt_table, lifecycle->fresh_down_table, 12);
+  lifecycle->fresh_down_valid = FALSE;
+  lifecycle->material.first_arm_timestamp = timestamp;
+  lifecycle->phase = GOODIX_POST_TLS_PHASE_REARM_GATE;
+  if (lifecycle->audit != NULL)
+    lifecycle->audit->rearm_0x32_count++;
+  /* Repeat the existing single-acquisition/release graph, not initialization. */
+  return submit_arm (lifecycle, FALSE, error);
 }

@@ -241,6 +241,9 @@ gboolean goodix_device_context_has_pending_enrollment_graph (
 GoodixSecureSession *goodix_device_context_get_secure_session (GoodixDeviceContext *ctx);
 GoodixPostTlsLifecycle *goodix_device_context_get_post_tls_lifecycle (
   GoodixDeviceContext *ctx);
+/* Synthetic post-secure-session entry; real login callbacks/lifecycle follow. */
+gboolean goodix_device_context_test_login_post_tls (GoodixDeviceContext *ctx,
+  const GoodixPostTlsMaterial *material, GoodixPostTlsAudit *audit, GError **error);
 #endif
 #ifdef GOODIX_ENABLE_TEST_SEAMS
 void goodix_device_context_set_usb_submit_seam (GoodixDeviceContext *ctx,

@@ -140,7 +140,78 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — early-login canonico e riproducibilità Git (20 settembre 2026)
+### Stato corrente — prepared-login fino a tre tentativi (20 settembre 2026)
+
+Task corrente `GOODIX_PREPARED_LOGIN_THREE_BOUNDED_ATTEMPTS.md`, entry HEAD
+`2e09880433e4b9f24a38e897cb974c6df504e39f`, `development` pulito. L'Utente riferisce
+READY/Claim/attach e prima immagine funzionanti, seguiti da indisponibilità dopo
+NO MATCH. Non è stata eseguita dall'AI una nuova acquisizione. La lettura della
+configurazione host mostra ancora l'overlay `login-early` e PAM `max-tries=1
+ timeout=8`; nessuna candidate gestita installata è stata rilevata.
+
+**Causa verificata nel codice:** PrepareLogin crea il contesto e READY; ClaimLogin
+consuma `login_used` per impedire un nuovo Claim; il primo VerifyStart azzera
+`login_ready`. Il driver autorizza il gate una volta, azzera `login_preparing` e
+marca l'epoch consumata. Dopo acquisizione/release la deactivation impone fence,
+drena e chiude l'epoch. Il successivo VerifyStart prepared è rifiutato da fprintd;
+per un'azione ordinaria il driver riaprirebbe invece una nuova epoch. Inoltre
+`match_cb` può segnalare NO MATCH prima della release: il ciclo PAM chiama
+VerifyStop e cancella il rilascio ancora attivo. Alzare soltanto max-tries non
+risolve nessuno dei due confini di lifecycle.
+
+**Delta:** stesso ClaimLogin, massimo tre VerifyStart espliciti. Solo un NO MATCH
+host pulito più `34 -> IRQ0200 -> 20/B0 -> 50/NAV` completo conserva il contesto
+inattivo e drenato. Il successivo VerifyStart usa il fresh down table con il
+normale `32`, poi richiede un nuovo IRQ2 prima di `22`; non ripete bootstrap,
+TLS, calibrazione o reopen. Il gate post-TLS e il driver limitano a tre anche
+una chiamata che aggirasse PAM. Il contatore fprintd è per ClaimLogin; quello
+driver per contesto preparato. Un nuovo contesto riparte da zero. L'attesa fra
+action scade dopo 8 s; PAM resta bounded a 8 s per tentativo. Dopo due NO MATCH
+non parte alcun nuovo comando finché manca la nuova VerifyStart. Dopo MATCH,
+terzo NO MATCH, errore reale, timeout, cancellazione, owner loss o teardown non
+è ammesso proseguire. La cancellazione prima della completion differita viene
+ricontrollata prima di conservare la sessione.
+
+Il MATCH mantiene la notifica immediata. Solo NO MATCH viene comunicato a PAM
+alla completion, a rilascio completo, così VerifyStop non tronca la coda fisica.
+I retry FP_DEVICE_RETRY restano convertiti in errore terminale per prepared-login;
+il loop automatico ordinario non viene abilitato. PAM, fprintd e driver impongono
+ciascuno il limite; la regola canonica login passa a max-tries=3. Nessun nuovo
+comando wire o scrittura persistente. Sudo/Claim ordinaria, enrollment, password
+stack e preparazione iniziale conservano i propri percorsi.
+
+**Provenance e deployment:** patch originale fprintd e greeter restano identici
+al prototipo; `fprintd-attempts.patch` si applica dopo la cleanup patch. I file
+driver/lifecycle modificati sono pin correnti in source-files.sha256, non più
+presentati come equivalenza byte del prototipo. Il vecchio overlay versionato
+non viene modificato. `development/patches/login-three/` è il piccolo delta per
+l'overlay installato: stessa implementazione canonica, quattro loader storici
+preservati per il deployment D293, backup/ripristino esatto dei file toccati.
+La candidate gestita usa i loader canonici. Una vecchia installazione managed
+con regola PAM a un tentativo richiede uninstall con il suo manager originale
+prima del fresh install: update in-place è respinto senza modifiche, poiché
+lo stato storico conserva una sola regola PAM. Update/rollback resta disponibile
+fra candidate con la stessa regola a tre tentativi. Non va sovrapposta
+all'overlay di sviluppo. Nessuna migrazione di materiali.
+
+**Riesame pre-live:** cambia il lifecycle dopo un NO MATCH, non soltanto il
+packaging o il tempo d'attesa. Si verifica se il riarmo fisico già noto funziona
+nello stesso contesto prepared attraverso due NO MATCH. Se fallisce nello
+stesso punto, rollback del delta e lettura mirata dell'ultimo esito/phase per
+separare mancato rilascio, riarmo e invalidazione host; niente terza campagna
+equivalente o retry diagnostici automatici.
+
+Test mirati PASS: protocollo 17 e driver 45 casi in entrambi i modi normal e
+sanitizer, daemon/greeter in entrambi i modi, 26 transazioni managed e 9 del
+delta di sviluppo. La riproduzione completa da sorgenti committati e le due
+candidate restano da consolidare prima della consegna. La validazione fisica resta
+`HUMAN_REQUIRED` prima di installazione, sudo o USB (§6/§8 AGENTS.md). Il README
+privato contiene tre autenticazioni separate, ciascuna con massimo tre contatti,
+stop al MATCH, fallback dopo tre NO MATCH e rollback su FAIL. L'evidenza precedente
+sul successo immediato al primo contatto non viene estesa ai nuovi tentativi.
+
+### Baseline precedente — early-login canonico e riproducibilità Git
+
 
 Il precedente prompt `GOODIX_PROMOTE_EARLY_LOGIN_TO_CANONICAL_RELEASE_CORRECTED.md`
 conferma la prova fisica dell'Utente sul prototipo `login-early` al commit
@@ -218,7 +289,7 @@ le sole informazioni di recovery necessarie fuori dallo scope locale e
 pubblica lo state dopo i passaggi reversibili. Sono verificati errori di
 label, runtime parziale, reload, checksum/file-set, drift e simmetria rollback.
 
-**Correttivo riproducibilità (20 settembre 2026):** il task corrente è
+**Correttivo riproducibilità concluso (20 settembre 2026):** il task era
 `GOODIX_CORRECT_REPRODUCIBILITY_AND_PUBLICATION.md`. Il vecchio controllo su
 copia del worktree non provava la riproducibilità dal Git pubblicato: aveva
 ereditato `.gitignore` upstream ignorato da sé stesso e assente dal commit.

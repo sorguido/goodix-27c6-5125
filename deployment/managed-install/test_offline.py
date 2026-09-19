@@ -162,6 +162,24 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertEqual(self.vendor_pam.read_bytes(), self.vendor_bytes)
         self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
 
+    def test_single_attempt_candidate_update_fails_without_host_changes(self):
+        first = self.candidate("a" * 40)
+        second = self.candidate("b" * 40)
+        self.run_tx("--root-install", self.caller, str(first))
+        saved = self.root / "var/lib/goodix-27c6-5125-managed/plasmalogin.managed"
+        managed = self.root / "etc/pam.d/plasmalogin"
+        state = saved.parent / "state"
+        old_hash = sha(saved)
+        old_pam = saved.read_bytes().replace(b"max-tries=3 timeout=8", b"max-tries=1 timeout=8")
+        saved.write_bytes(old_pam)
+        managed.write_bytes(old_pam)
+        state.write_text(state.read_text().replace(old_hash, sha(saved)))
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        result = self.run_tx("--root-update", self.caller, str(second), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("single_attempt_pam_requires_previous_uninstall_then_fresh_install", result.stderr)
+        self.assertEqual(before, {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()})
+
     def test_legacy_update_adds_pam_and_rollback_restores_absence(self):
         first = self.candidate("1" * 40)
         second = self.candidate("2" * 40)

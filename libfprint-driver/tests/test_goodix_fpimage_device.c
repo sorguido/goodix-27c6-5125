@@ -2592,10 +2592,233 @@ test_d279_20_dormant_enrollment_context_ownership (void)
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
+static gboolean login_test_match;
+static void
+login_verify_done (FpDevice *device, GAsyncResult *res, gpointer data)
+{
+  TestFixture *f = data;
+  f->success = fp_device_verify_finish (device, res, &login_test_match, NULL, &f->error);
+  test_complete (f);
+}
+
+static void
+login_identify_done (FpDevice *device, GAsyncResult *res, gpointer data)
+{
+  TestFixture *f = data;
+  g_autoptr(FpPrint) match = NULL;
+  f->success = fp_device_identify_finish (device, res, &match, NULL, &f->error);
+  login_test_match = match != NULL;
+  test_complete (f);
+}
+
+static void
+test_login_series (gconstpointer data)
+{
+  /* Upper digit: terminal attempt; lower: 1 match, 0 no-match, 2 cancel,
+   * 3 malformed protocol. Start after a synthetic secure-session handoff. */
+  guint scenario = GPOINTER_TO_UINT (data) % 100, target = scenario / 10, outcome = scenario % 10;
+  gboolean identify = GPOINTER_TO_UINT (data) >= 100;
+  g_autoptr(GPtrArray) gallery = g_ptr_array_new ();
+  TestFixture *f = test_fixture_new ();
+  uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
+  g_autoptr(FpPrint) template = NULL;
+  g_autoptr(GError) error = NULL;
+  GoodixPostTlsMaterial material = { .capture_profile = GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION };
+  GoodixPostTlsAudit audit;
+  goodix_test_sigfm_match_reset_audit ();
+  guint8 af[16] = { 0 };
+  const guint8 typed82_body[2] = { 0, 0x20 };
+  g_autoptr(GBytes) baseline = d279_25_build_primary_plaintext (0);
+  /* Obtain a real synthetic libfprint print, without reading any templates. */
+  fixture_open (f);
+  fpi_device_set_nr_enroll_stages (FP_DEVICE (f->device), 1);
+  template = fp_print_new (FP_DEVICE (f->device));
+  fill_gradient_samples (samples);
+  f->done = FALSE;
+  fp_device_enroll (FP_DEVICE (f->device), g_steal_pointer (&template), NULL,
+                   progress_cb, f, NULL, (GAsyncReadyCallback) enroll_cb, f);
+  goodix_device_context_emit_arm_complete (f->ctx, NULL);
+  goodix_device_context_emit_finger_down (f->ctx);
+  goodix_device_context_emit_image_ready (f->ctx, samples, G_N_ELEMENTS (samples));
+  goodix_device_context_emit_release_tail_complete (f->ctx);
+  goodix_device_context_emit_finger_up_ready (f->ctx);
+  test_wait (f); g_assert_no_error (f->error);
+  template = g_object_ref (f->enroll_print);
+  g_ptr_array_add (gallery, template);
+  fixture_close (f); fixture_open (f);
+  goodix_device_context_set_async_usb_submit_seam (f->ctx, host_only_usb_submit, NULL);
+  for (guint i = 0; i < 6; i++)
+    { material.initial_fdt_table[i * 2] = 0x80; material.initial_fdt_table[i * 2 + 1] = (guint8) (0x40 + i); }
+  g_assert_true (goodix_device_context_test_login_post_tls (f->ctx, &material, &audit, &error));
+  GoodixPostTlsLifecycle *post_tls = goodix_device_context_get_post_tls_lifecycle (f->ctx);
+  GoodixFpiUsbBackend *backend = goodix_device_context_get_fpi_usb_backend (f->ctx);
+  guint64 generation = goodix_device_context_get_generation (f->ctx);
+  d279_24_complete_out (f->ctx, generation);
+  {
+    g_autoptr(GBytes) frame = d279_24_build_ack (0xd4);
+    goodix_post_tls_lifecycle_handle_a0 (post_tls, frame);
+  }
+  d279_24_complete_out (f->ctx, generation);
+  af[1] = 0x02;
+  {
+    g_autoptr(GBytes) frame = d279_24_build_response (0xae, af, sizeof af);
+    goodix_post_tls_lifecycle_handle_a0 (post_tls, frame);
+  }
+  for (guint fdt_index = 0u; fdt_index < 3u; fdt_index++)
+    {
+      d279_24_complete_out (f->ctx, generation);
+      {
+        g_autoptr(GBytes) ack = d279_24_build_ack (0x36);
+        goodix_post_tls_lifecycle_handle_a0 (post_tls, ack);
+      }
+      {
+        g_autoptr(GBytes) event = d279_24_build_event (
+          0x36, 0x0100, 0x0000,
+          (guint16) (0x0300u + fdt_index * 0x20u));
+        goodix_post_tls_lifecycle_handle_a0 (post_tls, event);
+      }
+      if (fdt_index == 0u)
+        {
+          d279_24_complete_out (f->ctx, generation);
+          {
+            g_autoptr(GBytes) ack = d279_24_build_ack (0x50);
+            g_autoptr(GBytes) nav = d279_24_build_nav ();
+            goodix_post_tls_lifecycle_handle_a0 (post_tls, ack);
+            goodix_post_tls_lifecycle_handle_a0 (post_tls, nav);
+          }
+        }
+      else if (fdt_index == 1u)
+        {
+          d279_24_complete_out (f->ctx, generation);
+          {
+            g_autoptr(GBytes) ack = d279_24_build_ack (0x82);
+            g_autoptr(GBytes) typed = d279_24_build_response (
+              0x82, typed82_body, sizeof typed82_body);
+            goodix_post_tls_lifecycle_handle_a0 (post_tls, ack);
+            goodix_post_tls_lifecycle_handle_a0 (post_tls, typed);
+          }
+          d279_24_complete_out (f->ctx, generation);
+          {
+            g_autoptr(GBytes) ack = d279_24_build_ack (0x20);
+            goodix_post_tls_lifecycle_handle_a0 (post_tls, ack);
+            goodix_post_tls_lifecycle_handle_plaintext (post_tls, baseline);
+          }
+        }
+    }
+  d279_24_complete_out (f->ctx, generation);
+  {
+    g_autoptr(GBytes) ack = d279_24_build_ack (0x32);
+    goodix_post_tls_lifecycle_handle_a0 (post_tls, ack);
+  }
+
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (post_tls), ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  for (guint attempt = 1; attempt <= target; attempt++)
+    {
+      g_autoptr(GCancellable) cancel = g_cancellable_new ();
+      gboolean terminal = attempt == target;
+      goodix_test_sigfm_match_set_score (terminal && outcome == 1 ? 100 : 0);
+      /* Release arrives before matching on even attempts, after it on odd. */
+      goodix_test_sigfm_extract_set_block (attempt % 2 == 0 && outcome != 4);
+      f->done = FALSE;
+      if (identify)
+        fp_device_identify (FP_DEVICE (f->device), gallery, cancel, NULL, NULL, NULL,
+                            (GAsyncReadyCallback) login_identify_done, f);
+      else
+        fp_device_verify (FP_DEVICE (f->device), template, cancel, NULL, NULL, NULL,
+                          (GAsyncReadyCallback) login_verify_done, f);
+      g_assert_false (f->done);
+      if (attempt == 1)
+        g_assert_true (goodix_device_context_arm_receive (f->ctx, &error));
+      else
+        d279_25_complete_and_ack (f->ctx, generation, 0x32);
+      g_assert_cmpuint (goodix_device_context_get_generation (f->ctx), ==, generation);
+      g_assert_cmpuint (audit.first_image_command_count, ==, attempt - 1);
+      if (terminal && (outcome == 2 || outcome == 3))
+        {
+          if (outcome == 2) g_cancellable_cancel (cancel);
+          else
+            {
+              g_autoptr(GBytes) bad = d279_24_build_event (0x32, 2, 0, 0x180);
+              gsize n; const guint8 *bytes = g_bytes_get_data (bad, &n);
+              goodix_device_context_complete_receive (f->ctx, generation, bytes, n, NULL);
+            }
+          if (goodix_fpi_usb_backend_get_outstanding (backend))
+            {
+              g_autoptr(GError) cancelled = g_error_new_literal (G_IO_ERROR, G_IO_ERROR_CANCELLED, "cancelled RX");
+              goodix_device_context_complete_receive (f->ctx, generation, NULL, 0, cancelled);
+            }
+          goodix_test_sigfm_extract_unblock ();
+          test_wait (f); g_assert_false (f->success); g_clear_error (&f->error);
+          break;
+        }
+      g_autoptr(GBytes) down = d279_24_build_event (0x32, 2, 0x3f, 0x180);
+      d279_25_feed_context_frame (f->ctx, generation, down);
+      d279_25_complete_and_ack (f->ctx, generation, 0x22);
+      goodix_post_tls_lifecycle_handle_plaintext (post_tls, baseline);
+      if (terminal && outcome == 4)
+        while (goodix_test_sigfm_match_get_call_count () < attempt)
+          g_main_context_iteration (NULL, TRUE);
+      d279_25_complete_and_ack (f->ctx, generation, 0x34);
+      g_assert_false (f->done); /* NO MATCH cannot complete before physical up. */
+      g_autoptr(GBytes) up = d279_24_build_event (0x34, 0x200, 0, 0x120);
+      d279_25_feed_context_frame (f->ctx, generation, up);
+      d279_25_complete_and_ack (f->ctx, generation, 0x20);
+      goodix_post_tls_lifecycle_handle_plaintext (post_tls, baseline);
+      d279_25_complete_and_ack (f->ctx, generation, 0x50);
+      g_autoptr(GBytes) nav = d279_24_build_nav ();
+      /* Terminal completion fences after this receive; do not use the helper
+       * that asserts every injection leaves the context unfenced. */
+      gsize n; const guint8 *bytes = g_bytes_get_data (nav, &n);
+      goodix_device_context_complete_receive (f->ctx, generation, bytes, n, NULL);
+      goodix_test_sigfm_extract_unblock ();
+      if (terminal && outcome == 4)
+        {
+          g_cancellable_cancel (cancel);
+          test_wait (f); g_assert_false (f->success); g_clear_error (&f->error);
+          break;
+        }
+      test_wait (f); g_assert_no_error (f->error); g_assert_true (f->success);
+      g_assert_cmpint (login_test_match, ==, terminal && outcome == 1);
+      g_assert_cmpuint (audit.first_image_command_count, ==, attempt);
+      g_assert_true (goodix_fpi_usb_backend_is_drained (backend));
+      if (!terminal) g_assert_false (goodix_device_context_get_terminal_fence (f->ctx));
+    }
+  if (target == 1 && outcome == 0)
+    {
+      fixture_close (f); g_assert_null (goodix_fpimage_device_get_context (f->device));
+      test_fixture_free (f); goodix_test_sigfm_match_set_score (100); return;
+    }
+  guint images = audit.first_image_command_count;
+  f->done = FALSE;
+  fp_device_verify (FP_DEVICE (f->device), template, NULL, NULL, NULL, NULL,
+                    (GAsyncReadyCallback) login_verify_done, f);
+  test_wait (f); g_assert_false (f->success); g_clear_error (&f->error);
+  g_assert_cmpuint (audit.first_image_command_count, ==, images);
+  g_assert_cmpuint (audit.baseline_decode_count, ==, 1);
+  g_assert_cmpuint (audit.fdt36_submit_count, ==, 3);
+  g_assert_cmpuint (audit.d4_count, ==, 1);
+  g_assert_cmpuint (audit.reopen_count, ==, 0);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_real_submit_count (backend), ==, 0);
+  fixture_close (f); g_assert_null (goodix_fpimage_device_get_context (f->device));
+  test_fixture_free (f);
+  goodix_test_sigfm_match_set_score (100);
+}
+
 int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+  g_test_add_data_func ("/login/identify-second-match", GUINT_TO_POINTER (121), test_login_series);
+  g_test_add_data_func ("/login/identify-third-match", GUINT_TO_POINTER (131), test_login_series);
+  g_test_add_data_func ("/login/cancel-after-release-before-completion", GUINT_TO_POINTER (14), test_login_series);
+  g_test_add_data_func ("/login/close-between-attempts", GUINT_TO_POINTER (10), test_login_series);
+  g_test_add_data_func ("/login/no-match-then-match", GUINT_TO_POINTER (21), test_login_series);
+  g_test_add_data_func ("/login/two-no-match-then-match", GUINT_TO_POINTER (31), test_login_series);
+  g_test_add_data_func ("/login/three-no-match-no-fourth", GUINT_TO_POINTER (30), test_login_series);
+  g_test_add_data_func ("/login/cancel-first", GUINT_TO_POINTER (12), test_login_series);
+  g_test_add_data_func ("/login/cancel-second", GUINT_TO_POINTER (22), test_login_series);
+  g_test_add_data_func ("/login/protocol-error-first", GUINT_TO_POINTER (13), test_login_series);
+  g_test_add_data_func ("/login/protocol-error-second", GUINT_TO_POINTER (23), test_login_series);
   g_test_add_func ("/login/prepare-close-drains-rx", test_login_prepare_close_pending_rx);
   g_test_add_func ("/login/preparation-deadline", test_login_prepare_deadline);
 

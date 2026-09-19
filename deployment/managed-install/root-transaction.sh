@@ -33,7 +33,7 @@ kde_fingerprint_managed_saved=$state_dir/kde-fingerprint.managed
 material=$(p /var/lib/goodix-5125-poc)
 policy_name=goodix_fprint_account_delete
 policy_priority=400
-expected_pam_rule='auth        sufficient    /usr/lib64/goodix-27c6-5125/current/pam_fprintd.so max-tries=1 timeout=8'
+expected_pam_rule='auth        sufficient    /usr/lib64/goodix-27c6-5125/current/pam_fprintd.so max-tries=3 timeout=8'
 legacy_pam_rule='auth        sufficient                                   pam_fprintd.so'
 expected_kde_fingerprint_pam_rule='auth        required      pam_fprintd.so max-tries=3 timeout=45'
 required_candidate=(
@@ -326,6 +326,9 @@ verify_saved_pam() {
   [[ -f $pam_saved && ! -L $pam_saved && $(digest "$pam_saved") == "$expected_override" ]] ||
     fail managed_pam_saved_drift
   [[ -n $test_root || $(stat -c '%u:%g:%a' "$pam_saved") == 0:0:644 ]] || fail managed_pam_saved_metadata_invalid
+  if grep -Fqx "${expected_pam_rule/max-tries=3/max-tries=1}" "$pam_saved" && [[ $ACTIVE_LOGIN_STATE == MANAGED ]]; then
+    fail single_attempt_pam_requires_previous_uninstall_then_fresh_install
+  fi
   [[ $(grep -Fxc "$expected_pam_rule" "$pam_saved") -eq 1 ]] || fail managed_pam_rule_drift
   cmp -s "$vendor_pam" <(awk -v rule="$expected_pam_rule" '$0 != rule { print }' "$pam_saved") ||
     fail managed_pam_not_vendor_derived

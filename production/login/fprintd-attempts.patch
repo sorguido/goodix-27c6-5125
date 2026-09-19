@@ -1,0 +1,151 @@
+--- a/src/device.c
++++ b/src/device.c
+@@ -105,6 +105,7 @@
+   gboolean         login_ready;
+   gboolean         login_claim;
+   gboolean         login_used;
++  guint            login_attempts;
+   gulong           login_signal;
+   GTask           *login_suspend_task;
+ 
+@@ -1160,7 +1161,10 @@
+     }
+   priv->login_claim = login;
+   if (login)
+-    priv->login_used = TRUE;
++    {
++      priv->login_used = TRUE;
++      priv->login_attempts = 0;
++    }
+   user = g_object_steal_qdata (G_OBJECT (invocation), quark_auth_user);
+   g_assert (user);
+   g_assert (g_str_equal (username, "") || g_str_equal (user, username));
+@@ -1615,7 +1619,10 @@
+   cancelled = g_cancellable_is_cancelled (priv->current_cancellable);
+   matched = match != NULL && cancelled == FALSE;
+ 
+-  report_verify_status (rdev, matched, error);
++  /* Prepared NO MATCH waits for host matching AND device release/cleanup.
++   * Otherwise PAM's VerifyStop cancels the still-running release tail. */
++  if (!priv->login_claim || matched)
++    report_verify_status (rdev, matched, error);
+ }
+ 
+ static void
+@@ -1626,7 +1633,7 @@
+   FprintDevicePrivate *priv = fprint_device_get_instance_private (rdev);
+   gboolean success;
+   const char *name;
+-  gboolean match;
++  gboolean match = FALSE;
+ 
+   success = fp_device_verify_finish (dev, res, &match, NULL, &error);
+   g_assert (!!success == !error);
+@@ -1639,6 +1646,18 @@
+       g_clear_error (&error);
+       error = g_error_new_literal (FP_DEVICE_ERROR, FP_DEVICE_ERROR_GENERAL,
+                                    "Login attempt ended; use password");
++    }
++
++  if (priv->login_claim)
++    {
++      priv->login_ready = success && !match && priv->login_owner &&
++                          priv->login_attempts < 3 &&
++                          !g_cancellable_is_cancelled (priv->current_cancellable);
++      g_message ("GOODIX_LOGIN_RESULT attempt=%u limit=3 continuation=%d",
++                 priv->login_attempts, priv->login_ready);
++      g_autoptr(SessionData) login_session = session_data_get (priv);
++      if (!error && !login_session->verify_status_reported)
++        report_verify_status (rdev, match, error);
+     }
+ 
+   /* Automatically restart the operation for retry failures */
+@@ -1657,7 +1676,9 @@
+ 
+       if (error)
+         {
+-          report_verify_status (rdev, FALSE, error);
++          g_autoptr(SessionData) error_session = session_data_get (priv);
++          if (!priv->login_claim || !error_session->verify_status_reported)
++            report_verify_status (rdev, FALSE, error);
+ 
+           if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+             g_warning ("Device reported an error during verify: %s",
+@@ -1691,6 +1712,18 @@
+       g_clear_error (&error);
+       error = g_error_new_literal (FP_DEVICE_ERROR, FP_DEVICE_ERROR_GENERAL,
+                                    "Login attempt ended; use password");
++    }
++
++  if (priv->login_claim)
++    {
++      priv->login_ready = success && match == NULL && priv->login_owner &&
++                          priv->login_attempts < 3 &&
++                          !g_cancellable_is_cancelled (priv->current_cancellable);
++      g_message ("GOODIX_LOGIN_RESULT attempt=%u limit=3 continuation=%d",
++                 priv->login_attempts, priv->login_ready);
++      g_autoptr(SessionData) login_session = session_data_get (priv);
++      if (!error && !login_session->verify_status_reported)
++        report_verify_status (rdev, match != NULL, error);
+     }
+ 
+   /* Automatically restart the operation for retry failures */
+@@ -1709,7 +1742,9 @@
+ 
+       if (error)
+         {
+-          report_verify_status (rdev, FALSE, error);
++          g_autoptr(SessionData) error_session = session_data_get (priv);
++          if (!priv->login_claim || !error_session->verify_status_reported)
++            report_verify_status (rdev, FALSE, error);
+ 
+           if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+             g_warning ("Device reported an error during identify: %s",
+@@ -1741,9 +1776,17 @@
+       return TRUE;
+     }
+ 
++  session = session_data_get (priv);
++
++  if (!can_start_action (rdev, &error))
++    {
++      g_dbus_method_invocation_return_gerror (invocation, error);
++      return TRUE;
++    }
++
+   if (priv->login_claim)
+     {
+-      if (!priv->login_ready || !priv->login_owner)
++      if (!priv->login_ready || !priv->login_owner || priv->login_attempts >= 3)
+         {
+           g_dbus_method_invocation_return_dbus_error (
+             invocation, "net.reactivated.Fprint.Error.Internal",
+@@ -1751,14 +1794,7 @@
+           return TRUE;
+         }
+       priv->login_ready = FALSE;
+-    }
+-
+-  session = session_data_get (priv);
+-
+-  if (!can_start_action (rdev, &error))
+-    {
+-      g_dbus_method_invocation_return_gerror (invocation, error);
+-      return TRUE;
++      priv->login_attempts++;
+     }
+ 
+   if (finger == FP_FINGER_UNKNOWN)
+--- a/pam/pam_fprintd.c
++++ b/pam/pam_fprintd.c
+@@ -773,6 +773,10 @@
+ 
+   data = calloc (1, sizeof (verify_data));
+   data->max_tries = max_tries;
++  const char *service = NULL;
++  pam_get_item (pamh, PAM_SERVICE, (const void **) &service);
++  if (service && strcmp (service, "plasmalogin") == 0 && data->max_tries > 3)
++    data->max_tries = 3;
+   data->pamh = pamh;
+ 
+   if (sd_bus_open_system (&bus) < 0)

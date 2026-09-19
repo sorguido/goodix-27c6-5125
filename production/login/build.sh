@@ -12,6 +12,7 @@ mkdir "$output"
 cp -a "$root/reference/fprintd-fedora44-1.94.5/source" "$output/fprintd"
 patch --batch --fuzz=0 -d "$output/fprintd" -p1 <"$here/fprintd.patch"
 patch --batch --fuzz=0 -d "$output/fprintd" -p1 <"$here/fprintd-cleanup.patch"
+patch --batch --fuzz=0 -d "$output/fprintd" -p1 <"$here/fprintd-attempts.patch"
 mkdir -p "$output/deps/prefix" "$output/deps/lib" "$output/deps/pc" "$output/deps/rpms"
 # Header-only prerequisites: copied from a verified cache or downloaded, never installed.
 rpm_dir=${GOODIX_HEADER_RPMS:-$root/GoodixArtifacts/login-header-rpms}

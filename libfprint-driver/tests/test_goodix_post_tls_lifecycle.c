@@ -1298,6 +1298,90 @@ test_login_ready_handoff (void)
 }
 
 static void
+login_next_physical_cycle (Fixture *fixture)
+{
+  const guint fragmentation = 3;
+  const guint8 cmd01[] = { 1, 0 };
+  guint8 nav[2409] = { 0x50, 1 };
+  guint8 arm[16] = { 8, 1 };
+  g_autoptr(GBytes) image = build_image (fixture);
+  g_autoptr(GBytes) auxiliary = g_bytes_new_static ("aux", 3);
+  g_autoptr(GBytes) ack = NULL, event = NULL, typed = NULL;
+  g_autoptr(GError) error = NULL;
+  guint prior_images = fixture->image_count;
+  g_assert_true (g_queue_is_empty (fixture->out));
+  g_assert_true (goodix_post_tls_lifecycle_next_login (fixture->lifecycle, 7, &error));
+  g_assert_no_error (error);
+  memcpy (arm + 2, fixture->expected_down, 12);
+  arm[14] = 7;
+  complete_command (fixture, 0x32, arm, sizeof arm);
+  ack = build_ack (0x32);
+  feed_frame (fixture, ack, fragmentation);
+  g_assert_cmpuint (fixture->image_count, ==, prior_images);
+  g_assert_true (g_queue_is_empty (fixture->out)); /* No capture without a new down. */
+  g_clear_pointer (&event, g_bytes_unref);
+  event = build_event (0x32, 0x0002, 0x003f, 0x0180);
+  feed_frame (fixture, event, fragmentation);
+  complete_command (fixture, 0x22, cmd01, sizeof cmd01);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x22);
+  feed_frame (fixture, ack, fragmentation);
+  goodix_post_tls_lifecycle_handle_plaintext (fixture->lifecycle, image);
+  g_assert_false (goodix_post_tls_lifecycle_next_login (fixture->lifecycle, 7, &error));
+  g_clear_error (&error);
+
+  {
+    guint8 body34[14] = { 0x0a, 0x01 };
+    memcpy (body34 + 2, fixture->expected_up, 12);
+    complete_command (fixture, 0x34, body34, sizeof body34);
+  }
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x34);
+  feed_frame (fixture, ack, fragmentation);
+  g_clear_pointer (&event, g_bytes_unref);
+  event = build_event (0x34, 0x0200, 0x0000, 0x0120);
+  feed_frame (fixture, event, fragmentation);
+  complete_command (fixture, 0x20, cmd01, sizeof cmd01);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x20);
+  feed_frame (fixture, ack, fragmentation);
+  goodix_post_tls_lifecycle_handle_plaintext (fixture->lifecycle, auxiliary);
+  complete_command (fixture, 0x50, cmd01, sizeof cmd01);
+  g_clear_pointer (&ack, g_bytes_unref);
+  ack = build_ack (0x50);
+  feed_frame (fixture, ack, fragmentation);
+  g_clear_pointer (&typed, g_bytes_unref);
+  typed = build_nav_no_check (nav, sizeof nav);
+  feed_frame (fixture, typed, fragmentation);
+
+}
+
+static void
+test_login_three_physical_attempts (void)
+{
+  Fixture *f = fixture_new_for_profile (GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  g_autoptr(GError) error = NULL;
+  goodix_post_tls_lifecycle_prepare_login (f->lifecycle, login_ready_callback);
+  f->authorize_on_ready = TRUE;
+  run_full_trace (f, 3);
+  login_next_physical_cycle (f);
+  login_next_physical_cycle (f);
+  g_assert_false (goodix_post_tls_lifecycle_next_login (f->lifecycle, 7, &error));
+  g_assert_nonnull (error);
+  g_assert_true (g_queue_is_empty (f->out));
+  g_assert_cmpuint (f->image_count, ==, 3);
+  g_assert_cmpuint (f->audit.release_tail_complete_count, ==, 3);
+  g_assert_cmpuint (f->audit.irq0200_count, ==, 3);
+  g_assert_cmpuint (f->audit.rearm_0x32_count, ==, 2);
+  g_assert_cmpuint (f->audit.baseline_decode_count, ==, 1);
+  g_assert_cmpuint (f->audit.d4_count, ==, 1);
+  g_assert_cmpuint (f->audit.fdt36_submit_count, ==, 3);
+  g_assert_cmpuint (f->audit.reopen_count, ==, 0);
+  g_assert_cmpuint (f->login_ready_count, ==, 1);
+  fixture_free (f);
+}
+
+static void
 test_login_early_contact (void)
 {
   Fixture *f = fixture_new_for_profile (GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
@@ -1335,6 +1419,7 @@ int
 main (int argc, char **argv)
 {
   g_test_init (&argc, &argv, NULL);
+  g_test_add_func ("/login/three-physical-attempts", test_login_three_physical_attempts);
   g_test_add_func ("/login/ready-same-session-handoff", test_login_ready_handoff);
   g_test_add_func ("/login/early-contact-no-22", test_login_early_contact);
   g_test_add_func ("/login/cancel-ready-no-22", test_login_cancel_ready);

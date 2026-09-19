@@ -74,7 +74,7 @@ source corresponding to Fedora fprintd 1.94.5-5.fc44. Source RPM/tar/spec hashes
 are in its `PROVENANCE.md`; `SOURCE_SHA256SUMS` covers all 141 retained upstream files, including dotfiles (eight biometric test images
 are excluded). Three reference metadata files outside `source/` are not part
 of that upstream count.
-`production/login/fprintd.patch` is the sole maintained downstream delta,
+`production/login/fprintd.patch` is the original downstream delta,
 mechanically promoted byte-for-byte from the live-tested prototype. The
 separate `fprintd-cleanup.patch` adds a GPL-2.0-or-later guard for a reproduced
 pending-open/suspend race; it preserves the successful preparation/attach path. Upstream
@@ -95,3 +95,10 @@ Historical `development/patches/login-early/` is frozen evidence of the physical
 validation at `9671e02e19504e20e0097f598fa960f2c13e7a1e`, not a build dependency.
 The canonical loader and per-reader material contract are retained. Promotion
 does not change the public export/audit boundary or publish private history.
+
+Prepared-login three-attempt follow-up: `production/login/fprintd-attempts.patch`
+is a GPL-2.0-or-later local delta over the two existing patches. Upstream bytes
+and the original prototype patch/greeter remain unchanged. Modified driver
+and lifecycle sources retain LGPL-2.1-or-later notices. Their current digests
+are in the production source manifest; they no longer claim prototype byte
+equivalence. No new external implementation or licensing boundary is introduced.

@@ -106,6 +106,17 @@ nine runtime binaries/libraries match both the exported normal build and the
 pre-correction build byte-for-byte. Prototype equivalence checks pass and the
 cleanup patch is unchanged. No executable source or login behavior changed.
 
+Prepared-login three-attempt follow-up: physical recovery after NO MATCH is
+pending human validation. Source changes preserve the original patch/greeter
+hashes and introduce a separately pinned driver/lifecycle and daemon/PAM delta.
+The focused offline suite includes matching at attempts two/three, three NO
+MATCH and refusal of attempt four, hard failure/cancel on attempts one/two,
+physical-release gating, same-generation rearm, and cleanup/ordinary consumer
+regressions. Driver fixtures use a synthetic post-secure-session entry and
+matcher; daemon fixtures use a private bus. These tests do not establish new
+hardware evidence. Development overlay transaction tests restore exact previous
+files and modes after partial writes, label/reload failures and explicit rollback.
+
 Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual
 source commit and output identity. A build digest is provenance, not a claim of
 live deployment or portability beyond the stated target.

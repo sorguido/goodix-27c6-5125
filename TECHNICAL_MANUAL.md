@@ -48,8 +48,11 @@ The driver uses bounded asynchronous USB transfers through libfprint. It owns a
 single action at a time, prevents implicit sensor-reaching retries, and releases
 the device on cancellation or terminal completion. Ordinary verification permits up to
 three physical attempts at the PAM/KDE layer and stops on the first match.
-The prepared login is the validated one-action exception: one attempt with
-an 8-second PAM bound, then password fallback. No automatic re-preparation.
+Prepared login permits up to three physical attempts under one ClaimLogin,
+with an 8-second PAM bound per attempt and immediate stop on MATCH. Only a
+clean NO MATCH plus complete finger release permits another explicit VerifyStart;
+errors/timeouts stop immediately. Three NO MATCH results end fingerprint and
+leave password fallback. This extension is validated offline, pending live confirmation. No automatic re-preparation.
 
 
 ## Preparation before interactive login
@@ -79,8 +82,9 @@ Fedora's ordinary PAM module and the existing managed three-attempt rule.
 The architecture was physically validated in the historical prototype; the
 canonical candidate is validated offline here. Loader policy remains the
 canonical per-reader manifest contract, not the prototype's old fixed loader.
-Source equivalence covers the driver login/lifecycle sources, greeter and
-base fprintd patch. A separately reviewable two-line guard prevents preparation
+Unchanged prototype hashes cover the greeter and base fprintd patch. The
+three-attempt driver/lifecycle delta and separate fprintd-attempts patch are
+pinned as current sources, without claiming prototype byte equivalence. A separately reviewable two-line guard prevents preparation
 from starting after suspend/abandon while an asynchronous open was pending;
 the private-bus regression fails on the prototype and passes with this guard.
 The successful READY-to-Verify path is unchanged; it is not a byte-identity claim for the complete runtime.

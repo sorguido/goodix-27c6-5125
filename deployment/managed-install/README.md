@@ -35,11 +35,25 @@ python3 deployment/managed-install/test_offline.py
 
 The complete candidate includes libfprint, the paired fprintd/PAM extension,
 greeter parent/drop-in, both PAM integrations and account-delete protection.
-Login is the validated single prepared action (8 s), followed by password on
-failure; ordinary sudo/KScreenLocker retain their existing paths. Runtime
+Prepared login permits up to three explicit physical attempts (8 s each),
+stopping on MATCH, error/timeout, or the third NO MATCH before password fallback; ordinary sudo/KScreenLocker retain their existing paths. Runtime
 versions switch together on update/rollback. The greeter integration applies
 on its next normal startup; the manager never restarts Plasma.
 
 Pre-early-login releases require uninstall followed by a fresh install, with
 materials/templates preserved. Development overlays and custom unit overrides
 are rejected. See the installation guide for exact prerequisites and recovery.
+
+An existing managed installation with the same three-attempt PAM rule uses
+`prepare` then `update`; `rollback` restores its previous complete candidate.
+A previous one-attempt managed installation must first be uninstalled using
+its original version of `manage.sh`, then freshly installed with this version.
+Updating it in place is rejected before host changes: the old manager has only
+one saved PAM rule, so it cannot safely switch that rule on rollback. Materials
+and templates are preserved by uninstall. A fresh managed install uses
+`install`, with `uninstall` as its inverse. Existing
+development overlays must use their separate follow-up; do not install this
+managed candidate over them. The three-contact manual cases are one non-matching
+finger then a matching finger, two non-matches then a match, and three non-matches
+then password, each in a separate normal login. Stop at the first MATCH and never
+make a fourth contact. FAIL/timeout/regression requires rollback; retain on PASS.

@@ -61,8 +61,10 @@ The output also contains `fprintd`, `pam_fprintd.so` and `greeter`. SDK objects
 are linked with the host Fedora libraries because Fedora PAM requires the host
 GLIBC ABI. No host headers/packages are installed by the build. The upstream
 fprintd source and downstream login inputs have separate complete digest
-manifests; the original prototype's driver/patch/greeter hashes remain checked
+manifests; the original prototype's unchanged patch/greeter hashes remain checked
 by `login/prototype-equivalence.sha256`. The subsequent
+`fprintd-attempts.patch` bounds prepared login to three physical attempts;
+current driver/lifecycle hashes are in `source-files.sha256`.
 `fprintd-cleanup.patch` blocks late preparation if suspend/abandon invalidated
 the request during open; the original patch remains independently verifiable. Build outputs are not claimed identical
 to the historical overlay, which used different material loaders.
