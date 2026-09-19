@@ -17,6 +17,24 @@ The build combines:
 - two pinned PAM/polkit header RPMs under `GoodixArtifacts/login-header-rpms/`
   (or the directory set by `GOODIX_HEADER_RPMS`).
 
+Obtain the five OpenCV RPMs using the command in
+`GoodixArtifacts/opencv-4.13-rpms/README.md`. Obtain the two header RPMs without
+installing them:
+
+```bash
+mkdir -p GoodixArtifacts/login-header-rpms
+dnf5 download --destdir GoodixArtifacts/login-header-rpms \
+  pam-devel-1.7.2-2.fc44.x86_64 polkit-devel-127-2.fc44.2.x86_64
+(cd GoodixArtifacts/login-header-rpms && \
+  sha256sum -c ../../production/login/headers.sha256)
+```
+
+These seven public, digest-pinned RPMs are external build prerequisites,
+excluded from the source export. Reproduction must retrieve them independently
+instead of inheriting the working tree's ignored cache. The SDK and Fedora
+system libraries/toolchain are also required; this is not a hermetic build
+from Git bytes alone. No ignored or untracked *source* file is required.
+
 Run the source audit:
 
 ```bash

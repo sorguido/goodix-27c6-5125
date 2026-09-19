@@ -71,7 +71,9 @@ does not provide legal advice for unrelated distributions or modifications.
 
 `reference/fprintd-fedora44-1.94.5/source/` is the immutable upstream GPL-2.0-or-later
 source corresponding to Fedora fprintd 1.94.5-5.fc44. Source RPM/tar/spec hashes
-are in its `PROVENANCE.md`; `SOURCE_SHA256SUMS` covers all 138 retained upstream files (eight biometric test images are excluded).
+are in its `PROVENANCE.md`; `SOURCE_SHA256SUMS` covers all 141 retained upstream files, including dotfiles (eight biometric test images
+are excluded). Three reference metadata files outside `source/` are not part
+of that upstream count.
 `production/login/fprintd.patch` is the sole maintained downstream delta,
 mechanically promoted byte-for-byte from the live-tested prototype. The
 separate `fprintd-cleanup.patch` adds a GPL-2.0-or-later guard for a reproduced

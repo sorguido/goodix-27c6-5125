@@ -58,8 +58,10 @@ tests pass in both modes; 25 managed transaction tests pass. The complete
 mock-filesystem install/status/uninstall cycle. SPDX integrity checks cover 45
 packages, 30 files and 75 relationships, including deterministic regeneration.
 All nine runtime binaries/libraries are byte-identical across the canonical
-build, a source-only copy without Git/private trees invoked from `/tmp`, and
-the prepared candidate. ABI, symbol, dependency and RPATH checks pass. None of
+build, a working-tree copy without Git/private trees invoked from `/tmp`, and
+the prepared candidate. That copy was not sufficient proof of reproduction
+from committed content: it inherited an ignored upstream `.gitignore` absent
+from the original import. ABI, symbol, dependency and RPATH checks pass. None of
 these checks is a new host installation or live fingerprint test.
 
 Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual

@@ -48,3 +48,17 @@ The import retains upstream whitespace and the README heading underline.
 Scoped Git attributes avoid treating these pre-existing bytes as new defects;
 all retained source bytes are independently pinned by SOURCE_SHA256SUMS.
 Project patches and their expanded changes are reviewed separately.
+
+Corrective source audit (20 September 2026): the upstream archive was downloaded
+again from the Source0 URL and matched the tar SHA-256 above. It contains 149
+regular files: all 141 retained files match upstream byte-for-byte; the only
+eight exclusions are the JPEG/PNG pairs `arch`, `loop-right`, `tented_arch` and
+`whorl` under `tests/prints/`. The three files outside `source/` are reference
+metadata: `PROVENANCE.md`, `SOURCE_SHA256SUMS` and `.gitattributes`.
+
+The upstream `.gitignore` ignores itself (`/.gitignore`). It was present in the
+working tree and digest manifest but absent from the original import commit.
+It is now explicitly tracked, unchanged from the verified archive, with digest
+`49b93d42e37741013036bd1a4ffe7b4de5b5992c7bdd0f6b72afef40e8ce4350`.
+The existing 141-entry digest manifest is retained unchanged. The earlier
+138-file narrative count omitted dotfiles and was incorrect.

@@ -142,7 +142,7 @@ delle sezioni pertinenti.
 
 ### Stato corrente — early-login validato e promozione canonica (19 settembre 2026)
 
-Il prompt corrente `GOODIX_PROMOTE_EARLY_LOGIN_TO_CANONICAL_RELEASE_CORRECTED.md`
+Il precedente prompt `GOODIX_PROMOTE_EARLY_LOGIN_TO_CANONICAL_RELEASE_CORRECTED.md`
 conferma la prova fisica dell'Utente sul prototipo `login-early` al commit
 `9671e02e19504e20e0097f598fa960f2c13e7a1e`, verificato come entry HEAD su
 `development` pulito. Esiti **osservati e riferiti dall'Utente**:
@@ -161,7 +161,7 @@ immediato è risolto nel perimetro della prova; l'architettura B è validata sul
 target Fedora 44 KDE / 27c6:5125 / APP12509. Il rollback confermato riguarda
 l'overlay temporaneo, non una migrazione alla candidate gestita.
 
-Il task corrente promuove quell'architettura nel percorso canonico. Non
+La promozione ha portato quell'architettura nel percorso canonico. Non
 comprende installazione, sudo, mutazioni host, USB, nuova prova cold-boot o
 pubblicazione. La chiusura riguarda soltanto questa promozione; il progetto
 rimane aperto. Nessuna richiesta di installazione costituisce la closure.
@@ -169,7 +169,8 @@ rimane aperto. Nessuna richiesta di installazione costituisce la closure.
 **Sorgenti e build:** driver/lifecycle già canonici invariati; helper GIO e
 patch fprintd/PAM promossi meccanicamente in `production/login/`. Il reference
 fprintd 1.94.5 è in `reference/fprintd-fedora44-1.94.5/`, con provenance RPM,
-licenze e manifest completo dei 138 file mantenuti. Otto immagini NIST dei
+licenze e manifest completo dei 141 file upstream mantenuti (inclusi i dotfile);
+i tre metadata del reference sono esterni a `source/`. Otto immagini NIST dei
 test upstream sono escluse; non servono alla build o ai test sintetici.
 `production/build.sh` produce libfprint, fprintd, PAM e greeter, senza Git
 storico, directory development, runtime installate o materiali protetti.
@@ -216,6 +217,20 @@ state rollback era scritto prima del successo del reload. Il correttivo salva
 le sole informazioni di recovery necessarie fuori dallo scope locale e
 pubblica lo state dopo i passaggi reversibili. Sono verificati errori di
 label, runtime parziale, reload, checksum/file-set, drift e simmetria rollback.
+
+**Correttivo riproducibilità (20 settembre 2026):** il task corrente è
+`GOODIX_CORRECT_REPRODUCIBILITY_AND_PUBLICATION.md`. Il vecchio controllo su
+copia del worktree non provava la riproducibilità dal Git pubblicato: aveva
+ereditato `.gitignore` upstream ignorato da sé stesso e assente dal commit.
+L'archivio upstream riscaricato coincide con il digest già documentato; tutti
+i 141 file mantenuti coincidono byte per byte, con sole otto immagini escluse.
+Si conserva il manifest e si versiona esplicitamente `.gitignore`; si include
+il reference fprintd nell'allowlist. Il conteggio precedente 138 era errato
+per omissione dei dotfile. Nessun codice o comportamento early-login cambia.
+La nuova verifica richiesta usa esclusivamente sorgenti esportati dal commit
+secondo allowlist, senza storia privata; i sette RPM pubblici pin vengono
+riscaricati come prerequisiti esterni, non copiati dalla cache ignorata.
+Esito della nuova closure da consolidare dopo l'esecuzione.
 
 **Closure corrente:** sorgenti/provenance, build normale e sanitizer,
 protocollo 16 casi, shell driver 34 casi, handler fprintd e ordine del greeter

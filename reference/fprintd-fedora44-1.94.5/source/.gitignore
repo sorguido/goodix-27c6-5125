@@ -1,0 +1,11 @@
+/*.bak
+/*.o
+/*.orig
+/*.rej
+/*.tab.c
+/*~
+/.*.sw[nop]
+/.dirstamp
+/.gitignore
+/_build
+/tags
