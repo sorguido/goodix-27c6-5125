@@ -140,108 +140,133 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — login a freddo con contatto immediato (19 settembre 2026)
+### Stato corrente — esito same-action e decisione sul login (19 settembre 2026)
 
-Il task esplicito dell'Utente riguarda il primo login Plasma dopo cold boot:
-`Invio → dito appoggiato subito`, senza attendere deliberatamente circa due
-secondi. **Il difetto resta aperto. È preparata soltanto la patch temporanea
-per il test lift/recontact nella stessa action, non una soluzione production.**
-I PASS funzionali riportati sotto non qualificano questo specifico timing.
-La review iniziale parte da `development` a
-`9f8dcb8eb6c652c8b511284f33e64b5be2dac7cb`, con worktree inizialmente pulito.
+Il difetto `Invio → dito immediato` resta aperto. La prova temporanea
+lift/recontact è stata **eseguita**, senza acquisizione per il matcher nella
+prima action; non è una candidate production. La ripartenza parte da
+`development` pulito, `a27259194de10a706837f4259d774f5d91a47e8c`. Il task
+corrente chiede prima una correzione locale anti-contaminazione della baseline
+(A), poi, solo se A non è giustificata, una preparazione realmente anticipata
+(B). È autorizzata la preparazione offline della soluzione se giustificata,
+non una nuova live autonoma.
 
-Le undici fonti originali del tema sono state riesaminate integralmente. La
-timeline normalizzata, il confronto codice/storia/OEM e la decisione sono in
-`development/open issues/latenza_impronta_al_login/RESOLUTION_REVIEW_2026-09-19.md`;
-il journal storico recuperato in sola lettura è preservato accanto come
-`journal-evidence-2026-09-15.tsv`. Non sono state eseguite nuove live.
+Fonti: `development/open issues/latenza_impronta_al_login/goodix-same-action-live.txt`,
+testimonianza fisica esplicita dell'Utente, codice production e patch diagnostica
+`c7238d00ae618edbdffc423cdb21ec77fb7a3a5a`. Il confronto community e la
+valutazione A/B sono nella nuova sezione iniziale del report esistente
+`RESOLUTION_REVIEW_2026-09-19.md` nella stessa directory. La review precedente
+resta evidenza storica: il suo esperimento mancante è ora stato eseguito.
 
-La coppia controllata PRE-HELD/DELAYED mostra reply e prompt circa 16–18 ms
-dopo VerifyStart in entrambi i casi, ma il primo termina con errore A0 a
-`+0.492938 s`, senza immagine, mentre il secondo produce MATCH a `+2.980607 s`.
-Nei sei log A/B la prima divergenza osservabile è analogamente il rifiuto
-protocollo entro 0–1 s, non il matcher. I timestamp non misurano direttamente
-il contatto fisico; il successo sudo successivo non prova il login.
+**Osservato, prima action:** Invio una sola volta, dito continuamente appoggiato
+per poco più di 4 s, sollevato completamente per poco più di 1 s, riappoggiato
+per poco più di 3 s; nessun secondo Invio e nessun terzo contatto. Alle 20:42:56
+si registrano sample `63 → 0 → 0` e `waiting_irq2`; alle 20:43:01 un solo
+`reverse80`; alle 20:43:16 cancellazione in `FIRST_IRQ2`, `first_image=0`,
+retry/rearm/reset/reopen/persistent a zero e backend drenato. Non è un
+NO_MATCH e non qualifica il dito come cattivo/invalido. La seconda attesa delle
+20:43:23 è un'altra action, senza sequenza fisica documentata qui. Il MATCH
+20:48:32 è ancora un'altra autenticazione e prova soltanto che il runtime
+temporaneo poteva acquisire e riconoscere. Il fingerprint usato per sudo durante
+l'installazione precedeva lo spegnimento: non emerge evidenza per attribuirgli
+il failure cold-login.
 
-Due boundary distinti devono restare separati:
+**Meccanismo candidato: SUPPORTED, non PROVEN.** Nel codice è invece PROVEN il
+seguente dataflow: il primo `36` usa il seed; ciascun `IRQ0100` accettato
+sostituisce `current_fdt_table` con sei coppie `80 || ((raw_word >> 1) & 0xff)`;
+il successivo `36` usa quella tabella e il `32` finale usa quella del terzo
+sample. La patch temporanea consente tale apprendimento anche per `flags=63`.
+Quindi ogni zero successivo è misurato con un riferimento già modificato:
+`63 → 0 → 0` è compatibile con contatto assorbito nella baseline, senza alcun
+movimento. I delta confrontano stabilità dei raw, non assenza di dito. Il log
+non contiene raw dei canali e non prova la funzione di confronto del firmware;
+restano possibili adattamento analogico o altra anomalia di arming. La
+coincidenza temporale lift/`reverse80` è una correlazione supportata dalla
+sequenza fisica, non la definizione generale di `reverse80 = finger-off`.
+Il modello semplice «baseline valida, solo primo edge perso, basta un nuovo
+contatto» non spiega questa prova; non sono falsificate tutte le possibili
+anomalie del rilevatore di edge.
 
-- Il parser corrente richiede flag zero nei sample FDT `36/IRQ0100`. Il
-  journal del D297/01 sperimentale osserva invece `flags=0x003f`, rifiutati
-  prima della prima immagine. Il frame esatto dei nuovi log generici non è
-  registrato: l'identificazione di ogni failure con quel frame resta inferenza.
-- I correttivi sperimentali successivi superavano quel rifiuto ma D299/D300
-  potevano restare in `FIRST_IRQ2`, con otto ACK, nessun IRQ2 accettato,
-  nessun `22/B0/decode/pipeline`, fino a cancel. Il journal corregge la sintesi
-  storica: i due timeout D299 appartengono allo **stesso boot**
-  `89f8f25b8fa2472aa8cbbec2f97ecf17`. D300 è un altro boot e conferma POV=0;
-  D2 non è giustificato. Questi numeri D297/D298 identificano esperimenti di
-  login storici, distinti dai milestone KScreenLocker/pubblicazione qui sotto.
+`first_image=0` significa nessuna immagine primaria da `22` consegnata al
+matcher. Non significa zero immagini nel bootstrap: raggiungere FIRST_IRQ2
+nel codice eseguito richiede il B0 di baseline da `20`, il decode e il terzo
+sample. Questo è dedotto dal call-flow, senza leggere dati biometrici. Anche
+quel riferimento può essere stato acquisito col dito presente; il suo contenuto
+non è noto. Non si attribuisce una decisione al matcher, che non è stato chiamato.
 
-Il codice Fedora di fprintd risponde a VerifyStart ed emette
-VerifyFingerSelected subito dopo aver avviato l'operazione asincrona: non
-attende `fpi_image_device_activate_complete`. La callback modifica lo stato
-interno libfprint. Il D301 storico che la ritardava fino all'ACK di FIRST_ARM
-non impedisce quindi né il prompt precoce né il contatto fisico. L'ACK prova
-accettazione del comando, non una latenza analogica FDT conosciuta.
+**A, recupero locale:** la prima maschera nonzero permette di rifiutare il
+sample sospetto prima di apprenderlo (la produzione lo fa già). Non abbiamo
+però un contratto target per attendere un vero finger-off a quel punto:
+`36` produce un sample, non una sottoscrizione finger-off; il solo `reverse80`
+non certifica livello fisico o una baseline pulita. Il percorso validato
+`34 → IRQ0200` usa una up-table derivata da un precedente IRQ2 e segue la
+prima immagine. Nell'enrollment l'IRQ0100 a contatto è accettato ma non genera
+la up-table: anch'essa proviene da IRQ2. Applicare la trasformazione IRQ2 al
+raw IRQ0100, o usare `34` prima della prima acquisizione, sarebbe un nuovo
+contratto, non un semplice riuso già verificato. Polling/resampling cieco,
+allargamento soglie e promozione della patch temporanea non risolvono questo
+vuoto. Se il dito rimane appoggiato, una attesa finger-off da sola non può
+farlo sparire; non si promette un recupero invisibile al workflow.
 
-È inoltre **non provato** che i delta FDT validi di D299 escludano una
-calibrazione col dito appoggiato: tre sample stabili possono incorporare lo
-stesso contatto. Il codice apprende la tabella dai sample; la reference
-richiede sensore libero per creare la baseline. Restano concorrenti un edge
-mancato e una baseline/arm non più sensibile a quel contatto. La capture D255
-mostra bootstrap prima della UI e reentry senza ripetere i tre sample, ma non
-è una traccia Windows pre-login e non prova il comportamento del firmware
-con dito già presente. Avviare prima il solo servizio fprintd non equivale a
-inizializzare il sensore.
+**B, preparazione anticipata:** il percorso reale è Invio → PAM → Claim →
+`fp_device_open` → VerifyStart → activate → secure/TLS/FDT. `img_open` corrente
+carica materiali e reclama l'interfaccia; non esegue calibrazione. fprintd
+risponde a VerifyStart e notifica il dito senza attendere activate-complete.
+Spostare FDT in open cambia l'ordine rispetto al prompt, ma resta dopo Invio:
+non soddisfa il contatto immediato. Avviare prima il daemon non esegue Claim.
+Il minimo confine realmente anticipato richiederebbe fprintd come unico owner,
+una preparazione completata prima che il greeter accetti Invio e una sessione
+mantenuta fino all'action autorizzata. Non viene spacciato per un drop-in di
+boot: servono lifetime/cancel/suspend e gestione di un contatto durante tale
+attesa. Anticipare anche `20` non garantisce, senza un controllo affidabile di
+sensore libero, che il frame sia non biometrico; rinviarlo lascia la relativa
+baseline esposta al dito dopo Invio. Nessuna implementazione B viene promossa
+senza chiudere questo contratto.
 
-Nessun correttivo al solo callback/parser supera questa review causale.
-Anticipare realmente calibrazione e arm a prima di Invio richiederebbe un
-nuovo contratto di lifetime, ownership, attesa e cancellazione: è una direzione
-architetturale da decidere esplicitamente secondo `AGENTS.md` §6.4, non un
-servizio di boot da aggiungere autonomamente. Non sono stati modificati wire,
-threshold, retry, materiali protetti o runtime installato.
+**Singolo fatto device-side mancante:** esiste su APP12509 una transizione
+bounded, volatile, prima di qualunque immagine, da `36/IRQ0100` con contatto a
+un evento che certifichi sensore libero e permetta una calibrazione pulita
+nella stessa sessione? Il caso concreto da chiarire è l'ammissibilità di
+`34/IRQ0200` in quel punto e la provenienza valida della sua up-table senza
+un precedente IRQ2. Non basta il nome finger-up del comando. Il log same-action
+non contiene tale transizione e gli altri chip non ne dimostrano la semantica.
+Questo è il boundary esatto per evidenza/protocollo OEM mirato, non una
+richiesta di campagna capture o di ripetere immediate-vs-delayed. Nessuna
+nuova sequenza wire di prova è dichiarata pronta.
 
-La proposta circoscritta per tale decisione conserva fprintd/libfprint come
-unico owner, anticipa la calibrazione pulita a prima di Invio e trattiene la
-sessione preparata con lifetime esplicito; l'acquisizione dell'impronta resta
-legata alla verifica richiesta. Cleanup di idle/cancel/suspend, limiti finiti,
-fallback password e preservazione ENROLL devono essere chiusi offline prima
-di consegnare install/rollback. Non è autorizzata né implementata; nessuna
-deroga alle invarianti hardware viene proposta.
+La comparazione read-only usa `goodix-fp-linux-dev/libfprint` al commit
+`eebdacff358c90e3f909ae4f5526fff194fe3f7c`: Goodix MOC, FPC MOC, Elan MOC,
+Synaptics, Elan image e AES2501. Mostra separazione init/action e meccanismi
+specifici di readiness/contatto, non un contratto universale di calibrazione
+prima del prompt. Elan image calibra in AWAIT_FINGER_ON e contempla esplicitamente
+il problema del dito durante calibrazione. Nessun codice è stato copiato.
+Flash/delete/reset dei driver esterni non sono pratiche autorizzate qui.
 
-Il fatto mancante più circoscritto è se, durante **la stessa action** D299/D300
-già in attesa di IRQ2, un sollevamento completo e nuovo contatto senza
-VerifyStart/rearm produca IRQ2. L'Utente ha precisato il 19 settembre che nei
-test ricordati ogni nuovo contatto seguiva la chiusura della verifica e un
-nuovo Invio; non ha sollevato e riappoggiato il dito nella stessa verifica
-attiva. Questa testimonianza conferma il vuoto sperimentale, non il risultato
-del test mancante. Il report definisce il singolo esperimento discriminante e
-ne esplicita il prerequisito non chiuso: la produzione corrente può terminare
-prima di raggiungere quell'attesa. Non è un'istruzione di live pronta né
-autorizza a reinstallare D299. Un nuovo contatto senza IRQ2 smentirebbe il
-semplice edge perso e imporrebbe di riesaminare calibrazione/arm, non ripetere
-un altro tentativo con pacing o logging diverso.
+Verifiche nuove: il test host della sequenza maschere `63/0/0` controlla i byte
+delle tabelle nei tre `36` e nel primo `32`, poi un solo reverse80 e cancel,
+senza aggiungere un IRQ2 sintetico risolutivo. Raw e frame restano sintetici:
+prova il dataflow host, non la fisica del firmware. Suite variante **18/18**,
+baseline **13/13**, entrambe normali e ASan/UBSan; `production/check-source.sh`
+PASS. Codice production e relativa ABI invariati; nessuna nuova build installabile è richiesta per questi soli
+test/documenti. Stato **HUMAN_REQUIRED** sul contratto di recovery mancante;
+nessuna candidate install/rollback nuova viene presentata come soluzione.
 
-Verifiche della review iniziale: runner lifecycle riallineato agli header Fedora già pin;
-due casi di caratterizzazione nel test esistente; 13/13 PASS normale e 13/13
-ASan/UBSan; `production/check-source.sh` e build production reale PASS, ABI
-verificata, nessuna dipendenza production dal tree privato, zero accesso USB.
-I nuovi test passano con il difetto ancora presente: verificano il rifiuto
-osservato e che la readiness senza IRQ2 non generi immagini/retry. Non provano
-una correzione hardware. Quella review si fermava senza install/rollback per
-una candidate inesistente. La successiva decisione esplicita dell'Utente,
-descritta di seguito, autorizza la sola prova temporanea. Login immediato e
-recovery PRE-HELD restano non qualificati.
+Verifica host read-only: overlay diagnostico, relativo wrapper, drop-in,
+override PAM e stato di rollback assenti; ExecStart D293 e servizio inattivo;
+hash di wrapper D293, drop-in 95 e PAM vendor conformi alla baseline pin.
+Non si richiede di ripetere un rollback già rimosso. Nessun accesso USB,
+materiale protetto, sudo o modifica del servizio è stato eseguito dall'AI.
 
-#### Patch temporanea autorizzata — stessa action, lift/recontact
+#### Provenance della patch temporanea eseguita — stessa action, lift/recontact
 
 L'Utente ha scelto esplicitamente la strada 1: Invio, contatto immediato, poi
 sollevamento completo e riappoggio se la medesima verifica è ancora attiva.
-Non ha autorizzato la strategia più ampia di inizializzazione anticipata.
+In quel task non aveva autorizzato la strategia di inizializzazione anticipata;
+il task successivo la valuta condizionatamente, come descritto sopra.
 Implementazione e istruzioni operative sono in
 `development/patches/login-same-action/`; non è stato creato un Operator Kit,
-un collector o un nuovo D-number. Il precedente report resta la review storica
-dei dati e non è più l'autorità sullo stato di preparazione della patch.
+un collector o un nuovo D-number. Il report conserva la review iniziale e ora
+contiene anche la decisione post-live; il manuale resta la fonte canonica.
 
 Il preparatore applica un solo diff a una copia dei sorgenti production
 `c0e13ff5f78ac32403a753446dcbc44aa7f30556`; il driver canonico non cambia.
@@ -291,14 +316,14 @@ vendor, ExecStart D293 e lo stato attivo/inattivo iniziale del servizio.
 Verifica integrità e rifiuta di cancellare file modificati. Stato di ripristino
 e hash sono dati transazionali/provenance, non grant o credenziali autorizzative.
 
-Verifica offline: 17/17 test della variante e 13/13 della baseline, ciascuno
+Verifica offline alla consegna originaria: 17/17 test della variante e 13/13 della baseline, ciascuno
 sia normale sia ASan/UBSan; sei test di transazione su filesystem fittizio,
 inclusi failure di copia/label, ripresa rollback e preservazione dei file
 modificati; build reale con ABI fprintd, SONAME e audit simboli PASS. I replay
 con IRQ2 sintetico provano esclusivamente il comportamento host condizionato
-alla sua ricezione, non il risultato fisico. Stato: `HUMAN_REQUIRED` prima di
-installazione, sudo e nuova live; nessuna USB reale o attivazione servizio
-eseguita dall'AI.
+alla sua ricezione, non il risultato fisico. La consegna originaria si fermava
+a `HUMAN_REQUIRED`; la successiva esecuzione umana e il suo esito sono ora
+consolidati nella sezione corrente. Nessuna live è stata eseguita dall'AI.
 
 ### Stato consolidato precedente e qualificazione dello stack
 

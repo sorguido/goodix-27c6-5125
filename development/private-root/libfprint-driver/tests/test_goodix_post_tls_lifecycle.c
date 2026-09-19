@@ -31,6 +31,7 @@ typedef struct
   gboolean handoff_should_fail;
   gboolean stop_before_finger;
   guint16 baseline_flags;
+  const guint16 *baseline_flag_sequence;
   gboolean response_before_ack;
   gboolean stop_before_82;
   guint reverse_events;
@@ -520,12 +521,27 @@ run_full_trace (Fixture *fixture,
 
   for (guint fdt_index = 0; fdt_index < 3u; fdt_index++)
     {
-      complete_command (fixture, 0x36, NULL, 0);
+      guint8 request[14] = { 0x09, 0x01 };
+      if (fdt_index == 0u)
+        memcpy (request + 2, fixture->material.initial_fdt_table, 12u);
+      else
+        for (guint channel = 0; channel < 6u; channel++)
+          {
+            /* Independent expected bytes for the synthetic sample below.
+             * Check what reaches the next command, not just a local table. */
+            request[2u + channel * 2u] = 0x80;
+            request[3u + channel * 2u] =
+              (guint8) (0x80u + (fdt_index - 1u) * 0x10u + channel);
+          }
+      complete_command (fixture, 0x36, request, sizeof request);
       g_clear_pointer (&ack, g_bytes_unref);
       ack = build_ack (0x36);
       feed_frame (fixture, ack, fragmentation);
       g_clear_pointer (&event, g_bytes_unref);
-      event = build_event (0x36, 0x0100, fixture->baseline_flags,
+      event = build_event (0x36, 0x0100,
+                           fixture->baseline_flag_sequence != NULL ?
+                             fixture->baseline_flag_sequence[fdt_index] :
+                             fixture->baseline_flags,
                            (guint16) (0x0300u + fdt_index * 0x20u));
       feed_frame (fixture, event, fragmentation);
       if (fdt_index == 0)
@@ -559,7 +575,17 @@ run_full_trace (Fixture *fixture,
         }
     }
 
-  complete_command (fixture, 0x32, NULL, 0);
+  {
+    guint8 request[16] = { 0x08, 0x01 };
+    for (guint channel = 0; channel < 6u; channel++)
+      {
+        request[2u + channel * 2u] = 0x80;
+        request[3u + channel * 2u] = (guint8) (0xa0u + channel);
+      }
+    request[14] = (guint8) fixture->material.first_arm_timestamp;
+    request[15] = (guint8) (fixture->material.first_arm_timestamp >> 8);
+    complete_command (fixture, 0x32, request, sizeof request);
+  }
   g_clear_pointer (&ack, g_bytes_unref);
   ack = build_ack (0x32);
   feed_frame (fixture, ack, fragmentation);
@@ -1037,6 +1063,37 @@ test_login_readiness_without_irq2_does_not_capture (void)
 
 #ifdef GOODIX_SAME_ACTION_TEST
 static void
+test_same_action_observed_masks_learn_without_finger_off (void)
+{
+  Fixture *fixture = fixture_new_for_profile (
+    GOODIX_POST_TLS_CAPTURE_PROFILE_SINGLE_ACQUISITION);
+  const guint16 flags[] = { 0x003f, 0, 0 };
+  /* Only the mask sequence comes from the live. Raw values and frames are
+   * synthetic: this proves host learning, not the firmware comparator. */
+  fixture->baseline_flag_sequence = flags;
+  fixture->response_before_ack = TRUE;
+  fixture->reverse_events = 1;
+  fixture->stop_before_finger = TRUE;
+  run_full_trace (fixture, 1u);
+  g_assert_cmpint (goodix_post_tls_lifecycle_get_phase (fixture->lifecycle),
+                   ==, GOODIX_POST_TLS_PHASE_FIRST_IRQ2);
+  g_assert_cmpuint (fixture->audit.fdt_irq100_count, ==, 3u);
+  g_assert_cmpuint (fixture->audit.fdt_delta_within_threshold_count, ==, 2u);
+  g_assert_cmpuint (fixture->audit.baseline_b0_count, ==, 1u);
+  g_assert_cmpuint (fixture->audit.command_count, ==, 9u);
+  g_assert_cmpuint (fixture->audit.first_image_command_count, ==, 0u);
+  g_assert_cmpuint (fixture->finger_down_count, ==, 0u);
+  g_assert_cmpuint (fixture->finger_up_count, ==, 0u);
+  g_assert_cmpuint (fixture->image_count, ==, 0u);
+  g_assert_cmpuint (fixture->audit.retry_count, ==, 0u);
+  g_assert_true (g_queue_is_empty (fixture->out));
+  goodix_post_tls_lifecycle_cancel (fixture->lifecycle, "test deadline");
+  g_assert_cmpuint (fixture->terminal_count, ==, 1u);
+  g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
+  fixture_free (fixture);
+}
+
+static void
 test_same_action_baseline_scope (void)
 {
   for (guint i = 0; i < 3u; i++)
@@ -1234,6 +1291,8 @@ main (int argc, char **argv)
   g_test_add_func ("/login-latency/readiness-without-irq2-does-not-capture",
                    test_login_readiness_without_irq2_does_not_capture);
 #ifdef GOODIX_SAME_ACTION_TEST
+  g_test_add_func ("/same-action/observed-masks-learn-without-finger-off",
+                   test_same_action_observed_masks_learn_without_finger_off);
   g_test_add_func ("/same-action/baseline-scope", test_same_action_baseline_scope);
   g_test_add_func ("/same-action/known-prefix-conditional-irq", test_same_action_known_prefix_then_irq);
   g_test_add_func ("/same-action/missing-irq-reverse-limit", test_same_action_missing_irq_and_reverse_limit);

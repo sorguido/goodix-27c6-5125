@@ -1,12 +1,168 @@
 # Cold-login immediate contact: resolution review, 2026-09-19
 
-Historical review of the initial investigation. The User subsequently chose
-the bounded same-action lift/recontact experiment. Its temporary patch and
-current operational instructions are in `development/patches/login-same-action/`
-at the repository root and the current state is in the technical manual.
-No earlier-initialization strategy was authorized. The evidence below remains
-valid; statements that no experimental deployment is prepared describe the
-initial review, not the subsequent task.
+## Post-live decision: same-action result
+
+This section supersedes the initial decision below. Entry HEAD was
+`a27259194de10a706837f4259d774f5d91a47e8c`, branch `development`, clean.
+The diagnostic runtime was recipe `c7238d00ae618edbdffc423cdb21ec77fb7a3a5a`,
+patch SHA-256 `b0fa8d3dade95bf13b1b59295709583ae95b84f859b9ec44296c7d3c209a0936`.
+The new task authorizes evaluating A first, then B, and preparing one candidate
+only if justified. The temporary experiment is not promoted to production.
+
+### What the new action establishes
+
+Source: [`goodix-same-action-live.txt`](goodix-same-action-live.txt), lines 10–16,
+plus the User's physical account: one Enter, continuous immediate contact for
+slightly over 4 s, complete lift for slightly over 1 s, recontact for slightly
+over 3 s; no second Enter or third contact within that action.
+
+| Time | First cold action |
+| --- | --- |
+| 20:42:56 | Baseline masks 63, 0, 0; waiting_irq2 |
+| 20:43:01 | One reverse80 event, temporally consistent with the reported lift |
+| 20:43:16 | Cancel in FIRST_IRQ2; first_image=0; drained; no retry/rearm/reopen/reset/persistent write reported |
+
+There is no accepted IRQ2, primary fingerprint image, SIGFM extraction or
+matcher decision. Calling this a bad finger or a NO_MATCH is incorrect.
+The 20:43:23 wait is a separate action; its physical sequence is not established
+by this testimony. The 20:48:32 MATCH (lines 33–43) is another authentication:
+it confirms the temporary runtime can acquire/match, not cold-login success.
+Installation-time sudo fingerprint authentication preceded cold boot; no
+evidence supports treating it as causal here. Generation=1 is reused in fresh
+contexts, so action identity also requires timestamp/process/audit boundaries.
+
+### Causal challenge: SUPPORTED, not PROVEN
+
+The **host update is PROVEN** in the actual temporary patch and production
+code (`goodix_post_tls_lifecycle.c`, `goodix_fdt_irq_policy.c`):
+
+```text
+36(seed) -> sample1(raw1,63) -> T1
+36(T1)   -> sample2(raw2, 0) -> T2
+20       -> baseline B0
+36(T2)   -> sample3(raw3, 0) -> T3
+32(T3)   -> wait
+Tn[channel] = 80 || ((raw_n[channel] >> 1) & ff)
+```
+
+NAV/82/ACK steps are omitted only from this dataflow sketch. The diagnostic
+patch passes validated metadata through the unchanged table transform even
+when the first mask is 63. Thus the subsequent masks use updated references;
+zeros do not independently certify finger absence. Stable raw deltas cannot
+certify absence either. This explains how a held finger **could** become the
+reference, a lift could become a reverse transition, and recontact could return
+toward that reference without IRQ2. It is an inference about the firmware:
+there are no channel values/comparator internals in the log, and analog
+adaptation or an arming fault is not excluded. The reverse80 timing is not a
+universal finger-off specification. The narrow model “valid clean baseline,
+only the initial edge was missed, any fresh edge recovers” fails this test;
+not every possible edge-detection defect is falsified.
+
+`first_image=0` counts the primary `22` path. Reaching FIRST_IRQ2 necessarily
+passes `handle_plaintext(FDT_B0)`, baseline decode/copy and the third sample.
+Therefore a bootstrap image from `20` was accepted, although no fingerprint
+image was delivered to matching. This is call-flow evidence, not inspection of
+its contents. A held finger may contaminate both FDT and image references.
+
+### A before B: exact selection boundary
+
+**A is preferred in size, but not implementable as a justified recovery yet.**
+The current strict driver already rejects a nonzero baseline mask instead of
+learning it. Recovery needs a trustworthy clean-state transition before
+continuing. `36` is a manual sample, not a demonstrated finger-off subscription.
+Accepting zero after learning contact or treating reverse80 as absolute absence
+would beg the causal question. Repeating samples against a frozen seed is
+polling without a proven empty-state predicate, and does not make a held finger
+leave the sensor. The validated `34/IRQ0200` path uses an up-table derived from
+IRQ2 after the first acquisition. Even enrollment's contact IRQ0100 does not
+derive that table (`goodix_enrollment_post_tls_events.c:319`,
+`goodix_enrollment_fdt_state.c:67`); the source remains IRQ2. Extending the raw
+interpretation and using `34` during setup is a new target contract. A range
+check passing, a synthetic IRQ0200 or an ACK would not prove that contract.
+Normal PAM also does not turn FingerPresent/FingerNeeded properties into a
+setup recovery dialogue; it displays VerifyStatus messages. A driver-only wait
+must not promise transparent success while the operator keeps the finger down.
+
+**B's smallest real boundary is before the greeter accepts Enter, not open.**
+The installed fprintd 1.94.5 path is directly traced in the local Fedora source:
+`pam_fprintd.c:claim_device` -> `device.c:fprint_device_claim` -> `fp_device_open`
+-> Claim reply -> VerifyStart -> driver activation. The observed Plasma action
+starts this PAM path after Enter. `img_open` currently acquires materials and
+the USB interface; secure/TLS/FDT start in activate. `device.c:1756` replies and
+emits VerifyFingerSelected without waiting for activation; PAM displays it.
+Starting the daemon does not Claim/open. Moving calibration to Claim/open would
+still race the specified immediate physical contact, even with a later prompt.
+
+A real B design would keep fprintd as sole owner, complete preparation before
+enabling login input, retain the prepared session, and gate acquisition on the
+authorized action, with bounded idle/cancel/suspend cleanup. That requires an
+actual greeter/readiness integration and a split driver lifetime, not a boot
+ordering drop-in. More fundamentally, moving `20` earlier cannot guarantee a
+non-biometric baseline without a reliable empty-sensor predicate; deferring it
+leaves image calibration exposed to the finger after Enter. A contact while
+armed but before Verify also needs correct presence/removal handling. These
+are concrete reasons not to label B a safe completed fix from this evidence.
+The new task permits its evaluation; lack of authorization is not the blocker.
+
+**One missing device-side fact:** the valid APP12509 pre-image empty-state
+transition after a contact-bearing `36/IRQ0100`. Specifically, can `34` be used
+there, with what valid up-table provenance absent IRQ2, and does its IRQ0200
+certify the clean state needed for calibration in the same session? This is
+one protocol contract, not a request for more A/B timing runs. The same-action
+log never exercised it; post-image evidence and other chips cannot establish
+it. No early-34 live sequence is presented as ready or safe. Evidence should
+address exactly this contract; a broad capture campaign is not requested.
+
+### Compact community architecture comparison (read-only)
+
+Repository: `goodix-fp-linux-dev/libfprint`, master observed at immutable commit
+`eebdacff358c90e3f909ae4f5526fff194fe3f7c`. Sources were read in `/tmp`; no code
+was imported or executed. These are architectural examples, not APP12509 proof.
+“Ready” below is the host/protocol milestone, not measured analog readiness.
+PAM can invite contact during asynchronous action setup; Claim/open completion
+can precede that prompt but still follows Enter in the target workflow.
+
+| Driver / pinned source | open/init | verify/identify or capture | Ready for finger | Setup while UI invites contact? | Finger present during setup |
+| --- | --- | --- | --- | --- | --- |
+| [Goodix MOC](https://github.com/goodix-fp-linux-dev/libfprint/blob/eebdacff358c90e3f909ae4f5526fff194fe3f7c/libfprint/drivers/goodixmoc/goodix.c#L1087) | Version, config, template list; complete open after init | Shield, CAPTURE_DATA, IDENTIFY | Reports NEEDED at capture; firmware owns acquisition | Init precedes Claim reply; action setup can overlap prompt; physical touch after Enter can precede either | No host empty-baseline guard; firmware behavior opaque. Init includes flash config and possible storage deletion: expressly not reusable here |
+| [FPC MOC](https://github.com/goodix-fp-linux-dev/libfprint/blob/eebdacff358c90e3f909ae4f5526fff194fe3f7c/libfprint/drivers/fpcmoc/fpc.c#L1516) | INIT/event, load DB, then open complete | ARM/event, GET_IMG, IDENTIFY, ABORT | NEEDED at ARM, PRESENT at FINGER_DWN | Init precedes Claim reply; ARM/capture runs after action request and may overlap prompt | Explicit firmware events; no visible host proof of finger-free calibration |
+| [Elan MOC](https://github.com/goodix-fp-linux-dev/libfprint/blob/eebdacff358c90e3f909ae4f5526fff194fe3f7c/libfprint/drivers/elanmoc/elanmoc.c#L1001) | Bounded status polling for 03, mode, version, dimensions, enrolled count | Set mode and firmware verify command/wait | Status gate during open; verify wait during action | Readiness polling is before open complete; action command can overlap prompt | Explicit not-ready failure; 03 is not a documented finger-absence predicate. USB reset in this driver is not imported |
+| [Synaptics](https://github.com/goodix-fp-linux-dev/libfprint/blob/eebdacff358c90e3f909ae4f5526fff194fe3f7c/libfprint/drivers/synaptics/synaptics.c#L1322) | FPS_INIT in probe and again in open; success/already-initialized accepted, busy handled by cancel | VERIFY_USER / ordered identify | Init callback completes open; firmware capture events govern action | Probe can run at discovery; open init precedes Claim reply; action readiness can overlap prompt | Explicit FINGER_REPORT tracks on/off; completion can wait for removal. No host empty-reference learning shown |
+| [Elan image](https://github.com/goodix-fp-linux-dev/libfprint/blob/eebdacff358c90e3f909ae4f5526fff194fe3f7c/libfprint/drivers/elan.c#L632) | Interface claim and host parameters only | Activate queries version/dimensions; AWAIT_FINGER_ON starts background/calibration, then capture | Calibration complete starts capture; activate-complete was earlier | **Yes**: calibration starts after activation in AWAIT_FINGER_ON | Bounded calibration status cycle 01→03; image path diagnoses possible finger-during-calibration. No general prevention is proved |
+| [AES2501 image](https://github.com/goodix-fp-linux-dev/libfprint/blob/eebdacff358c90e3f909ae4f5526fff194fe3f7c/libfprint/drivers/aes2501.c#L679) | Interface claim | Register initialization in activate, then histogram detection and capture | Init completion precedes start_finger_detection | **Yes**, action initialization can overlap the PAM prompt | Histogram examines current presence after init; no learned empty-FDT guard. Polling behavior is not copied |
+
+The signal is separation of setup from matching plus chip-specific status
+contracts. It is not “all drivers calibrate before Enter”, nor evidence that
+a callback or service startup repairs the Goodix boundary.
+
+### Offline closure and methodological decision
+
+The existing lifecycle test now checks the actual outgoing baseline tables:
+seed in first 36, previous raw-derived table in second/third 36, third table in
+32. One new host-only case uses the observed mask sequence 63/0/0, one reverse80
+and cancellation, with synthetic raw/image data. It asserts one baseline B0,
+zero primary images/finger callbacks/retries and no invented IRQ2 suffix.
+This characterizes the risky host behavior of the diagnostic, not firmware.
+18/18 variant and 13/13 baseline tests pass normally and with ASan/UBSan.
+`production/check-source.sh` passes. Production sources/ABI and deployment
+scripts are unchanged; no redundant build/ABI run or installation is claimed.
+
+PM decision: **HUMAN_REQUIRED**, no sufficiently justified A or B candidate.
+The new evidence changes the question from a missed first contact to the
+pre-image clean-state contract; the next test cannot be another paced login
+or parser relaxation. Without that contract, no new install/rollback pair or
+live is advertised. The historical pair remains available.
+
+Read-only host check: the temporary runtime, wrapper, PAM override, drop-in 96
+and transaction state are absent; effective ExecStart is D293 and service is
+inactive. D293 wrapper/drop-in and vendor PAM hashes match the pinned baseline.
+No sensor, protected material, service mutation or privileged action was used.
+
+## Initial investigation (historical)
+
+The remainder preserves the earlier investigation. Its missing same-action
+experiment and authorization status are superseded by the post-live decision
+above; historical observations and source provenance remain valid.
 
 Baseline: `development`, `9f8dcb8eb6c652c8b511284f33e64b5be2dac7cb`.
 The worktree was clean at entry. This is a topic review, not a new D-number.

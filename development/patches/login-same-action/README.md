@@ -1,5 +1,11 @@
 # Prova temporanea: sollevare e riappoggiare nella stessa verifica
 
+**STORICO — esperimento eseguito il 19 settembre 2026. Non reinstallare per
+ripeterlo: lift/recontact nella prima action non ha prodotto IRQ2 o immagine
+per il matcher. Non è una candidate production.** Il manuale tecnico e la
+sezione post-live di `RESOLUTION_REVIEW_2026-09-19.md` descrivono la decisione
+corrente. Le istruzioni originarie e il rollback restano preservati qui sotto.
+
 **HUMAN_REQUIRED — installazione, sudo e prova sul sensore spettano all'Utente.**
 Questa patch prepara un singolo esperimento; non è la soluzione del login.
 Serve a osservare se un nuovo contatto riattiva la rilevazione nella stessa
