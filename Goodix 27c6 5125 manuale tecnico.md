@@ -140,7 +140,7 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — early-login validato e promozione canonica (19 settembre 2026)
+### Stato corrente — early-login canonico e riproducibilità Git (20 settembre 2026)
 
 Il precedente prompt `GOODIX_PROMOTE_EARLY_LOGIN_TO_CANONICAL_RELEASE_CORRECTED.md`
 conferma la prova fisica dell'Utente sul prototipo `login-early` al commit
@@ -230,9 +230,32 @@ per omissione dei dotfile. Nessun codice o comportamento early-login cambia.
 La nuova verifica richiesta usa esclusivamente sorgenti esportati dal commit
 secondo allowlist, senza storia privata; i sette RPM pubblici pin vengono
 riscaricati come prerequisiti esterni, non copiati dalla cache ignorata.
-Esito della nuova closure da consolidare dopo l'esecuzione.
+**Nuova closure:** export stretto dei 504 file dell'allowlist dal commit
+`99f19e6cdd9ed71ffd757001d29f3316818cc949`, creato con `git archive` in
+`/tmp/goodix-committed-repro`, ogni file confrontato con il blob Git originale.
+Nessun file locale ignorato/non versionato è copiato; il reference ha 141 blob
+uguali ai 141 elementi del manifest. L'export è registrato in un repository
+temporaneo con un solo commit, `aa7834c42f64541b0afb4308e67e0a789ca1cf27`,
+per la provenance richiesta da prepare/SBOM, senza storia privata.
+Check-source, build normal/sanitizer, suite login offline (16 protocollo e
+34 driver in entrambi i modi, daemon/greeter privati), 25 transazioni, prepare
+e diff-check sono PASS da questa superficie. Candidate: 32 file esatti;
+SBOM 45 package / 30 file / 75 relazioni, rigenerazione byte-identica; indice
+SHA-256 `93d6eeb95ebcbf0f088c303a9dce9df485b33c28ed65456b0b0500f79a657ea7`.
+Nove runtime byte-identici tra build esportata, prepare e build precedente al
+correttivo. Ciclo candidate install/status/uninstall PASS solo su filesystem
+sintetico. Il confronto Git di driver, login e deployment è vuoto.
 
-**Closure corrente:** sorgenti/provenance, build normale e sanitizer,
+L'assenza di dipendenze ignorate/non versionate riguarda i sorgenti e le cache
+locali accidentali: i sette RPM pubblici richiesti restano input esterni,
+riscaricati e verificati contro i digest committati. Il loro staging è ignorato
+da Git per scelta; SDK e librerie Fedora restano prerequisiti host. Non si
+dichiara una build ermetica di soli byte Git né l'assenza letterale di ogni
+file ignorato. Nessun nuovo codice eseguibile, installazione host, USB, bus
+di sistema o pubblicazione pubblica. Correttivo concluso; progetto aperto.
+
+**Closure della promozione del 19 settembre (integrata dalla verifica Git sopra):**
+sorgenti/provenance, build normale e sanitizer,
 protocollo 16 casi, shell driver 34 casi, handler fprintd e ordine del greeter
 sono verificati offline; la suite transazioni corrente conta 25 casi. I test
 shell conservano il binding in-memory con matcher sintetico, usando il core

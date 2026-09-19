@@ -64,6 +64,48 @@ from committed content: it inherited an ignored upstream `.gitignore` absent
 from the original import. ABI, symbol, dependency and RPATH checks pass. None of
 these checks is a new host installation or live fingerprint test.
 
+Corrective committed-source reproduction on 20 September 2026:
+
+- Source commit: `99f19e6cdd9ed71ffd757001d29f3316818cc949`.
+- A strict `git archive` of the publication allowlist produced 504 files in
+  `/tmp/goodix-committed-repro`. Every file was compared with its committed
+  blob, including dotfiles; the fprintd manifest and tree both contain exactly
+  141 upstream files. No workspace copy, private history or development tree
+  was included. The sole PNG in the export is the upstream libfprint demo icon,
+  not a biometric fixture.
+- A single temporary local commit,
+  `aa7834c42f64541b0afb4308e67e0a789ca1cf27`, records that exact export for
+  managed preparation's provenance requirement. It is not a project release
+  commit and contains no private ancestors.
+- All seven external RPM prerequisites were downloaded afresh from Fedora
+  and checked against the committed manifests. SDK and Fedora system
+  libraries/toolchain remain documented external prerequisites. The claim is
+  no ignored/untracked **source** or accidental local cache dependency, not
+  a hermetic build from Git alone: RPM staging remains intentionally ignored.
+
+Commands executed using that committed export (build, login tests and
+managed preparation invoked with `/tmp` as the working directory):
+
+```bash
+/tmp/goodix-committed-repro/production/check-source.sh
+/tmp/goodix-committed-repro/production/build.sh normal /tmp/goodix-committed-normal
+/tmp/goodix-committed-repro/production/build.sh sanitizer /tmp/goodix-committed-sanitizer
+/tmp/goodix-committed-repro/production/login/check-offline.sh /tmp/goodix-committed-normal /tmp/goodix-committed-sanitizer
+/tmp/goodix-committed-repro/deployment/managed-install/manage.sh prepare /tmp/goodix-committed-managed
+python3 /tmp/goodix-committed-repro/deployment/managed-install/test_offline.py
+git -C /tmp/goodix-committed-repro diff --check
+```
+
+All pass: 16 protocol and 34 driver cases in both modes, daemon/greeter tests
+in both modes, and 25 transaction tests. Exact candidate set: 32 files. SPDX:
+45 packages, 30 files, 75 relationships; hashes, package verification code,
+references and byte-identical regeneration verified. Candidate SHA256SUMS
+digest: `93d6eeb95ebcbf0f088c303a9dce9df485b33c28ed65456b0b0500f79a657ea7`.
+The real candidate passes the existing mock-filesystem transaction test. All
+nine runtime binaries/libraries match both the exported normal build and the
+pre-correction build byte-for-byte. Prototype equivalence checks pass and the
+cleanup patch is unchanged. No executable source or login behavior changed.
+
 Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual
 source commit and output identity. A build digest is provenance, not a claim of
 live deployment or portability beyond the stated target.
