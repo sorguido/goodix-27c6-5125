@@ -51,6 +51,17 @@ After building both modes, run:
 production/login/check-offline.sh /absolute/normal /absolute/sanitizer
 ```
 
+Promotion closure on 19 September 2026: 16 protocol tests and 34 driver shell
+tests pass in normal and ASan/UBSan modes; daemon private-bus and greeter barrier
+tests pass in both modes; 25 managed transaction tests pass. The complete
+32-file candidate was prepared from a clean committed checkout and passed a
+mock-filesystem install/status/uninstall cycle. SPDX integrity checks cover 45
+packages, 30 files and 75 relationships, including deterministic regeneration.
+All nine runtime binaries/libraries are byte-identical across the canonical
+build, a source-only copy without Git/private trees invoked from `/tmp`, and
+the prepared candidate. ABI, symbol, dependency and RPATH checks pass. None of
+these checks is a new host installation or live fingerprint test.
+
 Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual
 source commit and output identity. A build digest is provenance, not a claim of
 live deployment or portability beyond the stated target.

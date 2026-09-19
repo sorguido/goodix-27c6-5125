@@ -222,8 +222,35 @@ protocollo 16 casi, shell driver 34 casi, handler fprintd e ordine del greeter
 sono verificati offline; la suite transazioni corrente conta 25 casi. I test
 shell conservano il binding in-memory con matcher sintetico, usando il core
 Fedora canonico e l'adapter SIGFM: non sostituiscono una bootstrap fisica.
-La verifica `manage.sh prepare` su checkout committato e la review finale
-sono il completamento autonomo ancora in corso di questo stesso task.
+`manage.sh prepare` è PASS dal checkout pulito committato
+`48035e9e78597fb8e3a8ff01ed676cda6355fc00`: candidate completa di 32 file,
+indice SHA-256 `3a7d03621860988c1be09dc5affacc78069c4156e6766cc0c0d3918e8d90079f`.
+Lo SBOM SPDX 2.3 contiene 45 package, 30 file e 75 relazioni; digest per file,
+verification code, ID/relazioni e rigenerazione deterministica verificati.
+La candidate effettiva attraversa install/status/uninstall su filesystem
+sintetico con ripristino esatto dei file PAM e rimozione del drop-in posseduto.
+I nove binari/librerie sono byte-identici fra build canonica, build avviata da
+`/tmp` su copia priva di `.git` e development, e candidate preparata. Il SDK
+25.08 osservato ha commit
+`b90ed309cc1d505dea48b6a2121c5dcfac22868120eee643b0596d31f96b9bb8`.
+La review PM del diff canonico, manifest, provenienza, failure path e closure
+accetta il risultato offline. ABI/simboli/RPATH/dependency, compilazione del
+modulo SELinux senza installarlo e `git diff --check` sono PASS. I successivi
+aggiornamenti documentali non cambiano quel live-critical set; ogni nuova
+prepare registra comunque il proprio SOURCE_COMMIT completo.
+
+```text
+OUTCOME=CANONICAL_PROMOTION_OFFLINE_PASS
+LIVE_VALIDATION_RECORDED=USER_CONFIRMED_PROTOTYPE_PASS
+ADVANCEMENT=COMPLETE_CANONICAL_PAIRED_LOGIN_BUILD_AND_MANAGED_CANDIDATE
+EXECUTABLE_CLOSURE=OFFLINE_PASS
+PM_REVIEW=ACCEPT
+TASK_STATUS=COMPLETE
+PROJECT_COMPLETE=false
+NEW_CANONICAL_INSTALL_OR_LIVE=false
+RESIDUAL_RISK=CANONICAL_MANAGED_TARGET_QUALIFICATION_NOT_PERFORMED_IN_THIS_TASK
+REVIEW_SET=GIT_BASE_9671e02_TO_CURRENT_DEVELOPMENT
+```
 Nessuna installazione/live della candidate promossa è avvenuta qui.
 `development/patches/login-early/` è preservato e marcato storico/superato,
 fuori dalle dipendenze release. Documentazione pubblica e SBOM distinguono
