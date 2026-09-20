@@ -41,12 +41,13 @@ main (int argc, char **argv)
 {
   g_autoptr(GError) error = NULL;
   g_autofree gchar *historical = NULL;
+  g_autofree gchar *converted = NULL;
   g_autofree gchar *directory = NULL;
   g_autoptr(GString) canonical = g_string_new (NULL);
   gchar digest[65];
   gsize length = 0;
 
-  if (argc != 2 || geteuid () == 0)
+  if (argc != 3 || geteuid () == 0)
     return 2;
   g_assert_true (g_file_get_contents (argv[1], &historical, &length, &error));
   g_assert_no_error (error);
@@ -74,6 +75,10 @@ main (int argc, char **argv)
    * then fails open. This is not a valid bundle or evidence about the host. */
   check_manifest (directory, canonical->str, canonical->len, "PROTECTED_OPEN");
   g_print ("SAME_SIZE_SYNTHETIC_V1_REACHES_ABSENT_TRANSPORT=PASS\n");
+  g_assert_true (g_file_get_contents (argv[2], &converted, &length, &error));
+  g_assert_no_error (error);
+  check_manifest (directory, converted, length, "PROTECTED_OPEN");
+  g_print ("CONVERTED_HISTORICAL_MANIFEST_ACCEPTED_BY_PRODUCTION_PARSER=PASS\n");
   g_assert_cmpint (g_rmdir (directory), ==, 0);
   return 0;
 }

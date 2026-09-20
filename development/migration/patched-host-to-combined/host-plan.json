@@ -1,0 +1,416 @@
+{
+  "d285_state": {
+    "D285_01_AUTHSELECT_ACTIVE": "local with-silent-lastlog with-mdns4",
+    "D285_01_AUTHSELECT_BACKUP": "d285-01-20260911T163528Z-a9e234e43d2b",
+    "D285_01_AUTHSELECT_BEFORE": "local with-silent-lastlog with-mdns4 with-fingerprint",
+    "D285_01_AUTHSELECT_CONF_BEFORE_SHA256": "26ce1714d26e1188cff2ff70585eed046e9796a5fdac7a8219d8b0a8483dd670",
+    "D285_01_BASELINE_SHA": "a9e234e43d2bdf3e81630df143eb7a809a19bff5",
+    "D285_01_DAEMON_SHA256": "2353dafe60cf731b5cefe8c7ecc1350b151b20b17e9f8d886cfeeb605064403f",
+    "D285_01_DROPIN_SHA256": "2065252f935304a6c35487b527ba22ab62fa05621a18556733d9fd581e3c02ed",
+    "D285_01_FINGERPRINT_AUTH_BEFORE_SHA256": "6ae17707e2bebef709c57c3226c7bb938857a2d93df2cd4a7d3026d54a380e0f",
+    "D285_01_INSTALL_STATUS": "ACTIVE",
+    "D285_01_MANIFEST_SHA256": "385630027c980768ea4e9864c889af4bcc5f63695f3b79f1ff48c1d0fa95cab3",
+    "D285_01_PAM_SHA256": "dd853208220902d1737357a02e47a6c1ac47e5ddf56bf02247efda52e17f2048",
+    "D285_01_PAM_SUDO_BEFORE_SHA256": "fb766aab394fc417c72f07365ea29f9ba65bb101991293a14a6e81aed6202f77",
+    "D285_01_PASSWORD_AUTH_BEFORE_SHA256": "2e53f704372b6c7fb69cdc4dfd6c27456d642c83feff8b1588fa1f9cb1126cd0",
+    "D285_01_RUNTIME": "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5",
+    "D285_01_SERVICE_BEFORE": "active",
+    "D285_01_SUDOERS_SHA256": "9c98b1ffa91b889a7d17bd654aaa77715dc751a0271e5fa1b168135f891480e1",
+    "D285_01_SYSTEM_AUTH_BEFORE_SHA256": "7885d720078eeb0a154baf4145460a2c754d4acc8e3d2cd243603674a92a170a",
+    "D285_01_SYSTEM_LIBFPRINT_BEFORE_SHA256": "d71d98e80eacd49b515ef1999016a540b6e39dc5009a6f84b1924e977d472504",
+    "D285_01_USER": "guido",
+    "D285_01_WRAPPER_SHA256": "e13a68518c067fb3872147be38c54470b00dc3d43e2bd8823f26c353fdf1d965"
+  },
+  "files": {
+    "/etc/pam.d/goodix-d285-01-sudo": {
+      "action": "remove",
+      "mode": 420,
+      "sha256": "dd853208220902d1737357a02e47a6c1ac47e5ddf56bf02247efda52e17f2048"
+    },
+    "/etc/pam.d/kde-fingerprint": {
+      "action": "vendor",
+      "mode": 420,
+      "sha256": "858713e5b3b7ecf58a91f6fe5b736f344aa6c5b9c207318e6ac552a1a3ffb3d1"
+    },
+    "/etc/pam.d/plasmalogin": {
+      "action": "remove",
+      "mode": 420,
+      "sha256": "91a632300cde2e9bd351625a49558cb0531a035338221039d3a01e671ad9cbcc"
+    },
+    "/etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete": {
+      "action": "remove",
+      "mode": 493,
+      "sha256": "42024daf2f33372014d5a1f45059aeb49a8be4b78198899e9cb9b331a813af10"
+    },
+    "/etc/sudoers.d/90-goodix-d285-01": {
+      "action": "remove",
+      "mode": 288,
+      "sha256": "9c98b1ffa91b889a7d17bd654aaa77715dc751a0271e5fa1b168135f891480e1"
+    },
+    "/etc/systemd/system/fprintd.service.d/90-goodix-d285-01.conf": {
+      "action": "remove",
+      "mode": 420,
+      "sha256": "2065252f935304a6c35487b527ba22ab62fa05621a18556733d9fd581e3c02ed"
+    },
+    "/etc/systemd/system/fprintd.service.d/95-goodix-d293-native.conf": {
+      "action": "remove",
+      "mode": 420,
+      "sha256": "91432adc0299628455f98772a42341b7b1fccc432fd85fcb1928eafa75523247"
+    },
+    "/etc/systemd/system/fprintd.service.d/96-goodix-login-early.conf": {
+      "action": "remove",
+      "mode": 420,
+      "sha256": "1eb54eaba7197f84c5a823ac2c7db7fbedd3e9d0563e099cb26836c952d77558"
+    },
+    "/etc/systemd/user/plasma-login.service.d/96-goodix-login-early.conf": {
+      "action": "remove",
+      "mode": 420,
+      "sha256": "afab3e76a33a3b04ac66f67c6b607be968537e235512fc00c943646cbc1e8371"
+    },
+    "/usr/lib/pam.d/plasmalogin": {
+      "action": "vendor",
+      "mode": 420,
+      "sha256": "559910be8631f69398332b2979bd5c18f1155a7af0960215d175694082cae2ac"
+    }
+  },
+  "guards": {
+    "/etc/authselect/authselect.conf": {
+      "mode": 420,
+      "sha256": "73197004d2b3cfedb7cd7b597456b49b50e3ffe756c5c9b292eb0225e03eee68"
+    },
+    "/etc/authselect/fingerprint-auth": {
+      "mode": 420,
+      "sha256": "9e0ea3820ffe5b6ff6f4cea4896b40e244077830538ea824911759095f8b4a8a"
+    },
+    "/etc/authselect/password-auth": {
+      "mode": 420,
+      "sha256": "2e53f704372b6c7fb69cdc4dfd6c27456d642c83feff8b1588fa1f9cb1126cd0"
+    },
+    "/etc/authselect/system-auth": {
+      "mode": 420,
+      "sha256": "2e53f704372b6c7fb69cdc4dfd6c27456d642c83feff8b1588fa1f9cb1126cd0"
+    },
+    "/etc/goodix-27c6-5125/d297-02-local.previous-dropin": {
+      "mode": 384,
+      "sha256": "fe3a105cc4515e720a16a81e2a53ee17a3ecb15127c81552f79cf4db6c7d1501"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/0": {
+      "mode": 420,
+      "sha256": "3c787a5a9dbe84f884cade0d8190777d0ada6841fe456d01d204215091661dfc"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/1": {
+      "mode": 493,
+      "sha256": "c1b38582ddbfe1149ced999ce1c123ac9ea8d2457ba37225cf8ac6f06dab65de"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/2": {
+      "mode": 420,
+      "sha256": "e6269190c42dc4f2446e6a24e500f1b9dffd91617d0f24394706a879b946c16b"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/3": {
+      "mode": 420,
+      "sha256": "455e5d8d93929133a48045ddd2abf38cd6c27c2a0a7563d726aa430e7a686c1f"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/4": {
+      "mode": 420,
+      "sha256": "098cc5f6c149fa52d4d7b4127d7427fcb9d6275d42c3671740ac6924e10a6e0b"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/5": {
+      "mode": 420,
+      "sha256": "b17bae92275e0ef00b4161876d3b6d827d8156da2e2e7300e91529424f99df78"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/6": {
+      "mode": 420,
+      "sha256": "519d8b59c7477d55a3640e8846471b88cac63aa3ed9e6371a171c3e876478f41"
+    },
+    "/etc/goodix-27c6-5125/login-three-backup/7": {
+      "mode": 384,
+      "sha256": "ed091dc160dc5ac633ce6022d77df03c25b25d0f535a87c94dee182fb96f7198"
+    },
+    "/etc/pam.d/sudo": {
+      "mode": 420,
+      "sha256": "fb766aab394fc417c72f07365ea29f9ba65bb101991293a14a6e81aed6202f77"
+    },
+    "/etc/pam.d/sudo-i": {
+      "mode": 420,
+      "sha256": "268616ef041372c9cdc170df1b4deea85cbf67928b17451759bfd24ac689b803"
+    },
+    "/etc/sudo.conf": {
+      "mode": 416,
+      "sha256": "9af0d568d19a8c778d17202647b5eb75e36b074f42b2df65aa1ea23e567e3be3"
+    },
+    "/etc/sudoers": {
+      "mode": 288,
+      "sha256": "c63df9a912d5f33614f0daab3996b400d36cac6e651a8b110f02dad15f885572"
+    },
+    "/usr/lib/pam.d/polkit-1": {
+      "mode": 420,
+      "sha256": "a4454c54582a86fd4560321b22ffb7639485968438a07d5412fadc102d62cf49"
+    },
+    "/usr/libexec/fprintd": {
+      "mode": 493,
+      "sha256": "2353dafe60cf731b5cefe8c7ecc1350b151b20b17e9f8d886cfeeb605064403f"
+    },
+    "/usr/local/bin/goodix-d285-01-fprintd": {
+      "mode": 493,
+      "sha256": "e13a68518c067fb3872147be38c54470b00dc3d43e2bd8823f26c353fdf1d965"
+    },
+    "/usr/local/bin/goodix-d293-native-fprintd": {
+      "mode": 493,
+      "sha256": "ea0f5c0ebc2bb9524943fef0921f2d0ff845380d35d43d7112c3d0df357f78d2"
+    },
+    "/usr/local/bin/goodix-d297-02-local-fprintd": {
+      "mode": 493,
+      "sha256": "60472e627b5fe8cf360bb678100b5f347c73c96191ac44c2890d41666b6889a6"
+    },
+    "/usr/local/bin/goodix-d297-local-fprintd": {
+      "mode": 493,
+      "sha256": "8d83855e9eeefe1645c4e9332d665078b6969430b439bef5b3bfca73ff747433"
+    },
+    "/usr/local/bin/goodix-login-early-fprintd": {
+      "mode": 493,
+      "sha256": "0017bfcd6239b0530b4187ba18762e9bcf21db59f73502ee03057f8a8723ac61"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/artifacts.sha256": {
+      "mode": 420,
+      "sha256": "385630027c980768ea4e9864c889af4bcc5f63695f3b79f1ff48c1d0fa95cab3"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/libfprint-2.so.2.0.0": {
+      "mode": 420,
+      "sha256": "c42de3508fe0a71ebbd2820f216398b63906418d88e028beb26df1563bc2a619"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/libgusb.so.2": {
+      "mode": 420,
+      "sha256": "86dd7a7ca9cc621f3bb7f9320d6dfe01d04528dbe7152722b617e0838d7eb9cd"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/libopencv_core.so.413": {
+      "mode": 420,
+      "sha256": "a52af4e78a69e2181a265fb816881a49a556602816d3e13c54cf478d8901d38d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/libopencv_features2d.so.413": {
+      "mode": 420,
+      "sha256": "6885430e36f705aeeb15bea7ac47abfef57b606819d30c83ca063bf93456221f"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/libopencv_flann.so.413": {
+      "mode": 420,
+      "sha256": "09405e8a9d412d69102a611b2311e6161c635266d1846d6253c3f360a84d7041"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d285-01-a9e234e43d2bdf3e81630df143eb7a809a19bff5/libopencv_imgproc.so.413": {
+      "mode": 420,
+      "sha256": "c3c3e85cd1c14936ab65df110ac9261487f66adefb219893ea30f9338b4234c4"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/artifacts.sha256": {
+      "mode": 384,
+      "sha256": "3bfeeb3fcfd789fc699067099187fe2ded63c073eeae502859f35ab5fc92473d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/libfprint-2.so.2.0.0": {
+      "mode": 420,
+      "sha256": "115db4450272435c80ecb61e3540577b99c8355fb02a0f1648175104a7c3dd20"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/libgusb.so.2": {
+      "mode": 420,
+      "sha256": "86dd7a7ca9cc621f3bb7f9320d6dfe01d04528dbe7152722b617e0838d7eb9cd"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/libopencv_core.so.413": {
+      "mode": 420,
+      "sha256": "a52af4e78a69e2181a265fb816881a49a556602816d3e13c54cf478d8901d38d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/libopencv_features2d.so.413": {
+      "mode": 420,
+      "sha256": "6885430e36f705aeeb15bea7ac47abfef57b606819d30c83ca063bf93456221f"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/libopencv_flann.so.413": {
+      "mode": 420,
+      "sha256": "09405e8a9d412d69102a611b2311e6161c635266d1846d6253c3f360a84d7041"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d293-native-e61fce313794922a2dab156a1b38a8ddc5837f19/libopencv_imgproc.so.413": {
+      "mode": 420,
+      "sha256": "c3c3e85cd1c14936ab65df110ac9261487f66adefb219893ea30f9338b4234c4"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/artifacts.sha256": {
+      "mode": 384,
+      "sha256": "12e1d2a570dc69b4fdd8a0afc07b32b8a6f5f84122630148d5bf9468cef20565"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/libfprint-2.so.2.0.0": {
+      "mode": 420,
+      "sha256": "9b669041d493933aa03644dd75fb56267c6df33761617b8db8e716e8c389cd55"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/libgusb.so.2": {
+      "mode": 420,
+      "sha256": "86dd7a7ca9cc621f3bb7f9320d6dfe01d04528dbe7152722b617e0838d7eb9cd"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/libopencv_core.so.413": {
+      "mode": 420,
+      "sha256": "a52af4e78a69e2181a265fb816881a49a556602816d3e13c54cf478d8901d38d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/libopencv_features2d.so.413": {
+      "mode": 420,
+      "sha256": "6885430e36f705aeeb15bea7ac47abfef57b606819d30c83ca063bf93456221f"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/libopencv_flann.so.413": {
+      "mode": 420,
+      "sha256": "09405e8a9d412d69102a611b2311e6161c635266d1846d6253c3f360a84d7041"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-02-local-ef302008c85adfecde14433dd486187d2ad9d3f8/libopencv_imgproc.so.413": {
+      "mode": 420,
+      "sha256": "c3c3e85cd1c14936ab65df110ac9261487f66adefb219893ea30f9338b4234c4"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/artifacts.sha256": {
+      "mode": 384,
+      "sha256": "3ea1bb5f00944182e8d58801408185553072953ca28ad21b9b2398ee9f01e704"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/libfprint-2.so.2.0.0": {
+      "mode": 420,
+      "sha256": "7e06c6bb49eaf7760288516599737648fc1eb0a64426d378118362c161c0e58d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/libgusb.so.2": {
+      "mode": 420,
+      "sha256": "86dd7a7ca9cc621f3bb7f9320d6dfe01d04528dbe7152722b617e0838d7eb9cd"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/libopencv_core.so.413": {
+      "mode": 420,
+      "sha256": "a52af4e78a69e2181a265fb816881a49a556602816d3e13c54cf478d8901d38d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/libopencv_features2d.so.413": {
+      "mode": 420,
+      "sha256": "6885430e36f705aeeb15bea7ac47abfef57b606819d30c83ca063bf93456221f"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/libopencv_flann.so.413": {
+      "mode": 420,
+      "sha256": "09405e8a9d412d69102a611b2311e6161c635266d1846d6253c3f360a84d7041"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/d297-local-c3722987700ea85a9f1062d764a10d8a1103b4f0/libopencv_imgproc.so.413": {
+      "mode": 420,
+      "sha256": "c3c3e85cd1c14936ab65df110ac9261487f66adefb219893ea30f9338b4234c4"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/PROVENANCE": {
+      "mode": 420,
+      "sha256": "69d2bfb18abb0044d00f13820e4859d9cbe029bb6f812159688e8065d6003995"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/SHA256SUMS": {
+      "mode": 420,
+      "sha256": "c82c0440692dcca4d5ef7b87f19f6ee744f6775a3b83b7ef501fa06d53f695f5"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/fprintd": {
+      "mode": 493,
+      "sha256": "56adcc05718e12dd393d732b6e0af369b85044e3cf19e4209ca631d7cae5e353"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/greeter": {
+      "mode": 493,
+      "sha256": "6b0f919275d5eb2cde7911a32f07a7f7058ac256d97f2bee779f95c0edf6d02b"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/libfprint-2.so.2.0.0": {
+      "mode": 420,
+      "sha256": "39b70e0ba3da385b7921671543295f8166e27ffde5e990cf1cee94ee0aee081f"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/libgusb.so.2": {
+      "mode": 420,
+      "sha256": "86dd7a7ca9cc621f3bb7f9320d6dfe01d04528dbe7152722b617e0838d7eb9cd"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/libopencv_core.so.413": {
+      "mode": 420,
+      "sha256": "a52af4e78a69e2181a265fb816881a49a556602816d3e13c54cf478d8901d38d"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/libopencv_features2d.so.413": {
+      "mode": 420,
+      "sha256": "6885430e36f705aeeb15bea7ac47abfef57b606819d30c83ca063bf93456221f"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/libopencv_flann.so.413": {
+      "mode": 420,
+      "sha256": "09405e8a9d412d69102a611b2311e6161c635266d1846d6253c3f360a84d7041"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/libopencv_imgproc.so.413": {
+      "mode": 420,
+      "sha256": "c3c3e85cd1c14936ab65df110ac9261487f66adefb219893ea30f9338b4234c4"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/pam_fprintd.so": {
+      "mode": 420,
+      "sha256": "d746f2cdace223a42ae988207f306bd734a78d3e9a99c9071a8b58c087039372"
+    },
+    "/usr/local/lib64/goodix-27c6-5125/login-early/source-files.sha256": {
+      "mode": 420,
+      "sha256": "448e3ca22500b2e1099c441ba6399a6c3282089e12f82db45625d4b13d300315"
+    },
+    "/var/lib/goodix-d297-01-kscreenlocker/kde-fingerprint.managed": {
+      "mode": 420,
+      "sha256": "858713e5b3b7ecf58a91f6fe5b736f344aa6c5b9c207318e6ac552a1a3ffb3d1"
+    },
+    "/var/lib/goodix-d297-01-kscreenlocker/kde-fingerprint.vendor": {
+      "mode": 420,
+      "sha256": "8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437"
+    }
+  },
+  "inventory_sha256": "58fef9bbcafec8485e3dd428d7cc19347b493ee7d036f99bb61513e5d24924a9",
+  "preserve": {
+    "/var/lib/fprint": {
+      "gid": 0,
+      "mode": "0o700",
+      "type": 16384,
+      "uid": 0
+    },
+    "/var/lib/fprint/guido": {
+      "gid": 0,
+      "mode": "0o700",
+      "type": 16384,
+      "uid": 0
+    },
+    "/var/lib/fprint/guido/goodix_27c6_5125": {
+      "gid": 0,
+      "mode": "0o700",
+      "type": 16384,
+      "uid": 0
+    },
+    "/var/lib/fprint/guido/goodix_27c6_5125/0": {
+      "gid": 0,
+      "mode": "0o700",
+      "type": 16384,
+      "uid": 0
+    },
+    "/var/lib/fprint/guido/goodix_27c6_5125/0/7": {
+      "gid": 0,
+      "mode": "0o644",
+      "mtime_ns": 1789253249103441463,
+      "size": 521555,
+      "type": 32768,
+      "uid": 0
+    },
+    "/var/lib/goodix-5125-poc": {
+      "gid": 0,
+      "mode": "0o700",
+      "type": 16384,
+      "uid": 0
+    },
+    "/var/lib/goodix-5125-poc/fdt-cache.bin": {
+      "gid": 0,
+      "mode": "0o600",
+      "mtime_ns": 1788558662721953349,
+      "size": 13520,
+      "type": 32768,
+      "uid": 0
+    },
+    "/var/lib/goodix-5125-poc/gfusb.dll": {
+      "gid": 0,
+      "mode": "0o600",
+      "mtime_ns": 1788558662699953514,
+      "size": 5771496,
+      "type": 32768,
+      "uid": 0
+    },
+    "/var/lib/goodix-5125-poc/target-config-90.bin": {
+      "gid": 0,
+      "mode": "0o600",
+      "mtime_ns": 1786826739136590577,
+      "size": 224,
+      "type": 32768,
+      "uid": 0
+    },
+    "/var/lib/goodix-5125-poc/transport-material.bin": {
+      "gid": 0,
+      "mode": "0o600",
+      "mtime_ns": 1785331381151850526,
+      "size": 88,
+      "type": 32768,
+      "uid": 0
+    }
+  },
+  "schema": 1
+}

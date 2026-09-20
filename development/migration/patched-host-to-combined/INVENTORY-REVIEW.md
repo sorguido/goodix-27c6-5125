@@ -1,6 +1,12 @@
 # Review del PC patchato — inventario consegnato il 20 settembre 2026
 
-**PM_DECISION=HUMAN_REQUIRED — MATERIAL_MANIFEST_COMPATIBILITY_DECISION**
+**PM_DECISION=HUMAN_REQUIRED — MIGRATION_AND_CANDIDATE_LIVE**
+
+La review iniziale e16bc6404e8b60ae683d79347e495f5029aee681 ha identificato il
+gate sul formato. L’Utente ha successivamente autorizzato esclusivamente la
+preparazione offline della conversione reversibile del manifest: il gate di
+preparazione è superato, quello di esecuzione reale rimane. Le evidenze
+inventariali sottostanti restano invariate; la closure finale è aggiornata.
 
 Ripartenza su `development`, HEAD `4e571eb72cc9c213cfbebab4a745afeefee6373c`,
 worktree pulito e ref remoto privato allineato. La baseline del task originale
@@ -126,7 +132,7 @@ Il delta D290 è invertibile in memoria: rimuovere l'unica riga
 produce il vendor Plasma `c6fc4a0b…`. Anche questo è un risultato sui byte
 software, non un ripristino eseguito sul PC.
 
-## Baseline target proposta, ancora non installabile
+## Baseline target deterministica, preparata offline
 
 | Oggetto | Classificazione per la futura migrazione | Condizione |
 |---|---|---|
@@ -141,16 +147,16 @@ software, non un ripristino eseguito sul PC.
 | altri state/rollback/authselect backup storici | PRESERVE | recovery e provenance; non consumarli con vecchi uninstall |
 | authselect e system-auth/fingerprint-auth | PRESERVE | password-only già configurato; non riabilitare with-fingerprint |
 | sudo/sudo-i e Polkit vendor | PRESERVE / RECREATE_BY_CANDIDATE | integrazioni locali prodotte dal manager |
-| hook e modulo SELinux B5 | UNKNOWN_STOP → RECREATE_BY_CANDIDATE | ownership/digest policy da verificare; stessi nomi, collisione reale |
+| hook e modulo SELinux B5 | REMOVE / RECREATE_BY_CANDIDATE | policy di recovery ricostruita; futuro preflight richiede hash CIL effettivo, priorità 400 e modulo abilitato/unico |
 | template, staging, archivi, quattro binari materiali | PRESERVE | zero letture/conversioni/rimozioni biometriche o modifiche dei binari |
-| manifest materiali installato | UNKNOWN_STOP | nessuna conversione autorizzata; incompatibilità del formato storico |
+| manifest materiali installato | MIGRATE | preparazione autorizzata; hash storico esatto obbligatorio, originale conservato integralmente, nessun altro materiale convertito |
 | selezione fprintd e greeter managed | RECREATE_BY_CANDIDATE | solo dopo baseline supportata e recovery pronto |
 
-Questa è una classificazione, non `MIGRATION_PLAN=DETERMINISTIC`. Il manager
+La classificazione è implementata nel piano fisso `host-plan.json`. Il manager
 rifiuta i vecchi drop-in, il vendor PAM modificato, PAM custom e selettori sudo;
 non si modificano tali controlli per accettare il PC attuale.
 
-## Strategia e blocker di formato
+## Strategia e risoluzione offline del formato
 
 A) Rimozione manuale selettiva: i file sono individuati, ma resta da rendere
 atomica/verificabile la recovery fra PAM, selettore, policy e runtime.
@@ -158,7 +164,10 @@ B) Uninstall storici: scartati. D285 enumera USB, avvia fprintd, cancella un
 template e riabilita with-fingerprint; D293 ripristina una snapshot precedente
 al 96; D297 ha state stale; early non ripristina D290 nel vendor PAM.
 C) Nuova transazione specifica: preferita per la parte overlay, con pin,
-backup propri e recovery ripetibile; non ancora preparata per l'esecuzione.
+backup propri e recovery ripetibile; implementata e verificata offline.
+La rimozione del selettore D285 precede quella del PAM che seleziona; il
+runtime è mascherato e inattivo. Le selezioni fprintd vengono tolte 96→95→90,
+poi si ricostruisce la baseline. I runtime storici restano senza selettori.
 
 Il blocker precedente alla fase E/F è il contratto dei materiali. Il manuale,
 la ricetta `development/patches/login-three/prepare.sh` e la PROVENANCE
@@ -183,52 +192,160 @@ compatibile con cinque file dal contenuto sintetico arbitrario: il controllo
 è solo metadata. Un install/status PASS su root sintetica non giustificherebbe
 quindi la migrazione senza risolvere il formato.
 
-Proposta da autorizzare: preparare offline una conversione reversibile del
-**solo manifest host**, originale root-only conservato, tutti i binari e i
-template invariati, nessuna azione sul sensore, esecuzione futura solo umana.
-L'alternativa è una candidate privata con loader storico, divergente dalla
-candidate canonica richiesta. Né conversione né ripristino dei quattro loader
-sono implicitamente autorizzati. La prima viola l'attuale vincolo sui materiali;
-la seconda cambia la strategia canonica. Dettagli e decisione nel README.
+## Conversione autorizzata, minima e deterministica
 
-Non si richiede un nuovo inventario generico né un terzo tentativo di accesso
-root. Il prossimo gate è la decisione di scope, previsto da AGENTS §§6.2/6.4,
-prima di preparare azioni dipendenti. Nessuna live viene consegnata come READY.
+`manifest.py` accetta esclusivamente il fixture D232 di 2305 byte con SHA-256
+`1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15`.
+Non legge file e non cerca materiali. I dieci campi risultanti sono:
+
+| Campo canonico | Provenienza |
+|---|---|
+| schema | costante `goodix-5125-device-materials-v1` |
+| vid, pid, app | target storico; rimozione del prefisso `0x` da vid/pid |
+| config90_sha256 | config90.body_sha256 |
+| a2_response_sha256 | a2.response_body_sha256 |
+| chip82_response_sha256 | chip82.response_body_sha256 |
+| otp_a6_response_sha256 | otp_a6.response_body_sha256 |
+| transport_sha256 | pin già applicato dal loader e61fce3 goodix_target_material.c |
+| fdt_cache_sha256 | pin già applicato dal loader e61fce3 goodix_runtime_inputs.c |
+
+I due digest mancanti nel JSON storico non vengono ricalcolati dal deposito;
+sono gli stessi vincoli di accettazione del runtime installato. Il test estrae
+indipendentemente tutti e sei i pin dagli array C del commit storico completo,
+poi li confronta con la conversione. Serializzazione: ASCII, chiavi ordinate,
+indentazione 2, newline finale. Metadati narrativi/redundanti restano nel backup
+integrale; nessun campo runtime aggiuntivo o fallback permissivo.
+
+Il vero parser canonico accetta la conversione e arriva alla lettura del
+transport deliberatamente assente, normale e ASan/UBSan. Non è una prova del
+binding completo o dei materiali reali. Il file host viene letto e qualificato
+soltanto dal futuro preflight umano: qualsiasi differenza interrompe tutto.
+
+## Transazione e rollback verificati
+
+Piano derivato dall'inventario fornito e dai soli file software leggibili:
+10 file software da rimuovere/ripristinare, 66 guardie software di preservazione,
+proiezione lessicale dello state D285 priva di pin biometrici, 10 oggetti
+metadata-only per template/quattro binari e relativi alberi. Il manifest è
+l'undicesimo target, con il pin storico indipendente. Lo staging e gli archivi
+sono esclusi dalle scritture/letture di contenuto, senza inventariarli di nuovo.
+
+Il modulo B5 originale è ricostruito da
+`232e9401ca3ce72a0f9f08448deb46c6251aaa2a`,
+`deployment/d293-phase-b-account-lifecycle/goodix_fprint_account_delete.{te,fc}`.
+`prepare-policy.sh` verifica TE/FC, compila senza installare, verifica PP da
+2086 byte SHA-256
+`674740ba782b501a68dbaff9bef04d725cc9e88adad6f37c6f3c468a2cc71d03`
+e CIL `e993729e97ad84f2a89e6cd41bbdb2e5f557a9898f0d96962183053bea0a69f3`.
+La dimensione 563 dell'HLL compresso nel deposito SELinux non è quella del PP.
+Il contenuto effettivamente attivo rimane da confrontare nel preflight root.
+
+`migration.py` non ha override root/test nel CLI: root reale è esclusivamente
+operatore; i test costruiscono esplicitamente Files sotto `/tmp` come utente.
+I path usano directory descriptor, O_NOFOLLOW/O_NOATIME, regular file single-link,
+owner/mode e sole etichette SELinux supportate. Snapshot root-only atomica
+prima dello switch; copie originali, policy e codice recovery verificati.
+Mask runtime fino alla prova password; release esplicita prima del vero manager.
+Nessun comando sensor-reaching, import, authselect, sudo o pkexec nel tool.
+
+Rollback rifiuta candidate/residui, drift e file temporanei estranei; ripristina
+originale manifest, file PAM/selettori e policy. Rileva cambiamenti dei quattro
+binari/template tramite metadata senza leggerli. I test provano il recupero
+anche usando il codice conservato nella snapshot, senza dipendere dal checkout.
+La snapshot non viene cancellata su PASS o rollback. Una snapshot incompleta
+`.pending` precede tutte le modifiche di configurazione e richiede STOP.
+
+Il codice non garantisce recovery automatica da qualunque modifica concorrente,
+corruzione, power-loss o failure della policy SELinux reale. La console root
+transitoria indipendente dal logout resta il canale di recovery umano; se non
+è ottenibile con password prima dello switch, non iniziare la migrazione.
+
+## Validazione e review PM
+
+Review Git-native del delta da e16bc6404e8b60ae683d79347e495f5029aee681,
+con alternanza Executor/PM; fase PM separata, senza modifiche durante la review.
+Non è stata usata una seconda istanza agente. Correttivi emersi dalla review:
+dimensione PP vs HLL compresso, rifiuto del padre mancante prima di rollback,
+conservazione di temporanei preesistenti su O_EXCL fallito, eccezione di lettura
+solo per il temporaneo del manifest durante recovery, e controllo del vincolo
+HEAD esatto imposto dal vero manager. Nessun controllo production indebolito.
+
+Prove eseguite senza root/USB/autenticazione:
+
+- 8 test inventario; 23 test conversione/migrazione/policy (includono 13
+  interruzioni: mask, undici file, rimozione policy), errori durante snapshot,
+  drift, link/FIFO, file temporanei parziali, CLI reale da cwd diverso,
+  rollback idempotente, preservation e codice recovery salvato;
+- vero parser: storico rifiutato, v1 sintetico della stessa dimensione accettato,
+  conversione effettiva accettata, tutti normale e ASan/UBSan;
+- build production completa normale e sanitizer; suite login completa con
+  protocollo/lifecycle, daemon/private-bus, greeter e 31 managed transaction;
+- PAM Polkit 18, sudo 15, incrociati 3, in normale e sanitizer; deploy Polkit 13;
+- candidate completa preparata due volte da e16bc6: tutti i 36 file identici,
+  indice SHA256SUMS `a91ec4eac1692bdf03f88245dd7a832c1970797c71647604e0d2406f8b8312e2`,
+  SBOM SPDX 2.3 con 50 package, 34 file e 84 relazioni;
+- vero manager su root sintetica post-migrazione: install/status/uninstall
+  PASS, ritorno alla baseline senza D285, poi rollback storico PASS;
+  failure candidate dopo policy/KScreenLocker/login/Polkit ripristina la
+  baseline post-migrazione, recuperabile con lo stesso rollback.
+
+Per l'esecuzione il manager richiede SOURCE_COMMIT = HEAD corrente: la candidate
+preliminare e16bc6 **non viene consegnata per installazione dopo questo commit**.
+La preparazione/riproduzione finale dal commit pulito è verificata nuovamente;
+SHA completo e indice finali sono nel MANIFEST, nella ricevuta di consegna e nel
+report finale. Nessun sorgente production cambia in questa transazione.
+
+Le root sintetiche usano systemctl/SELinux/identità simulate: provano percorsi,
+preflight strutturali e ripristino, non l'accettazione del vero host. La build
+compila il profilo production, ma il parser test interrompe prima dei materiali.
+Sanitizer ASan/UBSan con leak detection disabilitata per limite SDK/ptrace.
+Le prime esecuzioni PAM in sandbox hanno incontrato limiti socket/librerie:
+risolti usando uid 1000 fuori sandbox e librerie SDK linkate soltanto in /tmp.
+Nessuna installazione di dipendenze host o esecuzione privilegiata dell'AI.
+
+## Riesame metodologico prima della live
+
+1. Cosa cambia: una transazione nuova qualificata sostituisce gli uninstall
+   storici; si converte il solo formato e si usa l'intera candidate canonica,
+   con root console indipendente e rollback già verificato offline.
+2. Ipotesi nuova: il manifest con gli stessi pin storici espressi nel contratto
+   canonico permette al runtime combined di usare i materiali/template esistenti
+   e ai suoi consumer locali di operare senza i selettori storici.
+3. Se fallisce: interrompere al primo confine, ripristinare quando possibile,
+   poi diagnostica read-only mirata al failure reale. Non ripetere una live
+   equivalente né sostituire materiali/loader o rilassare il parser.
+
+Il fallimento precedente era accesso root `su`, non una prova di matching:
+non viene contato come NO MATCH, né viene inventato un PASS nuovo del sensore.
 
 ## Closure corrente
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-GATE=MATERIAL_MANIFEST_COMPATIBILITY_DECISION
-HEAD=git_HEAD_del_review_set_su_development
-WORKTREE=clean_after_review_commit
-HOST_INVENTORY=COMPLETE_FOR_BOUNDED_COLLECTOR_SCOPE
-PRIVILEGED_READ_REQUIRED=NO_REPEAT_INVENTORY_FUTURE_MATERIAL_CHECK_NEEDS_DECISION
-OVERLAY_ORDER=CONFIGURED_PRECEDENCE_AND_PROJECTED_STATES_REVIEWED
-D285_STATUS=ACTIVE_SELECTOR_PIN_VERIFIED_USER_SUDO_PASS_PRESERVED
+GATE=MIGRATION_AND_CANDIDATE_LIVE
+HOST_INVENTORY=COMPLETE_BOUNDED_SCOPE_OPAQUE_ARCHIVES_PRESERVED
+PRIVILEGED_READ_REQUIRED=FINAL_HUMAN_PREFLIGHT_ONLY
+OVERLAY_ORDER=PROVEN_CONFIGURED_PRECEDENCE
+D285_STATUS=ACTIVE_SELECTOR_PRESERVED_UNTIL_HUMAN_SWITCH
 D293_STATUS=SUPERSEDED_BUT_PRESENT
-LOGIN_EARLY_STATUS=SELECTED_WITH_THREE_ATTEMPT_DELTA
+LOGIN_EARLY_STATUS=SELECTED_WITH_LOGIN_THREE_DELTA
 AUTHSELECT_CURRENT=local_with-silent-lastlog_with-mdns4
-TARGET_BASELINE=PASSWORD_ONLY_WITH_PRESERVED_GOODIX_DATA_MATERIAL_BOUNDARY_UNRESOLVED
-TEMPLATE_PRESERVATION=UNTOUCHED_METADATA_REVIEWED_MIGRATION_PROOF_PENDING
-PROTECTED_MATERIAL_PRESERVATION=UNTOUCHED_METADATA_ONLY_MIGRATION_PROOF_PENDING
-MIGRATION_STRATEGY=C_SCOPED_TRANSACTION_PREFERRED_MATERIAL_DECISION_PENDING
-MIGRATION_TOOL=INVENTORY_AND_OFFLINE_BOUNDARY_CHECK_ONLY_NO_APPLY
-ROLLBACK=NOT_PREPARED_HISTORICAL_UNINSTALL_NOT_APPROVED
-CANDIDATE_SOURCE_COMMIT=NOT_REBUILT_CURRENT_CANONICAL_SOURCE_4e571eb72cc9c213cfbebab4a745afeefee6373c
-CANDIDATE_PREFLIGHT_POST_MIGRATION=NOT_RUN_BASELINE_UNRESOLVED
-CANDIDATE_REPRODUCTION=NOT_RUN_AT_THIS_GATE
-OFFLINE_TESTS=INVENTORY_8_SOURCE_CHECKS_MATERIALS_27_NORMAL_27_ASAN_UBSAN_BOUNDARY_2_PER_MODE_MANAGED_METADATA_1_PASS
-EXECUTABLE_CLOSURE=OFFLINE_FORMAT_BOUNDARY_VERIFIED_HOST_APPLY_NOT_PREPARED
+TARGET_BASELINE=PASSWORD_ONLY_WITH_EXISTING_DATA_AND_CANONICAL_MANIFEST
+TEMPLATE_PRESERVATION=UNTOUCHED_HOST_PROVEN_SYNTHETIC_NO_CONTENT_READ
+PROTECTED_MATERIAL_PRESERVATION=FOUR_BINARIES_UNTOUCHED_MANIFEST_ONLY_REVERSIBLE_PREPARED
+MIGRATION_STRATEGY=C_FIXED_TRANSACTION
+MIGRATION_APPLY=PREPARED_NOT_EXECUTED
+MIGRATION_ROLLBACK=PREPARED_NOT_EXECUTED
+CANDIDATE_PREFLIGHT_POST_MIGRATION=PASS_SYNTHETIC
+CANDIDATE_UNINSTALL_BASELINE_RESTORE=PASS_SYNTHETIC
+OFFLINE_TESTS=PASS
+EXECUTABLE_CLOSURE=OFFLINE_VERIFIED_HUMAN_ROOT_AND_LIVE_PENDING
 HOST_CHANGED=false
 POLKIT_PATCH_INSTALLED=false
 REAL_SENSOR_ACCESS=false
-NEXT_OPERATOR_ACTION=DECIDE_OFFLINE_PREPARATION_OF_MANIFEST_ONLY_REVERSIBLE_MIGRATION
+NEXT_OPERATOR_ACTION=HUMAN_HANDOFF_READ_RECOVERY_CONSOLE_FINAL_PREFLIGHT
 ```
 
-Build candidate normale/sanitizer, sudo/Polkit/private-bus suite completa,
-transaction/migration failure injection e install/uninstall post-migrazione
-non sono stati ripetuti né dichiarati PASS in questo step: il gate precede
-la determinazione della baseline e la creazione dell'apply. Il runtime non è
-modificato. Le prove precedenti restano documentate nel manuale nel loro scope.
-Nessun nuovo D-number, pubblicazione, secret, biometric data o payload host.
+Il singolo handoff operativo è [README.md](README.md). Nessun nuovo D-number,
+nessuna modifica delle policy permanenti, nessun materiale del PC nel payload
+candidate o nel review set pubblico; repository pubblico non toccato.

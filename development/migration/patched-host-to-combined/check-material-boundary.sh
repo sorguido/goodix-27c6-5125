@@ -11,7 +11,15 @@ fixture=$root/development/private-root/analysis/D232/D232_target_material_manife
 # This is the exact manifest pin in the e61fce3 D293 loader, not a host-file hash.
 [[ $(sha256sum "$fixture" | cut -d' ' -f1) == 1b5c3891c99b4ee71d37a69942e08dcf9d3985740958687ac4b0d6eb7ccdcf15 ]]
 work=$(mktemp -d /tmp/goodix-manifest-build.XXXXXX)
-trap 'rm -f -- "$work/normal" "$work/sanitizer"; rmdir -- "$work"' EXIT
+trap 'rm -f -- "$work/normal" "$work/sanitizer" "$work/converted.json"; rmdir -- "$work"' EXIT
+python3 -I -B - "$here" "$fixture" "$work/converted.json" <<'PY'
+import importlib.util, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('manifest', Path(sys.argv[1])/'manifest.py')
+module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+with Path(sys.argv[3]).open('xb') as output:
+    output.write(module.convert(Path(sys.argv[2]).read_bytes()))
+PY
 flatpak run --user --unshare=network --filesystem="$root:ro" --filesystem="$work" \
   --command=bash org.freedesktop.Sdk//25.08 -c '
   set -euo pipefail
@@ -31,7 +39,7 @@ flatpak run --user --unshare=network --filesystem="$root:ro" --filesystem="$work
     # LeakSanitizer cannot inspect threads in this SDK/ptrace environment.
     # Match the existing material suite: ASan/UBSan, no leak-check claim.
     ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
-      timeout 30 "$work/$mode" "$fixture"
+      timeout 30 "$work/$mode" "$fixture" "$work/converted.json"
     printf "MATERIAL_BOUNDARY_%s=PASS\n" "$mode"
   done
   ' bash "$root" "$here" "$fixture" "$work"

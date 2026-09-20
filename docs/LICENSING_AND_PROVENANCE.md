@@ -145,3 +145,23 @@ analysis manifest, whose provenance document excludes PSK/raw OTP/CONFIG90
 and biometric content. It neither reads the installed protected bundle nor
 copies that fixture into the candidate/public source set. No production
 source or material contract is changed by this offline evidence test.
+
+The manifest conversion and fixed host transaction (`manifest.py`, `migration.py`,
+`install.sh`, `uninstall.sh`, `prepare-policy.sh`, and `test_migration.py`) are
+independent GPL-2.0-or-later project code, standard-library-only. The private
+`host-plan.json` contains allowed software hashes and metadata, not binary or
+biometric contents. The conversion projects the already versioned D232 metadata;
+two absent digest fields use the existing C acceptance pins at commit
+`e61fce313794922a2dab156a1b38a8ddc5837f19`, paths
+`libfprint-driver/goodix_target_material.c` and `goodix_runtime_inputs.c`.
+It does not derive new secrets, change the canonical loader or redistribute
+protected files. Full historical manifest remains recoverable on the host only.
+
+Recovery policy reconstruction consumes this project's historical
+`deployment/d293-phase-b-account-lifecycle/goodix_fprint_account_delete.te`
+and `.fc` at `232e9401ca3ce72a0f9f08448deb46c6251aaa2a`, unchanged; existing
+GPL-2.0-or-later project licensing and attribution remain. Source hashes and
+reproduced PP/CIL hashes are pinned by `prepare-policy.sh`. No external code,
+new permanent dependency or candidate licensing boundary is introduced.
+These development-only tools, host plan and historical fixture are excluded
+from the canonical candidate payload; public repository remains untouched.
