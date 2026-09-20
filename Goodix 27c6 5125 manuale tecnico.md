@@ -242,6 +242,18 @@ su bus privato PASS, 18 open/18 close, nessuna riapertura implicita nei tre casi
 owner-loss; build normale completa e build PAM con hardening PASS. Nessun test
 è una nuova autenticazione Polkit/sudo/unlock/login sul sensore.
 
+Preparazione da checkout pulito del commit implementativo
+`82e3ae67b01075fc5509c85bca22647665d9fb39`: candidate locale e managed reali
+create senza installazione. Entrambe superano installazione/rimozione in root
+simulate con ripristino dei file precedenti. Il modulo è byte-identico nei due
+output, SHA-256 `9de3aba169b78298e539df1320f9bb10d64d418b6dd3ece196dcc401f1b7e3c2`.
+La candidate managed contiene 34 file; SBOM verificata: 48 pacchetti, 32 file,
+80 relazioni. Il digest SHA256SUMS della candidate a quel commit è
+`34f6a38853c31eba718bbb8644385087038fa5bda0cae0ed2511c1f21ab294bc`.
+Le successive modifiche di sola documentazione conservano questo live-critical
+set; `prepare` registra comunque il proprio HEAD completo, richiesto dal manager.
+Review PM positiva per il boundary offline; nessuna auto-approvazione live.
+
 Patch locale pronta in `development/patches/polkit-fingerprint/`: `install.sh`,
 `uninstall.sh`, `prepare.sh` e README operativo. Provenance full SHA e hash del
 modulo sono registrati nella preparazione/stato locale. Il README consegna

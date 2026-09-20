@@ -4,6 +4,16 @@
 The supported evidence boundary is Fedora 44 KDE x86_64 with Goodix USB
 `27c6:5125` / APP12509.
 
+Polkit closure at source commit `82e3ae67b01075fc5509c85bca22647665d9fb39`:
+18 PAM tests in normal and ASan/UBSan modes, 7 local transaction tests and
+30 managed transaction tests PASS. Actual daemon handlers on a private bus
+cover ordinary pending Claim, claimed idle and pending Verify owner loss with
+18 synthetic opens/closes. Both real candidates pass mock-filesystem
+install/remove. The bridge is byte-identical between local and managed builds,
+SHA-256 `9de3aba169b78298e539df1320f9bb10d64d418b6dd3ece196dcc401f1b7e3c2`.
+The managed artifact has 34 files; verified SPDX: 48 packages, 32 files and
+80 relationships. These results require no real authentication or device I/O.
+
 The user physically tested the early-login prototype at
 `9671e02e19504e20e0097f598fa960f2c13e7a1e` after cold boot and reported:
 
