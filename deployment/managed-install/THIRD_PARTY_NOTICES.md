@@ -64,3 +64,11 @@ pam_fprintd module in a separate PAM handle. No KDE, Polkit or Linux-PAM source
 expression is incorporated. Their exact versions are recorded as host
 integration dependencies in the SBOM. Corresponding source and build/deployment
 provenance are in `production/polkit/` at the candidate's source commit.
+
+## Sudo conversation bridge
+
+`pam_goodix_sudo.so` is project code under GPL-2.0-or-later. It uses libpam and
+Fedora's stock pam_fprintd in a separate handle. Sudo and Fedora PAM sources were
+read for behavior verification; no third-party expression is copied into this
+bridge. The candidate's ordinary-consumer retry correction retains fprintd's
+GPL-2.0-or-later source license and the existing combined distribution boundary.

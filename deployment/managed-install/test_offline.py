@@ -18,7 +18,7 @@ FILES = (
     "LICENSE", "GPL-2.0-or-later.txt", "LGPL-2.1-or-later.txt",
     "GPL-3.0-or-later.txt", "Apache-2.0.txt", "OpenCV-LICENSES.txt",
     "fprintd", "greeter", "pam_fprintd.so", "99-goodix-login-greeter.conf",
-    "login-source.sha256", "pam_goodix_polkit.so", "polkit-source.sha256", "fprintd-COPYING", "fprintd-AUTHORS",
+    "login-source.sha256", "pam_goodix_sudo.so", "sudo-source.sha256", "pam_goodix_polkit.so", "polkit-source.sha256", "fprintd-COPYING", "fprintd-AUTHORS",
     "production-source.sha256", "fprintd-source.sha256",
     "libfprint-2.so.2.0.0",
     "libgusb.so.2", "libopencv_core.so.413", "libopencv_features2d.so.413",
@@ -62,6 +62,13 @@ class ManagedInstallContract(unittest.TestCase):
         (self.root / "etc/pam.d/system-auth").write_text(
             "auth required pam_env.so\nauth required pam_faildelay.so delay=2000000\n"
             "auth sufficient pam_unix.so nullok\nauth required pam_deny.so\n")
+        spec = importlib.util.spec_from_file_location("sudo_rules", HERE.parent.parent / "production/sudo/rules.py")
+        rules = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(rules)
+        (self.root / "etc/pam.d/sudo").write_bytes(rules.VENDOR)
+        (self.root / "etc/pam.d/sudo-i").write_bytes(rules.LOGIN_VENDOR)
+        (self.root / "etc/sudoers.offline.json").write_text("{}")
+        self.sudo_vendor_bytes = rules.VENDOR
         self.vendor_bytes = self.vendor_pam.read_bytes()
         self.kde_fingerprint_pam = self.root / "etc/pam.d/kde-fingerprint"
         self.kde_fingerprint_pam.parent.mkdir(parents=True, exist_ok=True)
@@ -108,6 +115,7 @@ class ManagedInstallContract(unittest.TestCase):
             "TARGET_OS=Fedora-44-KDE-x86_64\n"
             "PROTECTED_MATERIAL_INCLUDED=false\n"
             "PAM_FILES_INCLUDED=true\n"
+            "SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1\n"
             "POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1\n"
             "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n"
             "KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM\n"
@@ -180,6 +188,7 @@ class ManagedInstallContract(unittest.TestCase):
         self.run_tx("--root-install", self.caller, str(first))
         pam = self.root / "etc/pam.d/polkit-1"
         contents = pam.read_bytes()
+        sudo_pam = (self.root / "etc/pam.d/sudo").read_bytes()
         counter = self.root / "run/polkit/goodix-fingerprint/1000"
         counter.write_text("3"); counter.chmod(0o600)
         module = self.root / "usr/lib64/goodix-27c6-5125/current/pam_goodix_polkit.so"
@@ -189,10 +198,31 @@ class ManagedInstallContract(unittest.TestCase):
         self.run_tx("--root-rollback", self.caller)
         self.assertEqual(module.read_bytes(), (first / "pam_goodix_polkit.so").read_bytes())
         self.assertEqual(pam.read_bytes(), contents)
+        self.assertEqual((self.root / "etc/pam.d/sudo").read_bytes(), sudo_pam)
         self.assertEqual(counter.read_text(), "3")
         self.run_tx("--root-uninstall", self.caller)
         self.assertFalse(pam.exists())
+        self.assertEqual((self.root / "etc/pam.d/sudo").read_bytes(), self.sudo_vendor_bytes)
+        self.assertFalse((self.root / "etc/pam.d/goodix-sudo-fingerprint").exists())
         self.assertFalse(counter.exists())
+
+    def test_pre_sudo_migration_and_selector_drift_are_refused(self):
+        first = self.candidate("a" * 40)
+        self.run_tx("--root-install", self.caller, str(first))
+        state = self.root / "var/lib/goodix-27c6-5125-managed/state"
+        original = state.read_text()
+        state.write_text(original.replace("SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1\n", ""))
+        result = self.run_tx("--root-update", self.caller, str(self.candidate("b" * 40)), check=False)
+        self.assertIn("pre_sudo_install_requires_original_uninstall_then_fresh_install", result.stderr)
+        state.write_text(original)
+        policy = self.root / "etc/sudoers.offline.json"
+        policy.write_text('{"Defaults":[{"Options":[{"pam_login_service":"custom"}]}]}')
+        result = self.run_tx("--status", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("custom sudo PAM selector", result.stderr)
+        self.run_tx("--root-uninstall", self.caller)
+        self.assertEqual((self.root / "etc/pam.d/sudo").read_bytes(), self.sudo_vendor_bytes)
+        self.assertIn("custom", policy.read_text())
 
     def test_polkit_partial_fresh_install_restores_absence(self):
         candidate = self.candidate("a" * 40)

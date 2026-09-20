@@ -29,9 +29,10 @@ That behavior is now integrated into the canonical source/build/managed
 candidate. This promotion is validated offline; the promoted managed candidate
 has not been installed or exercised live as part of this task. Independent
 hardware, full release migration/recovery qualification and publication remain
-separate project boundaries. The clean managed candidate preserves sudo configuration
-but does not establish sudo fingerprint authentication; the development PC uses
-a separate D285 PAM/sudoers path. See [Validation](docs/VALIDATION.md).
+separate project boundaries. The clean managed candidate now owns service-local
+sudo/sudo-i and Polkit fingerprint paths, validated offline and awaiting native
+live acceptance. It uses no D285 dependency or global fingerprint change; the
+development PC still uses its separate, untouched D285 PAM/sudoers path. See [Validation](docs/VALIDATION.md).
 
 If you encounter a reproducible problem, please open a GitHub issue with the
 software version/commit, Fedora version, hardware identity, command used and

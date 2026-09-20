@@ -4,7 +4,17 @@
 The supported evidence boundary is Fedora 44 KDE x86_64 with Goodix USB
 `27c6:5125` / APP12509.
 
-Polkit closure at source commit `82e3ae67b01075fc5509c85bca22647665d9fb39`:
+Current combined sudo/Polkit offline closure: 18 Polkit PAM tests, 15 sudo PAM
+tests and 3 concurrent PAM/budget tests, each normal plus ASan/UBSan; 13 combined
+local deployment tests and 31 managed transaction tests. The complete driver,
+prepared-login and greeter regression suite passes in normal/sanitized builds.
+The real daemon's private-bus test covers all 12 ordered consumer pairs and
+ordinary retry errors: 31 synthetic opens/closes, no extra acquisition and
+nominal owner-loss cleanup. Password verification leaves/device I/O are simulated;
+native applications, SELinux execution and target cleanup still require the
+operator handoff in `deployment/managed-install/AUTHENTICATION-LIVE.md`.
+
+Previous Polkit-only closure at source commit `82e3ae67b01075fc5509c85bca22647665d9fb39`:
 18 PAM tests in normal and ASan/UBSan modes, 7 local transaction tests and
 30 managed transaction tests PASS. Actual daemon handlers on a private bus
 cover ordinary pending Claim, claimed idle and pending Verify owner loss with
@@ -35,10 +45,10 @@ recovery across the complete release path and independent hardware remain open.
 
 The user's current observation on 20 September 2026 confirms sudo fingerprint
 PASS on the development PC through D285's `pam_service=goodix-d285-01-sudo`.
-This is current host evidence. It does not qualify a clean managed install:
-that installer supplies neither this selector/service nor global fingerprint.
-Clean candidate sudo fingerprint remains a release integration gap; ordinary
-sudo configuration is preserved.
+This is current host evidence and remains separate from clean-candidate evidence.
+The current installer now establishes its own sudo/sudo-i service integration,
+without a sudoers selector, D285 dependency or global fingerprint. That closes
+the former implementation gap offline; real candidate sudo validation is pending.
 
 Polkit now has an independently implemented service-local PAM conversation
 bridge and reversible local/managed deployment. Password-first submission,

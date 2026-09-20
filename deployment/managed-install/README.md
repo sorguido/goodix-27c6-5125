@@ -41,21 +41,24 @@ files, tmpfiles entry and narrow socket-helper drop-in; it enables no global
 authselect feature. See `production/polkit/README.md` for supported versions,
 file ownership, cancellation semantics and counter lifetime.
 
-The clean candidate does **not** establish sudo fingerprint support. The earlier
-unconditional claim relied on the development PC's separate D285 PAM/sudoers
-integration and is corrected. The installer preserves existing sudo behavior;
-a clean candidate-owned sudo fingerprint path remains a release gap.
+The clean candidate now establishes service-local sudo and sudo-i fingerprint
+support, qualified offline and pending live validation. It uses a password-first
+native prompt, explicit fingerprint choices, at most three per invocation and an
+8-second overall ceiling per choice. It does not depend on D285 or modify
+system-auth/authselect/sudoers. See `production/sudo/README.md` and the operator
+handoff `AUTHENTICATION-LIVE.md`. Existing development overlays are refused.
 
-Managed releases without `POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1`
+Managed releases without either `POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1`
+or `SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1`
 require uninstall using their original manager, then a fresh install. New
 versions with this integration keep the same host rules and pair the bridge
 binary through `current`; update and rollback preserve the attempt counters.
 Uninstall restores original Polkit PAM presence and removes the new files.
 
 The complete candidate includes libfprint, the paired fprintd/PAM extension,
-greeter parent/drop-in, login/KScreenLocker/Polkit PAM integrations and account-delete protection.
+greeter parent/drop-in, login/KScreenLocker/Polkit/sudo PAM integrations and account-delete protection.
 Prepared login permits up to three explicit physical attempts (8 s each),
-stopping on MATCH, error/timeout, or the third NO MATCH before password fallback; ordinary sudo/KScreenLocker retain their existing paths. Runtime
+stopping on MATCH, error/timeout, or the third NO MATCH before password fallback; sudo uses its separate explicit-choice bridge and KScreenLocker retains its qualified service path. Runtime
 versions switch together on update/rollback. The greeter integration applies
 on its next normal startup; the manager never restarts Plasma.
 
@@ -63,7 +66,7 @@ Pre-early-login releases require uninstall followed by a fresh install, with
 materials/templates preserved. Development overlays and custom unit overrides
 are rejected. See the installation guide for exact prerequisites and recovery.
 
-An existing managed installation with the same three-attempt PAM rule uses
+An existing combined managed installation with both integration fields and the same host rules uses
 `prepare` then `update`; `rollback` restores its previous complete candidate.
 A previous one-attempt managed installation must first be uninstalled using
 its original version of `manage.sh`, then freshly installed with this version.

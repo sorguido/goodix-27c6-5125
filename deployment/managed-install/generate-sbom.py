@@ -17,6 +17,17 @@ import tempfile
 
 SHIPPED_COMPONENTS = (
     {
+        "SPDXID": "SPDXRef-Package-Goodix-sudo-pam",
+        "name": "pam-goodix-sudo-conversation",
+        "versionInfo": "1",
+        "downloadLocation": "NOASSERTION",
+        "filesAnalyzed": False,
+        "licenseConcluded": "GPL-2.0-or-later",
+        "licenseDeclared": "GPL-2.0-or-later",
+        "copyrightText": "Goodix 27c6:5125 project contributors",
+        "sourceInfo": "production/sudo/pam_goodix_sudo.c; independent password-first PAM bridge.",
+    },
+    {
         "SPDXID": "SPDXRef-Package-Goodix-polkit-pam",
         "name": "pam-goodix-polkit-conversation",
         "versionInfo": "1",
@@ -51,7 +62,7 @@ SHIPPED_COMPONENTS = (
         "licenseConcluded": "GPL-3.0-or-later",
         "licenseDeclared": "GPL-2.0-or-later",
         "copyrightText": "See fprintd-AUTHORS and corresponding source notices",
-        "sourceInfo": "reference/fprintd-fedora44-1.94.5/source + production/login/fprintd.patch + fprintd-cleanup.patch + fprintd-attempts.patch; daemon and PAM module, paired with the GPL-3.0-or-later libfprint combined work.",
+        "sourceInfo": "reference/fprintd-fedora44-1.94.5/source + production/login/fprintd.patch + fprintd-cleanup.patch + fprintd-attempts.patch + fprintd-consumer-retry.patch; daemon and PAM module, paired with the GPL-3.0-or-later libfprint combined work.",
     },
     {
         "SPDXID": "SPDXRef-Package-Goodix-greeter",
@@ -109,6 +120,7 @@ SHIPPED_COMPONENTS = (
 )
 
 INTEGRATION_PACKAGES = (
+    "sudo",
     "polkit",
     "polkit-kde",
     "fprintd",
@@ -196,7 +208,7 @@ def dynamic_package_paths(candidate: pathlib.Path) -> set[pathlib.Path]:
     with tempfile.TemporaryDirectory(prefix="goodix-sbom-") as directory:
         (pathlib.Path(directory) / "libfprint-2.so.2").symlink_to(candidate / "libfprint-2.so.2.0.0")
         env = os.environ | {"LD_LIBRARY_PATH": f"{directory}:{candidate}"}
-        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "pam_fprintd.so", candidate / "pam_goodix_polkit.so"]):
+        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "pam_fprintd.so", candidate / "pam_goodix_polkit.so", candidate / "pam_goodix_sudo.so"]):
             for line in run("ldd", str(binary), env=env).splitlines():
                 match = re.search(r"=>\s+(/\S+)\s+\(", line)
                 if not match and line.lstrip().startswith("/"):

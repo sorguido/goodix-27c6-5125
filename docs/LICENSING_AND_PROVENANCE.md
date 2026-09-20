@@ -113,3 +113,17 @@ Polkit 127, Linux-PAM 1.7.2 and the exact Fedora KDE source RPM is documented in
 `production/polkit/README.md`; it is behavioral reference, not imported source.
 The managed SBOM identifies the bridge separately and records host Polkit/KDE/PAM
 dependencies. The existing combined libfprint licensing boundary is unchanged.
+
+## Combined sudo/Polkit boundary (20 September 2026)
+
+New `production/sudo/` source, build, rules and offline tests are independent
+project GPL-2.0-or-later code; the sudo bridge reuses project-owned child/PAM
+patterns from the Polkit bridge with a separate native-conversation design.
+No sudo, KDE or Linux-PAM expression is incorporated. Exact Fedora sudo/PAM
+SRPM versions, source digests and reviewed functions are recorded in
+`production/sudo/README.md`. They are reference evidence, not shipped payload.
+`production/login/fprintd-consumer-retry.patch` changes the already pinned
+fprintd `src/device.c` retry condition for ordinary Verify/Identify; existing
+GPL-2.0-or-later copyright/license and combined GPL-3.0-or-later boundary remain.
+SBOM adds the sudo bridge and records the host sudo dependency. Firmware,
+protected material and biometric templates are not part of these artifacts.

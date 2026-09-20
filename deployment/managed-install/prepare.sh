@@ -39,6 +39,9 @@ done
 for component in fprintd greeter; do
   install -m 0755 "$build/$component" "$candidate/$component"
 done
+"$root/production/sudo/build.sh" "$build/sudo"
+install -m 0644 "$build/sudo/pam_goodix_sudo.so" "$candidate/pam_goodix_sudo.so"
+install -m 0644 "$root/production/sudo/source.sha256" "$candidate/sudo-source.sha256"
 "$root/production/polkit/build.sh" "$build/polkit"
 install -m 0644 "$build/polkit/pam_goodix_polkit.so" "$candidate/pam_goodix_polkit.so"
 install -m 0644 "$root/production/polkit/source.sha256" "$candidate/polkit-source.sha256"
@@ -81,6 +84,7 @@ printf '%s\n' \
   'TARGET_OS=Fedora-44-KDE-x86_64' \
   'PROTECTED_MATERIAL_INCLUDED=false' \
   'PAM_FILES_INCLUDED=true' \
+  'SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1' \
   'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1' \
   'PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR' \
   'KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM' \

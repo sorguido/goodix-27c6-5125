@@ -108,14 +108,18 @@ The spec has no downstream patch directives. KDE retries failed conversations
 and can recreate a session on identity selection, which does not advance its
 retry counter. Hence a per-PAM `max-tries` is insufficient by itself.
 
-## Clean candidate sudo boundary
+## Combined candidate boundary
 
-The managed installer does not establish a sudo fingerprint PAM service or
-sudoers selector and intentionally does not enable global authselect fingerprint.
-There is no deterministic prerequisite in the clean supported starting state
-that supplies sudo fingerprint. The unconditional support/acceptance claim is
-therefore removed. Candidate installation preserves the host's sudo path;
-fingerprint support for a clean candidate remains an explicit release gap.
-The development PC's current user-reported sudo PASS uses the separate D285
-service/selector and is valid current evidence for that PC. It is not an
-implicit prerequisite or qualification of this candidate.
+The clean managed candidate also owns service-local sudo/sudo-i authentication;
+see `production/sudo/README.md`. Its password-only system-auth baseline remains
+unchanged. The Polkit C bridge/counter design does not require modification.
+The shared deploy transaction adds sudo ownership in managed schema 2 and fixes
+recovery after an interrupted removal has already deleted a parent directory.
+Managed pre-sudo states require their original uninstall before a fresh install.
+The standalone local Polkit patch stays schema 1 and does not alter sudo.
+
+The candidate daemon now makes ordinary consumer retry errors terminal too.
+Independent PAM tests and real-daemon private-bus tests cover budget separation,
+BUSY, owner cancellation and no implicit reopen. The development PC's D285 path
+remains untouched and is not a candidate prerequisite. The local Polkit patch
+remains uninstalled. Follow the combined operator handoff for the later live gate.

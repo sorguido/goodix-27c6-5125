@@ -35,7 +35,8 @@ static void fake_verify (FpDevice *d, FpPrint *p, GCancellable *c,
                          GAsyncReadyCallback done_cb, gpointer u)
 {
   GTask *t = g_task_new (d, c, done_cb, u);
-  verifies++; cb (d, verify_outcome == 1 ? p : NULL, NULL, md, NULL);
+  verifies++;
+  if (verify_outcome >= 0) cb (d, verify_outcome == 1 ? p : NULL, NULL, md, NULL);
   if (destroy) destroy (md);
   if (hold_verify) { pending_verify = t; return; }
   if (verify_outcome < 0)
@@ -386,6 +387,66 @@ int main (int argc, char **argv)
       client = connection (g_test_dbus_get_bus_address (bus));
     }
   g_test_message ("POLKIT_OWNER_LOSS=PASS ordinary_claim_pending_idle_verify no_hidden_reopen=1");
+
+  /* All ordered consumer pairs: sudo/Polkit/KScreenLocker use Claim; login
+   * uses PrepareLogin + ClaimLogin. A denied peer cannot stop/steal the owner. */
+  const char *consumers[] = {"sudo", "polkit", "kscreenlocker", "login"};
+  for (guint owner = 0; owner < 4; owner++)
+    for (guint peer = 0; peer < 4; peer++)
+      {
+        if (owner == peer) continue;
+        guint initial_opens = opens, initial_verifies = verifies;
+        hold_open = FALSE; hold_verify = TRUE; verify_outcome = 0;
+        if (owner == 3)
+          {
+            guint initial_prepares = prepares;
+            request (client, server, "PrepareLogin", NULL);
+            while (prepares == initial_prepares) g_main_context_iteration (NULL, TRUE);
+            g_signal_emit_by_name (d, "goodix-login-prepared", TRUE, "offline ready");
+            iterate_until (&done); g_assert_no_error (call_error);
+          }
+        request (client, server, owner == 3 ? "ClaimLogin" : "Claim", g_variant_new ("(s)", "offline"));
+        iterate_until (&done); g_assert_no_error (call_error);
+        request (client, server, "VerifyStart", g_variant_new ("(s)", "right-index-finger"));
+        iterate_until (&done); g_assert_no_error (call_error); g_assert_nonnull (pending_verify);
+        GDBusConnection *other = connection (g_test_dbus_get_bus_address (bus));
+        request (other, server, peer == 3 ? "ClaimLogin" : "Claim", g_variant_new ("(s)", "offline"));
+        iterate_until (&done); g_assert_nonnull (call_error);
+        request (other, server, "VerifyStop", NULL);
+        iterate_until (&done); g_assert_nonnull (call_error);
+        g_dbus_connection_close_sync (other, NULL, NULL); g_object_unref (other);
+        end = g_get_monotonic_time () + 20000;
+        while (g_get_monotonic_time () < end) { g_main_context_iteration (NULL, FALSE); g_usleep (1000); }
+        g_assert_nonnull (pending_verify);
+        g_assert_false (g_cancellable_is_cancelled (g_task_get_cancellable (pending_verify)));
+        g_assert_cmpuint (opens, ==, initial_opens + 1);
+        g_assert_cmpuint (verifies, ==, initial_verifies + 1);
+        g_idle_add (finish_cancelled, NULL);
+        g_dbus_connection_close_sync (client, NULL, NULL);
+        end = g_get_monotonic_time () + 2000000;
+        while ((opened || priv->_session || priv->current_cancellable) && g_get_monotonic_time () < end)
+          { g_main_context_iteration (NULL, FALSE); g_usleep (1000); }
+        g_assert_false (opened); g_assert_null (priv->_session);
+        g_assert_null (priv->current_cancellable); g_assert_cmpint (priv->current_action, ==, ACTION_NONE);
+        g_assert_cmpuint (opens, ==, closes);
+        g_assert_cmpuint (verifies, ==, initial_verifies + 1);
+        g_object_unref (client); client = connection (g_test_dbus_get_bus_address (bus));
+        g_test_message ("CROSS_CONSUMER owner=%s blocked=%s busy_no_reopen=1 owner_loss_cleanup=1", consumers[owner], consumers[peer]);
+      }
+  /* Ordinary consumer retry errors must not trigger another device action. */
+  hold_verify = FALSE; verify_outcome = -2;
+  guint initial_verifies = verifies;
+  request (client, server, "Claim", g_variant_new ("(s)", "offline"));
+  iterate_until (&done); g_assert_no_error (call_error);
+  g_test_expect_message (NULL, G_LOG_LEVEL_WARNING, "*Device reported an error during verify*");
+  request (client, server, "VerifyStart", g_variant_new ("(s)", "right-index-finger"));
+  iterate_until (&done); g_assert_no_error (call_error);
+  while (priv->current_cancellable) g_main_context_iteration (NULL, TRUE);
+  g_test_assert_expected_messages ();
+  g_assert_cmpuint (verifies, ==, initial_verifies + 1);
+  request (client, server, "Release", NULL); iterate_until (&done); g_assert_no_error (call_error);
+  g_assert_cmpuint (opens, ==, closes);
+  g_test_message ("ORDINARY_RETRY_ERROR_TERMINAL=PASS additional_action=0");
 
   g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (rdev));
   g_object_unref (rdev); g_object_unref (d);

@@ -1,5 +1,12 @@
 # Patch locale Polkit/Discover
 
+Current handoff: the local patch is **not installed** and remains uninstalled
+during the combined sudo/Polkit closure. Do not use the installation below to
+validate clean-candidate sudo; follow
+`deployment/managed-install/AUTHENTICATION-LIVE.md` and its D285 migration gate.
+The standalone lifecycle remains available for its original, separate scope.
+
+
 **HUMAN_REQUIRED — preparata offline, da installare e provare dall'Utente.**
 Scopo: impronta nel dialogo KDE/Polkit, con password subito utilizzabile e
 massimo tre scelte esplicite d'impronta. La patch usa il daemon già attivo sul

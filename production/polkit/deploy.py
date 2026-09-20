@@ -13,6 +13,12 @@ import re
 import stat
 import subprocess
 import sys
+import importlib.util
+from types import SimpleNamespace
+
+_spec = importlib.util.spec_from_file_location("sudo_rules", Path(__file__).resolve().parents[1] / "sudo/rules.py")
+sudo = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(sudo)
 
 ROOT = Path(os.environ.get("GOODIX_MANAGED_TEST_ROOT", "/"))
 TEST = ROOT != Path("/")
@@ -50,6 +56,8 @@ def regular(name, mode=0o644):
     require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == mode,
             f"file type/mode drift: {name}")
     require(TEST or (info.st_uid, info.st_gid) == (0, 0), f"file ownership drift: {name}")
+    if not TEST:
+        require(set(os.listxattr(path)) <= {"security.selinux"}, f"custom file attributes: {name}")
     return path.read_bytes()
 
 
@@ -58,11 +66,12 @@ def run(*args):
         subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def parents(name, created=None):
+def parents(name, created=None, missing_ok=False):
     for path in reversed(list(p(name).parents)[:-1]):
         if not path.is_relative_to(ROOT):
             continue
         if not path.exists() and not path.is_symlink():
+            if missing_ok: continue
             require(created is not None, f"missing directory: {path}")
             path.mkdir(mode=0o755)
             path.chmod(0o755)
@@ -88,18 +97,25 @@ def atomic(name, data, mode=0o644):
         if temporary.exists(): temporary.unlink()
 
 
-def no_helpers():
+def no_helpers(kind="local"):
+    ancestors = set()
+    pid = os.getpid()
+    while pid > 1:
+        ancestors.add(str(pid))
+        try: pid = int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[1])
+        except FileNotFoundError: break
     if TEST: return
     for proc in Path("/proc").glob("[0-9]*/exe"):
         try:
             executable = os.readlink(proc)
         except FileNotFoundError:
             continue
-        require(executable != "/usr/lib/polkit-1/polkit-agent-helper-1",
+        require(executable != "/usr/lib/polkit-1/polkit-agent-helper-1" and
+                not (kind == "managed" and executable == "/usr/bin/sudo" and proc.parent.name not in ancestors),
                 "close authentication dialogs before install/uninstall")
 
 
-def baseline():
+def baseline(kind="local"):
     parents(VENDOR)
     require(regular(VENDOR) == VENDOR_BYTES, "unsupported/drifted vendor polkit PAM")
     for directory in ("/etc/pam.d", "/usr/lib/pam.d"):
@@ -135,28 +151,35 @@ def baseline():
         # adding SELinux grants. Socket mode additionally needs ReadWritePaths.
         label = subprocess.check_output(["matchpathcon", "-n", GUARD], text=True)
         require(":policykit_var_run_t:" in label, "unsupported SELinux runtime label")
-    return digest(system.read_bytes())
+    extra = sudo.baseline(SimpleNamespace(p=p, regular=regular, require=require, digest=digest, TEST=TEST)) if kind == "managed" else ""
+    return digest(system.read_bytes() + extra.encode())
 
 
 def payload(kind):
     module = LOCAL if kind == "local" else MANAGED
     prefix = ("auth required pam_env.so\nauth required pam_faildelay.so delay=2000000\n"
               f"auth [success=done ignore=ignore open_err=ignore symbol_err=ignore module_unknown=ignore default=die] {module}\n").encode()
-    return {
+    result = {
         PAM: VENDOR_BYTES.replace(b"auth       include", prefix + b"auth       include", 1),
         LEAF: b"#%PAM-1.0\nauth required /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45\n",
         TMPFILES: f"d {GUARD} 0700 root root -\n".encode(),
         DROPIN: f"[Service]\nReadWritePaths={GUARD}\n".encode(),
     }
 
+    if kind == "managed": result.update(sudo.payload())
+    return result
 
 def preflight(kind):
     require(kind in ("local", "managed"), "invalid deployment kind")
-    system_auth = baseline()
-    no_helpers()
+    system_auth = baseline(kind)
+    no_helpers(kind)
     if p(PAM).exists() or p(PAM).is_symlink():
         require(regular(PAM) == VENDOR_BYTES, "custom Polkit override: preserve and review")
-    for name in set(FILES) - {PAM} | {GUARD, STATE} | ({LOCAL} if kind == "local" else set()):
+        run("matchpathcon", "-V", str(p(PAM)))
+    if kind == "managed":
+        require(regular(sudo.PAM) == sudo.VENDOR, "custom sudo PAM: original owner rollback required")
+        run("matchpathcon", "-V", str(p(sudo.PAM)))
+    for name in set(payload(kind)) - {PAM, sudo.PAM} | {GUARD, STATE} | ({LOCAL} if kind == "local" else set()):
         require(not p(name).exists() and not p(name).is_symlink(), f"Polkit path collision: {name}")
     return system_auth
 
@@ -167,8 +190,8 @@ def load():
     require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700,
             "Polkit state directory drift")
     data = json.loads(regular(STATE + "/state.json", 0o600))
-    require(data["kind"] in ("local", "managed") and data["schema"] == 1, "unsupported Polkit state")
-    require(set(data["hashes"]) == set(FILES) | ({LOCAL} if data["kind"] == "local" else set()),
+    require(data["kind"] in ("local", "managed") and data["schema"] == (2 if data["kind"] == "managed" else 1), "unsupported Polkit state")
+    require(set(data["hashes"]) == set(payload(data["kind"])) | ({LOCAL} if data["kind"] == "local" else set()),
             "Polkit state file set drift")
     return data
 
@@ -177,7 +200,8 @@ def verify(kind, recovery=False):
     data = load()
     require(data["kind"] == kind, "local/managed Polkit deployment collision")
     if not recovery:
-        require(data["system_auth"] == baseline(), "system-auth changed since Polkit installation")
+        no_helpers(kind)
+        require(data["system_auth"] == baseline(kind), "system-auth changed since Polkit installation")
         require(all(data["hashes"][name] == digest(contents) for name, contents in payload(kind).items()),
                 "Polkit host rules changed: original uninstall then fresh install required")
         info = p(GUARD).lstat()
@@ -185,11 +209,12 @@ def verify(kind, recovery=False):
                 (TEST or (info.st_uid, info.st_gid) == (0, 0)), "Polkit runtime directory drift")
         run("matchpathcon", "-V", str(p(GUARD)))
     for name, expected in data["hashes"].items():
-        parents(name)
         path = p(name)
+        parents(name, missing_ok=recovery)
         if recovery and not path.exists() and not path.is_symlink(): continue
         contents = regular(name)
         if recovery and name == PAM and data["pam_existed"] and contents == VENDOR_BYTES: continue
+        if recovery and name == sudo.PAM and contents == sudo.VENDOR: continue
         require(digest(contents) == expected, f"owned Polkit file drift: {name}")
     return data
 
@@ -198,14 +223,15 @@ def uninstall(kind):
     if not p(STATE).exists() and not p(STATE).is_symlink():
         print("POLKIT_UNINSTALL=ALREADY_ABSENT")
         return
-    no_helpers()
+    no_helpers(kind)
     data = verify(kind, recovery=True)
+    if kind == "managed": atomic(sudo.PAM, sudo.VENDOR)
     # Remove the entry point first; tolerate an interrupted earlier removal.
     if data["pam_existed"]:
         atomic(PAM, VENDOR_BYTES)
     elif p(PAM).exists(): p(PAM).unlink()
     for name in data["hashes"]:
-        if name != PAM and p(name).exists(): p(name).unlink()
+        if name not in (PAM, sudo.PAM) and p(name).exists(): p(name).unlink()
     run("systemctl", "daemon-reload")
     if p(GUARD).exists():
         info = p(GUARD).lstat()
@@ -249,7 +275,7 @@ def install(kind, module=None):
         source_commit = match.group(1)
     existed = p(PAM).exists() or p(PAM).is_symlink()
     if existed: require(regular(PAM) == VENDOR_BYTES, "custom Polkit override: preserve and review")
-    for name in set(files) - {PAM} | {GUARD, STATE}:
+    for name in set(files) - {PAM, sudo.PAM} | {GUARD, STATE}:
         require(not p(name).exists() and not p(name).is_symlink(), f"Polkit path collision: {name}")
     # Every missing directory is recorded before installing any PAM content.
     directories = []
@@ -257,7 +283,7 @@ def install(kind, module=None):
         for name in (*files, GUARD, STATE + "/state.json"):
             parents(name, directories)
         p(STATE).chmod(0o700)
-        data = dict(schema=1, kind=kind, source_commit=source_commit, system_auth=system_auth, pam_existed=existed,
+        data = dict(schema=2 if kind == "managed" else 1, kind=kind, source_commit=source_commit, system_auth=system_auth, pam_existed=existed,
                     hashes={name: digest(contents) for name, contents in files.items()},
                     directories=[name for name in directories if name != STATE])
         atomic(STATE + "/state.json", json.dumps(data, sort_keys=True).encode(), 0o600)
@@ -270,9 +296,11 @@ def install(kind, module=None):
         # Library precedes leaf; public service is enabled only after tmpfiles.
         for name in (*([LOCAL] if kind == "local" else []), LEAF, TMPFILES, DROPIN):
             atomic(name, files[name])
+        if kind == "managed": atomic(sudo.LEAF, files[sudo.LEAF])
         p(GUARD).mkdir(mode=0o700)
         run("restorecon", "-RF", str(p("/run/polkit")))
         run("systemctl", "daemon-reload")
+        if kind == "managed": atomic(sudo.PAM, files[sudo.PAM])
         atomic(PAM, files[PAM])
         verify(kind)
     except Exception:

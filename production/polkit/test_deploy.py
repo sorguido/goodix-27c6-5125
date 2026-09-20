@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import json
+import subprocess
 from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
@@ -26,6 +28,9 @@ class Deployment(unittest.TestCase):
         d.p("/etc/pam.d/system-auth").write_text(
             "auth required pam_env.so\nauth required pam_faildelay.so delay=2000000\n"
             "auth sufficient pam_unix.so nullok\nauth required pam_deny.so\n")
+        d.p(d.sudo.PAM).write_bytes(d.sudo.VENDOR)
+        d.p(d.sudo.LOGIN).write_bytes(d.sudo.LOGIN_VENDOR)
+        d.p("/etc/sudoers.offline.json").write_text("{}")
         self.module = self.root / "candidate.so"
         self.module.write_bytes(b"\x7fELFoffline-only-fixture")
         (self.root / "PROVENANCE").write_text("SOURCE_COMMIT=" + "a" * 40 + "\nPURPOSE=POLKIT_INTERRUPTIBLE_SERVICE_LOCAL_V1\n")
@@ -82,6 +87,66 @@ class Deployment(unittest.TestCase):
             with self.assertRaises(RuntimeError): d.install("local", self.module)
         self.assertEqual(before, self.snapshot())
         self.assertFalse(d.p(d.STATE).exists())
+
+    def test_interrupted_uninstall_missing_parent_resumes(self):
+        before = self.snapshot()
+        d.install("local", self.module)
+        d.p(d.LOCAL).unlink()
+        d.p(d.LOCAL).parent.rmdir()
+        d.uninstall("local")
+        self.assertEqual(before, self.snapshot())
+
+    def test_combined_second_service_failure_restores_both(self):
+        before = self.snapshot()
+        original = d.atomic
+        def fail(name, data, *args):
+            if name == d.PAM and data != d.VENDOR_BYTES:
+                raise RuntimeError("injected final Polkit enable failure")
+            return original(name, data, *args)
+        with patch.object(d, "atomic", side_effect=fail):
+            with self.assertRaises(RuntimeError): d.install("managed")
+        self.assertEqual(before, self.snapshot())
+
+    def test_missing_owned_file_with_symlink_parent_is_not_recovery(self):
+        d.install("local", self.module)
+        d.p(d.LOCAL).unlink()
+        d.p(d.LOCAL).parent.rmdir()
+        outside = self.root / "unowned"
+        outside.mkdir()
+        d.p(d.LOCAL).parent.symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(RuntimeError): d.uninstall("local")
+        self.assertTrue(d.p(d.PAM).exists())
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_sudo_selectors_custom_pam_login_and_rpmnew_refused(self):
+        cases = ((d.sudo.PAM, b"custom"), (d.sudo.LOGIN, b"custom"),
+                 (d.sudo.PAM + ".rpmnew", b"new"),
+                 ("/etc/sudoers.offline.json", b'{"Defaults":[{"Binding":[{"username":"anyone"}],"Options":[{"pam_service":"goodix-d285-01-sudo"}]}]}'))
+        for name, contents in cases:
+            path = d.p(name); old = path.read_bytes() if path.exists() else None
+            path.write_bytes(contents)
+            before = self.snapshot()
+            with self.assertRaises(RuntimeError): d.install("managed")
+            self.assertEqual(before, self.snapshot())
+            if old is None: path.unlink()
+            else: path.write_bytes(old)
+
+    def test_real_sudoers_parser_expands_scoped_includes(self):
+        included = self.root / "included-sudoers"
+        policy = self.root / "sudoers-fixture"
+        policy.write_text(f"@include {included}\nALL ALL=(ALL) ALL\n")
+        for option in ("pam_service", "pam_login_service", "pam_askpass_service"):
+            included.write_text(f'Defaults:offline_user {option}="custom"\n')
+            parsed = json.loads(subprocess.check_output(
+                ["/usr/bin/cvtsudoers", "-c", "/dev/null", "-f", "json", str(policy)]))
+            with self.assertRaises(RuntimeError): d.sudo.selectors(parsed)
+
+    def test_nss_local_boundary_case_spacing_and_continuation(self):
+        for text in ("hosts: files dns\n", "sudoers:files\n", " SUDOERS: FILES # local\n"):
+            self.assertTrue(d.sudo.local_nss(text))
+        for text in ("sudoers:files sss\n", "SUDOERS:ldap\n", "sudoers:\n",
+                     "sudoers:files\nsudoers:files\n", "sudoers\\\n: sss\n"):
+            self.assertFalse(d.sudo.local_nss(text))
 
     def test_owned_file_drift_preserved_and_mode_collision(self):
         d.install("local", self.module)

@@ -40,7 +40,7 @@ required_candidate=(
   MANIFEST SHA256SUMS SBOM.spdx.json THIRD_PARTY_NOTICES.md LICENSE
   GPL-2.0-or-later.txt LGPL-2.1-or-later.txt GPL-3.0-or-later.txt
   Apache-2.0.txt OpenCV-LICENSES.txt
-  fprintd greeter pam_fprintd.so pam_goodix_polkit.so polkit-source.sha256 99-goodix-login-greeter.conf login-source.sha256
+  fprintd greeter pam_fprintd.so pam_goodix_polkit.so pam_goodix_sudo.so sudo-source.sha256 polkit-source.sha256 99-goodix-login-greeter.conf login-source.sha256
   fprintd-COPYING fprintd-AUTHORS production-source.sha256 fprintd-source.sha256
   libfprint-2.so.2.0.0 libgusb.so.2
   libopencv_core.so.413 libopencv_features2d.so.413 libopencv_flann.so.413
@@ -128,6 +128,7 @@ verify_candidate() {
   [[ $(manifest_value "$candidate" FAR_FRR_CLAIM) == NOT_MADE ]] || fail far_frr_claim_invalid
   commit=$(manifest_value "$candidate" SOURCE_COMMIT) || fail candidate_commit_missing
   is_commit "$commit" || fail candidate_commit_invalid
+  [[ $(manifest_value "$candidate" SUDO_INTEGRATION) == PASSWORD_FIRST_SERVICE_LOCAL_V1 ]] || fail sudo_integration_missing
   [[ $(manifest_value "$candidate" POLKIT_INTEGRATION) == INTERRUPTIBLE_SERVICE_LOCAL_V1 ]] || fail polkit_integration_missing
   verify_repo_provenance "$commit"
   printf '%s\n' "$commit"
@@ -169,11 +170,11 @@ install_runtime_tree() {
     install -m 0644 -- "$candidate/$library" "$destination/$library"
   done
   install -m 0755 "$candidate/fprintd" "$candidate/greeter" "$destination/"
-  install -m 0644 "$candidate/pam_fprintd.so" "$candidate/pam_goodix_polkit.so" "$destination/"
+  install -m 0644 "$candidate/pam_fprintd.so" "$candidate/pam_goodix_polkit.so" "$candidate/pam_goodix_sudo.so" "$destination/"
   host_action restorecon -RF "$destination"
   host_action chcon --reference=/usr/libexec/fprintd "$destination/fprintd"
   host_action chcon --reference=/usr/libexec/plasma-login-greeter "$destination/greeter"
-  host_action chcon --reference=/usr/lib64/security/pam_fprintd.so "$destination/pam_fprintd.so" "$destination/pam_goodix_polkit.so"
+  host_action chcon --reference=/usr/lib64/security/pam_fprintd.so "$destination/pam_fprintd.so" "$destination/pam_goodix_polkit.so" "$destination/pam_goodix_sudo.so"
   if [[ -n $test_root && ${GOODIX_MANAGED_TEST_FAIL_AFTER_LOGIN_RUNTIME:-false} == true ]]; then
     fail injected_failure_after_login_runtime
   fi
@@ -185,8 +186,8 @@ verify_runtime_layout() {
   [[ -d $directory && ! -L $directory ]] || fail runtime_directory_invalid
   [[ $(readlink "$directory/libfprint-2.so.2") == libfprint-2.so.2.0.0 && \
      $(readlink "$directory/libfprint-2.so") == libfprint-2.so.2 ]] || fail runtime_symlink_drift
-  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 12 ]] || fail runtime_file_set_drift
-  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter pam_fprintd.so pam_goodix_polkit.so; do
+  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 13 ]] || fail runtime_file_set_drift
+  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter pam_fprintd.so pam_goodix_polkit.so pam_goodix_sudo.so; do
     [[ -f $directory/$file && ! -L $directory/$file ]] || fail runtime_file_invalid
     mode=644
     [[ $file != fprintd && $file != greeter ]] || mode=755
@@ -440,6 +441,7 @@ write_state() {
   local current_kde_pam=${11} previous_kde_pam=${12} kde_vendor_sha=${13} kde_override_sha=${14}
   local pending=$state.pending.$$
   {
+    echo SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1
     echo POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1
     echo GOODIX_MANAGED_STATUS=ACTIVE
     echo GOODIX_MANAGED_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
@@ -494,6 +496,8 @@ verify_active() {
   local allow_vendor_drift=${2:-false}
   [[ -f $state && ! -L $state ]] || fail state_missing
   [[ $(state_value GOODIX_MANAGED_STATUS) == ACTIVE ]] || fail state_inactive
+  [[ $(state_value SUDO_INTEGRATION || true) == PASSWORD_FIRST_SERVICE_LOCAL_V1 ]] ||
+    fail pre_sudo_install_requires_original_uninstall_then_fresh_install
   [[ $(state_value POLKIT_INTEGRATION || true) == INTERRUPTIBLE_SERVICE_LOCAL_V1 ]] ||
     fail pre_polkit_install_requires_original_uninstall_then_fresh_install
   if [[ $allow_vendor_drift != true ]]; then polkit_deploy verify managed; fi
@@ -1004,7 +1008,7 @@ case ${1:-} in
     printf '%s\n' 'GOODIX_MANAGED_STATUS=ACTIVE' "EARLY_LOGIN_STATUS=$ACTIVE_LOGIN_STATE" "CURRENT_COMMIT=$(state_value CURRENT_COMMIT)" \
       "PREVIOUS_COMMIT=$(state_value PREVIOUS_COMMIT)" \
       "PROTECTED_MATERIAL_READY=$(material_ready && echo true || echo false)" \
-      'RPM_OFFICIAL_DISTRIBUTION=false' 'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1' "MANAGED_PAM_INTEGRATION=$pam_managed" \
+      'RPM_OFFICIAL_DISTRIBUTION=false' 'SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1' 'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1' "MANAGED_PAM_INTEGRATION=$pam_managed" \
       "MANAGED_PAM_STATUS=$pam_status" \
       "KSCREENLOCKER_MANAGED_PAM_INTEGRATION=$kde_pam_managed" \
       "KSCREENLOCKER_MANAGED_PAM_STATUS=$kde_pam_status" \

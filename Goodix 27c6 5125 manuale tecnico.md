@@ -140,7 +140,122 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — Polkit/Discover: correttivo interrompibile pronto offline (20 settembre 2026)
+### Stato corrente — integrazione congiunta Polkit e sudo, closure offline (20 settembre 2026)
+
+Task esplicito `AI_PM_POLKIT_SUDO_PARALLEL_CLOSURE.md`, baseline
+`dad2b99584549a87acd4599b902a8b6dc349820d`, branch development pulito alla
+ripartenza. La patch Polkit locale **non è installata** e resta tale. Il PASS
+sudo sul PC corrente via D285 resta evidenza Utente valida; nessun file host,
+sudoers, servizio, template, materiale protetto o stato sensore è stato cambiato.
+Il gap della candidate pulita è ora chiuso **nell'implementazione e nelle prove
+offline**; sudo/Polkit della nuova candidate restano non validati live.
+
+**Review indipendente Polkit:** riletti bridge, deploy, lifecycle managed,
+helper Polkit 127 e sorgenti KDE Fedora 6.7.5. Il riuso del token da pam_unix è
+confermato sul sorgente RPM Fedora PAM 1.7.2-2: pam_unix_auth chiama
+pam_get_authtok, che restituisce il token esistente prima di una conversazione.
+Le patch Fedora non alterano questi due file. Nessun accesso a shadow/password
+reali. Restano validi password immediata, input pipe/socket anche bufferizzato,
+figlio information-only, contatore per UID su tre scelte e reset solo dopo
+teardown PAM riuscito. Non serve cambiare il bridge Polkit C per integrare sudo.
+Le assunzioni SELinux/tmpfiles/helper systemd restano circoscritte e invariate;
+label e funzionamento delle applicazioni reali restano da verificare live.
+
+**Cause e design sudo:** i file RPM Fedora `/etc/pam.d/sudo` e `sudo-i` sono
+config(noreplace); sudo include system-auth senza fingerprint, sudo-i include
+sudo. Sorgente esatto sudo 1.9.17-8.p2.fc44: build con --with-pam-login,
+default pam_service=sudo e pam_login_service=sudo-i, uno stesso handle PAM per
+passwd_tries, terminale e segnali gestiti dalla conversazione nativa. La nuova
+candidate antepone a sudo `pam_goodix_sudo.so` e conserva byte per byte le
+restanti righe vendor. sudo-i è verificato e lasciato invariato: entrambe le
+modalità interattive sono comprese nel claim. Identità PAM locali non-root,
+nessun nome utente fissato e nessuna dipendenza dal selettore D285.
+
+La password è disponibile al primo prompt. Invio vuoto sceglie esplicitamente
+un tentativo d'impronta con limite complessivo di 8 secondi, comprendente Claim
+ed eventuale avvio daemon. Dopo NO MATCH il prompt offre password o un'altra
+scelta, massimo tre per handle/invocazione; i retry password di sudo non possono
+moltiplicare il budget. MATCH termina la serie. Errore, BUSY, assenza enrollment,
+timeout o scelta password disabilitano ulteriori figli nella stessa invocazione.
+Durante gli 8 secondi scelti non si promette password concorrente: attendere il
+prompt, oppure Ctrl+C per cancellare. Non sono aggiunte letture stdin/tty,
+modifiche termios o handler segnali. Il padre osserva INT/QUIT pending lasciandoli
+a sudo. Morte padre/cancel/timeout terminano il figlio; nessun contatore Polkit è
+letto o modificato. Il setcred del modulo è un no-op esplicito, coerente con il
+normale passaggio sudo all'identità run-as dopo autenticazione/account check.
+
+**Scelta modulo:** foglia sudo con il modulo Fedora hash-pinned
+`/usr/lib64/security/pam_fprintd.so max-tries=1 timeout=8`. Usa Claim ordinario,
+come Polkit e KScreenLocker; l'estensione PAM candidate serve ClaimLogin soltanto
+per plasmalogin e non porta un beneficio a sudo. Bridge e daemon si aggiornano
+insieme tramite current; la dipendenza stock resta verificata per versione/hash.
+Source review dimostra assenza di Claim senza enrollment e fallback su BUSY;
+i test PAM usano foglie sintetiche, non credenziali/biometria reali.
+
+**Correttivi emersi dalla review:** il rollback Polkit ora può riprendere dopo
+che un precedente tentativo ha già rimosso directory possedute, continuando a
+rifiutare antenati symlink/insicuri. Il daemon conservava il ramo di restart
+FP_DEVICE_RETRY per Verify/Identify ordinari: la nuova patch
+`production/login/fprintd-consumer-retry.patch` lo rende terminale, come già per
+prepared login. Resta invariato il fence del driver; nessun nuovo comando wire.
+Questo elimina una richiesta interna superflua anche quando il driver avrebbe
+comunque impedito una seconda acquisizione.
+
+**Lifecycle congiunto:** stato managed schema 2 in `/var/lib/goodix-polkit`,
+schema locale Polkit 1 invariato. Un'unica transazione possiede le regole dei due
+consumer: foglie prima degli entrypoint, ripristino di entrambi su failure,
+verifica ownership prima del rollback e runtime conservato se il rollback stesso
+fallisce. Ripristino esatto di presenza/contenuto/modi/owner e label supportate;
+mtime non ripristinato, ACL/xattr custom rifiutati. Un crash/power loss non è una
+transazione atomica fra filesystem diversi: stato/checkout vanno conservati per
+recovery. Modifiche preesistenti o successive non vengono sovrascritte.
+
+Preflight verifica componenti/package sudo, sudo-i, sudo.conf e system-auth;
+cvtsudoers legge include e Defaults scoped e rifiuta qualunque selettore PAM
+custom, incluso D285. NSS sudoers deve essere locale. Nessuna modifica sudoers,
+authselect o system-auth. Il nuovo campo
+`SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1`, modulo, source hash e SBOM
+sono obbligatori nella candidate. Vecchie release senza i campi delle due
+integrazioni richiedono il proprio uninstall originale prima della nuova install;
+nessuna migrazione asimmetrica in-place. Update/rollback mantengono regole
+identiche e contatore Polkit, commutando tutto il runtime immutabile insieme.
+
+**Evidenza offline del confine corrente:** Polkit 18 test PAM normali e 18
+ASan/UBSan; sudo 15 normali e 15 ASan/UBSan, inclusi limite reale di 8 secondi,
+setcred, tre NO MATCH, retry applicativi, root/nonlocal fallback e morte padre.
+Tredici test deployment locale/congiunto e 31 managed PASS.
+Tre test PAM concorrenti per direzione/fallback e indipendenza budget, normali
+più sanitizzati. Le prove daemon usano i veri handler su bus privato e sole
+operazioni device simulate: 12 coppie ordinate fra sudo/Polkit/KScreenLocker/login,
+Claim e VerifyStop concorrenti respinti, nessun open/verify aggiuntivo, cleanup
+owner-loss nominale. Ulteriore prova errore retry ordinario terminale. Driver,
+prepared login e greeter restano coperti dalla suite normale/sanitizzata.
+Questa è evidenza composita offline, non prova simultanea delle applicazioni reali.
+
+Build normale/sanitizzata e chiusura dei manifest appartengono al review set
+Git-native di questo task; la preparazione candidate finale riporta il full SHA
+nel MANIFEST e il digest del proprio SHA256SUMS. I sorgenti Fedora esatti e i
+loro hash sono registrati in `production/sudo/README.md`, con la scelta ABI e
+la distinzione tra prove e limiti. Nessuna nuova dipendenza runtime installata.
+
+**Handoff e boundary residuo:** `deployment/managed-install/AUTHENTICATION-LIVE.md`
+consegna install/uninstall, update/rollback compatibili, workflow nativi,
+PASS/FAIL/STOP e caso di contesa senza contatti. Sul PC D285 la migrazione è un
+gate distinto: il suo uninstall storico può cancellare il template posseduto e
+ripristinare un'altra baseline authselect; occorre ricostruire ownership e overlay
+installati prima di produrre una migrazione specifica reversibile. Il manager
+pulito non deve essere sovrapposto al PC corrente e la patch locale Polkit resta
+non installata. Non è richiesto approvare nuovamente uno SHA come credenziale.
+
+`OUTCOME=HUMAN_REQUIRED`; `ADVANCEMENT=CLEAN_SUDO_AND_POLKIT_INTEGRATION_OFFLINE`;
+`EXECUTABLE_CLOSURE=OFFLINE_VERIFIED_LIVE_PENDING`;
+`RESIDUAL_BLOCKER_OR_RISK=NATIVE_UX_TARGET_CLEANUP_AND_D285_MIGRATION_GATE`.
+Seguono i dettagli della baseline Polkit precedente, conservati come provenance;
+il gap sudo e i conteggi candidate sotto riportati si riferiscono a dad2b99,
+non allo stato corrente descritto in questa sezione.
+
+### Avanzamento precedente — Polkit/Discover alla baseline dad2b99 (20 settembre 2026)
+
 
 La diagnosi consolidata in `2f34f95563271c5070ec60db6415311d708041b7`
 resta valida: `/usr/lib/pam.d/polkit-1` include `system-auth`, privo di
