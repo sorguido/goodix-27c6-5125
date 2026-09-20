@@ -185,7 +185,20 @@ class Conversation(unittest.TestCase):
         self.counter.write_text("corrupt"); self.counter.chmod(0o600)
         self.run_pam("offline-password\n")
         self.assertEqual(self.starts(), [])
-        self.assertEqual(self.counter.read_text(), "0")
+        self.assertEqual(self.counter.read_text(), "corrupt")
+
+    def test_special_mode_and_hardlink_counters_preserved_without_child(self):
+        for kind in ('mode', 'hardlink', 'fifo'):
+            with self.subTest(kind=kind):
+                if kind == 'fifo': os.mkfifo(self.counter, 0o600)
+                else:
+                    self.counter.write_text('0'); self.counter.chmod(0o644 if kind=='mode' else 0o600)
+                    if kind == 'hardlink': os.link(self.counter, self.root/'second-link')
+                before=self.counter.lstat()
+                self.run_pam('offline-password\n')
+                self.assertEqual(self.starts(), [])
+                self.assertEqual(self.counter.lstat().st_ino, before.st_ino)
+                self.counter.unlink()
 
     def test_symlink_collision_not_overwritten(self):
         target = self.root / "unrelated"

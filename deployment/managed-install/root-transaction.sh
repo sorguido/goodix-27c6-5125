@@ -473,7 +473,7 @@ write_state() {
   mv -f -- "$pending" "$state"
 }
 ensure_runtime_root_mode() {
-  local mode
+  local mode allow_fix=${1:-true}
   [[ -e $runtime_root || -L $runtime_root ]] || return 0
   [[ -d $runtime_root && ! -L $runtime_root ]] || fail runtime_root_invalid
   if [[ -z $test_root ]]; then
@@ -483,6 +483,7 @@ ensure_runtime_root_mode() {
   case $mode in
     755) ;;
     700)
+      [[ $allow_fix == true ]] || fail runtime_root_mode_drift_before_uninstall
       chmod 0755 "$runtime_root" || fail runtime_root_mode_fix_failed
       [[ $(stat -c '%a' "$runtime_root") == 755 ]] || fail runtime_root_mode_fix_failed
       ;;
@@ -491,7 +492,7 @@ ensure_runtime_root_mode() {
 }
 
 verify_active() {
-  ensure_runtime_root_mode
+  ensure_runtime_root_mode "${3:-true}"
   local allow_legacy=${1:-false}
   local allow_vendor_drift=${2:-false}
   [[ -f $state && ! -L $state ]] || fail state_missing
@@ -917,7 +918,9 @@ root_rollback() {
 root_uninstall() {
   local caller=$1 current previous service_before
   [[ -n $test_root || ${SUDO_USER:-} == "$caller" ]] || fail caller_identity_mismatch
-  verify_active true true
+  # Removal qualification must not repair permissions before Polkit's complete
+  # counter validation. Status/install retain their existing legacy repair.
+  verify_active true true false
   [[ $(state_value INSTALLER) == "$caller" ]] || fail installer_mismatch
   current=$(state_value CURRENT_COMMIT); previous=$(state_value PREVIOUS_COMMIT); service_before=$(state_value SERVICE_BEFORE)
   polkit_deploy uninstall managed

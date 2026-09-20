@@ -27,8 +27,9 @@ fingerprint choices until successful PAM teardown. It spans helper restarts,
 dialog cancellation and identity switching back to that UID. A nonblocking
 exclusive lock prevents parallel conversations from opening another fingerprint
 child. A choice is consumed before forking, including unavailable/error/cancel
-cases. Three choices, or a corrupt count, require password authentication;
-successful authentication **and account checks** reset the count. A MATCH ends
+cases. Three choices require password authentication; successful authentication
+**and account checks** reset a valid count. A corrupt/foreign counter disables
+fingerprint and is preserved even after password success. A MATCH ends
 the series. This is a conservative limit on choices, not a measured physical
 contact counter; existing driver action/fencing telemetry remains authoritative.
 The counter is an operational limit, never an authorization credential. Reboot
@@ -62,7 +63,26 @@ Recovery metadata lives in `/var/lib/goodix-polkit`, mode 0700. The local module
 lives at `/usr/local/lib64/goodix-27c6-5125/polkit/pam_goodix_polkit.so`; the
 managed module lives in the immutable candidate tree through `current`.
 
-`/run/polkit/goodix-fingerprint` is root:root 0700, with numeric files 0600.
+`/run/polkit/goodix-fingerprint` is root:root 0700. Each valid local non-root
+UID counter is a regular root:root 0600 single-link file containing one byte
+`0`–`3`. The setuid helper can retain the caller's egid; fresh O_EXCL counters
+are explicitly fchown'ed to 0:0 and rechecked before use. Existing counters are
+never silently repaired. A failed initialization removes only the fresh
+O_EXCL inode after checking its identity, so a failed fchown cannot strand an
+empty counter. Links, special files, wrong owners/groups/modes/links
+or invalid contents disable fingerprint while preserving normal password PAM.
+Uninstall qualifies the complete directory, locks every counter and checks
+state/temporary collisions before its first write. Only the exact historical
+module SHA `9de3aba169b78298e539df1320f9bb10d64d418b6dd3ece196dcc401f1b7e3c2`
+may recover the authentic guido/1000 counter with primary GID 1000; every other
+noncanonical group is rejected. Normal status/update reject that historical
+GID until the qualified uninstall; a new runtime cannot inherit the old defect.
+Canonical counters use the same local passwd
+identity set as runtime. No NSS/network lookup or numeric-name wildcard.
+Handled removal I/O errors restore the original Polkit/sudo PAM files, module,
+counters and state with metadata, including labels and timestamps. Process kill,
+power loss and concurrent root modification are not covered by this in-memory
+rollback; retain saved recovery on any STOP.
 Fedora's existing `policykit_var_run_t` label supplies the required SELinux
 access; no new SELinux grants are added. The narrow socket-helper drop-in adds
 only `ReadWritePaths` for that directory because the vendor unit uses
@@ -77,6 +97,8 @@ changing authselect/PAM factors or upgrading beyond the qualified versions.
 ```bash
 production/polkit/build.sh /tmp/goodix-polkit-check-build
 python3 production/polkit/test_pam.py /tmp/goodix-polkit-check-build/headers/usr/include
+GOODIX_PAM_TEST_HEADERS=/tmp/goodix-polkit-check-build/headers/usr/include \
+GOODIX_HISTORICAL_POLKIT_MODULE=/tmp/goodix-polkit-historical-d7.so \
 python3 production/polkit/test_deploy.py
 python3 deployment/managed-install/test_offline.py
 ```
@@ -112,7 +134,7 @@ retry counter. Hence a per-PAM `max-tries` is insufficient by itself.
 
 The clean managed candidate also owns service-local sudo/sudo-i authentication;
 see `production/sudo/README.md`. Its password-only system-auth baseline remains
-unchanged. The Polkit C bridge/counter design does not require modification.
+unchanged. The counter metadata corrective below retains the conversation and retry design.
 The shared deploy transaction adds sudo ownership in managed schema 2 and fixes
 recovery after an interrupted removal has already deleted a parent directory.
 Managed pre-sudo states require their original uninstall before a fresh install.
@@ -123,3 +145,20 @@ Independent PAM tests and real-daemon private-bus tests cover budget separation,
 BUSY, owner cancellation and no implicit reopen. The development PC's D285 path
 remains untouched and is not a candidate prerequisite. The local Polkit patch
 remains uninstalled. Follow the combined operator handoff for the later live gate.
+
+## Post-live counter corrective
+
+The d7de505 host run passed password/fingerprint, NO-MATCH fallback and cancel
+for Polkit. Its first uninstall failed on root:1000 runtime metadata after
+removing some PAM files; a human-qualified GID-only repair allowed complete
+restore. The corrected runtime/uninstall contract above addresses that defect.
+`test_guard.c` executes production `open_guard()` with syscall metadata doubles
+(euid contract 0, inherited group 1000), while the actual process and files
+remain unprivileged in /tmp. It checks fchown(0,0), reopened metadata and failure
+to normalize; its resulting synthetic counter is consumed by real deploy tests.
+Supply the preserved exact historical module for the compatibility test; it
+verifies the digest before use. No real root helper is executed by tests.
+Upstream [Polkit 127 helper](https://github.com/polkit-org/polkit/blob/127/src/polkitagent/polkitagenthelper-pam.c)
+is a behavioral reference: it requires euid 0 but does not change egid before PAM.
+The local 4755 root:root executable and the human-observed root:1000 inode
+corroborate this creation path; no root-helper credentials were sampled live.

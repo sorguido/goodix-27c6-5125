@@ -137,41 +137,70 @@ local_uid(const char *name, uid_t *uid)
 }
 
 static struct guard *
+failed_guard(int dir, const char *name, int fd, int fresh)
+{
+  struct stat opened, named;
+  /* Failed initialization must not strand our own empty/noncanonical inode.
+   * Existing counters, substituted names and extra links are never removed. */
+  if (fresh && fstat(fd, &opened) == 0 &&
+      fstatat(dir, name, &named, AT_SYMLINK_NOFOLLOW) == 0 &&
+      opened.st_dev == named.st_dev && opened.st_ino == named.st_ino &&
+      opened.st_nlink == 1)
+    unlinkat(dir, name, 0);
+  if (fd >= 0) close(fd);
+  close(dir);
+  return NULL;
+}
+
+static struct guard *
 open_guard(pam_handle_t *pamh, uid_t uid, unsigned *used)
 {
   const char *directory = GUARD_DIRECTORY;
   uid_t owner = 0;
+  gid_t group = 0;
 #ifdef GOODIX_POLKIT_OFFLINE_TEST
   directory = getenv("GOODIX_POLKIT_TEST_GUARD");
   owner = geteuid();
+  group = getegid();
   if (!directory || strncmp(directory, "/tmp/goodix-polkit-test.", 24)) return NULL;
 #endif
   struct stat s;
   int dir = open(directory, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
   if (dir < 0) return NULL;
-  if (fstat(dir, &s) < 0 || s.st_uid != owner || (s.st_mode & 07777) != 0700) {
+  if (fstat(dir, &s) < 0 || s.st_uid != owner || s.st_gid != group ||
+      (s.st_mode & 07777) != 0700) {
     close(dir); return NULL;
   }
   char filename[32];
   snprintf(filename, sizeof filename, "%lu", (unsigned long)uid);
   int fd = openat(dir, filename, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
   int fresh = fd >= 0;
-  if (fd < 0 && errno == EEXIST)
-    fd = openat(dir, filename, O_RDWR | O_NOFOLLOW | O_CLOEXEC);
-  close(dir);
-  if (fd < 0) return NULL;
+  if (fd < 0 && errno == EEXIST &&
+      fstatat(dir, filename, &s, AT_SYMLINK_NOFOLLOW) == 0 && S_ISREG(s.st_mode))
+    fd = openat(dir, filename, O_RDWR | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+  if (fd < 0) return failed_guard(dir, filename, fd, 0);
   if (fstat(fd, &s) < 0 || !S_ISREG(s.st_mode) || s.st_uid != owner ||
       (s.st_mode & 07777) != 0600 || s.st_nlink != 1 ||
-      flock(fd, LOCK_EX | LOCK_NB) < 0) { close(fd); return NULL; }
+      flock(fd, LOCK_EX | LOCK_NB) < 0) return failed_guard(dir, filename, fd, fresh);
   char value = '3';
   if (fresh) {
-    if (pwrite(fd, "0", 1, 0) != 1) { close(fd); return NULL; }
+    /* The setuid (not setgid) helper can retain the caller's egid. Never
+     * inherit that group into our root-owned runtime contract. Only the
+     * O_EXCL inode just created here may be normalized. */
+    if (fchown(fd, owner, group) < 0 || fstat(fd, &s) < 0 ||
+        s.st_uid != owner || s.st_gid != group ||
+        (s.st_mode & 07777) != 0600 || s.st_nlink != 1) {
+      return failed_guard(dir, filename, fd, fresh);
+    }
+    if (pwrite(fd, "0", 1, 0) != 1) return failed_guard(dir, filename, fd, fresh);
     value = '0';
-  } else if (s.st_size != 1 || pread(fd, &value, 1, 0) != 1 ||
+  } else if (s.st_gid != group || s.st_size != 1 || pread(fd, &value, 1, 0) != 1 ||
              value < '0' || value > '3') {
-    /* An interrupted or corrupt counter is exhausted until password success. */
-    value = '3';
+    /* Foreign or corrupt state is preserved, including on password success.
+     * Historical noncanonical counters are handled by qualified uninstall. */
+    return failed_guard(dir, filename, fd, 0);
   }
+  close(dir);
   struct guard *g = calloc(1, sizeof *g);
   if (!g) { close(fd); return NULL; }
   g->fd = fd;

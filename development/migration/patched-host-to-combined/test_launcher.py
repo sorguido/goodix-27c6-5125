@@ -94,8 +94,7 @@ class BoundaryTests(unittest.TestCase):
 
 class FlowTests(unittest.TestCase):
     def setUp(self):
-        self.tx=mock.Mock(); self.tx.host.run.side_effect=['active',
-            'argv[]=/usr/bin/openvt -s -w -- /usr/bin/bash --noprofile --norc ;']
+        self.tx=mock.Mock(); self.tx.host.run.side_effect=tests.FakeHost.run
         self.tx.apply.return_value='APPLIED_RUNTIME_MASKED'; self.tx.release.return_value='RELEASED'
         self.tx.recovery_restore.return_value='RESTORED'
         self.invoke=mock.Mock(); self.ask=mock.Mock(); self.check=mock.Mock()
@@ -135,6 +134,54 @@ class FlowTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError): l.run_flow(self.tx,self.invoke,self.ask,self.check)
         self.tx.recovery_restore.assert_called_once()
 
+class VtTests(unittest.TestCase):
+    def host(self, overrides=None):
+        host=mock.Mock()
+        def run(*args):
+            original=tests.FakeHost.run(*args)
+            return (overrides or {}).get(args[0],original)
+        host.run.side_effect=run
+        return host
+
+    def test_recovery_root_on_tty12_and_tty1_unclaimed(self):
+        rows=tests.FakeHost.run('/usr/bin/ps')+'\n700 1 1000 1000 ? Web Content'
+        l.console_ready(self.host({'/usr/bin/ps':rows}))
+
+    def test_old_openvt_default_tty_or_failed_console_refused(self):
+        for value in ('inactive','argv[]=/usr/bin/openvt -s -w -- /usr/bin/bash --noprofile --norc ;'):
+            host=self.host();original=host.run.side_effect
+            host.run.side_effect=lambda *a: value if (('ActiveState' in a) if value=='inactive' else ('ExecStart' in a)) else original(*a)
+            with self.assertRaises(RuntimeError): l.console_ready(host)
+
+    def test_tty1_conflict_or_wrong_recovery_identity_refused(self):
+        good=tests.FakeHost.run('/usr/bin/ps')
+        for rows in (good+'\n700 1 0 0 tty1 bash',good.replace('tty12','tty1'),
+                     good.replace('501 500 0 0','501 500 1000 1000'),
+                     good.replace('501 500','501 999'),good.replace('tty12','tty3')):
+            with self.subTest(rows=rows),self.assertRaises(RuntimeError):
+                l.console_ready(self.host({'/usr/bin/ps':rows}))
+
+    def test_logind_reserved_autovt_sessions_and_version_fail_closed(self):
+        for key,value in (('/usr/bin/rpm','unreviewed'),('/usr/bin/busctl','u 12'),
+                          ('/usr/bin/systemd-analyze','[Login]\nReserveVT=12'),
+                          ('/usr/bin/loginctl','1 0 root seat0 7 user tty1 no -')):
+            with self.subTest(key=key),self.assertRaises(RuntimeError): l.console_ready(self.host({key:value}))
+
+    def test_login_check_readonly_and_never_claims_greeter_pass(self):
+        import io
+        import contextlib
+        with tempfile.TemporaryDirectory(prefix='goodix-launcher-test.',dir='/tmp') as root:
+            root=Path(root);(root/'run').mkdir();short=root/'run/gx';short.write_bytes(b'synthetic');short.chmod(0o700)
+            real=Path.lstat
+            def virtual(path):
+                info=real(path);values=list(info);values[4]=values[5]=0
+                return os.stat_result(values)
+            output=io.StringIO()
+            with mock.patch.object(Path,'lstat',virtual),contextlib.redirect_stdout(output):
+                l.login_check(self.host(),root)
+            self.assertIn('tty1=UNCLAIMED',output.getvalue())
+            self.assertIn('logout_greeter_result=PENDING_LIVE',output.getvalue())
+
 class SyntheticFlowTests(unittest.TestCase):
     def test_real_transaction_and_saved_recovery_from_unrelated_cwd(self):
         candidate=os.environ.get('GOODIX_MIGRATION_TEST_CANDIDATE')
@@ -144,8 +191,7 @@ class SyntheticFlowTests(unittest.TestCase):
             fixture.put('/etc/pam.d/system-auth',fixture.path('/etc/authselect/system-auth').read_bytes())
             fixture.put('/usr/lib/systemd/user/plasma-login.service',b'[Service]\nExecStart=/usr/libexec/plasma-login-greeter\n')
             fixture.put('/etc/sudoers.offline.json',b'{}')
-            fixture.host.run=lambda *args: ('active' if 'ActiveState' in args else
-                'argv[]=/usr/bin/openvt -s -w -- /usr/bin/bash --noprofile --norc ;')
+            fixture.host.run=tests.FakeHost.run
             env=os.environ|{'GOODIX_MANAGED_TEST_ROOT':str(fixture.root),
                 'GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256':tests.m.VENDOR['/etc/pam.d/kde-fingerprint'][2]}
             def invoke(command):

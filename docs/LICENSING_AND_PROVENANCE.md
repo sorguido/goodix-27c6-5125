@@ -187,3 +187,13 @@ reading protected material or importing new third-party expression. The RPM
 verification test uses the already installed Fedora librpm Python binding and
 an in-memory copy of package metadata; no RPM database or package is changed.
 No production, license, redistribution or public-repository boundary changes.
+
+The post-live Polkit-counter/VT corrective modifies the existing GPL-2.0-or-later
+bridge, deploy transaction, managed removal preflight, launcher and tests. New
+`production/polkit/test_guard.c` includes only this project's own bridge and
+adds syscall test doubles, retaining its license. No upstream code is copied.
+Polkit 127 helper and KDE Plasma Login Manager v6.7.5 Display/UserSession source
+are behavioral references linked in the corrective review. `legacy-recovery.json`
+also pins the complete d7de50585d555b1ca676e4fcf6c9ed77cc20d601 recovery snapshot.
+Saved recovery retains the same removal-only adapter and SPDX notices.
+No third-party relicensing, new dependency or public-repository change.

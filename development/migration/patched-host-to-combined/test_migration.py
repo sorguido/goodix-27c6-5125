@@ -38,6 +38,18 @@ class FakeHost:
     def restore_policy(self,path):
         assert m.digest(path.read_bytes())==m.POLICY_SHA
         self.actions.append('restore-policy'); self.value='legacy'
+    @staticmethod
+    def run(*args):
+        if args[0]=='/usr/bin/rpm': return 'plasma-login-manager-6.7.5-1.fc44.x86_64'
+        if args[0]=='/usr/bin/busctl': return 'u 6'
+        if args[0]=='/usr/bin/systemd-analyze': return '[Login]\n#ReserveVT=6'
+        if args[0]=='/usr/bin/ps': return '500 1 0 0 ? openvt\n501 500 0 0 tty12 bash\n600 1 1000 1000 tty2 plasma'
+        if args[0]=='/usr/bin/loginctl': return '15 1000 guido seat0 600 user tty2 no -'
+        if args[0]=='/usr/bin/systemctl':
+            if 'ExecStart' in args: return 'argv[]=/usr/bin/openvt -c 12 -w -- /usr/bin/bash --noprofile --norc ;'
+            if 'MainPID' in args: return '500'
+            if 'ActiveState' in args: return 'active' if args[2] in ('goodix-migration-recovery.service','plasmalogin.service') else 'inactive'
+        raise AssertionError(args)
 
 class ManifestTests(unittest.TestCase):
     def test_exact_projection_and_independent_historical_pins(self):
@@ -93,6 +105,7 @@ class MigrationTests(unittest.TestCase):
             data=Path(p).read_bytes() if p in m.VENDOR else ('synthetic owned '+p).encode()
             self.put(p,data,row['mode']); row['sha256']=m.digest(data)
         self.put(m.MATERIAL,LEGACY.read_bytes(),0o600)
+        self.put('/etc/passwd',b'root:x:0:0:root:/root:/bin/bash\nguido:x:1000:1000::/home/guido:/bin/bash\n')
         for p,row in self.plan['preserve'].items():
             if row['type']==stat.S_IFDIR:
                 self.path(p).mkdir(parents=True,exist_ok=True); self.path(p).chmod(int(row['mode'],8))
@@ -328,6 +341,20 @@ class MigrationTests(unittest.TestCase):
         result=run('--status'); self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1',result.stdout)
         self.assertIn('POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1',result.stdout)
+        # Runtime state is a single bounded Polkit counter; sudo's state lives
+        # only in its PAM handle (covered by the native combined PAM tests).
+        counter=self.path('/run/polkit/goodix-fingerprint/1000')
+        counter.write_bytes(b'4');counter.chmod(0o600)
+        def snapshot():
+            return {str(p.relative_to(self.root)):(p.lstat().st_mode,
+                os.readlink(p) if p.is_symlink() else p.read_bytes() if p.is_file() else None)
+                for p in self.root.rglob('*')}
+        before=snapshot()
+        refused=run('--root-uninstall',caller)
+        self.assertNotEqual(refused.returncode,0)
+        self.assertIn('counter content drift',refused.stderr)
+        self.assertEqual(snapshot(),before,'guard STOP partially uninstalled candidate')
+        counter.write_bytes(b'2')
         with self.assertRaisesRegex(RuntimeError,'candidate_present'): self.tx.rollback()
         # The complete saved recovery uses its own manager/deploy/rules copies,
         # not the original checkout. Its only allowed manager mode is uninstall.

@@ -68,6 +68,7 @@ class ManagedInstallContract(unittest.TestCase):
         (self.root / "etc/pam.d/sudo").write_bytes(rules.VENDOR)
         (self.root / "etc/pam.d/sudo-i").write_bytes(rules.LOGIN_VENDOR)
         (self.root / "etc/sudoers.offline.json").write_text("{}")
+        (self.root / "etc/passwd").write_text('root:x:0:0:root:/root:/bin/bash\nguido:x:1000:1000::/home/guido:/bin/bash\n')
         self.sudo_vendor_bytes = rules.VENDOR
         self.vendor_bytes = self.vendor_pam.read_bytes()
         self.kde_fingerprint_pam = self.root / "etc/pam.d/kde-fingerprint"
@@ -465,6 +466,11 @@ class ManagedInstallContract(unittest.TestCase):
         self.run_tx("--root-install", self.caller, str(candidate))
         runtime_root = self.root / "usr/lib64/goodix-27c6-5125"
         runtime_root.chmod(0o700)
+        # Uninstall must be read-only until all counter checks have passed.
+        refused=self.run_tx('--root-uninstall',self.caller,check=False)
+        self.assertIn('runtime_root_mode_drift_before_uninstall',refused.stderr)
+        self.assertEqual(runtime_root.stat().st_mode & 0o777,0o700)
+        self.assertTrue((self.root/'etc/pam.d/polkit-1').exists())
 
         material = self.root / "var/lib/goodix-5125-poc"
         material.mkdir(mode=0o700)

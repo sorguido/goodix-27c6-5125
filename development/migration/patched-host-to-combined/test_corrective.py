@@ -154,10 +154,16 @@ class CorrectiveTests(unittest.TestCase):
         self.assertEqual(self.tx.rearm(t.POLICY),'ALREADY_REARMED')
         self.tx.apply(t.POLICY);self.tx.rollback();self.f.assert_restored()
 
+    legacy_index=0
+
+    def test_historical_d7_snapshot_import_is_pinned_and_preserved(self):
+        self.legacy_index=1
+        self.test_historical_f97_snapshot_import_is_pinned_and_preserved()
+
     def test_historical_f97_snapshot_import_is_pinned_and_preserved(self):
         repo=self.f.temp/'old-repo';base=repo/'development/migration/patched-host-to-combined'
         base.mkdir(parents=True)
-        pins=json.loads((HERE/'legacy-recovery.json').read_text());rev=pins['source_commit']
+        pins=json.loads((HERE/'legacy-recovery.json').read_text())['revisions'][self.legacy_index];rev=pins['source_commit']
         for name in pins['source']:
             (base/name).write_bytes(subprocess.check_output(['git','-C',str(t.REPO),'show',rev+':development/migration/patched-host-to-combined/'+name]))
         for name in m.recovery.PATHS:
@@ -182,8 +188,7 @@ class CorrectiveTests(unittest.TestCase):
         self.f.put('/etc/pam.d/system-auth',self.f.path('/etc/authselect/system-auth').read_bytes())
         self.f.put('/usr/lib/systemd/user/plasma-login.service',b'[Service]\nExecStart=/usr/libexec/plasma-login-greeter\n')
         self.f.put('/etc/sudoers.offline.json',b'{}')
-        self.f.host.run=lambda *args: ('active' if 'ActiveState' in args else
-            'argv[]=/usr/bin/openvt -s -w -- /usr/bin/bash --noprofile --norc ;')
+        self.f.host.run=t.FakeHost.run
         env=os.environ|{'GOODIX_MANAGED_TEST_ROOT':str(self.f.root),
                         'GOODIX_MANAGED_TEST_FAIL_AFTER_POLICY':'true',
                         'GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256':m.VENDOR['/etc/pam.d/kde-fingerprint'][2]}

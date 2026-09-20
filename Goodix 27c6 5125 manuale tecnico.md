@@ -140,7 +140,109 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — correzione metadata RPM e riarmo dopo rollback (20 settembre 2026)
+### Stato corrente — Polkit recovery e conflitto VT Plasma Login (21 settembre 2026)
+
+La run **umana** della candidate `d7de50585d555b1ca676e4fcf6c9ed77cc20d601`
+ha prodotto PASS reali: **install/status; sudo password e fingerprint; sudo-i
+password e fingerprint; Polkit password e fingerprint; sudo e Polkit
+NO-MATCH→password; sudo e Polkit cancel→password; KScreenLocker password e
+fingerprint**. Questi risultati identificano quella build e non vengono
+trasferiti automaticamente al nuovo correttivo offline.
+
+Il precedente logout ha trovato tty1 occupata dalla recovery root avviata con
+openvt senza VT esplicito. Plasma Login è terminato con status 23. La corretta
+classificazione è **INVALID / PROCEDURE-INDUCED VT CONFLICT**, non candidate
+FAIL: i login candidate **PASSWORD e FINGERPRINT restano PENDING LIVE**.
+L'Utente ha completato il rollback, cessato la console tty1, riavviato Plasma
+Login e ottenuto **POST-RECOVERY PLASMA LOGIN PASSWORD=PASS**. Nessun risultato
+successivo di login candidate viene inferito dalle prove offline.
+
+**Recovery Polkit:** il primo `/run/gx` ha restituito ownership drift sul
+counter `/run/polkit/goodix-fingerprint/1000`: directory root:root 0700;
+file regolare root:1000 0600, un link, un byte `0`. Il runtime controllava UID
+ma non GID; il deploy pretendeva entrambi 0, dopo aver già rimosso file PAM.
+La sola correzione umana qualificata del GID a 0 ha permesso recovery completa.
+Il meccanismo è verificabile: helper Fedora root:root **4755**, senza setgid;
+il sorgente [Polkit 127](https://github.com/polkit-org/polkit/blob/127/src/polkitagent/polkitagenthelper-pam.c)
+non cambia egid prima di PAM. `openat(O_CREAT)` nel padre senza SGID eredita
+l'egid del helper; mancava `fchown`. La ricostruzione è coerente con il GID
+1000 osservato dall'Utente; non è una nuova cattura live delle credenziali.
+
+**Correttivo implementato:** il runtime normalizza soltanto l'inode appena
+creato con O_EXCL a root:root, ricontrolla metadata e poi inizializza il byte.
+Se l’inizializzazione fallisce, rimuove solo il proprio inode appena creato e
+identificato, senza lasciare un counter vuoto che bloccherebbe la recovery.
+I counter esistenti devono già essere canonici; foreign/corruzione disabilitano
+fingerprint preservando il file anche dopo password corretta. Non cambia
+conversazione, limite tre scelte, cancellazione, cleanup o percorso sensore.
+Uninstall qualifica tutti i counter (identità locale, root:root 0600, regular,
+un link, byte 0–3, nessun attributo/entry estraneo), stato e collisioni prima
+anche della prima modifica PAM; mantiene lock esclusivi durante la rimozione.
+La sola compatibilità non canonica riguarda guido/1000, GID primario 1000 e
+il modulo storico esatto SHA `9de3aba169b78298e539df1320f9bb10d64d418b6dd3ece196dcc401f1b7e3c2`.
+I counter canonici conservano lo stesso insieme locale non-root del runtime;
+nessuna wildcard sui nomi numerici o gruppi. Errori I/O gestiti dopo l'inizio
+ripristinano localmente tutti i file/counter/stato Polkit e sudo con metadata.
+Il manager non ripara più permessi 0700 durante il preflight uninstall:
+un drift resta STOP senza mutation. Power loss, kill e scritture root concorrenti
+non sono coperti da una promessa generale di atomicità dell'intero host.
+
+**Recovery senza conflitto:** `openvt -c 12 -w`, senza force o switch automatico,
+mantiene la shell root su tty12 e lascia Konsole visibile. Sul target sono stati
+letti come guido: Plasma Login 6.7.5-1.fc44 attivo; logind NAutoVTs effettivo 6,
+ReserveVT configurato/default 6; tty1/tty12 senza processi, getty tty12 inattivo;
+KDE tty2 e ulteriore sessione tty3; vecchia recovery inattiva. Il servizio vendor
+confligge con getty tty1. Nel sorgente [KDE v6.7.5 Display.cpp](https://github.com/KDE/plasma-login-manager/blob/v6.7.5/src/daemon/Display.cpp),
+il greeter preferisce il VT iniziale quando non occupato da sessioni logind,
+mentre le nuove sessioni usano VT_OPENQRY; dopo oltre cinque ttyFailed esce 23.
+Una shell openvt non registrata in logind può quindi rendere tty1 apparentemente
+libera ma impedirne l'acquisizione. tty12 aperta non è un VT libero per le nuove
+sessioni. È evidenza di piattaforma e sorgente, non un nuovo logout provato.
+
+`operator.sh login-check` è read-only/non privilegiato: verifica versione,
+logind, getty, comando/PID openvt, sua shell figlia root realmente su tty12,
+assenza di processi/sessioni su tty1, `/run/gx` root:root 0700 e display manager
+attivo. Richiede il PASS subito prima di **ciascun** logout; non attiva VT,
+helper, daemon o sensore. Il risultato stampa esplicitamente PENDING_LIVE per
+il greeter. La recovery corta resta disponibile prima e dopo il logout.
+Il riarmo ora autentica anche la snapshot RESTORED d7de505, preservandola
+integralmente come già faceva per f97de44; nessun cleanup host è eseguito dall'AI.
+
+Riesame metodologico: cambiano il contratto counter/uninstall e il VT della
+recovery, non il pacing del sensore. Le ipotesi sono creazione canonica +
+rollback senza rimozione parziale, e acquisizione tty1 senza console concorrente.
+Se lo stesso failure ricorre, fermarsi con metadata del counter oppure stato
+VT/messaggio greeter del failure reale; nessuna whitelist più larga, correzione
+manuale cieca o terzo logout equivalente. Il retest è limitato a install,
+smoke Polkit password/fingerprint, preflight VT, Plasma password/fingerprint,
+**recovery reale anche dopo PASS** e login password post-recovery. sudo password
+è esercitato dal normale comando di recovery; gli altri consumer restano PASS
+storici senza ripetizione inutile. TTY solo emergenza, Ctrl+Alt+F12 e `/run/gx`.
+
+Prove offline: PAM Polkit 19 normali e 19 ASan/UBSan; deploy 19 con tutti i
+casi richiesti (metadata root virtuali, nessuna esecuzione root); migrazione 26;
+launcher/VT 23; metadata/riarmo 14, incluse snapshot f97de44 e d7de505;
+managed 31; PAM incrociati sudo/Polkit 3; stack protocollo/lifecycle/daemon su
+bus privato/greeter normale e sanitizer PASS. Due build isolate del nuovo
+modulo Polkit producono byte identici. La funzione VT read-only reale passa
+sull'host come guido; non è stata creata o attivata alcuna console dall'AI.
+La review PM separata dall'implementazione ha riesaminato direttamente diff,
+percorsi reali e test, senza seconda istanza agente. Ha corretto anche il
+preflight uninstall che riparava permessi e la possibilità di portare un vecchio
+GID in update: quel caso richiede prima l'uninstall qualificato. La consegna
+integrale viene sigillata da HEAD pulito nei quattro path del README, con
+confronto delle due candidate e receipt prima del gate; i digest finali sono
+nei manifest/SHA256SUMS della consegna.
+
+Review set: diff dalla baseline d7de505, sorgenti e test Polkit/managed/migration,
+[review correttiva](development/migration/patched-host-to-combined/POLKIT-VT-REVIEW.md),
+README operativo e questo stato canonico. Gate successivo unico:
+**OUTCOME=HUMAN_REQUIRED / GATE=LIVE_RETEST** dopo review e riproduzione candidate.
+Root, sudo/pkexec, USB, install e modifiche host restano esclusivamente umani;
+nessun protected material, impronta o firmware è stato modificato dall'AI.
+
+### Correttivo precedente — metadata RPM e riarmo dopo rollback
+
 
 La run **umana** da `f97de44e0192f249ccb80fd9b32e1488195f0101` ha superato
 preflight, apply mascherato e prova password sudo; dopo release il manager si è

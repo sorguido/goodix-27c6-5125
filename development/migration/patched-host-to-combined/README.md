@@ -1,6 +1,6 @@
 # PC patchato → candidate combinata: handoff operatore
 
-**OUTCOME=HUMAN_REQUIRED — GATE=MIGRATION_AND_CANDIDATE_LIVE**
+**OUTCOME=HUMAN_REQUIRED — GATE=LIVE_RETEST**
 
 Preparazione offline autorizzata e completata. **Nessuna migrazione,
 installazione o autenticazione reale è stata eseguita dall'AI.** I comandi
@@ -15,26 +15,32 @@ contiene ownership, classificazioni, prove e limiti.
 
 ## Scopo, baseline e prerequisiti
 
-Il precedente preflight umano si è fermato read-only con `fprintd_dropins_drift`:
-era omesso il drop-in generale Fedora `service.d/10-timeout-abort.conf`,
-verificato conforme al pacchetto systemd. Ora viene preservato e controllato
-per percorso, posizione e digest esatti; ogni altro drop-in resta rifiutato.
-La run umana successiva da `f97de44e0192f249ccb80fd9b32e1488195f0101` ha
-superato preflight, apply e prova password. Install si è fermato su
-`plasmalogin_vendor_pam_package_drift`; rollback automatico PASS, nessun workflow
-sensore iniziato. Il backup è ora `RESTORED` e `/run/gx` è conservato.
+La candidate `d7de50585d555b1ca676e4fcf6c9ed77cc20d601` ha ottenuto
+**PASS umani reali**: install/status; sudo e sudo-i password/fingerprint;
+Polkit password/fingerprint; sudo e Polkit NO-MATCH→password e cancel→password;
+KScreenLocker password/fingerprint. Questi risultati restano validi come
+provenance della candidate precedente, non sono una prova della nuova build.
 
-Causa provata offline con il verificatore RPM: la post-image precedente aveva
-contenuto/dimensione corretti, ma mtime corrente anziché quello del pacchetto.
-La nuova migrazione imposta per entrambi i PAM vendor il contratto RPM completo,
-compresa la data `1788825600`, e verifica davvero la compatibilità prima di
-release/install. Il managed installer conserva tutti i controlli originali.
+Il precedente logout/login è **INVALID / PROCEDURE-INDUCED VT CONFLICT**:
+la recovery root occupava tty1, richiesta da Plasma Login; il daemon ha
+terminato con 23 dopo ripetuti `ttyFailed`. Non è un candidate FAIL.
+Dopo rollback e chiusura della vecchia console, l'operatore ha riavviato Plasma
+Login e verificato il normale login password. **Plasma Login candidate
+PASSWORD e FINGERPRINT restano PENDING LIVE.**
 
-La prova verifica la transizione dagli overlay D285/D293/login-early aggiornati
-da login-three alla candidate canonica con driver, fprintd, greeter, login,
-KScreenLocker, Polkit, sudo/sudo-i e protezione account-delete. Non valida
-Windows, FAR/FRR, enrollment, cancellazione account, provisioning o firmware.
-Non installare la patch Polkit separata e non usare uninstall storici.
+Il primo `/run/gx` si era fermato sul counter Polkit root:1000 0600, regolare,
+un link, un byte `0`. Il helper setuid, non setgid, eredita il gruppo utente;
+il runtime non lo normalizzava e uninstall pretendeva root:root. L'operatore
+ha qualificato il file e corretto solo il GID: recovery completa PASS.
+Non ripetere quella correzione manuale. Il nuovo runtime crea il counter
+root:root; uninstall verifica l'intero runtime prima delle rimozioni e ripristina
+localmente i file su errori I/O gestiti. La compatibilità root:1000 è limitata
+al preciso vecchio modulo e all'account locale guido/1000.
+
+Questo retest verifica **solo il delta Polkit/recovery e il login ancora aperto**.
+Non valida Windows, FAR/FRR, enrollment, account-delete, provisioning o firmware.
+Nessuna patch Polkit separata e nessun uninstall storico. Per questa prova,
+**il recupero finale è obbligatorio anche dopo PASS**, come richiesto dall'Utente.
 
 PC qualificato: Fedora 44 KDE, account locale `guido` uid/gid 1000, stack
 password authselect `local with-silent-lastlog with-mdns4`, versione pacchetti
@@ -102,11 +108,26 @@ Per la `.pending` del riarmo valgono le condizioni della sezione 1a.
 
 ## 1. Preflight da KDE/Konsole: un comando copia-incolla
 
-La sessione osservata è KDE su **tty2**, con console root di recupero già
-aperta su **tty1** e servizio `goodix-migration-recovery.service` attivo.
-**Tutte le operazioni ordinarie restano in Konsole.** Non trascrivere path o
-sequenze sulla TTY e non chiudere la console di emergenza. Il launcher ne
-verifica servizio e comando prima dello switch. Non ripetere `su -`.
+La verifica read-only corrente trova KDE su tty2, anche una sessione su tty3,
+Plasma Login attivo e vecchia recovery inattiva. La nuova recovery usa
+**tty12**, fuori dai VT automatici 1–6 di logind e dal suo ReserveVT=6.
+Plasma Login 6.7.5 preferisce tty1 e usa VT_OPENQRY per nuove sessioni:
+un processo che mantiene tty12 aperta la esclude dalla ricerca dei VT liberi.
+`openvt -c 12 -w` non forza un VT occupato e non cambia il VT visibile.
+
+**Tutte le operazioni ordinarie restano in Konsole; TTY solo emergenza.**
+Prima predisporre la console (password nel dialogo KDE):
+
+```bash
+/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh console
+```
+
+Atteso `RECOVERY_CONSOLE=START_REQUESTED tty12` oppure `ALREADY_ACTIVE`.
+Non è necessario passare sulla TTY o digitare comandi lì. Prima di riarmo/run
+il launcher verifica processo openvt, shell root figlia realmente su tty12,
+logind, assenza di getty su tty12 e assenza di processi/sessioni su tty1.
+Una vecchia console con scelta VT automatica è rifiutata, mai terminata in
+modo implicito. Qualsiasi collisione: STOP e conservare la recovery.
 
 In Konsole come guido, incollare:
 
@@ -133,18 +154,6 @@ Qualsiasi differenza interrompe
 senza modifiche. Per i drop-in vengono mostrati elenco atteso ed effettivo,
 così lo STOP è direttamente diagnosticabile. Non forzare collisioni/permessi.
 
-**Solo se la console di recupero non è più aperta**, da Konsole:
-
-```bash
-/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh console
-```
-
-Lo stesso preflight precede qualsiasi creazione del servizio transitorio.
-Se la console qualificata esiste, viene preservata. Se va creata, il normale
-agent password KDE avvia systemd-run/openvt; sulla nuova TTY sono ammessi solo
-`id -u` (atteso 0) e `tty`, poi ritorno a KDE con Ctrl+Alt+F2. Nessun comando
-ordinario sulla TTY. Se il servizio esistente è diverso/inattivo anomalo: STOP.
-
 ## 1a. Dopo rollback: riarmo da Konsole, senza cleanup manuale
 
 Solo dopo `PREFLIGHT_PASS_REARM_REQUIRED`, con console root ancora aperta:
@@ -154,7 +163,7 @@ Solo dopo `PREFLIGHT_PASS_REARM_REQUIRED`, con console root ancora aperta:
 ```
 
 È una singola elevazione password-only. Verifica stato `RESTORED`, source hash
-correnti o quelli esatti della run f97de44, backup, `/run/gx`, baseline integra,
+correnti o quelli esatti delle run f97de44/d7de505, backup, `/run/gx`, baseline integra,
 assenza candidate/residui/maschera, policy storica, PAM/overlay e fprintd inattivo.
 Una collisione estranea o recovery modificata resta STOP. Non cancella nulla.
 
@@ -201,7 +210,7 @@ Un'unica elevazione password-only avvia fasi esplicite nello stesso terminale:
    `MANAGED_INSTALLER_BASELINE_COMPATIBLE=PASS` prima di rimuovere la maschera
    e installare la candidate;
    **Ctrl+C** ripristina. Il launcher ricontrolla la consegna prima di procedere.
-5. Il manager invariato esegue install e status nella sessione privilegiata già
+5. Il manager esegue install e status nella sessione privilegiata già
    aperta, senza nuova autenticazione attraverso il PAM appena installato.
    Attesi `GOODIX_MANAGED_INSTALL=PASS`, `GOODIX_MANAGED_STATUS=ACTIVE`, SHA
    consegnato e le due integrazioni `INTERRUPTIBLE_SERVICE_LOCAL_V1` /
@@ -227,85 +236,99 @@ candidate quando il suo state è presente, quindi rollback storico. Su residui
 parziali, drift o `RECOVERY=STOP` non forza rimozioni: tenere la console root,
 interrompere e usare la sezione 5. Non ripetere install o test in loop.
 
-## 4. Workflow reale, una serie per volta
+## 4. Retest minimo da Konsole e normale login
 
 Non eseguire test simultanei. Per ogni serie fingerprint: **massimo tre
 contatti fisici indipendenti, stop al primo MATCH; NO MATCH 1/2 consente il
 successivo, NO MATCH 3 termina, mai quarto contatto**. Errore, timeout o cancel
-terminano la serie. Non riaprire dialoghi per aggirare il limite. I limiti
-sono implementati nei bridge/daemon/driver; non dipendono da un harness.
+terminano la serie. Non riaprire dialoghi per aggirare il limite tecnico.
 
-1. **sudo**: `sudo -k /usr/bin/true` prima con password. Nuova invocazione per
-   fingerprint: Invio vuoto seleziona un tentativo, poi un contatto. Dopo
-   NO MATCH scegliere esplicitamente il successivo Invio, entro tre. Ogni
-   selezione ha limite totale 8 s; attendere il nuovo prompt per la password.
-2. **sudo-i**: `sudo -k -i`, prima con password, poi `exit`; una seconda
-   invocazione per la serie fingerprint, poi `exit`. Non fare altro da root.
-3. **Polkit KDE**: `/usr/bin/pkexec --disable-internal-agent /usr/bin/true`,
-   prima password; nuova invocazione per fingerprint con invio vuoto. Fino a
-   tre scelte esplicite; la password resta utilizzabile durante l'attesa
-   (massimo 45 s). Si prova il dialogo KDE senza aggiornare pacchetti tramite
-   Discover; nessun PASS specifico di un'operazione Discover viene inferito.
-4. **NO MATCH → password**: una serie separata sudo e una Polkit con un dito
-   non registrato, al massimo tre NO MATCH, poi password valida. Non iscrivere
-   o cancellare dita. Se quel dito dà MATCH, interrompere e riportare FAIL.
-5. **Cancel**: una richiesta sudo e una Polkit, scegliere fingerprint senza
-   contatti, poi Ctrl+C/Annulla. Verificare che la richiesta si chiuda e la
-   successiva operazione normale con password funzioni. Non ripetere in loop.
-6. **KScreenLocker**: normale blocco schermo, sblocco password; nuovo blocco
-   per una serie fingerprint entro tre contatti. Password deve recuperare
-   dopo NO MATCH/errore. Non creare altri account o template per questa prova.
-7. **Plasma login, ultimo**: salvare il lavoro, mantenere la console root di
-   sistema. Logout/login normale con password; un secondo logout/login per
-   la serie fingerprint preparata dal greeter, entro tre contatti/8 s per
-   tentativo e stop al MATCH. Nessun lancio manuale del daemon/lettore.
+1. **Polkit, unico smoke consumer richiesto dal delta**:
+   `/usr/bin/pkexec --disable-internal-agent /usr/bin/true`, con password.
+   Una nuova invocazione per fingerprint: Invio vuoto seleziona un tentativo,
+   poi un contatto; massimo tre scelte esplicite e stop al MATCH. La password
+   resta disponibile durante l'attesa (massimo 45 s). Questo esercita creazione,
+   riapertura e reset del counter corretto. Non ripetere sudo-i, NO-MATCH,
+   cancel o KScreenLocker: codice/PAM relativi sono invariati e già PASS reali.
+2. Salvare il lavoro. **Prima di ogni logout**, incollare:
 
-`PASS_IF`: tutti i workflow richiesti funzionano, password/cancel rimangono
-utilizzabili e i limiti sono rispettati, senza regressioni osservabili.
-`FAIL_IF`: password valida inutilizzabile, mancato riconoscimento al termine
-della serie, credenziali non valide accettate, login/unlock rotto, nuovo blocco
-sudo o altra instabilità. `STOP_IF`: drift/preflight negativo, recovery non
-pronta, retry non richiesto, quarto tentativo, attività che prosegue dopo
-cancel, possibile effetto persistente. Interrompere al primo FAIL/STOP.
+   ```bash
+   /home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh login-check
+   ```
 
-## 5. Recovery: un solo comando breve sulla TTY
+   Non eleva privilegi e non avvia servizi, autenticazioni, USB o logout.
+   Atteso `LOGIN_PREFLIGHT=PASS recovery_root_tty12=READY tty1=UNCLAIMED
+   logout_greeter_result=PENDING_LIVE`. Controlla anche `/run/gx` root:root 0700,
+   processo root su tty12, logind e Plasma Login attivo. È un controllo istantaneo:
+   non cambiare servizi/VT dopo il PASS. Se STOP, **non fare logout**.
+3. **Plasma Login PASSWORD**: normale logout KDE, greeter visibile, login con
+   password valida. Non deve verificarsi il precedente loop/exit 23.
+4. Ripetere `login-check` dalla nuova Konsole. **Plasma Login FINGERPRINT**:
+   normale logout/login, serie nel greeter entro tre contatti/8 s per tentativo,
+   stop al MATCH. Nessun avvio manuale del daemon o lettore.
+5. **Recovery/uninstall reale obbligatorio**, anche se tutti i punti passano:
+   seguire la sezione 5. La nuova candidate non resta installata in questo retest.
 
-Dopo FAIL/instabilità/regressione il rollback è obbligatorio. Chiudere i
-consumer, passare alla console root già aperta (Ctrl+Alt+F1 nello scenario
-osservato) e digitare soltanto:
+`PASS_IF`: smoke Polkit password/fingerprint, entrambi i login e recovery finale
+funzionano, senza regressioni e con limiti rispettati.
+`FAIL_IF`: password valida inutilizzabile, riconoscimento fallito dopo la serie,
+credenziali non valide accettate, login rotto, recovery fallita o instabilità.
+`STOP_IF`: preflight negativo, recovery non pronta, retry non richiesto, quarto
+contatto, attività dopo cancel, possibile effetto persistente. Fermarsi al primo
+FAIL/STOP. Un nuovo problema greeter/VT va riportato separatamente da un rifiuto
+PAM/impronta: **nessun PASS login viene dedotto dalle sole prove offline**.
+
+## 5. Recovery ordinaria in Konsole; `/run/gx` in emergenza
+
+Chiudere dialoghi e consumer. Se Konsole è disponibile, incollare e scegliere
+**password**, senza contatti sul lettore:
+
+```bash
+sudo -k /run/gx
+```
+
+È anche lo smoke sudo password necessario per rimuovere la candidate. Se il
+login/desktop o l'autenticazione non funziona, **Ctrl+Alt+F12** raggiunge la
+shell root già aperta; digitare soltanto:
 
 ```bash
 /run/gx
 ```
 
-È un comando root-only predisposto **prima** dello switch. Verifica hash e
-backup, disinstalla la candidate col suo manager salvato quando presente,
-poi ripristina esattamente gli originali e la policy storica. Non richiede
-checkout, percorsi lunghi, variabili o una nuova autenticazione. Funziona
-anche se il checkout cambia. Non usa vecchi uninstall D285/D293/D297.
+Il comando root-only verifica sorgenti e backup, disinstalla la candidate con
+il manager salvato, poi ripristina gli undici originali e la policy storica.
+Non dipende dal checkout o dai percorsi in /tmp; non usa uninstall D285/D293.
+Un counter foreign, malformato, con altro owner/gruppo/mode/tipo/link o entry
+extra causa STOP prima della rimozione. Non correggere metadata a mano.
+Gli errori I/O gestiti nella rimozione Polkit ripristinano i suoi file e counter;
+non è una garanzia generale contro power loss o modifiche root concorrenti.
 
 Atteso `RECOVERY=RESTORED_ORIGINALS_DAEMON_INACTIVE_BACKUP_RETAINED` (oppure
-`ALREADY_RESTORED` alla verifica ripetuta). Byte, owner/mode/etichette e manifest
-originale sono ripristinati; fprintd resta inactive, maschera rimossa, selezioni
-90/95/96 ripristinate. Template e quattro binari materiali restano intatti.
-L'uninstall candidate intermedio ripristina la baseline post-migrazione senza
-D285; soltanto il successivo rollback ripristina lo stack storico. Backup e
-comando breve rimangono recuperabili. Le nuove snapshot ripristinano anche gli mtime originali.
-La snapshot f97de44 non registrava questi timestamp: il riarmo fotografa la
-baseline successiva al suo rollback, senza inventare date storiche perdute.
+`ALREADY_RESTORED`). Byte, owner/mode/etichette/mtime e manifest originale sono
+ripristinati; fprintd inactive, maschera rimossa, selezioni 90/95/96 ripristinate.
+Template e quattro materiali restano intatti. L'uninstall intermedio ripristina
+prima la baseline post-migrazione senza D285; poi il rollback storico recupera
+D285. Backup e `/run/gx` restano disponibili, inclusi gli archivi dei tentativi.
 
-Su drift/partial install non qualificato il comando si ferma senza sovrascrivere
-file estranei: mantenere la console e riportare lo STOP, senza cancellare stato
-a mano. Se apply non è iniziato, non serve rollback e `/run/gx` non esiste.
-Se è rimasta solo la snapshot `.pending`, lo switch non è iniziato: conservare
-file e riportare l'errore. Non pianificare reboot/power-loss durante la prova.
+Se il recupero o il greeter restano in STOP, conservare la console e riportare
+messaggio/punto esatto; non forzare, ripetere live o riavviare alla cieca.
+Dopo recovery PASS, mantenere la console tty12 e verificare un normale
+logout/login password sullo stack ripristinato. Poi, da KDE/Konsole, verificare
+fprintd inattivo e chiudere la console con una normale elevazione Polkit, ora
+sulla baseline password-only:
 
-Dopo ripristino usare il normale accesso password da KDE; nessuna serie
-fingerprint aggiuntiva automatica. Su **PASS mantenere la candidate installata**
-e il backup. Chiudere infine la console root con `exit`: il servizio transitorio
-termina. L'unica digitazione ordinaria è in Konsole; la TTY resta il paracadute.
+```bash
+systemctl is-active fprintd.service
+/usr/bin/pkexec --disable-internal-agent /usr/bin/systemctl stop goodix-migration-recovery.service
+systemctl is-active goodix-migration-recovery.service
+```
 
-Riportare PASS/FAIL per i consumer, messaggio esatto e passaggio del failure.
-Niente password, segreti, impronte o bundle. Log aggiuntivi soltanto dopo un
-failure reale. La UX è verificata offline; il suo comportamento reale resta
-parte del prossimo Human Gate.
+Entrambi i controlli `is-active` devono stampare `inactive` (exit 3 è atteso).
+La recovery su tty12 non richiede il precedente stop della console su tty1 né
+un riavvio manuale di Plasma Login. Se si è dovuta usare la TTY e KDE non torna,
+riportare il failure prima di ulteriori interventi.
+
+Riportare: Polkit password/fingerprint; preflight VT prima dei due logout;
+Plasma password/fingerprint; recovery e login password post-recovery. In caso
+di errore: messaggio esatto e passaggio. Niente segreti/impronte/bundle.
+Log mirati si richiedono soltanto dopo un nuovo failure reale.

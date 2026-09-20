@@ -10,8 +10,10 @@ def saved(tx, directory):
     data,_=tx.fs.read(directory+'/state.json',0o600,65536)
     state=json.loads(data)
     m.require(isinstance(state,dict),'invalid_recovery_state_shape')
-    pins=json.loads((m.HERE/'legacy-recovery.json').read_bytes())
+    revisions=json.loads((m.HERE/'legacy-recovery.json').read_bytes())['revisions']
     current=state.get('source') == tx.source()
+    pins=next((row for row in revisions if row['source']==state.get('source')),None)
+    m.require(current or pins is not None,'unknown_recovery_provenance')
     expected=tx.source() if current else pins['source']
     m.require(state.get('source') == expected,'unknown_recovery_provenance')
     for name, sha in expected.items():
@@ -19,7 +21,7 @@ def saved(tx, directory):
         m.require(m.digest(content)==sha,'saved_recovery_source_drift')
     if not current:
         m.require(state.get('recovery')==pins['recovery'],'unknown_saved_manager')
-    # All imports have now been authenticated against current or pinned f97de44 sources.
+    # Imports are authenticated against current or exactly pinned historical sources.
     if current:
         restored=tx.at(directory)
     else:

@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import json
 import subprocess
+import stat
 from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
@@ -30,6 +31,7 @@ class Deployment(unittest.TestCase):
             "auth sufficient pam_unix.so nullok\nauth required pam_deny.so\n")
         d.p(d.sudo.PAM).write_bytes(d.sudo.VENDOR)
         d.p(d.sudo.LOGIN).write_bytes(d.sudo.LOGIN_VENDOR)
+        d.p('/etc/passwd').write_text('root:x:0:0:root:/root:/bin/bash\nguido:x:1000:1000::/home/guido:/bin/bash\n')
         d.p("/etc/sudoers.offline.json").write_text("{}")
         self.module = self.root / "candidate.so"
         self.module.write_bytes(b"\x7fELFoffline-only-fixture")
@@ -39,8 +41,119 @@ class Deployment(unittest.TestCase):
         self.temp.cleanup()
 
     def snapshot(self):
-        return {str(p.relative_to(self.root)): (p.read_bytes(), p.stat().st_mode & 0o7777)
-                for p in self.root.rglob("*") if p.is_file()}
+        result={}
+        for p in self.root.rglob('*'):
+            info=p.lstat()
+            if stat.S_ISDIR(info.st_mode): continue
+            data=p.read_bytes() if stat.S_ISREG(info.st_mode) else os.readlink(p) if p.is_symlink() else None
+            result[str(p.relative_to(self.root))]=(data,info.st_mode,info.st_nlink,info.st_uid,info.st_gid)
+        return result
+
+    def counter(self, contents=b'0'):
+        path=d.p(d.GUARD)/'1000'
+        path.write_bytes(contents); path.chmod(0o600)
+        return path
+
+    def test_every_bad_runtime_entry_stops_before_mutation(self):
+        d.install('managed')
+        for kind in ('mode','symlink','hardlink','fifo','content','size','unexpected-counter','extra-entry','xattr'):
+            with self.subTest(kind=kind):
+                counter=d.p(d.GUARD)/'1000'
+                if kind=='fifo': os.mkfifo(counter,0o600)
+                elif kind=='symlink': counter.symlink_to(self.module)
+                else: self.counter(b'4' if kind=='content' else b'00' if kind=='size' else b'0')
+                extra=None
+                if kind=='mode': counter.chmod(0o644)
+                if kind=='hardlink': extra=self.root/'hardlink'; os.link(counter,extra)
+                if kind in ('unexpected-counter','extra-entry'):
+                    extra=d.p(d.GUARD)/('1001' if kind=='unexpected-counter' else 'foreign')
+                    extra.write_bytes(b'0');extra.chmod(0o600)
+                if kind=='xattr': os.setxattr(counter,'user.foreign',b'1')
+                before=self.snapshot()
+                with patch.object(d,'run') as actions, self.assertRaises((RuntimeError,OSError)):
+                    d.uninstall('managed')
+                actions.assert_not_called();self.assertEqual(before,self.snapshot())
+                counter.unlink()
+                if extra is not None: extra.unlink()
+
+    def virtual_root_metadata(self, counter_uid=0, counter_gid=0):
+        original_stat,original_fstat=os.stat,os.fstat
+        def convert(info):
+            values=list(info);values[4]=0;values[5]=0
+            if info.st_ino==self.counter_inode:
+                values[4]=counter_uid;values[5]=counter_gid
+            return os.stat_result(values)
+        return (patch.object(d,'guard_owners',return_value=(0,0)),
+                patch.object(os,'stat',side_effect=lambda *a,**k:convert(original_stat(*a,**k))),
+                patch.object(os,'fstat',side_effect=lambda *a,**k:convert(original_fstat(*a,**k))))
+
+    def test_foreign_uid_gid_and_unpinned_legacy_stop_before_mutation(self):
+        d.install('managed');counter=self.counter();self.counter_inode=counter.stat().st_ino
+        for uid,gid in ((1,0),(0,10),(0,1000)):
+            before=self.snapshot();owners,pathstat,fdstat=self.virtual_root_metadata(uid,gid)
+            with owners,pathstat,fdstat,patch.object(d,'run') as actions,self.assertRaises(RuntimeError):
+                d.uninstall('managed')
+            actions.assert_not_called();self.assertEqual(before,self.snapshot())
+
+    def test_authentic_d7_runtime_allows_only_exact_primary_group(self):
+        candidate=os.environ.get('GOODIX_HISTORICAL_POLKIT_MODULE')
+        if not candidate: self.skipTest('historical d7 module required')
+        self.module.write_bytes(Path(candidate).read_bytes())
+        self.assertEqual(d.digest(self.module.read_bytes()),d.HISTORICAL_MODULE)
+        d.install('local',self.module);counter=self.counter();self.counter_inode=counter.stat().st_ino
+        owners,pathstat,fdstat=self.virtual_root_metadata(0,1000)
+        with owners,pathstat,fdstat:
+            with self.assertRaisesRegex(RuntimeError,'counter group drift'):
+                d.verify('local')
+            d.uninstall('local')
+        self.assertFalse(d.p(d.STATE).exists());self.assertFalse(d.p(d.PAM).exists())
+
+    def test_production_runtime_virtual_setuid_counter_then_uninstall(self):
+        headers=os.environ.get('GOODIX_PAM_TEST_HEADERS')
+        if not headers: self.skipTest('PAM headers required')
+        binary=self.root/'guard-test'
+        subprocess.run(['gcc','-Wall','-Wextra','-Werror','-O2','-I'+headers,
+            str(HERE/'test_guard.c'),'/usr/lib64/libpam.so.0',
+            '-Wl,--wrap=open,--wrap=fstat,--wrap=fchown,--wrap=pam_set_data','-o',str(binary)],check=True)
+        d.install('managed')
+        result=subprocess.run([str(binary),str(d.p(d.GUARD)),'pass'],check=True,capture_output=True,text=True)
+        self.assertIn('COUNTER_GID=0',result.stdout)
+        self.assertEqual((d.p(d.GUARD)/'1000').read_bytes(),b'0')
+        d.uninstall('managed');self.assertFalse(d.p(d.STATE).exists())
+        guard=self.root/'failure-guard';guard.mkdir(mode=0o700)
+        subprocess.run([str(binary),str(guard),'fail'],check=True)
+        self.assertFalse((guard/'1000').exists())
+
+    def test_all_state_and_temporary_collisions_precede_mutation(self):
+        d.install('managed')
+        for name in (d.STATE+'/foreign', d.PAM+'.goodix-next', d.sudo.PAM+'.goodix-next'):
+            path=d.p(name);path.write_bytes(b'preserve');before=self.snapshot()
+            with self.assertRaises(RuntimeError): d.uninstall('managed')
+            self.assertEqual(before,self.snapshot());path.unlink()
+
+    def test_handled_io_failure_restores_candidate_including_runtime_counter(self):
+        d.install('managed');self.counter(b'2')
+        for stage in ('reload','unlink','final-directory'):
+            before=self.snapshot();failed=False
+            original_unlink,original_rmdir=Path.unlink,Path.rmdir
+            def maybe_fail(kind):
+                nonlocal failed
+                if kind==stage and not failed:
+                    failed=True;raise OSError('injected removal I/O failure')
+            def unlink(path,*args,**kwargs):
+                if path==d.p(d.LEAF): maybe_fail('unlink')
+                return original_unlink(path,*args,**kwargs)
+            def rmdir(path,*args,**kwargs):
+                if path==d.p(d.STATE): maybe_fail('final-directory')
+                return original_rmdir(path,*args,**kwargs)
+            def run(*args):
+                if args[0]=='systemctl': maybe_fail('reload')
+            with self.subTest(stage=stage),patch.object(Path,'unlink',unlink),patch.object(Path,'rmdir',rmdir),\
+                 patch.object(d,'run',run),self.assertRaisesRegex(OSError,'injected'):
+                d.uninstall('managed')
+            self.assertTrue(failed);self.assertEqual(before,self.snapshot())
+            d.verify('managed')
+        d.uninstall('managed')
 
     def test_absence_install_idempotence_restore(self):
         before = self.snapshot()

@@ -14,6 +14,7 @@ import stat
 import subprocess
 import sys
 import importlib.util
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 _spec = importlib.util.spec_from_file_location("sudo_rules", Path(__file__).resolve().parents[1] / "sudo/rules.py")
@@ -35,6 +36,10 @@ LEAF = "/etc/pam.d/goodix-polkit-fingerprint"
 TMPFILES = "/etc/tmpfiles.d/goodix-polkit.conf"
 DROPIN = "/etc/systemd/system/polkit-agent-helper@.service.d/50-goodix-polkit.conf"
 FILES = (LEAF, TMPFILES, DROPIN, PAM)  # enable the public PAM service last
+# Exact PAM binary delivered at d7de50585d555b1ca676e4fcf6c9ed77cc20d601.
+# Compatibility applies only to its authentic local-user counter, never to a
+# new module or to an arbitrary GID. The outer managed verifier pins its tree.
+HISTORICAL_MODULE = "9de3aba169b78298e539df1320f9bb10d64d418b6dd3ece196dcc401f1b7e3c2"
 
 
 def require(value, reason):
@@ -53,7 +58,7 @@ def digest(data):
 def regular(name, mode=0o644):
     path = p(name)
     info = path.lstat()
-    require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == mode,
+    require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == mode and info.st_nlink == 1,
             f"file type/mode drift: {name}")
     require(TEST or (info.st_uid, info.st_gid) == (0, 0), f"file ownership drift: {name}")
     if not TEST:
@@ -187,7 +192,8 @@ def preflight(kind):
 def load():
     parents(STATE + "/state.json")
     info = p(STATE).lstat()
-    require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700,
+    require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700 and
+            (TEST or (info.st_uid, info.st_gid) == (0, 0)),
             "Polkit state directory drift")
     data = json.loads(regular(STATE + "/state.json", 0o600))
     require(data["kind"] in ("local", "managed") and data["schema"] == (2 if data["kind"] == "managed" else 1), "unsupported Polkit state")
@@ -208,6 +214,9 @@ def verify(kind, recovery=False):
         require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700 and
                 (TEST or (info.st_uid, info.st_gid) == (0, 0)), "Polkit runtime directory drift")
         run("matchpathcon", "-V", str(p(GUARD)))
+        # A historical noncanonical counter can be removed with its pinned
+        # module, but must not be carried into an update to the new contract.
+        with qualified_guard(kind, historical=False): pass
     for name, expected in data["hashes"].items():
         path = p(name)
         parents(name, missing_ok=recovery)
@@ -219,35 +228,149 @@ def verify(kind, recovery=False):
     return data
 
 
+def local_counter_users():
+    # Same local non-root identity set as runtime local_uid(); no NSS/network.
+    # A numeric filename alone is not a trusted identity.
+    users = {}
+    for line in p("/etc/passwd").read_text().splitlines():
+        row = line.split(":")
+        require(len(row) == 7, "local passwd drift")
+        require(row[2].isdecimal() and row[3].isdecimal(), "local passwd identity drift")
+        if int(row[2]) != 0: users[str(int(row[2]))] = row[0], int(row[3])
+    return users
+
+
+def historical_runtime(kind):
+    path = p(MANAGED if kind == "managed" else LOCAL)
+    return path.is_file() and not path.is_symlink() and digest(path.read_bytes()) == HISTORICAL_MODULE
+
+
+def guard_owners():
+    return (os.geteuid(), os.getegid()) if TEST else (0, 0)
+
+
+@contextmanager
+def qualified_guard(kind, historical=True):
+    """Read-only qualification of the COMPLETE directory before any removal.
+
+    Keep exclusive counter locks until uninstall finishes. O_NOFOLLOW and
+    O_NONBLOCK reject links and special files without waiting on a FIFO.
+    """
+    handles = []
+    directory = None
+    try:
+        if not os.path.lexists(p(GUARD)):
+            yield []
+            return
+        parents(GUARD)
+        directory = os.open(p(GUARD), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        info = os.fstat(directory)
+        owner, group = guard_owners()
+        require(stat.S_IMODE(info.st_mode) == 0o700 and
+                (info.st_uid, info.st_gid) == (owner, group), "guard directory drift")
+        require(set(os.listxattr(directory)) <= {"security.selinux"}, "guard directory attributes drift")
+        entries = os.listdir(directory)
+        users = local_counter_users() if entries else {}
+        require(set(entries) <= set(users), "unexpected guard entry; preserve for review")
+        for name in entries:
+            info = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o600 and
+                    info.st_nlink == 1 and info.st_size == 1 and info.st_uid == owner,
+                    "counter type/mode/owner/link/size drift")
+            require(info.st_gid == group or
+                    (historical and name == '1000' and users[name] == ('guido',1000) and
+                     info.st_gid == 1000 and historical_runtime(kind)),
+                    "counter group drift")
+            fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory)
+            handles.append(fd)
+            require(os.fstat(fd) == info, "counter changed during qualification")
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            require(os.read(fd, 2) in (b"0", b"1", b"2", b"3"), "counter content drift")
+            require(set(os.listxattr(fd)) <= {"security.selinux"}, "counter attributes drift")
+        yield entries
+    finally:
+        for fd in handles: os.close(fd)
+        if directory is not None: os.close(directory)
+
+
+@contextmanager
+def removal_rollback(data, entries):
+    """Small in-memory antidote for handled I/O failures after qualification.
+
+    Public PAM/module bytes and bounded counters only; no protected material.
+    Crash/power-loss recovery is outside this local antidote.
+    """
+    names=set(data['hashes']) | {STATE+'/state.json'} | {GUARD+'/'+n for n in entries}
+    directories=set(data['directories']) | {STATE, GUARD}
+    def metadata(path):
+        info=path.lstat()
+        return (info, {key:os.getxattr(path,key) for key in os.listxattr(path)})
+    files={name:(p(name).read_bytes(),metadata(p(name))) if p(name).exists() else None for name in names}
+    dirs={name:metadata(p(name)) for name in directories if p(name).exists()}
+    for name in names:
+        require(not os.path.lexists(p(name+'.goodix-next')), "uninstall temporary collision")
+    def restore_metadata(path, saved):
+        info,attrs=saved
+        if not TEST: os.chown(path,info.st_uid,info.st_gid)
+        path.chmod(stat.S_IMODE(info.st_mode))
+        for key in os.listxattr(path):
+            if key not in attrs: os.removexattr(path,key)
+        for key,value in attrs.items(): os.setxattr(path,key,value)
+        os.utime(path,ns=(info.st_atime_ns,info.st_mtime_ns))
+    try:
+        yield
+    except BaseException:
+        # Runtime directory stays private before counter bytes are restored.
+        for name in sorted(dirs,key=lambda n:len(Path(n).parts)):
+            p(name).mkdir(mode=stat.S_IMODE(dirs[name][0].st_mode),exist_ok=True)
+        for name in sorted(files, key=lambda n:(n in (PAM,sudo.PAM),n)):
+            saved=files[name]
+            if saved is None:
+                if p(name).exists(): p(name).unlink()
+                continue
+            contents,meta=saved
+            temporary=p(name+'.goodix-next')
+            fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            with os.fdopen(fd,'wb') as file:
+                file.write(contents);file.flush();os.fsync(file.fileno())
+            restore_metadata(temporary,meta)
+            os.replace(temporary,p(name))
+        for name,meta in dirs.items(): restore_metadata(p(name),meta)
+        run('systemctl','daemon-reload')
+        print('POLKIT_UNINSTALL=ROLLED_BACK previous_candidate_files=RESTORED',file=sys.stderr)
+        raise
+
+
 def uninstall(kind):
     if not p(STATE).exists() and not p(STATE).is_symlink():
         print("POLKIT_UNINSTALL=ALREADY_ABSENT")
         return
     no_helpers(kind)
     data = verify(kind, recovery=True)
-    if kind == "managed": atomic(sudo.PAM, sudo.VENDOR)
-    # Remove the entry point first; tolerate an interrupted earlier removal.
-    if data["pam_existed"]:
-        atomic(PAM, VENDOR_BYTES)
-    elif p(PAM).exists(): p(PAM).unlink()
-    for name in data["hashes"]:
-        if name not in (PAM, sudo.PAM) and p(name).exists(): p(name).unlink()
-    run("systemctl", "daemon-reload")
-    if p(GUARD).exists():
-        info = p(GUARD).lstat()
-        require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700,
-                "guard directory drift")
-        for child in p(GUARD).iterdir():
-            require(child.name.isdecimal(), "unexpected guard entry; preserve for review")
-            regular(GUARD + "/" + child.name, 0o600)
-            child.unlink()
-        p(GUARD).rmdir()
-    for name in reversed(data["directories"]):
-        try: p(name).rmdir()
-        except FileNotFoundError: pass
-        except OSError: pass  # preserve directories acquired by other software
-    p(STATE + "/state.json").unlink()
-    p(STATE).rmdir()
+    require(set(os.listdir(p(STATE))) == {"state.json"}, "unexpected Polkit state entry")
+    for name in (PAM, sudo.PAM) if kind == "managed" else (PAM,):
+        require(not os.path.lexists(p(name + ".goodix-next")), "PAM temporary collision")
+    require(isinstance(data["directories"], list) and all(
+        name in {"/" + str(parent.relative_to(ROOT)) for path in (*payload(kind), LOCAL, GUARD)
+                 for parent in p(path).parents if parent.is_relative_to(ROOT) and parent != ROOT}
+        for name in data["directories"]), "Polkit directory ledger drift")
+    # All drift checks precede the FIRST mutation, including the complete
+    # runtime set. Handled later I/O failures restore the original file set.
+    with qualified_guard(kind) as entries, removal_rollback(data, entries):
+        if kind == "managed": atomic(sudo.PAM, sudo.VENDOR)
+        if data["pam_existed"]:
+            atomic(PAM, VENDOR_BYTES)
+        elif p(PAM).exists(): p(PAM).unlink()
+        for name in data["hashes"]:
+            if name not in (PAM, sudo.PAM) and p(name).exists(): p(name).unlink()
+        run("systemctl", "daemon-reload")
+        for name in entries: p(GUARD + "/" + name).unlink()
+        if p(GUARD).exists(): p(GUARD).rmdir()
+        for name in reversed(data["directories"]):
+            try: p(name).rmdir()
+            except OSError: pass  # preserve directories acquired by other software
+        p(STATE + "/state.json").unlink()
+        p(STATE).rmdir()
     print("POLKIT_UNINSTALL=PASS previous_PAM=RESTORED")
 
 
