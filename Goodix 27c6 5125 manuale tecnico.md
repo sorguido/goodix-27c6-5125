@@ -140,10 +140,72 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — conversione manifest e migrazione reversibile preparate offline (20 settembre 2026)
+### Stato corrente — preflight Fedora corretto e operazioni da KDE/Konsole (20 settembre 2026)
+
+Il task corrente di correzione preflight/UX parte da
+`development` pulito a `7d9ccfa8c978d0309823e8023bd13dd245f785b7`.
+L'Utente ha riportato lo STOP umano read-only `fprintd_dropins_drift`, prima
+di apply, install o conversione host. KDE è su tty2, console root di recovery
+su tty1, fprintd inactive. Questo è un failure del preflight host, **non**
+una run biometrica fallita e non una nuova prova sul sensore.
+
+**Causa dimostrata sul PC senza privilegi:** `systemctl show fprintd.service`
+restituisce, nell'ordine, il drop-in generale
+`/usr/lib/systemd/system/service.d/10-timeout-abort.conf` e i tre noti 90/95/96.
+`Host.qualify()` confrontava soltanto gli ultimi tre: assunzione incompleta del
+piano, non nuovo overlay Goodix. Il file aggiuntivo è root:root 0644, 596 byte,
+appartiene a `systemd-259.9-1.fc44.x86_64`; SHA-256 osservato e digest RPM
+coincidono: `ae6b234f92bc22f1201a7572b59b454c9809f33c80d13f361b9674e1801acc37`.
+Imposta esclusivamente `TimeoutStopFailureMode=abort`. La correzione aggiunge
+quel percorso alla lista esatta ordinata e al piano PRESERVE con hash/mode;
+nessuna wildcard o ammissione generica di `service.d`. Aggiunte, omissioni,
+riordino, duplicati e modifica del contenuto restano STOP. La qualifica delle
+proprietà pubbliche reali passa ora come uid 1000; il preflight completo root
+(material manifest/policy) non è stato eseguito dall'AI.
+
+**Vincolo UX corrente esplicito:** almeno 95% copy-paste da KDE/Konsole, nessuna
+operazione ordinaria da TTY; TTY esclusivamente recovery. Il nuovo
+`operator.sh` funziona da qualsiasi cwd: `preflight` controlla consegna/HEAD,
+PAM password-only e invoca un singolo pkexec per preflight read-only; `run`
+usa una sola sessione privilegiata con due pause di fase, apply, verifica sudo
+con privilegi ridotti a guido e fprintd ancora mascherato, release/install e
+status. Non ri-autentica dopo la modifica del PAM, non avvia workflow biometrici
+né chiude la console root. Il servizio transitorio di recovery è stato osservato
+attivo con il comando openvt/bash atteso; `console` da KDE lo preserva o lo
+prepara solo dopo preflight positivo. Nessun grant/token o cerimonia SHA.
+
+Prima dello switch la snapshot conserva anche codice recovery e copia del
+manager/deploy/rules, e viene predisposto il comando root-only `/run/gx`.
+La copia del manager è limitata all'uninstall di guido; l'unico adattamento è
+rimuovere la ricerca Git inutilizzata dalla rimozione, mantenendo ogni controllo
+originale. La recovery può prima disinstallare la candidate e poi ripristinare
+manifest/configurazioni/policy storiche anche con checkout cambiato. Su residui
+parziali o drift si ferma. Il lock ora usa il descrittore `/run`, senza creare
+un file su preflight negativo. Comando breve e backup restano disponibili;
+`/run/gx` scompare al reboot. Nessuna modifica production o di governance.
+
+Prove del correttivo: 26 test migration/policy (inclusi drift Fedora reale,
+interruzioni, copia recovery e candidate sintetica), 18 launcher (cwd, receipt,
+boundary privilegi, errori pkexec senza retry, preflight negativo senza apply,
+password/interrupt/candidate failure e intero workflow sintetico). I test non
+invocano root, pkexec, sudo, setpriv reali né USB: le chiamate amministrative del
+launcher sono iniettate, mentre manager e rollback operano su root sintetica.
+Regressioni rieseguite PASS: inventory 8, deploy Polkit 13, parser nelle tre
+varianti normale e ASan/UBSan, build production sanitizer, login completo
+(protocollo/lifecycle, daemon/private-bus, greeter, 31 managed transaction),
+PAM Polkit 18, sudo 15 e incrociati 3 sia normale sia sanitizer. Il runtime
+production è invariato; la consegna finale viene ricostruita e confrontata da
+HEAD pulito dopo review. Nessun PASS UX fisico è inferito dai test.
+
+Riesame §9: cambia una precisa ipotesi host-side smentita dall'evidenza (elenco
+incompleto dei drop-in) e l'interfaccia operatore, non il protocollo sensore.
+Non si prepara un terzo tentativo device-side equivalente. Se il nuovo
+preflight fallisce, usare la diagnostica atteso/effettivo e fermarsi; nessun
+allargamento automatico della whitelist. Rimane aperto il gate
+`MIGRATION_AND_CANDIDATE_LIVE`, con il README aggiornato come unico handoff.
 
 Il task Utente `AI_PM_MIGRATE_PATCHED_HOST_TO_COMBINED_CANDIDATE.md` parte da
-`dfc33c3e44d6172dc7244b4f958ad71be3774be5`. La ripartenza corrente verifica
+`dfc33c3e44d6172dc7244b4f958ad71be3774be5`. La ripartenza di quella fase verificò
 `development` pulito e allineato al remoto a
 `e16bc6404e8b60ae683d79347e495f5029aee681`. L'Utente ha completato l'inventario
 privilegiato e consegnato `/home/guido/goodix-inventory.json`, stderr vuoto:
@@ -248,13 +310,11 @@ Prima di rimozione il preflight umano richiede modulo effettivo unico, abilitato
 priorità 400 e digest CIL esatto; in caso contrario STOP senza switch.
 
 Il confine intermedio conserva una maschera runtime e la console root umana
-indipendente dal logout: prima va provata la password sudo vendor. Release
-esplicita della maschera, poi install della candidate tramite manager invariato.
-Il precedente `su` fallito non viene ripetuto: il README propone password
-Polkit → servizio transitorio systemd/openvt, da verificare **prima** di apply.
-Se non si ottiene la console root, non esiste autorizzazione a procedere.
+indipendente dal logout: il launcher prova la password sudo vendor prima di
+release/install tramite manager invariato. La TTY non richiede operazioni
+ordinarie. Se la console non è disponibile, lo switch viene rifiutato.
 
-`uninstall.sh`/codice salvato ripristinano originali e policy B5 esatti,
+`/run/gx`/codice salvato ripristinano originali e policy B5 esatti,
 compreso manifest storico integrale, owner/mode/etichette; fprintd torna
 inactive, maschera rimossa, backup conservato. Dopo candidate install serve
 prima il suo uninstall, che ripristina la baseline post-migrazione **senza

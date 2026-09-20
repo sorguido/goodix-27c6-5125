@@ -283,11 +283,30 @@ class MigrationTests(unittest.TestCase):
         self.tx.apply(POLICY)
         state=self.tx.state()
         for name,h in state['source'].items(): self.assertEqual(m.digest(self.path(m.BACKUP+'/'+name).read_bytes()),h)
-        self.assertEqual(set(state['source']),{'migration.py','manifest.py','inventory.py','host-plan.json'})
+        self.assertEqual(set(state['source']),{'migration.py','manifest.py','inventory.py','host-plan.json','recovery.py'})
+        manager=self.path(m.BACKUP+'/recovery/'+m.recovery.PATHS[0])
+        refused=subprocess.run(['/usr/bin/bash',str(manager),'--status'],cwd='/tmp',capture_output=True)
+        self.assertEqual(refused.returncode,2)
         spec=importlib.util.spec_from_file_location('saved_migration',self.path(m.BACKUP+'/migration.py'))
         saved=importlib.util.module_from_spec(spec); spec.loader.exec_module(saved)
         recovered=saved.Migration(self.fs,self.host,plan=self.plan)
         recovered.rollback(); self.assert_restored()
+
+    def test_vendor_dropin_is_preserved_and_digest_drift_refused(self):
+        original=self.path(m.VENDOR_DROPIN).read_bytes()
+        self.path(m.VENDOR_DROPIN).write_bytes(original+b'changed')
+        with self.assertRaisesRegex(RuntimeError,'preserved_software_drift'): self.tx.apply(POLICY)
+        self.assertEqual(self.host.actions,[])
+        self.path(m.VENDOR_DROPIN).write_bytes(original)
+        self.tx.apply(POLICY); self.tx.rollback()
+        self.assertEqual(self.path(m.VENDOR_DROPIN).read_bytes(),original)
+        self.assertNotIn(m.VENDOR_DROPIN,m.ORDER)
+
+    def test_short_recovery_collision_never_overwritten(self):
+        self.put(m.recovery.SHORT,b'foreign',0o700)
+        with self.assertRaisesRegex(RuntimeError,'short_recovery_path_collision'): self.tx.apply(POLICY)
+        self.assertEqual(self.path(m.recovery.SHORT).read_bytes(),b'foreign')
+        self.assertFalse(self.path(m.BACKUP).exists())
 
     def test_real_candidate_install_status_uninstall_restores_migration_baseline(self):
         candidate=os.environ.get('GOODIX_MIGRATION_TEST_CANDIDATE')
@@ -309,7 +328,17 @@ class MigrationTests(unittest.TestCase):
         self.assertIn('SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1',result.stdout)
         self.assertIn('POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1',result.stdout)
         with self.assertRaisesRegex(RuntimeError,'candidate_present'): self.tx.rollback()
-        result=run('--root-uninstall',caller); self.assertEqual(result.returncode,0,result.stderr)
+        # The complete saved recovery uses its own manager/deploy/rules copies,
+        # not the original checkout. Its only allowed manager mode is uninstall.
+        saved_manager=self.path(m.BACKUP+'/recovery/'+m.recovery.PATHS[0])
+        self.assertNotIn(b'repo=$(git',saved_manager.read_bytes())
+        def invoke(command):
+            self.assertEqual(Path(command[1]),saved_manager)
+            completed=subprocess.run(command,env=env,capture_output=True,text=True)
+            self.assertEqual(completed.returncode,0,completed.stderr)
+        # Stop after manager uninstall to assert exactly the migration baseline.
+        with mock.patch.object(self.tx,'rollback',return_value='stopped_before_historical_restore'):
+            self.assertEqual(m.recovery.restore(self.tx,invoke),'stopped_before_historical_restore')
         self.assertEqual({p:(self.path(p).read_bytes() if self.path(p).exists() else None) for p in m.ORDER},baseline)
         self.assertFalse(self.path('/etc/sudoers.d/90-goodix-d285-01').exists())
         self.tx.rollback(); self.assert_restored()
@@ -335,6 +364,17 @@ class MigrationTests(unittest.TestCase):
             finally: fixture.tearDown()
 
 class PolicyTests(unittest.TestCase):
+    def test_actual_fedora_dropin_list_and_unknown_order_missing_refused(self):
+        host=m.Host()
+        prefix=['Enforcing','selinux-policy-targeted-44.9-1.fc44.noarch',
+                '/usr/lib/systemd/system/fprintd.service']
+        with mock.patch.object(host,'run',side_effect=prefix+[' '.join(m.EXPECTED_DROPINS)]):
+            host.qualify()
+        for rows in (m.EXPECTED_DROPINS[1:],m.EXPECTED_DROPINS+['/etc/systemd/system/service.d/unknown.conf'],
+                     list(reversed(m.EXPECTED_DROPINS)),m.EXPECTED_DROPINS+[m.VENDOR_DROPIN]):
+            with self.subTest(rows=rows),mock.patch.object(host,'run',side_effect=prefix+[' '.join(rows)]),self.assertRaisesRegex(RuntimeError,'fprintd_dropins_drift'):
+                host.qualify()
+
     def test_effective_policy_digest_priority_and_disabled(self):
         host=m.Host()
         correct=[f'400 {m.POLICY} pp sha256:ignored',f'{m.POLICY} sha256:{m.CIL_SHA}']

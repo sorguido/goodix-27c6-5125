@@ -165,3 +165,15 @@ reproduced PP/CIL hashes are pinned by `prepare-policy.sh`. No external code,
 new permanent dependency or candidate licensing boundary is introduced.
 These development-only tools, host plan and historical fixture are excluded
 from the canonical candidate payload; public repository remains untouched.
+
+The follow-up `launcher.py`, `operator.sh`, `recovery.py`, and launcher tests
+are independent GPL-2.0-or-later project code. The saved recovery manager is
+mechanically derived from the same checkout's GPL-2.0-or-later
+`deployment/managed-install/root-transaction.sh`: only the unused Git-root
+lookup is removed and dispatch is restricted to uninstall for the known local
+installer. `production/polkit/deploy.py` and `production/sudo/rules.py` are
+copied unchanged into the private recovery snapshot, retaining SPDX notices.
+Exact saved-source hashes are recorded in transaction state. No production
+source or license boundary changes. The Fedora systemd vendor drop-in is
+preserved on the host and its package digest is recorded; it is not copied
+into the candidate. No protected or biometric contents enter this tooling.

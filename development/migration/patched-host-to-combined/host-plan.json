@@ -146,6 +146,10 @@
       "mode": 420,
       "sha256": "a4454c54582a86fd4560321b22ffb7639485968438a07d5412fadc102d62cf49"
     },
+    "/usr/lib/systemd/system/service.d/10-timeout-abort.conf": {
+      "mode": 420,
+      "sha256": "ae6b234f92bc22f1201a7572b59b454c9809f33c80d13f361b9674e1801acc37"
+    },
     "/usr/libexec/fprintd": {
       "mode": 493,
       "sha256": "2353dafe60cf731b5cefe8c7ecc1350b151b20b17e9f8d886cfeeb605064403f"

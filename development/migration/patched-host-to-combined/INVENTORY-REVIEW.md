@@ -8,11 +8,54 @@ preparazione offline della conversione reversibile del manifest: il gate di
 preparazione è superato, quello di esecuzione reale rimane. Le evidenze
 inventariali sottostanti restano invariate; la closure finale è aggiornata.
 
-Ripartenza su `development`, HEAD `4e571eb72cc9c213cfbebab4a745afeefee6373c`,
+Ripartenza della fase inventario su `development`, HEAD `4e571eb72cc9c213cfbebab4a745afeefee6373c`,
 worktree pulito e ref remoto privato allineato. La baseline del task originale
 resta `dfc33c3e44d6172dc7244b4f958ad71be3774be5`. Nessun altro worktree, reset,
 stash, cambio branch o autenticazione dell'AI. Le query host restano uid 1000;
 i metadata root-only provengono dal JSON consegnato dall'Utente.
+
+## Correttivo successivo a 7d9ccfa: causa dello STOP e UX
+
+Il primo preflight umano è terminato read-only `fprintd_dropins_drift`:
+nessun apply/install/conversione host. Il controllo diretto come uid 1000
+mostra il percorso aggiuntivo **vendor**
+`/usr/lib/systemd/system/service.d/10-timeout-abort.conf`, prima dei tre 90/95/96.
+RPM owner `systemd-259.9-1.fc44.x86_64`; file root:root 0644, 596 byte,
+SHA effettivo = RPM = `ae6b234f92bc22f1201a7572b59b454c9809f33c80d13f361b9674e1801acc37`.
+Contenuto: sola opzione `TimeoutStopFailureMode=abort` più commenti Fedora.
+La lista del preflight era incompleta. Il piano ora preserva e qualifica quel
+solo file: nessuna wildcard, nessun file aggiuntivo ammesso implicitamente.
+La nuova qualifica delle proprietà host pubbliche è PASS senza root.
+
+Il task operativo impone >=95% copia-incolla da KDE: `operator.sh preflight`
+e `operator.sh run` sostituiscono la trascrizione dei comandi sulla TTY.
+Il launcher controlla la baseline PAM password-only prima del singolo pkexec,
+non autentica di nuovo dopo l'installazione, verifica la password come guido
+mentre fprintd è mascherato e termina prima dei workflow biometrici manuali.
+La root console già osservata attiva resta solo emergenza. `/run/gx` avvia
+recovery salvata, indipendente dal checkout, compresa la rimozione candidate.
+Il manager production non cambia; la sua copia per recovery rimuove soltanto
+il Git-root lookup inutilizzato ed è vincolata alla sola modalità uninstall.
+
+Test mirati: migration/policy 26, launcher 18, inclusi vero manager su root
+sintetica, recovery salvata, interrupt, privilege failures simulati, receipt e
+cwd. Nessuna chiamata root/sudo/pkexec/USB reale nei test. Il difetto iniziale
+è stato riprodotto contro l'elenco completo; aggiunte/omissioni/riordino,
+duplicati e contenuto vendor diverso restano rifiutati. PM review Git-native
+separata dall'implementazione, non review di una seconda istanza agente.
+Regressioni rieseguite PASS: inventory 8, deploy Polkit 13, parser nelle tre
+varianti normale/ASan/UBSan, build sanitizer e login completo con 31 test managed,
+PAM Polkit 18, sudo 15, incrociati 3 sia normale sia sanitizer. La review ha
+controllato direttamente diff, log, percorso da cwd esterno, sorgenti salvati,
+ordine password/mask/install/status e assenza di modifiche production/governance.
+Decisione PM: ACCEPT_AND_CONTINUE alla preparazione della consegna dal nuovo
+HEAD pulito, con gate reale invariato. I risultati candidate/receipt del commit
+finale sono verificati dopo il commit e riportati nell'handoff, senza generare
+un successivo commit che ne invalidi la corrispondenza SOURCE_COMMIT.
+Sono stati riletti AGENTS/START e le sezioni correnti del manuale; non è presente
+un documento separato denominato Linee Guida nel clone o nei percorsi documentali
+esaminati. Le linee guida correnti incorporate in AGENTS/manuale sono applicate;
+nessuna policy viene modificata.
 
 ## Evidenza ricevuta e limiti
 
@@ -224,7 +267,7 @@ soltanto dal futuro preflight umano: qualsiasi differenza interrompe tutto.
 ## Transazione e rollback verificati
 
 Piano derivato dall'inventario fornito e dai soli file software leggibili:
-10 file software da rimuovere/ripristinare, 66 guardie software di preservazione,
+10 file software da rimuovere/ripristinare, 67 guardie software di preservazione,
 proiezione lessicale dello state D285 priva di pin biometrici, 10 oggetti
 metadata-only per template/quattro binari e relativi alberi. Il manifest è
 l'undicesimo target, con il pin storico indipendente. Lo staging e gli archivi
@@ -343,7 +386,7 @@ EXECUTABLE_CLOSURE=OFFLINE_VERIFIED_HUMAN_ROOT_AND_LIVE_PENDING
 HOST_CHANGED=false
 POLKIT_PATCH_INSTALLED=false
 REAL_SENSOR_ACCESS=false
-NEXT_OPERATOR_ACTION=HUMAN_HANDOFF_READ_RECOVERY_CONSOLE_FINAL_PREFLIGHT
+NEXT_OPERATOR_ACTION=KDE_OPERATOR_PREFLIGHT_THEN_RUN
 ```
 
 Il singolo handoff operativo è [README.md](README.md). Nessun nuovo D-number,

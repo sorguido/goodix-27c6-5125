@@ -4,7 +4,7 @@
 
 Preparazione offline autorizzata e completata. **Nessuna migrazione,
 installazione o autenticazione reale è stata eseguita dall'AI.** I comandi
-seguenti appartengono esclusivamente al prossimo intervento umano. Non sono
+seguenti appartengono esclusivamente al prossimo intervento umano da KDE/Konsole. Non sono
 un'autorizzazione a farli eseguire all'agente.
 
 L'inventario privilegiato è già riesaminato: non ripetere il vecchio probe.
@@ -14,6 +14,12 @@ factory state rimangono invariati. [INVENTORY-REVIEW.md](INVENTORY-REVIEW.md)
 contiene ownership, classificazioni, prove e limiti.
 
 ## Scopo, baseline e prerequisiti
+
+Il precedente preflight umano si è fermato read-only con `fprintd_dropins_drift`:
+era omesso il drop-in generale Fedora `service.d/10-timeout-abort.conf`,
+verificato conforme al pacchetto systemd. Ora viene preservato e controllato
+per percorso, posizione e digest esatti; ogni altro drop-in resta rifiutato.
+Apply, install e conversione host **non sono stati eseguiti**.
 
 La prova verifica la transizione dagli overlay D285/D293/login-early aggiornati
 da login-three alla candidate canonica con driver, fprintd, greeter, login,
@@ -60,109 +66,113 @@ materiali e il template vengono controllati **solo tramite metadata**, mai
 letti, hashati, copiati o modificati. Il manifest originale è copiato byte per
 byte in `/var/lib/goodix-27c6-5125-migration/original-manifest.json` root:root
 0600; la directory root-only 0700 conserva anche gli altri dieci originali
-numerati, etichette/modi nel `state.json`, `recovery-policy.pp` e quattro file
-di codice/piano (`migration.py`, `manifest.py`, `inventory.py`, `host-plan.json`).
+numerati, etichette/modi nel `state.json`, `recovery-policy.pp` e cinque file
+di codice/piano (`migration.py`, `manifest.py`, `inventory.py`, `host-plan.json`,
+`recovery.py`). Conserva anche il manager di rimozione e i suoi moduli
+`production/polkit/deploy.py` e `production/sudo/rules.py`, con hash verificati.
+La copia del manager conserva tutti i controlli e ammette solo uninstall di
+guido; viene rimossa soltanto la ricerca Git inutilizzata da uninstall.
+La recovery non dipende dal checkout o dalla candidate in /tmp.
 Il backup completo viene verificato prima di disattivare D285.
 
 Oggetti temporanei: directory backup `.pending` durante snapshot;
-`<nome>.goodix-migration-new` per scritture atomiche; lock vuoto
-`/run/lock/goodix-migration.lock`; maschera runtime
+`<nome>.goodix-migration-new` per scritture atomiche; comando di emergenza
+root-only `/run/gx` (0700), che esegue il codice salvato; maschera runtime
 `/run/systemd/system/fprintd.service -> /dev/null`. La maschera blocca
 l'attivazione mentre si verifica la password, poi viene rimossa esplicitamente.
-Lock e backup sono recupero/concorrenza, non grant o credenziali.
+Il lock concorrente è sul descrittore della directory `/run`, senza creare
+un file. Backup e hash sono recupero/integrità, non grant o credenziali.
+`/run/gx` resta disponibile anche dopo rollback, fino al riavvio.
 
 Un errore gestito nell'apply tenta il rollback. Dopo interruzione, lo stesso
 rollback accetta soltanto i byte originali o quelli previsti dal piano; su
 modifiche estranee si ferma. Se resta soltanto `.pending`, lo switch non è
 iniziato: conservare tutto e riportare lo STOP, senza cancellarlo o riprovare.
 
-## 1. Console di recupero e preflight finale
+## 1. Preflight da KDE/Konsole: un comando copia-incolla
 
-Il precedente `su -` è fallito: non ripeterlo. Prima di qualsiasi rimozione,
-ottenere una console root separata dalla sessione KDE, attraverso il normale
-agent Polkit e la password di guido. Nel terminale KDE di guido:
+La sessione osservata è KDE su **tty2**, con console root di recupero già
+aperta su **tty1** e servizio `goodix-migration-recovery.service` attivo.
+**Tutte le operazioni ordinarie restano in Konsole.** Non trascrivere path o
+sequenze sulla TTY e non chiudere la console di emergenza. Il launcher ne
+verifica servizio e comando prima dello switch. Non ripetere `su -`.
 
-```bash
-loginctl show-session self -p VTNr --value
-/usr/bin/pkexec --disable-internal-agent --user root /usr/bin/systemd-run --unit=goodix-migration-recovery --collect --setenv=TERM=linux -- /usr/bin/openvt -s -w -- /usr/bin/bash --noprofile --norc
-```
-
-Annotare il numero VT di KDE. Il secondo comando apre una VT libera con un
-servizio **transitorio di sistema**, indipendente dal logout KDE, senza
-configurazione permanente. Nella nuova console verificare `id -u` = `0` e
-annotare `tty` (`/dev/ttyN`). Se la console non compare, il comando fallisce o
-l'identità non è root: **STOP prima della migrazione**. Non usare fingerprint
-per ottenerla. Tenerla disponibile, fisicamente presidiata, fino alla fine;
-Ctrl+Alt+F(numero) permette di tornare a KDE o alla console di recupero.
-
-Dalla console root, verificare la consegna e poi eseguire il solo preflight:
+In Konsole come guido, incollare:
 
 ```bash
-sha256sum --check --quiet /tmp/goodix-migration-ready.SHA256SUMS
-/usr/bin/python3 -I -B /home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/migration.py --preflight
+/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh preflight
 ```
 
-Entrambi devono terminare senza errori; il secondo deve stampare
-`MIGRATION=PREFLIGHT_PASS_NO_CONFIGURATION_CHANGE`. Il preflight non crea
-lock/backup, non avvia fprintd, non apre USB. Qualifica per la prima volta il
-**manifest host effettivo**, senza stamparlo; l'identità storica finora era
-un'inferenza. Hash diverso, policy diversa, processo attivo, pacchetto cambiato,
-file/attributo/overlay aggiunto o metadata divergenti comportano STOP.
+Il launcher controlla branch, HEAD pulito, candidate, receipt e tutti i digest;
+verifica che il PAM Polkit sia ancora la baseline password-only qualificata,
+poi usa **un solo pkexec senza retry o agent testuale di fallback**. Inserire
+la password nel normale dialogo KDE. Non viene proposta/scelta l'impronta per
+ottenere questi privilegi. In caso di annullamento, errore o PAM diverso,
+STOP prima delle operazioni. Le prove fingerprint avvengono solo nella sezione 4.
 
-## 2. Migrazione e confine password
+Atteso: `OPERATOR=PREFLIGHT_PASS_NO_CONFIGURATION_CHANGE`.
+Il preflight non crea lock/backup, non avvia fprintd né apre USB; qualifica
+anche manifest host effettivo e policy B5. Qualsiasi differenza interrompe
+senza modifiche. Per i drop-in vengono mostrati elenco atteso ed effettivo,
+così lo STOP è direttamente diagnosticabile. Non forzare collisioni/permessi.
 
-Solo dopo il PASS precedente, nella console root:
+**Solo se la console di recupero non è più aperta**, da Konsole:
 
 ```bash
-/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/install.sh /tmp/goodix-migration-ready-policy/goodix_fprint_account_delete.pp
+/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh console
 ```
 
-Atteso: `MIGRATION=APPLIED_RUNTIME_MASKED`. Tornare nel terminale KDE di guido:
+Lo stesso preflight precede qualsiasi creazione del servizio transitorio.
+Se la console qualificata esiste, viene preservata. Se va creata, il normale
+agent password KDE avvia systemd-run/openvt; sulla nuova TTY sono ammessi solo
+`id -u` (atteso 0) e `tty`, poi ritorno a KDE con Ctrl+Alt+F2. Nessun comando
+ordinario sulla TTY. Se il servizio esistente è diverso/inattivo anomalo: STOP.
+
+## 2. Migrazione, password, candidate e status: un launcher in Konsole
+
+Dopo il PASS del preflight, sempre da Konsole come guido:
 
 ```bash
-sudo -k /usr/bin/true
+/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh run
 ```
 
-Inserire la password di guido. Deve funzionare attraverso il PAM password
-vendor; non toccare il sensore. Se fallisce, interrompere e usare il rollback
-della sezione 5 dalla console root. Non installare la candidate.
+Un'unica elevazione password-only avvia fasi esplicite nello stesso terminale:
 
-Se la password funziona, nella console root rimuovere la maschera:
+1. Verifica nuovamente consegna, preflight e console di recupero attiva.
+   **Invio** applica la migrazione; **Ctrl+C prima di Invio** esce senza modifiche.
+2. Conserva backup e tool di recupero, prepara `/run/gx`, applica il piano e
+   mantiene fprintd mascherato. Atteso `MIGRATION=APPLIED_RUNTIME_MASKED`.
+3. Esegue la normale verifica `sudo -k /usr/bin/true` dopo aver ridotto i
+   privilegi a guido. **Digitare la password in Konsole**, senza contatto.
+   La maschera resta attiva. Password fallita/interruzione: tenta il rollback,
+   non installa la candidate. Nessuna password viene raccolta dal launcher.
+4. Dopo `PASSWORD=PASS`, **Invio** rimuove la maschera e installa la candidate;
+   **Ctrl+C** ripristina. Il launcher ricontrolla la consegna prima di procedere.
+5. Il manager invariato esegue install e status nella sessione privilegiata già
+   aperta, senza nuova autenticazione attraverso il PAM appena installato.
+   Attesi `GOODIX_MANAGED_INSTALL=PASS`, `GOODIX_MANAGED_STATUS=ACTIVE`, SHA
+   consegnato e le due integrazioni `INTERRUPTIBLE_SERVICE_LOCAL_V1` /
+   `PASSWORD_FIRST_SERVICE_LOCAL_V1`.
+6. `OPERATOR=PASS_INSTALL_AND_STATUS` conclude il launcher **prima** dei workflow
+   biometrici. La console root di emergenza rimane aperta. Passare alla sezione 4.
 
-```bash
-/usr/bin/python3 -I -B /var/lib/goodix-27c6-5125-migration/migration.py --release-mask
-```
+Non rilanciare `run` dopo install: il launcher rifiuta correttamente il PAM
+Polkit cambiato e una baseline già migrata. Nessun material import, enrollment,
+riavvio Plasma o workflow fingerprint viene automatizzato.
 
-Atteso: `MIGRATION=RELEASED_FOR_CANDIDATE_INSTALL`. La baseline ora è Fedora
-password-only, materiali esistenti con solo manifest convertito e nessuna
-selezione degli overlay storici. La pausa fra release e install deve essere
-breve, senza avviare consumer fingerprint.
+## 3. Effetti candidate e failure
 
-## 3. Installazione e stato della candidate
+La candidate installa runtime/driver/daemon/PAM/greeter sotto
+`/usr/lib64/goodix-27c6-5125/<commit>` con `current`, wrapper, drop-in 99,
+integrazioni locali login/unlock/sudo/Polkit, leaf fingerprint, stato managed e
+Polkit, tmpfiles/helper Polkit e hook/policy account-delete. Elenco completo in
+`docs/INSTALLATION.md`. Il manager non modifica sudoers o authselect.
+`PROTECTED_MATERIAL_READY=true` resta un controllo metadata, non un MATCH.
 
-Dal terminale KDE **come guido**, password al normale sudo quando richiesta:
-
-```bash
-cd /home/guido/Repository/goodix-27c6-5125_private
-deployment/managed-install/manage.sh install /tmp/goodix-combined-migration-ready/candidate
-deployment/managed-install/manage.sh status
-```
-
-Install deve dare `GOODIX_MANAGED_INSTALL=PASS`; status deve mostrare il commit
-consegnato, `POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1` e
-`SUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1`, integrazioni login/unlock
-attive. `PROTECTED_MATERIAL_READY=true` prova soltanto metadata, non contenuti
-né riconoscimento. Nessun import dei materiali è necessario.
-
-Il manager installa `/usr/lib64/goodix-27c6-5125/<commit>` e `current`, wrapper
-`/usr/libexec/goodix-27c6-5125/fprintd-wrapper`, drop-in fprintd/greeter 99,
-PAM locali login/unlock/sudo/Polkit e leaf fingerprint, stato managed/Polkit,
-tmpfiles e drop-in helper Polkit, hook/policy account-delete. Lista completa e
-contratto invariato in `docs/INSTALLATION.md` e
-`deployment/managed-install/README.md`. Non cambia sudoers o authselect;
-non riavvia Plasma. FAIL: se cleanup completo, rollback storico; se
-`RECOVERY_REQUIRED`/`POLKIT_ROLLBACK_FAILED`, preservare console e file,
-riportare errore senza forzare rimozioni.
+Su errore dopo apply il launcher tenta lo stesso recupero salvato: uninstall
+candidate quando il suo state è presente, quindi rollback storico. Su residui
+parziali, drift o `RECOVERY=STOP` non forza rimozioni: tenere la console root,
+interrompere e usare la sezione 5. Non ripetere install o test in loop.
 
 ## 4. Workflow reale, una serie per volta
 
@@ -205,44 +215,42 @@ sudo o altra instabilità. `STOP_IF`: drift/preflight negativo, recovery non
 pronta, retry non richiesto, quarto tentativo, attività che prosegue dopo
 cancel, possibile effetto persistente. Interrompere al primo FAIL/STOP.
 
-## 5. Rollback e stato finale
+## 5. Recovery: un solo comando breve sulla TTY
 
 Dopo FAIL/instabilità/regressione il rollback è obbligatorio. Chiudere i
-consumer. Se la candidate è installata, dalla **console root** usare il suo
-uninstall corrente (le variabili identificano l'installer, non autenticano):
+consumer, passare alla console root già aperta (Ctrl+Alt+F1 nello scenario
+osservato) e digitare soltanto:
 
 ```bash
-SUDO_USER=guido SUDO_UID=1000 SUDO_GID=1000 /home/guido/Repository/goodix-27c6-5125_private/deployment/managed-install/root-transaction.sh --root-uninstall guido
+/run/gx
 ```
 
-Atteso `GOODIX_MANAGED_UNINSTALL=PASS`: ripristina la baseline post-migrazione,
-**non D285**. Se install non era iniziato o cleanup è completo, saltare questo
-comando. Su uninstall fallito fermarsi; non eliminare a mano lo stato managed.
-Il rollback storico rifiuta comunque qualsiasi residuo della candidate.
+È un comando root-only predisposto **prima** dello switch. Verifica hash e
+backup, disinstalla la candidate col suo manager salvato quando presente,
+poi ripristina esattamente gli originali e la policy storica. Non richiede
+checkout, percorsi lunghi, variabili o una nuova autenticazione. Funziona
+anche se il checkout cambia. Non usa vecchi uninstall D285/D293/D297.
 
-Sempre dalla console root, ripristinare poi gli originali:
+Atteso `RECOVERY=RESTORED_ORIGINALS_DAEMON_INACTIVE_BACKUP_RETAINED` (oppure
+`ALREADY_RESTORED` alla verifica ripetuta). Byte, owner/mode/etichette e manifest
+originale sono ripristinati; fprintd resta inactive, maschera rimossa, selezioni
+90/95/96 ripristinate. Template e quattro binari materiali restano intatti.
+L'uninstall candidate intermedio ripristina la baseline post-migrazione senza
+D285; soltanto il successivo rollback ripristina lo stack storico. Backup e
+comando breve rimangono recuperabili. Non vengono ripristinati timestamp inutili.
 
-```bash
-/usr/bin/python3 -I -B /var/lib/goodix-27c6-5125-migration/migration.py --rollback
-```
+Su drift/partial install non qualificato il comando si ferma senza sovrascrivere
+file estranei: mantenere la console e riportare lo STOP, senza cancellare stato
+a mano. Se apply non è iniziato, non serve rollback e `/run/gx` non esiste.
+Se è rimasta solo la snapshot `.pending`, lo switch non è iniziato: conservare
+file e riportare l'errore. Non pianificare reboot/power-loss durante la prova.
 
-Equivalentemente usare `development/migration/patched-host-to-combined/uninstall.sh`.
-Il codice salvato funziona anche se il checkout cambia. Atteso
-`MIGRATION=RESTORED_ORIGINALS_DAEMON_INACTIVE_BACKUP_RETAINED` (oppure
-`ALREADY_RESTORED` a una seconda verifica). Ripristina esattamente byte,
-owner/mode/etichette dei file toccati, originale manifest e policy B5;
-riporta la selezione D285/95/96, lascia fprintd inactive come all'inizio e
-toglie la maschera. Timestamp non necessari non vengono ripristinati.
-Il backup rimane root-only. Nel normale accesso successivo usare la password;
-nessuna nuova serie fingerprint automatica per dimostrare il rollback.
+Dopo ripristino usare il normale accesso password da KDE; nessuna serie
+fingerprint aggiuntiva automatica. Su **PASS mantenere la candidate installata**
+e il backup. Chiudere infine la console root con `exit`: il servizio transitorio
+termina. L'unica digitazione ordinaria è in Konsole; la TTY resta il paracadute.
 
-Su drift il rollback **non sovrascrive lavoro estraneo**: mantenere la console
-e riportare l'errore. Il recupero dopo spegnimento/power-loss non è stato
-provato fisicamente; non pianificare un riavvio durante questa prova.
-
-Su **PASS mantenere la candidate installata** e il backup recuperabile.
-Chiudere la console root con `exit` solo dopo le verifiche: il servizio
-transitorio termina e viene raccolto. Tornare al VT grafico.
-Riportare PASS/FAIL per i consumer, comportamento osservato, testo esatto
-dell'errore e passaggio; niente secret, impronte o bundle. Log mirati soltanto
-se un failure reale li rende necessari.
+Riportare PASS/FAIL per i consumer, messaggio esatto e passaggio del failure.
+Niente password, segreti, impronte o bundle. Log aggiuntivi soltanto dopo un
+failure reale. La UX è verificata offline; il suo comportamento reale resta
+parte del prossimo Human Gate.

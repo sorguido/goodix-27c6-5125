@@ -27,12 +27,18 @@ def module(name):
 
 manifest = module('manifest')
 inventory = module('inventory')
+recovery = module('recovery')
 MATERIAL = '/var/lib/goodix-5125-poc/target-material-manifest.json'
 BACKUP = '/var/lib/goodix-27c6-5125-migration'
 MASK = '/run/systemd/system/fprintd.service'
 POLICY = 'goodix_fprint_account_delete'
 POLICY_SHA = '674740ba782b501a68dbaff9bef04d725cc9e88adad6f37c6f3c468a2cc71d03'
 CIL_SHA = 'e993729e97ad84f2a89e6cd41bbdb2e5f557a9898f0d96962183053bea0a69f3'
+VENDOR_DROPIN = '/usr/lib/systemd/system/service.d/10-timeout-abort.conf'
+EXPECTED_DROPINS = [VENDOR_DROPIN,
+    '/etc/systemd/system/fprintd.service.d/90-goodix-d285-01.conf',
+    '/etc/systemd/system/fprintd.service.d/95-goodix-d293-native.conf',
+    '/etc/systemd/system/fprintd.service.d/96-goodix-login-early.conf']
 VENDOR = {
     '/usr/lib/pam.d/plasmalogin': (
         b'auth        sufficient    /usr/lib64/security/pam_fprintd.so max-tries=3 timeout=45 debug\n', b'',
@@ -246,10 +252,11 @@ class Host:
                 'selinux-policy-targeted-44.9-1.fc44.noarch', 'policy_package_drift')
         require(self.run('/usr/bin/systemctl','show','fprintd.service','-p','FragmentPath','--value') ==
                 '/usr/lib/systemd/system/fprintd.service', 'fprintd_unit_override')
-        require(self.run('/usr/bin/systemctl','show','fprintd.service','-p','DropInPaths','--value').split() == [
-            '/etc/systemd/system/fprintd.service.d/90-goodix-d285-01.conf',
-            '/etc/systemd/system/fprintd.service.d/95-goodix-d293-native.conf',
-            '/etc/systemd/system/fprintd.service.d/96-goodix-login-early.conf'], 'fprintd_dropins_drift')
+        actual = self.run('/usr/bin/systemctl','show','fprintd.service','-p','DropInPaths','--value').split()
+        if actual != EXPECTED_DROPINS:
+            print('FPRINTD_EXPECTED_DROPINS='+json.dumps(EXPECTED_DROPINS),file=sys.stderr)
+            print('FPRINTD_ACTUAL_DROPINS='+json.dumps(actual),file=sys.stderr)
+            raise RuntimeError('fprintd_dropins_drift')
 
 class Migration:
     def __init__(self, fs, host, plan=None, checkpoint=None):
@@ -299,6 +306,7 @@ class Migration:
 
     def before(self):
         self.no_candidate(); self.host.qualify(); self.guards()
+        require(self.fs.info(recovery.SHORT) is None, 'short_recovery_path_collision')
         require(self.host.inactive(), 'fprintd_must_be_inactive')
         require(self.fs.info(MASK) is None, 'runtime_override_present')
         require(self.host.policy() == 'legacy', 'legacy_policy_missing')
@@ -355,10 +363,17 @@ class Migration:
             require(row['after'] == (digest(after) if after is not None else None), 'postimage_contract_drift')
         policy, _ = self.fs.read(BACKUP + '/recovery-policy.pp', 0o600, 65536)
         require(digest(policy) == POLICY_SHA, 'recovery_policy_drift')
+        require(set(state['recovery']) == set(recovery.PATHS), 'recovery_file_set_drift')
+        for name, expected in state['recovery'].items():
+            data, _ = self.fs.read(BACKUP+'/recovery/'+name,0o600)
+            require(digest(data) == expected, 'saved_manager_recovery_drift')
+        if self.fs.info(recovery.SHORT) is not None:
+            data,_ = self.fs.read(recovery.SHORT,0o700,4096)
+            require(data == recovery.SHORT_BYTES, 'short_recovery_command_drift')
         return state
 
     def source(self):
-        return {p:digest((HERE/p).read_bytes()) for p in ('migration.py','manifest.py','inventory.py','host-plan.json')}
+        return {p:digest((HERE/p).read_bytes()) for p in ('migration.py','manifest.py','inventory.py','host-plan.json','recovery.py')}
 
     def original(self, row):
         return self.fs.read(BACKUP+'/'+row['backup'], 0o600, 65536)[0]
@@ -423,6 +438,12 @@ class Migration:
         state['source'] = {name:digest(data) for name,data in sources.items()}
         for name,data in sources.items():
             self.fs.write(pending+'/'+name,data,0o600,exclusive=True)
+        saved = recovery.sources(HERE.parents[2])
+        for directory in recovery.DIRECTORIES:
+            self.fs.mkdir(pending+'/recovery'+directory)
+        for name,data in saved.items():
+            self.fs.write(pending+'/recovery/'+name,data,0o600,exclusive=True)
+        state['recovery'] = {name:digest(data) for name,data in saved.items()}
         self.fs.write(pending+'/state.json',(json.dumps(state,sort_keys=True,indent=2)+'\n').encode(),0o600,exclusive=True)
         fd, leaf = self.fs.parent(BACKUP)
         try: os.rename(leaf+'.pending',leaf,src_dir_fd=fd,dst_dir_fd=fd); os.fsync(fd)
@@ -440,6 +461,7 @@ class Migration:
         self.snapshot(state,policy_path)
         try:
             self.validate(state,'before')
+            self.fs.write(recovery.SHORT,recovery.SHORT_BYTES,0o700,exclusive=True)
             self.fs.set_mask(); self.host.reload(); self.host.stop()
             require(self.host.inactive(), 'daemon_did_not_stop')
             self.checkpoint('masked')
@@ -521,12 +543,9 @@ def main():
     fs = Files()
     lock = None
     try:
-        # Preflight is read-only. Mutations recheck everything under a process
-        # lock; the empty lock file is not a grant or an authorization token.
+        # Directory flock needs no new lock file, even on negative preflight.
         if action != '--preflight':
-            lock = os.open('/run/lock/goodix-migration.lock',os.O_WRONLY|os.O_CREAT|os.O_NOFOLLOW,0o600)
-            s=os.fstat(lock)
-            require(stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and stat.S_IMODE(s.st_mode)==0o600,'unsafe_lock')
+            lock = os.open('/run',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         migration=Migration(fs,Host())
         if action == '--preflight':
