@@ -16,26 +16,48 @@ backup o file. I dati aperti usano `O_NOATIME`; gli antenati sono aperti senza
 seguire symlink. Non ci sono parametri, selezione di root, retry o percorsi
 presi dagli stati. I file di test usano esclusivamente directory sintetiche.
 
-Da una **shell root già disponibile**, ottenuta tramite un percorso password
-indipendente dal fingerprint e senza cambiare la configurazione, eseguire:
+Il primo handoff richiedeva una shell root già disponibile. L'Utente ha
+riportato uid 1000 e un solo `su -` fallito, senza eseguire l'inventario o
+modificare il sistema. Non ripetere `su`: la causa del fallimento non è stata
+stabilita e non occorre cambiare la password root.
+
+Il percorso corrente usa **Polkit Fedora già installato**, verificato in sola
+lettura: `/etc/pam.d/polkit-1` assente, vendor `polkit-1 → system-auth → pam_unix`,
+nessun modulo fingerprint in quella catena; patch Polkit locale assente.
+La regola Fedora indica `wheel` come gruppo amministratore e `guido` ne fa
+parte. Le regole locali root-only non sono state lette: l'identità effettivamente
+offerta e la concessione dell'autorizzazione restano da osservare.
+
+Dal terminale della **sessione KDE corrente di guido**, eseguire una sola volta:
 
 ```bash
-/usr/bin/python3 -I -B /home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/inventory.py
+/usr/bin/pkexec --disable-internal-agent --user root /usr/bin/python3 -I -B /home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/inventory.py
 ```
 
-Non anteporre `sudo`: il sudo corrente seleziona D285 e può avviare il sensore
-durante l'autenticazione. Lo script non acquisisce privilegi e non autentica.
-Se non è disponibile una shell root con accesso password indipendente, fermarsi
-e riportarlo; non modificare PAM/sudoers, non usare pkexec o provare il sensore
-per ottenere il report. `-I -B` isola Python da moduli/configurazioni utente e
-disabilita la scrittura di bytecode. Il comando funziona da qualsiasi directory.
+Nel dialogo KDE verificare il programma `/usr/bin/python3` e l'identità
+amministrativa **guido**; inserire una sola volta la password di guido. Root è
+l'utente del processo d'inventario, non la password da inserire. Se vengono
+offerte più identità, scegliere guido; se guido manca, viene richiesta soltanto
+la password root, compare fingerprint o il primo inserimento password fallisce,
+annullare e riportare il messaggio. Non eseguire retry o contatti sul sensore.
+Se il comando fallisce senza dialogo, fermarsi e riportare l'errore.
+
+`--disable-internal-agent` richiede l'agente già registrato della sessione e
+impedisce il ripiego a un nuovo agente testuale. `pkexec` esegue direttamente
+il solo script come root, senza aprire una shell e senza usare il selettore
+sudoers D285. Non anteporre sudo. Non vengono installate patch, modificati
+PAM/policy/password o riavviati servizi fprintd. Sono possibili i normali log
+di autenticazione del sistema; lo script resta privo di scritture.
+`-I -B` isola Python da moduli/configurazioni utente e disabilita il bytecode.
+Il comando funziona da qualsiasi directory e l'AI non lo esegue.
 
 Il solo output da restituire all'AI è il JSON completo. L'exit zero significa
 che il report è stato raccolto, non che l'inventario o la migrazione sono PASS.
 `UNKNOWN_STOP` segnala un errore, un tipo/percorso non sicuro o il superamento
 di un limite; anche `ABSENT` va interpretato in review. Non riprovare con chmod,
-nuovi privilegi o rimozione di file. Interrompere in caso di richieste di
-autenticazione, attivazione sensore o comportamento diverso dalla sola stampa.
+rimozione di file o altre modalità di autenticazione. Dopo il dialogo password
+previsto deve comparire soltanto il report: interrompere davanti ad altre
+richieste, attivazione sensore o comportamento diverso.
 
 Le letture sono elencate integralmente nelle costanti e in `collect()`:
 

@@ -270,7 +270,7 @@ class Inventory:
 
 def main():
     if len(sys.argv) != 1 or os.geteuid() != 0:
-        print('INVENTORY=REFUSED requires_existing_root_shell no_sudo_or_authentication_by_script')
+        print('INVENTORY=REFUSED requires_root_execution no_sudo_or_authentication_by_script')
         return 2
     print(json.dumps(Inventory().collect(), indent=2, sort_keys=True))
     return 0  # A collected report is never migration approval.

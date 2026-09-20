@@ -147,7 +147,7 @@ Il task Utente `AI_PM_MIGRATE_PATCHED_HOST_TO_COMBINED_CANDIDATE.md` parte da
 allineato anche al ref remoto privato. Il suo caso A impone di fermarsi prima
 della migrazione quando l'inventario richiede letture root-only. Questo è il
 boundary corrente: nessun apply, rollback storico, installazione candidate,
-autenticazione reale o accesso al sensore è stato eseguito.
+autenticazione reale o accesso al sensore è stato eseguito dall'AI.
 
 La lettura host come uid 1000, fuori dalla rimappatura owner del sandbox,
 conferma fprintd `inactive/dead`, drop-in `90 D285 → 95 D293 → 96 login-early`
@@ -192,9 +192,34 @@ autenticazione; legge path fissi, proietta soltanto campi software degli stati,
 esclude i pin template D285, raccoglie solo metadata per materiali/impronte e
 stampa JSON. Otto test sintetici PASS verificano assenza di scritture e
 variazioni atime, esclusione dati protetti, limiti, rifiuto di symlink/hardlink/
-FIFO, failure reporting e invocazione da cwd diverso senza root. L'esecuzione
-root resta all'Utente da una shell già disponibile con accesso password
-indipendente: non anteporre sudo, che sul PC corrente può selezionare D285.
+FIFO, failure reporting e invocazione da cwd diverso senza root.
+
+**Risposta al gate e percorso corrente:** dopo il commit
+`0a8611608fe302c272d35d3e335169e0c218e06e` l'Utente ha riportato uid 1000/guido,
+PAM su/password verificato read-only e un solo `su -` fallito, senza sudo,
+pkexec, modifiche password/configurazioni o esecuzione dell'inventario. La
+causa dell'errore su non è nota; la shell root richiesta inizialmente non è
+disponibile. Quell'handoff è sostituito dal solo inventario via **pkexec con
+password amministrativa di guido**, eseguito manualmente dall'Utente.
+
+La nuova lettura non privilegiata conferma il PAM Polkit vendor conforme a
+RPM, override `/etc/pam.d/polkit-1` assente, catena `polkit-1 → system-auth →
+pam_unix` senza fingerprint e patch locale Polkit ancora assente. pkexec e
+helper installati coincidono coi digest del package polkit 127-2.fc44.2.
+La regola amministrativa Fedora indica wheel e guido appartiene a wheel;
+le regole locali `/etc/polkit-1/rules.d` sono root-only, quindi concessione e
+identità offerte restano da osservare, non sono un PASS già acquisito.
+
+Il README aggiornato consegna una sola invocazione diretta dello script con
+`pkexec --disable-internal-agent --user root`, nella sessione KDE di guido.
+Non apre una shell root e non usa sudoers D285; nessuna patch viene installata.
+Il cambiamento sostanziale rispetto a su è autenticare l'amministratore locale
+tramite il PAM Polkit esistente. Se guido non è disponibile, il dialogo chiede
+soltanto root/fingerprint, manca l'agente o la prima password fallisce, si
+annulla e si riporta l'errore, senza retry o altri canali. Nessun contatto è
+previsto. L'AI non esegue pkexec né l'inventario root. L'autenticazione umana
+può produrre normali log di sistema; il collector non scrive file e la
+configurazione installata resta invariata. Nessun nuovo kit o D-number.
 
 `OUTCOME=HUMAN_REQUIRED`; `GATE=PRIVILEGED_READ_ONLY_INVENTORY`;
 `ADVANCEMENT=OBSERVED_OVERLAY_MAP_AND_BOUNDED_MISSING_EVIDENCE_INVENTORY`;

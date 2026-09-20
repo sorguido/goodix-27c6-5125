@@ -109,6 +109,50 @@ loader storico e materiali canonici deve ancora essere risolta, senza import,
 overwrite o esportazione dei materiali. Nessuna garanzia di rollback esatto
 può essere dichiarata prima di tale ricostruzione.
 
+## Risposta al gate: shell root non disponibile
+
+Ripartenza a `0a8611608fe302c272d35d3e335169e0c218e06e`, development pulito e
+allineato al remoto. L'Utente attesta uid 1000/guido, lettura di su/system-auth/
+postlogin, una sola esecuzione `su -` fallita e nessun sudo, pkexec, cambio
+password/configurazioni o esecuzione inventory. Non si attribuisce il failure
+a password errata, root bloccato o altra causa non provata; niente retry su su.
+
+La verifica corrente non privilegiata qualifica un'alternativa circoscritta:
+`pkexec → agente KDE → helper PAM polkit-1 → system-auth → pam_unix`.
+Il vendor PAM è conforme al digest RPM riportato sopra; override `/etc`, leaf
+fingerprint, stato/modulo locale e drop-in helper della patch Polkit sono
+assenti. system-auth conserva il digest `2e53f704…` e non contiene pam_fprintd,
+pam_goodix o pam_exec. Non c'è dipendenza dal servizio/selettore sudo D285.
+
+I binari installati polkit 127-2.fc44.2 sono root:root 04755 e coincidono
+con i digest RPM:
+
+- `/usr/bin/pkexec`: `926bdb901a39b1cc0fb051dea2c789d95f53e1ef13794e923d7469cd6d579d9a`;
+- `/usr/lib/polkit-1/polkit-agent-helper-1`: `026972c2853aa610480cdf5957dacdf28d7b07059977282cfee0a5d8deb0605a`.
+
+Il manuale pkexec installato documenta utente target root, esecuzione diretta
+del comando, agente della sessione e `--disable-internal-agent` per impedire
+il fallback a un agente testuale. Il sorgente helper Polkit 127 già studiato
+nel boundary precedente chiama `pam_start("polkit-1", user_to_auth, ...)`.
+L'azione vendor `org.freedesktop.policykit.exec` richiede auth_admin;
+`/usr/share/polkit-1/rules.d/50-default.rules`, digest RPM verificato
+`4192b104907809623aa7ca4c58e1527da19710bae6278abe96f88d9f2d6430e9`,
+indica `unix-group:wheel`; `id` sul target conferma guido in wheel.
+`/etc/polkit-1/rules.d` non è leggibile senza root: non si dichiara qualificata
+la decisione finale delle regole locali. Un diniego, identità diversa da guido
+o assenza dell'agente causa STOP; non richiede cambi di configurazione.
+
+**Riesame del metodo:** si usa la password dell'amministratore locale tramite
+il PAM Polkit osservato, invece di ripetere l'accesso con credenziali root via
+su. L'ipotesi da verificare è che la policy corrente consenta a guido di
+eseguire il solo inventario. Se fallisce, annullare al primo errore e riportarlo;
+nessun secondo tentativo automatico, nuovo canale o modifica PAM per aggirarlo.
+Non è una live biometrica: nessun contatto è previsto e la patch fingerprint
+Polkit rimane assente. È una normale autenticazione privilegiata dell'Utente,
+ancora oltre il gate per l'AI. Può generare i normali log di autenticazione,
+non una modifica della configurazione installata. Il README contiene il solo
+comando manuale; il collector è invariato salvo il testo di rifiuto non-root.
+
 ## Closure di questo gate
 
 ```text
@@ -135,7 +179,11 @@ EXECUTABLE_CLOSURE=INVENTORY_OFFLINE_VERIFIED_ROOT_EXECUTION_PENDING
 HOST_CHANGED=false
 POLKIT_PATCH_INSTALLED=false
 REAL_SENSOR_ACCESS=false
-NEXT_OPERATOR_ACTION=RUN_SINGLE_READ_ONLY_INVENTORY_FROM_EXISTING_ROOT_SHELL
+ROOT_SHELL_AVAILABLE=false
+SU_ATTEMPT=USER_REPORTED_FAILED_ONCE_CAUSE_UNKNOWN
+PKEXEC_PAM_ROUTE=PASSWORD_ONLY_VERIFIED_READ_ONLY
+PKEXEC_AUTHORIZATION=HUMAN_EXECUTION_PENDING
+NEXT_OPERATOR_ACTION=RUN_SINGLE_PKEXEC_INVENTORY_WITH_GUIDO_PASSWORD
 ```
 
 Candidate build normal/sanitizer, Polkit/sudo/private-bus/managed suites,
