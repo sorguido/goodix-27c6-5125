@@ -140,9 +140,81 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — prepared-login fino a tre tentativi (20 settembre 2026)
+### Stato corrente — Polkit/Discover: diagnosi e blocco UX (20 settembre 2026)
 
-Task corrente `GOODIX_PREPARED_LOGIN_THREE_BOUNDED_ATTEMPTS.md`, entry HEAD
+Il task esplicito `AI_PM_POLKIT_FINGERPRINT_DISCOVER.md` richiede fingerprint
+nel dialogo KDE/Polkit, password immediata e nessun nuovo ciclo di retry.
+Recovery su `development`, HEAD iniziale
+`59167be30742ae270a91502cf094d55aa5fe978d`, worktree pulito. L'audit non
+privilegiato ha identificato una causa sufficiente del mancato fingerprint:
+`/usr/lib/pam.d/polkit-1` include `system-auth`, privo di `pam_fprintd`.
+L'override `/etc/pam.d/polkit-1` è assente. Authselect è `local` con
+`with-silent-lastlog` e `with-mdns4`, senza `with-fingerprint`;
+`fingerprint-auth` restituisce `authinfo_unavail`. Non è un NO MATCH del driver:
+questo percorso PAM non lo invoca.
+
+Il target osservato è Fedora 44 KDE x86_64, polkit `127-2.fc44.2`,
+polkit-kde/plasma-workspace `6.7.5-1.fc44`, fprintd/fprintd-pam `1.94.5-5.fc44`,
+authselect `1.7.1-1.fc44`. Polkit e agente KDE sono attivi; il socket helper
+è inattivo. La verifica RPM non rileva drift in polkit, polkit-kde o
+fprintd-pam; in plasma-workspace segnala soltanto il noto `kde-fingerprint`.
+Il primo controllo nel sandbox rimappava owner/group e non accedeva al bus:
+le verifiche sono state ripetute fuori dal sandbox come normale utente,
+senza sudo, confermando i metadata `root:root:0644` dei PAM ispezionati.
+
+Il PC usa ancora i drop-in D285/D293/login-early, con precedenza del `96`
+login-early. La regola login osservata ora è `max-tries=3 timeout=8 debug`:
+questa osservazione aggiorna la precedente fotografia a un tentativo, ma non
+prova il riarmo fisico dopo NO MATCH. State e current link managed sono assenti.
+`kde-fingerprint` usa il modulo Fedora con `max-tries=3 timeout=45`.
+Il normale file `sudo` include lo stesso system-auth senza fingerprint;
+esiste però `goodix-d285-01-sudo`, che usa il modulo Fedora con tre tentativi.
+Il selettore sudoers non è leggibile senza privilegi: il percorso specifico
+è compatibile con i PASS storici, non è stato riverificato come selezione
+effettiva corrente. Non si riabilita authselect per deduzione da quei PASS.
+
+**Blocco della correzione semplice:** il PAM Fedora 1.94.5 attende D-Bus e
+SIGINT, non l'arrivo della password. L'helper Polkit esegue una conversazione
+PAM seriale. Inserire fingerprint prima di system-auth rimanda la password
+all'esito/timeout fingerprint; il timeout è per tentativo e non limita tutta
+la richiesta. Il rischio è coerente con
+[polkit #650](https://github.com/polkit-org/polkit/issues/650), riferito a un
+altro host: nessun ritardo Polkit è stato misurato sul target in questa sessione.
+Mettere fingerprint dopo l'include invariato non realizza un OR corretto:
+il `pam_deny required` del ramo password fallito resta un errore della stack.
+Cambiare control flow o richiedere un Invio vuoto prima dell'impronta modifica
+il workflow e non risolve il passaggio immediato da un NO MATCH alla password.
+
+Il sorgente KDE tag `v6.7.5` consente inoltre fino a tre conversazioni complessive,
+con due riavvii dopo fallimento non cancellato. Tre tentativi del modulo sono
+per conversazione: non sono un
+limite globale del dialogo. Il limite prepared-login è specifico di plasmalogin
+e non si estende a polkit-1. Questo è un rischio da codice upstream della
+stessa versione, non una serie di nove contatti osservata sul sensore.
+
+**Decisione PM: HUMAN_REQUIRED, secondo §B del prompt.** Nessuna regola PAM,
+patch installabile o integrazione release Polkit viene dichiarata pronta.
+Il modulo Fedora è il percorso compatibile con la normale API Claim già
+usata da KScreenLocker; il modulo candidate passa a ClaimLogin soltanto per
+plasmalogin e non aggiunge concorrenza per Polkit. Il path candidate è inoltre
+assente sul PC. Una modifica della conversazione/cancellazione richiede una
+decisione di strategia; un timeout ridotto da solo non soddisfa i requisiti.
+
+La diagnosi, la classificazione delle otto ipotesi, provenance delle fonti,
+alternative e limiti sono in
+`development/issues/polkit-fingerprint/README.md`. Il lifecycle esistente
+resta invariato: 26 test su root sintetica PASS. Non sono test di supporto
+Polkit, né una nuova prova sudo/login/unlock. Documentazione del confine release
+chiarita; niente modifica host, USB, autenticazione o materiale protetto.
+
+`ROOT_CAUSE=POLKIT_SYSTEM_AUTH_WITHOUT_PAM_FPRINTD`,
+`REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED` per la soluzione completa,
+`ADVANCEMENT=HOST_AUTH_CHAIN_AND_UX_BLOCKER_IDENTIFIED`,
+`EXECUTABLE_CLOSURE=NOT_APPLICABLE` al delta documentale.
+
+### Ultimo avanzamento implementativo — prepared-login fino a tre tentativi (20 settembre 2026)
+
+Task precedente `GOODIX_PREPARED_LOGIN_THREE_BOUNDED_ATTEMPTS.md`, entry HEAD
 `2e09880433e4b9f24a38e897cb974c6df504e39f`, `development` pulito. L'Utente riferisce
 READY/Claim/attach e prima immagine funzionanti, seguiti da indisponibilità dopo
 NO MATCH. Non è stata eseguita dall'AI una nuova acquisizione. La lettura della

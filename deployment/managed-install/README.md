@@ -33,6 +33,15 @@ Run the host-only transaction tests with:
 python3 deployment/managed-install/test_offline.py
 ```
 
+Polkit/Discover fingerprint authentication is not currently managed or
+validated. This installer does not create a `polkit-1` PAM override or enable
+global authselect fingerprint support. On a profile without fingerprint in
+`system-auth`, Fedora's vendor Polkit stack remains password-only. Adding
+`pam_fprintd` before that stack would serialize password authentication behind
+fingerprint verification; its per-conversation retry limit also does not bound
+KDE's repeated authentication sessions. Existing login/KScreenLocker validation
+does not establish Polkit support.
+
 The complete candidate includes libfprint, the paired fprintd/PAM extension,
 greeter parent/drop-in, both PAM integrations and account-delete protection.
 Prepared login permits up to three explicit physical attempts (8 s each),
