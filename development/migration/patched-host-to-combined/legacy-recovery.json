@@ -1,0 +1,15 @@
+{
+  "recovery": {
+    "deployment/managed-install/root-transaction.sh": "d304c2e2004a10a6761e67f8eb6dca90e15f8f1921e21e984545bfc24bd74356",
+    "production/polkit/deploy.py": "7c4678b828bf4b3b27dbbc550c8ac0b1617c00a043ebab4e62c41917643886d3",
+    "production/sudo/rules.py": "05ab5a9f049838ce5ce510e495889a367b4439cd1db13713b3f1884f11b47a18"
+  },
+  "source": {
+    "host-plan.json": "e807881d26ad6056cf1dff91fbd717024407c69b11033db253a90ffd93e4a2a4",
+    "inventory.py": "c48612ed42e43f85a3dc87c7b0ffbef055ac1d7bc2510825c4c45379eadc9190",
+    "manifest.py": "90283dbd86cd61da1196a37af65d15a45aa6e2b0fcbf5c5cb66aaf867e7a6744",
+    "migration.py": "cdca61f52d2b80bb9537d59ad67dce171732762c228c4c9e3e8cbee8cd67cf74",
+    "recovery.py": "2b37a7e840bad695cc2bfbf846ee1c761af851a97627ff6f8b0a8721f0c28fa5"
+  },
+  "source_commit": "f97de44e0192f249ccb80fd9b32e1488195f0101"
+}

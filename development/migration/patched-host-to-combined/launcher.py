@@ -98,7 +98,7 @@ def console_ready(host):
 
 def run_flow(tx,invoke,ask,check_delivery):
     # preflight stays read-only; negative preflight never reaches apply.
-    tx.before(); console_ready(tx.host)
+    tx.before(armed=True); console_ready(tx.host)
     print('PREFLIGHT=PASS. Console di emergenza mantenuta; nessuna attività biometrica automatica.',flush=True)
     ask('Invio: applica la migrazione; Ctrl+C: esci senza modifiche. ')
     check_delivery()
@@ -131,14 +131,14 @@ def run_flow(tx,invoke,ask,check_delivery):
 def main():
     args=sys.argv[1:]
     if args in ([],['--help']):
-        print('Uso da KDE/Konsole: operator.sh check | preflight | console | run\n'
-              'check: solo consegna offline; preflight: root read-only; console: solo recovery; '
+        print('Uso da KDE/Konsole: operator.sh check | preflight | rearm | console | run\n'
+              'check: solo consegna offline; preflight: root read-only; rearm: prepara nuovo tentativo dopo rollback; console: solo recovery; '
               'run: fasi esplicite, poi stop prima delle prove biometriche.'); return 0
     require(len(args)==1,'usage')
     action=args[0]
     if action.startswith('--root-'):
         require(os.geteuid()==0 and os.environ.get('PKEXEC_UID')=='1000','operator_root_boundary')
-        require(action in ('--root-preflight','--root-console','--root-run'),'root_action')
+        require(action in ('--root-preflight','--root-rearm','--root-console','--root-run'),'root_action')
         delivery(); password_only()
         spec=importlib.util.spec_from_file_location('migration',HERE/'migration.py')
         m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
@@ -149,7 +149,10 @@ def main():
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
             def invoke(command): subprocess.run(command,check=True,env=ENV)
             if action=='--root-preflight':
-                tx.before(); print('OPERATOR=PREFLIGHT_PASS_NO_CONFIGURATION_CHANGE')
+                print('OPERATOR='+tx.preflight())
+            elif action=='--root-rearm':
+                console_ready(tx.host)
+                print('OPERATOR='+tx.rearm(POLICY))
             elif action=='--root-console':
                 tx.before()
                 units=tx.host.run('/usr/bin/systemctl','list-units','--all','--plain','--no-legend',
@@ -164,7 +167,7 @@ def main():
         finally: os.close(lock); fs.close()
     else:
         require(os.geteuid()==1000,'operator_must_be_guido')
-        require(action in ('check','preflight','console','run'),'usage')
+        require(action in ('check','preflight','rearm','console','run'),'usage')
         head=delivery(); print('DELIVERY=PASS SOURCE_COMMIT='+head,flush=True)
         if action=='check': return 0
         password_only()
@@ -176,7 +179,7 @@ if __name__=='__main__':
     try: sys.exit(main())
     except KeyboardInterrupt:
         print('OPERATOR=STOP interrupted_no_retry',file=sys.stderr); sys.exit(130)
-    except (OSError,ValueError,KeyError,RuntimeError,subprocess.SubprocessError) as error:
+    except (OSError,ValueError,KeyError,TypeError,AttributeError,RuntimeError,subprocess.SubprocessError) as error:
         reason=str(error) if isinstance(error,RuntimeError) else 'io_or_subprocess_failure'
         if not re.fullmatch('[A-Za-z0-9_]+',reason): reason='validation_failure'
         print('OPERATOR=STOP reason='+reason+' keep_recovery_console',file=sys.stderr); sys.exit(1)

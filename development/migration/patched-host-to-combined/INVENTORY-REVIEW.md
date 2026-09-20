@@ -14,6 +14,66 @@ resta `dfc33c3e44d6172dc7244b4f958ad71be3774be5`. Nessun altro worktree, reset,
 stash, cambio branch o autenticazione dell'AI. Le query host restano uid 1000;
 i metadata root-only provengono dal JSON consegnato dall'Utente.
 
+## Correttivo successivo alla run f97de44: RPM e riarmo
+
+Evidenza operatore: preflight reale PASS, apply mascherato PASS, password PASS,
+release, install STOP `plasmalogin_vendor_pam_package_drift`, rollback automatico
+PASS. Nessun workflow sensore. Nuovo preflight STOP sulla recovery preservata.
+I precedenti risultati solo-offline sono quindi aggiornati senza inferire un
+PASS candidate/live. HEAD iniziale `f97de44e0192f249ccb80fd9b32e1488195f0101`, pulito.
+
+Query read-only uid 1000 e riproduzione con librpm dimostrano l'mtime:
+
+- PAM Plasma package: 1010 byte, SHA `c6fc4a0b…`, 0100644 root/root, data
+  `1788825600`, caps `(none)`, verifyflags `4294967295`, fileflags 0;
+- file storico dopo rollback: 1100 byte, SHA `559910be…`, mode/owner corretti,
+  label `system_u:object_r:lib_t:s0`, `mtime_ns=1789933663280138531`, flags `S.5....T.`;
+- trasformazione precedente riprodotta in /tmp: **solo RPMVERIFY_MTIME=32**;
+  stessa post-image con mtime package: **RPMVERIFY_NONE=0**. Header RPM copiato
+  in memoria e soli path/uid/gid adattati al test utente. Nessuna scrittura RPM DB;
+- KDE package `plasma-workspace`: post-image 520 byte, SHA `8b3181ce…`, stessa
+  data, config/noreplace 17; proprietà/metadata entrambe qualificate nel piano.
+
+Non sono log acquisiti durante il breve intervallo post-apply reale. Sono query
+attuali e una riproduzione del difetto con l'effettivo verificatore RPM. La
+prima verifica in sandbox riportava anche U/G per la mappatura degli utenti:
+scartata come evidenza host, poi ripetuta fuori sandbox sempre uid 1000.
+
+Il gate post-image confronta tutti gli attributi rilevanti e ripete il controllo
+RPM del manager prima di release; il manager production resta immutato. Le nuove
+snapshot registrano mtime ns e lo ripristinano su rollback. Quello precedente
+alla run f97de44 non fu registrato e non viene inventato.
+
+Il rearm autentica codice e backup correnti oppure esatti di f97de44, verifica
+baseline restaurata, archivia per digest completo del vecchio state e conserva
+un riferimento nel nuovo state. Exchange atomico mantiene `/run/gx` utilizzabile.
+Due chiamate sono idempotenti; collisioni estranee STOP; pending prima exchange
+STOP senza cleanup, pending dopo exchange completabile dal medesimo comando.
+La recovery annulla anche il rearm preparato prima di un nuovo apply.
+
+Test: 26 migration, 18 launcher, 13 corrective; 31 managed con login completo,
+PAM 18/15/3 normale e sanitizer, deploy 13 e parser 3 casi in entrambi i modi.
+I casi mirati coprono entrambi i failure reali, mtime e metadata diversi,
+partial install, import della snapshot realmente versionata, rearm/secondo apply,
+foreign/modified short, backup/archivio estranei e drift della baseline.
+Nessuna lettura host dei quattro binari o template; per essi soltanto metadata
+nei futuri comandi umani e fixture sintetici nei test.
+
+Review PM Git-native separata dall'implementazione: esamina direttamente codice,
+diff e output; nessuna seconda istanza agente. README e manuale sono aggiornati,
+nessun Dxxx nuovo, governance/production invariati. Dopo review positiva la
+consegna viene costruita due volte dal commit pulito e i 36 file confrontati;
+SHA finali vengono riportati nell'handoff senza un commit successivo che li
+renda stale. Il prossimo passo resta umano e da KDE, senza cleanup sulla TTY.
+
+Decisione PM del correttivo: `ACCEPT_AND_CONTINUE` alla consegna finale. Log e
+test sono stati riesaminati direttamente; il syscall exchange/reversal è
+verificato come uid 1000 anche con sole directory temporanee sul filesystem
+Btrfs del workspace (stesso tipo osservato per /var/lib), oltre alle root
+sintetiche tmpfs. Il preflight aggiornato resta il probe host read-only prima
+di rearm/apply; la verifica della post-image reale resta un gate tecnico prima
+di release. Nessuna nuova evidenza privilegiata è necessaria per la preparazione.
+
 ## Correttivo successivo a 7d9ccfa: causa dello STOP e UX
 
 Il primo preflight umano è terminato read-only `fprintd_dropins_drift`:

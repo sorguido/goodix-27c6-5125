@@ -177,3 +177,13 @@ Exact saved-source hashes are recorded in transaction state. No production
 source or license boundary changes. The Fedora systemd vendor drop-in is
 preserved on the host and its package digest is recorded; it is not copied
 into the candidate. No protected or biometric contents enter this tooling.
+
+The package metadata/re-arm corrective adds independent GPL-2.0-or-later
+`package_baseline.py`, `rearm.py` and offline tests. `legacy-recovery.json`
+contains only source hashes from private commit
+`f97de44e0192f249ccb80fd9b32e1488195f0101`, including the previously documented
+removal-only manager adapter. It authenticates saved code before import, without
+reading protected material or importing new third-party expression. The RPM
+verification test uses the already installed Fedora librpm Python binding and
+an in-memory copy of package metadata; no RPM database or package is changed.
+No production, license, redistribution or public-repository boundary changes.

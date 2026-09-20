@@ -6,6 +6,8 @@ No USB, authentication, material import, binary/template content reads, or
 historical uninstaller. Snapshots are recovery state, never authorization tokens.
 """
 import base64
+import ctypes
+from types import SimpleNamespace
 import fcntl
 import hashlib
 import importlib.util
@@ -28,6 +30,8 @@ def module(name):
 manifest = module('manifest')
 inventory = module('inventory')
 recovery = module('recovery')
+package_baseline = module('package_baseline')
+rearm = module('rearm')
 MATERIAL = '/var/lib/goodix-5125-poc/target-material-manifest.json'
 BACKUP = '/var/lib/goodix-27c6-5125-migration'
 MASK = '/run/systemd/system/fprintd.service'
@@ -153,7 +157,7 @@ class Files:
             if pin is not None: os.close(pin)
             os.close(fd)
 
-    def write(self, path, data, mode, label='', exclusive=False):
+    def write(self, path, data, mode, label='', exclusive=False, mtime_ns=None):
         fd, leaf = self.parent(path)
         temporary = leaf + '.goodix-migration-new'
         out = None
@@ -170,6 +174,8 @@ class Files:
             os.fchown(out, self.uid, self.gid)
             os.fchmod(out, mode)
             if label: os.setxattr(out, 'security.selinux', base64.b64decode(label, validate=True))
+            if mtime_ns is not None:
+                os.utime(out,ns=(os.fstat(out).st_atime_ns,mtime_ns))
             os.fsync(out); os.close(out); out = None
             if exclusive:
                 os.link(temporary, leaf, src_dir_fd=fd, dst_dir_fd=fd, follow_symlinks=False)
@@ -196,6 +202,24 @@ class Files:
         try: os.mkdir(leaf, 0o700, dir_fd=fd); os.fsync(fd)
         finally: os.close(fd)
 
+    def rename(self, old, new):
+        require(self.info(new) is None, 'rename_destination_exists')
+        a,x=self.parent(old); b,y=self.parent(new)
+        try: os.rename(x,y,src_dir_fd=a,dst_dir_fd=b); os.fsync(a); os.fsync(b)
+        finally: os.close(a); os.close(b)
+
+    def exchange(self, old, new):
+        a,x=self.parent(old); b,y=self.parent(new)
+        try:
+            libc=ctypes.CDLL(None,use_errno=True)
+            call=libc.renameat2
+            call.argtypes=(ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint)
+            call.restype=ctypes.c_int
+            if call(a,x.encode(),b,y.encode(),2) != 0:
+                raise OSError(ctypes.get_errno(),'snapshot_exchange_failed')
+            os.fsync(a); os.fsync(b)
+        finally: os.close(a); os.close(b)
+
     def link_value(self, path):
         fd, leaf = self.parent(path)
         try: return os.readlink(leaf, dir_fd=fd)
@@ -216,6 +240,10 @@ class Host:
                                 env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL':'C'})
         require(result.returncode == 0, 'host_command_failed_' + Path(args[0]).name)
         return result.stdout.decode('utf-8').strip()
+
+    def packages(self, contract, postimage=False):
+        if postimage: package_baseline.verify_host(self,contract)
+        else: package_baseline.qualify(self,contract)
 
     def inactive(self):
         return self.run('/usr/bin/systemctl', 'show', 'fprintd.service', '-p', 'ActiveState', '--value') == 'inactive'
@@ -261,11 +289,35 @@ class Host:
 class Migration:
     def __init__(self, fs, host, plan=None, checkpoint=None):
         self.fs, self.host = fs, host
+        self.backup = BACKUP
+        self.hash = digest
+        self.module_api = SimpleNamespace(HERE=HERE,BACKUP=BACKUP,digest=digest,
+                                          require=require,recovery=recovery,os=os)
         require(plan is None or fs.test, 'real_plan_override_refused')
         self.plan = plan if plan is not None else json.loads((HERE / 'host-plan.json').read_bytes())
         require(set(self.plan['files']) == set(ORDER) - {MATERIAL}, 'plan_file_set')
+        require(set(self.plan['packages']) == set(VENDOR), 'package_contract_file_set')
         self.checkpoint = checkpoint or (lambda phase: None)
         require(checkpoint is None or fs.test, 'real_fault_injection_refused')
+
+    def at(self, directory):
+        other=Migration(self.fs,self.host,plan=self.plan if self.fs.test else None)
+        other.backup=directory
+        return other
+
+    def rearm(self, policy_path):
+        return rearm.rotate(self,policy_path)
+
+    def preflight(self):
+        self.before()
+        if self.fs.info(self.backup):
+            state,_=rearm.saved(self,self.backup)
+            if state['status']=='RESTORED': return 'PREFLIGHT_PASS_REARM_REQUIRED'
+        return 'PREFLIGHT_PASS_NO_CONFIGURATION_CHANGE'
+
+    def package_compatible(self, state):
+        package_baseline.check_files(self,state)
+        self.host.packages(self.plan['packages'],postimage=True)
 
     def guards(self):
         for p, row in self.plan['guards'].items():
@@ -304,9 +356,18 @@ class Migration:
         for path in COLLISIONS:
             require(self.fs.info(path) is None, 'candidate_present_uninstall_first')
 
-    def before(self):
+    def before(self, armed=False):
         self.no_candidate(); self.host.qualify(); self.guards()
-        require(self.fs.info(recovery.SHORT) is None, 'short_recovery_path_collision')
+        self.host.packages(self.plan['packages'])
+        if self.fs.info(self.backup):
+            previous,_=rearm.saved(self,self.backup)
+            require(not armed or previous['status']=='PREPARED','restored_attempt_requires_rearm')
+            if armed:
+                require(self.fs.info(self.backup+'.pending') is None,'rearm_finalize_required')
+                rearm.finish(self,previous)
+        else:
+            require(self.fs.info(recovery.SHORT) is None, 'short_recovery_path_collision')
+            require(self.fs.info(self.backup+'.pending') is None,'incomplete_snapshot_keep_recovery')
         require(self.host.inactive(), 'fprintd_must_be_inactive')
         require(self.fs.info(MASK) is None, 'runtime_override_present')
         require(self.host.policy() == 'legacy', 'legacy_policy_missing')
@@ -332,40 +393,41 @@ class Migration:
                 require(digest(after) == expected, 'vendor_digest_mismatch')
             else:
                 after = None
-            files[p] = dict(mode=row['mode'], label=label, before=row['sha256'],
+            files[p] = dict(mode=row['mode'], label=label, mtime_ns=self.fs.info(p)['mtime_ns'], before=row['sha256'],
                             after=digest(after) if after is not None else None,
                             backup='original-manifest.json' if p == MATERIAL else str(index))
-        return dict(schema=1, status='PREPARED', files=files, preserved=self.preserve()), files
+        return dict(schema=2, status='PREPARED', files=files, preserved=self.preserve()), files
 
     def save(self, state):
-        self.fs.write(BACKUP + '/state.json', (json.dumps(state,sort_keys=True,indent=2)+'\n').encode(), 0o600)
+        self.fs.write(self.backup + '/state.json', (json.dumps(state,sort_keys=True,indent=2)+'\n').encode(), 0o600)
 
     def state(self):
-        info = self.fs.info(BACKUP)
+        info = self.fs.info(self.backup)
         require(info is not None and info['type'] == stat.S_IFDIR and info['mode'] == 0o700
                 and info['uid'] == self.fs.uid and info['gid'] == self.fs.gid, 'recovery_directory_invalid')
-        data, _ = self.fs.read(BACKUP + '/state.json', 0o600, 65536)
+        data, _ = self.fs.read(self.backup + '/state.json', 0o600, 65536)
         state = json.loads(data)
-        require(state['schema'] == 1 and set(state['files']) == set(ORDER)
+        require(state['schema'] == 2 and set(state['files']) == set(ORDER)
                 and state['status'] in ('PREPARED','APPLIED','RESTORED'), 'recovery_state_invalid')
         require(state['source'] == self.source(), 'migration_source_changed_use_saved_version')
         for name, expected in state['source'].items():
-            data, _ = self.fs.read(BACKUP+'/'+name,0o600)
+            data, _ = self.fs.read(self.backup+'/'+name,0o600)
             require(digest(data) == expected, 'saved_recovery_source_drift')
         for index,p in enumerate(ORDER):
             row = state['files'][p]
             require(row['backup'] == ('original-manifest.json' if p == MATERIAL else str(index)), 'backup_path_invalid')
             expected = self.plan['files'].get(p, {'mode':0o600,'sha256':manifest.LEGACY_SHA256})
             require(row['mode'] == expected['mode'] and row['before'] == expected['sha256'], 'backup_contract_drift')
-            original, _ = self.fs.read(BACKUP+'/'+row['backup'], 0o600, 65536)
+            require(type(row['mtime_ns']) is int and 0 <= row['mtime_ns'] < 2**63,'backup_mtime_invalid')
+            original, _ = self.fs.read(self.backup+'/'+row['backup'], 0o600, 65536)
             require(digest(original) == row['before'], 'backup_digest_drift')
             after = self.converted(p,original)
             require(row['after'] == (digest(after) if after is not None else None), 'postimage_contract_drift')
-        policy, _ = self.fs.read(BACKUP + '/recovery-policy.pp', 0o600, 65536)
+        policy, _ = self.fs.read(self.backup + '/recovery-policy.pp', 0o600, 65536)
         require(digest(policy) == POLICY_SHA, 'recovery_policy_drift')
         require(set(state['recovery']) == set(recovery.PATHS), 'recovery_file_set_drift')
         for name, expected in state['recovery'].items():
-            data, _ = self.fs.read(BACKUP+'/recovery/'+name,0o600)
+            data, _ = self.fs.read(self.backup+'/recovery/'+name,0o600)
             require(digest(data) == expected, 'saved_manager_recovery_drift')
         if self.fs.info(recovery.SHORT) is not None:
             data,_ = self.fs.read(recovery.SHORT,0o700,4096)
@@ -373,10 +435,10 @@ class Migration:
         return state
 
     def source(self):
-        return {p:digest((HERE/p).read_bytes()) for p in ('migration.py','manifest.py','inventory.py','host-plan.json','recovery.py')}
+        return {p:digest((HERE/p).read_bytes()) for p in ('migration.py','manifest.py','inventory.py','host-plan.json','recovery.py','package_baseline.py','rearm.py','legacy-recovery.json')}
 
     def original(self, row):
-        return self.fs.read(BACKUP+'/'+row['backup'], 0o600, 65536)[0]
+        return self.fs.read(self.backup+'/'+row['backup'], 0o600, 65536)[0]
 
     def converted(self, path, original):
         if path == MATERIAL: return manifest.convert(original)
@@ -414,8 +476,10 @@ class Migration:
             value = self.current(p,row)
             allowed = {row[which]} if which else {row['before'],row['after']}
             require(value in allowed, 'owned_path_changed_' + p)
+            if which=='before':
+                require(self.fs.info(p)['mtime_ns']==row['mtime_ns'],'original_mtime_drift')
 
-    def snapshot(self, state, policy_path):
+    def snapshot(self, state, policy_path, publish=True):
         policy = Path(policy_path)
         require(policy.name == POLICY+'.pp', 'invalid_recovery_policy_name')
         pin = os.open(policy,os.O_PATH|os.O_NOFOLLOW)
@@ -427,7 +491,7 @@ class Migration:
             with os.fdopen(fd,'rb') as stream: data=stream.read(2087)
         finally: os.close(pin)
         require(digest(data) == POLICY_SHA, 'recovery_policy_input_drift')
-        pending = BACKUP + '.pending'
+        pending = self.backup + '.pending'
         self.fs.mkdir(pending)
         for p, row in state['files'].items():
             original, _ = self.fs.read(p,row['mode'],65536)
@@ -445,23 +509,30 @@ class Migration:
             self.fs.write(pending+'/recovery/'+name,data,0o600,exclusive=True)
         state['recovery'] = {name:digest(data) for name,data in saved.items()}
         self.fs.write(pending+'/state.json',(json.dumps(state,sort_keys=True,indent=2)+'\n').encode(),0o600,exclusive=True)
-        fd, leaf = self.fs.parent(BACKUP)
-        try: os.rename(leaf+'.pending',leaf,src_dir_fd=fd,dst_dir_fd=fd); os.fsync(fd)
-        finally: os.close(fd)
-        self.state()  # Check durable backups before changing any host configuration.
+        self.at(pending).state()  # Verify complete new snapshot before publication.
+        if publish:
+            self.fs.rename(pending,self.backup)
+            self.state()
 
     def apply(self, policy_path):
-        if self.fs.info(BACKUP):
-            state = self.state()
-            require(state['status'] == 'APPLIED', 'existing_recovery_run_rollback_not_apply')
-            self.validate(state,'after')
-            require(self.host.policy() == 'absent', 'policy_reappeared')
-            return 'ALREADY_APPLIED'
-        state, _ = self.before()
-        self.snapshot(state,policy_path)
+        if self.fs.info(self.backup):
+            # A historical RESTORED snapshot needs explicit, qualified re-arm.
+            raw,_=self.fs.read(self.backup+'/state.json',0o600,65536)
+            require(json.loads(raw)['status']!='RESTORED','restored_attempt_requires_rearm')
+            state=self.state()
+            if state['status']=='APPLIED':
+                self.validate(state,'after'); self.package_compatible(state)
+                require(self.host.policy()=='absent','policy_reappeared')
+                return 'ALREADY_APPLIED'
+            require(state['status']=='PREPARED' and 'rearmed_from' in state,'existing_recovery_run_rollback_not_apply')
+            self.before(armed=True)
+        else:
+            state,_=self.before(armed=True)
+            self.snapshot(state,policy_path)
         try:
             self.validate(state,'before')
-            self.fs.write(recovery.SHORT,recovery.SHORT_BYTES,0o700,exclusive=True)
+            if self.fs.info(recovery.SHORT) is None:
+                self.fs.write(recovery.SHORT,recovery.SHORT_BYTES,0o700,exclusive=True)
             self.fs.set_mask(); self.host.reload(); self.host.stop()
             require(self.host.inactive(), 'daemon_did_not_stop')
             self.checkpoint('masked')
@@ -475,11 +546,12 @@ class Migration:
                 else:
                     after = None
                 if after is None: self.fs.delete(p)
-                else: self.fs.write(p,after,row['mode'],row['label'])
+                else: self.fs.write(p,after,row['mode'],row['label'],mtime_ns=
+                                    package_baseline.mtime(self.plan['packages'],p) if p in VENDOR else row['mtime_ns'])
                 self.checkpoint(p)
             self.host.remove_policy(); self.checkpoint('policy_removed')
             self.host.reload()
-            self.validate(state,'after')
+            self.validate(state,'after'); self.package_compatible(state)
             state['status'] = 'APPLIED'; self.save(state)
             return 'APPLIED_RUNTIME_MASKED'
         except BaseException:
@@ -492,6 +564,8 @@ class Migration:
         state = self.state()
         require(state['status'] == 'APPLIED', 'migration_not_applied')
         self.validate(state,'after')
+        self.package_compatible(state)
+        print('MANAGED_INSTALLER_BASELINE_COMPATIBLE=PASS',flush=True)
         require(self.host.policy() == 'absent' and self.host.inactive(), 'release_boundary_drift')
         if self.fs.info(MASK) is not None:
             require(self.fs.link_value(MASK) == '/dev/null', 'foreign_runtime_mask')
@@ -511,20 +585,20 @@ class Migration:
         for status in ('PREPARED','APPLIED','RESTORED'):
             value = dict(state,status=status)
             alternatives.append((json.dumps(value,sort_keys=True,indent=2)+'\n').encode())
-        self.clear_pending(BACKUP+'/state.json',alternatives,{0o600})
+        self.clear_pending(self.backup+'/state.json',alternatives,{0o600})
         if state['status'] == 'RESTORED' and self.fs.info(MASK) is None:
             require(policy == 'legacy', 'restored_policy_drift')
             self.validate(state,'before')
             return 'ALREADY_RESTORED'
         self.fs.set_mask(); self.host.reload(); self.host.stop()
         require(self.host.inactive(), 'daemon_did_not_stop')
-        if policy == 'absent': self.host.restore_policy(self.fs.root / (BACKUP+'/recovery-policy.pp').lstrip('/'))
+        if policy == 'absent': self.host.restore_policy(self.fs.root / (self.backup+'/recovery-policy.pp').lstrip('/'))
         for p in reversed(ORDER):
             row = state['files'][p]
             value = self.current(p,row)
             require(value in (row['before'],row['after']), 'rollback_path_drift')
-            if value != row['before']:
-                self.fs.write(p,self.original(row),row['mode'],row['label'])
+            if value != row['before'] or self.fs.info(p)['mtime_ns'] != row['mtime_ns']:
+                self.fs.write(p,self.original(row),row['mode'],row['label'],mtime_ns=row['mtime_ns'])
         self.validate(state,'before')
         state['status'] = 'RESTORED'; self.save(state)
         self.fs.delete(MASK); self.host.reload()

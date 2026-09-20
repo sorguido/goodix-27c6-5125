@@ -416,5 +416,37 @@
       "uid": 0
     }
   },
-  "schema": 1
+  "schema": 1,
+  "packages": {
+    "/usr/lib/pam.d/plasmalogin": {
+      "package": "plasma-login-manager",
+      "rpm": [
+        "/usr/lib/pam.d/plasmalogin",
+        "1010",
+        "1788825600",
+        "c6fc4a0bc2d89f88fa15ca7e9a6c5aaeccfbe66897755b5416ce9c5e35b4e40b",
+        "100644",
+        "root",
+        "root",
+        "(none)",
+        "4294967295",
+        "0"
+      ]
+    },
+    "/etc/pam.d/kde-fingerprint": {
+      "package": "plasma-workspace",
+      "rpm": [
+        "/etc/pam.d/kde-fingerprint",
+        "520",
+        "1788825600",
+        "8b3181ce5979f498e2cd07acaf3f57c63b1e2f9593e44bfa9027b6dd8bb62437",
+        "100644",
+        "root",
+        "root",
+        "(none)",
+        "4294967295",
+        "17"
+      ]
+    }
+  }
 }

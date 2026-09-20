@@ -62,8 +62,13 @@ class BoundaryTests(unittest.TestCase):
     def test_actual_launcher_from_other_cwd_and_root_guard(self):
         result=subprocess.run([str(HERE/'operator.sh'),'--help'],cwd='/tmp',capture_output=True,text=True)
         self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('rearm',result.stdout)
         result=subprocess.run([str(HERE/'operator.sh'),'--root-run'],cwd='/tmp',capture_output=True,text=True,
                               env=os.environ|{'PKEXEC_UID':'1000','GOODIX_MANAGED_TEST_ROOT':'/tmp/not-used'})
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('operator_root_boundary',result.stderr)
+        result=subprocess.run([str(HERE/'operator.sh'),'--root-rearm'],cwd='/tmp',capture_output=True,text=True,
+                              env=os.environ|{'PKEXEC_UID':'1000'})
         self.assertNotEqual(result.returncode,0)
         self.assertIn('operator_root_boundary',result.stderr)
     def test_failed_pkexec_has_no_retry_or_fallback(self):

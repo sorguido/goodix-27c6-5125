@@ -140,9 +140,83 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — preflight Fedora corretto e operazioni da KDE/Konsole (20 settembre 2026)
+### Stato corrente — correzione metadata RPM e riarmo dopo rollback (20 settembre 2026)
 
-Il task corrente di correzione preflight/UX parte da
+La run **umana** da `f97de44e0192f249ccb80fd9b32e1488195f0101` ha superato
+preflight, apply mascherato e prova password sudo; dopo release il manager si è
+fermato con `plasmalogin_vendor_pam_package_drift`. Il launcher ha restituito
+`RESTORED_ORIGINALS_DAEMON_INACTIVE_BACKUP_RETAINED`. Nessun workflow sensore è
+iniziato. Il preflight successivo si è fermato su `short_recovery_path_collision`.
+Questa è nuova evidenza reale host-side: apply/password/rollback sono provati,
+install candidate e compatibilità biometrica restano aperti. La console root
+resta solo emergenza. Il correttivo parte dallo stesso HEAD pulito; nessuna
+migrazione, cleanup host, autenticazione o USB viene eseguita dall'AI.
+
+**Package drift dimostrato:** query non privilegiate fuori dalla mappatura
+utenti della sandbox mostrano RPM `plasma-login-manager-6.7.5-1.fc44.x86_64`,
+PAM atteso di 1010 byte, root:root 0644, SHA `c6fc4a0b…`, mtime `1788825600`,
+nessuna capability, verifyflags `4294967295`. Dopo rollback il file storico è
+1100 byte, SHA `559910be…`, root:root 0644, label `lib_t`, flag `S.5....T.`.
+Le altre righe RPM su /run e /var/lib/plasmalogin sono estranee al controllo
+path-scoped del manager. Per KDE il proprietario del file è `plasma-workspace`,
+post-image 520 byte, SHA `8b3181ce…`, stessa data e flag config/noreplace 17.
+
+Il verificatore **RPM reale** (`rpm.file.verify`) applicato al PAM ricostruito
+in /tmp restituisce soltanto `RPMVERIFY_MTIME=32`; dopo l'esatta data package
+restituisce 0. Il test usa una copia in memoria dell'header installato, con soli
+path e uid/gid adattati all'utente di test; database RPM e host non sono scritti.
+Non è un dump conservato durante l'install fallita: è la riproduzione offline
+con l'algoritmo RPM e i medesimi byte/metadata package. La causa è l'mtime non
+ripristinato, non un motivo per indebolire `verify_vendor_pam()`.
+
+La migrazione qualifica ora l'intera riga RPM dei due PAM, imposta mtime package
+oltre a bytes/mode/owner/label e verifica size/digest/attributi. Dopo apply e
+**prima** di togliere la maschera, controlla la post-image e la verifica RPM reale
+path-scoped: `MANAGED_INSTALLER_BASELINE_COMPATIBLE=PASS` è distinto dal solo
+hash post-image. Un failure recupera prima di install. Lo state schema 2 salva
+gli mtime originali nanosecondi per rollback. Lo state f97de44 non li salvava:
+non sono ricostruiti retroattivamente; il riarmo fotografa la baseline corrente.
+
+**Lifecycle corretto:** preflight riconosce una recovery autentica `RESTORED`
+e restituisce `PREFLIGHT_PASS_REARM_REQUIRED`. `operator.sh rearm` da KDE verifica
+baseline, assenza residui candidate/mask, policy, overlay/PAM e daemon inattivo;
+autentica prima di importare il codice salvato, accettando solo sorgenti correnti
+o i pin completi della run f97de44 in `legacy-recovery.json`. Tree estraneo,
+source o `/run/gx` alterati restano STOP. Nessun cleanup cieco.
+
+Il riarmo prepara/verifica una nuova snapshot `PREPARED`, scambia atomicamente
+le directory tramite `renameat2(RENAME_EXCHANGE)` e conserva integralmente la
+vecchia sotto `.restored-<SHA256-del-vecchio-state.json>`. Il nuovo state riferisce
+l'archivio. `/run/gx` resta valido sulla directory canonica sempre presente;
+non cambia PAM/policy/servizi/materiali. Ripetere rearm dopo successo è idempotente;
+interruzione dopo exchange è completabile dallo stesso comando, prima di exchange
+è STOP esplicito con vecchia recovery intatta. Nessun power-loss recovery generale
+è promesso. La recovery salvata annulla anche un riarmo non ancora applicato.
+
+Prove del correttivo: migration 26, launcher 18, test mirati metadata/riarmo 13,
+inclusi vero RPM, import snapshot f97de44, collisioni/drift, interrupt ai due
+confini exchange, annullamento rearm e intera sequenza launcher → failure reale
+del manager sintetico → rollback → rearm → preflight → secondo apply.
+Regressioni PASS: login/protocollo/lifecycle/private-bus/greeter con 31 managed,
+PAM Polkit 18/sudo 15/incrociati 3 normale e ASan/UBSan, deploy Polkit 13,
+parser/materiali tre casi normale/sanitizer. Zero root/autenticazione/USB nei test.
+Exchange e inversione verificati anche su Btrfs in directory temporanee del
+workspace, come uid 1000; /var/lib ha lo stesso tipo di filesystem. Review PM
+diretta positiva, distinta dall'implementazione, senza seconda istanza agente.
+Il production runtime e il managed installer sono invariati. Candidate finale e
+receipt vanno ricostruite dal commit pulito e verificate prima dell'handoff.
+
+Riesame metodologico: cambia il contratto metadata post-migrazione, con una
+ipotesi precisa dimostrata da RPM, e si chiude il lifecycle `RESTORED → REARM`.
+Nessun nuovo tentativo device-side equivalente. Se RPM fallisce ancora, fermarsi
+con i flag del file interessato, rollback e diagnosi del nuovo attributo; non
+allargare whitelist o ripetere apply alla cieca. Prossimo gate invariato:
+`MIGRATION_AND_CANDIDATE_LIVE`, sequenza KDE `preflight → rearm → run` nel README.
+
+### Correttivo precedente — drop-in Fedora e UX KDE/Konsole
+
+
+Il precedente task di correzione preflight/UX partiva da
 `development` pulito a `7d9ccfa8c978d0309823e8023bd13dd245f785b7`.
 L'Utente ha riportato lo STOP umano read-only `fprintd_dropins_drift`, prima
 di apply, install o conversione host. KDE è su tty2, console root di recovery

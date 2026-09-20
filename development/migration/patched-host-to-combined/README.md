@@ -19,7 +19,16 @@ Il precedente preflight umano si è fermato read-only con `fprintd_dropins_drift
 era omesso il drop-in generale Fedora `service.d/10-timeout-abort.conf`,
 verificato conforme al pacchetto systemd. Ora viene preservato e controllato
 per percorso, posizione e digest esatti; ogni altro drop-in resta rifiutato.
-Apply, install e conversione host **non sono stati eseguiti**.
+La run umana successiva da `f97de44e0192f249ccb80fd9b32e1488195f0101` ha
+superato preflight, apply e prova password. Install si è fermato su
+`plasmalogin_vendor_pam_package_drift`; rollback automatico PASS, nessun workflow
+sensore iniziato. Il backup è ora `RESTORED` e `/run/gx` è conservato.
+
+Causa provata offline con il verificatore RPM: la post-image precedente aveva
+contenuto/dimensione corretti, ma mtime corrente anziché quello del pacchetto.
+La nuova migrazione imposta per entrambi i PAM vendor il contratto RPM completo,
+compresa la data `1788825600`, e verifica davvero la compatibilità prima di
+release/install. Il managed installer conserva tutti i controlli originali.
 
 La prova verifica la transizione dagli overlay D285/D293/login-early aggiornati
 da login-three alla candidate canonica con driver, fprintd, greeter, login,
@@ -66,9 +75,10 @@ materiali e il template vengono controllati **solo tramite metadata**, mai
 letti, hashati, copiati o modificati. Il manifest originale è copiato byte per
 byte in `/var/lib/goodix-27c6-5125-migration/original-manifest.json` root:root
 0600; la directory root-only 0700 conserva anche gli altri dieci originali
-numerati, etichette/modi nel `state.json`, `recovery-policy.pp` e cinque file
-di codice/piano (`migration.py`, `manifest.py`, `inventory.py`, `host-plan.json`,
-`recovery.py`). Conserva anche il manager di rimozione e i suoi moduli
+numerati, etichette/modi/mtime nanosecondi nel `state.json` schema 2,
+`recovery-policy.pp` e otto file di codice/piano (`migration.py`, `manifest.py`,
+`inventory.py`, `host-plan.json`, `recovery.py`, `package_baseline.py`, `rearm.py`,
+`legacy-recovery.json`). Conserva anche il manager di rimozione e i suoi moduli
 `production/polkit/deploy.py` e `production/sudo/rules.py`, con hash verificati.
 La copia del manager conserva tutti i controlli e ammette solo uninstall di
 guido; viene rimossa soltanto la ricerca Git inutilizzata da uninstall.
@@ -86,8 +96,9 @@ un file. Backup e hash sono recupero/integrità, non grant o credenziali.
 
 Un errore gestito nell'apply tenta il rollback. Dopo interruzione, lo stesso
 rollback accetta soltanto i byte originali o quelli previsti dal piano; su
-modifiche estranee si ferma. Se resta soltanto `.pending`, lo switch non è
+modifiche estranee si ferma. Se resta soltanto `.pending` della prima snapshot, lo switch non è
 iniziato: conservare tutto e riportare lo STOP, senza cancellarlo o riprovare.
+Per la `.pending` del riarmo valgono le condizioni della sezione 1a.
 
 ## 1. Preflight da KDE/Konsole: un comando copia-incolla
 
@@ -110,9 +121,15 @@ la password nel normale dialogo KDE. Non viene proposta/scelta l'impronta per
 ottenere questi privilegi. In caso di annullamento, errore o PAM diverso,
 STOP prima delle operazioni. Le prove fingerprint avvengono solo nella sezione 4.
 
-Atteso: `OPERATOR=PREFLIGHT_PASS_NO_CONFIGURATION_CHANGE`.
+Nel corrente stato post-rollback è atteso
+`OPERATOR=PREFLIGHT_PASS_REARM_REQUIRED`: baseline qualificata, nessuna modifica,
+recovery propria riconosciuta; proseguire con la sezione 1a.
+Dopo riarmo è atteso `OPERATOR=PREFLIGHT_PASS_NO_CONFIGURATION_CHANGE`.
 Il preflight non crea lock/backup, non avvia fprintd né apre USB; qualifica
-anche manifest host effettivo e policy B5. Qualsiasi differenza interrompe
+anche manifest host effettivo, policy B5 e contratto package dei due PAM:
+è il probe host read-only di compatibilità prima della nuova migrazione.
+La verifica RPM della post-image effettiva viene poi imposta prima di release.
+Qualsiasi differenza interrompe
 senza modifiche. Per i drop-in vengono mostrati elenco atteso ed effettivo,
 così lo STOP è direttamente diagnosticabile. Non forzare collisioni/permessi.
 
@@ -127,6 +144,38 @@ Se la console qualificata esiste, viene preservata. Se va creata, il normale
 agent password KDE avvia systemd-run/openvt; sulla nuova TTY sono ammessi solo
 `id -u` (atteso 0) e `tty`, poi ritorno a KDE con Ctrl+Alt+F2. Nessun comando
 ordinario sulla TTY. Se il servizio esistente è diverso/inattivo anomalo: STOP.
+
+## 1a. Dopo rollback: riarmo da Konsole, senza cleanup manuale
+
+Solo dopo `PREFLIGHT_PASS_REARM_REQUIRED`, con console root ancora aperta:
+
+```bash
+/home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/operator.sh rearm
+```
+
+È una singola elevazione password-only. Verifica stato `RESTORED`, source hash
+correnti o quelli esatti della run f97de44, backup, `/run/gx`, baseline integra,
+assenza candidate/residui/maschera, policy storica, PAM/overlay e fprintd inattivo.
+Una collisione estranea o recovery modificata resta STOP. Non cancella nulla.
+
+Prepara e verifica una nuova snapshot della baseline corrente, poi scambia
+atomicamente le directory e archivia integralmente il tentativo precedente in
+`/var/lib/goodix-27c6-5125-migration.restored-<SHA256-del-vecchio-state.json>`.
+La nuova snapshot riferisce l'archivio e conserva il proprio codice di recupero.
+`/run/gx` continua a puntare alla directory attiva, sempre presente; il riarmo
+non cambia PAM, policy, servizi o materiali. Non avvia apply né il lettore.
+
+Atteso: `OPERATOR=REARMED_BASELINE_UNCHANGED_PREVIOUS_BACKUP_ARCHIVED`.
+Una ripetizione verificata restituisce `OPERATOR=ALREADY_REARMED`.
+Ora eseguire `run` nella sezione 2: ricontrolla preflight e compatibilità.
+`run` senza il riarmo richiesto si ferma prima di apply.
+
+Interruzione **prima** dello scambio: vecchia recovery intatta, STOP esplicito
+`rearm_pending_before_exchange_keep_recovery`; riportarlo, senza cleanup.
+Interruzione **dopo** lo scambio: nuova recovery valida; ripetere soltanto
+`rearm` completa l'archiviazione se tutti i controlli passano. Qualsiasi altro
+STOP richiede di preservare console e file. Il riarmo può essere annullato con
+`/run/gx`: torna `RESTORED`, senza eliminare l'archivio o eseguire una live.
 
 ## 2. Migrazione, password, candidate e status: un launcher in Konsole
 
@@ -146,7 +195,11 @@ Un'unica elevazione password-only avvia fasi esplicite nello stesso terminale:
    privilegi a guido. **Digitare la password in Konsole**, senza contatto.
    La maschera resta attiva. Password fallita/interruzione: tenta il rollback,
    non installa la candidate. Nessuna password viene raccolta dal launcher.
-4. Dopo `PASSWORD=PASS`, **Invio** rimuove la maschera e installa la candidate;
+4. Dopo `PASSWORD=PASS`, **Invio** verifica nuovamente i due PAM vendor
+   (contenuto, size, mode/owner, mtime, attributi/label e metadata RPM), esegue
+   il controllo RPM reale del PAM Plasma e richiede
+   `MANAGED_INSTALLER_BASELINE_COMPATIBLE=PASS` prima di rimuovere la maschera
+   e installare la candidate;
    **Ctrl+C** ripristina. Il launcher ricontrolla la consegna prima di procedere.
 5. Il manager invariato esegue install e status nella sessione privilegiata già
    aperta, senza nuova autenticazione attraverso il PAM appena installato.
@@ -237,7 +290,9 @@ originale sono ripristinati; fprintd resta inactive, maschera rimossa, selezioni
 90/95/96 ripristinate. Template e quattro binari materiali restano intatti.
 L'uninstall candidate intermedio ripristina la baseline post-migrazione senza
 D285; soltanto il successivo rollback ripristina lo stack storico. Backup e
-comando breve rimangono recuperabili. Non vengono ripristinati timestamp inutili.
+comando breve rimangono recuperabili. Le nuove snapshot ripristinano anche gli mtime originali.
+La snapshot f97de44 non registrava questi timestamp: il riarmo fotografa la
+baseline successiva al suo rollback, senza inventare date storiche perdute.
 
 Su drift/partial install non qualificato il comando si ferma senza sovrascrivere
 file estranei: mantenere la console e riportare lo STOP, senza cancellare stato

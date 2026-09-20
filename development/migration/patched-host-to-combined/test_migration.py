@@ -25,6 +25,7 @@ POLICY = None
 class FakeHost:
     def __init__(self,root): self.root=root; self.value='legacy'; self.actions=[]
     def qualify(self): pass
+    def packages(self,contract,postimage=False): pass
     def inactive(self): return True
     def reload(self): self.actions.append('reload')
     def stop(self): self.actions.append('stop')
@@ -283,7 +284,7 @@ class MigrationTests(unittest.TestCase):
         self.tx.apply(POLICY)
         state=self.tx.state()
         for name,h in state['source'].items(): self.assertEqual(m.digest(self.path(m.BACKUP+'/'+name).read_bytes()),h)
-        self.assertEqual(set(state['source']),{'migration.py','manifest.py','inventory.py','host-plan.json','recovery.py'})
+        self.assertEqual(set(state['source']),{'migration.py','manifest.py','inventory.py','host-plan.json','recovery.py','rearm.py','package_baseline.py','legacy-recovery.json'})
         manager=self.path(m.BACKUP+'/recovery/'+m.recovery.PATHS[0])
         refused=subprocess.run(['/usr/bin/bash',str(manager),'--status'],cwd='/tmp',capture_output=True)
         self.assertEqual(refused.returncode,2)

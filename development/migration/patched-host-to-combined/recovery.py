@@ -59,7 +59,7 @@ def main():
         def invoke(command): subprocess.run(command,check=True,env=ENV)
         print('RECOVERY='+restore(tx,invoke))
         return 0
-    except (OSError,ValueError,RuntimeError,KeyError,subprocess.SubprocessError):
+    except (OSError,ValueError,RuntimeError,KeyError,TypeError,AttributeError,subprocess.SubprocessError):
         print('RECOVERY=STOP preserve_console_and_backups_do_not_force',file=sys.stderr); return 1
     finally: os.close(lock); fs.close()
 
