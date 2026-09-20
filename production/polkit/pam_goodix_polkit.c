@@ -282,7 +282,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
     pam_info(pamh, "Fingerprint unavailable; use your password.");
     return PAM_IGNORE;
   }
-  pam_info(pamh, "Enter your password, or submit an empty field to use one fingerprint attempt.");
+  pam_info(pamh, "Enter your password, or submit an empty field to use fingerprint.");
   int result = pam_get_authtok(pamh, PAM_AUTHTOK, &token, NULL);
   if (result != PAM_SUCCESS || !token) return PAM_AUTH_ERR;
   if (*token) return PAM_IGNORE; /* pam_unix consumes the existing PAM token. */
