@@ -14,6 +14,15 @@ nominal owner-loss cleanup. Password verification leaves/device I/O are simulate
 native applications, SELinux execution and target cleanup still require the
 operator handoff in `deployment/managed-install/AUTHENTICATION-LIVE.md`.
 
+The combined candidate prepared from
+`9e47bdc77246322d6fafee18dd278a066dd583ef` has 36 files; verified SPDX includes
+50 packages, 34 files and 84 relationships. SHA256SUMS digest:
+`34cc30c30d1be009f4ae8ff13c1c6f455340d1496ee0245cd2fc9d57c8a9413b`.
+Independent normal runtime and standalone bridge builds are byte-identical.
+Both actual managed and local-Polkit artifacts pass temporary-root install/remove
+with exact file restoration. Later documentation-only commits preserve the
+runtime source; each fresh prepare records its own full source commit.
+
 Previous Polkit-only closure at source commit `82e3ae67b01075fc5509c85bca22647665d9fb39`:
 18 PAM tests in normal and ASan/UBSan modes, 7 local transaction tests and
 30 managed transaction tests PASS. Actual daemon handlers on a private bus

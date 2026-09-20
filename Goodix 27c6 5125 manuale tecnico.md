@@ -238,6 +238,20 @@ nel MANIFEST e il digest del proprio SHA256SUMS. I sorgenti Fedora esatti e i
 loro hash sono registrati in `production/sudo/README.md`, con la scelta ABI e
 la distinzione tra prove e limiti. Nessuna nuova dipendenza runtime installata.
 
+**Candidate realmente preparata e riprodotta:** dal checkout pulito
+`9e47bdc77246322d6fafee18dd278a066dd583ef`, 36 file e SBOM verificata
+(50 pacchetti, 34 file, 84 relazioni). Digest SHA256SUMS
+`34cc30c30d1be009f4ae8ff13c1c6f455340d1496ee0245cd2fc9d57c8a9413b`.
+Tutto il runtime è byte-identico alla build indipendente normale; il bridge sudo
+è identico alla sua ricompilazione separata e quello Polkit alla candidate locale.
+Install/uninstall della candidate completa e della patch locale reali in root
+simulate PASS con ripristino esatto dei file, senza installazione sull'host.
+I successivi commit di sole evidenze/documentazione non modificano questo
+live-critical set; la preparazione registra comunque il proprio HEAD completo.
+Check finale read-only: sudo e sudo-i corrispondono ai digest RPM; system-auth
+resta `2e53f704372b6c7fb69cdc4dfd6c27456d642c83feff8b1588fa1f9cb1126cd0`;
+override, stato e modulo Polkit locale sono assenti.
+
 **Handoff e boundary residuo:** `deployment/managed-install/AUTHENTICATION-LIVE.md`
 consegna install/uninstall, update/rollback compatibili, workflow nativi,
 PASS/FAIL/STOP e caso di contesa senza contatti. Sul PC D285 la migrazione è un
