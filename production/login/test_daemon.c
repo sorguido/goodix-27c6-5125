@@ -28,6 +28,8 @@ static void fake_close (FpDevice *d, GCancellable *c, GAsyncReadyCallback cb, gp
 static gboolean fake_finish (FpDevice *d, GAsyncResult *r, GError **e)
 { (void)d; return g_task_propagate_boolean (G_TASK (r), e); }
 static gboolean fake_is_open (FpDevice *d) { (void)d; return opened; }
+static gboolean fake_close_sync (FpDevice *d, GCancellable *c, GError **e)
+{ (void)d; (void)c; (void)e; opened = FALSE; closes++; return TRUE; }
 static void fake_verify (FpDevice *d, FpPrint *p, GCancellable *c,
                          FpMatchCb cb, gpointer md, GDestroyNotify destroy,
                          GAsyncReadyCallback done_cb, gpointer u)
@@ -58,6 +60,7 @@ static gboolean fake_verify_finish (FpDevice *d, GAsyncResult *r, gboolean *matc
 #define fp_device_open_finish fake_finish
 #define fp_device_close_finish fake_finish
 #define fp_device_is_open fake_is_open
+#define fp_device_close_sync fake_close_sync
 #include "device.c"
 static int synthetic_print (FpDevice *d, FpFinger finger, const char *user, FpPrint **p)
 { (void)user; *p = fp_print_new (d); fp_print_set_finger (*p, finger); return 0; }
@@ -128,6 +131,23 @@ static void suspended (GObject *o, GAsyncResult *res, gpointer data)
   fprint_device_suspend_finish (FPRINT_DEVICE (o), res, &error);
   g_assert_no_error (error);
   suspend_done = TRUE;
+}
+/* Ordinary Claim passes NULL as cancellable: owner-loss drains the open and
+ * then closes it. Verify has a cancellable and must receive cancellation. */
+static gboolean finish_cancelled (gpointer unused)
+{
+  (void)unused;
+  if (pending_open)
+    {
+      g_task_return_boolean (pending_open, TRUE);
+      g_clear_object (&pending_open);
+      return G_SOURCE_REMOVE;
+    }
+  GTask *task = pending_open ? pending_open : pending_verify;
+  if (!task || !g_cancellable_is_cancelled (g_task_get_cancellable (task))) return G_SOURCE_CONTINUE;
+  g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_CANCELLED, "offline owner disappeared");
+  g_clear_object (&pending_open); g_clear_object (&pending_verify);
+  return G_SOURCE_REMOVE;
 }
 int main (int argc, char **argv)
 {
@@ -324,6 +344,48 @@ int main (int argc, char **argv)
     }
   g_assert_cmpuint (opens, ==, closes);
   g_test_message ("LOGIN_THREE_ATTEMPTS=PASS no_match_then_match=2,3 max=3 hard_error=1,2 no_hidden_restart=1");
+
+  /* Polkit parent cancellation closes the PAM child's connection. Exercise
+   * the actual name-owner watcher on ordinary Claim (not ClaimLogin), during
+   * pending open, claimed idle, and pending Verify. No real libfprint I/O. */
+  for (int phase = 0; phase < 3; phase++)
+    {
+      guint before_opens = opens, before_verifies = verifies;
+      hold_open = phase == 0;
+      hold_verify = phase == 2;
+      verify_outcome = 0;
+      request (client, server, "Claim", g_variant_new ("(s)", "offline"));
+      if (hold_open)
+        {
+          end = g_get_monotonic_time () + 2000000;
+          while (!pending_open && g_get_monotonic_time () < end)
+            { g_main_context_iteration (NULL, FALSE); g_usleep (1000); }
+          g_assert_nonnull (pending_open);
+        }
+      else
+        {
+          iterate_until (&done); g_assert_no_error (call_error);
+          if (hold_verify)
+            {
+              request (client, server, "VerifyStart", g_variant_new ("(s)", "right-index-finger"));
+              iterate_until (&done); g_assert_no_error (call_error);
+              g_assert_nonnull (pending_verify);
+            }
+        }
+      if (hold_open || hold_verify) g_idle_add (finish_cancelled, NULL);
+      g_dbus_connection_close_sync (client, NULL, NULL);
+      end = g_get_monotonic_time () + 2000000;
+      while ((opened || priv->_session || !done) && g_get_monotonic_time () < end)
+        { g_main_context_iteration (NULL, FALSE); g_usleep (1000); }
+      g_assert_false (opened); g_assert_null (priv->_session);
+      g_assert_null (priv->current_cancellable);
+      g_assert_cmpint (priv->current_action, ==, ACTION_NONE);
+      g_assert_cmpuint (opens, ==, before_opens + 1);
+      g_assert_cmpuint (verifies, ==, before_verifies + (phase == 2));
+      g_object_unref (client);
+      client = connection (g_test_dbus_get_bus_address (bus));
+    }
+  g_test_message ("POLKIT_OWNER_LOSS=PASS ordinary_claim_pending_idle_verify no_hidden_reopen=1");
 
   g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON (rdev));
   g_object_unref (rdev); g_object_unref (d);

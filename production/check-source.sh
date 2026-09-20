@@ -96,6 +96,7 @@ echo PRODUCTION_PRIVATE_TREE_DEPENDENCY_COUNT=0
 
 (cd "$root/reference/fprintd-fedora44-1.94.5" && sha256sum -c SOURCE_SHA256SUMS >/dev/null)
 (cd "$root" && sha256sum -c production/login/source.sha256 >/dev/null)
+(cd "$root" && sha256sum -c production/polkit/source.sha256 >/dev/null)
 (cd "$root" && sha256sum -c production/login/prototype-equivalence.sha256)
 echo PRODUCTION_LOGIN_SOURCE_AND_PROTOTYPE_EQUIVALENCE=PASS
 
@@ -104,6 +105,9 @@ from pathlib import Path
 import sys
 root = Path(sys.argv[1])
 for base, manifest, expected in (
+    (root, root / 'production/polkit/source.sha256',
+     {str(p.relative_to(root)) for p in (root / 'production/polkit').iterdir()
+      if p.is_file() and p.name != 'source.sha256'}),
     (root, root / 'production/login/source.sha256',
      {str(p.relative_to(root)) for p in (root / 'production/login').iterdir()
       if p.is_file() and p.name != 'source.sha256'}),

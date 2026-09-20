@@ -102,3 +102,14 @@ and the original prototype patch/greeter remain unchanged. Modified driver
 and lifecycle sources retain LGPL-2.1-or-later notices. Their current digests
 are in the production source manifest; they no longer claim prototype byte
 equivalence. No new external implementation or licensing boundary is introduced.
+
+## Service-local Polkit bridge (20 September 2026)
+
+New `production/polkit/pam_goodix_polkit.c`, build, deployment and offline tests:
+independent project implementation, GPL-2.0-or-later, no third-party code copied
+or minimally adapted. Public PAM/stdio/process APIs only; existing Fedora
+pam_fprintd remains separately installed and unmodified. Source inspection of
+Polkit 127, Linux-PAM 1.7.2 and the exact Fedora KDE source RPM is documented in
+`production/polkit/README.md`; it is behavioral reference, not imported source.
+The managed SBOM identifies the bridge separately and records host Polkit/KDE/PAM
+dependencies. The existing combined libfprint licensing boundary is unchanged.

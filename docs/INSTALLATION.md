@@ -136,8 +136,25 @@ enroll a fingerprint. Exercise the normal workflows in this order:
 2. fingerprint verification in KDE;
 3. Plasma login with fingerprint;
 4. real session lock and fingerprint unlock;
-5. `sudo` with fingerprint;
-6. password fallback.
+5. password fallback and unchanged sudo behavior;
+6. Polkit/Discover password, explicit fingerprint choice, cancellation and fallback
+   as described in `production/polkit/README.md`. Polkit support remains pending live validation.
+
+The clean installer does not configure sudo fingerprint. It neither selects the
+D285 sudo-specific service nor enables global authselect fingerprint. Earlier
+unconditional sudo fingerprint acceptance wording was incorrect for this clean
+starting state; a candidate-owned sudo integration remains a release gap.
+The current development PC's user-reported sudo fingerprint PASS is separate.
+
+Polkit requires the audited local password stack without global fingerprint and
+the exact versions listed in `production/polkit/README.md`. Close authentication
+dialogs during lifecycle changes. The candidate owns the Polkit PAM override,
+leaf service, runtime counter directory/tmpfiles rule and narrow helper socket
+drop-in. The PAM bridge is paired with the immutable current runtime; update and
+rollback preserve its counters. Existing managed releases without
+`POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1` must use their original
+installer to uninstall, then install this candidate fresh. Do not update them
+in place or apply the development PC patch over a managed installation.
 
 For the prepared cold login, press Enter once and place the finger naturally
 immediately. This path permits at most three physical attempts, each bounded

@@ -39,6 +39,9 @@ done
 for component in fprintd greeter; do
   install -m 0755 "$build/$component" "$candidate/$component"
 done
+"$root/production/polkit/build.sh" "$build/polkit"
+install -m 0644 "$build/polkit/pam_goodix_polkit.so" "$candidate/pam_goodix_polkit.so"
+install -m 0644 "$root/production/polkit/source.sha256" "$candidate/polkit-source.sha256"
 install -m 0644 "$build/pam_fprintd.so" "$candidate/pam_fprintd.so"
 install -m 0644 "$here/99-goodix-login-greeter.conf" "$candidate/99-goodix-login-greeter.conf"
 install -m 0644 "$root/production/source-files.sha256" "$candidate/production-source.sha256"
@@ -78,6 +81,7 @@ printf '%s\n' \
   'TARGET_OS=Fedora-44-KDE-x86_64' \
   'PROTECTED_MATERIAL_INCLUDED=false' \
   'PAM_FILES_INCLUDED=true' \
+  'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1' \
   'PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR' \
   'KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM' \
   'EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1' \

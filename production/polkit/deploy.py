@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Closed-set Polkit deployment, shared by the local patch and managed installer.
+
+No authentication, bus access or service restart. Run only by the operator.
+"""
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+
+ROOT = Path(os.environ.get("GOODIX_MANAGED_TEST_ROOT", "/"))
+TEST = ROOT != Path("/")
+STATE = "/var/lib/goodix-polkit"
+GUARD = "/run/polkit/goodix-fingerprint"
+LOCAL = "/usr/local/lib64/goodix-27c6-5125/polkit/pam_goodix_polkit.so"
+MANAGED = "/usr/lib64/goodix-27c6-5125/current/pam_goodix_polkit.so"
+VENDOR = "/usr/lib/pam.d/polkit-1"
+VENDOR_BYTES = (b"#%PAM-1.0\n\nauth       include      system-auth\n"
+                b"account    include      system-auth\npassword   include      system-auth\n"
+                b"session    include      system-auth\n")
+PAM = "/etc/pam.d/polkit-1"
+LEAF = "/etc/pam.d/goodix-polkit-fingerprint"
+TMPFILES = "/etc/tmpfiles.d/goodix-polkit.conf"
+DROPIN = "/etc/systemd/system/polkit-agent-helper@.service.d/50-goodix-polkit.conf"
+FILES = (LEAF, TMPFILES, DROPIN, PAM)  # enable the public PAM service last
+
+
+def require(value, reason):
+    if not value:
+        raise RuntimeError(reason)
+
+
+def p(name):
+    return ROOT / name.lstrip("/")
+
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def regular(name, mode=0o644):
+    path = p(name)
+    info = path.lstat()
+    require(stat.S_ISREG(info.st_mode) and stat.S_IMODE(info.st_mode) == mode,
+            f"file type/mode drift: {name}")
+    require(TEST or (info.st_uid, info.st_gid) == (0, 0), f"file ownership drift: {name}")
+    return path.read_bytes()
+
+
+def run(*args):
+    if not TEST:
+        subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def parents(name, created=None):
+    for path in reversed(list(p(name).parents)[:-1]):
+        if not path.is_relative_to(ROOT):
+            continue
+        if not path.exists() and not path.is_symlink():
+            require(created is not None, f"missing directory: {path}")
+            path.mkdir(mode=0o755)
+            path.chmod(0o755)
+            created.append("/" + str(path.relative_to(ROOT)))
+        info = path.lstat()
+        require(stat.S_ISDIR(info.st_mode) and not info.st_mode & 0o022,
+                f"unsafe parent: {path}")
+        require(TEST or info.st_uid == 0, f"parent ownership: {path}")
+
+
+def atomic(name, data, mode=0o644):
+    temporary = p(name + ".goodix-next")
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+    try:
+        os.fchmod(fd, mode)
+        with os.fdopen(fd, "wb") as file:
+            file.write(data)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, p(name))
+        run("restorecon", "-F", str(p(name)))
+    finally:
+        if temporary.exists(): temporary.unlink()
+
+
+def no_helpers():
+    if TEST: return
+    for proc in Path("/proc").glob("[0-9]*/exe"):
+        try:
+            executable = os.readlink(proc)
+        except FileNotFoundError:
+            continue
+        require(executable != "/usr/lib/polkit-1/polkit-agent-helper-1",
+                "close authentication dialogs before install/uninstall")
+
+
+def baseline():
+    parents(VENDOR)
+    require(regular(VENDOR) == VENDOR_BYTES, "unsupported/drifted vendor polkit PAM")
+    for directory in ("/etc/pam.d", "/usr/lib/pam.d"):
+        for suffix in (".rpmnew", ".rpmsave"):
+            path = p(directory + "/polkit-1" + suffix)
+            require(not path.exists() and not path.is_symlink(), "resolve polkit PAM rpmnew/rpmsave first")
+    # This boundary supports the Fedora local password stack audited here.
+    # Reject richer auth stacks rather than bypassing their required factors.
+    system = p("/etc/pam.d/system-auth")
+    info = system.stat()
+    require(stat.S_ISREG(info.st_mode) and not info.st_mode & 0o022 and
+            (TEST or (info.st_uid, info.st_gid) == (0, 0)), "unsafe system-auth metadata")
+    rows = [line.split() for line in system.read_text().splitlines()
+            if line.split() and line.split()[0] == "auth"]
+    require(rows == [
+        ["auth", "required", "pam_env.so"],
+        ["auth", "required", "pam_faildelay.so", "delay=2000000"],
+        ["auth", "sufficient", "pam_unix.so", "nullok"],
+        ["auth", "required", "pam_deny.so"],
+    ], "unsupported system-auth: local password stack without global fingerprint required")
+    if not TEST:
+        for package, version in (("polkit", "127-2.fc44.2"), ("polkit-kde", "6.7.5-1.fc44"),
+                                 ("fprintd-pam", "1.94.5-5.fc44"), ("pam", "1.7.2-2.fc44")):
+            value = subprocess.check_output(["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", package], text=True)
+            require(value == version, f"unsupported {package} version")
+        for name, expected in (
+            ("/usr/lib64/security/pam_fprintd.so", "96e47e1514a7c6c4fc722fa086bc25bb1c4d44774421c3d2970c7fc2b4385ebd"),
+            ("/usr/lib/polkit-1/polkit-agent-helper-1", "026972c2853aa610480cdf5957dacdf28d7b07059977282cfee0a5d8deb0605a"),
+        ):
+            mode = 0o4755 if "helper" in name else 0o755
+            require(digest(regular(name, mode)) == expected, f"stock component drift: {name}")
+        # The existing policy labels permit the narrow runtime counter, without
+        # adding SELinux grants. Socket mode additionally needs ReadWritePaths.
+        label = subprocess.check_output(["matchpathcon", "-n", GUARD], text=True)
+        require(":policykit_var_run_t:" in label, "unsupported SELinux runtime label")
+    return digest(system.read_bytes())
+
+
+def payload(kind):
+    module = LOCAL if kind == "local" else MANAGED
+    prefix = ("auth required pam_env.so\nauth required pam_faildelay.so delay=2000000\n"
+              f"auth [success=done ignore=ignore open_err=ignore symbol_err=ignore module_unknown=ignore default=die] {module}\n").encode()
+    return {
+        PAM: VENDOR_BYTES.replace(b"auth       include", prefix + b"auth       include", 1),
+        LEAF: b"#%PAM-1.0\nauth required /usr/lib64/security/pam_fprintd.so max-tries=1 timeout=45\n",
+        TMPFILES: f"d {GUARD} 0700 root root -\n".encode(),
+        DROPIN: f"[Service]\nReadWritePaths={GUARD}\n".encode(),
+    }
+
+
+def preflight(kind):
+    require(kind in ("local", "managed"), "invalid deployment kind")
+    system_auth = baseline()
+    no_helpers()
+    if p(PAM).exists() or p(PAM).is_symlink():
+        require(regular(PAM) == VENDOR_BYTES, "custom Polkit override: preserve and review")
+    for name in set(FILES) - {PAM} | {GUARD, STATE} | ({LOCAL} if kind == "local" else set()):
+        require(not p(name).exists() and not p(name).is_symlink(), f"Polkit path collision: {name}")
+    return system_auth
+
+
+def load():
+    parents(STATE + "/state.json")
+    info = p(STATE).lstat()
+    require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700,
+            "Polkit state directory drift")
+    data = json.loads(regular(STATE + "/state.json", 0o600))
+    require(data["kind"] in ("local", "managed") and data["schema"] == 1, "unsupported Polkit state")
+    require(set(data["hashes"]) == set(FILES) | ({LOCAL} if data["kind"] == "local" else set()),
+            "Polkit state file set drift")
+    return data
+
+
+def verify(kind, recovery=False):
+    data = load()
+    require(data["kind"] == kind, "local/managed Polkit deployment collision")
+    if not recovery:
+        require(data["system_auth"] == baseline(), "system-auth changed since Polkit installation")
+        require(all(data["hashes"][name] == digest(contents) for name, contents in payload(kind).items()),
+                "Polkit host rules changed: original uninstall then fresh install required")
+        info = p(GUARD).lstat()
+        require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700 and
+                (TEST or (info.st_uid, info.st_gid) == (0, 0)), "Polkit runtime directory drift")
+        run("matchpathcon", "-V", str(p(GUARD)))
+    for name, expected in data["hashes"].items():
+        parents(name)
+        path = p(name)
+        if recovery and not path.exists() and not path.is_symlink(): continue
+        contents = regular(name)
+        if recovery and name == PAM and data["pam_existed"] and contents == VENDOR_BYTES: continue
+        require(digest(contents) == expected, f"owned Polkit file drift: {name}")
+    return data
+
+
+def uninstall(kind):
+    if not p(STATE).exists() and not p(STATE).is_symlink():
+        print("POLKIT_UNINSTALL=ALREADY_ABSENT")
+        return
+    no_helpers()
+    data = verify(kind, recovery=True)
+    # Remove the entry point first; tolerate an interrupted earlier removal.
+    if data["pam_existed"]:
+        atomic(PAM, VENDOR_BYTES)
+    elif p(PAM).exists(): p(PAM).unlink()
+    for name in data["hashes"]:
+        if name != PAM and p(name).exists(): p(name).unlink()
+    run("systemctl", "daemon-reload")
+    if p(GUARD).exists():
+        info = p(GUARD).lstat()
+        require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode) == 0o700,
+                "guard directory drift")
+        for child in p(GUARD).iterdir():
+            require(child.name.isdecimal(), "unexpected guard entry; preserve for review")
+            regular(GUARD + "/" + child.name, 0o600)
+            child.unlink()
+        p(GUARD).rmdir()
+    for name in reversed(data["directories"]):
+        try: p(name).rmdir()
+        except FileNotFoundError: pass
+        except OSError: pass  # preserve directories acquired by other software
+    p(STATE + "/state.json").unlink()
+    p(STATE).rmdir()
+    print("POLKIT_UNINSTALL=PASS previous_PAM=RESTORED")
+
+
+def install(kind, module=None):
+    require(kind in ("local", "managed"), "invalid deployment kind")
+    if p(STATE).exists() or p(STATE).is_symlink():
+        data = verify(kind)
+        if kind == "local":
+            require(module is not None and digest(Path(module).read_bytes()) == data["hashes"][LOCAL],
+                    "different local patch: uninstall the previous patch first")
+        print("POLKIT_INSTALL=ALREADY_ACTIVE")
+        return
+    system_auth = preflight(kind)
+    files = payload(kind)
+    source_commit = None  # managed provenance is owned by the outer transaction
+    if kind == "local":
+        require(not p("/var/lib/goodix-27c6-5125-managed/state").exists(), "managed host needs managed lifecycle")
+        source = Path(module)
+        require(source.is_file() and not source.is_symlink(), "invalid local PAM payload")
+        files[LOCAL] = source.read_bytes()  # freeze before the first host mutation
+        require(files[LOCAL][:4] == b"\x7fELF", "local PAM payload is not ELF")
+        provenance = (source.parent / "PROVENANCE").read_text()
+        match = re.fullmatch(r"SOURCE_COMMIT=([0-9a-f]{40})\nPURPOSE=POLKIT_INTERRUPTIBLE_SERVICE_LOCAL_V1\n", provenance)
+        require(match is not None, "invalid local source provenance")
+        source_commit = match.group(1)
+    existed = p(PAM).exists() or p(PAM).is_symlink()
+    if existed: require(regular(PAM) == VENDOR_BYTES, "custom Polkit override: preserve and review")
+    for name in set(files) - {PAM} | {GUARD, STATE}:
+        require(not p(name).exists() and not p(name).is_symlink(), f"Polkit path collision: {name}")
+    # Every missing directory is recorded before installing any PAM content.
+    directories = []
+    try:
+        for name in (*files, GUARD, STATE + "/state.json"):
+            parents(name, directories)
+        p(STATE).chmod(0o700)
+        data = dict(schema=1, kind=kind, source_commit=source_commit, system_auth=system_auth, pam_existed=existed,
+                    hashes={name: digest(contents) for name, contents in files.items()},
+                    directories=[name for name in directories if name != STATE])
+        atomic(STATE + "/state.json", json.dumps(data, sort_keys=True).encode(), 0o600)
+    except Exception:
+        for name in reversed(directories):
+            try: p(name).rmdir()
+            except OSError: pass
+        raise
+    try:
+        # Library precedes leaf; public service is enabled only after tmpfiles.
+        for name in (*([LOCAL] if kind == "local" else []), LEAF, TMPFILES, DROPIN):
+            atomic(name, files[name])
+        p(GUARD).mkdir(mode=0o700)
+        run("restorecon", "-RF", str(p("/run/polkit")))
+        run("systemctl", "daemon-reload")
+        atomic(PAM, files[PAM])
+        verify(kind)
+    except Exception:
+        uninstall(kind)
+        raise
+    print("POLKIT_INSTALL=PASS live_validation=HUMAN_REQUIRED")
+
+
+if __name__ == "__main__":
+    try:
+        require(not TEST or (str(ROOT).startswith("/tmp/goodix-managed-test.") and ROOT.is_dir()
+                            and ROOT.stat().st_uid == os.geteuid()), "unsafe offline test root")
+        require(TEST or os.geteuid() == 0, "operator root transaction required")
+        require(len(sys.argv) in (3, 4), "usage: install|verify|preflight|uninstall local|managed [PAM_MODULE]")
+        action, kind = sys.argv[1:3]
+        # Serialize with the existing parent directory, without a persistent lock file.
+        lock = os.open(p("/var/lib"), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if action == "install": install(kind, sys.argv[3] if len(sys.argv) == 4 else None)
+        elif action == "verify": verify(kind)
+        elif action == "preflight": preflight(kind)
+        elif action == "uninstall": uninstall(kind)
+        else: raise RuntimeError("unknown action")
+        os.close(lock)
+    except Exception as error:
+        print(f"POLKIT_DEPLOY=FAIL reason={error}", file=sys.stderr)
+        sys.exit(1)

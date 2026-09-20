@@ -55,3 +55,12 @@ The complete project licensing and provenance ledger is
 `docs/LICENSING_AND_PROVENANCE.md`. No firmware, PSK, protected runtime
 material, fingerprint template, real biometric sample or private capture is
 covered by these open-source notices or included in the candidate.
+
+## Polkit conversation bridge
+
+`pam_goodix_polkit.so` is independently implemented project code under
+GPL-2.0-or-later. It uses public libpam APIs and invokes the installed Fedora
+pam_fprintd module in a separate PAM handle. No KDE, Polkit or Linux-PAM source
+expression is incorporated. Their exact versions are recorded as host
+integration dependencies in the SBOM. Corresponding source and build/deployment
+provenance are in `production/polkit/` at the candidate's source commit.

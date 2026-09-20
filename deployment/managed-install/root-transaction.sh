@@ -40,7 +40,7 @@ required_candidate=(
   MANIFEST SHA256SUMS SBOM.spdx.json THIRD_PARTY_NOTICES.md LICENSE
   GPL-2.0-or-later.txt LGPL-2.1-or-later.txt GPL-3.0-or-later.txt
   Apache-2.0.txt OpenCV-LICENSES.txt
-  fprintd greeter pam_fprintd.so 99-goodix-login-greeter.conf login-source.sha256
+  fprintd greeter pam_fprintd.so pam_goodix_polkit.so polkit-source.sha256 99-goodix-login-greeter.conf login-source.sha256
   fprintd-COPYING fprintd-AUTHORS production-source.sha256 fprintd-source.sha256
   libfprint-2.so.2.0.0 libgusb.so.2
   libopencv_core.so.413 libopencv_features2d.so.413 libopencv_flann.so.413
@@ -49,6 +49,8 @@ required_candidate=(
   99-goodix-27c6-5125-managed.conf plasmalogin-pam.rule kde-fingerprint-pam.rule
 )
 required_material=(target-material-manifest.json transport-material.bin target-config-90.bin gfusb.dll fdt-cache.bin)
+
+polkit_deploy() { python3 "$here/../../production/polkit/deploy.py" "$@"; }
 
 fail() { printf 'GOODIX_MANAGED_TRANSACTION=FAIL reason=%s\n' "$1" >&2; exit 1; }
 digest() { sha256sum "$1" | awk '{print $1}'; }
@@ -126,6 +128,7 @@ verify_candidate() {
   [[ $(manifest_value "$candidate" FAR_FRR_CLAIM) == NOT_MADE ]] || fail far_frr_claim_invalid
   commit=$(manifest_value "$candidate" SOURCE_COMMIT) || fail candidate_commit_missing
   is_commit "$commit" || fail candidate_commit_invalid
+  [[ $(manifest_value "$candidate" POLKIT_INTEGRATION) == INTERRUPTIBLE_SERVICE_LOCAL_V1 ]] || fail polkit_integration_missing
   verify_repo_provenance "$commit"
   printf '%s\n' "$commit"
 }
@@ -166,11 +169,11 @@ install_runtime_tree() {
     install -m 0644 -- "$candidate/$library" "$destination/$library"
   done
   install -m 0755 "$candidate/fprintd" "$candidate/greeter" "$destination/"
-  install -m 0644 "$candidate/pam_fprintd.so" "$destination/"
+  install -m 0644 "$candidate/pam_fprintd.so" "$candidate/pam_goodix_polkit.so" "$destination/"
   host_action restorecon -RF "$destination"
   host_action chcon --reference=/usr/libexec/fprintd "$destination/fprintd"
   host_action chcon --reference=/usr/libexec/plasma-login-greeter "$destination/greeter"
-  host_action chcon --reference=/usr/lib64/security/pam_fprintd.so "$destination/pam_fprintd.so"
+  host_action chcon --reference=/usr/lib64/security/pam_fprintd.so "$destination/pam_fprintd.so" "$destination/pam_goodix_polkit.so"
   if [[ -n $test_root && ${GOODIX_MANAGED_TEST_FAIL_AFTER_LOGIN_RUNTIME:-false} == true ]]; then
     fail injected_failure_after_login_runtime
   fi
@@ -182,8 +185,8 @@ verify_runtime_layout() {
   [[ -d $directory && ! -L $directory ]] || fail runtime_directory_invalid
   [[ $(readlink "$directory/libfprint-2.so.2") == libfprint-2.so.2.0.0 && \
      $(readlink "$directory/libfprint-2.so") == libfprint-2.so.2 ]] || fail runtime_symlink_drift
-  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 11 ]] || fail runtime_file_set_drift
-  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter pam_fprintd.so; do
+  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 12 ]] || fail runtime_file_set_drift
+  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter pam_fprintd.so pam_goodix_polkit.so; do
     [[ -f $directory/$file && ! -L $directory/$file ]] || fail runtime_file_invalid
     mode=644
     [[ $file != fprintd && $file != greeter ]] || mode=755
@@ -437,6 +440,7 @@ write_state() {
   local current_kde_pam=${11} previous_kde_pam=${12} kde_vendor_sha=${13} kde_override_sha=${14}
   local pending=$state.pending.$$
   {
+    echo POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1
     echo GOODIX_MANAGED_STATUS=ACTIVE
     echo GOODIX_MANAGED_DISTRIBUTION_MODEL=SOURCE_FIRST_MANAGED_INSTALL
     echo RPM_OFFICIAL_DISTRIBUTION=false
@@ -490,6 +494,9 @@ verify_active() {
   local allow_vendor_drift=${2:-false}
   [[ -f $state && ! -L $state ]] || fail state_missing
   [[ $(state_value GOODIX_MANAGED_STATUS) == ACTIVE ]] || fail state_inactive
+  [[ $(state_value POLKIT_INTEGRATION || true) == INTERRUPTIBLE_SERVICE_LOCAL_V1 ]] ||
+    fail pre_polkit_install_requires_original_uninstall_then_fresh_install
+  if [[ $allow_vendor_drift != true ]]; then polkit_deploy verify managed; fi
   local current previous expected
   if [[ $(state_value EARLY_LOGIN_INTEGRATION || true) == PAIRED_FPRINTD_PAM_GREETER_V1 ]]; then
     [[ -f $greeter_dropin && ! -L $greeter_dropin && $(digest "$greeter_dropin") == $(state_value GREETER_DROPIN_SHA256) ]] || fail greeter_dropin_drift
@@ -651,6 +658,7 @@ root_install_or_update() {
   cleanup_pam_installed=false
   cleanup_greeter_installed=false
   cleanup_kde_pam_installed=false
+  cleanup_polkit=false
   cleanup_transaction() {
     local rc=$?
     set +e
@@ -669,6 +677,11 @@ root_install_or_update() {
       host_action systemctl daemon-reload
       [[ $cleanup_service_before != active ]] || host_action systemctl start fprintd.service
     elif [[ $rc -ne 0 && $cleanup_kind == fresh ]]; then
+      if [[ $cleanup_polkit == true ]] && ! polkit_deploy uninstall managed; then
+        printf '%s\n' 'GOODIX_MANAGED_RECOVERY_REQUIRED=POLKIT_ROLLBACK_FAILED runtime_and_backups_preserved' >&2
+        remove_frozen_candidate "$cleanup_candidate"
+        exit "$rc"
+      fi
       if [[ $cleanup_kde_pam_installed == true && -f $kde_fingerprint_vendor_saved ]]; then
         install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
         host_action restorecon -F "$kde_fingerprint_pam"
@@ -757,6 +770,8 @@ root_install_or_update() {
      ! -e $dropin && ! -L $dropin && ! -e $hook && ! -L $hook && ! -e $state_dir && ! -L $state_dir && \
      ! -e $managed_pam && ! -L $managed_pam ]] ||
     fail managed_path_collision
+  polkit_deploy preflight managed
+  [[ ! -e $(p /var/lib/goodix-polkit) && ! -L $(p /var/lib/goodix-polkit) ]] || fail polkit_deployment_collision
   verify_vendor_pam
   verify_kde_fingerprint_vendor
   verify_login_host
@@ -790,6 +805,11 @@ root_install_or_update() {
   install -D -m 0644 "$candidate/99-goodix-login-greeter.conf" "$greeter_dropin"
   host_action restorecon -F "$greeter_dropin"
   ln -s "$commit" "$current_link"
+  cleanup_polkit=true
+  polkit_deploy install managed
+  if [[ -n $test_root && ${GOODIX_MANAGED_TEST_FAIL_AFTER_POLKIT:-false} == true ]]; then
+    fail injected_failure_after_polkit
+  fi
   write_state "$commit" NONE "$caller" "$service_before" "$(tree_digest "$runtime_root/$commit")" NONE \
     ACTIVE NONE "$installed_pam_vendor_sha" "$installed_pam_override_sha" \
     ACTIVE NONE "$installed_kde_fingerprint_vendor_sha" "$installed_kde_fingerprint_override_sha"
@@ -896,6 +916,7 @@ root_uninstall() {
   verify_active true true
   [[ $(state_value INSTALLER) == "$caller" ]] || fail installer_mismatch
   current=$(state_value CURRENT_COMMIT); previous=$(state_value PREVIOUS_COMMIT); service_before=$(state_value SERVICE_BEFORE)
+  polkit_deploy uninstall managed
   host_action systemctl stop fprintd.service
   if [[ $ACTIVE_PAM_STATE == MANAGED && $(state_value CURRENT_PAM_STATUS) == ACTIVE ]]; then
     [[ -f $managed_pam && ! -L $managed_pam && \
@@ -983,7 +1004,7 @@ case ${1:-} in
     printf '%s\n' 'GOODIX_MANAGED_STATUS=ACTIVE' "EARLY_LOGIN_STATUS=$ACTIVE_LOGIN_STATE" "CURRENT_COMMIT=$(state_value CURRENT_COMMIT)" \
       "PREVIOUS_COMMIT=$(state_value PREVIOUS_COMMIT)" \
       "PROTECTED_MATERIAL_READY=$(material_ready && echo true || echo false)" \
-      'RPM_OFFICIAL_DISTRIBUTION=false' "MANAGED_PAM_INTEGRATION=$pam_managed" \
+      'RPM_OFFICIAL_DISTRIBUTION=false' 'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1' "MANAGED_PAM_INTEGRATION=$pam_managed" \
       "MANAGED_PAM_STATUS=$pam_status" \
       "KSCREENLOCKER_MANAGED_PAM_INTEGRATION=$kde_pam_managed" \
       "KSCREENLOCKER_MANAGED_PAM_STATUS=$kde_pam_status" \

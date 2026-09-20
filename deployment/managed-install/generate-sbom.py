@@ -17,6 +17,17 @@ import tempfile
 
 SHIPPED_COMPONENTS = (
     {
+        "SPDXID": "SPDXRef-Package-Goodix-polkit-pam",
+        "name": "pam-goodix-polkit-conversation",
+        "versionInfo": "1",
+        "downloadLocation": "NOASSERTION",
+        "filesAnalyzed": False,
+        "licenseConcluded": "GPL-2.0-or-later",
+        "licenseDeclared": "GPL-2.0-or-later",
+        "copyrightText": "Goodix 27c6:5125 project contributors",
+        "sourceInfo": "production/polkit/pam_goodix_polkit.c; independent PAM bridge, no KDE/Polkit code incorporated.",
+    },
+    {
         "SPDXID": "SPDXRef-Package-libfprint-goodix",
         "name": "libfprint-goodix-27c6-5125",
         "versionInfo": "1.94.100",
@@ -98,6 +109,8 @@ SHIPPED_COMPONENTS = (
 )
 
 INTEGRATION_PACKAGES = (
+    "polkit",
+    "polkit-kde",
     "fprintd",
     "fprintd-pam",
     "pam",
@@ -183,7 +196,7 @@ def dynamic_package_paths(candidate: pathlib.Path) -> set[pathlib.Path]:
     with tempfile.TemporaryDirectory(prefix="goodix-sbom-") as directory:
         (pathlib.Path(directory) / "libfprint-2.so.2").symlink_to(candidate / "libfprint-2.so.2.0.0")
         env = os.environ | {"LD_LIBRARY_PATH": f"{directory}:{candidate}"}
-        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "pam_fprintd.so"]):
+        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "pam_fprintd.so", candidate / "pam_goodix_polkit.so"]):
             for line in run("ldd", str(binary), env=env).splitlines():
                 match = re.search(r"=>\s+(/\S+)\s+\(", line)
                 if not match and line.lstrip().startswith("/"):

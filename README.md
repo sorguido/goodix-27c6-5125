@@ -10,8 +10,9 @@ The supported configuration is intentionally narrow:
 - Fedora 44 KDE on x86_64;
 - Goodix USB `27c6:5125` / APP12509;
 - local users and the Fedora fprintd service with a source-built paired daemon/PAM extension;
-- enrollment, verification, Plasma login, Plasma session unlock, `sudo`, and
-  account-deletion protection.
+- enrollment, verification, Plasma login, Plasma session unlock and
+  account-deletion protection;
+- service-local Polkit fingerprint integration prepared and checked offline, pending live validation.
 
 Other Goodix devices, firmware revisions, distributions, desktop environments,
 and network identities have not been qualified.
@@ -28,7 +29,9 @@ That behavior is now integrated into the canonical source/build/managed
 candidate. This promotion is validated offline; the promoted managed candidate
 has not been installed or exercised live as part of this task. Independent
 hardware, full release migration/recovery qualification and publication remain
-separate project boundaries. See [Validation](docs/VALIDATION.md).
+separate project boundaries. The clean managed candidate preserves sudo configuration
+but does not establish sudo fingerprint authentication; the development PC uses
+a separate D285 PAM/sudoers path. See [Validation](docs/VALIDATION.md).
 
 If you encounter a reproducible problem, please open a GitHub issue with the
 software version/commit, Fedora version, hardware identity, command used and

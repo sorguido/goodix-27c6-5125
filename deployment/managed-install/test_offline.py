@@ -18,7 +18,7 @@ FILES = (
     "LICENSE", "GPL-2.0-or-later.txt", "LGPL-2.1-or-later.txt",
     "GPL-3.0-or-later.txt", "Apache-2.0.txt", "OpenCV-LICENSES.txt",
     "fprintd", "greeter", "pam_fprintd.so", "99-goodix-login-greeter.conf",
-    "login-source.sha256", "fprintd-COPYING", "fprintd-AUTHORS",
+    "login-source.sha256", "pam_goodix_polkit.so", "polkit-source.sha256", "fprintd-COPYING", "fprintd-AUTHORS",
     "production-source.sha256", "fprintd-source.sha256",
     "libfprint-2.so.2.0.0",
     "libgusb.so.2", "libopencv_core.so.413", "libopencv_features2d.so.413",
@@ -54,9 +54,17 @@ class ManagedInstallContract(unittest.TestCase):
         unit = self.root / "usr/lib/systemd/user/plasma-login.service"
         unit.parent.mkdir(parents=True)
         unit.write_text("[Service]\nExecStart=/usr/libexec/plasma-login-greeter\n")
+        (self.root / "var/lib").mkdir(parents=True)
+        (self.root / "usr/lib/pam.d/polkit-1").write_bytes(
+            b"#%PAM-1.0\n\nauth       include      system-auth\naccount    include      system-auth\n"
+            b"password   include      system-auth\nsession    include      system-auth\n")
+        (self.root / "etc/pam.d").mkdir(parents=True)
+        (self.root / "etc/pam.d/system-auth").write_text(
+            "auth required pam_env.so\nauth required pam_faildelay.so delay=2000000\n"
+            "auth sufficient pam_unix.so nullok\nauth required pam_deny.so\n")
         self.vendor_bytes = self.vendor_pam.read_bytes()
         self.kde_fingerprint_pam = self.root / "etc/pam.d/kde-fingerprint"
-        self.kde_fingerprint_pam.parent.mkdir(parents=True)
+        self.kde_fingerprint_pam.parent.mkdir(parents=True, exist_ok=True)
         self.kde_fingerprint_pam.write_text(
             "auth        substack      fingerprint-auth\n"
             "auth        include       postlogin\n\n"
@@ -100,6 +108,7 @@ class ManagedInstallContract(unittest.TestCase):
             "TARGET_OS=Fedora-44-KDE-x86_64\n"
             "PROTECTED_MATERIAL_INCLUDED=false\n"
             "PAM_FILES_INCLUDED=true\n"
+            "POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1\n"
             "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n"
             "KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM\n"
             "EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1\n"
@@ -161,6 +170,67 @@ class ManagedInstallContract(unittest.TestCase):
         self.assertFalse(managed.exists())
         self.assertEqual(self.vendor_pam.read_bytes(), self.vendor_bytes)
         self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+
+    def test_polkit_paired_update_rollback_and_counter_survival(self):
+        first = self.candidate("a" * 40)
+        second = self.candidate("b" * 40)
+        (second / "pam_goodix_polkit.so").write_bytes(b"new synthetic module")
+        (second / "SHA256SUMS").write_text("".join(
+            f"{sha(p)}  {p.name}\n" for p in sorted(second.iterdir()) if p.name != "SHA256SUMS"))
+        self.run_tx("--root-install", self.caller, str(first))
+        pam = self.root / "etc/pam.d/polkit-1"
+        contents = pam.read_bytes()
+        counter = self.root / "run/polkit/goodix-fingerprint/1000"
+        counter.write_text("3"); counter.chmod(0o600)
+        module = self.root / "usr/lib64/goodix-27c6-5125/current/pam_goodix_polkit.so"
+        self.run_tx("--root-update", self.caller, str(second))
+        self.assertEqual(module.read_bytes(), b"new synthetic module")
+        self.assertEqual(counter.read_text(), "3")
+        self.run_tx("--root-rollback", self.caller)
+        self.assertEqual(module.read_bytes(), (first / "pam_goodix_polkit.so").read_bytes())
+        self.assertEqual(pam.read_bytes(), contents)
+        self.assertEqual(counter.read_text(), "3")
+        self.run_tx("--root-uninstall", self.caller)
+        self.assertFalse(pam.exists())
+        self.assertFalse(counter.exists())
+
+    def test_polkit_partial_fresh_install_restores_absence(self):
+        candidate = self.candidate("a" * 40)
+        self.env["GOODIX_MANAGED_TEST_FAIL_AFTER_POLKIT"] = "true"
+        result = self.run_tx("--root-install", self.caller, str(candidate), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("injected_failure_after_polkit", result.stderr)
+        for name in ("etc/pam.d/polkit-1", "etc/pam.d/goodix-polkit-fingerprint",
+                     "var/lib/goodix-polkit", "run/polkit/goodix-fingerprint"):
+            self.assertFalse((self.root / name).exists(), name)
+        self.assertEqual(self.kde_fingerprint_pam.read_bytes(), self.kde_vendor_bytes)
+
+    def test_failed_polkit_recovery_preserves_referenced_runtime(self):
+        # Simulate failure of the independent rollback transaction, without
+        # introducing another production test hook or touching the host.
+        commands = self.temp / "commands"
+        commands.mkdir()
+        python = commands / "python3"
+        python.write_text('#!/bin/sh\nif [ "$2" = uninstall ]; then exit 1; fi\nexec /usr/bin/python3 "$@"\n')
+        python.chmod(0o755)
+        self.env["PATH"] = str(commands) + os.pathsep + self.env["PATH"]
+        self.env["GOODIX_MANAGED_TEST_FAIL_AFTER_POLKIT"] = "true"
+        result = self.run_tx("--root-install", self.caller, str(self.candidate("a" * 40)), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("POLKIT_ROLLBACK_FAILED", result.stderr)
+        self.assertTrue((self.root / "etc/pam.d/polkit-1").is_file())
+        self.assertTrue((self.root / "var/lib/goodix-polkit/state.json").is_file())
+        self.assertTrue((self.root / "usr/lib64/goodix-27c6-5125/current/pam_goodix_polkit.so").is_file())
+
+    def test_pre_polkit_managed_install_requires_original_uninstall(self):
+        self.run_tx("--root-install", self.caller, str(self.candidate("a" * 40)))
+        state = self.root / "var/lib/goodix-27c6-5125-managed/state"
+        state.write_text(state.read_text().replace("POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1\n", ""))
+        before = {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        result = self.run_tx("--root-update", self.caller, str(self.candidate("b" * 40)), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("pre_polkit_install_requires_original_uninstall", result.stderr)
+        self.assertEqual(before, {p: p.read_bytes() for p in self.root.rglob("*") if p.is_file()})
 
     def test_single_attempt_candidate_update_fails_without_host_changes(self):
         first = self.candidate("a" * 40)

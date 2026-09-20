@@ -33,17 +33,27 @@ Run the host-only transaction tests with:
 python3 deployment/managed-install/test_offline.py
 ```
 
-Polkit/Discover fingerprint authentication is not currently managed or
-validated. This installer does not create a `polkit-1` PAM override or enable
-global authselect fingerprint support. On a profile without fingerprint in
-`system-auth`, Fedora's vendor Polkit stack remains password-only. Adding
-`pam_fprintd` before that stack would serialize password authentication behind
-fingerprint verification; its per-conversation retry limit also does not bound
-KDE's repeated authentication sessions. Existing login/KScreenLocker validation
-does not establish Polkit support.
+Polkit/Discover has a service-local, interruptible fingerprint PAM bridge,
+qualified offline and pending live acceptance. It preserves immediate password
+submission, requires an explicit empty-field submission for each fingerprint
+choice, and bounds choices across restarted dialogs. The installer owns its PAM
+files, tmpfiles entry and narrow socket-helper drop-in; it enables no global
+authselect feature. See `production/polkit/README.md` for supported versions,
+file ownership, cancellation semantics and counter lifetime.
+
+The clean candidate does **not** establish sudo fingerprint support. The earlier
+unconditional claim relied on the development PC's separate D285 PAM/sudoers
+integration and is corrected. The installer preserves existing sudo behavior;
+a clean candidate-owned sudo fingerprint path remains a release gap.
+
+Managed releases without `POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1`
+require uninstall using their original manager, then a fresh install. New
+versions with this integration keep the same host rules and pair the bridge
+binary through `current`; update and rollback preserve the attempt counters.
+Uninstall restores original Polkit PAM presence and removes the new files.
 
 The complete candidate includes libfprint, the paired fprintd/PAM extension,
-greeter parent/drop-in, both PAM integrations and account-delete protection.
+greeter parent/drop-in, login/KScreenLocker/Polkit PAM integrations and account-delete protection.
 Prepared login permits up to three explicit physical attempts (8 s each),
 stopping on MATCH, error/timeout, or the third NO MATCH before password fallback; ordinary sudo/KScreenLocker retain their existing paths. Runtime
 versions switch together on update/rollback. The greeter integration applies
@@ -66,3 +76,8 @@ managed candidate over them. The three-contact manual cases are one non-matching
 finger then a matching finger, two non-matches then a match, and three non-matches
 then password, each in a separate normal login. Stop at the first MATCH and never
 make a fourth contact. FAIL/timeout/regression requires rollback; retain on PASS.
+
+If a partial install reports `POLKIT_ROLLBACK_FAILED`, stop and report that
+message. Runtime and recovery metadata are retained instead of deleting a
+module still referenced by PAM. Close authentication dialogs and preserve the
+checkout for targeted recovery; do not delete the retained files manually.

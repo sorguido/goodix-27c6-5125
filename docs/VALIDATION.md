@@ -23,6 +23,19 @@ account-delete protection. Those results are retained, but are not presented as
 a new full live qualification of this promoted managed candidate. Migration,
 recovery across the complete release path and independent hardware remain open.
 
+The user's current observation on 20 September 2026 confirms sudo fingerprint
+PASS on the development PC through D285's `pam_service=goodix-d285-01-sudo`.
+This is current host evidence. It does not qualify a clean managed install:
+that installer supplies neither this selector/service nor global fingerprint.
+Clean candidate sudo fingerprint remains a release integration gap; ordinary
+sudo configuration is preserved.
+
+Polkit now has an independently implemented service-local PAM conversation
+bridge and reversible local/managed deployment. Password-first submission,
+explicit fingerprint selection, cancellation and cross-conversation limits are
+checked offline. Real Discover behavior, SELinux execution and target cleanup
+are pending human validation. No Polkit live PASS is claimed.
+
 Offline validation commands for the distributed release surface are:
 
 ```bash
@@ -140,7 +153,7 @@ no reopen within a claim. MATCH remains immediate, while NO MATCH waits for
 release. These tests use synthetic protocol images/matching and a post-secure
 session seam; they do not qualify a physical handshake or target rearm.
 
-The actual managed candidate has 32 files. Its SPDX SBOM has 45 packages,
+That pre-Polkit managed candidate had 32 files. Its SPDX SBOM has 45 packages,
 30 files and 75 relationships; hashes, references, package verification code
 and byte-identical regeneration pass. The SBOM includes the attempts patch.
 SHA256SUMS digest:
