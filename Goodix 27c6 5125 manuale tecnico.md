@@ -140,94 +140,109 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — migrazione PC patchato, inventario privilegiato necessario (20 settembre 2026)
+### Stato corrente — inventario riesaminato, gate compatibilità manifest materiali (20 settembre 2026)
 
 Il task Utente `AI_PM_MIGRATE_PATCHED_HOST_TO_COMBINED_CANDIDATE.md` parte da
-`development` pulito a `dfc33c3e44d6172dc7244b4f958ad71be3774be5`, verificato
-allineato anche al ref remoto privato. Il suo caso A impone di fermarsi prima
-della migrazione quando l'inventario richiede letture root-only. Questo è il
-boundary corrente: nessun apply, rollback storico, installazione candidate,
-autenticazione reale o accesso al sensore è stato eseguito dall'AI.
+`dfc33c3e44d6172dc7244b4f958ad71be3774be5`. La ripartenza corrente verifica
+`development` pulito e allineato al remoto a
+`4e571eb72cc9c213cfbebab4a745afeefee6373c`. L'Utente ha completato l'inventario
+privilegiato e consegnato `/home/guido/goodix-inventory.json`, stderr vuoto:
+65096 byte, SHA-256 `58fef9bbcafec8485e3dd428d7cc19347b493ee7d036f99bb61513e5d24924a9`.
+Il precedente gate root-shell indisponibile/su fallito, poi handoff via pkexec
+password-only, è superato dalla consegna del report; nessuna autenticazione
+è stata eseguita dall'AI. Non si richiede di ripetere quell'inventario.
 
-La lettura host come uid 1000, fuori dalla rimappatura owner del sandbox,
-conferma fprintd `inactive/dead`, drop-in `90 D285 → 95 D293 → 96 login-early`
-ed ExecStart `goodix-login-early-fprintd`. Il greeter usa lo stesso runtime.
-**Login-three è ora osservato installato:** PROVENANCE early indica
-`98ec4e6cbbd06b9eff9e00dc9bb07629c62567a8`, scopo
-`PREPARED_LOGIN_THREE_ATTEMPTS`; PAM ha `max-tries=3 timeout=8 debug` e
-`login-three-backup` è presente. Questo prova la configurazione software,
-non aggiunge una validazione fisica del riarmo dopo NO MATCH. I runtime e
-wrapper D297 `c372298`/`ef302008` sono ancora presenti ma il drop-in 99 è
-assente; lo stato D297/02 e previous-dropin restano da correlare.
+**Inventario chiuso nel suo scope bounded:** 262 righe, di cui 27 ABSENT e
+3 UNKNOWN_STOP. Questi ultimi sono soltanto limiti di profondità degli archivi
+`d236-results/archive`, `d275-history/attempt-1` e `attempt-2-pre-corrective`
+sotto il deposito protetto: interamente PRESERVE, contenuti non ispezionati.
+Il report non certifica uno schema materiali compatibile o un rollback pronto.
+Non è stato copiato in Git/candidate; i dettagli sono nella review privata
+`development/migration/patched-host-to-combined/INVENTORY-REVIEW.md`.
 
-D285 conserva il PASS sudo attestato dall'Utente; il PAM corrente osservato
-ha tre tentativi/45 s e fallback pam_unix. Sudo e sudo-i corrispondono ai digest
-RPM. Authselect è valido, `local with-silent-lastlog with-mdns4`, senza
-fingerprint globale. Il selettore sudoers e `/etc/sudo.conf` sono root-only:
-non si dichiara verificato il loro contenuto corrente. L'uninstall D285
-versionato avvia fprintd, cancella il template ownership-pinned e riabilita
-`with-fingerprint`: non è un percorso di migrazione preservante i template.
+La selezione osservata resta **D285/90 → D293/95 → login-early/96**, aggiornato
+nel runtime da login-three, PROVENANCE
+`98ec4e6cbbd06b9eff9e00dc9bb07629c62567a8`, PAM `max-tries=3 timeout=8 debug`.
+fprintd era `inactive/dead`, ExecStart `goodix-login-early-fprintd`; il greeter
+usa il medesimo runtime. Questo è stato software, non una nuova prova fisica.
+D285 possiede il selettore per guido e conserva il PASS sudo umano precedente:
+frammento sudoers, PAM, wrapper, manifest e drop-in coincidono coi pin di state.
+Il PAM D285 corrente ha tre tentativi/45 s e fallback pam_unix. sudoers e
+sudo.conf corrispondono ai digest RPM; l'unico frammento osservato coincide
+esattamente con `Defaults:guido pam_service=goodix-d285-01-sudo` più newline.
+Authselect è già valido e password-only, `local with-silent-lastlog with-mdns4`.
 
-La baseline da ripulire comprende inoltre **D290 nel PAM vendor**:
-`/usr/lib/pam.d/plasmalogin` ha digest `559910be…`, mentre il package
-plasma-login-manager 6.7.5-1.fc44 dichiara `c6fc4a0b…`. Il delta manuale D290
-è documentato nella sezione storica; rimuovere soltanto l'override early in
-`/etc` non ripristina quel vendor e il manager corrente lo rifiuta. Anche
-KScreenLocker conserva il delta D297; hook B5 e relativo state sono presenti.
-La policy package corrente è selinux-policy-targeted 44.9-1.fc44; la coerenza
-attuale del modulo B5 e dei backup root-only non è ancora chiusa. I path della
-candidate managed e della patch locale Polkit risultano assenti.
+D293 resta presente ma superato nella selezione. D297 c372298/ef302008 restano
+presenti senza drop-in 99; lo state D297/02 ACTIVE è stale, previous-dropin
+coerente col proprio pin. Gli otto backup login-three coincidono coi rispettivi
+`before`; sette `after` e tutti i sedici pin proiettati early sono correlati.
+Il digest completo dello state early corrente non è stato raccolto: nessuna
+closure del vecchio rollback. I backup KScreenLocker vendor/managed coincidono
+coi pin; il PAM attuale è il managed D297. Il delta D290 in `/usr/lib/pam.d/plasmalogin`
+e quello KScreenLocker sono invertibili **in memoria** ai digest RPM esatti.
+Hook B5 coincide col pin di state; modulo SELinux osservato a priorità 400,
+digest CIL effettivo ancora da verificare prima di rimozione. Policy package
+corrente 44.9-1.fc44, state storico 44.8-1.fc44. Candidate managed e patch
+locale Polkit rimangono assenti. Gli uninstall storici restano inappropriati:
+D285 cancella template e riabilita fingerprint globale; gli altri ripristinano
+baseline superate o non correggono il vendor D290.
 
-Template, materiali `/var/lib/goodix-5125-poc`, staging, stati D285/D293/B5/D297,
-backup login-three e manifest runtime root-only richiedono l'inventario umano.
-Sono stati letti solo metadata delle directory protette, nessun contenuto o
-digest biometrico/materiale. Non si inferisce il numero di template dalla
-dimensione della directory. Compatibilità dei materiali con i loader canonici,
-ownership e rollback esatto restano aperti; nessuna strategia apply è approvata.
+Il tree fprintd contiene un regular template in
+`/var/lib/fprint/guido/goodix_27c6_5125/0/7`, root:root 0644, 521555 byte, con
+antenati 0700. È evidenza di presenza, non di compatibilità/validità biometrica.
+Il bundle ha i cinque file root:root 0600 attesi, dimensioni transport 88,
+CONFIG90 224, manifest 2305, DLL 5771496, cache FDT 13520 byte. Template,
+materiali, staging e archivi sono intatti: nessuna lettura di contenuti o
+hash protetti dell'host, nessuna scrittura, nessun accesso USB dell'AI.
 
-Il singolo script esplicitamente richiesto dal prompt è
-`development/migration/patched-host-to-combined/inventory.py`, con README e
-review dei file/overlay nella stessa directory. Non esegue subprocessi o
-autenticazione; legge path fissi, proietta soltanto campi software degli stati,
-esclude i pin template D285, raccoglie solo metadata per materiali/impronte e
-stampa JSON. Otto test sintetici PASS verificano assenza di scritture e
-variazioni atime, esclusione dati protetti, limiti, rifiuto di symlink/hardlink/
-FIFO, failure reporting e invocazione da cwd diverso senza root.
+**Nuovo blocker verificato offline:** il runtime installato conserva i quattro
+loader D293 e61fce3, come già documentato nella sezione della patch temporanea.
+Il loader storico richiede il manifest da 2305 byte tramite pin SHA-256; il
+manifest D232 di analisi, già versionato e non segreto secondo la propria
+provenance, coincide esattamente con quel pin. Il loader canonico richiede
+invece `goodix-5125-device-materials-v1`, dieci campi stringa, e rifiuta il D232
+annidato. La nuova prova compila il vero loader senza USB/daemon: rifiuto
+`PROTECTED_CONTENT` dopo un solo file letto, prima di transport/CONFIG90;
+un v1 sintetico della stessa dimensione supera il parser. Normale e
+ASan/UBSan PASS. La sola lunghezza 2305 del file host **non prova** che il
+contenuto sia D232: l'identità è fortemente inferita dalla provenance e dalla
+storia, non misurata sul deposito. Non è lecito dichiarare compatibilità.
+`material_ready()` del manager verifica solo presenza/owner/mode; il suo
+PASS con file sintetici arbitrari è stato riprodotto e non risolve il formato.
 
-**Risposta al gate e percorso corrente:** dopo il commit
-`0a8611608fe302c272d35d3e335169e0c218e06e` l'Utente ha riportato uid 1000/guido,
-PAM su/password verificato read-only e un solo `su -` fallito, senza sudo,
-pkexec, modifiche password/configurazioni o esecuzione dell'inventario. La
-causa dell'errore su non è nota; la shell root richiesta inizialmente non è
-disponibile. Quell'handoff è sostituito dal solo inventario via **pkexec con
-password amministrativa di guido**, eseguito manualmente dall'Utente.
+La parte overlay suggerisce una transazione nuova e circoscritta: togliere
+selettori/drop-in attivi, ripristinare i due PAM vendor, trasferire ownership
+B5, conservare runtime/state/backup storici inattivi e authselect corrente.
+Non è ancora un piano deterministico né un apply eseguibile: la baseline deve
+risolvere prima il manifest e qualificare policy/recovery finali.
 
-La nuova lettura non privilegiata conferma il PAM Polkit vendor conforme a
-RPM, override `/etc/pam.d/polkit-1` assente, catena `polkit-1 → system-auth →
-pam_unix` senza fingerprint e patch locale Polkit ancora assente. pkexec e
-helper installati coincidono coi digest del package polkit 127-2.fc44.2.
-La regola amministrativa Fedora indica wheel e guido appartiene a wheel;
-le regole locali `/etc/polkit-1/rules.d` sono root-only, quindi concessione e
-identità offerte restano da osservare, non sono un PASS già acquisito.
+**Decisione proposta, non autorizzata:** preparare offline una conversione
+reversibile del solo manifest al formato canonico, con originale root-only
+conservato e futuro controllo fail-closed, quattro binari materiali e template
+immutati, nessuna scrittura sensore o lettura AI di segreti. L'esecuzione reale
+resterebbe esclusivamente umana, dopo completamento di patch/rollback, prove
+candidate e handoff. L'alternativa di una candidate privata con loader storico
+richiede anch'essa una decisione: cambia la candidate canonica richiesta.
+Il prompt attuale mantiene il materiale protetto intoccabile; AGENTS §§6.2 e
+6.4 richiedono il gate. Non si aggiunge silenziosamente un'eccezione, non si
+riabilitano i vecchi loader canonici e non si indebolisce il parser.
 
-Il README aggiornato consegna una sola invocazione diretta dello script con
-`pkexec --disable-internal-agent --user root`, nella sessione KDE di guido.
-Non apre una shell root e non usa sudoers D285; nessuna patch viene installata.
-Il cambiamento sostanziale rispetto a su è autenticare l'amministratore locale
-tramite il PAM Polkit esistente. Se guido non è disponibile, il dialogo chiede
-soltanto root/fingerprint, manca l'agente o la prima password fallisce, si
-annulla e si riporta l'errore, senza retry o altri canali. Nessun contatto è
-previsto. L'AI non esegue pkexec né l'inventario root. L'autenticazione umana
-può produrre normali log di sistema; il collector non scrive file e la
-configurazione installata resta invariata. Nessun nuovo kit o D-number.
+Verifiche pertinenti: inventario 8/8, source checks PASS, loader 27/27 normale
+e 27/27 ASan/UBSan, prova formato 2 per modo, test managed metadata 1/1;
+57 correlazioni su report/software e due ricostruzioni vendor in memoria.
+LeakSanitizer non supportato nell'SDK/ptrace, disabilitato come nella suite
+materiali esistente; non si dichiara leak-check. Il test aggiunto resta privato
+in development e non è dipendenza della build production.
 
-`OUTCOME=HUMAN_REQUIRED`; `GATE=PRIVILEGED_READ_ONLY_INVENTORY`;
-`ADVANCEMENT=OBSERVED_OVERLAY_MAP_AND_BOUNDED_MISSING_EVIDENCE_INVENTORY`;
-`EXECUTABLE_CLOSURE=INVENTORY_OFFLINE_VERIFIED_ROOT_EXECUTION_PENDING`;
-`RESIDUAL_BLOCKER_OR_RISK=ROOT_ONLY_OWNERSHIP_SUDO_POLICY_AND_ROLLBACK_STATE`.
-Le fasi apply/recovery e le prove candidate post-migrazione sono rinviate
-all'esito dell'inventario, come prescritto dal caso A. La closure candidate
-precedente riportata sotto resta valida nel proprio scope offline.
+`OUTCOME=HUMAN_REQUIRED`; `GATE=MATERIAL_MANIFEST_COMPATIBILITY_DECISION`;
+`ADVANCEMENT=PRIVILEGED_INVENTORY_REVIEW_AND_EXECUTED_FORMAT_BOUNDARY_EVIDENCE`;
+`EXECUTABLE_CLOSURE=OFFLINE_BOUNDARY_VERIFIED_HOST_APPLY_NOT_PREPARED`;
+`RESIDUAL_BLOCKER_OR_RISK=CANONICAL_MATERIAL_FORMAT_REQUIRES_EXPLICIT_SCOPE_DECISION`.
+I due casi finali del prompt non coprono questo blocker: non è più il medesimo
+inventario mancante e non è una migrazione pronta alla live. Il README
+esplicita la decisione senza consegnare operazioni premature. Apply/rollback,
+build completa/riproduzione e simulazione post-migrazione restano da completare;
+nessuno dei precedenti PASS candidate viene riattribuito a questo PC.
 
 ### Avanzamento consolidato — integrazione congiunta Polkit e sudo, closure offline (20 settembre 2026)
 

@@ -136,3 +136,12 @@ standard library and do not copy historical deployment implementations.
 Historical scripts are reviewed as ownership evidence through Git; no external
 code is imported. This host-specific development handoff is not candidate
 payload and changes no distribution or licensing boundary.
+
+The follow-up `check-material-boundary.sh` is independent project
+GPL-2.0-or-later code; `test_material_boundary.c` is independent
+LGPL-2.1-or-later test code linked only with the existing target-material
+loader/binder. It consumes the already versioned private D232 non-secret
+analysis manifest, whose provenance document excludes PSK/raw OTP/CONFIG90
+and biometric content. It neither reads the installed protected bundle nor
+copies that fixture into the candidate/public source set. No production
+source or material contract is changed by this offline evidence test.

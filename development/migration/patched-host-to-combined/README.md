@@ -1,96 +1,103 @@
-# Inventario preliminare della migrazione — solo lettura
+# Migrazione PC patchato → combined candidate: decisione sui materiali
 
-**OUTCOME=HUMAN_REQUIRED — GATE=PRIVILEGED_READ_ONLY_INVENTORY**
+**OUTCOME=HUMAN_REQUIRED — GATE=MATERIAL_MANIFEST_COMPATIBILITY_DECISION**
 
-Il prompt Utente `AI_PM_MIGRATE_PATCHED_HOST_TO_COMBINED_CANDIDATE.md`, §§5 e
-14 caso A, richiede questo stop prima di definire la migrazione: mancano gli
-stati di ownership/rollback, sudoers, sudo.conf e metadata protetti leggibili
-soltanto da root. La baseline sorgente esaminata è `development` a
-`dfc33c3e44d6172dc7244b4f958ad71be3774be5`. Il commit che aggiunge questa directory
-identifica la versione dello script; non serve approvare lo SHA come credenziale.
+L'inventario privilegiato è stato consegnato dall'Utente con stderr vuoto e
+riesaminato. Non ripetere `inventory.py`, `su` o pkexec. Il prossimo passo non
+è ancora installare o disinstallare: è risolvere un'incompatibilità fra il
+loader del runtime installato e quello della candidate canonica.
 
-`inventory.py` è l'unico comando operatore. Non è un installer, un rollback o
-una prova di autenticazione. Non esegue processi esterni, servizi, PAM, D-Bus,
-USB o comandi di sistema. Emette soltanto JSON sul terminale; non crea log,
-backup o file. I dati aperti usano `O_NOATIME`; gli antenati sono aperti senza
-seguire symlink. Non ci sono parametri, selezione di root, retry o percorsi
-presi dagli stati. I file di test usano esclusivamente directory sintetiche.
+## Risultato della review
 
-Il primo handoff richiedeva una shell root già disponibile. L'Utente ha
-riportato uid 1000 e un solo `su -` fallito, senza eseguire l'inventario o
-modificare il sistema. Non ripetere `su`: la causa del fallimento non è stata
-stabilita e non occorre cambiare la password root.
+- D285 possiede esattamente il selettore sudo di guido; PAM, wrapper e drop-in
+  corrispondono ai pin software dello state. Rimane il PASS sudo umano già
+  attestato, senza una nuova autenticazione eseguita dall'AI.
+- La selezione è D285/90 → D293/95 → login-early/96, aggiornato da login-three.
+  KScreenLocker e B5 sono integrazioni aggiuntive. I due runtime D297 sono
+  presenti ma non selezionati; lo state D297/02 `ACTIVE` è stale.
+- È presente un file template, root:root, 521555 byte. I cinque file dei
+  materiali sono presenti con owner/mode attesi. Si tratta di metadata,
+  non di una validazione dei contenuti o del riconoscimento.
+- I tre `UNKNOWN_STOP` sono limiti di profondità in archivi storici sotto
+  `/var/lib/goodix-5125-poc`; questi alberi restano interamente preservati.
+  Non sono errori di lettura del selettore o dei backup necessari.
 
-Il percorso corrente usa **Polkit Fedora già installato**, verificato in sola
-lettura: `/etc/pam.d/polkit-1` assente, vendor `polkit-1 → system-auth → pam_unix`,
-nessun modulo fingerprint in quella catena; patch Polkit locale assente.
-La regola Fedora indica `wheel` come gruppo amministratore e `guido` ne fa
-parte. Le regole locali root-only non sono state lette: l'identità effettivamente
-offerta e la concessione dell'autorizzazione restano da osservare.
+La review dettagliata, le classificazioni degli oggetti e i limiti sono in
+[INVENTORY-REVIEW.md](INVENTORY-REVIEW.md). Il report ricevuto rimane nel path
+indicato dall'Utente; non è stato copiato nel repository o in una candidate.
 
-Dal terminale della **sessione KDE corrente di guido**, eseguire una sola volta:
+## Blocker verificato offline
 
-```bash
-/usr/bin/pkexec --disable-internal-agent --user root /usr/bin/python3 -I -B /home/guido/Repository/goodix-27c6-5125_private/development/migration/patched-host-to-combined/inventory.py
-```
+Il runtime login-three conserva quattro sorgenti del loader D293
+`e61fce313794922a2dab156a1b38a8ddc5837f19`. Quel loader accetta un manifest di
+2305 byte tramite pin SHA-256. Il manifest di analisi D232 **già versionato e
+non segreto** coincide con quel pin, ma ha uno schema diverso dal v1 canonico.
+La prova con il vero loader corrente lo rifiuta `PROTECTED_CONTENT`, prima
+di leggere transport o CONFIG90. Un v1 interamente sintetico, portato alla
+stessa dimensione, supera invece il parser: la lunghezza non è il problema.
 
-Nel dialogo KDE verificare il programma `/usr/bin/python3` e l'identità
-amministrativa **guido**; inserire una sola volta la password di guido. Root è
-l'utente del processo d'inventario, non la password da inserire. Se vengono
-offerte più identità, scegliere guido; se guido manca, viene richiesta soltanto
-la password root, compare fingerprint o il primo inserimento password fallisce,
-annullare e riportare il messaggio. Non eseguire retry o contatti sul sensore.
-Se il comando fallisce senza dialogo, fermarsi e riportare l'errore.
+Il manifest installato ha anch'esso 2305 byte. La sua identità con D232 è una
+forte inferenza da metadata, provenance software e storia, **non una lettura
+o un hash del file protetto attuale**. Non si dichiara verificato il contenuto
+host. Il manager controlla presenza/permessi dei materiali, non lo schema:
+`PROTECTED_MATERIAL_READY=true` non può chiudere questo blocker.
 
-`--disable-internal-agent` richiede l'agente già registrato della sessione e
-impedisce il ripiego a un nuovo agente testuale. `pkexec` esegue direttamente
-il solo script come root, senza aprire una shell e senza usare il selettore
-sudoers D285. Non anteporre sudo. Non vengono installate patch, modificati
-PAM/policy/password o riavviati servizi fprintd. Sono possibili i normali log
-di autenticazione del sistema; lo script resta privo di scritture.
-`-I -B` isola Python da moduli/configurazioni utente e disabilita il bytecode.
-Il comando funziona da qualsiasi directory e l'AI non lo esegue.
+## Decisione necessaria prima di continuare
 
-Il solo output da restituire all'AI è il JSON completo. L'exit zero significa
-che il report è stato raccolto, non che l'inventario o la migrazione sono PASS.
-`UNKNOWN_STOP` segnala un errore, un tipo/percorso non sicuro o il superamento
-di un limite; anche `ABSENT` va interpretato in review. Non riprovare con chmod,
-rimozione di file o altre modalità di autenticazione. Dopo il dialogo password
-previsto deve comparire soltanto il report: interrompere davanti ad altre
-richieste, attivazione sensore o comportamento diverso.
+Proposta: autorizzare la **preparazione offline di una transizione locale,
+reversibile, del solo `target-material-manifest.json` al formato canonico**,
+con esecuzione futura esclusivamente umana dopo un nuovo handoff completo.
+Il delta consentito sarebbe precisamente:
 
-Le letture sono elencate integralmente nelle costanti e in `collect()`:
+1. Qualificare nella futura transazione umana l'originale atteso; STOP su
+   differenze, senza stampare i suoi valori. Derivare i campi del v1 soltanto
+   da evidenze già qualificate, mai da valori inventati.
+2. Conservare l'originale root-only e sostituire atomicamente il solo manifest;
+   recovery simmetrico dell'originale in caso di mancata installazione o FAIL.
+3. Lasciare invariati i quattro file binari del bundle, staging, template,
+   firmware e stato del sensore. Nessuna lettura di segreti reali da parte AI,
+   nessuna esportazione, provisioning, nuova PSK o nuova acquisizione.
+4. Completare apply/rollback degli overlay, prove sintetiche e riproduzione
+   della candidate canonica, quindi fermarsi prima di ogni operazione host.
 
-- sudoers e sudo.conf: metadata e digest; dai frammenti sudoers soltanto scope
-  e selettori PAM, oltre alle direttive include. È una lettura lessicale,
-  **non una valutazione della policy effettiva**: include esterni/custom richiedono
-  review successiva; non vengono seguiti automaticamente.
-- D285/D293/B5/D297 e login-early/login-three: soli campi software espliciti;
-  pin/path template contenuti nello state D285 esclusi, chiavi sconosciute
-  escluse. Nessun `source`/eval degli stati. Hash delle copie software di rollback.
-- Cinque runtime storici già individuati: soli file software nominati,
-  massimo 32 MiB ciascuno; stati testuali massimo 64 KiB.
-- Template, materiale protetto e staging: esclusivamente path, tipo, owner,
-  mode, dimensione e mtime. **Nessun contenuto, digest biometrico, PSK, manifest
-  di materiali o capture viene aperto o esportato.** L'inventario delle directory
-  è limitato a 128 entry per directory, profondità esplicita e budget di righe.
-- Backup authselect, state KScreenLocker e directory del modulo SELinux B5:
-  metadata; dei due backup PAM KScreenLocker soltanto digest software.
+Questa proposta **non è implementata né autorizzata** dal task attuale.
+L'alternativa da decidere esplicitamente è una candidate privata con loader
+storico: conserverebbe anche il manifest, ma cambierebbe la candidate
+canonica richiesta e richiederebbe nuova provenance e validazione.
+Reintrodurre tacitamente i quattro loader, indebolire il parser o importare
+un nuovo bundle non sono correzioni ordinarie di questa migrazione.
 
-Nessun apply/rollback di migrazione viene consegnato prima della review di
-queste letture. Il rollback dello script non è applicabile: non modifica il
-sistema. D285 funzionante e tutti gli overlay restano presenti.
+La conferma serve perché il prompt Utente §0 dice «materiale protetto restano
+intoccabili» e §4 vieta di leggerne il contenuto; [AGENTS.md](../../../AGENTS.md)
+§6.2 impone il gate per «accesso o manipolazione di […] protected material non
+già specificamente autorizzati», e §6.4 per un cambio materiale di strategia.
+Questo caso non soddisfa né il caso A (ripetere il medesimo inventario non
+risolve il formato), né il caso B del prompt (migrazione pronta alla live).
+Si esplicita quindi il gate aggiuntivo, senza dichiarare uno dei due esiti
+falsamente chiuso. Non è una richiesta di approvazione dello SHA.
 
-Verifica offline eseguita: otto test sintetici PASS, inclusi assenza di scritture
-e variazioni atime, esclusione di contenuti/pin protetti, rifiuto di symlink,
-hardlink e FIFO, limiti, errori leggibili e invocazione reale da `/tmp` rifiutata
-senza root. Comando di sviluppo, da utente normale:
+## Verifiche di sviluppo già eseguite
+
+Da utente normale, dalla root Git; sono prove offline, non comandi operatore:
 
 ```bash
 python3 -I -B development/migration/patched-host-to-combined/test_inventory.py -v
+production/check-source.sh
+development/private-root/libfprint-driver/tests/run_goodix_runtime_inputs_test.sh
+bash development/migration/patched-host-to-combined/check-material-boundary.sh
+python3 -I -B deployment/managed-install/test_offline.py ManagedInstallContract.test_status_repairs_legacy_runtime_root_and_reports_material_readiness -v
 ```
 
-La ricostruzione e i limiti sono in [INVENTORY-REVIEW.md](INVENTORY-REVIEW.md);
-il manuale tecnico rimane la fonte narrativa canonica. Dopo il report umano si
-decideranno apply/recovery, baseline compatibile e riproduzione candidate; non
-eseguire vecchi uninstall o installazioni mentre l'inventario è incompleto.
+Risultati: inventario 8/8; source checks PASS; loader 27/27 normale e 27/27
+ASan/UBSan; due verifiche sul confine formato in entrambi i modi; test mirato
+del manager 1/1. Il test del manager dimostra soltanto il controllo metadata
+con file sintetici, non una candidate installata sul PC. LeakSanitizer non è
+supportato nell'ambiente SDK/ptrace: è disabilitato come nella suite materiali
+esistente; nessun claim di leak-check. Nessuna libreria USB/daemon viene
+collegata dal nuovo test. Il fixture D232 privato non entra nel build canonico.
+
+Apply/rollback, build completa della candidate, riproducibilità, simulazione
+della migrazione e piano live finale restano da completare dopo la decisione.
+Le prove candidate precedenti conservano il loro scope storico: non sono
+state riattribuite al PC post-migrazione. Finché questo gate resta aperto,
+conservare lo stack attuale e non eseguire gli uninstall storici.
