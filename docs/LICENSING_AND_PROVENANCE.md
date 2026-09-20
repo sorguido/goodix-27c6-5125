@@ -127,3 +127,12 @@ fprintd `src/device.c` retry condition for ordinary Verify/Identify; existing
 GPL-2.0-or-later copyright/license and combined GPL-3.0-or-later boundary remain.
 SBOM adds the sudo bridge and records the host sudo dependency. Firmware,
 protected material and biometric templates are not part of these artifacts.
+
+## Private host migration inventory (20 September 2026)
+
+`development/migration/patched-host-to-combined/inventory.py` and its offline
+tests are independent project code, GPL-2.0-or-later. They use only Python's
+standard library and do not copy historical deployment implementations.
+Historical scripts are reviewed as ownership evidence through Git; no external
+code is imported. This host-specific development handoff is not candidate
+payload and changes no distribution or licensing boundary.

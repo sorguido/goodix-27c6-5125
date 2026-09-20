@@ -140,7 +140,71 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — integrazione congiunta Polkit e sudo, closure offline (20 settembre 2026)
+### Stato corrente — migrazione PC patchato, inventario privilegiato necessario (20 settembre 2026)
+
+Il task Utente `AI_PM_MIGRATE_PATCHED_HOST_TO_COMBINED_CANDIDATE.md` parte da
+`development` pulito a `dfc33c3e44d6172dc7244b4f958ad71be3774be5`, verificato
+allineato anche al ref remoto privato. Il suo caso A impone di fermarsi prima
+della migrazione quando l'inventario richiede letture root-only. Questo è il
+boundary corrente: nessun apply, rollback storico, installazione candidate,
+autenticazione reale o accesso al sensore è stato eseguito.
+
+La lettura host come uid 1000, fuori dalla rimappatura owner del sandbox,
+conferma fprintd `inactive/dead`, drop-in `90 D285 → 95 D293 → 96 login-early`
+ed ExecStart `goodix-login-early-fprintd`. Il greeter usa lo stesso runtime.
+**Login-three è ora osservato installato:** PROVENANCE early indica
+`98ec4e6cbbd06b9eff9e00dc9bb07629c62567a8`, scopo
+`PREPARED_LOGIN_THREE_ATTEMPTS`; PAM ha `max-tries=3 timeout=8 debug` e
+`login-three-backup` è presente. Questo prova la configurazione software,
+non aggiunge una validazione fisica del riarmo dopo NO MATCH. I runtime e
+wrapper D297 `c372298`/`ef302008` sono ancora presenti ma il drop-in 99 è
+assente; lo stato D297/02 e previous-dropin restano da correlare.
+
+D285 conserva il PASS sudo attestato dall'Utente; il PAM corrente osservato
+ha tre tentativi/45 s e fallback pam_unix. Sudo e sudo-i corrispondono ai digest
+RPM. Authselect è valido, `local with-silent-lastlog with-mdns4`, senza
+fingerprint globale. Il selettore sudoers e `/etc/sudo.conf` sono root-only:
+non si dichiara verificato il loro contenuto corrente. L'uninstall D285
+versionato avvia fprintd, cancella il template ownership-pinned e riabilita
+`with-fingerprint`: non è un percorso di migrazione preservante i template.
+
+La baseline da ripulire comprende inoltre **D290 nel PAM vendor**:
+`/usr/lib/pam.d/plasmalogin` ha digest `559910be…`, mentre il package
+plasma-login-manager 6.7.5-1.fc44 dichiara `c6fc4a0b…`. Il delta manuale D290
+è documentato nella sezione storica; rimuovere soltanto l'override early in
+`/etc` non ripristina quel vendor e il manager corrente lo rifiuta. Anche
+KScreenLocker conserva il delta D297; hook B5 e relativo state sono presenti.
+La policy package corrente è selinux-policy-targeted 44.9-1.fc44; la coerenza
+attuale del modulo B5 e dei backup root-only non è ancora chiusa. I path della
+candidate managed e della patch locale Polkit risultano assenti.
+
+Template, materiali `/var/lib/goodix-5125-poc`, staging, stati D285/D293/B5/D297,
+backup login-three e manifest runtime root-only richiedono l'inventario umano.
+Sono stati letti solo metadata delle directory protette, nessun contenuto o
+digest biometrico/materiale. Non si inferisce il numero di template dalla
+dimensione della directory. Compatibilità dei materiali con i loader canonici,
+ownership e rollback esatto restano aperti; nessuna strategia apply è approvata.
+
+Il singolo script esplicitamente richiesto dal prompt è
+`development/migration/patched-host-to-combined/inventory.py`, con README e
+review dei file/overlay nella stessa directory. Non esegue subprocessi o
+autenticazione; legge path fissi, proietta soltanto campi software degli stati,
+esclude i pin template D285, raccoglie solo metadata per materiali/impronte e
+stampa JSON. Otto test sintetici PASS verificano assenza di scritture e
+variazioni atime, esclusione dati protetti, limiti, rifiuto di symlink/hardlink/
+FIFO, failure reporting e invocazione da cwd diverso senza root. L'esecuzione
+root resta all'Utente da una shell già disponibile con accesso password
+indipendente: non anteporre sudo, che sul PC corrente può selezionare D285.
+
+`OUTCOME=HUMAN_REQUIRED`; `GATE=PRIVILEGED_READ_ONLY_INVENTORY`;
+`ADVANCEMENT=OBSERVED_OVERLAY_MAP_AND_BOUNDED_MISSING_EVIDENCE_INVENTORY`;
+`EXECUTABLE_CLOSURE=INVENTORY_OFFLINE_VERIFIED_ROOT_EXECUTION_PENDING`;
+`RESIDUAL_BLOCKER_OR_RISK=ROOT_ONLY_OWNERSHIP_SUDO_POLICY_AND_ROLLBACK_STATE`.
+Le fasi apply/recovery e le prove candidate post-migrazione sono rinviate
+all'esito dell'inventario, come prescritto dal caso A. La closure candidate
+precedente riportata sotto resta valida nel proprio scope offline.
+
+### Avanzamento consolidato — integrazione congiunta Polkit e sudo, closure offline (20 settembre 2026)
 
 Task esplicito `AI_PM_POLKIT_SUDO_PARALLEL_CLOSURE.md`, baseline
 `dad2b99584549a87acd4599b902a8b6dc349820d`, branch development pulito alla
