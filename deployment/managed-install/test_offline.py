@@ -145,10 +145,10 @@ class ManagedInstallContract(unittest.TestCase):
         transaction = TRANSACTION.read_text(encoding="utf-8")
         self.assertIn('install -m 0600 "$source/$name" "$freeze/$name"', transaction)
         self.assertIn('/usr/bin/bash "$candidate/plasma-vt-preflight"', transaction)
-        self.assertNotIn('\\n    "$candidate/plasma-vt-preflight"\\n', transaction)
+        self.assertNotIn('\n    "$candidate/plasma-vt-preflight"\n', transaction)
 
         frozen = self.temp / "frozen-plasma-vt-preflight"
-        frozen.write_text("#!/usr/bin/bash\\nprintf 'FROZEN_PREFLIGHT=PASS\\n'\\n", encoding="utf-8")
+        frozen.write_text("#!/usr/bin/bash\nprintf 'FROZEN_PREFLIGHT=PASS\n'\n", encoding="utf-8")
         frozen.chmod(0o600)
         self.assertEqual(frozen.stat().st_mode & 0o777, 0o600)
         with self.assertRaises(PermissionError):
@@ -157,7 +157,7 @@ class ManagedInstallContract(unittest.TestCase):
             ["/usr/bin/bash", str(frozen)],
             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
         )
-        self.assertEqual(result.stdout, "FROZEN_PREFLIGHT=PASS\\n")
+        self.assertEqual(result.stdout, "FROZEN_PREFLIGHT=PASS\n")
 
     def test_plasma_vt_exact_inverse_and_text_consoles_preserved(self):
         directory=self.root/'etc/systemd/system/plasmalogin.service.d'
