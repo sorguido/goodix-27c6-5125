@@ -22,7 +22,7 @@ CANDIDATE=Path('/tmp/goodix-combined-migration-ready/candidate')
 POLICY=Path('/tmp/goodix-migration-ready-policy/goodix_fprint_account_delete.pp')
 RECEIPT=Path('/tmp/goodix-migration-ready.SHA256SUMS')
 FOLDERS=('development/migration/patched-host-to-combined','deployment/managed-install',
-         'production/polkit','production/sudo')
+         'production/polkit','production/sudo','production/plasma-vt')
 CONSOLE='goodix-migration-recovery.service'
 CONSOLE_ARGV='/usr/bin/openvt -c 12 -w -- /usr/bin/bash --noprofile --norc'
 ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LC_ALL':'C','PYTHONDONTWRITEBYTECODE':'1',
@@ -46,7 +46,7 @@ def delivery(repo=REPO,candidate=CANDIDATE,policy=POLICY,receipt=RECEIPT):
     require(not git(repo,'status','--porcelain','--untracked-files=all'),'worktree_dirty')
     require(candidate.is_dir() and not candidate.is_symlink(),'candidate_missing_or_symlink')
     paths=set(candidate.iterdir())
-    require(len(paths)==36,'candidate_file_set')
+    require(len(paths)==40,'candidate_file_set')
     paths.add(policy)
     for folder in FOLDERS:
         paths.update(repo/name for name in git(repo,'ls-files','--',folder).splitlines())
@@ -65,6 +65,7 @@ def delivery(repo=REPO,candidate=CANDIDATE,policy=POLICY,receipt=RECEIPT):
     require(manifest['SOURCE_COMMIT']==head,'candidate_head_mismatch')
     require(manifest['SUDO_INTEGRATION']=='PASSWORD_FIRST_SERVICE_LOCAL_V1' and
             manifest['POLKIT_INTEGRATION']=='INTERRUPTIBLE_SERVICE_LOCAL_V1' and
+            manifest['PLASMA_VT_INTEGRATION']=='QUALIFIED_SESSION_VT_V1' and
             manifest['PROTECTED_MATERIAL_INCLUDED']=='false','candidate_contract')
     return head
 
@@ -140,8 +141,15 @@ def login_check(host, root=Path('/')):
             (info.st_uid,info.st_gid,info.st_nlink)==(0,0,1),'saved_recovery_command_drift')
     require(host.run('/usr/bin/systemctl','show','plasmalogin.service',
                      '-p','ActiveState','--value')=='active','plasmalogin_not_active')
+    pid=host.run('/usr/bin/systemctl','show','plasmalogin.service','-p','MainPID','--value')
+    require(pid.isdecimal() and int(pid)>1,'plasma_pid_missing')
+    expected='/usr/lib64/goodix-27c6-5125/current/plasmalogin'
+    require(host.run('/usr/bin/ps','-p',pid,'-o','args=')==expected,
+            'plasma_activation_required_restart_from_recovery_console')
+    require(sha((root/expected.lstrip('/')).read_bytes())==sha((CANDIDATE/'plasmalogin').read_bytes()),
+            'installed_plasma_candidate_drift')
     print('LOGIN_PREFLIGHT=PASS recovery_root_tty12=READY tty1=UNCLAIMED '
-          'logout_greeter_result=PENDING_LIVE',flush=True)
+          'plasma_vt=RUNNING_CORRECTIVE logout_greeter_result=PENDING_LIVE',flush=True)
 
 
 def run_flow(tx,invoke,ask,check_delivery):
@@ -166,7 +174,7 @@ def run_flow(tx,invoke,ask,check_delivery):
         invoke(['/usr/bin/bash',manager,'--root-install','guido',str(CANDIDATE)])
         invoke(['/usr/bin/bash',manager,'--status'])
         print('OPERATOR=PASS_INSTALL_AND_STATUS. Esegui ora i workflow manuali del README; '
-              'TTY solo emergenza: /run/gx. La console root resta aperta.',flush=True)
+              'Plasma VT richiede attivazione dalla console tty12 come indicato nel README. /run/gx resta disponibile.',flush=True)
     except BaseException:
         if attempted and tx.fs.info('/var/lib/goodix-27c6-5125-migration') is not None:
             try:

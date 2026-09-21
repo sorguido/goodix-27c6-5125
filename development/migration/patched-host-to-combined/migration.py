@@ -68,6 +68,7 @@ COLLISIONS = (
     '/usr/libexec/goodix-27c6-5125/fprintd-wrapper',
     '/etc/systemd/system/fprintd.service.d/99-goodix-27c6-5125-managed.conf',
     '/etc/systemd/user/plasma-login.service.d/99-goodix-login-greeter.conf',
+    '/etc/systemd/system/plasmalogin.service.d/99-goodix-plasma-vt.conf',
     '/etc/pam.d/polkit-1', '/etc/pam.d/goodix-polkit-fingerprint',
     '/etc/pam.d/goodix-sudo-fingerprint',
 )
@@ -396,7 +397,10 @@ class Migration:
             files[p] = dict(mode=row['mode'], label=label, mtime_ns=self.fs.info(p)['mtime_ns'], before=row['sha256'],
                             after=digest(after) if after is not None else None,
                             backup='original-manifest.json' if p == MATERIAL else str(index))
-        return dict(schema=2, status='PREPARED', files=files, preserved=self.preserve()), files
+        plasma_before = self.host.run('/usr/bin/systemctl','show','plasmalogin.service','-p','ActiveState','--value')
+        require(plasma_before in ('active','inactive'), 'plasma_service_before_invalid')
+        return dict(schema=2, status='PREPARED', files=files, preserved=self.preserve(),
+                    plasma_service_before=plasma_before), files
 
     def save(self, state):
         self.fs.write(self.backup + '/state.json', (json.dumps(state,sort_keys=True,indent=2)+'\n').encode(), 0o600)
@@ -409,6 +413,7 @@ class Migration:
         state = json.loads(data)
         require(state['schema'] == 2 and set(state['files']) == set(ORDER)
                 and state['status'] in ('PREPARED','APPLIED','RESTORED'), 'recovery_state_invalid')
+        require(state.get('plasma_service_before') in ('active','inactive'), 'plasma_service_before_invalid')
         require(state['source'] == self.source(), 'migration_source_changed_use_saved_version')
         for name, expected in state['source'].items():
             data, _ = self.fs.read(self.backup+'/'+name,0o600)

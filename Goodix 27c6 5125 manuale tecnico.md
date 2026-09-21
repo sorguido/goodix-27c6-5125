@@ -140,22 +140,105 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — Polkit recovery e conflitto VT Plasma Login (21 settembre 2026)
+### Stato corrente — Plasma Login, race VT/getty (21 settembre 2026)
 
-La run **umana** della candidate `d7de50585d555b1ca676e4fcf6c9ed77cc20d601`
-ha prodotto PASS reali: **install/status; sudo password e fingerprint; sudo-i
-password e fingerprint; Polkit password e fingerprint; sudo e Polkit
-NO-MATCH→password; sudo e Polkit cancel→password; KScreenLocker password e
-fingerprint**. Questi risultati identificano quella build e non vengono
-trasferiti automaticamente al nuovo correttivo offline.
+Baseline live **86d9ebc2cc70aeee43f52c07246e0f24d3e0ef0a**, lasciata installata
+durante il lavoro offline. Il log ripristinato dall'Utente
+`/home/guido/goodix-plasma-login-first-attempt-20260921.log` contiene 4004 righe,
+827168 byte, SHA-256 `fed92e23a15becce6a3f404387b14aa461796f8ef16f27b2679da210ed111cf7`.
+L'analisi dell'intero file e dei sorgenti corrispondenti sostituisce la precedente
+classificazione generica di login candidate ancora non provato.
 
-Il precedente logout ha trovato tty1 occupata dalla recovery root avviata con
-openvt senza VT esplicito. Plasma Login è terminato con status 23. La corretta
-classificazione è **INVALID / PROCEDURE-INDUCED VT CONFLICT**, non candidate
-FAIL: i login candidate **PASSWORD e FINGERPRINT restano PENDING LIVE**.
-L'Utente ha completato il rollback, cessato la console tty1, riavviato Plasma
-Login e ottenuto **POST-RECOVERY PLASMA LOGIN PASSWORD=PASS**. Nessun risultato
-successivo di login candidate viene inferito dalle prove offline.
+**Osservato:** password PAM pam_unix e KDE sessione 5 tty3 riusciti alle 20:48:50,
+dopo circa otto secondi e un timeout fingerprint. Dopo logout, getty tty3 parte
+alle 20:50:17.106061; fingerprint e PAM session_open della sessione 8 riescono,
+ma alle 20:50:23.161306 TIOCSCTTY fallisce EPERM e il helper esce 5. Il successivo
+login su tty4 riesce. Dopo quel logout, getty tty4 parte alle 20:50:45.520151;
+nuovo MATCH/PAM/session_open della sessione 10 riusciti, TIOCSCTTY EPERM alle
+20:50:53.332792. Il login seguente su tty5 riesce. Due riproduzioni della stessa
+classe, non un matcher/driver/PAM fingerprint failure. I successi al secondo
+login non valgono come accettazione del primo handoff. La sola maggiore lentezza
+del fingerprint non spiega il caso: anche la password precedente attende otto
+secondi. Non è il precedente conflitto indotto dalla recovery su tty1; tty12
+resta separata e non viene alterata dall'AI.
+
+**Meccanismo verificato nel sorgente:** acquisito il SRPM Fedora
+plasma-login-manager 6.7.5-1.fc44 e conservati sorgente/spec/quattro patch
+immutabili con digest. Display sceglie il VT prima di PAM; setUpNewVt usa
+VT_OPENQRY e restituisce soltanto il numero, senza aprire /dev/ttyN. La patch
+Fedora 170 riguarda l'attesa del cambio VT, non questa assegnazione. Nel logind
+259.9, l'avvio della nuova sessione rilegge il VT attivo e può avviare auto-getty
+su quello appena liberato. Il getty Fedora Type=idle può essere già `Started`
+senza avere ancora aperto la tty (attesa 5+1 secondi limitata). La query kernel
+può quindi scegliere quel VT; dopo PAM, il helper esegue setsid e TIOCSCTTY
+quando un'altra sessione può averne assunto il controllo. Questo spiega anche
+la successiva scelta del VT seguente ormai libero. L'esatto PID/interleaving
+agetty delle due run è **inferito**, non catturato da trace: `root` nel messaggio
+è l'owner dell'inode tty, non una misura della controlling session.
+
+**Correttivo offline:** daemon Plasma locale target-pinned, che seleziona un VT
+libero fuori dall'intervallo automatico qualificato NAutoVTs=ReserveVT=6,
+controlla getty/autovt/kmscon e job prima/dopo open e mantiene il descrittore
+fino al handoff, errore o cancellazione. VT_GETSTATE limita la scansione ai bit
+osservabili 1–15; tty12 già aperta è occupata e viene esclusa. Nessun fallback
+al VT attivo, sleep, retry della sessione, TIOCSCTTY forzato, stop/mask getty o
+modifica globale logind. Password e fingerprint condividono l'assegnazione
+prima di PAM. Il helper vendor, driver/SIGFM/protocollo, bridge sudo/Polkit,
+locker, timeout e limite tre contatti rimangono invariati. I sorgenti KDE
+conservano licenze/notices; ledger e SBOM includono il daemon aggiuntivo.
+
+**Lifecycle:** due file nel runtime gestito (`plasmalogin`, preflight) e un
+solo drop-in del servizio Plasma. Nessun file vendor sovrascritto. Install/status
+verifica i file ma indica RESTART_REQUIRED finché il daemon precedente è attivo.
+L'attivazione umana riavvia Plasma da tty12 e termina KDE; si rientra con password
+prima di login-check/logout/test fingerprint. Il login-check verifica processo
+e digest attivi, oltre alla recovery. /run/gx usa il codice salvato, arresta il
+daemon locale, completa l'inverse della migrazione e poi riavvia quello vendor;
+lo stato originale attivo/inattivo è salvato per ripresa dopo interruzione.
+Il riarmo accetta per hash anche la snapshot 86d9 senza modificarne gli originali.
+Update con daemon/preflight diversi richiede uninstall salvato e fresh install;
+update con questi byte identici conserva il rollback gestito. Drift di pacchetto
+ferma il preflight: eseguire recovery prima di aggiornare Fedora. Il codice di
+recovery è salvato, ma se i file vendor sono già cambiati può fermarsi sul drift
+e richiedere review; non promette un ripristino attraverso upgrade non qualificati.
+
+**Verificato offline:** 14 casi del selettore C++ reale su syscall VT simulate e
+bus privato (tty3/4, terminale libero, tty12, getty/job concorrente, errori,
+cleanup); kernel reale su sole PTY nuove, uid1000: controlling tty occupata
+rifiutata EPERM e libera acquisita senza steal. Managed 35, migrazione 27,
+launcher 23, metadata/riarmo 15, incluse inverse/collisioni e recovery da cwd
+estranea. I test PAM usano fixture software stabili, perché l'host resta con
+candidate attiva. Il preflight read-only passa sull'host reale. Nessun daemon
+Plasma nuovo, root, USB, logout o installazione è stato eseguito dall'AI.
+Le simulazioni **non** provano VT_OPENQRY/TIOCSCTTY su VT reali né SELinux/start
+systemd: REAL_TARGET_LIVE_PENDING. La consegna deve essere riprodotta due volte
+da HEAD pulito, byte-identica e sigillata nei quattro percorsi del README
+prima del gate; il manifest e la risposta di consegna identificano lo SHA finale.
+
+PLASMA LOGIN FINGERPRINT = **PENDING CORRECTIVE LIVE**. Nuova password e recovery
+tty12: contratti offline verificati, regressione reale da osservare. Metodo:
+cambia l'assegnazione strutturale del VT, non il pacing del sensore. Ipotesi:
+il getty automatico del VT liberato non può reclamare quello della sessione
+nuova. Se ricorre EPERM, STOP/recovery e diagnostica mirata su VT effettivo,
+gettystate/job e controlling session; nessun secondo login di accettazione o
+terzo tentativo equivalente. Retest umano minimo: recupero 86d9, install e
+attivazione, password/login-check, logout, **un solo login fingerprint** con
+massimo tre contatti/stop al MATCH, **recovery anche dopo PASS**, password finale.
+
+Review set Git-native: diff dalla baseline 86d9, source/provenance Plasma,
+managed/migration e test, [review](development/migration/patched-host-to-combined/PLASMA-VT-RACE-REVIEW.md),
+[README operativo](development/migration/patched-host-to-combined/README.md) e
+questo stato canonico. Gate: **HUMAN_REQUIRED / LIVE_RETEST**. Nessun nuovo D-number.
+
+### Correttivo precedente — Polkit recovery e console tty12
+
+La candidate d7de505 ha PASS umani install/status, sudo/sudo-i e Polkit
+password/fingerprint/NO-MATCH/cancel, KScreenLocker password/fingerprint.
+Il suo logout con recovery su tty1 era INVALID / PROCEDURE-INDUCED VT CONFLICT
+(status 23); dopo rollback, chiusura di quella console e riavvio, password PASS.
+Il correttivo ecae84f ha introdotto counter canonico e tty12; 86d9 ha cambiato
+solo microcopy Polkit. Queste correzioni restano baseline, non vengono riaperte.
+Le istruzioni di retest di quel passo sono superate dal correttivo corrente.
 
 **Recovery Polkit:** il primo `/run/gx` ha restituito ownership drift sul
 counter `/run/polkit/goodix-fingerprint/1000`: directory root:root 0700;
@@ -208,38 +291,6 @@ il greeter. La recovery corta resta disponibile prima e dopo il logout.
 Il riarmo ora autentica anche la snapshot RESTORED d7de505, preservandola
 integralmente come già faceva per f97de44; nessun cleanup host è eseguito dall'AI.
 
-Riesame metodologico: cambiano il contratto counter/uninstall e il VT della
-recovery, non il pacing del sensore. Le ipotesi sono creazione canonica +
-rollback senza rimozione parziale, e acquisizione tty1 senza console concorrente.
-Se lo stesso failure ricorre, fermarsi con metadata del counter oppure stato
-VT/messaggio greeter del failure reale; nessuna whitelist più larga, correzione
-manuale cieca o terzo logout equivalente. Il retest è limitato a install,
-smoke Polkit password/fingerprint, preflight VT, Plasma password/fingerprint,
-**recovery reale anche dopo PASS** e login password post-recovery. sudo password
-è esercitato dal normale comando di recovery; gli altri consumer restano PASS
-storici senza ripetizione inutile. TTY solo emergenza, Ctrl+Alt+F12 e `/run/gx`.
-
-Prove offline: PAM Polkit 19 normali e 19 ASan/UBSan; deploy 19 con tutti i
-casi richiesti (metadata root virtuali, nessuna esecuzione root); migrazione 26;
-launcher/VT 23; metadata/riarmo 14, incluse snapshot f97de44 e d7de505;
-managed 31; PAM incrociati sudo/Polkit 3; stack protocollo/lifecycle/daemon su
-bus privato/greeter normale e sanitizer PASS. Due build isolate del nuovo
-modulo Polkit producono byte identici. La funzione VT read-only reale passa
-sull'host come guido; non è stata creata o attivata alcuna console dall'AI.
-La review PM separata dall'implementazione ha riesaminato direttamente diff,
-percorsi reali e test, senza seconda istanza agente. Ha corretto anche il
-preflight uninstall che riparava permessi e la possibilità di portare un vecchio
-GID in update: quel caso richiede prima l'uninstall qualificato. La consegna
-integrale viene sigillata da HEAD pulito nei quattro path del README, con
-confronto delle due candidate e receipt prima del gate; i digest finali sono
-nei manifest/SHA256SUMS della consegna.
-
-Review set: diff dalla baseline d7de505, sorgenti e test Polkit/managed/migration,
-[review correttiva](development/migration/patched-host-to-combined/POLKIT-VT-REVIEW.md),
-README operativo e questo stato canonico. Gate successivo unico:
-**OUTCOME=HUMAN_REQUIRED / GATE=LIVE_RETEST** dopo review e riproduzione candidate.
-Root, sudo/pkexec, USB, install e modifiche host restano esclusivamente umani;
-nessun protected material, impronta o firmware è stato modificato dall'AI.
 
 ### Correttivo precedente — metadata RPM e riarmo dopo rollback
 
@@ -339,8 +390,10 @@ riordino, duplicati e modifica del contenuto restano STOP. La qualifica delle
 proprietà pubbliche reali passa ora come uid 1000; il preflight completo root
 (material manifest/policy) non è stato eseguito dall'AI.
 
-**Vincolo UX corrente esplicito:** almeno 95% copy-paste da KDE/Konsole, nessuna
-operazione ordinaria da TTY; TTY esclusivamente recovery. Il nuovo
+**Vincolo UX di questo passo storico:** almeno 95% copy-paste da KDE/Konsole,
+TTY esclusivamente recovery. Il correttivo VT corrente richiede inoltre una
+singola attivazione del daemon da tty12, perché il riavvio termina KDE; vedere
+lo stato corrente e il README. In questo passo, il nuovo
 `operator.sh` funziona da qualsiasi cwd: `preflight` controlla consegna/HEAD,
 PAM password-only e invoca un singolo pkexec per preflight read-only; `run`
 usa una sola sessione privilegiata con due pause di fase, apply, verifica sudo

@@ -36,12 +36,18 @@ def sources(repo):
 
 
 def restore(tx, invoke):
-    tx.state()  # Validate saved sources and backups before any host operation.
+    state = tx.state()  # Validate saved sources and backups before any host operation.
     if tx.fs.info('/var/lib/goodix-27c6-5125-managed/state') is not None:
         manager=str(tx.fs.root / (BACKUP+'/recovery/'+PATHS[0]).lstrip('/'))
-        invoke(['/usr/bin/bash',manager,'--root-uninstall','guido'])
+        invoke(['/usr/bin/env','GOODIX_DEFER_PLASMA_RESTART=true',
+                '/usr/bin/bash',manager,'--root-uninstall','guido'])
     # Refuses partial/foreign candidate residue. Never deletes it speculatively.
-    return tx.rollback()
+    result = tx.rollback()
+    if state['plasma_service_before'] == 'active':
+        invoke(['/usr/bin/systemctl','start','plasmalogin.service'])
+    # The restored greeter may legitimately activate fprintd again. Do not
+    # report its pre-restart inactive state as the final observable state.
+    return result.replace('DAEMON_INACTIVE','PLASMA_BASELINE_RESTORED')
 
 
 def main():

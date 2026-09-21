@@ -43,6 +43,7 @@ class FakeHost:
         if args[0]=='/usr/bin/rpm': return 'plasma-login-manager-6.7.5-1.fc44.x86_64'
         if args[0]=='/usr/bin/busctl': return 'u 6'
         if args[0]=='/usr/bin/systemd-analyze': return '[Login]\n#ReserveVT=6'
+        if args[0]=='/usr/bin/ps' and 'args=' in args: return '/usr/lib64/goodix-27c6-5125/current/plasmalogin'
         if args[0]=='/usr/bin/ps': return '500 1 0 0 ? openvt\n501 500 0 0 tty12 bash\n600 1 1000 1000 tty2 plasma'
         if args[0]=='/usr/bin/loginctl': return '15 1000 guido seat0 600 user tty2 no -'
         if args[0]=='/usr/bin/systemctl':
@@ -96,13 +97,22 @@ class MigrationTests(unittest.TestCase):
         self.root=self.temp/'root'; self.root.mkdir()
         self.plan=json.loads((HERE/'host-plan.json').read_bytes())
         self.preserved_bytes={}
+        spec=importlib.util.spec_from_file_location('sudo_fixture_rules',REPO/'production/sudo/rules.py')
+        sudo=importlib.util.module_from_spec(spec);spec.loader.exec_module(sudo)
         for p,row in self.plan['guards'].items():
             data=('synthetic software '+p).encode()
             if p in ('/etc/pam.d/sudo','/etc/pam.d/sudo-i','/usr/lib/pam.d/polkit-1','/etc/authselect/system-auth'):
                 data=Path(p).read_bytes()  # public software only, no protected data
+            if p=='/etc/pam.d/sudo': data=sudo.VENDOR
+            if p=='/etc/pam.d/sudo-i': data=sudo.LOGIN_VENDOR
             self.put(p,data,row['mode']); row['sha256']=m.digest(data)
         for p,row in self.plan['files'].items():
-            data=Path(p).read_bytes() if p in m.VENDOR else ('synthetic owned '+p).encode()
+            data=('synthetic owned '+p).encode()
+            if p in m.VENDOR:
+                old,new,expected=m.VENDOR[p]
+                vendor=(HERE/'test-data'/(Path(p).name+'.vendor')).read_bytes()
+                assert m.digest(vendor)==expected
+                data=vendor.replace(new,old,1) if new else old+vendor
             self.put(p,data,row['mode']); row['sha256']=m.digest(data)
         self.put(m.MATERIAL,LEGACY.read_bytes(),0o600)
         self.put('/etc/passwd',b'root:x:0:0:root:/root:/bin/bash\nguido:x:1000:1000::/home/guido:/bin/bash\n')
@@ -361,15 +371,34 @@ class MigrationTests(unittest.TestCase):
         saved_manager=self.path(m.BACKUP+'/recovery/'+m.recovery.PATHS[0])
         self.assertNotIn(b'repo=$(git',saved_manager.read_bytes())
         def invoke(command):
-            self.assertEqual(Path(command[1]),saved_manager)
+            if command == ['/usr/bin/systemctl','start','plasmalogin.service']:
+                self.assert_restored()  # Never start vendor before the full inverse.
+                return
+            self.assertEqual(Path(command[3]),saved_manager)
             completed=subprocess.run(command,env=env,capture_output=True,text=True)
             self.assertEqual(completed.returncode,0,completed.stderr)
-        # Stop after manager uninstall to assert exactly the migration baseline.
-        with mock.patch.object(self.tx,'rollback',return_value='stopped_before_historical_restore'):
-            self.assertEqual(m.recovery.restore(self.tx,invoke),'stopped_before_historical_restore')
-        self.assertEqual({p:(self.path(p).read_bytes() if self.path(p).exists() else None) for p in m.ORDER},baseline)
-        self.assertFalse(self.path('/etc/sudoers.d/90-goodix-d285-01').exists())
-        self.tx.rollback(); self.assert_restored()
+        real_rollback=self.tx.rollback
+        def checked_rollback():
+            self.assertEqual({p:(self.path(p).read_bytes() if self.path(p).exists() else None) for p in m.ORDER},baseline)
+            self.assertFalse(self.path('/etc/sudoers.d/90-goodix-d285-01').exists())
+            return real_rollback()
+        with mock.patch.object(self.tx,'rollback',side_effect=checked_rollback):
+            self.assertEqual(m.recovery.restore(self.tx,invoke),'RESTORED_ORIGINALS_PLASMA_BASELINE_RESTORED_BACKUP_RETAINED')
+        self.assert_restored()
+
+    def test_saved_recovery_resumes_final_plasma_start_after_interruption(self):
+        self.tx.apply(POLICY)
+        calls=[]
+        with mock.patch.object(self.tx,'rollback',side_effect=RuntimeError('interrupted_before_restore')):
+            with self.assertRaisesRegex(RuntimeError,'interrupted_before_restore'):
+                m.recovery.restore(self.tx,calls.append)
+        self.assertEqual(calls,[])
+        self.assertEqual(self.tx.state()['plasma_service_before'],'active')
+        def start(command):
+            self.assertEqual(command,['/usr/bin/systemctl','start','plasmalogin.service'])
+            self.assert_restored(); calls.append(command)
+        m.recovery.restore(self.tx,start)
+        self.assertEqual(len(calls),1)
 
     def test_real_candidate_partial_install_restores_migration_baseline(self):
         candidate=os.environ.get('GOODIX_MIGRATION_TEST_CANDIDATE')

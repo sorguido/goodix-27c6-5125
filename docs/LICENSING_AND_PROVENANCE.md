@@ -197,3 +197,23 @@ are behavioral references linked in the corrective review. `legacy-recovery.json
 also pins the complete d7de50585d555b1ca676e4fcf6c9ed77cc20d601 recovery snapshot.
 Saved recovery retains the same removal-only adapter and SPDX notices.
 No third-party relicensing, new dependency or public-repository change.
+
+## Plasma Login VT/getty corrective (21 September 2026)
+
+`reference/plasma-login-manager-fedora44-6.7.5/` retains the exact Fedora SRPM's
+upstream source/spec/four patches with notices and SHA-256 manifest. Its
+PROVENANCE.md records source/tar hashes and per-file license boundaries.
+`production/plasma-vt/session-vt.patch` changes only Display.cpp, Display.h
+and the daemon CMake source list. New SessionVt C++, policy header, build,
+preflight and offline tests are independent GPL-2.0-or-later project code.
+The daemon compiles the original upstream common/auth/daemon target sources;
+Fedora patch 170 is retained. The corresponding user-session helper remains
+the installed Fedora binary. Generated configuration/D-Bus source derives
+from the retained upstream inputs with the pinned Qt/KDE generators.
+The prepared daemon uses applicable GPL-3.0-or-later grants; original GPL/LGPL
+notices are not rewritten. Third-party notices and SPDX SBOM include this
+component and resolve its actual Qt/KDE runtime dependencies. Header RPMs are
+hash-pinned compile-time inputs only, extracted without installation. No new
+runtime library is bundled and no protected/private evidence is exported.
+This supersedes the earlier statement that the candidate contains no Plasma
+source: that statement applies to the pre-corrective early-login integration.

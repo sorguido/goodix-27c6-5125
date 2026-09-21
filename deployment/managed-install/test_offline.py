@@ -17,6 +17,7 @@ FILES = (
     "MANIFEST", "SHA256SUMS", "SBOM.spdx.json", "THIRD_PARTY_NOTICES.md",
     "LICENSE", "GPL-2.0-or-later.txt", "LGPL-2.1-or-later.txt",
     "GPL-3.0-or-later.txt", "Apache-2.0.txt", "OpenCV-LICENSES.txt",
+    "plasmalogin", "plasma-vt-preflight", "plasma-vt-source.sha256", "99-goodix-plasma-vt.conf",
     "fprintd", "greeter", "pam_fprintd.so", "99-goodix-login-greeter.conf",
     "login-source.sha256", "pam_goodix_sudo.so", "sudo-source.sha256", "pam_goodix_polkit.so", "polkit-source.sha256", "fprintd-COPYING", "fprintd-AUTHORS",
     "production-source.sha256", "fprintd-source.sha256",
@@ -121,6 +122,7 @@ class ManagedInstallContract(unittest.TestCase):
             "PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR\n"
             "KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM\n"
             "EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1\n"
+            "PLASMA_VT_INTEGRATION=QUALIFIED_SESSION_VT_V1\n"
             "SBOM_FORMAT=SPDX-2.3-JSON\n"
             "COMBINED_BINARY_LICENSE=GPL-3.0-or-later\n"
             "FAR_FRR_CLAIM=NOT_MADE\n",
@@ -138,6 +140,49 @@ class ManagedInstallContract(unittest.TestCase):
             [str(TRANSACTION), *args], env=self.env, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=check,
         )
+
+    def test_plasma_vt_exact_inverse_and_text_consoles_preserved(self):
+        directory=self.root/'etc/systemd/system/plasmalogin.service.d'
+        directory.mkdir(parents=True);sentinel=directory/'operator-note';sentinel.write_bytes(b'keep')
+        logind=self.root/'etc/systemd/logind.conf';logind.write_bytes(b'[Login]\nNAutoVTs=6\nReserveVT=6\n')
+        candidate=self.candidate('1'*40)
+        self.run_tx('--root-install',self.caller,str(candidate))
+        runtime=self.root/'usr/lib64/goodix-27c6-5125/current'
+        self.assertEqual((runtime/'plasmalogin').read_bytes(),(candidate/'plasmalogin').read_bytes())
+        self.assertIn('PLASMA_VT_ACTIVATION=RESTART_REQUIRED',self.run_tx('--status').stdout)
+        self.run_tx('--root-uninstall',self.caller)
+        self.assertEqual(sentinel.read_bytes(),b'keep')
+        self.assertFalse((directory/'99-goodix-plasma-vt.conf').exists())
+        self.assertEqual(logind.read_bytes(),b'[Login]\nNAutoVTs=6\nReserveVT=6\n')
+
+    def test_unactivated_vendor_survives_install_rollback(self):
+        self.run_tx('--root-install',self.caller,str(self.candidate('8'*40)))
+        self.env['GOODIX_MANAGED_TEST_PLASMA_RUNNING']='false'
+        self.env['GOODIX_MANAGED_TEST_FAIL_ACTION']='systemctl:stop:plasmalogin.service'
+        self.run_tx('--root-uninstall',self.caller)
+        self.assertFalse((self.root/'var/lib/goodix-27c6-5125-managed/state').exists())
+
+    def test_changed_plasma_update_refuses_before_mutation(self):
+        first=self.candidate('2'*40);second=self.candidate('3'*40)
+        self.run_tx('--root-install',self.caller,str(first))
+        (second/'plasmalogin').write_bytes(b'new daemon requiring activation')
+        (second/'SHA256SUMS').write_text(''.join(sha(p)+'  '+p.name+'\n' for p in sorted(second.iterdir()) if p.name!='SHA256SUMS'))
+        result=self.run_tx('--root-update',self.caller,str(second),check=False)
+        self.assertIn('plasma_vt_update_requires_saved_uninstall',result.stderr)
+        self.assertEqual(os.readlink(self.root/'usr/lib64/goodix-27c6-5125/current'),'2'*40)
+        self.run_tx('--root-uninstall',self.caller)
+
+    def test_plasma_dropin_collision_and_drift_preserved(self):
+        candidate=self.candidate('4'*40)
+        dropin=self.root/'etc/systemd/system/plasmalogin.service.d/99-goodix-plasma-vt.conf'
+        dropin.parent.mkdir(parents=True);dropin.write_bytes(b'foreign')
+        result=self.run_tx('--root-install',self.caller,str(candidate),check=False)
+        self.assertIn('plasma_dropin_collision',result.stderr);self.assertEqual(dropin.read_bytes(),b'foreign')
+        dropin.unlink();self.run_tx('--root-install',self.caller,str(candidate))
+        original=dropin.read_bytes();dropin.write_bytes(b'drift')
+        result=self.run_tx('--root-uninstall',self.caller,check=False)
+        self.assertIn('plasma_dropin_drift',result.stderr);self.assertEqual(dropin.read_bytes(),b'drift')
+        dropin.write_bytes(original);self.run_tx('--root-uninstall',self.caller)
 
     def test_install_idempotent_update_rollback_uninstall(self):
         a = "a" * 40

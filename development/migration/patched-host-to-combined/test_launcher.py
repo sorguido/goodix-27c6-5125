@@ -32,9 +32,9 @@ class DeliveryTests(unittest.TestCase):
                         'commit','-qm','fixture'],check=True)
         self.head=l.git(self.repo,'rev-parse','HEAD')
         self.candidate=self.temp/'candidate'; self.candidate.mkdir()
-        for n in range(35): (self.candidate/str(n)).write_bytes(b'synthetic')
+        for n in range(39): (self.candidate/str(n)).write_bytes(b'synthetic')
         (self.candidate/'MANIFEST').write_text('SOURCE_COMMIT='+self.head+'\nSUDO_INTEGRATION=PASSWORD_FIRST_SERVICE_LOCAL_V1\n'
-                'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1\nPROTECTED_MATERIAL_INCLUDED=false\n')
+                'POLKIT_INTEGRATION=INTERRUPTIBLE_SERVICE_LOCAL_V1\nPLASMA_VT_INTEGRATION=QUALIFIED_SESSION_VT_V1\nPROTECTED_MATERIAL_INCLUDED=false\n')
         self.policy=self.temp/'policy.pp'; self.policy.write_bytes(b'synthetic policy')
         paths=set(self.candidate.iterdir())|{self.policy}
         paths.update(self.repo/name for name in l.git(self.repo,'ls-files').splitlines())
@@ -172,13 +172,23 @@ class VtTests(unittest.TestCase):
         import contextlib
         with tempfile.TemporaryDirectory(prefix='goodix-launcher-test.',dir='/tmp') as root:
             root=Path(root);(root/'run').mkdir();short=root/'run/gx';short.write_bytes(b'synthetic');short.chmod(0o700)
+            binary=root/'usr/lib64/goodix-27c6-5125/current/plasmalogin'
+            binary.parent.mkdir(parents=True);binary.write_bytes(b'synthetic daemon')
+            candidate=root/'candidate';candidate.mkdir();(candidate/'plasmalogin').write_bytes(binary.read_bytes())
             real=Path.lstat
             def virtual(path):
                 info=real(path);values=list(info);values[4]=values[5]=0
                 return os.stat_result(values)
             output=io.StringIO()
-            with mock.patch.object(Path,'lstat',virtual),contextlib.redirect_stdout(output):
+            with mock.patch.object(Path,'lstat',virtual),mock.patch.object(l,'CANDIDATE',candidate),contextlib.redirect_stdout(output):
                 l.login_check(self.host(),root)
+                host=self.host();original=host.run.side_effect
+                host.run.side_effect=lambda *a:'/usr/bin/plasmalogin' if 'args=' in a else original(*a)
+                with self.assertRaisesRegex(RuntimeError,'plasma_activation_required'):
+                    l.login_check(host,root)
+                binary.write_bytes(b'drift')
+                with self.assertRaisesRegex(RuntimeError,'installed_plasma_candidate_drift'):
+                    l.login_check(self.host(),root)
             self.assertIn('tty1=UNCLAIMED',output.getvalue())
             self.assertIn('logout_greeter_result=PENDING_LIVE',output.getvalue())
 
@@ -195,6 +205,7 @@ class SyntheticFlowTests(unittest.TestCase):
             env=os.environ|{'GOODIX_MANAGED_TEST_ROOT':str(fixture.root),
                 'GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256':tests.m.VENDOR['/etc/pam.d/kde-fingerprint'][2]}
             def invoke(command):
+                if command == ['/usr/bin/systemctl','start','plasmalogin.service']: return
                 if command[0]=='/usr/bin/setpriv':
                     self.assertTrue(fixture.path(tests.m.MASK).is_symlink())
                     self.assertFalse(fixture.path('/etc/sudoers.d/90-goodix-d285-01').exists())

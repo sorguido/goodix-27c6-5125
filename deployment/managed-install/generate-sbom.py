@@ -17,6 +17,17 @@ import tempfile
 
 SHIPPED_COMPONENTS = (
     {
+        "SPDXID": "SPDXRef-Package-Plasma-Login-VT",
+        "name": "plasma-login-manager-goodix-vt",
+        "versionInfo": "6.7.5-1.fc44-local-vt1",
+        "downloadLocation": "https://invent.kde.org/plasma/plasma-login-manager",
+        "filesAnalyzed": False,
+        "licenseConcluded": "GPL-3.0-or-later",
+        "licenseDeclared": "GPL-2.0-or-later AND LGPL-2.1-or-later AND CC0-1.0",
+        "copyrightText": "Upstream KDE/SDDM contributors; notices retained in corresponding source",
+        "sourceInfo": "reference/plasma-login-manager-fedora44-6.7.5 plus production/plasma-vt; daemon only, original Fedora helper retained.",
+    },
+    {
         "SPDXID": "SPDXRef-Package-Goodix-sudo-pam",
         "name": "pam-goodix-sudo-conversation",
         "versionInfo": "1",
@@ -208,7 +219,7 @@ def dynamic_package_paths(candidate: pathlib.Path) -> set[pathlib.Path]:
     with tempfile.TemporaryDirectory(prefix="goodix-sbom-") as directory:
         (pathlib.Path(directory) / "libfprint-2.so.2").symlink_to(candidate / "libfprint-2.so.2.0.0")
         env = os.environ | {"LD_LIBRARY_PATH": f"{directory}:{candidate}"}
-        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "pam_fprintd.so", candidate / "pam_goodix_polkit.so", candidate / "pam_goodix_sudo.so"]):
+        for binary in sorted([*candidate.glob("lib*.so*"), candidate / "fprintd", candidate / "greeter", candidate / "plasmalogin", candidate / "pam_fprintd.so", candidate / "pam_goodix_polkit.so", candidate / "pam_goodix_sudo.so"]):
             for line in run("ldd", str(binary), env=env).splitlines():
                 match = re.search(r"=>\s+(/\S+)\s+\(", line)
                 if not match and line.lstrip().startswith("/"):

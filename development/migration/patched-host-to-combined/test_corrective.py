@@ -156,6 +156,10 @@ class CorrectiveTests(unittest.TestCase):
 
     legacy_index=0
 
+    def test_historical_86d9_snapshot_import_is_pinned_and_preserved(self):
+        self.legacy_index=2
+        self.test_historical_f97_snapshot_import_is_pinned_and_preserved()
+
     def test_historical_d7_snapshot_import_is_pinned_and_preserved(self):
         self.legacy_index=1
         self.test_historical_f97_snapshot_import_is_pinned_and_preserved()
@@ -193,7 +197,7 @@ class CorrectiveTests(unittest.TestCase):
                         'GOODIX_MANAGED_TEST_FAIL_AFTER_POLICY':'true',
                         'GOODIX_MANAGED_TEST_KDE_VENDOR_SHA256':m.VENDOR['/etc/pam.d/kde-fingerprint'][2]}
         def invoke(command):
-            if command[0]=='/usr/bin/setpriv': return
+            if command[0]=='/usr/bin/setpriv' or command==['/usr/bin/systemctl','start','plasmalogin.service']: return
             subprocess.run(command,env=env,cwd='/tmp',check=True,capture_output=True)
         self.tx.recovery_restore=lambda call:m.recovery.restore(self.tx,call)
         with mock.patch.object(launcher,'POLICY',t.POLICY),mock.patch.object(launcher,'CANDIDATE',Path(candidate)):

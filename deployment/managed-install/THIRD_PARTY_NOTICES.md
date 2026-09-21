@@ -72,3 +72,16 @@ Fedora's stock pam_fprintd in a separate handle. Sudo and Fedora PAM sources wer
 read for behavior verification; no third-party expression is copied into this
 bridge. The candidate's ordinary-consumer retry correction retains fprintd's
 GPL-2.0-or-later source license and the existing combined distribution boundary.
+
+## Plasma Login daemon VT corrective
+
+The additional `plasmalogin` executable is built from Fedora
+plasma-login-manager 6.7.5-1.fc44 plus a local session VT allocation patch.
+KDE/SDDM notices (including Abdurrahman AVCI, Pier Luigi Fiorini, Martin Bříza,
+David Edmundson and other contributors) remain in the complete corresponding
+source at `reference/plasma-login-manager-fedora44-6.7.5/`.
+Per-file GPL-2.0-or-later / LGPL-2.1-or-later / CC0 notices are preserved;
+this combined daemon uses applicable GPL-3.0-or-later terms. Local VT source,
+patch, build and tests are GPL-2.0-or-later. Existing candidate license texts
+and the SPDX SBOM cover this additional executable; no vendor helper is bundled
+or replaced. See the reference PROVENANCE.md for exact source/package hashes.

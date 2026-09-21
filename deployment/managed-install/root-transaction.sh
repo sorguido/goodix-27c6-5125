@@ -23,6 +23,9 @@ wrapper=$(p /usr/libexec/goodix-27c6-5125/fprintd-wrapper)
 dropin=$(p /etc/systemd/system/fprintd.service.d/99-goodix-27c6-5125-managed.conf)
 greeter_dropin=$(p /etc/systemd/user/plasma-login.service.d/99-goodix-login-greeter.conf)
 greeter_directory_created=false
+plasma_dropin=$(p /etc/systemd/system/plasmalogin.service.d/99-goodix-plasma-vt.conf)
+plasma_directory_created=false
+plasma_service_before=inactive
 hook=$(p /etc/shadow-maint/userdel-pre.d/50-goodix-fprint-account-delete)
 vendor_pam=$(p /usr/lib/pam.d/plasmalogin)
 managed_pam=$(p /etc/pam.d/plasmalogin)
@@ -41,6 +44,7 @@ required_candidate=(
   GPL-2.0-or-later.txt LGPL-2.1-or-later.txt GPL-3.0-or-later.txt
   Apache-2.0.txt OpenCV-LICENSES.txt
   fprintd greeter pam_fprintd.so pam_goodix_polkit.so pam_goodix_sudo.so sudo-source.sha256 polkit-source.sha256 99-goodix-login-greeter.conf login-source.sha256
+  plasmalogin plasma-vt-preflight plasma-vt-source.sha256 99-goodix-plasma-vt.conf
   fprintd-COPYING fprintd-AUTHORS production-source.sha256 fprintd-source.sha256
   libfprint-2.so.2.0.0 libgusb.so.2
   libopencv_core.so.413 libopencv_features2d.so.413 libopencv_flann.so.413
@@ -79,7 +83,8 @@ material_ready() {
 }
 host_action() {
   if [[ -n $test_root ]]; then
-    [[ ${GOODIX_MANAGED_TEST_FAIL_ACTION:-} != "$1:${2:-}" ]] || return 1
+    [[ ${GOODIX_MANAGED_TEST_FAIL_ACTION:-} != "$1:${2:-}" && \
+       ${GOODIX_MANAGED_TEST_FAIL_ACTION:-} != "$1:${2:-}:${3:-}" ]] || return 1
     return 0
   fi
   "$@"
@@ -130,6 +135,7 @@ verify_candidate() {
   is_commit "$commit" || fail candidate_commit_invalid
   [[ $(manifest_value "$candidate" SUDO_INTEGRATION) == PASSWORD_FIRST_SERVICE_LOCAL_V1 ]] || fail sudo_integration_missing
   [[ $(manifest_value "$candidate" POLKIT_INTEGRATION) == INTERRUPTIBLE_SERVICE_LOCAL_V1 ]] || fail polkit_integration_missing
+  [[ $(manifest_value "$candidate" PLASMA_VT_INTEGRATION) == QUALIFIED_SESSION_VT_V1 ]] || fail plasma_vt_contract
   verify_repo_provenance "$commit"
   printf '%s\n' "$commit"
 }
@@ -169,9 +175,11 @@ install_runtime_tree() {
     libopencv_features2d.so.413 libopencv_flann.so.413 libopencv_imgproc.so.413; do
     install -m 0644 -- "$candidate/$library" "$destination/$library"
   done
-  install -m 0755 "$candidate/fprintd" "$candidate/greeter" "$destination/"
+  install -m 0755 "$candidate/fprintd" "$candidate/greeter" "$candidate/plasmalogin" "$candidate/plasma-vt-preflight" "$destination/"
   install -m 0644 "$candidate/pam_fprintd.so" "$candidate/pam_goodix_polkit.so" "$candidate/pam_goodix_sudo.so" "$destination/"
   host_action restorecon -RF "$destination"
+  host_action chcon --reference=/usr/bin/plasmalogin "$destination/plasmalogin"
+  host_action chcon --reference=/usr/bin/bash "$destination/plasma-vt-preflight"
   host_action chcon --reference=/usr/libexec/fprintd "$destination/fprintd"
   host_action chcon --reference=/usr/libexec/plasma-login-greeter "$destination/greeter"
   host_action chcon --reference=/usr/lib64/security/pam_fprintd.so "$destination/pam_fprintd.so" "$destination/pam_goodix_polkit.so" "$destination/pam_goodix_sudo.so"
@@ -186,11 +194,11 @@ verify_runtime_layout() {
   [[ -d $directory && ! -L $directory ]] || fail runtime_directory_invalid
   [[ $(readlink "$directory/libfprint-2.so.2") == libfprint-2.so.2.0.0 && \
      $(readlink "$directory/libfprint-2.so") == libfprint-2.so.2 ]] || fail runtime_symlink_drift
-  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 13 ]] || fail runtime_file_set_drift
-  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter pam_fprintd.so pam_goodix_polkit.so pam_goodix_sudo.so; do
+  [[ $(find "$directory" -mindepth 1 -maxdepth 1 -printf '%f\n' | wc -l) -eq 15 ]] || fail runtime_file_set_drift
+  for file in libfprint-2.so.2.0.0 libgusb.so.2 libopencv_{core,features2d,flann,imgproc}.so.413 fprintd greeter plasmalogin plasma-vt-preflight pam_fprintd.so pam_goodix_polkit.so pam_goodix_sudo.so; do
     [[ -f $directory/$file && ! -L $directory/$file ]] || fail runtime_file_invalid
     mode=644
-    [[ $file != fprintd && $file != greeter ]] || mode=755
+    [[ $file != fprintd && $file != greeter && $file != plasmalogin && $file != plasma-vt-preflight ]] || mode=755
     [[ $(stat -c %a "$directory/$file") == "$mode" ]] || fail runtime_mode_drift
     [[ -n $test_root || $(stat -c '%u:%g' "$directory/$file") == 0:0 ]] || fail runtime_owner_drift
   done
@@ -458,6 +466,10 @@ write_state() {
     echo EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1
     echo "GREETER_DROPIN_SHA256=$(digest "$greeter_dropin")"
     echo "GREETER_DIRECTORY_CREATED=$greeter_directory_created"
+    echo PLASMA_VT_INTEGRATION=QUALIFIED_SESSION_VT_V1
+    echo "PLASMA_DROPIN_SHA256=$(digest "$plasma_dropin")"
+    echo "PLASMA_DIRECTORY_CREATED=$plasma_directory_created"
+    echo "PLASMA_SERVICE_BEFORE=$plasma_service_before"
     echo "POLICY_SOURCE_SHA256=$policy_source_sha"
     echo "POLICY_CONTEXTS_SHA256=$policy_contexts_sha"
     echo "CURRENT_PAM_STATUS=$current_pam"
@@ -501,7 +513,15 @@ verify_active() {
     fail pre_sudo_install_requires_original_uninstall_then_fresh_install
   [[ $(state_value POLKIT_INTEGRATION || true) == INTERRUPTIBLE_SERVICE_LOCAL_V1 ]] ||
     fail pre_polkit_install_requires_original_uninstall_then_fresh_install
-  if [[ $allow_vendor_drift != true ]]; then polkit_deploy verify managed; fi
+  [[ $(state_value PLASMA_VT_INTEGRATION || true) == QUALIFIED_SESSION_VT_V1 ]] || fail pre_vt_install_requires_saved_original_uninstall
+  [[ -f $plasma_dropin && ! -L $plasma_dropin && $(digest "$plasma_dropin") == $(state_value PLASMA_DROPIN_SHA256) ]] || fail plasma_dropin_drift
+  plasma_directory_created=$(state_value PLASMA_DIRECTORY_CREATED)
+  [[ $plasma_directory_created == true || $plasma_directory_created == false ]] || fail plasma_directory_state_invalid
+  plasma_service_before=$(state_value PLASMA_SERVICE_BEFORE)
+  [[ $plasma_service_before == active || $plasma_service_before == inactive ]] || fail plasma_service_state_invalid
+  if [[ $allow_vendor_drift != true ]]; then
+    polkit_deploy verify managed
+  fi
   local current previous expected
   if [[ $(state_value EARLY_LOGIN_INTEGRATION || true) == PAIRED_FPRINTD_PAM_GREETER_V1 ]]; then
     [[ -f $greeter_dropin && ! -L $greeter_dropin && $(digest "$greeter_dropin") == $(state_value GREETER_DROPIN_SHA256) ]] || fail greeter_dropin_drift
@@ -528,6 +548,10 @@ verify_active() {
   if [[ $ACTIVE_LOGIN_STATE == MANAGED ]]; then
     verify_runtime_layout "$runtime_root/$current"
     [[ $previous == NONE ]] || verify_runtime_layout "$runtime_root/$previous"
+  fi
+  if [[ $allow_vendor_drift != true && -z $test_root ]]; then
+    verify_runtime_layout "$runtime_root/$current"
+    "$current_link/plasma-vt-preflight"
   fi
   for pair in "$wrapper:WRAPPER_SHA256" "$dropin:DROPIN_SHA256" "$hook:HOOK_SHA256"; do
     expected=$(state_value "${pair#*:}")
@@ -662,6 +686,7 @@ root_install_or_update() {
   cleanup_service_before=inactive
   cleanup_pam_installed=false
   cleanup_greeter_installed=false
+  cleanup_plasma_installed=false
   cleanup_kde_pam_installed=false
   cleanup_polkit=false
   cleanup_transaction() {
@@ -691,6 +716,8 @@ root_install_or_update() {
         install -m 0644 "$kde_fingerprint_vendor_saved" "$kde_fingerprint_pam"
         host_action restorecon -F "$kde_fingerprint_pam"
       fi
+      if [[ $cleanup_plasma_installed == true ]]; then rm -f -- "$plasma_dropin"; fi
+      if [[ $plasma_directory_created == true ]]; then rmdir -- "$(dirname "$plasma_dropin")" 2>/dev/null; fi
       if [[ $cleanup_greeter_installed == true ]]; then rm -f -- "$greeter_dropin"; fi
       if [[ $greeter_directory_created == true ]]; then rmdir -- "$(dirname "$greeter_dropin")" 2>/dev/null; fi
       rm -f -- "$current_link" "$wrapper" "$dropin" "$hook" "$managed_pam" "$pam_saved" \
@@ -721,11 +748,15 @@ root_install_or_update() {
       remove_frozen_candidate "$candidate"; trap - EXIT; return
     fi
     [[ $mode == update ]] || fail active_install_requires_update
+    [[ $(digest "$candidate/plasmalogin") == $(digest "$runtime_root/$current/plasmalogin") && \
+       $(digest "$candidate/plasma-vt-preflight") == $(digest "$runtime_root/$current/plasma-vt-preflight") ]] || \
+      fail plasma_vt_update_requires_saved_uninstall_then_fresh_install
     [[ $previous == NONE ]] || fail rollback_slot_occupied
     [[ $(digest "$candidate/fprintd-wrapper") == $(state_value WRAPPER_SHA256) && \
        $(digest "$candidate/99-goodix-27c6-5125-managed.conf") == $(state_value DROPIN_SHA256) && \
        $(digest "$candidate/50-goodix-fprint-account-delete") == $(state_value HOOK_SHA256) && \
        $(digest "$candidate/99-goodix-login-greeter.conf") == $(state_value GREETER_DROPIN_SHA256) && \
+       $(digest "$candidate/99-goodix-plasma-vt.conf") == $(state_value PLASMA_DROPIN_SHA256) && \
        $(digest "$candidate/goodix_fprint_account_delete.te") == "$policy_source_sha" && \
        $(digest "$candidate/goodix_fprint_account_delete.fc") == "$policy_contexts_sha" ]] ||
       fail managed_host_assets_changed_requires_fresh_install
@@ -782,6 +813,16 @@ root_install_or_update() {
   verify_login_host
   [[ ! -e $greeter_dropin && ! -L $greeter_dropin ]] || fail greeter_dropin_collision
   [[ -d $(dirname "$greeter_dropin") ]] || greeter_directory_created=true
+  [[ ! -L $(dirname "$plasma_dropin") ]] || fail plasma_dropin_directory_symlink
+  [[ ! -e $plasma_dropin && ! -L $plasma_dropin ]] || fail plasma_dropin_collision
+  [[ -d $(dirname "$plasma_dropin") ]] || plasma_directory_created=true
+  if [[ -z $test_root ]]; then
+    "$candidate/plasma-vt-preflight"
+    [[ $(systemctl show plasmalogin.service -p FragmentPath --value) == /usr/lib/systemd/system/plasmalogin.service && \
+       $(systemctl show plasmalogin.service -p DropInPaths --value) == /usr/lib/systemd/system/service.d/10-timeout-abort.conf ]] || fail plasma_unit_override
+    plasma_service_before=$(systemctl is-active plasmalogin.service || true)
+    [[ $plasma_service_before == active || $plasma_service_before == inactive ]] || fail plasma_service_state
+  fi
   service_before=$(service_state)
   [[ $service_before == active || $service_before == inactive ]] || fail unsupported_service_state
   cleanup_kind=fresh
@@ -806,6 +847,9 @@ root_install_or_update() {
     fail injected_failure_after_kscreenlocker_pam
   fi
   install_runtime_tree "$candidate" "$commit"
+  cleanup_plasma_installed=true
+  install -D -m 0644 "$candidate/99-goodix-plasma-vt.conf" "$plasma_dropin"
+  host_action restorecon -F "$plasma_dropin"
   cleanup_greeter_installed=true
   install -D -m 0644 "$candidate/99-goodix-login-greeter.conf" "$greeter_dropin"
   host_action restorecon -F "$greeter_dropin"
@@ -923,7 +967,25 @@ root_uninstall() {
   verify_active true true false
   [[ $(state_value INSTALLER) == "$caller" ]] || fail installer_mismatch
   current=$(state_value CURRENT_COMMIT); previous=$(state_value PREVIOUS_COMMIT); service_before=$(state_value SERVICE_BEFORE)
+  # Keep a still-running vendor daemon during rollback of a staged install.
+  # Stop the replacement (or a pending restart) before removing its runtime.
+  local stop_plasma=true plasma_pid plasma_sha
+  if [[ -n $test_root ]]; then
+    stop_plasma=${GOODIX_MANAGED_TEST_PLASMA_RUNNING:-true}
+    [[ $stop_plasma == true || $stop_plasma == false ]] || fail invalid_plasma_test_state
+  else
+    plasma_pid=$(systemctl show plasmalogin.service -p MainPID --value)
+    [[ $plasma_pid =~ ^[0-9]+$ ]] || fail plasma_pid_invalid_before_uninstall
+    if [[ $plasma_pid != 0 ]]; then
+      plasma_sha=$(digest "/proc/$plasma_pid/exe")
+      if [[ $plasma_sha != $(digest "$runtime_root/$current/plasmalogin") ]]; then
+        [[ $plasma_sha == $(digest /usr/bin/plasmalogin) ]] || fail unknown_running_plasma_preserve_recovery
+        stop_plasma=false
+      fi
+    fi
+  fi
   polkit_deploy uninstall managed
+  if [[ $stop_plasma == true ]]; then host_action systemctl stop plasmalogin.service; fi
   host_action systemctl stop fprintd.service
   if [[ $ACTIVE_PAM_STATE == MANAGED && $(state_value CURRENT_PAM_STATUS) == ACTIVE ]]; then
     [[ -f $managed_pam && ! -L $managed_pam && \
@@ -946,6 +1008,8 @@ root_uninstall() {
     rm -f -- "$greeter_dropin"
     if [[ $greeter_directory_created == true ]]; then rmdir -- "$(dirname "$greeter_dropin")" 2>/dev/null || true; fi
   fi
+  rm -f -- "$plasma_dropin"
+  if [[ $plasma_directory_created == true ]]; then rmdir -- "$(dirname "$plasma_dropin")" 2>/dev/null || true; fi
   rm -f -- "$current_link" "$wrapper" "$dropin" "$hook"
   find "$runtime_root/$current" -xdev -depth -delete
   if [[ $previous != NONE ]]; then find "$runtime_root/$previous" -xdev -depth -delete; fi
@@ -954,6 +1018,9 @@ root_uninstall() {
   rmdir -- "$state_dir" 2>/dev/null || true
   host_action systemctl daemon-reload
   [[ $service_before != active ]] || host_action systemctl start fprintd.service
+  if [[ ${GOODIX_DEFER_PLASMA_RESTART:-false} != true && $plasma_service_before == active ]]; then
+    host_action systemctl start plasmalogin.service
+  fi
   printf '%s\n' 'GOODIX_MANAGED_UNINSTALL=PASS' 'PROTECTED_MATERIAL_PRESERVED=true' \
     'FEDORA_FPRINTD_BASELINE=RESTORED' 'MANAGED_PAM_REMOVED=true' \
     'KSCREENLOCKER_VENDOR_PAM_RESTORED=true' 'PLASMALOGIN_VENDOR_MODIFIED=false' \
@@ -1008,6 +1075,14 @@ case ${1:-} in
       kde_pam_status=$(state_value CURRENT_KSCREENLOCKER_PAM_STATUS)
       kde_pam_managed=true
     fi
+    plasma_activation=RESTART_REQUIRED
+    if [[ -z $test_root ]]; then
+      plasma_pid=$(systemctl show plasmalogin.service -p MainPID --value)
+      if [[ $plasma_pid =~ ^[1-9][0-9]*$ && -r /proc/$plasma_pid/exe && $(digest "/proc/$plasma_pid/exe") == $(digest "$current_link/plasmalogin") ]]; then
+        plasma_activation=RUNNING_CORRECTIVE
+      fi
+    fi
+    printf '%s\n' "PLASMA_VT_ACTIVATION=$plasma_activation"
     printf '%s\n' 'GOODIX_MANAGED_STATUS=ACTIVE' "EARLY_LOGIN_STATUS=$ACTIVE_LOGIN_STATE" "CURRENT_COMMIT=$(state_value CURRENT_COMMIT)" \
       "PREVIOUS_COMMIT=$(state_value PREVIOUS_COMMIT)" \
       "PROTECTED_MATERIAL_READY=$(material_ready && echo true || echo false)" \

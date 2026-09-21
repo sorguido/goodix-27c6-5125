@@ -46,6 +46,11 @@ install -m 0644 "$root/production/sudo/source.sha256" "$candidate/sudo-source.sh
 install -m 0644 "$build/polkit/pam_goodix_polkit.so" "$candidate/pam_goodix_polkit.so"
 install -m 0644 "$root/production/polkit/source.sha256" "$candidate/polkit-source.sha256"
 install -m 0644 "$build/pam_fprintd.so" "$candidate/pam_fprintd.so"
+python3 -B "$root/production/plasma-vt/build.py" "$build/plasma-vt"
+install -m 0755 "$build/plasma-vt/plasmalogin" "$candidate/plasmalogin"
+install -m 0755 "$root/production/plasma-vt/plasma-vt-preflight" "$candidate/plasma-vt-preflight"
+install -m 0644 "$root/production/plasma-vt/source.sha256" "$candidate/plasma-vt-source.sha256"
+install -m 0644 "$here/99-goodix-plasma-vt.conf" "$candidate/99-goodix-plasma-vt.conf"
 install -m 0644 "$here/99-goodix-login-greeter.conf" "$candidate/99-goodix-login-greeter.conf"
 install -m 0644 "$root/production/source-files.sha256" "$candidate/production-source.sha256"
 install -m 0644 "$root/reference/fprintd-fedora44-1.94.5/SOURCE_SHA256SUMS" "$candidate/fprintd-source.sha256"
@@ -89,6 +94,7 @@ printf '%s\n' \
   'PAM_INTEGRATION=MANAGED_ETC_OVERRIDE_FROM_VENDOR' \
   'KSCREENLOCKER_PAM_INTEGRATION=MANAGED_PACKAGE_CONFIG_TRANSFORM' \
   'EARLY_LOGIN_INTEGRATION=PAIRED_FPRINTD_PAM_GREETER_V1' \
+  'PLASMA_VT_INTEGRATION=QUALIFIED_SESSION_VT_V1' \
   'SBOM_FORMAT=SPDX-2.3-JSON' \
   'COMBINED_BINARY_LICENSE=GPL-3.0-or-later' \
   'FAR_FRR_CLAIM=NOT_MADE' \
