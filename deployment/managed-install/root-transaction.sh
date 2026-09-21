@@ -817,7 +817,7 @@ root_install_or_update() {
   [[ ! -e $plasma_dropin && ! -L $plasma_dropin ]] || fail plasma_dropin_collision
   [[ -d $(dirname "$plasma_dropin") ]] || plasma_directory_created=true
   if [[ -z $test_root ]]; then
-    "$candidate/plasma-vt-preflight"
+    /usr/bin/bash "$candidate/plasma-vt-preflight"
     [[ $(systemctl show plasmalogin.service -p FragmentPath --value) == /usr/lib/systemd/system/plasmalogin.service && \
        $(systemctl show plasmalogin.service -p DropInPaths --value) == /usr/lib/systemd/system/service.d/10-timeout-abort.conf ]] || fail plasma_unit_override
     plasma_service_before=$(systemctl is-active plasmalogin.service || true)
