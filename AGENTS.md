@@ -8,8 +8,9 @@ Le fonti principali sono:
 
 1. decisione o autorizzazione esplicita corrente dell'Utente;
 2. questo `AGENTS.md`;
-3. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
-4. evidenze versionate nel repository.
+3. `ROADMAP_DISTRO_DECOUPLED_RELEASE.md` per il boundary architetturale e la sequenza production/release attiva;
+4. `Goodix 27c6 5125 manuale tecnico.md` per lo stato e la conoscenza tecnica corrente;
+5. evidenze versionate nel repository.
 
 Una decisione esplicita corrente dell'Utente può autorizzare una deroga limitata. Nessuna deroga può essere inferita da un generico “procedi”, dalla disponibilità dell'hardware o dal fatto che una stessa operazione sia stata autorizzata in passato.
 
@@ -46,11 +47,11 @@ Prima di modificare qualunque file:
 1. identifica la Git root;
 2. verifica il branch corrente;
 3. verifica `git status --short`;
-4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md` e questo
-   `AGENTS.md`;
+4. durante bootstrap/recovery leggi integralmente `START_PROMPT.md`, questo
+   `AGENTS.md` e `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`;
 5. per la ripartenza ricostruisci lo stato dal task esplicito dell'Utente o, in
-   sua assenza, dal più piccolo task tecnicamente giustificato tra i temi/confini
-   realmente aperti nel repository e nel manuale;
+   sua assenza, dal più piccolo task tecnicamente giustificato **all'interno della
+   fase attiva della roadmap**; non selezionare autonomamente lavoro fuori roadmap;
 6. nel manuale tecnico leggi obbligatoriamente la sezione di stato corrente,
    l'ultimo avanzamento consolidato e i blocker o le decisioni architetturali
    pertinenti al task;
@@ -281,11 +282,11 @@ Deve ricostruire lo stato reale del repository prima di scegliere il primo task:
 - task/temi/confini tecnici ancora aperti pertinenti dal repository e dal manuale;
 - test, report, launcher e artefatti rilevanti.
 
-Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere scelto dal task esplicito dell'Utente o dal più piccolo task tecnicamente giustificato ricostruito da stato reale, manuale, evidenze e blocker. Non inventare una nuova direzione senza giustificazione tecnica o richiesta Utente.
+Il primo `CURRENT_TASK` di una ripartenza orchestrata deve essere scelto dal task esplicito dell'Utente o dal più piccolo task tecnicamente giustificato ricostruito da stato reale, roadmap, manuale, evidenze e blocker. In assenza di una nuova decisione esplicita dell'Utente, il task deve appartenere alla fase attiva R1-R7 di `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`. Non inventare una nuova direzione e non reintrodurre percorsi marcati `REJECTED_ARCHITECTURE` o `HISTORICAL_ONLY`.
 
 Un worktree sporco non è automaticamente un errore. Può essere lavoro lasciato da una sessione interrotta. Non cancellarlo, resettarlo, stasharlo o sovrascriverlo senza averne ricostruito provenienza e intento.
 
-Durante il loop:
+Durante il loop, la roadmap distro-decoupled è un boundary operativo vincolante. L'AI PM deve rifiutare scope creep verso patch private di KDE/Plasma/PAM/sudo/PolicyKit/systemd e deve classificare come `RELEASE_BLOCKER` qualunque soluzione in cui un normale update possa rompere più del solo fingerprint. L'AI Executor non può ampliare autonomamente tale boundary.
 
 ### AI Executor
 
@@ -335,6 +336,8 @@ non consente mai all'AI di installarla né di eseguire live, USB o `sudo`.
 Sono sempre Human Gate per l'agente:
 
 ### 6.1 Hardware e live
+
+Dopo la bonifica R0 descritta in `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, tutte le nuove build/install/runtime validation, prove di update-survivability e live del progetto sono **VM-only**. Il Fedora fisico resta baseline di sicurezza: nessuna nuova mutazione runtime sul target fisico senza una nuova autorizzazione esplicita dell'Utente. Operazioni Git/documentali non sono mutazioni runtime host.
 
 - nuova esecuzione live sul sensore;
 - accesso USB Goodix reale;
@@ -812,7 +815,11 @@ Human Gate espliciti
 +
 review Git-native
 +
+roadmap distro-decoupled vincolante
++
 update survivability / distro decoupling
++
+VM-only runtime validation
 =
 autonomia senza perdere controllo
 ```
