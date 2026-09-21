@@ -192,6 +192,77 @@ riproducibilità, nella chiarezza di noto/non noto, nella riduzione dei rischi
 nascosti e nell'avanzamento concreto verso il target. Negli step device-oriented
 deve inoltre emergere evidenza o apprendimento reale al confine device-side.
 
+### Update survivability e disaccoppiamento dalla distribuzione
+
+Il driver deve restare, per quanto ragionevolmente possibile, confinato al
+confine device/libfprint/fprintd. Fedora, PAM, sudo, PolicyKit, systemd e
+KDE/Plasma restano di proprietà della distribuzione e non devono essere
+trasformati in componenti privati del progetto.
+
+Invariante di release:
+
+```text
+NORMAL_DISTRO_UPDATE_MUST_NOT_BREAK_PASSWORD_LOGIN_OR_DESKTOP
+```
+
+È accettabile che un normale aggiornamento di `libfprint`, `fprintd` o di un
+componente correlato renda temporaneamente indisponibile l'impronta, sovrascriva
+un'integrazione locale o richieda la reinstallazione del driver, purché:
+
+- il desktop grafico continui ad avviarsi normalmente;
+- il login con password resti disponibile;
+- `sudo` e PolicyKit restino utilizzabili con i normali percorsi password;
+- l'aggiornamento non richieda uninstall preventivo, TTY, recovery manuale o
+  ricompilazione di componenti desktop/login per mantenere il PC accessibile;
+- il failure biometrico sia contenuto al sottosistema fingerprint.
+
+Non è accettabile come architettura di release una soluzione che, al normale
+aggiornamento di Fedora o di un suo sottocomponente, possa compromettere login
+grafico, password, `sudo`, PolicyKit o avvio del desktop.
+
+Di conseguenza, salvo autorizzazione esplicita dell'Utente per una prova
+temporanea e chiaramente classificata come non-release:
+
+- non distribuire o sostituire build private di `plasmalogin`, greeter,
+  `sudo`, PolicyKit, PAM vendor o altri componenti critici della distribuzione;
+- non mantenere copie congelate di configurazioni PAM vendor sotto `/etc` che
+  possano mascherare aggiornamenti successivi del pacchetto;
+- non introdurre pin di versione/hash di componenti Fedora come requisito
+  runtime per l'accessibilità del sistema;
+- non sostituire `ExecStart` di servizi critici se il contratto con il vendor
+  non è update-safe e il failure non degrada esclusivamente la biometria;
+- se un bug appartiene a KDE/Plasma, systemd, PAM, fprintd o altro componente
+  upstream, preferire fix/upstreaming o una limitazione documentata a un fork
+  privato permanente del componente.
+
+Prima di qualificare una candidate come release è obbligatorio un **Update
+Survivability Audit** di ogni file/unit/configurazione host modificata. Per
+ciascun elemento devono essere identificati almeno: owner RPM, tipo di override
+o sostituzione, dipendenze da versione/hash, comportamento dopo update, blast
+radius, possibilità di rollback post-update e rischio di lockout.
+
+Classificazione minima:
+
+```text
+A = update può compromettere login grafico/password/desktop
+B = update può compromettere sudo/PolicyKit o autenticazione non biometrica
+C = update può rompere soltanto fingerprint
+D = update può bloccare solo installer/status/recovery
+E = update impatta solo rebuild/manutenzione della release
+```
+
+Qualunque elemento A o B non risolto è un `RELEASE_BLOCKER`.
+
+L'esito considerato accettabile per il normale aggiornamento di un componente
+biometrico è, al massimo:
+
+```text
+driver/fingerprint non disponibile
+-> password e desktop restano normali
+-> reinstallazione/aggiornamento driver
+```
+
+
 ---
 
 ## 5. Modalità autonoma PM ↔ Executor
@@ -740,6 +811,8 @@ alternanza disciplinata Executor/PM
 Human Gate espliciti
 +
 review Git-native
++
+update survivability / distro decoupling
 =
 autonomia senza perdere controllo
 ```
