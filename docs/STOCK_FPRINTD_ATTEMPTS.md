@@ -117,7 +117,7 @@ production source, attempt/retry rule, compiler flag or roadmap is changed.
 
 ## Post-MATCH lifecycle corrective
 
-The latest human-reported VM run **compiled and linked both builds and
+The preceding human-reported VM run **compiled and linked both builds and
 started normal and sanitizer tests**. Both stopped at
 `/goodix/r3/verify-match-1`: the first rejected post-MATCH action logged
 `GOODIX_STOCK_CAPTURE_REJECT attempts=1 terminal=1 new_transport=0`, then the
@@ -169,10 +169,47 @@ releases. Existing VERIFY and IDENTIFY `FP_DEVICE_RETRY` cases retain one
 automatic API resubmission, a terminal non-retry error, zero new resources or
 submissions, then close; they do not repeat activation failures in one Claim.
 
-Offline lifecycle review is closed for **10/10 cases**. The changed fixture
-also passes `-fsyntax-only` with both existing normal/sanitizer profiles,
-without diagnostics. Runtime validation of this corrective is pending; the
-AI has not built or executed the suite on the physical host or accessed the VM.
+Offline lifecycle review closed for **10/10 cases** in `620ee15`, with the
+fixture passing `-fsyntax-only` in both profiles. The next VM report identifies
+the D291 audit failure below as the only known failure in both runs. A complete
+suite PASS is still required; the AI has not executed the suite or accessed the VM.
+
+## D291 SIGFM audit corrective
+
+The latest human-reported VM run builds/links and starts both suites. Its
+only known failure, identical in normal and sanitizer, is
+`/goodix/d291/fixed-raw-baseline-pinning-mechanics` at fixture line 2146.
+The seam had reversed the probe and enrolled signatures in its audit arrays.
+
+Reviewed the actual call chain: canonical `fpi-print.c` calls
+`goodix_sigfm_match_ephemeral(probe, enrolled, &score)`; the metrics adapter
+forwards the arguments in that order to `sigfm_match_score()`. The active
+`libfprint-driver/tests/support/fpimage_link_stubs.c` now names the first
+parameter `probe`, records it in the probe array and records the second
+parameter in the enrolled array. The comment is corrected. Score calculation,
+locking, counters, array bounds and getters are unchanged.
+
+All four getter uses are in the D291 continuity fixture. With
+`N = GOODIX_SIGFM_ENROLL_MAX_STAGES`, their unchanged assertions mean:
+
+| Getter use | Intended evidence |
+| --- | --- |
+| enrolled signature at 0 | Save the nonzero signature of the first template sample as `T` |
+| probe signature at 0 | The initial wrong raster gives a probe different from `T` |
+| enrolled signature at N | The next explicit action still compares against the same template sample `T` |
+| probe signature at N | The enrolled raw raster, normalized with the pinned baseline A despite new session baseline B, gives `T` |
+
+The first NO_MATCH compares all N template samples; the next MATCH stops at
+the first sample, so the audit indices are justified by the existing call-count
+assertions. The test still proves fixed-raw pinning mechanics only, not physical
+session equivalence or biometric stability. No fixture assertion, production
+preprocessing/pinning, attempt policy, stock component, compiler flag or
+roadmap changes. The gate compiles the active support file in both profiles;
+the historical private-root copy is not its build input and is left intact.
+
+Static review and `-fsyntax-only` of the corrected support file pass in both
+existing compiler profiles with no diagnostics. The same 44-case VM gate is
+pending; no new test framework or physical-host build/execution is introduced.
 
 ## Preventive compile-surface review (22 September 2026)
 
@@ -219,7 +256,7 @@ been inferred from the local SDK.
 
 Source digest/path audit, shell syntax, and the test entry point's help/non-VM
 refusal from an unrelated cwd are PASS. The complete static review preceded
-the now-successful VM build/link. **The lifecycle-corrected fixture and all
+the now-successful VM build/link. **The corrected SIGFM audit seam and all
 44 normal/ASan/UBSan cases still require manual VM validation.** Static review
 does not substitute for a complete suite PASS or sensor-safety evidence.
 
@@ -231,16 +268,17 @@ PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
 BUILD_LINK=PASS
 NORMAL_TESTS_STARTED=true
 SANITIZER_TESTS_STARTED=true
-FIRST_FAILURE=/goodix/r3/verify-match-1
-FAILURE_CLASS=TEST_LIFECYCLE_STATE_MACHINE
-REAL_USB_SUBMIT=0
+NORMAL_FIRST_FAILURE=/goodix/d291/fixed-raw-baseline-pinning-mechanics
+SANITIZER_FIRST_FAILURE=/goodix/d291/fixed-raw-baseline-pinning-mechanics
+OTHER_KNOWN_FAILURES=NONE
 SENSOR_CONNECTED=false
 R3_A_INSTALLATION=UNCHANGED
 R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
-LIFECYCLE_CORRECTIVE_VM_EXECUTION=PENDING
+SIGFM_AUDIT_CORRECTIVE_VM_EXECUTION=PENDING
 STATIC_COMPILE_SURFACE_REVIEW=CLOSED
 PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
 LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
+SIGFM_AUDIT_STUB_SYNTAX_ONLY=PASS_BOTH_PROFILES
 STOCK_ATTEMPT_SOURCE_CORRECTION=IMPLEMENTED
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE

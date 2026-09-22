@@ -5,18 +5,15 @@
 disconnected. Do not rebuild R2, reinstall R3-A or run a live test.**
 
 The latest VM run **compiled/linked and started both normal and sanitizer
-tests**, then failed at `/goodix/r3/verify-match-1` with the same
-`ACTIVATING -> ACTIVATING` warning. This is a test lifecycle failure:
-the fixture attempted two consecutive activation failures without close.
-The earlier two compile failures remain historical; the latest run is not
-classified as zero tests executed.
-
-All ten R3 cases have now undergone offline lifecycle review. Each series
-case checks one rejected post-MATCH action, then closes; separate fixtures
-cover both action kinds and cross-kind rejection. All ten verify state reset
-and an admitted acquisition after a new open. The two early-MATCH cancellation
-cases retain drain/release checks. The corrected fixture passes syntax-only
-analysis with both existing profiles; actual execution remains pending.
+tests**. Both report the same single known failure:
+`/goodix/d291/fixed-raw-baseline-pinning-mechanics`, fixture line 2146.
+The SIGFM test seam had recorded probe and enrolled signatures in the wrong
+audit arrays. This corrective fixes that mapping and its comment, and names
+the first parameter `probe`. All four getter uses and the existing D291
+assertions have been reviewed; the assertions and score calculation remain
+unchanged. The support file passes syntax-only analysis in both profiles.
+Production behavior and the preceding ten-case R3 lifecycle correction are
+unchanged. Full normal/sanitizer execution of this corrective is pending.
 Pull the corrective and repeat this same gate with a new output directory.
 Keep previous outputs as evidence. R3-A stays installed; no rollback is needed.
 

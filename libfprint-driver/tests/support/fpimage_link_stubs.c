@@ -329,23 +329,23 @@ sigfm_keypoints_count (SigfmImgInfo *info)
 }
 
 int
-sigfm_match_score (SigfmImgInfo *frame, SigfmImgInfo *enrolled)
+sigfm_match_score (SigfmImgInfo *probe, SigfmImgInfo *enrolled)
 {
   gint score;
 
   g_mutex_lock (&sigfm_mutex);
   if (sigfm_match_call_count < G_N_ELEMENTS (sigfm_enrolled_signatures))
     {
-      /* fpi-print passes the stored template first and the current probe
-       * second; keep both identities visible to the continuity tests. */
-      sigfm_enrolled_signatures[sigfm_match_call_count] =
-        frame->pixel_signature;
+      /* Canonical fpi-print passes the current probe first and the stored
+       * enrollment sample second; retain those identities in the audit. */
       sigfm_probe_signatures[sigfm_match_call_count] =
+        probe->pixel_signature;
+      sigfm_enrolled_signatures[sigfm_match_call_count] =
         enrolled->pixel_signature;
     }
   sigfm_match_call_count++;
   score = sigfm_content_match ?
-    (frame->pixel_signature == enrolled->pixel_signature ? 100 : 0) :
+    (probe->pixel_signature == enrolled->pixel_signature ? 100 : 0) :
     sigfm_match_score_value;
   g_mutex_unlock (&sigfm_mutex);
   return score;
