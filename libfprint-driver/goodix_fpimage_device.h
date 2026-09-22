@@ -96,7 +96,7 @@ typedef struct
   guint production_identify_enroll_handoff_count;
   guint production_logical_action_attempt_count;
   guint production_transport_epoch_count;
-  /* Stock capture budget spans transport rollovers within one logical open. */
+  /* Cumulative telemetry only; never limits explicit stock capture actions. */
   guint production_capture_attempt_count;
   gboolean production_capture_terminal;
   gboolean production_identify_enroll_handoff_armed;

@@ -291,6 +291,17 @@ Non è accettabile alcun effetto ulteriore.
 **Gate R3:** review offline dell'architettura prima della prima installazione in
 VM.
 
+**Decisione Utente sui tentativi stock:** Fedora stock determina il numero di
+tentativi espliciti. Il driver non impone un limite cumulativo di capture per
+logical open/Claim: dopo clean NO_MATCH e cleanup completo, una nuova action
+VERIFY/IDENTIFY esplicita può acquisire normalmente una volta. Il contatore,
+se presente, è soltanto telemetria. MATCH resta terminale per il Claim dopo
+il cleanup necessario; processing error/`FP_DEVICE_RETRY` non deve consentire
+nuova acquisizione di materiali, USB claim o transport submission alla
+risottomissione automatica. Un nuovo Claim/open riparte da stato fresco.
+Nessuna modifica a fprintd/PAM/CLI stock; prossimo gate limitato ai test
+sintetici VM senza sensore, prima di qualunque live.
+
 ---
 
 ## R4 — Consumer di autenticazione: solo percorso stock

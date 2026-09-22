@@ -24,8 +24,11 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`, `development` inizialmente pulito,
-e dalla nuova evidenza manuale R3-A fornita dall'Utente.
+`c0b23695349561c243829fabdeedc58f53d264fa`, `development` inizialmente pulito,
+e dalla decisione esplicita dell'Utente di rimuovere il limite cumulativo
+di tre capture per Claim. R3-A load resta PASS; i test sintetici non sono
+ancora stati eseguiti. Il numero di tentativi espliciti appartiene a Fedora
+stock, con terminalità dopo MATCH/errore e blocco dei retry impliciti.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -197,12 +200,20 @@ Nessun elemento A/B identificato nell'impronta installativa statica, ma R5
 rimane obbligatoria e non è anticipata da questo audit. Il dettaglio di file,
 necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
-### R3 — limite stock e regressione sintetica prima di qualsiasi live
+### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: chiudere il confine retry/attempt stock senza modificare daemon
-Fedora o consumer; implementare il guard nel driver, estendere i test esistenti
-e consegnare la sola compilazione/esecuzione sintetica in VM. Non collegare
-il sensore e non consegnare una live finché l'evidenza offline non è accettata.
+`CURRENT_TASK`: correggere `c0b2369` eliminando il limite cumulativo nel driver,
+ammettere quarta e successive action esplicite dopo clean NO_MATCH, preservare
+terminalità MATCH/error e provare zero nuove risorse alla risottomissione
+automatica. Aggiornare test/documentazione e riconsegnare soltanto il gate
+sintetico VM. Nessuna modifica a fprintd/PAM/CLI stock, nessuna live.
+
+La decisione esplicita dell'Utente prevale sulla precedente interpretazione
+dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
+imporre nel driver. Il default PAM è una scelta del consumer, non un requisito
+hardware. La roadmap R3 registra la semantica corretta; AGENTS/START_PROMPT
+non sono modificati. Il cap di `c0b2369` e la sua consegna VM sono superati,
+senza alcuna evidenza di esecuzione di quei test o installazione del correttivo.
 
 La nuova lettura di fprintd `device.c` distingue NO_MATCH pulito (`done=true`,
 nessun retry daemon) da `FP_DEVICE_RETRY` (`done=false`, risottomissione
@@ -216,40 +227,47 @@ nella VM. Il percorso di client vanished cancella, attende e chiude il device.
 Il report MATCH può precedere finger-off/STOP: la cancellazione immediata del
 client non equivale al completamento pulito del trasporto.
 
-Gap accertato nella baseline R2 installata: nessun contatore nello stesso
-logical open limita i rollover puliti, né impedisce ogni nuova chiamata dopo
-MATCH. Il vecchio `login_attempts` è solo prepared-login privato. Le prove
-storiche D291/R9 di tre richieste non chiamavano una quarta: non provano un
-rifiuto tecnico della quarta nel driver stock.
+Gap accertato nella baseline R2 installata: non viene impedita ogni nuova
+chiamata dopo MATCH nello stesso Claim. L'assenza di un cap dopo NO_MATCH
+pulito è invece desiderata. Il vecchio `login_attempts` è solo prepared-login
+privato e non deve stabilire le regole del percorso stock.
 
-Il correttivo locale in `goodix_fpimage_device.c/.h` introduce contatore comune
-VERIFY/IDENTIFY e latch terminale per logical open, preservati tra i reset
-transport. Prima di qualunque reopen/acquire/claim/generation rifiuta dopo
-MATCH, errore di processing o terzo NO_MATCH. I primi due NO_MATCH consentono
-una nuova action esplicita; solo il terzo logga `NO_MATCH_SERIES`. L'audit
-esistente registra contatore/limite/esito, senza nuovo scheduler, protocollo
+Il correttivo locale in `goodix_fpimage_device.c/.h` conserva contatore comune
+VERIFY/IDENTIFY come sola telemetria e latch terminale per logical open,
+preservati tra i reset transport. Nessuna soglia del contatore governa accesso
+o terminalità. Prima di qualunque reopen/acquire/claim/generation rifiuta dopo
+MATCH o errore di processing. Ogni NO_MATCH pulito seguito da cleanup consente
+una nuova action esplicita, anche quarta e successiva nello stesso Claim.
+Il log stock riporta sempre `NO_MATCH`, mai un `NO_MATCH_SERIES` dedotto dal
+conteggio; non pubblicizza più `limit=3`. Nessun nuovo scheduler, protocollo
 wire o retry. Un eventuale errore retry conservato nel poison viene convertito
 in errore terminale alla successiva activation, evitando un loop solo host.
 Il consueto IDENTIFY NO_MATCH iniziale può ancora passare a ENROLL; l'handoff
-è vietato dopo esito terminale. Close completo/new Claim avvia una nuova
-serie: nessun contatore globale/persistente o lockout account viene introdotto.
+è vietato dopo esito terminale. Close completo/new Claim riparte da stato
+fresco: nessun limite cumulativo, contatore persistente o lockout account.
 
 Cleanup e ordine esito/drain restano quelli esistenti: release e pulizia TLS
 su completamento pulito, fence/cancel e drain prima della distruzione anomala,
 nessuna inferenza di quiescenza device dopo una cancellazione. MATCH termina
 ulteriori acquisizioni, non sopprime il necessario rilascio del dito/cleanup.
-Una nuova chiamata dopo il gate deve fallire senza nuovo materiale, claim o
+Una nuova chiamata dopo MATCH/errore deve fallire senza nuovo materiale, claim o
 submit; le callback stock del daemon restano completamente invariate.
 
 Estesa la suite sintetica esistente in
 `development/private-root/libfprint-driver/tests/test_goodix_d278_secure_session.c`
-con dieci casi VERIFY/IDENTIFY: otto per MATCH al primo/secondo/terzo tentativo
-e tre NO_MATCH, due per cancellazione dalla callback MATCH prima di
-finger-off/STOP. Gli otto casi di serie provano ulteriori API VERIFY e IDENTIFY
-dopo il terminale, zero reacquire/claim/submit, cleanup e reset solo dopo
-close/open. I due casi MATCH anticipato impongono drain prima della chiusura
-e verificano release/cleansing TLS; modellano il client stock tramite le API
-libfprint, senza dichiarare una prova D-Bus reale. I 34 casi esistenti comprendono retry extraction, cancel,
+con dieci casi R3 VERIFY/IDENTIFY: MATCH al primo/secondo/terzo tentativo,
+cinque NO_MATCH consecutivi seguiti da un sesto tentativo con MATCH, due casi
+di cancellazione dalla callback MATCH prima di finger-off/STOP. Ogni action
+ammessa verifica una sola acquisizione normale e cleanup; quarta/quinta
+riacquisiscono materiale/claim una sola volta, senza retry impliciti. Dopo
+MATCH gli otto casi di serie provano ulteriori API VERIFY e IDENTIFY con zero
+reacquire/claim/submit, poi stato fresco dopo close/open. Il cinque dei test
+è copertura, non una nuova quota. Le prove retry/fatal verificano ora anche
+i contatori effettivi di material acquisition e OUT submission sulla
+risottomissione respinta. I due casi MATCH anticipato impongono drain prima
+della chiusura e verificano release/cleansing TLS; modellano il client stock
+tramite le API libfprint, senza dichiarare una prova D-Bus reale. I 34 casi
+esistenti comprendono retry extraction, cancel,
 drain, matcher tardivo/fatal, handoff ENROLL e TLS sintetico. Il builder test
 attivo usa ora, per questa suite, la base libfprint Fedora canonica e il
 profilo production/SIGFM: la vecchia destinazione Rocky core non esiste più.
@@ -274,9 +292,11 @@ continuità sorgenti rifiuta correttamente il driver cambiato.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=R3_A_LOAD_ACCEPTED_AND_STOCK_ATTEMPT_GUARD_IMPLEMENTED
+ADVANCEMENT=STOCK_EXPLICIT_ATTEMPTS_UNCAPPED_TERMINAL_RETRY_FENCE_PRESERVED
 ACTIVE_PHASE=R3
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
+STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
+DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
 EXECUTABLE_CLOSURE=SOURCE_SHELL_INERT_PASS_C_BUILD_AND_TEST_PENDING
 REAL_TARGET_COMPATIBILITY=R3_A_STOCK_LOAD_PASS_CORRECTED_DRIVER_UNBUILT
@@ -289,10 +309,11 @@ NEXT_BOUNDARY=USER_VM_SYNTHETIC_TESTS_WITH_SENSOR_DISCONNECTED
 
 Review set Git-native da `92311c5`: driver/manifest, estensione della suite e
 builder esistenti, runner VM, documentazione/licensing e questo manuale.
+Il correttivo corrente rispetto al cap errato parte da `c0b2369`.
 `docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
 in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
 workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il
-correttivo prima di una build/installazione separata; workflow nativo bounded
+correttivo prima di una build/installazione separata; workflow nativo stock
 e disponibilità/handoff dei materiali vanno risolti prima del sensore.
 Nessun componente auth Fedora è cambiato e nessuna dipendenza password è
 aggiunta; R5 resta da dimostrare, non dedotta da R3-A.

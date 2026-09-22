@@ -1862,6 +1862,7 @@ production_run_explicit_verify (Fixture *fixture,
   guint claim_before = fixture->interface_claim_count;
   guint release_before = fixture->interface_release_count;
   guint material_release_before = fixture->material_release_count;
+  guint material_acquire_before = fixture->material_acquire_count;
   guint match_before = fixture->verify_match_callback_count;
   guint no_match_before = fixture->verify_no_match_callback_count;
   guint in_after;
@@ -1925,6 +1926,8 @@ production_run_explicit_verify (Fixture *fixture,
                    expected_explicit_reopen != 0u);
   g_assert_cmpuint (fixture->interface_claim_count, ==,
                     claim_before + expected_explicit_reopen);
+  g_assert_cmpuint (fixture->material_acquire_count, ==,
+                    material_acquire_before + expected_explicit_reopen);
   g_assert_cmpuint (fixture->interface_release_count, ==,
                     release_before + 1u);
   g_assert_cmpuint (fixture->material_release_count, ==,
@@ -1958,6 +1961,7 @@ production_run_explicit_identify (Fixture  *fixture,
   guint claim_before = fixture->interface_claim_count;
   guint release_before = fixture->interface_release_count;
   guint material_release_before = fixture->material_release_count;
+  guint material_acquire_before = fixture->material_acquire_count;
   guint in_after;
   guint claim_after;
 
@@ -2000,7 +2004,7 @@ production_run_explicit_identify (Fixture  *fixture,
   g_assert_cmpuint (audit.production_transport_epoch_count, ==,
                     expected_logical_actions);
   g_assert_cmpint (audit.production_identify_enroll_handoff_armed, ==,
-                   !expected_match && expected_logical_actions < 3u);
+                   !expected_match);
   g_assert_cmpuint (audit.tls.handshake_count, ==, 1u);
   g_assert_cmpuint (audit.post_tls.first_image_pipeline_count, ==, 1u);
   g_assert_cmpuint (audit.post_tls.single_acquisition_terminal_count, ==, 1u);
@@ -2021,6 +2025,8 @@ production_run_explicit_identify (Fixture  *fixture,
                    expected_reopen);
   g_assert_cmpuint (fixture->interface_claim_count, ==,
                     claim_before + (expected_reopen ? 1u : 0u));
+  g_assert_cmpuint (fixture->material_acquire_count, ==,
+                    material_acquire_before + (expected_reopen ? 1u : 0u));
   g_assert_cmpuint (fixture->interface_release_count, ==,
                     release_before + 1u);
   g_assert_cmpuint (fixture->material_release_count, ==,
@@ -2257,8 +2263,8 @@ test_d293_r9_explicit_multi_identify_same_open (void)
   production_close_epoch (fixture);
   production_open_epoch (fixture);
 
-  /* Historical consumer-shaped coverage; R3 below also deliberately submits
-   * a fourth call and proves that the driver's logical-open guard rejects it. */
+  /* Historical consumer-shaped coverage; R3 below also submits fourth and
+   * fifth explicit calls after clean NO_MATCH, without a driver attempt cap. */
   production_run_explicit_identify (fixture, gallery, 0, FALSE, FALSE, 1u);
   production_run_explicit_identify (fixture, gallery, 0, FALSE, TRUE, 2u);
   production_run_explicit_identify (fixture, gallery, 0, FALSE, TRUE, 3u);
@@ -2300,7 +2306,25 @@ test_r3_stock_capture_series (gconstpointer data)
                                         match, attempt > 1u ? 1u : 0u);
       goodix_device_context_get_production_enrollment_audit (fixture->context, &audit);
       g_assert_cmpuint (audit.production_capture_attempt_count, ==, attempt);
-      g_assert_cmpint (audit.production_capture_terminal, ==, match || attempt == 3u);
+      g_assert_cmpint (audit.production_capture_terminal, ==, match);
+      g_assert_cmpuint (audit.production_transport_epoch_count, ==, attempt);
+      g_assert_true (audit.tls.project_secret_zeroized);
+    }
+
+  if (!final_match)
+    {
+      /* Five clean NO_MATCH calls, including fourth/fifth admission above,
+       * leave the Claim reusable. A sixth explicit action can still MATCH;
+       * it is that outcome, never the telemetry count, that ends the Claim. */
+      target++;
+      if (identify)
+        production_run_explicit_identify (fixture, gallery, 100, TRUE,
+                                          TRUE, target);
+      else
+        production_run_explicit_verify (fixture, enrolled, 100, TRUE, 1u);
+      goodix_device_context_get_production_enrollment_audit (fixture->context, &audit);
+      g_assert_cmpuint (audit.production_capture_attempt_count, ==, target);
+      g_assert_true (audit.production_capture_terminal);
       g_assert_true (audit.tls.project_secret_zeroized);
     }
 
@@ -2308,8 +2332,8 @@ test_r3_stock_capture_series (gconstpointer data)
   claim_before = fixture->interface_claim_count;
   in_before = fixture->in_submit_count;
   out_before = goodix_fpi_usb_backend_get_out_submit_count (fixture->backend);
-  /* Try both action kinds after terminal completion, including a fourth
-   * NO_MATCH call and an immediate extra call after MATCH at 1, 2 or 3. */
+  /* Try both action kinds after MATCH at 1, 2, 3 or 6. No later explicit
+   * action may acquire resources in that same terminal Claim. */
   for (guint kind = 0u; kind < 2u; kind++)
     {
       g_clear_error (&fixture->action_error);
@@ -2594,6 +2618,8 @@ test_d293_r9_fatal_host_processing_is_terminal (void)
   guint claim_before;
   guint in_before;
   guint out_before;
+  guint material_acquire_before;
+  guint64 out_submit_before;
 
   g_ptr_array_add (gallery, g_object_ref (enrolled));
   production_close_epoch (fixture);
@@ -2643,6 +2669,8 @@ test_d293_r9_fatal_host_processing_is_terminal (void)
   claim_before = fixture->interface_claim_count;
   in_before = fixture->in_submit_count;
   out_before = g_queue_get_length (fixture->out);
+  material_acquire_before = fixture->material_acquire_count;
+  out_submit_before = goodix_fpi_usb_backend_get_out_submit_count (fixture->backend);
   goodix_test_sigfm_match_set_score (100);
   g_clear_error (&fixture->action_error);
   g_clear_object (&fixture->identify_match);
@@ -2663,6 +2691,8 @@ test_d293_r9_fatal_host_processing_is_terminal (void)
   g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
   g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
   g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_assert_cmpuint (fixture->material_acquire_count, ==, material_acquire_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (fixture->backend), ==, out_submit_before);
   g_assert_true (goodix_fpi_usb_backend_is_drained (fixture->backend));
   g_assert_false (goodix_device_context_has_runtime_material (
                     fixture->context));
@@ -2694,6 +2724,8 @@ test_d280_01_production_two_epoch_template_reuse (void)
   guint claim_before;
   guint in_before;
   guint out_before;
+  guint material_acquire_before;
+  guint64 out_submit_before;
 
   fp_print_set_finger (template, FP_FINGER_RIGHT_INDEX);
   fp_print_set_username (template, "d280-01-production-shaped");
@@ -2985,6 +3017,8 @@ test_d280_01_production_two_epoch_template_reuse (void)
   claim_before = fixture->interface_claim_count;
   in_before = fixture->in_submit_count;
   out_before = g_queue_get_length (fixture->out);
+  material_acquire_before = fixture->material_acquire_count;
+  out_submit_before = goodix_fpi_usb_backend_get_out_submit_count (fixture->backend);
   g_clear_error (&fixture->action_error);
   g_clear_object (&fixture->verify_print);
   fixture->generation = 0u;
@@ -3003,6 +3037,8 @@ test_d280_01_production_two_epoch_template_reuse (void)
   g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
   g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
   g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_assert_cmpuint (fixture->material_acquire_count, ==, material_acquire_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (fixture->backend), ==, out_submit_before);
   g_clear_error (&fixture->action_error);
   production_close_epoch (fixture);
 
@@ -3074,6 +3110,8 @@ test_d293_02_identify_failure_cancel_no_handoff (void)
   guint claim_before;
   guint in_before;
   guint out_before;
+  guint material_acquire_before;
+  guint64 out_submit_before;
 
   g_ptr_array_add (gallery, g_object_ref (enrolled));
 
@@ -3122,6 +3160,8 @@ test_d293_02_identify_failure_cancel_no_handoff (void)
   claim_before = fixture->interface_claim_count;
   in_before = fixture->in_submit_count;
   out_before = g_queue_get_length (fixture->out);
+  material_acquire_before = fixture->material_acquire_count;
+  out_submit_before = goodix_fpi_usb_backend_get_out_submit_count (fixture->backend);
   g_clear_error (&fixture->action_error);
   g_clear_object (&fixture->identify_match);
   g_clear_object (&fixture->identify_print);
@@ -3139,6 +3179,8 @@ test_d293_02_identify_failure_cancel_no_handoff (void)
   g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
   g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
   g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_assert_cmpuint (fixture->material_acquire_count, ==, material_acquire_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (fixture->backend), ==, out_submit_before);
   g_clear_error (&fixture->action_error);
 
   production_close_epoch (fixture);
@@ -3197,6 +3239,8 @@ test_d293_02_identify_failure_cancel_no_handoff (void)
   claim_before = fixture->interface_claim_count;
   in_before = fixture->in_submit_count;
   out_before = g_queue_get_length (fixture->out);
+  material_acquire_before = fixture->material_acquire_count;
+  out_submit_before = goodix_fpi_usb_backend_get_out_submit_count (fixture->backend);
   g_clear_error (&fixture->action_error);
   g_clear_object (&fixture->identify_match);
   g_clear_object (&fixture->identify_print);
@@ -3214,6 +3258,8 @@ test_d293_02_identify_failure_cancel_no_handoff (void)
   g_assert_cmpuint (fixture->interface_claim_count, ==, claim_before);
   g_assert_cmpuint (fixture->in_submit_count, ==, in_before);
   g_assert_cmpuint (g_queue_get_length (fixture->out), ==, out_before);
+  g_assert_cmpuint (fixture->material_acquire_count, ==, material_acquire_before);
+  g_assert_cmpuint (goodix_fpi_usb_backend_get_out_submit_count (fixture->backend), ==, out_submit_before);
   g_clear_error (&fixture->action_error);
 
   production_close_epoch (fixture);
@@ -4918,11 +4964,11 @@ main (int argc,
   g_test_add_data_func ("/goodix/r3/verify-match-1", GUINT_TO_POINTER (11), test_r3_stock_capture_series);
   g_test_add_data_func ("/goodix/r3/verify-match-2", GUINT_TO_POINTER (21), test_r3_stock_capture_series);
   g_test_add_data_func ("/goodix/r3/verify-match-3", GUINT_TO_POINTER (31), test_r3_stock_capture_series);
-  g_test_add_data_func ("/goodix/r3/verify-no-match-3-no-fourth", GUINT_TO_POINTER (30), test_r3_stock_capture_series);
+  g_test_add_data_func ("/goodix/r3/verify-no-match-5-then-match", GUINT_TO_POINTER (50), test_r3_stock_capture_series);
   g_test_add_data_func ("/goodix/r3/identify-match-1", GUINT_TO_POINTER (111), test_r3_stock_capture_series);
   g_test_add_data_func ("/goodix/r3/identify-match-2", GUINT_TO_POINTER (121), test_r3_stock_capture_series);
   g_test_add_data_func ("/goodix/r3/identify-match-3", GUINT_TO_POINTER (131), test_r3_stock_capture_series);
-  g_test_add_data_func ("/goodix/r3/identify-no-match-3-no-fourth", GUINT_TO_POINTER (130), test_r3_stock_capture_series);
+  g_test_add_data_func ("/goodix/r3/identify-no-match-5-then-match", GUINT_TO_POINTER (150), test_r3_stock_capture_series);
   g_test_add_data_func ("/goodix/r3/verify-match-client-cancel", GUINT_TO_POINTER (0), test_r3_match_then_client_cancel);
   g_test_add_data_func ("/goodix/r3/identify-match-client-cancel", GUINT_TO_POINTER (1), test_r3_match_then_client_cancel);
   g_test_add_func ("/goodix/d278/a0-vectors-malformed",

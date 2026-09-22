@@ -182,12 +182,14 @@ the action and subsequent activation checks the poison before opening another
 transport epoch. This is static evidence of a fence, not a current dynamic
 regression PASS with stock fprintd. Clean outcomes permit explicit reopen;
 the `login_attempts >= 3` guard belongs to the private prepared-login path,
-not automatically to ordinary stock VerifyStart. The new R3 source adds a
-per-open capture cap and terminal latch, with synthetic evidence pending;
-see `STOCK_FPRINTD_ATTEMPTS.md`. The native stock workflow
-must demonstrate the required three-attempt limit/stop-on-match and reject
-hidden retries before any sensor-reaching test. Do not weaken the fence or
-reuse the private consumer patch to get a build or live PASS.
+not to ordinary stock VerifyStart. Per the user's explicit decision, the
+current R3 correction removes the cumulative cap introduced in `c0b2369`.
+Clean NO_MATCH with cleanup admits further explicit attempts chosen by the
+stock consumer; the counter is telemetry only. MATCH/error remains terminal
+for that Claim. Synthetic evidence is pending; see `STOCK_FPRINTD_ATTEMPTS.md`.
+The native stock workflow must preserve terminal-outcome fencing, cleanup
+and zero implicit sensor-reaching retries before any sensor test. Do not
+weaken the fence or reuse the private consumer patch to get a build or live PASS.
 
 The methodological change from the rejected Plasma retest is architectural:
 remove private authentication components, first prove the library with the
@@ -225,4 +227,5 @@ source/header digests, not the installed binary or daemon. Normal/sanitized
 execution of the extended 44-case suite remains pending; source/shell/inert
 checks alone do not close retry safety. The previous installation's saved
 inverse remains valid and untouched. Review set: Git diff from install commit
-`92311c5`, retry audit, changed driver/tests/runner, ledger and canonical manual.
+`92311c5`, retry audit, changed driver/tests/runner, ledger and canonical manual;
+the user-directed removal of the cap is the corrective diff from `c0b2369`.

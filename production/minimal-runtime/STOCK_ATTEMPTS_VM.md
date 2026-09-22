@@ -10,11 +10,16 @@ evidence: R2 build `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, installation
 SELinux Enforcing, five private libraries and Fedora libgusb. Keep that
 installation and `/home/guido/goodix-r2-20260922-081148/` in place.
 
-The current source adds a driver guard for at most three capture attempts
-per logical open/Claim and a terminal latch after MATCH/error. The installed
-R2 binary does **not** contain this correction. The existing synthetic test
-suite now actively tries a fourth call and calls after MATCH, and checks
-that they cannot acquire materials, claim USB or submit transport work.
+The current source keeps a terminal latch after MATCH/error and removes the
+cumulative three-capture cap from `c0b2369`, following the user's explicit
+decision. Fedora stock chooses the number of explicit attempts. After clean
+NO_MATCH and cleanup, fourth and later explicit actions must be admitted.
+The counter is telemetry only. The installed R2 binary does **not** contain
+this source correction. The synthetic tests require five clean NO_MATCH
+actions and a sixth MATCH, one normal acquisition per explicit call, then
+zero new material acquisitions, USB claims or transport submissions on calls
+after MATCH. Retry/error resubmissions remain fenced in the same Claim;
+full close/open starts with fresh state.
 It also covers processing retries, client cancellation immediately after
 the early MATCH report, drain/outcome ordering, resource release, synthetic
 TLS secret cleansing and IDENTIFY→ENROLL.
@@ -61,6 +66,8 @@ and undefined-behavior checks are enabled.
 **PASS_IF:** both runs pass all 44 tests, no sanitizer finding/timeout occurs,
 the command exits zero and ends with `R3_STOCK_ATTEMPTS_VM_TEST=PASS` and
 `R3_INSTALLED_RUNTIME_CHANGED=false`. The checkout must remain clean.
+In particular, `/goodix/r3/{verify,identify}-no-match-5-then-match` must pass:
+the test's five-NO_MATCH length is coverage, not a new driver limit.
 
 **FAIL_IF:** compilation, assertion, sanitizer, source audit or timeout fails.
 **STOP_IF:** any failure or request for root, real material, USB or runtime

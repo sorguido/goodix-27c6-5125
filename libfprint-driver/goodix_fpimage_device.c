@@ -130,7 +130,7 @@ struct _GoodixDeviceContext
   guint                      production_identify_enroll_handoff_count;
   guint                      production_logical_action_attempt_count;
   guint                      production_transport_epoch_count;
-  /* Per logical open/stock Claim, never reset by a capture epoch rollover. */
+  /* Telemetry only; Fedora consumers choose the number of explicit attempts. */
   guint                      production_capture_attempt_count;
   gboolean                   production_capture_terminal;
 #ifdef GOODIX_ENABLE_TEST_SEAMS
@@ -823,7 +823,7 @@ goodix_fpimage_device_log_production_audit (
                  audit->production_explicit_identify_reopen_count;
   g_message (
     "GOODIX_PRODUCTION_EPOCH_AUDIT action=%s attempts=%u rejected=%u "
-    "logical_actions=%u transport_epochs=%u capture_attempts=%u capture_limit=3 capture_terminal=%u identify_enroll_handoffs=%u "
+    "logical_actions=%u transport_epochs=%u capture_attempts=%u capture_terminal=%u identify_enroll_handoffs=%u "
     "identify_enroll_armed=%u consumed=%u tls=%u "
     "first_image=%u release_tail=%u single_terminal=%u rearm32=%u "
     "enroll_stages=%u enroll_rearm32=%u enroll_terminal=%u "
@@ -1662,20 +1662,18 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       return;
     }
 
-  /* Stock clients keep one libfprint open across VerifyStart calls. Bound
-   * that entire series before a rollover can acquire material/claim/USB.
-   * A hostile or misconfigured fourth call, or a call after MATCH, is inert.
-   * A new Claim after full close is a new series, not an in-action retry. */
+  /* MATCH or processing failure ends this stock Claim before any rollover
+   * can acquire material/claim/USB. Clean NO_MATCH allows another explicit
+   * request, with no cumulative driver limit. Full close/open resets state. */
   if (goodix_fpimage_device_is_production_usb (self) &&
-      (ctx->production_capture_terminal ||
-       ctx->production_capture_attempt_count >= 3))
+      ctx->production_capture_terminal)
     {
       ctx->production_rejected_action_count++;
-      g_message ("GOODIX_STOCK_CAPTURE_REJECT attempts=%u limit=3 terminal=1 new_transport=0",
+      g_message ("GOODIX_STOCK_CAPTURE_REJECT attempts=%u terminal=1 new_transport=0",
                  ctx->production_capture_attempt_count);
       fpi_image_device_activate_complete (dev, g_error_new_literal (
         FP_DEVICE_ERROR, FP_DEVICE_ERROR_NOT_SUPPORTED,
-        "Goodix capture series completed; release the device before a new series"));
+        "Goodix capture outcome is terminal; release the device before a new attempt"));
       return;
     }
 
@@ -1775,7 +1773,7 @@ goodix_fpimage_device_activate (FpImageDevice *dev)
       if (action == FPI_DEVICE_ACTION_VERIFY || action == FPI_DEVICE_ACTION_IDENTIFY)
         {
           ctx->production_capture_attempt_count++;
-          g_message ("GOODIX_STOCK_CAPTURE_BEGIN attempt=%u limit=3 action=%s",
+          g_message ("GOODIX_STOCK_CAPTURE_BEGIN attempt=%u action=%s",
                      ctx->production_capture_attempt_count,
                      action == FPI_DEVICE_ACTION_VERIFY ? "VERIFY" : "IDENTIFY");
         }
@@ -1855,12 +1853,10 @@ goodix_device_context_record_capture_result (GoodixDeviceContext *ctx,
   if (!goodix_fpimage_device_is_production_usb (ctx->device) || ctx->login_series)
     return;
 
-  ctx->production_capture_terminal |= !success || match ||
-                                     ctx->production_capture_attempt_count >= 3;
-  g_message ("GOODIX_STOCK_CAPTURE_RESULT attempt=%u limit=3 outcome=%s terminal=%u",
+  ctx->production_capture_terminal |= !success || match;
+  g_message ("GOODIX_STOCK_CAPTURE_RESULT attempt=%u outcome=%s terminal=%u",
              ctx->production_capture_attempt_count,
-             !success ? "ERROR" : match ? "MATCH" :
-             ctx->production_capture_attempt_count >= 3 ? "NO_MATCH_SERIES" : "NO_MATCH",
+             !success ? "ERROR" : match ? "MATCH" : "NO_MATCH",
              ctx->production_capture_terminal);
 }
 
