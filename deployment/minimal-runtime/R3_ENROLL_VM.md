@@ -8,8 +8,10 @@ stages/contacts completed; the final listing contains that label. Both epochs
 closed/drained, fprintd inactive/MainPID 0, sensor detached, runtime/template
 retained, no rollback.
 The canonical manual contains the complete telemetry and review. Preserve the
-procedure below as evidence; **do not repeat it**. The next human gate is
-[native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md).
+procedure below as evidence; **do not repeat it**. Subsequent
+[native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md)
+also passed at the first attempt. R3 is closed; the current human gate is
+[R4 stock KScreenLocker configuration, read-only](R4_KSCREENLOCKER_PREFLIGHT_VM.md).
 The historical procedure below records the requested slot, not evidence that
 the physical left index was presented. No storage relabeling has been performed.
 

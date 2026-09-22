@@ -16,63 +16,61 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 enrollment acquisizione/storage PASS, etichetta errata, verify non eseguito (22 settembre 2026)
+### Stato corrente — R3 chiusa, R4 attiva: preflight KScreenLocker stock VM (22 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Recovery da `ce41ad60ff10393e305c94bf64a9baced34ec503`, `development`
-pulito e allineato a origin. L'Utente riporta **PASS di acquisizione e storage
-dell'enrollment stock nella VM**, dopo `R3_ENROLL_PREFLIGHT=PASS SENSOR_CONNECTED=false`:
-`guido` / `left-index-finger`, otto notifiche `enroll-stage-passed`,
-`enroll-completed` e dito presente nella lista finale. L'audit conferma
-8 stage/8 contatti enrollment, 7 rearm inter-stage, nessun retry diversity,
-un solo handoff IDENTIFY NO_MATCH → ENROLL e due epoch chiusi/drained con
-zero operazioni pendenti, retry, reset, clear_halt o famiglie persistenti rilevate.
-L'Utente riferisce circa 8 contatti enrollment; l'acquisizione IDENTIFY iniziale
-è separata. I dettagli e le quattro righe originali sono nella review R3 sotto.
+Recovery da `a44fcaa304cd8796dda0b444eec1200f757a7f01`, `development`
+pulito e allineato a origin, su handoff Utente `CODEX_HANDOFF_R3_VERIFY_PASS.md`.
+**VERIFY stock PASS al primo tentativo:** `verify-match (done)`, CLI exit 0,
+una capture e un epoch, MATCH terminale, release_tail=1/single_terminal=1,
+outstanding=0, drained=1, context_closed=1. Nessun secondo verify, retry,
+reopen, reset, clear_halt o famiglia persistente rilevata. Le righe complete
+sono nella closure R3 sotto; l'ordine incollato non è ordine temporale.
 
-**Rettifica Utente prima di qualsiasi verify, recovery da
-`1e0c5c214a36f3232c2b90363c90026c5033e37b`:** il dito fisicamente acquisito è
-l'**indice DESTRO**, mentre `r3_finger=left-index-finger` ha salvato il template
-nello slot `#0: left-index-finger` di `guido`. L'etichetta non prova il dito
-anatomico. La precedente consegna che chiedeva l'indice sinistro è superata.
-Il PASS resta acquisizione/storage/cleanup; l'associazione anatomica è errata e
-non è stata corretta nello storage. Nessun riconoscimento è ancora provato.
+Con il precedente enrollment stock completato (8 stage/contatti enrollment,
+un solo handoff IDENTIFY NO_MATCH → ENROLL e cleanup completo), **R3 è
+formalmente chiusa al confine biometrico** previsto dalla roadmap. R3-A,
+private libfprint/OpenCV + fprintd/libgusb Fedora stock, resta l'architettura
+qualificata; non occorre passare a R3-B/R3-C. Non ripetere enrollment, verify,
+Claim/Release, build, install, conversione manifest o riconciliazione già chiusi.
+
+Il dito fisico acquisito e riconosciuto è l'**indice DESTRO**, selezionato
+tramite l'etichetta salvata `left-index-finger` di `guido`. Il mismatch resta
+**stato noto di laboratorio, non riparato** e va riesaminato prima dell'uso
+ordinario/consumer reale. Non è una regressione del matcher: il MATCH riguarda
+il dito realmente acquisito. Non cancellare, rinominare, modificare o riacquisire
+il template durante questa closure e il successivo preflight read-only.
 
 Stato finale riportato: fprintd **inactive/MainPID 0**, sensore scollegato dalla
-VM, runtime e nuovo template conservati, nessun rollback. **Acquisizione chiusa;
-nessun verify eseguito.** Non ripetere enrollment, Claim/Release, conversione
-manifest, riconciliazione, reinstallazione o rebuild già qualificati.
+VM, runtime e template mantenuti, nessun rebuild/reinstall/reenroll/rollback.
+Baseline: build `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, install
+`264cd7ff1ba77857e1985502f299e4375f9a0516`, output VM
+`/home/guido/goodix-r3-20260922-111144`, manifest runtime-v1 SHA256
+`1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`,
+receipt riconciliato, contesti fprintd_var_lib_t e baseline SELinux Enforcing.
+44/44 normal e 44/44 ASan/UBSan sintetici restano accettati come risultati VM
+riportati. Il live-critical set locale è invariato rispetto alla build.
+Il nuovo handoff non include checkout SHA, RPM NEVRA o output preflight VERIFY:
+non si inventano misure guest né si presenta HEAD locale come SHA live misurato.
+La provenance è quella della baseline mantenuta e della procedura corretta,
+con questo limite esplicito; non giustifica una ripetizione del MATCH.
 
-Baseline invariata: build `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`,
-install `264cd7ff1ba77857e1985502f299e4375f9a0516`, output VM
-`/home/guido/goodix-r3-20260922-111144`, stock `/usr/libexec/fprintd`,
-libfprint/OpenCV private e libgusb Fedora, SELinux Enforcing. Restano accettati
-44/44 normal e 44/44 ASan/UBSan sintetici riportati in VM. Manifest runtime-v1
-SHA256 `1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`,
-receipt riconciliato e contesti fprintd_var_lib_t. Il checkout guest esatto
-dell'enrollment non è riportato: non si equipara automaticamente a HEAD locale.
-Il preflight PASS collega il runtime mantenuto ai pin verificati dalla procedura.
+`ACCEPT_AND_CONTINUE`: **R4 attiva**, primo target KScreenLocker stock.
+L'audit individua `kde` → password-auth e `kde-fingerprint` → fingerprint-auth;
+il profilo authselect local può modificare anche system-auth quando abilita
+with-fingerprint. Configurazione e package effettivi della VM sono ancora ignoti:
+lo stato del fisico o i PASS con overlay della rejected architecture non li
+qualificano. Consegna minima read-only:
+`deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`.
+Nessuna patch auth/runtime o live consumer preparata su una baseline presunta.
+`HUMAN_REQUIRED` per le query VM riservate all'Utente dalla roadmap §4; nessun
+privilegio o collegamento sensore richiesto dal nuovo blocco.
 
-Il precedente STOP `require_stopped` non era una live: il corrective `ce41ad6`
-ha conservato il gate, aggiunto lo stato osservato agli errori e reso esplicito
-un solo stop umano a sensore assente. **77 test offline PASS** in quella
-recovery; il successivo preflight è ora PASS riportato. La causa precisa del
-vecchio stato transitorio resta ignota; il successo non la ricostruisce.
-Non serve un ulteriore corrective software; serve rettificare documentazione
-e dito fisico della consegna, preservando il template già acquisito.
-
-`CORRECTIVE` documentale della consegna `1e0c5c2`, quindi
-`ACCEPT_AND_CONTINUE`: il prossimo confine R3 è la **verifica nativa dell'indice
-DESTRO selezionando lo slot left-index-finger**, con il template conservato. Consegna:
-`deployment/minimal-runtime/R3_VERIFY_VM.md`, fino a tre invocazioni esplicite
-stock, stop al primo MATCH e continuazione solo dopo NO_MATCH pulito.
-Ogni invocazione ha un Claim/capture; non è una serie imposta dal driver.
-L'AI si ferma a `HUMAN_REQUIRED` prima di privilegi, USB e live VM.
-Il mismatch dell'etichetta resta esplicito per la successiva review consumer;
-questa prova non lo sana né qualifica un enrollment dell'indice sinistro.
-R4, R5, R6 e R7 restano aperte. Le evidenze live sono riportate dall'Utente,
-corroborate dalla review del codice; non sono un rerun AI, un readback factory
-né una qualifica Windows, verify o release.
+R4 consumer non ancora qualificati; R5, R6 e R7 aperte. Il PASS biometrico non
+prova login/password/desktop, comportamento dopo update, serie PAM, false match
+su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
+live sono riportate dall'Utente, corroborate dalla review di codice e telemetria;
+l'AI non ha rieseguito la VM né letto materiale protetto o template biometrici.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -247,9 +245,9 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è rettificare il dito fisico dell'enrollment e della
-consegna verify: indice DESTRO nello slot left-index-finger, come nello stato
-corrente e nella review R3 sotto.
+Il `CURRENT_TASK` attuale è il primo preflight R4 della configurazione
+KScreenLocker stock VM. R3 è chiusa da enrollment e VERIFY PASS; la closure
+più avanti conserva evidenze e limiti della qualifica.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -841,7 +839,7 @@ Review `ACCEPT_AND_CONTINUE` del corrective, poi `HUMAN_REQUIRED` alla stessa
 prima live VM. Driver, binari, footprint, roadmap e licensing invariati;
 nessun nuovo coupling, file auth Fedora o failure oltre fingerprint introdotto.
 
-### R3 — review dell'enrollment PASS e consegna verify stock
+### R3 — enrollment e preparazione verify (completati, evidenza storica)
 
 Recovery del 22 settembre 2026 da `ce41ad60ff10393e305c94bf64a9baced34ec503`.
 Il primo handoff Utente chiude l'acquisizione della prima live enrollment, preceduta da preflight
@@ -889,10 +887,11 @@ restano i pin del preflight PASS; il confronto del live-critical set con
 `b8cdd17` non mostra modifiche. Questa limitazione documentale non giustifica
 ripetere una live riuscita; la prossima procedura stampa SHA completo e RPM.
 
-**CURRENT_TASK:** correggere la consegna del primo verify stock sul template
+**Task di quella consegna:** correggere il primo verify stock sul template
 mantenuto: slot left-index-finger, dito fisico DESTRO, senza codice runtime nuovo. La guida
 `deployment/minimal-runtime/R3_ENROLL_VM.md` resta evidenza della procedura
-completata; il gate attivo è `deployment/minimal-runtime/R3_VERIFY_VM.md`.
+completata; anche `deployment/minimal-runtime/R3_VERIFY_VM.md` è ora una
+procedura completata, dopo il PASS consolidato sotto.
 L'installazione e l'inversa salvata restano quelle qualificate, recuperabili
 nel versionamento; nessun aggiornamento dell'inversa è implicato dal pull.
 
@@ -983,25 +982,144 @@ o dipendenza per password/desktop; nessuna nuova classe A/B. R5 resta da
 validare realmente. Esito della review offline: consegna accettata e arresto
 prima di privilegi/USB/live per AGENTS §6.1/§6.2 e roadmap §4.
 
+### R3 — closure formale del VERIFY PASS e avanzamento a R4
+
+Handoff Utente `CODEX_HANDOFF_R3_VERIFY_PASS.md`, riesaminato su
+`a44fcaa304cd8796dda0b444eec1200f757a7f01`. L'Utente riporta MATCH del dito
+fisico corretto (indice DESTRO) contro il template acquisito, conservato come
+left-index-finger di guido. Nessun secondo tentativo e nessun rebuild, reinstall,
+reenroll o rollback. Runtime/template mantenuti, sensore scollegato e servizio
+finale inactive/MainPID 0. Il mismatch è esplicitamente mantenuto durante la
+closure e va riesaminato prima dell'uso ordinario consumer.
+
+Output osservato e telemetria ricevuta, integrali; non sono un journal con
+ordine temporale verificabile né dati biometrici raw:
+
+```text
+Verify started!
+Verifying: left-index-finger
+Verify result: verify-match (done)
+R3_VERIFY_CLI_EXIT=0
+```
+
+```text
+GOODIX_PRODUCTION_EPOCH_AUDIT action=FPI_DEVICE_ACTION_VERIFY attempts=1 rejected=0 logical_actions=1 transport_epochs=1 capture_attempts=1 capture_terminal=1 identify_enroll_handoffs=0 identify_enroll_armed=0 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 enroll_contacts=0 enroll_retry_scans=0 secure_retry=0 post_retry=0 reopen=0 explicit_verify_reopen=0 explicit_identify_reopen=0 reset=0 clear_halt=0 persistent=0 sigfm_baseline_pinned=1 sigfm_baseline_reused=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+GOODIX_STOCK_CAPTURE_RESULT attempt=1 outcome=MATCH terminal=1
+GOODIX_STOCK_CAPTURE_BEGIN attempt=1 action=VERIFY
+```
+
+**Review PM: ACCEPT_AND_CONTINUE; R3=CLOSED_BIOMETRIC_BOUNDARY.**
+Il sorgente CLI stock (`utils/verify.c`) collega verify-match a exit 0, esegue
+una sola VerifyStart e chiude tramite VerifyStop/Release. L'audit production
+in `goodix_fpimage_device.c` corrobora un'unica action/capture/transport epoch,
+nessun rejected/handoff/enrollment, un TLS, una first_image e MATCH terminale.
+Questa live ha anche release_tail=1 e single_terminal=1: non richiede di
+ricorrere all'eccezione di cancellazione prima della release tail descritta
+nella preparazione. 82 real_submit sono richieste USB dell'epoch, non 82
+contatti o tentativi. Outstanding zero, drained e context_closed a uno
+confermano la chiusura telemetrata; zero retry/reopen/reset/clear_halt/persistent.
+Il pin SIGFM è presente e non riusato. Nessun secondo contatto è necessario
+per chiudere una serie che si arresta al primo MATCH.
+
+La closure soddisfa il criterio della roadmap per passare a R4:
+fprintd-enroll PASS + fprintd-verify PASS. Non estende questo esito a una serie
+NO_MATCH nello stesso Claim, IDENTIFY multi-template, dito diverso, PAM/KDE,
+Windows/factory readback o update-survivability. L'etichetta left-index è
+metadata noto errato, non una causa di failure né un difetto del matcher
+osservato. Nessun intervento sul template è incluso nel lavoro corrente.
+
+**Limiti di provenance:** il nuovo handoff non riporta il checkout SHA guest,
+le versioni RPM o la riga preflight VERIFY. Il checkout della consegna è
+`a44fcaa`, il build/install già consolidato resta dichiarato mantenuto e il
+live-critical set locale coincide con `b8cdd17`. Non si deduce un nuovo hash
+runtime o un nuovo preflight guest dal solo MATCH. La prossima query R4
+identifica lo stato guest contemporaneo, senza trasformarlo retroattivamente
+in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
+per la closure operativa riferita a questa baseline di laboratorio, non per
+una release/export pubblico. Nessuna ripetizione di conferma della live.
+
+### R4 — primo passo: configurazione stock KScreenLocker nella VM
+
+**CURRENT_TASK:** determinare il percorso PAM effettivo di KScreenLocker e
+la configurazione authselect della VM, prima di scegliere una modifica stock
+reversibile o una live consumer. È il primo consumer selezionato; nessun
+consumer è già SUPPORTED sulla sola base del PASS CLI. L'installazione R3,
+l'inversa salvata e il template restano la baseline. Nessun nuovo installer
+serve per una query read-only, né un rollback dopo PASS R3.
+
+Lettura mirata del manuale: le precedenti live D289/D297 di KScreenLocker
+usavano overlay/sostituzioni PAM e runtime storico. Restano
+HISTORICAL_ONLY/REJECTED_ARCHITECTURE, non qualifica del nuovo stock VM.
+Il nuovo audit read-only sul fisico osserva i file package-owned
+`/etc/pam.d/kde` e `/etc/pam.d/kde-fingerprint` di plasma-workspace
+6.7.5-1.fc44: auth substack password-auth e fingerprint-auth rispettivamente,
+con include postlogin. I file sotto /usr/lib/pam.d corrispondenti sono assenti.
+Questo prova il layout ispezionato sul fisico, non quello della VM.
+
+Il template installato `/usr/share/authselect/default/local/fingerprint-auth`
+esclude il ramo reale senza with-fingerprint e restituisce authinfo_unavail
+tramite pam_debug; con la feature usa pam_fprintd. Lo stesso profilo modifica
+system-auth (pam_fprintd sufficient), mentre password-auth esaminato non
+contiene pam_fprintd. Authselect-libs locale è 1.7.1-1.fc44; current --raw e
+check sono query non privilegiate verificate sul fisico, che riporta local
+with-silent-lastlog/with-mdns4 senza fingerprint. Non è una baseline guest,
+né autorizza ad abilitare globalmente la feature per un solo consumer.
+
+Il sorgente fprintd-pam Fedora 1.94.5 definisce default max-tries=3/timeout=30:
+clean NO_MATCH può portare a un'altra VerifyStart, MATCH ritorna PAM_SUCCESS
+chiudendo il bus, timeout termina. Queste semantiche non stabiliscono da sole
+quante volte il greeter guest invochi PAM; niente live KScreenLocker finché
+la composizione effettiva non è ricostruita. Si mantengono stock daemon,
+modulo, servizi e file vendor; niente overlay PAM, LD_PRELOAD, build privata
+KDE, test harness o riuso operativo del kit storico.
+
+La consegna `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`
+richiede solo la query umana in VM: ambiente/versioni, authselect current/check,
+verifica RPM senza scriptlet e sei nomi PAM in /etc e /usr/lib per osservare
+symlink e shadowing. Il controllo pre/post è read-only, sensore assente e
+fprintd inactive/MainPID 0; non ferma/avvia servizi, non chiama fprintd-list,
+non autentica, non blocca la sessione e non usa sudo. Output mancante,
+configurazione invalida o file inattesi tornano alla review, senza repair.
+Lo stato locale non può sostituire questa informazione guest indispensabile.
+
+Verifica offline: sintassi del blocco Bash e dei due Python inline, import/path
+del helper già qualificato, chiamate solo require_stopped, assenza di comandi
+install/live/auth/configurazione, link locali, integrità delle righe di evidenza
+rispetto all'handoff e confronto del live-critical set. I precedenti risultati
+77 offline e 44/44 VM per profilo restano storici, non test rieseguiti per
+questo delta documentale. Nessun nuovo Dxxx o cambiamento dei guardrail.
+La roadmap è aggiornata solo nello stato R3/R4, senza cambiare architettura,
+policy dei tentativi o criteri di release.
+
+Review PM: preparazione read-only accettata; coupling aggiuntivo NO, componenti
+Fedora auth modificati NO, footprint runtime invariato. R5 resta obbligatoria.
+**HUMAN_REQUIRED** per la query guest, riservata all'Utente dalla roadmap §4;
+nessuna richiesta di nuova autorizzazione hardware o di manipolazione template.
+Dopo l'output si prepara il minimo passo stock con rollback, se necessario,
+e si riesamina esplicitamente la gestione dell'etichetta prima del consumer reale.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
-ACTIVE_PHASE=R3
-ADVANCEMENT=ENROLLMENT_PHYSICAL_FINGER_CORRECTED_VERIFY_HANDOFF_UPDATED
-R3_OPEN_CLOSE=PASS_HUMAN_REPORTED
+ACTIVE_PHASE=R4
+ADVANCEMENT=R3_BIOMETRIC_BOUNDARY_CLOSED_STOCK_KSCREENLOCKER_CONFIG_REVIEW_STARTED
+R3=CLOSED_BIOMETRIC_BOUNDARY
 R3_ENROLLMENT=PASS_ACQUISITION_STORAGE_CLEANUP_HUMAN_REPORTED
+R3_VERIFY=PASS_FIRST_ATTEMPT_MATCH_HUMAN_REPORTED
+VERIFY_GUEST_CHECKOUT_SHA=NOT_REPORTED
+VERIFY_GUEST_RPM_NEVRA=NOT_REPORTED
+VERIFY_PREFLIGHT_OUTPUT=NOT_REPORTED
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
-ENROLLMENT_LABEL_MISMATCH=KNOWN_NOT_REPAIRED
-R3_VERIFY=NOT_YET_EXECUTED
-ENROLLMENT_GUEST_CHECKOUT_SHA=NOT_REPORTED
-EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_VERIFY_REQUIRES_HUMAN_VM
-RESIDUAL_BLOCKER_OR_RISK=LABEL_MISMATCH_UNRESOLVED_VERIFY_AND_R4_R5_R6_R7_NOT_QUALIFIED
+ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_REVIEW_BEFORE_CONSUMER
+R4_CONSUMER_LIVE=NOT_YET_EXECUTED
+EXECUTABLE_CLOSURE=OFFLINE_PASS_READ_ONLY_GUEST_QUERY_REQUIRES_HUMAN
+RESIDUAL_BLOCKER_OR_RISK=GUEST_PAM_AUTHSELECT_UNKNOWN_R4_R5_R6_R7_NOT_QUALIFIED
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_1e0c5c214a36f3232c2b90363c90026c5033e37b
+REVIEW_SET=GIT_DIFF_FROM_a44fcaa304cd8796dda0b444eec1200f757a7f01
 PRODUCTION_DRIVER_CHANGED=false
-ROADMAP_CHANGED=false
+ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_STOCK_VERIFY_RIGHT_INDEX_STORED_AS_LEFT_INDEX
+NEXT_BOUNDARY=HUMAN_VM_READ_ONLY_KSCREENLOCKER_CONFIGURATION
 ```
 
 ### Governance corrente

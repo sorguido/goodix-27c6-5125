@@ -17,9 +17,11 @@ clean-replacement evidence, not as the next live action.
 the physical **RIGHT index** was saved as `guido` / `left-index-finger`. Eight enrollment
 contacts/stages, completed and listed, clean epoch closure; runtime/template
 retained and reader detached. [The enrollment procedure](R3_ENROLL_VM.md) is
-completed evidence. **Next human gate: [native verification in the VM](R3_VERIFY_VM.md).**
-Select the stored left-index label while physically presenting the RIGHT index.
-Use the retained runtime and template; no rebuild/reinstall or repeated enrollment.
+completed evidence. [Stock verification](R3_VERIFY_VM.md) also passed with the
+RIGHT index at the first attempt, with clean release/drain/close. **R3 is closed
+at the biometric boundary. Next human gate: [R4 KScreenLocker configuration,
+read-only in the VM](R4_KSCREENLOCKER_PREFLIGHT_VM.md).** Keep the runtime/template
+and known label mismatch; no rebuild/reinstall, repeated enrollment or verify.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

@@ -249,6 +249,13 @@ Nessuna live richiesta.
 
 ## R3 — Integrazione minima con fprintd Fedora stock
 
+**Stato: COMPLETATA al confine biometrico (22 settembre 2026).** Enrollment
+stock PASS e verify stock MATCH al primo tentativo, con cleanup completo,
+riportati dall'Utente e riesaminati nel manuale tecnico. Runtime/template
+conservati; indice DESTRO nello slot left-index-finger resta mismatch noto di
+laboratorio, da riesaminare prima dell'uso ordinario consumer. Nessuna qualifica
+R4/R5 o release è implicata; non ripetere le live R3 già chiuse.
+
 Valutare le opzioni in questo ordine e passare alla successiva soltanto se la
 precedente è esclusa da evidenza tecnica.
 
@@ -299,12 +306,18 @@ se presente, è soltanto telemetria. MATCH resta terminale per il Claim dopo
 il cleanup necessario; processing error/`FP_DEVICE_RETRY` non deve consentire
 nuova acquisizione di materiali, USB claim o transport submission alla
 risottomissione automatica. Un nuovo Claim/open riparte da stato fresco.
-Nessuna modifica a fprintd/PAM/CLI stock; prossimo gate limitato ai test
-sintetici VM senza sensore, prima di qualunque live.
+Nessuna modifica a fprintd/PAM/CLI stock. Il gate iniziale era limitato ai test
+sintetici VM senza sensore; la successiva qualifica R3 è ora completata come
+riportato sopra. La semantica dei tentativi resta invariata.
 
 ---
 
 ## R4 — Consumer di autenticazione: solo percorso stock
+
+**Stato: ATTIVA.** Primo passo minimo: ricostruzione read-only della
+configurazione KScreenLocker/PAM/authselect nella VM, a sensore scollegato,
+prima di predisporre qualunque test consumer o modifica stock reversibile.
+Consegna: `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`.
 
 Una volta ottenuti:
 

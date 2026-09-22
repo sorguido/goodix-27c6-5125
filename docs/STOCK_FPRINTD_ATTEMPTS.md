@@ -22,13 +22,14 @@ enrollment acquisition/storage have now passed in the VM. The user clarified
 before any verify that the physical RIGHT index was enrolled as `guido` /
 `left-index-finger`: a known label mismatch, not a matching result. Enrollment
 completed with eight stages/contacts and clean closure; the canonical
-manual preserves the complete user telemetry. Runtime and template are retained,
-sensor detached, fprintd inactive. No verification has run. The current gate is
-[native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md), with up to
-three manual CLI invocations selecting stored `left-index-finger` while physically
-using the RIGHT index, stop at first MATCH, continuation only after clean
-NO_MATCH. Each CLI invocation is one Claim/capture; this does not qualify a series
-inside one Claim or impose a cumulative driver cap.
+manual preserves the complete user telemetry. Subsequent stock VERIFY passed
+at the first attempt: RIGHT index against stored left-index-finger, terminal
+MATCH, one capture/epoch, completed release tail and drained/closed resources.
+Runtime and template are retained, sensor detached, fprintd inactive. No second
+verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
+This single MATCH does not qualify a real NO_MATCH series inside one Claim or
+impose a cumulative driver cap. The current gate is
+[R4 KScreenLocker configuration, read-only](../deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md).
 
 ## Source findings
 
@@ -325,8 +326,10 @@ STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PASS_SYNTHETIC_HUMAN_REPORTED
 SYNTHETIC_PHASE_NEXT_GATE=COMPLETED_VM_CLEAN_REPLACEMENT
-CURRENT_GATE=HUMAN_REQUIRED_VM_STOCK_VERIFY
-LIVE_HANDOFF_READY=true
+R3_VERIFY=PASS_FIRST_ATTEMPT_MATCH_HUMAN_REPORTED
+R3=CLOSED_BIOMETRIC_BOUNDARY
+CURRENT_GATE=HUMAN_REQUIRED_VM_READ_ONLY_KSCREENLOCKER_CONFIGURATION
+NEXT_SENSOR_LIVE_HANDOFF_READY=false
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
 
@@ -334,12 +337,12 @@ The previous compiler/lifecycle/audit/expectation failures above are historical,
 not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
-native enrollment are completed evidence; do not repeat them. Proceed only
-through the current verification handoff after the human gate, retaining the
-qualified runtime, reconciled receipt and saved inverse.
+native enrollment/verify are completed evidence; do not repeat them. Proceed
+through the read-only R4 configuration handoff, retaining the qualified runtime,
+template, reconciled receipt and saved inverse.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file; the next verification is human-executed in the VM.
+file; the next configuration query is human-executed in the VM.

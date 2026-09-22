@@ -39,11 +39,15 @@ clarified that the physical **RIGHT index** was stored as `guido` /
 `left-index-finger`. Eight enrollment
 stages/contacts, completed and present in the final listing, both epochs
 closed/drained with zero retries or persistent families reported. Runtime and
-template remain, without rollback; no verify has run. The canonical manual
-records the full evidence and its limits. The current human gate is
-[native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md),
-using the physical RIGHT index and the retained left-index label/template.
-The anatomical label remains incorrect; no rebuild/reinstall or repeat enrollment.
+template remain, without rollback. Subsequent stock verification produced
+MATCH at the first attempt using the physical RIGHT index against that stored
+label, with clean release/drain/close and no retries or persistent families
+reported. **R3 is closed at the biometric boundary.** The canonical manual
+records full evidence, missing guest SHA/RPM/preflight output and limits of the
+qualification. The current human gate is
+[R4 KScreenLocker configuration, read-only](../deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md).
+The anatomical label remains known laboratory state for review before ordinary
+consumer use; no template mutation, rebuild/reinstall or repeat biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
@@ -125,8 +129,8 @@ installation and changed no protected binary. Receipt reconciliation records
 that replacement without replacing the saved inverse. `/var/lib/fprint/` remains
 stock template storage and is not touched by runtime installation/uninstall.
 The completed native enrollment added the `guido` / `left-index-finger` host
-template from the physical RIGHT index, as corrected by the user. The next
-verify selects that stored label and uses the RIGHT index, without enrollment,
+template from the physical RIGHT index, as corrected by the user. Successful
+verify selected that label and used the RIGHT index, without enrollment,
 template deletion or relabeling. Normal consumer finger labeling is unresolved.
 
 No additional udev rule is justified by current source evidence. The library
@@ -254,8 +258,8 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md).
-The accepted build/load/material/Claim/enrollment gates are not repeated. The review finds
+[R4 KScreenLocker configuration, read-only](../deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md).
+The accepted R3 build/load/material/Claim/enrollment/verify gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure
 beyond fingerprint and no replacement of Fedora-owned authentication files.
 Recovery remains removal/reinstall/update of Goodix integration. R5 remains

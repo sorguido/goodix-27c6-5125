@@ -1,13 +1,25 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3: verify the right index stored as left-index-finger in the VM
 
+**COMPLETED — stock VERIFY PASS at the first attempt; R3 biometric boundary closed.**
+The user reported `verify-match (done)`, CLI exit 0, one capture/epoch,
+release_tail=1/single_terminal=1 and closed/drained resources, with zero
+retry/reset/persistent families observed. No second verify or rollback;
+runtime/template retained, sensor detached, fprintd inactive/MainPID 0.
+The canonical manual contains the complete evidence and review. The RIGHT-index
+template still has the left-index label; preserve it as known laboratory state.
+**Do not repeat the completed procedure below.** The current human gate is
+[R4 stock KScreenLocker configuration, read-only](R4_KSCREENLOCKER_PREFLIGHT_VM.md).
+
+## Completed procedure and its original criteria
+
 **HUMAN_REQUIRED — VM service operations, real USB and verification are human-only.**
 The 22 September enrollment is accepted for acquisition/storage/cleanup:
 `enroll-completed`, eight enrollment contacts/stages and closed, drained epochs.
 The user clarified which physical finger was used before any verification: the template
 contains the **RIGHT index**, but its stored label is **`left-index-finger`**.
-The earlier instruction to touch with the left index is superseded. No verify
-has run, and the label mismatch has not been repaired in host storage.
+The earlier instruction to touch with the left index was superseded before the
+successful verify. The label mismatch has not been repaired in host storage.
 
 | Item | Value for this gate |
 | --- | --- |
