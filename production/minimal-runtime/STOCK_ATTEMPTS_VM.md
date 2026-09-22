@@ -4,17 +4,21 @@
 **Next human gate: compile and run offline tests only. Keep the reader
 disconnected. Do not rebuild R2, reinstall R3-A or run a live test.**
 
-Both previous VM attempts stopped during compilation: first on the
-enrollment stage-count `guint` → `gint` conversion, then on the fixture's
-mixed-signedness `CLAMP`. **0 R3 tests executed**, reader disconnected,
-R3-A unchanged. The stage count is range-checked before casting; the CLAMP
-upper bound now uses a compile-time-checked `gint`. Preventive static review
-covered all 43 translation units in both compiler profiles, including the
-targets after the fixture: 86 syntax-only parses passed without diagnostics.
-Actual code generation, linking and tests still require this VM gate.
-Compiler warning flags and retry semantics are unchanged. Pull the corrective
-and repeat this same gate with a new output directory. Keep both failed build
-outputs as evidence; no rollback of R3-A is needed.
+The latest VM run **compiled/linked and started both normal and sanitizer
+tests**, then failed at `/goodix/r3/verify-match-1` with the same
+`ACTIVATING -> ACTIVATING` warning. This is a test lifecycle failure:
+the fixture attempted two consecutive activation failures without close.
+The earlier two compile failures remain historical; the latest run is not
+classified as zero tests executed.
+
+All ten R3 cases have now undergone offline lifecycle review. Each series
+case checks one rejected post-MATCH action, then closes; separate fixtures
+cover both action kinds and cross-kind rejection. All ten verify state reset
+and an admitted acquisition after a new open. The two early-MATCH cancellation
+cases retain drain/release checks. The corrected fixture passes syntax-only
+analysis with both existing profiles; actual execution remains pending.
+Pull the corrective and repeat this same gate with a new output directory.
+Keep previous outputs as evidence. R3-A stays installed; no rollback is needed.
 
 R3-A stock loading is accepted from the user's Fedora 44 KDE x86_64 VM
 evidence: R2 build `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, installation
@@ -29,9 +33,9 @@ NO_MATCH and cleanup, fourth and later explicit actions must be admitted.
 The counter is telemetry only. The installed R2 binary does **not** contain
 this source correction. The synthetic tests require five clean NO_MATCH
 actions and a sixth MATCH, one normal acquisition per explicit call, then
-zero new material acquisitions, USB claims or transport submissions on calls
-after MATCH. Retry/error resubmissions remain fenced in the same Claim;
-full close/open starts with fresh state.
+zero new material acquisitions, USB claims or transport submissions on the
+single rejected action after MATCH in each Claim. Retry/error resubmissions
+remain fenced in the same Claim; full close/open starts with fresh state.
 It also covers processing retries, client cancellation immediately after
 the early MATCH report, drain/outcome ordering, resource release, synthetic
 TLS secret cleansing and IDENTIFY→ENROLL.
@@ -40,7 +44,7 @@ This uses the canonical driver and Fedora libfprint source with synthetic
 USB/material/SIGFM interfaces, not the system daemon, installed runtime,
 real protected materials or real USB. It reuses the existing integration
 fixtures; no operator harness or authentication consumer is introduced.
-Actual normal and ASan/UBSan execution is still pending. A source review
+Corrective normal and ASan/UBSan execution is still pending. A source review
 alone is not a regression PASS or permission for a live test.
 
 ## Run as the ordinary VM user

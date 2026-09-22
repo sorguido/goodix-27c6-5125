@@ -77,9 +77,11 @@ has ten R3 cases: VERIFY and IDENTIFY with MATCH at 1/2/3, five consecutive
 clean NO_MATCH followed by MATCH on a sixth explicit action, and cancellation
 from the early MATCH callback. Each admitted action checks one normal
 acquisition and cleanup; fourth/fifth calls must reacquire materials/claim
-exactly once, without implicit retries. The eight series cases then attempt
-further VERIFY and IDENTIFY after MATCH, requiring zero new resources or
-submissions, and verify fresh state on full close/open. Existing retry/fatal
+exactly once, without implicit retries. Each of the eight series cases then
+attempts exactly one VERIFY or IDENTIFY after MATCH, requiring zero new
+resources or submissions, then closes the Claim. Same-kind and cross-kind
+rejections use separate fixtures, as mapped below. All ten cases verify
+fresh state and an admitted action after full close/open. Existing retry/fatal
 tests also check actual acquisition and OUT submission counters on rejected
 resubmission. The two early-MATCH cases cancel before
 finger-off/STOP, require outstanding callbacks to drain and verify resource
@@ -112,6 +114,65 @@ now asserts at compile time that the maximum fits `gint`, then uses a
 `const gint` upper bound. All three CLAMP operands are signed; the intended
 range remains 0..4095, including clipping negative values to zero. No
 production source, attempt/retry rule, compiler flag or roadmap is changed.
+
+## Post-MATCH lifecycle corrective
+
+The latest human-reported VM run **compiled and linked both builds and
+started normal and sanitizer tests**. Both stopped at
+`/goodix/r3/verify-match-1`: the first rejected post-MATCH action logged
+`GOODIX_STOCK_CAPTURE_REJECT attempts=1 terminal=1 new_transport=0`, then the
+next action caused the fatal `ACTIVATING -> ACTIVATING` state warning. This
+is `TEST_LIFECYCLE_STATE_MACHINE`, not a compile failure or suite PASS. The
+report does not establish results for the remaining nine R3 cases.
+
+Source review confirms the cause in the canonical Fedora-base
+`fpi-image-device.c`: `fpi_image_device_activate_complete(error)` completes
+the action while retaining `ACTIVATING` and `active=false`; another capture
+calls `fpi_image_device_activate()` and attempts the invalid transition.
+`fpi_image_device_close_complete()` resets the state to `INACTIVE`, as does
+open completion. The old two-kind rejection loop skipped this close.
+The stock daemon retries only `FP_DEVICE_RETRY`; other errors complete the
+action, and stock PAM exits and releases the device on terminal error.
+No stock component or driver policy is changed to accommodate the test.
+
+Reviewed all ten R3 registrations, shared action helpers, completion/error
+callbacks, drain and teardown. The corrected sequences are below; all names
+have prefix `/goodix/r3/`. Each row uses its own fixture and Claim.
+
+| Case | Before close | Action after fresh open |
+| --- | --- | --- |
+| `verify-match-1` | MATCH, one rejected VERIFY | VERIFY |
+| `verify-match-2` | NO_MATCH, MATCH, one rejected IDENTIFY | VERIFY |
+| `verify-match-3` | Two NO_MATCH, MATCH, one rejected VERIFY | VERIFY |
+| `verify-no-match-5-then-match` | Five NO_MATCH, sixth MATCH, one rejected VERIFY | VERIFY |
+| `identify-match-1` | MATCH, one rejected IDENTIFY | IDENTIFY |
+| `identify-match-2` | NO_MATCH, MATCH, one rejected VERIFY | IDENTIFY |
+| `identify-match-3` | Two NO_MATCH, MATCH, one rejected IDENTIFY | IDENTIFY |
+| `identify-no-match-5-then-match` | Five NO_MATCH, sixth MATCH, one rejected IDENTIFY | IDENTIFY |
+| `verify-match-client-cancel` | Early MATCH callback, cancellation, drain, close | VERIFY |
+| `identify-match-client-cancel` | Early MATCH callback, cancellation, drain, close | IDENTIFY |
+
+The eight rejected actions still require `FP_DEVICE_ERROR_NOT_SUPPORTED`,
+unchanged material/claim/IN/OUT counts, empty/drained transport, no held
+material/claim and unchanged capture/transport-epoch counters. Exactly one
+rejection is asserted. The two cancellation cases retain their pending-work,
+poison, resource-release and TLS-cleansing checks; they do not insert another
+capture before Release. Both now also exercise a fresh Claim.
+
+Close/open helpers read the actual `fpi-image-device-state` property and
+`fp_device_is_open()`. Close resets the property without emitting the
+state-changed signal, so the fixture's cached signal value cannot prove this
+reset. No internal state is forced by the tests. The new Claim must have zero
+capture count, no terminal latch/poison and admit one normal acquisition of
+the original action kind, with one new material acquisition/claim and balanced
+releases. Existing VERIFY and IDENTIFY `FP_DEVICE_RETRY` cases retain one
+automatic API resubmission, a terminal non-retry error, zero new resources or
+submissions, then close; they do not repeat activation failures in one Claim.
+
+Offline lifecycle review is closed for **10/10 cases**. The changed fixture
+also passes `-fsyntax-only` with both existing normal/sanitizer profiles,
+without diagnostics. Runtime validation of this corrective is pending; the
+AI has not built or executed the suite on the physical host or accessed the VM.
 
 ## Preventive compile-surface review (22 September 2026)
 
@@ -157,17 +218,29 @@ diagnostics or sanitizer/test execution. The guest toolchain version has not
 been inferred from the local SDK.
 
 Source digest/path audit, shell syntax, and the test entry point's help/non-VM
-refusal from an unrelated cwd are PASS. **Corrected compilation and the 44
-normal/ASan/UBSan cases remain pending manual VM execution.** Static review
-does not substitute for those results. No dynamic or sensor-safety PASS is claimed.
+refusal from an unrelated cwd are PASS. The complete static review preceded
+the now-successful VM build/link. **The lifecycle-corrected fixture and all
+44 normal/ASan/UBSan cases still require manual VM validation.** Static review
+does not substitute for a complete suite PASS or sensor-safety evidence.
+
+Latest VM evidence is human-reported; review status describes the corrective:
 
 ```text
 R3_A_STOCK_LOAD=PASS_HUMAN_REPORTED
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
-PREVIOUS_VM_COMPILATION=FAIL_SIGN_COMPARE
-PREVIOUS_VM_R3_TESTS_EXECUTED=0
+BUILD_LINK=PASS
+NORMAL_TESTS_STARTED=true
+SANITIZER_TESTS_STARTED=true
+FIRST_FAILURE=/goodix/r3/verify-match-1
+FAILURE_CLASS=TEST_LIFECYCLE_STATE_MACHINE
+REAL_USB_SUBMIT=0
+SENSOR_CONNECTED=false
+R3_A_INSTALLATION=UNCHANGED
+R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
+LIFECYCLE_CORRECTIVE_VM_EXECUTION=PENDING
 STATIC_COMPILE_SURFACE_REVIEW=CLOSED
-STATIC_SYNTAX_ONLY_PASSES=86
+PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
+LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
 STOCK_ATTEMPT_SOURCE_CORRECTION=IMPLEMENTED
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE

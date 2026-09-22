@@ -24,16 +24,17 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`8abfb35d538951273ef9058e3281082b5dcb0fb5`, `development` inizialmente pulito,
-e dal secondo stop di compilazione riportato dall'Utente nel gate sintetico
-VM: signedness mista nel `CLAMP` del fixture secure-session. Il precedente
-errore `guint` → `gint` in `fpi_device_set_nr_enroll_stages` era già corretto
-con controllo di range. Entrambi i tentativi: **0 test R3 eseguiti**, sensore
-scollegato e R3-A invariata. Il corrective corrente rende signed il limite
-del CLAMP con static assertion e chiude la review statica delle 43 unità
-compilate dal gate, senza cambiare warning, runtime, retry o attempt policy.
-Il numero di tentativi espliciti resta di Fedora stock, con terminalità
-MATCH/errore. Build/link ed esecuzione della suite restano da provare in VM.
+`912218a40379b5a97e518338323d83f75c06b89f`, `development` inizialmente pulito,
+e dal nuovo esito VM fornito dall'Utente in `R3_test_lifecycle_corrective.md`:
+**build/link PASS, suite normal e sanitizer avviate**, entrambe ferme al
+primo caso `/goodix/r3/verify-match-1` per `ACTIVATING -> ACTIVATING`.
+I due precedenti stop di compilazione restano storici; il run corrente non
+è più classificato come zero test eseguiti. La review conferma un errore di
+lifecycle del test: due activation failure consecutive senza close/open.
+Il corrective limita a un solo rifiuto post-MATCH per Claim e verifica close,
+stato fresco e nuova action nei dieci casi R3. Nessun cambio di warning,
+runtime, retry/attempt policy o roadmap. Sensore scollegato, R3-A invariata;
+suite corretta da rieseguire manualmente nella VM, nessuna live.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -207,12 +208,13 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: correggere il CLAMP mixed-signedness del fixture e completare
-la review statica preventiva dell'intera superficie dei due script del gate,
-compresi tutti i target successivi al fixture, con i flag effettivi.
-Ripreparare il medesimo gate sintetico VM senza allentare warning o modificare
-semantica retry, attempt policy, runtime e componenti Fedora. Nessuna live,
-installazione o rollback di R3-A; roadmap invariata per questo corrective.
+`CURRENT_TASK`: correggere il lifecycle post-MATCH del fixture, dopo review
+dei dieci casi R3 e della state machine canonica. Un solo rifiuto per Claim,
+close che ripristina lo stato e nuova action ammessa dopo open; copertura
+VERIFY/IDENTIFY e incrociata su fixture separate. Conservare cinque NO_MATCH
+più sesto MATCH e i controlli sulla risottomissione `FP_DEVICE_RETRY`.
+Ripreparare il medesimo gate sintetico VM. Nessuna modifica production,
+runtime, componenti Fedora, warning o roadmap; nessuna live o rollback R3-A.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -266,12 +268,15 @@ cinque NO_MATCH consecutivi seguiti da un sesto tentativo con MATCH, due casi
 di cancellazione dalla callback MATCH prima di finger-off/STOP. Ogni action
 ammessa verifica una sola acquisizione normale e cleanup; quarta/quinta
 riacquisiscono materiale/claim una sola volta, senza retry impliciti. Dopo
-MATCH gli otto casi di serie provano ulteriori API VERIFY e IDENTIFY con zero
-reacquire/claim/submit, poi stato fresco dopo close/open. Il cinque dei test
+MATCH ciascuno degli otto casi di serie prova una sola API respinta con zero
+reacquire/claim/submit, poi close/open e nuova action ammessa. I casi MATCH-2
+incrociano VERIFY→IDENTIFY e IDENTIFY→VERIFY; gli altri mantengono lo stesso
+tipo, sempre su fixture separate. Il cinque dei test
 è copertura, non una nuova quota. Le prove retry/fatal verificano ora anche
 i contatori effettivi di material acquisition e OUT submission sulla
 risottomissione respinta. I due casi MATCH anticipato impongono drain prima
-della chiusura e verificano release/cleansing TLS; modellano il client stock
+della chiusura e verificano release/cleansing TLS, quindi un nuovo open e
+un'acquisizione ammessa dello stesso tipo; modellano il client stock
 tramite le API libfprint, senza dichiarare una prova D-Bus reale. I 34 casi
 esistenti comprendono retry extraction, cancel,
 drain, matcher tardivo/fatal, handoff ENROLL e TLS sintetico. Il builder test
@@ -293,12 +298,12 @@ Nessuna modifica ai flag warning o al percorso retry/cleanup.
 **Secondo esito VM:** nuovo stop prima dei test nel fixture
 `test_goodix_d278_secure_session.c:1640`, `-Werror=sign-compare` su
 `CLAMP(value, 0, GOODIX_SENSOR_SAMPLE_MAX)`: `gint` contro `4095u`.
-Ancora **0 test R3 eseguiti**, sensore scollegato, R3-A invariata. Il fix
+In quel tentativo ancora **0 test R3 eseguiti**, sensore scollegato, R3-A invariata. Il fix
 usa `const gint sample_max`, preceduto da static assertion di rappresentabilità
 in `gint`. Il CLAMP ha così tre operandi signed e conserva l'intervallo
 inteso 0..4095, troncando a zero i valori negativi. Cambia solo il fixture.
 
-**Review preventiva chiusa:** ricostruiti sorgenti, ordine, include e flag
+**Review preventiva compile chiusa in `912218a`:** ricostruiti sorgenti, ordine, include e flag
 effettivi dei due script, con i define del gate stock. Sono 43 unità in
 ciascun profilo: 27 C strict, 14 C base/supporto, un fixture strict con la
 sola preesistente eccezione `-Wno-conversion`, un C++ metrics. L'eccezione
@@ -315,12 +320,44 @@ L'analisi statica non verifica code generation, warning dipendenti dalle
 ottimizzazioni, linking o comportamento dei sanitizer. Non si inferisce
 la versione toolchain della VM da quella locale.
 
+**Nuovo run VM e corrective lifecycle:** l'Utente riporta build/link PASS,
+test normal e sanitizer iniziati e identico primo failure in
+`/goodix/r3/verify-match-1`. Il log mostra prima il rifiuto driver
+`GOODIX_STOCK_CAPTURE_REJECT attempts=1 terminal=1 new_transport=0`, poi il
+warning fatale `ACTIVATING -> ACTIVATING`. Classificazione:
+`TEST_LIFECYCLE_STATE_MACHINE`; nessun PASS della suite né evidenza di esito
+per gli altri nove R3. Real USB submit zero, sensore scollegato, R3-A invariata.
+
+Conferma dal codice canonico `fpi-image-device.c`:
+`fpi_image_device_activate_complete(error)` completa l'action lasciando
+`active=false` e stato `ACTIVATING`; una seconda capture senza close tenta
+la transizione illegale. Close e open completati ripristinano `INACTIVE`.
+Il loop di due rifiuti del test era quindi errato. fprintd risottomette solo
+`FP_DEVICE_RETRY`, mentre l'errore terminale completa l'action; PAM stock
+esce e fa Release. Non si modifica questa policy per far passare il fixture.
+
+Review offline completata su **10/10 casi**, helper, callback e teardown.
+Negli otto casi di serie resta un solo rifiuto, con errore atteso, contatori
+material/claim/IN/OUT invariati, nessuna risorsa trattenuta, trasporto drenato
+e un solo rejected action. I due casi di cancellazione mantengono MATCH
+anticipato, drain, poison e cleanup, seguiti direttamente da close. Tutti
+verificano nuovo Claim senza latch/poison/conteggio e nuova acquisizione
+ammessa. Gli helper close/open leggono la proprietà reale
+`fpi-image-device-state` e `fp_device_is_open()`: il close notifica la proprietà
+senza emettere il segnale state-changed, perciò la cache del fixture non prova
+il reset. Nessuna forzatura dello stato o warning ignorato. I test esistenti
+VERIFY/IDENTIFY su processing retry restano invariati: una risottomissione
+automatica respinta senza risorse/submit, errore non-retry, poi close.
+Matrice nominativa dei dieci casi in `docs/STOCK_FPRINTD_ATTEMPTS.md`.
+
 **Verificato sul workspace:** audit digest/path dei 62 sorgenti e quattro
 supporti PASS (nessun digest production da aggiornare: cambia solo il fixture), sintassi
 shell e diff PASS; help e rifiuto non-VM dell'entrypoint reale da cwd estranea
-PASS senza creare output. Nessuna build o esecuzione C del progetto sul
-fisico, soltanto analisi statica. Le 44 prove normal e ASan/UBSan sono **preparate, non eseguite**:
-non dichiarare chiuso il retry sulla sola analisi statica.
+PASS senza creare output. Il fixture corretto passa nuovamente
+`-fsyntax-only` con entrambi i profili normal/sanitizer, senza diagnostiche.
+Nessuna build o esecuzione C del progetto sul fisico, soltanto analisi statica.
+Le **44 prove complete della versione corretta restano da eseguire** in VM:
+il run interrotto al primo R3 non chiude il retry né il lifecycle corretto.
 
 Il prossimo gate è il test-build offline nella VM, da utente ordinario,
 tramite `production/minimal-runtime/check-stock-attempts.sh`, SDK esistente,
@@ -333,18 +370,27 @@ continuità sorgenti rifiuta correttamente il driver cambiato.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=FIXTURE_SIGNED_CLAMP_AND_FULL_STATIC_COMPILE_SURFACE_REVIEW
+ADVANCEMENT=POST_MATCH_TEST_LIFECYCLE_CORRECTED_AND_ALL_TEN_R3_CASES_REVIEWED
 ACTIVE_PHASE=R3
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
-PREVIOUS_VM_COMPILATION=FAIL_SIGN_COMPARE
-PREVIOUS_VM_R3_TESTS_EXECUTED=0
+BUILD_LINK=PASS
+NORMAL_TESTS_STARTED=true
+SANITIZER_TESTS_STARTED=true
+FIRST_FAILURE=/goodix/r3/verify-match-1
+FAILURE_CLASS=TEST_LIFECYCLE_STATE_MACHINE
+REAL_USB_SUBMIT=0
+SENSOR_CONNECTED=false
+R3_A_INSTALLATION=UNCHANGED
+R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
+LIFECYCLE_CORRECTIVE_VM_EXECUTION=PENDING
 STATIC_COMPILE_SURFACE_REVIEW=CLOSED
-STATIC_SYNTAX_ONLY_PASSES=86
+PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
+LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
 EXECUTABLE_CLOSURE=STATIC_SYNTAX_SOURCE_SHELL_INERT_PASS_VM_BUILD_AND_TEST_PENDING
-REAL_TARGET_COMPATIBILITY=R3_A_STOCK_LOAD_PASS_CORRECTED_DRIVER_UNBUILT
+REAL_TARGET_COMPATIBILITY=R3_A_STOCK_LOAD_PASS_SYNTHETIC_BUILD_LINK_PASS_SUITE_FAIL
 LIVE_HANDOFF_READY=false
 INSTALLED_RUNTIME_CHANGED=false
 FEDORA_COMPONENTS_REPLACED=NONE
@@ -356,9 +402,10 @@ Review set Git-native da `92311c5`: driver/manifest, estensione della suite e
 builder esistenti, runner VM, documentazione/licensing e questo manuale.
 Il correttivo corrente rispetto al cap errato parte da `c0b2369`.
 Il primo corrective di compilazione (`8abfb35`, da `0097221`) cambia il punto
-di conversione nel driver e il suo digest. Il corrective corrente parte da
-`8abfb35` e cambia solo il CLAMP del fixture e la documentazione tecnica
-necessaria: nessun nuovo D-number, digest production o modifica della roadmap.
+di conversione nel driver e il suo digest; il secondo (`912218a`) il CLAMP
+del fixture. Il corrective corrente parte da `912218a` e modifica soltanto
+lifecycle/assertion del fixture e documentazione tecnica: nessun nuovo
+D-number, digest production o modifica della roadmap.
 `docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
 in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
 workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il
