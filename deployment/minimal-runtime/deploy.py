@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""R3-A: own only the private library directory and one environment drop-in."""
+"""R3: private libraries, one environment drop-in and an owned material fcontext."""
 import argparse
 import fcntl
 import hashlib
@@ -155,6 +155,259 @@ def load_payload(build):
     return payload, install_commit
 
 
+# Material contents never enter this deployment code: only lstat and SELinux xattrs.
+MATERIAL = Path("/var/lib/goodix-5125-poc")
+MATERIAL_NAMES = ("target-material-manifest.json", "transport-material.bin",
+                  "target-config-90.bin", "gfusb.dll", "fdt-cache.bin")
+MATERIAL_RULE = r"/var/lib/goodix-5125-poc(/.*)?"
+MATERIAL_CONTEXT = "system_u:object_r:fprintd_var_lib_t:s0"
+LEGACY_INSTALL = "264cd7ff1ba77857e1985502f299e4375f9a0516"
+LEGACY_INVERSE_DIGEST = "67cfd22b5a0df829233722c1cf16dda8dadf473f4acb20529465f6015cddf585"
+
+
+def atomic_file(path, data, mode):
+    fd, temporary = tempfile.mkstemp(prefix=".goodix-metadata-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fchmod(stream.fileno(), mode)
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def save_state(state):
+    atomic_file(RUNTIME / STATE, (json.dumps(state, indent=2) + "\n").encode(), 0o600)
+
+
+def material_paths():
+    return (MATERIAL, *(MATERIAL / name for name in MATERIAL_NAMES))
+
+
+def material_metadata():
+    safe_directory(MATERIAL.parent)
+    result = []
+    for index, path in enumerate(material_paths()):
+        st = path.lstat()
+        expected = (stat.S_IFDIR | 0o700) if index == 0 else (stat.S_IFREG | 0o600)
+        require(st.st_mode == expected and st.st_uid == st.st_gid == 0,
+                f"material metadata mismatch: {path}; no provisioning performed")
+        require(index == 0 or st.st_nlink == 1, f"material hard link: {path}")
+        result.append([st.st_dev, st.st_ino, st.st_uid, st.st_gid, st.st_mode,
+                       st.st_size, st.st_mtime_ns])
+    require({p.name for p in MATERIAL.iterdir()} == set(MATERIAL_NAMES),
+            "unexpected material directory entries; retain for review")
+    return result
+
+
+def material_contexts():
+    return [os.getxattr(p, "security.selinux", follow_symlinks=False)
+            .rstrip(b"\0").decode("ascii") for p in material_paths()]
+
+
+def selinux_tools():
+    for name in ("semanage", "restorecon", "matchpathcon"):
+        require(shutil.which(name, path=ENV["PATH"]) is not None,
+                f"missing {name}; STOP for review, do not change enforcement")
+    require(run("getenforce") == "Enforcing", "SELinux Enforcing required")
+
+
+def may_cover_material(expression):
+    # Conservative PCRE stem check, NOT a Python-regex approximation of SELinux.
+    # Unknown constructs/alternation can cover this path: stop for human review.
+    if "|" in expression:
+        return True
+    expression = expression.removeprefix("^")
+    end = next((i for i, char in enumerate(expression)
+                if char in r".\[]()*+?{}$"), len(expression))
+    stem, remainder = expression[:end], expression[end:]
+    if remainder.startswith(("*", "?", "{")):
+        stem = stem[:-1]  # A quantifier can make the last literal optional.
+    target = str(MATERIAL)
+    return target.startswith(stem) or stem.startswith(target + "/") or stem == target
+
+
+def local_material_rule():
+    # -C queries the local customization store (including equivalences), not the
+    # effective/default label. -n and LC_ALL=C give the Fedora CLI's stable rows.
+    listing = run("semanage", "fcontext", "-l", "-C", "-n")
+    found = False
+    kinds = "all files|regular file|directory|character device|block device|socket|symbolic link|named pipe"
+    for line in listing.splitlines():
+        if not line.strip():
+            continue
+        row = re.fullmatch(r"(.+?)\s+(" + kinds + r")\s+(\S+)\s*", line)
+        if row:
+            expression, kind, context = row.groups()
+            if expression == MATERIAL_RULE and kind == "all files" and context == MATERIAL_CONTEXT:
+                require(not found, "duplicate project fcontext rule; retain for review")
+                found = True
+            else:
+                require(not may_cover_material(expression),
+                        f"conflicting/possibly covering local fcontext: {expression}; retain for review")
+        else:
+            equivalence = re.fullmatch(r"(\S+)\s+=\s+(\S+)", line)
+            require(equivalence is not None, "unrecognized local fcontext output; retain for review")
+            require(not may_cover_material(equivalence[1]),
+                    "local fcontext equivalence covers material; retain for review")
+    return found
+
+
+def material_plan():
+    selinux_tools()
+    metadata = material_metadata()
+    contexts = material_contexts()
+    present = local_material_rule()
+    require(all(c in ("system_u:object_r:var_lib_t:s0", MATERIAL_CONTEXT) for c in contexts),
+            "unexpected material context; retain for review")
+    return {"rule": MATERIAL_RULE, "context": MATERIAL_CONTEXT, "owned": False,
+            "phase": "apply" if present else "creating", "preexisting": present,
+            "metadata": metadata, "before_contexts": contexts}
+
+
+def check_material_record(record):
+    require(isinstance(record, dict), "invalid material ownership record; retain for review")
+    require(record.get("rule") == MATERIAL_RULE and record.get("context") == MATERIAL_CONTEXT
+            and type(record.get("owned")) is bool and type(record.get("preexisting")) is bool
+            and record.get("phase") in ("creating", "apply", "ready", "removing", "removed")
+            and isinstance(record.get("before_contexts"), list)
+            and len(record["before_contexts"]) == 6,
+            "invalid material ownership metadata; retain for review")
+    require(record["phase"] != "creating", "uncertain mapping creation; retain state for review")
+    require(record["owned"] != record["preexisting"] and
+            all(c in ("system_u:object_r:var_lib_t:s0", MATERIAL_CONTEXT)
+                for c in record["before_contexts"]),
+            "inconsistent material ownership metadata; retain for review")
+    require(material_metadata() == record["metadata"], "material metadata drift; retain for review")
+    present = local_material_rule()
+    phase = record["phase"]
+    if phase in ("apply", "ready") or not record["owned"]:
+        require(present, "material local rule drift; retain for review")
+    elif phase == "removed":
+        require(not present, "removed material rule reappeared; retain for review")
+    actual = material_contexts()
+    defaults = None
+    if record["owned"] and phase in ("removing", "removed") and not present:
+        defaults = [run("matchpathcon", "-n", str(p)) for p in material_paths()]
+    for i, context in enumerate(actual):
+        allowed = {MATERIAL_CONTEXT}
+        if phase == "apply" or phase == "removing":
+            allowed.add(record["before_contexts"][i])
+        if defaults is not None:
+            allowed.add(defaults[i])
+            if phase == "removed":
+                allowed = {defaults[i]}
+        require(context in allowed, "material SELinux context drift; retain for review")
+    return present
+
+
+def restore_material(record, expected):
+    # No recursive traversal: exactly the directory and the five checked files.
+    require(material_metadata() == record["metadata"], "material metadata drift before relabel")
+    run("restorecon", "-F", "--", *(str(p) for p in material_paths()))
+    require(material_metadata() == record["metadata"], "material metadata changed during relabel")
+    require(material_contexts() == expected, "effective material SELinux context verification failed")
+
+
+def apply_material(state, record):
+    state["material_selinux"] = record
+    save_state(state)  # Save inverse/intent before the first SELinux mutation.
+    require(local_material_rule() == record["preexisting"], "local rule changed during deployment")
+    require(material_metadata() == record["metadata"] and
+            material_contexts() == record["before_contexts"],
+            "material changed during deployment; retain for review")
+    if not record["preexisting"]:
+        run("semanage", "fcontext", "-a", "-f", "a", "-t", "fprintd_var_lib_t", "-r", "s0", MATERIAL_RULE)
+        record["owned"] = True  # Ownership only after successful creation.
+        record["phase"] = "apply"
+        save_state(state)
+    require(local_material_rule(), "project mapping missing after establishment")
+    restore_material(record, [MATERIAL_CONTEXT] * 6)
+    record["phase"] = "ready"
+    save_state(state)
+
+
+def remove_material(state):
+    record = state.get("material_selinux")
+    if record is None:
+        return  # Legacy R3 install never owned a mapping.
+    selinux_tools()
+    present = check_material_record(record)
+    if record["phase"] == "removed":
+        return
+    if record["owned"]:
+        record["phase"] = "removing"
+        save_state(state)
+        if present:
+            require(check_material_record(record), "local rule changed before deletion")
+            run("semanage", "fcontext", "-d", "-f", "a", MATERIAL_RULE)
+        require(not local_material_rule(), "owned material rule still present after deletion")
+        defaults = [run("matchpathcon", "-n", str(p)) for p in material_paths()]
+        restore_material(record, defaults)
+    elif record["phase"] == "apply":
+        restore_material(record, [MATERIAL_CONTEXT] * 6)
+    # An unowned compatible rule and its labels stay in place.
+    record["phase"] = "removed"
+    save_state(state)
+
+
+def require_stopped():
+    no_sensor()
+    require(property_value("ActiveState") == "inactive" and property_value("MainPID") == "0",
+            "fprintd must already be inactive/MainPID 0; no service action performed")
+
+
+def show_material():
+    selinux_tools()
+    material_metadata()
+    present = local_material_rule()
+    print(f"R3_MATERIAL_LOCAL_RULE={'PRESENT_COMPATIBLE' if present else 'ABSENT'}")
+    for i, (path, context) in enumerate(zip(material_paths(), material_contexts())):
+        print(f"{path} root:root {'0700' if i == 0 else '0600'} {context}")
+
+
+def label_existing():
+    require_stopped()
+    state = inspect_owned()
+    require(DROPIN.exists(), "incomplete runtime install; retain for review")
+    record = state.get("material_selinux")
+    if record is not None:
+        selinux_tools()
+        check_material_record(record)
+        require(record["phase"] in ("ready", "removed"), "incomplete material operation; use inverse/review")
+        if record["phase"] == "ready":
+            print(f"R3_MATERIAL_LABEL=ALREADY_APPLIED OWNED={str(record['owned']).lower()} "
+                  f"LABEL_COMMIT={state['material_label_commit']}")
+            return
+    plan = material_plan()  # All collision/layout checks before changing the saved inverse.
+    require(git("branch", "--show-current") == "development" and not git("status", "--porcelain"),
+            "clean committed development required")
+    commit = git("rev-parse", "HEAD")
+    inverse = read_regular(Path(__file__).resolve())
+    old_inverse = read_regular(RUNTIME / "deploy.py")
+    require(old_inverse == inverse or (state["install_commit"] == LEGACY_INSTALL and
+            digest(old_inverse) == LEGACY_INVERSE_DIGEST and record is None),
+            "unknown saved inverse; no runtime upgrade performed")
+    old_state = read_regular(RUNTIME / STATE)
+    try:
+        atomic_file(RUNTIME / "deploy.py", inverse, 0o644)
+        state["files"]["deploy.py"] = digest(inverse)
+        state["material_label_commit"] = commit
+        save_state(state)
+    except BaseException:
+        atomic_file(RUNTIME / "deploy.py", old_inverse, 0o644)
+        atomic_file(RUNTIME / STATE, old_state, 0o600)
+        raise
+    # On label failure keep this inverse, state and runtime for inspected rollback.
+    apply_material(state, plan)
+    require_stopped()
+    inspect_owned()
+    print(f"R3_MATERIAL_LABEL=PASS OWNED={str(plan['owned']).lower()} LABEL_COMMIT={commit}")
+    show_material()
+
+
 def inspect_owned():
     safe_directory(RUNTIME)
     state = json.loads(read_regular(RUNTIME / STATE, 65536))
@@ -180,6 +433,7 @@ def inspect_owned():
 def remove_owned_files(state, own_dropin=True):
     require(own_dropin or not (DROPIN.exists() or DROPIN.is_symlink()),
             "concurrent foreign drop-in: service left stopped; retained runtime for review")
+    remove_material(state)
     # Missing drop-in is allowed for recovery after an interrupted removal.
     if own_dropin and (DROPIN.exists() or DROPIN.is_symlink()):
         require(read_regular(DROPIN) == CONFIG, "drop-in collision during recovery; retained runtime")
@@ -211,10 +465,16 @@ def install(payload, install_commit, previous_service):
         require(DROPIN.exists(), "incomplete install: use saved uninstall before reinstalling")
         require(all(state["files"].get(name) == digest(data) for name, data in payload.items()),
                 "different payload: use saved uninstall first")
+        require(state.get("material_selinux", {}).get("phase") == "ready",
+                "material labeling incomplete; use reviewed labeling action")
+        selinux_tools()
+        check_material_record(state["material_selinux"])
         print("R3_INSTALL=ALREADY_INSTALLED")
         return
     require(not DROPIN.exists() and not DROPIN.is_symlink(), "project drop-in path already occupied")
+    material = material_plan()
     state = {"schema": 1, "build_commit": BUILD_COMMIT, "install_commit": install_commit,
+             "material_label_commit": install_commit,
              "previous_service": previous_service, "created_dropin_directory": not DROPIN.parent.exists(),
              "files": {name: digest(data) for name, data in payload.items()}}
     stage = Path(tempfile.mkdtemp(prefix=".goodix-5125-stage-", dir=RUNTIME.parent))
@@ -251,6 +511,7 @@ def install(payload, install_commit, previous_service):
             Path(temporary).unlink()
         run("restorecon", "-RF", str(RUNTIME), str(DROPIN))
         run("systemctl", "daemon-reload")
+        apply_material(state, material)
         # Leave stopped: the user explicitly starts stock fprintd in the R3 load check.
         print(f"R3_INSTALL=PASS BUILD_SOURCE_COMMIT={BUILD_COMMIT} INSTALL_COMMIT={install_commit}")
         print("FPRINTD=STOPPED_READY_FOR_MANUAL_LOAD_CHECK FEDORA_COMPONENTS_REPLACED=NONE")
@@ -274,6 +535,9 @@ def uninstall():
         print("R3_UNINSTALL=ALREADY_ABSENT")
         return
     state = inspect_owned()
+    if state.get("material_selinux") is not None:
+        selinux_tools()
+        check_material_record(state["material_selinux"])
     run("systemctl", "stop", UNIT)
     remove_owned_files(state)
     print("R3_UNINSTALL=PASS FEDORA_VENDOR_FILES_UNCHANGED=true MATERIALS_TEMPLATES_PRESERVED=true")
@@ -281,10 +545,10 @@ def uninstall():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("install", "uninstall"))
+    parser.add_argument("action", choices=("install", "uninstall", "material-status", "label-material", "unlabel-material"))
     parser.add_argument("build_output", nargs="?", type=Path)
     args = parser.parse_args()
-    require((args.action == "install") == (args.build_output is not None), "install needs a build directory; uninstall takes none")
+    require((args.action == "install") == (args.build_output is not None), "only install takes a build directory")
     machine_gate()
     def interrupted(_signum, _frame):
         raise KeyboardInterrupt("deployment interrupted")
@@ -298,6 +562,19 @@ def main():
             active = install_preflight()
             payload, commit = load_payload(args.build_output)
             install(payload, commit, active)
+        elif args.action == "material-status":
+            require_stopped()
+            show_material()
+        elif args.action == "label-material":
+            install_preflight()
+            label_existing()
+        elif args.action == "unlabel-material":
+            require_stopped()
+            state = inspect_owned()
+            remove_material(state)
+            require_stopped()
+            print("R3_MATERIAL_ROLLBACK=PASS RUNTIME_PRESERVED=true")
+            show_material()
         else:
             uninstall()  # No Fedora version/RPM/build-source check: inverse works after an update.
     finally:

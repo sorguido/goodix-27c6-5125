@@ -26,6 +26,12 @@ class Transactions(unittest.TestCase):
         output = patch("sys.stdout", new_callable=io.StringIO)
         output.start()
         self.addCleanup(output.stop)
+        # These original transaction tests isolate the material boundary. The
+        # separate test_material_labels.py exercises it with real temp metadata.
+        for name in ("material_plan", "apply_material", "remove_material", "selinux_tools", "check_material_record"):
+            context = patch.object(d, name)
+            context.start()
+            self.addCleanup(context.stop)
         self.calls = []
         self.failure = None
         self.payload = {name: f"synthetic {name}".encode() for name in d.LIBRARIES}
@@ -76,6 +82,9 @@ class Transactions(unittest.TestCase):
 
     def test_identical_install_is_idempotent(self):
         self.install()
+        state = d.inspect_owned()
+        state["material_selinux"] = {"phase": "ready"}
+        d.save_state(state)
         before = (self.runtime / d.STATE).read_bytes()
         self.calls.clear()
         self.install()

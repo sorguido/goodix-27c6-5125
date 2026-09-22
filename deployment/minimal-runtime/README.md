@@ -4,8 +4,11 @@
 **Completed: clean replacement and stock fprintd load PASS**, reported by
 the user for install `264cd7ff1ba77857e1985502f299e4375f9a0516`, qualified
 source `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`. Service inactive/MainPID 0,
-no real sensor access yet. Do not repeat removal, install or load-check.
-The next handoff is [one live Claim/Release](R3_LIVE_OPEN_CLOSE_VM.md).
+first enumeration PASS but Claim failed on the manifest's generic SELinux label.
+Do not repeat removal, install or load-check. The next handoff is
+[Gate A: material labels only](R3_SELINUX_MATERIAL_VM.md), sensor disconnected.
+The [live Claim/Release procedure](R3_LIVE_OPEN_CLOSE_VM.md) is blocked until
+Gate A review and separate approval.
 The procedure below preserves the completed replacement and saved rollback
 reference; it is not the next action.
 
@@ -119,16 +122,20 @@ and any later sensor work require separate review/handoff.
 
 ## Footprint and rollback
 
-The installer still owns exactly:
+The current installer owns:
 
 - `/usr/local/lib64/goodix-27c6-5125/`: five private libraries (libfprint and
   four OpenCV), two libfprint links, notices/hashes/provenance, `deploy.py`,
   `uninstall.sh` and `installation.json`;
 - `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf`:
-  `[Service]` with only the project `LD_LIBRARY_PATH`.
+  `[Service]` with only the project `LD_LIBRARY_PATH`;
+- the exact local fcontext `/var/lib/goodix-5125-poc(/.*)?` **only if created
+  by this installation**, recorded in `installation.json`. Existing compatible
+  rules remain unowned. Six material labels are applied and verified; files,
+  owner/mode and contents are preserved. See the linked Gate A ownership review.
 
 No ExecStart replacement, daemon, wrapper, PAM, udev, template or material
-change. Temporary staging is removed on ordinary success/error. The installer
+content change. Temporary staging is removed on ordinary success/error. The installer
 checks clean `development`, VM/OS, stock fprintd, SELinux, exact normal-build
 identity, critical-source continuity, five library digests and relative links.
 Identical payload reinstall is idempotent; a different payload or old build
@@ -146,7 +153,10 @@ If the new transaction already removed its runtime, its matching checkout's
 Never use that fallback for the old R3-A installation. On rollback error,
 stop and return the error; do not delete remaining state manually.
 
-The saved inverse needs neither Git nor build output. It removes only owned
+The updated saved inverse needs neither Git nor build output. It first
+removes only an owned material fcontext and restores default labels on the
+six paths; pre-existing compatible rules are preserved, drift stops for review.
+It then removes only owned
 files/drop-in, reloads systemd and restores the saved service state using
 Fedora stock libraries. It returns to **Fedora stock**, not the old R2 payload.
 Repeat the stock checkpoint from step 3 after rollback. Unrelated files,
@@ -169,3 +179,9 @@ It covers install/uninstall, idempotence, build/payload rejection, drift and
 collisions, service state, transaction rollback, saved inverse independent of
 checkout/build, unchanged vendor/material sentinels and reader-absence gates.
 This does not substitute for the manual VM deployment.
+
+The original 27 filesystem tests isolate the material boundary; the dedicated
+`test_material_labels.py` exercises creation/adoption/conflicts, label and
+metadata checks, partial failure recovery, the existing-install corrective
+and saved inverse using synthetic files and mock SELinux interfaces. Current
+Gate A does not execute the historical replacement procedure above.

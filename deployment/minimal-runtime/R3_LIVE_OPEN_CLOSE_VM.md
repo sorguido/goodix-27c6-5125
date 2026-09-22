@@ -1,12 +1,20 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3 first live gate: enumeration and one Claim/Release
 
-**HUMAN_REQUIRED. VM execution by the user only.** No reinstall or rebuild.
+**BLOCKED: Gate B requires separate review/approval after
+[Gate A material labeling](R3_SELINUX_MATERIAL_VM.md). Do not execute this
+procedure during Gate A.** No reinstall or rebuild.
+
+First execution from `4a27996fe14aed51e2400ba172f27d5177af2cb1`:
+enumeration PASS, Claim FAIL/Internal due to the manifest's `var_lib_t` read
+denial. No retry; no interface claim or biometric activation reached. The
+sensor was detached and the qualified runtime retained. The procedure below
+is preserved for later separately approved Gate B, not a current live handoff.
 The user reports clean replacement and stock load **PASS**: source
 `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, install
 `264cd7ff1ba77857e1985502f299e4375f9a0516`, five private libraries, system
 libgusb, stock `/usr/libexec/fprintd`, no Fedora replacement. The service is
-inactive/MainPID 0 and the sensor has not yet been accessed in this VM.
+inactive/MainPID 0 and the sensor is again disconnected.
 Normal and ASan/UBSan synthetic results are 44/44 PASS each.
 
 This gate is explicitly **one open/close, zero physical capture contacts**,
@@ -41,7 +49,8 @@ Reviewed the qualified source against the following paths:
   `goodix_runtime_inputs.c`: directory root:root 0700, five direct regular
   files root:root 0600, no-follow/read-only loader. Metadata preflight cannot
   prove contents or SELinux access; the real loader performs those checks
-  during Claim. No copying, printing, hashing or regenerating protected data.
+  during Claim. The later retry preflight also checks effective SELinux xattrs. No copying,
+  printing, hashing or regenerating protected data.
 
 Classification confirmed: below biometric activation. The helper opens one
 private **system-bus connection**, uses GetDefaultDevice, Claim("") and one
@@ -89,12 +98,14 @@ r3_out=$(mktemp -d "$HOME/goodix-r3-open-close-XXXXXXXX")
   sudo python3 -B - <<'PY'
 import hashlib
 import json
+import os
 from pathlib import Path
 import stat
 runtime = Path('/usr/local/lib64/goodix-27c6-5125')
 state = json.loads((runtime / 'installation.json').read_text())
 assert state['build_commit'] == 'b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226'
 assert state['install_commit'] == '264cd7ff1ba77857e1985502f299e4375f9a0516'
+assert state['material_selinux']['phase'] == 'ready'
 for name in ('libfprint-2.so.2.0.0', 'libopencv_core.so.413',
              'libopencv_features2d.so.413', 'libopencv_flann.so.413', 'libopencv_imgproc.so.413'):
     assert hashlib.sha256((runtime / name).read_bytes()).hexdigest() == state['files'][name]
@@ -102,10 +113,12 @@ print('R3_INSTALLED_PROVENANCE_AND_LIBRARY_HASHES=PASS')
 # Metadata only below: never open/read/hash protected file contents.
 material = Path('/var/lib/goodix-5125-poc')
 assert material.resolve(strict=True) == material
+assert os.getxattr(material, 'security.selinux').rstrip(b'\0') == b'system_u:object_r:fprintd_var_lib_t:s0'
 info = material.lstat()
 assert stat.S_ISDIR(info.st_mode) and (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) == (0, 0, 0o700)
 for name in ('target-material-manifest.json', 'transport-material.bin',
              'target-config-90.bin', 'gfusb.dll', 'fdt-cache.bin'):
+    assert os.getxattr(material / name, 'security.selinux', follow_symlinks=False).rstrip(b'\0') == b'system_u:object_r:fprintd_var_lib_t:s0'
     info = (material / name).lstat()
     assert stat.S_ISREG(info.st_mode) and info.st_size > 0
     assert (info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) == (0, 0, 0o600)
@@ -119,7 +132,7 @@ Require `ExecStart=/usr/libexec/fprintd` and only the accepted project library
 environment, with no new override. If preflight fails, **STOP before attaching
 or claiming**. In particular, absent Gio or invalid material metadata is a
 preflight failure, not permission to install packages/copy materials. Metadata
-checks use stat only; they do not touch timestamps for evidence.
+checks use stat and SELinux xattrs only; they do not read file contents.
 
 ## 2. Human attachment, then one invocation
 

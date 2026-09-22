@@ -20,13 +20,19 @@ rehashing the guest's binaries. R3-A stock load is now also **PASS**, reported
 by the user for install `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`: SELinux
 Enforcing, stock ExecStart/process `/usr/libexec/fprintd`, five private library
 mappings and `/usr/lib64/libgusb.so.2.0.10`. The reader stayed disconnected;
-installation and R2 output remain in place, rollback untested in the VM.
+that historical installation was retained until the later clean R3 replacement.
+The R2 output is preserved.
 No biometric, R4/R5/R6 or release qualification is claimed. The user now
 reports PM-accepted [synthetic retry/attempt results](STOCK_FPRINTD_ATTEMPTS.md):
 44/44 normal and 44/44 ASan/UBSan at `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`.
 A normal runtime build from that SHA is also reported complete/reviewed,
-at `/home/guido/goodix-r3-20260922-111144`. The installed old R2 binary lacks
-that correction; the next gate is clean replacement, not another build/test.
+at `/home/guido/goodix-r3-20260922-111144`. Clean replacement and stock load
+subsequently passed at install `264cd7ff1ba77857e1985502f299e4375f9a0516`.
+The first enumeration passed; Claim failed before interface claim on a causal
+SELinux manifest read denial (`var_lib_t`). The qualified R3 runtime remains
+installed, sensor detached and fprintd inactive/MainPID 0. Next is
+[Gate A label-only correction](../deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md),
+then separate review before any new live execution.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
@@ -85,7 +91,7 @@ staging are written. The terminal log is adjacent to output. No project file
 is installed, no service is started, and no Fedora-owned file is changed.
 Optional prerequisite installation in the README is manual VM package setup.
 
-**R3-A installed surface, stock loading PASS; runtime/update qualification pending:**
+**Current R3 surface, stock loading PASS; label correction pending VM Gate A:**
 
 | Path | Purpose | RPM owner / override | Update class and rollback expectation |
 | --- | --- | --- | --- |
@@ -94,12 +100,17 @@ Optional prerequisite installation in the README is manual VM package setup.
 | Same directory: `installation.json`, `deploy.py`, `uninstall.sh` | Remember previous service state and retain the exact inverse | New root-owned project files; state mode 0600 | D: preserve and review on drift; rollback does not require Git, build output or a Fedora version/hash pin |
 | `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Service-local library search path only | New project drop-in; vendor unit remains fprintd RPM-owned | C by design: removal and daemon-reload restore the vendor definition; no ExecStart/authentication override |
 | `/etc/systemd/system/fprintd.service.d/` if absent | Contain the new drop-in | Existing directory preserved, or a new project-created directory | D: remove only if created here and still empty |
+| Local fcontext `/var/lib/goodix-5125-poc(/.*)?` | Let stock fprintd_t read preserved inputs under Enforcing | Local project rule created through semanage, not a vendor policy edit; owned only if absent before installation | C/D/E: incompatible policy affects fingerprint or maintenance only; inverse deletes only owned exact rule; reinstall/update Goodix integration restores it |
+| Six effective material SELinux labels | Apply standard `fprintd_var_lib_t` | Existing root-owned directory/files; no content/owner/mode change | C: inverse restorecons current defaults after owned rule deletion; pre-existing compatible rule stays; drift stops for review |
+| `.goodix-metadata-*` inside private runtime | Atomic saved inverse/state replacement for label corrective | Temporary project files | D: retained mismatch after hard power loss needs review; no authentication dependency |
 | `.goodix-5125-stage-*` under `/usr/local/lib64/`, `.goodix-5125-dropin-*` under the drop-in directory | Stage owned files and publish without replacing an occupied drop-in | Temporary project files | D: removed on ordinary completion/error; abrupt power-loss recovery not qualified |
 
-The installer never reads or modifies `/var/lib/goodix-5125-poc/` or
-`/var/lib/fprint/`. The former remains the separate protected input boundary;
-the latter remains stock fprintd storage. Neither is an uninstall target.
-This sensor-disconnected step needs no material/template migration.
+The installer inspects only metadata and SELinux xattrs of the six material
+paths, establishes the owned/unowned local rule and relabels only those paths.
+It never reads or changes their contents, UID/GID or modes and never deletes
+them. `/var/lib/fprint/` remains untouched stock storage. No material/template
+migration is performed. The current label-only action changes only the saved
+inverse/state and mapping/labels, preserving all runtime binaries/drop-in.
 
 No additional udev rule is justified by current source evidence. The library
 build disables rule generation. The physical workspace's Fedora vendor unit
@@ -107,12 +118,12 @@ permits USB access and its RPM-owned hwdb includes `27c6:5125`; this does not
 establish the guest's udev/SELinux behavior. Do not copy those files into `/etc`.
 The installer checks stock RPM integrity, unit path/ExecStart, absence of
 foreign local overrides and SELinux Enforcing in the VM before mutation.
-It only applies Fedora's normal file contexts with `restorecon` to its new
-files. This table is an architectural audit, not the completed R5 test.
+It applies default contexts to new runtime files and the standard fprintd
+storage context to the six material paths via the owned/unowned local rule. This table is an architectural audit, not the completed R5 test.
 
 ```text
 HOST_FILES_TOUCHED=NONE_BY_R2_BUILD
-R3_HOST_FILES_TOUCHED=PRIVATE_LIBRARY_DIRECTORY_AND_ONE_FPRINTD_ENVIRONMENT_DROPIN
+R3_HOST_FILES_TOUCHED=PRIVATE_RUNTIME_ENVIRONMENT_DROPIN_LOCAL_MATERIAL_FCONTEXT_AND_SIX_LABELS
 FEDORA_COMPONENTS_REPLACED=NONE
 EXPECTED_UPDATE_FAILURE=FINGERPRINT_ONLY   # R3 design requirement, not measured
 RUNTIME_VERSION_HASH_PINS_FOR_PASSWORD_ACCESS=NONE
@@ -225,23 +236,25 @@ no service, library or USB execution is claimed. The real install entry point
 also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
-The current **HUMAN_REQUIRED** is the
-[clean replacement procedure](../deployment/minimal-runtime/README.md).
-The only deployment logic delta is the accepted normal build SHA, now
-`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, plus its rejection message.
-Source continuity and all existing guards remain. The user must first run the
-old inverse saved under the installed runtime, verify stock files/environment,
-then install the qualified build and leave fprintd stopped for review before
-load-check. The new uninstaller rejects old metadata; no multi-version
-compatibility or in-place update is introduced. The footprint table is unchanged.
-The new saved inverse returns to Fedora stock without Git/build/snapshot.
+The current **HUMAN_REQUIRED** is
+[Gate A: labels only](../deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md).
+The already installed build and stock load are accepted; neither is repeated.
+The implementation review answers the four architectural questions before
+modification: no increased critical distro coupling, no expected update failure
+beyond fingerprint, no Fedora-owned auth component replaced, recovery by
+remove/reinstall or update of Goodix integration. This uses the existing
+Fedora type, which grants more than read permission; production remains
+O_RDONLY. No custom policy module, permissive mode or driver change.
 
-Current offline deployment verification: **27 tests PASS**, including exact
-build/mode and payload rejection, old metadata preservation, critical-source
-drift, clean checkout, five-library set, saved inverse executed from its copy
-with no checkout/build access, vendor/material sentinels and reader-absence
-gates. Existing transaction/service/collision tests remain. Host interfaces
-are mocked and filesystem writes remain temporary; no VM, root, service or USB
-operation was performed by the AI. Wrapper/documented-command syntax and
-non-VM refusal also pass. The manual VM clean replacement and the later new
-runtime load-check are still pending; synthetic PASS is not release closure.
+The saved inverse gains ownership-aware mapping removal. `label-material`
+updates only that inverse and installation metadata on the known R3 install;
+`unlabel-material` reverses its labels/rule while preserving the qualified
+runtime. Full uninstall includes the same inverse. Rule/context drift is
+retained for review. See the Gate A review for partial-failure behavior and
+the unqualified hard power-loss window. This is not a general runtime upgrade.
+
+Offline verification combines the original 27 deployment tests, dedicated
+20 SELinux lifecycle tests with synthetic files/mock commands/xattrs, and the
+12 existing open/close tests: **59 PASS**. The source audit and real non-VM entrypoint
+refusal do not mutate the physical runtime. Gate A has not run, and Gate B
+requires later separate review/approval. R5 and release validation remain open.

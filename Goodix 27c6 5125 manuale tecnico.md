@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 install/load PASS, primo gate hardware Claim/Release (22 settembre 2026)
+### Stato corrente — R3 Claim fermata da SELinux, correttivo label-only al Gate A (22 settembre 2026)
 
 La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
 in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
@@ -24,23 +24,26 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`264cd7ff1ba77857e1985502f299e4375f9a0516`, `development` inizialmente pulito,
-e dal task Utente `task_codex_r3_first_live_open_close.md`. Stato accettato
-fornito dall'Utente: sorgente qualificato `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`,
-44/44 normal e 44/44 ASan/UBSan PASS, clean replacement PASS, nuovo stock
-fprintd load PASS. Eseguibile `/usr/libexec/fprintd`, libfprint e quattro OpenCV
-private, libgusb di sistema, nessun componente Fedora sostituito. Servizio
-**inactive/MainPID 0**, nessun accesso reale al sensore nella VM fino a qui.
-Output build conservato: `/home/guido/goodix-r3-20260922-111144`.
-L'AI non ha rieseguito né osservato direttamente le operazioni VM.
+`4a27996fe14aed51e2400ba172f27d5177af2cb1`, `development` inizialmente pulito,
+e dal task Utente `task_codex_r3_selinux_material_labeling.md`. Restano accettati
+44/44 normal e 44/44 ASan/UBSan, build qualificata
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, installazione `264cd7f`,
+clean replacement e stock load PASS. Il primo gate hardware ha enumerato un
+Goodix ma Claim è fallita con Internal: AVC causale fprintd_t/read sul manifest
+etichettato var_lib_t, prima del claim interfaccia USB e di activate.
+Nessun retry. Il sensore è di nuovo **scollegato**, fprintd **inactive/MainPID 0**,
+runtime qualificato conservato. Questa è evidenza manuale Utente, non una
+ripetizione o osservazione diretta dell'AI. Output build conservato:
+`/home/guido/goodix-r3-20260922-111144`.
 
-Il task corrente prepara **esattamente un Claim/Release tramite fprintd stock**,
-con una sola connessione D-Bus, sotto l'attivazione biometrica: zero contatti,
-nessun VERIFY/IDENTIFY/ENROLL e nessun retry. Prima dell'attach si controllano
-solo presenza/layout/metadata dei materiali; l'open autorizzata all'Utente
-eserciterà il loader production esistente in sola lettura. Sensore collegato
-solo dall'Utente dopo il gate, poi distaccato con fprintd fermo. Lo snapshot
-cold resta un paracadute esterno, non una dipendenza del prodotto.
+Il task corrente integra il mapping locale persistente
+`/var/lib/goodix-5125-poc(/.*)? → fprintd_var_lib_t` nel lifecycle minimale,
+con ownership esplicita e inversa salvata. Driver e cinque librerie invariati;
+nessuna nuova policy allow/modulo o modifica a Fedora/PAM/KDE. L'AI lavora
+solo sul repository e con test offline; la prossima azione Utente è **Gate A,
+sole etichette a sensore scollegato**, poi STOP per review. La nuova Claim/Release
+è un **Gate B separato**, non autorizzato da questa consegna. Lo snapshot cold
+resta solo un paracadute esterno.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -214,11 +217,10 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: confermare offline il percorso enumerazione/Claim/open e
-Release/close stock, preparare un helper minimo con connessione D-Bus unica,
-test simulati e procedura VM con preflight metadata, un solo ciclo e controllo
-negativo di attivazione nel journal. Nessuna modifica production, runtime,
-policy o roadmap. Gate hardware eseguito soltanto dall'Utente.
+`CURRENT_TASK`: correggere la deployment SELinux label, verificare ownership,
+restorecon e rollback con filesystem sintetico, aggiornare inversa/documentazione
+e consegnare il solo Gate A VM. Nessuna modifica production/retry/attempt,
+binari, roadmap o governance. La successiva live richiede review separata.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -418,7 +420,7 @@ nuovo runtime, il sensore, il workflow dei consumer o R5.
 
 ### R3 — clean replacement completata, nuovo load stock PASS
 
-La sola modifica eseguibile al deployment è `BUILD_COMMIT=b8cdd17...` con
+In quella clean replacement la sola modifica al deployment era `BUILD_COMMIT=b8cdd17...` con
 messaggio di rifiuto coerente. Restano i controlli VM/Fedora 44 x86_64,
 SELinux Enforcing, sensore assente, checkout development pulito, daemon/unit
 stock, build normale, cinque hash/librerie, symlink e continuità dei sorgenti
@@ -435,8 +437,8 @@ progetto assente e file RPM invariati, installazione del build già presente in
 indipendente da Git/build ritorna a Fedora stock, non al vecchio payload R2.
 La normale conservazione active/inactive dell'inversa resta invariata.
 Il nuovo install lasciava fprintd fermo prima della review/load-check separata.
-Il task corrente riporta clean replacement e load-check PASS; la VM è tornata
-inactive/MainPID 0, con il nuovo runtime installato e sensore non ancora usato.
+Quel task riportava clean replacement e load-check PASS; il successivo primo
+gate hardware ha poi incontrato il diniego SELinux descritto sotto.
 
 **Verifica offline della clean replacement:** 27 test su filesystem temporanei e interfacce
 host/device simulate PASS: clean install/uninstall, idempotenza, build e
@@ -455,7 +457,7 @@ precedenti restano tracciati: `8abfb35` conversione enrollment, `912218a` CLAMP
 e compile review, `620ee15` lifecycle, `5b0369e` audit SIGFM, `b8cdd17`
 expectation D282. Nessun nuovo D-number o digest production.
 
-### R3 — primo gate hardware limitato a enumerazione e un open/close
+### R3 — primo gate hardware: enumerazione PASS, Claim FAIL prima del claim USB
 
 **Review prima dell'implementazione confermata:** fprintd stock `device.c`
 lega Claim al sender, invoca `fp_device_open()` una volta e Release invoca
@@ -502,7 +504,7 @@ zero, transport_epochs=1, drained=1 e context_closed=1. Evidenza mancante o
 marker inatteso non è PASS. Non è una cattura wire/readback factory: la
 conclusione usa call graph, invocazioni bounded e telemetria esistente.
 
-**Verificato offline:** 12 test PASS con D-Bus simulato e file sintetici:
+**Verificato offline nella preparazione del primo gate:** 12 test PASS con D-Bus simulato e file sintetici:
 connessione unica, ordine/allowlist dei tre metodi, deadline, no retry,
 Release su errore/interrupt dopo Claim, output sanitizzato, guard VM,
 sintassi shell/Python e negativi del controllo journal. Il diff resta
@@ -521,22 +523,112 @@ R3_CLEAN_REPLACEMENT=PASS_HUMAN_REPORTED
 R3_STOCK_FPRINTD_LOAD=PASS_HUMAN_REPORTED
 CURRENT_VM_FPRINTD_STATE=inactive
 CURRENT_VM_MAINPID=0
-REAL_SENSOR_ACCESSED=NO
+REAL_SENSOR_ACCESSED=YES_HUMAN_ENUMERATION_AND_FAILED_OPEN
+R3_LIVE_ENUMERATION=PASS_HUMAN_REPORTED
+R3_OPEN_CLOSE=FAIL_STAGE_CLAIM_SELINUX
+USB_INTERFACE_CLAIM_REACHED=false
+BIOMETRIC_ACTIVATION_REACHED=false
 LIVE_CLAIM_MAX=1
 LIVE_RELEASE_MAX=1
 BIOMETRIC_ACTIVATIONS_ALLOWED=0
 CAPTURE_CONTACTS_ALLOWED=0
 AUTOMATIC_RETRY_ALLOWED=false
 OPEN_CLOSE_OFFLINE_TESTS=12_PASS
-EXECUTABLE_CLOSURE=MOCK_STATIC_PASS_MANUAL_VM_LIVE_PENDING
+EXECUTABLE_CLOSURE=FIRST_LIVE_FAILED_MATERIAL_LABEL_CORRECTIVE_REQUIRED
 RUNTIME_PRODUCTION_AND_ROADMAP_CHANGED=false
-NEXT_BOUNDARY=HUMAN_VM_ENUMERATION_ONE_CLAIM_RELEASE_STOP_DETACH
+NEXT_BOUNDARY=HUMAN_VM_LABEL_ONLY_SENSOR_DISCONNECTED
 ```
 
 Questo gate one-shot a zero contatti è richiesto esplicitamente dall'Utente,
 non è una serie VERIFY/MATCH. Resta aperta ogni validazione di riconoscimento,
 consumer stock e update-survivability R5. Nessun incremento di coupling
 Fedora o dipendenza password/desktop viene introdotto.
+
+### R3 — corrective SELinux dei materiali e separazione Gate A/B
+
+L'Utente riporta `R3_VM_SENSOR_COUNT=1`, `R3_LIVE_ENUMERATION=PASS`,
+`R3_OPEN_CLOSE=FAIL STAGE=CLAIM`, errore
+`net.reactivated.Fprint.Error.Internal` e finale sensore scollegato/runtime
+preservato. Il diniego AVC nella stessa finestra è `fprintd_t → var_lib_t:file
+read` su `target-material-manifest.json`, in Enforcing. Directory e cinque
+file avevano già owner/mode corretti. Call graph verificato: il loader
+O_RDONLY fallisce prima di `g_usb_device_claim_interface()` in img_open;
+nessuna activate, generation, TLS o capture raggiunta. L'enumerazione/GUsb
+open precede quel punto: non si afferma zero accesso USB totale. Il diniego
+nr_hugepages distinto non è causa dimostrata e non viene corretto.
+
+**Review prima della modifica:** la policy Fedora installata sul workspace
+fisico (`selinux-policy-targeted 44.9-1.fc44`, policy.35, letta con setools)
+conferma il tipo fprintd_var_lib_t e gli allow fprintd_t di lettura/manage;
+file_contexts vendor mappa `/var/lib/fprint(/.*)?`. Il contesto della VM resta
+quello documentato dall'Utente. Le sei regole storiche sul fisico non vengono
+importate: la listing semanage non privilegiata non può aprire lo store;
+formato e gestione equivalenze sono verificati nel suo sorgente installato.
+Nessuna mutazione host SELinux o lettura dei materiali. Il tipo standard può
+concedere scrittura: il driver resta O_RDONLY; nessun nuovo tipo/modulo custom.
+
+Risposte architetturali: `DOES_THIS_CHANGE_INCREASE_DISTRO_COUPLING? NO`,
+`CAN_A_NORMAL_UPDATE_BREAK_MORE_THAN_FINGERPRINT? NO` come analisi statica,
+`DOES_IT_TOUCH_A_FEDORA_OWNED_AUTH_COMPONENT? NO`,
+`IS_REINSTALL_DRIVER_SUFFICIENT_RECOVERY? YES` tramite rimozione/reinstallazione
+o aggiornamento dell'integrazione Goodix. Si riusa il contratto storage fprintd
+esistente; regola locale project-owned, non allow o file auth vendor privato.
+Failure atteso C/D/E, nessuna nuova dipendenza password/desktop/sudo/PolicyKit.
+L'update-survivability R5 resta obbligatoria e non è dedotta dalla review.
+
+`deployment/minimal-runtime/deploy.py` integra tre casi: assenza → crea regola
+esatta e registra owned solo dopo successo; esatta compatibile preesistente →
+unowned; conflitto/possibile copertura/equivalenza → STOP senza sovrascrittura.
+Il controllo delle regex locali è conservativo e può richiedere review per
+espressioni complesse. Dopo la regola, restorecon non ricorsivo sui sei path
+espliciti, verifica xattr SELinux, inode/size/mtime e owner/mode immutati;
+nessun contenuto protetto letto, hashato, copiato o modificato. Sono rifiutati
+symlink, hard link, entry aggiuntive e metadata inattesi.
+
+La nuova installazione pulita include le label nel lifecycle. Per la VM già
+qualificata `label-material` aggiorna solo `deploy.py` salvato e
+`installation.json`, oltre a mapping/label; riconosce l'inversa `264cd7f`
+tramite digest e conserva build/install SHA. Registra separatamente
+`material_label_commit`, ownership e avanzamento apply/remove per recuperare
+failure parziali noti. Nessun aggiornamento dei binari, drop-in o notices.
+L'inversa `unlabel-material` conserva il runtime: elimina solo la regola owned,
+verifica assenza, applica e verifica i default Fedora ai sei path. La regola
+compatibile preesistente rimane; full uninstall richiama la stessa inversa.
+Drift o creazione ambigua → STOP conservando stato/inversa, senza cancellare
+regole non attribuibili. L'inversa non dipende da Git/build; hard power loss
+fra aggiornamento script/stato resta non qualificato e richiede review.
+
+**Riesame metodologico:** cambia davvero la label persistente del manifest;
+la nuova ipotesi è che il tipo storage standard consenta il loader negato.
+Gate A verifica solo mapping/label. Se il successivo Gate B approvato fallisse
+ancora nello stesso punto, nessun retry: leggere il nuovo AVC mirato e la
+provenance installata, rivedere diagnosi prima di un'altra live.
+
+Review set Git-native da `4a27996`: deployment, test offline, handoff Gate A,
+README, audit runtime e manuale. I 27 test originali isolano il confine SELinux;
+i 20 test SELinux PASS usano metadata/file sintetici, comandi/xattr mock e inversa
+salvata senza Git/build. I 12 test open/close restano PASS: totale 59 test
+offline. Audit dei 62 sorgenti
+production e quattro input build-support PASS; entrypoint label-material reale
+rifiutato sul fisico prima di mutazioni. Sintassi Python/shell verificata.
+Il gate operativo è `deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md`;
+la precedente procedura live è marcata bloccata e richiede label effettive
+anche nel futuro preflight. Nessun nuovo D-number o digest production.
+La review PM del diff e dei percorsi install/inversa conferma il boundary;
+la decisione resta HUMAN_REQUIRED prima delle label reali VM, senza avviare
+un nuovo ciclo live o una nuova build.
+
+```text
+ROOT_CAUSE=SELINUX_GENERIC_VAR_LIB_T_DENIAL
+CORRECTIVE=STANDARD_FPRINTD_VAR_LIB_T_MAPPING
+CUSTOM_SELINUX_MODULE=false
+PRODUCTION_DRIVER_CHANGED=false
+RUNTIME_BINARY_CHANGED=false
+ROADMAP_CHANGED=false
+AI_PHYSICAL_RUNTIME_MUTATION=false
+GATE_A=HUMAN_REQUIRED_VM_LABEL_ONLY_SENSOR_DISCONNECTED
+GATE_B=BLOCKED_PENDING_GATE_A_REVIEW_AND_SEPARATE_APPROVAL
+```
 
 ### Governance corrente
 
