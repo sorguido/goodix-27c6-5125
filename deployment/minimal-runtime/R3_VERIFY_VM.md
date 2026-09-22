@@ -1,15 +1,32 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# R3: native verification of the enrolled finger in the VM
+# R3: verify the right index stored as left-index-finger in the VM
 
 **HUMAN_REQUIRED — VM service operations, real USB and verification are human-only.**
-The 22 September enrollment of `guido` / `left-index-finger` is accepted:
-`enroll-completed`, stored template, eight enrollment contacts/stages and closed,
-drained IDENTIFY and ENROLL epochs. No verification has been run yet.
+The 22 September enrollment is accepted for acquisition/storage/cleanup:
+`enroll-completed`, eight enrollment contacts/stages and closed, drained epochs.
+The user clarified which physical finger was used before any verification: the template
+contains the **RIGHT index**, but its stored label is **`left-index-finger`**.
+The earlier instruction to touch with the left index is superseded. No verify
+has run, and the label mismatch has not been repaired in host storage.
+
+| Item | Value for this gate |
+| --- | --- |
+| Account | `guido` |
+| Stored template label / CLI `-f` argument | `left-index-finger` |
+| Physical finger to present | **RIGHT index** |
+
+Keep `-f left-index-finger`: it selects the existing template. Changing the
+argument to `right-index-finger` would select a different slot. Stock prompts
+will still say `left-index-finger`; for this documented mismatch, present the
+**RIGHT index**. The matcher compares biometric samples, not anatomical labels.
+Do not rename/move/edit template files, delete a slot or enroll again for this
+gate. Correct label-to-anatomy assignment remains unresolved for normal consumer
+use; a MATCH here would qualify recognition of the reported right index only.
 
 This gate tests recognition through stock `fprintd-verify`, using that template.
 It does not qualify PAM/KDE, update survivability, wrong-finger rejection or a
 series inside one Claim. Use up to **three explicitly started CLI invocations**
-with the same enrolled finger. Stop at the first MATCH; continue after the first
+with the physical right index. Stop at the first MATCH; continue after the first
 or second clean NO_MATCH only. No fourth invocation, automatic loop or retry.
 
 Stock CLI makes one VerifyStart per Claim; the driver bounds each admitted
@@ -85,7 +102,7 @@ Do not repeatedly stop/retry the preflight or change the installed inverse.
 ## One native invocation, then inspect its result
 
 **Human step:** attach exactly one Goodix `27c6:5125` to the VM. Paste this block
-once. Touch with the **left index finger** only when prompted; lift fully when
+once. Touch with the **RIGHT index finger** only when prompted; lift fully when
 the result appears and wait for the command and cleanup to finish. Do not touch
 again within this invocation. A retry prompt, error or timeout means STOP.
 
@@ -115,6 +132,7 @@ again within this invocation. A retry prompt, error or timeout means STOP.
   printf '%s\n' "$r3_list" | grep -Fxq 'found 1 devices'
   printf '%s\n' "$r3_list" | grep -Fq 'Goodix 27c6:5125 Fingerprint Sensor'
   printf '%s\n' "$r3_list" | grep -Eq '^[[:space:]]*- #[0-9]+: left-index-finger$'
+  printf '%s\n' 'Stored label: left-index-finger; physically use the RIGHT index finger.'
   r3_cli_exit=0
   timeout --signal=TERM --kill-after=5s 60s fprintd-verify -f left-index-finger guido || r3_cli_exit=$?
   printf 'R3_VERIFY_CLI_EXIT=%s\n' "$r3_cli_exit"
@@ -169,8 +187,9 @@ sensor from the VM**. If the block failed to stop fprintd, use
 `sudo systemctl stop fprintd.service` for cleanup only. Verify inactive/MainPID 0
 with `systemctl show fprintd.service -p ActiveState -p MainPID`.
 
-**PASS_IF:** at least one MATCH in at most three invocations with the evidence
-above, service inactive and reader detached. Keep the runtime and template.
+**PASS_IF:** at least one MATCH using the physical RIGHT index in at most three
+invocations against stored `left-index-finger`, with the evidence above, service
+inactive and reader detached. Keep the runtime/template and record the mismatch.
 **FAIL_IF:** three clean NO_MATCH, live error, instability or cleanup failure.
 Do not reenroll, delete templates, adjust matching or authentication policy.
 An inconclusive STOP needs review; never repeat live to replace missing evidence.
@@ -196,6 +215,7 @@ If inverse integrity or removal fails, retain the state and report it; do not
 force deletion or substitute the current checkout's inverse.
 
 Return the full checkout SHA, package versions, number of invocations/contacts,
-each CLI result/exit and complete safety lines in invocation order, final
-inactive/detached state and whether runtime/template were kept or rolled back.
+confirmation that the physical RIGHT index was used against stored
+`left-index-finger`, each CLI result/exit and complete safety lines in invocation
+order, final inactive/detached state and whether runtime/template were kept or rolled back.
 No images, template contents, protected material or broad logs are needed.

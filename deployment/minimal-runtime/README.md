@@ -13,10 +13,12 @@ passed sensor-free and one subsequent enumeration -> Claim -> Release passed.
 Do not repeat those gates.  The procedure below is retained as historical
 clean-replacement evidence, not as the next live action.
 
-**Enrollment is also PASS:** `guido` / `left-index-finger`, eight enrollment
+**Enrollment acquisition/storage PASS, with a label mismatch:** the user confirms
+the physical **RIGHT index** was saved as `guido` / `left-index-finger`. Eight enrollment
 contacts/stages, completed and listed, clean epoch closure; runtime/template
 retained and reader detached. [The enrollment procedure](R3_ENROLL_VM.md) is
 completed evidence. **Next human gate: [native verification in the VM](R3_VERIFY_VM.md).**
+Select the stored left-index label while physically presenting the RIGHT index.
 Use the retained runtime and template; no rebuild/reinstall or repeated enrollment.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic

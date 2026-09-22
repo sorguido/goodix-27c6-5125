@@ -1,13 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3: one native enrollment in the VM
 
-**COMPLETED — enrollment PASS, human-reported on 22 September 2026.**
-`guido` / `left-index-finger` completed enrollment with eight stages/contacts;
-the final listing contains the finger. Both epochs closed/drained, fprintd
-inactive/MainPID 0, sensor detached, runtime/template retained, no rollback.
+**COMPLETED — acquisition/storage PASS with a reported finger-label mismatch.**
+On 22 September 2026, `guido` enrolled the physical **RIGHT index** under the
+label `left-index-finger`, as clarified by the user before any verify. Eight
+stages/contacts completed; the final listing contains that label. Both epochs
+closed/drained, fprintd inactive/MainPID 0, sensor detached, runtime/template
+retained, no rollback.
 The canonical manual contains the complete telemetry and review. Preserve the
 procedure below as evidence; **do not repeat it**. The next human gate is
-[native verification of that finger](R3_VERIFY_VM.md).
+[native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md).
+The historical procedure below records the requested slot, not evidence that
+the physical left index was presented. No storage relabeling has been performed.
 
 ## Completed procedure
 

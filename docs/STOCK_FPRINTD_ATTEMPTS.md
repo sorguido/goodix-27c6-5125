@@ -18,12 +18,15 @@ normal **44/44 PASS** and ASan/UBSan **44/44 PASS** at
 runtime build from that SHA. This closes synthetic execution; it does not
 claim real USB or biometric safety. The subsequent clean replacement at install
 `264cd7ff1ba77857e1985502f299e4375f9a0516`, load/material/Claim gates and native
-enrollment have now passed in the VM. Enrollment of `guido` / `left-index-finger`
-completed with eight enrollment stages/contacts and clean closure; the canonical
+enrollment acquisition/storage have now passed in the VM. The user clarified
+before any verify that the physical RIGHT index was enrolled as `guido` /
+`left-index-finger`: a known label mismatch, not a matching result. Enrollment
+completed with eight stages/contacts and clean closure; the canonical
 manual preserves the complete user telemetry. Runtime and template are retained,
 sensor detached, fprintd inactive. No verification has run. The current gate is
 [native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md), with up to
-three manual CLI invocations, stop at first MATCH, continuation only after clean
+three manual CLI invocations selecting stored `left-index-finger` while physically
+using the RIGHT index, stop at first MATCH, continuation only after clean
 NO_MATCH. Each CLI invocation is one Claim/capture; this does not qualify a series
 inside one Claim or impose a cumulative driver cap.
 

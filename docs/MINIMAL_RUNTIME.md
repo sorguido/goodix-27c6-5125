@@ -34,13 +34,16 @@ the manifest through the exact-input historical converter, passed the production
 material-loader preflight without USB and completed one stock-fprintd
 Claim/Release. Those gates are closed. The receipt is reconciled and the last
 reported state is sensor disconnected/fprintd inactive. The subsequent native
-enrollment is **PASS**: `guido` / `left-index-finger`, eight enrollment
+enrollment is **acquisition/storage PASS with a label mismatch**: the user
+clarified that the physical **RIGHT index** was stored as `guido` /
+`left-index-finger`. Eight enrollment
 stages/contacts, completed and present in the final listing, both epochs
 closed/drained with zero retries or persistent families reported. Runtime and
 template remain, without rollback; no verify has run. The canonical manual
 records the full evidence and its limits. The current human gate is
 [native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md),
-using the retained R3 runtime/template. No rebuild/reinstall or repeat enrollment.
+using the physical RIGHT index and the retained left-index label/template.
+The anatomical label remains incorrect; no rebuild/reinstall or repeat enrollment.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
@@ -122,7 +125,9 @@ installation and changed no protected binary. Receipt reconciliation records
 that replacement without replacing the saved inverse. `/var/lib/fprint/` remains
 stock template storage and is not touched by runtime installation/uninstall.
 The completed native enrollment added the `guido` / `left-index-finger` host
-template. The next verify uses it without enrollment or template deletion.
+template from the physical RIGHT index, as corrected by the user. The next
+verify selects that stored label and uses the RIGHT index, without enrollment,
+template deletion or relabeling. Normal consumer finger labeling is unresolved.
 
 No additional udev rule is justified by current source evidence. The library
 build disables rule generation. The physical workspace's Fedora vendor unit
