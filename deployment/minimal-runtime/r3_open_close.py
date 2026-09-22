@@ -10,6 +10,7 @@ SERVICE = "net.reactivated.Fprint"
 MANAGER = "/net/reactivated/Fprint/Manager"
 DEVICE_IFACE = "net.reactivated.Fprint.Device"
 TIMEOUT_MS = 15000
+MAX_REMOTE_MESSAGE = 240
 
 
 class GateError(Exception):
@@ -21,6 +22,25 @@ class GateError(Exception):
 
 def emit(marker):
     print(marker, flush=True)
+
+
+def sanitize_remote_message(error, remote):
+    """Return only a bounded one-line message from a trusted remote D-Bus error."""
+    if not remote or not re.fullmatch(r"net[.]reactivated[.]Fprint[.]Error[.][A-Za-z0-9_]{1,80}", remote):
+        return None
+    message = getattr(error, "message", None)
+    if not isinstance(message, str):
+        return None
+    prefix = "GDBus.Error:" + remote + ":"
+    if prefix in message:
+        message = message.split(prefix, 1)[1]
+    message = re.sub(r"[\x00-\x1f\x7f]+", " ", message)
+    message = re.sub(r"\s+", " ", message).strip()
+    if not message:
+        return None
+    if len(message) > MAX_REMOTE_MESSAGE:
+        message = message[:MAX_REMOTE_MESSAGE - 3] + "..."
+    return message
 
 
 def one_open_close(connection, gio, glib, report=emit):
@@ -100,6 +120,9 @@ def main():
                 pass
         if remote and re.fullmatch(r"[A-Za-z0-9_.]{1,160}", remote):
             emit("R3_REMOTE_ERROR=" + remote)
+            message = sanitize_remote_message(error.cause, remote)
+            if message:
+                emit("R3_REMOTE_MESSAGE=" + message)
         emit("R3_OPEN_CLOSE=FAIL STAGE=" + stage)
         return 1
     emit("R3_OPEN_CLOSE=PASS")

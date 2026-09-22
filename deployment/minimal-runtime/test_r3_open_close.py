@@ -135,6 +135,45 @@ class OpenClose(unittest.TestCase):
                 self.assertFalse(any("secret" in marker or "\n" in marker for marker in markers))
                 self.assertEqual(len(markers), 2 if remote.startswith("net.") else 1)
 
+    def test_remote_message_is_prefix_stripped_one_line_and_bounded(self):
+        remote = "net.reactivated.Fprint.Error.Internal"
+        self.gio.DBusError = SimpleNamespace(get_remote_error=lambda _error: remote)
+        long_tail = "x" * 400
+        cause = SimpleNamespace(
+            message="GDBus.Error:" + remote +
+                    ": Open failed with error: Permission denied\n" + long_tail)
+        with patch.object(h.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+                patch.object(h.signal, "signal"), patch.object(h, "emit") as report, \
+                patch.object(h, "run_session", side_effect=h.GateError("CLAIM", cause)), \
+                patch.object(sys, "argv", ["helper"]), \
+                patch.dict(sys.modules, {"gi": SimpleNamespace(require_version=lambda *_args: None),
+                                        "gi.repository": SimpleNamespace(Gio=self.gio, GLib=self.glib)}):
+            self.assertEqual(h.main(), 1)
+        markers = [call.args[0] for call in report.call_args_list]
+        self.assertEqual(markers[0], "R3_REMOTE_ERROR=" + remote)
+        self.assertTrue(markers[1].startswith(
+            "R3_REMOTE_MESSAGE=Open failed with error: Permission denied "))
+        self.assertNotIn("\n", markers[1])
+        payload = markers[1].split("=", 1)[1]
+        self.assertLessEqual(len(payload), h.MAX_REMOTE_MESSAGE)
+        self.assertTrue(payload.endswith("..."))
+        self.assertEqual(markers[-1], "R3_OPEN_CLOSE=FAIL STAGE=CLAIM")
+
+    def test_remote_message_is_not_emitted_for_generic_local_exception(self):
+        remote = "net.reactivated.Fprint.Error.Internal"
+        self.gio.DBusError = SimpleNamespace(get_remote_error=lambda _error: remote)
+        with patch.object(h.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+                patch.object(h.signal, "signal"), patch.object(h, "emit") as report, \
+                patch.object(h, "run_session",
+                             side_effect=h.GateError("CLAIM", RuntimeError("private diagnostic"))), \
+                patch.object(sys, "argv", ["helper"]), \
+                patch.dict(sys.modules, {"gi": SimpleNamespace(require_version=lambda *_args: None),
+                                        "gi.repository": SimpleNamespace(Gio=self.gio, GLib=self.glib)}):
+            self.assertEqual(h.main(), 1)
+        markers = [call.args[0] for call in report.call_args_list]
+        self.assertEqual(markers, ["R3_REMOTE_ERROR=" + remote,
+                                   "R3_OPEN_CLOSE=FAIL STAGE=CLAIM"])
+
     def test_static_method_allowlist_and_no_live_loops(self):
         tree = ast.parse((HERE / "r3_open_close.py").read_text())
         strings = [node.value for node in ast.walk(tree)
