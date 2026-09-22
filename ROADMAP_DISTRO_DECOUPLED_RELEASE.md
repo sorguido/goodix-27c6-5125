@@ -378,24 +378,60 @@ indisponibile il fingerprint.
 
 ---
 
-## R7 — Upstream come obiettivo di lungo periodo
+## R7 — Release autonoma, sicura e sostenibile per l'utente finale
+
+L'obiettivo finale del progetto **non è l'upstream ufficiale**. L'obiettivo è
+una release pubblica sufficientemente autonoma, stabile e sicura da poter
+essere installata e mantenuta da un utente finale senza esporre il sistema
+operativo a rischi sproporzionati.
+
+La release deve essere progettata affinché il suo failure model resti
+strettamente confinato al sottosistema fingerprint.
 
 Obiettivo finale:
 
 ~~~text
-driver Goodix
-→ upstream libfprint
-→ pacchetto distribuzione
+installazione semplice
+→ fingerprint funzionante
+→ normali aggiornamenti del sistema operativo
+→ nessun rischio ragionevole di lockout o rottura del desktop
+→ se il driver diventa incompatibile: fingerprint FAIL soltanto
+→ reinstallazione/aggiornamento del driver sufficiente al recupero
 ~~~
 
-Valutare separatamente:
+La release deve quindi soddisfare contemporaneamente:
 
-- accettabilità/upstreaming del driver Goodix;
-- matcher SIGFM e relative dipendenze;
-- packaging/provenance/licensing;
-- eventuali bug/patch da inviare a fprintd/KDE/Plasma upstream.
+- nessuna necessità ordinaria di TTY, recovery console o procedure manuali di
+  ripristino del sistema;
+- nessuna modifica privata di componenti critici Fedora/KDE necessaria per
+  mantenere accessibili password, desktop, sudo o PolicyKit;
+- comportamento prevedibile anche quando futuri aggiornamenti cambiano
+  libfprint, fprintd, PAM, KDE/Plasma, systemd o kernel;
+- aggiornamenti incompatibili possono rendere temporaneamente indisponibile
+  l'impronta, ma non devono rendere il PC meno accessibile o meno sicuro;
+- installazione, aggiornamento e rimozione del driver devono essere comprensibili,
+  reversibili e proporzionati;
+- la recovery ordinaria deve essere reinstallare/aggiornare/rimuovere il driver,
+  non riparare Fedora;
+- eventuali limitazioni dei consumer stock vengono documentate senza
+  trasformarle in dipendenze private permanenti del progetto.
 
-R7 non blocca una prima public release distro-decoupled che soddisfi R5/R6.
+L'eventuale contributo upstream di singole correzioni o componenti resta una
+possibilità tecnica facoltativa, non un requisito, non una milestone e non il
+criterio di successo del progetto.
+
+R7 è raggiunta quando la release soddisfa R5/R6 e dimostra che il suo normale
+lifecycle non richiede all'utente finale acrobazie di recupero del sistema né
+lo espone inutilmente a regressioni causate da futuri aggiornamenti del sistema
+operativo.
+
+~~~text
+FINAL_PROJECT_GOAL=SAFE_STANDALONE_END_USER_RELEASE
+UPSTREAM_REQUIRED=false
+NORMAL_RECOVERY=REINSTALL_UPDATE_OR_REMOVE_DRIVER
+MAX_ACCEPTABLE_UPDATE_FAILURE=FINGERPRINT_ONLY
+SYSTEM_RECOVERY_GYMNASTICS_ALLOWED=false
+~~~
 
 ---
 
