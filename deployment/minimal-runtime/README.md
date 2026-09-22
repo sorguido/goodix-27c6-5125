@@ -1,9 +1,13 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3: clean replacement of the R3-A runtime
 
-**HUMAN_REQUIRED — clean replacement R3-A → qualified R3 runtime in VM.**
-Stop after installation with fprintd **stopped**, and return evidence for
-review **before any load-check**. Keep the Goodix reader disconnected.
+**Completed: clean replacement and stock fprintd load PASS**, reported by
+the user for install `264cd7ff1ba77857e1985502f299e4375f9a0516`, qualified
+source `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`. Service inactive/MainPID 0,
+no real sensor access yet. Do not repeat removal, install or load-check.
+The next handoff is [one live Claim/Release](R3_LIVE_OPEN_CLOSE_VM.md).
+The procedure below preserves the completed replacement and saved rollback
+reference; it is not the next action.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

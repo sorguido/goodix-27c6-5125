@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 sintetico e build PASS, gate clean replacement in VM (22 settembre 2026)
+### Stato corrente — R3 install/load PASS, primo gate hardware Claim/Release (22 settembre 2026)
 
 La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
 in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
@@ -24,22 +24,23 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, `development` inizialmente pulito,
-e dal task Utente `task_codex_r3_clean_reinstall_installer.md`: **44/44 normal
-PASS e 44/44 ASan/UBSan PASS**, stato dichiarato accettato da PM/review.
-Anche la build runtime normale dello stesso SHA è dichiarata completata e
-revisionata pulita in VM, output confermato dall'Utente
-`/home/guido/goodix-r3-20260922-111144`. Evidenza fornita dall'Utente, non
-riesecuzione o accesso dell'AI alla VM. I precedenti failure del fixture sono
-superati da questa qualifica sintetica; nessuna prova biometrica è inferita.
+`264cd7ff1ba77857e1985502f299e4375f9a0516`, `development` inizialmente pulito,
+e dal task Utente `task_codex_r3_first_live_open_close.md`. Stato accettato
+fornito dall'Utente: sorgente qualificato `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`,
+44/44 normal e 44/44 ASan/UBSan PASS, clean replacement PASS, nuovo stock
+fprintd load PASS. Eseguibile `/usr/libexec/fprintd`, libfprint e quattro OpenCV
+private, libgusb di sistema, nessun componente Fedora sostituito. Servizio
+**inactive/MainPID 0**, nessun accesso reale al sensore nella VM fino a qui.
+Output build conservato: `/home/guido/goodix-r3-20260922-111144`.
+L'AI non ha rieseguito né osservato direttamente le operazioni VM.
 
-Il task corrente prepara la sostituzione pulita della vecchia R3-A: prima
-inversa salvata nell'installazione `92311c5`/build `c5df717`, poi verifica
-Fedora stock, infine installazione del runtime qualificato `b8cdd17` con il
-medesimo footprint. Il sensore resta scollegato. Il gate si ferma con
-**fprintd stopped, prima del nuovo load-check**. Lo snapshot cold VM riferito
-dall'Utente è soltanto un paracadute esterno di laboratorio; non è requisito
-del prodotto o dell'inversa. Nessun upgrade in-place.
+Il task corrente prepara **esattamente un Claim/Release tramite fprintd stock**,
+con una sola connessione D-Bus, sotto l'attivazione biometrica: zero contatti,
+nessun VERIFY/IDENTIFY/ENROLL e nessun retry. Prima dell'attach si controllano
+solo presenza/layout/metadata dei materiali; l'open autorizzata all'Utente
+eserciterà il loader production esistente in sola lettura. Sensore collegato
+solo dall'Utente dopo il gate, poi distaccato con fprintd fermo. Lo snapshot
+cold resta un paracadute esterno, non una dipendenza del prodotto.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -213,11 +214,11 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: adattare minimamente il deployment alla sola build normale
-`b8cdd17`, mantenere footprint/inversa, verificare offline la transazione e
-consegnare uninstall vecchia inversa → stock → install R3 → servizio fermo.
-La suite sintetica completa e la nuova build VM sono accettate dal task
-Utente; non vanno ripetute. Nessun cambio production, policy o roadmap.
+`CURRENT_TASK`: confermare offline il percorso enumerazione/Claim/open e
+Release/close stock, preparare un helper minimo con connessione D-Bus unica,
+test simulati e procedura VM con preflight metadata, un solo ciclo e controllo
+negativo di attivazione nel journal. Nessuna modifica production, runtime,
+policy o roadmap. Gate hardware eseguito soltanto dall'Utente.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -415,7 +416,7 @@ su `b8cdd17`, accettate da PM/review, e la nuova build normale revisionata
 pulita. Questo supera il gate sintetico; non prova ancora il caricamento del
 nuovo runtime, il sensore, il workflow dei consumer o R5.
 
-### R3 — clean replacement della baseline installata
+### R3 — clean replacement completata, nuovo load stock PASS
 
 La sola modifica eseguibile al deployment è `BUILD_COMMIT=b8cdd17...` con
 messaggio di rifiuto coerente. Restano i controlli VM/Fedora 44 x86_64,
@@ -425,17 +426,19 @@ production critici. Nessun cambio a driver, runtime production, retry/attempt,
 Fedora/PAM/udev, materiali/template, footprint, roadmap o governance.
 
 Il nuovo uninstaller non adotta metadata `c5df717` e non acquisisce supporto
-multi-versione. L'Utente eseguirà **prima**
+multi-versione. La procedura completata richiedeva **prima**
 `sudo /usr/local/lib64/goodix-27c6-5125/uninstall.sh` della vecchia R3-A.
 Verificati directory/drop-in assenti, ExecStart vendor, environment del
-progetto assente e file RPM invariati, installerà il build già presente in
+progetto assente e file RPM invariati, installazione del build già presente in
 `/home/guido/goodix-r3-20260922-111144`. Il nuovo installer salva di nuovo
 `deploy.py`, `uninstall.sh`, `installation.json`, hash e provenance; l'inversa
 indipendente da Git/build ritorna a Fedora stock, non al vecchio payload R2.
 La normale conservazione active/inactive dell'inversa resta invariata.
-Il nuovo install lascia fprintd fermo e si attende review prima di avviarlo.
+Il nuovo install lasciava fprintd fermo prima della review/load-check separata.
+Il task corrente riporta clean replacement e load-check PASS; la VM è tornata
+inactive/MainPID 0, con il nuovo runtime installato e sensore non ancora usato.
 
-**Verifica offline corrente:** 27 test su filesystem temporanei e interfacce
+**Verifica offline della clean replacement:** 27 test su filesystem temporanei e interfacce
 host/device simulate PASS: clean install/uninstall, idempotenza, build e
 payload differenti, rifiuto vecchi metadata, collisioni/drift, stato servizio,
 rollback su failure, inversa salvata senza checkout/build, footprint e
@@ -445,40 +448,95 @@ sono verificati senza root, installazione, servizio reale, USB o nuove build.
 La review del diff mantiene il failure model fingerprint-only; R5 resta
 obbligatoria, non dedotta da test con interfacce simulate.
 
+Review set della clean replacement da `b8cdd17`: deployment, 27 test offline,
+istruzioni e documentazione tecnica. Commit install `264cd7f`; inversa salvata
+nel runtime, indipendente da Git/build, ritorna a Fedora stock. I corrective
+precedenti restano tracciati: `8abfb35` conversione enrollment, `912218a` CLAMP
+e compile review, `620ee15` lifecycle, `5b0369e` audit SIGFM, `b8cdd17`
+expectation D282. Nessun nuovo D-number o digest production.
+
+### R3 — primo gate hardware limitato a enumerazione e un open/close
+
+**Review prima dell'implementazione confermata:** fprintd stock `device.c`
+lega Claim al sender, invoca `fp_device_open()` una volta e Release invoca
+`fp_device_close()`. GetDefaultDevice seleziona il device enumerato;
+`fprintd-list`/ListEnrolledFingers leggono template host, senza Claim/open.
+Perciò la procedura richiede un solo device enumerato, identificato Goodix,
+prima dell'unico Claim. Nessuna chiamata biometrica o prepared-login.
+
+La classe Goodix USB non registra una probe sensor-specific. Il core
+libfprint apre GUsb prima di `img_open`; quest'ultima carica i cinque input
+protetti read-only e reclama interfaccia 0 con flag NONE. Creazione del
+contesto/backend e open non iniziano generation o submit. Il protocollo
+parte in activate; l'entry privata login-prepare resta non invocata dal
+percorso stock. Close rilascia interfaccia/materiali e fa cleanse/free,
+senza wire capture. L'enumerazione comprende normali operazioni USB e
+impostazioni sysfs transitorie wakeup/persist del core, non firmware/factory.
+Il contatore `transport_epochs=1` nasce dal claim, non da una capture.
+
+L'helper `deployment/minimal-runtime/r3_open_close.py` apre una connessione
+system D-Bus privata; esegue soltanto GetDefaultDevice, Claim("") e Release
+sullo stesso sender. Release è nel finally dopo Claim riuscita, anche se
+fallisce il reporting locale. Deadline 15 s per chiamata, NO_AUTO_START,
+nessun loop/retry o secondo Release dopo errore; connessione chiusa nel
+finally esterno. Timeout di Claim ambiguo = FAIL, senza retry: la chiusura
+del bus lascia a fprintd il solo cleanup owner-loss. Output limitato a marker
+fissi e nome remoto D-Bus validato, mai il testo libero dell'errore.
+
+La procedura `deployment/minimal-runtime/R3_LIVE_OPEN_CLOSE_VM.md` controlla
+inizialmente servizio fermo, provenance installata/hash delle sole librerie,
+SELinux Enforcing, assenza lettore e metadata dei cinque materiali (root:root,
+directory 0700, file regolari 0600; nessuna lettura/hash/copia dei contenuti).
+Se manca Gio o fallisce il preflight, STOP prima del collegamento senza nuovi
+pacchetti o provisioning. L'Utente collega esattamente un `27c6:5125`, esegue
+listing e helper una volta, ferma fprintd e stacca il sensore. In caso di FAIL
+il task esplicito richiede **runtime conservato**, stop/detach e review;
+nessuna disinstallazione automatica o patch production dedotta dal failure.
+
+Il journal è limitato a unit fprintd e finestra temporale del gate, con cap
+201 righe/64 KiB e STOP su troncamento. Devono mancare `GOODIX_STOCK_CAPTURE_`
+(incluso BEGIN), `GOODIX_LOGIN_`, `GOODIX_SIGFM_` e i marker stock noti di
+attivazione/capture. Serve esattamente un `GOODIX_PRODUCTION_EPOCH_AUDIT`
+con action NONE, tutti i contatori action/capture/TLS/retry/submit/persistent
+zero, transport_epochs=1, drained=1 e context_closed=1. Evidenza mancante o
+marker inatteso non è PASS. Non è una cattura wire/readback factory: la
+conclusione usa call graph, invocazioni bounded e telemetria esistente.
+
+**Verificato offline:** 12 test PASS con D-Bus simulato e file sintetici:
+connessione unica, ordine/allowlist dei tre metodi, deadline, no retry,
+Release su errore/interrupt dopo Claim, output sanitizzato, guard VM,
+sintassi shell/Python e negativi del controllo journal. Il diff resta
+solo helper/test/handoff e manuale; sorgenti production e roadmap invariati.
+L'AI non ha eseguito azioni VM/root, servizi reali o USB, né letto contenuti
+protetti. La disponibilità Gio nella VM viene verificata dall'Utente.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=QUALIFIED_R3_CLEAN_REPLACEMENT_PREPARED
 ACTIVE_PHASE=R3
+QUALIFIED_SOURCE_COMMIT=b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226
+INSTALL_COMMIT=264cd7ff1ba77857e1985502f299e4375f9a0516
 R3_SYNTHETIC_NORMAL=44/44 PASS
 R3_SYNTHETIC_ASAN_UBSAN=44/44 PASS
-QUALIFIED_SOURCE_COMMIT=b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226
-R3_RUNTIME_BUILD=PASS_HUMAN_REPORTED_REVIEWED
-CURRENT_VM_R3_A_BUILD=c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6
-CURRENT_VM_R3_A_INSTALL=92311c5ebe1d05a68ad0542ecb8aeafb9776db0e
-REAL_SENSOR_REQUIRED=false
-SENSOR_CONNECTED=false
-DEPLOYMENT_OFFLINE_TESTS=27_PASS
-STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
-DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
-STOCK_RETRY_OFFLINE_CLOSURE=PASS_SYNTHETIC_HUMAN_REPORTED
-EXECUTABLE_CLOSURE=OFFLINE_PASS_MANUAL_VM_INSTALL_PENDING
-R3_CLEAN_REPLACEMENT=PENDING_HUMAN_VM_EXECUTION
-NEW_RUNTIME_STOCK_LOAD_CHECK=PENDING_SEPARATE_REVIEW
-LIVE_HANDOFF_READY=false
-INSTALLED_RUNTIME_CHANGED=false
-FEDORA_COMPONENTS_REPLACED=NONE
-PHYSICAL_HOST_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=USER_VM_SAVED_OLD_INVERSE_STOCK_CLEAN_INSTALL_LEAVE_STOPPED
+R3_CLEAN_REPLACEMENT=PASS_HUMAN_REPORTED
+R3_STOCK_FPRINTD_LOAD=PASS_HUMAN_REPORTED
+CURRENT_VM_FPRINTD_STATE=inactive
+CURRENT_VM_MAINPID=0
+REAL_SENSOR_ACCESSED=NO
+LIVE_CLAIM_MAX=1
+LIVE_RELEASE_MAX=1
+BIOMETRIC_ACTIVATIONS_ALLOWED=0
+CAPTURE_CONTACTS_ALLOWED=0
+AUTOMATIC_RETRY_ALLOWED=false
+OPEN_CLOSE_OFFLINE_TESTS=12_PASS
+EXECUTABLE_CLOSURE=MOCK_STATIC_PASS_MANUAL_VM_LIVE_PENDING
+RUNTIME_PRODUCTION_AND_ROADMAP_CHANGED=false
+NEXT_BOUNDARY=HUMAN_VM_ENUMERATION_ONE_CLAIM_RELEASE_STOP_DETACH
 ```
 
-Review set corrente Git-native da `b8cdd17`: deployment, test offline,
-istruzioni e documentazione tecnica aggiornata. I corrective precedenti
-restano tracciati: `8abfb35` conversione enrollment, `912218a` CLAMP e compile
-review, `620ee15` lifecycle, `5b0369e` audit SIGFM, `b8cdd17` expectation D282.
-Nessun nuovo D-number o digest production. Procedura e rollback in
-`deployment/minimal-runtime/README.md`; il gate segue roadmap §4 e il task
-Utente corrente. Fermarsi dopo installazione, prima del load-check; workflow
-stock/materiali e sensore restano confini successivi separati.
+Questo gate one-shot a zero contatti è richiesto esplicitamente dall'Utente,
+non è una serie VERIFY/MATCH. Resta aperta ogni validazione di riconoscimento,
+consumer stock e update-survivability R5. Nessun incremento di coupling
+Fedora o dipendenza password/desktop viene introdotto.
 
 ### Governance corrente
 
