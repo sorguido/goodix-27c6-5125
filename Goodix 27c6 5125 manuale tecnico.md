@@ -57,6 +57,20 @@ aperti. Il PASS open/close non prova capture, matching o assenza di scritture
 factory tramite readback. Le evidenze live sono riportate dall'Utente;
 l'AI ha verificato codice, diff e test offline, non rieseguito la VM.
 
+**Aggiornamento preflight enrollment, recovery da `64457b379972dd458c91032b701210ab066a3cac`:**
+l'Utente riporta STOP in `require_stopped`, sensore scollegato, zero live e
+zero tentativi enrollment. Subito dopo osserva inactive/dead, MainPID 0,
+Result success e ExecMainStartTimestamp vuoto. Lo stato al momento del
+rifiuto non era registrato: causa della transizione non determinata, nessun
+failure biometrico o difetto driver dimostrato. Il corrective conserva il
+gate inactive/MainPID 0, legge le cinque proprietà in una sola interrogazione
+e le include nell'errore. Nella sola procedura enrollment l'Utente ferma
+esplicitamente fprintd una volta dopo i controlli VM/root/sensore assente;
+poi verifica lo stato prima e dopo gli altri controlli. Nessun polling,
+retry, masking o aggiornamento dell'inversa installata. **77 test offline PASS**;
+stessa prima live enrollment ancora da eseguire. Nessun rollback dovuto a
+questo STOP preliminare.
+
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
 nessun processo Goodix e authselect valido senza fingerprint globale.
@@ -770,16 +784,69 @@ errore/provenance/manifest/label; se fallisce dopo activation, analizzare
 l'esatto stadio con la telemetria già esistente prima di qualunque nuovo
 tentativo. Nessuna modifica driver dedotta da un mero errore CLI.
 
+**Corrective del preflight enrollment dopo `64457b3`:**
+`CORRECTIVE_OF=R3_ENROLL_PREFLIGHT`. Il failure riportato è esclusivamente
+nel controllo stato servizio, prima di install_preflight, lettura del manifest
+e qualunque collegamento/live. Il successivo read-only restituisce:
+
+```text
+ActiveState=inactive
+SubState=dead
+MainPID=0
+Result=success
+ExecMainStartTimestamp=
+SENSOR_CONNECTED=false
+NO_LIVE_ATTEMPT=true
+NO_ENROLLMENT_ATTEMPT=true
+```
+
+Il vecchio controllo leggeva ActiveState e MainPID con comandi separati e
+short-circuit, senza registrare il valore rifiutato. Non si può ricostruire
+quale condizione sia fallita né dedurre un preciso client attivatore, timeout
+idle o crash. Il sorgente stock manager.c contiene l'uscita su idle, ma ciò
+non prova che abbia causato questo evento. Anche il timestamp vuoto appartiene
+alla query successiva e non dimostra la storia precedente del servizio.
+
+`require_stopped()` resta read-only, preceduto da no_sensor: un solo
+`systemctl show --all` raccoglie ActiveState/SubState/MainPID/Result/timestamp,
+inclusi campi vuoti; proprietà assenti, duplicate o malformate causano STOP.
+I criteri restano ActiveState inactive e MainPID 0. Non è una garanzia atomica
+contro una successiva attivazione esterna; si riduce la finestra delle letture
+e si conserva la diagnostica. La consegna aggiunge un solo stop sincrono,
+eseguito dall'Utente dopo machine_gate a sensore assente, e un nuovo controllo
+finale dopo le verifiche read-only. Lo stop non viene nascosto nel helper né
+introdotto nelle altre operazioni deployment. Se un altro client riattiva il
+servizio, STOP senza loop, stop ripetuti o riconnessione del sensore.
+
+**Review metodologica:** cambia solo la preparazione del servizio, non il
+metodo né l'ipotesi biometrica. Non si presenta questa correzione host-side
+come nuova evidenza sul device: nessuna live enrollment è stata tentata.
+L'ipotesi enrollment precedentemente definita resta da testare per la prima
+volta. Se si ripete lo STOP, acquisire i valori ora riportati e il journal
+ristretto della finestra per ricostruire attivazione/arresto; non proporre
+retry live, polling o modifiche del driver per aggirarlo.
+
+Verifica offline: 27 transazioni + 36 material/preflight + 14 helper =
+**77 PASS**. Cinque regressioni verificano query unica con timestamp vuoto,
+stato transitorio seguito da inactive senza retry, stati/PID non ammessi,
+risposte incomplete/duplicate/malformate e sensor-absence prima della query.
+Host, SELinux e servizio sono simulati; nessuna azione reale dell'AI.
+Sintassi dei quattro blocchi shell e del Python inline PASS; ordine
+machine_gate → stop unico → require_stopped e controllo finale verificati.
+Review `ACCEPT_AND_CONTINUE` del corrective, poi `HUMAN_REQUIRED` alla stessa
+prima live VM. Driver, binari, footprint, roadmap e licensing invariati;
+nessun nuovo coupling, file auth Fedora o failure oltre fingerprint introdotto.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R3
-ADVANCEMENT=CLAIM_RELEASE_CLOSED_AND_MANIFEST_PREFLIGHT_CORRECTED
+ADVANCEMENT=ENROLLMENT_SERVICE_PREFLIGHT_CORRECTED_WITH_OBSERVED_STATE_DIAGNOSTICS
 R3_OPEN_CLOSE=PASS_HUMAN_REPORTED
 R3_ENROLLMENT=NOT_YET_VALIDATED
 EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_ENROLLMENT_REQUIRES_HUMAN_VM
 RESIDUAL_BLOCKER_OR_RISK=BIOMETRIC_R3_AND_R4_R5_R6_R7_NOT_QUALIFIED
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_93e16f4_AND_THREE_EXTERNAL_COMMITS
+REVIEW_SET=GIT_DIFF_FROM_64457b3_FOR_PREFLIGHT_CORRECTIVE
 PRODUCTION_DRIVER_CHANGED=false
 ROADMAP_CHANGED=false
 AI_PHYSICAL_RUNTIME_MUTATION=false

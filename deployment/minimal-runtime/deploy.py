@@ -416,8 +416,22 @@ def remove_material(state):
 
 def require_stopped():
     no_sensor()
-    require(property_value("ActiveState") == "inactive" and property_value("MainPID") == "0",
-            "fprintd must already be inactive/MainPID 0; no service action performed")
+    # One query retains the observed failure state; do not poll or stop here.
+    names = ("ActiveState", "SubState", "MainPID", "Result", "ExecMainStartTimestamp")
+    output = run("systemctl", "show", UNIT, "--all",
+                 *("--property=" + name for name in names))
+    observed = {}
+    for line in output.splitlines():
+        name, separator, value = line.partition("=")
+        require(separator and name in names and name not in observed,
+                "invalid fprintd state response; no service action performed by this check")
+        observed[name] = value
+    require(set(observed) == set(names),
+            "incomplete fprintd state response; no service action performed by this check")
+    require(observed["ActiveState"] == "inactive" and observed["MainPID"] == "0",
+            "fprintd must already be inactive/MainPID 0; observed " +
+            " ".join(name + "=" + observed[name] for name in names) +
+            "; no service action performed by this check")
 
 
 def show_material():

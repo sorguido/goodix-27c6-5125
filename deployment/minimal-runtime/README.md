@@ -193,6 +193,9 @@ The original 27 filesystem tests isolate the material boundary; the dedicated
 `test_material_labels.py` exercises creation/adoption/conflicts, label and
 metadata checks, partial failure recovery, the existing-install corrective
 and saved inverse using synthetic files and mock SELinux interfaces. Current
-recovery validation: 27 deployment + 31 material + 14 open/close = 72 PASS.
+recovery validation: 27 deployment + 36 material/preflight + 14 open/close = 77 PASS.
 The JSON corrective requires no change to the installed runtime or saved inverse.
 Do not rerun the completed receipt reconciliation.
+The enrollment preflight corrective retains the stopped-service gate and adds
+the observed service properties to failures; see the current enrollment guide
+for the single human-executed stop with the reader disconnected.

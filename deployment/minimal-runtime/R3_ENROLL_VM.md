@@ -26,6 +26,14 @@ settings or other biometric client may run during the test. Sudo and standard
 PolicyKit password prompts are expected; do not change authentication policies.
 Stop on every failed block. No dependencies or protected inputs are provisioned.
 
+The previous preflight stopped at `require_stopped` before any live attempt;
+the later observation was inactive/dead, MainPID 0, Result success, with no
+start timestamp. The state at the failed check was not recorded, so a specific
+activation/exit cause is not established. This revision explicitly stops
+fprintd once, **after VM/root/reader-absence checks**, then verifies its state.
+The check itself remains read-only and reports the observed fields on failure.
+No polling, automatic retry, masking or service configuration change is added.
+
 ```bash
 r3_repo=$(git rev-parse --show-toplevel)
 r3_user=$(id -un)
@@ -44,6 +52,7 @@ import sys
 sys.path.insert(0, 'deployment/minimal-runtime')
 import deploy as d
 d.machine_gate()                    # VM, root, reader absent; no USB handle
+d.run('systemctl', 'stop', d.UNIT)   # Human VM preparation, synchronous, once
 d.require_stopped()
 d.install_preflight()               # Fedora, stock service/RPM, Enforcing
 d.run('rpm', '-V', 'libfprint')
@@ -60,6 +69,7 @@ critical = ['libfprint-driver', 'reference/libfprint-fedora44-1.94.100',
             'production/check-source.sh', 'production/source-files.tsv',
             'production/source-files.sha256', 'production/host-test-only-symbols.txt']
 d.git('diff', '--exit-code', d.BUILD_COMMIT, 'HEAD', '--', *critical)
+d.require_stopped()                 # Still inactive after the read-only checks
 print('R3_ENROLL_PREFLIGHT=PASS SENSOR_CONNECTED=false')
 PY
 )
@@ -68,6 +78,9 @@ PY
 This reads the non-secret manifest and runtime software only; the four binary
 materials are checked by metadata. The production driver will load them read-only
 during the human live action. Any preflight failure means STOP before attachment.
+If the service is reactivated or state collection fails, return the complete
+observed-state error; do not repeatedly stop it or rerun the block. This is a
+continuation of the first enrollment gate, not a second biometric attempt.
 
 ## 2. Select a free finger slot, then enroll once
 

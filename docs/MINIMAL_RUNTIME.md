@@ -262,7 +262,15 @@ failure handling and the unqualified hard power-loss window.
 
 Recovery independently reran the three external commits' 70 tests, then
 reproduced and fixed the JSON duplicate/escape mismatch on synthetic manifests.
-Current validation is **27 deployment + 31 material + 14 open/close = 72 PASS**.
+That recovery passed 27 deployment + 31 material + 14 open/close = 72 tests.
+The subsequent enrollment preflight stopped at `require_stopped`, before live;
+the user's later query was inactive/dead/MainPID 0, but the rejected state was
+not recorded. The current corrective uses one read-only property query with
+observed-state diagnostics, keeps inactive/MainPID 0 mandatory and adds no retry.
+The enrollment instructions now explicitly stop fprintd once with the reader
+absent, after the VM/root checks, and recheck state after preflight. The helper
+does not stop the service. Current validation is **27 + 36 + 14 = 77 PASS**.
+No installed inverse or runtime replacement is needed for this correction.
 Production parser, runtime binaries and source digests remain unchanged. The
 non-secret canonical serialization matches the user-reported runtime manifest
 SHA256 `1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`;

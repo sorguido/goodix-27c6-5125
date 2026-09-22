@@ -39,6 +39,9 @@ class MaterialLifecycle(unittest.TestCase):
         self.contexts = VM_PRESTATE.copy()
         self.rules = []
         self.calls = []
+        self.service_state = {"ActiveState": "inactive", "SubState": "dead",
+                              "MainPID": "0", "Result": "success",
+                              "ExecMainStartTimestamp": ""}
         self.fail = None
         self.bad_restore = False
         self.foreign_rule = r"/opt/foreign\.data(/.*)?    all files    system_u:object_r:usr_t:s0"
@@ -115,7 +118,9 @@ class MaterialLifecycle(unittest.TestCase):
         elif args[:2] == ("matchpathcon", "-n"):
             return DEFAULT
         elif args[:2] == ("systemctl", "show"):
-            return {"--property=ActiveState": "inactive", "--property=MainPID": "0"}[args[3]]
+            return "\n".join(name + "=" + self.service_state[name]
+                             for arg in args[3:] if arg.startswith("--property=")
+                             for name in [arg.removeprefix("--property=")])
         elif args[0] not in ("systemctl", "restorecon"):
             self.failTest(f"unexpected command: {args}")
         return ""
@@ -503,7 +508,7 @@ class MaterialLifecycle(unittest.TestCase):
         with patch.object(d, "LEGACY_INVERSE_DIGEST", "0" * 64):
             with self.assertRaisesRegex(RuntimeError, "unknown saved inverse"):
                 d.label_existing()
-        with patch.object(d, "property_value", return_value="active"):
+        with patch.dict(self.service_state, ActiveState="active", SubState="running", MainPID="42"):
             with self.assertRaisesRegex(RuntimeError, "inactive/MainPID"):
                 d.label_existing()
         self.rules.append(self.exact(DEFAULT))
@@ -511,6 +516,52 @@ class MaterialLifecycle(unittest.TestCase):
             d.label_existing()
         self.assertEqual((self.runtime / d.STATE).read_bytes(), before)
         self.assertFalse(self.mutations())
+
+    def test_stopped_check_uses_one_read_only_query_with_empty_timestamp(self):
+        with patch.object(d, "property_value", side_effect=AssertionError("split query")):
+            d.require_stopped()
+        self.assertEqual(self.calls, [("systemctl", "show", d.UNIT, "--all",
+                                      "--property=ActiveState", "--property=SubState",
+                                      "--property=MainPID", "--property=Result",
+                                      "--property=ExecMainStartTimestamp")])
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_stopped_check_reports_transient_and_does_not_retry_to_inactive(self):
+        active = ("ActiveState=deactivating\nSubState=stop-sigterm\nMainPID=42\n"
+                  "Result=success\nExecMainStartTimestamp=Tue 2026-09-22 14:00:00 CEST")
+        inactive = "\n".join(k + "=" + v for k, v in self.service_state.items())
+        with patch.object(d, "run", side_effect=[active, inactive]) as query:
+            with self.assertRaisesRegex(RuntimeError, "observed ActiveState=deactivating") as caught:
+                d.require_stopped()
+        self.assertIn("SubState=stop-sigterm MainPID=42 Result=success", str(caught.exception))
+        self.assertIn("ExecMainStartTimestamp=Tue 2026-09-22", str(caught.exception))
+        self.assertEqual(query.call_count, 1)
+        self.assertEqual(query.call_args.args[:3], ("systemctl", "show", d.UNIT))
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_stopped_check_rejects_active_failed_and_nonzero_pid(self):
+        for state, pid in (("active", "0"), ("failed", "0"), ("inactive", "42")):
+            with self.subTest(state=state, pid=pid), \
+                    patch.dict(self.service_state, ActiveState=state, MainPID=pid):
+                with self.assertRaisesRegex(RuntimeError, "inactive/MainPID"):
+                    d.require_stopped()
+        self.assertFalse(self.mutations())
+
+    def test_stopped_check_rejects_missing_duplicate_and_malformed_properties(self):
+        valid = "\n".join(k + "=" + v for k, v in self.service_state.items())
+        for output in ("", valid.replace("MainPID=0\n", ""),
+                       valid + "\nMainPID=0", valid + "\nmalformed"):
+            with self.subTest(output=output), patch.object(d, "run", return_value=output):
+                with self.assertRaisesRegex(RuntimeError, "fprintd state response"):
+                    d.require_stopped()
+        self.assertEqual(self.snapshot(), self.before)
+
+    def test_stopped_check_requires_sensor_absence_before_service_query(self):
+        with patch.object(d, "no_sensor", side_effect=RuntimeError("sensor present")), \
+                patch.object(d, "run") as query:
+            with self.assertRaisesRegex(RuntimeError, "sensor present"):
+                d.require_stopped()
+        query.assert_not_called()
 
     def test_failed_label_existing_keeps_inverse_for_label_only_rollback(self):
         self.legacy()
