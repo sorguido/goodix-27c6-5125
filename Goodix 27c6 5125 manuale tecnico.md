@@ -24,12 +24,16 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`0097221a4518edabb296834693d85f76f06e5daf`, `development` inizialmente pulito,
-e dall'errore di compilazione riportato dall'Utente nel gate sintetico VM:
-conversione `guint` → `gint` in `fpi_device_set_nr_enroll_stages`.
-Compilazione fallita, **0 test R3 eseguiti**, sensore scollegato e R3-A
-invariata. Il corrective controlla il range prima del cast; il numero di
-tentativi espliciti resta di Fedora stock, con terminalità MATCH/errore.
+`8abfb35d538951273ef9058e3281082b5dcb0fb5`, `development` inizialmente pulito,
+e dal secondo stop di compilazione riportato dall'Utente nel gate sintetico
+VM: signedness mista nel `CLAMP` del fixture secure-session. Il precedente
+errore `guint` → `gint` in `fpi_device_set_nr_enroll_stages` era già corretto
+con controllo di range. Entrambi i tentativi: **0 test R3 eseguiti**, sensore
+scollegato e R3-A invariata. Il corrective corrente rende signed il limite
+del CLAMP con static assertion e chiude la review statica delle 43 unità
+compilate dal gate, senza cambiare warning, runtime, retry o attempt policy.
+Il numero di tentativi espliciti resta di Fedora stock, con terminalità
+MATCH/errore. Build/link ed esecuzione della suite restano da provare in VM.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -203,11 +207,12 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: correggere esclusivamente la conversione enrollment
-`template_stage_target` da `guint` al `gint` positivo richiesto da libfprint,
-con controllo esplicito di rappresentabilità e senza allentare i warning.
-Ripreparare il medesimo gate sintetico VM; semantica retry, test e componenti
-Fedora restano invariati. Nessuna live o rollback di R3-A.
+`CURRENT_TASK`: correggere il CLAMP mixed-signedness del fixture e completare
+la review statica preventiva dell'intera superficie dei due script del gate,
+compresi tutti i target successivi al fixture, con i flag effettivi.
+Ripreparare il medesimo gate sintetico VM senza allentare warning o modificare
+semantica retry, attempt policy, runtime e componenti Fedora. Nessuna live,
+installazione o rollback di R3-A; roadmap invariata per questo corrective.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -275,7 +280,7 @@ profilo production/SIGFM: la vecchia destinazione Rocky core non esiste più.
 Il fixture privato è una dipendenza solo di questo test interno, non del
 runtime/build production o di una futura suite pubblica qualificata.
 
-**Esito del gate VM riportato dall'Utente:** compilazione arrestata prima dei
+**Primo esito del gate VM riportato dall'Utente:** compilazione arrestata prima dei
 test a `goodix_fpimage_device.c:2530:44` per `-Werror=sign-conversion` sulla
 chiamata `fpi_device_set_nr_enroll_stages(..., template_stage_target)`.
 Non è un failure della nuova logica retry: nessun test R3 è stato eseguito.
@@ -285,11 +290,36 @@ con errore leggibile e rilascio della pipeline, prima di completare lo stage;
 solo dopo il controllo si passa `(gint) template_stage_target` a libfprint.
 Nessuna modifica ai flag warning o al percorso retry/cleanup.
 
+**Secondo esito VM:** nuovo stop prima dei test nel fixture
+`test_goodix_d278_secure_session.c:1640`, `-Werror=sign-compare` su
+`CLAMP(value, 0, GOODIX_SENSOR_SAMPLE_MAX)`: `gint` contro `4095u`.
+Ancora **0 test R3 eseguiti**, sensore scollegato, R3-A invariata. Il fix
+usa `const gint sample_max`, preceduto da static assertion di rappresentabilità
+in `gint`. Il CLAMP ha così tre operandi signed e conserva l'intervallo
+inteso 0..4095, troncando a zero i valori negativi. Cambia solo il fixture.
+
+**Review preventiva chiusa:** ricostruiti sorgenti, ordine, include e flag
+effettivi dei due script, con i define del gate stock. Sono 43 unità in
+ciascun profilo: 27 C strict, 14 C base/supporto, un fixture strict con la
+sola preesistente eccezione `-Wno-conversion`, un C++ metrics. L'eccezione
+del fixture lascia attivo `-Wsign-compare`. Esaminati confronti, macro e
+ternari nell'intero fixture e tutti i cinque target successivi; nessun altro
+difetto identificato. `goodix_sigfm_preprocess.c` passa il profilo strict
+completo e non richiede modifiche. Dettaglio in `docs/STOCK_FPRINTD_ATTEMPTS.md`.
+
+Analisi `-fsyntax-only` con GCC/G++ 15.2.0 dell'SDK 25.08 già disponibile
+localmente in lettura: **43 unità × 2 profili normal/sanitizer, zero
+diagnostiche**. Generati soltanto enum sorgente/header e log temporanei,
+nessun oggetto, assembly, link, eseguibile o test; nessun avvio Flatpak.
+L'analisi statica non verifica code generation, warning dipendenti dalle
+ottimizzazioni, linking o comportamento dei sanitizer. Non si inferisce
+la versione toolchain della VM da quella locale.
+
 **Verificato sul workspace:** audit digest/path dei 62 sorgenti e quattro
-supporti PASS (in questo corrective aggiornato solo l'hash del file C), sintassi
+supporti PASS (nessun digest production da aggiornare: cambia solo il fixture), sintassi
 shell e diff PASS; help e rifiuto non-VM dell'entrypoint reale da cwd estranea
-PASS senza creare output. Nessuna compilazione o esecuzione C è stata svolta
-sul fisico. Le 44 prove normal e ASan/UBSan sono **preparate, non eseguite**:
+PASS senza creare output. Nessuna build o esecuzione C del progetto sul
+fisico, soltanto analisi statica. Le 44 prove normal e ASan/UBSan sono **preparate, non eseguite**:
 non dichiarare chiuso il retry sulla sola analisi statica.
 
 Il prossimo gate è il test-build offline nella VM, da utente ordinario,
@@ -303,15 +333,17 @@ continuità sorgenti rifiuta correttamente il driver cambiato.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=ENROLLMENT_STAGE_GUINT_TO_GINT_RANGE_CHECK_AND_CAST
+ADVANCEMENT=FIXTURE_SIGNED_CLAMP_AND_FULL_STATIC_COMPILE_SURFACE_REVIEW
 ACTIVE_PHASE=R3
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
-PREVIOUS_VM_COMPILATION=FAIL_SIGN_CONVERSION
+PREVIOUS_VM_COMPILATION=FAIL_SIGN_COMPARE
 PREVIOUS_VM_R3_TESTS_EXECUTED=0
+STATIC_COMPILE_SURFACE_REVIEW=CLOSED
+STATIC_SYNTAX_ONLY_PASSES=86
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
-EXECUTABLE_CLOSURE=SOURCE_SHELL_INERT_PASS_C_BUILD_AND_TEST_PENDING
+EXECUTABLE_CLOSURE=STATIC_SYNTAX_SOURCE_SHELL_INERT_PASS_VM_BUILD_AND_TEST_PENDING
 REAL_TARGET_COMPATIBILITY=R3_A_STOCK_LOAD_PASS_CORRECTED_DRIVER_UNBUILT
 LIVE_HANDOFF_READY=false
 INSTALLED_RUNTIME_CHANGED=false
@@ -323,8 +355,10 @@ NEXT_BOUNDARY=USER_VM_SYNTHETIC_TESTS_WITH_SENSOR_DISCONNECTED
 Review set Git-native da `92311c5`: driver/manifest, estensione della suite e
 builder esistenti, runner VM, documentazione/licensing e questo manuale.
 Il correttivo corrente rispetto al cap errato parte da `c0b2369`.
-Il corrective di compilazione parte da `0097221` e cambia solo il punto di
-conversione nel driver, il suo digest e la documentazione dello stesso gate.
+Il primo corrective di compilazione (`8abfb35`, da `0097221`) cambia il punto
+di conversione nel driver e il suo digest. Il corrective corrente parte da
+`8abfb35` e cambia solo il CLAMP del fixture e la documentazione tecnica
+necessaria: nessun nuovo D-number, digest production o modifica della roadmap.
 `docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
 in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
 workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il

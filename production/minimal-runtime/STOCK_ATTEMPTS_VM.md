@@ -4,12 +4,17 @@
 **Next human gate: compile and run offline tests only. Keep the reader
 disconnected. Do not rebuild R2, reinstall R3-A or run a live test.**
 
-The previous VM attempt failed compilation on the enrollment stage-count
-`guint` → `gint` conversion: **0 R3 tests executed**, reader disconnected,
-R3-A unchanged. The source now validates `1..G_MAXINT` before an explicit
-cast; compiler warning flags and retry semantics are unchanged. Pull the
-corrective and repeat this same gate with a new output directory. Keep the
-failed build output as evidence; no rollback of R3-A is needed.
+Both previous VM attempts stopped during compilation: first on the
+enrollment stage-count `guint` → `gint` conversion, then on the fixture's
+mixed-signedness `CLAMP`. **0 R3 tests executed**, reader disconnected,
+R3-A unchanged. The stage count is range-checked before casting; the CLAMP
+upper bound now uses a compile-time-checked `gint`. Preventive static review
+covered all 43 translation units in both compiler profiles, including the
+targets after the fixture: 86 syntax-only parses passed without diagnostics.
+Actual code generation, linking and tests still require this VM gate.
+Compiler warning flags and retry semantics are unchanged. Pull the corrective
+and repeat this same gate with a new output directory. Keep both failed build
+outputs as evidence; no rollback of R3-A is needed.
 
 R3-A stock loading is accepted from the user's Fedora 44 KDE x86_64 VM
 evidence: R2 build `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, installation

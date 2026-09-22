@@ -96,13 +96,65 @@ execution are real test code. No daemon/consumer source is modified or run.
 The fixture's historical private path is a test-only dependency, explicitly
 not a production/runtime or qualified public-release test dependency.
 
-The user-reported VM attempt stopped during compilation at
+The first user-reported VM attempt stopped during compilation at
 `goodix_fpimage_device.c:2530:44`: implicit `guint` to `gint` conversion in
 `fpi_device_set_nr_enroll_stages`, rejected by `-Werror=sign-conversion`.
 **Zero R3 tests ran; the reader remained disconnected and R3-A unchanged.**
 The minimal correction checks `1..G_MAXINT` before stage completion and the
 explicit `gint` cast, freeing the image pipeline and reporting an error for
 an invalid value. Warning flags and retry semantics are unchanged.
+
+The second VM attempt stopped at fixture line 1640 on
+`CLAMP(value, 0, GOODIX_SENSOR_SAMPLE_MAX)`, rejected by `-Werror=sign-compare`:
+`value` is `gint`, while the maximum is `4095u`. Again **zero R3 tests ran,
+the reader stayed disconnected and R3-A remained unchanged**. The fixture
+now asserts at compile time that the maximum fits `gint`, then uses a
+`const gint` upper bound. All three CLAMP operands are signed; the intended
+range remains 0..4095, including clipping negative values to zero. No
+production source, attempt/retry rule, compiler flag or roadmap is changed.
+
+## Preventive compile-surface review (22 September 2026)
+
+Reviewed both `production/minimal-runtime/check-stock-attempts.sh` and
+`libfprint-driver/tests/run_goodix_fpimage_device_test_inner.sh`, with the
+actual gate settings `GOODIX_STOCK_ATTEMPT_TEST=1` and
+`GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST=1`. The normal and sanitized
+branches compile the same **43 translation units in the same order**,
+including both generated enum registration sources and the 12-source loop.
+
+| Units | Effective builder profile |
+| --- | --- |
+| 27 project C sources, including `goodix_sigfm_preprocess.c` | `-std=gnu11 -O2 -g -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion`, test seams, SIGFM and production action profile, function/data sections |
+| 1 complete secure-session fixture | Same strict flags plus the existing `-Wno-conversion`; `-Wsign-compare` remains active through `-Wextra` |
+| 14 base/support C sources | Existing `local_flags`: eight Fedora core sources, two generated enum sources, three stubs and `rockytkg-imgproc/goodix_imgproc.c`; existing warning exceptions are unchanged |
+| 1 C++ metrics source | Existing `-std=c++17 -O2 -g` profile; C warning flags are not attributed to this target |
+
+The sanitized C profiles append `-O1 -fno-omit-frame-pointer
+-fsanitize=address,undefined`; C++ uses `-std=c++17` with these sanitizer
+options, as in the builder. Include order, generated enum inputs and
+pkg-config flags were retained. No warning suppression was added or widened.
+
+The full fixture was checked for comparisons, macro expansions and ternary
+signedness. Its signed image delta and score branches stay signed; count
+branches use unsigned operands, and sizes/deadlines use their corresponding
+unsigned/signed types. No other diagnostic was found with the effective
+flags. All five sources compiled **after** the fixture were also checked:
+`gusb_stub.c`, `fpimage_link_stubs.c`, `goodix_imgproc.c`,
+`goodix_sigfm_preprocess.c` and `goodix_sigfm_metrics.cpp`. In particular,
+preprocessing uses `size_t` for lengths, representable image/parameter
+constants, explicit byte extraction and matching enum return types; it needs
+no source change under the full strict profile.
+
+Static compiler-front-end analysis used the already installed local SDK
+25.08 headers and GCC/G++ 15.2.0, GLib 2.84.4 and OpenSSL 3.5.7, read-only,
+with `-fsyntax-only` in both profiles. SDK front ends were invoked through
+their SDK loader; no Flatpak instance, project executable or test was started.
+Result: **86 successful parses, zero diagnostics**, covering all 43 units in
+both profiles. Only temporary generated enum source/header and diagnostic
+files were written; no object, assembly or executable was produced. This
+closes the static review, not code generation, linking, optimization-dependent
+diagnostics or sanitizer/test execution. The guest toolchain version has not
+been inferred from the local SDK.
 
 Source digest/path audit, shell syntax, and the test entry point's help/non-VM
 refusal from an unrelated cwd are PASS. **Corrected compilation and the 44
@@ -112,8 +164,10 @@ does not substitute for those results. No dynamic or sensor-safety PASS is claim
 ```text
 R3_A_STOCK_LOAD=PASS_HUMAN_REPORTED
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
-PREVIOUS_VM_COMPILATION=FAIL_SIGN_CONVERSION
+PREVIOUS_VM_COMPILATION=FAIL_SIGN_COMPARE
 PREVIOUS_VM_R3_TESTS_EXECUTED=0
+STATIC_COMPILE_SURFACE_REVIEW=CLOSED
+STATIC_SYNTAX_ONLY_PASSES=86
 STOCK_ATTEMPT_SOURCE_CORRECTION=IMPLEMENTED
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE

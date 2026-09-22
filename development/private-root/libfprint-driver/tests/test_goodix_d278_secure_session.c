@@ -1620,6 +1620,8 @@ static GBytes *
 enrollment_image_for_stage (GBytes *source,
                             guint   stage)
 {
+  G_STATIC_ASSERT (GOODIX_SENSOR_SAMPLE_MAX <= (guint) G_MAXINT);
+  const gint sample_max = (gint) GOODIX_SENSOR_SAMPLE_MAX;
   uint16_t samples[GOODIX_CANONICAL_IMAGE_SAMPLE_COUNT];
   GoodixImageDecodeAudit audit = { 0 };
   g_autoptr(GError) error = NULL;
@@ -1637,8 +1639,7 @@ enrollment_image_for_stage (GBytes *source,
         gint delta = band < 10u ? 700 : -350;
         gint value = (gint) samples[index] + delta;
 
-        samples[index] = (uint16_t) CLAMP (value, 0,
-                                           GOODIX_SENSOR_SAMPLE_MAX);
+        samples[index] = (uint16_t) CLAMP (value, 0, sample_max);
       }
   return post_image_from_samples (samples);
 }
