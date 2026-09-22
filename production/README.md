@@ -16,15 +16,17 @@
 The active **build-only** R2 entry point is
 [`minimal-runtime/build.sh`](minimal-runtime/build.sh), with the
 [manual VM procedure](minimal-runtime/README.md). It creates no host
-installation. The first VM build is pending; no replacement release candidate
-is qualified yet.
+installation. The first VM build is PASS at `c5df717`; R3 installation/runtime validation
+is the next boundary. Use the
+[R3-A install/load procedure without the reader](../deployment/minimal-runtime/README.md)
+with the retained R2 binaries. No replacement release candidate is qualified yet.
 
 ## Component classification for the active roadmap
 
 | Path | Classification | Active use |
 | --- | --- | --- |
 | `source-files.tsv`, `source-files.sha256`, `build-support/`, `build-inner.sh` | R2 extraction inputs | Driver/libfprint/SIGFM and necessary libraries; audit before a VM build |
-| `minimal-runtime/`, `check-source.sh --driver-only` | Active R2 extraction | Build/audit only the library set; VM build pending |
+| `minimal-runtime/`, `check-source.sh --driver-only` | Active R2 extraction | Build/audit only the library set; VM build PASS at c5df717 |
 | `build.sh`, default `check-source.sh` | Historical complete stack | Include login/consumer dependencies; not the active minimal runtime path |
 | `login/` | HISTORICAL_ONLY / REJECTED_ARCHITECTURE | Preserve private daemon/PAM/greeter sources and evidence |
 | `plasma-vt/` | HISTORICAL_ONLY / REJECTED_ARCHITECTURE | Preserve VT bug evidence for possible upstream work |

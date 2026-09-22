@@ -13,8 +13,13 @@ the source it contains.
 | SIGFM | Rockytkg materialized libfprint fork | `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | `LGPL-2.1-or-later` | Feature extraction and matching |
 | R2 preprocessing | Adapted from Rockytkg `goodix_imgproc` | `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | `GPL-2.0-or-later` | Image preprocessing |
 | OpenCV | Fedora 44 packages | 4.13.0-1.fc44 | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC` | Bundled runtime libraries |
-| libgusb | Fedora 44 package | 0.4.9-5.fc44 | `LGPL-2.1-or-later` | Bundled runtime library |
+| libgusb | Fedora 44 system package | VM-installed version; R2 build reference 0.4.9-5.fc44 | `LGPL-2.1-or-later` | System runtime/build dependency; not bundled in R2 |
 | OpenSSL | Fedora 44 system library | host version | Apache-2.0 | TLS implementation |
+
+The R2 build copies libgusb into temporary build/pkgconfig staging only. The
+installed Fedora library supplies it at runtime; it is excluded from the five
+shared libraries in `runtime/`. The old managed candidate bundled libgusb,
+which remains a historical packaging fact and is not the R2 release boundary.
 
 The exact target-specific compilation units, licenses, origins, and SHA-256
 digests are recorded in `production/source-files.tsv` and
@@ -67,7 +72,7 @@ source tree or candidate.
 This project records its compatibility determination and source provenance; it
 does not provide legal advice for unrelated distributions or modifications.
 
-## Minimal runtime extraction (22 September 2026)
+## Minimal runtime extraction and deployment (22 September 2026)
 
 `production/minimal-runtime/build.sh` is an adaptation of the project's
 `production/build.sh` at `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`, under the
@@ -77,6 +82,14 @@ removes the custom authentication build and private libgusb payload. The
 There is no new third-party import, no change to per-file licenses or the
 combined library's GPL-3.0-or-later boundary, and no public export. See
 [Runtime extraction](MINIMAL_RUNTIME.md) for the selected components.
+
+`deployment/minimal-runtime/deploy.py`, its two shell entry points and
+`test_offline.py` are independently written local GPL-2.0-or-later code using
+only Python's standard library and existing Fedora tools. No historical
+managed transaction or external implementation is copied. R3 deploys the
+unchanged R2 library set with its original notices and build provenance; the
+ledger copy is updated to correctly classify Fedora libgusb as a system
+dependency. The saved uninstall implementation retains the same license.
 
 ## Historical host-integration provenance
 

@@ -1,12 +1,23 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R2 runtime extraction and R3-A audit
 
-Source baseline audited: `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1` on
-`development`, 22 September 2026. The current changes extract a build-only
-path; their final identity is the Git commit containing this document.
-R1 is complete. R2 source extraction/static audit is complete; the first VM
-build remains required. R3-A is the first integration hypothesis, not a
-validated installation. No R4/R5/R6 or release qualification is claimed.
+R2 extraction baseline: `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1` on
+`development`, 22 September 2026. R3-A deployment preparation starts from
+`c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`; its final identity is the Git
+commit containing `deployment/minimal-runtime/` and this review.
+R1 and R2 are complete. The user reported a successful normal build on Fedora
+44 KDE x86_64/KVM at `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, with the
+reader disconnected. The retained VM output is
+`/home/guido/goodix-r2-20260922-081148/`. Stock fprintd resolves the private
+libfprint and all four OpenCV libraries, with no missing dependencies; all
+five runtime checksum checks passed and the checkout stayed clean.
+The reported `LIBFPRINT_2_0_0` ABI check passed; host/test-only symbols and
+private-tree dependencies were zero, and no RPATH was present.
+The daemon was not executed, USB/material loaders were not accessed and no
+Fedora component was replaced. This is human-produced evidence reviewed
+against the committed build/source path, not an AI rerun or independently
+rehashing the guest's binaries. R3-A installation/runtime behavior remains
+unverified; no R4/R5/R6 or release qualification is claimed.
 
 ## MINIMAL_RUNTIME_CONTENTS
 
@@ -64,24 +75,34 @@ staging are written. The terminal log is adjacent to output. No project file
 is installed, no service is started, and no Fedora-owned file is changed.
 Optional prerequisite installation in the README is manual VM package setup.
 
-**R3-A proposed surface, not installed or approved by this audit:**
+**R3-A prepared surface, reviewed offline; VM installation still pending:**
 
 | Path | Purpose | RPM owner / override | Update class and rollback expectation |
 | --- | --- | --- | --- |
-| `/usr/local/lib64/goodix-27c6-5125/` | Private library payload | Project-owned new files, no Fedora replacement | C: library/ABI failure may disable fingerprint; remove/reinstall private runtime |
-| `/etc/systemd/system/fprintd.service.d/<project-drop-in>.conf` | Service-local library search path only | Project-owned new drop-in; vendor unit stays owned by fprintd | C: applies only to fprintd; removal and daemon-reload restore vendor definition; installer must preserve pre-existing files/state |
-| `/var/lib/goodix-5125-poc/` | Existing device-specific inputs | Preserved separately; read-only runtime use | C for missing/incompatible materials; never delete/overwrite as software rollback |
-| `/var/lib/fprint/` | Stock fprintd template storage | Owned/managed by Fedora fprintd | Preserve across install/uninstall/update; format compatibility requires a separate check |
+| `/usr/local/lib64/goodix-27c6-5125/` shared objects and two links | Private library payload | New project files, no RPM owner or Fedora replacement | C: incompatible/missing libraries can disable only the fprintd path; remove/reinstall the private runtime |
+| Same directory: notices, `SHA256SUMS`, source/build provenance | Trace the five binaries and preserve license terms | New project files | D/E: integrity checks/maintenance may fail; no password runtime dependency |
+| Same directory: `installation.json`, `deploy.py`, `uninstall.sh` | Remember previous service state and retain the exact inverse | New root-owned project files; state mode 0600 | D: preserve and review on drift; rollback does not require Git, build output or a Fedora version/hash pin |
+| `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Service-local library search path only | New project drop-in; vendor unit remains fprintd RPM-owned | C by design: removal and daemon-reload restore the vendor definition; no ExecStart/authentication override |
+| `/etc/systemd/system/fprintd.service.d/` if absent | Contain the new drop-in | Existing directory preserved, or a new project-created directory | D: remove only if created here and still empty |
+| `.goodix-5125-stage-*` under `/usr/local/lib64/`, `.goodix-5125-dropin-*` under the drop-in directory | Stage owned files and publish without replacing an occupied drop-in | Temporary project files | D: removed on ordinary completion/error; abrupt power-loss recovery not qualified |
+
+The installer never reads or modifies `/var/lib/goodix-5125-poc/` or
+`/var/lib/fprint/`. The former remains the separate protected input boundary;
+the latter remains stock fprintd storage. Neither is an uninstall target.
+This sensor-disconnected step needs no material/template migration.
 
 No additional udev rule is justified by current source evidence. The library
 build disables rule generation. The physical workspace's Fedora vendor unit
 permits USB access and its RPM-owned hwdb includes `27c6:5125`; this does not
 establish the guest's udev/SELinux behavior. Do not copy those files into `/etc`.
-The exact R3 surface and RPM ownership must be rechecked in the VM before
-installation. This prospective table is not the completed R5 audit.
+The installer checks stock RPM integrity, unit path/ExecStart, absence of
+foreign local overrides and SELinux Enforcing in the VM before mutation.
+It only applies Fedora's normal file contexts with `restorecon` to its new
+files. This table is an architectural audit, not the completed R5 test.
 
 ```text
 HOST_FILES_TOUCHED=NONE_BY_R2_BUILD
+R3_HOST_FILES_TOUCHED=PRIVATE_LIBRARY_DIRECTORY_AND_ONE_FPRINTD_ENVIRONMENT_DROPIN
 FEDORA_COMPONENTS_REPLACED=NONE
 EXPECTED_UPDATE_FAILURE=FINGERPRINT_ONLY   # R3 design requirement, not measured
 RUNTIME_VERSION_HASH_PINS_FOR_PASSWORD_ACCESS=NONE
@@ -112,6 +133,40 @@ install/remove symmetry and actual library mappings. Preserve the vendor
 ExecStart and stock authentication files. A normal update must not require a
 frozen package version to keep password/desktop/sudo/PolicyKit available.
 
+The first R3 handoff is deliberately limited to installation and the normal
+stock-daemon start **without the sensor**. It tests actual mappings and
+SELinux/service load restrictions using the successful R2 binaries. It does
+not claim to close sensor access, material access, retry behavior or update
+survivability. A failed stock startup calls for its exact error and targeted
+diagnosis; do not repeat the already successful build or select R3-B/C without
+evidence that the environment-only approach is insufficient.
+
+`deployment/minimal-runtime/install.sh` and `uninstall.sh` share a small
+standard-library filesystem transaction. The install uses no version-pinned
+Fedora payload and copies only the allowlisted R2 files. The accepted build
+SHA and unchanged build-critical source comparison bind this handoff to the
+retained binaries; they are installation provenance, not a runtime prerequisite
+for password access. Documentation-only changes do not invalidate that build.
+The installed inverse has no Git/OS-release/RPM-version prerequisite.
+
+The transaction refuses a non-VM before host actions, verifies runtime digests,
+source continuity and destination ownership, preserves existing files and retains an
+exact saved inverse. It records service state, stops fprintd, publishes the
+runtime and environment drop-in, then leaves fprintd stopped for the user's
+explicit start. On ordinary deployment failure it reverses owned changes;
+on a foreign collision/content drift or recovery failure it retains evidence
+and reports the error rather than guessing ownership. Rollback removes the
+project environment before restoring the prior service state. No udev rule,
+SELinux policy module, D-Bus policy, PAM file or system executable is changed.
+
+**Update failure reasoning:** the only loader change is scoped to fprintd,
+whose executable/unit remain RPM-managed. Loss of ABI/dependencies can stop
+fingerprint service, but no new project dependency is inserted in password,
+desktop, sudo or PolicyKit. No A/B element is identified in this footprint;
+this is a static conclusion, pending the mandatory R5 real-update checks.
+Existing distro consumer failure handling must still be exercised, not assumed
+from a successful library load. No release qualification follows from R3 alone.
+
 Stock `reference/fprintd-fedora44-1.94.5/source/src/device.c` resubmits VERIFY
 and IDENTIFY after `FP_DEVICE_RETRY`. The historical
 `production/login/fprintd-consumer-retry.patch` suppresses that behavior; it
@@ -134,11 +189,29 @@ at that boundary, not another VT patch or an equivalent repeated live.
 
 Source digest/path audit, shell syntax, non-VM refusal before output creation,
 and the driver audit from a temporary source subset without historical auth
-components are permitted offline checks. They cannot establish compilation,
-ELF closure, SELinux, physical attempts, biometric success or R5 survivability.
+components passed during R2 preparation. The subsequent human VM evidence
+closes compilation and ELF linkage for the reported source. It does not
+establish SELinux execution, physical attempts,
+biometric success or R5 survivability.
 
-The user explicitly retains all VM execution. Use the
-[VM build handoff](../production/minimal-runtime/README.md), return its source
-commit/linkage evidence, then resume R2 review and R3-A preparation. Direct AI
-access to the VM is neither needed nor a blocker. The next gate is the manual
-VM build, not authorization to reinstall the historical managed candidate.
+The user explicitly retains all VM execution. R2 review is
+`ACCEPT_AND_CONTINUE`: preserve the existing build; do not repeat it. Continue
+with the R3-A reversible installation and a stock-daemon load check with the
+sensor disconnected. Direct AI access to the VM is neither needed nor a
+blocker. The previous [build procedure](../production/minimal-runtime/README.md)
+remains reproducible reference, not the next task.
+
+R3 offline verification: 17 temporary-filesystem/input tests cover symmetric
+removal, active/inactive restoration, idempotence, checksum and ownership
+drift, collision preservation, failed reload and failed vendor restart with
+the inverse retained. All host-command/device interfaces are test doubles;
+no service, library or USB execution is claimed. The real install entry point
+also refuses this physical host from an unrelated cwd before mutation. Both
+shell wrappers pass syntax checks; the driver-only source audit remains PASS.
+
+PM review decision: **HUMAN_REQUIRED** for the
+[R3-A install/load procedure](../deployment/minimal-runtime/README.md).
+The review set is the Git diff from the accepted R2 commit plus the exact
+new deployment sources/tests, roadmap, ledger and canonical manual. Offline
+closure is sufficient for handoff; actual installation, inverse behavior
+under systemd/SELinux and stock-daemon execution remain human VM evidence.

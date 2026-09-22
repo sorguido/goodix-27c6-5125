@@ -13,8 +13,10 @@
 > The next runtime must use the Goodix library with Fedora stock fprintd and
 > stock authentication consumers. No replacement candidate is ready yet.
 
-Current R2 work: [minimal runtime audit](docs/MINIMAL_RUNTIME.md) and
-[manual VM build procedure](production/minimal-runtime/README.md).
+R2 VM build is PASS at `c5df717`. Current handoff:
+[R3-A manual installation and stock-daemon load check, without the reader](deployment/minimal-runtime/README.md).
+See the [minimal runtime audit](docs/MINIMAL_RUNTIME.md); retain the existing
+R2 output rather than rebuilding.
 The following product and installation description is historical.
 
 This project provides a source-built libfprint driver for the Goodix USB

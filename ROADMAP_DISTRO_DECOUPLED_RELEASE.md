@@ -122,8 +122,9 @@ Da questo punto in avanti:
 - build/install/test/runtime/update-survivability si eseguono sulla VM;
 - l'eventuale pass-through USB del sensore reale alla VM resta soggetto ai
   normali Human Gate e alle invarianti factory-preserving;
-- il target fisico può essere usato soltanto per operazioni read-only o per una
-  nuova azione esplicitamente autorizzata dall'Utente;
+- il Fedora fisico resta il workspace dell'AI per sviluppo sul repository,
+  audit, documentazione e verifiche offline consentite che non mutino il
+  runtime host;
 - modifiche Git/documentali al repository non sono considerate mutazioni del
   runtime host, ma nessun artefatto prodotto può essere installato sul target
   fisico senza nuova decisione esplicita.
@@ -131,7 +132,26 @@ Da questo punto in avanti:
 ~~~text
 PHYSICAL_HOST_RUNTIME_MUTATION=false
 VM_ONLY_RUNTIME_VALIDATION=true
+AI_SOURCE_WORKSPACE=PHYSICAL_FEDORA
+AI_VM_ACCESS_REQUIRED=false
+VM_EXECUTION=HUMAN_ONLY_AFTER_GATE
+VM_REPOSITORY_SYNC=USER_PULL_DEVELOPMENT
 ~~~
+
+La VM non è un ambiente al quale l'AI deve accedere direttamente. Quando il
+lavoro richiede build, installazione, runtime, live o update-validation in VM:
+
+1. l'AI prepara, verifica nello scope offline consentito e committa su
+   `development` tutto il necessario per la prova;
+2. termina con `HUMAN_REQUIRED`, consegnando comandi ed evidenze attese;
+3. l'Utente esegue manualmente il pull di `development` nella VM;
+4. l'Utente esegue la prova e restituisce evidenze/output;
+5. l'AI riprende dal repository e dagli output forniti.
+
+La mancanza di accesso diretto dell'AI alla VM non è un blocker. Non si cerca
+un accesso alternativo e non si ripete una prova già chiusa solo perché l'AI
+non l'ha eseguita direttamente. Restano invariati i gate su privilegi, USB,
+materiali protetti e factory state.
 
 ---
 
@@ -462,7 +482,8 @@ Deve:
 - non trasformare una limitation di Fedora/KDE in un nuovo sottosistema privato;
 - non usare il fatto che una patch “funziona” come prova di release-safety;
 - produrre test offline prima del Human Gate;
-- eseguire ogni runtime/live/update test esclusivamente sulla VM;
+- demandare all'Utente, dopo il gate, ogni build/install/runtime/live/update
+  test in VM secondo §4;
 - preservare le invarianti factory-preserving esistenti.
 
 ## Review

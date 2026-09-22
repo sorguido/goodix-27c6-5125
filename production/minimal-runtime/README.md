@@ -1,14 +1,20 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R2: minimal library build on the Fedora VM
 
-**HUMAN_REQUIRED / VM_BUILD.** Run this procedure manually in the Fedora 44
+**R2 VM BUILD = PASS (22 September 2026).** The user completed this procedure
+at `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`. Keep the existing VM output
+`/home/guido/goodix-r2-20260922-081148/`; do not rebuild for R3. The instructions
+below remain a build reference for future source changes.
+
+Run this procedure manually in the Fedora 44
 KDE x86_64 VM, as its ordinary user, after pulling `development`. Keep the
 Goodix reader disconnected from the guest. No protected material is needed.
 The AI uses the physical workspace for source work and safe offline checks;
 it does not connect to the VM or execute its builds.
 
 Purpose: build the extracted driver/library set and check its dynamic linkage
-against the VM's Fedora fprintd. This is the next R2 gate, before R3 deployment.
+against the VM's Fedora fprintd. This was the R2 gate, now completed; the next
+step is the [R3-A install/load check](../../deployment/minimal-runtime/README.md).
 It does not install the project, run fprintd, enroll/verify, test authentication,
 exercise USB, or establish update survivability. No new installer/uninstaller
 is appropriate at this build-only boundary: no host runtime file is changed.
