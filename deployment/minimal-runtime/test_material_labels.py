@@ -15,6 +15,7 @@ spec = importlib.util.spec_from_file_location("r3_label_deploy", HERE / "deploy.
 d = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(d)
 DEFAULT = "system_u:object_r:var_lib_t:s0"
+VM_PRESTATE = ["unconfined_u:object_r:var_lib_t:s0"] + [DEFAULT] * 5
 
 
 class MaterialLifecycle(unittest.TestCase):
@@ -32,7 +33,7 @@ class MaterialLifecycle(unittest.TestCase):
             p = self.material / name
             p.write_bytes(b"synthetic protected-content sentinel")
             p.chmod(0o600)
-        self.contexts = [DEFAULT] * 6
+        self.contexts = VM_PRESTATE.copy()
         self.rules = []
         self.calls = []
         self.fail = None
@@ -75,7 +76,8 @@ class MaterialLifecycle(unittest.TestCase):
 
     def snapshot(self):
         return [(p.read_bytes() if p.is_file() else None, p.stat().st_uid,
-                 p.stat().st_gid, stat.S_IMODE(p.stat().st_mode), p.stat().st_mtime_ns)
+                 p.stat().st_gid, stat.S_IMODE(p.stat().st_mode),
+                 p.stat().st_size, p.stat().st_mtime_ns)
                 for p in d.material_paths()]
 
     def xattr(self, path, key, **kwargs):
@@ -286,6 +288,107 @@ class MaterialLifecycle(unittest.TestCase):
         d.save_state(state)
         self.calls.clear()
         return {name: (self.runtime / name).read_bytes() for name in d.LIBRARIES}
+
+    def test_real_mixed_prestate_cli_and_saved_label_inverse(self):
+        binaries = self.legacy()
+        def action(module, name):
+            with patch("sys.argv", ["deploy.py", name]), \
+                    patch.object(module, "machine_gate"), \
+                    patch.object(module, "install_preflight", return_value="inactive"), \
+                    patch.object(module.signal, "signal"), \
+                    patch("sys.stdout", new_callable=io.StringIO) as output:
+                module.main()
+            return output.getvalue()
+        before_output = action(d, "material-status")
+        self.assertIn(str(self.material) + " root:root 0700 " + VM_PRESTATE[0], before_output)
+        self.assertEqual(before_output.count("root:root 0600 " + DEFAULT), 5)
+        self.assertFalse(self.mutations())
+        self.assertIn("R3_MATERIAL_LABEL=PASS OWNED=true", action(d, "label-material"))
+        state = d.inspect_owned()
+        self.assertEqual(state["material_selinux"]["before_contexts"], VM_PRESTATE)
+        self.assertEqual(state["material_selinux"]["rule"], self.rule)
+        self.assertEqual(self.contexts, [d.MATERIAL_CONTEXT] * 6)
+        self.assertEqual(self.snapshot(), self.before)
+        saved_spec = importlib.util.spec_from_file_location("r3_mixed_saved", self.runtime / "deploy.py")
+        saved = importlib.util.module_from_spec(saved_spec)
+        with patch("sys.dont_write_bytecode", True):
+            saved_spec.loader.exec_module(saved)
+        for name in ("RUNTIME", "DROPIN", "MATERIAL", "MATERIAL_RULE", "safe_directory", "no_sensor", "run"):
+            self.patch(saved, name, getattr(d, name))
+        self.patch(saved, "REPO", self.base / "nonexistent")
+        self.patch(saved, "git", lambda *a: self.failTest("saved inverse used Git"))
+        self.patch(saved, "load_payload", lambda *a: self.failTest("saved inverse used build"))
+        self.assertIn("R3_MATERIAL_ROLLBACK=PASS", action(saved, "unlabel-material"))
+        self.assertEqual(self.contexts, [DEFAULT] * 6)  # matchpathcon, not original SELinux user.
+        self.assertNotEqual(self.contexts[0], VM_PRESTATE[0])
+        self.assertEqual(d.inspect_owned()["material_selinux"]["phase"], "removed")
+        self.assertEqual(self.rules, [self.foreign_rule])
+        self.assertTrue(self.dropin.exists())
+        self.assertEqual(binaries, {n: (self.runtime / n).read_bytes() for n in d.LIBRARIES})
+        self.assertEqual(self.snapshot(), self.before)
+        self.assertFalse(any(c[0] == "systemctl" and c[1] != "show" for c in self.calls))
+
+    def test_user_field_is_not_a_system_unconfined_special_case(self):
+        self.legacy()
+        self.contexts = ["staff_u:object_r:fprintd_var_lib_t:s0"] + ["guest_u:object_r:var_lib_t:s0"] * 5
+        before_contexts = self.contexts.copy()
+        self.rules.append(self.exact())
+        d.label_existing()
+        record = d.inspect_owned()["material_selinux"]
+        self.assertFalse(record["owned"])
+        self.assertEqual(record["before_contexts"], before_contexts)
+        self.assertEqual(self.contexts, [d.MATERIAL_CONTEXT] * 6)
+        d.remove_material(d.inspect_owned())
+        self.assertIn(self.exact(), self.rules)
+        self.assertFalse(any(c[:3] in (("semanage", "fcontext", "-a"),
+                                      ("semanage", "fcontext", "-d")) for c in self.calls))
+
+    def test_invalid_types_roles_levels_and_structure_rejected_before_mutation(self):
+        self.legacy()
+        before_state = (self.runtime / d.STATE).read_bytes()
+        for context in ("unconfined_u:object_r:etc_t:s0", "system_u:object_r:usr_t:s0",
+                        "system_u:object_r:unlabeled_t:s0", "system_u:system_r:var_lib_t:s0",
+                        "system_u:object_r:var_lib_t:s1", "system_u:object_r:var_lib_t:s0:c0",
+                        "system_u:object_r:var_lib_t:s0-s0", "system_u:object_r:var_lib_t",
+                        ":object_r:var_lib_t:s0", "bad user:object_r:var_lib_t:s0",
+                        "system_u:object_r:var_lib_t:s0\n", "system_u::var_lib_t:s0"):
+            with self.subTest(context=context):
+                self.contexts[0] = context
+                with self.assertRaisesRegex(RuntimeError, "unexpected material context"):
+                    d.label_existing()
+                self.assertFalse(self.mutations())
+                self.assertEqual((self.runtime / d.STATE).read_bytes(), before_state)
+
+    def test_mixed_prestate_partial_apply_drift_checks_remain_exact(self):
+        self.legacy()
+        self.fail = ("restorecon", "-F", "--", *(str(p) for p in d.material_paths()))
+        with self.assertRaisesRegex(RuntimeError, "injected"):
+            d.label_existing()
+        state = d.inspect_owned()
+        self.assertEqual(state["material_selinux"]["phase"], "apply")
+        self.assertEqual(state["material_selinux"]["before_contexts"], VM_PRESTATE)
+        d.check_material_record(state["material_selinux"])
+        self.contexts[0] = "staff_u:object_r:var_lib_t:s0"
+        self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "context drift"):
+            d.remove_material(state)
+        self.assertFalse(self.mutations())
+        self.contexts[0] = VM_PRESTATE[0]
+        d.remove_material(state)
+        self.assertEqual(self.contexts, [DEFAULT] * 6)
+
+    def test_record_and_canonical_poststate_remain_strict(self):
+        self.install()
+        state = d.inspect_owned()
+        self.calls.clear()
+        state["material_selinux"]["before_contexts"][0] = "unconfined_u:object_r:etc_t:s0"
+        with self.assertRaisesRegex(RuntimeError, "inconsistent material ownership"):
+            d.remove_material(state)
+        state["material_selinux"]["before_contexts"][0] = VM_PRESTATE[0]
+        self.contexts[0] = "unconfined_u:object_r:fprintd_var_lib_t:s0"
+        with self.assertRaisesRegex(RuntimeError, "context drift"):
+            d.remove_material(state)
+        self.assertFalse(self.mutations())
 
     def test_label_existing_replaces_only_inverse_state_and_labels_and_rolls_back_labels_only(self):
         binaries = self.legacy()

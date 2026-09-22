@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 Claim fermata da SELinux, correttivo label-only al Gate A (22 settembre 2026)
+### Stato corrente — R3 Gate A corretto per il pre-stato SELinux misto (22 settembre 2026)
 
 La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
 in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
@@ -24,8 +24,8 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`4a27996fe14aed51e2400ba172f27d5177af2cb1`, `development` inizialmente pulito,
-e dal task Utente `task_codex_r3_selinux_material_labeling.md`. Restano accettati
+`de7e6e4ef78d533dcada179a93ad01030c7e72d0`, `development` inizialmente pulito,
+e dal task Utente `task_codex_r3_selinux_prestate_context_fix.md`. Restano accettati
 44/44 normal e 44/44 ASan/UBSan, build qualificata
 `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, installazione `264cd7f`,
 clean replacement e stock load PASS. Il primo gate hardware ha enumerato un
@@ -36,7 +36,13 @@ runtime qualificato conservato. Questa è evidenza manuale Utente, non una
 ripetizione o osservazione diretta dell'AI. Output build conservato:
 `/home/guido/goodix-r3-20260922-111144`.
 
-Il task corrente integra il mapping locale persistente
+Il Gate A `de7e6e4` è ritirato prima della mutazione VM: la review rileva che
+la directory reale è `unconfined_u:object_r:var_lib_t:s0`, i cinque file
+`system_u:object_r:var_lib_t:s0`. Owner/mode restano corretti. La precedente
+allowlist di stringhe complete rifiutava quel pre-stato; non è una nuova live
+fallita. Il correttivo parsea user/role/type/level, conserva i contesti completi
+e mantiene object_r, s0 e la allowlist dei due tipi previsti. Il task conserva
+il mapping locale persistente
 `/var/lib/goodix-5125-poc(/.*)? → fprintd_var_lib_t` nel lifecycle minimale,
 con ownership esplicita e inversa salvata. Driver e cinque librerie invariati;
 nessuna nuova policy allow/modulo o modifica a Fedora/PAM/KDE. L'AI lavora
@@ -217,9 +223,9 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: correggere la deployment SELinux label, verificare ownership,
-restorecon e rollback con filesystem sintetico, aggiornare inversa/documentazione
-e consegnare il solo Gate A VM. Nessuna modifica production/retry/attempt,
+`CURRENT_TASK`: chiudere il mismatch fra pre-contesto reale e fixture Gate A,
+verificare status/apply/inversa con label miste e negativi, aggiornare
+inversa/documentazione e riconsegnare il solo Gate A VM. Nessuna modifica production/retry/attempt,
 binari, roadmap o governance. La successiva live richiede review separata.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
@@ -598,6 +604,38 @@ Drift o creazione ambigua → STOP conservando stato/inversa, senza cancellare
 regole non attribuibili. L'inversa non dipende da Git/build; hard power loss
 fra aggiornamento script/stato resta non qualificato e richiede review.
 
+**Corrective pre-stato, review prima della modifica:** il task successivo
+`task_codex_r3_selinux_prestate_context_fix.md` ritira il gate `de7e6e4` prima
+delle mutazioni VM. La directory osservata dall'Utente ha SELinux user
+unconfined_u, i cinque file system_u, tutti object_r:var_lib_t:s0 con DAC
+root:root 0700/0600. Il controllo precedente confondeva la stringa iniziale
+con il contesto completo canonico richiesto dopo relabel; la fixture era
+omogenea e non copriva l'ambiente reale. Classe
+`GATE_FIXTURE_PRESTATE_ASSUMPTION`, nessun cambio al design SELinux o al driver.
+
+La [documentazione primaria Red Hat sui contesti SELinux](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/selinux_users_and_administrators_guide/sect-security-enhanced_linux-working_with_selinux-selinux_contexts_labeling_files)
+conferma che root Unix può avere un contesto file con user unconfined_u.
+Le manpage Fedora installate restorecon(8)/matchpathcon(8), lette senza
+esecuzione mutativa, distinguono sostituzione completa con -F e lookup del
+contesto di default del path. Non si deduce quindi system_u dall'UID root.
+Il parser iniziale richiede user identificatore non vuoto, object_r, s0 esatto
+e soltanto var_lib_t/fprintd_var_lib_t; niente categorie/range aggiuntivi,
+nessun caso speciale limitato a system_u/unconfined_u. Conserva i sei contesti
+completi in before_contexts, validati anche dall'inversa. I confronti di drift
+restano esatti e il post-stato richiesto resta
+system_u:object_r:fprintd_var_lib_t:s0 su tutti i sei path. Status è diagnostico
+e riporta l'xattr reale; soltanto la validazione del piano ammette la modifica.
+
+Il rollback dopo rimozione owned segue matchpathcon: può produrre
+system_u:object_r:var_lib_t:s0 sulla directory invece dell'originario user
+unconfined_u; deve preservare contenuti/UID/GID/mode/size/mtime. La fixture ora
+parte sempre dal pre-stato misto reale. Nuove regressioni esercitano i tre
+entrypoint status/label/unlabel (inversa salvata senza Git/build), utenti
+SELinux diversi e tipo già corretto, tipi estranei/ruoli/livelli/strutture
+invalide, drift di user durante apply parziale e rigore del post-stato canonico.
+Collisioni/ownership locali invariati. Nessuna esecuzione Gate A/B viene
+asserita da questi test; sensore scollegato e runtime qualificato conservato.
+
 **Riesame metodologico:** cambia davvero la label persistente del manifest;
 la nuova ipotesi è che il tipo storage standard consenta il loader negato.
 Gate A verifica solo mapping/label. Se il successivo Gate B approvato fallisse
@@ -606,12 +644,13 @@ provenance installata, rivedere diagnosi prima di un'altra live.
 
 Review set Git-native da `4a27996`: deployment, test offline, handoff Gate A,
 README, audit runtime e manuale. I 27 test originali isolano il confine SELinux;
-i 20 test SELinux PASS usano metadata/file sintetici, comandi/xattr mock e inversa
-salvata senza Git/build. I 12 test open/close restano PASS: totale 59 test
+i 25 test SELinux PASS usano metadata/file sintetici, comandi/xattr mock e inversa
+salvata senza Git/build. I 12 test open/close restano PASS: totale 64 test
 offline. Audit dei 62 sorgenti
 production e quattro input build-support PASS; entrypoint label-material reale
 rifiutato sul fisico prima di mutazioni. Sintassi Python/shell verificata.
-Il gate operativo è `deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md`;
+Il delta corrective da `de7e6e4` riguarda parser, fixture e documentazione;
+il gate operativo aggiornato è `deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md`;
 la precedente procedura live è marcata bloccata e richiede label effettive
 anche nel futuro preflight. Nessun nuovo D-number o digest production.
 La review PM del diff e dei percorsi install/inversa conferma il boundary;
@@ -619,6 +658,9 @@ la decisione resta HUMAN_REQUIRED prima delle label reali VM, senza avviare
 un nuovo ciclo live o una nuova build.
 
 ```text
+PRESTATE_CONTEXT_FIX=PASS
+REAL_VM_MIXED_CONTEXT_REGRESSION=PASS
+OFFLINE_TESTS=64_PASS
 ROOT_CAUSE=SELINUX_GENERIC_VAR_LIB_T_DENIAL
 CORRECTIVE=STANDARD_FPRINTD_VAR_LIB_T_MAPPING
 CUSTOM_SELINUX_MODULE=false

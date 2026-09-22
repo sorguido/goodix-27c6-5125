@@ -2,6 +2,9 @@
 # R3 Gate A: persistent material labels, sensor disconnected
 
 **HUMAN_REQUIRED — apply project-owned fprintd_var_lib_t material mapping in VM.**
+The Gate A from `de7e6e4ef78d533dcada179a93ad01030c7e72d0` is withdrawn before
+VM mutation: do not execute that commit. Use the revised commit in the handoff.
+The correction below covers the actual mixed SELinux pre-state.
 Gate B (one live enumeration/Claim/Release) is blocked until the user returns
 Gate A evidence and a separate review/approval permits it. Do not run the live
 procedure, start fprintd or reconnect the sensor during this gate.
@@ -58,6 +61,40 @@ fprintd storage label resolves the observed manifest denial. Gate A checks
 mapping/labels only; it does not test Claim. If the later separately approved
 Gate B fails at the same point, stop without retry, inspect the exact new AVC
 and runtime provenance, and revise that diagnosis before another live run.
+
+## Pre-state corrective: SELinux user is not the Unix owner
+
+The user measured `unconfined_u:object_r:var_lib_t:s0` on the root:root 0700
+directory and `system_u:object_r:var_lib_t:s0` on the five root:root 0600 files.
+The previous code/fixture incorrectly assumed `system_u` for every initial
+context. This was caught in PM review before Gate A mutation, not a new live
+failure. Classification: `GATE_FIXTURE_PRESTATE_ASSUMPTION`; the causal
+manifest AVC and the standard mapping design remain unchanged.
+
+[Red Hat's SELinux context documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/7/html/selinux_users_and_administrators_guide/sect-security-enhanced_linux-working_with_selinux-selinux_contexts_labeling_files)
+distinguishes SELinux user/role/type/level from Unix ownership and shows
+root-owned files labeled with `unconfined_u`. The installed Fedora
+`restorecon(8)` states that `-F` replaces the complete context; `matchpathcon(8)`
+returns the default context for the existing path/file kind. These were
+reviewed read-only before the corrective; no labels or protected files were
+read or changed on the physical host.
+
+The pre-state parser separates four fields. It requires a nonempty SELinux
+user identifier, `object_r`, exactly `s0` (no categories/range expansion), and
+only `var_lib_t` or already `fprintd_var_lib_t`. It does not equate SELinux user
+with UID 0 or introduce an allowlist of `system_u`/`unconfined_u`. Unix
+root:root and 0700/0600 checks remain independent and unchanged. All six full
+pre-contexts are retained verbatim in state; partial-operation drift checks
+still compare exact recorded contexts, not just types. After mapping and
+restorecon, all six full effective contexts must still equal
+`system_u:object_r:fprintd_var_lib_t:s0`. Local-rule collisions/ownership are
+unchanged. `material-status` reports the actual full labels without normalizing
+them; reporting alone is not permission to apply unexpected types.
+
+On owned-rule removal, restorecon uses the defaults returned by matchpathcon:
+the directory may become `system_u:object_r:var_lib_t:s0` rather than recover
+its original `unconfined_u` field. This is the intended distribution-default
+rollback, while contents/UID/GID/mode/size/mtime remain preserved.
 
 ## Deployment and inverse
 
@@ -190,6 +227,11 @@ Offline checks use temporary synthetic files and mocked SELinux commands/xattrs:
 `test_offline.py` and `test_r3_open_close.py`. No AI VM/root, live SELinux
 mutation, USB, service execution or production build is performed.
 
-Offline result: **27 deployment + 20 SELinux lifecycle + 12 open/close = 59 PASS**.
+Offline result: **27 deployment + 25 SELinux lifecycle + 12 open/close = 64 PASS**.
+The fixture now starts from the real VM mixed labels throughout. Added coverage
+runs material-status, label-material and the saved unlabel-material entrypoint;
+checks a different SELinux user and an already-correct type; rejects unrelated
+types, malformed fields, wrong roles/levels; preserves exact partial-operation
+drift checks and the canonical post-state. All host interfaces are mocked.
 Driver-only digest audit PASS; Python/shell syntax PASS; the actual labeling
 entrypoint refuses the physical host before mutation. VM Gate A remains pending.

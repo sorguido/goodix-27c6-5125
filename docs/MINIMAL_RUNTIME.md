@@ -254,7 +254,15 @@ retained for review. See the Gate A review for partial-failure behavior and
 the unqualified hard power-loss window. This is not a general runtime upgrade.
 
 Offline verification combines the original 27 deployment tests, dedicated
-20 SELinux lifecycle tests with synthetic files/mock commands/xattrs, and the
-12 existing open/close tests: **59 PASS**. The source audit and real non-VM entrypoint
+25 SELinux lifecycle tests with synthetic files/mock commands/xattrs, and the
+12 existing open/close tests: **64 PASS**. The source audit and real non-VM entrypoint
 refusal do not mutate the physical runtime. Gate A has not run, and Gate B
 requires later separate review/approval. R5 and release validation remain open.
+
+The Gate A at `de7e6e4` was withdrawn before VM mutation: its initial full-label
+allowlist rejected the real directory's `unconfined_u` field. The revised
+pre-state parser accepts a structurally valid user with object_r, s0 and only
+var_lib_t/fprintd_var_lib_t; root DAC checks and the canonical full post-label
+remain strict. Exact pre-contexts remain recorded; rollback follows current
+matchpathcon defaults. The mixed real pre-state is now the synthetic fixture
+default. No local-rule ownership or mapping-design change, no live retry.

@@ -207,6 +207,20 @@ def material_contexts():
             .rstrip(b"\0").decode("ascii") for p in material_paths()]
 
 
+def valid_material_precontext(context):
+    # SELinux user is distinct from the Unix UID. Preserve its full value in
+    # before_contexts; this transition constrains object role, type and level.
+    if not isinstance(context, str):
+        return False
+    fields = context.split(":", 3)
+    if len(fields) != 4:
+        return False
+    user, role, label_type, level = fields
+    return (re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", user) is not None
+            and role == "object_r" and level == "s0"
+            and label_type in ("var_lib_t", "fprintd_var_lib_t"))
+
+
 def selinux_tools():
     for name in ("semanage", "restorecon", "matchpathcon"):
         require(shutil.which(name, path=ENV["PATH"]) is not None,
@@ -260,7 +274,7 @@ def material_plan():
     metadata = material_metadata()
     contexts = material_contexts()
     present = local_material_rule()
-    require(all(c in ("system_u:object_r:var_lib_t:s0", MATERIAL_CONTEXT) for c in contexts),
+    require(all(valid_material_precontext(c) for c in contexts),
             "unexpected material context; retain for review")
     return {"rule": MATERIAL_RULE, "context": MATERIAL_CONTEXT, "owned": False,
             "phase": "apply" if present else "creating", "preexisting": present,
@@ -277,8 +291,7 @@ def check_material_record(record):
             "invalid material ownership metadata; retain for review")
     require(record["phase"] != "creating", "uncertain mapping creation; retain state for review")
     require(record["owned"] != record["preexisting"] and
-            all(c in ("system_u:object_r:var_lib_t:s0", MATERIAL_CONTEXT)
-                for c in record["before_contexts"]),
+            all(valid_material_precontext(c) for c in record["before_contexts"]),
             "inconsistent material ownership metadata; retain for review")
     require(material_metadata() == record["metadata"], "material metadata drift; retain for review")
     present = local_material_rule()
