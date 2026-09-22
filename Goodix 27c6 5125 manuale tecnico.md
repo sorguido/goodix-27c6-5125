@@ -16,60 +16,51 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 Claim/Release PASS, enrollment stock da validare (22 settembre 2026)
+### Stato corrente — R3 enrollment stock PASS, verify da validare (22 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Recovery da `93e16f480aa006759e9c7d520abc493e01536ca5`, `development`
-pulito, con handoff Utente `CODEX_HANDOFF_R3_CLAIM_PASS_RESUME.md`.
-Review diretta dei commit `6d970c5d4c946a984f6b6a64d85ab5474902a18f`,
-`0d1cea8dcc7ddbbc46aa32be8bd35eb99ba1c646` e `93e16f480aa006759e9c7d520abc493e01536ca5`:
-restano accettati 44/44 normal e 44/44 ASan/UBSan riportati in VM, build
-`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, installazione
-`264cd7ff1ba77857e1985502f299e4375f9a0516`, clean replacement e load stock PASS.
-Output VM conservato: `/home/guido/goodix-r3-20260922-111144`.
+Recovery da `ce41ad60ff10393e305c94bf64a9baced34ec503`, `development`
+pulito e allineato a origin. L'Utente riporta **PASS dell'enrollment stock
+nella VM**, dopo `R3_ENROLL_PREFLIGHT=PASS SENSOR_CONNECTED=false`:
+`guido` / `left-index-finger`, otto notifiche `enroll-stage-passed`,
+`enroll-completed` e dito presente nella lista finale. L'audit conferma
+8 stage/8 contatti enrollment, 7 rearm inter-stage, nessun retry diversity,
+un solo handoff IDENTIFY NO_MATCH → ENROLL e due epoch chiusi/drained con
+zero operazioni pendenti, retry, reset, clear_halt o famiglie persistenti rilevate.
+L'Utente riferisce circa 8 contatti enrollment; l'acquisizione IDENTIFY iniziale
+è separata. I dettagli e le quattro righe originali sono nella review R3 sotto.
 
-L'Utente ha completato la correzione SELinux e, dopo la diagnostica bounded,
-la conversione del solo manifest legacy D232 nella proiezione runtime-v1.
-Il preflight del vero material loader, senza sensore/GUsb/libusb, è PASS
-riportato. La successiva unica enumerazione → Claim → Release è **PASS**
-riportato, con stock `/usr/libexec/fprintd`, libfprint/OpenCV private,
-libgusb Fedora e SELinux Enforcing. **Questo confine è chiuso: nessuna
-ripetizione equivalente, reinstallazione o rebuild di conferma.**
-Il receipt è stato riconciliato dall'Utente dopo la live, a sensore assente e
-fprintd inactive. I sei path hanno il contesto canonico fprintd_var_lib_t;
-manifest runtime SHA256
-`1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`.
-I quattro binari protetti sono rimasti invariati secondo l'handoff.
+Stato finale riportato: fprintd **inactive/MainPID 0**, sensore scollegato dalla
+VM, runtime e nuovo template conservati, nessun rollback. **Enrollment chiuso;
+nessun verify eseguito.** Non ripetere enrollment, Claim/Release, conversione
+manifest, riconciliazione, reinstallazione o rebuild già qualificati.
 
-La review offline riproduce 70/70 test originari. Un `CORRECTIVE` locale
-chiude un gap reale del nuovo preflight: il decoder JSON Python accettava
-chiavi duplicate/escape che il parser C production rifiuta. Il controllo ora
-li rifiuta prima di ogni mutazione; 72/72 test PASS. Nessun cambiamento al
-driver, ai binari, alla roadmap o ai guardrail; manifest canonico già validato
-compatibile. L'inversa salvata nella VM resta quella già installata; non si
-pretende che la riconciliazione del receipt abbia aggiornato lo script salvato.
+Baseline invariata: build `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`,
+install `264cd7ff1ba77857e1985502f299e4375f9a0516`, output VM
+`/home/guido/goodix-r3-20260922-111144`, stock `/usr/libexec/fprintd`,
+libfprint/OpenCV private e libgusb Fedora, SELinux Enforcing. Restano accettati
+44/44 normal e 44/44 ASan/UBSan sintetici riportati in VM. Manifest runtime-v1
+SHA256 `1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`,
+receipt riconciliato e contesti fprintd_var_lib_t. Il checkout guest esatto
+dell'enrollment non è riportato: non si equipara automaticamente a HEAD locale.
+Il preflight PASS collega il runtime mantenuto ai pin verificati dalla procedura.
 
-Il prossimo confine R3 è **un enrollment nativo con fprintd-enroll**, su un
-dito non ancora registrato, con il runtime qualificato conservato. La consegna
-è `deployment/minimal-runtime/R3_ENROLL_VM.md`; dopo enrollment e review,
-resta da qualificare fprintd-verify. Consumer R4, update R5 e release restano
-aperti. Il PASS open/close non prova capture, matching o assenza di scritture
-factory tramite readback. Le evidenze live sono riportate dall'Utente;
-l'AI ha verificato codice, diff e test offline, non rieseguito la VM.
+Il precedente STOP `require_stopped` non era una live: il corrective `ce41ad6`
+ha conservato il gate, aggiunto lo stato osservato agli errori e reso esplicito
+un solo stop umano a sensore assente. **77 test offline PASS** in quella
+recovery; il successivo preflight è ora PASS riportato. La causa precisa del
+vecchio stato transitorio resta ignota; il successo non la ricostruisce.
+Non serve un ulteriore corrective software a fronte di questo enrollment PASS.
 
-**Aggiornamento preflight enrollment, recovery da `64457b379972dd458c91032b701210ab066a3cac`:**
-l'Utente riporta STOP in `require_stopped`, sensore scollegato, zero live e
-zero tentativi enrollment. Subito dopo osserva inactive/dead, MainPID 0,
-Result success e ExecMainStartTimestamp vuoto. Lo stato al momento del
-rifiuto non era registrato: causa della transizione non determinata, nessun
-failure biometrico o difetto driver dimostrato. Il corrective conserva il
-gate inactive/MainPID 0, legge le cinque proprietà in una sola interrogazione
-e le include nell'errore. Nella sola procedura enrollment l'Utente ferma
-esplicitamente fprintd una volta dopo i controlli VM/root/sensore assente;
-poi verifica lo stato prima e dopo gli altri controlli. Nessun polling,
-retry, masking o aggiornamento dell'inversa installata. **77 test offline PASS**;
-stessa prima live enrollment ancora da eseguire. Nessun rollback dovuto a
-questo STOP preliminare.
+`ACCEPT_AND_CONTINUE`: il prossimo confine R3 è la **verifica nativa dello
+stesso indice sinistro**, con il template conservato. Consegna:
+`deployment/minimal-runtime/R3_VERIFY_VM.md`, fino a tre invocazioni esplicite
+stock, stop al primo MATCH e continuazione solo dopo NO_MATCH pulito.
+Ogni invocazione ha un Claim/capture; non è una serie imposta dal driver.
+L'AI si ferma a `HUMAN_REQUIRED` prima di privilegi, USB e live VM.
+R4, R5, R6 e R7 restano aperte. Le evidenze live sono riportate dall'Utente,
+corroborate dalla review del codice; non sono un rerun AI, un readback factory
+né una qualifica Windows, verify o release.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -244,9 +235,9 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è consolidare il PASS Claim/Release e preparare il
-successivo enrollment stock, come descritto nello stato corrente e nella
-sezione di recovery R3 sotto.
+Il `CURRENT_TASK` attuale è consolidare il PASS enrollment e preparare la
+verifica stock dello stesso dito, come descritto nello stato corrente e nella
+review R3 sotto.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -756,8 +747,9 @@ Sintassi dei quattro blocchi shell e del preflight Python, link locali e
 entrypoint help da cwd estranea verificati offline. Il workflow CLI reale
 resta da eseguire dall'Utente nella VM.
 
-`ACCEPT_AND_CONTINUE` dopo il corrective. Il successivo `CURRENT_TASK` è
-preparare un solo enrollment stock VM, senza rebuild/reinstall. L'audit di
+`ACCEPT_AND_CONTINUE` dopo il corrective. Il `CURRENT_TASK` di quella
+consegna era preparare un solo enrollment stock VM, senza rebuild/reinstall;
+il suo esito PASS è consolidato nella review successiva sotto. L'audit di
 `reference/fprintd-fedora44-1.94.5/source/{utils/enroll.c,src/device.c}`
 conferma una EnrollStart per invocazione, IDENTIFY anti-duplicato seguito
 soltanto su NO_MATCH pulito da ENROLL, EnrollStop e Release. Il daemon
@@ -837,20 +829,120 @@ Review `ACCEPT_AND_CONTINUE` del corrective, poi `HUMAN_REQUIRED` alla stessa
 prima live VM. Driver, binari, footprint, roadmap e licensing invariati;
 nessun nuovo coupling, file auth Fedora o failure oltre fingerprint introdotto.
 
+### R3 — review dell'enrollment PASS e consegna verify stock
+
+Recovery del 22 settembre 2026 da `ce41ad60ff10393e305c94bf64a9baced34ec503`.
+Il nuovo handoff Utente chiude la prima live enrollment, preceduta da preflight
+PASS a sensore scollegato. Esito osservato dall'Utente: stock fprintd-enroll,
+utente locale `guido`, `left-index-finger`, 8 × enroll-stage-passed,
+enroll-completed e fprintd-list finale con left-index-finger presente; circa
+8 contatti enrollment. Cleanup riportato inactive/MainPID 0, sensore scollegato
+dalla VM; runtime/template mantenuti, nessun rollback e nessun verify.
+
+Telemetria completa fornita dall'Utente, conservata nell'ordine ricevuto
+(non è un journal con timestamp; l'ordine incollato non è ordine temporale):
+
+```text
+GOODIX_PRODUCTION_EPOCH_AUDIT action=FPI_DEVICE_ACTION_ENROLL attempts=1 rejected=0 logical_actions=2 transport_epochs=2 capture_attempts=1 capture_terminal=0 identify_enroll_handoffs=1 identify_enroll_armed=0 consumed=1 tls=1 first_image=0 release_tail=0 single_terminal=0 rearm32=0 enroll_stages=8 enroll_rearm32=7 enroll_terminal=1 enroll_contacts=8 enroll_retry_scans=0 secure_retry=0 post_retry=0 reopen=0 explicit_verify_reopen=0 explicit_identify_reopen=0 reset=0 clear_halt=0 persistent=0 sigfm_baseline_pinned=1 sigfm_baseline_reused=0 real_submit=203 outstanding=0 drained=1 context_closed=1
+GOODIX_PRODUCTION_EPOCH_AUDIT action=FPI_DEVICE_ACTION_IDENTIFY attempts=1 rejected=0 logical_actions=1 transport_epochs=1 capture_attempts=1 capture_terminal=0 identify_enroll_handoffs=0 identify_enroll_armed=1 consumed=1 tls=1 first_image=1 release_tail=1 single_terminal=1 rearm32=0 enroll_stages=0 enroll_rearm32=0 enroll_terminal=0 enroll_contacts=0 enroll_retry_scans=0 secure_retry=0 post_retry=0 reopen=0 explicit_verify_reopen=0 explicit_identify_reopen=0 reset=0 clear_halt=0 persistent=0 sigfm_baseline_pinned=1 sigfm_baseline_reused=0 real_submit=82 outstanding=0 drained=1 context_closed=1
+GOODIX_STOCK_CAPTURE_RESULT attempt=1 outcome=NO_MATCH terminal=0
+GOODIX_STOCK_CAPTURE_BEGIN attempt=1 action=IDENTIFY
+```
+
+**Review PM: ACCEPT_AND_CONTINUE.** La lettura di `utils/enroll.c`,
+`src/device.c` del fprintd stock e del lifecycle/audit in
+`libfprint-driver/goodix_fpimage_device.c` corrobora un IDENTIFY anti-duplicato
+con NO_MATCH pulito e un singolo handoff ENROLL. `logical_actions=2` e
+`transport_epochs=2` sono cumulativi nel Claim; `capture_attempts=1` conserva
+il conteggio IDENTIFY, non segnala una verify nascosta. I campi
+first_image/release_tail/single_terminal a zero nell'epoch ENROLL appartengono
+al percorso di acquisizione singola, mentre l'enrollment usa i propri contatori
+stage/rearm/terminal/contact: non sono prova di immagini enrollment mancanti.
+Le otto notifiche CLI non sono un contatore totale dei contatti: stock emette
+anche lo stage del controllo duplicati. Gli 8 contatti enrollment telemetrati
+sono separati dall'acquisizione IDENTIFY iniziale.
+
+Entrambi gli epoch hanno TLS=1, nessun retry secure/post, reset/clear_halt,
+reopen o famiglia persistente rilevata, outstanding=0, drained=1 e
+context_closed=1. Il SIGFM baseline è pinned in entrambi. Questi contatori
+supportano il PASS nel percorso esercitato, non un readback del firmware o
+una prova esaustiva dello stato factory/Windows. Il template è attestato da
+CLI/listing e dall'Utente; l'AI non ne ha letto i contenuti.
+
+Il guest checkout SHA non compare nel nuovo handoff: si registra
+`ENROLLMENT_GUEST_CHECKOUT_SHA=NOT_REPORTED`. `ce41ad6` identifica la consegna
+locale preparata, non una misura del checkout guest. Build/install/manifest
+restano i pin del preflight PASS; il confronto del live-critical set con
+`b8cdd17` non mostra modifiche. Questa limitazione documentale non giustifica
+ripetere una live riuscita; la prossima procedura stampa SHA completo e RPM.
+
+**CURRENT_TASK:** consolidare l'evidenza enrollment e consegnare il primo
+verify stock sul template mantenuto, senza codice runtime nuovo. La guida
+`deployment/minimal-runtime/R3_ENROLL_VM.md` resta evidenza della procedura
+completata; il gate attivo è `deployment/minimal-runtime/R3_VERIFY_VM.md`.
+L'installazione e l'inversa salvata restano quelle qualificate, recuperabili
+nel versionamento; nessun aggiornamento dell'inversa è implicato dal pull.
+
+Il sorgente `utils/verify.c` esegue un Claim, una VerifyStart, VerifyStop e
+Release per invocazione; non offre un'opzione per tre tentativi. La selezione
+esplicita left-index-finger usa VERIFY, senza la selezione IDENTIFY di una
+galleria. Exit 1 comprende sia NO_MATCH sia errori: la continuazione richiede
+il risultato stock done, il RESULT driver NO_MATCH non terminale e cleanup
+pulito, non il solo exit code. Un eventuale retry API stock è fermato dal
+fence driver prima di nuove acquisizioni sensor-reaching.
+
+La consegna permette fino a tre invocazioni CLI manuali indipendenti, una
+capture tecnica per invocazione, stop al primo MATCH e nessun quarto tentativo
+nel gate. Non equivale a tre action nello stesso Claim e non qualifica quel
+boundary consumer/PAM. Non viene introdotto un cap cumulativo driver contrario
+alla decisione esplicita stock; nessun loop di retry o nuovo harness. Dopo
+NO_MATCH, si prosegue soltanto con release_tail=1/single_terminal=1 e risorse
+chiuse/drained. Dopo MATCH anticipato, la chiusura stock può cancellare prima
+della release tail: conservarne i contatori senza equiparare cancellazione a
+quiescenza device, richiedendo comunque drain/close e zero outstanding.
+Il daemon non esegue la riconciliazione storage device su questo driver che
+non espone STORAGE_LIST; la nuova live non prevede cancellazione di template.
+
+**Riesame metodologico pre-live:** (1) il confine cambia da costruzione e
+salvataggio del template a riconoscimento del medesimo dito tramite CLI stock;
+(2) l'ipotesi nuova è che il template appena acquisito sia caricato e produca
+MATCH nel runtime qualificato; il preflight non costituisce l'ipotesi;
+(3) se fallisce nel loader, analizzare errore/provenance/label/manifest senza
+ripetizione automatica; se fallisce nel matching o cleanup, fermarsi al primo
+errore o dopo tre NO_MATCH puliti e analizzare stadio e telemetria reali prima
+di qualunque nuova live. Nessun reenrollment o allentamento soglie implicito.
+
+Verifica offline della consegna: sintassi dei tre blocchi Bash e Python
+inline, import reale e preflight su funzioni host sostituite (successo e tre
+failure fail-closed: machine_gate, require_stopped, inspect_owned), link locali
+e corrispondenza della telemetria con i campi production. Review statica della
+singola invocazione CLI, assenza di loop retry e cleanup anche su errore.
+Audit driver-only 62 sorgenti + quattro supporti PASS, live-critical set
+immutato. Nessuna nuova build o esecuzione
+VM dall'AI; le 77 verifiche della recovery precedente non vengono dichiarate
+come una nuova suite eseguita per questo delta documentale.
+
+Review architetturale: nessun coupling aggiuntivo, file Fedora/auth modificato
+o dipendenza per password/desktop; nessuna nuova classe A/B. R5 resta da
+validare realmente. Esito della review offline: consegna accettata e arresto
+prima di privilegi/USB/live per AGENTS §6.1/§6.2 e roadmap §4.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R3
-ADVANCEMENT=ENROLLMENT_SERVICE_PREFLIGHT_CORRECTED_WITH_OBSERVED_STATE_DIAGNOSTICS
+ADVANCEMENT=STOCK_VM_ENROLLMENT_PASS_REVIEWED_NATIVE_VERIFY_HANDOFF_READY
 R3_OPEN_CLOSE=PASS_HUMAN_REPORTED
-R3_ENROLLMENT=NOT_YET_VALIDATED
-EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_ENROLLMENT_REQUIRES_HUMAN_VM
-RESIDUAL_BLOCKER_OR_RISK=BIOMETRIC_R3_AND_R4_R5_R6_R7_NOT_QUALIFIED
+R3_ENROLLMENT=PASS_HUMAN_REPORTED
+R3_VERIFY=NOT_YET_EXECUTED
+ENROLLMENT_GUEST_CHECKOUT_SHA=NOT_REPORTED
+EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_VERIFY_REQUIRES_HUMAN_VM
+RESIDUAL_BLOCKER_OR_RISK=VERIFY_AND_R4_R5_R6_R7_NOT_QUALIFIED
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_64457b3_FOR_PREFLIGHT_CORRECTIVE
+REVIEW_SET=GIT_DIFF_FROM_ce41ad60ff10393e305c94bf64a9baced34ec503
 PRODUCTION_DRIVER_CHANGED=false
 ROADMAP_CHANGED=false
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_STOCK_ENROLLMENT
+NEXT_BOUNDARY=HUMAN_VM_STOCK_VERIFY_LEFT_INDEX
 ```
 
 ### Governance corrente

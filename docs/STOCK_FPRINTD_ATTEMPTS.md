@@ -1,24 +1,31 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Stock fprintd retry and attempt review — R3
 
-Installed baseline reviewed: `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`.
+Original installed baseline reviewed: `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`.
 The source correction supersedes the cumulative cap introduced in `c0b2369`:
 the user's explicit decision leaves the number of explicit attempts to Fedora
 stock. A clean NO_MATCH with completed cleanup never exhausts a driver budget.
 R3-A installation and stock library loading are **PASS, human-reported** in
 Fedora 44 KDE x86_64/KVM with SELinux Enforcing and the sensor disconnected.
 The daemon, its ExecStart and libgusb are Fedora-owned; only libfprint and four
-OpenCV libraries load from the project directory. Installation remains in
-place; rollback was not exercised. This accepts R3-A loading, not enrollment,
+OpenCV libraries load from the project directory. That installation was retained
+until the later clean replacement below. This accepted R3-A loading, not enrollment,
 recognition, attempt safety or update survivability.
 
 **Current evidence:** the user's clean-reinstall task reports PM-accepted
 normal **44/44 PASS** and ASan/UBSan **44/44 PASS** at
 `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, and a clean, reviewed normal
 runtime build from that SHA. This closes synthetic execution; it does not
-claim real USB or biometric safety. The next gate is the
-[clean replacement](../deployment/minimal-runtime/README.md), stopping with
-fprintd inactive before a separate load-check review.
+claim real USB or biometric safety. The subsequent clean replacement at install
+`264cd7ff1ba77857e1985502f299e4375f9a0516`, load/material/Claim gates and native
+enrollment have now passed in the VM. Enrollment of `guido` / `left-index-finger`
+completed with eight enrollment stages/contacts and clean closure; the canonical
+manual preserves the complete user telemetry. Runtime and template are retained,
+sensor detached, fprintd inactive. No verification has run. The current gate is
+[native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md), with up to
+three manual CLI invocations, stop at first MATCH, continuation only after clean
+NO_MATCH. Each CLI invocation is one Claim/capture; this does not qualify a series
+inside one Claim or impose a cumulative driver cap.
 
 ## Source findings
 
@@ -33,7 +40,7 @@ fprintd inactive before a separate load-check review.
 | Host result ordering | Canonical `reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c`, `fpi_image_device_minutiae_detected`, `fp_image_device_maybe_complete_action` | Outcome callbacks reach the driver before the early match report to fprintd; the final API completion waits for deactivation and processing. The early report can precede finger-off/STOP. |
 | Driver cleanup/reopen | `libfprint-driver/goodix_fpimage_device.c`, `complete_deactivation`, `finish_deactivation`, `close_completed_capture_epoch` | Clean outcomes wait for STOP/drain and asynchronous matcher completion, release claim/material/TLS, then permit a later explicit action. Processing failure/cancel/transport error poison the logical open. |
 
-At the installed baseline, the driver does not reject every later same-kind
+At the original R3-A baseline, the driver did not reject every later same-kind
 call after MATCH. That is the terminal-outcome gap addressed here. Its lack
 of a cumulative cap after clean NO_MATCH is desired behavior. The cap in
 `c0b2369` incorrectly turned a previous three-attempt test convention/PAM
@@ -309,27 +316,27 @@ R3_A_STOCK_LOAD=PASS_HUMAN_REPORTED
 R3_SYNTHETIC_NORMAL=44/44 PASS
 R3_SYNTHETIC_ASAN_UBSAN=44/44 PASS
 QUALIFIED_SOURCE_COMMIT=b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226
-REAL_SENSOR_REQUIRED=false
-SENSOR_CONNECTED=false
+SYNTHETIC_REAL_SENSOR_REQUIRED=false
+LAST_REPORTED_SENSOR_CONNECTED=false
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PASS_SYNTHETIC_HUMAN_REPORTED
-NEXT_GATE=HUMAN_REQUIRED_VM_CLEAN_REPLACEMENT_LEAVE_FPRINTD_STOPPED
-LIVE_HANDOFF_READY=false
-INSTALLED_RUNTIME_CHANGED=false
+SYNTHETIC_PHASE_NEXT_GATE=COMPLETED_VM_CLEAN_REPLACEMENT
+CURRENT_GATE=HUMAN_REQUIRED_VM_STOCK_VERIFY
+LIVE_HANDOFF_READY=true
+CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
 
 The previous compiler/lifecycle/audit/expectation failures above are historical,
 not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
-Follow the [clean replacement procedure](../deployment/minimal-runtime/README.md):
-old saved inverse first, verify Fedora stock, install the qualified runtime,
-leave fprintd stopped and return evidence before its load-check. The old
-installed inverse remains unchanged until the user runs it. Native consumer
-workflow and material handoff remain separate boundaries before sensor use.
+The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
+native enrollment are completed evidence; do not repeat them. Proceed only
+through the current verification handoff after the human gate, retaining the
+qualified runtime, reconciled receipt and saved inverse.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file; the VM replacement is manual and still pending.
+file; the next verification is human-executed in the VM.

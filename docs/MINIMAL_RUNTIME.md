@@ -22,7 +22,7 @@ Enforcing, stock ExecStart/process `/usr/libexec/fprintd`, five private library
 mappings and `/usr/lib64/libgusb.so.2.0.10`. The reader stayed disconnected;
 that historical installation was retained until the later clean R3 replacement.
 The R2 output is preserved.
-No biometric, R4/R5/R6 or release qualification is claimed. The user now
+That load result alone did not qualify biometrics, R4/R5/R6 or release. The user
 reports PM-accepted [synthetic retry/attempt results](STOCK_FPRINTD_ATTEMPTS.md):
 44/44 normal and 44/44 ASan/UBSan at `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`.
 A normal runtime build from that SHA is also reported complete/reviewed,
@@ -33,9 +33,14 @@ bounded diagnostics exposed the legacy D232 manifest. The user converted only
 the manifest through the exact-input historical converter, passed the production
 material-loader preflight without USB and completed one stock-fprintd
 Claim/Release. Those gates are closed. The receipt is reconciled and the last
-reported state is sensor disconnected/fprintd inactive. The current human gate
-is [one native enrollment](../deployment/minimal-runtime/R3_ENROLL_VM.md),
-using the retained R3 runtime. No rebuild/reinstall or repeat open/close.
+reported state is sensor disconnected/fprintd inactive. The subsequent native
+enrollment is **PASS**: `guido` / `left-index-finger`, eight enrollment
+stages/contacts, completed and present in the final listing, both epochs
+closed/drained with zero retries or persistent families reported. Runtime and
+template remain, without rollback; no verify has run. The canonical manual
+records the full evidence and its limits. The current human gate is
+[native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md),
+using the retained R3 runtime/template. No rebuild/reinstall or repeat enrollment.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
@@ -116,8 +121,8 @@ content/UID/GID/mode. The completed human manifest conversion was separate from
 installation and changed no protected binary. Receipt reconciliation records
 that replacement without replacing the saved inverse. `/var/lib/fprint/` remains
 stock template storage and is not touched by runtime installation/uninstall.
-The next native enrollment may add one host template in a previously unused
-slot; overwriting an existing template is excluded from that gate.
+The completed native enrollment added the `guido` / `left-index-finger` host
+template. The next verify uses it without enrollment or template deletion.
 
 No additional udev rule is justified by current source evidence. The library
 build disables rule generation. The physical workspace's Fedora vendor unit
@@ -244,8 +249,8 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[one native enrollment](../deployment/minimal-runtime/R3_ENROLL_VM.md).
-The accepted build/load/material/Claim gates are not repeated. The review finds
+[native verification](../deployment/minimal-runtime/R3_VERIFY_VM.md).
+The accepted build/load/material/Claim/enrollment gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure
 beyond fingerprint and no replacement of Fedora-owned authentication files.
 Recovery remains removal/reinstall/update of Goodix integration. R5 remains
@@ -271,6 +276,8 @@ The enrollment instructions now explicitly stop fprintd once with the reader
 absent, after the VM/root checks, and recheck state after preflight. The helper
 does not stop the service. Current validation is **27 + 36 + 14 = 77 PASS**.
 No installed inverse or runtime replacement is needed for this correction.
+The subsequent human handoff reports preflight PASS and enrollment PASS; the original
+transient service-state cause remains unknown. No new software fix is inferred.
 Production parser, runtime binaries and source digests remain unchanged. The
 non-secret canonical serialization matches the user-reported runtime manifest
 SHA256 `1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`;

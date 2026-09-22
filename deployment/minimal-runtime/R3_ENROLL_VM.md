@@ -1,6 +1,16 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3: one native enrollment in the VM
 
+**COMPLETED — enrollment PASS, human-reported on 22 September 2026.**
+`guido` / `left-index-finger` completed enrollment with eight stages/contacts;
+the final listing contains the finger. Both epochs closed/drained, fprintd
+inactive/MainPID 0, sensor detached, runtime/template retained, no rollback.
+The canonical manual contains the complete telemetry and review. Preserve the
+procedure below as evidence; **do not repeat it**. The next human gate is
+[native verification of that finger](R3_VERIFY_VM.md).
+
+## Completed procedure
+
 **HUMAN_REQUIRED — real USB and enrollment are human-executed only.**
 Claim/Release is closed by the 22 September user handoff. This gate advances
 into biometric activation and host template storage using stock `fprintd-enroll`.

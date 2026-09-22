@@ -13,8 +13,11 @@ passed sensor-free and one subsequent enumeration -> Claim -> Release passed.
 Do not repeat those gates.  The procedure below is retained as historical
 clean-replacement evidence, not as the next live action.
 
-**Next human gate: [one native enrollment in the VM](R3_ENROLL_VM.md).**
-Use the retained runtime; no rebuild/reinstall or repeated Claim/Release.
+**Enrollment is also PASS:** `guido` / `left-index-finger`, eight enrollment
+contacts/stages, completed and listed, clean epoch closure; runtime/template
+retained and reader detached. [The enrollment procedure](R3_ENROLL_VM.md) is
+completed evidence. **Next human gate: [native verification in the VM](R3_VERIFY_VM.md).**
+Use the retained runtime and template; no rebuild/reinstall or repeated enrollment.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from
@@ -197,5 +200,6 @@ recovery validation: 27 deployment + 36 material/preflight + 14 open/close = 77 
 The JSON corrective requires no change to the installed runtime or saved inverse.
 Do not rerun the completed receipt reconciliation.
 The enrollment preflight corrective retains the stopped-service gate and adds
-the observed service properties to failures; see the current enrollment guide
-for the single human-executed stop with the reader disconnected.
+the observed service properties to failures. Its subsequent preflight and live
+enrollment passed. The current verify guide retains the single human-executed
+stop with the reader disconnected; no further corrective is required.
