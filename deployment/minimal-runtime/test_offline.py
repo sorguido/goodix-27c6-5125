@@ -82,6 +82,79 @@ class Transactions(unittest.TestCase):
         self.assertEqual((self.runtime / d.STATE).read_bytes(), before)
         self.assertFalse(self.calls)
 
+    def test_different_payload_refused_without_mutation(self):
+        self.install()
+        before = (self.runtime / d.STATE).read_bytes()
+        self.payload[d.LIBRARIES[0]] = b"different payload"
+        self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "different payload"):
+            self.install()
+        self.assertEqual((self.runtime / d.STATE).read_bytes(), before)
+        self.assertEqual((self.runtime / d.LIBRARIES[0]).read_bytes(),
+                         f"synthetic {d.LIBRARIES[0]}".encode())
+        self.assertFalse(self.calls)
+
+    def test_old_install_requires_its_saved_inverse(self):
+        self.install()
+        state_path = self.runtime / d.STATE
+        state = json.loads(state_path.read_text())
+        state["build_commit"] = "c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6"
+        state_path.write_text(json.dumps(state))
+        before = state_path.read_bytes()
+        self.calls.clear()
+        for action in (self.install, d.uninstall):
+            with self.assertRaisesRegex(RuntimeError, "unknown installation"):
+                action()
+        self.assertEqual(state_path.read_bytes(), before)
+        self.assertTrue((self.runtime / "uninstall.sh").exists())
+        self.assertFalse(self.calls)
+
+    def test_saved_inverse_works_without_checkout_or_build(self):
+        self.payload["deploy.py"] = (HERE / "deploy.py").read_bytes()
+        self.payload["uninstall.sh"] = (HERE / "uninstall.sh").read_bytes()
+        self.install()
+        saved_spec = importlib.util.spec_from_file_location(
+            "r3_saved_inverse", self.runtime / "deploy.py")
+        saved = importlib.util.module_from_spec(saved_spec)
+        with patch("sys.dont_write_bytecode", True):
+            saved_spec.loader.exec_module(saved)
+        self.calls.clear()
+        with patch.object(saved, "RUNTIME", self.runtime), \
+                patch.object(saved, "DROPIN", self.dropin), \
+                patch.object(saved, "REPO", self.base / "absent-checkout"), \
+                patch.object(saved, "safe_directory"), \
+                patch.object(saved, "no_sensor"), \
+                patch.object(saved, "run", side_effect=self.command), \
+                patch.object(saved, "git", side_effect=AssertionError("Git forbidden")), \
+                patch.object(saved, "load_payload", side_effect=AssertionError("build forbidden")):
+            saved.uninstall()
+        self.assertFalse(self.runtime.exists())
+        self.assertFalse(self.dropin.exists())
+        self.assertEqual(self.calls, [("systemctl", "stop", d.UNIT),
+                                      ("systemctl", "daemon-reload")])
+
+    def test_only_owned_footprint_changes_vendor_and_materials_preserved(self):
+        sentinels = ("usr/libexec/fprintd", "usr/lib/systemd/system/fprintd.service",
+                     "etc/pam.d/fingerprint-auth", "usr/lib/udev/rules.d/vendor.rules",
+                     "var/lib/fprint/synthetic", "var/lib/goodix-5125-poc/synthetic")
+        for name in sentinels:
+            path = self.base / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"untouched synthetic sentinel")
+        def snapshot():
+            return {p.relative_to(self.base): p.read_bytes()
+                    for p in self.base.rglob("*") if p.is_file()}
+        before = snapshot()
+        self.install()
+        self.assertTrue(all((self.base / name).read_bytes() == data
+                            for name, data in before.items()))
+        added = set(snapshot()) - set(before)
+        expected = {p.relative_to(self.base) for p in self.runtime.rglob("*") if p.is_file()}
+        self.assertEqual(added, expected | {self.dropin.relative_to(self.base)})
+        d.uninstall()
+        self.assertEqual(snapshot(), before)
+        self.assertFalse(any(call[0] not in ("systemctl", "restorecon") for call in self.calls))
+
     def test_initial_collision_preserved(self):
         self.dropin.parent.mkdir()
         self.dropin.write_bytes(b"foreign")
@@ -106,6 +179,15 @@ class Transactions(unittest.TestCase):
         self.assertFalse(self.runtime.exists())
         self.assertFalse(self.dropin.parent.exists())
         self.assertEqual(self.calls[-1], ("systemctl", "start", d.UNIT))
+
+    def test_sensor_recheck_failure_precedes_service_stop_and_publication(self):
+        with patch.object(d, "no_sensor", side_effect=RuntimeError("sensor present")):
+            with self.assertRaisesRegex(RuntimeError, "sensor present"):
+                self.install()
+        self.assertFalse(self.runtime.exists())
+        self.assertFalse(self.dropin.exists())
+        self.assertEqual(list(self.runtime.parent.iterdir()), [])
+        self.assertFalse(self.calls)
 
     def test_failed_vendor_restart_retains_inverse_for_retry(self):
         self.install("active")
@@ -197,6 +279,9 @@ class InputValidation(unittest.TestCase):
         self.assertIn("deploy.py", payload)
         self.assertNotIn("libgusb.so.2", payload)
         self.assertNotIn("fprintd", payload)
+        self.assertEqual(d.BUILD_COMMIT, "b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226")
+        self.assertEqual(payload["deploy.py"], (HERE / "deploy.py").read_bytes())
+        self.assertEqual(payload["uninstall.sh"], (HERE / "uninstall.sh").read_bytes())
 
     def test_modified_library_rejected(self):
         (self.build / "runtime" / d.LIBRARIES[0]).write_bytes(b"changed")
@@ -209,9 +294,44 @@ class InputValidation(unittest.TestCase):
             d.load_payload(self.build)
 
     def test_wrong_build_provenance_rejected(self):
-        (self.build / "build-provenance.txt").write_text("SOURCE_COMMIT=other\nBUILD_MODE=normal\n")
-        with self.assertRaisesRegex(RuntimeError, "retained normal"):
-            d.load_payload(self.build)
+        for commit, mode in (("c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6", "normal"),
+                             ("other", "normal"), (d.BUILD_COMMIT, "sanitized")):
+            with self.subTest(commit=commit, mode=mode):
+                (self.build / "build-provenance.txt").write_text(
+                    f"SOURCE_COMMIT={commit}\nBUILD_MODE={mode}\n")
+                with self.assertRaisesRegex(RuntimeError, "qualified normal R3"):
+                    d.load_payload(self.build)
+
+    def test_dirty_or_wrong_branch_rejected(self):
+        for branch, status in (("development", " M file"), ("main", "")):
+            with self.subTest(branch=branch, status=status), \
+                    patch.object(d, "git", side_effect=lambda *args:
+                                 {"branch": branch, "status": status}[args[0]]):
+                with self.assertRaisesRegex(RuntimeError, "development|clean committed"):
+                    d.load_payload(self.build)
+
+    def test_critical_source_drift_rejected(self):
+        original = d.git
+        def drift(*args):
+            if args[0] == "diff":
+                self.assertEqual(args[1:5], ("--exit-code", d.BUILD_COMMIT, "HEAD", "--"))
+                self.assertIn("libfprint-driver", args)
+                self.assertIn("production/build-inner.sh", args)
+                raise RuntimeError("critical source drift")
+            return original(*args)
+        with patch.object(d, "git", side_effect=drift):
+            with self.assertRaisesRegex(RuntimeError, "critical source drift"):
+                d.load_payload(self.build)
+
+    def test_missing_or_additional_library_rejected(self):
+        manifest = self.build / "runtime/SHA256SUMS"
+        original = manifest.read_text()
+        for altered in ("\n".join(original.splitlines()[1:]) + "\n",
+                        original + "0" * 64 + "  libgusb.so.2\n"):
+            with self.subTest(manifest=altered):
+                manifest.write_text(altered)
+                with self.assertRaisesRegex(RuntimeError, "library set"):
+                    d.load_payload(self.build)
 
     def test_link_outside_runtime_rejected(self):
         link = self.build / "runtime/libfprint-2.so.2"
@@ -219,6 +339,30 @@ class InputValidation(unittest.TestCase):
         link.symlink_to("/usr/lib64/libfprint-2.so.2")
         with self.assertRaisesRegex(RuntimeError, "unexpected link"):
             d.load_payload(self.build)
+
+
+class SensorGate(unittest.TestCase):
+    def test_present_reader_rejected_absent_reader_allowed_without_usb(self):
+        with tempfile.TemporaryDirectory(prefix="goodix-r3-sysfs-") as tmp:
+            directory = Path(tmp)
+            device = directory / "synthetic-device"
+            device.mkdir()
+            (device / "idVendor").write_text("27c6\n")
+            (device / "idProduct").write_text("5125\n")
+            with patch.object(d, "Path", return_value=directory):
+                with self.assertRaisesRegex(RuntimeError, "disconnect the Goodix"):
+                    d.no_sensor()
+                (device / "idProduct").write_text("0000\n")
+                d.no_sensor()
+
+    def test_machine_gate_checks_vm_privilege_and_sensor(self):
+        with patch.object(d, "run") as command, \
+                patch.object(d.os, "geteuid", return_value=0), \
+                patch.object(d, "no_sensor", side_effect=RuntimeError("sensor present")) as sensor:
+            with self.assertRaisesRegex(RuntimeError, "sensor present"):
+                d.machine_gate()
+            command.assert_called_once_with("systemd-detect-virt", "--vm", "--quiet")
+            sensor.assert_called_once_with()
 
 
 if __name__ == "__main__":

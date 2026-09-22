@@ -1,30 +1,25 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3: synthetic retry/attempt regression in the VM
 
-**Next human gate: compile and run offline tests only. Keep the reader
-disconnected. Do not rebuild R2, reinstall R3-A or run a live test.**
+**Completed: normal 44/44 PASS and ASan/UBSan 44/44 PASS at
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, reported by the user as accepted
+by PM/review.** The qualified normal runtime build is also complete. Do not
+repeat these tests or rebuild for the current task. The next gate is the
+[clean replacement](../../deployment/minimal-runtime/README.md), using the
+old saved inverse first and ending with fprintd stopped before load-check.
 
-The latest VM run **compiled/linked and started both normal and sanitizer
-tests**. Both fail at
-`/goodix/d282/production-enrollment-intermediate-extraction-terminal`:
-a normal `GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30` message occurs while an
-unrelated expected warning is pending. This is `TEST_EXPECTATION_SCOPE`.
-The expectation now starts only when the stage-3 worker is blocked, just
-before failure/unblock; successful stages 1 and 2 keep their normal logs.
-All three expectation scopes have been reviewed. Logs, fatal-warning handling
-and production behavior are unchanged. The fixture passes syntax-only checks
-in both profiles; full normal/sanitizer execution remains pending.
-
-**REAL_SENSOR_REQUIRED=false:** keep the Goodix reader disconnected from the
-VM. The runner rejects a visible reader and Flatpak uses `--nodevice=all`.
-Pull the corrective and repeat this same gate with a new output directory.
-Keep previous outputs as evidence. R3-A stays installed; no rollback is needed.
+The D282 expectation correction in `b8cdd17` restricts the expected warning
+to the blocked stage-3 worker. All three scopes were reviewed; normal logs,
+fatal-warning handling and production behavior remained unchanged.
+**REAL_SENSOR_REQUIRED=false:** keep the Goodix reader disconnected.
+The instructions below retain the completed synthetic procedure for reference.
 
 R3-A stock loading is accepted from the user's Fedora 44 KDE x86_64 VM
 evidence: R2 build `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, installation
 `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`, stock `/usr/libexec/fprintd`,
-SELinux Enforcing, five private libraries and Fedora libgusb. Keep that
-installation and `/home/guido/goodix-r2-20260922-081148/` in place.
+SELinux Enforcing, five private libraries and Fedora libgusb. That install
+remained in place throughout this synthetic gate. Its clean replacement is
+now handed off separately; retain `/home/guido/goodix-r2-20260922-081148/`.
 
 The current source keeps a terminal latch after MATCH/error and removes the
 cumulative three-capture cap from `c0b2369`, following the user's explicit
@@ -44,8 +39,8 @@ This uses the canonical driver and Fedora libfprint source with synthetic
 USB/material/SIGFM interfaces, not the system daemon, installed runtime,
 real protected materials or real USB. It reuses the existing integration
 fixtures; no operator harness or authentication consumer is introduced.
-Corrective normal and ASan/UBSan execution is still pending. A source review
-alone is not a regression PASS or permission for a live test.
+Corrective execution passed as reported above. Synthetic qualification is
+not permission for a live test.
 
 ## Run as the ordinary VM user
 
@@ -108,6 +103,6 @@ reader stayed disconnected and R3-A stayed installed.
 On failure, return the first compiler/assertion/sanitizer error and the test
 name from `tests.log`. No protected contents or broad system logs are needed.
 
-After PASS the AI reviews dynamic evidence before preparing a separate
-runtime update or any sensor handoff. Stock consumer workflow, material
-availability and live safety do not follow automatically from these tests.
+After PASS the AI reviews dynamic evidence before a separate deployment
+or sensor handoff; the current deployment procedure is linked above. Stock
+consumer workflow, material availability and live safety do not follow automatically from these tests.

@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 
-BUILD_COMMIT = "c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6"
+BUILD_COMMIT = "b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226"
 RUNTIME = Path("/usr/local/lib64/goodix-27c6-5125")
 DROPIN = Path("/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf")
 UNIT = "fprintd.service"
@@ -123,7 +123,7 @@ def load_payload(build):
     install_commit = git("rev-parse", "HEAD")
     provenance = read_regular(build / "build-provenance.txt", 65536)
     require(provenance.startswith(f"SOURCE_COMMIT={BUILD_COMMIT}\nBUILD_MODE=normal\n".encode()),
-            "expected the retained normal R2 build, not a rebuild or sanitizer output")
+            "expected the qualified normal R3 build from " + BUILD_COMMIT)
     critical = ["libfprint-driver", "reference/libfprint-fedora44-1.94.100",
                 "Rockytkg/libfprint/libfprint/sigfm", "production/build-inner.sh",
                 "production/build-support", "production/minimal-runtime/build.sh",

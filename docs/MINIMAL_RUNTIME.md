@@ -21,10 +21,13 @@ by the user for install `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`: SELinux
 Enforcing, stock ExecStart/process `/usr/libexec/fprintd`, five private library
 mappings and `/usr/lib64/libgusb.so.2.0.10`. The reader stayed disconnected;
 installation and R2 output remain in place, rollback untested in the VM.
-No biometric, R4/R5/R6 or release qualification is claimed. The current
-[retry/attempt correction and audit](STOCK_FPRINTD_ATTEMPTS.md) require
-synthetic VM execution before any sensor handoff; the installed binary does
-not contain that source correction.
+No biometric, R4/R5/R6 or release qualification is claimed. The user now
+reports PM-accepted [synthetic retry/attempt results](STOCK_FPRINTD_ATTEMPTS.md):
+44/44 normal and 44/44 ASan/UBSan at `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`.
+A normal runtime build from that SHA is also reported complete/reviewed,
+at `/home/guido/goodix-r3-20260922-111144`. The installed old R2 binary lacks
+that correction; the next gate is clean replacement, not another build/test.
+A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
 
@@ -150,8 +153,8 @@ evidence that the environment-only approach is insufficient.
 
 `deployment/minimal-runtime/install.sh` and `uninstall.sh` share a small
 standard-library filesystem transaction. The install uses no version-pinned
-Fedora payload and copies only the allowlisted R2 files. The accepted build
-SHA and unchanged build-critical source comparison bind this handoff to the
+Fedora payload and copies only the allowlisted five-library payload. The
+accepted build SHA and unchanged build-critical source comparison bind this handoff to the
 retained binaries; they are installation provenance, not a runtime prerequisite
 for password access. Documentation-only changes do not invalidate that build.
 The installed inverse has no Git/OS-release/RPM-version prerequisite.
@@ -186,7 +189,8 @@ not to ordinary stock VerifyStart. Per the user's explicit decision, the
 current R3 correction removes the cumulative cap introduced in `c0b2369`.
 Clean NO_MATCH with cleanup admits further explicit attempts chosen by the
 stock consumer; the counter is telemetry only. MATCH/error remains terminal
-for that Claim. Synthetic evidence is pending; see `STOCK_FPRINTD_ATTEMPTS.md`.
+for that Claim. Synthetic evidence now passes 44/44 in both modes as reported
+by the user; see `STOCK_FPRINTD_ATTEMPTS.md`. This does not establish real sensor behavior.
 The native stock workflow must preserve terminal-outcome fencing, cleanup
 and zero implicit sensor-reaching retries before any sensor test. Do not
 weaken the fence or reuse the private consumer patch to get a build or live PASS.
@@ -207,7 +211,8 @@ biometric success or R5 survivability.
 
 The user explicitly retains all VM execution. R2 review is
 `ACCEPT_AND_CONTINUE`: preserve the existing build; do not repeat it. R3-A
-install/load evidence is also `ACCEPT_AND_CONTINUE`; keep its installation.
+original install/load evidence is also `ACCEPT_AND_CONTINUE`; its removal
+is now explicitly requested for the clean replacement below.
 Direct AI access to the VM is neither needed nor a
 blocker. The previous [build procedure](../production/minimal-runtime/README.md)
 remains reproducible reference, not the next task.
@@ -220,12 +225,23 @@ no service, library or USB execution is claimed. The real install entry point
 also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
-PM review now accepts the user-reported install/load evidence. The next
-**HUMAN_REQUIRED** is the [synthetic stock-attempt test](../production/minimal-runtime/STOCK_ATTEMPTS_VM.md).
-No new install or live is handed off. The correction changes the two driver
-source/header digests, not the installed binary or daemon. Normal/sanitized
-execution of the extended 44-case suite remains pending; source/shell/inert
-checks alone do not close retry safety. The previous installation's saved
-inverse remains valid and untouched. Review set: Git diff from install commit
-`92311c5`, retry audit, changed driver/tests/runner, ledger and canonical manual;
-the user-directed removal of the cap is the corrective diff from `c0b2369`.
+The current **HUMAN_REQUIRED** is the
+[clean replacement procedure](../deployment/minimal-runtime/README.md).
+The only deployment logic delta is the accepted normal build SHA, now
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, plus its rejection message.
+Source continuity and all existing guards remain. The user must first run the
+old inverse saved under the installed runtime, verify stock files/environment,
+then install the qualified build and leave fprintd stopped for review before
+load-check. The new uninstaller rejects old metadata; no multi-version
+compatibility or in-place update is introduced. The footprint table is unchanged.
+The new saved inverse returns to Fedora stock without Git/build/snapshot.
+
+Current offline deployment verification: **27 tests PASS**, including exact
+build/mode and payload rejection, old metadata preservation, critical-source
+drift, clean checkout, five-library set, saved inverse executed from its copy
+with no checkout/build access, vendor/material sentinels and reader-absence
+gates. Existing transaction/service/collision tests remain. Host interfaces
+are mocked and filesystem writes remain temporary; no VM, root, service or USB
+operation was performed by the AI. Wrapper/documented-command syntax and
+non-VM refusal also pass. The manual VM clean replacement and the later new
+runtime load-check are still pending; synthetic PASS is not release closure.

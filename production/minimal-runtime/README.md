@@ -5,8 +5,11 @@
 at `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`. Keep the existing VM output
 `/home/guido/goodix-r2-20260922-081148/`; do not rebuild for R3. The instructions
 below remain a build reference for future source changes. R3-A stock loading
-has also passed at install `92311c5`. The next gate is the
-[synthetic attempt test](STOCK_ATTEMPTS_VM.md); keep the installed baseline.
+has also passed at install `92311c5`. Synthetic normal and ASan/UBSan suites
+now pass 44/44 at `b8cdd17`, whose normal runtime build is already complete
+at `/home/guido/goodix-r3-20260922-111144`, per the user. The next gate is the
+[clean replacement](../../deployment/minimal-runtime/README.md), ending with
+fprintd stopped before load-check. Do not repeat either completed build.
 
 Run this procedure manually in the Fedora 44
 KDE x86_64 VM, as its ordinary user, after pulling `development`. Keep the
@@ -16,8 +19,8 @@ it does not connect to the VM or execute its builds.
 
 Purpose: build the extracted driver/library set and check its dynamic linkage
 against the VM's Fedora fprintd. This was the R2 gate, now completed; the
-R3-A load check is also complete. Do not rebuild the runtime for the current
-test-only handoff.
+original R3-A load check is also complete. Do not rebuild for the current
+clean replacement handoff.
 It does not install the project, run fprintd, enroll/verify, test authentication,
 exercise USB, or establish update survivability. No new installer/uninstaller
 is appropriate at this build-only boundary: no host runtime file is changed.

@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3-A load PASS, gate test sintetici retry/attempt (22 settembre 2026)
+### Stato corrente — R3 sintetico e build PASS, gate clean replacement in VM (22 settembre 2026)
 
 La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
 in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
@@ -24,16 +24,22 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`5b0369ee55968b5262a83cb7f4a3608cdddd02b9`, `development` inizialmente pulito,
-e dall'esito VM fornito in `R3_D282_expectation_scope_corrective.md`:
-**build/link PASS, suite normal e sanitizer avviate**, entrambe ferme in
-`/goodix/d282/production-enrollment-intermediate-extraction-terminal`.
-Un normale log `GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30` degli stage riusciti
-incontra l'expectation installata prematuramente per il failure allo stage 3.
-Il corrective sposta soltanto quella expectation e chiude la review di tutte
-le tre presenti nel fixture. Nessun log silenziato o guardrail allentato.
-Sensore scollegato, R3-A invariata; medesimo gate sintetico VM ancora da
-superare integralmente. Il sensore reale non serve e deve restare scollegato.
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, `development` inizialmente pulito,
+e dal task Utente `task_codex_r3_clean_reinstall_installer.md`: **44/44 normal
+PASS e 44/44 ASan/UBSan PASS**, stato dichiarato accettato da PM/review.
+Anche la build runtime normale dello stesso SHA è dichiarata completata e
+revisionata pulita in VM, output confermato dall'Utente
+`/home/guido/goodix-r3-20260922-111144`. Evidenza fornita dall'Utente, non
+riesecuzione o accesso dell'AI alla VM. I precedenti failure del fixture sono
+superati da questa qualifica sintetica; nessuna prova biometrica è inferita.
+
+Il task corrente prepara la sostituzione pulita della vecchia R3-A: prima
+inversa salvata nell'installazione `92311c5`/build `c5df717`, poi verifica
+Fedora stock, infine installazione del runtime qualificato `b8cdd17` con il
+medesimo footprint. Il sensore resta scollegato. Il gate si ferma con
+**fprintd stopped, prima del nuovo load-check**. Lo snapshot cold VM riferito
+dall'Utente è soltanto un paracadute esterno di laboratorio; non è requisito
+del prodotto o dell'inversa. Nessun upgrade in-place.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -134,7 +140,7 @@ ownership/modi e content binding sui cinque input preservati. Nessun nuovo
 riuso esterno o cambio licenza. La provenance Rockytkg è stata consultata in
 `development/Rockytkg/snapshot/PROVENANCE.md`, dove risiede lo snapshot.
 
-### R3-A — installazione e caricamento stock PASS, baseline conservata
+### R3-A — installazione e caricamento stock PASS, baseline prima della sostituzione
 
 L'Utente ha eseguito installazione e load check nella Fedora 44 KDE x86_64 VM:
 
@@ -161,8 +167,8 @@ load, senza inferire enrollment, riconoscimento, safety retry, rollback reale
 o R5. La scelta A è sufficiente al caricamento osservato; B/C non selezionate.
 Nessuna installazione/load/build viene ripetuta dall'AI.
 
-`deployment/minimal-runtime/install.sh` e `uninstall.sh` usano una transazione
-locale Python standard-library. Installano esclusivamente i cinque binari R2,
+La versione R3-A di `deployment/minimal-runtime/install.sh` e `uninstall.sh`
+usa una transazione locale Python standard-library. Installava i cinque binari R2,
 symlink, notices/provenance e inversa salvata in
 `/usr/local/lib64/goodix-27c6-5125/`, più
 `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf`.
@@ -174,8 +180,8 @@ applicati ai nuovi file tramite restorecon, senza disabilitare SELinux.
 Il preflight rifiuta host fisico, VM/OS errati, sensore presente, checkout
 sporco/non-development, build diversa, drift runtime, fprintd non stock,
 override locali estranei e SELinux non Enforcing. La continuità degli input
-build viene confrontata con lo SHA R2; manuale/ledger/deployment nuovi non
-invalidano i binari conservati. La copia runtime è allowlisted e verificata
+build veniva confrontata con lo SHA R2 (ora col solo SHA R3 qualificato);
+manuale/ledger/deployment nuovi non invalidano i binari conservati. La copia runtime è allowlisted e verificata
 contro i cinque hash dell'output; vengono registrati separatamente build SHA
 e install SHA, senza token o approvazione aggiuntiva.
 
@@ -207,12 +213,11 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: restringere l'expectation D282 al worker già bloccato dello
-stage `enrollment_extraction_failure_stage`, prima di set-failure/unblock;
-review di tutti gli usi di `g_test_expect_message()` nel fixture. Conservare
-log normali, fatal/warning, assert di failure/cleanup, production e policy.
-Nessun cambio alla roadmap; medesimo gate sintetico VM senza sensore,
-installazione, live o rollback R3-A.
+`CURRENT_TASK`: adattare minimamente il deployment alla sola build normale
+`b8cdd17`, mantenere footprint/inversa, verificare offline la transazione e
+consegnare uninstall vecchia inversa → stock → install R3 → servizio fermo.
+La suite sintetica completa e la nuova build VM sono accettate dal task
+Utente; non vanno ripetute. Nessun cambio production, policy o roadmap.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -372,7 +377,7 @@ nel logical open anche quando la sessione successiva fornisce B. Questo è
 ancora un test delle meccaniche di pinning, non prova di equivalenza fra
 sessioni fisiche o stabilità biometrica; preprocessing e pinning non cambiano.
 
-**Run VM corrente e corrective expectation D282:** build/link PASS, normal
+**Precedente run VM e corrective expectation D282 (`b8cdd17`):** build/link PASS, normal
 e sanitizer avviati e identico failure in
 `/goodix/d282/production-enrollment-intermediate-extraction-terminal`.
 Il messaggio `libfprint-image-FATAL-: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30`
@@ -405,68 +410,75 @@ shell e diff PASS; help e rifiuto non-VM dell'entrypoint reale da cwd estranea
 PASS senza creare output. Il fixture corretto passa
 `-fsyntax-only` con entrambi i profili normal/sanitizer, senza diagnostiche.
 Nessuna build o esecuzione C del progetto sul fisico, soltanto analisi statica.
-Le **44 prove complete della versione corretta restano da eseguire** in VM:
-il failure di expectation D282 non chiude la regressione completa.
+Il successivo task Utente riporta entrambe le suite complete **44/44 PASS**
+su `b8cdd17`, accettate da PM/review, e la nuova build normale revisionata
+pulita. Questo supera il gate sintetico; non prova ancora il caricamento del
+nuovo runtime, il sensore, il workflow dei consumer o R5.
 
-Il prossimo gate è il test-build offline nella VM, da utente ordinario,
-tramite `production/minimal-runtime/check-stock-attempts.sh`, SDK esistente,
-rete/dispositivi disabilitati. Non installa nulla, non esegue fprintd, non legge
-materiali veri. Restano in place la baseline R3-A e l'inversa salvata; nessun
-rollback di quella baseline serve per un failure del test sintetico. L'antidoto
-è solo rimuovere il nuovo output test dopo aver conservato l'evidenza utile.
-Non rilanciare il vecchio installer dal nuovo checkout: il suo controllo
-continuità sorgenti rifiuta correttamente il driver cambiato.
+### R3 — clean replacement della baseline installata
+
+La sola modifica eseguibile al deployment è `BUILD_COMMIT=b8cdd17...` con
+messaggio di rifiuto coerente. Restano i controlli VM/Fedora 44 x86_64,
+SELinux Enforcing, sensore assente, checkout development pulito, daemon/unit
+stock, build normale, cinque hash/librerie, symlink e continuità dei sorgenti
+production critici. Nessun cambio a driver, runtime production, retry/attempt,
+Fedora/PAM/udev, materiali/template, footprint, roadmap o governance.
+
+Il nuovo uninstaller non adotta metadata `c5df717` e non acquisisce supporto
+multi-versione. L'Utente eseguirà **prima**
+`sudo /usr/local/lib64/goodix-27c6-5125/uninstall.sh` della vecchia R3-A.
+Verificati directory/drop-in assenti, ExecStart vendor, environment del
+progetto assente e file RPM invariati, installerà il build già presente in
+`/home/guido/goodix-r3-20260922-111144`. Il nuovo installer salva di nuovo
+`deploy.py`, `uninstall.sh`, `installation.json`, hash e provenance; l'inversa
+indipendente da Git/build ritorna a Fedora stock, non al vecchio payload R2.
+La normale conservazione active/inactive dell'inversa resta invariata.
+Il nuovo install lascia fprintd fermo e si attende review prima di avviarlo.
+
+**Verifica offline corrente:** 27 test su filesystem temporanei e interfacce
+host/device simulate PASS: clean install/uninstall, idempotenza, build e
+payload differenti, rifiuto vecchi metadata, collisioni/drift, stato servizio,
+rollback su failure, inversa salvata senza checkout/build, footprint e
+sentinelle Fedora/materiali intatte, sensore richiesto assente. Sintassi dei
+wrapper/istruzioni, audit driver-only, diff e rifiuto non-VM degli entrypoint
+sono verificati senza root, installazione, servizio reale, USB o nuove build.
+La review del diff mantiene il failure model fingerprint-only; R5 resta
+obbligatoria, non dedotta da test con interfacce simulate.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=D282_WARNING_EXPECTATION_SCOPED_TO_BLOCKED_FAILURE_STAGE
+ADVANCEMENT=QUALIFIED_R3_CLEAN_REPLACEMENT_PREPARED
 ACTIVE_PHASE=R3
-PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
-BUILD_LINK=PASS
-NORMAL_TESTS_STARTED=true
-SANITIZER_TESTS_STARTED=true
-NORMAL_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
-SANITIZER_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
-FAILURE_CLASS=TEST_EXPECTATION_SCOPE
+R3_SYNTHETIC_NORMAL=44/44 PASS
+R3_SYNTHETIC_ASAN_UBSAN=44/44 PASS
+QUALIFIED_SOURCE_COMMIT=b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226
+R3_RUNTIME_BUILD=PASS_HUMAN_REPORTED_REVIEWED
+CURRENT_VM_R3_A_BUILD=c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6
+CURRENT_VM_R3_A_INSTALL=92311c5ebe1d05a68ad0542ecb8aeafb9776db0e
 REAL_SENSOR_REQUIRED=false
 SENSOR_CONNECTED=false
-R3_A_INSTALLATION=UNCHANGED
-R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
-EXPECTATION_SCOPE_REVIEW=3_OF_3_CLOSED_OFFLINE
-EXPECTATION_SCOPE_CORRECTIVE_VM_EXECUTION=PENDING
-STATIC_COMPILE_SURFACE_REVIEW=CLOSED
-PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
-LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
-SIGFM_AUDIT_STUB_SYNTAX_ONLY=PASS_BOTH_PROFILES
-EXPECTATION_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
+DEPLOYMENT_OFFLINE_TESTS=27_PASS
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
-STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
-EXECUTABLE_CLOSURE=STATIC_SYNTAX_SOURCE_SHELL_INERT_PASS_VM_BUILD_AND_TEST_PENDING
-REAL_TARGET_COMPATIBILITY=R3_A_STOCK_LOAD_PASS_SYNTHETIC_BUILD_LINK_PASS_SUITE_FAIL
+STOCK_RETRY_OFFLINE_CLOSURE=PASS_SYNTHETIC_HUMAN_REPORTED
+EXECUTABLE_CLOSURE=OFFLINE_PASS_MANUAL_VM_INSTALL_PENDING
+R3_CLEAN_REPLACEMENT=PENDING_HUMAN_VM_EXECUTION
+NEW_RUNTIME_STOCK_LOAD_CHECK=PENDING_SEPARATE_REVIEW
 LIVE_HANDOFF_READY=false
 INSTALLED_RUNTIME_CHANGED=false
 FEDORA_COMPONENTS_REPLACED=NONE
 PHYSICAL_HOST_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=USER_VM_SYNTHETIC_TESTS_WITH_SENSOR_DISCONNECTED
+NEXT_BOUNDARY=USER_VM_SAVED_OLD_INVERSE_STOCK_CLEAN_INSTALL_LEAVE_STOPPED
 ```
 
-Review set Git-native da `92311c5`: driver/manifest, estensione della suite e
-builder esistenti, runner VM, documentazione/licensing e questo manuale.
-Il correttivo corrente rispetto al cap errato parte da `c0b2369`.
-Il primo corrective di compilazione (`8abfb35`, da `0097221`) cambia il punto
-di conversione nel driver e il suo digest; il secondo (`912218a`) il CLAMP
-del fixture. `620ee15` corregge il lifecycle/assertion dei casi R3 e
-`5b0369e` l'audit del seam SIGFM. Il corrective corrente parte da `5b0369e`
-e sposta soltanto l'expectation D282 nel fixture, aggiornando la documentazione
-tecnica: nessun nuovo D-number, digest production o modifica della roadmap.
-`docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
-in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
-workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il
-correttivo prima di una build/installazione separata; workflow nativo stock
-e disponibilità/handoff dei materiali vanno risolti prima del sensore.
-Nessun componente auth Fedora è cambiato e nessuna dipendenza password è
-aggiunta; R5 resta da dimostrare, non dedotta da R3-A.
+Review set corrente Git-native da `b8cdd17`: deployment, test offline,
+istruzioni e documentazione tecnica aggiornata. I corrective precedenti
+restano tracciati: `8abfb35` conversione enrollment, `912218a` CLAMP e compile
+review, `620ee15` lifecycle, `5b0369e` audit SIGFM, `b8cdd17` expectation D282.
+Nessun nuovo D-number o digest production. Procedura e rollback in
+`deployment/minimal-runtime/README.md`; il gate segue roadmap §4 e il task
+Utente corrente. Fermarsi dopo installazione, prima del load-check; workflow
+stock/materiali e sensore restano confini successivi separati.
 
 ### Governance corrente
 

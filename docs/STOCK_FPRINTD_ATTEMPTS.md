@@ -12,6 +12,14 @@ OpenCV libraries load from the project directory. Installation remains in
 place; rollback was not exercised. This accepts R3-A loading, not enrollment,
 recognition, attempt safety or update survivability.
 
+**Current evidence:** the user's clean-reinstall task reports PM-accepted
+normal **44/44 PASS** and ASan/UBSan **44/44 PASS** at
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, and a clean, reviewed normal
+runtime build from that SHA. This closes synthetic execution; it does not
+claim real USB or biometric safety. The next gate is the
+[clean replacement](../deployment/minimal-runtime/README.md), stopping with
+fprintd inactive before a separate load-check review.
+
 ## Source findings
 
 | Boundary | Code reviewed | Finding |
@@ -172,7 +180,8 @@ submissions, then close; they do not repeat activation failures in one Claim.
 Offline lifecycle review closed for **10/10 cases** in `620ee15`, with the
 fixture passing `-fsyntax-only` in both profiles. The next VM report identifies
 the D291 audit failure below as the only known failure in both runs. A complete
-suite PASS is still required; the AI has not executed the suite or accessed the VM.
+suite PASS was still pending at that point; the accepted result is recorded
+above. The AI has not executed the suite or accessed the VM.
 
 ## D291 SIGFM audit corrective
 
@@ -213,7 +222,7 @@ failure below. No new test framework or physical-host execution was introduced.
 
 ## D282 expected-warning scope corrective
 
-The current human-reported run builds/links and starts normal and sanitizer
+The run preceding `b8cdd17` builds/links and starts normal and sanitizer
 suites; both fail at
 `/goodix/d282/production-enrollment-intermediate-extraction-terminal` with
 `libfprint-image-FATAL-: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30`.
@@ -245,8 +254,8 @@ consumed before those logs. No second overlapping expectation or successful
 extraction remains in these three scopes. The other two sites need no change.
 The fix does not suppress audit logs, alter fatal-log handling, add expected
 success messages or change any production code/flags. Static syntax checks
-of the fixture pass in both existing profiles; corrected runtime execution
-remains the same sensor-free, human-only VM gate.
+of the fixture passed in both existing profiles; the subsequent 44/44 PASS
+in both modes closes that sensor-free VM gate.
 
 ## Preventive compile-surface review (22 September 2026)
 
@@ -291,54 +300,36 @@ closes the static review, not code generation, linking, optimization-dependent
 diagnostics or sanitizer/test execution. The guest toolchain version has not
 been inferred from the local SDK.
 
-Source digest/path audit, shell syntax, and the test entry point's help/non-VM
-refusal from an unrelated cwd are PASS. The complete static review preceded
-the now-successful VM build/link. **The corrected expectation scope and all
-44 normal/ASan/UBSan cases still require manual VM validation.** Static review
-does not substitute for a complete suite PASS or sensor-safety evidence.
-
-Latest VM evidence is human-reported; review status describes the corrective:
+Source digest/path audit, shell syntax and the test entry point's help/non-VM
+refusal from an unrelated cwd passed. The static review preceded the successful
+VM build/link; the user now supplies the complete suite qualification:
 
 ```text
 R3_A_STOCK_LOAD=PASS_HUMAN_REPORTED
-PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
-BUILD_LINK=PASS
-NORMAL_TESTS_STARTED=true
-SANITIZER_TESTS_STARTED=true
-NORMAL_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
-SANITIZER_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
-FAILURE_CLASS=TEST_EXPECTATION_SCOPE
+R3_SYNTHETIC_NORMAL=44/44 PASS
+R3_SYNTHETIC_ASAN_UBSAN=44/44 PASS
+QUALIFIED_SOURCE_COMMIT=b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226
 REAL_SENSOR_REQUIRED=false
 SENSOR_CONNECTED=false
-R3_A_INSTALLATION=UNCHANGED
-R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
-EXPECTATION_SCOPE_REVIEW=3_OF_3_CLOSED_OFFLINE
-EXPECTATION_SCOPE_CORRECTIVE_VM_EXECUTION=PENDING
-STATIC_COMPILE_SURFACE_REVIEW=CLOSED
-PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
-LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
-SIGFM_AUDIT_STUB_SYNTAX_ONLY=PASS_BOTH_PROFILES
-EXPECTATION_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
-STOCK_ATTEMPT_SOURCE_CORRECTION=IMPLEMENTED
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
-STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
-NEXT_GATE=HUMAN_REQUIRED_VM_TEST_BUILD_WITHOUT_SENSOR
+STOCK_RETRY_OFFLINE_CLOSURE=PASS_SYNTHETIC_HUMAN_REPORTED
+NEXT_GATE=HUMAN_REQUIRED_VM_CLEAN_REPLACEMENT_LEAVE_FPRINTD_STOPPED
 LIVE_HANDOFF_READY=false
 INSTALLED_RUNTIME_CHANGED=false
 ```
 
-Follow [the VM test procedure](../production/minimal-runtime/STOCK_ATTEMPTS_VM.md).
-Retain the installed R3-A baseline and R2 output. Do not use the old installer
-from the new source checkout: its source-continuity guard correctly rejects
-changed driver code. The installed inverse remains unchanged and available.
-After test evidence, review the correction before preparing a separate build
-and reversible runtime update. The native consumer workflow and material
-handoff must be settled before a sensor-reaching request. The consumer chooses
-the number of explicit attempts; the driver fences terminal outcomes and
-implicit sensor-reaching retries.
+The previous compiler/lifecycle/audit/expectation failures above are historical,
+not current failures. The qualified build already exists at
+`/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
+Follow the [clean replacement procedure](../deployment/minimal-runtime/README.md):
+old saved inverse first, verify Fedora stock, install the qualified runtime,
+leave fprintd stopped and return evidence before its load-check. The old
+installed inverse remains unchanged until the user runs it. Native consumer
+workflow and material handoff remain separate boundaries before sensor use.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
-survivability empirically. This test-only step changes no installed file.
+survivability empirically. This repository preparation changes no installed
+file; the VM replacement is manual and still pending.
