@@ -5,15 +5,18 @@
 disconnected. Do not rebuild R2, reinstall R3-A or run a live test.**
 
 The latest VM run **compiled/linked and started both normal and sanitizer
-tests**. Both report the same single known failure:
-`/goodix/d291/fixed-raw-baseline-pinning-mechanics`, fixture line 2146.
-The SIGFM test seam had recorded probe and enrolled signatures in the wrong
-audit arrays. This corrective fixes that mapping and its comment, and names
-the first parameter `probe`. All four getter uses and the existing D291
-assertions have been reviewed; the assertions and score calculation remain
-unchanged. The support file passes syntax-only analysis in both profiles.
-Production behavior and the preceding ten-case R3 lifecycle correction are
-unchanged. Full normal/sanitizer execution of this corrective is pending.
+tests**. Both fail at
+`/goodix/d282/production-enrollment-intermediate-extraction-terminal`:
+a normal `GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30` message occurs while an
+unrelated expected warning is pending. This is `TEST_EXPECTATION_SCOPE`.
+The expectation now starts only when the stage-3 worker is blocked, just
+before failure/unblock; successful stages 1 and 2 keep their normal logs.
+All three expectation scopes have been reviewed. Logs, fatal-warning handling
+and production behavior are unchanged. The fixture passes syntax-only checks
+in both profiles; full normal/sanitizer execution remains pending.
+
+**REAL_SENSOR_REQUIRED=false:** keep the Goodix reader disconnected from the
+VM. The runner rejects a visible reader and Flatpak uses `--nodevice=all`.
 Pull the corrective and repeat this same gate with a new output directory.
 Keep previous outputs as evidence. R3-A stays installed; no rollback is needed.
 

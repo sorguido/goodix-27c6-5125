@@ -1764,6 +1764,10 @@ drive_production_enrollment_stages (Fixture   *fixture,
           if (stage == fixture->enrollment_extraction_failure_stage)
             {
               g_assert_true (goodix_test_sigfm_extract_wait_blocked (5000000));
+              /* Earlier stages must finish with their normal extraction logs
+               * before expecting the warning from this blocked worker. */
+              g_test_expect_message ("libfprint-image_device", G_LOG_LEVEL_WARNING,
+                                     "Failed to detect minutiae:*");
               goodix_test_sigfm_extract_set_failure (TRUE);
               goodix_test_sigfm_extract_unblock ();
               return;
@@ -3510,8 +3514,6 @@ test_d282_01_production_intermediate_enrollment_extraction_failure (void)
    * extraction failure must terminate this action after its release tail and
    * before the following rearm can request a fourth contact. */
   fixture->enrollment_extraction_failure_stage = 3u;
-  g_test_expect_message ("libfprint-image_device", G_LOG_LEVEL_WARNING,
-                         "Failed to detect minutiae:*");
   drive_production_enrollment_stages (fixture, &client);
   in_at_failure = fixture->in_submit_count;
   out_at_failure = goodix_fpi_usb_backend_get_out_submit_count (

@@ -24,16 +24,16 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`620ee15b0da454e501c2298fbc30253540ae3479`, `development` inizialmente pulito,
-e dal nuovo esito VM fornito dall'Utente in `R3_D291_SIGFM_audit_corrective.md`:
-**build/link PASS, suite normal e sanitizer avviate**, stesso unico failure
-noto in `/goodix/d291/fixed-raw-baseline-pinning-mechanics`, riga 2146.
-La review conferma le firme probe/enrolled invertite nell'audit del seam di
-test. Il corrective corregge soltanto quella registrazione, commento e nome
-del parametro locale; assert D291, score, production e policy restano invariati.
-I precedenti corrective compile/lifecycle restano conservati. Sensore
-scollegato, R3-A invariata; nessun altro failure noto, ma ancora nessun PASS
-completo della suite. Prossimo passo: medesimo gate sintetico VM, nessuna live.
+`5b0369ee55968b5262a83cb7f4a3608cdddd02b9`, `development` inizialmente pulito,
+e dall'esito VM fornito in `R3_D282_expectation_scope_corrective.md`:
+**build/link PASS, suite normal e sanitizer avviate**, entrambe ferme in
+`/goodix/d282/production-enrollment-intermediate-extraction-terminal`.
+Un normale log `GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30` degli stage riusciti
+incontra l'expectation installata prematuramente per il failure allo stage 3.
+Il corrective sposta soltanto quella expectation e chiude la review di tutte
+le tre presenti nel fixture. Nessun log silenziato o guardrail allentato.
+Sensore scollegato, R3-A invariata; medesimo gate sintetico VM ancora da
+superare integralmente. Il sensore reale non serve e deve restare scollegato.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -207,11 +207,12 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: correggere l'identità probe/enrolled nell'audit SIGFM del
-supporto test attivo, verificando la catena canonica e tutti gli usi dei due
-getter nel D291. Primo argomento = probe, secondo = enrolled. Nessun cambio
-agli assert corretti, score, preprocessing/pinning, retry/attempt, production,
-Fedora, flag o roadmap. Ripreparare lo stesso gate VM senza live o rollback R3-A.
+`CURRENT_TASK`: restringere l'expectation D282 al worker già bloccato dello
+stage `enrollment_extraction_failure_stage`, prima di set-failure/unblock;
+review di tutti gli usi di `g_test_expect_message()` nel fixture. Conservare
+log normali, fatal/warning, assert di failure/cleanup, production e policy.
+Nessun cambio alla roadmap; medesimo gate sintetico VM senza sensore,
+installazione, live o rollback R3-A.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -347,7 +348,7 @@ VERIFY/IDENTIFY su processing retry restano invariati: una risottomissione
 automatica respinta senza risorse/submit, errore non-retry, poi close.
 Matrice nominativa dei dieci casi in `docs/STOCK_FPRINTD_ATTEMPTS.md`.
 
-**Run VM corrente e corrective audit SIGFM:** build/link PASS e suite normal
+**Precedente run VM e corrective audit SIGFM (`5b0369e`):** build/link PASS e suite normal
 e sanitizer avviate; unico failure noto in entrambe
 `/goodix/d291/fixed-raw-baseline-pinning-mechanics`, riga 2146. Sensore
 scollegato, R3-A invariata. Non si deduce un PASS completo da «nessun altro
@@ -371,14 +372,41 @@ nel logical open anche quando la sessione successiva fornisce B. Questo è
 ancora un test delle meccaniche di pinning, non prova di equivalenza fra
 sessioni fisiche o stabilità biometrica; preprocessing e pinning non cambiano.
 
+**Run VM corrente e corrective expectation D282:** build/link PASS, normal
+e sanitizer avviati e identico failure in
+`/goodix/d282/production-enrollment-intermediate-extraction-terminal`.
+Il messaggio `libfprint-image-FATAL-: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30`
+è un audit normale di estrazione riuscita: diventa fatale per l'expectation
+di warning installata prima di tutti gli stage, anziché al solo stage 3.
+Classificazione `TEST_EXPECTATION_SCOPE`, non errore di SIGFM production.
+
+L'expectation viene ora registrata dentro il ramo dello stage di failure,
+dopo conferma `goodix_test_sigfm_extract_wait_blocked()` e immediatamente
+prima di `set_failure(TRUE)` e `unblock()`. Stage 1/2 e release tail dello
+stage 3 precedono l'expectation; il helper ritorna subito dopo lo sblocco.
+Resta la verifica dell'unico warning intenzionale dopo il cleanup terminale
+con `g_test_assert_expected_messages()`, prima del reset del failure seam.
+Gli assert mantengono due progressi enrollment, zero retry e nessun quarto
+contatto/submit.
+
+Review chiusa su **3/3 expectation** e altrettante verifiche: le due rimanenti
+coprono VERIFY e IDENTIFY con una sola estrazione già impostata per fallire,
+dopo completamento delle azioni precedenti e activation/TLS. Il worker ritorna
+errore prima del normale audit keypoints; il callback emette il warning prima
+dei log di esito/cleanup. Le expectation sono verificate prima di successive
+azioni, senza sovrapposizioni o estrazioni riuscite nello scope pendente.
+Nessuna modifica necessaria a quei due siti, nessun filtro/silenziamento log,
+nessun allentamento dei fatal o dei flag. Dettaglio dei tre scope in
+`docs/STOCK_FPRINTD_ATTEMPTS.md`.
+
 **Verificato sul workspace:** audit digest/path dei 62 sorgenti e quattro
-supporti PASS (nessun digest production da aggiornare: cambia solo il seam test), sintassi
+supporti PASS (nessun digest production da aggiornare: cambia solo il fixture), sintassi
 shell e diff PASS; help e rifiuto non-VM dell'entrypoint reale da cwd estranea
-PASS senza creare output. Il supporto test corretto passa
+PASS senza creare output. Il fixture corretto passa
 `-fsyntax-only` con entrambi i profili normal/sanitizer, senza diagnostiche.
 Nessuna build o esecuzione C del progetto sul fisico, soltanto analisi statica.
 Le **44 prove complete della versione corretta restano da eseguire** in VM:
-il failure nell'audit D291 non chiude la regressione completa.
+il failure di expectation D282 non chiude la regressione completa.
 
 Il prossimo gate è il test-build offline nella VM, da utente ordinario,
 tramite `production/minimal-runtime/check-stock-attempts.sh`, SDK esistente,
@@ -391,23 +419,26 @@ continuità sorgenti rifiuta correttamente il driver cambiato.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=SIGFM_TEST_AUDIT_PROBE_ENROLLED_IDENTITIES_CORRECTED
+ADVANCEMENT=D282_WARNING_EXPECTATION_SCOPED_TO_BLOCKED_FAILURE_STAGE
 ACTIVE_PHASE=R3
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
 BUILD_LINK=PASS
 NORMAL_TESTS_STARTED=true
 SANITIZER_TESTS_STARTED=true
-NORMAL_FIRST_FAILURE=/goodix/d291/fixed-raw-baseline-pinning-mechanics
-SANITIZER_FIRST_FAILURE=/goodix/d291/fixed-raw-baseline-pinning-mechanics
-OTHER_KNOWN_FAILURES=NONE
+NORMAL_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
+SANITIZER_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
+FAILURE_CLASS=TEST_EXPECTATION_SCOPE
+REAL_SENSOR_REQUIRED=false
 SENSOR_CONNECTED=false
 R3_A_INSTALLATION=UNCHANGED
 R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
-SIGFM_AUDIT_CORRECTIVE_VM_EXECUTION=PENDING
+EXPECTATION_SCOPE_REVIEW=3_OF_3_CLOSED_OFFLINE
+EXPECTATION_SCOPE_CORRECTIVE_VM_EXECUTION=PENDING
 STATIC_COMPILE_SURFACE_REVIEW=CLOSED
 PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
 LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
 SIGFM_AUDIT_STUB_SYNTAX_ONLY=PASS_BOTH_PROFILES
+EXPECTATION_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
@@ -425,10 +456,10 @@ builder esistenti, runner VM, documentazione/licensing e questo manuale.
 Il correttivo corrente rispetto al cap errato parte da `c0b2369`.
 Il primo corrective di compilazione (`8abfb35`, da `0097221`) cambia il punto
 di conversione nel driver e il suo digest; il secondo (`912218a`) il CLAMP
-del fixture. `620ee15` corregge il lifecycle/assertion dei casi R3. Il
-corrective corrente parte da `620ee15` e cambia solo l'audit del seam SIGFM
-e documentazione tecnica: nessun nuovo D-number, digest production o modifica
-della roadmap.
+del fixture. `620ee15` corregge il lifecycle/assertion dei casi R3 e
+`5b0369e` l'audit del seam SIGFM. Il corrective corrente parte da `5b0369e`
+e sposta soltanto l'expectation D282 nel fixture, aggiornando la documentazione
+tecnica: nessun nuovo D-number, digest production o modifica della roadmap.
 `docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
 in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
 workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il

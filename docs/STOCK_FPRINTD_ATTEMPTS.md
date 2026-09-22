@@ -176,7 +176,7 @@ suite PASS is still required; the AI has not executed the suite or accessed the 
 
 ## D291 SIGFM audit corrective
 
-The latest human-reported VM run builds/links and starts both suites. Its
+The VM run preceding `5b0369e` builds/links and starts both suites. Its
 only known failure, identical in normal and sanitizer, is
 `/goodix/d291/fixed-raw-baseline-pinning-mechanics` at fixture line 2146.
 The seam had reversed the probe and enrolled signatures in its audit arrays.
@@ -207,9 +207,46 @@ preprocessing/pinning, attempt policy, stock component, compiler flag or
 roadmap changes. The gate compiles the active support file in both profiles;
 the historical private-root copy is not its build input and is left intact.
 
-Static review and `-fsyntax-only` of the corrected support file pass in both
-existing compiler profiles with no diagnostics. The same 44-case VM gate is
-pending; no new test framework or physical-host build/execution is introduced.
+Static review and `-fsyntax-only` of the corrected support file passed in both
+profiles in `5b0369e`. The subsequent VM report identifies the D282 expectation
+failure below. No new test framework or physical-host execution was introduced.
+
+## D282 expected-warning scope corrective
+
+The current human-reported run builds/links and starts normal and sanitizer
+suites; both fail at
+`/goodix/d282/production-enrollment-intermediate-extraction-terminal` with
+`libfprint-image-FATAL-: GOODIX_SIGFM_EXTRACT_AUDIT keypoints=30`.
+That is a normal successful-extraction message, made fatal by a pending
+expectation for a different domain/level/message. The fixture registered
+`Failed to detect minutiae:*` before stages 1 and 2, although only stage 3
+was meant to fail. Classification: `TEST_EXPECTATION_SCOPE`.
+
+The expectation is now installed inside the existing failure-stage branch,
+after `goodix_test_sigfm_extract_wait_blocked()` succeeds and immediately
+before `set_failure(TRUE)` and `unblock()`. Earlier stages finish without a
+pending expectation. The helper returns after unblocking stage 3; the caller
+still drains the terminal failure, checks the single expected warning with
+`g_test_assert_expected_messages()` and restores the failure seam. Existing
+assertions still require two enrollment progress reports and no fourth contact.
+
+Reviewed all three `g_test_expect_message()` uses and their paired assertions:
+
+| Scope | Why unrelated successful logs do not fall inside the expectation |
+| --- | --- |
+| D282 enrollment stage 3 | Stages 1/2 and the stage-3 release tail precede installation; the worker is confirmed blocked before the expectation is installed. Only the intended failing extraction remains. |
+| VERIFY processing retry in `test_d280_01_production_two_epoch_template_reuse` | Prior successful actions finish before this open. Activation/TLS precede installation, failure is already enabled, and the single image returns an extraction error before the success audit message. |
+| IDENTIFY processing retry in `test_d293_02_identify_failure_cancel_no_handoff` | Enrollment and activation/TLS precede installation. The only image uses the already-enabled failure seam; expectation is asserted before any later API resubmission. |
+
+The canonical `fp-image.c` worker emits the keypoint audit only after
+`GOODIX_SIGFM_OK`; injected extraction failure returns before that message.
+In the callback, the expected warning precedes result/cleanup logs, so it is
+consumed before those logs. No second overlapping expectation or successful
+extraction remains in these three scopes. The other two sites need no change.
+The fix does not suppress audit logs, alter fatal-log handling, add expected
+success messages or change any production code/flags. Static syntax checks
+of the fixture pass in both existing profiles; corrected runtime execution
+remains the same sensor-free, human-only VM gate.
 
 ## Preventive compile-surface review (22 September 2026)
 
@@ -256,7 +293,7 @@ been inferred from the local SDK.
 
 Source digest/path audit, shell syntax, and the test entry point's help/non-VM
 refusal from an unrelated cwd are PASS. The complete static review preceded
-the now-successful VM build/link. **The corrected SIGFM audit seam and all
+the now-successful VM build/link. **The corrected expectation scope and all
 44 normal/ASan/UBSan cases still require manual VM validation.** Static review
 does not substitute for a complete suite PASS or sensor-safety evidence.
 
@@ -268,17 +305,20 @@ PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
 BUILD_LINK=PASS
 NORMAL_TESTS_STARTED=true
 SANITIZER_TESTS_STARTED=true
-NORMAL_FIRST_FAILURE=/goodix/d291/fixed-raw-baseline-pinning-mechanics
-SANITIZER_FIRST_FAILURE=/goodix/d291/fixed-raw-baseline-pinning-mechanics
-OTHER_KNOWN_FAILURES=NONE
+NORMAL_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
+SANITIZER_FIRST_FAILURE=/goodix/d282/production-enrollment-intermediate-extraction-terminal
+FAILURE_CLASS=TEST_EXPECTATION_SCOPE
+REAL_SENSOR_REQUIRED=false
 SENSOR_CONNECTED=false
 R3_A_INSTALLATION=UNCHANGED
 R3_TEST_LIFECYCLE_REVIEW=10_OF_10_CLOSED_OFFLINE
-SIGFM_AUDIT_CORRECTIVE_VM_EXECUTION=PENDING
+EXPECTATION_SCOPE_REVIEW=3_OF_3_CLOSED_OFFLINE
+EXPECTATION_SCOPE_CORRECTIVE_VM_EXECUTION=PENDING
 STATIC_COMPILE_SURFACE_REVIEW=CLOSED
 PRIOR_COMPILE_REVIEW_SYNTAX_ONLY_PASSES=86
 LIFECYCLE_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
 SIGFM_AUDIT_STUB_SYNTAX_ONLY=PASS_BOTH_PROFILES
+EXPECTATION_FIXTURE_SYNTAX_ONLY=PASS_BOTH_PROFILES
 STOCK_ATTEMPT_SOURCE_CORRECTION=IMPLEMENTED
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
