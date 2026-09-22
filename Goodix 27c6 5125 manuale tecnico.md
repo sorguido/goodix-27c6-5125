@@ -21,9 +21,13 @@ BACKUP_BRANCH_POLICY=READ_ONLY
 La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
 in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
 l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
+Il successivo aggiornamento remoto
+`af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza riscrivere storia,
+precisa R7: release autonoma, sicura e sostenibile per l'utente finale;
+l'upstream è facoltativo. Il task R2 e il gate build VM restano invariati.
 La recovery parte da `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`, branch
 `development`, worktree inizialmente pulito, senza lavoro parziale da recuperare.
-Il commit più recente conserva materiale specifico del device nel repository
+Il commit `09ff757` conserva materiale specifico del device nel repository
 privato: è provenance di conservazione, non autorizzazione a leggerne il
 contenuto, trasferirlo, installarlo o pubblicarlo. Nessun contenuto protetto è
 stato letto durante questa ripartenza.
