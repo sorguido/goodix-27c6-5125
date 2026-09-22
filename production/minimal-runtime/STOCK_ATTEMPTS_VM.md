@@ -4,6 +4,13 @@
 **Next human gate: compile and run offline tests only. Keep the reader
 disconnected. Do not rebuild R2, reinstall R3-A or run a live test.**
 
+The previous VM attempt failed compilation on the enrollment stage-count
+`guint` → `gint` conversion: **0 R3 tests executed**, reader disconnected,
+R3-A unchanged. The source now validates `1..G_MAXINT` before an explicit
+cast; compiler warning flags and retry semantics are unchanged. Pull the
+corrective and repeat this same gate with a new output directory. Keep the
+failed build output as evidence; no rollback of R3-A is needed.
+
 R3-A stock loading is accepted from the user's Fedora 44 KDE x86_64 VM
 evidence: R2 build `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, installation
 `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`, stock `/usr/libexec/fprintd`,

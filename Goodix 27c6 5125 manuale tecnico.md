@@ -24,11 +24,12 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`c0b23695349561c243829fabdeedc58f53d264fa`, `development` inizialmente pulito,
-e dalla decisione esplicita dell'Utente di rimuovere il limite cumulativo
-di tre capture per Claim. R3-A load resta PASS; i test sintetici non sono
-ancora stati eseguiti. Il numero di tentativi espliciti appartiene a Fedora
-stock, con terminalità dopo MATCH/errore e blocco dei retry impliciti.
+`0097221a4518edabb296834693d85f76f06e5daf`, `development` inizialmente pulito,
+e dall'errore di compilazione riportato dall'Utente nel gate sintetico VM:
+conversione `guint` → `gint` in `fpi_device_set_nr_enroll_stages`.
+Compilazione fallita, **0 test R3 eseguiti**, sensore scollegato e R3-A
+invariata. Il corrective controlla il range prima del cast; il numero di
+tentativi espliciti resta di Fedora stock, con terminalità MATCH/errore.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -202,11 +203,11 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: correggere `c0b2369` eliminando il limite cumulativo nel driver,
-ammettere quarta e successive action esplicite dopo clean NO_MATCH, preservare
-terminalità MATCH/error e provare zero nuove risorse alla risottomissione
-automatica. Aggiornare test/documentazione e riconsegnare soltanto il gate
-sintetico VM. Nessuna modifica a fprintd/PAM/CLI stock, nessuna live.
+`CURRENT_TASK`: correggere esclusivamente la conversione enrollment
+`template_stage_target` da `guint` al `gint` positivo richiesto da libfprint,
+con controllo esplicito di rappresentabilità e senza allentare i warning.
+Ripreparare il medesimo gate sintetico VM; semantica retry, test e componenti
+Fedora restano invariati. Nessuna live o rollback di R3-A.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -274,8 +275,18 @@ profilo production/SIGFM: la vecchia destinazione Rocky core non esiste più.
 Il fixture privato è una dipendenza solo di questo test interno, non del
 runtime/build production o di una futura suite pubblica qualificata.
 
+**Esito del gate VM riportato dall'Utente:** compilazione arrestata prima dei
+test a `goodix_fpimage_device.c:2530:44` per `-Werror=sign-conversion` sulla
+chiamata `fpi_device_set_nr_enroll_stages(..., template_stage_target)`.
+Non è un failure della nuova logica retry: nessun test R3 è stato eseguito.
+Sensore scollegato, R3-A invariata; nessun rollback. Il difetto preesistente
+è corretto localmente: rifiuto di zero o valori maggiori di `(guint) G_MAXINT`
+con errore leggibile e rilascio della pipeline, prima di completare lo stage;
+solo dopo il controllo si passa `(gint) template_stage_target` a libfprint.
+Nessuna modifica ai flag warning o al percorso retry/cleanup.
+
 **Verificato sul workspace:** audit digest/path dei 62 sorgenti e quattro
-supporti PASS (aggiornati soltanto i due hash driver modificati), sintassi
+supporti PASS (in questo corrective aggiornato solo l'hash del file C), sintassi
 shell e diff PASS; help e rifiuto non-VM dell'entrypoint reale da cwd estranea
 PASS senza creare output. Nessuna compilazione o esecuzione C è stata svolta
 sul fisico. Le 44 prove normal e ASan/UBSan sono **preparate, non eseguite**:
@@ -292,9 +303,11 @@ continuità sorgenti rifiuta correttamente il driver cambiato.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=STOCK_EXPLICIT_ATTEMPTS_UNCAPPED_TERMINAL_RETRY_FENCE_PRESERVED
+ADVANCEMENT=ENROLLMENT_STAGE_GUINT_TO_GINT_RANGE_CHECK_AND_CAST
 ACTIVE_PHASE=R3
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
+PREVIOUS_VM_COMPILATION=FAIL_SIGN_CONVERSION
+PREVIOUS_VM_R3_TESTS_EXECUTED=0
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE
 STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
@@ -310,6 +323,8 @@ NEXT_BOUNDARY=USER_VM_SYNTHETIC_TESTS_WITH_SENSOR_DISCONNECTED
 Review set Git-native da `92311c5`: driver/manifest, estensione della suite e
 builder esistenti, runner VM, documentazione/licensing e questo manuale.
 Il correttivo corrente rispetto al cap errato parte da `c0b2369`.
+Il corrective di compilazione parte da `0097221` e cambia solo il punto di
+conversione nel driver, il suo digest e la documentazione dello stesso gate.
 `docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
 in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
 workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il

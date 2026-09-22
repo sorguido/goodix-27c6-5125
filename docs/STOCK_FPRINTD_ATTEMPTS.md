@@ -96,15 +96,24 @@ execution are real test code. No daemon/consumer source is modified or run.
 The fixture's historical private path is a test-only dependency, explicitly
 not a production/runtime or qualified public-release test dependency.
 
-Source digest/path audit, shell syntax, and the real new test entry point's
-help/non-VM refusal from an unrelated cwd are PASS. **Compilation and the 44
-normal/ASan/UBSan cases have not been run in this turn.** They must run manually
-in the VM under the human-only rule. Static review does not substitute for
-those results. No new dynamic or sensor-safety PASS is claimed.
+The user-reported VM attempt stopped during compilation at
+`goodix_fpimage_device.c:2530:44`: implicit `guint` to `gint` conversion in
+`fpi_device_set_nr_enroll_stages`, rejected by `-Werror=sign-conversion`.
+**Zero R3 tests ran; the reader remained disconnected and R3-A unchanged.**
+The minimal correction checks `1..G_MAXINT` before stage completion and the
+explicit `gint` cast, freeing the image pipeline and reporting an error for
+an invalid value. Warning flags and retry semantics are unchanged.
+
+Source digest/path audit, shell syntax, and the test entry point's help/non-VM
+refusal from an unrelated cwd are PASS. **Corrected compilation and the 44
+normal/ASan/UBSan cases remain pending manual VM execution.** Static review
+does not substitute for those results. No dynamic or sensor-safety PASS is claimed.
 
 ```text
 R3_A_STOCK_LOAD=PASS_HUMAN_REPORTED
 PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
+PREVIOUS_VM_COMPILATION=FAIL_SIGN_CONVERSION
+PREVIOUS_VM_R3_TESTS_EXECUTED=0
 STOCK_ATTEMPT_SOURCE_CORRECTION=IMPLEMENTED
 STOCK_EXPLICIT_ATTEMPT_COUNT_POLICY=FEDORA_CONSUMER
 DRIVER_CUMULATIVE_CAPTURE_LIMIT=NONE

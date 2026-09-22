@@ -2520,14 +2520,21 @@ context_enrollment_image (GoodixEnrollmentPipeline *pipeline,
             goodix_enrollment_diversity_get_template_stage_target (
               ctx->enrollment_diversity);
           if (template_stage_target == 0u ||
-              !goodix_enrollment_pipeline_finish_current_stage (pipeline,
-                                                                  error))
+              template_stage_target > (guint) G_MAXINT)
+            {
+              goodix_fpimage_pipeline_free (sigfm_pipeline);
+              g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                                   "SIGFM enrollment stage target must be in 1..G_MAXINT");
+              return FALSE;
+            }
+          if (!goodix_enrollment_pipeline_finish_current_stage (pipeline,
+                                                                 error))
             {
               goodix_fpimage_pipeline_free (sigfm_pipeline);
               return FALSE;
             }
           fpi_device_set_nr_enroll_stages (FP_DEVICE (ctx->device),
-                                           template_stage_target);
+                                           (gint) template_stage_target);
           if (ctx->terminal_delivery_at_release_ready)
             {
               fpi_image_device_hold_enroll_completion (
