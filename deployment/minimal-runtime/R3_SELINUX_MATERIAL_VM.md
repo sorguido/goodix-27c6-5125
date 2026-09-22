@@ -1,13 +1,13 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3 Gate A: persistent material labels, sensor disconnected
 
-**HUMAN_REQUIRED — apply project-owned fprintd_var_lib_t material mapping in VM.**
-The Gate A from `de7e6e4ef78d533dcada179a93ad01030c7e72d0` is withdrawn before
-VM mutation: do not execute that commit. Use the revised commit in the handoff.
-The correction below covers the actual mixed SELinux pre-state.
-Gate B (one live enumeration/Claim/Release) is blocked until the user returns
-Gate A evidence and a separate review/approval permits it. Do not run the live
-procedure, start fprintd or reconnect the sensor during this gate.
+**COMPLETED — historical Gate A instructions, do not repeat.**
+The 22 September user handoff confirms canonical labels on all six paths,
+a runtime-v1 manifest, reconciled receipt and subsequent Claim/Release PASS.
+The next human boundary is [native enrollment](R3_ENROLL_VM.md).
+The pending/separate-approval wording below records the earlier gate; it is
+superseded by that closure. The withdrawn `de7e6e4` attempt and its mixed
+SELinux pre-state corrective remain preserved as provenance.
 
 ## Evidence and implementation review
 

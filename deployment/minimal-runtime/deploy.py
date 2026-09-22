@@ -220,8 +220,19 @@ def material_metadata():
 def runtime_manifest_preflight():
     path = MATERIAL / "target-material-manifest.json"
     data = read_regular(path, 4096)
+    # goodix_target_material.c accepts unescaped strings and unique keys only.
+    # Python's default JSON decoder would normalize escapes and discard duplicates.
+    require(b"\\" not in data, "runtime material manifest string escapes are unsupported")
+
+    def unique_fields(pairs):
+        value = {}
+        for key, item in pairs:
+            require(key not in value, "runtime material manifest duplicate field")
+            value[key] = item
+        return value
+
     try:
-        value = json.loads(data.decode("ascii"))
+        value = json.loads(data.decode("ascii"), object_pairs_hook=unique_fields)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise RuntimeError("runtime material manifest is not valid ASCII JSON") from error
     require(isinstance(value, dict), "runtime material manifest must be a JSON object")

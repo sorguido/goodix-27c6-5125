@@ -13,6 +13,9 @@ passed sensor-free and one subsequent enumeration -> Claim -> Release passed.
 Do not repeat those gates.  The procedure below is retained as historical
 clean-replacement evidence, not as the next live action.
 
+**Next human gate: [one native enrollment in the VM](R3_ENROLL_VM.md).**
+Use the retained runtime; no rebuild/reinstall or repeated Claim/Release.
+
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from
 `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`. Reuse that output; do not rebuild.
@@ -135,7 +138,9 @@ The current installer owns:
   rules remain unowned. Six material labels are applied and verified. The
   non-secret target manifest is additionally parsed fail-closed and must match
   the exact runtime-v1 schema and acceptance pins; secret/binary material
-  contents remain unopened by deployment code. See the linked Gate A ownership
+  contents remain unopened by deployment code. Duplicate fields and escaped
+  strings are rejected consistently with the production parser. See the
+  [historical Gate A](R3_SELINUX_MATERIAL_VM.md) ownership
   review.
 
 No ExecStart replacement, daemon, wrapper, PAM, udev, template or material
@@ -188,4 +193,6 @@ The original 27 filesystem tests isolate the material boundary; the dedicated
 `test_material_labels.py` exercises creation/adoption/conflicts, label and
 metadata checks, partial failure recovery, the existing-install corrective
 and saved inverse using synthetic files and mock SELinux interfaces. Current
-Gate A does not execute the historical replacement procedure above.
+recovery validation: 27 deployment + 31 material + 14 open/close = 72 PASS.
+The JSON corrective requires no change to the installed runtime or saved inverse.
+Do not rerun the completed receipt reconciliation.

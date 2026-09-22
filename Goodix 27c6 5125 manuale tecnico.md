@@ -16,40 +16,46 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R3 Gate A corretto per il pre-stato SELinux misto (22 settembre 2026)
+### Stato corrente — R3 Claim/Release PASS, enrollment stock da validare (22 settembre 2026)
 
-La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
-in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
-l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
-L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
-riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
-l'utente finale; upstream facoltativo. La recovery corrente parte da
-`de7e6e4ef78d533dcada179a93ad01030c7e72d0`, `development` inizialmente pulito,
-e dal task Utente `task_codex_r3_selinux_prestate_context_fix.md`. Restano accettati
-44/44 normal e 44/44 ASan/UBSan, build qualificata
-`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, installazione `264cd7f`,
-clean replacement e stock load PASS. Il primo gate hardware ha enumerato un
-Goodix ma Claim è fallita con Internal: AVC causale fprintd_t/read sul manifest
-etichettato var_lib_t, prima del claim interfaccia USB e di activate.
-Nessun retry. Il sensore è di nuovo **scollegato**, fprintd **inactive/MainPID 0**,
-runtime qualificato conservato. Questa è evidenza manuale Utente, non una
-ripetizione o osservazione diretta dell'AI. Output build conservato:
-`/home/guido/goodix-r3-20260922-111144`.
+La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
+Recovery da `93e16f480aa006759e9c7d520abc493e01536ca5`, `development`
+pulito, con handoff Utente `CODEX_HANDOFF_R3_CLAIM_PASS_RESUME.md`.
+Review diretta dei commit `6d970c5d4c946a984f6b6a64d85ab5474902a18f`,
+`0d1cea8dcc7ddbbc46aa32be8bd35eb99ba1c646` e `93e16f480aa006759e9c7d520abc493e01536ca5`:
+restano accettati 44/44 normal e 44/44 ASan/UBSan riportati in VM, build
+`b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, installazione
+`264cd7ff1ba77857e1985502f299e4375f9a0516`, clean replacement e load stock PASS.
+Output VM conservato: `/home/guido/goodix-r3-20260922-111144`.
 
-Il Gate A `de7e6e4` è ritirato prima della mutazione VM: la review rileva che
-la directory reale è `unconfined_u:object_r:var_lib_t:s0`, i cinque file
-`system_u:object_r:var_lib_t:s0`. Owner/mode restano corretti. La precedente
-allowlist di stringhe complete rifiutava quel pre-stato; non è una nuova live
-fallita. Il correttivo parsea user/role/type/level, conserva i contesti completi
-e mantiene object_r, s0 e la allowlist dei due tipi previsti. Il task conserva
-il mapping locale persistente
-`/var/lib/goodix-5125-poc(/.*)? → fprintd_var_lib_t` nel lifecycle minimale,
-con ownership esplicita e inversa salvata. Driver e cinque librerie invariati;
-nessuna nuova policy allow/modulo o modifica a Fedora/PAM/KDE. L'AI lavora
-solo sul repository e con test offline; la prossima azione Utente è **Gate A,
-sole etichette a sensore scollegato**, poi STOP per review. La nuova Claim/Release
-è un **Gate B separato**, non autorizzato da questa consegna. Lo snapshot cold
-resta solo un paracadute esterno.
+L'Utente ha completato la correzione SELinux e, dopo la diagnostica bounded,
+la conversione del solo manifest legacy D232 nella proiezione runtime-v1.
+Il preflight del vero material loader, senza sensore/GUsb/libusb, è PASS
+riportato. La successiva unica enumerazione → Claim → Release è **PASS**
+riportato, con stock `/usr/libexec/fprintd`, libfprint/OpenCV private,
+libgusb Fedora e SELinux Enforcing. **Questo confine è chiuso: nessuna
+ripetizione equivalente, reinstallazione o rebuild di conferma.**
+Il receipt è stato riconciliato dall'Utente dopo la live, a sensore assente e
+fprintd inactive. I sei path hanno il contesto canonico fprintd_var_lib_t;
+manifest runtime SHA256
+`1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`.
+I quattro binari protetti sono rimasti invariati secondo l'handoff.
+
+La review offline riproduce 70/70 test originari. Un `CORRECTIVE` locale
+chiude un gap reale del nuovo preflight: il decoder JSON Python accettava
+chiavi duplicate/escape che il parser C production rifiuta. Il controllo ora
+li rifiuta prima di ogni mutazione; 72/72 test PASS. Nessun cambiamento al
+driver, ai binari, alla roadmap o ai guardrail; manifest canonico già validato
+compatibile. L'inversa salvata nella VM resta quella già installata; non si
+pretende che la riconciliazione del receipt abbia aggiornato lo script salvato.
+
+Il prossimo confine R3 è **un enrollment nativo con fprintd-enroll**, su un
+dito non ancora registrato, con il runtime qualificato conservato. La consegna
+è `deployment/minimal-runtime/R3_ENROLL_VM.md`; dopo enrollment e review,
+resta da qualificare fprintd-verify. Consumer R4, update R5 e release restano
+aperti. Il PASS open/close non prova capture, matching o assenza di scritture
+factory tramite readback. Le evidenze live sono riportate dall'Utente;
+l'AI ha verificato codice, diff e test offline, non rieseguito la VM.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -58,7 +64,7 @@ Questa ripartenza non ha ripetuto autenticazione o interrogato il servizio sul
 bus di sistema. Materiali in `/var/lib/goodix-5125-poc/` e template in
 `/var/lib/fprint/` vanno preservati. La presenza di materiale privato nel
 repository non autorizza a leggerlo, trasferirlo, installarlo o pubblicarlo.
-Nessun contenuto protetto è stato letto durante R1–R3.
+Nessun contenuto protetto è stato letto dall'AI durante questa recovery R1–R3.
 
 La decisione esplicita corrente dell'Utente è ora recepita in roadmap §4:
 
@@ -223,10 +229,10 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
-`CURRENT_TASK`: chiudere il mismatch fra pre-contesto reale e fixture Gate A,
-verificare status/apply/inversa con label miste e negativi, aggiornare
-inversa/documentazione e riconsegnare il solo Gate A VM. Nessuna modifica production/retry/attempt,
-binari, roadmap o governance. La successiva live richiede review separata.
+Questa sezione conserva la preparazione e la closure sintetica precedenti.
+Il `CURRENT_TASK` attuale è consolidare il PASS Claim/Release e preparare il
+successivo enrollment stock, come descritto nello stato corrente e nella
+sezione di recovery R3 sotto.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -489,7 +495,9 @@ fallisce il reporting locale. Deadline 15 s per chiamata, NO_AUTO_START,
 nessun loop/retry o secondo Release dopo errore; connessione chiusa nel
 finally esterno. Timeout di Claim ambiguo = FAIL, senza retry: la chiusura
 del bus lascia a fprintd il solo cleanup owner-loss. Output limitato a marker
-fissi e nome remoto D-Bus validato, mai il testo libero dell'errore.
+fissi e nome remoto D-Bus validato. Dal commit `6d970c5`, anche il messaggio
+dei soli errori net.reactivated.Fprint.Error validati è riportato su una riga,
+con prefisso rimosso e limite di 240 caratteri, senza modificare il flusso live.
 
 La procedura `deployment/minimal-runtime/R3_LIVE_OPEN_CLOSE_VM.md` controlla
 inizialmente servizio fermo, provenance installata/hash delle sole librerie,
@@ -517,6 +525,8 @@ sintassi shell/Python e negativi del controllo journal. Il diff resta
 solo helper/test/handoff e manuale; sorgenti production e roadmap invariati.
 L'AI non ha eseguito azioni VM/root, servizi reali o USB, né letto contenuti
 protetti. La disponibilità Gio nella VM viene verificata dall'Utente.
+
+Stato storico del primo failure, superato dalla closure descritta sotto:
 
 ```text
 OUTCOME=HUMAN_REQUIRED
@@ -550,7 +560,10 @@ non è una serie VERIFY/MATCH. Resta aperta ogni validazione di riconoscimento,
 consumer stock e update-survivability R5. Nessun incremento di coupling
 Fedora o dipendenza password/desktop viene introdotto.
 
-### R3 — corrective SELinux dei materiali e separazione Gate A/B
+### R3 — corrective SELinux dei materiali e separazione Gate A/B (storico, completato)
+
+Le prescrizioni pending/approval di questa ricostruzione sono superate dal
+PASS e dalla riconciliazione descritti nella sezione seguente.
 
 L'Utente riporta `R3_VM_SENSOR_COUNT=1`, `R3_LIVE_ENUMERATION=PASS`,
 `R3_OPEN_CLOSE=FAIL STAGE=CLAIM`, errore
@@ -670,6 +683,107 @@ ROADMAP_CHANGED=false
 AI_PHYSICAL_RUNTIME_MUTATION=false
 GATE_A=HUMAN_REQUIRED_VM_LABEL_ONLY_SENSOR_DISCONNECTED
 GATE_B=BLOCKED_PENDING_GATE_A_REVIEW_AND_SEPARATE_APPROVAL
+```
+
+### R3 — recovery Claim/Release, manifest runtime e successivo enrollment
+
+L'handoff Utente del 22 settembre riporta il Claim diagnostico successivo
+alle label: `R3_REMOTE_ERROR=net.reactivated.Fprint.Error.Internal`,
+`R3_REMOTE_MESSAGE=Open failed with error: target manifest schema or field rejected`,
+`R3_OPEN_CLOSE=FAIL STAGE=CLAIM`. Il sorgente production conferma che il
+parser fallisce prima del claim dell'interfaccia USB. La causa è il manifest
+legacy `d232-target-material-v1`, misurato byte-per-byte uguale alla sorgente
+storica dall'Utente; non è evidenza di un difetto driver, VM, libgusb o libusb.
+
+La conversione eseguita dall'Utente riusa soltanto la funzione pura
+`development/migration/patched-host-to-combined/manifest.py`, vincolata a
+size/hash legacy esatti, senza eseguire la migrazione host storica respinta.
+Il risultato ha dieci campi runtime-v1, root:root 0600 e contesto
+`system_u:object_r:fprintd_var_lib_t:s0`. Sensore assente/fprintd inactive
+durante la conversione; gli altri quattro file non trasformati. Segue PASS
+riportato del preflight compilato in SDK 25.08 con `--nodevice=all`, dai
+moduli production d190_binder/target_material/runtime_inputs/runtime_material;
+esecuzione senza dipendenze GUsb/libusb. L'AI non ha aperto il deposito reale.
+
+La successiva live restituisce:
+
+```text
+R3_LIVE_ENUMERATION=PASS
+R3_LIVE_CLAIM=PASS CLAIM_CALLS=1
+R3_LIVE_RELEASE=PASS RELEASE_CALLS=1
+R3_OPEN_CLOSE=PASS
+```
+
+Il gate open/close è accettato nel confine esplicitamente chiuso dall'Utente.
+L'handoff non include un nuovo journal integrale o un readback factory:
+non si inventano valori raw di telemetria né una qualifica biometrica.
+La successiva riconciliazione restituisce `R3_MATERIAL_MANIFEST_RECONCILE=PASS`,
+`R3_MATERIAL_MANIFEST=RUNTIME_V1`, `R3_MATERIAL_LOCAL_RULE=PRESENT_COMPATIBLE`
+e lo SHA indicato nello stato corrente. Directory root:root 0700, cinque file
+root:root 0600 e tutti sei i contesti canonici; ultimo stato riportato sensore
+assente/fprintd inactive. La riconciliazione cambia solo `installation.json`:
+metadata del manifest/directory e digest non segreto. Non ripetere il comando
+one-shot né dedurne un aggiornamento dell'inversa salvata.
+
+Review dei tre commit esterni: helper senza nuovo metodo/retry; preflight
+limitato al solo manifest non segreto e ai dieci campi/pin canonici; receipt
+narrow che verifica gli altri quattro metadata e mantiene la provenienza
+runtime; fixture di transazione isolata dal nuovo material preflight. I test
+originari sono 27 deployment + 29 materiali + 14 helper = **70 PASS**.
+Il gap duplicate/escape è riprodotto su dati sintetici e corretto nello stesso
+milestone con due regressioni mirate: ora **72 PASS**. Il manifest canonico
+serializzato deterministicamente produce lo stesso SHA riportato nell'handoff;
+non è un rehash del file guest. Audit 62 sorgenti + quattro supporti PASS.
+Verifica ad hoc su filesystem sintetico anche dell'inversa esatta di
+`7f5a896`, precedente al guard manifest: dopo riconciliazione del receipt
+resta byte-per-byte invariata, disinstalla il runtime e preserva i materiali.
+Nessuna esecuzione privilegiata; host/SELinux sostituiti dalle fixture esistenti.
+Sintassi dei quattro blocchi shell e del preflight Python, link locali e
+entrypoint help da cwd estranea verificati offline. Il workflow CLI reale
+resta da eseguire dall'Utente nella VM.
+
+`ACCEPT_AND_CONTINUE` dopo il corrective. Il successivo `CURRENT_TASK` è
+preparare un solo enrollment stock VM, senza rebuild/reinstall. L'audit di
+`reference/fprintd-fedora44-1.94.5/source/{utils/enroll.c,src/device.c}`
+conferma una EnrollStart per invocazione, IDENTIFY anti-duplicato seguito
+soltanto su NO_MATCH pulito da ENROLL, EnrollStop e Release. Il daemon
+sostituisce un template se il dito selezionato esiste già: la consegna richiede
+quindi uno slot libero e non autorizza overwrite/delete di template esistenti.
+Il driver non espone storage device; i rami daemon clear/delete storage e
+DATA_FULL/restart condizionati a quelle feature non sono questo percorso.
+
+Il precheck IDENTIFY è realmente one-shot anti-duplicato, non una serie
+VERIFY: MATCH termina come enroll-duplicate, NO_MATCH abilita un solo handoff
+pulito. È l'eccezione motivata §8.2 per questo boundary. Il driver conserva
+poison/terminal fence su processing error e impedisce riacquisizione in caso
+di risottomissione stock. Enrollment conserva il bound tecnico 20 contatti,
+max 8 stage e retry diversity espliciti; massimo complessivo 21 contatti
+incluso il precheck. Non si introduce un orchestratore né si cambia la
+semantica dei tentativi decisa dall'Utente. La lettura del codice e i PASS
+sintetici non anticipano l'esito della nuova live.
+
+**Riesame pre-live:** cambia il confine esercitato, da open/close già riuscito
+ad activation/IDENTIFY→ENROLL/storage con CLI stock; l'ipotesi è che il
+runtime qualificato completi il normale enrollment nel nuovo stack. Se
+fallisce ancora nel material loader, stop senza retry e confronto mirato di
+errore/provenance/manifest/label; se fallisce dopo activation, analizzare
+l'esatto stadio con la telemetria già esistente prima di qualunque nuovo
+tentativo. Nessuna modifica driver dedotta da un mero errore CLI.
+
+```text
+OUTCOME=HUMAN_REQUIRED
+ACTIVE_PHASE=R3
+ADVANCEMENT=CLAIM_RELEASE_CLOSED_AND_MANIFEST_PREFLIGHT_CORRECTED
+R3_OPEN_CLOSE=PASS_HUMAN_REPORTED
+R3_ENROLLMENT=NOT_YET_VALIDATED
+EXECUTABLE_CLOSURE=OFFLINE_PASS_LIVE_ENROLLMENT_REQUIRES_HUMAN_VM
+RESIDUAL_BLOCKER_OR_RISK=BIOMETRIC_R3_AND_R4_R5_R6_R7_NOT_QUALIFIED
+CANONICAL_DOCUMENTATION=THIS_MANUAL
+REVIEW_SET=GIT_DIFF_FROM_93e16f4_AND_THREE_EXTERNAL_COMMITS
+PRODUCTION_DRIVER_CHANGED=false
+ROADMAP_CHANGED=false
+AI_PHYSICAL_RUNTIME_MUTATION=false
+NEXT_BOUNDARY=HUMAN_VM_STOCK_ENROLLMENT
 ```
 
 ### Governance corrente

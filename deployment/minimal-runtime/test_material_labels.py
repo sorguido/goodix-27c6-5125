@@ -279,6 +279,29 @@ class MaterialLifecycle(unittest.TestCase):
         self.assertFalse(self.mutations())
         self.assertFalse(self.runtime.exists())
 
+    def test_manifest_duplicate_fields_rejected_before_any_mutation(self):
+        manifest = self.material / "target-material-manifest.json"
+        valid = json.dumps(d.MATERIAL_MANIFEST_EXPECTED)
+        for pid in ("0000", "5125"):
+            with self.subTest(pid=pid):
+                manifest.write_text('{"pid":"' + pid + '",' + valid[1:])
+                with self.assertRaisesRegex(RuntimeError, "duplicate field"):
+                    self.install()
+                self.assertFalse(self.mutations())
+                self.assertFalse(self.runtime.exists())
+
+    def test_manifest_escaped_keys_and_values_rejected_before_any_mutation(self):
+        manifest = self.material / "target-material-manifest.json"
+        valid = json.dumps(d.MATERIAL_MANIFEST_EXPECTED)
+        for value in (valid.replace('"schema"', r'"sch\u0065ma"'),
+                      valid.replace('"5125"', r'"\u0035125"')):
+            with self.subTest(value=value):
+                manifest.write_text(value)
+                with self.assertRaisesRegex(RuntimeError, "string escapes"):
+                    self.install()
+                self.assertFalse(self.mutations())
+                self.assertFalse(self.runtime.exists())
+
     def test_idempotent_install_checks_labels_and_preserves_ownership(self):
         self.install()
         state = (self.runtime / d.STATE).read_bytes()

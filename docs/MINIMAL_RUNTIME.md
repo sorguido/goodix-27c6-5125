@@ -28,11 +28,14 @@ reports PM-accepted [synthetic retry/attempt results](STOCK_FPRINTD_ATTEMPTS.md)
 A normal runtime build from that SHA is also reported complete/reviewed,
 at `/home/guido/goodix-r3-20260922-111144`. Clean replacement and stock load
 subsequently passed at install `264cd7ff1ba77857e1985502f299e4375f9a0516`.
-The first enumeration passed; Claim failed before interface claim on a causal
-SELinux manifest read denial (`var_lib_t`). The qualified R3 runtime remains
-installed, sensor detached and fprintd inactive/MainPID 0. Next is
-[Gate A label-only correction](../deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md),
-then separate review before any new live execution.
+The first Claim failed on a generic SELinux label; after label correction,
+bounded diagnostics exposed the legacy D232 manifest. The user converted only
+the manifest through the exact-input historical converter, passed the production
+material-loader preflight without USB and completed one stock-fprintd
+Claim/Release. Those gates are closed. The receipt is reconciled and the last
+reported state is sensor disconnected/fprintd inactive. The current human gate
+is [one native enrollment](../deployment/minimal-runtime/R3_ENROLL_VM.md),
+using the retained R3 runtime. No rebuild/reinstall or repeat open/close.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
@@ -91,7 +94,7 @@ staging are written. The terminal log is adjacent to output. No project file
 is installed, no service is started, and no Fedora-owned file is changed.
 Optional prerequisite installation in the README is manual VM package setup.
 
-**Current R3 surface, stock loading PASS; label correction pending VM Gate A:**
+**Current R3 surface: stock load, material correction and Claim/Release PASS reported:**
 
 | Path | Purpose | RPM owner / override | Update class and rollback expectation |
 | --- | --- | --- | --- |
@@ -105,12 +108,16 @@ Optional prerequisite installation in the README is manual VM package setup.
 | `.goodix-metadata-*` inside private runtime | Atomic saved inverse/state replacement for label corrective | Temporary project files | D: retained mismatch after hard power loss needs review; no authentication dependency |
 | `.goodix-5125-stage-*` under `/usr/local/lib64/`, `.goodix-5125-dropin-*` under the drop-in directory | Stage owned files and publish without replacing an occupied drop-in | Temporary project files | D: removed on ordinary completion/error; abrupt power-loss recovery not qualified |
 
-The installer inspects only metadata and SELinux xattrs of the six material
-paths, establishes the owned/unowned local rule and relabels only those paths.
-It never reads or changes their contents, UID/GID or modes and never deletes
-them. `/var/lib/fprint/` remains untouched stock storage. No material/template
-migration is performed. The current label-only action changes only the saved
-inverse/state and mapping/labels, preserving all runtime binaries/drop-in.
+Deployment inspects metadata/SELinux xattrs of all six material paths and
+parses only the non-secret manifest. It rejects legacy D232, unexpected fields
+or pins, duplicate keys and string escapes incompatible with the production
+parser. It never opens the four protected binary contents or changes any material
+content/UID/GID/mode. The completed human manifest conversion was separate from
+installation and changed no protected binary. Receipt reconciliation records
+that replacement without replacing the saved inverse. `/var/lib/fprint/` remains
+stock template storage and is not touched by runtime installation/uninstall.
+The next native enrollment may add one host template in a previously unused
+slot; overwriting an existing template is excluded from that gate.
 
 No additional udev rule is justified by current source evidence. The library
 build disables rule generation. The physical workspace's Fedora vendor unit
@@ -222,8 +229,8 @@ biometric success or R5 survivability.
 
 The user explicitly retains all VM execution. R2 review is
 `ACCEPT_AND_CONTINUE`: preserve the existing build; do not repeat it. R3-A
-original install/load evidence is also `ACCEPT_AND_CONTINUE`; its removal
-is now explicitly requested for the clean replacement below.
+original install/load evidence is also `ACCEPT_AND_CONTINUE`; its replacement
+by the qualified R3 build has completed.
 Direct AI access to the VM is neither needed nor a
 blocker. The previous [build procedure](../production/minimal-runtime/README.md)
 remains reproducible reference, not the next task.
@@ -237,27 +244,29 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[Gate A: labels only](../deployment/minimal-runtime/R3_SELINUX_MATERIAL_VM.md).
-The already installed build and stock load are accepted; neither is repeated.
-The implementation review answers the four architectural questions before
-modification: no increased critical distro coupling, no expected update failure
-beyond fingerprint, no Fedora-owned auth component replaced, recovery by
-remove/reinstall or update of Goodix integration. This uses the existing
-Fedora type, which grants more than read permission; production remains
-O_RDONLY. No custom policy module, permissive mode or driver change.
+[one native enrollment](../deployment/minimal-runtime/R3_ENROLL_VM.md).
+The accepted build/load/material/Claim gates are not repeated. The review finds
+no increased coupling to critical distro components, no expected update failure
+beyond fingerprint and no replacement of Fedora-owned authentication files.
+Recovery remains removal/reinstall/update of Goodix integration. R5 remains
+unqualified; the static assessment is not a real-update result.
 
-The saved inverse gains ownership-aware mapping removal. `label-material`
-updates only that inverse and installation metadata on the known R3 install;
-`unlabel-material` reverses its labels/rule while preserving the qualified
-runtime. Full uninstall includes the same inverse. Rule/context drift is
-retained for review. See the Gate A review for partial-failure behavior and
-the unqualified hard power-loss window. This is not a general runtime upgrade.
+The installed inverse retains ownership-aware mapping removal and works with
+the reconciled metadata. The completed `reconcile-material-manifest` changed
+only the receipt; it did not upgrade that inverse. Full uninstall preserves
+all material/template contents. An ad hoc synthetic-filesystem check used the
+exact pre-guard inverse from `7f5a896`, reconciled its receipt with current code
+and completed removal with material sentinels unchanged. Host/SELinux interfaces
+were mocked; this is not a live rollback claim. See the historical Gate A review for partial
+failure handling and the unqualified hard power-loss window.
 
-Offline verification combines the original 27 deployment tests, dedicated
-25 SELinux lifecycle tests with synthetic files/mock commands/xattrs, and the
-12 existing open/close tests: **64 PASS**. The source audit and real non-VM entrypoint
-refusal do not mutate the physical runtime. Gate A has not run, and Gate B
-requires later separate review/approval. R5 and release validation remain open.
+Recovery independently reran the three external commits' 70 tests, then
+reproduced and fixed the JSON duplicate/escape mismatch on synthetic manifests.
+Current validation is **27 deployment + 31 material + 14 open/close = 72 PASS**.
+Production parser, runtime binaries and source digests remain unchanged. The
+non-secret canonical serialization matches the user-reported runtime manifest
+SHA256 `1b98bf54925cf9608ee8bf4e7d2f811f535c3c9395ea2eaf38fe18fb017aacc8`;
+no guest file or protected contents were read by the AI.
 
 The Gate A at `de7e6e4` was withdrawn before VM mutation: its initial full-label
 allowlist rejected the real directory's `unconfined_u` field. The revised

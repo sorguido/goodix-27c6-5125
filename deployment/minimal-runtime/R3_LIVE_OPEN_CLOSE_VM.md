@@ -1,15 +1,19 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3 first live gate: enumeration and one Claim/Release
 
-**BLOCKED: Gate B requires separate review/approval after
-[Gate A material labeling](R3_SELINUX_MATERIAL_VM.md). Do not execute this
-procedure during Gate A.** No reinstall or rebuild.
+**COMPLETED — historical procedure, not a current live instruction.**
+The user handoff on 22 September 2026 closes stock-fprintd Claim/Release after
+the SELinux labels and legacy D232 manifest were corrected. A sensor-free
+production material-loader preflight and the subsequent single Claim/Release
+passed; the receipt was then reconciled. Do not repeat this gate. The next
+human boundary is [native enrollment](R3_ENROLL_VM.md).
 
-First execution from `4a27996fe14aed51e2400ba172f27d5177af2cb1`:
-enumeration PASS, Claim FAIL/Internal due to the manifest's `var_lib_t` read
-denial. No retry; no interface claim or biometric activation reached. The
-sensor was detached and the qualified runtime retained. The procedure below
-is preserved for later separately approved Gate B, not a current live handoff.
+The first execution from `4a27996fe14aed51e2400ba172f27d5177af2cb1`
+failed on the manifest's generic SELinux label; the later bounded diagnostic
+identified the incompatible legacy schema. These are resolved deployment
+failures. Instructions below preserve the original procedure and its expected
+telemetry; they are not a claim that every raw journal field was supplied in
+the latest handoff.
 The user reports clean replacement and stock load **PASS**: source
 `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, install
 `264cd7ff1ba77857e1985502f299e4375f9a0516`, five private libraries, system
