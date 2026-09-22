@@ -4,7 +4,9 @@
 **R2 VM BUILD = PASS (22 September 2026).** The user completed this procedure
 at `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`. Keep the existing VM output
 `/home/guido/goodix-r2-20260922-081148/`; do not rebuild for R3. The instructions
-below remain a build reference for future source changes.
+below remain a build reference for future source changes. R3-A stock loading
+has also passed at install `92311c5`. The next gate is the
+[synthetic attempt test](STOCK_ATTEMPTS_VM.md); keep the installed baseline.
 
 Run this procedure manually in the Fedora 44
 KDE x86_64 VM, as its ordinary user, after pulling `development`. Keep the
@@ -13,8 +15,9 @@ The AI uses the physical workspace for source work and safe offline checks;
 it does not connect to the VM or execute its builds.
 
 Purpose: build the extracted driver/library set and check its dynamic linkage
-against the VM's Fedora fprintd. This was the R2 gate, now completed; the next
-step is the [R3-A install/load check](../../deployment/minimal-runtime/README.md).
+against the VM's Fedora fprintd. This was the R2 gate, now completed; the
+R3-A load check is also complete. Do not rebuild the runtime for the current
+test-only handoff.
 It does not install the project, run fprintd, enroll/verify, test authentication,
 exercise USB, or establish update survivability. No new installer/uninstaller
 is appropriate at this build-only boundary: no host runtime file is changed.

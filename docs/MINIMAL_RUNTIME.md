@@ -16,8 +16,15 @@ private-tree dependencies were zero, and no RPATH was present.
 The daemon was not executed, USB/material loaders were not accessed and no
 Fedora component was replaced. This is human-produced evidence reviewed
 against the committed build/source path, not an AI rerun or independently
-rehashing the guest's binaries. R3-A installation/runtime behavior remains
-unverified; no R4/R5/R6 or release qualification is claimed.
+rehashing the guest's binaries. R3-A stock load is now also **PASS**, reported
+by the user for install `92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`: SELinux
+Enforcing, stock ExecStart/process `/usr/libexec/fprintd`, five private library
+mappings and `/usr/lib64/libgusb.so.2.0.10`. The reader stayed disconnected;
+installation and R2 output remain in place, rollback untested in the VM.
+No biometric, R4/R5/R6 or release qualification is claimed. The current
+[retry/attempt correction and audit](STOCK_FPRINTD_ATTEMPTS.md) require
+synthetic VM execution before any sensor handoff; the installed binary does
+not contain that source correction.
 
 ## MINIMAL_RUNTIME_CONTENTS
 
@@ -30,7 +37,7 @@ unverified; no R4/R5/R6 or release qualification is claimed.
 | System libraries | VM GLib/GIO/GObject, OpenSSL, libusb and other ELF dependencies | Remain distribution-owned; actual transitive resolution is recorded in `fprintd.ldd` by the VM build |
 | Notices and identity | OpenCV license corpus, existing four license texts, per-file source ledger and hashes, runtime SHA256SUMS | Preserve current licensing/provenance; this internal build payload is not a public release/export |
 
-The source audit verified all 62 existing digests and the four build-support
+The source audit verifies the 62 manifest digests and the four build-support
 inputs. The new `check-source.sh --driver-only` stops before historical
 fprintd/login/sudo/Polkit checks. Its default mode remains the historical full
 audit. The new build reuses `build-inner.sh`'s Goodix-only Meson selection,
@@ -75,7 +82,7 @@ staging are written. The terminal log is adjacent to output. No project file
 is installed, no service is started, and no Fedora-owned file is changed.
 Optional prerequisite installation in the README is manual VM package setup.
 
-**R3-A prepared surface, reviewed offline; VM installation still pending:**
+**R3-A installed surface, stock loading PASS; runtime/update qualification pending:**
 
 | Path | Purpose | RPM owner / override | Update class and rollback expectation |
 | --- | --- | --- | --- |
@@ -133,7 +140,7 @@ install/remove symmetry and actual library mappings. Preserve the vendor
 ExecStart and stock authentication files. A normal update must not require a
 frozen package version to keep password/desktop/sudo/PolicyKit available.
 
-The first R3 handoff is deliberately limited to installation and the normal
+The completed first R3 handoff was limited to installation and the normal
 stock-daemon start **without the sensor**. It tests actual mappings and
 SELinux/service load restrictions using the successful R2 binaries. It does
 not claim to close sensor access, material access, retry behavior or update
@@ -175,7 +182,9 @@ the action and subsequent activation checks the poison before opening another
 transport epoch. This is static evidence of a fence, not a current dynamic
 regression PASS with stock fprintd. Clean outcomes permit explicit reopen;
 the `login_attempts >= 3` guard belongs to the private prepared-login path,
-not automatically to ordinary stock VerifyStart. The native stock workflow
+not automatically to ordinary stock VerifyStart. The new R3 source adds a
+per-open capture cap and terminal latch, with synthetic evidence pending;
+see `STOCK_FPRINTD_ATTEMPTS.md`. The native stock workflow
 must demonstrate the required three-attempt limit/stop-on-match and reject
 hidden retries before any sensor-reaching test. Do not weaken the fence or
 reuse the private consumer patch to get a build or live PASS.
@@ -195,13 +204,13 @@ establish SELinux execution, physical attempts,
 biometric success or R5 survivability.
 
 The user explicitly retains all VM execution. R2 review is
-`ACCEPT_AND_CONTINUE`: preserve the existing build; do not repeat it. Continue
-with the R3-A reversible installation and a stock-daemon load check with the
-sensor disconnected. Direct AI access to the VM is neither needed nor a
+`ACCEPT_AND_CONTINUE`: preserve the existing build; do not repeat it. R3-A
+install/load evidence is also `ACCEPT_AND_CONTINUE`; keep its installation.
+Direct AI access to the VM is neither needed nor a
 blocker. The previous [build procedure](../production/minimal-runtime/README.md)
 remains reproducible reference, not the next task.
 
-R3 offline verification: 17 temporary-filesystem/input tests cover symmetric
+R3-A preparation verification: 17 temporary-filesystem/input tests cover symmetric
 removal, active/inactive restoration, idempotence, checksum and ownership
 drift, collision preservation, failed reload and failed vendor restart with
 the inverse retained. All host-command/device interfaces are test doubles;
@@ -209,9 +218,11 @@ no service, library or USB execution is claimed. The real install entry point
 also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
-PM review decision: **HUMAN_REQUIRED** for the
-[R3-A install/load procedure](../deployment/minimal-runtime/README.md).
-The review set is the Git diff from the accepted R2 commit plus the exact
-new deployment sources/tests, roadmap, ledger and canonical manual. Offline
-closure is sufficient for handoff; actual installation, inverse behavior
-under systemd/SELinux and stock-daemon execution remain human VM evidence.
+PM review now accepts the user-reported install/load evidence. The next
+**HUMAN_REQUIRED** is the [synthetic stock-attempt test](../production/minimal-runtime/STOCK_ATTEMPTS_VM.md).
+No new install or live is handed off. The correction changes the two driver
+source/header digests, not the installed binary or daemon. Normal/sanitized
+execution of the extended 44-case suite remains pending; source/shell/inert
+checks alone do not close retry safety. The previous installation's saved
+inverse remains valid and untouched. Review set: Git diff from install commit
+`92311c5`, retry audit, changed driver/tests/runner, ledger and canonical manual.

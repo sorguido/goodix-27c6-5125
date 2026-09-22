@@ -12,12 +12,25 @@ build_dir=$2
 shift 2
 local_fp_dir="$git_root/reference/libfprint-fedora44-1.94.100/source/libfprint"
 test_dir="$git_root/libfprint-driver/tests"
+test_source="$test_dir/test_goodix_fpimage_device.c"
+test_warnings=""
+test_timeout=30
+if [ "${GOODIX_STOCK_ATTEMPT_TEST:-0}" = 1 ]; then
+  # Reuse the existing synthetic full-TLS fixtures, compiled against the
+  # canonical Fedora base and current driver, not the retired Rocky core.
+  test_source="$git_root/development/private-root/libfprint-driver/tests/test_goodix_d278_secure_session.c"
+  test_warnings="-Wno-conversion"
+  test_timeout=90
+fi
 
 glib_cflags=$(pkg-config --cflags glib-2.0 gio-2.0 gobject-2.0 openssl)
 glib_libs=$(pkg-config --libs glib-2.0 gio-2.0 gobject-2.0 openssl)
 includes="-I$test_dir/support/d277 -I$test_dir/support -I$git_root/libfprint-driver -I$git_root/reference/libfprint-fedora44-1.94.100/source -I$git_root/Rockytkg/libfprint/libfprint -I$local_fp_dir -I$git_root/Rockytkg/libfprint/libfprint/sigfm -I$local_fp_dir/nbis/include -I$local_fp_dir/nbis/libfprint-include -I$build_dir"
 strict_flags="-std=gnu11 -O2 -g -DGOODIX_ENABLE_TEST_SEAMS -Wall -Wextra -Werror -Wformat=2 -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -ffunction-sections -fdata-sections"
 local_flags="-DGOODIX_LIBFPRINT_SIGFM -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-parameter -Wno-missing-prototypes -Wno-discarded-qualifiers -Wno-sign-compare -Wno-cast-function-type -Wno-enum-conversion -Wno-maybe-uninitialized -ffunction-sections -fdata-sections"
+if [ "${GOODIX_STOCK_ATTEMPT_TEST:-0}" = 1 ]; then
+  strict_flags="$strict_flags -DGOODIX_LIBFPRINT_SIGFM"
+fi
 
 if [ "${GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE_TEST:-0}" = 1 ]; then
   strict_flags="$strict_flags -DGOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE"
@@ -139,8 +152,8 @@ for source in \
     -o "$build_dir/${source%.c}.o"
 done
 gcc $local_flags $glib_cflags $includes -c "$test_dir/support/fpi_usb_transfer_compile_stub.c" -o "$build_dir/fpi_usb_transfer_compile_stub.o"
-gcc $strict_flags $glib_cflags $includes -c \
-  "$test_dir/test_goodix_fpimage_device.c" \
+gcc $strict_flags $test_warnings $glib_cflags $includes -c \
+  "$test_source" \
   -o "$build_dir/test_goodix_fpimage_device.o"
 
 # ---- Host-only test seams ----
@@ -207,7 +220,7 @@ gcc -Wl,--gc-sections "$build_dir/metrics.o" -lstdc++ \
   $glib_libs -lm -o "$build_dir/test_goodix_fpimage_device"
 
 set +e
-timeout --signal=TERM 30 "$build_dir/test_goodix_fpimage_device" "$@"
+timeout --signal=TERM "$test_timeout" "$build_dir/test_goodix_fpimage_device" "$@"
 normal_rc=$?
 case $normal_rc in
   0) echo "Normal test run: PASS" ;;
@@ -294,8 +307,8 @@ for source in \
     -o "$build_dir/${source%.c}_san.o"
 done
 gcc $san_local_flags $glib_cflags $includes -c "$test_dir/support/fpi_usb_transfer_compile_stub.c" -o "$build_dir/fpi_usb_transfer_compile_stub_san.o"
-gcc $san_strict_flags $glib_cflags $includes -c \
-  "$test_dir/test_goodix_fpimage_device.c" \
+gcc $san_strict_flags $test_warnings $glib_cflags $includes -c \
+  "$test_source" \
   -o "$build_dir/test_goodix_fpimage_device_san.o"
 gcc $san_local_flags $glib_cflags $includes -c \
   "$test_dir/support/gusb_stub.c" \
@@ -353,7 +366,7 @@ gcc $san_common -Wl,--gc-sections "$build_dir/metrics_san.o" -lstdc++ \
 set +e
 ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 \
 UBSAN_OPTIONS=halt_on_error=1 \
-  timeout --signal=TERM 30 "$build_dir/test_goodix_fpimage_device_sanitized" "$@"
+  timeout --signal=TERM "$test_timeout" "$build_dir/test_goodix_fpimage_device_sanitized" "$@"
 san_rc=$?
 case $san_rc in
   0) echo "Sanitizer test run: PASS" ;;
@@ -365,6 +378,11 @@ set -e
 
 if [ "$normal_rc" -ne 0 ] || [ "$san_rc" -ne 0 ]; then
   exit 1
+fi
+if [ "${GOODIX_STOCK_ATTEMPT_TEST:-0}" = 1 ]; then
+  echo R3_STOCK_ATTEMPTS_SYNTHETIC_NORMAL_AND_SANITIZERS=PASS
+  echo REAL_USB_SUBMIT=0
+  exit 0
 fi
 echo D279_20_DORMANT_CONTEXT_OWNERSHIP_AND_DRAIN=PASS
 echo D279_24_CONTEXT_FIRST_ARM_ENROLLMENT_HANDOFF=PASS

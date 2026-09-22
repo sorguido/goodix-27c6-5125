@@ -16,10 +16,10 @@
 The active **build-only** R2 entry point is
 [`minimal-runtime/build.sh`](minimal-runtime/build.sh), with the
 [manual VM procedure](minimal-runtime/README.md). It creates no host
-installation. The first VM build is PASS at `c5df717`; R3 installation/runtime validation
-is the next boundary. Use the
-[R3-A install/load procedure without the reader](../deployment/minimal-runtime/README.md)
-with the retained R2 binaries. No replacement release candidate is qualified yet.
+installation. The first VM build is PASS at `c5df717`; R3-A stock loading is
+PASS at install `92311c5`. Keep that installation and the retained R2 output.
+The next gate is the [synthetic stock-attempt regression](minimal-runtime/STOCK_ATTEMPTS_VM.md),
+before a driver update or sensor test. No replacement release candidate is qualified yet.
 
 ## Component classification for the active roadmap
 

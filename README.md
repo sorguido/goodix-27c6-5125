@@ -13,8 +13,8 @@
 > The next runtime must use the Goodix library with Fedora stock fprintd and
 > stock authentication consumers. No replacement candidate is ready yet.
 
-R2 VM build is PASS at `c5df717`. Current handoff:
-[R3-A manual installation and stock-daemon load check, without the reader](deployment/minimal-runtime/README.md).
+R2 VM build is PASS at `c5df717`; R3-A stock load is PASS at install `92311c5`.
+Current handoff: [synthetic retry/attempt tests in the VM, without the reader](production/minimal-runtime/STOCK_ATTEMPTS_VM.md).
 See the [minimal runtime audit](docs/MINIMAL_RUNTIME.md); retain the existing
 R2 output rather than rebuilding.
 The following product and installation description is historical.

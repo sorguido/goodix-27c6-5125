@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R2 accettata, R3-A al gate install/load VM (22 settembre 2026)
+### Stato corrente — R3-A load PASS, gate test sintetici retry/attempt (22 settembre 2026)
 
 La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
 in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
@@ -24,8 +24,8 @@ l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
 L'aggiornamento `af2ecac13787095a81dcc0f7354f71725d0623a3`, integrato senza
 riscrivere storia, precisa R7: release autonoma, sicura e sostenibile per
 l'utente finale; upstream facoltativo. La recovery corrente parte da
-`c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`, `development` inizialmente pulito,
-e dalla nuova evidenza manuale R2 fornita dall'Utente.
+`92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`, `development` inizialmente pulito,
+e dalla nuova evidenza manuale R3-A fornita dall'Utente.
 
 **R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
 critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
@@ -80,7 +80,7 @@ L'estrazione R2 parte da `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`.
 `production/minimal-runtime/build.sh` riusa `build-inner.sh` e i soli input
 Goodix/SIGFM/R2; `check-source.sh --driver-only` verifica 62 file (30 TU e 32
 header) e quattro supporti build, senza i componenti autenticazione privati.
-Sorgenti driver e manifest sono invariati. Il payload contiene libfprint,
+In R2 sorgenti driver e manifest restavano invariati. Il payload contiene libfprint,
 quattro OpenCV, due symlink libfprint e licenze/provenance. `libgusb.so.2` è
 Fedora di sistema: la copia pkgconfig è solo input build. Il ledger
 `docs/LICENSING_AND_PROVENANCE.md` è stato corretto per non classificarla più
@@ -126,12 +126,32 @@ ownership/modi e content binding sui cinque input preservati. Nessun nuovo
 riuso esterno o cambio licenza. La provenance Rockytkg è stata consultata in
 `development/Rockytkg/snapshot/PROVENANCE.md`, dove risiede lo snapshot.
 
-### R3-A — installazione reversibile pronta per prova manuale senza sensore
+### R3-A — installazione e caricamento stock PASS, baseline conservata
 
-`CURRENT_TASK`: riusare la build R2 accettata con libfprint privata e un solo
-`Environment=LD_LIBRARY_PATH=...` per il fprintd Fedora; preparare installazione,
-inversa e verifica minima di caricamento, senza nuova build o accesso sensore.
-La scelta rispetta l'ordine R3-A → B → C: nessuna evidenza esclude oggi A.
+L'Utente ha eseguito installazione e load check nella Fedora 44 KDE x86_64 VM:
+
+```text
+R3_A_STOCK_LOAD=PASS_HUMAN_REPORTED
+BUILD_SOURCE_COMMIT=c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6
+INSTALL_COMMIT=92311c5ebe1d05a68ad0542ecb8aeafb9776db0e
+SELINUX=Enforcing
+EXECSTART=/usr/libexec/fprintd
+MAIN_PROCESS_EXECUTABLE=/usr/libexec/fprintd
+LD_LIBRARY_PATH=/usr/local/lib64/goodix-27c6-5125
+SYSTEM_LIBGUSB=/usr/lib64/libgusb.so.2.0.10
+FEDORA_COMPONENTS_REPLACED=NONE
+SENSOR_CONNECTED=false
+INSTALLATION_RETAINED=true
+ROLLBACK_EXECUTED=false
+```
+
+I mapping comprendono `libfprint-2.so.2.0.0` e tutte le quattro
+`libopencv_{core,features2d,flann,imgproc}.so.413` nella directory privata.
+Conservato anche `/home/guido/goodix-r2-20260922-081148/`. La review PM ha
+confrontato output, installer e footprint: `ACCEPT_AND_CONTINUE` per R3-A
+load, senza inferire enrollment, riconoscimento, safety retry, rollback reale
+o R5. La scelta A è sufficiente al caricamento osservato; B/C non selezionate.
+Nessuna installazione/load/build viene ripetuta dall'AI.
 
 `deployment/minimal-runtime/install.sh` e `uninstall.sh` usano una transazione
 locale Python standard-library. Installano esclusivamente i cinque binari R2,
@@ -163,7 +183,7 @@ drift o failure di ripristino conservano evidenze/stato e producono errore;
 nessun file estraneo viene sovrascritto o cancellato. Crash/power loss duro
 non è una garanzia qualificata dai test offline.
 
-**Verificato offline:** 17 test su filesystem temporanei, con comandi host e
+**Verificato offline nella preparazione R3-A:** 17 test su filesystem temporanei, con comandi host e
 USB sostituiti da test double, coprono install/uninstall, stato active/inactive,
 idempotenza, collisioni, drift, input/path/hash e failure reload/restart con
 conservazione dell'inversa. Sintassi wrapper PASS; entrypoint reale da cwd
@@ -177,39 +197,105 @@ Nessun elemento A/B identificato nell'impronta installativa statica, ma R5
 rimane obbligatoria e non è anticipata da questo audit. Il dettaglio di file,
 necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 
-Il retry stock resta aperto: `device.c` di fprintd rilancia VERIFY/IDENTIFY su
-`FP_DEVICE_RETRY`; il driver ha un fence/poison prima del reopen fallito.
-`login_attempts >= 3` appartiene al ramo prepared-login privato e non prova
-il limite del workflow stock. Prima di collegare il sensore occorrono review
-e regressioni pertinenti sul confine stock, limiti tecnici dei tre tentativi,
-stop al primo MATCH e cleanup. Non importare la patch privata consumer-retry
-né riprendere VT/consumer custom. La nuova ipotesi ora verificabile è il
-caricamento di R2 nel servizio Fedora senza override ExecStart. Se fallisce,
-si analizza l'errore reale di quel confine; non si ripete la build né si
-seleziona B/C senza evidenza tecnica.
+### R3 — limite stock e regressione sintetica prima di qualsiasi live
+
+`CURRENT_TASK`: chiudere il confine retry/attempt stock senza modificare daemon
+Fedora o consumer; implementare il guard nel driver, estendere i test esistenti
+e consegnare la sola compilazione/esecuzione sintetica in VM. Non collegare
+il sensore e non consegnare una live finché l'evidenza offline non è accettata.
+
+La nuova lettura di fprintd `device.c` distingue NO_MATCH pulito (`done=true`,
+nessun retry daemon) da `FP_DEVICE_RETRY` (`done=false`, risottomissione
+immediata della stessa API VERIFY/IDENTIFY). Il driver avvelena i processing
+failure prima del reopen: la seconda API può essere host-only, ma va provato
+che non riacquisisca risorse e termini. Nel sorgente stock `utils/verify.c`
+la CLI fa una sola VerifyStart per Claim; non offre una serie di tre. Il PAM
+stock usa un Claim e fino a tre VerifyStart per default, esce al MATCH e
+chiude il bus. Questo è audit del codice, non una configurazione PAM abilitata
+nella VM. Il percorso di client vanished cancella, attende e chiude il device.
+Il report MATCH può precedere finger-off/STOP: la cancellazione immediata del
+client non equivale al completamento pulito del trasporto.
+
+Gap accertato nella baseline R2 installata: nessun contatore nello stesso
+logical open limita i rollover puliti, né impedisce ogni nuova chiamata dopo
+MATCH. Il vecchio `login_attempts` è solo prepared-login privato. Le prove
+storiche D291/R9 di tre richieste non chiamavano una quarta: non provano un
+rifiuto tecnico della quarta nel driver stock.
+
+Il correttivo locale in `goodix_fpimage_device.c/.h` introduce contatore comune
+VERIFY/IDENTIFY e latch terminale per logical open, preservati tra i reset
+transport. Prima di qualunque reopen/acquire/claim/generation rifiuta dopo
+MATCH, errore di processing o terzo NO_MATCH. I primi due NO_MATCH consentono
+una nuova action esplicita; solo il terzo logga `NO_MATCH_SERIES`. L'audit
+esistente registra contatore/limite/esito, senza nuovo scheduler, protocollo
+wire o retry. Un eventuale errore retry conservato nel poison viene convertito
+in errore terminale alla successiva activation, evitando un loop solo host.
+Il consueto IDENTIFY NO_MATCH iniziale può ancora passare a ENROLL; l'handoff
+è vietato dopo esito terminale. Close completo/new Claim avvia una nuova
+serie: nessun contatore globale/persistente o lockout account viene introdotto.
+
+Cleanup e ordine esito/drain restano quelli esistenti: release e pulizia TLS
+su completamento pulito, fence/cancel e drain prima della distruzione anomala,
+nessuna inferenza di quiescenza device dopo una cancellazione. MATCH termina
+ulteriori acquisizioni, non sopprime il necessario rilascio del dito/cleanup.
+Una nuova chiamata dopo il gate deve fallire senza nuovo materiale, claim o
+submit; le callback stock del daemon restano completamente invariate.
+
+Estesa la suite sintetica esistente in
+`development/private-root/libfprint-driver/tests/test_goodix_d278_secure_session.c`
+con dieci casi VERIFY/IDENTIFY: otto per MATCH al primo/secondo/terzo tentativo
+e tre NO_MATCH, due per cancellazione dalla callback MATCH prima di
+finger-off/STOP. Gli otto casi di serie provano ulteriori API VERIFY e IDENTIFY
+dopo il terminale, zero reacquire/claim/submit, cleanup e reset solo dopo
+close/open. I due casi MATCH anticipato impongono drain prima della chiusura
+e verificano release/cleansing TLS; modellano il client stock tramite le API
+libfprint, senza dichiarare una prova D-Bus reale. I 34 casi esistenti comprendono retry extraction, cancel,
+drain, matcher tardivo/fatal, handoff ENROLL e TLS sintetico. Il builder test
+attivo usa ora, per questa suite, la base libfprint Fedora canonica e il
+profilo production/SIGFM: la vecchia destinazione Rocky core non esiste più.
+Il fixture privato è una dipendenza solo di questo test interno, non del
+runtime/build production o di una futura suite pubblica qualificata.
+
+**Verificato sul workspace:** audit digest/path dei 62 sorgenti e quattro
+supporti PASS (aggiornati soltanto i due hash driver modificati), sintassi
+shell e diff PASS; help e rifiuto non-VM dell'entrypoint reale da cwd estranea
+PASS senza creare output. Nessuna compilazione o esecuzione C è stata svolta
+sul fisico. Le 44 prove normal e ASan/UBSan sono **preparate, non eseguite**:
+non dichiarare chiuso il retry sulla sola analisi statica.
+
+Il prossimo gate è il test-build offline nella VM, da utente ordinario,
+tramite `production/minimal-runtime/check-stock-attempts.sh`, SDK esistente,
+rete/dispositivi disabilitati. Non installa nulla, non esegue fprintd, non legge
+materiali veri. Restano in place la baseline R3-A e l'inversa salvata; nessun
+rollback di quella baseline serve per un failure del test sintetico. L'antidoto
+è solo rimuovere il nuovo output test dopo aver conservato l'evidenza utile.
+Non rilanciare il vecchio installer dal nuovo checkout: il suo controllo
+continuità sorgenti rifiuta correttamente il driver cambiato.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
-ADVANCEMENT=R2_VM_BUILD_ACCEPTED_AND_R3_A_REVERSIBLE_DEPLOYMENT_PREPARED
-ACTIVE_PHASE=R3_A
-R2_VM_BUILD=PASS_HUMAN_REPORTED
-PM_R2_REVIEW=ACCEPT_AND_CONTINUE
-PM_R3_REVIEW=HUMAN_REQUIRED_FOR_VM_INSTALL_AND_STOCK_LOAD
-EXECUTABLE_CLOSURE=OFFLINE_PATHS_PASS_VM_INSTALL_LOAD_PENDING
-REAL_TARGET_COMPATIBILITY=R2_BUILD_LINKAGE_PASS_R3_EXECUTION_PENDING
-RESIDUAL_BLOCKER_OR_RISK=R3_VM_LOAD_THEN_STOCK_RETRY_SENSOR_AND_R5_VALIDATION
+ADVANCEMENT=R3_A_LOAD_ACCEPTED_AND_STOCK_ATTEMPT_GUARD_IMPLEMENTED
+ACTIVE_PHASE=R3
+PM_R3_A_LOAD_REVIEW=ACCEPT_AND_CONTINUE
+STOCK_RETRY_OFFLINE_CLOSURE=PENDING_VM_SYNTHETIC_EXECUTION_AND_REVIEW
+EXECUTABLE_CLOSURE=SOURCE_SHELL_INERT_PASS_C_BUILD_AND_TEST_PENDING
+REAL_TARGET_COMPATIBILITY=R3_A_STOCK_LOAD_PASS_CORRECTED_DRIVER_UNBUILT
+LIVE_HANDOFF_READY=false
+INSTALLED_RUNTIME_CHANGED=false
 FEDORA_COMPONENTS_REPLACED=NONE
 PHYSICAL_HOST_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=USER_VM_INSTALL_AND_STOCK_FPRINTD_LOAD_WITH_SENSOR_DISCONNECTED
+NEXT_BOUNDARY=USER_VM_SYNTHETIC_TESTS_WITH_SENSOR_DISCONNECTED
 ```
 
-Review set Git-native dalla baseline R2 `c5df717`: roadmap §4 autorizzata,
-ledger libgusb, deployment R3, test e README, audit runtime e stato canonico.
-Il README corrente è `deployment/minimal-runtime/README.md`: comandi esatti,
-PASS/FAIL/STOP, rollback ed evidenze minime da restituire. Il gate discende
-da decisione Utente/roadmap §4 e AGENTS.md §6/§8: installazione privilegiata e
-avvio runtime si eseguono manualmente in VM. Nessun gate è dovuto a mancanza
-di accesso AI alla VM e nessuna nuova approvazione SHA è richiesta.
+Review set Git-native da `92311c5`: driver/manifest, estensione della suite e
+builder esistenti, runner VM, documentazione/licensing e questo manuale.
+`docs/STOCK_FPRINTD_ATTEMPTS.md` contiene la review tecnica; istruzioni esatte
+in `production/minimal-runtime/STOCK_ATTEMPTS_VM.md`. Il gate deriva dal
+workflow human-only VM della roadmap §4. Dopo le evidenze si rivede il
+correttivo prima di una build/installazione separata; workflow nativo bounded
+e disponibilità/handoff dei materiali vanno risolti prima del sensore.
+Nessun componente auth Fedora è cambiato e nessuna dipendenza password è
+aggiunta; R5 resta da dimostrare, non dedotta da R3-A.
 
 ### Governance corrente
 

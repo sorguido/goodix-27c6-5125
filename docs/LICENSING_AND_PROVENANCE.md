@@ -91,6 +91,16 @@ unchanged R2 library set with its original notices and build provenance; the
 ledger copy is updated to correctly classify Fedora libgusb as a system
 dependency. The saved uninstall implementation retains the same license.
 
+The follow-up R3 stock-attempt counter/latch and audit fields modify only
+local `goodix_fpimage_device.c/.h` under their existing LGPL-2.1-or-later
+terms. Their two source-manifest digests are updated. The existing
+LGPL-2.1-or-later synthetic secure-session fixture gains direct fourth-call
+and post-MATCH regressions; its existing inner builder can compile it against
+the canonical Fedora base. No Fedora fprintd/PAM code is changed or copied.
+`production/minimal-runtime/check-stock-attempts.sh` is independent local
+GPL-2.0-or-later glue for that VM-only test build. No new third-party source,
+dependency, licensing boundary or public export is introduced.
+
 ## Historical host-integration provenance
 
 The following integration records preserve original licenses, attribution and

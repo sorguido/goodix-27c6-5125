@@ -1,6 +1,14 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3-A: stock fprintd library-load check, without the reader
 
+**Completed: R3-A STOCK LOAD = PASS**, human-reported at install commit
+`92311c5ebe1d05a68ad0542ecb8aeafb9776db0e`, with SELinux Enforcing and the
+reader disconnected. Keep this installation and its saved rollback. Do not
+repeat the procedure below from newer driver source; the next gate is the
+[synthetic retry/attempt test in the VM](../../production/minimal-runtime/STOCK_ATTEMPTS_VM.md).
+The installed R2 binary does not include the pending R3 attempt correction.
+The remaining instructions preserve this baseline's install/rollback record.
+
 Run manually **inside the Fedora 44 KDE x86_64 VM**, after the human gate.
 Reuse the successful R2 output `/home/guido/goodix-r2-20260922-081148/`, built
 from `c5df71772b3ade7cf3d1ea2d418a65e0ab75b1f6`. **Do not rebuild.**
