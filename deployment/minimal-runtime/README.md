@@ -1,16 +1,17 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R3: clean replacement of the R3-A runtime
 
-**Completed: clean replacement and stock fprintd load PASS**, reported by
-the user for install `264cd7ff1ba77857e1985502f299e4375f9a0516`, qualified
-source `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`. Service inactive/MainPID 0,
-first enumeration PASS but Claim failed on the manifest's generic SELinux label.
-Do not repeat removal, install or load-check. The next handoff is
-[Gate A: material labels only](R3_SELINUX_MATERIAL_VM.md), sensor disconnected.
-The [live Claim/Release procedure](R3_LIVE_OPEN_CLOSE_VM.md) is blocked until
-Gate A review and separate approval.
-The procedure below preserves the completed replacement and saved rollback
-reference; it is not the next action.
+**Completed: clean replacement, SELinux material correction, production material
+preflight and live stock-fprintd Claim/Release PASS** on 22 September 2026.
+The post-replacement open failures had two deployment causes: the material tree
+initially carried a generic SELinux label, and after that correction the installed
+`target-material-manifest.json` was still the historical
+`d232-target-material-v1` source rather than the production loader's
+`goodix-5125-device-materials-v1` projection.  The reviewed deterministic
+conversion restored the runtime-v1 manifest; the production material loader then
+passed sensor-free and one subsequent enumeration -> Claim -> Release passed.
+Do not repeat those gates.  The procedure below is retained as historical
+clean-replacement evidence, not as the next live action.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from
@@ -131,8 +132,11 @@ The current installer owns:
   `[Service]` with only the project `LD_LIBRARY_PATH`;
 - the exact local fcontext `/var/lib/goodix-5125-poc(/.*)?` **only if created
   by this installation**, recorded in `installation.json`. Existing compatible
-  rules remain unowned. Six material labels are applied and verified; files,
-  owner/mode and contents are preserved. See the linked Gate A ownership review.
+  rules remain unowned. Six material labels are applied and verified. The
+  non-secret target manifest is additionally parsed fail-closed and must match
+  the exact runtime-v1 schema and acceptance pins; secret/binary material
+  contents remain unopened by deployment code. See the linked Gate A ownership
+  review.
 
 No ExecStart replacement, daemon, wrapper, PAM, udev, template or material
 content change. Temporary staging is removed on ordinary success/error. The installer

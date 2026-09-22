@@ -31,7 +31,10 @@ class MaterialLifecycle(unittest.TestCase):
         self.material.mkdir(parents=True, mode=0o700)
         for name in d.MATERIAL_NAMES:
             p = self.material / name
-            p.write_bytes(b"synthetic protected-content sentinel")
+            if name == "target-material-manifest.json":
+                p.write_text(json.dumps(d.MATERIAL_MANIFEST_EXPECTED, sort_keys=True, indent=2) + "\n")
+            else:
+                p.write_bytes(b"synthetic protected-content sentinel")
             p.chmod(0o600)
         self.contexts = VM_PRESTATE.copy()
         self.rules = []
@@ -239,16 +242,42 @@ class MaterialLifecycle(unittest.TestCase):
             self.install()
         self.assertFalse(self.mutations())
 
-    def test_material_contents_are_never_opened_by_deployment(self):
+    def test_only_nonsecret_manifest_content_is_opened_by_deployment(self):
         original = d.read_regular
+        opened_material = []
+        manifest = self.material / "target-material-manifest.json"
         def checked_read(path, *args):
-            self.assertNotEqual(path.parent, self.material)
+            if path.parent == self.material:
+                self.assertEqual(path, manifest)
+                opened_material.append(path)
             self.assertNotEqual(path, self.material)
             return original(path, *args)
         with patch.object(d, "read_regular", checked_read):
             self.install()
             d.uninstall()
+        self.assertTrue(opened_material)
+        self.assertEqual(set(opened_material), {manifest})
         self.assertEqual(self.snapshot(), self.before)
+
+    def test_legacy_d232_manifest_rejected_before_any_mutation(self):
+        manifest = self.material / "target-material-manifest.json"
+        manifest.write_text('{"schema":"d232-target-material-v1"}\n')
+        manifest.chmod(0o600)
+        with self.assertRaisesRegex(RuntimeError, "legacy D232"):
+            self.install()
+        self.assertFalse(self.mutations())
+        self.assertFalse(self.runtime.exists())
+
+    def test_runtime_manifest_field_or_pin_drift_rejected_before_any_mutation(self):
+        manifest = self.material / "target-material-manifest.json"
+        value = dict(d.MATERIAL_MANIFEST_EXPECTED)
+        value["pid"] = "0000"
+        manifest.write_text(json.dumps(value) + "\n")
+        manifest.chmod(0o600)
+        with self.assertRaisesRegex(RuntimeError, "fields or acceptance pins"):
+            self.install()
+        self.assertFalse(self.mutations())
+        self.assertFalse(self.runtime.exists())
 
     def test_idempotent_install_checks_labels_and_preserves_ownership(self):
         self.install()
@@ -260,6 +289,42 @@ class MaterialLifecycle(unittest.TestCase):
         self.contexts[0] = DEFAULT
         with self.assertRaisesRegex(RuntimeError, "context drift"):
             self.install()
+
+    def test_reconcile_reviewed_manifest_replacement_updates_only_receipt(self):
+        self.install()
+        state = d.inspect_owned()
+        saved = state["material_selinux"]["metadata"]
+        saved[0][6] -= 1
+        saved[1][1] -= 1
+        saved[1][5] = d.LEGACY_MANIFEST_SIZE
+        state["material_selinux"].pop("manifest_sha256", None)
+        d.save_state(state)
+        before_files = {name: (self.runtime / name).read_bytes() for name in d.LIBRARIES}
+        self.calls.clear()
+        d.reconcile_runtime_manifest()
+        reconciled = d.inspect_owned()
+        self.assertTrue(reconciled["material_manifest_reconciled"])
+        self.assertEqual(reconciled["material_selinux"]["metadata"], d.material_metadata())
+        self.assertEqual(reconciled["material_selinux"]["manifest_sha256"],
+                         d.runtime_manifest_preflight())
+        self.assertEqual(before_files, {name: (self.runtime / name).read_bytes()
+                                        for name in d.LIBRARIES})
+        self.assertFalse(self.mutations())
+        d.uninstall()
+        self.assertFalse(self.runtime.exists())
+
+    def test_reconcile_refuses_nonmanifest_material_drift(self):
+        self.install()
+        state = d.inspect_owned()
+        state["material_selinux"]["metadata"][1][5] = d.LEGACY_MANIFEST_SIZE
+        state["material_selinux"].pop("manifest_sha256", None)
+        d.save_state(state)
+        target = self.material / "transport-material.bin"
+        target.write_bytes(b"changed opaque sentinel")
+        target.chmod(0o600)
+        with self.assertRaisesRegex(RuntimeError, "non-manifest material metadata drift"):
+            d.reconcile_runtime_manifest()
+        self.assertTrue(self.runtime.exists())
 
     def test_saved_inverse_with_owned_mapping_needs_no_git_or_build(self):
         self.install()

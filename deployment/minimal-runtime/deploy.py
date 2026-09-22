@@ -155,12 +155,27 @@ def load_payload(build):
     return payload, install_commit
 
 
-# Material contents never enter this deployment code: only lstat and SELinux xattrs.
+# Secret/binary material contents never enter deployment code.  The manifest
+# is explicitly non-secret and is parsed fail-closed because the production
+# loader requires the runtime-v1 projection, not the historical D232 source.
 MATERIAL = Path("/var/lib/goodix-5125-poc")
 MATERIAL_NAMES = ("target-material-manifest.json", "transport-material.bin",
                   "target-config-90.bin", "gfusb.dll", "fdt-cache.bin")
 MATERIAL_RULE = r"/var/lib/goodix-5125-poc(/.*)?"
 MATERIAL_CONTEXT = "system_u:object_r:fprintd_var_lib_t:s0"
+MATERIAL_MANIFEST_EXPECTED = {
+    "schema": "goodix-5125-device-materials-v1",
+    "vid": "27c6",
+    "pid": "5125",
+    "app": "GF_ST411SEC_APP_12509",
+    "transport_sha256": "eb47bbed40e079ca780cd9cd4b2324520a67584ad3d576674914152fd6080a75",
+    "config90_sha256": "e1988b1115ade748f6cf5dca8d31aadf99871a7865b97d7ec0971d0da21d4d82",
+    "fdt_cache_sha256": "9f5327731cff3046e31d18356a6334c9e1494330f434f3fe75ad0a4c80db09e2",
+    "a2_response_sha256": "39e469ce5a5ba3136c4a44381f2e4183dca275257adfcf3c0025094f05c022f5",
+    "chip82_response_sha256": "82537d2c108887baef128b47ad401fc888d54b184673b1fc23811d79ab6d5703",
+    "otp_a6_response_sha256": "d7e81a415aa5e7b0168c9a632756d1dc8b7b47346cc0a44dc68796f854c2b92b",
+}
+LEGACY_MANIFEST_SIZE = 2305
 LEGACY_INSTALL = "264cd7ff1ba77857e1985502f299e4375f9a0516"
 LEGACY_INVERSE_DIGEST = "67cfd22b5a0df829233722c1cf16dda8dadf473f4acb20529465f6015cddf585"
 
@@ -200,6 +215,21 @@ def material_metadata():
     require({p.name for p in MATERIAL.iterdir()} == set(MATERIAL_NAMES),
             "unexpected material directory entries; retain for review")
     return result
+
+
+def runtime_manifest_preflight():
+    path = MATERIAL / "target-material-manifest.json"
+    data = read_regular(path, 4096)
+    try:
+        value = json.loads(data.decode("ascii"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("runtime material manifest is not valid ASCII JSON") from error
+    require(isinstance(value, dict), "runtime material manifest must be a JSON object")
+    require(value.get("schema") != "d232-target-material-v1",
+            "legacy D232 material manifest is incompatible with R3; convert to runtime v1 before deployment")
+    require(value == MATERIAL_MANIFEST_EXPECTED,
+            "runtime material manifest fields or acceptance pins mismatch")
+    return digest(data)
 
 
 def material_contexts():
@@ -272,13 +302,15 @@ def local_material_rule():
 def material_plan():
     selinux_tools()
     metadata = material_metadata()
+    manifest_sha256 = runtime_manifest_preflight()
     contexts = material_contexts()
     present = local_material_rule()
     require(all(valid_material_precontext(c) for c in contexts),
             "unexpected material context; retain for review")
     return {"rule": MATERIAL_RULE, "context": MATERIAL_CONTEXT, "owned": False,
             "phase": "apply" if present else "creating", "preexisting": present,
-            "metadata": metadata, "before_contexts": contexts}
+            "metadata": metadata, "before_contexts": contexts,
+            "manifest_sha256": manifest_sha256}
 
 
 def check_material_record(record):
@@ -294,6 +326,11 @@ def check_material_record(record):
             all(valid_material_precontext(c) for c in record["before_contexts"]),
             "inconsistent material ownership metadata; retain for review")
     require(material_metadata() == record["metadata"], "material metadata drift; retain for review")
+    if record.get("manifest_sha256") is not None:
+        require(re.fullmatch(r"[0-9a-f]{64}", record["manifest_sha256"]) is not None,
+                "invalid saved material manifest digest; retain for review")
+        require(runtime_manifest_preflight() == record["manifest_sha256"],
+                "runtime material manifest drift; retain for review")
     present = local_material_rule()
     phase = record["phase"]
     if phase in ("apply", "ready") or not record["owned"]:
@@ -375,7 +412,10 @@ def require_stopped():
 def show_material():
     selinux_tools()
     material_metadata()
+    manifest_sha256 = runtime_manifest_preflight()
     present = local_material_rule()
+    print("R3_MATERIAL_MANIFEST=RUNTIME_V1")
+    print(f"R3_MATERIAL_MANIFEST_SHA256={manifest_sha256}")
     print(f"R3_MATERIAL_LOCAL_RULE={'PRESENT_COMPATIBLE' if present else 'ABSENT'}")
     for i, (path, context) in enumerate(zip(material_paths(), material_contexts())):
         print(f"{path} root:root {'0700' if i == 0 else '0600'} {context}")
@@ -391,6 +431,7 @@ def label_existing():
         check_material_record(record)
         require(record["phase"] in ("ready", "removed"), "incomplete material operation; use inverse/review")
         if record["phase"] == "ready":
+            runtime_manifest_preflight()
             print(f"R3_MATERIAL_LABEL=ALREADY_APPLIED OWNED={str(record['owned']).lower()} "
                   f"LABEL_COMMIT={state['material_label_commit']}")
             return
@@ -419,6 +460,38 @@ def label_existing():
     inspect_owned()
     print(f"R3_MATERIAL_LABEL=PASS OWNED={str(plan['owned']).lower()} LABEL_COMMIT={commit}")
     show_material()
+
+
+def reconcile_runtime_manifest():
+    """Accept only the reviewed legacy-D232 -> runtime-v1 manifest replacement."""
+    require_stopped()
+    state = inspect_owned()
+    require(DROPIN.exists(), "incomplete runtime install; retain for review")
+    record = state.get("material_selinux")
+    require(isinstance(record, dict) and record.get("phase") == "ready",
+            "material labeling must already be ready before manifest reconciliation")
+    selinux_tools()
+    require(local_material_rule(), "material local rule missing; retain for review")
+    require(material_contexts() == [MATERIAL_CONTEXT] * 6,
+            "material SELinux contexts are not canonical; retain for review")
+    manifest_sha256 = runtime_manifest_preflight()
+    current = material_metadata()
+    saved = record.get("metadata")
+    require(isinstance(saved, list) and len(saved) == 6,
+            "saved material metadata is invalid; retain for review")
+    require(current[2:] == saved[2:],
+            "non-manifest material metadata drift; retain for review")
+    require(current[0][:5] == saved[0][:5],
+            "material directory identity/ownership/mode drift; retain for review")
+    require(saved[1][2:5] == current[1][2:5] and saved[1][5] == LEGACY_MANIFEST_SIZE,
+            "saved manifest is not the reviewed legacy D232 prestate")
+    record["metadata"] = current
+    record["manifest_sha256"] = manifest_sha256
+    state["material_manifest_reconciled"] = True
+    save_state(state)
+    check_material_record(record)
+    print("R3_MATERIAL_MANIFEST_RECONCILE=PASS SCHEMA=goodix-5125-device-materials-v1")
+    print(f"R3_MATERIAL_MANIFEST_SHA256={manifest_sha256}")
 
 
 def inspect_owned():
@@ -482,6 +555,7 @@ def install(payload, install_commit, previous_service):
                 "material labeling incomplete; use reviewed labeling action")
         selinux_tools()
         check_material_record(state["material_selinux"])
+        runtime_manifest_preflight()
         print("R3_INSTALL=ALREADY_INSTALLED")
         return
     require(not DROPIN.exists() and not DROPIN.is_symlink(), "project drop-in path already occupied")
@@ -558,7 +632,8 @@ def uninstall():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("install", "uninstall", "material-status", "label-material", "unlabel-material"))
+    parser.add_argument("action", choices=("install", "uninstall", "material-status", "label-material",
+                                           "reconcile-material-manifest", "unlabel-material"))
     parser.add_argument("build_output", nargs="?", type=Path)
     args = parser.parse_args()
     require((args.action == "install") == (args.build_output is not None), "only install takes a build directory")
@@ -581,6 +656,8 @@ def main():
         elif args.action == "label-material":
             install_preflight()
             label_existing()
+        elif args.action == "reconcile-material-manifest":
+            reconcile_runtime_manifest()
         elif args.action == "unlabel-material":
             require_stopped()
             state = inspect_owned()
