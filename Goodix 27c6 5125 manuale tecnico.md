@@ -16,6 +16,136 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
+### Stato corrente — R1 chiusa, R2 al gate build VM (22 settembre 2026)
+
+La fonte operativa attiva è `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`, introdotta
+in `eff02f8cc03590b92b27542aab4cbefbef8be6ce` e resa vincolante per
+l'orchestrazione in `07b86159283fdf214e12c587674093558e25fd6b`.
+La recovery parte da `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`, branch
+`development`, worktree inizialmente pulito, senza lavoro parziale da recuperare.
+Il commit più recente conserva materiale specifico del device nel repository
+privato: è provenance di conservazione, non autorizzazione a leggerne il
+contenuto, trasferirlo, installarlo o pubblicarlo. Nessun contenuto protetto è
+stato letto durante questa ripartenza.
+
+**R0:** la roadmap registra bonifica del Fedora fisico completata, componenti
+critici stock, password sudo PASS post-reboot, `ExecStart=/usr/libexec/fprintd`,
+nessun processo Goodix e authselect valido senza fingerprint globale.
+Questo è lo stato canonico riportato dalla roadmap; questa sessione non ha
+ripetuto test di autenticazione né verificato il servizio sul bus di sistema.
+Materiali in `/var/lib/goodix-5125-poc/` e template in `/var/lib/fprint/` vanno
+preservati. Il fisico resta baseline di sicurezza; build e test runtime nuovi
+sono esclusivamente su VM.
+
+**R1:** congelati documentalmente gli entry point della managed candidate e
+la consegna Plasma VT. Il README principale, le guide installazione/validazione,
+il manuale inglese, il README production e i due handoff managed/migrazione
+classificano esplicitamente la vecchia architettura come respinta. La tabella
+in `production/README.md` separa gli input driver/libfprint recuperabili dai
+componenti host esclusi. Nessun sorgente, test, eseguibile o rollback storico
+è stato cancellato o modificato. Le istruzioni sottostanti nei documenti
+marcati sono conservate esclusivamente come evidenza.
+
+```text
+ACTIVE_ROADMAP=ROADMAP_DISTRO_DECOUPLED_RELEASE.md
+OLD_MANAGED_ARCHITECTURE=HISTORICAL_ONLY
+PLASMA_PRIVATE_RUNTIME=OUT_OF_PRODUCTION_SCOPE
+CUSTOM_AUTH_CONSUMERS=OUT_OF_PRODUCTION_SCOPE
+R1_REVIEW=ACCEPT_AND_CONTINUE
+R1_EXECUTABLE_CLOSURE=NOT_APPLICABLE_DOCUMENTATION_ONLY
+```
+
+L'ultimo avanzamento hardware/software storico non viene annullato: resta
+prova funzionale entro il suo scope, non qualifica update-survivability della
+nuova release. Sono superati il gate di retest Plasma VT del 21 settembre e
+la proposta di reinstallare la candidate combined. La nuova sequenza è R1–R7;
+le precedenti closure A–F e le dichiarazioni di baseline installata riportate
+nelle sezioni storiche non descrivono lo stato host dopo R0.
+
+### Avanzamento R2 — runtime minimo estratto, build VM da eseguire
+
+La decisione esplicita dell'Utente in questa ripartenza precisa il workflow:
+workspace sul Fedora fisico per sviluppo Git, audit, codice/documentazione e
+verifiche offline che non mutano il runtime host; pull di `development` ed
+esecuzione manuale dell'Utente per build/install/runtime/live/update in VM.
+L'AI non deve collegarsi alla VM. La mancanza di accesso diretto non è un
+blocker; il confine operativo corrente è la prima build manuale R2.
+
+`production/minimal-runtime/build.sh` estrae il percorso libreria dal builder
+storico, riusando `build-inner.sh` e gli stessi input Goodix/SIGFM/R2. Il nuovo
+`check-source.sh --driver-only` verifica i 62 file (30 TU + 32 header) e i
+quattro supporti build, senza dipendere da fprintd/login/sudo/Polkit privati.
+La modalità default storica del checker è preservata. Il sorgente del driver
+e i suoi manifest non sono stati modificati.
+
+Il payload previsto è `libfprint-2.so.2.0.0`, due symlink e quattro OpenCV
+(core/features2d/flann/imgproc), più licenze/provenance. `libgusb.so.2` resta
+Fedora stock: la copia sotto pkgconfig è soltanto input di build e non fa parte
+del payload. Nessun daemon, PAM, greeter, Plasma privato o hook account viene
+costruito o installato. Il builder rifiuta root/non-VM/OS o branch errati,
+checkout sporco, output preesistente/interno al repository e input non validi.
+Registra SHA completo, metadati guest/SDK e digest degli input, verifica il
+payload RPM fprintd e la copertura dei suoi simboli, assenza RPATH, simboli
+host-only e dipendenze mancanti. La build Flatpak esclude rete e dispositivi.
+Il PASS di questi controlli ELF resta **da ottenere sulla VM**.
+
+Audit statico dei materiali: i loader già presenti aprono in sola lettura,
+con no-follow e verifiche uid/gid/modo/content binding, i cinque input nella
+directory preservata. Nessun contenuto protetto è stato letto o trasferito.
+Il record provenance Rockytkg è stato trovato e letto in
+`development/Rockytkg/snapshot/PROVENANCE.md`, perché il vecchio path root
+non esiste. Nessun nuovo riuso di sorgenti esterni o cambio licenza.
+
+**Boundary residuo R3-A:** la scelta prioritaria rimane libfprint privata e solo
+`Environment=LD_LIBRARY_PATH=...`, con daemon/ExecStart Fedora. I metadata RPM,
+SONAME e unit osservati in sola lettura sul workspace corroborano la
+fattibilità, senza provare l'ambiente guest. Il fprintd stock rilancia
+VERIFY/IDENTIFY su `FP_DEVICE_RETRY`; il driver corrente contiene fence/poison
+prima del reopen per esiti falliti. Il limite `login_attempts >= 3` appartiene
+invece al ramo prepared-login privato: non prova il limite del workflow stock.
+Prima della live servono regressioni sul daemon stock, limiti tecnici della
+serie e cleanup, oltre a install/rollback minimi e review R3. Non importare la
+patch privata consumer-retry né riaprire il correttivo VT.
+
+**Verificato in questa sessione:** audit driver-only PASS anche da cwd estranea
+su subset temporaneo privo di auth/deployment/storico privato; checker storico
+completo PASS; sintassi Bash PASS; help e rifiuto non-VM prima della creazione
+output PASS; rifiuto argomenti checker invalidi PASS. Si tratta di verifiche
+sorgente e dei soli percorsi inerti/rifiuto: nessuna compilazione, esecuzione
+del driver, fprintd, autenticazione, USB, installazione o privilegi root.
+
+Review set Git-native dalla baseline `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`:
+classificazione R1, builder/checker R2, ledger, questo manuale,
+`docs/MINIMAL_RUNTIME.md` (contenuti, file host, necessità, failure model e gap),
+`production/minimal-runtime/README.md` (comandi VM, prerequisiti, PASS/FAIL/STOP,
+cleanup della sola directory output ed evidenze richieste).
+
+```text
+OUTCOME=HUMAN_REQUIRED
+ADVANCEMENT=R1_FROZEN_AND_R2_LIBRARY_BUILD_PATH_EXTRACTED
+ACTIVE_PHASE=R2
+R2_VM_BUILD=PENDING_HUMAN_EXECUTION
+PM_R2_REVIEW=ACCEPTED_WITH_VM_BUILD_GATE
+EXECUTABLE_CLOSURE=SOURCE_AND_INERT_PATHS_PASS_VM_BUILD_PENDING
+REAL_TARGET_COMPATIBILITY=BLOCKED_HUMAN_REQUIRED_FOR_VM_BUILD_EVIDENCE
+RESIDUAL_BLOCKER_OR_RISK=VM_ELF_CLOSURE_THEN_STOCK_FPRINTD_RETRY_AND_R3_INSTALL_REVIEW
+FEDORA_COMPONENTS_REPLACED=NONE
+PHYSICAL_HOST_RUNTIME_MUTATION=false
+NEXT_BOUNDARY=USER_VM_BUILD_THEN_R2_REVIEW_AND_R3_A
+```
+
+Review PM sul diff e sugli artefatti: nessun aumento dell'accoppiamento distro,
+nessun componente autenticazione Fedora toccato e nessun update/runtime host
+eseguito. La build R2 non richiede recovery del sistema; per R3 il requisito
+«reinstallare il driver è sufficiente» resta una proprietà da provare in VM,
+non un PASS anticipato. Il rischio retry stock è esplicitamente aperto.
+
+La procedura corrente non installa nulla: non consegna un installer fittizio o
+un rollback host non necessario per una build. L'antidoto è la rimozione della
+sola directory output; dopo FAIL si preservano prima log e diagnostica, dopo
+PASS si conserva il risultato per R3. Il prossimo gate install/live richiederà
+la coppia install/uninstall simmetrica prevista da AGENTS.md §8.
+
 ### Governance corrente
 
 Per una normale live factory-preserving il Human Gate è esclusivamente il
@@ -114,7 +244,7 @@ FOURTH_ATTEMPT_ALLOWED=false
 HIDDEN_OR_UNBOUNDED_RETRY_ALLOWED=false
 ```
 
-Il 17 settembre 2026 l'Utente ha stabilito che la roadmap sequenziale A→F è sostanzialmente chiusa e non governa più il progetto. Il lavoro prosegue per task e temi distinti. Si mantengono invariati Human Gate, safety, factory-preserving, protezioni Git, licensing e target production iniziale.
+Il 17 settembre 2026 l'Utente aveva chiuso la sequenza A→F e adottato task e temi distinti. La successiva roadmap distro-decoupled governa ora la selezione dei task nelle fasi R1–R7; il loop di `START_PROMPT.md` resta applicabile entro quel boundary. Human Gate, factory-preserving, protezioni Git, licensing e target restano invariati.
 
 ### Consultazione del manuale al bootstrap
 
@@ -140,7 +270,14 @@ La lettura integrale resta eccezionale: si usa soltanto quando una decisione
 trasversale o una contraddizione non è risolvibile con ricerca mirata e lettura
 delle sezioni pertinenti.
 
-### Stato corrente — Plasma Login, race VT/getty (21 settembre 2026)
+## Evidenze storiche precedenti alla roadmap distro-decoupled
+
+Le sezioni seguenti conservano risultati, decisioni e istruzioni nel loro
+contesto storico. Formule come «stato corrente», «candidate pronta», «baseline
+attiva» e `HUMAN_REQUIRED` al loro interno non riattivano l'architettura
+respinta né prevalgono sullo stato corrente iniziale e sulla roadmap R1–R7.
+
+### Stato storico — Plasma Login, race VT/getty (21 settembre 2026)
 
 Baseline live **86d9ebc2cc70aeee43f52c07246e0f24d3e0ef0a**, lasciata installata
 durante il lavoro offline. Il log ripristinato dall'Utente

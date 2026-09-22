@@ -1,6 +1,15 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Security and privacy
 
+> **Current release boundary — 22 September 2026.** The device/privacy
+> constraints below remain applicable. Managed installation, saved PAM copies
+> and account-deletion hooks describe the **HISTORICAL_ONLY /
+> REJECTED_ARCHITECTURE** candidate, not the active release. Follow the
+> [distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
+> The private workspace contains protected historical material and must never
+> be published as a source export; the source-only claim below concerns the
+> intended audited public surface.
+
 ## Device preservation
 
 The supported runtime is designed to preserve factory firmware and persistent

@@ -67,7 +67,27 @@ source tree or candidate.
 This project records its compatibility determination and source provenance; it
 does not provide legal advice for unrelated distributions or modifications.
 
-## Canonical early-login integration
+## Minimal runtime extraction (22 September 2026)
+
+`production/minimal-runtime/build.sh` is an adaptation of the project's
+`production/build.sh` at `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`, under the
+same GPL-2.0-or-later terms. It retains the existing libfprint build inputs and
+removes the custom authentication build and private libgusb payload. The
+`check-source.sh --driver-only` path is a local GPL-2.0-or-later change.
+There is no new third-party import, no change to per-file licenses or the
+combined library's GPL-3.0-or-later boundary, and no public export. See
+[Runtime extraction](MINIMAL_RUNTIME.md) for the selected components.
+
+## Historical host-integration provenance
+
+The following integration records preserve original licenses, attribution and
+past implementation facts. The private fprintd/PAM, greeter, Plasma,
+sudo/PolicyKit and managed migration components are now
+**HISTORICAL_ONLY / REJECTED_ARCHITECTURE** under the
+[distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
+They are excluded from the new runtime. This classification changes no license.
+
+### Historical early-login integration
 
 `reference/fprintd-fedora44-1.94.5/source/` is the immutable upstream GPL-2.0-or-later
 source corresponding to Fedora fprintd 1.94.5-5.fc44. Source RPM/tar/spec hashes

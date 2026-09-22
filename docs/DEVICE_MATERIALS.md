@@ -597,7 +597,13 @@ runtime once the five-file bundle exists.
 
 ---
 
-# Import and installation
+# Historical import and installation
+
+> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE.** The managed importer below is
+> preserved for provenance and recovery. Do not use it for the new VM runtime.
+> The [distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md) requires
+> materials to stay separate from software; transfer/access remains a Human
+> Gate. The five-file format is unchanged.
 
 When a complete valid five-file bundle is available, import it with:
 

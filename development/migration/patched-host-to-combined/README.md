@@ -1,5 +1,12 @@
 # Correttivo Plasma Login: primo accesso dopo logout
 
+> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 settembre 2026.**
+> Questo handoff è superato dalla bonifica R0 e dalla
+> [roadmap distro-decoupled](../../../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
+> La baseline installata, la console di recovery e il gate citati sotto sono
+> lo stato storico del 21 settembre, non istruzioni correnti. Non reinstallare
+> questa candidate. Sorgenti, evidenze e rollback restano preservati.
+
 **OUTCOME=HUMAN_REQUIRED — installazione e live esclusivamente umane.**
 Baseline attualmente installata: `86d9ebc2cc70aeee43f52c07246e0f24d3e0ef0a`.
 La preparazione AI non modifica l'host, la console root tty12 o `/run/gx`.

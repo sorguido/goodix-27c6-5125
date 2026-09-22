@@ -1,6 +1,42 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Reproducible production build
 
+> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 September 2026.**
+> The managed candidate, private fprintd/PAM pair, Plasma daemon/greeter,
+> KScreenLocker overrides and custom sudo/PolicyKit integrations described
+> below are preserved as historical evidence. Their installation, build and
+> live instructions are not the active release workflow. Past PASS results
+> do not qualify them for the new release.
+>
+> Follow the [distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md). R0 restored the physical
+> Fedora host to its stock baseline; new build/runtime validation is VM-only.
+> The next runtime must use the Goodix library with Fedora stock fprintd and
+> stock authentication consumers. No replacement candidate is ready yet.
+
+The active **build-only** R2 entry point is
+[`minimal-runtime/build.sh`](minimal-runtime/build.sh), with the
+[manual VM procedure](minimal-runtime/README.md). It creates no host
+installation. The first VM build is pending; no replacement release candidate
+is qualified yet.
+
+## Component classification for the active roadmap
+
+| Path | Classification | Active use |
+| --- | --- | --- |
+| `source-files.tsv`, `source-files.sha256`, `build-support/`, `build-inner.sh` | R2 extraction inputs | Driver/libfprint/SIGFM and necessary libraries; audit before a VM build |
+| `minimal-runtime/`, `check-source.sh --driver-only` | Active R2 extraction | Build/audit only the library set; VM build pending |
+| `build.sh`, default `check-source.sh` | Historical complete stack | Include login/consumer dependencies; not the active minimal runtime path |
+| `login/` | HISTORICAL_ONLY / REJECTED_ARCHITECTURE | Preserve private daemon/PAM/greeter sources and evidence |
+| `plasma-vt/` | HISTORICAL_ONLY / REJECTED_ARCHITECTURE | Preserve VT bug evidence for possible upstream work |
+| `sudo/`, `polkit/` | HISTORICAL_ONLY / REJECTED_ARCHITECTURE | Preserve source/tests; excluded from release |
+| `../deployment/managed-install/` | HISTORICAL_ONLY / REJECTED_ARCHITECTURE | Preserve original rollback/recovery; no new deployment |
+
+The classification does not delete or alter historical executables, tests,
+digests or saved rollback implementations. The following build description is
+historical, including its former claim to be the production build authority.
+
+## Historical build description
+
 This directory is the build authority for Fedora 44 KDE x86_64 and Goodix
 `27c6:5125` / APP12509. It builds directly from the publishable source tree and
 does not require private Git history or any excluded directory.

@@ -1,6 +1,18 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Combined sudo and Polkit: operator handoff
 
+> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 September 2026.**
+> The managed candidate, private fprintd/PAM pair, Plasma daemon/greeter,
+> KScreenLocker overrides and custom sudo/PolicyKit integrations described
+> below are preserved as historical evidence. Their installation, build and
+> live instructions are not the active release workflow. Past PASS results
+> do not qualify them for the new release.
+>
+> Follow the [distro-decoupled roadmap](../../ROADMAP_DISTRO_DECOUPLED_RELEASE.md). R0 restored the physical
+> Fedora host to its stock baseline; new build/runtime validation is VM-only.
+> The next runtime must use the Goodix library with Fedora stock fprintd and
+> stock authentication consumers. No replacement candidate is ready yet.
+
 Status: offline candidate, **live validation pending**. The development PC's
 D285 sudo fingerprint PASS remains valid; the local Polkit patch is **not
 installed**. Do not install that standalone patch as part of this handoff.

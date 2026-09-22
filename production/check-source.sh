@@ -2,8 +2,20 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 set -euo pipefail
 
+# The driver audit is usable without the rejected private auth stack.
+case "${1:-}" in
+  --driver-only) [[ $# -eq 1 ]] || exit 2; driver_only=true ;;
+  "") [[ $# -eq 0 ]] || exit 2; driver_only=false ;;
+  *) echo "usage: $0 [--driver-only]" >&2; exit 2 ;;
+esac
+
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 root=$(CDPATH= cd -- "$script_dir/.." && pwd -P)
+if $driver_only; then
+  build_entry="$script_dir/minimal-runtime/build.sh"
+else
+  build_entry="$script_dir/build.sh"
+fi
 work=$(mktemp -d /tmp/goodix-production-check.XXXXXX)
 cleanup () {
   if [[ $work == /tmp/goodix-production-check.* && -d $work && ! -L $work ]]; then
@@ -65,7 +77,7 @@ meson_file="$root/reference/libfprint-fedora44-1.94.100/source/libfprint/meson.b
 grep -F "../../../../libfprint-driver/goodix_fpimage_device.c" "$meson_file" >/dev/null
 grep -F "../../../../Rockytkg/libfprint/libfprint/sigfm/sigfm.cpp" "$meson_file" >/dev/null
 if grep -E '(^|[/.])(red_tag|development)(/|$)' \
-    "$meson_file" "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
+    "$meson_file" "$build_entry" "$script_dir/build-inner.sh"; then
   echo "production path depends on a private or superseded tree" >&2; exit 1
 fi
 
@@ -74,13 +86,13 @@ legacy_policy="${legacy_policy}282_DIRECT_ENROLL_PROFILE"
 if grep -F "$legacy_policy" \
      "$root/libfprint-driver/goodix_fpimage_device.c" \
      "$root/libfprint-driver/goodix_fpimage_device.h" \
-     "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
+     "$build_entry" "$script_dir/build-inner.sh"; then
   echo "historical build-policy identifier remains canonical" >&2; exit 1
 fi
 if grep -F 'GOODIX_PRODUCTION_DIRECT_ENROLL_PROFILE' \
      "$root/libfprint-driver/goodix_fpimage_device.c" \
      "$root/libfprint-driver/goodix_fpimage_device.h" \
-     "$script_dir/build.sh" "$script_dir/build-inner.sh"; then
+     "$build_entry" "$script_dir/build-inner.sh"; then
   echo "superseded direct-enroll policy remains canonical" >&2; exit 1
 fi
 grep -F 'GOODIX_PRODUCTION_FPRINTD_ACTION_PROFILE' \
@@ -93,6 +105,11 @@ echo PRODUCTION_SOURCE_MANIFEST_PATH_SET_CHECK=PASS
 echo PRODUCTION_SOURCE_TU_COUNT=30
 echo PRODUCTION_SOURCE_HEADER_COUNT=32
 echo PRODUCTION_PRIVATE_TREE_DEPENDENCY_COUNT=0
+
+if $driver_only; then
+  echo PRODUCTION_SOURCE_SCOPE=DRIVER_ONLY
+  exit 0
+fi
 
 (cd "$root/reference/fprintd-fedora44-1.94.5" && sha256sum -c SOURCE_SHA256SUMS >/dev/null)
 (cd "$root" && sha256sum -c production/login/source.sha256 >/dev/null)

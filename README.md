@@ -1,6 +1,22 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Goodix 27c6:5125 for Fedora KDE
 
+> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 September 2026.**
+> The managed candidate, private fprintd/PAM pair, Plasma daemon/greeter,
+> KScreenLocker overrides and custom sudo/PolicyKit integrations described
+> below are preserved as historical evidence. Their installation, build and
+> live instructions are not the active release workflow. Past PASS results
+> do not qualify them for the new release.
+>
+> Follow the [distro-decoupled roadmap](ROADMAP_DISTRO_DECOUPLED_RELEASE.md). R0 restored the physical
+> Fedora host to its stock baseline; new build/runtime validation is VM-only.
+> The next runtime must use the Goodix library with Fedora stock fprintd and
+> stock authentication consumers. No replacement candidate is ready yet.
+
+Current R2 work: [minimal runtime audit](docs/MINIMAL_RUNTIME.md) and
+[manual VM build procedure](production/minimal-runtime/README.md).
+The following product and installation description is historical.
+
 This project provides a source-built libfprint driver for the Goodix USB
 fingerprint reader `27c6:5125` running firmware `GF_ST411SEC_APP_12509`. It
 integrates with Fedora's standard `libfprint -> fprintd -> PAM/KDE` stack.
