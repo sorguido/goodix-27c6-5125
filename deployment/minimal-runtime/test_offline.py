@@ -28,7 +28,8 @@ class Transactions(unittest.TestCase):
         self.addCleanup(output.stop)
         # These original transaction tests isolate the material boundary. The
         # separate test_material_labels.py exercises it with real temp metadata.
-        for name in ("material_plan", "apply_material", "remove_material", "selinux_tools", "check_material_record"):
+        for name in ("material_plan", "apply_material", "remove_material", "selinux_tools",
+                     "check_material_record", "runtime_manifest_preflight"):
             context = patch.object(d, name)
             context.start()
             self.addCleanup(context.stop)
