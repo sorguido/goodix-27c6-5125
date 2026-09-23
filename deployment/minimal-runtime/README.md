@@ -20,9 +20,10 @@ retained and reader detached. [The enrollment procedure](R3_ENROLL_VM.md) is
 completed evidence. [Stock verification](R3_VERIFY_VM.md) also passed with the
 RIGHT index at the first attempt, with clean release/drain/close. **R3 is closed
 at the biometric boundary. R4 KScreenLocker password unlock and first-contact
-fingerprint unlock also passed, with closed/drained host cleanup. Next human
-gate: [read the existing SELinux alert](R4_KSCREENLOCKER_VM.md#current-gate-read-the-existing-selinux-alert).**
-The alert remains unqualified; final SUPPORTED classification is pending. Keep
+fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
+the tested baseline. Next human gate: [sudo configuration query](R4_SUDO_PREFLIGHT_VM.md).**
+The audit query identified three nr_hugepages read denials, non-fatal for the
+tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated live.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic

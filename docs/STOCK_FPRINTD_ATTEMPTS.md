@@ -29,13 +29,15 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 SELinux alert review](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md#current-gate-read-the-existing-selinux-alert).
+[R4 sudo configuration query](../deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md).
 Stock KScreenLocker subsequently passed password unlock with the reader absent
 and fingerprint unlock at contact 1 without a password. MATCH was terminal and
 resources closed/drained; release_tail/single_terminal were zero, consistent
 with the early-MATCH cancellation case below, not proof of device quiescence.
-The visible SELinux alert has no supplied AVC and still needs classification;
-no new live or rollback is called for on this functional PASS.
+The reported audit query identifies three fprintd/read nr_hugepages denials,
+non-fatal for that completed path. KScreenLocker is SUPPORTED on the tested
+baseline with the denial documented; no universal harmlessness or exact library
+callsite is claimed. No repeated unlock, audit query or rollback is needed.
 
 ## Source findings
 
@@ -336,8 +338,9 @@ R3_VERIFY=PASS_FIRST_ATTEMPT_MATCH_HUMAN_REPORTED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_KSCREENLOCKER_FUNCTIONAL=PASS_CONTACT_1_HOST_CLEANUP_PASS_HUMAN_REPORTED
-R4_KSCREENLOCKER_CLASSIFICATION=PENDING_SELINUX_ALERT_REVIEW
-CURRENT_GATE=HUMAN_REQUIRED_VM_READ_EXISTING_SELINUX_ALERT
+R4_KSCREENLOCKER_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
+R4_SELINUX_ASSESSMENT=NON_FATAL_FOR_TESTED_KSCREENLOCKER_PATH
+CURRENT_GATE=HUMAN_REQUIRED_VM_SUDO_CONFIGURATION_QUERY_SENSOR_DETACHED
 NEXT_SENSOR_LIVE_HANDOFF_READY=false
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
@@ -347,13 +350,13 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-through the R4 single-alert read-only review after the successful native unlock,
-retaining the qualified runtime, template, reconciled receipt and saved inverse.
+to the R4 sudo configuration query, retaining the qualified runtime, template,
+reconciled receipt and saved inverse. The KScreenLocker SELinux review is closed.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file. The alert viewer lookup returned NOT_FOUND; the next step is a human
-sudo read of existing VM audit records in the documented ten-minute window,
-with the sensor detached and no new biometric test.
+file. The next step is a human read of the VM sudo policy and PAM configuration,
+with the sensor detached and no biometric test. The three reported audit denials
+remain documented without a policy change; other consumers are still unqualified.

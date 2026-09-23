@@ -314,19 +314,22 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ## R4 — Consumer di autenticazione: solo percorso stock
 
-**Stato: ATTIVA; KScreenLocker PASS funzionale (23 settembre 2026).** Password
+**Stato: ATTIVA; KScreenLocker SUPPORTED sulla baseline provata (23 settembre 2026).** Password
 unlock a lettore assente e fingerprint unlock al primo contatto senza password,
 cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
 riportati dall'Utente e accettati. Nessuna modifica PAM/authselect necessaria;
 runtime/template mantenuti e test completato da non ripetere.
-Un avviso SELinux osservato durante il successo resta da qualificare: nessun
-AVC/cause attribution disponibile, classificazione finale SUPPORTED pending.
-Lookup nel visualizzatore NOT_FOUND; unlock riferito alle 09:06 CEST circa del
-23/09/2026. Prossimo gate in `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`:
-una query audit read-only con sudo nella VM, finestra 07:01–07:11 UTC
-(09:01–09:11 CEST), senza nuova live, policy o rollback. L'assenza dal viewer
-non prova assenza di AVC. Dopo la closure, prima dei successivi consumer si ricostruisce la
-loro catena PAM effettiva guest; system-auth non è assunto come percorso universale.
+Review SELinux chiusa nello scope provato: dopo lookup viewer NOT_FOUND, la
+query mirata riporta tre AVC fprintd/read su nr_hugepages, sysctl_vm_t,
+permissive=0, alle 09:04:02, 09:04:32 e 09:06:14 CEST. L'ultimo coincide con
+lo sblocco riuscito: diniego non fatale per questo percorso, documentato senza
+modifiche SELinux o attribuzione a un callsite non provato. Non è innocuità
+universale né qualifica R5. Query audit e live sono completate, da non ripetere.
+Prossimo gate in `deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md`: lettura
+della configurazione/policy sudo e dei file PAM nella VM, con sensore scollegato
+e letture amministrative umane. Nessuna nuova live o modifica runtime; si
+ricostruisce la catena effettiva prima del test stock. system-auth non è assunto
+come percorso universale; sudo, PolicyKit e login restano da qualificare.
 
 Una volta ottenuti:
 

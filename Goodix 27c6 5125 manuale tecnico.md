@@ -16,21 +16,25 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 KScreenLocker PASS funzionale, review avviso SELinux (23 settembre 2026)
+### Stato corrente — R4 KScreenLocker SUPPORTED, preflight sudo stock (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Ripresa da `6986a6b772fecc8843e40f926ad2eaaa64d49522`, `development`
+Ripresa da `0932cff265e510d2c6f5271c2d2c1acc952ce837`, `development`
 pulito e allineato a origin, sull'aggiornamento Utente
-`R4_KSCREENLOCKER_SELINUX_ALERT_LOOKUP=NOT_FOUND`, successivo all'handoff
+`R4_SELINUX_AUDIT_QUERY=PASS`, successivo al lookup viewer NOT_FOUND e all'handoff
 `CODEX_HANDOFF_R4_KSCREENLOCKER_PASS.md`.
 **KScreenLocker stock PASS funzionale:** password unlock con lettore assente,
 poi fingerprint unlock al primo contatto dell'indice DESTRO, campo password
 vuoto e ritorno al desktop. Una VERIFY/epoch, MATCH terminale, nessun retry,
 reopen, reset o famiglia persistente rilevata; outstanding=0, drained=1,
 context_closed=1. Sensore scollegato e fprintd finale inactive/MainPID 0.
-L'avviso SELinux apparso durante B resta **non qualificato**: il successo non
-ne prova l'innocuità. La classificazione finale SUPPORTED attende questa review,
-senza negare il PASS osservato o attribuire prematuramente un bug al driver/KDE.
+La query mirata riporta tre AVC fprintd/read su `nr_hugepages`, tipo
+`sysctl_vm_t`, permissive=0, alle 09:04:02, 09:04:32 e 09:06:14 CEST.
+L'ultimo è contemporaneo allo sblocco riuscito: il diniego è **non fatale per
+il percorso KScreenLocker provato**. KScreenLocker è classificato **SUPPORTED
+sulla baseline testata**, con questa diagnostica documentata. Nessun correttivo
+SELinux o nuova live è necessario; non si dimostrano innocuità universale,
+assenza di altri effetti o callsite esatto dal solo riepilogo ricevuto.
 
 **Precedente VERIFY CLI R3 PASS al primo tentativo:** `verify-match (done)`, CLI exit 0,
 una capture e un epoch, MATCH terminale, release_tail=1/single_terminal=1,
@@ -85,20 +89,24 @@ percorso PAM che può disconnettersi prima della coda di rilascio, non prova di
 quiescenza device né, da soli, un failure. L'ordine causale non è ricostruibile
 dal solo estratto; non si forza un altro contatto per completare quei contatori.
 
-Il lookup nel visualizzatore è **NOT_FOUND**: nessun ID/report/AVC conservato
-reperito dall'Utente. Il successo è collocato alle **09:06 CEST circa del
-23 settembre 2026**, cioè 07:06 UTC. Prossimo passo minimo: una sola lettura
-audit della VM nella finestra 09:01–09:11 CEST / 07:01–07:11 UTC, senza
-filtro sul processo presunto. Il README R4 contiene il blocco esatto.
-`HUMAN_REQUIRED` per esecuzione VM e sudo di sola lettura (roadmap §4,
-AGENTS §6.2): nessuna nuova live, modifica policy/label, permissive,
-installazione o rollback. Runtime, template e inversa
-salvata sono mantenuti. La query precedente non colma retroattivamente la
+Il lookup nel visualizzatore resta **NOT_FOUND**, superato come limite
+diagnostico dal riepilogo della query audit della VM nella finestra
+09:01–09:11 CEST / 07:01–07:11 UTC del 23 settembre. La query è chiusa PASS:
+non ripeterla né ampliare la ricerca. Prossimo passo minimo: ricostruire la
+catena PAM e la policy effettiva di **sudo ordinario per guido** nella VM,
+prima di una nuova live. Il blocco in
+`deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md` legge configurazione e
+Defaults locali, inclusi include/alias, e lista la regola per `/usr/bin/true`
+senza eseguirlo. `HUMAN_REQUIRED` per esecuzione VM e letture amministrative
+(roadmap §4, AGENTS §6.2), con sensore scollegato. Nessuna modifica policy/label,
+PAM, permissive, installazione o rollback. Runtime, template e inversa
+salvata sono mantenuti. Le nuove evidenze non colmano retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
 omette SHA guest e output RPM completi, senza invalidare il risultato osservato.
 
-La closure R4 KScreenLocker resta aperta sulla qualificazione dell'avviso;
-gli altri consumer e R5, R6, R7 restano aperti. Questi PASS non provano
+La closure R4 KScreenLocker e la review dell'avviso sono completate nello
+scope osservato; sudo, PolicyKit, login e R5, R6, R7 restano aperti. Questi PASS
+non provano
 login, isolamento esaustivo password/desktop, comportamento dopo update,
 serie PAM, false match su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
 live sono riportate dall'Utente, corroborate dalla review di codice e telemetria;
@@ -277,9 +285,10 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è la review dell'avviso SELinux dopo il PASS
-funzionale KScreenLocker VM. R3 è chiusa da enrollment e VERIFY PASS; la closure
-più avanti conserva evidenze e limiti della qualifica.
+Il `CURRENT_TASK` attuale è il preflight della configurazione sudo stock nella
+VM, dopo la closure KScreenLocker e della diagnostica SELinux. R3 è chiusa da
+enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
+della qualifica.
 
 La decisione esplicita dell'Utente prevale sulla precedente interpretazione
 dei tre tentativi di AGENTS §8.2/§10 nel percorso stock: non è una quota da
@@ -1071,7 +1080,7 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — KScreenLocker: PASS funzionale, avviso SELinux da qualificare
+### R4 — KScreenLocker SUPPORTED; sudo stock al gate di configurazione
 
 **Review PM del nuovo handoff:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
@@ -1203,7 +1212,7 @@ R3 è dichiarata mantenuta; non si richiede una ripetizione per integrare metada
 | B: sblocco senza password, entro tre contatti | Indice DESTRO, slot left-index-finger, primo contatto, campo password vuoto, nessun secondo contatto/sessione fingerprint; PASS |
 | MATCH terminale e budget | Una VERIFY, logical_actions=1, transport_epochs=1, capture_attempts=1, MATCH terminal=1, rejected=0; PASS |
 | Safety/cleanup | retry/reopen/reset/clear_halt/persistent=0, outstanding=0, drained=1, context_closed=1, servizio inactive/MainPID 0, sensore scollegato; PASS nei limiti della telemetria |
-| Anomalia SELinux | Avviso visibile durante B; nessun AVC/report disponibile, causa e correlazione temporale ignote; review aperta |
+| Anomalia SELinux | Query mirata: tre AVC fprintd/read nr_hugepages, sysctl_vm_t, Enforcing/permissive=0; ultimo contemporaneo al MATCH; non fatale per il percorso provato, review chiusa nello scope osservato |
 
 Output integrale ricevuto (ordine incollato, senza timestamp; non ricostruisce
 l'ordine temporale del journal):
@@ -1243,75 +1252,97 @@ e R5 non sono stati provati da questo singolo successo. I due unlock A/B
 sono distinti: il resoconto "nessuna seconda sessione" riguarda la serie B,
 non nega il precedente lock per la password.
 
-#### Avviso SELinux: evidenza mancante e prossimo gate
+#### SELinux: diniego nr_hugepages non fatale nel percorso provato
 
-L'Utente osserva l'avviso in Enforcing durante B. Il successivo aggiornamento
-riporta `R4_KSCREENLOCKER_SELINUX_ALERT_LOOKUP=NOT_FOUND`: alla riapertura del
-visualizzatore non risulta un alert registrato relativo all'evento; ID, report,
-raw AVC, first/last seen e occurrence count non sono disponibili. Nessun
-ausearch, scansione generale sealert, sudo diagnostico, modifica policy/label,
-permissive, nuova live o rollback eseguito. Password/fingerprint PASS, desktop
-ritornato, fprintd inactive/MainPID 0, lettore scollegato, Enforcing e runtime/
-template invariati sono riconfermati. Il lookup è chiuso come NOT_FOUND, non
-come assenza dimostrata di un diniego né come nuova regressione.
+Il primo lookup nel visualizzatore era NOT_FOUND: nessun alert ID/report
+conservato. Il successivo `R4_SELINUX_AUDIT_QUERY=PASS` riporta **tre AVC** nella
+finestra mirata **07:01–07:11 UTC del 23/09/2026** (09:01–09:11 CEST):
 
-Nuova evidenza temporale: unlock fingerprint **2026-09-23 circa 09:06 CEST**,
-Europe/Rome UTC+2; conversione 07:06 UTC. Il timestamp dell'AVC resta ignoto.
-Mancano processo/path, contesti e permesso negato. Il PASS non rende benigno
-l'avviso e non ne localizza la causa. I precedenti AVC manifest/nr_hugepages
-restano episodi distinti, non identificazione del nuovo evento.
+| Orario locale CEST riportato | Processo | Operazione | Target | Tipo target | permissive |
+| --- | --- | --- | --- | --- | --- |
+| 09:04:02 | fprintd | read | nr_hugepages | sysctl_vm_t | 0 |
+| 09:04:32 | fprintd | read | nr_hugepages | sysctl_vm_t | 0 |
+| 09:06:14 | fprintd | read | nr_hugepages | sysctl_vm_t | 0 |
 
-**CURRENT_TASK:** consolidare il lookup negativo e preparare una sola query
-mirata sui log audit esistenti. `deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`
-seleziona AVC/USER_AVC/SELINUX_ERR fra **07:01:00 e 07:11:00 UTC del 23/09/2026**
-(09:01–09:11 CEST, margine ±5 minuti sull'orario approssimativo). Non filtra
-comm/exe presunti, né richiede tutti gli alert/il boot intero. `ausearch
---input-logs` legge i log configurati, `--raw` conserva i record; gli altri
-record appartenenti agli eventi selezionati sono parte dell'evidenza.
-Il comando opera con LC_ALL=C e TZ=UTC, non con il fuso implicito del guest.
+L'ultimo evento è riferito come contemporaneo allo sblocco fingerprint
+riuscito. Password unlock PASS, fingerprint unlock PASS al primo contatto,
+desktop ritornato e cleanup fprintd PASS sono riconfermati. Nessun cambio
+SELinux, nuova live o rollback; runtime/template mantenuti. È nuova evidenza
+fornita dall'Utente, **non lettura diretta dell'audit guest da parte dell'AI**.
+Non sono allegati raw AVC completi, ID evento, PID, contesto sorgente o path
+completo: non si inventano né si attribuisce la notifica UI a un preciso ID.
+Tre AVC non equivalgono a tre tentativi biometrici: la live KScreenLocker
+resta quella riportata con una sola capture e MATCH al primo contatto.
 
-Verifica offline della sintassi reale su input temporaneo sintetico, senza
-leggere log audit host: con LC_ALL=C la data a quattro cifre 09/23/2026 è
-rifiutata dall'ausearch installato; il formato C 09/23/26 è accettato e seleziona
-correttamente l'evento sintetico del 2026 dentro la finestra, escludendo quelli
-prima/dopo. Il comando consegnato usa quel formato. La conversione
-Europe/Rome → UTC è verificata separatamente; non si inventa un timestamp
-esatto del MATCH né si assume l'orologio guest necessariamente privo di scarto.
+**Conclusione:** il diniego di lettura non ha impedito il percorso di
+KScreenLocker effettivamente completato. La review diagnostica è chiusa come
+**NON_FATAL_FOR_TESTED_KSCREENLOCKER_PATH**; il consumer è **SUPPORTED sulla
+baseline provata**, con il diniego documentato. Non significa SELinux privo
+di denials, innocuità universale, assenza di effetti prestazionali o successo
+di tutti i consumer. Non è emersa una necessità di allargare permessi, cambiare
+label/sysctl, disabilitare Enforcing o ripetere il test. La notifica può restare
+un limite di esperienza d'uso; non c'è prova di un bug upstream specifico.
 
-Sudo serve all'Utente per leggere i log nella VM: sensore già scollegato,
-normale password prevista, nessun nuovo test di autenticazione biometrica.
-La query non tocca regole, labels, servizi, checkpoint, template o materiali.
-Exit 1 può significare nessun match oppure errore di argomenti/accesso/lettura:
-si riporta il messaggio completo insieme al codice. Output vuoto o mancante
-non prova che l'avviso fosse innocuo; restano possibili limiti temporali,
-retention o ritardo di notifica, senza sceglierne uno come causa osservata.
-Su assenza/errori si torna alla review senza ampliare automaticamente la
-ricerca o riprodurre la live. Nessun installer/inversa nuovo, rollback o
-rimedio SELinux è giustificato dalle evidenze correnti.
+Il precedente episodio D282 nel manuale menziona OpenCV/nr_hugepages e fu
+anch'esso non causale rispetto al terminale osservato. È un precedente
+compatibile, **non prova del callsite del nuovo AVC**. Il riepilogo corrente
+identifica fprintd come processo, senza distinguere daemon e librerie caricate:
+l'attribuzione a una specifica chiamata OpenCV resta non verificata.
+Non serve un audit ulteriore per decidere questa closure circoscritta.
 
-**Classificazione finale SUPPORTED sospesa sulla qualificazione dell'avviso**,
-non sul funzionamento già dimostrato. Se risulta irrilevante per il failure
-model, si documenta e si chiude senza lavoro artificiale; se pertinente, si
-valuta il confine reale senza patch private al consumer. Password/desktop
-compromessi restano blocker, non una KNOWN_LIMITATION accettabile. Dopo questa
-closure, il successivo consumer R4 richiederà la propria catena PAM guest:
-la presenza di pam_fprintd in system-auth non prova l'inclusione da parte di
-sudo, PolicyKit o login. Non si anticipa una nuova live su questi consumer.
+La query consegnata è conservata come evidenza completata nel README
+KScreenLocker. La precedente verifica offline usò solo input temporaneo
+sintetico: LC_ALL=C richiede la data 09/23/26 nell'ausearch installato;
+TZ=UTC e filtro temporale selezionavano l'evento interno ed escludevano gli
+esterni. Non si presenta tale verifica sintattica come evidenza dell'audit reale.
 
-Verifica offline del delta: formato e filtro temporale ausearch su soli dati
-sintetici, conversione del fuso, sintassi Bash, semantica da manpage, link
-locali e live-critical set/install/inversa invariati. La precedente review
-della telemetria e del percorso PAM resta valida. Nessun log audit reale,
-servizio, consumer o query SELinux host/VM eseguito dall'AI; nessuna build
-o suite runtime ripetuta. Le 10 verifiche sintattiche del
-precedente handoff e le suite VM restano evidenze storiche. Review PM: coupling
-aggiuntivo NO, file auth Fedora modificati NO, nessuna nuova dipendenza di
-password/desktop dal driver. Il failure model da update resta da provare in R5.
+#### Prossimo consumer: configurazione sudo della VM
+
+**CURRENT_TASK:** acquisire la configurazione di sudo ordinario per `guido`,
+senza `-i`, prima di scegliere il normale test stock. L'evidenza guest corrente
+mostra pam_fprintd in system-auth, ma non identifica ancora il servizio PAM
+selezionato da sudo, eventuali Defaults o esenzioni di autenticazione.
+La configurazione fisica e l'integrazione storica privata sono reference,
+non baseline guest né candidate da reintrodurre.
+
+`deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md` contiene un solo blocco
+operatore: checkout/provenance, lettore assente e fprintd inizialmente inactive,
+versioni, authselect, file PAM nelle due directory, NSS, sudo.conf, Defaults
+locali con include/alias e regola di policy per `/usr/bin/true`. Il comando
+viene **listato, non eseguito**. La lettura amministrativa usa una sola sudo
+esterna con `-N` (nessun rinnovo credenziali); l'eventuale password e i normali
+log sono effetti della query. Una chiamata interna noninterattiva lista la
+policy per guido come root, senza nuova autenticazione biometrica. Nessun
+contenuto di template, chiavi o materiali Goodix viene letto.
+
+Il parser nativo cvtsudoers evita di perdere Defaults scoped o inclusi. La
+sua uscita non viene installata; non prova da sola quale policy sia effettiva:
+sudo.conf/NSS e listing devono essere coerenti. Plugin/path custom, policy
+remota o nuovi include PAM tornano alla review. Non si assume system-auth come
+catena universale né si deduce supporto fingerprint dalla sola configurazione.
+La password della query può attivare fprintd a lettore assente: si riporta lo
+stato finale senza stop/poll/retry, e il marker COMPLETE non significa inactive.
+
+**HUMAN_REQUIRED** prima dell'esecuzione nella VM e delle letture privilegiate
+(roadmap §4, AGENTS §6.2). Nessuna live sudo è già pronta o autorizzata da questo
+preflight; dopo l'output si stabiliranno percorso nativo, identità e limiti di
+tentativi pertinenti. KScreenLocker, enrollment, VERIFY e audit query non si
+ripetono. Runtime, template RIGHT-index/left-index-finger e inversa installata
+restano invariati; nessun installer/uninstaller nuovo è necessario per una
+lettura di configurazione.
+
+Verifica offline del delta: parser cvtsudoers reale su soli file temporanei
+sintetici, includendo alias, include e Defaults per comando; sintassi Bash e
+Python incorporato, import/path da checkout e lettura del percorso effettivo
+senza eseguire sudo o query servizi host; link verificati e live-critical set invariato.
+Nessuna build o suite runtime ripetuta. Review PM diretta del diff e del blocco:
+nessuna modifica di driver/install/inversa, PAM, authselect o file Fedora;
+nessun nuovo coupling di password/desktop. R5 rimane da qualificare realmente.
 
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=ALERT_VIEWER_LOOKUP_NOT_FOUND_UNLOCK_TIME_KNOWN_BOUNDED_AUDIT_QUERY_PREPARED
+ADVANCEMENT=KSCREENLOCKER_SUPPORTED_SCOPED_SELINUX_DIAGNOSTIC_CLOSED_SUDO_CONFIG_QUERY_READY
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -1322,28 +1353,34 @@ R4_PASSWORD_UNLOCK=PASS_SENSOR_ABSENT_HUMAN_REPORTED
 R4_FINGERPRINT_UNLOCK=PASS_CONTACT_1_NO_PASSWORD_HUMAN_REPORTED
 R4_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0
 R4_DEVICE_RELEASE_TAIL=COMPLETION_NOT_OBSERVED
-R4_KSCREENLOCKER_CLASSIFICATION=PENDING_SELINUX_ALERT_REVIEW
+R4_KSCREENLOCKER_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 SELINUX=ENFORCING_HUMAN_REPORTED
 SELINUX_ALERT_VISIBLE_DURING_LIVE=true
-SELINUX_ALERT_CAUSE=UNKNOWN_NO_AVC_SUPPLIED
 R4_KSCREENLOCKER_SELINUX_ALERT_LOOKUP=NOT_FOUND_HUMAN_REPORTED
 R4_UNLOCK_APPROXIMATE_TIME=2026-09-23_09:06_CEST_07:06_UTC
 R4_AUDIT_QUERY_WINDOW=2026-09-23_07:01:00_TO_07:11:00_UTC
-R4_AUDIT_QUERY=NOT_YET_EXECUTED_IN_VM
+R4_SELINUX_AUDIT_QUERY=PASS_HUMAN_REPORTED
+R4_SELINUX_AVC_COUNT=3_IN_TARGET_WINDOW_HUMAN_REPORTED
+R4_SELINUX_DENIAL=fprintd_read_nr_hugepages_target_type_sysctl_vm_t_permissive_0
+R4_SELINUX_ASSESSMENT=NON_FATAL_FOR_TESTED_KSCREENLOCKER_PATH
+R4_SELINUX_FULL_RAW_AVC=NOT_SUPPLIED
+R4_SELINUX_EXACT_LIBRARY_CALLSITE=NOT_ESTABLISHED
+R4_SELINUX_DIAGNOSTIC=CLOSED_WITH_DOCUMENTED_DENIAL
+R4_SUDO_CONFIG_QUERY=PREPARED_NOT_EXECUTED_IN_VM
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=OFFLINE_SYNTHETIC_AUDIT_QUERY_PASS_VM_PRIVILEGED_READ_REQUIRES_HUMAN
-RESIDUAL_BLOCKER_OR_RISK=SELINUX_EVENT_UNQUALIFIED_OTHER_CONSUMERS_R5_R6_R7_OPEN
+EXECUTABLE_CLOSURE=OFFLINE_QUERY_CHECKS_PASS_VM_PRIVILEGED_READ_REQUIRES_HUMAN
+RESIDUAL_BLOCKER_OR_RISK=DOCUMENTED_SELINUX_DENIAL_OTHER_CONSUMERS_R5_R6_R7_OPEN
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_6986a6b772fecc8843e40f926ad2eaaa64d49522
+REVIEW_SET=GIT_DIFF_FROM_0932cff265e510d2c6f5271c2d2c1acc952ce837
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_READ_AUDIT_SELINUX_2026_09_23_0701_0711_UTC
+NEXT_BOUNDARY=HUMAN_VM_SUDO_CONFIGURATION_QUERY_SENSOR_DETACHED
 ```
 
 ### Governance corrente

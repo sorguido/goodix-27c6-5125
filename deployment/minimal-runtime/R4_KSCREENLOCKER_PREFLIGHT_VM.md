@@ -6,8 +6,9 @@
 The canonical manual records the guest evidence and its limits: valid authselect
 with fingerprint already enabled, separate stock password/fingerprint substacks,
 and two RPM digest checks not performed. No authentication was tested.
-Native stock KScreenLocker password/fingerprint unlock has since passed. The
-current human gate is [review of its visible SELinux alert](R4_KSCREENLOCKER_VM.md#current-gate-read-the-existing-selinux-alert),
+Native stock KScreenLocker password/fingerprint unlock has since passed and is
+SUPPORTED on the tested baseline, with a documented non-fatal nr_hugepages
+read denial. The current human gate is the [sudo configuration query](R4_SUDO_PREFLIGHT_VM.md),
 with the retained RIGHT-index template still labeled left-index-finger. No
 configuration patch, repeated unlock or rollback is called for on this PASS.
 

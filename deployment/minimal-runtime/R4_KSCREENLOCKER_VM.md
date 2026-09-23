@@ -4,17 +4,31 @@
 **COMPLETED — password unlock and first-contact fingerprint unlock PASS,
 human-reported; cleanup closed/drained, sensor detached, fprintd inactive/MainPID 0.**
 The physical RIGHT index matched the stored left-index-finger template, without
-entering a password in the fingerprint session. Preserve runtime/template and
-do not repeat the test. A visible SELinux alert still needs identification;
-final `SUPPORTED` classification is pending that review. The successful unlock
-does not explain the alert or establish its harmlessness.
+entering a password in the fingerprint session. **SUPPORTED on the tested
+baseline**, with the non-fatal SELinux denial below documented. Preserve
+runtime/template and do not repeat the test or its completed audit query.
+The next human gate is the [stock sudo configuration query](R4_SUDO_PREFLIGHT_VM.md).
 
-## Current gate: read the existing SELinux alert
+## Completed SELinux review
 
-**HUMAN_REQUIRED — one read-only audit query in the VM, with the sensor detached.**
-The alert-viewer lookup is **completed: NOT_FOUND**, as reported by the user.
-No alert ID/report/raw AVC is available. Do not repeat the viewer lookup or
-scan all sealert entries. This does not establish that no denial occurred.
+The user reports `R4_SELINUX_AUDIT_QUERY=PASS`: three AVCs in the target window,
+all `fprintd`, denied `read` of `nr_hugepages`, target type `sysctl_vm_t`,
+`permissive=0`, in Enforcing. Local times: **09:04:02, 09:04:32 and 09:06:14
+CEST on 23 September 2026**. The last event coincided with the successful
+first-contact unlock; password, desktop and cleanup also passed.
+
+The read denial was **non-fatal for the tested KScreenLocker path**. This
+supports consumer closure with a documented denial, not universal harmlessness
+or a precise library callsite. Full raw events/source context/event IDs were
+not supplied, and the AI did not inspect guest logs directly. The earlier
+viewer lookup remains NOT_FOUND. No policy/label/sysctl change, permissive mode,
+additional audit search, rollback or repeated live is warranted by this result.
+
+## Completed audit query and original criteria
+
+**Historical human gate — do not rerun the block below.** The query followed
+the unsuccessful viewer lookup. Its original instructions are retained for
+provenance; the returned summary and classification are recorded above.
 
 The successful unlock was approximately **23 September 2026, 09:06 CEST
 (Europe/Rome, UTC+2)**. Query only **09:01–09:11 CEST = 07:01–07:11 UTC**, a
@@ -62,8 +76,8 @@ return the observation without another query/live. Confirm that the sensor is
 still detached and runtime/template/SELinux policy are unchanged. No rollback
 is required for this diagnostic result. The retained installation/inverse below
 remain available; a functional PASS is not rolled back for missing evidence.
-After this review, determine final consumer classification and the next stock
-consumer's actual guest PAM route before another live test.
+That review is now complete. The next stock consumer's actual guest PAM route
+is covered by the sudo preflight linked above, before another live test.
 
 ## Completed live procedure and original criteria
 
