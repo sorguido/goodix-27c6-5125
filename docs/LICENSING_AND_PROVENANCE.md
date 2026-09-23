@@ -1,298 +1,67 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Licensing and provenance
 
-Licensing is per file. No directory name changes the license or copyright of
-the source it contains.
+Licensing is per file. A directory name or a combined binary's license does not
+change the original copyright or grant of any source file.
 
-## Distributed components
+## Components
 
-| Component | Origin | Version or commit | License | Local use |
-| --- | --- | --- | --- | --- |
-| libfprint base | Fedora 44 source package / upstream libfprint | 1.94.100 | Per-file upstream terms, predominantly `LGPL-2.1-or-later` | Patched base and public ABI |
-| Goodix driver sources | This project | current source tree | Per-file SPDX; predominantly `LGPL-2.1-or-later` | USB, TLS, image, lifecycle, enrollment, and matching integration |
-| SIGFM | Rockytkg materialized libfprint fork | `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | `LGPL-2.1-or-later` | Feature extraction and matching |
-| R2 preprocessing | Adapted from Rockytkg `goodix_imgproc` | `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | `GPL-2.0-or-later` | Image preprocessing |
-| OpenCV | Fedora 44 packages | 4.13.0-1.fc44 | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC` | Bundled runtime libraries |
-| libgusb | Fedora 44 system package | VM-installed version; R2 build reference 0.4.9-5.fc44 | `LGPL-2.1-or-later` | System runtime/build dependency; not bundled in R2 |
-| OpenSSL | Fedora 44 system library | host version | Apache-2.0 | TLS implementation |
+| Component | Source/version | License and use |
+| --- | --- | --- |
+| libfprint base | Fedora libfprint 1.94.100 | Upstream per-file terms, predominantly LGPL-2.1-or-later; public library ABI and core |
+| Goodix driver | Project source | Per-file SPDX, predominantly LGPL-2.1-or-later; device, transport, secure session and image integration |
+| SIGFM | Rockytkg's materialized libfprint fork, commit `7ebe0c809b4d1df3400e84299a4ec4acdea84590` | LGPL-2.1-or-later; feature extraction and matching |
+| Image preprocessing | Adapted from Rockytkg, commit `227eba219fa9e3fbac5bd59aca79f624f67cd11b` | GPL-2.0-or-later; device-independent preprocessing subset |
+| OpenCV | Fedora 4.13.0-1.fc44 packages | Fedora expression `BSD-3-Clause AND Apache-2.0 AND ISC`; required runtime libraries |
+| libgusb | Fedora system library | LGPL-2.1-or-later; USB dependency, not privately bundled |
+| OpenSSL | Fedora system library | Apache-2.0; TLS dependency |
+| Lifecycle and Plasma selector tools | Project source | GPL-2.0-or-later; ordinary Linux-PAM APIs, Python standard library and Fedora tools |
 
-The R2 build copies libgusb into temporary build/pkgconfig staging only. The
-installed Fedora library supplies it at runtime; it is excluded from the five
-shared libraries in `runtime/`. The old managed candidate bundled libgusb,
-which remains a historical packaging fact and is not the R2 release boundary.
+Fedora supplies fprintd, its PAM module, Plasma, sudo and PolicyKit. Their
+implementations are not copied into private replacement consumers by this
+architecture. Each separately supplied package retains its own license.
 
-The exact target-specific compilation units, licenses, origins, and SHA-256
-digests are recorded in `production/source-files.tsv` and
-`production/source-files.sha256`. The Fedora base provenance and source-package
-digests are recorded in
-`reference/libfprint-fedora44-1.94.100/PROVENANCE.md`.
+## Combined library and notices
 
-Device-material acquisition, extraction, recovery and generation helpers are
-not part of the distributed release surface. The runtime expects protected
-material supplied separately by the user and the project does not distribute
-OEM binaries, secrets, caches or captures.
+The Goodix-enabled libfprint incorporates GPL-2.0-or-later preprocessing and
+links Apache-2.0 components. Applicable later-version grants allow the combined
+library to be conveyed under GPL-3.0-or-later. Individual source files retain
+their own notices and licenses; GPL code is not relabelled as LGPL.
 
-## Combined binary
+Library build outputs include the applicable license texts, OpenCV's license
+corpus extracted from the pinned packages, source manifests and build provenance.
+Final public package notices must reflect the actual payload; no finished public
+package or complete package SBOM is asserted here.
 
-The Goodix-enabled `libfprint-2.so.2.0.0` statically incorporates the GPL R2
-component and dynamically links Apache-2.0 components. The applicable “or
-later” grants permit the combined binary to be conveyed under
-`GPL-3.0-or-later`. This does not relicense individual files: every source file
-retains its own notice and grant.
+## Source provenance
 
-The prepared candidate includes the GPL-2.0-or-later,
-LGPL-2.1-or-later, GPL-3.0-or-later, and Apache-2.0 license texts, the exact
-OpenCV license corpus extracted from the pinned RPMs, third-party notices, and
-an SPDX 2.3 JSON SBOM.
+The exact target-specific source paths, licenses and origins are recorded in
+[`production/source-files.tsv`](../production/source-files.tsv), with digests in
+[`production/source-files.sha256`](../production/source-files.sha256).
+The [Fedora libfprint provenance record](../reference/libfprint-fedora44-1.94.100/PROVENANCE.md)
+identifies the original archive/source-package hashes and downstream changes.
 
-## Imported source details
+The four SIGFM files are `sigfm.cpp`, `sigfm.h`, `binary.hpp` and `img-info.hpp`
+under `Rockytkg/libfprint/libfprint/sigfm/`. Their notices identify Matthieu
+Charette, Natasha England-Elbro, Timur Mangliev and other credited contributors.
+The preprocessing files `libfprint-driver/rockytkg-imgproc/goodix_imgproc.c`
+and `.h` derive from Rockytkg's `src/goodix_imgproc.c` and
+`include/goodix_imgproc.h` at the commit above. Firmware, provisioning, USB
+control and debug-dump behavior are not incorporated with that subset.
 
-The four SIGFM files in `Rockytkg/libfprint/libfprint/sigfm/` originate from
-the Rockytkg materialized libfprint fork commit above. Their original notices
-name Matthieu Charette, Natasha England-Elbro, Timur Mangliev, and other
-contributors represented in the files.
-
-`libfprint-driver/rockytkg-imgproc/goodix_imgproc.[ch]` is an adapted,
-device-independent preprocessing subset of Rockytkg's
-`src/goodix_imgproc.c` and `include/goodix_imgproc.h` at commit
-`227eba219fa9e3fbac5bd59aca79f624f67cd11b`. Sensor-reaching code, firmware,
-environment overrides, and debug dumps are not included.
-
-The libfprint integration forward-ports SIGFM print semantics and bounded image
-actions onto Fedora's newer libfprint 1.94.100 core. These are downstream
-changes, not upstream libfprint or Fedora behavior.
+Local lifecycle and recovery code uses this project's ownership/receipt formats;
+no new external implementation or license boundary is introduced by the removal
+tools. The Plasma selector uses public Linux-PAM interfaces without copying
+PAM, fprintd or Plasma source into a private replacement component.
 
 ## Excluded material
 
-No open-source grant in this repository covers OEM firmware or binaries,
-device secrets, private captures, fingerprint images or templates, factory
-data, or other protected material. None of those items belongs in the public
-source tree or candidate.
+Open-source licenses in this tree do not grant rights to distribute OEM firmware
+or binaries, reader secrets, private captures, factory data, fingerprint images
+or templates. Those items are excluded from public source and software payloads.
+The runtime consumes a separately supplied legitimate device-material bundle.
 
-This project records its compatibility determination and source provenance; it
-does not provide legal advice for unrelated distributions or modifications.
-
-## Minimal runtime extraction and deployment (22 September 2026)
-
-`production/minimal-runtime/build.sh` is an adaptation of the project's
-`production/build.sh` at `09ff7571c1d66e5e3e3bd1f8d89c75c733ca70c1`, under the
-same GPL-2.0-or-later terms. It retains the existing libfprint build inputs and
-removes the custom authentication build and private libgusb payload. The
-`check-source.sh --driver-only` path is a local GPL-2.0-or-later change.
-There is no new third-party import, no change to per-file licenses or the
-combined library's GPL-3.0-or-later boundary, and no public export. See
-[Runtime extraction](MINIMAL_RUNTIME.md) for the selected components.
-
-`deployment/minimal-runtime/deploy.py`, its two shell entry points and
-`test_offline.py` are independently written local GPL-2.0-or-later code using
-only Python's standard library and existing Fedora tools. No historical
-managed transaction or external implementation is copied. R3 deploys the
-unchanged R2 library set with its original notices and build provenance; the
-ledger copy is updated to correctly classify Fedora libgusb as a system
-dependency. The saved uninstall implementation retains the same license.
-
-The follow-up R3 stock-attempt counter/latch and audit fields modify only
-local `goodix_fpimage_device.c/.h` under their existing LGPL-2.1-or-later
-terms. Their two source-manifest digests are updated. The existing
-LGPL-2.1-or-later synthetic secure-session fixture gains direct fourth/fifth
-explicit-call admission and post-MATCH/error rejection regressions. The
-counter is telemetry only under the user's stock-attempt decision; the
-cumulative cap from `c0b2369` is removed. Its existing inner builder can compile
-it against the canonical Fedora base. No Fedora fprintd/PAM code is changed or copied.
-`production/minimal-runtime/check-stock-attempts.sh` is independent local
-GPL-2.0-or-later glue for that VM-only test build. No new third-party source,
-dependency, licensing boundary or public export is introduced.
-
-## R4 explicit-choice Plasma Login candidate (23 September 2026)
-
-`deployment/plasma-login-opt-in/` is independent GPL-2.0-or-later project code:
-one small selector module, PAM composition, VM-only build, temporary synthetic
-tests and an install/inverse pair of actions. It uses public Linux-PAM APIs and
-the Python standard library; no Linux-PAM, fprintd or Plasma implementation is
-copied, patched or redistributed as a private consumer. The compatibility table
-records configuration facts observed in the human's Fedora VM preflight; it is
-not a copied vendor runtime file and does not restrict the password path to a
-vendor hash/version. Existing R3 runtime inputs and their licenses are unchanged.
-
-Behavioral references are the immutable local Plasma Login/fprintd sources and
-Linux-PAM v1.7.2. The exact Fedora PAM source package
-`pam-1.7.2-2.fc44.src.rpm`, SHA256
-`7fc17d339337dda1afa8df8deb9c78fcbf706d4bb8306957f72a610d195e077d`, was inspected
-read-only in memory for packaging/patchset equivalence; it is not a candidate
-payload or runtime pin. The [R4 integration review](R4_PLASMA_LOGIN_INTEGRATION.md)
-links the exact source package and relevant API/dispatch sources.
-No protected material, real token, biometric data or third-party test image
-enters the new tests. No licensing boundary change or public export is made.
-
-## Historical host-integration provenance
-
-The following integration records preserve original licenses, attribution and
-past implementation facts. The private fprintd/PAM, greeter, Plasma,
-sudo/PolicyKit and managed migration components are now
-**HISTORICAL_ONLY / REJECTED_ARCHITECTURE** under the
-[distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
-They are excluded from the new runtime. This classification changes no license.
-
-### Historical early-login integration
-
-`reference/fprintd-fedora44-1.94.5/source/` is the immutable upstream GPL-2.0-or-later
-source corresponding to Fedora fprintd 1.94.5-5.fc44. Source RPM/tar/spec hashes
-are in its `PROVENANCE.md`; `SOURCE_SHA256SUMS` covers all 141 retained upstream files, including dotfiles (eight biometric test images
-are excluded). Three reference metadata files outside `source/` are not part
-of that upstream count.
-`production/login/fprintd.patch` is the original downstream delta,
-mechanically promoted byte-for-byte from the live-tested prototype. The
-separate `fprintd-cleanup.patch` adds a GPL-2.0-or-later guard for a reproduced
-pending-open/suspend race; it preserves the successful preparation/attach path. Upstream
-`src/device.c`, `src/manager.c`, `src/fprintd.h`, Device XML and
-`pam/pam_fprintd.c` retain their original notices and grants. The new private
-login include, GIO greeter, build scripts and daemon/greeter tests are
-GPL-2.0-or-later. Driver changes and promoted synthetic driver tests retain
-LGPL-2.1-or-later per-file terms.
-
-The daemon paired with the GPL-3.0-or-later libfprint combined work is conveyed
-under the compatible later grant; the PAM and greeter source retain GPL-2.0-or-later.
-The candidate includes upstream `fprintd-COPYING`, `fprintd-AUTHORS`, existing
-license texts/notices, source digest manifests and an expanded SPDX SBOM.
-PAM/polkit devel RPMs are hash-pinned compile-time inputs only, not runtime
-payload. No Plasma source is imported or relicensed.
-
-Historical `development/patches/login-early/` is frozen evidence of the physical
-validation at `9671e02e19504e20e0097f598fa960f2c13e7a1e`, not a build dependency.
-The canonical loader and per-reader material contract are retained. Promotion
-does not change the public export/audit boundary or publish private history.
-
-Prepared-login three-attempt follow-up: `production/login/fprintd-attempts.patch`
-is a GPL-2.0-or-later local delta over the two existing patches. Upstream bytes
-and the original prototype patch/greeter remain unchanged. Modified driver
-and lifecycle sources retain LGPL-2.1-or-later notices. Their current digests
-are in the production source manifest; they no longer claim prototype byte
-equivalence. No new external implementation or licensing boundary is introduced.
-
-## Service-local Polkit bridge (20 September 2026)
-
-New `production/polkit/pam_goodix_polkit.c`, build, deployment and offline tests:
-independent project implementation, GPL-2.0-or-later, no third-party code copied
-or minimally adapted. Public PAM/stdio/process APIs only; existing Fedora
-pam_fprintd remains separately installed and unmodified. Source inspection of
-Polkit 127, Linux-PAM 1.7.2 and the exact Fedora KDE source RPM is documented in
-`production/polkit/README.md`; it is behavioral reference, not imported source.
-The managed SBOM identifies the bridge separately and records host Polkit/KDE/PAM
-dependencies. The existing combined libfprint licensing boundary is unchanged.
-
-## Combined sudo/Polkit boundary (20 September 2026)
-
-New `production/sudo/` source, build, rules and offline tests are independent
-project GPL-2.0-or-later code; the sudo bridge reuses project-owned child/PAM
-patterns from the Polkit bridge with a separate native-conversation design.
-No sudo, KDE or Linux-PAM expression is incorporated. Exact Fedora sudo/PAM
-SRPM versions, source digests and reviewed functions are recorded in
-`production/sudo/README.md`. They are reference evidence, not shipped payload.
-`production/login/fprintd-consumer-retry.patch` changes the already pinned
-fprintd `src/device.c` retry condition for ordinary Verify/Identify; existing
-GPL-2.0-or-later copyright/license and combined GPL-3.0-or-later boundary remain.
-SBOM adds the sudo bridge and records the host sudo dependency. Firmware,
-protected material and biometric templates are not part of these artifacts.
-
-## Private host migration inventory (20 September 2026)
-
-`development/migration/patched-host-to-combined/inventory.py` and its offline
-tests are independent project code, GPL-2.0-or-later. They use only Python's
-standard library and do not copy historical deployment implementations.
-Historical scripts are reviewed as ownership evidence through Git; no external
-code is imported. This host-specific development handoff is not candidate
-payload and changes no distribution or licensing boundary.
-
-The follow-up `check-material-boundary.sh` is independent project
-GPL-2.0-or-later code; `test_material_boundary.c` is independent
-LGPL-2.1-or-later test code linked only with the existing target-material
-loader/binder. It consumes the already versioned private D232 non-secret
-analysis manifest, whose provenance document excludes PSK/raw OTP/CONFIG90
-and biometric content. It neither reads the installed protected bundle nor
-copies that fixture into the candidate/public source set. No production
-source or material contract is changed by this offline evidence test.
-
-The manifest conversion and fixed host transaction (`manifest.py`, `migration.py`,
-`install.sh`, `uninstall.sh`, `prepare-policy.sh`, and `test_migration.py`) are
-independent GPL-2.0-or-later project code, standard-library-only. The private
-`host-plan.json` contains allowed software hashes and metadata, not binary or
-biometric contents. The conversion projects the already versioned D232 metadata;
-two absent digest fields use the existing C acceptance pins at commit
-`e61fce313794922a2dab156a1b38a8ddc5837f19`, paths
-`libfprint-driver/goodix_target_material.c` and `goodix_runtime_inputs.c`.
-It does not derive new secrets, change the canonical loader or redistribute
-protected files. Full historical manifest remains recoverable on the host only.
-
-Recovery policy reconstruction consumes this project's historical
-`deployment/d293-phase-b-account-lifecycle/goodix_fprint_account_delete.te`
-and `.fc` at `232e9401ca3ce72a0f9f08448deb46c6251aaa2a`, unchanged; existing
-GPL-2.0-or-later project licensing and attribution remain. Source hashes and
-reproduced PP/CIL hashes are pinned by `prepare-policy.sh`. No external code,
-new permanent dependency or candidate licensing boundary is introduced.
-These development-only tools, host plan and historical fixture are excluded
-from the canonical candidate payload; public repository remains untouched.
-
-The follow-up `launcher.py`, `operator.sh`, `recovery.py`, and launcher tests
-are independent GPL-2.0-or-later project code. The saved recovery manager is
-mechanically derived from the same checkout's GPL-2.0-or-later
-`deployment/managed-install/root-transaction.sh`: only the unused Git-root
-lookup is removed and dispatch is restricted to uninstall for the known local
-installer. `production/polkit/deploy.py` and `production/sudo/rules.py` are
-copied unchanged into the private recovery snapshot, retaining SPDX notices.
-Exact saved-source hashes are recorded in transaction state. No production
-source or license boundary changes. The Fedora systemd vendor drop-in is
-preserved on the host and its package digest is recorded; it is not copied
-into the candidate. No protected or biometric contents enter this tooling.
-
-The package metadata/re-arm corrective adds independent GPL-2.0-or-later
-`package_baseline.py`, `rearm.py` and offline tests. `legacy-recovery.json`
-contains only source hashes from private commit
-`f97de44e0192f249ccb80fd9b32e1488195f0101`, including the previously documented
-removal-only manager adapter. It authenticates saved code before import, without
-reading protected material or importing new third-party expression. The RPM
-verification test uses the already installed Fedora librpm Python binding and
-an in-memory copy of package metadata; no RPM database or package is changed.
-No production, license, redistribution or public-repository boundary changes.
-
-The post-live Polkit-counter/VT corrective modifies the existing GPL-2.0-or-later
-bridge, deploy transaction, managed removal preflight, launcher and tests. New
-`production/polkit/test_guard.c` includes only this project's own bridge and
-adds syscall test doubles, retaining its license. No upstream code is copied.
-Polkit 127 helper and KDE Plasma Login Manager v6.7.5 Display/UserSession source
-are behavioral references linked in the corrective review. `legacy-recovery.json`
-also pins the complete d7de50585d555b1ca676e4fcf6c9ed77cc20d601 recovery snapshot.
-Saved recovery retains the same removal-only adapter and SPDX notices.
-No third-party relicensing, new dependency or public-repository change.
-
-## Plasma Login VT/getty corrective (21 September 2026)
-
-`reference/plasma-login-manager-fedora44-6.7.5/` retains the exact Fedora SRPM's
-upstream source/spec/four patches with notices and SHA-256 manifest. Its
-PROVENANCE.md records source/tar hashes and per-file license boundaries.
-`production/plasma-vt/session-vt.patch` changes only Display.cpp, Display.h
-and the daemon CMake source list. New SessionVt C++, policy header, build,
-preflight and offline tests are independent GPL-2.0-or-later project code.
-The daemon compiles the original upstream common/auth/daemon target sources;
-Fedora patch 170 is retained. The corresponding user-session helper remains
-the installed Fedora binary. Generated configuration/D-Bus source derives
-from the retained upstream inputs with the pinned Qt/KDE generators.
-The prepared daemon uses applicable GPL-3.0-or-later grants; original GPL/LGPL
-notices are not rewritten. Third-party notices and SPDX SBOM include this
-component and resolve its actual Qt/KDE runtime dependencies. Header RPMs are
-hash-pinned compile-time inputs only, extracted without installation. No new
-runtime library is bundled and no protected/private evidence is exported.
-This supersedes the earlier statement that the candidate contains no Plasma
-source: that statement applies to the pre-corrective early-login integration.
-
-## R5 removal and emergency recovery (23 September 2026)
-
-`deployment/recovery/` and its synthetic tests are local GPL-2.0-or-later code,
-using the Python standard library and existing Fedora commands. Static paths,
-receipt schemas and ownership checks derive from this project's GPL-2.0-or-later
-`deployment/minimal-runtime/deploy.py` and
-`deployment/plasma-login-opt-in/manage.py` at
-`75d1495c328bade7c5a0bf267893cb79014c3bad`. Installed standalone copies retain
-the SPDX notice. No third-party import, new runtime library, protected material
-or licensing-boundary change. The login inverse correction retains its license.
-R5 reuses the qualified R3/R4 binaries and original build manifests; it does not
-relicense or rebuild them. No public export or public-repository operation.
+The [publication manifest](../PUBLICATION_MANIFEST.md) defines eligible source
+and documentation. Preserve original notices and corresponding source when
+redistributing components. [References](REFERENCES.md) and
+[acknowledgements](../ACKNOWLEDGEMENTS.md) identify the upstream projects.

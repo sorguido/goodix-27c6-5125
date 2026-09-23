@@ -591,14 +591,39 @@ NORMAL_LIFECYCLE_TTY_REQUIRED=false
 EMERGENCY_TTY_RECOVERY_ALLOWED=true
 ~~~
 
-**Avanzamento offline (23 settembre 2026):** implementati i due comandi standalone
-in `deployment/recovery/`, patch tooling install/inversa e guide
-`docs/UNINSTALL.md`, `docs/R5_INSTALL.md`, `deployment/recovery/R5_VM.md`.
-Rimozione normale indipendente dal vendor, emergency su path statici; 60 test
-sintetici PASS, review Git-native e closure offline nel manuale. **Live non
-eseguita: PM_DECISION=HUMAN_REQUIRED** prima della sequenza R5-E. La VM resta
-alla baseline R4-PASS finché l'Utente applica la patch; R5 non è chiusa e R6
-resta NOT_AUTHORIZED. La matrice update non viene reintrodotta.
+**Stato aggiornato dal correttivo Utente (23 settembre 2026):** il prompt
+`CODEX_CORRECTIVE_SENSOR_PRESENT_AND_PUBLIC_DOCS.md` impone il lettore integrato
+continuamente presente in install/update/uninstall/recovery. Vietato sostituire
+il detach con unbind, disable o occultamento. La sicurezza del lifecycle viene
+dal controllo software del servizio; presenza in sysfs non è un errore.
+
+A `4f244fa2946da94406f03991332f8a70e9a8b401` l'Utente riferisce PASS di tooling,
+rimozione normale, password/desktop, assenza path progetto, fprintd stock e
+metadata invariati dei cinque materiali/template. Reinstallazione allora con
+lettore scollegato e un login Plasma con un contatto MATCH PASS. Emergency in
+TTY con lettore presente riferita riuscita, ma output/stato finale esatti
+incompleti. La successiva reinstallazione reader-present è stata fermata dal
+gate USB del tool, prima del runtime. Quella è la classe di failure corretta.
+
+Tutti gli entrypoint attivi ammettono ora il lettore presente. Tooling senza
+azioni fprintd/USB; runtime protetto da inibizione temporanea dell'attivazione,
+stop e verifica inactive/MainPID 0/LoadState masked; nessun riavvio automatico.
+Login usa il manager corrente con gli output originali verificati. Le operazioni
+concorrenti sono serializzate. Qualifica sintetica e review nel manuale corrente;
+classificazione dei percorsi in `development/READER_PRESENT_LIFECYCLE_REVIEW.md`.
+
+**PM_DECISION=HUMAN_REQUIRED:** resta solo la sequenza correttiva VM in
+`deployment/recovery/R5_VM.md`, con installazione interna `docs/R5_INSTALL.md`.
+Nessuna nuova prova biometrica richiesta. La VM è riferita rimossa ma il suo
+stato preciso viene prima verificato. Il controllo password TTY usa runtime
+progetto assente e lettore ancora presente, senza workaround PAM.
+
+Documenti pubblici riscritti come prodotto; `PUBLICATION_MANIFEST.md` elenca
+singolarmente i documenti ammessi ed esclude evidenze interne. Come richiesto
+dal correttivo, la procedura interna non è presentata come installer finale:
+packaging pubblico ancora indisponibile, requisito di percorso finale non
+surrettiziamente dichiarato chiuso. **R5 non chiusa; R6 non iniziata né
+autorizzata.** Nessuna matrice update generale reintrodotta.
 
 ### R5-A — Uninstall normale unificato
 
@@ -765,7 +790,15 @@ no dependency on vendor_ready()
 Quando il lavoro offline e la documentazione sono pronti, **HUMAN_REQUIRED**.
 La live R5 deve essere preparata ma non eseguita autonomamente dall'AI.
 
-Sequenza concordata:
+La sequenza inizialmente concordata sotto è conservata come provenance.
+Il nuovo correttivo la sostituisce operativamente con: verifica dello stato
+rimosso riferito → install reader-present → normal uninstall e password/desktop
+→ stessa reinstallazione reader-present → un comando emergency TTY → verifica
+TTY/password e desktop con runtime assente. Lettore sempre presente; nessun
+nuovo MATCH, enrollment o rebuild. Blocchi esatti in
+`deployment/recovery/R5_VM.md`. Il packaging finale non è inventato né anticipato.
+
+Sequenza originale (parzialmente eseguita, non ripetere integralmente):
 
 1. creare snapshot della VM nello stato R4 PASS corrente;
 2. eseguire `goodix-uninstall` dalla sessione grafica;

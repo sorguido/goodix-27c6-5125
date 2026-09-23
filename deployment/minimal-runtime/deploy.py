@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """R3: private libraries, one environment drop-in and an owned material fcontext."""
 import argparse
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
@@ -20,6 +21,7 @@ BUILD_COMMIT = "b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226"
 RUNTIME = Path("/usr/local/lib64/goodix-27c6-5125")
 DROPIN = Path("/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf")
 UNIT = "fprintd.service"
+SERVICE_MASK = Path("/run/systemd/system/fprintd.service")
 LIBRARIES = ("libfprint-2.so.2.0.0",) + tuple(
     f"libopencv_{part}.so.413" for part in ("core", "features2d", "flann", "imgproc"))
 LINKS = {"libfprint-2.so.2": "libfprint-2.so.2.0.0", "libfprint-2.so": "libfprint-2.so.2"}
@@ -35,7 +37,10 @@ def require(ok, message):
 
 
 def run(*args):
-    result = subprocess.run(args, env=ENV, text=True, capture_output=True)
+    try:
+        result = subprocess.run(args, env=ENV, text=True, capture_output=True, timeout=30)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"{' '.join(args)}: timed out after 30 seconds; retained for review") from error
     require(result.returncode == 0,
             f"{' '.join(args)}: {result.stderr.strip() or result.stdout.strip() or result.returncode}")
     return result.stdout.strip()
@@ -63,19 +68,48 @@ def safe_directory(path):
                 and not st.st_mode & 0o022, f"unsafe directory: {item}")
 
 
-def no_sensor():
-    # Read sysfs identity only; no USB handle or sensor command is opened.
-    for device in Path("/sys/bus/usb/devices").iterdir():
-        if (device / "idVendor").exists():
-            vendor = (device / "idVendor").read_text().strip().lower()
-            product = (device / "idProduct").read_text().strip().lower()
-            require((vendor, product) != ("27c6", "5125"), "disconnect the Goodix reader from the VM")
-
-
 def machine_gate():
     run("systemd-detect-virt", "--vm", "--quiet")
     require(os.geteuid() == 0, "run manually with sudo inside the VM")
-    no_sensor()
+
+
+@contextmanager
+def quiesced_service():
+    """Block activation while changing runtime files; never start a device action."""
+    safe_directory(SERVICE_MASK.parent)
+    owned = None
+    acquisition_attempted = False
+    try:
+        if SERVICE_MASK.exists() or SERVICE_MASK.is_symlink():
+            require(SERVICE_MASK.is_symlink() and os.readlink(SERVICE_MASK) == "/dev/null",
+                    "fprintd runtime mask path occupied; no service or runtime change performed")
+        else:
+            # Record intent before the syscall: a signal can arrive after creating
+            # the link but before Python receives its result or records its inode.
+            acquisition_attempted = True
+            SERVICE_MASK.symlink_to("/dev/null")
+            metadata = SERVICE_MASK.lstat()
+            owned = (metadata.st_dev, metadata.st_ino)
+        run("systemctl", "daemon-reload")
+        run("systemctl", "stop", UNIT)
+        require_stopped(masked=True)
+        yield
+        require_stopped(masked=True)
+    finally:
+        if owned is not None:
+            metadata = SERVICE_MASK.lstat()
+            require((metadata.st_dev, metadata.st_ino) == owned and
+                    SERVICE_MASK.is_symlink() and os.readlink(SERVICE_MASK) == "/dev/null",
+                    "fprintd runtime mask changed; preserve it for review")
+            SERVICE_MASK.unlink()
+            run("systemctl", "daemon-reload")
+        elif acquisition_attempted:
+            # Without a verified identity, deleting this path could remove an
+            # administrator's concurrent mask. Preserve it explicitly for review.
+            print(f"FPRINTD_MASK_ACQUISITION=INCOMPLETE: any mask at {SERVICE_MASK} "
+                  "was retained because ownership could not be established; "
+                  "no runtime files were changed. Report this error before continuing.",
+                  file=sys.stderr)
 
 
 def property_value(name):
@@ -414,10 +448,11 @@ def remove_material(state):
     save_state(state)
 
 
-def require_stopped():
-    no_sensor()
+def require_stopped(*, masked=False):
     # One query retains the observed failure state; do not poll or stop here.
     names = ("ActiveState", "SubState", "MainPID", "Result", "ExecMainStartTimestamp")
+    if masked:
+        names += ("LoadState",)
     output = run("systemctl", "show", UNIT, "--all",
                  *("--property=" + name for name in names))
     observed = {}
@@ -432,6 +467,10 @@ def require_stopped():
             "fprintd must already be inactive/MainPID 0; observed " +
             " ".join(name + "=" + observed[name] for name in names) +
             "; no service action performed by this check")
+    if masked:
+        require(observed['LoadState'] == 'masked',
+                'fprintd activation is not inhibited; observed LoadState=' + observed['LoadState'] +
+                '; no runtime/material mutation performed')
 
 
 def show_material():
@@ -550,8 +589,7 @@ def remove_owned_files(state, own_dropin=True):
         require(read_regular(DROPIN) == CONFIG, "drop-in collision during recovery; retained runtime")
         DROPIN.unlink()
     run("systemctl", "daemon-reload")
-    restore_service(state)
-    # Retain the inverse and previous state until the vendor service is restored.
+    # Activation remains masked until the enclosing lifecycle operation ends.
     shutil.rmtree(RUNTIME)
     if state["created_dropin_directory"]:
         try:
@@ -562,20 +600,14 @@ def remove_owned_files(state, own_dropin=True):
                 raise
 
 
-def restore_service(state):
-    if state["previous_service"] == "active":
-        no_sensor()
-        run("systemctl", "start", UNIT)
-
-
 def install(payload, install_commit, previous_service):
     safe_directory(RUNTIME.parent)
     safe_directory(DROPIN.parent if DROPIN.parent.exists() else DROPIN.parent.parent)
     if RUNTIME.exists() or RUNTIME.is_symlink():
         state = inspect_owned()
-        require(DROPIN.exists(), "incomplete install: use saved uninstall before reinstalling")
+        require(DROPIN.exists(), "incomplete install: use goodix-uninstall before reinstalling")
         require(all(state["files"].get(name) == digest(data) for name, data in payload.items()),
-                "different payload: use saved uninstall first")
+                "different payload: use goodix-uninstall first")
         require(state.get("material_selinux", {}).get("phase") == "ready",
                 "material labeling incomplete; use reviewed labeling action")
         selinux_tools()
@@ -589,9 +621,15 @@ def install(payload, install_commit, previous_service):
              "material_label_commit": install_commit,
              "previous_service": previous_service, "created_dropin_directory": not DROPIN.parent.exists(),
              "files": {name: digest(data) for name, data in payload.items()}}
+    with quiesced_service():
+        publish_install(payload, state, material)
+    print(f"R3_INSTALL=PASS BUILD_SOURCE_COMMIT={BUILD_COMMIT} INSTALL_COMMIT={install_commit}")
+    print("FPRINTD=STOPPED_READY_FOR_MANUAL_LOAD_CHECK FEDORA_COMPONENTS_REPLACED=NONE")
+
+
+def publish_install(payload, state, material):
     stage = Path(tempfile.mkdtemp(prefix=".goodix-5125-stage-", dir=RUNTIME.parent))
     published = False
-    stopped = False
     own_dropin = False
     try:
         for name, data in payload.items():
@@ -604,9 +642,6 @@ def install(payload, install_commit, previous_service):
         (stage / STATE).write_text(json.dumps(state, indent=2) + "\n")
         (stage / STATE).chmod(0o600)
         stage.chmod(0o755)
-        no_sensor()
-        stopped = True
-        run("systemctl", "stop", UNIT)
         stage.rename(RUNTIME)
         published = True
         DROPIN.parent.mkdir(mode=0o755, exist_ok=True)
@@ -624,15 +659,11 @@ def install(payload, install_commit, previous_service):
         run("restorecon", "-RF", str(RUNTIME), str(DROPIN))
         run("systemctl", "daemon-reload")
         apply_material(state, material)
-        # Leave stopped: the user explicitly starts stock fprintd in the R3 load check.
-        print(f"R3_INSTALL=PASS BUILD_SOURCE_COMMIT={BUILD_COMMIT} INSTALL_COMMIT={install_commit}")
-        print("FPRINTD=STOPPED_READY_FOR_MANUAL_LOAD_CHECK FEDORA_COMPONENTS_REPLACED=NONE")
+        # The enclosing mask keeps the service stopped through final verification.
     except BaseException:
         if published:
             # Only this transaction's files exist here; restore before propagating failure.
             remove_owned_files(state, own_dropin=own_dropin)
-        elif stopped:
-            restore_service(state)
         raise
     finally:
         if stage.exists():
@@ -650,8 +681,8 @@ def uninstall():
     if state.get("material_selinux") is not None:
         selinux_tools()
         check_material_record(state["material_selinux"])
-    run("systemctl", "stop", UNIT)
-    remove_owned_files(state)
+    with quiesced_service():
+        remove_owned_files(state)
     print("R3_UNINSTALL=PASS FEDORA_VENDOR_FILES_UNCHANGED=true MATERIALS_TEMPLATES_PRESERVED=true")
 
 
@@ -680,14 +711,15 @@ def main():
             show_material()
         elif args.action == "label-material":
             install_preflight()
-            label_existing()
+            with quiesced_service():
+                label_existing()
         elif args.action == "reconcile-material-manifest":
-            reconcile_runtime_manifest()
+            with quiesced_service():
+                reconcile_runtime_manifest()
         elif args.action == "unlabel-material":
-            require_stopped()
-            state = inspect_owned()
-            remove_material(state)
-            require_stopped()
+            with quiesced_service():
+                state = inspect_owned()
+                remove_material(state)
             print("R3_MATERIAL_ROLLBACK=PASS RUNTIME_PRESERVED=true")
             show_material()
         else:

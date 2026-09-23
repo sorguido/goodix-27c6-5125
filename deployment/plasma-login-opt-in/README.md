@@ -1,5 +1,12 @@
 # Plasma Login: explicit empty-field fingerprint choice
 
+> **Internal historical component guide.** Earlier detached-reader procedures
+> below document completed tests and must not be reused for lifecycle operations.
+> The active [reader-present corrective procedure](../recovery/R5_VM.md) uses the
+> current installers. The integrated reader stays connected; saved old inverses
+> are provenance, not the current removal entrypoint (`goodix-uninstall`).
+
+
 **Installation and file/default-label verification accepted PASS at
 `24c3018071e8d120687ff8fbd2f344cde620692d`; keep the installed candidate.**
 Build, installation and [real VM login](R4_PLASMA_LOGIN_VM.md) are completed PASS.

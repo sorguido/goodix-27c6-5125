@@ -16,6 +16,7 @@ SOURCE = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location('recovery_manage', SOURCE / 'manage.py')
 m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
+REAL_GATE = m.gate
 
 
 class RecoveryTools(unittest.TestCase):
@@ -70,7 +71,8 @@ class RecoveryTools(unittest.TestCase):
         self.commit = 'a' * 40
         self.system_calls = []
         for name, value in {'HERE': self.here, 'ROOT': self.here.parents[1],
-                            'COMMANDS': self.commands, 'SUPPORT': self.support}.items():
+                            'COMMANDS': self.commands, 'SUPPORT': self.support,
+                            'LOCK_DIRECTORY': self.root / 'usr/local/lib64'}.items():
             self.start(patch.object(m, name, value))
         self.start(patch.object(Path, 'lstat', synthetic_lstat))
         self.start(patch.object(m, 'parents', side_effect=synthetic_parents))
@@ -214,6 +216,26 @@ class RecoveryTools(unittest.TestCase):
         self.assertTrue(all(path.exists() for path in self.commands))
         self.assert_preserved()
 
+    def test_tool_install_and_remove_allow_present_reader_without_usb_or_service_calls(self):
+        sysfs = self.root / 'sys/bus/usb/devices/1-4'
+        sysfs.mkdir(parents=True)
+        (sysfs / 'idVendor').write_text('27c6')
+        (sysfs / 'idProduct').write_text('5125')
+        original_iterdir = Path.iterdir
+        def no_usb(path):
+            self.assertNotIn('/sys/bus/usb', str(path))
+            return original_iterdir(path)
+        with patch.object(m.os, 'geteuid', return_value=0), \
+                patch.object(m, 'run', return_value='') as command, \
+                patch.object(Path, 'iterdir', no_usb):
+            REAL_GATE()
+            command.assert_called_once_with('systemd-detect-virt', '--vm', '--quiet')
+        m.install()
+        m.uninstall()
+        self.assert_absent()
+        self.assertFalse(any(call[0] == 'systemctl' for call in self.system_calls))
+        self.assertEqual((sysfs / 'idVendor').read_text(), '27c6')
+
     def test_main_self_elevation_uses_fixed_interpreter_action_and_environment(self):
         for action in ('install', 'uninstall'):
             with self.subTest(action=action), patch.object(sys, 'argv', ['manage.py', action]), \
@@ -229,10 +251,52 @@ class RecoveryTools(unittest.TestCase):
     def test_main_root_dispatch_still_requires_gate(self):
         with patch.object(sys, 'argv', ['manage.py', 'install']), \
                 patch.object(m.os, 'geteuid', return_value=0), \
-                patch.object(m, 'gate') as gate, patch.object(m, 'install') as install:
+                patch.object(m, 'gate') as gate, patch.object(m, 'install') as install, \
+                patch.object(m, 'lifecycle_lock', return_value=123) as lock, \
+                patch.object(m.os, 'close') as closed:
             m.main()
             gate.assert_called_once_with()
             install.assert_called_once_with()
+            lock.assert_called_once_with()
+            closed.assert_called_once_with(123)
+        self.assert_absent()
+
+    def test_busy_shared_lock_prevents_tool_mutation(self):
+        with patch.object(m.os, 'open', return_value=123) as opened, \
+                patch.object(m.fcntl, 'flock', side_effect=BlockingIOError('synthetic busy')) as flock, \
+                patch.object(m.os, 'close') as closed:
+            with self.assertRaisesRegex(RuntimeError, 'another Goodix lifecycle operation is active'):
+                m.lifecycle_lock()
+            opened.assert_called_once_with(m.LOCK_DIRECTORY, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            flock.assert_called_once_with(123, m.fcntl.LOCK_EX | m.fcntl.LOCK_NB)
+            closed.assert_called_once_with(123)
+        with patch.object(sys, 'argv', ['manage.py', 'install']), \
+                patch.object(m.os, 'geteuid', return_value=0), patch.object(m, 'gate'), \
+                patch.object(m, 'lifecycle_lock', side_effect=RuntimeError('active lifecycle operation')), \
+                patch.object(m, 'install') as install:
+            with self.assertRaisesRegex(RuntimeError, 'active lifecycle operation'):
+                m.main()
+            install.assert_not_called()
+        self.assert_absent()
+
+    def test_shared_lock_is_released_after_either_tool_action_fails(self):
+        for action in ('install', 'uninstall'):
+            with self.subTest(action=action), patch.object(sys, 'argv', ['manage.py', action]), \
+                    patch.object(m.os, 'geteuid', return_value=0), patch.object(m, 'gate'), \
+                    patch.object(m, 'lifecycle_lock', return_value=123), \
+                    patch.object(m.os, 'close') as closed, \
+                    patch.object(m, action, side_effect=RuntimeError('synthetic action failure')):
+                with self.assertRaisesRegex(RuntimeError, 'synthetic action failure'):
+                    m.main()
+                closed.assert_called_once_with(123)
+        self.assert_absent()
+
+    def test_absent_library_parent_needs_no_new_lock_artifact(self):
+        absent = self.root / 'absent-lib64'
+        with patch.object(m, 'LOCK_DIRECTORY', absent), patch.object(m.os, 'open') as opened:
+            self.assertIsNone(m.lifecycle_lock())
+            opened.assert_not_called()
+            self.assertFalse(absent.exists())
         self.assert_absent()
 
     def test_wrappers_resolve_own_path_from_foreign_cwd_without_privileges(self):

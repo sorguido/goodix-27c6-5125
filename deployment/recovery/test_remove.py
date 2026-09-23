@@ -34,6 +34,10 @@ class RecoveryTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.m = load()
         self.bind(self.m)
+        self.m.MASK.parent.mkdir(parents=True)
+        self.sysfs = self.root / 'sys/bus/usb/devices/1-4'
+        self.write(self.sysfs / 'idVendor', b'27c6')
+        self.write(self.sysfs / 'idProduct', b'5125')
         self.events = []
         self.active = True
         self.rule = True
@@ -59,7 +63,7 @@ class RecoveryTests(unittest.TestCase):
         self.install_fixture()
 
     def bind(self, module):
-        for name in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL'):
+        for name in ('CONFIG', 'SUPPORT', 'RUNTIME', 'DROPIN', 'NORMAL', 'FORCE', 'RECOVERY', 'MATERIAL', 'MASK'):
             setattr(module, name, self.root / str(getattr(module, name)).lstrip('/'))
 
     def write(self, path, value, mode=0o644):
@@ -121,6 +125,8 @@ class RecoveryTests(unittest.TestCase):
         if args == ('systemctl', 'stop', 'fprintd.service'):
             self.active = False
             return ''
+        if args == ('systemctl', 'show', 'fprintd.service', '--property=ActiveState', '--property=MainPID', '--property=LoadState'):
+            return 'ActiveState=active\nMainPID=42\nLoadState=masked\n' if self.active else 'ActiveState=inactive\nMainPID=0\nLoadState=masked\n'
         if args == ('semanage', 'fcontext', '-l', '-C', '-n'):
             return ('/unrelated(/.*)? all files system_u:object_r:var_lib_t:s0\n' +
                     (self.m.RULE + ' all files system_u:object_r:fprintd_var_lib_t:s0\n' if self.rule else ''))
@@ -149,6 +155,7 @@ class RecoveryTests(unittest.TestCase):
                      self.m.NORMAL, self.m.FORCE, self.m.RECOVERY):
             self.assertFalse(self.m.present(path), str(path))
         self.assertFalse(self.active)
+        self.assertFalse(self.m.MASK.exists() or self.m.MASK.is_symlink())
         self.assert_preserved()
         self.assertTrue(self.events)
         self.assertTrue(all(not login and not dropin for _args, login, dropin in self.events))
@@ -428,6 +435,163 @@ class RecoveryTests(unittest.TestCase):
                     mock.patch.object(self.m.sys, 'argv', [str(path)]):
                 self.assertEqual(self.m.main(), 0)
                 remove.assert_called_once_with(force=force)
+
+    def test_reader_presence_is_not_consulted_by_normal_or_force_removal(self):
+        for force in (False, True):
+            with self.subTest(force=force):
+                if force:
+                    self.install_fixture()
+                original = Path.iterdir
+                def no_usb_inspection(path):
+                    self.assertNotIn('/sys/bus/usb', str(path), 'lifecycle must not inspect/open USB')
+                    return original(path)
+                with mock.patch.object(Path, 'iterdir', no_usb_inspection):
+                    self.assertEqual(self.m.remove(force=force), 0)
+                self.assertEqual((self.sysfs / 'idVendor').read_bytes(), b'27c6')
+                self.assertEqual((self.sysfs / 'idProduct').read_bytes(), b'5125')
+                self.assert_removed()
+
+    def test_mask_blocks_activation_during_runtime_and_label_removal(self):
+        original_remove = self.m.remove_path
+        original_label = self.m.remove_label
+        def remove_path(path):
+            if path == self.m.RUNTIME:
+                self.assertEqual(os.readlink(self.m.MASK), '/dev/null')
+                self.assertFalse(self.active)
+            return original_remove(path)
+        def remove_label():
+            self.assertEqual(os.readlink(self.m.MASK), '/dev/null')
+            self.assertFalse(self.active)
+            return original_label()
+        with mock.patch.object(self.m, 'remove_path', side_effect=remove_path), \
+                mock.patch.object(self.m, 'remove_label', side_effect=remove_label):
+            self.assertEqual(self.m.remove(force=True), 0)
+        self.assert_removed()
+
+    def test_unquiesced_service_retains_runtime_and_material_labels(self):
+        original = self.m.command
+        def active_despite_stop(*args):
+            if args[:2] == ('systemctl', 'show'):
+                return 'ActiveState=deactivating\nMainPID=42\n'
+            return original(*args)
+        self.m.command = active_despite_stop
+        self.assertEqual(self.m.remove(force=True), 1)
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assertTrue(self.rule)
+        self.assertFalse(self.m.CONFIG.exists())
+        self.assertFalse(self.m.DROPIN.exists())
+        self.assertFalse(self.m.MASK.is_symlink())
+        self.assertIn('has not quiesced', self.output.getvalue())
+        self.assertTrue(self.m.FORCE.exists())
+        self.assert_preserved()
+
+    def test_shadowed_mask_cannot_allow_runtime_mutation(self):
+        original = self.m.command
+        def shadowed(*args):
+            if args[:2] == ('systemctl', 'show'):
+                return 'ActiveState=inactive\nMainPID=0\nLoadState=loaded\n'
+            return original(*args)
+        self.m.command = shadowed
+        self.assertEqual(self.m.remove(force=True), 1)
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assertTrue(self.rule)
+        self.assertFalse(self.m.CONFIG.exists())
+        self.assertFalse(self.m.DROPIN.exists())
+        self.assertFalse(self.m.MASK.is_symlink())
+        self.assertTrue(self.m.FORCE.exists())
+        self.assert_preserved()
+
+    def test_concurrent_lifecycle_is_rejected_before_mutations(self):
+        fd = os.open(self.m.RUNTIME.parent, os.O_RDONLY | os.O_DIRECTORY)
+        self.m.fcntl.flock(fd, self.m.fcntl.LOCK_EX | self.m.fcntl.LOCK_NB)
+        try:
+            with mock.patch.object(self.m.os, 'geteuid', return_value=0), \
+                    mock.patch.object(self.m.sys, 'argv', [str(self.m.FORCE)]):
+                with self.assertRaisesRegex(RuntimeError, 'another Goodix lifecycle'):
+                    self.m.main()
+            self.assertTrue(self.m.CONFIG.exists())
+            self.assertEqual(self.events, [])
+        finally:
+            os.close(fd)
+
+    def test_existing_runtime_mask_is_preserved(self):
+        self.m.MASK.symlink_to('/dev/null')
+        before = self.m.MASK.lstat()
+        self.assertEqual(self.m.remove(force=True), 0)
+        self.assertEqual(self.m.MASK.lstat().st_ino, before.st_ino)
+        self.assertEqual(os.readlink(self.m.MASK), '/dev/null')
+        self.assertFalse(self.m.RUNTIME.exists())
+        self.assert_preserved()
+
+    def test_mask_collision_still_disarms_auth_and_retains_runtime(self):
+        self.write(self.m.MASK, b'foreign override')
+        self.assertEqual(self.m.remove(force=True), 1)
+        self.assertFalse(self.m.CONFIG.exists())
+        self.assertFalse(self.m.DROPIN.exists())
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assertEqual(self.m.MASK.read_bytes(), b'foreign override')
+        self.assert_preserved()
+
+    def test_interruption_releases_only_own_temporary_mask(self):
+        with mock.patch.object(self.m, 'remove_label', side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.m.remove(force=True)
+        self.assertFalse(self.m.MASK.is_symlink())
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assertTrue(self.m.FORCE.exists())
+        self.assert_preserved()
+
+    def test_lstat_failure_after_mask_creation_reports_unconfirmed_ownership(self):
+        original_lstat = Path.lstat
+        failed = False
+        def fail_acquisition(path, *args, **kwargs):
+            nonlocal failed
+            if path == self.m.MASK and not failed:
+                failed = True
+                raise OSError('synthetic post-create metadata failure')
+            return original_lstat(path, *args, **kwargs)
+        with mock.patch.object(Path, 'lstat', fail_acquisition):
+            self.assertEqual(self.m.remove(force=True), 1)
+        self.assertTrue(self.m.MASK.is_symlink())
+        self.assertEqual(os.readlink(self.m.MASK), '/dev/null')
+        self.assertIn('FPRINTD_MASK_ACQUISITION=INCOMPLETE', self.output.getvalue())
+        self.assertIn('ownership could not be established', self.output.getvalue())
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assertTrue(self.m.FORCE.exists())
+        self.assert_preserved()
+
+    def test_interruption_during_mask_creation_reports_and_preserves_unknown_mask(self):
+        original_symlink = Path.symlink_to
+        def interrupt_after_create(path, *args, **kwargs):
+            original_symlink(path, *args, **kwargs)
+            if path == self.m.MASK:
+                raise KeyboardInterrupt('synthetic interruption after symlink')
+        with mock.patch.object(Path, 'symlink_to', interrupt_after_create):
+            with self.assertRaises(KeyboardInterrupt):
+                self.m.remove(force=True)
+        self.assertTrue(self.m.MASK.is_symlink())
+        self.assertIn('FPRINTD_MASK_ACQUISITION=INCOMPLETE', self.output.getvalue())
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assertTrue(self.m.FORCE.exists())
+        self.assert_preserved()
+
+    def test_replaced_mask_during_acquisition_is_never_deleted(self):
+        original_lstat = Path.lstat
+        replaced = False
+        def replace_before_identity(path, *args, **kwargs):
+            nonlocal replaced
+            if path == self.m.MASK and not replaced:
+                replaced = True
+                path.unlink()
+                path.write_bytes(b'foreign replacement unit')
+                raise OSError('synthetic replacement during acquisition')
+            return original_lstat(path, *args, **kwargs)
+        with mock.patch.object(Path, 'lstat', replace_before_identity):
+            self.assertEqual(self.m.remove(force=True), 1)
+        self.assertEqual(self.m.MASK.read_bytes(), b'foreign replacement unit')
+        self.assertIn('ownership could not be established', self.output.getvalue())
+        self.assertTrue(self.m.RUNTIME.exists())
+        self.assert_preserved()
 
     def test_command_absent_fprintd_stop_is_benign(self):
         for reason in ('not loaded', 'not found'):

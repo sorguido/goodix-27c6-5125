@@ -1,7 +1,8 @@
 #!/usr/bin/python3 -I
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Install/remove only the R5 recovery commands, never runtime or authentication."""
+"""Install/remove only recovery commands, never runtime or authentication."""
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -14,6 +15,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 COMMANDS = (Path('/usr/local/bin/goodix-uninstall'), Path('/usr/local/bin/goodix-force-remove'))
 SUPPORT = Path('/usr/local/share/goodix-recovery')
+LOCK_DIRECTORY = Path('/usr/local/lib64')
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C'}
 
 
@@ -45,11 +47,8 @@ def parents(path):
 def gate():
     require(os.geteuid() == 0, 'root required')
     run('systemd-detect-virt', '--vm', '--quiet')
-    for device in Path('/sys/bus/usb/devices').iterdir():
-        vendor = device / 'idVendor'
-        if vendor.exists() and vendor.read_text().strip().lower() == '27c6':
-            require((device / 'idProduct').read_text().strip().lower() != '5125',
-                    'detach the Goodix reader before installing/removing recovery tooling')
+    # Recovery tooling has no device or authentication dependency. In particular
+    # installing its files must never inspect/open USB or start/stop fprintd.
 
 
 def digest(data):
@@ -123,6 +122,24 @@ def uninstall():
     print('GOODIX_RECOVERY_ROLLBACK=PASS RUNTIME_AND_LOGIN_UNCHANGED=true')
 
 
+def lifecycle_lock():
+    # Serialize tooling installation/rollback with runtime, login and removal.
+    # With no library parent, neither runtime nor login installation can run.
+    parents(LOCK_DIRECTORY)
+    if not present(LOCK_DIRECTORY):
+        return None
+    trusted(LOCK_DIRECTORY, directory=True)
+    fd = os.open(LOCK_DIRECTORY, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BaseException as error:
+        os.close(fd)
+        if isinstance(error, BlockingIOError):
+            raise RuntimeError('another Goodix lifecycle operation is active; wait for it to finish') from error
+        raise
+    return fd
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('install', 'uninstall'))
@@ -131,7 +148,12 @@ def main():
         os.execve('/usr/bin/sudo', ['sudo', '--', '/usr/bin/python3', '-I', '-B',
                                    str(HERE / 'manage.py'), args.action], ENV)
     gate()
-    install() if args.action == 'install' else uninstall()
+    fd = lifecycle_lock()
+    try:
+        install() if args.action == 'install' else uninstall()
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 if __name__ == '__main__':

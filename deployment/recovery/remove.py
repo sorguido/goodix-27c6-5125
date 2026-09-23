@@ -1,12 +1,14 @@
 #!/usr/bin/python3 -I
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Standalone R5 removal. Installed as both user commands; no saved code executed."""
+"""Standalone removal. Installed as both user commands; no saved code executed."""
 import hashlib
+import fcntl
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -15,6 +17,7 @@ CONFIG = Path('/etc/pam.d/plasmalogin')
 SUPPORT = Path('/usr/local/lib64/goodix-plasma-login')
 RUNTIME = Path('/usr/local/lib64/goodix-27c6-5125')
 DROPIN = Path('/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf')
+MASK = Path('/run/systemd/system/fprintd.service')
 NORMAL = Path('/usr/local/bin/goodix-uninstall')
 FORCE = Path('/usr/local/bin/goodix-force-remove')
 RECOVERY = Path('/usr/local/share/goodix-recovery')
@@ -176,6 +179,58 @@ def remove_label():
         command('restorecon', '-F', '--', *paths)
 
 
+def inhibit_activation():
+    """Temporarily block service activation, without hiding or opening a device."""
+    parents(MASK)
+    require(MASK.parent.is_dir(), f'service control directory unavailable: {MASK.parent}')
+    created = None
+    acquisition_attempted = False
+    try:
+        acquisition_attempted = True
+        try:
+            MASK.symlink_to('/dev/null')
+        except FileExistsError:
+            acquisition_attempted = False
+            require(MASK.is_symlink() and os.readlink(MASK) == '/dev/null',
+                    f'cannot inhibit fprintd: existing service override {MASK}; retained for review')
+            return None
+        info = MASK.lstat()
+        require(stat.S_ISLNK(info.st_mode) and os.readlink(MASK) == '/dev/null',
+                'temporary fprintd mask changed during acquisition; retained for review')
+        created = (info.st_dev, info.st_ino)
+        return created
+    except BaseException:
+        if created is not None:
+            release_inhibition(created)
+        elif acquisition_attempted:
+            # The syscall may have succeeded before an exception/signal. Without
+            # its recorded inode we cannot safely delete an apparent mask.
+            print(f'FPRINTD_MASK_ACQUISITION=INCOMPLETE: any mask at {MASK} is retained '
+                  'because ownership could not be established. Runtime and material files '
+                  'are retained; report this output before continuing.', file=sys.stderr)
+        raise
+
+
+def release_inhibition(created):
+    if created is not None:
+        info = MASK.lstat()
+        require((info.st_dev, info.st_ino) == created and MASK.is_symlink()
+                and os.readlink(MASK) == '/dev/null',
+                'temporary fprintd mask changed; retained for review')
+        MASK.unlink()
+        command('systemctl', 'daemon-reload')
+
+
+def stop_and_verify():
+    command('systemctl', 'daemon-reload')
+    command('systemctl', 'stop', 'fprintd.service')
+    output = command('systemctl', 'show', 'fprintd.service', '--property=ActiveState', '--property=MainPID', '--property=LoadState')
+    state = dict(line.split('=', 1) for line in output.splitlines() if '=' in line)
+    require(state.get('ActiveState') == 'inactive' and state.get('MainPID') == '0'
+            and state.get('LoadState') == 'masked',
+            'fprintd has not quiesced or activation is not inhibited; service state: ' + output.strip())
+
+
 def remove(force=False):
     owned_rule = True if force else normal_preflight()
     errors = []
@@ -191,18 +246,27 @@ def remove(force=False):
     # Disarm entry points BEFORE touching their dependencies or service state.
     login_removed = attempt('login entry', lambda: remove_path(CONFIG))
     runtime_detached = attempt('runtime entry', lambda: remove_path(DROPIN))
-    attempt('service reload', lambda: command('systemctl', 'daemon-reload'))
-    attempt('stop fingerprint service', lambda: command('systemctl', 'stop', 'fprintd.service'))
-    # Never start fprintd or restart a login/desktop service during removal.
-    if login_removed:
-        attempt('login support', lambda: remove_path(SUPPORT))
-    labels_removed = True
-    if owned_rule:
-        labels_removed = attempt('project material labels', remove_label)
-    if runtime_detached and labels_removed:
-        # Retain the ownership receipt if label cleanup fails. A later normal
-        # invocation must not mistake the remaining label effect for absence.
-        attempt('runtime files', lambda: remove_path(RUNTIME))
+    created_mask = None
+    try:
+        try:
+            created_mask = inhibit_activation()
+            inhibited = True
+        except (OSError, RuntimeError) as error:
+            errors.append('service activation control: ' + str(error))
+            inhibited = False
+        # Even failure to inhibit cannot prevent removing the authentication
+        # entry points above or attempting to stop an already-running service.
+        stopped = attempt('stop fingerprint service', stop_and_verify)
+        if login_removed:
+            attempt('login support', lambda: remove_path(SUPPORT))
+        if inhibited and stopped:
+            labels_removed = not owned_rule or attempt('project material labels', remove_label)
+            if runtime_detached and labels_removed:
+                attempt('runtime files', lambda: remove_path(RUNTIME))
+        # An unquiesced process may still use runtime/materials: retain them and
+        # the recovery tools, reporting the exact service-state failure.
+    finally:
+        attempt('restore service activation', lambda: release_inhibition(created_mask))
     # Do not remove shared parent directories or unrelated drop-ins.
     if not errors:
         attempt('recovery receipt', lambda: remove_path(RECOVERY))
@@ -214,7 +278,7 @@ def remove(force=False):
         print('GOODIX_REMOVAL=INCOMPLETE; recovery command retained where possible.', file=sys.stderr)
         for error in errors:
             print(error, file=sys.stderr)
-        print('Keep the reader disconnected. Report this final output before continuing.', file=sys.stderr)
+        print('Leave the reader connected. Report this final output before continuing.', file=sys.stderr)
         return 1
     print('GOODIX_REMOVAL=PASS GOODIX_PROJECT_IN_CRITICAL_AUTH_PATH=false FEDORA_CURRENT_STATE_EXPOSED=true')
     print('Materials and fingerprint templates preserved. No Fedora files restored.')
@@ -233,12 +297,35 @@ def main():
         # Fixed root-owned installed path, never sudo a script selected by cwd/PATH.
         path = FORCE if name == FORCE.name else NORMAL
         os.execve('/usr/bin/sudo', ['sudo', '--', '/usr/bin/python3', '-I', '-B', str(path)], ENV)
-    return remove(force=name == FORCE.name)
+    def interrupted(_signum, _frame):
+        raise KeyboardInterrupt('removal interrupted')
+    signal.signal(signal.SIGTERM, interrupted)
+    # Same existing-directory lock as the runtime/login installers. Do not let
+    # one transaction release a borrowed mask while another replaces libraries.
+    fd = None
+    try:
+        parents(RUNTIME)
+        try:
+            fd = os.open(RUNTIME.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except FileNotFoundError:
+            pass  # No library parent: no runtime installer can be in progress.
+        if fd is not None:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as error:
+                raise RuntimeError('another Goodix lifecycle operation is active; wait for it to finish') from error
+        return remove(force=name == FORCE.name)
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 if __name__ == '__main__':
     try:
         sys.exit(main())
+    except KeyboardInterrupt:
+        print('GOODIX_REMOVAL=INTERRUPTED; recovery tooling retained where possible.', file=sys.stderr)
+        sys.exit(130)
     except (OSError, RuntimeError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print(f'GOODIX_REMOVAL=STOP {error}. Use goodix-force-remove for emergency removal.', file=sys.stderr)
         sys.exit(1)

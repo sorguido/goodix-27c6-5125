@@ -1,52 +1,57 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Security and privacy
 
-> **Current release boundary — 22 September 2026.** The device/privacy
-> constraints below remain applicable. Managed installation, saved PAM copies
-> and account-deletion hooks describe the **HISTORICAL_ONLY /
-> REJECTED_ARCHITECTURE** candidate, not the active release. Follow the
-> [distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md).
-> The private workspace contains protected historical material and must never
-> be published as a source export; the source-only claim below concerns the
-> intended audited public surface.
+## Factory-preserving design
 
-## Device preservation
+The supported path preserves factory firmware, the existing reader PSK and
+persistent device state. It excludes flashing, IAP, ClearApp, OTP writes,
+key provisioning/replacement, factory-data writes and persistent VID:PID or
+mode changes. Unknown command families and unsafe protocol states fail closed.
+These design constraints do not claim exhaustive factory readback or universal
+Windows compatibility testing.
 
-The supported runtime is designed to preserve factory firmware and persistent
-state. It excludes firmware flashing, IAP, ClearApp, OTP access, PSK
-provisioning, factory-data writes, and unknown command families. Unexpected
-protocol states, unrecognized responses, and unbounded retries fail closed.
+An integrated reader remains present for installation, update, removal and
+recovery. Lifecycle tools use host service controls to quiesce fprintd, do not
+send USB commands, and do not initiate capture because a reader is connected.
+Recovery-tool management does not access the sensor. A successful source review
+or synthetic test does not by itself establish every real-system failure path.
 
-## Protected material
+## Protected input and biometric data
 
-Transport material is device-specific and secret. It is stored only under
-`/var/lib/goodix-5125-poc` as root-owned mode-0600 regular files inside a
-root-owned mode-0700 directory. The loader rejects symlinks, metadata drift,
-wrong sizes, and wrong hashes. Sensitive intermediate buffers are cleansed.
+Device material is root-owned and validated before use according to
+[the material contract](DEVICE_MATERIALS.md). The transport record contains an
+existing secret; the project neither generates nor distributes it. The OEM DLL
+is parsed for validated data, not loaded as executable code. Sensitive buffers
+are cleansed by the material/session implementation.
 
-The source repository and release candidate contain no real transport secret,
-OEM DLL, firmware, fingerprint sample, biometric template, factory data, or
-private USB capture. Debug output must never include these values.
+Fingerprint images are processed in memory. Fedora fprintd stores enrolled
+templates in `/var/lib/fprint/`. Removal preserves templates and device material;
+it does not export or purge them. Manage enrolled fingers using KDE or fprintd,
+including before deleting an account where cleanup is needed. This architecture
+does not install an account-deletion hook or promise automatic template deletion.
 
-## Biometric data
+## Host authentication boundary
 
-Decoded images exist only in process memory during an action. Enrollment
-templates are serialized through libfprint and stored by fprintd in its normal
-root-owned data directory. The managed installer neither exports nor purges
-them. Delete enrolled fingers through KDE or fprintd before deleting an
-account; the installed account-deletion hook blocks removal while that user's
-fingerprint namespace is non-empty.
+Fedora owns fprintd, Plasma, PAM, sudo and PolicyKit. The project adds a private
+library directory, a narrow service environment drop-in and a minimal optional
+Plasma Login selector. It does not ship a replacement daemon/greeter or freeze
+Fedora's vendor authentication files. SELinux uses a narrow material label
+mapping, without a custom permission-granting policy module.
 
-## Host integration
-
-The installer uses narrow root transactions, validates all candidate hashes,
-and records the active source commit. It does not overwrite Fedora's vendor
-`plasmalogin` file. PAM recovery copies and runtime versions are hash-pinned.
-SELinux policy is installed only for the account-deletion hook.
+Password access must remain available. A future incompatible Fedora PAM layout
+can affect the selector; compatibility across all future updates has not been
+proven. [Removal](UNINSTALL.md) exposes the current Fedora configuration without
+restoring an old copy. Emergency removal still requires working console and
+administrative authentication; it cannot bypass them or repair unrelated damage.
 
 ## Reporting a problem
 
-Share source version, exact error text, sanitized service status, and a
-redacted journal excerpt. Do not share protected-material directories,
-fingerprint storage, raw USB traffic, OEM binaries, firmware, images, or
-templates.
+Report the software version, Fedora version, reader identity, exact command,
+observed behavior and non-secret error text. Share only relevant redacted logs
+when needed. Never attach device-material directories, firmware, OEM binaries,
+raw USB captures, fingerprint images or templates.
+
+Only the audited source surface in the [publication manifest](../PUBLICATION_MANIFEST.md)
+may be distributed. That list is not a claim that every file in a maintainer's
+workspace is suitable for publication. The [validation page](VALIDATION.md)
+describes the current support limits.

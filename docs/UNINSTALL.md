@@ -1,102 +1,88 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Uninstall and emergency recovery
 
-## Emergency: the graphical login is unavailable
+## Emergency: graphical login is unavailable
 
-1. Press **Ctrl+Alt+F3**.
-2. Log in with your normal username and password.
-3. Type **`goodix-force-remove`** and press Enter. Enter your normal password if asked.
+1. Press **Ctrl+Alt+F3** to open a text console.
+2. Sign in with your normal username. If Fedora offers fingerprint first, keep
+   your finger off the reader and wait for its password prompt, then enter your
+   password.
+3. Type **`goodix-force-remove`** and press Enter. Complete the normal sudo
+   authentication if requested; it may also offer fingerprint before password.
 4. Follow the one final instruction displayed, if any.
 
-The command is installed in your normal command search path. You do not need
-the repository, a build directory, a commit, or additional arguments. It removes
-the Goodix project's influence on authentication and exposes the **current
-Fedora configuration**. It does not repair a Fedora installation independently
-broken by another cause. If text-console login or the normal sudo password
-authentication itself is unavailable, this command cannot grant access; report
-that failure instead of repeatedly trying credentials.
+**Leave the integrated reader connected.** Do not unplug, disable or hide it.
+The command is installed in the normal command search path and needs no source
+tree, build directory or extra arguments. Save this page where you can read it
+without your desktop.
 
-Save this page somewhere you can read without the VM desktop. The command must
-have been installed before the emergency; existing R4 installations receive it
-through the [R5 VM procedure](../deployment/recovery/R5_VM.md).
+Fedora determines console and sudo authentication prompts. There may be a wait
+before password is offered; there is no promised immediate method selector or
+universal fixed delay. Password fallback when biometrics are unavailable still
+needs confirmation on the tested console configuration. If no password prompt
+appears or correct password authentication fails, stop and report that failure.
+The removal command cannot bypass authentication or repair an independently
+broken Fedora installation.
+
+The command must already be installed. A finished public installation package
+is [not yet available](INSTALLATION.md); this guide does not imply that an
+uninstalled command can be downloaded or run automatically during an emergency.
 
 ## Normal uninstall from a working desktop
 
-Close fingerprint settings and authentication dialogs, detach the Goodix reader
-from the VM, then open a terminal and run:
+Finish authentication dialogs and close fingerprint settings. Keep the reader
+connected, with your finger off it. In a normal terminal, run:
 
 ```text
 goodix-uninstall
 ```
 
-Enter your usual password when requested. The command checks the project's
-receipts, ownership and file hashes before removal. A changed or unrecognized
-project file causes a clear refusal. It does **not** require Fedora's vendor PAM
-file to exist or match an old version. On a refusal, keep the error and report it;
-do not work around the check by deleting individual files.
+The command requests ordinary sudo authentication itself. It checks only the
+project's software ownership, receipts and hashes before removal. Missing or
+changed Fedora vendor files do not block removal of project-owned files.
+Unrecognized project changes produce a clear refusal; retain the message and
+report it instead of deleting individual files manually.
 
-A successful removal needs no repository or build output. The recovery commands
-remove themselves last, after the software removal succeeds. A second invocation
-can therefore say “command not found”; that alone is not a removal failure.
-The [installation procedure](R5_INSTALL.md) reinstalls the commands with the
-driver when needed.
+A successful removal prints its result and asks for a normal restart to close
+old authentication sessions. Follow that instruction, then use your password to
+log in. Recovery tools remove themselves last after successful cleanup, so a
+second invocation may report “command not found”.
 
-## What is removed and preserved
+## Removal scope
 
-Both commands remove the qualified R3/R4 software and its project-owned effects:
-
-| Project-owned item | Removal effect |
+| Project-owned item | Effect |
 | --- | --- |
-| `/etc/pam.d/plasmalogin` | Removes the project's login entry first; Fedora's current PAM becomes responsible again |
-| `/usr/local/lib64/goodix-plasma-login/` | Removes the selector module, saved manager and receipt |
-| `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library setting and reloads systemd configuration |
-| `/usr/local/lib64/goodix-27c6-5125/` | Removes the private libfprint/OpenCV runtime, links, notices, saved inverse and receipt |
-| Project material SELinux mapping | Removes the owned exact mapping and returns the explicit material paths to the current policy's default labels |
-| `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/receipt.json` | Removes recovery commands and their receipt last after successful cleanup |
+| `/etc/pam.d/plasmalogin` | Removes the project's login entry first and exposes current Fedora PAM |
+| `/usr/local/lib64/goodix-plasma-login/` | Removes the selector, saved manager and receipt |
+| `/etc/systemd/system/fprintd.service.d/90-goodix-5125-runtime.conf` | Removes the private library environment and reloads service configuration |
+| `/usr/local/lib64/goodix-27c6-5125/` | Removes private libfprint/OpenCV, links, notices and installation metadata |
+| Exact project material SELinux mapping | Removes an owned mapping and reapplies current policy labels to explicit material paths |
+| `/usr/local/bin/goodix-uninstall`, `/usr/local/bin/goodix-force-remove`, `/usr/local/share/goodix-recovery/` | Removes recovery tools last after successful cleanup |
 
-The commands stop fprintd; they do not restart the display manager or start a
-fingerprint authentication. They never restore saved Fedora files, replace
-package-owned binaries, or roll back Fedora to an old snapshot.
+Removal quiesces fprintd before removing runtime files. It does not start an
+authentication, directly access USB, restart the display manager, overwrite
+Fedora-owned files or replay saved Fedora configuration. An error leaves the
+remaining recovery tooling available where possible and reports unfinished work.
 
-These are deliberately **preserved**:
+Emergency removal uses fixed project-owned paths, tolerates missing receipts or
+partial software and does not depend on Fedora vendor layout or version. It
+removes the project's influence; it does not diagnose or repair Fedora.
 
-- `/var/lib/goodix-5125-poc/` and the five device-specific material files;
+## Preserved data
+
+Both commands preserve:
+
+- `/var/lib/goodix-5125-poc/` and all five device-specific material files;
 - fingerprint templates under `/var/lib/fprint/`;
-- sensor firmware, keys, factory state and persistent device configuration;
-- the repository and saved build outputs.
+- firmware, existing keys, factory state and persistent device configuration;
+- source checkouts and saved build outputs.
 
-Material **labels** may change back to the current Fedora policy; material
-contents, ownership and permissions are preserved. Template contents and labels
-are not changed. Normal uninstall retains a compatible mapping recorded as
-pre-existing/unowned. Emergency removal does not trust a receipt: it removes the
-exact known project mapping if present, but never removes broader or unrelated
-SELinux rules.
+Material labels can return to the **current** Fedora policy; material contents,
+Unix ownership and permissions remain unchanged. Template contents and labels
+are not modified. Normal removal preserves a compatible mapping recorded as
+pre-existing/unowned. Emergency removal removes only the exact known project
+mapping, even if its receipt is missing; unrelated SELinux rules are untouched.
 
-Emergency removal deliberately tolerates missing receipts, missing vendor files
-and partial installations. It acts on a fixed, reviewed list of project paths;
-it does not search for files to delete or execute saved installation code. It
-keeps recovery tooling if cleanup reports errors, so those errors can be reported
-and the removal completed. Unexpected files outside the known installation set
-are not an invitation to delete more broadly.
-
-## Qualification and rollback
-
-This is the current **R5 VM candidate**, pending human qualification of normal
-removal, reinstall and TTY emergency removal. The physical Fedora host is not a
-runtime test target. The complete sequence and observable criteria are in
-[R5 VM qualification](../deployment/recovery/R5_VM.md); no deliberate Fedora
-corruption or package update is required.
-
-To undo only the initial addition of the two recovery commands while keeping
-the previously qualified R3/R4 installation, run from the repository root:
-
-```bash
-./deployment/recovery/uninstall.sh
-```
-
-This inverse asks for the usual sudo password itself and removes only the recovery tools, never the driver or login
-integration. Use it only when abandoning the tools-only preparation before
-testing full removal. After a driver install failure or a runtime regression,
-use the normal full uninstall above; emergency removal remains available when
-graphical login is unavailable. Report the command result, exact error and
-failure point. Do not attach protected material or biometric templates.
+Report the command's result, exact error, failure point and whether password
+login/desktop work. Do not send protected files, templates or raw fingerprint
+images. [Validation scope](VALIDATION.md) records the remaining recovery checks.

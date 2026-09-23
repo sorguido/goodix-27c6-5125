@@ -1,39 +1,38 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # Upstream references
 
-## libfprint and fprintd
+## Fingerprint stack
 
-- libfprint: <https://gitlab.freedesktop.org/libfprint/libfprint>
-- fprintd: <https://gitlab.freedesktop.org/libfprint/fprintd>
-- Integrated libfprint version: 1.94.100
-- Qualified Fedora fprintd version: 1.94.5-5.fc44
+- [libfprint](https://gitlab.freedesktop.org/libfprint/libfprint): library base 1.94.100.
+- [fprintd](https://gitlab.freedesktop.org/libfprint/fprintd): the tested Fedora
+  package is 1.94.5-5.fc44; Fedora supplies the service and PAM module.
+- [Linux-PAM](https://github.com/linux-pam/linux-pam): public module and dispatch APIs.
+- [Plasma Login Manager](https://invent.kde.org/plasma/plasma-login-manager):
+  Fedora supplies the login daemon and greeter.
 
-The repository contains the Fedora 44 libfprint source base needed to build the
-downstream driver. fprintd remains supplied by Fedora and is not vendored.
+The project contains the libfprint source base required for its library build.
+It does not build a replacement Fedora authentication daemon or desktop.
 
-## Rockytkg implementation reference
+## Matching and preprocessing
 
-- Repository: <https://github.com/Rockytkg/goodix-linux-27c6-5125>
-- Audited source commit: `227eba219fa9e3fbac5bd59aca79f624f67cd11b`
-- Materialized libfprint fork commit used for SIGFM:
-  `7ebe0c809b4d1df3400e84299a4ec4acdea84590`
+[Rockytkg's Goodix project](https://github.com/Rockytkg/goodix-linux-27c6-5125)
+is the source of the reused image preprocessing subset and matching reference:
 
-Only the qualified SIGFM files and the adapted R2 preprocessing subset are
-distributed here. The upstream firmware, provisioning, OTP, PSK, USB runtime,
-and update paths are not part of this product.
+- preprocessing origin: `227eba219fa9e3fbac5bd59aca79f624f67cd11b`;
+- materialized libfprint/SIGFM origin: `7ebe0c809b4d1df3400e84299a4ec4acdea84590`.
 
-## Standards and formats
+Reuse does not include firmware updates, provisioning, PSK replacement or the
+upstream USB control path. Its behavior is not evidence for every local device.
+See [Licensing and provenance](LICENSING_AND_PROVENANCE.md).
 
-- RFC 5246, TLS 1.2
-- RFC 5487, TLS PSK cipher suites
-- RFC 5288, AES-GCM cipher suites for TLS
-- SPDX 2.3 JSON
-- CRC-32/MPEG-2: polynomial `0x04c11db7`, init `0xffffffff`, non-reflected,
-  xorout zero
+## Protocol and build references
 
-## Fedora packaging
+- [RFC 5246: TLS 1.2](https://www.rfc-editor.org/rfc/rfc5246)
+- [RFC 5487: PSK cipher suites](https://www.rfc-editor.org/rfc/rfc5487)
+- [RFC 5288: AES-GCM cipher suites](https://www.rfc-editor.org/rfc/rfc5288)
+- [OpenCV](https://opencv.org/): image-processing dependency.
+- [Pinned OpenCV package digests](../production/build-support/opencv-rpms.sha256)
+- [Fedora libfprint source provenance](../reference/libfprint-fedora44-1.94.100/PROVENANCE.md)
 
-The build targets Fedora 44 packages and ABI. Package names, versions, and file
-relationships in a prepared candidate are recorded by its SPDX SBOM. Pinned
-OpenCV RPM names and SHA-256 values are in
-`production/build-support/opencv-rpms.sha256`.
+Source versions identify tested/build inputs. They are not runtime version pins
+for password login or guarantees about later Fedora updates.

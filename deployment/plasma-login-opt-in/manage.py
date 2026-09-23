@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Human-only VM install/inverse; no authentication or service operations."""
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -15,10 +16,14 @@ import tempfile
 CONFIG = Path('/etc/pam.d/plasmalogin')
 SUPPORT = Path('/usr/local/lib64/goodix-plasma-login')
 VENDOR = Path('/usr/lib/pam.d/plasmalogin')
-USB = Path('/sys/bus/usb/devices')
 OWNER = (0, 0)
 MODULE = 'pam_goodix_login_gate.so'
 INPUTS = (MODULE, 'plasmalogin.pam', 'manage.py', 'SOURCE_COMMIT')
+# Preserve the already qualified binary output while installing this corrected
+# lifecycle inverse. The original build manifest is checked, never rewritten.
+QUALIFIED_SOURCE = '6fc6e640710885954d9e6fd603b3bc47b45d2ac6'
+QUALIFIED_MANAGER_SHA256 = '3a18ec5a110ea2879efd6a0f728a34285a40b7afd93edf330bc541089ba62553'
+QUALIFIED_PAM_SHA256 = '5d537fe653d2051b1cf95a9d5e7cf1dac3688ba96dc7559d9586c619bc70bcea'
 
 
 def require(condition, message):
@@ -38,12 +43,8 @@ def environment(*, removal=False):
         require(release.get('ID') == 'fedora' and release.get('VERSION_ID') == '44'
                 and platform.machine() == 'x86_64', 'Fedora 44 x86_64 VM required')
         require(run('getenforce') == 'Enforcing', 'SELinux Enforcing required')
-    require(USB.is_dir(), 'USB presence metadata unavailable')
-    for device in USB.iterdir():
-        vendor = device / 'idVendor'
-        if vendor.exists() and vendor.read_text().strip().lower() == '27c6':
-            require((device / 'idProduct').read_text().strip().lower() != '5125',
-                    'detach Goodix 27c6:5125 before installation/removal')
+    # This component publishes/removes files only. It never authenticates,
+    # starts services, inspects USB presence or opens a device.
 
 
 def trusted(path, directory=False, mode=None):
@@ -84,7 +85,12 @@ def candidate(directory):
     rows = read_regular(directory / 'SHA256SUMS').decode().splitlines()
     expected = {f'{digest(data)}  {name}' for name, data in content.items()}
     require(len(rows) == len(INPUTS) and set(rows) == expected, 'candidate digest/manifest mismatch')
-    require(content['manage.py'] == Path(__file__).read_bytes(), 'invoke candidate manage.py')
+    current_manager = Path(__file__).read_bytes()
+    qualified_output = (content['SOURCE_COMMIT'] == (QUALIFIED_SOURCE + '\n').encode()
+                        and digest(content['manage.py']) == QUALIFIED_MANAGER_SHA256
+                        and digest(content['plasmalogin.pam']) == QUALIFIED_PAM_SHA256)
+    require(content['manage.py'] == current_manager or qualified_output,
+            'unsupported candidate manager; use current manager with current or qualified preserved output')
     return content
 
 
@@ -130,7 +136,12 @@ def install(directory):
     parents(SUPPORT)
     require(not present(CONFIG) and not present(SUPPORT), 'project path collision; uninstall before reinstall')
     content = candidate(directory)
+    input_manager_sha256 = digest(content['manage.py'])
+    content['manage.py'] = Path(__file__).read_bytes()
+    # source_commit identifies the binary/PAM build; the files hash identifies
+    # the current installed inverse, separately from the original build manager.
     receipt = {'schema': 1, 'source_commit': content['SOURCE_COMMIT'].decode().strip(),
+               'input_manager_sha256': input_manager_sha256,
                'files': {name: digest(content[name]) for name in (MODULE, 'manage.py')},
                'config_sha256': digest(content['plasmalogin.pam'])}
     created = []
@@ -184,13 +195,18 @@ def uninstall():
     for name in entries:
         trusted(SUPPORT / name, mode=0o644)
     receipt = json.loads(read_regular(SUPPORT / 'receipt.json'))
-    require(isinstance(receipt, dict) and set(receipt) == {'schema', 'source_commit', 'files', 'config_sha256'}
+    required_fields = {'schema', 'source_commit', 'files', 'config_sha256'}
+    require(isinstance(receipt, dict) and required_fields <= set(receipt)
+            and set(receipt) <= required_fields | {'input_manager_sha256'}
             and receipt['schema'] == 1 and isinstance(receipt['source_commit'], str)
             and re.fullmatch('[0-9a-f]{40}', receipt['source_commit'])
             and isinstance(receipt['files'], dict) and set(receipt['files']) == {MODULE, 'manage.py'},
             'invalid project receipt')
     require(all(isinstance(value, str) and re.fullmatch('[0-9a-f]{64}', value)
                 for value in [receipt['config_sha256'], *receipt['files'].values()]), 'invalid receipt hashes')
+    if 'input_manager_sha256' in receipt:
+        require(isinstance(receipt['input_manager_sha256'], str)
+                and re.fullmatch('[0-9a-f]{64}', receipt['input_manager_sha256']), 'invalid input manager hash')
     for name in (MODULE, 'manage.py'):
         if name in entries:
             require(digest(read_regular(SUPPORT / name)) == receipt['files'][name], f'project file drift: {name}')
@@ -210,13 +226,33 @@ def uninstall():
     print('PLASMA_LOGIN_UNINSTALL=PASS')
 
 
+def lifecycle_lock():
+    # Share the runtime/removal transaction lock on this existing directory.
+    # No lock file or other persistent artifact is introduced.
+    parents(SUPPORT)
+    fd = os.open(SUPPORT.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BaseException as error:
+        os.close(fd)
+        if isinstance(error, BlockingIOError):
+            raise RuntimeError('another Goodix lifecycle operation is active; wait for it to finish') from error
+        raise
+    return fd
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('install', 'uninstall'))
     parser.add_argument('build_output', nargs='?', type=Path)
     args = parser.parse_args()
     require((args.action == 'install') == (args.build_output is not None), 'install requires BUILDOUT; uninstall takes no argument')
-    install(args.build_output) if args.action == 'install' else uninstall()
+    require(os.geteuid() == 0, 'root required; run only at the human installation gate')
+    fd = lifecycle_lock()
+    try:
+        install(args.build_output) if args.action == 'install' else uninstall()
+    finally:
+        os.close(fd)
 
 
 if __name__ == '__main__':

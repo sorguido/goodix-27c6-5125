@@ -2,8 +2,11 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Temporary-file lifecycle tests. Host environment and commands are mocked."""
 import importlib.util
+import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -50,6 +53,11 @@ class Lifecycle(unittest.TestCase):
         self.manifest()
 
     def command(self, *args):
+        if args[0] == 'systemd-detect-virt':
+            self.assertEqual(args, ('systemd-detect-virt', '--vm', '--quiet'))
+            return ''
+        if args[0] == 'getenforce':
+            return 'Enforcing'
         if args[0] == 'rpm':
             return 'plasma-login-manager'
         if args[0] == 'matchpathcon':
@@ -186,9 +194,7 @@ class Lifecycle(unittest.TestCase):
                 ENVIRONMENT()
 
     def test_removal_environment_is_independent_of_fedora_and_selinux_version(self):
-        usb = self.root / 'synthetic-usb'
-        usb.mkdir()
-        with patch.object(m.os, 'geteuid', return_value=0), patch.object(m, 'USB', usb), \
+        with patch.object(m.os, 'geteuid', return_value=0), \
                 patch.object(m.platform, 'freedesktop_os_release',
                              side_effect=AssertionError('removal must not inspect Fedora release')), \
                 patch.object(m.platform, 'machine',
@@ -196,12 +202,111 @@ class Lifecycle(unittest.TestCase):
                 patch.object(m, 'run', return_value='') as commands:
             ENVIRONMENT(removal=True)
             commands.assert_called_once_with('systemd-detect-virt', '--vm', '--quiet')
-            device = usb / '1-1'
-            device.mkdir()
-            (device / 'idVendor').write_text('27c6\n')
-            (device / 'idProduct').write_text('5125\n')
-            with self.assertRaisesRegex(RuntimeError, 'detach Goodix'):
-                ENVIRONMENT(removal=True)
+
+    def test_install_and_remove_with_reader_present_never_inspect_or_open_usb(self):
+        device = self.root / 'sys/bus/usb/devices/1-1'
+        device.mkdir(parents=True)
+        (device / 'idVendor').write_text('27c6\n')
+        (device / 'idProduct').write_text('5125\n')
+        original_iterdir = Path.iterdir
+        original_open = os.open
+
+        def guarded_iterdir(path):
+            self.assertNotEqual(str(path), '/sys/bus/usb/devices')
+            self.assertFalse(path == device.parent or device.parent in path.parents,
+                             'login lifecycle must not inspect synthetic USB presence')
+            return original_iterdir(path)
+
+        def guarded_open(path, *args, **kwargs):
+            self.assertFalse(str(path).startswith(('/dev/bus/usb/', '/sys/bus/usb/')),
+                             'login lifecycle attempted direct USB access')
+            return original_open(path, *args, **kwargs)
+
+        with patch.object(m, 'environment', side_effect=ENVIRONMENT), \
+                patch.object(m.os, 'geteuid', return_value=0), \
+                patch.object(m.platform, 'freedesktop_os_release',
+                             return_value={'ID': 'fedora', 'VERSION_ID': '44'}), \
+                patch.object(m.platform, 'machine', return_value='x86_64'), \
+                patch.object(Path, 'iterdir', guarded_iterdir), patch.object(m.os, 'open', guarded_open):
+            m.install(self.output)
+            self.assertTrue(self.config.exists())
+            m.uninstall()
+        self.assertFalse(self.config.exists())
+        self.assertFalse(self.support.exists())
+        self.assertEqual((device / 'idVendor').read_text(), '27c6\n')
+        self.assertEqual((device / 'idProduct').read_text(), '5125\n')
+
+    def qualified_output(self):
+        # Exercise the exact compatibility gate with synthetic pinned inputs.
+        # Public source exports deliberately omit private Git history; original
+        # pin provenance is checked separately during internal release review.
+        fixtures = {'manage.py': b'# synthetic previous manager; never executed\n',
+                    'plasmalogin.pam': b'synthetic qualified PAM\n'}
+        pins = patch.multiple(m,
+                              QUALIFIED_MANAGER_SHA256=m.digest(fixtures['manage.py']),
+                              QUALIFIED_PAM_SHA256=m.digest(fixtures['plasmalogin.pam']))
+        pins.start()
+        self.addCleanup(pins.stop)
+        for name, data in fixtures.items():
+            (self.output / name).write_bytes(data)
+        (self.output / 'SOURCE_COMMIT').write_text(m.QUALIFIED_SOURCE + '\n')
+        self.manifest()
+
+    def test_qualified_preserved_output_saves_current_inverse_and_keeps_manifest(self):
+        self.qualified_output()
+        before = {path.name: path.read_bytes() for path in self.output.iterdir()}
+        m.install(self.output)
+        self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()}, before)
+        self.assertEqual((self.support / m.MODULE).read_bytes(), before[m.MODULE])
+        self.assertEqual(self.config.read_bytes(), before['plasmalogin.pam'])
+        current_manager = Path(m.__file__).read_bytes()
+        self.assertEqual((self.support / 'manage.py').read_bytes(), current_manager)
+        receipt = json.loads((self.support / 'receipt.json').read_bytes())
+        self.assertEqual(receipt['source_commit'], m.QUALIFIED_SOURCE)
+        self.assertEqual(receipt['input_manager_sha256'], m.QUALIFIED_MANAGER_SHA256)
+        self.assertEqual(receipt['files']['manage.py'], m.digest(current_manager))
+        # Execute the saved inverse implementation against the synthetic tree.
+        saved_spec = importlib.util.spec_from_file_location('saved_login_inverse', self.support / 'manage.py')
+        saved = importlib.util.module_from_spec(saved_spec)
+        with patch.object(sys, 'dont_write_bytecode', True):
+            saved_spec.loader.exec_module(saved)
+        with patch.multiple(saved, CONFIG=self.config, SUPPORT=self.support, VENDOR=self.vendor,
+                            OWNER=(os.getuid(), os.getgid())), \
+                patch.object(saved, 'environment'), patch.object(saved, 'parents'):
+            saved.uninstall()
+        self.assertFalse(self.config.exists())
+        self.assertFalse(self.support.exists())
+
+    def test_unknown_manager_or_qualified_pam_drift_is_rejected_even_with_new_manifest(self):
+        self.qualified_output()
+        manager = self.output / 'manage.py'
+        original = manager.read_bytes()
+        manager.write_bytes(original + b'\n# altered manager\n')
+        self.manifest()
+        with self.assertRaisesRegex(RuntimeError, 'unsupported candidate manager'):
+            m.install(self.output)
+        manager.write_bytes(original)
+        (self.output / 'plasmalogin.pam').write_bytes(b'unqualified PAM\n')
+        self.manifest()
+        with self.assertRaisesRegex(RuntimeError, 'unsupported candidate manager'):
+            m.install(self.output)
+        self.qualified_output()
+        (self.output / 'SOURCE_COMMIT').write_text('b' * 40 + '\n')
+        self.manifest()
+        with self.assertRaisesRegex(RuntimeError, 'unsupported candidate manager'):
+            m.install(self.output)
+        self.assertFalse(self.config.exists())
+        self.assertFalse(self.support.exists())
+
+    def test_current_inverse_accepts_original_receipt_shape(self):
+        m.install(self.output)
+        receipt_path = self.support / 'receipt.json'
+        receipt = json.loads(receipt_path.read_bytes())
+        del receipt['input_manager_sha256']
+        receipt_path.write_text(json.dumps(receipt) + '\n')
+        m.uninstall()
+        self.assertFalse(self.config.exists())
+        self.assertFalse(self.support.exists())
 
     def test_missing_module_with_active_config_can_be_uninstalled(self):
         m.install(self.output)
@@ -234,6 +339,39 @@ class Lifecycle(unittest.TestCase):
         os.mkfifo(module)
         with self.assertRaisesRegex(RuntimeError, 'not a regular file'):
             m.install(self.output)
+        self.assertFalse(self.support.exists())
+
+    def test_main_serializes_both_actions_and_closes_lock_after_failure(self):
+        for action, args in (('install', ['install', str(self.output)]), ('uninstall', ['uninstall'])):
+            with self.subTest(action=action), patch.object(sys, 'argv', ['manage.py', *args]), \
+                    patch.object(m.os, 'geteuid', return_value=0), \
+                    patch.object(m, 'lifecycle_lock', return_value=123) as lock, \
+                    patch.object(m.os, 'close') as close, \
+                    patch.object(m, action, side_effect=RuntimeError('synthetic action failure')) as operation:
+                with self.assertRaisesRegex(RuntimeError, 'synthetic action failure'):
+                    m.main()
+                lock.assert_called_once_with()
+                operation.assert_called_once_with(*([self.output] if action == 'install' else []))
+                close.assert_called_once_with(123)
+
+    def test_busy_shared_lock_fails_before_any_install_or_remove_operation(self):
+        with patch.object(m.os, 'open', return_value=123) as opened, \
+                patch.object(m.fcntl, 'flock', side_effect=BlockingIOError('synthetic busy')) as flock, \
+                patch.object(m.os, 'close') as closed:
+            with self.assertRaisesRegex(RuntimeError, 'another Goodix lifecycle operation is active'):
+                m.lifecycle_lock()
+            opened.assert_called_once_with(self.support.parent,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            flock.assert_called_once_with(123, m.fcntl.LOCK_EX | m.fcntl.LOCK_NB)
+            closed.assert_called_once_with(123)
+        with patch.object(sys, 'argv', ['manage.py', 'uninstall']), \
+                patch.object(m.os, 'geteuid', return_value=0), \
+                patch.object(m, 'lifecycle_lock', side_effect=RuntimeError('active lifecycle operation')), \
+                patch.object(m, 'uninstall') as uninstall:
+            with self.assertRaisesRegex(RuntimeError, 'active lifecycle operation'):
+                m.main()
+            uninstall.assert_not_called()
+        self.assertFalse(self.config.exists())
         self.assertFalse(self.support.exists())
 
 

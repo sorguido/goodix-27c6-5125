@@ -7,7 +7,8 @@ copy of `remove.py`; emergency removal has no helper, repository, build, receipt
 or vendor PAM dependency. Existing R3/R4 binaries remain unchanged.
 
 **Human-only, VM-only deployment.** From the clean `development` repository root,
-with the reader detached, a working desktop and ordinary sudo password:
+with the integrated reader continuously present, a working desktop and ordinary
+sudo credentials (allow the stock fingerprint prompt to reach password):
 
 ```bash
 ./deployment/recovery/install.sh
@@ -15,7 +16,7 @@ with the reader detached, a working desktop and ordinary sudo password:
 
 The script asks for sudo itself. Expect `GOODIX_RECOVERY_INSTALL=PASS`, then
 `command -v goodix-uninstall` and `command -v goodix-force-remove` must resolve
-to `/usr/local/bin`. It neither stops services nor changes authentication.
+to `/usr/local/bin`. It does not inspect USB, stop services or change authentication.
 It refuses collisions/drift and undoes newly created files on installation
 failure. Repeat with identical files is harmless. Stop on any error.
 
@@ -48,5 +49,6 @@ active/inactive fprintd; missing repository/build; repeat; preserved material,
 template and Fedora sentinels; redirected paths and incomplete cleanup.
 The installer tests exercise executable standalone copies, cwd-independent
 invocation, privilege dispatch, collisions and symmetric tools-only rollback.
-Service, sudo, SELinux and root ownership are simulated. Real VM qualification
+Reader-presence fixtures, verified temporary activation masks and no automatic
+service start are covered. Service, sudo, SELinux and root ownership are simulated. Real VM qualification
 remains pending; these results do not assert host/runtime behavior.

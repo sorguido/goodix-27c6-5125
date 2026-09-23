@@ -1,18 +1,19 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Install the qualified driver and removal commands
+# Internal qualification install: continuously present reader
 
-This is the end-user installation procedure exercised by **R5**, using the
-existing qualified runtime and login build outputs. It is restricted to the
-Fedora 44 KDE x86_64 VM while qualification is pending. R6 final packaging has
-not started. A previously prepared five-file device-material set must already
-exist under `/var/lib/goodix-5125-poc/`; this procedure does not acquire, replace
-or import protected material. Existing fingerprint templates are retained.
+**Internal development procedure, excluded from publication.** Public installation
+status is in [INSTALLATION.md](INSTALLATION.md); final packaging is not available.
+This procedure reuses the accepted software outputs in the existing Fedora 44
+KDE x86_64 VM. It does not start R6. A five-file device-material set and retained
+template already exist; there is no material acquisition/import or enrollment.
 
-Start from a working graphical session with the reader detached, SELinux
-Enforcing, the normal sudo password available, and no open authentication or
-fingerprint-settings dialog. Use the private clone on `development`, clean and
-updated to the R5 handoff commit. For reinstall, first complete
-[`goodix-uninstall`](UNINSTALL.md#normal-uninstall-from-a-working-desktop).
+Keep the Goodix reader connected and visible throughout. Start from a working
+desktop with SELinux Enforcing and normal sudo credentials. Close fingerprint
+settings and authentication dialogs. Do not touch the reader during lifecycle
+operations; if stock sudo offers fingerprint first, wait for its normal password
+prompt. Do not edit PAM, unplug, unbind or disable the integrated reader.
+Use the clean `development` checkout delivered with the current corrective.
+If existing project software needs replacement, use `goodix-uninstall` first.
 
 The accepted outputs are:
 
@@ -25,8 +26,9 @@ Use those original outputs and manifests; there is no reason to rebuild the
 qualified binaries for an uninstall-only change. If either output is missing or
 does not verify, stop and report it. Do not generate a replacement build or use
 the historical managed installer. The runtime installer checks its unchanged
-production inputs against the original build commit. The saved login manager
-is used for **installation only**; full removal uses the R5 command.
+production inputs against the original build commit. The current repository login manager verifies the preserved original output
+and installs its corrected inverse; the old saved manager is never executed.
+The original binary, PAM input and build manifest are not rewritten.
 
 ## Install
 
@@ -56,7 +58,7 @@ later component fails. The usual sudo password is expected.
     (cd "$r5_login" && sha256sum -c SHA256SUMS)
     ./deployment/recovery/install.sh
     sudo ./deployment/minimal-runtime/install.sh "$r5_runtime"
-    sudo python3 -I -B "$r5_login/manage.py" install "$r5_login"
+    sudo python3 -I -B deployment/plasma-login-opt-in/manage.py install "$r5_login"
     test "$(command -v goodix-uninstall)" = /usr/local/bin/goodix-uninstall
     test "$(command -v goodix-force-remove)" = /usr/local/bin/goodix-force-remove
     matchpathcon -V /etc/pam.d/plasmalogin \
@@ -67,9 +69,12 @@ later component fails. The usual sudo password is expected.
     sudo -N -- systemctl stop fprintd.service
     test "$(systemctl show fprintd.service -p ActiveState --value)" = inactive
     test "$(systemctl show fprintd.service -p MainPID --value)" = 0
-    systemctl show fprintd.service -p ExecStart -p Environment -p ActiveState -p MainPID
+    test "$(systemctl show fprintd.service -p LoadState --value)" = loaded
+    test ! -e /run/systemd/system/fprintd.service
+    test ! -L /run/systemd/system/fprintd.service
+    systemctl show fprintd.service -p ExecStart -p Environment -p ActiveState -p MainPID -p LoadState
     test -z "$(git status --porcelain)"
-    printf '%s\n' 'R5_INSTALL=PASS SENSOR_CONNECTED=false'
+    printf '%s\n' 'R5_INSTALL=PASS READER_PRESENT_ALLOWED=true'
 )
 ```
 
@@ -83,23 +88,31 @@ the [removal commands](UNINSTALL.md) to `/usr/local/bin`.
 
 Expected results are component install success, matching default login file
 labels, Fedora `/usr/libexec/fprintd` as `ExecStart`, only the private runtime
-directory added to `LD_LIBRARY_PATH`, and fprintd inactive/MainPID 0. A sudo
-authentication may activate stock fprintd without the reader; the final stop
-leaves the installation ready for the one explicit functional check.
+directory added to `LD_LIBRARY_PATH`, and fprintd inactive/MainPID 0. Lifecycle
+code inhibits activation temporarily, stops and verifies the service before
+runtime writes, then removes only its own temporary mask without starting the
+service. Stock sudo authentication is separate and may briefly use fingerprint;
+leave the reader untouched and use its password prompt. The final explicit stop
+prepares the lifecycle checkpoint without initiating biometric capture.
 
 **PASS_IF:** all commands succeed and `R5_INSTALL=PASS` is printed, desktop is
-usable, reader detached, existing materials/templates preserved. Follow the
-single functional check in the [R5 procedure](../deployment/recovery/R5_VM.md).
+usable, reader continuously present, existing materials/templates preserved.
+Continue only with the [corrective VM procedure](../deployment/recovery/R5_VM.md).
 The install marker alone does not prove fingerprint functionality.
 
 **FAIL_IF / STOP_IF:** a prerequisite, provenance, install or label check fails,
 an unexpected project path is occupied, or desktop/password behavior regresses.
 Do not overwrite, rebuild, modify Fedora policy or retry authentication. Retain
-the exact error and point of failure. If any component was installed, keep the
-reader detached and run `goodix-uninstall`; if the desktop cannot be reached,
-follow the four [emergency steps](UNINSTALL.md#emergency-the-graphical-login-is-unavailable).
+the exact error and point of failure. If any component was installed, leave the
+reader connected and run `goodix-uninstall`; if the desktop cannot be reached,
+follow the four [emergency steps](UNINSTALL.md#emergency-graphical-login-is-unavailable).
 If normal removal refuses a partial installation, stop and report the refusal;
 the fixed-path emergency command is available without the build or repository.
+
+A stop caused by active service state reports that state; close authentication
+dialogs and report it, rather than hiding the reader. Replacing an older version
+of only the recovery tools uses the current `deployment/recovery/uninstall.sh`
+followed by `install.sh`; it does not touch runtime or login integration.
 
 Successful full removal returns the software state to current Fedora and keeps
 device materials/templates. A successful installation normally stays installed;

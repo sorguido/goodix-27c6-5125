@@ -1,230 +1,71 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-# Validation scope
+# Validation scope and known limitations
 
-> **HISTORICAL_ONLY / REJECTED_ARCHITECTURE — 22 September 2026.**
-> The managed candidate, private fprintd/PAM pair, Plasma daemon/greeter,
-> KScreenLocker overrides and custom sudo/PolicyKit integrations described
-> below are preserved as historical evidence. Their installation, build and
-> live instructions are not the active release workflow. Past PASS results
-> do not qualify them for the new release.
->
-> Follow the [distro-decoupled roadmap](../ROADMAP_DISTRO_DECOUPLED_RELEASE.md). R0 restored the physical
-> Fedora host to its stock baseline; new build/runtime validation is VM-only.
-> The next runtime must use the Goodix library with Fedora stock fprintd and
-> stock authentication consumers. No replacement candidate is ready yet.
+## Tested configuration
 
-The supported evidence boundary is Fedora 44 KDE x86_64 with Goodix USB
-`27c6:5125` / APP12509.
+The evidence concerns one Goodix USB `27c6:5125` reader running
+`GF_ST411SEC_APP_12509`, on Fedora 44 KDE x86_64 with local accounts. Fedora's
+stock fprintd and authentication consumers are used with the project's libfprint
+runtime and minimal Plasma Login selector. Results below are operator-reported
+observations reviewed against the implementation and available telemetry.
 
-Current combined sudo/Polkit offline closure: 18 Polkit PAM tests, 15 sudo PAM
-tests and 3 concurrent PAM/budget tests, each normal plus ASan/UBSan; 13 combined
-local deployment tests and 31 managed transaction tests. The complete driver,
-prepared-login and greeter regression suite passes in normal/sanitized builds.
-The real daemon's private-bus test covers all 12 ordered consumer pairs and
-ordinary retry errors: 31 synthetic opens/closes, no extra acquisition and
-nominal owner-loss cleanup. Password verification leaves/device I/O are simulated;
-native applications, SELinux execution and target cleanup still require the
-operator handoff in `deployment/managed-install/AUTHENTICATION-LIVE.md`.
+| Function | Evidence and boundary |
+| --- | --- |
+| Enrollment and standard verification | Enrollment completed and a subsequent verification matched the enrolled finger |
+| KScreenLocker | Password unlock and fingerprint unlock reached the desktop |
+| Ordinary sudo | Correct password and fingerprint authentication succeeded |
+| PolicyKit | Correct password and fingerprint authentication succeeded through the KDE agent |
+| Plasma Login | Nonempty password reached the desktop without forced fingerprint wait; explicit fingerprint selection reached the desktop after one contact without a password |
+| Normal removal | Software paths removed, Fedora fprintd exposed without private library environment, password login and KDE desktop remained usable |
+| Material/template preservation | File inode, size, owner, mode and modification time unchanged across reported normal removal; this is metadata evidence, not a cryptographic proof of all bytes |
+| Reinstallation | Installation completed and one subsequent Plasma fingerprint login matched with clean drain/close telemetry |
+| Emergency removal | Operator reported successful text-console removal while the reader remained connected; exact final output/state confirmation remains incomplete |
 
-The combined candidate prepared from
-`9e47bdc77246322d6fafee18dd278a066dd583ef` has 36 files; verified SPDX includes
-50 packages, 34 files and 84 relationships. SHA256SUMS digest:
-`34cc30c30d1be009f4ae8ff13c1c6f455340d1496ee0245cd2fc9d57c8a9413b`.
-Independent normal runtime and standalone bridge builds are byte-identical.
-Both actual managed and local-Polkit artifacts pass temporary-root install/remove
-with exact file restoration. Later documentation-only commits preserve the
-runtime source; each fresh prepare records its own full source commit.
+## Reader-present lifecycle
 
-Previous Polkit-only closure at source commit `82e3ae67b01075fc5509c85bca22647665d9fb39`:
-18 PAM tests in normal and ASan/UBSan modes, 7 local transaction tests and
-30 managed transaction tests PASS. Actual daemon handlers on a private bus
-cover ordinary pending Claim, claimed idle and pending Verify owner loss with
-18 synthetic opens/closes. Both real candidates pass mock-filesystem
-install/remove. The bridge is byte-identical between local and managed builds,
-SHA-256 `9de3aba169b78298e539df1320f9bb10d64d418b6dd3ece196dcc401f1b7e3c2`.
-The managed artifact has 34 files; verified SPDX: 48 packages, 32 files and
-80 relationships. These results require no real authentication or device I/O.
+The lifecycle contract permits a connected, visible integrated reader for all
+management operations. Recovery-tool installation previously rejected a present
+reader, before runtime installation began. The current lifecycle implementation
+replaces device-absence checks with software service controls. The corrected
+installation and remaining password-fallback
+behavior still need on-system qualification.
 
-The user physically tested the early-login prototype at
-`9671e02e19504e20e0097f598fa960f2c13e7a1e` after cold boot and reported:
+Successful reinstall evidence above predates that correction and does not prove
+the corrected reader-present installation path. A successful emergency command
+report alone does not prove every final file, service, label or password check.
+The public installer and update package are not yet ready for release.
 
-- immediate successful login with immediate finger placement after Enter;
-- password login PASS;
-- sudo fingerprint authentication PASS;
-- temporary overlay rollback PASS.
+## Offline evidence
 
-No deliberate delay was used. No sub-second timing was instrumented or claimed.
-That evidence validates the architecture. Its canonical promotion is an offline
-source/build/deployment integration; the promoted managed candidate has not been
-installed or tested live in this task.
+Synthetic tests exercise software ownership and hash checks, partial and missing
+installations, vendor-file absence, active/inactive fprintd, command invocation
+without source/build directories, preserved material/template sentinels and
+repeat removal. Lifecycle tests substitute host service and privileged operations;
+they do not open real USB or authenticate through host PAM.
 
-Earlier target evidence covers reader discovery, bounded enrollment, template
-persistence, same/different-finger outcomes, local users, session unlock and
-account-delete protection. Those results are retained, but are not presented as
-a new full live qualification of this promoted managed candidate. Migration,
-recovery across the complete release path and independent hardware remain open.
+Driver tests cover explicit attempts, MATCH termination, processing-error fences
+and cleanup using synthetic inputs. These checks support implementation review,
+not claims of recognition accuracy, hardware behavior or complete operating-system
+recovery. A normal unit-test pass is not a substitute for observing password and
+desktop access after installation/removal.
 
-The user's current observation on 20 September 2026 confirms sudo fingerprint
-PASS on the development PC through D285's `pam_service=goodix-d285-01-sudo`.
-This is current host evidence and remains separate from clean-candidate evidence.
-The current installer now establishes its own sudo/sudo-i service integration,
-without a sudoers selector, D285 dependency or global fingerprint. That closes
-the former implementation gap offline; real candidate sudo validation is pending.
+## Known limitations
 
-Polkit now has an independently implemented service-local PAM conversation
-bridge and reversible local/managed deployment. Password-first submission,
-explicit fingerprint selection, cancellation and cross-conversation limits are
-checked offline. Real Discover behavior, SELinux execution and target cleanup
-are pending human validation. No Polkit live PASS is claimed.
+- No broad independent-reader, cross-firmware or cross-distribution qualification.
+- No measured universal false-acceptance or false-rejection rate.
+- No supported acquisition or construction of the five protected input files.
+- No finished public installer, updater or package migration contract.
+- Console/sudo authentication can offer fingerprint before password; an immediate
+  method selector or fixed fallback delay is not promised. Unavailable-biometric
+  password fallback still needs confirmation for the tested console configuration.
+- The Plasma Login selector depends on the current Fedora vendor PAM path.
+  Compatibility with all future package changes is not established.
+- Password-encrypted KWallet may require a separate password after fingerprint login.
+- Ordinary sudo evidence does not separately qualify every login-shell variant.
+- A recurring SELinux read denial involving `nr_hugepages` was non-fatal during
+  tested successful authentication; this does not classify every future denial.
+- Full factory-state readback, exhaustive Windows compatibility, power-loss recovery
+  and every future update combination have not been demonstrated.
 
-Offline validation commands for the distributed release surface are:
-
-```bash
-production/check-source.sh
-python3 deployment/managed-install/test_offline.py
-```
-
-Per-reader runtime material handling is device-dynamic and has host-only
-regression coverage, including distinct synthetic valid bundles and fail-closed
-manifest cases. That validates runtime acceptance logic; it is **not** a claim
-that this release provides or qualifies acquisition of a fresh five-file bundle.
-Device-material acquisition is outside the supported release scope.
-
-The normal and sanitizer builds cover all paired runtime components. Protocol
-and driver shell suites use synthetic I/O; private-bus tests exercise actual
-patched fprintd handlers, including a reproduced pending-open/suspend race.
-Greeter tests execute the actual helper with a marker child. Managed transaction
-tests cover complete payload, cleanup failures, update/rollback and drift.
-Source checks preserve prototype hashes while separately identifying the cleanup
-correction and canonical loader differences. See `production/login/README.md`
-for the precise seams and limits of these tests.
-
-After building both modes, run:
-
-```bash
-production/login/check-offline.sh /absolute/normal /absolute/sanitizer
-```
-
-Promotion closure on 19 September 2026: 16 protocol tests and 34 driver shell
-tests pass in normal and ASan/UBSan modes; daemon private-bus and greeter barrier
-tests pass in both modes; 25 managed transaction tests pass. The complete
-32-file candidate was prepared from a clean committed checkout and passed a
-mock-filesystem install/status/uninstall cycle. SPDX integrity checks cover 45
-packages, 30 files and 75 relationships, including deterministic regeneration.
-All nine runtime binaries/libraries are byte-identical across the canonical
-build, a working-tree copy without Git/private trees invoked from `/tmp`, and
-the prepared candidate. That copy was not sufficient proof of reproduction
-from committed content: it inherited an ignored upstream `.gitignore` absent
-from the original import. ABI, symbol, dependency and RPATH checks pass. None of
-these checks is a new host installation or live fingerprint test.
-
-Corrective committed-source reproduction on 20 September 2026:
-
-- Source commit: `99f19e6cdd9ed71ffd757001d29f3316818cc949`.
-- A strict `git archive` of the publication allowlist produced 504 files in
-  `/tmp/goodix-committed-repro`. Every file was compared with its committed
-  blob, including dotfiles; the fprintd manifest and tree both contain exactly
-  141 upstream files. No workspace copy, private history or development tree
-  was included. The sole PNG in the export is the upstream libfprint demo icon,
-  not a biometric fixture.
-- A single temporary local commit,
-  `aa7834c42f64541b0afb4308e67e0a789ca1cf27`, records that exact export for
-  managed preparation's provenance requirement. It is not a project release
-  commit and contains no private ancestors.
-- All seven external RPM prerequisites were downloaded afresh from Fedora
-  and checked against the committed manifests. SDK and Fedora system
-  libraries/toolchain remain documented external prerequisites. The claim is
-  no ignored/untracked **source** or accidental local cache dependency, not
-  a hermetic build from Git alone: RPM staging remains intentionally ignored.
-
-Commands executed using that committed export (build, login tests and
-managed preparation invoked with `/tmp` as the working directory):
-
-```bash
-/tmp/goodix-committed-repro/production/check-source.sh
-/tmp/goodix-committed-repro/production/build.sh normal /tmp/goodix-committed-normal
-/tmp/goodix-committed-repro/production/build.sh sanitizer /tmp/goodix-committed-sanitizer
-/tmp/goodix-committed-repro/production/login/check-offline.sh /tmp/goodix-committed-normal /tmp/goodix-committed-sanitizer
-/tmp/goodix-committed-repro/deployment/managed-install/manage.sh prepare /tmp/goodix-committed-managed
-python3 /tmp/goodix-committed-repro/deployment/managed-install/test_offline.py
-git -C /tmp/goodix-committed-repro diff --check
-```
-
-All pass: 16 protocol and 34 driver cases in both modes, daemon/greeter tests
-in both modes, and 25 transaction tests. Exact candidate set: 32 files. SPDX:
-45 packages, 30 files, 75 relationships; hashes, package verification code,
-references and byte-identical regeneration verified. Candidate SHA256SUMS
-digest: `93d6eeb95ebcbf0f088c303a9dce9df485b33c28ed65456b0b0500f79a657ea7`.
-The real candidate passes the existing mock-filesystem transaction test. All
-nine runtime binaries/libraries match both the exported normal build and the
-pre-correction build byte-for-byte. Prototype equivalence checks pass and the
-cleanup patch is unchanged. No executable source or login behavior changed.
-
-## Prepared-login three-attempt follow-up
-
-Implementation commit `62eca6aa331e980683c09fc961042bc2631f6fe1` and recipe
-correction `cde01e3e3e8e7dad1f6dc00e10ef303634d4f913` were exported using the
-committed publication allowlist. All 505 source files, including dotfiles,
-match Git blobs byte-for-byte. The local source-only checkout at
-`eb9972e14e6bdc21b62d5d5a6b8283c4451186e6` contains only export commits, no private
-ancestors. Seven documented external RPM prerequisites were copied after
-checking their committed hashes; no ignored/untracked source supplied a build.
-The recipe now extracts RPMs through a temporary archive, avoiding the observed
-SIGPIPE when cpio finishes before rpm2cpio writes archive padding.
-
-From `/tmp`, these complete paths passed:
-
-```bash
-/tmp/goodix-three-committed/production/check-source.sh
-/tmp/goodix-three-committed/production/build.sh normal /tmp/goodix-three-final-normal
-/tmp/goodix-three-committed/production/build.sh sanitizer /tmp/goodix-three-final-sanitizer
-/tmp/goodix-three-committed/production/login/check-offline.sh /tmp/goodix-three-final-normal /tmp/goodix-three-final-sanitizer
-/tmp/goodix-three-committed/deployment/managed-install/manage.sh prepare /tmp/goodix-three-final-managed
-git -C /tmp/goodix-three-committed diff --check
-```
-
-Results: 17 protocol and 45 driver tests in **each** normal/sanitizer mode;
-paired daemon and greeter tests in both modes; 26 managed transaction tests.
-The suite covers second/third MATCH, three NO MATCH, refusal of attempt four,
-hard error/retry/cancel on attempts one/two, complete physical-release gating,
-same-generation rearm, cancellation during deferred completion, close between
-attempts, cleanup and existing ordinary-consumer/enrollment regressions.
-Daemon tests observe 15 synthetic opens and 15 closes per executable, with
-no reopen within a claim. MATCH remains immediate, while NO MATCH waits for
-release. These tests use synthetic protocol images/matching and a post-secure
-session seam; they do not qualify a physical handshake or target rearm.
-
-That pre-Polkit managed candidate had 32 files. Its SPDX SBOM has 45 packages,
-30 files and 75 relationships; hashes, references, package verification code
-and byte-identical regeneration pass. The SBOM includes the attempts patch.
-SHA256SUMS digest:
-`59ab21d9c41ff51694fc6f52316dd9bc0faf4ef09b09ce7b4557caa3d6ee4100`.
-All nine runtime components match the independent normal build byte-for-byte;
-there is no RPATH or test-only symbol in the production driver. The real
-candidate passes the existing mock install/status/uninstall path, restoring
-password/PAM files. A managed candidate with the old one-attempt PAM rule is
-rejected before update changes; it requires its original uninstall before a
-fresh install. Update/rollback within the three-attempt rule still passes.
-
-The separate development delta was also built from `cde01e3...`. Its fprintd
-and PAM binaries match the canonical candidate byte-for-byte; its driver
-sources differ only in the four explicitly retained historical loaders. Its
-SHA256SUMS digest is
-`bbc5f1e4d8e0d47cceaf12421183842b1356cc8a1fb7b461cec47f3a11af8792`.
-Nine delta transaction tests and the real candidate's mock install/rollback
-pass, including exact prior bytes/modes and failure recovery. The frozen
-historical overlay is unchanged and is not a canonical build dependency.
-
-Physical second/third-attempt recovery, password/sudo behavior on the target
-and timing remain subject to human validation. No host install, sudo, real USB
-access or live biometric test was performed. Original prototype patch/greeter
-hashes remain intact; none of the new offline results extend the old live
-qualification to the new physical attempts.
-
-Candidate `MANIFEST`, source digests, `SHA256SUMS` and SPDX SBOM record the actual
-source commit and output identity. A build digest is provenance, not a claim of
-live deployment or portability beyond the stated target.
-
-No statistically meaningful false-acceptance or false-rejection rate is
-claimed. Functional match/no-match observations are not a substitute for a
-population study.
+Report exact behavior and errors without protected data. See
+[Security](SECURITY.md), [Installation](INSTALLATION.md) and [Removal](UNINSTALL.md).

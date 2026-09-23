@@ -21,6 +21,12 @@ class Transactions(unittest.TestCase):
         self.base = Path(self.temporary.name)
         self.runtime = self.base / "lib64/goodix-27c6-5125"
         self.dropin = self.base / "system/fprintd.service.d/90-goodix-5125-runtime.conf"
+        self.mask = self.base / "run/systemd/system/fprintd.service"
+        self.mask.parent.mkdir(parents=True)
+        self.reader = self.base / "sys/bus/usb/devices/reader"
+        self.reader.mkdir(parents=True)
+        (self.reader / "idVendor").write_text("27c6\n")
+        (self.reader / "idProduct").write_text("5125\n")
         self.runtime.parent.mkdir()
         self.dropin.parent.parent.mkdir()
         output = patch("sys.stdout", new_callable=io.StringIO)
@@ -35,25 +41,39 @@ class Transactions(unittest.TestCase):
             self.addCleanup(context.stop)
         self.calls = []
         self.failure = None
+        self.stop_stuck = False
+        self.mask_shadowed = False
         self.payload = {name: f"synthetic {name}".encode() for name in d.LIBRARIES}
         self.payload.update({"licenses/test.txt": b"synthetic license", "deploy.py": b"inverse",
                              "uninstall.sh": b"inverse entry"})
-        for name, value in (("RUNTIME", self.runtime), ("DROPIN", self.dropin)):
+        for name, value in (("RUNTIME", self.runtime), ("DROPIN", self.dropin),
+                            ("SERVICE_MASK", self.mask)):
             context = patch.object(d, name, value)
             context.start()
             self.addCleanup(context.stop)
         # Host interfaces are replaced; file publication/removal and integrity checks are real.
         for name, replacement in (("safe_directory", lambda _p: None),
-                                  ("no_sensor", lambda: None), ("run", self.command)):
+                                  ("run", self.command)):
             context = patch.object(d, name, replacement)
             context.start()
             self.addCleanup(context.stop)
 
     def command(self, *args):
         self.calls.append(args)
+        self.assertNotIn(args[:2], (("systemctl", "start"), ("systemctl", "restart")))
         if args == self.failure:
             self.failure = None
             raise RuntimeError("injected host-command failure")
+        if args == ("systemctl", "stop", d.UNIT):
+            self.assertTrue(self.mask.is_symlink())
+            self.assertEqual(d.os.readlink(self.mask), "/dev/null")
+        if args[:2] == ("systemctl", "show"):
+            state = {"ActiveState": "active" if self.stop_stuck else "inactive",
+                     "MainPID": "42" if self.stop_stuck else "0", "SubState": "running" if self.stop_stuck else "dead",
+                     "Result": "success", "ExecMainStartTimestamp": "",
+                     "LoadState": "loaded" if self.mask_shadowed else "masked"}
+            return "\n".join(name + "=" + state[name] for arg in args[3:]
+                             if arg.startswith("--property=") for name in [arg.removeprefix("--property=")])
         return ""
 
     def install(self, active="inactive"):
@@ -73,12 +93,15 @@ class Transactions(unittest.TestCase):
         self.assertNotIn(("systemctl", "start", d.UNIT), self.calls)
         d.uninstall()
 
-    def test_active_state_restored_and_created_directory_removed(self):
+    def test_reader_present_active_service_is_not_restarted_after_removal(self):
         self.install("active")
         self.assertNotIn(("systemctl", "start", d.UNIT), self.calls)
         d.uninstall()
         self.assertFalse(self.dropin.parent.exists())
-        self.assertEqual(self.calls[-1], ("systemctl", "start", d.UNIT))
+        self.assertEqual(self.calls[-1], ("systemctl", "daemon-reload"))
+        self.assertFalse(self.mask.is_symlink())
+        self.assertEqual((self.reader / "idVendor").read_text(), "27c6\n")
+        self.assertEqual((self.reader / "idProduct").read_text(), "5125\n")
         self.assertFalse(any(call[0] in ("rpm", "git") for call in self.calls))
 
     def test_identical_install_is_idempotent(self):
@@ -131,17 +154,17 @@ class Transactions(unittest.TestCase):
         self.calls.clear()
         with patch.object(saved, "RUNTIME", self.runtime), \
                 patch.object(saved, "DROPIN", self.dropin), \
+                patch.object(saved, "SERVICE_MASK", self.mask), \
                 patch.object(saved, "REPO", self.base / "absent-checkout"), \
                 patch.object(saved, "safe_directory"), \
-                patch.object(saved, "no_sensor"), \
                 patch.object(saved, "run", side_effect=self.command), \
                 patch.object(saved, "git", side_effect=AssertionError("Git forbidden")), \
                 patch.object(saved, "load_payload", side_effect=AssertionError("build forbidden")):
             saved.uninstall()
         self.assertFalse(self.runtime.exists())
         self.assertFalse(self.dropin.exists())
-        self.assertEqual(self.calls, [("systemctl", "stop", d.UNIT),
-                                      ("systemctl", "daemon-reload")])
+        self.assertIn(("systemctl", "stop", d.UNIT), self.calls)
+        self.assertFalse(self.mask.is_symlink())
 
     def test_only_owned_footprint_changes_vendor_and_materials_preserved(self):
         sentinels = ("usr/libexec/fprintd", "usr/lib/systemd/system/fprintd.service",
@@ -182,32 +205,45 @@ class Transactions(unittest.TestCase):
         self.assertEqual((self.runtime / "keep").read_bytes(), b"foreign")
         self.assertFalse(self.calls)
 
-    def test_reload_failure_restores_files_and_service(self):
+    def test_reload_failure_restores_only_own_mask_without_starting_service(self):
         self.failure = ("systemctl", "daemon-reload")
         with self.assertRaisesRegex(RuntimeError, "injected"):
             self.install("active")
         self.assertFalse(self.runtime.exists())
         self.assertFalse(self.dropin.parent.exists())
-        self.assertEqual(self.calls[-1], ("systemctl", "start", d.UNIT))
+        self.assertEqual(self.calls[-1], ("systemctl", "daemon-reload"))
+        self.assertFalse(self.mask.is_symlink())
 
-    def test_sensor_recheck_failure_precedes_service_stop_and_publication(self):
-        with patch.object(d, "no_sensor", side_effect=RuntimeError("sensor present")):
-            with self.assertRaisesRegex(RuntimeError, "sensor present"):
-                self.install()
+    def test_nonquiescent_service_refuses_runtime_writes_with_precise_state(self):
+        self.stop_stuck = True
+        with self.assertRaisesRegex(RuntimeError, "ActiveState=active.*MainPID=42"):
+            self.install()
         self.assertFalse(self.runtime.exists())
         self.assertFalse(self.dropin.exists())
         self.assertEqual(list(self.runtime.parent.iterdir()), [])
-        self.assertFalse(self.calls)
+        self.assertIn(("systemctl", "stop", d.UNIT), self.calls)
+        self.assertFalse(self.mask.is_symlink())
 
-    def test_failed_vendor_restart_retains_inverse_for_retry(self):
+    def test_failed_stop_retains_runtime_and_inverse_for_retry(self):
         self.install("active")
-        self.failure = ("systemctl", "start", d.UNIT)
+        self.failure = ("systemctl", "stop", d.UNIT)
         with self.assertRaisesRegex(RuntimeError, "injected"):
             d.uninstall()
         self.assertTrue((self.runtime / "uninstall.sh").exists())
-        self.assertFalse(self.dropin.exists())
+        self.assertTrue(self.dropin.exists())
+        self.assertFalse(self.mask.is_symlink())
         d.uninstall()
         self.assertFalse(self.runtime.exists())
+
+    def test_nonquiescent_uninstall_preserves_runtime_and_activation(self):
+        self.install()
+        before = (self.runtime / d.STATE).read_bytes()
+        self.stop_stuck = True
+        with self.assertRaisesRegex(RuntimeError, 'ActiveState=active.*MainPID=42'):
+            d.uninstall()
+        self.assertEqual((self.runtime / d.STATE).read_bytes(), before)
+        self.assertEqual(self.dropin.read_bytes(), d.CONFIG)
+        self.assertFalse(self.mask.is_symlink())
 
     def test_uninstall_does_not_delete_foreign_additions(self):
         self.install()
@@ -245,7 +281,7 @@ class Transactions(unittest.TestCase):
                 self.install("active")
         self.assertEqual(self.dropin.read_bytes(), b"foreign concurrent file")
         self.assertTrue((self.runtime / "uninstall.sh").exists())
-        self.assertNotIn(("systemctl", "daemon-reload"), self.calls)
+        self.assertFalse(self.mask.is_symlink())
         self.assertNotIn(("systemctl", "start", d.UNIT), self.calls)
 
     def test_created_tree_has_exact_relative_links(self):
@@ -254,6 +290,100 @@ class Transactions(unittest.TestCase):
         state = json.loads((self.runtime / d.STATE).read_text())
         self.assertEqual(state["build_commit"], d.BUILD_COMMIT)
         self.assertEqual(set(state["files"]), set(self.payload))
+
+    def test_present_reader_install_uninstall_does_not_read_sysfs_or_open_usb(self):
+        original_iterdir = Path.iterdir
+        original_open = d.os.open
+        def guarded_iterdir(path):
+            if str(path).startswith('/sys/') or path == self.reader.parent:
+                self.fail('runtime lifecycle inspected USB presence')
+            return original_iterdir(path)
+        def guarded_open(path, *args, **kwargs):
+            self.assertFalse(str(path).startswith(('/sys/bus/usb/', '/dev/bus/usb/')),
+                             'runtime lifecycle opened USB/sysfs directly')
+            return original_open(path, *args, **kwargs)
+        with patch.object(Path, 'iterdir', guarded_iterdir), patch.object(d.os, 'open', guarded_open):
+            self.install()
+            self.assertFalse(self.mask.is_symlink())
+            d.uninstall()
+        self.assertTrue(self.reader.exists())
+        self.assertFalse(self.runtime.exists())
+
+    def test_borrowed_runtime_mask_is_preserved(self):
+        self.mask.symlink_to('/dev/null')
+        identity = self.mask.lstat().st_ino
+        self.install()
+        d.uninstall()
+        self.assertTrue(self.mask.is_symlink())
+        self.assertEqual(self.mask.lstat().st_ino, identity)
+
+    def test_mask_lstat_failure_after_create_retains_uncertain_mask_with_diagnostic(self):
+        original_lstat = Path.lstat
+        def failed_identity(path, *args, **kwargs):
+            if path == self.mask:
+                original_lstat(path, *args, **kwargs)
+                raise OSError('synthetic identity-read failure after creation')
+            return original_lstat(path, *args, **kwargs)
+        with patch.object(Path, 'lstat', failed_identity), \
+                patch('sys.stderr', new_callable=io.StringIO) as error:
+            with self.assertRaisesRegex(OSError, 'identity-read failure'):
+                self.install()
+        self.assertTrue(self.mask.is_symlink())
+        self.assertEqual(d.os.readlink(self.mask), '/dev/null')
+        self.assertIn('FPRINTD_MASK_ACQUISITION=INCOMPLETE', error.getvalue())
+        self.assertIn('retained because ownership could not be established', error.getvalue())
+        self.assertFalse(self.runtime.exists())
+        self.assertFalse(self.dropin.exists())
+        self.assertFalse(self.calls)
+
+    def test_interrupt_after_mask_creation_preserves_unverified_identity(self):
+        original_symlink = Path.symlink_to
+        def interrupted_creation(path, target, *args, **kwargs):
+            original_symlink(path, target, *args, **kwargs)
+            if path == self.mask:
+                raise KeyboardInterrupt('synthetic signal after creating mask')
+        with patch.object(Path, 'symlink_to', interrupted_creation), \
+                patch('sys.stderr', new_callable=io.StringIO) as error:
+            with self.assertRaises(KeyboardInterrupt):
+                self.install()
+        self.assertTrue(self.mask.is_symlink())
+        self.assertIn('FPRINTD_MASK_ACQUISITION=INCOMPLETE', error.getvalue())
+        self.assertFalse(self.runtime.exists())
+        self.assertFalse(self.calls)
+
+    def test_foreign_runtime_unit_is_not_overwritten(self):
+        self.mask.write_bytes(b'foreign runtime unit')
+        with self.assertRaisesRegex(RuntimeError, 'mask path occupied'):
+            self.install()
+        self.assertEqual(self.mask.read_bytes(), b'foreign runtime unit')
+        self.assertFalse(self.runtime.exists())
+        self.assertFalse(self.calls)
+
+    def test_shadowed_runtime_mask_refuses_mutation_after_stopping_service(self):
+        self.mask_shadowed = True
+        with self.assertRaisesRegex(RuntimeError, 'not inhibited.*LoadState=loaded'):
+            self.install()
+        self.assertIn(('systemctl', 'stop', d.UNIT), self.calls)
+        self.assertFalse(self.runtime.exists())
+        self.assertFalse(self.dropin.exists())
+        self.assertFalse(self.mask.is_symlink())
+
+    def test_changed_mask_is_preserved_after_interrupted_operation(self):
+        alternate = self.base / 'foreign-mask'
+        alternate.write_bytes(b'preserve')
+        with self.assertRaisesRegex(RuntimeError, 'runtime mask changed'):
+            with d.quiesced_service():
+                self.mask.unlink()
+                self.mask.symlink_to(alternate)
+        self.assertEqual(d.os.readlink(self.mask), str(alternate))
+        self.assertEqual(alternate.read_bytes(), b'preserve')
+
+    def test_interrupt_restores_only_own_mask(self):
+        with self.assertRaises(KeyboardInterrupt):
+            with d.quiesced_service():
+                raise KeyboardInterrupt('synthetic interruption')
+        self.assertFalse(self.mask.is_symlink())
+        self.assertNotIn(("systemctl", "start", d.UNIT), self.calls)
 
 
 class InputValidation(unittest.TestCase):
@@ -351,28 +481,20 @@ class InputValidation(unittest.TestCase):
             d.load_payload(self.build)
 
 
-class SensorGate(unittest.TestCase):
-    def test_present_reader_rejected_absent_reader_allowed_without_usb(self):
-        with tempfile.TemporaryDirectory(prefix="goodix-r3-sysfs-") as tmp:
-            directory = Path(tmp)
-            device = directory / "synthetic-device"
-            device.mkdir()
-            (device / "idVendor").write_text("27c6\n")
-            (device / "idProduct").write_text("5125\n")
-            with patch.object(d, "Path", return_value=directory):
-                with self.assertRaisesRegex(RuntimeError, "disconnect the Goodix"):
-                    d.no_sensor()
-                (device / "idProduct").write_text("0000\n")
-                d.no_sensor()
-
-    def test_machine_gate_checks_vm_privilege_and_sensor(self):
+class MachineGate(unittest.TestCase):
+    def test_machine_gate_checks_vm_privilege_without_usb_presence_requirement(self):
         with patch.object(d, "run") as command, \
                 patch.object(d.os, "geteuid", return_value=0), \
-                patch.object(d, "no_sensor", side_effect=RuntimeError("sensor present")) as sensor:
-            with self.assertRaisesRegex(RuntimeError, "sensor present"):
-                d.machine_gate()
+                patch.object(Path, 'iterdir', side_effect=AssertionError('USB/sysfs query forbidden')):
+            d.machine_gate()
             command.assert_called_once_with("systemd-detect-virt", "--vm", "--quiet")
-            sensor.assert_called_once_with()
+
+    def test_host_command_timeout_is_bounded_and_readable(self):
+        args = ('systemctl', 'stop', d.UNIT)
+        with patch.object(d.subprocess, 'run', side_effect=d.subprocess.TimeoutExpired(args, 30)) as command:
+            with self.assertRaisesRegex(RuntimeError, 'timed out after 30 seconds'):
+                d.run(*args)
+            command.assert_called_once_with(args, env=d.ENV, text=True, capture_output=True, timeout=30)
 
 
 if __name__ == "__main__":

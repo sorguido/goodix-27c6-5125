@@ -1,4 +1,11 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+
+> **Internal historical component guide.** Earlier detached-reader procedures
+> below document completed tests and must not be reused for lifecycle operations.
+> The active [reader-present corrective procedure](../recovery/R5_VM.md) uses the
+> current installers. The integrated reader stays connected; saved old inverses
+> are provenance, not the current removal entrypoint (`goodix-uninstall`).
+
 # R3: clean replacement of the R3-A runtime
 
 **Completed: clean replacement, SELinux material correction, production material

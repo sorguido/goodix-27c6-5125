@@ -27,6 +27,8 @@ class MaterialLifecycle(unittest.TestCase):
         self.runtime.parent.mkdir()
         self.dropin = self.base / "system/unit.d/runtime.conf"
         self.dropin.parent.parent.mkdir()
+        self.mask = self.base / 'run/systemd/system/fprintd.service'
+        self.mask.parent.mkdir(parents=True)
         self.material = self.base / "var/lib/goodix-5125-poc"
         self.material.mkdir(parents=True, mode=0o700)
         for name in d.MATERIAL_NAMES:
@@ -62,9 +64,9 @@ class MaterialLifecycle(unittest.TestCase):
                 return SimpleNamespace(**attrs)
             return st
         self.patch(Path, "lstat", metadata)
-        for name, value in (("RUNTIME", self.runtime), ("DROPIN", self.dropin),
+        for name, value in (("RUNTIME", self.runtime), ("DROPIN", self.dropin), ("SERVICE_MASK", self.mask),
                             ("MATERIAL", self.material), ("MATERIAL_RULE", self.rule),
-                            ("safe_directory", lambda p: None), ("no_sensor", lambda: None),
+                            ("safe_directory", lambda p: None),
                             ("run", self.command), ("git", self.git)):
             self.patch(d, name, value)
         self.patch(d.shutil, "which", lambda name, **kwargs: "/mock/" + name)
@@ -118,7 +120,7 @@ class MaterialLifecycle(unittest.TestCase):
         elif args[:2] == ("matchpathcon", "-n"):
             return DEFAULT
         elif args[:2] == ("systemctl", "show"):
-            return "\n".join(name + "=" + self.service_state[name]
+            return "\n".join(name + "=" + ('masked' if name == 'LoadState' else self.service_state[name])
                              for arg in args[3:] if arg.startswith("--property=")
                              for name in [arg.removeprefix("--property=")])
         elif args[0] not in ("systemctl", "restorecon"):
@@ -359,7 +361,7 @@ class MaterialLifecycle(unittest.TestCase):
         saved_spec = importlib.util.spec_from_file_location("r3_saved", self.runtime / "deploy.py")
         saved = importlib.util.module_from_spec(saved_spec)
         with patch("sys.dont_write_bytecode", True): saved_spec.loader.exec_module(saved)
-        for name in ("RUNTIME", "DROPIN", "MATERIAL", "MATERIAL_RULE", "safe_directory", "no_sensor", "run"):
+        for name in ("RUNTIME", "DROPIN", "SERVICE_MASK", "MATERIAL", "MATERIAL_RULE", "safe_directory", "run"):
             self.patch(saved, name, getattr(d, name))
         self.patch(saved, "REPO", self.base / "nonexistent")
         self.patch(saved, "git", lambda *a: self.failTest("saved inverse used Git"))
@@ -406,7 +408,7 @@ class MaterialLifecycle(unittest.TestCase):
         saved = importlib.util.module_from_spec(saved_spec)
         with patch("sys.dont_write_bytecode", True):
             saved_spec.loader.exec_module(saved)
-        for name in ("RUNTIME", "DROPIN", "MATERIAL", "MATERIAL_RULE", "safe_directory", "no_sensor", "run"):
+        for name in ("RUNTIME", "DROPIN", "SERVICE_MASK", "MATERIAL", "MATERIAL_RULE", "safe_directory", "run"):
             self.patch(saved, name, getattr(d, name))
         self.patch(saved, "REPO", self.base / "nonexistent")
         self.patch(saved, "git", lambda *a: self.failTest("saved inverse used Git"))
@@ -419,7 +421,8 @@ class MaterialLifecycle(unittest.TestCase):
         self.assertTrue(self.dropin.exists())
         self.assertEqual(binaries, {n: (self.runtime / n).read_bytes() for n in d.LIBRARIES})
         self.assertEqual(self.snapshot(), self.before)
-        self.assertFalse(any(c[0] == "systemctl" and c[1] != "show" for c in self.calls))
+        self.assertFalse(any(c[:2] in (("systemctl", "start"), ("systemctl", "restart")) for c in self.calls))
+        self.assertFalse(self.mask.is_symlink())
 
     def test_user_field_is_not_a_system_unconfined_special_case(self):
         self.legacy()
@@ -556,12 +559,11 @@ class MaterialLifecycle(unittest.TestCase):
                     d.require_stopped()
         self.assertEqual(self.snapshot(), self.before)
 
-    def test_stopped_check_requires_sensor_absence_before_service_query(self):
-        with patch.object(d, "no_sensor", side_effect=RuntimeError("sensor present")), \
-                patch.object(d, "run") as query:
-            with self.assertRaisesRegex(RuntimeError, "sensor present"):
-                d.require_stopped()
-        query.assert_not_called()
+    def test_stopped_check_does_not_inspect_reader_presence(self):
+        with patch.object(Path, 'iterdir', side_effect=AssertionError('USB/sysfs query forbidden')):
+            d.require_stopped()
+        self.assertEqual(self.calls[0][:3], ('systemctl', 'show', d.UNIT))
+        self.assertFalse(self.mutations())
 
     def test_failed_label_existing_keeps_inverse_for_label_only_rollback(self):
         self.legacy()
