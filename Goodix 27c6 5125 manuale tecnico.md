@@ -16,13 +16,19 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 KScreenLocker SUPPORTED, preflight sudo stock (23 settembre 2026)
+### Stato corrente — R4 preflight sudo PASS, prova stock pronta al gate (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Ripresa da `0932cff265e510d2c6f5271c2d2c1acc952ce837`, `development`
-pulito e allineato a origin, sull'aggiornamento Utente
-`R4_SELINUX_AUDIT_QUERY=PASS`, successivo al lookup viewer NOT_FOUND e all'handoff
-`CODEX_HANDOFF_R4_KSCREENLOCKER_PASS.md`.
+Ripresa da `168469b79565cf401f2cb256448c184f3a803d8c`, `development`
+pulito e allineato a origin, sull'handoff Utente
+`CODEX_HANDOFF_R4_SUDO_PREFLIGHT_PASS.md`. **ACCEPT_AND_CONTINUE sul preflight
+sudo di configurazione/policy** eseguito nella VM a quello stesso SHA, a sensore
+assente. sudo Fedora 1.9.17-8.p2.fc44 senza differenze RPM; authselect local valido
+con with-fingerprint già attivo. Percorso effettivo: sudo → system-auth →
+pam_fprintd sufficient; successo conclude auth, altrimenti segue pam_unix.
+Nessun selettore PAM custom, NOPASSWD per il comando proposto o policy remota
+emerso. La password ha consentito la query; **fingerprint sudo non ancora provato**.
+
 **KScreenLocker stock PASS funzionale:** password unlock con lettore assente,
 poi fingerprint unlock al primo contatto dell'indice DESTRO, campo password
 vuoto e ritorno al desktop. Una VERIFY/epoch, MATCH terminale, nessun retry,
@@ -34,7 +40,12 @@ L'ultimo è contemporaneo allo sblocco riuscito: il diniego è **non fatale per
 il percorso KScreenLocker provato**. KScreenLocker è classificato **SUPPORTED
 sulla baseline testata**, con questa diagnostica documentata. Nessun correttivo
 SELinux o nuova live è necessario; non si dimostrano innocuità universale,
-assenza di altri effetti o callsite esatto dal solo riepilogo ricevuto.
+assenza di altri effetti o callsite esatto. Il nuovo preflight sudo aggiunge
+un raw AVC alle 09:55:15.537 CEST, PID 3802, sorgente fprintd_t e target
+sysctl_vm_t: stesso tipo di diniego durante un'attivazione senza sensore.
+Il PID coincide con il fprintd active/running finale. Il viewer aggrega 20 avvisi
+dal 22 settembre, non 20 tentativi biometrici né 20 eventi di questa query.
+Nessuna policy custom, audit2allow, permissive o nuova live diagnostica.
 
 **Precedente VERIFY CLI R3 PASS al primo tentativo:** `verify-match (done)`, CLI exit 0,
 una capture e un epoch, MATCH terminale, release_tail=1/single_terminal=1,
@@ -58,8 +69,13 @@ Usare l'indice DESTRO anche se il prompt indica sinistro. Non cancellare,
 rinominare, modificare o riacquisire il template; il MATCH riguarda il dito
 realmente acquisito e non qualifica la correttezza anatomica dell'etichetta.
 
-Stato finale riportato: fprintd **inactive/MainPID 0**, sensore scollegato dalla
-VM, runtime e template mantenuti, nessun rebuild/reinstall/reenroll/rollback.
+Ultimo stato riportato dopo il preflight sudo: fprintd **active/running,
+MainPID 3802**, sensore scollegato dalla VM, runtime e template mantenuti,
+nessun rebuild/reinstall/reenroll/rollback. Il precedente inactive/MainPID 0
+resta la closure KScreenLocker, non lo stato finale della query sudo. Lo stock
+può attivarsi su GetDevices a lettore assente e ha un idle timeout di 30 secondi:
+lo snapshot immediato è compatibile con tale comportamento, non prova un daemon
+bloccato né la sua successiva uscita. Nessuna bonifica retroattiva richiesta.
 Baseline: build `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, install
 `264cd7ff1ba77857e1985502f299e4375f9a0516`, output VM
 `/home/guido/goodix-r3-20260922-111144`, manifest runtime-v1 SHA256
@@ -89,25 +105,27 @@ percorso PAM che può disconnettersi prima della coda di rilascio, non prova di
 quiescenza device né, da soli, un failure. L'ordine causale non è ricostruibile
 dal solo estratto; non si forza un altro contatto per completare quei contatori.
 
-Il lookup nel visualizzatore resta **NOT_FOUND**, superato come limite
+Il primo lookup nel visualizzatore aveva dato **NOT_FOUND**, superato come limite
 diagnostico dal riepilogo della query audit della VM nella finestra
 09:01–09:11 CEST / 07:01–07:11 UTC del 23 settembre. La query è chiusa PASS:
-non ripeterla né ampliare la ricerca. Prossimo passo minimo: ricostruire la
-catena PAM e la policy effettiva di **sudo ordinario per guido** nella VM,
-prima di una nuova live. Il blocco in
-`deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md` legge configurazione e
-Defaults locali, inclusi include/alias, e lista la regola per `/usr/bin/true`
-senza eseguirlo. `HUMAN_REQUIRED` per esecuzione VM e letture amministrative
-(roadmap §4, AGENTS §6.2), con sensore scollegato. Nessuna modifica policy/label,
-PAM, permissive, installazione o rollback. Runtime, template e inversa
-salvata sono mantenuti. Le nuove evidenze non colmano retroattivamente la
+non ripeterla né ampliare la ricerca. Anche il preflight sudo è ora completato.
+Prossimo passo: **sudo ordinario per guido** con `/usr/bin/true`, come descritto
+in `deployment/minimal-runtime/R4_SUDO_VM.md`. Prima password a lettore assente
+durante il singolo stop preparatorio del daemon, poi una sola serie fingerprint,
+cache ignorata con `-k`, massimo tre contatti e stop al primo MATCH. Prima di
+qualsiasi password dopo failure, scollegare USB: sudo può ripetere l'intera
+chiamata PAM e non ha un limite globale di tre capture. Il default pam_fprintd
+è tre per chiamata, non un cap driver. `HUMAN_REQUIRED` per privilegi/USB/live
+nella VM (roadmap §4, AGENTS §6.1/§6.2). Nessuna patch PAM/sudoers/authselect o
+runtime necessaria; lo stop transitorio conserva l'attivazione D-Bus stock.
+Runtime, template e inversa salvata mantenuti; rollback solo dopo FAIL reale,
+instabilità/regressione. Le nuove evidenze non colmano retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
 omette SHA guest e output RPM completi, senza invalidare il risultato osservato.
 
 La closure R4 KScreenLocker e la review dell'avviso sono completate nello
 scope osservato; sudo, PolicyKit, login e R5, R6, R7 restano aperti. Questi PASS
-non provano
-login, isolamento esaustivo password/desktop, comportamento dopo update,
+non provano login, isolamento esaustivo password/desktop, comportamento dopo update,
 serie PAM, false match su altro dito, readback factory o compatibilità Windows esaustiva. Le evidenze
 live sono riportate dall'Utente, corroborate dalla review di codice e telemetria;
 l'AI non ha rieseguito la VM né letto materiale protetto o template biometrici.
@@ -285,8 +303,8 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è il preflight della configurazione sudo stock nella
-VM, dopo la closure KScreenLocker e della diagnostica SELinux. R3 è chiusa da
+Il `CURRENT_TASK` attuale è la prova sudo stock nella VM, preparata offline
+dopo il preflight PASS e la closure KScreenLocker. R3 è chiusa da
 enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
 della qualifica.
 
@@ -1080,7 +1098,7 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — KScreenLocker SUPPORTED; sudo stock al gate di configurazione
+### R4 — KScreenLocker SUPPORTED; preflight sudo PASS e gate stock
 
 **Review PM del nuovo handoff:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
@@ -1269,8 +1287,10 @@ riuscito. Password unlock PASS, fingerprint unlock PASS al primo contatto,
 desktop ritornato e cleanup fprintd PASS sono riconfermati. Nessun cambio
 SELinux, nuova live o rollback; runtime/template mantenuti. È nuova evidenza
 fornita dall'Utente, **non lettura diretta dell'audit guest da parte dell'AI**.
-Non sono allegati raw AVC completi, ID evento, PID, contesto sorgente o path
-completo: non si inventano né si attribuisce la notifica UI a un preciso ID.
+Per questi tre eventi non erano allegati raw AVC completi, ID evento, PID,
+contesto sorgente o path completo: non si ricostruiscono retroattivamente dal
+successivo evento del preflight sudo né si attribuisce la notifica KScreenLocker
+a un preciso ID.
 Tre AVC non equivalgono a tre tentativi biometrici: la live KScreenLocker
 resta quella riportata con una sola capture e MATCH al primo contatto.
 
@@ -1296,53 +1316,131 @@ sintetico: LC_ALL=C richiede la data 09/23/26 nell'ausearch installato;
 TZ=UTC e filtro temporale selezionavano l'evento interno ed escludevano gli
 esterni. Non si presenta tale verifica sintattica come evidenza dell'audit reale.
 
-#### Prossimo consumer: configurazione sudo della VM
+#### Nuovo AVC durante il preflight sudo, senza sensore
 
-**CURRENT_TASK:** acquisire la configurazione di sudo ordinario per `guido`,
-senza `-i`, prima di scegliere il normale test stock. L'evidenza guest corrente
-mostra pam_fprintd in system-auth, ma non identifica ancora il servizio PAM
-selezionato da sudo, eventuali Defaults o esenzioni di autenticazione.
-La configurazione fisica e l'integrazione storica privata sono reference,
-non baseline guest né candidate da reintrodurre.
+L'handoff `CODEX_HANDOFF_R4_SUDO_PREFLIGHT_PASS.md` fornisce ora il report del
+viewer e un raw AVC autentico riportato dall'Utente, successivo alla finestra
+KScreenLocker. ID locale `88ab1d9f-52ca-4023-a716-8d3e694a8a61`, conteggio
+aggregato **20**, first seen **2026-09-22 08:49:36 CEST**, last seen
+**2026-09-23 09:55:15 CEST**. Policy targeted
+`selinux-policy-targeted-44.9-1.fc44.noarch`, kernel guest
+`7.2.5-200.fc44.x86_64`, Enforcing. Questi dati sono riportati, non interrogati
+dall'AI e non trasferiti come misure al precedente unlock.
 
-`deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md` contiene un solo blocco
-operatore: checkout/provenance, lettore assente e fprintd inizialmente inactive,
-versioni, authselect, file PAM nelle due directory, NSS, sudo.conf, Defaults
-locali con include/alias e regola di policy per `/usr/bin/true`. Il comando
-viene **listato, non eseguito**. La lettura amministrativa usa una sola sudo
-esterna con `-N` (nessun rinnovo credenziali); l'eventuale password e i normali
-log sono effetti della query. Una chiamata interna noninterattiva lista la
-policy per guido come root, senza nuova autenticazione biometrica. Nessun
-contenuto di template, chiavi o materiali Goodix viene letto.
+```text
+type=AVC msg=audit(1790150115.537:182): avc:  denied  { read } for  pid=3802 comm="fprintd" name="nr_hugepages" dev="proc" ino=29901 scontext=system_u:system_r:fprintd_t:s0 tcontext=system_u:object_r:sysctl_vm_t:s0 tclass=file permissive=0
+```
 
-Il parser nativo cvtsudoers evita di perdere Defaults scoped o inclusi. La
-sua uscita non viene installata; non prova da sola quale policy sia effettiva:
-sudo.conf/NSS e listing devono essere coerenti. Plugin/path custom, policy
-remota o nuovi include PAM tornano alla review. Non si assume system-auth come
-catena universale né si deduce supporto fingerprint dalla sola configurazione.
-La password della query può attivare fprintd a lettore assente: si riporta lo
-stato finale senza stop/poll/retry, e il marker COMPLETE non significa inactive.
+La conversione offline dell'epoch dà **07:55:15.537 UTC / 09:55:15.537 CEST**,
+coerente con last seen. PID 3802 coincide con il MainPID finale della query.
+L'handoff identifica il target come `/proc/sys/vm/nr_hugepages`; il record
+incollato contiene basename, proc, inode e tipo, non un record PATH completo.
+Il diniego ricorre anche a sensore assente, con query sudo completata dopo il
+prompt password: non è fatale per questo percorso e non richiede un contatto
+biometrico per comparire. Il conteggio aggregato non misura tentativi,
+attivazioni del daemon o venti denial prodotti dal solo preflight corrente.
 
-**HUMAN_REQUIRED** prima dell'esecuzione nella VM e delle letture privilegiate
-(roadmap §4, AGENTS §6.2). Nessuna live sudo è già pronta o autorizzata da questo
-preflight; dopo l'output si stabiliranno percorso nativo, identità e limiti di
-tentativi pertinenti. KScreenLocker, enrollment, VERIFY e audit query non si
-ripetono. Runtime, template RIGHT-index/left-index-finger e inversa installata
-restano invariati; nessun installer/uninstaller nuovo è necessario per una
-lettura di configurazione.
+**KNOWN_NON_FATAL_RUNTIME_DENIAL nei percorsi osservati**: KScreenLocker e
+query sudo/password. Fingerprint sudo resta non provato. Callsite/libreria
+interna e innocuità generale non sono stabiliti. I consigli catchall del viewer
+sono testo diagnostico, non istruzioni da eseguire: nessun audit2allow/semodule,
+policy custom, sysctl, label o permissive. Nessuna nuova query/live serve a
+riprodurre questo diniego; restano valide la closure KScreenLocker e la baseline.
 
-Verifica offline del delta: parser cvtsudoers reale su soli file temporanei
-sintetici, includendo alias, include e Defaults per comando; sintassi Bash e
-Python incorporato, import/path da checkout e lettura del percorso effettivo
-senza eseguire sudo o query servizi host; link verificati e live-critical set invariato.
-Nessuna build o suite runtime ripetuta. Review PM diretta del diff e del blocco:
-nessuna modifica di driver/install/inversa, PAM, authselect o file Fedora;
-nessun nuovo coupling di password/desktop. R5 rimane da qualificare realmente.
+#### Review del preflight sudo e preparazione della prova stock
+
+**Decisione PM: ACCEPT_AND_CONTINUE** sul preflight a
+`168469b79565cf401f2cb256448c184f3a803d8c`, Fedora 44 KDE x86_64, sensore assente,
+nessun tentativo biometrico o modifica runtime/template/PAM/authselect/SELinux.
+
+| Confine | Evidenza guest e significato |
+| --- | --- |
+| Pacchetti | sudo 1.9.17-8.p2.fc44; fprintd/fprintd-pam 1.94.5-5.fc44; pam 1.7.2-2.fc44; authselect/authselect-libs 1.7.1-1.fc44, tutti x86_64 |
+| sudo/PAM | /etc/pam.d/sudo RPM-owned include system-auth; system-auth generato da authselect contiene sufficient pam_fprintd senza opzioni, poi sufficient pam_unix nullok e required pam_deny |
+| Semantica auth | MATCH può concludere l'auth prima di pam_unix, se i precedenti required non hanno fallito; failure biometrico sufficient lascia procedere alla password. Account/session restano obblighi distinti del consumer |
+| sudo-i | include sudo, confermato solo come configurazione; nessuna qualifica live sudo -i |
+| Profilo | local with-silent-lastlog with-mdns4 with-fingerprint; authselect check valido; nessuna abilitazione nuova necessaria |
+| Selettori/policy | sudo.conf solo commenti/default; parser con include/alias non mostra pam_service, rootpw/targetpw/runaspw o !authenticate custom; listing /usr/bin/true da /etc/sudoers, RunAsUsers ALL, Commands ALL, nessun NOPASSWD emerso |
+| NSS | files/systemd per identità; nessuna direttiva sudoers remota emersa. Insieme a plugin default, parser e listing corrobora il percorso locale, non una prova universale contro ogni modifica futura |
+| Integrità | SUDO_RPM_VERIFY_EXIT=0, senza output; prova di verifica del pacchetto sudo, non di tutti gli RPM |
+| Password/query | Prompt password per guido, query amministrativa completata; evidenza di password funzionante a lettore assente, non di fingerprint sudo |
+| Stato finale | active/running, MainPID=3802, sensore assente; osservazione accettata come prevista dal preflight, non cleanup biometrico fallito |
+
+**Daemon attivo:** sorgenti stock locali
+`reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c` (`open_device`,
+`do_auth`) chiamano GetDevices anche senza lettore; assenza di
+device torna PAM_AUTHINFO_UNAVAIL. Il servizio è Type=dbus, con ExecStart stock.
+`src/fprintd.h` definisce TIMEOUT=30; `main.c` ha no_timeout=false;
+`manager.c::fprint_manager_new` arma il timer iniziale e
+`fprint_manager_busy_notified` lo riarma quando nessun device è busy; il callback
+esce con codice 0. Lo snapshot immediato active è quindi compatibile con lo
+stock e non prova persistenza anomala. Il tempo di vita effettivo successivo
+non è stato misurato; non si dichiara inactive senza una nuova osservazione.
+
+**CURRENT_TASK:** una sola serie sudo ordinaria, con comando innocuo
+`sudo -k -- /usr/bin/true`, dopo password a sensore assente durante lo stop
+preparatorio. README `deployment/minimal-runtime/R4_SUDO_VM.md`. `-k` con
+comando ignora la cache e non la rinnova, secondo il manpage sudo installato;
+non si affida il risultato al solo exit 0. B richiede MATCH, nessuna password
+inserita e telemetria coerente. Non servono nuovo install/inversa, pacchetti,
+PAM o sudoers: la coppia R3 e l'inversa installata restano applicabili.
+
+**Limiti tecnici del consumer:** pam_fprintd stock reinizializza max_tries=3
+in ogni do_auth; timeout=30 secondi per VerifyStart. NO_MATCH pulito decrementa
+il budget e consente una successiva action esplicita; MATCH ritorna subito
+successo e chiude il bus. Tre NO_MATCH esauriscono quella chiamata PAM.
+Il driver conserva il fence su MATCH/errore e il cleanup, senza un cap
+cumulativo imposto alle action esplicite dopo NO_MATCH.
+
+Review diretta di sudo upstream **v1.9.17p2**:
+[`sudo_pam_verify` e conversazione](https://raw.githubusercontent.com/sudo-project/sudo/v1.9.17p2/plugins/sudoers/auth/pam.c)
+e [`verify_user`](https://raw.githubusercontent.com/sudo-project/sudo/v1.9.17p2/plugins/sudoers/auth/sudo_auth.c).
+Il primo chiama pam_authenticate; errori auth ordinari diventano AUTH_FAILURE,
+che il secondo può ritentare secondo passwd_tries. La conversazione legge la
+password al prompt; interruzione/errore di lettura è terminale per sudo.
+Il precedente audit Fedora SRPM in `production/sudo/README.md` documenta che
+la sola patch Fedora riguarda il mailer, non questi file; tale directory è
+storica, non un'integrazione da riattivare. Il dispatch upstream
+[Linux-PAM 1.7.2](https://raw.githubusercontent.com/linux-pam/linux-pam/v1.7.2/libpam/pam_dispatch.c)
+corrobora il significato di sufficient/done e la prosecuzione dopo un risultato
+ignorato, coerente con i file guest. Nessun sorgente terzo importato/modificato.
+
+**Tre tentativi non sono un cap globale di sudo:** una password sbagliata può
+far richiamare PAM e riaprire la serie. Per la prova, l'unica serie fingerprint
+resta nella prima chiamata: non inserire password/Invio vuoto con sensore
+collegato; dopo NO_MATCH 3, timeout, errore o prompt inatteso, scollegare prima
+di rispondere alla password. Il prompt blocca il percorso ordinario osservato;
+non si modifica sudo per ottenere un contatore globale. MATCH interrompe i
+contatti; NO_MATCH 1/2 attendono il successivo prompt nativo, massimo tre.
+No quarta capture, nuovo sudo, sudo -i o altro consumer durante il collegamento.
+
+**Preparazione/cleanup:** un solo stop fprintd umano dopo password a lettore
+assente prepara inactive/MainPID 0 e l'inizio della finestra journal. È un
+nuovo confine operativo, non una riparazione del precedente stato active.
+Non disabilita/maschera il servizio: B mantiene l'attivazione D-Bus normale.
+Dopo B si scollega il lettore, si verifica la password se necessaria per il
+fallback, si ferma il daemon e si riportano le righe safety esistenti. MATCH
+può anticipare release_tail/single_terminal come in KScreenLocker, ma drain,
+close e assenza di retry/persistenza restano richiesti. Nessun nuovo collector.
+
+PASS conserva runtime/template. FAIL reale, instabilità o regressione usa
+l'inversa salvata; STOP preliminare, warning noto o sole evidenze incomplete
+non giustificano rollback. Se la password sudo non funziona, è un blocker:
+non si tenta una riparazione PAM/sudoers/TTY né si forza l'uninstall. Un failure
+fingerprint con password sicura può diventare KNOWN_LIMITATION dopo review,
+non autorizza bridge privati e non implica un bug upstream già localizzato.
+
+Verifica offline del delta: review di sorgenti/manpage, conversione timestamp,
+sintassi dei blocchi Bash e Python, cwd/import/path, link/anchor e diff. Nessuna
+esecuzione dei blocchi sudo, fprintd/PAM, servizi, USB, build o test runtime.
+Review PM: solo documentazione operativa; source/install/inversa invariati,
+nessun nuovo coupling di password/desktop. **HUMAN_REQUIRED** prima di A/B
+(privilegi e USB/live VM; AGENTS §6.1/§6.2 e roadmap §4).
 
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=KSCREENLOCKER_SUPPORTED_SCOPED_SELINUX_DIAGNOSTIC_CLOSED_SUDO_CONFIG_QUERY_READY
+ADVANCEMENT=SUDO_CONFIG_POLICY_PASS_RECURRENT_AVC_IDENTIFIED_NATIVE_SUDO_TEST_READY
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -1351,7 +1449,7 @@ R4_LIVE_GUEST_CHECKOUT_SHA=NOT_REPORTED
 R4_LIVE_GUEST_RPM_OUTPUT=NOT_REPORTED
 R4_PASSWORD_UNLOCK=PASS_SENSOR_ABSENT_HUMAN_REPORTED
 R4_FINGERPRINT_UNLOCK=PASS_CONTACT_1_NO_PASSWORD_HUMAN_REPORTED
-R4_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0
+R4_KSCREENLOCKER_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0
 R4_DEVICE_RELEASE_TAIL=COMPLETION_NOT_OBSERVED
 R4_KSCREENLOCKER_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 SELINUX=ENFORCING_HUMAN_REPORTED
@@ -1363,24 +1461,34 @@ R4_SELINUX_AUDIT_QUERY=PASS_HUMAN_REPORTED
 R4_SELINUX_AVC_COUNT=3_IN_TARGET_WINDOW_HUMAN_REPORTED
 R4_SELINUX_DENIAL=fprintd_read_nr_hugepages_target_type_sysctl_vm_t_permissive_0
 R4_SELINUX_ASSESSMENT=NON_FATAL_FOR_TESTED_KSCREENLOCKER_PATH
-R4_SELINUX_FULL_RAW_AVC=NOT_SUPPLIED
+R4_KSCREENLOCKER_FULL_RAW_AVC=NOT_SUPPLIED
+R4_SUDO_PREFLIGHT_RAW_AVC=SUPPLIED_EVENT_1790150115.537:182_PID3802
+R4_SELINUX_ALERT_ID=88ab1d9f-52ca-4023-a716-8d3e694a8a61
+R4_SELINUX_ALERT_AGGREGATE_COUNT=20_NOT_BIOMETRIC_ATTEMPT_COUNT
 R4_SELINUX_EXACT_LIBRARY_CALLSITE=NOT_ESTABLISHED
 R4_SELINUX_DIAGNOSTIC=CLOSED_WITH_DOCUMENTED_DENIAL
-R4_SUDO_CONFIG_QUERY=PREPARED_NOT_EXECUTED_IN_VM
+R4_SUDO_CONFIG_QUERY=PASS_HUMAN_REPORTED
+R4_SUDO_PREFLIGHT_GUEST_COMMIT=168469b79565cf401f2cb256448c184f3a803d8c
+R4_SUDO_RPM_VERIFY=PASS_EXIT0
+R4_SUDO_PREFLIGHT_SELINUX_ASSESSMENT=NON_FATAL_FOR_OBSERVED_PASSWORD_QUERY
+R4_SUDO_PAM_ROUTE=STOCK_SUDO_SYSTEM_AUTH_FPRINTD_SUFFICIENT_THEN_UNIX
+R4_SUDO_PREFLIGHT_FINAL_SERVICE=ACTIVE_RUNNING_PID3802_SENSOR_ABSENT
+R4_SUDO_FINGERPRINT=NOT_YET_TESTED
+R4_SUDO_NATIVE_GATE=READY_HUMAN_ONLY
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=OFFLINE_QUERY_CHECKS_PASS_VM_PRIVILEGED_READ_REQUIRES_HUMAN
+EXECUTABLE_CLOSURE=OFFLINE_NATIVE_PROCEDURE_CHECKS_PASS_LIVE_REQUIRES_HUMAN
 RESIDUAL_BLOCKER_OR_RISK=DOCUMENTED_SELINUX_DENIAL_OTHER_CONSUMERS_R5_R6_R7_OPEN
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_0932cff265e510d2c6f5271c2d2c1acc952ce837
+REVIEW_SET=GIT_DIFF_FROM_168469b79565cf401f2cb256448c184f3a803d8c
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_SUDO_CONFIGURATION_QUERY_SENSOR_DETACHED
+NEXT_BOUNDARY=HUMAN_VM_NATIVE_SUDO_PASSWORD_THEN_FINGERPRINT
 ```
 
 ### Governance corrente

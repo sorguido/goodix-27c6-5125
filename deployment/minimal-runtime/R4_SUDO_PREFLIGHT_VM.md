@@ -1,7 +1,20 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: inspect the VM's stock sudo configuration
 
-**HUMAN_REQUIRED — configuration query in the existing VM, sensor detached.**
+**COMPLETED — configuration/policy query PASS, human-reported at
+`168469b79565cf401f2cb256448c184f3a803d8c`, sensor detached. Do not rerun.**
+The guest confirms stock sudo → system-auth, pam_fprintd sufficient followed by
+pam_unix; valid authselect with fingerprint enabled, no custom PAM selector or
+NOPASSWD observed, sudo RPM verification exit 0. The password query completed.
+The immediate final fprintd active/running/PID 3802 is compatible with stock
+D-Bus activation and its idle timer; it is not a failed biometric cleanup.
+The recurring nr_hugepages denial now has a supplied raw AVC with that PID,
+non-fatal for the completed query; keep Enforcing. Fingerprint sudo is untested.
+The current human gate is the [ordinary stock sudo test](R4_SUDO_VM.md).
+
+## Completed query and original criteria
+
+**Historical human gate — do not execute the block below again.**
 KScreenLocker is **SUPPORTED on the tested baseline**: password unlock and
 first-contact fingerprint unlock passed. The three reported SELinux denials
 of a `nr_hugepages` read were non-fatal for that test; keep Enforcing and the
@@ -115,8 +128,8 @@ do not stop it in this query or interpret the completion marker as inactive.
 
 Return the whole output and confirm no biometric attempt, sensor connection,
 runtime/template/SELinux/authentication-configuration change or rollback.
-The next review will select the normal stock sudo workflow and its technical
-attempt limits, or document a limitation. No sudo live is prepared by this file.
+The review is now complete; the native test and its limits are in the current
+guide linked above. No sudo live was performed by this query.
 
 ## Installation and rollback
 

@@ -21,10 +21,13 @@ completed evidence. [Stock verification](R3_VERIFY_VM.md) also passed with the
 RIGHT index at the first attempt, with clean release/drain/close. **R3 is closed
 at the biometric boundary. R4 KScreenLocker password unlock and first-contact
 fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
-the tested baseline. Next human gate: [sudo configuration query](R4_SUDO_PREFLIGHT_VM.md).**
+the tested baseline. Next human gate: [ordinary stock sudo test](R4_SUDO_VM.md).**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
-the runtime/template and known label mismatch; no rollback or repeated live.
+the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
+The sudo configuration query has passed (stock system-auth with pam_fprintd,
+password query completed, sudo RPM verification clean). Its active final daemon
+and recurring non-fatal denial are documented; sudo fingerprint remains untested.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

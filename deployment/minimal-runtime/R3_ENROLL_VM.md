@@ -11,7 +11,7 @@ The canonical manual contains the complete telemetry and review. Preserve the
 procedure below as evidence; **do not repeat it**. Subsequent
 [native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md)
 also passed at the first attempt. R3 is closed; the current human gate is
-[R4 sudo configuration query](R4_SUDO_PREFLIGHT_VM.md);
+[R4 ordinary stock sudo test](R4_SUDO_VM.md);
 KScreenLocker is SUPPORTED on the tested baseline, with a documented non-fatal
 nr_hugepages read denial. Its live and audit query are completed; do not repeat them.
 The historical procedure below records the requested slot, not evidence that

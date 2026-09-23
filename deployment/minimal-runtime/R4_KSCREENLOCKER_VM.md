@@ -7,7 +7,8 @@ The physical RIGHT index matched the stored left-index-finger template, without
 entering a password in the fingerprint session. **SUPPORTED on the tested
 baseline**, with the non-fatal SELinux denial below documented. Preserve
 runtime/template and do not repeat the test or its completed audit query.
-The next human gate is the [stock sudo configuration query](R4_SUDO_PREFLIGHT_VM.md).
+The sudo configuration query has also passed; the next human gate is the
+[ordinary stock sudo test](R4_SUDO_VM.md).
 
 ## Completed SELinux review
 
@@ -77,7 +78,8 @@ still detached and runtime/template/SELinux policy are unchanged. No rollback
 is required for this diagnostic result. The retained installation/inverse below
 remain available; a functional PASS is not rolled back for missing evidence.
 That review is now complete. The next stock consumer's actual guest PAM route
-is covered by the sudo preflight linked above, before another live test.
+was subsequently established by the completed sudo preflight; follow the current
+stock sudo guide linked above.
 
 ## Completed live procedure and original criteria
 
@@ -200,7 +202,7 @@ authenticator does not restart PAM solely on fingerprint failure. A password
 failure or a new authentication session can restart it, which is why neither
 belongs to this fingerprint series. The driver permits only a clean NO_MATCH
 reopen and fences processing-error resubmission before new sensor work. See
-[the canonical review](../../Goodix%2027c6%205125%20manuale%20tecnico.md#r4--kscreenlocker-pass-funzionale-avviso-selinux-da-qualificare).
+[the canonical review](../../Goodix%2027c6%205125%20manuale%20tecnico.md).
 
 On success, lift the finger, confirm the desktop returned **without entering a
 password**, and detach USB. On failure/STOP, lift and detach USB via the VM

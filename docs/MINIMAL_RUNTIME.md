@@ -45,12 +45,15 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 sudo configuration query](../deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md).
+[R4 ordinary stock sudo test](../deployment/minimal-runtime/R4_SUDO_VM.md).
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
 completed KScreenLocker path; SELinux review is closed with that limit documented.
 No PAM/authselect/runtime change, rollback or repeated unlock/audit query is required.
+The sudo preflight subsequently passed: stock policy/PAM, password query completed,
+RPM sudo verification clean. Fingerprint sudo remains untested; the current guide
+prepares one native series without a configuration patch.
 The user retains the anatomical label mismatch through this R4 phase; present
 the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
@@ -264,12 +267,15 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 sudo configuration query](../deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md).
+[R4 ordinary stock sudo test](../deployment/minimal-runtime/R4_SUDO_VM.md).
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
 completed KScreenLocker path; SELinux review is closed with that limit documented.
 No PAM/authselect/runtime change, rollback or repeated unlock/audit query is required.
+The sudo preflight subsequently passed: stock policy/PAM, password query completed,
+RPM sudo verification clean. Fingerprint sudo remains untested; the current guide
+prepares one native series without a configuration patch.
 The accepted R3 build/load/material/Claim/enrollment/verify and functional
 KScreenLocker gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure

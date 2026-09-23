@@ -325,11 +325,20 @@ permissive=0, alle 09:04:02, 09:04:32 e 09:06:14 CEST. L'ultimo coincide con
 lo sblocco riuscito: diniego non fatale per questo percorso, documentato senza
 modifiche SELinux o attribuzione a un callsite non provato. Non è innocuità
 universale né qualifica R5. Query audit e live sono completate, da non ripetere.
-Prossimo gate in `deployment/minimal-runtime/R4_SUDO_PREFLIGHT_VM.md`: lettura
-della configurazione/policy sudo e dei file PAM nella VM, con sensore scollegato
-e letture amministrative umane. Nessuna nuova live o modifica runtime; si
-ricostruisce la catena effettiva prima del test stock. system-auth non è assunto
-come percorso universale; sudo, PolicyKit e login restano da qualificare.
+**Preflight sudo PASS** a `168469b79565cf401f2cb256448c184f3a803d8c`:
+sudo Fedora → system-auth con pam_fprintd sufficient e fallback pam_unix;
+profilo valido con fingerprint già attivo, nessun selettore custom/NOPASSWD
+emerso e verifica RPM sudo exit 0. Password/query completata a lettore assente;
+fingerprint sudo ancora non provato. Stato finale active/running/PID 3802
+compatibile con attivazione stock e idle timeout; non è cleanup live fallito.
+Nuovo raw AVC nr_hugepages, stesso PID alle 09:55:15 CEST, non fatale per la
+query; nessuna modifica SELinux o ripetizione diagnostica.
+Prossimo gate in `deployment/minimal-runtime/R4_SUDO_VM.md`: password a sensore
+assente durante lo stop preparatorio, poi una serie sudo ordinaria con cache
+ignorata, comando /usr/bin/true e fino a tre contatti, stop al primo MATCH.
+Scollegare prima di qualsiasi password dopo failure: sudo può ripetere PAM,
+il limite stock di tre è per chiamata. Nessuna patch PAM/sudoers/runtime.
+sudo -i resta solo configurazione osservata; PolicyKit/login e R5 restano aperti.
 
 Una volta ottenuti:
 
