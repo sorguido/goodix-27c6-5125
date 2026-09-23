@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 Plasma Login opt-in, build/test sintetici VM al gate (23 settembre 2026)
+### Stato corrente — R4 Plasma build/test VM PASS, installazione al gate (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
 L'handoff `CODEX_SUPERSEDING_R4_PLASMA_LOGIN_REPLAN.md` revoca espressamente
@@ -34,7 +34,8 @@ baseline. Review della source reference Fedora 6.7.5 e dei patchset: nessun
 selettore nativo di servizio biometrico. Non richiedere una live stock destinata
 a non acquisire. Questa diagnosi resta evidenza, non una limitation accettabile.
 
-**CURRENT_TASK: candidata minima PAM opt-in, verifiche sintetiche nella VM.**
+**CURRENT_TASK: installazione VM della candidata minima PAM opt-in già costruita
+e verificata, con sensore assente e desktop aperto.**
 La decisione UX esplicita successiva accetta Invio a campo vuoto come scelta
 fingerprint: password non vuota inviata subito al vendor senza attesa biometrica;
 campo temporaneamente disabilitato durante la serie scelta e disponibile dopo
@@ -48,10 +49,31 @@ Drift della policy disabilita fingerprint; password, account e session passano
 al vendor. Il reset prima del vendor tratta anche gli errori di modulo durante
 `pam_setcred`; non cancella un rifiuto vendor. Nessun daemon/greeter privato.
 
-**HUMAN_REQUIRED soltanto per build e test PAM sintetici VM, sensore assente,
-senza sudo/installazione/logout/autenticazione reale** (roadmap §4).
-Il gate verifica la candidata con la vera libreria PAM e dati fittizi in directory
-temporanee; non tocca il PAM di sistema. Non è ancora pronta la live login.
+L'handoff `CODEX_MINI_RESUME_R4_PLASMA_BUILD_PASS.md` riporta
+`PLASMA_LOGIN_VM_BUILD_TESTS=PASS`, `Ran 11 tests / OK`,
+`INSTALLATION=NOT_PERFORMED`, source
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6`. **ACCEPT_AND_CONTINUE sul gate
+build/test sintetici VM.** Il marker finale nello script versionato segue
+necessariamente compilazione, unità C, dispatcher vero libpam con fixture e
+11 lifecycle test: completamento accettato come evidenza riportata, non run AI.
+Non sono allegati i log completi dei singoli casi C né gli hash binari stampati;
+non si inventano misure. Il primo STOP per pam-devel assente era pre-build;
+l'Utente ha installato quella sola dipendenza di build e completato la prova.
+
+Output originario `/tmp/goodix-login-build.OeCmF8Ja`, conservato integralmente
+nella VM in `development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`
+relativo alla Git root. Esclusione solo locale `.git/info/exclude`, worktree
+riportato pulito; nessuna modifica `.gitignore` o tracking dei binari.
+Il nuovo handoff riutilizza modulo production, manifest e inversa invariati;
+la variante test gate-test.so ha path fixture temporanei e non va installata
+o rieseguita dalla copia spostata. Nessuna rebuild o ripetizione dei PASS.
+
+**HUMAN_REQUIRED per la sola installazione e verifica file/hash/label nella VM**
+(roadmap §4 e AGENTS §6.1/§6.2). README pronto con installazione e rollback
+della copia preservata: sensore assente e desktop aperto; nessun logout, login
+o nuovo collegamento USB. La verifica del deployment reale viene prima di
+chiudere la sessione funzionante. Build e fixture non provano ancora caricamento
+nel dominio SELinux del login helper, autenticazione reale o update safety.
 Il modello fingerprint-only è proposto entro il contratto corrente del path
 vendor `/usr/lib/pam.d/plasmalogin`, non una qualifica R5: rimozione/relocation
 incompatibile del vendor può bloccare il login e resta rischio classe A da
@@ -2005,11 +2027,11 @@ con override ancora presente può rompere password (classe A). Non c'è un
 claim universale update-safe; se un normale update introduce questo failure,
 è RELEASE_BLOCKER. R5 non è stata preparata o eseguita.
 
-Il prossimo gate consegna **solo build e test sintetici VM senza installare**:
+Il precedente gate consegnava **solo build e test sintetici VM senza installare**:
 unità C del selettore, vera libpam con moduli/dati fittizi e configurazioni in
 directory temporanee, incluso controllo negativo senza reset. Nessun account
-reale, PAM di sistema, root, D-Bus, USB o template. Il risultato C/PAM è ancora
-PENDING_HUMAN_VM; una review sorgente o un test Python non ne è un PASS.
+reale, PAM di sistema, root, D-Bus, USB o template. Il risultato era allora
+PENDING_HUMAN_VM; la successiva closure sotto consolida il PASS riportato.
 La coppia futura install/remove viene verificata su filesystem temporanei;
 non autorizza ancora una live login. R3, KScreenLocker, sudo e PolicyKit
 restano PASS nello scope osservato; runtime/template invariati.
@@ -2024,10 +2046,63 @@ SELinux con delega vendor anche su SUCCESS. Il gate non ha effettuato alcuna
 build C o esecuzione PAM sul fisico: 33 casi unità C e 16 dispatcher predisposti,
 esito ancora da ottenere nella VM. Nessun nuovo PASS di autenticazione dedotto.
 
+#### Plasma Login — closure build/test VM e consegna installazione
+
+Recovery sullo stesso `6fc6e640710885954d9e6fd603b3bc47b45d2ac6`, branch
+development e worktree locale pulito. Il mini handoff riporta il marker finale
+build/test PASS, gli 11 test lifecycle OK, lettore scollegato, nessuna
+installazione/login e runtime/template invariati. Review diretta di launcher,
+modulo, PAM, fixture e manager: il marker finale non è raggiungibile dopo un
+failure di compilazione, delle 33 unità C predisposte, dei 16 casi dispatcher
+predisposti o degli 11 test Python. I numeri C derivano dal test set versionato,
+non da output individuali allegati. Il PASS umano è accettato senza rieseguire
+VM o build sul fisico. pam-devel assente ha causato solo STOP prima della build,
+risolto dall'Utente installando la dipendenza; nessun failure runtime da correggere.
+
+La copia integrale dell'output conserva SOURCE_COMMIT, SHA256SUMS e VM_TESTS_PASS.
+Il manager è indipendente dalla directory della build e sceglie soltanto la
+libreria production: mock.so, gate-test.so e test executable non vengono installati.
+La variante gate-test.so conserva invece path fixture sotto /tmp; la relocation
+non è un motivo per rerun di quella variante né invalida il modulo production.
+Non leggere o importare nel repository artefatti guest non disponibili localmente.
+L'esclusione `.git/info/exclude` è uno stato locale guest, non una modifica di
+governance o una nuova regola `.gitignore` da propagare.
+
+**Decisione PM: ACCEPT_AND_CONTINUE per build/test; successivo boundary minimo
+installazione con desktop aperto.** Nessun corrective al live-critical set.
+README aggiornato: verifica esatta del manifest della copia, source SHA e
+confronto con PAM/manager versionati; installazione umana tramite sudo; controlli
+read-only di bytes, metadata, receipt e default label dei soli file posseduti;
+confronto effimero prima/dopo del PAM vendor. Nessun load-check PAM, logout,
+fingerprint, enroll/verify o servizio riavviato. La normale sudo può attivare
+fprintd senza sensore: non è una misura nuova di cleanup né prova biometrica.
+
+Installazione reale, etichettatura SELinux e footprint non erano esercitati
+dalle fixture: è giustificato verificarli prima di chiudere la sessione funzionante,
+senza richiedere una nuova build o una live prematura. Inversa identica preservata
+e versionata: rimuove prima l'entry PAM del progetto, poi supporto, facendo
+riemergere il vendor corrente. Rollback dopo FAIL/regressione, non dopo PASS.
+R3, template indice DESTRO/slot sinistro e gli altri consumer qualificati restano
+preservati. R4 non è chiusa e R5 resta bloccata; rischio packaging/path vendor
+e verifica update non vengono risolti da questi test sintetici.
+
+**Executable closure della nuova consegna:** sintassi dei due blocchi Bash e
+dei due heredoc Python PASS. Su fixture temporanee del manager esistente,
+esercitati i controlli README sulla copia spostata (anche path con spazi),
+verifica bytes/receipt installati, rifiuto payload alterato e manifest errato;
+help della copia del manager invocato da cwd estranea PASS. Postcheck rollback
+esercitati su assenza, file/directory residui e symlink rotti: nessun falso PASS;
+test Bash separati assicurano arresto su ogni residuo. Ambiente/privilegi
+e comandi host sostituiti dalle fixture; nessun PAM, root, installazione host
+o binario C eseguito dall'AI. Diff live-critical set e test rispetto a 6fc6e64
+vuoto; modifica solo documentale, nessuna nuova build richiesta. Review PM
+successiva sui file reali: consegna accettata per installazione VM, arresto
+HUMAN_REQUIRED prima della mutazione privilegiata. Nessun gate login superato.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=LOGIN_PREFLIGHT_CONSOLIDATED_OPT_IN_PAM_CANDIDATE_IMPLEMENTED
+ADVANCEMENT=PLASMA_VM_BUILD_PASS_ACCEPTED_PRESERVED_OUTPUT_INSTALL_HANDOFF
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -2112,24 +2187,29 @@ R4_CLOSED=false
 R5_BLOCKED_UNTIL_LOGIN_RESOLVED=true
 R4_LOGIN_UX=NONEMPTY_PASSWORD_OR_EXPLICIT_EMPTY_FINGERPRINT
 R4_LOGIN_CANDIDATE=PROJECT_OWNED_OPT_IN_GATE_AND_CURRENT_VENDOR_INCLUDES
-R4_LOGIN_C_PAM_TESTS=PENDING_HUMAN_VM_SENSOR_FREE
+R4_LOGIN_C_PAM_TESTS=PASS_HUMAN_REPORTED_FINAL_BUILD_MARKER
+R4_LOGIN_BUILD_SOURCE_COMMIT=6fc6e640710885954d9e6fd603b3bc47b45d2ac6
+R4_LOGIN_BUILD_PRESERVED=development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja
+R4_LOGIN_BUILD_EXCLUSION=GUEST_LOCAL_GIT_INFO_EXCLUDE_ONLY
+R4_LOGIN_INSTALLATION=NOT_PERFORMED
 R4_LOGIN_LIVE=NOT_READY
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=OFFLINE_SCOPE_ONLY_C_BUILD_AND_PAM_DISPATCH_PENDING_VM
+EXECUTABLE_CLOSURE=VM_BUILD_TESTS_REPORTED_PASS_INSTALL_PATH_OFFLINE_REVIEWED
 OFFLINE_SOURCE_AND_LIFECYCLE_CHECKS=PASS_11_SYNTHETIC_LIFECYCLE_TESTS
-PM_REVIEW=ACCEPT_VM_BUILD_TEST_GATE_ONLY
+R4_LOGIN_INSTALL_HANDOFF_OFFLINE_CHECKS=PASS_RELOCATED_FIXTURE_INTEGRITY_SYNTAX_CWD
+PM_REVIEW=ACCEPT_BUILD_PASS_HUMAN_INSTALLATION_GATE
 RESIDUAL_BLOCKER_OR_RISK=LOGIN_UNQUALIFIED_VENDOR_PATH_CONTRACT_UPDATE_VALIDATION_PENDING
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_4997fe47825cb1748bf34650b3b2eaaedb9dba49
+REVIEW_SET=GIT_DIFF_FROM_6fc6e640710885954d9e6fd603b3bc47b45d2ac6
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=R4_REPLAN_AND_EXPLICIT_USER_UX_RECORDED
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_LOGIN_GATE_BUILD_SYNTHETIC_PAM_TESTS_NO_INSTALL
+NEXT_BOUNDARY=HUMAN_VM_INSTALL_VERIFY_FILES_LABELS_DESKTOP_OPEN_SENSOR_ABSENT_NO_LOGIN
 ```
 
 ### Governance corrente

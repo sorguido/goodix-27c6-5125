@@ -4,7 +4,8 @@
 **COMPLETED — configuration query reported PASS at guest checkout
 `725b3c1f8bf879b9e56632b4f15da494968cead7`. Do not repeat this procedure.**
 Stock Plasma Login uses password-auth without fingerprint. R4 remains open:
-the next gate is [the opt-in selector's sensor-free VM build/tests](../plasma-login-opt-in/README.md).
+the opt-in selector's VM build/tests passed. The next gate is
+[installation with the reader detached and desktop open](../plasma-login-opt-in/README.md).
 The original query below is retained as evidence.
 
 **Original HUMAN_REQUIRED — one reader-absent configuration query in the existing VM.**

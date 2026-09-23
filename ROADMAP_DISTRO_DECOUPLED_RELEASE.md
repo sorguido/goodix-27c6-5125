@@ -466,11 +466,22 @@ vendor corrente è una dipendenza di packaging: rimozione/relocation incompatibi
 può rompere password e sarebbe un blocker classe A, mai una qualifica implicita
 fingerprint-only. Nessuna prova R5 anticipata e nessun PASS login dedotto.
 
-**Prossimo gate:** sola build e test sintetici nella VM secondo
-`deployment/plasma-login-opt-in/README.md`, lettore assente, senza root,
-installazione PAM, logout o autenticazione reale. I test C e con vera libpam
-sono PENDING_HUMAN_VM. Qualunque successiva installazione, modifica PAM live,
-logout/reboot o prova login resta **HUMAN_REQUIRED** dopo review dei risultati.
+**Build/test VM PASS accettato** al source commit
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6`: marker finale riportato
+`PLASMA_LOGIN_VM_BUILD_TESTS=PASS`, 11 test Python OK; lo script completa prima
+anche unità C e dispatcher libpam sintetico. Nessuna installazione/login.
+Il primo STOP per pam-devel assente era pre-build, risolto dall'Utente nella VM.
+Output conservato in
+`development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`,
+escluso solo localmente tramite `.git/info/exclude`. Riutilizzare output e
+manifest originali; nessuna rebuild o ripetizione dei test riusciti.
+
+**Prossimo gate HUMAN_REQUIRED:** sola installazione della candidata invariata
+e verifica bytes/metadata/receipt/default label nella VM secondo
+`deployment/plasma-login-opt-in/README.md`, lettore assente e desktop aperto.
+Install/remove minimali già verificati su fixture; restano da osservare il
+deployment e i contesti reali prima di lasciare la sessione. Nessun logout,
+reboot o prova login in questo gate. Nessun PASS login/update dedotto dai test;
 R5 resta bloccata finché gli exit criteria R4 non sono chiusi.
 
 Una volta ottenuti:

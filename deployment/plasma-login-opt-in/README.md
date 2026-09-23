@@ -1,23 +1,46 @@
 # Plasma Login: explicit empty-field fingerprint choice
 
-**Current gate: human VM build and synthetic tests only. No installation or
-login test yet.** R4 is open and R5 is blocked. The qualified R3 runtime and
+**Current gate: human VM installation and file/label verification only, with
+the desktop open and reader detached. No logout or login test yet.**
+The build/synthetic-test gate is accepted PASS; do not repeat it.
+R4 is open and R5 is blocked. The qualified R3 runtime and
 RIGHT-index template stored as `left-index-finger` stay unchanged.
 
 [Architecture, alternatives and evidence](../../docs/R4_PLASMA_LOGIN_INTEGRATION.md)
 explain the current-vendor composition and its remaining qualification limits.
 This is a small independent PAM selector, not a rebuilt Plasma component.
 
-## Run now, in the existing VM
+## Accepted build and preserved output
 
-Keep the desktop open, the Goodix reader detached from the VM, and SELinux
-Enforcing. Use the ordinary user, not root. This builds only the new selector
-and its synthetic tests; it does not rebuild or reinstall R3. Required existing
-tools are gcc, pam-devel, Python 3, Git, RPM and the normal Fedora utilities.
-If a dependency is missing, stop and report that error; do not improvise a
-package transaction in this step.
+The user reports `PLASMA_LOGIN_VM_BUILD_TESTS=PASS`, `Ran 11 tests / OK` and
+`INSTALLATION=NOT_PERFORMED` from source
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6`. The initial missing pam-devel STOP
+was before compilation; the user installed that build dependency in the VM
+and completed the gate. No runtime/PAM corrective or repeat build is required.
 
-From the VM's private clone on `development`, paste this block as a whole:
+The original output `/tmp/goodix-login-build.OeCmF8Ja` was copied intact to
+`development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`
+inside the VM clone. It is excluded only through that clone's `.git/info/exclude`,
+not tracked or added to `.gitignore`. Keep the copy and its original manifests.
+The production module has fixed vendor paths, independent of its build directory.
+The test-only `gate-test.so` embeds temporary fixture paths: do not install it
+or rerun the relocated test binaries. The manager selects only the production
+module, its PAM entry and the saved inverse.
+
+## Run now: install the reviewed output, keep the desktop open
+
+Use the existing Fedora 44 KDE VM, with SELinux Enforcing, reader detached,
+and your working desktop session open. Run the block from the ordinary user's
+private clone. The sole privileged step is the explicit sudo install; the usual
+sudo password may be requested. sudo's stock PAM may activate fprintd with the
+reader absent; the installer does not operate services or authenticate a login.
+
+This gate verifies deployment paths and Fedora's actual SELinux file labels
+before a later login test. It does not prove that the login helper can load the
+module or authenticate. Do not logout, reboot, attach the reader, change policy,
+run enroll/verify, restart the display manager or perform a login during this gate.
+
+Paste the entire block; any failure stops it:
 
 ```bash
 (
@@ -26,57 +49,87 @@ From the VM's private clone on `development`, paste this block as a whole:
     test "$(git branch --show-current)" = development
     test -z "$(git status --porcelain)"
     git pull --ff-only origin development
-    git rev-parse HEAD
-    bash deployment/plasma-login-opt-in/build-vm.sh
+    printf 'GUIDE_CHECKOUT=%s\n' "$(git rev-parse HEAD)"
+    r4_source=6fc6e640710885954d9e6fd603b3bc47b45d2ac6
+    git diff --exit-code "$r4_source" HEAD -- \
+        deployment/plasma-login-opt-in/manage.py \
+        deployment/plasma-login-opt-in/pam_goodix_login_gate.c \
+        deployment/plasma-login-opt-in/plasmalogin.pam
+    r4_build="$PWD/development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja"
+    # Read-only: validate all four manifest entries before executing the saved inverse.
+    python3 -I -B - "$r4_build" "$r4_source" <<'PY'
+import importlib.util
+from pathlib import Path
+import sys
+spec = importlib.util.spec_from_file_location('manager', 'deployment/plasma-login-opt-in/manage.py')
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+data = m.candidate(Path(sys.argv[1]))
+m.require(data['SOURCE_COMMIT'] == (sys.argv[2] + '\n').encode(), 'unexpected build source')
+m.require(data['plasmalogin.pam'] == Path('deployment/plasma-login-opt-in/plasmalogin.pam').read_bytes(), 'PAM source mismatch')
+print('R4_LOGIN_SAVED_BUILD=PASS SOURCE_COMMIT=' + sys.argv[2])
+PY
+    r4_vendor_before=$(sha256sum /usr/lib/pam.d/plasmalogin)
+    sudo python3 -I -B "$r4_build/manage.py" install "$r4_build"
+
+    # Read-only activation checks; no PAM transaction is invoked.
+    python3 -I -B - "$r4_build" <<'PY'
+import importlib.util
+import json
+from pathlib import Path
+import sys
+spec = importlib.util.spec_from_file_location('manager', 'deployment/plasma-login-opt-in/manage.py')
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+data = m.candidate(Path(sys.argv[1]))
+m.trusted(m.SUPPORT, directory=True, mode=0o755)
+m.require({p.name for p in m.SUPPORT.iterdir()} == {m.MODULE, 'manage.py', 'receipt.json'}, 'unexpected support contents')
+for installed, expected in ((m.CONFIG, data['plasmalogin.pam']), (m.SUPPORT / m.MODULE, data[m.MODULE]), (m.SUPPORT / 'manage.py', data['manage.py'])):
+    m.trusted(installed, mode=0o644)
+    m.require(m.read_regular(installed) == expected, 'installed bytes differ: ' + str(installed))
+m.trusted(m.SUPPORT / 'receipt.json', mode=0o644)
+expected = {'schema': 1, 'source_commit': data['SOURCE_COMMIT'].decode().strip(), 'files': {name: m.digest(data[name]) for name in (m.MODULE, 'manage.py')}, 'config_sha256': m.digest(data['plasmalogin.pam'])}
+m.require(json.loads(m.read_regular(m.SUPPORT / 'receipt.json')) == expected, 'receipt mismatch')
+print('R4_LOGIN_INSTALLED_FILES=PASS')
+PY
+    test "$(sha256sum /usr/lib/pam.d/plasmalogin)" = "$r4_vendor_before"
+    matchpathcon -V /etc/pam.d/plasmalogin \
+        /usr/local/lib64/goodix-plasma-login \
+        /usr/local/lib64/goodix-plasma-login/pam_goodix_login_gate.so \
+        /usr/local/lib64/goodix-plasma-login/manage.py \
+        /usr/local/lib64/goodix-plasma-login/receipt.json
+    test -z "$(git status --porcelain)"
+    printf '%s\n' 'R4_PLASMA_INSTALL=PASS SENSOR_CONNECTED=false LOGIN_TEST=NOT_PERFORMED'
 )
 ```
 
-The build script enforces VM/Fedora 44/x86_64, non-root, Enforcing, reader
-absence from USB metadata and a clean `development` checkout. It records the
-full source commit and hashes its output. The temporary directory printed as
-`BUILD_OUTPUT` contains the candidate and can remain for review.
+The unchanged installer enforces root, VM/Fedora 44/x86_64, Enforcing and reader
+absence from USB metadata, verifies the current vendor file's ownership, and
+refuses existing project paths. It prepares and labels the module/inverse before
+publishing the PAM entry last. The vendor hash comparison is only a before/after
+check for this installation, not a saved Fedora copy or a runtime version pin.
 
-The C unit test supplies fake tokens and temporary configuration text. The
-dispatcher test uses the VM's actual libpam with `pam_start_confdir`, a private
-temporary service and synthetic modules, including a test-path variant of the
-real selector. Every module/include path is restricted to test inputs. It never
-loads pam_unix, pam_fprintd, the real SELinux module or the system login service.
-There is no real user authentication, secret, fprintd call, service action, USB
-open or sensor command. Python lifecycle tests mock host/privilege operations.
+**PASS_IF:** exit 0, `R4_LOGIN_SAVED_BUILD=PASS`, `PLASMA_LOGIN_INSTALL=PASS`,
+`R4_LOGIN_INSTALLED_FILES=PASS`, matching default contexts and the final
+`R4_PLASMA_INSTALL=PASS ... LOGIN_TEST=NOT_PERFORMED`. The desktop stays usable,
+reader detached, R3 runtime/template unchanged. Keep this successful installation.
 
-**PASS_IF:** the command exits 0, all unit/dispatch/lifecycle cases pass, and the
-last output includes `PLASMA_LOGIN_VM_BUILD_TESTS=PASS`, `BUILD_OUTPUT=...` and
-`INSTALLATION=NOT_PERFORMED`.
+**FAIL_IF / STOP_IF:** any failed prerequisite, collision, changed manifest/source,
+install or verification error, unexpected label or desktop regression. Preserve
+the error and stop; do not repair Fedora/PAM, change SELinux policy or permissions,
+rebuild, bypass checks or force an overwrite. A failure before installation makes
+no project change. On failure after installation use the inverse below while
+the desktop remains open; do not proceed to login.
 
-**FAIL_IF / STOP_IF:** any command, compilation, assertion, prerequisite or
-source-integrity check fails. Do not bypass a check, install the output, use
-sudo, connect the reader, log out, reboot, or try a password/fingerprint login.
-The missing-reset negative test is expected to observe a synthetic credential
-failure internally; the overall test must nevertheless exit successfully.
+Report `GUIDE_CHECKOUT`, the block's output and observed failure point if any.
+Confirm desktop open, sensor detached, no login test, R3 runtime/template retained,
+and whether rollback was necessary. No journal or broad diagnostic query is
+requested. **Stop after this checkpoint for review of the installed state.**
 
-Report the full checkout SHA, output from this small build/test block and its
-`BUILD_OUTPUT` path. Confirm reader detached, no install/login/USB action and
-runtime/template unchanged. No additional system log query is requested.
-After PASS, stop for review; no automatic continuation to installation.
+## Owned installation and inverse
 
-**Rollback for this gate:** none is needed on the system because no runtime
-configuration was changed. Keep the build directory for review. A failed build
-does not require uninstalling the working R3 runtime or deleting its template.
-
-## Owned installation and inverse (prepared, not the current procedure)
-
-The installation/removal implementation is supplied now for audit. It becomes
-an operator procedure only after the VM results and a separate concrete login
-handoff have been reviewed. Do not execute it during the build/test gate.
-
-Future installation entry point, from the printed build directory:
-`sudo python3 "$BUILD_OUTPUT/manage.py" install "$BUILD_OUTPUT"`.
-This is one ordinary sudo authorization, with the sensor detached. It verifies
-the build manifest and completed VM tests, environment, current vendor package
-ownership and absence of colliding files. It labels the support files before
-publishing the PAM entry atomically, last. It starts/restarts no service and
-performs no authentication. The directory variable must be set explicitly to
-the actual output; it is not populated in the parent shell by the build script.
+Only the following project files become effective; there is no service restart
+or load-check. File-label verification is not proof of runtime SELinux permission.
 
 | Project-owned path | Installation effect | Inverse |
 | --- | --- | --- |
@@ -91,19 +144,38 @@ No vendor backup is replayed. The existing R3 runtime under its separate
 `goodix-27c6-5125` directory and saved inverse are untouched. Authselect, template
 contents, protected material, firmware and persistent device state are untouched.
 
-The corresponding future rollback is:
-`sudo python3 /usr/local/lib64/goodix-plasma-login/manage.py uninstall`.
-Run it on a real installation FAIL, instability/regression, or explicit request;
-keep a successful validated advancement by default. The reader must be detached.
+The corresponding rollback, only on installation/verification FAIL,
+instability/regression or explicit request, is below. Keep the reader detached
+and the desktop open. Use the preserved candidate's identical inverse so that
+partial installation/removal is also recoverable. The installed identical copy
+is `/usr/local/lib64/goodix-plasma-login/manage.py`.
+
+```bash
+(
+    set -euo pipefail
+    cd "$(git rev-parse --show-toplevel)"
+    r4_build="$PWD/development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja"
+    git show 6fc6e640710885954d9e6fd603b3bc47b45d2ac6:deployment/plasma-login-opt-in/manage.py | cmp - "$r4_build/manage.py"
+    sudo python3 -I -B "$r4_build/manage.py" uninstall
+    test ! -e /etc/pam.d/plasmalogin
+    test ! -L /etc/pam.d/plasmalogin
+    test ! -e /usr/local/lib64/goodix-plasma-login
+    test ! -L /usr/local/lib64/goodix-plasma-login
+    test -f /usr/lib/pam.d/plasmalogin
+    printf '%s\n' 'R4_PLASMA_ROLLBACK=PASS CURRENT_VENDOR_VISIBLE=true'
+)
+```
+
 The inverse checks ownership and hashes, refuses foreign modifications, removes
 the project entry before its module, and exposes the **current** packaged PAM.
 It does not restore an old Fedora snapshot. A repeated removal with everything
 already absent is harmless when using the same saved candidate's `manage.py`.
 Keep this candidate/versioned inverse available even after later source changes.
 
-For later install/remove review, expected state is the exact table above or its
-complete absence respectively, with vendor files unchanged and normal stock
-login available after removal. SELinux loading, real login/password fallback,
-contact telemetry and package-update behavior are still untested. Their normal
-workflow, observable PASS/FAIL criteria and any necessary targeted diagnosis
-will be specified in the later login handoff; this README does not grant a live.
+If removal refuses a foreign/changed file, stop and report the refusal; do not
+delete it manually. Expected final state is the table above after install PASS,
+or its complete absence and current vendor configuration visible after rollback.
+No R3 uninstall, template deletion or restoration of old Fedora files is needed.
+SELinux runtime loading, real login/password fallback, contact telemetry and
+package-update behavior remain untested. Their normal workflow and observable
+criteria belong to the subsequent login handoff.

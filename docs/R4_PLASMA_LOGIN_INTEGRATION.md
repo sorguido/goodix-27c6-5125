@@ -1,10 +1,45 @@
 # R4 — explicit fingerprint choice at Plasma Login
 
-Status: **implemented candidate for sensor-free VM checks; not installed or live-qualified**.
+Status: **VM build/synthetic tests accepted PASS; installation checkpoint prepared;
+not installed or login-qualified**.
 Baseline for this review: `4997fe47825cb1748bf34650b3b2eaaedb9dba49`.
 The user superseded the proposed login-limitation/R5 transition. R4 stays open,
 Plasma fingerprint login is required, and R5 stays blocked. No obsolete R5 files
 or commits existed in the clean checkout when this replan started.
+
+## VM gate review and next boundary
+
+The human's `CODEX_MINI_RESUME_R4_PLASMA_BUILD_PASS.md` reports source
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6`, the final
+`PLASMA_LOGIN_VM_BUILD_TESTS=PASS` marker, 11 lifecycle tests OK and
+`INSTALLATION=NOT_PERFORMED`. The marker follows compilation, C unit tests,
+actual libpam synthetic dispatch and lifecycle tests in the versioned script;
+the reported completion is accepted. Individual C-case output, binary hashes
+and a fresh RPM inventory were not supplied and are not invented. The test
+sets contain 33 C unit cases and 16 dispatcher cases; these counts come from
+source review, not a separately quoted VM transcript. The initial missing
+pam-devel STOP was before build; the user installed that build dependency and
+completed the gate. No runtime corrective or new build is justified.
+
+The user preserved the complete `/tmp/goodix-login-build.OeCmF8Ja` directory at
+`development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja`
+inside the VM clone, excluded only through local `.git/info/exclude`, with
+clean Git status. The production module and manager have no dependency on the
+original build directory. The synthetic gate variant has compiled temporary
+fixture paths and must not be installed or rerun from the moved copy.
+Build artifacts remain local, untracked and outside the review/export set.
+
+**ACCEPT_AND_CONTINUE:** reuse the unchanged production output for the small
+installation checkpoint in the [README](../deployment/plasma-login-opt-in/README.md).
+The handoff checks its manifest, source/PAM/manager bytes, installed files,
+receipt and labels; execution is still pending. No Plasma Login PAM transaction
+or sensor access is requested; ordinary sudo authentication is expected. Actual file
+deployment/SELinux labels were mocked in lifecycle tests, so this checkpoint
+precedes leaving the working desktop. Installer/inverse/module/PAM source stay
+byte-for-byte unchanged from the tested commit. The source SHA is provenance,
+not a second authorization mechanism. Keep the installation on success; use
+the preserved identical inverse on failure/regression. Real login, runtime
+SELinux loading and update survivability remain unqualified; R4 stays open.
 
 ## Evidence and the supported option A
 
@@ -133,8 +168,9 @@ The reset is necessary for **pam_setcred**, not just pam_authenticate. Linux-PAM
 reuses authentication routing for credential establishment; a numerical jump
 can contribute the missing module's error before the vendor runs. The reset
 clears only the project prefix's accumulated result. The included VM regression
-test must demonstrate both the broken prefix without reset and the corrected
-case using the real library, including the SELinux-success branch. See
+test covers both the broken prefix without reset and the corrected case using
+the real library, including the SELinux-success branch; its containing gate
+is now reported PASS as scoped above. See
 [dispatcher implementation](https://raw.githubusercontent.com/linux-pam/linux-pam/v1.7.2/libpam/pam_dispatch.c)
 and [token API](https://raw.githubusercontent.com/linux-pam/linux-pam/v1.7.2/libpam/pam_get_authtok.c).
 
@@ -159,9 +195,9 @@ series. Source review and synthetic tests cannot claim these live observations.
 
 | Change/failure | Intended result | Qualification |
 | --- | --- | --- |
-| Gate missing/unloadable, token/config check fails | Current vendor password path; no fingerprint | Real PAM VM regression pending |
-| Current vendor auth policy changes in any of the three files | Fingerprint disabled; current password/auth policy used | C fixture checks prepared |
-| Current account/session/password-change rules change | New rules read directly | Real PAM include checks prepared |
+| Gate missing/unloadable, token/config check fails | Current vendor password path; no fingerprint | Synthetic PAM gate accepted PASS; real login pending |
+| Current vendor auth policy changes in any of the three files | Fingerprint disabled; current password/auth policy used | C fixture gate accepted PASS |
+| Current account/session/password-change rules change | New rules read directly | Account/session synthetic cases in accepted gate; password-change not exercised |
 | fprintd/module/device unavailable | Chosen fingerprint series fails; next password submission skips it | Synthetic dispatch plus later live required |
 | Content update at the vendor's packaged path | No frozen copy masks it; compatible fingerprint may remain available | R5 update validation still blocked |
 | Remove integration | Remove owned override first; current Fedora configuration becomes visible | Synthetic lifecycle checks; no stock backup replay |
@@ -198,6 +234,6 @@ is not attributed to the D295/02 run without provenance.
 
 Option B has not been excluded, so option D (private Plasma/greeter or VT work)
 is neither selected nor implemented. R3 and the other three consumer PASSes
-remain preserved. The next boundary is solely human VM build and synthetic
-PAM tests with no reader, no root and no system PAM installation. A live login
-procedure is not ready until those results have been reviewed.
+remain preserved. The next boundary is solely human VM installation/file-label
+verification with the reader absent and desktop open, using the accepted build.
+The subsequent real-login procedure awaits review of that deployment state.
