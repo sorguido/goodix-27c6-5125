@@ -476,13 +476,24 @@ Output conservato in
 escluso solo localmente tramite `.git/info/exclude`. Riutilizzare output e
 manifest originali; nessuna rebuild o ripetizione dei test riusciti.
 
-**Prossimo gate HUMAN_REQUIRED:** sola installazione della candidata invariata
-e verifica bytes/metadata/receipt/default label nella VM secondo
-`deployment/plasma-login-opt-in/README.md`, lettore assente e desktop aperto.
-Install/remove minimali già verificati su fixture; restano da osservare il
-deployment e i contesti reali prima di lasciare la sessione. Nessun logout,
-reboot o prova login in questo gate. Nessun PASS login/update dedotto dai test;
-R5 resta bloccata finché gli exit criteria R4 non sono chiusi.
+**Installazione VM PASS accettata**, guida checkout
+`24c3018071e8d120687ff8fbd2f344cde620692d`, stesso source/output preservato:
+manifest/source, installazione, bytes/metadata/receipt, cinque default-label
+check, hash vendor invariato e worktree pulito riportati dall'Utente. Desktop
+aperto, sensore assente, nessun logout/reboot/login; R3 runtime/template mantenuti.
+Nessuna rebuild/reinstallazione o rollback su PASS. I default label non provano
+ancora il caricamento del modulo nel dominio SELinux del login helper.
+
+**Prossimo gate HUMAN_REQUIRED:** procedura reviewata
+`deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md`: normale logout e password
+a lettore assente senza attesa fingerprint; soltanto dopo PASS, una serie
+opt-in Invio vuoto con indice DESTRO, massimo tre contatti e stop al MATCH.
+Il greeter può riabilitare il campo su errori PAM intermedi: nessuna nuova
+submission/contatto su feedback generico ambiguo, detach prima del fallback.
+Telemetria esistente e cleanup minimi, inversa della sola integrazione login
+su FAIL/regressione; nessuna recovery TTY o vendor repair. Se MATCH immediato,
+il fallback dopo failure resta non esercitato. Nessun PASS login/update dedotto;
+R4 aperta e R5 bloccata finché gli exit criteria R4 non sono chiusi.
 
 Una volta ottenuti:
 

@@ -1,7 +1,7 @@
 # R4 — explicit fingerprint choice at Plasma Login
 
-Status: **VM build/synthetic tests accepted PASS; installation checkpoint prepared;
-not installed or login-qualified**.
+Status: **VM build/tests and installation accepted PASS; real password/fingerprint
+login procedure reviewed and at HUMAN_REQUIRED. Login remains unqualified**.
 Baseline for this review: `4997fe47825cb1748bf34650b3b2eaaedb9dba49`.
 The user superseded the proposed login-limitation/R5 transition. R4 stays open,
 Plasma fingerprint login is required, and R5 stays blocked. No obsolete R5 files
@@ -29,17 +29,27 @@ original build directory. The synthetic gate variant has compiled temporary
 fixture paths and must not be installed or rerun from the moved copy.
 Build artifacts remain local, untracked and outside the review/export set.
 
-**ACCEPT_AND_CONTINUE:** reuse the unchanged production output for the small
-installation checkpoint in the [README](../deployment/plasma-login-opt-in/README.md).
-The handoff checks its manifest, source/PAM/manager bytes, installed files,
-receipt and labels; execution is still pending. No Plasma Login PAM transaction
-or sensor access is requested; ordinary sudo authentication is expected. Actual file
-deployment/SELinux labels were mocked in lifecycle tests, so this checkpoint
-precedes leaving the working desktop. Installer/inverse/module/PAM source stay
-byte-for-byte unchanged from the tested commit. The source SHA is provenance,
-not a second authorization mechanism. Keep the installation on success; use
-the preserved identical inverse on failure/regression. Real login, runtime
-SELinux loading and update survivability remain unqualified; R4 stays open.
+**Installation review: ACCEPT_AND_CONTINUE.** The subsequent
+`CODEX_MINI_RESUME_R4_PLASMA_INSTALL_PASS.md` identifies guide checkout
+`24c3018071e8d120687ff8fbd2f344cde620692d` and the same source/output above.
+It reports `R4_LOGIN_SAVED_BUILD=PASS`, `PLASMA_LOGIN_INSTALL=PASS`,
+`R4_LOGIN_INSTALLED_FILES=PASS`, all five default-label checks and
+`R4_PLASMA_INSTALL=PASS SENSOR_CONNECTED=false LOGIN_TEST=NOT_PERFORMED`.
+Silent vendor-hash and clean-worktree checks also passed. Review of the exact
+[procedure](../deployment/plasma-login-opt-in/README.md) and manager confirms
+manifest/source validation, installed bytes, root ownership/modes, exact receipt
+and support contents, with publication of the PAM entry last. Installer, inverse,
+module, PAM and tests have no delta from the tested source. This accepts the
+human's deployment evidence; it does not claim direct guest inspection or
+invent binary hashes, label strings or a fresh fprintd state.
+
+Desktop remained open, reader detached, no logout/reboot/login, R3 runtime and
+template preserved. Keep the installation without rebuild/reinstall/rollback.
+Default file labels do not prove SELinux permission in the real login helper.
+The next [human VM gate](../deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md)
+uses normal logout/password login while detached, then only on password PASS a
+single explicit fingerprint series. Real login and update safety are not yet
+qualified. No R5 work is authorized by this installation PASS.
 
 ## Evidence and the supported option A
 
@@ -47,7 +57,7 @@ The human's completed login configuration query reports guest checkout
 `725b3c1f8bf879b9e56632b4f15da494968cead7`, Fedora 44 KDE Wayland,
 `plasma-login-manager-6.7.5-1.fc44`, PAM `1.7.2-2.fc44`, authselect
 `1.7.1-1.fc44`, systemd `259.9-1.fc44`, and fprintd-pam `1.94.5-5.fc44`.
-The active display manager is stock `plasmalogin.service`, with stock
+At that preflight the active display manager was stock `plasmalogin.service`, with stock
 `/usr/bin/plasmalogin`, no local normal-login PAM override, no autologin user,
 and valid authselect `local` with `with-fingerprint` already enabled.
 
@@ -185,11 +195,28 @@ is added. Driver epoch/capture telemetry remains the evidence for real contacts.
 
 On exhaustion/unavailability the prefix resets and the vendor evaluates the
 empty submission normally; for the laboratory account with a password this
-fails and returns to the greeter. `Main.qml::onLoginFailed` re-enables the UI;
-`Display::startAuth` rejects a concurrently active authentication. No automatic
-second GUI submission was found. The eventual human live must still verify
-return to the field, at most three contacts, first-MATCH stop and no second
-series. Source review and synthetic tests cannot claim these live observations.
+fails and returns to the greeter. `Display::startAuth` rejects a concurrently
+active authentication; no automatic second GUI submission was found.
+
+**Pre-live source-review correction:** `Main.qml::onLoginFailed` re-enables the
+UI, but that signal does not prove terminal PAM completion. `PamBackend::converse`
+maps each `PAM_ERROR_MSG` to `ERROR_AUTHENTICATION`; `Display::slotAuthError`
+emits `loginFailed` immediately. Stock pam_fprintd sends such an error for each
+NO_MATCH before continuing its bounded loop. Thus the field may be enabled and
+show generic failure while a second VerifyStart is already pending. Also,
+`GreeterProxy::informationMessage` has no display handler in the audited stock
+frontend, so no visible finger-specific prompt is promised. These are source
+findings, not new VM observations or a reason to modify private Plasma code.
+
+The procedure forbids resubmission during the series and additional contacts
+on generic/ambiguous feedback. Up to three are available in PAM; continuation
+requires an unambiguous native NO_MATCH/new request. After a STOP, detach before
+password recovery and allow the outstanding call to end; a conservative wait
+around the 30-second per-attempt timeout is an operator margin, not a guarantee
+against a hung helper. A failed password return is a blocker. A successful
+first MATCH does not exercise failure fallback, which remains explicitly
+unobserved in that run. Source review/synthetic tests do not substitute for
+real session startup, contact/cleanup evidence or measured password access.
 
 ## Update and uninstall model
 
@@ -234,6 +261,9 @@ is not attributed to the D295/02 run without provenance.
 
 Option B has not been excluded, so option D (private Plasma/greeter or VT work)
 is neither selected nor implemented. R3 and the other three consumer PASSes
-remain preserved. The next boundary is solely human VM installation/file-label
-verification with the reader absent and desktop open, using the accepted build.
-The subsequent real-login procedure awaits review of that deployment state.
+remain preserved. The installation checkpoint is accepted; the next boundary
+is human VM password login, then conditional opt-in fingerprint, with cleanup
+and the saved inverse only on FAIL/regression. No source corrective or rebuild
+is required to enter that reviewed gate. If password/desktop access is lost,
+the inverse cannot be presumed executable from that desktop: stop and report
+instead of inventing a TTY, snapshot or alternate privileged recovery path.

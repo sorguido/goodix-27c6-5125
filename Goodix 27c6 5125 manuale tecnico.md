@@ -16,7 +16,7 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 Plasma build/test VM PASS, installazione al gate (23 settembre 2026)
+### Stato corrente — R4 Plasma installazione VM PASS, login reale al gate (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
 L'handoff `CODEX_SUPERSEDING_R4_PLASMA_LOGIN_REPLAN.md` revoca espressamente
@@ -34,8 +34,8 @@ baseline. Review della source reference Fedora 6.7.5 e dei patchset: nessun
 selettore nativo di servizio biometrico. Non richiedere una live stock destinata
 a non acquisire. Questa diagnosi resta evidenza, non una limitation accettabile.
 
-**CURRENT_TASK: installazione VM della candidata minima PAM opt-in già costruita
-e verificata, con sensore assente e desktop aperto.**
+**CURRENT_TASK: prima qualifica login reale VM della candidata PAM opt-in
+installata: password a sensore assente, poi fingerprint soltanto dopo PASS.**
 La decisione UX esplicita successiva accetta Invio a campo vuoto come scelta
 fingerprint: password non vuota inviata subito al vendor senza attesa biometrica;
 campo temporaneamente disabilitato durante la serie scelta e disponibile dopo
@@ -68,17 +68,33 @@ Il nuovo handoff riutilizza modulo production, manifest e inversa invariati;
 la variante test gate-test.so ha path fixture temporanei e non va installata
 o rieseguita dalla copia spostata. Nessuna rebuild o ripetizione dei PASS.
 
-**HUMAN_REQUIRED per la sola installazione e verifica file/hash/label nella VM**
-(roadmap §4 e AGENTS §6.1/§6.2). README pronto con installazione e rollback
-della copia preservata: sensore assente e desktop aperto; nessun logout, login
-o nuovo collegamento USB. La verifica del deployment reale viene prima di
-chiudere la sessione funzionante. Build e fixture non provano ancora caricamento
-nel dominio SELinux del login helper, autenticazione reale o update safety.
+L'handoff `CODEX_MINI_RESUME_R4_PLASMA_INSTALL_PASS.md`, checkout guida
+`24c3018071e8d120687ff8fbd2f344cde620692d`, riporta tutti i marker installativi
+PASS, cinque default-label check, hash PAM vendor invariato e worktree pulito.
+**ACCEPT_AND_CONTINUE sull'installazione:** bytes/metadata/receipt verificati
+secondo il blocco versionato, stesso output/source 6fc6e64. Desktop aperto,
+lettore assente, nessun logout/reboot/login; runtime R3/template mantenuti.
+Nessuna rebuild, reinstallazione o rollback su questo PASS. Non è una misura
+nuova dello stato fprintd né un'ispezione diretta AI dei file guest.
+
+**HUMAN_REQUIRED per logout/login password e successiva serie opt-in nella VM**
+(roadmap §4 e AGENTS §6.1/§6.2), procedura reviewata in
+`deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md`. Prima password non vuota
+senza sensore/attesa fingerprint; soltanto dopo PASS, una scelta Invio vuoto e
+indice DESTRO, fino a tre contatti, stop al MATCH o feedback ambiguo. Review
+sorgente: il greeter può mostrare Login Failed e riabilitare il campo anche
+su errore PAM intermedio; non è prova di fine serie. Nessun nuovo Invio durante
+la serie, detach prima del ritorno password. Telemetria minima e cleanup dopo
+logout usano un timestamp UTC annotato, non una variabile persa con la sessione.
+Installazione/default label non provano ancora caricamento nel dominio SELinux
+del login helper, autenticazione reale o update safety. Il fallback dopo failure
+non viene dichiarato esercitato se la serie passa subito al MATCH.
 Il modello fingerprint-only è proposto entro il contratto corrente del path
 vendor `/usr/lib/pam.d/plasmalogin`, non una qualifica R5: rimozione/relocation
 incompatibile del vendor può bloccare il login e resta rischio classe A da
 risolvere se introdotto da un update normale, mai outcome accettabile di release.
-Nessun file package-owned, runtime R3, template o policy SELinux modificato.
+L'unico delta installato è l'integrazione login project-owned inventariata;
+nessun file package-owned, runtime R3, template o policy SELinux modificato.
 
 **Precedente ACCEPT_AND_CONTINUE sulla live stock
 PolicyKit; SUPPORTED_ON_TESTED_BASELINE.** Password reale di guido con lettore
@@ -1976,7 +1992,8 @@ con questa differenza del pacchetto. Non sono riportati stat effettivi;
 non si dichiara equivalenza esatta dei valori o innocuità universale e non si
 correggono permessi. La sessione attiva non è un nuovo PASS password login.
 
-Nessun `/etc/pam.d/plasmalogin{,-autologin,-greeter}`. Normal auth vendor:
+Al preflight nessun `/etc/pam.d/plasmalogin{,-autologin,-greeter}`; la successiva
+installazione R4 aggiunge soltanto il primo, come descritto sotto. Normal auth vendor:
 pam_selinux_permit, substack password-auth, wallet opzionali e include postlogin.
 password-auth contiene env/faildelay/unix/deny senza fprintd; postlogin non ha
 auth. L'auth di fingerprint-auth/system-auth non è raggiunta da questo login.
@@ -2099,10 +2116,77 @@ vuoto; modifica solo documentale, nessuna nuova build richiesta. Review PM
 successiva sui file reali: consegna accettata per installazione VM, arresto
 HUMAN_REQUIRED prima della mutazione privilegiata. Nessun gate login superato.
 
+#### Plasma Login — closure installazione e procedura login reale
+
+Recovery da `24c3018071e8d120687ff8fbd2f344cde620692d`, development pulito.
+L'handoff installativo identifica esattamente quel checkout guida, source
+`6fc6e640710885954d9e6fd603b3bc47b45d2ac6` e la stessa copia guest preservata.
+Riporta `R4_LOGIN_SAVED_BUILD=PASS`, `PLASMA_LOGIN_INSTALL=PASS`,
+`R4_LOGIN_INSTALLED_FILES=PASS`, i cinque path verified e
+`R4_PLASMA_INSTALL=PASS SENSOR_CONNECTED=false LOGIN_TEST=NOT_PERFORMED`.
+Conferma esplicitamente i check silenziosi: hash vendor invariato, worktree
+pulito e default label verificati. Nessun valore di hash binario/context string
+ulteriore viene inventato. Desktop aperto, nessun logout/reboot/attach/login,
+R3 e template conservati. Non è fornita una misura fprintd successiva a sudo;
+il cleanup PolicyKit resta storico, non viene riciclato come misura installativa.
+
+**Review PM installazione: ACCEPT_AND_CONTINUE.** Verificati direttamente README
+al checkout dichiarato, manager e diff rispetto al source: manifest/input esatti,
+provenance, bytes installati, ownership root/root e modi, receipt completo e
+insieme esatto dei file supporto. Pubblicazione entry PAM per ultima e inverse
+con rimozione entry per prima, nessun replay vendor. I marker riportati sono
+coerenti con quel percorso; l'accettazione usa evidenza Utente, non accesso VM
+AI. Default label PASS chiude il checkpoint file, non il caricamento runtime
+nel dominio helper. Nessun difetto installativo osservato giustifica rebuild,
+reinstall o rollback; mantenere l'avanzamento.
+
+**Delta autonomo minimo:** guida del normale logout/login in
+`deployment/plasma-login-opt-in/R4_PLASMA_LOGIN_VM.md`. Password prima con lettore
+assente, collegamento soltanto al successivo greeter e dopo PASS password,
+Invio vuoto esplicito e indice DESTRO. Limite nativo max-tries=3/timeout=30 per
+tentativo e fence driver invariati, niente quarto contatto o seconda serie.
+Solo la telemetria esistente nel breve intervallo annotato viene richiesta,
+dopo detach/stop fprintd. Non si crea collector/kit, recovery service o nuovo
+Dxxx. Guida di installazione conservata come completata; inverse esatta sempre
+disponibile, solo FAIL/regressione rimuove questa integrazione, non il runtime R3.
+
+**Nuova precisazione di source review:** PamBackend::converse traduce ogni
+PAM_ERROR_MSG in ERROR_AUTHENTICATION; Display::slotAuthError emette subito
+loginFailed. Stock pam_fprintd usa PAM_ERROR_MSG anche sul primo/secondo
+NO_MATCH, prima di proseguire il proprio ciclo bounded. Main.qml riabilita
+quindi il campo anche prima del termine PAM. GreeterProxy emette inoltre
+informationMessage, ma nel frontend stock auditato manca un handler che mostri
+quei prompt; non promettere un messaggio dito visibile. Le evidenze sono nei
+file immutabili di `reference/plasma-login-manager-fedora44-6.7.5/source/` e
+`reference/fprintd-fedora44-1.94.5/source/pam/pam_fprintd.c`. Nessuna nuova
+osservazione live o causa di failure VM viene dedotta da questo audit.
+
+La procedura non tratta generic Login Failed/campo abilitato come segnale
+terminale: altri contatti solo su NO_MATCH/richiesta nativa inequivoci, altrimenti
+STOP e detach. Nessun invio ripetuto. Ritorno password dopo il termine atteso
+del PAM corrente, con margine operatore 40 secondi dopo detach attorno al timeout
+di 30 e normale rifiuto vendor; il margine non prova recovery da helper bloccato.
+Password non vuota salta fingerprint; accesso password/desktop fallito resta
+blocker, non limitation accettabile. Se il desktop non è raggiungibile, rollback
+PENDING_NO_DESKTOP: non si presume TTY, snapshot o accesso privilegiato alternativo.
+Se MATCH immediato, fallback negativo NOT_EXERCISED; nessuna serie artificiale
+aggiuntiva per trasformarlo in PASS. Questo è il primo login della nuova
+candidata; non è una ripetizione del vecchio failure VT con diverso pacing.
+
+**Executable closure offline della guida:** sintassi Bash, heredoc Python,
+import da cwd repository e timestamp UTC verificati senza runtime/PAM/USB;
+sei casi con comandi servizio/journal sostituiti verificano cleanup prima del
+rifiuto di timestamp assente/invalido e assenza di query dopo errore dello stop.
+Link, diff e manifest delle due source reference PASS. Il controllo source conferma invariati modulo, PAM,
+install/inversa, test e runtime R3. La review della procedura riguarda ordine
+dei gate, password prima dell'attach, feedback non necessariamente terminale,
+limite stock, timestamp tra sessioni, cleanup e rollback. Login/password/fallback
+e SELinux runtime restano da osservare; R4 aperta e R5 bloccata.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=PLASMA_VM_BUILD_PASS_ACCEPTED_PRESERVED_OUTPUT_INSTALL_HANDOFF
+ADVANCEMENT=PLASMA_VM_INSTALL_PASS_ACCEPTED_NATIVE_LOGIN_PROCEDURE_REVIEWED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -2191,25 +2275,34 @@ R4_LOGIN_C_PAM_TESTS=PASS_HUMAN_REPORTED_FINAL_BUILD_MARKER
 R4_LOGIN_BUILD_SOURCE_COMMIT=6fc6e640710885954d9e6fd603b3bc47b45d2ac6
 R4_LOGIN_BUILD_PRESERVED=development/build-artifacts/plasma-login-opt-in/goodix-login-build.OeCmF8Ja
 R4_LOGIN_BUILD_EXCLUSION=GUEST_LOCAL_GIT_INFO_EXCLUDE_ONLY
-R4_LOGIN_INSTALLATION=NOT_PERFORMED
-R4_LOGIN_LIVE=NOT_READY
+R4_LOGIN_INSTALLATION=PASS_HUMAN_REPORTED
+R4_LOGIN_INSTALL_GUIDE_CHECKOUT=24c3018071e8d120687ff8fbd2f344cde620692d
+R4_LOGIN_INSTALLED_BYTES_METADATA_RECEIPT=PASS_HUMAN_REPORTED
+R4_LOGIN_DEFAULT_FILE_LABELS=PASS_HUMAN_REPORTED
+R4_LOGIN_INSTALL_VENDOR_PAM_HASH_UNCHANGED=true
+R4_LOGIN_LIVE=PROCEDURE_REVIEWED_PENDING_HUMAN_VM
+PASSWORD_LOGIN=NOT_PERFORMED
+PASSWORD_LOGIN_NO_FORCED_FINGERPRINT_WAIT=NOT_OBSERVED
+PLASMA_LOGIN_FINGERPRINT=NOT_PERFORMED
+R4_LOGIN_FAILURE_FALLBACK=SOURCE_REVIEWED_NOT_LIVE_OBSERVED
+R4_LOGIN_UI_ERROR_MAY_PRECEDE_PAM_COMPLETION=true
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=VM_BUILD_TESTS_REPORTED_PASS_INSTALL_PATH_OFFLINE_REVIEWED
+EXECUTABLE_CLOSURE=VM_INSTALL_REPORTED_PASS_NATIVE_LOGIN_GUIDE_OFFLINE_REVIEWED
 OFFLINE_SOURCE_AND_LIFECYCLE_CHECKS=PASS_11_SYNTHETIC_LIFECYCLE_TESTS
 R4_LOGIN_INSTALL_HANDOFF_OFFLINE_CHECKS=PASS_RELOCATED_FIXTURE_INTEGRITY_SYNTAX_CWD
-PM_REVIEW=ACCEPT_BUILD_PASS_HUMAN_INSTALLATION_GATE
+PM_REVIEW=ACCEPT_INSTALL_PASS_HUMAN_NATIVE_LOGIN_GATE
 RESIDUAL_BLOCKER_OR_RISK=LOGIN_UNQUALIFIED_VENDOR_PATH_CONTRACT_UPDATE_VALIDATION_PENDING
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_6fc6e640710885954d9e6fd603b3bc47b45d2ac6
+REVIEW_SET=GIT_DIFF_FROM_24c3018071e8d120687ff8fbd2f344cde620692d
 PRODUCTION_DRIVER_CHANGED=false
-PAM_AUTHSELECT_RUNTIME_DELTA=NONE
-ROADMAP_CHANGE=R4_REPLAN_AND_EXPLICIT_USER_UX_RECORDED
+PAM_AUTHSELECT_RUNTIME_DELTA=LOGIN_PROJECT_OWNED_ENTRY_AND_SUPPORT_INSTALLED_AUTHSELECT_UNCHANGED
+ROADMAP_CHANGE=R4_INSTALL_PASS_AND_NEXT_REVIEWED_LOGIN_GATE_RECORDED
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_INSTALL_VERIFY_FILES_LABELS_DESKTOP_OPEN_SENSOR_ABSENT_NO_LOGIN
+NEXT_BOUNDARY=HUMAN_VM_PASSWORD_LOGIN_SENSOR_ABSENT_THEN_CONDITIONAL_FINGERPRINT
 ```
 
 ### Governance corrente

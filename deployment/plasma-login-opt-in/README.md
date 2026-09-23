@@ -1,8 +1,10 @@
 # Plasma Login: explicit empty-field fingerprint choice
 
-**Current gate: human VM installation and file/label verification only, with
-the desktop open and reader detached. No logout or login test yet.**
-The build/synthetic-test gate is accepted PASS; do not repeat it.
+**Installation and file/default-label verification accepted PASS at
+`24c3018071e8d120687ff8fbd2f344cde620692d`; keep the installed candidate.**
+The build and installation gates are completed; do not repeat them.
+Next: [reviewed password-first, then opt-in fingerprint login in the VM](R4_PLASMA_LOGIN_VM.md).
+No real login has been performed yet.
 R4 is open and R5 is blocked. The qualified R3 runtime and
 RIGHT-index template stored as `left-index-finger` stay unchanged.
 
@@ -27,7 +29,18 @@ The test-only `gate-test.so` embeds temporary fixture paths: do not install it
 or rerun the relocated test binaries. The manager selects only the production
 module, its PAM entry and the saved inverse.
 
-## Run now: install the reviewed output, keep the desktop open
+## Completed installation procedure — do not rerun
+
+`CODEX_MINI_RESUME_R4_PLASMA_INSTALL_PASS.md` reports every success marker below,
+all five paths verified against default SELinux labels, unchanged vendor PAM
+hash and clean Git status. Desktop open, sensor detached, no logout/reboot/login,
+R3 runtime/template preserved. The read-only byte/metadata/receipt checks and
+manifest/source comparisons match the versioned procedure; this is accepted
+human-reported deployment evidence, not an AI inspection of guest files.
+No new fprintd state measurement or runtime SELinux-load result was supplied.
+
+The original instructions below are retained for provenance. Continue with the
+linked login procedure above, using this installation and its existing inverse.
 
 Use the existing Fedora 44 KDE VM, with SELinux Enforcing, reader detached,
 and your working desktop session open. Run the block from the ordinary user's
@@ -144,10 +157,10 @@ No vendor backup is replayed. The existing R3 runtime under its separate
 `goodix-27c6-5125` directory and saved inverse are untouched. Authselect, template
 contents, protected material, firmware and persistent device state are untouched.
 
-The corresponding rollback, only on installation/verification FAIL,
+The corresponding rollback, only on installation/verification/login FAIL,
 instability/regression or explicit request, is below. Keep the reader detached
-and the desktop open. Use the preserved candidate's identical inverse so that
-partial installation/removal is also recoverable. The installed identical copy
+and use a working desktop terminal. Use the preserved candidate's identical
+inverse so that partial installation/removal is also recoverable. The installed identical copy
 is `/usr/local/lib64/goodix-plasma-login/manage.py`.
 
 ```bash
@@ -177,5 +190,5 @@ delete it manually. Expected final state is the table above after install PASS,
 or its complete absence and current vendor configuration visible after rollback.
 No R3 uninstall, template deletion or restoration of old Fedora files is needed.
 SELinux runtime loading, real login/password fallback, contact telemetry and
-package-update behavior remain untested. Their normal workflow and observable
-criteria belong to the subsequent login handoff.
+package-update behavior remain untested. The [login handoff](R4_PLASMA_LOGIN_VM.md)
+defines the next workflow, criteria and the STOP if desktop access is unavailable.
