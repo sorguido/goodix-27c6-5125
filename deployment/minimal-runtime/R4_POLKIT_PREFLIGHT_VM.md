@@ -1,22 +1,31 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: inspect the VM's stock PolicyKit authentication configuration
 
-**Current HUMAN_REQUIRED — resolve the candidate's action, reader detached.**
-The supplemental query completed once at reported checkout `d5e890b`, resolving
-locally to `d5e890ba479ed35134742a7466ed4c13d2747ca3`. All three legacy policy
-locations returned POLICY_FILES=0 and pkla-compat RPM verification returned 0.
-The user reports collection of the rule bodies; this handoff contains their
-summary, not all bodies for direct review. The stock wheel administrator rule
-is corroborated without observed PKLA overrides. Actual dialog identity and
-fresh authentication remain untested.
+**COMPLETED — all three configuration queries accepted; no repeat required.**
+The targeted query passed at guest checkout
+`0d8ccb7482fb10d7520f8830f59fb2e979c04380`, reader absent, without sudo,
+authentication or configuration changes. `/usr/bin/true` resolves to itself;
+only the default exec record was returned, with empty exec annotations and
+three auth_admin defaults. For the no-argument command, the selected action is
+**org.freedesktop.policykit.exec**, without competing path annotations.
+`matches_resolved_path_with_no_arguments=false` describes the unannotated
+fallback record, not a failed action selection.
 
-The available action-catalog copy loses its beginning. This is **incomplete
-returned evidence, not a failed query**, and does not establish the absence of
-program annotations. Do not repeat either completed block below. Final fprintd
-active/running/PID 8053 is compatible with reader-absent sudo activation;
-no retrospective stop or polling is required. Runtime/template remain retained.
+The supplement already established zero files in all three PKLA locations and
+pkla-compat RPM verification exit 0. Full rule bodies were collected according
+to the user; the handoff supplies their summary, with no reported automatic
+grant for this action. This is not an exhaustive direct JavaScript audit.
+The native password test must visibly authenticate guido; a silent success
+will not qualify. No new service snapshot was requested/reported by the
+metadata query; PID 8053 remains the last historical measurement.
 
-## Current targeted read-only query
+Next human gate: [stock KDE PolicyKit password and fingerprint](R4_POLKIT_VM.md).
+Runtime/template remain preserved. The instructions below are **historical**.
+
+## Completed targeted query and original criteria
+
+**Historical human gate — do not run this block again.**
+The following preserves the completed query and its original criteria.
 
 In an ordinary-user Bash terminal in the existing Fedora 44 KDE VM checkout,
 as `guido`, keep the reader detached and authentication dialogs closed. Run
@@ -98,9 +107,10 @@ returns the candidate path, relevant records and action-selection result.
 selection; return output without retry or authentication. No installation or
 rollback is needed. Keep the saved inverse
 `/usr/local/lib64/goodix-27c6-5125/uninstall.sh` and RIGHT-index template labeled
-left-index-finger. PolicyKit live remains **NOT READY** pending review, with
+left-index-finger. At this previous gate, PolicyKit live was **NOT READY** pending review, with
 password first while detached, then at most three contacts in the first PAM
-series, stop at MATCH and detach before fallback/restart. Do not run that live now.
+series, stop at MATCH and detach before fallback/restart. The current live
+procedure is now linked above; this historical query is not repeated.
 
 ## Completed supplemental query and original criteria
 

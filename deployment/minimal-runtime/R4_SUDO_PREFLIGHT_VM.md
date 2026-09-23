@@ -14,7 +14,7 @@ non-fatal for the completed query; keep Enforcing. The subsequent
 first-contact MATCH without a password, exit 0 and closed/drained cleanup;
 sudo is SUPPORTED on the tested baseline. Its final inactive/MainPID 0 supersedes
 this preflight's immediate snapshot. The current human gate is the
-[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), reader detached.
+[stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.
 
 ## Completed query and original criteria
 

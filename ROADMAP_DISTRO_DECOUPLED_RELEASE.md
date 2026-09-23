@@ -361,16 +361,24 @@ Nessun override legacy emerso; default wheel corroborato. Ultimo fprintd
 active/running/PID 8053 dopo sudo senza lettore: compatibile con attivazione
 stock, non failure da ripulire. PID 6749 resta lo snapshot del preflight iniziale.
 
-**Lookup azione ancora aperto:** la copia del catalogo perde l'inizio, quindi
-non prova il path risolto di `/usr/bin/true` né l'assenza di annotazioni pertinenti.
-È una lacuna della copia, non un failure della query. Non ripetere supplemento
-o catalogo completo. Il default exec auth_admin non prova da solo identità GUI
-o assenza di autorizzazione automatica/cache. Prossimo gate: il solo blocco
-mirato corrente in `deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`,
-senza sudo, a sensore assente, filtra i metadata pertinenti al programma.
-Nessuna nuova query PAM/agente/regole/PKLA, patch, cache clear o live;
-`/usr/bin/true` resta candidata da confermare dopo review.
-Runtime/template preservati. PolicyKit/login e R5 restano aperti.
+**Query azione PASS** a `0d8ccb7482fb10d7520f8830f59fb2e979c04380`:
+`/usr/bin/true` risolve a sé stesso, nessuna azione annotata concorrente,
+selezione `org.freedesktop.policykit.exec`, default auth_admin in tutti i casi.
+Sensore assente, nessun sudo/autenticazione/modifica; nessuna nuova misura
+fprintd. Preflight completato: non ripetere query, supplemento o catalogo.
+Non sono emersi grant automatici di questa azione dalle regole riportate;
+la prova password nativa deve confermare una richiesta reale per guido, prima
+che il sensore sia collegato. Un successo silenzioso non qualifica il consumer.
+
+**Prossimo gate:** `deployment/minimal-runtime/R4_POLKIT_VM.md`, password via
+KDE stock a lettore assente, poi stessa azione con indice DESTRO, massimo tre
+contatti nella prima serie PAM e stop al MATCH. Autorizzazioni temporanee
+revocate prima di A/B; nessun input/cambio identità con USB collegato, detach
+prima del fallback o restart. Cleanup/telemetria e inversa salvata previsti.
+Nessuna nuova patch o reinstallazione. PolicyKit resta UNTESTED fino alla live;
+PASS qualifica la baseline, failure password-safe richiede review come limitation
+senza bridge privato, password/desktop compromessi sono blocker. Runtime/template
+preservati su PASS; login e R5 restano aperti.
 
 Una volta ottenuti:
 

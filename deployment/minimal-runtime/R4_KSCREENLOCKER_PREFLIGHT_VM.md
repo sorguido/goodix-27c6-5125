@@ -10,7 +10,7 @@ Native stock KScreenLocker password/fingerprint unlock has since passed and is
 SUPPORTED on the tested baseline, with a documented non-fatal nr_hugepages
 read denial. Ordinary stock sudo subsequently passed password and first-contact
 fingerprint authentication. The current human gate is the
-[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), reader detached,
+[stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached,
 with the retained RIGHT-index template still labeled left-index-finger. No
 configuration patch, repeated unlock or rollback is called for on this PASS.
 

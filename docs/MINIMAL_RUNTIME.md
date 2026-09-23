@@ -45,7 +45,7 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 PolicyKit targeted action query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.
+[R4 stock PolicyKit live procedure](../deployment/minimal-runtime/R4_POLKIT_VM.md), password first with reader detached.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -60,11 +60,14 @@ has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
 system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
 The supplement completed at reported checkout `d5e890b`: zero files in all three
 PKLA locations, pkla-compat verification exit 0 and rule body collection confirmed
-by the user. Its action-catalog copy loses the beginning, not evidence of a failed
-query or absent annotations. The current targeted query prints only metadata
-relevant to `/usr/bin/true`, without sudo; do not repeat the supplement/catalog.
-PolicyKit authentication is untested. Wheel is corroborated without observed PKLA
-overrides; actual dialog identity and fresh authentication remain unproved.
+by the user. The targeted query then passed at
+`0d8ccb7482fb10d7520f8830f59fb2e979c04380`: `/usr/bin/true` resolves to itself,
+no competing annotated action, default exec selected with auth_admin defaults.
+All queries are completed. Native authentication is still untested: the next
+gate requires a real KDE password dialog for guido while detached, then MATCH
+without input in the first PAM series (up to three contacts). Temporary session
+authorizations are revoked before each stage; detach before fallback/restart.
+No new patch or reinstall, no automatic-success qualification.
 The user retains the anatomical label mismatch through this R4 phase; present
 the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
@@ -278,7 +281,7 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 PolicyKit targeted action query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.
+[R4 stock PolicyKit live procedure](../deployment/minimal-runtime/R4_POLKIT_VM.md), password first with reader detached.
 Stock KScreenLocker is SUPPORTED on the tested baseline: password unlock and
 first-contact fingerprint unlock passed, with closed/drained host cleanup.
 The audit query reports three nr_hugepages read denials, non-fatal for the
@@ -293,11 +296,14 @@ has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
 system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
 The supplement completed at reported checkout `d5e890b`: zero files in all three
 PKLA locations, pkla-compat verification exit 0 and rule body collection confirmed
-by the user. Its action-catalog copy loses the beginning, not evidence of a failed
-query or absent annotations. The current targeted query prints only metadata
-relevant to `/usr/bin/true`, without sudo; do not repeat the supplement/catalog.
-PolicyKit authentication is untested. Wheel is corroborated without observed PKLA
-overrides; actual dialog identity and fresh authentication remain unproved.
+by the user. The targeted query then passed at
+`0d8ccb7482fb10d7520f8830f59fb2e979c04380`: `/usr/bin/true` resolves to itself,
+no competing annotated action, default exec selected with auth_admin defaults.
+All queries are completed. Native authentication is still untested: the next
+gate requires a real KDE password dialog for guido while detached, then MATCH
+without input in the first PAM series (up to three contacts). Temporary session
+authorizations are revoked before each stage; detach before fallback/restart.
+No new patch or reinstall, no automatic-success qualification.
 The accepted R3 build/load/material/Claim/enrollment/verify and functional
 KScreenLocker and ordinary sudo gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure

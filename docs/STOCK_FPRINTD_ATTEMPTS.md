@@ -29,7 +29,7 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 PolicyKit targeted action query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.
+[R4 stock PolicyKit live procedure](../deployment/minimal-runtime/R4_POLKIT_VM.md), password first with reader detached.
 Stock KScreenLocker subsequently passed password unlock with the reader absent
 and fingerprint unlock at contact 1 without a password. MATCH was terminal and
 resources closed/drained; release_tail/single_terminal were zero, consistent
@@ -352,11 +352,12 @@ R4_SUDO_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 R4_SUDO_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
 SUDO_I_AUTH=CONFIGURATION_COVERED_NOT_LIVE_TESTED
 SUDO_I_LOGIN_SHELL_SESSION=UNTESTED
-R4_POLKIT_CONFIG_QUERY=PASS_HUMAN_REPORTED_POLICY_CLOSURE_INCOMPLETE
+R4_POLKIT_CONFIG_QUERY=PASS_HUMAN_REPORTED_ALL_PREFLIGHT_QUERIES_CLOSED
 R4_POLKIT_AUTHENTICATION=NOT_YET_TESTED
 R4_POLKIT_POLICY_SUPPLEMENT=COMPLETED_HUMAN_REPORTED_NO_PKLA_OVERRIDES_OBSERVED
-CURRENT_GATE=HUMAN_REQUIRED_VM_POLKIT_TRUE_ACTION_QUERY_SENSOR_ABSENT
-NEXT_SENSOR_LIVE_HANDOFF_READY=false
+R4_POLKIT_TRUE_ACTION_QUERY=PASS_HUMAN_REPORTED_EXEC_SELECTED_AUTH_ADMIN_DEFAULTS
+CURRENT_GATE=HUMAN_REQUIRED_VM_STOCK_POLKIT_PASSWORD_THEN_FINGERPRINT
+NEXT_SENSOR_LIVE_HANDOFF_READY=OFFLINE_VERIFIED_HUMAN_EXECUTION_REQUIRED
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
 
@@ -365,7 +366,7 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-to the targeted R4 PolicyKit action query, retaining the qualified runtime,
+to the native R4 PolicyKit live gate, retaining the qualified runtime,
 template, reconciled receipt and saved inverse. Sudo configuration and native authentication
 have passed; do not repeat them. The KScreenLocker SELinux review is closed.
 
@@ -378,11 +379,14 @@ with pam_fprintd sufficient and pam_unix fallback, KDE agent active, stock helpe
 and clean polkit/polkit-kde verification. The supplement completed at reported
 checkout `d5e890b`, with zero files in all three PKLA locations and pkla-compat
 RPM verification exit 0. Rule bodies were collected according to the user;
-the handoff supplies a summary. The action-catalog copy loses its beginning:
-no execution failure, but path/annotation evidence is still needed. Wheel is
-corroborated without observed PKLA overrides; actual dialog identity and fresh
-authentication remain unproved. The next step is the targeted human-only action
-query, without sudo, sensor or PolicyKit authentication. Do not repeat the full
-supplement/catalog. The repeated nr_hugepages read denial was also non-fatal
+the handoff supplies a summary. The targeted query at
+`0d8ccb7482fb10d7520f8830f59fb2e979c04380` closes path/action selection:
+`/usr/bin/true` resolves to itself, no annotated competitor, exec selected with
+auth_admin defaults. No reported automatic grant for this action; native
+password authentication must visibly challenge guido before the fingerprint
+stage. All queries are closed. The next gate uses KDE stock, revokes temporary
+authorizations before both stages, limits B to the first PAM series and requires
+detach before fallback/restart. No private bridge or new runtime patch.
+The repeated nr_hugepages read denial was also non-fatal
 during the completed sudo query and, as reported, the successful sudo live;
 no policy change is prepared. PolicyKit, login and R5 remain unqualified.

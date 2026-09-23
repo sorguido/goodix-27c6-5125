@@ -15,7 +15,7 @@ timestamp was supplied. No policy change, rollback or repeat live is needed.
 `sudo -i` authentication is configuration-covered by the observed auth include
 and ordinary PASS; its login shell/session remains untested, without an extended
 SUPPORTED claim. The next human gate is the
-[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), with reader detached.
+[stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.
 Keep runtime/template and the known RIGHT-index/left-index-finger label mismatch.
 
 ## Completed procedure and original criteria

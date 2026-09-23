@@ -23,7 +23,7 @@ at the biometric boundary. R4 KScreenLocker password unlock and first-contact
 fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
 the tested baseline. Ordinary stock sudo also passed password and first-contact
 fingerprint authentication. Next human gate:
-[PolicyKit targeted action query](R4_POLKIT_PREFLIGHT_VM.md#current-targeted-read-only-query), reader detached.**
+[Stock PolicyKit live procedure](R4_POLKIT_VM.md), password first with reader detached.**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
@@ -35,9 +35,13 @@ through system-auth, active KDE agent, stock helper and clean polkit/polkit-kde
 RPM verification. The supplement completed at reported checkout `d5e890b`:
 zero files in all three PKLA locations, pkla-compat verification exit 0 and rule
 body collection confirmed by the user. Final reader-absent fprintd PID 8053 is
-compatible with sudo activation. The action-catalog copy loses its beginning;
-the current query prints only metadata relevant to `/usr/bin/true`, without
-sudo or authentication. Do not repeat the supplement or the complete catalog.
+compatible with sudo activation; no newer service measurement is supplied.
+The targeted query passed at `0d8ccb7482fb10d7520f8830f59fb2e979c04380`:
+`/usr/bin/true` resolves to itself, no competing annotation, action exec selected
+with auth_admin defaults. All queries are closed. The next gate is stock KDE
+password then fingerprint, with temporary authorizations revoked before each,
+only the first PAM series and detach before fallback/restart. No new patch,
+reinstall or qualification based on silent success.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

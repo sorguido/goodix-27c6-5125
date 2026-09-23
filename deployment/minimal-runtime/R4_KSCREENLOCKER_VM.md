@@ -9,8 +9,8 @@ baseline**, with the non-fatal SELinux denial below documented. Preserve
 runtime/template and do not repeat the test or its completed audit query.
 The subsequent [ordinary stock sudo test](R4_SUDO_VM.md) also passed password
 and first-contact fingerprint authentication, with closed/drained cleanup.
-The next human gate is the [PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md),
-reader detached; no new live is prepared yet.
+The next human gate is the [stock PolicyKit live procedure](R4_POLKIT_VM.md),
+password first with the reader detached, then the bounded fingerprint series.
 
 ## Completed SELinux review
 
