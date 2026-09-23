@@ -253,7 +253,7 @@ Nessuna live richiesta.
 stock PASS e verify stock MATCH al primo tentativo, con cleanup completo,
 riportati dall'Utente e riesaminati nel manuale tecnico. Runtime/template
 conservati; indice DESTRO nello slot left-index-finger resta mismatch noto di
-laboratorio, da riesaminare prima dell'uso ordinario consumer. Nessuna qualifica
+laboratorio mantenuto nella fase R4 per decisione Utente. Nessuna qualifica
 R4/R5 o release è implicata; non ripetere le live R3 già chiuse.
 
 Valutare le opzioni in questo ordine e passare alla successiva soltanto se la
@@ -314,10 +314,14 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ## R4 — Consumer di autenticazione: solo percorso stock
 
-**Stato: ATTIVA.** Primo passo minimo: ricostruzione read-only della
-configurazione KScreenLocker/PAM/authselect nella VM, a sensore scollegato,
-prima di predisporre qualunque test consumer o modifica stock reversibile.
-Consegna: `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`.
+**Stato: ATTIVA; preflight KScreenLocker PASS come query (23 settembre 2026).**
+La VM riporta authselect local valido con with-fingerprint già attivo, percorso
+kde/password-auth senza pam_fprintd e kde-fingerprint/fingerprint-auth con
+pam_fprintd. Nessuna modifica PAM/authselect è necessaria. Prossimo gate:
+`deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md`, password unlock a lettore
+assente seguito da una sessione fingerprint nativa bounded. Nessun consumer
+è ancora SUPPORTED. Prima dei successivi consumer si ricostruisce la loro
+catena PAM effettiva guest; system-auth non è assunto come percorso universale.
 
 Una volta ottenuti:
 

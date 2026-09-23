@@ -9,7 +9,8 @@ runtime/template retained, sensor detached, fprintd inactive/MainPID 0.
 The canonical manual contains the complete evidence and review. The RIGHT-index
 template still has the left-index label; preserve it as known laboratory state.
 **Do not repeat the completed procedure below.** The current human gate is
-[R4 stock KScreenLocker configuration, read-only](R4_KSCREENLOCKER_PREFLIGHT_VM.md).
+[R4 native stock KScreenLocker unlock](R4_KSCREENLOCKER_VM.md);
+the configuration query has passed without a configuration change.
 
 ## Completed procedure and its original criteria
 

@@ -11,7 +11,8 @@ The canonical manual contains the complete telemetry and review. Preserve the
 procedure below as evidence; **do not repeat it**. Subsequent
 [native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md)
 also passed at the first attempt. R3 is closed; the current human gate is
-[R4 stock KScreenLocker configuration, read-only](R4_KSCREENLOCKER_PREFLIGHT_VM.md).
+[R4 native stock KScreenLocker unlock](R4_KSCREENLOCKER_VM.md);
+the configuration query has passed without a configuration change.
 The historical procedure below records the requested slot, not evidence that
 the physical left index was presented. No storage relabeling has been performed.
 

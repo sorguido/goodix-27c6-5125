@@ -1,7 +1,18 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: inspect the VM's stock KScreenLocker configuration
 
-**HUMAN_REQUIRED — run this read-only query in the VM, with the sensor detached.**
+**COMPLETED — query/preflight PASS, human-reported at
+`90a3c46beeead6b50e13426870e3d30f496c67f9`. Do not repeat this query.**
+The canonical manual records the guest evidence and its limits: valid authselect
+with fingerprint already enabled, separate stock password/fingerprint substacks,
+and two RPM digest checks not performed. No authentication was tested.
+The current human gate is [native stock KScreenLocker unlock](R4_KSCREENLOCKER_VM.md),
+with the retained RIGHT-index template still labeled left-index-finger by the
+user's decision for R4. No configuration patch is needed.
+
+## Completed query and original criteria
+
+**HUMAN_REQUIRED — original read-only query in the VM, with the sensor detached.**
 R3 is closed at the biometric boundary: stock enrollment and stock verification
 passed, the latter at the first attempt with clean release/drain/close. Keep the
 qualified runtime and template. Do not repeat either biometric test.

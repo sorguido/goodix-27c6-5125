@@ -45,9 +45,11 @@ label, with clean release/drain/close and no retries or persistent families
 reported. **R3 is closed at the biometric boundary.** The canonical manual
 records full evidence, missing guest SHA/RPM/preflight output and limits of the
 qualification. The current human gate is
-[R4 KScreenLocker configuration, read-only](../deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md).
-The anatomical label remains known laboratory state for review before ordinary
-consumer use; no template mutation, rebuild/reinstall or repeat biometric test.
+[R4 native stock KScreenLocker unlock](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md);
+the guest configuration query is PASS, with fingerprint already enabled and a
+separate password stack. No PAM/authselect/runtime delta is needed.
+The user retains the anatomical label mismatch through this R4 phase; present
+the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
 
 ## MINIMAL_RUNTIME_CONTENTS
@@ -131,7 +133,8 @@ stock template storage and is not touched by runtime installation/uninstall.
 The completed native enrollment added the `guido` / `left-index-finger` host
 template from the physical RIGHT index, as corrected by the user. Successful
 verify selected that label and used the RIGHT index, without enrollment,
-template deletion or relabeling. Normal consumer finger labeling is unresolved.
+template deletion or relabeling. The mismatch remains known lab state through R4
+by user decision; normal end-user finger labeling is unresolved.
 
 No additional udev rule is justified by current source evidence. The library
 build disables rule generation. The physical workspace's Fedora vendor unit
@@ -258,7 +261,9 @@ also refuses this physical host from an unrelated cwd before mutation. Both
 shell wrappers pass syntax checks; the driver-only source audit remains PASS.
 
 The current **HUMAN_REQUIRED** is
-[R4 KScreenLocker configuration, read-only](../deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md).
+[R4 native stock KScreenLocker unlock](../deployment/minimal-runtime/R4_KSCREENLOCKER_VM.md);
+the guest configuration query is PASS, with fingerprint already enabled and a
+separate password stack. No PAM/authselect/runtime delta is needed.
 The accepted R3 build/load/material/Claim/enrollment/verify gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure
 beyond fingerprint and no replacement of Fedora-owned authentication files.
