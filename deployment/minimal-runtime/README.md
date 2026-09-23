@@ -21,13 +21,17 @@ completed evidence. [Stock verification](R3_VERIFY_VM.md) also passed with the
 RIGHT index at the first attempt, with clean release/drain/close. **R3 is closed
 at the biometric boundary. R4 KScreenLocker password unlock and first-contact
 fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
-the tested baseline. Next human gate: [ordinary stock sudo test](R4_SUDO_VM.md).**
+the tested baseline. Ordinary stock sudo also passed password and first-contact
+fingerprint authentication. Next human gate:
+[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), reader detached.**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
-The sudo configuration query has passed (stock system-auth with pam_fprintd,
-password query completed, sudo RPM verification clean). Its active final daemon
-and recurring non-fatal denial are documented; sudo fingerprint remains untested.
+The completed sudo live ended with exit 0, no password during MATCH, closed/drained
+cleanup and fprintd inactive/MainPID 0. It is SUPPORTED on the tested baseline;
+do not repeat it. sudo-i auth is configuration-covered, its login shell/session
+untested. The next query establishes PolicyKit's actual guest configuration;
+no PolicyKit authentication test is prepared yet.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

@@ -7,8 +7,10 @@ The physical RIGHT index matched the stored left-index-finger template, without
 entering a password in the fingerprint session. **SUPPORTED on the tested
 baseline**, with the non-fatal SELinux denial below documented. Preserve
 runtime/template and do not repeat the test or its completed audit query.
-The sudo configuration query has also passed; the next human gate is the
-[ordinary stock sudo test](R4_SUDO_VM.md).
+The subsequent [ordinary stock sudo test](R4_SUDO_VM.md) also passed password
+and first-contact fingerprint authentication, with closed/drained cleanup.
+The next human gate is the [PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md),
+reader detached; no new live is prepared yet.
 
 ## Completed SELinux review
 
@@ -78,8 +80,8 @@ still detached and runtime/template/SELinux policy are unchanged. No rollback
 is required for this diagnostic result. The retained installation/inverse below
 remain available; a functional PASS is not rolled back for missing evidence.
 That review is now complete. The next stock consumer's actual guest PAM route
-was subsequently established by the completed sudo preflight; follow the current
-stock sudo guide linked above.
+was subsequently established by the completed sudo preflight and live PASS;
+follow the current PolicyKit configuration guide linked above.
 
 ## Completed live procedure and original criteria
 

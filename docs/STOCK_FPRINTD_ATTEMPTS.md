@@ -29,7 +29,7 @@ Runtime and template are retained, sensor detached, fprintd inactive. No second
 verify, no relabeling or rollback. **R3 is closed at the biometric boundary.**
 This single MATCH does not qualify a real NO_MATCH series inside one Claim or
 impose a cumulative driver cap. The current gate is
-[R4 ordinary stock sudo test](../deployment/minimal-runtime/R4_SUDO_VM.md).
+[R4 PolicyKit configuration query](../deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md), reader detached.
 Stock KScreenLocker subsequently passed password unlock with the reader absent
 and fingerprint unlock at contact 1 without a password. MATCH was terminal and
 resources closed/drained; release_tail/single_terminal were zero, consistent
@@ -38,6 +38,11 @@ The reported audit query identifies three fprintd/read nr_hugepages denials,
 non-fatal for that completed path. KScreenLocker is SUPPORTED on the tested
 baseline with the denial documented; no universal harmlessness or exact library
 callsite is claimed. No repeated unlock, audit query or rollback is needed.
+Ordinary sudo subsequently passed password with reader absent and first-contact
+MATCH without password, exit 0, drained/closed resources and inactive/MainPID 0.
+The same tail counters were zero, compatible with early PAM return; the warning
+recurred during success. Sudo is SUPPORTED on the tested baseline; sudo-i auth
+is configuration-covered, without a live claim for its login shell/session.
 
 ## Source findings
 
@@ -48,7 +53,7 @@ callsite is claimed. No repeated unlock, audit query or rollback is needed.
 | Enrollment duplicate check | Same file, `enroll_identify_cb` | Also resubmits IDENTIFY on `FP_DEVICE_RETRY`; a clean duplicate MATCH ends enrollment. The same driver failure fence applies before a retry can reacquire resources. |
 | Stock CLI | `source/utils/verify.c`, `do_verify`, `main` | One Claim, one VerifyStart, VerifyStop and Release. There is no three-attempt option/loop. Do not describe three separate CLI invocations as one driver-enforced series. |
 | Stock PAM | `source/pam/pam_fprintd.c`, `do_verify`, `do_auth` | Default max-tries is 3; one Claim spans explicit VerifyStart calls after NO_MATCH. This is consumer policy, not a driver limit. MATCH returns success and closes the bus; timeout/error terminates. The later R4 query confirms this module without options in guest fingerprint-auth; native KScreenLocker later passed at contact 1; an actual multi-attempt PAM series remains untested. |
-| Stock sudo | Guest preflight at `168469b79565cf401f2cb256448c184f3a803d8c`; sudo v1.9.17p2 `auth/pam.c`, `auth/sudo_auth.c` | system-auth uses pam_fprintd sufficient before pam_unix. The 3-try PAM budget resets on a new call; sudo can repeat PAM after whole-stack failure. One live series must detach USB before password fallback to prevent further sensor work. `sudo -k command` ignores and does not refresh cached credentials. |
+| Stock sudo | Guest preflight at `168469b79565cf401f2cb256448c184f3a803d8c`; sudo v1.9.17p2 `auth/pam.c`, `auth/sudo_auth.c` | system-auth uses pam_fprintd sufficient before pam_unix. The 3-try PAM budget resets on a new call; sudo can repeat PAM after whole-stack failure. One live series must detach USB before password fallback to prevent further sensor work. `sudo -k command` ignores and does not refresh cached credentials. Subsequent ordinary sudo live at reported `f5a4430` passed reader-absent password, then first-contact MATCH without password and exit 0; clean host closure. No live multi-attempt/failure-fallback qualification. |
 | Client disappearance | `src/device.c`, `_fprint_device_client_vanished`, `fprint_device_release` | Cancel the current action, wait for its completion, then close the libfprint device. No new capture is scheduled for cleanup. |
 | Host result ordering | Canonical `reference/libfprint-fedora44-1.94.100/source/libfprint/fpi-image-device.c`, `fpi_image_device_minutiae_detected`, `fp_image_device_maybe_complete_action` | Outcome callbacks reach the driver before the early match report to fprintd; the final API completion waits for deactivation and processing. The early report can precede finger-off/STOP. |
 | Driver cleanup/reopen | `libfprint-driver/goodix_fpimage_device.c`, `complete_deactivation`, `finish_deactivation`, `close_completed_capture_epoch` | Clean outcomes wait for STOP/drain and asynchronous matcher completion, release claim/material/TLS, then permit a later explicit action. Processing failure/cancel/transport error poison the logical open. |
@@ -342,9 +347,13 @@ R4_KSCREENLOCKER_FUNCTIONAL=PASS_CONTACT_1_HOST_CLEANUP_PASS_HUMAN_REPORTED
 R4_KSCREENLOCKER_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 R4_SELINUX_ASSESSMENT=NON_FATAL_FOR_TESTED_KSCREENLOCKER_PATH
 R4_SUDO_PREFLIGHT=PASS_CONFIG_POLICY_PASSWORD_QUERY
-R4_SUDO_FINGERPRINT=NOT_YET_TESTED
-CURRENT_GATE=HUMAN_REQUIRED_VM_NATIVE_SUDO_PASSWORD_THEN_FINGERPRINT
-NEXT_SENSOR_LIVE_HANDOFF_READY=true
+R4_SUDO_FINGERPRINT=PASS_CONTACT_1_NO_PASSWORD_EXIT0_HUMAN_REPORTED
+R4_SUDO_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
+R4_SUDO_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
+SUDO_I_AUTH=CONFIGURATION_COVERED_NOT_LIVE_TESTED
+SUDO_I_LOGIN_SHELL_SESSION=UNTESTED
+CURRENT_GATE=HUMAN_REQUIRED_VM_POLKIT_CONFIG_QUERY_SENSOR_ABSENT
+NEXT_SENSOR_LIVE_HANDOFF_READY=false
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
 
@@ -353,14 +362,15 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-to the R4 ordinary stock sudo test, retaining the qualified runtime, template,
-reconciled receipt and saved inverse. The sudo configuration query has passed;
-fingerprint sudo remains untested. The KScreenLocker SELinux review is closed.
+to the R4 PolicyKit configuration query, retaining the qualified runtime, template,
+reconciled receipt and saved inverse. Sudo configuration and native authentication
+have passed; do not repeat them. The KScreenLocker SELinux review is closed.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file. The next step is the human-only native sudo gate. The repeated nr_hugepages
-read denial was also non-fatal during the completed reader-absent sudo query;
-no policy change is prepared. Other consumers and R5 remain unqualified.
+file. The next step is the human-only PolicyKit query, without a sensor or
+PolicyKit authentication. The repeated nr_hugepages read denial was also non-fatal
+during the completed sudo query and, as reported, the successful sudo live;
+no policy change is prepared. PolicyKit, login and R5 remain unqualified.

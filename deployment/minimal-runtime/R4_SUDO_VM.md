@@ -1,6 +1,26 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: ordinary stock sudo authentication in the VM
 
+**COMPLETED — ordinary sudo SUPPORTED on the tested baseline, human-reported.**
+Preparation and reader-absent password passed; `sudo -k -- /usr/bin/true` then
+exited 0 after a first-contact RIGHT-index MATCH with no password during B.
+One VERIFY/epoch, zero retry/reopen/reset/persistent families, closed/drained
+resources, fprintd inactive/MainPID 0 and reader detached. The observed
+release_tail=0/single_terminal=0 fit the early PAM MATCH return described below.
+The canonical manual preserves full telemetry and provenance: reported checkout
+`f5a4430`, locally resolved to `f5a4430b50a24dc7247b455701ba35ffc582713c`.
+The known nr_hugepages warning recurred during success; no new raw AVC or event
+timestamp was supplied. No policy change, rollback or repeat live is needed.
+
+`sudo -i` authentication is configuration-covered by the observed auth include
+and ordinary PASS; its login shell/session remains untested, without an extended
+SUPPORTED claim. The next human gate is the
+[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), with reader detached.
+Keep runtime/template and the known RIGHT-index/left-index-finger label mismatch.
+
+## Completed procedure and original criteria
+
+**Historical human gate — do not rerun the procedure below.**
 **HUMAN_REQUIRED — human-only VM preparation, USB and authentication.**
 The [configuration query](R4_SUDO_PREFLIGHT_VM.md) passed at
 `168469b79565cf401f2cb256448c184f3a803d8c`: sudo uses system-auth, with

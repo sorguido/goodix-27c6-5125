@@ -11,9 +11,10 @@ The canonical manual contains the complete telemetry and review. Preserve the
 procedure below as evidence; **do not repeat it**. Subsequent
 [native verification of the RIGHT index using that stored label](R3_VERIFY_VM.md)
 also passed at the first attempt. R3 is closed; the current human gate is
-[R4 ordinary stock sudo test](R4_SUDO_VM.md);
-KScreenLocker is SUPPORTED on the tested baseline, with a documented non-fatal
-nr_hugepages read denial. Its live and audit query are completed; do not repeat them.
+[R4 PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), reader detached.
+KScreenLocker and ordinary sudo are SUPPORTED on the tested baseline, with a
+documented recurring non-fatal nr_hugepages read denial. Their completed tests
+must not be repeated.
 The historical procedure below records the requested slot, not evidence that
 the physical left index was presented. No storage relabeling has been performed.
 

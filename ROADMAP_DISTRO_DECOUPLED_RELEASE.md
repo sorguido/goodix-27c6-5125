@@ -314,8 +314,8 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ## R4 — Consumer di autenticazione: solo percorso stock
 
-**Stato: ATTIVA; KScreenLocker SUPPORTED sulla baseline provata (23 settembre 2026).** Password
-unlock a lettore assente e fingerprint unlock al primo contatto senza password,
+**Stato: ATTIVA; KScreenLocker e sudo ordinario SUPPORTED sulla baseline provata (23 settembre 2026).**
+Per KScreenLocker, password unlock a lettore assente e fingerprint unlock al primo contatto senza password,
 cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
 riportati dall'Utente e accettati. Nessuna modifica PAM/authselect necessaria;
 runtime/template mantenuti e test completato da non ripetere.
@@ -328,17 +328,31 @@ universale né qualifica R5. Query audit e live sono completate, da non ripetere
 **Preflight sudo PASS** a `168469b79565cf401f2cb256448c184f3a803d8c`:
 sudo Fedora → system-auth con pam_fprintd sufficient e fallback pam_unix;
 profilo valido con fingerprint già attivo, nessun selettore custom/NOPASSWD
-emerso e verifica RPM sudo exit 0. Password/query completata a lettore assente;
-fingerprint sudo ancora non provato. Stato finale active/running/PID 3802
+emerso e verifica RPM sudo exit 0. Password/query completata a lettore assente.
+Lo snapshot storico del preflight active/running/PID 3802 era
 compatibile con attivazione stock e idle timeout; non è cleanup live fallito.
-Nuovo raw AVC nr_hugepages, stesso PID alle 09:55:15 CEST, non fatale per la
+Raw AVC nr_hugepages, stesso PID alle 09:55:15 CEST, non fatale per la
 query; nessuna modifica SELinux o ripetizione diagnostica.
-Prossimo gate in `deployment/minimal-runtime/R4_SUDO_VM.md`: password a sensore
-assente durante lo stop preparatorio, poi una serie sudo ordinaria con cache
-ignorata, comando /usr/bin/true e fino a tre contatti, stop al primo MATCH.
-Scollegare prima di qualsiasi password dopo failure: sudo può ripetere PAM,
-il limite stock di tre è per chiamata. Nessuna patch PAM/sudoers/runtime.
-sudo -i resta solo configurazione osservata; PolicyKit/login e R5 restano aperti.
+
+**Live sudo ordinaria PASS** dalla guida `deployment/minimal-runtime/R4_SUDO_VM.md`,
+guest riportato `f5a4430` (risolto localmente a
+`f5a4430b50a24dc7247b455701ba35ffc582713c`): password reale con lettore assente,
+poi `sudo -k -- /usr/bin/true` exit 0, MATCH al primo contatto dell'indice DESTRO,
+nessuna password durante B. Una VERIFY/epoch, cleanup drained/closed, zero
+retry/reopen/reset/persistent; ultimo stato inactive/MainPID 0, lettore detached.
+release_tail=0/single_terminal=0 compatibili con ritorno anticipato PAM al MATCH.
+Nessuna patch PAM/sudoers/runtime, rollback o ripetizione del test riuscito.
+Avviso SELinux dello stesso tipo riferito anche durante il PASS; nessun nuovo
+raw AVC/timestamp allegato, i metadata precedenti restano riferiti al preflight.
+
+**Decisione sudo -i:** auth CONFIGURATION_COVERED tramite include sudo osservato
+e PASS ordinario; login shell/session UNTESTED, nessun SUPPORTED esteso a quella
+variante. Non serve una live aggiuntiva per il confine biometrico R4 senza nuova
+evidenza di una differenza pertinente. Prossimo gate:
+`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`, una query nella VM con
+sensore assente, per stabilire PAM reale, agente/helper, identità e policy prima
+di preparare il workflow PolicyKit stock. Nessuna live PolicyKit ancora pronta;
+runtime/template preservati. PolicyKit/login e R5 restano aperti.
 
 Una volta ottenuti:
 

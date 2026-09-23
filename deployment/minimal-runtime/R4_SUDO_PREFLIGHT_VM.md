@@ -9,8 +9,12 @@ NOPASSWD observed, sudo RPM verification exit 0. The password query completed.
 The immediate final fprintd active/running/PID 3802 is compatible with stock
 D-Bus activation and its idle timer; it is not a failed biometric cleanup.
 The recurring nr_hugepages denial now has a supplied raw AVC with that PID,
-non-fatal for the completed query; keep Enforcing. Fingerprint sudo is untested.
-The current human gate is the [ordinary stock sudo test](R4_SUDO_VM.md).
+non-fatal for the completed query; keep Enforcing. The subsequent
+[ordinary stock sudo test](R4_SUDO_VM.md) passed: password with reader absent,
+first-contact MATCH without a password, exit 0 and closed/drained cleanup;
+sudo is SUPPORTED on the tested baseline. Its final inactive/MainPID 0 supersedes
+this preflight's immediate snapshot. The current human gate is the
+[PolicyKit configuration query](R4_POLKIT_PREFLIGHT_VM.md), reader detached.
 
 ## Completed query and original criteria
 
