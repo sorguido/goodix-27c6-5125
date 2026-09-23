@@ -58,7 +58,11 @@ Salvo nuova decisione esplicita dell'Utente:
 
 - niente build privata/distribuita di plasmalogin;
 - niente sostituzione del Plasma greeter;
-- niente PAM vendor congelato o mascherato da override persistenti del progetto;
+- niente copia congelata del PAM vendor mascherata da override persistenti del progetto;
+- un'eventuale integrazione PAM necessaria al fingerprint di Plasma Login deve
+  essere minima, reversibile, vendor-aware e fail-safe: non può modificare file
+  package-owned, non può congelare una copia del vendor e un update Fedora non
+  può trasformare il failure in qualcosa di più grave del solo fingerprint;
 - niente moduli/override custom per sudo o PolicyKit come requisito di release;
 - niente fprintd custom se il fprintd Fedora stock può essere usato;
 - niente pin di versione/hash Fedora come requisito runtime per l'accessibilità
@@ -165,7 +169,10 @@ richiedono:
 
 - daemon plasmalogin ricompilato;
 - greeter custom;
-- PAM plasmalogin custom;
+- PAM plasmalogin custom che replica/congela il vendor o costruisce uno stack
+  parallelo permanente; resta ammissibile soltanto l'eventuale integrazione
+  minima e safety-bounded esplicitamente autorizzata da R4 per ottenere il
+  fingerprint login richiesto;
 - PAM KScreenLocker custom;
 - bridge/moduli custom sudo;
 - bridge/moduli custom PolicyKit;
@@ -312,9 +319,23 @@ riportato sopra. La semantica dei tentativi resta invariata.
 
 ---
 
-## R4 — Consumer di autenticazione: solo percorso stock
+## R4 — Consumer di autenticazione: stock-first, login Plasma richiesto
 
-**Stato: ATTIVA; KScreenLocker, sudo ordinario e PolicyKit SUPPORTED sulla baseline provata (23 settembre 2026).**
+**Stato: ATTIVA / REPLAN_REQUIRED; KScreenLocker, sudo ordinario e PolicyKit SUPPORTED sulla baseline provata (23 settembre 2026). Plasma Login fingerprint è un requisito di release ancora aperto.**
+
+**Decisione Utente (23 settembre 2026):** il fingerprint al login grafico Plasma
+è una funzione richiesta della release. L'assenza del percorso biometrico stock
+non è una `KNOWN_LIMITATION` accettabile per chiudere R4 e non autorizza il
+passaggio a R5. Il vincolo distro-decoupled resta però invariato: la soluzione
+non può compromettere password, desktop o recovery ordinaria e non può congelare
+componenti Fedora.
+
+~~~text
+PLASMA_LOGIN_FINGERPRINT_REQUIRED=true
+PLASMA_LOGIN_KNOWN_LIMITATION_ACCEPTABLE=false
+R4_CLOSED=false
+R5_BLOCKED_UNTIL_LOGIN_RESOLVED=true
+~~~
 Per KScreenLocker, password unlock a lettore assente e fingerprint unlock al primo contatto senza password,
 cleanup drained/closed, servizio inactive/MainPID 0 e lettore scollegato sono
 riportati dall'Utente e accettati. Nessuna modifica PAM/authselect necessaria;
@@ -385,14 +406,52 @@ SUPPORTED_ON_TESTED_BASELINE**; non ripetere. Runtime/template e inversa
 mantenuti, nessuna patch/PAM/policy/SELinux change o rollback. L'handoff non
 conferma una nuova ricorrenza SELinux PolicyKit: nessun nuovo evento dedotto.
 
-**Prossimo gate:** `deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md`, una
-sola query read-only nella VM, senza sudo, sensore assente e desktop aperto.
-Identificare display manager effettivo, unità/override, configurazione/autologin,
-PAM e authselect prima di preparare una live login. Non usare la vecchia managed
-candidate o il Fedora fisico come prova della configurazione guest. Nessun
-logout/riavvio/test/password/USB, nuova patch o reinstallazione. **HUMAN_REQUIRED**
-per l'evidenza VM (§4); login live NOT READY. Password/desktop devono restare
-sicuri, nessuna patch consumer privata o recovery TTY. Login e R5 restano aperti.
+**Preflight Plasma Login PASS come raccolta configurazione** al checkout guest
+`725b3c1f8bf879b9e56632b4f15da494968cead7`: sessione KDE Wayland con
+`Service=plasmalogin`; display manager stock `plasmalogin.service`; authselect
+valido con `with-fingerprint`. Il PAM stock `/usr/lib/pam.d/plasmalogin`
+entra in `password-auth`, che non contiene `pam_fprintd.so`; `fingerprint-auth`
+e `system-auth` contengono invece il modulo biometrico. Review sorgenti/package
+successiva: sulla baseline stock non emerge un servizio PAM biometrico alternativo
+per il normale login né un accesso diretto a fprintd. La live biometrica stock
+che non raggiungerebbe il sensore non va eseguita soltanto per confermare questa
+assenza.
+
+Questa evidenza **non chiude Plasma Login come limitation**. È il trigger per
+riesaminare il boundary di integrazione mantenendo il requisito funzionale.
+D295/02 resta una prova tecnica storica utile: dimostra che il gap può essere
+colmato con un delta PAM minimo senza ricompilare plasmalogin, ma la sua copia
+vendor persistente non è automaticamente accettabile come soluzione finale.
+
+Ordine di progettazione obbligatorio:
+
+1. cercare prima un meccanismo Fedora/PAM supportato che esponga il fingerprint
+   a Plasma Login senza congelare file vendor;
+2. se non esiste, progettare il più piccolo adapter/integrazione project-owned
+   che deleghi al percorso vendor corrente e fallisca in modo fingerprint-only;
+3. usare D295/02 soltanto come reference/proof-of-feasibility, non come scelta
+   automatica;
+4. ricorrere a modifiche più profonde di Plasma Login soltanto dopo esclusione
+   documentata delle opzioni precedenti e nuova review.
+
+Exit criteria aggiuntivi di R4 per Plasma Login:
+
+~~~text
+PASSWORD_LOGIN=PASS
+PASSWORD_LOGIN_NO_FORCED_FINGERPRINT_WAIT=true
+PLASMA_LOGIN_FINGERPRINT=PASS
+MAX_PHYSICAL_CONTACTS_PER_SERIES=3
+FEDORA_VENDOR_PAM_MODIFIED=false
+FEDORA_VENDOR_PAM_FROZEN=false
+NORMAL_UPDATE_MAX_FAILURE=FINGERPRINT_ONLY
+UNINSTALL_RETURNS_TO_STOCK=true
+TTY_RECOVERY_REQUIRED=false
+~~~
+
+Il prossimo lavoro è quindi offline/repository: disegno e review della minima
+integrazione compatibile con questi criteri. Qualunque installazione, modifica
+PAM live, logout/reboot o prova login in VM resta **HUMAN_REQUIRED**. R5 resta
+bloccata finché questi exit criteria non sono chiusi.
 
 Una volta ottenuti:
 
@@ -403,25 +462,36 @@ fprintd-verify = PASS
 
 il lavoro del driver è considerato completato al confine biometrico.
 
-KDE, KScreenLocker, sudo, PolicyKit e Plasma Login vengono testati usando
-esclusivamente i meccanismi stock della distribuzione.
+KDE, KScreenLocker, sudo e PolicyKit vengono qualificati sul percorso stock.
+Plasma Login è **stock-first**, ma il fingerprint login è un requisito esplicito
+della release: se il percorso stock non lo espone, si apre un replan della minima
+integrazione sicura invece di chiudere il consumer come limitation.
 
-Per ogni consumer:
+Regola consumer:
 
 ~~~text
-funziona stock      → SUPPORTED
-non funziona stock  → KNOWN_LIMITATION / UPSTREAM_BUG
+KSCREENLOCKER/SUDO/POLKIT stock PASS  → SUPPORTED
+KSCREENLOCKER/SUDO/POLKIT stock FAIL  → KNOWN_LIMITATION / UPSTREAM_BUG
+PLASMA_LOGIN stock fingerprint absent → REPLAN_REQUIRED
+PLASMA_LOGIN fingerprint PASS safely  → SUPPORTED
 ~~~
 
-Un consumer che non funziona non autorizza patch private al consumer.
+Un consumer che non funziona non autorizza patch private indiscriminate. Per
+Plasma Login è autorizzata soltanto la progettazione di un'integrazione minima,
+reversibile e update-safe entro il boundary definito sopra.
 
-Se il bug VT di Plasma Login Manager resta presente, può essere documentato e
-portato upstream. Non blocca la release del driver se password e desktop
-restano sicuri.
+Un eventuale bug VT di Plasma Login Manager può essere documentato/upstreamed
+senza bloccare la release **solo se non impedisce gli exit criteria richiesti di
+login password + fingerprint**. Se impedisce il fingerprint login, R4 resta
+aperta finché non esiste una soluzione conforme al failure model.
 
 ---
 
 ## R5 — Update Survivability Test su VM
+
+**Entry condition:** R4 formalmente chiusa, incluso `PLASMA_LOGIN_FINGERPRINT=PASS`
+e relativo password path sicuro. Finché il login Plasma resta aperto, R5 non
+parte.
 
 Testare una candidate funzionante attraverso aggiornamenti reali della VM.
 
@@ -467,13 +537,17 @@ Qualunque failure A/B dell'Update Survivability Audit è **RELEASE_BLOCKER**.
 
 ## R6 — Installer finale semplice e reversibile
 
-L'installer finale deve possedere soltanto i file del driver/runtime Goodix.
+L'installer finale deve possedere soltanto i file del driver/runtime Goodix e,
+se R4 dimostra che è indispensabile, **un solo artefatto di integrazione Plasma
+Login strettamente project-owned**. Tale artefatto non può essere una copia
+congelata di un PAM vendor né può modificare direttamente file package-owned.
 
 Target ideale:
 
 ~~~text
 /usr/local/lib64/goodix-27c6-5125/...
 /etc/systemd/system/fprintd.service.d/<unico-dropin-se-necessario>
+<eventuale integrazione login minima scelta e qualificata in R4>
 ~~~
 
 Più i materiali già separati e preservati:
@@ -491,6 +565,9 @@ systemctl daemon-reload
 ~~~
 
 Non deve ripristinare file Fedora byte-per-byte perché non deve modificarli.
+L'eventuale integrazione login deve essere rimovibile eliminando soltanto
+l'artefatto project-owned e facendo riemergere immediatamente il comportamento
+stock corrente della distribuzione.
 
 L'installer deve essere re-runnable dopo un update che abbia reso
 indisponibile il fingerprint.
@@ -533,7 +610,9 @@ La release deve quindi soddisfare contemporaneamente:
 - la recovery ordinaria deve essere reinstallare/aggiornare/rimuovere il driver,
   non riparare Fedora;
 - eventuali limitazioni dei consumer stock vengono documentate senza
-  trasformarle in dipendenze private permanenti del progetto.
+  trasformarle in dipendenze private permanenti del progetto, **salvo il login
+  fingerprint Plasma che è requisito funzionale esplicito e deve essere risolto
+  entro il boundary R4 prima della release**.
 
 L'eventuale contributo upstream di singole correzioni o componenti resta una
 possibilità tecnica facoltativa, non un requisito, non una milestone e non il
@@ -567,7 +646,8 @@ Prima di assegnare un task deve:
 3. verificare che il task non reintroduca componenti dichiarati
    REJECTED_ARCHITECTURE;
 4. verificare che il failure model resti FINGERPRINT_ONLY per normali update;
-5. rifiutare scope creep verso KDE/PAM/sudo/PolicyKit/systemd;
+5. rifiutare scope creep verso KDE/PAM/sudo/PolicyKit/systemd, salvo il boundary
+   ristretto e già autorizzato di R4 per l'integrazione fingerprint di Plasma Login;
 6. richiedere HUMAN_REQUIRED se per avanzare sembra necessario violare una
    invariante di questa roadmap.
 
@@ -576,8 +656,9 @@ Prima di assegnare un task deve:
 Deve:
 
 - implementare soltanto il task assegnato;
-- non modificare componenti sopra il confine fprintd senza nuova decisione
-  esplicita dell'Utente;
+- non modificare componenti sopra il confine fprintd salvo il boundary ristretto
+  R4 già autorizzato dall'Utente per il fingerprint login Plasma; anche lì sono
+  vietate mutazioni live autonome e modifiche dirette ai file package-owned;
 - non trasformare una limitation di Fedora/KDE in un nuovo sottosistema privato;
 - non usare il fatto che una patch “funziona” come prova di release-safety;
 - produrre test offline prima del Human Gate;
@@ -591,13 +672,15 @@ La review deve chiedere esplicitamente:
 
 ~~~text
 DOES_THIS_CHANGE_INCREASE_DISTRO_COUPLING?
+DOES_IT_MODIFY_OR_FREEZE_A_FEDORA_OWNED_AUTH_COMPONENT?
 CAN_A_NORMAL_UPDATE_BREAK_MORE_THAN_FINGERPRINT?
-DOES_IT_TOUCH_A_FEDORA_OWNED_AUTH_COMPONENT?
-IS_REINSTALL_DRIVER_SUFFICIENT_RECOVERY?
+IS_REINSTALL_UPDATE_OR_REMOVE_DRIVER_SUFFICIENT_RECOVERY?
 ~~~
 
-Se la risposta alle prime tre è sì oppure all'ultima è no, il task non è
-accettabile come production architecture.
+Una risposta sì alla prima domanda richiede minimizzazione, motivazione e prova
+R5: non è da sola un veto se serve al requisito Plasma Login. Una risposta sì
+alla seconda o terza, oppure no all'ultima, rende invece il task non accettabile
+come production architecture.
 
 ---
 
@@ -612,7 +695,10 @@ Una candidate può avanzare verso public release soltanto se:
 - Update Survivability Test R5 è PASS;
 - un normale update può al massimo rompere il fingerprint;
 - la recovery prevista è reinstall/update del driver;
-- password login, desktop, sudo e PolicyKit restano indipendenti dal driver;
+- password login, desktop, sudo e PolicyKit restano sicuri e indipendenti dal
+  successo biometrico del driver;
+- Plasma Login fingerprint è PASS sulla baseline qualificata senza attese
+  biometriche forzate sul percorso password;
 - installer/uninstaller sono piccoli, leggibili e reversibili;
 - eventuali limitazioni consumer sono documentate senza patch invasive.
 
