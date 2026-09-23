@@ -178,7 +178,9 @@ richiedono:
 - bridge/moduli custom PolicyKit;
 - fprintd custom quando non strettamente necessario;
 - snapshot/pinning esatti di componenti Fedora per mantenere funzionante il PC;
-- recovery TTY come parte del normale lifecycle.
+- recovery TTY come parte del normale lifecycle; è invece ammesso un solo
+  percorso **emergency-only**, documentato e a comando singolo, che rimuove gli
+  artefatti project-owned quando il login grafico non è più raggiungibile.
 
 Codice, test e documentazione storici non vanno cancellati soltanto perché
 l'architettura è stata respinta. Devono però essere marcati e trattati come
@@ -556,78 +558,270 @@ aperta finché non esiste una soluzione conforme al failure model.
 
 ---
 
-## R5 — Update Survivability Test su VM
+## R5 — Removal & Emergency Recovery Qualification su VM
 
-**Stato: NOT_STARTED / STOP_BEFORE_R5 per istruzione Utente.** L'entry condition
-funzionale R4 è soddisfatta; ciò non avvia R5. Non preparare guida, query update,
-matrice operativa o nuovo Human Gate finché l'Utente non richiede la ripresa.
-I requisiti già definiti sotto restano invariati e non costituiscono una nuova
-consegna operativa.
+**Stato: AUTORIZZATA / CURRENT PHASE.** R4 è formalmente chiusa e
+`PLASMA_LOGIN=SUPPORTED_ON_TESTED_BASELINE`. L'Utente ha autorizzato R5 con
+scope ristretto a installazione/rimozione/recovery; la precedente matrice
+obbligatoria di Update Survivability non è più un release gate R5.
 
-**Entry condition:** R4 formalmente chiusa, incluso `PLASMA_LOGIN_FINGERPRINT=PASS`
-e relativo password path sicuro. Finché il login Plasma resta aperto, R5 non
-parte.
+**Decisione Utente (23 settembre 2026):** il target realistico è una release
+installabile da un utente tecnico o assistito da AI, che possiede già il bundle
+dei cinque materiali device-specific. Non si tenta di dimostrare in anticipo
+ogni futura combinazione di aggiornamenti Fedora. Il requisito di sicurezza è
+che il progetto possa essere **rimosso completamente e facilmente** quando crea
+problemi, lasciando nuovamente Fedora corrente responsabile dei propri stack.
 
-Testare una candidate funzionante attraverso aggiornamenti reali della VM.
-
-Matrice minima:
-
-1. baseline candidate installata;
-2. update libfprint;
-3. update fprintd;
-4. update PAM/auth stack;
-5. update sudo/PolicyKit;
-6. update Plasma/KDE;
-7. update systemd;
-8. update kernel;
-9. full dnf upgrade disponibile per la release target.
-
-Dopo ogni step sono obbligatori:
+La distinzione è vincolante:
 
 ~~~text
-PASSWORD_LOGIN=PASS
-DESKTOP=PASS
-SUDO_PASSWORD=PASS
-POLKIT_PASSWORD=PASS
+NORMAL_UNINSTALL
+= percorso prudente da sessione grafica funzionante
+
+EMERGENCY_FORCE_REMOVE
+= pulsante rosso da TTY quando il login grafico non è raggiungibile
 ~~~
 
-È consentito:
+Il percorso TTY non diventa recovery ordinaria:
 
 ~~~text
-FINGERPRINT=FAIL_TEMPORARY
-RECOVERY=REINSTALL_OR_UPDATE_DRIVER
+NORMAL_LIFECYCLE_TTY_REQUIRED=false
+EMERGENCY_TTY_RECOVERY_ALLOWED=true
 ~~~
 
-Se uno step rompe il fingerprint, la prova non termina al semplice fatto che la
-password resti sicura: deve essere dimostrato che il recovery supportato
-(reinstall/update del driver e della propria eventuale integrazione login)
-ripristini il percorso biometrico richiesto senza riparare Fedora.
+### R5-A — Uninstall normale unificato
+
+Creare un comando utente semplice, preferibilmente:
 
 ~~~text
-AFTER_FINGERPRINT_FAILURE:
-PASSWORD_LOGIN=PASS
-DESKTOP=PASS
-REINSTALL_OR_UPDATE_DRIVER=PASS
-PLASMA_LOGIN_FINGERPRINT=PASS
+goodix-uninstall
 ~~~
 
-Se il recovery richiede modifiche manuali a PAM/Fedora o non ripristina il
-fingerprint login richiesto, lo step è **RELEASE_BLOCKER** fino a nuovo update
-del progetto compatibile con la baseline Fedora aggiornata.
+eseguibile da terminale nella normale sessione grafica e capace di chiedere
+autonomamente i privilegi necessari.
 
-È vietato:
+Deve rimuovere l'intero software Goodix installato e i suoi effetti
+project-owned, inclusi almeno:
+
+- integrazione Plasma Login project-owned;
+- runtime/libfprint Goodix project-owned;
+- drop-in/service integration project-owned;
+- eventuali policy/label/support software project-owned che l'installazione ha
+  aggiunto e che devono essere rimossi per tornare allo stack Fedora corrente.
+
+Deve invece preservare per default:
 
 ~~~text
-TTY_RECOVERY_REQUIRED=true
-FEDORA_COMPONENT_REPAIR_REQUIRED=true
-PASSWORD_PATH_BROKEN=true
+/var/lib/goodix-5125-poc/
+fingerprint templates
+factory/device-specific material
 ~~~
 
-Qualunque failure A/B dell'Update Survivability Audit è **RELEASE_BLOCKER**.
+Il normale uninstall può restare fail-closed e verificare receipt/hash/ownership
+**dei file del progetto**, ma non può subordinare la rimozione del progetto alla
+salute, esistenza, posizione, versione o hash di file Fedora.
+
+In particolare, l'attuale precondizione Plasma:
+
+~~~text
+vendor_ready()
+→ richiede /usr/lib/pam.d/plasmalogin
+~~~
+
+deve cessare di essere un requisito per poter rimuovere l'override project-owned.
+Se Fedora ha cambiato o spostato il proprio PAM, questo è un motivo in più per
+uscire di scena, non un motivo per bloccare l'uninstall.
+
+### R5-B — Emergency red button: `goodix-force-remove`
+
+Creare e installare un comando stabile e facile da digitare:
+
+~~~text
+goodix-force-remove
+~~~
+
+disponibile direttamente nel `PATH` dell'utente anche da TTY, senza repository,
+build output, `cd`, pipe, hash, commit o argomenti tecnici. Se eseguito come
+utente normale deve poter richiedere esso stesso la normale autenticazione
+`sudo`; l'utente deve digitare **un solo comando**.
+
+Semantica obbligatoria:
+
+~~~text
+GOODIX_FORCE_REMOVE_GOAL=
+REMOVE_PROJECT_INFLUENCE_FROM_CRITICAL_AUTH_PATH
+RETURN_CONTROL_TO_CURRENT_FEDORA
+~~~
+
+Il force-remove è deliberatamente diverso dal normale uninstall:
+
+- non controlla se il PAM vendor esiste ancora;
+- non controlla versione/hash/layout Fedora;
+- non richiede receipt valida;
+- non richiede repository o candidate;
+- non richiede che l'installazione sia completa;
+- non prova a diagnosticare o riparare Fedora;
+- non ripristina snapshot/copie storiche di file Fedora;
+- non cancella materiali protetti o template biometrici;
+- rimuove soltanto i **path e gli artefatti noti come project-owned**, in ordine
+  fail-safe, privilegiando prima il disinnesco del percorso di autenticazione;
+- tollera artefatti project-owned già assenti e installazioni parziali;
+- rimuove il proprio comando/tool di recovery per ultimo, se tecnicamente
+  sicuro, così che una rimozione completa non lasci software Goodix attivo.
+
+L'obiettivo non è promettere di riparare una Fedora già rotta per cause esterne.
+L'obiettivo è poter affermare, salvo imponderabili failure del sistema:
+
+~~~text
+GOODIX_PROJECT_IN_CRITICAL_AUTH_PATH=false
+FEDORA_CURRENT_STATE_EXPOSED=true
+~~~
+
+Il force-remove non deve fare verifiche incrociate o "ragionare" sulla distro nel
+momento di emergenza. Le verifiche di sicurezza devono essere concentrate nella
+scelta **statica e limitata** dei path project-owned che il comando è autorizzato
+a rimuovere.
+
+### R5-C — Documentazione canonica a prova di emergenza
+
+Il repository pubblico/canonico deve rendere immediatamente trovabili:
+
+- uninstall normale;
+- emergency recovery / force remove;
+- cosa viene rimosso;
+- cosa viene preservato;
+- cosa il force-remove **non** può garantire se Fedora stessa è corrotta.
+
+Il `README.md` principale deve collegare in modo evidente una pagina dedicata,
+preferibilmente:
+
+~~~text
+docs/UNINSTALL.md
+~~~
+
+La sezione emergency deve iniziare con istruzioni non tecniche e brevi, adatte a
+essere lette da smartphone quando il desktop non è accessibile. Target UX:
+
+~~~text
+1. premi Ctrl+Alt+F3
+2. login con username/password
+3. esegui: goodix-force-remove
+4. segui l'unica eventuale istruzione finale mostrata
+~~~
+
+La spiegazione tecnica può seguire, ma non deve precedere la procedura di
+emergenza.
+
+### R5-D — Test offline obbligatori prima della live
+
+Prima del prossimo Human Gate, testare sinteticamente almeno:
+
+~~~text
+NORMAL_UNINSTALL_COMPLETE_INSTALL
+NORMAL_UNINSTALL_VENDOR_PATH_MISSING
+NORMAL_UNINSTALL_PROJECT_DRIFT_FAILS_CLOSED
+
+FORCE_REMOVE_COMPLETE_INSTALL
+FORCE_REMOVE_VENDOR_PATH_MISSING
+FORCE_REMOVE_RECEIPT_MISSING
+FORCE_REMOVE_PARTIAL_RUNTIME
+FORCE_REMOVE_PARTIAL_LOGIN_INTEGRATION
+FORCE_REMOVE_FPRINTD_ACTIVE
+FORCE_REMOVE_FPRINTD_INACTIVE
+FORCE_REMOVE_REPOSITORY_MISSING
+FORCE_REMOVE_BUILD_OUTPUT_MISSING
+FORCE_REMOVE_IDEMPOTENT_REPEAT
+MATERIALS_PRESERVED
+TEMPLATES_PRESERVED
+FEDORA_FILES_NOT_RESTORED_OR_OVERWRITTEN
+~~~
+
+Il force-remove deve essere testato specificamente contro il caso che ha motivato
+questa fase:
+
+~~~text
+/usr/lib/pam.d/plasmalogin = MISSING
+/etc/pam.d/plasmalogin     = PROJECT_OVERRIDE_PRESENT
+
+EXPECTED:
+project override removed
+force-remove continues
+no dependency on vendor_ready()
+~~~
+
+### R5-E — Sequenza live VM dopo Human Gate
+
+Quando il lavoro offline e la documentazione sono pronti, **HUMAN_REQUIRED**.
+La live R5 deve essere preparata ma non eseguita autonomamente dall'AI.
+
+Sequenza concordata:
+
+1. creare snapshot della VM nello stato R4 PASS corrente;
+2. eseguire `goodix-uninstall` dalla sessione grafica;
+3. verificare rimozione software Goodix, preservazione materiali/template e
+   normale accessibilità Fedora;
+4. reinstallare il driver usando **esattamente la procedura destinata
+   all'utente finale**, così da qualificare anche quel percorso;
+5. eseguire solo la verifica funzionale minima necessaria a dimostrare che
+   l'installazione ha ripristinato la candidate qualificata;
+6. entrare in TTY secondo documentazione;
+7. digitare soltanto:
+   ~~~text
+   goodix-force-remove
+   ~~~
+8. verificare che gli artefatti project-owned siano disinnescati/rimossi e che
+   Fedora corrente torni responsabile del login/password.
+
+La live non deve provocare deliberatamente corruzione Fedora o spostamenti reali
+dei file vendor: questi scenari appartengono ai test sintetici.
+
+### Scope escluso da R5
+
+La precedente matrice obbligatoria:
+
+~~~text
+update libfprint
+update fprintd
+update PAM
+update sudo/PolicyKit
+update Plasma/KDE
+update systemd
+update kernel
+full dnf upgrade
+~~~
+
+non è più un release gate R5.
+
+Questi eventi restano sorgenti reali di compatibilità da osservare nell'uso
+quotidiano e nella manutenzione del progetto. Regressioni future vengono
+tracciate tramite issue GitHub, corrette quando riproducibili e possono generare
+nuove release. Non si interpreta questa scelta come garanzia che ogni update
+Fedora futuro sarà compatibile.
+
+**Exit criteria R5:**
+
+~~~text
+GOODIX_NORMAL_UNINSTALL=QUALIFIED
+GOODIX_FORCE_REMOVE=QUALIFIED
+EMERGENCY_TTY_RECOVERY=ONE_COMMAND
+PROJECT_AUTH_INFLUENCE_REMOVABLE_WITHOUT_VENDOR_PRECONDITION=true
+MATERIALS_PRESERVED=true
+TEMPLATES_PRESERVED=true
+END_USER_INSTALL_PATH=QUALIFIED
+FEDORA_SNAPSHOT_RESTORE_USED_BY_UNINSTALL=false
+R5=CLOSED
+~~~
+
+**Orchestration boundary:** durante una sessione autonoma R5, eseguire tutto il
+lavoro offline sicuro possibile e fermarsi obbligatoriamente al successivo
+`HUMAN_REQUIRED` entro R5. **R6 non è autorizzata automaticamente.**
 
 ---
-
 ## R6 — Installer finale semplice e reversibile
+
+**Stato: NOT_AUTHORIZED.** L'ingresso in R6 richiede nuova autorizzazione esplicita
+ dell'Utente dopo la chiusura di R5. Nessuna orchestrazione R5 può anticipare o
+ avviare task R6.
 
 L'installer finale deve possedere soltanto i file del driver/runtime Goodix e,
 se R4 dimostra che è indispensabile, **un solo artefatto di integrazione Plasma
@@ -691,7 +885,9 @@ installazione semplice
 La release deve quindi soddisfare contemporaneamente:
 
 - nessuna necessità ordinaria di TTY, recovery console o procedure manuali di
-  ripristino del sistema;
+  ripristino del sistema; è ammesso un percorso emergency-only documentato,
+  consistente in login TTY + un solo comando `goodix-force-remove`, come ultimo
+  airbag quando il login grafico non è raggiungibile;
 - nessuna modifica privata di componenti critici Fedora/KDE necessaria per
   mantenere accessibili password, desktop, sudo o PolicyKit;
 - comportamento prevedibile anche quando futuri aggiornamenti cambiano
@@ -742,7 +938,9 @@ Prima di assegnare un task deve:
 5. rifiutare scope creep verso KDE/PAM/sudo/PolicyKit/systemd, salvo il boundary
    ristretto e già autorizzato di R4 per l'integrazione fingerprint di Plasma Login;
 6. richiedere HUMAN_REQUIRED se per avanzare sembra necessario violare una
-   invariante di questa roadmap.
+   invariante di questa roadmap;
+7. durante R5 fermarsi al successivo HUMAN_REQUIRED e non aprire R6 senza nuova
+   autorizzazione esplicita dell'Utente.
 
 ## AI Executor
 
