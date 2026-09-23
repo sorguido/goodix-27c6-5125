@@ -55,8 +55,13 @@ Ordinary stock sudo subsequently passed password authentication with reader
 absent and first-contact MATCH without a password, exit 0 and closed/drained
 cleanup: SUPPORTED on the tested baseline. Its known nr_hugepages warning was
 non-fatal during success; no new event metadata was supplied. sudo-i auth is
-configuration-covered; its login shell/session is untested. The current query
-establishes PolicyKit's guest configuration before any new authentication test.
+configuration-covered; its login shell/session is untested. PolicyKit configuration
+has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
+system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
+The current supplemental query supplies missing PKLA inputs, complete rule bodies
+and action-selection annotations. PolicyKit authentication is still untested;
+no effective administrator identity or absence of automatic/cached authorization
+is inferred from wheel membership and the default action alone.
 The user retains the anatomical label mismatch through this R4 phase; present
 the RIGHT index. No template mutation, rebuild/reinstall or repeat CLI biometric test.
 A cold VM snapshot is only an external lab fallback, not a product dependency.
@@ -280,8 +285,13 @@ Ordinary stock sudo subsequently passed password authentication with reader
 absent and first-contact MATCH without a password, exit 0 and closed/drained
 cleanup: SUPPORTED on the tested baseline. Its known nr_hugepages warning was
 non-fatal during success; no new event metadata was supplied. sudo-i auth is
-configuration-covered; its login shell/session is untested. The current query
-establishes PolicyKit's guest configuration before any new authentication test.
+configuration-covered; its login shell/session is untested. PolicyKit configuration
+has passed at `b674dd8842cf336e6d74ec81070498879b856330`: stock PAM through
+system-auth, active KDE agent, stock helper and clean polkit/polkit-kde verification.
+The current supplemental query supplies missing PKLA inputs, complete rule bodies
+and action-selection annotations. PolicyKit authentication is still untested;
+no effective administrator identity or absence of automatic/cached authorization
+is inferred from wheel membership and the default action alone.
 The accepted R3 build/load/material/Claim/enrollment/verify and functional
 KScreenLocker and ordinary sudo gates are not repeated. The review finds
 no increased coupling to critical distro components, no expected update failure

@@ -352,7 +352,9 @@ R4_SUDO_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 R4_SUDO_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
 SUDO_I_AUTH=CONFIGURATION_COVERED_NOT_LIVE_TESTED
 SUDO_I_LOGIN_SHELL_SESSION=UNTESTED
-CURRENT_GATE=HUMAN_REQUIRED_VM_POLKIT_CONFIG_QUERY_SENSOR_ABSENT
+R4_POLKIT_CONFIG_QUERY=PASS_HUMAN_REPORTED_POLICY_CLOSURE_INCOMPLETE
+R4_POLKIT_AUTHENTICATION=NOT_YET_TESTED
+CURRENT_GATE=HUMAN_REQUIRED_VM_POLKIT_POLICY_INPUT_COMPLETION_SENSOR_ABSENT
 NEXT_SENSOR_LIVE_HANDOFF_READY=false
 CURRENT_INSTALLED_RUNTIME=QUALIFIED_R3_BUILD_RETAINED
 ```
@@ -362,15 +364,20 @@ not current failures. The qualified build already exists at
 `/home/guido/goodix-r3-20260922-111144`; do not rerun the synthetic gate or build.
 The [clean replacement procedure](../deployment/minimal-runtime/README.md) and
 native enrollment/verify are completed evidence; do not repeat them. Proceed
-to the R4 PolicyKit configuration query, retaining the qualified runtime, template,
-reconciled receipt and saved inverse. Sudo configuration and native authentication
+to the supplemental R4 PolicyKit policy-input query, retaining the qualified runtime,
+template, reconciled receipt and saved inverse. Sudo configuration and native authentication
 have passed; do not repeat them. The KScreenLocker SELinux review is closed.
 
 Architectural review: no increased distro coupling, no Fedora-owned auth
 component changed, and no new password/desktop dependency. An incompatible
 driver still has the intended class-C failure boundary; R5 must establish
 survivability empirically. This repository preparation changes no installed
-file. The next step is the human-only PolicyKit query, without a sensor or
-PolicyKit authentication. The repeated nr_hugepages read denial was also non-fatal
+file. PolicyKit configuration has passed: stock polkit-1 includes system-auth
+with pam_fprintd sufficient and pam_unix fallback, KDE agent active, stock helper
+and clean polkit/polkit-kde verification. The handoff summarizes the rule bodies;
+PKLA inputs and action-selection annotations remain missing. Wheel membership
+and default exec auth_admin alone do not prove the effective identity or absence
+of automatic/cached authorization. The next step is the human-only policy-input
+query, without a sensor or PolicyKit authentication. The repeated nr_hugepages read denial was also non-fatal
 during the completed sudo query and, as reported, the successful sudo live;
 no policy change is prepared. PolicyKit, login and R5 remain unqualified.

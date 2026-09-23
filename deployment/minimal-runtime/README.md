@@ -30,8 +30,11 @@ the runtime/template and known label mismatch; no rollback or repeated KScreenLo
 The completed sudo live ended with exit 0, no password during MATCH, closed/drained
 cleanup and fprintd inactive/MainPID 0. It is SUPPORTED on the tested baseline;
 do not repeat it. sudo-i auth is configuration-covered, its login shell/session
-untested. The next query establishes PolicyKit's actual guest configuration;
-no PolicyKit authentication test is prepared yet.
+untested. PolicyKit's initial configuration query has since passed: stock PAM
+through system-auth, active KDE agent, stock helper and clean polkit/polkit-kde
+RPM verification. Its final reader-absent fprintd PID 6749 is compatible with
+sudo activation. The current supplemental query closes missing PKLA inputs,
+complete rule bodies and action-selection annotations before any PolicyKit test.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from

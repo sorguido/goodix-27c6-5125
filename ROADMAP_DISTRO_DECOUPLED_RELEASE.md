@@ -348,11 +348,25 @@ raw AVC/timestamp allegato, i metadata precedenti restano riferiti al preflight.
 **Decisione sudo -i:** auth CONFIGURATION_COVERED tramite include sudo osservato
 e PASS ordinario; login shell/session UNTESTED, nessun SUPPORTED esteso a quella
 variante. Non serve una live aggiuntiva per il confine biometrico R4 senza nuova
-evidenza di una differenza pertinente. Prossimo gate:
-`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`, una query nella VM con
-sensore assente, per stabilire PAM reale, agente/helper, identità e policy prima
-di preparare il workflow PolicyKit stock. Nessuna live PolicyKit ancora pronta;
-runtime/template preservati. PolicyKit/login e R5 restano aperti.
+evidenza di una differenza pertinente.
+
+**Preflight PolicyKit configurazione PASS** a
+`b674dd8842cf336e6d74ec81070498879b856330`: polkit-1 stock include system-auth,
+pam_fprintd sufficient e successivo fallback pam_unix, agente KDE attivo,
+authority/helper stock e RPM polkit/polkit-kde exit 0. Nessuna autenticazione
+PolicyKit. Ultimo fprintd active/running/PID 6749 dopo vero prompt sudo senza
+lettore: compatibile con attivazione stock, non failure da ripulire.
+
+**Closure policy incompleta:** il riepilogo non fornisce tutti i corpi delle
+regole; pkla-compat consulta input legacy esclusi dalla query iniziale, che
+possono precedere la scelta wheel o cambiare autorizzazione/retention. Inoltre
+pkexec può selezionare un'altra azione tramite annotazioni del programma.
+Il default exec auth_admin non prova da solo identità o assenza di autorizzazione
+automatica. Prossimo gate: il blocco integrativo nella stessa
+`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`, a sensore assente, legge
+quegli input e le azioni registrate. Nessuna nuova query PAM/agente, patch,
+cache clear o live; `/usr/bin/true` resta candidata da confermare dopo review.
+Runtime/template preservati. PolicyKit/login e R5 restano aperti.
 
 Una volta ottenuti:
 

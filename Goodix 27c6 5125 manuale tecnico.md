@@ -16,12 +16,25 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 sudo SUPPORTED, preflight PolicyKit al gate (23 settembre 2026)
+### Stato corrente — R4 preflight PolicyKit PASS, closure policy al gate (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Ripresa da `f5a4430b50a24dc7247b455701ba35ffc582713c`, `development`
+Ripresa da `b674dd8842cf336e6d74ec81070498879b856330`, `development`
 pulito e allineato a origin, sull'handoff Utente
-`CODEX_HANDOFF_R4_SUDO_PASS.md`. **ACCEPT_AND_CONTINUE sulla live sudo ordinaria;
+`CODEX_HANDOFF_R4_POLKIT_PREFLIGHT_PASS.md`. **ACCEPT_AND_CONTINUE sul preflight
+di configurazione**, eseguito nella VM a quello SHA: polkit-1 include system-auth,
+pam_fprintd sufficient precede pam_unix, agente KDE attivo, authority/helper stock,
+RPM polkit/polkit-kde verificati exit 0. Nessuna autenticazione PolicyKit,
+biometria o modifica runtime/template/configurazione. **La policy effettiva
+della candidata exec resta da chiudere:** il riepilogo non contiene i 18 corpi
+integrali delle regole e la regola pkla-compat consulta configurazioni legacy
+non incluse nella query. Wheel è un fatto osservato, non ancora la prova
+dell'identità amministrativa effettiva; auth_admin è il default dell'azione,
+non la decisione finale per guido. Correttivo locale della stessa guida per
+questi input e per le annotazioni che possono cambiare l'azione scelta da pkexec.
+Nessuna live PolicyKit pronta e nessun problema runtime dimostrato.
+
+**Precedente live sudo ordinaria accettata;
 SUPPORTED sulla baseline provata.** Preparation PASS a sensore assente, password
 reale durante lo stop preparatorio, poi `sudo -k -- /usr/bin/true` exit 0 con
 MATCH al primo contatto dell'indice DESTRO e nessuna password durante B.
@@ -29,7 +42,8 @@ Una VERIFY/epoch, nessun retry/reopen/reset/famiglia persistente rilevato,
 outstanding=0, drained=1, context_closed=1; sensore scollegato e fprintd finale
 inactive/MainPID 0. I contatori release_tail=0/single_terminal=0 sono compatibili
 con il ritorno anticipato PAM dopo MATCH e non invalidano questo cleanup.
-Il checkout guest riportato `f5a4430` risolve localmente allo SHA completo sopra;
+Il checkout guest riportato `f5a4430` risolve localmente a
+`f5a4430b50a24dc7247b455701ba35ffc582713c`;
 non è una stampa guest dello SHA lungo. Versioni attese confermate dall'Utente,
 senza allegato RPM completo; runtime/template dichiarati invariati.
 Il preflight precedente aveva stabilito sudo Fedora → system-auth → pam_fprintd
@@ -81,13 +95,17 @@ Usare l'indice DESTRO anche se il prompt indica sinistro. Non cancellare,
 rinominare, modificare o riacquisire il template; il MATCH riguarda il dito
 realmente acquisito e non qualifica la correttezza anatomica dell'etichetta.
 
-Ultimo stato riportato dopo la live sudo: fprintd **inactive/MainPID 0**,
+Ultimo stato riportato dopo il preflight PolicyKit: fprintd **active/running,
+MainPID 6749**, a fronte dell'iniziale inactive/dead/MainPID 0. Il vero prompt
+sudo per leggere le regole, con lettore assente, è compatibile con attivazione
+stock via pam_fprintd; l'uscita successiva non è stata misurata. Non è una
+closure biometrica fallita e non richiede stop/cleanup retroattivo. Restano
 sensore scollegato dalla VM, runtime e template mantenuti,
-nessun rebuild/reinstall/reenroll/rollback. Lo stato active/running/PID 3802
+nessun rebuild/reinstall/reenroll/rollback. L'inactive/MainPID 0 dopo sudo live
+resta la sua closure storica; lo stato active/running/PID 3802
 resta lo snapshot storico del preflight precedente, compatibile con attivazione
-D-Bus senza lettore e idle timeout stock di 30 secondi; la sua uscita spontanea
-successiva non era stata misurata. La nuova closure è osservata dopo il cleanup
-prescritto, non prova retroattiva dell'idle timeout.
+D-Bus senza lettore e idle timeout stock di 30 secondi. Nessuno di questi
+snapshot misura retroattivamente il tempo di vita del daemon dopo le query.
 Baseline: build `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, install
 `264cd7ff1ba77857e1985502f299e4375f9a0516`, output VM
 `/home/guido/goodix-r3-20260922-111144`, manifest runtime-v1 SHA256
@@ -124,13 +142,14 @@ non ripeterla né ampliare la ricerca. Anche preflight e live sudo sono completa
 **Decisione sudo -i:** auth configurationally covered dall'include sudo osservato
 e dal PASS ordinario; login shell/session non provati, nessun SUPPORTED esteso.
 Non serve una live aggiuntiva per il confine biometrico R4 in assenza di nuova
-evidenza. Prossimo `CURRENT_TASK`: **configurazione PolicyKit nella VM**, in
-`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`. Leggere PAM effettivo,
-profilo authselect, agente KDE/helper, identità amministrative e policy
-dell'azione prima di scegliere il workflow nativo. Non assumere system-auth
-dalla configurazione del fisico o riattivare il bridge storico.
-`HUMAN_REQUIRED` per la query guest con lettore assente e lettura privilegiata
-delle regole (roadmap §4, AGENTS §6.2). Nessuna live PolicyKit ancora pronta.
+evidenza. Prossimo `CURRENT_TASK`: **completare gli input policy PolicyKit nella
+VM**, nella sezione corrente di `deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md`.
+La query iniziale è completata: non ripetere PAM, agente/helper o test già chiusi.
+Servono i corpi delle regole, configurazioni PKLA e annotazioni delle azioni;
+nessuna regola privata o modifica PAM. `HUMAN_REQUIRED` per la lettura guest
+privilegiata, a sensore assente (roadmap §4, AGENTS §6.2 e START_PROMPT §3.3).
+Si ferma la preparazione live dipendente da questi dati, non si presume un
+override né si dichiara già escluso. Nessun accesso VM autonomo dell'AI.
 Runtime, template e inversa salvata mantenuti; rollback solo dopo FAIL reale,
 instabilità/regressione. Le nuove evidenze non colmano retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
@@ -316,8 +335,8 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è la query di configurazione PolicyKit nella VM,
-dopo le closure sudo e KScreenLocker. R3 è chiusa da
+Il `CURRENT_TASK` attuale è completare la review della policy PolicyKit nella VM,
+dopo preflight di configurazione PASS e closure sudo/KScreenLocker. R3 è chiusa da
 enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
 della qualifica.
 
@@ -1111,7 +1130,7 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — KScreenLocker e sudo SUPPORTED; preflight PolicyKit
+### R4 — KScreenLocker e sudo SUPPORTED; preflight PolicyKit PASS, policy aperta
 
 **Review PM del preflight KScreenLocker:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
@@ -1517,8 +1536,8 @@ SUPPORTED dell'intera login shell. Non emerge una differenza di autenticazione
 che giustifichi ora un test aggiuntivo; account/session/ambiente di `sudo -i`
 non vengono dedotti dall'include auth. Riesaminare solo su nuova evidenza.
 
-Il prossimo `CURRENT_TASK` è stock PolicyKit/KDE. La guida
-`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md` consegna una sola query
+La preparazione precedente riguardava stock PolicyKit/KDE. La guida
+`deployment/minimal-runtime/R4_POLKIT_PREFLIGHT_VM.md` consegnava una sola query
 di configurazione guest a lettore assente: versioni/profilo, entrambe le sedi
 PAM, unit agente/helper, metadata dell'azione exec e regole amministrative.
 Le regole sono lette integralmente perché possono agire per gruppo o senza
@@ -1530,10 +1549,10 @@ stabilire. Stato unit e default dell'azione non provano da soli registrazione
 dell'agente o decisione dinamica delle regole. Nessun pkexec/pkcheck autenticante,
 nuova live, patch, installer, kit o riattivazione del bridge storico.
 La baseline R3 e la sua inversa salvata restano disponibili; la query non ha
-modifiche da annullare. Il prossimo gate è **HUMAN_REQUIRED** prima della query
-VM/lettura privilegiata, per roadmap §4 e AGENTS §6.2.
+modifiche da annullare. Quel gate è stato eseguito dall'Utente; segue la review
+che distingue configurazione acquisita e input policy ancora mancanti.
 
-**Verifiche offline del delta corrente:** sintassi del blocco Bash e del comando
+**Verifiche offline della preparazione precedente:** sintassi del blocco Bash e del comando
 Bash annidato, parse dei due heredoc Python, cwd dalla sottodirectory e import
 del modulo deployment; loop regole verificato su directory sintetiche vuota e
 popolata. Link locali aggiunti e diff controllati. Driver/core/tools invariati
@@ -1543,10 +1562,109 @@ successivi alla build restano distinti dal sorgente driver, non sono nuove
 modifiche di questo step. Nessuna esecuzione del blocco operativo, autenticazione,
 servizi, USB, build o test runtime sul fisico; nessuna VM raggiunta dall'AI.
 
+#### Review del preflight PolicyKit e corrective della copertura policy
+
+Handoff `CODEX_HANDOFF_R4_POLKIT_PREFLIGHT_PASS.md`, checkout guest completo
+`b674dd8842cf336e6d74ec81070498879b856330`. **Preflight configurazione PASS**:
+il blocco arriva a POLKIT_RPM_VERIFY_EXIT=0 e QUERY_COMPLETE, senza STOP,
+lettore sempre assente e nessuna autenticazione PolicyKit. Non è un PASS live.
+L'evidenza è il riepilogo dell'Utente con estratti, non una lettura diretta della
+VM né l'output integrale delle regole. Nessuna modifica installata o rollback.
+
+| Confine | Evidenza guest accettata e limite |
+| --- | --- |
+| Ambiente | Fedora 44 KDE Wayland, Enforcing, guido UID 1000, gruppi guido/wheel |
+| Versioni | polkit 127-2.fc44.2, polkit-kde 6.7.5-1.fc44; fprintd/fprintd-pam 1.94.5-5.fc44, PAM 1.7.2-2.fc44, authselect/authselect-libs 1.7.1-1.fc44; tutti x86_64 |
+| Profilo | local with-silent-lastlog with-mdns4 with-fingerprint, Current configuration is valid; nessuna nuova abilitazione |
+| PAM | /usr/lib/pam.d/polkit-1 posseduto da polkit, include system-auth per auth/account/password/session; /etc/authselect/system-auth contiene pam_env e pam_faildelay required, poi pam_fprintd sufficient, pam_unix sufficient nullok e pam_deny required |
+| Agente KDE | plasma-polkit-agent.service loaded/active/running, PID 1629, ExecStart /usr/libexec/kf6/polkit-kde-authentication-agent-1; drop-in standard Fedora service.d/10-timeout-abort.conf, non override Goodix |
+| Authority/helper | polkitd --no-debug --log-level=notice come polkitd; helper stock --socket-activated e /run/polkit/agent-helper.socket; nessun bridge privato emerso |
+| Azione interrogata | org.freedesktop.policykit.exec: any/inactive/active auth_admin; default statici, non decisione finale per guido né prova che pkexec sceglierà proprio questa azione |
+| Regole | Un file /etc, 49-polkit-pkla-compat.rules di polkit-pkla-compat 0.1-32.fc44; 17 file /usr/share package-owned, descritti in sintesi. 50-default.rules propone wheel, ma regole precedenti possono prevalere |
+| Integrità | rpm -V --noscript polkit polkit-kde exit 0; non verifica gli altri owner delle regole né l'assenza di configurazioni PKLA esterne |
+| Servizio | Iniziale inactive/dead/PID 0; finale active/running/PID 6749 dopo vero prompt sudo a lettore assente. Compatibile con attivazione stock; durata successiva non osservata, nessun cleanup biometrico fallito |
+
+**Percorso corretto:** quando la policy richiede autenticazione amministrativa,
+l'agente/helper usa polkit-1 → system-auth → pam_fprintd. Un MATCH sufficient
+può terminare auth prima di pam_unix se non ci sono precedenti required falliti;
+la password segue quando il risultato biometrico non conclude l'autenticazione.
+Non è una catena che esegue sempre entrambi i moduli. With-fingerprint rende
+presente il modulo nel profilo osservato, non forza una richiesta auth per azioni
+autorizzate automaticamente. Stato unit attivo non prova il dialogo funzionante.
+
+**CORRECTIVE locale, senza cambio architetturale:** il preflight originale non
+seguiva gli input di pkla-compat. I manpage vendor installati `polkit(8)`,
+`pkla-admin-identities(8)` e `pkla-check-authorization(8)` stabiliscono:
+
+- addAdminRule viene consultata in ordine fino a una risposta; l'helper PKLA
+  legge `/etc/polkit-1/localauthority.conf.d/*.conf`, che può quindi precedere
+  il fallback wheel di 50-default.rules;
+- l'helper autorizzazioni legge `.pkla` nelle sottodirectory di
+  `/etc/polkit-1/localauthority/` e `/var/lib/polkit-1/localauthority/` e può
+  produrre una decisione diversa dai default, incluso YES o auth con retention;
+- appartenenza al pacchetto della regola di compatibilità non prova il contenuto
+  di questi input. Il riepilogo delle altre regole non sostituisce i loro corpi
+  completi per escludere condizioni generali o per gruppo.
+
+Non si dichiara presente un override: **manca l'evidenza per escluderlo**.
+La review non può confermare ancora che guido sia l'identità amministrativa
+effettiva o che la candidata non sia autorizzata senza una nuova autenticazione.
+Il fisico è solo reference; le sue configurazioni non risolvono lo stato guest.
+
+**Selezione del comando:** `/usr/bin/true` resta la candidata senza effetti sui
+dati applicativi, distinta dai normali log/auth/session. Il sorgente
+[pkexec 127](https://raw.githubusercontent.com/polkit-org/polkit/127/src/programs/pkexec.c),
+`find_action_for_path` e `main`, risolve il path e cerca exec.path/exec.argv1
+fra le azioni registrate prima del fallback exec. Quindi il solo pkaction della
+default non basta. Il futuro comando candidato è
+`pkexec --disable-internal-agent --user root /usr/bin/true`: esecuzione come
+root distinta dall'identità che autentica, prevista guido solo dopo review.
+L'opzione disabilita il fallback all'agente testuale; non forza da sola l'agente
+KDE o un'autenticazione fresca. **Comando non pronto per esecuzione ora.**
+
+Auth_admin senza retention sarebbe adatto a evitare il riuso prodotto dal test,
+ma la scelta del trattamento delle autorizzazioni preesistenti resta subordinata
+alla policy effettiva. Il manpage pkcheck documenta list-temp/revoke-temp per
+l'intera sessione: non vengono eseguiti ora né confusi con sudo -k. Non si promette
+assenza di cache dal solo default statico e non si cancella stato per diagnosi.
+
+**Preparazione della futura live, non consegna eseguibile:** password PolicyKit
+a lettore assente prima della biometria; identità guido e azione confermate;
+una sola prima chiamata PAM, fino a tre contatti indipendenti dell'indice DESTRO,
+stop al primo MATCH. Il default stock fprintd-pam è tre per chiamata, non un
+limite globale dell'agente KDE: il precedente audit della versione Fedora nel
+manuale documenta ricreazione della conversazione dopo failure/cambio identità.
+Nessun cambio identità, submit vuoto o nuova conversazione con USB collegato;
+scollegare prima di eventuale password fallback. Prima di dichiarare READY
+occorrono review definitiva dei limiti del workflow nativo, cache, cleanup e
+telemetria; non si riattiva il vecchio contatore/bridge privato. PASS richiederà
+password e MATCH consumer-side, exit 0 senza password durante biometria, epoch
+drenati/chiusi e stato finale sicuro. Runtime/template restano mantenuti salvo
+reale failure/instabilità; il dato policy mancante non giustifica rollback.
+
+**Prossimo gate concreto:** il blocco integrativo in testa alla stessa
+`R4_POLKIT_PREFLIGHT_VM.md` legge le regole complete, input PKLA e metadata di
+tutte le azioni per non omettere un'annotazione alternativa. Nessuna esecuzione
+pkexec, helper PKLA, autenticazione PolicyKit, cache clear o servizio modificato.
+Un sudo legge i file protetti; lo stato finale fprintd viene riportato senza
+stop/polling. È il minimo completamento dei dati necessario per questa review,
+non una nuova prova del preflight PAM/agente, nuovo Dxxx o kit. Nessuna nuova
+evidenza cambia la classificazione del denial SELinux già chiuso.
+
+**Executable closure offline del corrective:** sintassi Bash esterna/annidata e
+parse dei due heredoc Python PASS; cwd dalla sottodirectory e import deployment
+risolti. Il corpo annidato della lettura, con sole radici riscritte verso dati
+temporanei sintetici e RPM sostituito nel check, distingue directory assenti,
+vuote e popolate, legge rules/conf/pkla e si interrompe su link rotto; marker
+STOP verificato su errore sintetico. Non è una simulazione dell'autorizzazione
+PolicyKit. Diff e riferimenti controllati; sei soli file documentali, driver e
+deployment/governance invariati. Nessuna esecuzione reale della query, sudo,
+helper, servizi, autenticazione, USB, build o test runtime da parte dell'AI.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=SUDO_SUPPORTED_SUDO_I_AUTH_CONFIG_COVERED_POLKIT_CONFIG_QUERY_READY
+ADVANCEMENT=POLKIT_CONFIG_PREFLIGHT_PASS_PKLA_AND_ACTION_SELECTION_GAPS_IDENTIFIED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -1590,22 +1708,31 @@ R4_SUDO_NATIVE_GATE=CLOSED_PASS
 R4_SUDO_LIVE_SELINUX=REPORTED_RECURRENCE_NO_NEW_RAW_EVENT_METADATA
 SUDO_I_AUTH=CONFIGURATION_COVERED_NOT_LIVE_TESTED
 SUDO_I_LOGIN_SHELL_SESSION=UNTESTED
-R4_POLKIT_CONFIG_QUERY=PREPARED_NOT_EXECUTED
+R4_POLKIT_CONFIG_QUERY=PASS_HUMAN_REPORTED_POLICY_CLOSURE_INCOMPLETE
+R4_POLKIT_PREFLIGHT_GUEST_COMMIT=b674dd8842cf336e6d74ec81070498879b856330
+R4_POLKIT_PAM_ROUTE=STOCK_POLKIT_1_SYSTEM_AUTH_FPRINTD_SUFFICIENT_THEN_UNIX_FALLBACK
+R4_POLKIT_KDE_AGENT=ACTIVE_RUNNING_PID1629_HUMAN_REPORTED
+R4_POLKIT_RPM_VERIFY=PASS_POLKIT_AND_POLKIT_KDE_ONLY
+R4_POLKIT_PREFLIGHT_FINAL_SERVICE=ACTIVE_RUNNING_PID6749_SENSOR_ABSENT
+R4_POLKIT_EFFECTIVE_ADMIN_IDENTITY=NOT_YET_ESTABLISHED_PKLA_INPUTS_MISSING
+R4_POLKIT_EXEC_ACTION_SELECTION_AND_NO_AUTO_AUTH=NOT_YET_ESTABLISHED
+R4_POLKIT_POLICY_SUPPLEMENT=PREPARED_NOT_EXECUTED
+R4_POLKIT_AUTHENTICATION=NOT_YET_TESTED
 R4_POLKIT_LIVE_READY=false
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=SUDO_PASS_HUMAN_REPORTED_POLKIT_QUERY_OFFLINE_CHECKS_PASS
-RESIDUAL_BLOCKER_OR_RISK=DOCUMENTED_SELINUX_DENIAL_OTHER_CONSUMERS_R5_R6_R7_OPEN
+EXECUTABLE_CLOSURE=POLKIT_CONFIG_PASS_HUMAN_REPORTED_POLICY_SUPPLEMENT_OFFLINE_CHECKS_PASS
+RESIDUAL_BLOCKER_OR_RISK=POLKIT_POLICY_INPUTS_MISSING_AUTH_LIVE_LOGIN_R5_R6_R7_OPEN
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_f5a4430b50a24dc7247b455701ba35ffc582713c
+REVIEW_SET=GIT_DIFF_FROM_b674dd8842cf336e6d74ec81070498879b856330
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
 ROADMAP_CHANGE=PHASE_STATUS_ONLY
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_POLKIT_CONFIG_QUERY_SENSOR_ABSENT
+NEXT_BOUNDARY=HUMAN_VM_POLKIT_POLICY_INPUT_COMPLETION_SENSOR_ABSENT
 ```
 
 ### Governance corrente

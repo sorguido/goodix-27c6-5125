@@ -1,6 +1,150 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: inspect the VM's stock PolicyKit authentication configuration
 
+**Initial query COMPLETED — configuration PASS, human-reported at
+`b674dd8842cf336e6d74ec81070498879b856330`. PolicyKit authentication is untested.**
+The guest confirms stock polkit-1 → system-auth, pam_fprintd sufficient followed
+by pam_unix; valid authselect with fingerprint enabled, KDE agent active,
+stock authority/helper and polkit/polkit-kde RPM verification exit 0. The final
+fprintd active/running/PID 6749 followed a real reader-absent sudo password prompt;
+it is compatible with stock activation, not a failed biometric cleanup.
+Do not repeat that full query or stop the daemon just to change this snapshot.
+
+**Current HUMAN_REQUIRED — complete the policy evidence, reader detached.**
+The handoff contains a summary, not the complete 18 rule bodies requested by
+the initial query. Package ownership alone does not establish their decisions.
+In particular, `49-polkit-pkla-compat.rules` delegates to PKLA configuration:
+`/etc/polkit-1/localauthority.conf.d/*.conf` may override administrator identities
+before `50-default.rules`, and `.pkla` files under `/etc/polkit-1/localauthority/`
+and `/var/lib/polkit-1/localauthority/` may override authorization, including
+`yes` or retained authentication. These inputs were outside the original query.
+Thus membership in wheel is known, but the effective administrator choice and
+absence of automatic/cached authorization are not established yet.
+
+The proposed harmless program is `/usr/bin/true`, executed as root with the
+stock KDE agent. It changes no application data; authentication/session logs
+are normal side effects. It remains a **candidate, not a live instruction**:
+[pkexec 127](https://raw.githubusercontent.com/polkit-org/polkit/127/src/programs/pkexec.c)
+resolves the program path and consults registered `exec.path`/`exec.argv1`
+annotations before falling back to `org.freedesktop.policykit.exec`. Reading
+only that default action does not prove which action will be selected.
+
+## Current supplemental read-only query
+
+In an ordinary-user Bash terminal in the existing Fedora 44 KDE VM checkout,
+as `guido`, keep the reader detached and all authentication dialogs closed.
+Run only this block, once. It reads policy inputs and registered action metadata;
+it does not invoke pkexec, request a PolicyKit authentication, run PKLA helpers,
+clear authorizations, or change policy/services. One sudo password may be needed
+for the protected configuration. Its normal activation of reader-absent fprintd
+and logs are allowed; the final state is reported without polling or stopping it.
+Runtime build `b8cdd17f57c9453cc1e89ba5c83da9eb2de8d226`, install
+`264cd7ff1ba77857e1985502f299e4375f9a0516` and the RIGHT-index template stored as
+left-index-finger remain retained.
+
+```bash
+(
+  set -euo pipefail
+  trap 'printf "R4_POLKIT_POLICY_STOP line=%s exit=%s\n" "$LINENO" "$?" >&2' ERR
+  export LC_ALL=C
+  cd "$(git rev-parse --show-toplevel)"
+  test "$(git branch --show-current)" = development
+  test -z "$(git status --porcelain)"
+  git pull --ff-only origin development
+  git rev-parse HEAD
+  test "$(id -un)" = guido
+  systemd-detect-virt --vm --quiet
+  test "$(getenforce)" = Enforcing
+  python3 -B - <<'PY_SENSOR'
+import sys
+sys.path.insert(0, 'deployment/minimal-runtime')
+import deploy as d
+d.no_sensor()
+print('R4_POLKIT_POLICY_START SENSOR_CONNECTED=false')
+PY_SENSOR
+  printf '\nCANDIDATE_PROGRAM\n'
+  test -x /usr/bin/true
+  readlink -f /usr/bin/true
+  rpm -qf /usr/bin/true
+  printf '\nREGISTERED_ACTIONS_WITH_ANNOTATIONS\n'
+  pkaction --verbose
+  sudo -N -- /bin/bash -eu -c '
+    export LC_ALL=C
+    shopt -s nullglob
+    rpm -q polkit-pkla-compat
+    for r4_dir in /etc/polkit-1/rules.d /usr/share/polkit-1/rules.d \
+                  /etc/polkit-1/localauthority.conf.d \
+                  /etc/polkit-1/localauthority /var/lib/polkit-1/localauthority; do
+      printf "\nPOLICY_DIRECTORY=%s\n" "$r4_dir"
+      if [[ ! -e "$r4_dir" && ! -L "$r4_dir" ]]; then
+        printf "ABSENT\n"
+        continue
+      fi
+      test -d "$r4_dir"
+      test -r "$r4_dir"
+      test -x "$r4_dir"
+      case "$r4_dir" in
+        */rules.d) r4_files=("$r4_dir"/*.rules) ;;
+        */localauthority.conf.d) r4_files=("$r4_dir"/*.conf) ;;
+        */localauthority)
+          for r4_subdir in "$r4_dir"/*/; do
+            test -r "$r4_subdir"
+            test -x "$r4_subdir"
+          done
+          r4_files=("$r4_dir"/*/*.pkla) ;;
+      esac
+      printf "POLICY_FILES=%s\n" "${#r4_files[@]}"
+      for r4_file in "${r4_files[@]}"; do
+        printf "\nPOLICY_FILE=%s\n" "$r4_file"
+        readlink -f "$r4_file"
+        rpm -qf "$r4_file" || :
+        cat "$r4_file"
+      done
+    done
+    printf "\nPKLA_COMPAT_RPM_VERIFY\n"
+    r4_rpm_rc=0
+    rpm -V --noscript polkit-pkla-compat || r4_rpm_rc=$?
+    printf "PKLA_COMPAT_RPM_VERIFY_EXIT=%s\n" "$r4_rpm_rc"
+  '
+  python3 -B - <<'PY_SENSOR'
+import sys
+sys.path.insert(0, 'deployment/minimal-runtime')
+import deploy as d
+d.no_sensor()
+print(d.run('systemctl', 'show', 'fprintd.service', '--all',
+            '--property=ActiveState', '--property=SubState', '--property=MainPID'))
+print('R4_POLKIT_POLICY_COMPLETE SENSOR_CONNECTED=false')
+PY_SENSOR
+)
+```
+
+Return **complete output**, not just package ownership, rule names or a summary.
+The registered action list is intentionally complete so another action's path
+annotation is not omitted. The rule reread supplies the bodies missing from the
+handoff; this does not repeat the PAM, agent or helper preflight. Empty/absent
+legacy directories and RPM differences are observations, not repair requests.
+No protected fingerprint material, keys or template contents are requested.
+
+**PASS_IF (evidence collection only):** the block completes with the reader absent
+and returns the rule bodies, legacy policy inputs and registered actions for
+review. **STOP_IF:** any prerequisite/read/query error, unexpected password
+identity, sensor connection or PolicyKit dialog. Return the partial output and
+exact error; do not retry, install, change rules or proceed to authentication.
+Confirm runtime/template/PAM/authselect/SELinux remain unchanged, no biometric
+attempt, no PolicyKit authentication and no rollback. Keep Enforcing; the known
+nr_hugepages warning alone needs no additional diagnostics.
+
+After review, the native password/fingerprint procedure must fix the selected
+action and `guido` authentication identity, handle cache explicitly and allow
+only the first PAM series: up to three contacts, stop at MATCH, detach before
+password fallback or any conversation restart/identity change. Those details
+are not yet a runnable live handoff. No private bridge or configuration patch
+is proposed. This query has no installation or changes to roll back; preserve
+the installed saved inverse `/usr/local/lib64/goodix-27c6-5125/uninstall.sh`.
+
+## Completed initial query and original criteria
+
+**Historical human gate — do not execute the block below again.**
 **HUMAN_REQUIRED — one configuration query in the VM, reader detached.**
 Ordinary sudo is SUPPORTED on the tested baseline: password with reader absent,
 then first-contact fingerprint MATCH without a password, exit 0 and closed/drained
