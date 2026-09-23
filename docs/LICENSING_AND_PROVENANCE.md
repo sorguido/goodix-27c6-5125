@@ -103,6 +103,27 @@ it against the canonical Fedora base. No Fedora fprintd/PAM code is changed or c
 GPL-2.0-or-later glue for that VM-only test build. No new third-party source,
 dependency, licensing boundary or public export is introduced.
 
+## R4 explicit-choice Plasma Login candidate (23 September 2026)
+
+`deployment/plasma-login-opt-in/` is independent GPL-2.0-or-later project code:
+one small selector module, PAM composition, VM-only build, temporary synthetic
+tests and an install/inverse pair of actions. It uses public Linux-PAM APIs and
+the Python standard library; no Linux-PAM, fprintd or Plasma implementation is
+copied, patched or redistributed as a private consumer. The compatibility table
+records configuration facts observed in the human's Fedora VM preflight; it is
+not a copied vendor runtime file and does not restrict the password path to a
+vendor hash/version. Existing R3 runtime inputs and their licenses are unchanged.
+
+Behavioral references are the immutable local Plasma Login/fprintd sources and
+Linux-PAM v1.7.2. The exact Fedora PAM source package
+`pam-1.7.2-2.fc44.src.rpm`, SHA256
+`7fc17d339337dda1afa8df8deb9c78fcbf706d4bb8306957f72a610d195e077d`, was inspected
+read-only in memory for packaging/patchset equivalence; it is not a candidate
+payload or runtime pin. The [R4 integration review](R4_PLASMA_LOGIN_INTEGRATION.md)
+links the exact source package and relevant API/dispatch sources.
+No protected material, real token, biometric data or third-party test image
+enters the new tests. No licensing boundary change or public export is made.
+
 ## Historical host-integration provenance
 
 The following integration records preserve original licenses, attribution and

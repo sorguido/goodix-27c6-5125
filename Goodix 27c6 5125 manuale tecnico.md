@@ -16,12 +16,49 @@ MAIN_BRANCH_POLICY=READ_ONLY
 BACKUP_BRANCH_POLICY=READ_ONLY
 ```
 
-### Stato corrente — R4 PolicyKit SUPPORTED, lookup login VM al gate (23 settembre 2026)
+### Stato corrente — R4 Plasma Login opt-in, build/test sintetici VM al gate (23 settembre 2026)
 
 La fonte operativa attiva resta `ROADMAP_DISTRO_DECOUPLED_RELEASE.md`.
-Ripresa da `8ed52181897c4078dfb2be26fe67481e7a7b6961`, `development`
-pulito e allineato a origin, sull'handoff Utente
-`CODEX_HANDOFF_R4_POLKIT_PASS.md`. **ACCEPT_AND_CONTINUE sulla live stock
+L'handoff `CODEX_SUPERSEDING_R4_PLASMA_LOGIN_REPLAN.md` revoca espressamente
+la proposta login stock assente → limitation → closure R4/R5. Recovery da
+`725b3c1f8bf879b9e56632b4f15da494968cead7`, worktree pulito senza lavoro R5
+da cancellare; letti i due commit Utente e fast-forward su `development` a
+`4997fe47825cb1748bf34650b3b2eaaedb9dba49`. Nessuna riscrittura della storia.
+**Fingerprint al login Plasma richiesto; R4 aperta, R5 bloccata.**
+
+Il preflight login riportato dall'Utente è completato, checkout guest
+`725b3c1f8bf879b9e56632b4f15da494968cead7`, sensore assente. Plasma Login
+Fedora stock usa `password-auth` senza pam_fprintd; authselect with-fingerprint
+è già attivo, ma non crea un percorso alternativo del normale login in questa
+baseline. Review della source reference Fedora 6.7.5 e dei patchset: nessun
+selettore nativo di servizio biometrico. Non richiedere una live stock destinata
+a non acquisire. Questa diagnosi resta evidenza, non una limitation accettabile.
+
+**CURRENT_TASK: candidata minima PAM opt-in, verifiche sintetiche nella VM.**
+La decisione UX esplicita successiva accetta Invio a campo vuoto come scelta
+fingerprint: password non vuota inviata subito al vendor senza attesa biometrica;
+campo temporaneamente disabilitato durante la serie scelta e disponibile dopo
+failure. Massimo tre contatti, stop al primo MATCH, nessun retry nascosto.
+Il disegno e le alternative sono in `docs/R4_PLASMA_LOGIN_INTEGRATION.md`;
+codice e consegna in `deployment/plasma-login-opt-in/README.md`.
+Include PAM assoluti delegano al file Fedora **corrente**, senza copiarlo.
+Un piccolo modulo project-owned seleziona soltanto token esplicitamente vuoto
+e auth policy corrente compatibile in plasmalogin/password-auth/postlogin.
+Drift della policy disabilita fingerprint; password, account e session passano
+al vendor. Il reset prima del vendor tratta anche gli errori di modulo durante
+`pam_setcred`; non cancella un rifiuto vendor. Nessun daemon/greeter privato.
+
+**HUMAN_REQUIRED soltanto per build e test PAM sintetici VM, sensore assente,
+senza sudo/installazione/logout/autenticazione reale** (roadmap §4).
+Il gate verifica la candidata con la vera libreria PAM e dati fittizi in directory
+temporanee; non tocca il PAM di sistema. Non è ancora pronta la live login.
+Il modello fingerprint-only è proposto entro il contratto corrente del path
+vendor `/usr/lib/pam.d/plasmalogin`, non una qualifica R5: rimozione/relocation
+incompatibile del vendor può bloccare il login e resta rischio classe A da
+risolvere se introdotto da un update normale, mai outcome accettabile di release.
+Nessun file package-owned, runtime R3, template o policy SELinux modificato.
+
+**Precedente ACCEPT_AND_CONTINUE sulla live stock
 PolicyKit; SUPPORTED_ON_TESTED_BASELINE.** Password reale di guido con lettore
 assente, dialogo KDE dell'azione `org.freedesktop.policykit.exec` per
 `/usr/bin/true` come root ed exit 0. Poi stesso dialogo/identità, MATCH al primo
@@ -44,13 +81,10 @@ Nessun nuovo evento SELinux durante PolicyKit è confermato: il richiamo nel
 prompt è condizionale. Resta la classificazione non fatale dei percorsi già
 osservati; nessuna nuova query, policy o attribuzione di metadata alla live.
 
-**Prossimo CURRENT_TASK: ricostruire il percorso effettivo del login grafico
-nella VM**, consumer R4 ancora aperto. Preparata
-`deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md`: una sola query read-only
-senza sudo, sensore assente e desktop aperto, per sessione/display manager,
-unità/configurazione effettive, pacchetto owner, PAM e authselect. Nessun logout,
-riavvio, autenticazione o modifica. **HUMAN_REQUIRED per l'esecuzione umana
-VM (roadmap §4; START_PROMPT §3.3); login live NOT READY.** Non assumere la
+La query `deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md` è ora
+**COMPLETATA**, da non ripetere. Ha raccolto sessione/display manager,
+unità/configurazione effettive, owner, PAM e authselect, senza logout,
+riavvio, autenticazione o modifica. Non assumere la
 configurazione del Fedora fisico o della vecchia managed candidate. R3,
 KScreenLocker, sudo e PolicyKit restano qualificati nello scope testato;
 nessuna ripetizione, patch consumer, reinstallazione o rollback su questi PASS.
@@ -160,9 +194,9 @@ non ripeterla né ampliare la ricerca. Anche preflight e live sudo sono completa
 e dal PASS ordinario; login shell/session non provati, nessun SUPPORTED esteso.
 Non serve una live aggiuntiva per il confine biometrico R4 in assenza di nuova
 evidenza. Anche la live PolicyKit è completata e accettata. Il successivo
-`CURRENT_TASK` è la sola query login VM indicata sopra: il percorso guest non
-è ricostruibile dai PASS degli altri consumer. La guida mantiene la coppia
-installazione/inversa esistente; nessun kit, bridge o accesso VM autonomo AI.
+`CURRENT_TASK` è la candidata opt-in login sopra, fondata sulla query login
+ora completata. La guida mantiene la coppia installazione/inversa R3 esistente;
+nessun kit o accesso VM autonomo AI.
 Runtime, template e inversa salvata mantenuti; rollback solo dopo FAIL reale,
 instabilità/regressione. Le nuove evidenze non colmano retroattivamente la
 provenance guest mancante del VERIFY R3; anche l'handoff live KScreenLocker
@@ -348,7 +382,7 @@ necessità, ownership, update e rollback è in `docs/MINIMAL_RUNTIME.md`.
 ### R3 — tentativi espliciti stock e regressione sintetica prima della live
 
 Questa sezione conserva la preparazione e la closure sintetica precedenti.
-Il `CURRENT_TASK` attuale è la query del login grafico stock nella VM, dopo
+Il `CURRENT_TASK` attuale è la candidata opt-in del login grafico nella VM, dopo
 le closure PASS PolicyKit, sudo e KScreenLocker. R3 è chiusa da
 enrollment e VERIFY PASS; la closure più avanti conserva evidenze e limiti
 della qualifica.
@@ -1143,7 +1177,7 @@ in prova del checkout/versioni al momento del VERIFY. Evidenza sufficiente
 per la closure operativa riferita a questa baseline di laboratorio, non per
 una release/export pubblico. Nessuna ripetizione di conferma della live.
 
-### R4 — KScreenLocker, sudo e PolicyKit SUPPORTED; lookup login VM al gate
+### R4 — KScreenLocker, sudo e PolicyKit SUPPORTED; Plasma Login opt-in in verifica
 
 **Review PM del preflight KScreenLocker:** ACCEPT_AND_CONTINUE per la query prevista in
 `deployment/minimal-runtime/R4_KSCREENLOCKER_PREFLIGHT_VM.md`, eseguita
@@ -1860,7 +1894,7 @@ qualifica ogni azione PolicyKit, ogni identità/configurazione o futuri update.
 La condizione «se è ricomparso» del paragrafo SELinux non attesta una ricorrenza
 PolicyKit: nessun nuovo AVC, orario o conteggio è acquisito. Non aprire diagnosi.
 
-**Task successivo minimo:** login grafico stock. Il preflight KScreenLocker
+**Preparazione precedente, ora completata:** query login grafico stock. Il preflight KScreenLocker
 aveva letto kde/kde-fingerprint e gli stack authselect, ma non identificato
 unità display-manager, PAM login e autologin effettivi della VM. La reference
 Fedora Plasma Login 6.7.5, previa lettura di PROVENANCE.md, indirizza verso
@@ -1877,9 +1911,9 @@ I precedenti failure VT/TIOCSCTTY del percorso managed sul Fedora fisico sono
 storici; non si inferisce una ricorrenza VM né si ripristinano patch private,
 getty/logind workaround o recovery TTY. La query mantiene il desktop aperto,
 legge soli file/configurazione/sessione, senza fprintd action o autenticazione.
-La mancanza di un percorso fingerprint stock resta da accertare, non giustifica
-un overlay PAM. Login e R5 sono ancora non qualificati. Gate umano richiesto
-da roadmap §4 e START_PROMPT §3.3 per ottenere l'evidenza guest indispensabile.
+La consegna non assumeva ancora l'assenza del percorso fingerprint. L'evidenza
+guest e la nuova decisione Utente sotto superano quel punto aperto. Login e R5
+restano non qualificati; la query è completata, non più il prossimo gate.
 
 La consegna è `deployment/minimal-runtime/R4_LOGIN_PREFLIGHT_VM.md`; nessuna
 nuova patch installativa, perché non cambia il runtime. Coppia installazione /
@@ -1895,10 +1929,105 @@ servizio, USB o dato protetto letto. Telemetria PolicyKit trascritta identica
 all'handoff; riferimenti, diff e confine documentale verificati. Driver,
 installer/inversa e governance invariati. Nessun nuovo harness permanente.
 
+#### Plasma Login — preflight consolidato e replan opt-in (23 settembre 2026)
+
+`CODEX_HANDOFF_R4_LOGIN_PREFLIGHT.md` riporta query completata a
+`725b3c1f8bf879b9e56632b4f15da494968cead7`, sensore assente, senza auth,
+logout o nuova live. Sessione locale guido KDE Wayland attiva, Service
+plasmalogin, seat0/VT2; display manager stock active/running PID 874,
+unità `/usr/lib/systemd/system/plasmalogin.service`, ExecStart
+`/usr/bin/plasmalogin`. Solo drop-in vendor globale 10-timeout-abort.conf;
+EnvironmentFile stock `/etc/sysconfig/plasmalogin` con QML_DISABLE_DISK_CACHE=1.
+Directory di configurazione presenti senza file riportati; file principale
+vendor con default commentati, Autologin User assente/Relogin false.
+Pacchetti riportati: plasma-login-manager/plasma-workspace 6.7.5-1.fc44,
+systemd 259.9-1.fc44, fprintd-pam 1.94.5-5.fc44, pam 1.7.2-2.fc44 e
+authselect 1.7.1-1.fc44. Authselect local valido, with-silent-lastlog,
+with-mdns4 e with-fingerprint. Nessuna nuova misura fprintd o AVC: l'ultimo
+cleanup resta quello PolicyKit, non si attribuisce alla query login.
+
+RPM verify exit 1 riporta soltanto `......G.. /run/plasmalogin` e
+`.M....... /var/lib/plasmalogin`: differenze di gruppo e modo, non digest
+di eseguibile/PAM. Spec Fedora e tmpfiles hanno rispettivamente gruppi
+plasmalogin/root per /run e modi 1770/0750 per /var/lib: risultato coerente
+con questa differenza del pacchetto. Non sono riportati stat effettivi;
+non si dichiara equivalenza esatta dei valori o innocuità universale e non si
+correggono permessi. La sessione attiva non è un nuovo PASS password login.
+
+Nessun `/etc/pam.d/plasmalogin{,-autologin,-greeter}`. Normal auth vendor:
+pam_selinux_permit, substack password-auth, wallet opzionali e include postlogin.
+password-auth contiene env/faildelay/unix/deny senza fprintd; postlogin non ha
+auth. L'auth di fingerprint-auth/system-auth non è raggiunta da questo login.
+L'audit dei sorgenti Fedora versionati (manifest SHA256 PASS) conferma tre
+soli servizi, nessun servizio fingerprint separato né configurazione nativa
+per selezionarlo. Dunque **stock fingerprint absent sulla baseline osservata**;
+non generalizzare a tutte le configurazioni Fedora e non provarlo nuovamente
+con una live che non potrebbe acquisire.
+
+L'Utente revoca esplicitamente la precedente conclusione proposta
+`KNOWN_LIMITATION → R4 close → R5` e aggiorna la roadmap nei commit
+`65aad2e62fed586eb385f99ac5ca3b59f0477923` e
+`4997fe47825cb1748bf34650b3b2eaaedb9dba49`. Il worktree interrotto era pulito,
+senza commit/file R5 da rimuovere; fast-forward senza reset. Fingerprint login
+obbligatorio, R4 aperta/R5 bloccata. Decisione UX successiva: password non vuota
+seleziona immediatamente password; Invio vuoto seleziona fingerprint. Durante
+la serie scelta il campo può restare disabilitato; dopo failure torna disponibile.
+
+**A:** include assoluti Linux-PAM sono supportati e consentono vendor corrente;
+include per nome ricadrebbe sull'override locale. Non basta anteporre pam_fprintd:
+non seleziona in base al token e impone attesa alla password. pam_exec con
+stdin vuoto non prova token esplicitamente vuoto su tutti gli errori di pipe;
+escluso dopo lettura sorgente upstream 1.7.2 e patchset SRPM Fedora esatto.
+Non esiste nella baseline auditata una composizione nativa completa per la UX
+richiesta. **B selezionata per verifica**, non esclusa né qualificata live:
+piccolo modulo indipendente, token vuoto esplicito + authshape conservativa
+dei tre file correnti. Nessun hash/versione Fedora necessario alla password.
+Prefisso SELinux solo su ramo opt-in e solo IGNORE abilita fprintd; altri esiti
+tornano al vendor. Reset prima del vendor protegge anche pam_setcred dagli
+errori del salto su modulo mancante; gli errori vendor restano autorevoli.
+Account/password/session includono sempre il vendor corrente. La libreria
+non autentica da sola, non esporta/logga password e non tocca bus o sensore.
+
+**C/D:** D295/02 prova fattibilità PAM-only e lifecycle reversibile, ma il
+vendor-copy e i vecchi test di drift amministrativo non provano update safety.
+La vecchia attesa password accettata non è più accettabile; l'evidenza separata
+di circa 30 secondi non va attribuita alla run D295/02 senza provenance.
+Nessun nuovo Dxxx per questa integrazione R4; nessuna build privata Plasma,
+patch greeter o workaround VT. B non è esclusa, quindi D non viene intrapresa.
+
+Implementazione, modello di file posseduti, failure/update/uninstall e fonti
+puntuali: `docs/R4_PLASMA_LOGIN_INTEGRATION.md`. Una sola integrazione del
+servizio login, esplicitamente composta dall'entry PAM e piccolo supporto
+project-owned separato dalla baseline R3. Nessun file vendor viene installato,
+copiato per il runtime o ripristinato da backup. Il path vendor assoluto è una
+dipendenza del packaging attuale: una sua rimozione/relocation incompatibile
+con override ancora presente può rompere password (classe A). Non c'è un
+claim universale update-safe; se un normale update introduce questo failure,
+è RELEASE_BLOCKER. R5 non è stata preparata o eseguita.
+
+Il prossimo gate consegna **solo build e test sintetici VM senza installare**:
+unità C del selettore, vera libpam con moduli/dati fittizi e configurazioni in
+directory temporanee, incluso controllo negativo senza reset. Nessun account
+reale, PAM di sistema, root, D-Bus, USB o template. Il risultato C/PAM è ancora
+PENDING_HUMAN_VM; una review sorgente o un test Python non ne è un PASS.
+La coppia futura install/remove viene verificata su filesystem temporanei;
+non autorizza ancora una live login. R3, KScreenLocker, sudo e PolicyKit
+restano PASS nello scope osservato; runtime/template invariati.
+
+**Review PM indipendente: ACCEPT_AND_CONTINUE limitato alla consegna build/test
+VM.** Verifiche locali consentite: 11/11 test lifecycle sintetici PASS (nessun
+comando privilegiato reale), sintassi Bash del launcher e dei blocchi README,
+AST dei tre Python, help reale dell'entrypoint anche da cwd estranea, link e
+diff. Corrective inclusi: metadata USB letti fail-closed nel build, rimozione
+con modulo mancante/cleanup interrotto, FIFO rifiutata senza blocco, controllo
+SELinux con delega vendor anche su SUCCESS. Il gate non ha effettuato alcuna
+build C o esecuzione PAM sul fisico: 33 casi unità C e 16 dispatcher predisposti,
+esito ancora da ottenere nella VM. Nessun nuovo PASS di autenticazione dedotto.
+
 ```text
 OUTCOME=HUMAN_REQUIRED
 ACTIVE_PHASE=R4
-ADVANCEMENT=POLKIT_STOCK_PASS_ACCEPTED_LOGIN_GUEST_QUERY_PREPARED
+ADVANCEMENT=LOGIN_PREFLIGHT_CONSOLIDATED_OPT_IN_PAM_CANDIDATE_IMPLEMENTED
 R3=CLOSED_BIOMETRIC_BOUNDARY
 R4_PREFLIGHT=PASS_QUERY_ONLY_HUMAN_REPORTED
 R4_PREFLIGHT_GUEST_COMMIT=90a3c46beeead6b50e13426870e3d30f496c67f9
@@ -1974,23 +2103,33 @@ R4_POLKIT_HOST_CLEANUP=PASS_DRAINED_CLOSED_INACTIVE_PID0_SENSOR_DETACHED
 R4_POLKIT_CLASSIFICATION=SUPPORTED_ON_TESTED_BASELINE
 R4_POLKIT_NATIVE_GATE=CLOSED_PASS
 R4_POLKIT_LIVE_SELINUX_RECURRENCE=NOT_CONFIRMED_BY_HANDOFF
-R4_LOGIN_GUEST_ROUTE=NOT_YET_ESTABLISHED
-R4_LOGIN_QUERY=PREPARED_NOT_EXECUTED
+R4_LOGIN_GUEST_ROUTE=STOCK_PLASMALOGIN_PASSWORD_AUTH_NO_FPRINTD
+R4_LOGIN_QUERY=PASS_QUERY_ONLY_HUMAN_REPORTED
+R4_LOGIN_QUERY_GUEST_COMMIT=725b3c1f8bf879b9e56632b4f15da494968cead7
+PLASMA_LOGIN_FINGERPRINT_REQUIRED=true
+PLASMA_LOGIN_KNOWN_LIMITATION_ACCEPTABLE=false
+R4_CLOSED=false
+R5_BLOCKED_UNTIL_LOGIN_RESOLVED=true
+R4_LOGIN_UX=NONEMPTY_PASSWORD_OR_EXPLICIT_EMPTY_FINGERPRINT
+R4_LOGIN_CANDIDATE=PROJECT_OWNED_OPT_IN_GATE_AND_CURRENT_VENDOR_INCLUDES
+R4_LOGIN_C_PAM_TESTS=PENDING_HUMAN_VM_SENSOR_FREE
 R4_LOGIN_LIVE=NOT_READY
 ENROLLMENT_STORED_LABEL=left-index-finger
 ENROLLMENT_PHYSICAL_FINGER=right-index-finger
 ENROLLMENT_LABEL_MISMATCH=KNOWN_LAB_STATE_PRESERVED_FOR_R4_BY_USER_DECISION
 RUNTIME_TEMPLATE_RETAINED=true
 ROLLBACK_REQUIRED_ON_THIS_PASS=false
-EXECUTABLE_CLOSURE=LOGIN_QUERY_SYNTAX_IMPORT_AND_SYNTHETIC_FILE_READ_CHECKS_PASS
-RESIDUAL_BLOCKER_OR_RISK=LOGIN_GUEST_ROUTE_UNKNOWN_LOGIN_R5_R6_R7_OPEN
+EXECUTABLE_CLOSURE=OFFLINE_SCOPE_ONLY_C_BUILD_AND_PAM_DISPATCH_PENDING_VM
+OFFLINE_SOURCE_AND_LIFECYCLE_CHECKS=PASS_11_SYNTHETIC_LIFECYCLE_TESTS
+PM_REVIEW=ACCEPT_VM_BUILD_TEST_GATE_ONLY
+RESIDUAL_BLOCKER_OR_RISK=LOGIN_UNQUALIFIED_VENDOR_PATH_CONTRACT_UPDATE_VALIDATION_PENDING
 CANONICAL_DOCUMENTATION=THIS_MANUAL
-REVIEW_SET=GIT_DIFF_FROM_8ed52181897c4078dfb2be26fe67481e7a7b6961
+REVIEW_SET=GIT_DIFF_FROM_4997fe47825cb1748bf34650b3b2eaaedb9dba49
 PRODUCTION_DRIVER_CHANGED=false
 PAM_AUTHSELECT_RUNTIME_DELTA=NONE
-ROADMAP_CHANGE=PHASE_STATUS_ONLY
+ROADMAP_CHANGE=R4_REPLAN_AND_EXPLICIT_USER_UX_RECORDED
 AI_PHYSICAL_RUNTIME_MUTATION=false
-NEXT_BOUNDARY=HUMAN_VM_LOGIN_CONFIG_QUERY_SENSOR_ABSENT_DESKTOP_OPEN
+NEXT_BOUNDARY=HUMAN_VM_LOGIN_GATE_BUILD_SYNTHETIC_PAM_TESTS_NO_INSTALL
 ```
 
 ### Governance corrente

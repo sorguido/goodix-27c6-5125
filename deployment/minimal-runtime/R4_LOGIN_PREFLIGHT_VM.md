@@ -1,13 +1,19 @@
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 # R4: identify the VM's stock graphical login route
 
-**HUMAN_REQUIRED — one reader-absent configuration query in the existing VM.**
+**COMPLETED — configuration query reported PASS at guest checkout
+`725b3c1f8bf879b9e56632b4f15da494968cead7`. Do not repeat this procedure.**
+Stock Plasma Login uses password-auth without fingerprint. R4 remains open:
+the next gate is [the opt-in selector's sensor-free VM build/tests](../plasma-login-opt-in/README.md).
+The original query below is retained as evidence.
+
+**Original HUMAN_REQUIRED — one reader-absent configuration query in the existing VM.**
 Keep the current desktop session open. No logout, reboot, lock, authentication,
 USB attachment or service action is requested. No sudo is needed.
 
 R3 and the R4 KScreenLocker, ordinary sudo and [PolicyKit](R4_POLKIT_VM.md)
-tests are accepted PASS; do not repeat them. The VM's actual display manager,
-login PAM route and autologin configuration have not yet been established.
+tests are accepted PASS; do not repeat them. At preparation time, the VM's actual
+display manager, login PAM route and autologin configuration had not yet been established.
 The physical host's historical Plasma Login results do not identify this guest.
 This query selects the running stock Plasma Login or SDDM service for inspection;
 an unexpected service requires review, not a change of display manager.

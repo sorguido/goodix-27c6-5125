@@ -448,10 +448,30 @@ UNINSTALL_RETURNS_TO_STOCK=true
 TTY_RECOVERY_REQUIRED=false
 ~~~
 
-Il prossimo lavoro è quindi offline/repository: disegno e review della minima
-integrazione compatibile con questi criteri. Qualunque installazione, modifica
-PAM live, logout/reboot o prova login in VM resta **HUMAN_REQUIRED**. R5 resta
-bloccata finché questi exit criteria non sono chiusi.
+**Avanzamento del replan:** composizione supportata Linux-PAM tramite include
+assoluti del vendor corrente, ma nessun selettore stock completo per la UX
+richiesta nella baseline auditata. Preparata B minima in
+`deployment/plasma-login-opt-in/`: un ingresso PAM del servizio login e piccolo
+supporto project-owned esplicitamente inventariato, separato dal runtime R3.
+Nessun file vendor copiato/congelato, daemon o greeter privato.
+La decisione UX Utente accetta Invio vuoto come scelta esplicita fingerprint,
+campo temporaneamente disabilitato durante la serie bounded e fallback al termine;
+una password non vuota va subito al vendor senza attesa fingerprint.
+La candidata disabilita solo l'opzione fingerprint su auth policy incompatibile
+e include sempre il vendor corrente per password/account/session. Il reset del
+prefisso è necessario anche per gli errori di modulo durante pam_setcred.
+
+Dettagli e limiti in `docs/R4_PLASMA_LOGIN_INTEGRATION.md`. Il contratto del path
+vendor corrente è una dipendenza di packaging: rimozione/relocation incompatibile
+può rompere password e sarebbe un blocker classe A, mai una qualifica implicita
+fingerprint-only. Nessuna prova R5 anticipata e nessun PASS login dedotto.
+
+**Prossimo gate:** sola build e test sintetici nella VM secondo
+`deployment/plasma-login-opt-in/README.md`, lettore assente, senza root,
+installazione PAM, logout o autenticazione reale. I test C e con vera libpam
+sono PENDING_HUMAN_VM. Qualunque successiva installazione, modifica PAM live,
+logout/reboot o prova login resta **HUMAN_REQUIRED** dopo review dei risultati.
+R5 resta bloccata finché gli exit criteria R4 non sono chiusi.
 
 Una volta ottenuti:
 

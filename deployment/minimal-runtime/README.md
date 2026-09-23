@@ -23,8 +23,11 @@ at the biometric boundary. R4 KScreenLocker password unlock and first-contact
 fingerprint unlock also passed, with closed/drained host cleanup: SUPPORTED on
 the tested baseline. Ordinary stock sudo also passed password and first-contact
 fingerprint authentication. Stock PolicyKit is now also SUPPORTED after password
-and first-contact fingerprint PASS. Next human gate:
-[Read-only VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md), reader detached and desktop open.**
+and first-contact fingerprint PASS. The [VM login configuration query](R4_LOGIN_PREFLIGHT_VM.md)
+is complete: normal stock Plasma Login uses password-auth without fingerprint.
+Plasma fingerprint login is required; R4 remains open and R5 is blocked.
+Next human gate: [opt-in login selector build and synthetic PAM tests](../plasma-login-opt-in/README.md),
+reader detached, no root, no installation or real authentication.**
 The audit query identified three nr_hugepages read denials, non-fatal for the
 tested KScreenLocker path; its [SELinux review](R4_KSCREENLOCKER_VM.md#completed-selinux-review) is closed. Keep
 the runtime/template and known label mismatch; no rollback or repeated KScreenLocker live.
@@ -40,8 +43,9 @@ or persistent family observed, final fprintd inactive/MainPID 0, reader detached
 This supersedes historical preflight PID 8053. Guide commit `8ed5218` resolves
 locally to `8ed52181897c4078dfb2be26fe67481e7a7b6961`; the handoff does not print
 the guest checkout SHA. No new PolicyKit SELinux recurrence is confirmed.
-No repeat, runtime/PAM/policy change or rollback. The next query identifies the
-actual VM display manager and login PAM route; graphical login live is not ready.
+No repeat or rollback of these PASSes. The separate opt-in candidate preserves
+this R3 runtime and delegates login to current vendor PAM. It has not been
+installed or live-qualified; graphical login live is not ready.
 
 The user reports PM-accepted normal **44/44** and ASan/UBSan **44/44** synthetic
 results, and a clean, reviewed normal runtime build from
